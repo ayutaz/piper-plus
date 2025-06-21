@@ -22,6 +22,8 @@ RUN set -e; \
       apt-get install --yes --no-install-recommends \
         build-essential cmake git pkg-config libicu-dev libespeak-ng-dev make ninja-build python3 ccache \
         libmecab-dev mecab mecab-ipadic-utf8 \
+        autoconf automake libtool \
+        flex bison \
         && break || { echo "apt core install failed ($i)"; sleep 5; }; \
     done; \
     # --- クロスコンパイルツール ----

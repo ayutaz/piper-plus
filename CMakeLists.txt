@@ -158,9 +158,11 @@ if(NOT DEFINED OPENJTALK_DIR)
     openjtalk_external
     PREFIX "${CMAKE_CURRENT_BINARY_DIR}/o"
     GIT_REPOSITORY https://github.com/r9y9/open_jtalk.git
-    GIT_TAG master
+    GIT_TAG 1.11  # stable tag that matches pyopenjtalk fork
     UPDATE_COMMAND ""
-    CMAKE_ARGS -DCMAKE_INSTALL_PREFIX:PATH=${OPENJTALK_DIR} -DBUILD_SHARED_LIBS:BOOL=OFF -DUSE_MECAB=ON
+    CONFIGURE_COMMAND <SOURCE_DIR>/configure --prefix=${OPENJTALK_DIR} --with-charset=utf-8
+    BUILD_COMMAND $(MAKE)
+    INSTALL_COMMAND $(MAKE) install
   )
 
   add_dependencies(piper openjtalk_external)
