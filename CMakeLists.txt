@@ -139,6 +139,70 @@ if(NOT DEFINED PIPER_PHONEMIZE_DIR)
   add_dependencies(test_piper piper_phonemize_external)
 endif()
 
+# ---- openjtalk (Japanese phonemizer) ----
+
+include(ExternalProject)
+
+if(NOT DEFINED OPENJTALK_DIR)
+  set(OPENJTALK_DIR "${CMAKE_CURRENT_BINARY_DIR}/oj")
+  # ---------------------------------------------------------------------------
+  # OpenJTalk は ExternalProject でビルド後に include/lib ディレクトリが生成されるが、
+  # configure 時点では存在しないため CMake 3.29 以降で
+  #   "Imported target openjtalk includes non-existent path" エラーが発生する。
+  # ここで空ディレクトリを先に生成しておくことで、後段の set_target_properties が
+  # 参照してもエラーにならないようにする。
+  # ---------------------------------------------------------------------------
+  file(MAKE_DIRECTORY "${OPENJTALK_DIR}/include")
+  file(MAKE_DIRECTORY "${OPENJTALK_DIR}/lib")
+  ExternalProject_Add(
+    openjtalk_external
+    PREFIX "${CMAKE_CURRENT_BINARY_DIR}/o"
+    GIT_REPOSITORY https://github.com/r9y9/open_jtalk.git
+    GIT_TAG master
+    UPDATE_COMMAND ""
+    CMAKE_ARGS -DCMAKE_INSTALL_PREFIX:PATH=${OPENJTALK_DIR} -DBUILD_SHARED_LIBS:BOOL=OFF -DUSE_MECAB=ON
+  )
+
+  add_dependencies(piper openjtalk_external)
+  add_dependencies(test_piper openjtalk_external)
+
+  # imported static lib
+  add_library(openjtalk STATIC IMPORTED)
+  set_target_properties(openjtalk PROPERTIES
+    IMPORTED_LOCATION ${OPENJTALK_DIR}/lib/libopenjtalk.a
+    INTERFACE_INCLUDE_DIRECTORIES ${OPENJTALK_DIR}/include
+  )
+
+  # HTS-Engine static lib built by OpenJTalk
+  add_library(hts_engine STATIC IMPORTED)
+  set_target_properties(hts_engine PROPERTIES
+    IMPORTED_LOCATION ${OPENJTALK_DIR}/lib/libhts_engine_API${CMAKE_STATIC_LIBRARY_SUFFIX}
+  )
+
+  # MeCab static lib (built as part of OpenJTalk external build)
+  add_library(mecab_static STATIC IMPORTED)
+  set_target_properties(mecab_static PROPERTIES
+    IMPORTED_LOCATION ${OPENJTALK_DIR}/lib/libmecab${CMAKE_STATIC_LIBRARY_SUFFIX}
+  )
+
+  # Ensure piper depends on these
+  add_dependencies(openjtalk_external hts_engine mecab_static)
+
+  # Link interface
+  target_link_libraries(openjtalk INTERFACE hts_engine mecab_static)
+else()
+  message(STATUS "Using prebuilt OpenJTalk at ${OPENJTALK_DIR}")
+  find_library(OPENJTALK_LIB NAMES openjtalk PATHS ${OPENJTALK_DIR}/lib)
+  if(NOT OPENJTALK_LIB)
+    message(FATAL_ERROR "openjtalk library not found in ${OPENJTALK_DIR}")
+  endif()
+  add_library(openjtalk STATIC IMPORTED)
+  set_target_properties(openjtalk PROPERTIES IMPORTED_LOCATION ${OPENJTALK_LIB} INTERFACE_INCLUDE_DIRECTORIES ${OPENJTALK_DIR}/include)
+endif()
+
+target_link_libraries(piper PUBLIC openjtalk)
+target_link_libraries(test_piper PUBLIC openjtalk)
+
 # ---- Declare executable ----
 
 if((NOT MSVC) AND (NOT APPLE))
@@ -299,3 +363,8 @@ if(APPLE)
   set_target_properties(piper PROPERTIES
     INSTALL_RPATH "@loader_path/../lib")
 endif()
+
+install(
+  DIRECTORY ${OPENJTALK_DIR}/share/open_jtalk_dic_utf_8
+  DESTINATION ${CMAKE_INSTALL_PREFIX}/share
+)

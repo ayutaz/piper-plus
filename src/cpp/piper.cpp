@@ -13,6 +13,7 @@
 #include "piper.hpp"
 #include "utf8.h"
 #include "wavfile.hpp"
+#include "openjtalk_phonemize.hpp"
 
 namespace piper {
 
@@ -69,6 +70,8 @@ void parsePhonemizeConfig(json &configRoot, PhonemizeConfig &phonemizeConfig) {
     auto phonemeTypeStr = configRoot["phoneme_type"].get<std::string>();
     if (phonemeTypeStr == "text") {
       phonemizeConfig.phonemeType = TextPhonemes;
+    } else if (phonemeTypeStr == "openjtalk") {
+      phonemizeConfig.phonemeType = OpenJTalkPhonemes;
     }
   }
 
@@ -472,6 +475,9 @@ void textToAudio(PiperConfig &config, Voice &voice, std::string text,
     eSpeakPhonemeConfig eSpeakConfig;
     eSpeakConfig.voice = voice.phonemizeConfig.eSpeak.voice;
     phonemize_eSpeak(text, eSpeakConfig, phonemes);
+  } else if (voice.phonemizeConfig.phonemeType == OpenJTalkPhonemes) {
+    // Japanese OpenJTalk phonemizer
+    phonemize_openjtalk(text, phonemes);
   } else {
     // Use UTF-8 codepoints as "phonemes"
     CodepointsPhonemeConfig codepointsConfig;

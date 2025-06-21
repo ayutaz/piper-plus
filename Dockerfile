@@ -20,7 +20,9 @@ RUN set -e; \
     for i in 1 2 3; do \
       apt-get update && \
       apt-get install --yes --no-install-recommends \
-        build-essential cmake git pkg-config libicu-dev libespeak-ng-dev make ninja-build python3 ccache && break || { echo "apt core install failed ($i)"; sleep 5; }; \
+        build-essential cmake git pkg-config libicu-dev libespeak-ng-dev make ninja-build python3 ccache \
+        libmecab-dev mecab mecab-ipadic-utf8 \
+        && break || { echo "apt core install failed ($i)"; sleep 5; }; \
     done; \
     # --- クロスコンパイルツール ----
     # buildx/QEMU ではビルド用コンテナ自体がターゲットと同じアーキテクチャになる。
