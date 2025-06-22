@@ -943,7 +943,8 @@ jobs:
           pip install numpy onnxruntime tqdm
           pip install -e src/python_run/
           
-      - name: Download test model
+      - name: Download test model (Unix)
+        if: runner.os != 'Windows'
         run: |
           mkdir -p test_models
           # Use the test model from the repository
@@ -957,6 +958,22 @@ jobs:
             cp test/models/ja_JP-test-medium.onnx.json test_models/en_US-test-medium.onnx.json
           fi
           ls -la test_models/
+          
+      - name: Download test model (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          New-Item -ItemType Directory -Force -Path test_models
+          # Use the test model from the repository
+          if (Test-Path "test/models/en_US-test-medium.onnx.json") {
+            Write-Host "Using English test model"
+            Copy-Item -Path "test/models/ja_JP-test-medium.onnx" -Destination "test_models/en_US-test-medium.onnx"
+            Copy-Item -Path "test/models/en_US-test-medium.onnx.json" -Destination "test_models/"
+          } else {
+            Write-Host "Using Japanese test model as fallback"
+            Copy-Item -Path "test/models/ja_JP-test-medium.onnx" -Destination "test_models/en_US-test-medium.onnx"
+            Copy-Item -Path "test/models/ja_JP-test-medium.onnx.json" -Destination "test_models/en_US-test-medium.onnx.json"
+          }
+          Get-ChildItem test_models
           
       - name: Test Python inference
         run: |
