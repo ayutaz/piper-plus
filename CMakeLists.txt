@@ -164,10 +164,9 @@ if(NOT DEFINED PIPER_PHONEMIZE_DIR)
 endif()
 
 # ---- openjtalk (Japanese phonemizer) ----
-# Only build OpenJTalk on Unix platforms (Linux, macOS)
-# Windows doesn't support the autotools build system used by OpenJTalk
+# Build OpenJTalk on all platforms using CMake-compatible fork
 
-if(NOT WIN32 AND NOT MSVC)
+if(TRUE)  # Enable for all platforms including Windows
   include(ExternalProject)
 
   if(NOT DEFINED OPENJTALK_DIR)
@@ -187,81 +186,189 @@ if(NOT WIN32 AND NOT MSVC)
     file(MAKE_DIRECTORY "${HTS_ENGINE_DIR}/lib")
     
     # Build HTS Engine first as a dependency for OpenJTalk
-    ExternalProject_Add(
-      hts_engine_external
-      PREFIX "${CMAKE_CURRENT_BINARY_DIR}/h"
-      GIT_REPOSITORY https://github.com/r9y9/hts_engine_API.git
-      GIT_TAG v1.0.9  # latest available stable version
-      UPDATE_COMMAND ""
-      CONFIGURE_COMMAND 
-        cd <SOURCE_DIR>/src && 
-        touch ChangeLog &&
-        autoreconf -fi &&
-        ./configure --prefix=${HTS_ENGINE_DIR} --enable-static --disable-shared
-      BUILD_COMMAND cd <SOURCE_DIR>/src && make -j${CMAKE_BUILD_PARALLEL_LEVEL}
-      INSTALL_COMMAND cd <SOURCE_DIR>/src && make install
-      BUILD_BYPRODUCTS 
-        ${HTS_ENGINE_DIR}/lib/libHTSEngine.a
-        ${HTS_ENGINE_DIR}/include/HTS_engine.h
-    )
+    if(WIN32)
+      # Use CMake version for Windows
+      ExternalProject_Add(
+        hts_engine_external
+        PREFIX "${CMAKE_CURRENT_BINARY_DIR}/h"
+        GIT_REPOSITORY https://github.com/r9y9/hts_engine_API.git
+        GIT_TAG v1.10  # CMake-compatible version
+        UPDATE_COMMAND ""
+        CMAKE_ARGS 
+          -DCMAKE_INSTALL_PREFIX=${HTS_ENGINE_DIR}
+          -DCMAKE_BUILD_TYPE=Release
+          -DBUILD_SHARED_LIBS=OFF
+        BUILD_BYPRODUCTS 
+          ${HTS_ENGINE_DIR}/lib/HTSEngine.lib
+          ${HTS_ENGINE_DIR}/include/HTS_engine.h
+      )
+    else()
+      # Use autotools for Unix
+      ExternalProject_Add(
+        hts_engine_external
+        PREFIX "${CMAKE_CURRENT_BINARY_DIR}/h"
+        GIT_REPOSITORY https://github.com/r9y9/hts_engine_API.git
+        GIT_TAG v1.10  # latest stable version
+        UPDATE_COMMAND ""
+        CONFIGURE_COMMAND 
+          cd <SOURCE_DIR>/src && 
+          touch ChangeLog &&
+          autoreconf -fi &&
+          ./configure --prefix=${HTS_ENGINE_DIR} --enable-static --disable-shared
+        BUILD_COMMAND cd <SOURCE_DIR>/src && make -j${CMAKE_BUILD_PARALLEL_LEVEL}
+        INSTALL_COMMAND cd <SOURCE_DIR>/src && make install
+        BUILD_BYPRODUCTS 
+          ${HTS_ENGINE_DIR}/lib/libHTSEngine.a
+          ${HTS_ENGINE_DIR}/include/HTS_engine.h
+      )
+    endif()
     
-    ExternalProject_Add(
-      openjtalk_external
-      PREFIX "${CMAKE_CURRENT_BINARY_DIR}/o"
-      GIT_REPOSITORY https://github.com/r9y9/open_jtalk.git
-      GIT_TAG 1.11  # stable tag that matches pyopenjtalk fork
-      UPDATE_COMMAND ""
-      DEPENDS hts_engine_external
-      CONFIGURE_COMMAND 
-        cd <SOURCE_DIR>/src && 
-        touch ChangeLog &&
-        autoreconf -fi &&
-        ./configure --prefix=${OPENJTALK_DIR} --with-charset=utf-8 --enable-static --disable-shared 
-        --with-hts-engine-header-path=${HTS_ENGINE_DIR}/include 
-        --with-hts-engine-library-path=${HTS_ENGINE_DIR}/lib
-      BUILD_COMMAND cd <SOURCE_DIR>/src && make -j${CMAKE_BUILD_PARALLEL_LEVEL}
-      INSTALL_COMMAND 
-        cd <SOURCE_DIR>/src && make install &&
-        mkdir -p ${OPENJTALK_DIR}/include &&
-        cp text2mecab/text2mecab.h ${OPENJTALK_DIR}/include/ &&
-        cp mecab/src/mecab.h ${OPENJTALK_DIR}/include/ &&
-        cp njd/njd.h ${OPENJTALK_DIR}/include/ &&
-        cp jpcommon/jpcommon.h ${OPENJTALK_DIR}/include/ &&
-        cp njd_set_pronunciation/njd_set_pronunciation.h ${OPENJTALK_DIR}/include/ &&
-        cp njd_set_digit/njd_set_digit.h ${OPENJTALK_DIR}/include/ &&
-        cp njd_set_accent_phrase/njd_set_accent_phrase.h ${OPENJTALK_DIR}/include/ &&
-        cp njd_set_accent_type/njd_set_accent_type.h ${OPENJTALK_DIR}/include/ &&
-        cp njd_set_unvoiced_vowel/njd_set_unvoiced_vowel.h ${OPENJTALK_DIR}/include/ &&
-        cp njd_set_long_vowel/njd_set_long_vowel.h ${OPENJTALK_DIR}/include/ &&
-        cp mecab2njd/mecab2njd.h ${OPENJTALK_DIR}/include/ &&
-        cp njd2jpcommon/njd2jpcommon.h ${OPENJTALK_DIR}/include/ &&
-        mkdir -p ${OPENJTALK_DIR}/lib &&
-        cp text2mecab/libtext2mecab.a ${OPENJTALK_DIR}/lib/ &&
-        cp mecab/src/libmecab.a ${OPENJTALK_DIR}/lib/ &&
-        cp njd/libnjd.a ${OPENJTALK_DIR}/lib/ &&
-        cp jpcommon/libjpcommon.a ${OPENJTALK_DIR}/lib/ &&
-        cp njd_set_pronunciation/libnjd_set_pronunciation.a ${OPENJTALK_DIR}/lib/ &&
-        cp njd_set_digit/libnjd_set_digit.a ${OPENJTALK_DIR}/lib/ &&
-        cp njd_set_accent_phrase/libnjd_set_accent_phrase.a ${OPENJTALK_DIR}/lib/ &&
-        cp njd_set_accent_type/libnjd_set_accent_type.a ${OPENJTALK_DIR}/lib/ &&
-        cp njd_set_unvoiced_vowel/libnjd_set_unvoiced_vowel.a ${OPENJTALK_DIR}/lib/ &&
-        cp njd_set_long_vowel/libnjd_set_long_vowel.a ${OPENJTALK_DIR}/lib/ &&
-        cp mecab2njd/libmecab2njd.a ${OPENJTALK_DIR}/lib/ &&
-        cp njd2jpcommon/libnjd2jpcommon.a ${OPENJTALK_DIR}/lib/
-      BUILD_BYPRODUCTS 
-        ${OPENJTALK_DIR}/lib/libtext2mecab.a
-        ${OPENJTALK_DIR}/lib/libmecab.a
-        ${OPENJTALK_DIR}/lib/libnjd.a
-        ${OPENJTALK_DIR}/lib/libjpcommon.a
-        ${OPENJTALK_DIR}/include/text2mecab.h
-        ${OPENJTALK_DIR}/include/mecab.h
-        ${OPENJTALK_DIR}/include/njd.h
-        ${OPENJTALK_DIR}/include/jpcommon.h
-    )
+    if(WIN32)
+      # Use CMake version for Windows
+      ExternalProject_Add(
+        openjtalk_external
+        PREFIX "${CMAKE_CURRENT_BINARY_DIR}/o"
+        GIT_REPOSITORY https://github.com/r9y9/open_jtalk.git
+        GIT_TAG 1.11  # CMake-compatible version
+        UPDATE_COMMAND ""
+        DEPENDS hts_engine_external
+        CMAKE_ARGS
+          -DCMAKE_INSTALL_PREFIX=${OPENJTALK_DIR}
+          -DCMAKE_BUILD_TYPE=Release
+          -DBUILD_SHARED_LIBS=OFF
+          -DHTS_ENGINE_INCLUDE_DIR=${HTS_ENGINE_DIR}/include
+          -DHTS_ENGINE_LIB=${HTS_ENGINE_DIR}/lib/HTSEngine.lib
+        BUILD_BYPRODUCTS 
+          ${OPENJTALK_DIR}/lib/OpenJTalk.lib
+          ${OPENJTALK_DIR}/lib/mecab.lib
+          ${OPENJTALK_DIR}/include/mecab.h
+          ${OPENJTALK_DIR}/include/njd.h
+          ${OPENJTALK_DIR}/include/jpcommon.h
+      )
+    else()
+      # Use autotools for Unix
+      ExternalProject_Add(
+        openjtalk_external
+        PREFIX "${CMAKE_CURRENT_BINARY_DIR}/o"
+        GIT_REPOSITORY https://github.com/r9y9/open_jtalk.git
+        GIT_TAG 1.11  # stable tag
+        UPDATE_COMMAND ""
+        DEPENDS hts_engine_external
+        CONFIGURE_COMMAND 
+          cd <SOURCE_DIR>/src && 
+          touch ChangeLog &&
+          autoreconf -fi &&
+          ./configure --prefix=${OPENJTALK_DIR} --with-charset=utf-8 --enable-static --disable-shared 
+          --with-hts-engine-header-path=${HTS_ENGINE_DIR}/include 
+          --with-hts-engine-library-path=${HTS_ENGINE_DIR}/lib
+        BUILD_COMMAND cd <SOURCE_DIR>/src && make -j${CMAKE_BUILD_PARALLEL_LEVEL}
+        INSTALL_COMMAND 
+          cd <SOURCE_DIR>/src && make install &&
+          mkdir -p ${OPENJTALK_DIR}/include &&
+          cp text2mecab/text2mecab.h ${OPENJTALK_DIR}/include/ &&
+          cp mecab/src/mecab.h ${OPENJTALK_DIR}/include/ &&
+          cp njd/njd.h ${OPENJTALK_DIR}/include/ &&
+          cp jpcommon/jpcommon.h ${OPENJTALK_DIR}/include/ &&
+          cp njd_set_pronunciation/njd_set_pronunciation.h ${OPENJTALK_DIR}/include/ &&
+          cp njd_set_digit/njd_set_digit.h ${OPENJTALK_DIR}/include/ &&
+          cp njd_set_accent_phrase/njd_set_accent_phrase.h ${OPENJTALK_DIR}/include/ &&
+          cp njd_set_accent_type/njd_set_accent_type.h ${OPENJTALK_DIR}/include/ &&
+          cp njd_set_unvoiced_vowel/njd_set_unvoiced_vowel.h ${OPENJTALK_DIR}/include/ &&
+          cp njd_set_long_vowel/njd_set_long_vowel.h ${OPENJTALK_DIR}/include/ &&
+          cp mecab2njd/mecab2njd.h ${OPENJTALK_DIR}/include/ &&
+          cp njd2jpcommon/njd2jpcommon.h ${OPENJTALK_DIR}/include/ &&
+          mkdir -p ${OPENJTALK_DIR}/lib &&
+          cp text2mecab/libtext2mecab.a ${OPENJTALK_DIR}/lib/ &&
+          cp mecab/src/libmecab.a ${OPENJTALK_DIR}/lib/ &&
+          cp njd/libnjd.a ${OPENJTALK_DIR}/lib/ &&
+          cp jpcommon/libjpcommon.a ${OPENJTALK_DIR}/lib/ &&
+          cp njd_set_pronunciation/libnjd_set_pronunciation.a ${OPENJTALK_DIR}/lib/ &&
+          cp njd_set_digit/libnjd_set_digit.a ${OPENJTALK_DIR}/lib/ &&
+          cp njd_set_accent_phrase/libnjd_set_accent_phrase.a ${OPENJTALK_DIR}/lib/ &&
+          cp njd_set_accent_type/libnjd_set_accent_type.a ${OPENJTALK_DIR}/lib/ &&
+          cp njd_set_unvoiced_vowel/libnjd_set_unvoiced_vowel.a ${OPENJTALK_DIR}/lib/ &&
+          cp njd_set_long_vowel/libnjd_set_long_vowel.a ${OPENJTALK_DIR}/lib/ &&
+          cp mecab2njd/libmecab2njd.a ${OPENJTALK_DIR}/lib/ &&
+          cp njd2jpcommon/libnjd2jpcommon.a ${OPENJTALK_DIR}/lib/
+        BUILD_BYPRODUCTS 
+          ${OPENJTALK_DIR}/lib/libtext2mecab.a
+          ${OPENJTALK_DIR}/lib/libmecab.a
+          ${OPENJTALK_DIR}/lib/libnjd.a
+          ${OPENJTALK_DIR}/lib/libjpcommon.a
+          ${OPENJTALK_DIR}/include/text2mecab.h
+          ${OPENJTALK_DIR}/include/mecab.h
+          ${OPENJTALK_DIR}/include/njd.h
+          ${OPENJTALK_DIR}/include/jpcommon.h
+      )
+    endif()
 
-    # For now, just create stub implementation - will implement proper OpenJTalk integration later
-    # This allows the build to succeed while we figure out library structure
-    add_library(openjtalk INTERFACE)
+    # Create imported library for OpenJTalk
+    if(WIN32)
+      # Windows libraries
+      add_library(openjtalk STATIC IMPORTED)
+      set_target_properties(openjtalk PROPERTIES
+        IMPORTED_LOCATION ${OPENJTALK_DIR}/lib/OpenJTalk.lib
+        INTERFACE_INCLUDE_DIRECTORIES "${OPENJTALK_DIR}/include;${HTS_ENGINE_DIR}/include"
+      )
+      
+      add_library(openjtalk_mecab STATIC IMPORTED)
+      set_target_properties(openjtalk_mecab PROPERTIES
+        IMPORTED_LOCATION ${OPENJTALK_DIR}/lib/mecab.lib
+      )
+      
+      add_library(hts_engine STATIC IMPORTED)
+      set_target_properties(hts_engine PROPERTIES
+        IMPORTED_LOCATION ${HTS_ENGINE_DIR}/lib/HTSEngine.lib
+      )
+      
+      target_link_libraries(openjtalk INTERFACE
+        openjtalk_mecab
+        hts_engine
+      )
+    else()
+      # Unix libraries
+      add_library(openjtalk STATIC IMPORTED)
+      set_target_properties(openjtalk PROPERTIES
+        IMPORTED_LOCATION ${OPENJTALK_DIR}/lib/libtext2mecab.a
+        INTERFACE_INCLUDE_DIRECTORIES "${OPENJTALK_DIR}/include;${HTS_ENGINE_DIR}/include"
+      )
+      
+      add_library(openjtalk_mecab STATIC IMPORTED)
+      set_target_properties(openjtalk_mecab PROPERTIES
+        IMPORTED_LOCATION ${OPENJTALK_DIR}/lib/libmecab.a
+      )
+      
+      add_library(openjtalk_njd STATIC IMPORTED)
+      set_target_properties(openjtalk_njd PROPERTIES
+        IMPORTED_LOCATION ${OPENJTALK_DIR}/lib/libnjd.a
+      )
+      
+      add_library(openjtalk_jpcommon STATIC IMPORTED)
+      set_target_properties(openjtalk_jpcommon PROPERTIES
+        IMPORTED_LOCATION ${OPENJTALK_DIR}/lib/libjpcommon.a
+      )
+      
+      add_library(hts_engine STATIC IMPORTED)
+      set_target_properties(hts_engine PROPERTIES
+        IMPORTED_LOCATION ${HTS_ENGINE_DIR}/lib/libHTSEngine.a
+      )
+      
+      # Link all OpenJTalk libraries together
+      target_link_libraries(openjtalk INTERFACE
+        openjtalk_mecab
+        openjtalk_njd
+        openjtalk_jpcommon
+        hts_engine
+        ${OPENJTALK_DIR}/lib/libnjd_set_pronunciation.a
+        ${OPENJTALK_DIR}/lib/libnjd_set_digit.a
+        ${OPENJTALK_DIR}/lib/libnjd_set_accent_phrase.a
+        ${OPENJTALK_DIR}/lib/libnjd_set_accent_type.a
+        ${OPENJTALK_DIR}/lib/libnjd_set_unvoiced_vowel.a
+        ${OPENJTALK_DIR}/lib/libnjd_set_long_vowel.a
+        ${OPENJTALK_DIR}/lib/libmecab2njd.a
+        ${OPENJTALK_DIR}/lib/libnjd2jpcommon.a
+      )
+    endif()
   else()
     message(STATUS "Using prebuilt OpenJTalk at ${OPENJTALK_DIR}")
     add_library(openjtalk INTERFACE)
@@ -269,10 +376,10 @@ if(NOT WIN32 AND NOT MSVC)
 
   target_link_libraries(piper PUBLIC openjtalk)
   target_link_libraries(test_piper PUBLIC openjtalk)
-else()
-  message(STATUS "OpenJTalk is not supported on Windows - skipping Japanese phonemizer")
-  # Create empty target for compatibility
-  add_library(openjtalk INTERFACE)
+  
+  # Add dependencies to ensure OpenJTalk is built first
+  add_dependencies(piper openjtalk_external)
+  add_dependencies(test_piper openjtalk_external)
 endif()
 
 # ---- Declare executable ----
@@ -434,4 +541,43 @@ if(APPLE)
     INSTALL_RPATH "@loader_path/../lib")
 endif()
 
-# OpenJTalk dictionary installation is skipped for stub implementation
+# Download and install OpenJTalk dictionary
+if(TRUE)  # Enable for all platforms
+  set(NAIST_JDIC_VERSION "0.6.3b-20111013")
+  set(NAIST_JDIC_URL "https://sourceforge.net/projects/open-jtalk/files/Dictionary/open_jtalk_dic-1.11/open_jtalk_dic_utf_8-1.11.tar.gz/download")
+  set(NAIST_JDIC_DIR "${CMAKE_CURRENT_BINARY_DIR}/naist-jdic")
+  
+  if(NOT EXISTS "${NAIST_JDIC_DIR}")
+    message(STATUS "Downloading naist-jdic dictionary...")
+    file(DOWNLOAD
+      ${NAIST_JDIC_URL}
+      "${CMAKE_CURRENT_BINARY_DIR}/naist-jdic.tar.gz"
+      SHOW_PROGRESS
+      STATUS DOWNLOAD_STATUS
+    )
+    
+    list(GET DOWNLOAD_STATUS 0 DOWNLOAD_STATUS_CODE)
+    if(DOWNLOAD_STATUS_CODE EQUAL 0)
+      message(STATUS "Extracting naist-jdic dictionary...")
+      execute_process(
+        COMMAND ${CMAKE_COMMAND} -E tar xzf "${CMAKE_CURRENT_BINARY_DIR}/naist-jdic.tar.gz"
+        WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
+      )
+      file(RENAME 
+        "${CMAKE_CURRENT_BINARY_DIR}/open_jtalk_dic_utf_8-1.11"
+        "${NAIST_JDIC_DIR}"
+      )
+    else()
+      message(WARNING "Failed to download naist-jdic dictionary. Japanese phonemization may not work properly.")
+    endif()
+  endif()
+  
+  if(EXISTS "${NAIST_JDIC_DIR}")
+    message(STATUS "Installing naist-jdic dictionary...")
+    install(
+      DIRECTORY ${NAIST_JDIC_DIR}
+      DESTINATION ${CMAKE_INSTALL_PREFIX}/share/openjtalk
+      USE_SOURCE_PERMISSIONS
+    )
+  endif()
+endif()

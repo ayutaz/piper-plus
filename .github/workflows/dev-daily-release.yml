@@ -903,9 +903,91 @@ jobs:
         run: |
           python -m twine upload --non-interactive --skip-existing src/python_run/dist/*
 
+  test_python_inference:
+    name: Test Python Inference
+    needs: [create_dev_release]
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            python-version: '3.10'
+          - os: windows-latest
+            python-version: '3.10'
+          - os: macos-latest
+            python-version: '3.10'
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+          
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install numpy onnxruntime tqdm
+          pip install -e src/python_run/
+          
+      - name: Download test model
+        run: |
+          mkdir -p test_models
+          # Use the test model from the repository
+          cp test/models/ja_JP-test-medium.onnx test_models/
+          cp test/models/ja_JP-test-medium.onnx.json test_models/
+          
+      - name: Test Python inference with Japanese text
+        run: |
+          echo "Testing Python inference..."
+          python -c "
+import sys
+import os
+sys.path.insert(0, 'src/python_run')
+from piper import PiperVoice
+
+# Load model
+model_path = 'test_models/ja_JP-test-medium.onnx'
+voice = PiperVoice.load(model_path)
+
+# Test texts
+test_texts = [
+    'こんにちは、音声合成のテストです。',
+    'Hello, this is a test.',
+    '本日は晴天なり。'
+]
+
+# Generate audio
+for i, text in enumerate(test_texts):
+    print(f'Generating audio for: {text}')
+    audio_bytes = voice.synthesize(text, wav_file=f'output_{i}.wav')
+    
+    # Verify output
+    if os.path.exists(f'output_{i}.wav'):
+        size = os.path.getsize(f'output_{i}.wav')
+        print(f'✓ Generated output_{i}.wav ({size} bytes)')
+        if size < 1000:
+            print(f'⚠ Warning: File size too small')
+            sys.exit(1)
+    else:
+        print(f'✗ Failed to generate output_{i}.wav')
+        sys.exit(1)
+
+print('✅ All tests passed!')
+"
+          
+      - name: Upload test outputs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-test-outputs-${{ matrix.os }}
+          path: output_*.wav
+          retention-days: 7
+
   test_summary:
     name: Build and Test Summary
-    needs: [build_linux, build_windows, build_macos, test_japanese_tts]
+    needs: [build_linux, build_windows, build_macos, test_japanese_tts, test_python_inference]
     runs-on: ubuntu-latest
     if: always()
     steps:
@@ -919,13 +1001,15 @@ jobs:
           echo "- macOS (x64, aarch64): ${{ needs.build_macos.result }}"
           echo ""
           echo "### Japanese TTS Test Results:"
-          echo "- All platforms: ${{ needs.test_japanese_tts.result }}"
+          echo "- Binary tests: ${{ needs.test_japanese_tts.result }}"
+          echo "- Python inference: ${{ needs.test_python_inference.result }}"
           echo ""
           
           if [ "${{ needs.build_linux.result }}" = "success" ] && \
              [ "${{ needs.build_windows.result }}" = "success" ] && \
              [ "${{ needs.build_macos.result }}" = "success" ] && \
-             [ "${{ needs.test_japanese_tts.result }}" = "success" ]; then
+             [ "${{ needs.test_japanese_tts.result }}" = "success" ] && \
+             [ "${{ needs.test_python_inference.result }}" = "success" ]; then
             echo "✅ All builds and tests passed successfully!"
             echo ""
             echo "Successfully built and tested Piper with Japanese support on:"
