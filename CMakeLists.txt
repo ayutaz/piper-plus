@@ -192,7 +192,7 @@ if(TRUE)  # Enable for all platforms including Windows
         hts_engine_external
         PREFIX "${CMAKE_CURRENT_BINARY_DIR}/h"
         GIT_REPOSITORY https://github.com/r9y9/hts_engine_API.git
-        GIT_TAG v1.10  # CMake-compatible version
+        GIT_TAG master  # Use master branch for CMake support
         UPDATE_COMMAND ""
         CMAKE_ARGS 
           -DCMAKE_INSTALL_PREFIX=${HTS_ENGINE_DIR}
@@ -229,7 +229,7 @@ if(TRUE)  # Enable for all platforms including Windows
         openjtalk_external
         PREFIX "${CMAKE_CURRENT_BINARY_DIR}/o"
         GIT_REPOSITORY https://github.com/r9y9/open_jtalk.git
-        GIT_TAG 1.11  # CMake-compatible version
+        GIT_TAG 1.11  # Use 1.11 branch for CMake support
         UPDATE_COMMAND ""
         DEPENDS hts_engine_external
         CMAKE_ARGS
