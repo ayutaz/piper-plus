@@ -7,8 +7,14 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
 
 import numpy as np
 import onnxruntime
-import pyopenjtalk
 from piper_phonemize import phonemize_codepoints, phonemize_espeak, tashkeel_run
+
+# Try to import pyopenjtalk, but make it optional
+try:
+    import pyopenjtalk
+    HAS_PYOPENJTALK = True
+except ImportError:
+    HAS_PYOPENJTALK = False
 
 from .config import PhonemeType, PiperConfig
 from .const import BOS, EOS, PAD
@@ -78,7 +84,11 @@ class PiperVoice:
                 return [tokens]
             except Exception:  # pragma: no cover – フォールバック
                 # 学習環境に piper_train が無い場合の簡易フォールバック
-                phonemes = pyopenjtalk.g2p(text, kana=False).split()
+                if HAS_PYOPENJTALK:
+                    phonemes = pyopenjtalk.g2p(text, kana=False).split()
+                else:
+                    # Fallback to codepoints for Japanese when pyopenjtalk is not available
+                    phonemes = list(text)
 
                 converted = []
                 for ph in phonemes:

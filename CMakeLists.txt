@@ -194,6 +194,7 @@ if(TRUE)  # Enable for all platforms including Windows
         GIT_REPOSITORY https://github.com/r9y9/hts_engine_API.git
         GIT_TAG master  # Use master branch for CMake support
         UPDATE_COMMAND ""
+        SOURCE_SUBDIR src  # CMakeLists.txt is in src directory
         CMAKE_ARGS 
           -DCMAKE_INSTALL_PREFIX=${HTS_ENGINE_DIR}
           -DCMAKE_BUILD_TYPE=Release
@@ -231,6 +232,7 @@ if(TRUE)  # Enable for all platforms including Windows
         GIT_REPOSITORY https://github.com/r9y9/open_jtalk.git
         GIT_TAG 1.11  # Use 1.11 branch for CMake support
         UPDATE_COMMAND ""
+        SOURCE_SUBDIR src  # CMakeLists.txt is in src directory
         DEPENDS hts_engine_external
         CMAKE_ARGS
           -DCMAKE_INSTALL_PREFIX=${OPENJTALK_DIR}
