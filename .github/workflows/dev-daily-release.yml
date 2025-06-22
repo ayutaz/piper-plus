@@ -941,41 +941,42 @@ jobs:
       - name: Test Python inference with Japanese text
         run: |
           echo "Testing Python inference..."
-          python -c "
-import sys
-import os
-sys.path.insert(0, 'src/python_run')
-from piper import PiperVoice
-
-# Load model
-model_path = 'test_models/ja_JP-test-medium.onnx'
-voice = PiperVoice.load(model_path)
-
-# Test texts
-test_texts = [
-    'こんにちは、音声合成のテストです。',
-    'Hello, this is a test.',
-    '本日は晴天なり。'
-]
-
-# Generate audio
-for i, text in enumerate(test_texts):
-    print(f'Generating audio for: {text}')
-    audio_bytes = voice.synthesize(text, wav_file=f'output_{i}.wav')
-    
-    # Verify output
-    if os.path.exists(f'output_{i}.wav'):
-        size = os.path.getsize(f'output_{i}.wav')
-        print(f'✓ Generated output_{i}.wav ({size} bytes)')
-        if size < 1000:
-            print(f'⚠ Warning: File size too small')
-            sys.exit(1)
-    else:
-        print(f'✗ Failed to generate output_{i}.wav')
-        sys.exit(1)
-
-print('✅ All tests passed!')
-"
+          cat > test_inference.py << 'EOF'
+          import sys
+          import os
+          sys.path.insert(0, 'src/python_run')
+          from piper import PiperVoice
+          
+          # Load model
+          model_path = 'test_models/ja_JP-test-medium.onnx'
+          voice = PiperVoice.load(model_path)
+          
+          # Test texts
+          test_texts = [
+              'こんにちは、音声合成のテストです。',
+              'Hello, this is a test.',
+              '本日は晴天なり。'
+          ]
+          
+          # Generate audio
+          for i, text in enumerate(test_texts):
+              print(f'Generating audio for: {text}')
+              audio_bytes = voice.synthesize(text, wav_file=f'output_{i}.wav')
+              
+              # Verify output
+              if os.path.exists(f'output_{i}.wav'):
+                  size = os.path.getsize(f'output_{i}.wav')
+                  print(f'✓ Generated output_{i}.wav ({size} bytes)')
+                  if size < 1000:
+                      print(f'⚠ Warning: File size too small')
+                      sys.exit(1)
+              else:
+                  print(f'✗ Failed to generate output_{i}.wav')
+                  sys.exit(1)
+          
+          print('✅ All tests passed!')
+          EOF
+          python test_inference.py
           
       - name: Upload test outputs
         if: always()
