@@ -925,7 +925,8 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           
-      - name: Install Python dependencies
+      - name: Install Python dependencies (Unix)
+        if: runner.os != 'Windows'
         run: |
           python -m pip install --upgrade pip
           pip install numpy onnxruntime tqdm
@@ -935,18 +936,27 @@ jobs:
           fi
           pip install -e src/python_run/
           
+      - name: Install Python dependencies (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          python -m pip install --upgrade pip
+          pip install numpy onnxruntime tqdm
+          pip install -e src/python_run/
+          
       - name: Download test model
         run: |
           mkdir -p test_models
           # Use the test model from the repository
-          if [ -f "test/models/en_US-test-medium.onnx" ]; then
-            cp test/models/en_US-test-medium.onnx test_models/
-            cp test/models/en_US-test-medium.onnx.json test_models/
-          else
-            # Fallback: use existing Japanese model
+          if [ -f "test/models/en_US-test-medium.onnx.json" ]; then
+            echo "Using English test model"
             cp test/models/ja_JP-test-medium.onnx test_models/en_US-test-medium.onnx
             cp test/models/en_US-test-medium.onnx.json test_models/
+          else
+            echo "Using Japanese test model as fallback"
+            cp test/models/ja_JP-test-medium.onnx test_models/en_US-test-medium.onnx
+            cp test/models/ja_JP-test-medium.onnx.json test_models/en_US-test-medium.onnx.json
           fi
+          ls -la test_models/
           
       - name: Test Python inference
         run: |
