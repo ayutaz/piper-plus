@@ -166,7 +166,7 @@ endif()
 # ---- openjtalk (Japanese phonemizer) ----
 # Build OpenJTalk on all platforms using CMake-compatible fork
 
-if(TRUE)  # Enable for all platforms including Windows
+if(FALSE)  # Temporarily disable OpenJTalk to fix basic builds
   include(ExternalProject)
 
   if(NOT DEFINED OPENJTALK_DIR)
@@ -544,7 +544,7 @@ if(APPLE)
 endif()
 
 # Download and install OpenJTalk dictionary
-if(TRUE)  # Enable for all platforms
+if(FALSE)  # Temporarily disable dictionary download
   set(NAIST_JDIC_VERSION "0.6.3b-20111013")
   set(NAIST_JDIC_URL "https://sourceforge.net/projects/open-jtalk/files/Dictionary/open_jtalk_dic-1.11/open_jtalk_dic_utf_8-1.11.tar.gz/download")
   set(NAIST_JDIC_DIR "${CMAKE_CURRENT_BINARY_DIR}/naist-jdic")

@@ -970,9 +970,13 @@ jobs:
           ]
           
           # Generate audio
+          import wave
+          
           for i, text in enumerate(test_texts):
               print(f'Generating audio for: {text}')
-              audio_bytes = voice.synthesize(text, wav_file=f'output_{i}.wav')
+              
+              with wave.open(f'output_{i}.wav', 'wb') as wav_file:
+                  voice.synthesize(text, wav_file)
               
               # Verify output
               if os.path.exists(f'output_{i}.wav'):
