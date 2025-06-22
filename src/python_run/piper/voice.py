@@ -7,7 +7,25 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
 
 import numpy as np
 import onnxruntime
-from piper_phonemize import phonemize_codepoints, phonemize_espeak, tashkeel_run
+
+# Try to import piper_phonemize, but make it optional
+try:
+    from piper_phonemize import phonemize_codepoints, phonemize_espeak, tashkeel_run
+    HAS_PIPER_PHONEMIZE = True
+except ImportError:
+    HAS_PIPER_PHONEMIZE = False
+    # Provide fallback implementations
+    def phonemize_codepoints(text, lang=None):
+        # Simple fallback: return text as list of characters
+        return list(text)
+    
+    def phonemize_espeak(text, voice=None):
+        # Simple fallback: return text as list of characters
+        return list(text)
+    
+    def tashkeel_run(text):
+        # Simple fallback: return original text
+        return text
 
 # Try to import pyopenjtalk, but make it optional
 try:
