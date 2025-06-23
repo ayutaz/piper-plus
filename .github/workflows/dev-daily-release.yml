@@ -176,24 +176,42 @@ jobs:
           if ($vs) {
             [Environment]::SetEnvironmentVariable('VSINSTALLDIR', $vs, 'Process')
           }
-          # espeak-ng を Chocolatey でインストール （1.52.0 は 64bit DLL/Binary を含む）
-          choco install -y espeak-ng
+          # Download pre-built espeak-ng for Windows with development files
+          $ESPEAK_VERSION = "1.51"
+          $ESPEAK_ZIP = "espeak-ng-w64-$ESPEAK_VERSION.zip"
+          $ESPEAK_URL = "https://github.com/espeak-ng/espeak-ng/releases/download/$ESPEAK_VERSION/$ESPEAK_ZIP"
+          $ESPEAK_DIR = "C:\espeak-ng"
+          
+          Write-Host "Downloading espeak-ng development files..."
+          Invoke-WebRequest -Uri $ESPEAK_URL -OutFile "$env:TEMP\$ESPEAK_ZIP" -ErrorAction Stop
+          
+          Write-Host "Extracting espeak-ng..."
+          Expand-Archive -Path "$env:TEMP\$ESPEAK_ZIP" -DestinationPath $ESPEAK_DIR -Force
+          
+          # The ZIP contains espeak-ng-w64 folder
+          if (Test-Path "$ESPEAK_DIR\espeak-ng-w64") {
+            $env:ESPEAK_NG_ROOT = "$ESPEAK_DIR\espeak-ng-w64"
+          } else {
+            $env:ESPEAK_NG_ROOT = $ESPEAK_DIR
+          }
+          [Environment]::SetEnvironmentVariable("ESPEAK_NG_ROOT", $env:ESPEAK_NG_ROOT, "Process")
       - name: Configure build
         run: |
-          # espeak-ng ルート
-          $ESPEAK_ROOT = "C:/ProgramData/chocolatey/lib/espeak-ng/tools"
-          if (Test-Path "$ESPEAK_ROOT\bin") {
-            $env:PATH = "$ESPEAK_ROOT\bin;$env:PATH"
-            $env:ESPEAK_DATA_PATH = "$ESPEAK_ROOT\share\espeak-ng-data"
+          # Use the espeak-ng we downloaded
+          Write-Host "Using ESPEAK_NG_ROOT: $env:ESPEAK_NG_ROOT"
+          
+          # Add espeak-ng to PATH if it exists
+          if (Test-Path "$env:ESPEAK_NG_ROOT\bin") {
+            $env:PATH = "$env:ESPEAK_NG_ROOT\bin;$env:PATH"
             [Environment]::SetEnvironmentVariable("PATH", $env:PATH, "Process")
-            [Environment]::SetEnvironmentVariable("ESPEAK_DATA_PATH", $env:ESPEAK_DATA_PATH, "Process")
           }
+          
           # CMake設定
           cmake -Bbuild `
             -G "Ninja" `
             -DCMAKE_INSTALL_PREFIX=_install/piper `
             -DCMAKE_BUILD_TYPE=${{ env.CMAKE_BUILD_TYPE }} `
-            -DESPEAK_NG_ROOT=$ESPEAK_ROOT
+            -DESPEAK_NG_ROOT="$env:ESPEAK_NG_ROOT"
           if ($LASTEXITCODE -ne 0) {
             Write-Error "CMake configuration failed"
             exit 1

@@ -393,21 +393,54 @@ endif()
 
 if(MSVC)
   # On Windows, espeak-ng might be installed via Chocolatey or provided via ESPEAK_NG_ROOT
+  message(STATUS "Windows build: Looking for espeak-ng")
   if(DEFINED ESPEAK_NG_ROOT)
+    message(STATUS "ESPEAK_NG_ROOT is set to: ${ESPEAK_NG_ROOT}")
     set(ESPEAK_NG_INCLUDE_DIR "${ESPEAK_NG_ROOT}/include")
     set(ESPEAK_NG_LIB_DIR "${ESPEAK_NG_ROOT}/lib")
-    find_library(ESPEAK_NG_LIB NAMES espeak-ng PATHS ${ESPEAK_NG_LIB_DIR} NO_DEFAULT_PATH)
+    find_library(ESPEAK_NG_LIB 
+      NAMES espeak-ng.lib libespeak-ng.lib espeak-ng libespeak-ng
+      PATHS 
+        ${ESPEAK_NG_LIB_DIR}
+        ${ESPEAK_NG_ROOT}
+        "${ESPEAK_NG_ROOT}/bin"
+      NO_DEFAULT_PATH)
   elseif(EXISTS "C:/ProgramData/chocolatey/lib/espeak-ng/tools")
     set(ESPEAK_NG_ROOT "C:/ProgramData/chocolatey/lib/espeak-ng/tools")
     set(ESPEAK_NG_INCLUDE_DIR "${ESPEAK_NG_ROOT}/include")
     set(ESPEAK_NG_LIB_DIR "${ESPEAK_NG_ROOT}/lib")
-    find_library(ESPEAK_NG_LIB NAMES espeak-ng PATHS ${ESPEAK_NG_LIB_DIR} NO_DEFAULT_PATH)
+    find_library(ESPEAK_NG_LIB 
+      NAMES espeak-ng.lib libespeak-ng.lib espeak-ng libespeak-ng
+      PATHS 
+        ${ESPEAK_NG_LIB_DIR}
+        ${ESPEAK_NG_ROOT}
+        "${ESPEAK_NG_ROOT}/bin"
+      NO_DEFAULT_PATH)
   else()
-    find_library(ESPEAK_NG_LIB NAMES espeak-ng)
+    find_library(ESPEAK_NG_LIB NAMES espeak-ng.lib libespeak-ng.lib espeak-ng libespeak-ng)
   endif()
   
   if(NOT ESPEAK_NG_LIB)
-    message(FATAL_ERROR "espeak-ng library not found. Please install it via 'choco install espeak-ng' or set ESPEAK_NG_ROOT")
+    # Try to find the library file directly
+    message(STATUS "Library not found via find_library, searching manually...")
+    if(DEFINED ESPEAK_NG_ROOT)
+      file(GLOB_RECURSE ESPEAK_NG_SEARCH 
+        "${ESPEAK_NG_ROOT}/*espeak*.lib"
+        "${ESPEAK_NG_ROOT}/*espeak*.a"
+      )
+      if(ESPEAK_NG_SEARCH)
+        list(GET ESPEAK_NG_SEARCH 0 ESPEAK_NG_LIB)
+        message(STATUS "Found library manually: ${ESPEAK_NG_LIB}")
+      else()
+        message(STATUS "No library files found in ${ESPEAK_NG_ROOT}")
+        file(GLOB_RECURSE ALL_FILES "${ESPEAK_NG_ROOT}/*")
+        message(STATUS "All files found: ${ALL_FILES}")
+      endif()
+    endif()
+    
+    if(NOT ESPEAK_NG_LIB)
+      message(FATAL_ERROR "espeak-ng library not found. Please ensure ESPEAK_NG_ROOT contains the library files.")
+    endif()
   endif()
   
   message(STATUS "Found espeak-ng: ${ESPEAK_NG_LIB}")
@@ -427,9 +460,15 @@ elseif(APPLE)
   if(DEFINED ESPEAK_NG_ROOT)
     set(ESPEAK_NG_INCLUDE_DIR "${ESPEAK_NG_ROOT}/include")
     set(ESPEAK_NG_LIB_DIR "${ESPEAK_NG_ROOT}/lib")
-    find_library(ESPEAK_NG_LIB NAMES espeak-ng PATHS ${ESPEAK_NG_LIB_DIR} NO_DEFAULT_PATH)
+    find_library(ESPEAK_NG_LIB 
+      NAMES espeak-ng.lib libespeak-ng.lib espeak-ng libespeak-ng
+      PATHS 
+        ${ESPEAK_NG_LIB_DIR}
+        ${ESPEAK_NG_ROOT}
+        "${ESPEAK_NG_ROOT}/bin"
+      NO_DEFAULT_PATH)
   else()
-    find_library(ESPEAK_NG_LIB NAMES espeak-ng)
+    find_library(ESPEAK_NG_LIB NAMES espeak-ng.lib libespeak-ng.lib espeak-ng libespeak-ng)
   endif()
   
   if(NOT ESPEAK_NG_LIB)
