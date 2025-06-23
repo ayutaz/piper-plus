@@ -2,8 +2,17 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 #include <limits.h>
+
+#ifdef _WIN32
+#include <windows.h>
+#include <io.h>
+#define access _access
+#define F_OK 0
+#else
+#include <unistd.h>
+#endif
+
 #ifdef __APPLE__
 #include <mach-o/dyld.h>
 #endif
@@ -92,7 +101,12 @@ OpenJTalk* openjtalk_initialize() {
         char exe_path[PATH_MAX];
         exe_path[0] = '\0';
         
-#ifdef __APPLE__
+#ifdef _WIN32
+        DWORD size = GetModuleFileNameA(NULL, exe_path, sizeof(exe_path));
+        if (size > 0 && size < sizeof(exe_path)) {
+            // Success
+        }
+#elif defined(__APPLE__)
         uint32_t size = sizeof(exe_path);
         if (_NSGetExecutablePath(exe_path, &size) == 0) {
             // Success
@@ -106,16 +120,29 @@ OpenJTalk* openjtalk_initialize() {
         
         if (exe_path[0] != '\0') {
             // Remove executable name to get directory
+#ifdef _WIN32
+            char* last_slash = strrchr(exe_path, '\\');
+            if (!last_slash) last_slash = strrchr(exe_path, '/');
+#else
             char* last_slash = strrchr(exe_path, '/');
+#endif
             if (last_slash) {
                 *last_slash = '\0';
                 // Try ../share/piper/openjtalk-dict (installed location)
+#ifdef _WIN32
+                snprintf(dict_path, sizeof(dict_path), "%s\\..\\share\\piper\\openjtalk-dict", exe_path);
+#else
                 snprintf(dict_path, sizeof(dict_path), "%s/../share/piper/openjtalk-dict", exe_path);
+#endif
                 if (access(dict_path, F_OK) == 0) {
                     dic_dir = dict_path;
                 } else {
                     // Try build/naist-jdic (build directory)
+#ifdef _WIN32
+                    snprintf(dict_path, sizeof(dict_path), "%s\\..\\build\\naist-jdic", exe_path);
+#else
                     snprintf(dict_path, sizeof(dict_path), "%s/../build/naist-jdic", exe_path);
+#endif
                     if (access(dict_path, F_OK) == 0) {
                         dic_dir = dict_path;
                     } else {
