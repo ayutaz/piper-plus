@@ -192,7 +192,8 @@ jobs:
           msiexec /a $MSI_PATH /qn TARGETDIR=$ESPEAK_DIR
           
           # Find the actual installation directory (MSI creates subdirectories)
-          $ESPEAK_NG_ROOT = Get-ChildItem -Path $ESPEAK_DIR -Directory -Recurse | Where-Object { Test-Path "$_\espeak-ng.exe" } | Select-Object -First 1
+          # Limit search depth to avoid permission errors
+          $ESPEAK_NG_ROOT = Get-ChildItem -Path $ESPEAK_DIR -Directory -Recurse -Depth 3 -ErrorAction SilentlyContinue | Where-Object { Test-Path "$_\espeak-ng.exe" } | Select-Object -First 1
           
           if ($ESPEAK_NG_ROOT) {
             $env:ESPEAK_NG_ROOT = $ESPEAK_NG_ROOT.FullName
@@ -205,7 +206,7 @@ jobs:
             }
             
             # Look for the DLL and create an import library
-            $dllPath = Get-ChildItem -Path $env:ESPEAK_NG_ROOT -Filter "espeak-ng.dll" -Recurse | Select-Object -First 1
+            $dllPath = Get-ChildItem -Path $env:ESPEAK_NG_ROOT -Filter "espeak-ng.dll" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
             if ($dllPath) {
               Write-Host "Found DLL at: $($dllPath.FullName)"
               # Copy DLL to lib directory for easier linking
