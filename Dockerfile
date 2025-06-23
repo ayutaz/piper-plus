@@ -72,6 +72,9 @@ RUN if [ "$TARGETARCH" = "arm64" ]; then \
         echo 'set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE ONLY)' >> cmake/linux-aarch64.cmake; \
     fi
 
+# 残りのソースファイルをコピー
+COPY . .
+
 # Configure step (deps resolution)
 RUN if [ "$TARGETARCH" = "amd64" ]; then \
         cmake -Bbuild -DCMAKE_INSTALL_PREFIX=install \
@@ -91,9 +94,6 @@ RUN if [ "$TARGETARCH" = "amd64" ]; then \
     else \
         echo "Unsupported architecture: $TARGETARCH" && exit 1; \
     fi
-
-# 残りのソースファイルをコピー
-COPY . .
 
 # Pre-download OpenJTalk dictionary to avoid download during build
 # Temporarily disabled while OpenJTalk is disabled
