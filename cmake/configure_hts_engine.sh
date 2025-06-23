@@ -9,4 +9,13 @@ if [ ! -f configure ]; then
     autoreconf -fiv || (aclocal && automake --add-missing && autoconf)
 fi
 
+# Platform-specific configuration
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    # Ensure we're building for the correct architecture on macOS
+    if [[ $(uname -m) == "arm64" ]]; then
+        export CFLAGS="-arch arm64"
+        export CXXFLAGS="-arch arm64"
+    fi
+fi
+
 ./configure --prefix="$2" --enable-static --disable-shared

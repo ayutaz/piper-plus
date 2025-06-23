@@ -9,9 +9,20 @@ if [ ! -f configure ]; then
     autoreconf -fiv || (aclocal && automake --add-missing && autoconf)
 fi
 
-# On Linux, iconv is part of glibc, so we don't need -liconv
-# Set LDFLAGS to help the build system understand this
-export LDFLAGS="-Wl,--as-needed"
-export LIBS=""
+# Platform-specific configuration
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    # macOS: iconv is part of the system
+    export LDFLAGS=""
+    export LIBS=""
+    # Ensure we're building for the correct architecture
+    if [[ $(uname -m) == "arm64" ]]; then
+        export CFLAGS="-arch arm64"
+        export CXXFLAGS="-arch arm64"
+    fi
+else
+    # Linux: iconv is part of glibc, so we don't need -liconv
+    export LDFLAGS="-Wl,--as-needed"
+    export LIBS=""
+fi
 
 ./configure --prefix="$2" --with-hts-engine-header-path="$3/include" --with-hts-engine-library-path="$3/lib" --with-charset=UTF-8 --without-libiconv-prefix
