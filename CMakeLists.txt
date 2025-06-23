@@ -375,8 +375,15 @@ if(TRUE)  # Enable OpenJTalk for Japanese support
     add_dependencies(test_piper naist_jdic_external)
   endif()
   
-  # Set dictionary path as compile definition
-  target_compile_definitions(piper PUBLIC OPENJTALK_DICT_DIR="${NAIST_JDIC_DIR}")
+  # Install dictionary with the binary
+  install(
+    DIRECTORY ${NAIST_JDIC_DIR}/
+    DESTINATION ${CMAKE_INSTALL_PREFIX}/share/piper/openjtalk-dict
+    USE_SOURCE_PERMISSIONS
+  )
+  
+  # Set dictionary path as relative to installation
+  target_compile_definitions(piper PUBLIC OPENJTALK_DICT_DIR="openjtalk-dict")
   target_compile_definitions(test_piper PUBLIC OPENJTALK_DICT_DIR="${NAIST_JDIC_DIR}")
 endif()
 

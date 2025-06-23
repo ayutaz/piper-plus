@@ -17,13 +17,87 @@
 #include "njd_set_long_vowel.h"
 #include "njd_set_unvoiced_vowel.h"
 
+#include <unistd.h>
+#include <limits.h>
+#ifdef _WIN32
+#include <windows.h>
+#endif
+
 // Get dictionary path from compile definition
 #ifndef OPENJTALK_DICT_DIR
-#error "OPENJTALK_DICT_DIR must be defined"
+#define OPENJTALK_DICT_DIR "openjtalk-dict"
 #endif
 
 // MeCab functions
 extern int Mecab_load(Mecab *m, const char *dic_dir);
+
+// Helper function to find dictionary
+static char* find_openjtalk_dict() {
+    static char dict_path[PATH_MAX];
+    char exe_path[PATH_MAX];
+    char test_path[PATH_MAX];
+    
+    // Try environment variable first
+    const char* env_dict = getenv("OPENJTALK_DICT_DIR");
+    if (env_dict && access(env_dict, R_OK) == 0) {
+        strncpy(dict_path, env_dict, PATH_MAX - 1);
+        return dict_path;
+    }
+    
+    // Get executable directory
+#ifdef _WIN32
+    GetModuleFileNameA(NULL, exe_path, PATH_MAX);
+    char* last_slash = strrchr(exe_path, '\\');
+    if (last_slash) *last_slash = '\0';
+#else
+    ssize_t len = readlink("/proc/self/exe", exe_path, PATH_MAX - 1);
+    if (len > 0) {
+        exe_path[len] = '\0';
+        char* last_slash = strrchr(exe_path, '/');
+        if (last_slash) *last_slash = '\0';
+    } else {
+        exe_path[0] = '\0';
+    }
+#endif
+    
+    // Try relative paths from executable
+    const char* relative_paths[] = {
+        "/../share/piper/openjtalk-dict",
+        "/../share/openjtalk-dict",
+        "/../../share/piper/openjtalk-dict",
+        "/../" OPENJTALK_DICT_DIR,
+        "/" OPENJTALK_DICT_DIR,
+        NULL
+    };
+    
+    for (const char** rel_path = relative_paths; *rel_path; rel_path++) {
+        snprintf(test_path, PATH_MAX, "%s%s", exe_path, *rel_path);
+        if (access(test_path, R_OK) == 0) {
+            strncpy(dict_path, test_path, PATH_MAX - 1);
+            return dict_path;
+        }
+    }
+    
+    // Try system paths
+    const char* system_paths[] = {
+        "/usr/share/piper/openjtalk-dict",
+        "/usr/local/share/piper/openjtalk-dict",
+        "/usr/share/openjtalk/dic/utf-8",
+        OPENJTALK_DICT_DIR,  // Compile-time fallback
+        NULL
+    };
+    
+    for (const char** sys_path = system_paths; *sys_path; sys_path++) {
+        if (access(*sys_path, R_OK) == 0) {
+            strncpy(dict_path, *sys_path, PATH_MAX - 1);
+            return dict_path;
+        }
+    }
+    
+    // Return compile-time default as last resort
+    strncpy(dict_path, OPENJTALK_DICT_DIR, PATH_MAX - 1);
+    return dict_path;
+}
 
 // OpenJTalk wrapper structure
 struct _OpenJTalk {
@@ -48,14 +122,21 @@ OpenJTalk* openjtalk_initialize() {
     // Initialize MeCab
     Mecab_initialize(&oj->mecab);
     
-    // Load MeCab dictionary
-    if (!Mecab_load(&oj->mecab, OPENJTALK_DICT_DIR)) {
-        fprintf(stderr, "Failed to load MeCab dictionary from: %s\n", OPENJTALK_DICT_DIR);
+    // Find and load MeCab dictionary
+    char* dict_path = find_openjtalk_dict();
+    if (!Mecab_load(&oj->mecab, dict_path)) {
+        fprintf(stderr, "Failed to load MeCab dictionary from: %s\n", dict_path);
+        fprintf(stderr, "Searched paths:\n");
+        fprintf(stderr, "  - $OPENJTALK_DICT_DIR (env var)\n");
+        fprintf(stderr, "  - Relative to executable\n");
+        fprintf(stderr, "  - System directories\n");
+        fprintf(stderr, "To fix: Set OPENJTALK_DICT_DIR environment variable or install dictionary\n");
         // Clean up and return NULL
         Mecab_clear(&oj->mecab);
         free(oj);
         return NULL;
     }
+    fprintf(stderr, "Loaded OpenJTalk dictionary from: %s\n", dict_path);
     
     // Initialize NJD
     NJD_initialize(&oj->njd);

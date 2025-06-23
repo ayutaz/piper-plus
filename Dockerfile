@@ -127,10 +127,15 @@ RUN if [ "$TARGETARCH" = "amd64" ]; then \
         ./build/piper --help; \
     fi
 
-# アーカイブの作成
+# アーカイブの作成（辞書ファイルも含める）
 WORKDIR /dist
 RUN mkdir -p piper && \
     cp -dR /build/install/* ./piper/ && \
+    # Copy dictionary if it exists
+    if [ -d /build/build/naist-jdic ]; then \
+        mkdir -p ./piper/share/piper && \
+        cp -r /build/build/naist-jdic ./piper/share/piper/openjtalk-dict; \
+    fi && \
     tar -czf "piper_${TARGETARCH}.tar.gz" piper/
 
 FROM scratch
