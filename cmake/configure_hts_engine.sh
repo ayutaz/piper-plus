@@ -13,8 +13,11 @@ fi
 if [[ "$OSTYPE" == "darwin"* ]]; then
     # Ensure we're building for the correct architecture on macOS
     if [[ $(uname -m) == "arm64" ]]; then
-        export CFLAGS="-arch arm64"
-        export CXXFLAGS="-arch arm64"
+        export CFLAGS="-arch arm64 -mmacosx-version-min=11.0"
+        export CXXFLAGS="-arch arm64 -mmacosx-version-min=11.0"
+    else
+        export CFLAGS="-arch x86_64 -mmacosx-version-min=10.15"
+        export CXXFLAGS="-arch x86_64 -mmacosx-version-min=10.15"
     fi
 fi
 

@@ -341,7 +341,11 @@ if(USE_OPENJTALK AND NOT WIN32)  # Enable OpenJTalk for Linux and macOS
       
       # Link all OpenJTalk libraries together
       if(APPLE)
-        # On macOS, iconv is part of the system
+        # On macOS, iconv needs to be explicitly linked
+        find_library(ICONV_LIBRARY NAMES iconv libiconv)
+        if(NOT ICONV_LIBRARY)
+          message(FATAL_ERROR "iconv library not found on macOS")
+        endif()
         target_link_libraries(openjtalk INTERFACE
           openjtalk_mecab
           openjtalk_njd
@@ -356,6 +360,7 @@ if(USE_OPENJTALK AND NOT WIN32)  # Enable OpenJTalk for Linux and macOS
           ${OPENJTALK_DIR}/lib/libnjd_set_long_vowel.a
           ${OPENJTALK_DIR}/lib/libmecab2njd.a
           ${OPENJTALK_DIR}/lib/libnjd2jpcommon.a
+          ${ICONV_LIBRARY}
         )
       else()
         # On Linux, iconv is part of glibc

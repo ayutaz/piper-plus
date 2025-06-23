@@ -12,12 +12,15 @@ fi
 # Platform-specific configuration
 if [[ "$OSTYPE" == "darwin"* ]]; then
     # macOS: iconv is part of the system
-    export LDFLAGS=""
+    export LDFLAGS="-liconv"
     export LIBS=""
     # Ensure we're building for the correct architecture
     if [[ $(uname -m) == "arm64" ]]; then
-        export CFLAGS="-arch arm64"
-        export CXXFLAGS="-arch arm64"
+        export CFLAGS="-arch arm64 -mmacosx-version-min=11.0"
+        export CXXFLAGS="-arch arm64 -mmacosx-version-min=11.0"
+    else
+        export CFLAGS="-arch x86_64 -mmacosx-version-min=10.15"
+        export CXXFLAGS="-arch x86_64 -mmacosx-version-min=10.15"
     fi
 else
     # Linux: iconv is part of glibc, so we don't need -liconv
