@@ -736,18 +736,27 @@ jobs:
             ls -la piper/lib/ || true
           fi
           
-          # Download test model (skip for now - model URL needs to be verified)
-          echo "Skipping Japanese model download for now..."
-          # curl -L -o test/models/ja_JP-test-medium.onnx \
-          #   "https://github.com/rhasspy/piper/releases/download/v1.2.0/voice-ja_JP-test-medium.onnx" || \
-          #   echo "Warning: Failed to download model, will try with built-in test"
+          # Download test model (using English model for basic functionality test)
+          echo "Downloading test model..."
+          mkdir -p test/models
+          curl -L -o test/models/en_US-lessac-medium.onnx \
+            "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/medium/en_US-lessac-medium.onnx" || \
+            echo "Warning: Failed to download model"
+          curl -L -o test/models/en_US-lessac-medium.onnx.json \
+            "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/medium/en_US-lessac-medium.onnx.json" || \
+            echo "Warning: Failed to download model config"
           
           # Run TTS with help first to verify binary works
           "${{ matrix.binary_path }}" --help || echo "Warning: Help command failed"
           
-          # Run TTS
-          if [ -f "test/models/ja_JP-test-medium.onnx" ]; then
-            cat test_input.txt | "${{ matrix.binary_path }}" --model test/models/ja_JP-test-medium.onnx --output_file test_output.wav
+          # Test OpenJTalk phonemization (without model)
+          echo "Testing OpenJTalk phonemization..."
+          echo "これはOpenJTalkのテストです" | "${{ matrix.binary_path }}" --phonemize openjtalk 2>&1 | grep -E "(phoneme|OpenJTalk|fallback)" || echo "OpenJTalk test output not captured"
+          
+          # Run TTS with English model
+          if [ -f "test/models/en_US-lessac-medium.onnx" ]; then
+            echo "Testing with English model..."
+            echo "This is a test" | "${{ matrix.binary_path }}" --model test/models/en_US-lessac-medium.onnx --output_file test_output.wav
           else
             # Fallback: just test that the binary runs
             echo "Testing binary functionality..."
@@ -798,15 +807,17 @@ jobs:
             exit 1
           }
           
-          # Download test model (skip for now - model URL needs to be verified)
-          Write-Host "Skipping Japanese model download for now..."
-          # New-Item -ItemType Directory -Force -Path "test\models" | Out-Null
-          # try {
-          #   Invoke-WebRequest -Uri "https://github.com/rhasspy/piper/releases/download/v1.2.0/voice-ja_JP-test-medium.onnx" `
-          #     -OutFile "test\models\ja_JP-test-medium.onnx"
-          # } catch {
-          #   Write-Host "Warning: Failed to download model, will try with built-in test"
-          # }
+          # Download test model (using English model for basic functionality test)
+          Write-Host "Downloading test model..."
+          New-Item -ItemType Directory -Force -Path "test\models" | Out-Null
+          try {
+            Invoke-WebRequest -Uri "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/medium/en_US-lessac-medium.onnx" `
+              -OutFile "test\models\en_US-lessac-medium.onnx"
+            Invoke-WebRequest -Uri "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/medium/en_US-lessac-medium.onnx.json" `
+              -OutFile "test\models\en_US-lessac-medium.onnx.json"
+          } catch {
+            Write-Host "Warning: Failed to download model"
+          }
           
           # Run TTS with help first to verify binary works
           Write-Host "Running: ${{ matrix.binary_path }} --help"
@@ -824,9 +835,18 @@ jobs:
             Get-ChildItem -Path piper -Filter "*.dll" -Recurse | ForEach-Object { Write-Host "  - $($_.Name)" }
           }
           
-          # Run TTS
-          if (Test-Path "test\models\ja_JP-test-medium.onnx") {
-            Get-Content test_input.txt | & "${{ matrix.binary_path }}" --model test\models\ja_JP-test-medium.onnx --output_file test_output.wav
+          # Test OpenJTalk phonemization (without model)
+          Write-Host "Testing OpenJTalk phonemization..."
+          try {
+            "これはOpenJTalkのテストです" | & "${{ matrix.binary_path }}" --phonemize openjtalk 2>&1 | Select-String -Pattern "phoneme|OpenJTalk|fallback"
+          } catch {
+            Write-Host "OpenJTalk test output not captured"
+          }
+          
+          # Run TTS with English model
+          if (Test-Path "test\models\en_US-lessac-medium.onnx") {
+            Write-Host "Testing with English model..."
+            "This is a test" | & "${{ matrix.binary_path }}" --model test\models\en_US-lessac-medium.onnx --output_file test_output.wav
           } else {
             # Fallback: just test that the binary runs
             Write-Host "Testing binary functionality..."
