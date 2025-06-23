@@ -92,6 +92,11 @@ if(FALSE)  # Temporarily disabled - match the OpenJTalk build setting above
   list(APPEND TEST_PIPER_SOURCES src/cpp/openjtalk_phonemize.cpp src/cpp/openjtalk_api.c)
 endif()
 
+# ---- Declare executable ----
+# NOTE: Must be done before external project dependencies
+add_executable(piper ${PIPER_SOURCES})
+add_executable(test_piper ${TEST_PIPER_SOURCES})
+
 # NOTE: external project prefix are shortened because of path length restrictions on Windows
 # NOTE: onnxruntime is pulled from piper-phonemize
 
@@ -385,7 +390,6 @@ if(FALSE)  # Temporarily disable OpenJTalk to fix builds
 endif()
 
 # ---- Find espeak-ng ----
-# NOTE: This must be done before add_executable() to ensure proper linking
 
 if(MSVC)
   # On Windows, espeak-ng might be installed via Chocolatey or provided via ESPEAK_NG_ROOT
@@ -437,11 +441,6 @@ elseif(APPLE)
     message(STATUS "espeak-ng include dir: ${ESPEAK_NG_INCLUDE_DIR}")
   endif()
 endif()
-
-# ---- Declare executable ----
-
-add_executable(piper ${PIPER_SOURCES})
-add_executable(test_piper ${TEST_PIPER_SOURCES})
 
 if((NOT MSVC) AND (NOT APPLE))
   # Linux flags - remove duplicate since already set above
