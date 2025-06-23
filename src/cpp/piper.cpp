@@ -14,8 +14,8 @@
 #include "utf8.h"
 #include "wavfile.hpp"
 
-// Only include OpenJTalk on Unix platforms
-#if !defined(_WIN32) && !defined(_MSC_VER)
+// Only include OpenJTalk on Unix platforms when enabled
+#if defined(USE_OPENJTALK) && !defined(_WIN32) && !defined(_MSC_VER)
 #include "openjtalk_phonemize.hpp"
 #endif
 
@@ -74,7 +74,7 @@ void parsePhonemizeConfig(json &configRoot, PhonemizeConfig &phonemizeConfig) {
     auto phonemeTypeStr = configRoot["phoneme_type"].get<std::string>();
     if (phonemeTypeStr == "text") {
       phonemizeConfig.phonemeType = TextPhonemes;
-#if !defined(_WIN32) && !defined(_MSC_VER)
+#if defined(USE_OPENJTALK) && !defined(_WIN32) && !defined(_MSC_VER)
     } else if (phonemeTypeStr == "openjtalk") {
       phonemizeConfig.phonemeType = OpenJTalkPhonemes;
 #endif
@@ -481,7 +481,7 @@ void textToAudio(PiperConfig &config, Voice &voice, std::string text,
     eSpeakPhonemeConfig eSpeakConfig;
     eSpeakConfig.voice = voice.phonemizeConfig.eSpeak.voice;
     phonemize_eSpeak(text, eSpeakConfig, phonemes);
-#if !defined(_WIN32) && !defined(_MSC_VER)
+#if defined(USE_OPENJTALK) && !defined(_WIN32) && !defined(_MSC_VER)
   } else if (voice.phonemizeConfig.phonemeType == OpenJTalkPhonemes) {
     // Japanese OpenJTalk phonemizer
     phonemize_openjtalk(text, phonemes);
