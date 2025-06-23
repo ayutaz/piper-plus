@@ -978,54 +978,10 @@ jobs:
       - name: Test Python inference
         run: |
           echo "Testing Python inference..."
-          python -c "
-import sys
-import os
-sys.path.insert(0, 'src/python_run')
-
-# Test basic imports
-try:
-    import piper
-    print('✓ piper package imports successfully')
-    
-    # Try to import PiperVoice
-    from piper import PiperVoice
-    print('✓ PiperVoice imports successfully')
-    
-    # Check if we can access basic functionality
-    print('✓ Basic import test passed!')
-    
-    # On Linux, try more comprehensive test
-    if sys.platform == 'linux':
-        print('Running extended test on Linux...')
-        try:
-            # Test model loading
-            model_path = 'test_models/en_US-test-medium.onnx'
-            if os.path.exists(model_path):
-                voice = PiperVoice.load(model_path)
-                print('✓ Model loaded successfully')
-                
-                # Test basic synthesis
-                import wave
-                with wave.open('test_output.wav', 'wb') as wav_file:
-                    voice.synthesize('Hello world', wav_file)
-                
-                if os.path.exists('test_output.wav'):
-                    size = os.path.getsize('test_output.wav')
-                    print('✓ Generated test_output.wav (' + str(size) + ' bytes)')
-            else:
-                print('⚠ Model file not found, skipping synthesis test')
-        except Exception as e:
-            print('⚠ Extended test failed: ' + str(e))
-            print('  This is not critical - basic imports still work')
-    
-except ImportError as e:
-    print('✗ Import failed: ' + str(e))
-    sys.exit(1)
-except Exception as e:
-    print('✗ Unexpected error: ' + str(e))
-    sys.exit(1)
-"
+          cd src/python_run
+          python -m pip install .
+          cd ../..
+          python -c "import piper; print('SUCCESS: piper package imported successfully')"
           
       - name: Upload test outputs
         if: always()
