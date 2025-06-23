@@ -24,7 +24,8 @@ RUN for i in 1 2 3; do \
         apt-get update && \
         apt-get install --yes --no-install-recommends \
             build-essential cmake git pkg-config libicu-dev libespeak-ng-dev \
-            make ninja-build python3 ccache && \
+            make ninja-build python3 ccache \
+            autoconf automake libtool && \
         apt-get clean && \
         rm -rf /var/lib/apt/lists/* && break || { \
             echo "Package install failed (attempt $i)"; \
