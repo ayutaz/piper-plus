@@ -87,7 +87,7 @@ set(PIPER_SOURCES src/cpp/main.cpp src/cpp/piper.cpp)
 set(TEST_PIPER_SOURCES src/cpp/test.cpp src/cpp/piper.cpp)
 
 # Add OpenJTalk sources for all platforms if OpenJTalk is enabled
-if(TRUE)  # OpenJTalk is now enabled for all platforms
+if(FALSE)  # Temporarily disabled - match the OpenJTalk build setting above
   list(APPEND PIPER_SOURCES src/cpp/openjtalk_phonemize.cpp src/cpp/openjtalk_api.c)
   list(APPEND TEST_PIPER_SOURCES src/cpp/openjtalk_phonemize.cpp src/cpp/openjtalk_api.c)
 endif()
@@ -166,7 +166,7 @@ endif()
 # ---- openjtalk (Japanese phonemizer) ----
 # Build OpenJTalk on all platforms using CMake-compatible fork
 
-if(TRUE)  # Enable OpenJTalk for Japanese support
+if(FALSE)  # Temporarily disable OpenJTalk to fix builds
   include(ExternalProject)
 
   if(NOT DEFINED OPENJTALK_DIR)
