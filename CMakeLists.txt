@@ -368,7 +368,7 @@ if(NOT WIN32)  # Enable OpenJTalk for Linux and macOS
       naist_jdic_external
       PREFIX "${CMAKE_CURRENT_BINARY_DIR}/dict"
       URL "https://sourceforge.net/projects/open-jtalk/files/Dictionary/open_jtalk_dic-1.11/${NAIST_JDIC_VERSION}.tar.gz"
-      URL_HASH SHA256=0abe12c43fff031aafaea02bdfc4802b9ef5cc58f8d35d1ce4e24be8a3926910
+      URL_HASH SHA256=33e9cd251bc41aa2bd7ca36f57abbf61eae3543ca25ca892ae345e394cb10549
       BUILD_COMMAND ""
       CONFIGURE_COMMAND ""
       INSTALL_COMMAND 
