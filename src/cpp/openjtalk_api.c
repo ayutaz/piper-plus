@@ -3,140 +3,186 @@
 #include <stdlib.h>
 #include <string.h>
 
-// Include the individual OpenJTalk component headers
-#include "text2mecab.h"
-#include "mecab.h"
-#include "njd.h"  
-#include "jpcommon.h"
-#include "mecab2njd.h"
-#include "njd2jpcommon.h"
-#include "njd_set_pronunciation.h"
-#include "njd_set_digit.h"
-#include "njd_set_accent_phrase.h"
-#include "njd_set_accent_type.h"
-#include "njd_set_long_vowel.h"
-#include "njd_set_unvoiced_vowel.h"
+// OpenJTalk implementation using static linking
+// This avoids the need for internal headers at compile time
 
-// Get dictionary path from compile definition
-#ifndef OPENJTALK_DICT_DIR
-#define OPENJTALK_DICT_DIR "openjtalk-dict"
-#endif
+// For static linking, declare the external functions
+extern void text2mecab(char*, const char*);
+extern void* mecab_new2(const char*, const char*);
+extern const char* mecab_sparse_tostr(void*, const char*);
+extern void mecab_destroy(void*);
+extern void mecab2njd(void*, const char*, int);
+extern void njd_set_pronunciation(void*);
+extern void njd_set_digit(void*);
+extern void njd_set_accent_phrase(void*);
+extern void njd_set_accent_type(void*);
+extern void njd_set_unvoiced_vowel(void*);
+extern void njd_set_long_vowel(void*);
+extern void njd2jpcommon(void*, void*);
+extern void JPCommon_make_label(void*);
+extern int JPCommon_get_label_size(void*);
+extern char** JPCommon_get_label_feature(void*);
+extern void NJD_initialize(void*);
+extern void NJD_clear(void*);
+extern void JPCommon_initialize(void*);
+extern void JPCommon_clear(void*);
+extern void JPCommon_refresh(void*);
+extern void NJD_refresh(void*);
 
-// MeCab functions
-extern int Mecab_load(Mecab *m, const char *dic_dir);
-
-// OpenJTalk wrapper structure
+// Structures to hold OpenJTalk state
 struct _OpenJTalk {
-    Mecab mecab;
-    NJD njd;
-    JPCommon jpcommon;
-    int initialized;
+    void* mecab;
+    void* njd;
+    void* jpcommon;
+    char* dic_dir;
 };
 
-// HTS Label wrapper structure that holds JPCommon labels
 struct _HTS_Label {
-    JPCommon* jpcommon;
-    int size;
+    char** labels;
+    size_t size;
 };
+
+
+// Helper to allocate structures with proper size
+// We allocate larger buffers to accommodate the actual struct sizes
+static void* alloc_njd() {
+    // NJD structure is relatively large, allocate enough space
+    return calloc(1, 4096);
+}
+
+static void* alloc_jpcommon() {
+    // JPCommon structure, allocate enough space
+    return calloc(1, 2048);
+}
 
 OpenJTalk* openjtalk_initialize() {
+    
     OpenJTalk* oj = (OpenJTalk*)malloc(sizeof(OpenJTalk));
     if (!oj) return NULL;
     
-    oj->initialized = 0;
+    // Initialize NJD and JPCommon structures
+    oj->njd = alloc_njd();
+    oj->jpcommon = alloc_jpcommon();
     
-    // Initialize MeCab
-    Mecab_initialize(&oj->mecab);
-    
-    // Try environment variable first, then compile-time path
-    const char* dict_path = getenv("OPENJTALK_DICT_DIR");
-    if (!dict_path) {
-        dict_path = OPENJTALK_DICT_DIR;
+    if (!oj->njd || !oj->jpcommon) {
+        if (oj->njd) free(oj->njd);
+        if (oj->jpcommon) free(oj->jpcommon);
+        free(oj);
+        return NULL;
     }
     
-    // Load MeCab dictionary
-    if (!Mecab_load(&oj->mecab, dict_path)) {
-        fprintf(stderr, "Warning: Failed to load MeCab dictionary from: %s\n", dict_path);
-        fprintf(stderr, "OpenJTalk will fallback to codepoints. To fix, set OPENJTALK_DICT_DIR environment variable.\n");
-        // Don't fail - just mark as not initialized
-        oj->initialized = 0;
-        return oj;
+    // Initialize structures
+    NJD_initialize(oj->njd);
+    JPCommon_initialize(oj->jpcommon);
+    
+    // Get dictionary directory from environment or use default
+    const char* dic_dir = getenv("OPENJTALK_DICTIONARY_DIR");
+    if (!dic_dir) {
+        // Try to find dictionary in build directory
+        dic_dir = "o/src/openjtalk_external/src/mecab-naist-jdic";
     }
     
-    fprintf(stderr, "Loaded OpenJTalk dictionary from: %s\n", dict_path);
+    oj->dic_dir = strdup(dic_dir);
     
-    // Initialize NJD
-    NJD_initialize(&oj->njd);
+    // Initialize MeCab with dictionary
+    char mecab_options[1024];
+    snprintf(mecab_options, sizeof(mecab_options), "-d %s", dic_dir);
     
-    // Initialize JPCommon
-    JPCommon_initialize(&oj->jpcommon);
+    oj->mecab = mecab_new2(mecab_options, "");
     
-    oj->initialized = 1;
+    if (!oj->mecab) {
+        fprintf(stderr, "OpenJTalk: Failed to initialize MeCab with dictionary: %s\n", dic_dir);
+        openjtalk_finalize(oj);
+        return NULL;
+    }
+    
+    fprintf(stderr, "OpenJTalk: Initialized with dictionary: %s\n", dic_dir);
     return oj;
 }
 
 void openjtalk_finalize(OpenJTalk* oj) {
     if (!oj) return;
     
-    if (oj->initialized) {
-        JPCommon_clear(&oj->jpcommon);
-        NJD_clear(&oj->njd);
-        Mecab_clear(&oj->mecab);
+    if (oj->mecab) {
+        mecab_destroy(oj->mecab);
+    }
+    
+    if (oj->njd) {
+        NJD_clear(oj->njd);
+        free(oj->njd);
+    }
+    
+    if (oj->jpcommon) {
+        JPCommon_clear(oj->jpcommon);
+        free(oj->jpcommon);
+    }
+    
+    if (oj->dic_dir) {
+        free(oj->dic_dir);
     }
     
     free(oj);
 }
 
 HTS_Label* openjtalk_extract_fullcontext(OpenJTalk* oj, const char* text) {
-    if (!oj || !oj->initialized || !text) return NULL;
+    if (!oj || !text || !oj->mecab) return NULL;
     
-    // Allocate buffer for MeCab output (estimate size)
-    size_t text_len = strlen(text);
-    size_t buffer_size = text_len * 10; // Generous estimate for MeCab output
-    char* mecab_output = (char*)malloc(buffer_size);
-    if (!mecab_output) return NULL;
+    // Clear previous data
+    NJD_refresh(oj->njd);
+    JPCommon_refresh(oj->jpcommon);
     
     // Convert text to MeCab format
-    text2mecab(mecab_output, text);
+    char buff[8192];
+    text2mecab(buff, text);
     
-    // Clear previous analysis
-    NJD_clear(&oj->njd);
-    NJD_initialize(&oj->njd);
+    // Parse with MeCab
+    const char* mecab_output = mecab_sparse_tostr(oj->mecab, buff);
     
-    // Analyze with MeCab
-    Mecab_analysis(&oj->mecab, mecab_output);
-    
-    // Convert MeCab output to NJD
-    mecab2njd(&oj->njd, Mecab_get_feature(&oj->mecab), Mecab_get_size(&oj->mecab));
-    
-    // Process through NJD stages
-    njd_set_pronunciation(&oj->njd);
-    njd_set_digit(&oj->njd);
-    njd_set_accent_phrase(&oj->njd);
-    njd_set_accent_type(&oj->njd);
-    njd_set_unvoiced_vowel(&oj->njd);
-    njd_set_long_vowel(&oj->njd);
-    
-    // Clear previous JPCommon analysis
-    JPCommon_refresh(&oj->jpcommon);
-    
-    // Convert to JPCommon
-    njd2jpcommon(&oj->jpcommon, &oj->njd);
-    
-    // Make full-context labels
-    JPCommon_make_label(&oj->jpcommon);
-    
-    // Create HTS_Label wrapper
-    HTS_Label* label = (HTS_Label*)malloc(sizeof(HTS_Label));
-    if (!label) {
-        free(mecab_output);
+    if (!mecab_output) {
+        fprintf(stderr, "OpenJTalk: MeCab parsing failed\n");
         return NULL;
     }
     
-    label->jpcommon = &oj->jpcommon;
-    label->size = JPCommon_get_label_size(&oj->jpcommon);
+    // Process through NJD pipeline
+    mecab2njd(oj->njd, mecab_output, strlen(mecab_output));
+    njd_set_pronunciation(oj->njd);
+    njd_set_digit(oj->njd);
+    njd_set_accent_phrase(oj->njd);
+    njd_set_accent_type(oj->njd);
+    njd_set_unvoiced_vowel(oj->njd);
+    njd_set_long_vowel(oj->njd);
+    njd2jpcommon(oj->jpcommon, oj->njd);
+    JPCommon_make_label(oj->jpcommon);
     
-    free(mecab_output);
+    // Get labels
+    int label_size = JPCommon_get_label_size(oj->jpcommon);
+    char** label_features = JPCommon_get_label_feature(oj->jpcommon);
+    
+    if (label_size <= 0 || !label_features) {
+        fprintf(stderr, "OpenJTalk: No labels generated\n");
+        return NULL;
+    }
+    
+    // Create HTS_Label structure
+    HTS_Label* label = (HTS_Label*)malloc(sizeof(HTS_Label));
+    if (!label) return NULL;
+    
+    label->size = label_size;
+    label->labels = (char**)malloc(sizeof(char*) * label_size);
+    if (!label->labels) {
+        free(label);
+        return NULL;
+    }
+    
+    // Copy labels
+    for (int i = 0; i < label_size; i++) {
+        if (label_features[i]) {
+            label->labels[i] = strdup(label_features[i]);
+        } else {
+            label->labels[i] = NULL;
+        }
+    }
+    
     return label;
 }
 
@@ -146,17 +192,19 @@ size_t HTS_Label_get_size(HTS_Label* label) {
 }
 
 const char* HTS_Label_get_string(HTS_Label* label, size_t index) {
-    if (!label || !label->jpcommon || index >= label->size) return NULL;
-    
-    char** features = JPCommon_get_label_feature(label->jpcommon);
-    if (!features) return NULL;
-    
-    return features[index];
+    if (!label || !label->labels || index >= label->size) return NULL;
+    return label->labels[index];
 }
 
 void HTS_Label_clear(HTS_Label* label) {
     if (!label) return;
-    // JPCommon cleanup is handled by openjtalk_finalize
-    // Don't free the JPCommon here as it's owned by OpenJTalk
+    
+    if (label->labels) {
+        for (size_t i = 0; i < label->size; i++) {
+            if (label->labels[i]) free(label->labels[i]);
+        }
+        free(label->labels);
+    }
+    
     free(label);
 }

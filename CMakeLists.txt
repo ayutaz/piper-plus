@@ -88,9 +88,8 @@ set(TEST_PIPER_SOURCES src/cpp/test.cpp src/cpp/piper.cpp)
 
 # Add OpenJTalk sources for all platforms if OpenJTalk is enabled
 if(NOT WIN32)  # Enable for Linux and macOS
-  # Use stub implementation for now to ensure builds succeed
-  list(APPEND PIPER_SOURCES src/cpp/openjtalk_phonemize.cpp src/cpp/openjtalk_stub.c)
-  list(APPEND TEST_PIPER_SOURCES src/cpp/openjtalk_phonemize.cpp src/cpp/openjtalk_stub.c)
+  list(APPEND PIPER_SOURCES src/cpp/openjtalk_phonemize.cpp src/cpp/openjtalk_api.c)
+  list(APPEND TEST_PIPER_SOURCES src/cpp/openjtalk_phonemize.cpp src/cpp/openjtalk_api.c)
 endif()
 
 # ---- Declare executable ----
@@ -330,6 +329,7 @@ if(NOT WIN32)  # Enable OpenJTalk for Linux and macOS
         openjtalk_njd
         openjtalk_jpcommon
         hts_engine
+        ${OPENJTALK_DIR}/lib/libtext2mecab.a
         ${OPENJTALK_DIR}/lib/libnjd_set_pronunciation.a
         ${OPENJTALK_DIR}/lib/libnjd_set_digit.a
         ${OPENJTALK_DIR}/lib/libnjd_set_accent_phrase.a
@@ -338,6 +338,7 @@ if(NOT WIN32)  # Enable OpenJTalk for Linux and macOS
         ${OPENJTALK_DIR}/lib/libnjd_set_long_vowel.a
         ${OPENJTALK_DIR}/lib/libmecab2njd.a
         ${OPENJTALK_DIR}/lib/libnjd2jpcommon.a
+        iconv
       )
     endif()
   else()
