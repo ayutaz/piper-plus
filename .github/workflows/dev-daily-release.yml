@@ -978,7 +978,7 @@ jobs:
       - name: Test Python inference
         run: |
           echo "Testing Python inference..."
-          cat > test_import.py << 'EOF'
+          python -c "
 import sys
 import os
 sys.path.insert(0, 'src/python_run')
@@ -1025,8 +1025,7 @@ except ImportError as e:
 except Exception as e:
     print('✗ Unexpected error: ' + str(e))
     sys.exit(1)
-EOF
-          python test_import.py
+"
           
       - name: Upload test outputs
         if: always()
