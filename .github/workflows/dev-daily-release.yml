@@ -353,48 +353,69 @@ jobs:
           echo "::group::Setup Homebrew"
           if [ "${{ matrix.arch }}" = "x64" ]; then
             # x64用のHomebrew設定
-            eval "$(/usr/local/bin/brew shellenv)"
+            echo "/usr/local/bin" >> $GITHUB_PATH
+            export HOMEBREW_PREFIX="/usr/local"
           else
-            # arm64用のHomebrew設定
-            eval "$(/opt/homebrew/bin/brew shellenv)"
+            # arm64用のHomebrew設定  
+            echo "/opt/homebrew/bin" >> $GITHUB_PATH
+            export HOMEBREW_PREFIX="/opt/homebrew"
           fi
+          echo "HOMEBREW_PREFIX=${HOMEBREW_PREFIX}" >> $GITHUB_ENV
           echo "::endgroup::"
       - name: Install dependencies
         run: |
           echo "::group::Install dependencies"
+          # Verify brew is accessible
+          which brew || echo "WARNING: brew not found in PATH"
+          echo "PATH=$PATH"
+          
           if [ "${{ matrix.arch }}" = "x64" ]; then
             # x64用の依存関係（Rosetta 2を使用）
-            arch -x86_64 brew install cmake espeak-ng ninja autoconf automake libtool
+            arch -x86_64 /usr/local/bin/brew install cmake espeak-ng ninja autoconf automake libtool
           else
             # arm64用の依存関係
-            brew install cmake espeak-ng ninja autoconf automake libtool
+            /opt/homebrew/bin/brew install cmake espeak-ng ninja autoconf automake libtool
+          fi
+          
+          # Add tool paths to environment
+          if [ "${{ matrix.arch }}" = "x64" ]; then
+            echo "/usr/local/opt/cmake/bin" >> $GITHUB_PATH
+            echo "/usr/local/opt/ninja/bin" >> $GITHUB_PATH
+          else
+            echo "/opt/homebrew/opt/cmake/bin" >> $GITHUB_PATH
+            echo "/opt/homebrew/opt/ninja/bin" >> $GITHUB_PATH
           fi
           echo "::endgroup::"
       - name: Configure build
         run: |
           echo "::group::Configure build"
-          # アーキテクチャに応じたCMAKE_OSX_ARCHITECTURESを設定
+          # Debug: Check available tools
+          echo "Checking for cmake:"
+          which cmake || echo "cmake not found in PATH"
+          echo "Checking for ninja:"
+          which ninja || echo "ninja not found in PATH"
+          
+          # Set up environment
           if [ "${{ matrix.arch }}" = "x64" ]; then
             export CMAKE_OSX_ARCHITECTURES="x86_64"
             export CMAKE_OSX_DEPLOYMENT_TARGET="10.15"
-            # x64用のビルド環境（Rosetta 2を使用）
-            arch -x86_64 cmake -Bbuild \
-              -G "Ninja" \
-              -DCMAKE_INSTALL_PREFIX=_install/piper \
-              -DCMAKE_BUILD_TYPE=${{ env.CMAKE_BUILD_TYPE }} \
-              -DCMAKE_OSX_ARCHITECTURES=$CMAKE_OSX_ARCHITECTURES \
-              -DCMAKE_OSX_DEPLOYMENT_TARGET=$CMAKE_OSX_DEPLOYMENT_TARGET
+            export CMAKE_CMD="arch -x86_64 cmake"
+            export ESPEAK_NG_ROOT="/usr/local/opt/espeak-ng"
           else
             export CMAKE_OSX_ARCHITECTURES="arm64"
             export CMAKE_OSX_DEPLOYMENT_TARGET="11.0"
-            # arm64用のビルド環境
-            cmake -Bbuild \
-              -G "Ninja" \
-              -DCMAKE_INSTALL_PREFIX=_install/piper \
-              -DCMAKE_BUILD_TYPE=${{ env.CMAKE_BUILD_TYPE }} \
-              -DCMAKE_OSX_ARCHITECTURES=$CMAKE_OSX_ARCHITECTURES \
-              -DCMAKE_OSX_DEPLOYMENT_TARGET=$CMAKE_OSX_DEPLOYMENT_TARGET
+            export CMAKE_CMD="cmake"
+            export ESPEAK_NG_ROOT="/opt/homebrew/opt/espeak-ng"
           fi
+          
+          # Configure with explicit paths
+          $CMAKE_CMD -Bbuild \
+            -G "Ninja" \
+            -DCMAKE_INSTALL_PREFIX=_install/piper \
+            -DCMAKE_BUILD_TYPE=${{ env.CMAKE_BUILD_TYPE }} \
+            -DCMAKE_OSX_ARCHITECTURES=$CMAKE_OSX_ARCHITECTURES \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=$CMAKE_OSX_DEPLOYMENT_TARGET \
+            -DESPEAK_NG_ROOT=$ESPEAK_NG_ROOT
           
           if [ $? -ne 0 ]; then
             echo "::error::CMake configuration failed"
@@ -404,6 +425,11 @@ jobs:
       - name: Build package
         run: |
           echo "::group::Build package"
+          # Debug: Check environment
+          echo "Current PATH: $PATH"
+          echo "Which cmake: $(which cmake)"
+          echo "Which ninja: $(which ninja)"
+          
           # アーキテクチャに応じたビルド
           if [ "${{ matrix.arch }}" = "x64" ]; then
             arch -x86_64 cmake --build build --config ${{ env.CMAKE_BUILD_TYPE }} --parallel
@@ -426,9 +452,9 @@ jobs:
         run: |
           # アーキテクチャに応じたインストール
           if [ "${{ matrix.arch }}" = "x64" ]; then
-            /usr/bin/arch -x86_64 cmake --install build
+            arch -x86_64 cmake --install build
           else
-            /opt/homebrew/bin/cmake --install build
+            cmake --install build
           fi
           
           if [ $? -ne 0 ]; then

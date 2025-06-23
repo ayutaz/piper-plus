@@ -387,6 +387,59 @@ if(FALSE)  # Temporarily disable OpenJTalk to fix builds
   target_compile_definitions(test_piper PUBLIC OPENJTALK_DICT_DIR="${NAIST_JDIC_DIR}")
 endif()
 
+# ---- Find espeak-ng ----
+
+if(MSVC)
+  # On Windows, espeak-ng might be installed via Chocolatey or provided via ESPEAK_NG_ROOT
+  if(DEFINED ESPEAK_NG_ROOT)
+    set(ESPEAK_NG_INCLUDE_DIR "${ESPEAK_NG_ROOT}/include")
+    set(ESPEAK_NG_LIB_DIR "${ESPEAK_NG_ROOT}/lib")
+    find_library(ESPEAK_NG_LIB NAMES espeak-ng PATHS ${ESPEAK_NG_LIB_DIR} NO_DEFAULT_PATH)
+  elseif(EXISTS "C:/ProgramData/chocolatey/lib/espeak-ng/tools")
+    set(ESPEAK_NG_ROOT "C:/ProgramData/chocolatey/lib/espeak-ng/tools")
+    set(ESPEAK_NG_INCLUDE_DIR "${ESPEAK_NG_ROOT}/include")
+    set(ESPEAK_NG_LIB_DIR "${ESPEAK_NG_ROOT}/lib")
+    find_library(ESPEAK_NG_LIB NAMES espeak-ng PATHS ${ESPEAK_NG_LIB_DIR} NO_DEFAULT_PATH)
+  else()
+    find_library(ESPEAK_NG_LIB NAMES espeak-ng)
+  endif()
+  
+  if(NOT ESPEAK_NG_LIB)
+    message(FATAL_ERROR "espeak-ng library not found. Please install it via 'choco install espeak-ng' or set ESPEAK_NG_ROOT")
+  endif()
+  
+  message(STATUS "Found espeak-ng: ${ESPEAK_NG_LIB}")
+  if(DEFINED ESPEAK_NG_INCLUDE_DIR)
+    message(STATUS "espeak-ng include dir: ${ESPEAK_NG_INCLUDE_DIR}")
+  endif()
+elseif(APPLE)
+  # On macOS, espeak-ng might be installed via Homebrew
+  if(DEFINED ENV{ESPEAK_NG_ROOT})
+    set(ESPEAK_NG_ROOT $ENV{ESPEAK_NG_ROOT})
+  elseif(EXISTS "/opt/homebrew/opt/espeak-ng")
+    set(ESPEAK_NG_ROOT "/opt/homebrew/opt/espeak-ng")
+  elseif(EXISTS "/usr/local/opt/espeak-ng")
+    set(ESPEAK_NG_ROOT "/usr/local/opt/espeak-ng")
+  endif()
+  
+  if(DEFINED ESPEAK_NG_ROOT)
+    set(ESPEAK_NG_INCLUDE_DIR "${ESPEAK_NG_ROOT}/include")
+    set(ESPEAK_NG_LIB_DIR "${ESPEAK_NG_ROOT}/lib")
+    find_library(ESPEAK_NG_LIB NAMES espeak-ng PATHS ${ESPEAK_NG_LIB_DIR} NO_DEFAULT_PATH)
+  else()
+    find_library(ESPEAK_NG_LIB NAMES espeak-ng)
+  endif()
+  
+  if(NOT ESPEAK_NG_LIB)
+    message(FATAL_ERROR "espeak-ng library not found. Please install it via 'brew install espeak-ng'")
+  endif()
+  
+  message(STATUS "Found espeak-ng: ${ESPEAK_NG_LIB}")
+  if(DEFINED ESPEAK_NG_INCLUDE_DIR)
+    message(STATUS "espeak-ng include dir: ${ESPEAK_NG_INCLUDE_DIR}")
+  endif()
+endif()
+
 # ---- Declare executable ----
 
 if((NOT MSVC) AND (NOT APPLE))
@@ -396,14 +449,28 @@ if((NOT MSVC) AND (NOT APPLE))
   set(PIPER_EXTRA_LIBRARIES "pthread")
 endif()
 
-target_link_libraries(piper PUBLIC
-  fmt
-  spdlog
-  espeak-ng
-  piper_phonemize
-  onnxruntime
-  ${PIPER_EXTRA_LIBRARIES}
-)
+if(APPLE OR MSVC)
+  target_link_libraries(piper PUBLIC
+    fmt
+    spdlog
+    ${ESPEAK_NG_LIB}
+    piper_phonemize
+    onnxruntime
+    ${PIPER_EXTRA_LIBRARIES}
+  )
+  if(DEFINED ESPEAK_NG_INCLUDE_DIR)
+    target_include_directories(piper PUBLIC ${ESPEAK_NG_INCLUDE_DIR})
+  endif()
+else()
+  target_link_libraries(piper PUBLIC
+    fmt
+    spdlog
+    espeak-ng
+    piper_phonemize
+    onnxruntime
+    ${PIPER_EXTRA_LIBRARIES}
+  )
+endif()
 
 # Windows固有のリンク設定
 if(MSVC)
@@ -452,13 +519,26 @@ target_link_directories(
   ${PIPER_PHONEMIZE_DIR}/lib
 )
 
-target_link_libraries(test_piper PUBLIC
-  fmt
-  spdlog
-  espeak-ng
-  piper_phonemize
-  onnxruntime
-)
+if(APPLE OR MSVC)
+  target_link_libraries(test_piper PUBLIC
+    fmt
+    spdlog
+    ${ESPEAK_NG_LIB}
+    piper_phonemize
+    onnxruntime
+  )
+  if(DEFINED ESPEAK_NG_INCLUDE_DIR)
+    target_include_directories(test_piper PUBLIC ${ESPEAK_NG_INCLUDE_DIR})
+  endif()
+else()
+  target_link_libraries(test_piper PUBLIC
+    fmt
+    spdlog
+    espeak-ng
+    piper_phonemize
+    onnxruntime
+  )
+endif()
 
 # ---- Declare install targets ----
 
