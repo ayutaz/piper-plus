@@ -87,7 +87,10 @@ set(PIPER_SOURCES src/cpp/main.cpp src/cpp/piper.cpp)
 set(TEST_PIPER_SOURCES src/cpp/test.cpp src/cpp/piper.cpp)
 
 # Add OpenJTalk sources for all platforms if OpenJTalk is enabled
-option(USE_OPENJTALK "Enable OpenJTalk for Japanese support" ON)
+if(NOT DEFINED USE_OPENJTALK_DEFAULT)
+  set(USE_OPENJTALK_DEFAULT OFF)
+endif()
+option(USE_OPENJTALK "Enable OpenJTalk for Japanese support" ${USE_OPENJTALK_DEFAULT})
 if(USE_OPENJTALK AND NOT WIN32)  # Enable for Linux and macOS
   message(STATUS "OpenJTalk support enabled for Japanese text processing")
   list(APPEND PIPER_SOURCES src/cpp/openjtalk_phonemize.cpp src/cpp/openjtalk_api.c)
@@ -270,6 +273,14 @@ if(USE_OPENJTALK AND NOT WIN32)  # Enable OpenJTalk for Linux and macOS
           ${OPENJTALK_DIR}/lib/libmecab.a
           ${OPENJTALK_DIR}/lib/libnjd.a
           ${OPENJTALK_DIR}/lib/libjpcommon.a
+          ${OPENJTALK_DIR}/lib/libnjd_set_pronunciation.a
+          ${OPENJTALK_DIR}/lib/libnjd_set_digit.a
+          ${OPENJTALK_DIR}/lib/libnjd_set_accent_phrase.a
+          ${OPENJTALK_DIR}/lib/libnjd_set_accent_type.a
+          ${OPENJTALK_DIR}/lib/libnjd_set_unvoiced_vowel.a
+          ${OPENJTALK_DIR}/lib/libnjd_set_long_vowel.a
+          ${OPENJTALK_DIR}/lib/libmecab2njd.a
+          ${OPENJTALK_DIR}/lib/libnjd2jpcommon.a
           ${OPENJTALK_DIR}/include/text2mecab.h
           ${OPENJTALK_DIR}/include/mecab.h
           ${OPENJTALK_DIR}/include/njd.h
