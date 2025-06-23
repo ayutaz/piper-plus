@@ -176,24 +176,23 @@ jobs:
           if ($vs) {
             [Environment]::SetEnvironmentVariable('VSINSTALLDIR', $vs, 'Process')
           }
-          # Download pre-built espeak-ng for Windows with development files
-          $ESPEAK_VERSION = "1.51"
-          $ESPEAK_ZIP = "espeak-ng-w64-$ESPEAK_VERSION.zip"
-          $ESPEAK_URL = "https://github.com/espeak-ng/espeak-ng/releases/download/$ESPEAK_VERSION/$ESPEAK_ZIP"
+          # Build espeak-ng from source for Windows
           $ESPEAK_DIR = "C:\espeak-ng"
           
-          Write-Host "Downloading espeak-ng development files..."
-          Invoke-WebRequest -Uri $ESPEAK_URL -OutFile "$env:TEMP\$ESPEAK_ZIP" -ErrorAction Stop
+          Write-Host "Cloning espeak-ng repository..."
+          git clone --depth 1 --branch 1.51 https://github.com/espeak-ng/espeak-ng.git $ESPEAK_DIR
           
-          Write-Host "Extracting espeak-ng..."
-          Expand-Archive -Path "$env:TEMP\$ESPEAK_ZIP" -DestinationPath $ESPEAK_DIR -Force
+          Write-Host "Building espeak-ng..."
+          Push-Location $ESPEAK_DIR
           
-          # The ZIP contains espeak-ng-w64 folder
-          if (Test-Path "$ESPEAK_DIR\espeak-ng-w64") {
-            $env:ESPEAK_NG_ROOT = "$ESPEAK_DIR\espeak-ng-w64"
-          } else {
-            $env:ESPEAK_NG_ROOT = $ESPEAK_DIR
-          }
+          # Configure and build using CMake
+          cmake -B build -G "Ninja" -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$ESPEAK_DIR\install"
+          cmake --build build --config Release
+          cmake --install build
+          
+          Pop-Location
+          
+          $env:ESPEAK_NG_ROOT = "$ESPEAK_DIR\install"
           [Environment]::SetEnvironmentVariable("ESPEAK_NG_ROOT", $env:ESPEAK_NG_ROOT, "Process")
       - name: Configure build
         run: |
