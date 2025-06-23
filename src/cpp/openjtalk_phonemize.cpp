@@ -40,7 +40,7 @@ void phonemize_openjtalk(const std::string &text,
   }
 
   // Use OpenJTalk to extract full-context labels
-  HTS_Label *labels = openjtalk_extract_fullcontext(oj, text.c_str());
+  OJ_Label *labels = openjtalk_extract_fullcontext(oj, text.c_str());
   if (!labels) {
     spdlog::error("OpenJTalk failed; using fallback codepoints");
     std::vector<Phoneme> line;
@@ -53,9 +53,9 @@ void phonemize_openjtalk(const std::string &text,
   }
 
   std::vector<Phoneme> currentSentence;
-  size_t num = HTS_Label_get_size(labels);
+  size_t num = OJ_Label_get_size(labels);
   for (size_t i = 0; i < num; ++i) {
-    const char *label = HTS_Label_get_string(labels, i);
+    const char *label = OJ_Label_get_string(labels, i);
     std::string lab(label);
     // simple parse: find between '-' and '+'
     auto pos1 = lab.find('-');
@@ -86,7 +86,7 @@ void phonemize_openjtalk(const std::string &text,
   if (!currentSentence.empty())
     sentences.push_back(currentSentence);
 
-  HTS_Label_clear(labels);
+  OJ_Label_clear(labels);
 }
 
 } 

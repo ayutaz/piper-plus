@@ -42,7 +42,7 @@ struct _OpenJTalk {
     char* dic_dir;
 };
 
-struct _HTS_Label {
+struct _OJ_Label {
     char** labels;
     size_t size;
 };
@@ -180,7 +180,7 @@ void openjtalk_finalize(OpenJTalk* oj) {
     free(oj);
 }
 
-HTS_Label* openjtalk_extract_fullcontext(OpenJTalk* oj, const char* text) {
+OJ_Label* openjtalk_extract_fullcontext(OpenJTalk* oj, const char* text) {
     if (!oj || !text || !oj->mecab) return NULL;
     
     // Clear previous data
@@ -219,8 +219,8 @@ HTS_Label* openjtalk_extract_fullcontext(OpenJTalk* oj, const char* text) {
         return NULL;
     }
     
-    // Create HTS_Label structure
-    HTS_Label* label = (HTS_Label*)malloc(sizeof(HTS_Label));
+    // Create OJ_Label structure
+    OJ_Label* label = (OJ_Label*)malloc(sizeof(OJ_Label));
     if (!label) return NULL;
     
     label->size = label_size;
@@ -242,17 +242,17 @@ HTS_Label* openjtalk_extract_fullcontext(OpenJTalk* oj, const char* text) {
     return label;
 }
 
-size_t HTS_Label_get_size(HTS_Label* label) {
+size_t OJ_Label_get_size(OJ_Label* label) {
     if (!label) return 0;
     return label->size;
 }
 
-const char* HTS_Label_get_string(HTS_Label* label, size_t index) {
+const char* OJ_Label_get_string(OJ_Label* label, size_t index) {
     if (!label || !label->labels || index >= label->size) return NULL;
     return label->labels[index];
 }
 
-void HTS_Label_clear(HTS_Label* label) {
+void OJ_Label_clear(OJ_Label* label) {
     if (!label) return;
     
     if (label->labels) {
