@@ -358,19 +358,30 @@ if(NOT WIN32)  # Enable OpenJTalk for Linux and macOS
   target_include_directories(test_piper PUBLIC ${OPENJTALK_DIR}/include ${HTS_ENGINE_DIR}/include)
   
   # ---- Download and install naist-jdic dictionary ----
-  # Temporarily disable dictionary download due to network issues
-  # The dictionary can be provided separately or via environment variable
+  set(NAIST_JDIC_VERSION "open_jtalk_dic_utf_8-1.11")
   set(NAIST_JDIC_DIR "${CMAKE_CURRENT_BINARY_DIR}/naist-jdic")
   
-  # Create an empty directory for now to avoid build errors
-  file(MAKE_DIRECTORY "${NAIST_JDIC_DIR}")
-  
-  # TODO: Re-enable when network is stable
-  # set(NAIST_JDIC_VERSION "open_jtalk_dic_utf_8-1.11")
-  # if(NOT EXISTS "${NAIST_JDIC_DIR}/sys.dic")
-  #   message(STATUS "Downloading naist-jdic dictionary...")
-  #   ExternalProject_Add(...)
-  # endif()
+  if(NOT EXISTS "${NAIST_JDIC_DIR}/sys.dic")
+    message(STATUS "Downloading naist-jdic dictionary...")
+    
+    # Download dictionary from SourceForge
+    ExternalProject_Add(
+      naist_jdic_external
+      PREFIX "${CMAKE_CURRENT_BINARY_DIR}/dict"
+      URL "https://sourceforge.net/projects/open-jtalk/files/Dictionary/open_jtalk_dic-1.11/${NAIST_JDIC_VERSION}.tar.gz"
+      URL_HASH SHA256=e5b6f206ab7e1bcd68ce6e964c4b22cc94fa528e212fed086ee4efc7ddf52dd2
+      BUILD_COMMAND ""
+      CONFIGURE_COMMAND ""
+      INSTALL_COMMAND 
+        ${CMAKE_COMMAND} -E copy_directory 
+        <SOURCE_DIR>
+        ${NAIST_JDIC_DIR}
+    )
+    
+    # Add dependency to ensure dictionary is downloaded
+    add_dependencies(piper naist_jdic_external)
+    add_dependencies(test_piper naist_jdic_external)
+  endif()
   
   # Install dictionary with the binary
   install(
@@ -661,8 +672,8 @@ if(APPLE)
     INSTALL_RPATH "@loader_path/../lib")
 endif()
 
-# Download and install OpenJTalk dictionary
-if(FALSE)  # Temporarily disable dictionary download
+# Alternative dictionary download (kept for reference)
+if(FALSE)  # Using ExternalProject_Add method above instead
   set(NAIST_JDIC_VERSION "0.6.3b-20111013")
   set(NAIST_JDIC_URL "https://sourceforge.net/projects/open-jtalk/files/Dictionary/open_jtalk_dic-1.11/open_jtalk_dic_utf_8-1.11.tar.gz/download")
   set(NAIST_JDIC_DIR "${CMAKE_CURRENT_BINARY_DIR}/naist-jdic")
