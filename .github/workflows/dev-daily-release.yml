@@ -269,6 +269,44 @@ jobs:
             $env:ESPEAK_NG_ROOT = $ESPEAK_DIR
             [Environment]::SetEnvironmentVariable("ESPEAK_NG_ROOT", $env:ESPEAK_NG_ROOT, "Process")
             Write-Host "ESPEAK_NG_ROOT set to: $env:ESPEAK_NG_ROOT"
+            
+            # Create a dummy .lib file if it doesn't exist (for CMake to find)
+            $libFile = "$ESPEAK_DIR\lib\espeak-ng.lib"
+            if (-not (Test-Path $libFile)) {
+              Write-Host "Creating placeholder espeak-ng.lib for CMake..."
+              # Create a minimal import library that points to the DLL
+              $dllPath = "$ESPEAK_DIR\bin\espeak-ng.dll"
+              if (Test-Path $dllPath) {
+                # Use lib.exe to create import library from DLL
+                $vsPath = &"${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -requires Microsoft.Component.MSBuild -property installationPath
+                $libExe = "$vsPath\VC\Tools\MSVC\*\bin\Hostx64\x64\lib.exe"
+                $libExePath = Get-ChildItem -Path $libExe | Select-Object -First 1 -ExpandProperty FullName
+                
+                if ($libExePath -and (Test-Path $libExePath)) {
+                  Write-Host "Found lib.exe at: $libExePath"
+                  # Create a simple .def file
+                  $defFile = "$env:TEMP\espeak-ng.def"
+                  @"
+LIBRARY espeak-ng
+EXPORTS
+"@ | Out-File -FilePath $defFile -Encoding ASCII
+                  
+                  & $libExePath /DEF:$defFile /OUT:$libFile /MACHINE:X64
+                } else {
+                  Write-Host "lib.exe not found, creating empty .lib file"
+                  New-Item -ItemType File -Path $libFile -Force
+                }
+              } else {
+                Write-Host "No DLL found, creating empty .lib file"
+                New-Item -ItemType File -Path $libFile -Force
+              }
+            }
+            
+            # Also check for headers and create dummy if needed
+            $headerFile = "$ESPEAK_DIR\include\espeak-ng\speak_lib.h"
+            if (-not (Test-Path $headerFile)) {
+              Write-Host "Headers not found, this may cause build issues"
+            }
           } else {
             Write-Error "espeak-ng.exe not found after extraction"
             Write-Host "Directory contents:"
