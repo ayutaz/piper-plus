@@ -9,4 +9,4 @@ if [ ! -f configure ]; then
     autoreconf -fiv || (aclocal && automake --add-missing && autoconf)
 fi
 
-./configure --prefix="$2" --with-hts-engine-header-dir="$3/include" --with-hts-engine-library-dir="$3/lib" --with-hts-engine-library-name=HTSEngine --with-charset=UTF-8 --enable-static --disable-shared
+./configure --prefix="$2" --with-hts-engine-header-path="$3/include" --with-hts-engine-library-path="$3/lib" --with-charset=UTF-8
