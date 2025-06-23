@@ -127,7 +127,7 @@ jobs:
           outputs: type=local,dest=dist
           cache-from: type=gha
           cache-to: type=gha,mode=max
-        timeout-minutes: ${{ matrix.arch == 'arm64' && 40 || 15 }}
+        timeout-minutes: ${{ matrix.arch == 'arm64' && 60 || 30 }}
 
       - name: Verify package
         run: |

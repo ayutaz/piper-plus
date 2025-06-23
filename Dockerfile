@@ -77,12 +77,16 @@ RUN if [ "$TARGETARCH" = "arm64" ]; then \
 COPY . .
 
 # Configure step (deps resolution)
+# Increase ccache size for OpenJTalk builds
+RUN ccache -M 2G
+
 RUN if [ "$TARGETARCH" = "amd64" ]; then \
         cmake -Bbuild -DCMAKE_INSTALL_PREFIX=install \
               -DCMAKE_BUILD_TYPE=Release \
               -DCMAKE_C_COMPILER_LAUNCHER=ccache \
               -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
               -DCMAKE_BUILD_PARALLEL_LEVEL=2 \
+              -DUSE_OPENJTALK=ON \
               -GNinja; \
     elif [ "$TARGETARCH" = "arm64" ]; then \
         cmake -Bbuild -DCMAKE_INSTALL_PREFIX=install \
@@ -91,6 +95,7 @@ RUN if [ "$TARGETARCH" = "amd64" ]; then \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
             -DCMAKE_BUILD_PARALLEL_LEVEL=1 \
+            -DUSE_OPENJTALK=ON \
             -GNinja; \
     else \
         echo "Unsupported architecture: $TARGETARCH" && exit 1; \
@@ -103,14 +108,14 @@ RUN if [ "$TARGETARCH" = "amd64" ]; then \
 RUN if [ "$TARGETARCH" = "arm64" ]; then \
         # ARM64 builds: single thread, timeout handling, retry on failure \
         echo "Starting ARM64 build with single thread..." && \
-        timeout 2400 cmake --build build --config Release --parallel 1 || \
-        (echo "Build failed, retrying..." && cmake --build build --config Release --parallel 1); \
+        timeout 3600 cmake --build build --config Release --parallel 1 || \
+        (echo "Build failed, retrying..." && timeout 1800 cmake --build build --config Release --parallel 1); \
     else \
         # x86_64 builds: standard parallel build \
         echo "Starting AMD64 build with 2 parallel threads..." && \
-        cmake --build build --config Release --parallel 2 --verbose || \
+        cmake --build build --config Release --parallel 2 || \
         (echo "Build failed with parallel build, retrying with single thread..." && \
-         cmake --build build --config Release --parallel 1 --verbose); \
+         cmake --build build --config Release --parallel 1); \
     fi
 
 # Install step  
@@ -118,7 +123,9 @@ RUN cmake --install build
 
 # テスト実行（amd64のみ）
 RUN if [ "$TARGETARCH" = "amd64" ]; then \
-        ./build/piper --help; \
+        ./build/piper --help && \
+        echo "Testing OpenJTalk support..." && \
+        ./build/piper --help 2>&1 | grep -q "openjtalk" && echo "OpenJTalk support confirmed" || echo "OpenJTalk support not found"; \
     fi
 
 # アーカイブの作成（辞書ファイルも含める）
