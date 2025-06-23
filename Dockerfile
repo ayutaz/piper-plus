@@ -54,9 +54,13 @@ ENV CCACHE_MAXSIZE=2G
 ENV CCACHE_COMPRESS=1
 RUN mkdir -p /tmp/ccache
 
-# ツールチェインファイルを作成
-RUN mkdir -p cmake && \
-    if [ "$TARGETARCH" = "arm64" ]; then \
+# CMakeLists.txtと設定ファイルを先にコピー（依存関係キャッシュ最適化）
+COPY CMakeLists.txt VERSION ./
+COPY cmake/ cmake/
+COPY src/cpp/ src/cpp/
+
+# ツールチェインファイルを作成（COPYの後に作成してオーバーライドを防ぐ）
+RUN if [ "$TARGETARCH" = "arm64" ]; then \
         echo 'set(CMAKE_SYSTEM_NAME Linux)' > cmake/linux-aarch64.cmake && \
         echo 'set(CMAKE_SYSTEM_PROCESSOR aarch64)' >> cmake/linux-aarch64.cmake && \
         echo 'set(CMAKE_C_COMPILER aarch64-linux-gnu-gcc)' >> cmake/linux-aarch64.cmake && \
@@ -67,11 +71,6 @@ RUN mkdir -p cmake && \
         echo 'set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)' >> cmake/linux-aarch64.cmake && \
         echo 'set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE ONLY)' >> cmake/linux-aarch64.cmake; \
     fi
-
-# CMakeLists.txtと設定ファイルを先にコピー（依存関係キャッシュ最適化）
-COPY CMakeLists.txt VERSION ./
-COPY cmake/ cmake/
-COPY src/cpp/ src/cpp/
 
 # Configure step (deps resolution)
 RUN if [ "$TARGETARCH" = "amd64" ]; then \
