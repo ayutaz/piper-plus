@@ -87,7 +87,7 @@ set(PIPER_SOURCES src/cpp/main.cpp src/cpp/piper.cpp)
 set(TEST_PIPER_SOURCES src/cpp/test.cpp src/cpp/piper.cpp)
 
 # Add OpenJTalk sources for all platforms if OpenJTalk is enabled
-option(USE_OPENJTALK "Enable OpenJTalk for Japanese support" ON)
+option(USE_OPENJTALK "Enable OpenJTalk for Japanese support" OFF)
 if(USE_OPENJTALK AND NOT WIN32)  # Enable for Linux and macOS
   message(STATUS "OpenJTalk support enabled for Japanese text processing")
   list(APPEND PIPER_SOURCES src/cpp/openjtalk_phonemize.cpp src/cpp/openjtalk_api.c)
@@ -220,7 +220,7 @@ if(USE_OPENJTALK AND NOT WIN32)  # Enable OpenJTalk for Linux and macOS
         UPDATE_COMMAND ""
         CONFIGURE_COMMAND 
           sh -c "cd <SOURCE_DIR>/src && touch ChangeLog && autoreconf -fi && ./configure --prefix=${HTS_ENGINE_DIR} --enable-static --disable-shared"
-        BUILD_COMMAND sh -c "cd <SOURCE_DIR>/src && make -j4"
+        BUILD_COMMAND sh -c "cd <SOURCE_DIR>/src && make"
         INSTALL_COMMAND sh -c "cd <SOURCE_DIR>/src && make install"
         BUILD_BYPRODUCTS 
           ${HTS_ENGINE_DIR}/lib/libHTSEngine.a
@@ -262,7 +262,7 @@ if(USE_OPENJTALK AND NOT WIN32)  # Enable OpenJTalk for Linux and macOS
         DEPENDS hts_engine_external
         CONFIGURE_COMMAND 
           sh -c "cd <SOURCE_DIR>/src && touch ChangeLog && autoreconf -fi && ./configure --prefix=${OPENJTALK_DIR} --with-charset=utf-8 --enable-static --disable-shared --with-hts-engine-header-path=${HTS_ENGINE_DIR}/include --with-hts-engine-library-path=${HTS_ENGINE_DIR}/lib"
-        BUILD_COMMAND sh -c "cd <SOURCE_DIR>/src && make -j4"
+        BUILD_COMMAND sh -c "cd <SOURCE_DIR>/src && make"
         INSTALL_COMMAND 
           sh -c "cd <SOURCE_DIR>/src && make install && mkdir -p ${OPENJTALK_DIR}/include && cp text2mecab/text2mecab.h ${OPENJTALK_DIR}/include/ && cp mecab/src/mecab.h ${OPENJTALK_DIR}/include/ && cp njd/njd.h ${OPENJTALK_DIR}/include/ && cp jpcommon/jpcommon.h ${OPENJTALK_DIR}/include/ && cp njd_set_pronunciation/njd_set_pronunciation.h ${OPENJTALK_DIR}/include/ && cp njd_set_digit/njd_set_digit.h ${OPENJTALK_DIR}/include/ && cp njd_set_accent_phrase/njd_set_accent_phrase.h ${OPENJTALK_DIR}/include/ && cp njd_set_accent_type/njd_set_accent_type.h ${OPENJTALK_DIR}/include/ && cp njd_set_unvoiced_vowel/njd_set_unvoiced_vowel.h ${OPENJTALK_DIR}/include/ && cp njd_set_long_vowel/njd_set_long_vowel.h ${OPENJTALK_DIR}/include/ && cp mecab2njd/mecab2njd.h ${OPENJTALK_DIR}/include/ && cp njd2jpcommon/njd2jpcommon.h ${OPENJTALK_DIR}/include/ && mkdir -p ${OPENJTALK_DIR}/lib && cp text2mecab/libtext2mecab.a ${OPENJTALK_DIR}/lib/ && cp mecab/src/libmecab.a ${OPENJTALK_DIR}/lib/ && cp njd/libnjd.a ${OPENJTALK_DIR}/lib/ && cp jpcommon/libjpcommon.a ${OPENJTALK_DIR}/lib/ && cp njd_set_pronunciation/libnjd_set_pronunciation.a ${OPENJTALK_DIR}/lib/ && cp njd_set_digit/libnjd_set_digit.a ${OPENJTALK_DIR}/lib/ && cp njd_set_accent_phrase/libnjd_set_accent_phrase.a ${OPENJTALK_DIR}/lib/ && cp njd_set_accent_type/libnjd_set_accent_type.a ${OPENJTALK_DIR}/lib/ && cp njd_set_unvoiced_vowel/libnjd_set_unvoiced_vowel.a ${OPENJTALK_DIR}/lib/ && cp njd_set_long_vowel/libnjd_set_long_vowel.a ${OPENJTALK_DIR}/lib/ && cp mecab2njd/libmecab2njd.a ${OPENJTALK_DIR}/lib/ && cp njd2jpcommon/libnjd2jpcommon.a ${OPENJTALK_DIR}/lib/"
         BUILD_BYPRODUCTS 
