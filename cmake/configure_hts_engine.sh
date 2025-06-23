@@ -1,7 +1,8 @@
 #!/bin/bash
 set -e
 
-cd "$1/src"
+echo "Configuring HTS Engine in directory: $1"
+cd "$1/src" || { echo "Failed to cd to $1/src"; exit 1; }
 
 if [ ! -f configure ]; then
     touch ChangeLog AUTHORS NEWS README

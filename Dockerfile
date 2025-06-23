@@ -76,6 +76,9 @@ RUN if [ "$TARGETARCH" = "arm64" ]; then \
 # 残りのソースファイルをコピー
 COPY . .
 
+# Ensure scripts are executable
+RUN chmod +x cmake/*.sh
+
 # Configure step (deps resolution)
 # Increase ccache size for OpenJTalk builds
 RUN ccache -M 2G
