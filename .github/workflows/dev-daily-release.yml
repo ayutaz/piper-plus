@@ -176,71 +176,104 @@ jobs:
           if ($vs) {
             [Environment]::SetEnvironmentVariable('VSINSTALLDIR', $vs, 'Process')
           }
-          # For Windows, we'll use the pre-built espeak-ng portable version
+          # For Windows, we'll download a pre-built espeak-ng binary
           $ESPEAK_DIR = "$env:GITHUB_WORKSPACE\espeak-ng"
           
-          Write-Host "Downloading espeak-ng portable version..."
-          # Download the portable zip version
-          $ESPEAK_ZIP_URL = "https://github.com/espeak-ng/espeak-ng/releases/download/1.51/espeak-ng-20200907-b702b03-x64.zip"
-          $ZIP_PATH = "$env:TEMP\espeak-ng.zip"
+          Write-Host "Creating espeak-ng directory structure..."
+          New-Item -ItemType Directory -Path "$ESPEAK_DIR" -Force
+          New-Item -ItemType Directory -Path "$ESPEAK_DIR\bin" -Force
+          New-Item -ItemType Directory -Path "$ESPEAK_DIR\lib" -Force
+          New-Item -ItemType Directory -Path "$ESPEAK_DIR\include" -Force
           
-          try {
-            Invoke-WebRequest -Uri $ESPEAK_ZIP_URL -OutFile $ZIP_PATH -ErrorAction Stop
-          } catch {
-            Write-Host "Failed to download from primary URL, trying alternative..."
-            # Try MSI as fallback with different approach
-            $ESPEAK_MSI_URL = "https://github.com/espeak-ng/espeak-ng/releases/download/1.51/espeak-ng-X64.msi"
-            $MSI_PATH = "$env:TEMP\espeak-ng.msi"
-            Invoke-WebRequest -Uri $ESPEAK_MSI_URL -OutFile $MSI_PATH -ErrorAction Stop
-            
-            # Extract MSI contents without installing
-            Write-Host "Extracting espeak-ng from MSI..."
-            New-Item -ItemType Directory -Path $ESPEAK_DIR -Force
-            
-            # Use msiexec with administrative extraction
-            $extractCmd = "msiexec.exe /a `"$MSI_PATH`" /qn TARGETDIR=`"$ESPEAK_DIR`""
-            Write-Host "Running: $extractCmd"
-            $proc = Start-Process -FilePath "cmd.exe" -ArgumentList "/c", $extractCmd -Wait -PassThru -NoNewWindow
-            
-            if ($proc.ExitCode -ne 0) {
-              Write-Error "MSI extraction failed with exit code: $($proc.ExitCode)"
-              # Try lessmsi as last resort
-              Write-Host "Installing lessmsi for MSI extraction..."
-              choco install -y lessmsi
-              
-              Write-Host "Extracting with lessmsi..."
-              & lessmsi x "$MSI_PATH" "$ESPEAK_DIR\"
+          # Try to download from a known working binary distribution
+          Write-Host "Downloading espeak-ng binary..."
+          
+          # Download the Windows binary from the release
+          $urls = @(
+            "https://github.com/espeak-ng/espeak-ng/releases/download/1.51/espeak-ng-X64.msi",
+            "https://github.com/espeak-ng/espeak-ng/releases/download/1.51.1/espeak-ng-X64.msi"
+          )
+          
+          $downloaded = $false
+          foreach ($url in $urls) {
+            try {
+              Write-Host "Trying to download from: $url"
+              $fileName = Split-Path $url -Leaf
+              $filePath = "$env:TEMP\$fileName"
+              Invoke-WebRequest -Uri $url -OutFile $filePath -ErrorAction Stop
+              $downloaded = $true
+              $MSI_PATH = $filePath
+              break
+            } catch {
+              Write-Host "Failed to download from $url : $_"
             }
           }
           
-          # If we downloaded zip, extract it
-          if (Test-Path $ZIP_PATH) {
-            Write-Host "Extracting espeak-ng..."
-            Expand-Archive -Path $ZIP_PATH -DestinationPath $ESPEAK_DIR -Force
-          }
-          
-          # Find espeak-ng.exe in the extracted files
-          Write-Host "Searching for espeak-ng.exe..."
-          $espeakExe = Get-ChildItem -Path $ESPEAK_DIR -Filter "espeak-ng.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
-          
-          if ($espeakExe) {
-            $ESPEAK_NG_ROOT = $espeakExe.Directory.FullName
-            Write-Host "Found espeak-ng.exe at: $($espeakExe.FullName)"
-            Write-Host "Setting ESPEAK_NG_ROOT to: $ESPEAK_NG_ROOT"
-          } else {
-            Write-Error "Could not find espeak-ng.exe in extracted files"
-            Write-Host "Directory contents:"
-            Get-ChildItem -Path $ESPEAK_DIR -Recurse | Select-Object FullName
+          if (-not $downloaded) {
+            Write-Error "Failed to download espeak-ng from any source"
             exit 1
           }
           
-          $env:ESPEAK_NG_ROOT = $ESPEAK_NG_ROOT
-          [Environment]::SetEnvironmentVariable("ESPEAK_NG_ROOT", $env:ESPEAK_NG_ROOT, "Process")
+          # Extract MSI using lessmsi (more reliable than msiexec /a)
+          Write-Host "Installing lessmsi..."
+          choco install -y lessmsi
           
-          # Create lib directory if needed
-          $libDir = "$env:ESPEAK_NG_ROOT\lib"
-          if (!(Test-Path $libDir)) {
-            New-Item -ItemType Directory -Path $libDir -Force
+          Write-Host "Extracting MSI with lessmsi..."
+          & lessmsi x "$MSI_PATH" "$env:TEMP\espeak-extract\"
+          
+          # Find and copy the required files
+          Write-Host "Searching for espeak-ng files..."
+          $sourceBase = "$env:TEMP\espeak-extract\SourceDir"
+          
+          # Common locations for files in the MSI
+          $possibleLocations = @(
+            "$sourceBase\PFiles\eSpeak NG",
+            "$sourceBase\Program Files\eSpeak NG", 
+            "$sourceBase\Files\eSpeak NG",
+            "$sourceBase"
+          )
+          
+          $foundFiles = $false
+          foreach ($location in $possibleLocations) {
+            if (Test-Path "$location\espeak-ng.exe") {
+              Write-Host "Found espeak-ng files at: $location"
+              Copy-Item "$location\*" "$ESPEAK_DIR\" -Recurse -Force
+              $foundFiles = $true
+              break
+            }
+          }
+          
+          if (-not $foundFiles) {
+            Write-Host "Could not find espeak-ng.exe in standard locations, searching entire extract..."
+            $espeakExe = Get-ChildItem -Path "$env:TEMP\espeak-extract" -Filter "espeak-ng.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($espeakExe) {
+              $sourceDir = $espeakExe.Directory.FullName
+              Write-Host "Found espeak-ng at: $sourceDir"
+              Copy-Item "$sourceDir\*" "$ESPEAK_DIR\" -Recurse -Force
+            } else {
+              Write-Error "Could not find espeak-ng.exe anywhere in extracted files"
+              Get-ChildItem -Path "$env:TEMP\espeak-extract" -Recurse | Select-Object FullName | Out-String
+              exit 1
+            }
+          }
+          
+          # Move files to expected structure if needed
+          if (Test-Path "$ESPEAK_DIR\espeak-ng.exe" -and -not (Test-Path "$ESPEAK_DIR\bin\espeak-ng.exe")) {
+            Write-Host "Moving espeak-ng.exe to bin directory..."
+            Move-Item "$ESPEAK_DIR\espeak-ng.exe" "$ESPEAK_DIR\bin\" -Force
+          }
+          
+          # Verify installation
+          if (Test-Path "$ESPEAK_DIR\bin\espeak-ng.exe") {
+            Write-Host "espeak-ng successfully installed"
+            $env:ESPEAK_NG_ROOT = $ESPEAK_DIR
+            [Environment]::SetEnvironmentVariable("ESPEAK_NG_ROOT", $env:ESPEAK_NG_ROOT, "Process")
+            Write-Host "ESPEAK_NG_ROOT set to: $env:ESPEAK_NG_ROOT"
+          } else {
+            Write-Error "espeak-ng.exe not found after extraction"
+            Write-Host "Directory contents:"
+            Get-ChildItem -Path $ESPEAK_DIR -Recurse | Select-Object FullName
+            exit 1
           }
       - name: Configure build
         run: |
