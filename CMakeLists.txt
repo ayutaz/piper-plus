@@ -324,22 +324,42 @@ if(NOT WIN32)  # Enable OpenJTalk for Linux and macOS
       )
       
       # Link all OpenJTalk libraries together
-      target_link_libraries(openjtalk INTERFACE
-        openjtalk_mecab
-        openjtalk_njd
-        openjtalk_jpcommon
-        hts_engine
-        ${OPENJTALK_DIR}/lib/libtext2mecab.a
-        ${OPENJTALK_DIR}/lib/libnjd_set_pronunciation.a
-        ${OPENJTALK_DIR}/lib/libnjd_set_digit.a
-        ${OPENJTALK_DIR}/lib/libnjd_set_accent_phrase.a
-        ${OPENJTALK_DIR}/lib/libnjd_set_accent_type.a
-        ${OPENJTALK_DIR}/lib/libnjd_set_unvoiced_vowel.a
-        ${OPENJTALK_DIR}/lib/libnjd_set_long_vowel.a
-        ${OPENJTALK_DIR}/lib/libmecab2njd.a
-        ${OPENJTALK_DIR}/lib/libnjd2jpcommon.a
-        iconv
-      )
+      if(APPLE)
+        # On macOS, iconv is part of the system
+        target_link_libraries(openjtalk INTERFACE
+          openjtalk_mecab
+          openjtalk_njd
+          openjtalk_jpcommon
+          hts_engine
+          ${OPENJTALK_DIR}/lib/libtext2mecab.a
+          ${OPENJTALK_DIR}/lib/libnjd_set_pronunciation.a
+          ${OPENJTALK_DIR}/lib/libnjd_set_digit.a
+          ${OPENJTALK_DIR}/lib/libnjd_set_accent_phrase.a
+          ${OPENJTALK_DIR}/lib/libnjd_set_accent_type.a
+          ${OPENJTALK_DIR}/lib/libnjd_set_unvoiced_vowel.a
+          ${OPENJTALK_DIR}/lib/libnjd_set_long_vowel.a
+          ${OPENJTALK_DIR}/lib/libmecab2njd.a
+          ${OPENJTALK_DIR}/lib/libnjd2jpcommon.a
+        )
+      else()
+        # On Linux, explicitly link iconv
+        target_link_libraries(openjtalk INTERFACE
+          openjtalk_mecab
+          openjtalk_njd
+          openjtalk_jpcommon
+          hts_engine
+          ${OPENJTALK_DIR}/lib/libtext2mecab.a
+          ${OPENJTALK_DIR}/lib/libnjd_set_pronunciation.a
+          ${OPENJTALK_DIR}/lib/libnjd_set_digit.a
+          ${OPENJTALK_DIR}/lib/libnjd_set_accent_phrase.a
+          ${OPENJTALK_DIR}/lib/libnjd_set_accent_type.a
+          ${OPENJTALK_DIR}/lib/libnjd_set_unvoiced_vowel.a
+          ${OPENJTALK_DIR}/lib/libnjd_set_long_vowel.a
+          ${OPENJTALK_DIR}/lib/libmecab2njd.a
+          ${OPENJTALK_DIR}/lib/libnjd2jpcommon.a
+          iconv
+        )
+      endif()
     endif()
   else()
     message(STATUS "Using prebuilt OpenJTalk at ${OPENJTALK_DIR}")
