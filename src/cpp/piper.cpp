@@ -481,12 +481,11 @@ void textToAudio(PiperConfig &config, Voice &voice, std::string text,
     eSpeakPhonemeConfig eSpeakConfig;
     eSpeakConfig.voice = voice.phonemizeConfig.eSpeak.voice;
     phonemize_eSpeak(text, eSpeakConfig, phonemes);
-// OpenJTalk temporarily disabled
-// #if !defined(_WIN32) && !defined(_MSC_VER)
-//   } else if (voice.phonemizeConfig.phonemeType == OpenJTalkPhonemes) {
-//     // Japanese OpenJTalk phonemizer
-//     phonemize_openjtalk(text, phonemes);
-// #endif
+#if !defined(_WIN32) && !defined(_MSC_VER)
+  } else if (voice.phonemizeConfig.phonemeType == OpenJTalkPhonemes) {
+    // Japanese OpenJTalk phonemizer
+    phonemize_openjtalk(text, phonemes);
+#endif
   } else {
     // Use UTF-8 codepoints as "phonemes"
     CodepointsPhonemeConfig codepointsConfig;

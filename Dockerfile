@@ -96,11 +96,10 @@ RUN if [ "$TARGETARCH" = "amd64" ]; then \
     fi
 
 # Pre-download OpenJTalk dictionary to avoid download during build
-# Temporarily disabled while OpenJTalk is disabled
-# RUN mkdir -p /build/build/naist-jdic && \
-#     curl -L --retry 3 https://sourceforge.net/projects/open-jtalk/files/Dictionary/open_jtalk_dic-1.11/open_jtalk_dic_utf_8-1.11.tar.gz/download -o /tmp/dict.tar.gz && \
-#     tar -xzf /tmp/dict.tar.gz -C /build/build/naist-jdic --strip-components=1 && \
-#     rm /tmp/dict.tar.gz
+RUN mkdir -p /build/build/naist-jdic && \
+    curl -L --retry 3 https://sourceforge.net/projects/open-jtalk/files/Dictionary/open_jtalk_dic-1.11/open_jtalk_dic_utf_8-1.11.tar.gz/download -o /tmp/dict.tar.gz && \
+    tar -xzf /tmp/dict.tar.gz -C /build/build/naist-jdic --strip-components=1 && \
+    rm /tmp/dict.tar.gz
 
 # Build step (with architecture-specific optimizations)
 RUN if [ "$TARGETARCH" = "arm64" ]; then \
@@ -124,10 +123,15 @@ RUN if [ "$TARGETARCH" = "amd64" ]; then \
         ./build/piper --help; \
     fi
 
-# アーカイブの作成
+# アーカイブの作成（辞書ファイルも含める）
 WORKDIR /dist
 RUN mkdir -p piper && \
     cp -dR /build/install/* ./piper/ && \
+    # Copy dictionary if it exists
+    if [ -d /build/build/naist-jdic ]; then \
+        mkdir -p ./piper/share/piper && \
+        cp -r /build/build/naist-jdic ./piper/share/piper/openjtalk-dict; \
+    fi && \
     tar -czf "piper_${TARGETARCH}.tar.gz" piper/
 
 FROM scratch
