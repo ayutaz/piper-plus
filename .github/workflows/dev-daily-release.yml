@@ -872,14 +872,30 @@ jobs:
             
             # Set up library path
             export LD_LIBRARY_PATH=$PWD/piper/lib:$LD_LIBRARY_PATH
+          elif [ "${{ runner.os }}" = "macOS" ]; then
+            echo "Checking library dependencies..."
+            otool -L "${{ matrix.binary_path }}" || true
+            ls -la piper/lib/ || true
+            
+            # Set up library path
+            export DYLD_LIBRARY_PATH=$PWD/piper/lib:$DYLD_LIBRARY_PATH
           fi
           
           # Set up espeak-ng data path
-          if [ -d "/usr/share/espeak-ng-data" ]; then
+          if [ "${{ runner.os }}" = "macOS" ]; then
+            # macOS with Homebrew
+            if [ -d "/opt/homebrew/share/espeak-ng-data" ]; then
+              export ESPEAK_DATA_PATH="/opt/homebrew/share/espeak-ng-data"
+            elif [ -d "/usr/local/share/espeak-ng-data" ]; then
+              export ESPEAK_DATA_PATH="/usr/local/share/espeak-ng-data"
+            fi
+          elif [ -d "/usr/share/espeak-ng-data" ]; then
             export ESPEAK_DATA_PATH="/usr/share/espeak-ng-data"
           elif [ -d "piper/espeak-ng-data" ]; then
             export ESPEAK_DATA_PATH=$PWD/piper/espeak-ng-data
           fi
+          
+          echo "ESPEAK_DATA_PATH=$ESPEAK_DATA_PATH"
           
           # Download test model (using English model for basic functionality test)
           echo "Downloading test model..."
