@@ -176,23 +176,46 @@ jobs:
           if ($vs) {
             [Environment]::SetEnvironmentVariable('VSINSTALLDIR', $vs, 'Process')
           }
-          # Build espeak-ng from source for Windows
+          # For Windows, we need to manually download and set up espeak-ng
+          # since building from source requires MSYS2/MinGW which is complex in CI
           $ESPEAK_DIR = "C:\espeak-ng"
           
-          Write-Host "Cloning espeak-ng repository..."
-          git clone --depth 1 --branch 1.51 https://github.com/espeak-ng/espeak-ng.git $ESPEAK_DIR
+          Write-Host "Downloading espeak-ng..."
+          # Download the MSI installer and extract files
+          $ESPEAK_MSI_URL = "https://github.com/espeak-ng/espeak-ng/releases/download/1.51/espeak-ng-X64.msi"
+          $MSI_PATH = "$env:TEMP\espeak-ng.msi"
           
-          Write-Host "Building espeak-ng..."
-          Push-Location $ESPEAK_DIR
+          Invoke-WebRequest -Uri $ESPEAK_MSI_URL -OutFile $MSI_PATH -ErrorAction Stop
           
-          # Configure and build using CMake
-          cmake -B build -G "Ninja" -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$ESPEAK_DIR\install"
-          cmake --build build --config Release
-          cmake --install build
+          # Extract MSI contents without installing
+          Write-Host "Extracting espeak-ng..."
+          msiexec /a $MSI_PATH /qn TARGETDIR=$ESPEAK_DIR
           
-          Pop-Location
+          # Find the actual installation directory (MSI creates subdirectories)
+          $ESPEAK_NG_ROOT = Get-ChildItem -Path $ESPEAK_DIR -Directory -Recurse | Where-Object { Test-Path "$_\espeak-ng.exe" } | Select-Object -First 1
           
-          $env:ESPEAK_NG_ROOT = "$ESPEAK_DIR\install"
+          if ($ESPEAK_NG_ROOT) {
+            $env:ESPEAK_NG_ROOT = $ESPEAK_NG_ROOT.FullName
+            Write-Host "Found espeak-ng at: $env:ESPEAK_NG_ROOT"
+            
+            # Create lib directory and copy import library if it exists
+            $libDir = "$env:ESPEAK_NG_ROOT\lib"
+            if (!(Test-Path $libDir)) {
+              New-Item -ItemType Directory -Path $libDir -Force
+            }
+            
+            # Look for the DLL and create an import library
+            $dllPath = Get-ChildItem -Path $env:ESPEAK_NG_ROOT -Filter "espeak-ng.dll" -Recurse | Select-Object -First 1
+            if ($dllPath) {
+              Write-Host "Found DLL at: $($dllPath.FullName)"
+              # Copy DLL to lib directory for easier linking
+              Copy-Item $dllPath.FullName "$libDir\espeak-ng.dll"
+            }
+          } else {
+            Write-Error "Could not find espeak-ng installation"
+            exit 1
+          }
+          
           [Environment]::SetEnvironmentVariable("ESPEAK_NG_ROOT", $env:ESPEAK_NG_ROOT, "Process")
       - name: Configure build
         run: |

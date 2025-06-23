@@ -370,8 +370,14 @@ if(NOT WIN32)  # Enable OpenJTalk for Linux and macOS
   target_link_libraries(test_piper PUBLIC openjtalk)
   
   # Add dependencies to ensure OpenJTalk is built first
-  add_dependencies(piper openjtalk_external)
-  add_dependencies(test_piper openjtalk_external)
+  if(TARGET openjtalk_external)
+    add_dependencies(piper openjtalk_external)
+    add_dependencies(test_piper openjtalk_external)
+  endif()
+  if(TARGET hts_engine_external)
+    add_dependencies(piper hts_engine_external)
+    add_dependencies(test_piper hts_engine_external)
+  endif()
   
   # Add include directories for OpenJTalk headers
   target_include_directories(piper PUBLIC ${OPENJTALK_DIR}/include ${HTS_ENGINE_DIR}/include)
@@ -399,8 +405,10 @@ if(NOT WIN32)  # Enable OpenJTalk for Linux and macOS
     )
     
     # Add dependency to ensure dictionary is downloaded
-    add_dependencies(piper naist_jdic_external)
-    add_dependencies(test_piper naist_jdic_external)
+    if(TARGET naist_jdic_external)
+      add_dependencies(piper naist_jdic_external)
+      add_dependencies(test_piper naist_jdic_external)
+    endif()
   endif()
   
   # Install dictionary with the binary
