@@ -86,10 +86,10 @@ endif()
 set(PIPER_SOURCES src/cpp/main.cpp src/cpp/piper.cpp)
 set(TEST_PIPER_SOURCES src/cpp/test.cpp src/cpp/piper.cpp)
 
-# Add OpenJTalk sources only on Unix platforms
-if(NOT WIN32 AND NOT MSVC)
-  list(APPEND PIPER_SOURCES src/cpp/openjtalk_phonemize.cpp src/cpp/openjtalk_wrapper.c)
-  list(APPEND TEST_PIPER_SOURCES src/cpp/openjtalk_phonemize.cpp src/cpp/openjtalk_wrapper.c)
+# Add OpenJTalk sources for all platforms if OpenJTalk is enabled
+if(TRUE)  # OpenJTalk is now enabled for all platforms
+  list(APPEND PIPER_SOURCES src/cpp/openjtalk_phonemize.cpp src/cpp/openjtalk_api.c)
+  list(APPEND TEST_PIPER_SOURCES src/cpp/openjtalk_phonemize.cpp src/cpp/openjtalk_api.c)
 endif()
 
 add_executable(piper ${PIPER_SOURCES})
@@ -166,7 +166,7 @@ endif()
 # ---- openjtalk (Japanese phonemizer) ----
 # Build OpenJTalk on all platforms using CMake-compatible fork
 
-if(FALSE)  # Temporarily disable OpenJTalk to fix basic builds
+if(TRUE)  # Enable OpenJTalk for Japanese support
   include(ExternalProject)
 
   if(NOT DEFINED OPENJTALK_DIR)
@@ -382,6 +382,36 @@ if(FALSE)  # Temporarily disable OpenJTalk to fix basic builds
   # Add dependencies to ensure OpenJTalk is built first
   add_dependencies(piper openjtalk_external)
   add_dependencies(test_piper openjtalk_external)
+  
+  # ---- Download and install naist-jdic dictionary ----
+  set(NAIST_JDIC_VERSION "open_jtalk_dic_utf_8-1.11")
+  set(NAIST_JDIC_DIR "${CMAKE_CURRENT_BINARY_DIR}/naist-jdic")
+  
+  if(NOT EXISTS "${NAIST_JDIC_DIR}")
+    message(STATUS "Downloading naist-jdic dictionary...")
+    
+    # Download dictionary from SourceForge
+    ExternalProject_Add(
+      naist_jdic_external
+      PREFIX "${CMAKE_CURRENT_BINARY_DIR}/dict"
+      URL "https://sourceforge.net/projects/open-jtalk/files/Dictionary/open_jtalk_dic-1.11/${NAIST_JDIC_VERSION}.tar.gz"
+      URL_HASH SHA256=0abe12c43fff031aafaea02bdfc4802b9ef5cc58f8d35d1ce4e24be8a3926910
+      BUILD_COMMAND ""
+      CONFIGURE_COMMAND ""
+      INSTALL_COMMAND 
+        ${CMAKE_COMMAND} -E copy_directory 
+        <SOURCE_DIR>
+        ${NAIST_JDIC_DIR}
+    )
+    
+    # Add dependency to ensure dictionary is downloaded
+    add_dependencies(piper naist_jdic_external)
+    add_dependencies(test_piper naist_jdic_external)
+  endif()
+  
+  # Set dictionary path as compile definition
+  target_compile_definitions(piper PUBLIC OPENJTALK_DICT_DIR="${NAIST_JDIC_DIR}")
+  target_compile_definitions(test_piper PUBLIC OPENJTALK_DICT_DIR="${NAIST_JDIC_DIR}")
 endif()
 
 # ---- Declare executable ----

@@ -1,41 +1,28 @@
 #include "openjtalk_wrapper.h"
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#include "openjtalk_api.h"
 
-// Simplified stub implementation for now - will be completed later
-// This allows the build to succeed while we figure out the library structure
+// Simple wrapper that delegates to the actual API implementation
 
 OpenJTalk* openjtalk_initialize() {
-    OpenJTalk* oj = (OpenJTalk*)malloc(sizeof(OpenJTalk));
-    if (!oj) return NULL;
-    
-    memset(oj, 0, sizeof(OpenJTalk));
-    oj->initialized = 0; // Set to 0 for now, will fallback to codepoints
-    
-    return oj;
+    return openjtalk_initialize();
 }
 
 void openjtalk_finalize(OpenJTalk* oj) {
-    if (!oj) return;
-    free(oj);
+    openjtalk_finalize(oj);
 }
 
 HTS_Label_Wrapper* openjtalk_extract_fullcontext(OpenJTalk* oj, const char* text) {
-    if (!oj || !text) return NULL;
-    
-    // Return NULL to trigger fallback behavior in phonemize function
-    return NULL;
+    return (HTS_Label_Wrapper*)openjtalk_extract_fullcontext(oj, text);
 }
 
 size_t HTS_Label_get_size(HTS_Label_Wrapper* label) {
-    return 0;
+    return HTS_Label_get_size((HTS_Label*)label);
 }
 
 const char* HTS_Label_get_string(HTS_Label_Wrapper* label, size_t index) {
-    return NULL;
+    return HTS_Label_get_string((HTS_Label*)label, index);
 }
 
 void HTS_Label_clear(HTS_Label_Wrapper* label) {
-    if (label) free(label);
+    HTS_Label_clear((HTS_Label*)label);
 }

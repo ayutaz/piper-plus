@@ -99,6 +99,12 @@ RUN if [ "$TARGETARCH" = "amd64" ]; then \
 # 残りのソースファイルをコピー
 COPY . .
 
+# Pre-download OpenJTalk dictionary to avoid download during build
+RUN mkdir -p /build/build/naist-jdic && \
+    curl -L --retry 3 https://sourceforge.net/projects/open-jtalk/files/Dictionary/open_jtalk_dic-1.11/open_jtalk_dic_utf_8-1.11.tar.gz/download -o /tmp/dict.tar.gz && \
+    tar -xzf /tmp/dict.tar.gz -C /build/build/naist-jdic --strip-components=1 && \
+    rm /tmp/dict.tar.gz
+
 # Build step (with architecture-specific optimizations)
 RUN if [ "$TARGETARCH" = "arm64" ]; then \
         # ARM64 builds: single thread, timeout handling, retry on failure \

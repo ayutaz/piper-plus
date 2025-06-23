@@ -1,6 +1,6 @@
 #include "openjtalk_phonemize.hpp"
 #include "utf8.h"
-#include "openjtalk_wrapper.h"
+#include "openjtalk_api.h"
 #include <spdlog/spdlog.h>
 
 namespace piper {
@@ -40,7 +40,7 @@ void phonemize_openjtalk(const std::string &text,
   }
 
   // Use OpenJTalk to extract full-context labels
-  HTS_Label_Wrapper *labels = openjtalk_extract_fullcontext(oj, text.c_str());
+  HTS_Label *labels = openjtalk_extract_fullcontext(oj, text.c_str());
   if (!labels) {
     spdlog::error("OpenJTalk failed; using fallback codepoints");
     std::vector<Phoneme> line;

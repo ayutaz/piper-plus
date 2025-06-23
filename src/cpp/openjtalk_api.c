@@ -17,6 +17,14 @@
 #include "njd_set_long_vowel.h"
 #include "njd_set_unvoiced_vowel.h"
 
+// Get dictionary path from compile definition
+#ifndef OPENJTALK_DICT_DIR
+#error "OPENJTALK_DICT_DIR must be defined"
+#endif
+
+// MeCab functions
+extern int Mecab_load(Mecab *m, const char *dic_dir);
+
 // OpenJTalk wrapper structure
 struct _OpenJTalk {
     Mecab mecab;
@@ -39,6 +47,15 @@ OpenJTalk* openjtalk_initialize() {
     
     // Initialize MeCab
     Mecab_initialize(&oj->mecab);
+    
+    // Load MeCab dictionary
+    if (!Mecab_load(&oj->mecab, OPENJTALK_DICT_DIR)) {
+        fprintf(stderr, "Failed to load MeCab dictionary from: %s\n", OPENJTALK_DICT_DIR);
+        // Clean up and return NULL
+        Mecab_clear(&oj->mecab);
+        free(oj);
+        return NULL;
+    }
     
     // Initialize NJD
     NJD_initialize(&oj->njd);
