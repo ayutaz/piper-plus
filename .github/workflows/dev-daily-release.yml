@@ -753,7 +753,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libespeak-ng1
+          sudo apt-get install -y libespeak-ng1 espeak-ng-data
           
       - name: Install dependencies (macOS)
         if: runner.os == 'macOS'
@@ -869,6 +869,16 @@ jobs:
             echo "Checking library dependencies..."
             ldd "${{ matrix.binary_path }}" || true
             ls -la piper/lib/ || true
+            
+            # Set up library path
+            export LD_LIBRARY_PATH=$PWD/piper/lib:$LD_LIBRARY_PATH
+          fi
+          
+          # Set up espeak-ng data path
+          if [ -d "/usr/share/espeak-ng-data" ]; then
+            export ESPEAK_DATA_PATH="/usr/share/espeak-ng-data"
+          elif [ -d "piper/espeak-ng-data" ]; then
+            export ESPEAK_DATA_PATH=$PWD/piper/espeak-ng-data
           fi
           
           # Download test model (using English model for basic functionality test)
@@ -886,7 +896,12 @@ jobs:
           
           # Test OpenJTalk phonemization (without model)
           echo "Testing OpenJTalk phonemization..."
-          echo "これはOpenJTalkのテストです" | "${{ matrix.binary_path }}" --phonemize openjtalk 2>&1 | grep -E "(phoneme|OpenJTalk|fallback)" || echo "OpenJTalk test output not captured"
+          # Note: OpenJTalk support is currently optional and may not be available in all builds
+          if "${{ matrix.binary_path }}" --help 2>&1 | grep -q "openjtalk"; then
+            echo "これはOpenJTalkのテストです" | "${{ matrix.binary_path }}" --phonemize openjtalk 2>&1 || echo "OpenJTalk phonemization not available"
+          else
+            echo "OpenJTalk support not compiled in this build"
+          fi
           
           # Run TTS with English model
           if [ -f "test/models/en_US-lessac-medium.onnx" ]; then
