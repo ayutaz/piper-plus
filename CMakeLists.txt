@@ -358,7 +358,7 @@ if(USE_OPENJTALK AND NOT WIN32)  # Enable OpenJTalk for Linux and macOS
           ${OPENJTALK_DIR}/lib/libnjd2jpcommon.a
         )
       else()
-        # On Linux, explicitly link iconv
+        # On Linux, iconv is part of glibc
         target_link_libraries(openjtalk INTERFACE
           openjtalk_mecab
           openjtalk_njd
@@ -373,8 +373,18 @@ if(USE_OPENJTALK AND NOT WIN32)  # Enable OpenJTalk for Linux and macOS
           ${OPENJTALK_DIR}/lib/libnjd_set_long_vowel.a
           ${OPENJTALK_DIR}/lib/libmecab2njd.a
           ${OPENJTALK_DIR}/lib/libnjd2jpcommon.a
-          iconv
         )
+        # On Debian/Ubuntu, iconv is part of glibc and doesn't need explicit linking
+        # However, some builds of OpenJTalk may still reference -liconv
+        # We'll handle this by checking if iconv needs explicit linking
+        find_library(ICONV_LIBRARY NAMES iconv libiconv PATHS /usr/lib /usr/local/lib NO_DEFAULT_PATH)
+        if(ICONV_LIBRARY)
+          target_link_libraries(openjtalk INTERFACE ${ICONV_LIBRARY})
+        else()
+          # Try to link without explicit iconv - it should be in glibc
+          # If OpenJTalk was built expecting -liconv, we may need to rebuild it
+          message(STATUS "iconv library not found as separate library - assuming it's part of glibc")
+        endif()
       endif()
     endif()
   else()
