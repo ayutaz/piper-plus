@@ -286,10 +286,8 @@ jobs:
                   Write-Host "Found lib.exe at: $libExePath"
                   # Create a simple .def file
                   $defFile = "$env:TEMP\espeak-ng.def"
-                  @"
-LIBRARY espeak-ng
-EXPORTS
-"@ | Out-File -FilePath $defFile -Encoding ASCII
+                  $defContent = "LIBRARY espeak-ng`nEXPORTS"
+                  $defContent | Out-File -FilePath $defFile -Encoding ASCII
                   
                   & $libExePath /DEF:$defFile /OUT:$libFile /MACHINE:X64
                 } else {
