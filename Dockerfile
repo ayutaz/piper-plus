@@ -108,14 +108,21 @@ RUN if [ "$TARGETARCH" = "amd64" ]; then \
 RUN if [ "$TARGETARCH" = "arm64" ]; then \
         # ARM64 builds: single thread, timeout handling, retry on failure \
         echo "Starting ARM64 build with single thread..." && \
-        timeout 3600 cmake --build build --config Release --parallel 1 || \
-        (echo "Build failed, retrying..." && timeout 1800 cmake --build build --config Release --parallel 1); \
+        timeout 3600 cmake --build build --config Release --parallel 1 --verbose || \
+        (echo "Build failed, showing error details..." && \
+         cat build/CMakeFiles/CMakeOutput.log || true && \
+         cat build/CMakeFiles/CMakeError.log || true && \
+         echo "Retrying build..." && \
+         timeout 1800 cmake --build build --config Release --parallel 1 --verbose); \
     else \
         # x86_64 builds: standard parallel build \
         echo "Starting AMD64 build with 2 parallel threads..." && \
-        cmake --build build --config Release --parallel 2 || \
-        (echo "Build failed with parallel build, retrying with single thread..." && \
-         cmake --build build --config Release --parallel 1); \
+        cmake --build build --config Release --parallel 2 --verbose || \
+        (echo "Build failed with parallel build, showing error details..." && \
+         cat build/CMakeFiles/CMakeOutput.log || true && \
+         cat build/CMakeFiles/CMakeError.log || true && \
+         echo "Retrying with single thread..." && \
+         cmake --build build --config Release --parallel 1 --verbose); \
     fi
 
 # Install step  
