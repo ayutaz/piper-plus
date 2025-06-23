@@ -302,7 +302,8 @@ jobs:
             -G "Ninja" `
             -DCMAKE_INSTALL_PREFIX=_install/piper `
             -DCMAKE_BUILD_TYPE=${{ env.CMAKE_BUILD_TYPE }} `
-            -DESPEAK_NG_ROOT="$env:ESPEAK_NG_ROOT"
+            -DESPEAK_NG_ROOT="$env:ESPEAK_NG_ROOT" `
+            -DUSE_OPENJTALK=ON
           if ($LASTEXITCODE -ne 0) {
             Write-Error "CMake configuration failed"
             exit 1
@@ -524,7 +525,8 @@ jobs:
             -DCMAKE_BUILD_TYPE=${{ env.CMAKE_BUILD_TYPE }} \
             -DCMAKE_OSX_ARCHITECTURES=$CMAKE_OSX_ARCHITECTURES \
             -DCMAKE_OSX_DEPLOYMENT_TARGET=$CMAKE_OSX_DEPLOYMENT_TARGET \
-            -DESPEAK_NG_ROOT=$ESPEAK_NG_ROOT
+            -DESPEAK_NG_ROOT=$ESPEAK_NG_ROOT \
+            -DUSE_OPENJTALK=ON
           
           if [ $? -ne 0 ]; then
             echo "::error::CMake configuration failed"

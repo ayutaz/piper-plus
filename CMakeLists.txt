@@ -88,10 +88,10 @@ set(TEST_PIPER_SOURCES src/cpp/test.cpp src/cpp/piper.cpp)
 
 # Add OpenJTalk sources for all platforms if OpenJTalk is enabled
 if(NOT DEFINED USE_OPENJTALK_DEFAULT)
-  set(USE_OPENJTALK_DEFAULT OFF)
+  set(USE_OPENJTALK_DEFAULT ON)
 endif()
 option(USE_OPENJTALK "Enable OpenJTalk for Japanese support" ${USE_OPENJTALK_DEFAULT})
-if(USE_OPENJTALK AND NOT WIN32)  # Enable for Linux and macOS
+if(USE_OPENJTALK)
   message(STATUS "OpenJTalk support enabled for Japanese text processing")
   list(APPEND PIPER_SOURCES src/cpp/openjtalk_phonemize.cpp src/cpp/openjtalk_api.c)
   list(APPEND TEST_PIPER_SOURCES src/cpp/openjtalk_phonemize.cpp src/cpp/openjtalk_api.c)
