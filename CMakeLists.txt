@@ -390,9 +390,10 @@ if(NOT WIN32)  # Enable OpenJTalk for Linux and macOS
     USE_SOURCE_PERMISSIONS
   )
   
-  # Set dictionary path - absolute for build/test, relative for installed binary
-  target_compile_definitions(piper PUBLIC OPENJTALK_DICT_DIR="${CMAKE_INSTALL_PREFIX}/share/piper/openjtalk-dict")
-  target_compile_definitions(test_piper PUBLIC OPENJTALK_DICT_DIR="${NAIST_JDIC_DIR}")
+  # Set dictionary path - use build directory path for build/test
+  # For build-time usage (including CI), use the actual extracted dictionary path
+  target_compile_definitions(piper PRIVATE OPENJTALK_DICT_DIR="${NAIST_JDIC_DIR}")
+  target_compile_definitions(test_piper PRIVATE OPENJTALK_DICT_DIR="${NAIST_JDIC_DIR}")
 endif()
 
 # ---- Find espeak-ng ----

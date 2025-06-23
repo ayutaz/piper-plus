@@ -2,6 +2,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
+#include <limits.h>
+#ifdef __APPLE__
+#include <mach-o/dyld.h>
+#endif
 
 // OpenJTalk implementation using static linking
 // This avoids the need for internal headers at compile time
@@ -75,11 +80,55 @@ OpenJTalk* openjtalk_initialize() {
     NJD_initialize(oj->njd);
     JPCommon_initialize(oj->jpcommon);
     
-    // Get dictionary directory from environment or use default
+    // Get dictionary directory from environment, CMake definition, or use default
     const char* dic_dir = getenv("OPENJTALK_DICTIONARY_DIR");
     if (!dic_dir) {
-        // Try to find dictionary in build directory
-        dic_dir = "o/src/openjtalk_external/src/mecab-naist-jdic";
+#ifdef OPENJTALK_DICT_DIR
+        // Use CMake-defined dictionary path (for build/test)
+        dic_dir = OPENJTALK_DICT_DIR;
+#else
+        // Try to find dictionary relative to executable for installed version
+        static char dict_path[PATH_MAX];
+        char exe_path[PATH_MAX];
+        exe_path[0] = '\0';
+        
+#ifdef __APPLE__
+        uint32_t size = sizeof(exe_path);
+        if (_NSGetExecutablePath(exe_path, &size) == 0) {
+            // Success
+        }
+#elif defined(__linux__)
+        ssize_t len = readlink("/proc/self/exe", exe_path, sizeof(exe_path) - 1);
+        if (len > 0) {
+            exe_path[len] = '\0';
+        }
+#endif
+        
+        if (exe_path[0] != '\0') {
+            // Remove executable name to get directory
+            char* last_slash = strrchr(exe_path, '/');
+            if (last_slash) {
+                *last_slash = '\0';
+                // Try ../share/piper/openjtalk-dict (installed location)
+                snprintf(dict_path, sizeof(dict_path), "%s/../share/piper/openjtalk-dict", exe_path);
+                if (access(dict_path, F_OK) == 0) {
+                    dic_dir = dict_path;
+                } else {
+                    // Try build/naist-jdic (build directory)
+                    snprintf(dict_path, sizeof(dict_path), "%s/../build/naist-jdic", exe_path);
+                    if (access(dict_path, F_OK) == 0) {
+                        dic_dir = dict_path;
+                    } else {
+                        // Fallback to current directory
+                        dic_dir = "naist-jdic";
+                    }
+                }
+            }
+        } else {
+            // Fallback if we can't determine exe path
+            dic_dir = "naist-jdic";
+        }
+#endif
     }
     
     oj->dic_dir = strdup(dic_dir);
@@ -97,6 +146,13 @@ OpenJTalk* openjtalk_initialize() {
     }
     
     fprintf(stderr, "OpenJTalk: Initialized with dictionary: %s\n", dic_dir);
+    
+    // Debug: Check if dictionary files actually exist
+    char dict_file[1024];
+    snprintf(dict_file, sizeof(dict_file), "%s/sys.dic", dic_dir);
+    if (access(dict_file, F_OK) != 0) {
+        fprintf(stderr, "OpenJTalk: WARNING - Dictionary file not found: %s\n", dict_file);
+    }
     return oj;
 }
 
