@@ -978,7 +978,7 @@ jobs:
       - name: Test Python inference
         run: |
           echo "Testing Python inference..."
-          python -c "
+          cat > test_import.py << 'EOF'
 import sys
 import os
 sys.path.insert(0, 'src/python_run')
@@ -1012,20 +1012,21 @@ try:
                 
                 if os.path.exists('test_output.wav'):
                     size = os.path.getsize('test_output.wav')
-                    print(f'✓ Generated test_output.wav ({size} bytes)')
+                    print('✓ Generated test_output.wav (' + str(size) + ' bytes)')
             else:
                 print('⚠ Model file not found, skipping synthesis test')
         except Exception as e:
-            print(f'⚠ Extended test failed: {e}')
+            print('⚠ Extended test failed: ' + str(e))
             print('  This is not critical - basic imports still work')
     
 except ImportError as e:
-    print(f'✗ Import failed: {e}')
+    print('✗ Import failed: ' + str(e))
     sys.exit(1)
 except Exception as e:
-    print(f'✗ Unexpected error: {e}')
+    print('✗ Unexpected error: ' + str(e))
     sys.exit(1)
-"
+EOF
+          python test_import.py
           
       - name: Upload test outputs
         if: always()
