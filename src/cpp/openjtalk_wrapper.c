@@ -4,6 +4,10 @@
 #include <string.h>
 #include <limits.h>
 #include <libgen.h>
+
+#ifndef PATH_MAX
+#define PATH_MAX 4096
+#endif
 #ifdef __APPLE__
 #include <mach-o/dyld.h>
 #endif
