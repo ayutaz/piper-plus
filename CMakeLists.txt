@@ -176,7 +176,7 @@ endif()
 # ---- openjtalk (Japanese phonemizer) ----
 # Build OpenJTalk on all platforms using CMake-compatible fork
 
-if(USE_OPENJTALK AND NOT WIN32)  # Enable OpenJTalk for Linux and macOS
+if(USE_OPENJTALK)  # Enable OpenJTalk for all platforms
   include(ExternalProject)
 
   if(NOT DEFINED OPENJTALK_DIR)

@@ -303,7 +303,7 @@ jobs:
             -DCMAKE_INSTALL_PREFIX=_install/piper `
             -DCMAKE_BUILD_TYPE=${{ env.CMAKE_BUILD_TYPE }} `
             -DESPEAK_NG_ROOT="$env:ESPEAK_NG_ROOT" `
-            -DUSE_OPENJTALK=OFF
+            -DUSE_OPENJTALK=ON
           if ($LASTEXITCODE -ne 0) {
             Write-Error "CMake configuration failed"
             exit 1
