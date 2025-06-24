@@ -253,6 +253,15 @@ if(NOT WIN32 AND NOT MSVC)
         ${OPENJTALK_DIR}/lib/libmecab.a
         ${OPENJTALK_DIR}/lib/libnjd.a
         ${OPENJTALK_DIR}/lib/libjpcommon.a
+        ${OPENJTALK_DIR}/lib/libmecab2njd.a
+        ${OPENJTALK_DIR}/lib/libnjd2jpcommon.a
+        ${OPENJTALK_DIR}/lib/libnjd_set_pronunciation.a
+        ${OPENJTALK_DIR}/lib/libnjd_set_digit.a
+        ${OPENJTALK_DIR}/lib/libnjd_set_accent_phrase.a
+        ${OPENJTALK_DIR}/lib/libnjd_set_accent_type.a
+        ${OPENJTALK_DIR}/lib/libnjd_set_unvoiced_vowel.a
+        ${OPENJTALK_DIR}/lib/libnjd_set_long_vowel.a
+        ${HTS_ENGINE_DIR}/lib/libHTSEngine.a
         ${OPENJTALK_DIR}/include/text2mecab.h
         ${OPENJTALK_DIR}/include/mecab.h
         ${OPENJTALK_DIR}/include/njd.h
