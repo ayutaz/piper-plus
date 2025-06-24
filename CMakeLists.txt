@@ -259,9 +259,37 @@ if(NOT WIN32 AND NOT MSVC)
         ${OPENJTALK_DIR}/include/jpcommon.h
     )
 
-    # For now, just create stub implementation - will implement proper OpenJTalk integration later
-    # This allows the build to succeed while we figure out library structure
+    # Create OpenJTalk interface library with proper linking
     add_library(openjtalk INTERFACE)
+    
+    # Link all OpenJTalk static libraries in correct order
+    target_link_libraries(openjtalk INTERFACE
+      ${OPENJTALK_DIR}/lib/libnjd2jpcommon.a
+      ${OPENJTALK_DIR}/lib/libnjd_set_long_vowel.a
+      ${OPENJTALK_DIR}/lib/libnjd_set_unvoiced_vowel.a
+      ${OPENJTALK_DIR}/lib/libnjd_set_accent_type.a
+      ${OPENJTALK_DIR}/lib/libnjd_set_accent_phrase.a
+      ${OPENJTALK_DIR}/lib/libnjd_set_digit.a
+      ${OPENJTALK_DIR}/lib/libnjd_set_pronunciation.a
+      ${OPENJTALK_DIR}/lib/libjpcommon.a
+      ${OPENJTALK_DIR}/lib/libnjd.a
+      ${OPENJTALK_DIR}/lib/libmecab2njd.a
+      ${OPENJTALK_DIR}/lib/libmecab.a
+      ${OPENJTALK_DIR}/lib/libtext2mecab.a
+      ${HTS_ENGINE_DIR}/lib/libHTSEngine.a
+      iconv
+    )
+    
+    # Add include directories
+    target_include_directories(openjtalk INTERFACE
+      ${OPENJTALK_DIR}/include
+      ${HTS_ENGINE_DIR}/include
+    )
+    
+    # Add dictionary path definition
+    target_compile_definitions(openjtalk INTERFACE
+      OPENJTALK_DICTIONARY_DIR="${CMAKE_CURRENT_BINARY_DIR}/naist-jdic"
+    )
   else()
     message(STATUS "Using prebuilt OpenJTalk at ${OPENJTALK_DIR}")
     add_library(openjtalk INTERFACE)
