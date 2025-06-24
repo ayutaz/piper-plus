@@ -209,8 +209,9 @@ if(USE_OPENJTALK)  # Enable OpenJTalk for all platforms
           -DCMAKE_INSTALL_PREFIX=${HTS_ENGINE_DIR}
           -DCMAKE_BUILD_TYPE=Release
           -DBUILD_SHARED_LIBS=OFF
+          -G ${CMAKE_GENERATOR}
         BUILD_BYPRODUCTS 
-          ${HTS_ENGINE_DIR}/lib/HTSEngine.lib
+          ${HTS_ENGINE_DIR}/lib/hts_engine_API.lib
           ${HTS_ENGINE_DIR}/include/HTS_engine.h
         LOG_DOWNLOAD ON
         LOG_UPDATE ON
@@ -251,7 +252,7 @@ if(USE_OPENJTALK)  # Enable OpenJTalk for all platforms
           -DCMAKE_BUILD_TYPE=Release
           -DBUILD_SHARED_LIBS=OFF
           -DHTS_ENGINE_INCLUDE_DIR=${HTS_ENGINE_DIR}/include
-          -DHTS_ENGINE_LIB=${HTS_ENGINE_DIR}/lib/HTSEngine.lib
+          -DHTS_ENGINE_LIB=${HTS_ENGINE_DIR}/lib/hts_engine_API.lib
           -DCMAKE_VERBOSE_MAKEFILE=ON
         BUILD_BYPRODUCTS 
           ${OPENJTALK_DIR}/lib/OpenJTalk.lib
@@ -315,7 +316,7 @@ if(USE_OPENJTALK)  # Enable OpenJTalk for all platforms
       
       add_library(hts_engine STATIC IMPORTED)
       set_target_properties(hts_engine PROPERTIES
-        IMPORTED_LOCATION ${HTS_ENGINE_DIR}/lib/HTSEngine.lib
+        IMPORTED_LOCATION ${HTS_ENGINE_DIR}/lib/hts_engine_API.lib
       )
       
       target_link_libraries(openjtalk INTERFACE
