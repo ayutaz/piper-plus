@@ -267,6 +267,17 @@ if(NOT WIN32 AND NOT MSVC)
         ${OPENJTALK_DIR}/include/jpcommon.h
     )
 
+    # Download and install NAIST Japanese Dictionary
+    ExternalProject_Add(
+      naist_jdic_external
+      PREFIX "${CMAKE_CURRENT_BINARY_DIR}/n"
+      URL "https://github.com/r9y9/open_jtalk/releases/download/v1.11.1/naist-jdic-utf8.tar.gz"
+      CONFIGURE_COMMAND ""
+      BUILD_COMMAND ""
+      INSTALL_COMMAND ${CMAKE_COMMAND} -E copy_directory <SOURCE_DIR> ${CMAKE_CURRENT_BINARY_DIR}/naist-jdic
+      BUILD_BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/naist-jdic/sys.dic
+    )
+
     # Create OpenJTalk interface library with proper linking
     add_library(openjtalk INTERFACE)
     
@@ -364,7 +375,7 @@ target_compile_definitions(piper PUBLIC _PIPER_VERSION=${piper_version})
 
 # Ensure OpenJTalk is built before piper
 if(NOT WIN32 AND NOT MSVC)
-  add_dependencies(piper openjtalk_external hts_engine_external)
+  add_dependencies(piper openjtalk_external hts_engine_external naist_jdic_external)
 endif()
 
 # ---- Declare test ----
@@ -401,7 +412,7 @@ target_link_libraries(test_piper PUBLIC
 
 # Ensure OpenJTalk is built before test_piper
 if(NOT WIN32 AND NOT MSVC)
-  add_dependencies(test_piper openjtalk_external hts_engine_external)
+  add_dependencies(test_piper openjtalk_external hts_engine_external naist_jdic_external)
 endif()
 
 # ---- Declare install targets ----
@@ -490,4 +501,10 @@ if(APPLE)
     INSTALL_RPATH "@loader_path/../lib")
 endif()
 
-# OpenJTalk dictionary installation is skipped for stub implementation
+# OpenJTalk dictionary installation
+if(NOT WIN32 AND NOT MSVC)
+  install(
+    DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/naist-jdic
+    DESTINATION ${CMAKE_INSTALL_PREFIX}/share
+  )
+endif()

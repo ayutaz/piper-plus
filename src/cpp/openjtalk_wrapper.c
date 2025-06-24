@@ -2,6 +2,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <limits.h>
+#include <libgen.h>
+#ifdef __APPLE__
+#include <mach-o/dyld.h>
+#endif
+#ifdef __linux__
+#include <unistd.h>
+#endif
 
 // Include the individual OpenJTalk component headers
 #ifdef OPENJTALK_DICTIONARY_DIR
@@ -45,13 +53,58 @@ OpenJTalk* openjtalk_initialize() {
     // Initialize MeCab
     Mecab_initialize(&oj->mecab);
     
-    // Load dictionary
+    // Try to load MeCab dictionary from multiple locations
     const char* dic_dir = getenv("OPENJTALK_DICTIONARY_DIR");
-    if (!dic_dir) {
-        dic_dir = OPENJTALK_DICTIONARY_DIR;
+    int loaded = 0;
+    
+    // Try environment variable first
+    if (dic_dir) {
+        if (Mecab_load(&oj->mecab, dic_dir)) {
+            loaded = 1;
+        }
     }
-    if (!Mecab_load(&oj->mecab, dic_dir)) {
-        fprintf(stderr, "Failed to load MeCab dictionary from: %s\n", dic_dir);
+    
+    // Try relative to the binary (../share/naist-jdic)
+    if (!loaded) {
+        char path[PATH_MAX];
+        #ifdef __linux__
+            ssize_t len = readlink("/proc/self/exe", path, sizeof(path) - 1);
+            if (len != -1) {
+                path[len] = '\0';
+                char* path_copy = strdup(path);
+                char* dir = dirname(path_copy);
+                snprintf(path, sizeof(path), "%s/../share/naist-jdic", dir);
+                if (Mecab_load(&oj->mecab, path)) {
+                    loaded = 1;
+                }
+                free(path_copy);
+            }
+        #elif defined(__APPLE__)
+            uint32_t size = sizeof(path);
+            if (_NSGetExecutablePath(path, &size) == 0) {
+                char* path_copy = strdup(path);
+                char* dir = dirname(path_copy);
+                snprintf(path, sizeof(path), "%s/../share/naist-jdic", dir);
+                if (Mecab_load(&oj->mecab, path)) {
+                    loaded = 1;
+                }
+                free(path_copy);
+            }
+        #endif
+    }
+    
+    // Try compile-time default
+    if (!loaded) {
+        if (Mecab_load(&oj->mecab, OPENJTALK_DICTIONARY_DIR)) {
+            loaded = 1;
+        }
+    }
+    
+    if (!loaded) {
+        fprintf(stderr, "Failed to load MeCab dictionary from any known location\n");
+        if (dic_dir) fprintf(stderr, "  Tried: %s\n", dic_dir);
+        fprintf(stderr, "  Tried: ../share/naist-jdic (relative to binary)\n");
+        fprintf(stderr, "  Tried: %s\n", OPENJTALK_DICTIONARY_DIR);
         free(oj);
         return NULL;
     }
