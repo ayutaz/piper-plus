@@ -88,12 +88,7 @@ set(TEST_PIPER_SOURCES src/cpp/test.cpp src/cpp/piper.cpp)
 
 # Add OpenJTalk sources for all platforms if OpenJTalk is enabled
 if(NOT DEFINED USE_OPENJTALK_DEFAULT)
-  if(WIN32)
-    # Temporarily disable OpenJTalk on Windows until build issues are resolved
-    set(USE_OPENJTALK_DEFAULT OFF)
-  else()
-    set(USE_OPENJTALK_DEFAULT ON)
-  endif()
+  set(USE_OPENJTALK_DEFAULT ON)
 endif()
 option(USE_OPENJTALK "Enable OpenJTalk for Japanese support" ${USE_OPENJTALK_DEFAULT})
 if(USE_OPENJTALK)
@@ -217,6 +212,11 @@ if(USE_OPENJTALK)  # Enable OpenJTalk for all platforms
         BUILD_BYPRODUCTS 
           ${HTS_ENGINE_DIR}/lib/HTSEngine.lib
           ${HTS_ENGINE_DIR}/include/HTS_engine.h
+        LOG_DOWNLOAD ON
+        LOG_UPDATE ON
+        LOG_CONFIGURE ON
+        LOG_BUILD ON
+        LOG_INSTALL ON
       )
     else()
       # Use autotools for Unix
@@ -259,6 +259,11 @@ if(USE_OPENJTALK)  # Enable OpenJTalk for all platforms
           ${OPENJTALK_DIR}/include/mecab.h
           ${OPENJTALK_DIR}/include/njd.h
           ${OPENJTALK_DIR}/include/jpcommon.h
+        LOG_DOWNLOAD ON
+        LOG_UPDATE ON
+        LOG_CONFIGURE ON
+        LOG_BUILD ON
+        LOG_INSTALL ON
       )
     else()
       # Use autotools for Unix
