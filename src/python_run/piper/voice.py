@@ -29,7 +29,7 @@ except ImportError:
 
 # Try to import pyopenjtalk, but make it optional
 try:
-    import pyopenjtalk
+    import pyopenjtalk as pyopenjtalk
     HAS_PYOPENJTALK = True
 except ImportError:
     HAS_PYOPENJTALK = False
@@ -39,6 +39,33 @@ from .const import BOS, EOS, PAD
 from .util import audio_float_to_int16
 
 _LOGGER = logging.getLogger(__name__)
+
+# Multi-character phoneme to PUA character mapping for Japanese
+# This must match the C++ side and Python training side
+MULTI_CHAR_TO_PUA = {
+    "a:": "\ue000",
+    "i:": "\ue001",
+    "u:": "\ue002",
+    "e:": "\ue003",
+    "o:": "\ue004",
+    "cl": "\ue005",
+    "ky": "\ue006",
+    "kw": "\ue007",
+    "gy": "\ue008",
+    "gw": "\ue009",
+    "ty": "\ue00a",
+    "dy": "\ue00b",
+    "py": "\ue00c",
+    "by": "\ue00d",
+    "ch": "\ue00e",
+    "ts": "\ue00f",
+    "sh": "\ue010",
+    "zy": "\ue011",
+    "hy": "\ue012",
+    "ny": "\ue013",
+    "my": "\ue014",
+    "ry": "\ue015",
+}
 
 
 @dataclass
@@ -109,16 +136,47 @@ class PiperVoice:
                     phonemes = list(text)
 
                 converted = []
+                # Add BOS marker
+                converted.append("^")
+                
                 for ph in phonemes:
                     if ph == "pau":
                         converted.append("_")
                         continue
+                    
+                    if ph == "sil":
+                        # Skip sil in the middle, it will be added as EOS
+                        continue
 
                     # Devoiced vowels come back as upper-case (A,I,U,E,O)
+                    # But NOT 'N' which is a special phoneme
                     if ph in {"A", "I", "U", "E", "O"}:
                         ph = ph.lower()
-
-                    converted.append(ph)
+                    
+                    # Check if this is a multi-character phoneme that needs PUA mapping
+                    if ph in MULTI_CHAR_TO_PUA:
+                        converted.append(MULTI_CHAR_TO_PUA[ph])
+                    else:
+                        converted.append(ph)
+                
+                # Add EOS marker
+                converted.append("$")
+                
+                # Log readable phonemes if debug logging is enabled
+                if _LOGGER.isEnabledFor(logging.DEBUG):
+                    readable_phonemes = []
+                    for ph in converted:
+                        if len(ph) == 1 and ord(ph) >= 0xE000 and ord(ph) <= 0xF8FF:
+                            # Find the original multi-char phoneme
+                            for orig, pua in MULTI_CHAR_TO_PUA.items():
+                                if pua == ph:
+                                    readable_phonemes.append(orig)
+                                    break
+                            else:
+                                readable_phonemes.append(ph)
+                        else:
+                            readable_phonemes.append(ph)
+                    _LOGGER.debug("Phonemized '%s' to: %s", text, ' '.join(readable_phonemes))
 
                 return [converted]
 

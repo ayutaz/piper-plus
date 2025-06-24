@@ -620,7 +620,7 @@ include(CTest)
 enable_testing()
 add_test(
   NAME test_piper
-  COMMAND test_piper "${CMAKE_SOURCE_DIR}/etc/test_voice.onnx" "${PIPER_PHONEMIZE_DIR}/share/espeak-ng-data" "${CMAKE_CURRENT_BINARY_DIR}/test.wav"
+  COMMAND test_piper "${CMAKE_SOURCE_DIR}/etc/test_voice.onnx" "auto" "${CMAKE_CURRENT_BINARY_DIR}/test.wav"
 )
 
 target_compile_features(test_piper PUBLIC cxx_std_17)
@@ -689,7 +689,7 @@ install(
 
 install(
   DIRECTORY ${PIPER_PHONEMIZE_DIR}/share/espeak-ng-data
-  DESTINATION ${CMAKE_INSTALL_PREFIX}
+  DESTINATION ${CMAKE_INSTALL_PREFIX}/share
 )
 
 install(
