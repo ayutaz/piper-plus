@@ -205,11 +205,11 @@ if(USE_OPENJTALK)  # Enable OpenJTalk for all platforms
         GIT_TAG master  # Use master branch for CMake support
         UPDATE_COMMAND ""
         SOURCE_SUBDIR src  # CMakeLists.txt is in src directory
+        CMAKE_GENERATOR ${CMAKE_GENERATOR}
         CMAKE_ARGS 
           -DCMAKE_INSTALL_PREFIX=${HTS_ENGINE_DIR}
           -DCMAKE_BUILD_TYPE=Release
           -DBUILD_SHARED_LIBS=OFF
-          -G ${CMAKE_GENERATOR}
         BUILD_BYPRODUCTS 
           ${HTS_ENGINE_DIR}/lib/hts_engine_API.lib
           ${HTS_ENGINE_DIR}/include/HTS_engine.h
@@ -247,6 +247,7 @@ if(USE_OPENJTALK)  # Enable OpenJTalk for all platforms
         UPDATE_COMMAND ""
         SOURCE_SUBDIR src  # CMakeLists.txt is in src directory
         DEPENDS hts_engine_external
+        CMAKE_GENERATOR ${CMAKE_GENERATOR}
         CMAKE_ARGS
           -DCMAKE_INSTALL_PREFIX=${OPENJTALK_DIR}
           -DCMAKE_BUILD_TYPE=Release
