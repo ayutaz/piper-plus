@@ -271,7 +271,7 @@ if(NOT WIN32 AND NOT MSVC)
     ExternalProject_Add(
       naist_jdic_external
       PREFIX "${CMAKE_CURRENT_BINARY_DIR}/n"
-      URL "https://github.com/r9y9/open_jtalk/releases/download/v1.11.1/naist-jdic-utf8.tar.gz"
+      URL "https://sourceforge.net/projects/open-jtalk/files/Dictionary/open_jtalk_dic-1.11/open_jtalk_dic_utf_8-1.11.tar.gz/download"
       CONFIGURE_COMMAND ""
       BUILD_COMMAND ""
       INSTALL_COMMAND ${CMAKE_COMMAND} -E copy_directory <SOURCE_DIR> ${CMAKE_CURRENT_BINARY_DIR}/naist-jdic
