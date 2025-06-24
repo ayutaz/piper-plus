@@ -261,7 +261,6 @@ if(NOT WIN32 AND NOT MSVC)
         ${OPENJTALK_DIR}/lib/libnjd_set_accent_type.a
         ${OPENJTALK_DIR}/lib/libnjd_set_unvoiced_vowel.a
         ${OPENJTALK_DIR}/lib/libnjd_set_long_vowel.a
-        ${HTS_ENGINE_DIR}/lib/libHTSEngine.a
         ${OPENJTALK_DIR}/include/text2mecab.h
         ${OPENJTALK_DIR}/include/mecab.h
         ${OPENJTALK_DIR}/include/njd.h
