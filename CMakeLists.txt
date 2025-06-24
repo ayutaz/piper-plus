@@ -262,6 +262,9 @@ if(NOT WIN32 AND NOT MSVC)
     # Create OpenJTalk interface library with proper linking
     add_library(openjtalk INTERFACE)
     
+    # Make sure OpenJTalk is built before linking
+    add_dependencies(openjtalk openjtalk_external)
+    
     # Link all OpenJTalk static libraries in correct order
     target_link_libraries(openjtalk INTERFACE
       ${OPENJTALK_DIR}/lib/libnjd2jpcommon.a
@@ -277,8 +280,18 @@ if(NOT WIN32 AND NOT MSVC)
       ${OPENJTALK_DIR}/lib/libmecab.a
       ${OPENJTALK_DIR}/lib/libtext2mecab.a
       ${HTS_ENGINE_DIR}/lib/libHTSEngine.a
-      iconv
     )
+    
+    # Platform-specific iconv linking
+    if(APPLE)
+      target_link_libraries(openjtalk INTERFACE iconv)
+    elseif(NOT WIN32)
+      # On Linux, iconv is usually part of libc
+      find_library(ICONV_LIBRARY NAMES iconv)
+      if(ICONV_LIBRARY)
+        target_link_libraries(openjtalk INTERFACE ${ICONV_LIBRARY})
+      endif()
+    endif()
     
     # Add include directories
     target_include_directories(openjtalk INTERFACE
