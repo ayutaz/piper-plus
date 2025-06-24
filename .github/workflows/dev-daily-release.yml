@@ -302,8 +302,7 @@ jobs:
             -G "Ninja" `
             -DCMAKE_INSTALL_PREFIX=_install/piper `
             -DCMAKE_BUILD_TYPE=${{ env.CMAKE_BUILD_TYPE }} `
-            -DESPEAK_NG_ROOT="$env:ESPEAK_NG_ROOT" `
-            -DUSE_OPENJTALK=ON
+            -DESPEAK_NG_ROOT="$env:ESPEAK_NG_ROOT"
           if ($LASTEXITCODE -ne 0) {
             Write-Error "CMake configuration failed"
             exit 1
@@ -578,6 +577,13 @@ jobs:
             echo "::error::piper binary not found in install directory"
             ls -la _install/piper/bin/ || true
             exit 1
+          fi
+          
+          # Copy OpenJTalk dictionary if it exists
+          if [ -d "build/naist-jdic" ]; then
+            echo "Copying OpenJTalk dictionary..."
+            mkdir -p _install/piper/share/piper
+            cp -r build/naist-jdic _install/piper/share/piper/openjtalk-dict
           fi
           
           # 実行権限の確認と設定
