@@ -193,6 +193,7 @@ if(NOT WIN32 AND NOT MSVC)
       GIT_REPOSITORY https://github.com/r9y9/hts_engine_API.git
       GIT_TAG v1.0.9  # latest available stable version
       UPDATE_COMMAND ""
+      DOWNLOAD_EXTRACT_TIMESTAMP TRUE
       CONFIGURE_COMMAND 
         cd <SOURCE_DIR>/src && 
         touch ChangeLog &&
@@ -211,6 +212,7 @@ if(NOT WIN32 AND NOT MSVC)
       GIT_REPOSITORY https://github.com/r9y9/open_jtalk.git
       GIT_TAG 1.11  # stable tag that matches pyopenjtalk fork
       UPDATE_COMMAND ""
+      DOWNLOAD_EXTRACT_TIMESTAMP TRUE
       DEPENDS hts_engine_external
       CONFIGURE_COMMAND 
         cd <SOURCE_DIR>/src && 
@@ -272,6 +274,7 @@ if(NOT WIN32 AND NOT MSVC)
       naist_jdic_external
       PREFIX "${CMAKE_CURRENT_BINARY_DIR}/n"
       URL "https://sourceforge.net/projects/open-jtalk/files/Dictionary/open_jtalk_dic-1.11/open_jtalk_dic_utf_8-1.11.tar.gz/download"
+      DOWNLOAD_EXTRACT_TIMESTAMP TRUE
       CONFIGURE_COMMAND ""
       BUILD_COMMAND ""
       INSTALL_COMMAND ${CMAKE_COMMAND} -E copy_directory <SOURCE_DIR>/open_jtalk_dic_utf_8-1.11 ${CMAKE_CURRENT_BINARY_DIR}/naist-jdic
