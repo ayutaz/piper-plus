@@ -98,6 +98,7 @@ RUN if [ "$TARGETARCH" = "amd64" ]; then \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
             -DCMAKE_BUILD_PARALLEL_LEVEL=1 \
+            -DUSE_OPENJTALK=ON \
             -GNinja; \
     else \
         echo "Unsupported architecture: $TARGETARCH" && exit 1; \
