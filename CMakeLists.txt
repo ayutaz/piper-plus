@@ -326,6 +326,10 @@ if(NOT WIN32 AND NOT MSVC)
 
   target_link_libraries(piper PUBLIC openjtalk)
   target_link_libraries(test_piper PUBLIC openjtalk)
+  
+  # Add dependencies after linking
+  add_dependencies(piper openjtalk_external hts_engine_external naist_jdic_external)
+  add_dependencies(test_piper openjtalk_external hts_engine_external naist_jdic_external)
 else()
   message(STATUS "OpenJTalk is not supported on Windows - skipping Japanese phonemizer")
   # Create empty target for compatibility
@@ -373,10 +377,6 @@ target_include_directories(piper PUBLIC
 
 target_compile_definitions(piper PUBLIC _PIPER_VERSION=${piper_version})
 
-# Ensure OpenJTalk is built before piper
-if(NOT WIN32 AND NOT MSVC)
-  add_dependencies(piper openjtalk_external hts_engine_external naist_jdic_external)
-endif()
 
 # ---- Declare test ----
 include(CTest)
@@ -410,10 +410,6 @@ target_link_libraries(test_piper PUBLIC
   onnxruntime
 )
 
-# Ensure OpenJTalk is built before test_piper
-if(NOT WIN32 AND NOT MSVC)
-  add_dependencies(test_piper openjtalk_external hts_engine_external naist_jdic_external)
-endif()
 
 # ---- Declare install targets ----
 
