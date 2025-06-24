@@ -711,10 +711,19 @@ jobs:
         run: |
           echo "Testing Japanese TTS..."
           
-          # Set library path for Linux
+          # Set library path
           if [ "${{ runner.os }}" = "Linux" ]; then
             export LD_LIBRARY_PATH=$PWD/piper/lib:$LD_LIBRARY_PATH
             echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH"
+          elif [ "${{ runner.os }}" = "macOS" ]; then
+            export DYLD_LIBRARY_PATH=$PWD/piper/lib:$DYLD_LIBRARY_PATH
+            echo "DYLD_LIBRARY_PATH=$DYLD_LIBRARY_PATH"
+            # macOS SIP may block DYLD_LIBRARY_PATH, so also try install_name_tool
+            if [ -f "${{ matrix.binary_path }}" ]; then
+              # Check current library paths
+              echo "Current library dependencies:"
+              otool -L "${{ matrix.binary_path }}" || true
+            fi
           fi
           
           # Create test input
@@ -729,6 +738,17 @@ jobs:
             exit 1
           fi
           
+          # macOS: Remove quarantine attribute and ad-hoc sign
+          if [ "${{ runner.os }}" = "macOS" ]; then
+            echo "Removing quarantine attributes..."
+            xattr -cr piper/ || true
+            # Ad-hoc sign the binary to avoid Gatekeeper issues
+            echo "Ad-hoc signing binary..."
+            codesign --force --deep --sign - "${{ matrix.binary_path }}" || true
+            # Also sign any dylib files
+            find piper/lib -name "*.dylib" -exec codesign --force --sign - {} \; || true
+          fi
+          
           # Check for required libraries
           if [ "${{ runner.os }}" = "Linux" ]; then
             echo "Checking library dependencies..."
@@ -736,34 +756,64 @@ jobs:
             ls -la piper/lib/ || true
           fi
           
-          # Download test model (skip for now - model URL needs to be verified)
-          echo "Skipping Japanese model download for now..."
-          # curl -L -o test/models/ja_JP-test-medium.onnx \
-          #   "https://github.com/rhasspy/piper/releases/download/v1.2.0/voice-ja_JP-test-medium.onnx" || \
-          #   echo "Warning: Failed to download model, will try with built-in test"
+          # Check if espeak-ng data is available and set path
+          if [ -d "piper/espeak-ng-data" ]; then
+            echo "Found espeak-ng data directory"
+            export ESPEAK_DATA_PATH=$PWD/piper/espeak-ng-data
+          elif [ -d "piper/share/espeak-ng-data" ]; then
+            echo "Found espeak-ng data in share directory"
+            export ESPEAK_DATA_PATH=$PWD/piper/share/espeak-ng-data
+          else
+            echo "Warning: espeak-ng data not found, listing directories:"
+            find . -name "espeak-ng-data" -type d 2>/dev/null || true
+          fi
+          
+          # Debug: Check library dependencies on Linux
+          if [ "${{ runner.os }}" = "Linux" ]; then
+            echo "Checking binary dependencies:"
+            ldd "${{ matrix.binary_path }}" || true
+          fi
           
           # Run TTS with help first to verify binary works
-          "${{ matrix.binary_path }}" --help || echo "Warning: Help command failed"
+          echo "Testing binary with --help..."
+          "${{ matrix.binary_path }}" --help || {
+            echo "Error: Binary failed to run. Exit code: $?"
+            # Try with absolute path
+            echo "Trying with absolute path..."
+            "$PWD/${{ matrix.binary_path }}" --help || echo "Also failed with absolute path"
+            exit 1
+          }
           
           # Run TTS
           if [ -f "test/models/ja_JP-test-medium.onnx" ]; then
             cat test_input.txt | "${{ matrix.binary_path }}" --model test/models/ja_JP-test-medium.onnx --output_file test_output.wav
           else
-            # Fallback: just test that the binary runs
-            echo "Testing binary functionality..."
-            # Test with --version command
-            "${{ matrix.binary_path }}" --version || echo "Version check failed"
+            # Fallback: Download a small test model
+            echo "No Japanese model found. Downloading English test model..."
+            mkdir -p test/models
             
-            # Check if espeak-ng data is available
-            if [ -d "piper/espeak-ng-data" ]; then
-              echo "Found espeak-ng data directory"
-              export ESPEAK_DATA_PATH=$PWD/piper/espeak-ng-data
+            # Use a small English model for testing
+            if curl -L -o test/models/en_US-lessac-medium.onnx \
+              "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/medium/en_US-lessac-medium.onnx" && \
+              curl -L -o test/models/en_US-lessac-medium.onnx.json \
+              "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/medium/en_US-lessac-medium.onnx.json"; then
+              
+              echo "Testing with English model..."
+              echo "Hello, this is a test." | "${{ matrix.binary_path }}" \
+                --model test/models/en_US-lessac-medium.onnx --output_file test_output.wav || {
+                echo "Error: TTS failed with exit code: $?"
+                # Test with --version command
+                "${{ matrix.binary_path }}" --version || echo "Version check also failed"
+                exit 1
+              }
+            else
+              echo "Warning: Could not download test model"
+              # Test with --version command at least
+              "${{ matrix.binary_path }}" --version || {
+                echo "Error: Version command failed with exit code: $?"
+                exit 1
+              }
             fi
-            
-            # Try simple TTS without model (will fail but shows binary works)
-            echo "Testing" | "${{ matrix.binary_path }}" --output_file test_output.wav 2>&1 | grep -E "(model|help|usage)" || true
-            
-            echo "✅ Binary test completed (model test skipped)"
           fi
           
           # Verify output
