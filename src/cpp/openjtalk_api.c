@@ -137,17 +137,27 @@ OpenJTalk* openjtalk_initialize() {
                 if (access(dict_path, F_OK) == 0) {
                     dic_dir = dict_path;
                 } else {
-                    // Try build/naist-jdic (build directory)
+                    // Try share/piper/openjtalk-dict (in same directory as executable)
 #ifdef _WIN32
-                    snprintf(dict_path, sizeof(dict_path), "%s\\..\\build\\naist-jdic", exe_path);
+                    snprintf(dict_path, sizeof(dict_path), "%s\\share\\piper\\openjtalk-dict", exe_path);
 #else
-                    snprintf(dict_path, sizeof(dict_path), "%s/../build/naist-jdic", exe_path);
+                    snprintf(dict_path, sizeof(dict_path), "%s/share/piper/openjtalk-dict", exe_path);
 #endif
                     if (access(dict_path, F_OK) == 0) {
                         dic_dir = dict_path;
                     } else {
-                        // Fallback to current directory
-                        dic_dir = "naist-jdic";
+                        // Try build/naist-jdic (build directory)
+#ifdef _WIN32
+                        snprintf(dict_path, sizeof(dict_path), "%s\\..\\build\\naist-jdic", exe_path);
+#else
+                        snprintf(dict_path, sizeof(dict_path), "%s/../build/naist-jdic", exe_path);
+#endif
+                        if (access(dict_path, F_OK) == 0) {
+                            dic_dir = dict_path;
+                        } else {
+                            // Fallback to current directory
+                            dic_dir = "naist-jdic";
+                        }
                     }
                 }
             }

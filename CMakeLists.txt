@@ -462,10 +462,12 @@ if(USE_OPENJTALK)  # Enable OpenJTalk for all platforms
     USE_SOURCE_PERMISSIONS
   )
   
-  # Set dictionary path - use build directory path for build/test
-  # For build-time usage (including CI), use the actual extracted dictionary path
-  target_compile_definitions(piper PRIVATE OPENJTALK_DICT_DIR="${NAIST_JDIC_DIR}")
-  target_compile_definitions(test_piper PRIVATE OPENJTALK_DICT_DIR="${NAIST_JDIC_DIR}")
+  # Set dictionary path - use build directory path for build/test ONLY
+  # For release builds, don't define OPENJTALK_DICT_DIR so the runtime code can find it relative to executable
+  if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR NOT CMAKE_BUILD_TYPE)
+    # Only define for debug builds and tests
+    target_compile_definitions(test_piper PRIVATE OPENJTALK_DICT_DIR="${NAIST_JDIC_DIR}")
+  endif()
 endif()
 
 # ---- Find espeak-ng ----
