@@ -274,7 +274,7 @@ if(NOT WIN32 AND NOT MSVC)
       URL "https://sourceforge.net/projects/open-jtalk/files/Dictionary/open_jtalk_dic-1.11/open_jtalk_dic_utf_8-1.11.tar.gz/download"
       CONFIGURE_COMMAND ""
       BUILD_COMMAND ""
-      INSTALL_COMMAND ${CMAKE_COMMAND} -E copy_directory <SOURCE_DIR> ${CMAKE_CURRENT_BINARY_DIR}/naist-jdic
+      INSTALL_COMMAND ${CMAKE_COMMAND} -E copy_directory <SOURCE_DIR>/open_jtalk_dic_utf_8-1.11 ${CMAKE_CURRENT_BINARY_DIR}/naist-jdic
       BUILD_BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/naist-jdic/sys.dic
     )
 
