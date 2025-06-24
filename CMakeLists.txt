@@ -365,7 +365,7 @@ target_compile_definitions(piper PUBLIC _PIPER_VERSION=${piper_version})
 
 # Ensure OpenJTalk is built before piper
 if(NOT WIN32 AND NOT MSVC)
-  add_dependencies(piper openjtalk_external hts_engine_external naist_jdic_external)
+  add_dependencies(piper openjtalk_external hts_engine_external)
 endif()
 
 # ---- Declare test ----
@@ -402,7 +402,7 @@ target_link_libraries(test_piper PUBLIC
 
 # Ensure OpenJTalk is built before test_piper
 if(NOT WIN32 AND NOT MSVC)
-  add_dependencies(test_piper openjtalk_external hts_engine_external naist_jdic_external)
+  add_dependencies(test_piper openjtalk_external hts_engine_external)
 endif()
 
 # ---- Declare install targets ----
