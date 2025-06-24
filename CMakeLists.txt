@@ -247,6 +247,7 @@ if(USE_OPENJTALK)  # Enable OpenJTalk for all platforms
           -DBUILD_SHARED_LIBS=OFF
           -DHTS_ENGINE_INCLUDE_DIR=${HTS_ENGINE_DIR}/include
           -DHTS_ENGINE_LIB=${HTS_ENGINE_DIR}/lib/HTSEngine.lib
+          -DCMAKE_VERBOSE_MAKEFILE=ON
         BUILD_BYPRODUCTS 
           ${OPENJTALK_DIR}/lib/OpenJTalk.lib
           ${OPENJTALK_DIR}/lib/mecab.lib
