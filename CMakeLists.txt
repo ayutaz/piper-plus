@@ -332,8 +332,11 @@ if(NOT WIN32 AND NOT MSVC)
   
   # Add dependencies after linking (only if we built them)
   if(NOT DEFINED OPENJTALK_DIR)
-    add_dependencies(piper openjtalk_external hts_engine_external naist_jdic_external)
-    add_dependencies(test_piper openjtalk_external hts_engine_external naist_jdic_external)
+    add_dependencies(piper openjtalk_external hts_engine_external)
+    add_dependencies(test_piper openjtalk_external hts_engine_external)
+    # Temporarily disabled dictionary download for debugging
+    # add_dependencies(piper naist_jdic_external)
+    # add_dependencies(test_piper naist_jdic_external)
   endif()
 else()
   message(STATUS "OpenJTalk is not supported on Windows - skipping Japanese phonemizer")
@@ -503,9 +506,10 @@ if(APPLE)
 endif()
 
 # OpenJTalk dictionary installation
-if(NOT WIN32 AND NOT MSVC)
-  install(
-    DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/naist-jdic
-    DESTINATION ${CMAKE_INSTALL_PREFIX}/share
-  )
-endif()
+# Temporarily disabled for debugging
+# if(NOT WIN32 AND NOT MSVC)
+#   install(
+#     DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/naist-jdic
+#     DESTINATION ${CMAKE_INSTALL_PREFIX}/share
+#   )
+# endif()
