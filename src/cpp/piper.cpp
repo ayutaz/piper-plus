@@ -29,8 +29,10 @@
 #include <mach-o/dyld.h>
 #endif
 
-// OpenJTalk support temporarily disabled for CI/CD
-// TODO: Re-enable when build issues are resolved
+// Only include OpenJTalk on Unix platforms (not Windows)
+#if !defined(_WIN32) && !defined(_MSC_VER)
+#include "openjtalk_phonemize.hpp"
+#endif
 
 namespace piper {
 
@@ -112,10 +114,12 @@ void parsePhonemizeConfig(json &configRoot, PhonemizeConfig &phonemizeConfig) {
     auto phonemeTypeStr = configRoot["phoneme_type"].get<std::string>();
     if (phonemeTypeStr == "text") {
       phonemizeConfig.phonemeType = TextPhonemes;
+#if !defined(_WIN32) && !defined(_MSC_VER)
     } else if (phonemeTypeStr == "openjtalk") {
-      // OpenJTalk models currently fall back to espeak
-      // TODO: Re-enable OpenJTalk when CI/CD issues are resolved
-      phonemizeConfig.phonemeType = eSpeakPhonemes;
+      phonemizeConfig.phonemeType = OpenJTalkPhonemes;
+      // OpenJTalk models don't use padding between phonemes
+      phonemizeConfig.interspersePad = false;
+#endif
     }
   }
 
@@ -585,6 +589,11 @@ void textToAudio(PiperConfig &config, Voice &voice, std::string text,
     eSpeakPhonemeConfig eSpeakConfig;
     eSpeakConfig.voice = voice.phonemizeConfig.eSpeak.voice;
     phonemize_eSpeak(text, eSpeakConfig, phonemes);
+#if !defined(_WIN32) && !defined(_MSC_VER)
+  } else if (voice.phonemizeConfig.phonemeType == OpenJTalkPhonemes) {
+    // Japanese OpenJTalk phonemizer
+    phonemize_openjtalk(text, phonemes);
+#endif
   } else {
     // Use UTF-8 codepoints as "phonemes"
     CodepointsPhonemeConfig codepointsConfig;

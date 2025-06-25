@@ -25,6 +25,18 @@ endif()
 add_executable(piper src/cpp/main.cpp src/cpp/piper.cpp)
 add_executable(test_piper src/cpp/test.cpp src/cpp/piper.cpp)
 
+# Add OpenJTalk support on Unix platforms (not Windows)
+if(NOT WIN32 AND NOT MSVC)
+  target_sources(piper PRIVATE 
+    src/cpp/openjtalk_wrapper.c
+    src/cpp/openjtalk_phonemize.cpp
+  )
+  target_sources(test_piper PRIVATE 
+    src/cpp/openjtalk_wrapper.c
+    src/cpp/openjtalk_phonemize.cpp
+  )
+endif()
+
 # Configure RPATH for macOS
 if(APPLE)
   set_target_properties(piper PROPERTIES
@@ -89,6 +101,39 @@ if(NOT DEFINED PIPER_PHONEMIZE_DIR)
   add_dependencies(test_piper piper_phonemize_external)
 endif()
 
+# ---- OpenJTalk (Unix platforms only) ---
+
+if(NOT WIN32 AND NOT MSVC)
+  if(NOT DEFINED OPENJTALK_DIR)
+    set(OPENJTALK_DIR "${CMAKE_CURRENT_BINARY_DIR}/oj")
+    ExternalProject_Add(
+      openjtalk_external
+      PREFIX "${CMAKE_CURRENT_BINARY_DIR}/o"
+      URL "https://github.com/r9y9/open_jtalk/archive/v1.11.tar.gz"
+      CONFIGURE_COMMAND ""
+      BUILD_COMMAND cd <SOURCE_DIR> && make
+      INSTALL_COMMAND ""
+      BUILD_IN_SOURCE 1
+      BUILD_BYPRODUCTS 
+        <SOURCE_DIR>/bin/libOpenJTalk.a
+        <SOURCE_DIR>/bin/libHTSEngine.a
+        <SOURCE_DIR>/bin/libjpcommon.a
+        <SOURCE_DIR>/bin/libmecab.a
+        <SOURCE_DIR>/bin/libnjd.a
+        <SOURCE_DIR>/bin/libnjd2jpcommon.a
+        <SOURCE_DIR>/bin/libnjd_set_accent_phrase.a
+        <SOURCE_DIR>/bin/libnjd_set_accent_type.a
+        <SOURCE_DIR>/bin/libnjd_set_digit.a
+        <SOURCE_DIR>/bin/libnjd_set_long_vowel.a
+        <SOURCE_DIR>/bin/libnjd_set_pronunciation.a
+        <SOURCE_DIR>/bin/libnjd_set_unvoiced_vowel.a
+        <SOURCE_DIR>/bin/libtext2mecab.a
+    )
+    add_dependencies(piper openjtalk_external)
+    add_dependencies(test_piper openjtalk_external)
+  endif()
+endif()
+
 # ---- Declare executable ----
 
 if(APPLE)
@@ -120,6 +165,31 @@ target_link_libraries(piper
 # Link espeak-ng
 target_link_libraries(piper espeak-ng)
 
+# Link OpenJTalk on Unix platforms
+if(NOT WIN32 AND NOT MSVC)
+  ExternalProject_Get_Property(openjtalk_external SOURCE_DIR)
+  target_link_libraries(piper
+    ${SOURCE_DIR}/bin/libOpenJTalk.a
+    ${SOURCE_DIR}/bin/libHTSEngine.a
+    ${SOURCE_DIR}/bin/libjpcommon.a
+    ${SOURCE_DIR}/bin/libmecab.a
+    ${SOURCE_DIR}/bin/libnjd.a
+    ${SOURCE_DIR}/bin/libnjd2jpcommon.a
+    ${SOURCE_DIR}/bin/libnjd_set_accent_phrase.a
+    ${SOURCE_DIR}/bin/libnjd_set_accent_type.a
+    ${SOURCE_DIR}/bin/libnjd_set_digit.a
+    ${SOURCE_DIR}/bin/libnjd_set_long_vowel.a
+    ${SOURCE_DIR}/bin/libnjd_set_pronunciation.a
+    ${SOURCE_DIR}/bin/libnjd_set_unvoiced_vowel.a
+    ${SOURCE_DIR}/bin/libtext2mecab.a
+  )
+  # Platform-specific libraries
+  if(APPLE)
+    find_library(ICONV_LIBRARY iconv)
+    target_link_libraries(piper ${ICONV_LIBRARY})
+  endif()
+endif()
+
 target_link_directories(piper PUBLIC
   ${FMT_DIR}/lib
   ${SPDLOG_DIR}/lib
@@ -134,6 +204,12 @@ target_include_directories(piper PUBLIC
   ${SPDLOG_DIR}/include
   ${PIPER_PHONEMIZE_DIR}/include
 )
+
+# Add OpenJTalk includes on Unix platforms
+if(NOT WIN32 AND NOT MSVC)
+  ExternalProject_Get_Property(openjtalk_external SOURCE_DIR)
+  target_include_directories(piper PUBLIC ${SOURCE_DIR}/src)
+endif()
 
 target_compile_definitions(piper PUBLIC _PIPER_VERSION=${piper_version})
 
@@ -168,6 +244,34 @@ target_link_libraries(test_piper PUBLIC
   piper_phonemize
   onnxruntime
 )
+
+# Link OpenJTalk for test_piper on Unix platforms
+if(NOT WIN32 AND NOT MSVC)
+  ExternalProject_Get_Property(openjtalk_external SOURCE_DIR)
+  target_link_libraries(test_piper
+    ${SOURCE_DIR}/bin/libOpenJTalk.a
+    ${SOURCE_DIR}/bin/libHTSEngine.a
+    ${SOURCE_DIR}/bin/libjpcommon.a
+    ${SOURCE_DIR}/bin/libmecab.a
+    ${SOURCE_DIR}/bin/libnjd.a
+    ${SOURCE_DIR}/bin/libnjd2jpcommon.a
+    ${SOURCE_DIR}/bin/libnjd_set_accent_phrase.a
+    ${SOURCE_DIR}/bin/libnjd_set_accent_type.a
+    ${SOURCE_DIR}/bin/libnjd_set_digit.a
+    ${SOURCE_DIR}/bin/libnjd_set_long_vowel.a
+    ${SOURCE_DIR}/bin/libnjd_set_pronunciation.a
+    ${SOURCE_DIR}/bin/libnjd_set_unvoiced_vowel.a
+    ${SOURCE_DIR}/bin/libtext2mecab.a
+  )
+  # Platform-specific libraries
+  if(APPLE)
+    find_library(ICONV_LIBRARY iconv)
+    target_link_libraries(test_piper ${ICONV_LIBRARY})
+  endif()
+  
+  # Add OpenJTalk includes for test_piper
+  target_include_directories(test_piper PUBLIC ${SOURCE_DIR}/src)
+endif()
 
 # ---- Declare install targets ----
 
