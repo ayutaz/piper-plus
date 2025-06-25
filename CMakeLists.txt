@@ -87,11 +87,10 @@ set(PIPER_SOURCES src/cpp/main.cpp src/cpp/piper.cpp)
 set(TEST_PIPER_SOURCES src/cpp/test.cpp src/cpp/piper.cpp)
 
 # Add OpenJTalk sources only on Unix platforms
-# Temporarily disabled to fix CI/CD builds
-# if(NOT WIN32 AND NOT MSVC)
-#   list(APPEND PIPER_SOURCES src/cpp/openjtalk_phonemize.cpp src/cpp/openjtalk_wrapper.c)
-#   list(APPEND TEST_PIPER_SOURCES src/cpp/openjtalk_phonemize.cpp src/cpp/openjtalk_wrapper.c)
-# endif()
+if(NOT WIN32 AND NOT MSVC)
+  list(APPEND PIPER_SOURCES src/cpp/openjtalk_phonemize.cpp src/cpp/openjtalk_wrapper.c)
+  list(APPEND TEST_PIPER_SOURCES src/cpp/openjtalk_phonemize.cpp src/cpp/openjtalk_wrapper.c)
+endif()
 
 # Executables will be created later after OpenJTalk setup
 
@@ -166,9 +165,8 @@ endif()
 # ---- openjtalk (Japanese phonemizer) ----
 # Only build OpenJTalk on Unix platforms (Linux, macOS)
 # Windows doesn't support the autotools build system used by OpenJTalk
-# Temporarily disabled to fix CI/CD builds
 
-if(FALSE AND NOT WIN32 AND NOT MSVC)
+if(NOT WIN32 AND NOT MSVC)
   include(ExternalProject)
 
   if(NOT DEFINED OPENJTALK_DIR)
@@ -334,8 +332,7 @@ add_executable(piper ${PIPER_SOURCES})
 add_executable(test_piper ${TEST_PIPER_SOURCES})
 
 # Link OpenJTalk and add dependencies for Unix platforms
-# Temporarily disabled to fix CI/CD builds
-if(FALSE AND NOT WIN32 AND NOT MSVC)
+if(NOT WIN32 AND NOT MSVC)
   target_link_libraries(piper PUBLIC openjtalk)
   target_link_libraries(test_piper PUBLIC openjtalk)
   
