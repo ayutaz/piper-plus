@@ -110,6 +110,7 @@ if(NOT WIN32 AND NOT MSVC)
       openjtalk_external
       PREFIX "${CMAKE_CURRENT_BINARY_DIR}/o"
       URL "https://github.com/r9y9/open_jtalk/archive/refs/tags/v1.11.1.tar.gz"
+      PATCH_COMMAND ${CMAKE_COMMAND} -E copy <SOURCE_DIR>/src/CMakeLists.txt <SOURCE_DIR>/src/CMakeLists.txt.orig && sed "s/cmake_minimum_required(VERSION 2.6)/cmake_minimum_required(VERSION 3.5)/" <SOURCE_DIR>/src/CMakeLists.txt.orig > <SOURCE_DIR>/src/CMakeLists.txt
       CMAKE_ARGS -DCMAKE_INSTALL_PREFIX:PATH=${OPENJTALK_DIR} -DCMAKE_BUILD_TYPE=Release
       SOURCE_SUBDIR src
       BUILD_BYPRODUCTS 
