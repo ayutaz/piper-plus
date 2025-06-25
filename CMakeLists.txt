@@ -109,7 +109,7 @@ if(NOT WIN32 AND NOT MSVC)
     ExternalProject_Add(
       openjtalk_external
       PREFIX "${CMAKE_CURRENT_BINARY_DIR}/o"
-      URL "https://github.com/r9y9/open_jtalk/archive/v1.11.tar.gz"
+      URL "https://github.com/r9y9/open_jtalk/archive/refs/tags/v1.11.1.tar.gz"
       CONFIGURE_COMMAND ""
       BUILD_COMMAND cd <SOURCE_DIR> && make
       INSTALL_COMMAND ""
