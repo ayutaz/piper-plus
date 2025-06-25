@@ -237,7 +237,7 @@ target_link_directories(
   ${PIPER_PHONEMIZE_DIR}/lib
 )
 
-target_link_libraries(test_piper PUBLIC
+target_link_libraries(test_piper
   fmt
   spdlog
   espeak-ng
