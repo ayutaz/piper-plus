@@ -112,11 +112,21 @@ endif()
 target_link_libraries(piper
   fmt
   spdlog
-  espeak-ng
   piper_phonemize
   onnxruntime
   ${PIPER_EXTRA_LIBRARIES}
 )
+
+# Link espeak-ng from piper_phonemize build
+if(APPLE)
+  target_link_libraries(piper
+    ${PIPER_PHONEMIZE_DIR}/lib/libespeak-ng.dylib
+  )
+else()
+  target_link_libraries(piper
+    espeak-ng
+  )
+endif()
 
 target_link_directories(piper PUBLIC
   ${FMT_DIR}/lib
@@ -124,11 +134,8 @@ target_link_directories(piper PUBLIC
   ${PIPER_PHONEMIZE_DIR}/lib
 )
 
-if(APPLE)
-  # Add Homebrew paths for macOS
-  target_link_directories(piper PUBLIC ${HOMEBREW_PREFIX}/lib)
-  target_include_directories(piper PUBLIC ${HOMEBREW_PREFIX}/include)
-endif()
+# Note: We don't need Homebrew paths for espeak-ng on macOS
+# because we're using the custom build from piper_phonemize
 
 target_include_directories(piper PUBLIC
   ${FMT_DIR}/include
@@ -206,15 +213,8 @@ install(
   DESTINATION share
 )
 
-# Copy espeak-ng library on macOS
-if(APPLE)
-  # Find and install espeak-ng library from Homebrew
-  find_library(ESPEAK_NG_LIB espeak-ng PATHS ${HOMEBREW_PREFIX}/lib REQUIRED)
-  if(ESPEAK_NG_LIB)
-    # Get the actual library file (resolving symlinks)
-    get_filename_component(ESPEAK_NG_LIB_REAL ${ESPEAK_NG_LIB} REALPATH)
-    install(FILES ${ESPEAK_NG_LIB_REAL} DESTINATION lib)
-    # Also install the symlink
-    install(FILES ${ESPEAK_NG_LIB} DESTINATION lib)
-  endif()
-endif()
+# Note: We don't need to copy espeak-ng library on macOS separately
+# because piper_phonemize builds and installs its own custom fork
+# of espeak-ng that includes the required espeak_TextToPhonemesWithTerminator
+# function. The library is already installed by the piper_phonemize
+# external project.
