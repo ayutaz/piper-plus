@@ -596,7 +596,8 @@ void textToAudio(PiperConfig &config, Voice &voice, std::string text,
     // Japanese OpenJTalk phonemizer
     // phonemize_openjtalk(text, phonemes); // Disabled for CI/CD
     // Fallback to codepoints
-    codepointsToPhonemes(text, voice.phonemizeConfig, phonemes);
+    CodepointsPhonemeConfig codepointsConfig;
+    phonemize_codepoints(text, codepointsConfig, phonemes);
 #endif
   } else {
     // Use UTF-8 codepoints as "phonemes"
