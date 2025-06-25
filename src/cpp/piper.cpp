@@ -31,7 +31,7 @@
 
 // Only include OpenJTalk on Unix platforms
 #if !defined(_WIN32) && !defined(_MSC_VER)
-#include "openjtalk_phonemize.hpp"
+// #include "openjtalk_phonemize.hpp" // Disabled for CI/CD
 #endif
 
 namespace piper {
@@ -116,9 +116,10 @@ void parsePhonemizeConfig(json &configRoot, PhonemizeConfig &phonemizeConfig) {
       phonemizeConfig.phonemeType = TextPhonemes;
 #if !defined(_WIN32) && !defined(_MSC_VER)
     } else if (phonemeTypeStr == "openjtalk") {
-      phonemizeConfig.phonemeType = OpenJTalkPhonemes;
+      // phonemizeConfig.phonemeType = OpenJTalkPhonemes; // Disabled for CI/CD
       // OpenJTalk models don't use padding between phonemes
-      phonemizeConfig.interspersePad = false;
+      // phonemizeConfig.interspersePad = false;
+      phonemizeConfig.phonemeType = eSpeakPhonemes; // Fallback to espeak
 #endif
     }
   }
@@ -592,7 +593,9 @@ void textToAudio(PiperConfig &config, Voice &voice, std::string text,
 #if !defined(_WIN32) && !defined(_MSC_VER)
   } else if (voice.phonemizeConfig.phonemeType == OpenJTalkPhonemes) {
     // Japanese OpenJTalk phonemizer
-    phonemize_openjtalk(text, phonemes);
+    // phonemize_openjtalk(text, phonemes); // Disabled for CI/CD
+    // Fallback to codepoints
+    codepointsToPhonemes(text, voice.phonemizeConfig, phonemes);
 #endif
   } else {
     // Use UTF-8 codepoints as "phonemes"
