@@ -591,7 +591,8 @@ void textToAudio(PiperConfig &config, Voice &voice, std::string text,
     eSpeakConfig.voice = voice.phonemizeConfig.eSpeak.voice;
     phonemize_eSpeak(text, eSpeakConfig, phonemes);
 #if !defined(_WIN32) && !defined(_MSC_VER)
-  } else if (voice.phonemizeConfig.phonemeType == OpenJTalkPhonemes) {
+  // } else if (voice.phonemizeConfig.phonemeType == OpenJTalkPhonemes) { // Disabled for CI/CD
+  } else if (false) {
     // Japanese OpenJTalk phonemizer
     // phonemize_openjtalk(text, phonemes); // Disabled for CI/CD
     // Fallback to codepoints
