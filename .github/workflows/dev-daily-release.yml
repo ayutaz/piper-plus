@@ -711,6 +711,15 @@ jobs:
         run: |
           echo "Testing Japanese TTS..."
           
+          # Download Japanese dictionary for OpenJTalk
+          echo "Downloading NAIST Japanese Dictionary..."
+          mkdir -p piper/share/naist-jdic
+          curl -L -o dict.tar.gz "https://sourceforge.net/projects/open-jtalk/files/Dictionary/open_jtalk_dic-1.11/open_jtalk_dic_utf_8-1.11.tar.gz/download"
+          tar -xzf dict.tar.gz --strip-components=1 -C piper/share/naist-jdic
+          rm dict.tar.gz
+          export OPENJTALK_DICTIONARY_DIR=$PWD/piper/share/naist-jdic
+          echo "Dictionary downloaded to: $OPENJTALK_DICTIONARY_DIR"
+          
           # Set library path for Linux
           if [ "${{ runner.os }}" = "Linux" ]; then
             export LD_LIBRARY_PATH=$PWD/piper/lib:$LD_LIBRARY_PATH
