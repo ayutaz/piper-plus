@@ -468,10 +468,11 @@ jobs:
           lipo -info "_install/piper/bin/piper"
           
           # アーキテクチャに応じたテスト実行
+          echo "Testing piper binary..."
           if [ "${{ matrix.arch }}" = "x64" ]; then
-            /usr/bin/arch -x86_64 echo "Testing piper binary..." | _install/piper/bin/piper --help
+            /usr/bin/arch -x86_64 _install/piper/bin/piper --help
           else
-            /usr/bin/arch -arm64 echo "Testing piper binary..." | _install/piper/bin/piper --help
+            /usr/bin/arch -arm64 _install/piper/bin/piper --help
           fi || {
             echo "::error::piper binary test failed"
             exit 1
