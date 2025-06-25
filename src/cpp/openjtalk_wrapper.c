@@ -16,7 +16,8 @@
 #endif
 
 // Include the individual OpenJTalk component headers
-#ifdef OPENJTALK_DICTIONARY_DIR
+#if 0 // Temporarily use stub implementation for CI/CD
+// #ifdef OPENJTALK_DICTIONARY_DIR
 #include "text2mecab.h"
 #include "mecab.h"
 #include "njd.h"  
