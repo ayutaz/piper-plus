@@ -110,24 +110,22 @@ if(NOT WIN32 AND NOT MSVC)
       openjtalk_external
       PREFIX "${CMAKE_CURRENT_BINARY_DIR}/o"
       URL "https://github.com/r9y9/open_jtalk/archive/refs/tags/v1.11.1.tar.gz"
-      CONFIGURE_COMMAND cd <SOURCE_DIR>/src && autoreconf -i && ./configure --with-charset=UTF-8
-      BUILD_COMMAND cd <SOURCE_DIR>/src && make
-      INSTALL_COMMAND ""
-      BUILD_IN_SOURCE 1
+      CMAKE_ARGS -DCMAKE_INSTALL_PREFIX:PATH=${OPENJTALK_DIR} -DCMAKE_BUILD_TYPE=Release
+      SOURCE_SUBDIR src
       BUILD_BYPRODUCTS 
-        <SOURCE_DIR>/src/bin/libOpenJTalk.a
-        <SOURCE_DIR>/src/bin/libHTSEngine.a
-        <SOURCE_DIR>/src/jpcommon/libjpcommon.a
-        <SOURCE_DIR>/src/mecab/src/libmecab.a
-        <SOURCE_DIR>/src/njd/libnjd.a
-        <SOURCE_DIR>/src/njd2jpcommon/libnjd2jpcommon.a
-        <SOURCE_DIR>/src/njd_set_accent_phrase/libnjd_set_accent_phrase.a
-        <SOURCE_DIR>/src/njd_set_accent_type/libnjd_set_accent_type.a
-        <SOURCE_DIR>/src/njd_set_digit/libnjd_set_digit.a
-        <SOURCE_DIR>/src/njd_set_long_vowel/libnjd_set_long_vowel.a
-        <SOURCE_DIR>/src/njd_set_pronunciation/libnjd_set_pronunciation.a
-        <SOURCE_DIR>/src/njd_set_unvoiced_vowel/libnjd_set_unvoiced_vowel.a
-        <SOURCE_DIR>/src/text2mecab/libtext2mecab.a
+        ${OPENJTALK_DIR}/lib/libOpenJTalk.a
+        ${OPENJTALK_DIR}/lib/libHTSEngine.a
+        ${OPENJTALK_DIR}/lib/libjpcommon.a
+        ${OPENJTALK_DIR}/lib/libmecab.a
+        ${OPENJTALK_DIR}/lib/libnjd.a
+        ${OPENJTALK_DIR}/lib/libnjd2jpcommon.a
+        ${OPENJTALK_DIR}/lib/libnjd_set_accent_phrase.a
+        ${OPENJTALK_DIR}/lib/libnjd_set_accent_type.a
+        ${OPENJTALK_DIR}/lib/libnjd_set_digit.a
+        ${OPENJTALK_DIR}/lib/libnjd_set_long_vowel.a
+        ${OPENJTALK_DIR}/lib/libnjd_set_pronunciation.a
+        ${OPENJTALK_DIR}/lib/libnjd_set_unvoiced_vowel.a
+        ${OPENJTALK_DIR}/lib/libtext2mecab.a
     )
     add_dependencies(piper openjtalk_external)
     add_dependencies(test_piper openjtalk_external)
@@ -167,21 +165,20 @@ target_link_libraries(piper espeak-ng)
 
 # Link OpenJTalk on Unix platforms
 if(NOT WIN32 AND NOT MSVC)
-  ExternalProject_Get_Property(openjtalk_external SOURCE_DIR)
   target_link_libraries(piper
-    ${SOURCE_DIR}/src/bin/libOpenJTalk.a
-    ${SOURCE_DIR}/src/bin/libHTSEngine.a
-    ${SOURCE_DIR}/src/jpcommon/libjpcommon.a
-    ${SOURCE_DIR}/src/mecab/src/libmecab.a
-    ${SOURCE_DIR}/src/njd/libnjd.a
-    ${SOURCE_DIR}/src/njd2jpcommon/libnjd2jpcommon.a
-    ${SOURCE_DIR}/src/njd_set_accent_phrase/libnjd_set_accent_phrase.a
-    ${SOURCE_DIR}/src/njd_set_accent_type/libnjd_set_accent_type.a
-    ${SOURCE_DIR}/src/njd_set_digit/libnjd_set_digit.a
-    ${SOURCE_DIR}/src/njd_set_long_vowel/libnjd_set_long_vowel.a
-    ${SOURCE_DIR}/src/njd_set_pronunciation/libnjd_set_pronunciation.a
-    ${SOURCE_DIR}/src/njd_set_unvoiced_vowel/libnjd_set_unvoiced_vowel.a
-    ${SOURCE_DIR}/src/text2mecab/libtext2mecab.a
+    ${OPENJTALK_DIR}/lib/libOpenJTalk.a
+    ${OPENJTALK_DIR}/lib/libHTSEngine.a
+    ${OPENJTALK_DIR}/lib/libjpcommon.a
+    ${OPENJTALK_DIR}/lib/libmecab.a
+    ${OPENJTALK_DIR}/lib/libnjd.a
+    ${OPENJTALK_DIR}/lib/libnjd2jpcommon.a
+    ${OPENJTALK_DIR}/lib/libnjd_set_accent_phrase.a
+    ${OPENJTALK_DIR}/lib/libnjd_set_accent_type.a
+    ${OPENJTALK_DIR}/lib/libnjd_set_digit.a
+    ${OPENJTALK_DIR}/lib/libnjd_set_long_vowel.a
+    ${OPENJTALK_DIR}/lib/libnjd_set_pronunciation.a
+    ${OPENJTALK_DIR}/lib/libnjd_set_unvoiced_vowel.a
+    ${OPENJTALK_DIR}/lib/libtext2mecab.a
   )
   # Platform-specific libraries
   if(APPLE)
@@ -207,11 +204,16 @@ target_include_directories(piper PUBLIC
 
 # Add OpenJTalk includes on Unix platforms
 if(NOT WIN32 AND NOT MSVC)
-  ExternalProject_Get_Property(openjtalk_external SOURCE_DIR)
-  target_include_directories(piper PUBLIC ${SOURCE_DIR}/src)
+  target_include_directories(piper PUBLIC ${OPENJTALK_DIR}/include)
 endif()
 
 target_compile_definitions(piper PUBLIC _PIPER_VERSION=${piper_version})
+
+# Add OpenJTalk dictionary path definition on Unix platforms
+if(NOT WIN32 AND NOT MSVC)
+  target_compile_definitions(piper PUBLIC OPENJTALK_DICTIONARY_DIR="${OPENJTALK_DIR}/share/naist-jdic")
+  target_compile_definitions(test_piper PUBLIC OPENJTALK_DICTIONARY_DIR="${OPENJTALK_DIR}/share/naist-jdic")
+endif()
 
 # ---- Declare test ----
 include(CTest)
@@ -247,21 +249,20 @@ target_link_libraries(test_piper
 
 # Link OpenJTalk for test_piper on Unix platforms
 if(NOT WIN32 AND NOT MSVC)
-  ExternalProject_Get_Property(openjtalk_external SOURCE_DIR)
   target_link_libraries(test_piper
-    ${SOURCE_DIR}/src/bin/libOpenJTalk.a
-    ${SOURCE_DIR}/src/bin/libHTSEngine.a
-    ${SOURCE_DIR}/src/jpcommon/libjpcommon.a
-    ${SOURCE_DIR}/src/mecab/src/libmecab.a
-    ${SOURCE_DIR}/src/njd/libnjd.a
-    ${SOURCE_DIR}/src/njd2jpcommon/libnjd2jpcommon.a
-    ${SOURCE_DIR}/src/njd_set_accent_phrase/libnjd_set_accent_phrase.a
-    ${SOURCE_DIR}/src/njd_set_accent_type/libnjd_set_accent_type.a
-    ${SOURCE_DIR}/src/njd_set_digit/libnjd_set_digit.a
-    ${SOURCE_DIR}/src/njd_set_long_vowel/libnjd_set_long_vowel.a
-    ${SOURCE_DIR}/src/njd_set_pronunciation/libnjd_set_pronunciation.a
-    ${SOURCE_DIR}/src/njd_set_unvoiced_vowel/libnjd_set_unvoiced_vowel.a
-    ${SOURCE_DIR}/src/text2mecab/libtext2mecab.a
+    ${OPENJTALK_DIR}/lib/libOpenJTalk.a
+    ${OPENJTALK_DIR}/lib/libHTSEngine.a
+    ${OPENJTALK_DIR}/lib/libjpcommon.a
+    ${OPENJTALK_DIR}/lib/libmecab.a
+    ${OPENJTALK_DIR}/lib/libnjd.a
+    ${OPENJTALK_DIR}/lib/libnjd2jpcommon.a
+    ${OPENJTALK_DIR}/lib/libnjd_set_accent_phrase.a
+    ${OPENJTALK_DIR}/lib/libnjd_set_accent_type.a
+    ${OPENJTALK_DIR}/lib/libnjd_set_digit.a
+    ${OPENJTALK_DIR}/lib/libnjd_set_long_vowel.a
+    ${OPENJTALK_DIR}/lib/libnjd_set_pronunciation.a
+    ${OPENJTALK_DIR}/lib/libnjd_set_unvoiced_vowel.a
+    ${OPENJTALK_DIR}/lib/libtext2mecab.a
   )
   # Platform-specific libraries
   if(APPLE)
@@ -270,7 +271,7 @@ if(NOT WIN32 AND NOT MSVC)
   endif()
   
   # Add OpenJTalk includes for test_piper
-  target_include_directories(test_piper PUBLIC ${SOURCE_DIR}/src)
+  target_include_directories(test_piper PUBLIC ${OPENJTALK_DIR}/include)
 endif()
 
 # ---- Declare install targets ----
