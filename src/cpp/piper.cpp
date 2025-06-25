@@ -29,7 +29,7 @@
 #include <mach-o/dyld.h>
 #endif
 
-// Only include OpenJTalk on Unix platforms
+// Only include OpenJTalk on Unix platforms (not Windows)
 #if !defined(_WIN32) && !defined(_MSC_VER)
 #include "openjtalk_phonemize.hpp"
 #endif
