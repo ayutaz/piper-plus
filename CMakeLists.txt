@@ -16,10 +16,6 @@ elseif(APPLE)
   # macOS flags
   string(APPEND CMAKE_CXX_FLAGS " -Wall -Wextra")
   string(APPEND CMAKE_C_FLAGS " -Wall -Wextra")
-  # Set RPATH for macOS
-  set(CMAKE_MACOSX_RPATH 1)
-  set(CMAKE_INSTALL_RPATH "@executable_path/../lib")
-  set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
 else()
   # Linux flags
   string(APPEND CMAKE_CXX_FLAGS " -Wall -Wextra -Wl,-rpath,'$ORIGIN'")
@@ -28,6 +24,20 @@ endif()
 
 add_executable(piper src/cpp/main.cpp src/cpp/piper.cpp)
 add_executable(test_piper src/cpp/test.cpp src/cpp/piper.cpp)
+
+# Configure RPATH for macOS
+if(APPLE)
+  set_target_properties(piper PROPERTIES
+    MACOSX_RPATH TRUE
+    INSTALL_RPATH "@executable_path/../lib"
+    BUILD_WITH_INSTALL_RPATH TRUE
+  )
+  set_target_properties(test_piper PROPERTIES
+    MACOSX_RPATH TRUE
+    INSTALL_RPATH "@executable_path/../lib"
+    BUILD_WITH_INSTALL_RPATH TRUE
+  )
+endif()
 
 # NOTE: external project prefix are shortened because of path length restrictions on Windows
 # NOTE: onnxruntime is pulled from piper-phonemize

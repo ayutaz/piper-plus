@@ -449,6 +449,36 @@ jobs:
             echo "::error::Failed to set executable permissions"
             exit 1
           fi
+          
+          # Check library dependencies
+          echo "Checking library dependencies..."
+          otool -L _install/piper/bin/piper
+          
+          # Check if libraries are installed
+          echo "Checking installed libraries..."
+          ls -la _install/piper/lib/ || echo "No lib directory found"
+          
+          # Check RPATH
+          echo "Checking RPATH settings..."
+          otool -l _install/piper/bin/piper | grep -A2 LC_RPATH || echo "No RPATH found"
+          
+          # Ensure espeak-ng library is copied
+          if [ "${{ matrix.arch }}" = "x64" ]; then
+            ESPEAK_LIB="/usr/local/lib/libespeak-ng.dylib"
+          else
+            ESPEAK_LIB="/opt/homebrew/lib/libespeak-ng.dylib"
+          fi
+          
+          if [ -f "$ESPEAK_LIB" ] && [ ! -f "_install/piper/lib/libespeak-ng.dylib" ]; then
+            echo "Copying espeak-ng library..."
+            mkdir -p _install/piper/lib
+            cp -P ${ESPEAK_LIB}* _install/piper/lib/ || true
+            # Also copy the actual library file (resolving symlinks)
+            cp -L "$ESPEAK_LIB" "_install/piper/lib/libespeak-ng.1.dylib" || true
+          fi
+          
+          echo "Final library check:"
+          ls -la _install/piper/lib/
       - name: Verify macOS package
         run: |
           # バイナリの存在確認
