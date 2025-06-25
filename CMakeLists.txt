@@ -336,6 +336,16 @@ if(NOT WIN32 AND NOT MSVC)
   target_link_libraries(piper PUBLIC openjtalk)
   target_link_libraries(test_piper PUBLIC openjtalk)
   
+  # Add OpenJTalk include directories
+  target_include_directories(piper PRIVATE
+    ${CMAKE_CURRENT_BINARY_DIR}/oj/include
+    ${CMAKE_CURRENT_BINARY_DIR}/hts/include
+  )
+  target_include_directories(test_piper PRIVATE
+    ${CMAKE_CURRENT_BINARY_DIR}/oj/include
+    ${CMAKE_CURRENT_BINARY_DIR}/hts/include
+  )
+  
   # Add dependencies after linking (only if we built them)
   if(NOT DEFINED OPENJTALK_DIR)
     add_dependencies(piper openjtalk_external hts_engine_external)
