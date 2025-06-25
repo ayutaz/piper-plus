@@ -29,10 +29,8 @@
 #include <mach-o/dyld.h>
 #endif
 
-// Only include OpenJTalk on Unix platforms
-#if !defined(_WIN32) && !defined(_MSC_VER)
-// #include "openjtalk_phonemize.hpp" // Disabled for CI/CD
-#endif
+// OpenJTalk support temporarily disabled for CI/CD
+// TODO: Re-enable when build issues are resolved
 
 namespace piper {
 

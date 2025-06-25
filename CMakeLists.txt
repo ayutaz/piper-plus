@@ -141,12 +141,12 @@ target_link_libraries(test_piper PUBLIC
 
 install(
   TARGETS piper
-  DESTINATION ${CMAKE_INSTALL_PREFIX})
+  DESTINATION bin)
 
 # Dependencies
 install(
   DIRECTORY ${PIPER_PHONEMIZE_DIR}/bin/
-  DESTINATION ${CMAKE_INSTALL_PREFIX}
+  DESTINATION bin
   USE_SOURCE_PERMISSIONS  # keep +x
   FILES_MATCHING
   PATTERN "piper_phonemize"
@@ -156,7 +156,7 @@ install(
 
 install(
   DIRECTORY ${PIPER_PHONEMIZE_DIR}/lib/
-  DESTINATION ${CMAKE_INSTALL_PREFIX}
+  DESTINATION lib
   FILES_MATCHING
   PATTERN "*.dll"
   PATTERN "*.so*"
@@ -164,10 +164,10 @@ install(
 
 install(
   DIRECTORY ${PIPER_PHONEMIZE_DIR}/share/espeak-ng-data
-  DESTINATION ${CMAKE_INSTALL_PREFIX}
+  DESTINATION share
 )
 
 install(
   FILES ${PIPER_PHONEMIZE_DIR}/share/libtashkeel_model.ort
-  DESTINATION ${CMAKE_INSTALL_PREFIX}
+  DESTINATION share
 )

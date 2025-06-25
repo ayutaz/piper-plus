@@ -688,9 +688,9 @@ jobs:
                 Write-Host "Creating piper directory structure..."
                 New-Item -ItemType Directory -Force -Path piper | Out-Null
                 Move-Item -Path "bin" -Destination "piper/" -Force
-                Move-Item -Path "espeak-ng-data" -Destination "piper/" -Force -ErrorAction SilentlyContinue
-                Move-Item -Path "*.dll" -Destination "piper/" -Force -ErrorAction SilentlyContinue
-                Move-Item -Path "*.ort" -Destination "piper/" -Force -ErrorAction SilentlyContinue
+                Move-Item -Path "share/espeak-ng-data" -Destination "piper/" -Force -ErrorAction SilentlyContinue
+                Move-Item -Path "lib/*.dll" -Destination "piper/" -Force -ErrorAction SilentlyContinue
+                Move-Item -Path "share/*.ort" -Destination "piper/" -Force -ErrorAction SilentlyContinue
               }
             }
           } else {
