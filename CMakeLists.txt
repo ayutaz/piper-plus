@@ -92,8 +92,7 @@ if(NOT WIN32 AND NOT MSVC)
   list(APPEND TEST_PIPER_SOURCES src/cpp/openjtalk_phonemize.cpp src/cpp/openjtalk_wrapper.c)
 endif()
 
-add_executable(piper ${PIPER_SOURCES})
-add_executable(test_piper ${TEST_PIPER_SOURCES})
+# Executables will be created later after OpenJTalk setup
 
 # NOTE: external project prefix are shortened because of path length restrictions on Windows
 # NOTE: onnxruntime is pulled from piper-phonemize
@@ -319,6 +318,21 @@ if(NOT WIN32 AND NOT MSVC)
     add_library(openjtalk INTERFACE)
   endif()
 
+  # OpenJTalk linking will be done after executable creation
+else()
+  message(STATUS "OpenJTalk is not supported on Windows - skipping Japanese phonemizer")
+  # Create empty target for compatibility
+  add_library(openjtalk INTERFACE)
+endif()
+
+# ---- Declare executable ----
+
+# Create executables after all dependencies are configured
+add_executable(piper ${PIPER_SOURCES})
+add_executable(test_piper ${TEST_PIPER_SOURCES})
+
+# Link OpenJTalk and add dependencies for Unix platforms
+if(NOT WIN32 AND NOT MSVC)
   target_link_libraries(piper PUBLIC openjtalk)
   target_link_libraries(test_piper PUBLIC openjtalk)
   
@@ -327,13 +341,7 @@ if(NOT WIN32 AND NOT MSVC)
     add_dependencies(piper openjtalk_external hts_engine_external)
     add_dependencies(test_piper openjtalk_external hts_engine_external)
   endif()
-else()
-  message(STATUS "OpenJTalk is not supported on Windows - skipping Japanese phonemizer")
-  # Create empty target for compatibility
-  add_library(openjtalk INTERFACE)
 endif()
-
-# ---- Declare executable ----
 
 if((NOT MSVC) AND (NOT APPLE))
   # Linux flags - remove duplicate since already set above
