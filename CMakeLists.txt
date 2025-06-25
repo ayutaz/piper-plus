@@ -12,7 +12,15 @@ if(MSVC)
   # Force compiler to use UTF-8 for IPA constants
   add_compile_options("$<$<C_COMPILER_ID:MSVC>:/utf-8>")
   add_compile_options("$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
-elseif(NOT APPLE)
+elseif(APPLE)
+  # macOS flags
+  string(APPEND CMAKE_CXX_FLAGS " -Wall -Wextra")
+  string(APPEND CMAKE_C_FLAGS " -Wall -Wextra")
+  # Set RPATH for macOS
+  set(CMAKE_MACOSX_RPATH 1)
+  set(CMAKE_INSTALL_RPATH "@executable_path/../lib")
+  set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
+else()
   # Linux flags
   string(APPEND CMAKE_CXX_FLAGS " -Wall -Wextra -Wl,-rpath,'$ORIGIN'")
   string(APPEND CMAKE_C_FLAGS " -Wall -Wextra")
@@ -73,7 +81,16 @@ endif()
 
 # ---- Declare executable ----
 
-if((NOT MSVC) AND (NOT APPLE))
+if(APPLE)
+  # macOS-specific settings
+  set(PIPER_EXTRA_LIBRARIES "pthread")
+  # Find Homebrew-installed espeak-ng
+  if(CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
+    set(HOMEBREW_PREFIX "/usr/local")
+  else()
+    set(HOMEBREW_PREFIX "/opt/homebrew")
+  endif()
+elseif(NOT MSVC)
   # Linux flags
   string(APPEND CMAKE_CXX_FLAGS " -Wall -Wextra -Wl,-rpath,'$ORIGIN'")
   string(APPEND CMAKE_C_FLAGS " -Wall -Wextra")
@@ -96,6 +113,12 @@ target_link_directories(piper PUBLIC
   ${SPDLOG_DIR}/lib
   ${PIPER_PHONEMIZE_DIR}/lib
 )
+
+if(APPLE)
+  # Add Homebrew paths for macOS
+  target_link_directories(piper PUBLIC ${HOMEBREW_PREFIX}/lib)
+  target_include_directories(piper PUBLIC ${HOMEBREW_PREFIX}/include)
+endif()
 
 target_include_directories(piper PUBLIC
   ${FMT_DIR}/include
@@ -160,6 +183,7 @@ install(
   FILES_MATCHING
   PATTERN "*.dll"
   PATTERN "*.so*"
+  PATTERN "*.dylib"
 )
 
 install(
@@ -171,3 +195,16 @@ install(
   FILES ${PIPER_PHONEMIZE_DIR}/share/libtashkeel_model.ort
   DESTINATION share
 )
+
+# Copy espeak-ng library on macOS
+if(APPLE)
+  # Find and install espeak-ng library from Homebrew
+  find_library(ESPEAK_NG_LIB espeak-ng PATHS ${HOMEBREW_PREFIX}/lib REQUIRED)
+  if(ESPEAK_NG_LIB)
+    # Get the actual library file (resolving symlinks)
+    get_filename_component(ESPEAK_NG_LIB_REAL ${ESPEAK_NG_LIB} REALPATH)
+    install(FILES ${ESPEAK_NG_LIB_REAL} DESTINATION lib)
+    # Also install the symlink
+    install(FILES ${ESPEAK_NG_LIB} DESTINATION lib)
+  endif()
+endif()
