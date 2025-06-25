@@ -117,16 +117,8 @@ target_link_libraries(piper
   ${PIPER_EXTRA_LIBRARIES}
 )
 
-# Link espeak-ng from piper_phonemize build
-if(APPLE)
-  target_link_libraries(piper
-    ${PIPER_PHONEMIZE_DIR}/lib/libespeak-ng.dylib
-  )
-else()
-  target_link_libraries(piper
-    espeak-ng
-  )
-endif()
+# Link espeak-ng
+target_link_libraries(piper espeak-ng)
 
 target_link_directories(piper PUBLIC
   ${FMT_DIR}/lib
