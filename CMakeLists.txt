@@ -95,6 +95,10 @@ set(TEST_PIPER_SOURCES src/cpp/test.cpp src/cpp/piper.cpp)
 
 # Executables will be created later after OpenJTalk setup
 
+# Create executables here temporarily to fix build
+add_executable(piper ${PIPER_SOURCES})
+add_executable(test_piper ${TEST_PIPER_SOURCES})
+
 # NOTE: external project prefix are shortened because of path length restrictions on Windows
 # NOTE: onnxruntime is pulled from piper-phonemize
 
@@ -329,9 +333,7 @@ endif()
 
 # ---- Declare executable ----
 
-# Create executables after all dependencies are configured
-add_executable(piper ${PIPER_SOURCES})
-add_executable(test_piper ${TEST_PIPER_SOURCES})
+# Executables already created above
 
 # Link OpenJTalk and add dependencies for Unix platforms
 # Temporarily disabled to fix CI/CD builds
