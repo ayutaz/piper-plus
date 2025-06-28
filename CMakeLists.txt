@@ -196,7 +196,7 @@ if(NOT DEFINED HTS_ENGINE_DIR)
   set(HTS_ENGINE_VERSION "1.10")
 
   if(MSVC)
-    # Windows: Use CMake-based build
+    # Windows: Use configure with MSYS2 or build without audio support
     ExternalProject_Add(
       hts_engine_external
       PREFIX "${CMAKE_CURRENT_BINARY_DIR}/h"
@@ -204,6 +204,9 @@ if(NOT DEFINED HTS_ENGINE_DIR)
       PATCH_COMMAND ${CMAKE_COMMAND} -E copy 
         ${CMAKE_CURRENT_SOURCE_DIR}/cmake/hts_engine_CMakeLists.txt 
         <SOURCE_DIR>/CMakeLists.txt
+        COMMAND ${CMAKE_COMMAND} -E copy
+        ${CMAKE_CURRENT_SOURCE_DIR}/cmake/hts_audio_windows.c
+        <SOURCE_DIR>/lib/HTS_audio.c
       CMAKE_ARGS 
         -DCMAKE_INSTALL_PREFIX:PATH=${HTS_ENGINE_DIR}
         -DBUILD_SHARED_LIBS:BOOL=OFF

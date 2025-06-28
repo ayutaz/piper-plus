@@ -5,7 +5,6 @@ set(HTS_ENGINE_VERSION 1.10)
 
 # Source files
 set(HTS_ENGINE_SOURCES
-    lib/HTS_audio.c
     lib/HTS_engine.c
     lib/HTS_gstream.c
     lib/HTS_label.c
@@ -16,12 +15,21 @@ set(HTS_ENGINE_SOURCES
     lib/HTS_vocoder.c
 )
 
+# Use the patched audio file for Windows that was copied by CMake
+if(MSVC OR WIN32)
+    list(APPEND HTS_ENGINE_SOURCES lib/HTS_audio.c)
+else()
+    list(APPEND HTS_ENGINE_SOURCES lib/HTS_audio.c)
+endif()
+
 # Create static library
 add_library(HTSEngine STATIC ${HTS_ENGINE_SOURCES})
 
 # Set properties for Windows static runtime
 if(MSVC)
     set_property(TARGET HTSEngine PROPERTY MSVC_RUNTIME_LIBRARY ${CMAKE_MSVC_RUNTIME_LIBRARY})
+    # Disable ARM64 specific code on x64 builds
+    target_compile_definitions(HTSEngine PRIVATE _AMD64_)
 endif()
 
 # Include directories
