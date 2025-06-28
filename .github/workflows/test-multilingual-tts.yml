@@ -258,21 +258,26 @@ jobs:
           
           REM Create expected directory structure
           mkdir ..\piper\bin
-          if exist Release\piper.exe (
+          if exist _install\piper\bin\piper.exe (
+            echo Found piper.exe in _install directory
+            xcopy /E /I _install\piper ..\piper\
+          ) else if exist Release\piper.exe (
             copy Release\piper.exe ..\piper\bin\
           ) else (
-            echo ERROR: piper.exe not found in Release directory
-            dir Release\
+            echo ERROR: piper.exe not found
+            dir /s *.exe
             exit /b 1
           )
           
-          REM Copy required files from build directory
-          if exist pi\share (
-            xcopy /E /I pi\share ..\piper\share
-          ) else if exist ei\share (
-            xcopy /E /I ei\share ..\piper\share
-          ) else (
-            echo WARNING: share directory not found
+          REM Copy required files from build directory (if not already copied)
+          if not exist ..\piper\share (
+            if exist pi\share (
+              xcopy /E /I pi\share ..\piper\share
+            ) else if exist ei\share (
+              xcopy /E /I ei\share ..\piper\share
+            ) else (
+              echo WARNING: share directory not found
+            )
           )
           
           REM Download OpenJTalk binary for Windows
