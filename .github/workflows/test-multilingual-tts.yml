@@ -263,9 +263,13 @@ jobs:
           REM Copy required files from build directory
           xcopy /E /I ei\share ..\piper\share
           
+          REM Download OpenJTalk binary for Windows
+          cd ..
+          powershell -ExecutionPolicy Bypass -File download_openjtalk_windows.ps1 -TargetDir piper\bin
+          
           REM List the contents to verify
-          dir ..\piper\bin\
-          dir ..\piper\share\
+          dir piper\bin\
+          dir piper\share\
 
       - name: Cache voice models
         uses: actions/cache@v4.2.0

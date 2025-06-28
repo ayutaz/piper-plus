@@ -349,34 +349,296 @@ void HTS_Label_clear(HTS_Label_Wrapper* label) {
 
 #else
 
-// Windows stub implementation
+// Windows implementation
+#include "openjtalk_windows.h"
+#include "openjtalk_dictionary_manager.h"
+#include <io.h>
+#include <fcntl.h>
+
+// Windows temporary file creation
+char* create_temp_file_windows(const char* prefix, const char* suffix) {
+    char temp_path[MAX_PATH];
+    char temp_filename[MAX_PATH];
+    
+    // Get temporary directory
+    if (GetTempPath(MAX_PATH, temp_path) == 0) {
+        return NULL;
+    }
+    
+    // Generate unique filename
+    if (GetTempFileName(temp_path, prefix, 0, temp_filename) == 0) {
+        return NULL;
+    }
+    
+    // Rename with suffix if needed
+    if (suffix && strlen(suffix) > 0) {
+        char new_filename[MAX_PATH];
+        snprintf(new_filename, MAX_PATH, "%s%s", temp_filename, suffix);
+        if (MoveFile(temp_filename, new_filename) == 0) {
+            DeleteFile(temp_filename);
+            return NULL;
+        }
+        return strdup(new_filename);
+    }
+    
+    return strdup(temp_filename);
+}
+
+// Execute OpenJTalk binary on Windows
+int execute_openjtalk_windows(OpenJTalk* oj, const char* input_file, const char* output_file) {
+    char command[4096];
+    STARTUPINFO si;
+    PROCESS_INFORMATION pi;
+    DWORD exit_code;
+    
+    // Build command line
+    snprintf(command, sizeof(command), 
+        "\"%s\" -x \"%s\" -m \"%s\" -ow \"%s\" \"%s\"",
+        oj->openjtalk_binary_path,
+        oj->dict_path,
+        oj->voice_path,
+        output_file,
+        input_file);
+    
+    // Initialize structures
+    ZeroMemory(&si, sizeof(si));
+    si.cb = sizeof(si);
+    ZeroMemory(&pi, sizeof(pi));
+    
+    // Create process
+    if (!CreateProcess(NULL, command, NULL, NULL, FALSE, 
+                      CREATE_NO_WINDOW, NULL, NULL, &si, &pi)) {
+        return -1;
+    }
+    
+    // Wait for completion
+    WaitForSingleObject(pi.hProcess, INFINITE);
+    
+    // Get exit code
+    if (!GetExitCodeProcess(pi.hProcess, &exit_code)) {
+        exit_code = -1;
+    }
+    
+    // Clean up
+    CloseHandle(pi.hProcess);
+    CloseHandle(pi.hThread);
+    
+    return (int)exit_code;
+}
+
 OpenJTalk* openjtalk_initialize() {
-    return NULL;
+    OpenJTalk* oj = (OpenJTalk*)calloc(1, sizeof(OpenJTalk));
+    if (!oj) return NULL;
+    
+    // Try to find OpenJTalk binary
+    const char* openjtalk_exe = getenv("OPENJTALK_BINARY");
+    if (!openjtalk_exe) {
+        // Try common locations
+        if (_access("open_jtalk.exe", 0) == 0) {
+            openjtalk_exe = "open_jtalk.exe";
+        } else if (_access("bin\\open_jtalk.exe", 0) == 0) {
+            openjtalk_exe = "bin\\open_jtalk.exe";
+        } else {
+            // Use bundled binary if available
+            char exe_path[MAX_PATH];
+            GetModuleFileName(NULL, exe_path, MAX_PATH);
+            char* last_slash = strrchr(exe_path, '\\');
+            if (last_slash) {
+                *last_slash = '\0';
+                char bundled_path[MAX_PATH];
+                snprintf(bundled_path, MAX_PATH, "%s\\open_jtalk.exe", exe_path);
+                if (_access(bundled_path, 0) == 0) {
+                    openjtalk_exe = strdup(bundled_path);
+                }
+            }
+        }
+    }
+    
+    if (!openjtalk_exe) {
+        free(oj);
+        return NULL;
+    }
+    
+    oj->openjtalk_binary_path = strdup(openjtalk_exe);
+    
+    // Ensure dictionary is available
+    const char* dict_path = NULL;
+    if (openjtalk_ensure_dictionary(&dict_path) != 0) {
+        free(oj->openjtalk_binary_path);
+        free(oj);
+        return NULL;
+    }
+    oj->dict_path = strdup(dict_path);
+    
+    // Set voice path
+    const char* voice_path = getenv("OPENJTALK_VOICE");
+    if (!voice_path) {
+        // Try to use bundled voice
+        char exe_path[MAX_PATH];
+        GetModuleFileName(NULL, exe_path, MAX_PATH);
+        char* last_slash = strrchr(exe_path, '\\');
+        if (last_slash) {
+            *last_slash = '\0';
+            static char voice_buf[MAX_PATH];
+            snprintf(voice_buf, MAX_PATH, "%s\\..\\share\\hts\\nitech_jp_atr503_m001.htsvoice", exe_path);
+            if (_access(voice_buf, 0) == 0) {
+                voice_path = voice_buf;
+            }
+        }
+    }
+    
+    if (voice_path) {
+        oj->voice_path = strdup(voice_path);
+    }
+    
+    return oj;
 }
 
 void openjtalk_finalize(OpenJTalk* oj) {
-    (void)oj;
+    if (!oj) return;
+    
+    free(oj->openjtalk_binary_path);
+    free(oj->dict_path);
+    free(oj->voice_path);
+    free(oj);
 }
 
 HTS_Label_Wrapper* openjtalk_extract_fullcontext(OpenJTalk* oj, const char* text) {
-    (void)oj;
-    (void)text;
-    return NULL;
+    if (!oj || !text || !oj->openjtalk_binary_path || !oj->dict_path) {
+        return NULL;
+    }
+    
+    // Create temporary files
+    char* input_file = create_temp_file_windows("ojin", ".txt");
+    char* output_file = create_temp_file_windows("ojout", ".lab");
+    
+    if (!input_file || !output_file) {
+        free(input_file);
+        free(output_file);
+        return NULL;
+    }
+    
+    // Write input text
+    FILE* fp = fopen(input_file, "w");
+    if (!fp) {
+        free(input_file);
+        free(output_file);
+        return NULL;
+    }
+    fprintf(fp, "%s", text);
+    fclose(fp);
+    
+    // Build command for label generation only
+    char command[4096];
+    snprintf(command, sizeof(command), 
+        "\"%s\" -x \"%s\" -ot \"%s\" \"%s\"",
+        oj->openjtalk_binary_path,
+        oj->dict_path,
+        output_file,
+        input_file);
+    
+    // Execute command
+    STARTUPINFO si;
+    PROCESS_INFORMATION pi;
+    ZeroMemory(&si, sizeof(si));
+    si.cb = sizeof(si);
+    ZeroMemory(&pi, sizeof(pi));
+    
+    if (!CreateProcess(NULL, command, NULL, NULL, FALSE, 
+                      CREATE_NO_WINDOW, NULL, NULL, &si, &pi)) {
+        DeleteFile(input_file);
+        free(input_file);
+        free(output_file);
+        return NULL;
+    }
+    
+    WaitForSingleObject(pi.hProcess, INFINITE);
+    CloseHandle(pi.hProcess);
+    CloseHandle(pi.hThread);
+    
+    // Parse labels
+    HTS_Label_Wrapper* labels = parse_labels_from_file(output_file);
+    
+    // Clean up
+    DeleteFile(input_file);
+    DeleteFile(output_file);
+    free(input_file);
+    free(output_file);
+    
+    return labels;
+}
+
+HTS_Label_Wrapper* parse_labels_from_file(const char* filename) {
+    FILE* fp = fopen(filename, "r");
+    if (!fp) return NULL;
+    
+    HTS_Label_Wrapper* label = (HTS_Label_Wrapper*)calloc(1, sizeof(HTS_Label_Wrapper));
+    if (!label) {
+        fclose(fp);
+        return NULL;
+    }
+    
+    label->capacity = 100;
+    label->labels = (char**)calloc(label->capacity, sizeof(char*));
+    if (!label->labels) {
+        free(label);
+        fclose(fp);
+        return NULL;
+    }
+    
+    char line[1024];
+    while (fgets(line, sizeof(line), fp)) {
+        // Remove newline
+        size_t len = strlen(line);
+        if (len > 0 && line[len-1] == '\n') {
+            line[len-1] = '\0';
+        }
+        
+        // Skip empty lines
+        if (strlen(line) == 0) continue;
+        
+        // Resize if needed
+        if (label->size >= label->capacity) {
+            label->capacity *= 2;
+            char** new_labels = (char**)realloc(label->labels, 
+                                               label->capacity * sizeof(char*));
+            if (!new_labels) {
+                HTS_Label_clear(label);
+                fclose(fp);
+                return NULL;
+            }
+            label->labels = new_labels;
+        }
+        
+        // Store label
+        label->labels[label->size] = strdup(line);
+        label->size++;
+    }
+    
+    fclose(fp);
+    return label;
 }
 
 size_t HTS_Label_get_size(HTS_Label_Wrapper* label) {
-    (void)label;
-    return 0;
+    return label ? label->size : 0;
 }
 
 const char* HTS_Label_get_string(HTS_Label_Wrapper* label, size_t index) {
-    (void)label;
-    (void)index;
-    return NULL;
+    if (!label || index >= label->size) return NULL;
+    return label->labels[index];
 }
 
 void HTS_Label_clear(HTS_Label_Wrapper* label) {
-    (void)label;
+    if (!label) return;
+    
+    if (label->labels) {
+        for (size_t i = 0; i < label->size; i++) {
+            free(label->labels[i]);
+        }
+        free(label->labels);
+    }
+    
+    free(label);
 }
 
 #endif // _WIN32

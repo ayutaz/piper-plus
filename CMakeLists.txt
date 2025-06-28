@@ -55,8 +55,21 @@ if(BUILD_TESTS)
   add_subdirectory(src/cpp/tests)
 endif()
 
-# Add OpenJTalk support on Unix platforms (not Windows)
+# Add OpenJTalk support 
 if(NOT WIN32 AND NOT MSVC)
+  # Unix platforms: use native OpenJTalk
+  target_sources(piper PRIVATE
+    src/cpp/openjtalk_phonemize.cpp
+    src/cpp/openjtalk_wrapper.c
+    src/cpp/openjtalk_dictionary_manager.c
+  )
+  target_sources(test_piper PRIVATE
+    src/cpp/openjtalk_phonemize.cpp
+    src/cpp/openjtalk_wrapper.c
+    src/cpp/openjtalk_dictionary_manager.c
+  )
+else()
+  # Windows: use wrapper implementation
   target_sources(piper PRIVATE
     src/cpp/openjtalk_phonemize.cpp
     src/cpp/openjtalk_wrapper.c
