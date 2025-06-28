@@ -311,18 +311,35 @@ if(NOT DEFINED OPENJTALK_DIR)
         add_custom_command(TARGET open_jtalk_fallback POST_BUILD
           COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:open_jtalk_fallback> "${OPENJTALK_WINDOWS_EXE}"
         )
+        
+        # Make openjtalk_external depend on the fallback
+        add_custom_target(openjtalk_external ALL
+          DEPENDS hts_engine_external open_jtalk_fallback
+          COMMENT "OpenJTalk for Windows - using fallback wrapper"
+        )
+      else()
+        message(STATUS "Successfully downloaded OpenJTalk binary")
+        add_custom_target(openjtalk_external ALL
+          DEPENDS hts_engine_external
+          COMMENT "OpenJTalk for Windows - using pre-built binary"
+        )
       endif()
-      
-      message(STATUS "Successfully downloaded OpenJTalk binary")
     else()
       message(STATUS "Using existing OpenJTalk binary at ${OPENJTALK_WINDOWS_EXE}")
+      add_custom_target(openjtalk_external ALL
+        DEPENDS hts_engine_external
+        COMMENT "OpenJTalk for Windows - using existing binary"
+      )
     endif()
-    
+  else()
+    # Windows without MSVC - not supported
+    message(WARNING "OpenJTalk is not supported on Windows without MSVC")
     add_custom_target(openjtalk_external ALL
-      DEPENDS hts_engine_external
-      COMMENT "OpenJTalk for Windows - using pre-built binary"
+      COMMENT "OpenJTalk - not supported on this platform"
     )
-  elseif(NOT WIN32)
+  endif()
+  
+  if(NOT WIN32)
     # Unix platforms: Use configure script
     ExternalProject_Add(
       openjtalk_external
