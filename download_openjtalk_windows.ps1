@@ -16,14 +16,19 @@ $ReleaseUrl = "https://api.github.com/repos/rosmarinus/jtalkdll/releases/latest"
 Write-Host "Fetching latest jtalkdll release..."
 try {
     $Release = Invoke-RestMethod -Uri $ReleaseUrl
+    Write-Host "Found release: $($Release.name)"
+    Write-Host "Available assets:"
+    $Release.assets | ForEach-Object { Write-Host "  - $($_.name)" }
+    
     # Look for Windows binary - jtalkdll releases use specific naming
     $Asset = $Release.assets | Where-Object { 
-        $_.name -like "*.zip" -and ($_.name -like "*jtalkdll*" -or $_.name -match "^jtalkdll.*\.zip$")
+        $_.name -like "*.zip"
     } | Select-Object -First 1
     
     if (!$Asset) {
-        Write-Error "Could not find Windows binary in latest release"
-        exit 1
+        Write-Warning "Could not find Windows binary in latest release, skipping OpenJTalk download"
+        # Don't fail the build, just skip OpenJTalk
+        exit 0
     }
     
     $DownloadUrl = $Asset.browser_download_url

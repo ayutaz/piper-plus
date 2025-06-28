@@ -10,7 +10,7 @@
 #include <string.h>
 
 // Windows-specific OpenJTalk structure
-typedef struct OpenJTalk {
+typedef struct OpenJTalk_impl {
     char* openjtalk_binary_path;
     char* dict_path;
     char* voice_path;
@@ -18,7 +18,7 @@ typedef struct OpenJTalk {
 } OpenJTalk;
 
 // Windows-specific label wrapper
-typedef struct HTS_Label_Wrapper {
+typedef struct HTS_Label_Wrapper_impl {
     char** labels;
     size_t size;
     size_t capacity;
