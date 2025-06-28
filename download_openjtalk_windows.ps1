@@ -16,7 +16,10 @@ $ReleaseUrl = "https://api.github.com/repos/rosmarinus/jtalkdll/releases/latest"
 Write-Host "Fetching latest jtalkdll release..."
 try {
     $Release = Invoke-RestMethod -Uri $ReleaseUrl
-    $Asset = $Release.assets | Where-Object { $_.name -like "*win*.zip" } | Select-Object -First 1
+    # Look for Windows binary - jtalkdll releases use specific naming
+    $Asset = $Release.assets | Where-Object { 
+        $_.name -like "*.zip" -and ($_.name -like "*jtalkdll*" -or $_.name -match "^jtalkdll.*\.zip$")
+    } | Select-Object -First 1
     
     if (!$Asset) {
         Write-Error "Could not find Windows binary in latest release"
