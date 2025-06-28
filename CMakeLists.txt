@@ -15,6 +15,10 @@ if(MSVC)
   
   # Use static runtime library to avoid DLL dependencies
   set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+  set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /MT")
+  set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /MTd")
+  set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} /MT")
+  set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} /MTd")
   
   # Additional Windows-specific flags for better compatibility
   add_compile_options(/EHsc)  # Enable C++ exceptions
@@ -35,6 +39,12 @@ endif()
 
 add_executable(piper src/cpp/main.cpp src/cpp/piper.cpp)
 add_executable(test_piper src/cpp/test.cpp src/cpp/piper.cpp)
+
+# Set runtime library for executables on Windows
+if(MSVC)
+  set_property(TARGET piper PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+  set_property(TARGET test_piper PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+endif()
 
 
 # Testing support
@@ -115,12 +125,14 @@ if(NOT DEFINED FMT_DIR)
   elseif(MSVC)
     # Pass static runtime library settings to external projects
     set(EXTERNAL_CMAKE_ARGS 
-      -DCMAKE_MSVC_RUNTIME_LIBRARY=${CMAKE_MSVC_RUNTIME_LIBRARY}
+      -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded$<$<CONFIG:Debug>:Debug>
       -DCMAKE_POLICY_DEFAULT_CMP0091=NEW
-      -DCMAKE_CXX_FLAGS_RELEASE="/MT /O2 /Ob2 /DNDEBUG"
-      -DCMAKE_C_FLAGS_RELEASE="/MT /O2 /Ob2 /DNDEBUG"
-      -DCMAKE_CXX_FLAGS_DEBUG="/MTd /Zi /Ob0 /Od /RTC1"
-      -DCMAKE_C_FLAGS_DEBUG="/MTd /Zi /Ob0 /Od /RTC1"
+      -DCMAKE_CXX_FLAGS_RELEASE="${CMAKE_CXX_FLAGS_RELEASE}"
+      -DCMAKE_C_FLAGS_RELEASE="${CMAKE_C_FLAGS_RELEASE}"
+      -DCMAKE_CXX_FLAGS_DEBUG="${CMAKE_CXX_FLAGS_DEBUG}"
+      -DCMAKE_C_FLAGS_DEBUG="${CMAKE_C_FLAGS_DEBUG}"
+      -DCMAKE_CXX_FLAGS="${CMAKE_CXX_FLAGS}"
+      -DCMAKE_C_FLAGS="${CMAKE_C_FLAGS}"
     )
   else()
     set(EXTERNAL_CMAKE_ARGS "")
@@ -133,6 +145,7 @@ if(NOT DEFINED FMT_DIR)
     CMAKE_ARGS -DCMAKE_INSTALL_PREFIX:PATH=${FMT_DIR}
     CMAKE_ARGS -DFMT_TEST:BOOL=OFF  # Don't build all the tests
     CMAKE_ARGS -DBUILD_SHARED_LIBS:BOOL=OFF  # Build static libraries
+    CMAKE_ARGS -DFMT_USE_CPP11:BOOL=ON
     CMAKE_ARGS ${EXTERNAL_CMAKE_ARGS}
   )
   add_dependencies(piper fmt_external)
@@ -150,6 +163,8 @@ if(NOT DEFINED SPDLOG_DIR)
     URL "https://github.com/gabime/spdlog/archive/refs/tags/v${SPDLOG_VERSION}.zip"
     CMAKE_ARGS -DCMAKE_INSTALL_PREFIX:PATH=${SPDLOG_DIR}
     CMAKE_ARGS -DSPDLOG_BUILD_SHARED:BOOL=OFF  # Build static libraries
+    CMAKE_ARGS -DSPDLOG_ENABLE_PCH:BOOL=OFF
+    CMAKE_ARGS -DSPDLOG_FMT_EXTERNAL:BOOL=OFF
     CMAKE_ARGS ${EXTERNAL_CMAKE_ARGS}
   )
   add_dependencies(piper spdlog_external)
@@ -166,6 +181,8 @@ if(NOT DEFINED PIPER_PHONEMIZE_DIR)
     URL "https://github.com/rhasspy/piper-phonemize/archive/refs/heads/master.zip"
     CMAKE_ARGS -DCMAKE_INSTALL_PREFIX:PATH=${PIPER_PHONEMIZE_DIR}
     CMAKE_ARGS -DBUILD_SHARED_LIBS:BOOL=OFF  # Build static libraries
+    CMAKE_ARGS -DPIPER_PHONEMIZE_BUILD_TESTS:BOOL=OFF
+    CMAKE_ARGS -DPIPER_PHONEMIZE_BUILD_PROGRAMS:BOOL=OFF
     CMAKE_ARGS ${EXTERNAL_CMAKE_ARGS}
   )
   add_dependencies(piper piper_phonemize_external)
