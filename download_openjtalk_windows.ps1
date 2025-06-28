@@ -1,4 +1,4 @@
-# PowerShell script to download OpenJTalk binary for Windows
+# PowerShell script to download or check OpenJTalk binary for Windows
 param(
     [string]$TargetDir = "bin"
 )
@@ -9,6 +9,23 @@ $ErrorActionPreference = "Stop"
 if (!(Test-Path $TargetDir)) {
     New-Item -ItemType Directory -Path $TargetDir | Out-Null
 }
+
+Write-Host "Checking for OpenJTalk binary..."
+
+# Check if OpenJTalk was built by CMake
+$BuiltBinary = Join-Path (Split-Path $TargetDir) "build\oj\bin\open_jtalk.exe"
+$TargetBinary = Join-Path $TargetDir "open_jtalk.exe"
+
+if (Test-Path $BuiltBinary) {
+    Write-Host "Found OpenJTalk binary built by CMake: $BuiltBinary"
+    Write-Host "OpenJTalk has been built from source successfully."
+    # Note: The binary will be installed by CMake install process
+    exit 0
+}
+
+# If not built from source, try to download (but this will likely fail)
+Write-Host "OpenJTalk was not built from source. Attempting to download..."
+Write-Host "Note: Pre-built Windows binaries are not available."
 
 # Download URL for jtalkdll releases
 $ReleaseUrl = "https://api.github.com/repos/rosmarinus/jtalkdll/releases/latest"
@@ -26,7 +43,9 @@ try {
     } | Select-Object -First 1
     
     if (!$Asset) {
-        Write-Warning "Could not find Windows binary in latest release, skipping OpenJTalk download"
+        Write-Warning "Could not find Windows binary in latest release."
+        Write-Warning "OpenJTalk needs to be built from source for Windows."
+        Write-Warning "Japanese TTS will not be available without OpenJTalk."
         # Don't fail the build, just skip OpenJTalk
         exit 0
     }
@@ -55,6 +74,7 @@ try {
     Write-Host "OpenJTalk binary successfully downloaded to: $OpenJtalkExe"
     
 } catch {
-    Write-Error "Failed to download OpenJTalk: $_"
-    exit 1
+    Write-Warning "Failed to download OpenJTalk: $_"
+    Write-Warning "Japanese TTS will not be available without OpenJTalk."
+    exit 0
 }

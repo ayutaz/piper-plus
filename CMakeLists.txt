@@ -189,13 +189,33 @@ if(NOT DEFINED PIPER_PHONEMIZE_DIR)
   add_dependencies(test_piper piper_phonemize_external)
 endif()
 
-# ---- HTSEngine (Unix platforms only) ---
+# ---- HTSEngine ---
 
-if(NOT WIN32 AND NOT MSVC)
-  if(NOT DEFINED HTS_ENGINE_DIR)
-    set(HTS_ENGINE_DIR "${CMAKE_CURRENT_BINARY_DIR}/he")
-    set(HTS_ENGINE_VERSION "1.10")
+if(NOT DEFINED HTS_ENGINE_DIR)
+  set(HTS_ENGINE_DIR "${CMAKE_CURRENT_BINARY_DIR}/he")
+  set(HTS_ENGINE_VERSION "1.10")
 
+  if(MSVC)
+    # Windows: Use CMake-based build
+    ExternalProject_Add(
+      hts_engine_external
+      PREFIX "${CMAKE_CURRENT_BINARY_DIR}/h"
+      URL "https://downloads.sourceforge.net/project/hts-engine/hts_engine%20API/hts_engine_API-${HTS_ENGINE_VERSION}/hts_engine_API-${HTS_ENGINE_VERSION}.tar.gz"
+      PATCH_COMMAND ${CMAKE_COMMAND} -E copy 
+        ${CMAKE_CURRENT_SOURCE_DIR}/cmake/hts_engine_CMakeLists.txt 
+        <SOURCE_DIR>/CMakeLists.txt
+      CMAKE_ARGS 
+        -DCMAKE_INSTALL_PREFIX:PATH=${HTS_ENGINE_DIR}
+        -DBUILD_SHARED_LIBS:BOOL=OFF
+        -DCMAKE_MSVC_RUNTIME_LIBRARY=${CMAKE_MSVC_RUNTIME_LIBRARY}
+        -DCMAKE_CXX_FLAGS_RELEASE="${CMAKE_CXX_FLAGS_RELEASE}"
+        -DCMAKE_C_FLAGS_RELEASE="${CMAKE_C_FLAGS_RELEASE}"
+        -DCMAKE_CXX_FLAGS_DEBUG="${CMAKE_CXX_FLAGS_DEBUG}"
+        -DCMAKE_C_FLAGS_DEBUG="${CMAKE_C_FLAGS_DEBUG}"
+      BUILD_BYPRODUCTS ${HTS_ENGINE_DIR}/lib/HTSEngine.lib
+    )
+  else()
+    # Unix platforms: Use configure script
     # Set architecture flags for configure scripts
     if(APPLE AND CMAKE_OSX_ARCHITECTURES)
       if(CMAKE_OSX_ARCHITECTURES STREQUAL "x86_64")
@@ -222,13 +242,37 @@ if(NOT WIN32 AND NOT MSVC)
       BUILD_BYPRODUCTS ${HTS_ENGINE_DIR}/lib/libHTSEngine.a
     )
   endif()
+endif()
 
-  # ---- OpenJTalk ---
+# ---- OpenJTalk ---
 
-  if(NOT DEFINED OPENJTALK_DIR)
-    set(OPENJTALK_DIR "${CMAKE_CURRENT_BINARY_DIR}/oj")
-    set(OPENJTALK_VERSION "1.11")
+if(NOT DEFINED OPENJTALK_DIR)
+  set(OPENJTALK_DIR "${CMAKE_CURRENT_BINARY_DIR}/oj")
+  set(OPENJTALK_VERSION "1.11")
 
+  if(MSVC)
+    # Windows: Use CMake-based build
+    ExternalProject_Add(
+      openjtalk_external
+      PREFIX "${CMAKE_CURRENT_BINARY_DIR}/o"
+      URL "https://downloads.sourceforge.net/project/open-jtalk/Open%20JTalk/open_jtalk-${OPENJTALK_VERSION}/open_jtalk-${OPENJTALK_VERSION}.tar.gz"
+      PATCH_COMMAND ${CMAKE_COMMAND} -E copy 
+        ${CMAKE_CURRENT_SOURCE_DIR}/cmake/openjtalk_CMakeLists.txt 
+        <SOURCE_DIR>/CMakeLists.txt
+      CMAKE_ARGS 
+        -DCMAKE_INSTALL_PREFIX:PATH=${OPENJTALK_DIR}
+        -DHTS_ENGINE_DIR:PATH=${HTS_ENGINE_DIR}
+        -DBUILD_SHARED_LIBS:BOOL=OFF
+        -DCMAKE_MSVC_RUNTIME_LIBRARY=${CMAKE_MSVC_RUNTIME_LIBRARY}
+        -DCMAKE_CXX_FLAGS_RELEASE="${CMAKE_CXX_FLAGS_RELEASE}"
+        -DCMAKE_C_FLAGS_RELEASE="${CMAKE_C_FLAGS_RELEASE}"
+        -DCMAKE_CXX_FLAGS_DEBUG="${CMAKE_CXX_FLAGS_DEBUG}"
+        -DCMAKE_C_FLAGS_DEBUG="${CMAKE_C_FLAGS_DEBUG}"
+      BUILD_BYPRODUCTS ${OPENJTALK_DIR}/bin/open_jtalk.exe
+      DEPENDS hts_engine_external
+    )
+  elseif(NOT WIN32)
+    # Unix platforms: Use configure script
     ExternalProject_Add(
       openjtalk_external
       PREFIX "${CMAKE_CURRENT_BINARY_DIR}/o"
@@ -286,8 +330,12 @@ target_link_libraries(piper
 )
 
 # Link OpenJTalk and HTS_Engine libraries
-if(NOT WIN32 AND NOT MSVC)
-  # Ensure libraries are built before linking
+if(MSVC)
+  # Windows: Ensure libraries are built before linking
+  add_dependencies(piper hts_engine_external openjtalk_external)
+  add_dependencies(test_piper hts_engine_external openjtalk_external)
+elseif(NOT WIN32)
+  # Unix platforms: Ensure libraries are built before linking
   add_dependencies(piper openjtalk_external hts_engine_external)
   add_dependencies(test_piper openjtalk_external hts_engine_external)
 
@@ -316,7 +364,18 @@ target_include_directories(piper PUBLIC
   ${PIPER_PHONEMIZE_DIR}/include
 )
 
-if(NOT WIN32 AND NOT MSVC)
+if(MSVC)
+  # Windows: Include directories for OpenJTalk and HTS_Engine
+  target_include_directories(piper PUBLIC
+    ${OPENJTALK_DIR}/include
+    ${HTS_ENGINE_DIR}/include
+  )
+  target_include_directories(test_piper PUBLIC
+    ${OPENJTALK_DIR}/include
+    ${HTS_ENGINE_DIR}/include
+  )
+elseif(NOT WIN32)
+  # Unix platforms: Include directories
   target_include_directories(piper PUBLIC
     ${OPENJTALK_DIR}/include
     ${HTS_ENGINE_DIR}/include
@@ -422,8 +481,22 @@ install(
 )
 
 # Install OpenJTalk for Japanese TTS support
-if(NOT WIN32 AND NOT MSVC)
-  # Install OpenJTalk binary
+if(MSVC)
+  # Windows: Install OpenJTalk binary that we built
+  install(
+    PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/oj/bin/open_jtalk.exe
+    DESTINATION bin
+    OPTIONAL  # Don't fail if not built
+  )
+
+  # Install OpenJTalk dictionary (will be downloaded separately)
+  install(
+    DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/share/open_jtalk
+    DESTINATION share
+    OPTIONAL  # Don't fail if not present
+  )
+elseif(NOT WIN32)
+  # Unix platforms: Install OpenJTalk binary
   install(
     PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/oj/bin/open_jtalk
     DESTINATION bin

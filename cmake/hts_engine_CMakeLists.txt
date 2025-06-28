@@ -1,0 +1,67 @@
+cmake_minimum_required(VERSION 3.13)
+project(HTSEngine C)
+
+set(HTS_ENGINE_VERSION 1.10)
+
+# Source files
+set(HTS_ENGINE_SOURCES
+    lib/HTS_audio.c
+    lib/HTS_engine.c
+    lib/HTS_gstream.c
+    lib/HTS_label.c
+    lib/HTS_misc.c
+    lib/HTS_model.c
+    lib/HTS_pstream.c
+    lib/HTS_sstream.c
+    lib/HTS_vocoder.c
+)
+
+# Create static library
+add_library(HTSEngine STATIC ${HTS_ENGINE_SOURCES})
+
+# Set properties for Windows static runtime
+if(MSVC)
+    set_property(TARGET HTSEngine PROPERTY MSVC_RUNTIME_LIBRARY ${CMAKE_MSVC_RUNTIME_LIBRARY})
+endif()
+
+# Include directories
+target_include_directories(HTSEngine
+    PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        $<INSTALL_INTERFACE:include>
+)
+
+# Compile definitions
+target_compile_definitions(HTSEngine PRIVATE
+    HAVE_STRING_H=1
+    HAVE_STDLIB_H=1
+    HAVE_MATH_H=1
+)
+
+if(WIN32)
+    target_compile_definitions(HTSEngine PRIVATE
+        _CRT_SECURE_NO_WARNINGS
+        WIN32_LEAN_AND_MEAN
+    )
+endif()
+
+# Install targets
+install(TARGETS HTSEngine
+    EXPORT HTSEngineTargets
+    ARCHIVE DESTINATION lib
+    LIBRARY DESTINATION lib
+    RUNTIME DESTINATION bin
+)
+
+# Install headers
+install(DIRECTORY include/
+    DESTINATION include
+    FILES_MATCHING PATTERN "*.h"
+)
+
+# Create and install cmake config files
+install(EXPORT HTSEngineTargets
+    FILE HTSEngineConfig.cmake
+    NAMESPACE HTSEngine::
+    DESTINATION lib/cmake/HTSEngine
+)
