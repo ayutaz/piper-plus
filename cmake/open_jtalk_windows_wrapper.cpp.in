@@ -62,10 +62,10 @@ int main(int argc, char* argv[]) {
     
     // Basic phoneme mapping for Japanese
     // This is extremely simplified and won't produce good results
+    long long current_time = 5000000;
+    long long duration = 3000000;
+    
     if (!input_text.empty()) {
-        long long current_time = 5000000;
-        long long duration = 3000000;
-        
         // Output a few dummy phonemes
         std::vector<std::string> phonemes = {"a", "i", "u", "e", "o"};
         
