@@ -119,7 +119,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]  # Windows一時的に無効化（アクセス違反エラーのため）
+        os: [ubuntu-latest, macos-latest, windows-latest]
         language:
           - en_US  # English (US)
           - en_GB  # English (UK)
@@ -227,14 +227,45 @@ jobs:
             tar -xzf piper.tar.gz
             rm piper.tar.gz
             
+          elif [ "${{ runner.os }}" = "Windows" ]; then
+            # For Windows, we need to build from source with static linking
+            echo "Windows: Building from source with static linking..."
+            # This will be handled in a separate build step
+            
           fi
           
-          # Make binary executable
-          chmod +x piper/bin/piper
+          # Make binary executable (skip on Windows build)
+          if [ "${{ runner.os }}" != "Windows" ]; then
+            chmod +x piper/bin/piper
+            
+            # Verify binary and libraries
+            ls -la piper/bin/
+            ls -la piper/lib/ || echo "No lib directory found"
+          fi
+
+      - name: Setup MSVC Developer Command Prompt
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+      
+      - name: Build piper on Windows
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: |
+          mkdir build
+          cd build
+          cmake .. -G "Visual Studio 17 2022" -A x64
+          cmake --build . --config Release --parallel
           
-          # Verify binary and libraries
-          ls -la piper/bin/
-          ls -la piper/lib/ || echo "No lib directory found"
+          REM Create expected directory structure
+          mkdir ..\piper\bin
+          copy Release\piper.exe ..\piper\bin\
+          
+          REM Copy required files from build directory
+          xcopy /E /I ei\share ..\piper\share
+          
+          REM List the contents to verify
+          dir ..\piper\bin\
+          dir ..\piper\share\
 
       - name: Cache voice models
         uses: actions/cache@v4.2.0
@@ -303,6 +334,23 @@ jobs:
           
           # Verify downloads
           ls -la test/models/
+
+      - name: Run TTS test (Windows)
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: |
+          echo ${{ matrix.test_text }} > test_input.txt
+          
+          type test_input.txt | piper\bin\piper.exe ^
+            --model "test\models\${{ matrix.model }}.onnx" ^
+            --output_file "test_output_${{ matrix.language }}.wav"
+          
+          if exist "test_output_${{ matrix.language }}.wav" (
+            echo TTS test passed for ${{ matrix.language }}!
+          ) else (
+            echo TTS failed for ${{ matrix.language }}
+            exit /b 1
+          )
 
       - name: Run TTS test (Linux/macOS)
         if: runner.os != 'Windows'

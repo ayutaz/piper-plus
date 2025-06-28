@@ -12,6 +12,17 @@ if(MSVC)
   # Force compiler to use UTF-8 for IPA constants
   add_compile_options("$<$<C_COMPILER_ID:MSVC>:/utf-8>")
   add_compile_options("$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
+  
+  # Use static runtime library to avoid DLL dependencies
+  set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+  
+  # Additional Windows-specific flags for better compatibility
+  add_compile_options(/EHsc)  # Enable C++ exceptions
+  add_compile_options(/W3)    # Warning level 3
+  
+  # Define Windows version macros
+  add_compile_definitions(WIN32_LEAN_AND_MEAN)
+  add_compile_definitions(_WIN32_WINNT=0x0601)  # Windows 7 and later
 elseif(APPLE)
   # macOS flags
   string(APPEND CMAKE_CXX_FLAGS " -Wall -Wextra")
@@ -88,6 +99,12 @@ if(NOT DEFINED FMT_DIR)
   # Pass architecture settings to external projects
   if(APPLE AND CMAKE_OSX_ARCHITECTURES)
     set(EXTERNAL_CMAKE_ARGS -DCMAKE_OSX_ARCHITECTURES=${CMAKE_OSX_ARCHITECTURES})
+  elseif(MSVC)
+    # Pass static runtime library settings to external projects
+    set(EXTERNAL_CMAKE_ARGS 
+      -DCMAKE_MSVC_RUNTIME_LIBRARY=${CMAKE_MSVC_RUNTIME_LIBRARY}
+      -DCMAKE_POLICY_DEFAULT_CMP0091=NEW
+    )
   else()
     set(EXTERNAL_CMAKE_ARGS "")
   endif()
@@ -98,6 +115,7 @@ if(NOT DEFINED FMT_DIR)
     URL "https://github.com/fmtlib/fmt/archive/refs/tags/${FMT_VERSION}.zip"
     CMAKE_ARGS -DCMAKE_INSTALL_PREFIX:PATH=${FMT_DIR}
     CMAKE_ARGS -DFMT_TEST:BOOL=OFF  # Don't build all the tests
+    CMAKE_ARGS -DBUILD_SHARED_LIBS:BOOL=OFF  # Build static libraries
     CMAKE_ARGS ${EXTERNAL_CMAKE_ARGS}
   )
   add_dependencies(piper fmt_external)
@@ -114,6 +132,7 @@ if(NOT DEFINED SPDLOG_DIR)
     PREFIX "${CMAKE_CURRENT_BINARY_DIR}/s"
     URL "https://github.com/gabime/spdlog/archive/refs/tags/v${SPDLOG_VERSION}.zip"
     CMAKE_ARGS -DCMAKE_INSTALL_PREFIX:PATH=${SPDLOG_DIR}
+    CMAKE_ARGS -DSPDLOG_BUILD_SHARED:BOOL=OFF  # Build static libraries
     CMAKE_ARGS ${EXTERNAL_CMAKE_ARGS}
   )
   add_dependencies(piper spdlog_external)
@@ -129,6 +148,7 @@ if(NOT DEFINED PIPER_PHONEMIZE_DIR)
     PREFIX "${CMAKE_CURRENT_BINARY_DIR}/p"
     URL "https://github.com/rhasspy/piper-phonemize/archive/refs/heads/master.zip"
     CMAKE_ARGS -DCMAKE_INSTALL_PREFIX:PATH=${PIPER_PHONEMIZE_DIR}
+    CMAKE_ARGS -DBUILD_SHARED_LIBS:BOOL=OFF  # Build static libraries
     CMAKE_ARGS ${EXTERNAL_CMAKE_ARGS}
   )
   add_dependencies(piper piper_phonemize_external)
@@ -207,6 +227,10 @@ if(APPLE)
   else()
     set(HOMEBREW_PREFIX "/opt/homebrew")
   endif()
+elseif(MSVC)
+  # Windows-specific settings
+  set(PIPER_EXTRA_LIBRARIES "")
+  # No pthread on Windows, using Windows threads
 elseif(NOT MSVC)
   # Linux flags
   string(APPEND CMAKE_CXX_FLAGS " -Wall -Wextra -Wl,-rpath,'$ORIGIN'")
