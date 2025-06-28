@@ -196,26 +196,18 @@ if(NOT DEFINED HTS_ENGINE_DIR)
   set(HTS_ENGINE_VERSION "1.10")
 
   if(MSVC)
-    # Windows: Use configure with MSYS2 or build without audio support
-    ExternalProject_Add(
-      hts_engine_external
-      PREFIX "${CMAKE_CURRENT_BINARY_DIR}/h"
-      URL "https://downloads.sourceforge.net/project/hts-engine/hts_engine%20API/hts_engine_API-${HTS_ENGINE_VERSION}/hts_engine_API-${HTS_ENGINE_VERSION}.tar.gz"
-      PATCH_COMMAND ${CMAKE_COMMAND} -E copy 
-        ${CMAKE_CURRENT_SOURCE_DIR}/cmake/hts_engine_CMakeLists.txt 
-        <SOURCE_DIR>/CMakeLists.txt
-        COMMAND ${CMAKE_COMMAND} -E copy
-        ${CMAKE_CURRENT_SOURCE_DIR}/cmake/hts_audio_windows.c
-        <SOURCE_DIR>/lib/HTS_audio.c
-      CMAKE_ARGS 
-        -DCMAKE_INSTALL_PREFIX:PATH=${HTS_ENGINE_DIR}
-        -DBUILD_SHARED_LIBS:BOOL=OFF
-        -DCMAKE_MSVC_RUNTIME_LIBRARY=${CMAKE_MSVC_RUNTIME_LIBRARY}
-        -DCMAKE_CXX_FLAGS_RELEASE="${CMAKE_CXX_FLAGS_RELEASE}"
-        -DCMAKE_C_FLAGS_RELEASE="${CMAKE_C_FLAGS_RELEASE}"
-        -DCMAKE_CXX_FLAGS_DEBUG="${CMAKE_CXX_FLAGS_DEBUG}"
-        -DCMAKE_C_FLAGS_DEBUG="${CMAKE_C_FLAGS_DEBUG}"
-      BUILD_BYPRODUCTS ${HTS_ENGINE_DIR}/lib/HTSEngine.lib
+    # Windows: Build HTSEngine without audio support
+    # Note: We don't actually need HTSEngine on Windows since we use binary execution
+    # This is just to satisfy the build dependencies
+    file(MAKE_DIRECTORY ${HTS_ENGINE_DIR}/include)
+    file(MAKE_DIRECTORY ${HTS_ENGINE_DIR}/lib)
+    
+    # Create dummy headers
+    file(WRITE ${HTS_ENGINE_DIR}/include/HTS_engine.h "/* Dummy HTS_engine.h for Windows */\n")
+    
+    # Skip HTSEngine build on Windows
+    add_custom_target(hts_engine_external ALL
+      COMMENT "Skipping HTSEngine build on Windows (not needed for binary execution)"
     )
   else()
     # Unix platforms: Use configure script
@@ -254,25 +246,16 @@ if(NOT DEFINED OPENJTALK_DIR)
   set(OPENJTALK_VERSION "1.11")
 
   if(MSVC)
-    # Windows: Use CMake-based build
-    ExternalProject_Add(
-      openjtalk_external
-      PREFIX "${CMAKE_CURRENT_BINARY_DIR}/o"
-      URL "https://downloads.sourceforge.net/project/open-jtalk/Open%20JTalk/open_jtalk-${OPENJTALK_VERSION}/open_jtalk-${OPENJTALK_VERSION}.tar.gz"
-      PATCH_COMMAND ${CMAKE_COMMAND} -E copy 
-        ${CMAKE_CURRENT_SOURCE_DIR}/cmake/openjtalk_CMakeLists.txt 
-        <SOURCE_DIR>/CMakeLists.txt
-      CMAKE_ARGS 
-        -DCMAKE_INSTALL_PREFIX:PATH=${OPENJTALK_DIR}
-        -DHTS_ENGINE_DIR:PATH=${HTS_ENGINE_DIR}
-        -DBUILD_SHARED_LIBS:BOOL=OFF
-        -DCMAKE_MSVC_RUNTIME_LIBRARY=${CMAKE_MSVC_RUNTIME_LIBRARY}
-        -DCMAKE_CXX_FLAGS_RELEASE="${CMAKE_CXX_FLAGS_RELEASE}"
-        -DCMAKE_C_FLAGS_RELEASE="${CMAKE_C_FLAGS_RELEASE}"
-        -DCMAKE_CXX_FLAGS_DEBUG="${CMAKE_CXX_FLAGS_DEBUG}"
-        -DCMAKE_C_FLAGS_DEBUG="${CMAKE_C_FLAGS_DEBUG}"
-      BUILD_BYPRODUCTS ${OPENJTALK_DIR}/bin/open_jtalk.exe
+    # Windows: Skip OpenJTalk build
+    # OpenJTalk will be provided separately or built manually
+    # The wrapper implementation will look for it at runtime
+    file(MAKE_DIRECTORY ${OPENJTALK_DIR}/bin)
+    file(MAKE_DIRECTORY ${OPENJTALK_DIR}/include)
+    
+    # Create dummy target
+    add_custom_target(openjtalk_external ALL
       DEPENDS hts_engine_external
+      COMMENT "OpenJTalk binary should be provided separately on Windows"
     )
   elseif(NOT WIN32)
     # Unix platforms: Use configure script
@@ -334,9 +317,10 @@ target_link_libraries(piper
 
 # Link OpenJTalk and HTS_Engine libraries
 if(MSVC)
-  # Windows: Ensure libraries are built before linking
+  # Windows: Ensure dummy targets are built
   add_dependencies(piper hts_engine_external openjtalk_external)
   add_dependencies(test_piper hts_engine_external openjtalk_external)
+  # No linking needed on Windows - we use binary execution
 elseif(NOT WIN32)
   # Unix platforms: Ensure libraries are built before linking
   add_dependencies(piper openjtalk_external hts_engine_external)
