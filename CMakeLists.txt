@@ -204,6 +204,8 @@ if(NOT DEFINED HTS_ENGINE_DIR)
       PATCH_COMMAND ${CMAKE_COMMAND} -E copy 
         ${CMAKE_CURRENT_SOURCE_DIR}/cmake/hts_engine_CMakeLists.txt 
         <SOURCE_DIR>/CMakeLists.txt
+        COMMAND ${CMAKE_COMMAND} -E remove
+        <SOURCE_DIR>/lib/HTS_audio.c
         COMMAND ${CMAKE_COMMAND} -E copy
         ${CMAKE_CURRENT_SOURCE_DIR}/cmake/hts_audio_windows.c
         <SOURCE_DIR>/lib/HTS_audio.c
@@ -373,12 +375,11 @@ elseif(MSVC)
   # No pthread on Windows, using Windows threads
   # Ensure static linking for Windows
   set(BUILD_SHARED_LIBS OFF)
-elseif(NOT MSVC)
+else()
   # Linux flags
   string(APPEND CMAKE_CXX_FLAGS " -Wall -Wextra -Wl,-rpath,'$ORIGIN'")
   string(APPEND CMAKE_C_FLAGS " -Wall -Wextra")
-  target_link_libraries(piper -static-libgcc -static-libstdc++)
-
+  
   set(PIPER_EXTRA_LIBRARIES "pthread")
 endif()
 
@@ -390,6 +391,12 @@ target_link_libraries(piper
   onnxruntime
   ${PIPER_EXTRA_LIBRARIES}
 )
+
+# Add static linking for Linux
+if(NOT WIN32 AND NOT APPLE)
+  target_link_libraries(piper -static-libgcc -static-libstdc++)
+  target_link_libraries(test_piper -static-libgcc -static-libstdc++)
+endif()
 
 # Add dependencies for external projects
 add_dependencies(piper fmt_external spdlog_external piper_phonemize_external)
