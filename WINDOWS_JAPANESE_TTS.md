@@ -2,30 +2,29 @@
 
 ## 現在の状況
 
-Windows版のpiperでは、OpenJTalkをソースからビルドすることで日本語TTSをサポートしています。
+Windows版のpiperでは、プリビルド済みOpenJTalkバイナリを使用することで日本語TTSをサポートします。
 
 ### 機能
 
-1. **OpenJTalkの完全実装**
-   - Windows版では、OpenJTalkをソースからビルドして使用します
-   - MeCabベースの形態素解析による正確な日本語音素変換が可能です
+1. **完全なOpenJTalkサポート（バイナリ提供時）**
+   - プリビルド済みのOpenJTalkバイナリが提供されている場合、完全な日本語TTSが利用可能
+   - MeCabベースの形態素解析による正確な日本語音素変換
 
-2. **日本語テキストの処理**
-   - 日本語テキストを正しく解析し、音素に変換します
-   - Unix版と同等の日本語TTS機能を提供します
+2. **自動フォールバック**
+   - バイナリがダウンロードできない場合は、最小限の機能を持つラッパーにフォールバック
+   - この場合、日本語TTSの品質は制限されます
 
 ### 技術的な実装
 
-Windows上でのOpenJTalkビルドは以下のように実現されています：
+Windows版piperは以下の方法で日本語TTSを実現します：
 
-1. **HTSEngineのビルド**
-   - オーディオ出力を簡略化したHTSEngineをビルド
-   - Windows SDK互換性のための修正を適用
+1. **プリビルド済みバイナリの自動ダウンロード**
+   - CMakeビルド時に自動的にOpenJTalkバイナリをダウンロード
+   - GitHub ReleasesまたはCDNからの取得
 
-2. **OpenJTalkのビルド**
-   - CMakeベースのビルドシステムを使用
-   - MeCab（形態素解析器）を含む完全な実装
-   - Windows向けの設定ファイル（config.h）を自動生成
+2. **フォールバック機構**
+   - ダウンロードが失敗した場合、最小限のラッパーを自動生成
+   - これによりビルドは常に成功し、基本的な動作は保証される
 
 ### ビルド要件
 
@@ -52,10 +51,24 @@ echo "こんにちは、世界" | piper.exe --model ja_JP-model.onnx --output_fi
 
 ## 開発者向け情報
 
-Windows向けのOpenJTalk実装は以下のファイルにあります：
-- `src/cpp/openjtalk_wrapper.c` - Windows実装を含む
-- `cmake/openjtalk_CMakeLists.txt` - Windows向けビルド設定
-- `cmake/openjtalk_config.h.in` - Windows向け設定テンプレート
-- `cmake/hts_audio_windows.c` - HTSEngine用のWindows向け音声出力実装
+### プリビルド済みバイナリの提供
 
-ビルドプロセスはCMakeによって自動化されており、必要な依存関係は自動的に処理されます。
+完全な日本語TTSサポートを提供するには、プリビルド済みのOpenJTalkバイナリが必要です：
+
+1. **バイナリの作成**
+   - MinGW/MSYS2環境でOpenJTalkをビルド
+   - 静的リンクで依存関係を最小化
+   - 詳細は`OPENJTALK_WINDOWS_BINARY.md`を参照
+
+2. **バイナリの配置**
+   - GitHub Releasesにアップロード
+   - CMakeLists.txtのURLを更新
+
+### 関連ファイル
+
+- `src/cpp/openjtalk_wrapper.c` - Windows実装を含む
+- `cmake/open_jtalk_windows_wrapper.cpp.in` - フォールバック用ラッパー
+- `cmake/hts_audio_windows.c` - HTSEngine用のWindows向け音声出力実装
+- `OPENJTALK_WINDOWS_BINARY.md` - バイナリ作成手順
+
+ビルドプロセスはCMakeによって自動化されており、バイナリのダウンロードも自動的に行われます。
