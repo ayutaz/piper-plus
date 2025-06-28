@@ -63,21 +63,21 @@ int main(int argc, char* argv[]) {
     // Basic phoneme mapping for Japanese
     // This is extremely simplified and won't produce good results
     if (!input_text.empty()) {
-        long long time = 5000000;
+        long long current_time = 5000000;
         long long duration = 3000000;
         
         // Output a few dummy phonemes
         std::vector<std::string> phonemes = {"a", "i", "u", "e", "o"};
         
         for (size_t i = 0; i < 5 && i < input_text.length(); ++i) {
-            ofs << time << " " << (time + duration) << " ";
+            ofs << current_time << " " << (current_time + duration) << " ";
             ofs << "xx^xx-" << phonemes[i % phonemes.size()] << "+xx=xx/A:xx+xx+xx/B:xx-xx_xx/C:xx_xx+xx/D:xx+xx_xx/E:xx_xx!xx_xx-xx/F:xx_xx#xx_xx@xx_xx|xx_xx/G:xx_xx%xx_xx_xx/H:xx_xx/I:xx-xx@xx+xx&xx-xx|xx+xx/J:xx_xx/K:xx+xx-xx\n";
-            time += duration;
+            current_time += duration;
         }
     }
     
     // End with silence
-    ofs << time << " " << (time + 5000000) << " xx^xx-sil+xx=xx/A:xx+xx+xx/B:xx-xx_xx/C:xx_xx+xx/D:xx+xx_xx/E:xx_xx!xx_xx-xx/F:xx_xx#xx_xx@xx_xx|xx_xx/G:xx_xx%xx_xx_xx/H:xx_xx/I:xx-xx@xx+xx&xx-xx|xx+xx/J:xx_xx/K:xx+xx-xx\n";
+    ofs << current_time << " " << (current_time + 5000000) << " xx^xx-sil+xx=xx/A:xx+xx+xx/B:xx-xx_xx/C:xx_xx+xx/D:xx+xx_xx/E:xx_xx!xx_xx-xx/F:xx_xx#xx_xx@xx_xx|xx_xx/G:xx_xx%xx_xx_xx/H:xx_xx/I:xx-xx@xx+xx&xx-xx|xx+xx/J:xx_xx/K:xx+xx-xx\n";
     
     ofs.close();
     
