@@ -331,15 +331,9 @@ if(NOT DEFINED OPENJTALK_DIR)
         COMMENT "OpenJTalk for Windows - using existing binary"
       )
     endif()
-  else()
-    # Windows without MSVC - not supported
-    message(WARNING "OpenJTalk is not supported on Windows without MSVC")
-    add_custom_target(openjtalk_external ALL
-      COMMENT "OpenJTalk - not supported on this platform"
-    )
   endif()
   
-  if(NOT WIN32)
+  if(NOT WIN32 AND NOT MSVC)
     # Unix platforms: Use configure script
     ExternalProject_Add(
       openjtalk_external
