@@ -364,12 +364,19 @@ jobs:
           
           type test_input.txt | piper\bin\piper.exe ^
             --model "test\models\${{ matrix.model }}.onnx" ^
-            --output_file "test_output_${{ matrix.language }}.wav"
+            --output_file "test_output_${{ matrix.language }}.wav" 2>&1
+          
+          if %ERRORLEVEL% NEQ 0 (
+            echo ERROR: piper.exe returned error code %ERRORLEVEL%
+            echo Checking if espeak-ng-data exists...
+            dir piper\share\
+            exit /b 1
+          )
           
           if exist "test_output_${{ matrix.language }}.wav" (
             echo TTS test passed for ${{ matrix.language }}!
           ) else (
-            echo TTS failed for ${{ matrix.language }}
+            echo TTS failed for ${{ matrix.language }} - no output file generated
             exit /b 1
           )
 
