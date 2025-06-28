@@ -256,60 +256,29 @@ if(NOT DEFINED OPENJTALK_DIR)
   set(OPENJTALK_VERSION "1.11")
 
   if(MSVC)
-    # Windows: Create a minimal OpenJTalk stub that returns dummy phonemes
-    # This allows the system to work without Japanese TTS support
-    file(MAKE_DIRECTORY ${OPENJTALK_DIR}/bin)
-    file(MAKE_DIRECTORY ${OPENJTALK_DIR}/include)
-    
-    # Create a stub open_jtalk.exe that outputs dummy phonemes
-    file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/open_jtalk_stub.c "
-#include <stdio.h>
-#include <string.h>
-
-int main(int argc, char* argv[]) {
-    // Simple stub that outputs dummy phoneme labels
-    // This allows piper to run without Japanese support
-    const char* output_file = NULL;
-    
-    // Parse arguments to find output file
-    for (int i = 1; i < argc - 1; i++) {
-        if (strcmp(argv[i], \"-ot\") == 0) {
-            output_file = argv[i + 1];
-            break;
-        }
-    }
-    
-    if (output_file) {
-        FILE* fp = fopen(output_file, \"w\");
-        if (fp) {
-            // Write dummy phoneme labels
-            fprintf(fp, \"0 10000000 xx^xx-sil+xx=xx\\n\");
-            fprintf(fp, \"10000000 20000000 xx^sil-d+u=m\\n\");
-            fprintf(fp, \"20000000 30000000 sil^d-u+m=i\\n\");
-            fprintf(fp, \"30000000 40000000 d^u-m+i=sil\\n\");
-            fprintf(fp, \"40000000 50000000 u^m-i+sil=xx\\n\");
-            fprintf(fp, \"50000000 60000000 m^i-sil+xx=xx\\n\");
-            fclose(fp);
-        }
-    }
-    
-    return 0;
-}
-")
-    
-    add_executable(open_jtalk_stub ${CMAKE_CURRENT_BINARY_DIR}/open_jtalk_stub.c)
-    set_target_properties(open_jtalk_stub PROPERTIES
-      OUTPUT_NAME "open_jtalk"
-      RUNTIME_OUTPUT_DIRECTORY ${OPENJTALK_DIR}/bin
-    )
-    
-    if(MSVC)
-      set_property(TARGET open_jtalk_stub PROPERTY MSVC_RUNTIME_LIBRARY ${CMAKE_MSVC_RUNTIME_LIBRARY})
-    endif()
-    
-    add_custom_target(openjtalk_external ALL
-      DEPENDS hts_engine_external open_jtalk_stub
-      COMMENT "Building OpenJTalk stub for Windows (Japanese TTS not supported)"
+    # Windows: Build OpenJTalk from source
+    ExternalProject_Add(
+      openjtalk_external
+      PREFIX "${CMAKE_CURRENT_BINARY_DIR}/o"
+      URL "https://downloads.sourceforge.net/project/open-jtalk/Open%20JTalk/open_jtalk-${OPENJTALK_VERSION}/open_jtalk-${OPENJTALK_VERSION}.tar.gz"
+      PATCH_COMMAND ${CMAKE_COMMAND} -E copy 
+        ${CMAKE_CURRENT_SOURCE_DIR}/cmake/openjtalk_CMakeLists.txt 
+        <SOURCE_DIR>/CMakeLists.txt
+        COMMAND ${CMAKE_COMMAND} -E copy
+        ${CMAKE_CURRENT_SOURCE_DIR}/cmake/openjtalk_config.h.in
+        <SOURCE_DIR>/../cmake/openjtalk_config.h.in
+      CMAKE_ARGS 
+        -DCMAKE_INSTALL_PREFIX:PATH=${OPENJTALK_DIR}
+        -DHTS_ENGINE_DIR:PATH=${HTS_ENGINE_DIR}
+        -DBUILD_SHARED_LIBS:BOOL=OFF
+        -DCMAKE_MSVC_RUNTIME_LIBRARY=${CMAKE_MSVC_RUNTIME_LIBRARY}
+        -DCMAKE_CXX_FLAGS_RELEASE="${CMAKE_CXX_FLAGS_RELEASE}"
+        -DCMAKE_C_FLAGS_RELEASE="${CMAKE_C_FLAGS_RELEASE}"
+        -DCMAKE_CXX_FLAGS_DEBUG="${CMAKE_CXX_FLAGS_DEBUG}"
+        -DCMAKE_C_FLAGS_DEBUG="${CMAKE_C_FLAGS_DEBUG}"
+        -DOPENJTALK_VERSION=${OPENJTALK_VERSION}
+      BUILD_BYPRODUCTS ${OPENJTALK_DIR}/bin/open_jtalk.exe
+      DEPENDS hts_engine_external
     )
   elseif(NOT WIN32)
     # Unix platforms: Use configure script

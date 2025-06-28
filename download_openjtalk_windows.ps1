@@ -18,7 +18,7 @@ $TargetBinary = Join-Path $TargetDir "open_jtalk.exe"
 
 if (Test-Path $BuiltBinary) {
     Write-Host "Found OpenJTalk binary built by CMake: $BuiltBinary"
-    Write-Host "Note: This is a stub implementation - Japanese TTS is not supported on Windows"
+    Write-Host "OpenJTalk has been built from source successfully."
     # The binary will be installed by CMake install process
     exit 0
 }

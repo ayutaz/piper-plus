@@ -10,7 +10,7 @@ find_path(HTS_ENGINE_INCLUDE_DIR HTS_engine.h
 )
 
 find_library(HTS_ENGINE_LIBRARY 
-    NAMES HTSEngine libHTSEngine
+    NAMES HTSEngine libHTSEngine HTSEngine.lib
     PATHS ${HTS_ENGINE_DIR}/lib
     NO_DEFAULT_PATH
 )
@@ -120,13 +120,19 @@ target_include_directories(open_jtalk PRIVATE
     ${HTS_ENGINE_INCLUDE_DIR}
 )
 
+# Generate config.h
+configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/../cmake/openjtalk_config.h.in
+    ${CMAKE_CURRENT_BINARY_DIR}/config.h
+    @ONLY
+)
+
+# Add binary dir to include path for config.h
+target_include_directories(open_jtalk PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
+
 # Compile definitions
 target_compile_definitions(open_jtalk PRIVATE
     HAVE_CONFIG_H
-    DIC_VERSION=102
-    MECAB_DEFAULT_RC="dummy"
-    PACKAGE="open_jtalk"
-    VERSION="${OPENJTALK_VERSION}"
     CHARSET_UTF_8
 )
 
