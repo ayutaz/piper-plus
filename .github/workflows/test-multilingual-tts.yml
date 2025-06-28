@@ -254,7 +254,7 @@ jobs:
           mkdir build
           cd build
           cmake .. -G "Visual Studio 17 2022" -A x64 -DCMAKE_INSTALL_PREFIX="%CD%\_install\piper"
-          cmake --build . --config Release --parallel
+          cmake --build . --config Release --parallel --target ALL_BUILD
           cmake --install . --config Release
           
           REM Create expected directory structure
