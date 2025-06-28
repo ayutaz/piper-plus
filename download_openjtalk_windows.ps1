@@ -12,14 +12,20 @@ if (!(Test-Path $TargetDir)) {
 
 Write-Host "Checking for OpenJTalk binary..."
 
-# Check if OpenJTalk was built by CMake
+# Check if OpenJTalk was built by CMake (either stub or real)
 $BuiltBinary = Join-Path (Split-Path $TargetDir) "build\oj\bin\open_jtalk.exe"
 $TargetBinary = Join-Path $TargetDir "open_jtalk.exe"
 
 if (Test-Path $BuiltBinary) {
     Write-Host "Found OpenJTalk binary built by CMake: $BuiltBinary"
-    Write-Host "OpenJTalk has been built from source successfully."
-    # Note: The binary will be installed by CMake install process
+    Write-Host "Note: This is a stub implementation - Japanese TTS is not supported on Windows"
+    # The binary will be installed by CMake install process
+    exit 0
+}
+
+# Also check if it's already in the target directory
+if (Test-Path $TargetBinary) {
+    Write-Host "OpenJTalk binary already exists: $TargetBinary"
     exit 0
 }
 

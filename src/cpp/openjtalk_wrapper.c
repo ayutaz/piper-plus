@@ -473,25 +473,31 @@ OpenJTalk* openjtalk_initialize() {
     }
     oj->dict_path = strdup(dict_path);
     
-    // Set voice path
-    const char* voice_path = getenv("OPENJTALK_VOICE");
-    if (!voice_path) {
-        // Try to use bundled voice
-        char exe_path[MAX_PATH];
-        GetModuleFileName(NULL, exe_path, MAX_PATH);
-        char* last_slash = strrchr(exe_path, '\\');
-        if (last_slash) {
-            *last_slash = '\0';
-            static char voice_buf[MAX_PATH];
-            snprintf(voice_buf, MAX_PATH, "%s\\..\\share\\hts\\nitech_jp_atr503_m001.htsvoice", exe_path);
-            if (_access(voice_buf, 0) == 0) {
-                voice_path = voice_buf;
+    // Set voice path - try automatic download first
+    const char* voice_path = NULL;
+    if (openjtalk_ensure_hts_voice(&voice_path) == 0 && voice_path) {
+        oj->voice_path = strdup(voice_path);
+    } else {
+        // Fallback to environment variable or bundled voice
+        voice_path = getenv("OPENJTALK_VOICE");
+        if (!voice_path) {
+            // Try to use bundled voice
+            char exe_path[MAX_PATH];
+            GetModuleFileName(NULL, exe_path, MAX_PATH);
+            char* last_slash = strrchr(exe_path, '\\');
+            if (last_slash) {
+                *last_slash = '\0';
+                static char voice_buf[MAX_PATH];
+                snprintf(voice_buf, MAX_PATH, "%s\\..\\share\\hts\\nitech_jp_atr503_m001.htsvoice", exe_path);
+                if (_access(voice_buf, 0) == 0) {
+                    voice_path = voice_buf;
+                }
             }
         }
-    }
-    
-    if (voice_path) {
-        oj->voice_path = strdup(voice_path);
+        
+        if (voice_path) {
+            oj->voice_path = strdup(voice_path);
+        }
     }
     
     return oj;
@@ -533,12 +539,23 @@ HTS_Label_Wrapper* openjtalk_extract_fullcontext(OpenJTalk* oj, const char* text
     
     // Build command for label generation only
     char command[4096];
-    snprintf(command, sizeof(command), 
-        "\"%s\" -x \"%s\" -ot \"%s\" \"%s\"",
-        oj->openjtalk_binary_path,
-        oj->dict_path,
-        output_file,
-        input_file);
+    if (oj->voice_path) {
+        snprintf(command, sizeof(command), 
+            "\"%s\" -x \"%s\" -m \"%s\" -ot \"%s\" \"%s\"",
+            oj->openjtalk_binary_path,
+            oj->dict_path,
+            oj->voice_path,
+            output_file,
+            input_file);
+    } else {
+        // Without voice model (may not work with all OpenJTalk versions)
+        snprintf(command, sizeof(command), 
+            "\"%s\" -x \"%s\" -ot \"%s\" \"%s\"",
+            oj->openjtalk_binary_path,
+            oj->dict_path,
+            output_file,
+            input_file);
+    }
     
     // Execute command
     STARTUPINFO si;
