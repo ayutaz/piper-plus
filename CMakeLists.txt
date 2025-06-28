@@ -265,6 +265,8 @@ elseif(MSVC)
   # Windows-specific settings
   set(PIPER_EXTRA_LIBRARIES "")
   # No pthread on Windows, using Windows threads
+  # Ensure static linking for Windows
+  set(BUILD_SHARED_LIBS OFF)
 elseif(NOT MSVC)
   # Linux flags
   string(APPEND CMAKE_CXX_FLAGS " -Wall -Wextra -Wl,-rpath,'$ORIGIN'")
@@ -387,7 +389,18 @@ install(
   PATTERN "piper_phonemize"
   PATTERN "espeak-ng"
   PATTERN "*.dll"
+  PATTERN "*.exe"
 )
+
+# On Windows, also install DLLs to bin directory for easier PATH management
+if(MSVC)
+  install(
+    DIRECTORY ${PIPER_PHONEMIZE_DIR}/lib/
+    DESTINATION bin
+    FILES_MATCHING
+    PATTERN "*.dll"
+  )
+endif()
 
 install(
   DIRECTORY ${PIPER_PHONEMIZE_DIR}/lib/
