@@ -391,6 +391,10 @@ target_link_libraries(piper
   ${PIPER_EXTRA_LIBRARIES}
 )
 
+# Add dependencies for external projects
+add_dependencies(piper fmt_external spdlog_external piper_phonemize_external)
+add_dependencies(test_piper fmt_external spdlog_external piper_phonemize_external)
+
 # Link OpenJTalk and HTS_Engine libraries
 if(MSVC)
   # Windows: Ensure dummy targets are built
@@ -417,6 +421,19 @@ target_link_directories(piper PUBLIC
   ${SPDLOG_DIR}/lib
   ${PIPER_PHONEMIZE_DIR}/lib
 )
+
+# Windows needs specific library paths
+if(MSVC)
+  # Add Windows-specific library directories
+  target_link_directories(piper PUBLIC
+    ${PIPER_PHONEMIZE_DIR}/lib
+    ${CMAKE_CURRENT_BINARY_DIR}/pi/lib
+  )
+  target_link_directories(test_piper PUBLIC
+    ${PIPER_PHONEMIZE_DIR}/lib
+    ${CMAKE_CURRENT_BINARY_DIR}/pi/lib
+  )
+endif()
 
 # Note: We don't need Homebrew paths for espeak-ng on macOS
 # because we're using the custom build from piper_phonemize
