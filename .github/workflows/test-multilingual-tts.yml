@@ -260,7 +260,10 @@ jobs:
           mkdir ..\piper\bin
           if exist _install\piper\bin\piper.exe (
             echo Found piper.exe in _install directory
-            xcopy /E /I _install\piper ..\piper\
+            echo Copying from _install\piper to ..\piper
+            dir _install\piper
+            xcopy /E /I /Y _install\piper ..\piper\
+            echo Copy complete
           ) else if exist Release\piper.exe (
             copy Release\piper.exe ..\piper\bin\
           ) else (
