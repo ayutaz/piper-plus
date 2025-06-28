@@ -285,7 +285,11 @@ jobs:
           powershell -ExecutionPolicy Bypass -File download_openjtalk_windows.ps1 -TargetDir piper\bin
           
           REM List the contents to verify
+          echo === Contents of piper\bin ===
           dir piper\bin\
+          echo === Contents of piper\lib (if exists) ===
+          if exist piper\lib dir piper\lib\
+          echo === Contents of piper\share ===
           dir piper\share\
 
       - name: Cache voice models
@@ -360,7 +364,19 @@ jobs:
         if: runner.os == 'Windows'
         shell: cmd
         run: |
+          REM Add DLL paths to PATH
+          set PATH=%CD%\piper\lib;%CD%\piper\bin;%PATH%
+          
           echo ${{ matrix.test_text }} > test_input.txt
+          
+          REM Check if piper.exe can run
+          piper\bin\piper.exe --help 2>&1
+          if %ERRORLEVEL% NEQ 0 (
+            echo ERROR: piper.exe cannot run - exit code %ERRORLEVEL%
+            echo Checking dependencies...
+            where onnxruntime.dll 2>nul || echo WARNING: onnxruntime.dll not found in PATH
+            exit /b 1
+          )
           
           type test_input.txt | piper\bin\piper.exe ^
             --model "test\models\${{ matrix.model }}.onnx" ^
