@@ -1,0 +1,121 @@
+name: Build OpenJTalk for Windows
+
+on:
+  push:
+    branches: [master, dev]
+    paths:
+      - '.github/workflows/build-openjtalk-windows.yml'
+  pull_request:
+    branches: [master]
+    paths:
+      - '.github/workflows/build-openjtalk-windows.yml'
+  workflow_dispatch:
+  schedule:
+    # Run monthly to ensure the binary is always available
+    - cron: '0 0 1 * *'
+
+jobs:
+  build-openjtalk:
+    name: Build OpenJTalk Windows Binary
+    runs-on: windows-latest
+    
+    steps:
+    - name: Setup MSYS2
+      uses: msys2/setup-msys2@v2
+      with:
+        msystem: MINGW64
+        update: true
+        install: >-
+          mingw-w64-x86_64-gcc
+          mingw-w64-x86_64-cmake
+          mingw-w64-x86_64-make
+          make
+          wget
+          tar
+          
+    - name: Build HTSEngine
+      shell: msys2 {0}
+      run: |
+        cd /tmp
+        wget https://downloads.sourceforge.net/project/hts-engine/hts_engine%20API/hts_engine_API-1.10/hts_engine_API-1.10.tar.gz
+        tar xzf hts_engine_API-1.10.tar.gz
+        cd hts_engine_API-1.10
+        
+        # Configure and build
+        ./configure --prefix=/mingw64
+        make -j$(nproc)
+        make install
+        
+    - name: Build OpenJTalk
+      shell: msys2 {0}
+      run: |
+        cd /tmp
+        wget https://downloads.sourceforge.net/project/open-jtalk/Open%20JTalk/open_jtalk-1.11/open_jtalk-1.11.tar.gz
+        tar xzf open_jtalk-1.11.tar.gz
+        cd open_jtalk-1.11
+        
+        # Configure with UTF-8 support
+        ./configure --prefix=/mingw64 --with-charset=UTF-8
+        make -j$(nproc)
+        
+        # The binary is in the current directory after build
+        cp open_jtalk.exe /tmp/
+        
+    - name: Check binary dependencies
+      shell: msys2 {0}
+      run: |
+        echo "=== Checking open_jtalk.exe dependencies ==="
+        ldd /tmp/open_jtalk.exe || echo "ldd failed, trying objdump"
+        objdump -p /tmp/open_jtalk.exe | grep "DLL Name" || true
+        
+        echo "=== Binary info ==="
+        file /tmp/open_jtalk.exe
+        ls -la /tmp/open_jtalk.exe
+        
+    - name: Test binary
+      shell: msys2 {0}
+      run: |
+        echo "=== Testing open_jtalk.exe ==="
+        /tmp/open_jtalk.exe --help || echo "Help flag not supported"
+        
+        # Create a simple test
+        echo "Test" > /tmp/test.txt
+        /tmp/open_jtalk.exe -x /mingw64/share/open_jtalk/dic -ot /tmp/test.lab /tmp/test.txt || echo "Test run failed (expected without dictionary)"
+        
+    - name: Strip binary
+      shell: msys2 {0}
+      run: |
+        echo "=== Original size ==="
+        ls -la /tmp/open_jtalk.exe
+        
+        strip /tmp/open_jtalk.exe
+        
+        echo "=== Stripped size ==="
+        ls -la /tmp/open_jtalk.exe
+        
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: open_jtalk_win64
+        path: C:\msys64\tmp\open_jtalk.exe
+        retention-days: 90
+        
+    - name: Create Release
+      if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: openjtalk-windows-latest
+        name: OpenJTalk Windows Binary (Latest)
+        body: |
+          Automated build of OpenJTalk for Windows (64-bit)
+          
+          Built with MinGW-w64 on MSYS2
+          - HTSEngine API 1.10
+          - OpenJTalk 1.11
+          - UTF-8 charset support
+          
+          This binary is automatically used by piper Windows builds.
+        files: C:\msys64\tmp\open_jtalk.exe
+        token: ${{ secrets.GITHUB_TOKEN }}
+        prerelease: false
+        draft: false

@@ -256,65 +256,54 @@ if(NOT DEFINED OPENJTALK_DIR)
   set(OPENJTALK_VERSION "1.11")
 
   if(MSVC)
-    # Windows: Download pre-built OpenJTalk binary
+    # Windows: Build OpenJTalk using GitHub Actions artifacts or fail
     file(MAKE_DIRECTORY ${OPENJTALK_DIR}/bin)
     
-    # Download pre-built OpenJTalk binary from piper-plus releases
-    # This binary should be built with MinGW and statically linked
-    set(OPENJTALK_WINDOWS_URL "https://github.com/ayutaz/piper-plus/releases/download/v1.0.0/open_jtalk_win64.exe")
+    # Try to use OpenJTalk binary from GitHub Actions artifacts
+    # This should be built automatically by CI/CD
+    set(OPENJTALK_WINDOWS_URL "$ENV{OPENJTALK_WINDOWS_URL}")
+    if(NOT OPENJTALK_WINDOWS_URL)
+      # Use the latest release from automated builds
+      set(OPENJTALK_WINDOWS_URL "https://github.com/ayutaz/piper-plus/releases/download/openjtalk-windows-latest/open_jtalk.exe")
+    endif()
+    
     set(OPENJTALK_WINDOWS_EXE "${OPENJTALK_DIR}/bin/open_jtalk.exe")
     
     if(NOT EXISTS ${OPENJTALK_WINDOWS_EXE})
       message(STATUS "Downloading pre-built OpenJTalk binary for Windows...")
+      message(STATUS "URL: ${OPENJTALK_WINDOWS_URL}")
+      
       file(DOWNLOAD
         ${OPENJTALK_WINDOWS_URL}
         ${OPENJTALK_WINDOWS_EXE}
         STATUS download_status
         SHOW_PROGRESS
+        TIMEOUT 60
       )
       
       list(GET download_status 0 status_code)
       list(GET download_status 1 error_message)
       
       if(NOT status_code EQUAL 0)
-        # Fallback: create a minimal wrapper if download fails
-        message(WARNING "Failed to download OpenJTalk binary: ${error_message}")
-        message(WARNING "Creating minimal wrapper instead. Japanese TTS will have limited functionality.")
-        
-        configure_file(
-          ${CMAKE_CURRENT_SOURCE_DIR}/cmake/open_jtalk_windows_wrapper.cpp.in
-          ${CMAKE_CURRENT_BINARY_DIR}/open_jtalk_windows_wrapper.cpp
-          @ONLY
-        )
-        
-        add_executable(open_jtalk_windows ${CMAKE_CURRENT_BINARY_DIR}/open_jtalk_windows_wrapper.cpp)
-        set_target_properties(open_jtalk_windows PROPERTIES
-          OUTPUT_NAME "open_jtalk"
-          RUNTIME_OUTPUT_DIRECTORY ${OPENJTALK_DIR}/bin
-        )
-        
-        if(MSVC)
-          set_property(TARGET open_jtalk_windows PROPERTY MSVC_RUNTIME_LIBRARY ${CMAKE_MSVC_RUNTIME_LIBRARY})
-        endif()
-        
-        add_custom_target(openjtalk_external ALL
-          DEPENDS hts_engine_external open_jtalk_windows
-          COMMENT "OpenJTalk for Windows - fallback wrapper"
-        )
-      else()
-        message(STATUS "Successfully downloaded OpenJTalk binary")
-        add_custom_target(openjtalk_external ALL
-          DEPENDS hts_engine_external
-          COMMENT "OpenJTalk for Windows - using pre-built binary"
+        message(FATAL_ERROR 
+          "Failed to download OpenJTalk binary for Windows.\n"
+          "Error: ${error_message}\n"
+          "URL: ${OPENJTALK_WINDOWS_URL}\n\n"
+          "OpenJTalk binary is required for Japanese TTS support.\n"
+          "Please ensure the binary is available at the specified URL.\n"
+          "The binary should be built using the build-openjtalk-windows GitHub Action."
         )
       endif()
+      
+      message(STATUS "Successfully downloaded OpenJTalk binary")
     else()
       message(STATUS "Using existing OpenJTalk binary at ${OPENJTALK_WINDOWS_EXE}")
-      add_custom_target(openjtalk_external ALL
-        DEPENDS hts_engine_external
-        COMMENT "OpenJTalk for Windows - using pre-built binary"
-      )
     endif()
+    
+    add_custom_target(openjtalk_external ALL
+      DEPENDS hts_engine_external
+      COMMENT "OpenJTalk for Windows - using pre-built binary"
+    )
   elseif(NOT WIN32)
     # Unix platforms: Use configure script
     ExternalProject_Add(
