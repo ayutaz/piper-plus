@@ -29,6 +29,10 @@
 
 HTS_AUDIO_C_START;
 
+/* Include necessary headers */
+#include <stddef.h>  /* for NULL */
+#include <stdlib.h>  /* for free */
+
 /* Force AUDIO_PLAY_NONE for Windows builds */
 #define AUDIO_PLAY_NONE
 
@@ -54,6 +58,9 @@ typedef struct _HTS_Audio {
 
 /* HTS Boolean type */
 typedef int HTS_Boolean;
+
+/* Forward declaration to avoid ordering issues */
+void HTS_Audio_clear(HTS_Audio * audio);
 
 /* HTS_Audio_initialize: initialize audio */
 void HTS_Audio_initialize(HTS_Audio * audio)
@@ -110,7 +117,7 @@ void HTS_Audio_clear(HTS_Audio * audio)
       return;
       
    if (audio->buff != NULL) {
-      HTS_free(audio->buff);
+      free(audio->buff);
    }
    HTS_Audio_initialize(audio);
 }
