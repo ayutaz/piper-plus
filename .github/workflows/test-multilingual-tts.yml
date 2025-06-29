@@ -328,6 +328,23 @@ jobs:
           
           echo ${{ matrix.test_text }} > test_input.txt
           
+          REM Debug information
+          echo === Debug Information ===
+          echo Current directory: %CD%
+          echo ESPEAK_DATA_PATH: %ESPEAK_DATA_PATH%
+          echo Checking espeak-ng-data:
+          if exist "%ESPEAK_DATA_PATH%" (
+            dir "%ESPEAK_DATA_PATH%"
+          ) else (
+            echo espeak-ng-data not found at %ESPEAK_DATA_PATH%
+          )
+          echo Checking model file:
+          if exist "test\models\${{ matrix.model }}.onnx" (
+            echo Model found
+          ) else (
+            echo Model not found: test\models\${{ matrix.model }}.onnx
+          )
+          
           REM Check if piper.exe can run
           piper\bin\piper.exe --help 2>&1
           if %ERRORLEVEL% NEQ 0 (
@@ -370,15 +387,27 @@ jobs:
             PIPER_CMD="./piper/bin/piper"
           fi
           
+          # Debug information
+          echo "=== Debug Information ==="
+          echo "Current directory: $(pwd)"
+          echo "ESPEAK_DATA_PATH: $ESPEAK_DATA_PATH"
+          echo "Checking espeak-ng-data directory:"
+          ls -la "$ESPEAK_DATA_PATH" 2>/dev/null || echo "espeak-ng-data not found at $ESPEAK_DATA_PATH"
+          echo "Checking piper binary:"
+          ls -la piper/bin/piper
+          echo "Checking model file:"
+          ls -la "test/models/${{ matrix.model }}.onnx" 2>/dev/null || echo "Model not found"
+          
           # Create test input
           echo "${{ matrix.test_text }}" > test_input.txt
           
-          # Run basic TTS test
+          # Run basic TTS test with verbose output
           echo "Running TTS for ${{ matrix.language }}..."
           cat test_input.txt | $PIPER_CMD \
             --model "test/models/${{ matrix.model }}.onnx" \
-            --output_file "test_output_${{ matrix.language }}.wav" || {
+            --output_file "test_output_${{ matrix.language }}.wav" 2>&1 || {
             echo "TTS failed for ${{ matrix.language }}"
+            echo "Error output above"
             exit 1
           }
           
