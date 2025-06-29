@@ -223,17 +223,10 @@ if(NOT DEFINED HTS_ENGINE_DIR)
       hts_engine_external
       PREFIX "${CMAKE_CURRENT_BINARY_DIR}/h"
       URL "https://downloads.sourceforge.net/project/hts-engine/hts_engine%20API/hts_engine_API-${HTS_ENGINE_VERSION}/hts_engine_API-${HTS_ENGINE_VERSION}.tar.gz"
-      PATCH_COMMAND ${CMAKE_COMMAND} -E copy 
-        ${CMAKE_CURRENT_SOURCE_DIR}/cmake/hts_engine_CMakeLists.txt 
-        <SOURCE_DIR>/CMakeLists.txt
-        COMMAND ${CMAKE_COMMAND} -E remove
-        <SOURCE_DIR>/lib/HTS_audio.c
-        COMMAND ${CMAKE_COMMAND} -E copy
-        ${CMAKE_CURRENT_SOURCE_DIR}/cmake/hts_audio_windows.c
-        <SOURCE_DIR>/lib/HTS_audio.c
-        COMMAND ${CMAKE_COMMAND} -E copy_directory
-        <SOURCE_DIR>/include
-        ${HTS_ENGINE_DIR}/include
+      PATCH_COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/cmake/hts_engine_CMakeLists.txt <SOURCE_DIR>/CMakeLists.txt
+        COMMAND ${CMAKE_COMMAND} -E remove <SOURCE_DIR>/lib/HTS_audio.c
+        COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/cmake/hts_audio_windows.c <SOURCE_DIR>/lib/HTS_audio.c
+        COMMAND ${CMAKE_COMMAND} -E copy_directory <SOURCE_DIR>/include ${HTS_ENGINE_DIR}/include
       CMAKE_ARGS 
         -DCMAKE_INSTALL_PREFIX:PATH=${HTS_ENGINE_DIR}
         -DBUILD_SHARED_LIBS:BOOL=OFF
@@ -563,60 +556,13 @@ if(MSVC)
     COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/Release"
     COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/Debug"
     
-    # Copy ONNX Runtime DLL if found
-    COMMAND if exist "${ONNXRUNTIME_DLL}" (
-      ${CMAKE_COMMAND} -E copy_if_different
-        "${ONNXRUNTIME_DLL}"
-        "${CMAKE_CURRENT_BINARY_DIR}/Release/onnxruntime.dll"
-    ) else (
-      ${CMAKE_COMMAND} -E echo "ONNX Runtime DLL not found for Release"
-    )
-    COMMAND if exist "${ONNXRUNTIME_DLL}" (
-      ${CMAKE_COMMAND} -E copy_if_different
-        "${ONNXRUNTIME_DLL}"
-        "${CMAKE_CURRENT_BINARY_DIR}/Debug/onnxruntime.dll"
-    ) else (
-      ${CMAKE_COMMAND} -E echo "ONNX Runtime DLL not found for Debug"
-    )
-    
-    # Copy ONNX Runtime providers shared library if exists
-    COMMAND if exist "${ONNXRUNTIME_LIB_DIR}/onnxruntime_providers_shared.dll" (
-      ${CMAKE_COMMAND} -E copy_if_different
-        "${ONNXRUNTIME_LIB_DIR}/onnxruntime_providers_shared.dll"
-        "${CMAKE_CURRENT_BINARY_DIR}/Release/onnxruntime_providers_shared.dll"
-    )
-    COMMAND if exist "${ONNXRUNTIME_LIB_DIR}/onnxruntime_providers_shared.dll" (
-      ${CMAKE_COMMAND} -E copy_if_different
-        "${ONNXRUNTIME_LIB_DIR}/onnxruntime_providers_shared.dll"
-        "${CMAKE_CURRENT_BINARY_DIR}/Debug/onnxruntime_providers_shared.dll"
-    )
-    
-    # Check what DLLs exist in the piper-phonemize directory
-    COMMAND ${CMAKE_COMMAND} -E echo "Checking ${PIPER_PHONEMIZE_DIR}/lib for DLLs..."
-    COMMAND if exist "${PIPER_PHONEMIZE_DIR}/lib/*.dll" dir "${PIPER_PHONEMIZE_DIR}/lib/*.dll"
-    
-    COMMAND ${CMAKE_COMMAND} -E echo "Checking ${PIPER_PHONEMIZE_DIR}/bin for DLLs..."
-    COMMAND if exist "${PIPER_PHONEMIZE_DIR}/bin/*.dll" dir "${PIPER_PHONEMIZE_DIR}/bin/*.dll"
-    
-    # Copy all DLLs from piper-phonemize lib
-    COMMAND if exist "${PIPER_PHONEMIZE_DIR}/lib/*.dll" (
-      xcopy /Y /Q "${PIPER_PHONEMIZE_DIR}/lib/*.dll" "${CMAKE_CURRENT_BINARY_DIR}/Release/"
-    )
-    COMMAND if exist "${PIPER_PHONEMIZE_DIR}/lib/*.dll" (
-      xcopy /Y /Q "${PIPER_PHONEMIZE_DIR}/lib/*.dll" "${CMAKE_CURRENT_BINARY_DIR}/Debug/"
-    )
-    
-    # Copy all DLLs from piper-phonemize bin if they exist
-    COMMAND if exist "${PIPER_PHONEMIZE_DIR}/bin/*.dll" (
-      xcopy /Y /Q "${PIPER_PHONEMIZE_DIR}/bin/*.dll" "${CMAKE_CURRENT_BINARY_DIR}/Release/"
-    )
-    COMMAND if exist "${PIPER_PHONEMIZE_DIR}/bin/*.dll" (
-      xcopy /Y /Q "${PIPER_PHONEMIZE_DIR}/bin/*.dll" "${CMAKE_CURRENT_BINARY_DIR}/Debug/"
-    )
-    
-    # List final DLL contents
-    COMMAND ${CMAKE_COMMAND} -E echo "DLLs in Release directory:"
-    COMMAND dir "${CMAKE_CURRENT_BINARY_DIR}/Release/*.dll"
+    # Use a CMake script to handle DLL copying more robustly
+    COMMAND ${CMAKE_COMMAND}
+      -DONNXRUNTIME_DLL="${ONNXRUNTIME_DLL}"
+      -DONNXRUNTIME_LIB_DIR="${ONNXRUNTIME_LIB_DIR}"
+      -DPIPER_PHONEMIZE_DIR="${PIPER_PHONEMIZE_DIR}"
+      -DCMAKE_CURRENT_BINARY_DIR="${CMAKE_CURRENT_BINARY_DIR}"
+      -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/copy_windows_dlls.cmake"
     
     COMMENT "Copying DLLs to Release and Debug directories..."
   )
@@ -627,13 +573,10 @@ if(MSVC)
     COMMAND ${CMAKE_COMMAND} -E echo "Copying required DLLs to output directory..."
     
     # Copy onnxruntime DLL if available
-    COMMAND if exist "${ONNXRUNTIME_DLL}" (
-      ${CMAKE_COMMAND} -E copy_if_different
-        "${ONNXRUNTIME_DLL}"
-        "$<TARGET_FILE_DIR:piper>/onnxruntime.dll"
-    ) else (
-      ${CMAKE_COMMAND} -E echo "Warning: ONNX Runtime DLL not available"
-    )
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+      "${ONNXRUNTIME_DLL}"
+      "$<TARGET_FILE_DIR:piper>/onnxruntime.dll"
+      || ${CMAKE_COMMAND} -E echo "Warning: ONNX Runtime DLL not available"
     
     # Copy espeak-ng DLL
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
@@ -671,13 +614,10 @@ if(MSVC)
     COMMAND ${CMAKE_COMMAND} -E echo "Copying required DLLs to test output directory..."
     
     # Copy onnxruntime DLL if available
-    COMMAND if exist "${ONNXRUNTIME_DLL}" (
-      ${CMAKE_COMMAND} -E copy_if_different
-        "${ONNXRUNTIME_DLL}"
-        "$<TARGET_FILE_DIR:test_piper>/onnxruntime.dll"
-    ) else (
-      ${CMAKE_COMMAND} -E echo "Warning: ONNX Runtime DLL not available for test_piper"
-    )
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+      "${ONNXRUNTIME_DLL}"
+      "$<TARGET_FILE_DIR:test_piper>/onnxruntime.dll"
+      || ${CMAKE_COMMAND} -E echo "Warning: ONNX Runtime DLL not available for test_piper"
     
     # Copy espeak-ng DLL
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
