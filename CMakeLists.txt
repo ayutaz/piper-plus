@@ -190,29 +190,33 @@ if(NOT DEFINED PIPER_PHONEMIZE_DIR)
   set(PIPER_PHONEMIZE_DIR "${CMAKE_CURRENT_BINARY_DIR}/pi")
   set(PIPER_PHONEMIZE_VERSION "2023.11.14-3")
   
-  # For Windows CI, skip piper-phonemize build and use minimal implementation
-  if(MSVC AND DEFINED ENV{GITHUB_ACTIONS})
-    message(STATUS "Windows CI detected - using minimal piper-phonemize implementation")
-    # Create minimal headers and libraries
-    file(MAKE_DIRECTORY "${PIPER_PHONEMIZE_DIR}/include")
-    file(MAKE_DIRECTORY "${PIPER_PHONEMIZE_DIR}/lib")
-    
-    # Create a dummy target to satisfy dependencies
-    add_custom_target(piper_phonemize_external
-      COMMAND ${CMAKE_COMMAND} -E echo "Using minimal piper-phonemize for Windows CI"
-    )
-  elseif(MSVC)
-    # On Windows (non-CI), build from source with simpler configuration
-    ExternalProject_Add(
-      piper_phonemize_external
-      PREFIX "${CMAKE_CURRENT_BINARY_DIR}/p"
-      URL "https://github.com/rhasspy/piper-phonemize/archive/refs/tags/${PIPER_PHONEMIZE_VERSION}.zip"
-      CMAKE_ARGS -DCMAKE_INSTALL_PREFIX:PATH=${PIPER_PHONEMIZE_DIR}
-      CMAKE_ARGS -DBUILD_SHARED_LIBS:BOOL=OFF  # Use static libraries to avoid DLL issues
-      CMAKE_ARGS -DPIPER_PHONEMIZE_BUILD_TESTS:BOOL=OFF
-      CMAKE_ARGS -DPIPER_PHONEMIZE_BUILD_PROGRAMS:BOOL=OFF
-      CMAKE_ARGS ${EXTERNAL_CMAKE_ARGS}
-    )
+  # For Windows CI, use a simpler approach
+  if(MSVC)
+    message(STATUS "Windows build detected - checking for CI environment")
+    if(DEFINED ENV{GITHUB_ACTIONS})
+      message(STATUS "GitHub Actions detected - skipping piper-phonemize build")
+      # Create minimal directories
+      file(MAKE_DIRECTORY "${PIPER_PHONEMIZE_DIR}/include")
+      file(MAKE_DIRECTORY "${PIPER_PHONEMIZE_DIR}/lib")
+      
+      # Create a dummy target to satisfy dependencies
+      add_custom_target(piper_phonemize_external
+        COMMAND ${CMAKE_COMMAND} -E echo "Skipping piper-phonemize for Windows CI"
+      )
+    else()
+      message(STATUS "Non-CI Windows build - building piper-phonemize from source")
+      # Build from source with simpler configuration
+      ExternalProject_Add(
+        piper_phonemize_external
+        PREFIX "${CMAKE_CURRENT_BINARY_DIR}/p"
+        URL "https://github.com/rhasspy/piper-phonemize/archive/refs/tags/${PIPER_PHONEMIZE_VERSION}.zip"
+        CMAKE_ARGS -DCMAKE_INSTALL_PREFIX:PATH=${PIPER_PHONEMIZE_DIR}
+        CMAKE_ARGS -DBUILD_SHARED_LIBS:BOOL=OFF
+        CMAKE_ARGS -DPIPER_PHONEMIZE_BUILD_TESTS:BOOL=OFF
+        CMAKE_ARGS -DPIPER_PHONEMIZE_BUILD_PROGRAMS:BOOL=OFF
+        CMAKE_ARGS ${EXTERNAL_CMAKE_ARGS}
+      )
+    endif()
   else()
     # On Unix platforms, use static libraries for easier deployment
     ExternalProject_Add(
