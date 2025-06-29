@@ -568,13 +568,8 @@ if(MSVC)
     COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/Release"
     COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/Debug"
     
-    # Use a CMake script to handle DLL copying more robustly
-    COMMAND ${CMAKE_COMMAND}
-      -DONNXRUNTIME_DLL="${ONNXRUNTIME_DLL}"
-      -DONNXRUNTIME_LIB_DIR="${ONNXRUNTIME_LIB_DIR}"
-      -DPIPER_PHONEMIZE_DIR="${PIPER_PHONEMIZE_DIR}"
-      -DCMAKE_CURRENT_BINARY_DIR="${CMAKE_CURRENT_BINARY_DIR}"
-      -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/copy_windows_dlls.cmake"
+    # When using static libraries, DLL copying is minimal
+    COMMAND ${CMAKE_COMMAND} -E echo "Static libraries used - minimal DLL copying needed"
     
     COMMENT "Copying DLLs to Release and Debug directories..."
   )
