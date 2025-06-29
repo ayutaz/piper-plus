@@ -127,12 +127,13 @@ if(NOT DEFINED FMT_DIR)
     set(EXTERNAL_CMAKE_ARGS 
       -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded$<$<CONFIG:Debug>:Debug>
       -DCMAKE_POLICY_DEFAULT_CMP0091=NEW
-      -DCMAKE_CXX_FLAGS_RELEASE="${CMAKE_CXX_FLAGS_RELEASE}"
-      -DCMAKE_C_FLAGS_RELEASE="${CMAKE_C_FLAGS_RELEASE}"
-      -DCMAKE_CXX_FLAGS_DEBUG="${CMAKE_CXX_FLAGS_DEBUG}"
-      -DCMAKE_C_FLAGS_DEBUG="${CMAKE_C_FLAGS_DEBUG}"
-      -DCMAKE_CXX_FLAGS="${CMAKE_CXX_FLAGS}"
-      -DCMAKE_C_FLAGS="${CMAKE_C_FLAGS}"
+      -DCMAKE_CXX_FLAGS_RELEASE="/MT /O2"
+      -DCMAKE_C_FLAGS_RELEASE="/MT /O2"
+      -DCMAKE_CXX_FLAGS_DEBUG="/MTd /Od /Zi"
+      -DCMAKE_C_FLAGS_DEBUG="/MTd /Od /Zi"
+      -DCMAKE_CXX_FLAGS="/EHsc /W3"
+      -DCMAKE_C_FLAGS="/W3"
+      -DCMAKE_BUILD_TYPE=Release
     )
   else()
     set(EXTERNAL_CMAKE_ARGS "")
@@ -180,27 +181,33 @@ endif()
 
 if(NOT DEFINED PIPER_PHONEMIZE_DIR)
   set(PIPER_PHONEMIZE_DIR "${CMAKE_CURRENT_BINARY_DIR}/pi")
+  set(PIPER_PHONEMIZE_VERSION "2023.11.14-4")
   if(MSVC)
-    # On Windows, we need to ensure DLLs are built for runtime dependencies
+    # On Windows, build with static runtime library for consistency
     ExternalProject_Add(
       piper_phonemize_external
       PREFIX "${CMAKE_CURRENT_BINARY_DIR}/p"
-      URL "https://github.com/rhasspy/piper-phonemize/archive/refs/heads/master.zip"
+      URL "https://github.com/rhasspy/piper-phonemize/archive/refs/tags/${PIPER_PHONEMIZE_VERSION}.zip"
       CMAKE_ARGS -DCMAKE_INSTALL_PREFIX:PATH=${PIPER_PHONEMIZE_DIR}
-      CMAKE_ARGS -DBUILD_SHARED_LIBS:BOOL=ON  # Need shared libs on Windows for DLLs
+      CMAKE_ARGS -DBUILD_SHARED_LIBS:BOOL=ON  # Still need DLLs for dependencies
       CMAKE_ARGS -DPIPER_PHONEMIZE_BUILD_TESTS:BOOL=OFF
       CMAKE_ARGS -DPIPER_PHONEMIZE_BUILD_PROGRAMS:BOOL=OFF
       CMAKE_ARGS -DONNXRUNTIME_ROOTDIR:PATH=${PIPER_PHONEMIZE_DIR}
       CMAKE_ARGS -DESPEAK_NG_DIR:PATH=${PIPER_PHONEMIZE_DIR}
       CMAKE_ARGS -DCMAKE_WINDOWS_EXPORT_ALL_SYMBOLS:BOOL=ON
+      CMAKE_ARGS -DCMAKE_MSVC_RUNTIME_LIBRARY:STRING=MultiThreaded$<$<CONFIG:Debug>:Debug>
+      CMAKE_ARGS -DCMAKE_POLICY_DEFAULT_CMP0091=NEW
+      CMAKE_ARGS -DCMAKE_GENERATOR:STRING=${CMAKE_GENERATOR}
       CMAKE_ARGS ${EXTERNAL_CMAKE_ARGS}
+      BUILD_COMMAND ${CMAKE_COMMAND} --build . --config Release
+      INSTALL_COMMAND ${CMAKE_COMMAND} --build . --config Release --target install
     )
   else()
     # On Unix platforms, use static libraries for easier deployment
     ExternalProject_Add(
       piper_phonemize_external
       PREFIX "${CMAKE_CURRENT_BINARY_DIR}/p"
-      URL "https://github.com/rhasspy/piper-phonemize/archive/refs/heads/master.zip"
+      URL "https://github.com/rhasspy/piper-phonemize/archive/refs/tags/${PIPER_PHONEMIZE_VERSION}.zip"
       CMAKE_ARGS -DCMAKE_INSTALL_PREFIX:PATH=${PIPER_PHONEMIZE_DIR}
       CMAKE_ARGS -DBUILD_SHARED_LIBS:BOOL=OFF  # Build static libraries
       CMAKE_ARGS -DPIPER_PHONEMIZE_BUILD_TESTS:BOOL=OFF
