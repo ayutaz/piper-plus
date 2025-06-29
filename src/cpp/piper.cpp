@@ -156,15 +156,6 @@ std::string tashkeel_run(const std::string &text, tashkeel::State &state) {
     return text;
 }
 
-// Stub for OpenJTalk when not available
-#if defined(_WIN32) || defined(_MSC_VER)
-void phonemize_openjtalk(const std::string &text,
-                         std::vector<std::vector<Phoneme>> &sentences) {
-    // Windows: OpenJTalk not supported, fall back to codepoints
-    CodepointsPhonemeConfig config;
-    phonemize_codepoints(text, config, sentences);
-}
-#endif
 #endif
 
 // Maximum value for 16-bit signed WAV sample

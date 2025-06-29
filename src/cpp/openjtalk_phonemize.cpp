@@ -1,14 +1,19 @@
 #include "openjtalk_phonemize.hpp"
 #include "utf8.h"
-#include "openjtalk_wrapper.h"
 #include <spdlog/spdlog.h>
 #include <unordered_map>
 #include <sstream>
 
+#if !defined(_WIN32) && !defined(_MSC_VER)
+#include "openjtalk_wrapper.h"
+#endif
+
 namespace piper {
 
+#if !defined(_WIN32) && !defined(_MSC_VER)
 static bool oj_initialized = false;
 static OpenJTalk *oj = nullptr;
+#endif
 
 // Multi-character phoneme to PUA character mapping
 // This must match the Python side token_mapper.py implementation
@@ -74,6 +79,7 @@ static std::string phonemeToDisplayString(Phoneme ph) {
     return result;
 }
 
+#if !defined(_WIN32) && !defined(_MSC_VER)
 static void ensure_init() {
   if (oj_initialized)
     return;
@@ -83,6 +89,7 @@ static void ensure_init() {
     spdlog::error("Failed to initialize OpenJTalk; falling back to codepoints");
   }
 }
+#endif
 
 // Convert string to phoneme (char32_t)
 Phoneme mapPhonemeStr(const std::string &phonemeStr) {
@@ -101,6 +108,11 @@ Phoneme mapPhonemeStr(const std::string &phonemeStr) {
 
 void phonemize_openjtalk(const std::string &text,
                          std::vector<std::vector<Phoneme>> &sentences) {
+#if defined(_WIN32) || defined(_MSC_VER)
+  // Windows: OpenJTalk not supported, return empty to trigger fallback
+  spdlog::debug("OpenJTalk not supported on Windows, returning empty");
+  return;
+#else
   ensure_init();
   if (!oj) {
     // OpenJTalk not available - this should only happen for English text
@@ -108,7 +120,7 @@ void phonemize_openjtalk(const std::string &text,
     // Just return empty to indicate phonemization failed
     return;
   }
-
+#else  // Not Windows
   // Use OpenJTalk to extract full-context labels
   HTS_Label_Wrapper *labels = openjtalk_extract_fullcontext(oj, text.c_str());
   if (!labels) {
@@ -179,6 +191,7 @@ void phonemize_openjtalk(const std::string &text,
   }
 
   HTS_Label_clear(labels);
+#endif
 }
 
 } 
