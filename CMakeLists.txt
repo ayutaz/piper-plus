@@ -546,8 +546,8 @@ target_link_libraries(test_piper
 
 # ---- Post-build steps for Windows DLL handling ----
 if(MSVC)
-  # Download ONNX Runtime for Windows
-  include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/download_onnxruntime_windows.cmake)
+  # Find or download ONNX Runtime for Windows
+  include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/find_onnxruntime_windows.cmake)
   
   # Create a custom target to handle DLL copying after all external projects are built
   add_custom_target(copy_dlls ALL
@@ -563,13 +563,17 @@ if(MSVC)
     COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/Release"
     COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/Debug"
     
-    # Copy ONNX Runtime DLL (downloaded separately)
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-      "${ONNXRUNTIME_DLL}"
-      "${CMAKE_CURRENT_BINARY_DIR}/Release/onnxruntime.dll"
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-      "${ONNXRUNTIME_DLL}"
-      "${CMAKE_CURRENT_BINARY_DIR}/Debug/onnxruntime.dll"
+    # Copy ONNX Runtime DLL if found
+    COMMAND if defined ONNXRUNTIME_DLL if exist "${ONNXRUNTIME_DLL}" (
+      ${CMAKE_COMMAND} -E copy_if_different
+        "${ONNXRUNTIME_DLL}"
+        "${CMAKE_CURRENT_BINARY_DIR}/Release/onnxruntime.dll"
+    )
+    COMMAND if defined ONNXRUNTIME_DLL if exist "${ONNXRUNTIME_DLL}" (
+      ${CMAKE_COMMAND} -E copy_if_different
+        "${ONNXRUNTIME_DLL}"
+        "${CMAKE_CURRENT_BINARY_DIR}/Debug/onnxruntime.dll"
+    )
     
     # Copy ONNX Runtime providers shared library if exists
     COMMAND if exist "${ONNXRUNTIME_LIB_DIR}/onnxruntime_providers_shared.dll" (
@@ -618,10 +622,14 @@ if(MSVC)
   add_custom_command(TARGET piper POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E echo "Copying required DLLs to output directory..."
     
-    # Copy onnxruntime DLL (use the downloaded one)
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-      "${ONNXRUNTIME_DLL}"
-      "$<TARGET_FILE_DIR:piper>/onnxruntime.dll"
+    # Copy onnxruntime DLL if available
+    COMMAND if defined ONNXRUNTIME_DLL if exist "${ONNXRUNTIME_DLL}" (
+      ${CMAKE_COMMAND} -E copy_if_different
+        "${ONNXRUNTIME_DLL}"
+        "$<TARGET_FILE_DIR:piper>/onnxruntime.dll"
+    ) else (
+      ${CMAKE_COMMAND} -E echo "Warning: ONNX Runtime DLL not available"
+    )
     
     # Copy espeak-ng DLL
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
@@ -658,10 +666,14 @@ if(MSVC)
   add_custom_command(TARGET test_piper POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E echo "Copying required DLLs to test output directory..."
     
-    # Copy onnxruntime DLL (use the downloaded one)
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-      "${ONNXRUNTIME_DLL}"
-      "$<TARGET_FILE_DIR:test_piper>/onnxruntime.dll"
+    # Copy onnxruntime DLL if available
+    COMMAND if defined ONNXRUNTIME_DLL if exist "${ONNXRUNTIME_DLL}" (
+      ${CMAKE_COMMAND} -E copy_if_different
+        "${ONNXRUNTIME_DLL}"
+        "$<TARGET_FILE_DIR:test_piper>/onnxruntime.dll"
+    ) else (
+      ${CMAKE_COMMAND} -E echo "Warning: ONNX Runtime DLL not available for test_piper"
+    )
     
     # Copy espeak-ng DLL
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
