@@ -171,20 +171,42 @@ if(NOT DEFINED SPDLOG_DIR)
   add_dependencies(test_piper spdlog_external)
 endif()
 
+# ---- ONNX Runtime for Windows ---
+if(MSVC)
+  include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/download_onnxruntime_windows.cmake)
+endif()
+
 # ---- piper-phonemize ---
 
 if(NOT DEFINED PIPER_PHONEMIZE_DIR)
   set(PIPER_PHONEMIZE_DIR "${CMAKE_CURRENT_BINARY_DIR}/pi")
-  ExternalProject_Add(
-    piper_phonemize_external
-    PREFIX "${CMAKE_CURRENT_BINARY_DIR}/p"
-    URL "https://github.com/rhasspy/piper-phonemize/archive/refs/heads/master.zip"
-    CMAKE_ARGS -DCMAKE_INSTALL_PREFIX:PATH=${PIPER_PHONEMIZE_DIR}
-    CMAKE_ARGS -DBUILD_SHARED_LIBS:BOOL=OFF  # Build static libraries
-    CMAKE_ARGS -DPIPER_PHONEMIZE_BUILD_TESTS:BOOL=OFF
-    CMAKE_ARGS -DPIPER_PHONEMIZE_BUILD_PROGRAMS:BOOL=OFF
-    CMAKE_ARGS ${EXTERNAL_CMAKE_ARGS}
-  )
+  if(MSVC)
+    # On Windows, we need to ensure DLLs are built for runtime dependencies
+    ExternalProject_Add(
+      piper_phonemize_external
+      PREFIX "${CMAKE_CURRENT_BINARY_DIR}/p"
+      URL "https://github.com/rhasspy/piper-phonemize/archive/refs/heads/master.zip"
+      CMAKE_ARGS -DCMAKE_INSTALL_PREFIX:PATH=${PIPER_PHONEMIZE_DIR}
+      CMAKE_ARGS -DBUILD_SHARED_LIBS:BOOL=OFF  # Actually use static libs to avoid DLL hell
+      CMAKE_ARGS -DPIPER_PHONEMIZE_BUILD_TESTS:BOOL=OFF
+      CMAKE_ARGS -DPIPER_PHONEMIZE_BUILD_PROGRAMS:BOOL=OFF
+      CMAKE_ARGS -DONNXRUNTIME_ROOTDIR:PATH=${PIPER_PHONEMIZE_DIR}
+      CMAKE_ARGS -DESPEAK_NG_DIR:PATH=${PIPER_PHONEMIZE_DIR}
+      CMAKE_ARGS ${EXTERNAL_CMAKE_ARGS}
+    )
+  else()
+    # On Unix platforms, use static libraries for easier deployment
+    ExternalProject_Add(
+      piper_phonemize_external
+      PREFIX "${CMAKE_CURRENT_BINARY_DIR}/p"
+      URL "https://github.com/rhasspy/piper-phonemize/archive/refs/heads/master.zip"
+      CMAKE_ARGS -DCMAKE_INSTALL_PREFIX:PATH=${PIPER_PHONEMIZE_DIR}
+      CMAKE_ARGS -DBUILD_SHARED_LIBS:BOOL=OFF  # Build static libraries
+      CMAKE_ARGS -DPIPER_PHONEMIZE_BUILD_TESTS:BOOL=OFF
+      CMAKE_ARGS -DPIPER_PHONEMIZE_BUILD_PROGRAMS:BOOL=OFF
+      CMAKE_ARGS ${EXTERNAL_CMAKE_ARGS}
+    )
+  endif()
   add_dependencies(piper piper_phonemize_external)
   add_dependencies(test_piper piper_phonemize_external)
 endif()
@@ -522,6 +544,149 @@ target_link_libraries(test_piper
 
 # OpenJTalk is used via binary execution for test_piper, not linked
 
+# ---- Post-build steps for Windows DLL handling ----
+if(MSVC)
+  # Create a custom target to handle DLL copying after all external projects are built
+  add_custom_target(copy_dlls ALL
+    DEPENDS piper test_piper piper_phonemize_external
+    COMMENT "Ensuring all DLLs are copied..."
+  )
+  
+  # Add DLL copy commands to the custom target
+  add_custom_command(TARGET copy_dlls POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E echo "Copying ONNX Runtime and other DLLs..."
+    
+    # Copy all DLLs to both Release and Debug directories
+    COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/Release"
+    COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/Debug"
+    
+    # Copy ONNX Runtime DLL (downloaded separately)
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+      "${ONNXRUNTIME_DLL}"
+      "${CMAKE_CURRENT_BINARY_DIR}/Release/onnxruntime.dll"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+      "${ONNXRUNTIME_DLL}"
+      "${CMAKE_CURRENT_BINARY_DIR}/Debug/onnxruntime.dll"
+    
+    # Copy ONNX Runtime providers shared library if exists
+    COMMAND if exist "${ONNXRUNTIME_LIB_DIR}/onnxruntime_providers_shared.dll" (
+      ${CMAKE_COMMAND} -E copy_if_different
+        "${ONNXRUNTIME_LIB_DIR}/onnxruntime_providers_shared.dll"
+        "${CMAKE_CURRENT_BINARY_DIR}/Release/onnxruntime_providers_shared.dll"
+    )
+    COMMAND if exist "${ONNXRUNTIME_LIB_DIR}/onnxruntime_providers_shared.dll" (
+      ${CMAKE_COMMAND} -E copy_if_different
+        "${ONNXRUNTIME_LIB_DIR}/onnxruntime_providers_shared.dll"
+        "${CMAKE_CURRENT_BINARY_DIR}/Debug/onnxruntime_providers_shared.dll"
+    )
+    
+    # Check what DLLs exist in the piper-phonemize directory
+    COMMAND ${CMAKE_COMMAND} -E echo "Checking ${PIPER_PHONEMIZE_DIR}/lib for DLLs..."
+    COMMAND if exist "${PIPER_PHONEMIZE_DIR}/lib/*.dll" dir "${PIPER_PHONEMIZE_DIR}/lib/*.dll"
+    
+    COMMAND ${CMAKE_COMMAND} -E echo "Checking ${PIPER_PHONEMIZE_DIR}/bin for DLLs..."
+    COMMAND if exist "${PIPER_PHONEMIZE_DIR}/bin/*.dll" dir "${PIPER_PHONEMIZE_DIR}/bin/*.dll"
+    
+    # Copy all DLLs from piper-phonemize lib
+    COMMAND if exist "${PIPER_PHONEMIZE_DIR}/lib/*.dll" (
+      xcopy /Y /Q "${PIPER_PHONEMIZE_DIR}/lib/*.dll" "${CMAKE_CURRENT_BINARY_DIR}/Release/"
+    )
+    COMMAND if exist "${PIPER_PHONEMIZE_DIR}/lib/*.dll" (
+      xcopy /Y /Q "${PIPER_PHONEMIZE_DIR}/lib/*.dll" "${CMAKE_CURRENT_BINARY_DIR}/Debug/"
+    )
+    
+    # Copy all DLLs from piper-phonemize bin if they exist
+    COMMAND if exist "${PIPER_PHONEMIZE_DIR}/bin/*.dll" (
+      xcopy /Y /Q "${PIPER_PHONEMIZE_DIR}/bin/*.dll" "${CMAKE_CURRENT_BINARY_DIR}/Release/"
+    )
+    COMMAND if exist "${PIPER_PHONEMIZE_DIR}/bin/*.dll" (
+      xcopy /Y /Q "${PIPER_PHONEMIZE_DIR}/bin/*.dll" "${CMAKE_CURRENT_BINARY_DIR}/Debug/"
+    )
+    
+    # List final DLL contents
+    COMMAND ${CMAKE_COMMAND} -E echo "DLLs in Release directory:"
+    COMMAND dir "${CMAKE_CURRENT_BINARY_DIR}/Release/*.dll"
+    
+    COMMENT "Copying DLLs to Release and Debug directories..."
+  )
+  
+  # Find all DLLs that need to be copied with piper.exe
+  # This includes onnxruntime.dll, espeak-ng.dll, piper_phonemize.dll, etc.
+  add_custom_command(TARGET piper POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E echo "Copying required DLLs to output directory..."
+    
+    # Copy onnxruntime DLL (use the downloaded one)
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+      "${ONNXRUNTIME_DLL}"
+      "$<TARGET_FILE_DIR:piper>/onnxruntime.dll"
+    
+    # Copy espeak-ng DLL
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+      "${PIPER_PHONEMIZE_DIR}/lib/espeak-ng.dll"
+      "$<TARGET_FILE_DIR:piper>/espeak-ng.dll"
+      || ${CMAKE_COMMAND} -E echo "Warning: espeak-ng.dll not found"
+    
+    # Copy piper_phonemize DLL
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+      "${PIPER_PHONEMIZE_DIR}/lib/piper_phonemize.dll"
+      "$<TARGET_FILE_DIR:piper>/piper_phonemize.dll"
+      || ${CMAKE_COMMAND} -E echo "Warning: piper_phonemize.dll not found"
+    
+    # Copy fmt and spdlog DLLs if they exist (usually static, but just in case)
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+      "${FMT_DIR}/lib/fmt.dll"
+      "$<TARGET_FILE_DIR:piper>/fmt.dll"
+      || ${CMAKE_COMMAND} -E echo "Note: fmt.dll not found (likely static)"
+    
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+      "${SPDLOG_DIR}/lib/spdlog.dll"
+      "$<TARGET_FILE_DIR:piper>/spdlog.dll"
+      || ${CMAKE_COMMAND} -E echo "Note: spdlog.dll not found (likely static)"
+    
+    # List all files in the output directory for debugging
+    COMMAND ${CMAKE_COMMAND} -E echo "Files in output directory:"
+    COMMAND ${CMAKE_COMMAND} -E echo "$<TARGET_FILE_DIR:piper>"
+    COMMAND dir "$<TARGET_FILE_DIR:piper>"
+    
+    COMMENT "Copying required DLLs for Windows..."
+  )
+  
+  # Same for test_piper
+  add_custom_command(TARGET test_piper POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E echo "Copying required DLLs to test output directory..."
+    
+    # Copy onnxruntime DLL (use the downloaded one)
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+      "${ONNXRUNTIME_DLL}"
+      "$<TARGET_FILE_DIR:test_piper>/onnxruntime.dll"
+    
+    # Copy espeak-ng DLL
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+      "${PIPER_PHONEMIZE_DIR}/lib/espeak-ng.dll"
+      "$<TARGET_FILE_DIR:test_piper>/espeak-ng.dll"
+      || ${CMAKE_COMMAND} -E echo "Warning: espeak-ng.dll not found"
+    
+    # Copy piper_phonemize DLL
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+      "${PIPER_PHONEMIZE_DIR}/lib/piper_phonemize.dll"
+      "$<TARGET_FILE_DIR:test_piper>/piper_phonemize.dll"
+      || ${CMAKE_COMMAND} -E echo "Warning: piper_phonemize.dll not found"
+    
+    # Copy fmt and spdlog DLLs if they exist (usually static, but just in case)
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+      "${FMT_DIR}/lib/fmt.dll"
+      "$<TARGET_FILE_DIR:test_piper>/fmt.dll"
+      || ${CMAKE_COMMAND} -E echo "Note: fmt.dll not found (likely static)"
+    
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+      "${SPDLOG_DIR}/lib/spdlog.dll"
+      "$<TARGET_FILE_DIR:test_piper>/spdlog.dll"
+      || ${CMAKE_COMMAND} -E echo "Note: spdlog.dll not found (likely static)"
+    
+    COMMENT "Copying required DLLs for test_piper..."
+  )
+endif()
+
 # ---- Declare install targets ----
 
 install(
@@ -547,6 +712,17 @@ if(MSVC)
     DESTINATION bin
     FILES_MATCHING
     PATTERN "*.dll"
+  )
+  
+  # Also install ONNX Runtime DLLs which might be in a different location
+  install(
+    FILES
+      ${PIPER_PHONEMIZE_DIR}/lib/onnxruntime.dll
+      ${PIPER_PHONEMIZE_DIR}/bin/onnxruntime.dll
+      ${CMAKE_CURRENT_BINARY_DIR}/pi/src/piper_phonemize_external-build/_deps/onnxruntime-src/lib/onnxruntime.dll
+      ${CMAKE_CURRENT_BINARY_DIR}/p/src/piper_phonemize_external-build/_deps/onnxruntime-src/lib/onnxruntime.dll
+    DESTINATION bin
+    OPTIONAL  # Don't fail if not found
   )
 endif()
 
