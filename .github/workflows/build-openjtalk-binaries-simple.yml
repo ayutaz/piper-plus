@@ -48,8 +48,8 @@ jobs:
         
         # Download and build HTSEngine first
         cd /tmp
-        curl -L -o hts.tar.gz "https://github.com/r9y9/hts_engine_API/archive/v1.10.tar.gz" || \
-        curl -L -o hts.tar.gz "https://downloads.sourceforge.net/project/hts-engine/hts_engine%20API/hts_engine_API-1.10/hts_engine_API-1.10.tar.gz"
+        curl -L -f -o hts.tar.gz "https://github.com/r9y9/hts_engine_API/archive/v1.10.tar.gz" || \
+        curl -L -f -o hts.tar.gz "https://downloads.sourceforge.net/project/hts-engine/hts_engine%20API/hts_engine_API-1.10/hts_engine_API-1.10.tar.gz"
         
         tar xzf hts.tar.gz
         cd hts_engine_API-*
@@ -69,8 +69,8 @@ jobs:
         
         # Now build OpenJTalk
         cd /tmp
-        curl -L -o ojt.tar.gz "https://github.com/r9y9/open_jtalk/archive/v1.11.tar.gz" || \
-        curl -L -o ojt.tar.gz "https://downloads.sourceforge.net/project/open-jtalk/Open%20JTalk/open_jtalk-1.11/open_jtalk-1.11.tar.gz"
+        curl -L -f -o ojt.tar.gz "https://github.com/r9y9/open_jtalk/archive/v1.11.tar.gz" || \
+        curl -L -f -o ojt.tar.gz "https://downloads.sourceforge.net/project/open-jtalk/Open%20JTalk/open_jtalk-1.11/open_jtalk-1.11.tar.gz"
         
         tar xzf ojt.tar.gz
         cd open_jtalk-* || cd Open_JTalk-*
