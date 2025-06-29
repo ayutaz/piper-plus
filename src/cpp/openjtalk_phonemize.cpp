@@ -120,7 +120,6 @@ void phonemize_openjtalk(const std::string &text,
     // Just return empty to indicate phonemization failed
     return;
   }
-#else  // Not Windows
   // Use OpenJTalk to extract full-context labels
   HTS_Label_Wrapper *labels = openjtalk_extract_fullcontext(oj, text.c_str());
   if (!labels) {
