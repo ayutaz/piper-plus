@@ -178,8 +178,48 @@ if(NOT DEFINED SPDLOG_DIR)
 endif()
 
 # ---- ONNX Runtime for Windows ---
+# Include this early to ensure ONNXRUNTIME_INCLUDE_DIR is set before targets are defined
 if(MSVC)
   include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/find_onnxruntime_windows.cmake)
+  
+  # For CI builds, ensure we have ONNX Runtime headers
+  if((DEFINED ENV{GITHUB_ACTIONS} OR USE_PREBUILT_PIPER_PHONEMIZE) AND NOT ONNXRUNTIME_INCLUDE_DIR)
+    message(STATUS "CI build: Setting up ONNX Runtime headers")
+    # Download just the headers if needed
+    set(ONNXRUNTIME_VERSION "1.15.1")
+    set(ONNX_ARCH "x64")
+    set(ONNXRUNTIME_URL "https://github.com/microsoft/onnxruntime/releases/download/v${ONNXRUNTIME_VERSION}/onnxruntime-win-${ONNX_ARCH}-${ONNXRUNTIME_VERSION}.zip")
+    set(ONNXRUNTIME_DOWNLOAD_DIR "${CMAKE_CURRENT_BINARY_DIR}/onnxruntime-ci")
+    set(ONNXRUNTIME_ZIP "${ONNXRUNTIME_DOWNLOAD_DIR}/onnxruntime.zip")
+    
+    file(MAKE_DIRECTORY ${ONNXRUNTIME_DOWNLOAD_DIR})
+    
+    if(NOT EXISTS "${ONNXRUNTIME_ZIP}")
+      message(STATUS "Downloading ONNX Runtime headers for CI...")
+      file(DOWNLOAD
+        ${ONNXRUNTIME_URL}
+        ${ONNXRUNTIME_ZIP}
+        SHOW_PROGRESS
+        STATUS download_status
+        TIMEOUT 300
+      )
+    endif()
+    
+    if(EXISTS "${ONNXRUNTIME_ZIP}")
+      message(STATUS "Extracting ONNX Runtime headers...")
+      execute_process(
+        COMMAND ${CMAKE_COMMAND} -E tar xf "${ONNXRUNTIME_ZIP}"
+        WORKING_DIRECTORY "${ONNXRUNTIME_DOWNLOAD_DIR}"
+        RESULT_VARIABLE extract_result
+      )
+      
+      if(extract_result EQUAL 0)
+        set(ONNXRUNTIME_INCLUDE_DIR "${ONNXRUNTIME_DOWNLOAD_DIR}/onnxruntime-win-${ONNX_ARCH}-${ONNXRUNTIME_VERSION}/include")
+        set(ONNXRUNTIME_LIB_DIR "${ONNXRUNTIME_DOWNLOAD_DIR}/onnxruntime-win-${ONNX_ARCH}-${ONNXRUNTIME_VERSION}/lib")
+        message(STATUS "ONNX Runtime headers available at: ${ONNXRUNTIME_INCLUDE_DIR}")
+      endif()
+    endif()
+  endif()
 endif()
 
 # ---- piper-phonemize ---
@@ -573,17 +613,19 @@ target_include_directories(piper PUBLIC
   ${PIPER_PHONEMIZE_DIR}/include
 )
 
+# Add ONNX Runtime include directory early for all platforms
+if(ONNXRUNTIME_INCLUDE_DIR)
+  target_include_directories(piper PUBLIC ${ONNXRUNTIME_INCLUDE_DIR})
+  target_include_directories(test_piper PUBLIC ${ONNXRUNTIME_INCLUDE_DIR})
+  message(STATUS "Added ONNX Runtime include directory: ${ONNXRUNTIME_INCLUDE_DIR}")
+endif()
+
 if(MSVC)
   # Windows: Include directories for OpenJTalk and HTS_Engine
   target_include_directories(piper PUBLIC
     ${OPENJTALK_DIR}/include
     ${HTS_ENGINE_DIR}/include
   )
-  # Add ONNX Runtime include directory for Windows
-  if(ONNXRUNTIME_INCLUDE_DIR)
-    target_include_directories(piper PUBLIC ${ONNXRUNTIME_INCLUDE_DIR})
-    target_include_directories(test_piper PUBLIC ${ONNXRUNTIME_INCLUDE_DIR})
-  endif()
   target_include_directories(test_piper PUBLIC
     ${OPENJTALK_DIR}/include
     ${HTS_ENGINE_DIR}/include
