@@ -32,8 +32,28 @@ HTS_AUDIO_C_START;
 /* Force AUDIO_PLAY_NONE for Windows builds */
 #define AUDIO_PLAY_NONE
 
-/* hts_engine libraries */
-#include "HTS_hidden.h"
+/* For Windows, we need to define the audio structure ourselves since */
+/* HTS_hidden.h is an internal header that may not be available */
+
+/* Define HTS_Audio structure for Windows */
+typedef struct _HTS_Audio {
+   int sampling_frequency;
+   int max_buff_size;
+   short *buff;
+   int buff_size;
+   void *audio_interface;
+} HTS_Audio;
+
+/* Define TRUE/FALSE if not already defined */
+#ifndef TRUE
+#define TRUE 1
+#endif
+#ifndef FALSE
+#define FALSE 0
+#endif
+
+/* HTS Boolean type */
+typedef int HTS_Boolean;
 
 /* HTS_Audio_initialize: initialize audio */
 void HTS_Audio_initialize(HTS_Audio * audio)
