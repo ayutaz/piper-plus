@@ -66,10 +66,7 @@ if(MSVC)
         
         # Try PowerShell first
         execute_process(
-          COMMAND powershell -Command "
-            Add-Type -AssemblyName System.IO.Compression.FileSystem;
-            [System.IO.Compression.ZipFile]::ExtractToDirectory('${ONNXRUNTIME_ZIP}', '${ONNXRUNTIME_EXTRACT_DIR}')
-          "
+          COMMAND powershell -Command "Add-Type -AssemblyName System.IO.Compression.FileSystem; [System.IO.Compression.ZipFile]::ExtractToDirectory('${ONNXRUNTIME_ZIP}', '${ONNXRUNTIME_EXTRACT_DIR}')"
           RESULT_VARIABLE ps_result
           OUTPUT_QUIET
           ERROR_QUIET

@@ -173,7 +173,7 @@ endif()
 
 # ---- ONNX Runtime for Windows ---
 if(MSVC)
-  include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/download_onnxruntime_windows.cmake)
+  include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/find_onnxruntime_windows.cmake)
 endif()
 
 # ---- piper-phonemize ---
