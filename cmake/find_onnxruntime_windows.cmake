@@ -2,12 +2,21 @@
 # First check if it's already available from piper-phonemize
 
 if(MSVC)
+  # Wait for piper_phonemize_external to complete if it's being built
+  if(TARGET piper_phonemize_external)
+    execute_process(
+      COMMAND ${CMAKE_COMMAND} -E echo "Waiting for piper-phonemize build to complete before searching for ONNX Runtime..."
+    )
+  endif()
+  
   # List of possible locations for onnxruntime.dll
   set(ONNXRUNTIME_SEARCH_PATHS
     "${PIPER_PHONEMIZE_DIR}/lib"
     "${PIPER_PHONEMIZE_DIR}/bin"
     "${CMAKE_CURRENT_BINARY_DIR}/pi/lib"
     "${CMAKE_CURRENT_BINARY_DIR}/pi/bin"
+    "${CMAKE_CURRENT_BINARY_DIR}/p/src/piper_phonemize_external-build/_deps/onnxruntime-src/lib"
+    "${CMAKE_CURRENT_BINARY_DIR}/p/src/piper_phonemize_external-build/_deps/onnxruntime-build/lib"
     "${CMAKE_CURRENT_BINARY_DIR}/_deps/onnxruntime-src/lib"
     "${CMAKE_CURRENT_BINARY_DIR}/_deps/onnxruntime-build/lib"
   )
