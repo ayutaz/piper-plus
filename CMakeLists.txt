@@ -268,7 +268,7 @@ if(NOT DEFINED OPENJTALK_DIR)
       # Use the latest release from automated builds
       # Download from the unified binary release
       # This should be updated to point to your own repository
-      set(OPENJTALK_WINDOWS_URL "https://github.com/YOUR_GITHUB_USERNAME/YOUR_REPO_NAME/releases/download/openjtalk-binaries-latest/open_jtalk_windows_x64.exe")
+      set(OPENJTALK_WINDOWS_URL "https://github.com/ayutaz/piper-plus/releases/download/openjtalk-binaries-latest/open_jtalk_windows_x64.exe")
     endif()
     
     set(OPENJTALK_WINDOWS_EXE "${OPENJTALK_DIR}/bin/open_jtalk.exe")

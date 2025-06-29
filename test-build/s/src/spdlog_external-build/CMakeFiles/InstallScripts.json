@@ -1,8 +1,0 @@
-{
-	"InstallScripts" : 
-	[
-		"/Users/s19447/Desktop/piper/test-build/s/src/spdlog_external-build/cmake_install.cmake",
-		"/Users/s19447/Desktop/piper/test-build/s/src/spdlog_external-build/example/cmake_install.cmake"
-	],
-	"Parallel" : false
-}
