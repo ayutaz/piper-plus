@@ -63,7 +63,8 @@ struct PhonemeIdConfig {
     bool interspersePad = true;
 };
 
-void phonemize_codepoints(const std::string &text, 
+void phonemize_codepoints(const std::string &text,
+                         const CodepointsPhonemeConfig &config,
                          std::vector<std::vector<Phoneme>> &phonemes) {
     // Simple implementation: convert text to codepoints
     std::vector<Phoneme> sentence;
@@ -733,7 +734,8 @@ void textToAudio(PiperConfig &config, Voice &voice, std::string text,
     if (phonemes.empty()) {
       spdlog::warn("OpenJTalk returned empty phonemes, falling back to codepoints");
 #ifdef PIPER_CI_BUILD
-      phonemize_codepoints(text, phonemes);
+      CodepointsPhonemeConfig codepointsConfig;
+      phonemize_codepoints(text, codepointsConfig, phonemes);
 #else
       piper::CodepointsPhonemeConfig codepointsConfig;
       piper::phonemize_codepoints(text, codepointsConfig, phonemes);
@@ -743,7 +745,8 @@ void textToAudio(PiperConfig &config, Voice &voice, std::string text,
   } else {
     // Use UTF-8 codepoints as "phonemes"
 #ifdef PIPER_CI_BUILD
-    phonemize_codepoints(text, phonemes);
+    CodepointsPhonemeConfig codepointsConfig;
+    phonemize_codepoints(text, codepointsConfig, phonemes);
 #else
     piper::CodepointsPhonemeConfig codepointsConfig;
     piper::phonemize_codepoints(text, codepointsConfig, phonemes);
