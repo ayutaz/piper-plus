@@ -118,8 +118,14 @@ jobs:
             build/piper*
             build/test_piper*
             build/**/*.exe
+            build/**/*.dll
+            build/**/*.so*
+            build/**/*.dylib
             build/oj/bin/
-            build/ei/share/
+            build/ei/
+            build/pi/
+            build/fi/
+            build/si/
           retention-days: 1
 
   test_multilingual:
@@ -318,6 +324,7 @@ jobs:
         run: |
           REM Add DLL paths to PATH
           set PATH=%CD%\piper\lib;%CD%\piper\bin;%PATH%
+          set ESPEAK_DATA_PATH=%CD%\piper\share\espeak-ng-data
           
           echo ${{ matrix.test_text }} > test_input.txt
           
@@ -353,6 +360,8 @@ jobs:
         shell: bash
         run: |
           # Set up environment
+          export ESPEAK_DATA_PATH=$PWD/piper/share/espeak-ng-data
+          
           if [ "${{ runner.os }}" = "Linux" ]; then
             export LD_LIBRARY_PATH=$PWD/piper/lib:$LD_LIBRARY_PATH
             PIPER_CMD="./piper/bin/piper"
