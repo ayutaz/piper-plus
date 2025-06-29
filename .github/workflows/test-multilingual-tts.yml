@@ -210,23 +210,39 @@ jobs:
           # Create directories
           mkdir -p piper/bin test/models
           
+          # Debug: Show what we received in build artifacts
+          echo "=== Inspecting downloaded build artifacts ==="
+          echo "Top-level build directory:"
+          ls -la build/
+          echo ""
+          
           # Copy built binaries
           if [ "${{ runner.os }}" = "Windows" ]; then
-            if [ -f build/Release/piper.exe ]; then
-              cp build/Release/piper.exe piper/bin/
-            elif [ -f build/piper.exe ]; then
-              cp build/piper.exe piper/bin/
-            else
+            # Check multiple possible locations for Windows binary
+            PIPER_FOUND=false
+            for piper_exe in "build/Release/piper.exe" "build/piper.exe" "build/Debug/piper.exe"; do
+              if [ -f "$piper_exe" ]; then
+                echo "Found piper.exe at: $piper_exe"
+                cp "$piper_exe" piper/bin/piper.exe
+                PIPER_FOUND=true
+                break
+              fi
+            done
+            
+            if [ "$PIPER_FOUND" = "false" ]; then
               echo "ERROR: piper.exe not found in build artifacts"
+              echo "Searching for all .exe files:"
               find build -name "*.exe" -type f
               exit 1
             fi
           else
+            # Check for Unix binary
             if [ -f build/piper ]; then
               cp build/piper piper/bin/
               chmod +x piper/bin/piper
             else
               echo "ERROR: piper binary not found in build artifacts"
+              echo "Searching for piper binary:"
               find build -name "piper" -type f
               exit 1
             fi
@@ -237,69 +253,132 @@ jobs:
             cp -r build/oj/bin/* piper/bin/ || true
           fi
           
-          # Debug: Show build directory structure
-          echo "=== Build directory structure ==="
-          echo "Checking for espeak-ng-data in build/:"
-          find build -type d -name "espeak-ng-data" 2>/dev/null || echo "No espeak-ng-data found in build/"
+          # Debug: Show build directory structure in detail
+          echo ""
+          echo "=== Detailed build directory structure ==="
+          echo "Looking for espeak-ng-data in all subdirectories:"
+          find build -type d -name "espeak-ng-data" 2>/dev/null | while read dir; do
+            echo "  Found: $dir"
+            echo "  Parent: $(dirname "$dir")"
+            echo "  Files count: $(find "$dir" -type f | wc -l)"
+          done
           
-          echo "=== build/ei directory structure ==="
+          # Check ei directory (espeak install)
+          echo ""
+          echo "=== build/ei directory check ==="
           if [ -d build/ei ]; then
+            echo "build/ei exists"
             ls -la build/ei/
             if [ -d build/ei/share ]; then
-              echo "=== build/ei/share contents ==="
+              echo "build/ei/share contents:"
               ls -la build/ei/share/
+              if [ -d build/ei/share/espeak-ng-data ]; then
+                echo "Found espeak-ng-data in ei/share!"
+              fi
             fi
           else
-            echo "No build/ei directory found"
+            echo "build/ei does not exist"
           fi
           
-          echo "=== build/pi directory structure ==="
+          # Check pi directory (piper-phonemize install)
+          echo ""
+          echo "=== build/pi directory check ==="
           if [ -d build/pi ]; then
+            echo "build/pi exists"
             ls -la build/pi/
             if [ -d build/pi/share ]; then
-              echo "=== build/pi/share contents ==="
+              echo "build/pi/share contents:"
               ls -la build/pi/share/
+              if [ -d build/pi/share/espeak-ng-data ]; then
+                echo "Found espeak-ng-data in pi/share!"
+              fi
             fi
           else
-            echo "No build/pi directory found"
+            echo "build/pi does not exist"
           fi
           
-          # Copy share directory for espeak-ng data
-          # First try ei/share (espeak install location)
-          if [ -d build/ei/share/espeak-ng-data ]; then
-            echo "Found espeak-ng-data at build/ei/share/espeak-ng-data"
-            mkdir -p piper/share
-            cp -r build/ei/share/espeak-ng-data piper/share/
-            echo "Copied espeak-ng-data to piper/share/"
-          # Then try pi/share (piper-phonemize location)
-          elif [ -d build/pi/share/espeak-ng-data ]; then
-            echo "Found espeak-ng-data at build/pi/share/espeak-ng-data"
+          # Copy share directory for espeak-ng data with improved logic
+          ESPEAK_DATA_COPIED=false
+          
+          # Try pi/share first (piper-phonemize location - most likely)
+          if [ -d build/pi/share/espeak-ng-data ]; then
+            echo ""
+            echo ">>> Copying espeak-ng-data from build/pi/share/espeak-ng-data"
             mkdir -p piper/share
             cp -r build/pi/share/espeak-ng-data piper/share/
-            echo "Copied espeak-ng-data to piper/share/"
-          elif [ -d build/ei/share ]; then
-            echo "Found build/ei/share but no espeak-ng-data subdirectory"
+            ESPEAK_DATA_COPIED=true
+          # Then try ei/share (espeak install location)
+          elif [ -d build/ei/share/espeak-ng-data ]; then
+            echo ""
+            echo ">>> Copying espeak-ng-data from build/ei/share/espeak-ng-data"
             mkdir -p piper/share
-            cp -r build/ei/share/* piper/share/
-            echo "Copied all contents of build/ei/share to piper/share/"
+            cp -r build/ei/share/espeak-ng-data piper/share/
+            ESPEAK_DATA_COPIED=true
+          # Try copying all share contents as fallback
           elif [ -d build/pi/share ]; then
-            echo "Found build/pi/share but no espeak-ng-data subdirectory"
+            echo ""
+            echo ">>> Copying all contents from build/pi/share"
             mkdir -p piper/share
             cp -r build/pi/share/* piper/share/
-            echo "Copied all contents of build/pi/share to piper/share/"
-          else
-            echo "WARNING: No espeak-ng-data found in build artifacts"
+            ESPEAK_DATA_COPIED=true
+          elif [ -d build/ei/share ]; then
+            echo ""
+            echo ">>> Copying all contents from build/ei/share"
+            mkdir -p piper/share
+            cp -r build/ei/share/* piper/share/
+            ESPEAK_DATA_COPIED=true
           fi
           
-          # List contents
-          echo "=== piper/bin contents ==="
-          ls -la piper/bin/
-          echo "=== piper/share contents ==="
-          ls -la piper/share/ 2>/dev/null || echo "No share directory"
-          if [ -d piper/share/espeak-ng-data ]; then
-            echo "=== piper/share/espeak-ng-data contents ==="
-            ls -la piper/share/espeak-ng-data/ | head -20
+          if [ "$ESPEAK_DATA_COPIED" = "false" ]; then
+            echo ""
+            echo "ERROR: No espeak-ng-data found in build artifacts!"
+            echo "This is required for TTS to work."
+            # Don't exit here, let the test fail with proper error message
           fi
+          
+          # Copy shared libraries
+          echo ""
+          echo "=== Copying shared libraries ==="
+          mkdir -p piper/lib
+          
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            # Copy Windows DLLs
+            find build -name "*.dll" -type f | while read dll; do
+              echo "Copying DLL: $dll"
+              cp "$dll" piper/lib/ || true
+            done
+          elif [ "${{ runner.os }}" = "Linux" ]; then
+            # Copy Linux shared objects
+            find build -name "*.so*" -type f | while read so; do
+              echo "Copying SO: $so"
+              cp "$so" piper/lib/ || true
+            done
+          elif [ "${{ runner.os }}" = "macOS" ]; then
+            # Copy macOS dynamic libraries
+            find build -name "*.dylib" -type f | while read dylib; do
+              echo "Copying DYLIB: $dylib"
+              cp "$dylib" piper/lib/ || true
+            done
+          fi
+          
+          # Final verification
+          echo ""
+          echo "=== Final setup verification ==="
+          echo "piper/bin contents:"
+          ls -la piper/bin/
+          echo ""
+          echo "piper/share contents:"
+          ls -la piper/share/ 2>/dev/null || echo "No share directory"
+          echo ""
+          if [ -d piper/share/espeak-ng-data ]; then
+            echo "espeak-ng-data successfully copied!"
+            echo "Number of files: $(find piper/share/espeak-ng-data -type f | wc -l)"
+          else
+            echo "WARNING: espeak-ng-data not found in final location!"
+          fi
+          echo ""
+          echo "piper/lib contents:"
+          ls -la piper/lib/ 2>/dev/null || echo "No lib directory"
 
 
       - name: Cache voice models
@@ -487,69 +566,90 @@ jobs:
         if: runner.os != 'Windows'
         shell: bash
         run: |
-          # Try to find espeak-ng-data in multiple locations
-          if [ -d "$PWD/piper/share/espeak-ng-data" ]; then
-            export ESPEAK_DATA_PATH=$PWD/piper/share/espeak-ng-data
-          elif [ -d "$PWD/build/ei/share/espeak-ng-data" ]; then
-            export ESPEAK_DATA_PATH=$PWD/build/ei/share/espeak-ng-data
-          elif [ -d "$PWD/build/pi/share/espeak-ng-data" ]; then
-            export ESPEAK_DATA_PATH=$PWD/build/pi/share/espeak-ng-data
-          else
-            echo "WARNING: espeak-ng-data not found, trying without setting ESPEAK_DATA_PATH"
-          fi
-          
+          # Set up library paths first
           if [ "${{ runner.os }}" = "Linux" ]; then
-            export LD_LIBRARY_PATH=$PWD/piper/lib:$LD_LIBRARY_PATH
+            export LD_LIBRARY_PATH=$PWD/piper/lib:$PWD/build/pi/lib:$PWD/build/ei/lib:$LD_LIBRARY_PATH
             PIPER_CMD="./piper/bin/piper"
           elif [ "${{ runner.os }}" = "macOS" ]; then
-            export DYLD_LIBRARY_PATH=$PWD/piper/lib:$DYLD_LIBRARY_PATH
+            export DYLD_LIBRARY_PATH=$PWD/piper/lib:$PWD/build/pi/lib:$PWD/build/ei/lib:$DYLD_LIBRARY_PATH
             PIPER_CMD="./piper/bin/piper"
+          fi
+          
+          # Try to find espeak-ng-data in multiple locations
+          # Priority order: piper/share > build/pi/share > build/ei/share
+          ESPEAK_DATA_FOUND=false
+          for esp_path in "$PWD/piper/share/espeak-ng-data" "$PWD/build/pi/share/espeak-ng-data" "$PWD/build/ei/share/espeak-ng-data"; do
+            if [ -d "$esp_path" ]; then
+              export ESPEAK_DATA_PATH=$esp_path
+              ESPEAK_DATA_FOUND=true
+              echo "Set ESPEAK_DATA_PATH to: $ESPEAK_DATA_PATH"
+              break
+            fi
+          done
+          
+          if [ "$ESPEAK_DATA_FOUND" = "false" ]; then
+            echo "WARNING: espeak-ng-data not found in any expected location!"
+            echo "Attempting to run without ESPEAK_DATA_PATH set..."
           fi
           
           # Debug information
           echo "=== Debug Information ==="
           echo "Current directory: $(pwd)"
           echo "ESPEAK_DATA_PATH: ${ESPEAK_DATA_PATH:-not set}"
+          echo "LD_LIBRARY_PATH: ${LD_LIBRARY_PATH:-not set}"
+          echo "DYLD_LIBRARY_PATH: ${DYLD_LIBRARY_PATH:-not set}"
           echo ""
-          echo "Checking piper/share directory:"
-          if [ -d "piper/share" ]; then
-            ls -la piper/share/
-          else
-            echo "piper/share directory does not exist"
-          fi
-          echo ""
-          echo "Checking build/ei/share directory:"
-          if [ -d "build/ei/share" ]; then
-            ls -la build/ei/share/
-          else
-            echo "build/ei/share directory does not exist"
-          fi
-          echo ""
-          echo "Checking build/pi/share directory:"
-          if [ -d "build/pi/share" ]; then
-            ls -la build/pi/share/
-          else
-            echo "build/pi/share directory does not exist"
-          fi
-          echo ""
-          echo "Checking for espeak-ng-data:"
-          if [ -n "$ESPEAK_DATA_PATH" ] && [ -d "$ESPEAK_DATA_PATH" ]; then
-            echo "Found espeak-ng-data at: $ESPEAK_DATA_PATH"
-            echo "Number of files/directories: $(ls -1 "$ESPEAK_DATA_PATH" | wc -l)"
-          else
-            echo "espeak-ng-data not found or ESPEAK_DATA_PATH not set"
-          fi
-          echo ""
+          
           echo "Checking piper binary:"
-          ls -la piper/bin/piper 2>/dev/null || echo "piper binary not found"
+          if [ -f "piper/bin/piper" ]; then
+            ls -la piper/bin/piper
+            echo "Testing if piper can run:"
+            if $PIPER_CMD --version 2>&1; then
+              echo "✓ Piper binary is executable"
+            else
+              echo "✗ Piper binary failed to run. Exit code: $?"
+              echo "Checking library dependencies:"
+              if [ "${{ runner.os }}" = "Linux" ]; then
+                ldd piper/bin/piper || echo "ldd failed"
+              elif [ "${{ runner.os }}" = "macOS" ]; then
+                otool -L piper/bin/piper || echo "otool failed"
+              fi
+            fi
+          else
+            echo "✗ piper binary not found at piper/bin/piper"
+          fi
           echo ""
+          
+          echo "Checking shared libraries:"
+          if [ -d "piper/lib" ]; then
+            echo "Libraries in piper/lib:"
+            ls -la piper/lib/ | head -10
+          else
+            echo "No piper/lib directory"
+          fi
+          echo ""
+          
+          echo "Checking espeak-ng-data:"
+          if [ -n "$ESPEAK_DATA_PATH" ] && [ -d "$ESPEAK_DATA_PATH" ]; then
+            echo "✓ Found espeak-ng-data at: $ESPEAK_DATA_PATH"
+            echo "  Number of files/directories: $(ls -1 "$ESPEAK_DATA_PATH" | wc -l)"
+            echo "  Sample contents:"
+            ls "$ESPEAK_DATA_PATH" | head -5
+          else
+            echo "✗ espeak-ng-data not found or ESPEAK_DATA_PATH not set"
+            echo "  Searching for espeak-ng-data:"
+            find . -type d -name "espeak-ng-data" 2>/dev/null | head -5
+          fi
+          echo ""
+          
           echo "Checking model file:"
           if [ -f "test/models/${{ matrix.model }}.onnx" ]; then
-            echo "Model found: test/models/${{ matrix.model }}.onnx"
+            echo "✓ Model found: test/models/${{ matrix.model }}.onnx"
             ls -la "test/models/${{ matrix.model }}.onnx"
           else
-            echo "Model not found: test/models/${{ matrix.model }}.onnx"
-            ls -la test/models/
+            echo "✗ Model not found: test/models/${{ matrix.model }}.onnx"
+            echo "  Contents of test/models:"
+            ls -la test/models/ 2>/dev/null || echo "  test/models directory does not exist"
           fi
           
           # Create test input
@@ -557,47 +657,50 @@ jobs:
           
           # Run basic TTS test with verbose output
           echo ""
-          echo "Running TTS for ${{ matrix.language }}..."
-          cat test_input.txt | $PIPER_CMD \
+          echo "=== Running TTS for ${{ matrix.language }} ==="
+          echo "Command: cat test_input.txt | $PIPER_CMD --model \"test/models/${{ matrix.model }}.onnx\" --output_file \"test_output_${{ matrix.language }}.wav\""
+          echo ""
+          
+          # First attempt
+          if cat test_input.txt | $PIPER_CMD \
             --model "test/models/${{ matrix.model }}.onnx" \
-            --output_file "test_output_${{ matrix.language }}.wav" 2>&1 || {
-            echo "TTS failed for ${{ matrix.language }}"
+            --output_file "test_output_${{ matrix.language }}.wav" 2>&1; then
+            echo "✓ TTS succeeded on first attempt"
+          else
+            EXIT_CODE=$?
+            echo "✗ TTS failed with exit code: $EXIT_CODE"
             echo ""
-            echo "Retrying with explicit ESPEAK_DATA_PATH in build directory..."
-            if [ -d "$PWD/build/ei/share/espeak-ng-data" ]; then
-              export ESPEAK_DATA_PATH=$PWD/build/ei/share/espeak-ng-data
-              echo "Retrying with ESPEAK_DATA_PATH=$ESPEAK_DATA_PATH"
-              cat test_input.txt | $PIPER_CMD \
-                --model "test/models/${{ matrix.model }}.onnx" \
-                --output_file "test_output_${{ matrix.language }}.wav" 2>&1 || {
-                echo "Retry with ei/share failed"
-                # Try pi/share as last resort
-                if [ -d "$PWD/build/pi/share/espeak-ng-data" ]; then
-                  export ESPEAK_DATA_PATH=$PWD/build/pi/share/espeak-ng-data
-                  echo "Retrying with ESPEAK_DATA_PATH=$ESPEAK_DATA_PATH"
-                  cat test_input.txt | $PIPER_CMD \
-                    --model "test/models/${{ matrix.model }}.onnx" \
-                    --output_file "test_output_${{ matrix.language }}.wav" 2>&1 || {
-                    echo "All retries failed"
-                    exit 1
-                  }
+            
+            # Retry with different ESPEAK_DATA_PATH locations
+            RETRY_SUCCESS=false
+            for retry_path in "$PWD/build/pi/share/espeak-ng-data" "$PWD/build/ei/share/espeak-ng-data" "$PWD/piper/share/espeak-ng-data"; do
+              if [ -d "$retry_path" ] && [ "$retry_path" != "$ESPEAK_DATA_PATH" ]; then
+                echo "Retrying with ESPEAK_DATA_PATH=$retry_path"
+                export ESPEAK_DATA_PATH=$retry_path
+                
+                if cat test_input.txt | $PIPER_CMD \
+                  --model "test/models/${{ matrix.model }}.onnx" \
+                  --output_file "test_output_${{ matrix.language }}.wav" 2>&1; then
+                  echo "✓ TTS succeeded with ESPEAK_DATA_PATH=$retry_path"
+                  RETRY_SUCCESS=true
+                  break
                 else
-                  exit 1
+                  echo "✗ Retry failed with ESPEAK_DATA_PATH=$retry_path"
                 fi
-              }
-            elif [ -d "$PWD/build/pi/share/espeak-ng-data" ]; then
-              export ESPEAK_DATA_PATH=$PWD/build/pi/share/espeak-ng-data
-              echo "Retrying with ESPEAK_DATA_PATH=$ESPEAK_DATA_PATH"
-              cat test_input.txt | $PIPER_CMD \
-                --model "test/models/${{ matrix.model }}.onnx" \
-                --output_file "test_output_${{ matrix.language }}.wav" 2>&1 || {
-                echo "Retry with pi/share also failed"
-                exit 1
-              }
-            else
+              fi
+            done
+            
+            if [ "$RETRY_SUCCESS" = "false" ]; then
+              echo ""
+              echo "ERROR: All TTS attempts failed for ${{ matrix.language }}"
+              echo "Final diagnostics:"
+              echo "- ESPEAK_DATA_PATH: ${ESPEAK_DATA_PATH:-not set}"
+              echo "- Working directory: $(pwd)"
+              echo "- Piper binary exists: $([ -f piper/bin/piper ] && echo 'yes' || echo 'no')"
+              echo "- Model exists: $([ -f "test/models/${{ matrix.model }}.onnx" ] && echo 'yes' || echo 'no')"
               exit 1
             fi
-          }
+          fi
           
           # Verify output
           if [ -f "test_output_${{ matrix.language }}.wav" ]; then
