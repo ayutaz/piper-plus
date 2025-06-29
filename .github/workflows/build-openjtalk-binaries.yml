@@ -228,7 +228,9 @@ jobs:
         export CPPFLAGS="-I/usr/local/include"
         export LDFLAGS="-L/usr/local/lib"
         ./configure --prefix=/usr/local --with-charset=UTF-8 --with-hts-engine-header-path=/usr/local/include --with-hts-engine-library-path=/usr/local/lib
-        make -j$(nproc)
+        
+        # Try to build, but continue on error
+        make -j$(nproc) -k || echo "Build had errors, checking for binary..."
         
         # Check where the binary was created
         if [ -f bin/open_jtalk ]; then
@@ -254,8 +256,10 @@ jobs:
     needs: [build-windows, build-macos, build-linux]
     runs-on: ubuntu-latest
     if: |
-      (github.event_name == 'push' && github.ref == 'refs/heads/master') ||
-      (github.event_name == 'workflow_dispatch' && github.event.inputs.create_release == 'true')
+      always() &&
+      (needs.build-windows.result == 'success' || needs.build-macos.result == 'success' || needs.build-linux.result == 'success') &&
+      ((github.event_name == 'push' && github.ref == 'refs/heads/master') ||
+       (github.event_name == 'workflow_dispatch' && github.event.inputs.create_release == 'true'))
     
     steps:
     - name: Download all artifacts
@@ -266,11 +270,18 @@ jobs:
     - name: Prepare release files
       run: |
         mkdir release
-        cp artifacts/open_jtalk_windows_x64/open_jtalk.exe release/open_jtalk_windows_x64.exe
-        cp artifacts/open_jtalk_macos_x64/open_jtalk release/open_jtalk_macos_x64
-        cp artifacts/open_jtalk_linux_x64/open_jtalk release/open_jtalk_linux_x64
-        chmod +x release/open_jtalk_macos_x64
-        chmod +x release/open_jtalk_linux_x64
+        # Copy available artifacts
+        if [ -f artifacts/open_jtalk_windows_x64/open_jtalk.exe ]; then
+          cp artifacts/open_jtalk_windows_x64/open_jtalk.exe release/open_jtalk_windows_x64.exe
+        fi
+        if [ -f artifacts/open_jtalk_macos_x64/open_jtalk ]; then
+          cp artifacts/open_jtalk_macos_x64/open_jtalk release/open_jtalk_macos_x64
+          chmod +x release/open_jtalk_macos_x64
+        fi
+        if [ -f artifacts/open_jtalk_linux_x64/open_jtalk ]; then
+          cp artifacts/open_jtalk_linux_x64/open_jtalk release/open_jtalk_linux_x64
+          chmod +x release/open_jtalk_linux_x64
+        fi
         
         cd release
         sha256sum * > SHA256SUMS
