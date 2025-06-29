@@ -1,0 +1,170 @@
+
+// Phonemes for Tamil
+// This inherits from ph_hindi
+
+
+phoneme @
+  vwl  starttype #@  endtype #@
+  length 130
+  FMT(vowel/V_2)
+endphoneme
+
+phoneme a
+  vwl  starttype #a  endtype #a
+  length 130
+  ChangeIfNotStressed(V)
+  FMT(vowel/a)
+endphoneme
+
+phoneme V
+  vwl  starttype #@  endtype #@
+  ipa ʌ
+  length 130
+  IF nextPh(isWordEnd) AND nextPh(m) THEN
+    ChangePhoneme(@)
+  ENDIF
+  FMT(vowel/V_3)
+endphoneme
+
+phoneme V#    // omit if the next phoneme is a vowel
+  vwl  starttype #@  endtype #@
+  length 130
+  IF nextPhW(isVowel) OR nextPhW(#) THEN
+    ChangePhoneme(NULL)
+  ENDIF
+  ChangePhoneme(V)
+endphoneme
+
+phoneme a:
+  vwl  starttype #a  endtype #a
+  length 300
+  FMT(vowel/a_5)
+endphoneme
+
+
+phoneme e
+  vwl  starttype #e  endtype #e
+  length 130
+  FMT(vowel/e)
+endphoneme
+
+
+phoneme e:
+  vwl  starttype #e  endtype #e
+  length 250
+  FMT(vowel/e)
+endphoneme
+
+
+phoneme i
+  vwl  starttype #i  endtype #i
+  length 130
+  IF thisPh(isWordEnd) AND thisPh(isNotStressed) THEN
+    FMT(vowel/ii_5)
+  ENDIF
+  FMT(vowel/i_6)
+endphoneme
+
+
+phoneme i:
+  vwl  starttype #i  endtype #i
+  length 270
+  FMT(vowel/i)
+endphoneme
+
+
+
+phoneme o
+  vwl  starttype #o  endtype #o
+  length 130
+  FMT(vowel/o)
+endphoneme
+
+
+phoneme o:
+  vwl  starttype #o  endtype #o
+  length 300
+  FMT(vowel/o)
+endphoneme
+
+
+phoneme u
+  vwl  starttype #u  endtype #u
+  length 110
+  ChangeIfNotStressed(U)
+  FMT(vowel/u_6)
+endphoneme
+
+phoneme u2   // as [u] but don't reduce
+  vwl  starttype #u  endtype #u
+  length 110
+  FMT(vowel/u_6)
+endphoneme
+
+phoneme U
+  vwl  starttype #u  endtype #u
+  ipa ʉ
+  length 110
+  FMT(vowel/u#_3)
+endphoneme
+
+phoneme u:
+  vwl  starttype #u  endtype #u
+  length 280
+  IF prevPhW(isVelar) THEN
+  ELSE
+    ChangeIfNotStressed(U:)
+  ENDIF
+  FMT(vowel/u_6)
+endphoneme
+
+phoneme U:
+  vwl  starttype #u  endtype #u
+  ipa ʉ
+  length 270
+  FMT(vowel/u#_3)
+endphoneme
+
+
+phoneme aI
+  vwl  starttype #a  endtype #i
+  length 280
+  FMT(vdiph/ai_8)
+endphoneme
+
+phoneme aU
+  vwl  starttype #a  endtype #u
+  length 270
+  FMT(vdiph/au)
+endphoneme
+
+
+
+phoneme t
+  import_phoneme base2/t    // dental
+endphoneme
+
+// ?? This is standard [v].  Should be it [v] without the fricative noise?
+phoneme v
+  import_phoneme base1/v
+endphoneme
+
+phoneme : //  Lengthen previous vowel by "length"
+  virtual
+  length 50
+endphoneme
+
+phoneme #    // a NULL phoneme for 'virama'
+  virtual
+  ChangePhoneme(NULL)
+endphoneme
+
+phoneme z.
+  CALL base1/z.
+  ipa U+027B
+endphoneme
+
+phoneme r
+  import_phoneme base1/r
+endphoneme
+

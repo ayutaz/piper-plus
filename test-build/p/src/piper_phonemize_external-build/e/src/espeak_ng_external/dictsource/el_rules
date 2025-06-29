@@ -1,0 +1,434 @@
+// Greek -modern
+ 
+// This file is UTF-8 encoded
+// all words lower case
+
+// Alphabet
+// Α α, Β β, Γ γ, Δ δ, Ε ε, Ζ ζ, Η η, Θ θ, Ι ι, Κ κ, Λ λ, Μ μ, Ν ν, Ξ ξ,
+// Ο ο, Π π, Ρ ρ, Σ σ ς (word-final form), Τ τ, Υ υ, Φ φ, Χ χ, Ψ ψ, Ω ω.
+
+// Letter group B:   θ κ ξ π ς σ τ φ χ  (voiceless consonants)
+// Letter group Y:   ε η ι υ  έ ή ί ύ  (front vowels).
+
+// TODO: Support combining marks/diacritics in the main rules.
+// TODO: Properly handle preserved polytonic combining marks (convert to standard combining mark codepoints).
+
+.L01 αι ε ι η υ οι ει  αί έ ί ή ύ οί εί 
+
+.replace
+// Map Greek Extended (1fxx) to Greek (03xx) for Polytonic character support (Unicode 8.0):
+ἀ	α // U+1f00
+ἁ	α // U+1f01
+ἂ	ά // U+1f02
+ἃ	ά // U+1f03
+ἄ	ά // U+1f04
+ἅ	ά // U+1f05
+ἆ	ά // U+1f06
+ἇ	ά // U+1f07
+
+ᾀ	α // U+1F80
+ᾁ	α // U+1F81
+ᾂ	α // U+1F82
+ᾃ	α // U+1F83
+ᾄ	α // U+1F84
+ᾅ	α // U+1F85
+ᾆ	α // U+1F86
+ᾇ	α // U+1F87
+
+ἐ	ε // U+1f10
+ἑ	ε // U+1f11
+ἒ	έ // U+1f12
+ἓ	έ // U+1f13
+ἔ	έ // U+1f14
+ἕ	έ // U+1f15
+
+ἠ	η // U+1f20
+ἡ	η // U+1f21
+ἢ	ή // U+1f22
+ἣ	ή // U+1f23
+ἤ	ή // U+1f24
+ἥ	ή // U+1f25
+ἦ	ή // U+1f26
+ἧ	ή // U+1f27
+
+ᾐ	η // U+1F90
+ᾑ	η // U+1F91
+ᾒ	η // U+1F92
+ᾓ	η // U+1F93
+ᾔ	η // U+1F94
+ᾕ	η // U+1F95
+ᾖ	η // U+1F96
+ᾗ	η // U+1F97
+
+ἰ	ι // U+1f30
+ἱ	ι // U+1f31
+ἲ	ί // U+1f32
+ἳ	ί // U+1f33
+ἴ	ί // U+1f34
+ἵ	ί // U+1f35
+ἶ	ί // U+1f36
+ἷ	ί // U+1f37
+
+ὀ	ο // U+1f40
+ὁ	ο // U+1f41
+ὂ	ό // U+1f42
+ὃ	ό // U+1f43
+ὄ	ό // U+1f44
+ὅ	ό // U+1f45
+
+ὐ	υ // U+1f50
+ὑ	υ // U+1f51
+ὒ	ύ // U+1f52
+ὓ	ύ // U+1f53
+ὔ	ύ // U+1f54
+ὕ	ύ // U+1f55
+ὖ	ύ // U+1f56
+ὗ	ύ // U+1f57
+
+ὠ	ω // U+1f60
+ὡ	ω // U+1f61
+ὢ	ώ // U+1f62
+ὣ	ώ // U+1f63
+ὤ	ώ // U+1f64
+ὥ	ώ // U+1f65
+ὦ	ώ // U+1f66
+ὧ	ώ // U+1f67
+
+ὰ	ά // U+1f70
+ά	ά // U+1f71
+ὲ	έ // U+1f72
+έ	έ // U+1f73
+ὴ	ή // U+1f74
+ή	ή // U+1f75
+ὶ	ί // U+1f76
+ί	ί // U+1f77
+ὸ	ό // U+1f78
+ό	ό // U+1f79
+ὺ	ύ // U+1f7a
+ύ	ύ // U+1f7b
+ὼ	ώ // U+1f7c
+ώ	ώ // U+1f7d
+
+ᾠ	ω // U+1fa0
+ᾡ	ω // U+1fa1
+ᾢ	ώ // U+1fa2
+ᾣ	ώ // U+1fa3
+ᾤ	ώ // U+1fa4
+ᾥ	ώ // U+1fa5
+ᾦ	ώ // U+1fa6
+ᾧ	ώ // U+1fa7
+
+ᾰ	α // U+1fb0
+ᾱ	α // U+1fb1
+ᾲ	ά // U+1fb2
+ᾳ	α // U+1fb3
+ᾴ	ά // U+1fb4
+ᾶ	ά // U+1fb6
+ᾷ	ά // U+1fb7
+
+῁	 ̈ // U+1fc1
+ῂ	ή // U+1fc2
+ῃ	η // U+1fc3
+ῄ	ή // U+1fc4
+ῆ	ή // U+1fc6
+ῇ	ή // U+1fc7
+῍	´ // U+1fcd
+῎	´ // U+1fce
+
+ῐ	ι // U+1fd0
+ῑ	ι // U+1fd1
+ῒ	ΐ // U+1fd2
+ΐ	ΐ // U+1fd3
+ῖ	ί // U+1fd6
+ῗ	ΐ // U+1fd7
+῝	´ // U+1fdd
+῞	´ // U+1fde
+
+ῠ	υ // U+1fe0
+ῡ	υ // U+1fe1
+ῢ	ΰ // U+1fe2
+ΰ	ΰ // U+1fe3
+ῤ	ρ // U+1fe4
+ῥ	ρ // U+1fe5
+ῦ	ύ // U+1fe6
+ῧ	ΰ // U+1fe7
+῭	΅ // U+1fed
+`	´ // U+1fef
+
+ῲ	ώ // U+1ff2
+ῳ	ω // U+1ff3
+ῴ	ώ // U+1ff4
+ῶ	ώ // U+1ff6
+ῷ	ώ // U+1ff7
+
+// replace variant letter forms with their standard equivalents
+ϐ	β    // U+03d0
+ϑ	θ    // U+03d1
+ϒ	υ    // U+03d2
+ϕ	φ    // U+03d5
+ϖ	π    // U+03d6
+ϰ	κ    // U+03f0
+ϱ	ρ    // U+03f1
+ϲ	ς    // U+03f2
+ϴ	θ    // U+03f4
+ϵ	ε    // U+03f5
+Ϲ	ς    // U+03f9
+
+.group α
+           α        a
+           αι       e
+           αί       'e
+           αυ       av
+           αυ (B    af      // +voiceless consonant κ, π, τ, χ, θ, σ, ξ.
+           αύ      'av
+           αύ (B   'af      // +voiceless consonant κ, π, τ, χ, θ, σ, ξ.
+           αη       aI
+           αϊ       aI
+
+.group β
+           β        v
+           β (β
+
+.group γ
+           γ        Q
+           γγ       g
+           γκ       g
+        A) γγ       Ng
+        A) γκ       Ng
+           γ (χ     N
+           γ (L01   j
+           γαι (A   j
+           γε (A    j
+           γι (A    j
+           γη (A    j
+           γυ (A    j
+           γοι (A   j
+           γει (A   j
+
+.group δ
+           δ        D
+           δ (δ
+
+
+.group ε
+           ε        e
+           ει       i
+           εί       'i
+        C) ει (A    C
+           ευ       ev
+           ευ (B    ef      // +voiceless consonant
+           ευ (β    e
+           ευ (φ    e
+           εύ      'ev
+           εύ (B   'ef      // +voiceless consonant
+           εύ (β   'e
+           εύ (φ   'e
+
+.group ζ
+           ζ        z
+           ζ (ζ
+           ζη (A    zj
+           ζι (A    zj
+           ζυ (A    zj
+           ζει (A   zj
+           ζοι (A   zj
+
+.group η
+           η        i
+//        C) η (A     ;
+           ηυ       iv
+           ηυ (B    if      // +voiceless consonant
+
+.group θ
+           θ        T
+           θ (θ
+
+.group ι
+           ι        i
+	τ) ι (Α     C
+        π) ι (A     C
+	τ) ι (Α     C
+        κ) ι (Α     C
+	ρ) ι (A     i
+        δ) ι (α_    j
+           ι (ε     i
+
+.group κ
+           κ        k
+           κ (κ
+       ν_) κ        g
+
+           κ (Y     c
+           κ (αι    c
+           κ (αί    c
+           κ (οι    c
+           κ (οί    c
+
+           κη (A    c  // k + i sound = [c]
+           κι (A    c
+           κυ (A    c
+           κει (A   c
+           κοι (A   c
+
+
+.group λ
+           λ        l
+           λ (λ
+           λη (A    l^
+           λι (A    l^
+           λυ (A    l^
+           λει (A   l^
+           λοι (A   l^
+
+.group μ
+           μ        m
+        A) μ (μ
+           μ (π     
+
+.group μπ
+	  μπ	b
+
+.group ν
+           ν        n
+           ν (ν
+           ντ       d  // always? or not after a vowel?
+           ν (_π    m
+           ν (_ψ    m
+           ν (_κ    N
+           ν (_και_  n  // there is a pause before και
+           ν (_ξ    N
+
+           νη (A    n^
+           νι (A    n^
+           νυ (A    n^
+           νει (A   n^
+           νοι (A   n^
+
+
+.group ξ
+           ξ        ks
+           ξ (ξ
+       ν_) ξ        gz
+
+.group ο
+           ο        o
+           οι       i
+           οί       'i
+ //       C) οι (A    ;
+           ου       u
+           ού       'u
+           οη       oI
+           οϊ       oI
+
+.group π
+           π        p
+           π (π
+       ν_) π        b
+        μ) π	    b
+
+.group ρ
+           ρ        r
+           ρρ       r
+        A) ρ (A     r
+        C) ρ        r
+
+       αυ) ρ        r   // υ  becomes consionant [v]
+       αύ) ρ        r
+       ευ) ρ        r
+       εύ) ρ        r
+       ηυ) ρ        r
+       ηύ) ρ        r
+
+
+.group σ
+           σ        s
+// ??          σ (σ
+           ση (A    sj
+           σι (A    sj
+           συ (A    sj
+           σει (A   sj
+           σοι (A   sj
+
+.group ς
+           ς        s
+           ς (_B    s    // +voiceless consonant
+           ς (_C    z
+
+.group τ
+           τ        t
+           τ (τ
+           τσ       ts
+           τζ       dz
+       ν_) τ        d
+       ν_) τσ       dz
+
+.group υ
+           υ        i
+//        C) υ (A     ;
+           υι       i
+           υί       'i
+
+.group φ
+           φ        f
+           φ (φ
+
+.group χ
+           χ        x
+           χ (Y     C
+           χ (αι    C
+           χ (αί    C
+           χ (οι    C
+           χ (οί    C
+
+           χει (A   C
+           χη (A    C
+           χι (A    C
+           χοι (A   C
+           χυ (A    C
+
+.group ψ
+           ψ        ps
+           ψ (ψ
+       ν_) ψ        bz
+
+.group ω
+           ω        o
+
+
+
+.group
+           ά        'a
+           άη       'aI
+           άι       'aI
+           έ        'e
+           ή        'i
+           ί        'i
+           ΐ        'i   // dialytika + tonos
+           ϊ        i
+           ϋ        i
+           ό        'o
+           όη       'oI
+           όι       'oI
+           ύ        'i
+           ΰ        'i   // dialytika + tonos
+           ώ        'o
+
+            ̓            // U+1fbd
+           ι            // U+1fbe
+            ̓            // U+1fbf
+
+             ͂           // U+1fc0
+           ῏            // U+1fcf
+
+           ῟            // U+1fdf
+
+            ̔            // U+1ffe
+
+           ͅ		// combining ypogegrammeni
+           
+           .        tel'ia
+           , (D     k'oma
+           !        Tavmastik'o
+        !) !
+
+

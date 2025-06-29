@@ -1,0 +1,311 @@
+ 
+//====================================================
+//  Tone Numbers
+//====================================================
+
+
+phoneme 1   //  tone: high level
+  stress
+  Tone(50, 50, envelope/p_level, NULL)
+endphoneme
+
+
+phoneme 2   //  tone: rise
+  stress
+  Tone(30, 50, envelope/p_rise, NULL)
+endphoneme
+
+
+phoneme 3   //  tone: mid level
+  stress
+  Tone(30, 30, envelope/p_level, NULL)
+endphoneme
+
+
+phoneme 4   //  tone: low fall
+  stress
+  Tone(20, 10, envelope/p_fall, NULL)
+endphoneme
+
+
+phoneme 5   //  tone: low rise
+  stress
+  Tone(10, 30, envelope/p_rise, NULL)
+endphoneme
+
+
+phoneme 6   //  tone: low level
+  stress
+  Tone(20, 20, envelope/p_level, NULL)
+endphoneme
+
+
+phoneme 7   //  tone: high fall
+  stress
+  Tone(50, 30, envelope/p_fall, NULL)
+endphoneme
+
+
+//====================================================
+//  Consonants
+//====================================================
+
+
+phoneme z  // [ts]
+  vls alv afr sib
+  lengthmod 2
+  Vowelin f1=0  f2=1700 -300 300  f3=-100 80
+  Vowelout f1=0 f2=1700 -300 250  f3=-100 80  rms=20
+  WAV(ustop/ts)
+endphoneme
+
+
+phoneme c  // [tS]
+  vls pla afr sib
+  lengthmod 2
+  Vowelin f1=0  f2=2300 200 400  f3=-100 80
+  IF nextPh(isPause2) THEN
+    WAV(ustop/tsh_)
+  ENDIF
+  WAV(ustop/tsh)
+endphoneme
+
+
+phoneme k
+  vls vel stp
+  lengthmod 2
+  Vowelin f1=0  f2=2300 200 300  f3=-200 80
+  Vowelout f1=1 f2=2300 300 400  f3=-200 80  rms=20
+
+  IF nextPh(isPause2) THEN
+    WAV(NULL)
+  ENDIF
+  IF nextPh(#i) THEN
+    WAV(ustop/ki)
+  ENDIF
+  IF nextPh(r) OR nextPh(R) THEN
+    WAV(ustop/kr)
+  ENDIF
+  IF nextPh(l) THEN
+    WAV(ustop/kl)
+  ENDIF
+  IF nextPh(@-) THEN
+    WAV(ustop/k_unasp,70)
+  ENDIF
+
+  WAV(ustop/k)
+endphoneme
+
+
+phoneme p
+  vls blb stp
+  lengthmod 2
+  Vowelin  f1=0  f2=1000 -50 -100  f3=-200 80 rms=30
+  Vowelout f1=1  f2=1000 -500 -350  f3=-300 80 rms=22
+  IF nextPh(isPause2) THEN
+    WAV(NULL)
+  ENDIF
+  WAV(ustop/p)
+endphoneme
+
+phoneme t
+  vls alv stp
+  lengthmod 2
+  Vowelin f1=0  f2=1700 -300 300  f3=100 80
+  Vowelout f1=1 f2=1700 -300 250  f3=-100 80  rms=20
+  IF nextPh(isPause2) THEN
+    WAV(NULL)
+  ENDIF
+  WAV(ustop/t)
+endphoneme
+
+
+//====================================================
+//  Vowels and Diphtnongs
+//====================================================
+
+phoneme aa
+  vwl starttype #a endtype #a
+  length 230
+  FMT(vowel/aa)
+endphoneme
+
+phoneme aai
+  vwl starttype #a endtype #i
+  length 270
+  FMT(vdiph/aai)
+endphoneme
+
+phoneme aau
+  vwl starttype #a endtype #u
+  length 260
+  FMT(vdiph/aau_2)
+endphoneme
+
+phoneme ang
+  vwl starttype #a endtype #a
+  length 220
+  FMT(vwl_zh/ang)
+endphoneme
+
+phoneme aang
+  vwl starttype #a endtype #a
+  length 270
+  FMT(vwl_zh/aang)
+endphoneme
+
+phoneme a
+  vwl  starttype #@  endtype #@
+  length 150
+  FMT(vowel/a#_3)
+endphoneme
+
+phoneme ai
+  vwl starttype #@ endtype #i
+  length 200
+  FMT(vdiph/@i_3)
+endphoneme
+
+phoneme au
+  vwl starttype #a endtype #u
+  length 200
+  FMT(vdiph/au_2)
+endphoneme
+
+phoneme e
+  vwl starttype #e endtype #e
+  length 220
+  FMT(vowel/ee_1)
+endphoneme
+
+phoneme ei
+  vwl starttype #e endtype #i
+  length 220
+  FMT(vdiph/ei)
+endphoneme
+
+phoneme eng
+  vwl starttype #e endtype #e
+  length 220
+  FMT(vwl_zh/eng)
+endphoneme
+
+phoneme eu
+  vwl starttype #e endtype #u
+  length 260
+  FMT(vdiph/eeu)
+endphoneme
+
+phoneme i
+  vwl  starttype #i  endtype #i
+  length 190
+  IfNextVowelAppend(;)
+
+  IF nextPhW(k) OR nextPhW(N) THEN
+    length 150
+    FMT(vowel/ii)
+  ENDIF
+
+  FMT(vowel/i)
+endphoneme
+
+phoneme ing
+  vwl starttype #i endtype #i
+  length 220
+  FMT(vwl_zh/ing)
+endphoneme
+
+phoneme iu
+  vwl starttype #i endtype #u
+  length 200
+  FMT(vdiph2/iu)
+endphoneme
+
+phoneme ng   // synonym for [N]
+  vwl //  starttype ng  endtype ng
+  length 350
+  IF nextPh(isVowel) THEN
+    ChangePhoneme(N)
+  ENDIF
+  FMT(vwl_zh/ng)
+endphoneme
+
+phoneme o
+  vwl starttype #o endtype #o
+  length 170
+  FMT(vowel/oo)
+endphoneme
+
+phoneme oeng
+  vwl starttype #o endtype #e
+  length 280
+  FMT(vwl_zh/oeng)
+endphoneme
+
+phoneme oi
+  vwl starttype #o endtype #i
+  length 200
+  FMT(vdiph/ooi)
+endphoneme
+
+phoneme ou
+  vwl starttype #o endtype #u
+  length 200
+  FMT(vdiph/ou)
+endphoneme
+
+phoneme ong
+  vwl starttype #o endtype #o 
+  length 220
+  FMT(vwl_zh/ong)
+endphoneme
+
+
+phoneme u
+  vwl starttype #u endtype #u
+  length 170
+  IF nextPhW(k) OR nextPhW(N) THEN
+    FMT(vowel/uu_bck)
+  ENDIF
+
+  FMT(vowel/u_bck)
+endphoneme
+
+phoneme ung
+  vwl starttype #u endtype #u
+  length 200
+  FMT(vwl_zh/ung)
+endphoneme
+
+phoneme ui
+  vwl starttype #u endtype #i
+  length 220
+  FMT(vdiph/ui)
+endphoneme
+
+
+phoneme oe
+  vwl  starttype #@  endtype #@
+  length 230
+  FMT(vowel/y#)
+endphoneme
+
+
+phoneme eo
+  vwl  starttype #@  endtype #@
+  length 170
+  FMT(vowel/8_3)
+endphoneme
+
+phoneme eoi
+  vwl  starttype #@  endtype #i
+  length 220
+  FMT(vdiph/y#y_2)
+endphoneme
+
+phoneme yu
+  vwl  starttype #u  endtype #u
+  length 220
+  FMT(vowel/y)
+endphoneme
+

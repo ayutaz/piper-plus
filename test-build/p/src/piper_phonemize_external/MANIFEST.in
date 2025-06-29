@@ -1,0 +1,4 @@
+include LICENSE.md
+include README.md
+recursive-include piper_phonemize/espeak-ng-data *
+include piper_phonemize/libtashkeel_model.ort

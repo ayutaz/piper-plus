@@ -1,0 +1,45 @@
+// words with a single light syllable which should not be stressed
+
+// conjunctions:
+a	$u
+an	$u
+ar	$u
+hya	$u
+i	$u
+mal	$u
+nan	$u
+o	$u
+qui	$u
+ta	$u
+var	$u
+// prepositions:
+et	$u
+han	$u
+ho	$u
+lo	$u
+mi	$u
+mil	$u
+no	$u
+nu	$u
+or	$u
+pa	$u
+po	$u
+tar	$u
+ter	$u
+va	$u
+ve	$u
+yo	$u
+
+// Native Numbers 0-10
+
+_0 _!
+_1 m'inE
+_2 'at:a
+_3 n'EldE
+_4 k'anta
+_5 l'Empe
+_6 'EnkwE
+_7 'otso
+_8 t'olto
+_9 n'ErtE
+_10 kw'aIn

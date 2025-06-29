@@ -1,0 +1,90 @@
+
+//====================================================
+//  Greek  - based on base2
+//====================================================
+
+
+phoneme a
+  vwl starttype #a endtype #a
+  length 140
+
+  IF thisPh(isWordEnd) AND thisPh(isNotStressed) AND nextPh(a) THEN
+    ChangePhoneme(NULL)
+  ENDIF
+
+  IF thisPh(isDiminished) THEN
+    FMT(vowel/a_4)
+  ENDIF
+  FMT(vowel/a_2)
+endphoneme
+
+
+phoneme e
+  vwl starttype #e endtype #e
+  length 140
+  FMT(vowel/e_mid2)
+endphoneme
+
+phoneme i
+  vwl starttype #i endtype #i
+  length 140
+  IfNextVowelAppend(;)
+  FMT(vowel/i)
+endphoneme
+
+phoneme o
+  vwl starttype #o endtype #o
+  length 150
+  FMT(vowel/oo)
+endphoneme
+
+phoneme u
+  vwl starttype #u endtype #u
+  length 160
+  FMT(vowel/u_bck)
+endphoneme
+
+
+// CONSONANTS
+
+phoneme t         // revert to alveolar /t/
+  vls alv stp
+  lengthmod 2
+  voicingswitch d
+  Vowelin f1=1  f2=1600 -300 300  f3=-100 80  amp=11
+  Vowelout f1=0 f2=1600 -300 250  f3=-100 80  rms=20
+  IF nextPh(isPause2) THEN
+    WAV(ustop/t_unasp2)
+  ENDIF
+  WAV(ustop/t_unasp2)
+endphoneme
+
+
+phoneme d         // revert to alveolar /d/
+  import_phoneme base1/d
+  voicingswitch t
+endphoneme
+
+
+phoneme k
+  vls vel stp
+  lengthmod 2
+  voicingswitch g
+  Vowelin f1=0  f2=2300 200 400  f3=-100 80
+  Vowelout f1=0 f2=2300 300 400  f3=-100 80  rms=20
+
+  IF nextPh(isPause2) THEN
+    WAV(ustop/k_)
+  ELIF nextPh(isRhotic) THEN
+    WAV(ustop/kr)
+  ELIF nextPh(l) THEN
+    WAV(ustop/kl)
+  ENDIF
+  WAV(ustop/k_unasp, 70)
+endphoneme
+
+
+phoneme r
+  import_phoneme base1/R3
+endphoneme
+

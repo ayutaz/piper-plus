@@ -1,0 +1,52 @@
+
+phoneme i
+  vwl starttype #i endtype #i
+  length 170
+  IfNextVowelAppend(;)
+  FMT(vowel/i)
+endphoneme
+
+
+phoneme E
+  vwl starttype #e endtype #e
+  length 170
+  FMT(vowel/e_mid)
+endphoneme
+
+
+phoneme A
+  vwl starttype #a endtype #a
+  length 180
+  FMT(vowel/aa_3)
+endphoneme
+
+
+phoneme o
+  vwl starttype #o endtype #o
+  length 170
+  FMT(vowel/oo)
+endphoneme
+
+
+phoneme u
+  vwl starttype #u endtype #u
+  length 170
+  FMT(vowel/u)
+endphoneme
+
+
+
+phoneme eI
+  vwl  starttype #e  endtype #i
+  length 210
+  FMT(vdiph/eei)
+endphoneme
+
+
+phoneme aU
+  vwl  starttype #a  endtype #u
+  length 230
+  FMT(vdiph/au)
+endphoneme
+
+ 

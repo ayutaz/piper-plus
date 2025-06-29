@@ -1,0 +1,237 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{A47A0CFD-FE52-40B4-8CEC-EE1BD4282CDD}</ProjectGuid>
+    <Keyword>Win32Proj</Keyword>
+    <RootNamespace>libespeakng</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="Shared">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <LinkIncremental>true</LinkIncremental>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <LinkIncremental>true</LinkIncremental>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <LinkIncremental>false</LinkIncremental>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <LinkIncremental>false</LinkIncremental>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <WarningLevel>TurnOffAllWarnings</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)/../include;$(ProjectDir)/../pcaudiolib/src/include;$(ProjectDir)/../speechPlayer/include;$(ProjectDir)/../include/compat;$(ProjectDir)/../ucd-tools/src/include</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>LIBESPEAK_NG_EXPORT;USE_KLATT=1;USE_SPEECHPLAYER=1;USE_MBROLA=1;USE_LIBPCAUDIO=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ProgramDataBaseFileName>$(IntDir)libespeak-ng.pdb</ProgramDataBaseFileName>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <ModuleDefinitionFile>libespeak-ng.def</ModuleDefinitionFile>
+      <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <WarningLevel>TurnOffAllWarnings</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <PreprocessorDefinitions>LIBESPEAK_NG_EXPORT;USE_KLATT=1;USE_SPEECHPLAYER=1;USE_MBROLA=1;USE_LIBPCAUDIO=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ProgramDataBaseFileName>$(IntDir)libespeak-ng.pdb</ProgramDataBaseFileName>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)/../include;$(ProjectDir)/../pcaudiolib/src/include;$(ProjectDir)/../speechPlayer/include;$(ProjectDir)/../include/compat;$(ProjectDir)/../ucd-tools/src/include</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <ModuleDefinitionFile>libespeak-ng.def</ModuleDefinitionFile>
+      <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <WarningLevel>TurnOffAllWarnings</WarningLevel>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)/../include;$(ProjectDir)/../pcaudiolib/src/include;$(ProjectDir)/../speechPlayer/include;$(ProjectDir)/../include/compat;$(ProjectDir)/../ucd-tools/src/include</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>LIBESPEAK_NG_EXPORT;USE_KLATT=1;USE_SPEECHPLAYER=1;USE_MBROLA=1;USE_LIBPCAUDIO=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ProgramDataBaseFileName>$(IntDir)libespeak-ng.pdb</ProgramDataBaseFileName>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <ModuleDefinitionFile>libespeak-ng.def</ModuleDefinitionFile>
+      <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>TurnOffAllWarnings</WarningLevel>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <PreprocessorDefinitions>LIBESPEAK_NG_EXPORT;USE_KLATT=1;USE_SPEECHPLAYER=1;USE_MBROLA=1;USE_LIBPCAUDIO=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ProgramDataBaseFileName>$(IntDir)libespeak-ng.pdb</ProgramDataBaseFileName>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)/../include;$(ProjectDir)/../pcaudiolib/src/include;$(ProjectDir)/../speechPlayer/include;$(ProjectDir)/../include/compat;$(ProjectDir)/../ucd-tools/src/include</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <ModuleDefinitionFile>libespeak-ng.def</ModuleDefinitionFile>
+      <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="..\libespeak-ng\common.c" />
+    <ClCompile Include="..\libespeak-ng\soundicon.c" />
+    <ClCompile Include="..\libespeak-ng\translateword.c" />
+    <ClCompile Include="..\ucd-tools\src\case.c" />
+    <ClCompile Include="..\ucd-tools\src\categories.c" />
+    <ClCompile Include="..\ucd-tools\src\ctype.c" />
+    <ClCompile Include="..\ucd-tools\src\proplist.c" />
+    <ClCompile Include="..\ucd-tools\src\scripts.c" />
+    <ClCompile Include="..\ucd-tools\src\tostring.c" />
+    <ClCompile Include="..\libespeak-ng\compiledata.c" />
+    <ClCompile Include="..\libespeak-ng\compiledict.c" />
+    <ClCompile Include="..\libespeak-ng\compilembrola.c" />
+    <ClCompile Include="..\libespeak-ng\dictionary.c" />
+    <ClCompile Include="..\libespeak-ng\encoding.c" />
+    <ClCompile Include="..\libespeak-ng\error.c" />
+    <ClCompile Include="..\libespeak-ng\espeak_api.c" />
+    <ClCompile Include="..\libespeak-ng\ieee80.c" />
+    <ClCompile Include="..\libespeak-ng\intonation.c" />
+    <ClCompile Include="..\libespeak-ng\klatt.c" />
+    <ClCompile Include="..\libespeak-ng\langopts.c" />
+    <ClCompile Include="..\libespeak-ng\mbrowrap.c" />
+    <ClCompile Include="..\libespeak-ng\mnemonics.c" />
+    <ClCompile Include="..\libespeak-ng\numbers.c" />
+    <ClCompile Include="..\libespeak-ng\phoneme.c" />
+    <ClCompile Include="..\libespeak-ng\phonemelist.c" />
+    <ClCompile Include="..\libespeak-ng\readclause.c" />
+    <ClCompile Include="..\libespeak-ng\setlengths.c" />
+    <ClCompile Include="..\libespeak-ng\spect.c" />
+    <ClCompile Include="..\libespeak-ng\speech.c" />
+    <ClCompile Include="..\libespeak-ng\sPlayer.c" />
+    <ClCompile Include="..\libespeak-ng\ssml.c" />
+    <ClCompile Include="..\libespeak-ng\synthdata.c" />
+    <ClCompile Include="..\libespeak-ng\synthesize.c" />
+    <ClCompile Include="..\libespeak-ng\synth_mbrola.c" />
+    <ClCompile Include="..\libespeak-ng\translate.c" />
+    <ClCompile Include="..\libespeak-ng\tr_languages.c" />
+    <ClCompile Include="..\libespeak-ng\voices.c" />
+    <ClCompile Include="..\libespeak-ng\wavegen.c" />
+    <ClCompile Include="..\pcaudiolib\src\audio.c" />
+    <ClCompile Include="..\pcaudiolib\src\windows.c" />
+    <ClCompile Include="..\pcaudiolib\src\xaudio2.cpp" />
+    <ClCompile Include="..\speechPlayer\src\frame.cpp" />
+    <ClCompile Include="..\speechPlayer\src\speechPlayer.cpp" />
+    <ClCompile Include="..\speechPlayer\src\speechWaveGenerator.cpp" />
+    <ClCompile Include="com\comentrypoints.c" />
+    <ClCompile Include="com\ttsengine.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\include\espeak-ng\espeak_ng.h" />
+    <ClInclude Include="..\include\espeak-ng\speak_lib.h" />
+    <ClInclude Include="..\libespeak-ng\common.h" />
+    <ClInclude Include="..\libespeak-ng\error.h" />
+    <ClInclude Include="..\libespeak-ng\klatt.h" />
+    <ClInclude Include="..\libespeak-ng\langopts.h" />
+    <ClInclude Include="..\libespeak-ng\mbrowrap.h" />
+    <ClInclude Include="..\libespeak-ng\phoneme.h" />
+    <ClInclude Include="..\libespeak-ng\sintab.h" />
+    <ClInclude Include="..\libespeak-ng\soundicon.h" />
+    <ClInclude Include="..\libespeak-ng\spect.h" />
+    <ClInclude Include="..\libespeak-ng\speech.h" />
+    <ClInclude Include="..\libespeak-ng\sPlayer.h" />
+    <ClInclude Include="..\libespeak-ng\synthesize.h" />
+    <ClInclude Include="..\libespeak-ng\translate.h" />
+    <ClInclude Include="..\libespeak-ng\translateword.h" />
+    <ClInclude Include="..\libespeak-ng\voice.h" />
+    <ClInclude Include="..\pcaudiolib\src\audio_priv.h" />
+    <ClInclude Include="..\pcaudiolib\src\include\pcaudiolib\audio.h" />
+    <ClInclude Include="..\include\ucd-tools\src\include\ucd\ucd.h" />
+    <ClInclude Include="config.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="libespeak-ng.def" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

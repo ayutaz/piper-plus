@@ -1,0 +1,162 @@
+
+
+//=========================================================
+// Swedish
+//=========================================================
+
+
+// Vowels
+//=======
+
+phoneme i:
+  vwl starttype #i endtype #i
+  length 180
+  IfNextVowelAppend(;)
+  IF prevPh(w) THEN
+    VowelStart(w/wi2)
+  ENDIF
+  FMT(vowel/i_2)
+endphoneme
+
+phoneme I
+  vwl starttype #i endtype #i
+  length 130
+  IfNextVowelAppend(;)
+  FMT(vowel/ii_3)
+endphoneme
+
+phoneme e:
+  vwl starttype #e endtype #e
+  length 210
+  FMT(vowel/e_2)
+endphoneme
+
+phoneme E
+  vwl starttype #e endtype #e
+  length 140
+  ChangeIfUnstressed(E-)
+  FMT(vowel/ee)
+endphoneme
+
+phoneme E:
+  vwl  starttype #e  endtype #@
+  length 220
+  FMT(vowel/ee_1)
+endphoneme
+
+phoneme E3
+  vwl starttype #e endtype #e
+  length 140
+  ChangeIfDiminished(@)
+  FMT(vowel/ee_6)
+endphoneme
+
+phoneme E-
+  vwl starttype #@ endtype #@
+  ipa ə
+  unstressed
+  length 140
+  FMT(vowel/ee#_2)
+endphoneme
+
+
+
+phoneme y:
+  vwl starttype #u endtype #u
+  length 220
+  FMT(vowel/y_5)
+endphoneme
+
+phoneme y
+  vwl starttype #u endtype #u
+  length 140
+  FMT(vowel/yy_3)
+endphoneme
+
+phoneme u-
+  vwl starttype #u endtype #u
+  ipa ʉ
+  length 200
+  FMT(vowel/u#_2)
+endphoneme
+
+phoneme Y:
+  vwl starttype #@ endtype #@
+  length 220
+  FMT(vowel/y#_2)
+endphoneme
+
+phoneme W
+  vwl starttype #@ endtype #@
+  length 140
+  FMT(vowel/oe_4)
+endphoneme
+
+phoneme 8
+  vwl starttype #u endtype #u
+  length 140
+  FMT(vowel/8_2)
+endphoneme
+
+
+
+phoneme a
+  vwl starttype #a endtype #a
+  length 140
+  IF thisPh(isNotStressed) AND thisPh(isWordEnd) THEN
+    FMT(vowel/a#_2)
+  ENDIF
+  FMT(vowel/a_5)
+endphoneme
+
+phoneme &
+  vwl starttype #a endtype #a
+  length 140
+  FMT(vowel/&)
+endphoneme
+
+phoneme A:
+  vwl starttype #a endtype #a
+  length 250
+  FMT(vowel/aa_4)
+endphoneme
+
+phoneme O
+  vwl starttype #o endtype #o
+  length 140
+  FMT(vowel/oo)
+endphoneme
+
+phoneme o:
+  vwl starttype #o endtype #o
+  length 210
+  FMT(vowel/o)
+endphoneme
+
+phoneme U
+  vwl starttype #u endtype #u
+  length 140
+  FMT(vowel/uu_4)
+endphoneme
+
+phoneme u:
+  vwl starttype #u endtype #u
+  length 210
+  FMT(vowel/u_bck)
+endphoneme
+
+
+//===================================================
+
+// CONSONANTS
+//===========
+
+
+phoneme sx        // Swedish "sj" sound
+  vls vel frc
+  lengthmod 3
+  Vowelin f1=0  f2=2300 300 400  f3=200 100
+  Vowelout f1=0 f2=2300 300 400  f3=200 100  rms=20
+  WAV(ufric/sx_sv, 60)
+endphoneme
+

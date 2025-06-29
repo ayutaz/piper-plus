@@ -1,0 +1,69 @@
+// This file is UTF-8 encoded
+// Māori
+
+// vowels
+
+.group a
+             a            a
+             ae	aI
+             ai	aI
+             ao	aU
+             au	au"
+
+.group ā
+             ā            a:
+
+.group e
+             e            e
+
+.group ē
+             ē            e:
+
+.group i
+             i            i
+
+.group ī
+             ī            i:
+
+.group o
+             o            O
+             oe	we
+             oi	oI
+             ou	ou"
+
+.group ō
+             ō            O:
+
+.group u
+             u            u"
+
+.group ū
+             ū            u":
+
+// consonants
+
+.group h
+             h            h
+
+.group k
+             k            k
+
+.group m
+             m            m
+
+.group n
+             n            n
+             ng           N
+
+.group p
+             p            p
+
+.group r
+             r            R
+
+.group t
+             t            t
+
+.group w
+             w            w
+             wh           f

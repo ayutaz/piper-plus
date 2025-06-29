@@ -1,0 +1,247 @@
+
+
+//*******************************************************************
+// VOWELS
+//*******************************************************************
+
+phoneme @    //  Schwa
+  vwl   starttype #@  endtype #@
+  unstressed
+  length 140
+  IfNextVowelAppend(r-)
+  FMT(vowel/@_fnt)
+endphoneme
+
+
+phoneme @2   //  Schwa, changes to I before a vowel
+  vwl  starttype #@  endtype #@
+  unstressed
+  length 120
+  IF nextPh(isVowel) THEN
+    ChangePhoneme(I2)
+  ENDIF
+  FMT(vowel/@_fnt)
+endphoneme
+
+
+phoneme a
+  vwl  starttype #a  endtype #a
+  length 160
+  FMT(vowel/a_2)
+endphoneme
+
+
+phoneme E
+  vwl  starttype #e  endtype #e
+  length 170
+  IF nextPhW(n) THEN
+    ChangeIfDiminished(@)
+  ELSE
+    ChangeIfDiminished(I2)
+  ENDIF
+  FMT(vowel/e)
+endphoneme
+
+
+phoneme I
+  vwl  starttype #i endtype #i
+  length 140
+  IfNextVowelAppend(;)
+  FMT(vowel/ii_6)
+endphoneme
+
+
+phoneme I2
+  vwl  starttype #i endtype #i
+  unstressed
+  length 140
+  IfNextVowelAppend(;)
+  FMT(vowel/ii_6)
+endphoneme
+
+
+phoneme I2#   // used for [I] in -ed adjectives which may be [E] in some accents
+  vwl  starttype #@  endtype #@
+  unstressed
+
+  IfNextVowelAppend(;)
+  ChangePhoneme(E)
+endphoneme
+
+
+phoneme i   //  optional variant of [I] for end of words
+  vwl  starttype #i  endtype #i
+  length 150
+  IfNextVowelAppend(;)
+  FMT(vowel/i)
+endphoneme
+
+
+phoneme 0
+  vwl  starttype #a   endtype #a
+  length 140
+  FMT(vowel/aa#)
+endphoneme
+
+
+phoneme V
+  vwl  starttype #o  endtype #o
+  length 140
+  FMT(vowel/oo_4)
+endphoneme
+
+
+phoneme U
+  vwl  starttype #o  endtype #o
+  length 150
+  FMT(vowel/uu_bck)
+endphoneme
+
+
+phoneme a#
+  vwl  starttype #@  endtype #@
+  unstressed
+  length 140
+  FMT(vowel/a#)
+endphoneme
+
+
+phoneme A:
+  vwl  starttype #a  endtype #@
+  length 240
+  FMT(vowel/a_2)
+endphoneme
+
+
+phoneme A@
+  vwl  starttype #a  endtype #@
+  length 260
+  IfNextVowelAppend(r-)
+  FMT(vowel/a_2)
+endphoneme
+
+
+phoneme aa   //   'bath' etc.
+  vwl  starttype #a  endtype #a
+  length 210
+  FMT(vowel/a_2)
+endphoneme
+
+
+phoneme 3:
+  vwl  starttype #o  endtype #o
+  length 240
+  IfNextVowelAppend(r-)
+  FMT(vowel/oo_4)
+endphoneme
+
+
+phoneme i:
+  vwl  starttype #i  endtype #i
+  length 190
+  IfNextVowelAppend(;)
+  FMT(vowel/i_fnt)
+endphoneme
+
+
+phoneme O:
+  vwl  starttype #o  endtype #o
+  length 240
+  FMT(vowel/oo)
+endphoneme
+
+
+phoneme O@
+  vwl  starttype #o  endtype #@
+  length 240
+  IfNextVowelAppend(r-)
+  FMT(vowel/oo)
+endphoneme
+
+
+phoneme o@
+  vwl  starttype #o  endtype #@
+  length 240
+  IfNextVowelAppend(r-)
+  FMT(vdiph2/o_oo)
+endphoneme
+
+
+phoneme O
+  vwl  starttype #o  endtype #o
+  length 150
+  FMT(vowel/oo)
+endphoneme
+
+
+phoneme u:
+  vwl  starttype #u  endtype #u
+  length 190
+  FMT(vowel/u)
+endphoneme
+
+
+phoneme aU
+  vwl  starttype #a  endtype #u
+  length 230
+  FMT(vdiph/aau_2)
+endphoneme
+
+
+phoneme oU
+  vwl  starttype #o  endtype #o
+  length 230
+  FMT(vowel/o)
+endphoneme
+
+
+phoneme aI
+  vwl  starttype #a  endtype #i
+  length 230
+  FMT(vdiph/ai)
+endphoneme
+
+
+phoneme eI
+  vwl  starttype #i  endtype #i
+  length 210
+  FMT(vowel/e)
+endphoneme
+
+
+phoneme OI
+  vwl  starttype #o  endtype #i
+  length 230
+  FMT(vdiph/0i_2)
+endphoneme
+
+
+phoneme e@
+  vwl  starttype #e  endtype #@
+  length 220
+  IfNextVowelAppend(r-)
+  FMT(vdiph2/e@)
+endphoneme
+
+
+phoneme i@
+  vwl  starttype #i  endtype #a
+  length 240
+  IfNextVowelAppend(r-)
+  FMT(vdiph2/ie)
+endphoneme
+
+
+phoneme i@3
+  vwl  starttype #i  endtype #a
+  length 240
+  IfNextVowelAppend(r-)
+  FMT(vdiph2/ie)
+endphoneme
+
+
+
+phoneme l
+  import_phoneme base1/l   // use clear [l] before not-vowel
+endphoneme
+

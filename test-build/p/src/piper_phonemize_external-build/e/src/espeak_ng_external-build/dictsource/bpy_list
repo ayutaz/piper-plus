@@ -1,0 +1,216 @@
+// Translation rules for Manipuri
+// This file is UTF8 encoded
+
+// Numbers
+// numbers are changed to latin characters before translation
+_0	suinO	// or p#'un'b'O ??
+_1	am:a:
+_2	a:n,'i
+_3	a,hu'm
+_4	ma:,ri
+_5	ma'N~a:
+_6	tar:u:kk
+_7	tar:et
+_8	ni,pa:n
+_9	ma:pa:n
+_1a	camma
+_2a	tSa:ni			// two hundreds etc
+_3a	tSahum
+_4a	tSamri
+_5a	tsam'N~a
+_6a	tSa'trUk
+_7a	tSat'ret.
+_8a	tSani,pan
+_9a	tSama,pal
+_10	't.a:ra
+_11	tara:'mathOi
+_12	tara:ni't#Oi
+_13	'tarahumd,Oi
+_14	tar.a:ma'r:i
+_15	tara:ma'N~a:
+_16	tara:ta:ruk
+_17	tara:tar'et
+_18	tara:nipa:n
+_19	tara:mapa:n
+
+_20	ku:n.
+_21	ku:n.ma:thOi
+_22	ku:ni'thOi
+_23	ku:n.hum'dOi
+_24	ku:n'ma:ri
+_25	ku:n'maN~'a:
+_26	kun'ta:ruk
+_27	kun'tar'et
+_28	kun'nipa:n
+_29	kun'mapa:n
+
+_30	k,u:n't#'ra:
+_31	k,u:n't#'ra:ma'thOi
+_32	k,u:n't#'ra:ni'thOi
+_33	k,u:n't#'ra:hum'dOi
+_34	k,u:n't#'ra:ma:ri
+_35	k,u:n't#'ra:maN~'a:
+_36	k,u:n't#'ra:ta:ruk
+_37	k,u:n't#'ra:tar'et
+_38	k,u:n't#'ra:nipa:n
+_39	k,u:n't#'ra:mapa:n
+
+_40	nifu
+_41	nifuma:t#Oi
+_42	nifu'nit#Oi
+_43	nifu,hum'dOi
+_44	nifu'ma:ri
+_45	nifu'maN~'a:
+_46	ni,futa:ruk
+_47	ni,futar'et
+_48	ni,funipa:n
+_49	ni,fumapa:n
+
+_50	j:aN~k#ai
+_51	j:aN~k#aima:t#Oi
+_52	j:aN~k#aini't#Oi
+_53	j:aN~k#aihum'dOi
+_54	j:aN~k#aiima:ri
+_55	j:aN~k#aimaN~'a:
+_56	j:aN~k#aita:ruk
+_57	j:aN~k#aitar'et
+_58	j:aN~k#aini'pa:n
+_59	j:aN~k#ai,map:al
+_60	h,umfu
+_61	h,umfu,ma:t#Oi
+_62	h,umfu,ni't#Oi
+_63	h,umfu,hum'dOi
+_64	h,umfu,ma:ri
+_65	h,umfu,maN~'a:
+_66	h,umfu,ta:ruk
+_67	h,umfu,tar'et
+_68	h,umfu,ni'pa:n
+_69	h,umfu,ma'pa:n
+
+_70	hu,mdra:
+_71	hum,dra:ma:t#Oi
+_72	hum,dra:ni't#Oi
+_73	hum,dra:hum'dOi
+_74	hum,dra:ma:ri
+_75	hum,dra:maN~'a:
+_76	hum,dra:ta:ruk
+_77	hum,dra:tar'et
+_78	hum,dra:ni'pa:n
+_79	hum,dra:ma'pa:n
+
+
+_80	ma:rfu
+_81	ma:r'fu,ma:,t#Oi
+_82	ma:r'fu,ni',t#Oi
+_83	ma:r'fu,hum',dOi
+_84	ma:r'fu,ma:r,i
+_85	ma:r'fu,maN~'a:
+_86	ma:r'fu,ta:ruk
+_87	ma:r'fu,tar'et
+_88	ma:r'fu,nipa:n
+_89	ma:r'fu,mapa:n
+
+_90	mO'ud'ra:
+_91	mO'ud'ra:,ma:t#Oi
+_92	mO'ud'ra:,ni't#Oi
+_93	mO'ud'ra:,hum'dOi
+_94	mO'ud'ra:,ma:ri
+_95	mO'ud'ra:,maN~'a:
+_96	mO'ud'ra:,ta:ruk
+_97	mO'ud'ra:,tar'et
+_98	mO'ud'ra:,ni'pa:n
+_99	mO'ud'ra:,mapa:n
+
+_C	c#@m'ma:
+_0M1	lisiN~
+_0M2	l'ak#
+
+
+_dpt	_	d'Osomik_
+
+
+// Single consonants
+ক	k:O
+খ	k#O
+গ	gO
+ঘ	g#O
+ঙ	'N~O~
+চ	tSO
+ছ	chO    // [h] to distinguish from [tS]
+জ	JO
+ঝ	J#@
+ঞ	'iNO~
+ট	t@
+ঠ	t#@
+ড	d@
+ঢ	d#@
+ণ	m,odd#en.n.'O
+ত	tO
+থ	t#@
+দ	do
+ধ	d#o
+ন	d,ontenn'@
+প	pO
+ফ	fo      // or [p#O] ?
+ব	bO
+ভ	b#o
+ম	mo
+য়	@j
+য	,ontostedZ'O
+র	ro
+ড় 	r.o
+ড়	r.O     // (d. + nukta)
+ঢ়	hr.O
+ঢ়	hr.O    // (d#. + nukta)
+ল	lO
+শ	t,aleboS:'O
+ষ	m,ud#en:oS:'O
+স	d,onteS:'O
+হ	hO
+ৎ	khOndott'O
+
+
+// full vowels
+অ	O
+আ	a
+ই	rOS:e'i
+ঈ	I
+উ	u
+ঊ	d'i:rg#o'u
+_এ	e
+_ঐ	oj
+_ও	o
+_ঔ	ow
+
+
+
+
+
+// combining vowel signs
+া	'akar
+ি	hrOS:o'ikar
+ী	d'i:rg#ikar
+ূ	hrOS:o'ukar
+ু	d'i:rg#ukar
+ৃ	r'ikar
+ে	'ekar
+ৈ	'ojkar
+ো	'okar
+ৌ	'owkar
+
+// signs
+ং	'OnuN~sOr
+ঃ	b'isOrgo	// sparingly used
+ঁ	tS'Ondrobindu	// sparingly used
+
+
+// Punctuation
+
+_,	koma
+_?	ahONg'ba:khudam
+_!	Ng'kapa:khudam
+
+// exception words
+      _)ঈ(_  I		// blood
+
+    ফল	f@l

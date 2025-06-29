@@ -1,0 +1,35 @@
+// Phonemes for Pyash (an artificial constructed language)
+// Inherits phonemes from Esperanto
+
+phoneme e
+  vwl starttype #e endtype #e
+  length 170
+  FMT(vowel/e_mid2)
+endphoneme
+
+phoneme @    //  Schwa, e.g. alph**a**
+  vwl   starttype #@  endtype #@
+  unstressed
+  length 140
+  FMT(vowel/@)
+endphoneme
+
+phoneme ˥   //  tone: high level
+  stress
+  Tone(50, 50, envelope/p_level, NULL)
+endphoneme
+
+phoneme 22   //  tone: low level
+  stress
+  Tone(20, 20, envelope/p_level, NULL)
+endphoneme
+
+phoneme ˩   //  tone: low level
+  stress
+  Tone(20, 20, envelope/p_level, NULL)
+endphoneme
+
+phoneme ˧   //  tone: mid level
+  stress
+  Tone(30, 30, envelope/p_level, NULL)
+endphoneme

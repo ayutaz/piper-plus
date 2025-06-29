@@ -1,0 +1,150 @@
+
+
+phoneme : //  lengthen previous vowel by "length"
+  virtual
+  length 50   // only a small increase for "long stress" because we probably put the stress on the wrong syllable
+endphoneme
+
+
+phoneme @    //  Schwa, can be stressed
+  vwl   starttype #@  endtype #@
+  length 160
+  FMT(vowel/@)
+endphoneme
+
+phoneme i
+  vwl starttype #i endtype #i
+  length 160
+//  IfNextVowelAppend(;)
+//  IF thisPh(isStressed) AND NOT nextPhW(isRhotic) THEN
+//    FMT(vowel/ii_6)
+//  ENDIF
+  FMT(vowel/ii_3)
+endphoneme
+
+phoneme u
+  vwl starttype #u endtype #u
+  length 160
+  FMT(vowel/u_2)
+endphoneme
+
+
+phoneme a
+  vwl starttype #a endtype #a
+  length 170
+  IF thisPh(isUnstressed) THEN
+    FMT(vowel/a_8)
+  ENDIF
+  FMT(vowel/a)
+endphoneme
+
+
+phoneme e
+  vwl starttype #e endtype #e
+  length 170
+  ChangeIfUnstressed(E)
+  FMT(vowel/e_2)
+endphoneme
+
+phoneme e+   // doesn't reduce to [e]
+  vwl starttype #e endtype #e
+  ChangePhoneme(e)
+  endphoneme
+
+phoneme E
+  vwl starttype #e endtype #e
+  length 160
+  FMT(vowel/e_mid)
+endphoneme
+
+phoneme E#
+  vwl starttype #e endtype #e
+  length 160
+  IF thisPh(isNotStressed) THEN
+    ChangePhoneme(@)
+  ENDIF
+  FMT(vowel/e_mid)
+endphoneme
+
+
+phoneme o
+  vwl starttype #o endtype #o
+  length 170
+  ChangeIfUnstressed(O)
+  FMT(vowel/o_8)
+endphoneme
+
+phoneme o+   // doesn't reduce to [O]
+  vwl starttype #o endtype #o
+  ChangePhoneme(o)
+  endphoneme
+
+phoneme O
+  vwl starttype #o endtype #o
+  length 170
+  IF thisPh(isStressed) THEN
+    FMT(vowel/0_2)
+  ENDIF
+  FMT(vowel/oo_4)
+endphoneme
+
+
+
+phoneme v
+  import_phoneme base1/v#
+endphoneme
+
+
+phoneme t
+  vls dnt stp
+  lengthmod 2
+  voicingswitch d
+  Vowelin f1=0  f2=1600 -300 300  f3=-100 80
+  Vowelout f1=0 f2=1600 -300 250  f3=-100 80  rms=20
+  IF nextPh(isPause2) AND prevPhW(isVowel) THEN
+    WAV(ustop/t_dnt, 40)
+  ENDIF
+  WAV(ustop/t_dnt, 60)
+endphoneme
+
+
+phoneme k
+  vls vel stp
+  voicingswitch g
+  lengthmod 2
+  Vowelin f1=0  f2=2300 200 300  f3=-200 80
+  Vowelout f1=0 f2=2300 300 400  f3=-200 80  rms=20
+
+  IF KlattSynth THEN
+    Vowelout f1=0 f2=2300 200 300  f3=-200 80  rms=20
+  ENDIF
+
+  IF thisPh(isWordEnd) THEN
+    WAV(ustop/k)
+  ELIF nextPh(isPause2) THEN
+    WAV(ustop/k_)
+  ELIF nextPh(r) OR nextPh(R) OR nextPh(R2) THEN
+    WAV(ustop/kr)
+  ELIF nextPh(#i) OR nextPh(;) THEN
+    WAV(ustop/ki)
+  ELIF nextPh(l) THEN
+    WAV(ustop/kl)
+  ELIF nextPh(@-) THEN
+    WAV(ustop/k_unasp, 70)
+  ENDIF
+  WAV(ustop/k)
+endphoneme
+
+
+// for foreign letters
+phoneme y
+  vwl starttype #i endtype #i
+  length 170
+  FMT(vowel/y)
+endphoneme
+
+phoneme R^       // Czech r-caron
+  import_phoneme sk/R^
+endphoneme
+
+

@@ -1,0 +1,76 @@
+
+//====================================================
+//  Catalan  - based on Spanish and Base2
+//====================================================
+
+phoneme a
+  vwl starttype #a endtype #a
+  length 180
+  ChangeIfUnstressed(a#)
+  FMT(vowel/a_6)
+endphoneme
+
+phoneme a#
+  vwl starttype #@ endtype #@
+  ipa ɐ
+  unstressed
+  length 170
+  FMT(vowel/a#_3)
+endphoneme
+
+phoneme e
+  vwl starttype #e endtype #e
+  length 170
+  ChangeIfUnstressed(@)
+  FMT(vowel/e)
+endphoneme
+
+phoneme E
+  vwl starttype #e endtype #e
+  length 180
+  ChangeIfUnstressed(@)
+  FMT(vowel/e_mid)
+endphoneme
+
+phoneme E2    // don't reduce
+  vwl starttype #e endtype #e
+  length 180
+  FMT(vowel/e_mid)
+endphoneme
+
+phoneme O
+  vwl starttype #o endtype #o
+  length 170
+  ChangeIfUnstressed(U)
+  FMT(vowel/oo)
+endphoneme
+
+phoneme o
+  vwl starttype #o endtype #o
+  length 170
+  ChangeIfUnstressed(U)
+  FMT(vowel/o)
+endphoneme
+
+phoneme U
+  vwl starttype #u endtype #u
+  unstressed
+  length 160
+  FMT(vowel/uu_2)
+endphoneme
+
+phoneme u
+  vwl starttype #u endtype #u
+  length 160
+  ChangeIfUnstressed(U)
+  FMT(vowel/u_bck)
+endphoneme
+
+
+
+phoneme l
+  import_phoneme en/l   // use 'dark' [l] after a vowel
+endphoneme
+
+
+

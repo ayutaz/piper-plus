@@ -1,0 +1,133 @@
+
+//====================================================
+//  Nepali  (inherits from Hindi)
+//====================================================
+
+phoneme V
+  vwl  starttype #@  endtype #@
+  length 160
+  ChangeIfNotStressed(@)
+  IF nextPh(H) THEN
+    FMT(vowel/@_low)
+  ENDIF
+  FMT(vowel/@_bck)
+endphoneme
+
+phoneme @3    // use a more front [@] after palatal consonants
+  vwl  starttype #@  endtype #@
+  length 140
+  FMT(vowel/@_3)
+endphoneme
+
+phoneme @/
+  vwl  starttype #@  endtype #@
+  length 130
+  IF nextPh(H) THEN
+    FMT(vowel/@_low)
+  ENDIF
+  FMT(vowel/@_bck)
+endphoneme
+
+
+phoneme i
+  vwl starttype #i endtype #i
+  length 160
+  IfNextVowelAppend(;)
+  FMT(vowel/i)
+endphoneme
+
+phoneme e
+  vwl starttype #e endtype #e
+  length 180
+  FMT(vowel/e)
+endphoneme
+
+phoneme a
+  vwl lng starttype #a endtype #a
+  length 230
+  FMT(vowel/aa_9)
+endphoneme
+
+phoneme o
+  vwl starttype #o endtype #o
+  length 180
+  FMT(vowel/o_mid)
+endphoneme
+
+phoneme u
+  vwl starttype #u endtype #u
+  length 160
+  FMT(vowel/u_bck)
+endphoneme
+
+
+
+
+
+// Diphthongs
+//===========
+
+
+phoneme aI
+  vwl lng starttype #a endtype #i
+  length 240
+  lng
+  FMT(vdiph/aai)
+endphoneme
+
+phoneme aU
+  vwl lng starttype #a endtype #u
+  length 240
+  lng
+  FMT(vdiph/aau_3)
+endphoneme
+
+phoneme eI
+  vwl lng starttype #e endtype #i
+  length 240
+  lng
+  FMT(vdiph/eei)
+endphoneme
+
+phoneme eU
+  vwl lng starttype #e endtype #u
+  length 240
+  lng
+  FMT(vdiph/eu)
+endphoneme
+
+phoneme VI
+  vwl lng starttype #@ endtype #i
+  length 240
+  lng
+  FMT(vdiph/Vi)
+endphoneme
+
+phoneme VU
+  vwl lng starttype #@ endtype #u
+  length 240
+  lng
+  FMT(vdiph/Vu)
+endphoneme
+
+phoneme oI
+  vwl lng starttype #o endtype #i
+  length 240
+  lng
+  FMT(vdiph/oi)
+endphoneme
+
+phoneme oU
+  vwl lng starttype #o endtype #u
+  length 240
+  lng
+  FMT(vdiph/ou)
+endphoneme
+
+phoneme uI
+  vwl lng starttype #u endtype #i
+  length 240
+  lng
+  FMT(vdiph/ui)
+endphoneme
+

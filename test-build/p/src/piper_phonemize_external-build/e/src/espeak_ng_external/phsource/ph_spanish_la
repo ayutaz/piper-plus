@@ -1,0 +1,10 @@
+
+//====================================================
+//  Latin American Spanish  - based on Spanish
+//====================================================
+
+phoneme T
+  vls alv frc sib
+  ChangePhoneme(s)
+endphoneme
+

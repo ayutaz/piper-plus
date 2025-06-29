@@ -1,0 +1,83 @@
+// Māori phonemes
+
+//=======
+// VOWELS
+//=======
+
+phoneme a
+  vwl starttype #a endtype #a
+  length 140
+  FMT(vowel/a_5) // from latin
+endphoneme
+
+phoneme a:
+  vwl starttype #a endtype #a
+  length 280
+  FMT(vowel/a_5)
+endphoneme
+
+phoneme e
+  vwl starttype #e endtype #e
+  length 140
+  FMT(vowel/e) // working hypothesis
+endphoneme
+
+phoneme e:
+  vwl starttype #e endtype #e
+  length 280
+  FMT(vowel/e)
+endphoneme
+
+phoneme i
+  vwl starttype #i endtype #i
+  length 140
+  FMT(vowel/i) // working hypothesis
+endphoneme
+
+phoneme i:
+  vwl starttype #i endtype #i
+  length 280
+  FMT(vowel/i)
+endphoneme
+
+phoneme o
+  vwl starttype #o endtype #o
+  length 140
+  FMT(vowel/o) // working hypothesis
+endphoneme
+
+phoneme o:
+  vwl starttype #o endtype #o
+  length 280
+  FMT(vowel/o)
+endphoneme
+
+phoneme u"
+  vwl starttype #u endtype #u
+  length 140
+  FMT(vwl_ru/u#u)
+endphoneme
+
+phoneme u":
+  vwl starttype #u endtype #u
+  length 280
+  FMT(vwl_ru/u#u)
+endphoneme
+
+//===========
+// CONSONANTS
+//===========
+
+phoneme N // si**ng** (modified from Kyrgz)
+  vcd vel nas
+
+  NextVowelStarts
+    VowelStart(nn/nn@)
+    VowelStart(nn/nna)
+    VowelStart(nn/nne)
+    VowelStart(nn/nni)
+    VowelStart(nn/nno)
+    VowelStart(nn/nnu)
+  EndSwitch
+endphoneme
+

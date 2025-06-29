@@ -1,0 +1,122 @@
+
+// This file is UTF8 encoded 
+// Spelling to phoneme words for Lojban (an artificial constructed language).
+
+// Note: initial/final "." has already been removed
+
+// Numbers
+_0	no
+_1	pa
+_2	Re
+_3	Si
+_4	vo
+_5	mu
+_6	xa
+_7	ze
+_8	bi
+_9	so
+_dpt	pi_
+
+
+b	b@
+c	S@
+d	d@
+f	f@
+g	g@
+j	Z@
+k	k@
+p	p@
+s	s@
+t	t@
+v	v@
+x	x@
+z	z@
+
+h	@h'@bu
+q	k'@bu
+w	v'@bu
+
+
+// stressed cmavo
+cai	S'aI__!
+cu'i	S'uhi_!
+pei	p'eI__!
+ru'e	R'uhe_!
+sai	s'aI__!
+nai	n'aI__!
+na	n'a__!
+ja'a	Z'aha_!
+
+// question cmavo
+ma	m'a__ // a longer pause to avoid resegmentation
+mo	m'o__
+xo	x'o__
+cu'e	S'uhe_!
+
+// emphasizing prefixes
+ba'e $u+
+za'e $u+
+
+
+// unstressed words. Note single-syllable cmavo are all unstressed in jbo_rules
+po'e	$u+	// of
+zo'e	$u+	// pronoun
+jo'u	$u+ $brk	// and
+ce'u	$u+ $brk	// lambda-it
+ke'a	$u+ $brk	// relative-it
+
+
+// end-of-clause [_;_] before these
+noi	_;_noI	$u
+poi	_;_poI	$u
+no'u	_;_nohu	$u
+po'u	_;_pohu	$u
+goi	_;_goI	$u
+
+
+// sentence connectives
+i	__;__i
+ija	_;__iZa
+ijanai	_;__iZan'aI
+ije	_;__iZe
+ije'i	_;__iZehi
+ijenai	_;__iZenaI
+ijo	_;__iZo
+ijonai	_;__iZon'aI
+inaja	_;__inaZa
+
+
+// connectives
+a	$brk
+e	$brk
+o	$brk
+u	$brk
+ja	$brk
+je	$brk
+ji	$brk
+jo	$brk
+ju	$brk
+joi	$brk
+
+
+// terminators and openers
+cu	$brk
+gi	$pause
+
+to	_::to	$u	// start parenthesis, pause but don't raise intonation
+lu	lu_:	$u $brk
+tu'e t,uhe_:	$u $brk
+
+ku	ku_:	$u
+boi	boI_:	$u
+
+ge'u	g,ehu_:	$u $brk
+lu'u	l,uhu_:	$u $brk
+
+li'u	l,ihu_::	$u $brk
+tu'u	t,uhu_::	$u $brk
+vau	vaU_::	$u
+kei	keI_::	$u
+ku'o	k,uho_::	$u
+toi	toI_::	$u
+

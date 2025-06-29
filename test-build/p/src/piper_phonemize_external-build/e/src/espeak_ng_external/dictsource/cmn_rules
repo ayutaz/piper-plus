@@ -1,0 +1,267 @@
+// This file is UTF8 encoded
+
+// Default is to handle latin characters as pinyin
+// ?1:	speak latin characters as English words
+
+.replace
+//replace tone mark with tone number
+ˉ 1
+ˊ 2
+ˇ 3
+ˋ 4
+ā a1
+á a2
+ǎ a3
+à a4
+// TODO: àn is not handled
+ō o1
+ó o2
+ŏ o3
+ǒ o3
+ò o4
+ê ea
+ē e1
+é e2
+ĕ e3
+ě e3
+è e4
+ī i1
+í i2
+ĭ i3
+ǐ i3
+ì i4
+ū u1
+ú u2
+ǔ u3
+ù u4
+ǖ ü1
+ǘ ü2
+ŭ u3
+ǚ ü3
+ǜ ü4
+//some pinyin vaiants 
+ŋ ng
+ɑ a
+ɡ g 
+ẑ zh 
+ĉ ch 
+ŝ sh 
+
+.L01  j q x y
+.L02  1 2 3 4 5 // tone number
+.L03  a o e i u v ai ei ui ao ou iu ie ve er an en in un vn ang eng ing ong ua ue uo uai uan uang ia iao ian iang
+
+
+// Note:  ngK  matches "ng" if not followed by a vowel
+// (D  will match on a digit and also if no digit is present. (special for tone
+language).
+
+// 儿 兒  erhua
+
+.group a
+       a        _^_EN
+
+       a (L02	A
+       ai (L02	ai
+       ao (L02	Au
+       a (nL02	a
+       a (ngL02	A
+
+    y) a (L02	iA
+    y) a (L02	Au
+    y) a (nL02	iE
+    y) a (ngL02	iA
+
+.group b
+       b        _^_EN
+       b (L03L02       p
+
+.group c
+       c        _^_EN
+       c (L03L02       tsh
+       ch (L03L02    ts.h
+
+.group d
+       d        _^_EN
+       d (L03L02       t
+
+.group e
+       e        _^_EN
+
+       e (L02	o-
+    d) e	@
+    t) e	@
+    n) e	@
+    l) e	@
+    y) e	iE
+
+       ei (L02	ei
+       e (nL02	@	// en
+       e (ngL02	@	// eng
+       er (L02	@r
+
+.group f
+       f        _^_EN
+       f (L03L02       f
+
+.group g
+       g        _^_EN
+       g (L03L02       k
+
+.group h
+       h        _^_EN
+       h (L03L02       X
+
+.group i
+       i        _^_EN
+
+	i (L02		i
+	i (nL02		i	// in
+	i (ngL02	i	// ing
+
+    z) i (L02       i[
+    c) i (L02       i[
+    s) i (L02       i[
+    h) i (L02       i. //after zh ch sh
+    r) i (L02       i.
+       ia (L02		iA
+       ia (nL02		iE
+       ia (ngL02	iA
+
+       iao (L02		jAu
+       ie (L02		iE
+       io (ngL02	y
+    q) io (ngL02	u 
+       iu (L02		iou 
+
+.group j
+       j        _^_EN
+       j (L03L02       tS;
+
+.group k
+       k        _^_EN
+       k (L03L02       kh
+
+.group l
+       l        _^_EN
+       l (L03L02       l
+
+.group m
+       m        _^_EN
+       m (L03L02       m
+
+.group n
+       n        _^_EN
+       n (L03L02       n
+       n (L02          n
+       ng (L02	N     // consider (ng+vowel) as (n g+vowel) ??
+    _) ng (K	N-    // syllablic [N]
+
+.group o
+       o        _^_EN
+
+       o (L02	o
+       ou (L02	ou
+       ong (L02	ong
+
+    y) o (L02	io
+    y) ou (L02	iou
+
+.group p
+       p        _^_EN
+       p (L03L02       ph
+
+.group q
+       q        _^_EN
+       q (L03L02       tS;h
+
+.group r
+       r        _^_EN
+       r (L03L02       z.
+
+.group s
+       s        _^_EN
+       s (L03L02       s
+       sh (L03L02      s.
+
+.group t
+       t        _^_EN
+       t (L03L02       th
+
+.group u
+       u        _^_EN
+
+       u (L02       u
+       ua (L02		wA
+       ua (nL02		ua
+    g) ua (nL02		wa
+    k) ua (nL02		wa
+       ua (ngL02 	wA
+
+       uai (L02	uai
+
+       ue (L02	yE	// üe
+       ui (L02	uei
+   sh) ui (L02	wei
+       u (nL02	u@
+    k) u (nL02	wu@
+   _h) u (nL02	wu@
+    t) u (nL02	wu@
+       uo (L02	uo
+
+   sh) ui (L02	rei
+   sh) u (nL02	wo-
+   sh) uo (L02	wo
+
+  L01) u	y   /// j,q,x,y + u
+  L01) u (DnK	y@
+    q) u (DnK+  yi
+  L01) ua (DnK	y&
+  L01) ue	yE
+
+.group ü
+       ü	_^_EN
+       ü (L02	y
+       üe (L02	yE
+
+.group v //variant of ü
+       v        _^_EN
+    l) v (L02   y // ü
+    n) v (L02   y // ü
+    l) ve (L02	yE // üe
+    n) ve (L02	yE // üe
+
+.group w
+       w        _^_EN
+       wa (L02		wA	// wa
+       wa (nL02		wA	// wan
+       wa (ngL02	wA	// wang
+       wai (L02		wai
+       wei (L02		wei
+       we (nL02		wu@	// wen
+       we (ngL02	wu@	// weng
+       wo (L02		wo
+       wu (L02		wu
+
+.group x
+       x        _^_EN
+       x (L03L02       S;
+
+.group y
+       y        _^_EN
+       y (L03L02	j
+
+.group z
+       z        _^_EN
+       z (L03L02       ts
+       zh (L03L02    ts.
+
+// tone number
+.group
+       1	55
+       2	35
+       3	214
+       4	51
+       5	11
+
+	|	_|

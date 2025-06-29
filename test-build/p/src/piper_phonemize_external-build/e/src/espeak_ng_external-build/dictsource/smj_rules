@@ -1,0 +1,219 @@
+// SMJ translation rules
+// This file is UTF-8 encoded
+
+// groups
+
+.L01 b d g k p t // Plosives
+
+.L02 r l j v // Sonorants
+
+
+.group a
+          a          A
+          a (@       A // back vowel
+       @) a          a:
+          artihkal   ar.t'ihkAl
+     %CC) a          A // short after Q3 consonant/cluster
+
+.group á
+     %CC) á          a // short after Q3 consonant/cluster
+	  á (@       A: //
+       @) á	     a: // in 2nd syll
+       C) á	     A: // after Q1 (single) consonant
+       
+.group ä
+	  ä (@       &
+	  ä          &: //
+//	  ä          i& // in Sweden
+	  ä          e& // in Sweden
+	  
+.group æ // same as ä
+	  æ (@       &	  
+	  æ          &: //
+//	  æ          i& // in Sweden
+	  æ          e& // in Sweden
+     %CC) æ          & // short after Q3 consonant/cluster
+	  
+.group å
+          å          O
+       @) å          O: // in 2nd syll
+     %CC) å          O // short after Q3 consonant/cluster
+          
+.group b
+          b          p
+       A) b (A       b // voiced in an intervocalic position
+          bb         b: // voiced within a geminate
+          bussa      p'u-s:A // Scandinavian loanword
+       
+.group c
+          c          ts
+          
+.group d
+          d          t
+          dal        dAl
+       A) d (A       d // voiced in an intervocalic position
+          dd         d:
+          dj         c // palatal plosive
+       A) dj (A      J\ // voiced palatal plosive between vowels
+       A) ddj (A     J\: // voiced palatal plosive between vowels
+          dts        dz // [d͡z]
+          dtj        dZ // [d͡ʒ]
+          
+.group e
+          e (@       E: // open-mid
+          e (_       iE  // open 2nd syll
+       @) e          iE // in 2nd syll
+          e          E // other environments
+          
+.group f
+          f          f
+          ff         f:
+          
+.group g
+          g          k
+       A) g (A       g // voiced in an intervocalic position          
+          gg         g:
+          
+.group h
+          h          h
+          hk         hk
+          hkk        k: // [h] not audible in Q3 cons. cluster
+          hp         hp
+          hpp        p: // [h] not audible in Q3 cons. cluster
+          ht         ht
+          htt        t: // [h] not audible in Q3 cons. cluster
+          hts        hts
+          htts       h:ts
+          htj        htS
+          httj       ht:S
+          
+.group i
+          i          i: // can be long as well?
+          ie (@      iE
+     %CC) i          i // short after Q3 consonant
+          
+.group j
+          j          j
+          ja         ja
+       i) jbb        jIb
+          journalissta         Sur.nal'isstA
+
+.group k
+          k          k
+          k (á       kh // Aspirated in Scandinavian loanwords, like this?
+          káffa      kh'A:f:A
+          kásus      kh'A:su-s
+          kássa      kh'A:S:A
+          kk         k:
+	  
+.group l
+          l	     l // Can be a copula itself
+          ll	     l: 
+          
+       á) lgg	     lAg // Q3
+       a) lbb	     lab // Q3
+       u) lpp	     lub // Q3
+       á) lmm	     lAm // Q3
+       á) lvv	     lAv // Q3
+          
+.group m
+          m          m
+          mm         m:     
+    	      
+.group n
+           n          n
+           nj         n_j
+           nnj        n_j:
+
+.group ñ
+          ñ          N
+          ññ         N:    
+           
+.group ń
+          ń          N
+          ńń         N:
+           
+.group ŋ
+          ŋ          N
+          ŋŋ         N:    
+           
+.group o
+          o          oO
+       @) o          uo
+          oa         ua //
+          oa (@      oA //
+         
+.group ö
+     %CC) ö          Y
+          ö          Y: //
+          
+.group ø
+     %CC) ø          Y
+          ø          Y: //
+          
+.group p
+          p          p
+          p (á       ph // Aspirated in Scandinavian loanwords
+          pp         p:
+          parlamænnta         par.lAm'&ntA
+
+.group r
+          r          r
+          rd         rt
+          rl         rl
+          rn         rn
+          rt         rt
+
+       a) rgg	     rag // Q3
+       e) rgg	     reg // Q3
+       æ) rgg	     r&g // Q3
+       a) rvv	     rav // Q3        
+       á) rbb	     rAb // Q3
+       i) rjj	     rij // Q3
+       u) rŋŋ	     ruN // Q3
+       
+          rr         r:
+.group s
+          s          s
+          ss         s: 
+       
+          sj         S
+          ssj        S: // Q2 or Q3                    
+          
+.group t
+          t          t
+          t (á       th // Aspirated in Scandinavian loanwords
+          t (_       ht // at the end of a word
+          tt         t:
+          tj         tS // voiceless alveo-palatal fricative in Sweden
+          ts         ts // voiceless alveo-palatal fricative in Sweden e.g. <subtsas>
+          tts        ts:
+
+.group u
+          u          u
+          uo (@      uo
+
+.group v
+          v          v
+          vv         v:
+     L01) v          f // before a plosive
+          v (_       P // in the end of a word, e.g. 1sg suffix
+
+       e) vdd        ved // Q3
+       i) vdd        vid // Q3
+       å) vdd        vOd // Q3
+
+.group w
+          w          v
+
+.group x
+          x          ks
+          xx         k:s
+          
+.group y
+          y          y
+
+.group z
+          z          ts
+          zz         t:s      // pizza
+       K) zh         Z

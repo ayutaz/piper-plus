@@ -1,0 +1,252 @@
+// Irish Phonemes
+//Please contact espeak.gaeilge@gmail.com
+// Version 2.8  2013
+
+// short vowels
+
+
+phoneme @    //  Schwa, but always unstressed
+  vwl   starttype #@  endtype #@
+  unstressed
+  length 110
+  IF nextPh(i:) THEN
+    length 80
+    FMT(vwl_af/r@)
+  ENDIF
+  IF nextPh(I) THEN
+    length 80
+    FMT(vwl_af/r@)
+  ENDIF
+  IF nextPh(e:) THEN
+    length 80
+    FMT(vwl_af/r@)
+  ENDIF
+  IF prevPh(i:) THEN
+    length 60
+    FMT(vwl_af/r@)
+  ENDIF
+  
+  FMT(vwl_af/@)
+endphoneme
+
+
+phoneme @/
+  vwl  starttype #@  endtype #@
+  length 130
+  FMT(vowel/@)
+endphoneme
+
+
+phoneme a
+  vwl starttype #a endtype #a
+  length 165
+  FMT(vowel/a_4)
+endphoneme
+
+
+phoneme a#
+  vwl starttype #@ endtype #@
+  ipa ɐ
+  length 130
+  ChangeIfStressed(a)
+  FMT(vowel/a#_3)
+endphoneme
+
+
+phoneme E
+  vwl  starttype #e  endtype #e
+  length 155
+  FMT(vowel/e_mid)
+endphoneme
+
+phoneme E#
+  vwl  starttype #@  endtype #@
+  length 130
+  ChangeIfStressed(E)
+  ChangePhoneme(@/)
+endphoneme
+
+
+phoneme I
+  vwl  starttype #i  endtype #i
+  length 130
+  FMT(vowel/ii_2)
+endphoneme
+
+
+phoneme i   // non syllabic i for end of words
+  vwl  starttype #i  endtype #i
+  unstressed
+  ipa iU+032F
+  length 45
+  FMT(vowel/ii_7)
+endphoneme
+
+
+phoneme O
+  vwl  starttype #a  endtype #@
+  length 155
+  FMT(vowel/V_4)
+endphoneme
+
+phoneme O#
+  vwl starttype #@ endtype #@
+  length 130
+  ChangeIfStressed(O)
+  ChangePhoneme(a#)
+endphoneme
+
+
+phoneme U
+  vwl starttype #u endtype #u
+  length 155
+  FMT(vowel/uu)
+endphoneme
+
+phoneme U#
+  vwl starttype #@ endtype #@
+  length 130
+  ChangeIfStressed(U)
+  ChangePhoneme(@/)
+endphoneme
+
+phoneme u1
+  vwl starttype #u endtype #u
+  ipa uU+0306
+  length 55
+  FMT(vowel/u)
+endphoneme
+
+phoneme 0
+  vwl  starttype #a   endtype #a
+  length 195
+  ipa A
+  FMT(vowel/aa_8)
+endphoneme
+
+phoneme 0#
+  vwl starttype #@ endtype #@
+  length 130
+  ChangeIfStressed(0)
+  ChangePhoneme(a#)
+endphoneme
+
+  
+phoneme o:
+  vwl  starttype #o  endtype #o
+  length 210
+  FMT(vowel/o)
+endphoneme
+
+
+// long vowels
+
+phoneme A:
+  vwl  starttype #a  endtype #a
+  length 220
+  FMT(vowel/aa_2)
+endphoneme
+
+
+phoneme e:
+  vwl  starttype #e  endtype #e
+  length 230
+  FMT(vowel/e)
+endphoneme
+
+
+phoneme i:
+  vwl  starttype #i  endtype #i
+  length 230
+  FMT(vowel/i)
+endphoneme
+
+
+
+
+phoneme u:
+  vwl  starttype #u  endtype #u
+  length 230
+  FMT(vowel/u_bck)
+endphoneme
+
+
+// Diphthongs
+
+
+phoneme @U
+  vwl starttype #@ endtype #u
+  length 260
+  FMT(vdiph/@u_3)
+endphoneme
+
+phoneme i@
+  vwl starttype #i endtype #@
+  length 260
+  FMT(vdiph2/i@)
+endphoneme
+
+phoneme u@
+  vwl starttype #u endtype #@
+  length 260
+  FMT(vdiph2/u@)
+endphoneme
+
+phoneme aI
+  vwl starttype #a endtype #i
+  length 275
+  FMT(vdiph/ai)
+endphoneme
+
+phoneme aI#
+  vwl starttype #@ endtype #@
+  length 130
+  ChangeIfStressed(aI)
+  ChangePhoneme(a#)
+endphoneme
+
+phoneme aU
+  vwl starttype #a endtype #u
+  length 300
+  FMT(vdiph/au_4)
+endphoneme
+
+phoneme aU#
+  vwl starttype #@ endtype #@
+  length 130
+  ChangeIfStressed(aU)
+  FMT(vdiph/au_4)
+endphoneme
+
+
+phoneme ;     // linking j, used between (i) vowels and a following vowel
+              // also to palatalize consonants
+  liquid pzd
+  lengthmod 0
+
+  IF prevPh(#i) THEN
+    ipa NULL   // linking after i vowel, don't show in ipa
+  ENDIF
+
+  NextVowelStarts
+    VowelStart(j2/j2@)
+    VowelStart(j2/j2a)
+    VowelStart(j2/j2e)
+    VowelStart(j2/j2i)
+    VowelStart(j2/j2o)
+    VowelStart(j2/j2u)
+  EndSwitch
+
+  IF prevPh(#i) THEN
+    VowelEnding(j2/xj2, -40)
+  ENDIF
+
+  IF prevPh(isPause) THEN
+    FMT(j2/_j2)
+  ENDIF
+endphoneme
+
+
+phoneme eI
+  import_phoneme en/eI
+endphoneme

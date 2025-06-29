@@ -1,0 +1,216 @@
+
+// Short vowels
+
+phoneme A
+  vwl starttype #o endtype #o
+  length 140
+  FMT(vowel/0_3)
+endphoneme
+
+phoneme E
+  vwl starttype #e endtype #e
+  length 140
+  FMT(vowel/e_mid)
+endphoneme
+
+phoneme i
+  vwl starttype #i endtype #i
+  length 140
+  IfNextVowelAppend(;)
+  FMT(vowel/i_4)
+endphoneme
+
+phoneme o
+  vwl starttype #o endtype #o
+  length 130
+  FMT(vowel/o_mid)
+endphoneme
+
+phoneme u
+  vwl starttype #u endtype #u
+  length 130
+  FMT(vowel/uu_bck)
+endphoneme
+
+phoneme Y
+  vwl starttype #@ endtype #@
+  length 130
+  FMT(vowel/y#_2)
+endphoneme
+
+phoneme y
+  vwl starttype #u endtype #u
+  length 130
+  FMT(vowel/yy_4)
+endphoneme
+
+
+// Long Vowels
+
+phoneme i:
+  vwl starttype #i endtype #i
+  length 220
+  FMT(vowel/i)
+endphoneme
+
+phoneme e:
+  vwl starttype #e endtype #e
+  length 240
+  FMT(vowel/e_3)
+endphoneme
+
+phoneme a:
+  vwl starttype #a endtype #a
+  length 270
+  FMT(vowel/a)
+endphoneme
+
+phoneme o:
+  vwl starttype #o endtype #o
+  length 260
+  FMT(vowel/o_2)
+endphoneme
+
+phoneme u:
+  vwl starttype #u endtype #u
+  length 240
+  FMT(vowel/u_bck)
+endphoneme
+
+phoneme y:
+  vwl starttype #u endtype #u
+  length 240
+  FMT(vowel/y)
+endphoneme
+
+phoneme Y:
+  vwl starttype #@ endtype #@
+  length 260
+  FMT(vowel/y#)
+endphoneme
+
+
+
+// CONSONANTS
+//===========
+
+
+phoneme ts
+  vls alv afr sib
+  lengthmod 2
+  Vowelin f1=0  f2=1700 -300 300  f3=-100 80
+  Vowelout f1=0 f2=1700 -300 250  f3=-100 80  rms=20
+  WAV(ustop/ts)   // don't use ustop/ts_ (before non-vowel)
+endphoneme
+
+
+phoneme dz
+  import_phoneme consonants/dz
+  voicingswitch ts
+endphoneme
+
+
+phoneme t        // dental variant of /t/
+  vls dnt stp
+  lengthmod 2
+  voicingswitch d
+  Vowelin f1=0  f2=1600 -300 300  f3=-100 80
+  Vowelout f1=0 f2=1600 -300 250  f3=-100 80  rms=20
+  IF nextPh(isPause2) THEN
+    WAV(ustop/t_dnt, 45)
+  ENDIF
+  WAV(ustop/t_dnt, 50)
+endphoneme
+
+
+phoneme t2
+// changes to pause when followed by [t], so the [t][ becomes [t:]
+  vls dnt stp
+  lengthmod 2
+  IF nextPh(t) THEN
+    WAV(ustop/null, 0)
+  ELSE
+    ChangePhoneme(t)
+  ENDIF
+endphoneme
+
+
+phoneme d
+  vcd dnt stp
+  voicingswitch t
+  lengthmod 5
+  Vowelin f1=2  f2=1500 -300 300  f3=-150 80
+  Vowelout f1=2 f2=1500 -300 300  f3=-150 80
+
+  IF PreVoicing THEN
+    FMT(d/xd)
+  ENDIF
+
+  IF nextPh(isPause2) THEN
+    FMT(d/d_)  addWav(x/d_dnt)
+  ELIF nextPh(r) THEN
+    FMT(d/dr) addWav(x/d_dnt, 110)
+  ENDIF
+
+  FMT(d/d) addWav(x/d_dnt, 110)
+endphoneme
+
+
+
+
+phoneme c
+  import_phoneme consonants/c2
+  voicingswitch J
+endphoneme
+
+
+phoneme p    // unaspirated
+  import_phoneme consonants/p-
+  voicingswitch b
+endphoneme
+
+
+phoneme k    // unsapirated
+  import_phoneme consonants/k-
+  voicingswitch g
+endphoneme
+
+
+phoneme s2     // second part of geminated [s:]
+  import_phoneme consonants/s2
+endphoneme
+
+
+phoneme l
+  liquid
+  lengthmod 7
+
+  IF nextPh(isNotVowel) THEN
+    ChangePhoneme(l/)
+  ENDIF
+
+  CALL vowelstart_l
+
+  IF prevPh(#@) THEN
+    VowelEnding(l/xl, -50)
+  ELIF prevPh(isVowel) THEN
+    VowelEnding(l/xl, -40)
+  ENDIF
+
+  IF prevPh(isPause) THEN
+    FMT(l/_l)
+  ENDIF
+
+  IF prevPh(t) THEN
+    FMT(l/tl)
+  ENDIF
+
+//  IF prevPh(l/) THEN
+//    FMT(l/l_long)    // double l, make it longer
+//  ENDIF
+
+  FMT(l/l)
+endphoneme
+
+
+

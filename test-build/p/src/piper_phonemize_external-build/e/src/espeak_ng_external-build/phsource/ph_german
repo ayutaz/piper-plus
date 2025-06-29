@@ -1,0 +1,512 @@
+
+
+//=========================================================
+// German
+//=========================================================
+
+
+
+phoneme @   //  Schwa
+  vwl starttype #@ endtype #@
+  unstressed
+  length 40
+  IF nextPh(r) THEN
+    IF next2Ph(isVowel) THEN
+    ELSE
+      ChangePhoneme(3)
+    ENDIF
+  ENDIF
+IF thisPh (isWordEnd) THEN
+length 120
+ENDIF
+  FMT(vowel/@_4)
+endphoneme
+
+
+phoneme 3   //  open Schwa+r
+  vwl starttype #@ endtype #@
+  unstressed flag1
+  length 140
+  FMT(vowel/a#_3)   // in eSpeak 1.44, this used vowel/V_3 at end-of-word
+endphoneme
+
+
+phoneme a
+  vwl starttype #a endtype #a
+  length 110
+  IF nextPh(isRhotic) THEN
+    length 125
+  ENDIF
+  FMT(vowel/a)
+endphoneme
+
+
+phoneme E
+  vwl starttype #e endtype #e
+  length 120
+  IF nextPh(*) THEN
+    length 135
+  ENDIF
+  FMT(vowel/e_mid2)
+endphoneme
+
+
+phoneme E2    //  as[E] but reduces to @ if unstressed
+  vwl starttype #e endtype #e
+  length 120
+  ChangeIfDiminished(@)
+  IF nextPh(*) THEN
+    length 135
+  ENDIF
+  FMT(vowel/e_mid2)
+endphoneme
+
+
+phoneme I
+  vwl starttype #i endtype #i
+  length 120
+  IF nextPh(*) THEN
+    length 135
+  ENDIF
+  IfNextVowelAppend(;)
+  FMT(vowel/ii)
+endphoneme
+
+
+phoneme I:
+  vwl starttype #i endtype #i
+  length 190
+  FMT(vowel/ii)
+endphoneme
+
+
+phoneme O
+  vwl starttype #o endtype #o
+  length 120
+  IF nextPh(*) THEN
+    length 135
+  ENDIF
+  FMT(vowel/oo)
+endphoneme
+
+
+phoneme U
+  vwl starttype #u endtype #u
+  length 120
+  IF nextPh(*) THEN
+    length 135
+  ENDIF
+
+  IF nextPh(r) AND next2Ph(isNotVowel) THEN
+    ChangePhoneme(UR)
+  ENDIF
+  FMT(vowel/uu_2)
+endphoneme
+
+
+phoneme A:
+  vwl starttype #a endtype #a
+  length 250
+  FMT(vowel/aa_6)
+endphoneme
+
+
+phoneme A   // reduces to [a] if not stressed
+  vwl starttype #a endtype #a
+  length 250
+  ChangeIfUnstressed(a)
+  FMT(vowel/aa_6)
+endphoneme
+
+
+phoneme i:
+  vwl starttype #i endtype #i
+  length 180
+  IF prevPh(w) THEN
+    VowelStart(w/wi2)
+  ENDIF
+  
+//  IF nextPh(r) AND next2Ph(isNotVowel) THEN
+//    ChangePhoneme(iR)
+//  ENDIF
+  FMT(vowel/i_2)
+endphoneme
+
+
+phoneme i2
+  vwl starttype #i endtype #i
+  length 180
+  ChangeIfNotStressed(I)
+  IF prevPh(w) THEN
+    VowelStart(w/wi2)
+  ENDIF
+  FMT(vowel/i_2)
+endphoneme
+
+
+phoneme u:
+  vwl starttype #u endtype #u
+  length 190
+  FMT(vowel/u)
+endphoneme
+
+
+phoneme aU
+  vwl starttype #a endtype #u
+  length 220
+  FMT(vdiph/aau_6)
+endphoneme
+
+
+phoneme aI
+  vwl starttype #a endtype #i
+  length 210
+  FMT(vdiph/ai_5)
+endphoneme
+
+
+phoneme EI
+  import_phoneme en-us/eI
+endphoneme
+
+
+
+phoneme OY
+  vwl starttype #o endtype #i
+  length 220
+  FMT(vdiph/oi)
+endphoneme
+
+
+phoneme E:
+  vwl starttype #e endtype #e
+  length 200
+  FMT(vowel/e_8)
+endphoneme
+
+
+phoneme e:
+  vwl starttype #e endtype #e
+  length 200
+  FMT(vowel/e_2)
+endphoneme
+
+
+phoneme o:
+  vwl starttype #o endtype #o
+  length 210
+  FMT(vowel/o)
+endphoneme
+
+
+phoneme y:
+  vwl starttype #u endtype #u
+  length 200
+  FMT(vowel/y)
+endphoneme
+
+
+phoneme y
+  vwl starttype #u endtype #u
+  length 100
+  IF nextPh(*) THEN
+    length 110
+  ENDIF
+  FMT(vowel/yy_4)
+endphoneme
+
+
+phoneme Y:
+  vwl starttype #@ endtype #u
+  length 220
+  FMT(vwl_de/y#)
+endphoneme
+
+
+phoneme W
+  vwl starttype #@ endtype #@
+  length 150
+  IF nextPh(*) THEN
+    length 160
+  ENDIF
+  FMT(vowel/oe)
+endphoneme
+
+
+
+// CONSONANTS
+//===========
+
+phoneme t
+  vls alv stp
+  voicingswitch d
+  lengthmod 2
+  Vowelin f1=0  f2=1700 -300 300  f3=-100 80
+  Vowelout f1=0 f2=1700 -300 250  f3=-100 80  rms=20
+
+  IF nextPh(isPause2) THEN
+    WAV(ustop/t_)
+  ELIF nextPh(r) THEN
+    WAV(ustop/t_)
+  ELIF nextPh(@-) THEN
+    WAV(ustop/t_dnt, 50)
+  ENDIF
+  WAV(ustop/t, 90)
+endphoneme
+
+
+
+phoneme ts
+  import_phoneme consonants/ts
+endphoneme
+
+
+phoneme pF
+  vls bld afr
+  ipa pf
+  Vowelout f1=0  f2=1000 -500 -350  f3=-200 80
+  lengthmod 2
+  WAV(ufric/f)    // could replace this with a [pf] wav file
+endphoneme
+
+
+phoneme g#    // for "ig" -> [IC] or [Ig]
+  vls pal frc
+  lengthmod 3
+
+  IF nextPhW(isVoiced) THEN
+    ChangePhoneme(g)
+  ELSE
+    ChangePhoneme(C)
+  ENDIF
+endphoneme
+
+
+
+phoneme l/    // used for [l] when not before a vowel
+  liquid
+  lengthmod 7
+
+  IF nextPh(isVowel) THEN
+    ChangePhoneme(l)
+  ENDIF
+
+  PrevVowelEndings
+    VowelEnding(l/L1_@L, -60)
+    VowelEnding(l/L1_aL, -40)
+    VowelEnding(l/L1_eL, -30)
+    VowelEnding(l/L1_iL, -30)
+    VowelEnding(l/L1_oL, -40)
+    VowelEnding(l/L1_uL, -40)
+  EndSwitch
+
+  FMT(l/l_3)
+endphoneme
+
+
+phoneme j
+  liquid pal
+  lengthmod 7
+
+  IF nextPh(isVowel) THEN
+    NextVowelStarts
+      VowelStart(j/j@)
+      VowelStart(j/ja)
+      VowelStart(j/je)
+      VowelStart(j/ji)
+      VowelStart(j/jo)
+      VowelStart(j/ju)
+    EndSwitch
+
+    VowelEnding(j/xj, -30)
+
+    IF prevPh(isPause) THEN
+      FMT(j/_j_short)          // difference from base1/j
+    ENDIF
+  ELSE
+    // no vowel follows
+    Vowelout len=70
+    FMT(j/j_)
+  ENDIF
+endphoneme
+
+
+phoneme r   // note, following consonant must be 'ustop/t_' not 'ustop/tr' etc.
+  liquid alv rhotic
+  lengthmod 6
+
+  IF prevPhW(@-) THEN
+  ELSE
+    IF nextPhW(isVowel) THEN
+      IF prevPhW(isVowel) THEN
+        ChangePhoneme(R)
+      ELSE
+        IF prevPhW(t) THEN
+          PauseBefore 30
+        ELSEIF prevPhW(d) OR prevPhW(b) OR prevPhW(g) OR prevPhW(k) OR prevPhW(p) THEN
+          PauseBefore 15
+        ELSE
+          FMT(r3/r_, 40) addWav(r3/rx, 150)
+        ENDIF
+      ENDIF
+   ENDIF
+  ENDIF
+
+  IF prevPh(isFlag1) THEN
+      ChangePhoneme(NULL)   // 'r' is already included in the previous vowel
+  ENDIF
+
+  CALL base1/*
+endphoneme
+
+
+
+phoneme iR  // TEST "vier" = [f'iR] not successful
+  vwl starttype #i endtype #@
+  ipa i?
+  flag1
+  length 240
+  FMT(vdiph2/i@_3)
+endphoneme
+
+
+phoneme UR
+  vwl starttype #u endtype #@
+  ipa ??
+  flag1
+  length 180
+  FMT(vwl_de/uu_@)
+endphoneme
+
+
+
+
+phoneme oU  // for English words
+  import_phoneme en-us/oU
+endphoneme
+
+phoneme A~
+  vwl  starttype #a endtype #a
+  length 260
+  FMT(vnasal/aa_n4)
+endphoneme
+
+
+phoneme W~
+  vwl starttype #@ endtype #@
+  length 200
+  FMT(vnasal/W_n)
+endphoneme
+
+
+phoneme l2  // as [l] but devoice previous phoneme
+  liquid lengthmod 7
+  ChangePhoneme (l)
+endphoneme
+
+phoneme b
+  vcd blb stp
+  voicingswitch p
+  IF nextPh(l2) OR nextPh(isPause) THEN
+    ChangePhoneme(p)
+  ENDIF
+  CALL base1/b
+endphoneme
+
+phoneme d
+  vcd alv stp
+  voicingswitch t
+  IF nextPh(l2) OR nextPh(isPause) THEN
+    ChangePhoneme(t)
+  ENDIF
+  lengthmod 5
+  Vowelin f1=1  f2=1700 -300 300  f3=-100 80
+  Vowelout f1=2 f2=1700 -300 300  f3=-100 80 brk
+
+  IF PreVoicing THEN
+    FMT(d/xd)
+  ENDIF
+
+  IF nextPh(isPause2) THEN
+    FMT(d/d_)  addWav(x/d_)
+  ELIF nextPh(r) THEN
+    FMT(d/dr) addWav(x/d)
+  ENDIF
+
+  FMT(d/d) addWav(x/d)
+endphoneme
+
+phoneme g
+  vcd vel stp
+  voicingswitch k
+  IF nextPh(l2) OR nextPh(isPause) THEN
+    ChangePhoneme(k)
+  ENDIF
+  CALL base1/g
+endphoneme
+
+
+phoneme k
+  vls vel stp
+  voicingswitch g
+  lengthmod 2
+  Vowelin f1=0  f2=2300 200 300  f3=-200 80
+  Vowelout f1=0 f2=2300 300 400  f3=-200 80  rms=20
+
+  IF KlattSynth THEN
+    Vowelout f1=0 f2=2300 200 300  f3=-200 80  rms=20
+  ENDIF
+
+  IF nextPh(isPause2) THEN
+    WAV(ustop/k_)
+  ELIF nextPh(r) THEN
+    WAV(ustop/k, 70)
+  ELIF nextPh(R) OR nextPh(R2) THEN
+    WAV(ustop/k_)
+  ELIF nextPh(i:) OR nextPh(j) OR nextPh(;) THEN
+    WAV(ustop/ki)
+  ELIF nextPh(l) THEN
+    WAV(ustop/kl)
+  ELIF nextPh(@-) THEN
+    WAV(ustop/k, 70)
+  ENDIF
+  WAV(ustop/k)
+endphoneme
+
+phoneme v
+  vcd lbd frc
+  voicingswitch f
+  IF nextPh(isPause) THEN
+    ChangePhoneme(f)
+  ENDIF
+  CALL base1/v
+endphoneme
+
+phoneme z
+  vcd alv frc sib
+  voicingswitch s
+  IF nextPh(isPause) THEN
+    ChangePhoneme(s)
+  ENDIF
+  CALL base1/z
+endphoneme
+
+phoneme x
+  vls vel frc
+  voicingswitch Q
+  lengthmod 3
+  Vowelin f1=0  f2=2300 200 400  f3=-100 80
+  Vowelout f1=0 f2=2300 300 400  f3=-100 80  rms=20
+
+  IF nextPh(isPause) THEN
+    WAV(ufric/x2, 60)
+  ENDIF
+  WAV(ufric/x_hr, 20)
+endphoneme
+
+
+phoneme O~ // saison, Pardon, Fond
+  vwl  starttype #o  endtype #o
+  length 190
+  FMT(vnasal/o_n5)
+endphoneme

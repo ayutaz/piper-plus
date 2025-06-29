@@ -1,0 +1,128 @@
+// This file is UTF8 encoded
+// Spelling to phoneme rules for Uzbek language
+
+.replace
+// Replace Cyrrilic script to Latin script
+    а    a
+    б    b
+    ц    c
+    д    d
+    е    e
+    э    e
+    ф    f
+    г    g
+    ҳ    h
+    и    i
+    ж    j
+    к    k
+    л    l
+    м    m
+    н    n
+    о    o
+    п    p
+    қ    q
+    р    r
+    с    s
+    т    t
+    у    u
+    в    v
+    х    x
+    й    y
+    з    z
+    ў    ó
+    ғ    ǵ
+    ш    š
+    ч    ç
+    ю    ju
+    я    ja
+    ь    ʼ
+    ъ    ʼ
+    ‘    ʻ  // Replace left single quotation mark to  modifier letter turned comma
+    '    ʻ  // apostrophe to modifier letter turned comma
+
+.group a
+    a    &
+
+.group b
+    b    b
+
+.group c
+    c    ts
+    ch   tS
+
+.group d
+    d    d
+
+.group e
+    e    e
+
+.group f
+    f    f,
+
+.group g
+    g    g
+    gʻ   Q"
+
+.group h
+    h    h
+
+.group i
+    i    y
+
+.group j
+    j    dZ
+
+.group k
+    k    k
+
+.group l
+    l    l
+
+.group m
+    m    m
+
+.group n
+    n    n
+    ng   N
+
+.group o
+    o    A
+    oʻ   o
+
+.group p
+    p    p
+
+.group q
+    q    q
+
+.group r
+    r    *
+
+.group s
+    s    s
+    sh   S
+
+.group t
+    t    t
+
+.group u
+    u    U
+
+.group v
+    v    v#
+
+.group x
+    x    X
+
+.group y
+    y    j
+
+.group z
+    z    z
+
+.group
+    ʻ     ?
+    ó     o:
+    ǵ     Q"
+    ş     S
+    ç     tS

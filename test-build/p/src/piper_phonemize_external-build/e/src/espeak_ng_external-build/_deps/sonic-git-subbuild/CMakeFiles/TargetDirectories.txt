@@ -1,0 +1,3 @@
+/Users/s19447/Desktop/piper/test-build/p/src/piper_phonemize_external-build/e/src/espeak_ng_external-build/_deps/sonic-git-subbuild/CMakeFiles/sonic-git-populate.dir
+/Users/s19447/Desktop/piper/test-build/p/src/piper_phonemize_external-build/e/src/espeak_ng_external-build/_deps/sonic-git-subbuild/CMakeFiles/edit_cache.dir
+/Users/s19447/Desktop/piper/test-build/p/src/piper_phonemize_external-build/e/src/espeak_ng_external-build/_deps/sonic-git-subbuild/CMakeFiles/rebuild_cache.dir

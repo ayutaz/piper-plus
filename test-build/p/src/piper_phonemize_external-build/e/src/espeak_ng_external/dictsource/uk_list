@@ -1,0 +1,225 @@
+// This file is UTF-8 encoded
+/// pronunciation of signs, numbers and exceptional words
+// Author: Andrij Mizyk <andm1zyk@proton.me>, 2022
+
+// all words must be LOWER CASE  (although the initial letter will be
+// automatically converted if it's a 7bit ascii character)
+//
+// You can use the uk_extra file, rather than this one
+// to add your own pronunciation definitions.
+//
+// if they are spoken as a single character in text precede by _
+// to distinguish from pronunciation as a language word
+
+
+// CHARACTERS
+//***********
+
+!  zn'ak||'okleku
+"  podv'i:jna||l'apka
+#  RES'i:tka
+$  d'olaR
+%  vi:ds'otok
+&  ampeRs'and
+//'  odIn'aRna||l'apka
+//(  Bi:dkR'eta||d'uZka
+//)  zakR'eta||d'uZka
+*  z'i:RotSka
++  pl^'us
+,  k'oma
+-  m'i:nus
+.  kR'apka
+/  kos'a||R'Iska
+:  dB'i:||kR'apkI
+;  kR'apka||z||k'omoju
+<  m'EnSE
+=  R'i:vnE
+>  b'i:l^SE
+//?  zn'ak||pIt'an:ja  // не читає
+@  sob'atSka
+[  Bi:dkR'eta||kBadR'atna||d'uZka
+\  ob'ERnEna||kos'a||R'Iska
+]  zakR'eta||kBadR'atna||d'uZka
+^  daS'ok
+\\_  n'IZn^e||pi:dkR'EslEn:ja
+`  hRaf'i:s
+{  B'i:dkReta||fi:h'uRna||d'uZka
+|  BERtIk'al^na||R'Iska
+}  zakR'eta||fi:h'uRna||d'uZka
+~  t'Il^da
+ʼ  ap'ostRof
+«  B'i:dkRIti:||lapk'I
+»  z'akRIti:||lapk'I
+…  tR'e||kR'apkI
+
+
+// NUMBERS
+//********
+
+_0	n'ul^
+_1	od'en
+_2	dB'a
+_3	tR'I
+_4	tSot'eRe
+_5	pj'at;
+_6	S'i:st;
+_7	s'i:m
+_8	v'i:si:m
+_9	d'Evjat;
+
+_10	d'Esjat;
+_11	oden'adsjat;
+_12	dvan'adsjat;
+_13	tRen'adsjat;
+_14	tSoteRn'adsjat;
+_15	pjatn'adsjat;
+_16	Si:stn'adsjat;
+_17	si:mn'adsjat;
+_18	vi:si:mn'adsjat;
+_19	devjatn'adsjat;
+_2X	dv'adsjat;
+_3X	tR'edsjat;
+_4X	s'oRok
+_5X	pjatdesj'at;
+_6X	Si:stdesj'at;
+_7X	si:mdesj'at;
+_8X	vi:si:mdesj'at;
+_9X	devjan'osto
+_1C	st'o
+_2C	dv'i:sti:
+_3C	tR'esta
+_4C	tSot'eResta
+_5C	pjats'ot
+_6C	Si:sts'ot
+_7C	si:ms'ot
+_8C	vi:si:ms'ot
+_9C	devjats'ot
+
+// large numbers, short scale
+_0C	st'o
+_0M1	t'esjatSa
+_0M2	mi:l;j'on
+_0M3	bi:l;j'on
+_0M4	tRel;j'on
+_0M5    kvadRal;j'on
+_0M6    kvi:ntel;j'on
+_0M7    sEkstel;j'on
+_0M8    sEptel;j'on
+_0M9    oktel;j'on
+_0M10   nonel;j'on
+
+
+// LETTERS
+//********
+
+_б  bE
+_в  BE
+г  hE
+ґ  gE
+д  dE
+_ж  ZE
+_з  zE
+_й  jot
+к  ka
+л  El^
+м  Em
+н  En
+п  pE
+р  ER
+с  Es
+т  tE
+ф  Ef
+х  xa
+ц  tsE
+ч  tSa
+ш  Sa
+щ  StSa
+ь  m|jak'Ij||zn'ak
+
+
+// ABBREVIATIONS
+//**************
+
+зсу  $abbrev
+
+
+// MAIN WORD DICTIONARY
+//*********************
+
+// дні
+вівторок $2
+середа $2
+четвер $2
+пʼятниця $1
+
+// місяці
+березень $1
+вересень $1
+
+// свята
+різдво $2
+
+// міста
+вінниця $1
+дніпро $2
+запоріжжя $3
+ужгород 'uZhoRod
+херсон $2
+чернівці $3
+
+// країни
+україна $3
+австрія $1
+англія $1
+боснія $1
+герцеговина $4
+греція $1
+грузія $2
+данія $1
+латвія $1
+литва $2
+нідерланди $3
+сербія $1
+франція $1
+чехія $1
+швеція $1
+
+//-------------
+
+або $2
+ага $2
+агов $2
+але $2
+були $2
+було $2
+вʼїзд v|j'i:zd
+вона $2
+вони $2
+воно $2
+дякую $1
+їй ji:j
+їм ji:m
+їх ji:x
+його $2
+коли $2
+лише $2
+отож $2
+проте $2
+себе $2
+таких $2
+тепер $2
+тому $2
+хоча $2
+чогось $2
+чому $2
+яка $2
+якби $2
+який $2
+якийсь $2
+яким $2
+яких $2
+які $2
+якось $2
+якщо $2
+
+//

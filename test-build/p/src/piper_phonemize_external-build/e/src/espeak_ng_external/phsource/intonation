@@ -1,0 +1,312 @@
+tune s1
+prehead   46 57
+headenv   fall 16
+head       4 80 50 -8 -5
+headextend 0 63 38 13 0
+nucleus0 fall 64 8
+nucleus  fall 70 18 24 12
+endtune
+
+tune s_ml
+prehead   46 57
+headenv   fall 16
+head       3 40 60 15 30
+headextend 0 63 38 13 0
+nucleus0 fall 64 8
+nucleus  fall 70 18 24 12
+endtune
+
+
+
+tune c1
+prehead   46 57
+headenv   fall 16
+head       4 80 46 -8 -5
+headextend 0 63 38 13 0
+nucleus0 fall-rise  80 18
+nucleus  fall-rise2 78 22 34 52
+endtune
+
+tune q1   // small change for version 1.47.05
+prehead   45 56
+headenv   fall 16
+head       3 75 43 -7 0
+headextend 20 60 35 11 0
+nucleus0 fall-rise  89 21
+nucleus  fall-rise2 86 21 34 68
+endtune
+
+tune q1a  // previous version
+prehead   46 57
+headenv   fall 16
+head       4 75 43 -7 0
+headextend 25 63 38 13 0
+nucleus0 fall-rise  88 22
+nucleus  fall-rise2 82 22 34 66
+endtune
+
+tune e1
+prehead   46 57
+headenv   fall 16
+head       3 90 50 -9 0
+headextend 16 82 50 32 16
+nucleus0 fall  92 8
+nucleus  fall  92 80 76 8
+endtune
+
+
+// PB Tunes for the Danish intonation
+// full-stop "." - punktum
+tune s2
+prehead   46 57
+headenv   fall 16
+head       4 65 60 -8 -5
+headextend 0 53 38 13 0
+nucleus0 fall 44 28
+nucleus  fall 50 42 34 28 // sidste ord før punktu
+
+onset 75 -5 -5
+endtune
+
+// comma "," - komma
+tune c2
+prehead   46 57
+headenv   fall 16
+head       4 65 50 -8 -5
+headextend 0 63 38 13 0
+nucleus0 rise  60 42
+nucleus  rise 55 42 34 52 // sidste tal: slutniveau
+endtune
+
+// question mark "?" - spørgsmålste
+
+tune q2
+prehead   40 75
+headenv   fall 16
+head       4 75 43 -7 0 //head       4 35 43 -7 0
+headextend 25 63 38 13 0
+nucleus0 rise  70 50 // første tal: slutniveaue
+
+nucleus  rise 35 45 60 70 // sidste tal: slutniveau
+endtune
+
+// exclamation mark "!" - udråbsteg
+
+tune e2
+prehead   46 57
+headenv   fall 16
+head       3 90 50 -9 0
+headextend 16 82 50 32 16
+nucleus0 fall  92 8
+nucleus  fall  92 80 76 8
+endtune
+
+
+
+// Tunes for the French intonation
+// full-stop "." - point
+tune s3
+prehead   46 57
+headenv   fall 16
+head       4 80 50 -8 -5
+headextend 0 63 38 13 0
+nucleus0 fall 64 8
+nucleus  fall 70 18 24 12
+endtune
+
+// comma "," - virgule
+tune c3
+prehead   46 57
+headenv   fall 16
+head       4 70 30 -8 -5
+// headextend 0 63 38 13 0
+nucleus0 fall-rise  75 50
+endtune
+
+// question mark "?" - point d'interrogation
+tune q3
+prehead   46 57
+headenv   fall 16
+head       4 75 43 -7 0
+headextend 25 63 38 13 0
+nucleus0 fall-rise  88 22
+nucleus  fall-rise2 82 22 34 66
+endtune
+
+// exclamation mark "!" - point d'exclamation
+tune e3
+prehead   46 57
+headenv   fall 16
+head       3 90 50 -9 0
+headextend 16 82 50 32 16
+nucleus0 fall  92 8
+nucleus  fall  92 80 76 8
+endtune
+
+
+// italian (by  llajta@gmx.us)
+
+tune s4
+prehead   46 57
+headenv   fall 16
+head       4 80 43 -8 -5
+headextend 0 63 38 13 0
+headlast 45 4 8
+nucleus0 fall 64 8
+nucleus  fall 68 18 22 10
+endtune
+
+tune c4
+prehead   46 57
+headenv   fall 16
+head       4 76 42 -8 -5
+headextend 0 63 38 13 0
+nucleus0 fall-rise  77 25
+nucleus  fall-rise2 78 25 24 52
+endtune
+
+tune q4
+prehead   47 58
+headenv   fall 16
+head       5 75 53 -7 1
+headextend 0 60 55 45 60
+onset 56 41 55
+headlast 60 24 30
+nucleus0 fall-rise  95 29
+nucleus  fall-rise2 92 21 34 79
+endtune
+
+tune e4
+prehead   46 57
+headenv   fall 16
+head       3 77 53 -7 0
+headextend 40 80 75 70 67
+headlast 75 67 55
+nucleus0 fall2  92 8
+nucleus  fall2  88 74 72 12
+endtune
+
+
+// latvian
+
+tune s5
+prehead   46 57
+headenv   fall 16
+head       4 80 55 -8 -5
+headextend 0 64 38 13 0
+nucleus0 fall 68 8
+nucleus  fall 74 18 24 12
+endtune
+
+tune c5
+prehead   46 57
+headenv   fall 16
+head       4 80 55 -8 -5
+headextend 0 64 38 13 0
+nucleus0 rise  77 25
+nucleus  rise 78 50 50 80
+endtune
+
+tune q5
+prehead   47 58
+headenv   fall 16
+head       5 75 53 -7 1
+headextend 0 60 55 45 60
+onset 60 48 62
+headlast 60 44 40
+nucleus0 fall-rise  70 50
+nucleus  fall-rise 35 45 60 70
+endtune
+
+tune e5
+prehead   46 57
+headenv   fall 16
+head       5 77 53 -7 0
+headextend 40 80 75 70 67
+headlast 80 72 60
+nucleus0 rise-fall  92 8
+nucleus  rise-fall  88 77 75 10
+endtune
+
+// spanish
+tune s6
+prehead   46 57
+headenv   fall 16
+head       5 79 50 -7 -4
+headextend 0 63 38 13 0
+nucleus0 fall 66 7
+nucleus fall 72 25 16 9
+endtune
+
+tune c6
+prehead   45 55
+headenv   fall 16
+head       4 80 49 -8 -3
+headextend 0 63 38 13 0
+nucleus0 fall-rise 70 15
+nucleus fall-rise 74 26 23 45
+endtune
+
+tune q6
+prehead   58 40
+headenv   fall 16
+head       3 74 45 -7 -2
+headextend 10 47 23 9 0
+onset 58 45 48
+headlast 55 32 27
+nucleus0 fall-rise 90 24
+nucleus fall-rise 78 25 90 68
+endtune
+
+tune e6
+prehead   46 57
+headenv   fall 16
+head       3 90 50 -9 0
+headextend 16 82 50 32 16
+nucleus0 fall  92 8
+nucleus fall  90 77 76 8
+endtune
+
+tune chrs
+prehead		0	0
+headenv		fall	0
+head		1	0	0	0	0
+headextend	0	0	0	0	0	0	0	0
+nucleus		fall	0	0	0	0
+nucleus0	fall	0	0
+onset		0	0	0
+headlast	0	0	0
+endtune
+
+tune chrc
+prehead		0	0
+headenv		fall	0
+head		1	0	0	0	0
+headextend	0	0	0	0	0	0	0	0
+nucleus		fall	0	0	0	0
+nucleus0	fall	0	0
+onset		0	0	0
+headlast	0	0	0
+endtune
+
+tune chrq
+prehead		0	0
+headenv		fall	0
+head		1	0	0	0	0
+headextend	0	0	0	0	0	0	0	0
+nucleus		fall	0	0	0	0
+nucleus0	fall	0	0
+onset		0	0	0
+headlast	0	0	0
+endtune
+
+tune chre
+prehead		0	0
+headenv		fall	0
+head		1	0	0	0	0
+headextend	0	0	0	0	0	0	0	0
+nucleus		fall	0	0	0	0
+nucleus0	fall	0	0
+onset		0	0	0
+headlast	0	0	0
+endtune

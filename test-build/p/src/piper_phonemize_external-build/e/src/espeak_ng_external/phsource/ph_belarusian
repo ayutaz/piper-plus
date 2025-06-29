@@ -1,0 +1,89 @@
+//====================================================
+//  Belarusian
+//====================================================
+
+phoneme a
+  vwl   starttype #a  endtype #a
+  ipa a
+  length 180
+  FMT(vowel/a)
+endphoneme
+
+phoneme i"
+  vwl starttype #i endtype #i
+  ipa ɨ
+  length 180
+  FMT(vowel/ii#_2)
+endphoneme
+
+phoneme Q
+  import_phoneme base1/Q"
+  ipa ɣ
+endphoneme
+
+phoneme ts
+  CALL consonants/ts
+  voicingswitch dz
+  ipa t͡s
+endphoneme
+
+phoneme ts;
+  CALL base1/tS;
+  voicingswitch dz;
+  ipa t͡sʲ
+endphoneme
+
+phoneme ts.
+  vls pla afr sib
+  ipa ʈ͡ʂ
+  lengthmod 2
+  voicingswitch dz.
+  Vowelin f1=0  f2=2300 200 400  f3=-100 80
+  WAV(ustop/tsh_sr, 50)
+endphoneme
+
+phoneme dz
+  CALL consonants/dz
+  voicingswitch ts
+  ipa d͡z
+endphoneme
+
+phoneme dz;
+  import_phoneme pl/dz;
+  CALL base1/dZ;
+  voicingswitch ts;
+  ipa d͡zʲ
+endphoneme
+
+phoneme dz.
+  vcd pla afr sib
+  ipa ɖ͡ʐ
+  lengthmod 5
+  voicingswitch ts.
+  Vowelin f1=2  f2=2300 200 400  f3=100 80
+  Vowelout f1=2  f2=2300 250 300  f3=100 80 brk
+endphoneme
+
+phoneme r
+  liquid trl
+  lengthmod 6
+  ipa r
+  length 80
+  FMT(r3/r_trill2) addWav(r3/r_trill2.wav, 65)
+endphoneme
+
+phoneme s;
+  import_phoneme base1/s;
+  ipa sʲ
+endphoneme
+
+phoneme z;
+  import_phoneme base1/z;
+  ipa zʲ
+endphoneme
+
+phoneme ;
+  liquid pzd
+  lengthmod 0
+  ipa ʲ
+endphoneme

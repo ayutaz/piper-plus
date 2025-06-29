@@ -1,0 +1,296 @@
+
+
+//=========================================================
+// Dutch
+//=========================================================
+
+
+// Vowels
+//=======
+
+
+phoneme @   //  Schwa
+  vwl starttype #@ endtype #@
+  unstressed
+  length 125
+  FMT(vowel/@_4)
+endphoneme
+
+phoneme i
+  vwl starttype #i endtype #i
+  length 130
+  FMT(vowel/i_2)
+endphoneme
+
+phoneme I
+  vwl starttype #i endtype #i
+  length 130
+  FMT(vowel/ii)
+endphoneme
+
+phoneme y
+  vwl starttype #u endtype #u
+  length 180
+  FMT(vowel/y)
+endphoneme
+
+phoneme 8
+  vwl starttype #u endtype #u
+  length 140
+  FMT(vowel/y#)
+endphoneme
+
+phoneme u
+  vwl starttype #u endtype #u
+  length 150
+  FMT(vowel/u_bck)
+endphoneme
+
+phoneme E
+  vwl starttype #e endtype #e
+  length 140
+  FMT(vowel/e_mid2)
+endphoneme
+
+phoneme E2    //  as[E] but reduces to @ if unstressed
+  vwl starttype #e endtype #e
+  length 140
+  ChangeIfDiminished(@)
+  FMT(vowel/ee_2)
+endphoneme
+
+phoneme O
+  vwl starttype #o endtype #o
+  length 140
+  FMT(vowel/o_6)
+endphoneme
+
+phoneme O:      // for "oor"
+  vwl starttype #o endtype #o
+  length 210
+  FMT(vowel/o_6)
+endphoneme
+
+phoneme a:
+  vwl starttype #a endtype #a
+  length 210
+  IF thisPh(isUnstressed) THEN
+    IF thisPh(isWordEnd) THEN
+      FMT(vowel/a#_2)
+    ELSE
+      FMT(vowel/a#_4)
+    ENDIF
+  ENDIF
+  FMT(vowel/a)
+endphoneme
+
+
+phoneme a   // ?? suggested by aegis, but seems too short
+  vwl starttype #a endtype #a
+  length 150
+  FMT(vowel/a_2)
+endphoneme
+
+
+phoneme A
+  vwl starttype #a endtype #a
+  length 150
+  IF thisPh(isUnstressed) THEN
+    FMT(vowel/a#_2)
+  ENDIF
+  FMT(vowel/aa_8)
+endphoneme
+
+phoneme A~
+  import_phoneme fr/A~
+endphoneme
+
+phoneme O~
+  vwl starttype #o endtype #o
+  length 190
+  FMT(vnasal/oo_n2)
+endphoneme
+
+
+// Diphthongs
+//===========
+
+phoneme e:
+  vwl starttype #e endtype #i
+  length 190
+  FMT(vdiph/ei)
+endphoneme
+
+phoneme e#    // as [e:] but change to [@] in unstressed syllables
+  vwl starttype #e endtype #i
+  length 190
+  ChangeIfUnstressed(@)
+  ChangePhoneme(e:)
+endphoneme
+
+phoneme Y:
+  vwl starttype #@ endtype #@
+  length 220
+  FMT(vdiph/y#y_3)
+endphoneme
+
+phoneme o:
+  vwl starttype #o endtype #u
+  length 150
+  FMT(vdiph/ou_4)
+endphoneme
+
+
+phoneme EI
+  vwl starttype #a endtype #i
+  length 210
+  FMT(vdiph/eei)
+endphoneme
+
+phoneme Wy
+  vwl starttype #@ endtype #u
+  length 220
+  FMT(vdiph/&y)
+endphoneme
+
+phoneme VU
+  vwl starttype #a endtype #o
+  length 220
+  FMT(vdiph/aau_2)
+endphoneme
+
+phoneme eU
+  vwl starttype #e endtype #u
+  length 220
+  FMT(vdiph/eu)
+endphoneme
+
+phoneme yU
+  vwl starttype #u endtype #u
+  length 220
+  FMT(vdiph2/yu)
+endphoneme
+
+
+
+
+// CONSONANTS
+//===========
+
+
+phoneme r
+  import_phoneme base1/R2
+endphoneme
+
+
+
+phoneme Q
+  vcd vel frc
+  lengthmod 6
+  voicingswitch x
+  Vowelin f1=2  f2=2300 200 300  f3=-300 80
+  Vowelout f1=2  f2=2300 250 300  f3=-300 80 brk
+
+  IF prevPhW(x) THEN
+    ChangePhoneme(NULL)
+  ENDIF
+  IF nextPhW(isVoiced) THEN
+  ELSE
+    ChangePhoneme(x)
+  ENDIF
+
+  IF nextPh(isPause2) THEN
+    FMT(voc/Q_) addWav(vocw/Q_)
+  ENDIF
+  FMT(voc/Q_less) addWav(vocw/Q2, 140)
+endphoneme
+
+
+phoneme !  //  Short pause, replaces assimilated t,d,p,b at end of word
+  pause
+  ipa NULL
+  starttype _ endtype _
+  lengthmod 1
+  length 25
+endphoneme
+
+
+phoneme k
+  import_phoneme consonants/k-  // unaspirated
+endphoneme
+
+
+phoneme t
+  IF thisPh(isWordEnd) THEN
+    IF nextPh(t) OR nextPh(d) THEN
+      ChangePhoneme(!)
+    ENDIF
+  ENDIF
+  CALL consonants/t-
+endphoneme
+
+phoneme d
+  IF thisPh(isWordEnd) THEN
+    IF nextPh(t) OR nextPh(d) THEN
+      ChangePhoneme(!)
+    ENDIF
+  ENDIF
+
+  IF prevPh(!) THEN  // previous was [t] or [d], now assimilated
+    ChangePhoneme(t)
+  ENDIF
+  CALL base1/d
+endphoneme
+
+phoneme p
+  IF thisPh(isWordEnd) THEN
+    IF nextPh(p) OR nextPh(b) THEN
+      ChangePhoneme(!)
+    ENDIF
+  ENDIF
+  CALL consonants/p-  // unaspirated
+endphoneme
+
+phoneme b
+  IF thisPh(isWordEnd) THEN
+    IF nextPh(p) OR nextPh(b) THEN
+      ChangePhoneme(!)
+    ENDIF
+  ENDIF
+
+  IF prevPh(!) THEN  // previous was [p] or [b], now assimilated
+    ChangePhoneme(p)
+  ENDIF
+  CALL base1/b
+endphoneme
+
+phoneme s
+  IF thisPh(isWordEnd) THEN
+    IF nextPh(s) OR nextPh(z) THEN
+      ChangePhoneme(!)
+    ENDIF
+  ENDIF
+  CALL base1/s
+endphoneme
+
+phoneme z
+  IF thisPh(isWordEnd) THEN
+    IF nextPh(s) OR nextPh(z) THEN
+      ChangePhoneme(!)
+    ENDIF
+  ENDIF
+
+  IF prevPh(!) THEN  // previous was [s] or [z], now assimilated
+    ChangePhoneme(s)
+  ENDIF
+  CALL base1/z
+endphoneme
+
+
+phoneme l
+  import_phoneme en/l
+endphoneme
+
+phoneme x
+  import_phoneme af/x2
+endphoneme

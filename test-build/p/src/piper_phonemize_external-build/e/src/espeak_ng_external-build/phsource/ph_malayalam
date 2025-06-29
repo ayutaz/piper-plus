@@ -1,0 +1,320 @@
+
+// Phonemes for Malayalam
+// This inherits from ph_hindi
+
+
+phoneme @
+  vwl  starttype #@  endtype #@
+  length 130
+  FMT(vowel/@_low)
+endphoneme
+
+
+phoneme y  // epenthetic vowel
+  vwl starttype #@ endtype #@
+  unstressed
+  ipa ɨ
+  length 80
+  FMT(vowel/u#_4, 120)
+endphoneme
+
+
+phoneme a
+  vwl starttype #a endtype #a
+  ipa ɐ
+  length 130
+
+  IF thisPh(isStressed) OR thisPh(isFirstVowel) OR thisPh(isWordEnd) THEN
+    FMT(vowel/a#_4)
+  ELSE
+    ChangeIfUnstressed(@)
+
+    IF nextPh(m) AND nextPh(isWordEnd) THEN
+      ChangePhoneme(@)
+    ENDIF
+
+    FMT(vowel/a#_3)
+  ENDIF
+endphoneme
+
+
+phoneme a#    // don't reduce to [@]
+  vwl starttype #a endtype #a
+  ChangePhoneme(a)
+endphoneme
+
+
+phoneme a:
+  vwl lng starttype #a  endtype #a
+  length 300
+  FMT(vowel/a_5)
+endphoneme
+
+
+phoneme e
+  vwl  starttype #e  endtype #e
+  length 130
+  FMT(vowel/e)
+endphoneme
+
+
+phoneme e:
+  vwl lng starttype #e  endtype #e
+  length 270
+  FMT(vowel/e)
+endphoneme
+
+
+phoneme i
+  vwl  starttype #i  endtype #i
+  length 130
+  FMT(vowel/i_6)
+endphoneme
+
+phoneme I
+  vwl  starttype #i  endtype #i
+  length 130
+  FMT(vowel/ii)
+endphoneme
+
+
+phoneme i:
+  vwl lng starttype #i  endtype #i
+  length 270
+  FMT(vowel/i)
+endphoneme
+
+
+
+phoneme o
+  vwl  starttype #o  endtype #o
+  length 130
+  FMT(vowel/o)
+endphoneme
+
+
+phoneme o:
+  vwl lng starttype #o  endtype #o
+  length 300
+  FMT(vowel/o)
+endphoneme
+
+
+phoneme u
+  vwl  starttype #u  endtype #u
+  length 110
+  FMT(vowel/u)
+endphoneme
+
+phoneme u:
+  vwl lng starttype #u  endtype #u
+  length 280
+  FMT(vowel/u)
+endphoneme
+
+
+phoneme aI
+  vwl lng starttype #a endtype #i
+  length 280
+  FMT(vdiph/ai)
+endphoneme
+
+phoneme aU
+  vwl lng starttype #a endtype #u
+  length 270
+  FMT(vdiph/aau_3)
+endphoneme
+
+
+// ?? This is standard [v].  Should be it [v] without the fricative noise?
+phoneme v
+  import_phoneme base1/v
+endphoneme
+
+phoneme r
+  import_phoneme base1/**
+endphoneme
+
+phoneme R
+  import_phoneme base1/R2
+endphoneme
+
+phoneme d2   // 'rr' sounds like English 'd'
+  import_phoneme base1/d
+endphoneme
+
+
+// Aspirated voice stops, sound like aspirated unvoiced stops ?
+
+phoneme b#
+  vls blb stp prevoice
+  lengthmod 2
+  voicingswitch b
+  Vowelin  f1=0  f2=1000 -50 -100  f3=-200 80
+  Vowelout f1=0  f2=1000 -500 -350  f3=-300 80 rms=30
+  
+  IF PreVoicing THEN
+    IF prevPhW(isVowel) THEN
+      FMT(b/xb)
+    ELSE
+      FMT(voc/murmur1)
+    ENDIF
+  ENDIF
+
+  IF nextPh(isPause2) THEN
+    WAV(ustop/p_)
+  ENDIF
+  IF nextPh(l) THEN
+    WAV(ustop/pl)
+  ENDIF
+  WAV(ustop/p_asp)
+endphoneme
+
+
+phoneme d#
+  vls dnt stp prevoice
+  lengthmod 2
+  voicingswitch d
+  Vowelin f1=0  f2=1500 -300 300  f3=-100 80  amp=16
+  Vowelout f1=0 f2=1500 -300 250  f3=-100 80  rms=20
+
+  IF PreVoicing THEN
+    IF prevPhW(isVowel) THEN
+      FMT(d/xd)
+    ELSE
+      FMT(voc/murmur1)
+    ENDIF
+  ENDIF
+
+  IF nextPh(isPause2) THEN
+    WAV(ustop/t_dnt, 35)
+  ENDIF
+  WAV(ustop/t_dnt, 50)
+endphoneme
+
+
+phoneme t.#
+  vls rfx stp
+  lengthmod 2
+  ipa ʈU+02B0
+  voicingswitch d.#
+  Vowelin f1=0  f2=1800 -300 300  f3=-200 80
+  Vowelout f1=0 f2=1800 -300 250  f3=-400 80  rms=20 colr=2
+  
+  IF nextPhW(t.#) THEN
+    ChangePhoneme(t.)
+  ENDIF
+  WAV(ustop/th_rfx2, 80)
+endphoneme
+
+
+phoneme d.#
+  vls rfx stp prevoice
+  lengthmod 2
+  ipa ʈU+02B0
+  Vowelin f1=0  f2=1800 -300 300  f3=-200 80
+  Vowelout f1=0 f2=1800 -300 250  f3=-400 80  rms=20 colr=2
+
+  IF PreVoicing THEN
+    IF prevPhW(isVowel) THEN
+      FMT(d/xdr)
+    ELSE
+      FMT(voc/murmur1)
+    ENDIF
+  ENDIF
+
+  voicingswitch d.#
+  WAV(ustop/th_rfx2, 80)
+endphoneme
+
+
+phoneme J#
+  vls pal afr sib pzd prevoice
+  voicingswitch c#
+  lengthmod 2
+  Vowelin f1=0  f2=2700 400 600  f3=300 80 rate len=70
+
+  IF PreVoicing THEN
+    IF prevPhW(isVowel) THEN
+      FMT(dzh/xdz_pzd)
+    ELSE
+      FMT(voc/murmur1)
+    ENDIF
+  ENDIF
+
+  IF nextPh(isPause2) THEN
+    WAV(ustop/ts_pzd)
+  ENDIF
+  WAV(ustop/ts_pzd)
+endphoneme
+
+
+phoneme g#
+  vls vel stp prevoice
+  lengthmod 2
+  Vowelin f1=1  f2=1400 -100 100  f3=-150 80
+  Vowelout f1=0 f2=2300 300 400  f3=-150 80  rms=20
+
+  IF PreVoicing THEN
+    IF prevPhW(isVowel) THEN
+      FMT(g/xg)
+    ELSE
+      FMT(voc/murmur1)
+    ENDIF
+  ENDIF
+
+  
+  IF nextPh(isPause2) THEN
+    WAV(ustop/k_asp, 40)
+  ENDIF
+  IF nextPhW(#e) OR nextPhW(#i) THEN
+    WAV(ustop/k_asp_e, 40)
+  ELIF nextPhW(#o) OR nextPhW(#u) THEN
+    WAV(ustop/k_asp_a, 25)
+  ELSE
+    WAV(ustop/k_asp_a, 30)
+  ENDIF
+endphoneme
+
+
+
+// suggested by Prasenjit Sen, but perhaps not needed?
+// ml_rules changes [p], [t], [k] to [b], [d], [g] in non-initial
+// positions
+
+phoneme p
+  import_phoneme consonants/p-
+  voicingswitch b
+
+  IF thisPh(isWordStart) THEN
+      CALL base1/p
+  ELIF thisPh(isWordEnd) AND NOT thisPh(isFirstVowel) THEN
+      ChangePhoneme(b)
+  ENDIF
+endphoneme
+
+
+phoneme t 
+  import_phoneme base1/t[
+  voicingswitch d
+
+  IF thisPh(isWordStart) THEN
+      CALL base1/t
+  ELIF thisPh(isWordEnd) AND NOT thisPh(isFirstVowel) THEN
+      ChangePhoneme(d)
+  ENDIF
+endphoneme
+
+
+phoneme k
+  import_phoneme consonants/k-
+  voicingswitch g
+
+  IF thisPh(isWordStart) THEN
+      CALL base1/k
+  ELIF thisPh(isWordEnd) AND NOT thisPh(isFirstVowel) THEN
+      ChangePhoneme(g)
+  ENDIF
+endphoneme
+
+

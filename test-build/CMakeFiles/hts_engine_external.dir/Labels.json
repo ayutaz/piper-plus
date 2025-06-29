@@ -1,0 +1,43 @@
+{
+	"sources" : 
+	[
+		{
+			"file" : "/Users/s19447/Desktop/piper/test-build/CMakeFiles/hts_engine_external"
+		},
+		{
+			"file" : "/Users/s19447/Desktop/piper/test-build/CMakeFiles/hts_engine_external.rule"
+		},
+		{
+			"file" : "/Users/s19447/Desktop/piper/test-build/CMakeFiles/hts_engine_external-complete.rule"
+		},
+		{
+			"file" : "/Users/s19447/Desktop/piper/test-build/h/src/hts_engine_external-stamp/hts_engine_external-build.rule"
+		},
+		{
+			"file" : "/Users/s19447/Desktop/piper/test-build/h/src/hts_engine_external-stamp/hts_engine_external-configure.rule"
+		},
+		{
+			"file" : "/Users/s19447/Desktop/piper/test-build/h/src/hts_engine_external-stamp/hts_engine_external-download.rule"
+		},
+		{
+			"file" : "/Users/s19447/Desktop/piper/test-build/h/src/hts_engine_external-stamp/hts_engine_external-install.rule"
+		},
+		{
+			"file" : "/Users/s19447/Desktop/piper/test-build/h/src/hts_engine_external-stamp/hts_engine_external-mkdir.rule"
+		},
+		{
+			"file" : "/Users/s19447/Desktop/piper/test-build/h/src/hts_engine_external-stamp/hts_engine_external-patch.rule"
+		},
+		{
+			"file" : "/Users/s19447/Desktop/piper/test-build/h/src/hts_engine_external-stamp/hts_engine_external-update.rule"
+		}
+	],
+	"target" : 
+	{
+		"labels" : 
+		[
+			"hts_engine_external"
+		],
+		"name" : "hts_engine_external"
+	}
+}

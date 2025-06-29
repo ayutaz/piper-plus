@@ -1,0 +1,167 @@
+
+// This file inherits phonemes from ph_croatian
+// Only phonemes which differ from the inherited phonemes need
+// to be included here.
+
+phoneme I
+  vwl starttype #i endtype #i
+  length 120
+  IfNextVowelAppend(;)
+  FMT(vowel/ii_6)
+endphoneme
+
+
+phoneme &
+  vwl starttype #a endtype #a
+  ipa ɐ
+  length 140
+  FMT(vowel/a#)
+endphoneme
+
+
+phoneme r*   // this is [R] from Slovak/Czech
+  liquid trl
+  ipa r
+  lengthmod 6
+  Vowelin  f1=0  f2=1700 -300 300  f3=-300 80
+  Vowelout f1=2  f2=1700 -300 300  f3=-300 80 brk
+  FMT(r3/r_trill) addWav(r3/r_trill.wav, 50)
+endphoneme
+
+
+
+phoneme t        // dental variant of /t/
+  vls dnt stp
+  lengthmod 2
+  voicingswitch d
+  Vowelin f1=0  f2=1600 -300 300  f3=-100 80
+  Vowelout f1=0 f2=1600 -300 250  f3=-100 80  rms=20
+  IF nextPh(isPause2) THEN
+    WAV(ustop/t_sr, 35)
+  ENDIF
+  WAV(ustop/t_sr, 50)
+endphoneme
+
+
+phoneme d
+  vcd alv stp
+  lengthmod 5
+  voicingswitch t
+  Vowelin f1=2  f2=1700 -300 300  f3=-100 80 amp=16
+  Vowelout f1=2 f2=1700 -300 300  f3=-100 80
+
+  IF PreVoicing THEN
+    FMT(d/xd)
+  ENDIF
+
+  IF nextPh(isPause2) THEN
+    FMT(d/d_dnt) addWav(ustop/t_sr)
+  ENDIF
+  FMT(d/d_dnt) addWav(ustop/t_sr, 50)
+endphoneme
+
+
+// This is for letter "h" at the beginning of a word
+// Use [x] from lang=hr, request by Gašić Dajan 27.06.2011
+phoneme x#
+  vls vel frc
+  lengthmod 3
+  IF nextPh(#i) OR nextPh(#e) THEN
+    WAV(ufric/ch_sr)
+  ELIF nextPh(isVowel) THEN
+    WAV(ufric/x_sr)
+  ENDIF
+  WAV(ufric/x_sr, 70)         // no vowel following
+endphoneme
+
+
+// This is for letter "h" not at the beginning of  word
+// Use standard [h], request by Gašić Dajan 27.06.2011
+phoneme h#
+  vls vel frc
+  lengthmod 3
+  IF nextPh(#@) THEN
+    WAV(h/h@)
+  ELIF nextPh(#i) OR nextPh(#e) THEN
+    WAV(ufric/ch_sr)
+  ELIF nextPh(isVowel) THEN
+    WAV(ufric/x_sr)
+  ENDIF
+  WAV(ufric/x_sr, 70)         // no vowel following
+endphoneme
+
+
+phoneme dZ
+  vcd pla afr sib
+  lengthmod 5
+  voicingswitch tS
+  Vowelin f1=2  f2=2300 200 400  f3=100 80
+  Vowelout f1=2  f2=2300 250 300  f3=100 80 brk
+
+  IF PreVoicing THEN
+    FMT(dzh/xdzh)
+  ENDIF
+
+  FMT(dzh/dzh) addWav(ufric/sh_pzd2)
+endphoneme
+
+
+phoneme dZ;
+  vcd alp sib afr
+  lengthmod 5
+  ipa dʑ
+  voicingswitch tS;
+  Vowelin f1=2  f2=2700 400 600  f3=300 80 rate len=70
+
+  IF PreVoicing THEN
+    FMT(dzh/xdzh)
+  ENDIF
+
+  FMT(dzh/dzh) addWav(ustop/ts_sr)
+endphoneme
+
+
+phoneme tS
+  vls pla afr sib
+  lengthmod 2
+  voicingswitch dZ
+  Vowelin f1=0  f2=2300 200 400  f3=-100 80
+  WAV(ustop/tsh_sr, 50)
+endphoneme
+
+
+phoneme tS;
+  vls alp sib afr
+  lengthmod 2
+  ipa tɕ
+  voicingswitch dZ;
+  Vowelin f1=0  f2=2700 400 600  f3=300 80 rate len=70
+  WAV(ustop/ts_sr)
+endphoneme
+
+
+phoneme Z
+  vcd pla frc sib
+  lengthmod 6
+  voicingswitch S
+  Vowelin  f1=0  f2=2000 0 300  f3=-200 80
+  Vowelout f1=2  f2=2000 0 300  f3=-200 80 brk
+  IF nextPh(isPause2) THEN
+    FMT(voc/zh) addWav(ufric/sh_pzd2, 50)
+  ENDIF
+  FMT(voc/zh) addWav(ufric/sh_pzd2, 60)
+endphoneme
+
+
+phoneme S
+  vls pla frc sib
+  lengthmod 3
+  voicingswitch Z
+  Vowelin  f1=0  f2=2100 100 300  f3=-100 80
+  Vowelout f1=0  f2=2100 100 300  f3=-100 80
+  IF nextPh(isPause2) THEN
+    WAV(ufric/sh_pzd2, 60)
+  ENDIF
+  WAV(ufric/sh_pzd2, 70)
+endphoneme
+

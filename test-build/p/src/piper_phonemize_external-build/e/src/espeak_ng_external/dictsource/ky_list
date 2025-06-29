@@ -1,0 +1,187 @@
+// ***************************************************************************/ 
+// *   Kyrgyz Language ky ky_list                                            *
+// *   Original Author Joshua Meyer 7-1-2016                                 *
+// *   Contact info: joshua.richard.meyer@gmail.com                          *
+// ***************************************************************************/
+// *   This program is free software; you can redistribute it and/or modify  *
+// *   it under the terms of the GNU General Public License as published by  *
+// *   the Free Software Foundation; either version 3 of the License, or     *
+// *   (at your option) any later version.                                   *
+// *                                                                         *
+// *   This program is distributed in the hope that it will be useful,       *
+// *   but WITHOUT ANY WARRANTY; without even the implied warranty of        *
+// *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         *
+// *   GNU General Public License for more details.                          *
+// *                                                                         *
+// *   You should have received a copy of the GNU General Public License     *
+// *   along with this program; if not, see:                                 *
+// *               <http://www.gnu.org/licenses/>.                           *
+// ***************************************************************************/
+
+
+// SOME USEFUL SYNTAX
+// ' 	primary stress
+// , 	secondary stress
+// % 	unstressed syllable
+// = 	put the primary stress on the preceding syllable
+// _: 	short pause
+// _ 	a shorter pause
+// || 	indicates a word boundary within a phoneme string
+// | 	can be used to separate two adjacent characters, to prevent 
+//      them from being considered as a multi-character phoneme mnemonic
+
+// Letters 
+_а a
+_б be
+_в ve
+_г ge
+_д de
+_е e
+_ё jo
+_ж dZe
+_з ze
+_и i
+_й ij
+_к ka
+_л el
+_м em
+_н en
+_ң IN
+_о o
+_ө O
+_п pe
+_р er
+_с es
+_т te
+_у u
+_ү y
+_ф ef
+_х Xa
+_ц tse
+_ч tSe
+_ш Sa
+_щ StSa
+_ъ adZIrat'u:||belgis'i
+_ы I
+_ь itSkert'y:||belgis'i
+_э e
+_ю ju
+_я ja
+
+// Numbers
+_0	n'oL
+_1	b'ir
+_2	ek'i
+_3	'ytS
+_4	t'Ort
+_5	b'eS
+_6  aLt'I
+_7  dZet'i
+_8  seg'iz
+_9  toG'uz
+_10 'on
+_11 onb'ir
+_12	onek'i
+_13	on'ytS
+_14	ont'Ort
+_15	onb'eS
+_16 onaLt'I
+_17 ondZet'i
+_18 onseg'iz
+_19 ontoG'uz
+_2X	dZIjIrm'a
+_3X	ot'uz
+_4X	q'Irq
+_5X	el'y:
+_6X	aLtIm'IS
+_7X	dZetim'iS
+_8X	seks'en
+_9X	toqs'on
+_0C	dZ'yz
+_2C	ekidZ'yz
+_3C	ytSdZ'yz
+_4C	tOrtdZ'yz
+_5C	beSdZ'yz
+_6C aLtIdZ'yz
+_7C dZetidZ'yz
+_8C segizdZ'yz
+_9C toGuzdZ'yz
+_0M1	m'iN
+_0M2	mili'on
+_dpt	_:jan'a_:
+
+// symbols
+@ majmyltS'a
+# tortS'o        $max3
+$ d'oLar
+% pratsent  $max3  //shorter e
+^ kr'ySka
+& ampers'and
+* dZILdIztS'a   $max3
++ qoS'u:        $max3
+= barab'ar      $max3
+/ bOrtS'Ok     $max3
+\ tetir'i||sl'eS      $max3
+_- sIzIqtS'a
+_ astInq'I||kenemt'e    $max3
+~ tild'e
+№ nom'er
+! il'ep||belg'i
+? sur'o:||belg'i
+( qaS'a:a||tS'u:
+) qaS'a:||dZab'u:
+| t'ik||sl'eS
+{ atSu:tS'u||figuraL'Iq||qaS'a:
+} dZabu:tS'u||figuraL'Iq||qaS'a:
+[ atSu:tS'u||kvadratt'Iq||qaS'a:
+] dZabu:tS'u||kvadratt'Iq||qaS'a:
+> azd'Iq||belgis'i
+< kOpt'yk||belgis'i
+_. tSek'it
+, yt'yr 
+` atSu:tS'u||apostr'of
+" tIrmaqtS'a
+' dZabu:tS'u||apostr'of
+; tSek'it||yt'yr
+: q'oS||tSek'it
+× kObOjty:
+// ÷
+// - дефис
+《 atSu:tSu||franzuz||tIrmaqtSaLarI
+ 》dZabu:tSu||franzuz||tIrmaqtSaLarI
+
+// Abbreviations
+
+КР ka||er
+км kiL,ometr
+см sant,imetr
+кг kil,ogram
+мм mil,imetr
+мл mil,litr
+
+// personal pronouns
+мен $u+
+сен $u+
+сиз $u+
+силер $u+
+сизгер $u+
+биз $u+
+ал $u+
+алар $u+
+
+
+// possessive pronouns
+
+// conjunctions
+(болсо да) $u
+жана $u
+неге $u
+тескерисинче $u
+эмнеге $u
+эмнеден $u
+
+// prepositions
+
+// postpositions
+
+// Character names

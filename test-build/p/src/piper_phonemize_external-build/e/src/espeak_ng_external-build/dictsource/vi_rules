@@ -1,0 +1,1330 @@
+// replace combining (tone) accents with single characters
+.replace
+à	à
+á	á
+ả	ả
+ã	ã
+ạ	ạ
+
+
+ằ	ằ
+ắ	ắ
+ẳ	ẳ
+ẵ	ẵ
+ặ	ặ
+
+ầ	ầ
+ấ	ấ
+ẩ	ẩ
+ẫ	ẫ
+ậ	ậ
+
+è	è
+é	é
+ẻ	ẻ
+ẽ	ẽ
+ẹ	ẹ
+
+ề	ề
+ế	ế
+ể	ể
+ễ	ễ
+ệ	ệ
+
+ì	ì
+í	í
+ỉ	ỉ
+ĩ	ĩ
+ị	ị
+
+ò	ò
+ó	ó
+ỏ	ỏ
+õ	õ
+ọ	ọ
+
+ồ	ồ
+ố	ố
+ổ	ổ
+ỗ	ỗ
+ộ	ộ
+
+ờ	ờ
+ớ	ớ
+ở	ở
+ỡ	ỡ
+ợ	ợ
+
+ù	ù
+ú	ú
+ủ	ủ
+ũ	ũ
+ụ	ụ
+
+ừ	ừ
+ứ	ứ
+ử	ử
+ữ	ữ
+ự	ự
+
+ỳ	ỳ
+ý	ý
+ỷ	ỷ
+ỹ	ỹ
+ỵ	ỵ
+
+ð	đ  // Ð U+0d0
+ɖ	đ  // Ɖ U+189
+
+//================================
+//  Consonants
+//================================
+.L01 t c ne nd k x s nt ch th me te le ce ny ry e o u re nch de p pe ph sh v ve ge r
+.L02 n a
+.L03 ch nh
+.L04 a u ă â o ô á à ả ã ạ ù ú ủ ũ ụ ắ ằ ẳ ẵ ặ ấ ầ ẩ ẫ ậ ó ò ỏ õ ọ ố ồ ổ ỗ ộ ư ứ ừ ử ữ ự ơ ớ ờ ở ỡ ợ
+.L05 o ó ò ỏ õ ọ ô ố ồ ộ ỗ ổ
+
+.group b
+        b          b
+     _) b          _b
+//b($w_alt2 _^_EN
+        
+ 
+
+.group c
+        c          k         //k
+        c (C       _^_EN
+        c (_       c
+     _) ch         tS       // try [tS;] [tS] [c] c     
+?2   _) ch         c
+?1   _) ch         c         
+        ch (_      c         
+        ce (_      _^_EN
+     _) cl         _^_EN
+	    // c (L05			kh
+    		
+ 
+ 
+
+.group d
+        d          z         // try [z] [J] [dZ] [dZ;] [J^]
+?2      d          J^
+?1      d          J^
+        
+ 
+        d (_       _^_EN
+        
+ 
+        
+ 
+        
+ 
+
+.group đ
+      //  đ          d
+     _) đ          d_
+        
+ 
+        
+ 
+        
+ 
+
+.group f
+        //f          f
+     _) f          _^_EN
+        f (_       _^_EN
+        
+ 
+        
+ 
+
+.group g
+        g (L04     Q         // try [g] [Q]
+        gh         Q         // or [g]  [Q]
+        gi         z         // try [D] [z] [j] [J^] [z;] [J] [dZ]
+        g (ì       z
+        g (í       z
+        g (ỉ       z
+        g (ĩ       z
+        g (ị       z
+     _) g          _^_EN
+?1      g (ì       J^
+?1      g (í       J^
+?1      g (ỉ       J^
+?1      g (ĩ       J^
+?1      g (ị       J^        
+        
+ 
+?2      g (ì       J^
+?2      g (í       J^
+?2      g (ỉ       J^
+?2      g (ĩ       J^
+?2      g (ị       J^        
+        
+ 
+?1      gi         J^
+?2      gi         J^        
+?1      giết       J^'iE3g
+?2      giết       J^'iE3g
+?1      giếng      J^'iE3N
+?1      giềng      J^'iE2N
+?2      giếng      J^'iE3N
+?1      giêng      J^'iE1N
+?2      giêng      J^'iE1N
+?2      giềng      J^'iE2N
+        giết       z'iE3t[
+        giếc       z'iE3kh
+        giêng      z'iE1N
+        giềng      z'iE2N
+        giếng      z'iE3N
+        giểng      z'iE4N
+        giễng      z'iE5N
+        giệng      z'iE6N
+        
+ 
+?1      giệt       J^'iE6g
+        giệt       z'iE6t[
+        giệc       z'iE6kh
+     _) gol        _^_EN
+     _) gat        _^_EN     
+        ght (_     _^_EN     
+        
+ 
+        
+ 
+
+.group h
+        h          h
+?2      hu         w         
+        
+ 
+
+.group j
+        j          Z
+        
+ 
+        
+ 
+
+.group k
+     _) k          k
+     _) kh         x
+        //kh         x
+        k (_       _^_EN
+        
+ 
+        
+ 
+
+.group l
+        l          l
+        l (_       _^_EN
+     C) le         _^_EN
+	   //le (A      _^_EN 
+        
+ 
+        
+ 
+
+.group m
+        m          m
+        
+ 
+        
+ 
+
+.group n
+        n          n
+?1      n (_       N         //n
+?2      n (_       N
+        ng         N
+        ngh        N
+        nh         n^
+?2 L02) nh         n         
+        nd (_      _^_EN
+        
+ 
+        
+ 
+
+.group ñ
+        ñ          n^
+        
+ 
+        
+ 
+
+.group p
+        p (C       _^_EN
+        p          p         
+        ph         f
+        
+ 
+        
+ 
+
+.group q
+        q          k
+        q (_       k
+		qu         kw         //kw
+		quô         ku@
+        quồ         ku@2
+        quố         ku@3
+        quổ         ku@4
+        quỗ         ku@5
+        quộ         ku@6
+        
+ 
+        
+ 
+
+.group r
+        r          z         // try [z] [z.] [r] [z;]
+?2      r          Q         
+?1      r          z.        
+        r (_       _^_EN
+        rm (_      _^_EN
+        
+ 
+        
+ 
+
+.group s
+        s          s       // try [s.] [s] [S]
+        
+ 
+     _) sh         _^_EN
+        s (_       _^_EN
+        st (_      _^_EN
+        
+ 
+        
+ 
+
+.group t
+        t          t[
+?1      t (_       kh
+?2      t (_       kh        
+        th         t
+        tr         tS        //cr        // try [cr] [tr] [tS;] [tS] [c] [dZ] [dz;]
+?1      tr         cr        
+?2      tr         c         
+        ts (_      _^_EN
+        th (_      _^_EN
+        tt (_      _^_EN
+        
+ 
+        
+ 
+
+.group v
+        v          v
+?2      v          J^        
+        ve (A      _^_EN     
+        
+ 
+        
+ 
+
+.group w
+        w          w
+     _) w          _^_EN
+        w (_       _^_EN
+        
+ 
+        
+ 
+
+.group x
+        x          s
+        x (_       _^_EN
+        
+ 
+        
+ 
+
+.group z
+        z          z
+        z (_       _^_EN
+        
+ 
+        
+ 
+//================================
+//  Vowels
+//================================
+        
+ 
+        
+ 
+        
+ 
+
+.group a
+        a          a:
+        ai         a:j
+        aì         a:j2
+        aí         a:j3
+        aỉ         a:j4
+        aĩ         a:j5
+        aị         a:j6
+        ay         aj
+?2      ay         a:I       
+        
+ 
+        
+ 
+        aý         aj3
+        aỷ         aj4
+        aỹ         aj5
+        aỵ         aj6
+        ao         a:w
+        aò         a:w2
+        aó         a:w3
+        aỏ         a:w4
+        aõ         a:w5
+        aọ         a:w6
+        au         aw
+?2      au         a:U
+        aù         aw2
+        aú         aw3
+        aủ         aw4
+        aũ         aw5
+        aụ         aw6
+        a (L01     _^_EN
+        ai (L02    _^_EN
+        a (@       _^_EN
+        a (L03     e-
+ 
+
+.group à
+        à          a:2
+        ài         a:j2
+        ày         aj2
+?2      ày         a:I2
+        à (L03     e-2
+ 
+        
+ 
+        
+ 
+        
+ 
+        ào         a:w2
+        àu         aw2
+?2      àu         a:U2
+        
+ 
+
+.group á
+        á          a:3
+        ái         a:j3
+        áy         aj3
+        áo         a:w3
+        áu         aw3
+?2      áu         a:U3      
+?2      áy         a:I3
+		á (L03     e-3
+		
+.group ả
+        ả          a:4
+        ải         a:j4
+        ảy         aj4
+        ảo         a:w4
+        ảu         aw4
+?2      ảu         a:U4      
+?2      ảy         a:I4      
+		ả (L03     e-4
+
+.group ã
+        ã          a:5
+        ãi         a:j5
+        ãy         aj5
+        ão         a:w5
+        ãu         aw5
+?2      ãu         a:U5      
+?2      ãy         a:I5
+		ã (L03     e-5
+
+.group ạ
+        ạ          a:6
+        ại         a:j6
+        ạy         aj6
+        ạo         a:w6
+        ạu         aw6
+?2      ạu         a:U6      
+?2      ạy         a:I6      
+		ạ (L03     e-6
+        
+ 
+//================================
+.group ă
+        ă          a
+        
+ 
+        
+ 
+        
+ 
+
+.group ằ
+        ằ          a2
+        
+ 
+        
+ 
+        
+ 
+
+.group ắ
+        ắ          a3
+        ắk          a3c
+ 
+        
+ 
+        
+ 
+
+.group ẳ
+        ẳ          a4
+        
+ 
+        
+ 
+        
+ 
+
+.group ẵ
+        ẵ          a5
+        
+ 
+        
+ 
+        
+ 
+
+.group ặ
+        ặ          a6
+        
+ 
+        
+ 
+//=================================
+.group â
+        â          @
+        ây         @I
+        âu         @w1       
+?2      â (L03     a         
+?1      â (L03     a         
+        
+ 
+        
+ 
+
+.group ầ
+        ầ          @2
+        ầy         @I2
+        ầu         @w2
+?2      ầ (L03     a2        
+?1      ầ (L03     a2        
+        
+ 
+        
+ 
+
+.group ấ
+        ấ          @3
+        ấy         @I3
+        ấu         @w3
+?2      ấ (L03     a3        
+?1      ấ (L03     a3        
+        
+ 
+        
+ 
+
+.group ẩ
+        ẩ          @4
+        ẩy         @I4
+        ẩu         @w4
+        
+ 
+        
+ 
+        
+ 
+
+.group ẫ
+        ẫ          @5
+        ẫy         @I5
+        ẫu         @w5
+        
+ 
+        
+ 
+        
+ 
+
+.group ậ
+        ậ          @6
+        ậy         @I6
+        ậu         @w6
+?2      ậ (L03     a6        
+?1      ậ (L03     a6        
+        
+ 
+//===========================
+.group e
+        e          E
+        eo         Ew
+        eò         Ew2
+        eó         Ew3
+        eỏ         Ew4
+        eỗ         Ew5
+        eọ         Ew6
+        e (L01     _^_EN
+        ey (_      _^_EN
+        e (@       _^_EN     
+        
+ 
+
+.group è
+        è          E2
+        èo         Ew2
+        
+ 
+        
+ 
+        
+ 
+
+.group é
+        é          E3
+        éo         Ew3
+        
+ 
+        
+ 
+        
+ 
+
+.group ẻ
+        ẻ          E4
+        ẻo         Ew4
+        
+ 
+        
+ 
+        
+ 
+
+.group ẽ
+        ẽ          E5
+        ẽo         Ew5
+        
+ 
+        
+ 
+        
+ 
+
+.group ẹ
+        ẹ          E6
+        ẹo         Ew6
+        
+ 
+        
+ 
+//============================
+        
+ 
+
+.group ê
+        ê          e
+        êu         ew1
+?2      ê (L03     @:        
+?2      ê (L02     @:        
+        
+ 
+
+.group ề
+        ề          e2
+        ều         ew2
+?2      ề (L03     @:2       
+?2      ề (L02     @:2
+        
+ 
+
+.group ế
+        ế          e3
+        ếu         ew3
+        
+ 
+?2      ế (L03     @:3
+?2      ế (L02     @:3
+
+.group ể
+        ể          e4
+        ểu         ew4
+?2      ể (L03     @:4       
+?2      ể (L02     @:4       
+        
+ 
+
+.group ễ
+        ễ          e5
+        ễu         ew5
+?2      ễ (L03     @:5       
+?2      ễ (L02     @:5
+        
+ 
+
+.group ệ
+        ệ          e6
+        ệu         ew6
+?2      ệ (L03     @:6
+?2      ệ (L02     @:6
+        
+ 
+//============================
+        
+ 
+
+.group i
+        i          i
+       A) i        j
+        ia         i@
+        ià         i@2
+        iá         i@3
+        iả         i@4
+        iã         i@5
+        iạ         i@6
+        iê         iE
+        iề         iE2
+        iế         iE3
+        iể         iE4
+        iễ         iE5
+        iệ         iE6
+        iu         iw
+        iù         iw2
+        iú         iw3
+        iủ         iw4
+        iũ         iw5
+        iụ         iw6
+        iêu        iEw
+        iều        iEw2
+        iếu        iEw3
+        iểu        iEw4
+        iễu        iEw5
+        iệu        iEw6
+        i (L01     _^_EN
+        i (@       _^_EN
+?2      i (L03     @         
+?1      i (L03     @
+?2      i (L02     @         
+
+.group ì
+        ì          i2
+        ì (A       j2
+        ìa         i@2
+        ìu         iw2
+?2      ì (L03     @2        
+?1      ì (L03     @2        
+?2      ì (L02     @2
+
+.group í
+        í          i3
+        í (A       j3
+        ía         i@3
+        íu         iw3
+?2      í (L03     @3        
+?1      í (L03     @3
+?2      í (L02     @3
+
+.group ỉ
+        ỉ          i4
+        ỉ (A       j4
+        ỉa         i@4
+        ỉu         iw4
+?2      ỉ (L03     @4        
+?1      ỉ (L03     @4
+?2      ỉ (L02     @4        
+        
+ 
+
+.group ĩ
+        ĩ          i5
+        ĩ (A       j5
+        ĩa         i@5
+        ĩu         iw5
+?2      ĩ (L03     @5        
+?1      ĩ (L03     @5
+?2      ĩ (L02     @5        
+        
+ 
+
+.group ị
+        ị          i6
+        ị (A       j6
+        ịa         i@6
+        ịu         iw6
+?2      ị (L03     @6        
+?1      ị (L03     @6
+?2      ị (L02     @6
+        
+ 
+//=========================
+        
+ 
+
+.group o
+        o          O
+		o (A       w
+		oi			Oj
+        oo         O
+        ong        O#N
+        oc		   O#k
+		
+
+.group ò
+        ò          O2
+        òa         wa:2       //ò (A       w2
+        òng        O#N2
+        òe         wE2
+        
+ 
+        
+ 
+        
+ 
+
+.group ó
+        ó          O3
+        óa         wa:3       //ó (A       w3
+        óng        O#N3
+        óe         wE3
+        óc		   O#3k
+ 
+        
+ 
+        
+ 
+
+.group ỏ
+        ỏ          O4
+        ỏa         wa:4       //ỏ (A       w4
+        ỏng        O#N4
+        ỏe         wE4
+        
+ 
+        
+ 
+        
+ 
+
+.group õ
+        õ          O5
+        õa         wa:5       //õ (A       w5
+        õng        O#N5
+        õe         wE5
+        
+ 
+        
+ 
+        
+ 
+
+.group ọ
+        ọ          O6
+        ọa         oa:6       //ọ (A       w6
+        ọng        O#N6
+        ọe         wE6
+        ọc		   O#6k
+ 
+        
+ 
+        
+ 
+//=============================
+        
+ 
+
+.group ô
+        ô          o
+        ôi         oj
+        ông        o#N        // ông sound
+?2      ôi         O-        //south dialect 
+        ôc		   o#k
+ 
+
+.group ồ
+        ồ          o2
+        ồi         oj2
+        ồng        o#N2
+?2      ồi         O-2       
+        
+ 
+        
+ 
+
+.group ố
+        ố          o3
+        ối         oj3
+        ống        o#N3
+?2      ối         O-3       
+        ốc		   o#3k
+ 
+        
+ 
+
+.group ổ
+        ổ          o4
+        ổi         oj4
+        ổng        o#N4
+?2      ổi         O-4       
+        
+ 
+        
+ 
+
+.group ỗ
+        ỗ          o5
+        ỗi         oj5
+        ỗng        o#N5
+        
+ 
+?2      ỗi         O-5
+        
+ 
+
+.group ộ
+        ộ          o6
+        ội         oj6
+        ộng        o#N6
+?2      ội         O-6       
+        ộc         o#6k
+ 
+        
+ 
+//=============================
+        
+ 
+
+.group ơ
+        ơ          @:
+        ơi         @:j
+        ơu         @:U
+?2      ơi         @-        //south dialect 
+        
+ 
+        
+ 
+
+.group ờ
+        ờ          @:2
+        ời         @:j2
+        ờu         @:U2
+?2      ời         @-2       
+        
+ 
+        
+ 
+
+.group ớ
+        ớ          @:3
+        ới         @:j3
+        ớu         @:U3
+?2      ới         @-3       
+        
+ 
+        
+ 
+
+.group ở
+        ở          @:4
+        ởi         @:j4
+        ởu         @:U4
+?2      ởi         @-4       
+        
+ 
+        
+ 
+
+.group ỡ
+        ỡ          @:5
+        ỡi         @:j5
+        ỡu         @:U5
+?2      ỡi         @-5       
+        
+ 
+        
+ 
+
+.group ợ
+        ợ          @:6
+        ợi         @:j6
+        ợu         @:U6
+?2      ợi         @-6       
+        
+ 
+        
+ 
+//=============================
+        
+ 
+
+.group u
+        u          u
+        u (A       w
+     A) u          w
+	 gi) u 			u
+        ui         uj
+        uì         uj2
+        uí         uj3
+        uỉ         uj4
+        uĩ         uj5
+        uị         uj6
+        ua         u@
+        uà         u@2
+        uá         u@3
+        uả         u@4
+        uã         u@5
+        uạ         u@6
+        uô         u@
+        uồ         u@2
+        uố         u@3
+        uổ         u@4
+        uỗ         u@5
+        uộ         u@6
+        uôi        u@j
+        uồi        u@j2
+        uối        u@j3
+        uổi        u@j4
+        uỗi        u@j5
+        uội        u@j6
+        //ung        u#
+        u (L01     _^_EN
+        u (@       _^_EN
+       // ua (L01    _^_EN
+?2      u          u-
+		uyu			wiw
+		uỳu			wiw2
+		uýu			wiw3
+		uỷu			wiw4
+		uỹu			wiw5
+		uỵu			wiw6
+
+.group ù
+        ù          u2
+        ù (A       w2
+		ùy         wi2
+        ùi         uj2
+        ùa         u@2
+		//ùng        u#2
+        
+ 
+?2      ù          u-2       
+        
+ 
+
+.group ú
+        ú          u3
+        ú (A       w3
+		úy		   wi3
+        úi         uj3
+        úa         u@3
+		//úng        u#3
+?2      ú          u-3       
+        
+ 
+        
+ 
+
+.group ủ
+        ủ          u4
+        ủ (A       w4
+		ủy  	   wi4
+        ủi         uj4
+        ủa         u@4
+		//ủng        u#4
+        
+ 
+?2      ủ          u-4       
+        
+ 
+
+.group ũ
+        ũ          u5
+        ũ (A       w5
+		ũy         wi5
+        ũi         uj5
+        ũa         u@5
+		//ũng        u#5
+?2      ũ          u-5       
+        
+ 
+        
+ 
+
+.group ụ
+        ụ          u6
+        ụ (A       w6
+		ụy         wi6
+        ụi         uj6
+        ụa         u@6
+		//ụng        u#6
+?2      ụ          u-6       
+        
+ 
+//=============================
+        
+ 
+
+.group ư
+        ư          y
+        ưa         y@
+        ươ         y@
+        ườ         y@2
+        ướ         y@3
+        ưở         y@4
+        ưỡ         y@5
+        ượ         y@6
+        ưu         iw
+        ươi        y@j
+        ười        y@j2
+        ưới        y@j3
+        ưởi        y@j4
+        ưỡi        y@j5
+        ượi        y@j6
+        ươu        y@w
+        ườu        y@w2
+        ướu        y@w3
+        ưởu        y@w4
+        ưỡu        y@w5
+        ượu        y@w6
+        
+ 
+        
+ 
+        
+ 
+
+.group ừ
+        ừ          y2
+        ừa         y@2
+        ừu         iw2
+        
+ 
+        
+ 
+        
+ 
+
+.group ứ
+        ứ          y3
+        ứa         y@3
+        ứu         iw3
+        
+ 
+        
+ 
+        
+ 
+
+.group ử
+        ử          y4
+        ửa         y@4
+        ửu         iw4
+        
+ 
+        
+ 
+        
+ 
+
+.group ữ
+        ữ          y5
+        ữa         y@5
+        ữu         iw5
+        
+ 
+        
+ 
+        
+ 
+
+.group ự
+        ự          y6
+        ựa         y@6
+        ựu         iw6
+        
+ 
+        
+ 
+//=============================
+        
+ 
+
+.group y
+        y          i
+       // y (A       j
+        ya         i@
+        yà         i@2
+        yá         i@3
+        yả         i@4
+        yã         i@5
+        yạ         i@6
+        yê         iE
+        yề         iE2
+        yế         iE3
+        yể         iE4
+        yễ         iE5
+        yệ         iE6
+      //  yêu        i@U        
+        y (L01     _^_EN
+    bu) y          _^_EN
+
+.group ỳ
+        ỳ          i2
+        ỳ (A       j2
+        ỳa         i@2
+        
+ 
+        
+ 
+        
+ 
+
+.group ý
+        ý          i3
+        ý (A       j3
+        ýa         i@3
+        
+ 
+        
+ 
+        
+ 
+
+.group ỷ
+        ỷ          i4
+        ỷ (A       j4
+        ỷa         i@4
+        
+ 
+        
+ 
+        
+ 
+
+.group ỹ
+        ỹ          i5
+        ỹ (A       j5
+        ỹa         i@5
+        
+ 
+        
+ 
+        
+ 
+
+.group ỵ
+        ỵ          i6
+        ỵ (A       j6
+        ỵa         i@6
+        
+ 
+        
+ 
+//=============================
+        
+ 
+
+.group 0xce   // Greek letters
+// 0xce is the first byte of the utf-8 code for these characters
+        
+ 
+        
+ 
+        α          a:1n_|f'a:1
+        ά          a:1n_|f'a:1
+        β          b'e1_|t['a:1
+        γ          Q'a:1_|m'a:1
+        δ          J'E1n_|t['a:1
+        ε          E1p_|s'i1_|l'O1n
+        έ          E1p_|s'i1_|l'O1n
+        ζ          D'e1_|t['a:1
+        η          e1_|t['a:1
+        ή          e1_|t['a:1
+        θ          t'e1_|t['a:1
+        ι          i1_|'o1_|t['a:1
+        ί          i1_|'o1_|t['a:1
+        κ          k'a:1p_|p'a:1
+        λ          l'a1m_|_d'a:1
+        μ          mw'i1
+        ν          nw'i1
+        ξ          s'i7
+        ο          o1_|m'i1_|kz.'O7n
+        
+ 
+        
+ 
+        
+ 
+
+.group 0xcf   // Greek letters
+        
+ 
+        
+ 
+        π          p'i1
+        ρ          z.'o1
+        σ          s'i3c_|m'a:1
+        ς          s'i3c_|m'a:1
+        τ          t['o1
+        υ          u1p_|s'i1_|l'O1n
+        ύ          u1p_|s'i1_|l'O1n
+        φ          f'i1
+        χ          c'i1
+        ψ          ps'i1
+        ω          o1_|m'e1_|Q'a:7
+        ώ          o1_|m'e1_|Q'a:7
+        ό          o1_|m'i1_|kz.'O7n
+        
+ 
+        
+ 
+        
+ 
+        
+ 
+        
+ 
+
+.group
+        %          f'@2n||tS'am
+        !          _:tS'@3m_|t'a:7n_:
+        ! (\!      
+//            :            koUl@n
+    D_) h (_DD_    D'@:2     // omit colon in time, eg: 2:30
+        $          d'o||l'a
+        !=         x'o#_|_b'a2N_
+        >=         l'@:3n_|h'@:1n_|hw,a6kh_b'a2N
+        <=         n^'O4_|h'@:1n_|hw,a6kh_b'a2N
+        
+ 
+        
+ 
+    __) - (_D      tS'y2
+    A_) - (_D      _
+    C_) - (_D      _
+        
+ 
+        .          tS'@3m_
+        . (.       _:
+    \.) .          
+        
+ 
+

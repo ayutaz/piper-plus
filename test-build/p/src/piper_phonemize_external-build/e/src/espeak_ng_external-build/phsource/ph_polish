@@ -1,0 +1,212 @@
+
+//====================================================
+//  Polish
+//====================================================
+
+
+phoneme a
+  vwl starttype #a endtype #a
+  length 190
+  ChangeIfDiminished(a#)
+  FMT(vowel/a)
+endphoneme
+
+phoneme a#
+  vwl starttype #a endtype #a
+  ipa a
+  length 170
+  FMT(vowel/a#_2)
+endphoneme
+
+
+
+phoneme E
+  vwl starttype #e endtype #e
+  length 180
+  IF nextPh(isPause) THEN
+    FMT(vowel/ee_1)
+  ENDIF
+  FMT(vowel/e_mid)
+endphoneme
+
+
+phoneme E#
+  vwl starttype #e endtype #e
+  length 180
+  FMT(vowel/ee#)
+endphoneme
+
+
+phoneme i
+  vwl starttype #i endtype #i
+  length 170
+  IfNextVowelAppend(;)
+  FMT(vowel/i_7)
+endphoneme
+
+
+phoneme O
+  vwl starttype #o endtype #o
+  length 180
+  FMT(vowel/oo_5)
+endphoneme
+
+
+phoneme u
+  vwl starttype #u endtype #u
+  length 180
+  FMT(vowel/u_bck)
+endphoneme
+
+
+phoneme y      // close central unrounded (i-bar)
+  vwl starttype #i endtype #i
+  ipa ɨ
+  length 180
+  FMT(vowel/ii#_2)
+endphoneme
+
+
+phoneme E~
+  vwl starttype #e endtype #u
+  length 250
+  FMT(vnasal/ee_u_n)
+endphoneme
+
+
+phoneme O~
+  vwl starttype #o endtype #o
+  length 250
+  FMT(vnasal/oo_n3)
+endphoneme
+
+
+// CONSONANTS
+//===========
+
+phoneme R
+  liquid trl
+  ipa r
+  lengthmod 6
+  Vowelin  f1=0  f2=1700 -300 300  f3=-300 80
+  Vowelout f1=2  f2=1700 -300 300  f3=-300 80 brk
+  FMT(r3/r_trill) addWav(r3/r_trill.wav, 50)
+endphoneme
+
+
+phoneme t
+  vls dnt stp
+  lengthmod 2
+  voicingswitch d
+  Vowelin f1=0  f2=1600 -300 300  f3=-100 80
+  Vowelout f1=0 f2=1600 -300 250  f3=-100 80  rms=20
+  IF nextPh(isPause2) THEN
+    WAV(ustop/t_dnt, 35)
+  ENDIF
+  WAV(ustop/t_dnt, 60)
+endphoneme
+
+
+phoneme t;
+  vls pal stp pzd
+  lengthmod 2
+  voicingswitch d;
+  Vowelin f1=0  f2=2700 400 600  f3=300 80 rate len=70
+  Vowelout f1=1  f2=2700 400 600  f3=200 70 len=50 colr=1
+  IF nextPh(isPause2) THEN
+    WAV(ustop/t_pzd, 30)
+  ENDIF
+  WAV(ustop/t_pzd, 60)
+endphoneme
+
+
+phoneme d
+  vcd dnt stp
+  lengthmod 5
+  voicingswitch t
+  Vowelin f1=2  f2=1500 -300 300  f3=-150 80
+  Vowelout f1=2 f2=1500 -300 300  f3=-150 80
+
+  IF PreVoicing THEN
+    FMT(d/xd)
+  ENDIF
+
+  IF nextPh(isPause2) THEN
+    FMT(d/d_) addWav(x/d_)
+  ELIF nextPh(isRhotic) THEN
+    FMT(d/dr) addWav(x/d_dnt, 110)
+  ENDIF
+
+  FMT(d/d) addWav(x/d_dnt, 110)
+endphoneme
+
+
+phoneme d;
+  vcd alv stp pzd
+  lengthmod 5
+  voicingswitch t;
+  Vowelin f1=2  f2=2700 400 600  f3=200 80 rate len=80
+  Vowelout f1=2 f2=2700 400 600  f3=200 80 rate len=100 colr=1
+
+  IF PreVoicing THEN
+    FMT(d/xd_pzd)
+  ENDIF
+
+  IF nextPh(isPause2) THEN
+    FMT(d/d_) addWav(x/d_pzd, 40)
+  ELIF nextPh(isRhotic) THEN
+    FMT(d/dr) addWav(x/d_pzd, 80)
+  ENDIF
+
+  FMT(d/d) addWav(x/d_pzd, 80)
+endphoneme
+
+
+phoneme ts
+  import_phoneme consonants/ts
+  voicingswitch dz
+endphoneme
+
+
+phoneme dz
+  CALL consonants/dz
+  voicingswitch ts
+  ipa dʑ
+endphoneme
+
+phoneme ts;
+  CALL base1/tS;
+  voicingswitch dz;
+  ipa tɕ
+endphoneme
+
+
+phoneme dz;
+  import_phoneme base1/dZ;
+  voicingswitch ts;
+endphoneme
+
+
+phoneme w
+  liquid
+  lengthmod 7
+
+  CALL base1/w
+  IF nextPh(isVowel) THEN
+    FMT(w/w2)   // longer [w]
+  ENDIF
+endphoneme
+
+
+phoneme f
+  vls lbd frc
+  lengthmod 3
+  voicingswitch v
+  Vowelout f1=0  f2=1000 -500 -350  f3=-200 80
+  IF nextPh(isPause2) THEN
+    WAV(ufric/f_)
+  ELIF nextPh(s) THEN
+    WAV(ufric/f, 160)
+  ENDIF
+  WAV(ufric/f, 140)
+endphoneme

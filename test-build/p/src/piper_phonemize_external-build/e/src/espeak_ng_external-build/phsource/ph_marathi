@@ -1,0 +1,67 @@
+
+//====================================================
+//  Marathi, based on ph_hindi
+//====================================================
+
+
+
+
+phoneme aI
+  vwl lng starttype #@ endtype #i
+  length 240
+  lng
+  FMT(vdiph/@i_4)
+endphoneme
+
+phoneme aI~
+  vwl lng starttype #@ endtype #i
+  length 270
+  lng
+  FMT(vnasal/ai_n)
+endphoneme
+
+
+phoneme aU
+  vwl lng starttype #a endtype #u
+  length 240
+  lng
+  FMT(vdiph/a#u)
+endphoneme
+
+phoneme aU~
+  vwl lng starttype #a endtype #u
+  length 300
+  lng
+  FMT(vnasal/au_n)
+endphoneme
+
+//F J
+
+phoneme c
+  import_phoneme base1/c
+endphoneme
+
+
+phoneme c#
+  CALL base1/tS;
+  ipa cU+02B0
+endphoneme
+
+
+phoneme tS
+  vls pla afr sib
+  voicingswitch dZ
+  lengthmod 2
+  Vowelin f1=0  f2=2300 200 400  f3=-100 80
+
+  IF nextPh(isPause2) THEN
+    WAV(ustop/tsh_)
+  ENDIF
+  WAV(ustop/tsh_unasp)
+endphoneme
+
+phoneme v 
+  import_phoneme base1/v
+  voicingswitch f
+endphoneme
+

@@ -1,0 +1,160 @@
+
+//====================================================
+//  Portuguese/Portugal  - based on Portuguese/Brazil
+//====================================================
+
+
+
+phoneme &
+  vwl starttype #@ endtype #@
+  length 180
+  ipa ɐ
+  FMT(vowel/a#_3)
+  unstressed
+endphoneme
+
+phoneme &/       // Used for final "a" when next word starts with "a"
+  vwl starttype #@ endtype #@
+  length 180
+  ipa ɐ
+  IF nextPh(isVowel) THEN
+    ChangePhoneme(NULL)
+  ENDIF
+  FMT(vowel/a#_3)
+endphoneme
+
+phoneme a
+  vwl starttype #a endtype #a
+  length 180
+  ChangeIfNotStressed(&)
+  FMT(vowel/a_2)
+endphoneme
+
+phoneme &~
+  vwl  starttype #e endtype #@
+  ipa ɐU+0303
+  length 240
+  FMT(vnasal/ee_n2)
+endphoneme
+
+phoneme &U~
+  vwl  starttype #@ endtype #u
+  ipa ɐU+0303ʊU+0303
+  length 240
+  FMT(vnasal/a#u_n)
+endphoneme
+
+
+
+phoneme E
+  vwl starttype #e endtype #e
+  length 180
+  ChangeIfUnstressed(y)
+  FMT(vowel/e_mid)
+endphoneme
+
+phoneme e
+  vwl starttype #e endtype #e
+  length 180
+  ChangeIfUnstressed(y)
+  FMT(vowel/e)
+endphoneme
+
+phoneme y
+  vwl starttype #@ endtype #@
+  length 130
+  ipa ɨ
+  FMT(vowel/i#_5)
+endphoneme
+
+
+phoneme i
+  vwl starttype #i endtype #i
+  length 170
+  IfNextVowelAppend(;)
+  FMT(vowel/i)
+endphoneme
+
+
+phoneme i/            // changes to NULL before a vowel
+  vwl starttype #i endtype #i
+  length 130
+  ipa ɨ
+  IF nextPh(isVowel) THEN
+    ChangePhoneme(NULL)
+  ENDIF
+  IfNextVowelAppend(;)
+  FMT(vowel/i#_5)
+endphoneme
+
+
+phoneme O
+  vwl starttype #o endtype #o
+  length 180
+//  ChangeIfNotStressed(o)
+  FMT(vowel/0_2)
+endphoneme
+
+
+phoneme o
+  vwl starttype #o endtype #o
+  length 180
+  ChangeIfNotStressed(u)
+  FMT(vowel/o)
+endphoneme
+
+
+phoneme u
+  vwl starttype #u endtype #u
+  length 180
+  FMT(vowel/u_6)
+endphoneme
+
+phoneme U
+  vwl starttype #u endtype #u
+  length 130
+  IF thisPh(isWordEnd) AND thisPh(isAfterStress) AND nextPh(isVowel) THEN
+    ChangePhoneme(w)
+  ENDIF
+  FMT(vowel/u_6)
+endphoneme
+
+
+phoneme EU
+  vwl starttype #e endtype #u
+  length 230
+  FMT(vdiph/eeu_2)
+endphoneme
+
+
+
+phoneme w
+  import_phoneme base2/w2
+endphoneme
+
+
+phoneme x      // [r] for Portugal
+  liquid trl
+  ipa ʁ
+  lengthmod 7
+  Vowelin f1=0  f2=1500 -400 400  f3=-400 80
+  IF nextPh(isNotVowel) THEN
+    ChangePhoneme(r/)
+  ENDIF
+  FMT(vwl_fr/@R) addWav(r3/rx, 120)
+endphoneme
+
+
+phoneme R    // for Portugal this is same the as [r]
+  import_phoneme pt/r
+endphoneme
+
+
+phoneme s#     // This is [s] for Brazil, [S] for Portugal
+  IF nextPh(isVoiced) THEN
+    ChangePhoneme(Z)
+  ENDIF
+  CALL base1/S
+  ipa ʃ
+endphoneme
+

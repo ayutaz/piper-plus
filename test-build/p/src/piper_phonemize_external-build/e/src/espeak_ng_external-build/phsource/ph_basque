@@ -1,0 +1,167 @@
+
+//====================================================
+//  Basque  - based on Base2
+//====================================================
+
+phoneme a
+  vwl starttype #a endtype #a
+  length 200
+  FMT(vowel/a_4)
+endphoneme
+
+
+phoneme a2  // delete if the next vowel is 'a'. Used for numbers.
+  vwl starttype #a endtype #a
+
+  length 200
+
+  IF nextPh(#a) THEN
+    ChangePhoneme(NULL)   // merge consecutive 'a'
+  ENDIF
+
+  FMT(vowel/a_4)
+endphoneme
+
+
+phoneme e
+  vwl starttype #e endtype #e
+  length 200
+  FMT(vowel/e_mid2)
+endphoneme
+
+
+phoneme i
+  vwl starttype #i endtype #i
+  length 190
+  IfNextVowelAppend(;)
+  FMT(vowel/i)
+endphoneme
+
+
+phoneme o
+  vwl starttype #o endtype #o
+  length 200
+  FMT(vowel/oo)
+endphoneme
+
+
+phoneme u
+  vwl starttype #u endtype #u
+  length 200
+  FMT(vowel/u_bck2)
+endphoneme
+
+
+phoneme Y
+  vwl  starttype #@  endtype #@
+  length 200
+  FMT(vowel/y#)
+endphoneme
+
+
+phoneme s
+  CALL es/s
+  ipa s̺
+endphoneme
+
+
+phoneme z
+  vls alv frc sib
+  ipa s̻
+  lengthmod 3
+  Vowelin  f1=0  f2=1700 -300 300  f3=-100 80
+  Vowelout f1=0  f2=1700 -300 250  f3=-100 80  rms=20  
+  IF nextPh(isPause) THEN
+    WAV(ufric/z_eu, 60)
+  ENDIF
+  WAV(ufric/z_eu, 90)
+endphoneme
+
+
+phoneme ts
+  vls alv afr sib
+  ipa ts̺
+  lengthmod 2
+  Vowelin f1=0  f2=1700 -300 300  f3=-100 80
+  Vowelout f1=0 f2=1700 -300 250  f3=-100 80  rms=20
+  IF nextPh(isPause2) THEN
+    WAV(ufric/ts_eu, 60)
+  ENDIF
+  WAV(ufric/ts_eu, 90)
+endphoneme
+
+
+phoneme tz
+  vls alv afr sib
+  ipa ts̻
+  lengthmod 2
+  Vowelin f1=0  f2=1700 -300 300  f3=-100 80
+  Vowelout f1=0 f2=1700 -300 250  f3=-100 80  rms=20
+  IF nextPh(isPause2) THEN
+    WAV(ufric/tz_eu, 90)
+  ENDIF
+  WAV(ufric/tz_eu, 60)
+endphoneme
+
+
+phoneme t
+  vls dnt stp
+  lengthmod 2  
+  CALL base2/t
+endphoneme
+
+
+phoneme r
+  vcd alv flp rhotic
+  brkafter
+  ipa ɾ
+  lengthmod 3
+
+  IF nextPhW(isVowel) THEN
+    ChangePhoneme(**)
+  ENDIF
+
+  CALL base1/*
+endphoneme
+
+
+phoneme b
+  import_phoneme es/b
+endphoneme
+
+phoneme d
+  import_phoneme es/d
+endphoneme
+
+phoneme g
+  import_phoneme es/g
+endphoneme
+
+phoneme n
+  vcd alv nas
+  lengthmod 4
+
+  IF prevPhW(#i) AND nextPhW(isVowel) THEN
+    ChangePhoneme(n^)
+  ENDIF
+  
+  CALL base1/n
+endphoneme
+
+phoneme n2  // doesn't palatalise, used for exceptions
+  vcd alv nas
+  lengthmod 4
+  CALL base1/n
+endphoneme
+
+phoneme l
+  liquid
+  IF prevPhW(#i) AND nextPhW(isVowel) THEN
+    ChangePhoneme(l^)
+  ENDIF
+  CALL base1/l
+endphoneme
+phoneme l2 // same as n2
+  liquid
+  CALL base1/l
+endphoneme

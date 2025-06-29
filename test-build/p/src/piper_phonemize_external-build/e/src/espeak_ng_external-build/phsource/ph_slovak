@@ -1,0 +1,202 @@
+
+phoneme i
+  vwl starttype #i endtype #i
+  length 100
+  IfNextVowelAppend(;)
+  FMT(vowel/ii_3)
+endphoneme
+
+phoneme i:
+  vwl starttype #i endtype #i
+  length 260
+  IfNextVowelAppend(;)
+  FMT(vowel/i_3)
+endphoneme
+
+phoneme &
+  vwl starttype #e endtype #e
+  length 120
+  FMT(vowel/ee_6)
+endphoneme
+
+phoneme e
+  vwl starttype #e endtype #e
+  length 120
+  FMT(vowel/e_mid2)
+endphoneme
+
+phoneme e:
+  vwl starttype #e endtype #e
+  length 290
+  FMT(vowel/e_mid)
+endphoneme
+
+
+phoneme a
+  vwl starttype #a endtype #a
+  length 120
+
+  IF thisPh(isWordEnd) AND thisPh(isUnstressed) THEN
+    FMT(vowel/a_8)
+  ENDIF
+  FMT(vowel/a)
+endphoneme
+
+phoneme a:
+  vwl starttype #a endtype #a
+  length 290
+  FMT(vowel/a)
+endphoneme
+
+phoneme o
+  vwl starttype #o endtype #o
+  length 120
+  FMT(vowel/oo_1)
+endphoneme
+
+phoneme o:
+  vwl starttype #o endtype #o
+  length 290
+  FMT(vowel/oo_1)
+endphoneme
+
+phoneme u
+  vwl starttype #u endtype #u
+  length 110
+  FMT(vowel/u_2)
+endphoneme
+
+phoneme u:
+  vwl starttype #u endtype #u
+  length 280
+  FMT(vowel/u_bck)
+endphoneme
+
+
+phoneme aU
+  vwl starttype #a endtype #u
+  length 270
+  FMT(vdiph/au_4)
+endphoneme
+
+
+phoneme eU
+  vwl starttype #e endtype #u
+  length 260
+  FMT(vdiph/eu)
+endphoneme
+
+phoneme oU
+  vwl starttype #o endtype #u
+  length 260
+  FMT(vdiph/ou_2)
+endphoneme
+
+
+phoneme aI
+  vwl starttype #a endtype #i
+  length 270
+  FMT(vdiph/ai)
+endphoneme
+
+phoneme eI
+  vwl starttype #e endtype #i
+  length 260
+  FMT(vdiph/eei_3)
+endphoneme
+
+
+
+phoneme r-     // syllabic r
+  vwl  starttype #@  endtype #@
+  ipa rU+0329
+  length 200
+  FMT(vowelr/r-voc)
+endphoneme
+
+phoneme r:     // syllabic r
+  vwl  starttype #@  endtype #@
+  ipa rU+0329ː
+  length 300
+  FMT(vowelr/r-voc)
+endphoneme
+
+
+
+phoneme R^       // Czech r-caron
+  vcd pla frc sib
+  ipa rU+031d
+  lengthmod 6
+  Vowelin  f1=0  f2=1700 -300 300  f3=-300 80
+  Vowelout f1=2  f2=1700 -300 300  f3=-300 80 brk
+  FMT(voc/zh) addWav(r3/rz_cs, 50)
+endphoneme
+
+phoneme R^/      // Czech r-caron (weaker, for after p,f,t,k)
+  vcd pla frc sib
+  ipa rU+031dU+030a
+  lengthmod 6
+  Vowelin  f1=0  f2=1700 -300 300  f3=-300 80
+  Vowelout f1=2  f2=1700 -300 300  f3=-300 80 brk
+  FMT(voc/zh_2) addWav(r3/rz_cs, 25)
+endphoneme
+
+
+phoneme l-
+  vwl  starttype #@  endtype #@
+  ipa lU+0329
+  length 140
+  FMT(vwl_hi/l-voc)
+endphoneme
+
+
+phoneme l:
+  vwl  starttype #@  endtype #@
+  ipa lU+0329ː
+  length 250
+  FMT(vwl_hi/l-voc)
+endphoneme
+
+
+phoneme l
+  import_phoneme en/l   // use 'dark' [l] after a vowel
+endphoneme
+
+
+phoneme w
+  import_phoneme base2/w2
+endphoneme
+
+
+phoneme t
+  vls alv stp
+  lengthmod 2
+  voicingswitch d
+  Vowelin f1=0  f2=1700 -300 300  f3=-100 80
+  Vowelout f1=0 f2=1700 -300 250  f3=-100 80  rms=20
+  IF nextPh(isPause2) THEN
+    WAV(ustop/t_)
+  ENDIF
+  WAV(ustop/t_short)
+endphoneme
+
+
+phoneme p
+  vls blb stp
+  lengthmod 2
+  voicingswitch b
+  Vowelin  f1=0  f2=1000 -50 -100  f3=-200 80
+  Vowelout f1=0  f2=1000 -500 -350  f3=-300 80 rms=30
+  IF nextPh(isPause2) THEN
+    WAV(ustop/p_unasp, 80)
+  ELIF nextPh(l) THEN
+    WAV(ustop/pl)
+  ENDIF
+  WAV(ustop/p_unasp, 120)
+endphoneme
+
+
+phoneme k
+  import_phoneme base2/k
+endphoneme
+

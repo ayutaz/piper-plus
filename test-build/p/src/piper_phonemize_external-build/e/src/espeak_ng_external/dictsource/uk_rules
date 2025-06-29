@@ -1,0 +1,118 @@
+// This file is UTF-8 encoded
+/// Spelling to phoneme words and exceptions for Ukrainian
+// Author: Andrij Mizyk <andm1zyk@proton.me>, 2022
+
+.group а
+       а     a
+
+.group б
+       б     b
+
+.group в
+       в     B
+
+.group г
+       г     h  // вимовляється як середнє між г та х
+
+.group ґ
+       ґ     g
+
+.group д
+       д     d
+       дж    dZ
+
+.group е
+       е     E
+
+.group є
+       є     jE
+
+.group ж
+       ж     Z
+
+.group з
+       з     z
+
+.group и
+       и     I
+
+.group і
+       і     i:
+
+.group ї
+       ї     ji:
+
+.group й
+       й     j
+
+.group к
+       к     k
+
+.group л
+       л     l
+       л (і  l^
+       лє    l^E
+       лю    l^u
+       ля    l^a
+       ль    l^
+
+.group м
+       м     m
+
+.group н
+       н     n
+       н (і  n^
+       нє    n^E
+       ню    n^u
+       ня    n^a
+       нь    n^
+
+.group о
+       о     o
+
+.group п
+       п     p
+
+.group р
+       р     R
+
+.group с
+       с     s
+
+.group т
+       т     t[
+       ть    t;
+
+.group у
+       у     u
+
+.group ф
+       ф     f
+
+.group х
+       х     x
+
+.group ц
+       ц     ts
+
+.group ч
+       ч     tS
+
+.group ш
+       ш     S
+       ш (в  l#  // швеція
+
+.group щ
+       щ     StS
+
+.group ь
+       ь     ;
+
+.group ю
+       ю     ju
+
+.group я
+       я     ja
+
+.group ʼ
+       ʼ     |

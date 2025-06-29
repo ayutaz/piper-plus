@@ -1,0 +1,2 @@
+/usr/bin/ar qc libspeechPlayer.a CMakeFiles/speechPlayer.dir/src/frame.cpp.o CMakeFiles/speechPlayer.dir/src/speechPlayer.cpp.o CMakeFiles/speechPlayer.dir/src/speechWaveGenerator.cpp.o
+/usr/bin/ranlib libspeechPlayer.a

@@ -1,0 +1,556 @@
+
+// This file is UTF8 encoded 
+//  phoneme rules for Sindhi
+// Letter group - l01: Vowels
+
+.replace
+٠	0
+١	1
+٢	2
+٣	3
+٤	4
+٥	5
+٦	6
+٧	7
+٨	8
+٩	9
+ی	ي
+ہ	ه
+
+// vowel signs, alif acts as consonants  at start of word if these follow
+.L01  َ ِ ُ و ي ع ا آ
+
+// Consonants
+.L02  ب ٻ ڀ پ ت ٿ ٺ ث ج جھ ڄ چ ڇ ح خ د ڌ ڊ ڏ ذ ر ڙ ڙھ ز س ش ص ض ط ظ غ ف ڦ ق ڪ ک گ ڳ گھ ل م ن ڻ ڃ ه ھ ء
+
+// VOWELS
+
+.group َ
+	َ	a
+	َي	E
+	َے	E
+	َو 	O
+	َع	a:
+
+.group ِ
+	ِ	I
+	ِي	i:
+	ِع	i:
+
+.group ُ
+	ُ	U
+	ُو	u:
+	ُع	O
+
+.group ھ
+	ھ	hV
+	ھ(L01	h
+ھ (l01	h
+
+.group ٰ
+	ٰ	a:
+
+.group ا
+	ا	a:
+	_) ا (L01   // Acts like Consonants if followed by a vowel but is silent.
+	_) ا	a
+	_)او	u:
+_)اي	e:
+	ائ (L02	a:I
+	افت(L02ا	IftI
+	اسلام	,Isl'a:m
+	_) انسان	Ins'a:n
+	اً(_S2	'an
+	_) افسر	,afs'aR
+	_) اتفاق	,ItIf'a:q
+	_)ابت(L02ا	IbtI
+	_)اعت	e:tI
+	_) اضاف	Iz'a:f
+	استثن	,Ist'asn
+	_)اجت(L02ا	IJtI
+	_)استح(L02ا	IstEH
+	_) امنگ	Um'ang
+	انعام	In'a:m
+	امتحان	,ImtIh'a:n
+	الزام	,Ilz'a:m
+	_)اشت(L02ا	IStI
+	اصو(ل	Us.u:
+	اعلان	e:l'a:n
+	اعزاز	e:z'a:z
+	انق(L02ا	InqI
+	اصلاح	,Is.l'a:h
+	امداد	,Imd'a:d
+	@) ات (_S2	'a:t
+	_)انت(L02ا	IntI
+	_)اخت(L02ا	IxtI
+	_)اقت(L02ا	IqtI
+	_)اح(L02	EH
+	_) است (L02	,IstI
+	_) ارت (L02	,IRtI
+	_)ان(ڊ	In
+	_)اصط(L02ا	Is.tI
+	_)انڊس	Ind.as
+	اع(_	a:
+	_L02)اب(L02_	a:bI
+
+.group آ
+	آ	a:
+	آتش	'a:tIS
+	آئ(L02	a:I
+
+.group ع
+	ع	a:
+	عا	a:
+	_) ع	a
+	عنوان	Unv'a:n
+	_) عمر	'UmR
+	L02) عی (_	'ai:
+	عِ	I
+	عُ	U
+	اL02)ع(_	e:
+
+.group و
+	و	o:
+	وُ	vU
+	وٗ	u:
+	و (L01	v
+	_) و	vV
+	 وع (_	u:
+	وّ	vv
+	_L02L02L02)و(L02	u:
+
+.group ي
+	ي	e:
+	ي(L01	j
+	_)ي	jV
+	L02)يع	i:
+	@)ي	i:
+	يٰ	a:
+	ي(_ٿ	e:
+	@)يل(_	jal
+
+.group ے		// yeh barree
+	ے	e:
+
+.group ۂ
+	ۂ	'ae:
+
+// with hamza
+.group ئ
+	ئ
+
+.group ٗ
+	ٗ	u:
+
+.group ؤ
+	ؤ	aU   // ??
+
+.group أ
+	أ	// ??
+
+
+// CONSONANTS
+
+.group ب
+	ب	bV
+	ب (L01	b'	
+	بّ	bbV
+	بّ (L01	bb
+	_) بگڑ	bIg'ar
+	_) بگڑ (L01	b'Igr
+	بغاوت	b,aQa:v'at
+	بزرگ	b'UzUr,g
+	_) بدل (L02	bad'al
+
+.group ڀ
+	ڀ	b#V
+	ڀ(L01	b#
+
+.group پ
+	پ	pV
+	پ (L01	p
+	_)پنهن(ج	pV~Hn
+
+.group ت
+	ت	t[V
+	ت(L01	t[
+	تّ	t[:V
+	تّ(L01	t[:
+
+.group ٿ
+	ٿ	t.V
+	ٿ(L01	t#
+	_)ٿين(د	t#i~:
+
+.group ٽ
+	ٽ	t.V
+	ٽ(L01	t.
+
+.group ٹ
+	ٹ	t.V
+	ٹ (L01	t.
+
+.group ٺ
+	ٺ	t.#V
+	ٺ(L01	t.#
+
+.group ث
+	ث	sV
+	ث (L01	s
+	ثّ	ssV
+ثّ (L01	ss
+
+.group ج
+	ج	JV
+	ج (L01	J
+	جّ	JJV
+	جّ (L01	JJ
+	_) جوا	J'ava:
+	جانب	J'a:nIb
+	_) جنس	J'Ins
+	_) جمل	J'Uml
+	_) جہ (L02	J'Eh
+	_) جدا	J'Uda:
+
+.group ڄ
+	ڄ	JV
+	ڄ(L01	J
+
+.group جھ
+	جھ	J#V
+	جھ(L01	J#
+
+.group چ
+	چ	cV
+	چ (L01	c
+	چّ	ccV
+	چّ (L01	cc
+	_) چہ (L02	c'Eh
+
+.group ڇ
+	ڇ	c#V
+	ڇ(L01	c#
+
+.group ح
+	ح	hV
+	ح (L01	h
+	ح (_	'ah
+	L01) ح (_	h
+	_) حوال	hav'a:l
+
+.group خ
+	خ	xV
+	خ (L01	x
+	@) خ (ت	x
+	خّ	x:V
+	خّ (L01	x:
+	_) خوش	x'US
+	_) خود	x'Ud
+	_)خورد	xUrd
+
+
+.group د
+	د	dV
+	د (L01	d
+	دّ (L01	d:
+	درخواست	d,aRxv'a:st
+	دیا(_	d'i:;a:
+	درج	d'aRJ
+	دفاع	d'Ifa:
+	_) دہ (L02	d'Eh
+	دلچسپ	d,Ilc'asp
+
+.group ڌ
+	ڌ	d#V
+	ڌ(L01	d#
+
+.group ڏ
+	ڏ	d.V
+	ڏ(L01	d.
+	_)ڏ(س	d.I
+
+.group ڊ
+	ڊ	d.V
+	ڊ(L01	d.
+
+.group ڍ
+	ڍ	d.#V
+	ڍ(L01	d.#
+
+.group ذ
+	ذ	zV
+	ذ(L01	z
+
+.group ر
+	ر	RV
+	ر (L01	R
+	رّ	RRV
+	رّ (l01	RR
+	@) ر (ٹ	R
+	@) ر (ڈ	R
+	@) ردہ (_	Rd,a
+	@) ر (چ	R
+	_) رہ (L02	R'Eh
+	_) رخ	R'Ux
+	@) ر (د	R
+	_) رفت	R'af@t
+
+.group ڙ
+	ڙ	r.V
+	ڙ(L01	r.
+
+.group ڙھ
+	ڙھ	r.hV
+	ڙھ(L01	r.h
+
+.group ڑ
+	ڑ	r:V
+	ڑ (L01	r:
+	ڑّ	r:r:V
+	ڑّ (L01	r:r:
+	ڑھ	r:hV
+	ڑھ (L01	r:h
+
+.group ز
+	ز	zV
+	ز (L01	z
+	زّ	zzV
+	زّ (L01	zz
+	_) زند	z'Ind
+	_) زہ (L02	z'Eh
+	_) زلزل	z,alz'al
+
+.group ٻ
+	ٻ	bV
+	ٻ(L01	b
+	_)ٻئي(_جL01_	bIe:
+
+.group س
+	س	sV
+	س (L01	s
+	سّ	ssV
+	سّ (L01	ss
+	_) سرخ	s'URx
+	L02)ستان	Ista:n
+	_) سلسل	s'Ils,Il
+	_) ستار	sIt'a:R
+	@) س (ٹ	s
+	@) س (ت	s
+	_) سپرد	sUp'URd
+	_) سہ (L02	s'Eh
+	سرگرم	s,aRg'aRm
+	_)سنڌ	sIndh
+	_)سمجھ(L01	samJ#
+
+.group ش
+	ش	SV
+	ش (L01	S
+	شّ	SSV
+	شّ (L01	SS
+	_) شعب	S'Ob
+	شاعر	Sa:'a:IR
+	_) شعرا	S'ORa:
+	_) شعل	S'Ol
+	@) ش (ت	S
+	_) شخص	S'axs.
+	_) شہ (L02	S'Eh
+	شرمند	S,aRm'Ind
+
+.group ص
+	ص	s.V
+	ص (L01	s.
+	صّ	ssV
+	صّ (L01	ss
+	صو(ب	s.u:
+
+.group ض
+	ض	zV
+	ض (L01	z
+	ضّ	zzv
+	ضّ (L01	zz
+	ضرو(ر	zaRu:
+
+.group ط
+	ط	tV
+	طھ	t#V
+		ط (L01	t
+	طھ (L01	t#
+	طّ	ttV
+	طّ (L01	tt
+
+.group ظ
+	ظ	z.V
+	ظ (L01	z.
+	ظّ	z.z.V
+	ظّ (L01	z.z.
+
+.group غ
+	غ	QV
+	غ (L01	Q
+	غّ	QQV
+	غّ (L01	QQ
+
+.group ف
+	ف	fV
+	ف (L01	f
+	فّ	ffV
+	فّ (L01	ff
+	_) فہ (L02	f'Eh
+	فلم	f'Ilm
+
+.group ڦ
+	ڦ	p#V
+	ڦ(L01	p#
+
+.group ق
+	ق	qV
+	ق (L01	q
+	قّ	qqV
+	قّ (L01	qq
+	قاعد	q'a:jd
+	_) قسط	q'Ist
+	_) قیا	q'aja:
+
+.group ک
+	ک	k#V
+	ک(L01	k#
+
+.group ڪ
+	ڪ	kV
+	ڪ(L01	k
+	_)ڪتا(ب	kIta:
+
+.group گ
+	گ	gV
+	گ (L01	g
+	گّ	ggV
+	گّ (L01	gg
+	_) گرفت	g'IRIft
+	_) گزر	gUz'aR
+	_) گزر (L01	gUzR
+	گمشد	g'UmS,Ud
+	_) گھما	gh'Uma:
+	_) گہ (L02	g'Eh
+	گزارش	gUz'a:RIS
+
+.group ڳ
+	ڳ	gV
+	ڳ(L01	g
+
+.group گھ
+	گھ	g#V
+	گھ(L01	g#
+
+.group ڱ
+	ڱ	N-V
+	ڱ(L01	N-
+
+.group ل
+	ل	lV
+	ل (L01	l
+	لّ	llV
+	لّ (L01	ll
+	لکھ	l'Ikh
+	_) لہ (L02	l'Eh
+
+.group م
+	م	mV
+	م (L01	m
+	مّ	m:V
+	مّ(L01	m:
+	مسجد	m'asJ,Id
+	مشرق	m'aSR,Iq
+	مقدم	mUq'adm
+	مسلم	m'Usl,Im
+	مسلما	mUs'alm,a:
+	@) م (پ	m
+	منزل	m'anz,Il
+	@) م (ب	m
+	محقق	mUh'aqIq
+	منظر	m,anz.'aR
+	محفل	m'Ehf,Il
+	محسن	m'o:hs,In
+	مجرم	m'UJR,Im
+	منظور	m,anz.'u:R
+	ملزم	m'Ulz,Im
+	مغرب	m'aQR,Ib
+	متحد	mUt'ahId
+	_) مہ (L02	m'Eh
+	مخالف	mUx'a:lIf
+	مخالفت	m,Uxa:lIf'at
+	مطالب	mUt'a:lIb
+	موجود	mo:J'u:d
+	متصل	mUt'as.Il
+	مخبر	m'Uxb,IR
+	ملحق	m'Ulh,Iq
+
+.group ن
+	ن	nV
+	ن (L01	n
+	@) ن (گ	n
+	@) ن (د	n
+	@)ن(ڌ	n
+	@)ن(ڊ	n
+	@) ن (ب	n
+	@) ن (س	n
+	نّ	nnV
+	نّ (L01	nn
+	@) ن (چ	n
+	@) ن (پ	n
+	نشان	nIS'a:n
+	_) نظر	naz.'aR
+	_) نظام	nIz.'a:m
+	_) نہ (L02	n'h
+	نھ	nh
+	_) نوا	n'ava:
+	_) نما	n'Uma:
+	_) نماز	nam'a:z
+	_)نڪر	nIkR
+
+.group ڃ
+	ڃ	n^V
+	ڃ(L01	n^
+
+.group ڻ
+	ڻ	n.V
+	ڻ(L01	n.
+
+.group ء
+	ء	
+
+.group ئ
+	ئ	
+	L01) ئ (L02	'I
+
+.group ه
+	ه	HV
+	ه(L01	H
+	_)ه(ند	hI
+	_)هوند(L01	Hu~:d
+
+
+.group ّ
+	ّ	:
+
+.group ً
+	ً	an
+
+
+// Common symbols
+
+.group
+	$	do:l@R
+	,	sVkat:Vh	// 	Sakata سکتہ
+		!	f'iJa:ja	//Fijaya	فجائیہ
+	;	w'ak't'a	//Waqfa	وقفہ
+	:	r'a:b'tah//Rabtar 	رابطہ
+	?	saw'a:l'i:ja:n'is'a:nV	// Sawaliya Nishan	سوالیہ نشان
+	%	f'i:sVd	//Fisad	فیصد
+
+ 
+
+.group 0xe0a4  // devanagari
+	0xe0a4  _^_NE  // switch to Nepali voice
+.group 0xe0a5  // devanagari
+	0xe0a5  _^_NE
+

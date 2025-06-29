@@ -1,0 +1,1821 @@
+// Emoji and Other Symbol pronunciations for Lithuanian
+//
+// Entries with `text|emoji` in the comments have text and emoji forms. They
+// can be followed by [FE0E] to select the text style, and [FE0F] to select
+// the emoji style.
+//
+// Entries with 'other' in the comments are not defined as emoji, but are other
+// Unicode characters.
+//
+// NOTE: See `src/ucd-tools/data/espeak-ng/emoji-data.txt` for additional data
+// in interpreting ZWJ emoji sequences.
+
+$textmode
+
+// 0000..007F : C0 Controls and Basic Latin
+
+//+	plus								// [002B] other (no translation)
+
+// 0080..00FF : C1 Controls and Latin-1 Supplement
+
+//¢	cents								// [00A2] other (no translation)
+//£	pound								// [00A3] other (no translation)
+//¤	currency sign							// [00A4] other (no translation)
+//¥	yen								// [00A5] other (no translation)
+//§	section								// [00A7] other (no translation)
+//¨	double dot							// [00A8] other (no translation)
+©	autorių teisės							// [00A9] text|emoji
+//¬	not sign							// [00AC] other (no translation)
+®	užregistruota							// [00AE] text|emoji
+//°	degrees								// [00B0] other (no translation)
+//±	plus or minus							// [00B1] other (no translation)
+//µ	micro								// [00B5] other (no translation)
+//¶	paragraph							// [00B6] other (no translation)
+//¼	a quarter							// [00BC] other (no translation)
+//½	a half								// [00BD] other (no translation)
+//¾	three quarters							// [00BE] other (no translation)
+//×	times								// [00D7] other (no translation)
+//÷	divided by							// [00F7] other (no translation)
+
+// 02B0..02FF : Spacing Modifier Letters
+
+//˙	dot								// [02D9] other (no translation)
+
+// 0900..097F : Devanagari
+
+//।	danda								// [0964] other (no translation)
+
+// 2000..203C : General Punctuation
+
+‼	du šauktukai							// [203C] text|emoji
+⁉	šauktukas ir klaustukas						// [2049] text|emoji
+
+// 20A0..20CF : Currency Symbols
+
+//₨	rupee								// [20A8] other (no translation)
+//€	euros								// [20AC] other (no translation)
+//₹	rupee								// [20B9] other (no translation)
+
+// 2100..214F : Letterlike Symbols
+
+//№	numero								// [2116] other (no translation)
+//℞	prescription							// [211E] other (no translation)
+™	prekės ženklas							// [2122] text|emoji
+ℹ	informacija							// [2139] text|emoji
+
+// 2150..218F : Number Forms
+
+//⅓	one third							// [2153] other (no translation)
+//⅔	two thirds							// [2154] other (no translation)
+
+// 2190..21FF : Arrows
+
+//←	left arrow							// [2190] other (no translation)
+//↑	up arrow							// [2191] other (no translation)
+//→	right arrow							// [2192] other (no translation)
+//↓	down arrow							// [2193] other (no translation)
+↔	rodyklė į kairę ir į dešinę					// [2194] text|emoji
+↕	rodyklė į viršų ir į apačią					// [2195] text|emoji
+↖	rodyklė į viršų ir į kairę					// [2196] text|emoji
+↗	rodyklė į viršų ir į dešinę					// [2197] text|emoji
+↘	rodyklė į apačią ir į dešinę					// [2198] text|emoji
+↙	rodyklė į apačią ir į kairę					// [2199] text|emoji
+↩	rodyklė į dešinę, užlenkta į kairę				// [21A9] text|emoji
+↪	rodyklė į kairę, užlenkta į dešinę				// [21AA] text|emoji
+
+// 2200..22FF : Mathematical Operators
+
+//∂	delta								// [2202] other (no translation)
+//∑	sum sign							// [2211] other (no translation)
+//−	minus								// [2212] other (no translation)
+//∗	asterisk							// [2217] other (no translation)
+//√	square root							// [221A] other (no translation)
+//∛	cube root							// [221B] other (no translation)
+//∝	proportional to							// [221D] other (no translation)
+//∞	infinity							// [221E] other (no translation)
+//∫	integral							// [222B] other (no translation)
+//∬	double integral							// [222C] other (no translation)
+//∴	therefore							// [2234] other (no translation)
+//∵	because								// [2235] other (no translation)
+//≈	approximately							// [2248] other (no translation)
+//≠	not equal to							// [2260] other (no translation)
+//≡	identical to							// [2261] other (no translation)
+//≤	less or equal to						// [2264] other (no translation)
+//≥	greater or equal to						// [2265] other (no translation)
+
+// 2300..23FF : Miscellaneous Technical
+
+⌚	laikrodis							// [231A]
+⌛	smėlio laikrodis						// [231B]
+⌨	klaviatūra							// [2328] text|emoji
+⏏	išmetimo mygtukas						// [23CF] text|emoji
+⏩	sukti pirmyn							// [23E9]
+⏪	atsukti atgal							// [23EA]
+⏫	greitai į viršų							// [23EB]
+⏬	greitai į apačią						// [23EC]
+⏭	kitas takelis							// [23ED] text|emoji
+⏮	paskutinis takelis						// [23EE] text|emoji
+⏯	paleisti arba pristabdyti					// [23EF] text|emoji
+⏰	žadintuvas							// [23F0]
+⏱	chronometras							// [23F1] text|emoji
+⏲	laikmatis							// [23F2] text|emoji
+⏳	smėlio laikrodis su krentančiu smėliu				// [23F3]
+⏸	pristabdyti							// [23F8] text|emoji
+⏹	sustabdymo mygtukas						// [23F9] text|emoji
+⏺	įrašymo mygtukas						// [23FA] text|emoji
+
+// 2460..24FF : Enclosed Alphanumerics
+
+Ⓜ	raidė M								// [24C2] text|emoji
+
+// 25A0..25FF : Geometric Shapes
+
+//■	black square							// [25A0] other (no translation)
+▪	juodas mažas kvadratas						// [25AA] text|emoji
+▫	baltas mažas kvadratas						// [25AB] text|emoji
+▶	paleisti							// [25B6] text|emoji
+◀	atvirkštinė tvarka						// [25C0] text|emoji
+//●	black circle							// [25CF] other (no translation)
+◻	baltas vidutinis kvadratas					// [25FB] text|emoji
+◼	juodas vidutinis kvadratas					// [25FC] text|emoji
+◽	baltas vidutiniškai mažas kvadratas				// [25FD]
+◾	juodas vidutiniškai mažas kvadratas				// [25FE]
+
+// 2600..26FF : Miscellaneous Symbols
+
+☀	saulė								// [2600] text|emoji
+☁	debesis								// [2601] text|emoji
+☂	skėtis								// [2602] text|emoji
+☃	sniego senis							// [2603] text|emoji
+☄	kometa								// [2604] text|emoji
+☎	telefonas							// [260E] text|emoji
+☑	balsavimo laukelis su varnele					// [2611] text|emoji
+☔	skėtis su lietaus lašais					// [2614]
+☕	karštas gėrimas							// [2615]
+☘	trilapis dobilas						// [2618] text|emoji
+☝	delnu atsukta aukštyn pirštu rodanti ranka			// [261D] text|emoji
+☠	kaukolė ir sukryžiuoti kaulai					// [2620] text|emoji
+☢	radioaktyvu							// [2622] text|emoji
+☣	biorizika							// [2623] text|emoji
+☦	ortodoksų kryžius						// [2626] text|emoji
+☪	žvaigždė ir pusmėnulis						// [262A] text|emoji
+☮	taikos simbolis							// [262E] text|emoji
+☯	In ir Jang							// [262F] text|emoji
+☸	Dharmos ratas							// [2638] text|emoji
+☹	paniuręs veidas							// [2639] text|emoji
+☺	besišypsantis veidas						// [263A] text|emoji
+♀	moteriškos lyties ženklas					// [2640] text|emoji
+♂	vyriškos lyties ženklas						// [2642] text|emoji
+♈	avinas								// [2648]
+♉	tauras								// [2649]
+♊	dvyniai								// [264A]
+♋	vėžys								// [264B]
+♌	liūtas								// [264C]
+♍	mergelė								// [264D]
+♎	svarstyklės							// [264E]
+♏	skorpionas							// [264F]
+♐	šaulys								// [2650]
+♑	ožiaragis							// [2651]
+♒	vandenio ženklas						// [2652]
+♓	žuvys								// [2653]
+♟	šachmatų pėstininkas						// [265F] text|emoji
+♠	pikai								// [2660] text|emoji
+♣	kryžiai								// [2663] text|emoji
+♥	širdys								// [2665] text|emoji
+♦	būgnai								// [2666] text|emoji
+♨	karštosios versmės						// [2668] text|emoji
+//♭	flat								// [266D] other (no translation)
+//♯	sharp								// [266F] other (no translation)
+♻	perdirbimo simbolis						// [267B] text|emoji
+♾	begalybė							// [267E] text|emoji
+♿	neįgaliojo vežimėlio simbolis					// [267F]
+⚒	plaktuvas ir kirstuvas						// [2692] text|emoji
+⚓	inkaras								// [2693]
+⚔	sukryžiuoti kardai						// [2694] text|emoji
+⚕	medicinos simbolis						// [2695] text|emoji
+⚖	svarstyklės su lėkštėmis					// [2696] text|emoji
+⚗	distiliavimo indas						// [2697] text|emoji
+⚙	krumpliaratis							// [2699] text|emoji
+⚛	atomo simbolis							// [269B] text|emoji
+⚜	lelijos simbolis						// [269C] text|emoji
+⚠	įspėjimas							// [26A0] text|emoji
+⚡	aukštoji įtampa							// [26A1]
+⚪	baltas rutulys							// [26AA]
+⚫	juodas rutulys							// [26AB]
+⚰	karstas								// [26B0] text|emoji
+⚱	laidojimo urna							// [26B1] text|emoji
+⚽	futbolo kamuolys						// [26BD]
+⚾	beisbolo kamuoliukas						// [26BE]
+⛄	sniego senis be sniego						// [26C4]
+⛅	saulė už debesų							// [26C5]
+⛈	debesis su žaibu ir lietumi					// [26C8] text|emoji
+⛎	gyvatnešis							// [26CE]
+⛏	kirstuvas							// [26CF] text|emoji
+⛑	šalmas su baltu kryžiumi					// [26D1] text|emoji
+⛓	grandinės							// [26D3] text|emoji
+⛔	įėjimo nėra							// [26D4]
+⛩	Šintoizmo šventykla						// [26E9] text|emoji
+⛪	bažnyčia							// [26EA]
+⛰	kalnas								// [26F0] text|emoji
+⛱	skėtis ant žemės						// [26F1] text|emoji
+⛲	fontanas							// [26F2]
+⛳	vėliava skylutėje						// [26F3]
+⛴	keltas								// [26F4] text|emoji
+⛵	burlaivis							// [26F5]
+⛷	slidininkas							// [26F7] text|emoji
+⛸	pačiūžos							// [26F8] text|emoji
+⛹	žmogus su kamuoliu						// [26F9] text|emoji
+⛺	palapinė							// [26FA]
+⛽	degalų siurblys							// [26FD]
+
+// 2700..27BF : Dingbats
+
+✂	žirklės								// [2702] text|emoji
+✅	balta paryškinta varnelė					// [2705]
+✈	lėktuvas							// [2708] text|emoji
+✉	vokas								// [2709] text|emoji
+✊	iškeltas kumštis						// [270A]
+✋	iškelta ranka							// [270B]
+✌	pergalės ženklą rodanti ranka					// [270C] text|emoji
+✍	rašanti ranka							// [270D] text|emoji
+✏	pieštukas							// [270F] text|emoji
+✒	juoda plunksna							// [2712] text|emoji
+✔	paryškinta varnelė						// [2714] text|emoji
+✖	paryškintas daugybos ženklas					// [2716] text|emoji
+✝	Romos katalikų kryžius						// [271D] text|emoji
+✡	Dovydo žvaigždė							// [2721] text|emoji
+✨	kibirkštėlės							// [2728]
+✳	aštuoniakampė žvaigždutė					// [2733] text|emoji
+✴	aštuoniakampė žvaigždė						// [2734] text|emoji
+❄	snaigė								// [2744] text|emoji
+❇	kibirkštėlė							// [2747] text|emoji
+❌	kryžiukas							// [274C]
+❎	kryžiuko mygtukas						// [274E]
+❓	klaustukas							// [2753]
+❔	baltas klaustukas						// [2754]
+❕	baltas šauktukas						// [2755]
+❗	šauktukas							// [2757]
+❣	storas širdelės formos šauktukas				// [2763] text|emoji
+❤	raudona širdelė							// [2764] text|emoji
+➕	paryškintas pliusas						// [2795]
+➖	paryškintas minusas						// [2796]
+➗	paryškintas dalybos ženklas					// [2797]
+➡	rodyklė į dešinę						// [27A1] text|emoji
+➰	kilpelė								// [27B0]
+➿	dviguba kilpelė							// [27BF]
+
+// 2900..297F : Supplemental Arrows-B
+
+⤴	rodyklė į dešinę, užlenkta į viršų				// [2934] text|emoji
+⤵	rodyklė į dešinę, užlenkta į apačią				// [2935] text|emoji
+
+// 2B00..2BFF : Miscellaneous Symbols and Arrows
+
+⬅	rodyklė į kairę							// [2B05] text|emoji
+⬆	rodyklė į viršų							// [2B06] text|emoji
+⬇	rodyklė į apačią						// [2B07] text|emoji
+⬛	juodas didelis kvadratas					// [2B1B]
+⬜	baltas didelis kvadratas					// [2B1C]
+⭐	balta vidutinė žvaigždė						// [2B50]
+⭕	ryškus didelis ratas						// [2B55]
+
+// 3000..303F : CJK Symbols and Punctuation
+
+〰	vingiuotas brūkšnys						// [3030] text|emoji
+〽	dalių apkeitimo ženklas						// [303D] text|emoji
+
+// 3200..32FF : Enclosed CJK Letters and Months
+
+㊗	pasveikinimą reiškiantis hieroglifas				// [3297] text|emoji
+㊙	paslaptį reiškiantis hieroglifas				// [3299] text|emoji
+
+// 1F100..1F1FF : Enclosed Alphanumeric Supplement
+
+🅰	mygtukas A (raudona)						// [1F170] text|emoji
+🅱	mygtukas B (raudona)						// [1F171] text|emoji
+🅾	simbolis O (raudona)						// [1F17E] text|emoji
+🅿	simbolis P							// [1F17F] text|emoji
+🆎	mygtukas AB (raudona)						// [1F18E]
+🆑	simbolis CL							// [1F191]
+🆒	simbolis COOL							// [1F192]
+🆓	simbolis FREE							// [1F193]
+🆔	simbolis ID							// [1F194]
+🆕	simbolis NEW							// [1F195]
+🆖	simbolis NG							// [1F196]
+🆗	simbolis OK							// [1F197]
+🆘	simbolis SOS							// [1F198]
+🆙	mygtukas Up!							// [1F199]
+🆚	simbolis VS							// [1F19A]
+
+// 1F200..1F2FF : Enclosed Ideographic Supplement
+
+🈁	čia reiškiantis hieroglifas					// [1F201]
+🈂	paslaugos mokestį reiškiantis hieroglifas			// [1F202] text|emoji
+🈚	nemokamumą reiškiantis hieroglifas				// [1F21A]
+🈯	rezervavimą reiškiantis hieroglifas				// [1F22F]
+🈲	draudimą reiškiantis hieroglifas				// [1F232]
+🈳	tuštumą reiškiantis hieroglifas					// [1F233]
+🈴	bendrumą reiškiantis hieroglifas				// [1F234]
+🈵	pilnatvę reiškiantis hieroglifas				// [1F235]
+🈶	ne nemokamą reiškiantis hieroglifas				// [1F236]
+🈷	mėnesio sumą reiškiantis hieroglifas				// [1F237] text|emoji
+🈸	taikymą reiškiantis hieroglifas					// [1F238]
+🈹	nuolaidą reiškiantis hieroglifas				// [1F239]
+🈺	veikimą reiškiantis hieroglifas					// [1F23A]
+🉐	susitarimą reiškiantis hieroglifas				// [1F250]
+🉑	sutikimą reiškiantis hieroglifas				// [1F251]
+
+// 1F000..1F02F : Mahjong Tiles
+
+🀄	madžongo raudonas drakonas					// [1F004]
+
+// 1F0A0..1F0FF : Playing Cards
+
+🃏	juokdarys							// [1F0CF]
+
+// 1F300..1F5FF : Miscellaneous Symbols and Pictographs
+
+🌀	ciklonas							// [1F300]
+🌁	rūkas								// [1F301]
+🌂	suskleistas skėtis						// [1F302]
+🌃	žvaigždėta naktis						// [1F303]
+🌄	saulėtekis virš kalnų						// [1F304]
+🌅	saulėtekis							// [1F305]
+🌆	sutemos virš miesto						// [1F306]
+🌇	saulėlydis							// [1F307]
+🌈	vaivorykštė							// [1F308]
+🌉	tiltas naktį							// [1F309]
+🌊	vandens banga							// [1F30A]
+🌋	ugnikalnis							// [1F30B]
+🌌	paukščių takas							// [1F30C]
+🌍	žemės rutulys su Europos ir Afrikos žemynais			// [1F30D]
+🌎	žemės rutulys su Šiaurės ir Pietų Amerikos žemynais		// [1F30E]
+🌏	žemės rutulys su Azijos ir Australijos žemynais			// [1F30F]
+🌐	žemės rutulys su dienovidiniais					// [1F310]
+🌑	jaunas mėnulis							// [1F311]
+🌒	priešpilnis mėnulis						// [1F312]
+🌓	pirmas fazės ketvirtis						// [1F313]
+🌔	priešpilnis (pabaiga)						// [1F314]
+🌕	pilnatis							// [1F315]
+🌖	delčia								// [1F316]
+🌗	paskutinis fazės ketvirtis					// [1F317]
+🌘	delčia (pabaiga)						// [1F318]
+🌙	pusmėnulis							// [1F319]
+🌚	jaunas mėnulis su veidu						// [1F31A]
+🌛	priešpilnio mėnulis su veidu					// [1F31B]
+🌜	delčios mėnulis su veidu					// [1F31C]
+🌝	pilnatis su veidu						// [1F31D]
+🌞	saulė su veidu							// [1F31E]
+🌟	žėrinti žvaigždė						// [1F31F]
+🌠	krintanti žvaigždė						// [1F320]
+🌡	termometras							// [1F321] text|emoji
+🌤	saulė už nedidelio debesies					// [1F324] text|emoji
+🌥	saulė už didelio debesies					// [1F325] text|emoji
+🌦	saulė už debesies, iš kurio lyja				// [1F326] text|emoji
+🌧	debesis, iš kurio lyja						// [1F327] text|emoji
+🌨	debesis, iš kurio sninga					// [1F328] text|emoji
+🌩	debesis su žaibu						// [1F329] text|emoji
+🌪	tornadas							// [1F32A] text|emoji
+🌫	ūkana								// [1F32B] text|emoji
+🌬	vėjo veidas							// [1F32C] text|emoji
+🌭	dešrainis							// [1F32D]
+🌮	meksikietiškas paplotėlis					// [1F32E]
+🌯	buritas								// [1F32F]
+🌰	lazdyno riešutas						// [1F330]
+🌱	daigas								// [1F331]
+🌲	amžinai žaliuojantis medis					// [1F332]
+🌳	lapuotis							// [1F333]
+🌴	palmė								// [1F334]
+🌵	kaktusas							// [1F335]
+🌶	aštrusis pipiras						// [1F336] text|emoji
+🌷	tulpė								// [1F337]
+🌸	vyšnios žiedas							// [1F338]
+🌹	rožė								// [1F339]
+🌺	kinrožė								// [1F33A]
+🌻	saulėgrąža							// [1F33B]
+🌼	gėlės žiedas							// [1F33C]
+🌽	kukurūzo burbuolė						// [1F33D]
+🌾	ryžių pėdas							// [1F33E]
+🌿	žolelė								// [1F33F]
+🍀	keturlapis dobilas						// [1F340]
+🍁	klevo lapas							// [1F341]
+🍂	nukritęs lapas							// [1F342]
+🍃	lapas vėjyje							// [1F343]
+🍄	grybas								// [1F344]
+🍅	pomidoras							// [1F345]
+🍆	baklažanas							// [1F346]
+🍇	vynuogės							// [1F347]
+🍈	melionas							// [1F348]
+🍉	arbūzas								// [1F349]
+🍊	mandarinas							// [1F34A]
+🍋	citrina								// [1F34B]
+🍌	bananas								// [1F34C]
+🍍	ananasas							// [1F34D]
+🍎	raudonas obuolys						// [1F34E]
+🍏	žalias obuolys							// [1F34F]
+🍐	kriaušė								// [1F350]
+🍑	persikas							// [1F351]
+🍒	vyšnios								// [1F352]
+🍓	braškė								// [1F353]
+🍔	mėsainis							// [1F354]
+🍕	pica								// [1F355]
+🍖	mėsa ant kaulo							// [1F356]
+🍗	paukščio šlaunelė						// [1F357]
+🍘	ryžių paplotėlis						// [1F358]
+🍙	ryžių rutuliukas						// [1F359]
+🍚	virti ryžiai							// [1F35A]
+🍛	ryžiai su kariu							// [1F35B]
+🍜	makaronų sriubos dubenėlis					// [1F35C]
+🍝	spagečiai							// [1F35D]
+🍞	duona								// [1F35E]
+🍟	gruzdintos bulvytės						// [1F35F]
+🍠	kepta saldžioji bulvė						// [1F360]
+🍡	dango								// [1F361]
+🍢	odenas								// [1F362]
+🍣	sušis								// [1F363]
+🍤	kepta krevetė							// [1F364]
+🍥	žuvies pyragėlis su išpieštu sūkurio simboliu			// [1F365]
+🍦	minkšti ledai							// [1F366]
+🍧	susmulkintas ledas						// [1F367]
+🍨	ledai								// [1F368]
+🍩	spurga								// [1F369]
+🍪	sausainis							// [1F36A]
+🍫	šokolado batonėlis						// [1F36B]
+🍬	saldainis							// [1F36C]
+🍭	ledinukas ant pagaliuko						// [1F36D]
+🍮	saldus kremas							// [1F36E]
+🍯	medaus puodynė							// [1F36F]
+🍰	trapus pyragas							// [1F370]
+🍱	bento dėžutė							// [1F371]
+🍲	puodas su maistu						// [1F372]
+🍳	valgio gaminimas						// [1F373]
+🍴	šakutė ir peilis						// [1F374]
+🍵	arbatos puodelis be rankenos					// [1F375]
+🍶	sakė								// [1F376]
+🍷	vyno taurė							// [1F377]
+🍸	kokteilio taurė							// [1F378]
+🍹	tropinis gėrimas						// [1F379]
+🍺	alaus bokalas							// [1F37A]
+🍻	susidaužiantys alaus bokalai					// [1F37B]
+🍼	kūdikio buteliukas						// [1F37C]
+🍽	šakutė ir peilis su lėkšte					// [1F37D] text|emoji
+🍾	butelis su iššokusiu kamščiu					// [1F37E]
+🍿	spragėsiai							// [1F37F]
+🎀	kaspinas							// [1F380]
+🎁	supakuota dovana						// [1F381]
+🎂	gimtadienio tortas						// [1F382]
+🎃	žibintas iš moliūgo						// [1F383]
+🎄	Kalėdų eglutė							// [1F384]
+🎅	Kalėdų senelis							// [1F385]
+🎆	fejerverkai							// [1F386]
+🎇	šaltoji ugnelė							// [1F387]
+🎈	balionas							// [1F388]
+🎉	konfeti šaudyklė						// [1F389]
+🎊	konfeti kamuolys						// [1F38A]
+🎋	tanabata medis							// [1F38B]
+🎌	sukryžiuotos vėliavos						// [1F38C]
+🎍	dekoracija iš pušies						// [1F38D]
+🎎	japoniškos lėlės						// [1F38E]
+🎏	karpio vėtrungė							// [1F38F]
+🎐	vėjo varpeliai							// [1F390]
+🎑	mėnesienos ceremonija						// [1F391]
+🎒	mokyklinė kuprinė						// [1F392]
+🎓	mokyklos baigimo kepurėlė					// [1F393]
+🎖	kariuomenės medalis						// [1F396] text|emoji
+🎗	atminimo kaspinas						// [1F397] text|emoji
+🎙	studijos mikrofonas						// [1F399] text|emoji
+🎚	lygio slankiklis						// [1F39A] text|emoji
+🎛	valdymo rankenos						// [1F39B] text|emoji
+🎞	filmo kadrai							// [1F39E] text|emoji
+🎟	įėjimo bilietai							// [1F39F] text|emoji
+🎠	karuselės arkliukas						// [1F3A0]
+🎡	apžvalgos ratas							// [1F3A1]
+🎢	linksmieji kalneliai						// [1F3A2]
+🎣	meškerė								// [1F3A3]
+🎤	mikrofonas							// [1F3A4]
+🎥	filmavimo kamera						// [1F3A5]
+🎦	kinas								// [1F3A6]
+🎧	ausinės								// [1F3A7]
+🎨	dailininko paletė						// [1F3A8]
+🎩	cilindras							// [1F3A9]
+🎪	cirko palapinė							// [1F3AA]
+🎫	bilietas							// [1F3AB]
+🎬	pliauškė							// [1F3AC]
+🎭	scenos menas							// [1F3AD]
+🎮	vaizdo žaidimas							// [1F3AE]
+🎯	smūgis tiesiai į taikinį					// [1F3AF]
+🎰	žaidimų automatas						// [1F3B0]
+🎱	biliardo kamuoliukas						// [1F3B1]
+🎲	kauliukas							// [1F3B2]
+🎳	boulingas							// [1F3B3]
+🎴	kortos su gėlėmis						// [1F3B4]
+🎵	muzikos nata							// [1F3B5]
+🎶	muzikos natos							// [1F3B6]
+🎷	saksofonas							// [1F3B7]
+🎸	gitara								// [1F3B8]
+🎹	muzikos klaviatūra						// [1F3B9]
+🎺	trimitas							// [1F3BA]
+🎻	smuikas								// [1F3BB]
+🎼	partitūra							// [1F3BC]
+🎽	bėgimo marškinėliai						// [1F3BD]
+🎾	teniso kamuoliukas						// [1F3BE]
+🎿	slidės								// [1F3BF]
+🏀	krepšinio kamuolys						// [1F3C0]
+🏁	vėliava langeliais						// [1F3C1]
+🏂	snieglenčių sporto mėgėjas					// [1F3C2]
+🏃	bėgikas								// [1F3C3]
+🏄	banglentininkas							// [1F3C4]
+🏅	sporto medalis							// [1F3C5]
+🏆	trofėjus							// [1F3C6]
+🏇	arklių lenktynės						// [1F3C7]
+🏈	amerikietiškojo futbolo kamuolys				// [1F3C8]
+🏉	regbio kamuolys							// [1F3C9]
+🏊	plaukikas							// [1F3CA]
+🏋	svorių kilnotojas						// [1F3CB] text|emoji
+🏌	golfo žaidėjas							// [1F3CC] text|emoji
+🏍	motociklas							// [1F3CD] text|emoji
+🏎	lenktyninis automobilis						// [1F3CE] text|emoji
+🏏	kriketas							// [1F3CF]
+🏐	tinklinio kamuolys						// [1F3D0]
+🏑	žolės riedulys							// [1F3D1]
+🏒	ledo ritulio lazda ir ritulys					// [1F3D2]
+🏓	stalo tenisas							// [1F3D3]
+🏔	kalnas su snieguota viršūne					// [1F3D4] text|emoji
+🏕	stovyklavimas							// [1F3D5] text|emoji
+🏖	paplūdimys ir skėtis						// [1F3D6] text|emoji
+🏗	pastato konstrukcija						// [1F3D7] text|emoji
+🏘	namai								// [1F3D8] text|emoji
+🏙	miesto vaizdas							// [1F3D9] text|emoji
+🏚	apleistas pastatas						// [1F3DA] text|emoji
+🏛	klasikinis pastatas						// [1F3DB] text|emoji
+🏜	dykuma								// [1F3DC] text|emoji
+🏝	atoki sala							// [1F3DD] text|emoji
+🏞	nacionalinis parkas						// [1F3DE] text|emoji
+🏟	stadionas							// [1F3DF] text|emoji
+🏠	namas								// [1F3E0]
+🏡	namas su sodu							// [1F3E1]
+🏢	biurų pastatas							// [1F3E2]
+🏣	japoniškas paštas						// [1F3E3]
+🏤	pašto pastatas							// [1F3E4]
+🏥	ligoninė							// [1F3E5]
+🏦	bankas								// [1F3E6]
+🏧	bankomato ženklas						// [1F3E7]
+🏨	viešbutis							// [1F3E8]
+🏩	meilės viešbutis						// [1F3E9]
+🏪	visą parą dirbanti parduotuvė					// [1F3EA]
+🏫	mokykla								// [1F3EB]
+🏬	prekybos centras						// [1F3EC]
+🏭	gamykla								// [1F3ED]
+🏮	raudonas popierinis žibintas					// [1F3EE]
+🏯	japoniška pilis							// [1F3EF]
+🏰	pilis								// [1F3F0]
+🏳	balta vėliava							// [1F3F3] text|emoji
+🏴	juoda vėliava							// [1F3F4]
+🏵	rozetė								// [1F3F5] text|emoji
+🏷	etiketė								// [1F3F7] text|emoji
+🏸	badmintonas							// [1F3F8]
+🏹	lankas ir strėlė						// [1F3F9]
+🏺	senovinė vaza							// [1F3FA]
+🏻	1 ir 2 odos tipai						// [1F3FB]
+🏼	3 odos tipas							// [1F3FC]
+🏽	4 odos tipas							// [1F3FD]
+🏾	5 odos tipas							// [1F3FE]
+🏿	6 odos tipas							// [1F3FF]
+🐀	žiurkė								// [1F400]
+🐁	pelė								// [1F401]
+🐂	jautis								// [1F402]
+🐃	azijinis buivolas						// [1F403]
+🐄	karvė								// [1F404]
+🐅	tigras								// [1F405]
+🐆	leopardas							// [1F406]
+🐇	triušis								// [1F407]
+🐈	katė								// [1F408]
+🐉	drakonas							// [1F409]
+🐊	krokodilas							// [1F40A]
+🐋	banginis							// [1F40B]
+🐌	sraigė								// [1F40C]
+🐍	gyvatė								// [1F40D]
+🐎	arklys								// [1F40E]
+🐏	avinas (gyvūnas)						// [1F40F]
+🐐	ožys								// [1F410]
+🐑	avis								// [1F411]
+🐒	beždžionė							// [1F412]
+🐓	gaidys								// [1F413]
+🐔	višta								// [1F414]
+🐕	šuo								// [1F415]
+🐖	kiaulė								// [1F416]
+🐗	šernas								// [1F417]
+🐘	dramblys							// [1F418]
+🐙	aštuonkojis							// [1F419]
+🐚	susisukusi kriauklė						// [1F41A]
+🐛	vabalas								// [1F41B]
+🐜	skruzdėlė							// [1F41C]
+🐝	bitė								// [1F41D]
+🐞	boružė								// [1F41E]
+🐟	žuvis								// [1F41F]
+🐠	tropinė žuvis							// [1F420]
+🐡	fugu								// [1F421]
+🐢	vėžlys								// [1F422]
+🐣	išsiritęs viščiukas						// [1F423]
+🐤	viščiukas							// [1F424]
+🐥	atsisukęs snapu viščiukas					// [1F425]
+🐦	paukštis							// [1F426]
+🐧	pingvinas							// [1F427]
+🐨	koala								// [1F428]
+🐩	pudelis								// [1F429]
+🐪	kupranugaris							// [1F42A]
+🐫	dvikupris kupranugaris						// [1F42B]
+🐬	delfinas							// [1F42C]
+🐭	pelės snukutis							// [1F42D]
+🐮	karvės snukis							// [1F42E]
+🐯	tigro snukis							// [1F42F]
+🐰	triušio snukutis						// [1F430]
+🐱	katės snukutis							// [1F431]
+🐲	drakono snukis							// [1F432]
+🐳	purškiantis banginis						// [1F433]
+🐴	arklio snukis							// [1F434]
+🐵	beždžionės snukutis						// [1F435]
+🐶	šuns snukutis							// [1F436]
+🐷	kiaulės snukis							// [1F437]
+🐸	varlės snukutis							// [1F438]
+🐹	žiurkėno snukutis						// [1F439]
+🐺	vilko snukis							// [1F43A]
+🐻	meškos snukis							// [1F43B]
+🐼	pandos snukis							// [1F43C]
+🐽	kiaulės nosis							// [1F43D]
+🐾	pėdutės								// [1F43E]
+🐿	voverė								// [1F43F] text|emoji
+👀	akys								// [1F440]
+👁	akis								// [1F441] text|emoji
+👂	ausis								// [1F442]
+👃	nosis								// [1F443]
+👄	burna								// [1F444]
+👅	liežuvis							// [1F445]
+👆	delnu nusukta aukštyn pirštu rodanti ranka			// [1F446]
+👇	delnu nusukta žemyn pirštu rodanti ranka			// [1F447]
+👈	į kairę pirštu rodanti ranka					// [1F448]
+👉	į dešinę pirštu rodanti ranka					// [1F449]
+👊	artėjantis kumštis						// [1F44A]
+👋	mojuojanti ranka						// [1F44B]
+👌	GERAI ženklas rankomis						// [1F44C]
+👍	nykštys į viršų							// [1F44D]
+👎	nykštys į apačią						// [1F44E]
+👏	plojančios rankos						// [1F44F]
+👐	atviros rankos							// [1F450]
+👑	karūna								// [1F451]
+👒	moteriška skrybėlė						// [1F452]
+👓	akiniai								// [1F453]
+👔	kaklaraištis							// [1F454]
+👕	marškinėliai							// [1F455]
+👖	džinsai								// [1F456]
+👗	suknelė								// [1F457]
+👘	kimono								// [1F458]
+👙	bikinis								// [1F459]
+👚	moteriški drabužiai						// [1F45A]
+👛	piniginė							// [1F45B]
+👜	rankinė								// [1F45C]
+👝	maišelis							// [1F45D]
+👞	vyriškas batas							// [1F45E]
+👟	bėgimo batelis							// [1F45F]
+👠	aukštakulnis batelis						// [1F460]
+👡	moteriška basutė						// [1F461]
+👢	moteriškas batas						// [1F462]
+👣	pėdsakai							// [1F463]
+👤	biusto siluetas							// [1F464]
+👥	biustų siluetai							// [1F465]
+👦	berniukas							// [1F466]
+👧	mergaitė							// [1F467]
+👨	vyras								// [1F468]
+👩	moteris								// [1F469]
+👪	šeima								// [1F46A]
+👫	vyras ir moteris, susikibę už rankų				// [1F46B]
+👬	du vyrai, susikibę už rankų					// [1F46C]
+👭	dvi moterys, susikibusios už rankų				// [1F46D]
+👮	policininkas							// [1F46E]
+👯	besilinksminančios moterys					// [1F46F]
+👰	nuotaka su veliumu						// [1F470]
+👱	šviesiaplaukis žmogus						// [1F471]
+👲	vyras su kinietiška kepurėle					// [1F472]
+👳	vyras su turbanu						// [1F473]
+👴	senas vyras							// [1F474]
+👵	sena moteris							// [1F475]
+👶	kūdikis								// [1F476]
+👷	statybininkas							// [1F477]
+👸	princesė							// [1F478]
+👹	pabaisa								// [1F479]
+👺	demonas								// [1F47A]
+👻	vaiduoklis							// [1F47B]
+👼	angeliukas							// [1F47C]
+👽	ateivis								// [1F47D]
+👾	monstras ateivis						// [1F47E]
+👿	velniūkštis							// [1F47F]
+💀	kaukolė								// [1F480]
+💁	informacijos skyriaus darbuotojas				// [1F481]
+💂	sargybinis							// [1F482]
+💃	šokanti moteris							// [1F483]
+💄	lūpų dažai							// [1F484]
+💅	nagų lakas							// [1F485]
+💆	veido masažas							// [1F486]
+💇	apkerpamas žmogus						// [1F487]
+💈	kirpėjo suktukas						// [1F488]
+💉	švirkštas							// [1F489]
+💊	piliulė								// [1F48A]
+💋	bučinio žymė							// [1F48B]
+💌	meilės laiškas							// [1F48C]
+💍	žiedas								// [1F48D]
+💎	brangakmenis							// [1F48E]
+💏	bučinys								// [1F48F]
+💐	puokštė								// [1F490]
+💑	pora su širdele							// [1F491]
+💒	vestuvės							// [1F492]
+💓	plakanti širdelė						// [1F493]
+💔	sudaužyta širdelė						// [1F494]
+💕	dvi širdelės							// [1F495]
+💖	žėrinti širdelė							// [1F496]
+💗	auganti širdelė							// [1F497]
+💘	širdelė su strėle						// [1F498]
+💙	mėlyna širdelė							// [1F499]
+💚	žalia širdelė							// [1F49A]
+💛	geltona širdelė							// [1F49B]
+💜	purpurinė širdelė						// [1F49C]
+💝	širdelė su kaspinu						// [1F49D]
+💞	besisukančios širdelės						// [1F49E]
+💟	širdelės dekoracija						// [1F49F]
+💠	deimantas su tašku						// [1F4A0]
+💡	lemputė								// [1F4A1]
+💢	pykčio simbolis							// [1F4A2]
+💣	bomba								// [1F4A3]
+💤	miego simbolis							// [1F4A4]
+💥	susidūrimas							// [1F4A5]
+💦	prakaito lašeliai						// [1F4A6]
+💧	lašas								// [1F4A7]
+💨	sukeltos dulkės							// [1F4A8]
+💩	išmatų krūvelė							// [1F4A9]
+💪	paryškinti bicepsai						// [1F4AA]
+💫	apsvaigęs							// [1F4AB]
+💬	kalbos debesėlis						// [1F4AC]
+💭	minties debesėlis						// [1F4AD]
+💮	balta gėlė							// [1F4AE]
+💯	šimtas taškų							// [1F4AF]
+💰	pinigų maišas							// [1F4B0]
+💱	valiutos keitimas						// [1F4B1]
+💲	paryškintas dolerio ženklas					// [1F4B2]
+💳	kredito kortelė							// [1F4B3]
+💴	jenos banknotas							// [1F4B4]
+💵	dolerio banknotas						// [1F4B5]
+💶	euro banknotas							// [1F4B6]
+💷	svaro sterlingų banknotas					// [1F4B7]
+💸	pinigai su sparnais						// [1F4B8]
+💹	didėjimo diagrama su jenos simboliu				// [1F4B9]
+💺	vieta								// [1F4BA]
+💻	skreitinis kompiuteris						// [1F4BB]
+💼	portfelis							// [1F4BC]
+💽	kompiuterio diskas						// [1F4BD]
+💾	diskelis							// [1F4BE]
+💿	optinis diskas							// [1F4BF]
+📀	skaitmeninis vaizdo diskas					// [1F4C0]
+📁	failų aplankas							// [1F4C1]
+📂	atidarytas failų aplankas					// [1F4C2]
+📃	užsirietęs puslapis						// [1F4C3]
+📄	puslapis viršutine puse						// [1F4C4]
+📅	kalendorius							// [1F4C5]
+📆	nuplėšiamas kalendorius						// [1F4C6]
+📇	kortelių dėklas							// [1F4C7]
+📈	didėjimo tendencijos diagrama					// [1F4C8]
+📉	mažėjimo tendencijos diagrama					// [1F4C9]
+📊	juostinė diagrama						// [1F4CA]
+📋	segtuvas							// [1F4CB]
+📌	smeigtukas							// [1F4CC]
+📍	apvalus smeigtukas						// [1F4CD]
+📎	sąvaržėlė							// [1F4CE]
+📏	tiesi liniuotė							// [1F4CF]
+📐	trikampė liniuotė						// [1F4D0]
+📑	žymių skirtukai							// [1F4D1]
+📒	sąskaitų knyga							// [1F4D2]
+📓	užrašinė							// [1F4D3]
+📔	užrašų knygelė su dekoratyviniu viršeliu			// [1F4D4]
+📕	užversta knyga							// [1F4D5]
+📖	atversta knyga							// [1F4D6]
+📗	žalia knyga							// [1F4D7]
+📘	mėlyna knyga							// [1F4D8]
+📙	oranžinė knyga							// [1F4D9]
+📚	knygos								// [1F4DA]
+📛	vardo ženklelis							// [1F4DB]
+📜	susuktas lapas							// [1F4DC]
+📝	atmintinė							// [1F4DD]
+📞	telefono ragelis						// [1F4DE]
+📟	gaviklis							// [1F4DF]
+📠	fakso aparatas							// [1F4E0]
+📡	palydovinė antena						// [1F4E1]
+📢	garsiakalbio simbolis						// [1F4E2]
+📣	garsintuvas							// [1F4E3]
+📤	siunčiamų laiškų dėklas						// [1F4E4]
+📥	gaunamų laiškų dėklas						// [1F4E5]
+📦	paketas								// [1F4E6]
+📧	el. laiškas							// [1F4E7]
+📨	gaunamas vokas							// [1F4E8]
+📩	vokas su rodykle						// [1F4E9]
+📪	uždaryta pašto dėžutė su nuleista vėliava			// [1F4EA]
+📫	uždaryta pašto dėžutė su pakelta vėliava			// [1F4EB]
+📬	atidaryta pašto dėžutė su pakelta vėliava			// [1F4EC]
+📭	atidaryta pašto dėžutė su nuleista vėliava			// [1F4ED]
+📮	pašto dėžutė							// [1F4EE]
+📯	pašto ragas							// [1F4EF]
+📰	laikraštis							// [1F4F0]
+📱	mobilusis telefonas						// [1F4F1]
+📲	mobilusis telefonas su rodykle					// [1F4F2]
+📳	vibravimo režimas						// [1F4F3]
+📴	išjungti mobilųjį telefoną					// [1F4F4]
+📵	jokių mobiliųjų telefonų					// [1F4F5]
+📶	antenos juostos							// [1F4F6]
+📷	fotoaparatas							// [1F4F7]
+📸	fotoaparatas su blykste						// [1F4F8]
+📹	vaizdo kamera							// [1F4F9]
+📺	televizorius							// [1F4FA]
+📻	radijas								// [1F4FB]
+📼	vaizdo įrašų kasetė						// [1F4FC]
+📽	filmų projektorius						// [1F4FD] text|emoji
+📿	rožinis								// [1F4FF]
+🔀	maišyti takelius						// [1F500]
+🔁	kartoti								// [1F501]
+🔂	kartoti vieną							// [1F502]
+🔃	vertikalios laikrodžio rodyklės kryptimis nukreiptos rodyklės	// [1F503]
+🔄	prieš laikrodžio rodyklę nukreiptų rodyklių mygtukas		// [1F504]
+🔅	užtemdymo mygtukas						// [1F505]
+🔆	ryškumo mygtukas						// [1F506]
+🔇	garsiakalbis išjungtas						// [1F507]
+🔈	tylus garsiakalbis						// [1F508]
+🔉	vidutinio garso garsiakalbis					// [1F509]
+🔊	didelis garsiakalbio garsumas					// [1F50A]
+🔋	baterija							// [1F50B]
+🔌	elektros kištukas						// [1F50C]
+🔍	didinimo stiklas į kairę					// [1F50D]
+🔎	didinimo stiklas į dešinę					// [1F50E]
+🔏	spyna ir rašiklis						// [1F50F]
+🔐	užrakinta spyna su raktu					// [1F510]
+🔑	raktas								// [1F511]
+🔒	spyna								// [1F512]
+🔓	atrakinta spyna							// [1F513]
+🔔	varpelis							// [1F514]
+🔕	perbrauktas varpelis						// [1F515]
+🔖	žymė								// [1F516]
+🔗	jungtis								// [1F517]
+🔘	akutė								// [1F518]
+🔙	rodyklė su užrašu Back						// [1F519]
+🔚	rodyklė su užrašu End						// [1F51A]
+🔛	rodyklė su užrašu On!						// [1F51B]
+🔜	rodyklė su užrašu Soon						// [1F51C]
+🔝	rodyklė su užrašu Top						// [1F51D]
+🔞	tik pilnamečiams						// [1F51E]
+🔟	mygtukas: 10							// [1F51F]
+🔠	įvestis didžiosios lotyniškos raidės				// [1F520]
+🔡	įvestis mažosios lotyniškos raidės				// [1F521]
+🔢	įvesties skaičiai						// [1F522]
+🔣	įvesties simboliai						// [1F523]
+🔤	įvestis lotyniškos raidės					// [1F524]
+🔥	ugnis								// [1F525]
+🔦	žibintuvėlis							// [1F526]
+🔧	veržliaraktis							// [1F527]
+🔨	plaktukas							// [1F528]
+🔩	veržlė ir varžtas						// [1F529]
+🔪	virtuvinis peilis						// [1F52A]
+🔫	pistoletas							// [1F52B]
+🔬	mikroskopas							// [1F52C]
+🔭	teleskopas							// [1F52D]
+🔮	krištolinis rutulys						// [1F52E]
+🔯	šešiakampė žvaigždė su tašku					// [1F52F]
+🔰	japoniškas pradedančiojo simbolis				// [1F530]
+🔱	trišakė emblema							// [1F531]
+🔲	juodas kvadratinis mygtukas					// [1F532]
+🔳	baltas kvadratinis mygtukas					// [1F533]
+🔴	raudonas rutulys						// [1F534]
+🔵	mėlynas rutulys							// [1F535]
+🔶	didelis oranžinis deimantas					// [1F536]
+🔷	didelis mėlynas deimantas					// [1F537]
+🔸	mažas oranžinis deimantas					// [1F538]
+🔹	mažas mėlynas deimantas						// [1F539]
+🔺	raudonas į viršų nukreiptas trikampis				// [1F53A]
+🔻	raudonas į apačią nukreiptas trikampis				// [1F53B]
+🔼	į viršų								// [1F53C]
+🔽	į apačią							// [1F53D]
+🕉	Om								// [1F549] text|emoji
+🕊	balandis							// [1F54A] text|emoji
+🕋	kaaba								// [1F54B]
+🕌	mečetė								// [1F54C]
+🕍	sinagoga							// [1F54D]
+🕎	menora								// [1F54E]
+🕐	pirma valanda							// [1F550]
+🕑	dvi valandos							// [1F551]
+🕒	trys valandos							// [1F552]
+🕓	keturios valandos						// [1F553]
+🕔	penkios valandos						// [1F554]
+🕕	šešios valandos							// [1F555]
+🕖	septynios valandos						// [1F556]
+🕗	aštuonios valandos						// [1F557]
+🕘	devinta valanda							// [1F558]
+🕙	dešimt valandų							// [1F559]
+🕚	vienuolika valandų						// [1F55A]
+🕛	dvylika valandų							// [1F55B]
+🕜	pusė dviejų							// [1F55C]
+🕝	pusė trijų							// [1F55D]
+🕞	pusė keturių							// [1F55E]
+🕟	pusė penkių							// [1F55F]
+🕠	pusė šešių							// [1F560]
+🕡	pusė septynių							// [1F561]
+🕢	pusė aštuonių							// [1F562]
+🕣	pusė devynių							// [1F563]
+🕤	pusė dešimt							// [1F564]
+🕥	pusė vienuolikos						// [1F565]
+🕦	pusė dvylikos							// [1F566]
+🕧	dvylika trisdešimt						// [1F567]
+🕯	žvakė								// [1F56F] text|emoji
+🕰	virš židinio laikomas laikrodis					// [1F570] text|emoji
+🕳	duobė								// [1F573] text|emoji
+🕴	į orą kylantis vyras su kostiumu				// [1F574] text|emoji
+🕵	detektyvas							// [1F575] text|emoji
+🕶	akiniai nuo saulės						// [1F576] text|emoji
+🕷	voras								// [1F577] text|emoji
+🕸	voratinklis							// [1F578] text|emoji
+🕹	valdymo svirtis							// [1F579] text|emoji
+🕺	šokantis vyras							// [1F57A]
+🖇	sukabintos sąvaržėlės						// [1F587] text|emoji
+🖊	rašiklis							// [1F58A] text|emoji
+🖋	automatinis plunksnakotis					// [1F58B] text|emoji
+🖌	teptukas							// [1F58C] text|emoji
+🖍	kreidelė							// [1F58D] text|emoji
+🖐	iškelta ranka su išskėstais pirštais				// [1F590] text|emoji
+🖕	vidurinis pirštas						// [1F595]
+🖖	vulkanų rasės pasisveikinimo ženklas				// [1F596]
+🖤	juoda širdis							// [1F5A4]
+🖥	stalinis kompiuteris						// [1F5A5] text|emoji
+🖨	spausdintuvas							// [1F5A8] text|emoji
+🖱	kompiuterio pelė						// [1F5B1] text|emoji
+🖲	rutulinis manipuliatorius					// [1F5B2] text|emoji
+🖼	rėmas su paveikslu						// [1F5BC] text|emoji
+🗂	kortelių laikiklio skirtukai					// [1F5C2] text|emoji
+🗃	kortelių saugojimo dėžė						// [1F5C3] text|emoji
+🗄	failų spintelė su stalčiais					// [1F5C4] text|emoji
+🗑	šiukšliadėžė							// [1F5D1] text|emoji
+🗒	užrašinė su spirale						// [1F5D2] text|emoji
+🗓	kalendorius su spirale						// [1F5D3] text|emoji
+🗜	suspaudimas							// [1F5DC] text|emoji
+🗝	senas raktas							// [1F5DD] text|emoji
+🗞	susuktas laikraštis						// [1F5DE] text|emoji
+🗡	durklas								// [1F5E1] text|emoji
+🗣	kalbanti galva							// [1F5E3] text|emoji
+🗨	kairysis kalbos debesėlis					// [1F5E8] text|emoji
+🗯	dešinysis pykčio debesėlis					// [1F5EF] text|emoji
+🗳	balsavimo dėžutė su balsavimo biuleteniu			// [1F5F3] text|emoji
+🗺	pasaulio žemėlapis						// [1F5FA] text|emoji
+🗻	Fudžio kalnas							// [1F5FB]
+🗼	Tokijo bokštas							// [1F5FC]
+🗽	laisvės statula							// [1F5FD]
+🗾	Japonijos žemėlapis						// [1F5FE]
+🗿	moai								// [1F5FF]
+
+// 1F600..1F64F : Emoticons
+
+😀	išsišiepęs veidas						// [1F600]
+😁	išsišiepęs veidas su besišypsančiomis akimis			// [1F601]
+😂	veidas su džiaugsmo ašaromis					// [1F602]
+😃	besišypsantis išsižiojęs veidas					// [1F603]
+😄	besišypsantis išsižiojęs veidas besišypsančiomis akimis		// [1F604]
+😅	besišypsantis išsižiojęs veidas, išpiltas šalto prakaito	// [1F605]
+😆	besišypsantis išsižiojęs veidas su smarkiai užmerktomis akimis	// [1F606]
+😇	besišypsantis veidas su aureole					// [1F607]
+😈	besišypsantis veidas su ragais					// [1F608]
+😉	mirksintis veidas						// [1F609]
+😊	besišypsantis veidas su besišypsančiomis akimis			// [1F60A]
+😋	skaniu maistu besimėgaujantis veidas				// [1F60B]
+😌	veidas su palengvėjimu						// [1F60C]
+😍	besišypsantis veidas su širdelės formos akimis			// [1F60D]
+😎	besišypsantis veidas su akiniais nuo saulės			// [1F60E]
+😏	iš pasitenkinimo besišypsantis veidas				// [1F60F]
+😐	neutralus veidas						// [1F610]
+😑	veidas be jokios išraiškos					// [1F611]
+😒	nelinksmas veidas						// [1F612]
+😓	veidas, išpiltas šalto prakaito					// [1F613]
+😔	susimąstęs veidas						// [1F614]
+😕	sutrikęs veidas							// [1F615]
+😖	suglumintas veidas						// [1F616]
+😗	bučiuojantis veidas						// [1F617]
+😘	bučinį siunčiantis veidas					// [1F618]
+😙	bučiuojantis su besišypsančiomis akimis				// [1F619]
+😚	bučiuojantis su užmerktomis akimis				// [1F61A]
+😛	veidas su iškištu liežuviu					// [1F61B]
+😜	veidas su iškištu liežuviu ir viena primerkta akimi		// [1F61C]
+😝	veidas su iškištu liežuviu ir stipriai užmerktomis akimis	// [1F61D]
+😞	nusivylęs veidas						// [1F61E]
+😟	susirūpinęs veidas						// [1F61F]
+😠	piktas veidas							// [1F620]
+😡	susiraukęs veidas						// [1F621]
+😢	verkiantis veidas						// [1F622]
+😣	atkaklus veidas							// [1F623]
+😤	veidas su iš nosies einančiais garais				// [1F624]
+😥	nusivylęs veidas su palengvėjimu				// [1F625]
+😦	paniuręs išsižiojęs veidas					// [1F626]
+😧	kenčiantis veidas						// [1F627]
+😨	baimės pilnas veidas						// [1F628]
+😩	nuvargęs veidas							// [1F629]
+😪	mieguistas veidas						// [1F62A]
+😫	pavargęs veidas							// [1F62B]
+😬	besivaipantis veidas						// [1F62C]
+😭	garsiai raudantis veidas					// [1F62D]
+😮	išsižiojęs veidas						// [1F62E]
+😯	nuščiuvęs veidas						// [1F62F]
+😰	išsižiojęs veidas, išpiltas šalto prakaito			// [1F630]
+😱	iš baimės šaukiantis veidas					// [1F631]
+😲	apstulbęs veidas						// [1F632]
+😳	nuraudęs veidas							// [1F633]
+😴	miegantis veidas						// [1F634]
+😵	apsvaigęs veidas						// [1F635]
+😶	veidas be burnos						// [1F636]
+😷	veidas su medicinine kauke					// [1F637]
+😸	išsišiepusios katės snukutis su besišypsančiomis akimis		// [1F638]
+😹	katės snukutis su džiaugsmo ašaromis				// [1F639]
+😺	besišypsančios katės snukutis					// [1F63A]
+😻	besišypsančios katės snukutis su širdelės formos akimis		// [1F63B]
+😼	nuvargusios besišypsančios katės snukutis			// [1F63C]
+😽	bučiuojančios katės snukutis					// [1F63D]
+😾	susiraukusios katės snukutis					// [1F63E]
+😿	verkiančios katės snukutis					// [1F63F]
+🙀	nustebusios katės snukutis					// [1F640]
+🙁	šiek tiek paniuręs veidas					// [1F641]
+🙂	šiek tiek besišypsantis veidas					// [1F642]
+🙃	apverstas veidas						// [1F643]
+🙄	veidas, vartantis akis						// [1F644]
+🙅	neigiamas gestas						// [1F645]
+🙆	teigiamas gestas						// [1F646]
+🙇	nusilenkęs žmogus						// [1F647]
+🙈	užsidengusi akis beždžionė					// [1F648]
+🙉	užsidengusi ausis beždžionė					// [1F649]
+🙊	užsidengusi burną beždžionė					// [1F64A]
+🙋	žmogus, iškėlęs ranką						// [1F64B]
+🙌	žmogus, iškėlęs rankas						// [1F64C]
+🙍	paniuręs žmogus							// [1F64D]
+🙎	susiraukęs žmogus						// [1F64E]
+🙏	suglausti delnai						// [1F64F]
+
+// 1F680..1F6FF : Transport and Map Symbols
+
+🚀	raketa								// [1F680]
+🚁	sraigstasparnis							// [1F681]
+🚂	lokomotyvas							// [1F682]
+🚃	traukinio vagonas						// [1F683]
+🚄	greitasis traukinys						// [1F684]
+🚅	greitasis traukinys su smailu priekiu				// [1F685]
+🚆	traukinys							// [1F686]
+🚇	metro								// [1F687]
+🚈	miesto tramvajus						// [1F688]
+🚉	stotis								// [1F689]
+🚊	tramvajus							// [1F68A]
+🚋	tramvajaus vagonas						// [1F68B]
+🚌	autobusas							// [1F68C]
+🚍	artėjantis autobusas						// [1F68D]
+🚎	troleibusas							// [1F68E]
+🚏	autobusų stotelė						// [1F68F]
+🚐	mikroautobusas							// [1F690]
+🚑	greitosios pagalbos automobilis					// [1F691]
+🚒	ugniagesių automobilis						// [1F692]
+🚓	policijos automobilis						// [1F693]
+🚔	artėjantis policijos automobilis				// [1F694]
+🚕	taksi								// [1F695]
+🚖	artėjantis taksi						// [1F696]
+🚗	automobilis							// [1F697]
+🚘	artėjantis automobilis						// [1F698]
+🚙	rekreacijos automobilis						// [1F699]
+🚚	krovininis sunkvežimis						// [1F69A]
+🚛	sunkvežimis su priekaba						// [1F69B]
+🚜	traktorius							// [1F69C]
+🚝	vienbėgis geležinkelis						// [1F69D]
+🚞	kalnų traukinys							// [1F69E]
+🚟	kabanti geležinkelio linija					// [1F69F]
+🚠	kalnų keltuvas							// [1F6A0]
+🚡	lynų keltuvas							// [1F6A1]
+🚢	laivas								// [1F6A2]
+🚣	irkluojantis žmogus						// [1F6A3]
+🚤	motorinis kateris						// [1F6A4]
+🚥	horizontalus šviesoforas					// [1F6A5]
+🚦	vertikalus šviesoforas						// [1F6A6]
+🚧	statybos							// [1F6A7]
+🚨	policijos automobilio lempa					// [1F6A8]
+🚩	trikampė vėliava						// [1F6A9]
+🚪	durys								// [1F6AA]
+🚫	draudžiama							// [1F6AB]
+🚬	rūkymas								// [1F6AC]
+🚭	rūkyti draudžiama						// [1F6AD]
+🚮	šiukšlių metimo į šiukšliadėžes ženklas				// [1F6AE]
+🚯	šiukšlinti draudžiama						// [1F6AF]
+🚰	geriamasis vanduo						// [1F6B0]
+🚱	draudžiama gerti vandenį					// [1F6B1]
+🚲	dviratis							// [1F6B2]
+🚳	dviračiai draudžiami						// [1F6B3]
+🚴	dviratininkas							// [1F6B4]
+🚵	kalnų dviratininkas						// [1F6B5]
+🚶	pėstysis							// [1F6B6]
+🚷	pėstiesiems eiti draudžiama					// [1F6B7]
+🚸	vaikų perėja							// [1F6B8]
+🚹	vyrų tualetas							// [1F6B9]
+🚺	moterų tualetas							// [1F6BA]
+🚻	tualeto kambarys						// [1F6BB]
+🚼	kūdikio simbolis						// [1F6BC]
+🚽	tualetas							// [1F6BD]
+🚾	tualeto patalpa							// [1F6BE]
+🚿	dušas								// [1F6BF]
+🛀	žmogus prausiasi vonioje					// [1F6C0]
+🛁	vonia								// [1F6C1]
+🛂	pasų kontrolė							// [1F6C2]
+🛃	muitinė								// [1F6C3]
+🛄	bagažo skyrius							// [1F6C4]
+🛅	paliktas bagažas						// [1F6C5]
+🛋	sofa ir lempa							// [1F6CB] text|emoji
+🛌	žmogus lovoje							// [1F6CC]
+🛍	pirkinių krepšeliai						// [1F6CD] text|emoji
+🛎	skambutis							// [1F6CE] text|emoji
+🛏	lova								// [1F6CF] text|emoji
+🛐	garbinimo vieta							// [1F6D0]
+🛑	sustojimo ženklas						// [1F6D1]
+🛒	pirkinių vežimėlis						// [1F6D2]
+🛠	plaktukas ir veržliaraktis					// [1F6E0] text|emoji
+🛡	skydas								// [1F6E1] text|emoji
+🛢	degalų statinė							// [1F6E2] text|emoji
+🛣	greitkelis							// [1F6E3] text|emoji
+🛤	geležinkelio bėgiai						// [1F6E4] text|emoji
+🛥	motorinė valtis							// [1F6E5] text|emoji
+🛩	mažas lėktuvas							// [1F6E9] text|emoji
+🛫	lėktuvo pakilimas						// [1F6EB]
+🛬	lėktuvo nusileidimas						// [1F6EC]
+🛰	palydovas							// [1F6F0] text|emoji
+🛳	keleivinis laivas						// [1F6F3] text|emoji
+🛴	paspirtukas							// [1F6F4]
+🛵	motoroleris							// [1F6F5]
+🛶	kanoja								// [1F6F6]
+🛷	rogės								// [1F6F7]
+🛸	skraidanti lėkštė						// [1F6F8]
+🛹	riedlentė							// [1F6F9]
+
+// 1F900..1F9FF : Supplemental Symbols and Pictographs
+
+🤐	veidas su užtrauktuku vietoje burnos				// [1F910]
+🤑	veidas su pinigu vietoje liežuvio				// [1F911]
+🤒	veidas su termometru						// [1F912]
+🤓	moksliuko veidas						// [1F913]
+🤔	mąstantis veidas						// [1F914]
+🤕	veidas su galvos tvarsčiu					// [1F915]
+🤖	roboto veidas							// [1F916]
+🤗	apkabinantis veidas						// [1F917]
+🤘	ragų ženklas							// [1F918]
+🤙	gestas paskambink man						// [1F919]
+🤚	pakelta viršutinė plaštakos pusė				// [1F91A]
+🤛	į kairę nukreiptas kumštis					// [1F91B]
+🤜	į dešinę nukreiptas kumštis					// [1F91C]
+🤝	rankos paspaudimas						// [1F91D]
+🤞	sukryžiuoti pirštai						// [1F91E]
+🤟	myliu tave gestas						// [1F91F]
+🤠	kaubojaus veidas su skrybėle					// [1F920]
+🤡	klouno veidas							// [1F921]
+🤢	besiruošiantis vemti veidas					// [1F922]
+🤣	raitausi iš juoko						// [1F923]
+🤤	besiseilėjantis veidas						// [1F924]
+🤥	meluojantis veidas						// [1F925]
+🤦	o varge								// [1F926]
+🤧	čiaudantis veidas						// [1F927]
+🤨	veidas su pakeltais antakiais					// [1F928]
+🤩	žvaigždžių liga							// [1F929]
+🤪	pamišęs veidas							// [1F92A]
+🤫	tildantis veidas						// [1F92B]
+🤬	veidas su simboliais ant burnos					// [1F92C]
+🤭	veidas su ranka ant burnos					// [1F92D]
+🤮	vemiantis veidas						// [1F92E]
+🤯	sprogstanti galva						// [1F92F]
+🤰	nėščia moteris							// [1F930]
+🤱	maitinimas krūtimi						// [1F931]
+🤲	delnai suglausti						// [1F932]
+🤳	asmenukė							// [1F933]
+🤴	princas								// [1F934]
+🤵	vyras su smokingu						// [1F935]
+🤶	ponia Claus							// [1F936]
+🤷	gūžtelėjimas pečiais						// [1F937]
+🤸	persivertimas šonu						// [1F938]
+🤹	žongliravimas							// [1F939]
+🤺	fechtuotojas							// [1F93A]
+🤼	imtynininkai							// [1F93C]
+🤽	vandensvydis							// [1F93D]
+🤾	rankinis							// [1F93E]
+🥀	gležna gėlė							// [1F940]
+🥁	būgnas								// [1F941]
+🥂	sudaužtos taurės						// [1F942]
+🥃	stiklinė							// [1F943]
+🥄	šaukštas							// [1F944]
+🥅	vartai								// [1F945]
+🥇	1-osios vietos medalis						// [1F947]
+🥈	2-osios vietos medalis						// [1F948]
+🥉	3-osios vietos medalis						// [1F949]
+🥊	bokso pirštinė							// [1F94A]
+🥋	kovos sporto šakos uniforma					// [1F94B]
+🥌	akmenslydis							// [1F94C]
+🥎	softbolas							// [1F94E]
+🥏	skraidantis diskas						// [1F94F]
+🥐	raguolis							// [1F950]
+🥑	avokadas							// [1F951]
+🥒	agurkas								// [1F952]
+🥓	kumpis								// [1F953]
+🥔	bulvė								// [1F954]
+🥕	morka								// [1F955]
+🥖	ilgas batonas							// [1F956]
+🥗	žalios salotos							// [1F957]
+🥘	prikaistuvis su maistu						// [1F958]
+🥙	įdarytas lavašas						// [1F959]
+🥚	kiaušinis							// [1F95A]
+🥛	pieno stiklinė							// [1F95B]
+🥜	žemės riešutas							// [1F95C]
+🥝	kivis								// [1F95D]
+🥞	blynai								// [1F95E]
+🥟	kukulis								// [1F95F]
+🥠	laimės sausainiukas						// [1F960]
+🥡	dėžutė išsinešti						// [1F961]
+🥢	lazdelės							// [1F962]
+🥣	dubuo su šaukštu						// [1F963]
+🥤	puodelis su šiaudeliu						// [1F964]
+🥥	kokosas								// [1F965]
+🥦	brokolis							// [1F966]
+🥧	pyragas								// [1F967]
+🥨	riestainis							// [1F968]
+🥩	mėsos gabalėliai						// [1F969]
+🥪	sumuštinis							// [1F96A]
+🥫	konservai							// [1F96B]
+🥬	lapinė daržovė							// [1F96C]
+🥭	mangas								// [1F96D]
+🥮	mėnulio pyragas							// [1F96E]
+🥯	apvalus riestainis						// [1F96F]
+🥰	besišypsantis veidas ir 3 širdys				// [1F970]
+🥳	švenčiantis veidas						// [1F973]
+🥴	apkvaišęs veidas						// [1F974]
+🥵	įkaitęs veidas							// [1F975]
+🥶	sušalęs veidas							// [1F976]
+🥺	maldaujantis veidas						// [1F97A]
+🥼	laboratorinis chalatas						// [1F97C]
+🥽	apsauginiai akiniai						// [1F97D]
+🥾	žygio batai							// [1F97E]
+🥿	lygiapadis batelis						// [1F97F]
+🦀	krabas								// [1F980]
+🦁	liūto snukis							// [1F981]
+🦂	skorpionas (gyvūnas)						// [1F982]
+🦃	kalakutas							// [1F983]
+🦄	vienaragio snukis						// [1F984]
+🦅	erelis								// [1F985]
+🦆	antis								// [1F986]
+🦇	šikšnosparnis							// [1F987]
+🦈	ryklys								// [1F988]
+🦉	pelėda								// [1F989]
+🦊	lapės snukis							// [1F98A]
+🦋	drugelis							// [1F98B]
+🦌	elnias								// [1F98C]
+🦍	gorila								// [1F98D]
+🦎	driežas								// [1F98E]
+🦏	raganosis							// [1F98F]
+🦐	krevetė								// [1F990]
+🦑	kalmaras							// [1F991]
+🦒	žirafa								// [1F992]
+🦓	zebras								// [1F993]
+🦔	ežys								// [1F994]
+🦕	sauropodas							// [1F995]
+🦖	Reksas								// [1F996]
+🦗	svirplys							// [1F997]
+🦘	kengūra								// [1F998]
+🦙	lama								// [1F999]
+🦚	povas								// [1F99A]
+🦛	hipopotamas							// [1F99B]
+🦜	papūga								// [1F99C]
+🦝	meškėnas							// [1F99D]
+🦞	omaras								// [1F99E]
+🦟	uodas								// [1F99F]
+🦠	mikrobas							// [1F9A0]
+🦡	barsukas							// [1F9A1]
+🦢	gulbė								// [1F9A2]
+🦰	raudoni plaukai							// [1F9B0]
+🦱	garbanoti plaukai						// [1F9B1]
+🦲	plikas								// [1F9B2]
+🦳	žili plaukai							// [1F9B3]
+🦴	kaulas								// [1F9B4]
+🦵	koja								// [1F9B5]
+🦶	pėda								// [1F9B6]
+🦷	dantis								// [1F9B7]
+🦸	superherojus							// [1F9B8]
+🦹	superpiktadarys							// [1F9B9]
+🧀	sūrio gabaliukas						// [1F9C0]
+🧁	keksiukas							// [1F9C1]
+🧂	druska								// [1F9C2]
+🧐	veidas su monokliu						// [1F9D0]
+🧑	suaugusysis							// [1F9D1]
+🧒	vaikas								// [1F9D2]
+🧓	kitas suaugusysis						// [1F9D3]
+🧔	barzdotas žmogus						// [1F9D4]
+🧕	moteris su skarele						// [1F9D5]
+🧖	asmuo garų kambaryje						// [1F9D6]
+🧗	kopiantis žmogus						// [1F9D7]
+🧘	žmogus lotoso pozoje						// [1F9D8]
+🧙	magas								// [1F9D9]
+🧚	fėja								// [1F9DA]
+🧛	vampyras							// [1F9DB]
+🧜	undinius							// [1F9DC]
+🧝	elfas								// [1F9DD]
+🧞	dvasia								// [1F9DE]
+🧟	zombis								// [1F9DF]
+🧠	smegenys							// [1F9E0]
+🧡	oranžinė širdelė						// [1F9E1]
+🧢	reklaminė kepurė						// [1F9E2]
+🧣	skara								// [1F9E3]
+🧤	pirštinės							// [1F9E4]
+🧥	paltas								// [1F9E5]
+🧦	kojinės								// [1F9E6]
+🧧	raudonas vokas							// [1F9E7]
+🧨	fejerverkas							// [1F9E8]
+🧩	dėlionė								// [1F9E9]
+🧪	mėgintuvėlis							// [1F9EA]
+🧫	petri lėkštelė							// [1F9EB]
+🧬	DNR								// [1F9EC]
+🧭	kompasas							// [1F9ED]
+🧮	skaitytuvai							// [1F9EE]
+🧰	įrankių rinkinys						// [1F9F0]
+🧱	plyta								// [1F9F1]
+🧲	magnetas							// [1F9F2]
+🧳	bagažas								// [1F9F3]
+🧴	losjono buteliukas						// [1F9F4]
+🧵	siūlas								// [1F9F5]
+🧶	siūlų kamuolys							// [1F9F6]
+🧷	žiogelis							// [1F9F7]
+🧸	meškiukas							// [1F9F8]
+🧹	šluota								// [1F9F9]
+🧺	pintinė								// [1F9FA]
+🧻	popieriaus ritinys						// [1F9FB]
+🧼	muilas								// [1F9FC]
+🧽	kempinė								// [1F9FD]
+🧾	čekis								// [1F9FE]
+🧿	amuletas akis							// [1F9FF]
+
+// Country Flags (Regional Indicator Symbols) -- ISO 3166-1 Country Codes
+
+🇦🇨	vėliava: Dangun Žengimo sala					// [1F1E6 1F1E8] AC
+🇦🇩	vėliava: Andora							// [1F1E6 1F1E9] AD
+🇦🇪	vėliava: Jungtiniai Arabų Emyratai				// [1F1E6 1F1EA] AE
+🇦🇫	vėliava: Afganistanas						// [1F1E6 1F1EB] AF
+🇦🇬	vėliava: Antigva ir Barbuda					// [1F1E6 1F1EC] AG
+🇦🇮	vėliava: Angilija						// [1F1E6 1F1EE] AI
+🇦🇱	vėliava: Albanija						// [1F1E6 1F1F1] AL
+🇦🇲	vėliava: Armėnija						// [1F1E6 1F1F2] AM
+🇦🇴	vėliava: Angola							// [1F1E6 1F1F4] AO
+🇦🇶	vėliava: Antarktida						// [1F1E6 1F1F6] AQ
+🇦🇷	vėliava: Argentina						// [1F1E6 1F1F7] AR
+🇦🇸	vėliava: Amerikos Samoa						// [1F1E6 1F1F8] AS
+🇦🇹	vėliava: Austrija						// [1F1E6 1F1F9] AT
+🇦🇺	vėliava: Australija						// [1F1E6 1F1FA] AU
+🇦🇼	vėliava: Aruba							// [1F1E6 1F1FC] AW
+🇦🇽	vėliava: Alandų Salos						// [1F1E6 1F1FD] AX
+🇦🇿	vėliava: Azerbaidžanas						// [1F1E6 1F1FF] AZ
+🇧🇦	vėliava: Bosnija ir Hercegovina					// [1F1E7 1F1E6] BA
+🇧🇧	vėliava: Barbadosas						// [1F1E7 1F1E7] BB
+🇧🇩	vėliava: Bangladešas						// [1F1E7 1F1E9] BD
+🇧🇪	vėliava: Belgija						// [1F1E7 1F1EA] BE
+🇧🇫	vėliava: Burkina Fasas						// [1F1E7 1F1EB] BF
+🇧🇬	vėliava: Bulgarija						// [1F1E7 1F1EC] BG
+🇧🇭	vėliava: Bahreinas						// [1F1E7 1F1ED] BH
+🇧🇮	vėliava: Burundis						// [1F1E7 1F1EE] BI
+🇧🇯	vėliava: Beninas						// [1F1E7 1F1EF] BJ
+🇧🇱	vėliava: Sen Bartelemi						// [1F1E7 1F1F1] BL
+🇧🇲	vėliava: Bermuda						// [1F1E7 1F1F2] BM
+🇧🇳	vėliava: Brunėjus						// [1F1E7 1F1F3] BN
+🇧🇴	vėliava: Bolivija						// [1F1E7 1F1F4] BO
+🇧🇶	vėliava: Karibų Nyderlandai					// [1F1E7 1F1F6] BQ
+🇧🇷	vėliava: Brazilija						// [1F1E7 1F1F7] BR
+🇧🇸	vėliava: Bahamos						// [1F1E7 1F1F8] BS
+🇧🇹	vėliava: Butanas						// [1F1E7 1F1F9] BT
+🇧🇻	vėliava: Buvė Sala						// [1F1E7 1F1FB] BV
+🇧🇼	vėliava: Botsvana						// [1F1E7 1F1FC] BW
+🇧🇾	vėliava: Baltarusija						// [1F1E7 1F1FE] BY
+🇧🇿	vėliava: Belizas						// [1F1E7 1F1FF] BZ
+🇨🇦	vėliava: Kanada							// [1F1E8 1F1E6] CA
+🇨🇨	vėliava: Kokosų (Kilingo) Salos					// [1F1E8 1F1E8] CC
+🇨🇩	vėliava: Kongas-Kinšasa						// [1F1E8 1F1E9] CD
+🇨🇫	vėliava: Centrinės Afrikos Respublika				// [1F1E8 1F1EB] CF
+🇨🇬	vėliava: Kongas-Brazavilis					// [1F1E8 1F1EC] CG
+🇨🇭	vėliava: Šveicarija						// [1F1E8 1F1ED] CH
+🇨🇮	vėliava: Dramblio Kaulo Krantas					// [1F1E8 1F1EE] CI
+🇨🇰	vėliava: Kuko Salos						// [1F1E8 1F1F0] CK
+🇨🇱	vėliava: Čilė							// [1F1E8 1F1F1] CL
+🇨🇲	vėliava: Kamerūnas						// [1F1E8 1F1F2] CM
+🇨🇳	vėliava: Kinija							// [1F1E8 1F1F3] CN
+🇨🇴	vėliava: Kolumbija						// [1F1E8 1F1F4] CO
+🇨🇵	vėliava: Klipertono sala					// [1F1E8 1F1F5] CP
+🇨🇷	vėliava: Kosta Rika						// [1F1E8 1F1F7] CR
+🇨🇺	vėliava: Kuba							// [1F1E8 1F1FA] CU
+🇨🇻	vėliava: Žaliasis Kyšulys					// [1F1E8 1F1FB] CV
+🇨🇼	vėliava: Kiurasao						// [1F1E8 1F1FC] CW
+🇨🇽	vėliava: Kalėdų Sala						// [1F1E8 1F1FD] CX
+🇨🇾	vėliava: Kipras							// [1F1E8 1F1FE] CY
+🇨🇿	vėliava: Čekija							// [1F1E8 1F1FF] CZ
+🇩🇪	vėliava: Vokietija						// [1F1E9 1F1EA] DE
+🇩🇬	vėliava: Diego Garsija						// [1F1E9 1F1EC] DG
+🇩🇯	vėliava: Džibutis						// [1F1E9 1F1EF] DJ
+🇩🇰	vėliava: Danija							// [1F1E9 1F1F0] DK
+🇩🇲	vėliava: Dominika						// [1F1E9 1F1F2] DM
+🇩🇴	vėliava: Dominikos Respublika					// [1F1E9 1F1F4] DO
+🇩🇿	vėliava: Alžyras						// [1F1E9 1F1FF] DZ
+🇪🇦	vėliava: Seuta ir Melila					// [1F1EA 1F1E6] EA
+🇪🇨	vėliava: Ekvadoras						// [1F1EA 1F1E8] EC
+🇪🇪	vėliava: Estija							// [1F1EA 1F1EA] EE
+🇪🇬	vėliava: Egiptas						// [1F1EA 1F1EC] EG
+🇪🇭	vėliava: Vakarų Sachara						// [1F1EA 1F1ED] EH
+🇪🇷	vėliava: Eritrėja						// [1F1EA 1F1F7] ER
+🇪🇸	vėliava: Ispanija						// [1F1EA 1F1F8] ES
+🇪🇹	vėliava: Etiopija						// [1F1EA 1F1F9] ET
+🇪🇺	vėliava: Europos Sąjunga					// [1F1EA 1F1FA] EU
+🇫🇮	vėliava: Suomija						// [1F1EB 1F1EE] FI
+🇫🇯	vėliava: Fidžis							// [1F1EB 1F1EF] FJ
+🇫🇰	vėliava: Folklando Salos					// [1F1EB 1F1F0] FI
+🇫🇲	vėliava: Mikronezija						// [1F1EB 1F1F2] FM
+🇫🇴	vėliava: Farerų Salos						// [1F1EB 1F1F4] FO
+🇫🇷	vėliava: Prancūzija						// [1F1EB 1F1F7] FR
+🇬🇦	vėliava: Gabonas						// [1F1EC 1F1E6] GA
+🇬🇧	vėliava: Jungtinė Karalystė					// [1F1EC 1F1E7] GB
+🇬🇩	vėliava: Grenada						// [1F1EC 1F1E9] GD
+🇬🇪	vėliava: Gruzija						// [1F1EC 1F1EA] GE
+🇬🇫	vėliava: Prancūzijos Gviana					// [1F1EC 1F1EB] GF
+🇬🇬	vėliava: Gernsis						// [1F1EC 1F1EC] GG
+🇬🇭	vėliava: Gana							// [1F1EC 1F1ED] GH
+🇬🇮	vėliava: Gibraltaras						// [1F1EC 1F1EE] GI
+🇬🇱	vėliava: Grenlandija						// [1F1EC 1F1F1] GL
+🇬🇲	vėliava: Gambija						// [1F1EC 1F1F2] GM
+🇬🇳	vėliava: Gvinėja						// [1F1EC 1F1F3] GN
+🇬🇵	vėliava: Gvadelupa						// [1F1EC 1F1F5] GP
+🇬🇶	vėliava: Pusiaujo Gvinėja					// [1F1EC 1F1F6] GQ
+🇬🇷	vėliava: Graikija						// [1F1EC 1F1F7] GR
+🇬🇸	vėliava: Pietų Džordžija ir Pietų Sandvičo salos		// [1F1EC 1F1F8] GS
+🇬🇹	vėliava: Gvatemala						// [1F1EC 1F1F9] GT
+🇬🇺	vėliava: Guamas							// [1F1EC 1F1FA] GU
+🇬🇼	vėliava: Bisau Gvinėja						// [1F1EC 1F1FC] GW
+🇬🇾	vėliava: Gajana							// [1F1EC 1F1FE] GY
+🇭🇰	vėliava: Ypatingasis Administracinis Kinijos Regionas Honkongas	// [1F1ED 1F1F0] HK
+🇭🇲	vėliava: Herdo ir Makdonaldo Salos				// [1F1ED 1F1F2] HM
+🇭🇳	vėliava: Hondūras						// [1F1ED 1F1F3] HN
+🇭🇷	vėliava: Kroatija						// [1F1ED 1F1F7] HR
+🇭🇹	vėliava: Haitis							// [1F1ED 1F1F9] HT
+🇭🇺	vėliava: Vengrija						// [1F1ED 1F1FA] HU
+🇮🇨	vėliava: Kanarų salos						// [1F1EE 1F1E8] IC
+🇮🇩	vėliava: Indonezija						// [1F1EE 1F1E9] ID
+🇮🇪	vėliava: Airija							// [1F1EE 1F1EA] IE
+🇮🇱	vėliava: Izraelis						// [1F1EE 1F1F1] IL
+🇮🇲	vėliava: Meno Sala						// [1F1EE 1F1F2] IM
+🇮🇳	vėliava: Indija							// [1F1EE 1F1F3] IN
+🇮🇴	vėliava: Indijos Vandenyno Britų Sritis				// [1F1EE 1F1F4] IO
+🇮🇶	vėliava: Irakas							// [1F1EE 1F1F6] IQ
+🇮🇷	vėliava: Iranas							// [1F1EE 1F1F7] IR
+🇮🇸	vėliava: Islandija						// [1F1EE 1F1F8] IS
+🇮🇹	vėliava: Italija						// [1F1EE 1F1F9] IT
+🇯🇪	vėliava: Džersis						// [1F1EF 1F1EA] JE
+🇯🇲	vėliava: Jamaika						// [1F1EF 1F1F2] JM
+🇯🇴	vėliava: Jordanija						// [1F1EF 1F1F4] JO
+🇯🇵	vėliava: Japonija						// [1F1EF 1F1F5] JP
+🇰🇪	vėliava: Kenija							// [1F1F0 1F1EA] KE
+🇰🇬	vėliava: Kirgizija						// [1F1F0 1F1EC] KG
+🇰🇭	vėliava: Kambodža						// [1F1F0 1F1ED] KH
+🇰🇮	vėliava: Kiribatis						// [1F1F0 1F1EE] KI
+🇰🇲	vėliava: Komorai						// [1F1F0 1F1F2] KM
+🇰🇳	vėliava: Sent Kitsas ir Nevis					// [1F1F0 1F1F3] KN
+🇰🇵	vėliava: Šiaurės Korėja						// [1F1F0 1F1F5] KP
+🇰🇷	vėliava: Pietų Korėja						// [1F1F0 1F1F7] KR
+🇰🇼	vėliava: Kuveitas						// [1F1F0 1F1FC] KW
+🇰🇾	vėliava: Kaimanų Salos						// [1F1F0 1F1FE] KY
+🇰🇿	vėliava: Kazachstanas						// [1F1F0 1F1FF] KZ
+🇱🇦	vėliava: Laosas							// [1F1F1 1F1E6] LA
+🇱🇧	vėliava: Libanas						// [1F1F1 1F1E7] LB
+🇱🇨	vėliava: Sent Lusija						// [1F1F1 1F1E8] LC
+🇱🇮	vėliava: Lichtenšteinas						// [1F1F1 1F1EE] LI
+🇱🇰	vėliava: Šri Lanka						// [1F1F1 1F1F0] LK
+🇱🇷	vėliava: Liberija						// [1F1F1 1F1F7] LR
+🇱🇸	vėliava: Lesotas						// [1F1F1 1F1F8] LS
+🇱🇹	vėliava: Lietuva						// [1F1F1 1F1F9] LT
+🇱🇺	vėliava: Liuksemburgas						// [1F1F1 1F1FA] LU
+🇱🇻	vėliava: Latvija						// [1F1F1 1F1FB] LV
+🇱🇾	vėliava: Libija							// [1F1F1 1F1FE] LY
+🇲🇦	vėliava: Marokas						// [1F1F2 1F1E6] MA
+🇲🇨	vėliava: Monakas						// [1F1F2 1F1E8] MC
+🇲🇩	vėliava: Moldova						// [1F1F2 1F1E9] MD
+🇲🇪	vėliava: Juodkalnija						// [1F1F2 1F1EA] ME
+🇲🇫	vėliava: Sen Martenas						// [1F1F2 1F1EB] MF
+🇲🇬	vėliava: Madagaskaras						// [1F1F2 1F1EC] MG
+🇲🇭	vėliava: Maršalo Salos						// [1F1F2 1F1ED] MH
+🇲🇰	vėliava: Makedonija						// [1F1F2 1F1F0] MK
+🇲🇱	vėliava: Malis							// [1F1F2 1F1F1] ML
+🇲🇲	vėliava: Mianmaras (Birma)					// [1F1F2 1F1F2] MM
+🇲🇳	vėliava: Mongolija						// [1F1F2 1F1F3] MN
+🇲🇴	vėliava: Ypatingasis Administracinis Kinijos Regionas Makao	// [1F1F2 1F1F4] MO
+🇲🇵	vėliava: Marianos Šiaurinės Salos				// [1F1F2 1F1F5] MP
+🇲🇶	vėliava: Martinika						// [1F1F2 1F1F6] MQ
+🇲🇷	vėliava: Mauritanija						// [1F1F2 1F1F7] MR
+🇲🇸	vėliava: Montseratas						// [1F1F2 1F1F8] MS
+🇲🇹	vėliava: Malta							// [1F1F2 1F1F9] MT
+🇲🇺	vėliava: Mauricijus						// [1F1F2 1F1FA] MU
+🇲🇻	vėliava: Maldyvai						// [1F1F2 1F1FB] MV
+🇲🇼	vėliava: Malavis						// [1F1F2 1F1FC] MW
+🇲🇽	vėliava: Meksika						// [1F1F2 1F1FD] MX
+🇲🇾	vėliava: Malaizija						// [1F1F2 1F1FE] MY
+🇲🇿	vėliava: Mozambikas						// [1F1F2 1F1FF] MZ
+🇳🇦	vėliava: Namibija						// [1F1F3 1F1E6] NA
+🇳🇨	vėliava: Naujoji Kaledonija					// [1F1F3 1F1E8] NC
+🇳🇪	vėliava: Nigeris						// [1F1F3 1F1EA] NE
+🇳🇫	vėliava: Norfolko sala						// [1F1F3 1F1EB] NF
+🇳🇬	vėliava: Nigerija						// [1F1F3 1F1EC] NG
+🇳🇮	vėliava: Nikaragva						// [1F1F3 1F1EE] NI
+🇳🇱	vėliava: Nyderlandai						// [1F1F3 1F1F1] NL
+🇳🇴	vėliava: Norvegija						// [1F1F3 1F1F4] NO
+🇳🇵	vėliava: Nepalas						// [1F1F3 1F1F5] NP
+🇳🇷	vėliava: Nauru							// [1F1F3 1F1F7] NR
+🇳🇺	vėliava: Niujė							// [1F1F3 1F1FA] NU
+🇳🇿	vėliava: Naujoji Zelandija					// [1F1F3 1F1FF] NZ
+🇴🇲	vėliava: Omanas							// [1F1F4 1F1F2] OM
+🇵🇦	vėliava: Panama							// [1F1F5 1F1E6] PA
+🇵🇪	vėliava: Peru							// [1F1F5 1F1EA] PE
+🇵🇫	vėliava: Prancūzijos Polinezija					// [1F1F5 1F1EB] PF
+🇵🇬	vėliava: Papua Naujoji Gvinėja					// [1F1F5 1F1EC] PG
+🇵🇭	vėliava: Filipinai						// [1F1F5 1F1ED] PH
+🇵🇰	vėliava: Pakistanas						// [1F1F5 1F1F0] PK
+🇵🇱	vėliava: Lenkija						// [1F1F5 1F1F1] PL
+🇵🇲	vėliava: Sen Pjeras ir Mikelonas				// [1F1F5 1F1F2] PM
+🇵🇳	vėliava: Pitkerno salos						// [1F1F5 1F1F3] PN
+🇵🇷	vėliava: Puerto Rikas						// [1F1F5 1F1F7] PR
+🇵🇸	vėliava: Palestinos teritorija					// [1F1F5 1F1F8] PS
+🇵🇹	vėliava: Portugalija						// [1F1F5 1F1F9] PT
+🇵🇼	vėliava: Palau							// [1F1F5 1F1FC] PW
+🇵🇾	vėliava: Paragvajus						// [1F1F5 1F1FE] PY
+🇶🇦	vėliava: Kataras						// [1F1F6 1F1E6] QA
+🇷🇪	vėliava: Reunjonas						// [1F1F7 1F1EA] RE
+🇷🇴	vėliava: Rumunija						// [1F1F7 1F1F4] RO
+🇷🇸	vėliava: Serbija						// [1F1F7 1F1F8] RS
+🇷🇺	vėliava: Rusija							// [1F1F7 1F1FA] RU
+🇷🇼	vėliava: Ruanda							// [1F1F7 1F1FC] RW
+🇸🇦	vėliava: Saudo Arabija						// [1F1F8 1F1E6] SA
+🇸🇧	vėliava: Saliamono Salos					// [1F1F8 1F1E7] SB
+🇸🇨	vėliava: Seišeliai						// [1F1F8 1F1E8] SC
+🇸🇩	vėliava: Sudanas						// [1F1F8 1F1E9] SD
+🇸🇪	vėliava: Švedija						// [1F1F8 1F1EA] SE
+🇸🇬	vėliava: Singapūras						// [1F1F8 1F1EC] SG
+🇸🇭	vėliava: Šv. Elenos Sala					// [1F1F8 1F1ED] SH
+🇸🇮	vėliava: Slovėnija						// [1F1F8 1F1EE] SI
+🇸🇯	vėliava: Svalbardas ir Janas Majenas				// [1F1F8 1F1EF] SJ
+🇸🇰	vėliava: Slovakija						// [1F1F8 1F1F0] SK
+🇸🇱	vėliava: Siera Leonė						// [1F1F8 1F1F1] SL
+🇸🇲	vėliava: San Marinas						// [1F1F8 1F1F2] SM
+🇸🇳	vėliava: Senegalas						// [1F1F8 1F1F3] SN
+🇸🇴	vėliava: Somalis						// [1F1F8 1F1F4] SO
+🇸🇷	vėliava: Surinamas						// [1F1F8 1F1F7] SR
+🇸🇸	vėliava: Pietų Sudanas						// [1F1F8 1F1F8] SS
+🇸🇹	vėliava: San Tomė ir Prinsipė					// [1F1F8 1F1F9] ST
+🇸🇻	vėliava: Salvadoras						// [1F1F8 1F1FB] SV
+🇸🇽	vėliava: Sint Martenas						// [1F1F8 1F1FD] SX
+🇸🇾	vėliava: Sirija							// [1F1F8 1F1FE] SY
+🇸🇿	vėliava: Svazilandas						// [1F1F8 1F1FF] SZ
+🇹🇦	vėliava: Tristanas da Kunja					// [1F1F9 1F1E6] TA
+🇹🇨	vėliava: Terkso ir Kaikoso Salos				// [1F1F9 1F1E8] TC
+🇹🇩	vėliava: Čadas							// [1F1F9 1F1E9] TD
+🇹🇫	vėliava: Prancūzijos Pietų sritys				// [1F1F9 1F1EB] TF
+🇹🇬	vėliava: Togas							// [1F1F9 1F1EC] TG
+🇹🇭	vėliava: Tailandas						// [1F1F9 1F1ED] TH
+🇹🇯	vėliava: Tadžikija						// [1F1F9 1F1EF] TJ
+🇹🇰	vėliava: Tokelau						// [1F1F9 1F1F0] TK
+🇹🇱	vėliava: Rytų Timoras						// [1F1F9 1F1F1] TL
+🇹🇲	vėliava: Turkmėnistanas						// [1F1F9 1F1F2] TM
+🇹🇳	vėliava: Tunisas						// [1F1F9 1F1F3] TN
+🇹🇴	vėliava: Tonga							// [1F1F9 1F1F4] TO
+🇹🇷	vėliava: Turkija						// [1F1F9 1F1F7] TR
+🇹🇹	vėliava: Trinidadas ir Tobagas					// [1F1F9 1F1F9] TT
+🇹🇻	vėliava: Tuvalu							// [1F1F9 1F1FB] TV
+🇹🇼	vėliava: Taivanas						// [1F1F9 1F1FC] TW
+🇹🇿	vėliava: Tanzanija						// [1F1F9 1F1FF] TZ
+🇺🇦	vėliava: Ukraina						// [1F1FA 1F1E6] UA
+🇺🇬	vėliava: Uganda							// [1F1FA 1F1EC] UG
+🇺🇲	vėliava: Jungtinių Valstijų Mažosios Tolimosios Salos		// [1F1FA 1F1F2] UM
+🇺🇳	vėliava: Jungtinės Tautos					// [1F1FA 1F1F3] UN
+🇺🇸	vėliava: Jungtinės Valstijos					// [1F1FA 1F1F8] US
+🇺🇾	vėliava: Urugvajus						// [1F1FA 1F1FE] UY
+🇺🇿	vėliava: Uzbekistanas						// [1F1FA 1F1FF] UZ
+🇻🇦	vėliava: Vatikano Miesto Valstybė				// [1F1FB 1F1E6] VA
+🇻🇨	vėliava: Šventasis Vincentas ir Grenadinai			// [1F1FB 1F1E8] VC
+🇻🇪	vėliava: Venesuela						// [1F1FB 1F1EA] VE
+🇻🇬	vėliava: Didžiosios Britanijos Mergelių Salos			// [1F1FB 1F1EC] VG
+🇻🇮	vėliava: Jungtinių Valstijų Mergelių Salos			// [1F1FB 1F1EE] VI
+🇻🇳	vėliava: Vietnamas						// [1F1FB 1F1F3] VN
+🇻🇺	vėliava: Vanuatu						// [1F1FB 1F1FA] VU
+🇼🇫	vėliava: Volisas ir Futūna					// [1F1FC 1F1EB] WF
+🇼🇸	vėliava: Samoa							// [1F1FC 1F1F8] WS
+🇽🇰	vėliava: Kosovas						// [1F1FD 1F1F0] XK
+🇾🇪	vėliava: Jemenas						// [1F1FE 1F1EA] YE
+🇾🇹	vėliava: Majotas						// [1F1FE 1F1F9] YT
+🇿🇦	vėliava: Pietų Afrika						// [1F1FF 1F1E6] ZA
+🇿🇲	vėliava: Zambija						// [1F1FF 1F1F2] ZM
+🇿🇼	vėliava: Zimbabvė						// [1F1FF 1F1FC] ZW
+
+// Subdivision Flags -- ISO 3166-2 Subdivision Codes
+
+🏴󠁧󠁢󠁥󠁮󠁧󠁿	vėliava: Anglija					// [1F3F4 E0067 E0062 E0065 E006E E0067 E007F]
+🏴󠁧󠁢󠁳󠁣󠁴󠁿	vėliava: Škotija					// [1F3F4 E0067 E0062 E0073 E0063 E0074 E007F]
+🏴󠁧󠁢󠁷󠁬󠁳󠁿	vėliava: Velsas						// [1F3F4 E0067 E0062 E0077 E006C E0073 E007F]
+
+// Keycaps (NOTE: keycap 10 is a single Unicode codepoint)
+
+#️⃣	mygtukas: #							// [0023 FE0F 20E3]
+*️⃣	mygtukas: *							// [002A FE0F 20E3]
+0️⃣	mygtukas: 0							// [0030 FE0F 20E3]
+1️⃣	mygtukas: 1							// [0031 FE0F 20E3]
+2️⃣	mygtukas: 2							// [0032 FE0F 20E3]
+3️⃣	mygtukas: 3							// [0033 FE0F 20E3]
+4️⃣	mygtukas: 4							// [0034 FE0F 20E3]
+5️⃣	mygtukas: 5							// [0035 FE0F 20E3]
+6️⃣	mygtukas: 6							// [0036 FE0F 20E3]
+7️⃣	mygtukas: 7							// [0037 FE0F 20E3]
+8️⃣	mygtukas: 8							// [0038 FE0F 20E3]
+9️⃣	mygtukas: 9							// [0039 FE0F 20E3]
+
+// Emoji ZWJ Sequence: Family
+
+👩‍❤‍💋‍👨	bučinys: moteris vyras			// [1F469 200D 2764 200D 1F48B 200D 1F468]
+👨‍❤‍💋‍👨	bučinys: vyras vyras			// [1F468 200D 2764 200D 1F48B 200D 1F468]
+👩‍❤‍💋‍👩	bučinys: moteris moteris		// [1F469 200D 2764 200D 1F48B 200D 1F469]
+👩‍❤‍👨	pora su širdele: moteris vyras			// [1F469 200D 2764 200D 1F468]
+👨‍❤‍👨	pora su širdele: vyras vyras			// [1F468 200D 2764 200D 1F468]
+👩‍❤‍👩	pora su širdele: moteris moteris		// [1F469 200D 2764 200D 1F469]
+👨‍👩‍👦	šeima: vyras moteris berniukas			// [1F468 200D 1F469 200D 1F466]
+👨‍👩‍👧	šeima: vyras moteris mergaitė			// [1F468 200D 1F469 200D 1F467]
+👨‍👩‍👧‍👦	šeima: vyras moteris mergaitė berniukas	// [1F468 200D 1F469 200D 1F467 200D 1F466]
+👨‍👩‍👦‍👦	šeima: vyras moteris berniukas berniukas// [1F468 200D 1F469 200D 1F466 200D 1F466]
+👨‍👩‍👧‍👧	šeima: vyras moteris mergaitė mergaitė	// [1F468 200D 1F469 200D 1F467 200D 1F467]
+👨‍👨‍👦	šeima: vyras vyras berniukas			// [1F468 200D 1F468 200D 1F466]
+👨‍👨‍👧	šeima: vyras vyras mergaitė			// [1F468 200D 1F468 200D 1F467]
+👨‍👨‍👧‍👦	šeima: vyras vyras mergaitė berniukas	// [1F468 200D 1F468 200D 1F467 200D 1F466]
+👨‍👨‍👦‍👦	šeima: vyras vyras berniukas berniukas	// [1F468 200D 1F468 200D 1F466 200D 1F466]
+👨‍👨‍👧‍👧	šeima: vyras vyras mergaitė mergaitė	// [1F468 200D 1F468 200D 1F467 200D 1F467]
+👩‍👩‍👦	šeima: moteris moteris berniukas		// [1F469 200D 1F469 200D 1F466]
+👩‍👩‍👧	šeima: moteris moteris mergaitė			// [1F469 200D 1F469 200D 1F467]
+👩‍👩‍👧‍👦	šeima: moteris moteris mergaitė berniukas// [1F469 200D 1F469 200D 1F467 200D 1F466]
+👩‍👩‍👦‍👦	šeima: moteris moteris berniukas berniukas// [1F469 200D 1F469 200D 1F466 200D 1F466]
+👩‍👩‍👧‍👧	šeima: moteris moteris mergaitė mergaitė// [1F469 200D 1F469 200D 1F467 200D 1F467]
+👨‍👦	šeima: vyras berniukas					// [1F468 200D 1F466]
+👨‍👦‍👦	šeima: vyras berniukas berniukas		// [1F468 200D 1F466 200D 1F466]
+👨‍👧	šeima: vyras mergaitė					// [1F468 200D 1F467]
+👨‍👧‍👦	šeima: vyras mergaitė berniukas			// [1F468 200D 1F467 200D 1F466]
+👨‍👧‍👧	šeima: vyras mergaitė mergaitė			// [1F468 200D 1F467 200D 1F467]
+👩‍👦	šeima: moteris berniukas				// [1F469 200D 1F466]
+👩‍👦‍👦	šeima: moteris berniukas berniukas		// [1F469 200D 1F466 200D 1F466]
+👩‍👧	šeima: moteris mergaitė					// [1F469 200D 1F467]
+👩‍👧‍👦	šeima: moteris mergaitė berniukas		// [1F469 200D 1F467 200D 1F466]
+👩‍👧‍👧	šeima: moteris mergaitė mergaitė		// [1F469 200D 1F467 200D 1F467]
+
+// Emoji ZWJ Sequence: Gendered Role, with object
+
+👨‍⚕	medikas							// [1F468 200D 2695]
+👩‍⚕	medikė							// [1F469 200D 2695]
+👨‍⚖	teisėjas						// [1F468 200D 2696]
+👩‍⚖	teisėja							// [1F469 200D 2696]
+👨‍✈	pilotas							// [1F468 200D 2708]
+👩‍✈	pilotė							// [1F469 200D 2708]
+👨‍🌾	ūkininkas						// [1F468 200D 1F33E]
+👩‍🌾	ūkininkė						// [1F469 200D 1F33E]
+👨‍🍳	virėjas							// [1F468 200D 1F373]
+👩‍🍳	virėja							// [1F469 200D 1F373]
+👨‍🎓	studentas						// [1F468 200D 1F393]
+👩‍🎓	studentė						// [1F469 200D 1F393]
+👨‍🎤	dainininkas						// [1F468 200D 1F3A4]
+👩‍🎤	dainininkė						// [1F469 200D 1F3A4]
+👨‍🎨	dailininkas						// [1F468 200D 1F3A8]
+👩‍🎨	dailininkė						// [1F469 200D 1F3A8]
+👨‍🏫	mokytojas						// [1F468 200D 1F3EB]
+👩‍🏫	mokytoja						// [1F469 200D 1F3EB]
+👨‍🏭	fabriko darbininkas					// [1F468 200D 1F3ED]
+👩‍🏭	fabriko darbininkė					// [1F469 200D 1F3ED]
+👨‍💻	technologas						// [1F468 200D 1F4BB]
+👩‍💻	technologė						// [1F469 200D 1F4BB]
+👨‍💼	biuro darbuotojas					// [1F468 200D 1F4BC]
+👩‍💼	biuro darbuotoja					// [1F469 200D 1F4BC]
+👨‍🔧	mechanikas						// [1F468 200D 1F527]
+👩‍🔧	mechanikė						// [1F469 200D 1F527]
+👨‍🔬	mokslininkas						// [1F468 200D 1F52C]
+👩‍🔬	mokslininkė						// [1F469 200D 1F52C]
+👨‍🚀	astronautas						// [1F468 200D 1F680]
+👩‍🚀	astronautė						// [1F469 200D 1F680]
+👨‍🚒	gaisrininkas						// [1F468 200D 1F692]
+👩‍🚒	gaisrininkė						// [1F469 200D 1F692]
+
+// Emoji ZWJ Sequence: Gendered Role
+
+👮‍♀	moteris policininkė					// [1F46E 200D 2640]
+👮‍♂	vyras policininkas					// [1F46E 200D 2642]
+👱‍♀	blondinė						// [1F471 200D 2640]
+👱‍♂	blondinas						// [1F471 200D 2642]
+👳‍♀	moteris su turbanu					// [1F473 200D 2640]
+👳‍♂	vyriškis su turbanu					// [1F473 200D 2642]
+👷‍♀	statybininkė						// [1F477 200D 2640]
+👷‍♂	vyras statybininkas					// [1F477 200D 2642]
+💂‍♀	sargybinė						// [1F482 200D 2640]
+💂‍♂	vyras sargybinis					// [1F482 200D 2642]
+🕵️‍♀	seklė							// [1F575 200D 2640]
+🕵️‍♂	seklys							// [1F575 200D 2642]
+🦸‍♀	moteris superherojė					// [1F9B8 200D 2640]
+🦸‍♂	vyras superherojus					// [1F9B8 200D 2642]
+🦹‍♀	moteris piktadarė					// [1F9B9 200D 2640]
+🦹‍♂	vyras piktadarys					// [1F9B9 200D 2642]
+🧙‍♀	magė							// [1F9D9 200D 2640]
+🧙‍♂	vyras magas						// [1F9D9 200D 2642]
+🧚‍♀	moteris fėja						// [1F9DA 200D 2640]
+🧚‍♂	burtininkas						// [1F9DA 200D 2642]
+🧛‍♀	vampyrė							// [1F9DB 200D 2640]
+🧛‍♂	vampyras vyras						// [1F9DB 200D 2642]
+🧜‍♀	undinėlė						// [1F9DC 200D 2640]
+🧜‍♂	vandenis/undinius					// [1F9DC 200D 2642]
+🧝‍♀	elfė							// [1F9DD 200D 2640]
+🧝‍♂	elfas vyras						// [1F9DD 200D 2642]
+🧞‍♀	džinė							// [1F9DE 200D 2640]
+🧞‍♂	džinas							// [1F9DE 200D 2642]
+🧟‍♀	zombė							// [1F9DF 200D 2640]
+🧟‍♂	zombis vyras						// [1F9DF 200D 2642]
+
+// Emoji ZWJ Sequence: Gendered Activity
+
+⛹‍♀	moteris su kamuoliu					// [26F9 200D 2640]
+⛹‍♂	vyras su kamuoliu					// [26F9 200D 2642]
+🏃‍♀	bėganti moteris						// [1F3C3 200D 2640]
+🏃‍♂	bėgantis vyras						// [1F3C3 200D 2642]
+🏄‍♀	banglentininkė						// [1F3C4 200D 2640]
+🏄‍♂	vyras banglentininkas					// [1F3C4 200D 2642]
+🏊‍♀	plaukikė						// [1F3CA 200D 2640]
+🏊‍♂	vyras plaukikas						// [1F3CA 200D 2642]
+🏋️‍♀	svorius kelianti moteris				// [1F3CB 200D 2640]
+🏋️‍♂	svorius keliantis vyras					// [1F3CB 200D 2642]
+🏌️‍♀	golfo žaidėja						// [1F3CC 200D 2640]
+🏌️‍♂	golfo žaidėjas vyras					// [1F3CC 200D 2642]
+👯‍♀	vakarėlyje dalyvaujančios moterys			// [1F46F 200D 2640]
+👯‍♂	vakarėlyje dalyvaujantys vyrai				// [1F46F 200D 2642]
+💆‍♀	masažuojama moters galva				// [1F486 200D 2640]
+💆‍♂	masažuojama vyro galva					// [1F486 200D 2642]
+💇‍♀	apkerpama moteris					// [1F487 200D 2640]
+💇‍♂	apkerpamas vyras					// [1F487 200D 2642]
+🚣‍♀	irkluotoja						// [1F6A3 200D 2640]
+🚣‍♂	irkluotojas						// [1F6A3 200D 2642]
+🚴‍♀	dviratininkė						// [1F6B4 200D 2640]
+🚴‍♂	vyras dviratininkas					// [1F6B4 200D 2642]
+🚵‍♀	kalnų dviratininkė moteris				// [1F6B5 200D 2640]
+🚵‍♂	kalnų dviratininkas vyras				// [1F6B5 200D 2642]
+🚶‍♀	einanti moteris						// [1F6B6 200D 2640]
+🚶‍♂	einantis vyras						// [1F6B6 200D 2642]
+🤸‍♀	moteris daro suktuką					// [1F938 200D 2640]
+🤸‍♂	vyras daro suktuką					// [1F938 200D 2642]
+🤹‍♀	žongliruotoja						// [1F939 200D 2640]
+🤹‍♂	žongliruotojas						// [1F939 200D 2642]
+🤼‍♀	moterų imtynės						// [1F93C 200D 2640]
+🤼‍♂	vyrų imtynės						// [1F93C 200D 2642]
+🤽‍♀	vandensvydžio žaidėja					// [1F93D 200D 2640]
+🤽‍♂	vandensvydžio žaidėjas					// [1F93D 200D 2642]
+🤾‍♀	rankininkė						// [1F93E 200D 2640]
+🤾‍♂	rankininkas						// [1F93E 200D 2642]
+🧖‍♀	moteris garų kambaryje					// [1F9D6 200D 2640]
+🧖‍♂	vyras garų kambaryje					// [1F9D6 200D 2642]
+🧗‍♀	kopiantis moteris					// [1F9D7 200D 2640]
+🧗‍♂	kopiantis vyras						// [1F9D7 200D 2642]
+🧘‍♀	moteris lotoso pozoje					// [1F9D8 200D 2640]
+🧘‍♂	vyras lotoso pozoje					// [1F9D8 200D 2642]
+
+// Emoji ZWJ Sequence: Gendered Gestures
+
+💁‍♀	ranką pakėlusi moteris					// [1F481 200D 2640]
+💁‍♂	lengvai ranką pakėlęs vyras				// [1F481 200D 2642]
+🙅‍♀	draudžianti moteris					// [1F645 200D 2640]
+🙅‍♂	draudžiantis vyras					// [1F645 200D 2642]
+🙆‍♀	leidžianti moteris					// [1F646 200D 2640]
+🙆‍♂	leidžiantis vyras					// [1F646 200D 2642]
+🙇‍♀	nusilenkianti moteris					// [1F647 200D 2640]
+🙇‍♂	nusilenkiantis vyras					// [1F647 200D 2642]
+🙋‍♀	ranką iškėlusi moteris					// [1F64B 200D 2640]
+🙋‍♂	ranką pakėlęs vyras					// [1F64B 200D 2642]
+🙍‍♀	paniurusi moteris					// [1F64D 200D 2640]
+🙍‍♂	paniuręs vyras						// [1F64D 200D 2642]
+🙎‍♀	susiraukusi moteris					// [1F64E 200D 2640]
+🙎‍♂	susiraukęs vyras					// [1F64E 200D 2642]
+🤦‍♀	susierzinusi moteris					// [1F926 200D 2640]
+🤦‍♂	susierzinęs vyras					// [1F926 200D 2642]
+🤷‍♀	abejojanti moteris					// [1F937 200D 2640]
+🤷‍♂	abejojantis vyras					// [1F937 200D 2642]
+
+// Emoji ZWJ Sequence: Other
+
+🏳‍🌈	vaivorykštinė vėliava					// [1F3F3 200D 1F308]
+🏴‍☠	piratų vėliava						// [1F3F4 200D 2620]
+👁‍🗨	akis kalbėjimo burbule					// [1F441 200D 1F5E8]
+
+// References:
+//   [UCD]	Unicode Character Database 11.0.0 [http://www.unicode.org/Public/11.0.0/ucd/]
+//   [Emoji]	Unicode Emoji 11.0 [http://www.unicode.org/Public/emoji/11.0/]
+//   [CLDR]	Unicode Common Locale Data Repository 33.1 [http://cldr.unicode.org/index/downloads/cldr-33.1]
+//
+// Sources:
+//   1.  emoji-test.txt (Emoji)
+//   2.  common/annotations/lt.xml (CLDR)
+//   3.  emoji-zwj-sequences.txt (Emoji)

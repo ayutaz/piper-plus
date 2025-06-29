@@ -1,0 +1,1 @@
+/usr/bin/cc "-D_FILE_OFFSET_BITS=64" -arch arm64 -Wl,-search_paths_first -Wl,-headerpad_max_install_names "CMakeFiles/espeak-ng-bin.dir/espeak-ng.c.o" -o espeak-ng  -Wl,-rpath,/Users/s19447/Desktop/piper/test-build/p/src/piper_phonemize_external-build/e/src/espeak_ng_external-build/src/libespeak-ng libespeak-ng/libespeak-ng.1.52.0.1.dylib

@@ -1,0 +1,410 @@
+// Japanese Phonemes
+//
+// Copyright (C) 2017 Reece H. Dunn
+//
+// This program is free software; you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation; either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program; if not, see: <http://www.gnu.org/licenses/>.
+
+// This is using the X-SAMPA transcriptions
+// (http://www.phon.ucl.ac.uk/home/sampa/x-sampa.htm).
+
+phoneme :
+  virtual
+  length 70
+endphoneme
+
+phoneme _j
+  liquid pzd starttype #i
+  ipa ʲ
+  lengthmod 2
+
+  NextVowelStarts
+    VowelStart(j/j@)
+    VowelStart(j/ja)
+    VowelStart(j/je)
+    VowelStart(j/ji)
+    VowelStart(j/jo)
+    VowelStart(j/ju)
+  EndSwitch
+endphoneme
+
+// Vowels /////////////////////////////////////////////////////////////////////
+
+// Close Vowels
+
+phoneme i
+  vwl starttype #i endtype #i
+  length 160
+
+  FMT(vowel/i)
+endphoneme
+
+phoneme i~
+  vwl lng starttype #i endtype #i
+  ipa ĩ
+  length 220
+  FMT(vnasal/i_n2)
+endphoneme
+
+phoneme u~
+  vwl starttype #u endtype #u
+  ipa ũ
+  length 220
+  FMT(vnasal/u_n)
+endphoneme
+
+phoneme u
+  vwl starttype #u endtype #u
+  ipa ɯᵝ
+  length 160
+
+  FMT(vowel/i#_7)
+endphoneme
+
+// Mid Vowels
+
+phoneme e
+  vwl starttype #e endtype #e
+  ipa e̞
+  length 160
+
+  FMT(vowel/e_8)
+endphoneme
+
+phoneme o
+  vwl starttype #o endtype #o
+  ipa o̞
+  length 160
+
+  FMT(vowel/oo_3)
+endphoneme
+
+// Open Vowels
+
+phoneme a
+  vwl starttype #a endtype #a
+  ipa ä
+  length 160
+
+  FMT(vowel/a)
+endphoneme
+
+// Consonants /////////////////////////////////////////////////////////////////
+
+phoneme m
+  vcd blb nas
+  Vowelout f1=2  f2=1000 -500 -350  f3=-200 80 brk
+  lengthmod 4
+
+  NextVowelStarts
+    VowelStart(m/m@)
+    VowelStart(m/ma)
+    VowelStart(m/me)
+    VowelStart(m/mi)
+    VowelStart(m/mo)
+    VowelStart(m/mu)
+  EndSwitch
+
+  IF nextPh(isNotVowel) THEN
+    FMT(m/m_)
+  ENDIF
+endphoneme
+
+phoneme n
+  vcd alv nas
+  Vowelout f1=2 f2=1500 -300 250  f3=-100 80  rms=20 brk
+  lengthmod 4
+
+  NextVowelStarts
+    VowelStart(n/n@)
+    VowelStart(n/na)
+    VowelStart(n/ne)
+    VowelStart(n/ni)
+    VowelStart(n/no)
+    VowelStart(n/nu)
+  EndSwitch
+
+  IF nextPh(isNotVowel) THEN
+    FMT(n/n_)
+  ENDIF
+endphoneme
+
+phoneme N
+  vcd vel nas
+  ipa ŋ
+  Vowelout f1=3 f2=2300 300 400  f3=-200 80  len=40 rms=20 brk
+  lengthmod 3
+
+  NextVowelStarts
+    VowelStart(nn/nn@)
+    VowelStart(nn/nna)
+    VowelStart(nn/nne)
+    VowelStart(nn/nni)
+    VowelStart(nn/nno)
+    VowelStart(nn/nnu)
+  EndSwitch
+
+  IF prevPh(#i) THEN
+    VowelEnding(nn/inn, -40)
+  ENDIF
+
+  IF prevPh(isNotVowel) AND nextPhW(isLiquid) THEN
+    FMT(nn/nnj)
+  ELIF prevPh(isPause) THEN
+    FMT(nn/_nn)
+  ELIF nextPh(isNotVowel) THEN
+    FMT(nn/nn_)
+  ENDIF
+endphoneme
+
+phoneme N\\
+  vcd uvl nas
+  ipa ɴ
+  // FIXME: Stub phoneme.
+  CALL ja/n
+endphoneme
+
+// Plosives
+
+phoneme p
+  vls blb stp
+  voicingswitch b
+  lengthmod 2
+  Vowelin  f1=0  f2=1000 -50  -100  f3=-200 80 amp=11
+  Vowelout f1=0  f2=1000 -500 -350  f3=-300 80 rms=22
+
+  WAV(ustop/p)
+endphoneme
+
+phoneme b
+  vcd blb stp
+  voicingswitch p
+  Vowelout f1=2  f2=1000 -500 -300  f3=-300 80 brk
+  lengthmod 5
+
+  IF nextPh(isPause2) THEN
+    FMT(b/b_) addWav(x/b_)
+  ELIF nextPh(@-) THEN
+    FMT(b/b@2) addWav(x/b)
+  ELIF nextPh(#@) THEN
+    FMT(b/b@) addWav(x/b)
+  ELIF nextPh(#a) THEN
+    FMT(b/ba) addWav(x/b)
+  ELIF nextPh(#e) THEN
+    FMT(b/be) addWav(x/b)
+  ELIF nextPh(#i) THEN
+    FMT(b/bi) addWav(x/b)
+  ELIF nextPh(#o) THEN
+    FMT(b/bo) addWav(x/b)
+  ELIF nextPh(#u) THEN
+    FMT(b/bu) addWav(x/b)
+  ENDIF
+
+  FMT(b/b) addWav(x/b)
+endphoneme
+
+phoneme t
+  vls alv stp
+  voicingswitch d
+  lengthmod 2
+  Vowelin  f1=0  f2=1700 -300 300  f3=-100 80
+  Vowelout f1=0  f2=1700 -300 250  f3=-100 80  rms=20
+
+  WAV(ustop/t, 90)
+endphoneme
+
+phoneme d
+  vcd alv stp
+  voicingswitch t
+  lengthmod 5
+  Vowelin  f1=1  f2=1700 -300 300  f3=-100 80
+  Vowelout f1=2  f2=1700 -300 300  f3=-100 80 brk
+
+  FMT(d/d) addWav(x/d)
+endphoneme
+
+phoneme k
+  vls vel stp
+  voicingswitch g
+  lengthmod 2
+  Vowelin  f1=0  f2=2300 200 300  f3=-200 80
+  Vowelout f1=0  f2=2300 300 400  f3=-200 80  rms=20
+
+  WAV(ustop/k)
+endphoneme
+
+phoneme g
+  vcd vel stp
+  voicingswitch k
+  lengthmod 5
+  Vowelin  f1=2  f2=2300 200 300  f3=-300 80
+  Vowelout f1=2  f2=2300 250 300  f3=-300 80 brk
+
+  FMT(g/g) addWav(x/g2, 150)
+endphoneme
+
+phoneme ?
+  vls glt stp
+  lengthmod 3
+  nolink
+  Vowelin  glstop
+  Vowelout glstop
+  WAV(ustop/null)
+endphoneme
+
+// Sibilant Affricates
+
+phoneme t_s
+  vls alv afr sib
+  ipa ts
+  lengthmod 2
+  Vowelin  f1=0  f2=1700 -300 300  f3=-100 80
+  Vowelout f1=0  f2=1700 -300 250  f3=-100 80  rms=20
+  WAV(ustop/ts, 70)
+endphoneme
+
+phoneme t_s\\
+  vls alp sib afr
+  voicingswitch d_z\\
+  ipa tɕ
+  lengthmod 2
+  Vowelin f1=0  f2=2700 400 600  f3=300 80 rate len=70
+
+  WAV(ustop/ts_pzd)
+endphoneme
+
+phoneme d_z\\
+  vcd alp sib afr
+  voicingswitch t_s\\
+  ipa dʑ
+  lengthmod 5
+  Vowelin  f1=2  f2=2700 400 600  f3=300 80 rate len=70
+  Vowelout f1=2  f2=2700 400 600  f3=300 80
+
+  FMT(dzh/dzh) addWav(x/dz_pzd)
+endphoneme
+
+// Sibilant Fricatives
+
+phoneme s
+  vls alv frc sib
+  voicingswitch z
+  lengthmod 3
+  Vowelin  f1=0  f2=1700 -300 300  f3=-100 80
+  Vowelout f1=0  f2=1700 -300 250  f3=-100 80  rms=20
+
+  WAV(ufric/s)
+endphoneme
+
+phoneme z
+  vcd alv frc sib
+  voicingswitch s
+  lengthmod 6
+  Vowelout f1=0  f2=1700 -300 300  f3=-100 60  len=50
+
+  FMT(voc/z) addWav(ufric/s_, 85)
+endphoneme
+
+phoneme s\\
+  vls alp sib frc
+  ipa ɕ
+  lengthmod 3
+  Vowelin  f1=1  f2=2700 400 600  f3=200 70 rate len=70
+  Vowelout f1=1  f2=2700 400 600  f3=200 70 rate
+
+  WAV(ufric/sh_pzd)
+endphoneme
+
+// Fricatives
+
+phoneme p\\
+  vls blb frc
+  ipa ɸ
+  Vowelout f1=0  f2=1000 -500 -350  f3=-200 80
+  lengthmod 2
+  WAV(ufric/f)
+endphoneme
+
+phoneme v
+  vcd lbd frc
+  lengthmod 6
+  Vowelin  f1=0  f2=1000 -300 -200  f3=-300 100
+  Vowelout f1=0  f2=1000 -500 -300  f3=-300 60  len=50
+
+  FMT(voc/v) addWav(vocw/v)
+endphoneme
+
+phoneme C
+  vls pal frc
+  ipa ç
+  lengthmod 3
+  Vowelin  f1=0  f2=2700 400 600  f3=200 70
+  Vowelout f1=0  f2=2700 400 600  f3=200 70  rms=20
+
+  WAV(ufric/ch)
+endphoneme
+
+// Approximant
+
+phoneme j
+  liquid pal starttype #i
+  lengthmod 7
+
+  NextVowelStarts
+    VowelStart(j/j@)
+    VowelStart(j/ja)
+    VowelStart(j/je)
+    VowelStart(j/ji)
+    VowelStart(j/jo)
+    VowelStart(j/ju)
+  EndSwitch
+
+  IF nextPh(isNotVowel) THEN
+    Vowelout len=70
+    FMT(j/j_)
+  ENDIF
+endphoneme
+
+// Flap or Tap
+
+phoneme r`
+  liquid rfx
+  ipa ɽ
+  lengthmod 3
+  Vowelout f1=3 f2=1400 -400 300  f3=-400 80 rms=35 len=15 colr=2
+  Vowelin  f1=2 f2=1400 -400 300  f3=-400 80 len=20
+
+  FMT(r3/@tap_rfx)
+endphoneme
+
+// Coarticulated
+
+phoneme w
+  liquid
+  lengthmod 7
+  starttype #u
+
+  NextVowelStarts
+    VowelStart(w/w@)
+    VowelStart(w/wa)
+    VowelStart(w/we)
+    VowelStart(w/wi)
+    VowelStart(w/wo)
+    VowelStart(w/wu)
+  EndSwitch
+
+  IF nextPh(isNotVowel) THEN
+    Vowelout len=50
+    FMT(w/w_)
+  ENDIF
+endphoneme

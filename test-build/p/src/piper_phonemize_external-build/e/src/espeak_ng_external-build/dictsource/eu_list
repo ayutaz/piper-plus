@@ -1,0 +1,238 @@
+
+// This file is UTF8 encoded 
+// Spelling-to-phoneme words for Basque
+
+// $alt j as [x]
+// $alt2 don't palatalise l
+// $alt3 don't palatalise n
+
+
+// Letter names
+b	be
+c	ze
+d	de
+f	'efe
+g	ge
+h	'atSe
+j	J'ota
+k	ka
+l	'ele
+m	'eme
+n	'ene
+ñ	'en^e
+p	pe
+q	ku
+r	'eR2e
+s	'ese
+t	'te
+v	'uBe
+w	'uBe||bikoitza
+x	'iSa
+y	'i||gr'ekoa
+z	'z'eta
+
+_a	a
+_e	e
+_i	i
+_o	o
+_u	u
+
+
+// numbers
+_0	z'ero
+_1	b'at
+_2	b'i
+_3	'iru
+_4	l'aU
+_5	b'ost
+_6	s'eI
+_7	z'azpi
+_8	z'ortzi
+_9	beD'eratzi
+_10	am'aR2
+_11	am'aIka
+_12	am'aBi
+_13	am'aIru
+_14	am'alaU
+_15	am'aBost
+_16	am'aseI
+_17	am'azazpi
+_18	em'ezortzi
+_19	em'eretzi
+_20	oQ'eI
+_2X	oQeIta
+_40	beR2oQ'eI
+_4X	beR2oQeIta
+_60	iruroQ'eI
+_6X	iruroQeIta
+_80	laUroQ'eI
+_8X	laUroQeIta
+_1C	e'un
+_2C	beR2'eun
+_3C	ir'ureun
+_4C	laur'eun
+_5C	bost'eun
+_6C	sei'eun
+_7C	zazp'ieun
+_8C	zortz'ieun
+_9c	bederatz'ieun
+_0C	e,un
+_0M1	m'il^a
+_0M2	mil^'ioI
+_1M2	mil^'ioI||bat
+_0and	eta
+_dpt	_koma
+
+
+// names of punctuation and symbol characters
+_. p'untu
+_, k'oma
+_- gid'oI
+_! arr'idura
+_? gald'era
+_: b'i||p'untu
+_; puntu||eta||koma
+_/ b'arra
+
+// Accent characters
+
+//names
+_acu az'entuduna
+_grv kam'utsa
+_cir zirk'unfleSua
+_dia d'jeresiduna
+
+// characters
+á 'a||a'zentuduna
+é 'e||a'zentuduna
+í 'i||a'zentuduna
+ó 'o||a'zentuduna
+ú 'u||a'zentuduna
+ü 'u||dj'eresiduna
+
+// function words
+// conjunctions
+eta	$u+ $pause  // and
+baina	$u+ $pause
+
+// pronouns
+ni	$1
+zu	$1
+gu	$1
+zuek	$1
+haiek	$1
+nire	$u+  
+zure	$u+
+haren	$u+
+bere	$u+
+gure	$u+
+zuen	$u+
+haien	$u+
+beren	$u+
+
+hau	$1	// this
+honen $1 
+hauen $1 
+hori	$1	// that
+horren	$1 // genitive
+hura	$1	// that (further)
+haien $1 // genitive
+
+// Some  verbs
+gara $2
+zara $2
+dira $2
+dio $2
+die $2
+
+// gramatical suffixes which can appear as words appended to numbers etc.
+// Should these be in eu_rules ??
+a	$u
+ak $u
+an	$u
+ean	$u
+etan $u
+eko	$u
+etarako $u
+ko	$u
+era	$u
+ra $u
+etara $u
+
+// Abbreviations
+adib ad'ibid,ez $hasdot
+
+// proper names and surnames
+juan $alt
+jorge $1 x'orxe
+jose $1 $alt
+josé $alt
+joaquín xoak'in
+joaquin xoak'in
+julian xulj'an
+julián xulj'an
+jacinto xaT'into
+jiménez xim'eneT
+genaro xen'aro
+gonzález gonT'aleT
+san $u $only $only
+santo $u
+aristoteles $3
+hume hjum $1
+humer hjum
+google g'uQel
+googler g'uQel
+moodle m'uDel
+moodler m'uDel
+doodle d'uDel
+doodler m'uDel
+nietztsche n'itSe 
+ainara $alt3
+
+// Other words
+
+// Bisillabic words which always have the stres  in the first syllable
+testu $1
+lehia $1
+patu $1
+kasu $1
+// Other (from the Standard Basque dictionary (hiztegi batua) from Euskaltzaindia, maybe even more should be added)
+
+abako $1
+aerobiko $3
+aerodinamika $5 $alt3
+aerodinamiko $5 $alt3
+aerodromo $3
+aerometro $3
+aeromodelismo $6
+aeronauta $4
+aeronautika $4
+aeronautiko $4
+aerosol $4
+aerostatika $4
+aerostato $4
+adrenalina $4 $alt3
+aharraus a'R2aus
+ainitz $alt3
+aintzat $1 $only
+aje $alt
+akademi $3
+aktibist $3
+alajain $alt
+album $1
+(aldez-alde) aldezalde $text
+alfanumeriko $4
+algebra $1 $alt
+aljebraiko $3 $alt 
+aljebra $1 $alt
+aljebraiko $3 $alt
+algoritmo $3
+alkalino $3 $alt3
+alkaloide $3
+alokutibo $4
+alproj $alt
+alprojakeri $alt
+(bat-batean) bapatean $text
+ijito $alt
+garaje $alt
+jertse xerts'e

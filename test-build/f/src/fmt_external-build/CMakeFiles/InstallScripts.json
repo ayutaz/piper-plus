@@ -1,0 +1,8 @@
+{
+	"InstallScripts" : 
+	[
+		"/Users/s19447/Desktop/piper/test-build/f/src/fmt_external-build/cmake_install.cmake",
+		"/Users/s19447/Desktop/piper/test-build/f/src/fmt_external-build/doc/cmake_install.cmake"
+	],
+	"Parallel" : false
+}

@@ -1,0 +1,239 @@
+
+//====================================================
+//  Welsh
+//====================================================
+
+
+// Short Vowels
+//=============
+
+phoneme a
+  vwl starttype #a endtype #a
+  length 150
+  FMT(vowel/a)
+endphoneme
+
+
+phoneme E
+  vwl starttype #e endtype #e
+  length 150
+  FMT(vowel/ee_2)
+endphoneme
+
+
+phoneme I
+  vwl starttype #i endtype #i
+  ipa ɨ
+  length 150
+  FMT(vowel/ii_3)
+endphoneme
+
+
+phoneme Y   // symbol used in place of I"  (I bar)
+  vwl starttype #i endtype #i
+  length 150
+  FMT(vowel/ii#)
+endphoneme
+
+
+phoneme O
+  vwl starttype #o endtype #o
+  length 150
+  FMT(vowel/oo_2)
+endphoneme
+
+
+phoneme U
+  vwl starttype #u endtype #u
+  length 150
+  FMT(vowel/u_bck)
+endphoneme
+
+
+phoneme V
+  vwl starttype #@ endtype #@
+  length 150
+  FMT(vowel/@)
+endphoneme
+
+
+// Long Vowels
+//============
+
+phoneme i:
+  vwl starttype #i endtype #i
+  length 180
+  ChangeIfNotStressed(I)
+  FMT(vowel/i)
+endphoneme
+
+
+phoneme y:     // symbol used in place of i" (i bar)
+  vwl starttype #i endtype #i
+  ipa ɨː
+  length 180
+  ChangeIfNotStressed(Y)
+  FMT(vowel/i#)
+endphoneme
+
+
+phoneme u:
+  vwl starttype #u endtype #u
+  length 190
+  ChangeIfNotStressed(U)
+  FMT(vowel/u)
+endphoneme
+
+
+phoneme e:
+  vwl starttype #e endtype #e
+  length 210
+  ChangeIfNotStressed(E)
+  FMT(vowel/e)
+endphoneme
+
+
+phoneme o:
+  vwl starttype #o endtype #o
+  length 210
+  ChangeIfNotStressed(O)
+  FMT(vowel/o_2)
+endphoneme
+
+
+phoneme A:
+  vwl starttype #a endtype #a
+  length 230
+  ChangeIfNotStressed(a)
+  FMT(vowel/aa_2)
+endphoneme
+
+
+// Diphthongs
+//===========
+
+phoneme AY
+  vwl starttype #a endtype #i
+  ipa ɑɨ
+  length 250
+  FMT(vdiph/aai_2)
+endphoneme
+
+
+phoneme aI
+  vwl starttype #a endtype #i
+  length 210
+  FMT(vdiph/ai_2)
+endphoneme
+
+
+phoneme aY
+  vwl starttype #a endtype #i
+  ipa aɨ
+  length 210
+  FMT(vdiph/ai_2)
+endphoneme
+
+
+phoneme aU
+  vwl starttype #a endtype #u
+  length 210
+  FMT(vdiph/au_4)
+endphoneme
+
+
+phoneme @I
+  vwl starttype #@ endtype #i
+  length 210
+  FMT(vdiph/@i_2)
+endphoneme
+
+
+phoneme @Y
+  vwl starttype #@ endtype #i
+  ipa əɨ
+  length 210
+  FMT(vdiph/@i_2)
+endphoneme
+
+
+phoneme eU
+  vwl starttype #e endtype #u
+  length 210
+  FMT(vdiph/eu)
+endphoneme
+
+
+phoneme Iu
+  vwl starttype #i endtype #u
+  length 210
+  FMT(vdiph2/iu_4)
+endphoneme
+
+
+phoneme Yu
+  vwl starttype #i endtype #u
+  ipa ɨu
+  length 210
+  FMT(vdiph2/iu_4)
+endphoneme
+
+
+phoneme OI
+  vwl starttype #o endtype #i
+  length 210
+  FMT(vdiph/ooi)
+endphoneme
+
+
+phoneme OY
+  vwl starttype #o endtype #i
+  ipa ɔɨ
+  length 210
+  FMT(vdiph/ooi)
+endphoneme
+
+
+phoneme uI
+  vwl starttype #u endtype #i
+  length 210
+  FMT(vdiph/ui_3)
+endphoneme
+
+
+phoneme uY
+  vwl starttype #u endtype #i
+  ipa uɨ
+  length 210
+  FMT(vdiph/ui_3)
+endphoneme
+
+
+// CONSONANTS
+//===========
+
+phoneme r
+  liquid trl
+  lengthmod 6
+  Vowelin  f1=0  f2=1600 -300 300  f3=-200 80
+  Vowelout f1=2  f2=1600 -300 300  f3=-200 80 brk
+  FMT(r3/r_trill2) addWav(r3/r_trill2.wav, 65)
+endphoneme
+
+
+phoneme g
+  vcd vel stp
+  lengthmod 5
+  voicingswitch k
+  Vowelin  f1=2  f2=2300 200 300  f3=-300 80
+  Vowelout f1=2  f2=2300 250 300  f3=-300 80 brk
+
+  IF PreVoicing THEN
+    FMT(g/xg)
+  ENDIF
+
+  IF nextPh(isPause2) THEN
+    FMT(g/g_) addWav(x/g_, 140)
+  ENDIF
+  FMT(g/g) addWav(x/g2, 150)
+endphoneme

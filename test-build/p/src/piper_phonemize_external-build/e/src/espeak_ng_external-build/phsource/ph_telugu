@@ -1,0 +1,139 @@
+
+// Phonemes for Telugu
+// This inherits from ph_hindi
+
+// (these are only guesses)
+
+phoneme @
+  vwl  starttype #a  endtype #a
+  length 130
+  FMT(vowel/@)
+endphoneme
+
+
+phoneme a
+  vwl lng starttype #a endtype #a
+  length 130
+  FMT(vowel/a#_2)
+endphoneme
+
+
+phoneme a:
+  vwl  starttype #a  endtype #a
+  length 300
+  FMT(vowel/a_5)
+endphoneme
+
+
+phoneme e
+  vwl  starttype #e  endtype #e
+  length 130
+  FMT(vowel/e_mid2)
+endphoneme
+
+
+phoneme e:
+  vwl  starttype #e  endtype #e
+  length 270
+  FMT(vowel/e)
+endphoneme
+
+
+phoneme i
+  vwl  starttype #i  endtype #i
+  length 130
+  FMT(vowel/i_6)
+endphoneme
+
+
+phoneme i:
+  vwl  starttype #i  endtype #i
+  length 270
+  FMT(vowel/i)
+endphoneme
+
+
+
+phoneme o
+  vwl  starttype #o  endtype #o
+  length 130
+  FMT(vowel/o)
+endphoneme
+
+
+phoneme o:
+  vwl  starttype #o  endtype #o
+  length 300
+  FMT(vowel/o)
+endphoneme
+
+
+phoneme u
+  vwl  starttype #u  endtype #u
+  length 110
+  FMT(vowel/u_6)
+endphoneme
+
+phoneme u:
+  vwl  starttype #u  endtype #u
+  length 280
+  FMT(vowel/u_6)
+endphoneme
+
+
+
+phoneme aI
+  vwl lng starttype #a endtype #i
+  length 280
+  FMT(vdiph/ai)
+endphoneme
+
+phoneme aU
+  vwl lng starttype #a endtype #u
+  length 270
+  FMT(vdiph/aau_3)
+endphoneme
+
+
+// ?? This is standard [v].  Should be it [v] without the fricative noise?
+phoneme v
+  import_phoneme base1/v
+endphoneme
+
+
+phoneme r
+  import_phoneme base1/R2
+endphoneme
+
+
+phoneme t.#
+  vls rfx stp
+  lengthmod 2
+  ipa ʈU+02B0
+  voicingswitch d.#
+  Vowelin f1=0  f2=1800 -300 300  f3=-200 80
+  Vowelout f1=0 f2=1800 -300 250  f3=-400 80  rms=20 colr=2
+  
+  IF nextPhW(t.#) THEN
+    ChangePhoneme(t.)
+  ENDIF
+  WAV(ustop/th_rfx2, 80)
+endphoneme
+
+phoneme d.#
+  vcd rfx stp
+  lengthmod 5
+  ipa ɖU+02B0
+  voicingswitch t.#
+  Vowelin f1=1  f2=1800 -300 300  f3=-150 80
+  Vowelout f1=1 f2=1800 -300 300  f3=-400 80 colr=2
+
+  IF PreVoicing THEN
+    FMT(d/xdr)
+  ENDIF
+
+  FMT(d/dr2, 50) addWav(ustop/th_rfx2, 80)
+
+endphoneme
+
+
