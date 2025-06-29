@@ -9,9 +9,6 @@
 
 #ifndef PIPER_CI_BUILD
 #include <espeak-ng/speak_lib.h>
-#include <piper-phonemize/phoneme_ids.hpp>
-#include <piper-phonemize/phonemize.hpp>
-#include <piper-phonemize/tashkeel.hpp>
 #endif
 #include <onnxruntime_cxx_api.h>
 #include <spdlog/spdlog.h>
@@ -67,7 +64,6 @@ struct PhonemeIdConfig {
 };
 
 void phonemize_codepoints(const std::string &text, 
-                         const CodepointsPhonemeConfig &config,
                          std::vector<std::vector<Phoneme>> &phonemes) {
     // Simple implementation: convert text to codepoints
     std::vector<Phoneme> sentence;
@@ -721,8 +717,7 @@ void textToAudio(PiperConfig &config, Voice &voice, std::string text,
 #ifdef PIPER_CI_BUILD
     // CI build: fall back to codepoints
     spdlog::debug("eSpeak phonemization disabled in CI build, using codepoints");
-    CodepointsPhonemeConfig codepointsConfig;
-    phonemize_codepoints(text, codepointsConfig, phonemes);
+    phonemize_codepoints(text, phonemes);
 #else
     // Use espeak-ng for phonemization
     piper::eSpeakPhonemeConfig eSpeakConfig;
@@ -738,8 +733,7 @@ void textToAudio(PiperConfig &config, Voice &voice, std::string text,
     if (phonemes.empty()) {
       spdlog::warn("OpenJTalk returned empty phonemes, falling back to codepoints");
 #ifdef PIPER_CI_BUILD
-      CodepointsPhonemeConfig codepointsConfig;
-      phonemize_codepoints(text, codepointsConfig, phonemes);
+      phonemize_codepoints(text, phonemes);
 #else
       piper::CodepointsPhonemeConfig codepointsConfig;
       piper::phonemize_codepoints(text, codepointsConfig, phonemes);
@@ -749,8 +743,7 @@ void textToAudio(PiperConfig &config, Voice &voice, std::string text,
   } else {
     // Use UTF-8 codepoints as "phonemes"
 #ifdef PIPER_CI_BUILD
-    CodepointsPhonemeConfig codepointsConfig;
-    phonemize_codepoints(text, codepointsConfig, phonemes);
+    phonemize_codepoints(text, phonemes);
 #else
     piper::CodepointsPhonemeConfig codepointsConfig;
     piper::phonemize_codepoints(text, codepointsConfig, phonemes);
