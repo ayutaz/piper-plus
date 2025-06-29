@@ -190,22 +190,51 @@ if(NOT DEFINED PIPER_PHONEMIZE_DIR)
   set(PIPER_PHONEMIZE_DIR "${CMAKE_CURRENT_BINARY_DIR}/pi")
   set(PIPER_PHONEMIZE_VERSION "2023.11.14-3")
   
-  # For Windows CI, use a simpler approach
   if(MSVC)
-    message(STATUS "Windows build detected - checking for CI environment")
-    if(DEFINED ENV{GITHUB_ACTIONS})
-      message(STATUS "GitHub Actions detected - skipping piper-phonemize build")
-      # Create minimal directories
-      file(MAKE_DIRECTORY "${PIPER_PHONEMIZE_DIR}/include")
-      file(MAKE_DIRECTORY "${PIPER_PHONEMIZE_DIR}/lib")
+    message(STATUS "Windows build detected")
+    
+    # Check if we should use pre-built binaries for CI
+    if(DEFINED ENV{GITHUB_ACTIONS} AND DEFINED ENV{USE_PREBUILT_PIPER_PHONEMIZE})
+      message(STATUS "CI build with pre-built piper-phonemize")
       
-      # Create a dummy target to satisfy dependencies
-      add_custom_target(piper_phonemize_external
-        COMMAND ${CMAKE_COMMAND} -E echo "Skipping piper-phonemize for Windows CI"
-      )
-    else()
-      message(STATUS "Non-CI Windows build - building piper-phonemize from source")
-      # Build from source with simpler configuration
+      # Download pre-built piper-phonemize
+      set(PIPER_PHONEMIZE_URL "https://github.com/rhasspy/piper-phonemize/releases/download/${PIPER_PHONEMIZE_VERSION}/piper-phonemize-windows-amd64.zip")
+      set(PIPER_PHONEMIZE_ZIP "${CMAKE_CURRENT_BINARY_DIR}/piper-phonemize-prebuilt.zip")
+      
+      if(NOT EXISTS "${PIPER_PHONEMIZE_ZIP}")
+        message(STATUS "Downloading pre-built piper-phonemize...")
+        file(DOWNLOAD
+          ${PIPER_PHONEMIZE_URL}
+          ${PIPER_PHONEMIZE_ZIP}
+          SHOW_PROGRESS
+          STATUS download_status
+        )
+        
+        list(GET download_status 0 status_code)
+        if(NOT status_code EQUAL 0)
+          message(WARNING "Failed to download pre-built piper-phonemize, falling back to source build")
+          set(BUILD_FROM_SOURCE ON)
+        else()
+          # Extract
+          file(MAKE_DIRECTORY ${PIPER_PHONEMIZE_DIR})
+          execute_process(
+            COMMAND ${CMAKE_COMMAND} -E tar xf "${PIPER_PHONEMIZE_ZIP}"
+            WORKING_DIRECTORY "${PIPER_PHONEMIZE_DIR}"
+          )
+        endif()
+      endif()
+      
+      if(NOT BUILD_FROM_SOURCE)
+        # Create dummy target
+        add_custom_target(piper_phonemize_external
+          COMMAND ${CMAKE_COMMAND} -E echo "Using pre-built piper-phonemize"
+        )
+      endif()
+    endif()
+    
+    # Build from source if not using pre-built
+    if(NOT TARGET piper_phonemize_external)
+      message(STATUS "Building piper-phonemize from source")
       ExternalProject_Add(
         piper_phonemize_external
         PREFIX "${CMAKE_CURRENT_BINARY_DIR}/p"
@@ -424,14 +453,50 @@ else()
   set(PIPER_EXTRA_LIBRARIES "pthread")
 endif()
 
-target_link_libraries(piper
-  fmt
-  spdlog
-  piper_phonemize
-  espeak-ng
-  onnxruntime
-  ${PIPER_EXTRA_LIBRARIES}
-)
+# Link libraries based on platform
+if(MSVC)
+  # Windows: Try to find libraries with different naming conventions
+  find_library(FMT_LIB NAMES fmt fmtd
+    PATHS ${FMT_DIR}/lib
+    NO_DEFAULT_PATH
+  )
+  find_library(SPDLOG_LIB NAMES spdlog spdlogd
+    PATHS ${SPDLOG_DIR}/lib
+    NO_DEFAULT_PATH
+  )
+  find_library(PIPER_PHONEMIZE_LIB NAMES piper_phonemize
+    PATHS ${PIPER_PHONEMIZE_DIR}/lib ${CMAKE_CURRENT_BINARY_DIR}/p/src/piper_phonemize_external-build/src
+    NO_DEFAULT_PATH
+  )
+  find_library(ESPEAK_NG_LIB NAMES espeak-ng
+    PATHS ${PIPER_PHONEMIZE_DIR}/lib ${CMAKE_CURRENT_BINARY_DIR}/p/src/piper_phonemize_external-build/_deps/espeak_ng-build/src
+    NO_DEFAULT_PATH
+  )
+  find_library(ONNXRUNTIME_LIB NAMES onnxruntime
+    PATHS ${PIPER_PHONEMIZE_DIR}/lib ${CMAKE_CURRENT_BINARY_DIR}/p/src/piper_phonemize_external-build/_deps/onnxruntime-src/lib ${ONNXRUNTIME_LIB_DIR}
+    NO_DEFAULT_PATH
+  )
+  
+  # Link found libraries or use defaults
+  target_link_libraries(piper
+    $<IF:$<BOOL:${FMT_LIB}>,${FMT_LIB},fmt>
+    $<IF:$<BOOL:${SPDLOG_LIB}>,${SPDLOG_LIB},spdlog>
+    $<IF:$<BOOL:${PIPER_PHONEMIZE_LIB}>,${PIPER_PHONEMIZE_LIB},piper_phonemize>
+    $<IF:$<BOOL:${ESPEAK_NG_LIB}>,${ESPEAK_NG_LIB},espeak-ng>
+    $<IF:$<BOOL:${ONNXRUNTIME_LIB}>,${ONNXRUNTIME_LIB},onnxruntime>
+    ${PIPER_EXTRA_LIBRARIES}
+  )
+else()
+  # Unix: Use standard library names
+  target_link_libraries(piper
+    fmt
+    spdlog
+    piper_phonemize
+    espeak-ng
+    onnxruntime
+    ${PIPER_EXTRA_LIBRARIES}
+  )
+endif()
 
 # Add static linking for Linux
 if(NOT WIN32 AND NOT APPLE)
@@ -445,10 +510,17 @@ add_dependencies(test_piper fmt_external spdlog_external piper_phonemize_externa
 
 # Link OpenJTalk and HTS_Engine libraries
 if(MSVC)
-  # Windows: Ensure dummy targets are built
+  # Windows: Ensure targets are built and link libraries
   add_dependencies(piper hts_engine_external openjtalk_external)
   add_dependencies(test_piper hts_engine_external openjtalk_external)
-  # No linking needed on Windows - we use binary execution
+  
+  # Windows uses .lib extension for static libraries
+  target_link_libraries(piper
+    ${HTS_ENGINE_DIR}/lib/HTSEngine.lib
+  )
+  target_link_libraries(test_piper
+    ${HTS_ENGINE_DIR}/lib/HTSEngine.lib
+  )
 elseif(NOT WIN32)
   # Unix platforms: Ensure libraries are built before linking
   add_dependencies(piper openjtalk_external hts_engine_external)
@@ -476,10 +548,22 @@ if(MSVC)
   target_link_directories(piper PUBLIC
     ${PIPER_PHONEMIZE_DIR}/lib
     ${CMAKE_CURRENT_BINARY_DIR}/pi/lib
+    ${CMAKE_CURRENT_BINARY_DIR}/p/src/piper_phonemize_external-build/src/Release
+    ${CMAKE_CURRENT_BINARY_DIR}/p/src/piper_phonemize_external-build/src/Debug
+    ${CMAKE_CURRENT_BINARY_DIR}/p/src/piper_phonemize_external-build/_deps/espeak_ng-build/src/Release
+    ${CMAKE_CURRENT_BINARY_DIR}/p/src/piper_phonemize_external-build/_deps/espeak_ng-build/src/Debug
+    ${CMAKE_CURRENT_BINARY_DIR}/p/src/piper_phonemize_external-build/_deps/onnxruntime-src/lib
+    ${ONNXRUNTIME_LIB_DIR}
   )
   target_link_directories(test_piper PUBLIC
     ${PIPER_PHONEMIZE_DIR}/lib
     ${CMAKE_CURRENT_BINARY_DIR}/pi/lib
+    ${CMAKE_CURRENT_BINARY_DIR}/p/src/piper_phonemize_external-build/src/Release
+    ${CMAKE_CURRENT_BINARY_DIR}/p/src/piper_phonemize_external-build/src/Debug
+    ${CMAKE_CURRENT_BINARY_DIR}/p/src/piper_phonemize_external-build/_deps/espeak_ng-build/src/Release
+    ${CMAKE_CURRENT_BINARY_DIR}/p/src/piper_phonemize_external-build/_deps/espeak_ng-build/src/Debug
+    ${CMAKE_CURRENT_BINARY_DIR}/p/src/piper_phonemize_external-build/_deps/onnxruntime-src/lib
+    ${ONNXRUNTIME_LIB_DIR}
   )
 endif()
 
@@ -550,14 +634,28 @@ target_link_directories(
   ${PIPER_PHONEMIZE_DIR}/lib
 )
 
-target_link_libraries(test_piper
-  fmt
-  spdlog
-  espeak-ng
-  piper_phonemize
-  onnxruntime
-  ${PIPER_EXTRA_LIBRARIES}
-)
+# Link libraries for test_piper based on platform
+if(MSVC)
+  # Windows: Use the same libraries as piper
+  target_link_libraries(test_piper
+    $<IF:$<BOOL:${FMT_LIB}>,${FMT_LIB},fmt>
+    $<IF:$<BOOL:${SPDLOG_LIB}>,${SPDLOG_LIB},spdlog>
+    $<IF:$<BOOL:${ESPEAK_NG_LIB}>,${ESPEAK_NG_LIB},espeak-ng>
+    $<IF:$<BOOL:${PIPER_PHONEMIZE_LIB}>,${PIPER_PHONEMIZE_LIB},piper_phonemize>
+    $<IF:$<BOOL:${ONNXRUNTIME_LIB}>,${ONNXRUNTIME_LIB},onnxruntime>
+    ${PIPER_EXTRA_LIBRARIES}
+  )
+else()
+  # Unix: Use standard library names
+  target_link_libraries(test_piper
+    fmt
+    spdlog
+    espeak-ng
+    piper_phonemize
+    onnxruntime
+    ${PIPER_EXTRA_LIBRARIES}
+  )
+endif()
 
 # OpenJTalk is used via binary execution for test_piper, not linked
 

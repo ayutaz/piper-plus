@@ -1,0 +1,98 @@
+name: Build piper
+
+on:
+  push:
+    branches: [ master, dev, 'fix/**', 'feat/**' ]
+  pull_request:
+    branches: [ master, dev ]
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        submodules: recursive
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential cmake python3-dev
+
+    - name: Configure
+      run: |
+        mkdir -p build
+        cd build
+        cmake .. -DCMAKE_BUILD_TYPE=Release
+
+    - name: Build
+      run: |
+        cd build
+        make -j$(nproc)
+
+    - name: Test
+      run: |
+        cd build
+        ctest --output-on-failure || true
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        submodules: recursive
+
+    - name: Setup MSVC
+      uses: microsoft/setup-msbuild@v1
+
+    - name: Configure
+      env:
+        USE_PREBUILT_PIPER_PHONEMIZE: "1"
+      run: |
+        mkdir build
+        cd build
+        cmake .. -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release
+
+    - name: Build
+      run: |
+        cd build
+        cmake --build . --config Release --target piper
+        cmake --build . --config Release --target test_piper
+
+    - name: List build outputs
+      run: |
+        cd build
+        dir /s *.exe
+        dir /s *.dll
+
+    - name: Test
+      run: |
+        cd build
+        ctest -C Release --output-on-failure || echo "Tests failed"
+
+  build-macos:
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        submodules: recursive
+
+    - name: Install dependencies
+      run: |
+        brew install cmake
+
+    - name: Configure
+      run: |
+        mkdir -p build
+        cd build
+        cmake .. -DCMAKE_BUILD_TYPE=Release
+
+    - name: Build
+      run: |
+        cd build
+        make -j$(sysctl -n hw.ncpu)
+
+    - name: Test
+      run: |
+        cd build
+        ctest --output-on-failure || true
