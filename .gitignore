@@ -24,3 +24,10 @@ lightning_logs/
 # Test artifacts
 test_japanese_tts.sh
 test_piper/
+test-build/
+
+# Build artifacts
+*.exe
+*.tar.gz
+hts_engine_API-*/
+home/

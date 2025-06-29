@@ -18,7 +18,8 @@ When building Piper on Windows:
 
 ```cmake
 # CMakeLists.txt attempts to download the binary
-set(OPENJTALK_WINDOWS_URL "https://github.com/ayutaz/piper-plus/releases/download/openjtalk-windows-latest/open_jtalk.exe")
+# This should be updated to point to your own repository
+set(OPENJTALK_WINDOWS_URL "https://github.com/YOUR_GITHUB_USERNAME/YOUR_REPO_NAME/releases/download/openjtalk-binaries-latest/open_jtalk_windows_x64.exe")
 
 # Downloads to: build/oj/bin/open_jtalk.exe
 ```
@@ -32,7 +33,7 @@ If automatic download fails, you can manually download the binary:
 .\scripts\download_openjtalk_windows.ps1
 
 # Or manually download from:
-# https://github.com/ayutaz/piper-plus/releases/download/openjtalk-windows-latest/open_jtalk.exe
+# https://github.com/YOUR_GITHUB_USERNAME/YOUR_REPO_NAME/releases/download/openjtalk-binaries-latest/open_jtalk_windows_x64.exe
 # Place in: build/oj/bin/open_jtalk.exe
 ```
 
