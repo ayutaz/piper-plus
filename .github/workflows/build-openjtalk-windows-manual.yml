@@ -1,29 +1,18 @@
-name: Build OpenJTalk for Windows
+name: Build OpenJTalk for Windows (Manual)
 
 on:
-  push:
-    branches: [master, dev]
-    paths:
-      - '.github/workflows/build-openjtalk-windows.yml'
-  pull_request:
-    branches: [master]
-    paths:
-      - '.github/workflows/build-openjtalk-windows.yml'
   workflow_dispatch:
     inputs:
-      create_release:
-        description: 'Create a release with the built binary'
+      upload_to_pr:
+        description: 'Upload binary as PR artifact (for testing)'
         required: false
         type: boolean
         default: true
-      release_tag:
-        description: 'Release tag name (default: openjtalk-windows-latest)'
+      pr_number:
+        description: 'PR number to comment on (optional)'
         required: false
         type: string
-        default: 'openjtalk-windows-latest'
-  schedule:
-    # Run monthly to ensure the binary is always available
-    - cron: '0 0 1 * *'
+        default: ''
 
 jobs:
   build-openjtalk:
@@ -107,32 +96,30 @@ jobs:
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
-        name: open_jtalk_win64
+        name: open_jtalk_windows_${{ github.run_number }}
         path: C:\msys64\tmp\open_jtalk.exe
-        retention-days: 90
+        retention-days: 7
         
-    - name: Create Release
-      if: |
-        (github.event_name == 'push' && github.ref == 'refs/heads/master') ||
-        (github.event_name == 'workflow_dispatch' && github.event.inputs.create_release == 'true')
-      uses: softprops/action-gh-release@v1
+    - name: Comment on PR
+      if: github.event.inputs.pr_number != ''
+      uses: actions/github-script@v7
       with:
-        tag_name: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.release_tag || 'openjtalk-windows-latest' }}
-        name: OpenJTalk Windows Binary (${{ github.event_name == 'workflow_dispatch' && github.event.inputs.release_tag || 'Latest' }})
-        body: |
-          Automated build of OpenJTalk for Windows (64-bit)
+        script: |
+          const artifactUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+          await github.rest.issues.createComment({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: ${{ github.event.inputs.pr_number }},
+            body: `🎉 OpenJTalk Windows binary has been built successfully!\n\n` +
+                  `📦 Download the artifact from: ${artifactUrl}\n\n` +
+                  `The binary will be available for 7 days as \`open_jtalk_windows_${context.runNumber}\`.`
+          });
           
-          Built with MinGW-w64 on MSYS2
-          - HTSEngine API 1.10
-          - OpenJTalk 1.11
-          - UTF-8 charset support
-          
-          This binary is automatically used by piper Windows builds.
-          
-          Build from: ${{ github.sha }}
-          Branch: ${{ github.ref_name }}
-          Triggered by: ${{ github.event_name }}
-        files: C:\msys64\tmp\open_jtalk.exe
-        token: ${{ secrets.GITHUB_TOKEN }}
-        prerelease: ${{ github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/master' }}
-        draft: false
+    - name: Display download instructions
+      run: |
+        echo "::notice::OpenJTalk Windows binary built successfully!"
+        echo "::notice::Download from the artifacts section of this workflow run."
+        echo "::notice::To use in your build:"
+        echo "::notice::1. Download the artifact"
+        echo "::notice::2. Place it in build/oj/bin/open_jtalk.exe"
+        echo "::notice::3. Run CMake configure again"
