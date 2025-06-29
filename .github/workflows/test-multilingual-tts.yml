@@ -481,7 +481,7 @@ jobs:
 
   summarize_results:
     name: Summarize Test Results
-    needs: [get_release_info, test_multilingual]
+    needs: [build_piper, test_multilingual]
     runs-on: ubuntu-latest
     if: always()
     steps:
