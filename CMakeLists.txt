@@ -743,33 +743,29 @@ if(MSVC)
   )
   
   # When using static libraries, only ONNX Runtime needs DLL
-  add_custom_command(TARGET piper POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E echo "Copying ONNX Runtime DLL if needed..."
+  if(ONNXRUNTIME_DLL)
+    add_custom_command(TARGET piper POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E echo "Copying ONNX Runtime DLL..."
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different ${ONNXRUNTIME_DLL} $<TARGET_FILE_DIR:piper>/onnxruntime.dll
+      COMMENT "Copying ONNX Runtime DLL for piper..."
+    )
     
-    # Only copy onnxruntime DLL if it exists
-    COMMAND ${CMAKE_COMMAND} -E $<IF:$<BOOL:${ONNXRUNTIME_DLL}>,copy_if_different,echo>
-      $<IF:$<BOOL:${ONNXRUNTIME_DLL}>,${ONNXRUNTIME_DLL},"ONNX Runtime DLL not found - using static library">
-      $<IF:$<BOOL:${ONNXRUNTIME_DLL}>,$<TARGET_FILE_DIR:piper>/onnxruntime.dll,"")
+    add_custom_command(TARGET test_piper POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E echo "Copying ONNX Runtime DLL for tests..."
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different ${ONNXRUNTIME_DLL} $<TARGET_FILE_DIR:test_piper>/onnxruntime.dll
+      COMMENT "Copying ONNX Runtime DLL for test_piper..."
+    )
+  else()
+    add_custom_command(TARGET piper POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E echo "ONNX Runtime DLL not found - using static library"
+      COMMENT "No DLL copying needed for piper..."
+    )
     
-    # List all files in the output directory for debugging
-    COMMAND ${CMAKE_COMMAND} -E echo "Files in output directory:"
-    COMMAND ${CMAKE_COMMAND} -E echo "$<TARGET_FILE_DIR:piper>"
-    COMMAND dir "$<TARGET_FILE_DIR:piper>"
-    
-    COMMENT "Copying required DLLs for Windows..."
-  )
-  
-  # Same for test_piper
-  add_custom_command(TARGET test_piper POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E echo "Copying ONNX Runtime DLL for tests if needed..."
-    
-    # Only copy onnxruntime DLL if it exists
-    COMMAND ${CMAKE_COMMAND} -E $<IF:$<BOOL:${ONNXRUNTIME_DLL}>,copy_if_different,echo>
-      $<IF:$<BOOL:${ONNXRUNTIME_DLL}>,${ONNXRUNTIME_DLL},"ONNX Runtime DLL not found - using static library">
-      $<IF:$<BOOL:${ONNXRUNTIME_DLL}>,$<TARGET_FILE_DIR:test_piper>/onnxruntime.dll,"">
-    
-    COMMENT "Copying required DLLs for test_piper..."
-  )
+    add_custom_command(TARGET test_piper POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E echo "ONNX Runtime DLL not found - using static library"
+      COMMENT "No DLL copying needed for test_piper..."
+    )
+  endif()
 endif()
 
 # ---- Declare install targets ----
