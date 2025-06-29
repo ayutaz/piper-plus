@@ -1,5 +1,10 @@
 cmake_minimum_required(VERSION 3.13)
 
+# Set policy for DOWNLOAD_EXTRACT_TIMESTAMP to avoid warnings
+if(POLICY CMP0135)
+  cmake_policy(SET CMP0135 NEW)
+endif()
+
 project(piper C CXX)
 
 file(READ "${CMAKE_CURRENT_LIST_DIR}/VERSION" piper_version)
