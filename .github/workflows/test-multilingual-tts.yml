@@ -117,6 +117,8 @@ jobs:
           path: |
             build/piper*
             build/test_piper*
+            build/Release/
+            build/Debug/
             build/**/*.exe
             build/**/*.dll
             build/**/*.so*
@@ -604,7 +606,7 @@ jobs:
           if [ -f "piper/bin/piper" ]; then
             ls -la piper/bin/piper
             echo "Testing if piper can run:"
-            if $PIPER_CMD --version 2>&1; then
+            if $PIPER_CMD --help >/dev/null 2>&1; then
               echo "✓ Piper binary is executable"
             else
               echo "✗ Piper binary failed to run. Exit code: $?"
