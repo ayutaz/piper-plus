@@ -564,15 +564,19 @@ if(MSVC)
     COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/Debug"
     
     # Copy ONNX Runtime DLL if found
-    COMMAND if defined ONNXRUNTIME_DLL if exist "${ONNXRUNTIME_DLL}" (
+    COMMAND if exist "${ONNXRUNTIME_DLL}" (
       ${CMAKE_COMMAND} -E copy_if_different
         "${ONNXRUNTIME_DLL}"
         "${CMAKE_CURRENT_BINARY_DIR}/Release/onnxruntime.dll"
+    ) else (
+      ${CMAKE_COMMAND} -E echo "ONNX Runtime DLL not found for Release"
     )
-    COMMAND if defined ONNXRUNTIME_DLL if exist "${ONNXRUNTIME_DLL}" (
+    COMMAND if exist "${ONNXRUNTIME_DLL}" (
       ${CMAKE_COMMAND} -E copy_if_different
         "${ONNXRUNTIME_DLL}"
         "${CMAKE_CURRENT_BINARY_DIR}/Debug/onnxruntime.dll"
+    ) else (
+      ${CMAKE_COMMAND} -E echo "ONNX Runtime DLL not found for Debug"
     )
     
     # Copy ONNX Runtime providers shared library if exists
@@ -623,7 +627,7 @@ if(MSVC)
     COMMAND ${CMAKE_COMMAND} -E echo "Copying required DLLs to output directory..."
     
     # Copy onnxruntime DLL if available
-    COMMAND if defined ONNXRUNTIME_DLL if exist "${ONNXRUNTIME_DLL}" (
+    COMMAND if exist "${ONNXRUNTIME_DLL}" (
       ${CMAKE_COMMAND} -E copy_if_different
         "${ONNXRUNTIME_DLL}"
         "$<TARGET_FILE_DIR:piper>/onnxruntime.dll"
@@ -667,7 +671,7 @@ if(MSVC)
     COMMAND ${CMAKE_COMMAND} -E echo "Copying required DLLs to test output directory..."
     
     # Copy onnxruntime DLL if available
-    COMMAND if defined ONNXRUNTIME_DLL if exist "${ONNXRUNTIME_DLL}" (
+    COMMAND if exist "${ONNXRUNTIME_DLL}" (
       ${CMAKE_COMMAND} -E copy_if_different
         "${ONNXRUNTIME_DLL}"
         "$<TARGET_FILE_DIR:test_piper>/onnxruntime.dll"
