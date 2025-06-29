@@ -15,11 +15,7 @@
 #include <piper-phonemize/phonemize.hpp>
 #include <piper-phonemize/tashkeel.hpp>
 #else
-// CI build stubs
-namespace piper {
-    using PhonemeId = int;
-    using Phoneme = char32_t;
-}
+// CI build stubs - defined before the main piper namespace
 namespace tashkeel {
     struct State {};
 }
@@ -30,6 +26,12 @@ namespace tashkeel {
 using json = nlohmann::json;
 
 namespace piper {
+
+#ifdef PIPER_CI_BUILD
+// Define types for CI build
+using PhonemeId = int;
+using Phoneme = char32_t;
+#endif
 
 typedef int64_t SpeakerId;
 
