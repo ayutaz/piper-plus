@@ -189,7 +189,7 @@ if(NOT DEFINED PIPER_PHONEMIZE_DIR)
       PREFIX "${CMAKE_CURRENT_BINARY_DIR}/p"
       URL "https://github.com/rhasspy/piper-phonemize/archive/refs/tags/${PIPER_PHONEMIZE_VERSION}.zip"
       CMAKE_ARGS -DCMAKE_INSTALL_PREFIX:PATH=${PIPER_PHONEMIZE_DIR}
-      CMAKE_ARGS -DBUILD_SHARED_LIBS:BOOL=ON  # Still need DLLs for dependencies
+      CMAKE_ARGS -DBUILD_SHARED_LIBS:BOOL=OFF  # Use static libraries to avoid DLL issues
       CMAKE_ARGS -DPIPER_PHONEMIZE_BUILD_TESTS:BOOL=OFF
       CMAKE_ARGS -DPIPER_PHONEMIZE_BUILD_PROGRAMS:BOOL=OFF
       CMAKE_ARGS -DONNXRUNTIME_ROOTDIR:PATH=${PIPER_PHONEMIZE_DIR}
@@ -574,28 +574,15 @@ if(MSVC)
     COMMENT "Copying DLLs to Release and Debug directories..."
   )
   
-  # Find all DLLs that need to be copied with piper.exe
-  # This includes onnxruntime.dll, espeak-ng.dll, piper_phonemize.dll, etc.
+  # When using static libraries, only ONNX Runtime needs DLL
   add_custom_command(TARGET piper POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E echo "Copying required DLLs to output directory..."
+    COMMAND ${CMAKE_COMMAND} -E echo "Copying ONNX Runtime DLL if needed..."
     
     # Copy onnxruntime DLL if available
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
       "${ONNXRUNTIME_DLL}"
       "$<TARGET_FILE_DIR:piper>/onnxruntime.dll"
-      || ${CMAKE_COMMAND} -E echo "Warning: ONNX Runtime DLL not available"
-    
-    # Copy espeak-ng DLL
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-      "${PIPER_PHONEMIZE_DIR}/lib/espeak-ng.dll"
-      "$<TARGET_FILE_DIR:piper>/espeak-ng.dll"
-      || ${CMAKE_COMMAND} -E echo "Warning: espeak-ng.dll not found"
-    
-    # Copy piper_phonemize DLL
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-      "${PIPER_PHONEMIZE_DIR}/lib/piper_phonemize.dll"
-      "$<TARGET_FILE_DIR:piper>/piper_phonemize.dll"
-      || ${CMAKE_COMMAND} -E echo "Warning: piper_phonemize.dll not found"
+      || ${CMAKE_COMMAND} -E echo "Note: ONNX Runtime DLL will be copied if found"
     
     # Copy fmt and spdlog DLLs if they exist (usually static, but just in case)
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
@@ -618,25 +605,13 @@ if(MSVC)
   
   # Same for test_piper
   add_custom_command(TARGET test_piper POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E echo "Copying required DLLs to test output directory..."
+    COMMAND ${CMAKE_COMMAND} -E echo "Copying ONNX Runtime DLL for tests..."
     
     # Copy onnxruntime DLL if available
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
       "${ONNXRUNTIME_DLL}"
       "$<TARGET_FILE_DIR:test_piper>/onnxruntime.dll"
-      || ${CMAKE_COMMAND} -E echo "Warning: ONNX Runtime DLL not available for test_piper"
-    
-    # Copy espeak-ng DLL
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-      "${PIPER_PHONEMIZE_DIR}/lib/espeak-ng.dll"
-      "$<TARGET_FILE_DIR:test_piper>/espeak-ng.dll"
-      || ${CMAKE_COMMAND} -E echo "Warning: espeak-ng.dll not found"
-    
-    # Copy piper_phonemize DLL
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-      "${PIPER_PHONEMIZE_DIR}/lib/piper_phonemize.dll"
-      "$<TARGET_FILE_DIR:test_piper>/piper_phonemize.dll"
-      || ${CMAKE_COMMAND} -E echo "Warning: piper_phonemize.dll not found"
+      || ${CMAKE_COMMAND} -E echo "Note: ONNX Runtime DLL will be copied if found"
     
     # Copy fmt and spdlog DLLs if they exist (usually static, but just in case)
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
