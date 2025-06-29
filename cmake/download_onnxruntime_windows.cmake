@@ -38,10 +38,16 @@ if(MSVC)
   set(ONNXRUNTIME_EXTRACT_DIR "${ONNXRUNTIME_DOWNLOAD_DIR}/extracted")
   if(NOT EXISTS "${ONNXRUNTIME_EXTRACT_DIR}")
     message(STATUS "Extracting ONNX Runtime...")
-    file(ARCHIVE_EXTRACT
-      INPUT ${ONNXRUNTIME_ZIP}
-      DESTINATION ${ONNXRUNTIME_EXTRACT_DIR}
+    file(MAKE_DIRECTORY ${ONNXRUNTIME_EXTRACT_DIR})
+    # Use execute_process for compatibility with older CMake versions
+    execute_process(
+      COMMAND ${CMAKE_COMMAND} -E tar xf ${ONNXRUNTIME_ZIP}
+      WORKING_DIRECTORY ${ONNXRUNTIME_EXTRACT_DIR}
+      RESULT_VARIABLE extract_result
     )
+    if(NOT extract_result EQUAL 0)
+      message(FATAL_ERROR "Failed to extract ONNX Runtime")
+    endif()
   endif()
   
   # Find the extracted directory (it has version in the name)
