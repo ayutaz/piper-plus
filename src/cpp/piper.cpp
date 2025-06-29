@@ -147,15 +147,13 @@ void phonemes_to_ids(const std::vector<Phoneme> &phonemes,
     }
 }
 
-namespace tashkeel {
-    void tashkeel_load(const std::string &modelPath, State &state) {
-        // Stub for CI build
-    }
-    
-    std::string tashkeel_run(const std::string &text, State &state) {
-        // Stub for CI build - return text unchanged
-        return text;
-    }
+void tashkeel_load(const std::string &modelPath, tashkeel::State &state) {
+    // Stub for CI build
+}
+
+std::string tashkeel_run(const std::string &text, tashkeel::State &state) {
+    // Stub for CI build - return text unchanged
+    return text;
 }
 
 // Stub for OpenJTalk when not available
@@ -603,8 +601,16 @@ void synthesize(std::vector<PhonemeId> &phonemeIds,
 
   std::vector<Ort::Value> inputTensors;
   std::vector<int64_t> phonemeIdsShape{1, (int64_t)phonemeIds.size()};
+  
+  // Convert PhonemeId vector to int64_t vector for ONNX Runtime
+  std::vector<int64_t> phonemeIds64;
+  phonemeIds64.reserve(phonemeIds.size());
+  for (const auto& id : phonemeIds) {
+    phonemeIds64.push_back(static_cast<int64_t>(id));
+  }
+  
   inputTensors.push_back(Ort::Value::CreateTensor<int64_t>(
-      memoryInfo, phonemeIds.data(), phonemeIds.size(), phonemeIdsShape.data(),
+      memoryInfo, phonemeIds64.data(), phonemeIds64.size(), phonemeIdsShape.data(),
       phonemeIdsShape.size()));
 
   std::vector<int64_t> phomemeIdLengthsShape{(int64_t)phonemeIdLengths.size()};
@@ -716,6 +722,7 @@ void textToAudio(PiperConfig &config, Voice &voice, std::string text,
 #ifndef PIPER_CI_BUILD
     text = tashkeel::tashkeel_run(text, *config.tashkeelState);
 #else
+    text = tashkeel_run(text, *config.tashkeelState);
     spdlog::debug("Tashkeel diacritization disabled in CI build");
 #endif
   }

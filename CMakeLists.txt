@@ -579,6 +579,11 @@ if(MSVC)
     ${OPENJTALK_DIR}/include
     ${HTS_ENGINE_DIR}/include
   )
+  # Add ONNX Runtime include directory for Windows
+  if(ONNXRUNTIME_INCLUDE_DIR)
+    target_include_directories(piper PUBLIC ${ONNXRUNTIME_INCLUDE_DIR})
+    target_include_directories(test_piper PUBLIC ${ONNXRUNTIME_INCLUDE_DIR})
+  endif()
   target_include_directories(test_piper PUBLIC
     ${OPENJTALK_DIR}/include
     ${HTS_ENGINE_DIR}/include
