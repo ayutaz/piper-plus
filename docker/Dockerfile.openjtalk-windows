@@ -1,0 +1,44 @@
+# Dockerfile for building OpenJTalk Windows binary using MinGW cross-compiler
+FROM ubuntu:22.04
+
+RUN apt-get update && apt-get install -y \
+    mingw-w64 \
+    build-essential \
+    curl \
+    tar \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /build
+
+# Build HTSEngine for Windows
+RUN curl -L -o hts.tar.gz "https://downloads.sourceforge.net/project/hts-engine/hts_engine%20API/hts_engine_API-1.10/hts_engine_API-1.10.tar.gz" && \
+    tar xzf hts.tar.gz && \
+    cd hts_engine_API-1.10 && \
+    ./configure --host=x86_64-w64-mingw32 --prefix=/usr/x86_64-w64-mingw32 --enable-static --disable-shared && \
+    make -j$(nproc) && \
+    make install
+
+# Build OpenJTalk for Windows (without mecab-dict-index which causes issues)
+RUN curl -L -o ojt.tar.gz "https://downloads.sourceforge.net/project/open-jtalk/Open%20JTalk/open_jtalk-1.11/open_jtalk-1.11.tar.gz" && \
+    tar xzf ojt.tar.gz && \
+    cd open_jtalk-1.11 && \
+    ./configure --host=x86_64-w64-mingw32 --prefix=/usr/x86_64-w64-mingw32 --with-charset=UTF-8 \
+        --with-hts-engine-header-path=/usr/x86_64-w64-mingw32/include \
+        --with-hts-engine-library-path=/usr/x86_64-w64-mingw32/lib && \
+    # Try to build just the binary, not the tools
+    make -C njd && \
+    make -C jpcommon && \
+    make -C text2mecab && \
+    make -C mecab/src libmecab.a && \
+    make -C mecab2njd && \
+    make -C njd_set_pronunciation && \
+    make -C njd_set_digit && \
+    make -C njd_set_accent_phrase && \
+    make -C njd_set_accent_type && \
+    make -C njd_set_unvoiced_vowel && \
+    make -C njd_set_long_vowel && \
+    make -C njd2jpcommon && \
+    make -C bin && \
+    cp bin/open_jtalk.exe /build/
+
+CMD ["cp", "/build/open_jtalk.exe", "/output/"]
