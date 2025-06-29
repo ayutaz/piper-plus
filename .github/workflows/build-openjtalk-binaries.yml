@@ -32,6 +32,10 @@ jobs:
         docker build -f docker/Dockerfile.openjtalk-windows -t openjtalk-windows .
         docker run -v $PWD:/output openjtalk-windows
         ls -la open_jtalk.exe || echo "Binary not found, checking docker build..."
+        # Ensure the binary is in the current directory
+        if [ -f /output/open_jtalk.exe ]; then
+          cp /output/open_jtalk.exe ./open_jtalk.exe
+        fi
         
     - name: Alternative - Cross-compile on Linux
       if: failure()
@@ -67,20 +71,36 @@ jobs:
         
         # Check if binary was created
         if [ -f bin/open_jtalk.exe ]; then
-          cp bin/open_jtalk.exe /tmp/
+          cp bin/open_jtalk.exe $GITHUB_WORKSPACE/open_jtalk.exe
+          echo "Copied open_jtalk.exe to workspace root"
         else
           echo "Binary not in bin/, checking other locations..."
           find . -name "open_jtalk.exe" -type f
+          # Try to find and copy any open_jtalk.exe found
+          if [ -f "$(find . -name 'open_jtalk.exe' -type f | head -1)" ]; then
+            cp "$(find . -name 'open_jtalk.exe' -type f | head -1)" $GITHUB_WORKSPACE/open_jtalk.exe
+          fi
         fi
         
+        
+    - name: Prepare Windows binary for upload
+      run: |
+        # Ensure we have a consistent location for the binary
+        if [ -f open_jtalk.exe ]; then
+          echo "Found open_jtalk.exe in current directory"
+        elif [ -f /tmp/open_jtalk.exe ]; then
+          echo "Found open_jtalk.exe in /tmp, copying to current directory"
+          cp /tmp/open_jtalk.exe ./open_jtalk.exe
+        else
+          echo "Warning: open_jtalk.exe not found in expected locations"
+          find / -name "open_jtalk.exe" -type f 2>/dev/null || true
+        fi
         
     - name: Upload Windows artifact
       uses: actions/upload-artifact@v4
       with:
         name: open_jtalk_windows_x64
-        path: |
-          open_jtalk.exe
-          /tmp/open_jtalk.exe
+        path: open_jtalk.exe
         if-no-files-found: warn
         retention-days: 90
 
@@ -270,9 +290,24 @@ jobs:
     - name: Prepare release files
       run: |
         mkdir release
-        # Copy available artifacts
+        # Debug: show artifact structure
+        echo "Artifact structure:"
+        find artifacts -type f -name "*.exe" -o -name "open_jtalk" | head -20
+        
+        # Copy available artifacts - handle different possible locations
         if [ -f artifacts/open_jtalk_windows_x64/open_jtalk.exe ]; then
           cp artifacts/open_jtalk_windows_x64/open_jtalk.exe release/open_jtalk_windows_x64.exe
+        elif [ -f artifacts/open_jtalk_windows_x64/tmp/open_jtalk.exe ]; then
+          cp artifacts/open_jtalk_windows_x64/tmp/open_jtalk.exe release/open_jtalk_windows_x64.exe
+        else
+          # Find any .exe file in the Windows artifact directory
+          WIN_EXE=$(find artifacts/open_jtalk_windows_x64 -name "*.exe" -type f | head -1)
+          if [ -n "$WIN_EXE" ]; then
+            echo "Found Windows binary at: $WIN_EXE"
+            cp "$WIN_EXE" release/open_jtalk_windows_x64.exe
+          else
+            echo "Warning: Windows binary not found in artifact"
+          fi
         fi
         if [ -f artifacts/open_jtalk_macos_x64/open_jtalk ]; then
           cp artifacts/open_jtalk_macos_x64/open_jtalk release/open_jtalk_macos_x64
