@@ -83,38 +83,48 @@ jobs:
           CI: true
           ESPEAK_DATA_PATH: ${{ github.workspace }}/build/ei/share/espeak-ng-data
 
-  # リリース情報を事前に取得してキャッシュ
-  get_release_info:
-    name: Get Release Information
-    runs-on: ubuntu-latest
-    outputs:
-      linux_asset_url: ${{ steps.get_urls.outputs.linux_url }}
-      macos_x64_asset_url: ${{ steps.get_urls.outputs.macos_x64_url }}
-      macos_aarch64_asset_url: ${{ steps.get_urls.outputs.macos_aarch64_url }}
+  # Build piper before running tests
+  build_piper:
+    name: Build piper on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
-      - name: Get release asset URLs
-        id: get_urls
+      - uses: actions/checkout@v4.2.2
+      
+      - name: Setup MSVC Developer Command Prompt
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+      
+      - name: Build piper
+        shell: bash
         run: |
-          # Get release information once
-          RELEASES_JSON=$(curl -s -H "Accept: application/vnd.github.v3+json" \
-            https://api.github.com/repos/${{ github.repository }}/releases)
-          
-          # Extract URLs
-          LINUX_URL=$(echo "$RELEASES_JSON" | jq -r '.[0].assets[] | select(.name | contains("piper_linux_amd64")) | .browser_download_url' | head -1)
-          MACOS_X64_URL=$(echo "$RELEASES_JSON" | jq -r '.[0].assets[] | select(.name | contains("piper_macos_x64")) | .browser_download_url' | head -1)
-          MACOS_AARCH64_URL=$(echo "$RELEASES_JSON" | jq -r '.[0].assets[] | select(.name | contains("piper_macos_aarch64")) | .browser_download_url' | head -1)
-          
-          echo "linux_url=$LINUX_URL" >> $GITHUB_OUTPUT
-          echo "macos_x64_url=$MACOS_X64_URL" >> $GITHUB_OUTPUT
-          echo "macos_aarch64_url=$MACOS_AARCH64_URL" >> $GITHUB_OUTPUT
-          
-          echo "Linux URL: $LINUX_URL"
-          echo "macOS x64 URL: $MACOS_X64_URL"
-          echo "macOS aarch64 URL: $MACOS_AARCH64_URL"
+          mkdir -p build
+          cd build
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            cmake .. -G "Visual Studio 17 2022" -A x64
+            cmake --build . --config Release --parallel
+          else
+            cmake ..
+            make -j$(nproc 2>/dev/null || sysctl -n hw.ncpu)
+          fi
+      
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: piper-build-${{ matrix.os }}
+          path: |
+            build/piper*
+            build/test_piper*
+            build/**/*.exe
+            build/oj/bin/
+            build/ei/share/
+          retention-days: 1
 
   test_multilingual:
     name: Test ${{ matrix.language }} on ${{ matrix.os }}
-    needs: get_release_info
+    needs: build_piper
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -182,120 +192,57 @@ jobs:
           echo "MATRIX_LANGUAGE=${{ matrix.language }}" >> $GITHUB_ENV
           echo "MATRIX_MODEL=${{ matrix.model }}" >> $GITHUB_ENV
 
-      - name: Download latest release binaries
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: piper-build-${{ matrix.os }}
+          path: build/
+      
+      - name: Setup piper from build
         shell: bash
         run: |
           # Create directories
-          mkdir -p piper test/models
+          mkdir -p piper/bin test/models
           
-          # Download the appropriate binary based on OS
-          if [ "${{ runner.os }}" = "Linux" ]; then
-            # Use pre-fetched URL
-            ASSET_URL="${{ needs.get_release_info.outputs.linux_asset_url }}"
-            
-            if [ -z "$ASSET_URL" ]; then
-              echo "No Linux binary found in releases"
-              exit 1
-            fi
-            
-            echo "Downloading Linux binary from: $ASSET_URL"
-            curl -L -o piper.tar.gz "$ASSET_URL"
-            tar -xzf piper.tar.gz
-            rm piper.tar.gz
-            
-          elif [ "${{ runner.os }}" = "macOS" ]; then
-            # Determine architecture
-            ARCH="x64"
-            if [[ "$(uname -m)" == "arm64" ]]; then
-              ARCH="aarch64"
-            fi
-            
-            # Use pre-fetched URL based on architecture
-            if [ "$ARCH" = "x64" ]; then
-              ASSET_URL="${{ needs.get_release_info.outputs.macos_x64_asset_url }}"
+          # Copy built binaries
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            if [ -f build/Release/piper.exe ]; then
+              cp build/Release/piper.exe piper/bin/
+            elif [ -f build/piper.exe ]; then
+              cp build/piper.exe piper/bin/
             else
-              ASSET_URL="${{ needs.get_release_info.outputs.macos_aarch64_asset_url }}"
-            fi
-            
-            if [ -z "$ASSET_URL" ]; then
-              echo "No macOS binary found for architecture: $ARCH"
+              echo "ERROR: piper.exe not found in build artifacts"
+              find build -name "*.exe" -type f
               exit 1
             fi
-            
-            echo "Downloading macOS binary from: $ASSET_URL"
-            curl -L -o piper.tar.gz "$ASSET_URL"
-            tar -xzf piper.tar.gz
-            rm piper.tar.gz
-            
-          elif [ "${{ runner.os }}" = "Windows" ]; then
-            # For Windows, we need to build from source with static linking
-            echo "Windows: Building from source with static linking..."
-            # This will be handled in a separate build step
-            
+          else
+            if [ -f build/piper ]; then
+              cp build/piper piper/bin/
+              chmod +x piper/bin/piper
+            else
+              echo "ERROR: piper binary not found in build artifacts"
+              find build -name "piper" -type f
+              exit 1
+            fi
           fi
           
-          # Make binary executable (skip on Windows build)
-          if [ "${{ runner.os }}" != "Windows" ]; then
-            chmod +x piper/bin/piper
-            
-            # Verify binary and libraries
-            ls -la piper/bin/
-            ls -la piper/lib/ || echo "No lib directory found"
+          # Copy OpenJTalk binary if available
+          if [ -d build/oj/bin ]; then
+            cp -r build/oj/bin/* piper/bin/ || true
           fi
+          
+          # Copy share directory for espeak-ng data
+          if [ -d build/ei/share ]; then
+            mkdir -p piper/share
+            cp -r build/ei/share/* piper/share/
+          fi
+          
+          # List contents
+          echo "=== piper/bin contents ==="
+          ls -la piper/bin/
+          echo "=== piper/share contents ==="
+          ls -la piper/share/ || echo "No share directory"
 
-      - name: Setup MSVC Developer Command Prompt
-        if: runner.os == 'Windows'
-        uses: ilammy/msvc-dev-cmd@v1
-      
-      - name: Build piper on Windows
-        if: runner.os == 'Windows'
-        shell: cmd
-        run: |
-          mkdir build
-          cd build
-          cmake .. -G "Visual Studio 17 2022" -A x64 -DCMAKE_INSTALL_PREFIX="%CD%\_install\piper"
-          cmake --build . --config Release --parallel --target piper
-          cmake --build . --config Release --parallel --target test_piper
-          cmake --install . --config Release
-          
-          REM Create expected directory structure
-          mkdir ..\piper\bin
-          if exist _install\piper\bin\piper.exe (
-            echo Found piper.exe in _install directory
-            echo Copying from _install\piper to ..\piper
-            dir _install\piper
-            xcopy /E /I /Y _install\piper ..\piper\
-            echo Copy complete
-          ) else if exist Release\piper.exe (
-            copy Release\piper.exe ..\piper\bin\
-          ) else (
-            echo ERROR: piper.exe not found
-            dir /s *.exe
-            exit /b 1
-          )
-          
-          REM Copy required files from build directory (if not already copied)
-          if not exist ..\piper\share (
-            if exist pi\share (
-              xcopy /E /I pi\share ..\piper\share
-            ) else if exist ei\share (
-              xcopy /E /I ei\share ..\piper\share
-            ) else (
-              echo WARNING: share directory not found
-            )
-          )
-          
-          REM Download OpenJTalk binary for Windows
-          cd ..
-          powershell -ExecutionPolicy Bypass -File download_openjtalk_windows.ps1 -TargetDir piper\bin
-          
-          REM List the contents to verify
-          echo === Contents of piper\bin ===
-          dir piper\bin\
-          echo === Contents of piper\lib (if exists) ===
-          if exist piper\lib dir piper\lib\
-          echo === Contents of piper\share ===
-          dir piper\share\
 
       - name: Cache voice models
         uses: actions/cache@v4.2.0
