@@ -539,9 +539,6 @@ target_link_libraries(test_piper
 
 # ---- Post-build steps for Windows DLL handling ----
 if(MSVC)
-  # Find or download ONNX Runtime for Windows
-  include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/find_onnxruntime_windows.cmake)
-  
   # Create a custom target to handle DLL copying after all external projects are built
   add_custom_target(copy_dlls ALL
     DEPENDS piper test_piper piper_phonemize_external
