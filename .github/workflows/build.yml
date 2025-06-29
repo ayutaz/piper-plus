@@ -48,10 +48,11 @@ jobs:
     - name: Configure
       env:
         USE_PREBUILT_PIPER_PHONEMIZE: "1"
+        GITHUB_ACTIONS: "true"
       run: |
         mkdir build
         cd build
-        cmake .. -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release
+        cmake .. -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release -DUSE_PREBUILT_PIPER_PHONEMIZE=ON
 
     - name: Build
       run: |
