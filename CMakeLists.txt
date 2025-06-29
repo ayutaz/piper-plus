@@ -746,22 +746,10 @@ if(MSVC)
   add_custom_command(TARGET piper POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E echo "Copying ONNX Runtime DLL if needed..."
     
-    # Copy onnxruntime DLL if available
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-      "${ONNXRUNTIME_DLL}"
-      "$<TARGET_FILE_DIR:piper>/onnxruntime.dll"
-      || ${CMAKE_COMMAND} -E echo "Note: ONNX Runtime DLL will be copied if found"
-    
-    # Copy fmt and spdlog DLLs if they exist (usually static, but just in case)
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-      "${FMT_DIR}/lib/fmt.dll"
-      "$<TARGET_FILE_DIR:piper>/fmt.dll"
-      || ${CMAKE_COMMAND} -E echo "Note: fmt.dll not found (likely static)"
-    
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-      "${SPDLOG_DIR}/lib/spdlog.dll"
-      "$<TARGET_FILE_DIR:piper>/spdlog.dll"
-      || ${CMAKE_COMMAND} -E echo "Note: spdlog.dll not found (likely static)"
+    # Only copy onnxruntime DLL if it exists
+    COMMAND ${CMAKE_COMMAND} -E $<IF:$<BOOL:${ONNXRUNTIME_DLL}>,copy_if_different,echo>
+      $<IF:$<BOOL:${ONNXRUNTIME_DLL}>,${ONNXRUNTIME_DLL},"ONNX Runtime DLL not found - using static library">
+      $<IF:$<BOOL:${ONNXRUNTIME_DLL}>,$<TARGET_FILE_DIR:piper>/onnxruntime.dll,"")
     
     # List all files in the output directory for debugging
     COMMAND ${CMAKE_COMMAND} -E echo "Files in output directory:"
@@ -773,24 +761,12 @@ if(MSVC)
   
   # Same for test_piper
   add_custom_command(TARGET test_piper POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E echo "Copying ONNX Runtime DLL for tests..."
+    COMMAND ${CMAKE_COMMAND} -E echo "Copying ONNX Runtime DLL for tests if needed..."
     
-    # Copy onnxruntime DLL if available
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-      "${ONNXRUNTIME_DLL}"
-      "$<TARGET_FILE_DIR:test_piper>/onnxruntime.dll"
-      || ${CMAKE_COMMAND} -E echo "Note: ONNX Runtime DLL will be copied if found"
-    
-    # Copy fmt and spdlog DLLs if they exist (usually static, but just in case)
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-      "${FMT_DIR}/lib/fmt.dll"
-      "$<TARGET_FILE_DIR:test_piper>/fmt.dll"
-      || ${CMAKE_COMMAND} -E echo "Note: fmt.dll not found (likely static)"
-    
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-      "${SPDLOG_DIR}/lib/spdlog.dll"
-      "$<TARGET_FILE_DIR:test_piper>/spdlog.dll"
-      || ${CMAKE_COMMAND} -E echo "Note: spdlog.dll not found (likely static)"
+    # Only copy onnxruntime DLL if it exists
+    COMMAND ${CMAKE_COMMAND} -E $<IF:$<BOOL:${ONNXRUNTIME_DLL}>,copy_if_different,echo>
+      $<IF:$<BOOL:${ONNXRUNTIME_DLL}>,${ONNXRUNTIME_DLL},"ONNX Runtime DLL not found - using static library">
+      $<IF:$<BOOL:${ONNXRUNTIME_DLL}>,$<TARGET_FILE_DIR:test_piper>/onnxruntime.dll,"">
     
     COMMENT "Copying required DLLs for test_piper..."
   )
