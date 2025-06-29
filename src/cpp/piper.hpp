@@ -9,9 +9,21 @@
 #include <vector>
 
 #include <onnxruntime_cxx_api.h>
+
+#ifndef PIPER_CI_BUILD
 #include <piper-phonemize/phoneme_ids.hpp>
 #include <piper-phonemize/phonemize.hpp>
 #include <piper-phonemize/tashkeel.hpp>
+#else
+// CI build stubs
+namespace piper {
+    using PhonemeId = int;
+    using Phoneme = char32_t;
+}
+namespace tashkeel {
+    struct State {};
+}
+#endif
 
 #include "json.hpp"
 

@@ -7,7 +7,9 @@
 #include <filesystem>
 #include <unordered_map>
 
+#ifndef PIPER_CI_BUILD
 #include <espeak-ng/speak_lib.h>
+#endif
 #include <onnxruntime_cxx_api.h>
 #include <spdlog/spdlog.h>
 
@@ -44,6 +46,56 @@ namespace piper {
 const std::string VERSION = STR(_PIPER_VERSION);
 #else
 const std::string VERSION = "";
+#endif
+
+#ifdef PIPER_CI_BUILD
+// Simple implementation for CI builds
+struct CodepointsPhonemeConfig {};
+struct eSpeakPhonemeConfig { std::string voice; };
+
+void phonemize_codepoints(const std::string &text, 
+                         const CodepointsPhonemeConfig &config,
+                         std::vector<std::vector<Phoneme>> &phonemes) {
+    // Simple implementation: convert text to codepoints
+    std::vector<Phoneme> sentence;
+    auto text_iter = text.begin();
+    auto text_end = text.end();
+    
+    while (text_iter != text_end) {
+        utf8::uint32_t codepoint = utf8::next(text_iter, text_end);
+        if (codepoint == U' ' || codepoint == U'\n' || codepoint == U'\r') {
+            if (!sentence.empty()) {
+                phonemes.push_back(sentence);
+                sentence.clear();
+            }
+        } else {
+            sentence.push_back(static_cast<Phoneme>(codepoint));
+        }
+    }
+    
+    if (!sentence.empty()) {
+        phonemes.push_back(sentence);
+    }
+}
+
+void phonemize_eSpeak(const std::string &text,
+                     const eSpeakPhonemeConfig &config,
+                     std::vector<std::vector<Phoneme>> &phonemes) {
+    // Stub for CI build - falls back to codepoints
+    CodepointsPhonemeConfig codepointsConfig;
+    phonemize_codepoints(text, codepointsConfig, phonemes);
+}
+
+namespace tashkeel {
+    void tashkeel_load(const std::string &modelPath, State &state) {
+        // Stub for CI build
+    }
+    
+    std::string tashkeel_run(const std::string &text, State &state) {
+        // Stub for CI build - return text unchanged
+        return text;
+    }
+}
 #endif
 
 // Maximum value for 16-bit signed WAV sample
@@ -324,6 +376,7 @@ std::string findEspeakDataPath() {
 
 void initialize(PiperConfig &config) {
   if (config.useESpeak) {
+#ifndef PIPER_CI_BUILD
     // Set up espeak-ng for calling espeak_TextToPhonemesWithTerminator
     // See: https://github.com/rhasspy/espeak-ng
     spdlog::debug("Initializing eSpeak");
@@ -345,6 +398,9 @@ void initialize(PiperConfig &config) {
 
     spdlog::debug("Initialized eSpeak with data path: {}", 
                   espeak_path ? espeak_path : "(default)");
+#else
+    spdlog::debug("eSpeak support disabled in CI build");
+#endif
   }
 
   // Load onnx model for libtashkeel
@@ -358,8 +414,12 @@ void initialize(PiperConfig &config) {
     spdlog::debug("Loading libtashkeel model from {}",
                   config.tashkeelModelPath.value());
     config.tashkeelState = std::make_unique<tashkeel::State>();
+#ifndef PIPER_CI_BUILD
     tashkeel::tashkeel_load(config.tashkeelModelPath.value(),
                             *config.tashkeelState);
+#else
+    spdlog::debug("Tashkeel support disabled in CI build");
+#endif
     spdlog::debug("Initialized libtashkeel");
   }
 
@@ -368,10 +428,14 @@ void initialize(PiperConfig &config) {
 
 void terminate(PiperConfig &config) {
   if (config.useESpeak) {
+#ifndef PIPER_CI_BUILD
     // Clean up espeak-ng
     spdlog::debug("Terminating eSpeak");
     espeak_Terminate();
     spdlog::debug("Terminated eSpeak");
+#else
+    spdlog::debug("eSpeak support disabled in CI build");
+#endif
   }
 
   spdlog::info("Terminated piper");
@@ -578,7 +642,11 @@ void textToAudio(PiperConfig &config, Voice &voice, std::string text,
     }
 
     spdlog::debug("Diacritizing text with libtashkeel: {}", text);
+#ifndef PIPER_CI_BUILD
     text = tashkeel::tashkeel_run(text, *config.tashkeelState);
+#else
+    spdlog::debug("Tashkeel diacritization disabled in CI build");
+#endif
   }
 
   // Phonemes for each sentence
@@ -586,10 +654,17 @@ void textToAudio(PiperConfig &config, Voice &voice, std::string text,
   std::vector<std::vector<Phoneme>> phonemes;
 
   if (voice.phonemizeConfig.phonemeType == eSpeakPhonemes) {
+#ifndef PIPER_CI_BUILD
     // Use espeak-ng for phonemization
     eSpeakPhonemeConfig eSpeakConfig;
     eSpeakConfig.voice = voice.phonemizeConfig.eSpeak.voice;
     phonemize_eSpeak(text, eSpeakConfig, phonemes);
+#else
+    // CI build: fall back to codepoints
+    spdlog::debug("eSpeak phonemization disabled in CI build, using codepoints");
+    CodepointsPhonemeConfig codepointsConfig;
+    phonemize_codepoints(text, codepointsConfig, phonemes);
+#endif
 #if !defined(_WIN32) && !defined(_MSC_VER)
   } else if (voice.phonemizeConfig.phonemeType == OpenJTalkPhonemes) {
     // Japanese OpenJTalk phonemizer

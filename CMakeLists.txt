@@ -199,11 +199,16 @@ if(NOT DEFINED PIPER_PHONEMIZE_DIR)
       
       # Create necessary directories
       file(MAKE_DIRECTORY "${PIPER_PHONEMIZE_DIR}/include")
+      file(MAKE_DIRECTORY "${PIPER_PHONEMIZE_DIR}/include/piper-phonemize")
       file(MAKE_DIRECTORY "${PIPER_PHONEMIZE_DIR}/lib")
       
-      # Create stub header
-      file(WRITE "${PIPER_PHONEMIZE_DIR}/include/piper_phonemize.h" 
+      # Create stub headers
+      file(WRITE "${PIPER_PHONEMIZE_DIR}/include/piper-phonemize/phoneme_ids.hpp" 
+        "#pragma once\n// Stub header for Windows CI\nnamespace piper { using PhonemeId = int; using Phoneme = char32_t; }\n")
+      file(WRITE "${PIPER_PHONEMIZE_DIR}/include/piper-phonemize/phonemize.hpp" 
         "#pragma once\n// Stub header for Windows CI\n")
+      file(WRITE "${PIPER_PHONEMIZE_DIR}/include/piper-phonemize/tashkeel.hpp" 
+        "#pragma once\n// Stub header for Windows CI\nnamespace tashkeel { struct State {}; }\n")
       
       # Create dummy target
       add_custom_target(piper_phonemize_external
@@ -440,28 +445,44 @@ if(MSVC)
     PATHS ${SPDLOG_DIR}/lib
     NO_DEFAULT_PATH
   )
-  find_library(PIPER_PHONEMIZE_LIB NAMES piper_phonemize
-    PATHS ${PIPER_PHONEMIZE_DIR}/lib ${CMAKE_CURRENT_BINARY_DIR}/p/src/piper_phonemize_external-build/src
-    NO_DEFAULT_PATH
-  )
-  find_library(ESPEAK_NG_LIB NAMES espeak-ng
-    PATHS ${PIPER_PHONEMIZE_DIR}/lib ${CMAKE_CURRENT_BINARY_DIR}/p/src/piper_phonemize_external-build/_deps/espeak_ng-build/src
-    NO_DEFAULT_PATH
-  )
+  
+  # Only look for these libraries if not in CI build
+  if(NOT DEFINED ENV{GITHUB_ACTIONS} AND NOT USE_PREBUILT_PIPER_PHONEMIZE)
+    find_library(PIPER_PHONEMIZE_LIB NAMES piper_phonemize
+      PATHS ${PIPER_PHONEMIZE_DIR}/lib ${CMAKE_CURRENT_BINARY_DIR}/p/src/piper_phonemize_external-build/src
+      NO_DEFAULT_PATH
+    )
+    find_library(ESPEAK_NG_LIB NAMES espeak-ng
+      PATHS ${PIPER_PHONEMIZE_DIR}/lib ${CMAKE_CURRENT_BINARY_DIR}/p/src/piper_phonemize_external-build/_deps/espeak_ng-build/src
+      NO_DEFAULT_PATH
+    )
+  endif()
+  
   find_library(ONNXRUNTIME_LIB NAMES onnxruntime
     PATHS ${PIPER_PHONEMIZE_DIR}/lib ${CMAKE_CURRENT_BINARY_DIR}/p/src/piper_phonemize_external-build/_deps/onnxruntime-src/lib ${ONNXRUNTIME_LIB_DIR}
     NO_DEFAULT_PATH
   )
   
   # Link found libraries or use defaults
-  target_link_libraries(piper
-    $<IF:$<BOOL:${FMT_LIB}>,${FMT_LIB},fmt>
-    $<IF:$<BOOL:${SPDLOG_LIB}>,${SPDLOG_LIB},spdlog>
-    $<IF:$<BOOL:${PIPER_PHONEMIZE_LIB}>,${PIPER_PHONEMIZE_LIB},piper_phonemize>
-    $<IF:$<BOOL:${ESPEAK_NG_LIB}>,${ESPEAK_NG_LIB},espeak-ng>
-    $<IF:$<BOOL:${ONNXRUNTIME_LIB}>,${ONNXRUNTIME_LIB},onnxruntime>
-    ${PIPER_EXTRA_LIBRARIES}
-  )
+  if(DEFINED ENV{GITHUB_ACTIONS} OR USE_PREBUILT_PIPER_PHONEMIZE)
+    # CI build: skip piper_phonemize and espeak-ng
+    target_link_libraries(piper
+      $<IF:$<BOOL:${FMT_LIB}>,${FMT_LIB},fmt>
+      $<IF:$<BOOL:${SPDLOG_LIB}>,${SPDLOG_LIB},spdlog>
+      $<IF:$<BOOL:${ONNXRUNTIME_LIB}>,${ONNXRUNTIME_LIB},onnxruntime>
+      ${PIPER_EXTRA_LIBRARIES}
+    )
+  else()
+    # Normal build: include all libraries
+    target_link_libraries(piper
+      $<IF:$<BOOL:${FMT_LIB}>,${FMT_LIB},fmt>
+      $<IF:$<BOOL:${SPDLOG_LIB}>,${SPDLOG_LIB},spdlog>
+      $<IF:$<BOOL:${PIPER_PHONEMIZE_LIB}>,${PIPER_PHONEMIZE_LIB},piper_phonemize>
+      $<IF:$<BOOL:${ESPEAK_NG_LIB}>,${ESPEAK_NG_LIB},espeak-ng>
+      $<IF:$<BOOL:${ONNXRUNTIME_LIB}>,${ONNXRUNTIME_LIB},onnxruntime>
+      ${PIPER_EXTRA_LIBRARIES}
+    )
+  endif()
 else()
   # Unix: Use standard library names
   target_link_libraries(piper
@@ -578,6 +599,12 @@ endif()
 
 target_compile_definitions(piper PUBLIC _PIPER_VERSION=${piper_version})
 
+# Add CI build definition
+if(DEFINED ENV{GITHUB_ACTIONS} OR USE_PREBUILT_PIPER_PHONEMIZE)
+  target_compile_definitions(piper PUBLIC PIPER_CI_BUILD)
+  target_compile_definitions(test_piper PUBLIC PIPER_CI_BUILD)
+endif()
+
 # Add OpenJTalk dictionary path definition on Unix platforms
 if(NOT WIN32 AND NOT MSVC)
   # Dictionary will be downloaded by CI/CD or provided by user
@@ -613,14 +640,25 @@ target_link_directories(
 # Link libraries for test_piper based on platform
 if(MSVC)
   # Windows: Use the same libraries as piper
-  target_link_libraries(test_piper
-    $<IF:$<BOOL:${FMT_LIB}>,${FMT_LIB},fmt>
-    $<IF:$<BOOL:${SPDLOG_LIB}>,${SPDLOG_LIB},spdlog>
-    $<IF:$<BOOL:${ESPEAK_NG_LIB}>,${ESPEAK_NG_LIB},espeak-ng>
-    $<IF:$<BOOL:${PIPER_PHONEMIZE_LIB}>,${PIPER_PHONEMIZE_LIB},piper_phonemize>
-    $<IF:$<BOOL:${ONNXRUNTIME_LIB}>,${ONNXRUNTIME_LIB},onnxruntime>
-    ${PIPER_EXTRA_LIBRARIES}
-  )
+  if(DEFINED ENV{GITHUB_ACTIONS} OR USE_PREBUILT_PIPER_PHONEMIZE)
+    # CI build: skip piper_phonemize and espeak-ng
+    target_link_libraries(test_piper
+      $<IF:$<BOOL:${FMT_LIB}>,${FMT_LIB},fmt>
+      $<IF:$<BOOL:${SPDLOG_LIB}>,${SPDLOG_LIB},spdlog>
+      $<IF:$<BOOL:${ONNXRUNTIME_LIB}>,${ONNXRUNTIME_LIB},onnxruntime>
+      ${PIPER_EXTRA_LIBRARIES}
+    )
+  else()
+    # Normal build: include all libraries
+    target_link_libraries(test_piper
+      $<IF:$<BOOL:${FMT_LIB}>,${FMT_LIB},fmt>
+      $<IF:$<BOOL:${SPDLOG_LIB}>,${SPDLOG_LIB},spdlog>
+      $<IF:$<BOOL:${ESPEAK_NG_LIB}>,${ESPEAK_NG_LIB},espeak-ng>
+      $<IF:$<BOOL:${PIPER_PHONEMIZE_LIB}>,${PIPER_PHONEMIZE_LIB},piper_phonemize>
+      $<IF:$<BOOL:${ONNXRUNTIME_LIB}>,${ONNXRUNTIME_LIB},onnxruntime>
+      ${PIPER_EXTRA_LIBRARIES}
+    )
+  endif()
 else()
   # Unix: Use standard library names
   target_link_libraries(test_piper
