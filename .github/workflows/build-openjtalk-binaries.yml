@@ -2,13 +2,9 @@ name: Build OpenJTalk Binaries
 
 on:
   push:
-    branches: [master, dev]
-    paths:
-      - '.github/workflows/build-openjtalk-binaries.yml'
+    branches: [master, dev, fix/windows-dll-and-openjtalk-support]
   pull_request:
     branches: [master]
-    paths:
-      - '.github/workflows/build-openjtalk-binaries.yml'
   workflow_dispatch:
     inputs:
       create_release:
@@ -44,24 +40,60 @@ jobs:
     - name: Build HTSEngine
       shell: msys2 {0}
       run: |
+        set -e
         cd /tmp
-        curl -L -o hts_engine_API-1.10.tar.gz https://downloads.sourceforge.net/project/hts-engine/hts_engine%20API/hts_engine_API-1.10/hts_engine_API-1.10.tar.gz
+        echo "Downloading HTSEngine..."
+        # Try multiple times with different methods
+        for i in {1..3}; do
+          echo "Attempt $i..."
+          if curl -L -f -o hts_engine_API-1.10.tar.gz "https://downloads.sourceforge.net/project/hts-engine/hts_engine%20API/hts_engine_API-1.10/hts_engine_API-1.10.tar.gz"; then
+            echo "Download successful"
+            break
+          fi
+          echo "Download failed, retrying in 5 seconds..."
+          sleep 5
+        done
+        
+        if [ ! -f hts_engine_API-1.10.tar.gz ]; then
+          echo "Failed to download HTSEngine after 3 attempts"
+          exit 1
+        fi
+        
         tar xzf hts_engine_API-1.10.tar.gz
         cd hts_engine_API-1.10
         
-        ./configure --prefix=/mingw64
+        ./configure --prefix=/mingw64 --enable-static --disable-shared
         make -j$(nproc)
         make install
         
     - name: Build OpenJTalk
       shell: msys2 {0}
       run: |
+        set -e
         cd /tmp
-        curl -L -o open_jtalk-1.11.tar.gz https://downloads.sourceforge.net/project/open-jtalk/Open%20JTalk/open_jtalk-1.11/open_jtalk-1.11.tar.gz
+        echo "Downloading OpenJTalk..."
+        # Try multiple times
+        for i in {1..3}; do
+          echo "Attempt $i..."
+          if curl -L -f -o open_jtalk-1.11.tar.gz "https://downloads.sourceforge.net/project/open-jtalk/Open%20JTalk/open_jtalk-1.11/open_jtalk-1.11.tar.gz"; then
+            echo "Download successful"
+            break
+          fi
+          echo "Download failed, retrying in 5 seconds..."
+          sleep 5
+        done
+        
+        if [ ! -f open_jtalk-1.11.tar.gz ]; then
+          echo "Failed to download OpenJTalk after 3 attempts"
+          exit 1
+        fi
+        
         tar xzf open_jtalk-1.11.tar.gz
         cd open_jtalk-1.11
         
-        ./configure --prefix=/mingw64 --with-charset=UTF-8
+        export CPPFLAGS="-I/mingw64/include"
+        export LDFLAGS="-L/mingw64/lib"
+        ./configure --prefix=/mingw64 --with-charset=UTF-8 --with-hts-engine-header-path=/mingw64/include --with-hts-engine-library-path=/mingw64/lib
         make -j$(nproc)
         
         cp open_jtalk.exe /tmp/
@@ -83,23 +115,57 @@ jobs:
         
     - name: Build HTSEngine
       run: |
+        set -e
         cd /tmp
-        curl -L -o hts_engine_API-1.10.tar.gz https://downloads.sourceforge.net/project/hts-engine/hts_engine%20API/hts_engine_API-1.10/hts_engine_API-1.10.tar.gz
+        echo "Downloading HTSEngine..."
+        for i in {1..3}; do
+          echo "Attempt $i..."
+          if curl -L -f -o hts_engine_API-1.10.tar.gz "https://downloads.sourceforge.net/project/hts-engine/hts_engine%20API/hts_engine_API-1.10/hts_engine_API-1.10.tar.gz"; then
+            echo "Download successful"
+            break
+          fi
+          echo "Download failed, retrying in 5 seconds..."
+          sleep 5
+        done
+        
+        if [ ! -f hts_engine_API-1.10.tar.gz ]; then
+          echo "Failed to download HTSEngine after 3 attempts"
+          exit 1
+        fi
+        
         tar xzf hts_engine_API-1.10.tar.gz
         cd hts_engine_API-1.10
         
-        ./configure --prefix=/usr/local
+        ./configure --prefix=/usr/local --enable-static --disable-shared
         make -j$(sysctl -n hw.ncpu)
         sudo make install
         
     - name: Build OpenJTalk
       run: |
+        set -e
         cd /tmp
-        curl -L -o open_jtalk-1.11.tar.gz https://downloads.sourceforge.net/project/open-jtalk/Open%20JTalk/open_jtalk-1.11/open_jtalk-1.11.tar.gz
+        echo "Downloading OpenJTalk..."
+        for i in {1..3}; do
+          echo "Attempt $i..."
+          if curl -L -f -o open_jtalk-1.11.tar.gz "https://downloads.sourceforge.net/project/open-jtalk/Open%20JTalk/open_jtalk-1.11/open_jtalk-1.11.tar.gz"; then
+            echo "Download successful"
+            break
+          fi
+          echo "Download failed, retrying in 5 seconds..."
+          sleep 5
+        done
+        
+        if [ ! -f open_jtalk-1.11.tar.gz ]; then
+          echo "Failed to download OpenJTalk after 3 attempts"
+          exit 1
+        fi
+        
         tar xzf open_jtalk-1.11.tar.gz
         cd open_jtalk-1.11
         
-        ./configure --prefix=/usr/local --with-charset=UTF-8
+        export CPPFLAGS="-I/usr/local/include"
+        export LDFLAGS="-L/usr/local/lib"
+        ./configure --prefix=/usr/local --with-charset=UTF-8 --with-hts-engine-header-path=/usr/local/include --with-hts-engine-library-path=/usr/local/lib
         make -j$(sysctl -n hw.ncpu)
         
         cp open_jtalk /tmp/
@@ -120,27 +186,61 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y build-essential wget
+        sudo apt-get install -y build-essential curl
         
     - name: Build HTSEngine
       run: |
+        set -e
         cd /tmp
-        curl -L -o hts_engine_API-1.10.tar.gz https://downloads.sourceforge.net/project/hts-engine/hts_engine%20API/hts_engine_API-1.10/hts_engine_API-1.10.tar.gz
+        echo "Downloading HTSEngine..."
+        for i in {1..3}; do
+          echo "Attempt $i..."
+          if curl -L -f -o hts_engine_API-1.10.tar.gz "https://downloads.sourceforge.net/project/hts-engine/hts_engine%20API/hts_engine_API-1.10/hts_engine_API-1.10.tar.gz"; then
+            echo "Download successful"
+            break
+          fi
+          echo "Download failed, retrying in 5 seconds..."
+          sleep 5
+        done
+        
+        if [ ! -f hts_engine_API-1.10.tar.gz ]; then
+          echo "Failed to download HTSEngine after 3 attempts"
+          exit 1
+        fi
+        
         tar xzf hts_engine_API-1.10.tar.gz
         cd hts_engine_API-1.10
         
-        ./configure --prefix=/usr/local
+        ./configure --prefix=/usr/local --enable-static --disable-shared
         make -j$(nproc)
         sudo make install
         
     - name: Build OpenJTalk
       run: |
+        set -e
         cd /tmp
-        curl -L -o open_jtalk-1.11.tar.gz https://downloads.sourceforge.net/project/open-jtalk/Open%20JTalk/open_jtalk-1.11/open_jtalk-1.11.tar.gz
+        echo "Downloading OpenJTalk..."
+        for i in {1..3}; do
+          echo "Attempt $i..."
+          if curl -L -f -o open_jtalk-1.11.tar.gz "https://downloads.sourceforge.net/project/open-jtalk/Open%20JTalk/open_jtalk-1.11/open_jtalk-1.11.tar.gz"; then
+            echo "Download successful"
+            break
+          fi
+          echo "Download failed, retrying in 5 seconds..."
+          sleep 5
+        done
+        
+        if [ ! -f open_jtalk-1.11.tar.gz ]; then
+          echo "Failed to download OpenJTalk after 3 attempts"
+          exit 1
+        fi
+        
         tar xzf open_jtalk-1.11.tar.gz
         cd open_jtalk-1.11
         
-        ./configure --prefix=/usr/local --with-charset=UTF-8
+        export CPPFLAGS="-I/usr/local/include"
+        export LDFLAGS="-L/usr/local/lib"
+        ./configure --prefix=/usr/local --with-charset=UTF-8 --with-hts-engine-header-path=/usr/local/include --with-hts-engine-library-path=/usr/local/lib
         make -j$(nproc)
         
         cp open_jtalk /tmp/
