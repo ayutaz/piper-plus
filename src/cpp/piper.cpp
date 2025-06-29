@@ -9,6 +9,9 @@
 
 #ifndef PIPER_CI_BUILD
 #include <espeak-ng/speak_lib.h>
+#include <piper-phonemize/phoneme_ids.hpp>
+#include <piper-phonemize/phonemize.hpp>
+#include <piper-phonemize/tashkeel.hpp>
 #endif
 #include <onnxruntime_cxx_api.h>
 #include <spdlog/spdlog.h>
@@ -53,6 +56,16 @@ const std::string VERSION = "";
 struct CodepointsPhonemeConfig {};
 struct eSpeakPhonemeConfig { std::string voice; };
 
+// Phoneme to ID mapping configuration
+using PhonemeIdMap = std::map<Phoneme, std::vector<PhonemeId>>;
+struct PhonemeIdConfig {
+    std::shared_ptr<PhonemeIdMap> phonemeIdMap;
+    PhonemeId idPad = 0;
+    PhonemeId idBos = 1;
+    PhonemeId idEos = 2;
+    bool interspersePad = true;
+};
+
 void phonemize_codepoints(const std::string &text, 
                          const CodepointsPhonemeConfig &config,
                          std::vector<std::vector<Phoneme>> &phonemes) {
@@ -84,6 +97,57 @@ void phonemize_eSpeak(const std::string &text,
     // Stub for CI build - falls back to codepoints
     CodepointsPhonemeConfig codepointsConfig;
     phonemize_codepoints(text, codepointsConfig, phonemes);
+}
+
+void phonemes_to_ids(const std::vector<Phoneme> &phonemes,
+                    const PhonemeIdConfig &config,
+                    std::vector<PhonemeId> &phonemeIds,
+                    std::map<Phoneme, std::size_t> &missingPhonemes) {
+    // Simple mapping for CI build
+    phonemeIds.clear();
+    
+    // Add BOS
+    if (config.idBos >= 0) {
+        phonemeIds.push_back(config.idBos);
+    }
+    
+    // Convert phonemes to IDs
+    for (const auto &phoneme : phonemes) {
+        if (config.phonemeIdMap) {
+            auto it = config.phonemeIdMap->find(phoneme);
+            if (it != config.phonemeIdMap->end() && !it->second.empty()) {
+                // Use first ID from the mapped list
+                phonemeIds.push_back(it->second[0]);
+                
+                // Add padding if needed
+                if (config.interspersePad && config.idPad >= 0) {
+                    phonemeIds.push_back(config.idPad);
+                }
+            } else {
+                // Phoneme not found - track it
+                missingPhonemes[phoneme]++;
+            }
+        } else {
+            // No mapping - use phoneme directly as ID
+            phonemeIds.push_back(static_cast<PhonemeId>(phoneme));
+            
+            // Add padding if needed
+            if (config.interspersePad && config.idPad >= 0) {
+                phonemeIds.push_back(config.idPad);
+            }
+        }
+    }
+    
+    // Remove trailing pad if present
+    if (config.interspersePad && config.idPad >= 0 && !phonemeIds.empty() && 
+        phonemeIds.back() == config.idPad) {
+        phonemeIds.pop_back();
+    }
+    
+    // Add EOS
+    if (config.idEos >= 0) {
+        phonemeIds.push_back(config.idEos);
+    }
 }
 
 namespace tashkeel {
@@ -654,16 +718,16 @@ void textToAudio(PiperConfig &config, Voice &voice, std::string text,
   std::vector<std::vector<Phoneme>> phonemes;
 
   if (voice.phonemizeConfig.phonemeType == eSpeakPhonemes) {
-#ifndef PIPER_CI_BUILD
-    // Use espeak-ng for phonemization
-    eSpeakPhonemeConfig eSpeakConfig;
-    eSpeakConfig.voice = voice.phonemizeConfig.eSpeak.voice;
-    phonemize_eSpeak(text, eSpeakConfig, phonemes);
-#else
+#ifdef PIPER_CI_BUILD
     // CI build: fall back to codepoints
     spdlog::debug("eSpeak phonemization disabled in CI build, using codepoints");
     CodepointsPhonemeConfig codepointsConfig;
     phonemize_codepoints(text, codepointsConfig, phonemes);
+#else
+    // Use espeak-ng for phonemization
+    piper::eSpeakPhonemeConfig eSpeakConfig;
+    eSpeakConfig.voice = voice.phonemizeConfig.eSpeak.voice;
+    piper::phonemize_eSpeak(text, eSpeakConfig, phonemes);
 #endif
 #if !defined(_WIN32) && !defined(_MSC_VER)
   } else if (voice.phonemizeConfig.phonemeType == OpenJTalkPhonemes) {
@@ -673,14 +737,24 @@ void textToAudio(PiperConfig &config, Voice &voice, std::string text,
     // If OpenJTalk failed, fall back to codepoints to prevent crash
     if (phonemes.empty()) {
       spdlog::warn("OpenJTalk returned empty phonemes, falling back to codepoints");
+#ifdef PIPER_CI_BUILD
       CodepointsPhonemeConfig codepointsConfig;
       phonemize_codepoints(text, codepointsConfig, phonemes);
+#else
+      piper::CodepointsPhonemeConfig codepointsConfig;
+      piper::phonemize_codepoints(text, codepointsConfig, phonemes);
+#endif
     }
 #endif
   } else {
     // Use UTF-8 codepoints as "phonemes"
+#ifdef PIPER_CI_BUILD
     CodepointsPhonemeConfig codepointsConfig;
     phonemize_codepoints(text, codepointsConfig, phonemes);
+#else
+    piper::CodepointsPhonemeConfig codepointsConfig;
+    piper::phonemize_codepoints(text, codepointsConfig, phonemes);
+#endif
   }
 
   // Synthesize each sentence independently.
@@ -711,10 +785,17 @@ void textToAudio(PiperConfig &config, Voice &voice, std::string text,
     std::vector<size_t> phraseSilenceSamples;
 
     // Use phoneme/id map from config
+#ifdef PIPER_CI_BUILD
     PhonemeIdConfig idConfig;
     idConfig.phonemeIdMap =
         std::make_shared<PhonemeIdMap>(voice.phonemizeConfig.phonemeIdMap);
     idConfig.interspersePad = voice.phonemizeConfig.interspersePad;
+#else
+    piper::PhonemeIdConfig idConfig;
+    idConfig.phonemeIdMap =
+        std::make_shared<piper::PhonemeIdMap>(voice.phonemizeConfig.phonemeIdMap);
+    idConfig.interspersePad = voice.phonemizeConfig.interspersePad;
+#endif
 
     if (voice.synthesisConfig.phonemeSilenceSeconds) {
       // Split into phrases
@@ -763,8 +844,13 @@ void textToAudio(PiperConfig &config, Voice &voice, std::string text,
       }
 
       // phonemes -> ids
+#ifdef PIPER_CI_BUILD
       phonemes_to_ids(*(phrasePhonemes[phraseIdx]), idConfig, phonemeIds,
                       missingPhonemes);
+#else
+      piper::phonemes_to_ids(*(phrasePhonemes[phraseIdx]), idConfig, phonemeIds,
+                            missingPhonemes);
+#endif
       if (spdlog::should_log(spdlog::level::debug)) {
         // DEBUG log for phoneme ids
         std::stringstream phonemeIdsStr;

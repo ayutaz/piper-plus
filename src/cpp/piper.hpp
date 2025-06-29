@@ -31,6 +31,10 @@ namespace piper {
 // Define types for CI build
 using PhonemeId = int;
 using Phoneme = char32_t;
+#else
+// Use types from piper-phonemize
+using PhonemeId = piper::PhonemeId;
+using Phoneme = piper::Phoneme;
 #endif
 
 typedef int64_t SpeakerId;
