@@ -25,8 +25,8 @@ Write-Host "Downloading OpenJTalk binary..." -ForegroundColor Cyan
 
 # Alternative download sources (update these with actual URLs when available)
 $downloadUrls = @(
-    # Primary URL (will work after PR is merged to ayutaz/piper-plus)
-    "https://github.com/ayutaz/piper-plus/releases/download/openjtalk-windows-latest/open_jtalk.exe",
+    # Primary URL from unified binary release
+    "https://github.com/ayutaz/piper-plus/releases/download/openjtalk-binaries-latest/open_jtalk_windows_x64.exe",
     
     # Alternative: Build from source using MSYS2
     # Instructions will be added in WINDOWS_OPENJTALK.md

@@ -1,0 +1,212 @@
+name: Build OpenJTalk Binaries
+
+on:
+  push:
+    branches: [master, dev]
+    paths:
+      - '.github/workflows/build-openjtalk-binaries.yml'
+  pull_request:
+    branches: [master]
+    paths:
+      - '.github/workflows/build-openjtalk-binaries.yml'
+  workflow_dispatch:
+    inputs:
+      create_release:
+        description: 'Create a release with the built binaries'
+        required: false
+        type: boolean
+        default: true
+      release_tag:
+        description: 'Release tag name'
+        required: false
+        type: string
+        default: 'openjtalk-binaries-latest'
+
+jobs:
+  build-windows:
+    name: Build OpenJTalk for Windows
+    runs-on: windows-latest
+    
+    steps:
+    - name: Setup MSYS2
+      uses: msys2/setup-msys2@v2
+      with:
+        msystem: MINGW64
+        update: true
+        install: >-
+          mingw-w64-x86_64-gcc
+          mingw-w64-x86_64-cmake
+          mingw-w64-x86_64-make
+          make
+          wget
+          tar
+          
+    - name: Build HTSEngine
+      shell: msys2 {0}
+      run: |
+        cd /tmp
+        wget https://downloads.sourceforge.net/project/hts-engine/hts_engine%20API/hts_engine_API-1.10/hts_engine_API-1.10.tar.gz
+        tar xzf hts_engine_API-1.10.tar.gz
+        cd hts_engine_API-1.10
+        
+        ./configure --prefix=/mingw64
+        make -j$(nproc)
+        make install
+        
+    - name: Build OpenJTalk
+      shell: msys2 {0}
+      run: |
+        cd /tmp
+        wget https://downloads.sourceforge.net/project/open-jtalk/Open%20JTalk/open_jtalk-1.11/open_jtalk-1.11.tar.gz
+        tar xzf open_jtalk-1.11.tar.gz
+        cd open_jtalk-1.11
+        
+        ./configure --prefix=/mingw64 --with-charset=UTF-8
+        make -j$(nproc)
+        
+        cp open_jtalk.exe /tmp/
+        strip /tmp/open_jtalk.exe
+        
+    - name: Upload Windows artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: open_jtalk_windows_x64
+        path: C:\msys64\tmp\open_jtalk.exe
+        retention-days: 90
+
+  build-macos:
+    name: Build OpenJTalk for macOS
+    runs-on: macos-latest
+    
+    steps:
+    - name: Install dependencies
+      run: |
+        brew install wget
+        
+    - name: Build HTSEngine
+      run: |
+        cd /tmp
+        wget https://downloads.sourceforge.net/project/hts-engine/hts_engine%20API/hts_engine_API-1.10/hts_engine_API-1.10.tar.gz
+        tar xzf hts_engine_API-1.10.tar.gz
+        cd hts_engine_API-1.10
+        
+        ./configure --prefix=/usr/local
+        make -j$(sysctl -n hw.ncpu)
+        sudo make install
+        
+    - name: Build OpenJTalk
+      run: |
+        cd /tmp
+        wget https://downloads.sourceforge.net/project/open-jtalk/Open%20JTalk/open_jtalk-1.11/open_jtalk-1.11.tar.gz
+        tar xzf open_jtalk-1.11.tar.gz
+        cd open_jtalk-1.11
+        
+        ./configure --prefix=/usr/local --with-charset=UTF-8
+        make -j$(sysctl -n hw.ncpu)
+        
+        cp open_jtalk /tmp/
+        strip /tmp/open_jtalk
+        
+    - name: Upload macOS artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: open_jtalk_macos_x64
+        path: /tmp/open_jtalk
+        retention-days: 90
+
+  build-linux:
+    name: Build OpenJTalk for Linux
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential wget
+        
+    - name: Build HTSEngine
+      run: |
+        cd /tmp
+        wget https://downloads.sourceforge.net/project/hts-engine/hts_engine%20API/hts_engine_API-1.10/hts_engine_API-1.10.tar.gz
+        tar xzf hts_engine_API-1.10.tar.gz
+        cd hts_engine_API-1.10
+        
+        ./configure --prefix=/usr/local
+        make -j$(nproc)
+        sudo make install
+        
+    - name: Build OpenJTalk
+      run: |
+        cd /tmp
+        wget https://downloads.sourceforge.net/project/open-jtalk/Open%20JTalk/open_jtalk-1.11/open_jtalk-1.11.tar.gz
+        tar xzf open_jtalk-1.11.tar.gz
+        cd open_jtalk-1.11
+        
+        ./configure --prefix=/usr/local --with-charset=UTF-8
+        make -j$(nproc)
+        
+        cp open_jtalk /tmp/
+        strip /tmp/open_jtalk
+        
+    - name: Upload Linux artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: open_jtalk_linux_x64
+        path: /tmp/open_jtalk
+        retention-days: 90
+
+  create-release:
+    name: Create Release
+    needs: [build-windows, build-macos, build-linux]
+    runs-on: ubuntu-latest
+    if: |
+      (github.event_name == 'push' && github.ref == 'refs/heads/master') ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.create_release == 'true')
+    
+    steps:
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: artifacts
+        
+    - name: Prepare release files
+      run: |
+        mkdir release
+        cp artifacts/open_jtalk_windows_x64/open_jtalk.exe release/open_jtalk_windows_x64.exe
+        cp artifacts/open_jtalk_macos_x64/open_jtalk release/open_jtalk_macos_x64
+        cp artifacts/open_jtalk_linux_x64/open_jtalk release/open_jtalk_linux_x64
+        chmod +x release/open_jtalk_macos_x64
+        chmod +x release/open_jtalk_linux_x64
+        
+        cd release
+        sha256sum * > SHA256SUMS
+        
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ github.event.inputs.release_tag || 'openjtalk-binaries-latest' }}
+        name: OpenJTalk Binaries (All Platforms)
+        body: |
+          Pre-built OpenJTalk binaries for all platforms
+          
+          ## Included files:
+          - `open_jtalk_windows_x64.exe` - Windows 64-bit binary
+          - `open_jtalk_macos_x64` - macOS 64-bit binary
+          - `open_jtalk_linux_x64` - Linux 64-bit binary
+          - `SHA256SUMS` - Checksums for verification
+          
+          ## Build info:
+          - HTSEngine API 1.10
+          - OpenJTalk 1.11
+          - UTF-8 charset support
+          
+          Build from: ${{ github.sha }}
+          Branch: ${{ github.ref_name }}
+        files: |
+          release/open_jtalk_windows_x64.exe
+          release/open_jtalk_macos_x64
+          release/open_jtalk_linux_x64
+          release/SHA256SUMS
+        token: ${{ secrets.GITHUB_TOKEN }}
+        prerelease: ${{ github.ref != 'refs/heads/master' }}
+        draft: false

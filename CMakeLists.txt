@@ -266,8 +266,8 @@ if(NOT DEFINED OPENJTALK_DIR)
     set(OPENJTALK_WINDOWS_URL "$ENV{OPENJTALK_WINDOWS_URL}")
     if(NOT OPENJTALK_WINDOWS_URL)
       # Use the latest release from automated builds
-      # This will work after the PR is merged to ayutaz/piper-plus
-      set(OPENJTALK_WINDOWS_URL "https://github.com/ayutaz/piper-plus/releases/download/openjtalk-windows-latest/open_jtalk.exe")
+      # Download from the unified binary release
+      set(OPENJTALK_WINDOWS_URL "https://github.com/ayutaz/piper-plus/releases/download/openjtalk-binaries-latest/open_jtalk_windows_x64.exe")
     endif()
     
     set(OPENJTALK_WINDOWS_EXE "${OPENJTALK_DIR}/bin/open_jtalk.exe")
