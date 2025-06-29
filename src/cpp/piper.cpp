@@ -157,6 +157,16 @@ namespace tashkeel {
         return text;
     }
 }
+
+// Stub for OpenJTalk when not available
+#if defined(_WIN32) || defined(_MSC_VER)
+void phonemize_openjtalk(const std::string &text,
+                         std::vector<std::vector<Phoneme>> &sentences) {
+    // Windows: OpenJTalk not supported, fall back to codepoints
+    CodepointsPhonemeConfig config;
+    phonemize_codepoints(text, config, sentences);
+}
+#endif
 #endif
 
 // Maximum value for 16-bit signed WAV sample
@@ -718,7 +728,8 @@ void textToAudio(PiperConfig &config, Voice &voice, std::string text,
 #ifdef PIPER_CI_BUILD
     // CI build: fall back to codepoints
     spdlog::debug("eSpeak phonemization disabled in CI build, using codepoints");
-    phonemize_codepoints(text, phonemes);
+    CodepointsPhonemeConfig codepointsConfig;
+    phonemize_codepoints(text, codepointsConfig, phonemes);
 #else
     // Use espeak-ng for phonemization
     piper::eSpeakPhonemeConfig eSpeakConfig;
