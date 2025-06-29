@@ -91,12 +91,21 @@ jobs:
         tar xzf open_jtalk-1.11.tar.gz
         cd open_jtalk-1.11
         
-        export CPPFLAGS="-I/mingw64/include"
-        export LDFLAGS="-L/mingw64/lib"
+        export CPPFLAGS="-I/mingw64/include -DWIN32"
+        export LDFLAGS="-L/mingw64/lib -mconsole"
         ./configure --prefix=/mingw64 --with-charset=UTF-8 --with-hts-engine-header-path=/mingw64/include --with-hts-engine-library-path=/mingw64/lib
         make -j$(nproc)
         
-        cp open_jtalk.exe /tmp/
+        # Check where the binary was created
+        if [ -f bin/open_jtalk.exe ]; then
+          cp bin/open_jtalk.exe /tmp/
+        elif [ -f open_jtalk.exe ]; then
+          cp open_jtalk.exe /tmp/
+        else
+          echo "Error: open_jtalk.exe not found"
+          find . -name "open_jtalk.exe" -type f
+          exit 1
+        fi
         strip /tmp/open_jtalk.exe
         
     - name: Upload Windows artifact
@@ -168,7 +177,16 @@ jobs:
         ./configure --prefix=/usr/local --with-charset=UTF-8 --with-hts-engine-header-path=/usr/local/include --with-hts-engine-library-path=/usr/local/lib
         make -j$(sysctl -n hw.ncpu)
         
-        cp open_jtalk /tmp/
+        # Check where the binary was created
+        if [ -f bin/open_jtalk ]; then
+          cp bin/open_jtalk /tmp/
+        elif [ -f open_jtalk ]; then
+          cp open_jtalk /tmp/
+        else
+          echo "Error: open_jtalk not found"
+          find . -name "open_jtalk" -type f
+          exit 1
+        fi
         strip /tmp/open_jtalk
         
     - name: Upload macOS artifact
@@ -243,7 +261,16 @@ jobs:
         ./configure --prefix=/usr/local --with-charset=UTF-8 --with-hts-engine-header-path=/usr/local/include --with-hts-engine-library-path=/usr/local/lib
         make -j$(nproc)
         
-        cp open_jtalk /tmp/
+        # Check where the binary was created
+        if [ -f bin/open_jtalk ]; then
+          cp bin/open_jtalk /tmp/
+        elif [ -f open_jtalk ]; then
+          cp open_jtalk /tmp/
+        else
+          echo "Error: open_jtalk not found"
+          find . -name "open_jtalk" -type f
+          exit 1
+        fi
         strip /tmp/open_jtalk
         
     - name: Upload Linux artifact
