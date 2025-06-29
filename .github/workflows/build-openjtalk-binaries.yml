@@ -37,15 +37,15 @@ jobs:
           mingw-w64-x86_64-gcc
           mingw-w64-x86_64-cmake
           mingw-w64-x86_64-make
+          mingw-w64-x86_64-curl
           make
-          wget
           tar
           
     - name: Build HTSEngine
       shell: msys2 {0}
       run: |
         cd /tmp
-        wget https://downloads.sourceforge.net/project/hts-engine/hts_engine%20API/hts_engine_API-1.10/hts_engine_API-1.10.tar.gz
+        curl -L -o hts_engine_API-1.10.tar.gz https://downloads.sourceforge.net/project/hts-engine/hts_engine%20API/hts_engine_API-1.10/hts_engine_API-1.10.tar.gz
         tar xzf hts_engine_API-1.10.tar.gz
         cd hts_engine_API-1.10
         
@@ -57,7 +57,7 @@ jobs:
       shell: msys2 {0}
       run: |
         cd /tmp
-        wget https://downloads.sourceforge.net/project/open-jtalk/Open%20JTalk/open_jtalk-1.11/open_jtalk-1.11.tar.gz
+        curl -L -o open_jtalk-1.11.tar.gz https://downloads.sourceforge.net/project/open-jtalk/Open%20JTalk/open_jtalk-1.11/open_jtalk-1.11.tar.gz
         tar xzf open_jtalk-1.11.tar.gz
         cd open_jtalk-1.11
         
@@ -79,14 +79,12 @@ jobs:
     runs-on: macos-latest
     
     steps:
-    - name: Install dependencies
-      run: |
-        brew install wget
+    # curl is already available on macOS, no need to install dependencies
         
     - name: Build HTSEngine
       run: |
         cd /tmp
-        wget https://downloads.sourceforge.net/project/hts-engine/hts_engine%20API/hts_engine_API-1.10/hts_engine_API-1.10.tar.gz
+        curl -L -o hts_engine_API-1.10.tar.gz https://downloads.sourceforge.net/project/hts-engine/hts_engine%20API/hts_engine_API-1.10/hts_engine_API-1.10.tar.gz
         tar xzf hts_engine_API-1.10.tar.gz
         cd hts_engine_API-1.10
         
@@ -97,7 +95,7 @@ jobs:
     - name: Build OpenJTalk
       run: |
         cd /tmp
-        wget https://downloads.sourceforge.net/project/open-jtalk/Open%20JTalk/open_jtalk-1.11/open_jtalk-1.11.tar.gz
+        curl -L -o open_jtalk-1.11.tar.gz https://downloads.sourceforge.net/project/open-jtalk/Open%20JTalk/open_jtalk-1.11/open_jtalk-1.11.tar.gz
         tar xzf open_jtalk-1.11.tar.gz
         cd open_jtalk-1.11
         
@@ -127,7 +125,7 @@ jobs:
     - name: Build HTSEngine
       run: |
         cd /tmp
-        wget https://downloads.sourceforge.net/project/hts-engine/hts_engine%20API/hts_engine_API-1.10/hts_engine_API-1.10.tar.gz
+        curl -L -o hts_engine_API-1.10.tar.gz https://downloads.sourceforge.net/project/hts-engine/hts_engine%20API/hts_engine_API-1.10/hts_engine_API-1.10.tar.gz
         tar xzf hts_engine_API-1.10.tar.gz
         cd hts_engine_API-1.10
         
@@ -138,7 +136,7 @@ jobs:
     - name: Build OpenJTalk
       run: |
         cd /tmp
-        wget https://downloads.sourceforge.net/project/open-jtalk/Open%20JTalk/open_jtalk-1.11/open_jtalk-1.11.tar.gz
+        curl -L -o open_jtalk-1.11.tar.gz https://downloads.sourceforge.net/project/open-jtalk/Open%20JTalk/open_jtalk-1.11/open_jtalk-1.11.tar.gz
         tar xzf open_jtalk-1.11.tar.gz
         cd open_jtalk-1.11
         
