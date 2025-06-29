@@ -344,11 +344,32 @@ jobs:
           mkdir -p piper/lib
           
           if [ "${{ runner.os }}" = "Windows" ]; then
-            # Copy Windows DLLs
-            find build -name "*.dll" -type f | while read dll; do
+            # Copy Windows DLLs from multiple possible locations
+            echo "Searching for DLLs in build directory..."
+            find build -name "*.dll" -type f 2>/dev/null | while read dll; do
               echo "Copying DLL: $dll"
               cp "$dll" piper/lib/ || true
+              # Also copy to bin directory for direct access
+              cp "$dll" piper/bin/ || true
             done
+            
+            # Specifically look for onnxruntime DLLs
+            echo ""
+            echo "Looking for onnxruntime DLLs..."
+            find build -name "onnxruntime*.dll" -type f 2>/dev/null | while read dll; do
+              echo "Found onnxruntime DLL: $dll"
+              cp "$dll" piper/bin/ || true
+            done
+            
+            # Copy from Release/Debug directories if they exist
+            if [ -d "build/Release" ]; then
+              echo "Copying from build/Release..."
+              cp build/Release/*.dll piper/bin/ 2>/dev/null || true
+            fi
+            if [ -d "build/Debug" ]; then
+              echo "Copying from build/Debug..."
+              cp build/Debug/*.dll piper/bin/ 2>/dev/null || true
+            fi
           elif [ "${{ runner.os }}" = "Linux" ]; then
             # Copy Linux shared objects
             find build -name "*.so*" -type f | while read so; do
@@ -416,21 +437,43 @@ jobs:
           if [ ! -f "${MODEL_DIR}/${MODEL_NAME}.onnx" ]; then
             echo "Downloading ${MODEL_NAME} model..."
             echo "URL: ${BASE_URL}/${MODEL_NAME}.onnx?download=true"
-            curl -L -o "${MODEL_DIR}/${MODEL_NAME}.onnx" \
-              "${BASE_URL}/${MODEL_NAME}.onnx?download=true" || {
-              echo "Failed to download model from: ${BASE_URL}/${MODEL_NAME}.onnx"
-              exit 1
-            }
+            # Add retry logic for downloads
+            for attempt in 1 2 3; do
+              echo "Download attempt $attempt of 3..."
+              if curl -L -f -o "${MODEL_DIR}/${MODEL_NAME}.onnx" \
+                "${BASE_URL}/${MODEL_NAME}.onnx?download=true"; then
+                echo "Successfully downloaded model on attempt $attempt"
+                break
+              else
+                echo "Download attempt $attempt failed"
+                if [ $attempt -eq 3 ]; then
+                  echo "Failed to download model after 3 attempts from: ${BASE_URL}/${MODEL_NAME}.onnx"
+                  exit 1
+                fi
+                sleep 5  # Wait before retry
+              fi
+            done
           fi
           
           if [ ! -f "${MODEL_DIR}/${MODEL_NAME}.onnx.json" ]; then
             echo "Downloading ${MODEL_NAME} config..."
             echo "URL: ${BASE_URL}/${MODEL_NAME}.onnx.json?download=true"
-            curl -L -o "${MODEL_DIR}/${MODEL_NAME}.onnx.json" \
-              "${BASE_URL}/${MODEL_NAME}.onnx.json?download=true" || {
-              echo "Failed to download config from: ${BASE_URL}/${MODEL_NAME}.onnx.json"
-              exit 1
-            }
+            # Add retry logic for config downloads
+            for attempt in 1 2 3; do
+              echo "Config download attempt $attempt of 3..."
+              if curl -L -f -o "${MODEL_DIR}/${MODEL_NAME}.onnx.json" \
+                "${BASE_URL}/${MODEL_NAME}.onnx.json?download=true"; then
+                echo "Successfully downloaded config on attempt $attempt"
+                break
+              else
+                echo "Config download attempt $attempt failed"
+                if [ $attempt -eq 3 ]; then
+                  echo "Failed to download config after 3 attempts from: ${BASE_URL}/${MODEL_NAME}.onnx.json"
+                  exit 1
+                fi
+                sleep 5  # Wait before retry
+              fi
+            done
           fi
           
           # Verify downloads
@@ -455,8 +498,8 @@ jobs:
         if: runner.os == 'Windows'
         shell: cmd
         run: |
-          REM Add DLL paths to PATH
-          set PATH=%CD%\piper\lib;%CD%\piper\bin;%PATH%
+          REM Add DLL paths to PATH - include Release and Debug directories
+          set PATH=%CD%\piper\lib;%CD%\piper\bin;%CD%\build\Release;%CD%\build\Debug;%CD%\build;%PATH%
           
           REM Try to find espeak-ng-data in multiple locations
           if exist "%CD%\piper\share\espeak-ng-data" (
@@ -519,40 +562,129 @@ jobs:
           )
           
           REM Check if piper.exe can run
-          piper\bin\piper.exe --help 2>&1
-          if %ERRORLEVEL% NEQ 0 (
-            echo ERROR: piper.exe cannot run - exit code %ERRORLEVEL%
-            echo Checking dependencies...
-            where onnxruntime.dll 2>nul || echo WARNING: onnxruntime.dll not found in PATH
+          echo.
+          echo === Checking piper.exe and dependencies ===
+          echo Verifying piper.exe exists:
+          if exist "piper\bin\piper.exe" (
+            echo Found piper.exe
+            dir piper\bin\piper.exe
+          ) else (
+            echo ERROR: piper\bin\piper.exe not found!
+            dir piper\bin\
             exit /b 1
           )
           
+          echo.
+          echo All files in piper\bin:
+          dir piper\bin\
+          
+          echo.
+          echo Trying to run piper.exe --help:
+          piper\bin\piper.exe --help 2>&1
+          if %ERRORLEVEL% NEQ 0 (
+            echo ERROR: piper.exe cannot run - exit code %ERRORLEVEL%
+            echo.
+            echo Checking for required DLLs in system:
+            where onnxruntime.dll 2>nul || echo WARNING: onnxruntime.dll not found in PATH
+            where espeak-ng.dll 2>nul || echo WARNING: espeak-ng.dll not found in PATH
+            where piper_phonemize.dll 2>nul || echo WARNING: piper_phonemize.dll not found in PATH
+            
+            REM List all DLLs in the directories to debug
+            echo.
+            echo Checking for DLLs in build directories:
+            if exist "build\Release" (
+              echo DLLs in build\Release:
+              dir /b build\Release\*.dll 2>nul || echo No DLLs found
+            )
+            if exist "build\Debug" (
+              echo DLLs in build\Debug:
+              dir /b build\Debug\*.dll 2>nul || echo No DLLs found
+            )
+            if exist "piper\lib" (
+              echo DLLs in piper\lib:
+              dir /b piper\lib\*.dll 2>nul || echo No DLLs found
+            )
+            if exist "piper\bin" (
+              echo DLLs in piper\bin:
+              dir /b piper\bin\*.dll 2>nul || echo No DLLs found
+            )
+            exit /b 1
+          )
+          
+          REM Add more verbose output for debugging
+          echo.
+          echo Running piper TTS for ${{ matrix.language }}...
           type test_input.txt | piper\bin\piper.exe ^
             --model "test\models\${{ matrix.model }}.onnx" ^
-            --output_file "test_output_${{ matrix.language }}.wav" 2>&1
+            --output_file "test_output_${{ matrix.language }}.wav" ^
+            --debug 2>&1
           
           if %ERRORLEVEL% NEQ 0 (
             echo ERROR: piper.exe returned error code %ERRORLEVEL%
             echo.
+            echo === Debug information for ${{ matrix.language }} failure ===
+            echo Language: ${{ matrix.language }}
+            echo Model: ${{ matrix.model }}
+            echo.
+            
+            REM Check if this is a phonemization issue
+            echo Checking if model and config exist:
+            if exist "test\models\${{ matrix.model }}.onnx" (
+              echo Model file exists: test\models\${{ matrix.model }}.onnx
+              for %%I in ("test\models\${{ matrix.model }}.onnx") do echo Size: %%~zI bytes
+            ) else (
+              echo ERROR: Model file missing!
+            )
+            if exist "test\models\${{ matrix.model }}.onnx.json" (
+              echo Config file exists: test\models\${{ matrix.model }}.onnx.json
+            ) else (
+              echo ERROR: Config file missing!
+            )
+            echo.
+            
             echo Retrying with explicit ESPEAK_DATA_PATH in build directory...
             if exist "build\ei\share\espeak-ng-data" (
               set ESPEAK_DATA_PATH=%CD%\build\ei\share\espeak-ng-data
               echo Retrying with ESPEAK_DATA_PATH=%ESPEAK_DATA_PATH%
               type test_input.txt | piper\bin\piper.exe ^
                 --model "test\models\${{ matrix.model }}.onnx" ^
-                --output_file "test_output_${{ matrix.language }}.wav" 2>&1
+                --output_file "test_output_${{ matrix.language }}.wav" ^
+                --debug 2>&1
               if %ERRORLEVEL% EQU 0 goto success
-              echo Retry with ei\share failed
+              echo Retry with ei\share failed with error code %ERRORLEVEL%
             )
             if exist "build\pi\share\espeak-ng-data" (
               set ESPEAK_DATA_PATH=%CD%\build\pi\share\espeak-ng-data
               echo Retrying with ESPEAK_DATA_PATH=%ESPEAK_DATA_PATH%
               type test_input.txt | piper\bin\piper.exe ^
                 --model "test\models\${{ matrix.model }}.onnx" ^
-                --output_file "test_output_${{ matrix.language }}.wav" 2>&1
+                --output_file "test_output_${{ matrix.language }}.wav" ^
+                --debug 2>&1
               if %ERRORLEVEL% EQU 0 goto success
-              echo Retry with pi\share also failed
+              echo Retry with pi\share also failed with error code %ERRORLEVEL%
             )
+            
+            REM Final diagnostic for nl_NL specific issues
+            if "${{ matrix.language }}" == "nl_NL" (
+              echo.
+              echo === Special diagnostics for nl_NL (Dutch) ===
+              echo This language often fails on Windows due to:
+              echo 1. Missing espeak-ng voice data for Dutch
+              echo 2. Phonemization issues with Dutch text
+              echo 3. Model compatibility issues
+              echo.
+              echo Attempting minimal test with simple phonemes...
+              echo a | piper\bin\piper.exe ^
+                --model "test\models\${{ matrix.model }}.onnx" ^
+                --output_file "test_minimal_${{ matrix.language }}.wav" ^
+                --debug 2>&1
+              if %ERRORLEVEL% EQU 0 (
+                echo Minimal test succeeded - issue is likely with Dutch phonemization
+              ) else (
+                echo Minimal test also failed - issue is likely with model or dependencies
+              )
+            )
+            
             exit /b 1
           )
           
