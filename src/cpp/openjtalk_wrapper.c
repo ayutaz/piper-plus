@@ -359,36 +359,240 @@ void HTS_Label_clear(HTS_Label_Wrapper* label) {
     free(label);
 }
 
-#else
+#else  // Windows implementation
 
-// Windows stub implementation
+#include <windows.h>
+#include <process.h>
+#include <io.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+
+// Windows implementation of OpenJTalk wrapper
+struct OpenJTalk {
+    char* openjtalk_path;
+    char* dictionary_path;
+};
+
+struct HTS_Label_Wrapper {
+    char** labels;
+    size_t num_labels;
+};
+
 OpenJTalk* openjtalk_initialize() {
-    return NULL;
+    OpenJTalk* oj = (OpenJTalk*)malloc(sizeof(OpenJTalk));
+    if (!oj) return NULL;
+    
+    oj->openjtalk_path = NULL;
+    oj->dictionary_path = NULL;
+    
+    // Find OpenJTalk binary
+    const char* possible_paths[] = {
+        "open_jtalk.exe",
+        "./open_jtalk.exe",
+        "../bin/open_jtalk.exe",
+        "../../bin/open_jtalk.exe",
+        "./build/oj/bin/open_jtalk.exe",
+        "./build/Release/open_jtalk.exe"
+    };
+    
+    for (int i = 0; i < sizeof(possible_paths)/sizeof(possible_paths[0]); i++) {
+        if (_access(possible_paths[i], 0) == 0) {
+            oj->openjtalk_path = _strdup(possible_paths[i]);
+            break;
+        }
+    }
+    
+    if (!oj->openjtalk_path) {
+        // Try to find in PATH
+        char path[MAX_PATH];
+        if (SearchPathA(NULL, "open_jtalk", ".exe", MAX_PATH, path, NULL)) {
+            oj->openjtalk_path = _strdup(path);
+        }
+    }
+    
+    if (!oj->openjtalk_path) {
+        LOG_ERROR("Failed to find open_jtalk.exe");
+        free(oj);
+        return NULL;
+    }
+    
+    // Get dictionary path
+    oj->dictionary_path = openjtalk_get_dict_path();
+    if (!oj->dictionary_path) {
+        LOG_ERROR("Failed to get dictionary path");
+        free(oj->openjtalk_path);
+        free(oj);
+        return NULL;
+    }
+    
+    return oj;
 }
 
 void openjtalk_finalize(OpenJTalk* oj) {
-    (void)oj;
+    if (oj) {
+        if (oj->openjtalk_path) free(oj->openjtalk_path);
+        if (oj->dictionary_path) free(oj->dictionary_path);
+        free(oj);
+    }
 }
 
 HTS_Label_Wrapper* openjtalk_extract_fullcontext(OpenJTalk* oj, const char* text) {
-    (void)oj;
-    (void)text;
-    return NULL;
+    if (!oj || !text) return NULL;
+    
+    // Create temporary files
+    char temp_path[MAX_PATH];
+    char input_file[MAX_PATH];
+    char output_file[MAX_PATH];
+    
+    GetTempPathA(MAX_PATH, temp_path);
+    
+    // Generate unique filenames
+    snprintf(input_file, MAX_PATH, "%s\\openjtalk_input_%d.txt", temp_path, GetCurrentProcessId());
+    snprintf(output_file, MAX_PATH, "%s\\openjtalk_output_%d.txt", temp_path, GetCurrentProcessId());
+    
+    // Write input text to file
+    FILE* fp = fopen(input_file, "wb");
+    if (!fp) {
+        LOG_ERROR("Failed to create input file: %s", input_file);
+        return NULL;
+    }
+    
+    // Write UTF-8 BOM if text contains Japanese characters
+    unsigned char utf8_bom[] = {0xEF, 0xBB, 0xBF};
+    fwrite(utf8_bom, 1, 3, fp);
+    fwrite(text, 1, strlen(text), fp);
+    fclose(fp);
+    
+    // Build command line
+    char command[4096];
+    snprintf(command, sizeof(command),
+             "\"%s\" -x \"%s\" -ot \"%s\" \"%s\"",
+             oj->openjtalk_path,
+             oj->dictionary_path,
+             output_file,
+             input_file);
+    
+    // Execute OpenJTalk
+    STARTUPINFOA si;
+    PROCESS_INFORMATION pi;
+    ZeroMemory(&si, sizeof(si));
+    si.cb = sizeof(si);
+    si.dwFlags = STARTF_USESHOWWINDOW;
+    si.wShowWindow = SW_HIDE;
+    ZeroMemory(&pi, sizeof(pi));
+    
+    if (!CreateProcessA(NULL, command, NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi)) {
+        LOG_ERROR("Failed to execute OpenJTalk: %s", command);
+        _unlink(input_file);
+        return NULL;
+    }
+    
+    // Wait for process to complete
+    WaitForSingleObject(pi.hProcess, INFINITE);
+    
+    DWORD exit_code;
+    GetExitCodeProcess(pi.hProcess, &exit_code);
+    CloseHandle(pi.hProcess);
+    CloseHandle(pi.hThread);
+    
+    if (exit_code != 0) {
+        LOG_ERROR("OpenJTalk exited with code %d", exit_code);
+        _unlink(input_file);
+        return NULL;
+    }
+    
+    // Read output file
+    fp = fopen(output_file, "rb");
+    if (!fp) {
+        LOG_ERROR("Failed to open output file: %s", output_file);
+        _unlink(input_file);
+        return NULL;
+    }
+    
+    // Get file size
+    fseek(fp, 0, SEEK_END);
+    long file_size = ftell(fp);
+    fseek(fp, 0, SEEK_SET);
+    
+    // Skip BOM if present
+    unsigned char bom[3];
+    if (fread(bom, 1, 3, fp) == 3) {
+        if (bom[0] != 0xEF || bom[1] != 0xBB || bom[2] != 0xBF) {
+            fseek(fp, 0, SEEK_SET);
+        }
+    } else {
+        fseek(fp, 0, SEEK_SET);
+    }
+    
+    // Read file content
+    char* buffer = (char*)malloc(file_size + 1);
+    if (!buffer) {
+        fclose(fp);
+        _unlink(input_file);
+        _unlink(output_file);
+        return NULL;
+    }
+    
+    size_t read_size = fread(buffer, 1, file_size, fp);
+    buffer[read_size] = '\0';
+    fclose(fp);
+    
+    // Parse labels
+    HTS_Label_Wrapper* label = (HTS_Label_Wrapper*)malloc(sizeof(HTS_Label_Wrapper));
+    if (!label) {
+        free(buffer);
+        _unlink(input_file);
+        _unlink(output_file);
+        return NULL;
+    }
+    
+    // Count lines
+    size_t num_lines = 0;
+    char* p = buffer;
+    while (*p) {
+        if (*p == '\n') num_lines++;
+        p++;
+    }
+    if (buffer[read_size-1] != '\n') num_lines++;
+    
+    // Allocate label array
+    label->labels = (char**)malloc(num_lines * sizeof(char*));
+    label->num_labels = 0;
+    
+    // Parse lines
+    char* line = strtok(buffer, "\r\n");
+    while (line) {
+        if (strlen(line) > 0) {
+            label->labels[label->num_labels] = _strdup(line);
+            label->num_labels++;
+        }
+        line = strtok(NULL, "\r\n");
+    }
+    
+    free(buffer);
+    _unlink(input_file);
+    _unlink(output_file);
+    
+    return label;
 }
 
 size_t HTS_Label_get_size(HTS_Label_Wrapper* label) {
-    (void)label;
-    return 0;
+    return label ? label->num_labels : 0;
 }
 
 const char* HTS_Label_get_string(HTS_Label_Wrapper* label, size_t index) {
-    (void)label;
-    (void)index;
-    return NULL;
+    if (!label || index >= label->num_labels) return NULL;
+    return label->labels[index];
 }
 
 void HTS_Label_clear(HTS_Label_Wrapper* label) {
-    (void)label;
+    if (label) {
+        for (size_t i = 0; i < label->num_labels; i++) {
+            free(label->labels[i]);
+        }
+        free(label->labels);
+        free(label);
+    }
 }
 
 #endif // _WIN32

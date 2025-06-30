@@ -61,19 +61,17 @@ if(BUILD_TESTS)
   add_subdirectory(src/cpp/tests)
 endif()
 
-# Add OpenJTalk support on Unix platforms (not Windows)
-if(NOT WIN32 AND NOT MSVC)
-  target_sources(piper PRIVATE
-    src/cpp/openjtalk_phonemize.cpp
-    src/cpp/openjtalk_wrapper.c
-    src/cpp/openjtalk_dictionary_manager.c
-  )
-  target_sources(test_piper PRIVATE
-    src/cpp/openjtalk_phonemize.cpp
-    src/cpp/openjtalk_wrapper.c
-    src/cpp/openjtalk_dictionary_manager.c
-  )
-endif()
+# Add OpenJTalk support on all platforms
+target_sources(piper PRIVATE
+  src/cpp/openjtalk_phonemize.cpp
+  src/cpp/openjtalk_wrapper.c
+  src/cpp/openjtalk_dictionary_manager.c
+)
+target_sources(test_piper PRIVATE
+  src/cpp/openjtalk_phonemize.cpp
+  src/cpp/openjtalk_wrapper.c
+  src/cpp/openjtalk_dictionary_manager.c
+)
 
 
 # Configure RPATH for macOS
@@ -186,7 +184,14 @@ endif()
 
 # ---- HTSEngine (Unix platforms only) ---
 
-if(NOT WIN32 AND NOT MSVC)
+# ---- HTSEngine and OpenJTalk ----
+
+if(WIN32)
+  # Use CMake-based build for Windows
+  include(cmake/HTSEngine.cmake)
+  include(cmake/OpenJTalk.cmake)
+else()
+  # Use autotools-based build for Unix
   if(NOT DEFINED HTS_ENGINE_DIR)
     set(HTS_ENGINE_DIR "${CMAKE_CURRENT_BINARY_DIR}/he")
     set(HTS_ENGINE_VERSION "1.10")
@@ -291,19 +296,29 @@ else()
 endif()
 
 # Link OpenJTalk and HTS_Engine libraries
-if(NOT WIN32 AND NOT MSVC)
+if(TARGET hts_engine_external AND TARGET openjtalk_external)
   # Ensure libraries are built before linking
   add_dependencies(piper openjtalk_external hts_engine_external)
   add_dependencies(test_piper openjtalk_external hts_engine_external)
 
   # Link libraries with absolute paths
-  # Note: OpenJTalk doesn't create a single library, we need to link individual components
-  target_link_libraries(piper
-    ${CMAKE_CURRENT_BINARY_DIR}/he/lib/libHTSEngine.a
-  )
-  target_link_libraries(test_piper
-    ${CMAKE_CURRENT_BINARY_DIR}/he/lib/libHTSEngine.a
-  )
+  if(WIN32)
+    target_link_libraries(piper
+      ${CMAKE_CURRENT_BINARY_DIR}/he/lib/HTSEngine.lib
+      ${CMAKE_CURRENT_BINARY_DIR}/oj/lib/libopenjtalk.lib
+    )
+    target_link_libraries(test_piper
+      ${CMAKE_CURRENT_BINARY_DIR}/he/lib/HTSEngine.lib
+      ${CMAKE_CURRENT_BINARY_DIR}/oj/lib/libopenjtalk.lib
+    )
+  else()
+    target_link_libraries(piper
+      ${CMAKE_CURRENT_BINARY_DIR}/he/lib/libHTSEngine.a
+    )
+    target_link_libraries(test_piper
+      ${CMAKE_CURRENT_BINARY_DIR}/he/lib/libHTSEngine.a
+    )
+  endif()
 endif()
 
 target_link_directories(piper PUBLIC

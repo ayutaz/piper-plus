@@ -343,6 +343,7 @@ jobs:
           - pt_BR  # Portuguese (Brazil)
           - ru_RU  # Russian
           - zh_CN  # Chinese (Simplified)
+          - ja_JP  # Japanese
           - nl_NL  # Dutch
           - pl_PL  # Polish
           - sv_SE  # Swedish
@@ -375,6 +376,9 @@ jobs:
           - language: zh_CN
             model: "zh_CN-huayan-medium"
             test_text: "你好，这是语音合成系统的测试。"
+          - language: ja_JP
+            model: "ja_JP-test-medium"
+            test_text: "こんにちは、これは音声合成システムのテストです。"
           - language: nl_NL
             model: "nl_NL-mls-medium"
             test_text: "Hallo, dit is een test van het spraaksynthesesysteem."
