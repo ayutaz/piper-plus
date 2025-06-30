@@ -4,14 +4,14 @@
  
  #ifdef AUDIO_PLAY_WIN32
  
-+/* Define architecture macros if not already defined */
-+#if defined(_M_AMD64) || defined(_M_X64)
-+  #ifndef _AMD64_
-+    #define _AMD64_
-+  #endif
-+#elif defined(_M_IX86) || defined(_X86_)
-+  #ifndef _X86_
-+    #define _X86_
++/* Define architecture macros required by Windows SDK */
++#if !defined(_AMD64_) && !defined(_X86_) && !defined(_ARM64_)
++  #if defined(_M_AMD64) || defined(_M_X64)
++    #define _AMD64_ 1
++  #elif defined(_M_IX86)
++    #define _X86_ 1
++  #elif defined(_M_ARM64)
++    #define _ARM64_ 1
 +  #endif
 +#endif
 +
