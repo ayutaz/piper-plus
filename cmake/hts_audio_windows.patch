@@ -1,0 +1,13 @@
+--- a/lib/HTS_audio.c
++++ b/lib/HTS_audio.c
+@@ -61,8 +61,10 @@
+ 
+ #ifdef AUDIO_PLAY_WIN32
+ 
++#define WIN32_LEAN_AND_MEAN
+ #include <windows.h>
+ #include <mmsystem.h>
++#pragma comment(lib, "winmm.lib")
+ 
+ #define AUDIO_WAIT_BUFF_SIZE 10
+ #define AUDIO_CHANNEL        1
