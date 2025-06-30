@@ -12,6 +12,8 @@ endif()
 option(HTS_EMBEDDED "Build for embedded devices" OFF)
 option(BUILD_SHARED_LIBS "Build shared libraries" OFF)
 
+# Architecture definitions are handled in the patch file
+
 # Version information
 set(HTS_ENGINE_VERSION "1.10")
 set(HTS_ENGINE_VERSION_MAJOR 1)
@@ -57,16 +59,7 @@ if(WIN32)
     WIN32_LEAN_AND_MEAN
   )
   
-  # Add architecture definitions required by Windows SDK
-  if(CMAKE_SIZEOF_VOID_P EQUAL 8)
-    if(CMAKE_SYSTEM_PROCESSOR MATCHES "ARM64")
-      target_compile_definitions(HTSEngine PRIVATE _ARM64_)
-    else()
-      target_compile_definitions(HTSEngine PRIVATE _AMD64_)
-    endif()
-  else()
-    target_compile_definitions(HTSEngine PRIVATE _X86_)
-  endif()
+  # Architecture definitions are handled in the patched HTS_audio.c
   
   # Link Windows audio libraries
   target_link_libraries(HTSEngine PRIVATE winmm)

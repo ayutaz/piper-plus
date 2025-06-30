@@ -1,13 +1,22 @@
 --- a/lib/HTS_audio.c
 +++ b/lib/HTS_audio.c
-@@ -61,8 +61,10 @@
+@@ -69,6 +69,19 @@ HTS_AUDIO_C_START;
  
  #ifdef AUDIO_PLAY_WIN32
  
++/* Define architecture macros if not already defined */
++#if defined(_M_AMD64) || defined(_M_X64)
++  #ifndef _AMD64_
++    #define _AMD64_
++  #endif
++#elif defined(_M_IX86) || defined(_X86_)
++  #ifndef _X86_
++    #define _X86_
++  #endif
++#endif
++
 +#define WIN32_LEAN_AND_MEAN
++#define NOMINMAX
  #include <windows.h>
  #include <mmsystem.h>
-+#pragma comment(lib, "winmm.lib")
- 
- #define AUDIO_WAIT_BUFF_SIZE 10
- #define AUDIO_CHANNEL        1
+ #define AUDIO_WAIT_BUFF_MS 10   /* wait time (0.01 sec) */
