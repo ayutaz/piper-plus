@@ -99,7 +99,7 @@ jobs:
           # Run piper which should download and verify checksum
           echo "Testing checksum verification..."
           # Use the test voice model that was built
-          if echo "Test" | ./build/piper --model ../etc/test_voice.onnx --output_file /tmp/test_checksum.wav 2>&1 | tee /tmp/checksum_log.txt; then
+          if echo "Test" | ./build/piper --model ${{ github.workspace }}/etc/test_voice.onnx --output_file /tmp/test_checksum.wav 2>&1 | tee /tmp/checksum_log.txt; then
             echo "✓ Piper executed successfully"
             # Check if dictionary was downloaded
             if [ -d "$HOME/.piper/dictionaries/openjtalk/open_jtalk_dic_utf_8-1.11" ]; then
@@ -124,7 +124,7 @@ jobs:
           
           echo "Testing offline mode..."
           # Should fail without dictionary - check for error messages
-          echo "Offline test" | ./build/piper --model ../etc/test_voice.onnx --output_file /tmp/test_offline.wav 2>&1 | tee /tmp/offline_log.txt || true
+          echo "Offline test" | ./build/piper --model ${{ github.workspace }}/etc/test_voice.onnx --output_file /tmp/test_offline.wav 2>&1 | tee /tmp/offline_log.txt || true
           
           # Check if it printed the expected error message
           if grep -q "dictionary manually" /tmp/offline_log.txt && grep -q "Failed to ensure OpenJTalk dictionary" /tmp/offline_log.txt; then
@@ -147,7 +147,7 @@ jobs:
           export PIPER_AUTO_DOWNLOAD_DICT=0
           
           echo "Testing environment variable controls..."
-          echo "Environment test" | ./build/piper --model ../etc/test_voice.onnx --output_file /tmp/test_env.wav 2>&1 | tee /tmp/env_log.txt || true
+          echo "Environment test" | ./build/piper --model ${{ github.workspace }}/etc/test_voice.onnx --output_file /tmp/test_env.wav 2>&1 | tee /tmp/env_log.txt || true
           
           if grep -q "download.*manually" /tmp/env_log.txt && grep -q "Failed to ensure OpenJTalk dictionary" /tmp/env_log.txt; then
             echo "✓ PIPER_AUTO_DOWNLOAD_DICT=0 works correctly"

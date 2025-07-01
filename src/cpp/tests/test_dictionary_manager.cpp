@@ -130,15 +130,18 @@ TEST_F(DictionaryManagerTest, CheckDictionary) {
     snprintf(unk_dic, sizeof(unk_dic), "%s/unk.dic", test_dict_path);
     
     FILE* fp = fopen(sys_dic, "w");
-    if (fp) {
-        fprintf(fp, "dummy content\n");
-        fclose(fp);
-    }
+    ASSERT_NE(fp, nullptr) << "Failed to create sys.dic";
+    fprintf(fp, "dummy content\n");
+    fclose(fp);
+    
     fp = fopen(unk_dic, "w");
-    if (fp) {
-        fprintf(fp, "dummy content\n");
-        fclose(fp);
-    }
+    ASSERT_NE(fp, nullptr) << "Failed to create unk.dic";
+    fprintf(fp, "dummy content\n");
+    fclose(fp);
+    
+    // Verify files exist and are readable
+    EXPECT_EQ(access(sys_dic, R_OK), 0) << "sys.dic not readable";
+    EXPECT_EQ(access(unk_dic, R_OK), 0) << "unk.dic not readable";
     
     // With dictionary files
     EXPECT_EQ(openjtalk_check_dictionary(test_dict_path), 1);
