@@ -98,8 +98,8 @@ jobs:
           
           # Run piper which should download and verify checksum
           echo "Testing checksum verification..."
-          # Use a simple English model for testing dictionary download functionality
-          if echo "Test" | ./build/piper --model ./test/models/en_US-lessac-medium.onnx --output_file /tmp/test_checksum.wav 2>&1 | tee /tmp/checksum_log.txt; then
+          # Use the test voice model that was built
+          if echo "Test" | ./build/piper --model ../etc/test_voice.onnx --output_file /tmp/test_checksum.wav 2>&1 | tee /tmp/checksum_log.txt; then
             echo "✓ Piper executed successfully"
             # Check if dictionary was downloaded
             if [ -d "$HOME/.piper/dictionaries/openjtalk/open_jtalk_dic_utf_8-1.11" ]; then
@@ -124,7 +124,7 @@ jobs:
           
           echo "Testing offline mode..."
           # Should fail without dictionary - check for error messages
-          echo "Offline test" | ./build/piper --model ./test/models/en_US-lessac-medium.onnx --output_file /tmp/test_offline.wav 2>&1 | tee /tmp/offline_log.txt || true
+          echo "Offline test" | ./build/piper --model ../etc/test_voice.onnx --output_file /tmp/test_offline.wav 2>&1 | tee /tmp/offline_log.txt || true
           
           # Check if it printed the expected error message
           if grep -q "dictionary manually" /tmp/offline_log.txt && grep -q "Failed to ensure OpenJTalk dictionary" /tmp/offline_log.txt; then
@@ -147,7 +147,7 @@ jobs:
           export PIPER_AUTO_DOWNLOAD_DICT=0
           
           echo "Testing environment variable controls..."
-          echo "Environment test" | ./build/piper --model ./test/models/en_US-lessac-medium.onnx --output_file /tmp/test_env.wav 2>&1 | tee /tmp/env_log.txt || true
+          echo "Environment test" | ./build/piper --model ../etc/test_voice.onnx --output_file /tmp/test_env.wav 2>&1 | tee /tmp/env_log.txt || true
           
           if grep -q "download.*manually" /tmp/env_log.txt && grep -q "Failed to ensure OpenJTalk dictionary" /tmp/env_log.txt; then
             echo "✓ PIPER_AUTO_DOWNLOAD_DICT=0 works correctly"
@@ -424,6 +424,12 @@ jobs:
           ls -la piper/lib/ || echo "No lib directory found"
           ls -la piper/share/ || echo "No share directory found"
           
+          # Copy test voice model from source if available
+          if [ -f "${{ github.workspace }}/etc/test_voice.onnx" ]; then
+            cp "${{ github.workspace }}/etc/test_voice.onnx" test/models/
+            cp "${{ github.workspace }}/etc/test_voice.onnx.json" test/models/
+          fi
+          
       - name: Extract piper binary (Windows)
         if: runner.os == 'Windows'
         run: |
@@ -467,25 +473,48 @@ jobs:
           # Construct URL following HuggingFace structure
           BASE_URL="https://huggingface.co/${MODEL_REPO}/resolve/${MODEL_VERSION}/${LANG_PREFIX}/${{ matrix.language }}/${SPEAKER}/${QUALITY}"
           
+          # Special handling for Japanese (uses English model)
+          if [ "${{ matrix.language }}" = "ja_JP" ] && [ "${MODEL_NAME}" = "en_US-lessac-medium" ]; then
+            # For Japanese tests, we use the English model
+            LANG_PREFIX="en"
+            ACTUAL_LANG="en_US"
+            BASE_URL="https://huggingface.co/${MODEL_REPO}/resolve/${MODEL_VERSION}/${LANG_PREFIX}/${ACTUAL_LANG}/${SPEAKER}/${QUALITY}"
+          fi
+          
           # Download model files if not cached
           if [ ! -f "${MODEL_DIR}/${MODEL_NAME}.onnx" ]; then
             echo "Downloading ${MODEL_NAME} model..."
             echo "URL: ${BASE_URL}/${MODEL_NAME}.onnx?download=true"
-            curl -L -o "${MODEL_DIR}/${MODEL_NAME}.onnx" \
-              "${BASE_URL}/${MODEL_NAME}.onnx?download=true" || {
-              echo "Failed to download model from: ${BASE_URL}/${MODEL_NAME}.onnx"
+            # Download with headers to check content type
+            HTTP_CODE=$(curl -L -o "${MODEL_DIR}/${MODEL_NAME}.onnx" -w "%{http_code}" \
+              "${BASE_URL}/${MODEL_NAME}.onnx?download=true")
+            
+            if [ "$HTTP_CODE" != "200" ]; then
+              echo "Failed to download model from: ${BASE_URL}/${MODEL_NAME}.onnx (HTTP ${HTTP_CODE})"
+              rm -f "${MODEL_DIR}/${MODEL_NAME}.onnx"
               exit 1
-            }
+            fi
           fi
           
           if [ ! -f "${MODEL_DIR}/${MODEL_NAME}.onnx.json" ]; then
             echo "Downloading ${MODEL_NAME} config..."
             echo "URL: ${BASE_URL}/${MODEL_NAME}.onnx.json?download=true"
-            curl -L -o "${MODEL_DIR}/${MODEL_NAME}.onnx.json" \
-              "${BASE_URL}/${MODEL_NAME}.onnx.json?download=true" || {
-              echo "Failed to download config from: ${BASE_URL}/${MODEL_NAME}.onnx.json"
+            HTTP_CODE=$(curl -L -o "${MODEL_DIR}/${MODEL_NAME}.onnx.json" -w "%{http_code}" \
+              "${BASE_URL}/${MODEL_NAME}.onnx.json?download=true")
+            
+            if [ "$HTTP_CODE" != "200" ]; then
+              echo "Failed to download config from: ${BASE_URL}/${MODEL_NAME}.onnx.json (HTTP ${HTTP_CODE})"
+              rm -f "${MODEL_DIR}/${MODEL_NAME}.onnx.json"
               exit 1
-            }
+            fi
+            
+            # Verify it's valid JSON
+            if ! jq . "${MODEL_DIR}/${MODEL_NAME}.onnx.json" >/dev/null 2>&1; then
+              echo "Downloaded config is not valid JSON"
+              head -n 5 "${MODEL_DIR}/${MODEL_NAME}.onnx.json"
+              rm -f "${MODEL_DIR}/${MODEL_NAME}.onnx.json"
+              exit 1
+            fi
           fi
           
           # Verify downloads
