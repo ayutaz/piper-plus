@@ -52,7 +52,7 @@ target_include_directories(HTSEngine
 # Platform-specific settings
 if(WIN32)
   target_compile_definitions(HTSEngine PRIVATE
-    AUDIO_PLAY_WIN32
+    AUDIO_PLAY_NONE  # Disable audio playback on Windows to avoid SDK issues
     _CRT_SECURE_NO_WARNINGS
     WIN32_LEAN_AND_MEAN
   )
