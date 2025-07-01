@@ -59,7 +59,17 @@ if(WIN32)
     WIN32_LEAN_AND_MEAN
   )
   
-  # Architecture definitions are handled in the patched HTS_audio.c
+  # Add architecture definitions to avoid Windows SDK issues
+  if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+    target_compile_definitions(HTSEngine PRIVATE _AMD64_)
+  else()
+    target_compile_definitions(HTSEngine PRIVATE _X86_)
+  endif()
+  
+  # Prevent ARM64 intrinsics on non-ARM64 builds
+  if(NOT CMAKE_SYSTEM_PROCESSOR MATCHES "ARM64")
+    target_compile_definitions(HTSEngine PRIVATE _ARM64_INTRINSICS_)
+  endif()
   
   # Link Windows audio libraries
   target_link_libraries(HTSEngine PRIVATE winmm)
