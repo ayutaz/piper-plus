@@ -130,12 +130,12 @@ TEST_F(DictionaryManagerTest, CheckDictionary) {
     snprintf(unk_dic, sizeof(unk_dic), "%s/unk.dic", test_dict_path);
     
     FILE* fp = fopen(sys_dic, "w");
-    ASSERT_NE(fp, nullptr) << "Failed to create sys.dic";
+    ASSERT_NE(fp, nullptr) << "Failed to create sys.dic at " << sys_dic;
     fprintf(fp, "dummy content\n");
     fclose(fp);
     
     fp = fopen(unk_dic, "w");
-    ASSERT_NE(fp, nullptr) << "Failed to create unk.dic";
+    ASSERT_NE(fp, nullptr) << "Failed to create unk.dic at " << unk_dic;
     fprintf(fp, "dummy content\n");
     fclose(fp);
     
