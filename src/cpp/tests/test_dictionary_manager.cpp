@@ -12,8 +12,8 @@ class DictionaryManagerTest : public ::testing::Test {
 protected:
     void SetUp() override {
         // Create a temporary test directory
-        char temp_template[] = "/tmp/piper_test_XXXXXX";
-        test_dir = mkdtemp(temp_template);
+        temp_dir_buffer = strdup("/tmp/piper_test_XXXXXX");
+        test_dir = mkdtemp(temp_dir_buffer);
         ASSERT_NE(test_dir, nullptr);
         
         // Save original environment variables
@@ -65,8 +65,15 @@ protected:
             snprintf(cmd, sizeof(cmd), "rm -rf %s", test_dir);
             system(cmd);
         }
+        
+        // Free allocated memory
+        if (temp_dir_buffer) {
+            free(temp_dir_buffer);
+            temp_dir_buffer = nullptr;
+        }
     }
     
+    char* temp_dir_buffer = nullptr;
     char* test_dir = nullptr;
     const char* original_home = nullptr;
     const char* original_dict_dir = nullptr;
