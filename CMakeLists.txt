@@ -61,17 +61,20 @@ if(BUILD_TESTS)
   add_subdirectory(src/cpp/tests)
 endif()
 
-# Add OpenJTalk support on all platforms
-target_sources(piper PRIVATE
-  src/cpp/openjtalk_phonemize.cpp
-  src/cpp/openjtalk_wrapper.c
-  src/cpp/openjtalk_dictionary_manager.c
-)
-target_sources(test_piper PRIVATE
-  src/cpp/openjtalk_phonemize.cpp
-  src/cpp/openjtalk_wrapper.c
-  src/cpp/openjtalk_dictionary_manager.c
-)
+# Add OpenJTalk support
+# Temporarily disable on Windows due to VS2019/Windows SDK compatibility issues with HTSEngine
+if(NOT WIN32)
+  target_sources(piper PRIVATE
+    src/cpp/openjtalk_phonemize.cpp
+    src/cpp/openjtalk_wrapper.c
+    src/cpp/openjtalk_dictionary_manager.c
+  )
+  target_sources(test_piper PRIVATE
+    src/cpp/openjtalk_phonemize.cpp
+    src/cpp/openjtalk_wrapper.c
+    src/cpp/openjtalk_dictionary_manager.c
+  )
+endif()
 
 
 # Configure RPATH for macOS
@@ -187,10 +190,11 @@ endif()
 # ---- HTSEngine and OpenJTalk ----
 
 if(WIN32)
-  # Use CMake-based build for Windows
-  include(cmake/HTSEngine.cmake)
-  include(cmake/OpenJTalk.cmake)
-else()
+  # Temporarily disabled due to VS2019/Windows SDK compatibility issues
+  # TODO: Re-enable when migrating to VS2022 or fixing SDK compatibility
+  # include(cmake/HTSEngine.cmake)
+  # include(cmake/OpenJTalk.cmake)
+elseif(NOT WIN32)
   # Use autotools-based build for Unix
   if(NOT DEFINED HTS_ENGINE_DIR)
     set(HTS_ENGINE_DIR "${CMAKE_CURRENT_BINARY_DIR}/he")

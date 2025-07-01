@@ -332,7 +332,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]  # Windowsサポートを再有効化
+        os: [ubuntu-latest, macos-latest, windows-latest]
         language:
           - en_US  # English (US)
           - en_GB  # English (UK)
@@ -347,6 +347,10 @@ jobs:
           - nl_NL  # Dutch
           - pl_PL  # Polish
           - sv_SE  # Swedish
+        exclude:
+          # Skip Japanese on Windows due to OpenJTalk/HTSEngine build issues
+          - os: windows-latest
+            language: ja_JP
         include:
           # Define test models for each language
           - language: en_US
