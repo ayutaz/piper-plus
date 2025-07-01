@@ -98,6 +98,7 @@ jobs:
   build_linux:
     name: Build Linux
     runs-on: ubuntu-latest
+    timeout-minutes: 45  # Set timeout for ARM64 builds
     needs: [create_dev_release]
     strategy:
       fail-fast: false  # Continue other builds even if one fails
@@ -855,45 +856,51 @@ jobs:
             ls -la piper/lib/ || true
           fi
           
-          # Download test model (skip for now - model URL needs to be verified)
-          echo "Skipping Japanese model download for now..."
-          # curl -L -o test/models/ja_JP-test-medium.onnx \
-          #   "https://github.com/rhasspy/piper/releases/download/v1.2.0/voice-ja_JP-test-medium.onnx" || \
-          #   echo "Warning: Failed to download model, will try with built-in test"
+          # Use English model for testing (Japanese-specific model not available)
+          mkdir -p test/models
+          if [ -f "etc/test_voice.onnx" ]; then
+            echo "Using built-in test voice"
+            cp etc/test_voice.onnx test/models/test-voice.onnx
+          else
+            echo "No test model available, will test binary functionality only"
+          fi
           
           # Run TTS with help first to verify binary works
           "${{ matrix.binary_path }}" --help || echo "Warning: Help command failed"
           
           # Run TTS
-          # Prefer Japanese model for testing PUA phoneme mapping
-          if [ -f "test/models/ja_JP-test-medium.onnx" ]; then
-            echo "Using Japanese model with Japanese text"
+          if [ -f "test/models/test-voice.onnx" ]; then
+            echo "Using test voice model"
             echo "Environment variables:"
             echo "OPENJTALK_DICTIONARY_DIR=$OPENJTALK_DICTIONARY_DIR"
             echo "OPENJTALK_VOICE=$OPENJTALK_VOICE"
             echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH"
             echo "DYLD_LIBRARY_PATH=$DYLD_LIBRARY_PATH"
             
-            # Run with debug output from the start
-            echo "Running TTS with debug output..."
-            cat test_input.txt | "${{ matrix.binary_path }}" --model test/models/ja_JP-test-medium.onnx --output_file test_output.wav --debug
+            # Test with both English and Japanese text
+            echo "Testing English TTS..."
+            echo "Hello, this is a test." | "${{ matrix.binary_path }}" --model test/models/test-voice.onnx --output_file test_english.wav
             if [ $? -ne 0 ]; then
-              echo "Japanese TTS failed!"
-              # Try to get more information
-              echo "Checking for core dump..."
-              ls -la core* || echo "No core dump found"
+              echo "English TTS failed!"
               exit 1
             fi
-          elif [ -f "etc/test_voice.onnx" ]; then
-            echo "Using test voice from repository (English model)"
-            cat test_input.txt | "${{ matrix.binary_path }}" --model etc/test_voice.onnx --output_file test_output.wav || echo "Test voice failed"
-          else
-            # Fallback: just test that the binary runs
-            echo "Testing binary functionality..."
-            # Test with --version command
-            "${{ matrix.binary_path }}" --version || echo "Version check failed"
             
-            echo "✅ Binary test completed (model test skipped)"
+            # Test Japanese phonemization (will use espeak-ng fallback on model mismatch)
+            echo "Testing Japanese phonemization..."
+            echo "こんにちは、世界" | "${{ matrix.binary_path }}" --model test/models/test-voice.onnx --output_file test_japanese.wav || {
+              echo "Japanese phonemization test failed (expected for English model)"
+            }
+            
+            echo "✅ TTS tests completed"
+          elif [ -f "etc/test_voice.onnx" ]; then
+            echo "Using test voice from repository"
+            cat test_input.txt | "${{ matrix.binary_path }}" --model etc/test_voice.onnx --output_file test_output.wav
+          else
+            # Test that the binary runs
+            echo "Testing binary functionality..."
+            "${{ matrix.binary_path }}" --version
+            
+            echo "✅ Binary test completed"
           fi
           
           # Verify output
@@ -927,15 +934,14 @@ jobs:
             exit 1
           }
           
-          # Download test model (skip for now - model URL needs to be verified)
-          Write-Host "Skipping Japanese model download for now..."
-          # New-Item -ItemType Directory -Force -Path "test\models" | Out-Null
-          # try {
-          #   Invoke-WebRequest -Uri "https://github.com/rhasspy/piper/releases/download/v1.2.0/voice-ja_JP-test-medium.onnx" `
-          #     -OutFile "test\models\ja_JP-test-medium.onnx"
-          # } catch {
-          #   Write-Host "Warning: Failed to download model, will try with built-in test"
-          # }
+          # Use English model for testing (Japanese-specific model not available)
+          New-Item -ItemType Directory -Force -Path "test\models" | Out-Null
+          if (Test-Path "etc\test_voice.onnx") {
+            Write-Host "Using built-in test voice"
+            Copy-Item "etc\test_voice.onnx" -Destination "test\models\test-voice.onnx"
+          } else {
+            Write-Host "No test model available, will test binary functionality only"
+          }
           
           # Run TTS with help first to verify binary works
           Write-Host "Running: ${{ matrix.binary_path }} --help"
@@ -954,36 +960,38 @@ jobs:
           }
           
           # Run TTS
-          if (Test-Path "test\models\ja_JP-test-medium.onnx") {
-            Get-Content test_input.txt | & "${{ matrix.binary_path }}" --model test\models\ja_JP-test-medium.onnx --output_file test_output.wav
+          if (Test-Path "test\models\test-voice.onnx") {
+            Write-Host "Using test voice model"
+            
+            # Test with English text
+            Write-Host "Testing English TTS..."
+            "Hello, this is a test." | & "${{ matrix.binary_path }}" --model test\models\test-voice.onnx --output_file test_english.wav
+            if ($LASTEXITCODE -ne 0) {
+              Write-Error "English TTS failed!"
+              exit 1
+            }
+            
+            # Test Japanese phonemization (will use espeak-ng fallback on model mismatch)
+            Write-Host "Testing Japanese phonemization..."
+            "こんにちは、世界" | & "${{ matrix.binary_path }}" --model test\models\test-voice.onnx --output_file test_japanese.wav
+            if ($LASTEXITCODE -ne 0) {
+              Write-Host "Japanese phonemization test failed (expected for English model)"
+            }
+            
+            Write-Host "✅ TTS tests completed"
+          } elseif (Test-Path "etc\test_voice.onnx") {
+            Write-Host "Using test voice from repository"
+            Get-Content test_input.txt | & "${{ matrix.binary_path }}" --model etc\test_voice.onnx --output_file test_output.wav
           } else {
-            # Fallback: just test that the binary runs
+            # Test that the binary runs
             Write-Host "Testing binary functionality..."
-            # Test with --version command
-            Write-Host "Running: ${{ matrix.binary_path }} --version"
-            try {
-              & "${{ matrix.binary_path }}" --version 2>&1 | Out-String | Write-Host
-              $versionExitCode = $LASTEXITCODE
-            } catch {
-              Write-Host "Exception running version: $_"
-              $versionExitCode = 1
-            }
-            if ($versionExitCode -ne 0) {
-              Write-Host "Version check failed with exit code $versionExitCode"
+            & "${{ matrix.binary_path }}" --version
+            if ($LASTEXITCODE -ne 0) {
+              Write-Error "Version check failed"
+              exit 1
             }
             
-            # Try to use the test voice from the repository
-            if (Test-Path "etc\test_voice.onnx") {
-              Write-Host "Using test voice from repository"
-              "Testing" | & "${{ matrix.binary_path }}" --model etc\test_voice.onnx --output_file test_output.wav
-              if ($LASTEXITCODE -ne 0) {
-                Write-Host "Test voice failed with exit code $LASTEXITCODE"
-              }
-            } else {
-              Write-Host "No test model available, skipping TTS test"
-            }
-            
-            Write-Host "✅ Binary test completed (model test skipped)"
+            Write-Host "✅ Binary test completed"
           }
           
           # Verify output
