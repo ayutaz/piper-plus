@@ -26,8 +26,9 @@ if(WIN32)
       ${CMAKE_COMMAND} -E copy 
         ${CMAKE_CURRENT_SOURCE_DIR}/cmake/HTSEngine_CMakeLists.txt 
         <SOURCE_DIR>/CMakeLists.txt
-      COMMAND ${CMAKE_COMMAND} -E chdir <SOURCE_DIR>
-        patch -p1 -N < ${CMAKE_CURRENT_SOURCE_DIR}/cmake/hts_audio_windows.patch || true
+      COMMAND ${CMAKE_COMMAND} -E copy
+        ${CMAKE_CURRENT_SOURCE_DIR}/cmake/hts_audio_windows.c
+        <SOURCE_DIR>/lib/HTS_audio.c
     BUILD_BYPRODUCTS 
       ${HTS_ENGINE_DIR}/lib/HTSEngine.lib
       ${HTS_ENGINE_DIR}/lib/libHTSEngine.a

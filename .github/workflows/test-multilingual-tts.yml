@@ -391,7 +391,7 @@ jobs:
             model: "zh_CN-huayan-medium"
             test_text: "你好，这是语音合成系统的测试。"
           - language: ja_JP
-            model: "en_US-lessac-medium"  # Use English model for testing Japanese phonemization
+            model: "ja_JP-test-medium"  # Use actual Japanese test model
             test_text: "こんにちは、これは音声合成システムのテストです。"
           - language: nl_NL
             model: "nl_NL-mls-medium"
@@ -485,16 +485,18 @@ jobs:
           # Construct URL following HuggingFace structure
           BASE_URL="https://huggingface.co/${MODEL_REPO}/resolve/${MODEL_VERSION}/${LANG_PREFIX}/${{ matrix.language }}/${SPEAKER}/${QUALITY}"
           
-          # Special handling for Japanese (uses English model)
-          if [ "${{ matrix.language }}" = "ja_JP" ] && [ "${MODEL_NAME}" = "en_US-lessac-medium" ]; then
-            # For Japanese tests, we use the English model
-            LANG_PREFIX="en"
-            ACTUAL_LANG="en_US"
-            BASE_URL="https://huggingface.co/${MODEL_REPO}/resolve/${MODEL_VERSION}/${LANG_PREFIX}/${ACTUAL_LANG}/${SPEAKER}/${QUALITY}"
+          # Special handling for Japanese test model
+          if [ "${{ matrix.language }}" = "ja_JP" ] && [ "${MODEL_NAME}" = "ja_JP-test-medium" ]; then
+            # Japanese test model is in the repository
+            echo "Using local Japanese test model"
+            cp "${{ github.workspace }}/test/models/${MODEL_NAME}.onnx" "test/models/" || true
+            cp "${{ github.workspace }}/test/models/${MODEL_NAME}.onnx.json" "test/models/" || true
+            # Skip download
+            SKIP_DOWNLOAD=true
           fi
           
           # Download model files if not cached
-          if [ ! -f "${MODEL_DIR}/${MODEL_NAME}.onnx" ]; then
+          if [ "${SKIP_DOWNLOAD}" != "true" ] && [ ! -f "${MODEL_DIR}/${MODEL_NAME}.onnx" ]; then
             echo "Downloading ${MODEL_NAME} model..."
             echo "URL: ${BASE_URL}/${MODEL_NAME}.onnx?download=true"
             # Download with headers to check content type
@@ -508,7 +510,7 @@ jobs:
             fi
           fi
           
-          if [ ! -f "${MODEL_DIR}/${MODEL_NAME}.onnx.json" ]; then
+          if [ "${SKIP_DOWNLOAD}" != "true" ] && [ ! -f "${MODEL_DIR}/${MODEL_NAME}.onnx.json" ]; then
             echo "Downloading ${MODEL_NAME} config..."
             echo "URL: ${BASE_URL}/${MODEL_NAME}.onnx.json?download=true"
             HTTP_CODE=$(curl -L -o "${MODEL_DIR}/${MODEL_NAME}.onnx.json" -w "%{http_code}" \
@@ -530,19 +532,21 @@ jobs:
           fi
           
           # Verify downloads
-          if [ ! -s "${MODEL_DIR}/${MODEL_NAME}.onnx" ]; then
+          if [ "${SKIP_DOWNLOAD}" != "true" ] && [ ! -s "${MODEL_DIR}/${MODEL_NAME}.onnx" ]; then
             echo "Error: Model file is empty or corrupted"
             exit 1
           fi
           
-          if [ ! -s "${MODEL_DIR}/${MODEL_NAME}.onnx.json" ]; then
+          if [ "${SKIP_DOWNLOAD}" != "true" ] && [ ! -s "${MODEL_DIR}/${MODEL_NAME}.onnx.json" ]; then
             echo "Error: Config file is empty or corrupted"
             exit 1
           fi
           
-          # Copy to test directory
-          cp "${MODEL_DIR}/${MODEL_NAME}.onnx" "test/models/"
-          cp "${MODEL_DIR}/${MODEL_NAME}.onnx.json" "test/models/"
+          # Copy to test directory if downloaded
+          if [ "${SKIP_DOWNLOAD}" != "true" ]; then
+            cp "${MODEL_DIR}/${MODEL_NAME}.onnx" "test/models/"
+            cp "${MODEL_DIR}/${MODEL_NAME}.onnx.json" "test/models/"
+          fi
           
           # Verify downloads
           ls -la test/models/

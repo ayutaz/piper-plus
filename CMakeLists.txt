@@ -62,19 +62,16 @@ if(BUILD_TESTS)
 endif()
 
 # Add OpenJTalk support
-# Temporarily disable on Windows due to VS2019/Windows SDK compatibility issues with HTSEngine
-if(NOT WIN32)
-  target_sources(piper PRIVATE
-    src/cpp/openjtalk_phonemize.cpp
-    src/cpp/openjtalk_wrapper.c
-    src/cpp/openjtalk_dictionary_manager.c
-  )
-  target_sources(test_piper PRIVATE
-    src/cpp/openjtalk_phonemize.cpp
-    src/cpp/openjtalk_wrapper.c
-    src/cpp/openjtalk_dictionary_manager.c
-  )
-endif()
+target_sources(piper PRIVATE
+  src/cpp/openjtalk_phonemize.cpp
+  src/cpp/openjtalk_wrapper.c
+  src/cpp/openjtalk_dictionary_manager.c
+)
+target_sources(test_piper PRIVATE
+  src/cpp/openjtalk_phonemize.cpp
+  src/cpp/openjtalk_wrapper.c
+  src/cpp/openjtalk_dictionary_manager.c
+)
 
 
 # Configure RPATH for macOS
@@ -190,10 +187,9 @@ endif()
 # ---- HTSEngine and OpenJTalk ----
 
 if(WIN32)
-  # Temporarily disabled due to VS2019/Windows SDK compatibility issues
-  # TODO: Re-enable when migrating to VS2022 or fixing SDK compatibility
-  # include(cmake/HTSEngine.cmake)
-  # include(cmake/OpenJTalk.cmake)
+  # Use CMake-based build for Windows
+  include(cmake/HTSEngine.cmake)
+  include(cmake/OpenJTalk.cmake)
 elseif(NOT WIN32)
   # Use autotools-based build for Unix
   if(NOT DEFINED HTS_ENGINE_DIR)
@@ -309,11 +305,9 @@ if(TARGET hts_engine_external AND TARGET openjtalk_external)
   if(WIN32)
     target_link_libraries(piper
       ${CMAKE_CURRENT_BINARY_DIR}/he/lib/HTSEngine.lib
-      ${CMAKE_CURRENT_BINARY_DIR}/oj/lib/libopenjtalk.lib
     )
     target_link_libraries(test_piper
       ${CMAKE_CURRENT_BINARY_DIR}/he/lib/HTSEngine.lib
-      ${CMAKE_CURRENT_BINARY_DIR}/oj/lib/libopenjtalk.lib
     )
   else()
     target_link_libraries(piper
@@ -456,13 +450,22 @@ install(
 )
 
 # Install OpenJTalk for Japanese TTS support
-if(NOT WIN32 AND NOT MSVC)
-  # Install OpenJTalk binary
-  install(
-    PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/oj/bin/open_jtalk
-    DESTINATION bin
-    OPTIONAL  # Don't fail if not built
-  )
+if(TARGET openjtalk_external)
+  if(WIN32)
+    # Install Windows OpenJTalk binary
+    install(
+      PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/oj/bin/open_jtalk.exe
+      DESTINATION bin
+      OPTIONAL  # Don't fail if not built
+    )
+  else()
+    # Install Unix OpenJTalk binary
+    install(
+      PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/oj/bin/open_jtalk
+      DESTINATION bin
+      OPTIONAL  # Don't fail if not built
+    )
+  endif()
 
   # Install OpenJTalk dictionary
   install(
