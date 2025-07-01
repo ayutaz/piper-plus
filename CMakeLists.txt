@@ -29,6 +29,7 @@ if(MSVC)
   # Define Windows version macros
   add_compile_definitions(WIN32_LEAN_AND_MEAN)
   add_compile_definitions(_WIN32_WINNT=0x0601)  # Windows 7 and later
+  add_compile_definitions(_CRT_SECURE_NO_WARNINGS)  # Disable deprecation warnings
 elseif(APPLE)
   # macOS flags
   string(APPEND CMAKE_CXX_FLAGS " -Wall -Wextra")

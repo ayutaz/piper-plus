@@ -48,40 +48,41 @@ OpenJTalk* openjtalk_initialize() {
         // System paths
         "/usr/local/bin/open_jtalk",
         "/usr/bin/open_jtalk",
-        "/opt/homebrew/bin/open_jtalk",  // macOS ARM64 homebrew
-        "/opt/local/bin/open_jtalk",      // macOS MacPorts
         NULL
     };
     
-    const char* found_bin = NULL;
+    oj->openjtalk_bin = NULL;
     for (int i = 0; possible_paths[i] != NULL; i++) {
         if (access(possible_paths[i], X_OK) == 0) {
-            found_bin = possible_paths[i];
+            oj->openjtalk_bin = strdup(possible_paths[i]);
             break;
         }
     }
     
-    if (!found_bin) {
-        // Try to find it relative to build directory
-        char build_path[512];
-        snprintf(build_path, sizeof(build_path), "%s/../oj/bin/open_jtalk", dic_path);
-        if (access(build_path, X_OK) == 0) {
-            found_bin = build_path;
+    if (!oj->openjtalk_bin) {
+        // Try using 'which' command as last resort
+        FILE* fp = popen("which open_jtalk 2>/dev/null", "r");
+        if (fp) {
+            char path[PATH_MAX];
+            if (fgets(path, sizeof(path), fp)) {
+                // Remove trailing newline
+                size_t len = strlen(path);
+                if (len > 0 && path[len-1] == '\n') {
+                    path[len-1] = '\0';
+                }
+                oj->openjtalk_bin = strdup(path);
+            }
+            pclose(fp);
         }
     }
     
-    if (!found_bin) {
-        fprintf(stderr, "open_jtalk binary not found. Searched paths:\n");
-        for (int i = 0; possible_paths[i] != NULL; i++) {
-            fprintf(stderr, "  %s\n", possible_paths[i]);
-        }
-        fprintf(stderr, "Please ensure OpenJTalk is installed or built\n");
+    if (!oj->openjtalk_bin) {
+        fprintf(stderr, "open_jtalk binary not found\n");
         free(oj);
         return NULL;
     }
     
     oj->dic_path = strdup(dic_path);
-    oj->openjtalk_bin = strdup(found_bin);
     oj->initialized = 1;
     
     return (OpenJTalk*)oj;
@@ -92,244 +93,167 @@ void openjtalk_finalize(OpenJTalk* oj) {
     
     struct OpenJTalk_impl* impl = (struct OpenJTalk_impl*)oj;
     
-    if (impl->dic_path) free(impl->dic_path);
-    if (impl->openjtalk_bin) free(impl->openjtalk_bin);
+    if (impl->dic_path) {
+        free(impl->dic_path);
+    }
+    if (impl->openjtalk_bin) {
+        free(impl->openjtalk_bin);
+    }
     
-    free(oj);
-}
-
-// Parse phoneme from OpenJTalk label format
-static char* extract_phoneme_from_label(const char* label) {
-    // OpenJTalk label format includes phoneme after "-" and before "+"
-    // Example: "xx^xx-sil+xx=xx/A:xx..."
-    const char* start = strchr(label, '-');
-    if (!start) return NULL;
-    start++; // Skip '-'
-    
-    const char* end = strchr(start, '+');
-    if (!end) return NULL;
-    
-    size_t len = end - start;
-    if (len == 0) return NULL;
-    
-    // Skip if phoneme contains invalid characters like '>'
-    if (memchr(start, '>', len) != NULL) return NULL;
-    
-    char* phoneme = (char*)malloc(len + 1);
-    if (!phoneme) return NULL;
-    
-    strncpy(phoneme, start, len);
-    phoneme[len] = '\0';
-    
-    return phoneme;
+    free(impl);
 }
 
 HTS_Label_Wrapper* openjtalk_extract_fullcontext(OpenJTalk* oj, const char* text) {
-    if (!oj || !text || strlen(text) == 0) return NULL;
+    if (!oj || !text) return NULL;
     
     struct OpenJTalk_impl* impl = (struct OpenJTalk_impl*)oj;
     if (!impl->initialized) return NULL;
     
-    // Create temporary files in platform-appropriate directory
-    const char* temp_dir = getenv("TMPDIR");
-    if (!temp_dir) temp_dir = getenv("TMP");
-    if (!temp_dir) temp_dir = getenv("TEMP");
-    if (!temp_dir) temp_dir = "/tmp";
-    
-    char input_file[512];
-    char output_file[512];
-    char trace_file[512];
-    
-    snprintf(input_file, sizeof(input_file), "%s/openjtalk_input_XXXXXX", temp_dir);
-    snprintf(output_file, sizeof(output_file), "%s/openjtalk_output_XXXXXX", temp_dir);
-    snprintf(trace_file, sizeof(trace_file), "%s/openjtalk_trace_XXXXXX", temp_dir);
+    // Create temporary files
+    char input_file[] = "/tmp/openjtalk_input_XXXXXX";
+    char output_file[] = "/tmp/openjtalk_output_XXXXXX";
     
     int input_fd = mkstemp(input_file);
-    if (input_fd < 0) return NULL;
-    
-    int output_fd = mkstemp(output_file);
-    if (output_fd < 0) {
-        close(input_fd);
-        unlink(input_file);
+    if (input_fd < 0) {
+        fprintf(stderr, "Failed to create temp input file\n");
         return NULL;
     }
     
-    int trace_fd = mkstemp(trace_file);
-    if (trace_fd < 0) {
-        close(input_fd);
-        close(output_fd);
-        unlink(input_file);
-        unlink(output_file);
-        return NULL;
-    }
-    
-    // Write input text
+    // Write text to input file
     FILE* fp = fdopen(input_fd, "w");
     if (!fp) {
         close(input_fd);
-        close(output_fd);
-        close(trace_fd);
         unlink(input_file);
-        unlink(output_file);
-        unlink(trace_file);
         return NULL;
     }
     
-    // Write the text exactly as provided
-    fprintf(fp, "%s", text);
-    // Ensure proper line ending
-    if (text[strlen(text)-1] != '\n') {
-        fprintf(fp, "\n");
-    }
+    // Write UTF-8 BOM to ensure proper encoding
+    fprintf(fp, "\xEF\xBB\xBF%s", text);
     fclose(fp);
-    close(output_fd);
-    close(trace_fd);
     
-    // Run open_jtalk with trace output only (no voice synthesis)
-    pid_t pid = fork();
-    if (pid == 0) {
-        // Child process
-        // Try to ensure HTS voice is available
-        const char* voice_path = NULL;
-        if (openjtalk_ensure_hts_voice(&voice_path) == 0 && voice_path) {
-            // Use provided or auto-downloaded voice model
-            execl(impl->openjtalk_bin, "open_jtalk",
-                  "-x", impl->dic_path,
-                  "-m", voice_path,
-                  "-ot", trace_file,
-                  "-ow", "/dev/null",  // Discard audio output
-                  input_file,
-                  NULL);
-        } else {
-            // Try without voice model (may not work with all OpenJTalk versions)
-            execl(impl->openjtalk_bin, "open_jtalk",
-                  "-x", impl->dic_path,
-                  "-ot", trace_file,
-                  input_file,
-                  NULL);
-        }
-        _exit(1);
-    } else if (pid < 0) {
-        // Fork failed
+    int output_fd = mkstemp(output_file);
+    if (output_fd < 0) {
+        unlink(input_file);
+        return NULL;
+    }
+    close(output_fd);  // We just need the filename
+    
+    // Build command
+    char* command = malloc(4096);
+    if (!command) {
         unlink(input_file);
         unlink(output_file);
-        unlink(trace_file);
         return NULL;
     }
     
-    // Wait for process
-    int status;
-    waitpid(pid, &status, 0);
+    snprintf(command, 4096, "%s -x %s -ot %s %s > /dev/null 2>&1",
+             impl->openjtalk_bin, impl->dic_path, output_file, input_file);
     
-    if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
+    // Execute OpenJTalk
+    int ret = system(command);
+    free(command);
+    
+    if (ret != 0) {
+        fprintf(stderr, "OpenJTalk command failed with code %d\n", ret);
         unlink(input_file);
         unlink(output_file);
-        unlink(trace_file);
         return NULL;
     }
     
-    // Read trace file for labels
-    fp = fopen(trace_file, "r");
+    // Read output file
+    fp = fopen(output_file, "r");
     if (!fp) {
+        fprintf(stderr, "Failed to open output file\n");
         unlink(input_file);
         unlink(output_file);
-        unlink(trace_file);
         return NULL;
     }
     
-    // Create wrapper
-    struct HTS_Label_Wrapper_impl* wrapper = (struct HTS_Label_Wrapper_impl*)calloc(1, sizeof(struct HTS_Label_Wrapper_impl));
-    if (!wrapper) {
+    // Create label wrapper
+    struct HTS_Label_Wrapper_impl* label = calloc(1, sizeof(struct HTS_Label_Wrapper_impl));
+    if (!label) {
         fclose(fp);
         unlink(input_file);
         unlink(output_file);
-        unlink(trace_file);
         return NULL;
     }
     
-    // Read labels
+    label->capacity = 100;
+    label->labels = malloc(label->capacity * sizeof(char*));
+    if (!label->labels) {
+        free(label);
+        fclose(fp);
+        unlink(input_file);
+        unlink(output_file);
+        return NULL;
+    }
+    
+    // Read labels from file, skipping BOM if present
     char line[4096];
-    size_t capacity = 64;
-    wrapper->labels = (char**)calloc(capacity, sizeof(char*));
-    if (!wrapper->labels) {
-        free(wrapper);
-        fclose(fp);
-        unlink(input_file);
-        unlink(output_file);
-        unlink(trace_file);
-        return NULL;
-    }
-    
-    wrapper->size = 0;
-    wrapper->capacity = capacity;
+    int first_line = 1;
     
     while (fgets(line, sizeof(line), fp)) {
+        // Skip BOM on first line if present
+        char* line_start = line;
+        if (first_line && line[0] == '\xEF' && line[1] == '\xBB' && line[2] == '\xBF') {
+            line_start += 3;
+        }
+        first_line = 0;
+        
         // Remove newline
-        size_t len = strlen(line);
-        if (len > 0 && line[len-1] == '\n') {
-            line[len-1] = '\0';
+        size_t len = strlen(line_start);
+        if (len > 0 && line_start[len-1] == '\n') {
+            line_start[len-1] = '\0';
+            len--;
+        }
+        if (len > 0 && line_start[len-1] == '\r') {
+            line_start[len-1] = '\0';
         }
         
         // Skip empty lines
-        if (strlen(line) == 0) continue;
+        if (strlen(line_start) == 0) continue;
         
-        // Check if this is a label line (contains phoneme information)
-        // Also skip any error/warning lines that might contain ">"
-        if (strstr(line, "-") && strstr(line, "+") && strstr(line, "/") && !strstr(line, ">")) {
-            // Grow array if needed
-            if (wrapper->size >= wrapper->capacity) {
-                size_t new_capacity = wrapper->capacity * 2;
-                char** new_labels = (char**)realloc(wrapper->labels, new_capacity * sizeof(char*));
-                if (!new_labels) {
-                    // Cleanup on error
-                    for (size_t i = 0; i < wrapper->size; i++) {
-                        free(wrapper->labels[i]);
-                    }
-                    free(wrapper->labels);
-                    free(wrapper);
-                    fclose(fp);
-                    unlink(input_file);
-                    unlink(output_file);
-                    unlink(trace_file);
-                    return NULL;
+        // Grow array if needed
+        if (label->size >= label->capacity) {
+            label->capacity *= 2;
+            char** new_labels = realloc(label->labels, label->capacity * sizeof(char*));
+            if (!new_labels) {
+                // Clean up on error
+                for (size_t i = 0; i < label->size; i++) {
+                    free(label->labels[i]);
                 }
-                wrapper->labels = new_labels;
-                wrapper->capacity = new_capacity;
-            }
-            
-            // Store the full label
-            wrapper->labels[wrapper->size] = strdup(line);
-            if (!wrapper->labels[wrapper->size]) {
-                // Cleanup on error
-                for (size_t i = 0; i < wrapper->size; i++) {
-                    free(wrapper->labels[i]);
-                }
-                free(wrapper->labels);
-                free(wrapper);
+                free(label->labels);
+                free(label);
                 fclose(fp);
                 unlink(input_file);
                 unlink(output_file);
-                unlink(trace_file);
                 return NULL;
             }
-            wrapper->size++;
+            label->labels = new_labels;
         }
+        
+        // Store label
+        label->labels[label->size] = strdup(line_start);
+        if (!label->labels[label->size]) {
+            // Clean up on error
+            for (size_t i = 0; i < label->size; i++) {
+                free(label->labels[i]);
+            }
+            free(label->labels);
+            free(label);
+            fclose(fp);
+            unlink(input_file);
+            unlink(output_file);
+            return NULL;
+        }
+        label->size++;
     }
     
     fclose(fp);
-    
-    // Cleanup temp files
     unlink(input_file);
     unlink(output_file);
-    unlink(trace_file);
     
-    if (wrapper->size == 0) {
-        free(wrapper->labels);
-        free(wrapper);
-        return NULL;
-    }
-    
-    return (HTS_Label_Wrapper*)wrapper;
+    return (HTS_Label_Wrapper*)label;
 }
 
 size_t HTS_Label_get_size(HTS_Label_Wrapper* label) {
@@ -345,8 +269,67 @@ const char* HTS_Label_get_string(HTS_Label_Wrapper* label, size_t index) {
     return impl->labels[index];
 }
 
+int openjtalk_get_label_index(HTS_Label_Wrapper* label, size_t index, size_t* start_index, size_t* end_index) {
+    if (!label || !start_index || !end_index) return -1;
+    
+    struct HTS_Label_Wrapper_impl* impl = (struct HTS_Label_Wrapper_impl*)label;
+    if (index >= impl->size) return -1;
+    
+    const char* label_str = impl->labels[index];
+    
+    // Parse timing information from label
+    // Format: "start_time end_time phoneme_context"
+    char* endptr;
+    long start = strtol(label_str, &endptr, 10);
+    if (*endptr != ' ') return -1;
+    
+    long end = strtol(endptr + 1, &endptr, 10);
+    if (*endptr != ' ') return -1;
+    
+    *start_index = (size_t)start;
+    *end_index = (size_t)end;
+    
+    return 0;
+}
+
+const char* openjtalk_get_label_phoneme(HTS_Label_Wrapper* label, size_t index) {
+    if (!label) return NULL;
+    
+    struct HTS_Label_Wrapper_impl* impl = (struct HTS_Label_Wrapper_impl*)label;
+    if (index >= impl->size) return NULL;
+    
+    const char* label_str = impl->labels[index];
+    
+    // Skip timing information
+    const char* p = label_str;
+    
+    // Skip start time
+    while (*p && *p != ' ') p++;
+    if (!*p) return NULL;
+    p++;
+    
+    // Skip end time
+    while (*p && *p != ' ') p++;
+    if (!*p) return NULL;
+    p++;
+    
+    // Extract phoneme from context
+    // Look for "-" and "+" markers
+    const char* phoneme_start = p;
+    while (*p && *p != '-' && *p != '+') p++;
+    
+    static char phoneme_buffer[256];
+    size_t len = p - phoneme_start;
+    if (len >= sizeof(phoneme_buffer)) len = sizeof(phoneme_buffer) - 1;
+    strncpy(phoneme_buffer, phoneme_start, len);
+    phoneme_buffer[len] = '\0';
+    
+    return phoneme_buffer;
+}
+
 void HTS_Label_clear(HTS_Label_Wrapper* label) {
     if (!label) return;
+    
     struct HTS_Label_Wrapper_impl* impl = (struct HTS_Label_Wrapper_impl*)label;
     
     if (impl->labels) {
@@ -361,238 +344,50 @@ void HTS_Label_clear(HTS_Label_Wrapper* label) {
 
 #else  // Windows implementation
 
-#include <windows.h>
-#include <process.h>
-#include <io.h>
-#include <fcntl.h>
-#include <sys/stat.h>
+// Windows stub implementation - OpenJTalk is not yet supported on Windows
+// These are placeholder definitions to allow compilation
 
-// Windows implementation of OpenJTalk wrapper
-struct OpenJTalk {
-    char* openjtalk_path;
-    char* dictionary_path;
+struct OpenJTalk_impl {
+    int dummy;  // Placeholder
 };
 
-struct HTS_Label_Wrapper {
-    char** labels;
-    size_t num_labels;
+struct HTS_Label_Wrapper_impl {
+    int dummy;  // Placeholder
 };
 
 OpenJTalk* openjtalk_initialize() {
-    OpenJTalk* oj = (OpenJTalk*)malloc(sizeof(OpenJTalk));
-    if (!oj) return NULL;
-    
-    oj->openjtalk_path = NULL;
-    oj->dictionary_path = NULL;
-    
-    // Find OpenJTalk binary
-    const char* possible_paths[] = {
-        "open_jtalk.exe",
-        "./open_jtalk.exe",
-        "../bin/open_jtalk.exe",
-        "../../bin/open_jtalk.exe",
-        "./build/oj/bin/open_jtalk.exe",
-        "./build/Release/open_jtalk.exe"
-    };
-    
-    for (int i = 0; i < sizeof(possible_paths)/sizeof(possible_paths[0]); i++) {
-        if (_access(possible_paths[i], 0) == 0) {
-            oj->openjtalk_path = _strdup(possible_paths[i]);
-            break;
-        }
-    }
-    
-    if (!oj->openjtalk_path) {
-        // Try to find in PATH
-        char path[MAX_PATH];
-        if (SearchPathA(NULL, "open_jtalk", ".exe", MAX_PATH, path, NULL)) {
-            oj->openjtalk_path = _strdup(path);
-        }
-    }
-    
-    if (!oj->openjtalk_path) {
-        LOG_ERROR("Failed to find open_jtalk.exe");
-        free(oj);
-        return NULL;
-    }
-    
-    // Get dictionary path
-    oj->dictionary_path = openjtalk_get_dict_path();
-    if (!oj->dictionary_path) {
-        LOG_ERROR("Failed to get dictionary path");
-        free(oj->openjtalk_path);
-        free(oj);
-        return NULL;
-    }
-    
-    return oj;
+    // OpenJTalk is not yet supported on Windows
+    return NULL;
 }
 
 void openjtalk_finalize(OpenJTalk* oj) {
-    if (oj) {
-        if (oj->openjtalk_path) free(oj->openjtalk_path);
-        if (oj->dictionary_path) free(oj->dictionary_path);
-        free(oj);
-    }
+    // No-op on Windows
+    (void)oj;
 }
 
 HTS_Label_Wrapper* openjtalk_extract_fullcontext(OpenJTalk* oj, const char* text) {
-    if (!oj || !text) return NULL;
-    
-    // Create temporary files
-    char temp_path[MAX_PATH];
-    char input_file[MAX_PATH];
-    char output_file[MAX_PATH];
-    
-    GetTempPathA(MAX_PATH, temp_path);
-    
-    // Generate unique filenames
-    snprintf(input_file, MAX_PATH, "%s\\openjtalk_input_%d.txt", temp_path, GetCurrentProcessId());
-    snprintf(output_file, MAX_PATH, "%s\\openjtalk_output_%d.txt", temp_path, GetCurrentProcessId());
-    
-    // Write input text to file
-    FILE* fp = fopen(input_file, "wb");
-    if (!fp) {
-        LOG_ERROR("Failed to create input file: %s", input_file);
-        return NULL;
-    }
-    
-    // Write UTF-8 BOM if text contains Japanese characters
-    unsigned char utf8_bom[] = {0xEF, 0xBB, 0xBF};
-    fwrite(utf8_bom, 1, 3, fp);
-    fwrite(text, 1, strlen(text), fp);
-    fclose(fp);
-    
-    // Build command line
-    char command[4096];
-    snprintf(command, sizeof(command),
-             "\"%s\" -x \"%s\" -ot \"%s\" \"%s\"",
-             oj->openjtalk_path,
-             oj->dictionary_path,
-             output_file,
-             input_file);
-    
-    // Execute OpenJTalk
-    STARTUPINFOA si;
-    PROCESS_INFORMATION pi;
-    ZeroMemory(&si, sizeof(si));
-    si.cb = sizeof(si);
-    si.dwFlags = STARTF_USESHOWWINDOW;
-    si.wShowWindow = SW_HIDE;
-    ZeroMemory(&pi, sizeof(pi));
-    
-    if (!CreateProcessA(NULL, command, NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi)) {
-        LOG_ERROR("Failed to execute OpenJTalk: %s", command);
-        _unlink(input_file);
-        return NULL;
-    }
-    
-    // Wait for process to complete
-    WaitForSingleObject(pi.hProcess, INFINITE);
-    
-    DWORD exit_code;
-    GetExitCodeProcess(pi.hProcess, &exit_code);
-    CloseHandle(pi.hProcess);
-    CloseHandle(pi.hThread);
-    
-    if (exit_code != 0) {
-        LOG_ERROR("OpenJTalk exited with code %d", exit_code);
-        _unlink(input_file);
-        return NULL;
-    }
-    
-    // Read output file
-    fp = fopen(output_file, "rb");
-    if (!fp) {
-        LOG_ERROR("Failed to open output file: %s", output_file);
-        _unlink(input_file);
-        return NULL;
-    }
-    
-    // Get file size
-    fseek(fp, 0, SEEK_END);
-    long file_size = ftell(fp);
-    fseek(fp, 0, SEEK_SET);
-    
-    // Skip BOM if present
-    unsigned char bom[3];
-    if (fread(bom, 1, 3, fp) == 3) {
-        if (bom[0] != 0xEF || bom[1] != 0xBB || bom[2] != 0xBF) {
-            fseek(fp, 0, SEEK_SET);
-        }
-    } else {
-        fseek(fp, 0, SEEK_SET);
-    }
-    
-    // Read file content
-    char* buffer = (char*)malloc(file_size + 1);
-    if (!buffer) {
-        fclose(fp);
-        _unlink(input_file);
-        _unlink(output_file);
-        return NULL;
-    }
-    
-    size_t read_size = fread(buffer, 1, file_size, fp);
-    buffer[read_size] = '\0';
-    fclose(fp);
-    
-    // Parse labels
-    HTS_Label_Wrapper* label = (HTS_Label_Wrapper*)malloc(sizeof(HTS_Label_Wrapper));
-    if (!label) {
-        free(buffer);
-        _unlink(input_file);
-        _unlink(output_file);
-        return NULL;
-    }
-    
-    // Count lines
-    size_t num_lines = 0;
-    char* p = buffer;
-    while (*p) {
-        if (*p == '\n') num_lines++;
-        p++;
-    }
-    if (buffer[read_size-1] != '\n') num_lines++;
-    
-    // Allocate label array
-    label->labels = (char**)malloc(num_lines * sizeof(char*));
-    label->num_labels = 0;
-    
-    // Parse lines
-    char* line = strtok(buffer, "\r\n");
-    while (line) {
-        if (strlen(line) > 0) {
-            label->labels[label->num_labels] = _strdup(line);
-            label->num_labels++;
-        }
-        line = strtok(NULL, "\r\n");
-    }
-    
-    free(buffer);
-    _unlink(input_file);
-    _unlink(output_file);
-    
-    return label;
+    // OpenJTalk is not yet supported on Windows
+    (void)oj;
+    (void)text;
+    return NULL;
 }
 
 size_t HTS_Label_get_size(HTS_Label_Wrapper* label) {
-    return label ? label->num_labels : 0;
+    // OpenJTalk is not yet supported on Windows
+    (void)label;
+    return 0;
 }
 
 const char* HTS_Label_get_string(HTS_Label_Wrapper* label, size_t index) {
-    if (!label || index >= label->num_labels) return NULL;
-    return label->labels[index];
+    // OpenJTalk is not yet supported on Windows
+    (void)label;
+    (void)index;
+    return NULL;
 }
 
 void HTS_Label_clear(HTS_Label_Wrapper* label) {
-    if (label) {
-        for (size_t i = 0; i < label->num_labels; i++) {
-            free(label->labels[i]);
-        }
-        free(label->labels);
-        free(label);
-    }
+    // OpenJTalk is not yet supported on Windows
+    (void)label;
 }
 
 #endif // _WIN32
