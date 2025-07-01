@@ -1,3 +1,20 @@
+/* Define architecture macros before any includes to avoid Windows SDK errors */
+#if defined(_WIN32) || defined(_WIN64)
+  #if defined(_M_AMD64) || defined(_M_X64) || defined(_WIN64)
+    #ifndef _AMD64_
+      #define _AMD64_ 1
+    #endif
+  #elif defined(_M_IX86)
+    #ifndef _X86_
+      #define _X86_ 1
+    #endif
+  #elif defined(_M_ARM64)
+    #ifndef _ARM64_
+      #define _ARM64_ 1
+    #endif
+  #endif
+#endif
+
 /* ----------------------------------------------------------------- */
 /*           The HMM-Based Speech Synthesis Engine "hts_engine API"  */
 /*           developed by HTS Working Group                          */

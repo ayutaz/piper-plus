@@ -1,15 +1,4 @@
 cmake_minimum_required(VERSION 3.13)
-
-# Set architecture definitions BEFORE project
-if(WIN32)
-  if(CMAKE_SIZEOF_VOID_P EQUAL 8)
-    add_definitions(-D_AMD64_)
-  else()
-    add_definitions(-D_X86_)
-  endif()
-  add_definitions(-D_WIN32_WINNT=0x0601)
-endif()
-
 project(HTSEngine C)
 
 # HTSEngine API 1.10 - CMake build configuration for Windows
