@@ -7,6 +7,7 @@
 #ifndef _WIN32
 #include <unistd.h>
 #include <sys/wait.h>
+#include <limits.h>  // for PATH_MAX
 #endif
 
 #ifndef _WIN32
