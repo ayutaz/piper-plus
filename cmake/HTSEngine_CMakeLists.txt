@@ -1,4 +1,15 @@
 cmake_minimum_required(VERSION 3.13)
+
+# Set architecture definitions BEFORE project
+if(WIN32)
+  if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+    add_definitions(-D_AMD64_)
+  else()
+    add_definitions(-D_X86_)
+  endif()
+  add_definitions(-D_WIN32_WINNT=0x0601)
+endif()
+
 project(HTSEngine C)
 
 # HTSEngine API 1.10 - CMake build configuration for Windows
@@ -11,8 +22,6 @@ endif()
 # Configuration options
 option(HTS_EMBEDDED "Build for embedded devices" OFF)
 option(BUILD_SHARED_LIBS "Build shared libraries" OFF)
-
-# Architecture definitions are handled in the patch file
 
 # Version information
 set(HTS_ENGINE_VERSION "1.10")
@@ -53,17 +62,9 @@ target_include_directories(HTSEngine
 
 # Platform-specific settings
 if(WIN32)
-  # Force architecture definitions before any system headers
-  if(CMAKE_SIZEOF_VOID_P EQUAL 8)
-    add_compile_definitions(_AMD64_)
-  else()
-    add_compile_definitions(_X86_)
-  endif()
-  
   target_compile_definitions(HTSEngine PRIVATE
     AUDIO_PLAY_WIN32
     _CRT_SECURE_NO_WARNINGS
-    _WIN32_WINNT=0x0601
     WIN32_LEAN_AND_MEAN
   )
   

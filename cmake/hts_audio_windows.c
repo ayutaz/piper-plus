@@ -66,25 +66,6 @@ HTS_AUDIO_C_START;
 /* hts_engine libralies */
 #include "HTS_hidden.h"
 
-/* Windows header compatibility fixes */
-#ifdef _WIN32
-  /* Define architecture macros if not already defined */
-  #if !defined(_AMD64_) && !defined(_X86_) && !defined(_ARM64_)
-    #if defined(_M_AMD64) || defined(_M_X64)
-      #define _AMD64_
-    #elif defined(_M_IX86)
-      #define _X86_
-    #elif defined(_M_ARM64)
-      #define _ARM64_
-    #endif
-  #endif
-  
-  /* Prevent ARM64 intrinsics on non-ARM64 builds */
-  #if !defined(_M_ARM64) && !defined(_ARM64_)
-    #define _ARM64_INTRINSICS_
-  #endif
-#endif
-
 #ifdef AUDIO_PLAY_WIN32
 
 #include <windows.h>
