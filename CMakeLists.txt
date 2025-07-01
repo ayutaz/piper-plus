@@ -189,7 +189,8 @@ endif()
 if(WIN32)
   # Use CMake-based build for Windows
   include(cmake/HTSEngine.cmake)
-  include(cmake/OpenJTalk.cmake)
+  # OpenJTalk doesn't build natively on Windows yet
+  # TODO: Add Windows OpenJTalk support
 elseif(NOT WIN32)
   # Use autotools-based build for Unix
   if(NOT DEFINED HTS_ENGINE_DIR)
@@ -296,10 +297,10 @@ else()
 endif()
 
 # Link OpenJTalk and HTS_Engine libraries
-if(TARGET hts_engine_external AND TARGET openjtalk_external)
-  # Ensure libraries are built before linking
-  add_dependencies(piper openjtalk_external hts_engine_external)
-  add_dependencies(test_piper openjtalk_external hts_engine_external)
+if(TARGET hts_engine_external)
+  # Ensure library is built before linking
+  add_dependencies(piper hts_engine_external)
+  add_dependencies(test_piper hts_engine_external)
 
   # Link libraries with absolute paths
   if(WIN32)
@@ -310,6 +311,10 @@ if(TARGET hts_engine_external AND TARGET openjtalk_external)
       ${CMAKE_CURRENT_BINARY_DIR}/he/lib/HTSEngine.lib
     )
   else()
+    if(TARGET openjtalk_external)
+      add_dependencies(piper openjtalk_external)
+      add_dependencies(test_piper openjtalk_external)
+    endif()
     target_link_libraries(piper
       ${CMAKE_CURRENT_BINARY_DIR}/he/lib/libHTSEngine.a
     )
