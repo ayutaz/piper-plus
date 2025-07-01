@@ -53,6 +53,13 @@ target_include_directories(HTSEngine
 
 # Platform-specific settings
 if(WIN32)
+  # Force architecture definitions before any system headers
+  if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+    add_compile_definitions(_AMD64_)
+  else()
+    add_compile_definitions(_X86_)
+  endif()
+  
   target_compile_definitions(HTSEngine PRIVATE
     AUDIO_PLAY_WIN32
     _CRT_SECURE_NO_WARNINGS

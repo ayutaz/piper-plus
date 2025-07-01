@@ -23,12 +23,15 @@ if(WIN32)
       -DCMAKE_GENERATOR_PLATFORM=${CMAKE_GENERATOR_PLATFORM}
       -DCMAKE_SYSTEM_PROCESSOR=${CMAKE_SYSTEM_PROCESSOR}
     PATCH_COMMAND 
-      ${CMAKE_COMMAND} -E copy 
+      ${CMAKE_COMMAND} -E echo "Patching HTSEngine for Windows..."
+      COMMAND ${CMAKE_COMMAND} -E copy 
         ${CMAKE_CURRENT_SOURCE_DIR}/cmake/HTSEngine_CMakeLists.txt 
         <SOURCE_DIR>/CMakeLists.txt
+      COMMAND ${CMAKE_COMMAND} -E echo "Copying patched HTS_audio.c..."
       COMMAND ${CMAKE_COMMAND} -E copy
         ${CMAKE_CURRENT_SOURCE_DIR}/cmake/hts_audio_windows.c
         <SOURCE_DIR>/lib/HTS_audio.c
+      COMMAND ${CMAKE_COMMAND} -E echo "Patch completed"
     BUILD_BYPRODUCTS 
       ${HTS_ENGINE_DIR}/lib/HTSEngine.lib
       ${HTS_ENGINE_DIR}/lib/libHTSEngine.a
