@@ -49,9 +49,9 @@ echo "Test 1: Auto-download disabled (should fail)"
 export PIPER_AUTO_DOWNLOAD_DICT=0
 export OPENJTALK_DICTIONARY_DIR="$TEST_DIR/nonexistent"
 if echo "テスト" | "$PIPER_BIN" --model "$PROJECT_ROOT/test/models/ja_JP-test-medium.onnx" --output_file "$TEST_DIR/test1.wav" 2>&1 | grep -q "download.*manually\|auto.*download.*disabled"; then
-    echo "✓ Test 1 passed: Correctly failed when auto-download is disabled"
+    echo "[OK] Test 1 passed: Correctly failed when auto-download is disabled"
 else
-    echo "✗ Test 1 failed: Should have failed with manual download message"
+    echo "[FAIL] Test 1 failed: Should have failed with manual download message"
     echo "Output:"
     echo "テスト" | "$PIPER_BIN" --model "$PROJECT_ROOT/test/models/ja_JP-test-medium.onnx" --output_file "$TEST_DIR/test1.wav" 2>&1 || true
 fi
@@ -65,18 +65,18 @@ unset OPENJTALK_DICTIONARY_DIR
 
 echo "Running piper with auto-download..."
 if echo "こんにちは" | "$PIPER_BIN" --model "$PROJECT_ROOT/test/models/ja_JP-test-medium.onnx" --output_file "$TEST_DIR/test2.wav" 2>&1 | tee "$TEST_DIR/download.log"; then
-    echo "✓ Test 2 passed: Auto-download succeeded"
+    echo "[OK] Test 2 passed: Auto-download succeeded"
     
     # Check if dictionary was downloaded
     if [ -d "$TEST_DIR/.local/share/piper/open_jtalk_dic_utf_8-1.11" ]; then
-        echo "✓ Dictionary downloaded to expected location"
+        echo "[OK] Dictionary downloaded to expected location"
     else
-        echo "⚠ Dictionary not found at expected location"
+        echo "[WARN] Dictionary not found at expected location"
         echo "Searching for dictionary:"
         find "$TEST_DIR" -name "open_jtalk_dic*" -type d 2>/dev/null || echo "No dictionary found"
     fi
 else
-    echo "✗ Test 2 failed: Auto-download should have succeeded"
+    echo "[FAIL] Test 2 failed: Auto-download should have succeeded"
     echo "Error output:"
     cat "$TEST_DIR/download.log" 2>/dev/null || echo "No log file"
 fi
@@ -89,9 +89,9 @@ export HOME="$TEST_DIR/offline"
 mkdir -p "$HOME"
 
 if echo "オフライン" | "$PIPER_BIN" --model "$PROJECT_ROOT/test/models/ja_JP-test-medium.onnx" --output_file "$TEST_DIR/test3.wav" 2>&1 | grep -q "Offline mode\|dictionary manually"; then
-    echo "✓ Test 3 passed: Offline mode prevents download"
+    echo "[OK] Test 3 passed: Offline mode prevents download"
 else
-    echo "✗ Test 3 failed: Should have failed in offline mode"
+    echo "[FAIL] Test 3 failed: Should have failed in offline mode"
 fi
 
 # Clean up

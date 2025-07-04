@@ -162,7 +162,7 @@ class MultilingualTTSTester:
         
         # Skip if already downloaded
         if model_path.exists() and config_path.exists():
-            print(f"✓ Model {model_name} already cached")
+            print(f"[OK] Model {model_name} already cached")
             return model_path, config_path
         
         # Construct URLs
@@ -191,7 +191,7 @@ class MultilingualTTSTester:
                 print(f"Failed to download config from primary URL: {e}")
                 raise
         
-        print(f"✓ Downloaded {model_name} successfully")
+        print(f"[OK] Downloaded {model_name} successfully")
         return model_path, config_path
     
     def test_language(self, language: str, config: Dict, 
@@ -249,7 +249,7 @@ class MultilingualTTSTester:
                     results["output_size"] = os.path.getsize(output_file)
                     if results["output_size"] > 10000:  # Minimum expected size
                         results["status"] = "success"
-                        print(f"✓ Success! Generated {results['output_size']} bytes in {results['time']:.2f}s")
+                        print(f"[OK] Success! Generated {results['output_size']} bytes in {results['time']:.2f}s")
                     else:
                         results["errors"].append(f"Output file too small: {results['output_size']} bytes")
                 else:
@@ -264,7 +264,7 @@ class MultilingualTTSTester:
             
         except Exception as e:
             results["errors"].append(f"Exception: {str(e)}")
-            print(f"✗ Error: {e}")
+            print(f"[ERROR] {e}")
         finally:
             # Cleanup
             if 'input_file' in locals():
@@ -302,9 +302,9 @@ class MultilingualTTSTester:
             
             os.unlink(input_file)
             if os.path.exists(output_file):
-                print(f"  ✓ Special test {i+1} passed")
+                print(f"  [OK] Special test {i+1} passed")
             else:
-                print(f"  ✗ Special test {i+1} failed")
+                print(f"  [FAIL] Special test {i+1} failed")
         
         # Performance test for long text
         if test_type == "performance":
@@ -333,7 +333,7 @@ class MultilingualTTSTester:
             os.unlink(input_file)
             if os.path.exists(output_file):
                 size = os.path.getsize(output_file)
-                print(f"  ✓ Performance: {len(long_text)} chars in {perf_time:.2f}s")
+                print(f"  [OK] Performance: {len(long_text)} chars in {perf_time:.2f}s")
                 print(f"    Speed: {len(long_text)/perf_time:.0f} chars/second")
                 results["performance"] = {
                     "chars": len(long_text),
@@ -378,7 +378,7 @@ class MultilingualTTSTester:
         print("-" * 70)
         
         for lang, result in sorted(results.items()):
-            status = "✓ Pass" if result["status"] == "success" else "✗ Fail"
+            status = "[PASS]" if result["status"] == "success" else "[FAIL]"
             time_str = f"{result['time']:.2f}s" if result['time'] > 0 else "N/A"
             size_str = f"{result['output_size']/1024:.1f}KB" if result['output_size'] > 0 else "N/A"
             
@@ -386,7 +386,7 @@ class MultilingualTTSTester:
             
             if result["errors"]:
                 for error in result["errors"]:
-                    print(f"  → {error}")
+                    print(f"  -> {error}")
         
         # Performance summary if available
         perf_results = {lang: r for lang, r in results.items() if "performance" in r}

@@ -194,9 +194,9 @@ class JapaneseTTSTester:
             if success:
                 wav_info = self.check_wav_file(output_file)
                 test_result["wav_info"] = wav_info
-                print(f"  ✓ Success! Generated {wav_info.get('duration', 0):.2f}s audio in {duration:.2f}s")
+                print(f"  [OK] Success! Generated {wav_info.get('duration', 0):.2f}s audio in {duration:.2f}s")
             else:
-                print(f"  ✗ Failed: {error}")
+                print(f"  [FAIL] Failed: {error}")
                 all_passed = False
             
             self.results["tests"][f"basic_{test_name}"] = test_result
@@ -225,9 +225,9 @@ class JapaneseTTSTester:
             if success:
                 wav_info = self.check_wav_file(output_file)
                 test_result["wav_info"] = wav_info
-                print(f"  ✓ Success! Generated {wav_info.get('duration', 0):.2f}s audio in {duration:.2f}s")
+                print(f"  [OK] Success! Generated {wav_info.get('duration', 0):.2f}s audio in {duration:.2f}s")
             else:
-                print(f"  ✗ Failed: {error}")
+                print(f"  [FAIL] Failed: {error}")
                 all_passed = False
             
             self.results["tests"][f"comprehensive_{test_name}"] = test_result
@@ -286,9 +286,9 @@ class JapaneseTTSTester:
             }
             
             if test_result["success"] and test_result["dictionary_downloaded"]:
-                print("  ✓ Dictionary auto-download successful!")
+                print("  [OK] Dictionary auto-download successful!")
             else:
-                print("  ✗ Dictionary auto-download failed")
+                print("  [FAIL] Dictionary auto-download failed")
                 print(f"    stderr: {stderr}")
             
             self.results["tests"]["dictionary_download"] = test_result
@@ -362,9 +362,9 @@ class JapaneseTTSTester:
         }
         
         if test_result["binary_exists"]:
-            print(f"  ✓ OpenJTalk binary found at: {openjtalk_path}")
+            print(f"  [OK] OpenJTalk binary found at: {openjtalk_path}")
         else:
-            print(f"  ✗ OpenJTalk binary not found at: {openjtalk_path}")
+            print(f"  [FAIL] OpenJTalk binary not found at: {openjtalk_path}")
         
         self.results["tests"]["openjtalk_binary"] = test_result
         
