@@ -3,6 +3,66 @@
 A fast, local neural text to speech system that sounds great and is optimized for the Raspberry Pi 4.
 Piper is used in a [variety of projects](#people-using-piper).
 
+## 目次
+- [追加機能](#追加機能)
+- [関連記事](#関連記事)
+- [Voices](#voices)
+- [Installation](#installation)
+- [Usage](#usage)
+  - [Streaming Audio](#streaming-audio)
+  - [JSON Input](#json-input)
+- [People using Piper](#people-using-piper)
+- [Training](#training)
+- [Running in Python](#running-in-python)
+
+## 追加機能
+* 日本語の事前学習及び追加学習/推論対応（OpenJTalk統合）
+  * 詳細な使用方法は[日本語音声合成ガイド](JAPANESE_USAGE.md)を参照
+  * **Windows対応**: [WindowsでのOpenJTalk使用ガイド](docs/openjtalk-windows.md)を参照
+  * PUA音素マッピングによる日本語TTS精度向上 - [技術詳細](PHONEME_MAPPING.md)を参照
+  * **自動ダウンロード機能**: 初回実行時に必要な辞書とHTSボイスファイルを自動ダウンロード
+  * 環境変数（オプション）：
+    - `OPENJTALK_DICTIONARY_DIR`: OpenJTalk辞書へのパス（未設定時は自動ダウンロード）
+    - `OPENJTALK_VOICE`: HTSボイスモデル（.htsvoice）へのパス（未設定時は自動ダウンロード）
+    - `PIPER_AUTO_DOWNLOAD_DICT`: `0`に設定すると自動ダウンロードを無効化
+    - `PIPER_OFFLINE_MODE`: `1`に設定するとオフラインモード（ネットワーク接続不要）
+  * 既存の日本語モデルは**再学習不要** - 設定ファイルの更新のみで対応可能
+* GitHub Actionsによる以下のプラットフォームのビルドおよびバイナリー配布の自動化
+
+  * Linux (amd64)
+  * macOS (x64, arm64) - OpenJTalkバイナリを含む
+  * Windows (x64) - **OpenJTalkバイナリを含む（日本語TTS対応）**
+  * 注: Linux ARM64は現在OpenJTalkサポートなし（[#42](https://github.com/ayutaz/piper-plus/issues/42)で対応予定）
+  * 注: ARMv7 (32ビット) はサポート終了。Raspberry Pi 3以降はARM64版をご利用ください
+
+### macOSユーザーへの注意事項
+
+ダウンロードしたバイナリを初めて実行する際、macOSのセキュリティ機能により警告が表示される場合があります。以下のコマンドで検疫属性を削除してください：
+
+```bash
+# ダウンロードしたファイルを展開後
+xattr -cr piper/
+
+# または特定のバイナリのみ
+xattr -cr piper/bin/piper
+xattr -cr piper/bin/open_jtalk  # 日本語TTSを使用する場合
+```
+
+これにより、Gatekeeperの警告なしに実行できるようになります。
+* 前処理済み .pt ファイルが破損していても学習時に自動スキップして継続できるように改善
+* DataLoader に `pin_memory=True` を設定し GPU 転送を最適化
+* `preprocess.py` に `--timeout-seconds` を追加し、ハングする発話を自動タイムアウト/スキップ
+* `piper_train` に `--num-workers` を追加し、DataLoader のワーカー数をコマンドラインから指定可能に
+* `piper_train` に `--save-top-k` を追加し、チェックポイント保存個数をコマンドラインから指定可能に
+* PyPI パッケージ `piper-tts-plus` として公開し、`pip install` で簡単インストール可能に
+* 多言語TTSテストインフラストラクチャーを追加し、CI/CDで自動テスト実行 - [詳細](docs/MULTILINGUAL_TESTING.md)
+* OpenJTalk辞書とHTSボイスモデルの自動ダウンロード機能を追加し、日本語TTSのセットアップを簡略化
+
+## 関連記事
+* [LJSpeechを使って英語のpiperの事前学習モデルを作成する](https://ayousanz.hatenadiary.jp/entry/2025/05/26/230341)
+* [jvs音声データセットを使ったpiper日本語モデルの作成](https://ayousanz.hatenadiary.jp/entry/2025/06/05/093217)
+* [piperモデルからつくよみちゃんデータセットを使って追加学習を行う](https://ayousanz.hatenadiary.jp/entry/2025/06/07/074232)
+
 ``` sh
 echo 'Welcome to the world of speech synthesis!' | \
   ./piper --model en_US-lessac-medium.onnx --output_file welcome.wav
@@ -29,6 +89,7 @@ Our goal is to support Home Assistant and the [Year of Voice](https://www.home-a
 * Ελληνικά, Greece (Greek, el_GR)
 * English, Great Britain (English, en_GB)
 * English, United States (English, en_US)
+* Español, Argentina (Spanish, es_AR)
 * Español, Spain (Spanish, es_ES)
 * Español, Mexico (Spanish, es_MX)
 * فارسی, Iran (Farsi, fa_IR)
@@ -42,6 +103,7 @@ Our goal is to support Home Assistant and the [Year of Voice](https://www.home-a
 * Lëtzebuergesch, Luxembourg (Luxembourgish, lb_LU)
 * Latviešu, Latvia (Latvian, lv_LV)
 * മലയാളം, India (Malayalam, ml_IN)
+* हिंदी, India (Hindi, hi_IN)
 * नेपाली, Nepal (Nepali, ne_NP)
 * Nederlands, Belgium (Dutch, nl_BE)
 * Nederlands, Netherlands (Dutch, nl_NL)
@@ -166,15 +228,17 @@ See [src/python_run](src/python_run)
 Install with `pip`:
 
 ``` sh
-pip install piper-tts
-```
+# 基本機能のみ
+pip install piper-tts-plus
 
-and then run:
+# GPU 版 (CUDA 環境がある場合)
+pip install "piper-tts-plus[gpu]"
 
-``` sh
-echo 'Welcome to the world of speech synthesis!' | piper \
-  --model en_US-lessac-medium \
-  --output_file welcome.wav
+# HTTP サーバー機能を含む場合
+pip install "piper-tts-plus[http]"
+
+# GPU + HTTP
+pip install "piper-tts-plus[gpu,http]"
 ```
 
 This will automatically download [voice files](https://huggingface.co/rhasspy/piper-voices/tree/v1.0.0) the first time they're used. Use `--data-dir` and `--download-dir` to adjust where voices are found/downloaded.

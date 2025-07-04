@@ -4,7 +4,25 @@ Check out a [video training guide by Thorsten Müller](https://www.youtube.com/w
 
 For Windows, see [ssamjh's guide using WSL](https://ssamjh.nz/create-custom-piper-tts-voice/)
 
+## 目次
+- [環境](#env)
+- [Getting Started](#getting-started)
+- [Preparing a Dataset](#preparing-a-dataset)
+- [Training a Model](#training-a-model)
+- [Multi-Speaker Fine-Tuning](#multi-speaker-fine-tuning)
+- [Testing](#testing)
+- [Tensorboard](#tensorboard)
+- [Exporting a Model](#exporting-a-model)
+- [DataLoader ワーカー数 (`--num-workers`)](#dataloader-ワーカー数---num-workers)
+- [チェックポイント保存個数 (`--save-top-k`)](#チェックポイント保存個数---save-top-k)
+
+
+
 ---
+
+# env
+* python 3.11
+* only single GPU
 
 Training a voice for Piper involves 3 main steps:
 
@@ -173,7 +191,27 @@ python3 -m piper_train \
     --max_epochs 10000 \
     --resume_from_checkpoint /path/to/lessac/epoch=2164-step=1355540.ckpt \
     --checkpoint-epochs 1 \
-    --precision 32
+    --precision 32 \
+    --num-workers 48
+```
+
+
+追加対応機能を踏まえて学習をする場合は、以下のようになります。学習を再開する際には `  --resume_from_checkpoint "${LATEST_CHECKPOINT_PATH}"` をつけて実行します
+
+```sh
+python3 -m piper_train \
+  --dataset-dir ${PREPROCESSED_MOE_DIR} \
+  --accelerator 'gpu' \
+  --devices 1 \
+  --quality medium \
+  --precision 16 \
+  --batch-size 64 \
+  --max_epochs 150 \
+  --checkpoint-epochs 10 \
+  --validation-split 0.01 \
+  --num-test-examples 10 \
+  --num-workers 45 \
+  --save-top-k -1 \
 ```
 
 Use `--quality high` to train a [larger voice model](https://github.com/rhasspy/piper/blob/master/src/python/piper_train/vits/config.py#L45) (sounds better, but is much slower).
@@ -239,3 +277,45 @@ If the export is successful, you can now use your voice with Piper:
 echo 'This is a test.' | \
   piper -m /path/to/model.onnx --output_file test.wav
 ```
+
+### DataLoader ワーカー数 (`--num-workers`)
+
+`DataLoader` が使用するワーカー数はデフォルトで `min(16, CPU コア数)` に設定されています。
+必要に応じて学習コマンドに `--num-workers <N>` を追加することで変更できます。
+
+```sh
+python3 -m piper_train \
+  --dataset-dir /path/to/training_dir/ \
+  --accelerator 'gpu' \
+  --devices 1 \
+  --batch-size 32 \
+  --num-workers 48   # 例: 48 スレッドを使用
+```
+
+ワーカー数を増やしすぎると、ディスク I/O や CPU ボトルネックによって逆に遅くなることがあります。マシンのコア数や負荷を確認しながら調整してください。
+
+### チェックポイント保存個数 (`--save-top-k`)
+
+PyTorch Lightning の `ModelCheckpoint` コールバックはデフォルトで **検証損失が最も良かったチェックポイント 1 個のみ** を保持します。
+
+`piper_train` ではコマンドライン引数 `--save-top-k`（デフォルト **-1**）を追加しており、
+この値を変更することで保存しておきたいチェックポイントの個数を簡単に調整できます。
+
+* `--save-top-k -1` : 評価指標に関わらず、保存タイミングが来たすべてのチェックポイントを残す
+* `--save-top-k 3` : 評価指標が良い上位 3 個のチェックポイントのみを保持（それ以外は自動削除）
+* `--save-top-k 1` : 従来どおり最良 1 個のみを保持
+
+例）10 エポックごとにチェックポイントを**すべて**残す場合:
+
+```sh
+python3 -m piper_train \
+  --dataset-dir /path/to/training_dir/ \
+  --accelerator 'gpu' \
+  --devices 1 \
+  --batch-size 32 \
+  --checkpoint-epochs 10 \
+  --save-top-k -1 \
+  --max_epochs 10000
+```
+
+学習結果を長期的に比較したい場合や、後から特定エポックに戻って再開したい場合に便利です。
