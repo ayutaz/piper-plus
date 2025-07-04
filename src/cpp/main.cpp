@@ -21,6 +21,7 @@
 #ifdef _WIN32
 #include <fcntl.h>
 #include <io.h>
+#include <windows.h>  // SetConsoleOutputCPとCP_UTF8のために追加
 #endif
 
 #ifdef __APPLE__
@@ -29,6 +30,8 @@
 
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/spdlog.h>
+
+#include <onnxruntime_cxx_api.h>
 
 #include "json.hpp"
 #include "piper.hpp"
@@ -98,19 +101,83 @@ void rawOutputProc(vector<int16_t> &sharedAudioBuffer, mutex &mutAudio,
 // ----------------------------------------------------------------------------
 
 int main(int argc, char *argv[]) {
+
   spdlog::set_default_logger(spdlog::stderr_color_st("piper"));
+
+#ifdef _WIN32
+  // Initialize Windows subsystems early
+  SetConsoleOutputCP(CP_UTF8);
+  
+  // Enhanced DLL loading for Windows
+  wchar_t exePathW[MAX_PATH];
+  GetModuleFileNameW(nullptr, exePathW, MAX_PATH);
+  std::filesystem::path exeDir = std::filesystem::path(exePathW).parent_path();
+  
+  // Try multiple DLL search paths
+  std::vector<std::filesystem::path> dllPaths = {
+    exeDir,                          // Same directory as exe
+    exeDir / "lib",                  // lib subdirectory
+    exeDir.parent_path() / "lib",    // ../lib relative to exe
+    exeDir / "bin"                   // bin subdirectory (for CI/CD)
+  };
+  
+  // Use AddDllDirectory for Windows 7+ if available
+  typedef DLL_DIRECTORY_COOKIE (WINAPI *AddDllDirectoryFunc)(PCWSTR);
+  typedef BOOL (WINAPI *SetDefaultDllDirectoriesFunc)(DWORD);
+  
+  HMODULE kernel32 = GetModuleHandleW(L"kernel32.dll");
+  auto pAddDllDirectory = (AddDllDirectoryFunc)GetProcAddress(kernel32, "AddDllDirectory");
+  auto pSetDefaultDllDirectories = (SetDefaultDllDirectoriesFunc)GetProcAddress(kernel32, "SetDefaultDllDirectories");
+  
+  if (pAddDllDirectory && pSetDefaultDllDirectories) {
+    // Windows 7+ approach: Use AddDllDirectory for multiple paths
+    pSetDefaultDllDirectories(LOAD_LIBRARY_SEARCH_DEFAULT_DIRS | LOAD_LIBRARY_SEARCH_USER_DIRS);
+    
+    for (const auto& path : dllPaths) {
+      if (std::filesystem::exists(path)) {
+        pAddDllDirectory(path.c_str());
+        spdlog::debug("Added DLL directory: {}", path.string());
+      }
+    }
+  } else {
+    // Windows XP/Vista fallback: Use SetDllDirectory
+    for (const auto& path : dllPaths) {
+      if (std::filesystem::exists(path)) {
+        SetDllDirectoryW(path.c_str());
+        spdlog::debug("Set DLL directory: {}", path.string());
+        break;  // SetDllDirectory only supports one path
+      }
+    }
+  }
+  
+  // Pre-load critical DLLs to ensure proper loading order
+  std::vector<std::wstring> criticalDlls = {
+    L"onnxruntime.dll",
+    L"onnxruntime_providers_shared.dll",
+    L"espeak-ng.dll",
+    L"piper_phonemize.dll"
+  };
+  
+  for (const auto& dllName : criticalDlls) {
+    HMODULE hDll = LoadLibraryW(dllName.c_str());
+    if (hDll) {
+      spdlog::debug("Pre-loaded DLL: {}", std::string(dllName.begin(), dllName.end()));
+    } else {
+      DWORD error = GetLastError();
+      spdlog::warn("Failed to pre-load DLL: {} (error: {})", 
+                   std::string(dllName.begin(), dllName.end()), error);
+    }
+  }
+#endif
 
   RunConfig runConfig;
   parseArgs(argc, argv, runConfig);
 
-#ifdef _WIN32
-  // Required on Windows to show IPA symbols
-  SetConsoleOutputCP(CP_UTF8);
-#endif
-
   piper::PiperConfig piperConfig;
   piper::Voice voice;
 
+  spdlog::debug("Model path: {}", runConfig.modelPath.string());
+  spdlog::debug("Model config path: {}", runConfig.modelConfigPath.string());
   spdlog::debug("Loading voice from {} (config={})",
                 runConfig.modelPath.string(),
                 runConfig.modelConfigPath.string());
@@ -151,15 +218,12 @@ int main(int argc, char *argv[]) {
     if (runConfig.eSpeakDataPath) {
       // User provided path
       piperConfig.eSpeakDataPath = runConfig.eSpeakDataPath.value().string();
-    } else {
-      // Assume next to piper executable
-      piperConfig.eSpeakDataPath =
-          std::filesystem::absolute(
-              exePath.parent_path().append("espeak-ng-data"))
-              .string();
-
-      spdlog::debug("espeak-ng-data directory is expected at {}",
+      spdlog::debug("Using user-provided espeak-ng-data directory: {}",
                     piperConfig.eSpeakDataPath);
+    } else {
+      // Let piper::initialize() find the data path automatically
+      piperConfig.eSpeakDataPath = "";
+      spdlog::debug("Will auto-detect espeak-ng-data directory");
     }
   } else {
     // Not using eSpeak
@@ -185,7 +249,12 @@ int main(int argc, char *argv[]) {
     }
   }
 
-  piper::initialize(piperConfig);
+  try {
+    piper::initialize(piperConfig);
+  } catch (const std::exception& e) {
+    spdlog::error("Failed to initialize piper: {}", e.what());
+    return EXIT_FAILURE;
+  }
 
   // Scales
   if (runConfig.noiseScale) {
