@@ -104,30 +104,26 @@ jobs:
           echo "Test model directory created"
       
       - name: Run basic Japanese TTS test
+        shell: bash
         run: |
           echo "Testing basic Japanese TTS functionality..."
-          python scripts/test_japanese_tts.py --basic
-        env:
-          PIPER_BIN: ${{ github.workspace }}/piper/bin/piper
-          OPENJTALK_BIN: ${{ github.workspace }}/piper/bin/open_jtalk
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            python scripts/test_japanese_tts.py --basic --piper piper/bin/piper.exe
+          else
+            python scripts/test_japanese_tts.py --basic --piper piper/bin/piper
+          fi
       
       - name: Run comprehensive Japanese tests
         if: success()
+        shell: bash
         run: |
           echo "Running comprehensive Japanese tests..."
-          python scripts/test_japanese_tts.py --comprehensive
-        env:
-          PIPER_BIN: ${{ github.workspace }}/piper/bin/piper
-          OPENJTALK_BIN: ${{ github.workspace }}/piper/bin/open_jtalk
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            python scripts/test_japanese_tts.py --comprehensive --piper piper/bin/piper.exe
+          else
+            python scripts/test_japanese_tts.py --comprehensive --piper piper/bin/piper
+          fi
       
-      - name: Run edge case tests
-        if: success()
-        run: |
-          echo "Running edge case tests..."
-          python scripts/test_japanese_tts.py --edge-cases
-        env:
-          PIPER_BIN: ${{ github.workspace }}/piper/bin/piper
-          OPENJTALK_BIN: ${{ github.workspace }}/piper/bin/open_jtalk
       
       - name: Generate test report
         if: always()

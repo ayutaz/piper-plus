@@ -110,6 +110,8 @@ jobs:
       - name: Run basic dictionary download tests
         run: |
           chmod +x test/test_dictionary_download.sh
+          # Create a symlink from build to piper for compatibility
+          ln -s piper build
           ./test/test_dictionary_download.sh
         env:
           CI: true
@@ -118,6 +120,8 @@ jobs:
         if: success()
         run: |
           chmod +x test/test_dictionary_download_comprehensive.sh
+          # Ensure symlink exists
+          [ -L build ] || ln -s piper build
           ./test/test_dictionary_download_comprehensive.sh
         env:
           CI: true
@@ -272,11 +276,17 @@ jobs:
         continue-on-error: true
       
       - name: Run multilingual tests
+        shell: bash
         run: |
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            PIPER_BIN="${{ github.workspace }}/piper/bin/piper.exe"
+          else
+            PIPER_BIN="${{ github.workspace }}/piper/bin/piper"
+          fi
           python scripts/test_multilingual_tts.py \
             --languages "${{ github.event.inputs.languages || 'en_US,de_DE' }}" \
             --test-type "${{ github.event.inputs.test_type || 'basic' }}" \
-            --piper-bin "${{ github.workspace }}/piper/bin/piper"
+            --piper "$PIPER_BIN"
         env:
           PIPER_CACHE_DIR: ${{ env.CACHE_DIR }}
       
