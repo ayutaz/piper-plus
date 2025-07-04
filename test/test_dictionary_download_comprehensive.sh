@@ -65,9 +65,19 @@ echo "=== Test 1: Auto-download disabled ==="
 export PIPER_AUTO_DOWNLOAD_DICT=0
 export OPENJTALK_DICTIONARY_DIR="$TEST_DIR/nonexistent"
 export OPENJTALK_VOICE="$TEST_DIR/nonexistent.htsvoice"
-# Test that auto-download is disabled - the command should fail (non-zero exit code)
-run_test "Auto-download disabled" "fail" \
-    'echo "テスト" | "$PIPER_BIN" --model "$PROJECT_ROOT/test/models/ja_JP-test-medium.onnx" --output_file test1.wav'
+
+# Test that auto-download is disabled - expect "Auto-download is disabled" message
+OUTPUT=$(echo "テスト" | "$PIPER_BIN" --model "$PROJECT_ROOT/test/models/ja_JP-test-medium.onnx" --output_file test1.wav 2>&1)
+if echo "$OUTPUT" | grep -q "Auto-download is disabled"; then
+    echo "✓ Auto-download disabled test passed"
+    ((PASSED++))
+else
+    echo "✗ Auto-download disabled test failed"
+    echo "Expected to see 'Auto-download is disabled' message"
+    echo "Actual output:"
+    echo "$OUTPUT"
+    ((FAILED++))
+fi
 
 # Test 2: Auto-download with checksum verification
 echo "=== Test 2: Auto-download with checksum verification ==="
@@ -76,13 +86,9 @@ export HOME="$TEST_DIR"
 unset OPENJTALK_DICTIONARY_DIR
 unset OPENJTALK_VOICE
 
-# For now, skip the remaining tests to isolate the issue
-echo "Skipping remaining tests for now..."
-echo
-echo "=== Test Summary ==="
-echo "Passed: $PASSED"
-echo "Failed: $FAILED"
-exit $FAILED
+# Continue with Test 2
+run_test "Auto-download with verification" "pass" \
+    'echo "テスト" | "$PIPER_BIN" --model "$PROJECT_ROOT/test/models/ja_JP-test-medium.onnx" --output_file test2.wav 2>&1 | tee /tmp/test2_output.log'
 
 # Check if checksum was verified
 if grep -q "Checksum verified successfully" /tmp/test2_output.log 2>/dev/null || grep -q "Verifying checksum" /tmp/test2_output.log 2>/dev/null; then
@@ -94,18 +100,26 @@ else
 fi
 
 # Check if HTS voice was also downloaded
-if [ -f "$TEST_DIR/.piper/voices/hts/hts_voice_nitech_jp_atr503_m001-1.05/nitech_jp_atr503_m001.htsvoice" ]; then
+if [ -f "$TEST_DIR/.local/share/piper/hts_voice_nitech_jp_atr503_m001-1.05/nitech_jp_atr503_m001.htsvoice" ]; then
     echo "✓ HTS voice was auto-downloaded"
+    ((PASSED++))
+elif [ -f "$TEST_DIR/.piper/voices/hts/hts_voice_nitech_jp_atr503_m001-1.05/nitech_jp_atr503_m001.htsvoice" ]; then
+    echo "✓ HTS voice was auto-downloaded (legacy path)"
     ((PASSED++))
 else
     echo "✗ HTS voice was not auto-downloaded"
+    echo "  Checked: $TEST_DIR/.local/share/piper/hts_voice_nitech_jp_atr503_m001-1.05/nitech_jp_atr503_m001.htsvoice"
+    echo "  Checked: $TEST_DIR/.piper/voices/hts/hts_voice_nitech_jp_atr503_m001-1.05/nitech_jp_atr503_m001.htsvoice"
+    # List what's actually in the directory
+    echo "  Contents of $TEST_DIR:"
+    find "$TEST_DIR" -name "*.htsvoice" -type f 2>/dev/null || true
     ((FAILED++))
 fi
 
 # Test 3: Resume download functionality
 echo "=== Test 3: Resume download functionality ==="
 # Create a partial download to test resume
-PARTIAL_FILE="$TEST_DIR/.piper/dictionaries/openjtalk/open_jtalk_dic_utf_8-1.11.tar.gz"
+PARTIAL_FILE="$TEST_DIR/.local/share/piper/open_jtalk_dic_utf_8-1.11.tar.gz"
 if [ -f "$PARTIAL_FILE" ]; then
     rm -f "$PARTIAL_FILE"
 fi
@@ -114,7 +128,7 @@ mkdir -p "$(dirname "$PARTIAL_FILE")"
 echo "partial content" > "$PARTIAL_FILE"
 
 # Remove the extracted directory to force re-download
-rm -rf "$TEST_DIR/.piper/dictionaries/openjtalk/open_jtalk_dic_utf_8-1.11"
+rm -rf "$TEST_DIR/.local/share/piper/open_jtalk_dic_utf_8-1.11"
 
 # This should attempt to resume
 run_test "Resume download" "pass" \
@@ -163,9 +177,13 @@ echo "=== Test 8: Verify downloaded files ==="
 echo "Checking downloaded files..."
 
 # Check dictionary files
-if [ -f "$TEST_DIR/.piper/dictionaries/openjtalk/open_jtalk_dic_utf_8-1.11/sys.dic" ] && \
-   [ -f "$TEST_DIR/.piper/dictionaries/openjtalk/open_jtalk_dic_utf_8-1.11/unk.dic" ]; then
+if [ -f "$TEST_DIR/.local/share/piper/open_jtalk_dic_utf_8-1.11/sys.dic" ] && \
+   [ -f "$TEST_DIR/.local/share/piper/open_jtalk_dic_utf_8-1.11/unk.dic" ]; then
     echo "✓ Dictionary files are complete"
+    ((PASSED++))
+elif [ -f "$TEST_DIR/.piper/dictionaries/openjtalk/open_jtalk_dic_utf_8-1.11/sys.dic" ] && \
+     [ -f "$TEST_DIR/.piper/dictionaries/openjtalk/open_jtalk_dic_utf_8-1.11/unk.dic" ]; then
+    echo "✓ Dictionary files are complete (legacy path)"
     ((PASSED++))
 else
     echo "✗ Dictionary files are incomplete"
@@ -173,8 +191,11 @@ else
 fi
 
 # Check HTS voice file
-if [ -f "$TEST_DIR/.piper/voices/hts/hts_voice_nitech_jp_atr503_m001-1.05/nitech_jp_atr503_m001.htsvoice" ]; then
+if [ -f "$TEST_DIR/.local/share/piper/hts_voice_nitech_jp_atr503_m001-1.05/nitech_jp_atr503_m001.htsvoice" ]; then
     echo "✓ HTS voice file exists"
+    ((PASSED++))
+elif [ -f "$TEST_DIR/.piper/voices/hts/hts_voice_nitech_jp_atr503_m001-1.05/nitech_jp_atr503_m001.htsvoice" ]; then
+    echo "✓ HTS voice file exists (legacy path)"
     ((PASSED++))
 else
     echo "✗ HTS voice file missing"

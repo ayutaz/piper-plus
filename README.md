@@ -18,17 +18,21 @@ Piper is used in a [variety of projects](#people-using-piper).
 ## 追加機能
 * 日本語の事前学習及び追加学習/推論対応（OpenJTalk統合）
   * 詳細な使用方法は[日本語音声合成ガイド](JAPANESE_USAGE.md)を参照
+  * **Windows対応**: [Windowsセットアップガイド](docs/windows-setup.md)を参照
+  * **API ドキュメント**: [OpenJTalk API リファレンス](docs/openjtalk-api.md)を参照
   * PUA音素マッピングによる日本語TTS精度向上 - [技術詳細](PHONEME_MAPPING.md)を参照
-  * **重要**: 日本語TTSを使用するには、以下の環境変数の設定が必要です：
-    - `OPENJTALK_DICTIONARY_DIR`: OpenJTalk辞書へのパス
-    - `OPENJTALK_VOICE`: HTSボイスモデル（.htsvoice）へのパス
-    - `ESPEAK_DATA_PATH`: espeak-ngデータへのパス（通常は`piper/share/espeak-ng-data`）
+  * **自動ダウンロード機能**: 初回実行時に必要な辞書とHTSボイスファイルを自動ダウンロード
+  * 環境変数（オプション）：
+    - `OPENJTALK_DICTIONARY_DIR`: OpenJTalk辞書へのパス（未設定時は自動ダウンロード）
+    - `OPENJTALK_VOICE`: HTSボイスモデル（.htsvoice）へのパス（未設定時は自動ダウンロード）
+    - `PIPER_AUTO_DOWNLOAD_DICT`: `0`に設定すると自動ダウンロードを無効化
+    - `PIPER_OFFLINE_MODE`: `1`に設定するとオフラインモード（ネットワーク接続不要）
   * 既存の日本語モデルは**再学習不要** - 設定ファイルの更新のみで対応可能
 * GitHub Actionsによる以下のプラットフォームのビルドおよびバイナリー配布の自動化
 
   * Linux (amd64)
   * macOS (x64, arm64) - OpenJTalkバイナリを含む
-  * Windows (x64)
+  * Windows (x64) - **OpenJTalkバイナリを含む（日本語TTS対応）**
   * 注: Linux ARM64は現在OpenJTalkサポートなし（[#42](https://github.com/ayutaz/piper-plus/issues/42)で対応予定）
   * 注: ARMv7 (32ビット) はサポート終了。Raspberry Pi 3以降はARM64版をご利用ください
 
@@ -86,6 +90,7 @@ Our goal is to support Home Assistant and the [Year of Voice](https://www.home-a
 * Ελληνικά, Greece (Greek, el_GR)
 * English, Great Britain (English, en_GB)
 * English, United States (English, en_US)
+* Español, Argentina (Spanish, es_AR)
 * Español, Spain (Spanish, es_ES)
 * Español, Mexico (Spanish, es_MX)
 * فارسی, Iran (Farsi, fa_IR)
@@ -99,6 +104,7 @@ Our goal is to support Home Assistant and the [Year of Voice](https://www.home-a
 * Lëtzebuergesch, Luxembourg (Luxembourgish, lb_LU)
 * Latviešu, Latvia (Latvian, lv_LV)
 * മലയാളം, India (Malayalam, ml_IN)
+* हिंदी, India (Hindi, hi_IN)
 * नेपाली, Nepal (Nepali, ne_NP)
 * Nederlands, Belgium (Dutch, nl_BE)
 * Nederlands, Netherlands (Dutch, nl_NL)
@@ -134,9 +140,44 @@ You can [run Piper with Python](#running-in-python) or download a binary release
 * [arm64](https://github.com/rhasspy/piper/releases/download/v1.2.0/piper_arm64.tar.gz) (64-bit Raspberry Pi 4)
 * [armv7](https://github.com/rhasspy/piper/releases/download/v1.2.0/piper_armv7.tar.gz) (32-bit Raspberry Pi 3/4)
 
+### Building from Source
+
 If you want to build from source, see the [Makefile](Makefile) and [C++ source](src/cpp).
-You must download and extract [piper-phonemize](https://github.com/rhasspy/piper-phonemize) to `lib/Linux-$(uname -m)/piper_phonemize` before building.
-For example, `lib/Linux-x86_64/piper_phonemize/lib/libpiper_phonemize.so` should exist for AMD/Intel machines (as well as everything else from `libpiper_phonemize-amd64.tar.gz`).
+
+#### Prerequisites
+
+* C++ compiler with C++17 support
+* CMake 3.13 or later
+* Git
+
+#### Build Steps
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/rhasspy/piper.git
+   cd piper
+   ```
+
+2. Create build directory:
+   ```bash
+   mkdir build
+   cd build
+   ```
+
+3. Configure and build:
+   ```bash
+   cmake ..
+   cmake --build . --config Release
+   ```
+
+#### Platform-specific Notes
+
+**Linux**: You must download and extract [piper-phonemize](https://github.com/rhasspy/piper-phonemize) to `lib/Linux-$(uname -m)/piper_phonemize` before building.
+For example, `lib/Linux-x86_64/piper_phonemize/lib/libpiper_phonemize.so` should exist for AMD/Intel machines.
+
+**Windows**: See the [Windows Setup Guide](docs/windows-setup.md) for detailed instructions.
+
+**macOS**: The build process will automatically download required dependencies.
 
 
 ## Usage

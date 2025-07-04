@@ -1,5 +1,6 @@
 #!/bin/bash
 # Test script for OpenJTalk dictionary auto-download functionality
+# Updated to trigger CI workflows
 
 set -e
 
@@ -46,10 +47,17 @@ if echo "こんにちは" | "$PIPER_BIN" --model "$PROJECT_ROOT/test/models/ja_J
     echo "✓ Test 2 passed: Auto-download succeeded"
     
     # Check if dictionary was downloaded
-    if [ -d "$TEST_DIR/.piper/dictionaries/openjtalk/open_jtalk_dic_utf_8-1.11" ]; then
+    if [ -d "$TEST_DIR/.local/share/piper/open_jtalk_dic_utf_8-1.11" ]; then
         echo "✓ Dictionary downloaded to correct location"
+    elif [ -d "$TEST_DIR/.piper/dictionaries/openjtalk/open_jtalk_dic_utf_8-1.11" ]; then
+        echo "✓ Dictionary downloaded to correct location (legacy path)"
     else
         echo "✗ Dictionary not found at expected location"
+        echo "  Checked: $TEST_DIR/.local/share/piper/open_jtalk_dic_utf_8-1.11"
+        echo "  Checked: $TEST_DIR/.piper/dictionaries/openjtalk/open_jtalk_dic_utf_8-1.11"
+        # List what's actually in the directory
+        echo "  Contents of $TEST_DIR:"
+        find "$TEST_DIR" -name "*open_jtalk*" -type d 2>/dev/null || true
     fi
 else
     echo "✗ Test 2 failed: Auto-download failed"
