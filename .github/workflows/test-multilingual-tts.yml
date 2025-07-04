@@ -86,10 +86,13 @@ jobs:
           export PATH="${{ github.workspace }}/piper/bin:$PATH"
           echo "PATH=${{ github.workspace }}/piper/bin:$PATH" >> $GITHUB_ENV
           
-          # Set library path for Linux
+          # Set library path for Linux and macOS
           if [ "${{ runner.os }}" = "Linux" ]; then
             export LD_LIBRARY_PATH="${{ github.workspace }}/piper/lib:${LD_LIBRARY_PATH}"
             echo "LD_LIBRARY_PATH=${{ github.workspace }}/piper/lib:${LD_LIBRARY_PATH}" >> $GITHUB_ENV
+          elif [ "${{ runner.os }}" = "macOS" ]; then
+            export DYLD_LIBRARY_PATH="${{ github.workspace }}/piper/lib:${DYLD_LIBRARY_PATH}"
+            echo "DYLD_LIBRARY_PATH=${{ github.workspace }}/piper/lib:${DYLD_LIBRARY_PATH}" >> $GITHUB_ENV
           fi
           
           # Set espeak data path
@@ -98,10 +101,13 @@ jobs:
             echo "ESPEAK_DATA_PATH=${{ github.workspace }}/piper/share/espeak-ng-data" >> $GITHUB_ENV
           fi
           
-          # Verify binaries
+          # Verify binaries and libraries
           echo "Checking piper binary..."
           which piper || echo "piper not in PATH"
           ls -la piper/bin/piper
+          
+          echo "Checking libraries..."
+          ls -la piper/lib/ || echo "No lib directory"
           
           echo "Checking open_jtalk binary..."
           which open_jtalk || echo "open_jtalk not in PATH"
@@ -246,10 +252,13 @@ jobs:
           tar -xzf piper-${{ runner.os }}.tar.gz
           chmod +x piper/bin/piper
           
-          # Set library path for Linux
+          # Set library path for Linux and macOS
           if [ "${{ runner.os }}" = "Linux" ]; then
             export LD_LIBRARY_PATH="${PWD}/piper/lib:${LD_LIBRARY_PATH}"
             echo "LD_LIBRARY_PATH=${PWD}/piper/lib:${LD_LIBRARY_PATH}" >> $GITHUB_ENV
+          elif [ "${{ runner.os }}" = "macOS" ]; then
+            export DYLD_LIBRARY_PATH="${PWD}/piper/lib:${DYLD_LIBRARY_PATH}"
+            echo "DYLD_LIBRARY_PATH=${PWD}/piper/lib:${DYLD_LIBRARY_PATH}" >> $GITHUB_ENV
           fi
       
       - name: Extract piper (Windows)
@@ -277,8 +286,11 @@ jobs:
           else
             PIPER_BIN="${{ github.workspace }}/piper/bin/piper"
           fi
+          # Convert comma-separated to space-separated for argparse
+          LANGUAGES="${{ github.event.inputs.languages || 'en_US,de_DE' }}"
+          LANGUAGES_SPACE=$(echo "$LANGUAGES" | tr ',' ' ')
           python scripts/test_multilingual_tts.py \
-            --languages "${{ github.event.inputs.languages || 'en_US,de_DE' }}" \
+            --languages $LANGUAGES_SPACE \
             --test-type "${{ github.event.inputs.test_type || 'basic' }}" \
             --piper "$PIPER_BIN"
         env:

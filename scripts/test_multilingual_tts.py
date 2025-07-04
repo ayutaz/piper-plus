@@ -368,7 +368,10 @@ class MultilingualTTSTester:
         print(f"Total languages tested: {total_count}")
         print(f"Successful: {success_count}")
         print(f"Failed: {total_count - success_count}")
-        print(f"Success rate: {success_count/total_count*100:.1f}%")
+        if total_count > 0:
+            print(f"Success rate: {success_count/total_count*100:.1f}%")
+        else:
+            print("No tests were run")
         
         print("\nDetailed Results:")
         print(f"{'Language':<10} {'Model':<25} {'Status':<10} {'Time':<8} {'Size':<10}")
