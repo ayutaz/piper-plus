@@ -32,7 +32,13 @@ def main():
     )
     parser.add_argument(
         "--resume_from_single_speaker_checkpoint",
-        help="For multi-speaker models only. Converts a single-speaker checkpoint to multi-speaker and resumes training",
+        help="For multi-speaker models only. Converts a single-speaker checkpoint to multi-speaker and resumes training",  # noqa: E501
+    )
+    parser.add_argument(
+        "--save-top-k",
+        type=int,
+        default=-1,
+        help="Save top k checkpoints (-1 to save all).",
     )
     Trainer.add_argparse_args(parser)
     VitsModel.add_model_specific_args(parser)
@@ -59,7 +65,11 @@ def main():
 
     trainer = Trainer.from_argparse_args(args)
     if args.checkpoint_epochs is not None:
-        trainer.callbacks = [ModelCheckpoint(every_n_epochs=args.checkpoint_epochs)]
+        trainer.callbacks = [
+            ModelCheckpoint(
+                every_n_epochs=args.checkpoint_epochs, save_top_k=args.save_top_k
+            )
+        ]
         _LOGGER.debug(
             "Checkpoints will be saved every %s epoch(s)", args.checkpoint_epochs
         )
@@ -92,7 +102,7 @@ def main():
     if args.resume_from_single_speaker_checkpoint:
         assert (
             num_speakers > 1
-        ), "--resume_from_single_speaker_checkpoint is only for multi-speaker models. Use --resume_from_checkpoint for single-speaker models."
+        ), "--resume_from_single_speaker_checkpoint is only for multi-speaker models. Use --resume_from_checkpoint for single-speaker models."  # noqa: E501
 
         # Load single-speaker checkpoint
         _LOGGER.debug(
@@ -121,7 +131,51 @@ def main():
             "Successfully converted single-speaker checkpoint to multi-speaker"
         )
 
-    trainer.fit(model)
+    # チェックポイントからの再開処理を修正
+    if args.resume_from_checkpoint:
+        _LOGGER.debug(
+            "Loading weights from checkpoint: %s", args.resume_from_checkpoint
+        )
+        try:
+            # まずは通常のResumeを試みる
+            trainer.fit(model, ckpt_path=args.resume_from_checkpoint)
+        except (RuntimeError, KeyError) as e:
+            # RuntimeError (size mismatchなど) や KeyError (optimizer stateなし) が発生した場合
+            _LOGGER.warning("Graceful resume failed with error: %s", e)
+            _LOGGER.info("Attempting to load weights only (strict=False)...")
+
+            # モデルの重みだけをロードする (不一致は許容)
+            checkpoint = torch.load(args.resume_from_checkpoint, map_location="cpu")
+            model.load_state_dict(checkpoint["state_dict"], strict=False)
+
+            _LOGGER.info(
+                "Weights loaded successfully with strict=False. Starting training without resuming optimizer state."  # noqa: E501
+            )
+
+            # argsからresume_from_checkpointを削除
+            args_dict = vars(args)
+            if "resume_from_checkpoint" in args_dict:
+                del args_dict["resume_from_checkpoint"]
+
+            # 新しいTrainerインスタンスを作成（ckpt_pathをクリアするため）
+            trainer = Trainer.from_argparse_args(args)
+            if args.checkpoint_epochs is not None:
+                trainer.callbacks = [
+                    ModelCheckpoint(
+                        every_n_epochs=args.checkpoint_epochs,
+                        save_top_k=args.save_top_k,
+                    )
+                ]
+                _LOGGER.debug(
+                    "Checkpoints will be saved every %s epoch(s)",
+                    args.checkpoint_epochs,
+                )
+
+            # 新しいTrainerで学習を開始
+            trainer.fit(model)
+    else:
+        # チェックポイントが指定されていない場合は、通常通り学習を開始
+        trainer.fit(model)
 
 
 def load_state_dict(model, saved_state_dict):

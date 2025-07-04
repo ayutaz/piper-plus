@@ -1,4 +1,5 @@
 """Piper configuration"""
+
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Dict, Mapping, Sequence
@@ -7,6 +8,7 @@ from typing import Any, Dict, Mapping, Sequence
 class PhonemeType(str, Enum):
     ESPEAK = "espeak"
     TEXT = "text"
+    OPENJTALK = "openjtalk"
 
 
 @dataclass

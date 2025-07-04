@@ -13,18 +13,29 @@ if requirements_path.is_file():
     with open(requirements_path, "r", encoding="utf-8") as requirements_file:
         requirements = requirements_file.read().splitlines()
 
+# README.md を PyPI 用の長い説明として読み込む
+long_description = ""
+readme_path = this_dir / "README.md"
+if readme_path.is_file():
+    long_description = readme_path.read_text(encoding="utf-8")
+
 data_files = [module_dir / "voices.json"]
 
 # -----------------------------------------------------------------------------
 
 setup(
-    name="piper-tts",
+    name="piper-tts-plus",
     version="1.2.0",
-    description="A fast, local neural text to speech system that sounds great and is optimized for the Raspberry Pi 4.",
-    url="http://github.com/rhasspy/piper",
-    author="Michael Hansen",
-    author_email="mike@rhasspy.org",
+    description=(
+        "A fast, local neural text to speech system that sounds great and is "
+        "optimized for the Raspberry Pi 4."
+    ),
+    url="https://github.com/ayutaz/piper-plus",
+    author="yousan",
+    author_email="rabbitcats77@gmail.com",
     license="MIT",
+    long_description=long_description,
+    long_description_content_type="text/markdown",
     packages=setuptools.find_packages(),
     package_data={"piper": [str(p.relative_to(module_dir)) for p in data_files]},
     entry_points={
@@ -44,5 +55,5 @@ setup(
         "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",
     ],
-    keywords="rhasspy piper tts",
+    keywords="piper japanese and other languages tts",
 )
