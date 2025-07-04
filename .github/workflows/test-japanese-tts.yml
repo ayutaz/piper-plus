@@ -7,147 +7,47 @@ on:
       - 'src/**'
       - 'test/**'
       - '.github/workflows/test-japanese-tts.yml'
+      - '.github/workflows/build-piper.yml'
   push:
     branches: [dev, feat/*, fix/*]
     paths:
       - 'src/**'
       - 'test/**'
       - '.github/workflows/test-japanese-tts.yml'
+      - '.github/workflows/build-piper.yml'
   workflow_dispatch:
 
 jobs:
-  build_piper:
-    name: Build piper on ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
+  # Build piper for all platforms
+  build:
+    name: Build for Japanese TTS tests
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-    steps:
-      - uses: actions/checkout@v4.2.2
-      
-      - name: Install dependencies (Ubuntu)
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y cmake build-essential
-      
-      - name: Install dependencies (macOS)
-        if: runner.os == 'macOS'
-        run: |
-          brew install cmake
-      
-      - name: Setup MSVC (Windows)
-        if: runner.os == 'Windows'
-        uses: ilammy/msvc-dev-cmd@v1
-      
-      - name: Build piper (Unix)
-        if: runner.os != 'Windows'
-        run: |
-          mkdir -p build
-          cd build
-          cmake .. -DCMAKE_BUILD_TYPE=Release
-          make -j$(nproc 2>/dev/null || sysctl -n hw.ncpu)
-      
-      - name: Build piper (Windows)
-        if: runner.os == 'Windows'
-        run: |
-          mkdir build
-          cd build
-          cmake .. -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release
-          cmake --build . --config Release --parallel 2
-      
-      - name: Create distribution package (Unix)
-        if: runner.os != 'Windows'
-        run: |
-          mkdir -p dist/piper/bin
-          mkdir -p dist/piper/lib
-          mkdir -p dist/piper/share
-          
-          # Copy main binary
-          cp build/piper dist/piper/bin/
-          
-          # Copy espeak-ng data
-          if [ -d "build/ei/share/espeak-ng-data" ]; then
-            cp -r build/ei/share/espeak-ng-data dist/piper/share/
-          fi
-          
-          # Copy libraries
-          if [ "${{ runner.os }}" = "Linux" ]; then
-            # Copy main libraries
-            cp build/*.so* dist/piper/lib/ 2>/dev/null || true
-            cp build/pi/lib/*.so* dist/piper/lib/ 2>/dev/null || true
-            # Also check for lib directory
-            if [ -d "build/lib" ]; then
-              cp build/lib/*.so* dist/piper/lib/ 2>/dev/null || true
-            fi
-          elif [ "${{ runner.os }}" = "macOS" ]; then
-            # Copy main libraries
-            cp build/*.dylib dist/piper/lib/ 2>/dev/null || true
-            cp build/pi/lib/*.dylib dist/piper/lib/ 2>/dev/null || true
-            # Also check for lib directory
-            if [ -d "build/lib" ]; then
-              cp build/lib/*.dylib dist/piper/lib/ 2>/dev/null || true
-            fi
-          fi
-          
-          # Copy OpenJTalk binary and dictionary
-          if [ -f "build/oj/bin/open_jtalk" ]; then
-            cp build/oj/bin/open_jtalk dist/piper/bin/
-          fi
-          
-          # Create archive
-          tar -czf piper-${{ runner.os }}.tar.gz -C dist piper
-      
-      - name: Create distribution package (Windows)
-        if: runner.os == 'Windows'
-        run: |
-          New-Item -ItemType Directory -Force -Path dist/piper/bin
-          New-Item -ItemType Directory -Force -Path dist/piper/lib
-          New-Item -ItemType Directory -Force -Path dist/piper/share
-          
-          # Copy main binary
-          Copy-Item build/Release/piper.exe -Destination dist/piper/bin/
-          
-          # Copy required DLLs
-          Copy-Item build/Release/*.dll -Destination dist/piper/bin/ -ErrorAction SilentlyContinue
-          
-          # Copy espeak-ng data
-          if (Test-Path "build/pi/share/espeak-ng-data") {
-            Copy-Item build/pi/share/espeak-ng-data -Destination dist/piper/share/ -Recurse -Force
-          }
-          
-          # Copy OpenJTalk executable
-          if (Test-Path "build/oj/bin/open_jtalk.exe") {
-            Copy-Item build/oj/bin/open_jtalk.exe -Destination dist/piper/bin/ -Force
-          }
-          
-          # Create archive
-          Compress-Archive -Path dist/piper -DestinationPath piper-${{ runner.os }}.zip
-      
-      - name: Upload build artifact
-        uses: actions/upload-artifact@v4.6.0
-        with:
-          name: piper-${{ runner.os }}
-          path: |
-            piper-${{ runner.os }}.tar.gz
-            piper-${{ runner.os }}.zip
-          retention-days: 1
+    uses: ./.github/workflows/build-piper.yml
+    with:
+      os: ${{ matrix.os }}
+      build-type: Release
+      include-tests: false
+      artifact-name: piper-japanese-${{ matrix.os }}-${{ github.sha }}
 
+  # Run Japanese TTS tests
   test_japanese:
     name: Test Japanese TTS on ${{ matrix.os }}
-    needs: build_piper
+    needs: build
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
+    
     steps:
       - uses: actions/checkout@v4.2.2
       
       - name: Download piper artifact
         uses: actions/download-artifact@v4.1.8
         with:
-          name: piper-${{ runner.os }}
+          name: piper-japanese-${{ matrix.os }}-${{ github.sha }}
       
       - name: Extract piper (Unix)
         if: runner.os != 'Windows'
@@ -161,43 +61,99 @@ jobs:
             export LD_LIBRARY_PATH="${PWD}/piper/lib:${LD_LIBRARY_PATH}"
             echo "LD_LIBRARY_PATH=${PWD}/piper/lib:${LD_LIBRARY_PATH}" >> $GITHUB_ENV
           fi
+          
+          # Verify OpenJTalk is available
+          if [ -f "piper/bin/open_jtalk" ]; then
+            echo "✓ OpenJTalk binary found"
+            ls -la piper/bin/open_jtalk
+          else
+            echo "⚠ OpenJTalk binary not found, Japanese TTS may not work"
+            echo "Contents of piper/bin:"
+            ls -la piper/bin/
+          fi
       
       - name: Extract piper (Windows)
         if: runner.os == 'Windows'
         run: |
           Expand-Archive -Path piper-Windows.zip -DestinationPath . -Force
+          
+          # Verify OpenJTalk is available
+          if (Test-Path "piper/bin/open_jtalk.exe") {
+            Write-Host "✓ OpenJTalk binary found"
+            Get-Item piper/bin/open_jtalk.exe | Select-Object Name, Length, LastWriteTime
+          } else {
+            Write-Host "⚠ OpenJTalk binary not found, Japanese TTS may not work"
+            Write-Host "Contents of piper/bin:"
+            Get-ChildItem piper/bin/
+          }
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
       
       - name: Install test dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install requests tqdm
+          pip install requests tqdm pytest numpy scipy
       
-      - name: Create test model
+      - name: Create test model directory
         shell: bash
         run: |
           mkdir -p test/models
-          # Use the existing test model from the repository
-          # If it doesn't exist, we'll skip model-dependent tests
-          echo "Checking for test models in repository..."
-          ls -la test/models/ || echo "No existing test models found"
+          echo "Test model directory created"
       
       - name: Run basic Japanese TTS test
         run: |
-          echo "Testing basic Japanese TTS..."
+          echo "Testing basic Japanese TTS functionality..."
           python scripts/test_japanese_tts.py --basic
+        env:
+          PIPER_BIN: ${{ github.workspace }}/piper/bin/piper
+          OPENJTALK_BIN: ${{ github.workspace }}/piper/bin/open_jtalk
       
       - name: Run comprehensive Japanese tests
+        if: success()
         run: |
           echo "Running comprehensive Japanese tests..."
           python scripts/test_japanese_tts.py --comprehensive
+        env:
+          PIPER_BIN: ${{ github.workspace }}/piper/bin/piper
+          OPENJTALK_BIN: ${{ github.workspace }}/piper/bin/open_jtalk
+      
+      - name: Run edge case tests
+        if: success()
+        run: |
+          echo "Running edge case tests..."
+          python scripts/test_japanese_tts.py --edge-cases
+        env:
+          PIPER_BIN: ${{ github.workspace }}/piper/bin/piper
+          OPENJTALK_BIN: ${{ github.workspace }}/piper/bin/open_jtalk
+      
+      - name: Generate test report
+        if: always()
+        run: |
+          python scripts/generate_test_report.py --format json --output test_results/report.json || echo "Report generation failed"
+        continue-on-error: true
       
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4.6.0
         with:
-          name: japanese-test-results-${{ matrix.os }}
+          name: japanese-test-results-${{ matrix.os }}-${{ github.sha }}
           path: |
             test_results/*.wav
             test_results/*.log
             test_results/*.json
+            test_results/*.txt
+          retention-days: 7
+      
+      - name: Upload test logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4.6.0
+        with:
+          name: japanese-test-logs-${{ matrix.os }}-${{ github.sha }}
+          path: |
+            *.log
+            piper/bin/
+            test/
           retention-days: 7

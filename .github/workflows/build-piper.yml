@@ -1,0 +1,300 @@
+name: Build Piper (Reusable)
+
+on:
+  workflow_call:
+    inputs:
+      os:
+        description: 'Operating system to build on'
+        required: true
+        type: string
+      build-type:
+        description: 'Build type (Release or Debug)'
+        required: false
+        type: string
+        default: 'Release'
+      include-tests:
+        description: 'Include test build flags'
+        required: false
+        type: boolean
+        default: false
+      artifact-name:
+        description: 'Name for the build artifact'
+        required: false
+        type: string
+        default: ''
+      cache-key-prefix:
+        description: 'Cache key prefix for dependency caching'
+        required: false
+        type: string
+        default: 'piper-deps'
+    outputs:
+      artifact-name:
+        description: 'Name of the uploaded artifact'
+        value: ${{ jobs.build.outputs.artifact-name }}
+      build-path:
+        description: 'Path to the build directory'
+        value: ${{ jobs.build.outputs.build-path }}
+
+jobs:
+  build:
+    name: Build on ${{ inputs.os }}
+    runs-on: ${{ inputs.os }}
+    outputs:
+      artifact-name: ${{ steps.set-artifact-name.outputs.name }}
+      build-path: ${{ steps.set-build-path.outputs.path }}
+    
+    steps:
+      - uses: actions/checkout@v4.2.2
+      
+      - name: Set artifact name
+        id: set-artifact-name
+        shell: bash
+        run: |
+          if [ -n "${{ inputs.artifact-name }}" ]; then
+            echo "name=${{ inputs.artifact-name }}" >> $GITHUB_OUTPUT
+          else
+            echo "name=piper-${{ runner.os }}-${{ github.sha }}" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Set build path
+        id: set-build-path
+        shell: bash
+        run: |
+          echo "path=${{ github.workspace }}/build" >> $GITHUB_OUTPUT
+      
+      # Cache for Linux dependencies
+      - name: Cache Linux dependencies
+        if: runner.os == 'Linux'
+        uses: actions/cache@v4
+        with:
+          path: |
+            /usr/local/lib/libonnxruntime*
+            /usr/local/include/onnxruntime*
+          key: ${{ inputs.cache-key-prefix }}-linux-onnxruntime-1.14.1
+      
+      # Cache for macOS dependencies
+      - name: Cache macOS dependencies
+        if: runner.os == 'macOS'
+        uses: actions/cache@v4
+        with:
+          path: |
+            /usr/local/lib/libonnxruntime*
+            /usr/local/include/onnxruntime*
+          key: ${{ inputs.cache-key-prefix }}-macos-${{ runner.arch }}-onnxruntime-1.14.1
+      
+      # Install dependencies
+      - name: Install dependencies (Ubuntu)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake build-essential curl wget
+          
+          # Check if ONNX Runtime is already cached
+          if [ ! -f "/usr/local/lib/libonnxruntime.so" ]; then
+            echo "Installing ONNX Runtime..."
+            wget https://github.com/microsoft/onnxruntime/releases/download/v1.14.1/onnxruntime-linux-x64-1.14.1.tgz
+            tar -xzf onnxruntime-linux-x64-1.14.1.tgz
+            sudo cp -r onnxruntime-linux-x64-1.14.1/lib/* /usr/local/lib/
+            sudo cp -r onnxruntime-linux-x64-1.14.1/include/* /usr/local/include/
+            sudo ldconfig
+            rm -rf onnxruntime-linux-x64-1.14.1*
+          else
+            echo "Using cached ONNX Runtime"
+            sudo ldconfig
+          fi
+      
+      - name: Install dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install cmake ninja wget
+          
+          # Check if ONNX Runtime is already cached
+          if [ ! -f "/usr/local/lib/libonnxruntime.dylib" ]; then
+            echo "Installing ONNX Runtime..."
+            sudo mkdir -p /usr/local/lib /usr/local/include
+            
+            if [[ $(uname -m) == 'arm64' ]]; then
+              wget https://github.com/microsoft/onnxruntime/releases/download/v1.14.1/onnxruntime-osx-arm64-1.14.1.tgz
+              tar -xzf onnxruntime-osx-arm64-1.14.1.tgz
+              sudo cp -r onnxruntime-osx-arm64-1.14.1/lib/* /usr/local/lib/
+              sudo cp -r onnxruntime-osx-arm64-1.14.1/include/* /usr/local/include/
+              rm -rf onnxruntime-osx-arm64-1.14.1*
+            else
+              wget https://github.com/microsoft/onnxruntime/releases/download/v1.14.1/onnxruntime-osx-x86_64-1.14.1.tgz
+              tar -xzf onnxruntime-osx-x86_64-1.14.1.tgz
+              sudo cp -r onnxruntime-osx-x86_64-1.14.1/lib/* /usr/local/lib/
+              sudo cp -r onnxruntime-osx-x86_64-1.14.1/include/* /usr/local/include/
+              rm -rf onnxruntime-osx-x86_64-1.14.1*
+            fi
+          else
+            echo "Using cached ONNX Runtime"
+          fi
+      
+      - name: Setup MSVC (Windows)
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+      
+      # Build Piper
+      - name: Build piper (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          mkdir -p build
+          cd build
+          
+          # Set CMAKE flags
+          CMAKE_FLAGS="-DCMAKE_BUILD_TYPE=${{ inputs.build-type }}"
+          if [ "${{ inputs.include-tests }}" = "true" ]; then
+            CMAKE_FLAGS="$CMAKE_FLAGS -DBUILD_TESTS=ON"
+          fi
+          
+          echo "Building with flags: $CMAKE_FLAGS"
+          cmake .. $CMAKE_FLAGS
+          make -j$(nproc 2>/dev/null || sysctl -n hw.ncpu)
+          
+          # For test builds, ensure OpenJTalk binary is in expected locations
+          if [ "${{ inputs.include-tests }}" = "true" ] && [ -f "oj/bin/open_jtalk" ]; then
+            cp oj/bin/open_jtalk ./
+            mkdir -p bin && cp oj/bin/open_jtalk bin/
+          fi
+      
+      - name: Build piper (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          mkdir build
+          cd build
+          
+          # Set CMAKE flags
+          $cmakeFlags = @("-G", "Visual Studio 17 2022", "-A", "x64", "-DCMAKE_BUILD_TYPE=${{ inputs.build-type }}")
+          if ("${{ inputs.include-tests }}" -eq "true") {
+            $cmakeFlags += "-DBUILD_TESTS=ON"
+          }
+          
+          Write-Host "Building with flags: $($cmakeFlags -join ' ')"
+          cmake .. @cmakeFlags
+          cmake --build . --config ${{ inputs.build-type }} --parallel 2
+      
+      # Create distribution package
+      - name: Create distribution package (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          mkdir -p dist/piper/bin
+          mkdir -p dist/piper/lib
+          mkdir -p dist/piper/share
+          
+          # Copy main binary
+          cp build/piper dist/piper/bin/
+          
+          # Copy espeak-ng data
+          if [ -d "build/ei/share/espeak-ng-data" ]; then
+            cp -r build/ei/share/espeak-ng-data dist/piper/share/
+          elif [ -d "build/p/src/piper_phonemize_external-build/install/share/espeak-ng-data" ]; then
+            cp -r build/p/src/piper_phonemize_external-build/install/share/espeak-ng-data dist/piper/share/
+          elif [ -d "build/pi/share/espeak-ng-data" ]; then
+            cp -r build/pi/share/espeak-ng-data dist/piper/share/
+          fi
+          
+          # Copy libraries
+          if [ "${{ runner.os }}" = "Linux" ]; then
+            # Copy main libraries
+            find build -name "*.so*" -type f -exec cp {} dist/piper/lib/ \; 2>/dev/null || true
+            # Check specific paths
+            [ -d "build/pi/lib" ] && cp build/pi/lib/*.so* dist/piper/lib/ 2>/dev/null || true
+            [ -d "build/p/src/piper_phonemize_external-build/install/lib" ] && cp build/p/src/piper_phonemize_external-build/install/lib/*.so* dist/piper/lib/ 2>/dev/null || true
+          elif [ "${{ runner.os }}" = "macOS" ]; then
+            # Copy main libraries
+            find build -name "*.dylib" -type f -exec cp {} dist/piper/lib/ \; 2>/dev/null || true
+            # Check specific paths
+            [ -d "build/pi/lib" ] && cp build/pi/lib/*.dylib dist/piper/lib/ 2>/dev/null || true
+            [ -d "build/p/src/piper_phonemize_external-build/install/lib" ] && cp build/p/src/piper_phonemize_external-build/install/lib/*.dylib dist/piper/lib/ 2>/dev/null || true
+          fi
+          
+          # Copy OpenJTalk binary and data
+          for oj_path in "build/oj/bin/open_jtalk" "build/open_jtalk" "build/bin/open_jtalk"; do
+            if [ -f "$oj_path" ]; then
+              cp "$oj_path" dist/piper/bin/
+              chmod +x dist/piper/bin/open_jtalk
+              break
+            fi
+          done
+          
+          # Create archive
+          tar -czf piper-${{ runner.os }}.tar.gz -C dist piper
+          
+          # Create a debug info file
+          echo "Distribution package contents:" > dist-contents.txt
+          find dist -type f | sort >> dist-contents.txt
+          echo "" >> dist-contents.txt
+          echo "Build directory OpenJTalk search:" >> dist-contents.txt
+          find build -name "open_jtalk" -type f 2>/dev/null | head -10 >> dist-contents.txt || echo "No open_jtalk found in build" >> dist-contents.txt
+      
+      - name: Create distribution package (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          New-Item -ItemType Directory -Force -Path dist/piper/bin
+          New-Item -ItemType Directory -Force -Path dist/piper/lib
+          New-Item -ItemType Directory -Force -Path dist/piper/share
+          
+          # Copy main binary
+          Copy-Item "build/${{ inputs.build-type }}/piper.exe" -Destination dist/piper/bin/
+          
+          # Copy required DLLs
+          Copy-Item "build/${{ inputs.build-type }}/*.dll" -Destination dist/piper/bin/ -ErrorAction SilentlyContinue
+          
+          # Copy espeak-ng data
+          $espeakPaths = @(
+            "build/ei/share/espeak-ng-data",
+            "build/p/src/piper_phonemize_external-build/install/share/espeak-ng-data",
+            "build/pi/share/espeak-ng-data"
+          )
+          foreach ($path in $espeakPaths) {
+            if (Test-Path $path) {
+              Copy-Item $path -Destination dist/piper/share/ -Recurse -Force
+              break
+            }
+          }
+          
+          # Copy OpenJTalk executable
+          $ojPaths = @(
+            "build/oj/bin/open_jtalk.exe",
+            "build/open_jtalk.exe",
+            "build/bin/open_jtalk.exe",
+            "build/${{ inputs.build-type }}/open_jtalk.exe"
+          )
+          foreach ($path in $ojPaths) {
+            if (Test-Path $path) {
+              Copy-Item $path -Destination dist/piper/bin/ -Force
+              break
+            }
+          }
+          
+          # Create archive
+          Compress-Archive -Path dist/piper -DestinationPath piper-${{ runner.os }}.zip
+          
+          # Create a debug info file
+          "Distribution package contents:" | Out-File -FilePath dist-contents.txt
+          Get-ChildItem -Path dist -Recurse | Select-Object FullName | Sort-Object FullName | Out-File -FilePath dist-contents.txt -Append
+          "" | Out-File -FilePath dist-contents.txt -Append
+          "Build directory OpenJTalk search:" | Out-File -FilePath dist-contents.txt -Append
+          Get-ChildItem -Path build -Filter "open_jtalk.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 10 | Select-Object FullName | Out-File -FilePath dist-contents.txt -Append
+      
+      # Upload artifacts
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4.6.0
+        with:
+          name: ${{ steps.set-artifact-name.outputs.name }}
+          path: |
+            piper-${{ runner.os }}.tar.gz
+            piper-${{ runner.os }}.zip
+            dist-contents.txt
+          retention-days: 1
+      
+      # Upload build logs on failure
+      - name: Upload build logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4.6.0
+        with:
+          name: build-logs-${{ runner.os }}-${{ github.sha }}
+          path: |
+            build/CMakeFiles/CMakeOutput.log
+            build/CMakeFiles/CMakeError.log
+          retention-days: 7
