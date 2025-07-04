@@ -18,7 +18,8 @@ Piper is used in a [variety of projects](#people-using-piper).
 ## 追加機能
 * 日本語の事前学習及び追加学習/推論対応（OpenJTalk統合）
   * 詳細な使用方法は[日本語音声合成ガイド](JAPANESE_USAGE.md)を参照
-  * **Windows対応**: [WindowsでのOpenJTalk使用ガイド](docs/openjtalk-windows.md)を参照
+  * **Windows対応**: [Windowsセットアップガイド](docs/windows-setup.md)を参照
+  * **API ドキュメント**: [OpenJTalk API リファレンス](docs/openjtalk-api.md)を参照
   * PUA音素マッピングによる日本語TTS精度向上 - [技術詳細](PHONEME_MAPPING.md)を参照
   * **自動ダウンロード機能**: 初回実行時に必要な辞書とHTSボイスファイルを自動ダウンロード
   * 環境変数（オプション）：
@@ -139,9 +140,44 @@ You can [run Piper with Python](#running-in-python) or download a binary release
 * [arm64](https://github.com/rhasspy/piper/releases/download/v1.2.0/piper_arm64.tar.gz) (64-bit Raspberry Pi 4)
 * [armv7](https://github.com/rhasspy/piper/releases/download/v1.2.0/piper_armv7.tar.gz) (32-bit Raspberry Pi 3/4)
 
+### Building from Source
+
 If you want to build from source, see the [Makefile](Makefile) and [C++ source](src/cpp).
-You must download and extract [piper-phonemize](https://github.com/rhasspy/piper-phonemize) to `lib/Linux-$(uname -m)/piper_phonemize` before building.
-For example, `lib/Linux-x86_64/piper_phonemize/lib/libpiper_phonemize.so` should exist for AMD/Intel machines (as well as everything else from `libpiper_phonemize-amd64.tar.gz`).
+
+#### Prerequisites
+
+* C++ compiler with C++17 support
+* CMake 3.13 or later
+* Git
+
+#### Build Steps
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/rhasspy/piper.git
+   cd piper
+   ```
+
+2. Create build directory:
+   ```bash
+   mkdir build
+   cd build
+   ```
+
+3. Configure and build:
+   ```bash
+   cmake ..
+   cmake --build . --config Release
+   ```
+
+#### Platform-specific Notes
+
+**Linux**: You must download and extract [piper-phonemize](https://github.com/rhasspy/piper-phonemize) to `lib/Linux-$(uname -m)/piper_phonemize` before building.
+For example, `lib/Linux-x86_64/piper_phonemize/lib/libpiper_phonemize.so` should exist for AMD/Intel machines.
+
+**Windows**: See the [Windows Setup Guide](docs/windows-setup.md) for detailed instructions.
+
+**macOS**: The build process will automatically download required dependencies.
 
 
 ## Usage
