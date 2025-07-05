@@ -475,17 +475,20 @@ class MultilingualTTSTester:
                     print(f"  -> {error}")
         
         # Performance summary if available
-        perf_results = {lang: r for lang, r in results.items() if "performance" in r}
+        perf_results = {lang: r for lang, r in results.items() if "performance" in r and r["performance"]}
         if perf_results:
             print(f"\n{'='*60}")
             print("PERFORMANCE SUMMARY")
             print(f"{'='*60}")
-            print(f"{'Language':<10} {'Chars/Second':<15} {'Total Time':<10}")
+            print(f"{'Language':<10} {'Chars/Second':<15} {'Generation Time':<10}")
             print("-" * 35)
             
             for lang, result in sorted(perf_results.items()):
                 perf = result["performance"]
-                print(f"{lang:<10} {perf['chars_per_second']:<15.0f} {perf['time']:<10.2f}s")
+                # Use generation time in seconds
+                gen_time_sec = perf.get('generation_time_ms', 0) / 1000
+                chars_per_sec = perf.get('chars_per_second', 0)
+                print(f"{lang:<10} {chars_per_sec:<15.0f} {gen_time_sec:<10.2f}s")
 
 
 def main():
