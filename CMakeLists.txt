@@ -262,9 +262,9 @@ elseif(NOT DEFINED HTS_ENGINE_DIR)
     endif()
 endif()
 
-  # ---- OpenJTalk ---
+# ---- OpenJTalk ---
 
-  if(NOT DEFINED OPENJTALK_DIR)
+if(NOT DEFINED OPENJTALK_DIR)
     set(OPENJTALK_DIR "${CMAKE_CURRENT_BINARY_DIR}/oj")
     set(OPENJTALK_VERSION "1.11")
 
@@ -336,7 +336,7 @@ endif()
       
       add_dependencies(openjtalk_external hts_engine_external)
     endif()
-  endif()
+endif()
 
 # ---- Declare executable ----
 
