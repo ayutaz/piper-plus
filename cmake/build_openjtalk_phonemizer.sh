@@ -27,6 +27,7 @@ $CC -o open_jtalk_phonemizer open_jtalk_phonemizer.c \
     ../jpcommon/.libs/libjpcommon.a \
     ../mecab/src/.libs/libmecab.a \
     ../njd/.libs/libnjd.a \
+    ${HTS_ENGINE_DIR}/lib/libHTSEngine.a \
     -lm
 
 # Copy to install directory

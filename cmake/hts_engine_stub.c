@@ -4,22 +4,7 @@
 #include <stdlib.h>
 #include "HTS_engine.h"
 
-/* Stub structures - need complete definitions for linking */
-struct _HTS_Engine {
-    void *dummy;
-};
-
-typedef struct _HTS_ModelSet {
-    void *dummy;
-} HTS_ModelSet;
-
-typedef struct _HTS_Global {
-    void *dummy;
-} HTS_Global;
-
-typedef struct _HTS_Audio {
-    void *dummy;
-} HTS_Audio;
+/* Stub structures are already defined in HTS_engine.h */
 
 /* Stub functions that should never be called */
 void HTS_Engine_initialize(HTS_Engine *engine) {
@@ -80,6 +65,84 @@ double HTS_Engine_get_generated_speech_size(HTS_Engine *engine) {
 short *HTS_Engine_get_generated_speech(HTS_Engine *engine) {
     fprintf(stderr, "ERROR: HTS_Engine_get_generated_speech called in phonemizer-only mode\n");
     exit(1);
+}
+
+/* Additional functions required by OpenJTalk */
+const char *HTS_Engine_get_fullcontext_label_format(HTS_Engine *engine) {
+    (void)engine;
+    return "HTS_TTS_JPN";
+}
+
+void HTS_Engine_set_gv_weight(HTS_Engine *engine, int stream_index, double weight) {
+    (void)engine;
+    (void)stream_index;
+    (void)weight;
+}
+
+void HTS_Engine_set_sampling_frequency(HTS_Engine *engine, int sampling_frequency) {
+    (void)engine;
+    (void)sampling_frequency;
+}
+
+void HTS_Engine_set_fperiod(HTS_Engine *engine, int fperiod) {
+    (void)engine;
+    (void)fperiod;
+}
+
+void HTS_Engine_set_gv_interpolation_weight(HTS_Engine *engine, int stream_index, int stage, double weight) {
+    (void)engine;
+    (void)stream_index;
+    (void)stage;
+    (void)weight;
+}
+
+void HTS_Engine_set_alpha(HTS_Engine *engine, double alpha) {
+    (void)engine;
+    (void)alpha;
+}
+
+void HTS_Engine_set_beta(HTS_Engine *engine, double beta) {
+    (void)engine;
+    (void)beta;
+}
+
+void HTS_Engine_set_speed(HTS_Engine *engine, double speed) {
+    (void)engine;
+    (void)speed;
+}
+
+void HTS_Engine_add_half_tone(HTS_Engine *engine, double half_tone) {
+    (void)engine;
+    (void)half_tone;
+}
+
+void HTS_Engine_set_msd_threshold(HTS_Engine *engine, int stream_index, double threshold) {
+    (void)engine;
+    (void)stream_index;
+    (void)threshold;
+}
+
+void HTS_Engine_set_duration_interpolation_weight(HTS_Engine *engine, int voice_index, double weight) {
+    (void)engine;
+    (void)voice_index;
+    (void)weight;
+}
+
+void HTS_Engine_set_parameter_interpolation_weight(HTS_Engine *engine, int voice_index, int stream_index, double weight) {
+    (void)engine;
+    (void)voice_index;
+    (void)stream_index;
+    (void)weight;
+}
+
+void HTS_Engine_set_volume(HTS_Engine *engine, double volume) {
+    (void)engine;
+    (void)volume;
+}
+
+void HTS_Engine_set_audio_buff_size(HTS_Engine *engine, int buff_size) {
+    (void)engine;
+    (void)buff_size;
 }
 
 /* Constants */

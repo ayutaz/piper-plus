@@ -205,7 +205,8 @@ if(USE_HTS_ENGINE_STUB)
   target_include_directories(hts_engine_stub PUBLIC ${HTS_ENGINE_DIR}/include)
   set_target_properties(hts_engine_stub PROPERTIES 
     ARCHIVE_OUTPUT_DIRECTORY ${HTS_ENGINE_DIR}/lib
-    OUTPUT_NAME HTSEngine)
+    OUTPUT_NAME HTSEngine
+    PREFIX "lib")
     
   # Create dummy target for dependencies
   add_custom_target(hts_engine_external DEPENDS hts_engine_stub)
@@ -325,7 +326,7 @@ if(NOT DEFINED OPENJTALK_DIR)
         BUILD_COMMAND ${CMAKE_COMMAND} -E chdir <SOURCE_DIR> make
         INSTALL_COMMAND 
           ${CMAKE_COMMAND} -E chdir <SOURCE_DIR> make install
-          COMMAND ${CMAKE_COMMAND} -E env CC=${CMAKE_C_COMPILER}
+          COMMAND ${CMAKE_COMMAND} -E env CC=${CMAKE_C_COMPILER} HTS_ENGINE_DIR=${HTS_ENGINE_DIR}
             bash ${CMAKE_CURRENT_SOURCE_DIR}/cmake/build_openjtalk_phonemizer.sh
             <SOURCE_DIR> ${OPENJTALK_DIR} ${CMAKE_C_COMPILER}
         BUILD_IN_SOURCE 1
