@@ -130,11 +130,12 @@ LANGUAGE_CONFIGS = {
         "test_text": "Xin chào, đây là bài kiểm tra hệ thống tổng hợp giọng nói.",
         "speaker": "vivos"
     },
-    "ko_KR": {
-        "model": "ko_KR-kss-x_low",
-        "test_text": "안녕하세요, 이것은 음성 합성 시스템의 테스트입니다.",
-        "speaker": "kss"
-    }
+    # Korean model temporarily disabled due to availability issues
+    # "ko_KR": {
+    #     "model": "ko_KR-kss-x_low",
+    #     "test_text": "안녕하세요, 이것은 음성 합성 시스템의 테스트입니다.",
+    #     "speaker": "kss"
+    # }
 }
 
 # Model repository configuration
