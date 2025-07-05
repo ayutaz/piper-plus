@@ -48,12 +48,12 @@ jobs:
           
           # Copy Japanese results
           if [ -d "japanese-results" ]; then
-            find japanese-results -name "*.json" -exec cp {} all-combined-results/performance/ \;
+            find japanese-results -name "*.json" -print0 | xargs -0 -r cp -t all-combined-results/performance/
           fi
           
           # Copy Multilingual results
           if [ -d "multilingual-results" ]; then
-            find multilingual-results -name "*.json" -exec cp {} all-combined-results/performance/ \;
+            find multilingual-results -name "*.json" -print0 | xargs -0 -r cp -t all-combined-results/performance/
           fi
           
           # List all collected files

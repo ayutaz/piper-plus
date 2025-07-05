@@ -12,12 +12,15 @@ import json
 import time
 import argparse
 from pathlib import Path
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Tuple, Optional, Any
 import urllib.request
 import tarfile
 import zipfile
 import wave
 import io
+
+# Import platform utilities
+from platform_utils import get_platform_name
 
 # Configure stdout for UTF-8 on Windows
 if sys.platform == "win32":
@@ -251,11 +254,7 @@ class MultilingualTTSTester:
                 input_file = f.name
             
             # Output file with platform info
-            platform_name = {
-                "linux": "ubuntu",
-                "darwin": "macos", 
-                "win32": "windows"
-            }.get(sys.platform, sys.platform)
+            platform_name = get_platform_name()
             output_file = f"{language}_{platform_name}_{config['model']}.wav"
             
             # Run TTS

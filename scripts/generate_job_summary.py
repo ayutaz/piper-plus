@@ -12,6 +12,9 @@ import sys
 from pathlib import Path
 from typing import Dict, List, Any
 
+# Import platform utilities
+from platform_utils import PLATFORM_ICONS
+
 
 def load_metrics_files(results_dir: Path) -> List[Dict[str, Any]]:
     """Load all performance metrics JSON files from the results directory."""
@@ -218,11 +221,7 @@ def generate_combined_platform_summary(all_metrics: List[Dict[str, Any]]) -> str
             summary_lines.append("|------------------|----------|-------------------|----------|")
             
             for platform, summary in sorted(platform_summaries.items()):
-                platform_icon = {
-                    "linux": "🐧",
-                    "darwin": "🍎",
-                    "win32": "🪟"
-                }.get(platform, "💻")
+                platform_icon = PLATFORM_ICONS.get(platform, "💻")
                 
                 avg_rtf = summary.get("avg_rtf", "N/A")
                 avg_speed = summary.get("avg_chars_per_second", "N/A")
@@ -244,11 +243,7 @@ def generate_combined_platform_summary(all_metrics: List[Dict[str, Any]]) -> str
                 
                 for result in sorted(all_test_results, key=lambda x: (x.get("platform", ""), x.get("test_name", ""))):
                     platform = result.get("platform", "unknown")
-                    platform_icon = {
-                        "linux": "🐧",
-                        "darwin": "🍎",
-                        "win32": "🪟"
-                    }.get(platform, "💻")
+                    platform_icon = PLATFORM_ICONS.get(platform, "💻")
                     
                     test_name = result.get("test_name", "Unknown")
                     audio_file = result.get("audio_file", "N/A")
@@ -329,11 +324,7 @@ def generate_combined_platform_summary(all_metrics: List[Dict[str, Any]]) -> str
                 platforms_data = language_by_platform[lang]
                 
                 for platform, data in sorted(platforms_data.items()):
-                    platform_icon = {
-                        "linux": "🐧",
-                        "darwin": "🍎", 
-                        "win32": "🪟"
-                    }.get(platform, "💻")
+                    platform_icon = PLATFORM_ICONS.get(platform, "💻")
                     
                     model = data.get("model", "Unknown")
                     perf = data.get("performance", {})

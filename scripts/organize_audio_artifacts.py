@@ -11,10 +11,10 @@ import os
 import shutil
 import wave
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Any
 
 
-def get_audio_info(wav_path: Path) -> Dict[str, any]:
+def get_audio_info(wav_path: Path) -> Dict[str, Any]:
     """Extract information from a WAV file."""
     try:
         with wave.open(str(wav_path), 'rb') as wav:
@@ -73,7 +73,7 @@ def categorize_audio_files(audio_files: List[Path]) -> Dict[str, List[Path]]:
     return categories
 
 
-def create_artifact_structure(results_dir: Path, output_dir: Path) -> Dict[str, any]:
+def create_artifact_structure(results_dir: Path, output_dir: Path) -> Dict[str, Any]:
     """Create organized structure for audio artifacts."""
     # Find all audio files
     audio_files = list(results_dir.glob("*.wav"))
@@ -185,7 +185,7 @@ def create_artifact_structure(results_dir: Path, output_dir: Path) -> Dict[str, 
     return metadata
 
 
-def create_artifact_readme(output_dir: Path, metadata: Dict[str, any]):
+def create_artifact_readme(output_dir: Path, metadata: Dict[str, Any]):
     """Create README.md for easier artifact browsing."""
     readme_lines = []
     
@@ -325,7 +325,7 @@ def create_artifact_readme(output_dir: Path, metadata: Dict[str, any]):
         f.write("\n".join(readme_lines))
 
 
-def create_sample_subset(output_dir: Path, metadata: Dict[str, any], max_files: int = 10):
+def create_sample_subset(output_dir: Path, metadata: Dict[str, Any], max_files: int = 10):
     """Create a subset of representative samples for quick download."""
     samples_dir = output_dir / "samples"
     samples_dir.mkdir(exist_ok=True)

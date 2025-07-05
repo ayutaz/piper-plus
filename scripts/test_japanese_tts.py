@@ -20,6 +20,9 @@ import wave
 from pathlib import Path
 from typing import Dict, List, Tuple
 
+# Import platform utilities
+from platform_utils import get_platform_name
+
 # Configure stdout for UTF-8 on Windows
 if sys.platform == "win32":
     import io
@@ -215,11 +218,7 @@ class JapaneseTTSTester:
         all_passed = True
         
         for test_name, text in TEST_SENTENCES["basic"].items():
-            platform_name = {
-                "linux": "ubuntu",
-                "darwin": "macos", 
-                "win32": "windows"
-            }.get(sys.platform, sys.platform)
+            platform_name = get_platform_name()
             output_file = str(self.results_dir / f"ja_JP_{platform_name}_basic_{test_name}.wav")
             print(f"\nTesting {test_name}: {text}")
             
@@ -253,11 +252,7 @@ class JapaneseTTSTester:
         all_passed = True
         
         for test_name, text in TEST_SENTENCES["comprehensive"].items():
-            platform_name = {
-                "linux": "ubuntu",
-                "darwin": "macos", 
-                "win32": "windows"
-            }.get(sys.platform, sys.platform)
+            platform_name = get_platform_name()
             output_file = str(self.results_dir / f"ja_JP_{platform_name}_comprehensive_{test_name}.wav")
             print(f"\nTesting {test_name}: {text[:50]}...")
             
