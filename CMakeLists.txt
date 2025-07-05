@@ -555,16 +555,26 @@ install(
 
 # Install OpenJTalk for Japanese TTS support
 if(TRUE)  # HTSEngine and OpenJTalk are built
-  # Install OpenJTalk binary
+  # Install OpenJTalk binaries
   if(WIN32)
     install(
       PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/oj/bin/open_jtalk.exe
       DESTINATION bin
       OPTIONAL  # Don't fail if not built
     )
+    install(
+      PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/oj/bin/open_jtalk_phonemizer.exe
+      DESTINATION bin
+      OPTIONAL  # Don't fail if not built
+    )
   else()
     install(
       PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/oj/bin/open_jtalk
+      DESTINATION bin
+      OPTIONAL  # Don't fail if not built
+    )
+    install(
+      PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/oj/bin/open_jtalk_phonemizer
       DESTINATION bin
       OPTIONAL  # Don't fail if not built
     )
