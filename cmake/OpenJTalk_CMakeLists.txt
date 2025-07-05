@@ -252,7 +252,7 @@ add_executable(open_jtalk bin/open_jtalk.c)
 target_sources(open_jtalk PRIVATE mecab/src/mecab.cpp)
 
 # Build open_jtalk_phonemizer executable (phoneme extraction only, no HTS)
-add_executable(open_jtalk_phonemizer ${CMAKE_SOURCE_DIR}/cmake/open_jtalk_phonemizer.c)
+add_executable(open_jtalk_phonemizer bin/open_jtalk_phonemizer.c)
 target_sources(open_jtalk_phonemizer PRIVATE mecab/src/mecab.cpp)
 
 # On Windows, we need to ensure proper linking order and symbol visibility
@@ -285,11 +285,19 @@ else()
   endif()
 endif()
 
-# Phonemizer always builds without HTS Engine
-target_link_libraries(open_jtalk_phonemizer PRIVATE
-  openjtalk
-  mecab
-)
+# Phonemizer always builds without HTS Engine (but links stub on Windows)
+if(WIN32 AND HAS_HTS_ENGINE)
+  target_link_libraries(open_jtalk_phonemizer PRIVATE
+    openjtalk
+    mecab
+    ${HTS_ENGINE_LIB}
+  )
+else()
+  target_link_libraries(open_jtalk_phonemizer PRIVATE
+    openjtalk
+    mecab
+  )
+endif()
 
 if(NOT WIN32)
   target_link_libraries(open_jtalk PRIVATE m)
