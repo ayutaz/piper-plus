@@ -433,7 +433,20 @@ def main():
     # Print summary
     print("\nCategory summary:")
     for category, data in metadata["categories"].items():
-        print(f"  - {category}: {data['count']} files")
+        if category == "japanese" and "platforms" in data:
+            total_count = sum(platform_data["count"] for platform_data in data["platforms"].values())
+            print(f"  - {category}: {total_count} files")
+        elif category == "multilingual" and "languages" in data:
+            total_count = sum(
+                platform_data["count"] 
+                for lang_data in data["languages"].values() 
+                for platform_data in lang_data["platforms"].values()
+            )
+            print(f"  - {category}: {total_count} files")
+        elif "count" in data:
+            print(f"  - {category}: {data['count']} files")
+        else:
+            print(f"  - {category}: unknown structure")
     
     print(f"\nArtifacts organized in: {output_dir.absolute()}")
     
