@@ -322,10 +322,30 @@ if(NOT DEFINED OPENJTALK_DIR)
           ${CMAKE_COMMAND} -E copy 
             ${CMAKE_CURRENT_SOURCE_DIR}/cmake/open_jtalk_phonemizer.c
             <SOURCE_DIR>/bin/open_jtalk_phonemizer.c
-          COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/cmake/open_jtalk_patch.sh
         CONFIGURE_COMMAND ${OPENJTALK_CONFIGURE_CMD}
         BUILD_COMMAND ${CMAKE_COMMAND} -E chdir <SOURCE_DIR> make
-        INSTALL_COMMAND ${CMAKE_COMMAND} -E chdir <SOURCE_DIR> make install
+        INSTALL_COMMAND 
+          ${CMAKE_COMMAND} -E chdir <SOURCE_DIR> make install
+          COMMAND ${CMAKE_COMMAND} -E chdir <SOURCE_DIR>/bin ${CMAKE_C_COMPILER} -o ${OPENJTALK_DIR}/bin/open_jtalk_phonemizer
+            open_jtalk_phonemizer.c
+            -I../mecab/src -I../njd -I../jpcommon -I../njd_set_accent_phrase
+            -I../njd_set_accent_type -I../njd_set_digit -I../njd_set_long_vowel
+            -I../njd_set_pronunciation -I../njd_set_unvoiced_vowel -I../njd2jpcommon
+            -I../text2mecab -I../mecab2njd
+            ${OPENJTALK_DIR}/lib/libtext2mecab.a
+            ${OPENJTALK_DIR}/lib/libmecab2njd.a
+            ${OPENJTALK_DIR}/lib/libnjd_set_pronunciation.a
+            ${OPENJTALK_DIR}/lib/libnjd_set_digit.a
+            ${OPENJTALK_DIR}/lib/libnjd_set_accent_phrase.a
+            ${OPENJTALK_DIR}/lib/libnjd_set_accent_type.a
+            ${OPENJTALK_DIR}/lib/libnjd_set_unvoiced_vowel.a
+            ${OPENJTALK_DIR}/lib/libnjd_set_long_vowel.a
+            ${OPENJTALK_DIR}/lib/libnjd2jpcommon.a
+            ${OPENJTALK_DIR}/lib/libjpcommon.a
+            ${OPENJTALK_DIR}/lib/libmecab.a
+            ${OPENJTALK_DIR}/lib/libnjd.a
+            ${HTS_ENGINE_DIR}/lib/libHTSEngine.a
+            -lm
         BUILD_IN_SOURCE 1
         BUILD_BYPRODUCTS
           ${OPENJTALK_DIR}/bin/open_jtalk
