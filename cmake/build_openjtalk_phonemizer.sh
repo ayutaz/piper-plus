@@ -1,16 +1,26 @@
 #!/bin/bash
 # Build open_jtalk_phonemizer after OpenJTalk is built
+# Usage: ./build_openjtalk_phonemizer.sh <compiler> <install_dir> <hts_engine_dir>
 
 set -e
 
-SRCDIR="$1"
-BUILDDIR="$2"
-CC="${3:-cc}"
+CC="$1"
+INSTALL_DIR="$2"
+HTS_ENGINE_DIR="$3"
 
-cd "$SRCDIR/bin"
+echo "Building open_jtalk_phonemizer..."
+echo "Compiler: $CC"
+echo "Install dir: $INSTALL_DIR"
+echo "HTS Engine dir: $HTS_ENGINE_DIR"
 
-# Compile open_jtalk_phonemizer
-# We're running after make, so libraries should be in .libs
+# Create bin directory if it doesn't exist
+mkdir -p "$INSTALL_DIR/bin"
+
+# Navigate to bin directory
+cd bin
+
+# Build the phonemizer binary
+echo "Compiling open_jtalk_phonemizer..."
 $CC -o open_jtalk_phonemizer open_jtalk_phonemizer.c \
     -I../mecab/src -I../njd -I../jpcommon -I../njd_set_accent_phrase \
     -I../njd_set_accent_type -I../njd_set_digit -I../njd_set_long_vowel \
@@ -28,8 +38,12 @@ $CC -o open_jtalk_phonemizer open_jtalk_phonemizer.c \
     ../jpcommon/.libs/libjpcommon.a \
     ../mecab/src/.libs/libmecab.a \
     ../njd/.libs/libnjd.a \
-    ${HTS_ENGINE_DIR}/lib/libHTSEngine.a \
+    "$HTS_ENGINE_DIR/lib/libHTSEngine.a" \
     -lm
 
 # Copy to install directory
-cp open_jtalk_phonemizer "$BUILDDIR/bin/"
+echo "Installing open_jtalk_phonemizer to $INSTALL_DIR/bin/"
+cp open_jtalk_phonemizer "$INSTALL_DIR/bin/"
+chmod +x "$INSTALL_DIR/bin/open_jtalk_phonemizer"
+
+echo "open_jtalk_phonemizer build complete!"
