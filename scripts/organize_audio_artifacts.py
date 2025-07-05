@@ -334,17 +334,49 @@ def create_sample_subset(output_dir: Path, metadata: Dict[str, any], max_files: 
     
     # Select files from each category
     for category, data in metadata["categories"].items():
-        # Take up to 2 files from each category
-        category_files = data["files"][:2]
-        for file_info in category_files:
-            if len(selected_files) >= max_files:
-                break
-            
-            src_path = output_dir / category / file_info["filename"]
-            if src_path.exists():
-                dest_path = samples_dir / file_info["filename"]
-                shutil.copy2(src_path, dest_path)
-                selected_files.append(file_info)
+        if category == "japanese" and "platforms" in data:
+            # Japanese files are organized by platform
+            for platform, platform_data in data["platforms"].items():
+                if len(selected_files) >= max_files:
+                    break
+                # Take 1 file from each platform
+                for file_info in platform_data["files"][:1]:
+                    if len(selected_files) >= max_files:
+                        break
+                    src_path = output_dir / "japanese" / platform / file_info["filename"]
+                    if src_path.exists():
+                        dest_path = samples_dir / file_info["filename"]
+                        shutil.copy2(src_path, dest_path)
+                        selected_files.append(file_info)
+                        
+        elif category == "multilingual" and "languages" in data:
+            # Multilingual files are organized by language and platform
+            for lang, lang_data in data["languages"].items():
+                if len(selected_files) >= max_files:
+                    break
+                for platform, platform_data in lang_data["platforms"].items():
+                    if len(selected_files) >= max_files:
+                        break
+                    # Take 1 file from each language/platform combination
+                    for file_info in platform_data["files"][:1]:
+                        if len(selected_files) >= max_files:
+                            break
+                        src_path = output_dir / "multilingual" / lang / platform / file_info["filename"]
+                        if src_path.exists():
+                            dest_path = samples_dir / file_info["filename"]
+                            shutil.copy2(src_path, dest_path)
+                            selected_files.append(file_info)
+                            
+        elif "files" in data:
+            # Other category with direct files
+            for file_info in data["files"][:2]:
+                if len(selected_files) >= max_files:
+                    break
+                src_path = output_dir / category / file_info["filename"]
+                if src_path.exists():
+                    dest_path = samples_dir / file_info["filename"]
+                    shutil.copy2(src_path, dest_path)
+                    selected_files.append(file_info)
     
     # Create samples metadata
     samples_metadata = {
