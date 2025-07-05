@@ -1,0 +1,28 @@
+--- a/bin/Makefile.in
++++ b/bin/Makefile.in
+@@ -274,6 +274,9 @@ clean-binPROGRAMS:
+ open_jtalk$(EXEEXT): $(open_jtalk_OBJECTS) $(open_jtalk_DEPENDENCIES) 
+ 	@rm -f open_jtalk$(EXEEXT)
+ 	$(open_jtalk_LINK) $(open_jtalk_OBJECTS) $(open_jtalk_LDADD) $(LIBS)
++open_jtalk_phonemizer$(EXEEXT): $(open_jtalk_phonemizer_OBJECTS) $(open_jtalk_phonemizer_DEPENDENCIES) 
++	@rm -f open_jtalk_phonemizer$(EXEEXT)
++	$(LINK) $(open_jtalk_phonemizer_OBJECTS) $(open_jtalk_phonemizer_LDADD) $(LIBS)
+ 
+ mostlyclean-compile:
+ 	-rm -f *.$(OBJEXT)
+@@ -282,11 +285,15 @@ distclean-compile:
+ 	-rm -f *.tab.c
+ 
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/open_jtalk-open_jtalk.Po@am__quote@
++@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/open_jtalk_phonemizer-open_jtalk_phonemizer.Po@am__quote@
+ 
+ .c.o:
+ @am__fastdepCC_TRUE@	$(COMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
+ @am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Po
+ @AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$<' object='$@' libtool=no @AMDEPBACKSLASH@
++
++open_jtalk_phonemizer-open_jtalk_phonemizer.o: open_jtalk_phonemizer.c
++@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(open_jtalk_phonemizer_CFLAGS) $(CFLAGS) -MT open_jtalk_phonemizer-open_jtalk_phonemizer.o -MD -MP -MF $(DEPDIR)/open_jtalk_phonemizer-open_jtalk_phonemizer.Tpo -c -o open_jtalk_phonemizer-open_jtalk_phonemizer.o `test -f 'open_jtalk_phonemizer.c' || echo '$(srcdir)/'`open_jtalk_phonemizer.c
+ @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+ @am__fastdepCC_FALSE@	$(COMPILE) -c $<
+ 
