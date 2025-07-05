@@ -7,6 +7,13 @@ on:
         description: '残したい tag 名の prefix (空なら全削除)'
         required: false
         default: ''
+      batch_size:
+        description: '並列処理のバッチサイズ'
+        required: false
+        default: '10'
+  schedule:
+    # 毎日午前3時（UTC）に実行
+    - cron: '0 3 * * *'
 
 jobs:
   cleanup:
@@ -22,39 +29,114 @@ jobs:
           script: |
             const owner = context.repo.owner;
             const repo  = context.repo.repo;
-            const protect = `${{ inputs.protect_pattern }}`; // 空文字なら無視
+            const protect = `${{ inputs.protect_pattern || '' }}`;
+            const batchSize = parseInt(`${{ inputs.batch_size || '10' }}`);
 
-            const perPage = 100;
+            console.log(`Starting cleanup of draft releases...`);
+            console.log(`Protection pattern: ${protect || 'none'}`);
+            console.log(`Batch size: ${batchSize}`);
+
+            // すべてのドラフトリリースを先に取得
+            const allDraftReleases = [];
             let page = 1;
-            let deleted = 0;
+            const perPage = 100;
 
+            console.log(`Fetching all draft releases...`);
             while (true) {
               const { data: releases } = await github.rest.repos.listReleases({
                 owner, repo, per_page: perPage, page
               });
+              
               if (releases.length === 0) break;
 
-              for (const rel of releases) {
-                if (!rel.draft) continue;                // 対象は draft のみ
-                if (protect && rel.tag_name.startsWith(protect)) continue; // 保護
-
-                console.log(`Deleting draft release: ${rel.name || rel.tag_name} (id=${rel.id})`);
-                await github.rest.repos.deleteRelease({ owner, repo, release_id: rel.id });
-
-                // 関連タグも削除
-                try {
-                  await github.rest.git.deleteRef({ owner, repo, ref: `tags/${rel.tag_name}` });
-                  console.log(`Deleted tag: ${rel.tag_name}`);
-                } catch (err) {
-                  if (err.status === 422) {
-                    console.log(`Tag not found: ${rel.tag_name}`);
-                  } else {
-                    throw err;
-                  }
+              const drafts = releases.filter(rel => {
+                if (!rel.draft) return false;
+                if (protect && rel.tag_name && rel.tag_name.startsWith(protect)) {
+                  console.log(`Protected: ${rel.tag_name}`);
+                  return false;
                 }
-                deleted++;
-              }
+                return true;
+              });
+
+              allDraftReleases.push(...drafts);
+              
+              // すべてのリリースがドラフト以外だったら終了
+              if (releases.filter(rel => rel.draft).length < perPage) break;
               page++;
             }
 
-            console.log(`Total draft releases deleted: ${deleted}`); 
+            console.log(`Found ${allDraftReleases.length} draft releases to delete`);
+
+            if (allDraftReleases.length === 0) {
+              console.log(`No draft releases found to delete`);
+              return;
+            }
+
+            // バッチ処理で削除
+            let deleted = 0;
+            let failed = 0;
+
+            for (let i = 0; i < allDraftReleases.length; i += batchSize) {
+              const batch = allDraftReleases.slice(i, i + batchSize);
+              
+              console.log(`Processing batch ${Math.floor(i / batchSize) + 1} of ${Math.ceil(allDraftReleases.length / batchSize)}`);
+              
+              // バッチ内で並列削除
+              const deletePromises = batch.map(async (rel) => {
+                try {
+                  console.log(`Deleting: ${rel.name || rel.tag_name} (id=${rel.id})`);
+                  
+                  // リリースを削除
+                  await github.rest.repos.deleteRelease({ 
+                    owner, 
+                    repo, 
+                    release_id: rel.id 
+                  });
+
+                  // タグも削除（存在する場合）
+                  if (rel.tag_name) {
+                    try {
+                      await github.rest.git.deleteRef({ 
+                        owner, 
+                        repo, 
+                        ref: `tags/${rel.tag_name}` 
+                      });
+                      console.log(`  └─ Tag deleted: ${rel.tag_name}`);
+                    } catch (err) {
+                      if (err.status === 422 || err.status === 404) {
+                        console.log(`  └─ Tag not found: ${rel.tag_name}`);
+                      } else {
+                        console.error(`  └─ Failed to delete tag ${rel.tag_name}: ${err.message}`);
+                      }
+                    }
+                  }
+                  
+                  return { success: true, release: rel };
+                } catch (err) {
+                  console.error(`Failed to delete release ${rel.name || rel.tag_name}: ${err.message}`);
+                  return { success: false, release: rel, error: err };
+                }
+              });
+
+              const results = await Promise.all(deletePromises);
+              
+              const successCount = results.filter(r => r.success).length;
+              deleted += successCount;
+              failed += results.filter(r => !r.success).length;
+              
+              console.log(`Batch complete: ${successCount} deleted, ${results.length - successCount} failed`);
+              
+              // レート制限を避けるため少し待機
+              if (i + batchSize < allDraftReleases.length) {
+                await new Promise(resolve => setTimeout(resolve, 1000));
+              }
+            }
+
+            console.log(`\n=== Cleanup Summary ===`);
+            console.log(`Total draft releases found: ${allDraftReleases.length}`);
+            console.log(`Successfully deleted: ${deleted}`);
+            console.log(`Failed to delete: ${failed}`);
+
+            if (failed > 0) {
+              core.warning(`Failed to delete ${failed} draft releases`);
+            } 
