@@ -287,7 +287,7 @@ jobs:
             PIPER_BIN="${{ github.workspace }}/piper/bin/piper"
           fi
           # Convert comma-separated to space-separated for argparse
-          LANGUAGES="${{ github.event.inputs.languages || 'en_US,de_DE' }}"
+          LANGUAGES="${{ github.event.inputs.languages || 'en_US,de_DE,fr_FR,es_ES,ja_JP,zh_CN,ko_KR' }}"
           LANGUAGES_SPACE=$(echo "$LANGUAGES" | tr ',' ' ')
           python scripts/test_multilingual_tts.py \
             --languages $LANGUAGES_SPACE \
