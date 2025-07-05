@@ -250,8 +250,13 @@ class MultilingualTTSTester:
                 f.write(config["test_text"])
                 input_file = f.name
             
-            # Output file
-            output_file = f"test_output_{language}.wav"
+            # Output file with platform info
+            platform_name = {
+                "linux": "ubuntu",
+                "darwin": "macos", 
+                "win32": "windows"
+            }.get(sys.platform, sys.platform)
+            output_file = f"{language}_{platform_name}_{config['model']}.wav"
             
             # Run TTS
             print(f"Running TTS with text: {config['test_text'][:50]}...")

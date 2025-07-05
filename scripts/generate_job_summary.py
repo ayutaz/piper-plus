@@ -332,20 +332,79 @@ def generate_audio_artifacts_section(results_dir: Path) -> str:
     summary_lines.append(f"テスト中に **{len(wav_files)}** 個の音声ファイルを生成しました。")
     summary_lines.append("")
     
-    # Group by test type
-    basic_files = [f for f in wav_files if "basic" in f.name]
-    comprehensive_files = [f for f in wav_files if "comprehensive" in f.name]
-    lang_files = [f for f in wav_files if "_basic.wav" in f.name or "_comprehensive.wav" in f.name]
+    # Group files by language and platform
+    file_groups = {}
+    for wav_file in wav_files:
+        # Parse filename pattern: language_platform_model.wav or ja_JP_platform_type_name.wav
+        parts = wav_file.name.split('_')
+        if len(parts) >= 3:
+            if parts[0] == "ja" and parts[1] == "JP":
+                lang = "ja_JP"
+                platform = parts[2]
+                desc = "_".join(parts[3:]).replace('.wav', '')
+            else:
+                lang = f"{parts[0]}_{parts[1]}" if parts[1].isupper() else parts[0]
+                platform = parts[2] if len(parts) > 2 else "unknown"
+                desc = "_".join(parts[3:]).replace('.wav', '') if len(parts) > 3 else parts[-1].replace('.wav', '')
+            
+            key = (lang, platform)
+            if key not in file_groups:
+                file_groups[key] = []
+            file_groups[key].append((wav_file.name, desc))
     
-    if basic_files:
-        summary_lines.append(f"- 基本テスト: {len(basic_files)} ファイル")
-    if comprehensive_files:
-        summary_lines.append(f"- 包括的テスト: {len(comprehensive_files)} ファイル")
-    if lang_files:
-        summary_lines.append(f"- 言語テスト: {len(lang_files)} ファイル")
+    # Display organized file list
+    if file_groups:
+        summary_lines.append("**言語・プラットフォーム別の音声ファイル:**")
+        summary_lines.append("")
+        summary_lines.append("<details>")
+        summary_lines.append("<summary>ファイル一覧（クリックして展開）</summary>")
+        summary_lines.append("")
+        
+        # Language names
+        lang_names = {
+            "ja_JP": "🇯🇵 日本語",
+            "en_US": "🇺🇸 英語（米国）",
+            "en_GB": "🇬🇧 英語（英国）",
+            "de_DE": "🇩🇪 ドイツ語",
+            "fr_FR": "🇫🇷 フランス語",
+            "es_ES": "🇪🇸 スペイン語",
+            "it_IT": "🇮🇹 イタリア語",
+            "pt_BR": "🇧🇷 ポルトガル語",
+            "zh_CN": "🇨🇳 中国語",
+            "ru_RU": "🇷🇺 ロシア語",
+            "nl_NL": "🇳🇱 オランダ語",
+            "ko_KR": "🇰🇷 韓国語"
+        }
+        
+        platform_names = {
+            "ubuntu": "Ubuntu",
+            "macos": "macOS",
+            "windows": "Windows"
+        }
+        
+        for (lang, platform), files in sorted(file_groups.items()):
+            lang_display = lang_names.get(lang, f"🌐 {lang}")
+            platform_display = platform_names.get(platform, platform)
+            
+            summary_lines.append(f"#### {lang_display} - {platform_display}")
+            summary_lines.append("")
+            
+            for filename, desc in sorted(files):
+                summary_lines.append(f"- `{filename}`")
+            
+            summary_lines.append("")
+        
+        summary_lines.append("</details>")
+        summary_lines.append("")
     
+    # Example naming pattern
+    summary_lines.append("**ファイル名の形式:**")
+    summary_lines.append("- 多言語: `言語コード_プラットフォーム_モデル名.wav`")
+    summary_lines.append("  - 例: `en_US_ubuntu_en_US-lessac-medium.wav`")
+    summary_lines.append("- 日本語: `ja_JP_プラットフォーム_テストタイプ_テスト名.wav`")
+    summary_lines.append("  - 例: `ja_JP_windows_basic_hiragana.wav`")
     summary_lines.append("")
-    summary_lines.append("音声ファイルはテストアーティファクトで利用可能です。")
+    summary_lines.append("音声ファイルはアーティファクトからダウンロードして聴くことができます。")
     summary_lines.append("")
     
     return "\n".join(summary_lines)

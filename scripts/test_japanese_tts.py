@@ -215,7 +215,12 @@ class JapaneseTTSTester:
         all_passed = True
         
         for test_name, text in TEST_SENTENCES["basic"].items():
-            output_file = str(self.results_dir / f"basic_{test_name}.wav")
+            platform_name = {
+                "linux": "ubuntu",
+                "darwin": "macos", 
+                "win32": "windows"
+            }.get(sys.platform, sys.platform)
+            output_file = str(self.results_dir / f"ja_JP_{platform_name}_basic_{test_name}.wav")
             print(f"\nTesting {test_name}: {text}")
             
             success, error, duration = self.run_tts(text, output_file)
@@ -248,7 +253,12 @@ class JapaneseTTSTester:
         all_passed = True
         
         for test_name, text in TEST_SENTENCES["comprehensive"].items():
-            output_file = str(self.results_dir / f"comprehensive_{test_name}.wav")
+            platform_name = {
+                "linux": "ubuntu",
+                "darwin": "macos", 
+                "win32": "windows"
+            }.get(sys.platform, sys.platform)
+            output_file = str(self.results_dir / f"ja_JP_{platform_name}_comprehensive_{test_name}.wav")
             print(f"\nTesting {test_name}: {text[:50]}...")
             
             success, error, duration = self.run_tts(text, output_file)
