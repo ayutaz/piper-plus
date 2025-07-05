@@ -15,12 +15,19 @@
 namespace piper {
 
 // Convert OpenJTalk phonemes to PUA characters for multi-phoneme support
+// This MUST match the Python implementation in jp_id_map.py exactly
 static const std::unordered_map<std::string, char32_t> phonemeToPua = {
+    // Long vowels (matches Python order)
     {"a:", 0xE000}, {"i:", 0xE001}, {"u:", 0xE002}, {"e:", 0xE003}, {"o:", 0xE004},
-    {"cl", 0xE005}, {"ky", 0xE006}, {"kw", 0xE007}, {"gy", 0xE008}, {"gw", 0xE009},
-    {"ty", 0xE00A}, {"dy", 0xE00B}, {"py", 0xE00C}, {"by", 0xE00D}, {"ch", 0xE00E},
-    {"ts", 0xE00F}, {"sh", 0xE010}, {"zy", 0xE011}, {"hy", 0xE012}, {"ny", 0xE013},
+    // Special consonants
+    {"cl", 0xE005}, // 促音/終止閉鎖
+    // Palatalized consonants - matches Python order exactly
+    {"ky", 0xE006}, {"kw", 0xE007}, {"gy", 0xE008}, {"gw", 0xE009},
+    {"ty", 0xE00A}, {"dy", 0xE00B}, {"py", 0xE00C}, {"by", 0xE00D}, 
+    {"ch", 0xE00E}, {"ts", 0xE00F}, {"sh", 0xE010}, 
+    {"zy", 0xE011}, {"hy", 0xE012}, {"ny", 0xE013}, 
     {"my", 0xE014}, {"ry", 0xE015}
+    // Note: N, q, j are single characters and don't need PUA mapping
 };
 
 void phonemize_openjtalk(const std::string &text, std::vector<std::vector<Phoneme>> &phonemes) {
@@ -54,24 +61,23 @@ void phonemize_openjtalk(const std::string &text, std::vector<std::vector<Phonem
     
     spdlog::debug("OpenJTalk returned phonemes: {}", phoneme_string);
     
-    // Split into sentences (OpenJTalk separates sentences with a period)
-    std::vector<std::string> sentences;
-    std::stringstream ss(phoneme_string);
-    std::string sentence;
+    // Parse phoneme string - phonemes are space-separated, sil marks sentence boundaries
+    std::vector<Phoneme> sentencePhonemes;
+    std::stringstream phonemeStream(phoneme_string);
+    std::string phoneme;
     
-    while (std::getline(ss, sentence, '.')) {
-        if (!sentence.empty()) {
-            sentences.push_back(sentence);
-        }
-    }
-    
-    // Convert each sentence's phonemes
-    for (const auto& sent : sentences) {
-        std::vector<Phoneme> sentencePhonemes;
-        std::stringstream phonemeStream(sent);
-        std::string phoneme;
-        
-        while (phonemeStream >> phoneme) {
+    while (phonemeStream >> phoneme) {
+        if (phoneme == "sil") {
+            // Sentence boundary
+            if (!sentencePhonemes.empty()) {
+                phonemes.push_back(sentencePhonemes);
+                sentencePhonemes.clear();
+            }
+        } else if (phoneme == "pau") {
+            // Short pause within sentence - add a special pause marker
+            sentencePhonemes.push_back(static_cast<Phoneme>('_'));
+        } else {
+            // Regular phoneme
             // Check if this is a multi-character phoneme that needs PUA
             auto it = phonemeToPua.find(phoneme);
             if (it != phonemeToPua.end()) {
@@ -84,10 +90,11 @@ void phonemize_openjtalk(const std::string &text, std::vector<std::vector<Phonem
                 spdlog::warn("Unknown multi-character phoneme: {}", phoneme);
             }
         }
-        
-        if (!sentencePhonemes.empty()) {
-            phonemes.push_back(sentencePhonemes);
-        }
+    }
+    
+    // Add any remaining phonemes as final sentence
+    if (!sentencePhonemes.empty()) {
+        phonemes.push_back(sentencePhonemes);
     }
     
     spdlog::debug("OpenJTalk phonemization complete: {} sentences", phonemes.size());
