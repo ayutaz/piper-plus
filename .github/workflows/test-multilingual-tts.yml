@@ -296,7 +296,29 @@ jobs:
         env:
           PIPER_CACHE_DIR: ${{ env.CACHE_DIR }}
       
-      # Note: Performance report generation is handled by test_multilingual_tts.py
+      # Generate job summary
+      - name: Generate Job Summary
+        if: always()
+        shell: bash
+        run: |
+          if [ -d "test_results" ]; then
+            echo "Generating job summary..."
+            python scripts/generate_job_summary.py --results-dir test_results
+          else
+            echo "No test results directory found"
+          fi
+      
+      # Organize audio artifacts
+      - name: Organize Audio Artifacts
+        if: always()
+        shell: bash
+        run: |
+          if [ -d "test_results" ]; then
+            echo "Organizing audio artifacts..."
+            python scripts/organize_audio_artifacts.py --results-dir test_results --create-samples --max-samples 20
+          else
+            echo "No test results directory found"
+          fi
       
       - name: Upload test results
         if: always()
@@ -306,4 +328,13 @@ jobs:
           path: |
             test_results/
             *.log
+          retention-days: 7
+      
+      - name: Upload audio artifacts
+        if: always()
+        uses: actions/upload-artifact@v4.6.0
+        with:
+          name: multilingual-audio-artifacts-${{ matrix.os }}-${{ github.sha }}
+          path: |
+            audio_artifacts/
           retention-days: 7

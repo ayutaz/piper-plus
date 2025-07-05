@@ -1,0 +1,299 @@
+#!/usr/bin/env python3
+"""
+Generate GitHub Actions Job Summary from performance metrics.
+This script reads performance metrics JSON files and generates a markdown summary
+with tables and visualizations for the GitHub Actions job summary.
+"""
+
+import argparse
+import json
+import os
+import sys
+from pathlib import Path
+from typing import Dict, List, Any
+
+
+def load_metrics_files(results_dir: Path) -> List[Dict[str, Any]]:
+    """Load all performance metrics JSON files from the results directory."""
+    metrics_files = []
+    
+    # Look for performance summary files
+    summary_files = list(results_dir.glob("performance_summary.json"))
+    
+    # Also look in performance subdirectory
+    perf_dir = results_dir / "performance"
+    if perf_dir.exists():
+        summary_files.extend(perf_dir.glob("*_metrics_*.json"))
+    
+    # Load each file
+    for file_path in summary_files:
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                data['source_file'] = file_path.name
+                metrics_files.append(data)
+        except Exception as e:
+            print(f"Warning: Failed to load {file_path}: {e}", file=sys.stderr)
+    
+    return metrics_files
+
+
+def generate_japanese_tts_summary(metrics: Dict[str, Any]) -> str:
+    """Generate summary for Japanese TTS test results."""
+    summary_lines = []
+    
+    summary_lines.append("### 🇯🇵 Japanese TTS Performance")
+    summary_lines.append("")
+    
+    # Overall statistics
+    if "summary" in metrics:
+        stats = metrics["summary"]
+        summary_lines.append("**Summary Statistics:**")
+        summary_lines.append(f"- Average RTF: **{stats.get('avg_rtf', 'N/A')}** (lower is better)")
+        summary_lines.append(f"- Average Speed: **{stats.get('avg_chars_per_second', 'N/A'):.1f}** chars/second")
+        summary_lines.append(f"- Total Tests: **{stats.get('total_tests', 0)}**")
+        summary_lines.append("")
+    
+    # Detailed results table
+    if "test_results" in metrics and metrics["test_results"]:
+        summary_lines.append("<details>")
+        summary_lines.append("<summary>Detailed Test Results</summary>")
+        summary_lines.append("")
+        summary_lines.append("| Test Name | Characters | Generation Time | Audio Duration | RTF | Speed (chars/s) |")
+        summary_lines.append("|-----------|------------|-----------------|----------------|-----|-----------------|")
+        
+        for result in metrics["test_results"]:
+            test_name = result.get("test_name", "Unknown")
+            chars = result.get("char_count", 0)
+            gen_time = result.get("generation_time_ms", 0)
+            audio_dur = result.get("audio_duration_ms", 0)
+            rtf = result.get("rtf", 0)
+            speed = result.get("chars_per_second", 0)
+            
+            summary_lines.append(f"| {test_name} | {chars} | {gen_time:.0f}ms | {audio_dur:.0f}ms | {rtf:.3f} | {speed:.1f} |")
+        
+        summary_lines.append("")
+        summary_lines.append("</details>")
+    
+    summary_lines.append("")
+    return "\n".join(summary_lines)
+
+
+def generate_multilingual_tts_summary(metrics: Dict[str, Any]) -> str:
+    """Generate summary for multilingual TTS test results."""
+    summary_lines = []
+    
+    summary_lines.append("### 🌍 Multilingual TTS Performance")
+    summary_lines.append("")
+    
+    # Overall statistics
+    if "summary" in metrics:
+        stats = metrics["summary"]
+        summary_lines.append("**Summary Statistics:**")
+        summary_lines.append(f"- Languages Tested: **{stats.get('total_languages', 0)}**")
+        summary_lines.append(f"- Average RTF: **{stats.get('avg_rtf', 'N/A')}**")
+        summary_lines.append(f"- Average Speed: **{stats.get('avg_speed_chars_per_second', 'N/A'):.1f}** chars/second")
+        summary_lines.append("")
+    
+    # Language comparison table
+    if "languages" in metrics and metrics["languages"]:
+        summary_lines.append("| Language | Model | RTF | Speed (chars/s) | Generation Time | Audio Duration |")
+        summary_lines.append("|----------|-------|-----|-----------------|-----------------|----------------|")
+        
+        for lang, data in sorted(metrics["languages"].items()):
+            model = data.get("model", "Unknown")
+            perf = data.get("performance", {})
+            rtf = perf.get("rtf", 0)
+            speed = perf.get("chars_per_second", 0)
+            gen_time = perf.get("generation_time_ms", 0)
+            audio_dur = perf.get("audio_duration_ms", 0)
+            
+            # Add flag emoji for languages
+            lang_flags = {
+                "en_US": "🇺🇸", "en_GB": "🇬🇧", "de_DE": "🇩🇪", "fr_FR": "🇫🇷",
+                "es_ES": "🇪🇸", "it_IT": "🇮🇹", "pt_BR": "🇧🇷", "ru_RU": "🇷🇺",
+                "zh_CN": "🇨🇳", "ja_JP": "🇯🇵", "ko_KR": "🇰🇷", "ar_JO": "🇯🇴",
+                "nl_NL": "🇳🇱", "pl_PL": "🇵🇱", "sv_SE": "🇸🇪", "tr_TR": "🇹🇷"
+            }
+            flag = lang_flags.get(lang, "🌐")
+            
+            summary_lines.append(f"| {flag} {lang} | {model} | {rtf:.3f} | {speed:.1f} | {gen_time:.0f}ms | {audio_dur:.0f}ms |")
+        
+        summary_lines.append("")
+    
+    # Performance visualization using Mermaid
+    if "languages" in metrics and len(metrics["languages"]) > 0:
+        summary_lines.append("<details>")
+        summary_lines.append("<summary>Performance Visualization</summary>")
+        summary_lines.append("")
+        summary_lines.append("```mermaid")
+        summary_lines.append("graph LR")
+        summary_lines.append("    subgraph RTF Performance")
+        
+        # Sort languages by RTF for better visualization
+        sorted_langs = sorted(
+            [(lang, data.get("performance", {}).get("rtf", 0)) 
+             for lang, data in metrics["languages"].items()],
+            key=lambda x: x[1]
+        )
+        
+        for lang, rtf in sorted_langs[:10]:  # Show top 10
+            # Color code based on RTF
+            if rtf < 0.5:
+                color = "green"
+            elif rtf < 1.0:
+                color = "yellow"
+            else:
+                color = "red"
+            
+            summary_lines.append(f"        {lang}[{lang}<br/>RTF: {rtf:.2f}]")
+        
+        summary_lines.append("    end")
+        summary_lines.append("```")
+        summary_lines.append("")
+        summary_lines.append("</details>")
+    
+    summary_lines.append("")
+    return "\n".join(summary_lines)
+
+
+def generate_platform_comparison(all_metrics: List[Dict[str, Any]]) -> str:
+    """Generate cross-platform comparison if multiple platforms tested."""
+    platforms = {}
+    
+    # Group by platform
+    for metrics in all_metrics:
+        platform = metrics.get("platform", "unknown")
+        if platform not in platforms:
+            platforms[platform] = []
+        platforms[platform].append(metrics)
+    
+    if len(platforms) <= 1:
+        return ""
+    
+    summary_lines = []
+    summary_lines.append("### 🖥️ Cross-Platform Comparison")
+    summary_lines.append("")
+    summary_lines.append("| Platform | Test Type | Avg RTF | Avg Speed (chars/s) |")
+    summary_lines.append("|----------|-----------|---------|---------------------|")
+    
+    for platform, metrics_list in sorted(platforms.items()):
+        for metrics in metrics_list:
+            test_type = "Japanese" if "ja_JP" in str(metrics) else "Multilingual"
+            
+            if "summary" in metrics:
+                avg_rtf = metrics["summary"].get("avg_rtf", "N/A")
+                avg_speed = metrics["summary"].get("avg_chars_per_second") or metrics["summary"].get("avg_speed_chars_per_second", "N/A")
+                
+                platform_icon = {
+                    "linux": "🐧",
+                    "darwin": "🍎",
+                    "win32": "🪟"
+                }.get(platform, "💻")
+                
+                summary_lines.append(f"| {platform_icon} {platform} | {test_type} | {avg_rtf} | {avg_speed} |")
+    
+    summary_lines.append("")
+    return "\n".join(summary_lines)
+
+
+def generate_audio_artifacts_section(results_dir: Path) -> str:
+    """Generate section about audio artifacts."""
+    wav_files = list(results_dir.glob("*.wav"))
+    
+    if not wav_files:
+        return ""
+    
+    summary_lines = []
+    summary_lines.append("### 🎵 Generated Audio Samples")
+    summary_lines.append("")
+    summary_lines.append(f"Generated **{len(wav_files)}** audio files during testing.")
+    summary_lines.append("")
+    
+    # Group by test type
+    basic_files = [f for f in wav_files if "basic" in f.name]
+    comprehensive_files = [f for f in wav_files if "comprehensive" in f.name]
+    lang_files = [f for f in wav_files if "_basic.wav" in f.name or "_comprehensive.wav" in f.name]
+    
+    if basic_files:
+        summary_lines.append(f"- Basic tests: {len(basic_files)} files")
+    if comprehensive_files:
+        summary_lines.append(f"- Comprehensive tests: {len(comprehensive_files)} files")
+    if lang_files:
+        summary_lines.append(f"- Language tests: {len(lang_files)} files")
+    
+    summary_lines.append("")
+    summary_lines.append("Audio files are available in the test artifacts.")
+    summary_lines.append("")
+    
+    return "\n".join(summary_lines)
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Generate GitHub Actions job summary from performance metrics")
+    parser.add_argument("--results-dir", default="test_results",
+                       help="Directory containing test results and metrics")
+    parser.add_argument("--output", default=None,
+                       help="Output file (default: write to GITHUB_STEP_SUMMARY)")
+    
+    args = parser.parse_args()
+    
+    results_dir = Path(args.results_dir)
+    if not results_dir.exists():
+        print(f"Error: Results directory {results_dir} does not exist")
+        sys.exit(1)
+    
+    # Load all metrics files
+    all_metrics = load_metrics_files(results_dir)
+    
+    if not all_metrics:
+        print("Warning: No metrics files found")
+        summary = "## 📊 TTS Performance Report\n\nNo performance metrics were collected during this test run.\n"
+    else:
+        # Generate summary sections
+        summary_parts = []
+        summary_parts.append("## 📊 TTS Performance Report")
+        summary_parts.append("")
+        
+        # Process each metrics file
+        for metrics in all_metrics:
+            if "language" in metrics and metrics["language"] == "ja_JP":
+                summary_parts.append(generate_japanese_tts_summary(metrics))
+            elif "languages" in metrics:
+                summary_parts.append(generate_multilingual_tts_summary(metrics))
+        
+        # Add cross-platform comparison if applicable
+        platform_comparison = generate_platform_comparison(all_metrics)
+        if platform_comparison:
+            summary_parts.append(platform_comparison)
+        
+        # Add audio artifacts section
+        audio_section = generate_audio_artifacts_section(results_dir)
+        if audio_section:
+            summary_parts.append(audio_section)
+        
+        # Add footer
+        summary_parts.append("---")
+        summary_parts.append("*Generated by Piper TTS Performance Testing Suite*")
+        
+        summary = "\n".join(summary_parts)
+    
+    # Write output
+    if args.output:
+        with open(args.output, 'w', encoding='utf-8') as f:
+            f.write(summary)
+        print(f"Summary written to {args.output}")
+    else:
+        # Write to GitHub Actions step summary
+        github_step_summary = os.environ.get("GITHUB_STEP_SUMMARY")
+        if github_step_summary:
+            with open(github_step_summary, 'a', encoding='utf-8') as f:
+                f.write(summary)
+            print("Summary written to GITHUB_STEP_SUMMARY")
+        else:
+            # Fallback: print to stdout
+            print(summary)
+
+
+if __name__ == "__main__":
+    main()

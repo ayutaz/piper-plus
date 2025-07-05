@@ -16,6 +16,7 @@ from typing import Dict, List, Tuple, Optional
 import urllib.request
 import tarfile
 import zipfile
+import wave
 
 # Language test configurations
 LANGUAGE_CONFIGS = {
@@ -147,6 +148,17 @@ class MultilingualTTSTester:
         self.cache_dir = Path(cache_dir or os.path.expanduser("~/.cache/piper/voices"))
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         
+        # Results directory
+        self.results_dir = Path("test_results")
+        self.results_dir.mkdir(exist_ok=True)
+        
+        # Performance directory
+        self.performance_dir = self.results_dir / "performance"
+        self.performance_dir.mkdir(exist_ok=True)
+        
+        # Performance metrics collection
+        self.all_metrics = {}
+        
     def download_model(self, language: str, config: Dict) -> Tuple[Path, Path]:
         """Download model files for a specific language."""
         model_name = config["model"]
@@ -194,6 +206,17 @@ class MultilingualTTSTester:
         print(f"[OK] Downloaded {model_name} successfully")
         return model_path, config_path
     
+    def get_audio_duration(self, wav_file: str) -> float:
+        """Get duration of a WAV file in seconds."""
+        try:
+            with wave.open(wav_file, 'rb') as wav:
+                frames = wav.getnframes()
+                rate = wav.getframerate()
+                return frames / rate
+        except Exception as e:
+            print(f"Error reading WAV file: {e}")
+            return 0
+    
     def test_language(self, language: str, config: Dict, 
                      test_type: str = "basic") -> Dict:
         """Test TTS for a specific language."""
@@ -207,7 +230,8 @@ class MultilingualTTSTester:
             "status": "failed",
             "time": 0,
             "output_size": 0,
-            "errors": []
+            "errors": [],
+            "performance": {}
         }
         
         try:
@@ -249,7 +273,27 @@ class MultilingualTTSTester:
                     results["output_size"] = os.path.getsize(output_file)
                     if results["output_size"] > 10000:  # Minimum expected size
                         results["status"] = "success"
+                        
+                        # Calculate performance metrics
+                        audio_duration = self.get_audio_duration(output_file)
+                        generation_time = results["time"]
+                        rtf = generation_time / audio_duration if audio_duration > 0 else float('inf')
+                        
+                        results["performance"] = {
+                            "generation_time_ms": round(generation_time * 1000, 2),
+                            "audio_duration_ms": round(audio_duration * 1000, 2),
+                            "rtf": round(rtf, 4),
+                            "chars_per_second": round(len(config["test_text"]) / generation_time, 2) if generation_time > 0 else 0,
+                            "text_length": len(config["test_text"])
+                        }
+                        
                         print(f"[OK] Success! Generated {results['output_size']} bytes in {results['time']:.2f}s")
+                        print(f"     RTF: {rtf:.4f}, Speed: {results['performance']['chars_per_second']:.1f} chars/s")
+                        
+                        # Save output to results directory
+                        result_path = self.results_dir / f"{language}_basic.wav"
+                        os.rename(output_file, result_path)
+                        output_file = str(result_path)
                     else:
                         results["errors"].append(f"Output file too small: {results['output_size']} bytes")
                 else:
@@ -354,7 +398,49 @@ class MultilingualTTSTester:
             else:
                 print(f"Warning: Unknown language {lang}")
         
+        # Save performance metrics
+        self.save_performance_metrics(results)
+        
         return results
+    
+    def save_performance_metrics(self, results: Dict[str, Dict]):
+        """Save performance metrics to JSON file."""
+        metrics = {
+            "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "platform": sys.platform,
+            "languages": {}
+        }
+        
+        for lang, result in results.items():
+            if result["status"] == "success" and result.get("performance"):
+                metrics["languages"][lang] = {
+                    "model": result["model"],
+                    "performance": result["performance"],
+                    "output_size": result["output_size"]
+                }
+        
+        # Calculate overall statistics
+        if metrics["languages"]:
+            all_rtf = [m["performance"]["rtf"] for m in metrics["languages"].values() if m["performance"]["rtf"] != float('inf')]
+            all_speeds = [m["performance"]["chars_per_second"] for m in metrics["languages"].values()]
+            
+            metrics["summary"] = {
+                "total_languages": len(metrics["languages"]),
+                "avg_rtf": round(sum(all_rtf) / len(all_rtf), 4) if all_rtf else 0,
+                "avg_speed_chars_per_second": round(sum(all_speeds) / len(all_speeds), 2) if all_speeds else 0
+            }
+        
+        # Save to file
+        metrics_file = self.performance_dir / f"multilingual_metrics_{sys.platform}_{int(time.time())}.json"
+        with open(metrics_file, 'w', encoding='utf-8') as f:
+            json.dump(metrics, f, ensure_ascii=False, indent=2)
+        
+        # Also save summary for job summary
+        summary_file = self.results_dir / "performance_summary.json"
+        with open(summary_file, 'w', encoding='utf-8') as f:
+            json.dump(metrics, f, ensure_ascii=False, indent=2)
+        
+        print(f"\nPerformance metrics saved to: {metrics_file}")
     
     def print_summary(self, results: Dict[str, Dict]):
         """Print a summary of test results."""
