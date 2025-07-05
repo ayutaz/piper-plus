@@ -13,6 +13,9 @@ import wave
 from pathlib import Path
 from typing import Dict, List, Tuple, Any
 
+# Import test text information
+from test_text_constants import get_test_text_description, MULTILINGUAL_TEST_TEXTS
+
 
 def get_audio_info(wav_path: Path) -> Dict[str, Any]:
     """Extract information from a WAV file."""
@@ -192,6 +195,41 @@ def create_artifact_readme(output_dir: Path, metadata: Dict[str, Any]):
     readme_lines.append("# TTS 音声テストアーティファクト")
     readme_lines.append("")
     readme_lines.append(f"総音声ファイル数: **{metadata['total_files']}**")
+    readme_lines.append("")
+    
+    # Add test text information
+    readme_lines.append("## テストで使用されたテキスト")
+    readme_lines.append("")
+    
+    # Japanese test texts
+    if "japanese" in metadata:
+        readme_lines.append(get_test_text_description("ja_JP"))
+        readme_lines.append("")
+    
+    # Multilingual test texts
+    if "multilingual" in metadata:
+        readme_lines.append("### 多言語テストテキスト")
+        readme_lines.append("")
+        readme_lines.append("| 言語 | テストテキスト |")
+        readme_lines.append("|------|----------------|")
+        
+        languages_in_test = set()
+        for lang_data in metadata.get("multilingual", {}).values():
+            if isinstance(lang_data, dict):
+                for lang in lang_data.keys():
+                    languages_in_test.add(lang)
+        
+        for lang in sorted(languages_in_test):
+            if lang in MULTILINGUAL_TEST_TEXTS:
+                text = MULTILINGUAL_TEST_TEXTS[lang]
+                # Truncate long texts
+                if len(text) > 60:
+                    text = text[:57] + "..."
+                readme_lines.append(f"| {lang} | {text} |")
+        
+        readme_lines.append("")
+    
+    readme_lines.append("---")
     readme_lines.append("")
     readme_lines.append("## ファイル命名規則")
     readme_lines.append("")

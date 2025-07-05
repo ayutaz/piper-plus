@@ -199,7 +199,8 @@ class JapaneseTTSTester:
             
             metric = {
                 "test_name": test_name,
-                "text": text[:50] + "..." if len(text) > 50 else text,  # Truncate long text
+                "text": text,  # Full text for reference
+                "text_preview": text[:50] + "..." if len(text) > 50 else text,  # Truncated for display
                 "char_count": len(text),
                 "generation_time_ms": round(generation_time * 1000, 2),
                 "audio_duration_ms": round(audio_duration * 1000, 2),

@@ -62,19 +62,20 @@ def generate_japanese_tts_summary(metrics: Dict[str, Any]) -> str:
         summary_lines.append("<details>")
         summary_lines.append("<summary>詳細なテスト結果</summary>")
         summary_lines.append("")
-        summary_lines.append("| テスト名 | 音声ファイル名 | 文字数 | 生成時間 | 音声時間 | RTF | 速度 (文字/秒) |")
-        summary_lines.append("|----------|----------------|--------|----------|----------|-----|----------------|")
+        summary_lines.append("| テスト名 | 音声ファイル名 | テストテキスト | 文字数 | 生成時間 | 音声時間 | RTF | 速度 (文字/秒) |")
+        summary_lines.append("|----------|----------------|----------------|--------|----------|----------|-----|----------------|")
         
         for result in metrics["test_results"]:
             test_name = result.get("test_name", "Unknown")
             audio_file = result.get("audio_file", "N/A")
+            text_preview = result.get("text_preview", result.get("text", ""))[:40] + "..."
             chars = result.get("char_count", 0)
             gen_time = result.get("generation_time_ms", 0)
             audio_dur = result.get("audio_duration_ms", 0)
             rtf = result.get("rtf", 0)
             speed = result.get("chars_per_second", 0)
             
-            summary_lines.append(f"| {test_name} | `{audio_file}` | {chars} | {gen_time:.0f}ms | {audio_dur:.0f}ms | {rtf:.3f} | {speed:.1f} |")
+            summary_lines.append(f"| {test_name} | `{audio_file}` | {text_preview} | {chars} | {gen_time:.0f}ms | {audio_dur:.0f}ms | {rtf:.3f} | {speed:.1f} |")
         
         summary_lines.append("")
         summary_lines.append("</details>")
@@ -101,8 +102,8 @@ def generate_multilingual_tts_summary(metrics: Dict[str, Any]) -> str:
     
     # Language comparison table
     if "languages" in metrics and metrics["languages"]:
-        summary_lines.append("| 言語 | モデル | 音声ファイル名 | RTF | 速度 (文字/秒) | 生成時間 | 音声時間 |")
-        summary_lines.append("|------|--------|----------------|-----|----------------|----------|----------|")
+        summary_lines.append("| 言語 | モデル | 音声ファイル名 | テストテキスト | RTF | 速度 (文字/秒) | 生成時間 | 音声時間 |")
+        summary_lines.append("|------|--------|----------------|----------------|-----|----------------|----------|----------|")
         
         for lang, data in sorted(metrics["languages"].items()):
             model = data.get("model", "Unknown")
@@ -112,6 +113,7 @@ def generate_multilingual_tts_summary(metrics: Dict[str, Any]) -> str:
             gen_time = perf.get("generation_time_ms", 0)
             audio_dur = perf.get("audio_duration_ms", 0)
             audio_file = perf.get("audio_file", "N/A")
+            test_text = perf.get("test_text", "")[:30] + "..."
             
             # Add flag emoji for languages
             lang_flags = {
@@ -122,7 +124,7 @@ def generate_multilingual_tts_summary(metrics: Dict[str, Any]) -> str:
             }
             flag = lang_flags.get(lang, "🌐")
             
-            summary_lines.append(f"| {flag} {lang} | {model} | `{audio_file}` | {rtf:.3f} | {speed:.1f} | {gen_time:.0f}ms | {audio_dur:.0f}ms |")
+            summary_lines.append(f"| {flag} {lang} | {model} | `{audio_file}` | {test_text} | {rtf:.3f} | {speed:.1f} | {gen_time:.0f}ms | {audio_dur:.0f}ms |")
         
         summary_lines.append("")
     
@@ -238,8 +240,8 @@ def generate_combined_platform_summary(all_metrics: List[Dict[str, Any]]) -> str
                 summary_lines.append("<details>")
                 summary_lines.append("<summary>テスト結果の詳細（クリックして展開）</summary>")
                 summary_lines.append("")
-                summary_lines.append("| プラットフォーム | テスト名 | 音声ファイル名 | 文字数 | 生成時間 | RTF | 速度 (文字/秒) |")
-                summary_lines.append("|------------------|----------|----------------|--------|----------|-----|----------------|")
+                summary_lines.append("| プラットフォーム | テスト名 | 音声ファイル名 | テストテキスト | 文字数 | 生成時間 | RTF | 速度 (文字/秒) |")
+                summary_lines.append("|------------------|----------|----------------|----------------|--------|----------|-----|----------------|")
                 
                 for result in sorted(all_test_results, key=lambda x: (x.get("platform", ""), x.get("test_name", ""))):
                     platform = result.get("platform", "unknown")
@@ -247,12 +249,13 @@ def generate_combined_platform_summary(all_metrics: List[Dict[str, Any]]) -> str
                     
                     test_name = result.get("test_name", "Unknown")
                     audio_file = result.get("audio_file", "N/A")
+                    text_preview = result.get("text_preview", result.get("text", ""))[:30] + "..."
                     chars = result.get("char_count", 0)
                     gen_time = result.get("generation_time_ms", 0)
                     rtf = result.get("rtf", 0)
                     speed = result.get("chars_per_second", 0)
                     
-                    summary_lines.append(f"| {platform_icon} {platform} | {test_name} | `{audio_file}` | {chars} | {gen_time:.0f}ms | {rtf:.3f} | {speed:.1f} |")
+                    summary_lines.append(f"| {platform_icon} {platform} | {test_name} | `{audio_file}` | {text_preview} | {chars} | {gen_time:.0f}ms | {rtf:.3f} | {speed:.1f} |")
                 
                 summary_lines.append("")
                 summary_lines.append("</details>")
