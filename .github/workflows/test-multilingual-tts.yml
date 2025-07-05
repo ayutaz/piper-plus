@@ -208,7 +208,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4.6.0
         with:
-          name: dictionary-test-results-${{ matrix.os }}-${{ github.sha }}
+          name: dictionary-download-test-results-${{ matrix.os }}-run${{ github.run_number }}
           path: |
             /tmp/test_*.wav
             /tmp/*_log.txt
@@ -287,7 +287,8 @@ jobs:
             PIPER_BIN="${{ github.workspace }}/piper/bin/piper"
           fi
           # Convert comma-separated to space-separated for argparse
-          LANGUAGES="${{ github.event.inputs.languages || 'en_US,de_DE' }}"
+          # Note: ko_KR temporarily removed due to model availability issues
+          LANGUAGES="${{ github.event.inputs.languages || 'en_US,de_DE,fr_FR,es_ES,zh_CN' }}"
           LANGUAGES_SPACE=$(echo "$LANGUAGES" | tr ',' ' ')
           python scripts/test_multilingual_tts.py \
             --languages $LANGUAGES_SPACE \
@@ -296,14 +297,85 @@ jobs:
         env:
           PIPER_CACHE_DIR: ${{ env.CACHE_DIR }}
       
-      # Note: Performance report generation is handled by test_multilingual_tts.py
+      # Organize audio artifacts
+      - name: Organize Audio Artifacts
+        if: always()
+        shell: bash
+        run: |
+          if [ -d "test_results" ]; then
+            echo "Organizing audio artifacts..."
+            python scripts/organize_audio_artifacts.py --results-dir test_results --create-samples --max-samples 20
+          else
+            echo "No test results directory found"
+          fi
       
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4.6.0
         with:
-          name: multilingual-test-results-${{ matrix.os }}-${{ github.sha }}
+          name: multilingual-tts-test-results-${{ matrix.os }}-run${{ github.run_number }}
           path: |
             test_results/
             *.log
+          retention-days: 7
+      
+      - name: Upload audio artifacts
+        if: always()
+        uses: actions/upload-artifact@v4.6.0
+        with:
+          name: multilingual-tts-audio-files-${{ matrix.os }}-run${{ github.run_number }}
+          path: |
+            audio_artifacts/
+          retention-days: 7
+  
+  # Generate combined summary
+  generate_combined_summary:
+    name: Generate Combined Summary
+    needs: [test_dictionary_download, test_multilingual]
+    if: always()
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4.2.2
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      
+      - name: Download all test results
+        uses: actions/download-artifact@v4.1.8
+        with:
+          pattern: multilingual-tts-test-results-*
+          path: all-results
+      
+      - name: Combine results and generate summary
+        run: |
+          echo "Combining test results from all platforms..."
+          
+          # Create combined results directory
+          mkdir -p combined-results/performance
+          
+          # Find and combine all performance JSON files
+          find all-results -name "performance_summary.json" -o -name "*_metrics_*.json" | while read file; do
+            # Extract platform from path
+            platform=$(echo "$file" | grep -oE "(ubuntu|macos|windows)-latest" | head -1)
+            if [ -n "$platform" ]; then
+              # Copy with platform prefix
+              cp "$file" "combined-results/performance/multilingual_${platform}_$(basename "$file")"
+            else
+              cp "$file" "combined-results/performance/"
+            fi
+          done
+          
+          # Generate combined summary
+          python scripts/generate_job_summary.py --results-dir combined-results
+      
+      - name: Upload combined summary
+        if: always()
+        uses: actions/upload-artifact@v4.6.0
+        with:
+          name: multilingual-tts-combined-summary-run${{ github.run_number }}
+          path: |
+            combined-results/
           retention-days: 7

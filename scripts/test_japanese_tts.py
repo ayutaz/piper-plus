@@ -20,6 +20,9 @@ import wave
 from pathlib import Path
 from typing import Dict, List, Tuple
 
+# Import platform utilities
+from platform_utils import get_platform_name
+
 # Configure stdout for UTF-8 on Windows
 if sys.platform == "win32":
     import io
@@ -64,9 +67,23 @@ class JapaneseTTSTester:
             "tests": {}
         }
         
+        # Performance metrics
+        self.performance_metrics = {
+            "language": "ja_JP",
+            "model": "ja_JP-test-medium",
+            "platform": sys.platform,
+            "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "test_results": [],
+            "summary": {}
+        }
+        
         # Create test results directory
         self.results_dir = Path("test_results")
         self.results_dir.mkdir(exist_ok=True)
+        
+        # Create performance directory
+        self.performance_dir = self.results_dir / "performance"
+        self.performance_dir.mkdir(exist_ok=True)
         
     def check_piper_exists(self) -> bool:
         """Check if piper executable exists."""
@@ -172,6 +189,29 @@ class JapaneseTTSTester:
         except Exception as e:
             return {"error": str(e)}
     
+    def record_performance_metrics(self, test_name: str, text: str, 
+                                 generation_time: float, audio_path: str) -> None:
+        """Record performance metrics for a test."""
+        wav_info = self.check_wav_file(audio_path)
+        if "error" not in wav_info:
+            audio_duration = wav_info.get("duration", 0)
+            rtf = generation_time / audio_duration if audio_duration > 0 else float('inf')
+            
+            metric = {
+                "test_name": test_name,
+                "text": text,  # Full text for reference
+                "text_preview": text[:50] + "..." if len(text) > 50 else text,  # Truncated for display
+                "char_count": len(text),
+                "generation_time_ms": round(generation_time * 1000, 2),
+                "audio_duration_ms": round(audio_duration * 1000, 2),
+                "rtf": round(rtf, 4),
+                "chars_per_second": round(len(text) / generation_time, 2) if generation_time > 0 else 0,
+                "file_size_bytes": os.path.getsize(audio_path),
+                "audio_file": os.path.basename(audio_path)
+            }
+            
+            self.performance_metrics["test_results"].append(metric)
+    
     def test_basic(self) -> bool:
         """Run basic Japanese TTS tests."""
         print("\n=== Running Basic Japanese TTS Tests ===")
@@ -179,7 +219,8 @@ class JapaneseTTSTester:
         all_passed = True
         
         for test_name, text in TEST_SENTENCES["basic"].items():
-            output_file = str(self.results_dir / f"basic_{test_name}.wav")
+            platform_name = get_platform_name()
+            output_file = str(self.results_dir / f"ja_JP_{platform_name}_basic_{test_name}.wav")
             print(f"\nTesting {test_name}: {text}")
             
             success, error, duration = self.run_tts(text, output_file)
@@ -195,6 +236,8 @@ class JapaneseTTSTester:
                 wav_info = self.check_wav_file(output_file)
                 test_result["wav_info"] = wav_info
                 print(f"  [OK] Success! Generated {wav_info.get('duration', 0):.2f}s audio in {duration:.2f}s")
+                # Record performance metrics
+                self.record_performance_metrics(f"basic_{test_name}", text, duration, output_file)
             else:
                 print(f"  [FAIL] Failed: {error}")
                 all_passed = False
@@ -210,7 +253,8 @@ class JapaneseTTSTester:
         all_passed = True
         
         for test_name, text in TEST_SENTENCES["comprehensive"].items():
-            output_file = str(self.results_dir / f"comprehensive_{test_name}.wav")
+            platform_name = get_platform_name()
+            output_file = str(self.results_dir / f"ja_JP_{platform_name}_comprehensive_{test_name}.wav")
             print(f"\nTesting {test_name}: {text[:50]}...")
             
             success, error, duration = self.run_tts(text, output_file)
@@ -226,6 +270,8 @@ class JapaneseTTSTester:
                 wav_info = self.check_wav_file(output_file)
                 test_result["wav_info"] = wav_info
                 print(f"  [OK] Success! Generated {wav_info.get('duration', 0):.2f}s audio in {duration:.2f}s")
+                # Record performance metrics
+                self.record_performance_metrics(f"comprehensive_{test_name}", text, duration, output_file)
             else:
                 print(f"  [FAIL] Failed: {error}")
                 all_passed = False
@@ -304,6 +350,36 @@ class JapaneseTTSTester:
         
         print(f"\nTest results saved to: {results_file}")
     
+    def save_performance_metrics(self):
+        """Save performance metrics and calculate summary statistics."""
+        if self.performance_metrics["test_results"]:
+            # Calculate summary statistics
+            results = self.performance_metrics["test_results"]
+            rtf_values = [r["rtf"] for r in results if r["rtf"] != float('inf')]
+            gen_times = [r["generation_time_ms"] for r in results]
+            char_speeds = [r["chars_per_second"] for r in results]
+            
+            self.performance_metrics["summary"] = {
+                "total_tests": len(results),
+                "avg_rtf": round(sum(rtf_values) / len(rtf_values), 4) if rtf_values else 0,
+                "min_rtf": round(min(rtf_values), 4) if rtf_values else 0,
+                "max_rtf": round(max(rtf_values), 4) if rtf_values else 0,
+                "avg_generation_time_ms": round(sum(gen_times) / len(gen_times), 2) if gen_times else 0,
+                "avg_chars_per_second": round(sum(char_speeds) / len(char_speeds), 2) if char_speeds else 0
+            }
+            
+            # Save to file
+            metrics_file = self.performance_dir / f"japanese_tts_metrics_{sys.platform}_{int(time.time())}.json"
+            with open(metrics_file, 'w', encoding='utf-8') as f:
+                json.dump(self.performance_metrics, f, ensure_ascii=False, indent=2)
+            
+            print(f"\nPerformance metrics saved to: {metrics_file}")
+            
+            # Also save a simplified version for the job summary
+            summary_file = self.results_dir / "performance_summary.json"
+            with open(summary_file, 'w', encoding='utf-8') as f:
+                json.dump(self.performance_metrics, f, ensure_ascii=False, indent=2)
+    
     def run_all_tests(self, test_type: str = "all") -> bool:
         """Run all requested tests."""
         if not self.check_piper_exists():
@@ -334,6 +410,7 @@ class JapaneseTTSTester:
             all_passed = False
         
         self.save_results()
+        self.save_performance_metrics()
         
         # Print summary
         print("\n=== Test Summary ===")
@@ -345,6 +422,14 @@ class JapaneseTTSTester:
         print(f"Failed: {total_tests - passed_tests}")
         if total_tests > 0:
             print(f"Success rate: {passed_tests/total_tests*100:.1f}%")
+        
+        # Print performance summary
+        if self.performance_metrics["summary"]:
+            print("\n=== Performance Summary ===")
+            summary = self.performance_metrics["summary"]
+            print(f"Average RTF: {summary['avg_rtf']} (lower is better)")
+            print(f"Average generation speed: {summary['avg_chars_per_second']:.1f} chars/second")
+            print(f"Average generation time: {summary['avg_generation_time_ms']:.1f} ms")
         
         return all_passed
     

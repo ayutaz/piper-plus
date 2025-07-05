@@ -12,10 +12,20 @@ import json
 import time
 import argparse
 from pathlib import Path
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Tuple, Optional, Any
 import urllib.request
 import tarfile
 import zipfile
+import wave
+import io
+
+# Import platform utilities
+from platform_utils import get_platform_name
+
+# Configure stdout for UTF-8 on Windows
+if sys.platform == "win32":
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
 
 # Language test configurations
 LANGUAGE_CONFIGS = {
@@ -129,11 +139,12 @@ LANGUAGE_CONFIGS = {
         "test_text": "Xin chào, đây là bài kiểm tra hệ thống tổng hợp giọng nói.",
         "speaker": "vivos"
     },
-    "ko_KR": {
-        "model": "ko_KR-kss-x_low",
-        "test_text": "안녕하세요, 이것은 음성 합성 시스템의 테스트입니다.",
-        "speaker": "kss"
-    }
+    # Korean model temporarily disabled due to availability issues
+    # "ko_KR": {
+    #     "model": "ko_KR-kss-x_low",
+    #     "test_text": "안녕하세요, 이것은 음성 합성 시스템의 테스트입니다.",
+    #     "speaker": "kss"
+    # }
 }
 
 # Model repository configuration
@@ -146,6 +157,17 @@ class MultilingualTTSTester:
         self.piper_path = Path(piper_path)
         self.cache_dir = Path(cache_dir or os.path.expanduser("~/.cache/piper/voices"))
         self.cache_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Results directory
+        self.results_dir = Path("test_results")
+        self.results_dir.mkdir(exist_ok=True)
+        
+        # Performance directory
+        self.performance_dir = self.results_dir / "performance"
+        self.performance_dir.mkdir(exist_ok=True)
+        
+        # Performance metrics collection
+        self.all_metrics = {}
         
     def download_model(self, language: str, config: Dict) -> Tuple[Path, Path]:
         """Download model files for a specific language."""
@@ -194,6 +216,17 @@ class MultilingualTTSTester:
         print(f"[OK] Downloaded {model_name} successfully")
         return model_path, config_path
     
+    def get_audio_duration(self, wav_file: str) -> float:
+        """Get duration of a WAV file in seconds."""
+        try:
+            with wave.open(wav_file, 'rb') as wav:
+                frames = wav.getnframes()
+                rate = wav.getframerate()
+                return frames / rate
+        except Exception as e:
+            print(f"Error reading WAV file: {e}")
+            return 0
+    
     def test_language(self, language: str, config: Dict, 
                      test_type: str = "basic") -> Dict:
         """Test TTS for a specific language."""
@@ -207,7 +240,8 @@ class MultilingualTTSTester:
             "status": "failed",
             "time": 0,
             "output_size": 0,
-            "errors": []
+            "errors": [],
+            "performance": {}
         }
         
         try:
@@ -215,12 +249,13 @@ class MultilingualTTSTester:
             model_path, config_path = self.download_model(language, config)
             
             # Create test input
-            with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False, encoding='utf-8') as f:
                 f.write(config["test_text"])
                 input_file = f.name
             
-            # Output file
-            output_file = f"test_output_{language}.wav"
+            # Output file with platform info
+            platform_name = get_platform_name()
+            output_file = f"{language}_{platform_name}_{config['model']}.wav"
             
             # Run TTS
             print(f"Running TTS with text: {config['test_text'][:50]}...")
@@ -232,12 +267,13 @@ class MultilingualTTSTester:
                 "--output_file", output_file
             ]
             
-            with open(input_file, 'r') as f:
+            with open(input_file, 'r', encoding='utf-8') as f:
                 process = subprocess.run(
                     cmd,
                     stdin=f,
                     capture_output=True,
-                    text=True
+                    text=True,
+                    encoding='utf-8'
                 )
             
             end_time = time.time()
@@ -249,7 +285,29 @@ class MultilingualTTSTester:
                     results["output_size"] = os.path.getsize(output_file)
                     if results["output_size"] > 10000:  # Minimum expected size
                         results["status"] = "success"
+                        
+                        # Calculate performance metrics
+                        audio_duration = self.get_audio_duration(output_file)
+                        generation_time = results["time"]
+                        rtf = generation_time / audio_duration if audio_duration > 0 else float('inf')
+                        
+                        results["performance"] = {
+                            "generation_time_ms": round(generation_time * 1000, 2),
+                            "audio_duration_ms": round(audio_duration * 1000, 2),
+                            "rtf": round(rtf, 4),
+                            "chars_per_second": round(len(config["test_text"]) / generation_time, 2) if generation_time > 0 else 0,
+                            "text_length": len(config["test_text"]),
+                            "audio_file": os.path.basename(output_file),
+                            "test_text": config["test_text"]  # Add test text
+                        }
+                        
                         print(f"[OK] Success! Generated {results['output_size']} bytes in {results['time']:.2f}s")
+                        print(f"     RTF: {rtf:.4f}, Speed: {results['performance']['chars_per_second']:.1f} chars/s")
+                        
+                        # Save output to results directory
+                        result_path = self.results_dir / f"{language}_basic.wav"
+                        os.rename(output_file, result_path)
+                        output_file = str(result_path)
                     else:
                         results["errors"].append(f"Output file too small: {results['output_size']} bytes")
                 else:
@@ -286,7 +344,7 @@ class MultilingualTTSTester:
         ]
         
         for i, test_text in enumerate(special_tests):
-            with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False, encoding='utf-8') as f:
                 f.write(test_text)
                 input_file = f.name
             
@@ -297,8 +355,8 @@ class MultilingualTTSTester:
                 "--output_file", output_file
             ]
             
-            with open(input_file, 'r') as f:
-                subprocess.run(cmd, stdin=f, capture_output=True)
+            with open(input_file, 'r', encoding='utf-8') as f:
+                subprocess.run(cmd, stdin=f, capture_output=True, text=True, encoding='utf-8')
             
             os.unlink(input_file)
             if os.path.exists(output_file):
@@ -311,7 +369,7 @@ class MultilingualTTSTester:
             print("\nRunning performance test...")
             long_text = (config["test_text"] + " ") * 50  # Repeat 50 times
             
-            with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False, encoding='utf-8') as f:
                 f.write(long_text)
                 input_file = f.name
             
@@ -324,8 +382,8 @@ class MultilingualTTSTester:
                 "--output_file", output_file
             ]
             
-            with open(input_file, 'r') as f:
-                subprocess.run(cmd, stdin=f, capture_output=True)
+            with open(input_file, 'r', encoding='utf-8') as f:
+                subprocess.run(cmd, stdin=f, capture_output=True, text=True, encoding='utf-8')
             
             end_time = time.time()
             perf_time = end_time - start_time
@@ -354,7 +412,49 @@ class MultilingualTTSTester:
             else:
                 print(f"Warning: Unknown language {lang}")
         
+        # Save performance metrics
+        self.save_performance_metrics(results)
+        
         return results
+    
+    def save_performance_metrics(self, results: Dict[str, Dict]):
+        """Save performance metrics to JSON file."""
+        metrics = {
+            "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "platform": sys.platform,
+            "languages": {}
+        }
+        
+        for lang, result in results.items():
+            if result["status"] == "success" and result.get("performance"):
+                metrics["languages"][lang] = {
+                    "model": result["model"],
+                    "performance": result["performance"],
+                    "output_size": result["output_size"]
+                }
+        
+        # Calculate overall statistics
+        if metrics["languages"]:
+            all_rtf = [m["performance"]["rtf"] for m in metrics["languages"].values() if m["performance"]["rtf"] != float('inf')]
+            all_speeds = [m["performance"]["chars_per_second"] for m in metrics["languages"].values()]
+            
+            metrics["summary"] = {
+                "total_languages": len(metrics["languages"]),
+                "avg_rtf": round(sum(all_rtf) / len(all_rtf), 4) if all_rtf else 0,
+                "avg_speed_chars_per_second": round(sum(all_speeds) / len(all_speeds), 2) if all_speeds else 0
+            }
+        
+        # Save to file
+        metrics_file = self.performance_dir / f"multilingual_metrics_{sys.platform}_{int(time.time())}.json"
+        with open(metrics_file, 'w', encoding='utf-8') as f:
+            json.dump(metrics, f, ensure_ascii=False, indent=2)
+        
+        # Also save summary for job summary
+        summary_file = self.results_dir / "performance_summary.json"
+        with open(summary_file, 'w', encoding='utf-8') as f:
+            json.dump(metrics, f, ensure_ascii=False, indent=2)
+        
+        print(f"\nPerformance metrics saved to: {metrics_file}")
     
     def print_summary(self, results: Dict[str, Dict]):
         """Print a summary of test results."""
@@ -389,17 +489,20 @@ class MultilingualTTSTester:
                     print(f"  -> {error}")
         
         # Performance summary if available
-        perf_results = {lang: r for lang, r in results.items() if "performance" in r}
+        perf_results = {lang: r for lang, r in results.items() if "performance" in r and r["performance"]}
         if perf_results:
             print(f"\n{'='*60}")
             print("PERFORMANCE SUMMARY")
             print(f"{'='*60}")
-            print(f"{'Language':<10} {'Chars/Second':<15} {'Total Time':<10}")
+            print(f"{'Language':<10} {'Chars/Second':<15} {'Generation Time':<10}")
             print("-" * 35)
             
             for lang, result in sorted(perf_results.items()):
                 perf = result["performance"]
-                print(f"{lang:<10} {perf['chars_per_second']:<15.0f} {perf['time']:<10.2f}s")
+                # Use generation time in seconds
+                gen_time_sec = perf.get('generation_time_ms', 0) / 1000
+                chars_per_sec = perf.get('chars_per_second', 0)
+                print(f"{lang:<10} {chars_per_sec:<15.0f} {gen_time_sec:<10.2f}s")
 
 
 def main():
