@@ -21,7 +21,18 @@ cd bin
 
 # Build the phonemizer binary
 echo "Compiling open_jtalk_phonemizer..."
-$CC -o open_jtalk_phonemizer open_jtalk_phonemizer.c \
+# Try to detect C++ compiler
+if command -v g++ >/dev/null 2>&1; then
+    CXX=g++
+elif command -v c++ >/dev/null 2>&1; then
+    CXX=c++
+else
+    # Fall back to C compiler with C++ stdlib
+    CXX="$CC"
+    EXTRA_LIBS="-lstdc++"
+fi
+
+$CXX -o open_jtalk_phonemizer open_jtalk_phonemizer.c \
     -I../mecab/src -I../njd -I../jpcommon -I../njd_set_accent_phrase \
     -I../njd_set_accent_type -I../njd_set_digit -I../njd_set_long_vowel \
     -I../njd_set_pronunciation -I../njd_set_unvoiced_vowel -I../njd2jpcommon \
@@ -39,7 +50,7 @@ $CC -o open_jtalk_phonemizer open_jtalk_phonemizer.c \
     ../mecab/src/libmecab.a \
     ../njd/libnjd.a \
     "$HTS_ENGINE_DIR/lib/libHTSEngine.a" \
-    -lm
+    -lm ${EXTRA_LIBS:-}
 
 # Copy to install directory
 echo "Installing open_jtalk_phonemizer to $INSTALL_DIR/bin/"

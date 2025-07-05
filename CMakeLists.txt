@@ -331,7 +331,7 @@ if(NOT DEFINED OPENJTALK_DIR)
             <SOURCE_DIR>/build_phonemizer.sh
           COMMAND ${CMAKE_COMMAND} -E chdir <SOURCE_DIR> chmod +x build_phonemizer.sh
           COMMAND ${CMAKE_COMMAND} -E chdir <SOURCE_DIR> ./build_phonemizer.sh
-            ${CMAKE_C_COMPILER} ${OPENJTALK_DIR} ${HTS_ENGINE_DIR}
+            ${CMAKE_CXX_COMPILER} ${OPENJTALK_DIR} ${HTS_ENGINE_DIR}
         BUILD_IN_SOURCE 1
         BUILD_BYPRODUCTS
           ${OPENJTALK_DIR}/bin/open_jtalk
