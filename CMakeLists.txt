@@ -298,7 +298,7 @@ if(NOT DEFINED OPENJTALK_DIR)
             <SOURCE_DIR>/apply_patch.ps1
           COMMAND powershell -ExecutionPolicy Bypass -File <SOURCE_DIR>/apply_patch.ps1 -SourceDir <SOURCE_DIR>
           COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/cmake/build_openjtalk_phonemizer.bat
-            <SOURCE_DIR> ${OPENJTALK_DIR} ${CMAKE_CXX_COMPILER}
+            <SOURCE_DIR> ${OPENJTALK_DIR} ${CMAKE_CXX_COMPILER} ${HTS_ENGINE_DIR}
         BUILD_BYPRODUCTS
           ${OPENJTALK_DIR}/bin/open_jtalk.exe
           ${OPENJTALK_DIR}/bin/open_jtalk_phonemizer.exe

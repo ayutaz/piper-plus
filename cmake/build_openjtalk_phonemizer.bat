@@ -4,6 +4,7 @@ REM Build open_jtalk_phonemizer after OpenJTalk is built
 set SRCDIR=%1
 set BUILDDIR=%2
 set CC=%3
+set HTS_ENGINE_DIR=%4
 if "%CC%"=="" set CC=cl
 
 cd /d "%SRCDIR%\bin"
@@ -25,7 +26,8 @@ REM Compile open_jtalk_phonemizer
     ..\njd2jpcommon\Release\njd2jpcommon.lib ^
     ..\jpcommon\Release\jpcommon.lib ^
     ..\mecab\src\Release\mecab.lib ^
-    ..\njd\Release\njd.lib
+    ..\njd\Release\njd.lib ^
+    "%HTS_ENGINE_DIR%\lib\HTSEngine.lib"
 
 if %ERRORLEVEL% neq 0 exit /b %ERRORLEVEL%
 
