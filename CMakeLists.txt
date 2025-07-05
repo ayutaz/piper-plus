@@ -323,12 +323,13 @@ if(NOT DEFINED OPENJTALK_DIR)
             ${CMAKE_CURRENT_SOURCE_DIR}/cmake/open_jtalk_phonemizer.c
             <SOURCE_DIR>/bin/open_jtalk_phonemizer.c
         CONFIGURE_COMMAND ${OPENJTALK_CONFIGURE_CMD}
-        BUILD_COMMAND ${CMAKE_COMMAND} -E chdir <SOURCE_DIR> make
-        INSTALL_COMMAND 
-          ${CMAKE_COMMAND} -E chdir <SOURCE_DIR> make install
+        BUILD_COMMAND 
+          ${CMAKE_COMMAND} -E chdir <SOURCE_DIR> make
           COMMAND ${CMAKE_COMMAND} -E env CC=${CMAKE_C_COMPILER} HTS_ENGINE_DIR=${HTS_ENGINE_DIR}
             bash ${CMAKE_CURRENT_SOURCE_DIR}/cmake/build_openjtalk_phonemizer.sh
             <SOURCE_DIR> ${OPENJTALK_DIR} ${CMAKE_C_COMPILER}
+        INSTALL_COMMAND 
+          ${CMAKE_COMMAND} -E chdir <SOURCE_DIR> make install
         BUILD_IN_SOURCE 1
         BUILD_BYPRODUCTS
           ${OPENJTALK_DIR}/bin/open_jtalk
