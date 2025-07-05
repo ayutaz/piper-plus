@@ -42,25 +42,25 @@ def generate_japanese_tts_summary(metrics: Dict[str, Any]) -> str:
     """Generate summary for Japanese TTS test results."""
     summary_lines = []
     
-    summary_lines.append("### 🇯🇵 Japanese TTS Performance")
+    summary_lines.append("### 🇯🇵 日本語 TTS パフォーマンス")
     summary_lines.append("")
     
     # Overall statistics
     if "summary" in metrics:
         stats = metrics["summary"]
-        summary_lines.append("**Summary Statistics:**")
-        summary_lines.append(f"- Average RTF: **{stats.get('avg_rtf', 'N/A')}** (lower is better)")
-        summary_lines.append(f"- Average Speed: **{stats.get('avg_chars_per_second', 'N/A'):.1f}** chars/second")
-        summary_lines.append(f"- Total Tests: **{stats.get('total_tests', 0)}**")
+        summary_lines.append("**統計サマリー:**")
+        summary_lines.append(f"- 平均 RTF: **{stats.get('avg_rtf', 'N/A')}** (低いほど良い)")
+        summary_lines.append(f"- 平均速度: **{stats.get('avg_chars_per_second', 'N/A'):.1f}** 文字/秒")
+        summary_lines.append(f"- 総テスト数: **{stats.get('total_tests', 0)}**")
         summary_lines.append("")
     
     # Detailed results table
     if "test_results" in metrics and metrics["test_results"]:
         summary_lines.append("<details>")
-        summary_lines.append("<summary>Detailed Test Results</summary>")
+        summary_lines.append("<summary>詳細なテスト結果</summary>")
         summary_lines.append("")
-        summary_lines.append("| Test Name | Characters | Generation Time | Audio Duration | RTF | Speed (chars/s) |")
-        summary_lines.append("|-----------|------------|-----------------|----------------|-----|-----------------|")
+        summary_lines.append("| テスト名 | 文字数 | 生成時間 | 音声時間 | RTF | 速度 (文字/秒) |")
+        summary_lines.append("|----------|--------|----------|----------|-----|----------------|")
         
         for result in metrics["test_results"]:
             test_name = result.get("test_name", "Unknown")
@@ -83,22 +83,22 @@ def generate_multilingual_tts_summary(metrics: Dict[str, Any]) -> str:
     """Generate summary for multilingual TTS test results."""
     summary_lines = []
     
-    summary_lines.append("### 🌍 Multilingual TTS Performance")
+    summary_lines.append("### 🌍 多言語 TTS パフォーマンス")
     summary_lines.append("")
     
     # Overall statistics
     if "summary" in metrics:
         stats = metrics["summary"]
-        summary_lines.append("**Summary Statistics:**")
-        summary_lines.append(f"- Languages Tested: **{stats.get('total_languages', 0)}**")
-        summary_lines.append(f"- Average RTF: **{stats.get('avg_rtf', 'N/A')}**")
-        summary_lines.append(f"- Average Speed: **{stats.get('avg_speed_chars_per_second', 'N/A'):.1f}** chars/second")
+        summary_lines.append("**統計サマリー:**")
+        summary_lines.append(f"- テスト言語数: **{stats.get('total_languages', 0)}**")
+        summary_lines.append(f"- 平均 RTF: **{stats.get('avg_rtf', 'N/A')}**")
+        summary_lines.append(f"- 平均速度: **{stats.get('avg_speed_chars_per_second', 'N/A'):.1f}** 文字/秒")
         summary_lines.append("")
     
     # Language comparison table
     if "languages" in metrics and metrics["languages"]:
-        summary_lines.append("| Language | Model | RTF | Speed (chars/s) | Generation Time | Audio Duration |")
-        summary_lines.append("|----------|-------|-----|-----------------|-----------------|----------------|")
+        summary_lines.append("| 言語 | モデル | RTF | 速度 (文字/秒) | 生成時間 | 音声時間 |")
+        summary_lines.append("|------|--------|-----|----------------|----------|----------|")
         
         for lang, data in sorted(metrics["languages"].items()):
             model = data.get("model", "Unknown")
@@ -124,11 +124,11 @@ def generate_multilingual_tts_summary(metrics: Dict[str, Any]) -> str:
     # Performance visualization using Mermaid
     if "languages" in metrics and len(metrics["languages"]) > 0:
         summary_lines.append("<details>")
-        summary_lines.append("<summary>Performance Visualization</summary>")
+        summary_lines.append("<summary>パフォーマンス可視化</summary>")
         summary_lines.append("")
         summary_lines.append("```mermaid")
         summary_lines.append("graph LR")
-        summary_lines.append("    subgraph RTF Performance")
+        summary_lines.append("    subgraph RTF パフォーマンス")
         
         # Sort languages by RTF for better visualization
         sorted_langs = sorted(
@@ -172,14 +172,14 @@ def generate_platform_comparison(all_metrics: List[Dict[str, Any]]) -> str:
         return ""
     
     summary_lines = []
-    summary_lines.append("### 🖥️ Cross-Platform Comparison")
+    summary_lines.append("### 🖥️ クロスプラットフォーム比較")
     summary_lines.append("")
-    summary_lines.append("| Platform | Test Type | Avg RTF | Avg Speed (chars/s) |")
-    summary_lines.append("|----------|-----------|---------|---------------------|")
+    summary_lines.append("| プラットフォーム | テストタイプ | 平均 RTF | 平均速度 (文字/秒) |")
+    summary_lines.append("|------------------|--------------|----------|-------------------|")
     
     for platform, metrics_list in sorted(platforms.items()):
         for metrics in metrics_list:
-            test_type = "Japanese" if "ja_JP" in str(metrics) else "Multilingual"
+            test_type = "日本語" if "ja_JP" in str(metrics) else "多言語"
             
             if "summary" in metrics:
                 avg_rtf = metrics["summary"].get("avg_rtf", "N/A")
@@ -205,9 +205,9 @@ def generate_audio_artifacts_section(results_dir: Path) -> str:
         return ""
     
     summary_lines = []
-    summary_lines.append("### 🎵 Generated Audio Samples")
+    summary_lines.append("### 🎵 生成された音声サンプル")
     summary_lines.append("")
-    summary_lines.append(f"Generated **{len(wav_files)}** audio files during testing.")
+    summary_lines.append(f"テスト中に **{len(wav_files)}** 個の音声ファイルを生成しました。")
     summary_lines.append("")
     
     # Group by test type
@@ -216,14 +216,14 @@ def generate_audio_artifacts_section(results_dir: Path) -> str:
     lang_files = [f for f in wav_files if "_basic.wav" in f.name or "_comprehensive.wav" in f.name]
     
     if basic_files:
-        summary_lines.append(f"- Basic tests: {len(basic_files)} files")
+        summary_lines.append(f"- 基本テスト: {len(basic_files)} ファイル")
     if comprehensive_files:
-        summary_lines.append(f"- Comprehensive tests: {len(comprehensive_files)} files")
+        summary_lines.append(f"- 包括的テスト: {len(comprehensive_files)} ファイル")
     if lang_files:
-        summary_lines.append(f"- Language tests: {len(lang_files)} files")
+        summary_lines.append(f"- 言語テスト: {len(lang_files)} ファイル")
     
     summary_lines.append("")
-    summary_lines.append("Audio files are available in the test artifacts.")
+    summary_lines.append("音声ファイルはテストアーティファクトで利用可能です。")
     summary_lines.append("")
     
     return "\n".join(summary_lines)
@@ -248,11 +248,11 @@ def main():
     
     if not all_metrics:
         print("Warning: No metrics files found")
-        summary = "## 📊 TTS Performance Report\n\nNo performance metrics were collected during this test run.\n"
+        summary = "## 📊 TTS パフォーマンスレポート\n\nこのテスト実行ではパフォーマンスメトリクスが収集されませんでした。\n"
     else:
         # Generate summary sections
         summary_parts = []
-        summary_parts.append("## 📊 TTS Performance Report")
+        summary_parts.append("## 📊 TTS パフォーマンスレポート")
         summary_parts.append("")
         
         # Process each metrics file
@@ -274,7 +274,7 @@ def main():
         
         # Add footer
         summary_parts.append("---")
-        summary_parts.append("*Generated by Piper TTS Performance Testing Suite*")
+        summary_parts.append("*Piper TTS パフォーマンステストスイートによって生成*")
         
         summary = "\n".join(summary_parts)
     
