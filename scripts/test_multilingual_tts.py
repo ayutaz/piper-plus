@@ -17,6 +17,12 @@ import urllib.request
 import tarfile
 import zipfile
 import wave
+import io
+
+# Configure stdout for UTF-8 on Windows
+if sys.platform == "win32":
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
 
 # Language test configurations
 LANGUAGE_CONFIGS = {
@@ -240,7 +246,7 @@ class MultilingualTTSTester:
             model_path, config_path = self.download_model(language, config)
             
             # Create test input
-            with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False, encoding='utf-8') as f:
                 f.write(config["test_text"])
                 input_file = f.name
             
@@ -257,12 +263,13 @@ class MultilingualTTSTester:
                 "--output_file", output_file
             ]
             
-            with open(input_file, 'r') as f:
+            with open(input_file, 'r', encoding='utf-8') as f:
                 process = subprocess.run(
                     cmd,
                     stdin=f,
                     capture_output=True,
-                    text=True
+                    text=True,
+                    encoding='utf-8'
                 )
             
             end_time = time.time()
@@ -331,7 +338,7 @@ class MultilingualTTSTester:
         ]
         
         for i, test_text in enumerate(special_tests):
-            with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False, encoding='utf-8') as f:
                 f.write(test_text)
                 input_file = f.name
             
@@ -342,8 +349,8 @@ class MultilingualTTSTester:
                 "--output_file", output_file
             ]
             
-            with open(input_file, 'r') as f:
-                subprocess.run(cmd, stdin=f, capture_output=True)
+            with open(input_file, 'r', encoding='utf-8') as f:
+                subprocess.run(cmd, stdin=f, capture_output=True, text=True, encoding='utf-8')
             
             os.unlink(input_file)
             if os.path.exists(output_file):
@@ -356,7 +363,7 @@ class MultilingualTTSTester:
             print("\nRunning performance test...")
             long_text = (config["test_text"] + " ") * 50  # Repeat 50 times
             
-            with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False, encoding='utf-8') as f:
                 f.write(long_text)
                 input_file = f.name
             
@@ -369,8 +376,8 @@ class MultilingualTTSTester:
                 "--output_file", output_file
             ]
             
-            with open(input_file, 'r') as f:
-                subprocess.run(cmd, stdin=f, capture_output=True)
+            with open(input_file, 'r', encoding='utf-8') as f:
+                subprocess.run(cmd, stdin=f, capture_output=True, text=True, encoding='utf-8')
             
             end_time = time.time()
             perf_time = end_time - start_time
