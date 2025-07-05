@@ -32,6 +32,12 @@ else
     EXTRA_LIBS="-lstdc++"
 fi
 
+# Platform-specific libraries
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    # macOS needs iconv for MeCab
+    EXTRA_LIBS="$EXTRA_LIBS -liconv"
+fi
+
 $CXX -o open_jtalk_phonemizer open_jtalk_phonemizer.c \
     -I../mecab/src -I../njd -I../jpcommon -I../njd_set_accent_phrase \
     -I../njd_set_accent_type -I../njd_set_digit -I../njd_set_long_vowel \
