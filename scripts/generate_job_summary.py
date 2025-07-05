@@ -157,43 +157,165 @@ def generate_multilingual_tts_summary(metrics: Dict[str, Any]) -> str:
     return "\n".join(summary_lines)
 
 
-def generate_platform_comparison(all_metrics: List[Dict[str, Any]]) -> str:
-    """Generate cross-platform comparison if multiple platforms tested."""
-    platforms = {}
+def generate_combined_platform_summary(all_metrics: List[Dict[str, Any]]) -> str:
+    """Generate combined summary with all platforms and test types."""
+    # Separate Japanese and multilingual metrics
+    japanese_metrics = []
+    multilingual_metrics = []
     
-    # Group by platform
     for metrics in all_metrics:
-        platform = metrics.get("platform", "unknown")
-        if platform not in platforms:
-            platforms[platform] = []
-        platforms[platform].append(metrics)
-    
-    if len(platforms) <= 1:
-        return ""
+        if "language" in metrics and metrics["language"] == "ja_JP":
+            japanese_metrics.append(metrics)
+        elif "languages" in metrics:
+            multilingual_metrics.append(metrics)
     
     summary_lines = []
-    summary_lines.append("### 🖥️ クロスプラットフォーム比較")
-    summary_lines.append("")
-    summary_lines.append("| プラットフォーム | テストタイプ | 平均 RTF | 平均速度 (文字/秒) |")
-    summary_lines.append("|------------------|--------------|----------|-------------------|")
     
-    for platform, metrics_list in sorted(platforms.items()):
-        for metrics in metrics_list:
-            test_type = "日本語" if "ja_JP" in str(metrics) else "多言語"
+    # Combined Japanese TTS summary across platforms
+    if japanese_metrics:
+        summary_lines.append("### 🇯🇵 日本語 TTS パフォーマンス (全プラットフォーム)")
+        summary_lines.append("")
+        
+        # Combine all test results
+        all_test_results = []
+        platform_summaries = {}
+        
+        for metrics in japanese_metrics:
+            platform = metrics.get("platform", "unknown")
+            if "test_results" in metrics:
+                for result in metrics["test_results"]:
+                    result["platform"] = platform
+                    all_test_results.append(result)
             
             if "summary" in metrics:
-                avg_rtf = metrics["summary"].get("avg_rtf", "N/A")
-                avg_speed = metrics["summary"].get("avg_chars_per_second") or metrics["summary"].get("avg_speed_chars_per_second", "N/A")
-                
+                platform_summaries[platform] = metrics["summary"]
+        
+        # Overall statistics
+        if platform_summaries:
+            total_tests = sum(s.get("total_tests", 0) for s in platform_summaries.values())
+            all_rtf = []
+            all_speeds = []
+            
+            for summary in platform_summaries.values():
+                if summary.get("avg_rtf", 0) > 0:
+                    all_rtf.append(summary["avg_rtf"])
+                if summary.get("avg_chars_per_second", 0) > 0:
+                    all_speeds.append(summary["avg_chars_per_second"])
+            
+            summary_lines.append("**統計サマリー (全プラットフォーム):**")
+            summary_lines.append(f"- 総テスト数: **{total_tests}**")
+            if all_rtf:
+                summary_lines.append(f"- 全体平均 RTF: **{sum(all_rtf) / len(all_rtf):.4f}** (低いほど良い)")
+            if all_speeds:
+                summary_lines.append(f"- 全体平均速度: **{sum(all_speeds) / len(all_speeds):.1f}** 文字/秒")
+            summary_lines.append("")
+            
+            # Platform comparison
+            summary_lines.append("**プラットフォーム別パフォーマンス:**")
+            summary_lines.append("| プラットフォーム | 平均 RTF | 平均速度 (文字/秒) | テスト数 |")
+            summary_lines.append("|------------------|----------|-------------------|----------|")
+            
+            for platform, summary in sorted(platform_summaries.items()):
                 platform_icon = {
                     "linux": "🐧",
                     "darwin": "🍎",
                     "win32": "🪟"
                 }.get(platform, "💻")
                 
-                summary_lines.append(f"| {platform_icon} {platform} | {test_type} | {avg_rtf} | {avg_speed} |")
+                avg_rtf = summary.get("avg_rtf", "N/A")
+                avg_speed = summary.get("avg_chars_per_second", "N/A")
+                test_count = summary.get("total_tests", 0)
+                
+                summary_lines.append(f"| {platform_icon} {platform} | {avg_rtf} | {avg_speed:.1f} | {test_count} |")
+            
+            summary_lines.append("")
     
-    summary_lines.append("")
+    # Combined multilingual TTS summary across platforms
+    if multilingual_metrics:
+        summary_lines.append("### 🌍 多言語 TTS パフォーマンス (全プラットフォーム)")
+        summary_lines.append("")
+        
+        # Combine language results across platforms
+        language_by_platform = {}
+        
+        for metrics in multilingual_metrics:
+            platform = metrics.get("platform", "unknown")
+            if "languages" in metrics:
+                for lang, data in metrics["languages"].items():
+                    if lang not in language_by_platform:
+                        language_by_platform[lang] = {}
+                    language_by_platform[lang][platform] = data
+        
+        # Overall statistics
+        all_languages = set()
+        platform_stats = {}
+        
+        for metrics in multilingual_metrics:
+            platform = metrics.get("platform", "unknown")
+            if "summary" in metrics:
+                platform_stats[platform] = metrics["summary"]
+            if "languages" in metrics:
+                all_languages.update(metrics["languages"].keys())
+        
+        summary_lines.append("**統計サマリー (全プラットフォーム):**")
+        summary_lines.append(f"- テスト言語数: **{len(all_languages)}**")
+        
+        if platform_stats:
+            all_rtf = []
+            all_speeds = []
+            
+            for stats in platform_stats.values():
+                if stats.get("avg_rtf", 0) > 0:
+                    all_rtf.append(stats["avg_rtf"])
+                if stats.get("avg_speed_chars_per_second", 0) > 0:
+                    all_speeds.append(stats["avg_speed_chars_per_second"])
+            
+            if all_rtf:
+                summary_lines.append(f"- 全体平均 RTF: **{sum(all_rtf) / len(all_rtf):.4f}**")
+            if all_speeds:
+                summary_lines.append(f"- 全体平均速度: **{sum(all_speeds) / len(all_speeds):.1f}** 文字/秒")
+        
+        summary_lines.append("")
+        
+        # Language performance across platforms
+        if language_by_platform:
+            summary_lines.append("**言語別クロスプラットフォーム比較:**")
+            summary_lines.append("| 言語 | プラットフォーム | モデル | RTF | 速度 (文字/秒) |")
+            summary_lines.append("|------|------------------|--------|-----|----------------|")
+            
+            # Language flags
+            lang_flags = {
+                "en_US": "🇺🇸", "en_GB": "🇬🇧", "de_DE": "🇩🇪", "fr_FR": "🇫🇷",
+                "es_ES": "🇪🇸", "it_IT": "🇮🇹", "pt_BR": "🇧🇷", "ru_RU": "🇷🇺",
+                "zh_CN": "🇨🇳", "ja_JP": "🇯🇵", "ko_KR": "🇰🇷", "ar_JO": "🇯🇴",
+                "nl_NL": "🇳🇱", "pl_PL": "🇵🇱", "sv_SE": "🇸🇪", "tr_TR": "🇹🇷"
+            }
+            
+            for lang in sorted(language_by_platform.keys()):
+                flag = lang_flags.get(lang, "🌐")
+                platforms_data = language_by_platform[lang]
+                
+                for platform, data in sorted(platforms_data.items()):
+                    platform_icon = {
+                        "linux": "🐧",
+                        "darwin": "🍎", 
+                        "win32": "🪟"
+                    }.get(platform, "💻")
+                    
+                    model = data.get("model", "Unknown")
+                    perf = data.get("performance", {})
+                    rtf = perf.get("rtf", "N/A")
+                    speed = perf.get("chars_per_second", "N/A")
+                    
+                    if isinstance(rtf, (int, float)):
+                        rtf = f"{rtf:.3f}"
+                    if isinstance(speed, (int, float)):
+                        speed = f"{speed:.1f}"
+                    
+                    summary_lines.append(f"| {flag} {lang} | {platform_icon} {platform} | {model} | {rtf} | {speed} |")
+            
+            summary_lines.append("")
+    
     return "\n".join(summary_lines)
 
 
@@ -255,17 +377,18 @@ def main():
         summary_parts.append("## 📊 TTS パフォーマンスレポート")
         summary_parts.append("")
         
-        # Process each metrics file
-        for metrics in all_metrics:
-            if "language" in metrics and metrics["language"] == "ja_JP":
-                summary_parts.append(generate_japanese_tts_summary(metrics))
-            elif "languages" in metrics:
-                summary_parts.append(generate_multilingual_tts_summary(metrics))
+        # Generate combined platform summary
+        combined_summary = generate_combined_platform_summary(all_metrics)
+        if combined_summary:
+            summary_parts.append(combined_summary)
         
-        # Add cross-platform comparison if applicable
-        platform_comparison = generate_platform_comparison(all_metrics)
-        if platform_comparison:
-            summary_parts.append(platform_comparison)
+        # If no combined summary, fall back to individual summaries
+        if not combined_summary:
+            for metrics in all_metrics:
+                if "language" in metrics and metrics["language"] == "ja_JP":
+                    summary_parts.append(generate_japanese_tts_summary(metrics))
+                elif "languages" in metrics:
+                    summary_parts.append(generate_multilingual_tts_summary(metrics))
         
         # Add audio artifacts section
         audio_section = generate_audio_artifacts_section(results_dir)

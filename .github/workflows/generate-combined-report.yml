@@ -1,0 +1,82 @@
+name: Generate Combined Performance Report
+
+on:
+  workflow_run:
+    workflows: ["Test Japanese TTS", "Test Multilingual TTS"]
+    types:
+      - completed
+
+jobs:
+  generate_combined_report:
+    name: Generate Combined Performance Report
+    if: ${{ github.event.workflow_run.event == 'pull_request' }}
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4.2.2
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      
+      # Download artifacts from both workflows
+      - name: Download Japanese TTS results
+        uses: dawidd6/action-download-artifact@v3
+        with:
+          workflow: test-japanese-tts.yml
+          run_id: ${{ github.event.workflow_run.id }}
+          name: japanese-combined-summary-*
+          path: japanese-results
+        continue-on-error: true
+      
+      - name: Download Multilingual TTS results
+        uses: dawidd6/action-download-artifact@v3
+        with:
+          workflow: test-multilingual-tts.yml
+          run_id: ${{ github.event.workflow_run.id }}
+          name: multilingual-combined-summary-*
+          path: multilingual-results
+        continue-on-error: true
+      
+      - name: Combine all results
+        run: |
+          echo "Combining all test results..."
+          
+          # Create combined directory
+          mkdir -p all-combined-results/performance
+          
+          # Copy Japanese results
+          if [ -d "japanese-results" ]; then
+            find japanese-results -name "*.json" -exec cp {} all-combined-results/performance/ \;
+          fi
+          
+          # Copy Multilingual results
+          if [ -d "multilingual-results" ]; then
+            find multilingual-results -name "*.json" -exec cp {} all-combined-results/performance/ \;
+          fi
+          
+          # List all collected files
+          echo "Collected performance files:"
+          find all-combined-results -name "*.json" -type f
+      
+      - name: Generate final combined summary
+        run: |
+          if [ -d "all-combined-results" ] && [ "$(find all-combined-results -name '*.json' -type f | wc -l)" -gt 0 ]; then
+            echo "Generating combined performance report..."
+            python scripts/generate_job_summary.py --results-dir all-combined-results
+          else
+            echo "No performance data found to generate report"
+            echo "## 📊 TTS パフォーマンスレポート" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "パフォーマンスデータが見つかりませんでした。" >> $GITHUB_STEP_SUMMARY
+          fi
+      
+      - name: Upload final combined report
+        if: always()
+        uses: actions/upload-artifact@v4.6.0
+        with:
+          name: combined-performance-report-${{ github.run_id }}
+          path: |
+            all-combined-results/
+          retention-days: 30
