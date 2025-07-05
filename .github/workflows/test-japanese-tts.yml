@@ -141,7 +141,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4.6.0
         with:
-          name: japanese-test-results-${{ matrix.os }}-${{ github.sha }}
+          name: japanese-tts-test-results-${{ matrix.os }}-run${{ github.run_number }}
           path: |
             test_results/*.wav
             test_results/*.log
@@ -154,7 +154,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4.6.0
         with:
-          name: japanese-audio-artifacts-${{ matrix.os }}-${{ github.sha }}
+          name: japanese-tts-audio-files-${{ matrix.os }}-run${{ github.run_number }}
           path: |
             audio_artifacts/
           retention-days: 7
@@ -163,7 +163,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4.6.0
         with:
-          name: japanese-test-logs-${{ matrix.os }}-${{ github.sha }}
+          name: japanese-test-logs-${{ matrix.os }}-run${{ github.run_number }}
           path: |
             *.log
             piper/bin/
@@ -188,7 +188,7 @@ jobs:
       - name: Download all test results
         uses: actions/download-artifact@v4.1.8
         with:
-          pattern: japanese-test-results-*
+          pattern: japanese-tts-test-results-*
           path: all-results
       
       - name: Combine results and generate summary
@@ -217,7 +217,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4.6.0
         with:
-          name: japanese-combined-summary-${{ github.sha }}
+          name: japanese-tts-combined-summary-run${{ github.run_number }}
           path: |
             combined-results/
           retention-days: 7

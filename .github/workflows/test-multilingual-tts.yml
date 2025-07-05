@@ -208,7 +208,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4.6.0
         with:
-          name: dictionary-test-results-${{ matrix.os }}-${{ github.sha }}
+          name: dictionary-download-test-results-${{ matrix.os }}-run${{ github.run_number }}
           path: |
             /tmp/test_*.wav
             /tmp/*_log.txt
@@ -313,7 +313,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4.6.0
         with:
-          name: multilingual-test-results-${{ matrix.os }}-${{ github.sha }}
+          name: multilingual-tts-test-results-${{ matrix.os }}-run${{ github.run_number }}
           path: |
             test_results/
             *.log
@@ -323,7 +323,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4.6.0
         with:
-          name: multilingual-audio-artifacts-${{ matrix.os }}-${{ github.sha }}
+          name: multilingual-tts-audio-files-${{ matrix.os }}-run${{ github.run_number }}
           path: |
             audio_artifacts/
           retention-days: 7
@@ -346,7 +346,7 @@ jobs:
       - name: Download all test results
         uses: actions/download-artifact@v4.1.8
         with:
-          pattern: multilingual-test-results-*
+          pattern: multilingual-tts-test-results-*
           path: all-results
       
       - name: Combine results and generate summary
@@ -375,7 +375,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4.6.0
         with:
-          name: multilingual-combined-summary-${{ github.sha }}
+          name: multilingual-tts-combined-summary-run${{ github.run_number }}
           path: |
             combined-results/
           retention-days: 7

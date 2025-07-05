@@ -297,7 +297,8 @@ class MultilingualTTSTester:
                             "audio_duration_ms": round(audio_duration * 1000, 2),
                             "rtf": round(rtf, 4),
                             "chars_per_second": round(len(config["test_text"]) / generation_time, 2) if generation_time > 0 else 0,
-                            "text_length": len(config["test_text"])
+                            "text_length": len(config["test_text"]),
+                            "audio_file": os.path.basename(output_file)
                         }
                         
                         print(f"[OK] Success! Generated {results['output_size']} bytes in {results['time']:.2f}s")
