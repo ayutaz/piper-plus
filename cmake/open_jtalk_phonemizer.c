@@ -87,9 +87,13 @@ static int OpenJTalk_synthesis(OpenJTalk * open_jtalk, const char *txt, FILE * t
    if (outputfile != NULL) {
       fp = fopen(outputfile, "wt");
       if (fp != NULL) {
-         if (JPCommon_get_label_size(&open_jtalk->jpcommon) > 2) {
-            JPCommon_fprint_label(fp, &open_jtalk->jpcommon, 1,
-                                  JPCommon_get_label_size(&open_jtalk->jpcommon) - 1);
+         int label_size = JPCommon_get_label_size(&open_jtalk->jpcommon);
+         if (label_size > 2) {
+            char **label_feature = JPCommon_get_label_feature(&open_jtalk->jpcommon);
+            int i;
+            for (i = 1; i < label_size - 1; i++) {
+               fprintf(fp, "%s\n", label_feature[i]);
+            }
          }
          fclose(fp);
       }
@@ -97,9 +101,13 @@ static int OpenJTalk_synthesis(OpenJTalk * open_jtalk, const char *txt, FILE * t
 
    /* output label to stdout for parsing */
    if (txtfp != NULL) {
-      if (JPCommon_get_label_size(&open_jtalk->jpcommon) > 2) {
-         JPCommon_fprint_label(txtfp, &open_jtalk->jpcommon, 1,
-                               JPCommon_get_label_size(&open_jtalk->jpcommon) - 1);
+      int label_size = JPCommon_get_label_size(&open_jtalk->jpcommon);
+      if (label_size > 2) {
+         char **label_feature = JPCommon_get_label_feature(&open_jtalk->jpcommon);
+         int i;
+         for (i = 1; i < label_size - 1; i++) {
+            fprintf(txtfp, "%s\n", label_feature[i]);
+         }
       }
    }
 
