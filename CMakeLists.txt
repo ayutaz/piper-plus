@@ -188,7 +188,7 @@ endif()
 # ---- HTSEngine ---
 
 # HTSEngine stub for phonemizer-only mode
-option(USE_HTS_ENGINE_STUB "Use HTS Engine stub (phonemizer-only mode)" ON)
+option(USE_HTS_ENGINE_STUB "Use HTS Engine stub (phonemizer-only mode)" OFF)
 
 if(USE_HTS_ENGINE_STUB)
   # Use stub instead of real HTS Engine
