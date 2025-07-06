@@ -60,26 +60,30 @@ ls -la "$HTS_ENGINE_DIR/" 2>/dev/null || echo "HTS_ENGINE_DIR does not exist"
 echo "Contents of HTS Engine lib directory:"
 ls -la "$HTS_ENGINE_DIR/lib/" 2>/dev/null || echo "lib directory does not exist"
 
-HTS_LIB="$HTS_ENGINE_DIR/lib/libHTSEngine.a"
-if [ ! -f "$HTS_LIB" ]; then
-    echo "Warning: HTS Engine library not found at $HTS_LIB"
-    # Check for alternative locations
-    if [ -f "$HTS_ENGINE_DIR/lib/HTSEngine.lib" ]; then
-        HTS_LIB="$HTS_ENGINE_DIR/lib/HTSEngine.lib"
-        echo "Found Windows library: $HTS_LIB"
-    elif [ -f "$HTS_ENGINE_DIR/lib/libhts_engine_stub.a" ]; then
-        HTS_LIB="$HTS_ENGINE_DIR/lib/libhts_engine_stub.a"
-        echo "Found stub library: $HTS_LIB"
-    else
-        echo "Error: No HTS Engine library found in $HTS_ENGINE_DIR/lib/"
-        echo "Expected one of:"
-        echo "  - $HTS_ENGINE_DIR/lib/libHTSEngine.a"
-        echo "  - $HTS_ENGINE_DIR/lib/HTSEngine.lib"
-        echo "  - $HTS_ENGINE_DIR/lib/libhts_engine_stub.a"
-        exit 1
-    fi
-else
+# Check for HTS Engine library
+HTS_LIB=""
+if [ -f "$HTS_ENGINE_DIR/lib/libHTSEngine.a" ]; then
+    HTS_LIB="$HTS_ENGINE_DIR/lib/libHTSEngine.a"
     echo "Found HTS Engine library: $HTS_LIB"
+elif [ -f "$HTS_ENGINE_DIR/lib/HTSEngine.lib" ]; then
+    HTS_LIB="$HTS_ENGINE_DIR/lib/HTSEngine.lib"
+    echo "Found Windows HTS Engine library: $HTS_LIB"
+elif [ -f "$HTS_ENGINE_DIR/lib/libhts_engine_stub.a" ]; then
+    HTS_LIB="$HTS_ENGINE_DIR/lib/libhts_engine_stub.a"
+    echo "Found HTS Engine stub library: $HTS_LIB"
+else
+    echo "ERROR: HTS Engine library not found!"
+    echo "Searched for:"
+    echo "  - $HTS_ENGINE_DIR/lib/libHTSEngine.a"
+    echo "  - $HTS_ENGINE_DIR/lib/HTSEngine.lib"
+    echo "  - $HTS_ENGINE_DIR/lib/libhts_engine_stub.a"
+    echo ""
+    echo "Directory contents:"
+    ls -la "$HTS_ENGINE_DIR/" 2>/dev/null || echo "HTS_ENGINE_DIR does not exist"
+    echo ""
+    echo "Build directory contents:"
+    find ../../.. -name "*HTSEngine*" -o -name "*hts_engine*" 2>/dev/null | head -20 || echo "No HTS files found"
+    exit 1
 fi
 
 $CXX -o open_jtalk_phonemizer open_jtalk_phonemizer.c \
