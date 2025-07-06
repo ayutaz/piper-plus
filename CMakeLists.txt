@@ -203,17 +203,32 @@ if(USE_HTS_ENGINE_STUB)
   # Build stub library
   add_library(hts_engine_stub STATIC ${CMAKE_CURRENT_SOURCE_DIR}/cmake/hts_engine_stub.c)
   target_include_directories(hts_engine_stub PUBLIC ${HTS_ENGINE_DIR}/include)
-  set_target_properties(hts_engine_stub PROPERTIES 
-    ARCHIVE_OUTPUT_DIRECTORY ${HTS_ENGINE_DIR}/lib
-    OUTPUT_NAME HTSEngine
-    PREFIX "lib")
+  if(WIN32)
+    set_target_properties(hts_engine_stub PROPERTIES 
+      ARCHIVE_OUTPUT_DIRECTORY ${HTS_ENGINE_DIR}/lib
+      OUTPUT_NAME HTSEngine
+      PREFIX "")
+  else()
+    set_target_properties(hts_engine_stub PROPERTIES 
+      ARCHIVE_OUTPUT_DIRECTORY ${HTS_ENGINE_DIR}/lib
+      OUTPUT_NAME HTSEngine
+      PREFIX "lib")
+  endif()
     
   # Ensure the stub library is built and create a symlink/copy for compatibility
-  add_custom_command(TARGET hts_engine_stub POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E make_directory ${HTS_ENGINE_DIR}/lib
-    COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:hts_engine_stub> ${HTS_ENGINE_DIR}/lib/libHTSEngine.a
-    COMMENT "Ensuring HTS Engine stub library is in expected location"
-  )
+  if(WIN32)
+    add_custom_command(TARGET hts_engine_stub POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E make_directory ${HTS_ENGINE_DIR}/lib
+      COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:hts_engine_stub> ${HTS_ENGINE_DIR}/lib/HTSEngine.lib
+      COMMENT "Ensuring HTS Engine stub library is in expected location (Windows)"
+    )
+  else()
+    add_custom_command(TARGET hts_engine_stub POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E make_directory ${HTS_ENGINE_DIR}/lib
+      COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:hts_engine_stub> ${HTS_ENGINE_DIR}/lib/libHTSEngine.a
+      COMMENT "Ensuring HTS Engine stub library is in expected location (Unix)"
+    )
+  endif()
     
   # Create dummy target for dependencies
   add_custom_target(hts_engine_external DEPENDS hts_engine_stub)
