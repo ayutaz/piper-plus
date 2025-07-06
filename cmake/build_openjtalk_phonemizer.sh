@@ -13,6 +13,18 @@ echo "Compiler: $CC"
 echo "Install dir: $INSTALL_DIR"
 echo "HTS Engine dir: $HTS_ENGINE_DIR"
 
+# Check if HTS Engine library exists
+echo "Checking for HTS Engine library..."
+if [ -f "$HTS_ENGINE_DIR/lib/libHTSEngine.a" ]; then
+    echo "Found: $HTS_ENGINE_DIR/lib/libHTSEngine.a"
+elif [ -f "$HTS_ENGINE_DIR/lib/HTSEngine.lib" ]; then
+    echo "Found: $HTS_ENGINE_DIR/lib/HTSEngine.lib"
+else
+    echo "Warning: HTS Engine library not found in $HTS_ENGINE_DIR/lib/"
+    echo "Contents of $HTS_ENGINE_DIR/lib/:"
+    ls -la "$HTS_ENGINE_DIR/lib/" 2>/dev/null || echo "Directory does not exist"
+fi
+
 # Create bin directory if it doesn't exist
 mkdir -p "$INSTALL_DIR/bin"
 
