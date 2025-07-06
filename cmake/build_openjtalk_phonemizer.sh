@@ -111,4 +111,15 @@ echo "Installing open_jtalk_phonemizer to $INSTALL_DIR/bin/"
 cp open_jtalk_phonemizer "$INSTALL_DIR/bin/"
 chmod +x "$INSTALL_DIR/bin/open_jtalk_phonemizer"
 
+# Verify installation
+if [ -f "$INSTALL_DIR/bin/open_jtalk_phonemizer" ]; then
+    echo "Successfully installed open_jtalk_phonemizer"
+    ls -la "$INSTALL_DIR/bin/open_jtalk_phonemizer"
+else
+    echo "ERROR: Failed to install open_jtalk_phonemizer"
+    echo "Install directory contents:"
+    ls -la "$INSTALL_DIR/bin/"
+    exit 1
+fi
+
 echo "open_jtalk_phonemizer build complete!"

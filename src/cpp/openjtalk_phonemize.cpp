@@ -78,16 +78,20 @@ void phonemize_openjtalk(const std::string &text, std::vector<std::vector<Phonem
             sentencePhonemes.push_back(static_cast<Phoneme>('_'));
         } else {
             // Regular phoneme
+            spdlog::debug("Processing phoneme: '{}' (length: {})", phoneme, phoneme.length());
+            
             // Check if this is a multi-character phoneme that needs PUA
             auto it = phonemeToPua.find(phoneme);
             if (it != phonemeToPua.end()) {
+                spdlog::debug("Found PUA mapping for '{}': U+{:04X}", phoneme, static_cast<uint32_t>(it->second));
                 sentencePhonemes.push_back(it->second);
             } else if (phoneme.length() == 1) {
                 // Single character phoneme
+                spdlog::debug("Single character phoneme '{}': U+{:04X}", phoneme, static_cast<uint32_t>(phoneme[0]));
                 sentencePhonemes.push_back(static_cast<Phoneme>(phoneme[0]));
             } else {
                 // Unknown multi-character phoneme, skip
-                spdlog::warn("Unknown multi-character phoneme: {}", phoneme);
+                spdlog::warn("Unknown multi-character phoneme: '{}' (length: {})", phoneme, phoneme.length());
             }
         }
     }

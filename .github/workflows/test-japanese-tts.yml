@@ -62,8 +62,12 @@ jobs:
             echo "LD_LIBRARY_PATH=${PWD}/piper/lib:${LD_LIBRARY_PATH}" >> $GITHUB_ENV
           fi
           
-          # Verify OpenJTalk is available
-          if [ -f "piper/bin/open_jtalk" ]; then
+          # Verify OpenJTalk is available (check phonemizer version first)
+          if [ -f "piper/bin/open_jtalk_phonemizer" ]; then
+            echo "✓ OpenJTalk phonemizer binary found"
+            ls -la piper/bin/open_jtalk_phonemizer
+            chmod +x piper/bin/open_jtalk_phonemizer || true
+          elif [ -f "piper/bin/open_jtalk" ]; then
             echo "✓ OpenJTalk binary found"
             ls -la piper/bin/open_jtalk
           else
@@ -77,8 +81,11 @@ jobs:
         run: |
           Expand-Archive -Path piper-Windows.zip -DestinationPath . -Force
           
-          # Verify OpenJTalk is available
-          if (Test-Path "piper/bin/open_jtalk.exe") {
+          # Verify OpenJTalk is available (check phonemizer version first)
+          if (Test-Path "piper/bin/open_jtalk_phonemizer.exe") {
+            Write-Host "✓ OpenJTalk phonemizer binary found"
+            Get-Item piper/bin/open_jtalk_phonemizer.exe | Select-Object Name, Length, LastWriteTime
+          } elseif (Test-Path "piper/bin/open_jtalk.exe") {
             Write-Host "✓ OpenJTalk binary found"
             Get-Item piper/bin/open_jtalk.exe | Select-Object Name, Length, LastWriteTime
           } else {
