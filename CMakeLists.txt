@@ -208,6 +208,13 @@ if(USE_HTS_ENGINE_STUB)
     OUTPUT_NAME HTSEngine
     PREFIX "lib")
     
+  # Ensure the stub library is built and create a symlink/copy for compatibility
+  add_custom_command(TARGET hts_engine_stub POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${HTS_ENGINE_DIR}/lib
+    COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:hts_engine_stub> ${HTS_ENGINE_DIR}/lib/libHTSEngine.a
+    COMMENT "Ensuring HTS Engine stub library is in expected location"
+  )
+    
   # Create dummy target for dependencies
   add_custom_target(hts_engine_external DEPENDS hts_engine_stub)
   

@@ -38,6 +38,38 @@ if [[ "$OSTYPE" == "darwin"* ]]; then
     EXTRA_LIBS="$EXTRA_LIBS -liconv"
 fi
 
+# Check if HTS Engine library exists
+echo "Checking for HTS Engine library..."
+echo "HTS_ENGINE_DIR: $HTS_ENGINE_DIR"
+
+# List contents of HTS Engine directory for debugging
+echo "Contents of HTS Engine directory:"
+ls -la "$HTS_ENGINE_DIR/" 2>/dev/null || echo "HTS_ENGINE_DIR does not exist"
+echo "Contents of HTS Engine lib directory:"
+ls -la "$HTS_ENGINE_DIR/lib/" 2>/dev/null || echo "lib directory does not exist"
+
+HTS_LIB="$HTS_ENGINE_DIR/lib/libHTSEngine.a"
+if [ ! -f "$HTS_LIB" ]; then
+    echo "Warning: HTS Engine library not found at $HTS_LIB"
+    # Check for alternative locations
+    if [ -f "$HTS_ENGINE_DIR/lib/HTSEngine.lib" ]; then
+        HTS_LIB="$HTS_ENGINE_DIR/lib/HTSEngine.lib"
+        echo "Found Windows library: $HTS_LIB"
+    elif [ -f "$HTS_ENGINE_DIR/lib/libhts_engine_stub.a" ]; then
+        HTS_LIB="$HTS_ENGINE_DIR/lib/libhts_engine_stub.a"
+        echo "Found stub library: $HTS_LIB"
+    else
+        echo "Error: No HTS Engine library found in $HTS_ENGINE_DIR/lib/"
+        echo "Expected one of:"
+        echo "  - $HTS_ENGINE_DIR/lib/libHTSEngine.a"
+        echo "  - $HTS_ENGINE_DIR/lib/HTSEngine.lib"
+        echo "  - $HTS_ENGINE_DIR/lib/libhts_engine_stub.a"
+        exit 1
+    fi
+else
+    echo "Found HTS Engine library: $HTS_LIB"
+fi
+
 $CXX -o open_jtalk_phonemizer open_jtalk_phonemizer.c \
     -I../mecab/src -I../njd -I../jpcommon -I../njd_set_accent_phrase \
     -I../njd_set_accent_type -I../njd_set_digit -I../njd_set_long_vowel \
@@ -55,7 +87,7 @@ $CXX -o open_jtalk_phonemizer open_jtalk_phonemizer.c \
     ../jpcommon/libjpcommon.a \
     ../mecab/src/libmecab.a \
     ../njd/libnjd.a \
-    "$HTS_ENGINE_DIR/lib/libHTSEngine.a" \
+    "$HTS_LIB" \
     -lm ${EXTRA_LIBS:-}
 
 # Copy to install directory
