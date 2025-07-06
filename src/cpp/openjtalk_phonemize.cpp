@@ -87,8 +87,16 @@ void phonemize_openjtalk(const std::string &text, std::vector<std::vector<Phonem
                 sentencePhonemes.push_back(it->second);
             } else if (phoneme.length() == 1) {
                 // Single character phoneme
-                spdlog::debug("Single character phoneme '{}': U+{:04X}", phoneme, static_cast<uint32_t>(phoneme[0]));
-                sentencePhonemes.push_back(static_cast<Phoneme>(phoneme[0]));
+                char ch = phoneme[0];
+                
+                // Convert uppercase vowels to lowercase (unvoiced vowels in Japanese)
+                if (ch == 'A' || ch == 'I' || ch == 'U' || ch == 'E' || ch == 'O') {
+                    ch = ch + 32; // Convert to lowercase
+                    spdlog::debug("Converting unvoiced vowel '{}' to '{}'", phoneme[0], ch);
+                }
+                
+                spdlog::debug("Single character phoneme '{}': U+{:04X}", ch, static_cast<uint32_t>(ch));
+                sentencePhonemes.push_back(static_cast<Phoneme>(ch));
             } else {
                 // Unknown multi-character phoneme, skip
                 spdlog::warn("Unknown multi-character phoneme: '{}' (length: {})", phoneme, phoneme.length());
