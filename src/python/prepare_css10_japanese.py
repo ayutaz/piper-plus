@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
 """
-Prepare CSS10 Japanese dataset for Piper TTS training.
-This script processes CSS10 Japanese data and creates the necessary files for training.
+Prepare CSS10 Japanese dataset for Piper TTS training with unvoiced vowel support.
 """
 
 import os
 import json
-import csv
 import argparse
 from pathlib import Path
 from typing import List, Dict, Tuple
@@ -14,34 +12,29 @@ import subprocess
 import concurrent.futures
 from tqdm import tqdm
 
-from openjtalk_phonemizer import phonemize_openjtalk, phonemes_to_ids
-from jp_phoneme_map import get_phoneme_id_map, create_model_config
+# Import from piper_train modules
+import sys
+sys.path.append(str(Path(__file__).parent))
+from piper_train.phonemize.japanese import phonemize_japanese
+from piper_train.phonemize.jp_id_map import get_japanese_id_map
+
 
 def download_css10_japanese(output_dir: Path):
-    """
-    Download CSS10 Japanese dataset.
-    CSS10: A Collection of Single Speaker Speech Datasets for 10 Languages
-    """
+    """Download CSS10 Japanese dataset."""
     css10_url = "https://github.com/Kyubyong/css10/archive/master.zip"
     print(f"Downloading CSS10 dataset from {css10_url}")
     
-    # Create output directory
     output_dir.mkdir(parents=True, exist_ok=True)
     
-    # Download command
-    download_cmd = [
-        "wget", "-O", str(output_dir / "css10.zip"), css10_url
-    ]
+    download_cmd = ["wget", "-O", str(output_dir / "css10.zip"), css10_url]
     
     try:
         subprocess.run(download_cmd, check=True)
         print("Download complete. Extracting...")
         
-        # Extract
         extract_cmd = ["unzip", str(output_dir / "css10.zip"), "-d", str(output_dir)]
         subprocess.run(extract_cmd, check=True)
         
-        # Move Japanese data
         japanese_dir = output_dir / "css10-master" / "japanese"
         if japanese_dir.exists():
             target_dir = output_dir / "japanese"
@@ -50,7 +43,6 @@ def download_css10_japanese(output_dir: Path):
                 shutil.rmtree(target_dir)
             japanese_dir.rename(target_dir)
         
-        # Cleanup
         os.remove(output_dir / "css10.zip")
         if (output_dir / "css10-master").exists():
             import shutil
@@ -63,11 +55,9 @@ def download_css10_japanese(output_dir: Path):
         print(f"Error downloading CSS10: {e}")
         return None
 
+
 def process_transcript_line(line: str) -> Tuple[str, str]:
-    """
-    Process a line from CSS10 transcript.
-    Format: filename|transcript
-    """
+    """Process a line from CSS10 transcript."""
     parts = line.strip().split('|')
     if len(parts) >= 2:
         filename = parts[0]
@@ -75,43 +65,20 @@ def process_transcript_line(line: str) -> Tuple[str, str]:
         return filename, transcript
     return None, None
 
-def phonemize_text(text: str, preserve_unvoiced: bool = True) -> List[str]:
-    """
-    Phonemize text and return flattened list of phonemes.
-    """
-    try:
-        sentences = phonemize_openjtalk(text, preserve_unvoiced=preserve_unvoiced)
-        # Flatten sentences and add sentence boundaries
-        phonemes = []
-        for i, sentence in enumerate(sentences):
-            if i > 0:
-                phonemes.append("^")  # Sentence boundary
-            phonemes.extend(sentence)
-        return phonemes
-    except Exception as e:
-        print(f"Error phonemizing text '{text}': {e}")
-        return []
 
-def prepare_dataset(css10_dir: Path, output_dir: Path, preserve_unvoiced: bool = True):
+def prepare_dataset(css10_dir: Path, output_dir: Path):
     """
     Prepare CSS10 Japanese dataset for Piper training.
-    
-    Args:
-        css10_dir: Path to CSS10 Japanese directory
-        output_dir: Output directory for processed data
-        preserve_unvoiced: Whether to preserve unvoiced vowels (uppercase)
+    Always preserves unvoiced vowels for better accuracy.
     """
-    # Create output directories
     output_dir.mkdir(parents=True, exist_ok=True)
     (output_dir / "wav").mkdir(exist_ok=True)
     
-    # Read transcript
     transcript_file = css10_dir / "transcript.txt"
     if not transcript_file.exists():
         print(f"Error: Transcript file not found at {transcript_file}")
         return
     
-    # Process all entries
     dataset = []
     phoneme_stats = {}
     
@@ -120,9 +87,10 @@ def prepare_dataset(css10_dir: Path, output_dir: Path, preserve_unvoiced: bool =
     with open(transcript_file, 'r', encoding='utf-8') as f:
         lines = f.readlines()
     
-    # Use multiprocessing for phonemization
+    # Get phoneme ID mapping
+    id_map = get_japanese_id_map()
+    
     with concurrent.futures.ProcessPoolExecutor() as executor:
-        # Submit all phonemization tasks
         futures = []
         entries = []
         
@@ -132,10 +100,9 @@ def prepare_dataset(css10_dir: Path, output_dir: Path, preserve_unvoiced: bool =
                 wav_path = css10_dir / "wav" / f"{filename}.wav"
                 if wav_path.exists():
                     entries.append((filename, text, wav_path))
-                    future = executor.submit(phonemize_text, text, preserve_unvoiced)
+                    future = executor.submit(phonemize_japanese, text)
                     futures.append(future)
         
-        # Collect results
         for (filename, text, wav_path), future in tqdm(zip(entries, futures), total=len(entries)):
             phonemes = future.result()
             
@@ -146,16 +113,28 @@ def prepare_dataset(css10_dir: Path, output_dir: Path, preserve_unvoiced: bool =
                     import shutil
                     shutil.copy2(wav_path, target_wav)
                 
-                # Count phoneme statistics
+                # Count phoneme statistics (original phonemes before PUA conversion)
                 for p in phonemes:
+                    # For PUA characters, find original phoneme
+                    if len(p) == 1 and ord(p) >= 0xE000:
+                        # This is handled by the mapping
+                        pass
                     phoneme_stats[p] = phoneme_stats.get(p, 0) + 1
                 
-                # Add to dataset
+                # Convert phonemes to IDs
+                phoneme_ids = []
+                for p in phonemes:
+                    if p in id_map:
+                        phoneme_ids.extend(id_map[p])
+                    else:
+                        print(f"Warning: Unknown phoneme '{p}'")
+                        phoneme_ids.extend(id_map.get("_", [0]))  # Use pause as fallback
+                
                 dataset.append({
                     "audio_path": f"wav/{filename}.wav",
                     "text": text,
                     "phonemes": phonemes,
-                    "phoneme_ids": phonemes_to_ids(phonemes)
+                    "phoneme_ids": phoneme_ids
                 })
     
     print(f"Processed {len(dataset)} utterances")
@@ -165,50 +144,47 @@ def prepare_dataset(css10_dir: Path, output_dir: Path, preserve_unvoiced: bool =
     with open(dataset_file, 'w', encoding='utf-8') as f:
         json.dump(dataset, f, ensure_ascii=False, indent=2)
     
-    # Write phoneme statistics
-    stats_file = output_dir / "phoneme_stats.json"
-    phoneme_stats_sorted = dict(sorted(phoneme_stats.items(), key=lambda x: x[1], reverse=True))
-    with open(stats_file, 'w', encoding='utf-8') as f:
-        json.dump(phoneme_stats_sorted, f, ensure_ascii=False, indent=2)
-    
-    # Create model config
-    config = create_model_config("ja_JP-css10-openjtalk")
-    config["dataset"] = "css10_japanese"
-    config["audio"]["quality"] = "high"
-    
-    config_file = output_dir / "config.json"
-    with open(config_file, 'w', encoding='utf-8') as f:
-        json.dump(config, f, ensure_ascii=False, indent=2)
-    
     # Write training filelist
     train_file = output_dir / "train.txt"
     val_file = output_dir / "val.txt"
     
-    # Split 95% train, 5% validation
     split_idx = int(len(dataset) * 0.95)
     
     with open(train_file, 'w', encoding='utf-8') as f:
         for entry in dataset[:split_idx]:
-            f.write(f"{entry['audio_path']}|{' '.join(entry['phonemes'])}\n")
+            phoneme_str = " ".join(entry['phonemes'])
+            f.write(f"{entry['audio_path']}|{phoneme_str}\n")
     
     with open(val_file, 'w', encoding='utf-8') as f:
         for entry in dataset[split_idx:]:
-            f.write(f"{entry['audio_path']}|{' '.join(entry['phonemes'])}\n")
+            phoneme_str = " ".join(entry['phonemes'])
+            f.write(f"{entry['audio_path']}|{phoneme_str}\n")
     
     print(f"\nDataset prepared at: {output_dir}")
     print(f"  - Total utterances: {len(dataset)}")
     print(f"  - Training: {split_idx}")
     print(f"  - Validation: {len(dataset) - split_idx}")
-    print(f"  - Unique phonemes: {len(phoneme_stats)}")
+    print(f"  - Unique symbols: {len(id_map)}")
     
     # Show unvoiced vowel statistics
-    unvoiced_stats = {p: count for p, count in phoneme_stats.items() if p in 'AIUEO'}
-    if unvoiced_stats:
+    unvoiced_counts = {}
+    voiced_counts = {}
+    
+    for p, count in phoneme_stats.items():
+        if p in 'AIUEO':
+            unvoiced_counts[p] = count
+        elif p in 'aiueo':
+            voiced_counts[p] = count
+    
+    if unvoiced_counts:
         print("\nUnvoiced vowel statistics:")
-        for vowel, count in sorted(unvoiced_stats.items()):
-            total_vowel = phoneme_stats.get(vowel.lower(), 0) + count
-            percentage = (count / total_vowel * 100) if total_vowel > 0 else 0
-            print(f"  {vowel}: {count:,} occurrences ({percentage:.1f}% of all '{vowel.lower()}' sounds)")
+        for vowel in sorted(unvoiced_counts.keys()):
+            unvoiced = unvoiced_counts.get(vowel, 0)
+            voiced = voiced_counts.get(vowel.lower(), 0)
+            total = unvoiced + voiced
+            percentage = (unvoiced / total * 100) if total > 0 else 0
+            print(f"  {vowel}: {unvoiced:,} occurrences ({percentage:.1f}% of all '{vowel.lower()}' sounds)")
+
 
 def main():
     parser = argparse.ArgumentParser(description="Prepare CSS10 Japanese dataset for Piper training")
@@ -216,12 +192,9 @@ def main():
     parser.add_argument("--css10-dir", type=Path, help="Path to CSS10 Japanese directory")
     parser.add_argument("--output-dir", type=Path, default=Path("css10_prepared"), 
                        help="Output directory for processed data")
-    parser.add_argument("--no-preserve-unvoiced", action="store_true",
-                       help="Convert unvoiced vowels to lowercase")
     
     args = parser.parse_args()
     
-    # Download if requested
     if args.download:
         css10_dir = download_css10_japanese(Path("css10_data"))
         if not css10_dir:
@@ -233,12 +206,8 @@ def main():
             print("Please specify --css10-dir or use --download")
             return
     
-    # Prepare dataset
-    prepare_dataset(
-        css10_dir,
-        args.output_dir,
-        preserve_unvoiced=not args.no_preserve_unvoiced
-    )
+    prepare_dataset(css10_dir, args.output_dir)
+
 
 if __name__ == "__main__":
     main()

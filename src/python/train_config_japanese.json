@@ -46,7 +46,9 @@
     "win_length": 1024,
     "n_mel_channels": 80,
     "mel_fmin": 0,
-    "mel_fmax": null
+    "mel_fmax": null,
+    "num_symbols": 58,
+    "preserve_unvoiced": true
   },
   "train": {
     "batch_size": 16,
@@ -67,10 +69,10 @@
     "eval_interval": 1000,
     "log_interval": 100,
     "save_interval": 5000,
-    "checkpoint_path": "./checkpoints/ja_JP_css10_openjtalk",
+    "checkpoint_path": "./checkpoints/ja_JP_css10_openjtalk_unvoiced",
     "logger": {
       "type": "tensorboard",
-      "log_dir": "./logs/ja_JP_css10_openjtalk"
+      "log_dir": "./logs/ja_JP_css10_openjtalk_unvoiced"
     }
   },
   "inference": {

@@ -64,9 +64,7 @@ def phonemize_japanese(text: str) -> List[str]:
             tokens.append("_")
             continue
 
-        # Devoiced vowels – convert to lower-case counterpart
-        if phoneme in {"A", "I", "U", "E", "O"}:
-            phoneme = phoneme.lower()
+        # Keep unvoiced vowels as uppercase for linguistic accuracy
 
         tokens.append(phoneme)
 
