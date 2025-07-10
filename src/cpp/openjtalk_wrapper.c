@@ -2,8 +2,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
-#include <stdint.h>
-#include <limits.h>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -20,10 +18,8 @@
 #include "openjtalk_dictionary_manager.h"
 // #include "openjtalk_api.h"  // Temporarily disabled - requires OpenJTalk static libs
 
-// Define SIZE_MAX if not available
-#ifndef SIZE_MAX
-#define SIZE_MAX ((size_t)-1)
-#endif
+// Define a safe maximum value for buffer size calculations
+#define OPENJTALK_SIZE_MAX ((size_t)-1)
 
 // Constants
 #define OPENJTALK_PATH_MAX 1024
@@ -59,6 +55,10 @@ static const char* find_openjtalk_binary() {
         "./bin/open_jtalk_phonemizer",
         "../bin/open_jtalk_phonemizer",
         "./piper/bin/open_jtalk_phonemizer",
+        "./oj/bin/open_jtalk_phonemizer",
+        "../oj/bin/open_jtalk_phonemizer",
+        "../../oj/bin/open_jtalk_phonemizer",
+        "../../../oj/bin/open_jtalk_phonemizer",
         "/usr/bin/open_jtalk_phonemizer",
         "/usr/local/bin/open_jtalk_phonemizer",
         // Fall back to regular open_jtalk if phonemizer not found
@@ -357,7 +357,7 @@ char* openjtalk_text_to_phonemes(const char* text) {
                             if (total_phoneme_len + space_needed > phoneme_buffer_size - 1) {
                                 // Reallocate buffer if needed
                                 // Check for potential overflow
-                                if (phoneme_buffer_size > SIZE_MAX / 2) {
+                                if (phoneme_buffer_size > OPENJTALK_SIZE_MAX / 2) {
                                     fprintf(stderr, "Buffer size would overflow\n");
                                     free(phonemes);
                                     free(file_content);

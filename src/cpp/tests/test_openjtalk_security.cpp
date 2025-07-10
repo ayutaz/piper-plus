@@ -76,7 +76,7 @@ TEST_F(OpenJTalkSecurityTest, ApiMethodMemoryManagement) {
 // Test that extremely large inputs are rejected
 TEST_F(OpenJTalkSecurityTest, RejectExtremelyLargeInput) {
     // Create input larger than 1MB limit
-    std::string huge_text(2 * 1024 * 1024, 'あ');
+    std::string huge_text(2 * 1024 * 1024, 'A');
     
     char* result = openjtalk_text_to_phonemes(huge_text.c_str());
     EXPECT_EQ(result, nullptr) << "Should reject input larger than 1MB";
@@ -149,7 +149,7 @@ TEST_F(OpenJTalkSecurityTest, EmptyStringHandling) {
 // Test malformed UTF-8 sequences
 TEST_F(OpenJTalkSecurityTest, MalformedUtf8Handling) {
     // Invalid UTF-8 sequence
-    const char invalid_utf8[] = {0xFF, 0xFE, 0xFD, 0};
+    const char invalid_utf8[] = {static_cast<char>(0xFF), static_cast<char>(0xFE), static_cast<char>(0xFD), 0};
     
     char* result = openjtalk_text_to_phonemes(invalid_utf8);
     // Should either handle gracefully or return NULL
