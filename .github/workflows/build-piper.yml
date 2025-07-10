@@ -217,6 +217,15 @@ jobs:
             fi
           done
           
+          # Copy OpenJTalk phonemizer binary
+          for oj_path in "build/oj/bin/open_jtalk_phonemizer" "build/open_jtalk_phonemizer" "build/bin/open_jtalk_phonemizer"; do
+            if [ -f "$oj_path" ]; then
+              cp "$oj_path" dist/piper/bin/
+              chmod +x dist/piper/bin/open_jtalk_phonemizer
+              break
+            fi
+          done
+          
           # Create archive
           tar -czf piper-${{ runner.os }}.tar.gz -C dist piper
           
@@ -261,6 +270,20 @@ jobs:
             "build/${{ inputs.build-type }}/open_jtalk.exe"
           )
           foreach ($path in $ojPaths) {
+            if (Test-Path $path) {
+              Copy-Item $path -Destination dist/piper/bin/ -Force
+              break
+            }
+          }
+          
+          # Copy OpenJTalk phonemizer executable
+          $ojPhonemizerPaths = @(
+            "build/oj/bin/open_jtalk_phonemizer.exe",
+            "build/open_jtalk_phonemizer.exe",
+            "build/bin/open_jtalk_phonemizer.exe",
+            "build/${{ inputs.build-type }}/open_jtalk_phonemizer.exe"
+          )
+          foreach ($path in $ojPhonemizerPaths) {
             if (Test-Path $path) {
               Copy-Item $path -Destination dist/piper/bin/ -Force
               break

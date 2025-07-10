@@ -58,12 +58,13 @@
 1. **テスト用モデル**（開発・検証用）
    - piper-plusリポジトリの`test/models/`ディレクトリに含まれています
    - ファイル名: `ja_JP-test-medium.onnx`と`ja_JP-test-medium.onnx.json`
+   - **58音素対応**（無声化母音を含む）- より自然な日本語音声を生成
    - GitHubからダウンロード:
      ```bash
      # ONNXモデル（約63MB）
      curl -L -o ja_JP-test-medium.onnx https://github.com/ayutaz/piper-plus/raw/master/test/models/ja_JP-test-medium.onnx
      
-     # 設定ファイル
+     # 設定ファイル（58音素対応）
      curl -L -o ja_JP-test-medium.onnx.json https://github.com/ayutaz/piper-plus/raw/master/test/models/ja_JP-test-medium.onnx.json
      ```
 
@@ -78,7 +79,8 @@
   "phoneme_type": "openjtalk",
   "language": {
     "code": "ja"
-  }
+  },
+  "num_symbols": 58  // 58音素対応（無声化母音を含む）
 }
 ```
 

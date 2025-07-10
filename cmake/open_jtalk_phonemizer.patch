@@ -1,0 +1,96 @@
+--- a/bin/Makefile.am
++++ b/bin/Makefile.am
+@@ -1,5 +1,5 @@
+ 
+-bin_PROGRAMS = open_jtalk
++bin_PROGRAMS = open_jtalk open_jtalk_phonemizer
+ 
+ open_jtalk_SOURCES = open_jtalk.c
+ open_jtalk_CFLAGS = @AM_CFLAGS@ @HTSENGINE_CFLAGS@
+@@ -17,6 +17,22 @@ open_jtalk_LDADD = ../text2mecab/libtext2mecab.la \
+ 	../njd/libnjd.la \
+ 	@HTSENGINE_LIBS@
+ 
++open_jtalk_phonemizer_SOURCES = open_jtalk_phonemizer.c
++open_jtalk_phonemizer_CFLAGS = @AM_CFLAGS@ @HTSENGINE_CFLAGS@
++open_jtalk_phonemizer_LDADD = ../text2mecab/libtext2mecab.la \
++	../mecab2njd/libmecab2njd.la \
++	../njd_set_pronunciation/libnjd_set_pronunciation.la \
++	../njd_set_digit/libnjd_set_digit.la \
++	../njd_set_accent_phrase/libnjd_set_accent_phrase.la \
++	../njd_set_accent_type/libnjd_set_accent_type.la \
++	../njd_set_unvoiced_vowel/libnjd_set_unvoiced_vowel.la \
++	../njd_set_long_vowel/libnjd_set_long_vowel.la \
++	../njd2jpcommon/libnjd2jpcommon.la \
++	../jpcommon/libjpcommon.la \
++	../mecab/src/libmecab.la \
++	../njd/libnjd.la \
++	@HTSENGINE_LIBS@
++
+ DISTCLEANFILES = *.log *.out *~
+ 
+ EXTRA_DIST = Makefile.mak
+--- a/bin/Makefile.in
++++ b/bin/Makefile.in
+@@ -33,7 +33,7 @@
+ POST_UNINSTALL = :
+ build_triplet = @build@
+ host_triplet = @host@
+-bin_PROGRAMS = open_jtalk$(EXEEXT)
++bin_PROGRAMS = open_jtalk$(EXEEXT) open_jtalk_phonemizer$(EXEEXT)
+ subdir = bin
+ DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in
+ ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
+@@ -61,6 +61,18 @@ open_jtalk_LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) \
+ 	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(open_jtalk_CFLAGS) \
+ 	$(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
++am_open_jtalk_phonemizer_OBJECTS = open_jtalk_phonemizer-open_jtalk_phonemizer.$(OBJEXT)
++open_jtalk_phonemizer_OBJECTS = $(am_open_jtalk_phonemizer_OBJECTS)
++open_jtalk_phonemizer_DEPENDENCIES = ../text2mecab/libtext2mecab.la \
++	../mecab2njd/libmecab2njd.la \
++	../njd_set_pronunciation/libnjd_set_pronunciation.la \
++	../njd_set_digit/libnjd_set_digit.la \
++	../njd_set_accent_phrase/libnjd_set_accent_phrase.la \
++	../njd_set_accent_type/libnjd_set_accent_type.la \
++	../njd_set_unvoiced_vowel/libnjd_set_unvoiced_vowel.la \
++	../njd_set_long_vowel/libnjd_set_long_vowel.la \
++	../njd2jpcommon/libnjd2jpcommon.la ../jpcommon/libjpcommon.la \
++	../mecab/src/libmecab.la ../njd/libnjd.la
+ DEFAULT_INCLUDES = -I.@am__isrc@ -I$(top_builddir)/mecab
+ depcomp = $(SHELL) $(top_srcdir)/config/depcomp
+ am__depfiles_maybe = depfiles
+@@ -72,8 +84,8 @@ LTCOMPILE = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) \
+ CCLD = $(CC)
+ LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) \
+ 	--mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) \
+ 	$(LDFLAGS) -o $@
+-SOURCES = $(open_jtalk_SOURCES)
+-DIST_SOURCES = $(open_jtalk_SOURCES)
++SOURCES = $(open_jtalk_SOURCES) $(open_jtalk_phonemizer_SOURCES)
++DIST_SOURCES = $(open_jtalk_SOURCES) $(open_jtalk_phonemizer_SOURCES)
+ ETAGS = etags
+ CTAGS = ctags
+ DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
+@@ -214,6 +226,22 @@ open_jtalk_LDADD = ../text2mecab/libtext2mecab.la \
+ 	../njd/libnjd.la \
+ 	@HTSENGINE_LIBS@
+ 
++open_jtalk_phonemizer_SOURCES = open_jtalk_phonemizer.c
++open_jtalk_phonemizer_CFLAGS = @AM_CFLAGS@ @HTSENGINE_CFLAGS@
++open_jtalk_phonemizer_LDADD = ../text2mecab/libtext2mecab.la \
++	../mecab2njd/libmecab2njd.la \
++	../njd_set_pronunciation/libnjd_set_pronunciation.la \
++	../njd_set_digit/libnjd_set_digit.la \
++	../njd_set_accent_phrase/libnjd_set_accent_phrase.la \
++	../njd_set_accent_type/libnjd_set_accent_type.la \
++	../njd_set_unvoiced_vowel/libnjd_set_unvoiced_vowel.la \
++	../njd_set_long_vowel/libnjd_set_long_vowel.la \
++	../njd2jpcommon/libnjd2jpcommon.la \
++	../jpcommon/libjpcommon.la \
++	../mecab/src/libmecab.la \
++	../njd/libnjd.la \
++	@HTSENGINE_LIBS@
++
+ DISTCLEANFILES = *.log *.out *~
+ EXTRA_DIST = Makefile.mak
+ all: all-am

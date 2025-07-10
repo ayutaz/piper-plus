@@ -17,11 +17,13 @@
 
 #include "openjtalk_dictionary_manager.h"
 
-// Global variable to store OpenJTalk binary path
-static char g_openjtalk_bin_path[1024] = {0};
+// Constants
+#define OPENJTALK_PATH_MAX 1024
+#define OPENJTALK_BUFFER_SIZE 4096
+#define OPENJTALK_COMMAND_SIZE 4096
 
-// Forward declaration
-static void katakana_to_phonemes(const char* katakana, char* phonemes_out);
+// Global variable to store OpenJTalk binary path
+static char g_openjtalk_bin_path[OPENJTALK_PATH_MAX] = {0};
 
 // Find OpenJTalk binary path
 static const char* find_openjtalk_binary() {
@@ -29,15 +31,28 @@ static const char* find_openjtalk_binary() {
         return g_openjtalk_bin_path;
     }
     
-    // Check if open_jtalk binary exists
+    // Check if open_jtalk_phonemizer binary exists (preferred)
     const char* paths[] = {
 #ifdef _WIN32
+        "open_jtalk_phonemizer.exe",
+        "bin\\open_jtalk_phonemizer.exe",
+        ".\\open_jtalk_phonemizer.exe",
+        "..\\bin\\open_jtalk_phonemizer.exe",
+        "piper\\bin\\open_jtalk_phonemizer.exe",
+        // Fall back to regular open_jtalk if phonemizer not found
         "open_jtalk.exe",
         "bin\\open_jtalk.exe",
         ".\\open_jtalk.exe",
         "..\\bin\\open_jtalk.exe",
         "piper\\bin\\open_jtalk.exe",
 #else
+        "./open_jtalk_phonemizer",
+        "./bin/open_jtalk_phonemizer",
+        "../bin/open_jtalk_phonemizer",
+        "./piper/bin/open_jtalk_phonemizer",
+        "/usr/bin/open_jtalk_phonemizer",
+        "/usr/local/bin/open_jtalk_phonemizer",
+        // Fall back to regular open_jtalk if phonemizer not found
         "./open_jtalk",
         "./bin/open_jtalk",
         "../bin/open_jtalk",
@@ -55,11 +70,19 @@ static const char* find_openjtalk_binary() {
         }
     }
     
-    // Try to find in PATH
+    // Try to find in PATH - first try phonemizer, then regular
 #ifdef _WIN32
-    FILE* fp = popen("where open_jtalk.exe 2>NUL", "r");
+    FILE* fp = popen("where open_jtalk_phonemizer.exe 2>NUL", "r");
+    if (!fp || fgets(g_openjtalk_bin_path, sizeof(g_openjtalk_bin_path), fp) == NULL) {
+        if (fp) pclose(fp);
+        fp = popen("where open_jtalk.exe 2>NUL", "r");
+    }
 #else
-    FILE* fp = popen("which open_jtalk 2>/dev/null", "r");
+    FILE* fp = popen("which open_jtalk_phonemizer 2>/dev/null", "r");
+    if (!fp || fgets(g_openjtalk_bin_path, sizeof(g_openjtalk_bin_path), fp) == NULL) {
+        if (fp) pclose(fp);
+        fp = popen("which open_jtalk 2>/dev/null", "r");
+    }
 #endif
     if (fp) {
         if (fgets(g_openjtalk_bin_path, sizeof(g_openjtalk_bin_path), fp) != NULL) {
@@ -146,30 +169,54 @@ char* openjtalk_text_to_phonemes(const char* text) {
         return NULL;
     }
     
-    // Get HTS voice path
-    const char* voice_path = get_openjtalk_voice_path();
-    if (!voice_path) {
-        unlink(input_file);
-        unlink(output_file);
-        return NULL;
-    }
+    // Check if we're using the phonemizer binary (doesn't need HTS voice)
+    bool is_phonemizer = strstr(openjtalk_bin, "phonemizer") != NULL;
     
     // Construct OpenJTalk command
-    // Use -ow /dev/null to suppress wave output and -ot to get trace/phoneme output
-    char command[4096];
-#ifdef _WIN32
-    // Use cmd /c to ensure proper command execution on Windows
-    snprintf(command, sizeof(command),
-             "cmd /c \"\"%s\" -x \"%s\" -m \"%s\" -ow NUL -ot \"%s\" \"%s\"\"",
-             openjtalk_bin, dic_path, voice_path, output_file, input_file);
-#else
-    snprintf(command, sizeof(command),
-             "\"%s\" -x \"%s\" -m \"%s\" -ow /dev/null -ot \"%s\" \"%s\"",
-             openjtalk_bin, dic_path, voice_path, output_file, input_file);
-#endif
+    char command[OPENJTALK_COMMAND_SIZE];
     
-    // Debug: Print command
-    fprintf(stderr, "Executing OpenJTalk command: %s\n", command);
+    if (is_phonemizer) {
+        // Use phonemizer binary - no HTS voice needed
+#ifdef _WIN32
+        snprintf(command, sizeof(command),
+                 "cmd /c \"\"%s\" -x \"%s\" -ot \"%s\" \"%s\"\"",
+                 openjtalk_bin, dic_path, output_file, input_file);
+#else
+        snprintf(command, sizeof(command),
+                 "\"%s\" -x \"%s\" -ot \"%s\" \"%s\"",
+                 openjtalk_bin, dic_path, output_file, input_file);
+#endif
+    } else {
+        // Fall back to regular open_jtalk with HTS voice
+        const char* voice_path = get_openjtalk_voice_path();
+        if (!voice_path) {
+            // Try to continue without voice for phoneme extraction
+            fprintf(stderr, "Warning: HTS voice not found, attempting phoneme extraction only\n");
+        }
+        
+#ifdef _WIN32
+        if (voice_path) {
+            snprintf(command, sizeof(command),
+                     "cmd /c \"\"%s\" -x \"%s\" -m \"%s\" -ow NUL -ot \"%s\" \"%s\"\"",
+                     openjtalk_bin, dic_path, voice_path, output_file, input_file);
+        } else {
+            snprintf(command, sizeof(command),
+                     "cmd /c \"\"%s\" -x \"%s\" -ow NUL -ot \"%s\" \"%s\"\"",
+                     openjtalk_bin, dic_path, output_file, input_file);
+        }
+#else
+        if (voice_path) {
+            snprintf(command, sizeof(command),
+                     "\"%s\" -x \"%s\" -m \"%s\" -ow /dev/null -ot \"%s\" \"%s\"",
+                     openjtalk_bin, dic_path, voice_path, output_file, input_file);
+        } else {
+            snprintf(command, sizeof(command),
+                     "\"%s\" -x \"%s\" -ow /dev/null -ot \"%s\" \"%s\"",
+                     openjtalk_bin, dic_path, output_file, input_file);
+        }
+#endif
+    }
+    
     
     // Execute OpenJTalk
     int result = system(command);
@@ -191,11 +238,10 @@ char* openjtalk_text_to_phonemes(const char* text) {
         return NULL;
     }
     
-    // Debug: Check file size
+    // Check file size
     fseek(fp, 0, SEEK_END);
     long file_size = ftell(fp);
     fseek(fp, 0, SEEK_SET);
-    fprintf(stderr, "Output file size: %ld bytes\n", file_size);
     
     // Allocate buffer based on file size
     char* file_content = malloc(file_size + 1);
@@ -211,7 +257,7 @@ char* openjtalk_text_to_phonemes(const char* text) {
     fclose(fp);
     
     // Allocate buffer for phonemes
-    char* phonemes = malloc(4096);
+    char* phonemes = malloc(OPENJTALK_BUFFER_SIZE);
     if (!phonemes) {
         free(file_content);
         unlink(output_file);
@@ -220,72 +266,49 @@ char* openjtalk_text_to_phonemes(const char* text) {
     
     phonemes[0] = '\0';
     
-    // Parse morphological analysis output to extract katakana readings
+    // Parse full-context labels from open_jtalk_phonemizer output
     char* line = strtok(file_content, "\n");
-    int in_text_analysis = 0;
     
     while (line != NULL) {
-        // Debug: Print first few lines
-        static int debug_line_count = 0;
-        if (debug_line_count++ < 10) {
-            fprintf(stderr, "Debug line: %s\n", line);
-        }
-        
-        // Check for text analysis section
-        if (strstr(line, "[Text analysis result]") != NULL) {
-            in_text_analysis = 1;
+        // Skip empty lines
+        if (strlen(line) == 0) {
             line = strtok(NULL, "\n");
             continue;
         }
         
-        // Check for end of text analysis section
-        if (in_text_analysis && line[0] == '[') {
-            break;
-        }
+        // Extract phoneme from full-context label using more robust parsing
+        // Format: xx^xx-p3+xx=xx/A:...
+        // We need to find the pattern "-phoneme+" where phoneme is between - and +
         
-        if (in_text_analysis && strlen(line) > 0) {
-            // Parse MeCab format: surface,pos1,pos2,...,base,reading,pronunciation,...
-            // We want the katakana reading (9th field)
-            char line_copy[1024];
-            strncpy(line_copy, line, sizeof(line_copy) - 1);
-            line_copy[sizeof(line_copy) - 1] = '\0';
-            
-            char* fields[20];
-            int field_count = 0;
-            char* save_ptr = NULL;
-            
-#ifdef _WIN32
-            char* field = strtok_s(line_copy, ",", &save_ptr);
-            
-            while (field != NULL && field_count < 20) {
-                fields[field_count++] = field;
-                field = strtok_s(NULL, ",", &save_ptr);
-            }
-#else
-            char* field = strtok_r(line_copy, ",", &save_ptr);
-            
-            while (field != NULL && field_count < 20) {
-                fields[field_count++] = field;
-                field = strtok_r(NULL, ",", &save_ptr);
-            }
-#endif
-            
-            // Get katakana reading (typically 9th field, index 8)
-            if (field_count >= 9) {
-                char* reading = fields[8];
-                // Skip punctuation marks
-                if (strcmp(reading, "、") != 0 && 
-                    strcmp(reading, "。") != 0 && 
-                    strcmp(reading, "*") != 0) {
-                    // Convert katakana to phonemes
-                    char phoneme_buffer[256];
-                    katakana_to_phonemes(reading, phoneme_buffer);
-                    
-                    if (strlen(phoneme_buffer) > 0) {
-                        if (strlen(phonemes) > 0) {
-                            strcat(phonemes, " ");
+        // First, find the phoneme context section (before the first '/')
+        char* context_end = strchr(line, '/');
+        if (context_end) {
+            // Create a temporary buffer for the context part
+            size_t context_len = context_end - line;
+            if (context_len > 0 && context_len < 256) {
+                char context[256];
+                strncpy(context, line, context_len);
+                context[context_len] = '\0';
+                
+                // Find the pattern -phoneme+ in the context
+                char* minus_pos = strchr(context, '-');
+                if (minus_pos) {
+                    char* plus_pos = strchr(minus_pos + 1, '+');
+                    if (plus_pos && plus_pos > minus_pos + 1) {
+                        // Extract phoneme
+                        size_t phoneme_len = plus_pos - minus_pos - 1;
+                        if (phoneme_len > 0 && phoneme_len < 32) {
+                            char phoneme[32];
+                            strncpy(phoneme, minus_pos + 1, phoneme_len);
+                            phoneme[phoneme_len] = '\0';
+                            
+                            // Add phoneme with space separator
+                            // All phonemes including sil and pau are passed through
+                            if (strlen(phonemes) > 0) {
+                                strcat(phonemes, " ");
+                            }
+                            strcat(phonemes, phoneme);
                         }
-                        strcat(phonemes, phoneme_buffer);
                     }
                 }
             }
@@ -294,7 +317,6 @@ char* openjtalk_text_to_phonemes(const char* text) {
         line = strtok(NULL, "\n");
     }
     
-    fprintf(stderr, "Phonemes extracted: %s\n", phonemes);
     
     free(file_content);
     unlink(output_file);
@@ -307,107 +329,6 @@ char* openjtalk_text_to_phonemes(const char* text) {
     return phonemes;
 }
 
-// Convert katakana to phoneme symbols
-static void katakana_to_phonemes(const char* katakana, char* phonemes_out) {
-    // Katakana to phoneme mapping table
-    static const struct {
-        const char* katakana;
-        const char* phoneme;
-    } katakana_map[] = {
-        // Basic katakana
-        {"ア", "a"}, {"イ", "i"}, {"ウ", "u"}, {"エ", "e"}, {"オ", "o"},
-        {"カ", "k a"}, {"キ", "k i"}, {"ク", "k u"}, {"ケ", "k e"}, {"コ", "k o"},
-        {"ガ", "g a"}, {"ギ", "g i"}, {"グ", "g u"}, {"ゲ", "g e"}, {"ゴ", "g o"},
-        {"サ", "s a"}, {"シ", "t͡ɕ i"}, {"ス", "s u"}, {"セ", "s e"}, {"ソ", "s o"},
-        {"ザ", "z a"}, {"ジ", "d͡ʑ i"}, {"ズ", "z u"}, {"ゼ", "z e"}, {"ゾ", "z o"},
-        {"タ", "t a"}, {"チ", "t͡ɕ i"}, {"ツ", "t͡s u"}, {"テ", "t e"}, {"ト", "t o"},
-        {"ダ", "d a"}, {"ヂ", "d͡ʑ i"}, {"ヅ", "d͡z u"}, {"デ", "d e"}, {"ド", "d o"},
-        {"ナ", "n a"}, {"ニ", "ɲ i"}, {"ヌ", "n u"}, {"ネ", "n e"}, {"ノ", "n o"},
-        {"ハ", "h a"}, {"ヒ", "ç i"}, {"フ", "f u"}, {"ヘ", "h e"}, {"ホ", "h o"},
-        {"バ", "b a"}, {"ビ", "b i"}, {"ブ", "b u"}, {"ベ", "b e"}, {"ボ", "b o"},
-        {"パ", "p a"}, {"ピ", "p i"}, {"プ", "p u"}, {"ペ", "p e"}, {"ポ", "p o"},
-        {"マ", "m a"}, {"ミ", "m i"}, {"ム", "m u"}, {"メ", "m e"}, {"モ", "m o"},
-        {"ヤ", "y a"}, {"ユ", "y u"}, {"ヨ", "y o"},
-        {"ラ", "r a"}, {"リ", "r i"}, {"ル", "r u"}, {"レ", "r e"}, {"ロ", "r o"},
-        {"ワ", "w a"}, {"ヰ", "w i"}, {"ヱ", "w e"}, {"ヲ", "w o"},
-        {"ン", "N"},
-        // Small katakana
-        {"ッ", "q"},
-        {"ャ", "y a"}, {"ュ", "y u"}, {"ョ", "y o"},
-        {"ァ", "a"}, {"ィ", "i"}, {"ゥ", "u"}, {"ェ", "e"}, {"ォ", "o"},
-        // Long vowel mark
-        {"ー", ":"}, // This will be processed specially
-        {NULL, NULL}
-    };
-    
-    const char* input = katakana;
-    char* output = phonemes_out;
-    output[0] = '\0';
-    
-    while (*input) {
-        int matched = 0;
-        
-        // Check for long vowel mark
-        if (strncmp(input, "ー", 3) == 0) {
-            // Long vowel mark - extend the previous vowel
-            if (output > phonemes_out && output[-1] == ' ') {
-                output--; // Remove trailing space
-            }
-            if (output > phonemes_out) {
-                // Find the last vowel and make it long
-                char* last_vowel = output - 1;
-                while (last_vowel > phonemes_out && *last_vowel != ' ') {
-                    last_vowel--;
-                }
-                if (*last_vowel == ' ') last_vowel++;
-                
-                // Add long vowel marker based on the last vowel
-                if (*last_vowel == 'a') strcat(output, " ã");
-                else if (*last_vowel == 'i') strcat(output, " ĩ");
-                else if (*last_vowel == 'u') strcat(output, " ũ");
-                else if (*last_vowel == 'e') strcat(output, " ẽ");
-                else if (*last_vowel == 'o') strcat(output, " õ");
-                output = output + strlen(output);
-            }
-            input += 3;
-            matched = 1;
-        }
-        
-        // Try to match katakana
-        if (!matched) {
-            for (int i = 0; katakana_map[i].katakana != NULL; i++) {
-                int kana_len = strlen(katakana_map[i].katakana);
-                if (strncmp(input, katakana_map[i].katakana, kana_len) == 0) {
-                    if (output > phonemes_out) {
-                        strcat(output, " ");
-                        output++;
-                    }
-                    strcat(output, katakana_map[i].phoneme);
-                    output += strlen(katakana_map[i].phoneme);
-                    input += kana_len;
-                    matched = 1;
-                    break;
-                }
-            }
-        }
-        
-        // Skip unrecognized characters
-        if (!matched) {
-            // Move to next UTF-8 character
-            if ((*input & 0x80) == 0) {
-                input++; // ASCII
-            } else if ((*input & 0xE0) == 0xC0) {
-                input += 2; // 2-byte UTF-8
-            } else if ((*input & 0xF0) == 0xE0) {
-                input += 3; // 3-byte UTF-8
-            } else if ((*input & 0xF8) == 0xF0) {
-                input += 4; // 4-byte UTF-8
-            } else {
-                input++; // Invalid, skip
-            }
-        }
-    }
-}
 
 // Free phoneme string
 void openjtalk_free_phonemes(char* phonemes) {

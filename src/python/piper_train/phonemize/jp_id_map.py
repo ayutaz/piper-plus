@@ -24,16 +24,21 @@ SPECIAL_TOKENS: List[str] = [
 
 # Core phoneme set – based on Open JTalk definitions and common practice in
 # Japanese TTS front-ends (Tacotron, VITS, etc.)
-# Long vowels (a:, i:, …) are kept as separate tokens.  Devoiced vowels
-# (A, I, …) are converted to lower-case during phonemization, so we only need
-# the lowercase versions here.
+# Long vowels (a:, i:, …) are kept as separate tokens.  Both voiced (lowercase)
+# and unvoiced (uppercase) vowels are preserved for linguistic accuracy.
 JAPANESE_PHONEMES: List[str] = [
-    # vowels
+    # voiced vowels
     "a",
     "i",
     "u",
     "e",
     "o",
+    # unvoiced vowels (uppercase)
+    "A",
+    "I",
+    "U",
+    "E",
+    "O",
     "a:",
     "i:",
     "u:",

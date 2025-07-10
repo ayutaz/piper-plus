@@ -16,9 +16,13 @@ set(OPEN_JTALK_VERSION "1.11")
 set(OPEN_JTALK_VERSION_MAJOR 1)
 set(OPEN_JTALK_VERSION_MINOR 11)
 
-# Find HTSEngine
-if(NOT HTS_ENGINE_INCLUDE_DIR OR NOT HTS_ENGINE_LIB)
-  message(FATAL_ERROR "HTSEngine not found. Please set HTS_ENGINE_INCLUDE_DIR and HTS_ENGINE_LIB")
+# Find HTSEngine (optional for phonemizer-only build)
+if(HTS_ENGINE_INCLUDE_DIR AND HTS_ENGINE_LIB)
+  set(HAS_HTS_ENGINE TRUE)
+  message(STATUS "HTSEngine found, building full OpenJTalk with synthesis support")
+else()
+  set(HAS_HTS_ENGINE FALSE)
+  message(STATUS "HTSEngine not found, building phonemizer-only version")
 endif()
 
 # Source files for mecab
@@ -135,7 +139,7 @@ add_library(openjtalk STATIC
   ${NJD2JPCOMMON_SOURCES}
 )
 
-target_include_directories(openjtalk PUBLIC
+set(OPENJTALK_INCLUDES
   ${CMAKE_CURRENT_SOURCE_DIR}
   ${CMAKE_CURRENT_SOURCE_DIR}/njd
   ${CMAKE_CURRENT_SOURCE_DIR}/njd_set_accent_phrase
@@ -149,8 +153,13 @@ target_include_directories(openjtalk PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/text2mecab
   ${CMAKE_CURRENT_SOURCE_DIR}/mecab2njd
   ${CMAKE_CURRENT_SOURCE_DIR}/mecab/src
-  ${HTS_ENGINE_INCLUDE_DIR}
 )
+
+if(HAS_HTS_ENGINE)
+  list(APPEND OPENJTALK_INCLUDES ${HTS_ENGINE_INCLUDE_DIR})
+endif()
+
+target_include_directories(openjtalk PUBLIC ${OPENJTALK_INCLUDES})
 
 target_link_libraries(openjtalk PUBLIC mecab)
 
@@ -236,41 +245,67 @@ struct pair_1st_cmp: public std::binary_function<bool, T1, T2> {
   endif()
 endif()
 
-# Build open_jtalk executable
+# Build open_jtalk executable (with HTS synthesis)
 add_executable(open_jtalk bin/open_jtalk.c)
 
 # Add mecab.cpp directly to the executable to ensure symbols are available
 target_sources(open_jtalk PRIVATE mecab/src/mecab.cpp)
 
+# Build open_jtalk_phonemizer executable (phoneme extraction only, no HTS)
+add_executable(open_jtalk_phonemizer bin/open_jtalk_phonemizer.c)
+target_sources(open_jtalk_phonemizer PRIVATE mecab/src/mecab.cpp)
+
 # On Windows, we need to ensure proper linking order and symbol visibility
-if(WIN32)
-  target_link_libraries(open_jtalk PRIVATE
+if(HAS_HTS_ENGINE)
+  if(WIN32)
+    target_link_libraries(open_jtalk PRIVATE
+      openjtalk
+      mecab
+      ${HTS_ENGINE_LIB}
+    )
+  else()
+    target_link_libraries(open_jtalk PRIVATE
+      openjtalk
+      mecab
+      ${HTS_ENGINE_LIB}
+    )
+  endif()
+else()
+  # Building without HTS Engine
+  if(WIN32)
+    target_link_libraries(open_jtalk PRIVATE
+      openjtalk
+      mecab
+    )
+  else()
+    target_link_libraries(open_jtalk PRIVATE
+      openjtalk
+      mecab
+    )
+  endif()
+endif()
+
+# Phonemizer always builds without HTS Engine (but links stub on Windows)
+if(WIN32 AND HAS_HTS_ENGINE)
+  target_link_libraries(open_jtalk_phonemizer PRIVATE
     openjtalk
     mecab
     ${HTS_ENGINE_LIB}
   )
 else()
-  target_link_libraries(open_jtalk PRIVATE
+  target_link_libraries(open_jtalk_phonemizer PRIVATE
     openjtalk
     mecab
-    ${HTS_ENGINE_LIB}
   )
 endif()
 
 if(NOT WIN32)
   target_link_libraries(open_jtalk PRIVATE m)
+  target_link_libraries(open_jtalk_phonemizer PRIVATE m)
 endif()
 
-target_include_directories(open_jtalk PRIVATE
-  ${CMAKE_CURRENT_SOURCE_DIR}
-  ${CMAKE_CURRENT_SOURCE_DIR}/njd
-  ${CMAKE_CURRENT_SOURCE_DIR}/njd2jpcommon
-  ${CMAKE_CURRENT_SOURCE_DIR}/jpcommon
-  ${CMAKE_CURRENT_SOURCE_DIR}/text2mecab
-  ${CMAKE_CURRENT_SOURCE_DIR}/mecab2njd
-  ${CMAKE_CURRENT_SOURCE_DIR}/mecab/src
-  ${HTS_ENGINE_INCLUDE_DIR}
-)
+target_include_directories(open_jtalk PRIVATE ${OPENJTALK_INCLUDES})
+target_include_directories(open_jtalk_phonemizer PRIVATE ${OPENJTALK_INCLUDES})
 
 # Install configuration
 install(TARGETS openjtalk mecab
@@ -279,7 +314,7 @@ install(TARGETS openjtalk mecab
   RUNTIME DESTINATION bin
 )
 
-install(TARGETS open_jtalk
+install(TARGETS open_jtalk open_jtalk_phonemizer
   RUNTIME DESTINATION bin
 )
 

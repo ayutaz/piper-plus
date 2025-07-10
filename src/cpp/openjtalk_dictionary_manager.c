@@ -329,6 +329,14 @@ int ensure_openjtalk_dictionary() {
 
 // Get the path to the HTS voice file
 const char* get_openjtalk_voice_path() {
+    // HTS voice not needed for phonemizer-only mode
+    // This function is kept for backward compatibility but returns NULL
+    return NULL;
+}
+
+#if 0
+// Original HTS voice download code - kept for reference but disabled
+static const char* get_openjtalk_voice_path_old() {
     static char voice_path[1024] = {0};
     
     if (voice_path[0] != '\0') {
@@ -464,3 +472,4 @@ const char* get_openjtalk_voice_path() {
     
     return voice_path;
 }
+#endif

@@ -187,8 +187,53 @@ endif()
 
 # ---- HTSEngine ---
 
-# Build HTSEngine on all platforms
-if(NOT DEFINED HTS_ENGINE_DIR)
+# HTSEngine stub for phonemizer-only mode
+option(USE_HTS_ENGINE_STUB "Use HTS Engine stub (phonemizer-only mode)" ON)
+
+if(USE_HTS_ENGINE_STUB)
+  # Use stub instead of real HTS Engine
+  set(HTS_ENGINE_DIR "${CMAKE_CURRENT_BINARY_DIR}/hts_stub")
+  file(MAKE_DIRECTORY ${HTS_ENGINE_DIR}/include)
+  file(MAKE_DIRECTORY ${HTS_ENGINE_DIR}/lib)
+  
+  # Copy stub files
+  configure_file(${CMAKE_CURRENT_SOURCE_DIR}/cmake/hts_engine_stub.h 
+                 ${HTS_ENGINE_DIR}/include/HTS_engine.h COPYONLY)
+  
+  # Build stub library
+  add_library(hts_engine_stub STATIC ${CMAKE_CURRENT_SOURCE_DIR}/cmake/hts_engine_stub.c)
+  target_include_directories(hts_engine_stub PUBLIC ${HTS_ENGINE_DIR}/include)
+  if(WIN32)
+    set_target_properties(hts_engine_stub PROPERTIES 
+      ARCHIVE_OUTPUT_DIRECTORY ${HTS_ENGINE_DIR}/lib
+      OUTPUT_NAME HTSEngine
+      PREFIX "")
+  else()
+    set_target_properties(hts_engine_stub PROPERTIES 
+      ARCHIVE_OUTPUT_DIRECTORY ${HTS_ENGINE_DIR}/lib
+      OUTPUT_NAME HTSEngine
+      PREFIX "lib")
+  endif()
+    
+  # Ensure the stub library is built and create a symlink/copy for compatibility
+  if(WIN32)
+    add_custom_command(TARGET hts_engine_stub POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E make_directory ${HTS_ENGINE_DIR}/lib
+      COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:hts_engine_stub> ${HTS_ENGINE_DIR}/lib/HTSEngine.lib
+      COMMENT "Ensuring HTS Engine stub library is in expected location (Windows)"
+    )
+  else()
+    add_custom_command(TARGET hts_engine_stub POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E make_directory ${HTS_ENGINE_DIR}/lib
+      COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:hts_engine_stub> ${HTS_ENGINE_DIR}/lib/libHTSEngine.a
+      COMMENT "Ensuring HTS Engine stub library is in expected location (Unix)"
+    )
+  endif()
+    
+  # Create dummy target for dependencies
+  add_custom_target(hts_engine_external DEPENDS hts_engine_stub)
+  
+elseif(NOT DEFINED HTS_ENGINE_DIR)
     set(HTS_ENGINE_DIR "${CMAKE_CURRENT_BINARY_DIR}/he")
     set(HTS_ENGINE_VERSION "1.10")
 
@@ -238,62 +283,84 @@ if(NOT DEFINED HTS_ENGINE_DIR)
         BUILD_BYPRODUCTS ${HTS_ENGINE_DIR}/lib/libHTSEngine.a
       )
     endif()
-  endif()
+endif()
 
-  # ---- OpenJTalk ---
+# ---- OpenJTalk ---
 
-  if(NOT DEFINED OPENJTALK_DIR)
+if(NOT DEFINED OPENJTALK_DIR)
     set(OPENJTALK_DIR "${CMAKE_CURRENT_BINARY_DIR}/oj")
     set(OPENJTALK_VERSION "1.11")
 
     if(WIN32)
       # Use CMake build for Windows
+      set(OPENJTALK_CMAKE_ARGS
+        -DCMAKE_INSTALL_PREFIX:PATH=${OPENJTALK_DIR}
+        -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}
+        -DBUILD_SHARED_LIBS:BOOL=OFF
+        -DHTS_ENGINE_INCLUDE_DIR:PATH=${HTS_ENGINE_DIR}/include
+        -DHTS_ENGINE_LIB:FILEPATH=${HTS_ENGINE_DIR}/lib/HTSEngine.lib
+        -DCMAKE_MSVC_RUNTIME_LIBRARY:STRING=${CMAKE_MSVC_RUNTIME_LIBRARY}
+        ${EXTERNAL_CMAKE_ARGS}
+      )
+      
       ExternalProject_Add(
         openjtalk_external
         PREFIX "${CMAKE_CURRENT_BINARY_DIR}/o"
         URL "https://downloads.sourceforge.net/project/open-jtalk/Open%20JTalk/open_jtalk-${OPENJTALK_VERSION}/open_jtalk-${OPENJTALK_VERSION}.tar.gz"
-        CMAKE_ARGS 
-          -DCMAKE_INSTALL_PREFIX:PATH=${OPENJTALK_DIR}
-          -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}
-          -DBUILD_SHARED_LIBS:BOOL=OFF
-          -DHTS_ENGINE_INCLUDE_DIR:PATH=${HTS_ENGINE_DIR}/include
-          -DHTS_ENGINE_LIB:FILEPATH=${HTS_ENGINE_DIR}/lib/HTSEngine.lib
-          -DCMAKE_MSVC_RUNTIME_LIBRARY:STRING=${CMAKE_MSVC_RUNTIME_LIBRARY}
-          ${EXTERNAL_CMAKE_ARGS}
+        CMAKE_ARGS ${OPENJTALK_CMAKE_ARGS}
         PATCH_COMMAND 
           ${CMAKE_COMMAND} -E copy 
             ${CMAKE_CURRENT_SOURCE_DIR}/cmake/OpenJTalk_CMakeLists.txt 
             <SOURCE_DIR>/CMakeLists.txt
           COMMAND ${CMAKE_COMMAND} -E copy
+            ${CMAKE_CURRENT_SOURCE_DIR}/cmake/open_jtalk_phonemizer.c
+            <SOURCE_DIR>/bin/open_jtalk_phonemizer.c
+          COMMAND ${CMAKE_COMMAND} -E copy
             ${CMAKE_CURRENT_SOURCE_DIR}/cmake/apply_openjtalk_patch.ps1
             <SOURCE_DIR>/apply_patch.ps1
-          COMMAND powershell -ExecutionPolicy Bypass -File <SOURCE_DIR>/apply_patch.ps1 -SourceDir <SOURCE_DIR>
+          COMMAND powershell -ExecutionPolicy Bypass -File "<SOURCE_DIR>/apply_patch.ps1" -SourceDir "<SOURCE_DIR>"
         BUILD_BYPRODUCTS
           ${OPENJTALK_DIR}/bin/open_jtalk.exe
-        DEPENDS hts_engine_external
+          ${OPENJTALK_DIR}/bin/open_jtalk_phonemizer.exe
       )
+      
+      add_dependencies(openjtalk_external hts_engine_external)
     else()
       # Use autotools for Unix platforms
+      set(OPENJTALK_CONFIGURE_CMD ${CMAKE_COMMAND} -E env ${CONFIGURE_ENV} ${CMAKE_COMMAND} -E chdir <SOURCE_DIR> ./configure
+        --prefix=${OPENJTALK_DIR}
+        --with-hts-engine-header-path=${HTS_ENGINE_DIR}/include
+        --with-hts-engine-library-path=${HTS_ENGINE_DIR}/lib
+        --with-charset=UTF-8
+        ${CONFIGURE_HOST})
+      
       ExternalProject_Add(
         openjtalk_external
         PREFIX "${CMAKE_CURRENT_BINARY_DIR}/o"
         URL "https://downloads.sourceforge.net/project/open-jtalk/Open%20JTalk/open_jtalk-${OPENJTALK_VERSION}/open_jtalk-${OPENJTALK_VERSION}.tar.gz"
-        PATCH_COMMAND ""
-        CONFIGURE_COMMAND ${CMAKE_COMMAND} -E env ${CONFIGURE_ENV} ${CMAKE_COMMAND} -E chdir <SOURCE_DIR> ./configure
-          --prefix=${OPENJTALK_DIR}
-          --with-hts-engine-header-path=${HTS_ENGINE_DIR}/include
-          --with-hts-engine-library-path=${HTS_ENGINE_DIR}/lib
-          --with-charset=UTF-8
-          ${CONFIGURE_HOST}
+        PATCH_COMMAND 
+          ${CMAKE_COMMAND} -E copy 
+            ${CMAKE_CURRENT_SOURCE_DIR}/cmake/open_jtalk_phonemizer.c
+            <SOURCE_DIR>/bin/open_jtalk_phonemizer.c
+        CONFIGURE_COMMAND ${OPENJTALK_CONFIGURE_CMD}
         BUILD_COMMAND ${CMAKE_COMMAND} -E chdir <SOURCE_DIR> make
-        INSTALL_COMMAND ${CMAKE_COMMAND} -E chdir <SOURCE_DIR> make install
+        INSTALL_COMMAND 
+          ${CMAKE_COMMAND} -E chdir <SOURCE_DIR> make install
+          COMMAND ${CMAKE_COMMAND} -E copy
+            ${CMAKE_CURRENT_SOURCE_DIR}/cmake/build_openjtalk_phonemizer.sh
+            <SOURCE_DIR>/build_phonemizer.sh
+          COMMAND ${CMAKE_COMMAND} -E chdir <SOURCE_DIR> chmod +x build_phonemizer.sh
+          COMMAND ${CMAKE_COMMAND} -E chdir <SOURCE_DIR> ./build_phonemizer.sh
+            ${CMAKE_CXX_COMPILER} ${OPENJTALK_DIR} ${HTS_ENGINE_DIR}
         BUILD_IN_SOURCE 1
         BUILD_BYPRODUCTS
           ${OPENJTALK_DIR}/bin/open_jtalk
-        DEPENDS hts_engine_external
+          ${OPENJTALK_DIR}/bin/open_jtalk_phonemizer
       )
+      
+      add_dependencies(openjtalk_external hts_engine_external)
     endif()
-  endif()
+endif()
 
 # ---- Declare executable ----
 
@@ -340,14 +407,19 @@ else()
   )
 endif()
 
-# Link OpenJTalk and HTS_Engine libraries
-if(TRUE)  # HTSEngine and OpenJTalk are built on all platforms
-  # Ensure libraries are built before linking
-  add_dependencies(piper openjtalk_external hts_engine_external)
-  add_dependencies(test_piper openjtalk_external hts_engine_external)
+# Link OpenJTalk libraries
+# Ensure OpenJTalk is built before linking
+add_dependencies(piper openjtalk_external)
+add_dependencies(test_piper openjtalk_external)
 
-  # Link libraries with absolute paths
-  # Note: OpenJTalk doesn't create a single library, we need to link individual components
+# Link HTS_Engine (required for OpenJTalk build)
+add_dependencies(piper hts_engine_external)
+add_dependencies(test_piper hts_engine_external)
+
+if(USE_HTS_ENGINE_STUB)
+  target_link_libraries(piper hts_engine_stub)
+  target_link_libraries(test_piper hts_engine_stub)
+else()
   if(WIN32)
     target_link_libraries(piper
       ${CMAKE_CURRENT_BINARY_DIR}/he/lib/HTSEngine.lib
@@ -386,17 +458,21 @@ if(WIN32 AND ONNXRUNTIME_INCLUDE_DIR)
   target_include_directories(test_piper PUBLIC ${ONNXRUNTIME_INCLUDE_DIR})
 endif()
 
-# Include OpenJTalk and HTSEngine headers
-if(TRUE)  # HTSEngine and OpenJTalk are built on all platforms
-  target_include_directories(piper PUBLIC
-    ${OPENJTALK_DIR}/include
-    ${HTS_ENGINE_DIR}/include
-  )
-  target_include_directories(test_piper PUBLIC
-    ${OPENJTALK_DIR}/include
-    ${HTS_ENGINE_DIR}/include
-  )
-endif()
+# Include OpenJTalk headers
+target_include_directories(piper PUBLIC
+  ${OPENJTALK_DIR}/include
+)
+target_include_directories(test_piper PUBLIC
+  ${OPENJTALK_DIR}/include
+)
+
+# Include HTSEngine headers (required for OpenJTalk)
+target_include_directories(piper PUBLIC
+  ${HTS_ENGINE_DIR}/include
+)
+target_include_directories(test_piper PUBLIC
+  ${HTS_ENGINE_DIR}/include
+)
 
 # OpenJTalk is used via binary execution, includes not needed
 
@@ -503,16 +579,26 @@ install(
 
 # Install OpenJTalk for Japanese TTS support
 if(TRUE)  # HTSEngine and OpenJTalk are built
-  # Install OpenJTalk binary
+  # Install OpenJTalk binaries
   if(WIN32)
     install(
       PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/oj/bin/open_jtalk.exe
       DESTINATION bin
       OPTIONAL  # Don't fail if not built
     )
+    install(
+      PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/oj/bin/open_jtalk_phonemizer.exe
+      DESTINATION bin
+      OPTIONAL  # Don't fail if not built
+    )
   else()
     install(
       PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/oj/bin/open_jtalk
+      DESTINATION bin
+      OPTIONAL  # Don't fail if not built
+    )
+    install(
+      PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/oj/bin/open_jtalk_phonemizer
       DESTINATION bin
       OPTIONAL  # Don't fail if not built
     )
