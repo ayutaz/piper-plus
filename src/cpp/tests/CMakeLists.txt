@@ -27,6 +27,9 @@ foreach(test_source ${TEST_SOURCES})
         target_sources(${test_name} PRIVATE
             ../openjtalk_dictionary_manager.c
         )
+        target_include_directories(${test_name} PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/..
+        )
         target_compile_definitions(${test_name} PRIVATE
             OPENJTALK_DIC_PATH="../share/open_jtalk/dic"
         )

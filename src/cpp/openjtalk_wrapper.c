@@ -3,6 +3,7 @@
 #include <string.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <limits.h>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -18,6 +19,11 @@
 
 #include "openjtalk_dictionary_manager.h"
 // #include "openjtalk_api.h"  // Temporarily disabled - requires OpenJTalk static libs
+
+// Define SIZE_MAX if not available
+#ifndef SIZE_MAX
+#define SIZE_MAX ((size_t)-1)
+#endif
 
 // Constants
 #define OPENJTALK_PATH_MAX 1024
