@@ -106,8 +106,9 @@ if(NOT DEFINED FMT_DIR)
 
   include(ExternalProject)
   # Pass architecture settings to external projects
-  if(APPLE AND CMAKE_OSX_ARCHITECTURES)
-    set(EXTERNAL_CMAKE_ARGS -DCMAKE_OSX_ARCHITECTURES=${CMAKE_OSX_ARCHITECTURES})
+  if(APPLE)
+    # Apple Silicon (arm64) only
+    set(EXTERNAL_CMAKE_ARGS -DCMAKE_OSX_ARCHITECTURES=arm64)
   else()
     set(EXTERNAL_CMAKE_ARGS "")
   endif()
@@ -260,15 +261,10 @@ elseif(NOT DEFINED HTS_ENGINE_DIR)
     else()
       # Use autotools for Unix platforms
       # Set architecture flags for configure scripts
-      if(APPLE AND CMAKE_OSX_ARCHITECTURES)
-        if(CMAKE_OSX_ARCHITECTURES STREQUAL "x86_64")
-          set(CONFIGURE_HOST "--host=x86_64-apple-darwin")
-        elseif(CMAKE_OSX_ARCHITECTURES STREQUAL "arm64")
-          set(CONFIGURE_HOST "--host=aarch64-apple-darwin")
-        else()
-          set(CONFIGURE_HOST "")
-        endif()
-        set(CONFIGURE_ENV "CFLAGS=-arch ${CMAKE_OSX_ARCHITECTURES}" "CXXFLAGS=-arch ${CMAKE_OSX_ARCHITECTURES}" "LDFLAGS=-arch ${CMAKE_OSX_ARCHITECTURES}")
+      if(APPLE)
+        # Apple Silicon (arm64) only
+        set(CONFIGURE_HOST "--host=aarch64-apple-darwin")
+        set(CONFIGURE_ENV "CFLAGS=-arch arm64" "CXXFLAGS=-arch arm64" "LDFLAGS=-arch arm64")
       else()
         set(CONFIGURE_HOST "")
         set(CONFIGURE_ENV "")
@@ -498,7 +494,7 @@ include(CTest)
 enable_testing()
 add_test(
   NAME test_piper
-  COMMAND test_piper "${CMAKE_SOURCE_DIR}/etc/test_voice.onnx" "$<TARGET_FILE_DIR:test_piper>/espeak-ng-data" "${CMAKE_CURRENT_BINARY_DIR}/test.wav"
+  COMMAND test_piper "${CMAKE_SOURCE_DIR}/test/models/test_voice.onnx" "$<TARGET_FILE_DIR:test_piper>/espeak-ng-data" "${CMAKE_CURRENT_BINARY_DIR}/test.wav"
 )
 
 target_compile_features(test_piper PUBLIC cxx_std_17)

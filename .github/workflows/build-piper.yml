@@ -110,22 +110,15 @@ jobs:
           
           # Check if ONNX Runtime is already cached
           if [ ! -f "/usr/local/lib/libonnxruntime.dylib" ]; then
-            echo "Installing ONNX Runtime..."
+            echo "Installing ONNX Runtime for Apple Silicon..."
             sudo mkdir -p /usr/local/lib /usr/local/include
             
-            if [[ $(uname -m) == 'arm64' ]]; then
-              wget https://github.com/microsoft/onnxruntime/releases/download/v1.14.1/onnxruntime-osx-arm64-1.14.1.tgz
-              tar -xzf onnxruntime-osx-arm64-1.14.1.tgz
-              sudo cp -r onnxruntime-osx-arm64-1.14.1/lib/* /usr/local/lib/
-              sudo cp -r onnxruntime-osx-arm64-1.14.1/include/* /usr/local/include/
-              rm -rf onnxruntime-osx-arm64-1.14.1*
-            else
-              wget https://github.com/microsoft/onnxruntime/releases/download/v1.14.1/onnxruntime-osx-x86_64-1.14.1.tgz
-              tar -xzf onnxruntime-osx-x86_64-1.14.1.tgz
-              sudo cp -r onnxruntime-osx-x86_64-1.14.1/lib/* /usr/local/lib/
-              sudo cp -r onnxruntime-osx-x86_64-1.14.1/include/* /usr/local/include/
-              rm -rf onnxruntime-osx-x86_64-1.14.1*
-            fi
+            # Only support arm64 (Apple Silicon)
+            wget https://github.com/microsoft/onnxruntime/releases/download/v1.14.1/onnxruntime-osx-arm64-1.14.1.tgz
+            tar -xzf onnxruntime-osx-arm64-1.14.1.tgz
+            sudo cp -r onnxruntime-osx-arm64-1.14.1/lib/* /usr/local/lib/
+            sudo cp -r onnxruntime-osx-arm64-1.14.1/include/* /usr/local/include/
+            rm -rf onnxruntime-osx-arm64-1.14.1*
           else
             echo "Using cached ONNX Runtime"
           fi
