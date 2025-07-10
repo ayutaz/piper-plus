@@ -31,13 +31,21 @@ Piper is used in a [variety of projects](#people-using-piper).
 * GitHub Actionsによる以下のプラットフォームのビルドおよびバイナリー配布の自動化
 
   * Linux (amd64)
-  * macOS (x64, arm64) - OpenJTalkバイナリを含む
+  * macOS (arm64のみ) - OpenJTalkバイナリを含む ※Apple Silicon専用
   * Windows (x64) - **OpenJTalkバイナリを含む（日本語TTS対応）**
   * 注: Linux ARM64は現在OpenJTalkサポートなし（[#42](https://github.com/ayutaz/piper-plus/issues/42)で対応予定）
   * 注: ARMv7 (32ビット) はサポート終了。Raspberry Pi 3以降はARM64版をご利用ください
 
 ### macOSユーザーへの注意事項
 
+#### Apple Silicon (M1/M2/M3以降) のみサポート
+本プロジェクトではApple Silicon (arm64) のみをサポートしています。Intel Mac (x86_64) のサポートは終了しました。
+
+**Intel Macユーザーの方へ:**
+- Dockerを使用したLinux版の実行を推奨します（[Dockerセットアップガイド](docs/docker-setup.md)参照）
+- または、ソースからのビルドをお試しください
+
+#### セキュリティ警告の対処
 ダウンロードしたバイナリを初めて実行する際、macOSのセキュリティ機能により警告が表示される場合があります。以下のコマンドで検疫属性を削除してください：
 
 ```bash
