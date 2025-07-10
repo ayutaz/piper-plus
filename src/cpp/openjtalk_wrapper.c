@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
+#include <stdint.h>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -22,6 +23,7 @@
 #define OPENJTALK_PATH_MAX 1024
 #define OPENJTALK_BUFFER_SIZE 4096
 #define OPENJTALK_COMMAND_SIZE 4096
+#define OPENJTALK_MAX_INPUT_SIZE (1024 * 1024)  // 1MB limit
 
 // Global variable to store OpenJTalk binary path
 static char g_openjtalk_bin_path[OPENJTALK_PATH_MAX] = {0};
@@ -119,8 +121,8 @@ char* openjtalk_text_to_phonemes(const char* text) {
     
     // Check text length for reasonable bounds
     size_t text_len = strlen(text);
-    if (text_len > 1024 * 1024) { // 1MB limit for safety
-        fprintf(stderr, "Input text too large: %zu bytes (max 1MB)\n", text_len);
+    if (text_len > OPENJTALK_MAX_INPUT_SIZE) {
+        fprintf(stderr, "Input text too large: %zu bytes (max %d bytes)\n", text_len, OPENJTALK_MAX_INPUT_SIZE);
         return NULL;
     }
     
@@ -146,13 +148,14 @@ char* openjtalk_text_to_phonemes(const char* text) {
     
     // Create unique temporary files
     if (GetTempFileName(temp_path, "ojt_in", 0, input_file) == 0) {
-        fprintf(stderr, "Failed to create temp input file\n");
+        fprintf(stderr, "Failed to create temp input file: error %lu\n", GetLastError());
         return NULL;
     }
     
     if (GetTempFileName(temp_path, "ojt_out", 0, output_file) == 0) {
-        fprintf(stderr, "Failed to create temp output file\n");
-        unlink(input_file);
+        fprintf(stderr, "Failed to create temp output file: error %lu\n", GetLastError());
+        // Clean up the input file that was already created
+        DeleteFile(input_file);
         return NULL;
     }
 #else
@@ -347,6 +350,14 @@ char* openjtalk_text_to_phonemes(const char* text) {
                             // Check buffer capacity
                             if (total_phoneme_len + space_needed > phoneme_buffer_size - 1) {
                                 // Reallocate buffer if needed
+                                // Check for potential overflow
+                                if (phoneme_buffer_size > SIZE_MAX / 2) {
+                                    fprintf(stderr, "Buffer size would overflow\n");
+                                    free(phonemes);
+                                    free(file_content);
+                                    unlink(output_file);
+                                    return NULL;
+                                }
                                 size_t new_size = phoneme_buffer_size * 2;
                                 char* new_phonemes = realloc(phonemes, new_size);
                                 if (!new_phonemes) {
@@ -405,8 +416,8 @@ char* openjtalk_text_to_phonemes_api(const char* text) {
     
     // Check text length for reasonable bounds
     size_t text_len = strlen(text);
-    if (text_len > 1024 * 1024) { // 1MB limit for safety
-        fprintf(stderr, "Input text too large: %zu bytes (max 1MB)\n", text_len);
+    if (text_len > OPENJTALK_MAX_INPUT_SIZE) {
+        fprintf(stderr, "Input text too large: %zu bytes (max %d bytes)\n", text_len, OPENJTALK_MAX_INPUT_SIZE);
         return NULL;
     }
     
@@ -466,6 +477,14 @@ char* openjtalk_text_to_phonemes_api(const char* text) {
                     size_t space_needed = (total_phoneme_len > 0 ? 1 : 0) + phoneme_len + 1;
                     if (total_phoneme_len + space_needed > phoneme_buffer_size - 1) {
                         // Reallocate buffer
+                        // Check for potential overflow
+                        if (phoneme_buffer_size > SIZE_MAX / 2) {
+                            fprintf(stderr, "Buffer size would overflow\n");
+                            free(phonemes);
+                            HTS_Label_clear(label);
+                            openjtalk_finalize(oj);
+                            return NULL;
+                        }
                         size_t new_size = phoneme_buffer_size * 2;
                         char* new_phonemes = realloc(phonemes, new_size);
                         if (!new_phonemes) {

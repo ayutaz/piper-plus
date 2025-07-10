@@ -118,3 +118,38 @@ TEST_F(OpenJTalkSecurityTest, ApiBufferReallocation) {
         openjtalk_free_phonemes(result);
     }
 }
+
+// Test NULL input handling
+TEST_F(OpenJTalkSecurityTest, NullInputHandling) {
+    char* result = openjtalk_text_to_phonemes(nullptr);
+    EXPECT_EQ(result, nullptr) << "Should handle NULL input gracefully";
+    
+    result = openjtalk_text_to_phonemes_api(nullptr);
+    EXPECT_EQ(result, nullptr) << "API method should also handle NULL input gracefully";
+}
+
+// Test empty string handling
+TEST_F(OpenJTalkSecurityTest, EmptyStringHandling) {
+    char* result = openjtalk_text_to_phonemes("");
+    EXPECT_EQ(result, nullptr) << "Should handle empty string gracefully";
+    
+    result = openjtalk_text_to_phonemes_api("");
+    EXPECT_EQ(result, nullptr) << "API method should also handle empty string gracefully";
+}
+
+// Test malformed UTF-8 sequences
+TEST_F(OpenJTalkSecurityTest, MalformedUtf8Handling) {
+    // Invalid UTF-8 sequence
+    const char invalid_utf8[] = {0xFF, 0xFE, 0xFD, 0};
+    
+    char* result = openjtalk_text_to_phonemes(invalid_utf8);
+    // Should either handle gracefully or return NULL
+    if (result) {
+        openjtalk_free_phonemes(result);
+    }
+    
+    result = openjtalk_text_to_phonemes_api(invalid_utf8);
+    if (result) {
+        openjtalk_free_phonemes(result);
+    }
+}
