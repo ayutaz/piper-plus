@@ -42,7 +42,14 @@ jobs:
           echo "| Platform | Status |" >> $GITHUB_STEP_SUMMARY
           echo "|----------|--------|" >> $GITHUB_STEP_SUMMARY
           
-          # Add build status for each platform
-          for job in ${{ toJson(needs.build-matrix.result) }}; do
-            echo "| $job | ✅ |" >> $GITHUB_STEP_SUMMARY
-          done
+          # Check if all builds succeeded
+          if [ "${{ needs.build-matrix.result }}" == "success" ]; then
+            echo "| All Platforms | ✅ Success |" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "All platform builds completed successfully! 🎉" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| Build Status | ❌ Failed |" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "One or more platform builds failed." >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
