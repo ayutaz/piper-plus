@@ -5,7 +5,8 @@ This guide explains how to train a Japanese TTS model for Piper using CSS10 data
 ## Features
 
 - Support for unvoiced vowels (無声化母音) represented as uppercase letters (A, I, U, E, O)
-- OpenJTalk-based phonemization
+- 58-phoneme system (expanded from 53) for more accurate Japanese representation
+- OpenJTalk-based phonemization with full-context labels
 - CSS10 Japanese dataset preparation
 - High-quality Japanese TTS model training
 
