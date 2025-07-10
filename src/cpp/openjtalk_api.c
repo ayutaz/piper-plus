@@ -16,6 +16,7 @@
 #include "njd_set_accent_type.h"
 #include "njd_set_long_vowel.h"
 #include "njd_set_unvoiced_vowel.h"
+#include "openjtalk_dictionary_manager.h"
 
 // OpenJTalk wrapper structure
 struct _OpenJTalk {
@@ -45,6 +46,20 @@ OpenJTalk* openjtalk_initialize() {
     
     // Initialize JPCommon
     JPCommon_initialize(&oj->jpcommon);
+    
+    // Load MeCab dictionary
+    const char* dic_path = get_openjtalk_dictionary_path();
+    if (!dic_path) {
+        fprintf(stderr, "Failed to get OpenJTalk dictionary path\n");
+        openjtalk_finalize(oj);
+        return NULL;
+    }
+    
+    if (Mecab_load(&oj->mecab, dic_path) != TRUE) {
+        fprintf(stderr, "Failed to load MeCab dictionary from %s\n", dic_path);
+        openjtalk_finalize(oj);
+        return NULL;
+    }
     
     oj->initialized = 1;
     return oj;

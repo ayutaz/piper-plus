@@ -4,6 +4,7 @@
 set(TEST_SOURCES
     test_phonemize.cpp
     test_piper_core.cpp
+    test_openjtalk_security.cpp
 )
 
 # Add dictionary manager test for Unix platforms
@@ -26,8 +27,26 @@ foreach(test_source ${TEST_SOURCES})
         target_sources(${test_name} PRIVATE
             ../openjtalk_dictionary_manager.c
         )
+        target_include_directories(${test_name} PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/..
+        )
         target_compile_definitions(${test_name} PRIVATE
             OPENJTALK_DIC_PATH="../share/open_jtalk/dic"
+        )
+    endif()
+    
+    # Link additional dependencies for security test
+    if(${test_name} STREQUAL "test_openjtalk_security")
+        target_sources(${test_name} PRIVATE
+            ../openjtalk_wrapper.c
+            ../openjtalk_dictionary_manager.c
+            # ../openjtalk_api.c  # Temporarily disabled - requires OpenJTalk static libs
+        )
+        target_include_directories(${test_name} PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/..
+        )
+        target_link_libraries(${test_name}
+            ${CMAKE_THREAD_LIBS_INIT}
         )
     endif()
 
