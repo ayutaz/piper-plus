@@ -1,0 +1,55 @@
+name: Build All Platforms
+
+on:
+  pull_request:
+    branches: [master, dev]
+  push:
+    branches: [dev, fix/*, feat/*]
+  workflow_dispatch:
+
+jobs:
+  build-matrix:
+    name: Build Matrix
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            name: Linux-x86_64
+            artifact: piper-linux-x86_64
+          - os: macos-latest  
+            name: macOS-aarch64
+            artifact: piper-macos-aarch64
+          - os: windows-latest
+            name: Windows-x64
+            artifact: piper-windows-x64
+    
+    uses: ./.github/workflows/build-piper.yml
+    with:
+      os: ${{ matrix.os }}
+      build-type: Release
+      artifact-name: ${{ matrix.artifact }}-${{ github.sha }}
+
+  build-summary:
+    name: Build Summary
+    needs: build-matrix
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+      - name: Check build results
+        run: |
+          echo "## Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "| Platform | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|--------|" >> $GITHUB_STEP_SUMMARY
+          
+          # Check if all builds succeeded
+          if [ "${{ needs.build-matrix.result }}" == "success" ]; then
+            echo "| All Platforms | ✅ Success |" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "All platform builds completed successfully! 🎉" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| Build Status | ❌ Failed |" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "One or more platform builds failed." >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
