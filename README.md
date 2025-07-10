@@ -6,6 +6,9 @@ Piper is used in a [variety of projects](#people-using-piper).
 ## 目次
 - [追加機能](#追加機能)
 - [関連記事](#関連記事)
+- [プラットフォームサポート](#プラットフォームサポート)
+  - [対応プラットフォーム](#対応プラットフォーム)
+  - [⚠️ 重要: macOSユーザーへのお知らせ](#️-重要-macosユーザーへのお知らせ)
 - [Voices](#voices)
 - [Installation](#installation)
 - [Usage](#usage)
@@ -28,36 +31,7 @@ Piper is used in a [variety of projects](#people-using-piper).
     - `PIPER_AUTO_DOWNLOAD_DICT`: `0`に設定すると自動ダウンロードを無効化
     - `PIPER_OFFLINE_MODE`: `1`に設定するとオフラインモード（ネットワーク接続不要）
   * 既存の日本語モデルは**再学習不要** - 設定ファイルの更新のみで対応可能
-* GitHub Actionsによる以下のプラットフォームのビルドおよびバイナリー配布の自動化
-
-  * Linux (amd64)
-  * macOS (arm64のみ) - OpenJTalkバイナリを含む ※Apple Silicon専用
-  * Windows (x64) - **OpenJTalkバイナリを含む（日本語TTS対応）**
-  * 注: Linux ARM64は現在OpenJTalkサポートなし（[#42](https://github.com/ayutaz/piper-plus/issues/42)で対応予定）
-  * 注: ARMv7 (32ビット) はサポート終了。Raspberry Pi 3以降はARM64版をご利用ください
-
-### macOSユーザーへの注意事項
-
-#### Apple Silicon (M1/M2/M3以降) のみサポート
-本プロジェクトではApple Silicon (arm64) のみをサポートしています。Intel Mac (x86_64) のサポートは終了しました。
-
-**Intel Macユーザーの方へ:**
-- Dockerを使用したLinux版の実行を推奨します（[Dockerセットアップガイド](docs/docker-setup.md)参照）
-- または、ソースからのビルドをお試しください
-
-#### セキュリティ警告の対処
-ダウンロードしたバイナリを初めて実行する際、macOSのセキュリティ機能により警告が表示される場合があります。以下のコマンドで検疫属性を削除してください：
-
-```bash
-# ダウンロードしたファイルを展開後
-xattr -cr piper/
-
-# または特定のバイナリのみ
-xattr -cr piper/bin/piper
-xattr -cr piper/bin/open_jtalk  # 日本語TTSを使用する場合
-```
-
-これにより、Gatekeeperの警告なしに実行できるようになります。
+* GitHub Actionsによる自動ビルドとバイナリー配布（詳細は[プラットフォームサポート](#プラットフォームサポート)を参照）
 * 前処理済み .pt ファイルが破損していても学習時に自動スキップして継続できるように改善
 * DataLoader に `pin_memory=True` を設定し GPU 転送を最適化
 * `preprocess.py` に `--timeout-seconds` を追加し、ハングする発話を自動タイムアウト/スキップ
@@ -82,6 +56,67 @@ echo 'Welcome to the world of speech synthesis!' | \
 Voices are trained with [VITS](https://github.com/jaywalnut310/vits/) and exported to the [onnxruntime](https://onnxruntime.ai/).
 
 [![A library from the Open Home Foundation](https://www.openhomefoundation.org/badges/ohf-library.png)](https://www.openhomefoundation.org/)
+
+## プラットフォームサポート
+
+### 対応プラットフォーム
+
+| プラットフォーム | アーキテクチャ | OpenJTalk対応 | 備考 |
+|-----------------|---------------|--------------|------|
+| Linux | x86_64 (amd64) | ✅ | フルサポート |
+| Linux | ARM64 | ❌ | 基本機能のみ ([#42](https://github.com/ayutaz/piper-plus/issues/42)) |
+| macOS | **ARM64 (Apple Silicon)のみ** | ✅ | M1/M2/M3以降のMac専用 |
+| Windows | x64 | ✅ | フルサポート |
+
+### ⚠️ 重要: macOSユーザーへのお知らせ
+
+**2024年より、macOSではApple Silicon (M1/M2/M3以降) のみをサポートしています。**
+
+#### Intel Macをお使いの方へ
+Intel Mac (x86_64) のサポートは終了しました。以下の代替方法をご利用ください：
+
+1. **Dockerを使用（推奨）**
+   ```bash
+   # Dockerイメージをプル
+   docker pull ghcr.io/ayutaz/piper-plus:latest
+   
+   # 実行例
+   docker run --rm -v $(pwd):/data ghcr.io/ayutaz/piper-plus:latest \
+     echo "Hello from Docker" | piper --model /data/model.onnx --output_file /data/output.wav
+   ```
+
+2. **ソースからビルド**
+   ```bash
+   # 依存関係をインストール
+   brew install cmake onnxruntime
+   
+   # ビルド
+   git clone https://github.com/ayutaz/piper-plus.git
+   cd piper-plus
+   mkdir build && cd build
+   cmake .. -DCMAKE_BUILD_TYPE=Release
+   make -j$(sysctl -n hw.ncpu)
+   ```
+
+3. **仮想マシンでLinux版を使用**
+   - UTM、Parallels Desktop、VMware Fusionなどを使用
+
+#### Apple Siliconユーザーの方へ
+通常通りダウンロードしてご利用いただけます。初回実行時のセキュリティ警告については、以下をご参照ください。
+
+##### macOSセキュリティ警告の対処
+ダウンロードしたバイナリを初めて実行する際、macOSのセキュリティ機能により警告が表示される場合があります。以下のコマンドで検疫属性を削除してください：
+
+```bash
+# ダウンロードしたファイルを展開後
+xattr -cr piper/
+
+# または特定のバイナリのみ
+xattr -cr piper/bin/piper
+xattr -cr piper/bin/open_jtalk  # 日本語TTSを使用する場合
+```
+
+これにより、Gatekeeperの警告なしに実行できるようになります。
 
 ## Voices
 
