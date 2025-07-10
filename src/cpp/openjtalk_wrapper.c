@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdbool.h>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -110,13 +109,13 @@ static const char* find_openjtalk_binary() {
 }
 
 // Check if OpenJTalk binary is available
-bool openjtalk_is_available() {
-    return find_openjtalk_binary() != NULL;
+int openjtalk_is_available() {
+    return find_openjtalk_binary() != NULL ? 1 : 0;
 }
 
 // Ensure OpenJTalk dictionary is available
-bool openjtalk_ensure_dictionary() {
-    return ensure_openjtalk_dictionary() == 0;
+int openjtalk_ensure_dictionary() {
+    return ensure_openjtalk_dictionary() == 0 ? 1 : 0;
 }
 
 // Convert text to phonemes using OpenJTalk
@@ -213,7 +212,7 @@ char* openjtalk_text_to_phonemes(const char* text) {
     }
     
     // Check if we're using the phonemizer binary (doesn't need HTS voice)
-    bool is_phonemizer = strstr(openjtalk_bin, "phonemizer") != NULL;
+    int is_phonemizer = strstr(openjtalk_bin, "phonemizer") != NULL ? 1 : 0;
     
     // Construct OpenJTalk command
     char command[OPENJTALK_COMMAND_SIZE];

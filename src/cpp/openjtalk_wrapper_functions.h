@@ -5,13 +5,11 @@
 extern "C" {
 #endif
 
-#include <stdbool.h>
-
 // Check if OpenJTalk binary is available
-bool openjtalk_is_available();
+int openjtalk_is_available();
 
 // Ensure OpenJTalk dictionary is available
-bool openjtalk_ensure_dictionary();
+int openjtalk_ensure_dictionary();
 
 // Convert text to phonemes using OpenJTalk (external binary)
 char* openjtalk_text_to_phonemes(const char* text);
