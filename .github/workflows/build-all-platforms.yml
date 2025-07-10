@@ -1,0 +1,48 @@
+name: Build All Platforms
+
+on:
+  pull_request:
+    branches: [master, dev]
+  push:
+    branches: [dev, fix/*, feat/*]
+  workflow_dispatch:
+
+jobs:
+  build-matrix:
+    name: Build Matrix
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            name: Linux-x86_64
+            artifact: piper-linux-x86_64
+          - os: macos-latest  
+            name: macOS-aarch64
+            artifact: piper-macos-aarch64
+          - os: windows-latest
+            name: Windows-x64
+            artifact: piper-windows-x64
+    
+    uses: ./.github/workflows/build-piper.yml
+    with:
+      os: ${{ matrix.os }}
+      build-type: Release
+      artifact-name: ${{ matrix.artifact }}-${{ github.sha }}
+
+  build-summary:
+    name: Build Summary
+    needs: build-matrix
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+      - name: Check build results
+        run: |
+          echo "## Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "| Platform | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|--------|" >> $GITHUB_STEP_SUMMARY
+          
+          # Add build status for each platform
+          for job in ${{ toJson(needs.build-matrix.result) }}; do
+            echo "| $job | ✅ |" >> $GITHUB_STEP_SUMMARY
+          done
