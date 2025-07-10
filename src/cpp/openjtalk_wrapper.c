@@ -16,6 +16,7 @@
 #endif
 
 #include "openjtalk_dictionary_manager.h"
+#include "openjtalk_api.h"
 
 // Constants
 #define OPENJTALK_PATH_MAX 1024
@@ -116,6 +117,13 @@ char* openjtalk_text_to_phonemes(const char* text) {
         return NULL;
     }
     
+    // Check text length for reasonable bounds
+    size_t text_len = strlen(text);
+    if (text_len > 1024 * 1024) { // 1MB limit for safety
+        fprintf(stderr, "Input text too large: %zu bytes (max 1MB)\n", text_len);
+        return NULL;
+    }
+    
     // Get dictionary path
     const char* dic_path = get_openjtalk_dictionary_path();
     if (!dic_path) {
@@ -128,13 +136,25 @@ char* openjtalk_text_to_phonemes(const char* text) {
     char output_file[256];
     
 #ifdef _WIN32
-    // Windows doesn't have mkstemp, use tmpnam
-    char* temp_dir = getenv("TEMP");
-    if (!temp_dir) temp_dir = getenv("TMP");
-    if (!temp_dir) temp_dir = ".";
+    // Use GetTempFileName for secure temporary file creation
+    char temp_path[MAX_PATH];
+    DWORD path_len = GetTempPath(MAX_PATH, temp_path);
+    if (path_len == 0 || path_len > MAX_PATH) {
+        fprintf(stderr, "Failed to get temp path\n");
+        return NULL;
+    }
     
-    sprintf(input_file, "%s\\openjtalk_input_%d.txt", temp_dir, GetCurrentProcessId());
-    sprintf(output_file, "%s\\openjtalk_output_%d.txt", temp_dir, GetCurrentProcessId());
+    // Create unique temporary files
+    if (GetTempFileName(temp_path, "ojt_in", 0, input_file) == 0) {
+        fprintf(stderr, "Failed to create temp input file\n");
+        return NULL;
+    }
+    
+    if (GetTempFileName(temp_path, "ojt_out", 0, output_file) == 0) {
+        fprintf(stderr, "Failed to create temp output file\n");
+        unlink(input_file);
+        return NULL;
+    }
 #else
     strcpy(input_file, "/tmp/openjtalk_input_XXXXXX");
     strcpy(output_file, "/tmp/openjtalk_output_XXXXXX");
@@ -152,6 +172,19 @@ char* openjtalk_text_to_phonemes(const char* text) {
 #endif
     
     // Write input text to file
+#ifdef _WIN32
+    // Use binary mode and UTF-8 BOM for Windows
+    FILE* fp = fopen(input_file, "wb");
+    if (!fp) {
+        unlink(input_file);
+        unlink(output_file);
+        return NULL;
+    }
+    // Write UTF-8 BOM for better compatibility
+    const unsigned char utf8_bom[] = {0xEF, 0xBB, 0xBF};
+    fwrite(utf8_bom, 1, 3, fp);
+    fwrite(text, 1, strlen(text), fp);
+#else
     FILE* fp = fopen(input_file, "w");
     if (!fp) {
         unlink(input_file);
@@ -159,6 +192,7 @@ char* openjtalk_text_to_phonemes(const char* text) {
         return NULL;
     }
     fprintf(fp, "%s", text);
+#endif
     fclose(fp);
     
     // Get OpenJTalk binary path
@@ -256,8 +290,10 @@ char* openjtalk_text_to_phonemes(const char* text) {
     file_content[read_size] = '\0';
     fclose(fp);
     
-    // Allocate buffer for phonemes
-    char* phonemes = malloc(OPENJTALK_BUFFER_SIZE);
+    // Allocate buffer for phonemes based on file size
+    // Phonemes are typically shorter than full-context labels, but allocate generously
+    size_t phoneme_buffer_size = file_size > OPENJTALK_BUFFER_SIZE ? file_size : OPENJTALK_BUFFER_SIZE;
+    char* phonemes = malloc(phoneme_buffer_size);
     if (!phonemes) {
         free(file_content);
         unlink(output_file);
@@ -265,6 +301,7 @@ char* openjtalk_text_to_phonemes(const char* text) {
     }
     
     phonemes[0] = '\0';
+    size_t total_phoneme_len = 0;
     
     // Parse full-context labels from open_jtalk_phonemizer output
     char* line = strtok(file_content, "\n");
@@ -304,10 +341,33 @@ char* openjtalk_text_to_phonemes(const char* text) {
                             
                             // Add phoneme with space separator
                             // All phonemes including sil and pau are passed through
-                            if (strlen(phonemes) > 0) {
-                                strcat(phonemes, " ");
+                            size_t phoneme_str_len = strlen(phoneme);
+                            size_t space_needed = (total_phoneme_len > 0 ? 1 : 0) + phoneme_str_len + 1;
+                            
+                            // Check buffer capacity
+                            if (total_phoneme_len + space_needed > phoneme_buffer_size - 1) {
+                                // Reallocate buffer if needed
+                                size_t new_size = phoneme_buffer_size * 2;
+                                char* new_phonemes = realloc(phonemes, new_size);
+                                if (!new_phonemes) {
+                                    free(phonemes);
+                                    free(file_content);
+                                    unlink(output_file);
+                                    return NULL;
+                                }
+                                phonemes = new_phonemes;
+                                phoneme_buffer_size = new_size;
                             }
-                            strcat(phonemes, phoneme);
+                            
+                            // Add space if not first phoneme
+                            if (total_phoneme_len > 0) {
+                                phonemes[total_phoneme_len++] = ' ';
+                            }
+                            
+                            // Copy phoneme
+                            memcpy(phonemes + total_phoneme_len, phoneme, phoneme_str_len);
+                            total_phoneme_len += phoneme_str_len;
+                            phonemes[total_phoneme_len] = '\0';
                         }
                     }
                 }
@@ -335,4 +395,111 @@ void openjtalk_free_phonemes(char* phonemes) {
     if (phonemes) {
         free(phonemes);
     }
+}
+
+// Convert text to phonemes using OpenJTalk internal API (more efficient)
+char* openjtalk_text_to_phonemes_api(const char* text) {
+    if (!text || strlen(text) == 0) {
+        return NULL;
+    }
+    
+    // Check text length for reasonable bounds
+    size_t text_len = strlen(text);
+    if (text_len > 1024 * 1024) { // 1MB limit for safety
+        fprintf(stderr, "Input text too large: %zu bytes (max 1MB)\n", text_len);
+        return NULL;
+    }
+    
+    // Ensure dictionary is available
+    if (!openjtalk_ensure_dictionary()) {
+        fprintf(stderr, "Failed to ensure OpenJTalk dictionary\n");
+        return NULL;
+    }
+    
+    // Initialize OpenJTalk
+    OpenJTalk* oj = openjtalk_initialize();
+    if (!oj) {
+        fprintf(stderr, "Failed to initialize OpenJTalk\n");
+        return NULL;
+    }
+    
+    // Extract full context labels
+    HTS_Label* label = openjtalk_extract_fullcontext(oj, text);
+    if (!label) {
+        fprintf(stderr, "Failed to extract full context\n");
+        openjtalk_finalize(oj);
+        return NULL;
+    }
+    
+    // Allocate initial buffer for phonemes
+    size_t phoneme_buffer_size = OPENJTALK_BUFFER_SIZE;
+    char* phonemes = malloc(phoneme_buffer_size);
+    if (!phonemes) {
+        HTS_Label_clear(label);
+        openjtalk_finalize(oj);
+        return NULL;
+    }
+    
+    phonemes[0] = '\0';
+    size_t total_phoneme_len = 0;
+    
+    // Extract phonemes from labels
+    size_t label_size = HTS_Label_get_size(label);
+    for (size_t i = 0; i < label_size; i++) {
+        const char* label_str = HTS_Label_get_string(label, i);
+        if (!label_str) continue;
+        
+        // Skip silence at beginning and end
+        if (i == 0 || i == label_size - 1) {
+            if (strstr(label_str, "-sil+")) continue;
+        }
+        
+        // Extract phoneme from full-context label
+        // Format: xx^xx-phoneme+xx=xx/A:...
+        const char* minus_pos = strchr(label_str, '-');
+        if (minus_pos) {
+            const char* plus_pos = strchr(minus_pos + 1, '+');
+            if (plus_pos && plus_pos > minus_pos + 1) {
+                size_t phoneme_len = plus_pos - minus_pos - 1;
+                if (phoneme_len > 0 && phoneme_len < 32) {
+                    // Check buffer capacity
+                    size_t space_needed = (total_phoneme_len > 0 ? 1 : 0) + phoneme_len + 1;
+                    if (total_phoneme_len + space_needed > phoneme_buffer_size - 1) {
+                        // Reallocate buffer
+                        size_t new_size = phoneme_buffer_size * 2;
+                        char* new_phonemes = realloc(phonemes, new_size);
+                        if (!new_phonemes) {
+                            free(phonemes);
+                            HTS_Label_clear(label);
+                            openjtalk_finalize(oj);
+                            return NULL;
+                        }
+                        phonemes = new_phonemes;
+                        phoneme_buffer_size = new_size;
+                    }
+                    
+                    // Add space if not first phoneme
+                    if (total_phoneme_len > 0) {
+                        phonemes[total_phoneme_len++] = ' ';
+                    }
+                    
+                    // Copy phoneme
+                    memcpy(phonemes + total_phoneme_len, minus_pos + 1, phoneme_len);
+                    total_phoneme_len += phoneme_len;
+                    phonemes[total_phoneme_len] = '\0';
+                }
+            }
+        }
+    }
+    
+    // Clean up
+    HTS_Label_clear(label);
+    openjtalk_finalize(oj);
+    
+    if (total_phoneme_len == 0) {
+        free(phonemes);
+        return NULL;
+    }
+    
+    return phonemes;
 }
