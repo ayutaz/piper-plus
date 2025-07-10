@@ -49,15 +49,10 @@ void phonemize_openjtalk(const std::string &text, std::vector<std::vector<Phonem
     }
     
     // Get phonemes from OpenJTalk
-    // Try API method first (more efficient), fall back to binary if needed
-    char* phoneme_str = openjtalk_text_to_phonemes_api(text.c_str());
+    char* phoneme_str = openjtalk_text_to_phonemes(text.c_str());
     if (!phoneme_str) {
-        spdlog::debug("API method failed, trying binary method");
-        phoneme_str = openjtalk_text_to_phonemes(text.c_str());
-        if (!phoneme_str) {
-            spdlog::error("OpenJTalk failed to convert text to phonemes");
-            return;
-        }
+        spdlog::error("OpenJTalk failed to convert text to phonemes");
+        return;
     }
     
     // Parse phoneme string

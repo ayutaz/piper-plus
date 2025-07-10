@@ -17,7 +17,8 @@ bool openjtalk_ensure_dictionary();
 char* openjtalk_text_to_phonemes(const char* text);
 
 // Convert text to phonemes using OpenJTalk internal API (more efficient)
-char* openjtalk_text_to_phonemes_api(const char* text);
+// TEMPORARILY DISABLED - requires OpenJTalk static libs
+// char* openjtalk_text_to_phonemes_api(const char* text);
 
 // Free phoneme string
 void openjtalk_free_phonemes(char* phonemes);

@@ -17,7 +17,7 @@
 #endif
 
 #include "openjtalk_dictionary_manager.h"
-#include "openjtalk_api.h"
+// #include "openjtalk_api.h"  // Temporarily disabled - requires OpenJTalk static libs
 
 // Constants
 #define OPENJTALK_PATH_MAX 1024
@@ -409,6 +409,8 @@ void openjtalk_free_phonemes(char* phonemes) {
 }
 
 // Convert text to phonemes using OpenJTalk internal API (more efficient)
+// TEMPORARILY DISABLED - requires OpenJTalk static libs
+/*
 char* openjtalk_text_to_phonemes_api(const char* text) {
     if (!text || strlen(text) == 0) {
         return NULL;
@@ -522,3 +524,4 @@ char* openjtalk_text_to_phonemes_api(const char* text) {
     
     return phonemes;
 }
+*/

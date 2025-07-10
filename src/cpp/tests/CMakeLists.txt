@@ -37,7 +37,7 @@ foreach(test_source ${TEST_SOURCES})
         target_sources(${test_name} PRIVATE
             ../openjtalk_wrapper.c
             ../openjtalk_dictionary_manager.c
-            ../openjtalk_api.c
+            # ../openjtalk_api.c  # Temporarily disabled - requires OpenJTalk static libs
         )
         target_link_libraries(${test_name}
             ${CMAKE_THREAD_LIBS_INIT}
