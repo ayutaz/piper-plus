@@ -494,7 +494,7 @@ include(CTest)
 enable_testing()
 add_test(
   NAME test_piper
-  COMMAND test_piper "${CMAKE_SOURCE_DIR}/etc/test_voice.onnx" "$<TARGET_FILE_DIR:test_piper>/espeak-ng-data" "${CMAKE_CURRENT_BINARY_DIR}/test.wav"
+  COMMAND test_piper "${CMAKE_SOURCE_DIR}/test/models/test_voice.onnx" "$<TARGET_FILE_DIR:test_piper>/espeak-ng-data" "${CMAKE_CURRENT_BINARY_DIR}/test.wav"
 )
 
 target_compile_features(test_piper PUBLIC cxx_std_17)

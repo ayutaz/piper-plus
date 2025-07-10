@@ -8,6 +8,9 @@ tmp/
 *.egg-info/
 build
 htmlcov
+# Python package build artifacts
+src/python_run/build/
+src/python_run/dist/
 
 /data/
 /build/
