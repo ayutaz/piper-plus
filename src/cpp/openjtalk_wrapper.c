@@ -155,7 +155,7 @@ char* openjtalk_text_to_phonemes(const char* text) {
     if (GetTempFileName(temp_path, "ojt_out", 0, output_file) == 0) {
         fprintf(stderr, "Failed to create temp output file: error %lu\n", GetLastError());
         // Clean up the input file that was already created
-        DeleteFile(input_file);
+        unlink(input_file);
         return NULL;
     }
 #else
