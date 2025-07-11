@@ -450,9 +450,9 @@ static OpenJTalkError create_temp_files(char* input_file, char* output_file, siz
     
 #ifdef _WIN32
     // Use GetTempFileName for secure temporary file creation
-    char temp_path[MAX_PATH];
-    DWORD path_len = GetTempPath(MAX_PATH, temp_path);
-    if (path_len == 0 || path_len > MAX_PATH) {
+    char temp_path[OPENJTALK_MAX_PATH];
+    DWORD path_len = GetTempPath(OPENJTALK_MAX_PATH, temp_path);
+    if (path_len == 0 || path_len > OPENJTALK_MAX_PATH) {
         return OPENJTALK_ERROR_TEMP_FILE;
     }
     

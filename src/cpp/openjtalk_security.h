@@ -1,6 +1,8 @@
 #ifndef OPENJTALK_SECURITY_H
 #define OPENJTALK_SECURITY_H
 
+#include <stddef.h>  // for size_t
+
 #ifdef __cplusplus
 extern "C" {
 #endif
