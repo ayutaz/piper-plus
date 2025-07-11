@@ -32,6 +32,18 @@ on:
           - basic
           - comprehensive
           - performance
+  workflow_call:
+    inputs:
+      languages:
+        description: 'Languages to test (comma-separated, e.g., en_US,de_DE,fr_FR)'
+        required: false
+        default: 'en_US,de_DE,fr_FR,es_ES,zh_CN'
+        type: string
+      test_type:
+        description: 'Test type'
+        required: false
+        default: 'basic'
+        type: string
 
 env:
   # HuggingFace model repository

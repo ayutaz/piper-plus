@@ -16,6 +16,7 @@ on:
       - '.github/workflows/test-japanese-tts.yml'
       - '.github/workflows/build-piper.yml'
   workflow_dispatch:
+  workflow_call:
 
 jobs:
   # Build piper for all platforms

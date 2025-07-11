@@ -1,0 +1,235 @@
+name: selective-test
+
+on:
+  workflow_call:
+    inputs:
+      full_test:
+        description: 'Run full test suite regardless of changes'
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  analyze_changes:
+    name: Analyze Changes
+    runs-on: ubuntu-latest
+    outputs:
+      should_test_cpp: ${{ steps.analyze.outputs.cpp }}
+      should_test_python: ${{ steps.analyze.outputs.python }}
+      should_test_workflows: ${{ steps.analyze.outputs.workflows }}
+      should_test_all: ${{ steps.analyze.outputs.all }}
+      test_platforms: ${{ steps.analyze.outputs.platforms }}
+    steps:
+      - uses: actions/checkout@v4.2.2
+        with:
+          fetch-depth: 0
+
+      - name: Analyze changed files
+        id: analyze
+        run: |
+          # Get changed files
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            CHANGED_FILES=$(git diff --name-only origin/${{ github.base_ref }}...HEAD)
+          else
+            CHANGED_FILES=$(git diff --name-only HEAD~1...HEAD)
+          fi
+          
+          echo "Changed files:"
+          echo "$CHANGED_FILES"
+          echo ""
+          
+          # Initialize flags
+          TEST_CPP=false
+          TEST_PYTHON=false
+          TEST_WORKFLOWS=false
+          TEST_ALL=false
+          
+          # Check for force full test
+          if [ "${{ inputs.full_test }}" = "true" ]; then
+            TEST_ALL=true
+          fi
+          
+          # Analyze changes
+          while IFS= read -r file; do
+            case "$file" in
+              *.cpp|*.hpp|*.c|*.h|CMakeLists.txt|*.cmake)
+                TEST_CPP=true
+                ;;
+              *.py|pyproject.toml|setup.py|requirements*.txt)
+                TEST_PYTHON=true
+                ;;
+              .github/workflows/*|.github/actions/*)
+                TEST_WORKFLOWS=true
+                ;;
+              Makefile|Dockerfile*)
+                TEST_ALL=true
+                ;;
+            esac
+          done <<< "$CHANGED_FILES"
+          
+          # Determine which platforms to test
+          if [ "$TEST_ALL" = "true" ] || [ "$TEST_CPP" = "true" ]; then
+            # Test all platforms for C++ changes
+            PLATFORMS='["ubuntu-22.04", "macos-13", "windows-2019"]'
+          elif [ "$TEST_PYTHON" = "true" ]; then
+            # Test only Linux for Python-only changes
+            PLATFORMS='["ubuntu-22.04"]'
+          else
+            # Minimal testing
+            PLATFORMS='["ubuntu-22.04"]'
+          fi
+          
+          # Output results
+          echo "cpp=$TEST_CPP" >> $GITHUB_OUTPUT
+          echo "python=$TEST_PYTHON" >> $GITHUB_OUTPUT
+          echo "workflows=$TEST_WORKFLOWS" >> $GITHUB_OUTPUT
+          echo "all=$TEST_ALL" >> $GITHUB_OUTPUT
+          echo "platforms=$PLATFORMS" >> $GITHUB_OUTPUT
+          
+          # Summary
+          echo "## Test Selection Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- C++ tests needed: $TEST_CPP" >> $GITHUB_STEP_SUMMARY
+          echo "- Python tests needed: $TEST_PYTHON" >> $GITHUB_STEP_SUMMARY
+          echo "- Workflow tests needed: $TEST_WORKFLOWS" >> $GITHUB_STEP_SUMMARY
+          echo "- Full test suite: $TEST_ALL" >> $GITHUB_STEP_SUMMARY
+          echo "- Test platforms: $PLATFORMS" >> $GITHUB_STEP_SUMMARY
+
+  quick_smoke_test:
+    name: Quick Smoke Test
+    needs: analyze_changes
+    if: needs.analyze_changes.outputs.should_test_all != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4.2.2
+        with:
+          submodules: true
+
+      - name: Quick build check
+        run: |
+          # Just verify the project builds
+          mkdir -p build
+          cd build
+          cmake ..
+          make -j$(nproc) piper
+          
+          # Basic version check
+          ./piper --version
+
+  platform_tests:
+    name: Platform Tests
+    needs: analyze_changes
+    if: needs.analyze_changes.outputs.should_test_cpp == 'true' || needs.analyze_changes.outputs.should_test_all == 'true'
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: ${{ fromJson(needs.analyze_changes.outputs.test_platforms) }}
+      fail-fast: false
+    steps:
+      - uses: actions/checkout@v4.2.2
+        with:
+          submodules: true
+
+      - name: Use cached build if available
+        uses: actions/cache@v4
+        id: build-cache
+        with:
+          path: |
+            build/
+            dist/
+          key: build-${{ runner.os }}-${{ hashFiles('**/*.cpp', '**/*.hpp', '**/CMakeLists.txt') }}
+
+      - name: Build if needed
+        if: steps.build-cache.outputs.cache-hit != 'true'
+        run: |
+          if [[ "${{ runner.os }}" == "Windows" ]]; then
+            cmake -B build -G "Visual Studio 16 2019" -A x64
+            cmake --build build --config Release
+          else
+            cmake -B build -DCMAKE_BUILD_TYPE=Release
+            cmake --build build -j$(nproc 2>/dev/null || sysctl -n hw.ncpu)
+          fi
+
+      - name: Run minimal tests
+        run: |
+          if [[ "${{ runner.os }}" == "Windows" ]]; then
+            ./build/Release/piper.exe --version
+          else
+            ./build/piper --version
+          fi
+
+  python_tests:
+    name: Python Tests
+    needs: analyze_changes
+    if: needs.analyze_changes.outputs.should_test_python == 'true' || needs.analyze_changes.outputs.should_test_all == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.9', '3.11', '3.13']
+    steps:
+      - uses: actions/checkout@v4.2.2
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Run Python linting
+        run: |
+          pip install ruff
+          ruff check .
+          ruff format --check .
+
+  workflow_tests:
+    name: Workflow Tests
+    needs: analyze_changes
+    if: needs.analyze_changes.outputs.should_test_workflows == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4.2.2
+
+      - name: Validate workflow files
+        run: |
+          # Install workflow parser
+          npm install -g @actions/workflow-parser
+          
+          # Validate all workflow files
+          for workflow in .github/workflows/*.yml; do
+            echo "Validating $workflow..."
+            npx workflow-parser "$workflow" || exit 1
+          done
+          
+          echo "✅ All workflow files are valid"
+
+  test_summary:
+    name: Test Summary
+    runs-on: ubuntu-latest
+    needs: [analyze_changes, quick_smoke_test, platform_tests, python_tests, workflow_tests]
+    if: always()
+    steps:
+      - name: Summary
+        run: |
+          echo "## 📊 Selective Test Results"
+          echo ""
+          echo "### Changed Components"
+          echo "- C++ code: ${{ needs.analyze_changes.outputs.should_test_cpp }}"
+          echo "- Python code: ${{ needs.analyze_changes.outputs.should_test_python }}"
+          echo "- Workflows: ${{ needs.analyze_changes.outputs.should_test_workflows }}"
+          echo ""
+          echo "### Test Results"
+          echo "- Quick smoke test: ${{ needs.quick_smoke_test.result || 'skipped' }}"
+          echo "- Platform tests: ${{ needs.platform_tests.result || 'skipped' }}"
+          echo "- Python tests: ${{ needs.python_tests.result || 'skipped' }}"
+          echo "- Workflow tests: ${{ needs.workflow_tests.result || 'skipped' }}"
+          
+          # Fail if any required test failed
+          if [ "${{ needs.quick_smoke_test.result }}" = "failure" ] || \
+             [ "${{ needs.platform_tests.result }}" = "failure" ] || \
+             [ "${{ needs.python_tests.result }}" = "failure" ] || \
+             [ "${{ needs.workflow_tests.result }}" = "failure" ]; then
+            echo ""
+            echo "❌ Some tests failed"
+            exit 1
+          else
+            echo ""
+            echo "✅ All required tests passed"
+          fi

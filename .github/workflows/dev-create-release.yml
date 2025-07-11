@@ -1,0 +1,197 @@
+name: dev-create-release
+
+on:
+  push:
+    branches:
+      - dev
+      - fix/*
+      - feat/*
+  workflow_dispatch:
+    inputs:
+      release_name:
+        description: 'リリース名（未指定の場合は日付ベースで自動生成）'
+        required: false
+        type: string
+      release_description:
+        description: 'リリース説明（未指定の場合は自動生成）'
+        required: false
+        type: string
+      use_new_workflow:
+        description: 'Use new workflow (for testing)'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  packages: read
+
+jobs:
+  # Create Release
+  create_release:
+    name: Create Development Release
+    runs-on: ubuntu-latest
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+      release_name: ${{ steps.get_release_name.outputs.name }}
+      tag_name: ${{ steps.get_release_name.outputs.tag_name }}
+    steps:
+      - uses: actions/checkout@v4.2.2
+        with:
+          fetch-depth: 0
+
+      - name: Generate release name
+        id: get_release_name
+        run: |
+          if [ -n "${{ github.event.inputs.release_name }}" ]; then
+            echo "name=${{ github.event.inputs.release_name }}" >> $GITHUB_OUTPUT
+          else
+            TIMESTAMP=$(TZ=Asia/Tokyo date +'%Y%m%d-%H%M%S')
+            echo "name=Dev Release ${TIMESTAMP}" >> $GITHUB_OUTPUT
+          fi
+          
+          TAG_NAME="dev-$(date -u +'%Y%m%d-%H%M%S')"
+          echo "tag_name=${TAG_NAME}" >> $GITHUB_OUTPUT
+
+      - name: Generate release notes
+        id: get_release_notes
+        run: |
+          if [ -n "${{ github.event.inputs.release_description }}" ]; then
+            echo "body<<EOF" >> $GITHUB_OUTPUT
+            echo "${{ github.event.inputs.release_description }}" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          else
+            # Auto-generate release notes
+            echo "body<<EOF" >> $GITHUB_OUTPUT
+            echo "## 🚀 Development Release" >> $GITHUB_OUTPUT
+            echo "" >> $GITHUB_OUTPUT
+            echo "**Build Date:** $(TZ=Asia/Tokyo date +'%Y-%m-%d %H:%M:%S JST')" >> $GITHUB_OUTPUT
+            echo "**Commit:** ${{ github.sha }}" >> $GITHUB_OUTPUT
+            echo "**Branch:** ${{ github.ref_name }}" >> $GITHUB_OUTPUT
+            echo "" >> $GITHUB_OUTPUT
+            
+            # Get recent commits
+            echo "### 📝 Recent Changes" >> $GITHUB_OUTPUT
+            git log --oneline -10 --pretty=format:"- %s (%h)" >> $GITHUB_OUTPUT
+            echo "" >> $GITHUB_OUTPUT
+            
+            echo "### ⚠️ Note" >> $GITHUB_OUTPUT
+            echo "This is a development release and may be unstable." >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create Release
+        id: create_release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Create release using gh CLI
+          RELEASE_URL=$(gh release create "${{ steps.get_release_name.outputs.tag_name }}" \
+            --title "${{ steps.get_release_name.outputs.name }}" \
+            --notes "${{ steps.get_release_notes.outputs.body }}" \
+            --prerelease \
+            --target "${{ github.sha }}")
+          
+          # Extract upload URL from release URL
+          # Release URL format: https://github.com/owner/repo/releases/tag/tagname
+          # We need to get the release ID to construct upload URL
+          RELEASE_ID=$(gh api \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "/repos/${{ github.repository }}/releases/tags/${{ steps.get_release_name.outputs.tag_name }}" \
+            --jq '.id')
+          
+          # Construct upload URL
+          UPLOAD_URL="https://uploads.github.com/repos/${{ github.repository }}/releases/${RELEASE_ID}/assets{?name,label}"
+          
+          echo "upload_url=${UPLOAD_URL}" >> $GITHUB_OUTPUT
+          echo "release_url=${RELEASE_URL}" >> $GITHUB_OUTPUT
+          echo "Created release: ${RELEASE_URL}"
+
+  # Trigger builds
+  build_all:
+    name: Build All Platforms
+    needs: create_release
+    uses: ./.github/workflows/dev-build-all.yml
+    with:
+      release_upload_url: ${{ needs.create_release.outputs.upload_url }}
+      use_new_workflow: ${{ inputs.use_new_workflow }}
+    permissions:
+      contents: write
+      packages: read
+
+  # Run comprehensive test suite
+  run_tests:
+    name: Run Test Suite
+    needs: build_all
+    uses: ./.github/workflows/test-suite.yml
+    with:
+      release_name: ${{ needs.create_release.outputs.release_name }}
+
+  # Publish to PyPI
+  publish_pypi:
+    name: Publish to PyPI
+    needs: [build_all, run_tests]
+    if: github.ref == 'refs/heads/dev' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4.2.2
+
+      - name: Download all wheels
+        uses: actions/download-artifact@v4
+        with:
+          pattern: wheels-*
+          path: dist/
+          merge-multiple: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install twine
+        run: pip install twine
+
+      - name: Check wheels
+        run: |
+          ls -la dist/
+          twine check dist/*.whl
+
+      - name: Publish to PyPI
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+        run: |
+          # Only publish if we have the token
+          if [ -n "$TWINE_PASSWORD" ]; then
+            twine upload --skip-existing dist/*.whl
+          else
+            echo "⚠️ PyPI token not found, skipping upload"
+          fi
+
+  # Final summary
+  release_summary:
+    name: Release Summary
+    runs-on: ubuntu-latest
+    needs: [create_release, build_all, run_tests, publish_pypi]
+    if: always()
+    steps:
+      - name: Summary
+        run: |
+          echo "## 📊 Release Summary"
+          echo ""
+          echo "**Release Name:** ${{ needs.create_release.outputs.release_name }}"
+          echo "**Tag:** ${{ needs.create_release.outputs.tag_name }}"
+          echo ""
+          echo "### Build Status"
+          echo "- Create Release: ${{ needs.create_release.result }}"
+          echo "- Build All: ${{ needs.build_all.result }}"
+          echo "- Test Suite: ${{ needs.run_tests.result }}"
+          echo "- Publish PyPI: ${{ needs.publish_pypi.result }}"
+          echo ""
+          
+          if [ "${{ needs.build_all.result }}" = "success" ]; then
+            echo "✅ All platforms built successfully"
+          else
+            echo "❌ Some builds failed"
+          fi

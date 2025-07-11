@@ -1,0 +1,139 @@
+name: test-suite
+
+on:
+  workflow_call:
+    inputs:
+      release_name:
+        description: 'Release name for context'
+        required: false
+        type: string
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  # Python Linting with Ruff
+  python_lint:
+    name: Python Linting
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.11', '3.12', '3.13']
+    steps:
+      - uses: actions/checkout@v4.2.2
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install Ruff
+        run: pip install ruff
+
+      - name: Run Ruff linting
+        run: |
+          echo "Running Ruff linting for Python ${{ matrix.python-version }}..."
+          ruff check .
+          ruff format --check .
+          echo "✅ Python linting passed"
+
+  # Japanese TTS Test (from existing workflow)
+  test_japanese_tts:
+    name: Test Japanese TTS
+    uses: ./.github/workflows/test-japanese-tts.yml
+
+  # Multilingual TTS Test (from existing workflow)
+  test_multilingual_tts:
+    name: Test Multilingual TTS
+    uses: ./.github/workflows/test-multilingual-tts.yml
+    with:
+      languages: 'en_US,de_DE,fr_FR,es_ES,zh_CN'
+      test_type: 'basic'
+
+  # Performance Benchmarks
+  performance_benchmark:
+    name: Performance Benchmarks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4.2.2
+
+      - name: Setup benchmark environment
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y time bc
+
+      - name: Download Linux build artifact
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: piper-linux-x64
+          path: dist/
+
+      - name: Run performance tests
+        run: |
+          # If no artifact, skip benchmark
+          if [ ! -f "dist/piper-linux-x64.tar.gz" ]; then
+            echo "No build artifact found, skipping benchmark"
+            exit 0
+          fi
+          
+          cd dist
+          tar xzf piper-linux-x64.tar.gz
+          
+          # Create benchmark report
+          echo "# Performance Benchmark Report" > benchmark.md
+          echo "Date: $(date)" >> benchmark.md
+          echo "" >> benchmark.md
+          
+          # Test 1: Startup time
+          echo "## Startup Time" >> benchmark.md
+          START=$(date +%s%N)
+          ./piper/piper --version
+          END=$(date +%s%N)
+          DURATION=$((($END - $START) / 1000000))
+          echo "- Version check: ${DURATION}ms" >> benchmark.md
+          
+          # Test 2: Memory usage (if test model available)
+          if [ -f "../etc/test_voice.onnx" ]; then
+            echo "" >> benchmark.md
+            echo "## Memory Usage" >> benchmark.md
+            echo "Test" | /usr/bin/time -v ./piper/piper --model ../etc/test_voice.onnx --output_file /dev/null 2>&1 | \
+              grep "Maximum resident set size" | \
+              awk '{print "- Peak memory: " $6/1024 " MB"}' >> benchmark.md
+          fi
+          
+          # Upload benchmark results
+          if [ -f benchmark.md ]; then
+            cat benchmark.md >> $GITHUB_STEP_SUMMARY
+          fi
+
+  # Test Summary
+  test_summary:
+    name: Test Suite Summary
+    needs: [python_lint, test_japanese_tts, test_multilingual_tts, performance_benchmark]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate test report
+        run: |
+          echo "## 📊 Test Suite Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "| Test | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Python Linting | ${{ needs.python_lint.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Japanese TTS | ${{ needs.test_japanese_tts.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Multilingual TTS | ${{ needs.test_multilingual_tts.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Performance Benchmark | ${{ needs.performance_benchmark.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Overall status
+          if [ "${{ needs.python_lint.result }}" = "success" ] && \
+             [ "${{ needs.test_japanese_tts.result }}" = "success" ] && \
+             [ "${{ needs.test_multilingual_tts.result }}" = "success" ]; then
+            echo "✅ **All critical tests passed!**" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **Some tests failed**" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
