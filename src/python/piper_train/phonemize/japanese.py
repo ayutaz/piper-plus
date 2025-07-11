@@ -1,5 +1,4 @@
 import re
-from typing import List
 
 import pyopenjtalk
 
@@ -19,7 +18,7 @@ def _is_question(text: str) -> bool:
     return text.strip().endswith("?") or text.strip().endswith("？")
 
 
-def phonemize_japanese(text: str) -> List[str]:
+def phonemize_japanese(text: str) -> list[str]:
     """Convert *text* into a list of phoneme/prosody tokens that Piper can ingest.
 
     The algorithm follows the so-called "Kurihara method" that inserts the
@@ -42,7 +41,7 @@ def phonemize_japanese(text: str) -> List[str]:
     """
 
     labels = pyopenjtalk.extract_fullcontext(text)
-    tokens: List[str] = []
+    tokens: list[str] = []
 
     for idx, label in enumerate(labels):
         m_ph = _RE_PHONEME.search(label)

@@ -1,8 +1,9 @@
 """Piper configuration"""
 
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, Mapping, Sequence
+from typing import Any
 
 
 class PhonemeType(str, Enum):
@@ -38,7 +39,7 @@ class PiperConfig:
     """espeak or text"""
 
     @staticmethod
-    def from_dict(config: Dict[str, Any]) -> "PiperConfig":
+    def from_dict(config: dict[str, Any]) -> "PiperConfig":
         inference = config.get("inference", {})
 
         return PiperConfig(

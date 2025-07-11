@@ -3,8 +3,8 @@ import torch
 
 def feature_loss(fmap_r, fmap_g):
     loss = 0
-    for dr, dg in zip(fmap_r, fmap_g):
-        for rl, gl in zip(dr, dg):
+    for dr, dg in zip(fmap_r, fmap_g, strict=False):
+        for rl, gl in zip(dr, dg, strict=False):
             rl = rl.float().detach()
             gl = gl.float()
             loss += torch.mean(torch.abs(rl - gl))
@@ -16,7 +16,7 @@ def discriminator_loss(disc_real_outputs, disc_generated_outputs):
     loss = 0
     r_losses = []
     g_losses = []
-    for dr, dg in zip(disc_real_outputs, disc_generated_outputs):
+    for dr, dg in zip(disc_real_outputs, disc_generated_outputs, strict=False):
         dr = dr.float()
         dg = dg.float()
         r_loss = torch.mean((1 - dr) ** 2)

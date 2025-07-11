@@ -1,7 +1,6 @@
 """Configuration classes"""
 
 from dataclasses import dataclass, field
-from typing import Optional, Tuple
 
 
 @dataclass
@@ -14,17 +13,17 @@ class MelAudioConfig:
     sample_bytes: int = 2
     channels: int = 1
     mel_fmin: float = 0.0
-    mel_fmax: Optional[float] = None
+    mel_fmax: float | None = None
 
 
 @dataclass
 class ModelAudioConfig:
     resblock: str
-    resblock_kernel_sizes: Tuple[int, ...]
-    resblock_dilation_sizes: Tuple[Tuple[int, ...], ...]
-    upsample_rates: Tuple[int, ...]
+    resblock_kernel_sizes: tuple[int, ...]
+    resblock_dilation_sizes: tuple[tuple[int, ...], ...]
+    upsample_rates: tuple[int, ...]
     upsample_initial_channel: int
-    upsample_kernel_sizes: Tuple[int, ...]
+    upsample_kernel_sizes: tuple[int, ...]
 
     @staticmethod
     def low_quality() -> "ModelAudioConfig":
@@ -86,15 +85,15 @@ class ModelConfig:
         return self.audio.resblock
 
     @property
-    def resblock_kernel_sizes(self) -> Tuple[int, ...]:
+    def resblock_kernel_sizes(self) -> tuple[int, ...]:
         return self.audio.resblock_kernel_sizes
 
     @property
-    def resblock_dilation_sizes(self) -> Tuple[Tuple[int, ...], ...]:
+    def resblock_dilation_sizes(self) -> tuple[tuple[int, ...], ...]:
         return self.audio.resblock_dilation_sizes
 
     @property
-    def upsample_rates(self) -> Tuple[int, ...]:
+    def upsample_rates(self) -> tuple[int, ...]:
         return self.audio.upsample_rates
 
     @property
@@ -102,7 +101,7 @@ class ModelConfig:
         return self.audio.upsample_initial_channel
 
     @property
-    def upsample_kernel_sizes(self) -> Tuple[int, ...]:
+    def upsample_kernel_sizes(self) -> tuple[int, ...]:
         return self.audio.upsample_kernel_sizes
 
     def __post_init__(self):
@@ -113,7 +112,7 @@ class ModelConfig:
 @dataclass
 class TrainingConfig:
     learning_rate: float = 2e-4
-    betas: Tuple[float, float] = field(default=(0.8, 0.99))
+    betas: tuple[float, float] = field(default=(0.8, 0.99))
     eps: float = 1e-9
     # batch_size: int = 32
     fp16_run: bool = False
@@ -122,7 +121,7 @@ class TrainingConfig:
     warmup_epochs: int = 0
     c_mel: int = 45
     c_kl: float = 1.0
-    grad_clip: Optional[float] = None
+    grad_clip: float | None = None
 
 
 # @dataclass

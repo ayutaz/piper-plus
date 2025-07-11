@@ -2,7 +2,6 @@
 import argparse
 import logging
 from pathlib import Path
-from typing import Optional
 
 import torch
 
@@ -76,7 +75,7 @@ def main() -> None:
     )
     sequence_lengths = torch.LongTensor([sequences.size(1)])
 
-    sid: Optional[torch.LongTensor] = None
+    sid: torch.LongTensor | None = None
     if num_speakers > 1:
         sid = torch.LongTensor([0])
 

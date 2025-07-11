@@ -4,7 +4,6 @@ import argparse
 import logging
 import os
 from pathlib import Path
-from typing import Optional
 
 import torch
 from torch import nn
@@ -121,7 +120,7 @@ def export_encoder(args, model_g):
     )
     sequence_lengths = torch.LongTensor([sequences.size(1)])
 
-    sid: Optional[torch.LongTensor] = None
+    sid: torch.LongTensor | None = None
     if num_speakers > 1:
         sid = torch.LongTensor([0])
 

@@ -18,7 +18,6 @@ import tempfile
 import time
 import wave
 from pathlib import Path
-from typing import Dict, Tuple
 
 # Import platform utilities
 from platform_utils import get_platform_name
@@ -113,7 +112,7 @@ class JapaneseTTSTester:
             "\nPlease ensure test models are available in the repository."
         )
 
-    def run_tts(self, text: str, output_file: str) -> Tuple[bool, str, float]:
+    def run_tts(self, text: str, output_file: str) -> tuple[bool, str, float]:
         """Run TTS and return success status, error message, and duration."""
         start_time = time.time()
 
@@ -176,7 +175,7 @@ class JapaneseTTSTester:
         except Exception as e:
             return False, str(e), time.time() - start_time
 
-    def check_wav_file(self, wav_file: str) -> Dict:
+    def check_wav_file(self, wav_file: str) -> dict:
         """Analyze WAV file properties."""
         try:
             with wave.open(wav_file, 'rb') as wav:

@@ -62,7 +62,7 @@ def test_phoneme_mapping():
         print(f"   IDs: {ids}")
 
         # Check for missing mappings
-        missing = [p for p, i in zip(phonemes, ids) if i == -1]
+        missing = [p for p, i in zip(phonemes, ids, strict=False) if i == -1]
         if missing:
             print(f"   WARNING: Missing mappings for: {missing}")
 

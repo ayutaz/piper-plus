@@ -1,5 +1,3 @@
-from typing import Dict, List
-
 from .token_mapper import register
 
 __all__ = ["get_japanese_id_map", "JAPANESE_PHONEMES", "SPECIAL_TOKENS"]
@@ -13,7 +11,7 @@ __all__ = ["get_japanese_id_map", "JAPANESE_PHONEMES", "SPECIAL_TOKENS"]
 # -----------------------------------------------------------------------------
 
 # Prosody / sentence boundary tokens inserted by `phonemize_japanese`
-SPECIAL_TOKENS: List[str] = [
+SPECIAL_TOKENS: list[str] = [
     "_",  # short pause (pau)
     "^",  # BOS
     "$",  # EOS (declarative)
@@ -27,7 +25,7 @@ SPECIAL_TOKENS: List[str] = [
 # Japanese TTS front-ends (Tacotron, VITS, etc.)
 # Long vowels (a:, i:, …) are kept as separate tokens.  Both voiced (lowercase)
 # and unvoiced (uppercase) vowels are preserved for linguistic accuracy.
-JAPANESE_PHONEMES: List[str] = [
+JAPANESE_PHONEMES: list[str] = [
     # voiced vowels
     "a",
     "i",
@@ -88,7 +86,7 @@ JAPANESE_PHONEMES: List[str] = [
 ]
 
 
-def get_japanese_id_map() -> Dict[str, List[int]]:
+def get_japanese_id_map() -> dict[str, list[int]]:
     """Return a mapping {symbol: [id]} suitable for Piper config.
 
     The first token (id=0) is always the pause "_" so that it functions as the
@@ -96,8 +94,8 @@ def get_japanese_id_map() -> Dict[str, List[int]]:
     """
 
     # 各トークンを1文字へ写像
-    symbols: List[str] = [register(s) for s in (SPECIAL_TOKENS + JAPANESE_PHONEMES)]
-    id_map: Dict[str, List[int]] = {}
+    symbols: list[str] = [register(s) for s in (SPECIAL_TOKENS + JAPANESE_PHONEMES)]
+    id_map: dict[str, list[int]] = {}
     for idx, symbol in enumerate(symbols):
         id_map[symbol] = [idx]
     return id_map

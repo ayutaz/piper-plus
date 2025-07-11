@@ -4,7 +4,7 @@ import io
 import logging
 import wave
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 from flask import Flask, request
 
@@ -73,7 +73,7 @@ def main() -> None:
         voices_info = get_voices(args.download_dir, update_voices=args.update_voices)
 
         # Resolve aliases for backwards compatibility with old voice names
-        aliases_info: Dict[str, Any] = {}
+        aliases_info: dict[str, Any] = {}
         for voice_info in voices_info.values():
             for voice_alias in voice_info.get("aliases", []):
                 aliases_info[voice_alias] = {"_is_alias": True, **voice_info}

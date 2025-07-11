@@ -13,7 +13,6 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict, dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Optional
 
 import numpy as np
 
@@ -38,7 +37,7 @@ class Utterance:
     text: str
     duration_sec: float
     speaker: str
-    exclude_reason: Optional[ExcludeReason] = None
+    exclude_reason: ExcludeReason | None = None
     rate: float = 0.0
 
     def __post_init__(self):

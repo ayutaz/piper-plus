@@ -1,8 +1,8 @@
 import json
 import logging
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, List, Optional, Sequence, Union
 
 import torch
 from torch import FloatTensor, LongTensor
@@ -13,11 +13,11 @@ _LOGGER = logging.getLogger("vits.dataset")
 
 @dataclass
 class Utterance:
-    phoneme_ids: List[int]
+    phoneme_ids: list[int]
     audio_norm_path: Path
     audio_spec_path: Path
-    speaker_id: Optional[int] = None
-    text: Optional[str] = None
+    speaker_id: int | None = None
+    text: str | None = None
 
 
 @dataclass
@@ -25,8 +25,8 @@ class UtteranceTensors:
     phoneme_ids: LongTensor
     spectrogram: FloatTensor
     audio_norm: FloatTensor
-    speaker_id: Optional[LongTensor] = None
-    text: Optional[str] = None
+    speaker_id: LongTensor | None = None
+    text: str | None = None
 
     @property
     def spec_length(self) -> int:
@@ -41,7 +41,7 @@ class Batch:
     spectrogram_lengths: LongTensor
     audios: FloatTensor
     audio_lengths: LongTensor
-    speaker_ids: Optional[LongTensor] = None
+    speaker_ids: LongTensor | None = None
 
 
 class PiperDataset(Dataset):
@@ -58,10 +58,10 @@ class PiperDataset(Dataset):
 
     def __init__(
         self,
-        dataset_paths: List[Union[str, Path]],
-        max_phoneme_ids: Optional[int] = None,
+        dataset_paths: list[str | Path],
+        max_phoneme_ids: int | None = None,
     ):
-        self.utterances: List[Utterance] = []
+        self.utterances: list[Utterance] = []
 
         for dataset_path in dataset_paths:
             dataset_path = Path(dataset_path)
@@ -116,7 +116,7 @@ class PiperDataset(Dataset):
     @staticmethod
     def load_dataset(
         dataset_path: Path,
-        max_phoneme_ids: Optional[int] = None,
+        max_phoneme_ids: int | None = None,
     ) -> Iterable[Utterance]:
         num_skipped = 0
 
@@ -205,7 +205,7 @@ class UtteranceCollate:
         spec_lengths = LongTensor(num_utterances)
         audio_lengths = LongTensor(num_utterances)
 
-        speaker_ids: Optional[LongTensor] = None
+        speaker_ids: LongTensor | None = None
         if self.is_multispeaker:
             speaker_ids = LongTensor(num_utterances)
 

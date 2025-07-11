@@ -1,6 +1,6 @@
 from hashlib import sha256
 from pathlib import Path
-from typing import Optional, Tuple, Union
+from typing import Optional, Union
 
 import librosa
 import torch
@@ -19,8 +19,8 @@ def make_silence_detector() -> SileroVoiceActivityDetector:
 
 
 def cache_norm_audio(
-    audio_path: Union[str, Path],
-    cache_dir: Union[str, Path],
+    audio_path: str | Path,
+    cache_dir: str | Path,
     detector: SileroVoiceActivityDetector,
     sample_rate: int,
     silence_threshold: float = 0.2,
@@ -31,7 +31,7 @@ def cache_norm_audio(
     window_length: int = 1024,
     hop_length: int = 256,
     ignore_cache: bool = False,
-) -> Tuple[Path, Path]:
+) -> tuple[Path, Path]:
     audio_path = Path(audio_path).absolute()
     cache_dir = Path(cache_dir)
 
@@ -42,7 +42,7 @@ def cache_norm_audio(
     audio_spec_path = cache_dir / f"{audio_cache_id}.spec.pt"
 
     # Normalize audio
-    audio_norm_tensor: Optional[torch.FloatTensor] = None
+    audio_norm_tensor: torch.FloatTensor | None = None
     if ignore_cache or (not audio_norm_path.exists()):
         # Trim silence first.
         #

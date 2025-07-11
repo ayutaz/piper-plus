@@ -1,7 +1,6 @@
 import logging
 import os
 from pathlib import Path
-from typing import List, Optional, Tuple, Union
 
 import pytorch_lightning as pl
 import torch
@@ -43,7 +42,7 @@ class VitsModel(pl.LightningModule):
         sample_bytes: int = 2,
         channels: int = 1,
         mel_fmin: float = 0.0,
-        mel_fmax: Optional[float] = None,
+        mel_fmax: float | None = None,
         # model
         inter_channels: int = 192,
         hidden_channels: int = 192,
@@ -58,9 +57,9 @@ class VitsModel(pl.LightningModule):
         use_sdp: bool = True,
         segment_size: int = 8192,
         # training
-        dataset: Optional[List[Union[str, Path]]] = None,
+        dataset: list[str | Path] | None = None,
         learning_rate: float = 2e-4,
-        betas: Tuple[float, float] = (0.8, 0.99),
+        betas: tuple[float, float] = (0.8, 0.99),
         eps: float = 1e-9,
         batch_size: int = 1,
         lr_decay: float = 0.999875,
@@ -68,12 +67,12 @@ class VitsModel(pl.LightningModule):
         warmup_epochs: int = 0,
         c_mel: int = 45,
         c_kl: float = 1.0,
-        grad_clip: Optional[float] = None,
+        grad_clip: float | None = None,
         num_workers: int = 1,
         seed: int = 1234,
         num_test_examples: int = 5,
         validation_split: float = 0.1,
-        max_phoneme_ids: Optional[int] = None,
+        max_phoneme_ids: int | None = None,
         **kwargs,
     ):
         super().__init__()
@@ -110,9 +109,9 @@ class VitsModel(pl.LightningModule):
         )
 
         # Dataset splits
-        self._train_dataset: Optional[Dataset] = None
-        self._val_dataset: Optional[Dataset] = None
-        self._test_dataset: Optional[Dataset] = None
+        self._train_dataset: Dataset | None = None
+        self._val_dataset: Dataset | None = None
+        self._test_dataset: Dataset | None = None
         self._load_datasets(validation_split, num_test_examples, max_phoneme_ids)
 
         # State kept between training optimizers
@@ -123,7 +122,7 @@ class VitsModel(pl.LightningModule):
         self,
         validation_split: float,
         num_test_examples: int,
-        max_phoneme_ids: Optional[int] = None,
+        max_phoneme_ids: int | None = None,
     ):
         if self.hparams.dataset is None:
             _LOGGER.debug("No dataset to load")

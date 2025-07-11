@@ -12,7 +12,6 @@ import subprocess
 # Import from piper_train modules
 import sys
 from pathlib import Path
-from typing import Tuple
 
 from tqdm import tqdm
 
@@ -58,7 +57,7 @@ def download_css10_japanese(output_dir: Path):
         return None
 
 
-def process_transcript_line(line: str) -> Tuple[str, str]:
+def process_transcript_line(line: str) -> tuple[str, str]:
     """Process a line from CSS10 transcript."""
     parts = line.strip().split('|')
     if len(parts) >= 2:
@@ -105,7 +104,7 @@ def prepare_dataset(css10_dir: Path, output_dir: Path):
                     future = executor.submit(phonemize_japanese, text)
                     futures.append(future)
 
-        for (filename, text, wav_path), future in tqdm(zip(entries, futures), total=len(entries)):
+        for (filename, text, wav_path), future in tqdm(zip(entries, futures, strict=False), total=len(entries)):
             phonemes = future.result()
 
             if phonemes:

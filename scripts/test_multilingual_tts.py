@@ -15,7 +15,6 @@ import time
 import urllib.request
 import wave
 from pathlib import Path
-from typing import Dict, List, Tuple
 
 # Import platform utilities
 from platform_utils import get_platform_name
@@ -167,7 +166,7 @@ class MultilingualTTSTester:
         # Performance metrics collection
         self.all_metrics = {}
 
-    def download_model(self, language: str, config: Dict) -> Tuple[Path, Path]:
+    def download_model(self, language: str, config: dict) -> tuple[Path, Path]:
         """Download model files for a specific language."""
         model_name = config["model"]
         speaker = config["speaker"]
@@ -225,8 +224,8 @@ class MultilingualTTSTester:
             print(f"Error reading WAV file: {e}")
             return 0
 
-    def test_language(self, language: str, config: Dict,
-                     test_type: str = "basic") -> Dict:
+    def test_language(self, language: str, config: dict,
+                     test_type: str = "basic") -> dict:
         """Test TTS for a specific language."""
         print(f"\n{'='*60}")
         print(f"Testing {language}: {config['model']}")
@@ -328,8 +327,8 @@ class MultilingualTTSTester:
 
         return results
 
-    def _run_additional_tests(self, language: str, config: Dict,
-                            model_path: Path, test_type: str, results: Dict):
+    def _run_additional_tests(self, language: str, config: dict,
+                            model_path: Path, test_type: str, results: dict):
         """Run additional tests for comprehensive or performance testing."""
         print("\nRunning additional tests...")
 
@@ -397,8 +396,8 @@ class MultilingualTTSTester:
                     "chars_per_second": len(long_text)/perf_time
                 }
 
-    def test_all_languages(self, languages: List[str] = None,
-                          test_type: str = "basic") -> Dict[str, Dict]:
+    def test_all_languages(self, languages: list[str] = None,
+                          test_type: str = "basic") -> dict[str, dict]:
         """Test all specified languages."""
         if languages is None:
             languages = list(LANGUAGE_CONFIGS.keys())
@@ -415,7 +414,7 @@ class MultilingualTTSTester:
 
         return results
 
-    def save_performance_metrics(self, results: Dict[str, Dict]):
+    def save_performance_metrics(self, results: dict[str, dict]):
         """Save performance metrics to JSON file."""
         metrics = {
             "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
@@ -454,7 +453,7 @@ class MultilingualTTSTester:
 
         print(f"\nPerformance metrics saved to: {metrics_file}")
 
-    def print_summary(self, results: Dict[str, Dict]):
+    def print_summary(self, results: dict[str, dict]):
         """Print a summary of test results."""
         print(f"\n{'='*60}")
         print("TEST SUMMARY")

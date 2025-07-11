@@ -3,8 +3,9 @@
 import json
 import logging
 import shutil
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Any, Dict, Iterable, Set, Tuple, Union
+from typing import Any
 from urllib.request import urlopen
 
 from .file_hash import get_file_hash
@@ -22,8 +23,8 @@ class VoiceNotFoundError(Exception):
 
 
 def get_voices(
-    download_dir: Union[str, Path], update_voices: bool = False
-) -> Dict[str, Any]:
+    download_dir: str | Path, update_voices: bool = False
+) -> dict[str, Any]:
     """Loads available voices from downloaded or embedded JSON file."""
     download_dir = Path(download_dir)
     voices_download = download_dir / "voices.json"
@@ -48,9 +49,9 @@ def get_voices(
 
 def ensure_voice_exists(
     name: str,
-    data_dirs: Iterable[Union[str, Path]],
-    download_dir: Union[str, Path],
-    voices_info: Dict[str, Any],
+    data_dirs: Iterable[str | Path],
+    download_dir: str | Path,
+    voices_info: dict[str, Any],
 ):
     assert data_dirs, "No data dirs"
     if name not in voices_info:
@@ -58,7 +59,7 @@ def ensure_voice_exists(
 
     voice_info = voices_info[name]
     voice_files = voice_info["files"]
-    files_to_download: Set[str] = set()
+    files_to_download: set[str] = set()
 
     for data_dir in data_dirs:
         data_dir = Path(data_dir)
@@ -128,7 +129,7 @@ def ensure_voice_exists(
         _LOGGER.info("Downloaded %s (%s)", download_file_path, file_url)
 
 
-def find_voice(name: str, data_dirs: Iterable[Union[str, Path]]) -> Tuple[Path, Path]:
+def find_voice(name: str, data_dirs: Iterable[str | Path]) -> tuple[Path, Path]:
     for data_dir in data_dirs:
         data_dir = Path(data_dir)
         onnx_path = data_dir / f"{name}.onnx"

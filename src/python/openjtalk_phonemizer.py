@@ -9,7 +9,6 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
-from typing import Dict, List, Optional
 
 from jp_phoneme_map import PHONEME_TO_PUA, get_phoneme_id_map
 
@@ -53,7 +52,7 @@ def find_openjtalk_binary():
 
     return None
 
-def phonemize_openjtalk(text: str, preserve_unvoiced: bool = True) -> List[List[str]]:
+def phonemize_openjtalk(text: str, preserve_unvoiced: bool = True) -> list[list[str]]:
     """
     Phonemize Japanese text using OpenJTalk.
 
@@ -153,7 +152,7 @@ def phonemize_openjtalk(text: str, preserve_unvoiced: bool = True) -> List[List[
         if os.path.exists(output_file):
             os.unlink(output_file)
 
-def phonemes_to_ids(phonemes: List[str], phoneme_id_map: Optional[Dict[str, int]] = None) -> List[int]:
+def phonemes_to_ids(phonemes: list[str], phoneme_id_map: dict[str, int] | None = None) -> list[int]:
     """
     Convert phonemes to IDs.
 

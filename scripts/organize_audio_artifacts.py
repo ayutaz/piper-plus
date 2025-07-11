@@ -11,13 +11,13 @@ import shutil
 import sys
 import wave
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
 
 # Import test text information
 from test_text_constants import MULTILINGUAL_TEST_TEXTS, get_test_text_description
 
 
-def get_audio_info(wav_path: Path) -> Dict[str, Any]:
+def get_audio_info(wav_path: Path) -> dict[str, Any]:
     """Extract information from a WAV file."""
     try:
         with wave.open(str(wav_path), 'rb') as wav:
@@ -31,7 +31,7 @@ def get_audio_info(wav_path: Path) -> Dict[str, Any]:
         return {"error": str(e)}
 
 
-def categorize_audio_files(audio_files: List[Path]) -> Dict[str, List[Path]]:
+def categorize_audio_files(audio_files: list[Path]) -> dict[str, list[Path]]:
     """Categorize audio files by type and language."""
     categories = {
         "japanese": {},  # Organized by platform
@@ -76,7 +76,7 @@ def categorize_audio_files(audio_files: List[Path]) -> Dict[str, List[Path]]:
     return categories
 
 
-def create_artifact_structure(results_dir: Path, output_dir: Path) -> Dict[str, Any]:
+def create_artifact_structure(results_dir: Path, output_dir: Path) -> dict[str, Any]:
     """Create organized structure for audio artifacts."""
     # Find all audio files
     audio_files = list(results_dir.glob("*.wav"))
@@ -188,7 +188,7 @@ def create_artifact_structure(results_dir: Path, output_dir: Path) -> Dict[str, 
     return metadata
 
 
-def create_artifact_readme(output_dir: Path, metadata: Dict[str, Any]):
+def create_artifact_readme(output_dir: Path, metadata: dict[str, Any]):
     """Create README.md for easier artifact browsing."""
     readme_lines = []
 
@@ -363,7 +363,7 @@ def create_artifact_readme(output_dir: Path, metadata: Dict[str, Any]):
         f.write("\n".join(readme_lines))
 
 
-def create_sample_subset(output_dir: Path, metadata: Dict[str, Any], max_files: int = 10):
+def create_sample_subset(output_dir: Path, metadata: dict[str, Any], max_files: int = 10):
     """Create a subset of representative samples for quick download."""
     samples_dir = output_dir / "samples"
     samples_dir.mkdir(exist_ok=True)

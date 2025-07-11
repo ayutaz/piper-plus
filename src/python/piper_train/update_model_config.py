@@ -11,12 +11,12 @@ import argparse
 import json
 import shutil
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 from piper_train.phonemize.token_mapper import FIXED_PUA_MAPPING, TOKEN2CHAR
 
 
-def update_phoneme_id_map(config: Dict[str, Any]) -> bool:
+def update_phoneme_id_map(config: dict[str, Any]) -> bool:
     """
     Update the phoneme_id_map in a model configuration to use PUA characters.
 

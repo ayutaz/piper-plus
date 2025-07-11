@@ -1,5 +1,4 @@
 import math
-import typing
 
 import torch
 from torch import nn
@@ -300,12 +299,12 @@ class Generator(torch.nn.Module):
     def __init__(
         self,
         initial_channel: int,
-        resblock: typing.Optional[str],
-        resblock_kernel_sizes: typing.Tuple[int, ...],
-        resblock_dilation_sizes: typing.Tuple[typing.Tuple[int, ...], ...],
-        upsample_rates: typing.Tuple[int, ...],
+        resblock: str | None,
+        resblock_kernel_sizes: tuple[int, ...],
+        resblock_dilation_sizes: tuple[tuple[int, ...], ...],
+        upsample_rates: tuple[int, ...],
         upsample_initial_channel: int,
-        upsample_kernel_sizes: typing.Tuple[int, ...],
+        upsample_kernel_sizes: tuple[int, ...],
         gin_channels: int = 0,
     ):
         super().__init__()
@@ -318,7 +317,7 @@ class Generator(torch.nn.Module):
         resblock_module = modules.ResBlock1 if resblock == "1" else modules.ResBlock2
 
         self.ups = nn.ModuleList()
-        for i, (u, k) in enumerate(zip(upsample_rates, upsample_kernel_sizes)):
+        for i, (u, k) in enumerate(zip(upsample_rates, upsample_kernel_sizes, strict=False)):
             self.ups.append(
                 weight_norm(
                     ConvTranspose1d(
@@ -335,7 +334,7 @@ class Generator(torch.nn.Module):
         for i in range(len(self.ups)):
             ch = upsample_initial_channel // (2 ** (i + 1))
             for _j, (k, d) in enumerate(
-                zip(resblock_kernel_sizes, resblock_dilation_sizes)
+                zip(resblock_kernel_sizes, resblock_dilation_sizes, strict=False)
             ):
                 self.resblocks.append(resblock_module(ch, k, d))
 
@@ -537,11 +536,11 @@ class SynthesizerTrn(nn.Module):
         kernel_size: int,
         p_dropout: float,
         resblock: str,
-        resblock_kernel_sizes: typing.Tuple[int, ...],
-        resblock_dilation_sizes: typing.Tuple[typing.Tuple[int, ...], ...],
-        upsample_rates: typing.Tuple[int, ...],
+        resblock_kernel_sizes: tuple[int, ...],
+        resblock_dilation_sizes: tuple[tuple[int, ...], ...],
+        upsample_rates: tuple[int, ...],
         upsample_initial_channel: int,
-        upsample_kernel_sizes: typing.Tuple[int, ...],
+        upsample_kernel_sizes: tuple[int, ...],
         n_speakers: int = 1,
         gin_channels: int = 0,
         use_sdp: bool = True,

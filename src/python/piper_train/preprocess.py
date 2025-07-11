@@ -11,11 +11,11 @@ import sys
 
 # import unicodedata  # noqa: F401 - May be used for text normalization
 from collections import Counter
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from enum import Enum
 from multiprocessing import JoinableQueue, Process, Queue
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional
 
 from piper_phonemize import (
     get_codepoints_map,
@@ -190,7 +190,7 @@ def main() -> None:
     assert num_utterances > 0, "No utterances found"
 
     is_multispeaker = len(speaker_counts) > 1
-    speaker_ids: Dict[str, int] = {}
+    speaker_ids: dict[str, int] = {}
 
     if is_multispeaker:
         _LOGGER.info("%s speakers detected", len(speaker_counts))
@@ -255,7 +255,7 @@ def main() -> None:
 
     batch_size = int(num_utterances / (args.max_workers * 2))
     queue_in: Queue[Iterable[Utterance]] = JoinableQueue()
-    queue_out: Queue[Optional[Utterance]] = Queue()
+    queue_out: Queue[Utterance | None] = Queue()
 
     # Start workers
     if args.phoneme_type == PhonemeType.TEXT:
@@ -567,12 +567,12 @@ def phonemize_batch_openjtalk(
 class Utterance:
     text: str
     audio_path: Path
-    speaker: Optional[str] = None
-    speaker_id: Optional[int] = None
-    phonemes: Optional[List[str]] = None
-    phoneme_ids: Optional[List[int]] = None
-    audio_norm_path: Optional[Path] = None
-    audio_spec_path: Optional[Path] = None
+    speaker: str | None = None
+    speaker_id: int | None = None
+    phonemes: list[str] | None = None
+    phoneme_ids: list[int] | None = None
+    audio_norm_path: Path | None = None
+    audio_spec_path: Path | None = None
     missing_phonemes: "Counter[str]" = field(default_factory=Counter)
 
 
@@ -603,7 +603,7 @@ def ljspeech_dataset(args: argparse.Namespace) -> Iterable[Utterance]:
         for row in reader:
             assert len(row) >= 2, "Not enough columns"
 
-            speaker: Optional[str] = None
+            speaker: str | None = None
             if is_single_speaker or (len(row) == 2):
                 filename, text = row[0], row[-1]
             else:

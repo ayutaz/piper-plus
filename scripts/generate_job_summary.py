@@ -10,13 +10,13 @@ import json
 import os
 import sys
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
 
 # Import platform utilities
 from platform_utils import PLATFORM_ICONS
 
 
-def load_metrics_files(results_dir: Path) -> List[Dict[str, Any]]:
+def load_metrics_files(results_dir: Path) -> list[dict[str, Any]]:
     """Load all performance metrics JSON files from the results directory."""
     metrics_files = []
 
@@ -41,7 +41,7 @@ def load_metrics_files(results_dir: Path) -> List[Dict[str, Any]]:
     return metrics_files
 
 
-def generate_japanese_tts_summary(metrics: Dict[str, Any]) -> str:
+def generate_japanese_tts_summary(metrics: dict[str, Any]) -> str:
     """Generate summary for Japanese TTS test results."""
     summary_lines = []
 
@@ -84,7 +84,7 @@ def generate_japanese_tts_summary(metrics: Dict[str, Any]) -> str:
     return "\n".join(summary_lines)
 
 
-def generate_multilingual_tts_summary(metrics: Dict[str, Any]) -> str:
+def generate_multilingual_tts_summary(metrics: dict[str, Any]) -> str:
     """Generate summary for multilingual TTS test results."""
     summary_lines = []
 
@@ -164,7 +164,7 @@ def generate_multilingual_tts_summary(metrics: Dict[str, Any]) -> str:
     return "\n".join(summary_lines)
 
 
-def generate_combined_platform_summary(all_metrics: List[Dict[str, Any]]) -> str:
+def generate_combined_platform_summary(all_metrics: list[dict[str, Any]]) -> str:
     """Generate combined summary with all platforms and test types."""
     # Separate Japanese and multilingual metrics
     japanese_metrics = []
@@ -335,9 +335,9 @@ def generate_combined_platform_summary(all_metrics: List[Dict[str, Any]]) -> str
                     speed = perf.get("chars_per_second", "N/A")
                     audio_file = perf.get("audio_file", "N/A")
 
-                    if isinstance(rtf, (int, float)):
+                    if isinstance(rtf, int | float):
                         rtf = f"{rtf:.3f}"
-                    if isinstance(speed, (int, float)):
+                    if isinstance(speed, int | float):
                         speed = f"{speed:.1f}"
 
                     summary_lines.append(f"| {flag} {lang} | {platform_icon} {platform} | {model} | `{audio_file}` | {rtf} | {speed} |")
