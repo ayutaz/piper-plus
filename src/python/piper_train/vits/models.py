@@ -317,7 +317,9 @@ class Generator(torch.nn.Module):
         resblock_module = modules.ResBlock1 if resblock == "1" else modules.ResBlock2
 
         self.ups = nn.ModuleList()
-        for i, (u, k) in enumerate(zip(upsample_rates, upsample_kernel_sizes, strict=False)):
+        for i, (u, k) in enumerate(
+            zip(upsample_rates, upsample_kernel_sizes, strict=False)
+        ):
             self.ups.append(
                 weight_norm(
                     ConvTranspose1d(
@@ -545,7 +547,6 @@ class SynthesizerTrn(nn.Module):
         gin_channels: int = 0,
         use_sdp: bool = True,
     ):
-
         super().__init__()
         self.n_vocab = n_vocab
         self.spec_channels = spec_channels
@@ -614,7 +615,6 @@ class SynthesizerTrn(nn.Module):
             self.emb_g = nn.Embedding(n_speakers, gin_channels)
 
     def forward(self, x, x_lengths, y, y_lengths, sid=None):
-
         x, m_p, logs_p, x_mask = self.enc_p(x, x_lengths)
         if self.n_speakers > 1:
             g = self.emb_g(sid).unsqueeze(-1)  # [b, h, 1]

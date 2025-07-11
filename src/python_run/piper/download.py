@@ -22,9 +22,7 @@ class VoiceNotFoundError(Exception):
     pass
 
 
-def get_voices(
-    download_dir: str | Path, update_voices: bool = False
-) -> dict[str, Any]:
+def get_voices(download_dir: str | Path, update_voices: bool = False) -> dict[str, Any]:
     """Loads available voices from downloaded or embedded JSON file."""
     download_dir = Path(download_dir)
     voices_download = download_dir / "voices.json"
@@ -33,9 +31,10 @@ def get_voices(
         # Download latest voices.json
         voices_url = URL_FORMAT.format(file="voices.json")
         _LOGGER.debug("Downloading %s to %s", voices_url, voices_download)
-        with urlopen(voices_url) as response, open(
-            voices_download, "wb"
-        ) as download_file:
+        with (
+            urlopen(voices_url) as response,
+            open(voices_download, "wb") as download_file,
+        ):
             shutil.copyfileobj(response, download_file)
 
     # Prefer downloaded file to embedded
@@ -121,9 +120,10 @@ def ensure_voice_exists(
         download_file_path.parent.mkdir(parents=True, exist_ok=True)
 
         _LOGGER.debug("Downloading %s to %s", file_url, download_file_path)
-        with urlopen(file_url) as response, open(
-            download_file_path, "wb"
-        ) as download_file:
+        with (
+            urlopen(file_url) as response,
+            open(download_file_path, "wb") as download_file,
+        ):
             shutil.copyfileobj(response, download_file)
 
         _LOGGER.info("Downloaded %s (%s)", download_file_path, file_url)

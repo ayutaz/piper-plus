@@ -20,12 +20,12 @@ from test_text_constants import MULTILINGUAL_TEST_TEXTS, get_test_text_descripti
 def get_audio_info(wav_path: Path) -> dict[str, Any]:
     """Extract information from a WAV file."""
     try:
-        with wave.open(str(wav_path), 'rb') as wav:
+        with wave.open(str(wav_path), "rb") as wav:
             return {
                 "duration_seconds": wav.getnframes() / wav.getframerate(),
                 "sample_rate": wav.getframerate(),
                 "channels": wav.getnchannels(),
-                "file_size_kb": wav_path.stat().st_size / 1024
+                "file_size_kb": wav_path.stat().st_size / 1024,
             }
     except Exception as e:
         return {"error": str(e)}
@@ -36,12 +36,12 @@ def categorize_audio_files(audio_files: list[Path]) -> dict[str, list[Path]]:
     categories = {
         "japanese": {},  # Organized by platform
         "multilingual": {},  # Organized by language and platform
-        "other": []
+        "other": [],
     }
 
     for audio_file in audio_files:
         name = audio_file.name
-        parts = name.split('_')
+        parts = name.split("_")
 
         # New naming pattern: language_platform_model.wav or ja_JP_platform_type_name.wav
         if len(parts) >= 3:
@@ -90,11 +90,7 @@ def create_artifact_structure(results_dir: Path, output_dir: Path) -> dict[str, 
     # Create output structure
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    metadata = {
-        "total_files": len(audio_files),
-        "categories": {},
-        "samples": {}
-    }
+    metadata = {"total_files": len(audio_files), "categories": {}, "samples": {}}
 
     # Copy files to organized structure
     if "japanese" in categories:
@@ -108,7 +104,7 @@ def create_artifact_structure(results_dir: Path, output_dir: Path) -> dict[str, 
 
             metadata["categories"]["japanese"]["platforms"][platform] = {
                 "count": len(files),
-                "files": []
+                "files": [],
             }
 
             for audio_file in files:
@@ -120,9 +116,11 @@ def create_artifact_structure(results_dir: Path, output_dir: Path) -> dict[str, 
                     "filename": audio_file.name,
                     "platform": platform,
                     "size_kb": round(info.get("file_size_kb", 0), 1),
-                    "duration_seconds": round(info.get("duration_seconds", 0), 2)
+                    "duration_seconds": round(info.get("duration_seconds", 0), 2),
                 }
-                metadata["categories"]["japanese"]["platforms"][platform]["files"].append(file_metadata)
+                metadata["categories"]["japanese"]["platforms"][platform][
+                    "files"
+                ].append(file_metadata)
 
     if "multilingual" in categories:
         multi_dir = output_dir / "multilingual"
@@ -132,16 +130,17 @@ def create_artifact_structure(results_dir: Path, output_dir: Path) -> dict[str, 
         for lang, platforms in categories["multilingual"].items():
             lang_dir = multi_dir / lang
             lang_dir.mkdir(exist_ok=True)
-            metadata["categories"]["multilingual"]["languages"][lang] = {"platforms": {}}
+            metadata["categories"]["multilingual"]["languages"][lang] = {
+                "platforms": {}
+            }
 
             for platform, files in platforms.items():
                 platform_dir = lang_dir / platform
                 platform_dir.mkdir(exist_ok=True)
 
-                metadata["categories"]["multilingual"]["languages"][lang]["platforms"][platform] = {
-                    "count": len(files),
-                    "files": []
-                }
+                metadata["categories"]["multilingual"]["languages"][lang]["platforms"][
+                    platform
+                ] = {"count": len(files), "files": []}
 
                 for audio_file in files:
                     dest_path = platform_dir / audio_file.name
@@ -153,16 +152,18 @@ def create_artifact_structure(results_dir: Path, output_dir: Path) -> dict[str, 
                         "language": lang,
                         "platform": platform,
                         "size_kb": round(info.get("file_size_kb", 0), 1),
-                        "duration_seconds": round(info.get("duration_seconds", 0), 2)
+                        "duration_seconds": round(info.get("duration_seconds", 0), 2),
                     }
-                    metadata["categories"]["multilingual"]["languages"][lang]["platforms"][platform]["files"].append(file_metadata)
+                    metadata["categories"]["multilingual"]["languages"][lang][
+                        "platforms"
+                    ][platform]["files"].append(file_metadata)
 
     if "other" in categories:
         other_dir = output_dir / "other"
         other_dir.mkdir(exist_ok=True)
         metadata["categories"]["other"] = {
             "count": len(categories["other"]),
-            "files": []
+            "files": [],
         }
 
         for audio_file in categories["other"]:
@@ -173,13 +174,13 @@ def create_artifact_structure(results_dir: Path, output_dir: Path) -> dict[str, 
             file_metadata = {
                 "filename": audio_file.name,
                 "size_kb": round(info.get("file_size_kb", 0), 1),
-                "duration_seconds": round(info.get("duration_seconds", 0), 2)
+                "duration_seconds": round(info.get("duration_seconds", 0), 2),
             }
             metadata["categories"]["other"]["files"].append(file_metadata)
 
     # Create index.json
     index_path = output_dir / "index.json"
-    with open(index_path, 'w', encoding='utf-8') as f:
+    with open(index_path, "w", encoding="utf-8") as f:
         json.dump(metadata, f, indent=2)
 
     # Create README for artifact browsing
@@ -278,7 +279,7 @@ def create_artifact_readme(output_dir: Path, metadata: dict[str, Any]):
             platform_display = {
                 "ubuntu": "Ubuntu",
                 "macos": "macOS",
-                "windows": "Windows"
+                "windows": "Windows",
             }.get(platform, platform)
 
             readme_lines.append(f"### {platform_display}")
@@ -319,10 +320,12 @@ def create_artifact_readme(output_dir: Path, metadata: dict[str, Any]):
             "zh_CN": "中国語",
             "it_IT": "イタリア語",
             "pt_BR": "ポルトガル語",
-            "ru_RU": "ロシア語"
+            "ru_RU": "ロシア語",
         }
 
-        for lang, lang_data in sorted(metadata["categories"]["multilingual"]["languages"].items()):
+        for lang, lang_data in sorted(
+            metadata["categories"]["multilingual"]["languages"].items()
+        ):
             lang_display = lang_names.get(lang, lang)
             readme_lines.append(f"### {lang_display} ({lang})")
             readme_lines.append("")
@@ -331,39 +334,47 @@ def create_artifact_readme(output_dir: Path, metadata: dict[str, Any]):
                 platform_display = {
                     "ubuntu": "Ubuntu",
                     "macos": "macOS",
-                    "windows": "Windows"
+                    "windows": "Windows",
                 }.get(platform, platform)
 
                 readme_lines.append(f"#### {platform_display}")
                 readme_lines.append(f"- ファイル数: {data['count']}")
 
                 for file_info in data["files"]:
-                    readme_lines.append(f"- `{file_info['filename']}` ({file_info.get('duration_seconds', 0):.1f}秒, {file_info.get('size_kb', 0):.1f}KB)")
+                    readme_lines.append(
+                        f"- `{file_info['filename']}` ({file_info.get('duration_seconds', 0):.1f}秒, {file_info.get('size_kb', 0):.1f}KB)"
+                    )
 
                 readme_lines.append("")
 
     # Usage instructions
     readme_lines.append("## 使用方法")
     readme_lines.append("")
-    readme_lines.append("1. GitHub Actions からアーティファクトアーカイブをダウンロード")
+    readme_lines.append(
+        "1. GitHub Actions からアーティファクトアーカイブをダウンロード"
+    )
     readme_lines.append("2. アーカイブを解凍")
     readme_lines.append("3. 目的の言語・プラットフォームフォルダに移動")
     readme_lines.append("4. WAVファイルを任意の音声プレイヤーで再生")
     readme_lines.append("")
     readme_lines.append("## プラットフォーム間の比較")
     readme_lines.append("")
-    readme_lines.append("同じテキストを異なるプラットフォームで生成した音声を比較できます：")
+    readme_lines.append(
+        "同じテキストを異なるプラットフォームで生成した音声を比較できます："
+    )
     readme_lines.append("- 例: `en_US_ubuntu_*.wav` vs `en_US_windows_*.wav`")
     readme_lines.append("- 音質、発音、生成速度の違いを確認できます")
     readme_lines.append("")
 
     # Write README
     readme_path = output_dir / "README.md"
-    with open(readme_path, 'w', encoding='utf-8') as f:
+    with open(readme_path, "w", encoding="utf-8") as f:
         f.write("\n".join(readme_lines))
 
 
-def create_sample_subset(output_dir: Path, metadata: dict[str, Any], max_files: int = 10):
+def create_sample_subset(
+    output_dir: Path, metadata: dict[str, Any], max_files: int = 10
+):
     """Create a subset of representative samples for quick download."""
     samples_dir = output_dir / "samples"
     samples_dir.mkdir(exist_ok=True)
@@ -381,7 +392,9 @@ def create_sample_subset(output_dir: Path, metadata: dict[str, Any], max_files: 
                 for file_info in platform_data["files"][:1]:
                     if len(selected_files) >= max_files:
                         break
-                    src_path = output_dir / "japanese" / platform / file_info["filename"]
+                    src_path = (
+                        output_dir / "japanese" / platform / file_info["filename"]
+                    )
                     if src_path.exists():
                         dest_path = samples_dir / file_info["filename"]
                         shutil.copy2(src_path, dest_path)
@@ -399,7 +412,13 @@ def create_sample_subset(output_dir: Path, metadata: dict[str, Any], max_files: 
                     for file_info in platform_data["files"][:1]:
                         if len(selected_files) >= max_files:
                             break
-                        src_path = output_dir / "multilingual" / lang / platform / file_info["filename"]
+                        src_path = (
+                            output_dir
+                            / "multilingual"
+                            / lang
+                            / platform
+                            / file_info["filename"]
+                        )
                         if src_path.exists():
                             dest_path = samples_dir / file_info["filename"]
                             shutil.copy2(src_path, dest_path)
@@ -420,25 +439,38 @@ def create_sample_subset(output_dir: Path, metadata: dict[str, Any], max_files: 
     samples_metadata = {
         "description": "Representative samples from each test category",
         "total_files": len(selected_files),
-        "files": selected_files
+        "files": selected_files,
     }
 
-    with open(samples_dir / "samples.json", 'w', encoding='utf-8') as f:
+    with open(samples_dir / "samples.json", "w", encoding="utf-8") as f:
         json.dump(samples_metadata, f, indent=2)
 
     return len(selected_files)
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Organize audio artifacts for GitHub Actions")
-    parser.add_argument("--results-dir", default="test_results",
-                       help="Directory containing test results")
-    parser.add_argument("--output-dir", default="audio_artifacts",
-                       help="Output directory for organized artifacts")
-    parser.add_argument("--create-samples", action="store_true",
-                       help="Create a subset of sample files")
-    parser.add_argument("--max-samples", type=int, default=10,
-                       help="Maximum number of sample files to include")
+    parser = argparse.ArgumentParser(
+        description="Organize audio artifacts for GitHub Actions"
+    )
+    parser.add_argument(
+        "--results-dir",
+        default="test_results",
+        help="Directory containing test results",
+    )
+    parser.add_argument(
+        "--output-dir",
+        default="audio_artifacts",
+        help="Output directory for organized artifacts",
+    )
+    parser.add_argument(
+        "--create-samples", action="store_true", help="Create a subset of sample files"
+    )
+    parser.add_argument(
+        "--max-samples",
+        type=int,
+        default=10,
+        help="Maximum number of sample files to include",
+    )
 
     args = parser.parse_args()
 
@@ -461,7 +493,9 @@ def main():
         print("No audio files found to organize")
         return 0
 
-    print(f"Organized {metadata['total_files']} audio files into {len(metadata['categories'])} categories")
+    print(
+        f"Organized {metadata['total_files']} audio files into {len(metadata['categories'])} categories"
+    )
 
     # Create sample subset if requested
     if args.create_samples:
@@ -472,7 +506,9 @@ def main():
     print("\nCategory summary:")
     for category, data in metadata["categories"].items():
         if category == "japanese" and "platforms" in data:
-            total_count = sum(platform_data["count"] for platform_data in data["platforms"].values())
+            total_count = sum(
+                platform_data["count"] for platform_data in data["platforms"].values()
+            )
             print(f"  - {category}: {total_count} files")
         elif category == "multilingual" and "languages" in data:
             total_count = sum(

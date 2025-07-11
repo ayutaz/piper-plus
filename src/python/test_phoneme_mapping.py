@@ -15,7 +15,7 @@ def test_phoneme_mapping():
 
     # Test basic vowels
     print("\n1. Basic Vowels:")
-    for vowel in ['a', 'i', 'u', 'e', 'o']:
+    for vowel in ["a", "i", "u", "e", "o"]:
         voiced_id = phoneme_map.get(vowel, -1)
         unvoiced_id = phoneme_map.get(vowel.upper(), -1)
         print(f"   {vowel}: ID {voiced_id} (voiced)")
@@ -23,7 +23,7 @@ def test_phoneme_mapping():
 
     # Test special phonemes
     print("\n2. Special Phonemes:")
-    special = {'N': 'Moraic nasal ん', 'q': 'Glottal stop っ', '_': 'Pause/silence'}
+    special = {"N": "Moraic nasal ん", "q": "Glottal stop っ", "_": "Pause/silence"}
     for phoneme, desc in special.items():
         id_val = phoneme_map.get(phoneme, -1)
         print(f"   {phoneme}: ID {id_val} ({desc})")
@@ -69,8 +69,12 @@ def test_phoneme_mapping():
     # Statistics
     print("\n5. Statistics:")
     print(f"   Total phonemes: {len(phoneme_map)}")
-    print(f"   Single-character phonemes: {len([p for p in phoneme_map if len(p) == 1])}")
-    print(f"   PUA phonemes: {len([p for p in phoneme_map if len(p) == 1 and ord(p) >= 0xE000])}")
+    print(
+        f"   Single-character phonemes: {len([p for p in phoneme_map if len(p) == 1])}"
+    )
+    print(
+        f"   PUA phonemes: {len([p for p in phoneme_map if len(p) == 1 and ord(p) >= 0xE000])}"
+    )
 
     # Verify no ID conflicts
     id_to_phoneme = {}
@@ -87,6 +91,7 @@ def test_phoneme_mapping():
             print(f"     '{p1}' and '{p2}' both map to ID {id_val}")
     else:
         print("   ✓ No ID conflicts found")
+
 
 if __name__ == "__main__":
     test_phoneme_mapping()

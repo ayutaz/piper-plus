@@ -478,8 +478,7 @@ def _read_data_chunk(
         fid.seek(start + size)
     else:
         raise ValueError(
-            "mmap=True not compatible with "
-            f"{bytes_per_sample}-byte container size."
+            "mmap=True not compatible with " f"{bytes_per_sample}-byte container size."
         )
 
     _handle_pad_byte(fid, size)
@@ -781,9 +780,7 @@ def write(filename, rate, data):
 
     try:
         dkind = data.dtype.kind
-        if not (
-            dkind in ("i", "f") or dkind == "u" and data.dtype.itemsize == 1
-        ):
+        if not (dkind in ("i", "f") or dkind == "u" and data.dtype.itemsize == 1):
             raise ValueError(f"Unsupported data type '{data.dtype}'")
 
         header_data = b""

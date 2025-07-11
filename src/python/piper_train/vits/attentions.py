@@ -18,7 +18,7 @@ class Encoder(nn.Module):
         kernel_size: int = 1,
         p_dropout: float = 0.0,
         window_size: int = 4,
-        **kwargs
+        **kwargs,
     ):
         super().__init__()
         self.hidden_channels = hidden_channels
@@ -60,7 +60,11 @@ class Encoder(nn.Module):
         attn_mask = x_mask.unsqueeze(2) * x_mask.unsqueeze(-1)
         x = x * x_mask
         for attn_layer, norm_layer_1, ffn_layer, norm_layer_2 in zip(
-            self.attn_layers, self.norm_layers_1, self.ffn_layers, self.norm_layers_2, strict=False
+            self.attn_layers,
+            self.norm_layers_1,
+            self.ffn_layers,
+            self.norm_layers_2,
+            strict=False,
         ):
             y = attn_layer(x, x, attn_mask)
             y = self.drop(y)
@@ -84,7 +88,7 @@ class Decoder(nn.Module):
         p_dropout: float = 0.0,
         proximal_bias: bool = False,
         proximal_init: bool = True,
-        **kwargs
+        **kwargs,
     ):
         super().__init__()
         self.hidden_channels = hidden_channels

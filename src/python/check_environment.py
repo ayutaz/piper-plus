@@ -17,7 +17,7 @@ try:
     print(f"無声化母音サポート: {'A' in JAPANESE_PHONEMES}")
 
     # Check actual mapping
-    unvoiced = [p for p in JAPANESE_PHONEMES if p in 'AIUEO']
+    unvoiced = [p for p in JAPANESE_PHONEMES if p in "AIUEO"]
     print(f"無声化母音: {unvoiced}")
 
     # Test phonemization
@@ -30,7 +30,7 @@ try:
     print("\n=== preprocess.pyが作成するconfig.json ===")
     print(f"num_symbols: {len(id_map)}")
     print("phoneme_id_map (無声化母音部分):")
-    for vowel in 'aiueoAIUEO':
+    for vowel in "aiueoAIUEO":
         if vowel in id_map:
             print(f"  '{vowel}': {id_map[vowel]}")
 

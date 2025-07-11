@@ -25,8 +25,9 @@ from platform_utils import get_platform_name
 # Configure stdout for UTF-8 on Windows
 if sys.platform == "win32":
     import io
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
-    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8")
 
 # Test sentences covering various Japanese text patterns
 TEST_SENTENCES = {
@@ -46,8 +47,9 @@ TEST_SENTENCES = {
         "honorifics": "田中さん、佐藤様、山田先生がいらっしゃいます。",
         "onomatopoeia": "犬がワンワンと吠えています。雨がザーザー降っています。",
         "dialects": "大阪弁：めっちゃええやん。標準語：とても良いですね。",
-    }
+    },
 }
+
 
 class JapaneseTTSTester:
     def __init__(self, piper_path: str, model_path: str = None):
@@ -63,7 +65,7 @@ class JapaneseTTSTester:
         self.results = {
             "platform": sys.platform,
             "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
-            "tests": {}
+            "tests": {},
         }
 
         # Performance metrics
@@ -73,7 +75,7 @@ class JapaneseTTSTester:
             "platform": sys.platform,
             "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
             "test_results": [],
-            "summary": {}
+            "summary": {},
         }
 
         # Create test results directory
@@ -98,7 +100,9 @@ class JapaneseTTSTester:
 
         print("Downloading Japanese TTS model...")
         # Use the test model that's already in the repository
-        test_model_path = Path(__file__).parent.parent / "test" / "models" / "ja_JP-test-medium.onnx"
+        test_model_path = (
+            Path(__file__).parent.parent / "test" / "models" / "ja_JP-test-medium.onnx"
+        )
 
         if test_model_path.exists():
             self.model_path = test_model_path
@@ -108,8 +112,9 @@ class JapaneseTTSTester:
         # If test model doesn't exist, raise error
         print("Test model not found, creating minimal test model...")
         raise FileNotFoundError(
-            "Japanese test model not found. Expected at: " + str(test_model_path) +
-            "\nPlease ensure test models are available in the repository."
+            "Japanese test model not found. Expected at: "
+            + str(test_model_path)
+            + "\nPlease ensure test models are available in the repository."
         )
 
     def run_tts(self, text: str, output_file: str) -> tuple[bool, str, float]:
@@ -118,9 +123,11 @@ class JapaneseTTSTester:
 
         cmd = [
             str(self.piper_path),
-            "--model", str(self.model_path),
-            "--output_file", output_file,
-            "--debug"
+            "--model",
+            str(self.model_path),
+            "--output_file",
+            output_file,
+            "--debug",
         ]
 
         try:
@@ -135,17 +142,31 @@ class JapaneseTTSTester:
                 lib_path = self.piper_path.parent.parent / "lib"
                 if lib_path.exists():
                     ld_library_path = env.get("LD_LIBRARY_PATH", "")
-                    env["LD_LIBRARY_PATH"] = f"{lib_path}:{ld_library_path}" if ld_library_path else str(lib_path)
+                    env["LD_LIBRARY_PATH"] = (
+                        f"{lib_path}:{ld_library_path}"
+                        if ld_library_path
+                        else str(lib_path)
+                    )
 
             # Set library path for macOS
             elif sys.platform == "darwin":
                 lib_path = self.piper_path.parent.parent / "lib"
                 if lib_path.exists():
                     dyld_library_path = env.get("DYLD_LIBRARY_PATH", "")
-                    env["DYLD_LIBRARY_PATH"] = f"{lib_path}:{dyld_library_path}" if dyld_library_path else str(lib_path)
+                    env["DYLD_LIBRARY_PATH"] = (
+                        f"{lib_path}:{dyld_library_path}"
+                        if dyld_library_path
+                        else str(lib_path)
+                    )
                     # Also set fallback path
-                    dyld_fallback_library_path = env.get("DYLD_FALLBACK_LIBRARY_PATH", "")
-                    env["DYLD_FALLBACK_LIBRARY_PATH"] = f"{lib_path}:{dyld_fallback_library_path}" if dyld_fallback_library_path else str(lib_path)
+                    dyld_fallback_library_path = env.get(
+                        "DYLD_FALLBACK_LIBRARY_PATH", ""
+                    )
+                    env["DYLD_FALLBACK_LIBRARY_PATH"] = (
+                        f"{lib_path}:{dyld_fallback_library_path}"
+                        if dyld_fallback_library_path
+                        else str(lib_path)
+                    )
 
             process = subprocess.Popen(
                 cmd,
@@ -154,7 +175,7 @@ class JapaneseTTSTester:
                 stderr=subprocess.PIPE,
                 env=env,
                 text=True,
-                encoding='utf-8'
+                encoding="utf-8",
             )
 
             stdout, stderr = process.communicate(input=text)
@@ -178,36 +199,43 @@ class JapaneseTTSTester:
     def check_wav_file(self, wav_file: str) -> dict:
         """Analyze WAV file properties."""
         try:
-            with wave.open(wav_file, 'rb') as wav:
+            with wave.open(wav_file, "rb") as wav:
                 return {
                     "channels": wav.getnchannels(),
                     "sample_width": wav.getsampwidth(),
                     "framerate": wav.getframerate(),
                     "frames": wav.getnframes(),
-                    "duration": wav.getnframes() / wav.getframerate()
+                    "duration": wav.getnframes() / wav.getframerate(),
                 }
         except Exception as e:
             return {"error": str(e)}
 
-    def record_performance_metrics(self, test_name: str, text: str,
-                                 generation_time: float, audio_path: str) -> None:
+    def record_performance_metrics(
+        self, test_name: str, text: str, generation_time: float, audio_path: str
+    ) -> None:
         """Record performance metrics for a test."""
         wav_info = self.check_wav_file(audio_path)
         if "error" not in wav_info:
             audio_duration = wav_info.get("duration", 0)
-            rtf = generation_time / audio_duration if audio_duration > 0 else float('inf')
+            rtf = (
+                generation_time / audio_duration if audio_duration > 0 else float("inf")
+            )
 
             metric = {
                 "test_name": test_name,
                 "text": text,  # Full text for reference
-                "text_preview": text[:50] + "..." if len(text) > 50 else text,  # Truncated for display
+                "text_preview": text[:50] + "..."
+                if len(text) > 50
+                else text,  # Truncated for display
                 "char_count": len(text),
                 "generation_time_ms": round(generation_time * 1000, 2),
                 "audio_duration_ms": round(audio_duration * 1000, 2),
                 "rtf": round(rtf, 4),
-                "chars_per_second": round(len(text) / generation_time, 2) if generation_time > 0 else 0,
+                "chars_per_second": round(len(text) / generation_time, 2)
+                if generation_time > 0
+                else 0,
                 "file_size_bytes": os.path.getsize(audio_path),
-                "audio_file": os.path.basename(audio_path)
+                "audio_file": os.path.basename(audio_path),
             }
 
             self.performance_metrics["test_results"].append(metric)
@@ -220,7 +248,9 @@ class JapaneseTTSTester:
 
         for test_name, text in TEST_SENTENCES["basic"].items():
             platform_name = get_platform_name()
-            output_file = str(self.results_dir / f"ja_JP_{platform_name}_basic_{test_name}.wav")
+            output_file = str(
+                self.results_dir / f"ja_JP_{platform_name}_basic_{test_name}.wav"
+            )
             print(f"\nTesting {test_name}: {text}")
 
             success, error, duration = self.run_tts(text, output_file)
@@ -229,15 +259,19 @@ class JapaneseTTSTester:
                 "text": text,
                 "success": success,
                 "duration": duration,
-                "error": error
+                "error": error,
             }
 
             if success:
                 wav_info = self.check_wav_file(output_file)
                 test_result["wav_info"] = wav_info
-                print(f"  [OK] Success! Generated {wav_info.get('duration', 0):.2f}s audio in {duration:.2f}s")
+                print(
+                    f"  [OK] Success! Generated {wav_info.get('duration', 0):.2f}s audio in {duration:.2f}s"
+                )
                 # Record performance metrics
-                self.record_performance_metrics(f"basic_{test_name}", text, duration, output_file)
+                self.record_performance_metrics(
+                    f"basic_{test_name}", text, duration, output_file
+                )
             else:
                 print(f"  [FAIL] Failed: {error}")
                 all_passed = False
@@ -254,7 +288,10 @@ class JapaneseTTSTester:
 
         for test_name, text in TEST_SENTENCES["comprehensive"].items():
             platform_name = get_platform_name()
-            output_file = str(self.results_dir / f"ja_JP_{platform_name}_comprehensive_{test_name}.wav")
+            output_file = str(
+                self.results_dir
+                / f"ja_JP_{platform_name}_comprehensive_{test_name}.wav"
+            )
             print(f"\nTesting {test_name}: {text[:50]}...")
 
             success, error, duration = self.run_tts(text, output_file)
@@ -263,15 +300,19 @@ class JapaneseTTSTester:
                 "text": text,
                 "success": success,
                 "duration": duration,
-                "error": error
+                "error": error,
             }
 
             if success:
                 wav_info = self.check_wav_file(output_file)
                 test_result["wav_info"] = wav_info
-                print(f"  [OK] Success! Generated {wav_info.get('duration', 0):.2f}s audio in {duration:.2f}s")
+                print(
+                    f"  [OK] Success! Generated {wav_info.get('duration', 0):.2f}s audio in {duration:.2f}s"
+                )
                 # Record performance metrics
-                self.record_performance_metrics(f"comprehensive_{test_name}", text, duration, output_file)
+                self.record_performance_metrics(
+                    f"comprehensive_{test_name}", text, duration, output_file
+                )
             else:
                 print(f"  [FAIL] Failed: {error}")
                 all_passed = False
@@ -296,8 +337,10 @@ class JapaneseTTSTester:
 
             cmd = [
                 str(self.piper_path),
-                "--model", str(self.model_path),
-                "--output_file", output_file
+                "--model",
+                str(self.model_path),
+                "--output_file",
+                output_file,
             ]
 
             # Set espeak-ng data path if available
@@ -314,21 +357,27 @@ class JapaneseTTSTester:
                 stderr=subprocess.PIPE,
                 env=env,
                 text=True,
-                encoding='utf-8'
+                encoding="utf-8",
             )
 
             stdout, stderr = process.communicate(input="辞書ダウンロードテスト")
             duration = time.time() - start_time
 
             # Check if dictionary was downloaded
-            dict_path = Path(temp_home) / ".local" / "share" / "piper" / "open_jtalk_dic_utf_8-1.11"
+            dict_path = (
+                Path(temp_home)
+                / ".local"
+                / "share"
+                / "piper"
+                / "open_jtalk_dic_utf_8-1.11"
+            )
 
             test_result = {
                 "success": process.returncode == 0,
                 "duration": duration,
                 "dictionary_downloaded": dict_path.exists(),
                 "stdout": stdout,
-                "stderr": stderr
+                "stderr": stderr,
             }
 
             if test_result["success"] and test_result["dictionary_downloaded"]:
@@ -343,9 +392,12 @@ class JapaneseTTSTester:
 
     def save_results(self):
         """Save test results to JSON file."""
-        results_file = self.results_dir / f"japanese_tts_results_{sys.platform}_{int(time.time())}.json"
+        results_file = (
+            self.results_dir
+            / f"japanese_tts_results_{sys.platform}_{int(time.time())}.json"
+        )
 
-        with open(results_file, 'w', encoding='utf-8') as f:
+        with open(results_file, "w", encoding="utf-8") as f:
             json.dump(self.results, f, ensure_ascii=False, indent=2)
 
         print(f"\nTest results saved to: {results_file}")
@@ -355,29 +407,38 @@ class JapaneseTTSTester:
         if self.performance_metrics["test_results"]:
             # Calculate summary statistics
             results = self.performance_metrics["test_results"]
-            rtf_values = [r["rtf"] for r in results if r["rtf"] != float('inf')]
+            rtf_values = [r["rtf"] for r in results if r["rtf"] != float("inf")]
             gen_times = [r["generation_time_ms"] for r in results]
             char_speeds = [r["chars_per_second"] for r in results]
 
             self.performance_metrics["summary"] = {
                 "total_tests": len(results),
-                "avg_rtf": round(sum(rtf_values) / len(rtf_values), 4) if rtf_values else 0,
+                "avg_rtf": round(sum(rtf_values) / len(rtf_values), 4)
+                if rtf_values
+                else 0,
                 "min_rtf": round(min(rtf_values), 4) if rtf_values else 0,
                 "max_rtf": round(max(rtf_values), 4) if rtf_values else 0,
-                "avg_generation_time_ms": round(sum(gen_times) / len(gen_times), 2) if gen_times else 0,
-                "avg_chars_per_second": round(sum(char_speeds) / len(char_speeds), 2) if char_speeds else 0
+                "avg_generation_time_ms": round(sum(gen_times) / len(gen_times), 2)
+                if gen_times
+                else 0,
+                "avg_chars_per_second": round(sum(char_speeds) / len(char_speeds), 2)
+                if char_speeds
+                else 0,
             }
 
             # Save to file
-            metrics_file = self.performance_dir / f"japanese_tts_metrics_{sys.platform}_{int(time.time())}.json"
-            with open(metrics_file, 'w', encoding='utf-8') as f:
+            metrics_file = (
+                self.performance_dir
+                / f"japanese_tts_metrics_{sys.platform}_{int(time.time())}.json"
+            )
+            with open(metrics_file, "w", encoding="utf-8") as f:
                 json.dump(self.performance_metrics, f, ensure_ascii=False, indent=2)
 
             print(f"\nPerformance metrics saved to: {metrics_file}")
 
             # Also save a simplified version for the job summary
             summary_file = self.results_dir / "performance_summary.json"
-            with open(summary_file, 'w', encoding='utf-8') as f:
+            with open(summary_file, "w", encoding="utf-8") as f:
                 json.dump(self.performance_metrics, f, ensure_ascii=False, indent=2)
 
     def run_all_tests(self, test_type: str = "all") -> bool:
@@ -415,7 +476,9 @@ class JapaneseTTSTester:
         # Print summary
         print("\n=== Test Summary ===")
         total_tests = len(self.results["tests"])
-        passed_tests = sum(1 for t in self.results["tests"].values() if t.get("success", False))
+        passed_tests = sum(
+            1 for t in self.results["tests"].values() if t.get("success", False)
+        )
 
         print(f"Total tests: {total_tests}")
         print(f"Passed: {passed_tests}")
@@ -428,8 +491,12 @@ class JapaneseTTSTester:
             print("\n=== Performance Summary ===")
             summary = self.performance_metrics["summary"]
             print(f"Average RTF: {summary['avg_rtf']} (lower is better)")
-            print(f"Average generation speed: {summary['avg_chars_per_second']:.1f} chars/second")
-            print(f"Average generation time: {summary['avg_generation_time_ms']:.1f} ms")
+            print(
+                f"Average generation speed: {summary['avg_chars_per_second']:.1f} chars/second"
+            )
+            print(
+                f"Average generation time: {summary['avg_generation_time_ms']:.1f} ms"
+            )
 
         return all_passed
 
@@ -451,18 +518,22 @@ class JapaneseTTSTester:
             "phonemizer_exists": openjtalk_phonemizer_path.exists(),
             "phonemizer_path": str(openjtalk_phonemizer_path),
             "binary_exists": openjtalk_path.exists(),
-            "binary_path": str(openjtalk_path)
+            "binary_path": str(openjtalk_path),
         }
 
         if test_result["phonemizer_exists"]:
-            print(f"  [OK] OpenJTalk phonemizer binary found at: {openjtalk_phonemizer_path}")
+            print(
+                f"  [OK] OpenJTalk phonemizer binary found at: {openjtalk_phonemizer_path}"
+            )
             return True
         elif test_result["binary_exists"]:
             print(f"  [OK] OpenJTalk binary found at: {openjtalk_path}")
             return True
         else:
             print(f"  [FAIL] OpenJTalk binary not found at: {openjtalk_path}")
-            print(f"  [FAIL] OpenJTalk phonemizer binary not found at: {openjtalk_phonemizer_path}")
+            print(
+                f"  [FAIL] OpenJTalk phonemizer binary not found at: {openjtalk_phonemizer_path}"
+            )
 
         self.results["tests"]["openjtalk_binary"] = test_result
 
@@ -470,11 +541,19 @@ class JapaneseTTSTester:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Test Japanese TTS functionality in piper")
-    parser.add_argument("--piper", default="piper/bin/piper", help="Path to piper executable")
-    parser.add_argument("--model", help="Path to Japanese TTS model (will download if not provided)")
+    parser = argparse.ArgumentParser(
+        description="Test Japanese TTS functionality in piper"
+    )
+    parser.add_argument(
+        "--piper", default="piper/bin/piper", help="Path to piper executable"
+    )
+    parser.add_argument(
+        "--model", help="Path to Japanese TTS model (will download if not provided)"
+    )
     parser.add_argument("--basic", action="store_true", help="Run only basic tests")
-    parser.add_argument("--comprehensive", action="store_true", help="Run comprehensive tests")
+    parser.add_argument(
+        "--comprehensive", action="store_true", help="Run comprehensive tests"
+    )
 
     args = parser.parse_args()
 

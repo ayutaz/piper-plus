@@ -85,7 +85,8 @@ class SpeechStreamer:
         chunks = list(
             zip(
                 np.split(z, split_at, axis=2),
-                np.split(y_mask, split_at, axis=2), strict=False,
+                np.split(y_mask, split_at, axis=2),
+                strict=False,
             )
         )
         wav_start_pad = wav_end_pad = None

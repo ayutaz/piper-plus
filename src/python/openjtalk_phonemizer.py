@@ -23,6 +23,7 @@ def ensure_openjtalk_dictionary():
 
     return str(dict_path)
 
+
 def find_openjtalk_binary():
     """Find OpenJTalk or open_jtalk_phonemizer binary."""
     # Prefer phonemizer version
@@ -44,13 +45,16 @@ def find_openjtalk_binary():
             return candidate
         # Try which command
         try:
-            result = subprocess.run(["which", candidate], capture_output=True, text=True, check=False)
+            result = subprocess.run(
+                ["which", candidate], capture_output=True, text=True, check=False
+            )
             if result.returncode == 0 and result.stdout.strip():
                 return result.stdout.strip()
         except Exception:
             pass
 
     return None
+
 
 def phonemize_openjtalk(text: str, preserve_unvoiced: bool = True) -> list[list[str]]:
     """
@@ -74,11 +78,11 @@ def phonemize_openjtalk(text: str, preserve_unvoiced: bool = True) -> list[list[
         raise RuntimeError("OpenJTalk dictionary not found")
 
     # Create temporary files
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
         f.write(text)
         input_file = f.name
 
-    output_file = tempfile.mktemp(suffix='.txt')
+    output_file = tempfile.mktemp(suffix=".txt")
 
     try:
         # Run OpenJTalk
@@ -100,7 +104,7 @@ def phonemize_openjtalk(text: str, preserve_unvoiced: bool = True) -> list[list[
         current_sentence = []
 
         if os.path.exists(output_file):
-            with open(output_file, encoding='utf-8') as f:
+            with open(output_file, encoding="utf-8") as f:
                 for line in f:
                     line = line.strip()
                     if not line:
@@ -108,34 +112,36 @@ def phonemize_openjtalk(text: str, preserve_unvoiced: bool = True) -> list[list[
 
                     # Parse full-context label
                     # Format: xx^xx-phoneme+xx=xx/A:...
-                    if '/' in line:
-                        context = line.split('/')[0]
+                    if "/" in line:
+                        context = line.split("/")[0]
 
                         # Find phoneme between - and +
-                        if '-' in context and '+' in context:
-                            parts = context.split('-')
+                        if "-" in context and "+" in context:
+                            parts = context.split("-")
                             if len(parts) >= 2:
-                                phoneme_part = parts[1].split('+')[0]
+                                phoneme_part = parts[1].split("+")[0]
 
                                 # Handle special phonemes
-                                if phoneme_part == 'sil':
+                                if phoneme_part == "sil":
                                     # Sentence boundary
                                     if current_sentence:
                                         phonemes_list.append(current_sentence)
                                         current_sentence = []
-                                elif phoneme_part == 'pau':
+                                elif phoneme_part == "pau":
                                     # Pause within sentence
-                                    current_sentence.append('_')
+                                    current_sentence.append("_")
                                 else:
                                     # Regular phoneme
                                     if not preserve_unvoiced and len(phoneme_part) == 1:
                                         # Convert uppercase vowels to lowercase
-                                        if phoneme_part in 'AIUEO':
+                                        if phoneme_part in "AIUEO":
                                             phoneme_part = phoneme_part.lower()
 
                                     # Convert multi-character phonemes to PUA if needed
                                     if phoneme_part in PHONEME_TO_PUA:
-                                        current_sentence.append(PHONEME_TO_PUA[phoneme_part])
+                                        current_sentence.append(
+                                            PHONEME_TO_PUA[phoneme_part]
+                                        )
                                     else:
                                         current_sentence.append(phoneme_part)
 
@@ -152,7 +158,10 @@ def phonemize_openjtalk(text: str, preserve_unvoiced: bool = True) -> list[list[
         if os.path.exists(output_file):
             os.unlink(output_file)
 
-def phonemes_to_ids(phonemes: list[str], phoneme_id_map: dict[str, int] | None = None) -> list[int]:
+
+def phonemes_to_ids(
+    phonemes: list[str], phoneme_id_map: dict[str, int] | None = None
+) -> list[int]:
     """
     Convert phonemes to IDs.
 
@@ -175,6 +184,7 @@ def phonemes_to_ids(phonemes: list[str], phoneme_id_map: dict[str, int] | None =
             ids.append(0)  # Silence
 
     return ids
+
 
 def test_phonemization():
     """Test phonemization with various Japanese texts."""
@@ -200,7 +210,7 @@ def test_phonemization():
                 print(f"  Sentence {i+1}: {' '.join(phonemes)}")
 
                 # Show unvoiced vowels
-                unvoiced = [p for p in phonemes if p in 'AIUEO']
+                unvoiced = [p for p in phonemes if p in "AIUEO"]
                 if unvoiced:
                     print(f"    Unvoiced vowels: {unvoiced}")
 
@@ -210,6 +220,7 @@ def test_phonemization():
 
         except Exception as e:
             print(f"  Error: {e}")
+
 
 if __name__ == "__main__":
     test_phonemization()

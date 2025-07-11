@@ -41,12 +41,14 @@ def download_css10_japanese(output_dir: Path):
             target_dir = output_dir / "japanese"
             if target_dir.exists():
                 import shutil
+
                 shutil.rmtree(target_dir)
             japanese_dir.rename(target_dir)
 
         os.remove(output_dir / "css10.zip")
         if (output_dir / "css10-master").exists():
             import shutil
+
             shutil.rmtree(output_dir / "css10-master")
 
         print(f"CSS10 Japanese data ready at: {output_dir / 'japanese'}")
@@ -59,7 +61,7 @@ def download_css10_japanese(output_dir: Path):
 
 def process_transcript_line(line: str) -> tuple[str, str]:
     """Process a line from CSS10 transcript."""
-    parts = line.strip().split('|')
+    parts = line.strip().split("|")
     if len(parts) >= 2:
         filename = parts[0]
         transcript = parts[1]
@@ -85,7 +87,7 @@ def prepare_dataset(css10_dir: Path, output_dir: Path):
 
     print("Processing transcripts...")
 
-    with open(transcript_file, encoding='utf-8') as f:
+    with open(transcript_file, encoding="utf-8") as f:
         lines = f.readlines()
 
     # Get phoneme ID mapping
@@ -104,7 +106,9 @@ def prepare_dataset(css10_dir: Path, output_dir: Path):
                     future = executor.submit(phonemize_japanese, text)
                     futures.append(future)
 
-        for (filename, text, wav_path), future in tqdm(zip(entries, futures, strict=False), total=len(entries)):
+        for (filename, text, wav_path), future in tqdm(
+            zip(entries, futures, strict=False), total=len(entries)
+        ):
             phonemes = future.result()
 
             if phonemes:
@@ -112,6 +116,7 @@ def prepare_dataset(css10_dir: Path, output_dir: Path):
                 target_wav = output_dir / "wav" / f"{filename}.wav"
                 if not target_wav.exists():
                     import shutil
+
                     shutil.copy2(wav_path, target_wav)
 
                 # Count phoneme statistics (original phonemes before PUA conversion)
@@ -129,20 +134,24 @@ def prepare_dataset(css10_dir: Path, output_dir: Path):
                         phoneme_ids.extend(id_map[p])
                     else:
                         print(f"Warning: Unknown phoneme '{p}'")
-                        phoneme_ids.extend(id_map.get("_", [0]))  # Use pause as fallback
+                        phoneme_ids.extend(
+                            id_map.get("_", [0])
+                        )  # Use pause as fallback
 
-                dataset.append({
-                    "audio_path": f"wav/{filename}.wav",
-                    "text": text,
-                    "phonemes": phonemes,
-                    "phoneme_ids": phoneme_ids
-                })
+                dataset.append(
+                    {
+                        "audio_path": f"wav/{filename}.wav",
+                        "text": text,
+                        "phonemes": phonemes,
+                        "phoneme_ids": phoneme_ids,
+                    }
+                )
 
     print(f"Processed {len(dataset)} utterances")
 
     # Write dataset JSON
     dataset_file = output_dir / "dataset.json"
-    with open(dataset_file, 'w', encoding='utf-8') as f:
+    with open(dataset_file, "w", encoding="utf-8") as f:
         json.dump(dataset, f, ensure_ascii=False, indent=2)
 
     # Write training filelist
@@ -151,14 +160,14 @@ def prepare_dataset(css10_dir: Path, output_dir: Path):
 
     split_idx = int(len(dataset) * 0.95)
 
-    with open(train_file, 'w', encoding='utf-8') as f:
+    with open(train_file, "w", encoding="utf-8") as f:
         for entry in dataset[:split_idx]:
-            phoneme_str = " ".join(entry['phonemes'])
+            phoneme_str = " ".join(entry["phonemes"])
             f.write(f"{entry['audio_path']}|{phoneme_str}\n")
 
-    with open(val_file, 'w', encoding='utf-8') as f:
+    with open(val_file, "w", encoding="utf-8") as f:
         for entry in dataset[split_idx:]:
-            phoneme_str = " ".join(entry['phonemes'])
+            phoneme_str = " ".join(entry["phonemes"])
             f.write(f"{entry['audio_path']}|{phoneme_str}\n")
 
     print(f"\nDataset prepared at: {output_dir}")
@@ -172,9 +181,9 @@ def prepare_dataset(css10_dir: Path, output_dir: Path):
     voiced_counts = {}
 
     for p, count in phoneme_stats.items():
-        if p in 'AIUEO':
+        if p in "AIUEO":
             unvoiced_counts[p] = count
-        elif p in 'aiueo':
+        elif p in "aiueo":
             voiced_counts[p] = count
 
     if unvoiced_counts:
@@ -184,15 +193,27 @@ def prepare_dataset(css10_dir: Path, output_dir: Path):
             voiced = voiced_counts.get(vowel.lower(), 0)
             total = unvoiced + voiced
             percentage = (unvoiced / total * 100) if total > 0 else 0
-            print(f"  {vowel}: {unvoiced:,} occurrences ({percentage:.1f}% of all '{vowel.lower()}' sounds)")
+            print(
+                f"  {vowel}: {unvoiced:,} occurrences ({percentage:.1f}% of all '{vowel.lower()}' sounds)"
+            )
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Prepare CSS10 Japanese dataset for Piper training")
-    parser.add_argument("--download", action="store_true", help="Download CSS10 dataset")
-    parser.add_argument("--css10-dir", type=Path, help="Path to CSS10 Japanese directory")
-    parser.add_argument("--output-dir", type=Path, default=Path("css10_prepared"),
-                       help="Output directory for processed data")
+    parser = argparse.ArgumentParser(
+        description="Prepare CSS10 Japanese dataset for Piper training"
+    )
+    parser.add_argument(
+        "--download", action="store_true", help="Download CSS10 dataset"
+    )
+    parser.add_argument(
+        "--css10-dir", type=Path, help="Path to CSS10 Japanese directory"
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=Path("css10_prepared"),
+        help="Output directory for processed data",
+    )
 
     args = parser.parse_args()
 

@@ -24,7 +24,7 @@ def update_model_config(json_path):
         return False
 
     # Read existing config
-    with open(json_path, encoding='utf-8') as f:
+    with open(json_path, encoding="utf-8") as f:
         config = json.load(f)
 
     # Get the new phoneme mapping
@@ -36,18 +36,18 @@ def update_model_config(json_path):
         new_phoneme_id_map[phoneme] = [id_val]
 
     # Backup original
-    backup_path = json_path.with_suffix('.json.backup')
-    with open(backup_path, 'w', encoding='utf-8') as f:
+    backup_path = json_path.with_suffix(".json.backup")
+    with open(backup_path, "w", encoding="utf-8") as f:
         json.dump(config, f, ensure_ascii=False, indent=4)
     print(f"Created backup: {backup_path}")
 
     # Update config
-    old_num_symbols = config.get('num_symbols', 0)
-    config['phoneme_id_map'] = new_phoneme_id_map
-    config['num_symbols'] = len(new_phoneme_map)
+    old_num_symbols = config.get("num_symbols", 0)
+    config["phoneme_id_map"] = new_phoneme_id_map
+    config["num_symbols"] = len(new_phoneme_map)
 
     # Write updated config
-    with open(json_path, 'w', encoding='utf-8') as f:
+    with open(json_path, "w", encoding="utf-8") as f:
         json.dump(config, f, ensure_ascii=False, indent=4)
 
     print(f"Updated {json_path}")
@@ -55,16 +55,22 @@ def update_model_config(json_path):
 
     # Show what was added
     print("\nAdded support for unvoiced vowels:")
-    for vowel in ['A', 'I', 'U', 'E', 'O']:
+    for vowel in ["A", "I", "U", "E", "O"]:
         if vowel in new_phoneme_id_map:
             print(f"  {vowel}: ID {new_phoneme_id_map[vowel][0]}")
 
     return True
 
+
 def main():
     if len(sys.argv) < 2:
         # Default to test model
-        test_model_path = Path(__file__).parent.parent.parent / "test" / "models" / "ja_JP-test-medium.onnx.json"
+        test_model_path = (
+            Path(__file__).parent.parent.parent
+            / "test"
+            / "models"
+            / "ja_JP-test-medium.onnx.json"
+        )
         if test_model_path.exists():
             print(f"Updating test model: {test_model_path}")
             update_model_config(test_model_path)
@@ -74,6 +80,7 @@ def main():
     else:
         for json_path in sys.argv[1:]:
             update_model_config(json_path)
+
 
 if __name__ == "__main__":
     main()

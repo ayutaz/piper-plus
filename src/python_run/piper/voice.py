@@ -251,13 +251,16 @@ class PiperVoice:
 
         for phonemes in sentence_phonemes:
             phoneme_ids = self.phonemes_to_ids(phonemes)
-            yield self.synthesize_ids_to_raw(
-                phoneme_ids,
-                speaker_id=speaker_id,
-                length_scale=length_scale,
-                noise_scale=noise_scale,
-                noise_w=noise_w,
-            ) + silence_bytes
+            yield (
+                self.synthesize_ids_to_raw(
+                    phoneme_ids,
+                    speaker_id=speaker_id,
+                    length_scale=length_scale,
+                    noise_scale=noise_scale,
+                    noise_w=noise_w,
+                )
+                + silence_bytes
+            )
 
     def synthesize_ids_to_raw(
         self,
@@ -305,8 +308,6 @@ class PiperVoice:
         audio = self.session.run(
             None,
             args,
-        )[
-            0
-        ].squeeze((0, 1))
+        )[0].squeeze((0, 1))
         audio = audio_float_to_int16(audio.squeeze())
         return audio.tobytes()

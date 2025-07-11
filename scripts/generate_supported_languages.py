@@ -52,6 +52,7 @@ _LANGUAGES = {
     "zh_CN": Language("简体中文", "Chinese", "China"),
 }
 
+
 def main() -> None:
     for lang_code, lang in sorted(_LANGUAGES.items()):
         print("*", f"{lang.native}, {lang.country}", f"({lang.english}, {lang_code})")

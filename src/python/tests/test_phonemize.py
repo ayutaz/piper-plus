@@ -110,7 +110,9 @@ class TestPhonemization:
             # Remove markers for comparison
             phoneme_list = [p for p in phonemes if p not in ["^", "$", "_"]]
             for expected in expected_phonemes:
-                assert expected in phoneme_list, f"Expected '{expected}' in phonemes for '{katakana}', got {phoneme_list}"
+                assert (
+                    expected in phoneme_list
+                ), f"Expected '{expected}' in phonemes for '{katakana}', got {phoneme_list}"
 
     @pytest.mark.unit
     @pytest.mark.japanese
@@ -126,7 +128,10 @@ class TestPhonemization:
             ("クー", ["k", "u", "u"]),  # Long 'u'
             ("ケー", ["k", "e", "e"]),  # Long 'e'
             ("コー", ["k", "o", "o"]),  # Long 'o'
-            ("ソフトウェアー", ["s", "o", "f", "u", "t", "o", "w", "e", "a", "a"]),  # Complex case
+            (
+                "ソフトウェアー",
+                ["s", "o", "f", "u", "t", "o", "w", "e", "a", "a"],
+            ),  # Complex case
         ]
 
         for text, expected_phonemes in test_cases:
@@ -136,7 +141,9 @@ class TestPhonemization:
             # Check if all expected phonemes are present in order
             phoneme_str = "".join(phoneme_list)
             expected_str = "".join(expected_phonemes)
-            assert expected_str in phoneme_str, f"Expected phonemes {expected_phonemes} for '{text}', got {phoneme_list}"
+            assert (
+                expected_str in phoneme_str
+            ), f"Expected phonemes {expected_phonemes} for '{text}', got {phoneme_list}"
 
     @pytest.mark.unit
     @pytest.mark.japanese
@@ -189,7 +196,9 @@ class TestPhonemization:
             phoneme_list = [p for p in phonemes if p not in ["^", "$", "_"]]
 
             # Check if 'q' (small tsu) is present
-            assert "q" in phoneme_list, f"Expected 'q' (small tsu) in phonemes for '{text}'"
+            assert (
+                "q" in phoneme_list
+            ), f"Expected 'q' (small tsu) in phonemes for '{text}'"
 
     @pytest.mark.unit
     @pytest.mark.japanese
@@ -221,4 +230,6 @@ class TestPhonemization:
             # Check if compound phonemes are handled correctly
             phoneme_str = " ".join(phoneme_list)
             expected_str = " ".join(expected_phonemes)
-            assert expected_str in phoneme_str, f"Expected '{expected_str}' in '{phoneme_str}' for '{text}'"
+            assert (
+                expected_str in phoneme_str
+            ), f"Expected '{expected_str}' in '{phoneme_str}' for '{text}'"

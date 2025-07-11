@@ -52,3 +52,9 @@ inline-quotes = "double"
 "__init__.py" = ["F401", "F403"]
 "src/python/tests/*" = ["ARG"]
 "scripts/*" = ["ARG"]
+# token_mapper.py: グローバル変数を使用した音素マッピングシステム
+"src/python/piper_train/phonemize/token_mapper.py" = ["PLW0603"]
+# mel_processing.py: パフォーマンス最適化のためのグローバルキャッシュ
+"src/python/piper_train/vits/mel_processing.py" = ["PLW0602"]
+# test_phonemize.py: オプショナルな依存関係の条件付きインポート
+"src/python/tests/test_phonemize.py" = ["E402"]
