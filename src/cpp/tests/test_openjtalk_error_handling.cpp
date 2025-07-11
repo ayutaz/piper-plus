@@ -22,16 +22,21 @@ protected:
 // Test error string conversion
 TEST_F(OpenJTalkErrorHandlingTest, ErrorToString) {
     EXPECT_STREQ(openjtalk_error_to_string(OPENJTALK_SUCCESS), "Success");
-    EXPECT_STREQ(openjtalk_error_to_string(OPENJTALK_ERROR_INVALID_INPUT), "Invalid input");
+    EXPECT_STREQ(openjtalk_error_to_string(OPENJTALK_ERROR_NULL_INPUT), "Null input provided");
+    EXPECT_STREQ(openjtalk_error_to_string(OPENJTALK_ERROR_EMPTY_INPUT), "Empty input provided");
+    EXPECT_STREQ(openjtalk_error_to_string(OPENJTALK_ERROR_INPUT_TOO_LARGE), "Input size exceeds limit");
+    EXPECT_STREQ(openjtalk_error_to_string(OPENJTALK_ERROR_INVALID_PATH), "Invalid path characters");
     EXPECT_STREQ(openjtalk_error_to_string(OPENJTALK_ERROR_DICTIONARY_NOT_FOUND), "Dictionary not found");
     EXPECT_STREQ(openjtalk_error_to_string(OPENJTALK_ERROR_VOICE_NOT_FOUND), "Voice file not found");
-    EXPECT_STREQ(openjtalk_error_to_string(OPENJTALK_ERROR_MEMORY), "Memory allocation failed");
-    EXPECT_STREQ(openjtalk_error_to_string(OPENJTALK_ERROR_IO), "I/O error");
-    EXPECT_STREQ(openjtalk_error_to_string(OPENJTALK_ERROR_COMMAND_FAILED), "Command execution failed");
     EXPECT_STREQ(openjtalk_error_to_string(OPENJTALK_ERROR_BINARY_NOT_FOUND), "OpenJTalk binary not found");
-    EXPECT_STREQ(openjtalk_error_to_string(OPENJTALK_ERROR_TEMP_FILE), "Temporary file operation failed");
-    EXPECT_STREQ(openjtalk_error_to_string(OPENJTALK_ERROR_PARSE_OUTPUT), "Failed to parse output");
+    EXPECT_STREQ(openjtalk_error_to_string(OPENJTALK_ERROR_MEMORY), "Memory allocation failed");
     EXPECT_STREQ(openjtalk_error_to_string(OPENJTALK_ERROR_BUFFER_TOO_SMALL), "Buffer too small");
+    EXPECT_STREQ(openjtalk_error_to_string(OPENJTALK_ERROR_IO_READ), "Failed to read file");
+    EXPECT_STREQ(openjtalk_error_to_string(OPENJTALK_ERROR_IO_WRITE), "Failed to write file");
+    EXPECT_STREQ(openjtalk_error_to_string(OPENJTALK_ERROR_TEMP_FILE), "Temporary file operation failed");
+    EXPECT_STREQ(openjtalk_error_to_string(OPENJTALK_ERROR_COMMAND_FAILED), "Command execution failed");
+    EXPECT_STREQ(openjtalk_error_to_string(OPENJTALK_ERROR_PARSE_OUTPUT), "Failed to parse output");
+    EXPECT_STREQ(openjtalk_error_to_string(OPENJTALK_ERROR_SECURITY), "Security validation failed");
     EXPECT_STREQ(openjtalk_error_to_string(OPENJTALK_ERROR_UNKNOWN), "Unknown error");
     EXPECT_STREQ(openjtalk_error_to_string((OpenJTalkError)999), "Unknown error");
 }
@@ -41,13 +46,13 @@ TEST_F(OpenJTalkErrorHandlingTest, SetResult) {
     OpenJTalkResult result = {OPENJTALK_SUCCESS, ""};
     
     // Test simple error message
-    openjtalk_set_result(&result, OPENJTALK_ERROR_INVALID_INPUT, NULL);
-    EXPECT_EQ(result.code, OPENJTALK_ERROR_INVALID_INPUT);
-    EXPECT_STREQ(result.message, "Invalid input");
+    openjtalk_set_result(&result, OPENJTALK_ERROR_NULL_INPUT, NULL);
+    EXPECT_EQ(result.code, OPENJTALK_ERROR_NULL_INPUT);
+    EXPECT_STREQ(result.message, "Null input provided");
     
     // Test formatted error message
-    openjtalk_set_result(&result, OPENJTALK_ERROR_IO, "Failed to open file: %s", "test.txt");
-    EXPECT_EQ(result.code, OPENJTALK_ERROR_IO);
+    openjtalk_set_result(&result, OPENJTALK_ERROR_IO_READ, "Failed to open file: %s", "test.txt");
+    EXPECT_EQ(result.code, OPENJTALK_ERROR_IO_READ);
     EXPECT_STREQ(result.message, "Failed to open file: test.txt");
     
     // Test with NULL result pointer (should not crash)

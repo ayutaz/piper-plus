@@ -42,6 +42,7 @@ foreach(test_source ${TEST_SOURCES})
             ../openjtalk_wrapper.c
             ../openjtalk_dictionary_manager.c
             ../openjtalk_error.c
+            ../openjtalk_security.c
             # ../openjtalk_api.c  # Temporarily disabled - requires OpenJTalk static libs
         )
         target_include_directories(${test_name} PRIVATE
@@ -58,6 +59,7 @@ foreach(test_source ${TEST_SOURCES})
             ../openjtalk_wrapper.c
             ../openjtalk_dictionary_manager.c
             ../openjtalk_error.c
+            ../openjtalk_security.c
             # ../openjtalk_api.c  # Temporarily disabled - requires OpenJTalk static libs
         )
         target_include_directories(${test_name} PRIVATE
