@@ -17,6 +17,10 @@ string(STRIP "${piper_version}" piper_version)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Set C standard for better compatibility
+set(CMAKE_C_STANDARD 99)
+set(CMAKE_C_STANDARD_REQUIRED ON)
+
 if(MSVC)
   # Force compiler to use UTF-8 for IPA constants
   add_compile_options("$<$<C_COMPILER_ID:MSVC>:/utf-8>")
@@ -69,15 +73,25 @@ target_sources(piper PRIVATE
   src/cpp/openjtalk_phonemize.cpp
   src/cpp/openjtalk_wrapper.c
   src/cpp/openjtalk_dictionary_manager.c
+  src/cpp/openjtalk_error.c
+  src/cpp/openjtalk_security.c
   # src/cpp/openjtalk_api.c  # Temporarily disabled - requires OpenJTalk static libs
 )
 target_sources(test_piper PRIVATE
   src/cpp/openjtalk_phonemize.cpp
   src/cpp/openjtalk_wrapper.c
   src/cpp/openjtalk_dictionary_manager.c
+  src/cpp/openjtalk_error.c
+  src/cpp/openjtalk_security.c
   # src/cpp/openjtalk_api.c  # Temporarily disabled - requires OpenJTalk static libs
 )
 
+# Link pthread library on Unix systems
+if(UNIX AND NOT APPLE)
+  find_package(Threads REQUIRED)
+  target_link_libraries(piper PRIVATE Threads::Threads)
+  target_link_libraries(test_piper PRIVATE Threads::Threads)
+endif()
 
 # Configure RPATH for macOS
 if(APPLE)
@@ -375,7 +389,7 @@ elseif(NOT MSVC)
   # Linux flags
   string(APPEND CMAKE_CXX_FLAGS " -Wall -Wextra -Wl,-rpath,'$ORIGIN'")
   string(APPEND CMAKE_C_FLAGS " -Wall -Wextra")
-  target_link_libraries(piper -static-libgcc -static-libstdc++)
+  target_link_libraries(piper PRIVATE -static-libgcc -static-libstdc++)
 
   set(PIPER_EXTRA_LIBRARIES "pthread")
 endif()
@@ -383,7 +397,7 @@ endif()
 # Platform-specific library linking
 if(WIN32)
   # Windows: Link libraries directly with generator expressions for debug/release
-  target_link_libraries(piper
+  target_link_libraries(piper PRIVATE
     optimized ${FMT_DIR}/lib/fmt.lib
     debug ${FMT_DIR}/lib/fmtd.lib
     optimized ${SPDLOG_DIR}/lib/spdlog.lib
@@ -395,7 +409,7 @@ if(WIN32)
   )
 else()
   # Unix: Use standard library names
-  target_link_libraries(piper
+  target_link_libraries(piper PRIVATE
     fmt
     spdlog
     piper_phonemize
@@ -415,21 +429,21 @@ add_dependencies(piper hts_engine_external)
 add_dependencies(test_piper hts_engine_external)
 
 if(USE_HTS_ENGINE_STUB)
-  target_link_libraries(piper hts_engine_stub)
-  target_link_libraries(test_piper hts_engine_stub)
+  target_link_libraries(piper PRIVATE hts_engine_stub)
+  target_link_libraries(test_piper PRIVATE hts_engine_stub)
 else()
   if(WIN32)
-    target_link_libraries(piper
+    target_link_libraries(piper PRIVATE
       ${CMAKE_CURRENT_BINARY_DIR}/he/lib/HTSEngine.lib
     )
-    target_link_libraries(test_piper
+    target_link_libraries(test_piper PRIVATE
       ${CMAKE_CURRENT_BINARY_DIR}/he/lib/HTSEngine.lib
     )
   else()
-    target_link_libraries(piper
+    target_link_libraries(piper PRIVATE
       ${CMAKE_CURRENT_BINARY_DIR}/he/lib/libHTSEngine.a
     )
-    target_link_libraries(test_piper
+    target_link_libraries(test_piper PRIVATE
       ${CMAKE_CURRENT_BINARY_DIR}/he/lib/libHTSEngine.a
     )
   endif()
@@ -516,7 +530,7 @@ target_link_directories(
 # Platform-specific library linking for test_piper
 if(WIN32)
   # Windows: Link libraries directly with generator expressions for debug/release
-  target_link_libraries(test_piper
+  target_link_libraries(test_piper PRIVATE
     optimized ${FMT_DIR}/lib/fmt.lib
     debug ${FMT_DIR}/lib/fmtd.lib
     optimized ${SPDLOG_DIR}/lib/spdlog.lib
@@ -527,7 +541,7 @@ if(WIN32)
     ${PIPER_EXTRA_LIBRARIES}
   )
 else()
-  target_link_libraries(test_piper
+  target_link_libraries(test_piper PRIVATE
     fmt
     spdlog
     espeak-ng
