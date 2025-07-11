@@ -1,4 +1,18 @@
-name: dev-daily-release
+# This workflow has been replaced by:
+# - dev-create-release.yml (orchestration and release creation)
+# - dev-build-all.yml (platform builds)
+#
+# The new workflows provide:
+# - Better separation of concerns
+# - Build caching for faster execution
+# - Selective testing based on changes
+# - Easier debugging and maintenance
+#
+# To re-enable this workflow in case of emergency:
+# 1. Rename this file back to dev-daily-release.yml
+# 2. Disable dev-create-release.yml by renaming it
+#
+# Original workflow content is preserved below for referencename: dev-daily-release
 
 on:
   push:
