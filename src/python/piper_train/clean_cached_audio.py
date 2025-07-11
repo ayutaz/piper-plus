@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import argparse
-from concurrent.futures import ThreadPoolExecutor
 import logging
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import torch

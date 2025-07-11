@@ -3,8 +3,9 @@
 import json
 import logging
 import shutil
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Any, Dict, Iterable, Set, Tuple, Union
+from typing import Any
 from urllib.request import urlopen
 
 from .file_hash import get_file_hash
@@ -21,9 +22,7 @@ class VoiceNotFoundError(Exception):
     pass
 
 
-def get_voices(
-    download_dir: Union[str, Path], update_voices: bool = False
-) -> Dict[str, Any]:
+def get_voices(download_dir: str | Path, update_voices: bool = False) -> dict[str, Any]:
     """Loads available voices from downloaded or embedded JSON file."""
     download_dir = Path(download_dir)
     voices_download = download_dir / "voices.json"
@@ -32,9 +31,10 @@ def get_voices(
         # Download latest voices.json
         voices_url = URL_FORMAT.format(file="voices.json")
         _LOGGER.debug("Downloading %s to %s", voices_url, voices_download)
-        with urlopen(voices_url) as response, open(
-            voices_download, "wb"
-        ) as download_file:
+        with (
+            urlopen(voices_url) as response,
+            open(voices_download, "wb") as download_file,
+        ):
             shutil.copyfileobj(response, download_file)
 
     # Prefer downloaded file to embedded
@@ -42,15 +42,15 @@ def get_voices(
     voices_path = voices_download if voices_download.exists() else voices_embedded
 
     _LOGGER.debug("Loading %s", voices_path)
-    with open(voices_path, "r", encoding="utf-8") as voices_file:
+    with open(voices_path, encoding="utf-8") as voices_file:
         return json.load(voices_file)
 
 
 def ensure_voice_exists(
     name: str,
-    data_dirs: Iterable[Union[str, Path]],
-    download_dir: Union[str, Path],
-    voices_info: Dict[str, Any],
+    data_dirs: Iterable[str | Path],
+    download_dir: str | Path,
+    voices_info: dict[str, Any],
 ):
     assert data_dirs, "No data dirs"
     if name not in voices_info:
@@ -58,7 +58,7 @@ def ensure_voice_exists(
 
     voice_info = voices_info[name]
     voice_files = voice_info["files"]
-    files_to_download: Set[str] = set()
+    files_to_download: set[str] = set()
 
     for data_dir in data_dirs:
         data_dir = Path(data_dir)
@@ -120,15 +120,16 @@ def ensure_voice_exists(
         download_file_path.parent.mkdir(parents=True, exist_ok=True)
 
         _LOGGER.debug("Downloading %s to %s", file_url, download_file_path)
-        with urlopen(file_url) as response, open(
-            download_file_path, "wb"
-        ) as download_file:
+        with (
+            urlopen(file_url) as response,
+            open(download_file_path, "wb") as download_file,
+        ):
             shutil.copyfileobj(response, download_file)
 
         _LOGGER.info("Downloaded %s (%s)", download_file_path, file_url)
 
 
-def find_voice(name: str, data_dirs: Iterable[Union[str, Path]]) -> Tuple[Path, Path]:
+def find_voice(name: str, data_dirs: Iterable[str | Path]) -> tuple[Path, Path]:
     for data_dir in data_dirs:
         data_dir = Path(data_dir)
         onnx_path = data_dir / f"{name}.onnx"

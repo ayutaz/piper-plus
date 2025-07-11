@@ -22,7 +22,7 @@ JAPANESE_TEST_SENTENCES = {
         "honorifics": "田中さん、佐藤様、山田先生がいらっしゃいます。",
         "onomatopoeia": "犬がワンワンと吠えています。雨がザーザー降っています。",
         "dialects": "大阪弁：めっちゃええやん。標準語：とても良いですね。",
-    }
+    },
 }
 
 # Multilingual test texts
@@ -50,8 +50,9 @@ MULTILINGUAL_TEST_TEXTS = {
     "uk_UA": "Привіт, це тест системи синтезу мовлення.",
     "vi_VN": "Xin chào, đây là bài kiểm tra hệ thống tổng hợp giọng nói.",
     "ja_JP": "こんにちは、これは音声合成システムのテストです。",
-    "ko_KR": "안녕하세요, 이것은 음성 합성 시스템의 테스트입니다."
+    "ko_KR": "안녕하세요, 이것은 음성 합성 시스템의 테스트입니다.",
 }
+
 
 def get_test_text_description(language: str) -> str:
     """Get a description of what test texts are used for a given language."""

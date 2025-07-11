@@ -1,5 +1,3 @@
-from typing import Optional, Tuple
-
 import numpy as np
 
 from .vad import SileroVoiceActivityDetector
@@ -13,12 +11,12 @@ def trim_silence(
     sample_rate=16000,
     keep_chunks_before: int = 2,
     keep_chunks_after: int = 2,
-) -> Tuple[float, Optional[float]]:
+) -> tuple[float, float | None]:
     """Returns the offset/duration of trimmed audio in seconds"""
     offset_sec: float = 0.0
-    duration_sec: Optional[float] = None
-    first_chunk: Optional[int] = None
-    last_chunk: Optional[int] = None
+    duration_sec: float | None = None
+    first_chunk: int | None = None
+    last_chunk: int | None = None
     seconds_per_chunk: float = samples_per_chunk / sample_rate
 
     chunk = audio_array[:samples_per_chunk]

@@ -6,30 +6,30 @@ import itertools
 import json
 import logging
 import os
-import sys
 import signal
+import sys
 
 # import unicodedata  # noqa: F401 - May be used for text normalization
 from collections import Counter
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from enum import Enum
 from multiprocessing import JoinableQueue, Process, Queue
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional
-
-# import pyopenjtalk  # noqa: F401 - Used in conditional imports
-from tqdm import tqdm
 
 from piper_phonemize import (
-    phonemize_espeak,
-    phonemize_codepoints,
-    phoneme_ids_espeak,
-    phoneme_ids_codepoints,
     get_codepoints_map,
     get_espeak_map,
     get_max_phonemes,
+    phoneme_ids_codepoints,
+    phoneme_ids_espeak,
+    phonemize_codepoints,
+    phonemize_espeak,
     tashkeel_run,
 )
+
+# import pyopenjtalk  # noqa: F401 - Used in conditional imports
+from tqdm import tqdm
 
 from .norm_audio import cache_norm_audio, make_silence_detector
 
@@ -92,7 +92,6 @@ def main() -> None:
     parser.add_argument(
         "--speaker-id", type=int, help="Add speaker id to single speaker dataset"
     )
-    #
     parser.add_argument(
         "--phoneme-type",
         choices=list(PhonemeType),
@@ -105,7 +104,6 @@ def main() -> None:
         default="ignore",
         help="Casing applied to utterance text",
     )
-    #
     parser.add_argument(
         "--dataset-name",
         help="Name of dataset to put in config (default: name of <ouput_dir>/../)",
@@ -114,13 +112,11 @@ def main() -> None:
         "--audio-quality",
         help="Audio quality to put in config (default: name of <output_dir>)",
     )
-    #
     parser.add_argument(
         "--tashkeel",
         action="store_true",
         help="Diacritize Arabic text with libtashkeel",
     )
-    #
     parser.add_argument(
         "--skip-audio", action="store_true", help="Don't preprocess audio"
     )
@@ -184,7 +180,7 @@ def main() -> None:
 
     # Count speakers
     _LOGGER.debug("Counting number of speakers/utterances in the dataset")
-    speaker_counts: "Counter[str]" = Counter()
+    speaker_counts: Counter[str] = Counter()
     num_utterances = 0
     for utt in make_dataset(args):
         speaker = utt.speaker or ""
@@ -194,7 +190,7 @@ def main() -> None:
     assert num_utterances > 0, "No utterances found"
 
     is_multispeaker = len(speaker_counts) > 1
-    speaker_ids: Dict[str, int] = {}
+    speaker_ids: dict[str, int] = {}
 
     if is_multispeaker:
         _LOGGER.info("%s speakers detected", len(speaker_counts))
@@ -258,8 +254,8 @@ def main() -> None:
     assert args.max_workers is not None
 
     batch_size = int(num_utterances / (args.max_workers * 2))
-    queue_in: "Queue[Iterable[Utterance]]" = JoinableQueue()
-    queue_out: "Queue[Optional[Utterance]]" = Queue()
+    queue_in: Queue[Iterable[Utterance]] = JoinableQueue()
+    queue_out: Queue[Utterance | None] = Queue()
 
     # Start workers
     if args.phoneme_type == PhonemeType.TEXT:
@@ -306,7 +302,7 @@ def main() -> None:
             queue_in.put(utt_batch)
 
         _LOGGER.debug("Waiting for jobs to finish")
-        missing_phonemes: "Counter[str]" = Counter()
+        missing_phonemes: Counter[str] = Counter()
         for _ in range(num_utterances):
             utt = queue_out.get()
             if utt is not None:
@@ -344,7 +340,7 @@ def main() -> None:
             _LOGGER.warning("Missing %s phoneme(s)", len(missing_phonemes))
 
     # Signal workers to stop
-    for proc in processes:
+    for _proc in processes:
         queue_in.put(None)
 
     # Wait for workers to stop
@@ -571,12 +567,12 @@ def phonemize_batch_openjtalk(
 class Utterance:
     text: str
     audio_path: Path
-    speaker: Optional[str] = None
-    speaker_id: Optional[int] = None
-    phonemes: Optional[List[str]] = None
-    phoneme_ids: Optional[List[int]] = None
-    audio_norm_path: Optional[Path] = None
-    audio_spec_path: Optional[Path] = None
+    speaker: str | None = None
+    speaker_id: int | None = None
+    phonemes: list[str] | None = None
+    phoneme_ids: list[int] | None = None
+    audio_norm_path: Path | None = None
+    audio_spec_path: Path | None = None
     missing_phonemes: "Counter[str]" = field(default_factory=Counter)
 
 
@@ -602,12 +598,12 @@ def ljspeech_dataset(args: argparse.Namespace) -> Iterable[Utterance]:
     if not wav_dir.is_dir():
         wav_dir = dataset_dir / "wavs"
 
-    with open(metadata_path, "r", encoding="utf-8") as csv_file:
+    with open(metadata_path, encoding="utf-8") as csv_file:
         reader = csv.reader(csv_file, delimiter="|")
         for row in reader:
             assert len(row) >= 2, "Not enough columns"
 
-            speaker: Optional[str] = None
+            speaker: str | None = None
             if is_single_speaker or (len(row) == 2):
                 filename, text = row[0], row[-1]
             else:
@@ -650,7 +646,7 @@ def mycroft_dataset(args: argparse.Namespace) -> Iterable[Utterance]:
     speaker_id = 0
     for metadata_path in dataset_dir.glob("**/*-metadata.txt"):
         speaker = metadata_path.parent.name if not is_single_speaker else None
-        with open(metadata_path, "r", encoding="utf-8") as csv_file:
+        with open(metadata_path, encoding="utf-8") as csv_file:
             # filename|text|length
             reader = csv.reader(csv_file, delimiter="|")
             for row in reader:

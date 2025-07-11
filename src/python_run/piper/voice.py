@@ -1,9 +1,10 @@
 import json
 import logging
 import wave
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
+from typing import Any
 
 import numpy as np
 import onnxruntime
@@ -79,18 +80,18 @@ class PiperVoice:
 
     @staticmethod
     def load(
-        model_path: Union[str, Path],
-        config_path: Optional[Union[str, Path]] = None,
+        model_path: str | Path,
+        config_path: str | Path | None = None,
         use_cuda: bool = False,
     ) -> "PiperVoice":
         """Load an ONNX model and config."""
         if config_path is None:
             config_path = f"{model_path}.json"
 
-        with open(config_path, "r", encoding="utf-8") as config_file:
+        with open(config_path, encoding="utf-8") as config_file:
             config_dict = json.load(config_file)
 
-        providers: List[Union[str, Tuple[str, Dict[str, Any]]]]
+        providers: list[str | tuple[str, dict[str, Any]]]
         if use_cuda:
             providers = [
                 (
@@ -110,7 +111,7 @@ class PiperVoice:
             ),
         )
 
-    def phonemize(self, text: str) -> List[List[str]]:
+    def phonemize(self, text: str) -> list[list[str]]:
         """Text to phonemes grouped by sentence."""
         if self.config.phoneme_type == PhonemeType.ESPEAK:
             if self.config.espeak_voice == "ar":
@@ -127,7 +128,9 @@ class PiperVoice:
             # Piper の学習時と同じアルゴリズム（accent/prosody 付き）で音素化
             try:
                 # `piper_train` がインストールされていれば専用実装を利用
-                from piper_train.phonemize.japanese import phonemize_japanese  # type: ignore
+                from piper_train.phonemize.japanese import (
+                    phonemize_japanese,  # type: ignore
+                )
 
                 tokens = phonemize_japanese(text)
                 return [tokens]
@@ -184,10 +187,10 @@ class PiperVoice:
 
         raise ValueError(f"Unexpected phoneme type: {self.config.phoneme_type}")
 
-    def phonemes_to_ids(self, phonemes: List[str]) -> List[int]:
+    def phonemes_to_ids(self, phonemes: list[str]) -> list[int]:
         """Phonemes to ids."""
         id_map = self.config.phoneme_id_map
-        ids: List[int] = list(id_map[BOS])
+        ids: list[int] = list(id_map[BOS])
 
         for phoneme in phonemes:
             if phoneme not in id_map:
@@ -209,10 +212,10 @@ class PiperVoice:
         self,
         text: str,
         wav_file: wave.Wave_write,
-        speaker_id: Optional[int] = None,
-        length_scale: Optional[float] = None,
-        noise_scale: Optional[float] = None,
-        noise_w: Optional[float] = None,
+        speaker_id: int | None = None,
+        length_scale: float | None = None,
+        noise_scale: float | None = None,
+        noise_w: float | None = None,
         sentence_silence: float = 0.0,
     ):
         """Synthesize WAV audio from text."""
@@ -233,10 +236,10 @@ class PiperVoice:
     def synthesize_stream_raw(
         self,
         text: str,
-        speaker_id: Optional[int] = None,
-        length_scale: Optional[float] = None,
-        noise_scale: Optional[float] = None,
-        noise_w: Optional[float] = None,
+        speaker_id: int | None = None,
+        length_scale: float | None = None,
+        noise_scale: float | None = None,
+        noise_w: float | None = None,
         sentence_silence: float = 0.0,
     ) -> Iterable[bytes]:
         """Synthesize raw audio per sentence from text."""
@@ -248,21 +251,24 @@ class PiperVoice:
 
         for phonemes in sentence_phonemes:
             phoneme_ids = self.phonemes_to_ids(phonemes)
-            yield self.synthesize_ids_to_raw(
-                phoneme_ids,
-                speaker_id=speaker_id,
-                length_scale=length_scale,
-                noise_scale=noise_scale,
-                noise_w=noise_w,
-            ) + silence_bytes
+            yield (
+                self.synthesize_ids_to_raw(
+                    phoneme_ids,
+                    speaker_id=speaker_id,
+                    length_scale=length_scale,
+                    noise_scale=noise_scale,
+                    noise_w=noise_w,
+                )
+                + silence_bytes
+            )
 
     def synthesize_ids_to_raw(
         self,
-        phoneme_ids: List[int],
-        speaker_id: Optional[int] = None,
-        length_scale: Optional[float] = None,
-        noise_scale: Optional[float] = None,
-        noise_w: Optional[float] = None,
+        phoneme_ids: list[int],
+        speaker_id: int | None = None,
+        length_scale: float | None = None,
+        noise_scale: float | None = None,
+        noise_w: float | None = None,
     ) -> bytes:
         """Synthesize raw audio from phoneme ids."""
         if length_scale is None:
@@ -302,8 +308,6 @@ class PiperVoice:
         audio = self.session.run(
             None,
             args,
-        )[
-            0
-        ].squeeze((0, 1))
+        )[0].squeeze((0, 1))
         audio = audio_float_to_int16(audio.squeeze())
         return audio.tobytes()

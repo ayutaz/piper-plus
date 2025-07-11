@@ -18,11 +18,11 @@ if readme_path.is_file():
 requirements = []
 requirements_path = this_dir / "requirements.txt"
 if requirements_path.is_file():
-    with open(requirements_path, "r", encoding="utf-8") as requirements_file:
+    with open(requirements_path, encoding="utf-8") as requirements_file:
         requirements = requirements_file.read().splitlines()
 
 version_path = module_dir / "VERSION"
-with open(version_path, "r", encoding="utf-8") as version_file:
+with open(version_path, encoding="utf-8") as version_file:
     version = version_file.read().strip()
 
 # -----------------------------------------------------------------------------

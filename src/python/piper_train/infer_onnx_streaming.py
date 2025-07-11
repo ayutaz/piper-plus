@@ -9,7 +9,6 @@ import sys
 import time
 
 # from pathlib import Path  # noqa: F401 - May be used in future
-
 import numpy as np
 import onnxruntime
 
@@ -87,6 +86,7 @@ class SpeechStreamer:
             zip(
                 np.split(z, split_at, axis=2),
                 np.split(y_mask, split_at, axis=2),
+                strict=False,
             )
         )
         wav_start_pad = wav_end_pad = None
@@ -164,7 +164,7 @@ def main():
 
     output_buffer = sys.stdout.buffer
 
-    for i, line in enumerate(sys.stdin):
+    for _i, line in enumerate(sys.stdin):
         line = line.strip()
         if not line:
             continue

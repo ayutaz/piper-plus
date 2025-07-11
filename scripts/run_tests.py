@@ -5,28 +5,38 @@ Provides a unified interface for running all tests with various options
 """
 
 import argparse
-import sys
-import subprocess
 import os
+import subprocess
+import sys
 from pathlib import Path
+
 
 def run_command(cmd, cwd=None):
     """Run a command and return exit code"""
     print(f"Running: {' '.join(cmd)}")
-    result = subprocess.run(cmd, cwd=cwd)
+    result = subprocess.run(cmd, cwd=cwd, check=False)
     return result.returncode
+
 
 def main():
     parser = argparse.ArgumentParser(description="Run piper-tts tests")
     parser.add_argument("--unit", action="store_true", help="Run only unit tests")
-    parser.add_argument("--integration", action="store_true", help="Run only integration tests")
+    parser.add_argument(
+        "--integration", action="store_true", help="Run only integration tests"
+    )
     parser.add_argument("--python", action="store_true", help="Run only Python tests")
     parser.add_argument("--cpp", action="store_true", help="Run only C++ tests")
-    parser.add_argument("--coverage", action="store_true", help="Generate coverage report")
+    parser.add_argument(
+        "--coverage", action="store_true", help="Generate coverage report"
+    )
     parser.add_argument("--parallel", action="store_true", help="Run tests in parallel")
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose output")
-    parser.add_argument("--failfast", "-x", action="store_true", help="Stop on first failure")
-    parser.add_argument("--japanese", action="store_true", help="Run only Japanese TTS tests")
+    parser.add_argument(
+        "--failfast", "-x", action="store_true", help="Stop on first failure"
+    )
+    parser.add_argument(
+        "--japanese", action="store_true", help="Run only Japanese TTS tests"
+    )
     parser.add_argument("--no-gpu", action="store_true", help="Skip GPU tests")
     parser.add_argument("tests", nargs="*", help="Specific test files or directories")
 
@@ -124,6 +134,7 @@ def main():
         print(f"Coverage report generated in: {base_dir}/htmlcov/index.html")
 
     return exit_code
+
 
 if __name__ == "__main__":
     sys.exit(main())

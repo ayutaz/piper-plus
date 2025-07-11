@@ -1,5 +1,4 @@
 import math
-import typing
 
 import torch
 from torch import nn
@@ -222,9 +221,9 @@ class ResBlock1(torch.nn.Module):
         self,
         channels: int,
         kernel_size: int = 3,
-        dilation: typing.Tuple[int] = (1, 3, 5),
+        dilation: tuple[int] = (1, 3, 5),
     ):
-        super(ResBlock1, self).__init__()
+        super().__init__()
         self.LRELU_SLOPE = 0.1
         self.convs1 = nn.ModuleList(
             [
@@ -299,7 +298,7 @@ class ResBlock1(torch.nn.Module):
         self.convs2.apply(init_weights)
 
     def forward(self, x, x_mask=None):
-        for c1, c2 in zip(self.convs1, self.convs2):
+        for c1, c2 in zip(self.convs1, self.convs2, strict=False):
             xt = F.leaky_relu(x, self.LRELU_SLOPE)
             if x_mask is not None:
                 xt = xt * x_mask
@@ -322,9 +321,9 @@ class ResBlock1(torch.nn.Module):
 
 class ResBlock2(torch.nn.Module):
     def __init__(
-        self, channels: int, kernel_size: int = 3, dilation: typing.Tuple[int] = (1, 3)
+        self, channels: int, kernel_size: int = 3, dilation: tuple[int] = (1, 3)
     ):
-        super(ResBlock2, self).__init__()
+        super().__init__()
         self.LRELU_SLOPE = 0.1
         self.convs = nn.ModuleList(
             [

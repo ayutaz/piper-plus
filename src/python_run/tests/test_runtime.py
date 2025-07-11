@@ -3,8 +3,9 @@ Runtime tests for piper voice synthesis
 Tests actual implementation without excessive mocking
 """
 
-import pytest
 import numpy as np
+import pytest
+
 from piper.util import audio_float_to_int16
 
 

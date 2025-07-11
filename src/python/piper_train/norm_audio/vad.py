@@ -1,4 +1,3 @@
-import typing
 from pathlib import Path
 
 import numpy as np
@@ -11,7 +10,7 @@ class SileroVoiceActivityDetector:
     https://github.com/snakers4/silero-vad
     """
 
-    def __init__(self, onnx_path: typing.Union[str, Path]):
+    def __init__(self, onnx_path: str | Path):
         onnx_path = str(onnx_path)
 
         self.session = onnxruntime.InferenceSession(onnx_path)

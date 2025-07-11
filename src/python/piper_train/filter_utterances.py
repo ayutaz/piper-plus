@@ -13,7 +13,6 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict, dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Optional
 
 import numpy as np
 
@@ -38,7 +37,7 @@ class Utterance:
     text: str
     duration_sec: float
     speaker: str
-    exclude_reason: Optional[ExcludeReason] = None
+    exclude_reason: ExcludeReason | None = None
     rate: float = 0.0
 
     def __post_init__(self):
@@ -129,11 +128,10 @@ def main():
                     utt.exclude_reason = ExcludeReason.LOW
                 elif utt.rate > upper:
                     utt.exclude_reason = ExcludeReason.HIGH
+                elif is_multispeaker:
+                    writer.writerow((utt.id, utt.speaker, utt.text))
                 else:
-                    if is_multispeaker:
-                        writer.writerow((utt.id, utt.speaker, utt.text))
-                    else:
-                        writer.writerow((utt.id, utt.text))
+                    writer.writerow((utt.id, utt.text))
 
     if args.write_json:
         speaker_excluded = {

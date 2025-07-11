@@ -4,7 +4,7 @@ import sys
 import time
 import wave
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 from . import PiperVoice
 from .download import ensure_voice_exists, find_voice, get_voices
@@ -36,7 +36,6 @@ def main() -> None:
         action="store_true",
         help="Stream raw audio to stdout",
     )
-    #
     parser.add_argument("-s", "--speaker", type=int, help="Id of speaker (default: 0)")
     parser.add_argument(
         "--length-scale", "--length_scale", type=float, help="Phoneme length"
@@ -47,9 +46,7 @@ def main() -> None:
     parser.add_argument(
         "--noise-w", "--noise_w", type=float, help="Phoneme width noise"
     )
-    #
     parser.add_argument("--cuda", action="store_true", help="Use GPU")
-    #
     parser.add_argument(
         "--sentence-silence",
         "--sentence_silence",
@@ -57,7 +54,6 @@ def main() -> None:
         default=0.0,
         help="Seconds of silence after each sentence",
     )
-    #
     parser.add_argument(
         "--data-dir",
         "--data_dir",
@@ -70,13 +66,11 @@ def main() -> None:
         "--download_dir",
         help="Directory to download voices into (default: first data dir)",
     )
-    #
     parser.add_argument(
         "--update-voices",
         action="store_true",
         help="Download latest voices.json during startup",
     )
-    #
     parser.add_argument(
         "--debug", action="store_true", help="Print DEBUG messages to console"
     )
@@ -95,7 +89,7 @@ def main() -> None:
         voices_info = get_voices(args.download_dir, update_voices=args.update_voices)
 
         # Resolve aliases for backwards compatibility with old voice names
-        aliases_info: Dict[str, Any] = {}
+        aliases_info: dict[str, Any] = {}
         for voice_info in voices_info.values():
             for voice_alias in voice_info.get("aliases", []):
                 aliases_info[voice_alias] = {"_is_alias": True, **voice_info}

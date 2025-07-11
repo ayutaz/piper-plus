@@ -3,10 +3,9 @@ import hashlib
 import json
 import sys
 from pathlib import Path
-from typing import Union
 
 
-def get_file_hash(path: Union[str, Path], bytes_per_chunk: int = 8192) -> str:
+def get_file_hash(path: str | Path, bytes_per_chunk: int = 8192) -> str:
     """Hash a file in chunks using md5."""
     path_hash = hashlib.md5()
     with open(path, "rb") as path_file:
