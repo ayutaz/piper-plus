@@ -224,7 +224,7 @@ class ResBlock1(torch.nn.Module):
         kernel_size: int = 3,
         dilation: typing.Tuple[int] = (1, 3, 5),
     ):
-        super(ResBlock1, self).__init__()
+        super().__init__()
         self.LRELU_SLOPE = 0.1
         self.convs1 = nn.ModuleList(
             [
@@ -324,7 +324,7 @@ class ResBlock2(torch.nn.Module):
     def __init__(
         self, channels: int, kernel_size: int = 3, dilation: typing.Tuple[int] = (1, 3)
     ):
-        super(ResBlock2, self).__init__()
+        super().__init__()
         self.LRELU_SLOPE = 0.1
         self.convs = nn.ModuleList(
             [

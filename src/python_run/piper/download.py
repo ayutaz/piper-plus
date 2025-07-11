@@ -42,7 +42,7 @@ def get_voices(
     voices_path = voices_download if voices_download.exists() else voices_embedded
 
     _LOGGER.debug("Loading %s", voices_path)
-    with open(voices_path, "r", encoding="utf-8") as voices_file:
+    with open(voices_path, encoding="utf-8") as voices_file:
         return json.load(voices_file)
 
 

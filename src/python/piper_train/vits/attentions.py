@@ -35,7 +35,7 @@ class Encoder(nn.Module):
         self.norm_layers_1 = nn.ModuleList()
         self.ffn_layers = nn.ModuleList()
         self.norm_layers_2 = nn.ModuleList()
-        for i in range(self.n_layers):
+        for _i in range(self.n_layers):
             self.attn_layers.append(
                 MultiHeadAttention(
                     hidden_channels,
@@ -104,7 +104,7 @@ class Decoder(nn.Module):
         self.norm_layers_1 = nn.ModuleList()
         self.ffn_layers = nn.ModuleList()
         self.norm_layers_2 = nn.ModuleList()
-        for i in range(self.n_layers):
+        for _i in range(self.n_layers):
             self.self_attn_layers.append(
                 MultiHeadAttention(
                     hidden_channels,

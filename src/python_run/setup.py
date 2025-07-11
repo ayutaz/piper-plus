@@ -10,7 +10,7 @@ module_dir = this_dir / "piper"
 requirements = []
 requirements_path = this_dir / "requirements.txt"
 if requirements_path.is_file():
-    with open(requirements_path, "r", encoding="utf-8") as requirements_file:
+    with open(requirements_path, encoding="utf-8") as requirements_file:
         requirements = requirements_file.read().splitlines()
 
 # README.md を PyPI 用の長い説明として読み込む

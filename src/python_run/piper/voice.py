@@ -87,7 +87,7 @@ class PiperVoice:
         if config_path is None:
             config_path = f"{model_path}.json"
 
-        with open(config_path, "r", encoding="utf-8") as config_file:
+        with open(config_path, encoding="utf-8") as config_file:
             config_dict = json.load(config_file)
 
         providers: List[Union[str, Tuple[str, Dict[str, Any]]]]
@@ -127,7 +127,9 @@ class PiperVoice:
             # Piper の学習時と同じアルゴリズム（accent/prosody 付き）で音素化
             try:
                 # `piper_train` がインストールされていれば専用実装を利用
-                from piper_train.phonemize.japanese import phonemize_japanese  # type: ignore
+                from piper_train.phonemize.japanese import (
+                    phonemize_japanese,  # type: ignore
+                )
 
                 tokens = phonemize_japanese(text)
                 return [tokens]

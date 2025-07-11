@@ -5,3 +5,4 @@ mypy==0.910
 pylint==2.10.2
 pytest==5.4.1
 pytest-cov==2.8.1
+ruff==0.8.5

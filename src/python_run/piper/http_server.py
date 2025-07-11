@@ -18,10 +18,8 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--host", default="0.0.0.0", help="HTTP server host")
     parser.add_argument("--port", type=int, default=5000, help="HTTP server port")
-    #
     parser.add_argument("-m", "--model", required=True, help="Path to Onnx model file")
     parser.add_argument("-c", "--config", help="Path to model config file")
-    #
     parser.add_argument("-s", "--speaker", type=int, help="Id of speaker (default: 0)")
     parser.add_argument(
         "--length-scale", "--length_scale", type=float, help="Phoneme length"
@@ -32,9 +30,7 @@ def main() -> None:
     parser.add_argument(
         "--noise-w", "--noise_w", type=float, help="Phoneme width noise"
     )
-    #
     parser.add_argument("--cuda", action="store_true", help="Use GPU")
-    #
     parser.add_argument(
         "--sentence-silence",
         "--sentence_silence",
@@ -42,7 +38,6 @@ def main() -> None:
         default=0.0,
         help="Seconds of silence after each sentence",
     )
-    #
     parser.add_argument(
         "--data-dir",
         "--data_dir",
@@ -55,13 +50,11 @@ def main() -> None:
         "--download_dir",
         help="Directory to download voices into (default: first data dir)",
     )
-    #
     parser.add_argument(
         "--update-voices",
         action="store_true",
         help="Download latest voices.json during startup",
     )
-    #
     parser.add_argument(
         "--debug", action="store_true", help="Print DEBUG messages to console"
     )

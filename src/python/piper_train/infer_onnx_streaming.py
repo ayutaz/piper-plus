@@ -9,7 +9,6 @@ import sys
 import time
 
 # from pathlib import Path  # noqa: F401 - May be used in future
-
 import numpy as np
 import onnxruntime
 
@@ -164,7 +163,7 @@ def main():
 
     output_buffer = sys.stdout.buffer
 
-    for i, line in enumerate(sys.stdin):
+    for _i, line in enumerate(sys.stdin):
         line = line.strip()
         if not line:
             continue

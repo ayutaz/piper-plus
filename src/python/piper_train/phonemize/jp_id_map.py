@@ -1,4 +1,5 @@
 from typing import Dict, List
+
 from .token_mapper import register
 
 __all__ = ["get_japanese_id_map", "JAPANESE_PHONEMES", "SPECIAL_TOKENS"]

@@ -7,11 +7,12 @@ phonemes with their corresponding Private Use Area (PUA) single-character
 representations, ensuring compatibility between Python training and C++ inference.
 """
 
-import json
 import argparse
+import json
 import shutil
 from pathlib import Path
-from typing import Dict, Any
+from typing import Any, Dict
+
 from piper_train.phonemize.token_mapper import FIXED_PUA_MAPPING, TOKEN2CHAR
 
 
@@ -64,7 +65,7 @@ def process_model_config(config_path: Path, backup: bool = True) -> None:
 
     # Read the configuration
     try:
-        with open(config_path, "r", encoding="utf-8") as f:
+        with open(config_path, encoding="utf-8") as f:
             config = json.load(f)
     except Exception as e:
         print(f"Error reading {config_path}: {e}")
@@ -132,7 +133,7 @@ def main():
         if args.dry_run:
             print(f"\n[DRY RUN] Would process: {config_path}")
             # Just show what would be done
-            with open(config_path, "r", encoding="utf-8") as f:
+            with open(config_path, encoding="utf-8") as f:
                 config = json.load(f)
             phoneme_id_map = config.get("phoneme_id_map", {})
             for phoneme in phoneme_id_map:

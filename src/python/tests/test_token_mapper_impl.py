@@ -4,11 +4,12 @@ Testing the actual implementation without modifying it
 """
 
 import pytest
+
 from piper_train.phonemize.token_mapper import (
-    TOKEN2CHAR,
     CHAR2TOKEN,
-    register,
+    TOKEN2CHAR,
     map_sequence,
+    register,
 )
 
 

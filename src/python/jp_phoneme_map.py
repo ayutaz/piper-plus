@@ -13,9 +13,9 @@ PHONEME_TO_PUA = {
     "cl": "\uE005",  # 促音/終止閉鎖
     # Palatalized consonants
     "ky": "\uE006", "kw": "\uE007", "gy": "\uE008", "gw": "\uE009",
-    "ty": "\uE00A", "dy": "\uE00B", "py": "\uE00C", "by": "\uE00D", 
-    "ch": "\uE00E", "ts": "\uE00F", "sh": "\uE010", 
-    "zy": "\uE011", "hy": "\uE012", "ny": "\uE013", 
+    "ty": "\uE00A", "dy": "\uE00B", "py": "\uE00C", "by": "\uE00D",
+    "ch": "\uE00E", "ts": "\uE00F", "sh": "\uE010",
+    "zy": "\uE011", "hy": "\uE012", "ny": "\uE013",
     "my": "\uE014", "ry": "\uE015"
 }
 
@@ -33,22 +33,22 @@ def get_phoneme_id_map():
         "#": 4,  # Boundary
         "[": 5,  # Left bracket
         "]": 6,  # Right bracket
-        
+
         # Voiced vowels (lowercase)
         "a": 7, "i": 8, "u": 9, "e": 10, "o": 11,
-        
+
         # Unvoiced vowels (uppercase) - NEW
         "A": 12, "I": 13, "U": 14, "E": 15, "O": 16,
-        
+
         # Special phonemes
         "N": 17,  # Moraic nasal ん
         "q": 18,  # Glottal stop っ
-        
+
         # Consonants
         "k": 19, "g": 20, "t": 21, "d": 22, "p": 23, "b": 24,
         "s": 25, "z": 26, "j": 27, "f": 28, "h": 29, "v": 30,
         "n": 31, "m": 32, "r": 33, "w": 34, "y": 35,
-        
+
         # PUA mappings (multi-character phonemes)
         "\uE000": 36,  # a:
         "\uE001": 37,  # i:
@@ -73,7 +73,7 @@ def get_phoneme_id_map():
         "\uE014": 56,  # my
         "\uE015": 57,  # ry
     }
-    
+
     return phoneme_id_map
 
 def get_phoneme_list():
@@ -87,16 +87,16 @@ def get_phoneme_list():
 def convert_phonemes_to_ids(phonemes):
     """
     Converts a list of phonemes to their corresponding IDs.
-    
+
     Args:
         phonemes: List of phoneme strings
-        
+
     Returns:
         List of phoneme IDs
     """
     phoneme_map = get_phoneme_id_map()
     ids = []
-    
+
     for phoneme in phonemes:
         # Check if it's a multi-character phoneme that needs PUA conversion
         if phoneme in PHONEME_TO_PUA:
@@ -111,26 +111,26 @@ def convert_phonemes_to_ids(phonemes):
         else:
             print(f"Warning: Unknown phoneme '{phoneme}'")
             ids.append(0)  # Use silence as fallback
-    
+
     return ids
 
 def create_model_config(model_path="ja_JP-openjtalk-medium"):
     """
     Creates a model configuration with Japanese phoneme mappings.
-    
+
     Args:
         model_path: Base path for the model
-        
+
     Returns:
         Dictionary containing model configuration
     """
     phoneme_map = get_phoneme_id_map()
-    
+
     # Convert to format expected by Piper
     phoneme_id_map = {}
     for phoneme, id_val in phoneme_map.items():
         phoneme_id_map[phoneme] = [id_val]
-    
+
     config = {
         "dataset": "japanese_tts",
         "audio": {
@@ -156,17 +156,17 @@ def create_model_config(model_path="ja_JP-openjtalk-medium"):
         "speaker_id_map": {},
         "piper_version": "1.0.0"
     }
-    
+
     return config
 
 if __name__ == "__main__":
     # Test the mappings
     print("Japanese Phoneme ID Mapping:")
     print("=" * 60)
-    
+
     phoneme_list = get_phoneme_list()
     phoneme_map = get_phoneme_id_map()
-    
+
     for i, phoneme in enumerate(phoneme_list):
         if len(phoneme) == 1 and ord(phoneme) >= 0xE000:
             # Find the original phoneme for PUA characters
@@ -178,16 +178,16 @@ if __name__ == "__main__":
             print(f"{i:3d}: {repr(phoneme)} (PUA for '{original}')")
         else:
             print(f"{i:3d}: {repr(phoneme)}")
-    
+
     print(f"\nTotal phonemes: {len(phoneme_list)}")
-    
+
     # Test conversion
     print("\nTest conversion:")
     test_phonemes = ["k", "o", "N", "n", "i", "ch", "i", "w", "a"]
     test_ids = convert_phonemes_to_ids(test_phonemes)
     print(f"Phonemes: {test_phonemes}")
     print(f"IDs: {test_ids}")
-    
+
     # Test with unvoiced vowels
     test_phonemes2 = ["d", "e", "s", "U"]  # です with unvoiced う
     test_ids2 = convert_phonemes_to_ids(test_phonemes2)

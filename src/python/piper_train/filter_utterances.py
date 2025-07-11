@@ -129,11 +129,10 @@ def main():
                     utt.exclude_reason = ExcludeReason.LOW
                 elif utt.rate > upper:
                     utt.exclude_reason = ExcludeReason.HIGH
+                elif is_multispeaker:
+                    writer.writerow((utt.id, utt.speaker, utt.text))
                 else:
-                    if is_multispeaker:
-                        writer.writerow((utt.id, utt.speaker, utt.text))
-                    else:
-                        writer.writerow((utt.id, utt.text))
+                    writer.writerow((utt.id, utt.text))
 
     if args.write_json:
         speaker_excluded = {

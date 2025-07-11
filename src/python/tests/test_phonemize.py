@@ -9,14 +9,15 @@ pytest.importorskip("piper_train.phonemize")
 
 # noqa: E402 - Import after pytest.importorskip
 from piper_train.phonemize.token_mapper import (
-    TOKEN2CHAR,
     CHAR2TOKEN,
+    TOKEN2CHAR,
     map_sequence,
 )  # noqa: E402
 
 # Japanese imports are optional
 try:
     import pyopenjtalk  # noqa: F401
+
     from piper_train.phonemize.japanese import phonemize_japanese
 
     HAS_JAPANESE = True
@@ -83,7 +84,7 @@ class TestPhonemization:
         """Test katakana to phonemes conversion"""
         if not HAS_JAPANESE:
             pytest.skip("Japanese phonemizer not available")
-        
+
         # Basic katakana
         test_cases = [
             ("ア", ["a"]),
@@ -103,14 +104,14 @@ class TestPhonemization:
             ("ワ", ["w", "a"]),
             ("ン", ["N"]),
         ]
-        
+
         for katakana, expected_phonemes in test_cases:
             phonemes = phonemize_japanese(katakana)
             # Remove markers for comparison
             phoneme_list = [p for p in phonemes if p not in ["^", "$", "_"]]
             for expected in expected_phonemes:
                 assert expected in phoneme_list, f"Expected '{expected}' in phonemes for '{katakana}', got {phoneme_list}"
-    
+
     @pytest.mark.unit
     @pytest.mark.japanese
     @pytest.mark.requires_openjtalk
@@ -118,7 +119,7 @@ class TestPhonemization:
         """Test handling of long vowels (ー)"""
         if not HAS_JAPANESE:
             pytest.skip("Japanese phonemizer not available")
-        
+
         test_cases = [
             ("カー", ["k", "a", "a"]),  # Long 'a'
             ("キー", ["k", "i", "i"]),  # Long 'i'
@@ -127,16 +128,16 @@ class TestPhonemization:
             ("コー", ["k", "o", "o"]),  # Long 'o'
             ("ソフトウェアー", ["s", "o", "f", "u", "t", "o", "w", "e", "a", "a"]),  # Complex case
         ]
-        
+
         for text, expected_phonemes in test_cases:
             phonemes = phonemize_japanese(text)
             phoneme_list = [p for p in phonemes if p not in ["^", "$", "_"]]
-            
+
             # Check if all expected phonemes are present in order
             phoneme_str = "".join(phoneme_list)
             expected_str = "".join(expected_phonemes)
             assert expected_str in phoneme_str, f"Expected phonemes {expected_phonemes} for '{text}', got {phoneme_list}"
-    
+
     @pytest.mark.unit
     @pytest.mark.japanese
     @pytest.mark.requires_openjtalk
@@ -144,31 +145,31 @@ class TestPhonemization:
         """Test handling of invalid inputs"""
         if not HAS_JAPANESE:
             pytest.skip("Japanese phonemizer not available")
-        
+
         # Test None input
         with pytest.raises((TypeError, AttributeError)):
             phonemize_japanese(None)
-        
+
         # Test empty string
         phonemes = phonemize_japanese("")
         assert isinstance(phonemes, list)
         assert len(phonemes) >= 2  # Should at least have start/end markers
-        
+
         # Test very long input (should not crash)
         long_text = "あ" * 1000
         phonemes = phonemize_japanese(long_text)
         assert len(phonemes) > 1000  # Should produce many phonemes
-        
+
         # Test mixed scripts
         mixed_text = "Hello こんにちは World"
         phonemes = phonemize_japanese(mixed_text)
         assert len(phonemes) > 0  # Should handle gracefully
-        
+
         # Test special characters
         special_chars = "！？。、・「」『』"
         phonemes = phonemize_japanese(special_chars)
         assert isinstance(phonemes, list)  # Should not crash
-    
+
     @pytest.mark.unit
     @pytest.mark.japanese
     @pytest.mark.requires_openjtalk
@@ -176,20 +177,20 @@ class TestPhonemization:
         """Test handling of small tsu (っ/ッ)"""
         if not HAS_JAPANESE:
             pytest.skip("Japanese phonemizer not available")
-        
+
         test_cases = [
             ("がっこう", ["g", "a", "q", "k", "o", "u"]),  # 学校
             ("ハッピー", ["h", "a", "q", "p", "i", "i"]),  # Happy
             ("ロック", ["r", "o", "q", "k", "u"]),  # Rock
         ]
-        
-        for text, expected_phonemes in test_cases:
+
+        for text, _expected_phonemes in test_cases:
             phonemes = phonemize_japanese(text)
             phoneme_list = [p for p in phonemes if p not in ["^", "$", "_"]]
-            
+
             # Check if 'q' (small tsu) is present
             assert "q" in phoneme_list, f"Expected 'q' (small tsu) in phonemes for '{text}'"
-    
+
     @pytest.mark.unit
     @pytest.mark.japanese
     @pytest.mark.requires_openjtalk
@@ -197,7 +198,7 @@ class TestPhonemization:
         """Test handling of compound kana (きゃ, しゅ, etc.)"""
         if not HAS_JAPANESE:
             pytest.skip("Japanese phonemizer not available")
-        
+
         test_cases = [
             ("きゃ", ["ky", "a"]),
             ("きゅ", ["ky", "u"]),
@@ -212,11 +213,11 @@ class TestPhonemization:
             ("にゅ", ["ny", "u"]),
             ("にょ", ["ny", "o"]),
         ]
-        
+
         for text, expected_phonemes in test_cases:
             phonemes = phonemize_japanese(text)
             phoneme_list = [p for p in phonemes if p not in ["^", "$", "_"]]
-            
+
             # Check if compound phonemes are handled correctly
             phoneme_str = " ".join(phoneme_list)
             expected_str = " ".join(expected_phonemes)

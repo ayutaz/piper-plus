@@ -120,7 +120,7 @@ class PiperDataset(Dataset):
     ) -> Iterable[Utterance]:
         num_skipped = 0
 
-        with open(dataset_path, "r", encoding="utf-8") as dataset_file:
+        with open(dataset_path, encoding="utf-8") as dataset_file:
             for line_idx, line in enumerate(dataset_file):
                 line = line.strip()
                 if not line:
@@ -173,7 +173,7 @@ class UtteranceCollate:
         num_mels = 0
 
         # Determine lengths
-        for utt_idx, utt in enumerate(utterances):
+        for _utt_idx, utt in enumerate(utterances):
             assert utt.spectrogram is not None
             assert utt.audio_norm is not None
 

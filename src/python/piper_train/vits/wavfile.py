@@ -470,18 +470,17 @@ def _read_data_chunk(
             else:
                 a[:, -bytes_per_sample:] = data.reshape((-1, bytes_per_sample))
             data = a.view(dt).reshape(a.shape[:-1])
+    elif bytes_per_sample in {1, 2, 4, 8}:
+        start = fid.tell()
+        data = numpy.memmap(
+            fid, dtype=dtype, mode="c", offset=start, shape=(n_samples,)
+        )
+        fid.seek(start + size)
     else:
-        if bytes_per_sample in {1, 2, 4, 8}:
-            start = fid.tell()
-            data = numpy.memmap(
-                fid, dtype=dtype, mode="c", offset=start, shape=(n_samples,)
-            )
-            fid.seek(start + size)
-        else:
-            raise ValueError(
-                "mmap=True not compatible with "
-                f"{bytes_per_sample}-byte container size."
-            )
+        raise ValueError(
+            "mmap=True not compatible with "
+            f"{bytes_per_sample}-byte container size."
+        )
 
     _handle_pad_byte(fid, size)
 
@@ -783,7 +782,7 @@ def write(filename, rate, data):
     try:
         dkind = data.dtype.kind
         if not (
-            dkind == "i" or dkind == "f" or (dkind == "u" and data.dtype.itemsize == 1)
+            dkind in ("i", "f") or dkind == "u" and data.dtype.itemsize == 1
         ):
             raise ValueError(f"Unsupported data type '{data.dtype}'")
 
@@ -816,7 +815,7 @@ def write(filename, rate, data):
             block_align,
             bit_depth,
         )
-        if not (dkind in ("i", "u")):
+        if dkind not in ("i", "u"):
             # add cbSize field for non-PCM files
             fmt_chunk_data += b"\x00\x00"
 
@@ -824,7 +823,7 @@ def write(filename, rate, data):
         header_data += fmt_chunk_data
 
         # fact chunk (non-PCM files)
-        if not (dkind in ("i", "u")):
+        if dkind not in ("i", "u"):
             header_data += b"fact"
             header_data += struct.pack("<II", 4, data.shape[0])
 

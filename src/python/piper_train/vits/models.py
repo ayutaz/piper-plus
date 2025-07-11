@@ -33,7 +33,7 @@ class StochasticDurationPredictor(nn.Module):
         self.log_flow = modules.Log()
         self.flows = nn.ModuleList()
         self.flows.append(modules.ElementwiseAffine(2))
-        for i in range(n_flows):
+        for _i in range(n_flows):
             self.flows.append(
                 modules.ConvFlow(2, filter_channels, kernel_size, n_layers=3)
             )
@@ -46,7 +46,7 @@ class StochasticDurationPredictor(nn.Module):
         )
         self.post_flows = nn.ModuleList()
         self.post_flows.append(modules.ElementwiseAffine(2))
-        for i in range(4):
+        for _i in range(4):
             self.post_flows.append(
                 modules.ConvFlow(2, filter_channels, kernel_size, n_layers=3)
             )
@@ -230,7 +230,7 @@ class ResidualCouplingBlock(nn.Module):
         self.gin_channels = gin_channels
 
         self.flows = nn.ModuleList()
-        for i in range(n_flows):
+        for _i in range(n_flows):
             self.flows.append(
                 modules.ResidualCouplingLayer(
                     channels,
@@ -308,7 +308,7 @@ class Generator(torch.nn.Module):
         upsample_kernel_sizes: typing.Tuple[int, ...],
         gin_channels: int = 0,
     ):
-        super(Generator, self).__init__()
+        super().__init__()
         self.LRELU_SLOPE = 0.1
         self.num_kernels = len(resblock_kernel_sizes)
         self.num_upsamples = len(upsample_rates)
@@ -334,7 +334,7 @@ class Generator(torch.nn.Module):
         self.resblocks = nn.ModuleList()
         for i in range(len(self.ups)):
             ch = upsample_initial_channel // (2 ** (i + 1))
-            for j, (k, d) in enumerate(
+            for _j, (k, d) in enumerate(
                 zip(resblock_kernel_sizes, resblock_dilation_sizes)
             ):
                 self.resblocks.append(resblock_module(ch, k, d))
@@ -383,7 +383,7 @@ class DiscriminatorP(torch.nn.Module):
         stride: int = 3,
         use_spectral_norm: bool = False,
     ):
-        super(DiscriminatorP, self).__init__()
+        super().__init__()
         self.LRELU_SLOPE = 0.1
         self.period = period
         self.use_spectral_norm = use_spectral_norm
@@ -463,7 +463,7 @@ class DiscriminatorP(torch.nn.Module):
 
 class DiscriminatorS(torch.nn.Module):
     def __init__(self, use_spectral_norm=False):
-        super(DiscriminatorS, self).__init__()
+        super().__init__()
         self.LRELU_SLOPE = 0.1
         norm_f = spectral_norm if use_spectral_norm else weight_norm
         self.convs = nn.ModuleList(
@@ -494,7 +494,7 @@ class DiscriminatorS(torch.nn.Module):
 
 class MultiPeriodDiscriminator(torch.nn.Module):
     def __init__(self, use_spectral_norm=False):
-        super(MultiPeriodDiscriminator, self).__init__()
+        super().__init__()
         periods = [2, 3, 5, 7, 11]
 
         discs = [DiscriminatorS(use_spectral_norm=use_spectral_norm)]
@@ -508,7 +508,7 @@ class MultiPeriodDiscriminator(torch.nn.Module):
         y_d_gs = []
         fmap_rs = []
         fmap_gs = []
-        for i, d in enumerate(self.discriminators):
+        for _i, d in enumerate(self.discriminators):
             y_d_r, fmap_r = d(y)
             y_d_g, fmap_g = d(y_hat)
             y_d_rs.append(y_d_r)

@@ -4,20 +4,18 @@ Test script for multilingual TTS functionality in Piper.
 This script can be run locally to test various languages before CI/CD execution.
 """
 
-import os
-import sys
-import subprocess
-import tempfile
-import json
-import time
 import argparse
-from pathlib import Path
-from typing import Dict, List, Tuple, Optional, Any
-import urllib.request
-import tarfile
-import zipfile
-import wave
 import io
+import json
+import os
+import subprocess
+import sys
+import tempfile
+import time
+import urllib.request
+import wave
+from pathlib import Path
+from typing import Dict, List, Tuple
 
 # Import platform utilities
 from platform_utils import get_platform_name
@@ -157,40 +155,40 @@ class MultilingualTTSTester:
         self.piper_path = Path(piper_path)
         self.cache_dir = Path(cache_dir or os.path.expanduser("~/.cache/piper/voices"))
         self.cache_dir.mkdir(parents=True, exist_ok=True)
-        
+
         # Results directory
         self.results_dir = Path("test_results")
         self.results_dir.mkdir(exist_ok=True)
-        
+
         # Performance directory
         self.performance_dir = self.results_dir / "performance"
         self.performance_dir.mkdir(exist_ok=True)
-        
+
         # Performance metrics collection
         self.all_metrics = {}
-        
+
     def download_model(self, language: str, config: Dict) -> Tuple[Path, Path]:
         """Download model files for a specific language."""
         model_name = config["model"]
         speaker = config["speaker"]
         lang_prefix = language.split("_")[0]
-        
+
         # Model paths
         model_dir = self.cache_dir / language
         model_dir.mkdir(parents=True, exist_ok=True)
-        
+
         model_path = model_dir / f"{model_name}.onnx"
         config_path = model_dir / f"{model_name}.onnx.json"
-        
+
         # Skip if already downloaded
         if model_path.exists() and config_path.exists():
             print(f"[OK] Model {model_name} already cached")
             return model_path, config_path
-        
+
         # Construct URLs
         quality = model_name.split("-")[-1]  # e.g., "medium", "low", "x_low"
         base_url = f"https://huggingface.co/{MODEL_REPO}/resolve/{MODEL_VERSION}/{lang_prefix}/{language}/{speaker}/{quality}"
-        
+
         # Download model
         if not model_path.exists():
             model_url = f"{base_url}/{model_name}.onnx?download=true"
@@ -201,7 +199,7 @@ class MultilingualTTSTester:
             except Exception as e:
                 print(f"Failed to download from primary URL: {e}")
                 raise
-        
+
         # Download config
         if not config_path.exists():
             config_url = f"{base_url}/{model_name}.onnx.json?download=true"
@@ -212,10 +210,10 @@ class MultilingualTTSTester:
             except Exception as e:
                 print(f"Failed to download config from primary URL: {e}")
                 raise
-        
+
         print(f"[OK] Downloaded {model_name} successfully")
         return model_path, config_path
-    
+
     def get_audio_duration(self, wav_file: str) -> float:
         """Get duration of a WAV file in seconds."""
         try:
@@ -226,14 +224,14 @@ class MultilingualTTSTester:
         except Exception as e:
             print(f"Error reading WAV file: {e}")
             return 0
-    
-    def test_language(self, language: str, config: Dict, 
+
+    def test_language(self, language: str, config: Dict,
                      test_type: str = "basic") -> Dict:
         """Test TTS for a specific language."""
         print(f"\n{'='*60}")
         print(f"Testing {language}: {config['model']}")
         print(f"{'='*60}")
-        
+
         results = {
             "language": language,
             "model": config["model"],
@@ -243,54 +241,54 @@ class MultilingualTTSTester:
             "errors": [],
             "performance": {}
         }
-        
+
         try:
             # Download model
             model_path, config_path = self.download_model(language, config)
-            
+
             # Create test input
             with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False, encoding='utf-8') as f:
                 f.write(config["test_text"])
                 input_file = f.name
-            
+
             # Output file with platform info
             platform_name = get_platform_name()
             output_file = f"{language}_{platform_name}_{config['model']}.wav"
-            
+
             # Run TTS
             print(f"Running TTS with text: {config['test_text'][:50]}...")
             start_time = time.time()
-            
+
             cmd = [
                 str(self.piper_path),
                 "--model", str(model_path),
                 "--output_file", output_file
             ]
-            
-            with open(input_file, 'r', encoding='utf-8') as f:
+
+            with open(input_file, encoding='utf-8') as f:
                 process = subprocess.run(
                     cmd,
                     stdin=f,
                     capture_output=True,
                     text=True,
-                    encoding='utf-8'
+                    encoding='utf-8', check=False
                 )
-            
+
             end_time = time.time()
             results["time"] = end_time - start_time
-            
+
             # Check results
             if process.returncode == 0:
                 if os.path.exists(output_file):
                     results["output_size"] = os.path.getsize(output_file)
                     if results["output_size"] > 10000:  # Minimum expected size
                         results["status"] = "success"
-                        
+
                         # Calculate performance metrics
                         audio_duration = self.get_audio_duration(output_file)
                         generation_time = results["time"]
                         rtf = generation_time / audio_duration if audio_duration > 0 else float('inf')
-                        
+
                         results["performance"] = {
                             "generation_time_ms": round(generation_time * 1000, 2),
                             "audio_duration_ms": round(audio_duration * 1000, 2),
@@ -300,10 +298,10 @@ class MultilingualTTSTester:
                             "audio_file": os.path.basename(output_file),
                             "test_text": config["test_text"]  # Add test text
                         }
-                        
+
                         print(f"[OK] Success! Generated {results['output_size']} bytes in {results['time']:.2f}s")
                         print(f"     RTF: {rtf:.4f}, Speed: {results['performance']['chars_per_second']:.1f} chars/s")
-                        
+
                         # Save output to results directory
                         result_path = self.results_dir / f"{language}_basic.wav"
                         os.rename(output_file, result_path)
@@ -315,11 +313,11 @@ class MultilingualTTSTester:
             else:
                 results["errors"].append(f"Process failed with code {process.returncode}")
                 results["errors"].append(f"stderr: {process.stderr}")
-            
+
             # Run additional tests based on test type
             if test_type in ["comprehensive", "performance"] and results["status"] == "success":
                 self._run_additional_tests(language, config, model_path, test_type, results)
-            
+
         except Exception as e:
             results["errors"].append(f"Exception: {str(e)}")
             print(f"[ERROR] {e}")
@@ -327,14 +325,14 @@ class MultilingualTTSTester:
             # Cleanup
             if 'input_file' in locals():
                 os.unlink(input_file)
-        
+
         return results
-    
-    def _run_additional_tests(self, language: str, config: Dict, 
+
+    def _run_additional_tests(self, language: str, config: Dict,
                             model_path: Path, test_type: str, results: Dict):
         """Run additional tests for comprehensive or performance testing."""
         print("\nRunning additional tests...")
-        
+
         # Test special characters
         special_tests = [
             "Testing numbers: 123, 456.78, -90",
@@ -342,55 +340,55 @@ class MultilingualTTSTester:
             "Testing symbols: $100, 50%, user@email.com",
             "Testing dates: January 1st, 2025 at 3:45 PM"
         ]
-        
+
         for i, test_text in enumerate(special_tests):
             with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False, encoding='utf-8') as f:
                 f.write(test_text)
                 input_file = f.name
-            
+
             output_file = f"test_special_{language}_{i}.wav"
             cmd = [
                 str(self.piper_path),
                 "--model", str(model_path),
                 "--output_file", output_file
             ]
-            
-            with open(input_file, 'r', encoding='utf-8') as f:
-                subprocess.run(cmd, stdin=f, capture_output=True, text=True, encoding='utf-8')
-            
+
+            with open(input_file, encoding='utf-8') as f:
+                subprocess.run(cmd, stdin=f, capture_output=True, text=True, encoding='utf-8', check=False)
+
             os.unlink(input_file)
             if os.path.exists(output_file):
                 print(f"  [OK] Special test {i+1} passed")
             else:
                 print(f"  [FAIL] Special test {i+1} failed")
-        
+
         # Performance test for long text
         if test_type == "performance":
             print("\nRunning performance test...")
             long_text = (config["test_text"] + " ") * 50  # Repeat 50 times
-            
+
             with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False, encoding='utf-8') as f:
                 f.write(long_text)
                 input_file = f.name
-            
+
             output_file = f"test_performance_{language}.wav"
             start_time = time.time()
-            
+
             cmd = [
                 str(self.piper_path),
                 "--model", str(model_path),
                 "--output_file", output_file
             ]
-            
-            with open(input_file, 'r', encoding='utf-8') as f:
-                subprocess.run(cmd, stdin=f, capture_output=True, text=True, encoding='utf-8')
-            
+
+            with open(input_file, encoding='utf-8') as f:
+                subprocess.run(cmd, stdin=f, capture_output=True, text=True, encoding='utf-8', check=False)
+
             end_time = time.time()
             perf_time = end_time - start_time
-            
+
             os.unlink(input_file)
             if os.path.exists(output_file):
-                size = os.path.getsize(output_file)
+                os.path.getsize(output_file)
                 print(f"  [OK] Performance: {len(long_text)} chars in {perf_time:.2f}s")
                 print(f"    Speed: {len(long_text)/perf_time:.0f} chars/second")
                 results["performance"] = {
@@ -398,25 +396,25 @@ class MultilingualTTSTester:
                     "time": perf_time,
                     "chars_per_second": len(long_text)/perf_time
                 }
-    
-    def test_all_languages(self, languages: List[str] = None, 
+
+    def test_all_languages(self, languages: List[str] = None,
                           test_type: str = "basic") -> Dict[str, Dict]:
         """Test all specified languages."""
         if languages is None:
             languages = list(LANGUAGE_CONFIGS.keys())
-        
+
         results = {}
         for lang in languages:
             if lang in LANGUAGE_CONFIGS:
                 results[lang] = self.test_language(lang, LANGUAGE_CONFIGS[lang], test_type)
             else:
                 print(f"Warning: Unknown language {lang}")
-        
+
         # Save performance metrics
         self.save_performance_metrics(results)
-        
+
         return results
-    
+
     def save_performance_metrics(self, results: Dict[str, Dict]):
         """Save performance metrics to JSON file."""
         metrics = {
@@ -424,7 +422,7 @@ class MultilingualTTSTester:
             "platform": sys.platform,
             "languages": {}
         }
-        
+
         for lang, result in results.items():
             if result["status"] == "success" and result.get("performance"):
                 metrics["languages"][lang] = {
@@ -432,39 +430,39 @@ class MultilingualTTSTester:
                     "performance": result["performance"],
                     "output_size": result["output_size"]
                 }
-        
+
         # Calculate overall statistics
         if metrics["languages"]:
             all_rtf = [m["performance"]["rtf"] for m in metrics["languages"].values() if m["performance"]["rtf"] != float('inf')]
             all_speeds = [m["performance"]["chars_per_second"] for m in metrics["languages"].values()]
-            
+
             metrics["summary"] = {
                 "total_languages": len(metrics["languages"]),
                 "avg_rtf": round(sum(all_rtf) / len(all_rtf), 4) if all_rtf else 0,
                 "avg_speed_chars_per_second": round(sum(all_speeds) / len(all_speeds), 2) if all_speeds else 0
             }
-        
+
         # Save to file
         metrics_file = self.performance_dir / f"multilingual_metrics_{sys.platform}_{int(time.time())}.json"
         with open(metrics_file, 'w', encoding='utf-8') as f:
             json.dump(metrics, f, ensure_ascii=False, indent=2)
-        
+
         # Also save summary for job summary
         summary_file = self.results_dir / "performance_summary.json"
         with open(summary_file, 'w', encoding='utf-8') as f:
             json.dump(metrics, f, ensure_ascii=False, indent=2)
-        
+
         print(f"\nPerformance metrics saved to: {metrics_file}")
-    
+
     def print_summary(self, results: Dict[str, Dict]):
         """Print a summary of test results."""
         print(f"\n{'='*60}")
         print("TEST SUMMARY")
         print(f"{'='*60}")
-        
+
         success_count = sum(1 for r in results.values() if r["status"] == "success")
         total_count = len(results)
-        
+
         print(f"Total languages tested: {total_count}")
         print(f"Successful: {success_count}")
         print(f"Failed: {total_count - success_count}")
@@ -472,22 +470,22 @@ class MultilingualTTSTester:
             print(f"Success rate: {success_count/total_count*100:.1f}%")
         else:
             print("No tests were run")
-        
+
         print("\nDetailed Results:")
         print(f"{'Language':<10} {'Model':<25} {'Status':<10} {'Time':<8} {'Size':<10}")
         print("-" * 70)
-        
+
         for lang, result in sorted(results.items()):
             status = "[PASS]" if result["status"] == "success" else "[FAIL]"
             time_str = f"{result['time']:.2f}s" if result['time'] > 0 else "N/A"
             size_str = f"{result['output_size']/1024:.1f}KB" if result['output_size'] > 0 else "N/A"
-            
+
             print(f"{lang:<10} {result['model']:<25} {status:<10} {time_str:<8} {size_str:<10}")
-            
+
             if result["errors"]:
                 for error in result["errors"]:
                     print(f"  -> {error}")
-        
+
         # Performance summary if available
         perf_results = {lang: r for lang, r in results.items() if "performance" in r and r["performance"]}
         if perf_results:
@@ -496,7 +494,7 @@ class MultilingualTTSTester:
             print(f"{'='*60}")
             print(f"{'Language':<10} {'Chars/Second':<15} {'Generation Time':<10}")
             print("-" * 35)
-            
+
             for lang, result in sorted(perf_results.items()):
                 perf = result["performance"]
                 # Use generation time in seconds
@@ -516,24 +514,24 @@ def main():
     parser.add_argument("--cache-dir", help="Directory to cache voice models")
     parser.add_argument("--skip-download", action="store_true",
                        help="Skip model downloads (use cached only)")
-    
+
     args = parser.parse_args()
-    
+
     # Check if piper exists
     if not os.path.exists(args.piper):
         print(f"Error: Piper not found at {args.piper}")
         sys.exit(1)
-    
+
     # Initialize tester
     tester = MultilingualTTSTester(args.piper, args.cache_dir)
-    
+
     # Run tests
     print(f"Starting multilingual TTS tests ({args.test_type} mode)...")
     results = tester.test_all_languages(args.languages, args.test_type)
-    
+
     # Print summary
     tester.print_summary(results)
-    
+
     # Return appropriate exit code
     success_count = sum(1 for r in results.values() if r["status"] == "success")
     if success_count == len(results):

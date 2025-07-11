@@ -56,7 +56,7 @@ def main():
     config_path = args.dataset_dir / "config.json"
     dataset_path = args.dataset_dir / "dataset.jsonl"
 
-    with open(config_path, "r", encoding="utf-8") as config_file:
+    with open(config_path, encoding="utf-8") as config_file:
         # See preprocess.py for format
         config = json.load(config_file)
         num_symbols = int(config["num_symbols"])

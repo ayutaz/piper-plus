@@ -5,15 +5,16 @@ Provides a unified interface for running all tests with various options
 """
 
 import argparse
-import sys
-import subprocess
 import os
+import subprocess
+import sys
 from pathlib import Path
+
 
 def run_command(cmd, cwd=None):
     """Run a command and return exit code"""
     print(f"Running: {' '.join(cmd)}")
-    result = subprocess.run(cmd, cwd=cwd)
+    result = subprocess.run(cmd, cwd=cwd, check=False)
     return result.returncode
 
 def main():

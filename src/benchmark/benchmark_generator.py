@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 import argparse
-import logging
 import json
-import time
+import logging
 import statistics
 import sys
+import time
 
 import torch
 
@@ -23,7 +23,7 @@ def main() -> None:
     if not args.config:
         args.config = f"{args.model}.json"
 
-    with open(args.config, "r", encoding="utf-8") as config_file:
+    with open(args.config, encoding="utf-8") as config_file:
         config = json.load(config_file)
 
     sample_rate = config["audio"]["sample_rate"]
