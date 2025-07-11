@@ -1,0 +1,137 @@
+name: 'Setup Build Cache'
+description: 'Configure ccache or sccache for faster builds'
+inputs:
+  cache_type:
+    description: 'Type of cache to use (ccache or sccache)'
+    required: false
+    default: 'ccache'
+  cache_key_prefix:
+    description: 'Prefix for cache key'
+    required: false
+    default: 'build-cache'
+  max_cache_size:
+    description: 'Maximum cache size'
+    required: false
+    default: '500M'
+
+outputs:
+  cache_hit:
+    description: 'Whether cache was restored'
+    value: ${{ steps.cache.outputs.cache-hit }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Setup cache environment
+      id: setup
+      shell: bash
+      run: |
+        # Determine OS and cache paths
+        if [[ "$RUNNER_OS" == "Linux" ]]; then
+          CACHE_DIR="$HOME/.cache/${{ inputs.cache_type }}"
+        elif [[ "$RUNNER_OS" == "macOS" ]]; then
+          CACHE_DIR="$HOME/Library/Caches/${{ inputs.cache_type }}"
+        elif [[ "$RUNNER_OS" == "Windows" ]]; then
+          CACHE_DIR="$HOME/AppData/Local/${{ inputs.cache_type }}"
+        fi
+        
+        echo "cache_dir=$CACHE_DIR" >> $GITHUB_OUTPUT
+        echo "CCACHE_DIR=$CACHE_DIR" >> $GITHUB_ENV
+        echo "SCCACHE_DIR=$CACHE_DIR" >> $GITHUB_ENV
+        
+        # Create cache key
+        CACHE_KEY="${{ inputs.cache_key_prefix }}-${{ runner.os }}-${{ github.job }}-${{ hashFiles('**/CMakeLists.txt', '**/*.cmake') }}"
+        echo "cache_key=$CACHE_KEY" >> $GITHUB_OUTPUT
+
+    - name: Restore cache
+      id: cache
+      uses: actions/cache@v4
+      with:
+        path: ${{ steps.setup.outputs.cache_dir }}
+        key: ${{ steps.setup.outputs.cache_key }}
+        restore-keys: |
+          ${{ inputs.cache_key_prefix }}-${{ runner.os }}-${{ github.job }}-
+          ${{ inputs.cache_key_prefix }}-${{ runner.os }}-
+
+    - name: Install ccache
+      if: inputs.cache_type == 'ccache'
+      shell: bash
+      run: |
+        if [[ "$RUNNER_OS" == "Linux" ]]; then
+          sudo apt-get update
+          sudo apt-get install -y ccache
+        elif [[ "$RUNNER_OS" == "macOS" ]]; then
+          brew install ccache
+        elif [[ "$RUNNER_OS" == "Windows" ]]; then
+          choco install ccache
+        fi
+
+    - name: Install sccache
+      if: inputs.cache_type == 'sccache'
+      shell: bash
+      run: |
+        # Download sccache binary
+        if [[ "$RUNNER_OS" == "Linux" ]]; then
+          SCCACHE_URL="https://github.com/mozilla/sccache/releases/download/v0.7.4/sccache-v0.7.4-x86_64-unknown-linux-musl.tar.gz"
+        elif [[ "$RUNNER_OS" == "macOS" ]]; then
+          SCCACHE_URL="https://github.com/mozilla/sccache/releases/download/v0.7.4/sccache-v0.7.4-x86_64-apple-darwin.tar.gz"
+        elif [[ "$RUNNER_OS" == "Windows" ]]; then
+          SCCACHE_URL="https://github.com/mozilla/sccache/releases/download/v0.7.4/sccache-v0.7.4-x86_64-pc-windows-msvc.zip"
+        fi
+        
+        curl -L $SCCACHE_URL -o sccache.archive
+        
+        if [[ "$RUNNER_OS" == "Windows" ]]; then
+          unzip sccache.archive
+          mv sccache-*/sccache.exe /usr/local/bin/
+        else
+          tar xzf sccache.archive
+          sudo mv sccache-*/sccache /usr/local/bin/
+          sudo chmod +x /usr/local/bin/sccache
+        fi
+
+    - name: Configure cache
+      shell: bash
+      run: |
+        if [[ "${{ inputs.cache_type }}" == "ccache" ]]; then
+          ccache --set-config max_size=${{ inputs.max_cache_size }}
+          ccache --set-config compression=true
+          ccache --set-config compression_level=6
+          
+          # Export for CMake
+          echo "CMAKE_C_COMPILER_LAUNCHER=ccache" >> $GITHUB_ENV
+          echo "CMAKE_CXX_COMPILER_LAUNCHER=ccache" >> $GITHUB_ENV
+          
+          # Show stats
+          ccache -z
+          ccache -s
+        elif [[ "${{ inputs.cache_type }}" == "sccache" ]]; then
+          # Export for CMake
+          echo "CMAKE_C_COMPILER_LAUNCHER=sccache" >> $GITHUB_ENV
+          echo "CMAKE_CXX_COMPILER_LAUNCHER=sccache" >> $GITHUB_ENV
+          echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
+          
+          # Start sccache server
+          sccache --start-server || true
+          sccache -s
+        fi
+
+    - name: Setup cache statistics
+      shell: bash
+      run: |
+        # Create post-action script to show cache stats
+        mkdir -p $RUNNER_TEMP
+        cat > $RUNNER_TEMP/show-cache-stats.sh << 'EOF'
+        #!/bin/bash
+        echo "::group::Cache Statistics"
+        if command -v ccache &> /dev/null; then
+          ccache -s
+        elif command -v sccache &> /dev/null; then
+          sccache -s
+        fi
+        echo "::endgroup::"
+        EOF
+        chmod +x $RUNNER_TEMP/show-cache-stats.sh
+        
+        # Register as post-action
+        echo "$RUNNER_TEMP/show-cache-stats.sh" >> $GITHUB_PATH

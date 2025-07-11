@@ -1,0 +1,359 @@
+name: dev-build-all
+
+on:
+  workflow_call:
+    inputs:
+      release_upload_url:
+        description: 'GitHub Release upload URL'
+        required: false
+        type: string
+      use_new_workflow:
+        description: 'Use new workflow (for testing)'
+        required: false
+        type: boolean
+        default: false
+    outputs:
+      artifacts_built:
+        description: 'Whether artifacts were successfully built'
+        value: ${{ jobs.summary.outputs.success }}
+  workflow_dispatch:
+    inputs:
+      use_new_workflow:
+        description: 'Use new workflow (for testing)'
+        required: false
+        type: boolean
+        default: false
+
+env:
+  DOCKER_BUILDKIT: 1
+  CMAKE_BUILD_TYPE: Release
+
+permissions:
+  contents: write
+  packages: read
+
+jobs:
+  # Linux x86_64 Build
+  build_linux_x64:
+    name: Build Linux x86_64
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4.2.2
+        with:
+          submodules: true
+
+      - name: Setup build cache
+        uses: ./.github/actions/setup-build-cache
+        with:
+          cache_type: ccache
+          cache_key_prefix: piper-linux-x64
+
+      - name: Build wheels
+        run: |
+          # For Linux x86_64, we build wheels for Python 3.9-3.13
+          declare -a python_versions=("cp39-cp39" "cp310-cp310" "cp311-cp311" "cp312-cp312" "cp313-cp313")
+          
+          for pyver in "${python_versions[@]}"; do
+            echo "Building wheel for Python ${pyver}"
+            docker run --rm \
+              -v "$(pwd)":/workspace \
+              -w /workspace \
+              -e PYTHON_VERSION="${pyver}" \
+              quay.io/pypa/manylinux_2_28_x86_64 \
+              bash -c "
+                /opt/python/${pyver}/bin/python -m pip install --upgrade pip wheel build
+                /opt/python/${pyver}/bin/python -m build --wheel
+                auditwheel repair dist/*.whl --plat manylinux_2_28_x86_64 -w dist/
+                rm dist/*-linux_x86_64.whl
+              "
+          done
+
+      - name: Create dist package
+        run: |
+          # Create distribution package with ccache
+          export CMAKE_C_COMPILER_LAUNCHER=ccache
+          export CMAKE_CXX_COMPILER_LAUNCHER=ccache
+          make dist
+          cd dist && tar czf piper-linux-x64.tar.gz piper/
+          
+          # Show cache statistics
+          ccache -s
+
+      - name: Upload wheel artifacts
+        uses: actions/upload-artifact@v4.5.0
+        with:
+          name: wheels-linux-x64
+          path: dist/*.whl
+
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4.5.0
+        with:
+          name: piper-linux-x64
+          path: dist/piper-linux-x64.tar.gz
+
+      - name: Upload to release
+        if: inputs.release_upload_url != ''
+        uses: ./.github/actions/retry-upload
+        with:
+          upload_url: ${{ inputs.release_upload_url }}
+          asset_path: dist/piper-linux-x64.tar.gz
+          asset_name: piper-linux-x64.tar.gz
+
+  # macOS ARM64 Build
+  build_macos_arm64:
+    name: Build macOS ARM64
+    runs-on: macos-13
+    steps:
+      - uses: actions/checkout@v4.2.2
+        with:
+          submodules: true
+
+      - name: Setup build cache
+        uses: ./.github/actions/setup-build-cache
+        with:
+          cache_type: ccache
+          cache_key_prefix: piper-macos-arm64
+
+      - name: Install dependencies
+        run: |
+          brew install cmake pkg-config espeak-ng onnxruntime mecab
+
+      - name: Build piper
+        run: |
+          export CMAKE_C_COMPILER_LAUNCHER=ccache
+          export CMAKE_CXX_COMPILER_LAUNCHER=ccache
+          make clean && make -j$(sysctl -n hw.ncpu)
+          
+          # Show cache statistics
+          ccache -s
+
+      - name: Create dist package
+        run: |
+          make dist-nostrip
+          cd dist
+          
+          # Fix library paths
+          for lib in libespeak-ng.2.dylib libonnxruntime*.dylib; do
+            install_name_tool -change \
+              /opt/homebrew/opt/espeak-ng/lib/libespeak-ng.2.dylib \
+              @loader_path/libespeak-ng.2.dylib \
+              piper/piper
+            install_name_tool -change \
+              /opt/homebrew/opt/onnxruntime/lib/$lib \
+              @loader_path/$lib \
+              piper/piper
+          done
+          
+          tar czf piper-macos-arm64.tar.gz piper/
+
+      - name: Build wheels
+        run: |
+          # Setup Python versions
+          brew install python@3.9 python@3.10 python@3.11 python@3.12 python@3.13
+          
+          for py in python3.9 python3.10 python3.11 python3.12 python3.13; do
+            $py -m pip install --upgrade pip wheel build delocate
+            $py -m build --wheel
+            delocate-wheel -w dist/ -v dist/*.whl
+          done
+
+      - name: Upload wheel artifacts
+        uses: actions/upload-artifact@v4.5.0
+        with:
+          name: wheels-macos-arm64
+          path: dist/*.whl
+
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4.5.0
+        with:
+          name: piper-macos-arm64
+          path: dist/piper-macos-arm64.tar.gz
+
+      - name: Upload to release
+        if: inputs.release_upload_url != ''
+        uses: ./.github/actions/retry-upload
+        with:
+          upload_url: ${{ inputs.release_upload_url }}
+          asset_path: dist/piper-macos-arm64.tar.gz
+          asset_name: piper-macos-arm64.tar.gz
+
+  # Windows x64 Build
+  build_windows_x64:
+    name: Build Windows x64
+    runs-on: windows-2019
+    steps:
+      - uses: actions/checkout@v4.2.2
+        with:
+          submodules: true
+
+      - name: Setup build cache
+        uses: ./.github/actions/setup-build-cache
+        with:
+          cache_type: sccache
+          cache_key_prefix: piper-windows-x64
+
+      - name: Download ONNX Runtime
+        run: |
+          Invoke-WebRequest -Uri "https://github.com/microsoft/onnxruntime/releases/download/v1.14.1/onnxruntime-win-x64-1.14.1.zip" -OutFile "onnxruntime.zip"
+          Expand-Archive -Path "onnxruntime.zip" -DestinationPath "."
+          Move-Item -Path "onnxruntime-win-x64-1.14.1" -Destination "onnxruntime"
+
+      - name: Build piper
+        run: |
+          cmake -B build -G "Visual Studio 16 2019" -A x64 -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
+          cmake --build build --config Release
+          
+          # Show cache statistics
+          sccache -s
+
+      - name: Create dist package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist/piper
+          
+          # Copy executables and libraries
+          Copy-Item build/Release/*.exe dist/piper/
+          Copy-Item build/Release/*.dll dist/piper/
+          Copy-Item onnxruntime/lib/*.dll dist/piper/
+          
+          # Create zip
+          Compress-Archive -Path dist/piper -DestinationPath dist/piper-windows-x64.zip
+
+      - name: Build wheels
+        run: |
+          # Install Python versions
+          foreach ($pyver in @("3.9", "3.10", "3.11", "3.12", "3.13")) {
+            python -m pip install --upgrade pip wheel build
+            python -m build --wheel
+          }
+
+      - name: Upload wheel artifacts
+        uses: actions/upload-artifact@v4.5.0
+        with:
+          name: wheels-windows-x64
+          path: dist/*.whl
+
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4.5.0
+        with:
+          name: piper-windows-x64
+          path: dist/piper-windows-x64.zip
+
+      - name: Upload to release
+        if: inputs.release_upload_url != ''
+        uses: ./.github/actions/retry-upload
+        with:
+          upload_url: ${{ inputs.release_upload_url }}
+          asset_path: dist/piper-windows-x64.zip
+          asset_name: piper-windows-x64.zip
+
+  # Linux ARM64 Build (Docker)
+  build_linux_arm64:
+    name: Build Linux ARM64
+    runs-on: ubuntu-22.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4.2.2
+        with:
+          submodules: true
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
+      - name: Build in Docker
+        run: |
+          docker run --rm \
+            --platform linux/arm64 \
+            -v "$(pwd)":/workspace \
+            -w /workspace \
+            debian:bookworm \
+            bash -c "
+              apt-get update && apt-get install -y build-essential cmake
+              make -j2
+              make dist
+              cd dist && tar czf piper-linux-arm64.tar.gz piper/
+            "
+
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4.5.0
+        with:
+          name: piper-linux-arm64
+          path: dist/piper-linux-arm64.tar.gz
+
+      - name: Upload to release
+        if: inputs.release_upload_url != ''
+        uses: ./.github/actions/retry-upload
+        with:
+          upload_url: ${{ inputs.release_upload_url }}
+          asset_path: dist/piper-linux-arm64.tar.gz
+          asset_name: piper-linux-arm64.tar.gz
+
+  # Linux ARMv7 Build (Docker)
+  build_linux_armv7:
+    name: Build Linux ARMv7
+    runs-on: ubuntu-22.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4.2.2
+        with:
+          submodules: true
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm
+
+      - name: Build in Docker
+        run: |
+          docker run --rm \
+            --platform linux/arm/v7 \
+            -v "$(pwd)":/workspace \
+            -w /workspace \
+            debian:bookworm \
+            bash -c "
+              apt-get update && apt-get install -y build-essential cmake
+              make -j2
+              make dist
+              cd dist && tar czf piper-linux-armv7.tar.gz piper/
+            "
+
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4.5.0
+        with:
+          name: piper-linux-armv7
+          path: dist/piper-linux-armv7.tar.gz
+
+      - name: Upload to release
+        if: inputs.release_upload_url != ''
+        uses: ./.github/actions/retry-upload
+        with:
+          upload_url: ${{ inputs.release_upload_url }}
+          asset_path: dist/piper-linux-armv7.tar.gz
+          asset_name: piper-linux-armv7.tar.gz
+
+  # Build Summary
+  summary:
+    name: Build Summary
+    runs-on: ubuntu-latest
+    needs: [build_linux_x64, build_macos_arm64, build_windows_x64, build_linux_arm64, build_linux_armv7]
+    if: always()
+    outputs:
+      success: ${{ steps.check.outputs.success }}
+    steps:
+      - name: Check build results
+        id: check
+        run: |
+          if [ "${{ needs.build_linux_x64.result }}" = "success" ] && \
+             [ "${{ needs.build_macos_arm64.result }}" = "success" ] && \
+             [ "${{ needs.build_windows_x64.result }}" = "success" ] && \
+             [ "${{ needs.build_linux_arm64.result }}" = "success" ] && \
+             [ "${{ needs.build_linux_armv7.result }}" = "success" ]; then
+            echo "success=true" >> $GITHUB_OUTPUT
+            echo "✅ All builds completed successfully"
+          else
+            echo "success=false" >> $GITHUB_OUTPUT
+            echo "❌ Some builds failed"
+            exit 1
+          fi
