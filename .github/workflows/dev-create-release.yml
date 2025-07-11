@@ -111,9 +111,6 @@ jobs:
     uses: ./.github/workflows/test-suite.yml
     with:
       release_name: ${{ needs.create_release.outputs.release_name }}
-    permissions:
-      contents: read
-      packages: read
 
   # Publish to PyPI
   publish_pypi:

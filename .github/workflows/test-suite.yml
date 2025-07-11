@@ -42,9 +42,6 @@ jobs:
   test_japanese_tts:
     name: Test Japanese TTS
     uses: ./.github/workflows/test-japanese-tts.yml
-    permissions:
-      contents: read
-      packages: read
 
   # Multilingual TTS Test (from existing workflow)
   test_multilingual_tts:
@@ -53,9 +50,6 @@ jobs:
     with:
       languages: 'en_US,de_DE,fr_FR,es_ES,zh_CN'
       test_type: 'basic'
-    permissions:
-      contents: read
-      packages: read
 
   # Performance Benchmarks
   performance_benchmark:
