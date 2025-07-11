@@ -2,7 +2,7 @@
 
 ## Requirements
 
-- Python 3.11 or higher
+- Python 3.11, 3.12, or 3.13
 
 ## Development Setup
 
