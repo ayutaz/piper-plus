@@ -43,7 +43,7 @@ __declspec(thread) static char g_openjtalk_bin_path[OPENJTALK_MAX_PATH] = {0};
 static CRITICAL_SECTION g_path_mutex;
 static BOOL g_mutex_initialized = FALSE;
 #else
-__thread static char g_openjtalk_bin_path[OPENJTALK_MAX_PATH] = {0};
+static __thread char g_openjtalk_bin_path[OPENJTALK_MAX_PATH] = {0};
 static pthread_mutex_t g_path_mutex = PTHREAD_MUTEX_INITIALIZER;
 #endif
 
