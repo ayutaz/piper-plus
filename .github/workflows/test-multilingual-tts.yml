@@ -44,9 +44,6 @@ on:
         required: false
         default: 'basic'
         type: string
-    permissions:
-      contents: read
-      packages: read
 
 env:
   # HuggingFace model repository

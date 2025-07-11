@@ -17,9 +17,6 @@ on:
       - '.github/workflows/build-piper.yml'
   workflow_dispatch:
   workflow_call:
-    permissions:
-      contents: read
-      packages: read
 
 jobs:
   # Build piper for all platforms
