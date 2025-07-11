@@ -1,7 +1,7 @@
 [tool.ruff]
 # Ruffの基本設定
 line-length = 88  # blackと同じ行長
-target-version = "py38"  # Python 3.8以降をターゲット
+target-version = "py311"  # Python 3.11以降をターゲット
 
 # 除外するファイルとディレクトリ
 exclude = [

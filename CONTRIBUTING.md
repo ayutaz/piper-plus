@@ -1,5 +1,9 @@
 # Contributing to Piper
 
+## Requirements
+
+- Python 3.11 or higher
+
 ## Development Setup
 
 ### Python Development
