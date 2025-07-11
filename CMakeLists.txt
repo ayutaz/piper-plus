@@ -82,6 +82,12 @@ target_sources(test_piper PRIVATE
   # src/cpp/openjtalk_api.c  # Temporarily disabled - requires OpenJTalk static libs
 )
 
+# Link pthread library on Unix systems
+if(UNIX AND NOT APPLE)
+  find_package(Threads REQUIRED)
+  target_link_libraries(piper PRIVATE Threads::Threads)
+  target_link_libraries(test_piper PRIVATE Threads::Threads)
+endif()
 
 # Configure RPATH for macOS
 if(APPLE)

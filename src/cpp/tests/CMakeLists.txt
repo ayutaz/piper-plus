@@ -48,8 +48,9 @@ foreach(test_source ${TEST_SOURCES})
         target_include_directories(${test_name} PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/..
         )
+        find_package(Threads REQUIRED)
         target_link_libraries(${test_name}
-            ${CMAKE_THREAD_LIBS_INIT}
+            Threads::Threads
         )
     endif()
     
@@ -65,8 +66,9 @@ foreach(test_source ${TEST_SOURCES})
         target_include_directories(${test_name} PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/..
         )
+        find_package(Threads REQUIRED)
         target_link_libraries(${test_name}
-            ${CMAKE_THREAD_LIBS_INIT}
+            Threads::Threads
         )
     endif()
 
