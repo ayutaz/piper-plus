@@ -104,75 +104,21 @@ jobs:
       contents: write
       packages: read
 
-  # Run tests
-  test_japanese:
-    name: Test Japanese TTS
+  # Run comprehensive test suite
+  run_tests:
+    name: Run Test Suite
     needs: build_all
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-22.04, macos-13, windows-2019]
-      fail-fast: false
-    steps:
-      - uses: actions/checkout@v4.2.2
-
-      - name: Setup test model cache
-        uses: actions/cache@v4
-        with:
-          path: |
-            test_models/
-            ~/.cache/piper_tts_models/
-          key: test-models-${{ runner.os }}-${{ hashFiles('**/test_*.onnx') }}
-          restore-keys: |
-            test-models-${{ runner.os }}-
-            test-models-
-
-      - name: Download test model
-        shell: bash
-        run: |
-          mkdir -p test_models
-          if [ ! -f test_models/test_voice.onnx ]; then
-            echo "Downloading test model..."
-            # Replace with actual test model URL
-            curl -L https://github.com/rhasspy/piper/releases/download/v1.2.0/voice-en-us-lessac-low.onnx -o test_models/test_voice.onnx || echo "Using placeholder model"
-          fi
-
-      - name: Download artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: piper-${{ matrix.os == 'ubuntu-22.04' && 'linux-x64' || matrix.os == 'macos-13' && 'macos-arm64' || 'windows-x64' }}
-          path: dist/
-
-      - name: Extract and test
-        shell: bash
-        run: |
-          cd dist
-          if [[ "${{ matrix.os }}" == "windows-2019" ]]; then
-            unzip piper-windows-x64.zip
-            ./piper/piper.exe --version
-            echo "こんにちは、世界" | ./piper/piper.exe \
-              --model ../test_models/test_voice.onnx \
-              --output_file test_ja.wav
-          else
-            tar xzf piper-*.tar.gz
-            ./piper/piper --version
-            echo "こんにちは、世界" | ./piper/piper \
-              --model ../test_models/test_voice.onnx \
-              --output_file test_ja.wav
-          fi
-          
-          # Verify output
-          if [ -f test_ja.wav ]; then
-            echo "✅ Japanese TTS test passed"
-          else
-            echo "❌ Japanese TTS test failed"
-            exit 1
-          fi
+    uses: ./.github/workflows/test-suite.yml
+    with:
+      release_name: ${{ needs.create_release.outputs.release_name }}
+    permissions:
+      contents: read
+      packages: read
 
   # Publish to PyPI
   publish_pypi:
     name: Publish to PyPI
-    needs: [build_all, test_japanese]
+    needs: [build_all, run_tests]
     if: github.ref == 'refs/heads/dev' && github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
@@ -214,7 +160,7 @@ jobs:
   release_summary:
     name: Release Summary
     runs-on: ubuntu-latest
-    needs: [create_release, build_all, test_japanese, publish_pypi]
+    needs: [create_release, build_all, run_tests, publish_pypi]
     if: always()
     steps:
       - name: Summary
@@ -227,7 +173,7 @@ jobs:
           echo "### Build Status"
           echo "- Create Release: ${{ needs.create_release.result }}"
           echo "- Build All: ${{ needs.build_all.result }}"
-          echo "- Test Japanese: ${{ needs.test_japanese.result }}"
+          echo "- Test Suite: ${{ needs.run_tests.result }}"
           echo "- Publish PyPI: ${{ needs.publish_pypi.result }}"
           echo ""
           
