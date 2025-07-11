@@ -8,7 +8,12 @@ int openjtalk_is_safe_path(const char* path) {
     if (!path) return 0;
     
     // Check for common command injection characters
+#ifdef _WIN32
+    // On Windows, backslash is a valid path separator
+    const char* dangerous_chars = ";|&<>`$(){}[]!";
+#else
     const char* dangerous_chars = ";|&<>`$(){}[]!\\";
+#endif
     
     for (const char* p = path; *p; p++) {
         if (strchr(dangerous_chars, *p)) {
@@ -23,7 +28,10 @@ int openjtalk_is_safe_path(const char* path) {
     
     // Check for dangerous patterns
     if (strstr(path, "..")) return 0;  // Path traversal
+#ifndef _WIN32
+    // On Unix, double slash is suspicious
     if (strstr(path, "//")) return 0;  // Double slash
+#endif
     
     return 1;
 }
