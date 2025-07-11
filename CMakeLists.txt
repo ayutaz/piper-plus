@@ -75,6 +75,7 @@ target_sources(piper PRIVATE
   src/cpp/openjtalk_dictionary_manager.c
   src/cpp/openjtalk_error.c
   src/cpp/openjtalk_security.c
+  src/cpp/openjtalk_optimized.c
   # src/cpp/openjtalk_api.c  # Temporarily disabled - requires OpenJTalk static libs
 )
 target_sources(test_piper PRIVATE
@@ -83,6 +84,7 @@ target_sources(test_piper PRIVATE
   src/cpp/openjtalk_dictionary_manager.c
   src/cpp/openjtalk_error.c
   src/cpp/openjtalk_security.c
+  src/cpp/openjtalk_optimized.c
   # src/cpp/openjtalk_api.c  # Temporarily disabled - requires OpenJTalk static libs
 )
 

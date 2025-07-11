@@ -6,6 +6,7 @@ set(TEST_SOURCES
     test_piper_core.cpp
     test_openjtalk_security.cpp
     test_openjtalk_error_handling.cpp
+    test_openjtalk_optimized.cpp
 )
 
 # Add dictionary manager test for Unix platforms
@@ -61,6 +62,25 @@ foreach(test_source ${TEST_SOURCES})
             ../openjtalk_dictionary_manager.c
             ../openjtalk_error.c
             ../openjtalk_security.c
+            # ../openjtalk_api.c  # Temporarily disabled - requires OpenJTalk static libs
+        )
+        target_include_directories(${test_name} PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/..
+        )
+        find_package(Threads REQUIRED)
+        target_link_libraries(${test_name}
+            Threads::Threads
+        )
+    endif()
+    
+    # Link additional dependencies for optimized test
+    if(${test_name} STREQUAL "test_openjtalk_optimized")
+        target_sources(${test_name} PRIVATE
+            ../openjtalk_wrapper.c
+            ../openjtalk_dictionary_manager.c
+            ../openjtalk_error.c
+            ../openjtalk_security.c
+            ../openjtalk_optimized.c
             # ../openjtalk_api.c  # Temporarily disabled - requires OpenJTalk static libs
         )
         target_include_directories(${test_name} PRIVATE

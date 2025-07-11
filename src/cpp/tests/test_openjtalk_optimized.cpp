@@ -1,0 +1,261 @@
+#include <gtest/gtest.h>
+#include <chrono>
+#include <vector>
+#include <thread>
+#include <cstring>
+
+extern "C" {
+#include "../openjtalk_optimized.h"
+#include "../openjtalk_wrapper_functions.h"
+}
+
+class OpenJTalkOptimizedTest : public ::testing::Test {
+protected:
+    void SetUp() override {
+        // Initialize with cache enabled
+        OpenJTalkCacheConfig config = {
+            .max_entries = 100,
+            .max_memory_bytes = 1024 * 1024,  // 1MB
+            .ttl_seconds = 300  // 5 minutes
+        };
+        ASSERT_TRUE(openjtalk_optimized_init(&config));
+    }
+    
+    void TearDown() override {
+        openjtalk_optimized_cleanup();
+    }
+};
+
+// Test basic functionality
+TEST_F(OpenJTalkOptimizedTest, BasicConversion) {
+    if (!openjtalk_is_available()) {
+        GTEST_SKIP() << "OpenJTalk not available";
+    }
+    
+    const char* text = "こんにちは";
+    char* phonemes = openjtalk_text_to_phonemes_optimized(text);
+    
+    ASSERT_NE(phonemes, nullptr);
+    EXPECT_GT(strlen(phonemes), 0);
+    
+    // Should contain expected phonemes
+    EXPECT_NE(strstr(phonemes, "k"), nullptr);
+    EXPECT_NE(strstr(phonemes, "o"), nullptr);
+    EXPECT_NE(strstr(phonemes, "n"), nullptr);
+    
+    openjtalk_free_phonemes(phonemes);
+}
+
+// Test cache functionality
+TEST_F(OpenJTalkOptimizedTest, CacheHitPerformance) {
+    if (!openjtalk_is_available()) {
+        GTEST_SKIP() << "OpenJTalk not available";
+    }
+    
+    const char* text = "キャッシュテスト";
+    
+    // First call - cache miss
+    auto start = std::chrono::high_resolution_clock::now();
+    char* phonemes1 = openjtalk_text_to_phonemes_optimized(text);
+    auto end = std::chrono::high_resolution_clock::now();
+    auto first_duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+    
+    ASSERT_NE(phonemes1, nullptr);
+    
+    // Second call - should be cache hit and much faster
+    start = std::chrono::high_resolution_clock::now();
+    char* phonemes2 = openjtalk_text_to_phonemes_optimized(text);
+    end = std::chrono::high_resolution_clock::now();
+    auto second_duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+    
+    ASSERT_NE(phonemes2, nullptr);
+    
+    // Verify same result
+    EXPECT_STREQ(phonemes1, phonemes2);
+    
+    // Second call should be significantly faster (at least 10x)
+    EXPECT_LT(second_duration * 10, first_duration);
+    
+    // Check cache stats
+    OpenJTalkCacheStats stats;
+    openjtalk_get_cache_stats(&stats);
+    EXPECT_EQ(stats.total_requests, 2);
+    EXPECT_EQ(stats.cache_hits, 1);
+    EXPECT_EQ(stats.cache_misses, 1);
+    EXPECT_EQ(stats.current_entries, 1);
+    
+    openjtalk_free_phonemes(phonemes1);
+    openjtalk_free_phonemes(phonemes2);
+}
+
+// Test performance comparison with original implementation
+TEST_F(OpenJTalkOptimizedTest, PerformanceComparison) {
+    if (!openjtalk_is_available()) {
+        GTEST_SKIP() << "OpenJTalk not available";
+    }
+    
+    const char* test_texts[] = {
+        "これはテストです",
+        "音声合成のパフォーマンステスト",
+        "OpenJTalkの最適化",
+        "日本語の音素変換",
+        "キャッシュ機能のテスト"
+    };
+    const int num_texts = sizeof(test_texts) / sizeof(test_texts[0]);
+    const int iterations = 5;
+    
+    // Test original implementation
+    auto start = std::chrono::high_resolution_clock::now();
+    for (int i = 0; i < iterations; i++) {
+        for (int j = 0; j < num_texts; j++) {
+            char* phonemes = openjtalk_text_to_phonemes(test_texts[j]);
+            if (phonemes) {
+                openjtalk_free_phonemes(phonemes);
+            }
+        }
+    }
+    auto end = std::chrono::high_resolution_clock::now();
+    auto original_duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+    
+    // Clear cache for fair comparison
+    openjtalk_clear_cache();
+    
+    // Test optimized implementation
+    start = std::chrono::high_resolution_clock::now();
+    for (int i = 0; i < iterations; i++) {
+        for (int j = 0; j < num_texts; j++) {
+            char* phonemes = openjtalk_text_to_phonemes_optimized(test_texts[j]);
+            if (phonemes) {
+                openjtalk_free_phonemes(phonemes);
+            }
+        }
+    }
+    end = std::chrono::high_resolution_clock::now();
+    auto optimized_duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+    
+    // Optimized version should be faster (especially with cache)
+    EXPECT_LT(optimized_duration, original_duration);
+    
+    // Check cache effectiveness
+    OpenJTalkCacheStats stats;
+    openjtalk_get_cache_stats(&stats);
+    EXPECT_EQ(stats.total_requests, num_texts * iterations);
+    EXPECT_EQ(stats.cache_hits, num_texts * (iterations - 1));  // First iteration misses
+    EXPECT_EQ(stats.cache_misses, num_texts);  // Only first iteration
+    
+    std::cout << "Original implementation: " << original_duration << "ms\n";
+    std::cout << "Optimized implementation: " << optimized_duration << "ms\n";
+    std::cout << "Speedup: " << (double)original_duration / optimized_duration << "x\n";
+}
+
+// Test concurrent access
+TEST_F(OpenJTalkOptimizedTest, ConcurrentAccess) {
+    if (!openjtalk_is_available()) {
+        GTEST_SKIP() << "OpenJTalk not available";
+    }
+    
+    const int num_threads = 4;
+    const int iterations_per_thread = 10;
+    std::vector<std::thread> threads;
+    
+    auto worker = [iterations_per_thread](int thread_id) {
+        for (int i = 0; i < iterations_per_thread; i++) {
+            char text[100];
+            snprintf(text, sizeof(text), "スレッド%dのテスト%d", thread_id, i);
+            
+            char* phonemes = openjtalk_text_to_phonemes_optimized(text);
+            EXPECT_NE(phonemes, nullptr);
+            if (phonemes) {
+                openjtalk_free_phonemes(phonemes);
+            }
+        }
+    };
+    
+    // Launch threads
+    for (int i = 0; i < num_threads; i++) {
+        threads.emplace_back(worker, i);
+    }
+    
+    // Wait for completion
+    for (auto& t : threads) {
+        t.join();
+    }
+    
+    // Verify cache stats
+    OpenJTalkCacheStats stats;
+    openjtalk_get_cache_stats(&stats);
+    EXPECT_EQ(stats.total_requests, num_threads * iterations_per_thread);
+}
+
+// Test cache eviction
+TEST_F(OpenJTalkOptimizedTest, CacheEviction) {
+    // Reinitialize with small cache
+    openjtalk_optimized_cleanup();
+    
+    OpenJTalkCacheConfig config = {
+        .max_entries = 3,
+        .max_memory_bytes = 1024,  // 1KB
+        .ttl_seconds = 300
+    };
+    ASSERT_TRUE(openjtalk_optimized_init(&config));
+    
+    if (!openjtalk_is_available()) {
+        GTEST_SKIP() << "OpenJTalk not available";
+    }
+    
+    // Add entries to fill cache
+    const char* texts[] = {"テスト1", "テスト2", "テスト3", "テスト4"};
+    
+    for (int i = 0; i < 4; i++) {
+        char* phonemes = openjtalk_text_to_phonemes_optimized(texts[i]);
+        if (phonemes) {
+            openjtalk_free_phonemes(phonemes);
+        }
+    }
+    
+    // Cache should have evicted oldest entry
+    OpenJTalkCacheStats stats;
+    openjtalk_get_cache_stats(&stats);
+    EXPECT_EQ(stats.current_entries, 3);  // Max entries
+    
+    // First entry should be evicted (cache miss)
+    char* phonemes = openjtalk_text_to_phonemes_optimized(texts[0]);
+    if (phonemes) {
+        openjtalk_free_phonemes(phonemes);
+    }
+    
+    openjtalk_get_cache_stats(&stats);
+    EXPECT_EQ(stats.cache_misses, 5);  // 4 initial + 1 for evicted entry
+}
+
+// Test empty and null input
+TEST_F(OpenJTalkOptimizedTest, InvalidInput) {
+    EXPECT_EQ(openjtalk_text_to_phonemes_optimized(nullptr), nullptr);
+    EXPECT_EQ(openjtalk_text_to_phonemes_optimized(""), nullptr);
+}
+
+// Test without cache
+TEST_F(OpenJTalkOptimizedTest, NoCache) {
+    // Reinitialize without cache
+    openjtalk_optimized_cleanup();
+    ASSERT_TRUE(openjtalk_optimized_init(nullptr));
+    
+    if (!openjtalk_is_available()) {
+        GTEST_SKIP() << "OpenJTalk not available";
+    }
+    
+    const char* text = "キャッシュなし";
+    
+    // Should still work without cache
+    char* phonemes1 = openjtalk_text_to_phonemes_optimized(text);
+    ASSERT_NE(phonemes1, nullptr);
+    
+    char* phonemes2 = openjtalk_text_to_phonemes_optimized(text);
+    ASSERT_NE(phonemes2, nullptr);
+    
+    // Results should be same
+    EXPECT_STREQ(phonemes1, phonemes2);
+    
+    openjtalk_free_phonemes(phonemes1);
+    openjtalk_free_phonemes(phonemes2);
+}
