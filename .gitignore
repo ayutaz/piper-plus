@@ -19,6 +19,10 @@ src/python_run/dist/
 /lib/
 /install/
 /download/
+/p/
+/o/
+/f/
+/s/
 *.so
 
 .venv/
