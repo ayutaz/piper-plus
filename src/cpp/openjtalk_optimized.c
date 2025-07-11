@@ -15,8 +15,12 @@
 #ifdef _WIN32
 #include <windows.h>
 #include <io.h>
+#include <process.h>
 #define F_OK 0
 #define access _access
+#define popen _popen
+#define pclose _pclose
+#define strtok_r strtok_s
 #else
 #include <unistd.h>
 #include <pthread.h>
@@ -774,10 +778,10 @@ static char* find_openjtalk_binary(void) {
     
     // Try PATH lookup
 #ifdef _WIN32
-    FILE* fp = _popen("where open_jtalk_phonemizer.exe 2>NUL", "r");
+    FILE* fp = popen("where open_jtalk_phonemizer.exe 2>NUL", "r");
     if (!fp || fgets(binary_path, sizeof(binary_path), fp) == NULL) {
-        if (fp) _pclose(fp);
-        fp = _popen("where open_jtalk.exe 2>NUL", "r");
+        if (fp) pclose(fp);
+        fp = popen("where open_jtalk.exe 2>NUL", "r");
     }
 #else
     FILE* fp = popen("which open_jtalk_phonemizer 2>/dev/null", "r");
