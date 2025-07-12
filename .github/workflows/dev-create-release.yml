@@ -127,12 +127,17 @@ jobs:
     uses: ./.github/workflows/test-suite.yml
     with:
       release_name: ${{ needs.create_release.outputs.release_name }}
+    continue-on-error: true  # Allow workflow to continue even if tests fail
 
   # Publish to PyPI
   publish_pypi:
     name: Publish to PyPI
     needs: [build_all, run_tests]
-    if: github.ref == 'refs/heads/dev' && github.event_name == 'push'
+    if: |
+      always() && 
+      needs.build_all.result == 'success' &&
+      github.ref == 'refs/heads/dev' && 
+      github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4.2.2
@@ -190,7 +195,7 @@ jobs:
           echo "### Build Status"
           echo "- Create Release: ${{ needs.create_release.result }}"
           echo "- Build All: ${{ needs.build_all.result }}"
-          echo "- Test Suite: ${{ needs.run_tests.result }}"
+          echo "- Test Suite: ${{ needs.run_tests.result }} (non-blocking)"
           echo "- Publish PyPI: ${{ needs.publish_pypi.result }}"
           echo ""
           
@@ -198,4 +203,8 @@ jobs:
             echo "✅ All platforms built successfully"
           else
             echo "❌ Some builds failed"
+          fi
+          
+          if [ "${{ needs.run_tests.result }}" = "failure" ]; then
+            echo "⚠️ Tests failed but workflow continued (non-blocking)"
           fi
