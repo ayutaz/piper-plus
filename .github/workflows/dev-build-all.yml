@@ -73,7 +73,28 @@ jobs:
           # Create distribution package with ccache
           export CMAKE_C_COMPILER_LAUNCHER=ccache
           export CMAKE_CXX_COMPILER_LAUNCHER=ccache
-          make dist
+          
+          # Build piper
+          mkdir -p build
+          cd build
+          cmake .. -DCMAKE_BUILD_TYPE=Release
+          make -j$(nproc)
+          cd ..
+          
+          # Create distribution
+          mkdir -p dist/piper/bin
+          mkdir -p dist/piper/lib
+          mkdir -p dist/piper/share
+          
+          # Copy binary and libraries
+          cp build/piper dist/piper/bin/
+          find build -name "*.so*" -type f -exec cp {} dist/piper/lib/ \; 2>/dev/null || true
+          
+          # Copy espeak-ng data
+          if [ -d "build/pi/share/espeak-ng-data" ]; then
+            cp -r build/pi/share/espeak-ng-data dist/piper/share/
+          fi
+          
           cd dist && tar czf piper-linux-x64.tar.gz piper/
           
           # Show cache statistics
@@ -102,7 +123,7 @@ jobs:
   # macOS ARM64 Build
   build_macos_arm64:
     name: Build macOS ARM64
-    runs-on: macos-13
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4.2.2
         with:
@@ -122,14 +143,32 @@ jobs:
         run: |
           export CMAKE_C_COMPILER_LAUNCHER=ccache
           export CMAKE_CXX_COMPILER_LAUNCHER=ccache
-          make clean && make -j$(sysctl -n hw.ncpu)
+          
+          # Build piper
+          mkdir -p build
+          cd build
+          cmake .. -DCMAKE_BUILD_TYPE=Release
+          make -j$(sysctl -n hw.ncpu)
+          cd ..
           
           # Show cache statistics
           ccache -s
 
       - name: Create dist package
         run: |
-          make dist-nostrip
+          # Create distribution
+          mkdir -p dist/piper/bin
+          mkdir -p dist/piper/lib
+          mkdir -p dist/piper/share
+          
+          # Copy binary and libraries
+          cp build/piper dist/piper/bin/
+          find build -name "*.dylib" -type f -exec cp {} dist/piper/lib/ \; 2>/dev/null || true
+          
+          # Copy espeak-ng data
+          if [ -d "build/pi/share/espeak-ng-data" ]; then
+            cp -r build/pi/share/espeak-ng-data dist/piper/share/
+          fi
           cd dist
           
           # Fix library paths
@@ -180,7 +219,7 @@ jobs:
   # Windows x64 Build
   build_windows_x64:
     name: Build Windows x64
-    runs-on: windows-2019
+    runs-on: windows-2022
     steps:
       - uses: actions/checkout@v4.2.2
         with:
@@ -200,7 +239,7 @@ jobs:
 
       - name: Build piper
         run: |
-          cmake -B build -G "Visual Studio 16 2019" -A x64 -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
+          cmake -B build -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
           cmake --build build --config Release
           
           # Show cache statistics
@@ -270,9 +309,14 @@ jobs:
             -w /workspace \
             debian:bookworm \
             bash -c "
-              apt-get update && apt-get install -y build-essential cmake
+              apt-get update && apt-get install -y build-essential cmake git
+              mkdir -p build && cd build
+              cmake .. -DCMAKE_BUILD_TYPE=Release
               make -j2
-              make dist
+              cd ..
+              mkdir -p dist/piper/bin dist/piper/lib dist/piper/share
+              cp build/piper dist/piper/bin/
+              find build -name '*.so*' -type f -exec cp {} dist/piper/lib/ \; 2>/dev/null || true
               cd dist && tar czf piper-linux-arm64.tar.gz piper/
             "
 
@@ -313,9 +357,14 @@ jobs:
             -w /workspace \
             debian:bookworm \
             bash -c "
-              apt-get update && apt-get install -y build-essential cmake
+              apt-get update && apt-get install -y build-essential cmake git
+              mkdir -p build && cd build
+              cmake .. -DCMAKE_BUILD_TYPE=Release
               make -j2
-              make dist
+              cd ..
+              mkdir -p dist/piper/bin dist/piper/lib dist/piper/share
+              cp build/piper dist/piper/bin/
+              find build -name '*.so*' -type f -exec cp {} dist/piper/lib/ \; 2>/dev/null || true
               cd dist && tar czf piper-linux-armv7.tar.gz piper/
             "
 
