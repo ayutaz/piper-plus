@@ -193,11 +193,11 @@ jobs:
             install_name_tool -change \
               /opt/homebrew/opt/espeak-ng/lib/libespeak-ng.2.dylib \
               @loader_path/libespeak-ng.2.dylib \
-              piper/piper
+              piper/bin/piper
             install_name_tool -change \
               /opt/homebrew/opt/onnxruntime/lib/$lib \
               @loader_path/$lib \
-              piper/piper
+              piper/bin/piper
           done
           
           tar czf piper-macos-arm64.tar.gz piper/
@@ -275,7 +275,7 @@ jobs:
           cmake --build build --config Release
           
           # Show cache statistics
-          sccache -s
+          sccache -s || echo "sccache stats not available"
 
       - name: Create dist package
         shell: pwsh

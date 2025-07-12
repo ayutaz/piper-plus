@@ -43,12 +43,15 @@ runs:
           while [ $attempt -le $MAX_RETRIES ]; do
             echo "Uploading $ASSET_NAME (attempt $attempt/$MAX_RETRIES)..."
             
+            # Clean up the URL template
+            CLEAN_URL=$(echo "$UPLOAD_URL" | sed 's/{.*}$//')
+            
             # Perform upload
             response=$(curl -s -w "\n%{http_code}" \
               -H "Authorization: token $GITHUB_TOKEN" \
               -H "Content-Type: $ASSET_CONTENT_TYPE" \
               --data-binary @"$ASSET_PATH" \
-              "$UPLOAD_URL?name=$ASSET_NAME")
+              "${CLEAN_URL}?name=$ASSET_NAME")
             
             # Extract HTTP status code
             http_code=$(echo "$response" | tail -n1)
