@@ -42,15 +42,21 @@
 
 #### タスク
 
-##### 0.1 Unity 6環境セットアップ（0.5人日）
+##### 0.1 Unity 6環境セットアップ（0.5人日）✅ 完了
 - **作業内容**:
-  - Unity Hub で Unity 6000.0.35f1 インストール
-  - 新規プロジェクト作成
-  - .gitignore 設定
-  - プロジェクト設定（圧縮、ビルド設定等）
-- **成果物**: Unity 6 プロジェクト
-- **完了条件**: Unity Editor が起動し、基本的なシーンが作成できる
-- **CI/CD**: Unity 6 対応 Docker イメージの準備
+  - Unity Hub で Unity 6000.0.35f1 インストール ✅
+  - 新規プロジェクト作成 ✅
+  - .gitignore 設定 ✅
+  - プロジェクト設定（圧縮、ビルド設定等）✅
+- **成果物**: Unity 6 プロジェクト ✅
+- **完了条件**: Unity Editor が起動し、基本的なシーンが作成できる ✅
+- **CI/CD**: Unity 6 対応 Docker イメージの準備 ✅
+- **実施内容**:
+  - Unity 6000.0.35f1 プロジェクト作成完了
+  - GitHub Actions CI/CD (game-ci) 設定完了
+  - PR #2 作成済み
+  - company name を com.yousan に変更
+  - .idea ディレクトリを .gitignore に追加
 
 ##### 0.2 Unity Sentis パッケージ導入（0.5人日）
 - **作業内容**:
