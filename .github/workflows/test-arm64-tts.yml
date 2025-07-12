@@ -41,21 +41,34 @@ jobs:
           
       - name: Build Docker image for ARM64
         run: |
+          # Build with cache and progress output
           docker buildx build \
             --platform linux/arm64 \
             --tag piper-arm64-test:latest \
             --load \
+            --progress=plain \
             -f Dockerfile .
             
-      - name: Download test model
+      - name: Download test models
         run: |
           mkdir -p test/models
+          
+          # Download Japanese model
           if [ ! -f test/models/ja_JP-test-medium.onnx ]; then
             echo "Downloading Japanese test model..."
             curl -L -o test/models/ja_JP-test-medium.onnx \
               "https://github.com/rhasspy/piper/releases/download/v0.0.2/voice-ja-jp-test-medium.onnx"
             curl -L -o test/models/ja_JP-test-medium.onnx.json \
               "https://github.com/rhasspy/piper/releases/download/v0.0.2/voice-ja-jp-test-medium.onnx.json"
+          fi
+          
+          # Download English model for testing
+          if [ ! -f test/models/en_US-amy-medium.onnx ]; then
+            echo "Downloading English test model..."
+            curl -L -o test/models/en_US-amy-medium.onnx \
+              "https://github.com/rhasspy/piper/releases/download/v1.0.0/en_US-amy-medium.onnx"
+            curl -L -o test/models/en_US-amy-medium.onnx.json \
+              "https://github.com/rhasspy/piper/releases/download/v1.0.0/en_US-amy-medium.onnx.json"
           fi
           
       - name: Run Japanese TTS test in ARM64 container
@@ -82,7 +95,7 @@ jobs:
               
               echo '=== Testing English TTS on ARM64 ==='
               echo 'Hello world' | /build/install/bin/piper \
-                --model /test/models/en_US-lessac-medium.onnx \
+                --model /test/models/en_US-amy-medium.onnx \
                 --output_file /test/english_arm64.wav || true
             "
             
