@@ -190,6 +190,14 @@ if(UNIX AND NOT APPLE)
   
   # Add math library
   target_link_libraries(openjtalk PUBLIC m)
+  
+  # Define CHARSET_UTF_8 for Linux (including ARM64)
+  target_compile_definitions(openjtalk PRIVATE
+    CHARSET_UTF_8
+  )
+  target_compile_definitions(mecab PRIVATE
+    CHARSET_UTF_8
+  )
 endif()
 
 # Apply C++17 compatibility patch for MeCab
