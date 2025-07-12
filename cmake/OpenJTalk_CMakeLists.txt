@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.13)
 project(OpenJTalk C CXX)
 
-# OpenJTalk 1.11 - CMake build configuration for Windows
+# OpenJTalk 1.11 - CMake build configuration for Windows and Linux ARM64
 # Based on the original autotools configuration
 
 set(CMAKE_C_STANDARD 99)
@@ -179,6 +179,17 @@ if(WIN32)
     set_property(TARGET mecab PROPERTY MSVC_RUNTIME_LIBRARY ${CMAKE_MSVC_RUNTIME_LIBRARY})
     set_property(TARGET openjtalk PROPERTY MSVC_RUNTIME_LIBRARY ${CMAKE_MSVC_RUNTIME_LIBRARY})
   endif()
+endif()
+
+# Platform-specific settings
+if(UNIX AND NOT APPLE)
+  # Linux-specific settings
+  find_package(Threads REQUIRED)
+  target_link_libraries(mecab PUBLIC Threads::Threads)
+  target_link_libraries(openjtalk PUBLIC Threads::Threads)
+  
+  # Add math library
+  target_link_libraries(openjtalk PUBLIC m)
 endif()
 
 # Apply C++17 compatibility patch for MeCab

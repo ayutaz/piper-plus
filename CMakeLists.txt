@@ -319,6 +319,10 @@ elseif(NOT DEFINED HTS_ENGINE_DIR)
         # Apple Silicon (arm64) only
         set(CONFIGURE_HOST "--host=aarch64-apple-darwin")
         set(CONFIGURE_ENV "CFLAGS=-arch arm64" "CXXFLAGS=-arch arm64" "LDFLAGS=-arch arm64")
+      elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64" AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
+        # Linux ARM64 cross-compilation
+        set(CONFIGURE_HOST "--host=aarch64-linux-gnu")
+        set(CONFIGURE_ENV "CC=aarch64-linux-gnu-gcc" "CXX=aarch64-linux-gnu-g++" "AR=aarch64-linux-gnu-ar" "RANLIB=aarch64-linux-gnu-ranlib")
       else()
         set(CONFIGURE_HOST "")
         set(CONFIGURE_ENV "")
@@ -343,38 +347,80 @@ if(NOT DEFINED OPENJTALK_DIR)
     set(OPENJTALK_DIR "${CMAKE_CURRENT_BINARY_DIR}/oj")
     set(OPENJTALK_VERSION "1.11")
 
-    if(WIN32)
-      # Use CMake build for Windows
+    # Use CMake build for Windows and Linux ARM64
+    if(WIN32 OR (CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64" AND CMAKE_SYSTEM_NAME STREQUAL "Linux"))
+      # Use CMake build for Windows and Linux ARM64
       set(OPENJTALK_CMAKE_ARGS
         -DCMAKE_INSTALL_PREFIX:PATH=${OPENJTALK_DIR}
         -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}
         -DBUILD_SHARED_LIBS:BOOL=OFF
         -DHTS_ENGINE_INCLUDE_DIR:PATH=${HTS_ENGINE_DIR}/include
-        -DHTS_ENGINE_LIB:FILEPATH=${HTS_ENGINE_DIR}/lib/HTSEngine.lib
-        -DCMAKE_MSVC_RUNTIME_LIBRARY:STRING=${CMAKE_MSVC_RUNTIME_LIBRARY}
         ${EXTERNAL_CMAKE_ARGS}
       )
       
-      ExternalProject_Add(
-        openjtalk_external
-        PREFIX "${CMAKE_CURRENT_BINARY_DIR}/o"
-        URL "https://downloads.sourceforge.net/project/open-jtalk/Open%20JTalk/open_jtalk-${OPENJTALK_VERSION}/open_jtalk-${OPENJTALK_VERSION}.tar.gz"
-        CMAKE_ARGS ${OPENJTALK_CMAKE_ARGS}
-        PATCH_COMMAND 
-          ${CMAKE_COMMAND} -E copy 
-            ${CMAKE_CURRENT_SOURCE_DIR}/cmake/OpenJTalk_CMakeLists.txt 
-            <SOURCE_DIR>/CMakeLists.txt
-          COMMAND ${CMAKE_COMMAND} -E copy
-            ${CMAKE_CURRENT_SOURCE_DIR}/cmake/open_jtalk_phonemizer.c
-            <SOURCE_DIR>/bin/open_jtalk_phonemizer.c
-          COMMAND ${CMAKE_COMMAND} -E copy
-            ${CMAKE_CURRENT_SOURCE_DIR}/cmake/apply_openjtalk_patch.ps1
-            <SOURCE_DIR>/apply_patch.ps1
-          COMMAND powershell -ExecutionPolicy Bypass -File "<SOURCE_DIR>/apply_patch.ps1" -SourceDir "<SOURCE_DIR>"
-        BUILD_BYPRODUCTS
-          ${OPENJTALK_DIR}/bin/open_jtalk.exe
-          ${OPENJTALK_DIR}/bin/open_jtalk_phonemizer.exe
-      )
+      # Platform-specific settings
+      if(WIN32)
+        list(APPEND OPENJTALK_CMAKE_ARGS
+          -DHTS_ENGINE_LIB:FILEPATH=${HTS_ENGINE_DIR}/lib/HTSEngine.lib
+          -DCMAKE_MSVC_RUNTIME_LIBRARY:STRING=${CMAKE_MSVC_RUNTIME_LIBRARY}
+        )
+      else()
+        # Linux ARM64
+        list(APPEND OPENJTALK_CMAKE_ARGS
+          -DHTS_ENGINE_LIB:FILEPATH=${HTS_ENGINE_DIR}/lib/libHTSEngine.a
+          -DCMAKE_TOOLCHAIN_FILE:FILEPATH=${CMAKE_TOOLCHAIN_FILE}
+          -DCMAKE_C_COMPILER:FILEPATH=aarch64-linux-gnu-gcc
+          -DCMAKE_CXX_COMPILER:FILEPATH=aarch64-linux-gnu-g++
+          -DCMAKE_AR:FILEPATH=aarch64-linux-gnu-ar
+          -DCMAKE_RANLIB:FILEPATH=aarch64-linux-gnu-ranlib
+        )
+      endif()
+      
+      if(WIN32)
+        ExternalProject_Add(
+          openjtalk_external
+          PREFIX "${CMAKE_CURRENT_BINARY_DIR}/o"
+          URL "https://downloads.sourceforge.net/project/open-jtalk/Open%20JTalk/open_jtalk-${OPENJTALK_VERSION}/open_jtalk-${OPENJTALK_VERSION}.tar.gz"
+          CMAKE_ARGS ${OPENJTALK_CMAKE_ARGS}
+          PATCH_COMMAND 
+            ${CMAKE_COMMAND} -E copy 
+              ${CMAKE_CURRENT_SOURCE_DIR}/cmake/OpenJTalk_CMakeLists.txt 
+              <SOURCE_DIR>/CMakeLists.txt
+            COMMAND ${CMAKE_COMMAND} -E copy
+              ${CMAKE_CURRENT_SOURCE_DIR}/cmake/open_jtalk_phonemizer.c
+              <SOURCE_DIR>/bin/open_jtalk_phonemizer.c
+            COMMAND ${CMAKE_COMMAND} -E copy
+              ${CMAKE_CURRENT_SOURCE_DIR}/cmake/apply_openjtalk_patch.ps1
+              <SOURCE_DIR>/apply_patch.ps1
+            COMMAND powershell -ExecutionPolicy Bypass -File "<SOURCE_DIR>/apply_patch.ps1" -SourceDir "<SOURCE_DIR>"
+          BUILD_BYPRODUCTS
+            ${OPENJTALK_DIR}/bin/open_jtalk.exe
+            ${OPENJTALK_DIR}/bin/open_jtalk_phonemizer.exe
+        )
+      else()
+        # Linux ARM64
+        ExternalProject_Add(
+          openjtalk_external
+          PREFIX "${CMAKE_CURRENT_BINARY_DIR}/o"
+          URL "https://downloads.sourceforge.net/project/open-jtalk/Open%20JTalk/open_jtalk-${OPENJTALK_VERSION}/open_jtalk-${OPENJTALK_VERSION}.tar.gz"
+          CMAKE_ARGS ${OPENJTALK_CMAKE_ARGS}
+          PATCH_COMMAND 
+            ${CMAKE_COMMAND} -E copy 
+              ${CMAKE_CURRENT_SOURCE_DIR}/cmake/OpenJTalk_CMakeLists.txt 
+              <SOURCE_DIR>/CMakeLists.txt
+            COMMAND ${CMAKE_COMMAND} -E copy
+              ${CMAKE_CURRENT_SOURCE_DIR}/cmake/open_jtalk_phonemizer.c
+              <SOURCE_DIR>/bin/open_jtalk_phonemizer.c
+            COMMAND ${CMAKE_COMMAND} -E copy
+              ${CMAKE_CURRENT_SOURCE_DIR}/cmake/open_jtalk_patch.sh
+              <SOURCE_DIR>/apply_patch.sh
+            COMMAND ${CMAKE_COMMAND} -E chdir <SOURCE_DIR> chmod +x apply_patch.sh
+            COMMAND ${CMAKE_COMMAND} -E chdir <SOURCE_DIR> ./apply_patch.sh
+          BUILD_BYPRODUCTS
+            ${OPENJTALK_DIR}/bin/open_jtalk
+            ${OPENJTALK_DIR}/bin/open_jtalk_phonemizer
+        )
+      endif()
       
       add_dependencies(openjtalk_external hts_engine_external)
     else()
