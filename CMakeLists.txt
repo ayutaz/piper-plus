@@ -43,8 +43,46 @@ else()
   string(APPEND CMAKE_C_FLAGS " -Wall -Wextra")
 endif()
 
+# ARM64-specific optimizations
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|ARM64")
+  message(STATUS "Detected ARM64 architecture, enabling optimizations")
+  
+  # Enable NEON SIMD instructions
+  if(NOT MSVC)
+    set(ARM64_FLAGS "-march=armv8-a+simd -mtune=cortex-a72")
+    string(APPEND CMAKE_CXX_FLAGS " ${ARM64_FLAGS}")
+    string(APPEND CMAKE_C_FLAGS " ${ARM64_FLAGS}")
+    
+    # Release build optimizations
+    set(CMAKE_CXX_FLAGS_RELEASE "-O2 -DNDEBUG -fomit-frame-pointer -ftree-vectorize -ffast-math")
+    set(CMAKE_C_FLAGS_RELEASE "-O2 -DNDEBUG -fomit-frame-pointer -ftree-vectorize -ffast-math")
+    
+    # Enable Link Time Optimization for release builds
+    if(CMAKE_BUILD_TYPE STREQUAL "Release")
+      include(CheckIPOSupported)
+      check_ipo_supported(RESULT ipo_supported OUTPUT error)
+      if(ipo_supported)
+        set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
+        message(STATUS "Link Time Optimization enabled for ARM64")
+      endif()
+    endif()
+    
+    # Strip symbols for smaller binaries
+    set(CMAKE_EXE_LINKER_FLAGS_RELEASE "-s")
+  endif()
+  
+  # Define macro for conditional compilation
+  add_compile_definitions(USE_ARM64_NEON)
+endif()
+
 add_executable(piper src/cpp/main.cpp src/cpp/piper.cpp)
 add_executable(test_piper src/cpp/test.cpp src/cpp/piper.cpp)
+
+# Add NEON optimized audio processing for ARM64
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|ARM64")
+  target_sources(piper PRIVATE src/cpp/audio_neon.cpp)
+  target_sources(test_piper PRIVATE src/cpp/audio_neon.cpp)
+endif()
 
 
 # Testing support
@@ -266,7 +304,7 @@ elseif(NOT DEFINED HTS_ENGINE_DIR)
           -DCMAKE_INSTALL_PREFIX:PATH=${HTS_ENGINE_DIR}
           -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}
           -DBUILD_SHARED_LIBS:BOOL=OFF
-          -DHTS_EMBEDDED:BOOL=OFF
+          -DHTS_EMBEDDED:BOOL=ON
           -DCMAKE_MSVC_RUNTIME_LIBRARY:STRING=${CMAKE_MSVC_RUNTIME_LIBRARY}
           ${EXTERNAL_CMAKE_ARGS}
         PATCH_COMMAND ${CMAKE_COMMAND} -E copy 

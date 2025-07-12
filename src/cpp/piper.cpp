@@ -17,6 +17,10 @@
 #include "wavfile.hpp"
 #include "openjtalk_phonemize.hpp"
 
+#ifdef USE_ARM64_NEON
+#include "audio_neon.hpp"
+#endif
+
 #ifdef _WIN32
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
@@ -566,18 +570,29 @@ void synthesize(std::vector<PhonemeId> &phonemeIds,
 
   // Get max audio value for scaling
   float maxAudioValue = 0.01f;
+  
+#ifdef USE_ARM64_NEON
+  maxAudioValue = findMaxAudioValueNEON(audio, audioCount);
+#else
   for (int64_t i = 0; i < audioCount; i++) {
     float audioValue = abs(audio[i]);
     if (audioValue > maxAudioValue) {
       maxAudioValue = audioValue;
     }
   }
+#endif
 
   // We know the size up front
   audioBuffer.reserve(audioCount);
 
   // Scale audio to fill range and convert to int16
   float audioScale = (MAX_WAV_VALUE / std::max(0.01f, maxAudioValue));
+  
+#ifdef USE_ARM64_NEON
+  // Resize buffer to final size for NEON implementation
+  audioBuffer.resize(audioCount);
+  scaleAndConvertAudioNEON(audio, audioBuffer.data(), audioCount, audioScale);
+#else
   for (int64_t i = 0; i < audioCount; i++) {
     int16_t intAudioValue = static_cast<int16_t>(
         std::clamp(audio[i] * audioScale,
@@ -586,6 +601,7 @@ void synthesize(std::vector<PhonemeId> &phonemeIds,
 
     audioBuffer.push_back(intAudioValue);
   }
+#endif
 
   // Clean up
   for (std::size_t i = 0; i < outputTensors.size(); i++) {

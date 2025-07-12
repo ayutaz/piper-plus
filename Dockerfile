@@ -101,8 +101,10 @@ COPY . .
 
 # Build step (with architecture-specific optimizations)
 RUN if [ "$TARGETARCH" = "arm64" ]; then \
-        # ARM64 builds: single thread, timeout handling, retry on failure \
-        echo "Starting ARM64 build with single thread..." && \
+        # ARM64 builds: optimized with NEON support \
+        echo "Starting optimized ARM64 build..." && \
+        export CFLAGS="-O2 -march=armv8-a+simd -mtune=cortex-a72 -fomit-frame-pointer" && \
+        export CXXFLAGS="-O2 -march=armv8-a+simd -mtune=cortex-a72 -fomit-frame-pointer" && \
         timeout 2400 cmake --build build --config Release --parallel 1 || \
         (echo "Build failed, retrying..." && cmake --build build --config Release --parallel 1); \
     else \
@@ -115,6 +117,12 @@ RUN if [ "$TARGETARCH" = "arm64" ]; then \
 
 # Install step  
 RUN cmake --install build
+
+# Strip binaries for smaller size on ARM64
+RUN if [ "$TARGETARCH" = "arm64" ]; then \
+        echo "Stripping binaries for size optimization..." && \
+        find install/bin -type f -executable -exec aarch64-linux-gnu-strip {} \; 2>/dev/null || true; \
+    fi
 
 # テスト実行（amd64のみ）
 RUN if [ "$TARGETARCH" = "amd64" ]; then \
