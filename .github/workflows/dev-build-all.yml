@@ -278,12 +278,17 @@ jobs:
           Move-Item -Path "onnxruntime-win-x64-1.14.1" -Destination "onnxruntime"
 
       - name: Build piper
+        shell: pwsh
         run: |
           cmake -B build -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
           cmake --build build --config Release
           
-          # Show cache statistics
-          sccache -s || echo "sccache stats not available"
+          # Show cache statistics (optional)
+          if (Get-Command sccache -ErrorAction SilentlyContinue) {
+            sccache -s
+          } else {
+            Write-Host "sccache stats not available"
+          }
 
       - name: Create dist package
         shell: pwsh
