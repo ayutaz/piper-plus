@@ -6,6 +6,8 @@
 
 各タスクは最大2人日（16時間）単位に分解されており、明確な成果物と完了条件を持ちます。全7フェーズ、90人日の包括的な実装計画を提供します。
 
+**重要な変更**: Unity Sentis の代わりに、Unity AI Interface (Inference Engine) を使用します。これはSentisの次世代版で、Unity 6.2以降で正式サポートされており、将来的なアップデートに対応しやすくなります。
+
 ## タスク見積もり基準
 
 - **0.5人日（4時間）**: 単純な実装、設定変更、小規模テスト
@@ -34,10 +36,10 @@
 
 全体スケジュール: 15週間（約3.5ヶ月）
 
-### フェーズ 0: Unity 6 & Sentis 検証（第1週 - 計3人日）
+### フェーズ 0: Unity 6 & AI Interface (Inference Engine) 検証（第1週 - 計3人日）
 
 #### マイルストーン
-- Unity 6000.0.35f1 と Unity Sentis 2.1.2 の互換性確認
+- Unity 6000.0.35f1 と Unity AI Interface (Inference Engine) 2.2.x の互換性確認
 - 最小限の動作プロトタイプ作成
 
 #### タスク
@@ -58,38 +60,38 @@
   - company name を com.yousan に変更
   - .idea ディレクトリを .gitignore に追加
 
-##### 0.2 Unity Sentis パッケージ導入（0.5人日）
+##### 0.2 Unity AI Interface (Inference Engine) パッケージ導入（0.5人日）
 - **作業内容**:
-  - Package Manager から Sentis 2.1.3 インストール
+  - Package Manager から com.unity.ai.inference 2.2.x インストール
   - 依存パッケージの確認
   - パッケージ設定の調整
 - **成果物**: manifest.json 更新
-- **完了条件**: Sentis がエラーなくインポートされる
+- **完了条件**: Inference Engine がエラーなくインポートされる
 
-##### 0.3 Sentis基本動作確認（1人日）
+##### 0.3 Inference Engine 基本動作確認（1人日）
 - **作業内容**:
   - 簡単な ONNX モデルのダウンロード（MNIST等）
-  - モデル読み込みスクリプト作成
+  - モデル読み込みスクリプト作成（Unity.InferenceEngine 名前空間使用）
   - 推論実行テスト
   - GPU/CPU バックエンド切り替えテスト
-- **成果物**: SentisTestScene、動作確認スクリプト
+- **成果物**: InferenceEngineTestScene、動作確認スクリプト
 - **完了条件**: ONNX モデルの推論が成功する
 
 ##### 0.4 最小音声合成プロトタイプ（1人日）
 - **作業内容**:
   - 固定音素 ID 配列の定義
-  - Sentis で音声波形生成（ダミーモデル使用）
+  - Inference Engine で音声波形生成（ダミーモデル使用）
   - AudioClip 生成と再生
 - **成果物**: MinimalTTSPrototype.cs
 - **完了条件**: Unity Editor で音が鳴る
 - **CI/CD**: Unity Test Framework の基本設定
 
-### フェーズ 1: Windows/Linux 基盤実装（第2-3週 - 計20人日）✅ 現在のPR範囲
+### フェーズ 1: Windows/Linux 基盤実装（第2-3週 - 計20人日）
 
 #### マイルストーン
 - TDD による Core API 設計と実装
 - ネイティブ音素化ライブラリの統合
-- Sentis を使用した音声合成の実装
+- Inference Engine を使用した音声合成の実装
 
 #### タスク
 
@@ -1455,9 +1457,9 @@ public class PiperPerformanceTests
 ### スケジュールリスク
 
 1. **依存関係の遅延**
-   - リスク: Sentis アップデートの影響
+   - リスク: Inference Engine アップデートの影響
    - 対策:
-     - Sentis 2.1.3 でバージョン固定
+     - Inference Engine 2.2.x でバージョン固定
      - 重要な機能は独自実装を準備
      - Unity との定期的な技術同期
 
