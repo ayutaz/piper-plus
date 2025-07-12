@@ -128,52 +128,52 @@ jobs:
     with:
       release_name: ${{ needs.create_release.outputs.release_name }}
 
-  # Publish to PyPI
-  publish_pypi:
-    name: Publish to PyPI
-    needs: [build_all, run_tests]
-    if: github.ref == 'refs/heads/dev' && github.event_name == 'push'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4.2.2
+  # # Publish to PyPI (disabled until wheel building is fixed)
+  # publish_pypi:
+  #   name: Publish to PyPI
+  #   needs: [build_all, run_tests]
+  #   if: github.ref == 'refs/heads/dev' && github.event_name == 'push'
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v4.2.2
 
-      - name: Download all wheels
-        uses: actions/download-artifact@v4
-        with:
-          pattern: wheels-*
-          path: dist/
-          merge-multiple: true
+  #     - name: Download all wheels
+  #       uses: actions/download-artifact@v4
+  #       with:
+  #         pattern: wheels-*
+  #         path: dist/
+  #         merge-multiple: true
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
+  #     - name: Set up Python
+  #       uses: actions/setup-python@v5
+  #       with:
+  #         python-version: '3.11'
 
-      - name: Install twine
-        run: pip install twine
+  #     - name: Install twine
+  #       run: pip install twine
 
-      - name: Check wheels
-        run: |
-          ls -la dist/
-          twine check dist/*.whl
+  #     - name: Check wheels
+  #       run: |
+  #         ls -la dist/
+  #         twine check dist/*.whl
 
-      - name: Publish to PyPI
-        env:
-          TWINE_USERNAME: __token__
-          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
-        run: |
-          # Only publish if we have the token
-          if [ -n "$TWINE_PASSWORD" ]; then
-            twine upload --skip-existing dist/*.whl
-          else
-            echo "⚠️ PyPI token not found, skipping upload"
-          fi
+  #     - name: Publish to PyPI
+  #       env:
+  #         TWINE_USERNAME: __token__
+  #         TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+  #       run: |
+  #         # Only publish if we have the token
+  #         if [ -n "$TWINE_PASSWORD" ]; then
+  #           twine upload --skip-existing dist/*.whl
+  #         else
+  #           echo "⚠️ PyPI token not found, skipping upload"
+  #         fi
 
   # Final summary
   release_summary:
     name: Release Summary
     runs-on: ubuntu-latest
-    needs: [create_release, build_all, run_tests, publish_pypi]
+    needs: [create_release, build_all, run_tests]
     if: always()
     steps:
       - name: Summary
@@ -187,7 +187,6 @@ jobs:
           echo "- Create Release: ${{ needs.create_release.result }}"
           echo "- Build All: ${{ needs.build_all.result }}"
           echo "- Test Suite: ${{ needs.run_tests.result }}"
-          echo "- Publish PyPI: ${{ needs.publish_pypi.result }}"
           echo ""
           
           if [ "${{ needs.build_all.result }}" = "success" ]; then
