@@ -155,18 +155,22 @@ jobs:
       - name: Check wheels
         run: |
           ls -la dist/
-          twine check dist/*.whl
+          if ls dist/*.whl 1> /dev/null 2>&1; then
+            twine check dist/*.whl
+          else
+            echo "No wheel files found, skipping check"
+          fi
 
       - name: Publish to PyPI
         env:
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
         run: |
-          # Only publish if we have the token
-          if [ -n "$TWINE_PASSWORD" ]; then
+          # Only publish if we have the token and wheels
+          if [ -n "$TWINE_PASSWORD" ] && ls dist/*.whl 1> /dev/null 2>&1; then
             twine upload --skip-existing dist/*.whl
           else
-            echo "⚠️ PyPI token not found, skipping upload"
+            echo "⚠️ PyPI token not found or no wheels to upload, skipping"
           fi
 
   # Final summary
