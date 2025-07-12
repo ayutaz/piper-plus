@@ -89,7 +89,7 @@ jobs:
           RELEASE_URL=$(gh release create "${{ steps.get_release_name.outputs.tag_name }}" \
             --title "${{ steps.get_release_name.outputs.name }}" \
             --notes "${{ steps.get_release_notes.outputs.body }}" \
-            --prerelease \
+            --draft \
             --target "${{ github.sha }}")
           
           # Extract upload URL from release URL
