@@ -20,6 +20,8 @@ jobs:
 
       - name: Get workflow run details
         id: metrics
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           # Get workflow run details
           WORKFLOW_NAME="${{ github.event.workflow_run.name }}"
@@ -60,6 +62,8 @@ jobs:
           echo "duration_min=$DURATION_MIN" >> $GITHUB_OUTPUT
 
       - name: Update performance tracking issue
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           # Find or create performance tracking issue
           ISSUE_NUMBER=$(gh issue list \
@@ -84,6 +88,8 @@ jobs:
           echo "Metrics posted to issue #$ISSUE_NUMBER"
 
       - name: Check performance trends
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           # Get historical data from issue comments
           ISSUE_NUMBER=$(gh issue list \
@@ -143,6 +149,8 @@ jobs:
       - uses: actions/checkout@v4.2.2
 
       - name: Generate performance report
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           # Find performance tracking issue
           ISSUE_NUMBER=$(gh issue list \
