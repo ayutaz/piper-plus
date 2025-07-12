@@ -74,10 +74,17 @@ runs:
           return 1
         }
         
+        # Debug logging
+        echo "Debug: UPLOAD_URL='$UPLOAD_URL'"
+        echo "Debug: ASSET_PATH='$ASSET_PATH'"
+        echo "Debug: ASSET_NAME='$ASSET_NAME'"
+        
         # Verify upload URL is not empty
         if [ -z "$UPLOAD_URL" ]; then
           echo "❌ Error: Upload URL is empty"
-          exit 1
+          echo "This usually happens when the workflow is triggered from a context without a release (e.g., PR push)"
+          echo "Skipping upload as this appears to be a non-release build"
+          exit 0  # Exit successfully to not fail the build
         fi
         
         # Verify file exists
