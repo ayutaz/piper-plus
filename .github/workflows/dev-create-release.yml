@@ -115,7 +115,7 @@ jobs:
     uses: ./.github/workflows/dev-build-all.yml
     with:
       release_upload_url: ${{ needs.create_release.outputs.upload_url }}
-      use_new_workflow: ${{ inputs.use_new_workflow }}
+      use_new_workflow: ${{ github.event.inputs.use_new_workflow || false }}
     permissions:
       contents: write
       packages: read
