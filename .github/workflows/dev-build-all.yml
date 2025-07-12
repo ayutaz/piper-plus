@@ -189,15 +189,23 @@ jobs:
           cd dist
           
           # Fix library paths
-          for lib in libespeak-ng.2.dylib libonnxruntime*.dylib; do
+          # Fix espeak-ng path
+          if [ -f "piper/lib/libespeak-ng.2.dylib" ]; then
             install_name_tool -change \
               /opt/homebrew/opt/espeak-ng/lib/libespeak-ng.2.dylib \
-              @loader_path/libespeak-ng.2.dylib \
+              @loader_path/../lib/libespeak-ng.2.dylib \
               piper/bin/piper
-            install_name_tool -change \
-              /opt/homebrew/opt/onnxruntime/lib/$lib \
-              @loader_path/$lib \
-              piper/bin/piper
+          fi
+          
+          # Fix onnxruntime paths
+          for lib in piper/lib/libonnxruntime*.dylib; do
+            if [ -f "$lib" ]; then
+              libname=$(basename "$lib")
+              install_name_tool -change \
+                "/opt/homebrew/opt/onnxruntime/lib/$libname" \
+                "@loader_path/../lib/$libname" \
+                piper/bin/piper
+            fi
           done
           
           tar czf piper-macos-arm64.tar.gz piper/
