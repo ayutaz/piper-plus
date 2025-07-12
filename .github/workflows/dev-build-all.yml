@@ -53,10 +53,32 @@ jobs:
           cache_type: ccache
           cache_key_prefix: piper-linux-x64
 
-      # Skip wheel building for now - focus on binary build
-      # - name: Build wheels
-      #   run: |
-      #     # Wheel building will be re-enabled after fixing setup.py issues
+      - name: Build wheels
+        run: |
+          # For Linux x86_64, we build wheels for Python 3.9-3.13
+          declare -a python_versions=("cp39-cp39" "cp310-cp310" "cp311-cp311" "cp312-cp312" "cp313-cp313")
+          
+          # Change to python_run directory where setup.py is located
+          cd src/python_run
+          
+          for pyver in "${python_versions[@]}"; do
+            echo "Building wheel for Python ${pyver}"
+            docker run --rm \
+              -v "$(pwd)":/workspace \
+              -w /workspace \
+              -e PYTHON_VERSION="${pyver}" \
+              quay.io/pypa/manylinux_2_28_x86_64 \
+              bash -c "
+                /opt/python/${pyver}/bin/python -m pip install --upgrade pip wheel build
+                /opt/python/${pyver}/bin/python -m build --wheel
+                auditwheel repair dist/*.whl --plat manylinux_2_28_x86_64 -w dist/
+                rm dist/*-linux_x86_64.whl
+              "
+          done
+          
+          # Move wheels to project root dist directory
+          mkdir -p ../../dist
+          mv dist/*.whl ../../dist/
 
       - name: Create dist package
         run: |
@@ -90,11 +112,11 @@ jobs:
           # Show cache statistics
           ccache -s
 
-      # - name: Upload wheel artifacts
-      #   uses: actions/upload-artifact@v4.5.0
-      #   with:
-      #     name: wheels-linux-x64
-      #     path: dist/*.whl
+      - name: Upload wheel artifacts
+        uses: actions/upload-artifact@v4.5.0
+        with:
+          name: wheels-linux-x64
+          path: dist/*.whl
 
       - name: Upload binary artifact
         uses: actions/upload-artifact@v4.5.0
@@ -175,16 +197,32 @@ jobs:
           
           tar czf piper-macos-arm64.tar.gz piper/
 
-      # Skip wheel building for now
-      # - name: Build wheels
-      #   run: |
-      #     # Wheel building will be re-enabled after fixing setup.py issues
+      - name: Build wheels
+        run: |
+          # Setup Python versions
+          brew install python@3.9 python@3.10 python@3.11 python@3.12 python@3.13
+          
+          # Change to python_run directory where setup.py is located
+          cd src/python_run
+          
+          for py in python3.9 python3.10 python3.11 python3.12 python3.13; do
+            if command -v $py &> /dev/null; then
+              echo "Building wheel for $py"
+              $py -m pip install --upgrade pip wheel build delocate
+              $py -m build --wheel
+              delocate-wheel -w dist/ -v dist/*.whl
+            fi
+          done
+          
+          # Move wheels to project root dist directory
+          mkdir -p ../../dist
+          mv dist/*.whl ../../dist/
 
-      # - name: Upload wheel artifacts
-      #   uses: actions/upload-artifact@v4.5.0
-      #   with:
-      #     name: wheels-macos-arm64
-      #     path: dist/*.whl
+      - name: Upload wheel artifacts
+        uses: actions/upload-artifact@v4.5.0
+        with:
+          name: wheels-macos-arm64
+          path: dist/*.whl
 
       - name: Upload binary artifact
         uses: actions/upload-artifact@v4.5.0
@@ -242,16 +280,32 @@ jobs:
           # Create zip
           Compress-Archive -Path dist/piper -DestinationPath dist/piper-windows-x64.zip
 
-      # Skip wheel building for now
-      # - name: Build wheels
-      #   run: |
-      #     # Wheel building will be re-enabled after fixing setup.py issues
+      - name: Build wheels
+        shell: pwsh
+        run: |
+          # Change to python_run directory where setup.py is located
+          cd src/python_run
+          
+          # Install Python versions and build wheels
+          foreach ($pyver in @("3.9", "3.10", "3.11", "3.12", "3.13")) {
+            $pythonPath = "C:\hostedtoolcache\windows\Python\$pyver*\x64\python.exe"
+            if (Test-Path $pythonPath) {
+              $python = Get-ChildItem $pythonPath | Select-Object -First 1
+              Write-Host "Building wheel for Python $pyver using $python"
+              & $python -m pip install --upgrade pip wheel build
+              & $python -m build --wheel
+            }
+          }
+          
+          # Move wheels to project root dist directory
+          New-Item -ItemType Directory -Force -Path ..\..\dist
+          Move-Item dist\*.whl ..\..\dist\
 
-      # - name: Upload wheel artifacts
-      #   uses: actions/upload-artifact@v4.5.0
-      #   with:
-      #     name: wheels-windows-x64
-      #     path: dist/*.whl
+      - name: Upload wheel artifacts
+        uses: actions/upload-artifact@v4.5.0
+        with:
+          name: wheels-windows-x64
+          path: dist/*.whl
 
       - name: Upload binary artifact
         uses: actions/upload-artifact@v4.5.0
