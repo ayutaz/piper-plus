@@ -61,7 +61,11 @@ runs:
           sudo apt-get update
           sudo apt-get install -y ccache
         elif [[ "$RUNNER_OS" == "macOS" ]]; then
-          brew install ccache
+          if ! command -v ccache &> /dev/null; then
+            brew install ccache
+          else
+            echo "ccache is already installed"
+          fi
         elif [[ "$RUNNER_OS" == "Windows" ]]; then
           choco install ccache
         fi
