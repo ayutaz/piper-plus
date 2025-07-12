@@ -83,7 +83,9 @@ runs:
         
         if [[ "$RUNNER_OS" == "Windows" ]]; then
           unzip sccache.archive
-          mv sccache-*/sccache.exe /usr/local/bin/
+          mkdir -p "$HOME/.local/bin"
+          mv sccache-*/sccache.exe "$HOME/.local/bin/"
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
         else
           tar xzf sccache.archive
           sudo mv sccache-*/sccache /usr/local/bin/
