@@ -74,6 +74,12 @@ runs:
           return 1
         }
         
+        # Verify upload URL is not empty
+        if [ -z "$UPLOAD_URL" ]; then
+          echo "❌ Error: Upload URL is empty"
+          exit 1
+        fi
+        
         # Verify file exists
         if [ ! -f "$ASSET_PATH" ]; then
           echo "❌ Error: File not found: $ASSET_PATH"

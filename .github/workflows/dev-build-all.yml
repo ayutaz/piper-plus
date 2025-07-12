@@ -41,6 +41,11 @@ jobs:
       - uses: actions/checkout@v4.2.2
         with:
           submodules: true
+          
+      - name: Debug inputs
+        run: |
+          echo "release_upload_url: '${{ inputs.release_upload_url }}'"
+          echo "use_new_workflow: '${{ inputs.use_new_workflow }}'"
 
       - name: Setup build cache
         uses: ./.github/actions/setup-build-cache
@@ -98,7 +103,7 @@ jobs:
           path: dist/piper-linux-x64.tar.gz
 
       - name: Upload to release
-        if: inputs.release_upload_url != ''
+        if: inputs.release_upload_url != '' && inputs.release_upload_url != null
         uses: ./.github/actions/retry-upload
         with:
           upload_url: ${{ inputs.release_upload_url }}
@@ -188,7 +193,7 @@ jobs:
           path: dist/piper-macos-arm64.tar.gz
 
       - name: Upload to release
-        if: inputs.release_upload_url != ''
+        if: inputs.release_upload_url != '' && inputs.release_upload_url != null
         uses: ./.github/actions/retry-upload
         with:
           upload_url: ${{ inputs.release_upload_url }}
@@ -255,7 +260,7 @@ jobs:
           path: dist/piper-windows-x64.zip
 
       - name: Upload to release
-        if: inputs.release_upload_url != ''
+        if: inputs.release_upload_url != '' && inputs.release_upload_url != null
         uses: ./.github/actions/retry-upload
         with:
           upload_url: ${{ inputs.release_upload_url }}
@@ -303,7 +308,7 @@ jobs:
           path: dist/piper-linux-arm64.tar.gz
 
       - name: Upload to release
-        if: inputs.release_upload_url != ''
+        if: inputs.release_upload_url != '' && inputs.release_upload_url != null
         uses: ./.github/actions/retry-upload
         with:
           upload_url: ${{ inputs.release_upload_url }}
@@ -351,7 +356,7 @@ jobs:
           path: dist/piper-linux-armv7.tar.gz
 
       - name: Upload to release
-        if: inputs.release_upload_url != ''
+        if: inputs.release_upload_url != '' && inputs.release_upload_url != null
         uses: ./.github/actions/retry-upload
         with:
           upload_url: ${{ inputs.release_upload_url }}
