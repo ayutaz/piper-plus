@@ -27,7 +27,7 @@ RUN for i in 1 2 3; do \
             make ninja-build python3 ccache \
             libmecab-dev mecab mecab-ipadic-utf8 \
             autoconf automake libtool \
-            flex bison && \
+            flex bison strace && \
         apt-get clean && \
         rm -rf /var/lib/apt/lists/* && break || { \
             echo "Package install failed (attempt $i)"; \

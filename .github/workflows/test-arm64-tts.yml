@@ -91,9 +91,12 @@ jobs:
             -v "$(pwd)/test":/test \
             piper-arm64-test:latest \
             bash -c "
+              set -x  # Enable bash debug mode
               echo '=== Debug: System info ==='
               uname -a
               arch
+              uname -m
+              dpkg --print-architecture
               
               echo '=== Debug: Checking piper binary ==='
               ls -la /build/install/bin/piper || echo 'Piper binary not found'
@@ -125,8 +128,19 @@ jobs:
               echo '=== Debug: Check for missing libraries ==='
               ldd /build/install/bin/piper | grep 'not found' && echo 'Missing libraries found!' || echo 'All libraries resolved'
               
+              echo '=== Debug: Check library architectures ==='
+              for lib in \$(ldd /build/install/bin/piper 2>/dev/null | awk '{print \$3}' | grep -v '^$' | head -5); do
+                echo \"Library: \$lib\"
+                file \"\$lib\" | grep -E 'ARM|x86|aarch64' || true
+              done
+              
               echo '=== Debug: Test minimal execution ==='
               /build/install/bin/piper || echo "Binary execution failed with exit code: $?"
+              
+              echo '=== Debug: Strace output (if available) ==='
+              which strace && {
+                timeout 5 strace -f -e trace=open,openat,execve /build/install/bin/piper --version 2>&1 | head -50 || true
+              } || echo 'strace not available'
               
               echo '=== Debug: Testing piper --version ==='
               /build/install/bin/piper --version || echo "Version check failed with exit code: $?"
