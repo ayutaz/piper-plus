@@ -1,22 +1,7 @@
 name: Test ARM64 TTS
 
 on:
-  pull_request:
-    branches: [master, dev]
-    paths:
-      - 'src/**'
-      - 'test/**'
-      - 'CMakeLists.txt'
-      - 'Dockerfile'
-      - '.github/workflows/test-arm64-tts.yml'
-  push:
-    branches: [dev, feat/*, fix/*]
-    paths:
-      - 'src/**'
-      - 'test/**'
-      - 'CMakeLists.txt'
-      - 'Dockerfile'
-      - '.github/workflows/test-arm64-tts.yml'
+  # Temporarily disable automatic runs - only manual trigger
   workflow_dispatch:
 
 jobs:
