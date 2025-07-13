@@ -57,9 +57,12 @@ ENV CCACHE_MAXSIZE=2G
 ENV CCACHE_COMPRESS=1
 RUN mkdir -p /tmp/ccache
 
-# ツールチェインファイルを作成
+# ツールチェインファイルを作成（クロスコンパイル時のみ）
 RUN mkdir -p cmake && \
-    if [ "$TARGETARCH" = "arm64" ]; then \
+    HOST_ARCH=$(dpkg --print-architecture) && \
+    echo "Host architecture: $HOST_ARCH, Target architecture: $TARGETARCH" && \
+    if [ "$TARGETARCH" = "arm64" ] && [ "$HOST_ARCH" = "amd64" ]; then \
+        echo "Creating ARM64 cross-compilation toolchain file..." && \
         echo 'set(CMAKE_SYSTEM_NAME Linux)' > cmake/linux-aarch64.cmake && \
         echo 'set(CMAKE_SYSTEM_PROCESSOR aarch64)' >> cmake/linux-aarch64.cmake && \
         echo 'set(CMAKE_C_COMPILER aarch64-linux-gnu-gcc)' >> cmake/linux-aarch64.cmake && \
@@ -69,6 +72,8 @@ RUN mkdir -p cmake && \
         echo 'set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)' >> cmake/linux-aarch64.cmake && \
         echo 'set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)' >> cmake/linux-aarch64.cmake && \
         echo 'set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE ONLY)' >> cmake/linux-aarch64.cmake; \
+    else \
+        echo "Native build detected, no toolchain file needed"; \
     fi
 
 # CMakeLists.txtと設定ファイルを先にコピー（依存関係キャッシュ最適化）
@@ -85,13 +90,25 @@ RUN if [ "$TARGETARCH" = "amd64" ]; then \
               -DCMAKE_BUILD_PARALLEL_LEVEL=2 \
               -GNinja; \
     elif [ "$TARGETARCH" = "arm64" ]; then \
-        cmake -Bbuild -DCMAKE_INSTALL_PREFIX=install \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_TOOLCHAIN_FILE=cmake/linux-aarch64.cmake \
-            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
-            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
-            -DCMAKE_BUILD_PARALLEL_LEVEL=1 \
-            -GNinja; \
+        HOST_ARCH=$(dpkg --print-architecture) && \
+        if [ "$HOST_ARCH" = "amd64" ]; then \
+            echo "Cross-compiling for ARM64..." && \
+            cmake -Bbuild -DCMAKE_INSTALL_PREFIX=install \
+                -DCMAKE_BUILD_TYPE=Release \
+                -DCMAKE_TOOLCHAIN_FILE=cmake/linux-aarch64.cmake \
+                -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+                -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+                -DCMAKE_BUILD_PARALLEL_LEVEL=1 \
+                -GNinja; \
+        else \
+            echo "Native ARM64 build..." && \
+            cmake -Bbuild -DCMAKE_INSTALL_PREFIX=install \
+                -DCMAKE_BUILD_TYPE=Release \
+                -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+                -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+                -DCMAKE_BUILD_PARALLEL_LEVEL=1 \
+                -GNinja; \
+        fi; \
     else \
         echo "Unsupported architecture: $TARGETARCH" && exit 1; \
     fi
@@ -121,7 +138,12 @@ RUN cmake --install build
 # Strip binaries for smaller size on ARM64
 RUN if [ "$TARGETARCH" = "arm64" ]; then \
         echo "Stripping binaries for size optimization..." && \
-        find install/bin -type f -executable -exec aarch64-linux-gnu-strip {} \; 2>/dev/null || true; \
+        HOST_ARCH=$(dpkg --print-architecture) && \
+        if [ "$HOST_ARCH" = "amd64" ]; then \
+            find install/bin -type f -executable -exec aarch64-linux-gnu-strip {} \; 2>/dev/null || true; \
+        else \
+            find install/bin -type f -executable -exec strip {} \; 2>/dev/null || true; \
+        fi; \
     fi
 
 # テスト実行（amd64のみ）

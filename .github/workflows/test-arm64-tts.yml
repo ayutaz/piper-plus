@@ -91,26 +91,47 @@ jobs:
             -v "$(pwd)/test":/test \
             piper-arm64-test:latest \
             bash -c "
+              echo '=== Debug: System info ==='
+              uname -a
+              arch
+              
               echo '=== Debug: Checking piper binary ==='
               ls -la /build/install/bin/piper || echo 'Piper binary not found'
               file /build/install/bin/piper || echo 'Cannot check file type'
               ldd /build/install/bin/piper 2>&1 || echo 'Cannot check dependencies'
               
+              echo '=== Debug: Checking libraries ==='
+              ls -la /build/install/lib/ || echo 'No lib directory'
+              find /build/install -name '*.so*' -type f | head -20
+              
+              echo '=== Debug: Checking espeak-ng data ==='
+              ls -la /build/install/share/espeak-ng-data/ || echo 'espeak-ng data not found'
+              
               echo '=== Debug: Checking OpenJTalk ==='
               ls -la /build/install/share/openjtalk/ || echo 'OpenJTalk data not found'
               ls -la /build/install/bin/open_jtalk* || echo 'OpenJTalk binary not found'
               
+              echo '=== Debug: Environment ==='
+              echo "PATH=$PATH"
+              echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH"
+              
+              echo '=== Debug: Setting LD_LIBRARY_PATH ==='
+              export LD_LIBRARY_PATH=/build/install/lib:$LD_LIBRARY_PATH
+              echo "Updated LD_LIBRARY_PATH=$LD_LIBRARY_PATH"
+              
               echo '=== Debug: Testing piper --version ==='
-              /build/install/bin/piper --version || echo 'Version check failed'
+              /build/install/bin/piper --version || echo 'Version check failed with exit code: $?'
               
               echo '=== Debug: Testing piper --help ==='
-              /build/install/bin/piper --help || echo 'Help command failed'
+              /build/install/bin/piper --help || echo 'Help command failed with exit code: $?'
               
               echo '=== Testing Japanese TTS on ARM64 ==='
+              export LD_LIBRARY_PATH=/build/install/lib:$LD_LIBRARY_PATH
               echo 'こんにちは世界' | /build/install/bin/piper \
                 --model /test/models/ja_JP-test-medium.onnx \
                 --output_file /test/japanese_arm64.wav 2>&1 || {
                 echo '❌ Piper command failed with exit code: $?'
+                echo 'Error output above'
                 exit 1
               }
               
@@ -133,6 +154,7 @@ jobs:
                 'AIとMLの違いを説明してください'
               )
               
+              export LD_LIBRARY_PATH=/build/install/lib:$LD_LIBRARY_PATH
               for i in \"\${!test_inputs[@]}\"; do
                 echo \"Testing: \${test_inputs[\$i]}\"
                 echo \"\${test_inputs[\$i]}\" | /build/install/bin/piper \
@@ -151,10 +173,12 @@ jobs:
             piper-arm64-test:latest \
             bash -c "
               echo '=== Testing English TTS on ARM64 ==='
+              export LD_LIBRARY_PATH=/build/install/lib:$LD_LIBRARY_PATH
               echo 'Hello world from ARM64' | /build/install/bin/piper \
                 --model /test/models/en_US-amy-medium.onnx \
                 --output_file /test/english_arm64.wav 2>&1 || {
                 echo '❌ English piper command failed with exit code: $?'
+                echo 'Error output above'
                 exit 1
               }
               
@@ -177,6 +201,7 @@ jobs:
                 'AI and ML are transforming the world'
               )
               
+              export LD_LIBRARY_PATH=/build/install/lib:$LD_LIBRARY_PATH
               for i in \"\${!test_inputs[@]}\"; do
                 echo \"Testing: \${test_inputs[\$i]}\"
                 echo \"\${test_inputs[\$i]}\" | /build/install/bin/piper \
@@ -195,6 +220,7 @@ jobs:
             piper-arm64-test:latest \
             bash -c "
               echo '=== Testing OpenJTalk phonemization ==='
+              export LD_LIBRARY_PATH=/build/install/lib:$LD_LIBRARY_PATH
               
               # Test if OpenJTalk can process Japanese text
               echo 'テスト' | /build/install/bin/piper \
