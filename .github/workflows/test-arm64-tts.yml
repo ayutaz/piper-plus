@@ -23,7 +23,7 @@ jobs:
   test-linux-arm64:
     name: Test Linux ARM64 TTS
     runs-on: ubuntu-22.04
-    timeout-minutes: 120
+    timeout-minutes: 60
     
     steps:
       - name: Checkout code
@@ -52,47 +52,152 @@ jobs:
             --cache-to type=gha,mode=max \
             -f Dockerfile .
             
-      # Skip model download for now - focus on build success
-      - name: Prepare test directory
+      - name: Download test models
         run: |
           mkdir -p test/models
-          echo "Test directory prepared"
           
-      - name: Run basic functionality test in Docker
+          # Download Japanese model
+          echo "Downloading Japanese test model..."
+          curl -L -o test/models/ja_JP-test-medium.onnx \
+            "https://github.com/rhasspy/piper/releases/download/v0.0.2/voice-ja-jp-test-medium.onnx" || \
+            curl -L -o test/models/ja_JP-test-medium.onnx \
+              "https://huggingface.co/rhasspy/piper-voices/resolve/main/ja/ja_JP/test/medium/ja_JP-test-medium.onnx"
+          
+          curl -L -o test/models/ja_JP-test-medium.onnx.json \
+            "https://github.com/rhasspy/piper/releases/download/v0.0.2/voice-ja-jp-test-medium.onnx.json" || \
+            curl -L -o test/models/ja_JP-test-medium.onnx.json \
+              "https://huggingface.co/rhasspy/piper-voices/resolve/main/ja/ja_JP/test/medium/ja_JP-test-medium.onnx.json"
+          
+          # Download English model
+          echo "Downloading English test model..."
+          curl -L -o test/models/en_US-amy-medium.onnx \
+            "https://github.com/rhasspy/piper/releases/download/v1.0.0/en_US-amy-medium.onnx" || \
+            curl -L -o test/models/en_US-amy-medium.onnx \
+              "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/amy/medium/en_US-amy-medium.onnx"
+          
+          curl -L -o test/models/en_US-amy-medium.onnx.json \
+            "https://github.com/rhasspy/piper/releases/download/v1.0.0/en_US-amy-medium.onnx.json" || \
+            curl -L -o test/models/en_US-amy-medium.onnx.json \
+              "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/amy/medium/en_US-amy-medium.onnx.json"
+          
+          ls -la test/models/
+          
+      - name: Run Japanese TTS test in Docker
         run: |
-          # Run tests inside ARM64 Docker container
+          # Run Japanese TTS test inside ARM64 Docker container
           docker run --rm \
             --platform linux/arm64 \
             -v "$(pwd)/test":/test \
             piper-arm64-build:latest \
             bash -c "
-              echo '=== Testing Piper binary on ARM64 ==='
-              /build/install/bin/piper --version || echo 'Version check failed'
+              echo '=== Testing Japanese TTS on ARM64 ==='
+              echo 'こんにちは世界' | /build/install/bin/piper \
+                --model /test/models/ja_JP-test-medium.onnx \
+                --output_file /test/japanese_arm64.wav
               
-              echo '=== Checking OpenJTalk availability ==='
-              if [ -f /build/install/bin/open_jtalk_phonemizer ]; then
-                echo '✅ OpenJTalk phonemizer found'
-                ls -la /build/install/bin/open_jtalk_phonemizer
+              # Check if output was created
+              if [ -f /test/japanese_arm64.wav ]; then
+                echo '✅ Japanese TTS test passed'
+                ls -la /test/japanese_arm64.wav
+                file /test/japanese_arm64.wav
               else
-                echo '❌ OpenJTalk phonemizer not found'
-                ls -la /build/install/bin/
+                echo '❌ Japanese TTS test failed'
+                exit 1
               fi
+              
+              # Test various Japanese inputs
+              echo '=== Testing various Japanese inputs ==='
+              test_inputs=(
+                'ありがとうございます'
+                '今日はいい天気ですね'
+                '123円です'
+                'AIとMLの違いを説明してください'
+              )
+              
+              for i in \"\${!test_inputs[@]}\"; do
+                echo \"Testing: \${test_inputs[\$i]}\"
+                echo \"\${test_inputs[\$i]}\" | /build/install/bin/piper \
+                  --model /test/models/ja_JP-test-medium.onnx \
+                  --output_file \"/test/japanese_test_\$i.wav\"
+                [ -f \"/test/japanese_test_\$i.wav\" ] && echo '✅ Success' || echo '❌ Failed'
+              done
             "
             
-      - name: Run simplified TTS test if build succeeded
-        if: success()
+      - name: Run English TTS test in Docker
         run: |
-          # Skip advanced tests for now to focus on build success
-          echo "Build succeeded, skipping advanced tests for now"
+          # Run English TTS test inside ARM64 Docker container
+          docker run --rm \
+            --platform linux/arm64 \
+            -v "$(pwd)/test":/test \
+            piper-arm64-build:latest \
+            bash -c "
+              echo '=== Testing English TTS on ARM64 ==='
+              echo 'Hello world from ARM64' | /build/install/bin/piper \
+                --model /test/models/en_US-amy-medium.onnx \
+                --output_file /test/english_arm64.wav
+              
+              # Check if output was created
+              if [ -f /test/english_arm64.wav ]; then
+                echo '✅ English TTS test passed'
+                ls -la /test/english_arm64.wav
+                file /test/english_arm64.wav
+              else
+                echo '❌ English TTS test failed'
+                exit 1
+              fi
+              
+              # Test various English inputs
+              echo '=== Testing various English inputs ==='
+              test_inputs=(
+                'The quick brown fox jumps over the lazy dog'
+                'Testing ARM64 support for Piper TTS'
+                '123 Main Street, Suite 456'
+                'AI and ML are transforming the world'
+              )
+              
+              for i in \"\${!test_inputs[@]}\"; do
+                echo \"Testing: \${test_inputs[\$i]}\"
+                echo \"\${test_inputs[\$i]}\" | /build/install/bin/piper \
+                  --model /test/models/en_US-amy-medium.onnx \
+                  --output_file \"/test/english_test_\$i.wav\"
+                [ -f \"/test/english_test_\$i.wav\" ] && echo '✅ Success' || echo '❌ Failed'
+              done
+            "
             
-      - name: Upload build logs
+      - name: Test OpenJTalk phonemization
+        run: |
+          # Test phonemization functionality
+          docker run --rm \
+            --platform linux/arm64 \
+            -v "$(pwd)/test":/test \
+            piper-arm64-build:latest \
+            bash -c "
+              echo '=== Testing OpenJTalk phonemization ==='
+              
+              # Test if OpenJTalk can process Japanese text
+              echo 'テスト' | /build/install/bin/piper \
+                --model /test/models/ja_JP-test-medium.onnx \
+                --output_raw 2>&1 | grep -q 'phoneme' && \
+                echo '✅ OpenJTalk phonemization works' || \
+                echo '❌ OpenJTalk phonemization failed'
+              
+              # Check OpenJTalk dictionary
+              if [ -d /build/install/share/openjtalk ]; then
+                echo '✅ OpenJTalk dictionary found'
+                ls -la /build/install/share/openjtalk/
+              else
+                echo '⚠️ OpenJTalk dictionary not found in expected location'
+              fi
+            "
+      
+      - name: Upload test outputs
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: arm64-build-logs
+          name: arm64-tts-test-outputs
           path: |
-            build.log
-          if-no-files-found: ignore
+            test/*.wav
+          if-no-files-found: warn
           
       - name: Check binary size
         run: |
