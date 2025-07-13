@@ -16,9 +16,28 @@
 - **完了**: Phase 0 - Unity 6 & AI Interface 検証 ✅（3/3人日）
 - **進行中**: Phase 1 - Windows/Linux 基盤実装 🚧（2/20人日）
   - ✅ 1.1 Core API - インターフェース設計（1人日）
-  - ✅ 1.3.1 PiperConfig ユニットテスト（0.5人日）
-  - ✅ 一部の Core API テスト（0.5人日）
+    - ✅ IPiperTTS インターフェース定義
+    - ✅ PiperConfig クラス基本実装
+    - ✅ PiperVoiceConfig 実装
+    - ✅ AudioChunk ストリーミング実装
+    - ✅ PiperException 階層実装
+    - ✅ CacheStatistics 実装
+    - ✅ PiperLogger 実装（Debug.Logラッパー）
+  - ✅ 各Core APIクラスのユニットテスト（1人日）
+    - ✅ PiperConfigTest (10テスト)
+    - ✅ PiperVoiceConfigTest (12テスト)
+    - ✅ AudioChunkTest (11テスト)
+    - ✅ CacheStatisticsTest (16テスト)
+    - ✅ PiperExceptionTest (12テスト)
+    - ✅ PiperLoggerTest (13テスト)
 - **全体進捗**: 5/90人日完了（5.6%）
+
+### 次のタスク
+**Phase 1.2: Core API - 実装（3人日）**
+- 1.2.1 PiperConfig バリデーション実装（0.5人日）
+- 1.2.2 PiperTTS 基本構造実装（1人日）
+- 1.2.3 PiperTTS 非同期初期化実装（1人日）
+- 1.2.4 PiperTTS 音声生成スタブ実装（0.5人日）
 
 ### Phase 1のゴール
 **「日本語テキストを入力して、Windows/LinuxのUnity上で実際の音声が再生される」**
@@ -132,23 +151,32 @@
 
 #### タスク
 
-##### 1.1 Core API - インターフェース設計（1人日）
+##### 1.1 Core API - インターフェース設計（1人日）✅ 完了
 
-###### 1.1.1 IPiperTTS インターフェース定義（0.5人日）
+###### 1.1.1 IPiperTTS インターフェース定義（0.5人日）✅ 完了
 - **作業内容**:
-  - インターフェースメソッド定義
-  - XML ドキュメントコメント記述
-  - 非同期パターンの設計
-- **成果物**: IPiperTTS.cs
-- **完了条件**: コンパイルエラーなし、設計レビュー完了
+  - インターフェースメソッド定義 ✅
+  - XML ドキュメントコメント記述 ✅
+  - 非同期パターンの設計 ✅
+- **成果物**: IPiperTTS.cs ✅
+- **完了条件**: コンパイルエラーなし、設計レビュー完了 ✅
+- **実施内容**:
+  - 非同期音声生成メソッド (GenerateAudioAsync, StreamAudioAsync)
+  - 音声管理メソッド (SetVoice, GetAvailableVoices)
+  - イベントシステム (OnGenerationProgress, OnGenerationComplete, OnError)
+  - PR #5 で実装済み
 
-###### 1.1.2 PiperConfig クラス設計（0.5人日）
+###### 1.1.2 PiperConfig クラス設計（0.5人日）✅ 完了
 - **作業内容**:
-  - 設定項目の定義
-  - デフォルト値の設定
-  - シリアライズ対応
-- **成果物**: PiperConfig.cs（基本実装）
-- **完了条件**: インスタンス生成可能
+  - 設定項目の定義 ✅
+  - デフォルト値の設定 ✅
+  - シリアライズ対応 ✅
+- **成果物**: PiperConfig.cs（基本実装）✅
+- **完了条件**: インスタンス生成可能 ✅
+- **実施内容**:
+  - デフォルト音声、キャッシュ設定、パフォーマンス設定
+  - Unity Inspector表示対応
+  - PR #5 で実装済み
 
 ##### 1.2 Core API - 実装（3人日）
 
@@ -184,15 +212,22 @@
 - **成果物**: PiperTTS.cs（完全版）
 - **完了条件**: API が一通り動作
 
-##### 1.3 Core API - テスト（2人日）
+##### 1.3 Core API - テスト（2人日）✅ 部分的に完了
 
-###### 1.3.1 PiperConfig ユニットテスト（0.5人日）
+###### 1.3.1 Core API ユニットテスト（1人日）✅ 完了
 - **作業内容**:
-  - 正常系テストケース（5個）
-  - 異常系テストケース（5個）
-  - エッジケーステスト
-- **成果物**: PiperConfigTests.cs
-- **完了条件**: カバレッジ 90% 以上
+  - PiperConfig テスト ✅
+  - PiperVoiceConfig テスト ✅
+  - AudioChunk テスト ✅
+  - CacheStatistics テスト ✅
+  - PiperException テスト ✅
+  - PiperLogger テスト ✅
+- **成果物**: 各クラスのテストファイル ✅
+- **完了条件**: 全クラスのテスト実装 ✅
+- **実施内容**:
+  - 合計74テスト実装
+  - CI/CDでの自動実行確認
+  - PR #5 でマージ済み
 
 ###### 1.3.2 PiperTTS 初期化テスト（1人日）
 - **作業内容**:
