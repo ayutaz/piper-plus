@@ -39,18 +39,21 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
           
-      - name: Build ARM64 binary using native compilation in Docker
+      - name: Pull pre-built ARM64 Docker image
         run: |
-          # Use Docker with buildx for proper ARM64 build
-          docker buildx build \
-            --platform linux/arm64 \
-            --target builder \
-            --tag piper-arm64-build:latest \
-            --load \
-            --progress=plain \
-            --cache-from type=gha \
-            --cache-to type=gha,mode=max \
-            -f Dockerfile .
+          # Use pre-built image from ghcr.io to save build time
+          docker pull ghcr.io/ayutaz/piper-plus:test-latest || {
+            echo "Pre-built image not available, building locally..."
+            docker buildx build \
+              --platform linux/arm64 \
+              --target builder \
+              --tag ghcr.io/ayutaz/piper-plus:test-latest \
+              --load \
+              --progress=plain \
+              --cache-from type=gha \
+              --cache-to type=gha,mode=max \
+              -f Dockerfile .
+          }
             
       - name: Download test models
         run: |
@@ -88,7 +91,7 @@ jobs:
           docker run --rm \
             --platform linux/arm64 \
             -v "$(pwd)/test":/test \
-            piper-arm64-build:latest \
+            ghcr.io/ayutaz/piper-plus:test-latest \
             bash -c "
               echo '=== Testing Japanese TTS on ARM64 ==='
               echo 'こんにちは世界' | /build/install/bin/piper \
@@ -129,7 +132,7 @@ jobs:
           docker run --rm \
             --platform linux/arm64 \
             -v "$(pwd)/test":/test \
-            piper-arm64-build:latest \
+            ghcr.io/ayutaz/piper-plus:test-latest \
             bash -c "
               echo '=== Testing English TTS on ARM64 ==='
               echo 'Hello world from ARM64' | /build/install/bin/piper \
@@ -170,7 +173,7 @@ jobs:
           docker run --rm \
             --platform linux/arm64 \
             -v "$(pwd)/test":/test \
-            piper-arm64-build:latest \
+            ghcr.io/ayutaz/piper-plus:test-latest \
             bash -c "
               echo '=== Testing OpenJTalk phonemization ==='
               
@@ -203,7 +206,7 @@ jobs:
         run: |
           docker run --rm \
             --platform linux/arm64 \
-            piper-arm64-build:latest \
+            ghcr.io/ayutaz/piper-plus:test-latest \
             bash -c "
               echo '=== ARM64 Binary Size ==='
               ls -lh /build/install/bin/piper
