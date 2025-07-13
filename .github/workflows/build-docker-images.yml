@@ -62,7 +62,7 @@ jobs:
           tags: |
             type=ref,event=branch
             type=ref,event=pr
-            type=sha,prefix={{branch}}-
+            type=sha,prefix=sha-
             type=raw,value=latest,enable={{is_default_branch}}
       
       - name: Build and push multi-platform images
@@ -70,19 +70,20 @@ jobs:
         with:
           context: .
           platforms: linux/amd64,linux/arm64
-          push: true
+          push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
           target: builder
+          outputs: ${{ github.event_name == 'pull_request' && 'type=docker' || '' }}
       
       - name: Build and push test images
         uses: docker/build-push-action@v5
         with:
           context: .
           platforms: linux/amd64,linux/arm64
-          push: true
+          push: ${{ github.event_name != 'pull_request' }}
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:test-${{ github.sha }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:test-latest
@@ -90,3 +91,4 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           target: builder
+          outputs: ${{ github.event_name == 'pull_request' && 'type=docker' || '' }}
