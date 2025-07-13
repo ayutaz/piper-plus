@@ -47,7 +47,7 @@ RUN HOST_ARCH=$(dpkg --print-architecture); \
     fi
 
 # ========== BUILD STAGE ==========
-FROM dependencies AS build
+FROM dependencies AS builder
 
 WORKDIR /build
 
@@ -134,6 +134,9 @@ WORKDIR /dist
 RUN mkdir -p piper && \
     cp -dR /build/install/* ./piper/ && \
     tar -czf "piper_${TARGETARCH}.tar.gz" piper/
+
+# Add an alias for backward compatibility
+FROM builder AS build
 
 FROM scratch
 COPY --from=build /dist/piper_*.tar.gz ./

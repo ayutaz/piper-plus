@@ -39,28 +39,18 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
           
-      - name: Build ARM64 binary using cross-compilation
+      - name: Build ARM64 binary using native compilation in Docker
         run: |
-          # Install ARM64 cross-compilation toolchain
-          sudo apt-get update
-          sudo apt-get install -y \
-            gcc-aarch64-linux-gnu \
-            g++-aarch64-linux-gnu \
-            qemu-user-static
-          
-          # Build using CMake directly (faster than Docker QEMU)
-          mkdir -p build-arm64
-          cd build-arm64
-          
-          # Configure for ARM64 cross-compilation
-          cmake .. \
-            -DCMAKE_TOOLCHAIN_FILE=../cmake/linux-aarch64.cmake \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_INSTALL_PREFIX=../install-arm64
-          
-          # Build (use all cores since it's cross-compilation)
-          make -j$(nproc) || make VERBOSE=1
-          make install
+          # Use Docker with buildx for proper ARM64 build
+          docker buildx build \
+            --platform linux/arm64 \
+            --target builder \
+            --tag piper-arm64-build:latest \
+            --load \
+            --progress=plain \
+            --cache-from type=gha \
+            --cache-to type=gha,mode=max \
+            -f Dockerfile .
             
       # Skip model download for now - focus on build success
       - name: Prepare test directory
@@ -68,21 +58,26 @@ jobs:
           mkdir -p test/models
           echo "Test directory prepared"
           
-      - name: Run basic functionality test using QEMU
+      - name: Run basic functionality test in Docker
         run: |
-          # Use QEMU to run ARM64 binary
-          echo '=== Testing Piper binary on ARM64 using QEMU ==='
-          qemu-aarch64-static -L /usr/aarch64-linux-gnu \
-            ./install-arm64/bin/piper --version || echo 'Version check failed'
-          
-          echo '=== Checking OpenJTalk availability ==='
-          if [ -f ./install-arm64/bin/open_jtalk_phonemizer ]; then
-            echo '✅ OpenJTalk phonemizer found'
-            ls -la ./install-arm64/bin/open_jtalk_phonemizer
-          else
-            echo '❌ OpenJTalk phonemizer not found'
-            ls -la ./install-arm64/bin/
-          fi
+          # Run tests inside ARM64 Docker container
+          docker run --rm \
+            --platform linux/arm64 \
+            -v "$(pwd)/test":/test \
+            piper-arm64-build:latest \
+            bash -c "
+              echo '=== Testing Piper binary on ARM64 ==='
+              /build/install/bin/piper --version || echo 'Version check failed'
+              
+              echo '=== Checking OpenJTalk availability ==='
+              if [ -f /build/install/bin/open_jtalk_phonemizer ]; then
+                echo '✅ OpenJTalk phonemizer found'
+                ls -la /build/install/bin/open_jtalk_phonemizer
+              else
+                echo '❌ OpenJTalk phonemizer not found'
+                ls -la /build/install/bin/
+              fi
+            "
             
       - name: Run simplified TTS test if build succeeded
         if: success()
@@ -101,8 +96,11 @@ jobs:
           
       - name: Check binary size
         run: |
-          echo '=== ARM64 Binary Size ==='
-          ls -lh ./install-arm64/bin/piper
-          file ./install-arm64/bin/piper
-          # Show library dependencies
-          aarch64-linux-gnu-readelf -d ./install-arm64/bin/piper | grep NEEDED || true
+          docker run --rm \
+            --platform linux/arm64 \
+            piper-arm64-build:latest \
+            bash -c "
+              echo '=== ARM64 Binary Size ==='
+              ls -lh /build/install/bin/piper
+              file /build/install/bin/piper || true
+            "
