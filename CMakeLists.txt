@@ -39,8 +39,11 @@ elseif(APPLE)
   string(APPEND CMAKE_C_FLAGS " -Wall -Wextra")
 else()
   # Linux flags
-  string(APPEND CMAKE_CXX_FLAGS " -Wall -Wextra -Wl,-rpath,'$ORIGIN'")
+  string(APPEND CMAKE_CXX_FLAGS " -Wall -Wextra -Wl,-rpath,'$ORIGIN' -Wl,-rpath,'$ORIGIN/../lib'")
   string(APPEND CMAKE_C_FLAGS " -Wall -Wextra")
+  # Set RPATH for installed binaries
+  set(CMAKE_INSTALL_RPATH "$ORIGIN/../lib")
+  set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 endif()
 
 # ARM64-specific optimizations

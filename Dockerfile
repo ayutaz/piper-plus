@@ -135,6 +135,10 @@ RUN if [ "$TARGETARCH" = "arm64" ]; then \
 # Install step  
 RUN cmake --install build
 
+# Set up library paths for runtime
+RUN echo "/build/install/lib" > /etc/ld.so.conf.d/piper.conf && \
+    ldconfig || true
+
 # Strip binaries for smaller size on ARM64
 RUN if [ "$TARGETARCH" = "arm64" ]; then \
         echo "Stripping binaries for size optimization..." && \
