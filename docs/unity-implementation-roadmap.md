@@ -36,11 +36,11 @@
 
 全体スケジュール: 15週間（約3.5ヶ月）
 
-### フェーズ 0: Unity 6 & AI Interface (Inference Engine) 検証（第1週 - 計3人日）
+### フェーズ 0: Unity 6 & AI Interface (Inference Engine) 検証（第1週 - 計3人日）✅ 完了
 
-#### マイルストーン
-- Unity 6000.0.35f1 と Unity AI Interface (Inference Engine) 2.2.x の互換性確認
-- 最小限の動作プロトタイプ作成
+#### マイルストーン ✅
+- Unity 6000.0.35f1 と Unity AI Interface (Inference Engine) 2.2.x の互換性確認 ✅
+- 最小限の動作プロトタイプ作成 ✅
 
 #### タスク
 
@@ -56,35 +56,51 @@
 - **実施内容**:
   - Unity 6000.0.35f1 プロジェクト作成完了
   - GitHub Actions CI/CD (game-ci) 設定完了
-  - PR #2 作成済み
+  - PR #2 作成・マージ済み
   - company name を com.yousan に変更
   - .idea ディレクトリを .gitignore に追加
 
-##### 0.2 Unity AI Interface (Inference Engine) パッケージ導入（0.5人日）
+##### 0.2 Unity AI Interface (Inference Engine) パッケージ導入（0.5人日）✅ 完了
 - **作業内容**:
-  - Package Manager から com.unity.ai.inference 2.2.x インストール
-  - 依存パッケージの確認
-  - パッケージ設定の調整
-- **成果物**: manifest.json 更新
-- **完了条件**: Inference Engine がエラーなくインポートされる
+  - Package Manager から com.unity.ai.inference 2.2.x インストール ✅
+  - 依存パッケージの確認 ✅
+  - パッケージ設定の調整 ✅
+- **成果物**: manifest.json 更新 ✅
+- **完了条件**: Inference Engine がエラーなくインポートされる ✅
+- **実施内容**:
+  - com.unity.ai.inference 2.2.1 インストール完了
+  - com.unity.burst 1.8.20 も同時にインストール
+  - PR #3 作成・マージ済み
 
-##### 0.3 Inference Engine 基本動作確認（1人日）
+##### 0.3 Inference Engine 基本動作確認（1人日）✅ 完了
 - **作業内容**:
-  - 簡単な ONNX モデルのダウンロード（MNIST等）
-  - モデル読み込みスクリプト作成（Unity.InferenceEngine 名前空間使用）
-  - 推論実行テスト
-  - GPU/CPU バックエンド切り替えテスト
-- **成果物**: InferenceEngineTestScene、動作確認スクリプト
-- **完了条件**: ONNX モデルの推論が成功する
+  - 簡単な ONNX モデルのダウンロード（MNIST等）✅
+  - モデル読み込みスクリプト作成（Unity.InferenceEngine 名前空間使用）✅
+  - 推論実行テスト ✅
+  - GPU/CPU バックエンド切り替えテスト ✅
+- **成果物**: InferenceEngineTestScene、動作確認スクリプト ✅
+- **完了条件**: ONNX モデルの推論が成功する ✅
+- **実施内容**:
+  - InferenceEngineBasicTest.cs (5テスト)
+  - ONNXModelLoaderTest.cs (3テスト)
+  - InferenceEngineEditorTest.cs (2テスト)
+  - InferenceEngineTestManager.cs (実行時テスト)
+  - PR #3 でマージ済み
 
-##### 0.4 最小音声合成プロトタイプ（1人日）
+##### 0.4 最小音声合成プロトタイプ（1人日）✅ 完了
 - **作業内容**:
-  - 固定音素 ID 配列の定義
-  - Inference Engine で音声波形生成（ダミーモデル使用）
-  - AudioClip 生成と再生
-- **成果物**: MinimalTTSPrototype.cs
-- **完了条件**: Unity Editor で音が鳴る
-- **CI/CD**: Unity Test Framework の基本設定
+  - 固定音素 ID 配列の定義 ✅
+  - Inference Engine で音声波形生成（ダミーモデル使用）✅
+  - AudioClip 生成と再生 ✅
+- **成果物**: MinimalTTSPrototype.cs ✅
+- **完了条件**: Unity Editor で音が鳴る ✅
+- **CI/CD**: Unity Test Framework の基本設定 ✅
+- **実施内容**:
+  - MinimalTTSPrototype.cs - 固定音素IDから波形生成
+  - PiperTTSPrototype.cs - 実際のPiper TTSモデル使用（ja_JP-test-medium.onnx）
+  - TTSPrototypeTest.cs (3テスト)
+  - CI/CD でテスト結果可視化実装（全13テスト成功）
+  - PR #4 作成・マージ済み
 
 ### フェーズ 1: Windows/Linux 基盤実装（第2-3週 - 計20人日）
 
