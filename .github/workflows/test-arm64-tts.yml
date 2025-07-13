@@ -53,6 +53,13 @@ jobs:
             --cache-to type=gha,mode=max \
             -f Dockerfile .
             
+      - name: Test ARM64 Docker image
+        run: |
+          # First test if the Docker image runs at all
+          echo "=== Testing basic Docker functionality ==="
+          docker run --rm --platform linux/arm64 piper-arm64-test:latest uname -m
+          docker run --rm --platform linux/arm64 piper-arm64-test:latest ls -la /build/install/bin/
+            
       - name: Download test models
         run: |
           mkdir -p test/models
@@ -83,6 +90,12 @@ jobs:
           
           ls -la test/models/
           
+      - name: Test piper binary directly
+        run: |
+          # Test if piper binary works at all
+          echo "=== Testing piper binary directly ==="
+          docker run --rm --platform linux/arm64 piper-arm64-test:latest /build/install/bin/piper --version || echo "Exit code: $?"
+          
       - name: Run Japanese TTS test in Docker
         run: |
           # Run Japanese TTS test inside ARM64 Docker container
@@ -91,6 +104,7 @@ jobs:
             -v "$(pwd)/test":/test \
             piper-arm64-test:latest \
             bash -c "
+              set -e  # Exit on error
               set -x  # Enable bash debug mode
               echo '=== Debug: System info ==='
               uname -a
@@ -106,6 +120,10 @@ jobs:
               echo '=== Debug: Checking libraries ==='
               ls -la /build/install/lib/ || echo 'No lib directory'
               find /build/install -name '*.so*' -type f | head -20
+              
+              echo '=== Debug: Check ONNX Runtime ==='
+              find /build -name '*onnxruntime*' -type f | head -10 || echo 'No ONNX Runtime files found'
+              ldd /build/install/bin/piper | grep onnx || echo 'ONNX Runtime not linked'
               
               echo '=== Debug: Checking espeak-ng data ==='
               ls -la /build/install/share/espeak-ng-data/ || echo 'espeak-ng data not found'
