@@ -39,21 +39,19 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
           
-      - name: Pull pre-built ARM64 Docker image
+      - name: Build ARM64 Docker image
         run: |
-          # Use pre-built image from ghcr.io to save build time
-          docker pull ghcr.io/ayutaz/piper-plus:test-latest || {
-            echo "Pre-built image not available, building locally..."
-            docker buildx build \
-              --platform linux/arm64 \
-              --target builder \
-              --tag ghcr.io/ayutaz/piper-plus:test-latest \
-              --load \
-              --progress=plain \
-              --cache-from type=gha \
-              --cache-to type=gha,mode=max \
-              -f Dockerfile .
-          }
+          # Always build locally for PR since pre-built images are not available yet
+          echo "Building ARM64 Docker image locally..."
+          docker buildx build \
+            --platform linux/arm64 \
+            --target builder \
+            --tag piper-arm64-test:latest \
+            --load \
+            --progress=plain \
+            --cache-from type=gha \
+            --cache-to type=gha,mode=max \
+            -f Dockerfile .
             
       - name: Download test models
         run: |
@@ -91,12 +89,30 @@ jobs:
           docker run --rm \
             --platform linux/arm64 \
             -v "$(pwd)/test":/test \
-            ghcr.io/ayutaz/piper-plus:test-latest \
+            piper-arm64-test:latest \
             bash -c "
+              echo '=== Debug: Checking piper binary ==='
+              ls -la /build/install/bin/piper || echo 'Piper binary not found'
+              file /build/install/bin/piper || echo 'Cannot check file type'
+              ldd /build/install/bin/piper 2>&1 || echo 'Cannot check dependencies'
+              
+              echo '=== Debug: Checking OpenJTalk ==='
+              ls -la /build/install/share/openjtalk/ || echo 'OpenJTalk data not found'
+              ls -la /build/install/bin/open_jtalk* || echo 'OpenJTalk binary not found'
+              
+              echo '=== Debug: Testing piper --version ==='
+              /build/install/bin/piper --version || echo 'Version check failed'
+              
+              echo '=== Debug: Testing piper --help ==='
+              /build/install/bin/piper --help || echo 'Help command failed'
+              
               echo '=== Testing Japanese TTS on ARM64 ==='
               echo 'こんにちは世界' | /build/install/bin/piper \
                 --model /test/models/ja_JP-test-medium.onnx \
-                --output_file /test/japanese_arm64.wav
+                --output_file /test/japanese_arm64.wav 2>&1 || {
+                echo '❌ Piper command failed with exit code: $?'
+                exit 1
+              }
               
               # Check if output was created
               if [ -f /test/japanese_arm64.wav ]; then
@@ -104,7 +120,7 @@ jobs:
                 ls -la /test/japanese_arm64.wav
                 file /test/japanese_arm64.wav
               else
-                echo '❌ Japanese TTS test failed'
+                echo '❌ Japanese TTS test failed - no output file created'
                 exit 1
               fi
               
@@ -132,12 +148,15 @@ jobs:
           docker run --rm \
             --platform linux/arm64 \
             -v "$(pwd)/test":/test \
-            ghcr.io/ayutaz/piper-plus:test-latest \
+            piper-arm64-test:latest \
             bash -c "
               echo '=== Testing English TTS on ARM64 ==='
               echo 'Hello world from ARM64' | /build/install/bin/piper \
                 --model /test/models/en_US-amy-medium.onnx \
-                --output_file /test/english_arm64.wav
+                --output_file /test/english_arm64.wav 2>&1 || {
+                echo '❌ English piper command failed with exit code: $?'
+                exit 1
+              }
               
               # Check if output was created
               if [ -f /test/english_arm64.wav ]; then
@@ -145,7 +164,7 @@ jobs:
                 ls -la /test/english_arm64.wav
                 file /test/english_arm64.wav
               else
-                echo '❌ English TTS test failed'
+                echo '❌ English TTS test failed - no output file created'
                 exit 1
               fi
               
@@ -173,7 +192,7 @@ jobs:
           docker run --rm \
             --platform linux/arm64 \
             -v "$(pwd)/test":/test \
-            ghcr.io/ayutaz/piper-plus:test-latest \
+            piper-arm64-test:latest \
             bash -c "
               echo '=== Testing OpenJTalk phonemization ==='
               
@@ -206,7 +225,7 @@ jobs:
         run: |
           docker run --rm \
             --platform linux/arm64 \
-            ghcr.io/ayutaz/piper-plus:test-latest \
+            piper-arm64-test:latest \
             bash -c "
               echo '=== ARM64 Binary Size ==='
               ls -lh /build/install/bin/piper

@@ -39,21 +39,19 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
           
-      - name: Pull pre-built ARM64 Docker image
+      - name: Build ARM64 Docker image
         run: |
-          # Use pre-built image from ghcr.io to save build time
-          docker pull ghcr.io/ayutaz/piper-plus:test-latest || {
-            echo "Pre-built image not available, building locally..."
-            docker buildx build \
-              --platform linux/arm64 \
-              --target builder \
-              --tag ghcr.io/ayutaz/piper-plus:test-latest \
-              --load \
-              --progress=plain \
-              --cache-from type=gha \
-              --cache-to type=gha,mode=max \
-              -f Dockerfile .
-          }
+          # Always build locally for PR since pre-built images are not available yet
+          echo "Building ARM64 Docker image locally..."
+          docker buildx build \
+            --platform linux/arm64 \
+            --target builder \
+            --tag piper-arm64-multilingual:latest \
+            --load \
+            --progress=plain \
+            --cache-from type=gha \
+            --cache-to type=gha,mode=max \
+            -f Dockerfile .
             
       - name: Download multilingual test models
         run: |
@@ -80,7 +78,7 @@ jobs:
           docker run --rm \
             --platform linux/arm64 \
             -v "$(pwd)/test":/test \
-            ghcr.io/ayutaz/piper-plus:test-latest \
+            piper-arm64-multilingual:latest \
             bash -c "
               echo '=== Testing German TTS on ARM64 ==='
               echo 'Guten Tag, wie geht es Ihnen?' | /build/install/bin/piper \
@@ -101,7 +99,7 @@ jobs:
           docker run --rm \
             --platform linux/arm64 \
             -v "$(pwd)/test":/test \
-            ghcr.io/ayutaz/piper-plus:test-latest \
+            piper-arm64-multilingual:latest \
             bash -c "
               echo '=== Testing French TTS on ARM64 ==='
               echo 'Bonjour, comment allez-vous?' | /build/install/bin/piper \
@@ -121,7 +119,7 @@ jobs:
         run: |
           docker run --rm \
             --platform linux/arm64 \
-            ghcr.io/ayutaz/piper-plus:test-latest \
+            piper-arm64-multilingual:latest \
             bash -c "
               echo '=== Testing espeak-ng availability ==='
               
