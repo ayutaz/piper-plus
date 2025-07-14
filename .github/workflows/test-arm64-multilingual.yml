@@ -23,7 +23,7 @@ jobs:
   test-multilingual-arm64:
     name: Test Multilingual TTS on ARM64
     runs-on: ubuntu-22.04
-    timeout-minutes: 120
+    timeout-minutes: 90
     
     steps:
       - name: Checkout code

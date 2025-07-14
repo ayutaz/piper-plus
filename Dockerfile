@@ -91,6 +91,8 @@ RUN if [ "$TARGETARCH" = "amd64" ]; then \
               -GNinja; \
     elif [ "$TARGETARCH" = "arm64" ]; then \
         HOST_ARCH=$(dpkg --print-architecture) && \
+        echo "Host architecture: $HOST_ARCH, Target: $TARGETARCH" && \
+        echo "CMAKE_SYSTEM_PROCESSOR will be: $(uname -m)" && \
         if [ "$HOST_ARCH" = "amd64" ]; then \
             echo "Cross-compiling for ARM64..." && \
             cmake -Bbuild -DCMAKE_INSTALL_PREFIX=install \
@@ -99,14 +101,17 @@ RUN if [ "$TARGETARCH" = "amd64" ]; then \
                 -DCMAKE_C_COMPILER_LAUNCHER=ccache \
                 -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
                 -DCMAKE_BUILD_PARALLEL_LEVEL=1 \
+                -DCMAKE_VERBOSE_MAKEFILE=ON \
                 -GNinja; \
         else \
             echo "Native ARM64 build..." && \
+            echo "System processor: $(uname -m)" && \
             cmake -Bbuild -DCMAKE_INSTALL_PREFIX=install \
                 -DCMAKE_BUILD_TYPE=Release \
                 -DCMAKE_C_COMPILER_LAUNCHER=ccache \
                 -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
                 -DCMAKE_BUILD_PARALLEL_LEVEL=1 \
+                -DCMAKE_VERBOSE_MAKEFILE=ON \
                 -GNinja; \
         fi; \
     else \
@@ -139,7 +144,11 @@ RUN cmake --install build
 RUN echo "=== Checking piper-phonemize build ===" && \
     find /build/build -name "*onnxruntime*" -type f | head -20 && \
     echo "=== Checking libraries in build directory ===" && \
-    find /build/build -name "*.so*" -type f | grep -E "(onnx|espeak|piper)" | head -20
+    find /build/build -name "*.so*" -type f | grep -E "(onnx|espeak|piper)" | head -20 && \
+    echo "=== Checking ONNX Runtime in piper-phonemize ===" && \
+    find /build/build/p/src/piper_phonemize_external-build -name "*onnx*" 2>/dev/null | head -20 || echo "No ONNX files in piper-phonemize build" && \
+    echo "=== Checking downloaded files ===" && \
+    find /build/build -path "*/download/*" -name "*onnx*" 2>/dev/null | head -10 || echo "No downloaded ONNX files"
 
 # Set up library paths for runtime
 RUN echo "/build/install/lib" > /etc/ld.so.conf.d/piper.conf && \
