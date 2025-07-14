@@ -153,10 +153,12 @@ RUN echo "=== Checking piper-phonemize build ===" && \
 # Set up library paths for runtime and create symlinks
 RUN echo "/build/install/lib" > /etc/ld.so.conf.d/piper.conf && \
     ldconfig || true && \
-    cd /build/install/lib && \
-    if [ -f libonnxruntime.so.1.14.1 ]; then \
-        ln -sf libonnxruntime.so.1.14.1 libonnxruntime.so.1 && \
-        ln -sf libonnxruntime.so.1 libonnxruntime.so; \
+    if [ -d /build/install/lib ]; then \
+        cd /build/install/lib && \
+        if [ -f libonnxruntime.so.1.14.1 ]; then \
+            ln -sf libonnxruntime.so.1.14.1 libonnxruntime.so.1 && \
+            ln -sf libonnxruntime.so.1 libonnxruntime.so; \
+        fi \
     fi
 
 # Strip binaries for smaller size on ARM64
