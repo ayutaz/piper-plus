@@ -1,0 +1,96 @@
+{
+  "model": {
+    "type": "vits_multilingual",
+    "version": "1.0",
+    "description": "Multilingual VITS model supporting Japanese (OpenJTalk) and other languages (espeak-ng)"
+  },
+  "audio": {
+    "sample_rate": 22050,
+    "channels": 1,
+    "sample_bytes": 2,
+    "quality": "medium"
+  },
+  "phoneme_config": {
+    "phoneme_type": "multilingual",
+    "num_symbols": 512,
+    "phoneme_map": "multilingual",
+    "vocab_size": 132,
+    "language_tags": true,
+    "languages": ["ja", "en", "zh", "es", "fr", "de", "ko", "mixed"]
+  },
+  "model_architecture": {
+    "num_languages": 8,
+    "lang_embedding_dim": 64,
+    "inter_channels": 192,
+    "hidden_channels": 192,
+    "filter_channels": 768,
+    "n_heads": 2,
+    "n_layers": 6,
+    "kernel_size": 3,
+    "p_dropout": 0.1,
+    "resblock": "2",
+    "resblock_kernel_sizes": [3, 5, 7],
+    "resblock_dilation_sizes": [[1, 2], [2, 6], [3, 12]],
+    "upsample_rates": [8, 8, 4],
+    "upsample_initial_channel": 256,
+    "upsample_kernel_sizes": [16, 16, 8],
+    "use_sdp": true,
+    "gin_channels": 512
+  },
+  "training": {
+    "batch_size": 16,
+    "learning_rate": 0.0002,
+    "betas": [0.8, 0.99],
+    "eps": 1e-9,
+    "lr_decay": 0.999875,
+    "segment_size": 8192,
+    "init_lr_ratio": 1.0,
+    "warmup_epochs": 0,
+    "c_mel": 45,
+    "c_kl": 1.0,
+    "grad_clip": 1.0
+  },
+  "inference": {
+    "noise_scale": 0.667,
+    "length_scale": 1.0,
+    "noise_scale_w": 0.8,
+    "max_length": null
+  },
+  "language_settings": {
+    "ja": {
+      "phonemizer": "openjtalk",
+      "prosody_support": true,
+      "accent_support": true
+    },
+    "en": {
+      "phonemizer": "espeak-ng",
+      "voice": "en-us",
+      "prosody_support": false
+    },
+    "zh": {
+      "phonemizer": "espeak-ng",
+      "voice": "cmn",
+      "prosody_support": false
+    },
+    "es": {
+      "phonemizer": "espeak-ng",
+      "voice": "es",
+      "prosody_support": false
+    },
+    "fr": {
+      "phonemizer": "espeak-ng",
+      "voice": "fr-fr",
+      "prosody_support": false
+    },
+    "de": {
+      "phonemizer": "espeak-ng",
+      "voice": "de",
+      "prosody_support": false
+    },
+    "ko": {
+      "phonemizer": "espeak-ng",
+      "voice": "ko",
+      "prosody_support": false
+    }
+  }
+}

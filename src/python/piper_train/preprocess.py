@@ -51,6 +51,18 @@ try:
 except ImportError:
     from piper_train.phonemize.jp_id_map import get_japanese_id_map  # type: ignore
 
+# -----------------------------------------------------------------------------
+# Multilingual phonemizer support
+# -----------------------------------------------------------------------------
+try:
+    from .phonemize.multilingual import phonemize_multilingual  # type: ignore
+    from .phonemize.multilingual_phoneme_map import get_multilingual_phoneme_mapper  # type: ignore
+    from .phonemize.multilingual_dataset import MultilingualDatasetFormatter  # type: ignore
+except ImportError:
+    from piper_train.phonemize.multilingual import phonemize_multilingual  # type: ignore
+    from piper_train.phonemize.multilingual_phoneme_map import get_multilingual_phoneme_mapper  # type: ignore
+    from piper_train.phonemize.multilingual_dataset import MultilingualDatasetFormatter  # type: ignore
+
 _DIR = Path(__file__).parent
 _VERSION = (_DIR / "VERSION").read_text(encoding="utf-8").strip()
 _LOGGER = logging.getLogger("preprocess")
@@ -65,6 +77,9 @@ class PhonemeType(str, Enum):
 
     OPENJTALK = "openjtalk"
     """Phonemes come from pyopenjtalk for Japanese"""
+    
+    MULTILINGUAL = "multilingual"
+    """Phonemes come from multilingual phonemizer (OpenJTalk + espeak-ng)"""
 
 
 def main() -> None:
@@ -100,6 +115,11 @@ def main() -> None:
         choices=list(PhonemeType),
         default=PhonemeType.ESPEAK,
         help="Type of phonemes to use (default: espeak)",
+    )
+    parser.add_argument(
+        "--multilingual",
+        action="store_true",
+        help="Enable multilingual phonemization (Japanese + other languages)",
     )
     parser.add_argument(
         "--text-casing",
@@ -170,9 +190,17 @@ def main() -> None:
     # Ensure enum
     args.phoneme_type = PhonemeType(args.phoneme_type)
 
+    # マルチ言語モードの設定
+    if args.multilingual:
+        args.phoneme_type = PhonemeType.MULTILINGUAL
+        multilingual_mapper = get_multilingual_phoneme_mapper()
+        args.phoneme_id_map = multilingual_mapper.phoneme_to_id
+        _LOGGER.info(
+            "Using multilingual phonemization (%s symbols)",
+            multilingual_mapper.get_vocab_size(),
+        )
     # 日本語の場合は自動的に OPENJTALK を使用し、ID マップを設定
-    japanese_id_map = None
-    if args.language == "ja":
+    elif args.language == "ja":
         args.phoneme_type = PhonemeType.OPENJTALK
         japanese_id_map = get_japanese_id_map()
         args.phoneme_id_map = japanese_id_map  # 子プロセスへ渡すため
@@ -248,15 +276,23 @@ def main() -> None:
                     get_codepoints_map()[args.language]
                     if args.phoneme_type == PhonemeType.TEXT
                     else (
-                        japanese_id_map
-                        if japanese_id_map is not None
-                        else get_espeak_map()
+                        args.phoneme_id_map
+                        if args.phoneme_type == PhonemeType.MULTILINGUAL
+                        else (
+                            japanese_id_map
+                            if japanese_id_map is not None
+                            else get_espeak_map()
+                        )
                     )
                 ),
                 "num_symbols": (
-                    len(japanese_id_map)
-                    if japanese_id_map is not None
-                    else get_max_phonemes()
+                    len(args.phoneme_id_map)
+                    if args.phoneme_type == PhonemeType.MULTILINGUAL
+                    else (
+                        len(japanese_id_map)
+                        if japanese_id_map is not None
+                        else get_max_phonemes()
+                    )
                 ),
                 "num_speakers": len(speaker_counts),
                 "speaker_id_map": speaker_ids,
@@ -282,6 +318,8 @@ def main() -> None:
         target = phonemize_batch_text
     elif args.phoneme_type == PhonemeType.OPENJTALK:
         target = phonemize_batch_openjtalk
+    elif args.phoneme_type == PhonemeType.MULTILINGUAL:
+        target = phonemize_batch_multilingual
     else:
         target = phonemize_batch_espeak
 
@@ -593,6 +631,86 @@ def phonemize_batch_openjtalk(
             queue_in.task_done()
     except Exception:
         _LOGGER.exception("phonemize_batch_openjtalk")
+
+
+def phonemize_batch_multilingual(
+    args: argparse.Namespace, queue_in: JoinableQueue, queue_out: Queue
+):
+    try:
+        if not getattr(args, "debug", False):
+            devnull_fd = os.open(os.devnull, os.O_RDWR)
+            os.dup2(devnull_fd, 2)
+
+        casing = get_text_casing(args.text_casing)
+        silence_detector = make_silence_detector()
+
+        timeout_sec = getattr(args, "timeout_seconds", 0)
+
+        def _timeout_handler(signum, frame):
+            raise TimeoutError()
+
+        if timeout_sec > 0:
+            signal.signal(signal.SIGALRM, _timeout_handler)
+
+        while True:
+            utt_batch = queue_in.get()
+            if utt_batch is None:
+                break
+
+            for utt in utt_batch:
+                try:
+                    if timeout_sec > 0:
+                        signal.alarm(timeout_sec)
+                    _LOGGER.debug(utt)
+                    
+                    # Use multilingual phonemizer
+                    # Try to detect primary language from args, otherwise auto-detect
+                    primary_language = getattr(args, "language", None)
+                    utt.phonemes = phonemize_multilingual(casing(utt.text), primary_language)
+                    
+                    # Convert phonemes to IDs using multilingual mapper
+                    multilingual_mapper = get_multilingual_phoneme_mapper()
+                    utt.phoneme_ids = []
+                    current_language = None
+                    
+                    for phoneme in utt.phonemes:
+                        # Check if it's a language tag
+                        if phoneme.startswith("<lang:") and phoneme.endswith(">"):
+                            # Extract language from tag
+                            lang_code = phoneme[6:-1]
+                            current_language = lang_code
+                            utt.phoneme_ids.append(multilingual_mapper.get_phoneme_id(phoneme, ""))
+                        elif phoneme.startswith("</lang:") and phoneme.endswith(">"):
+                            utt.phoneme_ids.append(multilingual_mapper.get_phoneme_id(phoneme, ""))
+                            current_language = None
+                        else:
+                            # Regular phoneme
+                            if current_language:
+                                utt.phoneme_ids.append(multilingual_mapper.get_phoneme_id(phoneme, current_language))
+                            else:
+                                # This shouldn't happen, but handle gracefully
+                                utt.phoneme_ids.append(multilingual_mapper.get_phoneme_id(phoneme, "en"))
+                                
+                    if not args.skip_audio:
+                        utt.audio_norm_path, utt.audio_spec_path = cache_norm_audio(
+                            utt.audio_path,
+                            args.cache_dir,
+                            silence_detector,
+                            args.sample_rate,
+                        )
+                    queue_out.put(utt)
+                    if timeout_sec > 0:
+                        signal.alarm(0)
+                except TimeoutError:
+                    _LOGGER.error("Skipping utterance due to timeout: %s", utt)
+                    queue_out.put(None)
+                except Exception:
+                    _LOGGER.exception("Failed to process utterance: %s", utt)
+                    queue_out.put(None)
+
+            queue_in.task_done()
+    except Exception:
+        _LOGGER.exception("phonemize_batch_multilingual")
 
 
 # -----------------------------------------------------------------------------
