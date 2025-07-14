@@ -355,7 +355,7 @@ jobs:
           # Use buildx to build without QEMU emulation
           docker buildx create --use --name native-builder --driver docker-container
           
-          # Build for ARM64 without running
+          # Build for ARM64 without running (export from builder stage)
           docker buildx build \
             --platform linux/arm64 \
             --target builder \
@@ -369,18 +369,44 @@ jobs:
         run: |
           echo "=== Checking ARM64 build artifacts ==="
           if [ -d /tmp/arm64-build ]; then
+            echo "Contents of /tmp/arm64-build:"
             ls -la /tmp/arm64-build/
-            find /tmp/arm64-build -name "piper" -type f | head -10
+            echo "Looking for dist directory:"
+            find /tmp/arm64-build -name "dist" -type d | head -10
+            echo "Looking for tar.gz files:"
             find /tmp/arm64-build -name "*.tar.gz" -type f | head -10
+            echo "All files in build output:"
+            find /tmp/arm64-build -type f | head -20
           else
             echo "Build artifacts not found"
             exit 1
           fi
+          
+      - name: Create ARM64 archive if needed
+        run: |
+          # Check if tar.gz exists, if not create it from build output
+          if [ -f /tmp/arm64-build/dist/piper_arm64.tar.gz ]; then
+            echo "Archive found in dist directory"
+            cp /tmp/arm64-build/dist/piper_arm64.tar.gz /tmp/
+          elif [ -d /tmp/arm64-build/install ]; then
+            echo "Creating archive from install directory"
+            cd /tmp/arm64-build
+            tar -czf /tmp/piper_arm64.tar.gz install/
+          elif [ -d /tmp/arm64-build/build/install ]; then
+            echo "Creating archive from build/install directory"  
+            cd /tmp/arm64-build/build
+            tar -czf /tmp/piper_arm64.tar.gz install/
+          else
+            echo "No suitable directory found for archiving"
+            find /tmp/arm64-build -type d | head -20
+            exit 1
+          fi
+          ls -la /tmp/piper_arm64.tar.gz
           
       - name: Upload ARM64 artifacts
         uses: actions/upload-artifact@v4
         with:
           name: piper-arm64-binary
           path: |
-            /tmp/arm64-build/*.tar.gz
+            /tmp/piper_arm64.tar.gz
           if-no-files-found: error
