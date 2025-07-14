@@ -35,7 +35,7 @@ jobs:
         uses: docker/setup-qemu-action@v3
         with:
           platforms: arm64
-          image: tonistiigi/binfmt:qemu-8.2.0
+          image: tonistiigi/binfmt:latest
           
       - name: Check QEMU version
         run: |
