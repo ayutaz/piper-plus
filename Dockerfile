@@ -150,9 +150,14 @@ RUN echo "=== Checking piper-phonemize build ===" && \
     echo "=== Checking downloaded files ===" && \
     find /build/build -path "*/download/*" -name "*onnx*" 2>/dev/null | head -10 || echo "No downloaded ONNX files"
 
-# Set up library paths for runtime
+# Set up library paths for runtime and create symlinks
 RUN echo "/build/install/lib" > /etc/ld.so.conf.d/piper.conf && \
-    ldconfig || true
+    ldconfig || true && \
+    cd /build/install/lib && \
+    if [ -f libonnxruntime.so.1.14.1 ]; then \
+        ln -sf libonnxruntime.so.1.14.1 libonnxruntime.so.1 && \
+        ln -sf libonnxruntime.so.1 libonnxruntime.so; \
+    fi
 
 # Strip binaries for smaller size on ARM64
 RUN if [ "$TARGETARCH" = "arm64" ]; then \
