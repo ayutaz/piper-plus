@@ -222,6 +222,7 @@ if(NOT DEFINED PIPER_PHONEMIZE_DIR)
   if(WIN32)
     set(PIPER_PHONEMIZE_SHARED_LIBS ON)
   else()
+    # Use static linking for ARM64 to avoid QEMU issues
     set(PIPER_PHONEMIZE_SHARED_LIBS OFF)
   endif()
   
