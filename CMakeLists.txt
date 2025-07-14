@@ -53,14 +53,15 @@ if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|ARM64")
   
   # Enable NEON SIMD instructions
   if(NOT MSVC)
-    # Temporarily use minimal ARM64 flags for debugging
-    set(ARM64_FLAGS "-march=armv8-a")
+    # Use compatible ARM64 flags for QEMU
+    # Avoid advanced instructions that might not be properly emulated
+    set(ARM64_FLAGS "-march=armv8-a -mtune=generic")
     string(APPEND CMAKE_CXX_FLAGS " ${ARM64_FLAGS}")
     string(APPEND CMAKE_C_FLAGS " ${ARM64_FLAGS}")
     
-    # Release build optimizations (reduced for debugging)
-    set(CMAKE_CXX_FLAGS_RELEASE "-O1 -DNDEBUG")
-    set(CMAKE_C_FLAGS_RELEASE "-O1 -DNDEBUG")
+    # Conservative optimization for QEMU compatibility
+    set(CMAKE_CXX_FLAGS_RELEASE "-O0 -DNDEBUG")
+    set(CMAKE_C_FLAGS_RELEASE "-O0 -DNDEBUG")
     
     # Enable Link Time Optimization for release builds
     if(CMAKE_BUILD_TYPE STREQUAL "Release")
