@@ -55,13 +55,20 @@ except ImportError:
 # Multilingual phonemizer support
 # -----------------------------------------------------------------------------
 try:
-    from .phonemize.multilingual import phonemize_multilingual  # type: ignore
     from .phonemize.multilingual_phoneme_map import get_multilingual_phoneme_mapper  # type: ignore
     from .phonemize.multilingual_dataset import MultilingualDatasetFormatter  # type: ignore
+    # Try full implementation first, fall back to stub if needed
+    try:
+        from .phonemize.multilingual import phonemize_multilingual  # type: ignore
+    except ImportError:
+        from .phonemize.multilingual_stub import phonemize_multilingual  # type: ignore
 except ImportError:
-    from piper_train.phonemize.multilingual import phonemize_multilingual  # type: ignore
     from piper_train.phonemize.multilingual_phoneme_map import get_multilingual_phoneme_mapper  # type: ignore
     from piper_train.phonemize.multilingual_dataset import MultilingualDatasetFormatter  # type: ignore
+    try:
+        from piper_train.phonemize.multilingual import phonemize_multilingual  # type: ignore
+    except ImportError:
+        from piper_train.phonemize.multilingual_stub import phonemize_multilingual  # type: ignore
 
 _DIR = Path(__file__).parent
 _VERSION = (_DIR / "VERSION").read_text(encoding="utf-8").strip()
