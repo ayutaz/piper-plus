@@ -53,13 +53,14 @@ if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|ARM64")
   
   # Enable NEON SIMD instructions
   if(NOT MSVC)
-    set(ARM64_FLAGS "-march=armv8-a+simd -mtune=cortex-a72")
+    # Temporarily use minimal ARM64 flags for debugging
+    set(ARM64_FLAGS "-march=armv8-a")
     string(APPEND CMAKE_CXX_FLAGS " ${ARM64_FLAGS}")
     string(APPEND CMAKE_C_FLAGS " ${ARM64_FLAGS}")
     
-    # Release build optimizations
-    set(CMAKE_CXX_FLAGS_RELEASE "-O2 -DNDEBUG -fomit-frame-pointer -ftree-vectorize -ffast-math")
-    set(CMAKE_C_FLAGS_RELEASE "-O2 -DNDEBUG -fomit-frame-pointer -ftree-vectorize -ffast-math")
+    # Release build optimizations (reduced for debugging)
+    set(CMAKE_CXX_FLAGS_RELEASE "-O1 -DNDEBUG")
+    set(CMAKE_C_FLAGS_RELEASE "-O1 -DNDEBUG")
     
     # Enable Link Time Optimization for release builds
     if(CMAKE_BUILD_TYPE STREQUAL "Release")
@@ -75,8 +76,8 @@ if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|ARM64")
     set(CMAKE_EXE_LINKER_FLAGS_RELEASE "-s")
   endif()
   
-  # Define macro for conditional compilation
-  add_compile_definitions(USE_ARM64_NEON)
+  # Temporarily disable NEON for debugging
+  # add_compile_definitions(USE_ARM64_NEON)
 endif()
 
 add_executable(piper src/cpp/main.cpp src/cpp/piper.cpp)

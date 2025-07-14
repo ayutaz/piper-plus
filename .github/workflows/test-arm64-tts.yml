@@ -23,7 +23,7 @@ jobs:
   test-linux-arm64:
     name: Test Linux ARM64 TTS
     runs-on: ubuntu-22.04
-    timeout-minutes: 90
+    timeout-minutes: 30
     
     steps:
       - name: Checkout code
@@ -35,6 +35,12 @@ jobs:
         uses: docker/setup-qemu-action@v3
         with:
           platforms: arm64
+          
+      - name: Check QEMU version
+        run: |
+          echo "=== QEMU Version ==="
+          docker run --rm --platform linux/arm64 alpine uname -m
+          docker run --rm --platform linux/arm64 alpine cat /proc/cpuinfo | head -20 || true
           
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -94,7 +100,7 @@ jobs:
         run: |
           # Test if piper binary works at all
           echo "=== Testing piper binary directly ==="
-          docker run --rm --platform linux/arm64 piper-arm64-test:latest bash -c "
+          docker run --rm --platform linux/arm64 --cap-add=SYS_PTRACE piper-arm64-test:latest bash -c "
             echo '=== System check ==='
             uname -m
             echo '=== Binary check ==='
@@ -103,9 +109,24 @@ jobs:
             ldd /build/install/bin/piper || echo 'ldd failed'
             echo '=== ONNX Runtime check ==='
             find /build/install -name '*onnx*' | head -10
-            echo '=== LD_LIBRARY_PATH test ==='
+            echo '=== Enable core dumps ==='
+            ulimit -c unlimited
+            echo '/tmp/core.%e.%p' > /proc/sys/kernel/core_pattern || true
+            echo '=== Running piper with different methods ==='
+            cd /build/install/bin
+            echo '--- Method 1: Direct execution ---'
+            ./piper --version 2>&1 || echo 'Exit code: \$?'
+            echo '--- Method 2: With LD_LIBRARY_PATH ---'
             export LD_LIBRARY_PATH=/build/install/lib:\$LD_LIBRARY_PATH
-            /build/install/bin/piper --version || echo 'Exit code: \$?'
+            ./piper --version 2>&1 || echo 'Exit code: \$?'
+            echo '--- Method 3: Using gdb ---'
+            if command -v gdb &> /dev/null; then
+              gdb -batch -ex 'run --version' -ex 'bt' -ex 'quit' ./piper 2>&1 || true
+            else
+              echo 'gdb not available'
+            fi
+            echo '--- Method 4: Check dmesg for errors ---'
+            dmesg | tail -20 || true
           "
           
       - name: Run Japanese TTS test in Docker
