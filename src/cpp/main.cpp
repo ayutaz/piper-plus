@@ -47,6 +47,9 @@ struct RunConfig {
 
   // Path to JSON voice config file
   filesystem::path modelConfigPath;
+  
+  // Test mode - skip ONNX runtime for CI testing
+  bool testMode = false;
 
   // Type of output to produce.
   // Default is to write a WAV file in the current directory.
@@ -597,6 +600,9 @@ void parseArgs(int argc, char *argv[], RunConfig &runConfig) {
     } else if (arg == "--version") {
       std::cout << piper::getVersion() << std::endl;
       exit(0);
+    } else if (arg == "--test-mode") {
+      runConfig.testMode = true;
+      spdlog::info("Test mode enabled - ONNX runtime will be skipped");
     } else if (arg == "--debug") {
       // Set DEBUG logging
       spdlog::set_level(spdlog::level::debug);
