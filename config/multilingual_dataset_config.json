@@ -1,0 +1,57 @@
+{
+  "description": "Configuration for multilingual dataset preprocessing",
+  "datasets": [
+    {
+      "language": "ja",
+      "input_dir": "/path/to/japanese/dataset",
+      "speaker_id_offset": 0,
+      "max_utterances": null,
+      "notes": "Japanese dataset using OpenJTalk phonemization"
+    },
+    {
+      "language": "en",
+      "input_dir": "/path/to/english/dataset",
+      "speaker_id_offset": 100,
+      "max_utterances": null,
+      "notes": "English dataset using espeak-ng"
+    },
+    {
+      "language": "zh",
+      "input_dir": "/path/to/chinese/dataset",
+      "speaker_id_offset": 200,
+      "max_utterances": null,
+      "notes": "Chinese dataset using espeak-ng"
+    },
+    {
+      "language": "es",
+      "input_dir": "/path/to/spanish/dataset",
+      "speaker_id_offset": 300,
+      "max_utterances": null,
+      "notes": "Spanish dataset using espeak-ng"
+    }
+  ],
+  "preprocessing": {
+    "sample_rate": 22050,
+    "max_workers": 4,
+    "dataset_format": "ljspeech",
+    "validation_split": 0.05
+  },
+  "expected_directory_structure": {
+    "ljspeech_format": {
+      "metadata.csv": "filename|speaker|text or filename|text",
+      "wav/": "Directory containing audio files",
+      "wavs/": "Alternative audio directory name"
+    },
+    "mycroft_format": {
+      "metadata.csv": "different format",
+      "audio/": "Directory containing audio files"
+    }
+  },
+  "output_structure": {
+    "dataset.jsonl": "Training utterances",
+    "validation.jsonl": "Validation utterances",
+    "config.json": "Dataset configuration",
+    "phoneme_map.json": "Phoneme to ID mapping",
+    "cache/": "Cached normalized audio and spectrograms"
+  }
+}

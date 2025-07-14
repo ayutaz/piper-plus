@@ -1,0 +1,63 @@
+{
+  "description": "Example configuration for multilingual dataset preprocessing",
+  "datasets": [
+    {
+      "language": "ja",
+      "input_dir": "/data/tts/japanese/jsut_basic5000",
+      "speaker_id_offset": 0,
+      "notes": "JSUT corpus - Japanese female speaker"
+    },
+    {
+      "language": "en",
+      "input_dir": "/data/tts/english/ljspeech",
+      "speaker_id_offset": 100,
+      "notes": "LJSpeech - English female speaker"
+    }
+  ],
+  "advanced_example": {
+    "description": "Example with multiple speakers per language",
+    "datasets": [
+      {
+        "language": "ja",
+        "input_dir": "/data/tts/japanese/multi_speaker_ja",
+        "speaker_id_offset": 0,
+        "notes": "Multiple Japanese speakers (IDs 0-49)"
+      },
+      {
+        "language": "en",
+        "input_dir": "/data/tts/english/vctk_subset",
+        "speaker_id_offset": 50,
+        "notes": "VCTK subset - Multiple English speakers (IDs 50-99)"
+      },
+      {
+        "language": "zh",
+        "input_dir": "/data/tts/chinese/databaker",
+        "speaker_id_offset": 100,
+        "notes": "DataBaker - Chinese female speaker (ID 100)"
+      },
+      {
+        "language": "es",
+        "input_dir": "/data/tts/spanish/mailabs_es",
+        "speaker_id_offset": 110,
+        "notes": "M-AILABS Spanish - Multiple speakers (IDs 110-119)"
+      }
+    ]
+  },
+  "minimal_example": {
+    "description": "Minimal example for testing",
+    "datasets": [
+      {
+        "language": "ja",
+        "input_dir": "./test_data/japanese_100",
+        "speaker_id_offset": 0,
+        "max_utterances": 100
+      },
+      {
+        "language": "en",
+        "input_dir": "./test_data/english_100",
+        "speaker_id_offset": 1,
+        "max_utterances": 100
+      }
+    ]
+  }
+}
