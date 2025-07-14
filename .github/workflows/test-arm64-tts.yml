@@ -94,7 +94,19 @@ jobs:
         run: |
           # Test if piper binary works at all
           echo "=== Testing piper binary directly ==="
-          docker run --rm --platform linux/arm64 piper-arm64-test:latest /build/install/bin/piper --version || echo "Exit code: $?"
+          docker run --rm --platform linux/arm64 piper-arm64-test:latest bash -c "
+            echo '=== System check ==='
+            uname -m
+            echo '=== Binary check ==='
+            file /build/install/bin/piper
+            echo '=== Library dependencies ==='
+            ldd /build/install/bin/piper || echo 'ldd failed'
+            echo '=== ONNX Runtime check ==='
+            find /build/install -name '*onnx*' | head -10
+            echo '=== LD_LIBRARY_PATH test ==='
+            export LD_LIBRARY_PATH=/build/install/lib:\$LD_LIBRARY_PATH
+            /build/install/bin/piper --version || echo 'Exit code: \$?'
+          "
           
       - name: Run Japanese TTS test in Docker
         run: |

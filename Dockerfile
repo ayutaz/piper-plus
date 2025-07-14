@@ -122,8 +122,8 @@ RUN if [ "$TARGETARCH" = "arm64" ]; then \
         echo "Starting optimized ARM64 build..." && \
         export CFLAGS="-O2 -march=armv8-a+simd -mtune=cortex-a72 -fomit-frame-pointer" && \
         export CXXFLAGS="-O2 -march=armv8-a+simd -mtune=cortex-a72 -fomit-frame-pointer" && \
-        timeout 2400 cmake --build build --config Release --parallel 1 || \
-        (echo "Build failed, retrying..." && cmake --build build --config Release --parallel 1); \
+        timeout 2400 cmake --build build --config Release --parallel 1 --verbose || \
+        (echo "Build failed, retrying..." && cmake --build build --config Release --parallel 1 --verbose); \
     else \
         # x86_64 builds: standard parallel build \
         echo "Starting AMD64 build with 2 parallel threads..." && \
@@ -134,6 +134,12 @@ RUN if [ "$TARGETARCH" = "arm64" ]; then \
 
 # Install step  
 RUN cmake --install build
+
+# Check piper-phonemize build results
+RUN echo "=== Checking piper-phonemize build ===" && \
+    find /build/build -name "*onnxruntime*" -type f | head -20 && \
+    echo "=== Checking libraries in build directory ===" && \
+    find /build/build -name "*.so*" -type f | grep -E "(onnx|espeak|piper)" | head -20
 
 # Set up library paths for runtime
 RUN echo "/build/install/lib" > /etc/ld.so.conf.d/piper.conf && \
@@ -149,6 +155,14 @@ RUN if [ "$TARGETARCH" = "arm64" ]; then \
             find install/bin -type f -executable -exec strip {} \; 2>/dev/null || true; \
         fi; \
     fi
+
+# ONNX Runtime確認
+RUN echo "=== Checking ONNX Runtime ===" && \
+    find /build -name "*onnxruntime*" -type f | head -20 && \
+    echo "=== Checking piper binary dependencies ===" && \
+    ldd /build/install/bin/piper | grep -i onnx || echo "ONNX Runtime not found in ldd output" && \
+    echo "=== Checking install directory ===" && \
+    find /build/install -name "*onnx*" -type f | head -10
 
 # テスト実行（amd64のみ）
 RUN if [ "$TARGETARCH" = "amd64" ]; then \
