@@ -64,7 +64,7 @@ Voices are trained with [VITS](https://github.com/jaywalnut310/vits/) and export
 | プラットフォーム | アーキテクチャ | OpenJTalk対応 | 備考 |
 |-----------------|---------------|--------------|------|
 | Linux | x86_64 (amd64) | ✅ | フルサポート |
-| Linux | ARM64 | ❌ | 基本機能のみ ([#42](https://github.com/ayutaz/piper-plus/issues/42)) |
+| Linux | ARM64 | ✅ | フルサポート (CMakeビルド使用) |
 | macOS | **ARM64 (Apple Silicon)のみ** | ✅ | M1/M2/M3以降のMac専用 |
 | Windows | x64 | ✅ | フルサポート |
 

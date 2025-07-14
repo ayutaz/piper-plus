@@ -8,6 +8,46 @@
 
 **重要な変更**: Unity Sentis の代わりに、Unity AI Interface (Inference Engine) を使用します。これはSentisの次世代版で、Unity 6.2以降で正式サポートされており、将来的なアップデートに対応しやすくなります。
 
+## 進捗サマリー
+
+最終更新: 2025年1月13日
+
+### 現在の進捗
+- **完了**: Phase 0 - Unity 6 & AI Interface 検証 ✅（3/3人日）
+- **進行中**: Phase 1 - Windows/Linux 基盤実装 🚧（2/20人日）
+  - ✅ 1.1 Core API - インターフェース設計（1人日）
+    - ✅ IPiperTTS インターフェース定義
+    - ✅ PiperConfig クラス基本実装
+    - ✅ PiperVoiceConfig 実装
+    - ✅ AudioChunk ストリーミング実装
+    - ✅ PiperException 階層実装
+    - ✅ CacheStatistics 実装
+    - ✅ PiperLogger 実装（Debug.Logラッパー）
+  - ✅ 各Core APIクラスのユニットテスト（1人日）
+    - ✅ PiperConfigTest (10テスト)
+    - ✅ PiperVoiceConfigTest (12テスト)
+    - ✅ AudioChunkTest (11テスト)
+    - ✅ CacheStatisticsTest (16テスト)
+    - ✅ PiperExceptionTest (12テスト)
+    - ✅ PiperLoggerTest (13テスト)
+- **全体進捗**: 5/90人日完了（5.6%）
+
+### 次のタスク
+**Phase 1.2: Core API - 実装（3人日）**
+- 1.2.1 PiperConfig バリデーション実装（0.5人日）
+- 1.2.2 PiperTTS 基本構造実装（1人日）
+- 1.2.3 PiperTTS 非同期初期化実装（1人日）
+- 1.2.4 PiperTTS 音声生成スタブ実装（0.5人日）
+
+### Phase 1のゴール
+**「日本語テキストを入力して、Windows/LinuxのUnity上で実際の音声が再生される」**
+
+成功基準:
+- OpenJTalkによる日本語音素化が動作
+- Piper TTSモデルで音声波形生成
+- 処理速度: 100ms/文以下（50文字）
+- メモリ使用量: 100MB以下
+
 ## タスク見積もり基準
 
 - **0.5人日（4時間）**: 単純な実装、設定変更、小規模テスト
@@ -36,11 +76,11 @@
 
 全体スケジュール: 15週間（約3.5ヶ月）
 
-### フェーズ 0: Unity 6 & AI Interface (Inference Engine) 検証（第1週 - 計3人日）
+### フェーズ 0: Unity 6 & AI Interface (Inference Engine) 検証（第1週 - 計3人日）✅ 完了
 
-#### マイルストーン
-- Unity 6000.0.35f1 と Unity AI Interface (Inference Engine) 2.2.x の互換性確認
-- 最小限の動作プロトタイプ作成
+#### マイルストーン ✅
+- Unity 6000.0.35f1 と Unity AI Interface (Inference Engine) 2.2.x の互換性確認 ✅
+- 最小限の動作プロトタイプ作成 ✅
 
 #### タスク
 
@@ -56,35 +96,51 @@
 - **実施内容**:
   - Unity 6000.0.35f1 プロジェクト作成完了
   - GitHub Actions CI/CD (game-ci) 設定完了
-  - PR #2 作成済み
+  - PR #2 作成・マージ済み
   - company name を com.yousan に変更
   - .idea ディレクトリを .gitignore に追加
 
-##### 0.2 Unity AI Interface (Inference Engine) パッケージ導入（0.5人日）
+##### 0.2 Unity AI Interface (Inference Engine) パッケージ導入（0.5人日）✅ 完了
 - **作業内容**:
-  - Package Manager から com.unity.ai.inference 2.2.x インストール
-  - 依存パッケージの確認
-  - パッケージ設定の調整
-- **成果物**: manifest.json 更新
-- **完了条件**: Inference Engine がエラーなくインポートされる
+  - Package Manager から com.unity.ai.inference 2.2.x インストール ✅
+  - 依存パッケージの確認 ✅
+  - パッケージ設定の調整 ✅
+- **成果物**: manifest.json 更新 ✅
+- **完了条件**: Inference Engine がエラーなくインポートされる ✅
+- **実施内容**:
+  - com.unity.ai.inference 2.2.1 インストール完了
+  - com.unity.burst 1.8.20 も同時にインストール
+  - PR #3 作成・マージ済み
 
-##### 0.3 Inference Engine 基本動作確認（1人日）
+##### 0.3 Inference Engine 基本動作確認（1人日）✅ 完了
 - **作業内容**:
-  - 簡単な ONNX モデルのダウンロード（MNIST等）
-  - モデル読み込みスクリプト作成（Unity.InferenceEngine 名前空間使用）
-  - 推論実行テスト
-  - GPU/CPU バックエンド切り替えテスト
-- **成果物**: InferenceEngineTestScene、動作確認スクリプト
-- **完了条件**: ONNX モデルの推論が成功する
+  - 簡単な ONNX モデルのダウンロード（MNIST等）✅
+  - モデル読み込みスクリプト作成（Unity.InferenceEngine 名前空間使用）✅
+  - 推論実行テスト ✅
+  - GPU/CPU バックエンド切り替えテスト ✅
+- **成果物**: InferenceEngineTestScene、動作確認スクリプト ✅
+- **完了条件**: ONNX モデルの推論が成功する ✅
+- **実施内容**:
+  - InferenceEngineBasicTest.cs (5テスト)
+  - ONNXModelLoaderTest.cs (3テスト)
+  - InferenceEngineEditorTest.cs (2テスト)
+  - InferenceEngineTestManager.cs (実行時テスト)
+  - PR #3 でマージ済み
 
-##### 0.4 最小音声合成プロトタイプ（1人日）
+##### 0.4 最小音声合成プロトタイプ（1人日）✅ 完了
 - **作業内容**:
-  - 固定音素 ID 配列の定義
-  - Inference Engine で音声波形生成（ダミーモデル使用）
-  - AudioClip 生成と再生
-- **成果物**: MinimalTTSPrototype.cs
-- **完了条件**: Unity Editor で音が鳴る
-- **CI/CD**: Unity Test Framework の基本設定
+  - 固定音素 ID 配列の定義 ✅
+  - Inference Engine で音声波形生成（ダミーモデル使用）✅
+  - AudioClip 生成と再生 ✅
+- **成果物**: MinimalTTSPrototype.cs ✅
+- **完了条件**: Unity Editor で音が鳴る ✅
+- **CI/CD**: Unity Test Framework の基本設定 ✅
+- **実施内容**:
+  - MinimalTTSPrototype.cs - 固定音素IDから波形生成
+  - PiperTTSPrototype.cs - 実際のPiper TTSモデル使用（ja_JP-test-medium.onnx）
+  - TTSPrototypeTest.cs (3テスト)
+  - CI/CD でテスト結果可視化実装（全13テスト成功）
+  - PR #4 作成・マージ済み
 
 ### フェーズ 1: Windows/Linux 基盤実装（第2-3週 - 計20人日）
 
@@ -95,23 +151,32 @@
 
 #### タスク
 
-##### 1.1 Core API - インターフェース設計（1人日）
+##### 1.1 Core API - インターフェース設計（1人日）✅ 完了
 
-###### 1.1.1 IPiperTTS インターフェース定義（0.5人日）
+###### 1.1.1 IPiperTTS インターフェース定義（0.5人日）✅ 完了
 - **作業内容**:
-  - インターフェースメソッド定義
-  - XML ドキュメントコメント記述
-  - 非同期パターンの設計
-- **成果物**: IPiperTTS.cs
-- **完了条件**: コンパイルエラーなし、設計レビュー完了
+  - インターフェースメソッド定義 ✅
+  - XML ドキュメントコメント記述 ✅
+  - 非同期パターンの設計 ✅
+- **成果物**: IPiperTTS.cs ✅
+- **完了条件**: コンパイルエラーなし、設計レビュー完了 ✅
+- **実施内容**:
+  - 非同期音声生成メソッド (GenerateAudioAsync, StreamAudioAsync)
+  - 音声管理メソッド (SetVoice, GetAvailableVoices)
+  - イベントシステム (OnGenerationProgress, OnGenerationComplete, OnError)
+  - PR #5 で実装済み
 
-###### 1.1.2 PiperConfig クラス設計（0.5人日）
+###### 1.1.2 PiperConfig クラス設計（0.5人日）✅ 完了
 - **作業内容**:
-  - 設定項目の定義
-  - デフォルト値の設定
-  - シリアライズ対応
-- **成果物**: PiperConfig.cs（基本実装）
-- **完了条件**: インスタンス生成可能
+  - 設定項目の定義 ✅
+  - デフォルト値の設定 ✅
+  - シリアライズ対応 ✅
+- **成果物**: PiperConfig.cs（基本実装）✅
+- **完了条件**: インスタンス生成可能 ✅
+- **実施内容**:
+  - デフォルト音声、キャッシュ設定、パフォーマンス設定
+  - Unity Inspector表示対応
+  - PR #5 で実装済み
 
 ##### 1.2 Core API - 実装（3人日）
 
@@ -147,15 +212,22 @@
 - **成果物**: PiperTTS.cs（完全版）
 - **完了条件**: API が一通り動作
 
-##### 1.3 Core API - テスト（2人日）
+##### 1.3 Core API - テスト（2人日）✅ 部分的に完了
 
-###### 1.3.1 PiperConfig ユニットテスト（0.5人日）
+###### 1.3.1 Core API ユニットテスト（1人日）✅ 完了
 - **作業内容**:
-  - 正常系テストケース（5個）
-  - 異常系テストケース（5個）
-  - エッジケーステスト
-- **成果物**: PiperConfigTests.cs
-- **完了条件**: カバレッジ 90% 以上
+  - PiperConfig テスト ✅
+  - PiperVoiceConfig テスト ✅
+  - AudioChunk テスト ✅
+  - CacheStatistics テスト ✅
+  - PiperException テスト ✅
+  - PiperLogger テスト ✅
+- **成果物**: 各クラスのテストファイル ✅
+- **完了条件**: 全クラスのテスト実装 ✅
+- **実施内容**:
+  - 合計74テスト実装
+  - CI/CDでの自動実行確認
+  - PR #5 でマージ済み
 
 ###### 1.3.2 PiperTTS 初期化テスト（1人日）
 - **作業内容**:
@@ -1362,6 +1434,60 @@ architectures:
    - ビルド失敗の通知
    - テスト失敗の詳細レポート
    - 自動 Issue 作成
+
+## フェーズゲート条件
+
+各フェーズの完了には以下の条件を満たす必要があります：
+
+### Phase 0 ✅ 完了
+- [x] Unity 6 環境でのビルド成功
+- [x] Unity AI Interface の動作確認
+- [x] 最小プロトタイプでの音声再生
+- [x] CI/CD パイプライン構築
+- [x] 全テスト（13個）の成功
+
+### Phase 1（Windows/Linux）
+- [ ] OpenJTalk による日本語音素化
+- [ ] Piper モデルでの音声合成
+- [ ] Windows/Linux 両方での動作
+- [ ] パフォーマンス基準達成（100ms/文）
+- [ ] E2E テストの成功
+
+### Phase 2（Android）
+- [ ] Android NDK ビルド成功
+- [ ] APK サイズ増加 30MB 以下
+- [ ] Android 8.0+ での動作確認
+- [ ] バッテリー消費基準達成
+
+### Phase 3（iOS）
+- [ ] iOS ビルド成功
+- [ ] App Store ガイドライン準拠
+- [ ] iPhone/iPad 両対応
+- [ ] バックグラウンド処理対応
+
+### Phase 4（WebGL）
+- [ ] WASM ビルド成功
+- [ ] 主要ブラウザ対応
+- [ ] ファイルサイズ最適化
+- [ ] Web Audio API 統合
+
+### Phase 5（Unity統合）
+- [ ] Unity Package Manager 対応
+- [ ] サンプルシーン完成
+- [ ] エディタ拡張実装
+- [ ] パフォーマンス最適化
+
+### Phase 6（多言語）
+- [ ] 50+ 言語サポート
+- [ ] 言語自動検出
+- [ ] espeak-ng 統合
+- [ ] 多言語テスト成功
+
+### Phase 7（リリース）
+- [ ] 全プラットフォームテスト合格
+- [ ] ドキュメント完成
+- [ ] パフォーマンス目標達成
+- [ ] v1.0.0 リリース準備
 
 ## テスト戦略
 
