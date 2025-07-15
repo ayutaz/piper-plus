@@ -98,7 +98,7 @@ class PiperDataset(Dataset):
                         f0_data = torch.load(utt.f0_path)
                         f0_values = f0_data["f0"]
                         f0_voiced = f0_data["voiced"]
-                        
+
                         # Ensure F0 length matches spectrogram length
                         if f0_values.shape[0] != spectrogram.shape[1]:
                             # Simple interpolation to match lengths
@@ -266,7 +266,7 @@ class UtteranceCollate:
             prosody_ids_padded = LongTensor(num_utterances, max_prosody_length)
             prosody_ids_padded.zero_()
             prosody_lengths = LongTensor(num_utterances)
-            
+
         f0_padded: FloatTensor | None = None
         f0_voiced_padded: FloatTensor | None = None
         if has_f0:
@@ -301,7 +301,7 @@ class UtteranceCollate:
                 prosody_length = utt.prosody_ids.size(0)
                 prosody_ids_padded[utt_idx, :prosody_length] = utt.prosody_ids
                 prosody_lengths[utt_idx] = prosody_length
-                
+
             if utt.f0_values is not None and f0_padded is not None:
                 f0_length = min(utt.f0_values.size(0), spec_length)
                 f0_padded[utt_idx, :f0_length] = utt.f0_values[:f0_length]

@@ -31,8 +31,8 @@ from piper_phonemize import (
 # import pyopenjtalk  # noqa: F401 - Used in conditional imports
 from tqdm import tqdm
 
-from .norm_audio import cache_norm_audio, make_silence_detector
 from .f0_extraction import cache_f0
+from .norm_audio import cache_norm_audio, make_silence_detector
 
 # Custom Japanese phonemizer with accent/prosody marks
 try:
@@ -569,7 +569,7 @@ def phonemize_batch_openjtalk(
                             silence_detector,
                             args.sample_rate,
                         )
-                        
+
                         # Extract F0 if enabled
                         if getattr(args, 'extract_f0', False):
                             utt.f0_path = cache_f0(

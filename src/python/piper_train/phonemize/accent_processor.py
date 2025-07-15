@@ -203,15 +203,15 @@ class JapaneseAccentProcessor:
 
     def extract_prosody_ids(self, phonemes: list[str]) -> list[int]:
         """Extract prosody IDs from a list of phonemes.
-        
+
         Args:
             phonemes: List of phonemes that may contain prosody marks
-            
+
         Returns:
             List of prosody IDs corresponding to each phoneme
         """
         prosody_ids = []
-        
+
         for phoneme in phonemes:
             if phoneme in self.PROSODY_MARKS or phoneme in self.ACCENT_MARKS:
                 # This is a prosody/accent mark
@@ -219,5 +219,5 @@ class JapaneseAccentProcessor:
             else:
                 # Regular phoneme - no prosody
                 prosody_ids.append(self.mark_to_id['<PAD>'])
-                
+
         return prosody_ids
