@@ -631,7 +631,7 @@ class SynthesizerTrn(nn.Module):
             g = self.emb_g(sid).unsqueeze(-1)  # [b, h, 1]
         else:
             g = None
-        
+
         # Apply F0 predictor if prosody_ids are provided
         f0_pred = None
         f0_variance = None
@@ -712,7 +712,7 @@ class SynthesizerTrn(nn.Module):
             g = self.emb_g(sid).unsqueeze(-1)  # [b, h, 1]
         else:
             g = None
-        
+
         # Apply F0 predictor if prosody_ids are provided
         if prosody_ids is not None:
             f0_pred, _ = self.f0_predictor(x, prosody_ids, x_mask, g)

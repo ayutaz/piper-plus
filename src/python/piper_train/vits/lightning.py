@@ -10,10 +10,10 @@ from torch.utils.data import DataLoader, Dataset, random_split
 
 from .commons import slice_segments
 from .dataset import Batch, PiperDataset, UtteranceCollate
+from .f0_predictor import F0Loss
 from .losses import discriminator_loss, feature_loss, generator_loss, kl_loss
 from .mel_processing import mel_spectrogram_torch, spec_to_mel_torch
 from .models import MultiPeriodDiscriminator, SynthesizerTrn
-from .f0_predictor import F0Loss
 
 _LOGGER = logging.getLogger("vits.lightning")
 
@@ -111,7 +111,7 @@ class VitsModel(pl.LightningModule):
         self.model_d = MultiPeriodDiscriminator(
             use_spectral_norm=self.hparams.use_spectral_norm
         )
-        
+
         # F0 loss
         self.f0_loss = F0Loss()
 
@@ -219,7 +219,7 @@ class VitsModel(pl.LightningModule):
         opt_d.step()
 
     def training_step_g(self, batch: Batch):
-        x, x_lengths, y, _, spec, spec_lengths, speaker_ids, prosody_ids, f0_values, f0_voiced = (
+        x, x_lengths, y, _, spec, spec_lengths, speaker_ids, prosody_ids, f0_values = (
             batch.phoneme_ids,
             batch.phoneme_lengths,
             batch.audios,
@@ -229,7 +229,6 @@ class VitsModel(pl.LightningModule):
             batch.speaker_ids if batch.speaker_ids is not None else None,
             batch.prosody_ids if batch.prosody_ids is not None else None,
             batch.f0_values if batch.f0_values is not None else None,
-            batch.f0_voiced if batch.f0_voiced is not None else None,
         )
         (
             y_hat,
@@ -285,13 +284,13 @@ class VitsModel(pl.LightningModule):
 
             loss_fm = feature_loss(fmap_r, fmap_g)
             loss_gen, _losses_gen = generator_loss(y_d_hat_g)
-            
+
             # F0 loss
             loss_f0 = torch.tensor(0.0, device=self.device)
             if f0_pred is not None and f0_values is not None:
                 # Create mask for valid F0 frames
                 f0_mask = z_mask[:, :, :f0_values.shape[-1]]
-                
+
                 # Apply F0 loss
                 loss_f0, f0_metrics = self.f0_loss(
                     None,  # f0_pred_bins not used in this version
@@ -300,11 +299,11 @@ class VitsModel(pl.LightningModule):
                     f0_values.unsqueeze(1),  # Add channel dimension
                     f0_mask
                 )
-                
+
                 # Log F0 metrics
                 for metric_name, metric_value in f0_metrics.items():
                     self.log(f"train/{metric_name}", metric_value)
-            
+
             loss_gen_all = loss_gen + loss_fm + loss_mel + loss_dur + loss_kl + loss_f0
 
             self.log("loss_gen_all", loss_gen_all)
