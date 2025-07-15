@@ -4,19 +4,20 @@ Inference script for multilingual VITS model.
 """
 
 import argparse
-import json
 import logging
-from pathlib import Path
 import sys
+from pathlib import Path
 
-import torch
 import numpy as np
+import torch
 
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src" / "python"))
 
+from piper_train.phonemize.multilingual_phoneme_map import (
+    get_multilingual_phoneme_mapper,
+)
 from piper_train.vits.models_multilingual import MultilingualSynthesizerTrn
-from piper_train.phonemize.multilingual_phoneme_map import get_multilingual_phoneme_mapper
 
 try:
     from piper_train.phonemize.multilingual import phonemize_multilingual
@@ -29,10 +30,10 @@ _LOGGER = logging.getLogger(__name__)
 def load_checkpoint(checkpoint_path: Path, device: str = "cpu"):
     """Load model from checkpoint."""
     checkpoint = torch.load(checkpoint_path, map_location=device)
-    
+
     # Extract hyperparameters
     hparams = checkpoint.get("hyper_parameters", {})
-    
+
     # Create model
     model = MultilingualSynthesizerTrn(
         n_vocab=hparams.get("num_symbols", 512),
@@ -57,16 +58,16 @@ def load_checkpoint(checkpoint_path: Path, device: str = "cpu"):
         n_languages=hparams.get("num_languages", 8),
         lang_embedding_dim=hparams.get("lang_embedding_dim", 64),
     )
-    
+
     # Load state dict
     state_dict = checkpoint["state_dict"]
     # Remove "model_g." prefix if present
     state_dict = {k.replace("model_g.", ""): v for k, v in state_dict.items()}
     model.load_state_dict(state_dict)
-    
+
     model.eval()
     model.to(device)
-    
+
     return model, hparams
 
 
@@ -83,20 +84,20 @@ def synthesize(
     """Synthesize speech from text."""
     # Get phoneme mapper
     mapper = get_multilingual_phoneme_mapper()
-    
+
     # Phonemize text
     phonemes = phonemize_multilingual(text, language)
     _LOGGER.info(f"Phonemes: {phonemes}")
-    
+
     # Convert to IDs
     phoneme_ids = []
     current_language = None
-    
+
     language_map = {
         "ja": 0, "en": 1, "zh": 2, "es": 3,
         "fr": 4, "de": 5, "ko": 6, "mixed": 7
     }
-    
+
     for phoneme in phonemes:
         if phoneme.startswith("<lang:") and phoneme.endswith(">"):
             lang_code = phoneme[6:-1]
@@ -105,25 +106,24 @@ def synthesize(
         elif phoneme.startswith("</lang:") and phoneme.endswith(">"):
             phoneme_ids.append(mapper.get_phoneme_id(phoneme, ""))
             current_language = None
+        elif current_language:
+            phoneme_ids.append(mapper.get_phoneme_id(phoneme, current_language))
         else:
-            if current_language:
-                phoneme_ids.append(mapper.get_phoneme_id(phoneme, current_language))
-            else:
-                phoneme_ids.append(mapper.get_phoneme_id(phoneme, language))
-    
+            phoneme_ids.append(mapper.get_phoneme_id(phoneme, language))
+
     _LOGGER.info(f"Phoneme IDs: {phoneme_ids}")
-    
+
     # Convert to tensors
     text_tensor = torch.LongTensor(phoneme_ids).unsqueeze(0)
     text_lengths = torch.LongTensor([len(phoneme_ids)])
-    
+
     # Language ID
     lang_id = language_map.get(language, 0)
     lang_ids = torch.LongTensor([lang_id])
-    
+
     # Speaker ID
     sid = torch.LongTensor([speaker_id]) if model.n_speakers > 1 else None
-    
+
     # Generate audio
     with torch.no_grad():
         audio, *_ = model.infer(
@@ -135,20 +135,20 @@ def synthesize(
             length_scale=length_scale,
             noise_scale_w=noise_scale_w,
         )
-    
+
     audio = audio.squeeze().cpu().numpy()
-    
+
     return audio, sample_rate
 
 
 def save_wav(audio: np.ndarray, sample_rate: int, output_path: Path):
     """Save audio to WAV file."""
     import wave
-    
+
     # Normalize and convert to int16
     audio = np.clip(audio, -1, 1)
     audio = (audio * 32767).astype(np.int16)
-    
+
     with wave.open(str(output_path), 'w') as wav_file:
         wav_file.setnchannels(1)
         wav_file.setsampwidth(2)
@@ -213,25 +213,25 @@ def main():
         action="store_true",
         help="Enable debug logging",
     )
-    
+
     args = parser.parse_args()
-    
+
     # Setup logging
     logging.basicConfig(
         level=logging.DEBUG if args.debug else logging.INFO,
         format="%(levelname)s: %(message)s"
     )
-    
+
     # Check device
     if args.device == "cuda" and not torch.cuda.is_available():
         _LOGGER.warning("CUDA requested but not available, using CPU")
         args.device = "cpu"
-    
+
     # Load model
     _LOGGER.info(f"Loading model from {args.checkpoint}")
     model, hparams = load_checkpoint(args.checkpoint, args.device)
     sample_rate = hparams.get("sample_rate", 22050)
-    
+
     # Synthesize
     _LOGGER.info(f"Synthesizing: {args.text}")
     audio, sr = synthesize(
@@ -243,11 +243,11 @@ def main():
         args.length_scale,
         sample_rate=sample_rate,
     )
-    
+
     # Save audio
     save_wav(audio, sr, args.output)
     _LOGGER.info(f"Audio saved to {args.output}")
-    
+
     # Print duration
     duration = len(audio) / sr
     _LOGGER.info(f"Duration: {duration:.2f} seconds")

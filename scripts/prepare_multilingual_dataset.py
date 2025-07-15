@@ -5,11 +5,9 @@ Creates sample data for testing the multilingual VITS model.
 """
 
 import argparse
-import json
 import logging
-import random
-from pathlib import Path
 import sys
+from pathlib import Path
 
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src" / "python"))
@@ -37,7 +35,7 @@ def create_sample_utterances():
             "speaker_id": 0,
             "primary_language": "ja"
         },
-        
+
         # English only
         {
             "text": "Hello, how are you today?",
@@ -53,7 +51,7 @@ def create_sample_utterances():
             "speaker_id": 0,
             "primary_language": "en"
         },
-        
+
         # Mixed Japanese and English
         {
             "text": "今日のmeetingは3時からです。",
@@ -76,7 +74,7 @@ def create_sample_utterances():
             "speaker_id": 0,
             "primary_language": None
         },
-        
+
         # Code-switching examples
         {
             "text": "私はPythonでprogrammingをしています。",
@@ -93,39 +91,39 @@ def create_sample_utterances():
             "primary_language": None
         },
     ]
-    
+
     return sample_data
 
 
 def create_dummy_audio_files(output_dir: Path, utterances: list):
     """Create dummy audio and spectrogram files for testing."""
     import numpy as np
-    
+
     for utt in utterances:
         # Create dummy paths
         audio_path = output_dir / utt.audio_path
         audio_path.parent.mkdir(parents=True, exist_ok=True)
-        
+
         # Create dummy audio data (silence)
         sample_rate = 22050
         duration = utt.duration
         num_samples = int(sample_rate * duration)
         audio_data = np.zeros(num_samples, dtype=np.float32)
-        
+
         # Save normalized audio
         audio_norm_path = audio_path.with_suffix('.norm.npy')
         np.save(audio_norm_path, audio_data)
-        
+
         # Create dummy spectrogram
         n_fft = 1024
         hop_length = 256
         num_frames = (num_samples // hop_length) + 1
         spec_data = np.zeros((n_fft // 2 + 1, num_frames), dtype=np.float32)
-        
+
         # Save spectrogram
         audio_spec_path = audio_path.with_suffix('.spec.npy')
         np.save(audio_spec_path, spec_data)
-        
+
         # Update utterance with actual paths
         utt.audio_norm_path = str(audio_norm_path)
         utt.audio_spec_path = str(audio_spec_path)
@@ -133,7 +131,7 @@ def create_dummy_audio_files(output_dir: Path, utterances: list):
 
 def main():
     logging.basicConfig(level=logging.INFO)
-    
+
     parser = argparse.ArgumentParser(
         description="Prepare a multilingual dataset for VITS training"
     )
@@ -171,23 +169,23 @@ def main():
         action="store_true",
         help="Create dummy audio files for testing",
     )
-    
+
     args = parser.parse_args()
-    
+
     # Create output directory
     args.output_dir.mkdir(parents=True, exist_ok=True)
-    
+
     # Create formatter
     formatter = MultilingualDatasetFormatter()
-    
+
     # Get sample utterances
     sample_data = create_sample_utterances()
-    
+
     # Create dummy audio files if requested
     if args.create_dummy_audio:
         _LOGGER.info("Creating dummy audio files...")
         create_dummy_audio_files(args.output_dir, sample_data)
-    
+
     # Format utterances
     utterances = []
     for data in sample_data:
@@ -197,7 +195,7 @@ def main():
             if not audio_path.with_suffix('.norm.npy').exists():
                 _LOGGER.warning(f"Skipping {data['text']}: audio files not found")
                 continue
-        
+
         utt = formatter.format_utterance(
             text=data["text"],
             audio_path=data.get("audio_norm_path", data["audio_path"]),
@@ -205,15 +203,15 @@ def main():
             speaker_id=data["speaker_id"],
             primary_language=data.get("primary_language"),
         )
-        
+
         # Update audio paths if dummy files were created
         if args.create_dummy_audio:
             utt.audio_path = data.get("audio_norm_path", data["audio_path"])
-        
+
         utterances.append(utt)
-    
+
     _LOGGER.info(f"Formatted {len(utterances)} utterances")
-    
+
     # Show some examples
     print("\nExample utterances:")
     for i, utt in enumerate(utterances[:3]):
@@ -225,7 +223,7 @@ def main():
             print(f"  - {seg['language']}: {seg['text']}")
         print(f"Phonemes ({len(utt.phonemes)}): {' '.join(utt.phonemes[:20])}...")
         print(f"Language ratios: {utt.metadata['language_ratio']}")
-    
+
     # Save dataset
     formatter.save_dataset(
         utterances=utterances,
@@ -235,22 +233,22 @@ def main():
         sample_rate=args.sample_rate,
         validation_split=args.validation_split,
     )
-    
+
     print(f"\nDataset saved to: {args.output_dir}")
-    print(f"Files created:")
+    print("Files created:")
     print(f"  - dataset.jsonl ({len(utterances) - int(len(utterances) * args.validation_split)} utterances)")
     print(f"  - validation.jsonl ({int(len(utterances) * args.validation_split)} utterances)")
-    print(f"  - config.json")
-    print(f"  - phoneme_map.json")
-    
+    print("  - config.json")
+    print("  - phoneme_map.json")
+
     # Show training command
-    print(f"\nTo train the model, run:")
-    print(f"python -m piper_train.train_multilingual \\")
+    print("\nTo train the model, run:")
+    print("python -m piper_train.train_multilingual \\")
     print(f"  --dataset-dir {args.output_dir} \\")
-    print(f"  --max_epochs 100 \\")
-    print(f"  --batch-size 16 \\")
+    print("  --max_epochs 100 \\")
+    print("  --batch-size 16 \\")
     print(f"  --validation-split {args.validation_split} \\")
-    print(f"  --checkpoint-epochs 10")
+    print("  --checkpoint-epochs 10")
 
 
 if __name__ == "__main__":
