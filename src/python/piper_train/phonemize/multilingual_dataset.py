@@ -25,6 +25,7 @@ _LOGGER = logging.getLogger(__name__)
 @dataclass
 class MultilingualUtterance:
     """Represents a single utterance in the multilingual dataset."""
+
     audio_path: str
     text: str
     text_language: str  # "mixed", "ja", "en", etc.
@@ -90,12 +91,14 @@ class MultilingualDatasetFormatter:
         # Convert segments to dict format
         segment_dicts = []
         for seg in segments:
-            segment_dicts.append({
-                "text": seg.text,
-                "language": seg.language.value,
-                "start_idx": seg.start_idx,
-                "end_idx": seg.end_idx
-            })
+            segment_dicts.append(
+                {
+                    "text": seg.text,
+                    "language": seg.language.value,
+                    "start_idx": seg.start_idx,
+                    "end_idx": seg.end_idx,
+                }
+            )
 
         # Phonemize text
         phonemes = self.phonemizer.phonemize(text, lang_enum)
@@ -142,7 +145,7 @@ class MultilingualDatasetFormatter:
             phoneme_ids=phoneme_ids,
             duration=duration,
             speaker_id=speaker_id,
-            metadata=metadata
+            metadata=metadata,
         )
 
     def create_dataset_config(
@@ -188,8 +191,10 @@ class MultilingualDatasetFormatter:
             "phoneme_id_map": {
                 "ja": dict(list(self.phoneme_mapper.phoneme_to_id.items())[:100]),
                 "en": dict(list(self.phoneme_mapper.phoneme_to_id.items())[100:200]),
-                "_": dict(list(self.phoneme_mapper.phoneme_to_id.items())[:50]),  # Special tokens
-            }
+                "_": dict(
+                    list(self.phoneme_mapper.phoneme_to_id.items())[:50]
+                ),  # Special tokens
+            },
         }
 
         return config
@@ -294,8 +299,16 @@ if __name__ == "__main__":
         print(f"Text: {text}")
         print(f"Language: {utt.text_language}")
         print(f"Segments: {utt.segments}")
-        print(f"Phonemes: {utt.phonemes[:20]}..." if len(utt.phonemes) > 20 else f"Phonemes: {utt.phonemes}")
-        print(f"Phoneme IDs: {utt.phoneme_ids[:20]}..." if len(utt.phoneme_ids) > 20 else f"Phoneme IDs: {utt.phoneme_ids}")
+        print(
+            f"Phonemes: {utt.phonemes[:20]}..."
+            if len(utt.phonemes) > 20
+            else f"Phonemes: {utt.phonemes}"
+        )
+        print(
+            f"Phoneme IDs: {utt.phoneme_ids[:20]}..."
+            if len(utt.phoneme_ids) > 20
+            else f"Phoneme IDs: {utt.phoneme_ids}"
+        )
         print(f"Metadata: {utt.metadata}")
 
     # Test saving dataset
@@ -306,7 +319,7 @@ if __name__ == "__main__":
         dataset_name="test_multilingual",
         audio_quality="medium",
         sample_rate=22050,
-        validation_split=0.25
+        validation_split=0.25,
     )
 
     print(f"\nDataset saved to {output_dir}")

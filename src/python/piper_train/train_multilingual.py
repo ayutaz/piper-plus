@@ -23,7 +23,9 @@ def main():
 
     parser = argparse.ArgumentParser(description="Train multilingual VITS model")
     parser.add_argument(
-        "--dataset-dir", required=True, help="Path to pre-processed multilingual dataset directory"
+        "--dataset-dir",
+        required=True,
+        help="Path to pre-processed multilingual dataset directory",
     )
     parser.add_argument(
         "--checkpoint-epochs",
@@ -95,7 +97,9 @@ def main():
 
         # Check if this is a multilingual dataset
         if not config.get("multilingual", False):
-            _LOGGER.warning("Dataset does not appear to be multilingual. Consider using standard training script.")
+            _LOGGER.warning(
+                "Dataset does not appear to be multilingual. Consider using standard training script."
+            )
 
         num_symbols = int(config["num_symbols"])
         num_speakers = int(config["num_speakers"])
@@ -162,7 +166,9 @@ def main():
 
     # Handle checkpoint conversion if needed
     if args.convert_from_single_lang:
-        _LOGGER.info(f"Converting single-language checkpoint: {args.convert_from_single_lang}")
+        _LOGGER.info(
+            f"Converting single-language checkpoint: {args.convert_from_single_lang}"
+        )
 
         # Load single-language checkpoint
         checkpoint = torch.load(args.convert_from_single_lang, map_location="cpu")
@@ -187,7 +193,9 @@ def main():
     if args.resume_from_checkpoint or args.convert_from_single_lang:
         trainer.fit(
             model,
-            ckpt_path=args.resume_from_checkpoint if args.resume_from_checkpoint else None
+            ckpt_path=args.resume_from_checkpoint
+            if args.resume_from_checkpoint
+            else None,
         )
     else:
         trainer.fit(model)

@@ -13,6 +13,7 @@ _LOGGER = logging.getLogger(__name__)
 
 class Language(str, Enum):
     """Supported languages."""
+
     JAPANESE = "ja"
     ENGLISH = "en"
     CHINESE = "zh"
@@ -25,6 +26,7 @@ class Language(str, Enum):
 @dataclass
 class TextSegment:
     """A segment of text with its detected language."""
+
     text: str
     language: Language
     start_idx: int
@@ -72,9 +74,11 @@ class LanguageDetectorStub:
         for char in text:
             code_point = ord(char)
             # Check for Japanese scripts
-            if (0x3040 <= code_point <= 0x309F or  # Hiragana
-                0x30A0 <= code_point <= 0x30FF or  # Katakana
-                0x4E00 <= code_point <= 0x9FFF):   # Kanji
+            if (
+                0x3040 <= code_point <= 0x309F  # Hiragana
+                or 0x30A0 <= code_point <= 0x30FF  # Katakana
+                or 0x4E00 <= code_point <= 0x9FFF
+            ):  # Kanji
                 return Language.JAPANESE
 
         # Default to English for non-Japanese text
@@ -83,12 +87,9 @@ class LanguageDetectorStub:
     def split_mixed_text(self, text: str) -> list[TextSegment]:
         """Simple split that treats entire text as one segment."""
         language = self.detect_language(text)
-        return [TextSegment(
-            text=text,
-            language=language,
-            start_idx=0,
-            end_idx=len(text)
-        )]
+        return [
+            TextSegment(text=text, language=language, start_idx=0, end_idx=len(text))
+        ]
 
 
 class MultilingualPhonemizerStub:
@@ -102,7 +103,9 @@ class MultilingualPhonemizerStub:
             "Install piper_phonemize for other languages."
         )
 
-    def phonemize(self, text: str, primary_language: Language | None = None) -> list[str]:
+    def phonemize(
+        self, text: str, primary_language: Language | None = None
+    ) -> list[str]:
         """Phonemize text (Japanese only in stub mode)."""
         try:
             from .japanese import phonemize_japanese
@@ -137,11 +140,15 @@ class MultilingualPhonemizerStub:
                 tagged_phonemes = mapper.add_language_tags(phonemes, "ja")
             else:
                 # Use stub for other languages
-                phoneme_sentences = phonemize_espeak_stub(segment.text, segment.language.value)
+                phoneme_sentences = phonemize_espeak_stub(
+                    segment.text, segment.language.value
+                )
                 phonemes = []
                 for sentence in phoneme_sentences:
                     phonemes.extend(sentence)
-                tagged_phonemes = mapper.add_language_tags(phonemes, segment.language.value)
+                tagged_phonemes = mapper.add_language_tags(
+                    phonemes, segment.language.value
+                )
 
             all_phonemes.extend(tagged_phonemes)
 
@@ -158,6 +165,7 @@ def get_multilingual_phonemizer(stub_mode: bool = False):
     try:
         # Try to import the full implementation
         from .multilingual import MultilingualPhonemizer
+
         return MultilingualPhonemizer()
     except ImportError as e:
         _LOGGER.warning(f"Failed to import full multilingual phonemizer: {e}")

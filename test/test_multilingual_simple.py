@@ -32,7 +32,23 @@ def test_phoneme_mapper():
 
     # Test Japanese phonemes
     print("\nJapanese phonemes:")
-    ja_phonemes = ["a", "i", "u", "e", "o", "k", "s", "t", "n", "h", "m", "y", "r", "w", "N"]
+    ja_phonemes = [
+        "a",
+        "i",
+        "u",
+        "e",
+        "o",
+        "k",
+        "s",
+        "t",
+        "n",
+        "h",
+        "m",
+        "y",
+        "r",
+        "w",
+        "N",
+    ]
     for phoneme in ja_phonemes[:5]:
         id = mapper.get_phoneme_id(phoneme, "ja")
         print(f"ja:{phoneme} -> {id}")
@@ -46,7 +62,9 @@ def test_phoneme_mapper():
 
     # Test encoding a sequence
     print("\nTest encoding sequences:")
-    ja_seq = mapper.add_language_tags(["k", "o", "N", "n", "i", "ch", "i", "w", "a"], "ja")
+    ja_seq = mapper.add_language_tags(
+        ["k", "o", "N", "n", "i", "ch", "i", "w", "a"], "ja"
+    )
     print(f"Japanese sequence: {ja_seq}")
 
     en_seq = mapper.add_language_tags(["h", "ə", "l", "oʊ"], "en")
@@ -65,29 +83,50 @@ def test_utterance_format():
         text="こんにちは、Hello!",
         text_language="mixed",
         segments=[
-            {
-                "text": "こんにちは、",
-                "language": "ja",
-                "start_idx": 0,
-                "end_idx": 6
-            },
-            {
-                "text": "Hello!",
-                "language": "en",
-                "start_idx": 6,
-                "end_idx": 12
-            }
+            {"text": "こんにちは、", "language": "ja", "start_idx": 0, "end_idx": 6},
+            {"text": "Hello!", "language": "en", "start_idx": 6, "end_idx": 12},
         ],
-        phonemes=["<lang:ja>", "k", "o", "N", "n", "i", "ch", "i", "w", "a", "</lang:ja>",
-                  "<lang:en>", "h", "ə", "l", "oʊ", "</lang:en>"],
-        phoneme_ids=[10, 110, 104, 124, 116, 101, 137, 101, 123, 100, 20,
-                     11, 244, 202, 248, 213, 21],
+        phonemes=[
+            "<lang:ja>",
+            "k",
+            "o",
+            "N",
+            "n",
+            "i",
+            "ch",
+            "i",
+            "w",
+            "a",
+            "</lang:ja>",
+            "<lang:en>",
+            "h",
+            "ə",
+            "l",
+            "oʊ",
+            "</lang:en>",
+        ],
+        phoneme_ids=[
+            10,
+            110,
+            104,
+            124,
+            116,
+            101,
+            137,
+            101,
+            123,
+            100,
+            20,
+            11,
+            244,
+            202,
+            248,
+            213,
+            21,
+        ],
         duration=2.0,
         speaker_id=0,
-        metadata={
-            "primary_language": "ja",
-            "language_ratio": {"ja": 0.6, "en": 0.4}
-        }
+        metadata={"primary_language": "ja", "language_ratio": {"ja": 0.6, "en": 0.4}},
     )
 
     # Test conversion to dict
@@ -128,11 +167,11 @@ def test_language_detection():
         return "Unknown"
 
     test_texts = [
-        "こんにちは",     # Hiragana
-        "コンニチハ",     # Katakana
-        "日本語",        # Kanji
-        "Hello",        # English
-        "안녕하세요",      # Korean
+        "こんにちは",  # Hiragana
+        "コンニチハ",  # Katakana
+        "日本語",  # Kanji
+        "Hello",  # English
+        "안녕하세요",  # Korean
     ]
 
     for text in test_texts:

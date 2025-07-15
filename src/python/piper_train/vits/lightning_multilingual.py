@@ -250,7 +250,9 @@ class MultilingualVitsModel(pl.LightningModule):
         self.manual_backward(loss_disc_all)
         if self.hparams.grad_clip:
             self.clip_gradients(
-                optim_d, gradient_clip_val=self.hparams.grad_clip, gradient_clip_algorithm="norm"
+                optim_d,
+                gradient_clip_val=self.hparams.grad_clip,
+                gradient_clip_algorithm="norm",
             )
         optim_d.step()
         optim_d.zero_grad()
@@ -260,7 +262,9 @@ class MultilingualVitsModel(pl.LightningModule):
             y_d_hat_r, y_d_hat_g, fmap_r, fmap_g = self.model_d(self._y, self._y_hat)
             loss_fm = feature_loss(fmap_r, fmap_g)
             loss_mel = F.l1_loss(y_mel, y_hat_mel) * self.hparams.c_mel
-            loss_kl = kl_loss(z_p, logs_q, m_p, logs_p, z_mask=y_mask) * self.hparams.c_kl
+            loss_kl = (
+                kl_loss(z_p, logs_q, m_p, logs_p, z_mask=y_mask) * self.hparams.c_kl
+            )
             loss_gen, losses_gen = generator_loss(y_d_hat_g)
             loss_gen_all = loss_gen + loss_fm + loss_mel + loss_kl
 
@@ -275,7 +279,9 @@ class MultilingualVitsModel(pl.LightningModule):
         self.manual_backward(loss_gen_all)
         if self.hparams.grad_clip:
             self.clip_gradients(
-                optim_g, gradient_clip_val=self.hparams.grad_clip, gradient_clip_algorithm="norm"
+                optim_g,
+                gradient_clip_val=self.hparams.grad_clip,
+                gradient_clip_algorithm="norm",
             )
         optim_g.step()
         optim_g.zero_grad()

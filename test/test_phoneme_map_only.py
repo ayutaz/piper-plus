@@ -38,7 +38,25 @@ def test_phoneme_mapper():
 
     # Test Japanese phonemes
     print("\n3. Japanese Phoneme Mapping (sample):")
-    test_ja = ["a", "i", "u", "e", "o", "k", "s", "t", "n", "N", "ch", "ts", "^", "$", "#", "[", "]"]
+    test_ja = [
+        "a",
+        "i",
+        "u",
+        "e",
+        "o",
+        "k",
+        "s",
+        "t",
+        "n",
+        "N",
+        "ch",
+        "ts",
+        "^",
+        "$",
+        "#",
+        "[",
+        "]",
+    ]
     for phoneme in test_ja:
         id = mapper.get_phoneme_id(phoneme, "ja")
         print(f"   ja:{phoneme:3} -> {id:3}")

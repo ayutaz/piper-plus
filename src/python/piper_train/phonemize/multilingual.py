@@ -9,6 +9,7 @@ from enum import Enum
 try:
     from .japanese import phonemize_japanese
     from .multilingual_phoneme_map import get_multilingual_phoneme_mapper
+
     pass  # token_mapper import removed - unused
 except ImportError:
     from piper_train.phonemize.japanese import phonemize_japanese
@@ -23,6 +24,7 @@ _LOGGER = logging.getLogger(__name__)
 
 class Language(str, Enum):
     """Supported languages."""
+
     JAPANESE = "ja"
     ENGLISH = "en"
     CHINESE = "zh"
@@ -35,6 +37,7 @@ class Language(str, Enum):
 @dataclass
 class TextSegment:
     """A segment of text with its detected language."""
+
     text: str
     language: Language
     start_idx: int
@@ -44,6 +47,7 @@ class TextSegment:
 @dataclass
 class PhonemeSegment:
     """Phonemes for a text segment."""
+
     phonemes: list[str]
     language: Language
     text: str
@@ -77,7 +81,9 @@ class LanguageDetector:
             code_point = ord(char)
 
             # Check Japanese (prioritize over Chinese for shared characters)
-            if self._is_in_ranges(code_point, self.SCRIPT_RANGES.get(Language.JAPANESE, [])):
+            if self._is_in_ranges(
+                code_point, self.SCRIPT_RANGES.get(Language.JAPANESE, [])
+            ):
                 # Check if it's specifically Hiragana or Katakana
                 if 0x3040 <= code_point <= 0x30FF:
                     script_counts[Language.JAPANESE] += 2  # Weight kana higher
@@ -85,7 +91,9 @@ class LanguageDetector:
                     script_counts[Language.JAPANESE] += 1
 
             # Check Korean
-            elif self._is_in_ranges(code_point, self.SCRIPT_RANGES.get(Language.KOREAN, [])):
+            elif self._is_in_ranges(
+                code_point, self.SCRIPT_RANGES.get(Language.KOREAN, [])
+            ):
                 script_counts[Language.KOREAN] += 1
 
             # Check if it's Latin script (could be multiple languages)
@@ -135,12 +143,14 @@ class LanguageDetector:
             else:
                 # Language changed, save current segment
                 if current_segment.strip():
-                    segments.append(TextSegment(
-                        text=current_segment,
-                        language=current_language,
-                        start_idx=start_idx,
-                        end_idx=i
-                    ))
+                    segments.append(
+                        TextSegment(
+                            text=current_segment,
+                            language=current_language,
+                            start_idx=start_idx,
+                            end_idx=i,
+                        )
+                    )
 
                 # Start new segment
                 current_segment = char
@@ -149,12 +159,14 @@ class LanguageDetector:
 
         # Add final segment
         if current_segment.strip():
-            segments.append(TextSegment(
-                text=current_segment,
-                language=current_language,
-                start_idx=start_idx,
-                end_idx=len(text)
-            ))
+            segments.append(
+                TextSegment(
+                    text=current_segment,
+                    language=current_language,
+                    start_idx=start_idx,
+                    end_idx=len(text),
+                )
+            )
 
         return segments
 
@@ -166,7 +178,9 @@ class MultilingualPhonemizer:
         self.language_detector = LanguageDetector()
         self.phoneme_mapper = get_multilingual_phoneme_mapper()
 
-    def phonemize(self, text: str, primary_language: Language | None = None) -> list[str]:
+    def phonemize(
+        self, text: str, primary_language: Language | None = None
+    ) -> list[str]:
         """
         Phonemize mixed-language text.
 
@@ -196,8 +210,7 @@ class MultilingualPhonemizer:
 
             # Add language tags and phonemes
             tagged_phonemes = self.phoneme_mapper.add_language_tags(
-                phoneme_segment.phonemes,
-                phoneme_segment.language.value
+                phoneme_segment.phonemes, phoneme_segment.language.value
             )
 
             all_phonemes.extend(tagged_phonemes)
@@ -222,11 +235,7 @@ class MultilingualPhonemizer:
             for sentence in phoneme_sentences:
                 phonemes.extend(sentence)
 
-        return PhonemeSegment(
-            phonemes=phonemes,
-            language=language,
-            text=text
-        )
+        return PhonemeSegment(phonemes=phonemes, language=language, text=text)
 
     def _get_espeak_language(self, language: Language) -> str:
         """Map Language enum to espeak language code."""
@@ -240,7 +249,9 @@ class MultilingualPhonemizer:
         }
         return mapping.get(language, "en-us")
 
-    def phonemize_to_ids(self, text: str, primary_language: Language | None = None) -> list[int]:
+    def phonemize_to_ids(
+        self, text: str, primary_language: Language | None = None
+    ) -> list[int]:
         """
         Phonemize text and convert to phoneme IDs.
 
@@ -269,7 +280,9 @@ class MultilingualPhonemizer:
                 current_language = None
             # Regular phoneme
             elif current_language:
-                ids.append(self.phoneme_mapper.get_phoneme_id(phoneme, current_language))
+                ids.append(
+                    self.phoneme_mapper.get_phoneme_id(phoneme, current_language)
+                )
             else:
                 # This shouldn't happen, but handle gracefully
                 ids.append(self.phoneme_mapper.get_phoneme_id(phoneme, "en"))

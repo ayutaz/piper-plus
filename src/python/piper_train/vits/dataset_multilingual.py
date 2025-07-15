@@ -22,6 +22,7 @@ _LOGGER = logging.getLogger(__name__)
 @dataclass
 class MultilingualUtterance:
     """Single multilingual training utterance."""
+
     phoneme_ids: list[int]
     audio_norm_path: Path
     audio_spec_path: Path
@@ -33,6 +34,7 @@ class MultilingualUtterance:
 @dataclass
 class MultilingualBatch:
     """Batch of multilingual training examples."""
+
     phoneme_ids: torch.Tensor
     phoneme_lengths: torch.Tensor
     audio: torch.Tensor
@@ -55,8 +57,14 @@ class MultilingualDataset(Dataset):
     ):
         self.utterances: list[MultilingualUtterance] = []
         self.language_map = language_map or {
-            "ja": 0, "en": 1, "zh": 2, "es": 3,
-            "fr": 4, "de": 5, "ko": 6, "mixed": 7
+            "ja": 0,
+            "en": 1,
+            "zh": 2,
+            "es": 3,
+            "fr": 4,
+            "de": 5,
+            "ko": 6,
+            "mixed": 7,
         }
 
         # Load utterances from dataset files
@@ -78,14 +86,17 @@ class MultilingualDataset(Dataset):
 
                     # Extract language information
                     text_language = utt_data.get("text_language", "en")
-                    language_id = self.language_map.get(text_language, 1)  # Default to English
+                    language_id = self.language_map.get(
+                        text_language, 1
+                    )  # Default to English
 
                     # For code-switching: create per-phoneme language IDs
                     language_ids_per_phoneme = None
                     if "segments" in utt_data and text_language == "mixed":
-                        language_ids_per_phoneme = self._create_per_phoneme_language_ids(
-                            utt_data["phonemes"],
-                            utt_data["segments"]
+                        language_ids_per_phoneme = (
+                            self._create_per_phoneme_language_ids(
+                                utt_data["phonemes"], utt_data["segments"]
+                            )
                         )
 
                     # Create utterance
@@ -188,7 +199,11 @@ class MultilingualCollate:
             else:
                 # Use utterance-level language ID for all phonemes
                 language_ids_per_phoneme.append(
-                    torch.full((len(utterance.phoneme_ids),), utterance.language_id, dtype=torch.long)
+                    torch.full(
+                        (len(utterance.phoneme_ids),),
+                        utterance.language_id,
+                        dtype=torch.long,
+                    )
                 )
 
         # Pad sequences
@@ -207,7 +222,11 @@ class MultilingualCollate:
         phoneme_lengths = torch.LongTensor(phoneme_lengths)
         audio_lengths = torch.LongTensor(audio_lengths)
         spectrogram_lengths = torch.LongTensor(spectrogram_lengths)
-        speaker_ids = torch.LongTensor(speaker_ids) if any(sid > 0 for sid in speaker_ids) else None
+        speaker_ids = (
+            torch.LongTensor(speaker_ids)
+            if any(sid > 0 for sid in speaker_ids)
+            else None
+        )
         language_ids = torch.LongTensor(language_ids)
 
         return MultilingualBatch(

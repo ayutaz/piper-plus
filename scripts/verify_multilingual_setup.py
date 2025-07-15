@@ -23,6 +23,7 @@ def check_dependencies():
     # Check pyopenjtalk
     try:
         import importlib.util
+
         spec = importlib.util.find_spec("pyopenjtalk")
         if spec is not None:
             print("✓ pyopenjtalk is installed")
@@ -39,24 +40,33 @@ def check_dependencies():
     # Check for piper_phonemize (optional for this test)
     try:
         import importlib.util
+
         spec = importlib.util.find_spec("piper_phonemize")
         if spec is not None:
             print("✓ piper_phonemize is installed")
         else:
-            print("⚠ piper_phonemize is NOT installed (required for non-Japanese languages)")
+            print(
+                "⚠ piper_phonemize is NOT installed (required for non-Japanese languages)"
+            )
             print("  This is expected if you haven't installed the full piper package")
     except ImportError:
-        print("⚠ piper_phonemize is NOT installed (required for non-Japanese languages)")
+        print(
+            "⚠ piper_phonemize is NOT installed (required for non-Japanese languages)"
+        )
         print("  This is expected if you haven't installed the full piper package")
 
     # Check our modules
     try:
         import importlib.util
-        spec = importlib.util.find_spec("piper_train.phonemize.multilingual_phoneme_map")
+
+        spec = importlib.util.find_spec(
+            "piper_train.phonemize.multilingual_phoneme_map"
+        )
         if spec is not None:
             from piper_train.phonemize.multilingual_phoneme_map import (
                 get_multilingual_phoneme_mapper,  # noqa: F401
             )
+
             print("✓ Multilingual phoneme mapper is available")
         else:
             print("✗ Failed to find multilingual phoneme mapper module")
@@ -67,11 +77,13 @@ def check_dependencies():
 
     try:
         import importlib.util
+
         spec = importlib.util.find_spec("piper_train.phonemize.multilingual")
         if spec is not None:
             from piper_train.phonemize.multilingual import (
                 MultilingualPhonemizer,  # noqa: F401
             )
+
             print("✓ Multilingual phonemizer is available")
         else:
             print("⚠ Multilingual phonemizer module not found")
@@ -155,7 +167,7 @@ def test_dataset_format():
             audio_path="test.wav",
             duration=1.5,
             speaker_id=0,
-            primary_language="ja"
+            primary_language="ja",
         )
 
         print(f"✓ Created utterance for: {utt.text}")
@@ -238,9 +250,13 @@ def main():
         print("✓ All checks passed! Multilingual setup is ready.")
         print("\nNext steps:")
         print("1. Prepare your datasets in LJSpeech format")
-        print("2. Create a configuration file (see examples/multilingual_dataset_example.json)")
+        print(
+            "2. Create a configuration file (see examples/multilingual_dataset_example.json)"
+        )
         print("3. Run preprocessing:")
-        print("   ./scripts/run_multilingual_preprocessing.sh -c your_config.json -o output_dir")
+        print(
+            "   ./scripts/run_multilingual_preprocessing.sh -c your_config.json -o output_dir"
+        )
         print("4. Train the model:")
         print("   python -m piper_train.train_multilingual --dataset-dir output_dir")
     else:

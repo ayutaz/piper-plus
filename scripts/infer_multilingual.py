@@ -38,7 +38,8 @@ def load_checkpoint(checkpoint_path: Path, device: str = "cpu"):
     model = MultilingualSynthesizerTrn(
         n_vocab=hparams.get("num_symbols", 512),
         spec_channels=hparams.get("spec_channels", 513),
-        segment_size=hparams.get("segment_size", 8192) // hparams.get("hop_length", 256),
+        segment_size=hparams.get("segment_size", 8192)
+        // hparams.get("hop_length", 256),
         inter_channels=hparams.get("inter_channels", 192),
         hidden_channels=hparams.get("hidden_channels", 192),
         filter_channels=hparams.get("filter_channels", 768),
@@ -48,7 +49,9 @@ def load_checkpoint(checkpoint_path: Path, device: str = "cpu"):
         p_dropout=hparams.get("p_dropout", 0.1),
         resblock=hparams.get("resblock", "2"),
         resblock_kernel_sizes=hparams.get("resblock_kernel_sizes", [3, 5, 7]),
-        resblock_dilation_sizes=hparams.get("resblock_dilation_sizes", [[1, 2], [2, 6], [3, 12]]),
+        resblock_dilation_sizes=hparams.get(
+            "resblock_dilation_sizes", [[1, 2], [2, 6], [3, 12]]
+        ),
         upsample_rates=hparams.get("upsample_rates", [8, 8, 4]),
         upsample_initial_channel=hparams.get("upsample_initial_channel", 256),
         upsample_kernel_sizes=hparams.get("upsample_kernel_sizes", [16, 16, 8]),
@@ -94,8 +97,14 @@ def synthesize(
     current_language = None
 
     language_map = {
-        "ja": 0, "en": 1, "zh": 2, "es": 3,
-        "fr": 4, "de": 5, "ko": 6, "mixed": 7
+        "ja": 0,
+        "en": 1,
+        "zh": 2,
+        "es": 3,
+        "fr": 4,
+        "de": 5,
+        "ko": 6,
+        "mixed": 7,
     }
 
     for phoneme in phonemes:
@@ -149,7 +158,7 @@ def save_wav(audio: np.ndarray, sample_rate: int, output_path: Path):
     audio = np.clip(audio, -1, 1)
     audio = (audio * 32767).astype(np.int16)
 
-    with wave.open(str(output_path), 'w') as wav_file:
+    with wave.open(str(output_path), "w") as wav_file:
         wav_file.setnchannels(1)
         wav_file.setsampwidth(2)
         wav_file.setframerate(sample_rate)
@@ -219,7 +228,7 @@ def main():
     # Setup logging
     logging.basicConfig(
         level=logging.DEBUG if args.debug else logging.INFO,
-        format="%(levelname)s: %(message)s"
+        format="%(levelname)s: %(message)s",
     )
 
     # Check device

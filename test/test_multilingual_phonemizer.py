@@ -41,7 +41,9 @@ class TestLanguageDetector(unittest.TestCase):
     def test_english_detection(self):
         """Test English text detection."""
         self.assertEqual(self.detector.detect_language("Hello world"), Language.ENGLISH)
-        self.assertEqual(self.detector.detect_language("This is a test"), Language.ENGLISH)
+        self.assertEqual(
+            self.detector.detect_language("This is a test"), Language.ENGLISH
+        )
 
     def test_mixed_text_splitting(self):
         """Test splitting mixed language text."""
@@ -177,7 +179,7 @@ class TestDatasetFormatter(unittest.TestCase):
             audio_path="test.wav",
             duration=1.5,
             speaker_id=0,
-            primary_language="ja"
+            primary_language="ja",
         )
 
         self.assertEqual(utt.text_language, "ja")
@@ -189,10 +191,7 @@ class TestDatasetFormatter(unittest.TestCase):
     def test_format_mixed_utterance(self):
         """Test formatting mixed language utterance."""
         utt = self.formatter.format_utterance(
-            text="こんにちは、Hello!",
-            audio_path="test.wav",
-            duration=2.0,
-            speaker_id=0
+            text="こんにちは、Hello!", audio_path="test.wav", duration=2.0, speaker_id=0
         )
 
         self.assertEqual(utt.text_language, "mixed")
@@ -203,9 +202,7 @@ class TestDatasetFormatter(unittest.TestCase):
     def test_utterance_to_dict(self):
         """Test utterance serialization."""
         utt = self.formatter.format_utterance(
-            text="Test",
-            audio_path="test.wav",
-            duration=1.0
+            text="Test", audio_path="test.wav", duration=1.0
         )
 
         data = utt.to_dict()

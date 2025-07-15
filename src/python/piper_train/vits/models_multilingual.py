@@ -269,7 +269,17 @@ class MultilingualSynthesizerTrn(nn.Module):
             (z, z_p, m_p, logs_p, m_q, logs_q),
         )
 
-    def infer(self, x, x_lengths, sid=None, lang_ids=None, noise_scale=1, length_scale=1, noise_scale_w=1.0, max_len=None):
+    def infer(
+        self,
+        x,
+        x_lengths,
+        sid=None,
+        lang_ids=None,
+        noise_scale=1,
+        length_scale=1,
+        noise_scale_w=1.0,
+        max_len=None,
+    ):
         x, m_p, logs_p, x_mask = self.enc_p(x, x_lengths, lang_ids)
 
         if self.n_speakers > 1:

@@ -26,69 +26,66 @@ def create_sample_utterances():
             "audio_path": "samples/ja_001.wav",
             "duration": 3.2,
             "speaker_id": 0,
-            "primary_language": "ja"
+            "primary_language": "ja",
         },
         {
             "text": "ありがとうございます。",
             "audio_path": "samples/ja_002.wav",
             "duration": 1.8,
             "speaker_id": 0,
-            "primary_language": "ja"
+            "primary_language": "ja",
         },
-
         # English only
         {
             "text": "Hello, how are you today?",
             "audio_path": "samples/en_001.wav",
             "duration": 2.5,
             "speaker_id": 0,
-            "primary_language": "en"
+            "primary_language": "en",
         },
         {
             "text": "This is a test of the text to speech system.",
             "audio_path": "samples/en_002.wav",
             "duration": 3.8,
             "speaker_id": 0,
-            "primary_language": "en"
+            "primary_language": "en",
         },
-
         # Mixed Japanese and English
         {
             "text": "今日のmeetingは3時からです。",
             "audio_path": "samples/mixed_001.wav",
             "duration": 2.8,
             "speaker_id": 0,
-            "primary_language": None
+            "primary_language": None,
         },
         {
             "text": "このsoftwareはopen sourceです。",
             "audio_path": "samples/mixed_002.wav",
             "duration": 3.0,
             "speaker_id": 0,
-            "primary_language": None
+            "primary_language": None,
         },
         {
             "text": "Let's go to 東京 tomorrow!",
             "audio_path": "samples/mixed_003.wav",
             "duration": 2.2,
             "speaker_id": 0,
-            "primary_language": None
+            "primary_language": None,
         },
-
         # Code-switching examples
         {
             "text": "私はPythonでprogrammingをしています。",
             "audio_path": "samples/mixed_004.wav",
             "duration": 3.5,
             "speaker_id": 0,
-            "primary_language": None
+            "primary_language": None,
         },
         {
             "text": "Please call me at 午後2時.",
             "audio_path": "samples/mixed_005.wav",
             "duration": 2.6,
             "speaker_id": 0,
-            "primary_language": None
+            "primary_language": None,
         },
     ]
 
@@ -111,7 +108,7 @@ def create_dummy_audio_files(output_dir: Path, utterances: list):
         audio_data = np.zeros(num_samples, dtype=np.float32)
 
         # Save normalized audio
-        audio_norm_path = audio_path.with_suffix('.norm.npy')
+        audio_norm_path = audio_path.with_suffix(".norm.npy")
         np.save(audio_norm_path, audio_data)
 
         # Create dummy spectrogram
@@ -121,7 +118,7 @@ def create_dummy_audio_files(output_dir: Path, utterances: list):
         spec_data = np.zeros((n_fft // 2 + 1, num_frames), dtype=np.float32)
 
         # Save spectrogram
-        audio_spec_path = audio_path.with_suffix('.spec.npy')
+        audio_spec_path = audio_path.with_suffix(".spec.npy")
         np.save(audio_spec_path, spec_data)
 
         # Update utterance with actual paths
@@ -192,7 +189,7 @@ def main():
         # Skip if audio files don't exist and not creating dummy files
         if not args.create_dummy_audio:
             audio_path = args.output_dir / data["audio_path"]
-            if not audio_path.with_suffix('.norm.npy').exists():
+            if not audio_path.with_suffix(".norm.npy").exists():
                 _LOGGER.warning(f"Skipping {data['text']}: audio files not found")
                 continue
 
@@ -236,8 +233,12 @@ def main():
 
     print(f"\nDataset saved to: {args.output_dir}")
     print("Files created:")
-    print(f"  - dataset.jsonl ({len(utterances) - int(len(utterances) * args.validation_split)} utterances)")
-    print(f"  - validation.jsonl ({int(len(utterances) * args.validation_split)} utterances)")
+    print(
+        f"  - dataset.jsonl ({len(utterances) - int(len(utterances) * args.validation_split)} utterances)"
+    )
+    print(
+        f"  - validation.jsonl ({int(len(utterances) * args.validation_split)} utterances)"
+    )
     print("  - config.json")
     print("  - phoneme_map.json")
 

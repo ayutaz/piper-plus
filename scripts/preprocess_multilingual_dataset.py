@@ -64,14 +64,23 @@ class MultilingualDatasetPreprocessor:
 
             # Run preprocessing for this language
             cmd = [
-                "python", "-m", "piper_train.preprocess",
-                "--input-dir", str(input_dir),
-                "--output-dir", str(temp_output),
-                "--language", language,
-                "--sample-rate", str(sample_rate),
-                "--dataset-format", dataset_format,
-                "--max-workers", str(max_workers),
-                "--cache-dir", str(self.cache_dir),
+                "python",
+                "-m",
+                "piper_train.preprocess",
+                "--input-dir",
+                str(input_dir),
+                "--output-dir",
+                str(temp_output),
+                "--language",
+                language,
+                "--sample-rate",
+                str(sample_rate),
+                "--dataset-format",
+                dataset_format,
+                "--max-workers",
+                str(max_workers),
+                "--cache-dir",
+                str(self.cache_dir),
                 "--multilingual",  # Enable multilingual mode
             ]
 
@@ -81,6 +90,7 @@ class MultilingualDatasetPreprocessor:
 
             # Execute preprocessing
             import subprocess
+
             result = subprocess.run(cmd, capture_output=True, text=True, check=False)  # noqa: PLW1510
 
             if result.returncode != 0:
@@ -325,7 +335,9 @@ def main():
             )
 
     if not dataset_configs:
-        parser.error("No datasets specified. Use --config-file or --japanese-dir/--english-dir")
+        parser.error(
+            "No datasets specified. Use --config-file or --japanese-dir/--english-dir"
+        )
 
     # Create preprocessor
     preprocessor = MultilingualDatasetPreprocessor(
