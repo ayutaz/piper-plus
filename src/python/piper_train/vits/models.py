@@ -8,6 +8,7 @@ from torch.nn.utils import remove_weight_norm, spectral_norm, weight_norm
 
 from . import attentions, commons, modules, monotonic_align
 from .commons import get_padding, init_weights
+from .f0_predictor import F0Predictor
 
 
 class StochasticDurationPredictor(nn.Module):
@@ -610,6 +611,16 @@ class SynthesizerTrn(nn.Module):
             self.dp = DurationPredictor(
                 hidden_channels, 256, 3, 0.5, gin_channels=gin_channels
             )
+        
+        # Add F0 predictor for prosody modeling
+        self.f0_predictor = F0Predictor(
+            hidden_channels=hidden_channels,
+            filter_channels=256,
+            n_heads=n_heads,
+            kernel_size=3,
+            p_dropout=p_dropout,
+            gin_channels=gin_channels
+        )
 
         if n_speakers > 1:
             self.emb_g = nn.Embedding(n_speakers, gin_channels)

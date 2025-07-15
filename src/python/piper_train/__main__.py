@@ -9,6 +9,7 @@ from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.strategies import DDPStrategy
 
 from .vits.lightning import VitsModel
+from .vits.ema import EMACallback
 
 _LOGGER = logging.getLogger(__package__)
 
@@ -57,6 +58,7 @@ def main():
         default=-1,
         help="Save top k checkpoints (-1 to save all).",
     )
+<<<<<<< HEAD
     # Trainer arguments (previously added by Trainer.add_argparse_args)
     parser.add_argument("--accelerator", default="auto", help="Accelerator to use")
     parser.add_argument("--devices", type=int, default=1, help="Number of devices")
@@ -132,7 +134,18 @@ def main():
         default=None,
         help="Path to checkpoint to resume training from",
     )
-
+    parser.add_argument(
+        "--use-ema",
+        action="store_true",
+        help="Use Exponential Moving Average for model parameters",
+    )
+    parser.add_argument(
+        "--ema-decay",
+        type=float,
+        default=0.999,
+        help="EMA decay rate (default: 0.999)",
+    )
+    Trainer.add_argparse_args(parser)
     VitsModel.add_model_specific_args(parser)
     parser.add_argument("--seed", type=int, default=1234)
     args = parser.parse_args()
@@ -182,6 +195,7 @@ def main():
         num_speakers = int(config["num_speakers"])
         sample_rate = int(config["audio"]["sample_rate"])
 
+<<<<<<< HEAD
     # Create trainer manually (replacing Trainer.from_argparse_args)
     trainer_kwargs = {
         "accelerator": args.accelerator,
@@ -220,10 +234,24 @@ def main():
                 save_top_k=args.save_top_k,
                 save_last=True,
             )
+=======
+    # Setup callbacks
+    callbacks = []
+    if args.checkpoint_epochs is not None:
+        callbacks.append(
+            ModelCheckpoint(
+                every_n_epochs=args.checkpoint_epochs, save_top_k=args.save_top_k
+            )
         )
         _LOGGER.debug(
             "Checkpoints will be saved every %s epoch(s)", args.checkpoint_epochs
         )
+    
+    if args.use_ema:
+        callbacks.append(EMACallback(decay=args.ema_decay))
+        _LOGGER.info("Using EMA with decay rate %s", args.ema_decay)
+    
+    trainer = Trainer.from_argparse_args(args, callbacks=callbacks)
 
     if callbacks:
         trainer_kwargs["callbacks"] = callbacks
@@ -334,11 +362,10 @@ def main():
                 del args_dict["resume_from_checkpoint"]
 
             # 新しいTrainerインスタンスを作成（ckpt_pathをクリアするため）
-            # Create new trainer without checkpoint path
-            new_trainer_kwargs = trainer_kwargs.copy()
-            new_callbacks = []
+            # Setup callbacks
+            callbacks = []
             if args.checkpoint_epochs is not None:
-                new_callbacks.append(
+                callbacks.append(
                     ModelCheckpoint(
                         every_n_epochs=args.checkpoint_epochs,
                         save_top_k=args.save_top_k,
@@ -349,10 +376,12 @@ def main():
                     "Checkpoints will be saved every %s epoch(s)",
                     args.checkpoint_epochs,
                 )
-            if new_callbacks:
-                new_trainer_kwargs["callbacks"] = new_callbacks
-
-            trainer = Trainer(**new_trainer_kwargs)
+            
+            if args.use_ema:
+                callbacks.append(EMACallback(decay=args.ema_decay))
+                _LOGGER.info("Using EMA with decay rate %s", args.ema_decay)
+            
+            trainer = Trainer.from_argparse_args(args, callbacks=callbacks)
 
             # 新しいTrainerで学習を開始
             trainer.fit(model)
