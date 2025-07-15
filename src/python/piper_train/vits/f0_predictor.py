@@ -10,6 +10,7 @@ class F0Predictor(nn.Module):
 
     Based on FastSpeech2 architecture with modifications for Japanese prosody.
     """
+
     def __init__(
         self,
         hidden_channels: int = 192,
@@ -38,19 +39,13 @@ class F0Predictor(nn.Module):
         for _ in range(n_layers):
             self.encoder_layers.append(
                 ConvReluNorm(
-                    hidden_channels,
-                    hidden_channels,
-                    kernel_size,
-                    p_dropout=p_dropout
+                    hidden_channels, hidden_channels, kernel_size, p_dropout=p_dropout
                 )
             )
 
         # Multi-head self-attention for context modeling
         self.attention = nn.MultiheadAttention(
-            hidden_channels,
-            n_heads,
-            dropout=p_dropout,
-            batch_first=True
+            hidden_channels, n_heads, dropout=p_dropout, batch_first=True
         )
 
         # Prosody embedding for Japanese accent marks
@@ -59,13 +54,17 @@ class F0Predictor(nn.Module):
 
         # F0 prediction head
         self.f0_proj = nn.Sequential(
-            nn.Conv1d(hidden_channels, filter_channels, kernel_size, padding=kernel_size//2),
+            nn.Conv1d(
+                hidden_channels, filter_channels, kernel_size, padding=kernel_size // 2
+            ),
             nn.ReLU(),
             nn.Dropout(p_dropout),
-            nn.Conv1d(filter_channels, hidden_channels, kernel_size, padding=kernel_size//2),
+            nn.Conv1d(
+                filter_channels, hidden_channels, kernel_size, padding=kernel_size // 2
+            ),
             nn.ReLU(),
             nn.Dropout(p_dropout),
-            nn.Conv1d(hidden_channels, n_bins, 1)  # Output discrete F0 bins
+            nn.Conv1d(hidden_channels, n_bins, 1),  # Output discrete F0 bins
         )
 
         # Variance predictor for F0 uncertainty
@@ -106,8 +105,12 @@ class F0Predictor(nn.Module):
 
         # Self-attention for long-range dependencies
         x_seq = x.transpose(1, 2)  # [B, T, hidden]
-        x_att, _ = self.attention(x_seq, x_seq, x_seq,
-                                  key_padding_mask=x_mask.squeeze(1) == 0 if x_mask is not None else None)
+        x_att, _ = self.attention(
+            x_seq,
+            x_seq,
+            x_seq,
+            key_padding_mask=x_mask.squeeze(1) == 0 if x_mask is not None else None,
+        )
         x = x + x_att.transpose(1, 2)
 
         # F0 prediction
@@ -139,11 +142,15 @@ class F0Predictor(nn.Module):
             min_val = self.min_f0
             max_val = self.max_f0
 
-        bin_centers = torch.linspace(min_val, max_val, self.n_bins, device=f0_bins.device)
+        bin_centers = torch.linspace(
+            min_val, max_val, self.n_bins, device=f0_bins.device
+        )
         bin_centers = bin_centers.view(1, -1, 1)  # [1, n_bins, 1]
 
         # Weighted sum to get continuous F0
-        f0_continuous = torch.sum(f0_probs * bin_centers, dim=1, keepdim=True)  # [B, 1, T]
+        f0_continuous = torch.sum(
+            f0_probs * bin_centers, dim=1, keepdim=True
+        )  # [B, 1, T]
 
         # Convert back from log space if needed
         if self.use_log_f0:
@@ -154,6 +161,7 @@ class F0Predictor(nn.Module):
 
 class F0Loss(nn.Module):
     """Combined loss for F0 prediction."""
+
     def __init__(self, lambda_ce=1.0, lambda_mse=0.5, lambda_var=0.1):
         super().__init__()
         self.lambda_ce = lambda_ce
@@ -179,11 +187,12 @@ class F0Loss(nn.Module):
             mask_sum = f0_true.numel()
 
         # MSE loss for continuous F0
-        mse_loss = F.mse_loss(f0_pred_values, f0_true, reduction='sum') / mask_sum
+        mse_loss = F.mse_loss(f0_pred_values, f0_true, reduction="sum") / mask_sum
 
         # Variance-weighted loss (uncertainty awareness)
-        weighted_mse = ((f0_pred_values - f0_true) ** 2 / (2 * f0_variance) +
-                       0.5 * torch.log(f0_variance))
+        weighted_mse = (f0_pred_values - f0_true) ** 2 / (
+            2 * f0_variance
+        ) + 0.5 * torch.log(f0_variance)
         if x_mask is not None:
             weighted_mse = weighted_mse * x_mask
         var_loss = weighted_mse.sum() / mask_sum
@@ -191,8 +200,4 @@ class F0Loss(nn.Module):
         # Total loss
         total_loss = self.lambda_mse * mse_loss + self.lambda_var * var_loss
 
-        return total_loss, {
-            'f0_mse': mse_loss.item(),
-            'f0_var': var_loss.item()
-        }
-
+        return total_loss, {"f0_mse": mse_loss.item(), "f0_var": var_loss.item()}

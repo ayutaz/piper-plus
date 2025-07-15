@@ -619,7 +619,7 @@ class SynthesizerTrn(nn.Module):
             n_heads=n_heads,
             kernel_size=3,
             p_dropout=p_dropout,
-            gin_channels=gin_channels
+            gin_channels=gin_channels,
         )
 
         if n_speakers > 1:

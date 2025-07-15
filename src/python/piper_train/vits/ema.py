@@ -1,4 +1,3 @@
-
 import torch
 from pytorch_lightning.callbacks import Callback
 from torch import nn
@@ -16,7 +15,7 @@ class ExponentialMovingAverage:
         model: nn.Module,
         decay: float = 0.999,
         use_num_updates: bool = True,
-        power: float = 2/3
+        power: float = 2 / 3,
     ):
         """
         Args:
@@ -49,10 +48,7 @@ class ExponentialMovingAverage:
         if self.use_num_updates:
             self.num_updates += 1
             # Adaptive decay rate based on number of updates
-            decay = min(
-                self.decay,
-                (1 + self.num_updates) / (10 + self.num_updates)
-            )
+            decay = min(self.decay, (1 + self.num_updates) / (10 + self.num_updates))
         else:
             decay = self.decay
 
@@ -81,16 +77,16 @@ class ExponentialMovingAverage:
     def state_dict(self):
         """Get state dict for checkpointing."""
         return {
-            'decay': self.decay,
-            'num_updates': self.num_updates,
-            'shadow_params': self.shadow_params,
+            "decay": self.decay,
+            "num_updates": self.num_updates,
+            "shadow_params": self.shadow_params,
         }
 
     def load_state_dict(self, state_dict):
         """Load from checkpoint."""
-        self.decay = state_dict['decay']
-        self.num_updates = state_dict['num_updates']
-        self.shadow_params = state_dict['shadow_params']
+        self.decay = state_dict["decay"]
+        self.num_updates = state_dict["num_updates"]
+        self.shadow_params = state_dict["shadow_params"]
 
     def to(self, device):
         """Move shadow parameters to device."""
@@ -106,7 +102,7 @@ class EMACallback(Callback):
         decay: float = 0.999,
         apply_ema_every_n_steps: int = 1,
         start_step: int = 0,
-        save_ema_weights_in_callback_state: bool = True
+        save_ema_weights_in_callback_state: bool = True,
     ):
         self.decay = decay
         self.apply_ema_every_n_steps = apply_ema_every_n_steps
@@ -121,7 +117,7 @@ class EMACallback(Callback):
         # Only apply EMA to generator (HiFi-GAN)
         self.ema_generator = ExponentialMovingAverage(
             model.model_g.dec,  # HiFi-GAN decoder
-            decay=self.decay
+            decay=self.decay,
         )
 
         # Optionally also apply to discriminator
@@ -157,28 +153,30 @@ class EMACallback(Callback):
     def on_save_checkpoint(self, trainer, model, checkpoint):
         """Save EMA state in checkpoint."""
         if self.save_ema_weights_in_callback_state:
-            checkpoint['ema_generator_state'] = (
+            checkpoint["ema_generator_state"] = (
                 self.ema_generator.state_dict() if self.ema_generator else None
             )
-            checkpoint['ema_discriminator_state'] = (
+            checkpoint["ema_discriminator_state"] = (
                 self.ema_discriminator.state_dict() if self.ema_discriminator else None
             )
 
     def on_load_checkpoint(self, trainer, model, checkpoint):
         """Load EMA state from checkpoint."""
-        if 'ema_generator_state' in checkpoint and checkpoint['ema_generator_state']:
+        if "ema_generator_state" in checkpoint and checkpoint["ema_generator_state"]:
             if self.ema_generator is None:
                 self.ema_generator = ExponentialMovingAverage(
-                    model.model_g.dec,
-                    decay=self.decay
+                    model.model_g.dec, decay=self.decay
                 )
-            self.ema_generator.load_state_dict(checkpoint['ema_generator_state'])
+            self.ema_generator.load_state_dict(checkpoint["ema_generator_state"])
 
-        if 'ema_discriminator_state' in checkpoint and checkpoint['ema_discriminator_state']:
+        if (
+            "ema_discriminator_state" in checkpoint
+            and checkpoint["ema_discriminator_state"]
+        ):
             if self.ema_discriminator is None:
                 self.ema_discriminator = ExponentialMovingAverage(
-                    model.model_d,
-                    decay=self.decay
+                    model.model_d, decay=self.decay
                 )
-            self.ema_discriminator.load_state_dict(checkpoint['ema_discriminator_state'])
-
+            self.ema_discriminator.load_state_dict(
+                checkpoint["ema_discriminator_state"]
+            )
