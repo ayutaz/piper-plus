@@ -1,4 +1,3 @@
-
 import torch
 import torch.nn as nn
 from copy import deepcopy
@@ -19,7 +18,7 @@ class ExponentialMovingAverage:
         model: nn.Module,
         decay: float = 0.999,
         use_num_updates: bool = True,
-        power: float = 2 / 3
+        power: float = 2 / 3,
     ):
         """
         Args:
@@ -52,10 +51,7 @@ class ExponentialMovingAverage:
         if self.use_num_updates:
             self.num_updates += 1
             # Adaptive decay rate based on number of updates
-            decay = min(
-                self.decay,
-                (1 + self.num_updates) / (10 + self.num_updates)
-            )
+            decay = min(self.decay, (1 + self.num_updates) / (10 + self.num_updates))
         else:
             decay = self.decay
 
@@ -124,7 +120,7 @@ class EMACallback(Callback):
         # Only apply EMA to generator (HiFi-GAN)
         self.ema_generator = ExponentialMovingAverage(
             model.model_g.dec,  # HiFi-GAN decoder
-            decay=self.decay
+            decay=self.decay,
         )
 
         # Optionally also apply to discriminator

@@ -9,10 +9,11 @@ from torch import nn
 @dataclass
 class AccentInfo:
     """Container for Japanese accent information."""
+
     accent_position: int  # Position of accent nucleus (0 = no accent)
     phrase_boundary: int  # Phrase boundary type (0=none, 1=minor, 2=major)
-    mora_count: int       # Number of moras in the word
-    is_question: bool     # Question intonation marker
+    mora_count: int  # Number of moras in the word
+    is_question: bool  # Question intonation marker
 
 
 class JapaneseAccentProcessor:
@@ -30,22 +31,23 @@ class JapaneseAccentProcessor:
         "_": "pause",
         "#": "boundary",
         "[": "rising",
-        "]": "falling"
+        "]": "falling",
     }
 
     # Extended accent marks for fine control
     ACCENT_MARKS = {
-        "↑": "accent_rise",      # Accent nucleus rise
-        "↓": "accent_fall",      # Post-accent fall
-        "→": "accent_flat",      # Flat intonation
-        "⤴": "phrase_rise",      # Phrase-final rise
-        "⤵": "phrase_fall",      # Phrase-final fall
-        "|": "minor_boundary",   # Minor phrase boundary
-        "‖": "major_boundary",   # Major phrase boundary
+        "↑": "accent_rise",  # Accent nucleus rise
+        "↓": "accent_fall",  # Post-accent fall
+        "→": "accent_flat",  # Flat intonation
+        "⤴": "phrase_rise",  # Phrase-final rise
+        "⤵": "phrase_fall",  # Phrase-final fall
+        "|": "minor_boundary",  # Minor phrase boundary
+        "‖": "major_boundary",  # Major phrase boundary
     }
 
     # Mora patterns for accent detection
     MORA_PATTERN = re.compile(r"[ァ-ヴー][ャュョゃゅょ]?|[ア-ン][ャュョゃゅょ]?|[a-z]+")
+
     def __init__(self):
         # Combined mark to ID mapping
         self.mark_to_id = {}
@@ -71,9 +73,9 @@ class JapaneseAccentProcessor:
     def process_text_with_accent(
         self,
         text: str,
-        phonemes: List[str],
-        accent_dict: Optional[Dict[str, AccentInfo]] = None,
-    ) -> Tuple[List[str], List[int]]:
+        phonemes: list[str],
+        accent_dict: dict[str, AccentInfo] | None = None,
+    ) -> tuple[list[str], list[int]]:
         """Process text to add detailed accent marks to phonemes.
 
         Args:
@@ -107,13 +109,17 @@ class JapaneseAccentProcessor:
                     if self._should_add_accent_mark(phoneme, phoneme_idx, phonemes):
                         accent_mark = self._get_accent_mark(phoneme_idx, len(phonemes))
                         enhanced_phonemes.append(accent_mark)
-                        prosody_ids.append(self.mark_to_id.get(accent_mark, self.mark_to_id["<UNK>"]))
+                        prosody_ids.append(
+                            self.mark_to_id.get(accent_mark, self.mark_to_id["<UNK>"])
+                        )
 
             phoneme_idx += 1
 
         return enhanced_phonemes, prosody_ids
 
-    def _should_add_accent_mark(self, phoneme: str, idx: int, phonemes: List[str]) -> bool:
+    def _should_add_accent_mark(
+        self, phoneme: str, idx: int, phonemes: list[str]
+    ) -> bool:
         """Determine if accent mark should be added after this phoneme."""
         # Simple heuristic - in practice would use linguistic rules
         # Add accent marks at mora boundaries
@@ -144,7 +150,7 @@ class JapaneseAccentProcessor:
         embedding = nn.Embedding(
             num_embeddings=num_marks,
             embedding_dim=embedding_dim,
-            padding_idx=self.mark_to_id["<PAD>"]
+            padding_idx=self.mark_to_id["<PAD>"],
         )
 
         # Initialize with small values
@@ -153,10 +159,8 @@ class JapaneseAccentProcessor:
         return embedding
 
     def extract_accent_features(
-        self,
-        phonemes: List[str],
-        prosody_ids: List[int],
-    ) -> Dict[str, float]:
+        self, phonemes: list[str], prosody_ids: list[int]
+    ) -> dict[str, float]:
         """Extract statistical features from accent patterns."""
         features = {
             "accent_density": 0.0,
@@ -193,7 +197,9 @@ class JapaneseAccentProcessor:
 
             # Boundary statistics
             boundary_marks = ["#", "|", "‖"]
-            features["boundary_count"] = sum(accent_counts.get(m, 0) for m in boundary_marks)
+            features["boundary_count"] = sum(
+                accent_counts.get(m, 0) for m in boundary_marks
+            )
 
         return features
 

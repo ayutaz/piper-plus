@@ -10,6 +10,7 @@ class F0Predictor(nn.Module):
 
     Based on FastSpeech2 architecture with modifications for Japanese prosody.
     """
+
     def __init__(
         self,
         hidden_channels: int = 192,
@@ -38,19 +39,13 @@ class F0Predictor(nn.Module):
         for _ in range(n_layers):
             self.encoder_layers.append(
                 ConvReluNorm(
-                    hidden_channels,
-                    hidden_channels,
-                    kernel_size,
-                    p_dropout=p_dropout
+                    hidden_channels, hidden_channels, kernel_size, p_dropout=p_dropout
                 )
             )
 
         # Multi-head self-attention for context modeling
         self.attention = nn.MultiheadAttention(
-            hidden_channels,
-            n_heads,
-            dropout=p_dropout,
-            batch_first=True
+            hidden_channels, n_heads, dropout=p_dropout, batch_first=True
         )
 
         # Prosody embedding for Japanese accent marks
@@ -170,6 +165,7 @@ class F0Predictor(nn.Module):
 
 class F0Loss(nn.Module):
     """Combined loss for F0 prediction."""
+
     def __init__(self, lambda_ce=1.0, lambda_mse=0.5, lambda_var=0.1):
         super().__init__()
         self.lambda_ce = lambda_ce
