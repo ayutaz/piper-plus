@@ -350,6 +350,12 @@ class VitsModel(pl.LightningModule):
         parser.add_argument("--n-layers", type=int, default=6)
         parser.add_argument("--n-heads", type=int, default=2)
         parser.add_argument(
+            "--gin-channels",
+            type=int,
+            default=0,
+            help="Speaker embedding size for multi-speaker models (default: 0 for single, 768 for multi)",
+        )
+        parser.add_argument(
             "--num-workers",
             type=int,
             default=min(16, os.cpu_count()),
