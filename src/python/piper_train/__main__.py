@@ -135,15 +135,15 @@ def main():
         help="Path to checkpoint to resume training from",
     )
     parser.add_argument(
-        "--use-ema",
+        "--no-ema",
         action="store_true",
-        help="Use Exponential Moving Average for model parameters",
+        help="Disable EMA (Exponential Moving Average). EMA is enabled by default for training stability",
     )
     parser.add_argument(
         "--ema-decay",
         type=float,
-        default=0.999,
-        help="EMA decay rate (default: 0.999)",
+        default=0.9995,
+        help="EMA decay rate (default: 0.9995)",
     )
     Trainer.add_argparse_args(parser)
     VitsModel.add_model_specific_args(parser)
@@ -247,9 +247,12 @@ def main():
             "Checkpoints will be saved every %s epoch(s)", args.checkpoint_epochs
         )
 
-    if args.use_ema:
+    # EMA is enabled by default
+    if not args.no_ema:
         callbacks.append(EMACallback(decay=args.ema_decay))
         _LOGGER.info("Using EMA with decay rate %s", args.ema_decay)
+    else:
+        _LOGGER.info("EMA disabled by user request")
 
     trainer = Trainer.from_argparse_args(args, callbacks=callbacks)
 
@@ -377,9 +380,12 @@ def main():
                     args.checkpoint_epochs,
                 )
 
-            if args.use_ema:
+            # EMA is enabled by default
+            if not args.no_ema:
                 callbacks.append(EMACallback(decay=args.ema_decay))
                 _LOGGER.info("Using EMA with decay rate %s", args.ema_decay)
+            else:
+                _LOGGER.info("EMA disabled by user request")
 
             trainer = Trainer.from_argparse_args(args, callbacks=callbacks)
 
