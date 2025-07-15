@@ -35,12 +35,12 @@ from .norm_audio import cache_norm_audio, make_silence_detector
 
 # Custom Japanese phonemizer with accent/prosody marks
 try:
-    from .phonemize.japanese import phonemize_japanese  # type: ignore
     from .phonemize.accent_processor import AccentProcessor  # type: ignore
+    from .phonemize.japanese import phonemize_japanese  # type: ignore
 except ImportError:
     # When running as script, relative import may fail; try absolute import fallback
-    from piper_train.phonemize.japanese import phonemize_japanese  # type: ignore
     from piper_train.phonemize.accent_processor import AccentProcessor  # type: ignore
+    from piper_train.phonemize.japanese import phonemize_japanese  # type: ignore
 
 # -----------------------------------------------------------------------------
 # Japanese phoneme id map support
@@ -540,7 +540,7 @@ def phonemize_batch_openjtalk(
                         else:
                             utt.missing_phonemes[phoneme] += 1
                             _LOGGER.warning(f"Missing phoneme: {phoneme}")
-                    
+
                     # Extract prosody IDs using AccentProcessor
                     utt.prosody_ids = accent_processor.extract_prosody_ids(utt.phonemes)
 
