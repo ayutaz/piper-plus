@@ -611,6 +611,16 @@ class SynthesizerTrn(nn.Module):
             self.dp = DurationPredictor(
                 hidden_channels, 256, 3, 0.5, gin_channels=gin_channels
             )
+        
+        # Add F0 predictor for prosody modeling
+        self.f0_predictor = F0Predictor(
+            hidden_channels=hidden_channels,
+            filter_channels=256,
+            n_heads=n_heads,
+            kernel_size=3,
+            p_dropout=p_dropout,
+            gin_channels=gin_channels
+        )
 
         # Add F0 predictor for prosody modeling
         self.f0_predictor = F0Predictor(

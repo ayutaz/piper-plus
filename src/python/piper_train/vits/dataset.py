@@ -237,7 +237,7 @@ class UtteranceCollate:
             max_phonemes_length = max(max_phonemes_length, phoneme_length)
             max_spec_length = max(max_spec_length, spec_length)
             max_audio_length = max(max_audio_length, audio_length)
-
+            
             if utt.prosody_ids is not None:
                 prosody_length = utt.prosody_ids.size(0)
                 max_prosody_length = max(max_prosody_length, prosody_length)
@@ -265,7 +265,7 @@ class UtteranceCollate:
         speaker_ids: LongTensor | None = None
         if self.is_multispeaker:
             speaker_ids = LongTensor(num_utterances)
-
+        
         prosody_ids_padded: LongTensor | None = None
         prosody_lengths: LongTensor | None = None
         if has_prosody and max_prosody_length > 0:
@@ -302,6 +302,11 @@ class UtteranceCollate:
             if utt.speaker_id is not None:
                 assert speaker_ids is not None
                 speaker_ids[utt_idx] = utt.speaker_id
+            
+            if utt.prosody_ids is not None and prosody_ids_padded is not None:
+                prosody_length = utt.prosody_ids.size(0)
+                prosody_ids_padded[utt_idx, :prosody_length] = utt.prosody_ids
+                prosody_lengths[utt_idx] = prosody_length
 
             if utt.prosody_ids is not None and prosody_ids_padded is not None:
                 prosody_length = utt.prosody_ids.size(0)
