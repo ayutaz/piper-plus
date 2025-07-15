@@ -62,13 +62,13 @@ def main():
         default=-1,
         help="Save top k checkpoints (-1 to save all).",
     )
-    
+
     # Add PyTorch Lightning Trainer arguments
     Trainer.add_argparse_args(parser)
-    
+
     # Add model-specific arguments
     MultilingualVitsModel.add_model_specific_args(parser)
-    
+
     parser.add_argument("--seed", type=int, default=1234)
     args = parser.parse_args()
     _LOGGER.debug(args)
@@ -83,7 +83,7 @@ def main():
     # Load dataset configuration
     config_path = args.dataset_dir / "config.json"
     dataset_path = args.dataset_dir / "dataset.jsonl"
-    
+
     # Also check for validation dataset
     validation_path = args.dataset_dir / "validation.jsonl"
     dataset_paths = [dataset_path]
@@ -92,23 +92,23 @@ def main():
 
     with open(config_path, encoding="utf-8") as config_file:
         config = json.load(config_file)
-        
+
         # Check if this is a multilingual dataset
         if not config.get("multilingual", False):
             _LOGGER.warning("Dataset does not appear to be multilingual. Consider using standard training script.")
-        
+
         num_symbols = int(config["num_symbols"])
         num_speakers = int(config["num_speakers"])
         sample_rate = int(config["audio"]["sample_rate"])
-        
+
         # Get language information
         languages = config.get("languages", ["ja", "en"])
         language_map = {lang: idx for idx, lang in enumerate(languages)}
-        
+
         # Add "mixed" language for code-switching
         if "mixed" not in language_map:
             language_map["mixed"] = len(language_map)
-        
+
         _LOGGER.info(f"Languages in dataset: {languages}")
         _LOGGER.info(f"Language mapping: {language_map}")
 
@@ -163,14 +163,14 @@ def main():
     # Handle checkpoint conversion if needed
     if args.convert_from_single_lang:
         _LOGGER.info(f"Converting single-language checkpoint: {args.convert_from_single_lang}")
-        
+
         # Load single-language checkpoint
         checkpoint = torch.load(args.convert_from_single_lang, map_location="cpu")
         state_dict = checkpoint["state_dict"]
-        
+
         # Initialize multilingual model state dict
         ml_state_dict = model.state_dict()
-        
+
         # Copy compatible weights
         for key, value in state_dict.items():
             if key in ml_state_dict and ml_state_dict[key].shape == value.shape:
@@ -178,7 +178,7 @@ def main():
                 _LOGGER.debug(f"Copied weight: {key}")
             else:
                 _LOGGER.debug(f"Skipped weight: {key}")
-        
+
         # Load the modified state dict
         model.load_state_dict(ml_state_dict, strict=False)
         _LOGGER.info("Checkpoint conversion completed")

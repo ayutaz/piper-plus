@@ -4,9 +4,7 @@ Extends the original VitsModel to support language embeddings.
 """
 
 import logging
-import os
 from pathlib import Path
-from typing import List, Optional, Dict, Any
 
 import pytorch_lightning as pl
 import torch
@@ -15,10 +13,13 @@ from torch.nn import functional as F
 from torch.utils.data import DataLoader, Dataset, random_split
 
 from .commons import slice_segments
-from .dataset import Batch, UtteranceCollate
-from .dataset_multilingual import MultilingualDataset, MultilingualBatch, MultilingualCollate
+from .dataset_multilingual import (
+    MultilingualBatch,
+    MultilingualCollate,
+    MultilingualDataset,
+)
 from .losses import discriminator_loss, feature_loss, generator_loss, kl_loss
-from .mel_processing import mel_spectrogram_torch, spec_to_mel_torch
+from .mel_processing import mel_spectrogram_torch
 from .models import MultiPeriodDiscriminator
 from .models_multilingual import MultilingualSynthesizerTrn
 
@@ -27,7 +28,7 @@ _LOGGER = logging.getLogger("vits.lightning_multilingual")
 
 class MultilingualVitsModel(pl.LightningModule):
     """PyTorch Lightning module for multilingual VITS training."""
-    
+
     def __init__(
         self,
         num_symbols: int,
@@ -85,7 +86,7 @@ class MultilingualVitsModel(pl.LightningModule):
         num_test_examples: int = 5,
         validation_split: float = 0.1,
         max_phoneme_ids: int | None = None,
-        language_map: Dict[str, int] | None = None,
+        language_map: dict[str, int] | None = None,
         **kwargs,
     ):
         super().__init__()
@@ -132,7 +133,7 @@ class MultilingualVitsModel(pl.LightningModule):
             n_languages=self.hparams.num_languages,
             lang_embedding_dim=self.hparams.lang_embedding_dim,
         )
-        
+
         self.model_d = MultiPeriodDiscriminator(
             use_spectral_norm=self.hparams.use_spectral_norm
         )
@@ -207,11 +208,11 @@ class MultilingualVitsModel(pl.LightningModule):
             lang_ids=batch.language_ids,
         )
 
-        mel = slice_segments(
-            batch.spectrogram,
-            ids_slice,
-            self.hparams.segment_size // self.hparams.hop_length,
-        )
+        # mel = slice_segments(
+        #     batch.spectrogram,
+        #     ids_slice,
+        #     self.hparams.segment_size // self.hparams.hop_length,
+        # )
         y_mel = slice_segments(
             batch.audio, ids_slice * self.hparams.hop_length, self.hparams.segment_size
         )
@@ -231,7 +232,7 @@ class MultilingualVitsModel(pl.LightningModule):
         )
 
         self._y_hat = y_hat
-        
+
         # Generator losses
         with autocast(enabled=False):
             # Only run discriminator on generator output
@@ -244,7 +245,7 @@ class MultilingualVitsModel(pl.LightningModule):
 
         # Log discriminator loss
         self.log("loss_disc_all", loss_disc_all)
-        
+
         # Update discriminator
         self.manual_backward(loss_disc_all)
         if self.hparams.grad_clip:
@@ -306,11 +307,11 @@ class MultilingualVitsModel(pl.LightningModule):
             lang_ids=batch.language_ids,
         )
 
-        mel = slice_segments(
-            batch.spectrogram,
-            ids_slice,
-            self.hparams.segment_size // self.hparams.hop_length,
-        )
+        # mel = slice_segments(
+        #     batch.spectrogram,
+        #     ids_slice,
+        #     self.hparams.segment_size // self.hparams.hop_length,
+        # )
         y_mel = slice_segments(
             batch.audio, ids_slice * self.hparams.hop_length, self.hparams.segment_size
         )
@@ -325,14 +326,14 @@ class MultilingualVitsModel(pl.LightningModule):
             self.hparams.mel_fmax,
         )
 
-        y = slice_segments(
-            batch.audio, ids_slice * self.hparams.hop_length, self.hparams.segment_size
-        )
+        # y = slice_segments(
+        #     batch.audio, ids_slice * self.hparams.hop_length, self.hparams.segment_size
+        # )
 
         # Calculate validation losses
         loss_mel = F.l1_loss(y_mel, y_hat_mel) * self.hparams.c_mel
         loss_kl = kl_loss(z_p, logs_q, m_p, logs_p, z_mask=y_mask) * self.hparams.c_kl
-        
+
         self.log("val_loss_mel", loss_mel)
         self.log("val_loss_kl", loss_kl)
         self.log("val_loss", loss_mel + loss_kl)
@@ -364,7 +365,7 @@ class MultilingualVitsModel(pl.LightningModule):
     def train_dataloader(self):
         if self._train_dataset is None:
             return None
-            
+
         return DataLoader(
             self._train_dataset,
             batch_size=self.hparams.batch_size,
@@ -377,7 +378,7 @@ class MultilingualVitsModel(pl.LightningModule):
     def val_dataloader(self):
         if self._val_dataset is None:
             return None
-            
+
         return DataLoader(
             self._val_dataset,
             batch_size=self.hparams.batch_size,
@@ -400,5 +401,5 @@ class MultilingualVitsModel(pl.LightningModule):
         parser.add_argument("--n-heads", type=int, default=2)
         parser.add_argument("--num-languages", type=int, default=8)
         parser.add_argument("--lang-embedding-dim", type=int, default=64)
-        
+
         return parent_parser

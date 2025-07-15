@@ -4,30 +4,23 @@ Extended from the original VITS model to support multiple languages.
 """
 
 import math
+
 import torch
 from torch import nn
-from torch.nn import Conv1d, Conv2d, ConvTranspose1d
-from torch.nn import functional as F
-from torch.nn.utils import remove_weight_norm, spectral_norm, weight_norm
 
-from . import attentions, commons, modules, monotonic_align
-from .commons import get_padding, init_weights
+from . import attentions, commons, monotonic_align
 from .models import (
-    StochasticDurationPredictor,
     DurationPredictor,
-    TextEncoder,
     Generator,
     PosteriorEncoder,
     ResidualCouplingBlock,
-    DiscriminatorP,
-    DiscriminatorS,
-    MultiPeriodDiscriminator
+    StochasticDurationPredictor,
 )
 
 
 class MultilingualTextEncoder(nn.Module):
     """Text encoder with language embedding support."""
-    
+
     def __init__(
         self,
         n_vocab: int,
@@ -56,11 +49,11 @@ class MultilingualTextEncoder(nn.Module):
         # Phoneme embedding
         self.emb = nn.Embedding(n_vocab, hidden_channels)
         nn.init.normal_(self.emb.weight, 0.0, hidden_channels**-0.5)
-        
+
         # Language embedding
         self.lang_emb = nn.Embedding(n_languages, lang_embedding_dim)
         nn.init.normal_(self.lang_emb.weight, 0.0, lang_embedding_dim**-0.5)
-        
+
         # Project language embedding to hidden channels
         self.lang_proj = nn.Linear(lang_embedding_dim, hidden_channels)
 
@@ -73,9 +66,9 @@ class MultilingualTextEncoder(nn.Module):
     def forward(self, x, x_lengths, lang_ids=None):
         # x: [batch_size, seq_len]
         # lang_ids: [batch_size] or [batch_size, seq_len]
-        
+
         x = self.emb(x) * math.sqrt(self.hidden_channels)  # [b, t, h]
-        
+
         # Add language embedding
         if lang_ids is not None:
             if lang_ids.dim() == 1:
@@ -89,7 +82,7 @@ class MultilingualTextEncoder(nn.Module):
                 lang_emb = self.lang_emb(lang_ids)  # [b, t, lang_dim]
                 lang_emb = self.lang_proj(lang_emb)  # [b, t, h]
                 x = x + lang_emb
-        
+
         x = torch.transpose(x, 1, -1)  # [b, h, t]
         x_mask = torch.unsqueeze(
             commons.sequence_mask(x_lengths, x.size(2)), 1
@@ -169,7 +162,7 @@ class MultilingualSynthesizerTrn(nn.Module):
             n_languages,
             lang_embedding_dim,
         )
-        
+
         self.dec = Generator(
             inter_channels,
             resblock,
@@ -180,7 +173,7 @@ class MultilingualSynthesizerTrn(nn.Module):
             upsample_kernel_sizes,
             gin_channels=gin_channels,
         )
-        
+
         self.enc_q = PosteriorEncoder(
             spec_channels,
             inter_channels,
@@ -190,7 +183,7 @@ class MultilingualSynthesizerTrn(nn.Module):
             16,
             gin_channels=gin_channels,
         )
-        
+
         self.flow = ResidualCouplingBlock(
             inter_channels, hidden_channels, 5, 1, 4, gin_channels=gin_channels
         )
@@ -210,7 +203,7 @@ class MultilingualSynthesizerTrn(nn.Module):
     def forward(self, x, x_lengths, y, y_lengths, sid=None, lang_ids=None):
         # Add language IDs to the forward pass
         x, m_p, logs_p, x_mask = self.enc_p(x, x_lengths, lang_ids)
-        
+
         if self.n_speakers > 1:
             g = self.emb_g(sid).unsqueeze(-1)  # [b, h, 1]
         else:
@@ -278,7 +271,7 @@ class MultilingualSynthesizerTrn(nn.Module):
 
     def infer(self, x, x_lengths, sid=None, lang_ids=None, noise_scale=1, length_scale=1, noise_scale_w=1.0, max_len=None):
         x, m_p, logs_p, x_mask = self.enc_p(x, x_lengths, lang_ids)
-        
+
         if self.n_speakers > 1:
             g = self.emb_g(sid).unsqueeze(-1)  # [b, h, 1]
         else:
@@ -288,15 +281,15 @@ class MultilingualSynthesizerTrn(nn.Module):
             logw = self.dp(x, x_mask, g=g, reverse=True, noise_scale=noise_scale_w)
         else:
             logw = self.dp(x, x_mask, g=g)
-        
+
         w = torch.exp(logw) * x_mask * length_scale
         w_ceil = torch.ceil(w)
         y_lengths = torch.clamp_min(torch.sum(w_ceil, [1, 2]).long(), 1)
-        
+
         y_mask = torch.unsqueeze(commons.sequence_mask(y_lengths, None), 1).type_as(
             x_mask
         )
-        
+
         attn_mask = torch.unsqueeze(x_mask, 2) * torch.unsqueeze(y_mask, -1)
         attn = commons.generate_path(w_ceil, attn_mask)
 
@@ -310,7 +303,7 @@ class MultilingualSynthesizerTrn(nn.Module):
         z_p = m_p + torch.randn_like(m_p) * torch.exp(logs_p) * noise_scale
         z = self.flow(z_p, y_mask, g=g, reverse=True)
         o = self.dec((z * y_mask)[:, :, :max_len], g=g)
-        
+
         return o, attn, y_mask, (z, z_p, m_p, logs_p)
 
     def voice_conversion(self, y, y_lengths, sid_src, sid_tgt):

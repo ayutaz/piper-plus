@@ -55,20 +55,26 @@ except ImportError:
 # Multilingual phonemizer support
 # -----------------------------------------------------------------------------
 try:
-    from .phonemize.multilingual_phoneme_map import get_multilingual_phoneme_mapper  # type: ignore
-    from .phonemize.multilingual_dataset import MultilingualDatasetFormatter  # type: ignore
+    from .phonemize.multilingual_phoneme_map import (
+        get_multilingual_phoneme_mapper,  # type: ignore
+    )
     # Try full implementation first, fall back to stub if needed
     try:
         from .phonemize.multilingual import phonemize_multilingual  # type: ignore
     except ImportError:
         from .phonemize.multilingual_stub import phonemize_multilingual  # type: ignore
 except ImportError:
-    from piper_train.phonemize.multilingual_phoneme_map import get_multilingual_phoneme_mapper  # type: ignore
-    from piper_train.phonemize.multilingual_dataset import MultilingualDatasetFormatter  # type: ignore
+    from piper_train.phonemize.multilingual_phoneme_map import (
+        get_multilingual_phoneme_mapper,  # type: ignore
+    )
     try:
-        from piper_train.phonemize.multilingual import phonemize_multilingual  # type: ignore
+        from piper_train.phonemize.multilingual import (
+            phonemize_multilingual,  # type: ignore
+        )
     except ImportError:
-        from piper_train.phonemize.multilingual_stub import phonemize_multilingual  # type: ignore
+        from piper_train.phonemize.multilingual_stub import (
+            phonemize_multilingual,  # type: ignore
+        )
 
 _DIR = Path(__file__).parent
 _VERSION = (_DIR / "VERSION").read_text(encoding="utf-8").strip()
@@ -84,7 +90,7 @@ class PhonemeType(str, Enum):
 
     OPENJTALK = "openjtalk"
     """Phonemes come from pyopenjtalk for Japanese"""
-    
+
     MULTILINGUAL = "multilingual"
     """Phonemes come from multilingual phonemizer (OpenJTalk + espeak-ng)"""
 
@@ -669,17 +675,17 @@ def phonemize_batch_multilingual(
                     if timeout_sec > 0:
                         signal.alarm(timeout_sec)
                     _LOGGER.debug(utt)
-                    
+
                     # Use multilingual phonemizer
                     # Try to detect primary language from args, otherwise auto-detect
                     primary_language = getattr(args, "language", None)
                     utt.phonemes = phonemize_multilingual(casing(utt.text), primary_language)
-                    
+
                     # Convert phonemes to IDs using multilingual mapper
                     multilingual_mapper = get_multilingual_phoneme_mapper()
                     utt.phoneme_ids = []
                     current_language = None
-                    
+
                     for phoneme in utt.phonemes:
                         # Check if it's a language tag
                         if phoneme.startswith("<lang:") and phoneme.endswith(">"):
@@ -690,14 +696,13 @@ def phonemize_batch_multilingual(
                         elif phoneme.startswith("</lang:") and phoneme.endswith(">"):
                             utt.phoneme_ids.append(multilingual_mapper.get_phoneme_id(phoneme, ""))
                             current_language = None
+                        # Regular phoneme
+                        elif current_language:
+                            utt.phoneme_ids.append(multilingual_mapper.get_phoneme_id(phoneme, current_language))
                         else:
-                            # Regular phoneme
-                            if current_language:
-                                utt.phoneme_ids.append(multilingual_mapper.get_phoneme_id(phoneme, current_language))
-                            else:
-                                # This shouldn't happen, but handle gracefully
-                                utt.phoneme_ids.append(multilingual_mapper.get_phoneme_id(phoneme, "en"))
-                                
+                            # This shouldn't happen, but handle gracefully
+                            utt.phoneme_ids.append(multilingual_mapper.get_phoneme_id(phoneme, "en"))
+
                     if not args.skip_audio:
                         utt.audio_norm_path, utt.audio_spec_path = cache_norm_audio(
                             utt.audio_path,
