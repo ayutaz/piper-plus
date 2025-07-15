@@ -19,6 +19,7 @@ class Utterance:
     speaker_id: int | None = None
     text: str | None = None
     prosody_ids: list[int] | None = None
+    f0_path: Path | None = None
 
 
 @dataclass
@@ -29,6 +30,8 @@ class UtteranceTensors:
     speaker_id: LongTensor | None = None
     text: str | None = None
     prosody_ids: LongTensor | None = None
+    f0_values: FloatTensor | None = None
+    f0_voiced: FloatTensor | None = None
 
     @property
     def spec_length(self) -> int:
@@ -46,6 +49,8 @@ class Batch:
     speaker_ids: LongTensor | None = None
     prosody_ids: LongTensor | None = None
     prosody_lengths: LongTensor | None = None
+    f0_values: FloatTensor | None = None
+    f0_voiced: FloatTensor | None = None
 
 
 class PiperDataset(Dataset):
@@ -85,6 +90,32 @@ class PiperDataset(Dataset):
                 audio_norm = torch.load(utt.audio_norm_path, map_location="cpu")
                 spectrogram = torch.load(utt.audio_spec_path, map_location="cpu")
 
+                # Load F0 if available
+                f0_values = None
+                f0_voiced = None
+                if utt.f0_path is not None and utt.f0_path.exists():
+                    try:
+                        f0_data = torch.load(utt.f0_path)
+                        f0_values = f0_data["f0"]
+                        f0_voiced = f0_data["voiced"]
+                        
+                        # Ensure F0 length matches spectrogram length
+                        if f0_values.shape[0] != spectrogram.shape[1]:
+                            # Simple interpolation to match lengths
+                            f0_values = torch.nn.functional.interpolate(
+                                f0_values.unsqueeze(0).unsqueeze(0),
+                                size=spectrogram.shape[1],
+                                mode='linear',
+                                align_corners=False
+                            ).squeeze()
+                            f0_voiced = torch.nn.functional.interpolate(
+                                f0_voiced.unsqueeze(0).unsqueeze(0),
+                                size=spectrogram.shape[1],
+                                mode='nearest'
+                            ).squeeze()
+                    except Exception as e:
+                        _LOGGER.warning(f"Failed to load F0 from {utt.f0_path}: {e}")
+
                 return UtteranceTensors(
                     phoneme_ids=LongTensor(utt.phoneme_ids),
                     audio_norm=audio_norm,
@@ -100,6 +131,8 @@ class PiperDataset(Dataset):
                         if utt.prosody_ids is not None
                         else None
                     ),
+                    f0_values=f0_values,
+                    f0_voiced=f0_voiced,
                 )
             except Exception as e:
                 _LOGGER.error(
@@ -164,6 +197,7 @@ class PiperDataset(Dataset):
             speaker_id=utt_dict.get("speaker_id"),
             text=utt_dict.get("text"),
             prosody_ids=utt_dict.get("prosody_ids"),
+            f0_path=Path(utt_dict["f0_path"]) if "f0_path" in utt_dict else None,
         )
 
 
@@ -182,6 +216,8 @@ class UtteranceCollate:
         max_prosody_length = 0
 
         num_mels = 0
+        has_prosody = any(utt.prosody_ids is not None for utt in utterances)
+        has_f0 = any(utt.f0_values is not None for utt in utterances)
 
         # Determine lengths
         for _utt_idx, utt in enumerate(utterances):
@@ -226,10 +262,18 @@ class UtteranceCollate:
 
         prosody_ids_padded: LongTensor | None = None
         prosody_lengths: LongTensor | None = None
-        if max_prosody_length > 0:
+        if has_prosody and max_prosody_length > 0:
             prosody_ids_padded = LongTensor(num_utterances, max_prosody_length)
             prosody_ids_padded.zero_()
             prosody_lengths = LongTensor(num_utterances)
+            
+        f0_padded: FloatTensor | None = None
+        f0_voiced_padded: FloatTensor | None = None
+        if has_f0:
+            f0_padded = FloatTensor(num_utterances, max_spec_length)
+            f0_voiced_padded = FloatTensor(num_utterances, max_spec_length)
+            f0_padded.zero_()
+            f0_voiced_padded.zero_()
 
         # Sort by decreasing spectrogram length
         sorted_utterances = sorted(
@@ -257,6 +301,12 @@ class UtteranceCollate:
                 prosody_length = utt.prosody_ids.size(0)
                 prosody_ids_padded[utt_idx, :prosody_length] = utt.prosody_ids
                 prosody_lengths[utt_idx] = prosody_length
+                
+            if utt.f0_values is not None and f0_padded is not None:
+                f0_length = min(utt.f0_values.size(0), spec_length)
+                f0_padded[utt_idx, :f0_length] = utt.f0_values[:f0_length]
+                if utt.f0_voiced is not None and f0_voiced_padded is not None:
+                    f0_voiced_padded[utt_idx, :f0_length] = utt.f0_voiced[:f0_length]
 
         return Batch(
             phoneme_ids=phonemes_padded,
@@ -268,4 +318,6 @@ class UtteranceCollate:
             speaker_ids=speaker_ids,
             prosody_ids=prosody_ids_padded,
             prosody_lengths=prosody_lengths,
+            f0_values=f0_padded,
+            f0_voiced=f0_voiced_padded,
         )

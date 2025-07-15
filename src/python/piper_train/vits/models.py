@@ -625,12 +625,18 @@ class SynthesizerTrn(nn.Module):
         if n_speakers > 1:
             self.emb_g = nn.Embedding(n_speakers, gin_channels)
 
-    def forward(self, x, x_lengths, y, y_lengths, sid=None):
+    def forward(self, x, x_lengths, y, y_lengths, sid=None, prosody_ids=None):
         x, m_p, logs_p, x_mask = self.enc_p(x, x_lengths)
         if self.n_speakers > 1:
             g = self.emb_g(sid).unsqueeze(-1)  # [b, h, 1]
         else:
             g = None
+        
+        # Apply F0 predictor if prosody_ids are provided
+        f0_pred = None
+        f0_variance = None
+        if prosody_ids is not None:
+            f0_pred, f0_variance = self.f0_predictor(x, prosody_ids, x_mask, g)
 
         z, m_q, logs_q, y_mask = self.enc_q(y, y_lengths, g=g)
         z_p = self.flow(z, y_mask, g=g)
@@ -686,6 +692,7 @@ class SynthesizerTrn(nn.Module):
             x_mask,
             y_mask,
             (z, z_p, m_p, logs_p, m_q, logs_q),
+            (f0_pred, f0_variance),  # Add F0 predictions to output
         )
 
     def infer(
@@ -697,6 +704,7 @@ class SynthesizerTrn(nn.Module):
         length_scale=1,
         noise_scale_w=0.8,
         max_len=None,
+        prosody_ids=None,
     ):
         x, m_p, logs_p, x_mask = self.enc_p(x, x_lengths)
         if self.n_speakers > 1:
@@ -704,6 +712,12 @@ class SynthesizerTrn(nn.Module):
             g = self.emb_g(sid).unsqueeze(-1)  # [b, h, 1]
         else:
             g = None
+        
+        # Apply F0 predictor if prosody_ids are provided
+        if prosody_ids is not None:
+            f0_pred, _ = self.f0_predictor(x, prosody_ids, x_mask, g)
+            # Incorporate F0 into the latent representation
+            x = x + f0_pred  # Simple addition, could be more sophisticated
 
         if self.use_sdp:
             logw = self.dp(x, x_mask, g=g, reverse=True, noise_scale=noise_scale_w)
