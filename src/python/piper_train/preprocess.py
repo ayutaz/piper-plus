@@ -571,14 +571,14 @@ def phonemize_batch_openjtalk(
                         )
 
                         # Extract F0 if enabled
-                        if getattr(args, 'extract_f0', False):
+                        if getattr(args, "extract_f0", False):
                             utt.f0_path = cache_f0(
                                 utt.audio_path,
                                 args.cache_dir,
                                 args.sample_rate,
                                 hop_length=args.hop_length,
-                                f0_min=getattr(args, 'f0_min', 80.0),
-                                f0_max=getattr(args, 'f0_max', 880.0),
+                                f0_min=getattr(args, "f0_min", 80.0),
+                                f0_max=getattr(args, "f0_max", 880.0),
                             )
                     queue_out.put(utt)
                     if timeout_sec > 0:

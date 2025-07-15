@@ -81,25 +81,27 @@ def apply_accent_modifications(
     """
     if question_intonation is None:
         # Auto-detect question
-        question_intonation = text.rstrip().endswith('？') or text.rstrip().endswith('?')
+        question_intonation = text.rstrip().endswith("？") or text.rstrip().endswith(
+            "?"
+        )
 
     # Add accent markers based on strength
     if accent_strength > 1.5:
         # Strong accent
-        text = text.replace('は', 'は↑').replace('が', 'が↑')
-        text = text.replace('です', 'で↓す')
-        text = text.replace('ます', 'ま↓す')
+        text = text.replace("は", "は↑").replace("が", "が↑")
+        text = text.replace("です", "で↓す")
+        text = text.replace("ます", "ま↓す")
     elif accent_strength > 0.5:
         # Normal accent
-        text = text.replace('です', 'です→')
-        text = text.replace('ます', 'ます→')
+        text = text.replace("です", "です→")
+        text = text.replace("ます", "ます→")
 
     # Add question intonation
     if question_intonation:
-        if text.rstrip().endswith('か'):
-            text = text[:-1] + '⤴か'
-        elif text.rstrip().endswith('？'):
-            text = text[:-1] + '⤴？'
+        if text.rstrip().endswith("か"):
+            text = text[:-1] + "⤴か"
+        elif text.rstrip().endswith("？"):
+            text = text[:-1] + "⤴？"
 
     return text
 
@@ -140,8 +142,8 @@ class AccentController:
         base_phonemes = phonemize_japanese(text)
 
         # Process with accent
-        enhanced_phonemes, prosody_ids_list = self.accent_processor.process_text_with_accent(
-            text, base_phonemes
+        enhanced_phonemes, prosody_ids_list = (
+            self.accent_processor.process_text_with_accent(text, base_phonemes)
         )
 
         # Modify prosody IDs based on emotion
@@ -157,9 +159,7 @@ class AccentController:
         return LongTensor(phoneme_ids_list), LongTensor(prosody_ids_list)
 
     def _apply_emotion_to_prosody(
-        self,
-        prosody_ids: list[int],
-        emotion: str
+        self, prosody_ids: list[int], emotion: str
     ) -> list[int]:
         """Apply emotion-specific modifications to prosody IDs."""
         # This is a simplified example - in practice would use more sophisticated mapping
@@ -173,9 +173,14 @@ class AccentController:
         # Apply offset to non-padding prosody marks
         modified_ids = []
         for pid in prosody_ids:
-            if pid != self.accent_processor.mark_to_id['<PAD>']:
+            if pid != self.accent_processor.mark_to_id["<PAD>"]:
                 # Apply emotion offset while keeping in valid range
-                modified_pid = max(0, min(pid + emotion_offset, len(self.accent_processor.mark_to_id) - 1))
+                modified_pid = max(
+                    0,
+                    min(
+                        pid + emotion_offset, len(self.accent_processor.mark_to_id) - 1
+                    ),
+                )
                 modified_ids.append(modified_pid)
             else:
                 modified_ids.append(pid)

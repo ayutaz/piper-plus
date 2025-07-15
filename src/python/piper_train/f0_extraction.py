@@ -12,6 +12,7 @@ _LOGGER = logging.getLogger("piper_train.f0_extraction")
 # Try to import pyworld, but make it optional
 try:
     import pyworld as pw
+
     HAS_PYWORLD = True
 except ImportError:
     HAS_PYWORLD = False
@@ -150,9 +151,7 @@ def interpolate_f0(f0: np.ndarray, voiced: np.ndarray) -> np.ndarray:
 
     # Use linear interpolation
     f0_interp[unvoiced_indices] = np.interp(
-        unvoiced_indices,
-        voiced_indices,
-        f0[voiced_indices]
+        unvoiced_indices, voiced_indices, f0[voiced_indices]
     )
 
     return f0_interp
@@ -238,14 +237,17 @@ def cache_f0(
     f0, voiced = result
 
     # Save to cache
-    torch.save({
-        "f0": f0,
-        "voiced": voiced,
-        "sample_rate": sample_rate,
-        "hop_length": hop_length,
-        "f0_min": f0_min,
-        "f0_max": f0_max,
-        "method": method,
-    }, cache_path)
+    torch.save(
+        {
+            "f0": f0,
+            "voiced": voiced,
+            "sample_rate": sample_rate,
+            "hop_length": hop_length,
+            "f0_min": f0_min,
+            "f0_max": f0_max,
+            "method": method,
+        },
+        cache_path,
+    )
 
     return cache_path

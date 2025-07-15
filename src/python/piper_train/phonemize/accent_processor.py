@@ -215,9 +215,11 @@ class JapaneseAccentProcessor:
         for phoneme in phonemes:
             if phoneme in self.PROSODY_MARKS or phoneme in self.ACCENT_MARKS:
                 # This is a prosody/accent mark
-                prosody_ids.append(self.mark_to_id.get(phoneme, self.mark_to_id['<UNK>']))
+                prosody_ids.append(
+                    self.mark_to_id.get(phoneme, self.mark_to_id["<UNK>"])
+                )
             else:
                 # Regular phoneme - no prosody
-                prosody_ids.append(self.mark_to_id['<PAD>'])
+                prosody_ids.append(self.mark_to_id["<PAD>"])
 
         return prosody_ids

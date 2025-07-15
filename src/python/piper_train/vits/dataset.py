@@ -105,13 +105,13 @@ class PiperDataset(Dataset):
                             f0_values = torch.nn.functional.interpolate(
                                 f0_values.unsqueeze(0).unsqueeze(0),
                                 size=spectrogram.shape[1],
-                                mode='linear',
-                                align_corners=False
+                                mode="linear",
+                                align_corners=False,
                             ).squeeze()
                             f0_voiced = torch.nn.functional.interpolate(
                                 f0_voiced.unsqueeze(0).unsqueeze(0),
                                 size=spectrogram.shape[1],
-                                mode='nearest'
+                                mode="nearest",
                             ).squeeze()
                     except Exception as e:
                         _LOGGER.warning(f"Failed to load F0 from {utt.f0_path}: {e}")
