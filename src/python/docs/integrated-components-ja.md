@@ -5,14 +5,24 @@
 ## 1. EMA (Exponential Moving Average)
 
 EMAは、モデルパラメータの指数移動平均を計算することで、学習の安定性と品質を向上させる手法です。
+**v2.0以降、EMAはデフォルトで有効になっています。**
 
 ### 使用方法
 
 ```bash
+# 通常の使用（EMAが自動的に有効）
+python -m piper_train \
+  --dataset-dir /path/to/dataset
+
+# EMAの減衰率を変更する場合
 python -m piper_train \
   --dataset-dir /path/to/dataset \
-  --use-ema \
   --ema-decay 0.999
+
+# EMAを無効化する場合（推奨されません）
+python -m piper_train \
+  --dataset-dir /path/to/dataset \
+  --no-ema
 ```
 
 ### 主な利点
@@ -24,7 +34,7 @@ python -m piper_train \
 ### 実装詳細
 
 - `vits/ema.py`: EMAの実装とPyTorch Lightningコールバック
-- デフォルトのdecay率: 0.999
+- デフォルトのdecay率: 0.9995
 - HiFi-GANデコーダー部分にのみ適用
 
 ## 2. AccentProcessor
