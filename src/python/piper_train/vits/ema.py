@@ -1,7 +1,7 @@
 
 import torch
-from torch import nn
 from pytorch_lightning.callbacks import Callback
+from torch import nn
 
 
 class ExponentialMovingAverage:
