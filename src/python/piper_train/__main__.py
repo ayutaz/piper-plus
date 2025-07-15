@@ -9,7 +9,6 @@ from pytorch_lightning.callbacks import ModelCheckpoint
 
 from .vits.ema import EMACallback
 from .vits.lightning import VitsModel
-from .vits.ema import EMACallback
 
 _LOGGER = logging.getLogger(__package__)
 
@@ -170,12 +169,6 @@ def main():
         _LOGGER.debug(
             "Checkpoints will be saved every %s epoch(s)", args.checkpoint_epochs
         )
-    
-    if args.use_ema:
-        callbacks.append(EMACallback(decay=args.ema_decay))
-        _LOGGER.info("Using EMA with decay rate %s", args.ema_decay)
-    
-    trainer = Trainer.from_argparse_args(args, callbacks=callbacks)
 
     # EMA is enabled by default
     if not args.no_ema:
@@ -183,6 +176,8 @@ def main():
         _LOGGER.info("Using EMA with decay rate %s", args.ema_decay)
     else:
         _LOGGER.info("EMA disabled by user request")
+
+    trainer = Trainer.from_argparse_args(args, callbacks=callbacks)
 
     trainer_kwargs = {
         "accelerator": args.accelerator,
@@ -316,12 +311,6 @@ def main():
                     "Checkpoints will be saved every %s epoch(s)",
                     args.checkpoint_epochs,
                 )
-            
-            if args.use_ema:
-                callbacks.append(EMACallback(decay=args.ema_decay))
-                _LOGGER.info("Using EMA with decay rate %s", args.ema_decay)
-            
-            trainer = Trainer.from_argparse_args(args, callbacks=callbacks)
 
             # EMA is enabled by default
             if not args.no_ema:
@@ -329,6 +318,8 @@ def main():
                 _LOGGER.info("Using EMA with decay rate %s", args.ema_decay)
             else:
                 _LOGGER.info("EMA disabled by user request")
+
+            trainer = Trainer.from_argparse_args(args, callbacks=callbacks)
 
             trainer_kwargs = {
                 "accelerator": args.accelerator,
