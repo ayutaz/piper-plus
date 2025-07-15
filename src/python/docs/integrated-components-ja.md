@@ -72,10 +72,7 @@ python -m piper_train \
 ## 3. F0 Predictor
 
 基本周波数（F0）予測モジュールで、より自然な音声合成を実現します。
-<<<<<<< HEAD
 **✅ PR #98により統合完了。SynthesizerTrnに組み込み済み。**
-=======
->>>>>>> d0e1cb2 (feat: Integrate EMA, AccentProcessor, and F0 Predictor into training pipeline)
 
 ### アーキテクチャ
 
@@ -124,7 +121,6 @@ Flow + Decoder
 ```bash
 python -m piper_train \
   --dataset-dir /path/to/japanese/dataset \
-<<<<<<< HEAD
   --ema-decay 0.9995 \
   --batch-size 64 \
   --validation-split 0.1 \
@@ -143,13 +139,6 @@ python -m piper_train \
   --batch-size 64 \
   --ema-decay 0.9995 \
   --num-workers 80
-=======
-  --use-ema \
-  --ema-decay 0.999 \
-  --batch-size 16 \
-  --validation-split 0.1 \
-  --checkpoint-epochs 10
->>>>>>> d0e1cb2 (feat: Integrate EMA, AccentProcessor, and F0 Predictor into training pipeline)
 ```
 
 ### ファインチューニングの場合

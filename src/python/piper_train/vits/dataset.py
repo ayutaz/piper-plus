@@ -307,12 +307,6 @@ class UtteranceCollate:
                 prosody_length = utt.prosody_ids.size(0)
                 prosody_ids_padded[utt_idx, :prosody_length] = utt.prosody_ids
                 prosody_lengths[utt_idx] = prosody_length
-
-            if utt.prosody_ids is not None and prosody_ids_padded is not None:
-                prosody_length = utt.prosody_ids.size(0)
-                prosody_ids_padded[utt_idx, :prosody_length] = utt.prosody_ids
-                prosody_lengths[utt_idx] = prosody_length
-
             if utt.f0_values is not None and f0_padded is not None:
                 f0_length = min(utt.f0_values.size(0), spec_length)
                 f0_padded[utt_idx, :f0_length] = utt.f0_values[:f0_length]

@@ -237,6 +237,7 @@ def cache_f0(
     f0, voiced = result
 
     # Save to cache
+<<<<<<< HEAD
     torch.save(
         {
             "f0": f0,
@@ -249,5 +250,16 @@ def cache_f0(
         },
         cache_path,
     )
+=======
+    torch.save({
+        "f0": f0,
+        "voiced": voiced,
+        "sample_rate": sample_rate,
+        "hop_length": hop_length,
+        "f0_min": f0_min,
+        "f0_max": f0_max,
+        "method": method,
+    }, cache_path)
+>>>>>>> 3f2f039 (Fix ruff linting issues)
 
     return cache_path
