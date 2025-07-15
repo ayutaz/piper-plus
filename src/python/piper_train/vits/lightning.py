@@ -302,15 +302,11 @@ class VitsModel(pl.LightningModule):
             loss_f0 = torch.tensor(0.0, device=self.device)
             if f0_pred is not None and f0_values is not None:
                 # Create mask for valid F0 frames
-<<<<<<< HEAD
                 f0_mask = z_mask[:, :, : f0_values.shape[-1]]
-=======
-                f0_mask = z_mask[:, :, :f0_values.shape[-1]]
->>>>>>> 3f2f039 (Fix ruff linting issues)
 
                 # Apply F0 loss
                 loss_f0, f0_metrics = self.f0_loss(
-                    f0_pred_bins[:, :, : f0_values.shape[-1]],  # Match dimensions
+                    None,  # f0_pred_bins not used in this version
                     f0_pred[:, :, : f0_values.shape[-1]],  # Match dimensions
                     f0_variance[:, :, : f0_values.shape[-1]],
                     f0_values.unsqueeze(1),  # Add channel dimension
@@ -319,13 +315,9 @@ class VitsModel(pl.LightningModule):
 
                 # Log F0 metrics
                 for metric_name, metric_value in f0_metrics.items():
-<<<<<<< HEAD
                     self._log_with_batch_info(
                         f"train/{metric_name}", metric_value, batch
                     )
-=======
-                    self.log(f"train/{metric_name}", metric_value)
->>>>>>> 3f2f039 (Fix ruff linting issues)
 
             loss_gen_all = loss_gen + loss_fm + loss_mel + loss_dur + loss_kl + loss_f0
 

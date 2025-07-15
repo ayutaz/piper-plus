@@ -81,13 +81,9 @@ def apply_accent_modifications(
     """
     if question_intonation is None:
         # Auto-detect question
-<<<<<<< HEAD
         question_intonation = text.rstrip().endswith("？") or text.rstrip().endswith(
             "?"
         )
-=======
-        question_intonation = text.rstrip().endswith('？') or text.rstrip().endswith('?')
->>>>>>> 3f2f039 (Fix ruff linting issues)
 
     # Add accent markers based on strength
     if accent_strength > 1.5:
@@ -97,7 +93,6 @@ def apply_accent_modifications(
         text = text.replace("ます", "ま↓す")
     elif accent_strength > 0.5:
         # Normal accent
-<<<<<<< HEAD
         text = text.replace("です", "です→")
         text = text.replace("ます", "ます→")
 
@@ -107,17 +102,6 @@ def apply_accent_modifications(
             text = text[:-1] + "⤴か"
         elif text.rstrip().endswith("？"):
             text = text[:-1] + "⤴？"
-=======
-        text = text.replace('です', 'です→')
-        text = text.replace('ます', 'ます→')
-
-    # Add question intonation
-    if question_intonation:
-        if text.rstrip().endswith('か'):
-            text = text[:-1] + '⤴か'
-        elif text.rstrip().endswith('？'):
-            text = text[:-1] + '⤴？'
->>>>>>> 3f2f039 (Fix ruff linting issues)
 
     return text
 
@@ -175,13 +159,7 @@ class AccentController:
         return LongTensor(phoneme_ids_list), LongTensor(prosody_ids_list)
 
     def _apply_emotion_to_prosody(
-<<<<<<< HEAD
         self, prosody_ids: list[int], emotion: str
-=======
-        self,
-        prosody_ids: list[int],
-        emotion: str
->>>>>>> 3f2f039 (Fix ruff linting issues)
     ) -> list[int]:
         """Apply emotion-specific modifications to prosody IDs."""
         # This is a simplified example - in practice would use more sophisticated mapping
