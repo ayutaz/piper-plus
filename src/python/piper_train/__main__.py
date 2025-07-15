@@ -91,6 +91,10 @@ def main():
         dict_args["upsample_initial_channel"] = 512
         dict_args["upsample_kernel_sizes"] = (16, 16, 4, 4)
 
+    # マルチスピーカーモデルの場合、gin_channelsを768に設定（品質向上のため）
+    if num_speakers > 1 and "gin_channels" not in dict_args:
+        dict_args["gin_channels"] = 768
+
     model = VitsModel(
         num_symbols=num_symbols,
         num_speakers=num_speakers,

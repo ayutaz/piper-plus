@@ -34,10 +34,7 @@ def phonemize_japanese(text: str) -> list[str]:
     Notes
     -----
     1. We rely on *pyopenjtalk.extract_fullcontext* to obtain full-context labels.
-    2. For vowels that are labelled as devoiced ("A I U E O"), we convert them
-       to their voiced counterparts ("a i u e o") so that they share the same
-       embedding.
-    3. "sil" at the beginning / end of the utterance is converted into ^ / $ or ?.
+    2. "sil" at the beginning / end of the utterance is converted into ^ / $ or ?.
     """
 
     labels = pyopenjtalk.extract_fullcontext(text)
