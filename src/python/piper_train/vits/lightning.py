@@ -289,15 +289,15 @@ class VitsModel(pl.LightningModule):
             loss_f0 = torch.tensor(0.0, device=self.device)
             if f0_pred is not None and f0_values is not None:
                 # Create mask for valid F0 frames
-                f0_mask = z_mask[:, :, :f0_values.shape[-1]]
+                f0_mask = z_mask[:, :, : f0_values.shape[-1]]
 
                 # Apply F0 loss
                 loss_f0, f0_metrics = self.f0_loss(
                     None,  # f0_pred_bins not used in this version
-                    f0_pred[:, :, :f0_values.shape[-1]],  # Match dimensions
-                    f0_variance[:, :, :f0_values.shape[-1]],
+                    f0_pred[:, :, : f0_values.shape[-1]],  # Match dimensions
+                    f0_variance[:, :, : f0_values.shape[-1]],
                     f0_values.unsqueeze(1),  # Add channel dimension
-                    f0_mask
+                    f0_mask,
                 )
 
                 # Log F0 metrics
