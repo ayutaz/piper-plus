@@ -13,6 +13,7 @@ from .dataset import Batch, PiperDataset, UtteranceCollate
 from .losses import discriminator_loss, feature_loss, generator_loss, kl_loss
 from .mel_processing import mel_spectrogram_torch, spec_to_mel_torch
 from .models import MultiPeriodDiscriminator, SynthesizerTrn
+from .f0_predictor import F0Loss
 
 _LOGGER = logging.getLogger("vits.lightning")
 
@@ -107,6 +108,9 @@ class VitsModel(pl.LightningModule):
         self.model_d = MultiPeriodDiscriminator(
             use_spectral_norm=self.hparams.use_spectral_norm
         )
+        
+        # F0 loss
+        self.f0_loss = F0Loss()
 
         # Dataset splits
         self._train_dataset: Dataset | None = None
@@ -138,7 +142,7 @@ class VitsModel(pl.LightningModule):
             full_dataset, [train_set_size, num_test_examples, valid_set_size]
         )
 
-    def forward(self, text, text_lengths, scales, sid=None):
+    def forward(self, text, text_lengths, scales, sid=None, prosody_ids=None):
         noise_scale = scales[0]
         length_scale = scales[1]
         noise_scale_w = scales[2]
@@ -149,6 +153,7 @@ class VitsModel(pl.LightningModule):
             length_scale=length_scale,
             noise_scale_w=noise_scale_w,
             sid=sid,
+            prosody_ids=prosody_ids,
         )
 
         return audio
@@ -196,7 +201,7 @@ class VitsModel(pl.LightningModule):
             return self.training_step_d(batch)
 
     def training_step_g(self, batch: Batch):
-        x, x_lengths, y, _, spec, spec_lengths, speaker_ids = (
+        x, x_lengths, y, _, spec, spec_lengths, speaker_ids, prosody_ids, f0_values, f0_voiced = (
             batch.phoneme_ids,
             batch.phoneme_lengths,
             batch.audios,
@@ -204,6 +209,9 @@ class VitsModel(pl.LightningModule):
             batch.spectrograms,
             batch.spectrogram_lengths,
             batch.speaker_ids if batch.speaker_ids is not None else None,
+            batch.prosody_ids if batch.prosody_ids is not None else None,
+            batch.f0_values if batch.f0_values is not None else None,
+            batch.f0_voiced if batch.f0_voiced is not None else None,
         )
         (
             y_hat,
@@ -213,7 +221,8 @@ class VitsModel(pl.LightningModule):
             _x_mask,
             z_mask,
             (_z, z_p, m_p, logs_p, _m_q, logs_q),
-        ) = self.model_g(x, x_lengths, spec, spec_lengths, speaker_ids)
+            (f0_pred, f0_variance),
+        ) = self.model_g(x, x_lengths, spec, spec_lengths, speaker_ids, prosody_ids)
         self._y_hat = y_hat
 
         mel = spec_to_mel_torch(
@@ -258,7 +267,27 @@ class VitsModel(pl.LightningModule):
 
             loss_fm = feature_loss(fmap_r, fmap_g)
             loss_gen, _losses_gen = generator_loss(y_d_hat_g)
-            loss_gen_all = loss_gen + loss_fm + loss_mel + loss_dur + loss_kl
+            
+            # F0 loss
+            loss_f0 = torch.tensor(0.0, device=self.device)
+            if f0_pred is not None and f0_values is not None:
+                # Create mask for valid F0 frames
+                f0_mask = z_mask[:, :, :f0_values.shape[-1]]
+                
+                # Apply F0 loss
+                loss_f0, f0_metrics = self.f0_loss(
+                    None,  # f0_pred_bins not used in this version
+                    f0_pred[:, :, :f0_values.shape[-1]],  # Match dimensions
+                    f0_variance[:, :, :f0_values.shape[-1]],
+                    f0_values.unsqueeze(1),  # Add channel dimension
+                    f0_mask
+                )
+                
+                # Log F0 metrics
+                for metric_name, metric_value in f0_metrics.items():
+                    self.log(f"train/{metric_name}", metric_value)
+            
+            loss_gen_all = loss_gen + loss_fm + loss_mel + loss_dur + loss_kl + loss_f0
 
             self.log("loss_gen_all", loss_gen_all)
 
