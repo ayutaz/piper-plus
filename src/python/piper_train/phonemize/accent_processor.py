@@ -7,10 +7,11 @@ import numpy as np
 @dataclass
 class AccentInfo:
     """Container for Japanese accent information."""
+
     accent_position: int  # Position of accent nucleus (0 = no accent)
     phrase_boundary: int  # Phrase boundary type (0=none, 1=minor, 2=major)
-    mora_count: int      # Number of moras in the word
-    is_question: bool    # Question intonation marker
+    mora_count: int  # Number of moras in the word
+    is_question: bool  # Question intonation marker
 
 
 class JapaneseAccentProcessor:
@@ -22,28 +23,28 @@ class JapaneseAccentProcessor:
 
     # Existing prosody marks from japanese.py
     PROSODY_MARKS = {
-        '^': 'start',
-        '$': 'end_declarative',
-        '?': 'end_question',
-        '_': 'pause',
-        '#': 'boundary',
-        '[': 'rising',
-        ']': 'falling'
+        "^": "start",
+        "$": "end_declarative",
+        "?": "end_question",
+        "_": "pause",
+        "#": "boundary",
+        "[": "rising",
+        "]": "falling",
     }
 
     # Extended accent marks for fine control
     ACCENT_MARKS = {
-        '↑': 'accent_rise',      # Accent nucleus rise
-        '↓': 'accent_fall',      # Post-accent fall
-        '→': 'accent_flat',      # Flat intonation
-        '⤴': 'phrase_rise',      # Phrase-final rise
-        '⤵': 'phrase_fall',      # Phrase-final fall
-        '|': 'minor_boundary',   # Minor phrase boundary
-        '‖': 'major_boundary',   # Major phrase boundary
+        "↑": "accent_rise",  # Accent nucleus rise
+        "↓": "accent_fall",  # Post-accent fall
+        "→": "accent_flat",  # Flat intonation
+        "⤴": "phrase_rise",  # Phrase-final rise
+        "⤵": "phrase_fall",  # Phrase-final fall
+        "|": "minor_boundary",  # Minor phrase boundary
+        "‖": "major_boundary",  # Major phrase boundary
     }
 
     # Mora patterns for accent detection
-    MORA_PATTERN = re.compile(r'[ァ-ヴー][ャュョゃゅょ]?|[ア-ン][ャュョゃゅょ]?|[a-z]+')
+    MORA_PATTERN = re.compile(r"[ァ-ヴー][ャュョゃゅょ]?|[ア-ン][ャュョゃゅょ]?|[a-z]+")
 
     def __init__(self):
         # Combined mark to ID mapping
@@ -61,8 +62,8 @@ class JapaneseAccentProcessor:
             id_counter += 1
 
         # Special tokens
-        self.mark_to_id['<PAD>'] = id_counter
-        self.mark_to_id['<UNK>'] = id_counter + 1
+        self.mark_to_id["<PAD>"] = id_counter
+        self.mark_to_id["<UNK>"] = id_counter + 1
 
         # Reverse mapping
         self.id_to_mark = {v: k for k, v in self.mark_to_id.items()}
@@ -71,7 +72,7 @@ class JapaneseAccentProcessor:
         self,
         text: str,
         phonemes: list[str],
-        accent_dict: dict[str, AccentInfo] | None = None
+        accent_dict: dict[str, AccentInfo] | None = None,
     ) -> tuple[list[str], list[int]]:
         """Process text to add detailed accent marks to phonemes.
 
@@ -97,7 +98,7 @@ class JapaneseAccentProcessor:
             else:
                 # Regular phoneme
                 enhanced_phonemes.append(phoneme)
-                prosody_ids.append(self.mark_to_id['<PAD>'])  # No prosody
+                prosody_ids.append(self.mark_to_id["<PAD>"])  # No prosody
 
                 # Check if we should add accent marks
                 if accent_dict and phoneme_idx < len(phonemes) - 1:
@@ -106,13 +107,17 @@ class JapaneseAccentProcessor:
                     if self._should_add_accent_mark(phoneme, phoneme_idx, phonemes):
                         accent_mark = self._get_accent_mark(phoneme_idx, len(phonemes))
                         enhanced_phonemes.append(accent_mark)
-                        prosody_ids.append(self.mark_to_id.get(accent_mark, self.mark_to_id['<UNK>']))
+                        prosody_ids.append(
+                            self.mark_to_id.get(accent_mark, self.mark_to_id["<UNK>"])
+                        )
 
             phoneme_idx += 1
 
         return enhanced_phonemes, prosody_ids
 
-    def _should_add_accent_mark(self, phoneme: str, idx: int, phonemes: list[str]) -> bool:
+    def _should_add_accent_mark(
+        self, phoneme: str, idx: int, phonemes: list[str]
+    ) -> bool:
         """Determine if accent mark should be added after this phoneme."""
         # Simple heuristic - in practice would use linguistic rules
         # Add accent marks at mora boundaries
@@ -129,11 +134,11 @@ class JapaneseAccentProcessor:
         relative_pos = position / total_length
 
         if relative_pos < 0.3:
-            return '↑'  # Early accent rise
+            return "↑"  # Early accent rise
         elif relative_pos < 0.7:
-            return '→'  # Mid-phrase flat
+            return "→"  # Mid-phrase flat
         else:
-            return '↓'  # Late accent fall
+            return "↓"  # Late accent fall
 
     def create_accent_embedding_layer(self, embedding_dim: int = 128):
         """Create embedding layer for accent marks."""
@@ -143,7 +148,7 @@ class JapaneseAccentProcessor:
         embedding = nn.Embedding(
             num_embeddings=num_marks,
             embedding_dim=embedding_dim,
-            padding_idx=self.mark_to_id['<PAD>']
+            padding_idx=self.mark_to_id["<PAD>"],
         )
 
         # Initialize with small values
@@ -152,18 +157,16 @@ class JapaneseAccentProcessor:
         return embedding
 
     def extract_accent_features(
-        self,
-        phonemes: list[str],
-        prosody_ids: list[int]
+        self, phonemes: list[str], prosody_ids: list[int]
     ) -> dict[str, float]:
         """Extract statistical features from accent patterns."""
         features = {
-            'accent_density': 0.0,
-            'rising_ratio': 0.0,
-            'falling_ratio': 0.0,
-            'boundary_count': 0,
-            'phrase_length_mean': 0.0,
-            'phrase_length_std': 0.0,
+            "accent_density": 0.0,
+            "rising_ratio": 0.0,
+            "falling_ratio": 0.0,
+            "boundary_count": 0,
+            "phrase_length_mean": 0.0,
+            "phrase_length_std": 0.0,
         }
 
         if not prosody_ids:
@@ -172,27 +175,28 @@ class JapaneseAccentProcessor:
         # Count accent types
         accent_counts = {}
         for pid in prosody_ids:
-            if pid != self.mark_to_id['<PAD>']:
-                mark = self.id_to_mark.get(pid, '<UNK>')
+            if pid != self.mark_to_id["<PAD>"]:
+                mark = self.id_to_mark.get(pid, "<UNK>")
                 accent_counts[mark] = accent_counts.get(mark, 0) + 1
 
         total_marks = sum(accent_counts.values())
         if total_marks > 0:
-            features['accent_density'] = total_marks / len(prosody_ids)
+            features["accent_density"] = total_marks / len(prosody_ids)
 
             # Ratios of different accent types
-            rising_marks = ['↑', '[', '⤴']
-            falling_marks = ['↓', ']', '⤵']
+            rising_marks = ["↑", "[", "⤴"]
+            falling_marks = ["↓", "]", "⤵"]
 
             rising_count = sum(accent_counts.get(m, 0) for m in rising_marks)
             falling_count = sum(accent_counts.get(m, 0) for m in falling_marks)
 
-            features['rising_ratio'] = rising_count / total_marks
-            features['falling_ratio'] = falling_count / total_marks
+            features["rising_ratio"] = rising_count / total_marks
+            features["falling_ratio"] = falling_count / total_marks
 
             # Boundary statistics
-            boundary_marks = ['#', '|', '‖']
-            features['boundary_count'] = sum(accent_counts.get(m, 0) for m in boundary_marks)
+            boundary_marks = ["#", "|", "‖"]
+            features["boundary_count"] = sum(
+                accent_counts.get(m, 0) for m in boundary_marks
+            )
 
         return features
-
