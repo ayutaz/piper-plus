@@ -8,6 +8,7 @@ from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import ModelCheckpoint
 
 from .vits.lightning import VitsModel
+from .vits.ema import EMACallback
 
 _LOGGER = logging.getLogger(__package__)
 
@@ -40,6 +41,17 @@ def main():
         default=-1,
         help="Save top k checkpoints (-1 to save all).",
     )
+    parser.add_argument(
+        "--use-ema",
+        action="store_true",
+        help="Use Exponential Moving Average for model parameters",
+    )
+    parser.add_argument(
+        "--ema-decay",
+        type=float,
+        default=0.999,
+        help="EMA decay rate (default: 0.999)",
+    )
     Trainer.add_argparse_args(parser)
     VitsModel.add_model_specific_args(parser)
     parser.add_argument("--seed", type=int, default=1234)
@@ -63,16 +75,23 @@ def main():
         num_speakers = int(config["num_speakers"])
         sample_rate = int(config["audio"]["sample_rate"])
 
-    trainer = Trainer.from_argparse_args(args)
+    # Setup callbacks
+    callbacks = []
     if args.checkpoint_epochs is not None:
-        trainer.callbacks = [
+        callbacks.append(
             ModelCheckpoint(
                 every_n_epochs=args.checkpoint_epochs, save_top_k=args.save_top_k
             )
-        ]
+        )
         _LOGGER.debug(
             "Checkpoints will be saved every %s epoch(s)", args.checkpoint_epochs
         )
+    
+    if args.use_ema:
+        callbacks.append(EMACallback(decay=args.ema_decay))
+        _LOGGER.info("Using EMA with decay rate %s", args.ema_decay)
+    
+    trainer = Trainer.from_argparse_args(args, callbacks=callbacks)
 
     dict_args = vars(args)
     if args.quality == "x-low":
@@ -162,18 +181,25 @@ def main():
                 del args_dict["resume_from_checkpoint"]
 
             # 新しいTrainerインスタンスを作成（ckpt_pathをクリアするため）
-            trainer = Trainer.from_argparse_args(args)
+            # Setup callbacks
+            callbacks = []
             if args.checkpoint_epochs is not None:
-                trainer.callbacks = [
+                callbacks.append(
                     ModelCheckpoint(
                         every_n_epochs=args.checkpoint_epochs,
                         save_top_k=args.save_top_k,
                     )
-                ]
+                )
                 _LOGGER.debug(
                     "Checkpoints will be saved every %s epoch(s)",
                     args.checkpoint_epochs,
                 )
+            
+            if args.use_ema:
+                callbacks.append(EMACallback(decay=args.ema_decay))
+                _LOGGER.info("Using EMA with decay rate %s", args.ema_decay)
+            
+            trainer = Trainer.from_argparse_args(args, callbacks=callbacks)
 
             # 新しいTrainerで学習を開始
             trainer.fit(model)

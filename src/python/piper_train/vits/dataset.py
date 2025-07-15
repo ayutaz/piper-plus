@@ -18,6 +18,7 @@ class Utterance:
     audio_spec_path: Path
     speaker_id: int | None = None
     text: str | None = None
+    prosody_ids: list[int] | None = None
 
 
 @dataclass
@@ -27,6 +28,7 @@ class UtteranceTensors:
     audio_norm: FloatTensor
     speaker_id: LongTensor | None = None
     text: str | None = None
+    prosody_ids: LongTensor | None = None
 
     @property
     def spec_length(self) -> int:
@@ -42,6 +44,8 @@ class Batch:
     audios: FloatTensor
     audio_lengths: LongTensor
     speaker_ids: LongTensor | None = None
+    prosody_ids: LongTensor | None = None
+    prosody_lengths: LongTensor | None = None
 
 
 class PiperDataset(Dataset):
@@ -91,6 +95,11 @@ class PiperDataset(Dataset):
                         else None
                     ),
                     text=utt.text,
+                    prosody_ids=(
+                        LongTensor(utt.prosody_ids)
+                        if utt.prosody_ids is not None
+                        else None
+                    ),
                 )
             except Exception as e:
                 _LOGGER.error(
@@ -154,6 +163,7 @@ class PiperDataset(Dataset):
             audio_spec_path=Path(utt_dict["audio_spec_path"]),
             speaker_id=utt_dict.get("speaker_id"),
             text=utt_dict.get("text"),
+            prosody_ids=utt_dict.get("prosody_ids"),
         )
 
 
@@ -169,6 +179,7 @@ class UtteranceCollate:
         max_phonemes_length = 0
         max_spec_length = 0
         max_audio_length = 0
+        max_prosody_length = 0
 
         num_mels = 0
 
@@ -184,6 +195,10 @@ class UtteranceCollate:
             max_phonemes_length = max(max_phonemes_length, phoneme_length)
             max_spec_length = max(max_spec_length, spec_length)
             max_audio_length = max(max_audio_length, audio_length)
+            
+            if utt.prosody_ids is not None:
+                prosody_length = utt.prosody_ids.size(0)
+                max_prosody_length = max(max_prosody_length, prosody_length)
 
             num_mels = utt.spectrogram.size(0)
             if self.is_multispeaker:
@@ -208,6 +223,13 @@ class UtteranceCollate:
         speaker_ids: LongTensor | None = None
         if self.is_multispeaker:
             speaker_ids = LongTensor(num_utterances)
+        
+        prosody_ids_padded: LongTensor | None = None
+        prosody_lengths: LongTensor | None = None
+        if max_prosody_length > 0:
+            prosody_ids_padded = LongTensor(num_utterances, max_prosody_length)
+            prosody_ids_padded.zero_()
+            prosody_lengths = LongTensor(num_utterances)
 
         # Sort by decreasing spectrogram length
         sorted_utterances = sorted(
@@ -230,6 +252,11 @@ class UtteranceCollate:
             if utt.speaker_id is not None:
                 assert speaker_ids is not None
                 speaker_ids[utt_idx] = utt.speaker_id
+            
+            if utt.prosody_ids is not None and prosody_ids_padded is not None:
+                prosody_length = utt.prosody_ids.size(0)
+                prosody_ids_padded[utt_idx, :prosody_length] = utt.prosody_ids
+                prosody_lengths[utt_idx] = prosody_length
 
         return Batch(
             phoneme_ids=phonemes_padded,
@@ -239,4 +266,6 @@ class UtteranceCollate:
             audios=audio_padded,
             audio_lengths=audio_lengths,
             speaker_ids=speaker_ids,
+            prosody_ids=prosody_ids_padded,
+            prosody_lengths=prosody_lengths,
         )

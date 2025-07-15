@@ -1,6 +1,7 @@
 
 import torch
 from torch import nn
+from pytorch_lightning.callbacks import Callback
 
 
 class ExponentialMovingAverage:
@@ -97,7 +98,7 @@ class ExponentialMovingAverage:
             self.shadow_params[name] = self.shadow_params[name].to(device)
 
 
-class EMACallback:
+class EMACallback(Callback):
     """PyTorch Lightning callback for EMA during training."""
 
     def __init__(
