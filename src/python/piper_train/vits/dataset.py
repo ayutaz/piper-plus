@@ -202,9 +202,30 @@ class PiperDataset(Dataset):
 
 
 class UtteranceCollate:
-    def __init__(self, is_multispeaker: bool, segment_size: int):
+    def __init__(
+        self,
+        is_multispeaker: bool,
+        segment_size: int,
+        use_augmentation: bool = False,
+        spec_augment_params: dict | None = None,
+        audio_augment_params: dict | None = None,
+    ):
         self.is_multispeaker = is_multispeaker
         self.segment_size = segment_size
+        self.use_augmentation = use_augmentation
+        
+        # Initialize augmentation modules
+        if use_augmentation:
+            from .augmentation import SpecAugment, AudioAugmentation
+            
+            spec_params = spec_augment_params or {}
+            audio_params = audio_augment_params or {}
+            
+            self.spec_augment = SpecAugment(**spec_params)
+            self.audio_augment = AudioAugmentation(**audio_params)
+        else:
+            self.spec_augment = None
+            self.audio_augment = None
 
     def __call__(self, utterances: Sequence[UtteranceTensors]) -> Batch:
         num_utterances = len(utterances)

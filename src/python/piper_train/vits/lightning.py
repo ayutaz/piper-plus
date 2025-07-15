@@ -14,6 +14,8 @@ from .f0_predictor import F0Loss
 from .losses import discriminator_loss, feature_loss, generator_loss, kl_loss
 from .mel_processing import mel_spectrogram_torch, spec_to_mel_torch
 from .models import MultiPeriodDiscriminator, SynthesizerTrn
+from .stft_discriminator import CombinedMultiDiscriminator
+from .stft_loss import MultiResolutionSTFTLoss
 
 _LOGGER = logging.getLogger("vits.lightning")
 
@@ -68,6 +70,8 @@ class VitsModel(pl.LightningModule):
         warmup_epochs: int = 0,
         c_mel: int = 45,
         c_kl: float = 1.0,
+        c_stft: float = 1.0,
+        use_stft_discriminator: bool = True,
         grad_clip: float | None = None,
         num_workers: int = 1,
         seed: int = 1234,
@@ -105,12 +109,20 @@ class VitsModel(pl.LightningModule):
             gin_channels=self.hparams.gin_channels,
             use_sdp=self.hparams.use_sdp,
         )
-        self.model_d = MultiPeriodDiscriminator(
-            use_spectral_norm=self.hparams.use_spectral_norm
-        )
+        if self.hparams.use_stft_discriminator:
+            self.model_d = CombinedMultiDiscriminator(
+                use_spectral_norm=self.hparams.use_spectral_norm
+            )
+        else:
+            self.model_d = MultiPeriodDiscriminator(
+                use_spectral_norm=self.hparams.use_spectral_norm
+            )
 
         # F0 loss
         self.f0_loss = F0Loss()
+        
+        # Multi-resolution STFT loss
+        self.stft_loss = MultiResolutionSTFTLoss()
 
         # Dataset splits
         self._train_dataset: Dataset | None = None
@@ -164,10 +176,24 @@ class VitsModel(pl.LightningModule):
             collate_fn=UtteranceCollate(
                 is_multispeaker=self.hparams.num_speakers > 1,
                 segment_size=self.hparams.segment_size,
+                use_augmentation=True,
+                spec_augment_params={
+                    "freq_mask_param": 27,
+                    "time_mask_param": 100,
+                    "freq_mask_num": 2,
+                    "time_mask_num": 2,
+                },
+                audio_augment_params={
+                    "speed_perturb_range": (0.9, 1.1),
+                    "pitch_shift_range": (-2, 2),
+                    "enable_speed_perturb": True,
+                    "enable_pitch_shift": True,
+                },
             ),
             num_workers=self.hparams.num_workers,
             batch_size=self.hparams.batch_size,
             pin_memory=True,
+            shuffle=True,
         )
 
     def val_dataloader(self):
@@ -286,7 +312,17 @@ class VitsModel(pl.LightningModule):
                 for metric_name, metric_value in f0_metrics.items():
                     self.log(f"train/{metric_name}", metric_value)
 
-            loss_gen_all = loss_gen + loss_fm + loss_mel + loss_dur + loss_kl + loss_f0
+            # Multi-resolution STFT loss
+            loss_stft = torch.tensor(0.0, device=self.device)
+            if self.hparams.use_stft_discriminator:
+                loss_stft, stft_metrics = self.stft_loss(o, y)
+                loss_stft = loss_stft * self.hparams.c_stft
+                
+                # Log STFT metrics
+                for metric_name, metric_value in stft_metrics.items():
+                    self.log(f"train/{metric_name}", metric_value)
+            
+            loss_gen_all = loss_gen + loss_fm + loss_mel + loss_dur + loss_kl + loss_f0 + loss_stft
 
             self.log("loss_gen_all", loss_gen_all)
 
