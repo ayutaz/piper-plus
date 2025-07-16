@@ -19,7 +19,9 @@ def main():
     logging.basicConfig(level=logging.DEBUG)
     parser = argparse.ArgumentParser(prog="piper_train.infer_torchscript")
     parser.add_argument(
-        "--model", required=True, help="Path to torchscript checkpoint (.ts)"
+        "--model",
+        required=True,
+        help="Path to torchscript checkpoint (.ts)",
     )
     parser.add_argument("--output-dir", required=True, help="Path to write WAV files")
     parser.add_argument("--sample-rate", type=int, default=22050)

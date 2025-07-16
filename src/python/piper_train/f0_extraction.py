@@ -108,7 +108,11 @@ def extract_f0_torch(
         # Extract F0
         if method == "pyworld":
             f0, voiced = extract_f0_pyworld(
-                audio_np, sample_rate, hop_length, f0_min, f0_max
+                audio_np,
+                sample_rate,
+                hop_length,
+                f0_min,
+                f0_max,
             )
         else:
             raise ValueError(f"Unknown F0 extraction method: {method}")
@@ -151,7 +155,9 @@ def interpolate_f0(f0: np.ndarray, voiced: np.ndarray) -> np.ndarray:
 
     # Use linear interpolation
     f0_interp[unvoiced_indices] = np.interp(
-        unvoiced_indices, voiced_indices, f0[voiced_indices]
+        unvoiced_indices,
+        voiced_indices,
+        f0[voiced_indices],
     )
 
     return f0_interp
@@ -228,7 +234,12 @@ def cache_f0(
 
     # Extract F0
     result = extract_f0_torch(
-        audio_path, sample_rate, hop_length, f0_min, f0_max, method
+        audio_path,
+        sample_rate,
+        hop_length,
+        f0_min,
+        f0_max,
+        method,
     )
 
     if result is None:

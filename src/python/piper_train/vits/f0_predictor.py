@@ -39,13 +39,19 @@ class F0Predictor(nn.Module):
         for _ in range(n_layers):
             self.encoder_layers.append(
                 ConvReluNorm(
-                    hidden_channels, hidden_channels, kernel_size, p_dropout=p_dropout
-                )
+                    hidden_channels,
+                    hidden_channels,
+                    kernel_size,
+                    p_dropout=p_dropout,
+                ),
             )
 
         # Multi-head self-attention for context modeling
         self.attention = nn.MultiheadAttention(
-            hidden_channels, n_heads, dropout=p_dropout, batch_first=True
+            hidden_channels,
+            n_heads,
+            dropout=p_dropout,
+            batch_first=True,
         )
 
         # Prosody embedding for Japanese accent marks
@@ -55,12 +61,18 @@ class F0Predictor(nn.Module):
         # F0 prediction head
         self.f0_proj = nn.Sequential(
             nn.Conv1d(
-                hidden_channels, filter_channels, kernel_size, padding=kernel_size // 2
+                hidden_channels,
+                filter_channels,
+                kernel_size,
+                padding=kernel_size // 2,
             ),
             nn.ReLU(),
             nn.Dropout(p_dropout),
             nn.Conv1d(
-                filter_channels, hidden_channels, kernel_size, padding=kernel_size // 2
+                filter_channels,
+                hidden_channels,
+                kernel_size,
+                padding=kernel_size // 2,
             ),
             nn.ReLU(),
             nn.Dropout(p_dropout),
@@ -147,13 +159,18 @@ class F0Predictor(nn.Module):
             max_val = self.max_f0
 
         bin_centers = torch.linspace(
-            min_val, max_val, self.n_bins, device=f0_bins.device
+            min_val,
+            max_val,
+            self.n_bins,
+            device=f0_bins.device,
         )
         bin_centers = bin_centers.view(1, -1, 1)  # [1, n_bins, 1]
 
         # Weighted sum to get continuous F0
         f0_continuous = torch.sum(
-            f0_probs * bin_centers, dim=1, keepdim=True
+            f0_probs * bin_centers,
+            dim=1,
+            keepdim=True,
         )  # [B, 1, T]
 
         # Convert back from log space if needed

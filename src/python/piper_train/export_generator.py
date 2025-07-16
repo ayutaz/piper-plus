@@ -17,7 +17,9 @@ def main():
     parser.add_argument("output", help="Path to output model (.pt)")
 
     parser.add_argument(
-        "--debug", action="store_true", help="Print DEBUG messages to the console"
+        "--debug",
+        action="store_true",
+        help="Print DEBUG messages to the console",
     )
     args = parser.parse_args()
 

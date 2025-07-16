@@ -8,7 +8,7 @@ import os
 import sys
 import time
 
-# from pathlib import Path  # noqa: F401 - May be used in future
+# from pathlib import Path
 import numpy as np
 import onnxruntime
 
@@ -40,11 +40,13 @@ class SpeechStreamer:
         sess_options = onnxruntime.SessionOptions()
         _LOGGER.debug("Loading encoder model from %s", encoder_path)
         self.encoder = onnxruntime.InferenceSession(
-            encoder_path, sess_options=sess_options
+            encoder_path,
+            sess_options=sess_options,
         )
         _LOGGER.debug("Loading decoder model from %s", decoder_path)
         self.decoder = onnxruntime.InferenceSession(
-            decoder_path, sess_options=sess_options
+            decoder_path,
+            sess_options=sess_options,
         )
 
         self.sample_rate = sample_rate
@@ -87,7 +89,7 @@ class SpeechStreamer:
                 np.split(z, split_at, axis=2),
                 np.split(y_mask, split_at, axis=2),
                 strict=False,
-            )
+            ),
         )
         wav_start_pad = wav_end_pad = None
         for idx, (z_chunk, y_mask_chunk) in enumerate(chunks):
@@ -130,10 +132,14 @@ def main():
     logging.basicConfig(level=logging.DEBUG)
     parser = argparse.ArgumentParser(prog="piper_train.infer_onnx_streaming")
     parser.add_argument(
-        "--encoder", required=True, help="Path to encoder model (.onnx)"
+        "--encoder",
+        required=True,
+        help="Path to encoder model (.onnx)",
     )
     parser.add_argument(
-        "--decoder", required=True, help="Path to decoder  model (.onnx)"
+        "--decoder",
+        required=True,
+        help="Path to decoder  model (.onnx)",
     )
     parser.add_argument("--sample-rate", type=int, default=22050)
     parser.add_argument("--noise-scale", type=float, default=0.667)
@@ -170,7 +176,7 @@ def main():
             continue
 
         utt = json.loads(line)
-        # utt_id = str(i)  # noqa: F841 - Not used currently
+        # utt_id = str(i)
         phoneme_ids = utt["phoneme_ids"]
         speaker_id = utt.get("speaker_id")
 
@@ -191,7 +197,7 @@ def main():
                 "input_lengths": text_lengths,
                 "scales": scales,
                 "sid": sid,
-            }
+            },
         )
         for wav_chunk in stream:
             output_buffer.write(wav_chunk)
@@ -199,7 +205,9 @@ def main():
 
 
 def denoise(
-    audio: np.ndarray, bias_spec: np.ndarray, denoiser_strength: float
+    audio: np.ndarray,
+    bias_spec: np.ndarray,
+    denoiser_strength: float,
 ) -> np.ndarray:
     audio_spec, audio_angles = transform(audio)
 
@@ -231,7 +239,7 @@ def stft(x, fft_size, hopsamp):
         [
             np.fft.rfft(window * x[i : i + fft_size])
             for i in range(0, len(x) - fft_size, hopsamp)
-        ]
+        ],
     )
 
 
@@ -257,7 +265,8 @@ def istft(X, fft_size, hopsamp):
 
 def inverse(magnitude, phase):
     recombine_magnitude_phase = np.concatenate(
-        [magnitude * np.cos(phase), magnitude * np.sin(phase)], axis=1
+        [magnitude * np.cos(phase), magnitude * np.sin(phase)],
+        axis=1,
     )
 
     x_org = recombine_magnitude_phase

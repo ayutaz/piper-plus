@@ -25,12 +25,13 @@ class STFTLoss(nn.Module):
         """Get window function."""
         if window == "hann":
             return torch.hann_window(win_size)
-        elif window == "hamming":
+        if window == "hamming":
             return torch.hamming_window(win_size)
-        else:
-            raise ValueError(f"Unknown window type: {window}")
+        raise ValueError(f"Unknown window type: {window}")
 
-    def forward(self, y_hat: torch.Tensor, y: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+    def forward(
+        self, y_hat: torch.Tensor, y: torch.Tensor
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         """Compute STFT magnitude and phase losses.
 
         Args:
@@ -96,16 +97,20 @@ class MultiResolutionSTFTLoss(nn.Module):
         assert len(fft_sizes) == len(hop_sizes) == len(win_sizes)
 
         self.stft_losses = nn.ModuleList()
-        for fft_size, hop_size, win_size in zip(fft_sizes, hop_sizes, win_sizes):
+        for fft_size, hop_size, win_size in zip(
+            fft_sizes, hop_sizes, win_sizes, strict=False
+        ):
             self.stft_losses.append(
-                STFTLoss(fft_size, hop_size, win_size, window)
+                STFTLoss(fft_size, hop_size, win_size, window),
             )
 
         self.mag_weight = mag_weight
         self.phase_weight = phase_weight
 
     def forward(
-        self, y_hat: torch.Tensor, y: torch.Tensor
+        self,
+        y_hat: torch.Tensor,
+        y: torch.Tensor,
     ) -> tuple[torch.Tensor, dict[str, float]]:
         """Compute multi-resolution STFT loss.
 

@@ -122,16 +122,16 @@ class VitsModel(pl.LightningModule):
         )
         if self.hparams.use_stft_discriminator:
             self.model_d = CombinedMultiDiscriminator(
-                use_spectral_norm=self.hparams.use_spectral_norm
+                use_spectral_norm=self.hparams.use_spectral_norm,
             )
         else:
             self.model_d = MultiPeriodDiscriminator(
-                use_spectral_norm=self.hparams.use_spectral_norm
+                use_spectral_norm=self.hparams.use_spectral_norm,
             )
 
         # F0 loss
         self.f0_loss = F0Loss()
-        
+
         # Multi-resolution STFT loss
         self.stft_loss = MultiResolutionSTFTLoss()
 
@@ -156,13 +156,15 @@ class VitsModel(pl.LightningModule):
             return
 
         full_dataset = PiperDataset(
-            self.hparams.dataset, max_phoneme_ids=max_phoneme_ids
+            self.hparams.dataset,
+            max_phoneme_ids=max_phoneme_ids,
         )
         valid_set_size = int(len(full_dataset) * validation_split)
         train_set_size = len(full_dataset) - valid_set_size - num_test_examples
 
         self._train_dataset, self._test_dataset, self._val_dataset = random_split(
-            full_dataset, [train_set_size, num_test_examples, valid_set_size]
+            full_dataset,
+            [train_set_size, num_test_examples, valid_set_size],
         )
 
     def forward(self, text, text_lengths, scales, sid=None, prosody_ids=None):
@@ -359,11 +361,11 @@ class VitsModel(pl.LightningModule):
             if self.hparams.use_stft_discriminator:
                 loss_stft, stft_metrics = self.stft_loss(o, y)
                 loss_stft = loss_stft * self.hparams.c_stft
-                
+
                 # Log STFT metrics
                 for metric_name, metric_value in stft_metrics.items():
                     self.log(f"train/{metric_name}", metric_value)
-            
+
             # Duration consistency loss
             loss_dur_consistency = torch.tensor(0.0, device=self.device)
             if self.hparams.use_duration_regularization and pred_durations is not None:
@@ -372,13 +374,24 @@ class VitsModel(pl.LightningModule):
                     x_lengths,
                     phoneme_ids=x,  # Pass phoneme IDs for phoneme-specific penalties
                 )
-                loss_dur_consistency = loss_dur_consistency * self.hparams.c_dur_consistency
-                
+                loss_dur_consistency = (
+                    loss_dur_consistency * self.hparams.c_dur_consistency
+                )
+
                 # Log duration metrics
                 for metric_name, metric_value in dur_metrics.items():
                     self.log(f"train/{metric_name}", metric_value)
-            
-            loss_gen_all = loss_gen + loss_fm + loss_mel + loss_dur + loss_kl + loss_f0 + loss_stft + loss_dur_consistency
+
+            loss_gen_all = (
+                loss_gen
+                + loss_fm
+                + loss_mel
+                + loss_dur
+                + loss_kl
+                + loss_f0
+                + loss_stft
+                + loss_dur_consistency
+            )
 
             self._log_with_batch_info("loss_gen_all", loss_gen_all, batch)
 
@@ -393,7 +406,8 @@ class VitsModel(pl.LightningModule):
         with autocast(self.device.type, enabled=False):
             # Discriminator
             loss_disc, _losses_disc_r, _losses_disc_g = discriminator_loss(
-                y_d_hat_r, y_d_hat_g
+                y_d_hat_r,
+                y_d_hat_g,
             )
             loss_disc_all = loss_disc
 
@@ -422,7 +436,9 @@ class VitsModel(pl.LightningModule):
 
             tag = test_utt.text or str(utt_idx)
             self.logger.experiment.add_audio(
-                tag, test_audio, sample_rate=self.hparams.sample_rate
+                tag,
+                test_audio,
+                sample_rate=self.hparams.sample_rate,
             )
 
         return val_loss
@@ -444,10 +460,12 @@ class VitsModel(pl.LightningModule):
         ]
         schedulers = [
             torch.optim.lr_scheduler.ExponentialLR(
-                optimizers[0], gamma=self.hparams.lr_decay
+                optimizers[0],
+                gamma=self.hparams.lr_decay,
             ),
             torch.optim.lr_scheduler.ExponentialLR(
-                optimizers[1], gamma=self.hparams.lr_decay
+                optimizers[1],
+                gamma=self.hparams.lr_decay,
             ),
         ]
 

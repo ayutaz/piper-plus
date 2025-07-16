@@ -24,13 +24,21 @@ def main():
         help="Directory to write WAV file(s) (default: current directory)",
     )
     parser.add_argument(
-        "--from-speaker", required=True, type=int, help="Speaker id number of source"
+        "--from-speaker",
+        required=True,
+        type=int,
+        help="Speaker id number of source",
     )
     parser.add_argument(
-        "--to-speaker", required=True, type=int, help="Speaker id number of target"
+        "--to-speaker",
+        required=True,
+        type=int,
+        help="Speaker id number of target",
     )
     parser.add_argument(
-        "--debug", action="store_true", help="Print DEBUG messages to the console"
+        "--debug",
+        action="store_true",
+        help="Print DEBUG messages to the console",
     )
     args = parser.parse_args()
 
@@ -83,7 +91,10 @@ def main():
                 start_time = time.perf_counter()
                 audio = (
                     model_g.voice_conversion(
-                        specs, spec_lengths, from_speaker, to_speaker
+                        specs,
+                        spec_lengths,
+                        from_speaker,
+                        to_speaker,
                     )[0][0, 0]
                     .data.cpu()
                     .float()

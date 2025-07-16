@@ -51,10 +51,13 @@ class Utterance:
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--write-json", help="Path to write information about excluded utterances"
+        "--write-json",
+        help="Path to write information about excluded utterances",
     )
     parser.add_argument(
-        "--dataset-dir", default=Path.cwd(), help="Path to dataset directory"
+        "--dataset-dir",
+        default=Path.cwd(),
+        help="Path to dataset directory",
     )
     parser.add_argument("--scale-lower", type=float, default=2.0)
     parser.add_argument("--scale-upper", type=float, default=2.0)
@@ -165,7 +168,11 @@ class ProcessUtterance:
         self.thread_data = threading.local()
 
     def __call__(
-        self, utt_id: str, text: str, wav_path: Path, speaker: str
+        self,
+        utt_id: str,
+        text: str,
+        wav_path: Path,
+        speaker: str,
     ) -> Utterance:
         if not wav_path.exists():
             return Utterance(
@@ -213,7 +220,7 @@ class ProcessUtterance:
 
         # Normalize
         audio_16khz = np.frombuffer(audio_16khz_bytes, dtype=np.int16).astype(
-            np.float32
+            np.float32,
         )
         audio_16khz /= np.abs(np.max(audio_16khz))
 

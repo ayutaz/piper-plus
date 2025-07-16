@@ -2,7 +2,12 @@
 
 from .token_mapper import register
 
-__all__ = ["get_japanese_enhanced_id_map", "JAPANESE_PHONEMES", "SPECIAL_TOKENS", "ACCENT_STRENGTH_TOKENS"]
+__all__ = [
+    "ACCENT_STRENGTH_TOKENS",
+    "JAPANESE_PHONEMES",
+    "SPECIAL_TOKENS",
+    "get_japanese_enhanced_id_map",
+]
 
 # Prosody / sentence boundary tokens
 SPECIAL_TOKENS: list[str] = [
@@ -31,29 +36,50 @@ ACCENT_STRENGTH_TOKENS: list[str] = [
 # Core phoneme set
 JAPANESE_PHONEMES: list[str] = [
     # voiced vowels
-    "a", "i", "u", "e", "o",
+    "a",
+    "i",
+    "u",
+    "e",
+    "o",
     # unvoiced vowels (uppercase)
-    "A", "I", "U", "E", "O",
+    "A",
+    "I",
+    "U",
+    "E",
+    "O",
     # long vowels
-    "a:", "i:", "u:", "e:", "o:",
+    "a:",
+    "i:",
+    "u:",
+    "e:",
+    "o:",
     # special consonant-centric phonemes
     "N",  # 撥音 (ん)
     "cl",  # 促音 / 終止閉鎖
     "q",  # 促音 (alternate label)
     # plosives + voiced counterparts
-    "k", "g",
-    "ky", "gy",
-    "s", "z",
-    "sh", "j",
-    "t", "d",
+    "k",
+    "g",
+    "ky",
+    "gy",
+    "s",
+    "z",
+    "sh",
+    "j",
+    "t",
+    "d",
     "ts",
     "ch",
     "ty",
     "dy",
     "n",
     "ny",
-    "h", "b", "p",
-    "hy", "by", "py",
+    "h",
+    "b",
+    "p",
+    "hy",
+    "by",
+    "py",
     "f",
     "m",
     "my",
@@ -71,29 +97,29 @@ for token in SPECIAL_TOKENS + ACCENT_STRENGTH_TOKENS + JAPANESE_PHONEMES:
 
 def get_japanese_enhanced_id_map() -> dict[str, list[int]]:
     """Get enhanced Japanese phoneme to ID mapping with accent strength levels.
-    
+
     Returns:
         Dictionary mapping phoneme strings to lists of token IDs.
     """
     id_map: dict[str, list[int]] = {}
     token_id = 0
-    
+
     # Add padding token
     id_map["_PAD_"] = [token_id]
     token_id += 1
-    
+
     # Add all tokens
     all_tokens = SPECIAL_TOKENS + ACCENT_STRENGTH_TOKENS + JAPANESE_PHONEMES
-    
+
     for token in all_tokens:
         if token not in id_map:
             id_map[token] = [token_id]
             token_id += 1
-    
+
     # Add compatibility mappings (old marks map to medium strength)
     if "[2" in id_map and "[" not in id_map:
         id_map["["] = id_map["[2"]  # Medium rise
     if "]2" in id_map and "]" not in id_map:
         id_map["]"] = id_map["]2"]  # Medium fall
-    
+
     return id_map

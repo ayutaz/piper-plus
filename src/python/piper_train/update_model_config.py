@@ -95,7 +95,7 @@ def process_model_config(config_path: Path, backup: bool = True) -> None:
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Update Piper model configurations to use PUA phoneme mappings"
+        description="Update Piper model configurations to use PUA phoneme mappings",
     )
     parser.add_argument(
         "configs",
@@ -104,7 +104,9 @@ def main():
         help="Path(s) to model configuration JSON files",
     )
     parser.add_argument(
-        "--no-backup", action="store_true", help="Don't create backup files"
+        "--no-backup",
+        action="store_true",
+        help="Don't create backup files",
     )
     parser.add_argument(
         "--dry-run",
@@ -126,7 +128,7 @@ def main():
             print(f"\nError: {config_path} does not exist")
             continue
 
-        if not config_path.suffix == ".json":
+        if config_path.suffix != ".json":
             print(f"\nWarning: {config_path} is not a JSON file, skipping")
             continue
 

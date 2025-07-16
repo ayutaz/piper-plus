@@ -34,7 +34,8 @@ def prepare_text_for_inference(
 
         accent_processor = JapaneseAccentProcessor()
         enhanced_phonemes, prosody_ids_list = accent_processor.process_text_with_accent(
-            text, base_phonemes
+            text,
+            base_phonemes,
         )
 
         # Convert phonemes to IDs
@@ -51,17 +52,16 @@ def prepare_text_for_inference(
 
         return phoneme_ids, prosody_ids
 
-    else:
-        # Other languages or no accent processing
-        # This would need to be implemented based on the language
-        # For now, return empty prosody IDs
-        _LOGGER.warning(f"Accent processing not implemented for language: {language}")
+    # Other languages or no accent processing
+    # This would need to be implemented based on the language
+    # For now, return empty prosody IDs
+    _LOGGER.warning(f"Accent processing not implemented for language: {language}")
 
-        # Placeholder - should use appropriate phonemizer
-        phoneme_ids = LongTensor([0])  # Dummy
-        prosody_ids = None
+    # Placeholder - should use appropriate phonemizer
+    phoneme_ids = LongTensor([0])  # Dummy
+    prosody_ids = None
 
-        return phoneme_ids, prosody_ids
+    return phoneme_ids, prosody_ids
 
 
 def apply_accent_modifications(
@@ -82,7 +82,7 @@ def apply_accent_modifications(
     if question_intonation is None:
         # Auto-detect question
         question_intonation = text.rstrip().endswith("？") or text.rstrip().endswith(
-            "?"
+            "?",
         )
 
     # Add accent markers based on strength
@@ -159,7 +159,9 @@ class AccentController:
         return LongTensor(phoneme_ids_list), LongTensor(prosody_ids_list)
 
     def _apply_emotion_to_prosody(
-        self, prosody_ids: list[int], emotion: str
+        self,
+        prosody_ids: list[int],
+        emotion: str,
     ) -> list[int]:
         """Apply emotion-specific modifications to prosody IDs."""
         # This is a simplified example - in practice would use more sophisticated mapping
@@ -178,7 +180,8 @@ class AccentController:
                 modified_pid = max(
                     0,
                     min(
-                        pid + emotion_offset, len(self.accent_processor.mark_to_id) - 1
+                        pid + emotion_offset,
+                        len(self.accent_processor.mark_to_id) - 1,
                     ),
                 )
                 modified_ids.append(modified_pid)

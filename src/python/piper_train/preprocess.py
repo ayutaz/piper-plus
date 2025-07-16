@@ -9,7 +9,7 @@ import os
 import signal
 import sys
 
-# import unicodedata  # noqa: F401 - May be used for text normalization
+# import unicodedata
 from collections import Counter
 from collections.abc import Iterable
 from dataclasses import dataclass, field
@@ -28,7 +28,7 @@ from piper_phonemize import (
     tashkeel_run,
 )
 
-# import pyopenjtalk  # noqa: F401 - Used in conditional imports
+# import pyopenjtalk
 from tqdm import tqdm
 
 from .f0_extraction import cache_f0
@@ -42,18 +42,22 @@ try:
 except ImportError:
     # When running as script, relative import may fail; try absolute import fallback
     from piper_train.phonemize.accent_processor import AccentProcessor  # type: ignore
-    from piper_train.phonemize.japanese import phonemize_japanese  # type: ignore
-    from piper_train.phonemize.japanese_enhanced import phonemize_japanese_enhanced  # type: ignore
+    from piper_train.phonemize.japanese_enhanced import (
+        phonemize_japanese_enhanced,  # type: ignore
+    )
 
 # -----------------------------------------------------------------------------
 # Japanese phoneme id map support
 # -----------------------------------------------------------------------------
 try:
     from .phonemize.jp_id_map import get_japanese_id_map  # type: ignore
-    from .phonemize.jp_id_map_enhanced import get_japanese_enhanced_id_map  # type: ignore
+    from .phonemize.jp_id_map_enhanced import (
+        get_japanese_enhanced_id_map,  # type: ignore
+    )
 except ImportError:
-    from piper_train.phonemize.jp_id_map import get_japanese_id_map  # type: ignore
-    from piper_train.phonemize.jp_id_map_enhanced import get_japanese_enhanced_id_map  # type: ignore
+    from piper_train.phonemize.jp_id_map_enhanced import (
+        get_japanese_enhanced_id_map,  # type: ignore
+    )
 
 _DIR = Path(__file__).parent
 _VERSION = (_DIR / "VERSION").read_text(encoding="utf-8").strip()
@@ -74,7 +78,9 @@ class PhonemeType(str, Enum):
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--input-dir", required=True, help="Directory with audio dataset"
+        "--input-dir",
+        required=True,
+        help="Directory with audio dataset",
     )
     parser.add_argument(
         "--output-dir",
@@ -89,15 +95,21 @@ def main() -> None:
         help="Target sample rate for voice (hertz)",
     )
     parser.add_argument(
-        "--dataset-format", choices=("ljspeech", "mycroft"), required=True
+        "--dataset-format",
+        choices=("ljspeech", "mycroft"),
+        required=True,
     )
     parser.add_argument("--cache-dir", help="Directory to cache processed audio files")
     parser.add_argument("--max-workers", type=int)
     parser.add_argument(
-        "--single-speaker", action="store_true", help="Force single speaker dataset"
+        "--single-speaker",
+        action="store_true",
+        help="Force single speaker dataset",
     )
     parser.add_argument(
-        "--speaker-id", type=int, help="Add speaker id to single speaker dataset"
+        "--speaker-id",
+        type=int,
+        help="Add speaker id to single speaker dataset",
     )
     parser.add_argument(
         "--phoneme-type",
@@ -125,10 +137,14 @@ def main() -> None:
         help="Diacritize Arabic text with libtashkeel",
     )
     parser.add_argument(
-        "--skip-audio", action="store_true", help="Don't preprocess audio"
+        "--skip-audio",
+        action="store_true",
+        help="Don't preprocess audio",
     )
     parser.add_argument(
-        "--debug", action="store_true", help="Print DEBUG messages to the console"
+        "--debug",
+        action="store_true",
+        help="Print DEBUG messages to the console",
     )
     parser.add_argument(
         "--timeout-seconds",
@@ -222,7 +238,7 @@ def main() -> None:
 
         # Assign speaker ids by most number of utterances first
         for speaker_id, (speaker, _speaker_count) in enumerate(
-            speaker_counts.most_common()
+            speaker_counts.most_common(),
         ):
             speaker_ids[speaker] = speaker_id
     else:
@@ -298,7 +314,9 @@ def main() -> None:
         proc.start()
 
     _LOGGER.info(
-        "Processing %s utterance(s) with %s worker(s)", num_utterances, args.max_workers
+        "Processing %s utterance(s) with %s worker(s)",
+        num_utterances,
+        args.max_workers,
     )
     # プログレスバーを表示（stdoutに表示し、早めに初期化）
     print(
@@ -344,7 +362,7 @@ def main() -> None:
                     ensure_ascii=True,
                     cls=PathEncoder,
                 )
-                print("", file=dataset_file)
+                print(file=dataset_file)
 
                 missing_phonemes.update(utt.missing_phonemes)
 
@@ -390,7 +408,9 @@ def get_text_casing(casing: str):
 
 
 def phonemize_batch_espeak(
-    args: argparse.Namespace, queue_in: JoinableQueue, queue_out: Queue
+    args: argparse.Namespace,
+    queue_in: JoinableQueue,
+    queue_out: Queue,
 ):
     try:
         # Suppress C-level warnings from pyopenjtalk/OpenJTalk to keep output clean
@@ -405,7 +425,7 @@ def phonemize_batch_espeak(
         timeout_sec = getattr(args, "timeout_seconds", 0)
 
         def _timeout_handler(signum, frame):
-            raise TimeoutError()
+            raise TimeoutError
 
         if timeout_sec > 0:
             signal.signal(signal.SIGALRM, _timeout_handler)
@@ -458,7 +478,9 @@ def phonemize_batch_espeak(
 
 
 def phonemize_batch_text(
-    args: argparse.Namespace, queue_in: JoinableQueue, queue_out: Queue
+    args: argparse.Namespace,
+    queue_in: JoinableQueue,
+    queue_out: Queue,
 ):
     try:
         if not getattr(args, "debug", False):
@@ -471,7 +493,7 @@ def phonemize_batch_text(
         timeout_sec = getattr(args, "timeout_seconds", 0)
 
         def _timeout_handler(signum, frame):
-            raise TimeoutError()
+            raise TimeoutError
 
         if timeout_sec > 0:
             signal.signal(signal.SIGALRM, _timeout_handler)
@@ -524,7 +546,9 @@ def phonemize_batch_text(
 
 
 def phonemize_batch_openjtalk(
-    args: argparse.Namespace, queue_in: JoinableQueue, queue_out: Queue
+    args: argparse.Namespace,
+    queue_in: JoinableQueue,
+    queue_out: Queue,
 ):
     try:
         if not getattr(args, "debug", False):
@@ -538,7 +562,7 @@ def phonemize_batch_openjtalk(
         timeout_sec = getattr(args, "timeout_seconds", 0)
 
         def _timeout_handler(signum, frame):
-            raise TimeoutError()
+            raise TimeoutError
 
         if timeout_sec > 0:
             signal.signal(signal.SIGALRM, _timeout_handler)
@@ -676,7 +700,10 @@ def ljspeech_dataset(args: argparse.Namespace) -> Iterable[Utterance]:
                     continue
 
             yield Utterance(
-                text=text, audio_path=wav_path, speaker=speaker, speaker_id=speaker_id
+                text=text,
+                audio_path=wav_path,
+                speaker=speaker,
+                speaker_id=speaker_id,
             )
 
 

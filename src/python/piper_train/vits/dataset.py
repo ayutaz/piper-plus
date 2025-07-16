@@ -76,7 +76,9 @@ class PiperDataset(Dataset):
             dataset_path = Path(dataset_path)
             _LOGGER.debug("Loading dataset: %s", dataset_path)
             self.utterances.extend(
-                PiperDataset.load_dataset(dataset_path, max_phoneme_ids=max_phoneme_ids)
+                PiperDataset.load_dataset(
+                    dataset_path, max_phoneme_ids=max_phoneme_ids
+                ),
             )
 
     def __len__(self):
@@ -219,14 +221,14 @@ class UtteranceCollate:
         self.is_multispeaker = is_multispeaker
         self.segment_size = segment_size
         self.use_augmentation = use_augmentation
-        
+
         # Initialize augmentation modules
         if use_augmentation:
-            from .augmentation import SpecAugment, AudioAugmentation
-            
+            from .augmentation import AudioAugmentation, SpecAugment
+
             spec_params = spec_augment_params or {}
             audio_params = audio_augment_params or {}
-            
+
             self.spec_augment = SpecAugment(**spec_params)
             self.audio_augment = AudioAugmentation(**audio_params)
         else:
@@ -304,7 +306,9 @@ class UtteranceCollate:
 
         # Sort by decreasing spectrogram length
         sorted_utterances = sorted(
-            utterances, key=lambda u: u.spectrogram.size(1), reverse=True
+            utterances,
+            key=lambda u: u.spectrogram.size(1),
+            reverse=True,
         )
         for utt_idx, utt in enumerate(sorted_utterances):
             phoneme_length = utt.phoneme_ids.size(0)

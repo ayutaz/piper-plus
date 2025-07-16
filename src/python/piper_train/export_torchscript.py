@@ -19,7 +19,9 @@ def main():
     parser.add_argument("output", help="Path to output model (.onnx)")
 
     parser.add_argument(
-        "--debug", action="store_true", help="Print DEBUG messages to the console"
+        "--debug",
+        action="store_true",
+        help="Print DEBUG messages to the console",
     )
     args = parser.parse_args()
 
@@ -51,7 +53,10 @@ def main():
 
     dummy_input_length = 50
     sequences = torch.randint(
-        low=0, high=num_symbols, size=(1, dummy_input_length), dtype=torch.long
+        low=0,
+        high=num_symbols,
+        size=(1, dummy_input_length),
+        dtype=torch.long,
     )
     sequence_lengths = torch.LongTensor([sequences.size(1)])
 
