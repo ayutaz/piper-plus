@@ -48,6 +48,7 @@ class Batch:
     audio_lengths: LongTensor
     speaker_ids: LongTensor | None = None
     prosody_ids: LongTensor | None = None
+    texts: list[str] | None = None
     prosody_lengths: LongTensor | None = None
     f0_values: FloatTensor | None = None
     f0_voiced: FloatTensor | None = None
@@ -298,6 +299,11 @@ class UtteranceCollate:
             f0_padded.zero_()
             f0_voiced_padded.zero_()
 
+        # Collect texts if available
+        texts = None
+        if any(utt.text is not None for utt in utterances):
+            texts = []
+        
         # Sort by decreasing spectrogram length
         sorted_utterances = sorted(
             utterances,
@@ -332,6 +338,9 @@ class UtteranceCollate:
                 f0_padded[utt_idx, :f0_length] = utt.f0_values[:f0_length]
                 if utt.f0_voiced is not None and f0_voiced_padded is not None:
                     f0_voiced_padded[utt_idx, :f0_length] = utt.f0_voiced[:f0_length]
+            
+            if texts is not None and utt.text is not None:
+                texts.append(utt.text)
 
         return Batch(
             phoneme_ids=phonemes_padded,
@@ -345,4 +354,5 @@ class UtteranceCollate:
             prosody_lengths=prosody_lengths,
             f0_values=f0_padded,
             f0_voiced=f0_voiced_padded,
+            texts=texts,
         )

@@ -352,6 +352,9 @@ def main() -> None:
 
                 utt_dict = dataclasses.asdict(utt)
                 utt_dict.pop("missing_phonemes")
+                
+                # Keep the original text for BERT encoder
+                utt_dict["text"] = utt.text
 
                 # JSONL
                 json.dump(

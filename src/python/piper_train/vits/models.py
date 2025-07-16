@@ -9,6 +9,7 @@ from torch.nn.utils import remove_weight_norm, spectral_norm, weight_norm
 from . import attentions, commons, modules, monotonic_align
 from .commons import get_padding, init_weights
 from .f0_predictor import F0Predictor
+from .flow_matching import FlowMatchingBlock
 
 
 class StochasticDurationPredictor(nn.Module):
@@ -570,6 +571,10 @@ class SynthesizerTrn(nn.Module):
         n_speakers: int = 1,
         gin_channels: int = 0,
         use_sdp: bool = True,
+        use_bert_encoder: bool = False,
+        bert_model_name: str = "cl-tohoku/bert-base-japanese-v3",
+        bert_weight: float = 0.3,
+        use_flow_matching: bool = False,
     ):
         super().__init__()
         self.n_vocab = n_vocab
@@ -592,6 +597,8 @@ class SynthesizerTrn(nn.Module):
         self.gin_channels = gin_channels
 
         self.use_sdp = use_sdp
+        self.use_bert_encoder = use_bert_encoder
+        self.use_flow_matching = use_flow_matching
 
         self.enc_p = TextEncoder(
             n_vocab,
@@ -603,6 +610,16 @@ class SynthesizerTrn(nn.Module):
             kernel_size,
             p_dropout,
         )
+        
+        # Wrap with BERT encoder if enabled
+        if use_bert_encoder:
+            from .bert_encoder import BERTTextEncoder
+            self.enc_p = BERTTextEncoder(
+                self.enc_p,
+                bert_model_name=bert_model_name,
+                bert_hidden_channels=hidden_channels,
+                bert_weight=bert_weight,
+            )
         self.dec = Generator(
             inter_channels,
             resblock,
@@ -622,14 +639,24 @@ class SynthesizerTrn(nn.Module):
             16,
             gin_channels=gin_channels,
         )
-        self.flow = ResidualCouplingBlock(
-            inter_channels,
-            hidden_channels,
-            5,
-            1,
-            4,
-            gin_channels=gin_channels,
-        )
+        if use_flow_matching:
+            self.flow = FlowMatchingBlock(
+                inter_channels,
+                hidden_channels,
+                5,
+                1,
+                4,
+                gin_channels=gin_channels,
+            )
+        else:
+            self.flow = ResidualCouplingBlock(
+                inter_channels,
+                hidden_channels,
+                5,
+                1,
+                4,
+                gin_channels=gin_channels,
+            )
 
         if use_sdp:
             self.dp = StochasticDurationPredictor(
@@ -662,8 +689,11 @@ class SynthesizerTrn(nn.Module):
         if n_speakers > 1:
             self.emb_g = nn.Embedding(n_speakers, gin_channels)
 
-    def forward(self, x, x_lengths, y, y_lengths, sid=None, prosody_ids=None):
-        x, m_p, logs_p, x_mask = self.enc_p(x, x_lengths)
+    def forward(self, x, x_lengths, y, y_lengths, sid=None, prosody_ids=None, texts=None):
+        if self.use_bert_encoder and texts is not None:
+            x, m_p, logs_p, x_mask = self.enc_p(x, x_lengths, texts=texts)
+        else:
+            x, m_p, logs_p, x_mask = self.enc_p(x, x_lengths)
         if self.n_speakers > 1:
             g = self.emb_g(sid).unsqueeze(-1)  # [b, h, 1]
         else:
@@ -751,8 +781,12 @@ class SynthesizerTrn(nn.Module):
         noise_scale_w=0.8,
         max_len=None,
         prosody_ids=None,
+        texts=None,
     ):
-        x, m_p, logs_p, x_mask = self.enc_p(x, x_lengths)
+        if self.use_bert_encoder and texts is not None:
+            x, m_p, logs_p, x_mask = self.enc_p(x, x_lengths, texts=texts)
+        else:
+            x, m_p, logs_p, x_mask = self.enc_p(x, x_lengths)
         if self.n_speakers > 1:
             assert sid is not None, "Missing speaker id"
             g = self.emb_g(sid).unsqueeze(-1)  # [b, h, 1]
@@ -803,3 +837,19 @@ class SynthesizerTrn(nn.Module):
         z_hat = self.flow(z_p, y_mask, g=g_tgt, reverse=True)
         o_hat = self.dec(z_hat * y_mask, g=g_tgt)
         return o_hat, y_mask, (z, z_p, z_hat)
+    
+    def compute_flow_matching_loss(self, z, y_mask, g=None):
+        """Compute flow matching loss if enabled.
+        
+        Args:
+            z: Latent variables [B, C, T]
+            y_mask: Mask [B, 1, T]
+            g: Global conditioning [B, C_g, 1]
+            
+        Returns:
+            loss: Flow matching loss or 0 if not using flow matching
+        """
+        if self.use_flow_matching and hasattr(self.flow, 'compute_loss'):
+            return self.flow.compute_loss(z, y_mask, g)
+        else:
+            return 0.0

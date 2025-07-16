@@ -78,8 +78,17 @@ class VitsModel(pl.LightningModule):
         c_kl: float = 1.0,
         c_stft: float = 1.0,
         c_dur_consistency: float = 0.01,
-        use_stft_discriminator: bool = True,
-        use_duration_regularization: bool = True,
+        use_stft_discriminator: bool = True,  # Default: ON - Better quality
+        use_duration_regularization: bool = True,  # Default: ON - Stability
+        use_wavlm_discriminator: bool = False,
+        wavlm_model: str = "microsoft/wavlm-base",
+        c_wavlm: float = 1.0,
+        wavlm_weight: float = 0.5,
+        use_bert_encoder: bool = False,  # Default: OFF - Japanese only, high memory
+        bert_model_name: str = "cl-tohoku/bert-base-japanese-v3",
+        bert_weight: float = 0.3,
+        use_flow_matching: bool = True,  # Default: ON - Better quality & stability
+        c_flow_matching: float = 1.0,
         grad_clip: float | None = None,
         num_workers: int = 1,
         seed: int = 1234,
@@ -96,6 +105,7 @@ class VitsModel(pl.LightningModule):
             self.hparams.gin_channels = 512
 
         # Set up models
+        self.use_bert = self.hparams.use_bert_encoder
         self.model_g = SynthesizerTrn(
             n_vocab=self.hparams.num_symbols,
             spec_channels=self.hparams.filter_length // 2 + 1,
@@ -116,8 +126,19 @@ class VitsModel(pl.LightningModule):
             n_speakers=self.hparams.num_speakers,
             gin_channels=self.hparams.gin_channels,
             use_sdp=self.hparams.use_sdp,
+            use_bert_encoder=self.hparams.use_bert_encoder,
+            bert_model_name=self.hparams.bert_model_name,
+            bert_weight=self.hparams.bert_weight,
+            use_flow_matching=self.hparams.use_flow_matching,
         )
-        if self.hparams.use_stft_discriminator:
+        if self.hparams.use_wavlm_discriminator:
+            from .wavlm_discriminator import WavLMMultiPeriodDiscriminator
+            self.model_d = WavLMMultiPeriodDiscriminator(
+                use_spectral_norm=self.hparams.use_spectral_norm,
+                wavlm_model=self.hparams.wavlm_model,
+                wavlm_weight=self.hparams.wavlm_weight,
+            )
+        elif self.hparams.use_stft_discriminator:
             self.model_d = CombinedMultiDiscriminator(
                 use_spectral_norm=self.hparams.use_spectral_norm,
             )
@@ -237,7 +258,7 @@ class VitsModel(pl.LightningModule):
             return self.training_step_d(batch)
 
     def training_step_g(self, batch: Batch):
-        x, x_lengths, y, _, spec, spec_lengths, speaker_ids, prosody_ids, f0_values = (
+        x, x_lengths, y, _, spec, spec_lengths, speaker_ids, prosody_ids, f0_values, texts = (
             batch.phoneme_ids,
             batch.phoneme_lengths,
             batch.audios,
@@ -247,6 +268,7 @@ class VitsModel(pl.LightningModule):
             batch.speaker_ids if batch.speaker_ids is not None else None,
             batch.prosody_ids if batch.prosody_ids is not None else None,
             batch.f0_values if batch.f0_values is not None else None,
+            batch.texts if batch.texts is not None else None,
         )
         (
             y_hat,
@@ -258,8 +280,12 @@ class VitsModel(pl.LightningModule):
             (_z, z_p, m_p, logs_p, _m_q, logs_q),
             (f0_pred, f0_variance),
             pred_durations,
-        ) = self.model_g(x, x_lengths, spec, spec_lengths, speaker_ids, prosody_ids)
+        ) = self.model_g(x, x_lengths, spec, spec_lengths, speaker_ids, prosody_ids, texts)
         self._y_hat = y_hat
+        
+        # Store z for flow matching loss
+        self._z = _z
+        self._z_mask = z_mask
 
         mel = spec_to_mel_torch(
             spec,
@@ -325,13 +351,16 @@ class VitsModel(pl.LightningModule):
 
             # Multi-resolution STFT loss
             loss_stft = torch.tensor(0.0, device=self.device)
-            if self.hparams.use_stft_discriminator:
+            if self.hparams.use_stft_discriminator and not self.hparams.use_wavlm_discriminator:
                 loss_stft, stft_metrics = self.stft_loss(y_hat, y)
                 loss_stft = loss_stft * self.hparams.c_stft
 
                 # Log STFT metrics
                 for metric_name, metric_value in stft_metrics.items():
                     self.log(f"train/{metric_name}", metric_value)
+            
+            # WavLM discriminator already includes multi-scale losses
+            # so we don't need separate STFT loss when using WavLM
 
             # Duration consistency loss
             loss_dur_consistency = torch.tensor(0.0, device=self.device)
@@ -349,6 +378,23 @@ class VitsModel(pl.LightningModule):
                 for metric_name, metric_value in dur_metrics.items():
                     self.log(f"train/{metric_name}", metric_value)
 
+            # Adjust feature matching loss weight when using WavLM
+            if self.hparams.use_wavlm_discriminator:
+                loss_fm = loss_fm * self.hparams.c_wavlm
+            
+            # Flow matching loss
+            loss_flow_matching = 0.0
+            if self.hparams.use_flow_matching:
+                # Get global conditioning if multi-speaker
+                g = None
+                if speaker_ids is not None:
+                    g = self.model_g.emb_g(speaker_ids).unsqueeze(-1)
+                
+                loss_flow_matching = self.model_g.compute_flow_matching_loss(
+                    self._z, self._z_mask, g
+                ) * self.hparams.c_flow_matching
+                self.log("loss_flow_matching", loss_flow_matching)
+                
             loss_gen_all = (
                 loss_gen
                 + loss_fm
@@ -358,9 +404,12 @@ class VitsModel(pl.LightningModule):
                 + loss_f0
                 + loss_stft
                 + loss_dur_consistency
+                + loss_flow_matching
             )
 
             self.log("loss_gen_all", loss_gen_all)
+            self.log("loss_fm", loss_fm)
+            self.log("loss_gen", loss_gen)
 
             return loss_gen_all
 
@@ -477,5 +526,56 @@ class VitsModel(pl.LightningModule):
             type=float,
             default=0.01,
             help="Weight for duration consistency loss",
+        )
+        parser.add_argument(
+            "--use-wavlm-discriminator",
+            action="store_true",
+            help="Use WavLM-based discriminator for enhanced perceptual quality",
+        )
+        parser.add_argument(
+            "--wavlm-model",
+            type=str,
+            default="microsoft/wavlm-base",
+            help="Pretrained WavLM model to use",
+        )
+        parser.add_argument(
+            "--c-wavlm",
+            type=float,
+            default=1.0,
+            help="Weight for WavLM discriminator loss",
+        )
+        parser.add_argument(
+            "--wavlm-weight",
+            type=float,
+            default=0.5,
+            help="Balance between WavLM and traditional discriminators",
+        )
+        parser.add_argument(
+            "--use-bert-encoder",
+            action="store_true",
+            help="Use Japanese BERT encoder for contextual text understanding",
+        )
+        parser.add_argument(
+            "--bert-model-name",
+            type=str,
+            default="cl-tohoku/bert-base-japanese-v3",
+            help="Pretrained Japanese BERT model to use",
+        )
+        parser.add_argument(
+            "--bert-weight",
+            type=float,
+            default=0.3,
+            help="Weight for combining BERT features with phoneme embeddings",
+        )
+        parser.add_argument(
+            "--use-flow-matching",
+            action="store_true",
+            help="Use Conditional Flow Matching instead of traditional normalizing flow",
+        )
+        parser.add_argument(
+            "--c-flow-matching",
+            type=float,
+            default=1.0,
+            help="Weight for flow matching loss",
         )
         return parent_parser
