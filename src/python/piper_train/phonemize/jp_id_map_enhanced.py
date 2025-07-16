@@ -91,7 +91,9 @@ def get_japanese_enhanced_id_map() -> dict[str, list[int]]:
             token_id += 1
     
     # Add compatibility mappings (old marks map to medium strength)
-    id_map["["] = id_map["[2"]  # Medium rise
-    id_map["]"] = id_map["]2"]  # Medium fall
+    if "[2" in id_map and "[" not in id_map:
+        id_map["["] = id_map["[2"]  # Medium rise
+    if "]2" in id_map and "]" not in id_map:
+        id_map["]"] = id_map["]2"]  # Medium fall
     
     return id_map

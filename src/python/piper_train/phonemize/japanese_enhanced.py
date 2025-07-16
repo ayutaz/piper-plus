@@ -11,11 +11,11 @@ __all__ = ["phonemize_japanese_enhanced"]
 # Regular expressions
 _RE_PHONEME = re.compile(r"-([^+]+)\+")
 _RE_A1 = re.compile(r"/A:([\d-]+)\+")
-_RE_A2 = re.compile(r"\+([0-9]+)\+")
-_RE_A3 = re.compile(r"\+([0-9]+)/")
-_RE_F1 = re.compile(r"/F:([\d_]+)")  # F1: lexical accent position
-_RE_F2 = re.compile(r"\+([\d_]+)\+")  # F2: current mora position in word
-_RE_F7 = re.compile(r"\+([\d_]+)/")   # F7: number of moras in word
+_RE_A2 = re.compile(r"\+([0-9]+)\+")  # Same as basic phonemizer
+_RE_A3 = re.compile(r"\+([0-9]+)/")   # Same as basic phonemizer
+_RE_F1 = re.compile(r"/F:(\d+)_")  # F1: lexical accent position
+_RE_F2 = re.compile(r"_(\d+)#")  # F2: current mora position in word  
+_RE_F7 = re.compile(r"\|(\d+)_")   # F7: number of moras in word
 
 # Extended accent strength marks
 ACCENT_STRENGTH_MARKS = {
@@ -206,18 +206,28 @@ def phonemize_japanese_enhanced(text: str) -> list[str]:
                         tokens.append("[3")
         
         # First mora of accent phrase (rising mark)
-        if a2 == 1 and idx > 0:
-            prev_label = labels[idx - 1]
-            if "sil" in prev_label or "pau" in prev_label:
-                # After silence, use stronger accent
-                if strength == "weak":
-                    tokens.append("[2")
-                elif strength == "medium":
-                    tokens.append("[3")
+        # Only add rising mark when a2==1 and next mora is 2
+        if (a2 == 1) and (a2_next == 2):
+            if idx > 0:
+                prev_label = labels[idx - 1]
+                if "sil" in prev_label or "pau" in prev_label:
+                    # After silence, use stronger accent
+                    if strength == "weak":
+                        tokens.append("[2")
+                    elif strength == "medium":
+                        tokens.append("[3")
+                    else:
+                        tokens.append("[3")
                 else:
-                    tokens.append("[3")
-            elif "#" not in tokens[-2:]:  # No recent boundary
-                # Normal rising mark
+                    # Normal rising mark
+                    if strength == "weak":
+                        tokens.append("[1")
+                    elif strength == "medium":
+                        tokens.append("[2")
+                    else:
+                        tokens.append("[3")
+            else:
+                # Default rising mark at start
                 if strength == "weak":
                     tokens.append("[1")
                 elif strength == "medium":

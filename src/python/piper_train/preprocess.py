@@ -38,18 +38,22 @@ from .norm_audio import cache_norm_audio, make_silence_detector
 try:
     from .phonemize.accent_processor import AccentProcessor  # type: ignore
     from .phonemize.japanese import phonemize_japanese  # type: ignore
+    from .phonemize.japanese_enhanced import phonemize_japanese_enhanced  # type: ignore
 except ImportError:
     # When running as script, relative import may fail; try absolute import fallback
     from piper_train.phonemize.accent_processor import AccentProcessor  # type: ignore
     from piper_train.phonemize.japanese import phonemize_japanese  # type: ignore
+    from piper_train.phonemize.japanese_enhanced import phonemize_japanese_enhanced  # type: ignore
 
 # -----------------------------------------------------------------------------
 # Japanese phoneme id map support
 # -----------------------------------------------------------------------------
 try:
     from .phonemize.jp_id_map import get_japanese_id_map  # type: ignore
+    from .phonemize.jp_id_map_enhanced import get_japanese_enhanced_id_map  # type: ignore
 except ImportError:
     from piper_train.phonemize.jp_id_map import get_japanese_id_map  # type: ignore
+    from piper_train.phonemize.jp_id_map_enhanced import get_japanese_enhanced_id_map  # type: ignore
 
 _DIR = Path(__file__).parent
 _VERSION = (_DIR / "VERSION").read_text(encoding="utf-8").strip()
@@ -174,10 +178,11 @@ def main() -> None:
     japanese_id_map = None
     if args.language == "ja":
         args.phoneme_type = PhonemeType.OPENJTALK
-        japanese_id_map = get_japanese_id_map()
+        # v2ブランチでは拡張版を使用
+        japanese_id_map = get_japanese_enhanced_id_map()
         args.phoneme_id_map = japanese_id_map  # 子プロセスへ渡すため
         _LOGGER.info(
-            "Using pyopenjtalk for Japanese phonemization (%s symbols)",
+            "Using enhanced pyopenjtalk for Japanese phonemization (%s symbols)",
             len(japanese_id_map),
         )
 
@@ -548,8 +553,8 @@ def phonemize_batch_openjtalk(
                     if timeout_sec > 0:
                         signal.alarm(timeout_sec)
                     _LOGGER.debug(utt)
-                    # 高低アクセントを含む日本語 phonemizer
-                    utt.phonemes = phonemize_japanese(casing(utt.text))
+                    # 高低アクセントを含む日本語 phonemizer (v2では拡張版を使用)
+                    utt.phonemes = phonemize_japanese_enhanced(casing(utt.text))
                     # phoneme_ids は phoneme_id_map から取得
                     utt.phoneme_ids = []
                     for phoneme in utt.phonemes:

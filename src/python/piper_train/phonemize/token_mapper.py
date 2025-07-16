@@ -30,6 +30,16 @@ FIXED_PUA_MAPPING = {
     "ny": 0xE013,
     "my": 0xE014,
     "ry": 0xE015,
+    # Enhanced accent strength markers (v2)
+    "[1": 0xE016,  # weak rising pitch
+    "[2": 0xE017,  # medium rising pitch
+    "[3": 0xE018,  # strong rising pitch
+    "]1": 0xE019,  # weak falling pitch
+    "]2": 0xE01A,  # medium falling pitch
+    "]3": 0xE01B,  # strong falling pitch
+    "?!": 0xE01C,  # WH question end
+    "?.": 0xE01D,  # Rhetorical question end
+    "?~": 0xE01E,  # Tag question end
 }
 
 # Build bidirectional mappings
@@ -43,7 +53,7 @@ for token, codepoint in FIXED_PUA_MAPPING.items():
     CHAR2TOKEN[ch] = token
 
 # Private Use Area for dynamic allocation (starting after fixed mappings)
-_PUA_START = 0xE020  # Start after the last fixed mapping
+_PUA_START = 0xE01F  # Start after the last fixed mapping
 _next = _PUA_START
 
 
