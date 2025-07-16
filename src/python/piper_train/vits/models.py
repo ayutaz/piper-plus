@@ -705,6 +705,7 @@ class SynthesizerTrn(nn.Module):
             y_mask,
             (z, z_p, m_p, logs_p, m_q, logs_q),
             (f0_pred_bins, f0_pred, f0_variance),  # Add F0 predictions to output
+            w,  # Add duration predictions for regularization
         )
 
     def infer(
