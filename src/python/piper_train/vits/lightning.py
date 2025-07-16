@@ -11,7 +11,13 @@ from torch.utils.data import DataLoader, Dataset, random_split
 from .commons import slice_segments
 from .dataset import Batch, PiperDataset, UtteranceCollate
 from .f0_predictor import F0Loss
-from .losses import discriminator_loss, feature_loss, generator_loss, kl_loss
+from .losses import (
+    discriminator_loss,
+    duration_consistency_loss,
+    feature_loss,
+    generator_loss,
+    kl_loss,
+)
 from .mel_processing import mel_spectrogram_torch, spec_to_mel_torch
 from .models import MultiPeriodDiscriminator, SynthesizerTrn
 from .stft_discriminator import CombinedMultiDiscriminator
@@ -71,7 +77,9 @@ class VitsModel(pl.LightningModule):
         c_mel: int = 45,
         c_kl: float = 1.0,
         c_stft: float = 1.0,
+        c_dur_consistency: float = 0.01,
         use_stft_discriminator: bool = True,
+        use_duration_regularization: bool = True,
         grad_clip: float | None = None,
         num_workers: int = 1,
         seed: int = 1234,
@@ -247,6 +255,7 @@ class VitsModel(pl.LightningModule):
             z_mask,
             (_z, z_p, m_p, logs_p, _m_q, logs_q),
             (f0_pred, f0_variance),
+            pred_durations,
         ) = self.model_g(x, x_lengths, spec, spec_lengths, speaker_ids, prosody_ids)
         self._y_hat = y_hat
 
@@ -322,7 +331,21 @@ class VitsModel(pl.LightningModule):
                 for metric_name, metric_value in stft_metrics.items():
                     self.log(f"train/{metric_name}", metric_value)
             
-            loss_gen_all = loss_gen + loss_fm + loss_mel + loss_dur + loss_kl + loss_f0 + loss_stft
+            # Duration consistency loss
+            loss_dur_consistency = torch.tensor(0.0, device=self.device)
+            if self.hparams.use_duration_regularization and pred_durations is not None:
+                loss_dur_consistency, dur_metrics = duration_consistency_loss(
+                    pred_durations,
+                    x_lengths,
+                    phoneme_ids=x,  # Pass phoneme IDs for phoneme-specific penalties
+                )
+                loss_dur_consistency = loss_dur_consistency * self.hparams.c_dur_consistency
+                
+                # Log duration metrics
+                for metric_name, metric_value in dur_metrics.items():
+                    self.log(f"train/{metric_name}", metric_value)
+            
+            loss_gen_all = loss_gen + loss_fm + loss_mel + loss_dur + loss_kl + loss_f0 + loss_stft + loss_dur_consistency
 
             self.log("loss_gen_all", loss_gen_all)
 
@@ -424,5 +447,17 @@ class VitsModel(pl.LightningModule):
             type=int,
             default=min(16, os.cpu_count()),
             help="Number of workers for DataLoader",
+        )
+        parser.add_argument(
+            "--use-duration-regularization",
+            action="store_true",
+            default=True,
+            help="Use duration consistency regularization",
+        )
+        parser.add_argument(
+            "--c-dur-consistency",
+            type=float,
+            default=0.01,
+            help="Weight for duration consistency loss",
         )
         return parent_parser
