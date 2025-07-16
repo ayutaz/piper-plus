@@ -103,7 +103,9 @@ def main():
 
 
 def denoise(
-    audio: np.ndarray, bias_spec: np.ndarray, denoiser_strength: float
+    audio: np.ndarray,
+    bias_spec: np.ndarray,
+    denoiser_strength: float,
 ) -> np.ndarray:
     audio_spec, audio_angles = transform(audio)
 
@@ -135,7 +137,7 @@ def stft(x, fft_size, hopsamp):
         [
             np.fft.rfft(window * x[i : i + fft_size])
             for i in range(0, len(x) - fft_size, hopsamp)
-        ]
+        ],
     )
 
 
@@ -161,7 +163,8 @@ def istft(X, fft_size, hopsamp):
 
 def inverse(magnitude, phase):
     recombine_magnitude_phase = np.concatenate(
-        [magnitude * np.cos(phase), magnitude * np.sin(phase)], axis=1
+        [magnitude * np.cos(phase), magnitude * np.sin(phase)],
+        axis=1,
     )
 
     x_org = recombine_magnitude_phase

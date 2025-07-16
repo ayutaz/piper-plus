@@ -17,7 +17,9 @@ def main() -> None:
         help="Path to directory with audio/spectrogram files (*.pt)",
     )
     parser.add_argument(
-        "--delete", action="store_true", help="Delete files that fail to load"
+        "--delete",
+        action="store_true",
+        help="Delete files that fail to load",
     )
     parser.add_argument("--debug", action="store_true")
     args = parser.parse_args()

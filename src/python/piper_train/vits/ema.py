@@ -57,7 +57,8 @@ class ExponentialMovingAverage:
                 if param.requires_grad and name in self.shadow_params:
                     # EMA update: shadow = decay * shadow + (1 - decay) * current
                     self.shadow_params[name].mul_(decay).add_(
-                        param.data, alpha=1 - decay
+                        param.data,
+                        alpha=1 - decay,
                     )
 
     def apply_shadow(self):
@@ -162,21 +163,20 @@ class EMACallback(Callback):
 
     def on_load_checkpoint(self, trainer, model, checkpoint):
         """Load EMA state from checkpoint."""
-        if "ema_generator_state" in checkpoint and checkpoint["ema_generator_state"]:
+        if checkpoint.get("ema_generator_state"):
             if self.ema_generator is None:
                 self.ema_generator = ExponentialMovingAverage(
-                    model.model_g.dec, decay=self.decay
+                    model.model_g.dec,
+                    decay=self.decay,
                 )
             self.ema_generator.load_state_dict(checkpoint["ema_generator_state"])
 
-        if (
-            "ema_discriminator_state" in checkpoint
-            and checkpoint["ema_discriminator_state"]
-        ):
+        if checkpoint.get("ema_discriminator_state"):
             if self.ema_discriminator is None:
                 self.ema_discriminator = ExponentialMovingAverage(
-                    model.model_d, decay=self.decay
+                    model.model_d,
+                    decay=self.decay,
                 )
             self.ema_discriminator.load_state_dict(
-                checkpoint["ema_discriminator_state"]
+                checkpoint["ema_discriminator_state"],
             )

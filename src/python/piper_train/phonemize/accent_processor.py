@@ -108,7 +108,7 @@ class JapaneseAccentProcessor:
                         accent_mark = self._get_accent_mark(phoneme_idx, len(phonemes))
                         enhanced_phonemes.append(accent_mark)
                         prosody_ids.append(
-                            self.mark_to_id.get(accent_mark, self.mark_to_id["<UNK>"])
+                            self.mark_to_id.get(accent_mark, self.mark_to_id["<UNK>"]),
                         )
 
             phoneme_idx += 1
@@ -116,7 +116,10 @@ class JapaneseAccentProcessor:
         return enhanced_phonemes, prosody_ids
 
     def _should_add_accent_mark(
-        self, phoneme: str, idx: int, phonemes: list[str]
+        self,
+        phoneme: str,
+        idx: int,
+        phonemes: list[str],
     ) -> bool:
         """Determine if accent mark should be added after this phoneme."""
         # Simple heuristic - in practice would use linguistic rules
@@ -135,10 +138,9 @@ class JapaneseAccentProcessor:
 
         if relative_pos < 0.3:
             return "↑"  # Early accent rise
-        elif relative_pos < 0.7:
+        if relative_pos < 0.7:
             return "→"  # Mid-phrase flat
-        else:
-            return "↓"  # Late accent fall
+        return "↓"  # Late accent fall
 
     def create_accent_embedding_layer(self, embedding_dim: int = 128):
         """Create embedding layer for accent marks."""
@@ -157,7 +159,9 @@ class JapaneseAccentProcessor:
         return embedding
 
     def extract_accent_features(
-        self, phonemes: list[str], prosody_ids: list[int]
+        self,
+        phonemes: list[str],
+        prosody_ids: list[int],
     ) -> dict[str, float]:
         """Extract statistical features from accent patterns."""
         features = {
@@ -216,7 +220,7 @@ class JapaneseAccentProcessor:
             if phoneme in self.PROSODY_MARKS or phoneme in self.ACCENT_MARKS:
                 # This is a prosody/accent mark
                 prosody_ids.append(
-                    self.mark_to_id.get(phoneme, self.mark_to_id["<UNK>"])
+                    self.mark_to_id.get(phoneme, self.mark_to_id["<UNK>"]),
                 )
             else:
                 # Regular phoneme - no prosody

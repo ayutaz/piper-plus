@@ -1,20 +1,18 @@
 """Data augmentation for VITS training."""
 
 import random
-from typing import Optional
 
 import numpy as np
 import torch
-import torch.nn.functional as F
 import torchaudio
 
 
 class SpecAugment:
     """SpecAugment: A Simple Data Augmentation Method for ASR.
-    
+
     Reference: https://arxiv.org/abs/1904.08779
     """
-    
+
     def __init__(
         self,
         freq_mask_param: int = 27,
@@ -24,7 +22,7 @@ class SpecAugment:
         replace_with_zero: bool = False,
     ):
         """Initialize SpecAugment.
-        
+
         Args:
             freq_mask_param: Maximum frequency mask length
             time_mask_param: Maximum time mask length
@@ -37,46 +35,46 @@ class SpecAugment:
         self.freq_mask_num = freq_mask_num
         self.time_mask_num = time_mask_num
         self.replace_with_zero = replace_with_zero
-    
+
     def __call__(self, spec: torch.Tensor) -> torch.Tensor:
         """Apply SpecAugment to spectrogram.
-        
+
         Args:
             spec: Spectrogram tensor [B, F, T] or [F, T]
-        
+
         Returns:
             Augmented spectrogram
         """
         if spec.dim() == 2:
             spec = spec.unsqueeze(0)
-        
+
         batch_size, n_freq, n_time = spec.shape
         spec_aug = spec.clone()
-        
+
         # Get replacement value
         if self.replace_with_zero:
             fill_value = 0.0
         else:
             fill_value = spec_aug.mean()
-        
+
         # Apply frequency masks
         for _ in range(self.freq_mask_num):
             f = random.randint(0, min(self.freq_mask_param, n_freq))
             f0 = random.randint(0, n_freq - f)
-            spec_aug[:, f0:f0 + f, :] = fill_value
-        
+            spec_aug[:, f0 : f0 + f, :] = fill_value
+
         # Apply time masks
         for _ in range(self.time_mask_num):
             t = random.randint(0, min(self.time_mask_param, n_time))
             t0 = random.randint(0, n_time - t)
-            spec_aug[:, :, t0:t0 + t] = fill_value
-        
+            spec_aug[:, :, t0 : t0 + t] = fill_value
+
         return spec_aug.squeeze(0) if batch_size == 1 else spec_aug
 
 
 class AudioAugmentation:
     """Audio-level augmentation for TTS training."""
-    
+
     def __init__(
         self,
         sample_rate: int = 22050,
@@ -88,7 +86,7 @@ class AudioAugmentation:
         gain_range: tuple[float, float] = (0.8, 1.2),
     ):
         """Initialize audio augmentation.
-        
+
         Args:
             sample_rate: Audio sample rate
             speed_perturb_range: Range for speed perturbation factors
@@ -105,75 +103,76 @@ class AudioAugmentation:
         self.enable_pitch_shift = enable_pitch_shift
         self.enable_random_gain = enable_random_gain
         self.gain_range = gain_range
-    
+
     def speed_perturb(self, audio: torch.Tensor, factor: float) -> torch.Tensor:
         """Apply speed perturbation to audio.
-        
+
         Args:
             audio: Audio tensor [T] or [1, T]
             factor: Speed factor (e.g., 0.9 = 90% speed)
-        
+
         Returns:
             Speed-perturbed audio
         """
         if audio.dim() == 1:
             audio = audio.unsqueeze(0)
-        
+
         # Resample to achieve speed change
         orig_freq = self.sample_rate
         new_freq = int(self.sample_rate / factor)
-        
+
         resampler = torchaudio.transforms.Resample(orig_freq, new_freq)
         audio_resampled = resampler(audio)
-        
+
         # Resample back to original sample rate
         resampler_back = torchaudio.transforms.Resample(new_freq, orig_freq)
         audio_final = resampler_back(audio_resampled)
-        
+
         return audio_final.squeeze(0)
-    
+
     def pitch_shift(self, audio: torch.Tensor, n_steps: int) -> torch.Tensor:
         """Apply pitch shifting to audio.
-        
+
         Args:
             audio: Audio tensor [T] or [1, T]
             n_steps: Number of semitones to shift
-        
+
         Returns:
             Pitch-shifted audio
         """
         if n_steps == 0:
             return audio
-        
+
         if audio.dim() == 1:
             audio = audio.unsqueeze(0)
-        
+
         # Use torchaudio's pitch shift
         pitch_shift = torchaudio.transforms.PitchShift(
-            self.sample_rate, n_steps
+            self.sample_rate,
+            n_steps,
         )
         audio_shifted = pitch_shift(audio)
-        
+
         return audio_shifted.squeeze(0)
-    
+
     def random_gain(self, audio: torch.Tensor, gain: float) -> torch.Tensor:
         """Apply random gain to audio.
-        
+
         Args:
             audio: Audio tensor
             gain: Gain factor
-        
+
         Returns:
             Gain-adjusted audio
         """
         return audio * gain
-    
+
     def __call__(self, audio: torch.Tensor) -> torch.Tensor:
         """Apply random augmentation to audio.
-        
+
         Args:
             audio: Audio tensor [T] or [1, T]
-        
+
         Returns:
             Augmented audio
         """
@@ -181,23 +180,23 @@ class AudioAugmentation:
         if self.enable_speed_perturb and random.random() < 0.5:
             speed_factor = random.uniform(*self.speed_perturb_range)
             audio = self.speed_perturb(audio, speed_factor)
-        
+
         # Pitch shifting
         if self.enable_pitch_shift and random.random() < 0.3:
             n_steps = random.randint(*self.pitch_shift_range)
             audio = self.pitch_shift(audio, n_steps)
-        
+
         # Random gain
         if self.enable_random_gain and random.random() < 0.5:
             gain = random.uniform(*self.gain_range)
             audio = self.random_gain(audio, gain)
-        
+
         return audio
 
 
 class PhonemeAugmentation:
     """Phoneme-level augmentation for robustness."""
-    
+
     def __init__(
         self,
         phoneme_dropout_prob: float = 0.1,
@@ -206,7 +205,7 @@ class PhonemeAugmentation:
         prosody_mask_token: int = 0,
     ):
         """Initialize phoneme augmentation.
-        
+
         Args:
             phoneme_dropout_prob: Probability of dropping a phoneme
             phoneme_mask_token: Token ID to use for masking
@@ -217,74 +216,78 @@ class PhonemeAugmentation:
         self.phoneme_mask_token = phoneme_mask_token
         self.prosody_dropout_prob = prosody_dropout_prob
         self.prosody_mask_token = prosody_mask_token
-    
+
     def __call__(
         self,
         phoneme_ids: torch.Tensor,
-        prosody_ids: Optional[torch.Tensor] = None,
-    ) -> tuple[torch.Tensor, Optional[torch.Tensor]]:
+        prosody_ids: torch.Tensor | None = None,
+    ) -> tuple[torch.Tensor, torch.Tensor | None]:
         """Apply phoneme augmentation.
-        
+
         Args:
             phoneme_ids: Phoneme ID tensor [B, T] or [T]
             prosody_ids: Optional prosody ID tensor
-        
+
         Returns:
             Augmented phoneme_ids and prosody_ids
         """
         # Phoneme dropout
         if self.phoneme_dropout_prob > 0:
-            dropout_mask = torch.rand_like(phoneme_ids.float()) < self.phoneme_dropout_prob
+            dropout_mask = (
+                torch.rand_like(phoneme_ids.float()) < self.phoneme_dropout_prob
+            )
             phoneme_ids = phoneme_ids.masked_fill(dropout_mask, self.phoneme_mask_token)
-        
+
         # Prosody dropout
         if prosody_ids is not None and self.prosody_dropout_prob > 0:
-            dropout_mask = torch.rand_like(prosody_ids.float()) < self.prosody_dropout_prob
+            dropout_mask = (
+                torch.rand_like(prosody_ids.float()) < self.prosody_dropout_prob
+            )
             prosody_ids = prosody_ids.masked_fill(dropout_mask, self.prosody_mask_token)
-        
+
         return phoneme_ids, prosody_ids
 
 
 class MixUp:
     """MixUp augmentation for spectrograms."""
-    
+
     def __init__(self, alpha: float = 0.2, prob: float = 0.5):
         """Initialize MixUp.
-        
+
         Args:
             alpha: Beta distribution parameter
             prob: Probability of applying mixup
         """
         self.alpha = alpha
         self.prob = prob
-    
+
     def __call__(
         self,
         spec1: torch.Tensor,
         spec2: torch.Tensor,
-        audio1: Optional[torch.Tensor] = None,
-        audio2: Optional[torch.Tensor] = None,
-    ) -> tuple[torch.Tensor, Optional[torch.Tensor], float]:
+        audio1: torch.Tensor | None = None,
+        audio2: torch.Tensor | None = None,
+    ) -> tuple[torch.Tensor, torch.Tensor | None, float]:
         """Apply MixUp to spectrograms and optionally audio.
-        
+
         Args:
             spec1: First spectrogram
             spec2: Second spectrogram
             audio1: Optional first audio
             audio2: Optional second audio
-        
+
         Returns:
             Mixed spectrogram, mixed audio (if provided), and mixing weight
         """
         if random.random() > self.prob:
             return spec1, audio1, 1.0
-        
+
         # Sample mixing weight from beta distribution
         lam = np.random.beta(self.alpha, self.alpha)
-        
+
         # Mix spectrograms
         mixed_spec = lam * spec1 + (1 - lam) * spec2
-        
+
         # Mix audio if provided
         mixed_audio = None
         if audio1 is not None and audio2 is not None:
@@ -293,5 +296,5 @@ class MixUp:
             audio1 = audio1[..., :min_len]
             audio2 = audio2[..., :min_len]
             mixed_audio = lam * audio1 + (1 - lam) * audio2
-        
+
         return mixed_spec, mixed_audio, lam

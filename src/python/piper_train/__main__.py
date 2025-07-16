@@ -18,7 +18,9 @@ def main():
 
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--dataset-dir", required=True, help="Path to pre-processed dataset directory"
+        "--dataset-dir",
+        required=True,
+        help="Path to pre-processed dataset directory",
     )
     parser.add_argument(
         "--checkpoint-epochs",
@@ -44,7 +46,8 @@ def main():
     parser.add_argument(
         "--no-ema",
         action="store_true",
-        help="Disable EMA (Exponential Moving Average). EMA is enabled by default for training stability",
+        help="Disable EMA (Exponential Moving Average). "
+        "EMA is enabled by default for training stability",
     )
     parser.add_argument(
         "--ema-decay",
@@ -80,11 +83,13 @@ def main():
     if args.checkpoint_epochs is not None:
         callbacks.append(
             ModelCheckpoint(
-                every_n_epochs=args.checkpoint_epochs, save_top_k=args.save_top_k
-            )
+                every_n_epochs=args.checkpoint_epochs,
+                save_top_k=args.save_top_k,
+            ),
         )
         _LOGGER.debug(
-            "Checkpoints will be saved every %s epoch(s)", args.checkpoint_epochs
+            "Checkpoints will be saved every %s epoch(s)",
+            args.checkpoint_epochs,
         )
 
     # EMA is enabled by default
@@ -113,7 +118,7 @@ def main():
         dict_args["upsample_initial_channel"] = 512
         dict_args["upsample_kernel_sizes"] = (16, 16, 4, 4)
 
-    # マルチスピーカーモデルの場合、gin_channelsを768に設定（品質向上のため）
+    # マルチスピーカーモデルの場合、gin_channelsを768に設定(品質向上のため)
     if num_speakers > 1 and "gin_channels" not in dict_args:
         dict_args["gin_channels"] = 768
 
@@ -154,19 +159,21 @@ def main():
         load_state_dict(model.model_g, g_dict)
         load_state_dict(model.model_d, model_single.model_d.state_dict())
         _LOGGER.info(
-            "Successfully converted single-speaker checkpoint to multi-speaker"
+            "Successfully converted single-speaker checkpoint to multi-speaker",
         )
 
     # チェックポイントからの再開処理を修正
     if args.resume_from_checkpoint:
         _LOGGER.debug(
-            "Loading weights from checkpoint: %s", args.resume_from_checkpoint
+            "Loading weights from checkpoint: %s",
+            args.resume_from_checkpoint,
         )
         try:
             # まずは通常のResumeを試みる
             trainer.fit(model, ckpt_path=args.resume_from_checkpoint)
         except (RuntimeError, KeyError) as e:
-            # RuntimeError (size mismatchなど) や KeyError (optimizer stateなし) が発生した場合
+            # RuntimeError (size mismatchなど) や KeyError (optimizer stateなし)
+            # が発生した場合
             _LOGGER.warning("Graceful resume failed with error: %s", e)
             _LOGGER.info("Attempting to load weights only (strict=False)...")
 
@@ -175,7 +182,7 @@ def main():
             model.load_state_dict(checkpoint["state_dict"], strict=False)
 
             _LOGGER.info(
-                "Weights loaded successfully with strict=False. Starting training without resuming optimizer state."  # noqa: E501
+                "Weights loaded successfully with strict=False. Starting training without resuming optimizer state.",  # noqa: E501
             )
 
             # argsからresume_from_checkpointを削除
@@ -183,7 +190,7 @@ def main():
             if "resume_from_checkpoint" in args_dict:
                 del args_dict["resume_from_checkpoint"]
 
-            # 新しいTrainerインスタンスを作成（ckpt_pathをクリアするため）
+            # 新しいTrainerインスタンスを作成(ckpt_pathをクリアするため)
             # Setup callbacks
             callbacks = []
             if args.checkpoint_epochs is not None:
@@ -191,7 +198,7 @@ def main():
                     ModelCheckpoint(
                         every_n_epochs=args.checkpoint_epochs,
                         save_top_k=args.save_top_k,
-                    )
+                    ),
                 )
                 _LOGGER.debug(
                     "Checkpoints will be saved every %s epoch(s)",

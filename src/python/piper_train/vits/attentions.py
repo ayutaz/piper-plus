@@ -42,7 +42,7 @@ class Encoder(nn.Module):
                     n_heads,
                     p_dropout=p_dropout,
                     window_size=window_size,
-                )
+                ),
             )
             self.norm_layers_1.append(LayerNorm(hidden_channels))
             self.ffn_layers.append(
@@ -52,7 +52,7 @@ class Encoder(nn.Module):
                     filter_channels,
                     kernel_size,
                     p_dropout=p_dropout,
-                )
+                ),
             )
             self.norm_layers_2.append(LayerNorm(hidden_channels))
 
@@ -116,13 +116,16 @@ class Decoder(nn.Module):
                     p_dropout=p_dropout,
                     proximal_bias=proximal_bias,
                     proximal_init=proximal_init,
-                )
+                ),
             )
             self.norm_layers_0.append(LayerNorm(hidden_channels))
             self.encdec_attn_layers.append(
                 MultiHeadAttention(
-                    hidden_channels, hidden_channels, n_heads, p_dropout=p_dropout
-                )
+                    hidden_channels,
+                    hidden_channels,
+                    n_heads,
+                    p_dropout=p_dropout,
+                ),
             )
             self.norm_layers_1.append(LayerNorm(hidden_channels))
             self.ffn_layers.append(
@@ -133,7 +136,7 @@ class Decoder(nn.Module):
                     kernel_size,
                     p_dropout=p_dropout,
                     causal=True,
-                )
+                ),
             )
             self.norm_layers_2.append(LayerNorm(hidden_channels))
 
@@ -200,11 +203,11 @@ class MultiHeadAttention(nn.Module):
             rel_stddev = self.k_channels**-0.5
             self.emb_rel_k = nn.Parameter(
                 torch.randn(n_heads_rel, window_size * 2 + 1, self.k_channels)
-                * rel_stddev
+                * rel_stddev,
             )
             self.emb_rel_v = nn.Parameter(
                 torch.randn(n_heads_rel, window_size * 2 + 1, self.k_channels)
-                * rel_stddev
+                * rel_stddev,
             )
 
         nn.init.xavier_uniform_(self.conv_q.weight)
@@ -239,7 +242,8 @@ class MultiHeadAttention(nn.Module):
             ), "Relative attention is only available for self-attention."
             key_relative_embeddings = self._get_relative_embeddings(self.emb_rel_k, t_s)
             rel_logits = self._matmul_with_relative_keys(
-                query / math.sqrt(self.k_channels), key_relative_embeddings
+                query / math.sqrt(self.k_channels),
+                key_relative_embeddings,
             )
             scores_local = self._relative_position_to_absolute_position(rel_logits)
             scores = scores + scores_local
@@ -264,10 +268,12 @@ class MultiHeadAttention(nn.Module):
         if self.window_size is not None:
             relative_weights = self._absolute_position_to_relative_position(p_attn)
             value_relative_embeddings = self._get_relative_embeddings(
-                self.emb_rel_v, t_s
+                self.emb_rel_v,
+                t_s,
             )
             output = output + self._matmul_with_relative_values(
-                relative_weights, value_relative_embeddings
+                relative_weights,
+                value_relative_embeddings,
             )
         output = (
             output.transpose(2, 3).contiguous().view(b, d, t_t)
@@ -307,7 +313,8 @@ class MultiHeadAttention(nn.Module):
         else:
             padded_relative_embeddings = relative_embeddings
         used_relative_embeddings = padded_relative_embeddings[
-            :, slice_start_position:slice_end_position
+            :,
+            slice_start_position:slice_end_position,
         ]
         return used_relative_embeddings
 
@@ -329,7 +336,10 @@ class MultiHeadAttention(nn.Module):
 
         # Reshape and slice out the padded elements.
         x_final = x_flat.view([batch, heads, length + 1, (2 * length) - 1])[
-            :, :, :length, length - 1 :
+            :,
+            :,
+            :length,
+            length - 1 :,
         ]
         return x_final
 

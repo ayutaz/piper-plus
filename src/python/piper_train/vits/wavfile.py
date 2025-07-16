@@ -312,7 +312,7 @@ def _raise_bad_format(format_tag):
         format_name = f"{format_tag:#06x}"
     raise ValueError(
         f"Unknown wave file format: {format_name}. Supported "
-        "formats: " + ", ".join(x.name for x in KNOWN_WAVE_FORMATS)
+        "formats: " + ", ".join(x.name for x in KNOWN_WAVE_FORMATS),
     )
 
 
@@ -387,7 +387,13 @@ def _read_fmt_chunk(fid, is_big_endian):
 
 
 def _read_data_chunk(
-    fid, format_tag, channels, bit_depth, is_big_endian, block_align, mmap=False
+    fid,
+    format_tag,
+    channels,
+    bit_depth,
+    is_big_endian,
+    block_align,
+    mmap=False,
 ):
     """
     Notes
@@ -437,7 +443,7 @@ def _read_data_chunk(
         else:
             raise ValueError(
                 "Unsupported bit depth: the WAV file "
-                f"has {bit_depth}-bit integer data."
+                f"has {bit_depth}-bit integer data.",
             )
     elif format_tag == WAVE_FORMAT.IEEE_FLOAT:
         if bit_depth in {32, 64}:
@@ -445,7 +451,7 @@ def _read_data_chunk(
         else:
             raise ValueError(
                 "Unsupported bit depth: the WAV file "
-                f"has {bit_depth}-bit floating-point data."
+                f"has {bit_depth}-bit floating-point data.",
             )
     else:
         _raise_bad_format(format_tag)
@@ -463,7 +469,8 @@ def _read_data_chunk(
             # Rearrange raw bytes into smallest compatible numpy dtype
             dt = f"{fmt}i4" if bytes_per_sample == 3 else f"{fmt}i8"
             a = numpy.zeros(
-                (len(data) // bytes_per_sample, numpy.dtype(dt).itemsize), dtype="V1"
+                (len(data) // bytes_per_sample, numpy.dtype(dt).itemsize),
+                dtype="V1",
             )
             if is_big_endian:
                 a[:, :bytes_per_sample] = data.reshape((-1, bytes_per_sample))
@@ -473,12 +480,16 @@ def _read_data_chunk(
     elif bytes_per_sample in {1, 2, 4, 8}:
         start = fid.tell()
         data = numpy.memmap(
-            fid, dtype=dtype, mode="c", offset=start, shape=(n_samples,)
+            fid,
+            dtype=dtype,
+            mode="c",
+            offset=start,
+            shape=(n_samples,),
         )
         fid.seek(start + size)
     else:
         raise ValueError(
-            "mmap=True not compatible with " f"{bytes_per_sample}-byte container size."
+            "mmap=True not compatible with " f"{bytes_per_sample}-byte container size.",
         )
 
     _handle_pad_byte(fid, size)
@@ -516,8 +527,8 @@ def _read_riff_chunk(fid):
     else:
         # There are also .wav files with "FFIR" or "XFIR" signatures?
         raise ValueError(
-            f"File format {repr(str1)} not understood. Only "
-            "'RIFF' and 'RIFX' supported."
+            f"File format {str1!r} not understood. Only "
+            "'RIFF' and 'RIFX' supported.",
         )
 
     # Size of entire file
@@ -525,7 +536,7 @@ def _read_riff_chunk(fid):
 
     str2 = fid.read(4)
     if str2 != b"WAVE":
-        raise ValueError(f"Not a WAV file. RIFF form type is {repr(str2)}.")
+        raise ValueError(f"Not a WAV file. RIFF form type is {str2!r}.")
 
     return file_size, is_big_endian
 
@@ -667,7 +678,7 @@ def read(filename, mmap=False):
 
                 raise ValueError("Unexpected end of file.")
             if len(chunk_id) < 4:
-                msg = f"Incomplete chunk ID: {repr(chunk_id)}"
+                msg = f"Incomplete chunk ID: {chunk_id!r}"
                 # If we have the data, ignore the broken chunk
                 if fmt_chunk_received and data_chunk_received:
                     warnings.warn(msg + ", ignoring it.", WavFileWarning, stacklevel=2)
@@ -780,7 +791,7 @@ def write(filename, rate, data):
 
     try:
         dkind = data.dtype.kind
-        if not (dkind in ("i", "f") or dkind == "u" and data.dtype.itemsize == 1):
+        if not (dkind in ("i", "f") or (dkind == "u" and data.dtype.itemsize == 1)):
             raise ValueError(f"Unsupported data type '{data.dtype}'")
 
         header_data = b""

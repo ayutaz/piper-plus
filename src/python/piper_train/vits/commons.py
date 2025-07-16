@@ -69,7 +69,7 @@ def get_timing_signal_1d(length, channels, min_timescale=1.0, max_timescale=1.0e
         num_timescales - 1
     )
     inv_timescales = min_timescale * torch.exp(
-        torch.arange(num_timescales, dtype=torch.float) * -log_timescale_increment
+        torch.arange(num_timescales, dtype=torch.float) * -log_timescale_increment,
     )
     scaled_time = position.unsqueeze(0) * inv_timescales.unsqueeze(1)
     signal = torch.cat([torch.sin(scaled_time), torch.cos(scaled_time)], 0)

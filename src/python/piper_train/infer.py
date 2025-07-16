@@ -20,7 +20,9 @@ def main():
     logging.basicConfig(level=logging.DEBUG)
     parser = argparse.ArgumentParser(prog="piper_train.infer")
     parser.add_argument(
-        "--checkpoint", required=True, help="Path to model checkpoint (.ckpt)"
+        "--checkpoint",
+        required=True,
+        help="Path to model checkpoint (.ckpt)",
     )
     parser.add_argument("--output-dir", required=True, help="Path to write WAV files")
     parser.add_argument("--sample-rate", type=int, default=22050)

@@ -31,7 +31,7 @@ class SileroVoiceActivityDetector:
 
         if len(audio_array.shape) > 2:
             raise ValueError(
-                f"Too many dimensions for input audio chunk {audio_array.shape}"
+                f"Too many dimensions for input audio chunk {audio_array.shape}",
             )
 
         if audio_array.shape[0] > 1:

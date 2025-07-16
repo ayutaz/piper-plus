@@ -1,8 +1,7 @@
 """Multi-Resolution STFT Discriminator for improved perceptual quality."""
 
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
+from torch import nn
 from torch.nn.utils import spectral_norm, weight_norm
 
 
@@ -19,19 +18,21 @@ class Conv2DBlock(nn.Module):
         norm_type: str = "spectral",
     ):
         super().__init__()
-        
+
         # Choose normalization
         if norm_type == "spectral":
             self.conv = spectral_norm(
-                nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding)
+                nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding),
             )
         elif norm_type == "weight":
             self.conv = weight_norm(
-                nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding)
+                nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding),
             )
         else:
-            self.conv = nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding)
-        
+            self.conv = nn.Conv2d(
+                in_channels, out_channels, kernel_size, stride, padding
+            )
+
         self.activation = nn.LeakyReLU(0.2, inplace=True)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -58,24 +59,33 @@ class STFTDiscriminator(nn.Module):
         # Build convolutional layers
         self.convs = nn.ModuleList()
         in_channels = 2  # Real and imaginary parts
-        
+
         for i, out_channels in enumerate(channels):
             kernel_size = (3, 3) if i < len(channels) - 1 else (3, 1)
             stride = (2, 2) if i < len(channels) - 1 else (1, 1)
             padding = (1, 1) if i < len(channels) - 1 else (1, 0)
-            
+
             self.convs.append(
                 Conv2DBlock(
-                    in_channels, out_channels, kernel_size, stride, padding, norm_type
-                )
+                    in_channels,
+                    out_channels,
+                    kernel_size,
+                    stride,
+                    padding,
+                    norm_type,
+                ),
             )
             in_channels = out_channels
 
         # Final conv to single channel output
         if norm_type == "spectral":
-            self.conv_post = spectral_norm(nn.Conv2d(channels[-1], 1, (3, 1), (1, 1), (1, 0)))
+            self.conv_post = spectral_norm(
+                nn.Conv2d(channels[-1], 1, (3, 1), (1, 1), (1, 0))
+            )
         else:
-            self.conv_post = weight_norm(nn.Conv2d(channels[-1], 1, (3, 1), (1, 1), (1, 0)))
+            self.conv_post = weight_norm(
+                nn.Conv2d(channels[-1], 1, (3, 1), (1, 1), (1, 0))
+            )
 
     def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, list[torch.Tensor]]:
         """Forward pass of STFT discriminator.
@@ -90,7 +100,7 @@ class STFTDiscriminator(nn.Module):
         # Handle different input shapes
         if x.dim() == 3:
             x = x.squeeze(1)
-        
+
         # Compute STFT
         x_stft = torch.stft(
             x,
@@ -100,7 +110,7 @@ class STFTDiscriminator(nn.Module):
             window=self.window,
             return_complex=True,
         )  # [B, F, T]
-        
+
         # Stack real and imaginary parts
         x_real = x_stft.real.unsqueeze(1)  # [B, 1, F, T]
         x_imag = x_stft.imag.unsqueeze(1)  # [B, 1, F, T]
@@ -122,7 +132,7 @@ class STFTDiscriminator(nn.Module):
 
 class MultiResolutionSTFTDiscriminator(nn.Module):
     """Multi-Resolution STFT Discriminator.
-    
+
     Uses multiple STFT resolutions to capture different time-frequency characteristics.
     """
 
@@ -136,7 +146,7 @@ class MultiResolutionSTFTDiscriminator(nn.Module):
     ):
         super().__init__()
         assert len(fft_sizes) == len(hop_sizes) == len(win_sizes)
-        
+
         # Default channel configurations for each resolution
         if channels is None:
             channels = [
@@ -147,15 +157,26 @@ class MultiResolutionSTFTDiscriminator(nn.Module):
 
         self.discriminators = nn.ModuleList()
         for fft_size, hop_size, win_size, ch in zip(
-            fft_sizes, hop_sizes, win_sizes, channels
+            fft_sizes,
+            hop_sizes,
+            win_sizes,
+            channels,
+            strict=False,
         ):
             self.discriminators.append(
-                STFTDiscriminator(fft_size, hop_size, win_size, norm_type, ch)
+                STFTDiscriminator(fft_size, hop_size, win_size, norm_type, ch),
             )
 
     def forward(
-        self, y: torch.Tensor, y_hat: torch.Tensor
-    ) -> tuple[list[torch.Tensor], list[torch.Tensor], list[list[torch.Tensor]], list[list[torch.Tensor]]]:
+        self,
+        y: torch.Tensor,
+        y_hat: torch.Tensor,
+    ) -> tuple[
+        list[torch.Tensor],
+        list[torch.Tensor],
+        list[list[torch.Tensor]],
+        list[list[torch.Tensor]],
+    ]:
         """Forward pass of multi-resolution STFT discriminator.
 
         Args:
@@ -176,7 +197,7 @@ class MultiResolutionSTFTDiscriminator(nn.Module):
         for discriminator in self.discriminators:
             y_d_r, fmap_r = discriminator(y)
             y_d_g, fmap_g = discriminator(y_hat)
-            
+
             y_d_rs.append(y_d_r)
             y_d_gs.append(y_d_g)
             fmap_rs.append(fmap_r)
@@ -197,19 +218,28 @@ class CombinedMultiDiscriminator(nn.Module):
         win_sizes: list[int] = [480, 960, 1920],
     ):
         super().__init__()
-        
+
         # Import existing MultiPeriodDiscriminator
         from .models import MultiPeriodDiscriminator
-        
+
         self.mpd = MultiPeriodDiscriminator(use_spectral_norm)
         self.mrd = MultiResolutionSTFTDiscriminator(
-            fft_sizes, hop_sizes, win_sizes,
-            norm_type="spectral" if use_spectral_norm else "weight"
+            fft_sizes,
+            hop_sizes,
+            win_sizes,
+            norm_type="spectral" if use_spectral_norm else "weight",
         )
 
     def forward(
-        self, y: torch.Tensor, y_hat: torch.Tensor
-    ) -> tuple[list[torch.Tensor], list[torch.Tensor], list[list[torch.Tensor]], list[list[torch.Tensor]]]:
+        self,
+        y: torch.Tensor,
+        y_hat: torch.Tensor,
+    ) -> tuple[
+        list[torch.Tensor],
+        list[torch.Tensor],
+        list[list[torch.Tensor]],
+        list[list[torch.Tensor]],
+    ]:
         """Forward pass combining both discriminators.
 
         Args:
@@ -224,10 +254,10 @@ class CombinedMultiDiscriminator(nn.Module):
         """
         # Multi-Period Discriminator
         mpd_y_d_rs, mpd_y_d_gs, mpd_fmap_rs, mpd_fmap_gs = self.mpd(y, y_hat)
-        
+
         # Multi-Resolution STFT Discriminator
         mrd_y_d_rs, mrd_y_d_gs, mrd_fmap_rs, mrd_fmap_gs = self.mrd(y, y_hat)
-        
+
         # Combine outputs
         y_d_rs = mpd_y_d_rs + mrd_y_d_rs
         y_d_gs = mpd_y_d_gs + mrd_y_d_gs

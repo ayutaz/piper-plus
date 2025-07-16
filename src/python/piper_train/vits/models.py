@@ -35,27 +35,33 @@ class StochasticDurationPredictor(nn.Module):
         self.flows.append(modules.ElementwiseAffine(2))
         for _i in range(n_flows):
             self.flows.append(
-                modules.ConvFlow(2, filter_channels, kernel_size, n_layers=3)
+                modules.ConvFlow(2, filter_channels, kernel_size, n_layers=3),
             )
             self.flows.append(modules.Flip())
 
         self.post_pre = nn.Conv1d(1, filter_channels, 1)
         self.post_proj = nn.Conv1d(filter_channels, filter_channels, 1)
         self.post_convs = modules.DDSConv(
-            filter_channels, kernel_size, n_layers=3, p_dropout=p_dropout
+            filter_channels,
+            kernel_size,
+            n_layers=3,
+            p_dropout=p_dropout,
         )
         self.post_flows = nn.ModuleList()
         self.post_flows.append(modules.ElementwiseAffine(2))
         for _i in range(4):
             self.post_flows.append(
-                modules.ConvFlow(2, filter_channels, kernel_size, n_layers=3)
+                modules.ConvFlow(2, filter_channels, kernel_size, n_layers=3),
             )
             self.post_flows.append(modules.Flip())
 
         self.pre = nn.Conv1d(in_channels, filter_channels, 1)
         self.proj = nn.Conv1d(filter_channels, filter_channels, 1)
         self.convs = modules.DDSConv(
-            filter_channels, kernel_size, n_layers=3, p_dropout=p_dropout
+            filter_channels,
+            kernel_size,
+            n_layers=3,
+            p_dropout=p_dropout,
         )
         if gin_channels != 0:
             self.cond = nn.Conv1d(gin_channels, filter_channels, 1)
@@ -86,7 +92,8 @@ class StochasticDurationPredictor(nn.Module):
             u = torch.sigmoid(z_u) * x_mask
             z0 = (w - u) * x_mask
             logdet_tot_q += torch.sum(
-                (F.logsigmoid(z_u) + F.logsigmoid(-z_u)) * x_mask, [1, 2]
+                (F.logsigmoid(z_u) + F.logsigmoid(-z_u)) * x_mask,
+                [1, 2],
             )
             logq = (
                 torch.sum(-0.5 * (math.log(2 * math.pi) + (e_q**2)) * x_mask, [1, 2])
@@ -105,16 +112,15 @@ class StochasticDurationPredictor(nn.Module):
                 - logdet_tot
             )
             return nll + logq  # [b]
-        else:
-            flows = list(reversed(self.flows))
-            flows = flows[:-2] + [flows[-1]]  # remove a useless vflow
-            z = torch.randn(x.size(0), 2, x.size(2)).type_as(x) * noise_scale
+        flows = list(reversed(self.flows))
+        flows = flows[:-2] + [flows[-1]]  # remove a useless vflow
+        z = torch.randn(x.size(0), 2, x.size(2)).type_as(x) * noise_scale
 
-            for flow in flows:
-                z = flow(z, x_mask, g=x, reverse=reverse)
-            z0, z1 = torch.split(z, [1, 1], 1)
-            logw = z0
-            return logw
+        for flow in flows:
+            z = flow(z, x_mask, g=x, reverse=reverse)
+        z0, z1 = torch.split(z, [1, 1], 1)
+        logw = z0
+        return logw
 
 
 class DurationPredictor(nn.Module):
@@ -136,11 +142,17 @@ class DurationPredictor(nn.Module):
 
         self.drop = nn.Dropout(p_dropout)
         self.conv_1 = nn.Conv1d(
-            in_channels, filter_channels, kernel_size, padding=kernel_size // 2
+            in_channels,
+            filter_channels,
+            kernel_size,
+            padding=kernel_size // 2,
         )
         self.norm_1 = modules.LayerNorm(filter_channels)
         self.conv_2 = nn.Conv1d(
-            filter_channels, filter_channels, kernel_size, padding=kernel_size // 2
+            filter_channels,
+            filter_channels,
+            kernel_size,
+            padding=kernel_size // 2,
         )
         self.norm_2 = modules.LayerNorm(filter_channels)
         self.proj = nn.Conv1d(filter_channels, 1, 1)
@@ -191,7 +203,12 @@ class TextEncoder(nn.Module):
         nn.init.normal_(self.emb.weight, 0.0, hidden_channels**-0.5)
 
         self.encoder = attentions.Encoder(
-            hidden_channels, filter_channels, n_heads, n_layers, kernel_size, p_dropout
+            hidden_channels,
+            filter_channels,
+            n_heads,
+            n_layers,
+            kernel_size,
+            p_dropout,
         )
         self.proj = nn.Conv1d(hidden_channels, out_channels * 2, 1)
 
@@ -199,7 +216,8 @@ class TextEncoder(nn.Module):
         x = self.emb(x) * math.sqrt(self.hidden_channels)  # [b, t, h]
         x = torch.transpose(x, 1, -1)  # [b, h, t]
         x_mask = torch.unsqueeze(
-            commons.sequence_mask(x_lengths, x.size(2)), 1
+            commons.sequence_mask(x_lengths, x.size(2)),
+            1,
         ).type_as(x)
 
         x = self.encoder(x * x_mask, x_mask)
@@ -240,7 +258,7 @@ class ResidualCouplingBlock(nn.Module):
                     n_layers,
                     gin_channels=gin_channels,
                     mean_only=True,
-                )
+                ),
             )
             self.flows.append(modules.Flip())
 
@@ -286,7 +304,8 @@ class PosteriorEncoder(nn.Module):
 
     def forward(self, x, x_lengths, g=None):
         x_mask = torch.unsqueeze(
-            commons.sequence_mask(x_lengths, x.size(2)), 1
+            commons.sequence_mask(x_lengths, x.size(2)),
+            1,
         ).type_as(x)
         x = self.pre(x) * x_mask
         x = self.enc(x, x_mask, g=g)
@@ -313,13 +332,17 @@ class Generator(torch.nn.Module):
         self.num_kernels = len(resblock_kernel_sizes)
         self.num_upsamples = len(upsample_rates)
         self.conv_pre = Conv1d(
-            initial_channel, upsample_initial_channel, 7, 1, padding=3
+            initial_channel,
+            upsample_initial_channel,
+            7,
+            1,
+            padding=3,
         )
         resblock_module = modules.ResBlock1 if resblock == "1" else modules.ResBlock2
 
         self.ups = nn.ModuleList()
         for i, (u, k) in enumerate(
-            zip(upsample_rates, upsample_kernel_sizes, strict=False)
+            zip(upsample_rates, upsample_kernel_sizes, strict=False),
         ):
             self.ups.append(
                 weight_norm(
@@ -329,15 +352,15 @@ class Generator(torch.nn.Module):
                         k,
                         u,
                         padding=(k - u) // 2,
-                    )
-                )
+                    ),
+                ),
             )
 
         self.resblocks = nn.ModuleList()
         for i in range(len(self.ups)):
             ch = upsample_initial_channel // (2 ** (i + 1))
             for _j, (k, d) in enumerate(
-                zip(resblock_kernel_sizes, resblock_dilation_sizes, strict=False)
+                zip(resblock_kernel_sizes, resblock_dilation_sizes, strict=False),
             ):
                 self.resblocks.append(resblock_module(ch, k, d))
 
@@ -399,7 +422,7 @@ class DiscriminatorP(torch.nn.Module):
                         (kernel_size, 1),
                         (stride, 1),
                         padding=(get_padding(kernel_size, 1), 0),
-                    )
+                    ),
                 ),
                 norm_f(
                     Conv2d(
@@ -408,7 +431,7 @@ class DiscriminatorP(torch.nn.Module):
                         (kernel_size, 1),
                         (stride, 1),
                         padding=(get_padding(kernel_size, 1), 0),
-                    )
+                    ),
                 ),
                 norm_f(
                     Conv2d(
@@ -417,7 +440,7 @@ class DiscriminatorP(torch.nn.Module):
                         (kernel_size, 1),
                         (stride, 1),
                         padding=(get_padding(kernel_size, 1), 0),
-                    )
+                    ),
                 ),
                 norm_f(
                     Conv2d(
@@ -426,7 +449,7 @@ class DiscriminatorP(torch.nn.Module):
                         (kernel_size, 1),
                         (stride, 1),
                         padding=(get_padding(kernel_size, 1), 0),
-                    )
+                    ),
                 ),
                 norm_f(
                     Conv2d(
@@ -435,9 +458,9 @@ class DiscriminatorP(torch.nn.Module):
                         (kernel_size, 1),
                         1,
                         padding=(get_padding(kernel_size, 1), 0),
-                    )
+                    ),
                 ),
-            ]
+            ],
         )
         self.conv_post = norm_f(Conv2d(1024, 1, (3, 1), 1, padding=(1, 0)))
 
@@ -476,7 +499,7 @@ class DiscriminatorS(torch.nn.Module):
                 norm_f(Conv1d(256, 1024, 41, 4, groups=64, padding=20)),
                 norm_f(Conv1d(1024, 1024, 41, 4, groups=256, padding=20)),
                 norm_f(Conv1d(1024, 1024, 5, 1, padding=2)),
-            ]
+            ],
         )
         self.conv_post = norm_f(Conv1d(1024, 1, 3, 1, padding=1))
 
@@ -600,16 +623,30 @@ class SynthesizerTrn(nn.Module):
             gin_channels=gin_channels,
         )
         self.flow = ResidualCouplingBlock(
-            inter_channels, hidden_channels, 5, 1, 4, gin_channels=gin_channels
+            inter_channels,
+            hidden_channels,
+            5,
+            1,
+            4,
+            gin_channels=gin_channels,
         )
 
         if use_sdp:
             self.dp = StochasticDurationPredictor(
-                hidden_channels, 192, 3, 0.5, 4, gin_channels=gin_channels
+                hidden_channels,
+                192,
+                3,
+                0.5,
+                4,
+                gin_channels=gin_channels,
             )
         else:
             self.dp = DurationPredictor(
-                hidden_channels, 256, 3, 0.5, gin_channels=gin_channels
+                hidden_channels,
+                256,
+                3,
+                0.5,
+                gin_channels=gin_channels,
             )
 
         # Add F0 predictor for prosody modeling
@@ -645,16 +682,22 @@ class SynthesizerTrn(nn.Module):
             # negative cross-entropy
             s_p_sq_r = torch.exp(-2 * logs_p)  # [b, d, t]
             neg_cent1 = torch.sum(
-                -0.5 * math.log(2 * math.pi) - logs_p, [1], keepdim=True
+                -0.5 * math.log(2 * math.pi) - logs_p,
+                [1],
+                keepdim=True,
             )  # [b, 1, t_s]
             neg_cent2 = torch.matmul(
-                -0.5 * (z_p**2).transpose(1, 2), s_p_sq_r
+                -0.5 * (z_p**2).transpose(1, 2),
+                s_p_sq_r,
             )  # [b, t_t, d] x [b, d, t_s] = [b, t_t, t_s]
             neg_cent3 = torch.matmul(
-                z_p.transpose(1, 2), (m_p * s_p_sq_r)
+                z_p.transpose(1, 2),
+                (m_p * s_p_sq_r),
             )  # [b, t_t, d] x [b, d, t_s] = [b, t_t, t_s]
             neg_cent4 = torch.sum(
-                -0.5 * (m_p**2) * s_p_sq_r, [1], keepdim=True
+                -0.5 * (m_p**2) * s_p_sq_r,
+                [1],
+                keepdim=True,
             )  # [b, 1, t_s]
             neg_cent = neg_cent1 + neg_cent2 + neg_cent3 + neg_cent4
 
@@ -673,7 +716,7 @@ class SynthesizerTrn(nn.Module):
             logw_ = torch.log(w + 1e-6) * x_mask
             logw = self.dp(x, x_mask, g=g)
             l_length = torch.sum((logw - logw_) ** 2, [1, 2]) / torch.sum(
-                x_mask
+                x_mask,
             )  # for averaging
 
         # expand prior
@@ -681,7 +724,9 @@ class SynthesizerTrn(nn.Module):
         logs_p = torch.matmul(attn.squeeze(1), logs_p.transpose(1, 2)).transpose(1, 2)
 
         z_slice, ids_slice = commons.rand_slice_segments(
-            z, y_lengths, self.segment_size
+            z,
+            y_lengths,
+            self.segment_size,
         )
         o = self.dec(z_slice, g=g)
         return (
@@ -728,16 +773,19 @@ class SynthesizerTrn(nn.Module):
         w_ceil = torch.ceil(w)
         y_lengths = torch.clamp_min(torch.sum(w_ceil, [1, 2]), 1).long()
         y_mask = torch.unsqueeze(
-            commons.sequence_mask(y_lengths, y_lengths.max()), 1
+            commons.sequence_mask(y_lengths, y_lengths.max()),
+            1,
         ).type_as(x_mask)
         attn_mask = torch.unsqueeze(x_mask, 2) * torch.unsqueeze(y_mask, -1)
         attn = commons.generate_path(w_ceil, attn_mask)
 
         m_p = torch.matmul(attn.squeeze(1), m_p.transpose(1, 2)).transpose(
-            1, 2
+            1,
+            2,
         )  # [b, t', t], [b, t, d] -> [b, d, t']
         logs_p = torch.matmul(attn.squeeze(1), logs_p.transpose(1, 2)).transpose(
-            1, 2
+            1,
+            2,
         )  # [b, t', t], [b, t, d] -> [b, d, t']
 
         z_p = m_p + torch.randn_like(m_p) * torch.exp(logs_p) * noise_scale
