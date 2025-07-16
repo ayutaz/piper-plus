@@ -282,7 +282,7 @@ class VitsModel(pl.LightningModule):
             pred_durations,
         ) = self.model_g(x, x_lengths, spec, spec_lengths, speaker_ids, prosody_ids, texts)
         self._y_hat = y_hat
-        
+
         # Store z for flow matching loss
         self._z = _z
         self._z_mask = z_mask
@@ -358,7 +358,7 @@ class VitsModel(pl.LightningModule):
                 # Log STFT metrics
                 for metric_name, metric_value in stft_metrics.items():
                     self.log(f"train/{metric_name}", metric_value)
-            
+
             # WavLM discriminator already includes multi-scale losses
             # so we don't need separate STFT loss when using WavLM
 
@@ -381,7 +381,7 @@ class VitsModel(pl.LightningModule):
             # Adjust feature matching loss weight when using WavLM
             if self.hparams.use_wavlm_discriminator:
                 loss_fm = loss_fm * self.hparams.c_wavlm
-            
+
             # Flow matching loss
             loss_flow_matching = 0.0
             if self.hparams.use_flow_matching:
@@ -389,12 +389,12 @@ class VitsModel(pl.LightningModule):
                 g = None
                 if speaker_ids is not None:
                     g = self.model_g.emb_g(speaker_ids).unsqueeze(-1)
-                
+
                 loss_flow_matching = self.model_g.compute_flow_matching_loss(
                     self._z, self._z_mask, g
                 ) * self.hparams.c_flow_matching
                 self.log("loss_flow_matching", loss_flow_matching)
-                
+
             loss_gen_all = (
                 loss_gen
                 + loss_fm

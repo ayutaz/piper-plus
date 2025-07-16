@@ -610,7 +610,7 @@ class SynthesizerTrn(nn.Module):
             kernel_size,
             p_dropout,
         )
-        
+
         # Wrap with BERT encoder if enabled
         if use_bert_encoder:
             from .bert_encoder import BERTTextEncoder
@@ -837,15 +837,15 @@ class SynthesizerTrn(nn.Module):
         z_hat = self.flow(z_p, y_mask, g=g_tgt, reverse=True)
         o_hat = self.dec(z_hat * y_mask, g=g_tgt)
         return o_hat, y_mask, (z, z_p, z_hat)
-    
+
     def compute_flow_matching_loss(self, z, y_mask, g=None):
         """Compute flow matching loss if enabled.
-        
+
         Args:
             z: Latent variables [B, C, T]
             y_mask: Mask [B, 1, T]
             g: Global conditioning [B, C_g, 1]
-            
+
         Returns:
             loss: Flow matching loss or 0 if not using flow matching
         """

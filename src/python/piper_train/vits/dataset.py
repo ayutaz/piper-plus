@@ -303,7 +303,7 @@ class UtteranceCollate:
         texts = None
         if any(utt.text is not None for utt in utterances):
             texts = []
-        
+
         # Sort by decreasing spectrogram length
         sorted_utterances = sorted(
             utterances,
@@ -338,7 +338,7 @@ class UtteranceCollate:
                 f0_padded[utt_idx, :f0_length] = utt.f0_values[:f0_length]
                 if utt.f0_voiced is not None and f0_voiced_padded is not None:
                     f0_voiced_padded[utt_idx, :f0_length] = utt.f0_voiced[:f0_length]
-            
+
             if texts is not None and utt.text is not None:
                 texts.append(utt.text)
 
