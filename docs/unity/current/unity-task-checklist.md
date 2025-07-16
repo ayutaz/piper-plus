@@ -11,12 +11,15 @@
   - [x] TestMode サポート
   - [x] 単体テスト作成
 
-- [x] **音素化インターフェース**
+- [x] **音素化インターフェース** ✅ Phase 1.4-1.6完了
   - [x] IPhonemizer インターフェース定義
+  - [x] PhonemeResult データ構造
   - [x] BasePhonemizer 実装（LRUキャッシュ付き）
   - [x] MockPhonemizer 実装（テスト用）
-  - [x] テキスト正規化機能
-  - [x] 単体テスト作成
+  - [x] テキスト正規化機能（多言語対応）
+  - [x] LRUキャッシュ実装（スレッドセーフ）
+  - [x] LanguageInfo メタデータ管理
+  - [x] 包括的単体テスト（126個）
 
 - [x] **Sentis音声合成（基本実装）**
   - [x] SentisAudioGenerator クラス

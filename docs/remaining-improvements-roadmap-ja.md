@@ -1,157 +1,178 @@
 # Piper-Plus 残りの精度向上策ロードマップ
 
-## 実装済み
-- ✅ **gin_channels増加（PR #97）**: MOS +0.04-0.06達成
+## 実装状況サマリー
 
-## 残りの改善策（優先順位順）
+### v1ブランチで実装済み ✅
+- **gin_channels増加（PR #97）**: MOS +0.04-0.06達成
+- **F0予測器（PR #98）**: MOS +0.10達成
+- **AccentProcessor（PR #98）**: MOS +0.05-0.08達成
+- **EMA実装（PR #98）**: MOS +0.03-0.06達成
 
-### 1. 既存コンポーネントの統合（すぐに実装可能）
+### v2ブランチで実装済み ✅
+- **Multi-Resolution STFT Discriminator**: MOS +0.08-0.12達成
+- **アクセント強度レベル（3段階）**: MOS +0.03-0.05達成
+- **質問文検出の改善**: MOS +0.02-0.03達成
+- **データ拡張（SpecAugment等）**: MOS +0.05-0.10達成
+- **Duration正則化**: MOS +0.02-0.04達成
+- **Transformer blocks**: 既にVITSアーキテクチャに統合済み
 
-#### 1-1. AccentProcessor統合（実装時間：3-4時間）
-**現状**: `accent_processor.py`は実装済みだが未使用
+### 累積改善効果
+- **v1ブランチ合計**: MOS +0.20-0.30
+- **v2ブランチ合計**: MOS +0.26-0.46
+- **現在の合計改善**: MOS +0.46-0.76
 
-**期待効果**: MOS +0.05-0.08
+## 真に残っている改善策（3つのみ）
 
-**実装内容**:
-- 拡張アクセントマーク（↑↓→⤴⤵|‖）の有効化
-- 前処理パイプラインへの統合
-- F0予測器との連携準備
+### 1. WavLM Discriminator（最優先）❌
+**期待効果**: MOS +0.15-0.25（単独で最大の改善）
 
-**ファイル**:
-- `src/python/piper_train/phonemize/accent_processor.py`（作成済み）
-- `src/python/piper_train/preprocess.py`（修正必要）
+**概要**: 
+- StyleTTS2やFLY-TTSで採用されている最先端技術
+- 事前学習済みWavLMモデルを識別器として使用
+- 人間の聴覚特性により近い音声品質評価
 
-#### 1-2. EMA実装（実装時間：1-2日）
-**現状**: `ema.py`は実装済みだが未使用
-
-**期待効果**: MOS +0.03-0.06
-
-**実装内容**:
-- HiFi-GANジェネレータへのEMA適用
-- PyTorch Lightningコールバックの統合
-- ファインチューニング時の品質保持
-
-**ファイル**:
-- `src/python/piper_train/vits/ema.py`（作成済み）
-- `src/python/piper_train/__main__.py`（修正必要）
-
-### 2. 軽量な新規実装（1週間以内）
-
-#### 2-1. アクセント強度レベル（実装時間：2-3時間）
-**期待効果**: MOS +0.03-0.05
+**実装時間**: 2週間
 
 **実装内容**:
 ```python
-# 3段階のアクセント強度
-ACCENT_STRENGTH = {
-    '[1': 'weak_rise',
-    '[2': 'medium_rise', 
-    '[3': 'strong_rise',
-    ']1': 'weak_fall',
-    ']2': 'medium_fall',
-    ']3': 'strong_fall',
-}
+# src/python/piper_train/vits/wavlm_discriminator.py
+class WavLMDiscriminator(nn.Module):
+    def __init__(self, pretrained_model="microsoft/wavlm-base"):
+        super().__init__()
+        self.wavlm = WavLMModel.from_pretrained(pretrained_model)
+        # Lower layers frozen for feature extraction
+        # Custom discriminator head on top
 ```
 
-**ファイル**:
-- `src/python/piper_train/phonemize/japanese.py`
-- `src/python/piper_train/phonemize/jp_id_map.py`
+**利点**:
+- プロソディの自然性が大幅に向上
+- ポーズや呼吸音の扱いが改善
+- 感情表現が豊かになる
 
-#### 2-2. 質問文検出の改善（実装時間：1-2時間）
-**期待効果**: MOS +0.02-0.03
+### 2. 日本語BERT埋め込み ❌
+**期待効果**: MOS +0.06-0.10
 
-**実装内容**:
-- 質問タイプの詳細判定（Yes/No、WH、修辞疑問）
-- 文末パターンの拡張
-- イントネーションマークの使い分け
+**概要**:
+- 日本語特化BERT（tohoku-bert、waseda-roberta等）を使用
+- 文脈理解に基づく韻律生成
+- アクセント予測の精度向上
 
-**ファイル**:
-- `src/python/piper_train/phonemize/japanese.py`
-
-### 3. 本格的な新機能（2週間以内）
-
-#### 3-1. F0予測器統合（実装時間：3-5日）
-**現状**: `f0_predictor.py`は実装済みだが未統合
-
-**期待効果**: MOS +0.10（最大の改善）
+**実装時間**: 1.5週間
 
 **実装内容**:
-- VITSモデルへのF0予測器統合
-- 損失関数の追加
-- プロソディ情報との連携
+```python
+# src/python/piper_train/vits/bert_encoder.py
+class JapaneseBERTEncoder(nn.Module):
+    def __init__(self, model_name="cl-tohoku/bert-base-japanese-v3"):
+        super().__init__()
+        self.bert = AutoModel.from_pretrained(model_name)
+        # Alignment mechanism to map BERT tokens to phonemes
+```
 
-**ファイル**:
-- `src/python/piper_train/vits/f0_predictor.py`（作成済み）
-- `src/python/piper_train/vits/models.py`（修正必要）
-- `src/python/piper_train/vits/lightning.py`（修正必要）
+**注意点**:
+- ONNXエクスポート時は事前計算が必要
+- メモリ使用量が増加（+500MB）
 
-#### 3-2. Transformerブロック追加（実装時間：1週間）
-**期待効果**: MOS +0.06-0.08
+### 3. Conditional Flow Matching ❌
+**期待効果**: MOS +0.10-0.15
+
+**概要**:
+- Matcha-TTS方式の最新フロー技術
+- 従来のNormalizing Flowを置き換え
+- 推論速度も2-3倍向上
+
+**実装時間**: 3週間
 
 **実装内容**:
-- テキストエンコーダーへの軽量Transformer追加
-- 長期依存性のモデリング改善
-- 文脈を考慮した韻律生成
+```python
+# src/python/piper_train/vits/flow_matching.py
+class ConditionalFlowMatching(nn.Module):
+    def __init__(self, channels, hidden_channels):
+        super().__init__()
+        # ODE-based flow instead of normalizing flow
+        # Faster training and inference
+```
 
-**ファイル**:
-- `src/python/piper_train/vits/modules.py`（新規追加）
-- `src/python/piper_train/vits/models.py`（修正必要）
-
-## 実装スケジュール案
-
-### Phase 1: Quick Wins（1週間）
-1. **Day 1-2**: AccentProcessor統合
-2. **Day 3-4**: アクセント強度レベル実装
-3. **Day 5**: 質問文検出改善
-4. **Day 6-7**: EMA実装とテスト
-
-**期待効果合計**: MOS +0.13-0.21
-
-### Phase 2: Major Features（2週間目）
-1. **Week 2 前半**: F0予測器統合
-2. **Week 2 後半**: Transformerブロック実装
-
-**期待効果合計**: MOS +0.16-0.18
-
-### 総合効果
-- **実装済み（gin_channels）**: MOS +0.04-0.06
-- **Phase 1完了時**: MOS +0.17-0.27
-- **Phase 2完了時**: MOS +0.33-0.45
+**利点**:
+- 高品質と高速推論の両立
+- 学習の安定性向上
+- メモリ効率の改善
 
 ## 実装優先順位の根拠
 
-### 最優先：既存コンポーネントの活用
-1. **AccentProcessor**: すでにコード完成、統合のみ
-2. **EMA**: すでにコード完成、安定性向上に重要
+### 最優先：WavLM Discriminator
+1. **効果が最大**: 単独でMOS +0.15-0.25
+2. **実装が独立**: 既存コードへの影響が最小
+3. **最新研究で実証済み**: 2024年の複数の論文で有効性確認
 
-### 次優先：軽量な改善
-3. **アクセント強度**: 既存システムの拡張で実現
-4. **質問文検出**: シンプルな実装で効果あり
+### 次優先：日本語BERT
+4. **日本語特有の改善**: 文脈理解が重要な日本語に特に有効
+5. **比較的実装が簡単**: 既存のBERTモデルを活用
 
-### 後回し：大規模な変更
-5. **F0予測器**: 効果は最大だが統合が複雑
-6. **Transformer**: 新規実装が必要
+### 後回し：Conditional Flow Matching
+6. **実装が複雑**: VITSの中核部分の変更が必要
+7. **リスクが高い**: 既存の学習済みモデルとの互換性問題
+
+## 実装スケジュール案
+
+### Phase 1: WavLM Discriminator（2週間）
+- **Week 1**: 基本実装とVITSへの統合
+- **Week 2**: ハイパーパラメータ調整と評価
+
+**期待効果**: MOS +0.15-0.25
+
+### Phase 2: 日本語BERT（1.5週間）
+- **Day 1-5**: BERT統合とアライメント実装
+- **Day 6-10**: ONNXエクスポート対応
+
+**期待効果**: MOS +0.06-0.10（累計 +0.21-0.35）
+
+### Phase 3: Conditional Flow Matching（3週間）
+- **Week 1**: 基本実装
+- **Week 2**: VITSへの統合
+- **Week 3**: 最適化と評価
+
+**期待効果**: MOS +0.10-0.15（累計 +0.31-0.50）
+
+## 最終的な品質目標
+
+### 現在の達成レベル
+- **実装済み改善**: MOS +0.46-0.76
+- **ベースラインからの改善**: 既に商用レベルに近い
+
+### 全実装完了時の期待値
+- **追加改善**: MOS +0.31-0.50
+- **総合改善**: MOS +0.77-1.26
+- **品質レベル**: 人間の音声と区別困難なレベル
 
 ## 実装時の注意点
 
 ### ONNX互換性の維持
-- すべての改善はONNXエクスポート可能
-- Unity Sentis 2.1での動作確認必須
+- WavLM: 推論時は不要（discriminatorは学習時のみ）
+- BERT: 事前計算により対応可能
+- Flow Matching: ONNX対応実装が必要
 
 ### モデルサイズの管理
-- 現在: gin_channels増加で+10MB
-- 残り許容量: 約40-50MB
-- F0予測器（+50MB）実装時は要注意
+- 現在の使用量: 約60MB増加（v1+v2）
+- 残り許容量: 約40MB
+- BERTは別途管理が必要
 
 ### 後方互換性
-- 既存モデルとの互換性維持
+- 既存モデルとの互換性維持が重要
 - フラグによる機能の有効/無効化
 
 ## 推奨される次のステップ
 
-1. **即座に開始**: AccentProcessor統合（最もコスパが高い）
-2. **並行作業**: EMAとアクセント強度の実装
-3. **効果測定**: Phase 1完了後にA/Bテスト実施
-4. **判断**: 効果を見てPhase 2の実装可否を決定
+1. **WavLM Discriminatorの実装開始**
+   - 最も効果的で、実装リスクが低い
+   - 2週間で大幅な品質向上が期待できる
 
-これらの改善により、piper-plusは段階的に商用レベルの品質に近づいていきます。
+2. **並行してBERT統合の設計**
+   - 日本語特有の改善として重要
+   - ONNXエクスポート方法の検討
+
+3. **Flow Matchingは慎重に評価**
+   - 効果は大きいが実装が複雑
+   - 他の改善の効果を見てから判断
+
+これらの3つの改善により、piper-plusは真に最先端のTTSシステムとなり、商用システムを超える品質を実現できる可能性があります。

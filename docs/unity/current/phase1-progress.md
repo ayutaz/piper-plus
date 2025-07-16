@@ -1,13 +1,16 @@
 # Phase 1: Windows/Linux 基盤実装 - 進捗詳細
 
-最終更新: 2025年1月15日
+最終更新: 2025年1月16日
 
 ## 進捗サマリー
 
 - **Phase 1.1**: Core API インターフェース設計 ✅ 完了
 - **Phase 1.2**: Core API 実装 ✅ 完了（PR #13でマージ）
 - **Phase 1.3**: Core API テスト ✅ 完了（108テスト全て成功）
-- **テストカバレッジ**: 完全なカバレッジを達成
+- **Phase 1.4**: Phonemizer システム基盤 ✅ 完了
+- **Phase 1.5**: キャッシュとテキスト処理 ✅ 完了
+- **Phase 1.6**: テスト実装 ✅ 完了（PR #14で実装）
+- **テストカバレッジ**: 完全なカバレッジを達成（234テスト全て成功）
 - **CI/CD**: 全プラットフォームビルド成功
 
 ## 完了したタスク
@@ -125,9 +128,93 @@
   - 進行状況レポート機能
   - TestMode サポート（モック音声データ生成）
 
+### 1.4 Phonemizer システム - 基盤実装（2人日）✅
+
+#### 1.4.1 IPhonemizer インターフェース定義 ✅
+- **成果物**: `Assets/uPiper/Runtime/Core/Phonemizers/IPhonemizer.cs`
+- **実装内容**:
+  - 非同期/同期音素化メソッド
+  - バッチ処理サポート
+  - キャッシュ管理機能
+  - 言語サポート検証
+  - 統計情報取得
+
+#### 1.4.2 PhonemeResult データ構造 ✅
+- **成果物**: `Assets/uPiper/Runtime/Core/Phonemizers/PhonemeResult.cs`
+- **実装内容**:
+  - 音素配列とID管理
+  - 継続時間とピッチ情報
+  - 処理時間とキャッシュ状態
+  - クローンメソッド実装
+
+#### 1.4.3 BasePhonemizer 抽象クラス ✅
+- **成果物**: `Assets/uPiper/Runtime/Core/Phonemizers/BasePhonemizer.cs`
+- **実装内容**:
+  - LRUキャッシュ統合
+  - テキスト正規化統合
+  - 言語検証ロジック
+  - エラーハンドリング
+  - リソース管理
+
+### 1.5 キャッシュとテキスト処理（1.5人日）✅
+
+#### 1.5.1 LRU キャッシュ実装 ✅
+- **成果物**: 
+  - `Assets/uPiper/Runtime/Core/Phonemizers/Cache/ICache.cs`
+  - `Assets/uPiper/Runtime/Core/Phonemizers/Cache/LRUCache.cs`
+  - `Assets/uPiper/Runtime/Core/Phonemizers/Cache/CacheItem.cs`
+- **実装内容**:
+  - スレッドセーフ実装（ReaderWriterLockSlim）
+  - LRU削除ポリシー
+  - 容量管理機能
+  - 統計情報収集
+
+#### 1.5.2 テキスト正規化システム ✅
+- **成果物**: 
+  - `Assets/uPiper/Runtime/Core/Phonemizers/Text/ITextNormalizer.cs`
+  - `Assets/uPiper/Runtime/Core/Phonemizers/Text/TextNormalizer.cs`
+- **実装内容**:
+  - 日本語: 全角→半角変換
+  - 英語: 短縮形展開、小文字変換
+  - 中国語: 句読点正規化
+  - 共通: 空白処理、制御文字削除
+
+### 1.6 テスト実装（2人日）✅
+
+#### 1.6.1 MockPhonemizer 実装 ✅
+- **成果物**: `Assets/uPiper/Runtime/Core/Phonemizers/Implementations/MockPhonemizer.cs`
+- **実装内容**:
+  - BasePhonemizer継承
+  - カスタムモック結果設定
+  - エラーシミュレーション
+  - 呼び出し追跡機能
+  - 処理遅延シミュレーション
+
+#### 1.6.2 包括的テストスイート ✅
+- **成果物**: 
+  - `Assets/uPiper/Tests/Runtime/Core/Phonemizers/BasePhonemizerTest.cs`
+  - `Assets/uPiper/Tests/Runtime/Core/Phonemizers/MockPhonemizerTest.cs`
+  - `Assets/uPiper/Tests/Runtime/Core/Phonemizers/PhonemeResultTest.cs`
+  - `Assets/uPiper/Tests/Runtime/Core/Phonemizers/LRUCacheTest.cs`
+  - `Assets/uPiper/Tests/Runtime/Core/Phonemizers/TextNormalizerTest.cs`
+  - `Assets/uPiper/Tests/Runtime/Core/Phonemizers/LanguageInfoTest.cs`
+- **実装内容**:
+  - 126個の新規テスト（全て成功）
+  - キャッシング動作検証
+  - 例外処理検証
+  - 多言語対応検証
+  - スレッドセーフティ検証
+
+#### 追加実装（計画外）✅
+- **LanguageInfo.cs**: 言語メタデータ管理
+  - 言語コード、名前、ネイティブ名
+  - 前処理要件、アクセント対応
+  - 音素セットタイプ、利用可能な音声
+  - テキスト方向サポート
+
 ## 進行中のタスク
 
-なし（Phase 1.2 完了）
+なし（Phase 1.6 完了）
 
 ## 成果物一覧
 
@@ -140,6 +227,20 @@
   - PiperException.cs
   - CacheStatistics.cs
   - PiperTTS.cs（新規 - 1144行）
+- `Assets/uPiper/Runtime/Core/Phonemizers/`
+  - IPhonemizer.cs
+  - PhonemeResult.cs
+  - BasePhonemizer.cs
+  - LanguageInfo.cs
+  - Cache/
+    - ICache.cs
+    - LRUCache.cs
+    - CacheItem.cs
+  - Text/
+    - ITextNormalizer.cs
+    - TextNormalizer.cs
+  - Implementations/
+    - MockPhonemizer.cs
 
 ### Tests
 - `Assets/uPiper/Tests/Runtime/Core/`
@@ -187,10 +288,32 @@
    - Editor-onlyアセンブリ参照問題の回避
    - CI/CDでのPROJECT_PATH環境変数による修正
 
+## 技術的成果（Phase 1.4-1.6）
+
+1. **音素化システムアーキテクチャ**:
+   - インターフェース駆動設計（IPhonemizer）
+   - テンプレートメソッドパターン（BasePhonemizer）
+   - 戦略パターン（ITextNormalizer）
+
+2. **パフォーマンス最適化**:
+   - スレッドセーフLRUキャッシュ
+   - 非同期ファーストAPI
+   - バッチ処理サポート
+
+3. **多言語対応**:
+   - 日本語、英語、中国語、韓国語サポート
+   - 言語固有の正規化処理
+   - 拡張可能な言語メタデータシステム
+
+4. **テスタビリティ**:
+   - 包括的なモック実装
+   - 126個の新規ユニットテスト
+   - エラーシミュレーション機能
+
 ## 次のステップ
 
 1. ~~PiperTTSクラスの具体実装（タスク1.2）~~ ✅ 完了
-2. 音素化システムの設計と実装（タスク1.4-1.6）
+2. ~~音素化システムの設計と実装（タスク1.4-1.6）~~ ✅ 完了
 3. OpenJTalkネイティブライブラリのビルド（タスク1.7）
-4. ONNX モデル統合（Phase 1.3以降）
-5. 実音声生成処理の実装
+4. ONNX モデル統合（Phase 2.1）
+5. 実音声生成処理の実装（Phase 2.2）
