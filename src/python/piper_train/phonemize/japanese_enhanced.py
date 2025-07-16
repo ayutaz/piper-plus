@@ -75,33 +75,27 @@ def _calculate_accent_strength(
     """
     # Base strength calculation
     if a3 <= 2:
-        base_strength = "weak"
+        strength = "weak"
     elif a3 <= 4:
-        base_strength = "medium"
+        strength = "medium"
     else:
-        base_strength = "strong"
+        strength = "strong"
+
+    # Strength adjustment mapping
+    strength_levels = ["weak", "medium", "strong"]
+    current_idx = strength_levels.index(strength)
 
     # Adjust for position in phrase
-    if position_in_phrase < 0.2:  # Beginning of phrase
-        if base_strength == "weak":
-            return "medium"
-        if base_strength == "medium":
-            return "strong"
-    elif position_in_phrase > 0.8:  # End of phrase
-        if base_strength == "strong":
-            return "medium"
-        if base_strength == "medium":
-            return "weak"
+    if position_in_phrase < 0.2 and current_idx < 2:  # Beginning
+        current_idx += 1
+    elif position_in_phrase > 0.8 and current_idx > 0:  # End
+        current_idx -= 1
 
     # Adjust for lexical accent
-    if f1 > 0 and a2 == f1:
-        # At lexical accent position
-        if base_strength == "weak":
-            return "medium"
-        if base_strength == "medium":
-            return "strong"
+    if f1 > 0 and a2 == f1 and current_idx < 2:
+        current_idx += 1
 
-    return base_strength
+    return strength_levels[current_idx]
 
 
 def phonemize_japanese_enhanced(text: str) -> list[str]:
