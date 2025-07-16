@@ -86,14 +86,20 @@ class MultiResolutionSTFTLoss(nn.Module):
 
     def __init__(
         self,
-        fft_sizes: list[int] = [512, 1024, 2048],
-        hop_sizes: list[int] = [120, 240, 480],
-        win_sizes: list[int] = [480, 960, 1920],
+        fft_sizes: list[int] | None = None,
+        hop_sizes: list[int] | None = None,
+        win_sizes: list[int] | None = None,
         window: str = "hann",
         mag_weight: float = 1.0,
         phase_weight: float = 0.1,
     ):
         super().__init__()
+        if fft_sizes is None:
+            fft_sizes = [512, 1024, 2048]
+        if hop_sizes is None:
+            hop_sizes = [120, 240, 480]
+        if win_sizes is None:
+            win_sizes = [480, 960, 1920]
         assert len(fft_sizes) == len(hop_sizes) == len(win_sizes)
 
         self.stft_losses = nn.ModuleList()
