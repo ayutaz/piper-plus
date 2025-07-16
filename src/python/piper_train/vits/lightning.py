@@ -359,7 +359,7 @@ class VitsModel(pl.LightningModule):
             # Multi-resolution STFT loss
             loss_stft = torch.tensor(0.0, device=self.device)
             if self.hparams.use_stft_discriminator:
-                loss_stft, stft_metrics = self.stft_loss(o, y)
+                loss_stft, stft_metrics = self.stft_loss(y_hat, y)
                 loss_stft = loss_stft * self.hparams.c_stft
 
                 # Log STFT metrics

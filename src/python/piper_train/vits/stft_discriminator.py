@@ -48,9 +48,11 @@ class STFTDiscriminator(nn.Module):
         hop_size: int = 256,
         win_size: int = 1024,
         norm_type: str = "spectral",
-        channels: list[int] = [32, 64, 128, 256, 512],
+        channels: list[int] | None = None,
     ):
         super().__init__()
+        if channels is None:
+            channels = [32, 64, 128, 256, 512]
         self.fft_size = fft_size
         self.hop_size = hop_size
         self.win_size = win_size
@@ -138,13 +140,19 @@ class MultiResolutionSTFTDiscriminator(nn.Module):
 
     def __init__(
         self,
-        fft_sizes: list[int] = [512, 1024, 2048],
-        hop_sizes: list[int] = [120, 240, 480],
-        win_sizes: list[int] = [480, 960, 1920],
+        fft_sizes: list[int] | None = None,
+        hop_sizes: list[int] | None = None,
+        win_sizes: list[int] | None = None,
         norm_type: str = "spectral",
-        channels: list[list[int]] = None,
+        channels: list[list[int]] | None = None,
     ):
         super().__init__()
+        if fft_sizes is None:
+            fft_sizes = [512, 1024, 2048]
+        if hop_sizes is None:
+            hop_sizes = [120, 240, 480]
+        if win_sizes is None:
+            win_sizes = [480, 960, 1920]
         assert len(fft_sizes) == len(hop_sizes) == len(win_sizes)
 
         # Default channel configurations for each resolution
@@ -213,11 +221,17 @@ class CombinedMultiDiscriminator(nn.Module):
         self,
         use_spectral_norm: bool = False,
         # Multi-Resolution STFT params
-        fft_sizes: list[int] = [512, 1024, 2048],
-        hop_sizes: list[int] = [120, 240, 480],
-        win_sizes: list[int] = [480, 960, 1920],
+        fft_sizes: list[int] | None = None,
+        hop_sizes: list[int] | None = None,
+        win_sizes: list[int] | None = None,
     ):
         super().__init__()
+        if fft_sizes is None:
+            fft_sizes = [512, 1024, 2048]
+        if hop_sizes is None:
+            hop_sizes = [120, 240, 480]
+        if win_sizes is None:
+            win_sizes = [480, 960, 1920]
 
         # Import existing MultiPeriodDiscriminator
         from .models import MultiPeriodDiscriminator
