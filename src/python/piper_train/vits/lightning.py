@@ -133,6 +133,7 @@ class VitsModel(pl.LightningModule):
         )
         if self.hparams.use_wavlm_discriminator:
             from .wavlm_discriminator import WavLMMultiPeriodDiscriminator
+
             self.model_d = WavLMMultiPeriodDiscriminator(
                 use_spectral_norm=self.hparams.use_spectral_norm,
                 wavlm_model=self.hparams.wavlm_model,
@@ -258,7 +259,18 @@ class VitsModel(pl.LightningModule):
             return self.training_step_d(batch)
 
     def training_step_g(self, batch: Batch):
-        x, x_lengths, y, _, spec, spec_lengths, speaker_ids, prosody_ids, f0_values, texts = (
+        (
+            x,
+            x_lengths,
+            y,
+            _,
+            spec,
+            spec_lengths,
+            speaker_ids,
+            prosody_ids,
+            f0_values,
+            texts,
+        ) = (
             batch.phoneme_ids,
             batch.phoneme_lengths,
             batch.audios,
@@ -280,7 +292,9 @@ class VitsModel(pl.LightningModule):
             (_z, z_p, m_p, logs_p, _m_q, logs_q),
             (f0_pred, f0_variance),
             pred_durations,
-        ) = self.model_g(x, x_lengths, spec, spec_lengths, speaker_ids, prosody_ids, texts)
+        ) = self.model_g(
+            x, x_lengths, spec, spec_lengths, speaker_ids, prosody_ids, texts
+        )
         self._y_hat = y_hat
 
         # Store z for flow matching loss
@@ -351,7 +365,10 @@ class VitsModel(pl.LightningModule):
 
             # Multi-resolution STFT loss
             loss_stft = torch.tensor(0.0, device=self.device)
-            if self.hparams.use_stft_discriminator and not self.hparams.use_wavlm_discriminator:
+            if (
+                self.hparams.use_stft_discriminator
+                and not self.hparams.use_wavlm_discriminator
+            ):
                 loss_stft, stft_metrics = self.stft_loss(y_hat, y)
                 loss_stft = loss_stft * self.hparams.c_stft
 
@@ -390,9 +407,10 @@ class VitsModel(pl.LightningModule):
                 if speaker_ids is not None:
                     g = self.model_g.emb_g(speaker_ids).unsqueeze(-1)
 
-                loss_flow_matching = self.model_g.compute_flow_matching_loss(
-                    self._z, self._z_mask, g
-                ) * self.hparams.c_flow_matching
+                loss_flow_matching = (
+                    self.model_g.compute_flow_matching_loss(self._z, self._z_mask, g)
+                    * self.hparams.c_flow_matching
+                )
                 self.log("loss_flow_matching", loss_flow_matching)
 
             loss_gen_all = (

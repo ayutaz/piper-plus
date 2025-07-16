@@ -614,6 +614,7 @@ class SynthesizerTrn(nn.Module):
         # Wrap with BERT encoder if enabled
         if use_bert_encoder:
             from .bert_encoder import BERTTextEncoder
+
             self.enc_p = BERTTextEncoder(
                 self.enc_p,
                 bert_model_name=bert_model_name,
@@ -689,7 +690,9 @@ class SynthesizerTrn(nn.Module):
         if n_speakers > 1:
             self.emb_g = nn.Embedding(n_speakers, gin_channels)
 
-    def forward(self, x, x_lengths, y, y_lengths, sid=None, prosody_ids=None, texts=None):
+    def forward(
+        self, x, x_lengths, y, y_lengths, sid=None, prosody_ids=None, texts=None
+    ):
         if self.use_bert_encoder and texts is not None:
             x, m_p, logs_p, x_mask = self.enc_p(x, x_lengths, texts=texts)
         else:
@@ -849,7 +852,7 @@ class SynthesizerTrn(nn.Module):
         Returns:
             loss: Flow matching loss or 0 if not using flow matching
         """
-        if self.use_flow_matching and hasattr(self.flow, 'compute_loss'):
+        if self.use_flow_matching and hasattr(self.flow, "compute_loss"):
             return self.flow.compute_loss(z, y_mask, g)
         else:
             return 0.0

@@ -27,7 +27,7 @@ class PrecomputedBERTEncoder(nn.Module):
         self,
         embedding_cache_path: str,
         hidden_channels: int = 192,
-        fallback_embedding: torch.Tensor | None = None
+        fallback_embedding: torch.Tensor | None = None,
     ):
         super().__init__()
 
@@ -37,33 +37,24 @@ class PrecomputedBERTEncoder(nn.Module):
 
         # Fallback for unseen texts
         if fallback_embedding is None:
-            self.register_buffer(
-                "fallback_embedding",
-                torch.zeros(1, hidden_channels)
-            )
+            self.register_buffer("fallback_embedding", torch.zeros(1, hidden_channels))
         else:
             self.register_buffer("fallback_embedding", fallback_embedding)
 
         # Text to index mapping
-        self.text_to_idx = {text: idx for idx, text in enumerate(self.embedding_cache.keys())}
+        self.text_to_idx = {
+            text: idx for idx, text in enumerate(self.embedding_cache.keys())
+        }
 
         # Convert cache to tensor for efficient lookup
         embeddings_list = list(self.embedding_cache.values())
         if embeddings_list:
-            self.register_buffer(
-                "embeddings",
-                torch.stack(embeddings_list, dim=0)
-            )
+            self.register_buffer("embeddings", torch.stack(embeddings_list, dim=0))
         else:
-            self.register_buffer(
-                "embeddings",
-                torch.zeros(1, 1, hidden_channels)
-            )
+            self.register_buffer("embeddings", torch.zeros(1, 1, hidden_channels))
 
     def forward(
-        self,
-        text_indices: torch.Tensor,
-        phoneme_lengths: torch.Tensor
+        self, text_indices: torch.Tensor, phoneme_lengths: torch.Tensor
     ) -> torch.Tensor:
         """Look up precomputed embeddings by index.
 
@@ -91,7 +82,7 @@ class PrecomputedBERTEncoder(nn.Module):
                 padding = torch.zeros(
                     max_phoneme_len - features.size(0),
                     self.hidden_channels,
-                    device=features.device
+                    device=features.device,
                 )
                 features = torch.cat([features, padding], dim=0)
             else:
@@ -108,7 +99,7 @@ def precompute_bert_embeddings(
     phoneme_lengths: list[int],
     output_path: str,
     batch_size: int = 32,
-    show_progress: bool = True
+    show_progress: bool = True,
 ) -> dict[str, torch.Tensor]:
     """Precompute BERT embeddings for a list of texts.
 
@@ -135,11 +126,13 @@ def precompute_bert_embeddings(
 
     with torch.no_grad():
         for i in iterator:
-            batch_texts = texts[i:i + batch_size]
-            batch_lengths = phoneme_lengths[i:i + batch_size]
+            batch_texts = texts[i : i + batch_size]
+            batch_lengths = phoneme_lengths[i : i + batch_size]
 
             # Convert to tensor
-            length_tensor = torch.tensor(batch_lengths, device=next(bert_encoder.parameters()).device)
+            length_tensor = torch.tensor(
+                batch_lengths, device=next(bert_encoder.parameters()).device
+            )
 
             # Get embeddings
             embeddings = bert_encoder(batch_texts, length_tensor)
@@ -153,7 +146,7 @@ def precompute_bert_embeddings(
 
     # Also save text mapping for easy lookup
     text_mapping = {text: idx for idx, text in enumerate(texts)}
-    with open(Path(output_path).with_suffix('.json'), 'w', encoding='utf-8') as f:
+    with open(Path(output_path).with_suffix(".json"), "w", encoding="utf-8") as f:
         json.dump(text_mapping, f, ensure_ascii=False, indent=2)
 
     return embedding_cache
@@ -162,7 +155,7 @@ def precompute_bert_embeddings(
 def create_onnx_compatible_encoder(
     original_encoder: nn.Module,
     embedding_cache_path: str,
-    bert_hidden_channels: int = 192
+    bert_hidden_channels: int = 192,
 ) -> nn.Module:
     """Create an ONNX-compatible version of the BERT text encoder.
 
@@ -186,7 +179,7 @@ def create_onnx_compatible_encoder(
             self.bert_weight = original_encoder.bert_weight
 
             # Copy projection if it exists
-            if hasattr(original_encoder, 'bert_projection'):
+            if hasattr(original_encoder, "bert_projection"):
                 self.bert_projection = original_encoder.bert_projection
             else:
                 self.bert_projection = None
@@ -195,7 +188,7 @@ def create_onnx_compatible_encoder(
             self,
             x: torch.Tensor,
             x_lengths: torch.Tensor,
-            text_indices: torch.Tensor | None = None
+            text_indices: torch.Tensor | None = None,
         ):
             """Forward pass using precomputed embeddings.
 
@@ -228,8 +221,7 @@ def create_onnx_compatible_encoder(
 
     # Create precomputed BERT encoder
     precomputed_bert = PrecomputedBERTEncoder(
-        embedding_cache_path,
-        hidden_channels=bert_hidden_channels
+        embedding_cache_path, hidden_channels=bert_hidden_channels
     )
 
     # Create ONNX-compatible encoder
@@ -243,7 +235,7 @@ def export_model_with_bert_cache(
     bert_cache_path: str,
     onnx_path: str,
     opset_version: int = 15,
-    **export_kwargs
+    **export_kwargs,
 ):
     """Export VITS model with precomputed BERT embeddings.
 
@@ -257,13 +249,10 @@ def export_model_with_bert_cache(
         **export_kwargs: Additional arguments for torch.onnx.export
     """
     # First, precompute BERT embeddings
-    if hasattr(model.model_g.enc_p, 'bert_encoder'):
+    if hasattr(model.model_g.enc_p, "bert_encoder"):
         print("Precomputing BERT embeddings...")
         precompute_bert_embeddings(
-            model.model_g.enc_p.bert_encoder,
-            texts,
-            phoneme_lengths,
-            bert_cache_path
+            model.model_g.enc_p.bert_encoder, texts, phoneme_lengths, bert_cache_path
         )
 
         # Replace encoder with ONNX-compatible version
@@ -271,7 +260,7 @@ def export_model_with_bert_cache(
         model.model_g.enc_p = create_onnx_compatible_encoder(
             model.model_g.enc_p,
             bert_cache_path,
-            bert_hidden_channels=model.model_g.hidden_channels
+            bert_hidden_channels=model.model_g.hidden_channels,
         )
 
     # Export to ONNX
@@ -293,17 +282,31 @@ def export_model_with_bert_cache(
     # Export
     torch.onnx.export(
         model,
-        (dummy_phoneme_ids, dummy_phoneme_lengths, dummy_scales, None, None, dummy_text_indices),
+        (
+            dummy_phoneme_ids,
+            dummy_phoneme_lengths,
+            dummy_scales,
+            None,
+            None,
+            dummy_text_indices,
+        ),
         onnx_path,
         opset_version=opset_version,
-        input_names=['phoneme_ids', 'phoneme_lengths', 'scales', 'speaker_id', 'prosody_ids', 'text_indices'],
-        output_names=['audio'],
+        input_names=[
+            "phoneme_ids",
+            "phoneme_lengths",
+            "scales",
+            "speaker_id",
+            "prosody_ids",
+            "text_indices",
+        ],
+        output_names=["audio"],
         dynamic_axes={
-            'phoneme_ids': {0: 'batch_size', 1: 'phoneme_length'},
-            'phoneme_lengths': {0: 'batch_size'},
-            'audio': {0: 'batch_size', 2: 'audio_length'},
+            "phoneme_ids": {0: "batch_size", 1: "phoneme_length"},
+            "phoneme_lengths": {0: "batch_size"},
+            "audio": {0: "batch_size", 2: "audio_length"},
         },
-        **export_kwargs
+        **export_kwargs,
     )
 
     print(f"Model exported to {onnx_path}")

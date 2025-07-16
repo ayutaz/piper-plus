@@ -9,13 +9,13 @@ References:
 - Matcha-TTS: A fast TTS architecture with conditional flow matching
 """
 
-
 import torch
 import torch.nn.functional as F
 from torch import nn
 
 try:
     from torchdiffeq import odeint
+
     ODE_AVAILABLE = True
 except ImportError:
     ODE_AVAILABLE = False
@@ -76,7 +76,7 @@ class ConditionalFlowMatcher(nn.Module):
         x_mask: torch.Tensor,
         g: torch.Tensor | None = None,
         reverse: bool = False,
-        **kwargs
+        **kwargs,
     ) -> tuple[torch.Tensor, torch.Tensor]:
         """Forward or reverse flow matching.
 
@@ -98,10 +98,7 @@ class ConditionalFlowMatcher(nn.Module):
             return self._forward_flow(z, x_mask, g)
 
     def _forward_flow(
-        self,
-        z: torch.Tensor,
-        x_mask: torch.Tensor,
-        g: torch.Tensor | None = None
+        self, z: torch.Tensor, x_mask: torch.Tensor, g: torch.Tensor | None = None
     ) -> tuple[torch.Tensor, torch.Tensor]:
         """Forward flow: noise to data."""
         batch_size = z.shape[0]
@@ -121,7 +118,7 @@ class ConditionalFlowMatcher(nn.Module):
             ode_func,
             z,
             t_span,
-            method='dopri5',
+            method="dopri5",
             atol=1e-5,
             rtol=1e-5,
         )[-1]
@@ -135,10 +132,7 @@ class ConditionalFlowMatcher(nn.Module):
         return x_1, log_det
 
     def _reverse_flow(
-        self,
-        x: torch.Tensor,
-        x_mask: torch.Tensor,
-        g: torch.Tensor | None = None
+        self, x: torch.Tensor, x_mask: torch.Tensor, g: torch.Tensor | None = None
     ) -> tuple[torch.Tensor, torch.Tensor]:
         """Reverse flow: data to noise."""
         batch_size = x.shape[0]
@@ -157,7 +151,7 @@ class ConditionalFlowMatcher(nn.Module):
             ode_func,
             x,
             t_span,
-            method='dopri5',
+            method="dopri5",
             atol=1e-5,
             rtol=1e-5,
         )[-1]
@@ -171,10 +165,7 @@ class ConditionalFlowMatcher(nn.Module):
         return z_0, log_det
 
     def compute_loss(
-        self,
-        x_1: torch.Tensor,
-        x_mask: torch.Tensor,
-        g: torch.Tensor | None = None
+        self, x_1: torch.Tensor, x_mask: torch.Tensor, g: torch.Tensor | None = None
     ) -> torch.Tensor:
         """Compute flow matching loss.
 
@@ -234,16 +225,16 @@ class TimeEmbedding(nn.Module):
             embeddings: Time embeddings [B, C]
         """
         half_dim = self.hidden_channels // 2
-        embeddings = torch.zeros(
-            t.shape[0], self.hidden_channels, device=t.device
-        )
+        embeddings = torch.zeros(t.shape[0], self.hidden_channels, device=t.device)
 
         # Sinusoidal embeddings
         embeddings[:, 0::2] = torch.sin(
-            t[:, None] * torch.pow(10000, torch.arange(0, half_dim, device=t.device) / half_dim)
+            t[:, None]
+            * torch.pow(10000, torch.arange(0, half_dim, device=t.device) / half_dim)
         )
         embeddings[:, 1::2] = torch.cos(
-            t[:, None] * torch.pow(10000, torch.arange(0, half_dim, device=t.device) / half_dim)
+            t[:, None]
+            * torch.pow(10000, torch.arange(0, half_dim, device=t.device) / half_dim)
         )
 
         # Project
@@ -284,7 +275,7 @@ class FlowEstimator(nn.Module):
         self.norm_layers = nn.ModuleList()
 
         for i in range(n_layers):
-            dilation = 2 ** i
+            dilation = 2**i
             padding = (kernel_size * dilation - dilation) // 2
             conv = nn.Conv1d(
                 hidden_channels,
@@ -313,7 +304,7 @@ class FlowEstimator(nn.Module):
         x: torch.Tensor,
         t: torch.Tensor,
         x_mask: torch.Tensor,
-        g: torch.Tensor | None = None
+        g: torch.Tensor | None = None,
     ) -> torch.Tensor:
         """Estimate velocity field.
 
@@ -337,7 +328,9 @@ class FlowEstimator(nn.Module):
             h = h + self.cond_layer(g)
 
         # Dilated convolutions with residual connections
-        for _, (conv, norm) in enumerate(zip(self.conv_layers, self.norm_layers, strict=False)):
+        for _, (conv, norm) in enumerate(
+            zip(self.conv_layers, self.norm_layers, strict=False)
+        ):
             # Add time embedding
             h_time = h + t_emb.unsqueeze(-1)
 
@@ -403,17 +396,19 @@ class FlowMatchingBlock(nn.Module):
             self.flows = nn.ModuleList([flow] * n_flows)
         else:
             # Independent parameters for each flow
-            self.flows = nn.ModuleList([
-                ConditionalFlowMatcher(
-                    channels,
-                    hidden_channels,
-                    kernel_size,
-                    n_layers,
-                    n_flows=1,
-                    gin_channels=gin_channels,
-                )
-                for _ in range(n_flows)
-            ])
+            self.flows = nn.ModuleList(
+                [
+                    ConditionalFlowMatcher(
+                        channels,
+                        hidden_channels,
+                        kernel_size,
+                        n_layers,
+                        n_flows=1,
+                        gin_channels=gin_channels,
+                    )
+                    for _ in range(n_flows)
+                ]
+            )
 
     def forward(
         self,
@@ -443,10 +438,7 @@ class FlowMatchingBlock(nn.Module):
         return x
 
     def compute_loss(
-        self,
-        x: torch.Tensor,
-        x_mask: torch.Tensor,
-        g: torch.Tensor | None = None
+        self, x: torch.Tensor, x_mask: torch.Tensor, g: torch.Tensor | None = None
     ) -> torch.Tensor:
         """Compute total flow matching loss.
 

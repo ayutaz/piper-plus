@@ -11,10 +11,13 @@ from torch.nn.utils import spectral_norm, weight_norm
 
 try:
     from transformers import WavLMModel
+
     WAVLM_AVAILABLE = True
 except ImportError:
     WAVLM_AVAILABLE = False
-    print("Warning: transformers library not found. WavLM discriminator will not be available.")
+    print(
+        "Warning: transformers library not found. WavLM discriminator will not be available."
+    )
 
 
 class DiscriminatorHead(nn.Module):
@@ -27,7 +30,7 @@ class DiscriminatorHead(nn.Module):
         kernel_size: int = 5,
         pool_size: int = 4,
         pool_stride: int = 2,
-        norm_type: str = "spectral"
+        norm_type: str = "spectral",
     ):
         super().__init__()
 
@@ -97,7 +100,7 @@ class WavLMDiscriminator(nn.Module):
         use_weighted_sum: bool = True,
         norm_type: str = "spectral",
         disc_hidden_dim: int = 256,
-        num_disc_layers: int = 3
+        num_disc_layers: int = 3,
     ):
         super().__init__()
 
@@ -132,32 +135,34 @@ class WavLMDiscriminator(nn.Module):
 
         # Multi-scale discriminator heads
         # Different pooling sizes create different temporal resolutions
-        self.discriminators = nn.ModuleList([
-            DiscriminatorHead(
-                self.hidden_size,
-                disc_hidden_dim,
-                kernel_size=5,
-                pool_size=1,  # No pooling - finest resolution
-                pool_stride=1,
-                norm_type=norm_type
-            ),
-            DiscriminatorHead(
-                self.hidden_size,
-                disc_hidden_dim,
-                kernel_size=5,
-                pool_size=4,  # 4x downsampling
-                pool_stride=2,
-                norm_type=norm_type
-            ),
-            DiscriminatorHead(
-                self.hidden_size,
-                disc_hidden_dim,
-                kernel_size=5,
-                pool_size=8,  # 8x downsampling
-                pool_stride=4,
-                norm_type=norm_type
-            )
-        ])
+        self.discriminators = nn.ModuleList(
+            [
+                DiscriminatorHead(
+                    self.hidden_size,
+                    disc_hidden_dim,
+                    kernel_size=5,
+                    pool_size=1,  # No pooling - finest resolution
+                    pool_stride=1,
+                    norm_type=norm_type,
+                ),
+                DiscriminatorHead(
+                    self.hidden_size,
+                    disc_hidden_dim,
+                    kernel_size=5,
+                    pool_size=4,  # 4x downsampling
+                    pool_stride=2,
+                    norm_type=norm_type,
+                ),
+                DiscriminatorHead(
+                    self.hidden_size,
+                    disc_hidden_dim,
+                    kernel_size=5,
+                    pool_size=8,  # 8x downsampling
+                    pool_stride=4,
+                    norm_type=norm_type,
+                ),
+            ]
+        )
 
         # Projection for combining features
         self.feature_projection = nn.Linear(self.hidden_size, self.hidden_size)
@@ -182,9 +187,7 @@ class WavLMDiscriminator(nn.Module):
         if self.use_weighted_sum:
             # Weighted sum of all layers
             weights = F.softmax(self.layer_weights, dim=0)
-            features = sum(
-                w * h for w, h in zip(weights, hidden_states, strict=False)
-            )
+            features = sum(w * h for w, h in zip(weights, hidden_states, strict=False))
         else:
             # Use last 4 layers
             features = torch.stack(hidden_states[-4:], dim=1).mean(dim=1)
@@ -245,7 +248,7 @@ class WavLMMultiPeriodDiscriminator(nn.Module):
         use_spectral_norm: bool = False,
         wavlm_model: str = "microsoft/wavlm-base",
         wavlm_weight: float = 0.5,
-        **wavlm_kwargs
+        **wavlm_kwargs,
     ):
         super().__init__()
 
@@ -261,7 +264,7 @@ class WavLMMultiPeriodDiscriminator(nn.Module):
         self.wavlm_disc = WavLMDiscriminator(
             pretrained_model=wavlm_model,
             norm_type="spectral" if use_spectral_norm else "weight",
-            **wavlm_kwargs
+            **wavlm_kwargs,
         )
 
         # Weight for balancing WavLM vs traditional discriminators
@@ -287,7 +290,9 @@ class WavLMMultiPeriodDiscriminator(nn.Module):
         mrd_y_d_rs, mrd_y_d_gs, mrd_fmap_rs, mrd_fmap_gs = self.mrd(y, y_hat)
 
         # WavLM Discriminator
-        wavlm_y_d_rs, wavlm_y_d_gs, wavlm_fmap_rs, wavlm_fmap_gs = self.wavlm_disc(y, y_hat)
+        wavlm_y_d_rs, wavlm_y_d_gs, wavlm_fmap_rs, wavlm_fmap_gs = self.wavlm_disc(
+            y, y_hat
+        )
 
         # Combine outputs
         y_d_rs = mpd_y_d_rs + mrd_y_d_rs + wavlm_y_d_rs

@@ -4,16 +4,18 @@ This module integrates Japanese BERT models to provide contextual embeddings
 that improve prosody and accent prediction for Japanese TTS.
 """
 
-
 import torch
 from torch import nn
 
 try:
     from transformers import AutoModel, AutoTokenizer
+
     BERT_AVAILABLE = True
 except ImportError:
     BERT_AVAILABLE = False
-    print("Warning: transformers library not found. BERT encoder will not be available.")
+    print(
+        "Warning: transformers library not found. BERT encoder will not be available."
+    )
 
 
 class PhonemeAligner(nn.Module):
@@ -29,16 +31,13 @@ class PhonemeAligner(nn.Module):
         hidden_channels: int,
         kernel_size: int = 3,
         n_layers: int = 2,
-        dropout: float = 0.1
+        dropout: float = 0.1,
     ):
         super().__init__()
 
         # Attention-based alignment
         self.attention = nn.MultiheadAttention(
-            hidden_channels,
-            num_heads=4,
-            dropout=dropout,
-            batch_first=True
+            hidden_channels, num_heads=4, dropout=dropout, batch_first=True
         )
 
         # Refinement layers
@@ -50,11 +49,11 @@ class PhonemeAligner(nn.Module):
                         hidden_channels,
                         hidden_channels,
                         kernel_size,
-                        padding=kernel_size // 2
+                        padding=kernel_size // 2,
                     ),
                     nn.ReLU(),
                     nn.Dropout(dropout),
-                    nn.LayerNorm(hidden_channels)
+                    nn.LayerNorm(hidden_channels),
                 )
             )
 
@@ -64,14 +63,14 @@ class PhonemeAligner(nn.Module):
             nn.ReLU(),
             nn.Dropout(dropout),
             nn.Linear(hidden_channels // 2, 1),
-            nn.Softplus()  # Ensure positive durations
+            nn.Softplus(),  # Ensure positive durations
         )
 
     def forward(
         self,
         bert_features: torch.Tensor,
         phoneme_lengths: torch.Tensor,
-        bert_mask: torch.Tensor | None = None
+        bert_mask: torch.Tensor | None = None,
     ) -> torch.Tensor:
         """Align BERT features to phoneme sequence length.
 
@@ -97,7 +96,9 @@ class PhonemeAligner(nn.Module):
         duration_sums = durations.sum(dim=1, keepdim=True)  # [B, 1]
         duration_sums = torch.clamp(duration_sums, min=1e-6)
 
-        normalized_durations = durations * (phoneme_lengths.float().unsqueeze(1) / duration_sums)
+        normalized_durations = durations * (
+            phoneme_lengths.float().unsqueeze(1) / duration_sums
+        )
         rounded_durations = torch.round(normalized_durations).long()
 
         # Adjust for rounding errors
@@ -114,9 +115,7 @@ class PhonemeAligner(nn.Module):
             expanded = []
             for j, dur in enumerate(rounded_durations[i]):
                 if dur > 0:
-                    expanded.append(
-                        bert_features[i, j].unsqueeze(0).expand(dur, -1)
-                    )
+                    expanded.append(bert_features[i, j].unsqueeze(0).expand(dur, -1))
             if expanded:
                 expanded = torch.cat(expanded, dim=0)  # [T_phoneme, C]
                 # Pad or truncate to max_phoneme_len
@@ -124,7 +123,7 @@ class PhonemeAligner(nn.Module):
                     padding = torch.zeros(
                         max_phoneme_len - expanded.size(0),
                         expanded.size(1),
-                        device=device
+                        device=device,
                     )
                     expanded = torch.cat([expanded, padding], dim=0)
                 else:
@@ -162,7 +161,7 @@ class JapaneseBERTEncoder(nn.Module):
         dropout: float = 0.1,
         use_cls_token: bool = True,
         aggregate_method: str = "attention",  # "attention", "mean", "max"
-        cache_dir: str | None = None
+        cache_dir: str | None = None,
     ):
         super().__init__()
 
@@ -201,7 +200,7 @@ class JapaneseBERTEncoder(nn.Module):
             nn.ReLU(),
             nn.Dropout(dropout),
             nn.Linear(hidden_channels * 2, hidden_channels),
-            nn.LayerNorm(hidden_channels)
+            nn.LayerNorm(hidden_channels),
         )
 
         # CLS token projection (if used)
@@ -211,14 +210,13 @@ class JapaneseBERTEncoder(nn.Module):
                 nn.ReLU(),
                 nn.Dropout(dropout),
                 nn.Linear(hidden_channels, hidden_channels),
-                nn.LayerNorm(hidden_channels)
+                nn.LayerNorm(hidden_channels),
             )
 
         # Attention aggregation (if used)
         if aggregate_method == "attention":
             self.attention_weights = nn.Sequential(
-                nn.Linear(hidden_channels, 1),
-                nn.Softmax(dim=1)
+                nn.Linear(hidden_channels, 1), nn.Softmax(dim=1)
             )
 
         # Phoneme aligner
@@ -258,11 +256,7 @@ class JapaneseBERTEncoder(nn.Module):
         """
         # Tokenize with padding and truncation
         encoded = self.tokenizer(
-            texts,
-            padding=True,
-            truncation=True,
-            max_length=512,
-            return_tensors="pt"
+            texts, padding=True, truncation=True, max_length=512, return_tensors="pt"
         )
 
         return encoded
@@ -271,7 +265,7 @@ class JapaneseBERTEncoder(nn.Module):
         self,
         texts: list[str],
         phoneme_lengths: torch.Tensor,
-        cache_key: str | None = None
+        cache_key: str | None = None,
     ) -> torch.Tensor:
         """Extract BERT features aligned to phoneme sequences.
 
@@ -322,9 +316,7 @@ class JapaneseBERTEncoder(nn.Module):
 
         # Align to phoneme sequences
         aligned_features = self.aligner(
-            bert_features,
-            phoneme_lengths,
-            inputs.get("attention_mask")
+            bert_features, phoneme_lengths, inputs.get("attention_mask")
         )
 
         # Cache if enabled
@@ -347,7 +339,7 @@ class BERTTextEncoder(nn.Module):
         bert_model_name: str = "cl-tohoku/bert-base-japanese-v3",
         bert_hidden_channels: int = 192,
         bert_weight: float = 0.3,
-        **bert_kwargs
+        **bert_kwargs,
     ):
         super().__init__()
 
@@ -355,12 +347,12 @@ class BERTTextEncoder(nn.Module):
         self.bert_encoder = JapaneseBERTEncoder(
             model_name=bert_model_name,
             hidden_channels=bert_hidden_channels,
-            **bert_kwargs
+            **bert_kwargs,
         )
         self.bert_weight = bert_weight
 
         # Projection to match dimensions if needed
-        if hasattr(original_encoder, 'hidden_channels'):
+        if hasattr(original_encoder, "hidden_channels"):
             orig_hidden = original_encoder.hidden_channels
             if bert_hidden_channels != orig_hidden:
                 self.bert_projection = nn.Linear(bert_hidden_channels, orig_hidden)
@@ -374,7 +366,7 @@ class BERTTextEncoder(nn.Module):
         x: torch.Tensor,
         x_lengths: torch.Tensor,
         texts: list[str] | None = None,
-        g: torch.Tensor | None = None
+        g: torch.Tensor | None = None,
     ):
         """Forward pass combining BERT and original encodings.
 
