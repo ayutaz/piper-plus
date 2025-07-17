@@ -28,16 +28,22 @@ class TTSEvaluator:
             if not script.exists():
                 logger.warning(f"Script not found: {script}")
 
-    def run_mcd_evaluation(self, ref_dir: str, synth_dir: str, output_file: str) -> dict:
+    def run_mcd_evaluation(
+        self, ref_dir: str, synth_dir: str, output_file: str
+    ) -> dict:
         """Run MCD evaluation"""
         if not self.mcd_script.exists():
             return {"error": "MCD script not found"}
 
         cmd = [
-            sys.executable, str(self.mcd_script),
-            "--reference_dir", ref_dir,
-            "--synthesized_dir", synth_dir,
-            "--output", output_file
+            sys.executable,
+            str(self.mcd_script),
+            "--reference_dir",
+            ref_dir,
+            "--synthesized_dir",
+            synth_dir,
+            "--output",
+            output_file,
         ]
 
         try:
@@ -51,17 +57,24 @@ class TTSEvaluator:
             logger.error(f"MCD evaluation error: {e}")
             return {"error": str(e)}
 
-    def run_pesq_evaluation(self, ref_dir: str, synth_dir: str, output_file: str) -> dict:
+    def run_pesq_evaluation(
+        self, ref_dir: str, synth_dir: str, output_file: str
+    ) -> dict:
         """Run PESQ evaluation"""
         if not self.pesq_script.exists():
             return {"error": "PESQ script not found"}
 
         cmd = [
-            sys.executable, str(self.pesq_script),
-            "--reference_dir", ref_dir,
-            "--synthesized_dir", synth_dir,
-            "--output", output_file,
-            "--mode", "wb"
+            sys.executable,
+            str(self.pesq_script),
+            "--reference_dir",
+            ref_dir,
+            "--synthesized_dir",
+            synth_dir,
+            "--output",
+            output_file,
+            "--mode",
+            "wb",
         ]
 
         try:
@@ -81,14 +94,18 @@ class TTSEvaluator:
             return {"error": "UTMOS script not found"}
 
         cmd = [
-            sys.executable, str(self.utmos_script),
-            "--audio_dir", audio_dir,
-            "--output", output_file
+            sys.executable,
+            str(self.utmos_script),
+            "--audio_dir",
+            audio_dir,
+            "--output",
+            output_file,
         ]
 
         # Add device selection if CUDA is available
         try:
             import torch
+
             if torch.cuda.is_available():
                 cmd.extend(["--device", "cuda"])
         except ImportError:
@@ -224,7 +241,7 @@ class TTSEvaluator:
 </html>
 """
 
-        with open(output_file, 'w') as f:
+        with open(output_file, "w") as f:
             f.write(html_content)
 
     def _rate_mcd(self, value: float) -> tuple:
@@ -265,22 +282,38 @@ def main():
     parser = argparse.ArgumentParser(description="Run comprehensive TTS evaluation")
 
     # Directories
-    parser.add_argument("--reference_dir", type=str, required=True,
-                        help="Directory containing reference audio files")
-    parser.add_argument("--synthesized_dir", type=str, required=True,
-                        help="Directory containing synthesized audio files")
-    parser.add_argument("--output_dir", type=str, required=True,
-                        help="Directory to save evaluation results")
+    parser.add_argument(
+        "--reference_dir",
+        type=str,
+        required=True,
+        help="Directory containing reference audio files",
+    )
+    parser.add_argument(
+        "--synthesized_dir",
+        type=str,
+        required=True,
+        help="Directory containing synthesized audio files",
+    )
+    parser.add_argument(
+        "--output_dir",
+        type=str,
+        required=True,
+        help="Directory to save evaluation results",
+    )
 
     # Optional metrics selection
-    parser.add_argument("--metrics", nargs="+",
-                        choices=["mcd", "pesq", "utmos", "all"],
-                        default=["all"],
-                        help="Metrics to evaluate (default: all)")
+    parser.add_argument(
+        "--metrics",
+        nargs="+",
+        choices=["mcd", "pesq", "utmos", "all"],
+        default=["all"],
+        help="Metrics to evaluate (default: all)",
+    )
 
     # Report generation
-    parser.add_argument("--generate_report", action="store_true",
-                        help="Generate HTML report")
+    parser.add_argument(
+        "--generate_report", action="store_true", help="Generate HTML report"
+    )
 
     args = parser.parse_args()
 
@@ -325,7 +358,7 @@ def main():
 
     # Save combined results
     combined_output = output_path / "evaluation_results.json"
-    with open(combined_output, 'w') as f:
+    with open(combined_output, "w") as f:
         json.dump(results, f, indent=2)
     logger.info(f"Combined results saved to {combined_output}")
 
@@ -350,4 +383,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

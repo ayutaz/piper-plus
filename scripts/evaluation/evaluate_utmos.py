@@ -58,7 +58,7 @@ class UTMOSEvaluator:
             inputs = self.feature_extractor(
                 waveform.squeeze().numpy(),
                 sampling_rate=self.target_sr,
-                return_tensors="pt"
+                return_tensors="pt",
             )
 
             # Move to device
@@ -72,7 +72,7 @@ class UTMOSEvaluator:
             return {
                 "audio_file": audio_path,
                 "mos_score": float(mos_score),
-                "status": "success"
+                "status": "success",
             }
 
         except Exception as e:
@@ -81,20 +81,21 @@ class UTMOSEvaluator:
                 "audio_file": audio_path,
                 "mos_score": None,
                 "status": "error",
-                "error": str(e)
+                "error": str(e),
             }
 
 
-def evaluate_directory(audio_dir: str, output_file: str | None = None,
-                      device: str | None = None) -> dict:
+def evaluate_directory(
+    audio_dir: str, output_file: str | None = None, device: str | None = None
+) -> dict:
     """Evaluate all audio files in a directory"""
     audio_path = Path(audio_dir)
 
     # Find all audio files
     audio_files = sorted(
-        list(audio_path.glob("*.wav")) +
-        list(audio_path.glob("*.mp3")) +
-        list(audio_path.glob("*.flac"))
+        list(audio_path.glob("*.wav"))
+        + list(audio_path.glob("*.mp3"))
+        + list(audio_path.glob("*.flac"))
     )
 
     if not audio_files:
@@ -124,31 +125,28 @@ def evaluate_directory(audio_dir: str, output_file: str | None = None,
             "min_mos": float(np.min(mos_scores)),
             "max_mos": float(np.max(mos_scores)),
             "median_mos": float(np.median(mos_scores)),
-            "num_samples": len(mos_scores)
+            "num_samples": len(mos_scores),
         }
     else:
-        stats = {
-            "mean_mos": None,
-            "num_samples": 0
-        }
+        stats = {"mean_mos": None, "num_samples": 0}
 
-    output = {
-        "statistics": stats,
-        "results": results
-    }
+    output = {"statistics": stats, "results": results}
 
     # Save results
     if output_file:
-        with open(output_file, 'w') as f:
+        with open(output_file, "w") as f:
             json.dump(output, f, indent=2)
         logger.info(f"Results saved to {output_file}")
 
     return output
 
 
-def compare_models(baseline_dir: str, test_dir: str,
-                  output_file: str | None = None,
-                  device: str | None = None) -> dict:
+def compare_models(
+    baseline_dir: str,
+    test_dir: str,
+    output_file: str | None = None,
+    device: str | None = None,
+) -> dict:
     """Compare MOS scores between baseline and test models"""
     logger.info("Evaluating baseline model outputs...")
     baseline_results = evaluate_directory(baseline_dir, device=device)
@@ -158,44 +156,61 @@ def compare_models(baseline_dir: str, test_dir: str,
 
     comparison = {
         "baseline": baseline_results["statistics"],
-        "test": test_results["statistics"]
+        "test": test_results["statistics"],
     }
 
     # Calculate improvement
-    if (baseline_results["statistics"]["mean_mos"] is not None and
-        test_results["statistics"]["mean_mos"] is not None):
-
-        improvement = (test_results["statistics"]["mean_mos"] -
-                      baseline_results["statistics"]["mean_mos"])
+    if (
+        baseline_results["statistics"]["mean_mos"] is not None
+        and test_results["statistics"]["mean_mos"] is not None
+    ):
+        improvement = (
+            test_results["statistics"]["mean_mos"]
+            - baseline_results["statistics"]["mean_mos"]
+        )
 
         comparison["improvement"] = {
             "absolute": float(improvement),
-            "percentage": float((improvement / baseline_results["statistics"]["mean_mos"]) * 100)
+            "percentage": float(
+                (improvement / baseline_results["statistics"]["mean_mos"]) * 100
+            ),
         }
 
     if output_file:
-        with open(output_file, 'w') as f:
+        with open(output_file, "w") as f:
             json.dump(comparison, f, indent=2)
 
     return comparison
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Evaluate TTS quality using UTMOS (automatic MOS prediction)")
+    parser = argparse.ArgumentParser(
+        description="Evaluate TTS quality using UTMOS (automatic MOS prediction)"
+    )
 
     # Single directory evaluation
-    parser.add_argument("--audio_dir", type=str, help="Directory containing audio files to evaluate")
+    parser.add_argument(
+        "--audio_dir", type=str, help="Directory containing audio files to evaluate"
+    )
 
     # Model comparison
-    parser.add_argument("--baseline_dir", type=str, help="Directory with baseline model outputs")
-    parser.add_argument("--test_dir", type=str, help="Directory with test model outputs")
+    parser.add_argument(
+        "--baseline_dir", type=str, help="Directory with baseline model outputs"
+    )
+    parser.add_argument(
+        "--test_dir", type=str, help="Directory with test model outputs"
+    )
 
     # Output
     parser.add_argument("--output", type=str, help="Output JSON file for results")
 
     # Device
-    parser.add_argument("--device", type=str, choices=["cuda", "cpu"],
-                        help="Device to use for evaluation (default: auto)")
+    parser.add_argument(
+        "--device",
+        type=str,
+        choices=["cuda", "cpu"],
+        help="Device to use for evaluation (default: auto)",
+    )
 
     args = parser.parse_args()
 
@@ -215,8 +230,9 @@ def main():
 
     elif args.baseline_dir and args.test_dir:
         # Model comparison
-        comparison = compare_models(args.baseline_dir, args.test_dir,
-                                  args.output, device=args.device)
+        comparison = compare_models(
+            args.baseline_dir, args.test_dir, args.output, device=args.device
+        )
 
         print("\nModel Comparison Results:")
         print("\nBaseline Model:")
@@ -239,10 +255,11 @@ def main():
             print(f"  Percentage: {comparison['improvement']['percentage']:+.1f}%")
 
     else:
-        parser.error("Please provide either --audio_dir for single evaluation, "
-                    "or --baseline_dir and --test_dir for model comparison")
+        parser.error(
+            "Please provide either --audio_dir for single evaluation, "
+            "or --baseline_dir and --test_dir for model comparison"
+        )
 
 
 if __name__ == "__main__":
     main()
-

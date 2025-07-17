@@ -31,13 +31,15 @@ def extract_mfcc(audio_path: str, sr: int = 22050, n_mfcc: int = 13) -> np.ndarr
     return mfcc.T  # Transpose to (time, features)
 
 
-def align_features(feat1: np.ndarray, feat2: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+def align_features(
+    feat1: np.ndarray, feat2: np.ndarray
+) -> tuple[np.ndarray, np.ndarray]:
     """Align two feature sequences using DTW"""
     from dtw import dtw
     from scipy.spatial.distance import cdist
 
     # Calculate distance matrix
-    dist_matrix = cdist(feat1, feat2, metric='euclidean')
+    dist_matrix = cdist(feat1, feat2, metric="euclidean")
 
     # Perform DTW
     alignment = dtw(dist_matrix)
@@ -59,7 +61,7 @@ def calculate_mcd(ref_features: np.ndarray, synth_features: np.ndarray) -> float
 
     # Calculate MCD
     diff = ref_aligned - synth_aligned
-    squared_diff = diff ** 2
+    squared_diff = diff**2
     sum_squared_diff = np.sum(squared_diff, axis=1)
 
     # MCD formula: (10 / ln(10)) * sqrt(2 * sum(squared_differences))
@@ -68,8 +70,9 @@ def calculate_mcd(ref_features: np.ndarray, synth_features: np.ndarray) -> float
     return mcd
 
 
-def evaluate_file_pair(ref_path: str, synth_path: str,
-                      sr: int = 22050, n_mfcc: int = 13) -> dict:
+def evaluate_file_pair(
+    ref_path: str, synth_path: str, sr: int = 22050, n_mfcc: int = 13
+) -> dict:
     """Evaluate MCD between a reference and synthesized audio file"""
     try:
         # Extract features
@@ -83,7 +86,7 @@ def evaluate_file_pair(ref_path: str, synth_path: str,
             "reference": ref_path,
             "synthesized": synth_path,
             "mcd": float(mcd),
-            "status": "success"
+            "status": "success",
         }
     except Exception as e:
         logger.error(f"Error processing {ref_path} and {synth_path}: {e}")
@@ -92,13 +95,17 @@ def evaluate_file_pair(ref_path: str, synth_path: str,
             "synthesized": synth_path,
             "mcd": None,
             "status": "error",
-            "error": str(e)
+            "error": str(e),
         }
 
 
-def evaluate_directory(ref_dir: str, synth_dir: str,
-                      output_file: str | None = None,
-                      sr: int = 22050, n_mfcc: int = 13) -> dict:
+def evaluate_directory(
+    ref_dir: str,
+    synth_dir: str,
+    output_file: str | None = None,
+    sr: int = 22050,
+    n_mfcc: int = 13,
+) -> dict:
     """Evaluate MCD for all matching files in directories"""
     ref_path = Path(ref_dir)
     synth_path = Path(synth_dir)
@@ -119,10 +126,7 @@ def evaluate_directory(ref_dir: str, synth_dir: str,
 
         # Evaluate
         result = evaluate_file_pair(
-            str(ref_file),
-            str(synth_file),
-            sr=sr,
-            n_mfcc=n_mfcc
+            str(ref_file), str(synth_file), sr=sr, n_mfcc=n_mfcc
         )
 
         results.append(result)
@@ -139,22 +143,16 @@ def evaluate_directory(ref_dir: str, synth_dir: str,
             "min_mcd": float(np.min(mcd_values)),
             "max_mcd": float(np.max(mcd_values)),
             "median_mcd": float(np.median(mcd_values)),
-            "num_samples": len(mcd_values)
+            "num_samples": len(mcd_values),
         }
     else:
-        stats = {
-            "mean_mcd": None,
-            "num_samples": 0
-        }
+        stats = {"mean_mcd": None, "num_samples": 0}
 
-    output = {
-        "statistics": stats,
-        "results": results
-    }
+    output = {"statistics": stats, "results": results}
 
     # Save results
     if output_file:
-        with open(output_file, 'w') as f:
+        with open(output_file, "w") as f:
             json.dump(output, f, indent=2)
         logger.info(f"Results saved to {output_file}")
 
@@ -162,22 +160,40 @@ def evaluate_directory(ref_dir: str, synth_dir: str,
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Calculate MCD between reference and synthesized speech")
+    parser = argparse.ArgumentParser(
+        description="Calculate MCD between reference and synthesized speech"
+    )
 
     # Single file evaluation
     parser.add_argument("--reference", type=str, help="Reference audio file")
     parser.add_argument("--synthesized", type=str, help="Synthesized audio file")
 
     # Directory evaluation
-    parser.add_argument("--reference_dir", type=str, help="Directory containing reference audio files")
-    parser.add_argument("--synthesized_dir", type=str, help="Directory containing synthesized audio files")
+    parser.add_argument(
+        "--reference_dir", type=str, help="Directory containing reference audio files"
+    )
+    parser.add_argument(
+        "--synthesized_dir",
+        type=str,
+        help="Directory containing synthesized audio files",
+    )
 
     # Output
     parser.add_argument("--output", type=str, help="Output JSON file for results")
 
     # Parameters
-    parser.add_argument("--sample_rate", type=int, default=22050, help="Sample rate for audio (default: 22050)")
-    parser.add_argument("--n_mfcc", type=int, default=13, help="Number of MFCC coefficients (default: 13)")
+    parser.add_argument(
+        "--sample_rate",
+        type=int,
+        default=22050,
+        help="Sample rate for audio (default: 22050)",
+    )
+    parser.add_argument(
+        "--n_mfcc",
+        type=int,
+        default=13,
+        help="Number of MFCC coefficients (default: 13)",
+    )
 
     args = parser.parse_args()
 
@@ -185,10 +201,7 @@ def main():
     if args.reference and args.synthesized:
         # Single file evaluation
         result = evaluate_file_pair(
-            args.reference,
-            args.synthesized,
-            sr=args.sample_rate,
-            n_mfcc=args.n_mfcc
+            args.reference, args.synthesized, sr=args.sample_rate, n_mfcc=args.n_mfcc
         )
 
         if result["status"] == "success":
@@ -197,7 +210,7 @@ def main():
             print(f"Error: {result['error']}")
 
         if args.output:
-            with open(args.output, 'w') as f:
+            with open(args.output, "w") as f:
                 json.dump(result, f, indent=2)
 
     elif args.reference_dir and args.synthesized_dir:
@@ -207,7 +220,7 @@ def main():
             args.synthesized_dir,
             output_file=args.output,
             sr=args.sample_rate,
-            n_mfcc=args.n_mfcc
+            n_mfcc=args.n_mfcc,
         )
 
         if results["statistics"]["num_samples"] > 0:
@@ -222,10 +235,11 @@ def main():
             print("No valid samples found for evaluation")
 
     else:
-        parser.error("Please provide either --reference and --synthesized for single file evaluation, "
-                    "or --reference_dir and --synthesized_dir for directory evaluation")
+        parser.error(
+            "Please provide either --reference and --synthesized for single file evaluation, "
+            "or --reference_dir and --synthesized_dir for directory evaluation"
+        )
 
 
 if __name__ == "__main__":
     main()
-

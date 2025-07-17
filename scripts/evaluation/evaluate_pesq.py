@@ -17,7 +17,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-def evaluate_pesq(ref_path: str, synth_path: str, mode: str = 'wb') -> dict:
+def evaluate_pesq(ref_path: str, synth_path: str, mode: str = "wb") -> dict:
     """
     Evaluate PESQ between reference and synthesized audio
 
@@ -31,7 +31,7 @@ def evaluate_pesq(ref_path: str, synth_path: str, mode: str = 'wb') -> dict:
     """
     try:
         # Set sample rate based on mode
-        if mode == 'wb':
+        if mode == "wb":
             target_sr = 16000
         else:  # nb
             target_sr = 8000
@@ -44,7 +44,9 @@ def evaluate_pesq(ref_path: str, synth_path: str, mode: str = 'wb') -> dict:
         # Load synthesized audio
         synth_audio, synth_sr = librosa.load(synth_path, sr=None)
         if synth_sr != target_sr:
-            synth_audio = librosa.resample(synth_audio, orig_sr=synth_sr, target_sr=target_sr)
+            synth_audio = librosa.resample(
+                synth_audio, orig_sr=synth_sr, target_sr=target_sr
+            )
 
         # Ensure same length
         min_len = min(len(ref_audio), len(synth_audio))
@@ -60,7 +62,7 @@ def evaluate_pesq(ref_path: str, synth_path: str, mode: str = 'wb') -> dict:
             "pesq_score": float(pesq_score),
             "mode": mode,
             "sample_rate": target_sr,
-            "status": "success"
+            "status": "success",
         }
 
     except Exception as e:
@@ -70,13 +72,13 @@ def evaluate_pesq(ref_path: str, synth_path: str, mode: str = 'wb') -> dict:
             "synthesized": synth_path,
             "pesq_score": None,
             "status": "error",
-            "error": str(e)
+            "error": str(e),
         }
 
 
-def evaluate_directory(ref_dir: str, synth_dir: str,
-                      output_file: str | None = None,
-                      mode: str = 'wb') -> dict:
+def evaluate_directory(
+    ref_dir: str, synth_dir: str, output_file: str | None = None, mode: str = "wb"
+) -> dict:
     """Evaluate PESQ for all matching files in directories"""
     ref_path = Path(ref_dir)
     synth_path = Path(synth_dir)
@@ -112,23 +114,16 @@ def evaluate_directory(ref_dir: str, synth_dir: str,
             "max_pesq": float(np.max(pesq_scores)),
             "median_pesq": float(np.median(pesq_scores)),
             "num_samples": len(pesq_scores),
-            "mode": mode
+            "mode": mode,
         }
     else:
-        stats = {
-            "mean_pesq": None,
-            "num_samples": 0,
-            "mode": mode
-        }
+        stats = {"mean_pesq": None, "num_samples": 0, "mode": mode}
 
-    output = {
-        "statistics": stats,
-        "results": results
-    }
+    output = {"statistics": stats, "results": results}
 
     # Save results
     if output_file:
-        with open(output_file, 'w') as f:
+        with open(output_file, "w") as f:
             json.dump(output, f, indent=2)
         logger.info(f"Results saved to {output_file}")
 
@@ -136,22 +131,35 @@ def evaluate_directory(ref_dir: str, synth_dir: str,
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Calculate PESQ between reference and synthesized speech")
+    parser = argparse.ArgumentParser(
+        description="Calculate PESQ between reference and synthesized speech"
+    )
 
     # Single file evaluation
     parser.add_argument("--reference", type=str, help="Reference audio file")
     parser.add_argument("--synthesized", type=str, help="Synthesized audio file")
 
     # Directory evaluation
-    parser.add_argument("--reference_dir", type=str, help="Directory containing reference audio files")
-    parser.add_argument("--synthesized_dir", type=str, help="Directory containing synthesized audio files")
+    parser.add_argument(
+        "--reference_dir", type=str, help="Directory containing reference audio files"
+    )
+    parser.add_argument(
+        "--synthesized_dir",
+        type=str,
+        help="Directory containing synthesized audio files",
+    )
 
     # Output
     parser.add_argument("--output", type=str, help="Output JSON file for results")
 
     # Parameters
-    parser.add_argument("--mode", type=str, default="wb", choices=["wb", "nb"],
-                        help="PESQ mode: 'wb' for wideband (16kHz), 'nb' for narrowband (8kHz)")
+    parser.add_argument(
+        "--mode",
+        type=str,
+        default="wb",
+        choices=["wb", "nb"],
+        help="PESQ mode: 'wb' for wideband (16kHz), 'nb' for narrowband (8kHz)",
+    )
 
     args = parser.parse_args()
 
@@ -167,7 +175,7 @@ def main():
             print(f"Error: {result['error']}")
 
         if args.output:
-            with open(args.output, 'w') as f:
+            with open(args.output, "w") as f:
                 json.dump(result, f, indent=2)
 
     elif args.reference_dir and args.synthesized_dir:
@@ -176,7 +184,7 @@ def main():
             args.reference_dir,
             args.synthesized_dir,
             output_file=args.output,
-            mode=args.mode
+            mode=args.mode,
         )
 
         if results["statistics"]["num_samples"] > 0:
@@ -192,10 +200,11 @@ def main():
             print("No valid samples found for evaluation")
 
     else:
-        parser.error("Please provide either --reference and --synthesized for single file evaluation, "
-                    "or --reference_dir and --synthesized_dir for directory evaluation")
+        parser.error(
+            "Please provide either --reference and --synthesized for single file evaluation, "
+            "or --reference_dir and --synthesized_dir for directory evaluation"
+        )
 
 
 if __name__ == "__main__":
     main()
-
