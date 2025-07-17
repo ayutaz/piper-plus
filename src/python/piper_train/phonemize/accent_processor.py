@@ -223,3 +223,7 @@ class JapaneseAccentProcessor:
                 prosody_ids.append(self.mark_to_id["<PAD>"])
 
         return prosody_ids
+
+
+# Alias for compatibility
+AccentProcessor = JapaneseAccentProcessor
