@@ -39,7 +39,7 @@ class F0Predictor(nn.Module):
         for _ in range(n_layers):
             self.encoder_layers.append(
                 ConvReluNorm(
-                    hidden_channels, hidden_channels, kernel_size, p_dropout=p_dropout
+                    hidden_channels, hidden_channels, hidden_channels, kernel_size, 2, p_dropout
                 )
             )
 
@@ -93,6 +93,7 @@ class F0Predictor(nn.Module):
 
         # Add prosody embeddings if provided
         if prosody_ids is not None:
+            prosody_ids = prosody_ids.long()  # Convert to LongTensor for embedding
             prosody_emb = self.prosody_embed(prosody_ids)  # [B, T, hidden]
             prosody_emb = prosody_emb.transpose(1, 2)  # [B, hidden, T]
             x = x + prosody_emb
@@ -100,7 +101,12 @@ class F0Predictor(nn.Module):
         # Encoder layers with residual connections
         for layer in self.encoder_layers:
             residual = x
-            x = layer(x * x_mask if x_mask is not None else x)
+            if x_mask is not None:
+                x = layer(x, x_mask)
+            else:
+                # Create a dummy mask of ones if no mask is provided
+                dummy_mask = torch.ones_like(x[:, :1, :])
+                x = layer(x, dummy_mask)
             x = x + residual
 
         # Self-attention for long-range dependencies

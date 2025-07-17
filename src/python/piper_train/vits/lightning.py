@@ -238,7 +238,7 @@ class VitsModel(pl.LightningModule):
             _x_mask,
             z_mask,
             (_z, z_p, m_p, logs_p, _m_q, logs_q),
-            (f0_pred, f0_variance),
+            (f0_pred_bins, f0_pred, f0_variance),
         ) = self.model_g(x, x_lengths, spec, spec_lengths, speaker_ids, prosody_ids)
         self._y_hat = y_hat
 
@@ -293,7 +293,7 @@ class VitsModel(pl.LightningModule):
 
                 # Apply F0 loss
                 loss_f0, f0_metrics = self.f0_loss(
-                    None,  # f0_pred_bins not used in this version
+                    f0_pred_bins[:, :, : f0_values.shape[-1]],  # Match dimensions
                     f0_pred[:, :, : f0_values.shape[-1]],  # Match dimensions
                     f0_variance[:, :, : f0_values.shape[-1]],
                     f0_values.unsqueeze(1),  # Add channel dimension
