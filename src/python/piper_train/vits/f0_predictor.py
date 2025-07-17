@@ -39,7 +39,12 @@ class F0Predictor(nn.Module):
         for _ in range(n_layers):
             self.encoder_layers.append(
                 ConvReluNorm(
-                    hidden_channels, hidden_channels, hidden_channels, kernel_size, 2, p_dropout
+                    hidden_channels,
+                    hidden_channels,
+                    hidden_channels,
+                    kernel_size,
+                    2,
+                    p_dropout,
                 )
             )
 

@@ -197,7 +197,9 @@ class PiperDataset(Dataset):
             speaker_id=utt_dict.get("speaker_id"),
             text=utt_dict.get("text"),
             prosody_ids=utt_dict.get("prosody_ids"),
-            f0_path=Path(utt_dict["f0_path"]) if "f0_path" in utt_dict and utt_dict["f0_path"] is not None else None,
+            f0_path=Path(utt_dict["f0_path"])
+            if "f0_path" in utt_dict and utt_dict["f0_path"] is not None
+            else None,
         )
 
 

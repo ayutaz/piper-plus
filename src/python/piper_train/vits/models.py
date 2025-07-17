@@ -636,7 +636,9 @@ class SynthesizerTrn(nn.Module):
         f0_pred = None
         f0_variance = None
         if prosody_ids is not None:
-            f0_pred_bins, f0_pred, f0_variance = self.f0_predictor(x, x_mask, prosody_ids, g)
+            f0_pred_bins, f0_pred, f0_variance = self.f0_predictor(
+                x, x_mask, prosody_ids, g
+            )
 
         z, m_q, logs_q, y_mask = self.enc_q(y, y_lengths, g=g)
         z_p = self.flow(z, y_mask, g=g)
