@@ -5,3 +5,5 @@ numpy>=1.19.0
 onnxruntime>=1.11.0
 pytorch-lightning~=1.7.0
 torch>=1.11.0,<2
+transformers>=4.30.0
+torchdiffeq>=0.2.3

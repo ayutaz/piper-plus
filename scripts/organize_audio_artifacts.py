@@ -14,6 +14,13 @@ from pathlib import Path
 from typing import Any
 
 # Import test text information
+import sys
+from pathlib import Path
+
+# Add scripts directory to Python path for imports
+scripts_dir = Path(__file__).parent
+sys.path.insert(0, str(scripts_dir))
+
 from test_text_constants import MULTILINGUAL_TEST_TEXTS, get_test_text_description
 
 
