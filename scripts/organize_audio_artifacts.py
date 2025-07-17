@@ -18,7 +18,10 @@ scripts_dir = Path(__file__).parent
 sys.path.insert(0, str(scripts_dir))
 
 # Import test text information
-from test_text_constants import MULTILINGUAL_TEST_TEXTS, get_test_text_description  # noqa: E402
+from test_text_constants import (  # noqa: E402
+    MULTILINGUAL_TEST_TEXTS,
+    get_test_text_description,
+)
 
 
 def get_audio_info(wav_path: Path) -> dict[str, Any]:
