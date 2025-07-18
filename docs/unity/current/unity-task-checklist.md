@@ -40,36 +40,39 @@
   - [x] ネイティブライブラリビルド（Windows/Linux/macOS）
   - [x] マルチプラットフォームテスト
 
-### ⚠️ 部分的実装（要改善）
-
-- [ ] **OpenJTalk音素化ライブラリ**
-  - [x] C++ラッパー作成（openjtalk_wrapper.cpp）
+- [x] **OpenJTalk音素化ライブラリ** ✅ Phase 1.7-1.8完了
+  - [x] C++ラッパー作成（openjtalk_wrapper_full.c）
   - [x] ビルドシステム（CMake）
   - [x] CI/CDでのビルド
-  - [ ] ❌ 実際のOpenJTalk統合（現在はシステムコマンド呼び出し）
-  - [ ] ❌ P/Invokeバインディング実装
-  - [ ] ❌ 辞書ファイル管理
-  - [ ] ❌ 動作テスト
+  - [x] ✅ 実際のOpenJTalk統合（pyopenjtalk互換の完全実装）
+  - [x] ✅ P/Invokeバインディング実装
+  - [x] ✅ 辞書ファイル管理（sys.dic, unk.dic, char.bin）
+  - [x] ✅ 動作テスト
 
-### ❌ 未実装タスク（このPR範囲）
-
-- [ ] **OpenJTalkPhonemizer実装**
+- [x] **OpenJTalkPhonemizer実装** ✅ Phase 1.8完了
   ```csharp
   public class OpenJTalkPhonemizer : BasePhonemizer
   {
       [DllImport("openjtalk_wrapper")]
-      private static extern IntPtr openjtalk_create();
-      // ... P/Invoke定義
+      private static extern IntPtr openjtalk_create(string dict_path);
+      // ... P/Invoke定義完了
   }
   ```
 
-- [ ] **音素IDマッピング**
-  - [ ] Piperフォーマットの音素ID変換
-  - [ ] 言語別マッピングテーブル
+- [x] **音素IDマッピング** ✅
+  - [x] Piperフォーマットの音素ID変換
+  - [x] 日本語音素マッピングテーブル
 
-- [ ] **実動作サンプル**
-  - [ ] エディター実行用サンプルシーン
-  - [ ] 統合テストスクリプト
+- [x] **実動作サンプル** ✅
+  - [x] エディター実行用サンプル（PiperTTSDemo, OpenJTalkPhonemizerDemo）
+  - [x] 統合テストスクリプト（OpenJTalkPhonemizerTest）
+
+### ❌ 未実装タスク（このPR範囲）
+
+- [ ] **ONNX モデル統合（Phase 1.9）**
+  - [ ] Sentisを使用したONNXモデル読み込み
+  - [ ] 音素列から音声波形への変換
+  - [ ] リアルタイム音声生成
 
 ## 今後のフェーズ
 
@@ -144,10 +147,10 @@
 - [x] SentisAudioGeneratorTests
 - [x] PhonemizersTests（MockPhonemizer）
 - [x] PlatformHelperTests
+- [x] OpenJTalkPhonemizerTests ✅ Phase 1.8完了
 
 ### ❌ 必要なテスト
 
-- [ ] OpenJTalkPhonemizerTests
 - [ ] 統合テスト（E2E）
 - [ ] パフォーマンステスト
 - [ ] ストレステスト
@@ -164,12 +167,13 @@
 - [x] プラットフォーム検出
 - [x] 単体テスト実行
 - [x] キャッシュ機能
+- [x] OpenJTalk音素化 ✅ Phase 1.8完了
+- [x] PiperTTSとの統合動作 ✅
 
 #### ❌ 要実装後確認
 
-- [ ] OpenJTalk音素化
-- [ ] 実際のONNXモデル読み込み
-- [ ] 音声生成（日本語）
+- [ ] 実際のONNXモデル読み込み（Phase 1.9）
+- [ ] 音声生成（日本語）（Phase 1.9）
 - [ ] リアルタイムパフォーマンス
 - [ ] メモリ使用量
 

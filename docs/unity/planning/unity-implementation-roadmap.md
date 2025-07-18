@@ -10,11 +10,11 @@
 
 ## 進捗サマリー
 
-最終更新: 2025年1月15日
+最終更新: 2025年1月13日
 
 ### 現在の進捗
 - **完了**: Phase 0 - Unity 6 & AI Interface 検証 ✅（3/3人日）
-- **進行中**: Phase 1 - Windows/Linux 基盤実装 🚧（8/20人日）
+- **進行中**: Phase 1 - Windows/Linux 基盤実装 🚧（2/20人日）
   - ✅ 1.1 Core API - インターフェース設計（1人日）
     - ✅ IPiperTTS インターフェース定義
     - ✅ PiperConfig クラス基本実装
@@ -23,26 +23,21 @@
     - ✅ PiperException 階層実装
     - ✅ CacheStatistics 実装
     - ✅ PiperLogger 実装（Debug.Logラッパー）
-  - ✅ 1.2 Core API - 実装（3人日）
-    - ✅ PiperConfig バリデーション実装（強化版）
-    - ✅ PiperTTS 基本構造実装（1144行）
-    - ✅ PiperTTS 非同期初期化実装
-    - ✅ PiperTTS 音声生成スタブ実装
-  - ✅ 1.3 Core API - テスト（2人日）
-    - ✅ PiperConfigTest（拡張版）
-    - ✅ PiperTTSFunctionTest（新規）
-    - ✅ PiperTTSSimpleTest（新規）
-    - ✅ SyncTestHelpers（新規）
-    - ✅ 合計108テスト（全て成功）
-  - ✅ エディタツール
-    - ✅ PiperTTSDemo.cs（手動テスト用EditorWindow）
-- **全体進捗**: 11/90人日完了（12.2%）
+  - ✅ 各Core APIクラスのユニットテスト（1人日）
+    - ✅ PiperConfigTest (10テスト)
+    - ✅ PiperVoiceConfigTest (12テスト)
+    - ✅ AudioChunkTest (11テスト)
+    - ✅ CacheStatisticsTest (16テスト)
+    - ✅ PiperExceptionTest (12テスト)
+    - ✅ PiperLoggerTest (13テスト)
+- **全体進捗**: 5/90人日完了（5.6%）
 
 ### 次のタスク
-**Phase 1.4-1.6: 音素化システム（2人日）**
-- 1.4 IPhonemizer インターフェース設計（0.5人日）
-- 1.5 BasePhonemizer 実装（1人日）
-- 1.6 MockPhonemizer 実装とテスト（0.5人日）
+**Phase 1.2: Core API - 実装（3人日）**
+- 1.2.1 PiperConfig バリデーション実装（0.5人日）
+- 1.2.2 PiperTTS 基本構造実装（1人日）
+- 1.2.3 PiperTTS 非同期初期化実装（1人日）
+- 1.2.4 PiperTTS 音声生成スタブ実装（0.5人日）
 
 ### Phase 1のゴール
 **「日本語テキストを入力して、Windows/LinuxのUnity上で実際の音声が再生される」**
@@ -183,49 +178,41 @@
   - Unity Inspector表示対応
   - PR #5 で実装済み
 
-##### 1.2 Core API - 実装（3人日）✅ 完了
+##### 1.2 Core API - 実装（3人日）
 
-###### 1.2.1 PiperConfig バリデーション実装（0.5人日）✅
+###### 1.2.1 PiperConfig バリデーション実装（0.5人日）
 - **作業内容**:
   - Validate() メソッド実装
   - エラーメッセージ定義
   - 例外クラス作成
-  - 定数化によるマジックナンバー除去
-- **成果物**: PiperConfig.cs（強化版）
-- **完了条件**: 不正な設定で適切な例外発生 ✅
-- **実施内容**: PR #13で完了
+- **成果物**: PiperConfig.cs（完全版）
+- **完了条件**: 不正な設定で適切な例外発生
 
-###### 1.2.2 PiperTTS 基本構造実装（1人日）✅
+###### 1.2.2 PiperTTS 基本構造実装（1人日）
 - **作業内容**:
   - クラス構造の実装
   - DI コンテナ設計
   - イベントハンドラ実装
-  - スレッドセーフ設計
-- **成果物**: PiperTTS.cs（1144行）
-- **完了条件**: 基本的なメソッドが呼び出し可能 ✅
-- **実施内容**: PR #13で完了
+- **成果物**: PiperTTS.cs（スケルトン）
+- **完了条件**: 基本的なメソッドが呼び出し可能
 
-###### 1.2.3 PiperTTS 非同期初期化実装（1人日）✅
+###### 1.2.3 PiperTTS 非同期初期化実装（1人日）
 - **作業内容**:
   - InitializeAsync 実装
   - リソース読み込み処理
   - エラーハンドリング
-  - CancellationToken サポート
 - **成果物**: PiperTTS.cs（初期化完了）
-- **完了条件**: 非同期初期化が正常動作 ✅
-- **実施内容**: PR #13で完了
+- **完了条件**: 非同期初期化が正常動作
 
-###### 1.2.4 PiperTTS 音声生成スタブ実装（0.5人日）✅
+###### 1.2.4 PiperTTS 音声生成スタブ実装（0.5人日）
 - **作業内容**:
   - GenerateSpeechAsync スタブ
   - TestMode 対応
   - ダミー AudioClip 返却
-  - StreamAudioAsync 実装
 - **成果物**: PiperTTS.cs（完全版）
-- **完了条件**: API が一通り動作 ✅
-- **実施内容**: PR #13で完了
+- **完了条件**: API が一通り動作
 
-##### 1.3 Core API - テスト（2人日）✅ 完了
+##### 1.3 Core API - テスト（2人日）✅ 部分的に完了
 
 ###### 1.3.1 Core API ユニットテスト（1人日）✅ 完了
 - **作業内容**:
@@ -242,23 +229,21 @@
   - CI/CDでの自動実行確認
   - PR #5 でマージ済み
 
-###### 1.3.2 PiperTTS 初期化テスト（0.5人日）✅
+###### 1.3.2 PiperTTS 初期化テスト（1人日）
 - **作業内容**:
   - 非同期テストの作成
   - モック作成
   - タイムアウトテスト
-- **成果物**: PiperTTSFunctionTest.cs、PiperTTSSimpleTest.cs
-- **完了条件**: 全初期化パターンをカバー ✅
-- **実施内容**: PR #13で完了（34テスト追加）
+- **成果物**: PiperTTSTests.cs（初期化部分）
+- **完了条件**: 全初期化パターンをカバー
 
-###### 1.3.3 PiperTTS 音声生成テスト（0.5人日）✅
+###### 1.3.3 PiperTTS 音声生成テスト（0.5人日）
 - **作業内容**:
   - TestMode でのテスト
   - 例外ケーステスト
   - メモリリークチェック
 - **成果物**: PiperTTSTests.cs（完全版）
-- **完了条件**: 全公開 API のテスト完了 ✅
-- **実施内容**: PR #13で完了（合計108テスト）
+- **完了条件**: 全公開 API のテスト完了
 
 ##### 1.4 音素化システム - インターフェース（1.5人日）
 
