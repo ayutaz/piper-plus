@@ -43,17 +43,55 @@ def main():
     # Trainer arguments (previously added by Trainer.add_argparse_args)
     parser.add_argument("--accelerator", default="auto", help="Accelerator to use")
     parser.add_argument("--devices", type=int, default=1, help="Number of devices")
-    parser.add_argument("--max_epochs", type=int, default=1000, help="Maximum number of epochs")
+    parser.add_argument(
+        "--max_epochs", type=int, default=1000, help="Maximum number of epochs"
+    )
     parser.add_argument("--precision", default="32-true", help="Training precision")
-    parser.add_argument("--accumulate_grad_batches", type=int, default=1, help="Accumulate gradients over k batches")
-    parser.add_argument("--gradient_clip_val", type=float, default=None, help="Gradient clipping value")
-    parser.add_argument("--val_check_interval", type=float, default=1.0, help="How often to check the validation set")
-    parser.add_argument("--log_every_n_steps", type=int, default=50, help="How often to log within steps")
-    parser.add_argument("--default_root_dir", type=str, default=None, help="Default path for logs and weights")
-    parser.add_argument("--fast_dev_run", action="store_true", help="Run a fast development run")
-    parser.add_argument("--strategy", type=str, default=None, help="Training strategy (e.g., ddp, ddp_spawn)")
-    parser.add_argument("--enable_progress_bar", action="store_true", default=True, help="Enable progress bar")
-    parser.add_argument("--detect_anomaly", action="store_true", help="Enable anomaly detection")
+    parser.add_argument(
+        "--accumulate_grad_batches",
+        type=int,
+        default=1,
+        help="Accumulate gradients over k batches",
+    )
+    parser.add_argument(
+        "--gradient_clip_val", type=float, default=None, help="Gradient clipping value"
+    )
+    parser.add_argument(
+        "--val_check_interval",
+        type=float,
+        default=1.0,
+        help="How often to check the validation set",
+    )
+    parser.add_argument(
+        "--log_every_n_steps",
+        type=int,
+        default=50,
+        help="How often to log within steps",
+    )
+    parser.add_argument(
+        "--default_root_dir",
+        type=str,
+        default=None,
+        help="Default path for logs and weights",
+    )
+    parser.add_argument(
+        "--fast_dev_run", action="store_true", help="Run a fast development run"
+    )
+    parser.add_argument(
+        "--strategy",
+        type=str,
+        default=None,
+        help="Training strategy (e.g., ddp, ddp_spawn)",
+    )
+    parser.add_argument(
+        "--enable_progress_bar",
+        action="store_true",
+        default=True,
+        help="Enable progress bar",
+    )
+    parser.add_argument(
+        "--detect_anomaly", action="store_true", help="Enable anomaly detection"
+    )
 
     VitsModel.add_model_specific_args(parser)
     parser.add_argument("--seed", type=int, default=1234)
