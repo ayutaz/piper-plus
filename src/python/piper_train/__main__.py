@@ -54,7 +54,7 @@ def main():
     parser.add_argument("--strategy", type=str, default=None, help="Training strategy (e.g., ddp, ddp_spawn)")
     parser.add_argument("--enable_progress_bar", action="store_true", default=True, help="Enable progress bar")
     parser.add_argument("--detect_anomaly", action="store_true", help="Enable anomaly detection")
-    
+
     VitsModel.add_model_specific_args(parser)
     parser.add_argument("--seed", type=int, default=1234)
     args = parser.parse_args()
@@ -92,17 +92,17 @@ def main():
         "enable_progress_bar": args.enable_progress_bar,
         "detect_anomaly": args.detect_anomaly,
     }
-    
+
     # Add strategy if specified
     if args.strategy:
         trainer_kwargs["strategy"] = args.strategy
-    
+
     # Configure callbacks
     callbacks = []
     if args.checkpoint_epochs is not None:
         callbacks.append(
             ModelCheckpoint(
-                every_n_epochs=args.checkpoint_epochs, 
+                every_n_epochs=args.checkpoint_epochs,
                 save_top_k=args.save_top_k,
                 save_last=True,
             )
@@ -110,10 +110,10 @@ def main():
         _LOGGER.debug(
             "Checkpoints will be saved every %s epoch(s)", args.checkpoint_epochs
         )
-    
+
     if callbacks:
         trainer_kwargs["callbacks"] = callbacks
-    
+
     trainer = Trainer(**trainer_kwargs)
 
     dict_args = vars(args)
@@ -221,7 +221,7 @@ def main():
                 )
             if new_callbacks:
                 new_trainer_kwargs["callbacks"] = new_callbacks
-            
+
             trainer = Trainer(**new_trainer_kwargs)
 
             # 新しいTrainerで学習を開始
