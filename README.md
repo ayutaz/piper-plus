@@ -40,6 +40,19 @@ Piper is used in a [variety of projects](#people-using-piper).
 * PyPI パッケージ `piper-tts-plus` として公開し、`pip install` で簡単インストール可能に
 * 多言語TTSテストインフラストラクチャーを追加し、CI/CDで自動テスト実行 - [詳細](docs/MULTILINGUAL_TESTING.md)
 * OpenJTalk辞書とHTSボイスモデルの自動ダウンロード機能を追加し、日本語TTSのセットアップを簡略化
+* マルチGPU学習対応（PyTorch Lightning 2.x）
+  * DDP (Distributed Data Parallel) 戦略による複数GPU並列学習
+  * 学習率の自動スケーリング機能（`--auto_lr_scaling`）
+  * 使用例：
+    ```bash
+    python -m piper_train \
+      --dataset-dir /path/to/dataset \
+      --batch-size 16 \
+      --devices 2 \
+      --strategy ddp \
+      --auto_lr_scaling \
+      --base_lr 2e-4
+    ```
 
 ## 関連記事
 * [LJSpeechを使って英語のpiperの事前学習モデルを作成する](https://ayousanz.hatenadiary.jp/entry/2025/05/26/230341)
