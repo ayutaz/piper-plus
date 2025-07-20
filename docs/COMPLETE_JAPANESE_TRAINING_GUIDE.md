@@ -142,6 +142,8 @@ python3 -m piper_train \
 
 学習で得られたチェックポイント（.ckpt）は、推論に適したONNX形式に変換します。
 
+#### 単一GPU環境での変換
+
 ```bash
 python3 -m piper_train.export_onnx \
   /path/to/your/model.ckpt \
@@ -150,6 +152,22 @@ python3 -m piper_train.export_onnx \
 # config.jsonも忘れずにコピー
 cp /path/to/preprocessed_data/config.json /path/to/output/model.onnx.json
 ```
+
+#### マルチGPU環境での変換
+
+マルチGPU学習で作成されたチェックポイントは、CUDAデバイス不一致エラーが発生する場合があります。この場合はCUDAを無効化してCPUで変換します：
+
+```bash
+# CUDAを無効化してCPUで変換
+CUDA_VISIBLE_DEVICES="" python3 -m piper_train.export_onnx \
+  /path/to/your/model.ckpt \
+  /path/to/output/model.onnx
+
+# config.jsonも忘れずにコピー
+cp /path/to/preprocessed_data/config.json /path/to/output/model.onnx.json
+```
+
+**注意**: マルチGPU学習のチェックポイントには複数のGPU情報が含まれているため、ONNX変換時にデバイス混在エラーが発生することがあります。`CUDA_VISIBLE_DEVICES=""`を使用することで安全にCPUで変換できます。
 
 ### 推論の実行
 

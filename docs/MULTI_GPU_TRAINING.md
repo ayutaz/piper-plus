@@ -292,11 +292,22 @@ python -m piper_train --dataset-dir /path/to/dataset --devices 2 --strategy ddp 
      export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
      ```
 
-2. **DataLoader関連エラー**
+2. **ONNX変換時のCUDAデバイスエラー**
+   マルチGPU学習で作成されたチェックポイントをONNX変換する際、デバイス不一致エラーが発生する場合:
+   ```bash
+   # CUDAを無効化してCPUで変換
+   CUDA_VISIBLE_DEVICES="" python3 -m piper_train.export_onnx \
+     /path/to/checkpoint.ckpt \
+     /path/to/output.onnx
+   ```
+   
+   **原因**: マルチGPU学習のチェックポイントには複数のGPU情報が含まれ、ONNX変換時にデバイス混在が発生
+
+3. **DataLoader関連エラー**
    - `--num-workers`を調整
    - `--persistent_workers`を無効化
 
-3. **DDP初期化エラー**
+4. **DDP初期化エラー**
    - ファイアウォール設定を確認
    - `NCCL_DEBUG=INFO`環境変数で詳細ログ
 
