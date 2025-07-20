@@ -45,9 +45,9 @@ class TestPerformance:
                 std_dev = statistics.stdev(times)
 
                 print(f"\nText length: {len(text)} chars")
-                print(f"Average time: {avg_time*1000:.2f}ms")
-                print(f"Std dev: {std_dev*1000:.2f}ms")
-                print(f"Min/Max: {min(times)*1000:.2f}ms / {max(times)*1000:.2f}ms")
+                print(f"Average time: {avg_time * 1000:.2f}ms")
+                print(f"Std dev: {std_dev * 1000:.2f}ms")
+                print(f"Min/Max: {min(times) * 1000:.2f}ms / {max(times) * 1000:.2f}ms")
 
                 # Performance criteria
                 if len(text) < 20:
@@ -85,17 +85,17 @@ class TestPerformance:
 
                 print(f"\nBatch size: {batch_size}")
                 print(f"Total time: {total_time:.2f}s")
-                print(f"Per text: {per_text_time*1000:.2f}ms")
-                print(f"Throughput: {batch_size/total_time:.1f} texts/sec")
+                print(f"Per text: {per_text_time * 1000:.2f}ms")
+                print(f"Throughput: {batch_size / total_time:.1f} texts/sec")
 
                 # All results should be valid
                 assert len(results) == batch_size
                 assert all(len(r) > 0 for r in results)
 
                 # Throughput should be reasonable
-                assert (
-                    batch_size / total_time > 5
-                ), f"Throughput too low: {batch_size/total_time:.1f} texts/sec"
+                assert batch_size / total_time > 5, (
+                    f"Throughput too low: {batch_size / total_time:.1f} texts/sec"
+                )
 
         except ImportError:
             pytest.skip("Japanese phonemizer not available")
@@ -147,9 +147,9 @@ class TestPerformance:
                 print(f"Output size: {len(phonemes)} phonemes")
 
                 # Memory usage should be reasonable
-                assert (
-                    mem_increase < size * 0.001
-                ), f"Memory usage too high: {mem_increase:.2f}MB for {size} chars"
+                assert mem_increase < size * 0.001, (
+                    f"Memory usage too high: {mem_increase:.2f}MB for {size} chars"
+                )
 
                 # Clean up
                 del text, phonemes
@@ -160,9 +160,9 @@ class TestPerformance:
             total_increase = final_mem - baseline_mem
 
             print(f"\nTotal memory increase: {total_increase:.2f}MB")
-            assert (
-                total_increase < 100
-            ), f"Possible memory leak: {total_increase:.2f}MB total increase"
+            assert total_increase < 100, (
+                f"Possible memory leak: {total_increase:.2f}MB total increase"
+            )
 
         except ImportError:
             pytest.skip("Japanese phonemizer not available")
@@ -185,11 +185,11 @@ class TestPerformance:
 
             print("\nStress test results:")
             print(
-                f"Input size: {len(very_long_text)} chars ({len(very_long_text)/1024:.1f}KB)"
+                f"Input size: {len(very_long_text)} chars ({len(very_long_text) / 1024:.1f}KB)"
             )
             print(f"Output size: {len(phonemes)} phonemes")
             print(f"Processing time: {process_time:.2f}s")
-            print(f"Throughput: {len(very_long_text)/process_time:.0f} chars/sec")
+            print(f"Throughput: {len(very_long_text) / process_time:.0f} chars/sec")
 
             # Should complete within reasonable time
             assert process_time < 30.0, f"Stress test too slow: {process_time:.2f}s"

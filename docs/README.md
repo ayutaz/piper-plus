@@ -13,6 +13,10 @@ Welcome to the Piper documentation. This directory contains detailed guides and 
 - [Japanese Usage Guide](../JAPANESE_USAGE.md) - Comprehensive Japanese TTS guide
 - [Phoneme Mapping](../PHONEME_MAPPING.md) - Technical details on Japanese phoneme handling
 
+### Technical Analysis
+- [WebAssembly Investigation](webassembly-investigation/README.md) - WebGL/WebAssembly support research
+- [Competitive Analysis](competitive-analysis/README.md) - Market positioning and competitor analysis
+
 ### Quick Links
 
 #### For Windows Users

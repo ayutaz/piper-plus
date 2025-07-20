@@ -1,0 +1,29 @@
+# Temporarily ignore files from previous sessions to focus on multi-GPU PR
+compare_epochs_evaluation.py
+evaluate_jvs_with_pr101_tools.py
+improved_evaluation.py
+manual_evaluation.py
+scripts/evaluation/run_tts_evaluation.py
+scripts/test_japanese_tts.py
+scripts/test_multilingual_tts.py
+src/python/create_partial_checkpoint.py
+src/python/openjtalk_phonemizer.py
+src/python/tests/test_integration.py
+src/python/tests/test_performance.py
+src/python/tests/test_phonemize.py
+src/python/verify_and_load_dataset.py
+src/python/verify_dataset.py
+
+# Ignore prepare scripts that aren't part of multi-GPU changes
+src/python/prepare_*.py
+scripts/prepare_*.py
+
+# Ignore evaluation scripts
+evaluate_*.py
+run_*_evaluation.sh
+evaluate_*.sh
+
+# Ignore other non-core files
+EVALUATION_GUIDE.md
+docs/training_*.md
+.claude/

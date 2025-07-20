@@ -22,7 +22,7 @@ For Windows, see [ssamjh's guide using WSL](https://ssamjh.nz/create-custom-pipe
 
 # env
 * python 3.11
-* only single GPU
+* Single or Multi-GPU support (PyTorch Lightning 2.x)
 
 Training a voice for Piper involves 3 main steps:
 
@@ -167,6 +167,25 @@ Once you have a `config.json`, `dataset.jsonl`, and audio files (`.pt`) from pre
 
 For most cases, you should fine-tune from [an existing model](https://huggingface.co/datasets/rhasspy/piper-checkpoints/tree/main). The model must have the sample audio quality and sample rate, but does not necessarily need to be in the same language.
 
+### Multi-GPU Training
+
+Piper supports multi-GPU training using PyTorch Lightning's DDP (Distributed Data Parallel) strategy:
+
+```sh
+python3 -m piper_train \
+    --dataset-dir /path/to/training_dir/ \
+    --accelerator 'gpu' \
+    --devices 2 \                        # Use 2 GPUs
+    --strategy ddp \                     # DDP strategy
+    --batch-size 16 \                    # Per GPU batch size
+    --max_epochs 10000
+```
+
+Key features for multi-GPU training:
+- **Automatic learning rate scaling**: Enabled by default. Use `--disable_auto_lr_scaling` to turn off
+- **Optimized DDP settings**: Automatically configured for VITS models
+- **DataLoader optimizations**: `pin_memory` and `persistent_workers` enabled by default
+
 It is **highly recommended** to train with the following `Dockerfile`:
 
 ``` dockerfile
@@ -219,6 +238,23 @@ Use `--quality high` to train a [larger voice model](https://github.com/rhasspy/
 You can adjust the validation split (5% = 0.05) and number of test examples for your specific dataset. For fine-tuning, they are often set to 0 because the target dataset is very small.
 
 Batch size can be tricky to get right. It depends on the size of your GPU's vRAM, the model's quality/size, and the length of the longest sentence in your dataset. The `--max-phoneme-ids <N>` argument to `piper_train` will drop sentences that have more than `N` phoneme ids. In practice, using `--batch-size 32` and `--max-phoneme-ids 400` will work for 24 GB of vRAM (RTX 3090/4090).
+
+### Advanced Training Options
+
+Additional options for fine-tuning your training:
+
+```sh
+python3 -m piper_train \
+  --dataset-dir /path/to/training_dir/ \
+  --accelerator 'gpu' \
+  --devices 1 \
+  --batch-size 32 \
+  --accumulate_grad_batches 2 \         # Gradient accumulation (effective batch = 64)
+  --gradient_clip_val 1.0 \             # Gradient clipping for stability
+  --precision 16-mixed \                # Mixed precision training (faster, less memory)
+  --detect_anomaly \                    # Enable anomaly detection (debugging)
+  --resume_from_checkpoint /path/to/checkpoint.ckpt  # Resume training
+```
 
 
 ### Multi-Speaker Fine-Tuning

@@ -228,9 +228,9 @@ class MultilingualTTSTester:
         self, language: str, config: dict, test_type: str = "basic"
     ) -> dict:
         """Test TTS for a specific language."""
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print(f"Testing {language}: {config['model']}")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
 
         results = {
             "language": language,
@@ -401,9 +401,9 @@ class MultilingualTTSTester:
 
             os.unlink(input_file)
             if os.path.exists(output_file):
-                print(f"  [OK] Special test {i+1} passed")
+                print(f"  [OK] Special test {i + 1} passed")
             else:
-                print(f"  [FAIL] Special test {i+1} failed")
+                print(f"  [FAIL] Special test {i + 1} failed")
 
         # Performance test for long text
         if test_type == "performance":
@@ -444,7 +444,7 @@ class MultilingualTTSTester:
             if os.path.exists(output_file):
                 os.path.getsize(output_file)
                 print(f"  [OK] Performance: {len(long_text)} chars in {perf_time:.2f}s")
-                print(f"    Speed: {len(long_text)/perf_time:.0f} chars/second")
+                print(f"    Speed: {len(long_text) / perf_time:.0f} chars/second")
                 results["performance"] = {
                     "chars": len(long_text),
                     "time": perf_time,
@@ -527,9 +527,9 @@ class MultilingualTTSTester:
 
     def print_summary(self, results: dict[str, dict]):
         """Print a summary of test results."""
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print("TEST SUMMARY")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
 
         success_count = sum(1 for r in results.values() if r["status"] == "success")
         total_count = len(results)
@@ -538,7 +538,7 @@ class MultilingualTTSTester:
         print(f"Successful: {success_count}")
         print(f"Failed: {total_count - success_count}")
         if total_count > 0:
-            print(f"Success rate: {success_count/total_count*100:.1f}%")
+            print(f"Success rate: {success_count / total_count * 100:.1f}%")
         else:
             print("No tests were run")
 
@@ -550,7 +550,7 @@ class MultilingualTTSTester:
             status = "[PASS]" if result["status"] == "success" else "[FAIL]"
             time_str = f"{result['time']:.2f}s" if result["time"] > 0 else "N/A"
             size_str = (
-                f"{result['output_size']/1024:.1f}KB"
+                f"{result['output_size'] / 1024:.1f}KB"
                 if result["output_size"] > 0
                 else "N/A"
             )
@@ -570,9 +570,9 @@ class MultilingualTTSTester:
             if "performance" in r and r["performance"]
         }
         if perf_results:
-            print(f"\n{'='*60}")
+            print(f"\n{'=' * 60}")
             print("PERFORMANCE SUMMARY")
-            print(f"{'='*60}")
+            print(f"{'=' * 60}")
             print(f"{'Language':<10} {'Chars/Second':<15} {'Generation Time':<10}")
             print("-" * 35)
 

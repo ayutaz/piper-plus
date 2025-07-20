@@ -484,7 +484,7 @@ class JapaneseTTSTester:
         print(f"Passed: {passed_tests}")
         print(f"Failed: {total_tests - passed_tests}")
         if total_tests > 0:
-            print(f"Success rate: {passed_tests/total_tests*100:.1f}%")
+            print(f"Success rate: {passed_tests / total_tests * 100:.1f}%")
 
         # Print performance summary
         if self.performance_metrics["summary"]:

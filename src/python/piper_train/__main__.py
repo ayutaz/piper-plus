@@ -6,10 +6,27 @@ from pathlib import Path
 import torch
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import ModelCheckpoint
+from pytorch_lightning.strategies import DDPStrategy
 
 from .vits.lightning import VitsModel
 
 _LOGGER = logging.getLogger(__package__)
+
+
+def calculate_effective_batch_size(batch_size, num_gpus=1):
+    """Calculate effective batch size for multi-GPU training."""
+    return batch_size * num_gpus
+
+
+def calculate_learning_rate(base_lr, effective_batch_size, base_batch_size=16):
+    """Calculate learning rate with linear scaling for multi-GPU training."""
+    return base_lr * (effective_batch_size / base_batch_size)
+
+
+def get_optimal_num_workers(num_gpus=1):
+    """Get optimal number of DataLoader workers for multi-GPU training."""
+    # 4 workers per GPU is generally optimal
+    return min(4 * num_gpus, torch.get_num_threads())
 
 
 def main():
@@ -92,6 +109,29 @@ def main():
     parser.add_argument(
         "--detect_anomaly", action="store_true", help="Enable anomaly detection"
     )
+    parser.add_argument(
+        "--auto_lr_scaling",
+        action="store_true",
+        default=True,
+        help="Automatically scale learning rate for multi-GPU training (default: enabled)",
+    )
+    parser.add_argument(
+        "--disable_auto_lr_scaling",
+        action="store_true",
+        help="Disable automatic learning rate scaling for multi-GPU training",
+    )
+    parser.add_argument(
+        "--base_lr",
+        type=float,
+        default=2e-4,
+        help="Base learning rate for single GPU training",
+    )
+    parser.add_argument(
+        "--resume_from_checkpoint",
+        type=str,
+        default=None,
+        help="Path to checkpoint to resume training from",
+    )
 
     VitsModel.add_model_specific_args(parser)
     parser.add_argument("--seed", type=int, default=1234)
@@ -104,6 +144,33 @@ def main():
 
     torch.backends.cudnn.benchmark = True
     torch.manual_seed(args.seed)
+
+    # Multi-GPU configuration
+    num_gpus = (
+        args.devices
+        if isinstance(args.devices, int)
+        else len(args.devices)
+        if args.devices
+        else 1
+    )
+    _LOGGER.info(f"Training with {num_gpus} GPU(s)")
+
+    # Automatic learning rate scaling for multi-GPU training
+    # Disable if --disable_auto_lr_scaling is set
+    if args.disable_auto_lr_scaling:
+        args.auto_lr_scaling = False
+
+    if args.auto_lr_scaling and num_gpus > 1:
+        original_lr = getattr(args, "learning_rate", args.base_lr)
+        effective_batch_size = calculate_effective_batch_size(
+            getattr(args, "batch_size", 16), num_gpus
+        )
+        scaled_lr = calculate_learning_rate(original_lr, effective_batch_size)
+        args.learning_rate = scaled_lr
+        _LOGGER.info(
+            f"Auto-scaled learning rate from {original_lr} to {scaled_lr} for {num_gpus} GPUs"
+        )
+        _LOGGER.info(f"Effective batch size: {effective_batch_size}")
 
     config_path = args.dataset_dir / "config.json"
     dataset_path = args.dataset_dir / "dataset.jsonl"
@@ -131,9 +198,18 @@ def main():
         "detect_anomaly": args.detect_anomaly,
     }
 
-    # Add strategy if specified
+    # Configure strategy for multi-GPU training
     if args.strategy:
-        trainer_kwargs["strategy"] = args.strategy
+        if args.strategy.startswith("ddp"):
+            # Optimize DDP strategy for VITS model
+            strategy = DDPStrategy(
+                find_unused_parameters=False,  # Performance improvement for VITS
+                gradient_as_bucket_view=True,  # Memory efficiency
+                static_graph=True,  # VITS has fixed graph structure
+            )
+            trainer_kwargs["strategy"] = strategy
+        else:
+            trainer_kwargs["strategy"] = args.strategy
 
     # Configure callbacks
     callbacks = []
@@ -155,6 +231,13 @@ def main():
     trainer = Trainer(**trainer_kwargs)
 
     dict_args = vars(args)
+
+    # Set learning rate (either scaled or base)
+    if args.auto_lr_scaling and num_gpus > 1:
+        dict_args["learning_rate"] = scaled_lr
+    else:
+        dict_args["learning_rate"] = args.base_lr
+
     if args.quality == "x-low":
         dict_args["hidden_channels"] = 96
         dict_args["inter_channels"] = 96
@@ -175,6 +258,15 @@ def main():
     if num_speakers > 1 and "gin_channels" not in dict_args:
         dict_args["gin_channels"] = 768
 
+    # Multi-GPU DataLoader optimization
+    if num_gpus > 1 and "num_workers" in dict_args:
+        optimal_workers = get_optimal_num_workers(num_gpus)
+        if dict_args["num_workers"] < optimal_workers:
+            _LOGGER.info(
+                f"Adjusting num_workers from {dict_args['num_workers']} to {optimal_workers} for multi-GPU training"
+            )
+            dict_args["num_workers"] = optimal_workers
+
     model = VitsModel(
         num_symbols=num_symbols,
         num_speakers=num_speakers,
@@ -184,9 +276,9 @@ def main():
     )
 
     if args.resume_from_single_speaker_checkpoint:
-        assert (
-            num_speakers > 1
-        ), "--resume_from_single_speaker_checkpoint is only for multi-speaker models. Use --resume_from_checkpoint for single-speaker models."  # noqa: E501
+        assert num_speakers > 1, (
+            "--resume_from_single_speaker_checkpoint is only for multi-speaker models. Use --resume_from_checkpoint for single-speaker models."
+        )  # noqa: E501
 
         # Load single-speaker checkpoint
         _LOGGER.debug(

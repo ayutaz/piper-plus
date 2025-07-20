@@ -10,7 +10,7 @@ dev = [
     "flake8==6.1.0",
     "mypy==1.7.1",
     "pylint==3.0.2",
-    "ruff==0.8.5",
+    "ruff==0.12.4",
     "pytest==7.4.3",
     "pytest-cov==4.1.0",
     "pytest-xdist==3.5.0",
@@ -31,7 +31,7 @@ test = [
     "pytest-timeout==2.2.0",
     "pytest-mock==3.12.0",
     "coverage[toml]==7.3.2",
-    "ruff==0.8.5",
+    "ruff==0.12.4",
     "mypy==1.7.1",
     "types-requests==2.31.0",
     "types-PyYAML==6.0.12",
@@ -39,7 +39,7 @@ test = [
 
 [tool.uv]
 dev-dependencies = [
-    "ruff==0.8.5",
+    "ruff==0.12.4",
     "pytest==7.4.3",
 ]
 
@@ -95,11 +95,17 @@ inline-quotes = "double"
 # Per-file ignores
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401", "F403"]
-"src/python/tests/*" = ["ARG"]
-"scripts/*" = ["ARG"]
+"src/python/tests/*" = ["ARG", "PLC0415"]  # Allow conditional imports in tests
+"scripts/*" = ["ARG", "PLC0415"]  # Allow conditional imports in scripts  
 # token_mapper.py: グローバル変数を使用した音素マッピングシステム
 "src/python/piper_train/phonemize/token_mapper.py" = ["PLW0603"]
 # mel_processing.py: パフォーマンス最適化のためのグローバルキャッシュ
 "src/python/piper_train/vits/mel_processing.py" = ["PLW0602"]
 # test_phonemize.py: オプショナルな依存関係の条件付きインポート
 "src/python/tests/test_phonemize.py" = ["E402"]
+# preprocess.py: 条件付きインポートで警告を抑制
+"src/python/piper_train/preprocess.py" = ["PLC0415"]
+# prepare scripts: 条件付きインポートを許可
+"src/python/prepare_*.py" = ["PLC0415"]
+# runtime files: 条件付きインポートを許可
+"src/python_run/*" = ["PLC0415"]

@@ -40,6 +40,34 @@ Piper is used in a [variety of projects](#people-using-piper).
 * PyPI パッケージ `piper-tts-plus` として公開し、`pip install` で簡単インストール可能に
 * 多言語TTSテストインフラストラクチャーを追加し、CI/CDで自動テスト実行 - [詳細](docs/MULTILINGUAL_TESTING.md)
 * OpenJTalk辞書とHTSボイスモデルの自動ダウンロード機能を追加し、日本語TTSのセットアップを簡略化
+* マルチGPU学習対応（PyTorch Lightning 2.x）
+  * DDP (Distributed Data Parallel) 戦略による複数GPU並列学習
+  * 学習率の自動スケーリング機能（`--auto_lr_scaling`）
+  * 使用例：
+    ```bash
+    python -m piper_train \
+      --dataset-dir /path/to/dataset \
+      --batch-size 16 \
+      --devices 2 \
+      --strategy ddp \
+      --base_lr 2e-4
+    # 注: --auto_lr_scaling はデフォルトで有効
+    # 無効にする場合は --disable_auto_lr_scaling を使用
+    ```
+* チェックポイント管理機能の強化
+  * `--resume_from_checkpoint` でチェックポイントからの学習再開
+  * `--resume_from_single_speaker_checkpoint` でシングルスピーカーモデルからマルチスピーカーへの変換
+* GPU推論サポート（C++バイナリ）
+  * `--use-cuda` オプションでONNX Runtime CUDAプロバイダーを有効化
+* 学習時の高度なオプション
+  * `--gradient_clip_val` - 勾配クリッピング
+  * `--accumulate_grad_batches` - 勾配累積によるバッチサイズ仮想拡張
+  * `--precision` - Mixed Precision Training対応（16-mixed等）
+  * `--detect_anomaly` - 学習時の異常検出機能
+* 音声評価ツール（`scripts/evaluation/`）
+  * MCD (Mel-Cepstral Distortion) 評価
+  * PESQ (Perceptual Evaluation of Speech Quality) 評価
+  * UTMOS評価
 
 ## 関連記事
 * [LJSpeechを使って英語のpiperの事前学習モデルを作成する](https://ayousanz.hatenadiary.jp/entry/2025/05/26/230341)
@@ -236,6 +264,16 @@ echo 'Welcome to the world of speech synthesis!' | \
 ```
 
 For multi-speaker models, use `--speaker <number>` to change speakers (default: 0).
+
+### Additional Options
+
+* `--use-cuda` - Enable GPU acceleration with CUDA
+* `--quiet` / `-q` - Disable logging output
+* `--phoneme-silence <phoneme> <seconds>` - Set silence duration for specific phonemes
+* `--length-scale <value>` - Adjust speech speed (default: 1.0, smaller = faster)
+* `--noise-scale <value>` - Control audio variation (default: 0.667)
+* `--noise-w <value>` - Control phoneme duration variation (default: 0.8)
+* `--sentence-silence <seconds>` - Silence between sentences (default: 0.2)
 
 See `piper --help` for more options.
 
