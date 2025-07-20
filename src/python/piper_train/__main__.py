@@ -164,7 +164,7 @@ def main():
     dict_args = vars(args)
 
     # Set learning rate (either scaled or base)
-    if hasattr(args, 'auto_lr_scaling') and args.auto_lr_scaling and num_gpus > 1:
+    if hasattr(args, "auto_lr_scaling") and args.auto_lr_scaling and num_gpus > 1:
         dict_args["learning_rate"] = scaled_lr
     else:
         dict_args["learning_rate"] = getattr(args, "base_lr", 2e-4)
