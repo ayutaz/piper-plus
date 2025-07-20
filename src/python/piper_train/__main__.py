@@ -132,11 +132,11 @@ def main():
 
     torch.backends.cudnn.benchmark = True
     torch.manual_seed(args.seed)
-    
+
     # Multi-GPU configuration
     num_gpus = args.devices if isinstance(args.devices, int) else len(args.devices) if args.devices else 1
     _LOGGER.info(f"Training with {num_gpus} GPU(s)")
-    
+
     # Automatic learning rate scaling for multi-GPU training
     if args.auto_lr_scaling and num_gpus > 1:
         original_lr = getattr(args, 'learning_rate', args.base_lr)
@@ -224,7 +224,7 @@ def main():
     # マルチスピーカーモデルの場合、gin_channelsを768に設定（品質向上のため）
     if num_speakers > 1 and "gin_channels" not in dict_args:
         dict_args["gin_channels"] = 768
-    
+
     # Multi-GPU DataLoader optimization
     if num_gpus > 1 and "num_workers" in dict_args:
         optimal_workers = get_optimal_num_workers(num_gpus)
