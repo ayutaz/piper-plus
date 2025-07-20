@@ -85,15 +85,20 @@ def main():
         default=2e-4,
         help="Base learning rate for single GPU training",
     )
-    Trainer.add_argparse_args(parser)
     VitsModel.add_model_specific_args(parser)
     parser.add_argument("--seed", type=int, default=1234)
     args = parser.parse_args()
     _LOGGER.debug(args)
 
     args.dataset_dir = Path(args.dataset_dir)
-    if not args.default_root_dir:
+    
+    # Set default values for removed Trainer arguments
+    if not hasattr(args, 'default_root_dir') or not args.default_root_dir:
         args.default_root_dir = args.dataset_dir
+    if not hasattr(args, 'max_epochs'):
+        args.max_epochs = 1000
+    if not hasattr(args, 'strategy'):
+        args.strategy = "ddp" if args.devices > 1 else None
 
     torch.backends.cudnn.benchmark = True
     torch.manual_seed(args.seed)
@@ -159,7 +164,14 @@ def main():
     else:
         _LOGGER.info("EMA disabled by user request")
 
-    trainer = Trainer.from_argparse_args(args, callbacks=callbacks)
+    trainer = Trainer(
+        accelerator="gpu",
+        devices=args.devices,
+        strategy=args.strategy,
+        max_epochs=args.max_epochs,
+        callbacks=callbacks,
+        default_root_dir=args.default_root_dir,
+    )
 
     dict_args = vars(args)
 
@@ -287,7 +299,14 @@ def main():
             else:
                 _LOGGER.info("EMA disabled by user request")
 
-            trainer = Trainer.from_argparse_args(args, callbacks=callbacks)
+            trainer = Trainer(
+                accelerator="gpu",
+                devices=args.devices,
+                strategy=args.strategy,
+                max_epochs=args.max_epochs,
+                callbacks=callbacks,
+                default_root_dir=args.default_root_dir,
+            )
 
             # 新しいTrainerで学習を開始
             trainer.fit(model)
