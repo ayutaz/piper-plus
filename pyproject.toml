@@ -105,3 +105,7 @@ inline-quotes = "double"
 "src/python/tests/test_phonemize.py" = ["E402"]
 # preprocess.py: 条件付きインポートで警告を抑制
 "src/python/piper_train/preprocess.py" = ["PLC0415"]
+# prepare scripts: 条件付きインポートを許可
+"src/python/prepare_*.py" = ["PLC0415"]
+# runtime files: 条件付きインポートを許可
+"src/python_run/*" = ["PLC0415"]
