@@ -85,6 +85,12 @@ def main():
         default=2e-4,
         help="Base learning rate for single GPU training",
     )
+    # Trainer arguments
+    parser.add_argument("--accelerator", default="gpu", help="Accelerator to use")
+    parser.add_argument("--devices", type=int, default=1, help="Number of devices")
+    parser.add_argument("--strategy", default=None, help="Training strategy (e.g., ddp)")
+    parser.add_argument("--max_epochs", type=int, default=1000, help="Maximum number of epochs")
+    parser.add_argument("--default_root_dir", default=None, help="Default path for logs and weights")
     VitsModel.add_model_specific_args(parser)
     parser.add_argument("--seed", type=int, default=1234)
     args = parser.parse_args()
@@ -92,13 +98,9 @@ def main():
 
     args.dataset_dir = Path(args.dataset_dir)
     
-    # Set default values for removed Trainer arguments
-    if not hasattr(args, 'default_root_dir') or not args.default_root_dir:
+    # Set default values for Trainer arguments
+    if not args.default_root_dir:
         args.default_root_dir = args.dataset_dir
-    if not hasattr(args, 'max_epochs'):
-        args.max_epochs = 1000
-    if not hasattr(args, 'strategy'):
-        args.strategy = "ddp" if args.devices > 1 else None
 
     torch.backends.cudnn.benchmark = True
     torch.manual_seed(args.seed)
