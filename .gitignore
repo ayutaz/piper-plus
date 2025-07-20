@@ -30,6 +30,11 @@ src/python_run/dist/
 .venv/
 lightning_logs/
 
+# Claude settings
+.claude/
+*.claude/
+settings.local.json
+
 # Test artifacts
 test_piper/
 test_build/
