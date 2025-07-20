@@ -1,9 +1,6 @@
 name: dev-create-release
 
 on:
-  push:
-    branches:
-      - dev
   workflow_dispatch:
     inputs:
       release_name:
