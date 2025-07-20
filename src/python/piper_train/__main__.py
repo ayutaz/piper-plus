@@ -253,9 +253,9 @@ def main():
     )
 
     if args.resume_from_single_speaker_checkpoint:
-        assert num_speakers > 1, (
-            "--resume_from_single_speaker_checkpoint is only for multi-speaker models. Use --resume_from_checkpoint for single-speaker models."
-        )  # noqa: E501
+        assert (
+            num_speakers > 1
+        ), "--resume_from_single_speaker_checkpoint is only for multi-speaker models. Use --resume_from_checkpoint for single-speaker models."  # noqa: E501
 
         # Load single-speaker checkpoint
         _LOGGER.debug(
