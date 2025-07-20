@@ -16,3 +16,6 @@ scipy>=1.9.0
 scikit-learn>=1.0.0
 soundfile>=0.12.0
 pyopenjtalk-plus  # For Japanese TTS support
+
+# ONNX optimization (optional)
+onnxsim-prebuilt>=0.4.0  # ONNX model simplification and optimization

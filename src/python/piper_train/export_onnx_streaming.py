@@ -8,6 +8,7 @@ from pathlib import Path
 import torch
 from torch import nn
 
+from .export_onnx import simplify_onnx_model
 from .vits import commons
 from .vits.lightning import VitsModel
 
@@ -79,6 +80,11 @@ def main() -> None:
     parser.add_argument(
         "--debug", action="store_true", help="Print DEBUG messages to the console"
     )
+    parser.add_argument(
+        "--simplify",
+        action="store_true",
+        help="Apply ONNX model simplification after export",
+    )
     args = parser.parse_args()
 
     if args.debug:
@@ -105,6 +111,19 @@ def main() -> None:
     _LOGGER.info("Exporting decoder...")
     export_decoder(args, model_g, decoder_input)
     _LOGGER.info("Exported model to  %s", str(args.output_dir))
+
+    # Apply ONNX simplification if requested
+    if args.simplify:
+        encoder_path = args.output_dir / "encoder.onnx"
+        decoder_path = args.output_dir / "decoder.onnx"
+
+        if encoder_path.exists():
+            _LOGGER.info("Simplifying encoder...")
+            simplify_onnx_model(encoder_path)
+
+        if decoder_path.exists():
+            _LOGGER.info("Simplifying decoder...")
+            simplify_onnx_model(decoder_path)
 
 
 def export_encoder(args, model_g):
