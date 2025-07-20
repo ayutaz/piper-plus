@@ -91,6 +91,7 @@ def main():
     parser.add_argument("--strategy", default=None, help="Training strategy (e.g., ddp)")
     parser.add_argument("--max_epochs", type=int, default=1000, help="Maximum number of epochs")
     parser.add_argument("--default_root_dir", default=None, help="Default path for logs and weights")
+    parser.add_argument("--resume_from_checkpoint", default=None, help="Path to checkpoint to resume from")
     VitsModel.add_model_specific_args(parser)
     parser.add_argument("--seed", type=int, default=1234)
     args = parser.parse_args()
