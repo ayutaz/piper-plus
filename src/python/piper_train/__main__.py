@@ -167,14 +167,17 @@ def main():
     else:
         _LOGGER.info("EMA disabled by user request")
 
-    trainer = Trainer(
-        accelerator="gpu",
-        devices=args.devices,
-        strategy=args.strategy,
-        max_epochs=args.max_epochs,
-        callbacks=callbacks,
-        default_root_dir=args.default_root_dir,
-    )
+    trainer_kwargs = {
+        "accelerator": args.accelerator,
+        "devices": args.devices,
+        "max_epochs": args.max_epochs,
+        "callbacks": callbacks,
+        "default_root_dir": args.default_root_dir,
+    }
+    if args.strategy:
+        trainer_kwargs["strategy"] = args.strategy
+    
+    trainer = Trainer(**trainer_kwargs)
 
     dict_args = vars(args)
 
@@ -302,14 +305,17 @@ def main():
             else:
                 _LOGGER.info("EMA disabled by user request")
 
-            trainer = Trainer(
-                accelerator="gpu",
-                devices=args.devices,
-                strategy=args.strategy,
-                max_epochs=args.max_epochs,
-                callbacks=callbacks,
-                default_root_dir=args.default_root_dir,
-            )
+            trainer_kwargs = {
+                "accelerator": args.accelerator,
+                "devices": args.devices,
+                "max_epochs": args.max_epochs,
+                "callbacks": callbacks,
+                "default_root_dir": args.default_root_dir,
+            }
+            if args.strategy:
+                trainer_kwargs["strategy"] = args.strategy
+            
+            trainer = Trainer(**trainer_kwargs)
 
             # 新しいTrainerで学習を開始
             trainer.fit(model)
