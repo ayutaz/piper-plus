@@ -130,23 +130,9 @@ python3 -m piper_train \
   --num-workers 45
 ```
 
-### マルチGPU学習の例
+### マルチGPU学習
 
-```bash
-python3 -m piper_train \
-  --dataset-dir /path/to/preprocessed_data \
-  --accelerator gpu \
-  --devices 4 \
-  --strategy ddp \
-  --batch-size 14 \
-  --accumulate_grad_batches 2 \
-  --precision 16-mixed \
-  --num-workers 80 \
-  --gradient_clip_val 1.0 \
-  --max_epochs 1500 \
-  --checkpoint-epochs 50 \
-  --save-top-k -1
-```
+マルチGPU環境での学習については、[マルチGPU学習ガイド](MULTI_GPU_TRAINING.md)を参照してください。L4 GPU 4枚での最適化設定やコスト効率の詳細が記載されています。
 
 ## 5. 評価と推論
 
