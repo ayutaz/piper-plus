@@ -2,6 +2,7 @@
 """
 Multi-GPU Training Test Script for Piper VITS
 """
+
 import argparse
 import json
 import subprocess
@@ -15,14 +16,22 @@ def test_single_gpu():
     """Test single GPU training as baseline."""
     print("Testing single GPU training...")
     cmd = [
-        sys.executable, "-m", "piper_train",
-        "--dataset-dir", "/tmp/test_dataset",
-        "--batch-size", "4",
-        "--num-workers", "2",
-        "--max_epochs", "1",
-        "--devices", "1",
+        sys.executable,
+        "-m",
+        "piper_train",
+        "--dataset-dir",
+        "/tmp/test_dataset",
+        "--batch-size",
+        "4",
+        "--num-workers",
+        "2",
+        "--max_epochs",
+        "1",
+        "--devices",
+        "1",
         "--fast_dev_run",
-        "--checkpoint-epochs", "1"
+        "--checkpoint-epochs",
+        "1",
     ]
 
     try:
@@ -40,16 +49,25 @@ def test_multi_gpu_ddp(num_gpus=2):
     """Test multi-GPU DDP training."""
     print(f"Testing {num_gpus} GPU DDP training...")
     cmd = [
-        sys.executable, "-m", "piper_train",
-        "--dataset-dir", "/tmp/test_dataset",
-        "--batch-size", "2",  # Smaller batch per GPU
-        "--num-workers", str(4 * num_gpus),
-        "--max_epochs", "1",
-        "--devices", str(num_gpus),
-        "--strategy", "ddp",
+        sys.executable,
+        "-m",
+        "piper_train",
+        "--dataset-dir",
+        "/tmp/test_dataset",
+        "--batch-size",
+        "2",  # Smaller batch per GPU
+        "--num-workers",
+        str(4 * num_gpus),
+        "--max_epochs",
+        "1",
+        "--devices",
+        str(num_gpus),
+        "--strategy",
+        "ddp",
         "--auto_lr_scaling",  # Enable automatic learning rate scaling
         "--fast_dev_run",
-        "--checkpoint-epochs", "1"
+        "--checkpoint-epochs",
+        "1",
     ]
 
     try:
@@ -68,13 +86,7 @@ def create_dummy_dataset():
     dataset_dir = Path("/tmp/test_dataset")
     dataset_dir.mkdir(exist_ok=True)
     # Create config.json
-    config = {
-        "num_symbols": 100,
-        "num_speakers": 1,
-        "audio": {
-            "sample_rate": 22050
-        }
-    }
+    config = {"num_symbols": 100, "num_speakers": 1, "audio": {"sample_rate": 22050}}
 
     with open(dataset_dir / "config.json", "w") as f:
         json.dump(config, f)
@@ -85,7 +97,7 @@ def create_dummy_dataset():
         data = {
             "audio_path": f"dummy_audio_{i}.wav",
             "phoneme_ids": list(range(10, 20)),  # Dummy phoneme sequence
-            "speaker_id": 0
+            "speaker_id": 0,
         }
         dataset_lines.append(json.dumps(data))
 
@@ -123,9 +135,15 @@ def create_dummy_dataset():
 
 def main():
     parser = argparse.ArgumentParser(description="Test multi-GPU training")
-    parser.add_argument("--num-gpus", type=int, default=2, help="Number of GPUs to test")
-    parser.add_argument("--skip-single", action="store_true", help="Skip single GPU test")
-    parser.add_argument("--create-dataset", action="store_true", help="Create dummy dataset")
+    parser.add_argument(
+        "--num-gpus", type=int, default=2, help="Number of GPUs to test"
+    )
+    parser.add_argument(
+        "--skip-single", action="store_true", help="Skip single GPU test"
+    )
+    parser.add_argument(
+        "--create-dataset", action="store_true", help="Create dummy dataset"
+    )
     args = parser.parse_args()
 
     if args.create_dataset:
