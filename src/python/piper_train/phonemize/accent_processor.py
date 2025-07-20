@@ -2,6 +2,7 @@ import re
 from dataclasses import dataclass
 
 import numpy as np
+from torch import nn
 
 
 @dataclass
@@ -142,8 +143,6 @@ class JapaneseAccentProcessor:
 
     def create_accent_embedding_layer(self, embedding_dim: int = 128):
         """Create embedding layer for accent marks."""
-        from torch import nn
-
         num_marks = len(self.mark_to_id)
         embedding = nn.Embedding(
             num_embeddings=num_marks,
