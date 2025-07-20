@@ -159,7 +159,7 @@ def main():
     # Disable if --disable_auto_lr_scaling is set
     if args.disable_auto_lr_scaling:
         args.auto_lr_scaling = False
-    
+
     if args.auto_lr_scaling and num_gpus > 1:
         original_lr = getattr(args, "learning_rate", args.base_lr)
         effective_batch_size = calculate_effective_batch_size(
@@ -231,13 +231,13 @@ def main():
     trainer = Trainer(**trainer_kwargs)
 
     dict_args = vars(args)
-    
+
     # Set learning rate (either scaled or base)
     if args.auto_lr_scaling and num_gpus > 1:
         dict_args["learning_rate"] = scaled_lr
     else:
         dict_args["learning_rate"] = args.base_lr
-    
+
     if args.quality == "x-low":
         dict_args["hidden_channels"] = 96
         dict_args["inter_channels"] = 96
