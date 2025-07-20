@@ -44,34 +44,40 @@ jobs:
           curl -LsSf https://astral.sh/uv/install.sh | sh
           echo "$HOME/.local/bin" >> $GITHUB_PATH
       
-      - name: Install Python dependencies
+      - name: Create virtual environment and install dependencies
         run: |
           cd src/python
+          uv venv
+          source .venv/bin/activate
           uv pip install -e .
           uv pip install -r requirements_test.txt
       
       - name: Build Cython extensions
         run: |
           cd src/python
+          source .venv/bin/activate
           ./build_monotonic_align.sh
       
       - name: Run unit tests
         run: |
           cd src/python
-          uv run pytest tests/ -v -m "unit" --tb=short
+          source .venv/bin/activate
+          pytest tests/ -v -m "unit" --tb=short
       
       - name: Run ONNX simplification tests
         run: |
           cd src/python
+          source .venv/bin/activate
           # Install optional dependency for testing
-          uv pip install onnxsim-prebuilt || echo "onnxsim-prebuilt not available, tests will skip"
-          uv run pytest tests/test_onnx_simplification.py -v --tb=short
+          pip install onnxsim-prebuilt || echo "onnxsim-prebuilt not available, tests will skip"
+          pytest tests/test_onnx_simplification.py -v --tb=short
       
       - name: Generate test report
         if: always()
         run: |
           cd src/python
-          uv run pytest tests/ -v --junitxml=test-results.xml || true
+          source .venv/bin/activate
+          pytest tests/ -v --junitxml=test-results.xml || true
       
       - name: Upload test results
         if: always()
