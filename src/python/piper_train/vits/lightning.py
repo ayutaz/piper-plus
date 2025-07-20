@@ -76,6 +76,7 @@ class VitsModel(pl.LightningModule):
         **kwargs,
     ):
         super().__init__()
+        self.automatic_optimization = False  # Multiple optimizers require manual optimization
         self.save_hyperparameters()
 
         if (self.hparams.num_speakers > 1) and (self.hparams.gin_channels <= 0):
@@ -194,12 +195,21 @@ class VitsModel(pl.LightningModule):
             batch_size=self.hparams.batch_size,
         )
 
-    def training_step(self, batch: Batch, batch_idx: int, optimizer_idx: int):
-        if optimizer_idx == 0:
-            return self.training_step_g(batch)
-
-        if optimizer_idx == 1:
-            return self.training_step_d(batch)
+    def training_step(self, batch: Batch, batch_idx: int):
+        # Manual optimization for multiple optimizers
+        opt_g, opt_d = self.optimizers()
+        
+        # Train generator
+        opt_g.zero_grad()
+        loss_g = self.training_step_g(batch)
+        self.manual_backward(loss_g)
+        opt_g.step()
+        
+        # Train discriminator
+        opt_d.zero_grad()
+        loss_d = self.training_step_d(batch)
+        self.manual_backward(loss_d)
+        opt_d.step()
 
     def training_step_g(self, batch: Batch):
         x, x_lengths, y, _, spec, spec_lengths, speaker_ids = (

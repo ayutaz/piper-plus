@@ -120,6 +120,12 @@ def main():
         default=2e-4,
         help="Base learning rate for single GPU training",
     )
+    parser.add_argument(
+        "--resume_from_checkpoint",
+        type=str,
+        default=None,
+        help="Path to checkpoint to resume training from",
+    )
 
     VitsModel.add_model_specific_args(parser)
     parser.add_argument("--seed", type=int, default=1234)
@@ -215,6 +221,13 @@ def main():
     trainer = Trainer(**trainer_kwargs)
 
     dict_args = vars(args)
+    
+    # Set learning rate (either scaled or base)
+    if args.auto_lr_scaling and num_gpus > 1:
+        dict_args["learning_rate"] = scaled_lr
+    else:
+        dict_args["learning_rate"] = args.base_lr
+    
     if args.quality == "x-low":
         dict_args["hidden_channels"] = 96
         dict_args["inter_channels"] = 96
