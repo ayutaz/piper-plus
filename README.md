@@ -50,8 +50,9 @@ Piper is used in a [variety of projects](#people-using-piper).
       --batch-size 16 \
       --devices 2 \
       --strategy ddp \
-      --auto_lr_scaling \
       --base_lr 2e-4
+    # 注: --auto_lr_scaling はデフォルトで有効
+    # 無効にする場合は --disable_auto_lr_scaling を使用
     ```
 * チェックポイント管理機能の強化
   * `--resume_from_checkpoint` でチェックポイントからの学習再開
