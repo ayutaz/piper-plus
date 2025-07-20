@@ -198,13 +198,13 @@ class VitsModel(pl.LightningModule):
     def training_step(self, batch: Batch, batch_idx: int):
         # Manual optimization for multiple optimizers
         opt_g, opt_d = self.optimizers()
-        
+
         # Train generator
         opt_g.zero_grad()
         loss_g = self.training_step_g(batch)
         self.manual_backward(loss_g)
         opt_g.step()
-        
+
         # Train discriminator
         opt_d.zero_grad()
         loss_d = self.training_step_d(batch)
