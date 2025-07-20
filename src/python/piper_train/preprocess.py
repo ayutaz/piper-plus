@@ -31,13 +31,16 @@ from piper_phonemize import (
 # import pyopenjtalk  # noqa: F401 - Used in conditional imports
 from tqdm import tqdm
 
+from .f0_extraction import cache_f0
 from .norm_audio import cache_norm_audio, make_silence_detector
 
 # Custom Japanese phonemizer with accent/prosody marks
 try:
+    from .phonemize.accent_processor import AccentProcessor  # type: ignore
     from .phonemize.japanese import phonemize_japanese  # type: ignore
 except ImportError:
     # When running as script, relative import may fail; try absolute import fallback
+    from piper_train.phonemize.accent_processor import AccentProcessor  # type: ignore
     from piper_train.phonemize.japanese import phonemize_japanese  # type: ignore
 
 # -----------------------------------------------------------------------------
@@ -128,6 +131,23 @@ def main() -> None:
         type=int,
         default=60,
         help="Timeout in seconds for processing utterances",
+    )
+    parser.add_argument(
+        "--extract-f0",
+        action="store_true",
+        help="Extract F0 values for training (requires pyworld)",
+    )
+    parser.add_argument(
+        "--f0-min",
+        type=float,
+        default=80.0,
+        help="Minimum F0 value in Hz (default: 80.0)",
+    )
+    parser.add_argument(
+        "--f0-max",
+        type=float,
+        default=880.0,
+        help="Maximum F0 value in Hz (default: 880.0)",
     )
     args = parser.parse_args()
 
@@ -508,6 +528,7 @@ def phonemize_batch_openjtalk(
 
         casing = get_text_casing(args.text_casing)
         silence_detector = make_silence_detector()
+        accent_processor = AccentProcessor()
 
         timeout_sec = getattr(args, "timeout_seconds", 0)
 
@@ -538,6 +559,9 @@ def phonemize_batch_openjtalk(
                             utt.missing_phonemes[phoneme] += 1
                             _LOGGER.warning(f"Missing phoneme: {phoneme}")
 
+                    # Extract prosody IDs using AccentProcessor
+                    utt.prosody_ids = accent_processor.extract_prosody_ids(utt.phonemes)
+
                     if not args.skip_audio:
                         utt.audio_norm_path, utt.audio_spec_path = cache_norm_audio(
                             utt.audio_path,
@@ -545,6 +569,17 @@ def phonemize_batch_openjtalk(
                             silence_detector,
                             args.sample_rate,
                         )
+
+                        # Extract F0 if enabled
+                        if getattr(args, "extract_f0", False):
+                            utt.f0_path = cache_f0(
+                                utt.audio_path,
+                                args.cache_dir,
+                                args.sample_rate,
+                                hop_length=args.hop_length,
+                                f0_min=getattr(args, "f0_min", 80.0),
+                                f0_max=getattr(args, "f0_max", 880.0),
+                            )
                     queue_out.put(utt)
                     if timeout_sec > 0:
                         signal.alarm(0)
@@ -571,8 +606,10 @@ class Utterance:
     speaker_id: int | None = None
     phonemes: list[str] | None = None
     phoneme_ids: list[int] | None = None
+    prosody_ids: list[int] | None = None
     audio_norm_path: Path | None = None
     audio_spec_path: Path | None = None
+    f0_path: Path | None = None  # Path to cached F0 values
     missing_phonemes: "Counter[str]" = field(default_factory=Counter)
 
 

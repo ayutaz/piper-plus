@@ -6,8 +6,8 @@ from pathlib import Path
 import torch
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import ModelCheckpoint
-from pytorch_lightning.strategies import DDPStrategy
 
+from .vits.ema import EMACallback
 from .vits.lightning import VitsModel
 
 _LOGGER = logging.getLogger(__package__)
@@ -57,57 +57,16 @@ def main():
         default=-1,
         help="Save top k checkpoints (-1 to save all).",
     )
-    # Trainer arguments (previously added by Trainer.add_argparse_args)
-    parser.add_argument("--accelerator", default="auto", help="Accelerator to use")
-    parser.add_argument("--devices", type=int, default=1, help="Number of devices")
     parser.add_argument(
-        "--max_epochs", type=int, default=1000, help="Maximum number of epochs"
-    )
-    parser.add_argument("--precision", default="32-true", help="Training precision")
-    parser.add_argument(
-        "--accumulate_grad_batches",
-        type=int,
-        default=1,
-        help="Accumulate gradients over k batches",
-    )
-    parser.add_argument(
-        "--gradient_clip_val", type=float, default=None, help="Gradient clipping value"
-    )
-    parser.add_argument(
-        "--val_check_interval",
-        type=float,
-        default=1.0,
-        help="How often to check the validation set",
-    )
-    parser.add_argument(
-        "--log_every_n_steps",
-        type=int,
-        default=50,
-        help="How often to log within steps",
-    )
-    parser.add_argument(
-        "--default_root_dir",
-        type=str,
-        default=None,
-        help="Default path for logs and weights",
-    )
-    parser.add_argument(
-        "--fast_dev_run", action="store_true", help="Run a fast development run"
-    )
-    parser.add_argument(
-        "--strategy",
-        type=str,
-        default=None,
-        help="Training strategy (e.g., ddp, ddp_spawn)",
-    )
-    parser.add_argument(
-        "--enable_progress_bar",
+        "--no-ema",
         action="store_true",
-        default=True,
-        help="Enable progress bar",
+        help="Disable EMA (Exponential Moving Average). EMA is enabled by default for training stability",
     )
     parser.add_argument(
-        "--detect_anomaly", action="store_true", help="Enable anomaly detection"
+        "--ema-decay",
+        type=float,
+        default=0.9995,
+        help="EMA decay rate (default: 0.9995)",
     )
     parser.add_argument(
         "--auto_lr_scaling",
@@ -126,19 +85,31 @@ def main():
         default=2e-4,
         help="Base learning rate for single GPU training",
     )
+    # Trainer arguments
+    parser.add_argument("--accelerator", default="gpu", help="Accelerator to use")
+    parser.add_argument("--devices", type=int, default=1, help="Number of devices")
+    parser.add_argument(
+        "--strategy", default=None, help="Training strategy (e.g., ddp)"
+    )
+    parser.add_argument(
+        "--max_epochs", type=int, default=1000, help="Maximum number of epochs"
+    )
+    parser.add_argument(
+        "--default_root_dir", default=None, help="Default path for logs and weights"
+    )
     parser.add_argument(
         "--resume_from_checkpoint",
-        type=str,
         default=None,
-        help="Path to checkpoint to resume training from",
+        help="Path to checkpoint to resume from",
     )
-
     VitsModel.add_model_specific_args(parser)
     parser.add_argument("--seed", type=int, default=1234)
     args = parser.parse_args()
     _LOGGER.debug(args)
 
     args.dataset_dir = Path(args.dataset_dir)
+
+    # Set default values for Trainer arguments
     if not args.default_root_dir:
         args.default_root_dir = args.dataset_dir
 
@@ -154,6 +125,9 @@ def main():
         else 1
     )
     _LOGGER.info(f"Training with {num_gpus} GPU(s)")
+
+    # Initialize scaled_lr
+    scaled_lr = args.base_lr
 
     # Automatic learning rate scaling for multi-GPU training
     # Disable if --disable_auto_lr_scaling is set
@@ -182,36 +156,7 @@ def main():
         num_speakers = int(config["num_speakers"])
         sample_rate = int(config["audio"]["sample_rate"])
 
-    # Create trainer manually (replacing Trainer.from_argparse_args)
-    trainer_kwargs = {
-        "accelerator": args.accelerator,
-        "devices": args.devices,
-        "max_epochs": args.max_epochs,
-        "precision": args.precision,
-        "accumulate_grad_batches": args.accumulate_grad_batches,
-        "gradient_clip_val": args.gradient_clip_val,
-        "val_check_interval": args.val_check_interval,
-        "log_every_n_steps": args.log_every_n_steps,
-        "default_root_dir": args.default_root_dir or args.dataset_dir,
-        "fast_dev_run": args.fast_dev_run,
-        "enable_progress_bar": args.enable_progress_bar,
-        "detect_anomaly": args.detect_anomaly,
-    }
-
-    # Configure strategy for multi-GPU training
-    if args.strategy:
-        if args.strategy.startswith("ddp"):
-            # Optimize DDP strategy for VITS model
-            strategy = DDPStrategy(
-                find_unused_parameters=False,  # Performance improvement for VITS
-                gradient_as_bucket_view=True,  # Memory efficiency
-                static_graph=True,  # VITS has fixed graph structure
-            )
-            trainer_kwargs["strategy"] = strategy
-        else:
-            trainer_kwargs["strategy"] = args.strategy
-
-    # Configure callbacks
+    # Setup callbacks
     callbacks = []
     if args.checkpoint_epochs is not None:
         callbacks.append(
@@ -225,18 +170,32 @@ def main():
             "Checkpoints will be saved every %s epoch(s)", args.checkpoint_epochs
         )
 
-    if callbacks:
-        trainer_kwargs["callbacks"] = callbacks
+    # EMA is enabled by default
+    if not args.no_ema:
+        callbacks.append(EMACallback(decay=args.ema_decay))
+        _LOGGER.info("Using EMA with decay rate %s", args.ema_decay)
+    else:
+        _LOGGER.info("EMA disabled by user request")
+
+    trainer_kwargs = {
+        "accelerator": args.accelerator,
+        "devices": args.devices,
+        "max_epochs": args.max_epochs,
+        "callbacks": callbacks,
+        "default_root_dir": args.default_root_dir,
+    }
+    if args.strategy:
+        trainer_kwargs["strategy"] = args.strategy
 
     trainer = Trainer(**trainer_kwargs)
 
     dict_args = vars(args)
 
     # Set learning rate (either scaled or base)
-    if args.auto_lr_scaling and num_gpus > 1:
+    if hasattr(args, "auto_lr_scaling") and args.auto_lr_scaling and num_gpus > 1:
         dict_args["learning_rate"] = scaled_lr
     else:
-        dict_args["learning_rate"] = args.base_lr
+        dict_args["learning_rate"] = getattr(args, "base_lr", 2e-4)
 
     if args.quality == "x-low":
         dict_args["hidden_channels"] = 96
@@ -321,7 +280,9 @@ def main():
             _LOGGER.info("Attempting to load weights only (strict=False)...")
 
             # モデルの重みだけをロードする (不一致は許容)
-            checkpoint = torch.load(args.resume_from_checkpoint, map_location="cpu")
+            checkpoint = torch.load(
+                args.resume_from_checkpoint, map_location="cpu", weights_only=True
+            )
             model.load_state_dict(checkpoint["state_dict"], strict=False)
 
             _LOGGER.info(
@@ -334,11 +295,10 @@ def main():
                 del args_dict["resume_from_checkpoint"]
 
             # 新しいTrainerインスタンスを作成（ckpt_pathをクリアするため）
-            # Create new trainer without checkpoint path
-            new_trainer_kwargs = trainer_kwargs.copy()
-            new_callbacks = []
+            # Setup callbacks
+            callbacks = []
             if args.checkpoint_epochs is not None:
-                new_callbacks.append(
+                callbacks.append(
                     ModelCheckpoint(
                         every_n_epochs=args.checkpoint_epochs,
                         save_top_k=args.save_top_k,
@@ -349,10 +309,25 @@ def main():
                     "Checkpoints will be saved every %s epoch(s)",
                     args.checkpoint_epochs,
                 )
-            if new_callbacks:
-                new_trainer_kwargs["callbacks"] = new_callbacks
 
-            trainer = Trainer(**new_trainer_kwargs)
+            # EMA is enabled by default
+            if not args.no_ema:
+                callbacks.append(EMACallback(decay=args.ema_decay))
+                _LOGGER.info("Using EMA with decay rate %s", args.ema_decay)
+            else:
+                _LOGGER.info("EMA disabled by user request")
+
+            trainer_kwargs = {
+                "accelerator": args.accelerator,
+                "devices": args.devices,
+                "max_epochs": args.max_epochs,
+                "callbacks": callbacks,
+                "default_root_dir": args.default_root_dir,
+            }
+            if args.strategy:
+                trainer_kwargs["strategy"] = args.strategy
+
+            trainer = Trainer(**trainer_kwargs)
 
             # 新しいTrainerで学習を開始
             trainer.fit(model)

@@ -6,7 +6,7 @@ black==23.11.0
 flake8==6.1.0
 mypy==1.7.1
 pylint==3.0.2
-ruff==0.8.5
+ruff==0.12.4
 
 # Testing
 pytest==7.4.3

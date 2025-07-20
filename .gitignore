@@ -54,3 +54,4 @@ build_log.zip
 *.dll
 *.exe
 windows_build_artifacts/
+CLAUDE.md
