@@ -406,8 +406,8 @@ wheels = [
 ]
 
 [[package]]
-name = "piper-tts-training"
-version = "1.0.0"
+name = "piper-plus"
+version = "1.3.0"
 source = { virtual = "." }
 
 [package.optional-dependencies]
