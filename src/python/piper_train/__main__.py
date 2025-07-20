@@ -112,7 +112,13 @@ def main():
     parser.add_argument(
         "--auto_lr_scaling",
         action="store_true",
-        help="Automatically scale learning rate for multi-GPU training",
+        default=True,
+        help="Automatically scale learning rate for multi-GPU training (default: enabled)",
+    )
+    parser.add_argument(
+        "--disable_auto_lr_scaling",
+        action="store_true",
+        help="Disable automatic learning rate scaling for multi-GPU training",
     )
     parser.add_argument(
         "--base_lr",
@@ -150,6 +156,10 @@ def main():
     _LOGGER.info(f"Training with {num_gpus} GPU(s)")
 
     # Automatic learning rate scaling for multi-GPU training
+    # Disable if --disable_auto_lr_scaling is set
+    if args.disable_auto_lr_scaling:
+        args.auto_lr_scaling = False
+    
     if args.auto_lr_scaling and num_gpus > 1:
         original_lr = getattr(args, "learning_rate", args.base_lr)
         effective_batch_size = calculate_effective_batch_size(
