@@ -38,6 +38,11 @@ jobs:
           ruff format --check .
           echo "✅ Python linting passed"
 
+  # Python Unit Tests
+  python_tests:
+    name: Python Unit Tests
+    uses: ./.github/workflows/python-tests.yml
+
   # Japanese TTS Test (from existing workflow)
   test_japanese_tts:
     name: Test Japanese TTS
@@ -111,7 +116,7 @@ jobs:
   # Test Summary
   test_summary:
     name: Test Suite Summary
-    needs: [python_lint, test_japanese_tts, test_multilingual_tts, performance_benchmark]
+    needs: [python_lint, python_tests, test_japanese_tts, test_multilingual_tts, performance_benchmark]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -123,6 +128,7 @@ jobs:
           echo "| Test | Status |" >> $GITHUB_STEP_SUMMARY
           echo "|------|--------|" >> $GITHUB_STEP_SUMMARY
           echo "| Python Linting | ${{ needs.python_lint.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Python Unit Tests | ${{ needs.python_tests.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Japanese TTS | ${{ needs.test_japanese_tts.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Multilingual TTS | ${{ needs.test_multilingual_tts.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Performance Benchmark | ${{ needs.performance_benchmark.result }} |" >> $GITHUB_STEP_SUMMARY
@@ -130,6 +136,7 @@ jobs:
           
           # Overall status
           if [ "${{ needs.python_lint.result }}" = "success" ] && \
+             [ "${{ needs.python_tests.result }}" = "success" ] && \
              [ "${{ needs.test_japanese_tts.result }}" = "success" ] && \
              [ "${{ needs.test_multilingual_tts.result }}" = "success" ]; then
             echo "✅ **All critical tests passed!**" >> $GITHUB_STEP_SUMMARY
