@@ -2,10 +2,14 @@
 
 このドキュメントでは、Piper TTSトレーニングパイプラインに統合された主要コンポーネントについて説明します。
 
+**更新日**: 2024年7月 (PR #98統合版)  
+**対応バージョン**: piper-plus v1.3.0  
+**PyTorch Lightning**: 2.4.0対応
+
 ## 1. EMA (Exponential Moving Average)
 
 EMAは、モデルパラメータの指数移動平均を計算することで、学習の安定性と品質を向上させる手法です。
-**v2.0以降、EMAはデフォルトで有効になっています。**
+**✅ PR #98により統合完了。デフォルトで有効になっています。**
 
 ### 使用方法
 
@@ -40,6 +44,7 @@ python -m piper_train \
 ## 2. AccentProcessor
 
 日本語音声合成のためのアクセント・プロソディ処理コンポーネントです。
+**✅ PR #98により統合完了。前処理パイプラインに組み込み済み。**
 
 ### 機能
 
@@ -67,6 +72,7 @@ python -m piper_train \
 ## 3. F0 Predictor
 
 基本周波数（F0）予測モジュールで、より自然な音声合成を実現します。
+**✅ PR #98により統合完了。SynthesizerTrnに組み込み済み。**
 
 ### アーキテクチャ
 
@@ -115,11 +121,24 @@ Flow + Decoder
 ```bash
 python -m piper_train \
   --dataset-dir /path/to/japanese/dataset \
-  --use-ema \
-  --ema-decay 0.999 \
-  --batch-size 16 \
+  --ema-decay 0.9995 \
+  --batch-size 64 \
   --validation-split 0.1 \
-  --checkpoint-epochs 10
+  --checkpoint-epochs 5 \
+  --num-workers 80
+```
+
+### Multi-GPU環境の場合 (推奨)
+
+```bash
+python -m piper_train \
+  --dataset-dir /path/to/japanese/dataset \
+  --accelerator gpu \
+  --devices 4 \
+  --strategy ddp_find_unused_parameters_true \
+  --batch-size 64 \
+  --ema-decay 0.9995 \
+  --num-workers 80
 ```
 
 ### ファインチューニングの場合

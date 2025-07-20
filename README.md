@@ -40,19 +40,27 @@ Piper is used in a [variety of projects](#people-using-piper).
 * PyPI パッケージ `piper-tts-plus` として公開し、`pip install` で簡単インストール可能に
 * 多言語TTSテストインフラストラクチャーを追加し、CI/CDで自動テスト実行 - [詳細](docs/MULTILINGUAL_TESTING.md)
 * OpenJTalk辞書とHTSボイスモデルの自動ダウンロード機能を追加し、日本語TTSのセットアップを簡略化
-* マルチGPU学習対応（PyTorch Lightning 2.x）
+* **🎯 音声品質向上コンポーネント統合 (PR #98)**
+  * **EMA (Exponential Moving Average)**: 学習安定性とファインチューニング品質向上
+  * **AccentProcessor**: 日本語韻律・アクセント処理の高精度化
+  * **F0 Predictor**: FastSpeech2ベースのピッチ予測によるイントネーション制御
+  * **期待効果**: 総合MOS向上 +0.18-0.26
+  * 詳細: [統合コンポーネントドキュメント](src/python/docs/integrated-components-ja.md)
+* マルチGPU学習対応（PyTorch Lightning 2.4.0）
   * DDP (Distributed Data Parallel) 戦略による複数GPU並列学習
   * 学習率の自動スケーリング機能（`--auto_lr_scaling`）
+  * コード品質向上（セキュリティ強化、分散ログ最適化）
   * 使用例：
     ```bash
     python -m piper_train \
       --dataset-dir /path/to/dataset \
-      --batch-size 16 \
-      --devices 2 \
-      --strategy ddp \
-      --base_lr 2e-4
+      --batch-size 64 \
+      --devices 4 \
+      --strategy ddp_find_unused_parameters_true \
+      --ema-decay 0.9995 \
+      --num-workers 80
     # 注: --auto_lr_scaling はデフォルトで有効
-    # 無効にする場合は --disable_auto_lr_scaling を使用
+    # EMAもデフォルトで有効、--no-emaで無効化可能
     ```
 * チェックポイント管理機能の強化
   * `--resume_from_checkpoint` でチェックポイントからの学習再開

@@ -10,7 +10,7 @@ pytest-mock==3.12.0  # For mocking
 coverage[toml]==7.3.2
 
 # Code quality (minimal set for CI/CD)
-ruff==0.8.5
+ruff==0.12.4
 mypy==1.7.1
 
 # Type stubs

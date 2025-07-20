@@ -98,7 +98,7 @@ def main():
     _LOGGER.debug(args)
 
     args.dataset_dir = Path(args.dataset_dir)
-    
+
     # Set default values for Trainer arguments
     if not args.default_root_dir:
         args.default_root_dir = args.dataset_dir
@@ -176,7 +176,7 @@ def main():
     }
     if args.strategy:
         trainer_kwargs["strategy"] = args.strategy
-    
+
     trainer = Trainer(**trainer_kwargs)
 
     dict_args = vars(args)
@@ -270,7 +270,7 @@ def main():
             _LOGGER.info("Attempting to load weights only (strict=False)...")
 
             # モデルの重みだけをロードする (不一致は許容)
-            checkpoint = torch.load(args.resume_from_checkpoint, map_location="cpu")
+            checkpoint = torch.load(args.resume_from_checkpoint, map_location="cpu", weights_only=True)
             model.load_state_dict(checkpoint["state_dict"], strict=False)
 
             _LOGGER.info(
@@ -314,7 +314,7 @@ def main():
             }
             if args.strategy:
                 trainer_kwargs["strategy"] = args.strategy
-            
+
             trainer = Trainer(**trainer_kwargs)
 
             # 新しいTrainerで学習を開始

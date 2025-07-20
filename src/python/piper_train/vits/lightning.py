@@ -218,6 +218,17 @@ class VitsModel(pl.LightningModule):
         self.manual_backward(loss_d)
         opt_d.step()
 
+    def _log_with_batch_info(self, key: str, value, batch: Batch = None, batch_size: int = None):
+        """Helper method to log with proper batch_size and sync_dist settings."""
+        if batch_size is None:
+            if batch is not None:
+                batch_size = batch.phoneme_ids.size(0)
+            else:
+                batch_size = self._y.size(0) if hasattr(self, '_y') else None
+
+        sync_dist = self.trainer.world_size > 1
+        self.log(key, value, batch_size=batch_size, sync_dist=sync_dist)
+
     def training_step_g(self, batch: Batch):
         x, x_lengths, y, _, spec, spec_lengths, speaker_ids, prosody_ids, f0_values = (
             batch.phoneme_ids,
@@ -302,11 +313,11 @@ class VitsModel(pl.LightningModule):
 
                 # Log F0 metrics
                 for metric_name, metric_value in f0_metrics.items():
-                    self.log(f"train/{metric_name}", metric_value)
+                    self._log_with_batch_info(f"train/{metric_name}", metric_value, batch)
 
             loss_gen_all = loss_gen + loss_fm + loss_mel + loss_dur + loss_kl + loss_f0
 
-            self.log("loss_gen_all", loss_gen_all)
+            self._log_with_batch_info("loss_gen_all", loss_gen_all, batch)
 
             return loss_gen_all
 
@@ -323,13 +334,13 @@ class VitsModel(pl.LightningModule):
             )
             loss_disc_all = loss_disc
 
-            self.log("loss_disc_all", loss_disc_all)
+            self._log_with_batch_info("loss_disc_all", loss_disc_all)
 
             return loss_disc_all
 
     def validation_step(self, batch: Batch, batch_idx: int):
         val_loss = self.training_step_g(batch) + self.training_step_d(batch)
-        self.log("val_loss", val_loss)
+        self._log_with_batch_info("val_loss", val_loss, batch)
 
         # Generate audio examples
         for utt_idx, test_utt in enumerate(self._test_dataset):

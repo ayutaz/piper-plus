@@ -87,8 +87,8 @@ class PiperDataset(Dataset):
         # 問題のあるファイルでロードが失敗した場合はスキップして次を試す
         while True:
             try:
-                audio_norm = torch.load(utt.audio_norm_path, map_location="cpu")
-                spectrogram = torch.load(utt.audio_spec_path, map_location="cpu")
+                audio_norm = torch.load(utt.audio_norm_path, map_location="cpu", weights_only=True)
+                spectrogram = torch.load(utt.audio_spec_path, map_location="cpu", weights_only=True)
 
                 # Load F0 if available
                 f0_values = None
