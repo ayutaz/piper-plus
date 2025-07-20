@@ -1,10 +1,6 @@
 name: dev-create-release
 
 on:
-  # 自動実行を無効化 - 手動でのみ実行可能
-  # push:
-  #   branches:
-  #     - dev
   workflow_dispatch:
     inputs:
       release_name:
