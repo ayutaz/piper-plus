@@ -436,8 +436,7 @@ def _read_data_chunk(
             dtype = f"{fmt}i{bytes_per_sample}"
         else:
             raise ValueError(
-                "Unsupported bit depth: the WAV file "
-                f"has {bit_depth}-bit integer data."
+                f"Unsupported bit depth: the WAV file has {bit_depth}-bit integer data."
             )
     elif format_tag == WAVE_FORMAT.IEEE_FLOAT:
         if bit_depth in {32, 64}:
@@ -478,7 +477,7 @@ def _read_data_chunk(
         fid.seek(start + size)
     else:
         raise ValueError(
-            "mmap=True not compatible with " f"{bytes_per_sample}-byte container size."
+            f"mmap=True not compatible with {bytes_per_sample}-byte container size."
         )
 
     _handle_pad_byte(fid, size)
