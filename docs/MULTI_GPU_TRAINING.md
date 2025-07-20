@@ -246,6 +246,20 @@ python -m piper_train \
 --accumulate_grad_batches 2
 ```
 
+### VRAM断片化対策
+
+長時間の学習でVRAMが断片化してOOMエラーが発生する場合:
+
+```bash
+# PyTorchのメモリアロケータを最適化
+export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+```
+
+この環境変数により:
+- メモリの断片化を削減
+- 長時間学習での安定性向上
+- チェックポイント保存時のOOM回避
+
 ## テスト手順
 
 ### 1. ダミーデータセットでのテスト
@@ -273,6 +287,10 @@ python -m piper_train --dataset-dir /path/to/dataset --devices 2 --strategy ddp 
    - batch_sizeを小さくする
    - `--precision 16-mixed`を使用
    - `--accumulate_grad_batches`を使用
+   - VRAM断片化対策として環境変数を設定:
+     ```bash
+     export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+     ```
 
 2. **DataLoader関連エラー**
    - `--num-workers`を調整
