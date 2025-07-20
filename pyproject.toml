@@ -95,11 +95,13 @@ inline-quotes = "double"
 # Per-file ignores
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401", "F403"]
-"src/python/tests/*" = ["ARG"]
-"scripts/*" = ["ARG"]
+"src/python/tests/*" = ["ARG", "PLC0415"]  # Allow conditional imports in tests
+"scripts/*" = ["ARG", "PLC0415"]  # Allow conditional imports in scripts  
 # token_mapper.py: グローバル変数を使用した音素マッピングシステム
 "src/python/piper_train/phonemize/token_mapper.py" = ["PLW0603"]
 # mel_processing.py: パフォーマンス最適化のためのグローバルキャッシュ
 "src/python/piper_train/vits/mel_processing.py" = ["PLW0602"]
 # test_phonemize.py: オプショナルな依存関係の条件付きインポート
 "src/python/tests/test_phonemize.py" = ["E402"]
+# preprocess.py: 条件付きインポートで警告を抑制
+"src/python/piper_train/preprocess.py" = ["PLC0415"]
