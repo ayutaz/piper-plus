@@ -218,13 +218,15 @@ class VitsModel(pl.LightningModule):
         self.manual_backward(loss_d)
         opt_d.step()
 
-    def _log_with_batch_info(self, key: str, value, batch: Batch = None, batch_size: int = None):
+    def _log_with_batch_info(
+        self, key: str, value, batch: Batch = None, batch_size: int = None
+    ):
         """Helper method to log with proper batch_size and sync_dist settings."""
         if batch_size is None:
             if batch is not None:
                 batch_size = batch.phoneme_ids.size(0)
             else:
-                batch_size = self._y.size(0) if hasattr(self, '_y') else None
+                batch_size = self._y.size(0) if hasattr(self, "_y") else None
 
         sync_dist = self.trainer.world_size > 1
         self.log(key, value, batch_size=batch_size, sync_dist=sync_dist)
@@ -313,7 +315,9 @@ class VitsModel(pl.LightningModule):
 
                 # Log F0 metrics
                 for metric_name, metric_value in f0_metrics.items():
-                    self._log_with_batch_info(f"train/{metric_name}", metric_value, batch)
+                    self._log_with_batch_info(
+                        f"train/{metric_name}", metric_value, batch
+                    )
 
             loss_gen_all = loss_gen + loss_fm + loss_mel + loss_dur + loss_kl + loss_f0
 

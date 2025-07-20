@@ -88,10 +88,20 @@ def main():
     # Trainer arguments
     parser.add_argument("--accelerator", default="gpu", help="Accelerator to use")
     parser.add_argument("--devices", type=int, default=1, help="Number of devices")
-    parser.add_argument("--strategy", default=None, help="Training strategy (e.g., ddp)")
-    parser.add_argument("--max_epochs", type=int, default=1000, help="Maximum number of epochs")
-    parser.add_argument("--default_root_dir", default=None, help="Default path for logs and weights")
-    parser.add_argument("--resume_from_checkpoint", default=None, help="Path to checkpoint to resume from")
+    parser.add_argument(
+        "--strategy", default=None, help="Training strategy (e.g., ddp)"
+    )
+    parser.add_argument(
+        "--max_epochs", type=int, default=1000, help="Maximum number of epochs"
+    )
+    parser.add_argument(
+        "--default_root_dir", default=None, help="Default path for logs and weights"
+    )
+    parser.add_argument(
+        "--resume_from_checkpoint",
+        default=None,
+        help="Path to checkpoint to resume from",
+    )
     VitsModel.add_model_specific_args(parser)
     parser.add_argument("--seed", type=int, default=1234)
     args = parser.parse_args()
@@ -270,7 +280,9 @@ def main():
             _LOGGER.info("Attempting to load weights only (strict=False)...")
 
             # モデルの重みだけをロードする (不一致は許容)
-            checkpoint = torch.load(args.resume_from_checkpoint, map_location="cpu", weights_only=True)
+            checkpoint = torch.load(
+                args.resume_from_checkpoint, map_location="cpu", weights_only=True
+            )
             model.load_state_dict(checkpoint["state_dict"], strict=False)
 
             _LOGGER.info(
