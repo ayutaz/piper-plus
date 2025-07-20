@@ -12,6 +12,58 @@ _LOGGER = logging.getLogger("piper_train.export_onnx")
 OPSET_VERSION = 15
 
 
+def simplify_onnx_model(onnx_path: Path, check_n: int = 3) -> bool:
+    """
+    Simplify ONNX model using onnxsim-prebuilt with validation.
+    
+    Args:
+        onnx_path: Path to ONNX model file
+        check_n: Number of validation checks to perform
+        
+    Returns:
+        True if simplification succeeded, False otherwise
+    """
+    try:
+        import onnx
+        from onnxsim import simplify
+        
+        _LOGGER.info("Loading ONNX model for simplification: %s", onnx_path)
+        original_model = onnx.load(str(onnx_path))
+        original_size = onnx_path.stat().st_size
+        
+        _LOGGER.info("Simplifying ONNX model...")
+        simplified_model, check_passed = simplify(
+            original_model,
+            check_n=check_n,
+            perform_optimization=True,
+            skip_fuse_bn=False,  # VITSには通常BatchNormがないので安全
+        )
+        
+        if not check_passed:
+            _LOGGER.error("ONNX model simplification failed validation")
+            return False
+            
+        # Save simplified model
+        onnx.save(simplified_model, str(onnx_path))
+        new_size = onnx_path.stat().st_size
+        reduction_percent = ((original_size - new_size) / original_size) * 100
+        
+        _LOGGER.info(
+            "Model simplified successfully: %s (%.1f%% size reduction: %d -> %d bytes)",
+            onnx_path, reduction_percent, original_size, new_size
+        )
+        return True
+        
+    except ImportError:
+        _LOGGER.warning(
+            "onnxsim-prebuilt not installed. Install with: pip install onnxsim-prebuilt"
+        )
+        return False
+    except Exception as e:
+        _LOGGER.error("ONNX model simplification failed: %s", e)
+        return False
+
+
 def main() -> None:
     """Main entry point"""
     torch.manual_seed(1234)
@@ -23,6 +75,12 @@ def main() -> None:
     parser.add_argument(
         "--debug", action="store_true", help="Print DEBUG messages to the console"
     )
+    parser.add_argument(
+        "--simplify", action="store_true", help="Apply ONNX model simplification after export"
+    )
+    parser.add_argument(
+        "--simplify-only", help="Only simplify existing ONNX model (path to .onnx file)"
+    )
     args = parser.parse_args()
 
     if args.debug:
@@ -33,6 +91,15 @@ def main() -> None:
     _LOGGER.debug(args)
 
     # -------------------------------------------------------------------------
+
+    # Handle simplify-only mode
+    if args.simplify_only:
+        simplify_path = Path(args.simplify_only)
+        if not simplify_path.exists():
+            _LOGGER.error("ONNX file not found: %s", simplify_path)
+            return
+        simplify_onnx_model(simplify_path)
+        return
 
     args.checkpoint = Path(args.checkpoint)
     args.output = Path(args.output)
@@ -100,6 +167,10 @@ def main() -> None:
     )
 
     _LOGGER.info("Exported model to %s", args.output)
+    
+    # Apply ONNX simplification if requested
+    if args.simplify:
+        simplify_onnx_model(args.output)
 
 
 # -----------------------------------------------------------------------------
