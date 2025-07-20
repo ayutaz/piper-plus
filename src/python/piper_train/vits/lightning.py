@@ -163,6 +163,7 @@ class VitsModel(pl.LightningModule):
             num_workers=self.hparams.num_workers,
             batch_size=self.hparams.batch_size,
             pin_memory=True,
+            persistent_workers=True if self.hparams.num_workers > 0 else False,  # Multi-GPU optimization
         )
 
     def val_dataloader(self):
@@ -175,6 +176,7 @@ class VitsModel(pl.LightningModule):
             num_workers=self.hparams.num_workers,
             batch_size=self.hparams.batch_size,
             pin_memory=True,
+            persistent_workers=True if self.hparams.num_workers > 0 else False,  # Multi-GPU optimization
         )
 
     def test_dataloader(self):
