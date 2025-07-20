@@ -76,7 +76,9 @@ class VitsModel(pl.LightningModule):
         **kwargs,
     ):
         super().__init__()
-        self.automatic_optimization = False  # Multiple optimizers require manual optimization
+        self.automatic_optimization = (
+            False  # Multiple optimizers require manual optimization
+        )
         self.save_hyperparameters()
 
         if (self.hparams.num_speakers > 1) and (self.hparams.gin_channels <= 0):
