@@ -10,7 +10,7 @@ dev = [
     "flake8==6.1.0",
     "mypy==1.7.1",
     "pylint==3.0.2",
-    "ruff==0.8.5",
+    "ruff",
     "pytest==7.4.3",
     "pytest-cov==4.1.0",
     "pytest-xdist==3.5.0",
@@ -31,7 +31,7 @@ test = [
     "pytest-timeout==2.2.0",
     "pytest-mock==3.12.0",
     "coverage[toml]==7.3.2",
-    "ruff==0.8.5",
+    "ruff",
     "mypy==1.7.1",
     "types-requests==2.31.0",
     "types-PyYAML==6.0.12",
@@ -39,7 +39,7 @@ test = [
 
 [tool.uv]
 dev-dependencies = [
-    "ruff==0.8.5",
+    "ruff",
     "pytest==7.4.3",
 ]
 
