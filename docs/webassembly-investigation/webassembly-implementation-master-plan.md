@@ -11,11 +11,17 @@
   - ブラウザテスト環境整備
   - CI/CDパイプライン設定
 
+- ✅ **Task 0.2**: 既存実装調査 (2025-07-21)
+  - MeCab WebAssembly実装調査（mecab-web-worker等）
+  - OpenJTalk WASM実装調査（wasm_open_jtalk）
+  - ビルドプロセスドキュメント化
+  - 技術的制約分析完了
+
 ### 現在のブランチ
-- `task/0.1-dev-environment`
+- `feat/webassembly-support`
 
 ### 次のタスク
-- **Task 0.2**: MeCab WebAssembly実装確認
+- **Task 0.3**: 最小プロトタイプ実装
 
 ## 概要
 

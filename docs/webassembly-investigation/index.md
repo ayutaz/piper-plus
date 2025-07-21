@@ -12,11 +12,18 @@ Piper-plusのWebAssembly対応（[Issue #106](https://github.com/ayutaz/piper-pl
 - **[README.md](./README.md)** - プロジェクト概要と最新ステータス
 - **[webassembly-implementation-master-plan.md](./webassembly-implementation-master-plan.md)** - 統合実装計画（10-12週間）
 - **[webassembly-technical-investigation.md](./webassembly-technical-investigation.md)** - 詳細な技術調査レポート
+- **[detailed-implementation-plan.md](./detailed-implementation-plan.md)** - 2日単位の詳細タスク計画
 
 ### 🔧 技術詳細
 - **[japanese-tts-implementation.md](./japanese-tts-implementation.md)** - 日本語TTS実装の技術詳細
 - **[dictionary-optimization-strategy.md](./dictionary-optimization-strategy.md)** - 辞書最適化戦略（103MB→2-3MB）
 - **[unity-webgl-integration.md](./unity-webgl-integration.md)** - Unity WebGL統合ガイド
+
+### 🔍 調査・分析
+- **[existing-implementations-survey.md](./existing-implementations-survey.md)** - 既存WebAssembly実装調査
+- **[build-process-documentation.md](./build-process-documentation.md)** - WebAssemblyビルドプロセス
+- **[technical-constraints-analysis.md](./technical-constraints-analysis.md)** - 技術的制約事項分析
+- **[task-0.2-technical-investigation-report.md](./task-0.2-technical-investigation-report.md)** - Task 0.2 統合調査レポート
 
 ### ✅ 品質保証
 - **[test-strategy.md](./test-strategy.md)** - テスト戦略（単体・統合・性能・品質）
@@ -69,7 +76,8 @@ Piper-plusのWebAssembly対応（[Issue #106](https://github.com/ayutaz/piper-pl
 
 ### 外部リンク
 - [eSpeak-NG WebAssembly](https://github.com/espeak-ng/espeak-ng/tree/master/emscripten)
-- [MeCab WebAssembly](https://github.com/alexbirch/mecab-wasm)
+- [MeCab WebAssembly](https://github.com/leyhline/mecab-web-worker)
+- [OpenJTalk WASM](https://github.com/hrhr49/wasm_open_jtalk)
 - [ONNX Runtime Web](https://onnxruntime.ai/docs/get-started/with-javascript.html)
 
 ### 問い合わせ先

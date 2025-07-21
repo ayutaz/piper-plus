@@ -12,6 +12,14 @@
 - GitHub Actions CI/CD設定完了
 - 日本語UTF-8文字列処理の動作確認済み
 
+### Task 0.2: 既存実装調査 ✅ **完了** (2025-07-21)
+- MeCab WebAssembly実装の調査完了
+  - mecab-web-worker（推奨）、mecab-emscripten等を分析
+- OpenJTalk WebAssembly実装の調査完了
+  - wasm_open_jtalk（Node.js版）を発見
+- ビルドプロセスのドキュメント化
+- 技術的制約事項の分析完了
+
 ## 概要
 
 piper-plusプロジェクトのWebAssembly対応（[Issue #106](https://github.com/ayutaz/piper-plus/issues/106)）に関する包括的な技術調査と実装計画です。日本語TTSを最優先とし、Unity WebGLでの動作を前提としています。
@@ -87,15 +95,18 @@ piper-plusプロジェクトのWebAssembly対応（[Issue #106](https://github.c
 
 ## 現在のステータス
 
-- **現在のブランチ**: `task/0.1-dev-environment`
-- **完了タスク**: Task 0.1 (開発環境構築)
-- **次のタスク**: Task 0.2 (MeCab WebAssembly実装確認)
+- **現在のブランチ**: `feat/webassembly-support`
+- **完了タスク**: Task 0.1, Task 0.2
+- **次のタスク**: Task 0.3 (最小プロトタイプ実装)
 
 ## 次のステップ
 
-1. **Task 0.2**: MeCab WebAssembly実装の既存実装確認とテスト
-2. **Task 0.3**: ONNX Runtime Webの基本動作確認
-3. **Task 0.4**: OpenJTalk移植アプローチの検討
+1. **Task 0.3**: 最小プロトタイプ実装
+   - MeCab WebAssemblyプロトタイプ作成
+   - 基本的な日本語テキスト処理機能
+   - ブラウザでの動作確認
+2. **Task 0.4**: メモリ・性能測定
+3. **Task 0.5**: Go/No-Go判定準備
 
 ## 関連リンク
 
