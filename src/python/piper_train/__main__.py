@@ -23,9 +23,15 @@ def check_ffmpeg_availability():
     """
     try:
         import torio
-        # Try to access FFmpeg functionality
-        torio._extension.utils._find_ffmpeg_extension()
-        return True, None
+        # Try to access FFmpeg functionality - test multiple versions
+        for ffmpeg_ver in ["FFmpeg6", "FFmpeg5", "FFmpeg4", "FFmpeg"]:
+            try:
+                torio._extension.utils._find_ffmpeg_extension(ffmpeg_ver)
+                return True, None
+            except RuntimeError:
+                continue
+        # If all versions fail, it means no FFmpeg is available
+        raise RuntimeError("No FFmpeg version available")
     except ImportError:
         return False, "torio package is not installed. Install with: pip install torio"
     except RuntimeError as e:
