@@ -2,13 +2,15 @@
 """Simple test for augmentation modules without pytest."""
 
 import sys
+
 import torch
+
 sys.path.insert(0, '/data/piper/src/python')
 
 from piper_train.vits.augmentation import (
-    SpecAugment,
     AudioAugmentation,
     PhonemeAugmentation,
+    SpecAugment,
 )
 
 
