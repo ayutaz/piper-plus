@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MeCab Core WebAssembly Test</title>
+    <style>
+        body {
+            font-family: 'Noto Sans JP', Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            border-radius: 8px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            border-bottom: 3px solid #2196F3;
+            padding-bottom: 10px;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+            font-weight: bold;
+        }
+        .status.success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status.error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .status.loading {
+            background-color: #cce5ff;
+            color: #004085;
+            border: 1px solid #b8daff;
+        }
+        .input-group {
+            margin: 20px 0;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        input[type="text"], textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+        button {
+            background-color: #2196F3;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+        }
+        button:hover:not(:disabled) {
+            background-color: #1976D2;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        .button-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin: 20px 0;
+        }
+        .results {
+            margin-top: 20px;
+        }
+        .result-section {
+            background-color: #f9f9f9;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 10px 0;
+        }
+        .result-section h3 {
+            margin-top: 0;
+            color: #333;
+            border-bottom: 2px solid #2196F3;
+            padding-bottom: 5px;
+        }
+        pre {
+            background-color: #f4f4f4;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 10px 0;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #2196F3;
+            color: white;
+        }
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        .performance-info {
+            display: flex;
+            justify-content: space-between;
+            background-color: #e3f2fd;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .version-info {
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .config-section {
+            background-color: #f0f0f0;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 20px 0;
+        }
+        .config-section h3 {
+            margin-top: 0;
+        }
+        .config-item {
+            margin: 10px 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .config-item input[type="number"] {
+            width: 100px;
+        }
+        .config-item input[type="checkbox"] {
+            width: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>MeCab Core WebAssembly テスト</h1>
+        
+        <div class="version-info">
+            <strong>Production Version</strong> - Full MeCab implementation with Viterbi algorithm
+        </div>
+        
+        <div id="status" class="status loading">MeCab Core を初期化中...</div>
+        
+        <div class="config-section">
+            <h3>設定</h3>
+            <div class="config-item">
+                <label for="nbest">N-Best出力数:</label>
+                <input type="number" id="nbest" value="1" min="1" max="10">
+                <button onclick="updateNBest()">更新</button>
+            </div>
+            <div class="config-item">
+                <label>
+                    <input type="checkbox" id="allMorphs">
+                    すべての形態素を出力
+                </label>
+                <button onclick="updateAllMorphs()">更新</button>
+            </div>
+            <div class="config-item">
+                <label for="unkFeature">未知語の品詞:</label>
+                <input type="text" id="unkFeature" value="名詞,サ変接続,*,*,*,*,*,*,*" style="width: 300px;">
+                <button onclick="updateUnkFeature()">更新</button>
+            </div>
+        </div>
+        
+        <div class="input-group">
+            <label for="inputText">解析するテキスト:</label>
+            <textarea id="inputText" placeholder="ここに日本語テキストを入力してください">今日は良い天気ですね。MeCabで形態素解析を行います。</textarea>
+        </div>
+        
+        <div class="button-group">
+            <button id="parseBtn" onclick="performParse()" disabled>形態素解析</button>
+            <button id="wakatiBtn" onclick="performWakati()" disabled>分かち書き</button>
+            <button id="readingBtn" onclick="performReading()" disabled>読み仮名</button>
+            <button id="tokensBtn" onclick="performTokens()" disabled>トークン解析</button>
+            <button onclick="clearResults()">結果をクリア</button>
+        </div>
+        
+        <div class="performance-info">
+            <span>初期化時間: <strong id="initTime">-</strong></span>
+            <span>処理時間: <strong id="processTime">-</strong></span>
+            <span>メモリ使用量: <strong id="memoryUsage">-</strong></span>
+        </div>
+        
+        <div id="results" class="results"></div>
+    </div>
+
+    <script type="module">
+        import MeCabCore from './mecab-core-wrapper.js';
+        
+        let mecab = null;
+        let initStartTime = performance.now();
+        
+        // Initialize MeCab Core
+        async function initialize() {
+            try {
+                mecab = new MeCabCore();
+                await mecab.initialize('../build/mecab_core_wasm.wasm');
+                
+                const initTime = performance.now() - initStartTime;
+                document.getElementById('initTime').textContent = `${initTime.toFixed(2)}ms`;
+                
+                updateStatus('MeCab Core 初期化完了！', 'success');
+                enableButtons(true);
+                
+                // Display version info
+                const version = mecab.getVersion();
+                console.log('MeCab Core Version:', version);
+                
+                // Update memory usage
+                updateMemoryUsage();
+                
+            } catch (error) {
+                updateStatus(`初期化エラー: ${error.message}`, 'error');
+                console.error('Initialization error:', error);
+            }
+        }
+        
+        function updateStatus(message, type) {
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = message;
+            statusEl.className = `status ${type}`;
+        }
+        
+        function enableButtons(enabled) {
+            ['parseBtn', 'wakatiBtn', 'readingBtn', 'tokensBtn'].forEach(id => {
+                document.getElementById(id).disabled = !enabled;
+            });
+        }
+        
+        function updateMemoryUsage() {
+            if (performance.memory) {
+                const used = (performance.memory.usedJSHeapSize / 1024 / 1024).toFixed(2);
+                document.getElementById('memoryUsage').textContent = `${used}MB`;
+            }
+        }
+        
+        window.performParse = function() {
+            const text = document.getElementById('inputText').value;
+            if (!text) return;
+            
+            const startTime = performance.now();
+            try {
+                const result = mecab.parse(text);
+                const processTime = performance.now() - startTime;
+                
+                displayResult('形態素解析結果', result, 'pre');
+                updateProcessTime(processTime);
+                updateMemoryUsage();
+            } catch (error) {
+                displayResult('エラー', error.message, 'error');
+            }
+        };
+        
+        window.performWakati = function() {
+            const text = document.getElementById('inputText').value;
+            if (!text) return;
+            
+            const startTime = performance.now();
+            try {
+                const result = mecab.wakati(text);
+                const processTime = performance.now() - startTime;
+                
+                displayResult('分かち書き結果', result, 'text');
+                updateProcessTime(processTime);
+                updateMemoryUsage();
+            } catch (error) {
+                displayResult('エラー', error.message, 'error');
+            }
+        };
+        
+        window.performReading = function() {
+            const text = document.getElementById('inputText').value;
+            if (!text) return;
+            
+            const startTime = performance.now();
+            try {
+                const result = mecab.getReading(text);
+                const processTime = performance.now() - startTime;
+                
+                displayResult('読み仮名', result, 'text');
+                updateProcessTime(processTime);
+                updateMemoryUsage();
+            } catch (error) {
+                displayResult('エラー', error.message, 'error');
+            }
+        };
+        
+        window.performTokens = function() {
+            const text = document.getElementById('inputText').value;
+            if (!text) return;
+            
+            const startTime = performance.now();
+            try {
+                const tokens = mecab.parseToTokens(text);
+                const processTime = performance.now() - startTime;
+                
+                // Create table for tokens
+                let html = '<table><tr><th>表層形</th><th>読み</th><th>発音</th><th>詳細</th></tr>';
+                tokens.forEach(token => {
+                    html += `<tr>
+                        <td>${token.surface}</td>
+                        <td>${token.reading || '-'}</td>
+                        <td>${token.pronunciation || '-'}</td>
+                        <td>${token.toString()}</td>
+                    </tr>`;
+                });
+                html += '</table>';
+                
+                displayResult('トークン解析結果', html, 'html');
+                updateProcessTime(processTime);
+                updateMemoryUsage();
+            } catch (error) {
+                displayResult('エラー', error.message, 'error');
+            }
+        };
+        
+        window.updateNBest = function() {
+            const n = parseInt(document.getElementById('nbest').value);
+            if (mecab && n > 0) {
+                mecab.setNBest(n);
+                updateStatus(`N-Best を ${n} に設定しました`, 'success');
+            }
+        };
+        
+        window.updateAllMorphs = function() {
+            const all = document.getElementById('allMorphs').checked;
+            if (mecab) {
+                mecab.setAllMorphs(all);
+                updateStatus(`すべての形態素出力: ${all ? '有効' : '無効'}`, 'success');
+            }
+        };
+        
+        window.updateUnkFeature = function() {
+            const feature = document.getElementById('unkFeature').value;
+            if (mecab && feature) {
+                mecab.setUnkFeature(feature);
+                updateStatus('未知語の品詞を更新しました', 'success');
+            }
+        };
+        
+        function displayResult(title, content, type) {
+            const resultsEl = document.getElementById('results');
+            const section = document.createElement('div');
+            section.className = 'result-section';
+            
+            let html = `<h3>${title}</h3>`;
+            
+            switch (type) {
+                case 'pre':
+                    html += `<pre>${content}</pre>`;
+                    break;
+                case 'html':
+                    html += content;
+                    break;
+                case 'error':
+                    html += `<div class="status error">${content}</div>`;
+                    break;
+                default:
+                    html += `<p>${content}</p>`;
+            }
+            
+            section.innerHTML = html;
+            resultsEl.insertBefore(section, resultsEl.firstChild);
+        }
+        
+        function updateProcessTime(time) {
+            document.getElementById('processTime').textContent = `${time.toFixed(2)}ms`;
+        }
+        
+        window.clearResults = function() {
+            document.getElementById('results').innerHTML = '';
+        };
+        
+        // Initialize on load
+        initialize();
+    </script>
+</body>
+</html>
