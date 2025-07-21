@@ -202,6 +202,14 @@ class VitsModel(pl.LightningModule):
                     "enable_speed_perturb": True,
                     "enable_pitch_shift": True,
                 },
+                phoneme_augment_params={
+                    "phoneme_dropout_prob": 0.1,
+                    "prosody_dropout_prob": 0.05,
+                },
+                mixup_params={
+                    "alpha": 0.2,
+                    "prob": 0.5,
+                },
             ),
             num_workers=self.hparams.num_workers,
             batch_size=self.hparams.batch_size,

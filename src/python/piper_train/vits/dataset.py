@@ -217,6 +217,8 @@ class UtteranceCollate:
         use_augmentation: bool = False,
         spec_augment_params: dict | None = None,
         audio_augment_params: dict | None = None,
+        phoneme_augment_params: dict | None = None,
+        mixup_params: dict | None = None,
     ):
         self.is_multispeaker = is_multispeaker
         self.segment_size = segment_size
@@ -224,16 +226,27 @@ class UtteranceCollate:
 
         # Initialize augmentation modules
         if use_augmentation:
-            from .augmentation import AudioAugmentation, SpecAugment  # noqa: PLC0415
+            from .augmentation import (  # noqa: PLC0415
+                AudioAugmentation,
+                MixUp,
+                PhonemeAugmentation,
+                SpecAugment,
+            )
 
             spec_params = spec_augment_params or {}
             audio_params = audio_augment_params or {}
+            phoneme_params = phoneme_augment_params or {}
+            mixup_params = mixup_params or {}
 
             self.spec_augment = SpecAugment(**spec_params)
             self.audio_augment = AudioAugmentation(**audio_params)
+            self.phoneme_augment = PhonemeAugmentation(**phoneme_params)
+            self.mixup = MixUp(**mixup_params)
         else:
             self.spec_augment = None
             self.audio_augment = None
+            self.phoneme_augment = None
+            self.mixup = None
 
     def __call__(self, utterances: Sequence[UtteranceTensors]) -> Batch:
         num_utterances = len(utterances)
@@ -315,7 +328,18 @@ class UtteranceCollate:
             spec_length = utt.spectrogram.size(1)
             audio_length = utt.audio_norm.size(1)
 
-            phonemes_padded[utt_idx, :phoneme_length] = utt.phoneme_ids
+            # Apply phoneme augmentation if enabled
+            if self.use_augmentation and self.phoneme_augment is not None:
+                augmented_phonemes, augmented_prosody = self.phoneme_augment(
+                    utt.phoneme_ids,
+                    utt.prosody_ids if utt.prosody_ids is not None else None,
+                )
+                phonemes_padded[utt_idx, :phoneme_length] = augmented_phonemes
+                # Update prosody if it was augmented
+                if augmented_prosody is not None and utt.prosody_ids is not None:
+                    utt.prosody_ids = augmented_prosody
+            else:
+                phonemes_padded[utt_idx, :phoneme_length] = utt.phoneme_ids
             phoneme_lengths[utt_idx] = phoneme_length
 
             # Apply augmentation if enabled (training only)
@@ -354,6 +378,34 @@ class UtteranceCollate:
                 f0_padded[utt_idx, :f0_length] = utt.f0_values[:f0_length]
                 if utt.f0_voiced is not None and f0_voiced_padded is not None:
                     f0_voiced_padded[utt_idx, :f0_length] = utt.f0_voiced[:f0_length]
+
+        # Apply MixUp augmentation if enabled (batch-level mixing)
+        if self.use_augmentation and self.mixup is not None and num_utterances > 1:
+            # Randomly select pairs for mixing
+            for i in range(0, num_utterances - 1, 2):
+                if i + 1 < num_utterances:
+                    # Apply MixUp to spectrogram and audio
+                    mixed_spec, mixed_audio, lam = self.mixup(
+                        spec_padded[i].clone(),
+                        spec_padded[i + 1].clone(),
+                        audio_padded[i].clone(),
+                        audio_padded[i + 1].clone(),
+                    )
+                    
+                    # Update with mixed versions (ensure they are detached)
+                    spec_padded[i] = mixed_spec.detach()
+                    audio_padded[i] = mixed_audio.detach() if mixed_audio is not None else audio_padded[i]
+                    
+                    # Mix phoneme lengths (weighted average)
+                    phoneme_lengths[i] = int(
+                        lam * phoneme_lengths[i] + (1 - lam) * phoneme_lengths[i + 1]
+                    )
+                    spec_lengths[i] = int(
+                        lam * spec_lengths[i] + (1 - lam) * spec_lengths[i + 1]
+                    )
+                    audio_lengths[i] = int(
+                        lam * audio_lengths[i] + (1 - lam) * audio_lengths[i + 1]
+                    )
 
         return Batch(
             phoneme_ids=phonemes_padded,

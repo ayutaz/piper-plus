@@ -110,6 +110,18 @@ class F0Predictor(nn.Module):
             prosody_ids = prosody_ids.long()  # Convert to LongTensor for embedding
             prosody_emb = self.prosody_embed(prosody_ids)  # [B, T, hidden]
             prosody_emb = prosody_emb.transpose(1, 2)  # [B, hidden, T]
+            
+            # Ensure prosody_emb matches x sequence length
+            if prosody_emb.size(2) != x.size(2):
+                # Truncate or pad prosody_emb to match x length
+                seq_len = x.size(2)
+                if prosody_emb.size(2) > seq_len:
+                    prosody_emb = prosody_emb[:, :, :seq_len]
+                else:
+                    # Pad with zeros if prosody is shorter
+                    pad_len = seq_len - prosody_emb.size(2)
+                    prosody_emb = torch.nn.functional.pad(prosody_emb, (0, pad_len))
+            
             x = x + prosody_emb
 
         # Encoder layers with residual connections
