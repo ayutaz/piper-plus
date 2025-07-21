@@ -318,10 +318,22 @@ class UtteranceCollate:
             phonemes_padded[utt_idx, :phoneme_length] = utt.phoneme_ids
             phoneme_lengths[utt_idx] = phoneme_length
 
-            spec_padded[utt_idx, :, :spec_length] = utt.spectrogram
+            # Apply augmentation if enabled (training only)
+            if self.use_augmentation and self.spec_augment is not None:
+                # Apply spec augmentation
+                augmented_spec = self.spec_augment(utt.spectrogram.unsqueeze(0))
+                spec_padded[utt_idx, :, :spec_length] = augmented_spec.squeeze(0)
+            else:
+                spec_padded[utt_idx, :, :spec_length] = utt.spectrogram
             spec_lengths[utt_idx] = spec_length
 
-            audio_padded[utt_idx, :, :audio_length] = utt.audio_norm
+            # Apply audio augmentation if enabled
+            if self.use_augmentation and self.audio_augment is not None:
+                # Apply audio augmentation
+                augmented_audio = self.audio_augment(utt.audio_norm)
+                audio_padded[utt_idx, :, :audio_length] = augmented_audio
+            else:
+                audio_padded[utt_idx, :, :audio_length] = utt.audio_norm
             audio_lengths[utt_idx] = audio_length
 
             if utt.speaker_id is not None:
