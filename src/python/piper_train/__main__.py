@@ -181,8 +181,6 @@ def main():
     else:
         _LOGGER.info("EMA disabled by user request")
 
-    trainer = Trainer.from_argparse_args(args, callbacks=callbacks)
-
     trainer_kwargs = {
         "accelerator": args.accelerator,
         "devices": args.devices,

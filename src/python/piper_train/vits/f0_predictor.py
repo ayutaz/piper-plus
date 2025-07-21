@@ -41,8 +41,10 @@ class F0Predictor(nn.Module):
                 ConvReluNorm(
                     hidden_channels,
                     hidden_channels,
+                    hidden_channels,
                     kernel_size,
-                    p_dropout=p_dropout,
+                    1,  # n_layers
+                    p_dropout,
                 ),
             )
 
