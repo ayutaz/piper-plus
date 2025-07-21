@@ -1,9 +1,7 @@
-import torch
-import torch.nn as nn
-from copy import deepcopy
-from typing import Optional
 
+import torch
 from pytorch_lightning.callbacks import Callback
+from torch import nn
 
 
 class ExponentialMovingAverage:

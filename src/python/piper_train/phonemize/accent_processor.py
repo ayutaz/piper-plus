@@ -1,5 +1,4 @@
 import re
-from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass
 
 import numpy as np
@@ -146,7 +145,6 @@ class JapaneseAccentProcessor:
 
     def create_accent_embedding_layer(self, embedding_dim: int = 128):
         """Create embedding layer for accent marks."""
-        from torch import nn
 
         num_marks = len(self.mark_to_id)
         embedding = nn.Embedding(
