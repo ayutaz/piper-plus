@@ -14,8 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Enhanced question detection (?!, ?., ?~)
   - Data augmentation (SpecAugment, AudioAugmentation, PhonemeAugmentation)
 - **`--precision` argument** for mixed precision training
-  - Supports: 32-true (default), 16-mixed, bf16-mixed
+  - Supports: 16-mixed (default), 32-true, bf16-mixed
   - Compatible with PyTorch Lightning 2.4.0
+  - Changed default from 32-true to 16-mixed for better performance
 
 ### Fixed
 - **PyTorch Lightning 2.x compatibility**

@@ -252,7 +252,7 @@ python3 -m piper_train \
   --accumulate_grad_batches 2 \         # Gradient accumulation (effective batch = 64)
   --gradient_clip_val 1.0 \             # Gradient clipping for stability
   --precision 16-mixed \                # Mixed precision training (faster, less memory)
-                                       # Options: 32-true (default), 16-mixed, bf16-mixed
+                                       # Options: 16-mixed (default), 32-true, bf16-mixed
   --detect_anomaly \                    # Enable anomaly detection (debugging)
   --resume_from_checkpoint /path/to/checkpoint.ckpt  # Resume training
 ```

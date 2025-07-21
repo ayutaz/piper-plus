@@ -96,8 +96,8 @@ def main():
     )
     parser.add_argument(
         "--precision", 
-        default="32-true",
-        help="Floating point precision (32-true, 16-mixed, bf16-mixed)"
+        default="16-mixed",
+        help="Floating point precision (32-true, 16-mixed (default), bf16-mixed)"
     )
     parser.add_argument(
         "--max_epochs", type=int, default=1000, help="Maximum number of epochs"
