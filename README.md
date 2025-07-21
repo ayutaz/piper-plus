@@ -70,7 +70,7 @@ Piper is used in a [variety of projects](#people-using-piper).
 * 学習時の高度なオプション
   * `--gradient_clip_val` - 勾配クリッピング
   * `--accumulate_grad_batches` - 勾配累積によるバッチサイズ仮想拡張
-  * `--precision` - Mixed Precision Training対応（16-mixed等）
+  * `--precision` - Mixed Precision Training対応（32-true (デフォルト), 16-mixed, bf16-mixed）
   * `--detect_anomaly` - 学習時の異常検出機能
 * 音声評価ツール（`scripts/evaluation/`）
   * MCD (Mel-Cepstral Distortion) 評価

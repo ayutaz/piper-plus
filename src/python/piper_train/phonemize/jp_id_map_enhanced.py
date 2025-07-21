@@ -99,8 +99,10 @@ def get_japanese_enhanced_id_map() -> dict[str, list[int]]:
     """Get enhanced Japanese phoneme to ID mapping with accent strength levels.
 
     Returns:
-        Dictionary mapping phoneme strings to lists of token IDs.
+        Dictionary mapping phoneme strings (including PUA chars) to lists of token IDs.
     """
+    from .token_mapper import register
+    
     id_map: dict[str, list[int]] = {}
     token_id = 0
 
@@ -108,18 +110,26 @@ def get_japanese_enhanced_id_map() -> dict[str, list[int]]:
     id_map["_PAD_"] = [token_id]
     token_id += 1
 
-    # Add all tokens
+    # Add all tokens, converting multi-character tokens to PUA chars
     all_tokens = SPECIAL_TOKENS + ACCENT_STRENGTH_TOKENS + JAPANESE_PHONEMES
 
     for token in all_tokens:
-        if token not in id_map:
-            id_map[token] = [token_id]
+        # Convert token to PUA character if it's multi-character
+        mapped_token = register(token)
+        if mapped_token not in id_map:
+            id_map[mapped_token] = [token_id]
             token_id += 1
 
     # Add compatibility mappings (old marks map to medium strength)
-    if "[2" in id_map and "[" not in id_map:
-        id_map["["] = id_map["[2"]  # Medium rise
-    if "]2" in id_map and "]" not in id_map:
-        id_map["]"] = id_map["]2"]  # Medium fall
+    # Convert these to PUA chars too
+    medium_rise = register("[2")
+    medium_fall = register("]2")
+    basic_rise = register("[")
+    basic_fall = register("]")
+    
+    if medium_rise in id_map and basic_rise not in id_map:
+        id_map[basic_rise] = id_map[medium_rise]  # Medium rise
+    if medium_fall in id_map and basic_fall not in id_map:
+        id_map[basic_fall] = id_map[medium_fall]  # Medium fall
 
     return id_map

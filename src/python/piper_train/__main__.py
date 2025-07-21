@@ -95,6 +95,11 @@ def main():
         "--strategy", default=None, help="Training strategy (e.g., ddp)"
     )
     parser.add_argument(
+        "--precision", 
+        default="32-true",
+        help="Floating point precision (32-true, 16-mixed, bf16-mixed)"
+    )
+    parser.add_argument(
         "--max_epochs", type=int, default=1000, help="Maximum number of epochs"
     )
     parser.add_argument(
@@ -187,6 +192,7 @@ def main():
         "max_epochs": args.max_epochs,
         "callbacks": callbacks,
         "default_root_dir": args.default_root_dir,
+        "precision": args.precision,
     }
     if args.strategy:
         trainer_kwargs["strategy"] = args.strategy
@@ -323,14 +329,13 @@ def main():
             else:
                 _LOGGER.info("EMA disabled by user request")
 
-            trainer = Trainer.from_argparse_args(args, callbacks=callbacks)
-
             trainer_kwargs = {
                 "accelerator": args.accelerator,
                 "devices": args.devices,
                 "max_epochs": args.max_epochs,
                 "callbacks": callbacks,
                 "default_root_dir": args.default_root_dir,
+                "precision": args.precision,
             }
             if args.strategy:
                 trainer_kwargs["strategy"] = args.strategy

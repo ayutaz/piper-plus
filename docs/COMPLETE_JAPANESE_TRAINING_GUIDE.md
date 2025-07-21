@@ -108,7 +108,7 @@ python3 -m piper_train.preprocess \
 ### 重要なハイパーパラメータ（A100 80GB向け）
 
 - `--quality`: medium（スマホ向けなどバランス重視）または high（大規模データで最高品質を目指す場合）
-- `--precision`: 16 (fp16混合精度) が速度とメモリ効率の観点から推奨されます。bf16 は torch.stft との互換性問題があるため、PyTorchのバージョンに注意が必要です
+- `--precision`: 16-mixed (fp16混合精度) が速度とメモリ効率の観点から推奨されます。bf16-mixed は torch.stft との互換性問題があるため、PyTorchのバージョンに注意が必要です。オプション: 32-true (デフォルト), 16-mixed, bf16-mixed
 - `--batch-size`: VRAMに収まる範囲でできるだけ大きく設定します（例: fp16 なら 96 や 128）
 - `--max_epochs` / `--max_steps`: 学習期間をエポック数または総ステップ数で指定します
 - `--num-workers`: データ読み込みを高速化するための引数。lightning.py を修正してコマンドラインから指定できるようにしました
@@ -122,7 +122,7 @@ python3 -m piper_train \
   --accelerator 'gpu' \
   --devices 1 \
   --quality medium \
-  --precision 16 \
+  --precision 16-mixed \
   --batch-size 64 \
   --max_epochs 500 \
   --checkpoint-epochs 10 \

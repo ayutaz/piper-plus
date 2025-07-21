@@ -210,7 +210,7 @@ python3 -m piper_train \
     --max_epochs 10000 \
     --resume_from_checkpoint /path/to/lessac/epoch=2164-step=1355540.ckpt \
     --checkpoint-epochs 1 \
-    --precision 32 \
+    --precision 32-true \
     --num-workers 48
 ```
 
@@ -223,7 +223,7 @@ python3 -m piper_train \
   --accelerator 'gpu' \
   --devices 1 \
   --quality medium \
-  --precision 16 \
+  --precision 16-mixed \
   --batch-size 64 \
   --max_epochs 150 \
   --checkpoint-epochs 10 \
@@ -252,6 +252,7 @@ python3 -m piper_train \
   --accumulate_grad_batches 2 \         # Gradient accumulation (effective batch = 64)
   --gradient_clip_val 1.0 \             # Gradient clipping for stability
   --precision 16-mixed \                # Mixed precision training (faster, less memory)
+                                       # Options: 32-true (default), 16-mixed, bf16-mixed
   --detect_anomaly \                    # Enable anomaly detection (debugging)
   --resume_from_checkpoint /path/to/checkpoint.ckpt  # Resume training
 ```

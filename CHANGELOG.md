@@ -5,6 +5,29 @@ All notable changes to piper-plus will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **Enhanced Japanese phoneme support** (PR #99)
+  - 65 phonemes with PUA (Private Use Area) character support
+  - 3-level accent strength system ([1/[2/[3, ]1/]2/]3)
+  - Enhanced question detection (?!, ?., ?~)
+  - Data augmentation (SpecAugment, AudioAugmentation, PhonemeAugmentation)
+- **`--precision` argument** for mixed precision training
+  - Supports: 32-true (default), 16-mixed, bf16-mixed
+  - Compatible with PyTorch Lightning 2.4.0
+
+### Fixed
+- **PyTorch Lightning 2.x compatibility**
+  - Removed duplicate `Trainer.from_argparse_args` API call
+  - Fixed precision argument not being passed to Trainer
+- **Japanese preprocessing**
+  - Fixed missing phoneme warnings for PUA characters
+  - Updated phoneme ID mapping to include all 96 symbols
+
+### Removed
+- MixUp data augmentation (gradient computation issues)
+
 ## [1.3.0] - 2024-07-20
 
 ### 🎯 音声品質向上コンポーネント統合 (PR #98)
