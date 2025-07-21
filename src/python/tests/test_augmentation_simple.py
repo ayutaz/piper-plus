@@ -5,7 +5,7 @@ import sys
 
 import torch
 
-sys.path.insert(0, '/data/piper/src/python')
+sys.path.insert(0, "/data/piper/src/python")
 
 from piper_train.vits.augmentation import (
     AudioAugmentation,
