@@ -9,6 +9,7 @@ from torch.nn import functional as F
 from torch.utils.data import DataLoader, Dataset, random_split
 
 from .commons import slice_segments
+from .augmentation import MixUp
 from .dataset import Batch, PiperDataset, UtteranceCollate
 from .f0_predictor import F0Loss
 from .losses import (
@@ -134,6 +135,10 @@ class VitsModel(pl.LightningModule):
 
         # Multi-resolution STFT loss
         self.stft_loss = MultiResolutionSTFTLoss()
+        
+        # MixUp augmentation (disabled due to gradient issues)
+        # TODO: Fix MixUp implementation for proper gradient flow
+        self.mixup = None  # MixUp(alpha=0.2, prob=0.5) if self.training else None
 
         # Dataset splits
         self._train_dataset: Dataset | None = None
@@ -205,10 +210,6 @@ class VitsModel(pl.LightningModule):
                 phoneme_augment_params={
                     "phoneme_dropout_prob": 0.1,
                     "prosody_dropout_prob": 0.05,
-                },
-                mixup_params={
-                    "alpha": 0.2,
-                    "prob": 0.5,
                 },
             ),
             num_workers=self.hparams.num_workers,
@@ -287,6 +288,25 @@ class VitsModel(pl.LightningModule):
             batch.prosody_ids if batch.prosody_ids is not None else None,
             batch.f0_values if batch.f0_values is not None else None,
         )
+        
+        # Apply MixUp augmentation during training
+        if self.mixup is not None and self.training and spec.size(0) > 1:
+            # Clone tensors to avoid in-place modifications
+            spec = spec.clone()
+            y = y.clone()
+            
+            # Randomly mix pairs of samples in the batch
+            batch_size = spec.size(0)
+            for i in range(0, batch_size - 1, 2):
+                if i + 1 < batch_size:
+                    mixed_spec, mixed_audio, lam = self.mixup(
+                        spec[i].unsqueeze(0),
+                        spec[i + 1].unsqueeze(0),
+                        y[i].unsqueeze(0),
+                        y[i + 1].unsqueeze(0),
+                    )
+                    spec[i] = mixed_spec.squeeze(0)
+                    y[i] = mixed_audio.squeeze(0) if mixed_audio is not None else y[i]
         (
             y_hat,
             l_length,
