@@ -2,7 +2,6 @@
 
 import random
 
-import numpy as np
 import torch
 import torchaudio
 
@@ -246,5 +245,3 @@ class PhonemeAugmentation:
             prosody_ids = prosody_ids.masked_fill(dropout_mask, self.prosody_mask_token)
 
         return phoneme_ids, prosody_ids
-
-
