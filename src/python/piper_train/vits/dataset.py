@@ -224,7 +224,7 @@ class UtteranceCollate:
 
         # Initialize augmentation modules
         if use_augmentation:
-            from .augmentation import AudioAugmentation, SpecAugment
+            from .augmentation import AudioAugmentation, SpecAugment  # noqa: PLC0415
 
             spec_params = spec_augment_params or {}
             audio_params = audio_augment_params or {}

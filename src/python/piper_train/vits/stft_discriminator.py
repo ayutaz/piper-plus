@@ -234,7 +234,7 @@ class CombinedMultiDiscriminator(nn.Module):
             win_sizes = [480, 960, 1920]
 
         # Import existing MultiPeriodDiscriminator
-        from .models import MultiPeriodDiscriminator
+        from .models import MultiPeriodDiscriminator  # noqa: PLC0415
 
         self.mpd = MultiPeriodDiscriminator(use_spectral_norm)
         self.mrd = MultiResolutionSTFTDiscriminator(
