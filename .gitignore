@@ -55,3 +55,6 @@ build_log.zip
 *.exe
 windows_build_artifacts/
 CLAUDE.md
+
+# Emscripten SDK
+/tools/emsdk/

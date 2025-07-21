@@ -17,11 +17,17 @@
   - ビルドプロセスドキュメント化
   - 技術的制約分析完了
 
+- ✅ **Task 0.3**: 最小プロトタイプ実装 (2025-07-21)
+  - MeCab WebAssemblyプロトタイプ作成
+  - SimpleMeCabクラス実装（C++/Embind）
+  - JavaScript APIラッパー作成
+  - ブラウザでの動作確認完了
+
 ### 現在のブランチ
 - `feat/webassembly-support`
 
 ### 次のタスク
-- **Task 0.3**: 最小プロトタイプ実装
+- **Task 0.4**: メモリ・性能測定
 
 ## 概要
 

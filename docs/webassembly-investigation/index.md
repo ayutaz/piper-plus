@@ -24,6 +24,7 @@ Piper-plusのWebAssembly対応（[Issue #106](https://github.com/ayutaz/piper-pl
 - **[build-process-documentation.md](./build-process-documentation.md)** - WebAssemblyビルドプロセス
 - **[technical-constraints-analysis.md](./technical-constraints-analysis.md)** - 技術的制約事項分析
 - **[task-0.2-technical-investigation-report.md](./task-0.2-technical-investigation-report.md)** - Task 0.2 統合調査レポート
+- **[task-0.3-prototype-report.md](./task-0.3-prototype-report.md)** - Task 0.3 プロトタイプ実装レポート
 
 ### ✅ 品質保証
 - **[test-strategy.md](./test-strategy.md)** - テスト戦略（単体・統合・性能・品質）

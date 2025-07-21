@@ -20,6 +20,14 @@
 - ビルドプロセスのドキュメント化
 - 技術的制約事項の分析完了
 
+### Task 0.3: 最小プロトタイプ実装 ✅ **完了** (2025-07-21)
+- MeCab WebAssemblyプロトタイプの作成
+  - SimpleMeCabクラス実装（C++）
+  - EmbindによるJavaScriptバインディング
+- ブラウザでの動作確認完了
+  - 形態素解析、分かち書き、読み仮名機能
+- ファイルサイズ: 約586KB（WASM + JS）
+
 ## 概要
 
 piper-plusプロジェクトのWebAssembly対応（[Issue #106](https://github.com/ayutaz/piper-plus/issues/106)）に関する包括的な技術調査と実装計画です。日本語TTSを最優先とし、Unity WebGLでの動作を前提としています。
@@ -96,17 +104,17 @@ piper-plusプロジェクトのWebAssembly対応（[Issue #106](https://github.c
 ## 現在のステータス
 
 - **現在のブランチ**: `feat/webassembly-support`
-- **完了タスク**: Task 0.1, Task 0.2
-- **次のタスク**: Task 0.3 (最小プロトタイプ実装)
+- **完了タスク**: Task 0.1, Task 0.2, Task 0.3
+- **次のタスク**: Task 0.4 (メモリ・性能測定)
 
 ## 次のステップ
 
-1. **Task 0.3**: 最小プロトタイプ実装
-   - MeCab WebAssemblyプロトタイプ作成
-   - 基本的な日本語テキスト処理機能
-   - ブラウザでの動作確認
-2. **Task 0.4**: メモリ・性能測定
-3. **Task 0.5**: Go/No-Go判定準備
+1. **Task 0.4**: メモリ・性能測定
+   - Chrome DevToolsでのプロファイリング
+   - Unity WebGLでのメモリテスト
+   - ベンチマーク基準値の設定
+2. **Task 0.5**: Go/No-Go判定準備
+3. **Phase 1**: 日本語音素化基盤の本格実装
 
 ## 関連リンク
 

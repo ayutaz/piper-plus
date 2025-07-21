@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MeCab WebAssembly Test</title>
+    <style>
+        body {
+            font-family: 'Noto Sans JP', Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            border-radius: 8px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            border-bottom: 3px solid #4CAF50;
+            padding-bottom: 10px;
+        }
+        .input-section, .output-section {
+            margin: 20px 0;
+        }
+        textarea {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+            resize: vertical;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        .output {
+            background-color: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 10px 0;
+            font-family: monospace;
+            white-space: pre-wrap;
+            min-height: 100px;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .status.loading {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+        .status.success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .status.error {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        .tab-buttons {
+            display: flex;
+            gap: 10px;
+            margin: 20px 0;
+        }
+        .tab-button {
+            background-color: #e0e0e0;
+            color: #333;
+        }
+        .tab-button.active {
+            background-color: #4CAF50;
+            color: white;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 10px 0;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #4CAF50;
+            color: white;
+        }
+        tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>MeCab WebAssembly テスト</h1>
+        
+        <div id="status" class="status loading">
+            MeCab WebAssemblyモジュールを読み込み中...
+        </div>
+
+        <div class="input-section">
+            <h2>入力テキスト</h2>
+            <textarea id="inputText" rows="4" placeholder="解析したい日本語テキストを入力してください">こんにちは世界！今日は良い天気ですね。</textarea>
+            
+            <div>
+                <button id="parseBtn" onclick="parseText()" disabled>形態素解析</button>
+                <button id="wakatiBtn" onclick="wakatiText()" disabled>分かち書き</button>
+                <button id="readingBtn" onclick="getReading()" disabled>読み仮名</button>
+                <button id="tokenBtn" onclick="parseToTokens()" disabled>詳細解析</button>
+            </div>
+        </div>
+
+        <div class="output-section">
+            <h2>解析結果</h2>
+            
+            <div class="tab-buttons">
+                <button class="tab-button active" onclick="showTab('parse')">形態素解析</button>
+                <button class="tab-button" onclick="showTab('wakati')">分かち書き</button>
+                <button class="tab-button" onclick="showTab('reading')">読み仮名</button>
+                <button class="tab-button" onclick="showTab('tokens')">詳細解析</button>
+            </div>
+
+            <div id="parseTab" class="tab-content active">
+                <div id="parseOutput" class="output">結果がここに表示されます</div>
+            </div>
+
+            <div id="wakatiTab" class="tab-content">
+                <div id="wakatiOutput" class="output">結果がここに表示されます</div>
+            </div>
+
+            <div id="readingTab" class="tab-content">
+                <div id="readingOutput" class="output">結果がここに表示されます</div>
+            </div>
+
+            <div id="tokensTab" class="tab-content">
+                <div id="tokensOutput" class="output">
+                    <table id="tokensTable" style="display:none;">
+                        <thead>
+                            <tr>
+                                <th>表層形</th>
+                                <th>品詞</th>
+                                <th>品詞細分類1</th>
+                                <th>基本形</th>
+                                <th>読み</th>
+                                <th>発音</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tokensBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="info">
+            <h3>使用方法</h3>
+            <ul>
+                <li>テキストボックスに日本語テキストを入力してください</li>
+                <li>各ボタンをクリックして、異なる形式の解析結果を確認できます</li>
+                <li>このプロトタイプは限定的な辞書を使用しています</li>
+            </ul>
+        </div>
+    </div>
+
+    <script type="module">
+        import MeCabWrapper from '../mecab-wrapper.js';
+        
+        let mecab = null;
+        
+        // Initialize MeCab
+        async function initializeMeCab() {
+            try {
+                mecab = new MeCabWrapper();
+                const success = await mecab.initialize('../dist/mecab_wasm.wasm');
+                
+                if (success) {
+                    updateStatus('MeCab WebAssemblyが正常に初期化されました', 'success');
+                    enableButtons();
+                } else {
+                    updateStatus('MeCabの初期化に失敗しました', 'error');
+                }
+            } catch (error) {
+                updateStatus('エラー: ' + error.message, 'error');
+                console.error(error);
+            }
+        }
+        
+        function updateStatus(message, type) {
+            const status = document.getElementById('status');
+            status.textContent = message;
+            status.className = `status ${type}`;
+        }
+        
+        function enableButtons() {
+            document.getElementById('parseBtn').disabled = false;
+            document.getElementById('wakatiBtn').disabled = false;
+            document.getElementById('readingBtn').disabled = false;
+            document.getElementById('tokenBtn').disabled = false;
+        }
+        
+        function getInputText() {
+            return document.getElementById('inputText').value;
+        }
+        
+        window.parseText = function() {
+            try {
+                const text = getInputText();
+                const result = mecab.parse(text);
+                document.getElementById('parseOutput').textContent = result;
+                showTab('parse');
+            } catch (error) {
+                alert('エラー: ' + error.message);
+            }
+        };
+        
+        window.wakatiText = function() {
+            try {
+                const text = getInputText();
+                const result = mecab.wakati(text);
+                document.getElementById('wakatiOutput').textContent = result;
+                showTab('wakati');
+            } catch (error) {
+                alert('エラー: ' + error.message);
+            }
+        };
+        
+        window.getReading = function() {
+            try {
+                const text = getInputText();
+                const result = mecab.getReading(text);
+                document.getElementById('readingOutput').textContent = result;
+                showTab('reading');
+            } catch (error) {
+                alert('エラー: ' + error.message);
+            }
+        };
+        
+        window.parseToTokens = function() {
+            try {
+                const text = getInputText();
+                const tokens = mecab.parseToTokens(text);
+                
+                const tbody = document.getElementById('tokensBody');
+                tbody.innerHTML = '';
+                
+                tokens.forEach(token => {
+                    const row = tbody.insertRow();
+                    row.insertCell(0).textContent = token.surface || '';
+                    row.insertCell(1).textContent = token.pos || '';
+                    row.insertCell(2).textContent = token.pos1 || '';
+                    row.insertCell(3).textContent = token.baseForm || '';
+                    row.insertCell(4).textContent = token.reading || '';
+                    row.insertCell(5).textContent = token.pronunciation || '';
+                });
+                
+                document.getElementById('tokensTable').style.display = 'table';
+                showTab('tokens');
+            } catch (error) {
+                alert('エラー: ' + error.message);
+            }
+        };
+        
+        window.showTab = function(tabName) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelectorAll('.tab-button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            
+            // Show selected tab
+            document.getElementById(tabName + 'Tab').classList.add('active');
+            event.target.classList.add('active');
+        };
+        
+        // Initialize on page load
+        initializeMeCab();
+    </script>
+</body>
+</html>
