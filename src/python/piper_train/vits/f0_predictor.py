@@ -43,7 +43,7 @@ class F0Predictor(nn.Module):
                     hidden_channels,
                     hidden_channels,
                     kernel_size,
-                    1,  # n_layers
+                    2,  # n_layers (minimum required)
                     p_dropout,
                 ),
             )
@@ -115,10 +115,7 @@ class F0Predictor(nn.Module):
         # Encoder layers with residual connections
         for layer in self.encoder_layers:
             residual = x
-            if x_mask is not None:
-                x = layer(x * x_mask)
-            else:
-                x = layer(x)
+            x = layer(x, x_mask)
             x = x + residual
 
         # Self-attention for long-range dependencies

@@ -331,7 +331,9 @@ class UtteranceCollate:
             if self.use_augmentation and self.audio_augment is not None:
                 # Apply audio augmentation
                 augmented_audio = self.audio_augment(utt.audio_norm)
-                audio_padded[utt_idx, :, :audio_length] = augmented_audio
+                # Ensure augmented audio matches expected length
+                actual_length = min(augmented_audio.size(0), audio_length)
+                audio_padded[utt_idx, :, :actual_length] = augmented_audio[:actual_length]
             else:
                 audio_padded[utt_idx, :, :audio_length] = utt.audio_norm
             audio_lengths[utt_idx] = audio_length

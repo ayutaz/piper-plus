@@ -368,7 +368,9 @@ class VitsModel(pl.LightningModule):
 
             # Duration consistency loss
             loss_dur_consistency = torch.tensor(0.0, device=self.device)
-            if self.hparams.use_duration_regularization and pred_durations is not None:
+            if (self.hparams.use_duration_regularization and 
+                self.hparams.c_dur_consistency > 0.0 and 
+                pred_durations is not None):
                 loss_dur_consistency, dur_metrics = duration_consistency_loss(
                     pred_durations,
                     x_lengths,
