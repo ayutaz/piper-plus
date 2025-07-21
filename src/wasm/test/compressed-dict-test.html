@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Compressed Dictionary Test</title>
+    <style>
+        body {
+            font-family: 'Noto Sans JP', Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            border-radius: 8px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            border-bottom: 3px solid #4CAF50;
+            padding-bottom: 10px;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+            font-weight: bold;
+        }
+        .status.loading {
+            background-color: #cce5ff;
+            color: #004085;
+        }
+        .status.success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .status.error {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .stat-card {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 15px;
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #4CAF50;
+        }
+        .stat-label {
+            color: #6c757d;
+            margin-top: 5px;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        #results {
+            margin-top: 20px;
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            display: none;
+        }
+        pre {
+            background-color: #f4f4f4;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>圧縮辞書テスト</h1>
+        
+        <div id="status" class="status loading">初期化中...</div>
+        
+        <div class="stats">
+            <div class="stat-card">
+                <div class="stat-value" id="originalSize">-</div>
+                <div class="stat-label">元のサイズ</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="compressedSize">-</div>
+                <div class="stat-label">圧縮後サイズ</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="compressionRatio">-</div>
+                <div class="stat-label">圧縮率</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="loadTime">-</div>
+                <div class="stat-label">読み込み時間</div>
+            </div>
+        </div>
+        
+        <div>
+            <button id="loadBtn" onclick="loadDictionary()">辞書を読み込む</button>
+            <button id="testBtn" onclick="testLookup()" disabled>単語検索テスト</button>
+            <button onclick="clearResults()">結果をクリア</button>
+        </div>
+        
+        <div id="results">
+            <h3>テスト結果</h3>
+            <pre id="resultContent"></pre>
+        </div>
+    </div>
+
+    <script type="module">
+        // Mock compressed dictionary loader for testing
+        class CompressedDictLoader {
+            constructor() {
+                this.loaded = false;
+                this.entries = [];
+                this.compressedSize = 0;
+                this.originalSize = 0;
+            }
+            
+            async loadFromURL(url) {
+                const startTime = performance.now();
+                
+                try {
+                    const response = await fetch(url);
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    
+                    const arrayBuffer = await response.arrayBuffer();
+                    this.compressedSize = arrayBuffer.byteLength;
+                    
+                    // Simulate decompression
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                    
+                    // Mock some entries
+                    this.entries = [
+                        { surface: "私", reading: "ワタシ", cost: 100 },
+                        { surface: "こんにちは", reading: "コンニチハ", cost: 120 },
+                        { surface: "ありがとう", reading: "アリガトウ", cost: 120 },
+                        { surface: "日本", reading: "ニホン", cost: 100 },
+                        { surface: "東京", reading: "トウキョウ", cost: 100 }
+                    ];
+                    
+                    // Calculate original size (mock)
+                    this.originalSize = this.compressedSize * 2.4;
+                    
+                    this.loaded = true;
+                    
+                    const loadTime = performance.now() - startTime;
+                    return { success: true, loadTime };
+                    
+                } catch (error) {
+                    console.error('Dictionary load error:', error);
+                    return { success: false, error: error.message };
+                }
+            }
+            
+            lookup(surface) {
+                return this.entries.find(e => e.surface === surface) || null;
+            }
+            
+            getStats() {
+                return {
+                    originalSize: this.originalSize,
+                    compressedSize: this.compressedSize,
+                    compressionRatio: (this.compressedSize / this.originalSize * 100).toFixed(1),
+                    entryCount: this.entries.length
+                };
+            }
+        }
+        
+        // Global dictionary loader instance
+        let dictLoader = new CompressedDictLoader();
+        
+        function updateStatus(message, type) {
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = message;
+            statusEl.className = `status ${type}`;
+        }
+        
+        function formatBytes(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+        }
+        
+        window.loadDictionary = async function() {
+            updateStatus('辞書を読み込み中...', 'loading');
+            document.getElementById('loadBtn').disabled = true;
+            
+            const result = await dictLoader.loadFromURL('../dict/test_dict.compressed');
+            
+            if (result.success) {
+                const stats = dictLoader.getStats();
+                
+                document.getElementById('originalSize').textContent = formatBytes(stats.originalSize);
+                document.getElementById('compressedSize').textContent = formatBytes(stats.compressedSize);
+                document.getElementById('compressionRatio').textContent = stats.compressionRatio + '%';
+                document.getElementById('loadTime').textContent = result.loadTime.toFixed(0) + 'ms';
+                
+                updateStatus('辞書の読み込みが完了しました！', 'success');
+                document.getElementById('testBtn').disabled = false;
+            } else {
+                updateStatus(`エラー: ${result.error}`, 'error');
+                document.getElementById('loadBtn').disabled = false;
+            }
+        };
+        
+        window.testLookup = function() {
+            const testWords = ["私", "こんにちは", "ありがとう", "日本", "東京", "存在しない単語"];
+            const results = [];
+            
+            results.push("=== 単語検索テスト ===\n");
+            
+            for (const word of testWords) {
+                const startTime = performance.now();
+                const entry = dictLoader.lookup(word);
+                const lookupTime = performance.now() - startTime;
+                
+                if (entry) {
+                    results.push(`✓ "${word}" → 読み: ${entry.reading}, コスト: ${entry.cost} (${lookupTime.toFixed(3)}ms)`);
+                } else {
+                    results.push(`✗ "${word}" → 見つかりません (${lookupTime.toFixed(3)}ms)`);
+                }
+            }
+            
+            results.push("\n=== パフォーマンス統計 ===");
+            results.push(`総エントリ数: ${dictLoader.getStats().entryCount}`);
+            results.push(`メモリ使用量: ${formatBytes(dictLoader.compressedSize)}`);
+            
+            document.getElementById('resultContent').textContent = results.join('\n');
+            document.getElementById('results').style.display = 'block';
+        };
+        
+        window.clearResults = function() {
+            document.getElementById('results').style.display = 'none';
+            document.getElementById('resultContent').textContent = '';
+        };
+        
+        // Initialize
+        updateStatus('準備完了。「辞書を読み込む」ボタンをクリックしてください。', 'success');
+    </script>
+</body>
+</html>

@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MeCab + OpenJTalk Integration Test</title>
+    <style>
+        body {
+            font-family: 'Noto Sans JP', Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            border-radius: 8px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            border-bottom: 3px solid #4CAF50;
+            padding-bottom: 10px;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+            font-weight: bold;
+        }
+        .status.loading {
+            background-color: #cce5ff;
+            color: #004085;
+            border: 1px solid #b8daff;
+        }
+        .status.success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status.error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .input-group {
+            margin: 20px 0;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        input[type="text"], textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+        }
+        button:hover:not(:disabled) {
+            background-color: #45a049;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        .pipeline {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            margin: 20px 0;
+            padding: 20px;
+            background-color: #f9f9f9;
+            border-radius: 8px;
+        }
+        .pipeline-step {
+            flex: 1;
+            text-align: center;
+            padding: 15px;
+            background-color: white;
+            border-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .pipeline-step.active {
+            background-color: #e8f5e9;
+            border: 2px solid #4CAF50;
+        }
+        .arrow {
+            font-size: 24px;
+            color: #4CAF50;
+        }
+        .result-section {
+            background-color: #f9f9f9;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 10px 0;
+        }
+        .result-section h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        pre {
+            background-color: #f4f4f4;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+        }
+        .phoneme-output {
+            font-family: monospace;
+            font-size: 18px;
+            color: #2196F3;
+            padding: 10px;
+            background-color: #e3f2fd;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .performance-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            margin: 20px 0;
+        }
+        .perf-metric {
+            background-color: #f0f0f0;
+            padding: 10px;
+            border-radius: 4px;
+            text-align: center;
+        }
+        .perf-metric .value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #4CAF50;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>MeCab + OpenJTalk 統合テスト</h1>
+        
+        <div id="status" class="status loading">モジュールを初期化中...</div>
+        
+        <div class="pipeline">
+            <div id="step1" class="pipeline-step">
+                <h4>入力テキスト</h4>
+                <p>日本語テキスト</p>
+            </div>
+            <div class="arrow">→</div>
+            <div id="step2" class="pipeline-step">
+                <h4>MeCab</h4>
+                <p>形態素解析</p>
+            </div>
+            <div class="arrow">→</div>
+            <div id="step3" class="pipeline-step">
+                <h4>OpenJTalk</h4>
+                <p>音素変換</p>
+            </div>
+            <div class="arrow">→</div>
+            <div id="step4" class="pipeline-step">
+                <h4>出力</h4>
+                <p>音素列/PUA</p>
+            </div>
+        </div>
+        
+        <div class="input-group">
+            <label for="inputText">日本語テキストを入力:</label>
+            <textarea id="inputText" rows="3">こんにちは、今日は良い天気ですね。OpenJTalkで音素変換を行います。</textarea>
+        </div>
+        
+        <div>
+            <button id="processBtn" onclick="processText()" disabled>音素変換実行</button>
+            <button onclick="clearResults()">結果をクリア</button>
+        </div>
+        
+        <div class="performance-info">
+            <div class="perf-metric">
+                <div>MeCab初期化</div>
+                <div class="value" id="mecabInitTime">-</div>
+            </div>
+            <div class="perf-metric">
+                <div>OpenJTalk初期化</div>
+                <div class="value" id="openjtalkInitTime">-</div>
+            </div>
+            <div class="perf-metric">
+                <div>解析時間</div>
+                <div class="value" id="parseTime">-</div>
+            </div>
+            <div class="perf-metric">
+                <div>変換時間</div>
+                <div class="value" id="convertTime">-</div>
+            </div>
+        </div>
+        
+        <div id="results"></div>
+    </div>
+
+    <script type="module">
+        import MeCabCore from '../mecab/test/mecab-core-wrapper.js';
+        import OpenJTalkModule from '../build/openjtalk_wasm.js';
+        
+        let mecab = null;
+        let openjtalk = null;
+        let openjtalkModule = null;
+        
+        async function initialize() {
+            try {
+                updateStatus('MeCabを初期化中...', 'loading');
+                activateStep('step2');
+                
+                // Initialize MeCab
+                const mecabStartTime = performance.now();
+                mecab = new MeCabCore();
+                await mecab.initialize('../mecab/build/mecab_core_wasm.wasm');
+                const mecabInitTime = performance.now() - mecabStartTime;
+                document.getElementById('mecabInitTime').textContent = `${mecabInitTime.toFixed(2)}ms`;
+                
+                updateStatus('OpenJTalkを初期化中...', 'loading');
+                activateStep('step3');
+                
+                // Initialize OpenJTalk
+                const openjtalkStartTime = performance.now();
+                openjtalkModule = await OpenJTalkModule({
+                    locateFile: (filename) => {
+                        if (filename.endsWith('.wasm')) {
+                            return '../build/openjtalk_wasm.wasm';
+                        }
+                        return filename;
+                    }
+                });
+                
+                // Enable debug mode
+                if (openjtalkModule.setDebugMode) {
+                    openjtalkModule.setDebugMode(true);
+                }
+                
+                openjtalk = new openjtalkModule.OpenJTalk();
+                const success = openjtalk.initialize();
+                const openjtalkInitTime = performance.now() - openjtalkStartTime;
+                document.getElementById('openjtalkInitTime').textContent = `${openjtalkInitTime.toFixed(2)}ms`;
+                
+                if (success) {
+                    updateStatus('初期化完了！音素変換の準備ができました。', 'success');
+                    document.getElementById('processBtn').disabled = false;
+                    activateStep(null);
+                } else {
+                    throw new Error('OpenJTalk initialization failed');
+                }
+                
+            } catch (error) {
+                updateStatus(`初期化エラー: ${error.message}`, 'error');
+                console.error('Initialization error:', error);
+            }
+        }
+        
+        function updateStatus(message, type) {
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = message;
+            statusEl.className = `status ${type}`;
+        }
+        
+        function activateStep(stepId) {
+            document.querySelectorAll('.pipeline-step').forEach(step => {
+                step.classList.remove('active');
+            });
+            if (stepId) {
+                document.getElementById(stepId).classList.add('active');
+            }
+        }
+        
+        window.processText = async function() {
+            const text = document.getElementById('inputText').value;
+            if (!text) return;
+            
+            const resultsEl = document.getElementById('results');
+            resultsEl.innerHTML = '';
+            
+            try {
+                // Step 1: MeCab parsing
+                activateStep('step2');
+                const parseStartTime = performance.now();
+                const mecabOutput = mecab.parse(text);
+                const parseTime = performance.now() - parseStartTime;
+                document.getElementById('parseTime').textContent = `${parseTime.toFixed(2)}ms`;
+                
+                displayResult('MeCab解析結果', mecabOutput, 'pre');
+                
+                // Step 2: OpenJTalk conversion
+                activateStep('step3');
+                const convertStartTime = performance.now();
+                
+                // Get phonemes
+                const phonemes = openjtalk.processText(mecabOutput);
+                
+                // Get PUA encoded string
+                const puaString = openjtalk.processToPUA(mecabOutput);
+                
+                // Get NJD nodes for debugging
+                const njdNodes = openjtalk.getNJDNodes(mecabOutput);
+                
+                const convertTime = performance.now() - convertStartTime;
+                document.getElementById('convertTime').textContent = `${convertTime.toFixed(2)}ms`;
+                
+                // Display results
+                activateStep('step4');
+                
+                displayResult('音素列', phonemes, 'phoneme');
+                displayResult('PUA エンコード', puaString, 'pua');
+                
+                // Display NJD nodes
+                let njdHtml = '<table><tr><th>表層形</th><th>品詞</th><th>読み</th><th>発音</th><th>アクセント</th><th>モーラ数</th></tr>';
+                for (let i = 0; i < njdNodes.size(); i++) {
+                    const node = njdNodes.get(i);
+                    njdHtml += `<tr>
+                        <td>${node.string}</td>
+                        <td>${node.pos}</td>
+                        <td>${node.read}</td>
+                        <td>${node.pron}</td>
+                        <td>${node.acc}</td>
+                        <td>${node.mora_size}</td>
+                    </tr>`;
+                }
+                njdHtml += '</table>';
+                displayResult('NJDノード詳細', njdHtml, 'html');
+                
+                activateStep(null);
+                
+            } catch (error) {
+                displayResult('エラー', error.message, 'error');
+                console.error('Processing error:', error);
+            }
+        };
+        
+        function displayResult(title, content, type) {
+            const resultsEl = document.getElementById('results');
+            const section = document.createElement('div');
+            section.className = 'result-section';
+            
+            let html = `<h3>${title}</h3>`;
+            
+            switch (type) {
+                case 'pre':
+                    html += `<pre>${content}</pre>`;
+                    break;
+                case 'phoneme':
+                    html += `<div class="phoneme-output">${content || '(空)'}</div>`;
+                    break;
+                case 'pua':
+                    const puaDisplay = content ? 
+                        `${content} (${content.split('').map(c => '\\u' + c.charCodeAt(0).toString(16).toUpperCase().padStart(4, '0')).join(' ')})` : 
+                        '(空)';
+                    html += `<div class="phoneme-output">${puaDisplay}</div>`;
+                    break;
+                case 'html':
+                    html += content;
+                    break;
+                case 'error':
+                    html += `<div class="status error">${content}</div>`;
+                    break;
+                default:
+                    html += `<p>${content}</p>`;
+            }
+            
+            section.innerHTML = html;
+            resultsEl.appendChild(section);
+        }
+        
+        window.clearResults = function() {
+            document.getElementById('results').innerHTML = '';
+        };
+        
+        // Initialize on load
+        initialize();
+    </script>
+</body>
+</html>

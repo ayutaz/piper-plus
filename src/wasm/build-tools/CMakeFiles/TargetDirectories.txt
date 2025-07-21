@@ -1,0 +1,4 @@
+/Users/s19447/Desktop/total-piper/piper/src/wasm/build-tools/CMakeFiles/dict_compressor.dir
+/Users/s19447/Desktop/total-piper/piper/src/wasm/build-tools/CMakeFiles/generate_test_dict.dir
+/Users/s19447/Desktop/total-piper/piper/src/wasm/build-tools/CMakeFiles/edit_cache.dir
+/Users/s19447/Desktop/total-piper/piper/src/wasm/build-tools/CMakeFiles/rebuild_cache.dir

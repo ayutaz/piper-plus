@@ -19,6 +19,7 @@
 #include <cstring>
 #include <fstream>
 #include "error_handler.h"
+#include "../../common/compressed_dict_loader.h"
 
 namespace mecab {
 
@@ -164,6 +165,7 @@ private:
     std::unique_ptr<TrieNode> dictionary_trie;
     ConnectionMatrix connection_matrix;
     std::vector<DictionaryEntry> dictionary;
+    std::vector<DictionaryEntry> unknown_entries;  // Temporary storage for unknown tokens
     bool initialized;
     
     // Configuration
@@ -221,8 +223,8 @@ private:
         
         // If no tokens found, create unknown token
         if (results.empty() && start_pos < text.size()) {
-            Node* unk_node = new Node();
-            static DictionaryEntry unk_entry;
+            // Add unknown entry to dictionary temporarily
+            DictionaryEntry unk_entry;
             unk_entry.surface = UTF8Utils::fromCodePoints({text[start_pos]});
             unk_entry.left_id = 0;  // Unknown word ID
             unk_entry.right_id = 0;
@@ -231,12 +233,15 @@ private:
             // Parse unknown feature string
             std::stringstream ss(config.unk_feature);
             std::string feature;
-            unk_entry.features.clear();
             while (std::getline(ss, feature, ',')) {
                 unk_entry.features.push_back(feature);
             }
             
-            unk_node->entry = &unk_entry;
+            // Store in temporary unknown entries vector
+            unknown_entries.push_back(unk_entry);
+            
+            Node* unk_node = new Node();
+            unk_node->entry = &unknown_entries.back();
             unk_node->start_pos = start_pos;
             unk_node->end_pos = start_pos + 1;
             results.push_back(unk_node);
@@ -393,6 +398,9 @@ public:
                 return "EOS\n";
             }
             
+            // Clear temporary unknown entries
+            unknown_entries.clear();
+            
             auto codepoints = UTF8Utils::toCodePoints(text);
             auto path = viterbi(codepoints);
             
@@ -434,6 +442,9 @@ public:
             if (text.empty()) {
                 return "";
             }
+            
+            // Clear temporary unknown entries
+            unknown_entries.clear();
             
             auto codepoints = UTF8Utils::toCodePoints(text);
             auto path = viterbi(codepoints);

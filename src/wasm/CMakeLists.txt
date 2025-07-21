@@ -48,6 +48,8 @@ endif()
 
 # Add subdirectories
 add_subdirectory(cpp)
+add_subdirectory(mecab)
+add_subdirectory(openjtalk)
 
 # Create test executable
 if(BUILD_TESTS)

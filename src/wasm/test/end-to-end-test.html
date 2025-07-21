@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>End-to-End TTS Pipeline Test</title>
+    <style>
+        body {
+            font-family: 'Noto Sans JP', Arial, sans-serif;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            border-radius: 8px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            border-bottom: 3px solid #4CAF50;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #555;
+            margin-top: 30px;
+        }
+        .pipeline-flow {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin: 30px 0;
+            padding: 20px;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+        }
+        .pipeline-stage {
+            flex: 1;
+            text-align: center;
+            padding: 20px;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            position: relative;
+        }
+        .pipeline-stage.active {
+            background-color: #e8f5e9;
+            border: 2px solid #4CAF50;
+        }
+        .pipeline-stage.completed {
+            background-color: #c8e6c9;
+        }
+        .stage-icon {
+            font-size: 48px;
+            margin-bottom: 10px;
+        }
+        .stage-name {
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 5px;
+        }
+        .stage-status {
+            font-size: 12px;
+            color: #666;
+        }
+        .arrow {
+            font-size: 32px;
+            color: #4CAF50;
+            margin: 0 10px;
+        }
+        .input-section {
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        textarea {
+            width: 100%;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+            box-sizing: border-box;
+            resize: vertical;
+            min-height: 100px;
+        }
+        .button-group {
+            margin: 20px 0;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+        button:hover:not(:disabled) {
+            background-color: #45a049;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        button.secondary {
+            background-color: #2196F3;
+        }
+        button.secondary:hover:not(:disabled) {
+            background-color: #1976D2;
+        }
+        .output-section {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+        .output-card {
+            background-color: #f8f9fa;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 15px;
+        }
+        .output-card h3 {
+            margin-top: 0;
+            color: #333;
+            border-bottom: 2px solid #e0e0e0;
+            padding-bottom: 10px;
+        }
+        pre {
+            background-color: #f4f4f4;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            font-size: 14px;
+            margin: 10px 0;
+        }
+        .performance-metrics {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .metric {
+            background-color: #e3f2fd;
+            padding: 15px;
+            border-radius: 4px;
+            text-align: center;
+        }
+        .metric-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #1976D2;
+        }
+        .metric-label {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+        .status-message {
+            padding: 15px;
+            border-radius: 4px;
+            margin: 20px 0;
+            display: none;
+        }
+        .status-message.info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .status-message.success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status-message.error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .audio-controls {
+            margin: 20px 0;
+            padding: 20px;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            display: none;
+        }
+        audio {
+            width: 100%;
+            margin: 10px 0;
+        }
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #4CAF50;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-left: 10px;
+            vertical-align: middle;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎤 日本語音声合成パイプライン - エンドツーエンドテスト</h1>
+        
+        <div class="pipeline-flow">
+            <div id="stage-input" class="pipeline-stage">
+                <div class="stage-icon">📝</div>
+                <div class="stage-name">入力テキスト</div>
+                <div class="stage-status">準備完了</div>
+            </div>
+            <div class="arrow">→</div>
+            <div id="stage-mecab" class="pipeline-stage">
+                <div class="stage-icon">🔍</div>
+                <div class="stage-name">MeCab</div>
+                <div class="stage-status">形態素解析</div>
+            </div>
+            <div class="arrow">→</div>
+            <div id="stage-openjtalk" class="pipeline-stage">
+                <div class="stage-icon">🗣️</div>
+                <div class="stage-name">OpenJTalk</div>
+                <div class="stage-status">音素変換</div>
+            </div>
+            <div class="arrow">→</div>
+            <div id="stage-onnx" class="pipeline-stage">
+                <div class="stage-icon">🧠</div>
+                <div class="stage-name">ONNX Runtime</div>
+                <div class="stage-status">音声合成</div>
+            </div>
+            <div class="arrow">→</div>
+            <div id="stage-output" class="pipeline-stage">
+                <div class="stage-icon">🔊</div>
+                <div class="stage-name">音声出力</div>
+                <div class="stage-status">完了</div>
+            </div>
+        </div>
+        
+        <div id="status-message" class="status-message"></div>
+        
+        <div class="input-section">
+            <h2>入力テキスト</h2>
+            <textarea id="inputText" placeholder="日本語テキストを入力してください...">こんにちは、今日はとても良い天気ですね。WebAssemblyで動作する日本語音声合成システムのテストを行っています。</textarea>
+            
+            <div class="button-group">
+                <button id="synthesizeBtn" onclick="synthesize()" disabled>
+                    音声合成開始
+                </button>
+                <button class="secondary" onclick="loadSample('greeting')">
+                    挨拶サンプル
+                </button>
+                <button class="secondary" onclick="loadSample('weather')">
+                    天気サンプル
+                </button>
+                <button class="secondary" onclick="loadSample('technical')">
+                    技術説明サンプル
+                </button>
+                <button class="secondary" onclick="clearAll()">
+                    クリア
+                </button>
+            </div>
+        </div>
+        
+        <div class="performance-metrics">
+            <div class="metric">
+                <div class="metric-value" id="mecabTime">-</div>
+                <div class="metric-label">MeCab処理</div>
+            </div>
+            <div class="metric">
+                <div class="metric-value" id="openjtalkTime">-</div>
+                <div class="metric-label">OpenJTalk処理</div>
+            </div>
+            <div class="metric">
+                <div class="metric-value" id="onnxTime">-</div>
+                <div class="metric-label">ONNX推論</div>
+            </div>
+            <div class="metric">
+                <div class="metric-value" id="totalTime">-</div>
+                <div class="metric-label">合計時間</div>
+            </div>
+            <div class="metric">
+                <div class="metric-value" id="rtf">-</div>
+                <div class="metric-label">RTF</div>
+            </div>
+            <div class="metric">
+                <div class="metric-value" id="memoryUsage">-</div>
+                <div class="metric-label">メモリ使用量</div>
+            </div>
+        </div>
+        
+        <div class="output-section">
+            <div class="output-card">
+                <h3>MeCab解析結果</h3>
+                <pre id="mecabOutput">解析結果がここに表示されます...</pre>
+            </div>
+            
+            <div class="output-card">
+                <h3>音素列</h3>
+                <pre id="phonemeOutput">音素列がここに表示されます...</pre>
+            </div>
+            
+            <div class="output-card">
+                <h3>PUAエンコード</h3>
+                <pre id="puaOutput">PUAエンコードがここに表示されます...</pre>
+            </div>
+            
+            <div class="output-card">
+                <h3>ONNX入力</h3>
+                <pre id="onnxInput">ONNX入力データがここに表示されます...</pre>
+            </div>
+        </div>
+        
+        <div id="audioControls" class="audio-controls">
+            <h3>🔊 合成音声</h3>
+            <audio id="audioPlayer" controls></audio>
+            <div>
+                <button onclick="downloadAudio()">音声をダウンロード</button>
+                <span id="audioInfo" style="margin-left: 20px; color: #666;"></span>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import MeCabCore from '../mecab/test/mecab-core-wrapper.js';
+        import OpenJTalkModule from '../build/openjtalk_wasm.js';
+        
+        // Global instances
+        let mecab = null;
+        let openjtalk = null;
+        let isInitialized = false;
+        
+        // Sample texts
+        const sampleTexts = {
+            greeting: 'こんにちは、お元気ですか？今日も一日頑張りましょう！',
+            weather: '今日は晴れて、気温は２５度まで上がるでしょう。洗濯物もよく乾きそうです。',
+            technical: 'WebAssemblyは、ウェブブラウザで高速に実行可能なバイナリ形式です。JavaScriptと連携して動作します。'
+        };
+        
+        // Pipeline stages
+        const stages = ['input', 'mecab', 'openjtalk', 'onnx', 'output'];
+        
+        function setStageStatus(stage, status) {
+            stages.forEach(s => {
+                const el = document.getElementById(`stage-${s}`);
+                el.classList.remove('active', 'completed');
+            });
+            
+            const stageEl = document.getElementById(`stage-${stage}`);
+            if (status === 'active') {
+                stageEl.classList.add('active');
+            } else if (status === 'completed') {
+                stageEl.classList.add('completed');
+            }
+        }
+        
+        function showStatus(message, type = 'info') {
+            const statusEl = document.getElementById('status-message');
+            statusEl.textContent = message;
+            statusEl.className = `status-message ${type}`;
+            statusEl.style.display = 'block';
+            
+            if (type === 'success') {
+                setTimeout(() => {
+                    statusEl.style.display = 'none';
+                }, 5000);
+            }
+        }
+        
+        async function initialize() {
+            try {
+                showStatus('システムを初期化中...', 'info');
+                
+                // Initialize MeCab
+                mecab = new MeCabCore();
+                await mecab.initialize('../mecab/build/mecab_core_wasm.wasm');
+                
+                // Initialize OpenJTalk
+                const openjtalkModule = await OpenJTalkModule({
+                    locateFile: (filename) => {
+                        if (filename.endsWith('.wasm')) {
+                            return '../build/openjtalk_wasm.wasm';
+                        }
+                        return filename;
+                    }
+                });
+                
+                openjtalk = new openjtalkModule.OpenJTalk();
+                const success = openjtalk.initialize();
+                
+                if (success) {
+                    isInitialized = true;
+                    document.getElementById('synthesizeBtn').disabled = false;
+                    showStatus('システムの初期化が完了しました！', 'success');
+                } else {
+                    throw new Error('OpenJTalk initialization failed');
+                }
+                
+            } catch (error) {
+                showStatus(`初期化エラー: ${error.message}`, 'error');
+                console.error('Initialization error:', error);
+            }
+        }
+        
+        window.synthesize = async function() {
+            if (!isInitialized) return;
+            
+            const text = document.getElementById('inputText').value.trim();
+            if (!text) {
+                showStatus('テキストを入力してください', 'error');
+                return;
+            }
+            
+            const synthesizeBtn = document.getElementById('synthesizeBtn');
+            synthesizeBtn.disabled = true;
+            synthesizeBtn.innerHTML = '処理中... <span class="loading-spinner"></span>';
+            
+            const metrics = {
+                mecabTime: 0,
+                openjtalkTime: 0,
+                onnxTime: 0,
+                totalTime: 0
+            };
+            
+            try {
+                const totalStart = performance.now();
+                
+                // Stage 1: MeCab
+                setStageStatus('mecab', 'active');
+                showStatus('形態素解析を実行中...', 'info');
+                const mecabStart = performance.now();
+                const mecabOutput = mecab.parse(text);
+                metrics.mecabTime = performance.now() - mecabStart;
+                document.getElementById('mecabOutput').textContent = mecabOutput;
+                setStageStatus('mecab', 'completed');
+                
+                // Stage 2: OpenJTalk
+                setStageStatus('openjtalk', 'active');
+                showStatus('音素変換を実行中...', 'info');
+                const openjtalkStart = performance.now();
+                const phonemes = openjtalk.processText(mecabOutput);
+                const puaString = openjtalk.processToPUA(mecabOutput);
+                metrics.openjtalkTime = performance.now() - openjtalkStart;
+                
+                document.getElementById('phonemeOutput').textContent = phonemes || '(空)';
+                document.getElementById('puaOutput').textContent = puaString ? 
+                    `${puaString}\n\n${puaString.split('').map(c => '\\u' + c.charCodeAt(0).toString(16).toUpperCase().padStart(4, '0')).join(' ')}` : 
+                    '(空)';
+                setStageStatus('openjtalk', 'completed');
+                
+                // Stage 3: ONNX (Mock)
+                setStageStatus('onnx', 'active');
+                showStatus('音声合成を実行中...', 'info');
+                const onnxStart = performance.now();
+                
+                // Mock ONNX processing
+                await new Promise(resolve => setTimeout(resolve, 500));
+                const mockOnnxInput = {
+                    phoneme_ids: puaString.split('').map(c => c.charCodeAt(0) - 0xE000),
+                    length_scale: 1.0,
+                    noise_scale: 0.667,
+                    noise_w: 0.8
+                };
+                document.getElementById('onnxInput').textContent = JSON.stringify(mockOnnxInput, null, 2);
+                
+                // Generate mock audio
+                const sampleRate = 22050;
+                const duration = 3; // seconds
+                const audioBuffer = new Float32Array(sampleRate * duration);
+                
+                // Simple sine wave for testing
+                for (let i = 0; i < audioBuffer.length; i++) {
+                    audioBuffer[i] = 0.1 * Math.sin(2 * Math.PI * 440 * i / sampleRate);
+                }
+                
+                metrics.onnxTime = performance.now() - onnxStart;
+                setStageStatus('onnx', 'completed');
+                
+                // Stage 4: Output
+                setStageStatus('output', 'active');
+                showStatus('音声を生成中...', 'info');
+                
+                // Create audio blob
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const buffer = audioContext.createBuffer(1, audioBuffer.length, sampleRate);
+                buffer.copyToChannel(audioBuffer, 0);
+                
+                // Convert to WAV
+                const wavBlob = await audioBufferToWav(buffer);
+                const audioUrl = URL.createObjectURL(wavBlob);
+                
+                document.getElementById('audioPlayer').src = audioUrl;
+                document.getElementById('audioControls').style.display = 'block';
+                document.getElementById('audioInfo').textContent = 
+                    `サンプルレート: ${sampleRate}Hz, 長さ: ${duration}秒`;
+                
+                setStageStatus('output', 'completed');
+                
+                // Update metrics
+                metrics.totalTime = performance.now() - totalStart;
+                document.getElementById('mecabTime').textContent = `${metrics.mecabTime.toFixed(1)}ms`;
+                document.getElementById('openjtalkTime').textContent = `${metrics.openjtalkTime.toFixed(1)}ms`;
+                document.getElementById('onnxTime').textContent = `${metrics.onnxTime.toFixed(1)}ms`;
+                document.getElementById('totalTime').textContent = `${metrics.totalTime.toFixed(1)}ms`;
+                document.getElementById('rtf').textContent = (metrics.totalTime / (duration * 1000)).toFixed(3);
+                
+                // Memory usage (mock)
+                if (performance.memory) {
+                    const mb = performance.memory.usedJSHeapSize / 1024 / 1024;
+                    document.getElementById('memoryUsage').textContent = `${mb.toFixed(1)}MB`;
+                } else {
+                    document.getElementById('memoryUsage').textContent = 'N/A';
+                }
+                
+                showStatus('音声合成が完了しました！', 'success');
+                
+            } catch (error) {
+                showStatus(`エラー: ${error.message}`, 'error');
+                console.error('Synthesis error:', error);
+            } finally {
+                synthesizeBtn.disabled = false;
+                synthesizeBtn.innerHTML = '音声合成開始';
+            }
+        };
+        
+        // Convert AudioBuffer to WAV blob
+        async function audioBufferToWav(buffer) {
+            const length = buffer.length * buffer.numberOfChannels * 2 + 44;
+            const arrayBuffer = new ArrayBuffer(length);
+            const view = new DataView(arrayBuffer);
+            const channels = [];
+            let offset = 0;
+            let pos = 0;
+            
+            // Write WAV header
+            const setUint16 = (data) => {
+                view.setUint16(pos, data, true);
+                pos += 2;
+            };
+            const setUint32 = (data) => {
+                view.setUint32(pos, data, true);
+                pos += 4;
+            };
+            
+            // RIFF identifier
+            setUint32(0x46464952);
+            // File length
+            setUint32(length - 8);
+            // RIFF type
+            setUint32(0x45564157);
+            // Format chunk identifier
+            setUint32(0x20746d66);
+            // Format chunk length
+            setUint32(16);
+            // Sample format (PCM)
+            setUint16(1);
+            // Channel count
+            setUint16(buffer.numberOfChannels);
+            // Sample rate
+            setUint32(buffer.sampleRate);
+            // Byte rate
+            setUint32(buffer.sampleRate * buffer.numberOfChannels * 2);
+            // Block align
+            setUint16(buffer.numberOfChannels * 2);
+            // Bits per sample
+            setUint16(16);
+            // Data chunk identifier
+            setUint32(0x61746164);
+            // Data chunk length
+            setUint32(length - pos - 4);
+            
+            // Write interleaved data
+            for (let i = 0; i < buffer.numberOfChannels; i++) {
+                channels.push(buffer.getChannelData(i));
+            }
+            
+            while (pos < length) {
+                for (let i = 0; i < buffer.numberOfChannels; i++) {
+                    let sample = channels[i][offset] * 0x7FFF;
+                    sample = Math.max(-0x8000, Math.min(0x7FFF, sample));
+                    view.setInt16(pos, sample, true);
+                    pos += 2;
+                }
+                offset++;
+            }
+            
+            return new Blob([arrayBuffer], { type: 'audio/wav' });
+        }
+        
+        window.loadSample = function(type) {
+            document.getElementById('inputText').value = sampleTexts[type];
+        };
+        
+        window.clearAll = function() {
+            document.getElementById('inputText').value = '';
+            document.getElementById('mecabOutput').textContent = '解析結果がここに表示されます...';
+            document.getElementById('phonemeOutput').textContent = '音素列がここに表示されます...';
+            document.getElementById('puaOutput').textContent = 'PUAエンコードがここに表示されます...';
+            document.getElementById('onnxInput').textContent = 'ONNX入力データがここに表示されます...';
+            document.getElementById('audioControls').style.display = 'none';
+            document.getElementById('status-message').style.display = 'none';
+            
+            // Reset stages
+            stages.forEach(s => {
+                const el = document.getElementById(`stage-${s}`);
+                el.classList.remove('active', 'completed');
+            });
+        };
+        
+        window.downloadAudio = function() {
+            const audio = document.getElementById('audioPlayer');
+            if (audio.src) {
+                const a = document.createElement('a');
+                a.href = audio.src;
+                a.download = `synthesized_${Date.now()}.wav`;
+                a.click();
+            }
+        };
+        
+        // Initialize on load
+        initialize();
+    </script>
+</body>
+</html>
