@@ -31,20 +31,17 @@ def check_ffmpeg_availability():
             except RuntimeError:
                 continue
         # If all versions fail, it means no FFmpeg is available
-        raise RuntimeError("No FFmpeg version available")
+        return False, (
+            "FFmpeg libraries are not available. This limits some audio augmentation features.\n"
+            "Core training functionality (including F0 Predictor) will work normally.\n"
+            "To enable full audio augmentation, install FFmpeg:\n"
+            "  Ubuntu/Debian: sudo apt-get install ffmpeg libavcodec-dev libavformat-dev libavutil-dev\n"
+            "  CentOS/RHEL: sudo yum install ffmpeg-devel\n"
+            "  macOS: brew install ffmpeg\n"
+            "  Or use conda: conda install ffmpeg"
+        )
     except ImportError:
         return False, "torio package is not installed. Install with: pip install torio"
-    except RuntimeError as e:
-        if "FFmpeg" in str(e) and "extension is not available" in str(e):
-            return False, (
-                "FFmpeg libraries are not available. This is required for F0 Predictor and audio augmentation features.\n"
-                "Please install FFmpeg:\n"
-                "  Ubuntu/Debian: sudo apt-get install ffmpeg libavcodec-dev libavformat-dev libavutil-dev\n"
-                "  CentOS/RHEL: sudo yum install ffmpeg-devel\n"
-                "  macOS: brew install ffmpeg\n"
-                "  Or use conda: conda install ffmpeg"
-            )
-        return False, f"Unknown FFmpeg error: {e}"
     except Exception as e:
         return False, f"Unexpected error checking FFmpeg: {e}"
 
@@ -73,8 +70,7 @@ def main():
     if not ffmpeg_available:
         _LOGGER.warning("FFmpeg availability check failed:")
         _LOGGER.warning(ffmpeg_error)
-        _LOGGER.warning("Some features (F0 Predictor, audio augmentation) may be limited, but training can continue.")
-        _LOGGER.info("Proceeding with training - install FFmpeg for full feature support")
+        _LOGGER.info("Proceeding with training - core functionality including F0 Predictor will work normally")
     else:
         _LOGGER.info("FFmpeg libraries are available - F0 Predictor and audio augmentation features enabled")
 
