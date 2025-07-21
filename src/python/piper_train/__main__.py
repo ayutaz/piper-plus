@@ -1,6 +1,7 @@
 import argparse
 import json
 import logging
+import sys
 from pathlib import Path
 
 import torch
@@ -11,6 +12,35 @@ from .vits.ema import EMACallback
 from .vits.lightning import VitsModel
 
 _LOGGER = logging.getLogger(__package__)
+
+
+def check_ffmpeg_availability():
+    """Check if FFmpeg libraries are available for torio.
+    
+    Returns:
+        bool: True if FFmpeg is available, False otherwise
+        str: Error message if FFmpeg is not available, None otherwise
+    """
+    try:
+        import torio
+        # Try to access FFmpeg functionality
+        torio._extension.utils._find_ffmpeg_extension()
+        return True, None
+    except ImportError:
+        return False, "torio package is not installed. Install with: pip install torio"
+    except RuntimeError as e:
+        if "FFmpeg" in str(e) and "extension is not available" in str(e):
+            return False, (
+                "FFmpeg libraries are not available. This is required for F0 Predictor and audio augmentation features.\n"
+                "Please install FFmpeg:\n"
+                "  Ubuntu/Debian: sudo apt-get install ffmpeg libavcodec-dev libavformat-dev libavutil-dev\n"
+                "  CentOS/RHEL: sudo yum install ffmpeg-devel\n"
+                "  macOS: brew install ffmpeg\n"
+                "  Or use conda: conda install ffmpeg"
+            )
+        return False, f"Unknown FFmpeg error: {e}"
+    except Exception as e:
+        return False, f"Unexpected error checking FFmpeg: {e}"
 
 
 def calculate_effective_batch_size(batch_size, num_gpus=1):
@@ -31,6 +61,16 @@ def get_optimal_num_workers(num_gpus=1):
 
 def main():
     logging.basicConfig(level=logging.DEBUG)
+    
+    # Early FFmpeg availability check
+    ffmpeg_available, ffmpeg_error = check_ffmpeg_availability()
+    if not ffmpeg_available:
+        _LOGGER.error("FFmpeg availability check failed:")
+        _LOGGER.error(ffmpeg_error)
+        _LOGGER.error("Training cannot continue without FFmpeg support.")
+        sys.exit(1)
+    else:
+        _LOGGER.info("FFmpeg libraries are available - F0 Predictor and audio augmentation features enabled")
 
     parser = argparse.ArgumentParser()
     parser.add_argument(
