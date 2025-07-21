@@ -59,19 +59,19 @@ All planned v2 branch improvements have been successfully implemented and integr
   - Tag questions: `?~` marker
 - **Pattern-based detection for Japanese question types**
 
-### 4. Data Augmentation ✅
-- **Status**: Fully implemented and integrated
+### 4. Data Augmentation ⚠️
+- **Status**: Mostly implemented (4/5 features working)
 - **Files**:
   - `src/python/piper_train/vits/augmentation.py` - Augmentation implementations
   - `src/python/piper_train/vits/lightning.py` - Training integration
   - `src/python/piper_train/vits/dataset.py` - Dataset collate function updates
-- **Features**:
-  - SpecAugment (frequency and time masking)
-  - Speed perturbation (0.9-1.1x)
-  - Pitch shifting (±2 semitones)
-  - Phoneme dropout and substitution
-  - MixUp augmentation
-  - Waveform-level augmentations
+- **Working Features**:
+  - ✅ SpecAugment (frequency and time masking)
+  - ✅ Speed perturbation (0.9-1.1x)
+  - ✅ Pitch shifting (±2 semitones)
+  - ✅ Phoneme dropout and substitution
+- **Not Working**:
+  - ❌ MixUp augmentation (implemented but disabled due to gradient computation issues with manual optimization)
 
 ### 5. Duration Regularization ✅
 - **Status**: Fully implemented and integrated

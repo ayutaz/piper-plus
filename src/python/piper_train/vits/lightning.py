@@ -136,9 +136,11 @@ class VitsModel(pl.LightningModule):
         # Multi-resolution STFT loss
         self.stft_loss = MultiResolutionSTFTLoss()
         
-        # MixUp augmentation (disabled due to gradient issues)
-        # TODO: Fix MixUp implementation for proper gradient flow
-        self.mixup = None  # MixUp(alpha=0.2, prob=0.5) if self.training else None
+        # MixUp augmentation
+        # Note: MixUp requires special handling in manual optimization mode
+        # Currently disabled pending proper implementation for VITS dual-optimizer setup
+        self.mixup = None
+        self.use_mixup = False  # Feature flag for future implementation
 
         # Dataset splits
         self._train_dataset: Dataset | None = None
