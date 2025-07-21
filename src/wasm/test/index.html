@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Piper WebAssembly Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .result {
+            background-color: #f0f0f0;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 3px;
+            font-family: monospace;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            cursor: pointer;
+        }
+        #status {
+            font-weight: bold;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>Piper WebAssembly Test Page</h1>
+    
+    <div id="status">Loading WebAssembly module...</div>
+    
+    <div class="test-section">
+        <h2>Basic Function Test</h2>
+        <input type="text" id="nameInput" placeholder="Enter your name" value="World">
+        <button onclick="testGreet()">Test Greet Function</button>
+        <div id="greetResult" class="result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>Japanese Text Test</h2>
+        <input type="text" id="japaneseInput" placeholder="日本語を入力" value="こんにちは世界">
+        <button onclick="testJapanese()">Test Japanese Processing</button>
+        <div id="japaneseResult" class="result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>Memory Test</h2>
+        <button onclick="testMemory()">Test Memory Allocation</button>
+        <div id="memoryResult" class="result"></div>
+    </div>
+
+    <script type="module">
+        let Module;
+        
+        // Load WebAssembly module
+        import('./hello_wasm.js').then(module => {
+            module.default().then(instance => {
+                Module = instance;
+                document.getElementById('status').textContent = 'WebAssembly module loaded successfully!';
+                document.getElementById('status').style.color = 'green';
+                
+                // Make functions available globally
+                window.Module = Module;
+            });
+        }).catch(error => {
+            document.getElementById('status').textContent = 'Error loading WebAssembly: ' + error;
+            document.getElementById('status').style.color = 'red';
+        });
+        
+        // Test functions
+        window.testGreet = function() {
+            if (!Module) {
+                alert('Module not loaded yet!');
+                return;
+            }
+            
+            const name = document.getElementById('nameInput').value;
+            const result = Module.greet(name);
+            document.getElementById('greetResult').textContent = result;
+        };
+        
+        window.testJapanese = function() {
+            if (!Module) {
+                alert('Module not loaded yet!');
+                return;
+            }
+            
+            const text = document.getElementById('japaneseInput').value;
+            const result = Module.processJapanese(text);
+            document.getElementById('japaneseResult').textContent = result;
+        };
+        
+        window.testMemory = function() {
+            if (!Module) {
+                alert('Module not loaded yet!');
+                return;
+            }
+            
+            try {
+                const size = 1000;
+                const result = Module.testMemory(size);
+                document.getElementById('memoryResult').textContent = result;
+            } catch (error) {
+                document.getElementById('memoryResult').textContent = 'Error: ' + error;
+            }
+        };
+    </script>
+</body>
+</html>

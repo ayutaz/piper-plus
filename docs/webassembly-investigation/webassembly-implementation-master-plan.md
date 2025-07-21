@@ -2,6 +2,21 @@
 
 最終更新: 2025-07-21
 
+## 📋 進捗状況
+
+### 完了タスク
+- ✅ **Task 0.1**: 開発環境構築 (2025-07-21)
+  - Emscripten SDK 4.0.11 セットアップ完了
+  - WebAssemblyビルド環境構築
+  - ブラウザテスト環境整備
+  - CI/CDパイプライン設定
+
+### 現在のブランチ
+- `task/0.1-dev-environment`
+
+### 次のタスク
+- **Task 0.2**: MeCab WebAssembly実装確認
+
 ## 概要
 
 このドキュメントは、piper-plusのWebAssembly対応における統合実装計画です。日本語TTSを最優先とし、Unity WebGLでの動作を前提としています。

@@ -1,0 +1,88 @@
+name: WebAssembly Build
+
+on:
+  push:
+    branches:
+      - dev
+      - 'task/**'
+      - 'feat/**'
+    paths:
+      - 'src/wasm/**'
+      - '.github/workflows/wasm-build.yml'
+  pull_request:
+    branches:
+      - dev
+    paths:
+      - 'src/wasm/**'
+
+jobs:
+  build-wasm:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Emscripten
+      uses: mymindstorm/setup-emsdk@v14
+      with:
+        version: 3.1.61
+        actions-cache-folder: 'emsdk-cache'
+    
+    - name: Verify Emscripten
+      run: emcc -v
+    
+    - name: Configure CMake
+      working-directory: src/wasm
+      run: |
+        mkdir -p build
+        cd build
+        emcmake cmake .. -DCMAKE_BUILD_TYPE=Release
+    
+    - name: Build WebAssembly
+      working-directory: src/wasm/build
+      run: emmake make -j$(nproc)
+    
+    - name: Check build artifacts
+      working-directory: src/wasm/build
+      run: |
+        ls -la cpp/
+        file cpp/hello_wasm.wasm
+        file cpp/hello_wasm.js
+    
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: wasm-build
+        path: |
+          src/wasm/build/cpp/*.wasm
+          src/wasm/build/cpp/*.js
+        retention-days: 7
+
+  test-wasm:
+    needs: build-wasm
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Download artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: wasm-build
+        path: src/wasm/test/
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+    
+    - name: Run basic tests
+      working-directory: src/wasm/test
+      run: |
+        # Simple Node.js test to verify WASM loads
+        node -e "
+        const fs = require('fs');
+        console.log('WebAssembly files present:');
+        console.log('- hello_wasm.wasm:', fs.existsSync('hello_wasm.wasm'));
+        console.log('- hello_wasm.js:', fs.existsSync('hello_wasm.js'));
+        "

@@ -2,6 +2,16 @@
 
 最終更新: 2025-07-21
 
+## 🚀 実装進捗
+
+### Task 0.1: 開発環境構築 ✅ **完了** (2025-07-21)
+- Emscripten SDK 4.0.11 インストール完了
+- CMake設定ファイル（Chrome最適化）作成
+- サンプルWebAssemblyプロジェクトのビルド成功
+- ブラウザテスト環境構築完了
+- GitHub Actions CI/CD設定完了
+- 日本語UTF-8文字列処理の動作確認済み
+
 ## 概要
 
 piper-plusプロジェクトのWebAssembly対応（[Issue #106](https://github.com/ayutaz/piper-plus/issues/106)）に関する包括的な技術調査と実装計画です。日本語TTSを最優先とし、Unity WebGLでの動作を前提としています。
@@ -75,11 +85,17 @@ piper-plusプロジェクトのWebAssembly対応（[Issue #106](https://github.c
 - [test-strategy.md](./test-strategy.md) - テスト戦略
 - [error-handling-strategy.md](./error-handling-strategy.md) - エラーハンドリング
 
+## 現在のステータス
+
+- **現在のブランチ**: `task/0.1-dev-environment`
+- **完了タスク**: Task 0.1 (開発環境構築)
+- **次のタスク**: Task 0.2 (MeCab WebAssembly実装確認)
+
 ## 次のステップ
 
-1. **Phase 0 開始**: OpenJTalk WebAssembly移植の実現性検証
-2. **最小辞書プロトタイプ**: 1000語での動作確認
-3. **Unity WebGLメモリ測定**: 実環境でのメモリ使用量確認
+1. **Task 0.2**: MeCab WebAssembly実装の既存実装確認とテスト
+2. **Task 0.3**: ONNX Runtime Webの基本動作確認
+3. **Task 0.4**: OpenJTalk移植アプローチの検討
 
 ## 関連リンク
 

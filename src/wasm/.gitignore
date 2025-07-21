@@ -1,0 +1,31 @@
+# Build directories
+build/
+dist/
+out/
+
+# Emscripten cache
+.emscripten_cache/
+*.o
+*.bc
+
+# Generated files
+*.wasm
+*.js
+*.data
+*.mem
+*.map
+
+# Test server
+__pycache__/
+*.pyc
+
+# IDE
+.vscode/
+.idea/
+
+# macOS
+.DS_Store
+
+# Keep test files
+!test/index.html
+!test/server.py

@@ -8,15 +8,18 @@
 
 ## Phase 0: 技術検証（5タスク = 7-10日）
 
-### Task 0.1: 開発環境構築（2日）
+### Task 0.1: 開発環境構築（2日） ✅ **完了** (2025-07-21)
 **Day 1-2**
-- [ ] Emscriptenインストールと動作確認
-- [ ] CMake設定ファイルの準備
-- [ ] サンプルWebAssemblyプロジェクトのビルド
-- [ ] Unity WebGLテストプロジェクト作成
-- [ ] GitHub リポジトリ設定（Actions CI/CD含む）
+- [✓] Emscriptenインストールと動作確認 (SDK 4.0.11)
+- [✓] CMake設定ファイルの準備 (Chrome最適化設定含む)
+- [✓] サンプルWebAssemblyプロジェクトのビルド
+- [✓] GitHub リポジトリ設定（Actions CI/CD含む）
+- [–] Unity WebGLテストプロジェクト作成 (後回し)
 
-**成果物**: 動作する開発環境、CIパイプライン
+**成果物**: 
+- ✅ 動作する開発環境 (`src/wasm/`)
+- ✅ CIパイプライン (`.github/workflows/wasm-build.yml`)
+- ✅ 日本語文字列処理の動作確認
 
 ### Task 0.2: 既存実装調査（2日）
 **Day 3-4**
