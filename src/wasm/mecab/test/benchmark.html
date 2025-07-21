@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MeCab WebAssembly Benchmark</title>
+    <style>
+        body {
+            font-family: 'Noto Sans JP', Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            border-radius: 8px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            border-bottom: 3px solid #4CAF50;
+            padding-bottom: 10px;
+        }
+        .metric {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px;
+            margin: 5px 0;
+            background-color: #f9f9f9;
+            border-radius: 4px;
+        }
+        .metric-name {
+            font-weight: bold;
+        }
+        .metric-value {
+            font-family: monospace;
+            color: #4CAF50;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        .progress {
+            width: 100%;
+            height: 20px;
+            background-color: #f0f0f0;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        .progress-bar {
+            height: 100%;
+            background-color: #4CAF50;
+            width: 0%;
+            transition: width 0.3s;
+        }
+        .chart-container {
+            margin: 20px 0;
+            height: 300px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #4CAF50;
+            color: white;
+        }
+        .warning {
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>MeCab WebAssembly ベンチマーク</h1>
+        
+        <div class="warning">
+            ⚠️ 正確な測定のため、他のタブを閉じて、Chrome DevToolsのPerformanceタブも併用してください。
+        </div>
+
+        <!-- 初期化ベンチマーク -->
+        <div class="test-section">
+            <h2>初期化パフォーマンス</h2>
+            <button id="initBenchBtn" onclick="runInitBenchmark()">初期化ベンチマーク実行</button>
+            <div class="progress">
+                <div id="initProgress" class="progress-bar"></div>
+            </div>
+            <div id="initResults"></div>
+        </div>
+
+        <!-- 解析パフォーマンス -->
+        <div class="test-section">
+            <h2>解析パフォーマンス</h2>
+            <label>テキスト長: 
+                <select id="textLength">
+                    <option value="10">10文字</option>
+                    <option value="50">50文字</option>
+                    <option value="100" selected>100文字</option>
+                    <option value="500">500文字</option>
+                    <option value="1000">1000文字</option>
+                </select>
+            </label>
+            <label>反復回数: 
+                <select id="iterations">
+                    <option value="10">10回</option>
+                    <option value="100" selected>100回</option>
+                    <option value="1000">1000回</option>
+                </select>
+            </label>
+            <button id="parseBenchBtn" onclick="runParseBenchmark()" disabled>解析ベンチマーク実行</button>
+            <div class="progress">
+                <div id="parseProgress" class="progress-bar"></div>
+            </div>
+            <div id="parseResults"></div>
+        </div>
+
+        <!-- メモリ使用量 -->
+        <div class="test-section">
+            <h2>メモリ使用量</h2>
+            <button onclick="measureMemory()">メモリ測定</button>
+            <div id="memoryResults"></div>
+        </div>
+
+        <!-- 詳細結果 -->
+        <div class="test-section">
+            <h2>詳細結果</h2>
+            <table id="resultsTable" style="display:none;">
+                <thead>
+                    <tr>
+                        <th>測定項目</th>
+                        <th>最小値 (ms)</th>
+                        <th>平均値 (ms)</th>
+                        <th>最大値 (ms)</th>
+                        <th>標準偏差</th>
+                    </tr>
+                </thead>
+                <tbody id="resultsBody"></tbody>
+            </table>
+        </div>
+
+        <!-- システム情報 -->
+        <div class="test-section">
+            <h2>システム情報</h2>
+            <div id="systemInfo"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        import MeCabWrapper from '../mecab-wrapper.js';
+        
+        let mecab = null;
+        let results = {
+            initialization: [],
+            parsing: {},
+            memory: {}
+        };
+
+        // システム情報を表示
+        function displaySystemInfo() {
+            const info = {
+                'User Agent': navigator.userAgent,
+                'プラットフォーム': navigator.platform,
+                'CPU コア数': navigator.hardwareConcurrency || 'N/A',
+                'メモリ': navigator.deviceMemory ? `${navigator.deviceMemory} GB` : 'N/A',
+                'ブラウザ言語': navigator.language,
+                '画面解像度': `${screen.width} x ${screen.height}`,
+                'タイムゾーン': Intl.DateTimeFormat().resolvedOptions().timeZone
+            };
+
+            const container = document.getElementById('systemInfo');
+            container.innerHTML = Object.entries(info)
+                .map(([key, value]) => `<div class="metric"><span class="metric-name">${key}:</span><span class="metric-value">${value}</span></div>`)
+                .join('');
+        }
+
+        // 高精度タイマー
+        function measureTime(fn) {
+            const start = performance.now();
+            const result = fn();
+            const end = performance.now();
+            return { result, time: end - start };
+        }
+
+        // 非同期関数用の高精度タイマー
+        async function measureTimeAsync(fn) {
+            const start = performance.now();
+            const result = await fn();
+            const end = performance.now();
+            return { result, time: end - start };
+        }
+
+        // 統計計算
+        function calculateStats(values) {
+            const n = values.length;
+            const mean = values.reduce((a, b) => a + b, 0) / n;
+            const variance = values.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / n;
+            const stdDev = Math.sqrt(variance);
+            const min = Math.min(...values);
+            const max = Math.max(...values);
+            
+            return { mean, stdDev, min, max };
+        }
+
+        // 初期化ベンチマーク
+        window.runInitBenchmark = async function() {
+            const btn = document.getElementById('initBenchBtn');
+            btn.disabled = true;
+            
+            const iterations = 10;
+            const times = [];
+            const progressBar = document.getElementById('initProgress');
+            
+            for (let i = 0; i < iterations; i++) {
+                // 既存インスタンスをクリーンアップ
+                if (mecab) {
+                    mecab.dispose();
+                    mecab = null;
+                }
+                
+                // ガベージコレクションを促す
+                await new Promise(resolve => setTimeout(resolve, 100));
+                
+                const { time } = await measureTimeAsync(async () => {
+                    mecab = new MeCabWrapper();
+                    return await mecab.initialize('../dist/mecab_wasm.wasm');
+                });
+                
+                times.push(time);
+                progressBar.style.width = `${((i + 1) / iterations) * 100}%`;
+            }
+            
+            const stats = calculateStats(times);
+            results.initialization = times;
+            
+            const resultsDiv = document.getElementById('initResults');
+            resultsDiv.innerHTML = `
+                <h3>初期化時間統計</h3>
+                <div class="metric">
+                    <span class="metric-name">平均初期化時間:</span>
+                    <span class="metric-value">${stats.mean.toFixed(2)} ms</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-name">最小値:</span>
+                    <span class="metric-value">${stats.min.toFixed(2)} ms</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-name">最大値:</span>
+                    <span class="metric-value">${stats.max.toFixed(2)} ms</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-name">標準偏差:</span>
+                    <span class="metric-value">${stats.stdDev.toFixed(2)} ms</span>
+                </div>
+            `;
+            
+            btn.disabled = false;
+            document.getElementById('parseBenchBtn').disabled = false;
+            
+            updateResultsTable();
+        };
+
+        // 解析ベンチマーク
+        window.runParseBenchmark = async function() {
+            if (!mecab) {
+                alert('先に初期化ベンチマークを実行してください');
+                return;
+            }
+            
+            const btn = document.getElementById('parseBenchBtn');
+            btn.disabled = true;
+            
+            const textLength = parseInt(document.getElementById('textLength').value);
+            const iterations = parseInt(document.getElementById('iterations').value);
+            
+            // テストテキストを生成
+            const baseText = 'こんにちは世界。今日は良い天気ですね。';
+            let testText = '';
+            while (testText.length < textLength) {
+                testText += baseText;
+            }
+            testText = testText.substring(0, textLength);
+            
+            const progressBar = document.getElementById('parseProgress');
+            const times = {
+                parse: [],
+                wakati: [],
+                reading: [],
+                tokens: []
+            };
+            
+            // ウォームアップ
+            for (let i = 0; i < 10; i++) {
+                mecab.parse(testText);
+            }
+            
+            // 本測定
+            for (let i = 0; i < iterations; i++) {
+                // parse
+                const parseTime = measureTime(() => mecab.parse(testText));
+                times.parse.push(parseTime.time);
+                
+                // wakati
+                const wakatiTime = measureTime(() => mecab.wakati(testText));
+                times.wakati.push(wakatiTime.time);
+                
+                // reading
+                const readingTime = measureTime(() => mecab.getReading(testText));
+                times.reading.push(readingTime.time);
+                
+                // tokens
+                const tokensTime = measureTime(() => mecab.parseToTokens(testText));
+                times.tokens.push(tokensTime.time);
+                
+                progressBar.style.width = `${((i + 1) / iterations) * 100}%`;
+                
+                // UIを更新する機会を与える
+                if (i % 10 === 0) {
+                    await new Promise(resolve => setTimeout(resolve, 0));
+                }
+            }
+            
+            const resultsDiv = document.getElementById('parseResults');
+            let html = `<h3>解析パフォーマンス (${textLength}文字 × ${iterations}回)</h3>`;
+            
+            results.parsing[`${textLength}chars`] = {};
+            
+            for (const [method, methodTimes] of Object.entries(times)) {
+                const stats = calculateStats(methodTimes);
+                results.parsing[`${textLength}chars`][method] = stats;
+                
+                html += `
+                    <h4>${method}メソッド</h4>
+                    <div class="metric">
+                        <span class="metric-name">平均処理時間:</span>
+                        <span class="metric-value">${stats.mean.toFixed(3)} ms</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-name">スループット:</span>
+                        <span class="metric-value">${(1000 / stats.mean).toFixed(1)} ops/sec</span>
+                    </div>
+                `;
+            }
+            
+            resultsDiv.innerHTML = html;
+            btn.disabled = false;
+            
+            updateResultsTable();
+        };
+
+        // メモリ測定
+        window.measureMemory = async function() {
+            if (!performance.memory) {
+                alert('メモリ測定はChromeでのみ利用可能です。--enable-precise-memory-infoフラグが必要な場合があります。');
+                return;
+            }
+            
+            const resultsDiv = document.getElementById('memoryResults');
+            
+            // 初期メモリ
+            const beforeInit = {
+                used: performance.memory.usedJSHeapSize / 1024 / 1024,
+                total: performance.memory.totalJSHeapSize / 1024 / 1024,
+                limit: performance.memory.jsHeapSizeLimit / 1024 / 1024
+            };
+            
+            // MeCab初期化後
+            if (!mecab) {
+                mecab = new MeCabWrapper();
+                await mecab.initialize('../dist/mecab_wasm.wasm');
+            }
+            
+            await new Promise(resolve => setTimeout(resolve, 100));
+            
+            const afterInit = {
+                used: performance.memory.usedJSHeapSize / 1024 / 1024,
+                total: performance.memory.totalJSHeapSize / 1024 / 1024,
+                limit: performance.memory.jsHeapSizeLimit / 1024 / 1024
+            };
+            
+            // 大量テキスト処理後
+            const largeText = 'これは長いテキストです。'.repeat(1000);
+            for (let i = 0; i < 100; i++) {
+                mecab.parse(largeText);
+            }
+            
+            await new Promise(resolve => setTimeout(resolve, 100));
+            
+            const afterProcess = {
+                used: performance.memory.usedJSHeapSize / 1024 / 1024,
+                total: performance.memory.totalJSHeapSize / 1024 / 1024,
+                limit: performance.memory.jsHeapSizeLimit / 1024 / 1024
+            };
+            
+            results.memory = {
+                initialization: afterInit.used - beforeInit.used,
+                processing: afterProcess.used - afterInit.used,
+                total: afterProcess.used
+            };
+            
+            resultsDiv.innerHTML = `
+                <h3>メモリ使用量</h3>
+                <div class="metric">
+                    <span class="metric-name">初期化によるメモリ増加:</span>
+                    <span class="metric-value">${results.memory.initialization.toFixed(2)} MB</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-name">処理によるメモリ増加:</span>
+                    <span class="metric-value">${results.memory.processing.toFixed(2)} MB</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-name">総メモリ使用量:</span>
+                    <span class="metric-value">${results.memory.total.toFixed(2)} MB</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-name">ヒープ制限:</span>
+                    <span class="metric-value">${afterProcess.limit.toFixed(2)} MB</span>
+                </div>
+            `;
+        };
+
+        // 結果テーブルを更新
+        function updateResultsTable() {
+            const tbody = document.getElementById('resultsBody');
+            tbody.innerHTML = '';
+            
+            // 初期化結果
+            if (results.initialization.length > 0) {
+                const stats = calculateStats(results.initialization);
+                const row = tbody.insertRow();
+                row.insertCell(0).textContent = '初期化';
+                row.insertCell(1).textContent = stats.min.toFixed(2);
+                row.insertCell(2).textContent = stats.mean.toFixed(2);
+                row.insertCell(3).textContent = stats.max.toFixed(2);
+                row.insertCell(4).textContent = stats.stdDev.toFixed(2);
+            }
+            
+            // 解析結果
+            for (const [textLength, methods] of Object.entries(results.parsing)) {
+                for (const [method, stats] of Object.entries(methods)) {
+                    const row = tbody.insertRow();
+                    row.insertCell(0).textContent = `${method} (${textLength})`;
+                    row.insertCell(1).textContent = stats.min.toFixed(3);
+                    row.insertCell(2).textContent = stats.mean.toFixed(3);
+                    row.insertCell(3).textContent = stats.max.toFixed(3);
+                    row.insertCell(4).textContent = stats.stdDev.toFixed(3);
+                }
+            }
+            
+            document.getElementById('resultsTable').style.display = 'table';
+        }
+
+        // JSON形式で結果をエクスポート
+        window.exportResults = function() {
+            const data = {
+                timestamp: new Date().toISOString(),
+                system: {
+                    userAgent: navigator.userAgent,
+                    platform: navigator.platform,
+                    cores: navigator.hardwareConcurrency,
+                    memory: navigator.deviceMemory
+                },
+                results: results
+            };
+            
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `mecab-benchmark-${Date.now()}.json`;
+            a.click();
+        };
+
+        // 初期化
+        displaySystemInfo();
+    </script>
+</body>
+</html>

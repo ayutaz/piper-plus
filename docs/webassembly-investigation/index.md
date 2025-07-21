@@ -25,6 +25,13 @@ Piper-plusのWebAssembly対応（[Issue #106](https://github.com/ayutaz/piper-pl
 - **[technical-constraints-analysis.md](./technical-constraints-analysis.md)** - 技術的制約事項分析
 - **[task-0.2-technical-investigation-report.md](./task-0.2-technical-investigation-report.md)** - Task 0.2 統合調査レポート
 - **[task-0.3-prototype-report.md](./task-0.3-prototype-report.md)** - Task 0.3 プロトタイプ実装レポート
+- **[task-0.4-performance-report.md](./task-0.4-performance-report.md)** - Task 0.4 パフォーマンス測定レポート
+
+### 📊 Go/No-Go判定資料
+- **[task-0.5-technical-verification-summary.md](./task-0.5-technical-verification-summary.md)** - 技術検証結果サマリー
+- **[task-0.5-risk-assessment.md](./task-0.5-risk-assessment.md)** - リスク評価書
+- **[task-0.5-implementation-policy.md](./task-0.5-implementation-policy.md)** - 実装方針最終案
+- **[task-0.5-presentation.md](./task-0.5-presentation.md)** - Go/No-Go判定プレゼンテーション
 
 ### ✅ 品質保証
 - **[test-strategy.md](./test-strategy.md)** - テスト戦略（単体・統合・性能・品質）
