@@ -1,112 +1,87 @@
-# Piper-WASM WebAssembly対応 技術調査サマリー
+# Piper WebAssembly実装 - 技術調査と実装計画
 
-調査日: 2025年7月20日
+最終更新: 2025-07-21
 
-## 調査概要
+## 概要
 
-piper-plusおよびuPiperプロジェクトのWebAssembly対応について、技術的実現可能性と実装戦略を調査しました。
+piper-plusプロジェクトのWebAssembly対応（[Issue #106](https://github.com/ayutaz/piper-plus/issues/106)）に関する包括的な技術調査と実装計画です。日本語TTSを最優先とし、Unity WebGLでの動作を前提としています。
 
-### 調査対象Issue
-- **piper-plus #106**: WebAssembly対応によるブラウザ内TTS実行
-- **uPiper #17**: WebGL Platform Support for OpenJTalk Phonemizer
+## 実現可能性評価: ✅ **高い**
 
-## 調査結果
-
-### 1. 実現可能性評価: ✅ **高い**
-
-#### 依存関係のWebAssembly対応状況
+### 技術スタック対応状況
 
 | コンポーネント | 対応状況 | 詳細 |
 |---------------|---------|------|
-| **ONNX Runtime** | ✅ 完全対応 | onnxruntime-web v1.22.0、WebGPU/WebGL/WASM backends |
-| **eSpeak-NG** | ✅ 公式対応 | 公式Emscriptenポート、Chrome OS実装済み |
-| **OpenJTalk** | ⚠️ 限定対応 | 古いnpmパッケージ存在、移植が必要 |
-| **MeCab** | ✅ 実証済み | 複数のWebAssemblyポート確認 |
+| **ONNX Runtime** | ✅ 完全対応 | onnxruntime-web、WebGPU/WebGL/WASM backends |
+| **eSpeak-NG** | ✅ 公式対応 | ChromeOSで実績あり（英語は後回し） |
+| **MeCab** | ✅ 実装済み | コミュニティによる移植版が存在 |
+| **OpenJTalk** | ⚠️ 要移植 | 新規移植が必要だが技術的に可能 |
 
-### 2. 推奨実装戦略
+## 実装計画（改訂版）
 
-**piper-plus側でWebAssembly基盤を構築**し、その後uPiper側でUnity WebGL統合を行う段階的アプローチを推奨。
+### タイムライン: 10-12週間
 
-#### 実装優先順位
-1. **OpenJTalk/MeCab WebAssembly移植**（最優先）
-2. **辞書データ最適化**（103MB → 2-3MB）
-3. **ONNX Runtime Web統合**
-4. **Unity WebGLプラグイン化**
+| フェーズ | 期間 | 内容 |
+|---------|------|------|
+| Phase 0 | 1週間 | 技術検証（OpenJTalk移植実現性、最小辞書検証） |
+| Phase 1 | 3-4週間 | 日本語音素化基盤（MeCab/OpenJTalk移植） |
+| Phase 2 | 2週間 | ONNX Runtime統合と音声合成 |
+| Phase 3 | 2週間 | 最適化とブラウザ統合 |
+| Phase 4 | 1-2週間 | Unity WebGL統合 |
+| Phase 5 | 2週間 | テスト、デモ、ドキュメント |
 
-### 3. 実装スケジュール
+### 成功指標（段階的目標）
 
-#### 日本語TTS最優先の場合
-- **2-3週間**: 基本的な音素変換（テキスト→音素）
-- **4-6週間**: 音声合成まで含む最小実装
-- **8-10週間**: Unity WebGL完全統合
+| Phase | 辞書サイズ | 初期化時間 | 音声生成遅延 | メモリ使用量 |
+|-------|-----------|------------|--------------|------------|
+| 1 | 10MB | < 5秒 | < 500ms | < 200MB |
+| 2 | 5MB | < 3秒 | < 400ms | < 150MB |
+| 3 | 2-3MB | < 2秒 | < 300ms | < 100MB |
 
-#### 段階的リリース計画
-- **v0.1**: テキスト→音素変換のみ（2-3週間）
-- **v0.2**: 基本的な音声合成（4-5週間）
-- **v0.3**: Unity WebGL対応（6-8週間）
+## 主要な技術課題と解決策
 
-### 4. 技術的課題と解決策
-
-#### 辞書サイズ問題
+### 1. 辞書サイズ最適化
 - **現状**: 103MB（sys.dic: 99MB）
-- **目標**: 2-3MB（最小辞書）
+- **目標**: 段階的に2-3MBまで削減
 - **解決策**: 
   - 頻度ベースの語彙選定
   - Brotli圧縮（約80%削減）
-  - 段階的ロード機能
+  - プログレッシブローディング
 
-#### メモリ制約
+### 2. Unity WebGLメモリ制限
+- **制約**: 256MBヒープ制限
 - **解決策**:
   - Web Worker活用
-  - 遅延初期化
-  - LRUキャッシュ実装
+  - メモリプール実装
+  - AudioClipキャッシング
 
-#### Unity WebGL制約
-- **解決策**:
-  - Native Plugin（.jslib）実装
-  - WebAssembly 2023機能活用
-  - 非同期API設計
+### 3. ブラウザ互換性
+- **WebGPU**: Chrome/Edge 113+で対応
+- **フォールバック**: WebGL → WASM実装
+- **Safari対策**: WebGPU非対応のためWASMフォールバック必須
 
-### 5. 成果物
+## ドキュメント構成
 
-#### piper-plus側
-- `piper-wasm` npmパッケージ
-- WebAssemblyビルド（piper-openjtalk.wasm）
-- 最小辞書セット（dict-minimal/）
-- JavaScript/TypeScript API
+### 実装計画
+- [webassembly-implementation-master-plan.md](./webassembly-implementation-master-plan.md) - 統合実装計画
+- [webassembly-technical-investigation.md](./webassembly-technical-investigation.md) - 詳細技術調査
 
-#### uPiper側
-- Unity WebGLプラグイン
-- C# API ラッパー
-- サンプルプロジェクト
-- Asset Store対応パッケージ
+### 技術詳細
+- [japanese-tts-implementation.md](./japanese-tts-implementation.md) - 日本語TTS実装詳細
+- [unity-webgl-integration.md](./unity-webgl-integration.md) - Unity WebGL統合方法
+- [dictionary-optimization-strategy.md](./dictionary-optimization-strategy.md) - 辞書最適化戦略
 
-## 詳細ドキュメント
+### 品質保証
+- [test-strategy.md](./test-strategy.md) - テスト戦略
+- [error-handling-strategy.md](./error-handling-strategy.md) - エラーハンドリング
 
-以下のファイルに詳細な実装計画が含まれています：
+## 次のステップ
 
-1. **piper-wasm-japanese-implementation-plan.md**
-   - 最小限の日本語TTS実装計画
-   - 具体的なコード例
-   - ビルドコマンド
+1. **Phase 0 開始**: OpenJTalk WebAssembly移植の実現性検証
+2. **最小辞書プロトタイプ**: 1000語での動作確認
+3. **Unity WebGLメモリ測定**: 実環境でのメモリ使用量確認
 
-2. **dictionary-optimization-strategy.md**
-   - 辞書データ最適化戦略
-   - 圧縮技術の詳細
-   - 段階的ロード実装
+## 関連リンク
 
-3. **unity-webgl-implementation-strategy.md**
-   - Unity WebGL統合方法
-   - プラグイン実装詳細
-   - デプロイメント設定
-
-## 結論
-
-WebAssembly対応は技術的に実現可能であり、既存の実装例とツールを活用することで、**1.5-2ヶ月で実用的な日本語TTSのWebAssembly版**が実現可能です。
-
-推奨アプローチ：
-1. piper-plus側でWebAssembly基盤構築
-2. 最小辞書での早期リリース
-3. 段階的な機能拡張とUnity統合
-
-これにより、ブラウザ内でのオフライン日本語音声合成が実現し、新しい活用シーンを開拓できます。
+- [Issue #106: WebAssembly対応](https://github.com/ayutaz/piper-plus/issues/106)
+- [uPiper Issue #17: WebGL Platform Support](https://github.com/ayutaz/uPiper/issues/17)
