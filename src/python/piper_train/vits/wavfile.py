@@ -489,7 +489,7 @@ def _read_data_chunk(
         fid.seek(start + size)
     else:
         raise ValueError(
-            "mmap=True not compatible with " f"{bytes_per_sample}-byte container size.",
+            f"mmap=True not compatible with {bytes_per_sample}-byte container size.",
         )
 
     _handle_pad_byte(fid, size)
@@ -527,8 +527,7 @@ def _read_riff_chunk(fid):
     else:
         # There are also .wav files with "FFIR" or "XFIR" signatures?
         raise ValueError(
-            f"File format {str1!r} not understood. Only "
-            "'RIFF' and 'RIFX' supported.",
+            f"File format {str1!r} not understood. Only 'RIFF' and 'RIFX' supported.",
         )
 
     # Size of entire file
