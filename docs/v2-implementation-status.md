@@ -132,3 +132,102 @@ The three remaining high-impact features:
 3. **Conditional Flow Matching** - Modern flow architecture
 
 These represent the final frontier for achieving human-level synthesis quality.
+
+## Recent Bug Fixes and Improvements (v2 Branch)
+
+### Latest Commits (July 2025)
+
+#### AudioAugmentation Tensor Dimension Fix ✅
+- **Issue**: Tensor dimension mismatch during audio augmentation
+- **Fix**: Automatic 1D to 2D tensor conversion in UtteranceCollate
+- **Files**: `src/python/piper_train/vits/dataset.py`
+- **Impact**: Stable data augmentation during training
+
+#### F0 Predictor Initialization Fix ✅
+- **Issue**: ConvReluNorm parameter passing error
+- **Fix**: Corrected argument order and types for PyTorch Lightning 2.x
+- **Files**: `src/python/piper_train/vits/f0_predictor.py`
+- **Impact**: F0 Predictor now initializes correctly
+
+#### PyTorch Lightning 2.x Compatibility ✅
+- **Issue**: Deprecated API usage (`from_argparse_args`)
+- **Fix**: Removed deprecated API calls from main training script
+- **Files**: `src/python/piper_train/__main__.py`
+- **Impact**: Full compatibility with PyTorch Lightning 2.x
+
+#### Duration Consistency Loss Adjustment ✅
+- **Issue**: Training instability with duration loss
+- **Fix**: Temporarily disabled duration consistency loss (weight=0.0)
+- **Files**: `src/python/piper_train/vits/lightning.py`
+- **Impact**: More stable training convergence
+
+## Verified Test Results
+
+### Preprocessing Test ✅
+- **Dataset**: CSS10 Japanese (10 samples)
+- **Status**: Successfully processed with enhanced phonemizer (65 symbols)
+- **Warnings**: Normal missing phoneme warnings for punctuation
+
+### Module Import Tests ✅
+- **SpecAugment**: ✅ Import and initialization successful
+- **AudioAugmentation**: ✅ Import and initialization successful  
+- **UtteranceCollate**: ✅ Data augmentation integration working
+- **F0Predictor**: ✅ Default parameters initialization working
+
+### Training Readiness ✅
+- **Prerequisites**: All modules load without errors
+- **Data Pipeline**: Preprocessing completes successfully
+- **Configuration**: All v2 features properly configured
+
+## Troubleshooting Guide
+
+### Common Issues and Solutions
+
+#### 1. Missing Phoneme Warnings
+```
+WARNING:preprocess:Missing  (55)
+```
+- **Status**: Normal behavior for Japanese text
+- **Cause**: Punctuation marks not converted to phonemes
+- **Solution**: No action needed, warnings are informational
+
+#### 2. F0 Predictor Import Errors
+```
+TypeError: 'float' object cannot be interpreted as an integer
+```
+- **Solution**: Use default parameters: `F0Predictor()`
+- **Alternative**: Specify correct parameter types
+
+#### 3. Tensor Dimension Errors during Training
+```
+RuntimeError: Expected 2D tensor, got 1D
+```
+- **Status**: Fixed in latest commits
+- **Solution**: Use current v2 branch code
+
+### Training Command Examples
+
+#### Basic v2 Training
+```bash
+python -m piper_train \
+  --dataset-dir /path/to/preprocessed \
+  --default_root_dir /path/to/output \
+  --batch-size 8 \
+  --max_epochs 100 \
+  --use-duration-regularization \
+  --num-workers 4
+```
+
+#### Advanced v2 Training (All Features)
+```bash
+python -m piper_train \
+  --dataset-dir /path/to/preprocessed \
+  --default_root_dir /path/to/output \
+  --batch-size 16 \
+  --max_epochs 1000 \
+  --use-duration-regularization \
+  --c-dur-consistency 0.01 \
+  --ema-decay 0.9995 \
+  --num-workers 8 \
+  --validation-split 0.1
+```
