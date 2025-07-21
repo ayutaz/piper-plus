@@ -84,10 +84,10 @@ def duration_consistency_loss(pred_durations, text_lengths, phoneme_ids=None):
     log_durations = torch.log(pred_durations + 1.0)  # +1 to avoid log(0)
 
     # Calculate mean duration per utterance
-    mean_duration = (log_durations * mask).sum(dim=1) / text_lengths.float()
+    mean_duration = (log_durations * mask).sum(dim=1, keepdim=True) / text_lengths.float().unsqueeze(1)
 
     # Calculate variance penalty
-    duration_diff = log_durations - mean_duration.unsqueeze(1)
+    duration_diff = log_durations - mean_duration
     variance_loss = ((duration_diff**2) * mask).sum() / mask.sum()
 
     # Calculate smoothness penalty (adjacent phoneme duration differences)
