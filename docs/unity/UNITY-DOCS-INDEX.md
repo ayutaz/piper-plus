@@ -1,12 +1,13 @@
 # Unity実装ドキュメント索引
 
-このドキュメントは、Unity Piper TTS実装に関するドキュメントの整理と索引です。
+このドキュメントは、Unity Piper TTS実装に関する一般的なドキュメントの整理と索引です。
+
+**注意**: uPiper固有の実装詳細（進捗管理、完了報告書など）は[uPiperリポジトリ](https://github.com/ayutaz/uPiper/tree/main/docs)に移動しました。詳細は[MOVED_TO_UPIPER.md](./MOVED_TO_UPIPER.md)を参照してください。
 
 ## 📁 ドキュメント構成
 
 ### 1. 🎯 現在の実装状況
-- [`phase1-progress.md`](phase1-progress.md) - **Phase 1進捗状況**（最新：2025年1月15日）
-- [`unity-task-checklist.md`](unity-task-checklist.md) - **全体タスクチェックリスト**
+- 進捗管理ドキュメントは[uPiper/docs/progress/](https://github.com/ayutaz/uPiper/tree/main/docs/progress)に移動しました
 
 ### 2. 📋 計画・設計ドキュメント
 
