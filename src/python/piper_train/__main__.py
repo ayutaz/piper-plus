@@ -71,10 +71,10 @@ def main():
     # Early FFmpeg availability check
     ffmpeg_available, ffmpeg_error = check_ffmpeg_availability()
     if not ffmpeg_available:
-        _LOGGER.error("FFmpeg availability check failed:")
-        _LOGGER.error(ffmpeg_error)
-        _LOGGER.error("Training cannot continue without FFmpeg support.")
-        sys.exit(1)
+        _LOGGER.warning("FFmpeg availability check failed:")
+        _LOGGER.warning(ffmpeg_error)
+        _LOGGER.warning("Some features (F0 Predictor, audio augmentation) may be limited, but training can continue.")
+        _LOGGER.info("Proceeding with training - install FFmpeg for full feature support")
     else:
         _LOGGER.info("FFmpeg libraries are available - F0 Predictor and audio augmentation features enabled")
 
