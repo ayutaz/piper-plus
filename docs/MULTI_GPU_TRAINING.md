@@ -90,8 +90,7 @@ python -m piper_train \
     --accelerator gpu \
     --devices 2 \
     --strategy ddp \
-    --batch-size 20 \               # GPU毎20、合計40
-    --accumulate_grad_batches 2 \   # 実効バッチサイズ80
+    --batch-size 40 \               # GPU毎40、合計80
     --precision 16-mixed \
     --num-workers 8 \               # GPU毎4ワーカー
     --gradient_clip_val 1.0 \
@@ -107,8 +106,7 @@ python -m piper_train \
     --accelerator gpu \
     --devices 4 \
     --strategy ddp \
-    --batch-size 14 \               # GPU毎14、合計56
-    --accumulate_grad_batches 2 \   # 実効バッチサイズ112
+    --batch-size 28 \               # GPU毎28、合計112
     --precision 16-mixed \
     --num-workers 16 \              # GPU毎4ワーカー
     --gradient_clip_val 1.0 \
@@ -124,8 +122,7 @@ python -m piper_train \
     --accelerator gpu \
     --devices 8 \
     --strategy ddp \
-    --batch-size 10 \               # GPU毎10、合計80
-    --accumulate_grad_batches 3 \   # 実効バッチサイズ240
+    --batch-size 30 \               # GPU毎30、合計240
     --precision 16-mixed \
     --num-workers 32 \              # GPU毎4ワーカー
     --gradient_clip_val 1.0 \
@@ -196,8 +193,7 @@ python -m piper_train \
     --base_lr 2e-4 \
     --num-workers 32 \
     --max_epochs 1000 \
-    --precision 16-mixed \
-    --accumulate_grad_batches 2
+    --precision 16-mixed
 ```
 
 ## DDP戦略の最適化
@@ -240,11 +236,6 @@ python -m piper_train \
 --precision 16-mixed
 ```
 
-### Gradient Accumulation
-
-```bash
---accumulate_grad_batches 2
-```
 
 ### VRAM断片化対策
 
@@ -340,11 +331,11 @@ L4 24GB での実際の使用量:
 ### バッチサイズ決定のコツ
 1. 小さなバッチサイズから開始（8-10）
 2. OOMが発生しない最大サイズを見つける
-3. 勾配累積で実効バッチサイズを調整
+3. 複数GPUで実効バッチサイズを調整
 
 ```bash
-# 例: GPU毎batch_size 8で実効128を実現
---batch-size 8 --accumulate_grad_batches 4  # 8×4×4GPU = 128
+# 例: GPU毎batch_size 32で実効128を実現  
+--batch-size 32  # 32×4GPU = 128
 ```
 
 ## パフォーマンス監視
