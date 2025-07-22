@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MeCab + OpenJTalk 統合テスト</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans JP', sans-serif;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        
+        h1, h2 {
+            color: #333;
+        }
+        
+        .input-group {
+            margin-bottom: 20px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        
+        textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+            resize: vertical;
+        }
+        
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        
+        button:hover {
+            background: #0056b3;
+        }
+        
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+        
+        .status.loading {
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+        
+        .status.success {
+            background: #e8f5e9;
+            color: #388e3c;
+        }
+        
+        .status.error {
+            background: #ffebee;
+            color: #d32f2f;
+        }
+        
+        .results {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        
+        .result-box {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 15px;
+        }
+        
+        .result-box h3 {
+            margin-top: 0;
+            color: #495057;
+        }
+        
+        pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            margin: 0;
+            font-size: 14px;
+        }
+        
+        .phoneme-result {
+            font-size: 20px;
+            color: #007bff;
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 4px;
+            text-align: center;
+            margin-top: 10px;
+        }
+        
+        .debug-info {
+            margin-top: 20px;
+        }
+        
+        .njd-node {
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 10px;
+            margin-bottom: 10px;
+        }
+        
+        .njd-node-header {
+            font-weight: bold;
+            color: #007bff;
+            margin-bottom: 5px;
+        }
+        
+        .njd-node-property {
+            display: flex;
+            justify-content: space-between;
+            padding: 2px 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        
+        .njd-node-property:last-child {
+            border-bottom: none;
+        }
+        
+        .property-name {
+            font-weight: 500;
+            color: #666;
+        }
+        
+        .property-value {
+            color: #333;
+        }
+        
+        .example-buttons {
+            margin-top: 10px;
+        }
+        
+        .example-btn {
+            background: #6c757d;
+            font-size: 14px;
+            padding: 5px 15px;
+        }
+        
+        .example-btn:hover {
+            background: #5a6268;
+        }
+        
+        @media (max-width: 768px) {
+            .results {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎤 MeCab + OpenJTalk 統合テスト</h1>
+        
+        <div id="status" class="status loading">
+            システムを初期化中...
+        </div>
+        
+        <div class="input-group">
+            <label for="textInput">変換するテキスト:</label>
+            <textarea id="textInput" rows="4" placeholder="日本語テキストを入力してください">
+こんにちは世界！
+今日は良い天気ですね。</textarea>
+            
+            <div class="example-buttons">
+                <button class="example-btn" onclick="setExample('basic')">基本</button>
+                <button class="example-btn" onclick="setExample('complex')">複雑</button>
+                <button class="example-btn" onclick="setExample('number')">数字</button>
+                <button class="example-btn" onclick="setExample('english')">英語混じり</button>
+            </div>
+        </div>
+        
+        <div>
+            <button id="convertBtn" onclick="convertText()" disabled>音素変換</button>
+            <button onclick="clearAll()">クリア</button>
+            <label style="display: inline-block; margin-left: 20px;">
+                <input type="checkbox" id="debugMode" onchange="toggleDebug()"> デバッグモード
+            </label>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>変換結果</h2>
+        
+        <div class="phoneme-result" id="phonemeResult">
+            音素列がここに表示されます
+        </div>
+        
+        <div class="results">
+            <div class="result-box">
+                <h3>MeCab解析結果</h3>
+                <pre id="mecabResult">解析結果がここに表示されます</pre>
+            </div>
+            
+            <div class="result-box">
+                <h3>PUAエンコード</h3>
+                <pre id="puaResult">PUAエンコード結果がここに表示されます</pre>
+            </div>
+        </div>
+    </div>
+
+    <div class="container debug-info" id="debugInfo" style="display: none;">
+        <h2>デバッグ情報</h2>
+        <h3>NJDノード詳細</h3>
+        <div id="njdNodes"></div>
+    </div>
+
+    <script type="module">
+        import { JapaneseTTSPipeline } from './openjtalk-wrapper.js';
+        
+        let pipeline = null;
+        let debugMode = false;
+        
+        // Examples
+        const examples = {
+            basic: "こんにちは世界！\n今日は良い天気ですね。",
+            complex: "私は日本語の音声合成システムを開発しています。\nこれはMeCabとOpenJTalkを使用した実装です。",
+            number: "今日は2025年7月22日です。\n気温は28度、湿度は65%です。",
+            english: "Hello, World! これは英語と日本語の混在テストです。\nPiper TTSは素晴らしいプロジェクトです。"
+        };
+        
+        // Set example text
+        window.setExample = function(type) {
+            document.getElementById('textInput').value = examples[type] || '';
+        };
+        
+        // Toggle debug mode
+        window.toggleDebug = function() {
+            debugMode = document.getElementById('debugMode').checked;
+            document.getElementById('debugInfo').style.display = debugMode ? 'block' : 'none';
+            if (pipeline && pipeline.openjtalk) {
+                pipeline.openjtalk.setDebugMode(debugMode);
+            }
+        };
+        
+        // Clear all
+        window.clearAll = function() {
+            document.getElementById('textInput').value = '';
+            document.getElementById('phonemeResult').textContent = '音素列がここに表示されます';
+            document.getElementById('mecabResult').textContent = '解析結果がここに表示されます';
+            document.getElementById('puaResult').textContent = 'PUAエンコード結果がここに表示されます';
+            document.getElementById('njdNodes').innerHTML = '';
+        };
+        
+        // Update status
+        function updateStatus(message, type = 'loading') {
+            const statusEl = document.getElementById('status');
+            statusEl.className = `status ${type}`;
+            statusEl.textContent = message;
+        }
+        
+        // Display NJD nodes
+        function displayNJDNodes(nodes) {
+            const container = document.getElementById('njdNodes');
+            container.innerHTML = '';
+            
+            nodes.forEach((node, index) => {
+                const nodeEl = document.createElement('div');
+                nodeEl.className = 'njd-node';
+                
+                const header = document.createElement('div');
+                header.className = 'njd-node-header';
+                header.textContent = `Node ${index + 1}: ${node.string}`;
+                nodeEl.appendChild(header);
+                
+                const properties = [
+                    { name: '品詞', value: node.pos },
+                    { name: '品詞細分類1', value: node.pos_group1 },
+                    { name: '品詞細分類2', value: node.pos_group2 },
+                    { name: '品詞細分類3', value: node.pos_group3 },
+                    { name: '読み', value: node.read },
+                    { name: '発音', value: node.pron },
+                    { name: 'アクセント', value: node.acc },
+                    { name: 'モーラ数', value: node.mora_size }
+                ];
+                
+                properties.forEach(prop => {
+                    if (prop.value && prop.value !== '*') {
+                        const propEl = document.createElement('div');
+                        propEl.className = 'njd-node-property';
+                        propEl.innerHTML = `
+                            <span class="property-name">${prop.name}:</span>
+                            <span class="property-value">${prop.value}</span>
+                        `;
+                        nodeEl.appendChild(propEl);
+                    }
+                });
+                
+                container.appendChild(nodeEl);
+            });
+        }
+        
+        // Convert text
+        window.convertText = async function() {
+            const text = document.getElementById('textInput').value.trim();
+            if (!text) {
+                alert('テキストを入力してください');
+                return;
+            }
+            
+            const convertBtn = document.getElementById('convertBtn');
+            convertBtn.disabled = true;
+            
+            try {
+                updateStatus('変換中...', 'loading');
+                
+                const result = await pipeline.textToPhonemes(text);
+                
+                // Display results
+                document.getElementById('phonemeResult').textContent = result.phonemes || '(音素なし)';
+                document.getElementById('mecabResult').textContent = result.mecabOutput;
+                document.getElementById('puaResult').textContent = result.puaEncoded || '(PUAエンコードなし)';
+                
+                if (debugMode) {
+                    displayNJDNodes(result.njdNodes);
+                }
+                
+                updateStatus('変換完了', 'success');
+                
+            } catch (error) {
+                console.error('Conversion error:', error);
+                updateStatus('エラー: ' + error.message, 'error');
+            } finally {
+                convertBtn.disabled = false;
+            }
+        };
+        
+        // Initialize
+        async function initialize() {
+            try {
+                pipeline = new JapaneseTTSPipeline();
+                await pipeline.initialize({
+                    mecabWasmPath: '../../mecab/dist/mecab_wasm.wasm',
+                    mecabDataPath: '../../mecab/dist/mecab_wasm.data',
+                    openjtalkWasmPath: './openjtalk_wasm.wasm',
+                    debug: debugMode
+                });
+                
+                document.getElementById('convertBtn').disabled = false;
+                updateStatus('準備完了', 'success');
+                
+            } catch (error) {
+                console.error('Initialization error:', error);
+                updateStatus('初期化エラー: ' + error.message, 'error');
+            }
+        }
+        
+        // Start initialization
+        initialize();
+    </script>
+</body>
+</html>

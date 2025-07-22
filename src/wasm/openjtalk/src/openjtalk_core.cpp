@@ -209,7 +209,7 @@ private:
     
     // Initialize phoneme mappings
     void initializePhonemeMap() {
-        // Basic Japanese phonemes to PUA mapping
+        // Complete Japanese phoneme mapping
         // Using Private Use Area (E000-F8FF) for compatibility
         phoneme_map = {
             // Vowels
@@ -219,31 +219,150 @@ private:
             {"エ", "e", "\uE003"},
             {"オ", "o", "\uE004"},
             
-            // Consonants + vowels
-            {"カ", "ka", "\uE005"},
-            {"キ", "ki", "\uE006"},
-            {"ク", "ku", "\uE007"},
-            {"ケ", "ke", "\uE008"},
-            {"コ", "ko", "\uE009"},
+            // K-group
+            {"カ", "k a", "\uE005"},
+            {"キ", "k i", "\uE006"},
+            {"ク", "k u", "\uE007"},
+            {"ケ", "k e", "\uE008"},
+            {"コ", "k o", "\uE009"},
+            {"キャ", "ky a", "\uE00A"},
+            {"キュ", "ky u", "\uE00B"},
+            {"キョ", "ky o", "\uE00C"},
             
-            {"ガ", "ga", "\uE00A"},
-            {"ギ", "gi", "\uE00B"},
-            {"グ", "gu", "\uE00C"},
-            {"ゲ", "ge", "\uE00D"},
-            {"ゴ", "go", "\uE00E"},
+            // G-group
+            {"ガ", "g a", "\uE010"},
+            {"ギ", "g i", "\uE011"},
+            {"グ", "g u", "\uE012"},
+            {"ゲ", "g e", "\uE013"},
+            {"ゴ", "g o", "\uE014"},
+            {"ギャ", "gy a", "\uE015"},
+            {"ギュ", "gy u", "\uE016"},
+            {"ギョ", "gy o", "\uE017"},
             
-            {"サ", "sa", "\uE00F"},
-            {"シ", "si", "\uE010"},
-            {"ス", "su", "\uE011"},
-            {"セ", "se", "\uE012"},
-            {"ソ", "so", "\uE013"},
+            // S-group
+            {"サ", "s a", "\uE020"},
+            {"シ", "sh i", "\uE021"},
+            {"ス", "s u", "\uE022"},
+            {"セ", "s e", "\uE023"},
+            {"ソ", "s o", "\uE024"},
+            {"シャ", "sh a", "\uE025"},
+            {"シュ", "sh u", "\uE026"},
+            {"ショ", "sh o", "\uE027"},
+            
+            // Z-group
+            {"ザ", "z a", "\uE030"},
+            {"ジ", "j i", "\uE031"},
+            {"ズ", "z u", "\uE032"},
+            {"ゼ", "z e", "\uE033"},
+            {"ゾ", "z o", "\uE034"},
+            {"ジャ", "j a", "\uE035"},
+            {"ジュ", "j u", "\uE036"},
+            {"ジョ", "j o", "\uE037"},
+            
+            // T-group
+            {"タ", "t a", "\uE040"},
+            {"チ", "ch i", "\uE041"},
+            {"ツ", "ts u", "\uE042"},
+            {"テ", "t e", "\uE043"},
+            {"ト", "t o", "\uE044"},
+            {"チャ", "ch a", "\uE045"},
+            {"チュ", "ch u", "\uE046"},
+            {"チョ", "ch o", "\uE047"},
+            
+            // D-group
+            {"ダ", "d a", "\uE050"},
+            {"ヂ", "j i", "\uE051"},
+            {"ヅ", "z u", "\uE052"},
+            {"デ", "d e", "\uE053"},
+            {"ド", "d o", "\uE054"},
+            
+            // N-group
+            {"ナ", "n a", "\uE060"},
+            {"ニ", "n i", "\uE061"},
+            {"ヌ", "n u", "\uE062"},
+            {"ネ", "n e", "\uE063"},
+            {"ノ", "n o", "\uE064"},
+            {"ニャ", "ny a", "\uE065"},
+            {"ニュ", "ny u", "\uE066"},
+            {"ニョ", "ny o", "\uE067"},
+            
+            // H-group
+            {"ハ", "h a", "\uE070"},
+            {"ヒ", "h i", "\uE071"},
+            {"フ", "f u", "\uE072"},
+            {"ヘ", "h e", "\uE073"},
+            {"ホ", "h o", "\uE074"},
+            {"ヒャ", "hy a", "\uE075"},
+            {"ヒュ", "hy u", "\uE076"},
+            {"ヒョ", "hy o", "\uE077"},
+            
+            // B-group
+            {"バ", "b a", "\uE080"},
+            {"ビ", "b i", "\uE081"},
+            {"ブ", "b u", "\uE082"},
+            {"ベ", "b e", "\uE083"},
+            {"ボ", "b o", "\uE084"},
+            {"ビャ", "by a", "\uE085"},
+            {"ビュ", "by u", "\uE086"},
+            {"ビョ", "by o", "\uE087"},
+            
+            // P-group
+            {"パ", "p a", "\uE090"},
+            {"ピ", "p i", "\uE091"},
+            {"プ", "p u", "\uE092"},
+            {"ペ", "p e", "\uE093"},
+            {"ポ", "p o", "\uE094"},
+            {"ピャ", "py a", "\uE095"},
+            {"ピュ", "py u", "\uE096"},
+            {"ピョ", "py o", "\uE097"},
+            
+            // M-group
+            {"マ", "m a", "\uE0A0"},
+            {"ミ", "m i", "\uE0A1"},
+            {"ム", "m u", "\uE0A2"},
+            {"メ", "m e", "\uE0A3"},
+            {"モ", "m o", "\uE0A4"},
+            {"ミャ", "my a", "\uE0A5"},
+            {"ミュ", "my u", "\uE0A6"},
+            {"ミョ", "my o", "\uE0A7"},
+            
+            // Y-group
+            {"ヤ", "y a", "\uE0B0"},
+            {"ユ", "y u", "\uE0B2"},
+            {"ヨ", "y o", "\uE0B4"},
+            
+            // R-group
+            {"ラ", "r a", "\uE0C0"},
+            {"リ", "r i", "\uE0C1"},
+            {"ル", "r u", "\uE0C2"},
+            {"レ", "r e", "\uE0C3"},
+            {"ロ", "r o", "\uE0C4"},
+            {"リャ", "ry a", "\uE0C5"},
+            {"リュ", "ry u", "\uE0C6"},
+            {"リョ", "ry o", "\uE0C7"},
+            
+            // W-group
+            {"ワ", "w a", "\uE0D0"},
+            {"ヲ", "w o", "\uE0D1"},
             
             // Special sounds
-            {"ン", "N", "\uE050"},
-            {"ッ", "cl", "\uE051"},
-            {"ー", ":", "\uE052"},
+            {"ン", "N", "\uE0E0"},
+            {"ッ", "cl", "\uE0E1"},
+            {"ー", ":", "\uE0E2"},
             
-            // Add more mappings as needed
+            // Small kana
+            {"ァ", "a", "\uE0F0"},
+            {"ィ", "i", "\uE0F1"},
+            {"ゥ", "u", "\uE0F2"},
+            {"ェ", "e", "\uE0F3"},
+            {"ォ", "o", "\uE0F4"},
+            
+            // Special combinations
+            {"ヴ", "v u", "\uE100"},
+            {"ヴァ", "v a", "\uE101"},
+            {"ヴィ", "v i", "\uE102"},
+            {"ヴェ", "v e", "\uE103"},
+            {"ヴォ", "v o", "\uE104"},
         };
     }
     
@@ -270,7 +389,10 @@ public:
                     
                     for (const auto& mapping : phoneme_map) {
                         if (mapping.text == substr) {
-                            phonemes << mapping.phoneme << " ";
+                            if (!phonemes.str().empty() && phonemes.str().back() != ' ') {
+                                phonemes << " ";
+                            }
+                            phonemes << mapping.phoneme;
                             i += len;
                             found = true;
                             break;
@@ -295,9 +417,14 @@ public:
                 }
             }
             
-            // Add pause between words if needed
-            if (node.pos == "記号" && node.pos_group1 == "句点") {
-                phonemes << "pau ";
+            // Add pause for punctuation
+            if (node.pos == "記号") {
+                if (node.string == "。" || node.string == "、") {
+                    if (!phonemes.str().empty() && phonemes.str().back() != ' ') {
+                        phonemes << " ";
+                    }
+                    phonemes << "pau";
+                }
             }
         }
         
