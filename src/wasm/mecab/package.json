@@ -1,0 +1,24 @@
+{
+  "name": "piper-mecab-wasm",
+  "version": "0.1.0",
+  "description": "MeCab WebAssembly module for Piper TTS",
+  "main": "dist/mecab.js",
+  "scripts": {
+    "build:wasm": "./build.sh",
+    "build": "cp mecab-wrapper.js dist/mecab.js",
+    "clean": "rm -rf build dist"
+  },
+  "files": [
+    "dist/",
+    "build/"
+  ],
+  "keywords": [
+    "mecab",
+    "webassembly",
+    "japanese",
+    "morphological-analysis"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {}
+}

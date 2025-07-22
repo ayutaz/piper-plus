@@ -1,0 +1,24 @@
+{
+  "name": "piper-openjtalk-wasm",
+  "version": "0.1.0",
+  "description": "OpenJTalk WebAssembly module for Piper TTS",
+  "main": "dist/openjtalk.js",
+  "scripts": {
+    "build:wasm": "./build.sh",
+    "build": "echo 'OpenJTalk build complete'",
+    "clean": "rm -rf build dist"
+  },
+  "files": [
+    "dist/",
+    "build/"
+  ],
+  "keywords": [
+    "openjtalk",
+    "webassembly",
+    "japanese",
+    "text-to-speech"
+  ],
+  "author": "",
+  "license": "BSD-3-Clause",
+  "devDependencies": {}
+}
