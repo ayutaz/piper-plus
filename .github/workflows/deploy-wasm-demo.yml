@@ -105,7 +105,7 @@ jobs:
           cp -r test/models/*.onnx* demo-site/test/models/ || true
           
           # Create index page
-          cat > demo-site/index.html << 'EOF'
+          cat > demo-site/index.html << 'HTML_EOF'
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -260,7 +260,7 @@ jobs:
     </footer>
 </body>
 </html>
-EOF
+HTML_EOF
           
       - name: Setup Pages
         uses: actions/configure-pages@v4

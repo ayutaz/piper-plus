@@ -46,6 +46,12 @@ Piper is used in a [variety of projects](#people-using-piper).
   * **F0 Predictor**: FastSpeech2ベースのピッチ予測によるイントネーション制御
   * **期待効果**: 総合MOS向上 +0.18-0.26
   * 詳細: [統合コンポーネントドキュメント](src/python/docs/integrated-components-ja.md)
+* **🌐 WebAssembly対応（ブラウザ上での日本語TTS）**
+  * MeCab/OpenJTalkのWebAssembly実装
+  * ONNX Runtime Webによるブラウザ内推論
+  * ストリーミング音声合成対応
+  * **Webデモサイト**: https://ayutaz.github.io/piper-plus/
+  * 詳細: [WebAssembly実装ドキュメント](docs/webassembly/README.md)
 * マルチGPU学習対応（PyTorch Lightning 2.4.0）
   * DDP (Distributed Data Parallel) 戦略による複数GPU並列学習
   * 学習率の自動スケーリング機能（`--auto_lr_scaling`）
