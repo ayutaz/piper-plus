@@ -1,0 +1,310 @@
+name: Deploy WASM Demo to GitHub Pages
+
+on:
+  push:
+    branches: [ main, feat/webassembly-support ]
+    paths:
+      - 'src/wasm/**'
+      - '.github/workflows/deploy-wasm-demo.yml'
+  pull_request:
+    branches: [ main, dev ]
+    paths:
+      - 'src/wasm/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+          
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: |
+            src/wasm/mecab/package-lock.json
+            src/wasm/openjtalk/package-lock.json
+            src/wasm/onnx/package-lock.json
+          
+      - name: Setup Emscripten
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: '3.1.61'
+          
+      - name: Cache WASM builds
+        uses: actions/cache@v4
+        with:
+          path: |
+            src/wasm/mecab/build
+            src/wasm/openjtalk/build
+            src/wasm/onnx/dist
+          key: ${{ runner.os }}-wasm-${{ hashFiles('src/wasm/**/*.cpp', 'src/wasm/**/*.c') }}
+          restore-keys: |
+            ${{ runner.os }}-wasm-
+            
+      - name: Build MeCab WASM
+        working-directory: src/wasm/mecab
+        run: |
+          npm ci
+          npm run build:wasm
+          npm run build
+          
+      - name: Build OpenJTalk WASM
+        working-directory: src/wasm/openjtalk
+        run: |
+          npm ci
+          ./build.sh
+          npm run build
+          
+      - name: Build ONNX Runtime Integration
+        working-directory: src/wasm/onnx
+        run: |
+          npm ci
+          npm run build
+          
+      - name: Prepare demo site
+        run: |
+          mkdir -p demo-site
+          
+          # Copy demo pages
+          cp -r src/wasm/test/*.html demo-site/
+          
+          # Copy built assets
+          mkdir -p demo-site/mecab/build
+          cp -r src/wasm/mecab/build/* demo-site/mecab/build/
+          
+          mkdir -p demo-site/openjtalk/build
+          cp -r src/wasm/openjtalk/build/* demo-site/openjtalk/build/
+          
+          mkdir -p demo-site/onnx/dist
+          cp -r src/wasm/onnx/dist/* demo-site/onnx/dist/
+          
+          # Copy data files
+          mkdir -p demo-site/mecab/data
+          cp -r src/wasm/mecab/data/* demo-site/mecab/data/ || true
+          
+          mkdir -p demo-site/openjtalk/data
+          cp -r src/wasm/openjtalk/data/* demo-site/openjtalk/data/ || true
+          
+          # Copy test models (if available)
+          mkdir -p demo-site/test/models
+          cp -r test/models/*.onnx* demo-site/test/models/ || true
+          
+          # Create index page
+          cat > demo-site/index.html << 'EOF'
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Piper WebAssembly TTS Demo</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        h1 {
+            color: #333;
+            border-bottom: 3px solid #4CAF50;
+            padding-bottom: 10px;
+        }
+        .demo-list {
+            list-style: none;
+            padding: 0;
+        }
+        .demo-list li {
+            margin: 15px 0;
+            padding: 15px;
+            background: #f5f5f5;
+            border-radius: 8px;
+            transition: background 0.3s;
+        }
+        .demo-list li:hover {
+            background: #e8e8e8;
+        }
+        .demo-list a {
+            text-decoration: none;
+            color: #333;
+            display: block;
+        }
+        .demo-title {
+            font-size: 18px;
+            font-weight: bold;
+            color: #4CAF50;
+            margin-bottom: 5px;
+        }
+        .demo-desc {
+            color: #666;
+            font-size: 14px;
+        }
+        .warning {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        .requirements {
+            background: #e3f2fd;
+            border: 1px solid #bbdefb;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        footer {
+            margin-top: 50px;
+            padding-top: 20px;
+            border-top: 1px solid #ddd;
+            text-align: center;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎙️ Piper WebAssembly TTS デモ</h1>
+    
+    <div class="requirements">
+        <strong>動作要件:</strong>
+        <ul>
+            <li>Chrome 113以降（推奨）</li>
+            <li>WebAssembly サポート</li>
+            <li>十分なメモリ（最低1GB RAM推奨）</li>
+        </ul>
+    </div>
+    
+    <h2>利用可能なデモ</h2>
+    
+    <ul class="demo-list">
+        <li>
+            <a href="mecab-test.html">
+                <div class="demo-title">MeCab 形態素解析デモ</div>
+                <div class="demo-desc">日本語テキストの形態素解析をブラウザ上で実行</div>
+            </a>
+        </li>
+        
+        <li>
+            <a href="openjtalk-test.html">
+                <div class="demo-title">OpenJTalk 音素変換デモ</div>
+                <div class="demo-desc">日本語テキストから音素列への変換とアクセント解析</div>
+            </a>
+        </li>
+        
+        <li>
+            <a href="full-tts-demo.html">
+                <div class="demo-title">完全統合TTSデモ</div>
+                <div class="demo-desc">MeCab → OpenJTalk → ONNX Runtime による完全な音声合成パイプライン</div>
+            </a>
+        </li>
+        
+        <li>
+            <a href="streaming-tts-demo.html">
+                <div class="demo-title">ストリーミングTTSデモ</div>
+                <div class="demo-desc">リアルタイムストリーミング音声合成（長文対応）</div>
+            </a>
+        </li>
+        
+        <li>
+            <a href="real-model-demo.html">
+                <div class="demo-title">実モデル音声合成デモ</div>
+                <div class="demo-desc">実際のPiperモデルを使用した高品質音声合成</div>
+            </a>
+        </li>
+    </ul>
+    
+    <div class="warning">
+        <strong>⚠️ 注意事項:</strong>
+        <ul>
+            <li>初回ロード時に大きなファイル（辞書、モデル）のダウンロードが発生します</li>
+            <li>モバイルデバイスでは動作しない可能性があります</li>
+            <li>実モデルデモには追加のONNXモデルファイルが必要です</li>
+        </ul>
+    </div>
+    
+    <h2>技術スタック</h2>
+    <ul>
+        <li><strong>MeCab</strong>: 日本語形態素解析エンジン（WebAssembly版）</li>
+        <li><strong>OpenJTalk</strong>: 日本語音素変換エンジン（WebAssembly版）</li>
+        <li><strong>ONNX Runtime Web</strong>: ニューラルネットワーク推論エンジン</li>
+        <li><strong>Web Audio API</strong>: ブラウザネイティブ音声再生</li>
+    </ul>
+    
+    <h2>パフォーマンス</h2>
+    <p>典型的な処理時間（100文字の日本語テキスト）:</p>
+    <ul>
+        <li>形態素解析: ~60ms</li>
+        <li>音素変換: ~30ms</li>
+        <li>音声合成: モデル依存（通常100-500ms）</li>
+        <li>合計: 200-600ms</li>
+    </ul>
+    
+    <footer>
+        <p>Piper WebAssembly TTS - Browser-based Japanese Text-to-Speech</p>
+        <p><a href="https://github.com/rhasspy/piper">GitHub Repository</a></p>
+    </footer>
+</body>
+</html>
+EOF
+          
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+        
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./demo-site
+          
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+        
+      - name: Comment PR with preview URL
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const previewUrl = '${{ steps.deployment.outputs.page_url }}';
+            const comment = `## 🚀 デモサイトプレビュー
+            
+            PRのデモサイトがデプロイされました:
+            
+            🔗 **[${previewUrl}](${previewUrl})**
+            
+            ### 利用可能なデモ:
+            - [MeCab 形態素解析デモ](${previewUrl}/mecab-test.html)
+            - [OpenJTalk 音素変換デモ](${previewUrl}/openjtalk-test.html)
+            - [完全統合TTSデモ](${previewUrl}/full-tts-demo.html)
+            - [ストリーミングTTSデモ](${previewUrl}/streaming-tts-demo.html)
+            - [実モデルデモ](${previewUrl}/real-model-demo.html)
+            
+            > **Note**: 初回アクセス時は大きなファイルのダウンロードが発生するため、読み込みに時間がかかる場合があります。`;
+            
+            github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              body: comment
+            });

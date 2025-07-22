@@ -16,6 +16,13 @@ export interface ModelConfig {
   readonly espeak?: {
     voice: string;
   };
+  readonly phonemeType?: string;
+  readonly inference?: {
+    noise_scale?: number;
+    length_scale?: number;
+    noise_w?: number;
+  };
+  readonly piperVersion?: string;
 }
 
 export interface SynthesisOptions {

@@ -8,18 +8,26 @@ import * as ort from 'onnxruntime-web';
 import { ModelLoader } from './ModelLoader';
 import { VoiceSynthesizer } from './VoiceSynthesizer';
 import { AudioPlayer } from './AudioPlayer';
+import { MemoryManager, ResourceTracker } from './MemoryManager';
 import { RuntimeOptions, SynthesisOptions, SynthesisResult } from './types';
 
 export class PiperONNXRuntime {
   private modelLoader: ModelLoader;
   private synthesizer: VoiceSynthesizer | null = null;
   private audioPlayer: AudioPlayer;
+  private memoryManager: MemoryManager;
+  private resourceTracker: ResourceTracker;
   private initialized = false;
   
   constructor(options: RuntimeOptions = {}) {
     this.setupONNXRuntime(options);
     this.modelLoader = new ModelLoader();
     this.audioPlayer = new AudioPlayer();
+    this.memoryManager = new MemoryManager();
+    this.resourceTracker = this.memoryManager.createResourceTracker();
+    
+    // Setup memory management
+    this.setupMemoryManagement();
   }
   
   private setupONNXRuntime(options: RuntimeOptions) {
@@ -181,10 +189,60 @@ export class PiperONNXRuntime {
   }
   
   /**
+   * Setup memory management
+   */
+  private setupMemoryManagement(): void {
+    // Register cleanup callbacks
+    this.memoryManager.registerCleanupCallback(async () => {
+      // Clear model cache
+      this.modelLoader.clearCache();
+      
+      // Force garbage collection if available
+      if (typeof gc !== 'undefined') {
+        gc();
+      }
+    });
+    
+    // Set memory warning handler
+    this.memoryManager.onMemoryWarning((stats) => {
+      console.warn('Memory warning:', {
+        used: this.memoryManager.formatBytes(stats.usedJSHeapSize),
+        total: this.memoryManager.formatBytes(stats.totalJSHeapSize),
+        limit: this.memoryManager.formatBytes(stats.jsHeapSizeLimit)
+      });
+    });
+    
+    // Start monitoring in production
+    if (process.env.NODE_ENV === 'production') {
+      this.memoryManager.startMonitoring();
+    }
+  }
+  
+  /**
+   * Get memory statistics
+   */
+  getMemoryStats() {
+    return this.memoryManager.getMemoryStats();
+  }
+  
+  /**
+   * Perform manual memory cleanup
+   */
+  async cleanupMemory(): Promise<void> {
+    await this.memoryManager.performCleanup();
+  }
+  
+  /**
    * Cleanup resources
    */
   async dispose(): Promise<void> {
     this.stop();
+    
+    // Stop memory monitoring
+    this.memoryManager.stopMonitoring();
+    
+    // Dispose tracked resources
+    await this.resourceTracker.disposeAll();
     
     if (this.synthesizer) {
       await this.synthesizer.dispose();

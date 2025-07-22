@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Piper WebAssembly Streaming TTS Demo</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .input-section {
+            margin: 20px 0;
+        }
+        textarea {
+            width: 100%;
+            min-height: 150px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        .primary {
+            background-color: #4CAF50;
+            color: white;
+        }
+        .primary:hover:not(:disabled) {
+            background-color: #45a049;
+        }
+        .secondary {
+            background-color: #f44336;
+            color: white;
+        }
+        .secondary:hover:not(:disabled) {
+            background-color: #da190b;
+        }
+        .status {
+            margin: 20px 0;
+            padding: 15px;
+            border-radius: 5px;
+            background-color: #e3f2fd;
+        }
+        .error {
+            background-color: #ffebee;
+            color: #c62828;
+        }
+        .success {
+            background-color: #e8f5e9;
+            color: #2e7d32;
+        }
+        .progress {
+            margin: 20px 0;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 30px;
+            background-color: #e0e0e0;
+            border-radius: 15px;
+            overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%;
+            background-color: #4CAF50;
+            transition: width 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+        }
+        .metrics {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .metric-card {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 5px;
+            text-align: center;
+        }
+        .metric-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #333;
+        }
+        .metric-label {
+            color: #666;
+            font-size: 14px;
+        }
+        #waveform {
+            width: 100%;
+            height: 150px;
+            background: #f0f0f0;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        .options {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+            padding: 15px;
+            background: #f9f9f9;
+            border-radius: 5px;
+        }
+        .option-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        .option-group label {
+            font-weight: bold;
+            color: #555;
+        }
+        .option-group input[type="range"] {
+            width: 100%;
+        }
+        .option-value {
+            text-align: center;
+            color: #666;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎙️ Piper Streaming TTS デモ</h1>
+        
+        <div class="input-section">
+            <h3>テキスト入力</h3>
+            <textarea id="textInput" placeholder="ここに日本語テキストを入力してください...">こんにちは、これはPiper音声合成エンジンのストリーミングデモです。長い文章でもリアルタイムで音声を生成し、すぐに再生を開始できます。</textarea>
+        </div>
+
+        <div class="options">
+            <div class="option-group">
+                <label for="chunkSize">チャンクサイズ（音素数）</label>
+                <input type="range" id="chunkSize" min="10" max="100" value="30" step="10">
+                <div class="option-value" id="chunkSizeValue">30</div>
+            </div>
+            <div class="option-group">
+                <label for="bufferSize">バッファサイズ（チャンク数）</label>
+                <input type="range" id="bufferSize" min="1" max="10" value="3" step="1">
+                <div class="option-value" id="bufferSizeValue">3</div>
+            </div>
+            <div class="option-group">
+                <label for="lengthScale">話速（Length Scale）</label>
+                <input type="range" id="lengthScale" min="0.5" max="2.0" value="1.0" step="0.1">
+                <div class="option-value" id="lengthScaleValue">1.0</div>
+            </div>
+            <div class="option-group">
+                <label for="noiseScale">音声変動（Noise Scale）</label>
+                <input type="range" id="noiseScale" min="0.0" max="1.0" value="0.667" step="0.1">
+                <div class="option-value" id="noiseScaleValue">0.667</div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button id="streamBtn" class="primary" onclick="startStreaming()">
+                ▶️ ストリーミング開始
+            </button>
+            <button id="stopBtn" class="secondary" onclick="stopStreaming()" disabled>
+                ⏹️ 停止
+            </button>
+            <button id="downloadBtn" class="primary" onclick="downloadAudio()" disabled>
+                💾 ダウンロード
+            </button>
+        </div>
+
+        <div class="progress">
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressBar" style="width: 0%">0%</div>
+            </div>
+        </div>
+
+        <div id="status" class="status">
+            準備完了。「ストリーミング開始」をクリックしてください。
+        </div>
+
+        <canvas id="waveform"></canvas>
+
+        <div class="metrics">
+            <div class="metric-card">
+                <div class="metric-value" id="chunksProcessed">0</div>
+                <div class="metric-label">処理済みチャンク</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-value" id="audioLength">0.0s</div>
+                <div class="metric-label">生成音声長</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-value" id="rtf">0.0x</div>
+                <div class="metric-label">リアルタイムファクター</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-value" id="latency">0ms</div>
+                <div class="metric-label">初期レイテンシ</div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        // Import modules
+        let mecabModule, openjtalkModule, onnxRuntime;
+        let streamingSynthesizer;
+        let audioContext;
+        let audioBuffers = [];
+        let isStreaming = false;
+        let cancelStream = null;
+        let startTime;
+        let firstChunkTime;
+        
+        // Update slider values
+        document.querySelectorAll('input[type="range"]').forEach(slider => {
+            slider.addEventListener('input', (e) => {
+                const valueDiv = document.getElementById(e.target.id + 'Value');
+                valueDiv.textContent = e.target.value;
+            });
+        });
+
+        async function initializeModules() {
+            try {
+                updateStatus('モジュールを初期化中...', 'info');
+                
+                // Initialize MeCab
+                const MeCabModule = await import('../mecab/build/mecab-core.js');
+                mecabModule = await MeCabModule.default();
+                await mecabModule._mecab_initialize();
+                
+                // Initialize OpenJTalk
+                const OpenJTalkModule = await import('../openjtalk/build/openjtalk-core.js');
+                openjtalkModule = await OpenJTalkModule.default();
+                await openjtalkModule._openjtalk_initialize();
+                openjtalkModule._openjtalk_setPUAMapping(1);
+                
+                // Initialize ONNX Runtime
+                const { PiperONNXRuntime } = await import('../onnx/dist/piper-onnx.js');
+                onnxRuntime = new PiperONNXRuntime();
+                
+                // Load model
+                const modelPath = '../../../test/models/ja_JP-test-medium.onnx';
+                const modelConfigPath = '../../../test/models/ja_JP-test-medium.onnx.json';
+                
+                await onnxRuntime.loadModel(modelPath, modelConfigPath);
+                
+                // Import StreamingSynthesizer
+                const { StreamingSynthesizer } = await import('../onnx/src/StreamingSynthesizer.js');
+                streamingSynthesizer = new StreamingSynthesizer(onnxRuntime.model);
+                await streamingSynthesizer.initialize();
+                
+                // Initialize audio context
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                
+                updateStatus('初期化完了！ストリーミングを開始できます。', 'success');
+                
+            } catch (error) {
+                console.error('Initialization error:', error);
+                updateStatus(`初期化エラー: ${error.message}`, 'error');
+            }
+        }
+
+        async function startStreaming() {
+            if (isStreaming) return;
+            
+            const text = document.getElementById('textInput').value;
+            if (!text) {
+                updateStatus('テキストを入力してください', 'error');
+                return;
+            }
+            
+            isStreaming = true;
+            audioBuffers = [];
+            startTime = performance.now();
+            firstChunkTime = null;
+            
+            // Update UI
+            document.getElementById('streamBtn').disabled = true;
+            document.getElementById('stopBtn').disabled = false;
+            document.getElementById('downloadBtn').disabled = true;
+            updateStatus('ストリーミング処理中...', 'info');
+            
+            try {
+                // Process text through MeCab
+                const mecabOutput = processMeCab(text);
+                console.log('MeCab output:', mecabOutput);
+                
+                // Process through OpenJTalk
+                const phonemes = processOpenJTalk(mecabOutput);
+                console.log('Phonemes:', phonemes);
+                
+                // Convert PUA to phoneme IDs
+                const phonemeIds = convertPUAToIds(phonemes);
+                console.log('Phoneme IDs:', phonemeIds);
+                
+                // Get streaming options
+                const options = {
+                    chunkSize: parseInt(document.getElementById('chunkSize').value),
+                    bufferSize: parseInt(document.getElementById('bufferSize').value),
+                    lengthScale: parseFloat(document.getElementById('lengthScale').value),
+                    noiseScale: parseFloat(document.getElementById('noiseScale').value),
+                    onChunk: handleAudioChunk
+                };
+                
+                // Start streaming synthesis
+                const result = await streamingSynthesizer.streamSynthesize(phonemeIds, options);
+                cancelStream = result.cancel;
+                
+                // Process audio stream
+                const reader = result.audioStream.getReader();
+                let totalSamples = 0;
+                
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    
+                    if (!firstChunkTime) {
+                        firstChunkTime = performance.now();
+                        const latency = firstChunkTime - startTime;
+                        document.getElementById('latency').textContent = `${Math.round(latency)}ms`;
+                    }
+                    
+                    // Play audio chunk
+                    playAudioChunk(value, result.sampleRate);
+                    audioBuffers.push(value);
+                    totalSamples += value.length;
+                    
+                    // Update metrics
+                    const audioLength = totalSamples / result.sampleRate;
+                    document.getElementById('audioLength').textContent = `${audioLength.toFixed(1)}s`;
+                    
+                    const elapsed = (performance.now() - startTime) / 1000;
+                    const rtf = audioLength / elapsed;
+                    document.getElementById('rtf').textContent = `${rtf.toFixed(1)}x`;
+                }
+                
+                updateStatus('ストリーミング完了！', 'success');
+                document.getElementById('downloadBtn').disabled = false;
+                
+            } catch (error) {
+                console.error('Streaming error:', error);
+                updateStatus(`ストリーミングエラー: ${error.message}`, 'error');
+            } finally {
+                isStreaming = false;
+                document.getElementById('streamBtn').disabled = false;
+                document.getElementById('stopBtn').disabled = true;
+            }
+        }
+
+        function stopStreaming() {
+            if (cancelStream) {
+                cancelStream();
+                cancelStream = null;
+            }
+            updateStatus('ストリーミングを停止しました', 'info');
+        }
+
+        function handleAudioChunk(chunk, chunkIndex) {
+            // Update progress
+            document.getElementById('chunksProcessed').textContent = chunkIndex + 1;
+            
+            // Draw waveform
+            drawWaveform(chunk);
+        }
+
+        function processMeCab(text) {
+            const inputPtr = mecabModule._malloc(text.length * 3 + 1);
+            mecabModule.stringToUTF8(text, inputPtr, text.length * 3 + 1);
+            
+            const resultPtr = mecabModule._mecab_parse(inputPtr);
+            const result = mecabModule.UTF8ToString(resultPtr);
+            
+            mecabModule._free(inputPtr);
+            mecabModule._free(resultPtr);
+            
+            return result;
+        }
+
+        function processOpenJTalk(mecabOutput) {
+            const inputPtr = openjtalkModule._malloc(mecabOutput.length * 3 + 1);
+            openjtalkModule.stringToUTF8(mecabOutput, inputPtr, mecabOutput.length * 3 + 1);
+            
+            const resultPtr = openjtalkModule._openjtalk_processMecabOutput(inputPtr);
+            const njdOutput = openjtalkModule.UTF8ToString(resultPtr);
+            openjtalkModule._free(resultPtr);
+            
+            const phonemePtr = openjtalkModule._openjtalk_convertToPhonemes(njdOutput.length * 3 + 1);
+            openjtalkModule.stringToUTF8(njdOutput, phonemePtr, njdOutput.length * 3 + 1);
+            
+            const phonemeResultPtr = openjtalkModule._openjtalk_convertToPhonemes(phonemePtr);
+            const phonemes = openjtalkModule.UTF8ToString(phonemeResultPtr);
+            
+            openjtalkModule._free(inputPtr);
+            openjtalkModule._free(phonemePtr);
+            openjtalkModule._free(phonemeResultPtr);
+            
+            return phonemes;
+        }
+
+        function convertPUAToIds(puaString) {
+            // Get phoneme ID map from model config
+            const phonemeIdMap = onnxRuntime.model.config.phoneme_id_map;
+            const ids = [];
+            
+            for (const char of puaString) {
+                if (phonemeIdMap[char]) {
+                    ids.push(phonemeIdMap[char][0]);
+                }
+            }
+            
+            return ids;
+        }
+
+        async function playAudioChunk(audioData, sampleRate) {
+            const buffer = audioContext.createBuffer(1, audioData.length, sampleRate);
+            buffer.copyToChannel(audioData, 0);
+            
+            const source = audioContext.createBufferSource();
+            source.buffer = buffer;
+            source.connect(audioContext.destination);
+            source.start();
+        }
+
+        function drawWaveform(audioData) {
+            const canvas = document.getElementById('waveform');
+            const ctx = canvas.getContext('2d');
+            
+            canvas.width = canvas.offsetWidth;
+            canvas.height = canvas.offsetHeight;
+            
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.strokeStyle = '#4CAF50';
+            ctx.lineWidth = 2;
+            
+            const step = Math.ceil(audioData.length / canvas.width);
+            const amp = canvas.height / 2;
+            
+            ctx.beginPath();
+            for (let i = 0; i < canvas.width; i++) {
+                const min = Math.min(...audioData.slice(i * step, (i + 1) * step));
+                const max = Math.max(...audioData.slice(i * step, (i + 1) * step));
+                
+                ctx.moveTo(i, amp * (1 + min));
+                ctx.lineTo(i, amp * (1 + max));
+            }
+            ctx.stroke();
+        }
+
+        async function downloadAudio() {
+            if (audioBuffers.length === 0) return;
+            
+            // Combine all audio buffers
+            const totalLength = audioBuffers.reduce((sum, buf) => sum + buf.length, 0);
+            const combined = new Float32Array(totalLength);
+            
+            let offset = 0;
+            for (const buffer of audioBuffers) {
+                combined.set(buffer, offset);
+                offset += buffer.length;
+            }
+            
+            // Convert to WAV
+            const sampleRate = onnxRuntime.model.config.audio.sample_rate;
+            const wavBuffer = audioToWAV(combined, sampleRate);
+            
+            // Download
+            const blob = new Blob([wavBuffer], { type: 'audio/wav' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'streaming_tts_output.wav';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function audioToWAV(audioData, sampleRate) {
+            const length = audioData.length;
+            const buffer = new ArrayBuffer(44 + length * 2);
+            const view = new DataView(buffer);
+            
+            // WAV header
+            const writeString = (offset, string) => {
+                for (let i = 0; i < string.length; i++) {
+                    view.setUint8(offset + i, string.charCodeAt(i));
+                }
+            };
+            
+            writeString(0, 'RIFF');
+            view.setUint32(4, 36 + length * 2, true);
+            writeString(8, 'WAVE');
+            writeString(12, 'fmt ');
+            view.setUint32(16, 16, true);
+            view.setUint16(20, 1, true);
+            view.setUint16(22, 1, true);
+            view.setUint32(24, sampleRate, true);
+            view.setUint32(28, sampleRate * 2, true);
+            view.setUint16(32, 2, true);
+            view.setUint16(34, 16, true);
+            writeString(36, 'data');
+            view.setUint32(40, length * 2, true);
+            
+            // Convert float to 16-bit PCM
+            let offset = 44;
+            for (let i = 0; i < length; i++) {
+                const sample = Math.max(-1, Math.min(1, audioData[i]));
+                view.setInt16(offset, sample * 0x7FFF, true);
+                offset += 2;
+            }
+            
+            return buffer;
+        }
+
+        function updateStatus(message, type = 'info') {
+            const statusDiv = document.getElementById('status');
+            statusDiv.textContent = message;
+            statusDiv.className = 'status';
+            if (type === 'error') statusDiv.classList.add('error');
+            if (type === 'success') statusDiv.classList.add('success');
+        }
+
+        // Initialize on load
+        window.addEventListener('load', initializeModules);
+    </script>
+</body>
+</html>

@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real Piper Model Demo - Japanese TTS</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            border-bottom: 3px solid #4CAF50;
+            padding-bottom: 10px;
+        }
+        .input-group {
+            margin: 20px 0;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        textarea {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+            resize: vertical;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-right: 10px;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        #status {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 5px;
+            background-color: #f0f0f0;
+            min-height: 50px;
+        }
+        .error {
+            color: #d32f2f;
+            background-color: #ffebee;
+        }
+        .success {
+            color: #2e7d32;
+            background-color: #e8f5e9;
+        }
+        .loading {
+            color: #1976d2;
+            background-color: #e3f2fd;
+        }
+        #waveform {
+            margin-top: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .controls-group {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .control-item {
+            display: flex;
+            flex-direction: column;
+        }
+        input[type="range"] {
+            width: 100%;
+            margin: 5px 0;
+        }
+        .value-display {
+            text-align: center;
+            color: #666;
+            font-size: 14px;
+        }
+        .info-panel {
+            background-color: #e3f2fd;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 20px;
+        }
+        .phoneme-display {
+            font-family: monospace;
+            background-color: #f5f5f5;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            word-break: break-all;
+        }
+        audio {
+            width: 100%;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Real Piper Model Demo - 日本語音声合成</h1>
+        
+        <div class="input-group">
+            <label for="textInput">テキストを入力してください:</label>
+            <textarea id="textInput" rows="4" placeholder="こんにちは、世界！今日はいい天気ですね。">こんにちは、世界！今日はいい天気ですね。</textarea>
+        </div>
+
+        <div class="controls-group">
+            <div class="control-item">
+                <label for="lengthScale">速度調整 (Length Scale):</label>
+                <input type="range" id="lengthScale" min="0.5" max="2.0" step="0.1" value="1.0">
+                <div class="value-display" id="lengthScaleValue">1.0</div>
+            </div>
+            <div class="control-item">
+                <label for="noiseScale">音声変動 (Noise Scale):</label>
+                <input type="range" id="noiseScale" min="0.0" max="1.5" step="0.1" value="0.667">
+                <div class="value-display" id="noiseScaleValue">0.667</div>
+            </div>
+            <div class="control-item">
+                <label for="noiseW">ノイズ重み (Noise W):</label>
+                <input type="range" id="noiseW" min="0.0" max="1.0" step="0.1" value="0.8">
+                <div class="value-display" id="noiseWValue">0.8</div>
+            </div>
+        </div>
+
+        <div>
+            <button id="synthesizeBtn" onclick="synthesizeSpeech()">音声生成</button>
+            <button id="downloadBtn" onclick="downloadAudio()" disabled>ダウンロード</button>
+        </div>
+
+        <div id="status"></div>
+        
+        <audio id="audioPlayer" controls style="display: none;"></audio>
+        
+        <canvas id="waveform" width="800" height="200" style="display: none;"></canvas>
+        
+        <div class="phoneme-display" id="phonemeDisplay" style="display: none;"></div>
+        
+        <div class="info-panel" id="infoPanel" style="display: none;">
+            <h3>合成情報</h3>
+            <div id="synthesisInfo"></div>
+        </div>
+    </div>
+
+    <!-- Load dependencies -->
+    <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.16.3/dist/ort.min.js"></script>
+    <script type="module">
+        // Import MeCab and OpenJTalk
+        import MeCabWorker from '/mecab/build/mecab-worker.js';
+        import OpenJTalkWorker from '/openjtalk/build/openjtalk-worker.js';
+        
+        // Import Piper ONNX Runtime
+        import { PiperONNXRuntime } from '/onnx/dist/piper-onnx-runtime.es.js';
+        
+        let mecab, openjtalk, piperRuntime;
+        let currentAudioData = null;
+        
+        // Update slider values
+        document.querySelectorAll('input[type="range"]').forEach(slider => {
+            slider.addEventListener('input', (e) => {
+                document.getElementById(e.target.id + 'Value').textContent = e.target.value;
+            });
+        });
+        
+        async function initializeSystem() {
+            updateStatus('システムを初期化中...', 'loading');
+            
+            try {
+                // Initialize MeCab
+                mecab = new MeCabWorker();
+                await mecab.initialize();
+                console.log('MeCab initialized');
+                
+                // Initialize OpenJTalk
+                openjtalk = new OpenJTalkWorker();
+                await openjtalk.initialize({
+                    dictionaryUrl: '/openjtalk/data/dictionary',
+                    voiceUrl: '/openjtalk/data/hts_voice_nitech_jp_atr503_m001-1.05/nitech_jp_atr503_m001.htsvoice'
+                });
+                console.log('OpenJTalk initialized');
+                
+                // Initialize Piper ONNX Runtime
+                piperRuntime = new PiperONNXRuntime({
+                    wasmPaths: {
+                        'ort-wasm.wasm': 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.16.3/dist/ort-wasm.wasm',
+                        'ort-wasm-simd.wasm': 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.16.3/dist/ort-wasm-simd.wasm'
+                    }
+                });
+                
+                // Load real Piper model
+                const modelPath = '/test/models/ja_JP-test-medium.onnx';
+                await piperRuntime.initialize(modelPath);
+                console.log('Piper ONNX Runtime initialized with real model');
+                
+                updateStatus('システムの準備ができました。テキストを入力して「音声生成」をクリックしてください。', 'success');
+                
+            } catch (error) {
+                console.error('Initialization error:', error);
+                updateStatus(`初期化エラー: ${error.message}`, 'error');
+            }
+        }
+        
+        window.synthesizeSpeech = async function() {
+            const text = document.getElementById('textInput').value;
+            if (!text) {
+                updateStatus('テキストを入力してください。', 'error');
+                return;
+            }
+            
+            updateStatus('音声を生成中...', 'loading');
+            document.getElementById('synthesizeBtn').disabled = true;
+            
+            try {
+                const startTime = performance.now();
+                
+                // Step 1: Text to morphemes
+                const morphemes = await mecab.parse(text);
+                console.log('Morphemes:', morphemes);
+                
+                // Step 2: Get phonemes with accents
+                const fullContextLabels = await openjtalk.synthesize(morphemes, {
+                    outputType: 'labels'
+                });
+                console.log('Full context labels:', fullContextLabels.length);
+                
+                // Step 3: Extract phonemes
+                const phonemes = extractPhonemesFromLabels(fullContextLabels);
+                console.log('Phonemes:', phonemes);
+                
+                // Display phonemes
+                const phonemeDisplay = document.getElementById('phonemeDisplay');
+                phonemeDisplay.textContent = `音素列: ${phonemes.join(' ')}`;
+                phonemeDisplay.style.display = 'block';
+                
+                // Step 4: Convert to PUA string
+                const puaString = phonemesToPUA(phonemes);
+                console.log('PUA string:', Array.from(puaString).map(c => 
+                    `\\u${c.charCodeAt(0).toString(16).padStart(4, '0')}`
+                ).join(''));
+                
+                // Step 5: Synthesize with Piper
+                const synthOptions = {
+                    lengthScale: parseFloat(document.getElementById('lengthScale').value),
+                    noiseScale: parseFloat(document.getElementById('noiseScale').value),
+                    noiseW: parseFloat(document.getElementById('noiseW').value)
+                };
+                
+                const result = await piperRuntime.synthesizeFromPUA(puaString, synthOptions);
+                currentAudioData = result;
+                
+                const totalTime = performance.now() - startTime;
+                
+                // Display synthesis info
+                const infoPanel = document.getElementById('infoPanel');
+                const synthesisInfo = document.getElementById('synthesisInfo');
+                synthesisInfo.innerHTML = `
+                    <p>生成時間: ${totalTime.toFixed(0)}ms</p>
+                    <p>音声長: ${result.duration.toFixed(2)}秒</p>
+                    <p>サンプルレート: ${result.sampleRate}Hz</p>
+                    <p>リアルタイムファクター: ${(result.duration * 1000 / totalTime).toFixed(1)}x</p>
+                    <p>音素数: ${phonemes.length}</p>
+                `;
+                infoPanel.style.display = 'block';
+                
+                // Play audio
+                await playAudio(result);
+                
+                // Draw waveform
+                drawWaveform(result.audio);
+                
+                updateStatus('音声生成が完了しました！', 'success');
+                document.getElementById('downloadBtn').disabled = false;
+                
+            } catch (error) {
+                console.error('Synthesis error:', error);
+                updateStatus(`エラー: ${error.message}`, 'error');
+            } finally {
+                document.getElementById('synthesizeBtn').disabled = false;
+            }
+        };
+        
+        function extractPhonemesFromLabels(labels) {
+            const phonemes = [];
+            for (const label of labels) {
+                const match = label.match(/\-([a-zA-Z]+)\+/);
+                if (match) {
+                    phonemes.push(match[1]);
+                }
+            }
+            return phonemes;
+        }
+        
+        function phonemesToPUA(phonemes) {
+            const phonemeMap = {
+                'a': 'a', 'i': 'i', 'u': 'u', 'e': 'e', 'o': 'o',
+                'A': 'A', 'I': 'I', 'U': 'U', 'E': 'E', 'O': 'O',
+                'k': 'k', 'g': 'g', 't': 't', 'd': 'd', 'n': 'n',
+                's': 's', 'z': 'z', 'h': 'h', 'm': 'm', 'r': 'r',
+                'w': 'w', 'y': 'y', 'p': 'p', 'b': 'b', 'f': 'f',
+                'v': 'v', 'N': 'N', 'q': 'q', 'j': 'j',
+                'ky': '\ue006', 'gy': '\ue009', 'ty': '\ue00a', 'dy': '\ue00b',
+                'ny': '\ue013', 'hy': '\ue012', 'by': '\ue00d', 'py': '\ue00c',
+                'my': '\ue014', 'ry': '\ue015',
+                'sh': '\ue010', 'ch': '\ue00a', 'ts': '\ue00a',
+                'kw': '\ue007', 'gw': '\ue008',
+                'cl': '\ue000', 'pau': '_', 'sil': '_'
+            };
+            
+            let result = '';
+            let i = 0;
+            
+            while (i < phonemes.length) {
+                const phoneme = phonemes[i];
+                
+                // Check for two-character phonemes
+                if (i + 1 < phonemes.length) {
+                    const combined = phoneme + phonemes[i + 1];
+                    if (phonemeMap[combined]) {
+                        result += phonemeMap[combined];
+                        i += 2;
+                        continue;
+                    }
+                }
+                
+                // Single character phoneme
+                result += phonemeMap[phoneme] || phoneme;
+                i++;
+            }
+            
+            return result;
+        }
+        
+        async function playAudio(result) {
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const audioBuffer = audioContext.createBuffer(1, result.audio.length, result.sampleRate);
+            audioBuffer.getChannelData(0).set(result.audio);
+            
+            // Create WAV blob
+            const wavBlob = createWAVBlob(result.audio, result.sampleRate);
+            const audioUrl = URL.createObjectURL(wavBlob);
+            
+            const audioPlayer = document.getElementById('audioPlayer');
+            audioPlayer.src = audioUrl;
+            audioPlayer.style.display = 'block';
+            audioPlayer.play();
+        }
+        
+        function createWAVBlob(audioData, sampleRate) {
+            const length = audioData.length;
+            const buffer = new ArrayBuffer(44 + length * 2);
+            const view = new DataView(buffer);
+            
+            // WAV header
+            const writeString = (offset, string) => {
+                for (let i = 0; i < string.length; i++) {
+                    view.setUint8(offset + i, string.charCodeAt(i));
+                }
+            };
+            
+            writeString(0, 'RIFF');
+            view.setUint32(4, 36 + length * 2, true);
+            writeString(8, 'WAVE');
+            writeString(12, 'fmt ');
+            view.setUint32(16, 16, true);
+            view.setUint16(20, 1, true);
+            view.setUint16(22, 1, true);
+            view.setUint32(24, sampleRate, true);
+            view.setUint32(28, sampleRate * 2, true);
+            view.setUint16(32, 2, true);
+            view.setUint16(34, 16, true);
+            writeString(36, 'data');
+            view.setUint32(40, length * 2, true);
+            
+            // Convert float to 16-bit PCM
+            let offset = 44;
+            for (let i = 0; i < length; i++) {
+                const sample = Math.max(-1, Math.min(1, audioData[i]));
+                view.setInt16(offset, sample * 0x7FFF, true);
+                offset += 2;
+            }
+            
+            return new Blob([buffer], { type: 'audio/wav' });
+        }
+        
+        function drawWaveform(audioData) {
+            const canvas = document.getElementById('waveform');
+            const ctx = canvas.getContext('2d');
+            canvas.style.display = 'block';
+            
+            const width = canvas.width;
+            const height = canvas.height;
+            const centerY = height / 2;
+            
+            ctx.clearRect(0, 0, width, height);
+            ctx.strokeStyle = '#4CAF50';
+            ctx.lineWidth = 2;
+            
+            ctx.beginPath();
+            const step = Math.ceil(audioData.length / width);
+            
+            for (let i = 0; i < width; i++) {
+                const index = i * step;
+                const value = audioData[index] || 0;
+                const y = centerY + (value * centerY * 0.8);
+                
+                if (i === 0) {
+                    ctx.moveTo(i, y);
+                } else {
+                    ctx.lineTo(i, y);
+                }
+            }
+            
+            ctx.stroke();
+            
+            // Draw center line
+            ctx.strokeStyle = '#ddd';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(0, centerY);
+            ctx.lineTo(width, centerY);
+            ctx.stroke();
+        }
+        
+        window.downloadAudio = function() {
+            if (!currentAudioData) return;
+            
+            const wavBlob = createWAVBlob(currentAudioData.audio, currentAudioData.sampleRate);
+            const url = URL.createObjectURL(wavBlob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `piper_tts_${new Date().getTime()}.wav`;
+            a.click();
+            URL.revokeObjectURL(url);
+        };
+        
+        function updateStatus(message, type = '') {
+            const status = document.getElementById('status');
+            status.textContent = message;
+            status.className = type;
+        }
+        
+        // Initialize on page load
+        initializeSystem();
+    </script>
+</body>
+</html>

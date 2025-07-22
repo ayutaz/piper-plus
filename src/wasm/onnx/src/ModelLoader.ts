@@ -6,9 +6,13 @@
 
 import * as ort from 'onnxruntime-web';
 import { PiperModel, ModelConfig } from './types';
+import { RetryHandler } from './RetryHandler';
+import { ErrorHandler, ErrorType } from './ErrorHandler';
 
 export class ModelLoader {
   private modelCache = new Map<string, PiperModel>();
+  private retryHandler = new RetryHandler();
+  private errorHandler = new ErrorHandler();
   
   /**
    * Load a Piper model from URL
@@ -23,10 +27,37 @@ export class ModelLoader {
     try {
       console.log(`Loading model: ${modelPath}`);
       
-      // Load model configuration
-      const config = await this.loadConfig(configPath || modelPath.replace('.onnx', '.json'));
+      // Auto-detect config path if not provided
+      if (!configPath) {
+        // Try both .json and .onnx.json patterns
+        const jsonPath = modelPath.replace('.onnx', '.json');
+        const onnxJsonPath = modelPath + '.json';
+        
+        // Check which one exists
+        try {
+          const response = await fetch(onnxJsonPath);
+          if (response.ok) {
+            configPath = onnxJsonPath;
+          } else {
+            configPath = jsonPath;
+          }
+        } catch {
+          configPath = jsonPath;
+        }
+      }
       
-      // Create ONNX session
+      // Load model configuration with retry
+      const config = await this.retryHandler.execute(
+        () => this.loadConfig(configPath!),
+        {
+          maxRetries: 3,
+          onRetry: (error, attempt) => {
+            console.log(`Retrying config load (attempt ${attempt})...`);
+          }
+        }
+      );
+      
+      // Create ONNX session with retry
       const sessionOptions: ort.InferenceSession.SessionOptions = {
         executionProviders: this.getExecutionProviders(),
         graphOptimizationLevel: 'all',
@@ -37,7 +68,18 @@ export class ModelLoader {
         logSeverityLevel: 3
       };
       
-      const session = await ort.InferenceSession.create(modelPath, sessionOptions);
+      const session = await this.retryHandler.execute(
+        () => ort.InferenceSession.create(modelPath, sessionOptions),
+        {
+          maxRetries: 2,
+          initialDelay: 2000,
+          onRetry: (error, attempt) => {
+            console.log(`Retrying model load (attempt ${attempt})...`);
+            // Clear any partial state
+            if (typeof gc !== 'undefined') gc();
+          }
+        }
+      );
       
       // Validate model
       this.validateModel(session, config);
@@ -56,8 +98,12 @@ export class ModelLoader {
       return model;
       
     } catch (error) {
-      console.error(`Failed to load model: ${modelPath}`, error);
-      throw new Error(`Model loading failed: ${error}`);
+      const piperError = this.errorHandler.handleError(error as Error, {
+        type: ErrorType.MODEL_LOADING,
+        operation: 'ModelLoader.load',
+        details: { modelPath, configPath }
+      });
+      throw piperError;
     }
   }
   
@@ -73,14 +119,20 @@ export class ModelLoader {
       
       const configData = await response.json();
       
-      // Validate and normalize config
+      // Validate and normalize Piper config format
       const config: ModelConfig = {
         sampleRate: configData.audio?.sample_rate || 22050,
         numSpeakers: configData.num_speakers || 1,
         phonemeIdMap: this.buildPhonemeIdMap(configData),
-        language: configData.language?.code || 'ja',
-        espeak: configData.espeak
+        language: configData.language?.code || configData.espeak?.voice || 'ja',
+        espeak: configData.espeak,
+        phonemeType: configData.phoneme_type,
+        inference: configData.inference,
+        piperVersion: configData.piper_version
       };
+      
+      // Log config details for debugging
+      console.log(`Loaded config: ${config.language}, phoneme_type: ${config.phonemeType}, version: ${config.piperVersion}`);
       
       return config;
       
@@ -92,7 +144,8 @@ export class ModelLoader {
         sampleRate: 22050,
         numSpeakers: 1,
         phonemeIdMap: this.getDefaultJapanesePhonemeMap(),
-        language: 'ja'
+        language: 'ja',
+        phonemeType: 'openjtalk'
       };
     }
   }
@@ -104,8 +157,12 @@ export class ModelLoader {
     const phonemeIdMap: Record<string, number> = {};
     
     if (configData.phoneme_id_map) {
-      // Use provided mapping
-      Object.assign(phonemeIdMap, configData.phoneme_id_map);
+      // Piper format: phoneme_id_map has arrays with IDs
+      for (const [phoneme, idArray] of Object.entries(configData.phoneme_id_map)) {
+        // Extract the first ID from the array
+        const id = Array.isArray(idArray) ? idArray[0] : idArray;
+        phonemeIdMap[phoneme] = id as number;
+      }
     } else if (configData.phonemes) {
       // Build mapping from phoneme list
       configData.phonemes.forEach((phoneme: string, index: number) => {

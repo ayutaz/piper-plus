@@ -93,21 +93,21 @@ export class VoiceSynthesizer {
     
     // Length scale (controls speech speed)
     if (this.session.inputNames.includes('length_scale')) {
-      const lengthScale = options.lengthScale || 1.0;
+      const lengthScale = options.lengthScale || this.model.config.inference?.length_scale || 1.0;
       const scaleData = new Float32Array([lengthScale]);
       feeds['length_scale'] = new ort.Tensor('float32', scaleData, [1]);
     }
     
     // Noise scale (controls variability)
     if (this.session.inputNames.includes('noise_scale')) {
-      const noiseScale = options.noiseScale || 0.667;
+      const noiseScale = options.noiseScale || this.model.config.inference?.noise_scale || 0.667;
       const noiseData = new Float32Array([noiseScale]);
       feeds['noise_scale'] = new ort.Tensor('float32', noiseData, [1]);
     }
     
     // Noise weight
     if (this.session.inputNames.includes('noise_w')) {
-      const noiseW = options.noiseW || 0.8;
+      const noiseW = options.noiseW || this.model.config.inference?.noise_w || 0.8;
       const noiseWData = new Float32Array([noiseW]);
       feeds['noise_w'] = new ort.Tensor('float32', noiseWData, [1]);
     }
