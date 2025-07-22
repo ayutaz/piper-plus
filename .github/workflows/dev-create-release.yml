@@ -1,21 +1,16 @@
-name: dev-create-release
+name: Manual Release
 
 on:
   workflow_dispatch:
     inputs:
+      version:
+        description: 'バージョン（X.X.X形式、例: 1.4.0） - タグ名はvを付けて自動生成されます'
+        required: true
+        type: string
       release_name:
-        description: 'リリース名（未指定の場合は日付ベースで自動生成）'
+        description: 'リリース名（未指定の場合は自動生成）'
         required: false
         type: string
-      release_description:
-        description: 'リリース説明（未指定の場合は自動生成）'
-        required: false
-        type: string
-      use_new_workflow:
-        description: 'Use new workflow (for testing)'
-        required: false
-        type: boolean
-        default: false
 
 permissions:
   contents: write
@@ -35,45 +30,103 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Validate version format
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          if ! echo "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "Error: Version must be in format X.X.X (e.g., 1.4.0)"
+            echo "Provided version: $VERSION"
+            exit 1
+          fi
+          echo "Version format is valid: $VERSION"
+
+      - name: Validate version consistency across files
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          echo "Checking version consistency for: $VERSION"
+          
+          # Check VERSION file
+          if [ -f "VERSION" ]; then
+            FILE_VERSION=$(cat VERSION | tr -d '\n\r')
+            if [ "$FILE_VERSION" != "$VERSION" ]; then
+              echo "❌ VERSION file has '$FILE_VERSION', expected '$VERSION'"
+              exit 1
+            fi
+            echo "✅ VERSION file: $FILE_VERSION"
+          fi
+          
+          # Check pyproject.toml
+          if [ -f "pyproject.toml" ]; then
+            PYPROJECT_VERSION=$(grep '^version = ' pyproject.toml | sed 's/version = "\(.*\)"/\1/')
+            if [ "$PYPROJECT_VERSION" != "$VERSION" ]; then
+              echo "❌ pyproject.toml has '$PYPROJECT_VERSION', expected '$VERSION'"
+              exit 1
+            fi
+            echo "✅ pyproject.toml: $PYPROJECT_VERSION"
+          fi
+          
+          # Check src/python/piper_train/VERSION
+          if [ -f "src/python/piper_train/VERSION" ]; then
+            TRAIN_VERSION=$(cat src/python/piper_train/VERSION | tr -d '\n\r')
+            if [ "$TRAIN_VERSION" != "$VERSION" ]; then
+              echo "❌ src/python/piper_train/VERSION has '$TRAIN_VERSION', expected '$VERSION'"
+              exit 1
+            fi
+            echo "✅ src/python/piper_train/VERSION: $TRAIN_VERSION"
+          fi
+          
+          # Check src/python_run/setup.py
+          if [ -f "src/python_run/setup.py" ]; then
+            SETUP_VERSION=$(grep 'version=' src/python_run/setup.py | grep -o '"[^"]*"' | tr -d '"')
+            if [ "$SETUP_VERSION" != "$VERSION" ]; then
+              echo "❌ src/python_run/setup.py has '$SETUP_VERSION', expected '$VERSION'"
+              exit 1
+            fi
+            echo "✅ src/python_run/setup.py: $SETUP_VERSION"
+          fi
+          
+          echo "\n✅ All version files are consistent with version $VERSION"
+
+      # Version update step removed - versions should be updated before release
+
       - name: Generate release name
         id: get_release_name
         run: |
           if [ -n "${{ github.event.inputs.release_name }}" ]; then
             echo "name=${{ github.event.inputs.release_name }}" >> $GITHUB_OUTPUT
           else
-            TIMESTAMP=$(TZ=Asia/Tokyo date +'%Y%m%d-%H%M%S')
-            echo "name=Dev Release ${TIMESTAMP}" >> $GITHUB_OUTPUT
+            echo "name=Release ${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
           fi
           
-          TAG_NAME="dev-$(date -u +'%Y%m%d-%H%M%S')"
-          echo "tag_name=${TAG_NAME}" >> $GITHUB_OUTPUT
+          echo "tag_name=v${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
 
       - name: Generate release notes
         id: get_release_notes
         run: |
-          if [ -n "${{ github.event.inputs.release_description }}" ]; then
-            echo "body<<EOF" >> $GITHUB_OUTPUT
-            echo "${{ github.event.inputs.release_description }}" >> $GITHUB_OUTPUT
-            echo "EOF" >> $GITHUB_OUTPUT
-          else
-            # Auto-generate release notes
-            echo "body<<EOF" >> $GITHUB_OUTPUT
-            echo "## 🚀 Development Release" >> $GITHUB_OUTPUT
-            echo "" >> $GITHUB_OUTPUT
-            echo "**Build Date:** $(TZ=Asia/Tokyo date +'%Y-%m-%d %H:%M:%S JST')" >> $GITHUB_OUTPUT
-            echo "**Commit:** ${{ github.sha }}" >> $GITHUB_OUTPUT
-            echo "**Branch:** ${{ github.ref_name }}" >> $GITHUB_OUTPUT
-            echo "" >> $GITHUB_OUTPUT
-            
-            # Get recent commits
-            echo "### 📝 Recent Changes" >> $GITHUB_OUTPUT
-            git log --oneline -10 --pretty=format:"- %s (%h)" >> $GITHUB_OUTPUT
-            echo "" >> $GITHUB_OUTPUT
-            
-            echo "### ⚠️ Note" >> $GITHUB_OUTPUT
-            echo "This is a development release and may be unstable." >> $GITHUB_OUTPUT
-            echo "EOF" >> $GITHUB_OUTPUT
-          fi
+          # Auto-generate release notes
+          echo "body<<EOF" >> $GITHUB_OUTPUT
+          echo "## 🚀 Release v${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          echo "" >> $GITHUB_OUTPUT
+          echo "**Build Date:** $(TZ=Asia/Tokyo date +'%Y-%m-%d %H:%M:%S JST')" >> $GITHUB_OUTPUT
+          echo "**Commit:** ${{ github.sha }}" >> $GITHUB_OUTPUT
+          echo "**Branch:** ${{ github.ref_name }}" >> $GITHUB_OUTPUT
+          echo "" >> $GITHUB_OUTPUT
+          
+          # Get recent commits
+          echo "### 📝 Recent Changes" >> $GITHUB_OUTPUT
+          git log --oneline -10 --pretty=format:"- %s (%h)" >> $GITHUB_OUTPUT
+          echo "" >> $GITHUB_OUTPUT
+          
+          echo "### 📦 Installation" >> $GITHUB_OUTPUT
+          echo "\`\`\`bash" >> $GITHUB_OUTPUT
+          echo "pip install piper-tts-plus==${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          echo "\`\`\`" >> $GITHUB_OUTPUT
+          echo "" >> $GITHUB_OUTPUT
+          
+          echo "### 🔗 Links" >> $GITHUB_OUTPUT
+          echo "- [PyPI Package](https://pypi.org/project/piper-tts-plus/${{ github.event.inputs.version }}/)" >> $GITHUB_OUTPUT
+          echo "- [Documentation](https://github.com/ayutaz/piper-plus#readme)" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Create Release
         id: create_release
@@ -110,7 +163,6 @@ jobs:
     uses: ./.github/workflows/dev-build-all.yml
     with:
       release_upload_url: ${{ needs.create_release.outputs.upload_url }}
-      use_new_workflow: ${{ github.event.inputs.use_new_workflow || false }}
     permissions:
       contents: write
       packages: read
@@ -134,9 +186,7 @@ jobs:
     needs: [build_all]  # run_tests removed temporarily
     if: |
       always() && 
-      needs.build_all.result == 'success' &&
-      github.ref == 'refs/heads/dev' && 
-      github.event_name == 'push'
+      needs.build_all.result == 'success'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4.2.2
@@ -168,7 +218,7 @@ jobs:
       - name: Publish to PyPI
         env:
           TWINE_USERNAME: __token__
-          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+          TWINE_PASSWORD: ${{ secrets.PIPY_TOKEN }}
         run: |
           # Only publish if we have the token and wheels
           if [ -n "$TWINE_PASSWORD" ] && ls dist/*.whl 1> /dev/null 2>&1; then

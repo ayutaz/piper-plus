@@ -7,22 +7,11 @@ on:
         description: 'GitHub Release upload URL'
         required: false
         type: string
-      use_new_workflow:
-        description: 'Use new workflow (for testing)'
-        required: false
-        type: boolean
-        default: false
     outputs:
       artifacts_built:
         description: 'Whether artifacts were successfully built'
         value: ${{ jobs.summary.outputs.success }}
   workflow_dispatch:
-    inputs:
-      use_new_workflow:
-        description: 'Use new workflow (for testing)'
-        required: false
-        type: boolean
-        default: false
 
 env:
   DOCKER_BUILDKIT: 1
@@ -45,7 +34,6 @@ jobs:
       - name: Debug inputs
         run: |
           echo "release_upload_url: '${{ inputs.release_upload_url }}'"
-          echo "use_new_workflow: '${{ inputs.use_new_workflow }}'"
 
       - name: Setup build cache
         uses: ./.github/actions/setup-build-cache
