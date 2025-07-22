@@ -1,10 +1,18 @@
-name: dev-create-release
+name: Manual Release
 
 on:
   workflow_dispatch:
     inputs:
+      version:
+        description: 'バージョン（例: 1.4.0）'
+        required: true
+        type: string
+      tag_name:
+        description: 'タグ名（例: v1.4.0）'
+        required: true
+        type: string
       release_name:
-        description: 'リリース名（未指定の場合は日付ベースで自動生成）'
+        description: 'リリース名（未指定の場合は自動生成）'
         required: false
         type: string
       release_description:
@@ -35,18 +43,25 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Update version in setup.py
+        run: |
+          sed -i 's/version=".*"/version="${{ github.event.inputs.version }}"/' src/python_run/setup.py
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add src/python_run/setup.py
+          git commit -m "chore: update version to ${{ github.event.inputs.version }}"
+          git push
+
       - name: Generate release name
         id: get_release_name
         run: |
           if [ -n "${{ github.event.inputs.release_name }}" ]; then
             echo "name=${{ github.event.inputs.release_name }}" >> $GITHUB_OUTPUT
           else
-            TIMESTAMP=$(TZ=Asia/Tokyo date +'%Y%m%d-%H%M%S')
-            echo "name=Dev Release ${TIMESTAMP}" >> $GITHUB_OUTPUT
+            echo "name=Release ${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
           fi
           
-          TAG_NAME="dev-$(date -u +'%Y%m%d-%H%M%S')"
-          echo "tag_name=${TAG_NAME}" >> $GITHUB_OUTPUT
+          echo "tag_name=${{ github.event.inputs.tag_name }}" >> $GITHUB_OUTPUT
 
       - name: Generate release notes
         id: get_release_notes
@@ -134,8 +149,7 @@ jobs:
     needs: [build_all]  # run_tests removed temporarily
     if: |
       always() && 
-      needs.build_all.result == 'success' &&
-      (github.ref == 'refs/heads/dev' || startsWith(github.ref, 'refs/heads/release/'))
+      needs.build_all.result == 'success'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4.2.2
