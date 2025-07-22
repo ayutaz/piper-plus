@@ -11,11 +11,6 @@ on:
         description: 'リリース名（未指定の場合は自動生成）'
         required: false
         type: string
-      use_new_workflow:
-        description: 'Use new workflow (for testing)'
-        required: false
-        type: boolean
-        default: false
 
 permissions:
   contents: write
@@ -168,7 +163,6 @@ jobs:
     uses: ./.github/workflows/dev-build-all.yml
     with:
       release_upload_url: ${{ needs.create_release.outputs.upload_url }}
-      use_new_workflow: ${{ github.event.inputs.use_new_workflow || false }}
     permissions:
       contents: write
       packages: read
