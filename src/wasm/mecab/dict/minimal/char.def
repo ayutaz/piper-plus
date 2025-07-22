@@ -1,0 +1,21 @@
+# Character category definition
+DEFAULT 0 1 0  # DEFAULT
+
+# Basic categories for minimal dictionary
+SPACE   0 1 0
+ALPHA   1 0 0
+SYMBOL  1 1 0
+NUMERIC 1 0 0
+KANJI   0 1 2  # Kanji characters
+HIRAGANA 0 1 2  # Hiragana
+KATAKANA 1 1 0  # Katakana
+
+# Character mappings (minimal set)
+0x0020 SPACE  # space
+0x0030..0x0039 NUMERIC  # numbers
+0x0041..0x005A ALPHA  # uppercase
+0x0061..0x007A ALPHA  # lowercase
+0x3005 KANJI  # 々
+0x3040..0x309F HIRAGANA  # hiragana
+0x30A0..0x30FF KATAKANA  # katakana
+0x4E00..0x9FFF KANJI  # CJK unified ideographs

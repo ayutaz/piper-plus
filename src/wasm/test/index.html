@@ -334,9 +334,9 @@
     <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.16.3/dist/ort.min.js"></script>
     <script type="module">
         // Import required modules
-        import MeCabWorker from './mecab/build/mecab-worker.js';
-        import OpenJTalkWorker from './openjtalk/build/openjtalk-worker.js';
-        import { PiperONNXRuntime } from './onnx/dist/piper-onnx-runtime.es.js';
+        import MeCabWorker from '../mecab/build/mecab-worker.js';
+        import OpenJTalkWorker from '../openjtalk/build/openjtalk-worker.js';
+        import { PiperONNXRuntime } from '../onnx/dist/piper-onnx-runtime.es.js';
         
         let mecab, openjtalk, piperRuntime;
         let isInitialized = false;
@@ -419,8 +419,8 @@
                 updateStatus('OpenJTalkを初期化中...', 'loading');
                 openjtalk = new OpenJTalkWorker();
                 await openjtalk.initialize({
-                    dictionaryUrl: './openjtalk/data/dictionary',
-                    voiceUrl: './openjtalk/data/voice.htsvoice'
+                    dictionaryUrl: '../openjtalk/data/dictionary',
+                    voiceUrl: '../openjtalk/data/voice.htsvoice'
                 });
                 showProgress('OpenJTalk初期化', 150);
                 
@@ -431,7 +431,7 @@
                 
                 // Load model
                 updateStatus('音声合成モデルを読み込み中...', 'loading');
-                await piperRuntime.loadModel('./models/ja_JP-test-medium.onnx');
+                await piperRuntime.loadModel('../models/ja_JP-test-medium.onnx');
                 showProgress('モデル読み込み', 300);
                 
                 isInitialized = true;

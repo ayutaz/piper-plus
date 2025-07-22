@@ -16,7 +16,7 @@
 #include <algorithm>
 #include <unordered_map>
 #include <cstring>
-#include "../../mecab/src/error_handler.h"
+#include "error_handler.h"
 
 using namespace emscripten;
 
@@ -365,10 +365,10 @@ public:
             phoneme_converter = std::make_unique<PhonemeConverter>();
             initialized = true;
             
-            mecab::ErrorHandler::logInfo("OpenJTalk initialized successfully");
+            ErrorHandler::logInfo("OpenJTalk initialized successfully");
             return true;
         } catch (const std::exception& e) {
-            mecab::ErrorHandler::logError("OpenJTalk initialization failed: " + std::string(e.what()));
+            ErrorHandler::logError("OpenJTalk initialization failed: " + std::string(e.what()));
             return false;
         }
     }
@@ -376,7 +376,7 @@ public:
     // Process MeCab output to phonemes
     std::string processText(const std::string& mecab_output) {
         if (!initialized) {
-            mecab::ErrorHandler::logError("OpenJTalk not initialized");
+            ErrorHandler::logError("OpenJTalk not initialized");
             return "";
         }
         
@@ -388,7 +388,7 @@ public:
             return phoneme_converter->njdToPhoneme(njd_nodes);
             
         } catch (const std::exception& e) {
-            mecab::ErrorHandler::logError("Text processing failed: " + std::string(e.what()));
+            ErrorHandler::logError("Text processing failed: " + std::string(e.what()));
             return "";
         }
     }
@@ -403,7 +403,7 @@ public:
             auto njd_nodes = text_analyzer->mecabToNJD(mecab_output);
             return phoneme_converter->njdToPUA(njd_nodes);
         } catch (const std::exception& e) {
-            mecab::ErrorHandler::logError("PUA conversion failed: " + std::string(e.what()));
+            ErrorHandler::logError("PUA conversion failed: " + std::string(e.what()));
             return "";
         }
     }
@@ -488,5 +488,5 @@ EMSCRIPTEN_BINDINGS(openjtalk_module) {
     register_vector<openjtalk::NJDNode>("VectorNJDNode");
     
     // Utility functions
-    function("setDebugMode", &mecab::ErrorHandler::setDebugMode);
+    function("setDebugMode", &openjtalk::ErrorHandler::setDebugMode);
 }

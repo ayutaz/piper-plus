@@ -1,0 +1,5 @@
+; Configuration file for minimal dictionary
+cost-factor = 700
+bos-feature = BOS/EOS,*,*,*,*,*,*,*,*
+eval-size = 4
+unk-eval-size = 2

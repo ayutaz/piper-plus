@@ -8,9 +8,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # OpenJTalk source files
 set(OPENJTALK_SOURCES
     src/openjtalk_core.cpp
-    src/text_analyzer.cpp
-    src/phoneme_converter.cpp
-    src/njd.cpp
+    src/error_handler.cpp
 )
 
 # Create OpenJTalk WebAssembly module
