@@ -252,7 +252,40 @@
         
         // Convert PUA-encoded phonemes to phoneme IDs
         function puaToPhonemeIds(puaString, phonemeIdMap) {
+            log(`puaToPhonemeIds called with string length: ${puaString.length}`);
             const phonemeIds = [];
+            
+            // Map uppercase PUA codes to lowercase PUA codes
+            const upperToLowerPUA = {
+                '\uE000': '\ue000', '\uE001': '\ue001', '\uE002': '\ue002', '\uE003': '\ue003', '\uE004': '\ue004',
+                '\uE005': '\ue005', '\uE006': '\ue006', '\uE007': '\ue007', '\uE008': '\ue008', '\uE009': '\ue009',
+                '\uE00A': '\ue00a', '\uE00B': '\ue00b', '\uE00C': '\ue00c', '\uE00D': '\ue00d', '\uE00E': '\ue00e',
+                '\uE00F': '\ue00f', '\uE010': '\ue010', '\uE011': '\ue011', '\uE012': '\ue012', '\uE013': '\ue013',
+                '\uE014': '\ue014', '\uE015': '\ue015',
+                // Map uppercase to single phonemes where lowercase PUA doesn't exist
+                '\uE020': 's', '\uE021': 's', '\uE022': 's', '\uE023': 's', '\uE024': 's',
+                '\uE025': 's', '\uE026': 's', '\uE027': 's',
+                '\uE030': 'z', '\uE031': 'j', '\uE032': 'z', '\uE033': 'z', '\uE034': 'z',
+                '\uE035': 'j', '\uE036': 'j', '\uE037': 'j',
+                '\uE040': 't', '\uE041': 't', '\uE042': 't', '\uE043': 't', '\uE044': 't',
+                '\uE045': 't', '\uE046': 't', '\uE047': 't',
+                '\uE050': 'd', '\uE051': 'j', '\uE052': 'z', '\uE053': 'd', '\uE054': 'd',
+                '\uE060': 'n', '\uE061': 'n', '\uE062': 'n', '\uE063': 'n', '\uE064': 'n',
+                '\uE065': 'n', '\uE066': 'n', '\uE067': 'n',
+                '\uE070': 'h', '\uE071': 'h', '\uE072': 'f', '\uE073': 'h', '\uE074': 'h',
+                '\uE075': 'h', '\uE076': 'h', '\uE077': 'h',
+                '\uE080': 'b', '\uE081': 'b', '\uE082': 'b', '\uE083': 'b', '\uE084': 'b',
+                '\uE085': 'b', '\uE086': 'b', '\uE087': 'b',
+                '\uE090': 'p', '\uE091': 'p', '\uE092': 'p', '\uE093': 'p', '\uE094': 'p',
+                '\uE095': 'p', '\uE096': 'p', '\uE097': 'p',
+                '\uE0A0': 'm', '\uE0A1': 'm', '\uE0A2': 'm', '\uE0A3': 'm', '\uE0A4': 'm',
+                '\uE0A5': 'm', '\uE0A6': 'm', '\uE0A7': 'm',
+                '\uE0B0': 'y', '\uE0B2': 'y', '\uE0B4': 'y',
+                '\uE0C0': 'r', '\uE0C1': 'r', '\uE0C2': 'r', '\uE0C3': 'r', '\uE0C4': 'r',
+                '\uE0C5': 'r', '\uE0C6': 'r', '\uE0C7': 'r',
+                '\uE0D0': 'w', '\uE0D1': 'w',
+                '\uE0E0': 'N', '\uE0E1': 'N', '\uE0E2': 'N'  // Special characters
+            };
             
             // Add start token
             if (phonemeIdMap['^']) {
@@ -261,17 +294,28 @@
             
             // Process each character
             for (const char of puaString) {
-                // First check if the character itself is in the phoneme_id_map
-                if (phonemeIdMap[char]) {
-                    phonemeIds.push(phonemeIdMap[char][0]);
+                let mappedChar = char;
+                
+                // Convert uppercase PUA to lowercase or phoneme
+                if (upperToLowerPUA[char]) {
+                    mappedChar = upperToLowerPUA[char];
+                }
+                
+                // Check if the mapped character is in the phoneme_id_map
+                if (phonemeIdMap[mappedChar]) {
+                    phonemeIds.push(phonemeIdMap[mappedChar][0]);
                 } else if (char === ' ') {
                     // Space maps to silence token
                     if (phonemeIdMap['_']) {
                         phonemeIds.push(phonemeIdMap['_'][0]);
                     }
                 } else {
-                    // For regular characters (should not happen with proper PUA encoding)
-                    log(`Warning: Unmapped character: ${char} (code: ${char.charCodeAt(0)})`, 'warn');
+                    // For unmapped characters, try the original character
+                    if (phonemeIdMap[char]) {
+                        phonemeIds.push(phonemeIdMap[char][0]);
+                    } else {
+                        log(`Warning: Unmapped character: ${char} (code: 0x${char.charCodeAt(0).toString(16)})`, 'warn');
+                    }
                 }
             }
             
@@ -376,6 +420,11 @@
                 
                 const phonemeIds = puaToPhonemeIds(puaPhonemes, phonemeIdMap);
                 log(`Phoneme IDs: ${phonemeIds.slice(0, 20).join(', ')}... (${phonemeIds.length} total)`);
+                
+                // Debug: Check if we got reasonable phoneme IDs
+                if (phonemeIds.length < 10) {
+                    log(`Warning: Very few phoneme IDs generated. Expected more for text: "${text}"`, 'warn');
+                }
                 
                 // Step 4: Prepare tensors
                 updateProgress(50, 'テンソルを準備中...');
