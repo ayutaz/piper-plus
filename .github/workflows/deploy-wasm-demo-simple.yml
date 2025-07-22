@@ -39,21 +39,21 @@ jobs:
       - name: Build MeCab WASM
         working-directory: src/wasm/mecab
         run: |
-          npm ci
+          npm install
           npm run build:wasm || echo "Build failed but continuing"
           npm run build || echo "Build failed but continuing"
           
       - name: Build OpenJTalk WASM
         working-directory: src/wasm/openjtalk
         run: |
-          npm ci
+          npm install
           ./build.sh || echo "Build failed but continuing"
           npm run build || echo "Build failed but continuing"
           
       - name: Build ONNX Runtime Integration
         working-directory: src/wasm/onnx
         run: |
-          npm ci
+          npm install
           npm run build || echo "Build failed but continuing"
           
       - name: Prepare demo site
