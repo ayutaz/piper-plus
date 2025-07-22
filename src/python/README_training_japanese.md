@@ -74,18 +74,72 @@ with open('css10_prepared/phoneme_stats.json', 'r') as f:
 
 ## Step 4: Train the Model
 
-### Option A: Using Piper's training script
+### Dataset Preprocessing (Required First)
 
 ```bash
-# Set up Piper training environment
-cd /path/to/piper-training
+# Preprocess CSS10 dataset with Japanese phonemization
+python3 -m piper_train.preprocess \
+    --language ja \
+    --input-dir /path/to/css10-ja-ljspeech \
+    --output-dir /path/to/dataset-css10-ja \
+    --dataset-format ljspeech \
+    --single-speaker \
+    --sample-rate 22050 \
+    --max-workers 45
+```
 
-# Train model
-python train.py \
-    --config ../piper/src/python/train_config_japanese.json \
-    --train-file ../piper/src/python/css10_prepared/train.txt \
-    --val-file ../piper/src/python/css10_prepared/val.txt \
-    --output-dir ./output/ja_JP_css10_openjtalk
+### FP16 Training Configuration
+
+To enable FP16 (half-precision) training for better performance:
+
+```bash
+# Add fp16_run to the generated config.json
+# Method 1: Edit config.json directly and add:
+#   "fp16_run": true
+
+# Method 2: Use sed command
+sed -i 's/"piper_version": "1.3.0"/"piper_version": "1.3.0",\n    "fp16_run": true/g' /path/to/dataset-css10-ja/config.json
+```
+
+### Multi-GPU Training (L4 × 4 GPUs)
+
+```bash
+# Set memory optimization
+export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+
+# Train with multi-GPU DDP strategy
+python -m piper_train \
+    --dataset-dir /path/to/dataset-css10-ja \
+    --accelerator gpu \
+    --devices 4 \
+    --strategy ddp_find_unused_parameters_true \
+    --batch-size 14 \
+    --num-workers 16 \
+    --auto_lr_scaling \
+    --base_lr 2e-4 \
+    --max_epochs 1500 \
+    --checkpoint-epochs 50 \
+    --ema-decay 0.9995 \
+    --default_root_dir /path/to/output-css10-ja
+```
+
+**Note**: `ddp_find_unused_parameters_true` strategy is required for VITS models as some parameters may not be used in certain training steps.
+
+### Single GPU Training
+
+```bash
+# Single GPU training command
+python -m piper_train \
+    --dataset-dir /path/to/dataset-css10-ja \
+    --accelerator gpu \
+    --devices 1 \
+    --batch-size 32 \
+    --num-workers 8 \
+    --learning_rate 2e-4 \
+    --max_epochs 2000 \
+    --checkpoint-epochs 100 \
+    --ema-decay 0.9995 \
+    --default_root_dir /path/to/output-css10-ja
 ```
 
 ### Option B: Using custom training script
