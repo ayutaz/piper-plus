@@ -10,6 +10,7 @@ on:
     branches: [ main, dev ]
     paths:
       - 'src/wasm/**'
+      - '.github/workflows/deploy-wasm-demo.yml'
   workflow_dispatch:
 
 permissions:
@@ -289,8 +290,6 @@ HTML_EOF
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     needs: build
-    permissions:
-      pull-requests: write
     steps:
       - name: Comment PR with build info
         uses: actions/github-script@v7
@@ -317,9 +316,13 @@ HTML_EOF
               '> **Note**: 初回アクセス時は大きなファイルのダウンロードが発生するため、読み込みに時間がかかる場合があります。'
             ].join('\n');
             
-            github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.payload.pull_request.number,
-              body: comment
-            });
+            try {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.pull_request.number,
+                body: comment
+              });
+            } catch (error) {
+              console.error('Failed to create comment:', error);
+            }
