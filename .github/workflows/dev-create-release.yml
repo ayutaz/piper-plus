@@ -135,8 +135,7 @@ jobs:
     if: |
       always() && 
       needs.build_all.result == 'success' &&
-      github.ref == 'refs/heads/dev' && 
-      github.event_name == 'push'
+      (github.ref == 'refs/heads/dev' || startsWith(github.ref, 'refs/heads/release/'))
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4.2.2
@@ -168,7 +167,7 @@ jobs:
       - name: Publish to PyPI
         env:
           TWINE_USERNAME: __token__
-          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+          TWINE_PASSWORD: ${{ secrets.PIPY_TOKEN }}
         run: |
           # Only publish if we have the token and wheels
           if [ -n "$TWINE_PASSWORD" ] && ls dist/*.whl 1> /dev/null 2>&1; then
