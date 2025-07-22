@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import http.server
-import socketserver
 import os
+import socketserver
 from pathlib import Path
 
 PORT = 8080
