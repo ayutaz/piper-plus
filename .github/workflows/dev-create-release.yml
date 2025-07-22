@@ -11,10 +11,6 @@ on:
         description: 'リリース名（未指定の場合は自動生成）'
         required: false
         type: string
-      release_description:
-        description: 'リリース説明（未指定の場合は自動生成）'
-        required: false
-        type: string
       use_new_workflow:
         description: 'Use new workflow (for testing)'
         required: false
@@ -112,31 +108,30 @@ jobs:
       - name: Generate release notes
         id: get_release_notes
         run: |
-          if [ -n "${{ github.event.inputs.release_description }}" ]; then
-            echo "body<<EOF" >> $GITHUB_OUTPUT
-            echo "${{ github.event.inputs.release_description }}" >> $GITHUB_OUTPUT
-            echo "EOF" >> $GITHUB_OUTPUT
-          else
-            # Auto-generate release notes
-            echo "body<<EOF" >> $GITHUB_OUTPUT
-            echo "## 🚀 Release v${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
-            echo "" >> $GITHUB_OUTPUT
-            echo "**Build Date:** $(TZ=Asia/Tokyo date +'%Y-%m-%d %H:%M:%S JST')" >> $GITHUB_OUTPUT
-            echo "**Commit:** ${{ github.sha }}" >> $GITHUB_OUTPUT
-            echo "**Branch:** ${{ github.ref_name }}" >> $GITHUB_OUTPUT
-            echo "" >> $GITHUB_OUTPUT
-            
-            # Get recent commits
-            echo "### 📝 Recent Changes" >> $GITHUB_OUTPUT
-            git log --oneline -10 --pretty=format:"- %s (%h)" >> $GITHUB_OUTPUT
-            echo "" >> $GITHUB_OUTPUT
-            
-            echo "### 📦 Installation" >> $GITHUB_OUTPUT
-            echo "\`\`\`bash" >> $GITHUB_OUTPUT
-            echo "pip install piper-tts-plus==${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
-            echo "\`\`\`" >> $GITHUB_OUTPUT
-            echo "EOF" >> $GITHUB_OUTPUT
-          fi
+          # Auto-generate release notes
+          echo "body<<EOF" >> $GITHUB_OUTPUT
+          echo "## 🚀 Release v${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          echo "" >> $GITHUB_OUTPUT
+          echo "**Build Date:** $(TZ=Asia/Tokyo date +'%Y-%m-%d %H:%M:%S JST')" >> $GITHUB_OUTPUT
+          echo "**Commit:** ${{ github.sha }}" >> $GITHUB_OUTPUT
+          echo "**Branch:** ${{ github.ref_name }}" >> $GITHUB_OUTPUT
+          echo "" >> $GITHUB_OUTPUT
+          
+          # Get recent commits
+          echo "### 📝 Recent Changes" >> $GITHUB_OUTPUT
+          git log --oneline -10 --pretty=format:"- %s (%h)" >> $GITHUB_OUTPUT
+          echo "" >> $GITHUB_OUTPUT
+          
+          echo "### 📦 Installation" >> $GITHUB_OUTPUT
+          echo "\`\`\`bash" >> $GITHUB_OUTPUT
+          echo "pip install piper-tts-plus==${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          echo "\`\`\`" >> $GITHUB_OUTPUT
+          echo "" >> $GITHUB_OUTPUT
+          
+          echo "### 🔗 Links" >> $GITHUB_OUTPUT
+          echo "- [PyPI Package](https://pypi.org/project/piper-tts-plus/${{ github.event.inputs.version }}/)" >> $GITHUB_OUTPUT
+          echo "- [Documentation](https://github.com/ayutaz/piper-plus#readme)" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Create Release
         id: create_release
