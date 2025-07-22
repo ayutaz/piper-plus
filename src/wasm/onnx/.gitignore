@@ -1,0 +1,5 @@
+node_modules/
+dist/*.wasm
+dist/*.map
+.DS_Store
+*.log

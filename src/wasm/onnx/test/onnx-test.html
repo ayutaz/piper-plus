@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ONNX Runtime Integration Test</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f0f2f5;
+        }
+        .container {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+        }
+        h1 {
+            color: #1a73e8;
+            margin-bottom: 30px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: bold;
+            margin-left: 20px;
+        }
+        .status-badge.ready {
+            background-color: #34a853;
+            color: white;
+        }
+        .status-badge.loading {
+            background-color: #fbbc04;
+            color: white;
+        }
+        .status-badge.error {
+            background-color: #ea4335;
+            color: white;
+        }
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin: 30px 0;
+        }
+        .info-card {
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #e0e0e0;
+        }
+        .info-card h3 {
+            margin: 0 0 10px 0;
+            color: #5f6368;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .info-card .value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #1a73e8;
+        }
+        .test-section {
+            margin: 30px 0;
+            padding: 25px;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            border: 1px solid #e0e0e0;
+        }
+        .test-section h2 {
+            margin-top: 0;
+            color: #202124;
+        }
+        button {
+            background-color: #1a73e8;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 4px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            margin: 5px;
+        }
+        button:hover:not(:disabled) {
+            background-color: #1557b0;
+        }
+        button:disabled {
+            background-color: #dadce0;
+            cursor: not-allowed;
+        }
+        button.secondary {
+            background-color: #5f6368;
+        }
+        button.secondary:hover:not(:disabled) {
+            background-color: #484a4d;
+        }
+        .input-group {
+            margin: 20px 0;
+        }
+        .input-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #3c4043;
+        }
+        input[type="text"], input[type="number"], select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #dadce0;
+            border-radius: 4px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        input[type="range"] {
+            width: 100%;
+            margin: 10px 0;
+        }
+        .range-value {
+            display: inline-block;
+            width: 50px;
+            text-align: right;
+            font-weight: bold;
+            color: #1a73e8;
+        }
+        #output {
+            background-color: #f1f3f4;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 20px 0;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            max-height: 300px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+        .performance-chart {
+            margin: 20px 0;
+            height: 200px;
+            background-color: #f8f9fa;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #5f6368;
+        }
+        audio {
+            width: 100%;
+            margin: 20px 0;
+        }
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #1a73e8;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            vertical-align: middle;
+            margin-left: 10px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>
+            🧠 ONNX Runtime Integration Test
+            <span id="status" class="status-badge loading">Initializing</span>
+        </h1>
+        
+        <div class="info-grid">
+            <div class="info-card">
+                <h3>ONNX Version</h3>
+                <div class="value" id="onnxVersion">-</div>
+            </div>
+            <div class="info-card">
+                <h3>Execution Provider</h3>
+                <div class="value" id="executionProvider">-</div>
+            </div>
+            <div class="info-card">
+                <h3>WebGPU Support</h3>
+                <div class="value" id="webgpuSupport">-</div>
+            </div>
+            <div class="info-card">
+                <h3>Model Status</h3>
+                <div class="value" id="modelStatus">Not Loaded</div>
+            </div>
+        </div>
+        
+        <div class="test-section">
+            <h2>Model Loading Test</h2>
+            
+            <div class="input-group">
+                <label for="modelUrl">Model URL (.onnx)</label>
+                <input type="text" id="modelUrl" value="https://huggingface.co/rhasspy/piper-voices/resolve/main/ja/ja_JP/kokoro/haruka/ja_JP-kokoro-haruka.onnx" placeholder="Enter ONNX model URL">
+            </div>
+            
+            <button id="loadModelBtn" onclick="loadModel()">
+                Load Model
+            </button>
+            <button class="secondary" onclick="useTestModel()">
+                Use Test Model
+            </button>
+            
+            <div id="output"></div>
+        </div>
+        
+        <div class="test-section" id="synthesisSection" style="display: none;">
+            <h2>Voice Synthesis Test</h2>
+            
+            <div class="input-group">
+                <label for="phonemeInput">Phoneme IDs (comma-separated)</label>
+                <input type="text" id="phonemeInput" value="0,5,10,15,20,25,30,35,0" placeholder="e.g., 0,5,10,15,20,0">
+            </div>
+            
+            <div class="input-group">
+                <label for="puaInput">PUA String</label>
+                <input type="text" id="puaInput" placeholder="e.g., \uE000\uE005\uE010...">
+            </div>
+            
+            <div class="input-group">
+                <label>Length Scale: <span id="lengthScaleValue" class="range-value">1.0</span></label>
+                <input type="range" id="lengthScale" min="0.5" max="2.0" step="0.1" value="1.0" 
+                       oninput="document.getElementById('lengthScaleValue').textContent = this.value">
+            </div>
+            
+            <div class="input-group">
+                <label>Noise Scale: <span id="noiseScaleValue" class="range-value">0.667</span></label>
+                <input type="range" id="noiseScale" min="0.0" max="1.0" step="0.001" value="0.667"
+                       oninput="document.getElementById('noiseScaleValue').textContent = this.value">
+            </div>
+            
+            <button onclick="synthesizeFromPhonemes()">
+                Synthesize from Phonemes
+            </button>
+            <button onclick="synthesizeFromPUA()">
+                Synthesize from PUA
+            </button>
+            <button class="secondary" onclick="downloadAudio()">
+                Download WAV
+            </button>
+            
+            <audio id="audioPlayer" controls style="display: none;"></audio>
+            
+            <div class="performance-chart" id="performanceChart">
+                Performance metrics will appear here after synthesis
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        let runtime = null;
+        let lastAudioData = null;
+        let lastSampleRate = 22050;
+        
+        // Log function
+        function log(message) {
+            const output = document.getElementById('output');
+            const timestamp = new Date().toLocaleTimeString();
+            output.textContent += `[${timestamp}] ${message}\n`;
+            output.scrollTop = output.scrollHeight;
+        }
+        
+        // Update status
+        function updateStatus(status, type = 'loading') {
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = status;
+            statusEl.className = `status-badge ${type}`;
+        }
+        
+        // Initialize runtime info
+        async function initializeInfo() {
+            // Check WebGPU support
+            const webgpuSupported = 'gpu' in navigator;
+            document.getElementById('webgpuSupport').textContent = webgpuSupported ? '✅ Yes' : '❌ No';
+            
+            // ONNX Runtime will be loaded dynamically
+            document.getElementById('onnxVersion').textContent = 'Loading...';
+            document.getElementById('executionProvider').textContent = 'Detecting...';
+        }
+        
+        // Load model
+        window.loadModel = async function() {
+            const modelUrl = document.getElementById('modelUrl').value.trim();
+            if (!modelUrl) {
+                log('Error: Please enter a model URL');
+                return;
+            }
+            
+            const loadBtn = document.getElementById('loadModelBtn');
+            loadBtn.disabled = true;
+            loadBtn.innerHTML = 'Loading... <span class="loading"></span>';
+            updateStatus('Loading Model', 'loading');
+            
+            try {
+                log(`Loading model from: ${modelUrl}`);
+                
+                // Dynamically import the runtime
+                const { default: PiperONNXRuntime } = await import('../dist/piper-onnx.js');
+                
+                // Create runtime instance
+                runtime = new PiperONNXRuntime({
+                    executionProviders: ['webgpu', 'webgl', 'wasm'],
+                    wasmPaths: {
+                        'ort-wasm.wasm': '../dist/ort-wasm.wasm',
+                        'ort-wasm-simd.wasm': '../dist/ort-wasm-simd.wasm'
+                    }
+                });
+                
+                // Initialize with model
+                await runtime.initialize(modelUrl);
+                
+                // Update info
+                const info = runtime.getInfo();
+                document.getElementById('onnxVersion').textContent = info.onnxVersion || '1.17.0';
+                document.getElementById('modelStatus').textContent = '✅ Loaded';
+                
+                // Detect execution provider
+                if (info.webGPUSupported && 'gpu' in navigator) {
+                    document.getElementById('executionProvider').textContent = 'WebGPU';
+                } else {
+                    document.getElementById('executionProvider').textContent = 'WebGL/WASM';
+                }
+                
+                log('Model loaded successfully!');
+                updateStatus('Ready', 'ready');
+                
+                // Show synthesis section
+                document.getElementById('synthesisSection').style.display = 'block';
+                
+            } catch (error) {
+                log(`Error loading model: ${error.message}`);
+                updateStatus('Error', 'error');
+                document.getElementById('modelStatus').textContent = '❌ Failed';
+            } finally {
+                loadBtn.disabled = false;
+                loadBtn.innerHTML = 'Load Model';
+            }
+        };
+        
+        // Use test model
+        window.useTestModel = function() {
+            // Use a small Japanese test model
+            document.getElementById('modelUrl').value = 'models/test_ja.onnx';
+            log('Set to test model path');
+        };
+        
+        // Synthesize from phonemes
+        window.synthesizeFromPhonemes = async function() {
+            if (!runtime) {
+                log('Error: Model not loaded');
+                return;
+            }
+            
+            const phonemeInput = document.getElementById('phonemeInput').value.trim();
+            if (!phonemeInput) {
+                log('Error: Please enter phoneme IDs');
+                return;
+            }
+            
+            try {
+                log('Starting synthesis from phonemes...');
+                const startTime = performance.now();
+                
+                // Parse phoneme IDs
+                const phonemeIds = phonemeInput.split(',').map(id => parseInt(id.trim()));
+                
+                // Get synthesis options
+                const options = {
+                    lengthScale: parseFloat(document.getElementById('lengthScale').value),
+                    noiseScale: parseFloat(document.getElementById('noiseScale').value)
+                };
+                
+                // Synthesize
+                const result = await runtime.synthesizeFromPhonemes(phonemeIds, options);
+                
+                const synthesisTime = performance.now() - startTime;
+                
+                // Play audio
+                await runtime.play(result);
+                lastAudioData = result.audio;
+                lastSampleRate = result.sampleRate;
+                
+                // Update performance metrics
+                const rtf = (result.duration * 1000) / synthesisTime;
+                document.getElementById('performanceChart').innerHTML = `
+                    <div style="text-align: center; width: 100%;">
+                        <h3>Performance Metrics</h3>
+                        <p>Synthesis Time: ${synthesisTime.toFixed(0)}ms</p>
+                        <p>Audio Duration: ${result.duration.toFixed(2)}s</p>
+                        <p>Real-time Factor: ${rtf.toFixed(1)}x</p>
+                        <p>Sample Rate: ${result.sampleRate}Hz</p>
+                    </div>
+                `;
+                
+                // Show audio player
+                document.getElementById('audioPlayer').style.display = 'block';
+                
+                log(`Synthesis completed in ${synthesisTime.toFixed(0)}ms (RTF: ${rtf.toFixed(1)}x)`);
+                
+            } catch (error) {
+                log(`Synthesis error: ${error.message}`);
+            }
+        };
+        
+        // Synthesize from PUA
+        window.synthesizeFromPUA = async function() {
+            if (!runtime) {
+                log('Error: Model not loaded');
+                return;
+            }
+            
+            const puaInput = document.getElementById('puaInput').value;
+            if (!puaInput) {
+                log('Error: Please enter PUA string');
+                return;
+            }
+            
+            try {
+                log('Starting synthesis from PUA...');
+                const startTime = performance.now();
+                
+                // Get synthesis options
+                const options = {
+                    lengthScale: parseFloat(document.getElementById('lengthScale').value),
+                    noiseScale: parseFloat(document.getElementById('noiseScale').value)
+                };
+                
+                // Synthesize
+                const result = await runtime.synthesizeFromPUA(puaInput, options);
+                
+                const synthesisTime = performance.now() - startTime;
+                
+                // Play audio
+                await runtime.play(result);
+                lastAudioData = result.audio;
+                lastSampleRate = result.sampleRate;
+                
+                // Update performance metrics
+                const rtf = (result.duration * 1000) / synthesisTime;
+                document.getElementById('performanceChart').innerHTML = `
+                    <div style="text-align: center; width: 100%;">
+                        <h3>Performance Metrics</h3>
+                        <p>Synthesis Time: ${synthesisTime.toFixed(0)}ms</p>
+                        <p>Audio Duration: ${result.duration.toFixed(2)}s</p>
+                        <p>Real-time Factor: ${rtf.toFixed(1)}x</p>
+                        <p>Sample Rate: ${result.sampleRate}Hz</p>
+                    </div>
+                `;
+                
+                // Show audio player
+                document.getElementById('audioPlayer').style.display = 'block';
+                
+                log(`Synthesis completed in ${synthesisTime.toFixed(0)}ms (RTF: ${rtf.toFixed(1)}x)`);
+                
+            } catch (error) {
+                log(`Synthesis error: ${error.message}`);
+            }
+        };
+        
+        // Download audio
+        window.downloadAudio = function() {
+            if (!lastAudioData || !runtime) {
+                log('Error: No audio to download');
+                return;
+            }
+            
+            const audioPlayer = runtime.audioPlayer || { download: () => {} };
+            if (audioPlayer.download) {
+                audioPlayer.download(lastAudioData, lastSampleRate, `piper_tts_${Date.now()}.wav`);
+                log('Audio downloaded');
+            }
+        };
+        
+        // Initialize on load
+        initializeInfo();
+        updateStatus('Ready to Load Model', 'loading');
+        log('ONNX Runtime test page initialized');
+        log('Click "Load Model" to begin');
+    </script>
+</body>
+</html>

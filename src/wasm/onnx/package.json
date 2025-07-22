@@ -1,0 +1,26 @@
+{
+  "name": "piper-onnx-runtime",
+  "version": "1.0.0",
+  "description": "ONNX Runtime integration for Piper TTS WebAssembly",
+  "main": "dist/index.js",
+  "type": "module",
+  "scripts": {
+    "build": "webpack --mode production",
+    "dev": "webpack --mode development --watch",
+    "test": "jest",
+    "serve": "http-server -p 8003"
+  },
+  "dependencies": {
+    "onnxruntime-web": "^1.17.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "copy-webpack-plugin": "^11.0.0",
+    "http-server": "^14.1.1",
+    "jest": "^29.7.0",
+    "ts-loader": "^9.5.1",
+    "typescript": "^5.3.3",
+    "webpack": "^5.89.0",
+    "webpack-cli": "^5.1.4"
+  }
+}
