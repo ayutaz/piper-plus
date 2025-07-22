@@ -119,7 +119,7 @@ jobs:
           else
             # Auto-generate release notes
             echo "body<<EOF" >> $GITHUB_OUTPUT
-            echo "## 🚀 Development Release" >> $GITHUB_OUTPUT
+            echo "## 🚀 Release v${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
             echo "" >> $GITHUB_OUTPUT
             echo "**Build Date:** $(TZ=Asia/Tokyo date +'%Y-%m-%d %H:%M:%S JST')" >> $GITHUB_OUTPUT
             echo "**Commit:** ${{ github.sha }}" >> $GITHUB_OUTPUT
@@ -131,8 +131,10 @@ jobs:
             git log --oneline -10 --pretty=format:"- %s (%h)" >> $GITHUB_OUTPUT
             echo "" >> $GITHUB_OUTPUT
             
-            echo "### ⚠️ Note" >> $GITHUB_OUTPUT
-            echo "This is a development release and may be unstable." >> $GITHUB_OUTPUT
+            echo "### 📦 Installation" >> $GITHUB_OUTPUT
+            echo "\`\`\`bash" >> $GITHUB_OUTPUT
+            echo "pip install piper-tts-plus==${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+            echo "\`\`\`" >> $GITHUB_OUTPUT
             echo "EOF" >> $GITHUB_OUTPUT
           fi
 
