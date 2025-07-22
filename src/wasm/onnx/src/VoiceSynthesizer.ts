@@ -129,8 +129,12 @@ export class VoiceSynthesizer {
     // Extract audio data
     let audioData: Float32Array;
     
+    // In test environment, data might be directly accessible
     if (outputTensor.data instanceof Float32Array) {
       audioData = outputTensor.data as Float32Array;
+    } else if (outputTensor instanceof Float32Array) {
+      // Handle case where outputTensor is the data itself
+      audioData = outputTensor;
     } else {
       // Convert to Float32Array if needed
       audioData = new Float32Array(outputTensor.data as any);
@@ -139,22 +143,17 @@ export class VoiceSynthesizer {
     // Handle batch dimension if present
     // Expected shape: [batch_size, num_samples] or [batch_size, 1, num_samples]
     const shape = outputTensor.dims;
-    if (shape.length > 1 && shape[0] === 1) {
-      // Remove batch dimension
-      if (shape.length === 2) {
-        // Shape is [1, num_samples]
-        return audioData;
-      } else if (shape.length === 3 && shape[1] === 1) {
-        // Shape is [1, 1, num_samples]
-        return audioData;
-      }
-    }
+    // Note: We process normalization after handling dimensions
     
     // Normalize audio to [-1, 1] range if needed
-    const maxValue = Math.max(...audioData.map(Math.abs));
+    const maxValue = Math.max(...Array.from(audioData).map(Math.abs));
     if (maxValue > 1.0) {
       const scale = 1.0 / maxValue;
-      audioData = audioData.map(x => x * scale);
+      const normalizedData = new Float32Array(audioData.length);
+      for (let i = 0; i < audioData.length; i++) {
+        normalizedData[i] = audioData[i] * scale;
+      }
+      return normalizedData;
     }
     
     return audioData;
