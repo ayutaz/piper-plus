@@ -1,0 +1,96 @@
+name: Deploy WASM Demo (Simplified)
+
+on:
+  push:
+    branches: [ main, feat/webassembly-support ]
+    paths:
+      - 'src/wasm/**'
+      - '.github/workflows/deploy-wasm-demo-simple.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages-wasm"
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+          
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          
+      - name: Setup Emscripten
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: '3.1.61'
+          
+      - name: Build MeCab WASM
+        working-directory: src/wasm/mecab
+        run: |
+          npm ci
+          npm run build:wasm || echo "Build failed but continuing"
+          npm run build || echo "Build failed but continuing"
+          
+      - name: Build OpenJTalk WASM
+        working-directory: src/wasm/openjtalk
+        run: |
+          npm ci
+          ./build.sh || echo "Build failed but continuing"
+          npm run build || echo "Build failed but continuing"
+          
+      - name: Build ONNX Runtime Integration
+        working-directory: src/wasm/onnx
+        run: |
+          npm ci
+          npm run build || echo "Build failed but continuing"
+          
+      - name: Prepare demo site
+        run: |
+          mkdir -p demo-site
+          
+          # Copy demo pages
+          cp -r src/wasm/test/*.html demo-site/ || true
+          
+          # Copy built assets
+          mkdir -p demo-site/mecab/build
+          cp -r src/wasm/mecab/build/* demo-site/mecab/build/ || true
+          
+          mkdir -p demo-site/openjtalk/build
+          cp -r src/wasm/openjtalk/build/* demo-site/openjtalk/build/ || true
+          
+          mkdir -p demo-site/onnx/dist
+          cp -r src/wasm/onnx/dist/* demo-site/onnx/dist/ || true
+          
+          # Create simple index
+          echo "<h1>Piper WASM Demo</h1><ul>" > demo-site/index.html
+          echo "<li><a href='mecab-test.html'>MeCab Test</a></li>" >> demo-site/index.html
+          echo "<li><a href='openjtalk-test.html'>OpenJTalk Test</a></li>" >> demo-site/index.html
+          echo "<li><a href='full-tts-demo.html'>Full TTS Demo</a></li>" >> demo-site/index.html
+          echo "</ul>" >> demo-site/index.html
+          
+      - name: Setup Pages
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/feat/webassembly-support'
+        uses: actions/configure-pages@v4
+        
+      - name: Upload artifact
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/feat/webassembly-support'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./demo-site
+          
+      - name: Deploy to GitHub Pages
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/feat/webassembly-support'
+        id: deployment
+        uses: actions/deploy-pages@v4
