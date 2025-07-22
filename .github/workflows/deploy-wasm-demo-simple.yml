@@ -92,7 +92,16 @@ jobs:
           mkdir -p demo-site/mecab/build
           cp -r src/wasm/mecab/build/* demo-site/mecab/build/ || true
           mkdir -p demo-site/mecab/test
+          
+          # Debug: List files before copy
+          echo "Files in src/wasm/mecab/test:"
+          ls -la src/wasm/mecab/test/
+          
           cp -r src/wasm/mecab/test/* demo-site/mecab/test/ || true
+          
+          # Debug: List files after copy
+          echo "Files in demo-site/mecab/test:"
+          ls -la demo-site/mecab/test/
           
           # Copy OpenJTalk assets
           mkdir -p demo-site/openjtalk/build
