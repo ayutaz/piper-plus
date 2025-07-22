@@ -47,6 +47,7 @@ if(EMSCRIPTEN)
         -s SINGLE_FILE=0 \
         -s DISABLE_EXCEPTION_CATCHING=0 \
         -s ENVIRONMENT=web \
+        -s USE_ZLIB=1 \
         -msimd128 \
         --bind \
     ")
