@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'バージョン（例: 1.4.0） - タグ名はvを付けて自動生成されます'
+        description: 'バージョン（X.X.X形式、例: 1.4.0） - タグ名はvを付けて自動生成されます'
         required: true
         type: string
       release_name:
@@ -38,6 +38,16 @@ jobs:
       - uses: actions/checkout@v4.2.2
         with:
           fetch-depth: 0
+
+      - name: Validate version format
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          if ! echo "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "Error: Version must be in format X.X.X (e.g., 1.4.0)"
+            echo "Provided version: $VERSION"
+            exit 1
+          fi
+          echo "Version format is valid: $VERSION"
 
       - name: Update version in setup.py
         run: |
