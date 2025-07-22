@@ -173,7 +173,7 @@
     </div>
 
     <script type="module">
-        let mecab, openjtalk, session;
+        let mecab, openjtalk, session, modelConfig;
         const debugLog = [];
         
         function log(message, level = 'info') {
@@ -221,6 +221,18 @@
             debugEl.style.display = debugEl.style.display === 'none' ? 'block' : 'none';
         };
         
+        // Load model configuration
+        async function loadModelConfig() {
+            try {
+                const response = await fetch('../models/ja_JP/ja_JP-test-medium.onnx.json');
+                const config = await response.json();
+                return config;
+            } catch (error) {
+                log('Failed to load model config, using default', 'warn');
+                return { phoneme_id_map: null };
+            }
+        }
+        
         // Create phoneme to ID mapping based on Japanese phonemes
         function createPhonemeIdMap() {
             const phonemes = [
@@ -242,37 +254,6 @@
         function puaToPhonemeIds(puaString, phonemeIdMap) {
             const phonemeIds = [];
             
-            // PUA to phoneme mapping
-            const puaMap = {
-                '\uE000': 'a', '\uE001': 'i', '\uE002': 'u', '\uE003': 'e', '\uE004': 'o',
-                '\uE005': 'k a', '\uE006': 'k i', '\uE007': 'k u', '\uE008': 'k e', '\uE009': 'k o',
-                '\uE00A': 'ky a', '\uE00B': 'ky u', '\uE00C': 'ky o',
-                '\uE010': 'g a', '\uE011': 'g i', '\uE012': 'g u', '\uE013': 'g e', '\uE014': 'g o',
-                '\uE015': 'gy a', '\uE016': 'gy u', '\uE017': 'gy o',
-                '\uE020': 's a', '\uE021': 'sh i', '\uE022': 's u', '\uE023': 's e', '\uE024': 's o',
-                '\uE025': 'sh a', '\uE026': 'sh u', '\uE027': 'sh o',
-                '\uE030': 'z a', '\uE031': 'j i', '\uE032': 'z u', '\uE033': 'z e', '\uE034': 'z o',
-                '\uE035': 'j a', '\uE036': 'j u', '\uE037': 'j o',
-                '\uE040': 't a', '\uE041': 'ch i', '\uE042': 'ts u', '\uE043': 't e', '\uE044': 't o',
-                '\uE045': 'ch a', '\uE046': 'ch u', '\uE047': 'ch o',
-                '\uE050': 'd a', '\uE051': 'j i', '\uE052': 'z u', '\uE053': 'd e', '\uE054': 'd o',
-                '\uE060': 'n a', '\uE061': 'n i', '\uE062': 'n u', '\uE063': 'n e', '\uE064': 'n o',
-                '\uE065': 'ny a', '\uE066': 'ny u', '\uE067': 'ny o',
-                '\uE070': 'h a', '\uE071': 'h i', '\uE072': 'f u', '\uE073': 'h e', '\uE074': 'h o',
-                '\uE075': 'hy a', '\uE076': 'hy u', '\uE077': 'hy o',
-                '\uE080': 'b a', '\uE081': 'b i', '\uE082': 'b u', '\uE083': 'b e', '\uE084': 'b o',
-                '\uE085': 'by a', '\uE086': 'by u', '\uE087': 'by o',
-                '\uE090': 'p a', '\uE091': 'p i', '\uE092': 'p u', '\uE093': 'p e', '\uE094': 'p o',
-                '\uE095': 'py a', '\uE096': 'py u', '\uE097': 'py o',
-                '\uE0A0': 'm a', '\uE0A1': 'm i', '\uE0A2': 'm u', '\uE0A3': 'm e', '\uE0A4': 'm o',
-                '\uE0A5': 'my a', '\uE0A6': 'my u', '\uE0A7': 'my o',
-                '\uE0B0': 'y a', '\uE0B2': 'y u', '\uE0B4': 'y o',
-                '\uE0C0': 'r a', '\uE0C1': 'r i', '\uE0C2': 'r u', '\uE0C3': 'r e', '\uE0C4': 'r o',
-                '\uE0C5': 'ry a', '\uE0C6': 'ry u', '\uE0C7': 'ry o',
-                '\uE0D0': 'w a', '\uE0D4': 'w o',
-                '\uE0E0': 'N', '\uE0E1': 'cl', '\uE0E2': ':'
-            };
-            
             // Add start token
             if (phonemeIdMap['^']) {
                 phonemeIds.push(phonemeIdMap['^'][0]);
@@ -280,17 +261,17 @@
             
             // Process each character
             for (const char of puaString) {
-                if (puaMap[char]) {
-                    const phonemes = puaMap[char].split(' ');
-                    for (const phoneme of phonemes) {
-                        if (phonemeIdMap[phoneme]) {
-                            phonemeIds.push(phonemeIdMap[phoneme][0]);
-                        }
-                    }
+                // First check if the character itself is in the phoneme_id_map
+                if (phonemeIdMap[char]) {
+                    phonemeIds.push(phonemeIdMap[char][0]);
                 } else if (char === ' ') {
+                    // Space maps to silence token
                     if (phonemeIdMap['_']) {
                         phonemeIds.push(phonemeIdMap['_'][0]);
                     }
+                } else {
+                    // For regular characters (should not happen with proper PUA encoding)
+                    log(`Warning: Unmapped character: ${char} (code: ${char.charCodeAt(0)})`, 'warn');
                 }
             }
             
@@ -378,7 +359,21 @@
                 
                 // Step 3: Convert to phoneme IDs
                 updateProgress(40, '音素IDに変換中...');
-                const phonemeIdMap = createPhonemeIdMap();
+                // Use the actual phoneme_id_map from the model
+                const phonemeIdMap = modelConfig.phoneme_id_map || createPhonemeIdMap();
+                
+                // Debug: Log PUA characters
+                log(`PUA phonemes: ${puaPhonemes}`);
+                const puaChars = [];
+                for (const char of puaPhonemes) {
+                    if (char.charCodeAt(0) >= 0xE000) {
+                        puaChars.push(`${char}(\\u${char.charCodeAt(0).toString(16)})`);
+                    }
+                }
+                if (puaChars.length > 0) {
+                    log(`PUA characters found: ${puaChars.join(', ')}`);
+                }
+                
                 const phonemeIds = puaToPhonemeIds(puaPhonemes, phonemeIdMap);
                 log(`Phoneme IDs: ${phonemeIds.slice(0, 20).join(', ')}... (${phonemeIds.length} total)`);
                 
@@ -484,9 +479,8 @@
                 
                 // Fetch model info first
                 updateProgress(35, 'モデル情報を取得中...');
-                const modelInfoResponse = await fetch('../models/ja_JP/ja_JP-test-medium.onnx.json');
-                const modelInfo = await modelInfoResponse.json();
-                log(`Model info loaded: ${modelInfo.language} ${modelInfo.quality}`);
+                modelConfig = await loadModelConfig();
+                log(`Model info loaded: language=${modelConfig.language?.code}, phoneme_type=${modelConfig.phoneme_type}`);
                 
                 // Try to load model with streaming
                 updateProgress(45, 'ONNXモデルをロード中...');
