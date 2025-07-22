@@ -29,3 +29,9 @@ __pycache__/
 # Keep test files
 !test/index.html
 !test/server.py
+!mecab/test/mecab-core-wrapper.js
+!mecab/test/*.html
+!openjtalk/test/*.js
+!openjtalk/test/*.html
+!onnx/test/*.js
+!onnx/test/*.html
