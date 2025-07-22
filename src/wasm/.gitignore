@@ -35,3 +35,8 @@ __pycache__/
 !openjtalk/test/*.html
 !onnx/test/*.js
 !onnx/test/*.html
+
+# Keep worker files
+!mecab/build/mecab-worker.js
+!openjtalk/build/openjtalk-worker.js
+!onnx/dist/piper-onnx-runtime.es.js

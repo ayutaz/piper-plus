@@ -51,6 +51,11 @@ jobs:
             echo 'placeholder' > build/mecab_core_wasm.wasm
           fi
           
+          # Ensure worker file exists
+          if [ ! -f build/mecab-worker.js ]; then
+            cp ../mecab/build/mecab-worker.js build/ || echo "Worker file not found"
+          fi
+          
       - name: Build OpenJTalk WASM  
         working-directory: src/wasm/openjtalk
         run: |
@@ -66,6 +71,11 @@ jobs:
             echo 'placeholder' > build/openjtalk.wasm
           fi
           
+          # Ensure worker file exists
+          if [ ! -f build/openjtalk-worker.js ]; then
+            cp ../openjtalk/build/openjtalk-worker.js build/ || echo "Worker file not found"
+          fi
+          
       - name: Build ONNX Runtime Integration
         working-directory: src/wasm/onnx
         run: |
@@ -78,7 +88,7 @@ jobs:
           if ! npm run build; then
             echo "Creating placeholder ONNX files..."
             echo 'export const PiperONNXRuntime = class {};' > dist/piper-onnx.js
-            echo 'export const PiperONNXRuntime = class {};' > dist/piper-onnx-runtime.es.js
+            cp ../onnx/dist/piper-onnx-runtime.es.js dist/ || echo "Runtime file not found"
           fi
           
       - name: Prepare demo site
