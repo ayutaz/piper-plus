@@ -4,11 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'バージョン（例: 1.4.0）'
-        required: true
-        type: string
-      tag_name:
-        description: 'タグ名（例: v1.4.0）'
+        description: 'バージョン（例: 1.4.0） - タグ名はvを付けて自動生成されます'
         required: true
         type: string
       release_name:
@@ -61,7 +57,7 @@ jobs:
             echo "name=Release ${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
           fi
           
-          echo "tag_name=${{ github.event.inputs.tag_name }}" >> $GITHUB_OUTPUT
+          echo "tag_name=v${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
 
       - name: Generate release notes
         id: get_release_notes
