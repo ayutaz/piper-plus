@@ -56,4 +56,7 @@ export interface RuntimeOptions {
   };
   numThreads?: number;
   graphOptimizationLevel?: 'disabled' | 'basic' | 'extended' | 'all';
+  preferredBackend?: 'cpu' | 'webgl' | 'webgpu' | 'wasm' | 'auto';
+  enableProfiling?: boolean;
+  powerPreference?: 'low-power' | 'high-performance' | 'default';
 }

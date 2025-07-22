@@ -16,6 +16,7 @@ permissions:
   contents: read
   pages: write
   id-token: write
+  pull-requests: write  # PR にコメントを書くため
 
 concurrency:
   group: "pages"
@@ -271,6 +272,8 @@ HTML_EOF
           path: ./demo-site
           
   deploy:
+    # Only deploy on push to main/feat branches (not on PR)
+    if: github.event_name == 'push'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -281,26 +284,38 @@ HTML_EOF
         id: deployment
         uses: actions/deploy-pages@v4
         
-      - name: Comment PR with preview URL
-        if: github.event_name == 'pull_request'
+  comment-pr:
+    # Comment on PR with artifact information
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    needs: build
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Comment PR with build info
         uses: actions/github-script@v7
         with:
           script: |
-            const previewUrl = '${{ steps.deployment.outputs.page_url }}';
-            const comment = `## 🚀 デモサイトプレビュー
-            
-            PRのデモサイトがデプロイされました:
-            
-            🔗 **[${previewUrl}](${previewUrl})**
-            
-            ### 利用可能なデモ:
-            - [MeCab 形態素解析デモ](${previewUrl}/mecab-test.html)
-            - [OpenJTalk 音素変換デモ](${previewUrl}/openjtalk-test.html)
-            - [完全統合TTSデモ](${previewUrl}/full-tts-demo.html)
-            - [ストリーミングTTSデモ](${previewUrl}/streaming-tts-demo.html)
-            - [実モデルデモ](${previewUrl}/real-model-demo.html)
-            
-            > **Note**: 初回アクセス時は大きなファイルのダウンロードが発生するため、読み込みに時間がかかる場合があります。`;
+            const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const comment = [
+              '## 🏗️ WebAssembly ビルド完了',
+              '',
+              'PRのWebAssemblyモジュールが正常にビルドされました。',
+              '',
+              `📦 **[ビルドアーティファクト](${runUrl})**`,
+              '',
+              '### ビルド内容:',
+              '- ✅ MeCab WebAssembly モジュール',
+              '- ✅ OpenJTalk WebAssembly モジュール',  
+              '- ✅ ONNX Runtime 統合',
+              '- ✅ デモページ',
+              '',
+              '### 次のステップ:',
+              '1. このPRがマージされると、デモサイトが自動的にデプロイされます',
+              '2. デプロイ後のURL: https://ayutaz.github.io/piper-plus/',
+              '',
+              '> **Note**: 初回アクセス時は大きなファイルのダウンロードが発生するため、読み込みに時間がかかる場合があります。'
+            ].join('\n');
             
             github.rest.issues.createComment({
               owner: context.repo.owner,

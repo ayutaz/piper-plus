@@ -9,6 +9,7 @@ import { ModelLoader } from './ModelLoader';
 import { VoiceSynthesizer } from './VoiceSynthesizer';
 import { AudioPlayer } from './AudioPlayer';
 import { MemoryManager, ResourceTracker } from './MemoryManager';
+import { WebGLOptimizer } from './WebGLOptimizer';
 import { RuntimeOptions, SynthesisOptions, SynthesisResult } from './types';
 
 export class PiperONNXRuntime {
@@ -17,9 +18,11 @@ export class PiperONNXRuntime {
   private audioPlayer: AudioPlayer;
   private memoryManager: MemoryManager;
   private resourceTracker: ResourceTracker;
+  private webglOptimizer: WebGLOptimizer;
   private initialized = false;
   
   constructor(options: RuntimeOptions = {}) {
+    this.webglOptimizer = new WebGLOptimizer();
     this.setupONNXRuntime(options);
     this.modelLoader = new ModelLoader();
     this.audioPlayer = new AudioPlayer();
@@ -50,9 +53,20 @@ export class PiperONNXRuntime {
       env.debug = true;
     }
     
-    // Configure execution providers
-    const providers = options.executionProviders || ['webgpu', 'webgl', 'wasm'];
-    console.log(`ONNX Runtime configured with providers: ${providers.join(', ')}`);
+    // Configure execution providers with WebGL optimization
+    const optimizedProviders = this.webglOptimizer.getOptimalExecutionProviders({
+      preferredBackend: options.preferredBackend,
+      enableProfiling: options.enableProfiling,
+      powerPreference: options.powerPreference
+    });
+    
+    console.log(`ONNX Runtime configured with providers: ${optimizedProviders.join(', ')}`);
+    
+    // Log recommendations
+    const recommendations = this.webglOptimizer.getRecommendations();
+    if (recommendations.length > 0) {
+      console.log('Performance recommendations:', recommendations);
+    }
   }
   
   /**
