@@ -1,119 +1,585 @@
 <!DOCTYPE html>
-<html>
+<html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>Piper WebAssembly Test</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Piper WebAssembly TTS デモ</title>
     <style>
+        :root {
+            --primary-color: #1a73e8;
+            --success-color: #34a853;
+            --warning-color: #fbbc04;
+            --error-color: #ea4335;
+            --bg-color: #f8f9fa;
+            --card-bg: #ffffff;
+            --text-color: #202124;
+            --text-secondary: #5f6368;
+            --border-color: #dadce0;
+        }
+        
         body {
-            font-family: Arial, sans-serif;
-            max-width: 800px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans JP', sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+        }
+        
+        .container {
+            max-width: 1200px;
             margin: 0 auto;
             padding: 20px;
         }
-        .test-section {
-            margin: 20px 0;
-            padding: 20px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
+        
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
         }
-        .result {
-            background-color: #f0f0f0;
-            padding: 10px;
-            margin: 10px 0;
-            border-radius: 3px;
-            font-family: monospace;
+        
+        h1 {
+            font-size: 32px;
+            margin: 0 0 10px 0;
+            color: var(--text-color);
         }
-        button {
-            padding: 10px 20px;
-            margin: 5px;
+        
+        .subtitle {
+            color: var(--text-secondary);
+            font-size: 18px;
+        }
+        
+        .card {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        
+        .status-banner {
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-weight: 500;
+            text-align: center;
+        }
+        
+        .status-loading {
+            background: #e3f2fd;
+            color: #1565c0;
+        }
+        
+        .status-ready {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+        
+        .status-error {
+            background: #ffebee;
+            color: #c62828;
+        }
+        
+        .input-section {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        
+        textarea {
+            width: 100%;
+            min-height: 120px;
+            padding: 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            font-size: 16px;
+            font-family: inherit;
+            resize: vertical;
+        }
+        
+        .sample-buttons {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        
+        .sample-btn {
+            padding: 6px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            background: white;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+        
+        .sample-btn:hover {
+            background: var(--bg-color);
+        }
+        
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-top: 20px;
+        }
+        
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        label {
+            font-size: 14px;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+        
+        input[type="range"] {
+            width: 100%;
+        }
+        
+        .range-value {
+            font-size: 12px;
+            color: var(--text-secondary);
+            text-align: right;
+        }
+        
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
             cursor: pointer;
         }
-        #status {
-            font-weight: bold;
-            margin: 10px 0;
+        
+        .action-buttons {
+            display: flex;
+            gap: 12px;
+            margin-top: 24px;
+        }
+        
+        button {
+            padding: 10px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .btn-primary {
+            background: var(--primary-color);
+            color: white;
+        }
+        
+        .btn-primary:hover:not(:disabled) {
+            background: #1557b0;
+        }
+        
+        .btn-secondary {
+            background: white;
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+        }
+        
+        .btn-secondary:hover:not(:disabled) {
+            background: var(--bg-color);
+        }
+        
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        
+        .audio-player {
+            margin-top: 20px;
+        }
+        
+        audio {
+            width: 100%;
+            margin-top: 10px;
+        }
+        
+        .progress-info {
+            margin-top: 20px;
+            padding: 16px;
+            background: var(--bg-color);
+            border-radius: 8px;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+        
+        .progress-item {
+            display: flex;
+            justify-content: space-between;
+            margin: 4px 0;
+        }
+        
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(0,0,0,.1);
+            border-radius: 50%;
+            border-top-color: var(--primary-color);
+            animation: spin 1s ease-in-out infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .error-message {
+            color: var(--error-color);
+            margin-top: 10px;
+            font-size: 14px;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                padding: 16px;
+            }
+            
+            .controls {
+                grid-template-columns: 1fr;
+            }
         }
     </style>
 </head>
 <body>
-    <h1>Piper WebAssembly Test Page</h1>
-    
-    <div id="status">Loading WebAssembly module...</div>
-    
-    <div class="test-section">
-        <h2>Basic Function Test</h2>
-        <input type="text" id="nameInput" placeholder="Enter your name" value="World">
-        <button onclick="testGreet()">Test Greet Function</button>
-        <div id="greetResult" class="result"></div>
-    </div>
-    
-    <div class="test-section">
-        <h2>Japanese Text Test</h2>
-        <input type="text" id="japaneseInput" placeholder="日本語を入力" value="こんにちは世界">
-        <button onclick="testJapanese()">Test Japanese Processing</button>
-        <div id="japaneseResult" class="result"></div>
-    </div>
-    
-    <div class="test-section">
-        <h2>Memory Test</h2>
-        <button onclick="testMemory()">Test Memory Allocation</button>
-        <div id="memoryResult" class="result"></div>
+    <div class="container">
+        <div class="header">
+            <h1>🎙️ Piper WebAssembly TTS</h1>
+            <p class="subtitle">ブラウザで動作する日本語音声合成デモ</p>
+        </div>
+
+        <div id="statusBanner" class="status-banner status-loading">
+            <span class="loading-spinner"></span>
+            システムを初期化中...
+        </div>
+
+        <div class="card">
+            <h2>テキスト入力</h2>
+            <div class="input-section">
+                <textarea id="textInput" placeholder="音声合成したいテキストを入力してください">こんにちは、世界！Piper WebAssemblyによる日本語音声合成のデモです。</textarea>
+                
+                <div class="sample-buttons">
+                    <button class="sample-btn" onclick="setSampleText('こんにちは、世界！')">挨拶</button>
+                    <button class="sample-btn" onclick="setSampleText('今日は良い天気ですね。散歩に行きませんか？')">日常会話</button>
+                    <button class="sample-btn" onclick="setSampleText('人工知能の発展により、音声合成技術も大きく進歩しています。')">技術説明</button>
+                    <button class="sample-btn" onclick="setSampleText('桜の花が咲く季節になりました。日本の春は美しいです。')">季節の話題</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>合成設定</h2>
+            <div class="controls">
+                <div class="control-group">
+                    <label for="speedSlider">話速</label>
+                    <input type="range" id="speedSlider" min="0.5" max="2.0" step="0.1" value="1.0">
+                    <div class="range-value" id="speedValue">1.0x</div>
+                </div>
+                
+                <div class="control-group">
+                    <label for="pitchSlider">音高</label>
+                    <input type="range" id="pitchSlider" min="0.5" max="2.0" step="0.1" value="1.0">
+                    <div class="range-value" id="pitchValue">1.0x</div>
+                </div>
+                
+                <div class="control-group">
+                    <label for="volumeSlider">音量</label>
+                    <input type="range" id="volumeSlider" min="0" max="1" step="0.1" value="0.8">
+                    <div class="range-value" id="volumeValue">80%</div>
+                </div>
+                
+                <div class="control-group">
+                    <label>オプション</label>
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="streamingMode">
+                        <label for="streamingMode">ストリーミングモード</label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="action-buttons">
+                <button id="synthesizeBtn" class="btn-primary" onclick="synthesize()" disabled>
+                    音声合成
+                </button>
+                <button id="stopBtn" class="btn-secondary" onclick="stopAudio()" style="display: none;">
+                    停止
+                </button>
+                <button class="btn-secondary" onclick="clearText()">
+                    クリア
+                </button>
+            </div>
+        </div>
+
+        <div class="card" style="display: none;" id="audioSection">
+            <h2>音声出力</h2>
+            <div class="audio-player">
+                <audio id="audioPlayer" controls></audio>
+            </div>
+            <div id="progressInfo" class="progress-info" style="display: none;"></div>
+            <div id="errorMessage" class="error-message" style="display: none;"></div>
+        </div>
     </div>
 
+    <!-- Load dependencies -->
+    <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.16.3/dist/ort.min.js"></script>
     <script type="module">
-        let Module;
+        // Import required modules
+        import MeCabWorker from './mecab/build/mecab-worker.js';
+        import OpenJTalkWorker from './openjtalk/build/openjtalk-worker.js';
+        import { PiperONNXRuntime } from './onnx/dist/piper-onnx-runtime.es.js';
         
-        // Load WebAssembly module
-        import('./hello_wasm.js').then(module => {
-            module.default().then(instance => {
-                Module = instance;
-                document.getElementById('status').textContent = 'WebAssembly module loaded successfully!';
-                document.getElementById('status').style.color = 'green';
-                
-                // Make functions available globally
-                window.Module = Module;
-            });
-        }).catch(error => {
-            document.getElementById('status').textContent = 'Error loading WebAssembly: ' + error;
-            document.getElementById('status').style.color = 'red';
+        let mecab, openjtalk, piperRuntime;
+        let isInitialized = false;
+        let currentAudioContext = null;
+        let currentSource = null;
+        
+        // UI elements
+        const statusBanner = document.getElementById('statusBanner');
+        const synthesizeBtn = document.getElementById('synthesizeBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const audioSection = document.getElementById('audioSection');
+        const audioPlayer = document.getElementById('audioPlayer');
+        const progressInfo = document.getElementById('progressInfo');
+        const errorMessage = document.getElementById('errorMessage');
+        
+        // Update slider values
+        document.getElementById('speedSlider').addEventListener('input', (e) => {
+            document.getElementById('speedValue').textContent = e.target.value + 'x';
         });
         
-        // Test functions
-        window.testGreet = function() {
-            if (!Module) {
-                alert('Module not loaded yet!');
+        document.getElementById('pitchSlider').addEventListener('input', (e) => {
+            document.getElementById('pitchValue').textContent = e.target.value + 'x';
+        });
+        
+        document.getElementById('volumeSlider').addEventListener('input', (e) => {
+            document.getElementById('volumeValue').textContent = Math.round(e.target.value * 100) + '%';
+        });
+        
+        // Sample text setter
+        window.setSampleText = function(text) {
+            document.getElementById('textInput').value = text;
+        };
+        
+        // Clear text
+        window.clearText = function() {
+            document.getElementById('textInput').value = '';
+        };
+        
+        // Update status
+        function updateStatus(message, type = 'loading') {
+            statusBanner.className = `status-banner status-${type}`;
+            if (type === 'loading') {
+                statusBanner.innerHTML = '<span class="loading-spinner"></span> ' + message;
+            } else {
+                statusBanner.textContent = message;
+            }
+        }
+        
+        // Show progress
+        function showProgress(stage, time = null) {
+            progressInfo.style.display = 'block';
+            const timeStr = time ? `${time.toFixed(1)}ms` : '処理中...';
+            
+            if (!progressInfo.querySelector(`[data-stage="${stage}"]`)) {
+                const item = document.createElement('div');
+                item.className = 'progress-item';
+                item.setAttribute('data-stage', stage);
+                item.innerHTML = `<span>${stage}</span><span>${timeStr}</span>`;
+                progressInfo.appendChild(item);
+            } else {
+                const item = progressInfo.querySelector(`[data-stage="${stage}"]`);
+                item.querySelector('span:last-child').textContent = timeStr;
+            }
+        }
+        
+        // Show error
+        function showError(message) {
+            errorMessage.style.display = 'block';
+            errorMessage.textContent = message;
+        }
+        
+        // Initialize system
+        async function initialize() {
+            try {
+                updateStatus('MeCabを初期化中...', 'loading');
+                mecab = new MeCabWorker();
+                await mecab.initialize();
+                showProgress('MeCab初期化', 100);
+                
+                updateStatus('OpenJTalkを初期化中...', 'loading');
+                openjtalk = new OpenJTalkWorker();
+                await openjtalk.initialize({
+                    dictionaryUrl: './openjtalk/data/dictionary',
+                    voiceUrl: './openjtalk/data/voice.htsvoice'
+                });
+                showProgress('OpenJTalk初期化', 150);
+                
+                updateStatus('ONNX Runtimeを初期化中...', 'loading');
+                piperRuntime = new PiperONNXRuntime();
+                await piperRuntime.initialize();
+                showProgress('ONNX Runtime初期化', 200);
+                
+                // Load model
+                updateStatus('音声合成モデルを読み込み中...', 'loading');
+                await piperRuntime.loadModel('./models/ja_JP-test-medium.onnx');
+                showProgress('モデル読み込み', 300);
+                
+                isInitialized = true;
+                synthesizeBtn.disabled = false;
+                updateStatus('準備完了', 'ready');
+                progressInfo.style.display = 'none';
+                
+            } catch (error) {
+                console.error('Initialization error:', error);
+                updateStatus('初期化エラー: ' + error.message, 'error');
+                showError(error.message);
+            }
+        }
+        
+        // Synthesize speech
+        window.synthesize = async function() {
+            if (!isInitialized) return;
+            
+            const text = document.getElementById('textInput').value.trim();
+            if (!text) {
+                showError('テキストを入力してください');
                 return;
             }
             
-            const name = document.getElementById('nameInput').value;
-            const result = Module.greet(name);
-            document.getElementById('greetResult').textContent = result;
-        };
-        
-        window.testJapanese = function() {
-            if (!Module) {
-                alert('Module not loaded yet!');
-                return;
-            }
+            // Get settings
+            const speed = parseFloat(document.getElementById('speedSlider').value);
+            const pitch = parseFloat(document.getElementById('pitchSlider').value);
+            const volume = parseFloat(document.getElementById('volumeSlider').value);
+            const streaming = document.getElementById('streamingMode').checked;
             
-            const text = document.getElementById('japaneseInput').value;
-            const result = Module.processJapanese(text);
-            document.getElementById('japaneseResult').textContent = result;
-        };
-        
-        window.testMemory = function() {
-            if (!Module) {
-                alert('Module not loaded yet!');
-                return;
-            }
+            // Reset UI
+            synthesizeBtn.disabled = true;
+            stopBtn.style.display = 'inline-block';
+            audioSection.style.display = 'block';
+            errorMessage.style.display = 'none';
+            progressInfo.innerHTML = '';
+            progressInfo.style.display = 'block';
             
             try {
-                const size = 1000;
-                const result = Module.testMemory(size);
-                document.getElementById('memoryResult').textContent = result;
+                // Step 1: Morphological analysis
+                updateStatus('形態素解析中...', 'loading');
+                const startMecab = performance.now();
+                const mecabResult = await mecab.parse(text);
+                showProgress('形態素解析', performance.now() - startMecab);
+                
+                // Step 2: Phoneme conversion
+                updateStatus('音素変換中...', 'loading');
+                const startOpenJTalk = performance.now();
+                const phonemes = await openjtalk.synthesize(mecabResult.text, {
+                    speed: speed,
+                    pitch: pitch
+                });
+                showProgress('音素変換', performance.now() - startOpenJTalk);
+                
+                // Step 3: Neural synthesis
+                updateStatus('音声合成中...', 'loading');
+                const startSynthesis = performance.now();
+                const audioResult = await piperRuntime.synthesize(phonemes.phonemes, {
+                    streaming: streaming
+                });
+                showProgress('音声合成', performance.now() - startSynthesis);
+                
+                // Step 4: Play audio
+                updateStatus('音声を再生中...', 'loading');
+                playAudio(audioResult.audio, audioResult.sampleRate, volume);
+                
+                updateStatus('合成完了', 'ready');
+                
             } catch (error) {
-                document.getElementById('memoryResult').textContent = 'Error: ' + error;
+                console.error('Synthesis error:', error);
+                updateStatus('エラーが発生しました', 'error');
+                showError(error.message);
+            } finally {
+                synthesizeBtn.disabled = false;
+                stopBtn.style.display = 'none';
             }
         };
+        
+        // Play audio
+        function playAudio(audioData, sampleRate, volume) {
+            // Create audio context if needed
+            if (!currentAudioContext) {
+                currentAudioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            
+            // Create audio buffer
+            const audioBuffer = currentAudioContext.createBuffer(1, audioData.length, sampleRate);
+            audioBuffer.getChannelData(0).set(audioData);
+            
+            // Create WAV blob
+            const wavBlob = createWavBlob(audioData, sampleRate);
+            const audioUrl = URL.createObjectURL(wavBlob);
+            
+            // Set audio player
+            audioPlayer.src = audioUrl;
+            audioPlayer.volume = volume;
+            audioPlayer.play();
+        }
+        
+        // Create WAV blob
+        function createWavBlob(samples, sampleRate) {
+            const buffer = new ArrayBuffer(44 + samples.length * 2);
+            const view = new DataView(buffer);
+            
+            // WAV header
+            const writeString = (offset, string) => {
+                for (let i = 0; i < string.length; i++) {
+                    view.setUint8(offset + i, string.charCodeAt(i));
+                }
+            };
+            
+            writeString(0, 'RIFF');
+            view.setUint32(4, 36 + samples.length * 2, true);
+            writeString(8, 'WAVE');
+            writeString(12, 'fmt ');
+            view.setUint32(16, 16, true);
+            view.setUint16(20, 1, true);
+            view.setUint16(22, 1, true);
+            view.setUint32(24, sampleRate, true);
+            view.setUint32(28, sampleRate * 2, true);
+            view.setUint16(32, 2, true);
+            view.setUint16(34, 16, true);
+            writeString(36, 'data');
+            view.setUint32(40, samples.length * 2, true);
+            
+            // Convert float samples to 16-bit PCM
+            let offset = 44;
+            for (let i = 0; i < samples.length; i++) {
+                const sample = Math.max(-1, Math.min(1, samples[i]));
+                view.setInt16(offset, sample * 0x7FFF, true);
+                offset += 2;
+            }
+            
+            return new Blob([buffer], { type: 'audio/wav' });
+        }
+        
+        // Stop audio
+        window.stopAudio = function() {
+            if (audioPlayer) {
+                audioPlayer.pause();
+                audioPlayer.currentTime = 0;
+            }
+            synthesizeBtn.disabled = false;
+            stopBtn.style.display = 'none';
+        };
+        
+        // Initialize on load
+        initialize();
     </script>
 </body>
 </html>
