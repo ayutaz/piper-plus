@@ -5,7 +5,7 @@
 import { InferenceSession } from 'onnxruntime-web';
 
 export interface OptimizationOptions {
-  preferredBackend?: 'cpu' | 'webgl' | 'webgpu' | 'wasm';
+  preferredBackend?: 'cpu' | 'webgl' | 'webgpu' | 'wasm' | 'auto';
   enableProfiling?: boolean;
   powerPreference?: 'low-power' | 'high-performance' | 'default';
 }
@@ -58,7 +58,7 @@ export class WebGLOptimizer {
         ];
         
         for (const ext of requiredExtensions) {
-          if (!gl.getExtension(ext)) {
+          if (!(gl as WebGL2RenderingContext).getExtension(ext)) {
             console.warn(`WebGL2 extension ${ext} not available`);
           }
         }
@@ -209,7 +209,7 @@ export class WebGLOptimizer {
       // セッションのプロファイリングデータを取得
       // 注: この機能は ONNX Runtime Web の将来のバージョンで利用可能になる予定
       return {
-        backend: session.handler ? 'active' : 'unknown',
+        backend: (session as any).handler ? 'active' : 'unknown',
         capabilities: this.capabilities
       };
     } catch (error) {

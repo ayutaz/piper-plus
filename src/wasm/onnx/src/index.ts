@@ -12,6 +12,7 @@ export { AudioPlayer } from './AudioPlayer';
 export { RetryHandler } from './RetryHandler';
 export { ErrorHandler, ErrorType, PiperError } from './ErrorHandler';
 export { MemoryManager, ResourceTracker } from './MemoryManager';
+export { JapaneseTTSPipeline, createJapaneseTTS } from './JapaneseTTSPipeline';
 export * from './types';
 
 // Default export for UMD builds

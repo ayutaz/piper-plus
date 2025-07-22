@@ -1,0 +1,852 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Japanese TTS Demo - ONNX Runtime Integration</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans JP', sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        
+        h1 {
+            color: #333;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .status {
+            padding: 10px 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            font-weight: 500;
+        }
+        
+        .status.loading {
+            background: #e3f2fd;
+            color: #1976d2;
+            border: 1px solid #90caf9;
+        }
+        
+        .status.success {
+            background: #e8f5e9;
+            color: #2e7d32;
+            border: 1px solid #81c784;
+        }
+        
+        .status.error {
+            background: #ffebee;
+            color: #c62828;
+            border: 1px solid #ef5350;
+        }
+        
+        .input-section {
+            margin-bottom: 20px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #555;
+        }
+        
+        textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+            resize: vertical;
+            transition: border-color 0.3s;
+        }
+        
+        textarea:focus {
+            outline: none;
+            border-color: #2196f3;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        
+        button {
+            background: #2196f3;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        button:hover:not(:disabled) {
+            background: #1976d2;
+        }
+        
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        
+        button.secondary {
+            background: #757575;
+        }
+        
+        button.secondary:hover:not(:disabled) {
+            background: #616161;
+        }
+        
+        button.danger {
+            background: #f44336;
+        }
+        
+        button.danger:hover:not(:disabled) {
+            background: #d32f2f;
+        }
+        
+        .settings {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        .setting-item {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        
+        .setting-item input[type="range"] {
+            width: 100%;
+        }
+        
+        .setting-value {
+            font-size: 14px;
+            color: #666;
+            text-align: right;
+        }
+        
+        .debug-section {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f5f5f5;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 14px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .debug-section h3 {
+            margin-top: 0;
+            color: #555;
+        }
+        
+        .debug-entry {
+            margin: 5px 0;
+            padding: 5px;
+            background: white;
+            border-radius: 2px;
+        }
+        
+        .phoneme-display {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 4px;
+            font-size: 18px;
+            text-align: center;
+            margin: 15px 0;
+            font-family: monospace;
+            color: #1565c0;
+        }
+        
+        .examples {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        
+        .example-btn {
+            background: #9c27b0;
+            font-size: 14px;
+            padding: 8px 16px;
+        }
+        
+        .example-btn:hover:not(:disabled) {
+            background: #7b1fa2;
+        }
+        
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            margin-top: 15px;
+        }
+        
+        .info-item {
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        
+        .info-label {
+            font-size: 12px;
+            color: #666;
+            text-transform: uppercase;
+        }
+        
+        .info-value {
+            font-size: 18px;
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background: #e0e0e0;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: #4caf50;
+            transition: width 0.3s ease;
+            width: 0%;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        
+        .loading-indicator {
+            display: none;
+            animation: pulse 1.5s infinite;
+        }
+        
+        .loading .loading-indicator {
+            display: inline-block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>
+            🎤 Japanese TTS Demo
+            <span class="loading-indicator">⏳</span>
+        </h1>
+        
+        <div id="status" class="status loading">
+            システムを初期化中...
+        </div>
+        
+        <div class="input-section">
+            <label for="textInput">テキスト入力:</label>
+            <textarea id="textInput" rows="4" placeholder="日本語のテキストを入力してください">
+こんにちは、世界！
+今日は素晴らしい天気ですね。</textarea>
+            
+            <div class="examples">
+                <button class="example-btn" onclick="setExample('greeting')">挨拶</button>
+                <button class="example-btn" onclick="setExample('weather')">天気</button>
+                <button class="example-btn" onclick="setExample('news')">ニュース</button>
+                <button class="example-btn" onclick="setExample('story')">物語</button>
+            </div>
+        </div>
+        
+        <div class="controls">
+            <button id="synthesizeBtn" onclick="synthesize()" disabled>
+                <span>🔊</span> 音声合成
+            </button>
+            <button id="stopBtn" onclick="stopPlayback()" disabled class="danger">
+                <span>⏹</span> 停止
+            </button>
+            <button class="secondary" onclick="clearText()">
+                <span>🗑</span> クリア
+            </button>
+            <button class="secondary" onclick="toggleDebug()">
+                <span>🐛</span> デバッグ
+            </button>
+        </div>
+        
+        <div class="settings">
+            <div class="setting-item">
+                <label for="speedSlider">話速:</label>
+                <input type="range" id="speedSlider" min="0.5" max="2.0" step="0.1" value="1.0" 
+                       oninput="updateSpeed(this.value)">
+                <span class="setting-value" id="speedValue">1.0x</span>
+            </div>
+            
+            <div class="setting-item">
+                <label for="pitchSlider">ピッチ:</label>
+                <input type="range" id="pitchSlider" min="0.5" max="2.0" step="0.1" value="1.0" 
+                       oninput="updatePitch(this.value)">
+                <span class="setting-value" id="pitchValue">1.0x</span>
+            </div>
+            
+            <div class="setting-item">
+                <label for="volumeSlider">音量:</label>
+                <input type="range" id="volumeSlider" min="0" max="1" step="0.1" value="0.8" 
+                       oninput="updateVolume(this.value)">
+                <span class="setting-value" id="volumeValue">80%</span>
+            </div>
+        </div>
+    </div>
+    
+    <div class="container">
+        <h2>音素変換結果</h2>
+        <div id="phonemeDisplay" class="phoneme-display">
+            音素列がここに表示されます
+        </div>
+        
+        <div class="progress-bar">
+            <div id="progressFill" class="progress-fill"></div>
+        </div>
+        
+        <div class="info-grid">
+            <div class="info-item">
+                <div class="info-label">処理時間</div>
+                <div class="info-value" id="processingTime">-- ms</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">音声長</div>
+                <div class="info-value" id="audioDuration">-- s</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">メモリ使用量</div>
+                <div class="info-value" id="memoryUsage">-- MB</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">RTF</div>
+                <div class="info-value" id="rtfValue">--</div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="container" id="debugContainer" style="display: none;">
+        <h2>デバッグ情報</h2>
+        <div id="debugOutput" class="debug-section">
+            <h3>ログ:</h3>
+        </div>
+    </div>
+
+    <script type="module">
+        // Since the module is UMD, we need to access it differently
+        // For now, we'll skip the bundled module and use dynamic imports
+        
+        // Define JapaneseTTSPipeline inline for demo
+        class JapaneseTTSPipeline {
+            constructor(options) {
+                this.options = options;
+                this.runtime = null;
+                this.mecab = null;
+                this.openjtalk = null;
+                this.initialized = false;
+            }
+            
+            async initialize() {
+                try {
+                    console.log('Initializing Japanese TTS Pipeline...');
+                    
+                    // Initialize MeCab
+                    const { MeCabWrapper } = await import('../../mecab/dist/mecab-wrapper.js');
+                    this.mecab = new MeCabWrapper();
+                    await this.mecab.initialize({
+                        wasmPath: this.options.mecabWasmPath || '../../mecab/dist/mecab_wasm.wasm',
+                        dataPath: this.options.mecabDataPath || '../../mecab/dist/mecab_wasm.data'
+                    });
+                    console.log('MeCab initialized');
+                    
+                    // Initialize OpenJTalk
+                    const { OpenJTalkWrapper } = await import('../../openjtalk/dist/openjtalk-wrapper.js');
+                    this.openjtalk = new OpenJTalkWrapper();
+                    await this.openjtalk.initialize({
+                        wasmPath: this.options.openjtalkWasmPath || '../../openjtalk/dist/openjtalk_wasm.wasm'
+                    });
+                    console.log('OpenJTalk initialized');
+                    
+                    // Initialize ONNX Runtime directly with onnxruntime-web
+                    // Load ONNX Runtime Web from CDN
+                    const ortScript = document.createElement('script');
+                    ortScript.src = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.0/dist/ort.min.js';
+                    
+                    await new Promise((resolve, reject) => {
+                        ortScript.onload = resolve;
+                        ortScript.onerror = reject;
+                        document.head.appendChild(ortScript);
+                    });
+                    
+                    // Now ort should be available globally
+                    const ort = window.ort;
+                    if (!ort) {
+                        throw new Error('Failed to load ONNX Runtime');
+                    }
+                    
+                    // Configure ONNX Runtime to use CDN WASM files
+                    ort.env.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.0/dist/';
+                    ort.env.wasm.numThreads = 1;  // Single thread to avoid crossOriginIsolated requirement
+                    ort.env.wasm.initTimeout = 60000;  // 60 seconds timeout
+                    
+                    // Disable SIMD if it's causing issues
+                    ort.env.wasm.simd = false;
+                    
+                    // Try to load the model with memory-efficient options
+                    try {
+                        console.log('Loading ONNX model...');
+                        this.session = await ort.InferenceSession.create(this.options.modelPath, {
+                            executionProviders: ['wasm'],
+                            graphOptimizationLevel: 'basic',  // Use basic optimization to reduce memory usage
+                            enableCpuMemArena: false,  // Disable memory arena to reduce memory footprint
+                            enableMemPattern: false,   // Disable memory pattern optimization
+                            executionMode: 'sequential',
+                            logSeverityLevel: 1,  // Verbose for debugging
+                            // Use fetch options to control download
+                            preferredOutputLocation: 'cpu'
+                        });
+                        console.log('Model loaded successfully');
+                    } catch (modelError) {
+                        console.error('Failed to load model:', modelError);
+                        // Try alternative approach: load model as ArrayBuffer first
+                        console.log('Attempting alternative loading method...');
+                        
+                        const modelResponse = await fetch(this.options.modelPath);
+                        const modelBuffer = await modelResponse.arrayBuffer();
+                        console.log(`Model size: ${(modelBuffer.byteLength / 1024 / 1024).toFixed(2)} MB`);
+                        
+                        this.session = await ort.InferenceSession.create(modelBuffer, {
+                            executionProviders: ['wasm'],
+                            graphOptimizationLevel: 'disabled',
+                            enableCpuMemArena: false,
+                            enableMemPattern: false,
+                            executionMode: 'sequential'
+                        });
+                    }
+                    
+                    // Load model config
+                    const configResponse = await fetch(this.options.modelConfigPath);
+                    this.modelConfig = await configResponse.json();
+                    
+                    this.ort = ort;
+                    console.log('ONNX Runtime initialized');
+                    
+                    this.initialized = true;
+                    console.log('Japanese TTS Pipeline initialized successfully');
+                    
+                } catch (error) {
+                    console.error('Failed to initialize Japanese TTS Pipeline:', error);
+                    throw error;
+                }
+            }
+            
+            async synthesize(text, options = {}) {
+                if (!this.initialized) {
+                    throw new Error('Pipeline not initialized. Call initialize() first.');
+                }
+                
+                try {
+                    console.log('Processing text:', text);
+                    
+                    // Step 1: Morphological analysis with MeCab
+                    const mecabOutput = this.mecab.parse(text);
+                    console.log('MeCab output:', mecabOutput);
+                    
+                    // Step 2: Convert to PUA-encoded phonemes with OpenJTalk
+                    const puaPhonemes = this.openjtalk.processToPUA(mecabOutput);
+                    console.log('PUA phonemes:', puaPhonemes);
+                    
+                    // Step 3: Convert PUA to phoneme IDs
+                    const phonemeIds = this.puaToPhonemeIds(puaPhonemes);
+                    console.log('Phoneme IDs:', phonemeIds);
+                    
+                    // Step 4: Prepare input tensors
+                    const phonemeIdsArray = new BigInt64Array(phonemeIds.map(id => BigInt(id)));
+                    const phonemeLengthsArray = new BigInt64Array([BigInt(phonemeIds.length)]);
+                    const speakerIdArray = new BigInt64Array([0n]);
+                    const scalesArray = new Float32Array([
+                        options.noiseScale || this.modelConfig.inference?.noise_scale || 0.667,
+                        options.lengthScale || this.modelConfig.inference?.length_scale || 1.0,
+                        options.noiseW || this.modelConfig.inference?.noise_w || 0.8
+                    ]);
+                    
+                    // Create ONNX tensors
+                    const feeds = {
+                        'phoneme_ids': new this.ort.Tensor('int64', phonemeIdsArray, [1, phonemeIds.length]),
+                        'phoneme_lengths': new this.ort.Tensor('int64', phonemeLengthsArray, [1]),
+                        'speaker_id': new this.ort.Tensor('int64', speakerIdArray, [1]),
+                        'scales': new this.ort.Tensor('float32', scalesArray, [3])
+                    };
+                    
+                    // Run inference
+                    const startTime = performance.now();
+                    const results = await this.session.run(feeds);
+                    const inferenceTime = performance.now() - startTime;
+                    
+                    // Extract audio
+                    const audioTensor = results.audio || results.output;
+                    const audio = new Float32Array(audioTensor.data);
+                    const sampleRate = this.modelConfig.sampleRate || 22050;
+                    const duration = audio.length / sampleRate;
+                    
+                    console.log('Synthesis complete:', {
+                        inferenceTime,
+                        duration,
+                        sampleRate,
+                        audioLength: audio.length
+                    });
+                    
+                    return {
+                        audio,
+                        sampleRate,
+                        duration
+                    };
+                    
+                } catch (error) {
+                    console.error('Synthesis error:', error);
+                    throw error;
+                }
+            }
+            
+            puaToPhonemeIds(puaString) {
+                const phonemeIds = [];
+                const phonemeIdMap = this.modelConfig.phoneme_id_map || {};
+                
+                // Create reverse map: PUA code -> phoneme -> ID
+                const puaToPhoneme = {
+                    '\uE000': 'a', '\uE001': 'i', '\uE002': 'u', '\uE003': 'e', '\uE004': 'o',
+                    '\uE005': 'k', '\uE006': 'k', '\uE007': 'k', '\uE008': 'k', '\uE009': 'k',
+                    '\uE00A': 'ky', '\uE00B': 'ky', '\uE00C': 'ky',
+                    '\uE010': 'g', '\uE011': 'g', '\uE012': 'g', '\uE013': 'g', '\uE014': 'g',
+                    '\uE015': 'gy', '\uE016': 'gy', '\uE017': 'gy',
+                    '\uE020': 's', '\uE021': 'sh', '\uE022': 's', '\uE023': 's', '\uE024': 's',
+                    '\uE025': 'sh', '\uE026': 'sh', '\uE027': 'sh',
+                    '\uE030': 'z', '\uE031': 'j', '\uE032': 'z', '\uE033': 'z', '\uE034': 'z',
+                    '\uE035': 'j', '\uE036': 'j', '\uE037': 'j',
+                    '\uE040': 't', '\uE041': 'ch', '\uE042': 'ts', '\uE043': 't', '\uE044': 't',
+                    '\uE045': 'ch', '\uE046': 'ch', '\uE047': 'ch',
+                    '\uE050': 'd', '\uE051': 'j', '\uE052': 'z', '\uE053': 'd', '\uE054': 'd',
+                    '\uE060': 'n', '\uE061': 'n', '\uE062': 'n', '\uE063': 'n', '\uE064': 'n',
+                    '\uE065': 'ny', '\uE066': 'ny', '\uE067': 'ny',
+                    '\uE070': 'h', '\uE071': 'h', '\uE072': 'f', '\uE073': 'h', '\uE074': 'h',
+                    '\uE075': 'hy', '\uE076': 'hy', '\uE077': 'hy',
+                    '\uE080': 'b', '\uE081': 'b', '\uE082': 'b', '\uE083': 'b', '\uE084': 'b',
+                    '\uE085': 'by', '\uE086': 'by', '\uE087': 'by',
+                    '\uE090': 'p', '\uE091': 'p', '\uE092': 'p', '\uE093': 'p', '\uE094': 'p',
+                    '\uE095': 'py', '\uE096': 'py', '\uE097': 'py',
+                    '\uE0A0': 'm', '\uE0A1': 'm', '\uE0A2': 'm', '\uE0A3': 'm', '\uE0A4': 'm',
+                    '\uE0A5': 'my', '\uE0A6': 'my', '\uE0A7': 'my',
+                    '\uE0B0': 'y', '\uE0B2': 'y', '\uE0B4': 'y',
+                    '\uE0C0': 'r', '\uE0C1': 'r', '\uE0C2': 'r', '\uE0C3': 'r', '\uE0C4': 'r',
+                    '\uE0C5': 'ry', '\uE0C6': 'ry', '\uE0C7': 'ry',
+                    '\uE0D0': 'w', '\uE0D1': 'w',
+                    '\uE0E0': 'N', '\uE0E1': 'cl', '\uE0E2': ':'
+                };
+                
+                // Add start token
+                if (phonemeIdMap['^']) {
+                    phonemeIds.push(phonemeIdMap['^'][0]);
+                }
+                
+                // Process each character
+                for (const char of puaString) {
+                    const phoneme = puaToPhoneme[char];
+                    if (phoneme && phonemeIdMap[phoneme]) {
+                        phonemeIds.push(phonemeIdMap[phoneme][0]);
+                    } else if (char === ' ' && phonemeIdMap['_']) {
+                        phonemeIds.push(phonemeIdMap['_'][0]);
+                    }
+                }
+                
+                // Add end token
+                if (phonemeIdMap['$']) {
+                    phonemeIds.push(phonemeIdMap['$'][0]);
+                }
+                
+                return phonemeIds;
+            }
+            
+            async getPhonemes(text) {
+                if (!this.mecab || !this.openjtalk) {
+                    throw new Error('Text processing modules not initialized');
+                }
+                
+                const mecabOutput = this.mecab.parse(text);
+                const phonemes = this.openjtalk.processText(mecabOutput);
+                const puaEncoded = this.openjtalk.processToPUA(mecabOutput);
+                
+                return {
+                    mecabOutput,
+                    phonemes,
+                    puaEncoded
+                };
+            }
+            
+            getInfo() {
+                return {
+                    initialized: this.initialized,
+                    modelLoaded: !!this.session,
+                    onnxVersion: this.ort?.version || 'unknown',
+                    webAssemblySupported: typeof WebAssembly !== 'undefined',
+                    webGPUSupported: 'gpu' in navigator
+                };
+            }
+            
+            getMemoryStats() {
+                if (typeof performance !== 'undefined' && performance.memory) {
+                    return {
+                        usedJSHeapSize: performance.memory.usedJSHeapSize,
+                        totalJSHeapSize: performance.memory.totalJSHeapSize,
+                        jsHeapSizeLimit: performance.memory.jsHeapSizeLimit
+                    };
+                }
+                return null;
+            }
+            
+            stop() {
+                // Audio stopping would be handled by the audio player
+                console.log('Stop playback requested');
+            }
+            
+            async dispose() {
+                if (this.mecab) {
+                    this.mecab.dispose();
+                }
+                if (this.openjtalk) {
+                    this.openjtalk.dispose();
+                }
+                if (this.runtime) {
+                    await this.runtime.dispose();
+                }
+                this.initialized = false;
+            }
+        }
+        
+        let pipeline = null;
+        let isPlaying = false;
+        let synthesisOptions = {
+            speed: 1.0,
+            pitch: 1.0,
+            volume: 0.8
+        };
+        
+        // Example texts
+        const examples = {
+            greeting: "こんにちは！お元気ですか？\n今日も一日頑張りましょう。",
+            weather: "今日の天気は晴れです。\n気温は25度で、過ごしやすい一日になりそうです。",
+            news: "本日のニュースをお伝えします。\n新しい技術により、音声合成がより自然になりました。",
+            story: "昔々、ある所に優しい王様が住んでいました。\n王様は毎日、国民の幸せを願っていました。"
+        };
+        
+        // Logging
+        function log(message, data = null) {
+            console.log(message, data);
+            
+            const debugOutput = document.getElementById('debugOutput');
+            const entry = document.createElement('div');
+            entry.className = 'debug-entry';
+            entry.textContent = `[${new Date().toTimeString().split(' ')[0]}] ${message}`;
+            if (data) {
+                entry.textContent += ` ${JSON.stringify(data)}`;
+            }
+            debugOutput.appendChild(entry);
+            debugOutput.scrollTop = debugOutput.scrollHeight;
+        }
+        
+        // Update status
+        function updateStatus(message, type = 'loading') {
+            const statusEl = document.getElementById('status');
+            statusEl.className = `status ${type}`;
+            statusEl.textContent = message;
+            
+            document.body.classList.toggle('loading', type === 'loading');
+        }
+        
+        // Example setter
+        window.setExample = function(type) {
+            document.getElementById('textInput').value = examples[type] || '';
+        };
+        
+        // Controls
+        window.updateSpeed = function(value) {
+            synthesisOptions.speed = parseFloat(value);
+            document.getElementById('speedValue').textContent = `${value}x`;
+        };
+        
+        window.updatePitch = function(value) {
+            synthesisOptions.pitch = parseFloat(value);
+            document.getElementById('pitchValue').textContent = `${value}x`;
+        };
+        
+        window.updateVolume = function(value) {
+            synthesisOptions.volume = parseFloat(value);
+            document.getElementById('volumeValue').textContent = `${Math.round(value * 100)}%`;
+        };
+        
+        window.clearText = function() {
+            document.getElementById('textInput').value = '';
+            document.getElementById('phonemeDisplay').textContent = '音素列がここに表示されます';
+            document.getElementById('processingTime').textContent = '-- ms';
+            document.getElementById('audioDuration').textContent = '-- s';
+            document.getElementById('rtfValue').textContent = '--';
+        };
+        
+        window.toggleDebug = function() {
+            const debugContainer = document.getElementById('debugContainer');
+            debugContainer.style.display = debugContainer.style.display === 'none' ? 'block' : 'none';
+        };
+        
+        // Synthesis
+        window.synthesize = async function() {
+            const text = document.getElementById('textInput').value.trim();
+            if (!text) {
+                alert('テキストを入力してください');
+                return;
+            }
+            
+            const synthesizeBtn = document.getElementById('synthesizeBtn');
+            const stopBtn = document.getElementById('stopBtn');
+            
+            synthesizeBtn.disabled = true;
+            stopBtn.disabled = false;
+            
+            try {
+                updateStatus('音声を合成中...', 'loading');
+                const startTime = performance.now();
+                
+                // Get phonemes for display
+                const phonemeData = await pipeline.getPhonemes(text);
+                document.getElementById('phonemeDisplay').textContent = phonemeData.phonemes;
+                log('Phonemes generated', { phonemes: phonemeData.phonemes });
+                
+                // Synthesize and play
+                const result = await pipeline.synthesize(text, synthesisOptions);
+                const processingTime = performance.now() - startTime;
+                
+                // Update stats
+                document.getElementById('processingTime').textContent = `${processingTime.toFixed(0)} ms`;
+                document.getElementById('audioDuration').textContent = `${result.duration.toFixed(2)} s`;
+                document.getElementById('rtfValue').textContent = 
+                    (result.duration * 1000 / processingTime).toFixed(2);
+                
+                log('Synthesis complete', {
+                    processingTime,
+                    duration: result.duration,
+                    sampleRate: result.sampleRate
+                });
+                
+                // Play audio
+                updateStatus('音声を再生中...', 'success');
+                isPlaying = true;
+                
+                // Create audio context and play
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const audioBuffer = audioContext.createBuffer(1, result.audio.length, result.sampleRate);
+                audioBuffer.getChannelData(0).set(result.audio);
+                
+                const source = audioContext.createBufferSource();
+                source.buffer = audioBuffer;
+                source.connect(audioContext.destination);
+                
+                source.onended = () => {
+                    updateStatus('再生完了', 'success');
+                    isPlaying = false;
+                    document.getElementById('stopBtn').disabled = true;
+                };
+                
+                source.start();
+                window.currentAudioSource = source;
+                
+            } catch (error) {
+                console.error('Synthesis error:', error);
+                updateStatus(`エラー: ${error.message}`, 'error');
+                log('Error during synthesis', { error: error.message });
+            } finally {
+                synthesizeBtn.disabled = false;
+                stopBtn.disabled = true;
+                document.getElementById('progressFill').style.width = '0%';
+            }
+        };
+        
+        window.stopPlayback = function() {
+            if (window.currentAudioSource && isPlaying) {
+                window.currentAudioSource.stop();
+                window.currentAudioSource = null;
+                isPlaying = false;
+                updateStatus('停止しました', 'success');
+                document.getElementById('stopBtn').disabled = true;
+            }
+        };
+        
+        // Update memory stats periodically
+        async function updateMemoryStats() {
+            if (pipeline) {
+                const stats = pipeline.getMemoryStats();
+                const usedMB = (stats.usedJSHeapSize / 1048576).toFixed(1);
+                document.getElementById('memoryUsage').textContent = `${usedMB} MB`;
+            }
+        }
+        
+        // Initialize
+        async function initialize() {
+            try {
+                log('Initializing Japanese TTS Pipeline...');
+                
+                pipeline = new JapaneseTTSPipeline({
+                    mecabWasmPath: '../../mecab/dist/mecab_wasm.wasm',
+                    mecabDataPath: '../../mecab/dist/mecab_wasm.data',
+                    openjtalkWasmPath: '../../openjtalk/dist/openjtalk_wasm.wasm',
+                    modelPath: '../models/ja_JP/ja_JP.onnx',
+                    modelConfigPath: '../models/ja_JP/ja_JP-test-medium.onnx.json',
+                    wasmPaths: '../dist/',
+                    numThreads: navigator.hardwareConcurrency || 4,
+                    enableProfiling: true
+                });
+                
+                await pipeline.initialize();
+                
+                const info = pipeline.getInfo();
+                log('Pipeline initialized', info);
+                
+                document.getElementById('synthesizeBtn').disabled = false;
+                updateStatus('準備完了', 'success');
+                
+                // Start memory monitoring
+                setInterval(updateMemoryStats, 2000);
+                
+            } catch (error) {
+                console.error('Initialization error:', error);
+                updateStatus(`初期化エラー: ${error.message}`, 'error');
+                log('Initialization failed', { error: error.message });
+            }
+        }
+        
+        // Start initialization
+        initialize();
+    </script>
+</body>
+</html>

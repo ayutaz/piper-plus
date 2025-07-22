@@ -5,7 +5,8 @@
   "main": "dist/index.js",
   "type": "module",
   "scripts": {
-    "build": "webpack --mode production",
+    "build": "webpack --mode production && webpack --config webpack.config.esm.js --mode production",
+    "build:esm": "webpack --config webpack.config.esm.js --mode production",
     "dev": "webpack --mode development --watch",
     "test": "jest",
     "serve": "http-server -p 8003"

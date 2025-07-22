@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Japanese TTS WebSocket Demo</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans JP', sans-serif;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f0f0f0;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        .connection-status {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        .connection-status.connected {
+            background: #4caf50;
+            color: white;
+        }
+        .connection-status.disconnected {
+            background: #f44336;
+            color: white;
+        }
+        .connection-status.connecting {
+            background: #ff9800;
+            color: white;
+        }
+        textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            font-size: 16px;
+            resize: vertical;
+            margin-bottom: 15px;
+        }
+        button {
+            background: #2196f3;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-right: 10px;
+            transition: background 0.3s;
+        }
+        button:hover:not(:disabled) {
+            background: #1976d2;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .phoneme-display {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: monospace;
+            margin: 15px 0;
+            min-height: 50px;
+        }
+        .stream-info {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 15px 0;
+        }
+        .stream-progress {
+            width: 100%;
+            height: 8px;
+            background: #e0e0e0;
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        .stream-progress-fill {
+            height: 100%;
+            background: #2196f3;
+            transition: width 0.3s ease;
+            width: 0%;
+        }
+        .log-container {
+            background: #263238;
+            color: #aed581;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+            margin-top: 20px;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+            margin-top: 20px;
+        }
+        .stat-item {
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 6px;
+            text-align: center;
+        }
+        .stat-label {
+            font-size: 12px;
+            color: #666;
+        }
+        .stat-value {
+            font-size: 20px;
+            font-weight: bold;
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <div class="connection-status disconnected" id="connectionStatus">
+        切断中
+    </div>
+    
+    <div class="container">
+        <h1>🎤 Japanese TTS WebSocket Demo</h1>
+        
+        <p>このデモはWebSocketを使用して、サーバー側でONNXモデルを実行し、音声をストリーミングします。</p>
+        
+        <textarea id="textInput" rows="3" placeholder="日本語のテキストを入力してください">
+こんにちは、世界！今日は良い天気ですね。</textarea>
+        
+        <div>
+            <button id="synthesizeBtn" onclick="synthesize()">音声合成</button>
+            <button id="connectBtn" onclick="toggleConnection()">接続</button>
+            <button onclick="clearAll()">クリア</button>
+        </div>
+        
+        <div class="phoneme-display">
+            <strong>音素列:</strong>
+            <div id="phonemeDisplay">-</div>
+        </div>
+        
+        <div class="stream-info" id="streamInfo" style="display: none;">
+            <strong>ストリーミング情報:</strong>
+            <div class="stream-progress">
+                <div class="stream-progress-fill" id="streamProgress"></div>
+            </div>
+            <div id="streamStatus">待機中...</div>
+        </div>
+        
+        <div class="stats">
+            <div class="stat-item">
+                <div class="stat-label">チャンク数</div>
+                <div class="stat-value" id="chunkCount">0</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">受信バイト</div>
+                <div class="stat-value" id="bytesReceived">0</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">処理時間</div>
+                <div class="stat-value" id="processingTime">--</div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="container">
+        <h3>ログ</h3>
+        <div class="log-container" id="logContainer"></div>
+    </div>
+
+    <script>
+        let ws = null;
+        let isConnected = false;
+        let audioChunks = [];
+        let totalAudioLength = 0;
+        let audioContext = null;
+        
+        function log(message, type = 'info') {
+            const timestamp = new Date().toISOString().split('T')[1].slice(0, 8);
+            const logEntry = `[${timestamp}] ${type.toUpperCase()}: ${message}`;
+            console.log(logEntry);
+            
+            const logContainer = document.getElementById('logContainer');
+            const logLine = document.createElement('div');
+            logLine.textContent = logEntry;
+            logLine.style.color = type === 'error' ? '#ff5252' : 
+                                 type === 'warn' ? '#ffc107' : 
+                                 type === 'success' ? '#4caf50' : '#aed581';
+            logContainer.appendChild(logLine);
+            logContainer.scrollTop = logContainer.scrollHeight;
+        }
+        
+        function updateConnectionStatus(status) {
+            const statusEl = document.getElementById('connectionStatus');
+            const connectBtn = document.getElementById('connectBtn');
+            
+            statusEl.className = 'connection-status ' + status;
+            switch (status) {
+                case 'connected':
+                    statusEl.textContent = '接続済み';
+                    connectBtn.textContent = '切断';
+                    isConnected = true;
+                    break;
+                case 'connecting':
+                    statusEl.textContent = '接続中...';
+                    connectBtn.textContent = '接続中...';
+                    connectBtn.disabled = true;
+                    break;
+                case 'disconnected':
+                    statusEl.textContent = '切断中';
+                    connectBtn.textContent = '接続';
+                    connectBtn.disabled = false;
+                    isConnected = false;
+                    break;
+            }
+            
+            document.getElementById('synthesizeBtn').disabled = !isConnected;
+        }
+        
+        function connectWebSocket() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                return;
+            }
+            
+            updateConnectionStatus('connecting');
+            log('WebSocketサーバーに接続中...');
+            
+            // Try localhost first, then fallback to configured server
+            const wsUrl = 'ws://localhost:8084';
+            ws = new WebSocket(wsUrl);
+            
+            ws.onopen = () => {
+                log('WebSocketサーバーに接続しました', 'success');
+                updateConnectionStatus('connected');
+            };
+            
+            ws.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    handleMessage(data);
+                } catch (error) {
+                    log(`メッセージ解析エラー: ${error.message}`, 'error');
+                }
+            };
+            
+            ws.onerror = (error) => {
+                log(`WebSocketエラー: ${error.type}`, 'error');
+            };
+            
+            ws.onclose = () => {
+                log('WebSocket接続が切断されました', 'warn');
+                updateConnectionStatus('disconnected');
+                ws = null;
+            };
+        }
+        
+        function disconnectWebSocket() {
+            if (ws) {
+                ws.close();
+                ws = null;
+            }
+        }
+        
+        function toggleConnection() {
+            if (isConnected) {
+                disconnectWebSocket();
+            } else {
+                connectWebSocket();
+            }
+        }
+        
+        function handleMessage(data) {
+            switch (data.type) {
+                case 'status':
+                    log(`サーバーステータス: モデル読み込み=${data.modelLoaded}`);
+                    if (data.modelInfo) {
+                        log(`モデル情報: ${data.modelInfo.language} ${data.modelInfo.quality}`);
+                    }
+                    break;
+                    
+                case 'phonemes':
+                    document.getElementById('phonemeDisplay').textContent = data.phonemes;
+                    log(`音素生成完了: ${data.phonemes}`);
+                    break;
+                    
+                case 'progress':
+                    log(`進捗: ${data.stage} ${data.percent}%`);
+                    break;
+                    
+                case 'audio_chunk':
+                    handleAudioChunk(data);
+                    break;
+                    
+                case 'complete':
+                    handleComplete(data);
+                    break;
+                    
+                case 'error':
+                    log(`エラー: ${data.error}`, 'error');
+                    break;
+                    
+                case 'pong':
+                    log('Pong received');
+                    break;
+            }
+        }
+        
+        function handleAudioChunk(data) {
+            const chunk = new Float32Array(data.data);
+            audioChunks.push(chunk);
+            totalAudioLength = data.total;
+            
+            const progress = (data.offset + chunk.length) / data.total * 100;
+            document.getElementById('streamProgress').style.width = progress + '%';
+            document.getElementById('streamStatus').textContent = 
+                `受信中: ${Math.round(progress)}% (${audioChunks.length} チャンク)`;
+            
+            document.getElementById('chunkCount').textContent = audioChunks.length;
+            document.getElementById('bytesReceived').textContent = 
+                ((data.offset + chunk.length) * 4 / 1024).toFixed(1) + ' KB';
+        }
+        
+        function handleComplete(data) {
+            log(`音声合成完了: ${data.duration.toFixed(2)}秒, ${data.sampleCount}サンプル`, 'success');
+            
+            // Combine all chunks
+            const fullAudio = new Float32Array(totalAudioLength);
+            let offset = 0;
+            for (const chunk of audioChunks) {
+                fullAudio.set(chunk, offset);
+                offset += chunk.length;
+            }
+            
+            // Play audio
+            playAudio(fullAudio, 22050);
+            
+            // Reset for next synthesis
+            audioChunks = [];
+            totalAudioLength = 0;
+        }
+        
+        function playAudio(audioData, sampleRate) {
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            
+            const buffer = audioContext.createBuffer(1, audioData.length, sampleRate);
+            buffer.getChannelData(0).set(audioData);
+            
+            const source = audioContext.createBufferSource();
+            source.buffer = buffer;
+            source.connect(audioContext.destination);
+            source.start();
+            
+            log(`音声再生開始: ${(audioData.length / sampleRate).toFixed(2)}秒`, 'success');
+        }
+        
+        window.synthesize = function() {
+            const text = document.getElementById('textInput').value.trim();
+            if (!text) {
+                alert('テキストを入力してください');
+                return;
+            }
+            
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                alert('WebSocketサーバーに接続されていません');
+                return;
+            }
+            
+            // Reset UI
+            document.getElementById('streamInfo').style.display = 'block';
+            document.getElementById('streamProgress').style.width = '0%';
+            document.getElementById('streamStatus').textContent = '処理中...';
+            document.getElementById('chunkCount').textContent = '0';
+            document.getElementById('bytesReceived').textContent = '0';
+            
+            const startTime = performance.now();
+            
+            // Send synthesis request
+            ws.send(JSON.stringify({
+                type: 'synthesize',
+                text: text,
+                options: {
+                    speed: 1.0,
+                    pitch: 1.0
+                }
+            }));
+            
+            // Update processing time
+            const updateTimer = setInterval(() => {
+                const elapsed = performance.now() - startTime;
+                document.getElementById('processingTime').textContent = 
+                    (elapsed / 1000).toFixed(2) + 's';
+                
+                if (audioChunks.length === 0 && elapsed > 100) {
+                    clearInterval(updateTimer);
+                }
+            }, 100);
+            
+            log(`音声合成リクエスト送信: "${text}"`);
+        };
+        
+        window.clearAll = function() {
+            document.getElementById('textInput').value = '';
+            document.getElementById('phonemeDisplay').textContent = '-';
+            document.getElementById('streamInfo').style.display = 'none';
+            document.getElementById('chunkCount').textContent = '0';
+            document.getElementById('bytesReceived').textContent = '0';
+            document.getElementById('processingTime').textContent = '--';
+            audioChunks = [];
+            totalAudioLength = 0;
+        };
+        
+        // Auto-connect on page load
+        window.addEventListener('load', () => {
+            setTimeout(connectWebSocket, 500);
+        });
+        
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+            if (ws) {
+                ws.close();
+            }
+        });
+    </script>
+</body>
+</html>

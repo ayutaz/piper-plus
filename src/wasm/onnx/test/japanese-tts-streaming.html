@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Japanese TTS Streaming Demo</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans JP', sans-serif;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f0f0f0;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        .status {
+            padding: 12px 20px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            font-weight: 500;
+        }
+        .status.info { background: #e3f2fd; color: #1565c0; }
+        .status.success { background: #e8f5e9; color: #2e7d32; }
+        .status.error { background: #ffebee; color: #c62828; }
+        .status.warning { background: #fff3e0; color: #ef6c00; }
+        textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            font-size: 16px;
+            resize: vertical;
+            margin-bottom: 15px;
+        }
+        button {
+            background: #2196f3;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-right: 10px;
+            transition: background 0.3s;
+        }
+        button:hover:not(:disabled) {
+            background: #1976d2;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .progress-container {
+            margin: 20px 0;
+            background: #f5f5f5;
+            border-radius: 8px;
+            padding: 20px;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 24px;
+            background: #e0e0e0;
+            border-radius: 12px;
+            overflow: hidden;
+            margin-bottom: 10px;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4caf50, #8bc34a);
+            transition: width 0.3s ease;
+            width: 0%;
+        }
+        .progress-text {
+            text-align: center;
+            color: #666;
+            font-size: 14px;
+        }
+        .phoneme-display {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: monospace;
+            margin: 15px 0;
+            min-height: 50px;
+        }
+        .debug-log {
+            background: #263238;
+            color: #aed581;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+            margin-top: 20px;
+        }
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .info-card {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 6px;
+            text-align: center;
+        }
+        .info-label {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+        .info-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎤 Japanese TTS Streaming Demo</h1>
+        
+        <div id="status" class="status info">システムを初期化中...</div>
+        
+        <textarea id="textInput" rows="3" placeholder="日本語のテキストを入力してください">
+こんにちは、世界！今日は良い天気ですね。</textarea>
+        
+        <div>
+            <button id="synthesizeBtn" onclick="synthesize()" disabled>音声合成</button>
+            <button onclick="clearAll()">クリア</button>
+            <button onclick="toggleDebug()">デバッグ表示</button>
+        </div>
+        
+        <div class="progress-container">
+            <div class="progress-bar">
+                <div id="progressFill" class="progress-fill"></div>
+            </div>
+            <div id="progressText" class="progress-text">準備中...</div>
+        </div>
+        
+        <div class="phoneme-display">
+            <strong>音素列:</strong>
+            <div id="phonemeDisplay">-</div>
+        </div>
+        
+        <div class="info-grid">
+            <div class="info-card">
+                <div class="info-label">処理時間</div>
+                <div class="info-value" id="processingTime">--</div>
+            </div>
+            <div class="info-card">
+                <div class="info-label">モデルサイズ</div>
+                <div class="info-value" id="modelSize">--</div>
+            </div>
+            <div class="info-card">
+                <div class="info-label">メモリ使用量</div>
+                <div class="info-value" id="memoryUsage">--</div>
+            </div>
+        </div>
+        
+        <div id="debugLog" class="debug-log" style="display: none;"></div>
+    </div>
+
+    <script type="module">
+        let mecab, openjtalk, session;
+        const debugLog = [];
+        
+        function log(message, level = 'info') {
+            const timestamp = new Date().toISOString().split('T')[1].slice(0, 8);
+            const logEntry = `[${timestamp}] ${level.toUpperCase()}: ${message}`;
+            console.log(logEntry);
+            debugLog.push(logEntry);
+            
+            const debugEl = document.getElementById('debugLog');
+            debugEl.textContent = debugLog.slice(-50).join('\n');
+            debugEl.scrollTop = debugEl.scrollHeight;
+        }
+        
+        function updateStatus(message, type = 'info') {
+            const status = document.getElementById('status');
+            status.textContent = message;
+            status.className = `status ${type}`;
+        }
+        
+        function updateProgress(percent, text) {
+            document.getElementById('progressFill').style.width = `${percent}%`;
+            document.getElementById('progressText').textContent = text;
+        }
+        
+        function formatBytes(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / 1048576).toFixed(1) + ' MB';
+        }
+        
+        function formatTime(ms) {
+            if (ms < 1000) return ms.toFixed(0) + ' ms';
+            return (ms / 1000).toFixed(2) + ' s';
+        }
+        
+        window.clearAll = function() {
+            document.getElementById('textInput').value = '';
+            document.getElementById('phonemeDisplay').textContent = '-';
+            document.getElementById('processingTime').textContent = '--';
+            updateProgress(0, '準備中...');
+        };
+        
+        window.toggleDebug = function() {
+            const debugEl = document.getElementById('debugLog');
+            debugEl.style.display = debugEl.style.display === 'none' ? 'block' : 'none';
+        };
+        
+        // Create phoneme to ID mapping based on Japanese phonemes
+        function createPhonemeIdMap() {
+            const phonemes = [
+                '_', '^', '$', 'pau', 'sil', 'cl', ':',
+                'a', 'i', 'u', 'e', 'o',
+                'k', 'g', 's', 'z', 't', 'd', 'n', 'h', 'b', 'p', 'm', 'y', 'r', 'w',
+                'ky', 'gy', 'sh', 'j', 'ch', 'ny', 'hy', 'by', 'py', 'my', 'ry',
+                'f', 'v', 'ts', 'dz', 'N'
+            ];
+            
+            const map = {};
+            phonemes.forEach((phoneme, index) => {
+                map[phoneme] = [index];
+            });
+            return map;
+        }
+        
+        // Convert PUA-encoded phonemes to phoneme IDs
+        function puaToPhonemeIds(puaString, phonemeIdMap) {
+            const phonemeIds = [];
+            
+            // PUA to phoneme mapping
+            const puaMap = {
+                '\uE000': 'a', '\uE001': 'i', '\uE002': 'u', '\uE003': 'e', '\uE004': 'o',
+                '\uE005': 'k a', '\uE006': 'k i', '\uE007': 'k u', '\uE008': 'k e', '\uE009': 'k o',
+                '\uE00A': 'ky a', '\uE00B': 'ky u', '\uE00C': 'ky o',
+                '\uE010': 'g a', '\uE011': 'g i', '\uE012': 'g u', '\uE013': 'g e', '\uE014': 'g o',
+                '\uE015': 'gy a', '\uE016': 'gy u', '\uE017': 'gy o',
+                '\uE020': 's a', '\uE021': 'sh i', '\uE022': 's u', '\uE023': 's e', '\uE024': 's o',
+                '\uE025': 'sh a', '\uE026': 'sh u', '\uE027': 'sh o',
+                '\uE030': 'z a', '\uE031': 'j i', '\uE032': 'z u', '\uE033': 'z e', '\uE034': 'z o',
+                '\uE035': 'j a', '\uE036': 'j u', '\uE037': 'j o',
+                '\uE040': 't a', '\uE041': 'ch i', '\uE042': 'ts u', '\uE043': 't e', '\uE044': 't o',
+                '\uE045': 'ch a', '\uE046': 'ch u', '\uE047': 'ch o',
+                '\uE050': 'd a', '\uE051': 'j i', '\uE052': 'z u', '\uE053': 'd e', '\uE054': 'd o',
+                '\uE060': 'n a', '\uE061': 'n i', '\uE062': 'n u', '\uE063': 'n e', '\uE064': 'n o',
+                '\uE065': 'ny a', '\uE066': 'ny u', '\uE067': 'ny o',
+                '\uE070': 'h a', '\uE071': 'h i', '\uE072': 'f u', '\uE073': 'h e', '\uE074': 'h o',
+                '\uE075': 'hy a', '\uE076': 'hy u', '\uE077': 'hy o',
+                '\uE080': 'b a', '\uE081': 'b i', '\uE082': 'b u', '\uE083': 'b e', '\uE084': 'b o',
+                '\uE085': 'by a', '\uE086': 'by u', '\uE087': 'by o',
+                '\uE090': 'p a', '\uE091': 'p i', '\uE092': 'p u', '\uE093': 'p e', '\uE094': 'p o',
+                '\uE095': 'py a', '\uE096': 'py u', '\uE097': 'py o',
+                '\uE0A0': 'm a', '\uE0A1': 'm i', '\uE0A2': 'm u', '\uE0A3': 'm e', '\uE0A4': 'm o',
+                '\uE0A5': 'my a', '\uE0A6': 'my u', '\uE0A7': 'my o',
+                '\uE0B0': 'y a', '\uE0B2': 'y u', '\uE0B4': 'y o',
+                '\uE0C0': 'r a', '\uE0C1': 'r i', '\uE0C2': 'r u', '\uE0C3': 'r e', '\uE0C4': 'r o',
+                '\uE0C5': 'ry a', '\uE0C6': 'ry u', '\uE0C7': 'ry o',
+                '\uE0D0': 'w a', '\uE0D4': 'w o',
+                '\uE0E0': 'N', '\uE0E1': 'cl', '\uE0E2': ':'
+            };
+            
+            // Add start token
+            if (phonemeIdMap['^']) {
+                phonemeIds.push(phonemeIdMap['^'][0]);
+            }
+            
+            // Process each character
+            for (const char of puaString) {
+                if (puaMap[char]) {
+                    const phonemes = puaMap[char].split(' ');
+                    for (const phoneme of phonemes) {
+                        if (phonemeIdMap[phoneme]) {
+                            phonemeIds.push(phonemeIdMap[phoneme][0]);
+                        }
+                    }
+                } else if (char === ' ') {
+                    if (phonemeIdMap['_']) {
+                        phonemeIds.push(phonemeIdMap['_'][0]);
+                    }
+                }
+            }
+            
+            // Add end token
+            if (phonemeIdMap['$']) {
+                phonemeIds.push(phonemeIdMap['$'][0]);
+            }
+            
+            return phonemeIds;
+        }
+        
+        // Load ONNX Runtime with better error handling
+        async function loadONNXRuntime() {
+            try {
+                log('Loading ONNX Runtime Web...');
+                updateProgress(10, 'ONNX Runtimeをロード中...');
+                
+                // First, check if ort is already available
+                if (window.ort) {
+                    log('ONNX Runtime already loaded');
+                    return window.ort;
+                }
+                
+                // Load from CDN with fallback
+                const script = document.createElement('script');
+                script.src = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.14.0/dist/ort.min.js';
+                
+                await new Promise((resolve, reject) => {
+                    script.onload = () => {
+                        log('ONNX Runtime script loaded');
+                        resolve();
+                    };
+                    script.onerror = () => {
+                        log('Failed to load ONNX Runtime from CDN', 'error');
+                        reject(new Error('Failed to load ONNX Runtime'));
+                    };
+                    document.head.appendChild(script);
+                });
+                
+                if (!window.ort) {
+                    throw new Error('ONNX Runtime not available after loading');
+                }
+                
+                // Configure ONNX Runtime
+                const ort = window.ort;
+                ort.env.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.14.0/dist/';
+                ort.env.wasm.numThreads = 1;
+                ort.env.logLevel = 'info';
+                
+                log('ONNX Runtime configured successfully');
+                return ort;
+                
+            } catch (error) {
+                log(`Failed to load ONNX Runtime: ${error.message}`, 'error');
+                throw error;
+            }
+        }
+        
+        // Synthesize function
+        window.synthesize = async function() {
+            const text = document.getElementById('textInput').value.trim();
+            if (!text) {
+                updateStatus('テキストを入力してください', 'warning');
+                return;
+            }
+            
+            const startTime = performance.now();
+            document.getElementById('synthesizeBtn').disabled = true;
+            
+            try {
+                updateStatus('処理中...', 'info');
+                updateProgress(20, 'テキストを解析中...');
+                
+                // Step 1: MeCab analysis
+                log('Running MeCab analysis...');
+                const mecabOutput = mecab.parse(text);
+                log(`MeCab output: ${mecabOutput.substring(0, 100)}...`);
+                
+                // Step 2: OpenJTalk phoneme conversion
+                updateProgress(30, '音素に変換中...');
+                const phonemes = openjtalk.processText(mecabOutput);
+                const puaPhonemes = openjtalk.processToPUA(mecabOutput);
+                document.getElementById('phonemeDisplay').textContent = phonemes;
+                log(`Phonemes: ${phonemes}`);
+                
+                // Step 3: Convert to phoneme IDs
+                updateProgress(40, '音素IDに変換中...');
+                const phonemeIdMap = createPhonemeIdMap();
+                const phonemeIds = puaToPhonemeIds(puaPhonemes, phonemeIdMap);
+                log(`Phoneme IDs: ${phonemeIds.slice(0, 20).join(', ')}... (${phonemeIds.length} total)`);
+                
+                // Step 4: Prepare tensors
+                updateProgress(50, 'テンソルを準備中...');
+                const ort = window.ort;
+                
+                const feeds = {
+                    'input': new ort.Tensor('int64', 
+                        new BigInt64Array(phonemeIds.map(id => BigInt(id))), 
+                        [1, phonemeIds.length]
+                    ),
+                    'input_lengths': new ort.Tensor('int64', 
+                        new BigInt64Array([BigInt(phonemeIds.length)]), 
+                        [1]
+                    ),
+                    'scales': new ort.Tensor('float32', 
+                        new Float32Array([0.667, 1.0, 0.8]), 
+                        [3]
+                    )
+                };
+                
+                // Step 5: Run inference
+                updateProgress(60, 'ニューラルネットワークで音声を生成中...');
+                log('Running ONNX inference...');
+                const inferenceStart = performance.now();
+                const results = await session.run(feeds);
+                const inferenceTime = performance.now() - inferenceStart;
+                log(`Inference completed in ${inferenceTime.toFixed(0)}ms`);
+                
+                // Step 6: Process audio output
+                updateProgress(80, '音声データを処理中...');
+                const audioTensor = results.output || results.audio;
+                if (!audioTensor) {
+                    throw new Error('No audio output from model');
+                }
+                
+                const audioData = new Float32Array(audioTensor.data);
+                log(`Generated ${audioData.length} audio samples`);
+                
+                // Step 7: Play audio
+                updateProgress(90, '音声を再生中...');
+                playAudio(audioData, 22050);
+                
+                // Update stats
+                const totalTime = performance.now() - startTime;
+                document.getElementById('processingTime').textContent = formatTime(totalTime);
+                
+                updateProgress(100, '完了！');
+                updateStatus('音声合成が完了しました', 'success');
+                
+            } catch (error) {
+                log(`Error: ${error.message}`, 'error');
+                updateStatus(`エラー: ${error.message}`, 'error');
+                updateProgress(0, 'エラーが発生しました');
+            } finally {
+                document.getElementById('synthesizeBtn').disabled = false;
+            }
+        };
+        
+        function playAudio(audioData, sampleRate) {
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const buffer = audioContext.createBuffer(1, audioData.length, sampleRate);
+            buffer.getChannelData(0).set(audioData);
+            
+            const source = audioContext.createBufferSource();
+            source.buffer = buffer;
+            source.connect(audioContext.destination);
+            source.start();
+            
+            log(`Playing audio: ${(audioData.length / sampleRate).toFixed(2)}s at ${sampleRate}Hz`);
+        }
+        
+        // Initialize everything
+        async function initialize() {
+            try {
+                log('Starting initialization...');
+                updateProgress(5, '初期化を開始...');
+                
+                // Load ONNX Runtime
+                const ort = await loadONNXRuntime();
+                
+                // Load MeCab
+                updateProgress(15, 'MeCabをロード中...');
+                log('Loading MeCab...');
+                const { MeCabWrapper } = await import('../../mecab/dist/mecab-wrapper.js');
+                mecab = new MeCabWrapper();
+                await mecab.initialize({
+                    wasmPath: '../../mecab/dist/mecab_wasm.wasm',
+                    dataPath: '../../mecab/dist/mecab_wasm.data'
+                });
+                log('MeCab loaded successfully');
+                
+                // Load OpenJTalk
+                updateProgress(25, 'OpenJTalkをロード中...');
+                log('Loading OpenJTalk...');
+                const { OpenJTalkWrapper } = await import('../../openjtalk/dist/openjtalk-wrapper.js');
+                openjtalk = new OpenJTalkWrapper();
+                await openjtalk.initialize({
+                    wasmPath: '../../openjtalk/dist/openjtalk_wasm.wasm'
+                });
+                log('OpenJTalk loaded successfully');
+                
+                // Fetch model info first
+                updateProgress(35, 'モデル情報を取得中...');
+                const modelInfoResponse = await fetch('../models/ja_JP/ja_JP-test-medium.onnx.json');
+                const modelInfo = await modelInfoResponse.json();
+                log(`Model info loaded: ${modelInfo.language} ${modelInfo.quality}`);
+                
+                // Try to load model with streaming
+                updateProgress(45, 'ONNXモデルをロード中...');
+                log('Loading ONNX model...');
+                
+                try {
+                    // First, get model size
+                    const modelUrl = '../models/ja_JP/ja_JP.onnx';
+                    const headResponse = await fetch(modelUrl, { method: 'HEAD' });
+                    const contentLength = headResponse.headers.get('content-length');
+                    const modelSizeMB = contentLength ? (parseInt(contentLength) / 1048576).toFixed(1) : '??';
+                    document.getElementById('modelSize').textContent = modelSizeMB + ' MB';
+                    log(`Model size: ${modelSizeMB} MB`);
+                    
+                    // Load model with progress tracking
+                    const modelResponse = await fetch(modelUrl);
+                    const reader = modelResponse.body.getReader();
+                    const chunks = [];
+                    let receivedLength = 0;
+                    const totalLength = parseInt(contentLength) || 0;
+                    
+                    while (true) {
+                        const { done, value } = await reader.read();
+                        if (done) break;
+                        
+                        chunks.push(value);
+                        receivedLength += value.length;
+                        
+                        if (totalLength > 0) {
+                            const percent = Math.round((receivedLength / totalLength) * 100);
+                            updateProgress(45 + (percent * 0.4), `モデルをダウンロード中... ${percent}%`);
+                        }
+                    }
+                    
+                    // Combine chunks
+                    log('Combining model chunks...');
+                    const modelBuffer = new Uint8Array(receivedLength);
+                    let position = 0;
+                    for (const chunk of chunks) {
+                        modelBuffer.set(chunk, position);
+                        position += chunk.length;
+                    }
+                    
+                    // Create session with minimal options
+                    updateProgress(85, 'モデルを初期化中...');
+                    session = await ort.InferenceSession.create(modelBuffer.buffer, {
+                        executionProviders: ['wasm'],
+                        graphOptimizationLevel: 'disabled',
+                        enableCpuMemArena: false,
+                        enableMemPattern: false,
+                        executionMode: 'sequential',
+                        logSeverityLevel: 2
+                    });
+                    
+                    log('Model loaded successfully');
+                    log(`Model inputs: ${session.inputNames.join(', ')}`);
+                    log(`Model outputs: ${session.outputNames.join(', ')}`);
+                    
+                } catch (modelError) {
+                    log(`Model loading error: ${modelError.message}`, 'error');
+                    
+                    // Try alternative approach
+                    log('Trying alternative model loading approach...');
+                    session = await ort.InferenceSession.create('../models/ja_JP/ja_JP.onnx', {
+                        executionProviders: ['wasm'],
+                        graphOptimizationLevel: 'disabled'
+                    });
+                }
+                
+                // Update memory stats
+                if (performance.memory) {
+                    const usedMB = (performance.memory.usedJSHeapSize / 1048576).toFixed(1);
+                    document.getElementById('memoryUsage').textContent = usedMB + ' MB';
+                }
+                
+                updateProgress(100, '準備完了！');
+                updateStatus('システムの準備が完了しました', 'success');
+                document.getElementById('synthesizeBtn').disabled = false;
+                
+                log('Initialization complete');
+                
+            } catch (error) {
+                log(`Initialization error: ${error.message}`, 'error');
+                updateStatus(`初期化エラー: ${error.message}`, 'error');
+                updateProgress(0, 'エラーが発生しました');
+            }
+        }
+        
+        // Start initialization when page loads
+        initialize();
+    </script>
+</body>
+</html>
