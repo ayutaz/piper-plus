@@ -580,7 +580,7 @@
             try {
                 // Initialize MeCab
                 showLoading('MeCabを読み込み中...');
-                const MeCabModule = await import('../mecab/test/mecab-core-wrapper.js');
+                const MeCabModule = await import('./mecab/mecab-core-wrapper.js');
                 mecab = new MeCabModule.default();
                 await mecab.initialize('../mecab/build/mecab_core_wasm.wasm');
                 

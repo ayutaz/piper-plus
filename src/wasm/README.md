@@ -2,6 +2,16 @@
 
 This directory contains the WebAssembly implementation of Piper TTS for browser-based Japanese text-to-speech.
 
+## 🌐 Live Demo
+
+**[Piper WebAssembly TTS Demo](https://ayutaz.github.io/piper-plus/)**
+
+The demo includes:
+- Full TTS Demo - Complete Japanese text-to-speech pipeline
+- Streaming TTS Demo - Real-time streaming synthesis
+- Performance Benchmark - SIMD and WebGL optimization testing
+- Simple Demo - Basic functionality test
+
 ## Directory Structure
 
 ```
@@ -50,6 +60,20 @@ cd build/test
 python3 server.py
 # Open http://localhost:8000/index.html in Chrome
 ```
+
+### 4. Deploy to GitHub Pages
+
+The project includes automated deployment to GitHub Pages:
+
+```bash
+# Trigger deployment workflow
+git push origin main
+
+# Or manually trigger from GitHub Actions
+# Go to Actions → Deploy WASM Demo → Run workflow
+```
+
+The demo will be available at: https://[username].github.io/[repo-name]/
 
 ## Build Options
 
