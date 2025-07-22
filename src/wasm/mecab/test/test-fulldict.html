@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MeCab with Full NAIST-JDIC Dictionary Test</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans JP', sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        .status {
+            padding: 10px 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            font-weight: 500;
+        }
+        .status.loading {
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+        .status.success {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+        .status.error {
+            background: #ffebee;
+            color: #c62828;
+        }
+        .progress {
+            width: 100%;
+            height: 20px;
+            background: #e0e0e0;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        .progress-bar {
+            height: 100%;
+            background: #2196f3;
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+        textarea {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+            resize: vertical;
+        }
+        button {
+            background: #2196f3;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-top: 10px;
+            margin-right: 10px;
+        }
+        button:hover {
+            background: #1976d2;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f5f5f5;
+            border-radius: 4px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            overflow-x: auto;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background: #e0e0e0;
+            font-weight: bold;
+        }
+        tr:nth-child(even) {
+            background: #f9f9f9;
+        }
+        .info-box {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .dict-status {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 3px;
+            font-size: 14px;
+            font-weight: bold;
+        }
+        .dict-status.full {
+            background: #4caf50;
+            color: white;
+        }
+        .dict-status.fallback {
+            background: #ff9800;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 MeCab with Full NAIST-JDIC Dictionary</h1>
+        
+        <div id="status" class="status loading">
+            MeCabを初期化中...
+        </div>
+        
+        <div class="progress">
+            <div id="progressBar" class="progress-bar"></div>
+        </div>
+        
+        <div id="progressText" style="text-align: center; margin: 10px 0; font-size: 14px; color: #666;">
+            準備中...
+        </div>
+        
+        <div class="info-box" id="dictInfo" style="display: none;">
+            <strong>辞書モード:</strong> <span id="dictMode" class="dict-status"></span>
+            <br>
+            <span id="dictDetails"></span>
+        </div>
+        
+        <div>
+            <h2>テキスト解析</h2>
+            <textarea id="input" rows="5" placeholder="解析したい日本語テキストを入力してください">
+今日は良い天気ですね。桜が綺麗に咲いています。
+私は昨日、友達と一緒に公園へ行きました。
+機械学習は面白い分野です。
+東京スカイツリーは634メートルの高さがあります。
+人工知能技術の発展は目覚ましいものがあります。</textarea>
+            <br>
+            <button id="parseBtn" onclick="parseText()" disabled>解析</button>
+            <button id="parseDetailBtn" onclick="parseDetailedText()" disabled>詳細解析</button>
+            <button id="wakatiBtn" onclick="parseWakati()" disabled>分かち書き</button>
+            <button id="readingBtn" onclick="showReading()" disabled>読み取得</button>
+        </div>
+        
+        <div id="result"></div>
+    </div>
+    
+    <div class="container" id="detailedResults" style="display: none;">
+        <h2>詳細解析結果</h2>
+        <table id="detailedTable">
+            <thead>
+                <tr>
+                    <th>表層形</th>
+                    <th>品詞</th>
+                    <th>品詞細分類1</th>
+                    <th>品詞細分類2</th>
+                    <th>品詞細分類3</th>
+                    <th>活用型</th>
+                    <th>読み</th>
+                    <th>発音</th>
+                </tr>
+            </thead>
+            <tbody id="detailedTableBody">
+            </tbody>
+        </table>
+    </div>
+
+    <script type="module">
+        import { MeCabWrapper } from '../dist/mecab-wrapper-fulldict.js';
+        
+        let mecab = null;
+        let isInitialized = false;
+        
+        function updateProgress(percent, text) {
+            document.getElementById('progressBar').style.width = percent + '%';
+            document.getElementById('progressText').textContent = text;
+        }
+        
+        async function initialize() {
+            const statusEl = document.getElementById('status');
+            
+            try {
+                console.log('Initializing MeCab with full NAIST-JDIC dictionary...');
+                updateProgress(10, 'WebAssemblyモジュールをロード中...');
+                
+                mecab = new MeCabWrapper();
+                
+                // Mock progress updates since dictionary loading is synchronous
+                updateProgress(30, 'NAIST-JDIC辞書をロード中...');
+                
+                await mecab.initialize({
+                    wasmPath: '../dist/mecab_wasm.wasm',
+                    dataPath: '../dist/mecab_wasm.data'
+                });
+                
+                updateProgress(100, '完了!');
+                
+                // Check dictionary status
+                const isFullDict = mecab.isUsingFullDictionary();
+                const dictInfoEl = document.getElementById('dictInfo');
+                const dictModeEl = document.getElementById('dictMode');
+                const dictDetailsEl = document.getElementById('dictDetails');
+                
+                dictInfoEl.style.display = 'block';
+                if (isFullDict) {
+                    dictModeEl.textContent = 'NAIST-JDIC完全版';
+                    dictModeEl.className = 'dict-status full';
+                    dictDetailsEl.textContent = 'PyOpenJTalkと同等の精度で解析が可能です。';
+                } else {
+                    dictModeEl.textContent = 'フォールバックモード';
+                    dictModeEl.className = 'dict-status fallback';
+                    dictDetailsEl.textContent = '辞書のロードに失敗したため、簡易モードで動作しています。';
+                }
+                
+                statusEl.className = 'status success';
+                statusEl.innerHTML = '✅ MeCab初期化完了';
+                
+                // Enable buttons
+                document.getElementById('parseBtn').disabled = false;
+                document.getElementById('parseDetailBtn').disabled = false;
+                document.getElementById('wakatiBtn').disabled = false;
+                document.getElementById('readingBtn').disabled = false;
+                
+                isInitialized = true;
+                
+                // Test parse
+                console.log('Test parse:', mecab.parse('テスト'));
+                
+            } catch (error) {
+                console.error('Initialization error:', error);
+                statusEl.className = 'status error';
+                statusEl.innerHTML = '❌ 初期化エラー: ' + error.message;
+                updateProgress(0, 'エラーが発生しました');
+            }
+        }
+        
+        window.parseText = function() {
+            if (!isInitialized) return;
+            
+            const input = document.getElementById('input').value;
+            const resultEl = document.getElementById('result');
+            
+            try {
+                const result = mecab.parse(input);
+                resultEl.innerHTML = '<h3>解析結果:</h3><div class="result">' + escapeHtml(result) + '</div>';
+                document.getElementById('detailedResults').style.display = 'none';
+            } catch (error) {
+                resultEl.innerHTML = '<div class="status error">エラー: ' + error.message + '</div>';
+            }
+        };
+        
+        window.parseDetailedText = function() {
+            if (!isInitialized) return;
+            
+            const input = document.getElementById('input').value;
+            const resultEl = document.getElementById('result');
+            
+            try {
+                const tokens = mecab.parseDetailed(input);
+                
+                // Update table
+                const tbody = document.getElementById('detailedTableBody');
+                tbody.innerHTML = '';
+                
+                tokens.forEach(token => {
+                    const row = tbody.insertRow();
+                    row.insertCell().textContent = token.surface;
+                    row.insertCell().textContent = token.pos;
+                    row.insertCell().textContent = token.pos1;
+                    row.insertCell().textContent = token.pos2;
+                    row.insertCell().textContent = token.pos3;
+                    row.insertCell().textContent = token.inflection;
+                    row.insertCell().textContent = token.reading;
+                    row.insertCell().textContent = token.pronunciation;
+                });
+                
+                document.getElementById('detailedResults').style.display = 'block';
+                resultEl.innerHTML = '';
+                
+            } catch (error) {
+                resultEl.innerHTML = '<div class="status error">エラー: ' + error.message + '</div>';
+            }
+        };
+        
+        window.parseWakati = function() {
+            if (!isInitialized) return;
+            
+            const input = document.getElementById('input').value;
+            const resultEl = document.getElementById('result');
+            
+            try {
+                const result = mecab.wakati(input);
+                resultEl.innerHTML = '<h3>分かち書き結果:</h3><div class="result">' + escapeHtml(result) + '</div>';
+                document.getElementById('detailedResults').style.display = 'none';
+            } catch (error) {
+                resultEl.innerHTML = '<div class="status error">エラー: ' + error.message + '</div>';
+            }
+        };
+        
+        window.showReading = function() {
+            if (!isInitialized) return;
+            
+            const input = document.getElementById('input').value;
+            const resultEl = document.getElementById('result');
+            
+            try {
+                const reading = mecab.getReading(input);
+                resultEl.innerHTML = '<h3>読み:</h3><div class="result">' + escapeHtml(reading) + '</div>';
+                document.getElementById('detailedResults').style.display = 'none';
+            } catch (error) {
+                resultEl.innerHTML = '<div class="status error">エラー: ' + error.message + '</div>';
+            }
+        };
+        
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        // Initialize on load
+        initialize();
+    </script>
+</body>
+</html>

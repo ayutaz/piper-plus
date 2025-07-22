@@ -1,0 +1,10 @@
+; Configuration file for MeCab WebAssembly with NAIST-JDIC
+dicdir = /dict/naist-jdic
+userdic = 
+; output-format-type = wakati
+; input-buffer-size = 8192
+; node-format = %m\t%H\n
+; bos-format = 
+; eos-format = EOS\n
+; unk-format = %m\t%H\n
+; unk-feature = UNKNOWN

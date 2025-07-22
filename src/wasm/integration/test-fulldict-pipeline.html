@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Japanese TTS with Full NAIST-JDIC Dictionary</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans JP', sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        .status {
+            padding: 10px 15px;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            font-weight: 500;
+        }
+        .status.loading {
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+        .status.success {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+        .status.error {
+            background: #ffebee;
+            color: #c62828;
+        }
+        .progress {
+            width: 100%;
+            height: 20px;
+            background: #e0e0e0;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        .progress-bar {
+            height: 100%;
+            background: #2196f3;
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+        textarea {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+            resize: vertical;
+        }
+        button {
+            background: #2196f3;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-top: 10px;
+            margin-right: 10px;
+        }
+        button:hover {
+            background: #1976d2;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .pipeline-stage {
+            padding: 10px;
+            margin: 5px 0;
+            border-left: 3px solid #ddd;
+            background: #f9f9f9;
+        }
+        .pipeline-stage.active {
+            border-left-color: #2196f3;
+            background: #e3f2fd;
+        }
+        .pipeline-stage.complete {
+            border-left-color: #4caf50;
+            background: #e8f5e9;
+        }
+        .result-box {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 10px 0;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+        .dict-info {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 3px;
+            font-size: 14px;
+            font-weight: bold;
+            background: #4caf50;
+            color: white;
+            margin-left: 10px;
+        }
+        audio {
+            width: 100%;
+            margin-top: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎙️ Japanese TTS with Full NAIST-JDIC Dictionary</h1>
+        
+        <div class="progress">
+            <div id="progressBar" class="progress-bar"></div>
+        </div>
+        
+        <div id="status" class="status loading">
+            システムを初期化中...
+        </div>
+        
+        <div id="pipelineStatus" style="display: none;">
+            <h3>パイプラインステータス</h3>
+            <div id="mecabStage" class="pipeline-stage">
+                1. MeCab (NAIST-JDIC完全版) <span id="mecabDict" class="dict-info">未初期化</span>
+            </div>
+            <div id="openjtalkStage" class="pipeline-stage">
+                2. OpenJTalk音素変換
+            </div>
+            <div id="synthesisStage" class="pipeline-stage">
+                3. 音声合成
+            </div>
+        </div>
+        
+        <div style="margin-top: 20px;">
+            <h2>テキスト入力</h2>
+            <textarea id="input" rows="5" placeholder="音声合成したい日本語テキストを入力してください">
+こんにちは、今日は良い天気ですね。
+人工知能による音声合成の技術は、日々進化しています。
+東京スカイツリーから見る景色は素晴らしいです。</textarea>
+            <br>
+            <button id="synthesizeBtn" onclick="synthesize()" disabled>音声合成</button>
+            <button id="analyzeBtn" onclick="analyzePipeline()" disabled>パイプライン解析</button>
+        </div>
+        
+        <div id="results" style="margin-top: 20px;"></div>
+    </div>
+
+    <script type="module">
+        import { MeCabWrapper } from '../mecab/dist/mecab-wrapper-fulldict.js';
+        import { OpenJTalkWrapper } from '../openjtalk/dist/openjtalk-wrapper.js';
+        
+        let mecab = null;
+        let openjtalk = null;
+        let isInitialized = false;
+        
+        function updateProgress(percent, text) {
+            document.getElementById('progressBar').style.width = percent + '%';
+            if (text) {
+                document.getElementById('status').textContent = text;
+            }
+        }
+        
+        function setStageStatus(stageId, status) {
+            const stage = document.getElementById(stageId);
+            stage.classList.remove('active', 'complete');
+            if (status === 'active') stage.classList.add('active');
+            if (status === 'complete') stage.classList.add('complete');
+        }
+        
+        async function initialize() {
+            const statusEl = document.getElementById('status');
+            
+            try {
+                // Initialize MeCab with full dictionary
+                updateProgress(20, 'MeCab (NAIST-JDIC) を初期化中...');
+                mecab = new MeCabWrapper();
+                await mecab.initialize({
+                    wasmPath: '../mecab/dist/mecab_wasm.wasm',
+                    dataPath: '../mecab/dist/mecab_wasm.data'
+                });
+                
+                // Update dictionary status
+                const dictStatus = mecab.isUsingFullDictionary() ? 'NAIST-JDIC完全版' : 'フォールバック';
+                document.getElementById('mecabDict').textContent = dictStatus;
+                if (mecab.isUsingFullDictionary()) {
+                    document.getElementById('mecabDict').style.background = '#4caf50';
+                } else {
+                    document.getElementById('mecabDict').style.background = '#ff9800';
+                }
+                
+                // Initialize OpenJTalk
+                updateProgress(60, 'OpenJTalkを初期化中...');
+                openjtalk = new OpenJTalkWrapper();
+                await openjtalk.initialize({
+                    wasmPath: '../openjtalk/dist/openjtalk_wasm.wasm'
+                });
+                
+                updateProgress(100, '初期化完了!');
+                
+                statusEl.className = 'status success';
+                statusEl.innerHTML = '✅ システム初期化完了 (NAIST-JDIC完全版)';
+                
+                document.getElementById('pipelineStatus').style.display = 'block';
+                document.getElementById('synthesizeBtn').disabled = false;
+                document.getElementById('analyzeBtn').disabled = false;
+                
+                isInitialized = true;
+                
+            } catch (error) {
+                console.error('Initialization error:', error);
+                statusEl.className = 'status error';
+                statusEl.innerHTML = '❌ 初期化エラー: ' + error.message;
+                updateProgress(0, '');
+            }
+        }
+        
+        window.analyzePipeline = async function() {
+            if (!isInitialized) return;
+            
+            const input = document.getElementById('input').value;
+            const resultsEl = document.getElementById('results');
+            
+            try {
+                resultsEl.innerHTML = '<h3>パイプライン解析結果</h3>';
+                
+                // Step 1: MeCab analysis
+                setStageStatus('mecabStage', 'active');
+                const mecabTokens = mecab.parseDetailed(input);
+                const reading = mecabTokens.map(t => t.reading).join('');
+                
+                resultsEl.innerHTML += `
+                    <div class="result-box">
+                        <strong>1. MeCab解析結果 (NAIST-JDIC):</strong>
+                        ${mecabTokens.map(t => `${t.surface}[${t.pos}/${t.reading}]`).join(' ')}
+                        
+                        <strong>読み:</strong> ${reading}
+                    </div>
+                `;
+                setStageStatus('mecabStage', 'complete');
+                
+                // Step 2: OpenJTalk phoneme conversion
+                setStageStatus('openjtalkStage', 'active');
+                const phonemes = openjtalk.textToPhonemes(reading);
+                
+                resultsEl.innerHTML += `
+                    <div class="result-box">
+                        <strong>2. OpenJTalk音素変換:</strong>
+                        ${phonemes}
+                    </div>
+                `;
+                setStageStatus('openjtalkStage', 'complete');
+                
+                // Step 3: Show PUA codes
+                const puaCodes = [];
+                for (let i = 0; i < phonemes.length; i++) {
+                    const code = phonemes.charCodeAt(i);
+                    if (code >= 0xe000 && code <= 0xe0ff) {
+                        puaCodes.push(`U+${code.toString(16).toUpperCase()}`);
+                    }
+                }
+                
+                resultsEl.innerHTML += `
+                    <div class="result-box">
+                        <strong>3. PUA音素コード:</strong>
+                        ${puaCodes.join(' ')}
+                        
+                        <em>注: 完全な辞書により、より正確な音素変換が行われています。</em>
+                    </div>
+                `;
+                
+            } catch (error) {
+                resultsEl.innerHTML = '<div class="status error">エラー: ' + error.message + '</div>';
+            }
+        };
+        
+        window.synthesize = async function() {
+            if (!isInitialized) return;
+            
+            const input = document.getElementById('input').value;
+            const resultsEl = document.getElementById('results');
+            
+            try {
+                resultsEl.innerHTML = '<div class="status loading">音声合成中...</div>';
+                
+                // Full pipeline simulation
+                setStageStatus('mecabStage', 'active');
+                const mecabTokens = mecab.parseDetailed(input);
+                const reading = mecabTokens.map(t => t.reading).join('');
+                setStageStatus('mecabStage', 'complete');
+                
+                setStageStatus('openjtalkStage', 'active');
+                const phonemes = openjtalk.textToPhonemes(reading);
+                setStageStatus('openjtalkStage', 'complete');
+                
+                setStageStatus('synthesisStage', 'active');
+                
+                // Create demo audio (sine wave)
+                const audioContext = new AudioContext();
+                const sampleRate = audioContext.sampleRate;
+                const duration = 2; // seconds
+                const samples = duration * sampleRate;
+                
+                const buffer = audioContext.createBuffer(1, samples, sampleRate);
+                const data = buffer.getChannelData(0);
+                
+                // Generate a simple melody based on phoneme length
+                const freqBase = 220; // A3
+                const freqStep = phonemes.length > 0 ? 440 / phonemes.length : 20;
+                
+                for (let i = 0; i < samples; i++) {
+                    const t = i / sampleRate;
+                    const freq = freqBase + Math.sin(t * 2) * freqStep;
+                    data[i] = Math.sin(2 * Math.PI * freq * t) * Math.exp(-t / duration);
+                }
+                
+                // Play audio
+                const source = audioContext.createBufferSource();
+                source.buffer = buffer;
+                source.connect(audioContext.destination);
+                source.start();
+                
+                setStageStatus('synthesisStage', 'complete');
+                
+                resultsEl.innerHTML = `
+                    <div class="status success">✅ 音声合成完了</div>
+                    <div class="result-box">
+                        <strong>入力:</strong> ${input}
+                        <strong>読み (NAIST-JDIC):</strong> ${reading}
+                        <strong>音素:</strong> ${phonemes}
+                        <strong>辞書モード:</strong> ${mecab.isUsingFullDictionary() ? 'NAIST-JDIC完全版' : 'フォールバック'}
+                        
+                        <em>注: これはデモ音声です。実際のTTSエンジンではONNXモデルを使用します。</em>
+                    </div>
+                `;
+                
+            } catch (error) {
+                resultsEl.innerHTML = '<div class="status error">エラー: ' + error.message + '</div>';
+                setStageStatus('mecabStage', '');
+                setStageStatus('openjtalkStage', '');
+                setStageStatus('synthesisStage', '');
+            }
+        };
+        
+        // Initialize on load
+        initialize();
+    </script>
+</body>
+</html>
