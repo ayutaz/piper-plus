@@ -5,17 +5,19 @@ import socketserver
 
 PORT = 8000
 
+
 class MyHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
     def end_headers(self):
         # Add CORS headers
-        self.send_header('Cross-Origin-Embedder-Policy', 'require-corp')
-        self.send_header('Cross-Origin-Opener-Policy', 'same-origin')
+        self.send_header("Cross-Origin-Embedder-Policy", "require-corp")
+        self.send_header("Cross-Origin-Opener-Policy", "same-origin")
         # Proper MIME types for WebAssembly
-        if self.path.endswith('.wasm'):
-            self.send_header('Content-Type', 'application/wasm')
-        elif self.path.endswith('.js'):
-            self.send_header('Content-Type', 'application/javascript')
+        if self.path.endswith(".wasm"):
+            self.send_header("Content-Type", "application/wasm")
+        elif self.path.endswith(".js"):
+            self.send_header("Content-Type", "application/javascript")
         super().end_headers()
+
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
