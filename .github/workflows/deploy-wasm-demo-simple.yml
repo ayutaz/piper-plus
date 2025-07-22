@@ -92,8 +92,7 @@ jobs:
           mkdir -p demo-site/mecab/build
           cp -r src/wasm/mecab/build/* demo-site/mecab/build/ || true
           mkdir -p demo-site/mecab/test
-          cp src/wasm/mecab/test/mecab-core-wrapper.js demo-site/mecab/test/ || true
-          cp src/wasm/mecab/test/*.js demo-site/mecab/ || true
+          cp -r src/wasm/mecab/test/* demo-site/mecab/test/ || true
           
           # Copy OpenJTalk assets
           mkdir -p demo-site/openjtalk/build

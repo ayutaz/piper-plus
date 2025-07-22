@@ -580,16 +580,16 @@
             try {
                 // Initialize MeCab
                 showLoading('MeCabを読み込み中...');
-                const MeCabModule = await import('./mecab/mecab-core-wrapper.js');
+                const MeCabModule = await import('./mecab/test/mecab-core-wrapper.js');
                 mecab = new MeCabModule.default();
-                await mecab.initialize('../mecab/build/mecab_core_wasm.wasm');
+                await mecab.initialize('./mecab/build/mecab_core_wasm.wasm');
                 
                 // Initialize OpenJTalk
                 showLoading('OpenJTalkを読み込み中...');
-                const OpenJTalkModule = await (await import('../build/openjtalk_wasm.js')).default({
+                const OpenJTalkModule = await (await import('./openjtalk/build/openjtalk_wasm.js')).default({
                     locateFile: (filename) => {
                         if (filename.endsWith('.wasm')) {
-                            return '../build/openjtalk_wasm.wasm';
+                            return './openjtalk/build/openjtalk_wasm.wasm';
                         }
                         return filename;
                     }
@@ -599,12 +599,12 @@
                 
                 // Initialize ONNX Runtime
                 showLoading('ONNX Runtimeを読み込み中...');
-                const { default: PiperONNXRuntime } = await import('../onnx/dist/piper-onnx.js');
+                const { default: PiperONNXRuntime } = await import('./onnx/dist/piper-onnx.js');
                 onnxRuntime = new PiperONNXRuntime({
                     executionProviders: ['webgpu', 'webgl', 'wasm'],
                     wasmPaths: {
-                        'ort-wasm.wasm': '../onnx/dist/ort-wasm.wasm',
-                        'ort-wasm-simd.wasm': '../onnx/dist/ort-wasm-simd.wasm'
+                        'ort-wasm.wasm': './onnx/dist/ort-wasm.wasm',
+                        'ort-wasm-simd.wasm': './onnx/dist/ort-wasm-simd.wasm'
                     }
                 });
                 

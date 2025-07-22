@@ -210,7 +210,7 @@
     </div>
 
     <script type="module">
-        import MeCabCore from '../mecab/test/mecab-core-wrapper.js';
+        import MeCabCore from './mecab/test/mecab-core-wrapper.js';
         import OpenJTalkModule from '../build/openjtalk_wasm.js';
         
         let mecab = null;
@@ -225,7 +225,7 @@
                 // Initialize MeCab
                 const mecabStartTime = performance.now();
                 mecab = new MeCabCore();
-                await mecab.initialize('../mecab/build/mecab_core_wasm.wasm');
+                await mecab.initialize('./mecab/build/mecab_core_wasm.wasm');
                 const mecabInitTime = performance.now() - mecabStartTime;
                 document.getElementById('mecabInitTime').textContent = `${mecabInitTime.toFixed(2)}ms`;
                 

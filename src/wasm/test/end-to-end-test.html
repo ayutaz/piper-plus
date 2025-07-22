@@ -334,7 +334,7 @@
     </div>
 
     <script type="module">
-        import MeCabCore from '../mecab/test/mecab-core-wrapper.js';
+        import MeCabCore from './mecab/test/mecab-core-wrapper.js';
         import OpenJTalkModule from '../build/openjtalk_wasm.js';
         
         // Global instances
@@ -385,7 +385,7 @@
                 
                 // Initialize MeCab
                 mecab = new MeCabCore();
-                await mecab.initialize('../mecab/build/mecab_core_wasm.wasm');
+                await mecab.initialize('./mecab/build/mecab_core_wasm.wasm');
                 
                 // Initialize OpenJTalk
                 const openjtalkModule = await OpenJTalkModule({
