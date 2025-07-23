@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>DARTS Final Solution</title>
+</head>
+<body>
+    <h1>DARTS Final Solution Analysis</h1>
+    <pre id="output"></pre>
+    
+    <script>
+        async function findDARTSSolution() {
+            const output = document.getElementById('output');
+            
+            try {
+                const response = await fetch('../dict/naist-jdic/sys.dic');
+                const buffer = await response.arrayBuffer();
+                const view = new DataView(buffer);
+                const uint8 = new Uint8Array(buffer);
+                
+                output.textContent = 'DARTS Final Solution Analysis\n\n';
+                
+                // We know:
+                // 1. DARTS starts at offset 1664
+                // 2. Node 0 has base=-2, check=199
+                // 3. Terminal nodes have negative base values
+                // 4. Feature strings are correctly loaded
+                
+                const DARTS_OFFSET = 1664;
+                const TOKEN_OFFSET = DARTS_OFFSET + view.getUint32(24, true);
+                const FEATURE_OFFSET = TOKEN_OFFSET + view.getUint32(28, true);
+                
+                // Let's trace through actual dictionary entries
+                output.textContent += 'Tracing actual dictionary entries:\n\n';
+                
+                // Find some common words in features
+                const decoder = new TextDecoder('utf-8');
+                const searchWords = [
+                    { word: '今', hex: [0xe4, 0xbb, 0x8a] },
+                    { word: '日', hex: [0xe6, 0x97, 0xa5] },
+                    { word: 'の', hex: [0xe3, 0x81, 0xae] },
+                    { word: 'は', hex: [0xe3, 0x81, 0xaf] },
+                    { word: 'を', hex: [0xe3, 0x82, 0x92] }
+                ];
+                
+                // First, find these words in the feature section
+                const featureSection = uint8.slice(FEATURE_OFFSET, FEATURE_OFFSET + 1000000);
+                const featureText = decoder.decode(featureSection);
+                
+                for (const sw of searchWords) {
+                    const idx = featureText.indexOf(sw.word);
+                    if (idx >= 0) {
+                        // Find the full feature string
+                        let start = idx;
+                        while (start > 0 && featureText[start-1] !== '\0') start--;
+                        let end = idx;
+                        while (end < featureText.length && featureText[end] !== '\0') end++;
+                        
+                        const fullFeature = featureText.substring(start, end);
+                        output.textContent += `Found "${sw.word}" in feature: ${fullFeature}\n`;
+                        
+                        // Now find which token has this feature
+                        const featureOffset = start;
+                        for (let tokenId = 0; tokenId < 1000; tokenId++) {
+                            const tokenAddr = TOKEN_OFFSET + tokenId * 16;
+                            const tokenFeatureOffset = view.getUint32(tokenAddr, true);
+                            if (tokenFeatureOffset === featureOffset) {
+                                output.textContent += `  -> Token ID ${tokenId}\n`;
+                                
+                                // Now find which DARTS node points to this token
+                                for (let nodeId = 0; nodeId < 10000; nodeId++) {
+                                    const base = view.getInt32(DARTS_OFFSET + nodeId * 8, true);
+                                    if (base < 0 && -base - 1 === tokenId) {
+                                        output.textContent += `  -> DARTS node ${nodeId} (base=${base})\n`;
+                                        
+                                        // Now trace back to find the path
+                                        const check = view.getInt32(DARTS_OFFSET + nodeId * 8 + 4, true);
+                                        output.textContent += `     check=${check}\n`;
+                                        
+                                        // Try to find what leads to this node
+                                        if (check >= 0 && check < 10000) {
+                                            const prevBase = view.getInt32(DARTS_OFFSET + check * 8, true);
+                                            output.textContent += `     Previous node ${check} has base=${prevBase}\n`;
+                                            
+                                            // Calculate which byte leads here
+                                            // nodeId = prevBase + byte + X
+                                            // So: byte = nodeId - prevBase - X
+                                            for (let x = -10; x <= 10; x++) {
+                                                const byte = nodeId - prevBase - x;
+                                                if (byte >= 0 && byte <= 255) {
+                                                    output.textContent += `       Possible: byte=0x${byte.toString(16)} with offset=${x}\n`;
+                                                    
+                                                    // Check if this matches our expected byte
+                                                    for (let i = 0; i < sw.hex.length; i++) {
+                                                        if (sw.hex[i] === byte) {
+                                                            output.textContent += `       ✓ MATCHES expected byte at position ${i}!\n`;
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        break;
+                                    }
+                                }
+                                break;
+                            }
+                        }
+                        output.textContent += '\n';
+                    }
+                }
+                
+                // Try a different approach: analyze the DARTS structure pattern
+                output.textContent += '\nAnalyzing DARTS structure patterns:\n';
+                
+                // Check if there's a pattern in the first few nodes
+                for (let i = 0; i < 20; i++) {
+                    const base = view.getInt32(DARTS_OFFSET + i * 8, true);
+                    const check = view.getInt32(DARTS_OFFSET + i * 8 + 4, true);
+                    
+                    if (i < 10) {
+                        output.textContent += `Node ${i}: base=${base}, check=${check}`;
+                        if (base < 0) {
+                            output.textContent += ` -> token ${-base-1}`;
+                        }
+                        output.textContent += '\n';
+                    }
+                }
+                
+                // Special investigation of node 0
+                output.textContent += '\nSpecial case analysis for node 0:\n';
+                output.textContent += 'Node 0: base=-2, check=199\n';
+                output.textContent += 'This might mean:\n';
+                output.textContent += '1. Node 0 is a terminal pointing to token 1\n';
+                output.textContent += '2. check=199 might be a special marker\n';
+                output.textContent += '3. The real root might be at a different node\n';
+                
+                // Check node 199
+                const node199base = view.getInt32(DARTS_OFFSET + 199 * 8, true);
+                const node199check = view.getInt32(DARTS_OFFSET + 199 * 8 + 4, true);
+                output.textContent += `\nNode 199: base=${node199base}, check=${node199check}\n`;
+                
+                // Try different starting points
+                output.textContent += '\nTrying different root nodes:\n';
+                const testByte = 0xe4; // First byte of "今"
+                
+                for (let root of [0, 1, 2, 199]) {
+                    const rootBase = view.getInt32(DARTS_OFFSET + root * 8, true);
+                    output.textContent += `\nFrom node ${root} (base=${rootBase}):\n`;
+                    
+                    // Try different formulas
+                    const formulas = [
+                        { name: 'base+byte', calc: rootBase + testByte },
+                        { name: 'base+byte+1', calc: rootBase + testByte + 1 },
+                        { name: '|base|+byte', calc: Math.abs(rootBase) + testByte },
+                        { name: 'byte-base', calc: testByte - rootBase },
+                        { name: 'byte only', calc: testByte }
+                    ];
+                    
+                    for (const f of formulas) {
+                        if (f.calc >= 0 && f.calc < 10000) {
+                            const check = view.getInt32(DARTS_OFFSET + f.calc * 8 + 4, true);
+                            if (check === root) {
+                                output.textContent += `  ✓ ${f.name} -> node ${f.calc} (check=${check} matches!)\n`;
+                            }
+                        }
+                    }
+                }
+                
+            } catch (error) {
+                output.textContent = 'Error: ' + error.message;
+            }
+        }
+        
+        findDARTSSolution();
+    </script>
+</body>
+</html>

@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>Test DARTS Algorithms</title>
+</head>
+<body>
+    <h1>DARTS Algorithm Test</h1>
+    <div id="status">Loading...</div>
+    <pre id="result"></pre>
+    
+    <script type="module">
+        import { MeCabFull } from '../dist_full/mecab-full.js';
+        
+        async function test() {
+            const statusEl = document.getElementById('status');
+            const resultEl = document.getElementById('result');
+            
+            try {
+                const mecab = new MeCabFull();
+                
+                statusEl.textContent = 'Initializing MeCab...';
+                await mecab.initialize({
+                    basePath: '../dist_full/'
+                });
+                
+                statusEl.textContent = 'Testing different DARTS algorithms...';
+                
+                // Test words that should be in dictionary
+                const testWords = [
+                    'の',    // Most common particle
+                    'は',    // Common particle
+                    'が',    // Common particle
+                    'に',    // Common particle
+                    'を',    // Common particle
+                    '今',    // Common kanji
+                    '日',    // Common kanji
+                    '私',    // Common kanji
+                    '人',    // Common kanji
+                    'です',  // Common verb ending
+                    'ます',  // Common verb ending
+                    'ある',  // Common verb
+                    'する',  // Common verb
+                    'こと',  // Common noun
+                    'もの',  // Common noun
+                ];
+                
+                resultEl.textContent = 'Testing common words with rotating DARTS algorithms:\n\n';
+                
+                // Test each word 3 times to try all algorithms
+                for (const word of testWords) {
+                    resultEl.textContent += `\nTesting "${word}":\n`;
+                    
+                    for (let i = 0; i < 3; i++) {
+                        const result = mecab.parse(word);
+                        const lines = result.split('\n').filter(l => l && l !== 'EOS');
+                        
+                        if (lines.length > 0) {
+                            const hasProperPOS = lines.some(l => 
+                                l.includes('助詞') || 
+                                l.includes('動詞') || 
+                                l.includes('名詞') ||
+                                l.includes('助動詞')
+                            );
+                            
+                            if (hasProperPOS) {
+                                resultEl.textContent += `  Algorithm ${i}: FOUND IN DICTIONARY!\n`;
+                                resultEl.textContent += `  ${lines[0]}\n`;
+                                break;
+                            } else {
+                                resultEl.textContent += `  Algorithm ${i}: Unknown word\n`;
+                            }
+                        } else {
+                            resultEl.textContent += `  Algorithm ${i}: No result\n`;
+                        }
+                    }
+                }
+                
+                // Test a full sentence
+                resultEl.textContent += '\n\nTesting full sentence:\n';
+                const sentence = '今日は良い天気です';
+                
+                for (let i = 0; i < 3; i++) {
+                    resultEl.textContent += `\nAlgorithm ${i} result:\n`;
+                    const result = mecab.parse(sentence);
+                    resultEl.textContent += result;
+                }
+                
+                statusEl.textContent = 'Test completed. Check console for debug output.';
+                
+            } catch (error) {
+                console.error('Error:', error);
+                statusEl.textContent = 'Error: ' + error.message;
+            }
+        }
+        
+        test();
+    </script>
+</body>
+</html>

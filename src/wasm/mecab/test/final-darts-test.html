@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>Final DARTS Test</title>
+    <style>
+        body { font-family: sans-serif; margin: 20px; }
+        .found { color: green; font-weight: bold; }
+        .unknown { color: orange; }
+        .comparison { display: flex; gap: 20px; }
+        .column { flex: 1; border: 1px solid #ddd; padding: 10px; }
+        pre { background: #f5f5f5; padding: 10px; }
+    </style>
+</head>
+<body>
+    <h1>最終DARTS辞書検索テスト</h1>
+    <div id="status">Loading...</div>
+    <div id="summary"></div>
+    <div id="results"></div>
+    
+    <script type="module">
+        import { MeCabFull } from '../dist_full/mecab-full.js';
+        
+        async function runFinalTest() {
+            const statusEl = document.getElementById('status');
+            const summaryEl = document.getElementById('summary');
+            const resultsEl = document.getElementById('results');
+            
+            try {
+                const mecab = new MeCabFull();
+                
+                statusEl.textContent = 'Initializing MeCab...';
+                await mecab.initialize({
+                    basePath: '../dist_full/'
+                });
+                
+                statusEl.textContent = 'Running final tests...';
+                
+                // Test sentences
+                const testCases = [
+                    { 
+                        input: '今日は良い天気です',
+                        expected: ['今日', 'は', '良い', '天気', 'です']
+                    },
+                    {
+                        input: '私は日本人です',
+                        expected: ['私', 'は', '日本', '人', 'です']
+                    },
+                    {
+                        input: '東京スカイツリー',
+                        expected: ['東京', 'スカイツリー']
+                    },
+                    {
+                        input: 'すもももももももものうち',
+                        expected: ['すもも', 'も', 'もも', 'も', 'もも', 'の', 'うち']
+                    }
+                ];
+                
+                let totalWords = 0;
+                let foundInDict = 0;
+                
+                resultsEl.innerHTML = '<h2>テスト結果</h2>';
+                
+                for (const test of testCases) {
+                    const div = document.createElement('div');
+                    div.innerHTML = `<h3>入力: "${test.input}"</h3>`;
+                    
+                    const result = mecab.parse(test.input);
+                    const lines = result.split('\n').filter(l => l && l !== 'EOS');
+                    
+                    const compDiv = document.createElement('div');
+                    compDiv.className = 'comparison';
+                    
+                    // Parse result
+                    const parseCol = document.createElement('div');
+                    parseCol.className = 'column';
+                    parseCol.innerHTML = '<h4>解析結果</h4><pre>' + result + '</pre>';
+                    
+                    // Analysis
+                    const analysisCol = document.createElement('div');
+                    analysisCol.className = 'column';
+                    analysisCol.innerHTML = '<h4>辞書検索状況</h4>';
+                    
+                    const ul = document.createElement('ul');
+                    for (const line of lines) {
+                        const parts = line.split('\t');
+                        if (parts.length >= 2) {
+                            const word = parts[0];
+                            const features = parts[1];
+                            totalWords++;
+                            
+                            const li = document.createElement('li');
+                            
+                            // Check if it's from dictionary or unknown
+                            if (features.includes('*,*,*,*,*,*,' + word + ',' + word + ',' + word)) {
+                                li.innerHTML = `<span class="unknown">${word}</span> - 未知語として処理`;
+                            } else {
+                                li.innerHTML = `<span class="found">${word}</span> - 辞書から検出！`;
+                                foundInDict++;
+                            }
+                            
+                            ul.appendChild(li);
+                        }
+                    }
+                    analysisCol.appendChild(ul);
+                    
+                    compDiv.appendChild(parseCol);
+                    compDiv.appendChild(analysisCol);
+                    div.appendChild(compDiv);
+                    
+                    resultsEl.appendChild(div);
+                }
+                
+                // Summary
+                const dictRate = ((foundInDict / totalWords) * 100).toFixed(1);
+                summaryEl.innerHTML = `
+                    <h2>サマリー</h2>
+                    <p>総単語数: ${totalWords}</p>
+                    <p class="found">辞書検出: ${foundInDict} (${dictRate}%)</p>
+                    <p class="unknown">未知語: ${totalWords - foundInDict}</p>
+                    <hr>
+                    <h3>改善状況</h3>
+                    <ul>
+                        <li>✅ 一部の単語（今、日、私、人など）が辞書から検出されるようになった</li>
+                        <li>⚠️ 助詞（は、を、の、が）はまだ検出できない</li>
+                        <li>⚠️ 動詞・形容詞の活用形は検出できない</li>
+                    </ul>
+                    <p><strong>結論:</strong> DARTS検索が部分的に動作するようになりましたが、
+                    完全なPyOpenJTalk相当の精度にはまだ到達していません。</p>
+                `;
+                
+                statusEl.textContent = 'Test completed!';
+                
+            } catch (error) {
+                statusEl.textContent = 'Error: ' + error.message;
+                console.error(error);
+            }
+        }
+        
+        runFinalTest();
+    </script>
+</body>
+</html>

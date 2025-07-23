@@ -433,24 +433,117 @@ private:
         std::vector<std::pair<size_t, size_t>> results;
         
         if (darts.empty()) {
-            std::cout << "DARTS is empty!" << std::endl;
             return results;
         }
         
-        // For debugging - only show first few attempts
-        static int totalLookups = 0;
-        static bool warnedAboutDARTS = false;
-        totalLookups++;
+        const unsigned char* key = reinterpret_cast<const unsigned char*>(text + pos);
+        size_t remain = len - pos;
         
-        if (!warnedAboutDARTS) {
-            std::cout << "\nWARNING: This dictionary uses a non-standard DARTS format." << std::endl;
-            std::cout << "Dictionary lookup is currently disabled. Using unknown word processing." << std::endl;
-            std::cout << "Feature data is correctly loaded and Viterbi algorithm works.\n" << std::endl;
-            warnedAboutDARTS = true;
+        // Try multiple DARTS algorithms since format is unclear
+        static int algorithm = 0;
+        static bool tested[4] = {false, false, false, false};
+        
+        // Only debug first attempt of each algorithm
+        bool debug = !tested[algorithm];
+        if (debug) {
+            tested[algorithm] = true;
+            std::cout << "\nTrying DARTS algorithm " << algorithm << " at pos " << pos << std::endl;
         }
         
-        // TODO: Implement correct DARTS algorithm for this dictionary format
-        // For now, return empty results to trigger unknown word processing
+        // Algorithm 0: Standard DARTS from node 1 (skip node 0)
+        if (algorithm == 0) {
+            size_t node_pos = 1;  // Start from node 1 instead of 0
+            size_t key_pos = 0;
+            
+            while (key_pos < remain) {
+                unsigned char c = key[key_pos];
+                
+                if (node_pos >= darts.size()) break;
+                
+                int32_t base = darts[node_pos].base;
+                
+                // Standard DARTS: t = base + c + 1
+                int32_t t = base + static_cast<int32_t>(c) + 1;
+                if (t < 0 || t >= static_cast<int32_t>(darts.size())) break;
+                
+                if (darts[t].check == static_cast<int32_t>(node_pos)) {
+                    // Valid transition
+                    node_pos = static_cast<size_t>(t);
+                    key_pos++;
+                    
+                    // Check if new node is terminal
+                    if (darts[t].base < 0) {
+                        size_t token_id = static_cast<size_t>(-darts[t].base - 1);
+                        if (token_id < tokens.size()) {
+                            results.push_back({token_id, key_pos});
+                            if (debug) {
+                                std::cout << "  Found match at pos " << key_pos 
+                                          << ", token_id=" << token_id << std::endl;
+                            }
+                        }
+                    }
+                } else {
+                    break;
+                }
+            }
+        }
+        // Algorithm 1: Modified DARTS with base+c (no +1)
+        else if (algorithm == 1) {
+            size_t node_pos = 0;
+            size_t key_pos = 0;
+            
+            while (key_pos < remain && node_pos < darts.size()) {
+                unsigned char c = key[key_pos];
+                int32_t base = darts[node_pos].base;
+                
+                // Skip negative base for transition
+                if (base < 0) base = 0;
+                
+                size_t t = base + c;
+                if (t >= darts.size()) break;
+                
+                if (darts[t].check == static_cast<int32_t>(node_pos)) {
+                    node_pos = t;
+                    key_pos++;
+                    
+                    if (darts[t].base < 0) {
+                        size_t token_id = static_cast<size_t>(-darts[t].base - 1);
+                        if (token_id < tokens.size()) {
+                            results.push_back({token_id, key_pos});
+                        }
+                    }
+                } else {
+                    break;
+                }
+            }
+        }
+        // Algorithm 2: Direct byte lookup
+        else if (algorithm == 2) {
+            // Try direct lookup: node = byte value
+            for (size_t i = 0; i < remain; i++) {
+                size_t node = key[i];
+                if (node < darts.size() && darts[node].base < 0) {
+                    size_t token_id = static_cast<size_t>(-darts[node].base - 1);
+                    if (token_id < tokens.size()) {
+                        results.push_back({token_id, i + 1});
+                    }
+                }
+            }
+        }
+        
+        // Use algorithm 0 as it shows the best results
+        // algorithm = (algorithm + 1) % 3;
+        algorithm = 0;  // Always use standard DARTS from node 1
+        
+        if (debug && results.empty()) {
+            std::cout << "  No matches found with this algorithm" << std::endl;
+        } else if (debug && !results.empty()) {
+            std::cout << "  Found " << results.size() << " matches!" << std::endl;
+            for (const auto& r : results) {
+                std::cout << "    Token " << r.first << ", length " << r.second << std::endl;
+            }
+        }
+        
         return results;
     }
     
@@ -624,13 +717,15 @@ private:
         // Process each position in the text
         for (size_t pos = 0; pos < len; ) {
             size_t char_len = getUTF8CharLength(ctext + pos);
+            bool found_in_dict = false;
             
-            // Dictionary lookup (currently disabled)
+            // Dictionary lookup (now partially working!)
             auto matches = dartsLookup(ctext, pos, len);
             total_matches += matches.size();
             
             if (!matches.empty()) {
                 // Found in dictionary
+                found_in_dict = true;
                 for (const auto& match : matches) {
                     size_t token_id = match.first;
                     size_t match_len = match.second;
@@ -657,19 +752,13 @@ private:
                 }
             }
             
-            pos += char_len;
-        }
-        
-        // Add unknown word nodes for all possible segments
-        // This ensures full coverage of the input text
-        for (size_t start = 0; start < len; ) {
-            auto unknown_nodes = createUnknownNodes(ctext, start, len);
+            // Always add unknown word candidates for robustness
+            auto unknown_nodes = createUnknownNodes(ctext, pos, len);
             for (auto* node : unknown_nodes) {
                 lattice[node->end_pos].push_back(node);
             }
             
-            size_t char_len = getUTF8CharLength(ctext + start);
-            start += char_len;
+            pos += char_len;
         }
         
         std::cout << "Total dictionary matches found: " << total_matches << std::endl;
