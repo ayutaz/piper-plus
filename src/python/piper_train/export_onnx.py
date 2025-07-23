@@ -126,7 +126,9 @@ def main() -> None:
     model_g.skip_f0_predictor = False  # Enable F0 predictor with new attention
 
     # Migrate F0 predictor attention weights from MultiheadAttention to ONNX-friendly version
-    if hasattr(model_g, 'f0_predictor') and hasattr(model_g.f0_predictor, 'migrate_attention_weights'):
+    if hasattr(model_g, "f0_predictor") and hasattr(
+        model_g.f0_predictor, "migrate_attention_weights"
+    ):
         print("Migrating F0 Predictor attention weights for ONNX compatibility...")
         model_g.f0_predictor.migrate_attention_weights()
         print("F0 Predictor is now ready for ONNX export with full functionality.")

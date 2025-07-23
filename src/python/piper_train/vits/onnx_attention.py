@@ -5,7 +5,6 @@ This module provides a custom attention implementation that avoids
 the reshape issues present in PyTorch's nn.MultiheadAttention during ONNX export.
 """
 
-
 import torch
 import torch.nn.functional as F
 from torch import nn
@@ -25,18 +24,28 @@ class ONNXFriendlyAttention(nn.Module):
     def __init__(self, hidden_channels: int, n_heads: int = 2, dropout: float = 0.1):
         super().__init__()
 
-        assert hidden_channels % n_heads == 0, f"hidden_channels {hidden_channels} must be divisible by n_heads {n_heads}"
+        assert hidden_channels % n_heads == 0, (
+            f"hidden_channels {hidden_channels} must be divisible by n_heads {n_heads}"
+        )
 
         self.hidden_channels = hidden_channels
         self.n_heads = n_heads
         self.head_dim = hidden_channels // n_heads
-        self.scale = self.head_dim ** -0.5
+        self.scale = self.head_dim**-0.5
 
         # Use Conv1D for projections to avoid reshape issues
-        self.q_proj = nn.Conv1d(hidden_channels, hidden_channels, kernel_size=1, bias=True)
-        self.k_proj = nn.Conv1d(hidden_channels, hidden_channels, kernel_size=1, bias=True)
-        self.v_proj = nn.Conv1d(hidden_channels, hidden_channels, kernel_size=1, bias=True)
-        self.out_proj = nn.Conv1d(hidden_channels, hidden_channels, kernel_size=1, bias=True)
+        self.q_proj = nn.Conv1d(
+            hidden_channels, hidden_channels, kernel_size=1, bias=True
+        )
+        self.k_proj = nn.Conv1d(
+            hidden_channels, hidden_channels, kernel_size=1, bias=True
+        )
+        self.v_proj = nn.Conv1d(
+            hidden_channels, hidden_channels, kernel_size=1, bias=True
+        )
+        self.out_proj = nn.Conv1d(
+            hidden_channels, hidden_channels, kernel_size=1, bias=True
+        )
 
         self.dropout = nn.Dropout(dropout)
 
@@ -54,7 +63,9 @@ class ONNXFriendlyAttention(nn.Module):
         if self.out_proj.bias is not None:
             nn.init.constant_(self.out_proj.bias, 0)
 
-    def forward(self, x: torch.Tensor, key_padding_mask: torch.Tensor = None) -> torch.Tensor:
+    def forward(
+        self, x: torch.Tensor, key_padding_mask: torch.Tensor = None
+    ) -> torch.Tensor:
         """
         Forward pass of ONNX-friendly attention.
 
@@ -86,7 +97,7 @@ class ONNXFriendlyAttention(nn.Module):
         if key_padding_mask is not None:
             # key_padding_mask: [B, T] -> [B, 1, 1, T]
             mask = key_padding_mask.unsqueeze(1).unsqueeze(1)
-            attn_scores = attn_scores.masked_fill(mask, float('-inf'))
+            attn_scores = attn_scores.masked_fill(mask, float("-inf"))
 
         # Apply softmax
         attn_weights = F.softmax(attn_scores, dim=-1)
@@ -97,7 +108,9 @@ class ONNXFriendlyAttention(nn.Module):
         attn_output = torch.matmul(attn_weights, v.transpose(-2, -1))
 
         # Reshape back to [B, C, T]
-        attn_output = attn_output.transpose(-2, -1).contiguous()  # [B, n_heads, head_dim, T]
+        attn_output = attn_output.transpose(
+            -2, -1
+        ).contiguous()  # [B, n_heads, head_dim, T]
         attn_output = attn_output.view(B, C, T)
 
         # Final projection
@@ -114,20 +127,30 @@ class ONNXFriendlyAttention(nn.Module):
         """
         with torch.no_grad():
             # Get weights from the source attention
-            in_proj_weight = multihead_attn.in_proj_weight  # [3*hidden_channels, hidden_channels]
-            in_proj_bias = multihead_attn.in_proj_bias      # [3*hidden_channels]
-            out_proj_weight = multihead_attn.out_proj.weight # [hidden_channels, hidden_channels]
-            out_proj_bias = multihead_attn.out_proj.bias     # [hidden_channels]
+            in_proj_weight = (
+                multihead_attn.in_proj_weight
+            )  # [3*hidden_channels, hidden_channels]
+            in_proj_bias = multihead_attn.in_proj_bias  # [3*hidden_channels]
+            out_proj_weight = (
+                multihead_attn.out_proj.weight
+            )  # [hidden_channels, hidden_channels]
+            out_proj_bias = multihead_attn.out_proj.bias  # [hidden_channels]
 
             # Split in_proj_weight into Q, K, V components
             hidden_dim = self.hidden_channels
-            q_weight = in_proj_weight[:hidden_dim, :]           # [hidden_channels, hidden_channels]
-            k_weight = in_proj_weight[hidden_dim:2*hidden_dim, :] # [hidden_channels, hidden_channels]
-            v_weight = in_proj_weight[2*hidden_dim:, :]         # [hidden_channels, hidden_channels]
+            q_weight = in_proj_weight[
+                :hidden_dim, :
+            ]  # [hidden_channels, hidden_channels]
+            k_weight = in_proj_weight[
+                hidden_dim : 2 * hidden_dim, :
+            ]  # [hidden_channels, hidden_channels]
+            v_weight = in_proj_weight[
+                2 * hidden_dim :, :
+            ]  # [hidden_channels, hidden_channels]
 
-            q_bias = in_proj_bias[:hidden_dim]                  # [hidden_channels]
-            k_bias = in_proj_bias[hidden_dim:2*hidden_dim]      # [hidden_channels]
-            v_bias = in_proj_bias[2*hidden_dim:]                # [hidden_channels]
+            q_bias = in_proj_bias[:hidden_dim]  # [hidden_channels]
+            k_bias = in_proj_bias[hidden_dim : 2 * hidden_dim]  # [hidden_channels]
+            v_bias = in_proj_bias[2 * hidden_dim :]  # [hidden_channels]
 
             # Copy weights to Conv1D layers (add unsqueeze(-1) for conv kernel dimension)
             self.q_proj.weight.copy_(q_weight.unsqueeze(-1))
@@ -142,7 +165,9 @@ class ONNXFriendlyAttention(nn.Module):
             self.out_proj.weight.copy_(out_proj_weight.unsqueeze(-1))
             self.out_proj.bias.copy_(out_proj_bias)
 
-        print("Successfully migrated MultiheadAttention weights to ONNXFriendlyAttention")
+        print(
+            "Successfully migrated MultiheadAttention weights to ONNXFriendlyAttention"
+        )
         print(f"Hidden channels: {self.hidden_channels}, Heads: {self.n_heads}")
 
 
@@ -233,7 +258,7 @@ class ONNXFriendlyF0Predictor(nn.Module):
         if prosody_ids is not None:
             prosody_ids = prosody_ids.long()
             prosody_emb = self.prosody_embed(prosody_ids)  # [B, T, hidden]
-            prosody_emb = prosody_emb.transpose(1, 2)      # [B, hidden, T]
+            prosody_emb = prosody_emb.transpose(1, 2)  # [B, hidden, T]
             x = x + prosody_emb
 
         # Encoder layers with residual connections
@@ -250,7 +275,7 @@ class ONNXFriendlyF0Predictor(nn.Module):
         key_padding_mask = None
         if x_mask is not None:
             # Convert mask from [B, 1, T] to [B, T] and invert (True = padding)
-            key_padding_mask = (x_mask.squeeze(1) == 0)
+            key_padding_mask = x_mask.squeeze(1) == 0
 
         x_att = self.attention(x, key_padding_mask)
         x = x + x_att

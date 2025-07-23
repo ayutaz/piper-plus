@@ -148,7 +148,7 @@ class F0Predictor(nn.Module):
         key_padding_mask = None
         if x_mask is not None:
             # Convert mask from [B, 1, T] to [B, T] and invert (True = padding)
-            key_padding_mask = (x_mask.squeeze(1) == 0)
+            key_padding_mask = x_mask.squeeze(1) == 0
 
         x_att = self.attention(x, key_padding_mask)
         x = x + x_att
@@ -174,11 +174,11 @@ class F0Predictor(nn.Module):
         Migrate weights from original MultiheadAttention to ONNX-friendly attention.
         This should be called after loading a checkpoint with the old attention weights.
         """
-        if hasattr(self, '_original_attention'):
+        if hasattr(self, "_original_attention"):
             print("Migrating F0 Predictor attention weights...")
             self.attention.migrate_from_multihead_attention(self._original_attention)
             # Remove the original attention to save memory
-            delattr(self, '_original_attention')
+            delattr(self, "_original_attention")
             print("Weight migration completed.")
 
     def _load_from_state_dict(
@@ -193,7 +193,9 @@ class F0Predictor(nn.Module):
     ):
         """Custom state dict loading to handle attention module changes."""
         # Check if we're loading from an old checkpoint with MultiheadAttention
-        attention_keys = [k for k in state_dict.keys() if k.startswith(prefix + "attention.")]
+        attention_keys = [
+            k for k in state_dict.keys() if k.startswith(prefix + "attention.")
+        ]
 
         if any("in_proj_weight" in k for k in attention_keys):
             # Old checkpoint with MultiheadAttention
@@ -206,7 +208,9 @@ class F0Predictor(nn.Module):
                 if len(weight_shape) == 2:
                     # Convert Linear weights to Conv1d format (add kernel dimension)
                     for key in list(state_dict.keys()):
-                        if key.startswith(prefix + "attention.") and key.endswith(".weight"):
+                        if key.startswith(prefix + "attention.") and key.endswith(
+                            ".weight"
+                        ):
                             if len(state_dict[key].shape) == 2:
                                 state_dict[key] = state_dict[key].unsqueeze(-1)
 
@@ -218,8 +222,13 @@ class F0Predictor(nn.Module):
 
             # Load the state dict
             super()._load_from_state_dict(
-                state_dict, prefix, local_metadata, strict,
-                missing_keys, unexpected_keys, error_msgs
+                state_dict,
+                prefix,
+                local_metadata,
+                strict,
+                missing_keys,
+                unexpected_keys,
+                error_msgs,
             )
 
             # Migrate weights to ONNX-friendly attention
@@ -233,8 +242,13 @@ class F0Predictor(nn.Module):
         else:
             # New checkpoint or already migrated
             super()._load_from_state_dict(
-                state_dict, prefix, local_metadata, strict,
-                missing_keys, unexpected_keys, error_msgs
+                state_dict,
+                prefix,
+                local_metadata,
+                strict,
+                missing_keys,
+                unexpected_keys,
+                error_msgs,
             )
 
     def _bins_to_f0(self, f0_bins):

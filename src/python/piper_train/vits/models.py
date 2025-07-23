@@ -717,7 +717,9 @@ class SynthesizerTrn(nn.Module):
         # Apply F0 predictor if prosody_ids are provided
         if prosody_ids is not None:
             # F0 predictor now works with ONNX-friendly attention
-            f0_pred_bins, f0_pred, f0_variance = self.f0_predictor(x, x_mask, prosody_ids, g)
+            f0_pred_bins, f0_pred, f0_variance = self.f0_predictor(
+                x, x_mask, prosody_ids, g
+            )
             # IMPORTANT: During training, F0 was not added to encoder output
             # To maintain compatibility with trained model, we skip F0 addition
             # This preserves the prosody benefits through the F0 predictor's internal processing
