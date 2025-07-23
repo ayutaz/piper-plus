@@ -129,29 +129,29 @@ mecab_wasm_full/fast:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/mecab_wasm_full.dir/build.make CMakeFiles/mecab_wasm_full.dir/build
 .PHONY : mecab_wasm_full/fast
 
-mecab_stub.o: mecab_stub.cpp.o
-.PHONY : mecab_stub.o
+Users/s19447/Desktop/total-piper/piper/src/wasm/mecab/src/mecab_viterbi.o: Users/s19447/Desktop/total-piper/piper/src/wasm/mecab/src/mecab_viterbi.cpp.o
+.PHONY : Users/s19447/Desktop/total-piper/piper/src/wasm/mecab/src/mecab_viterbi.o
 
 # target to build an object file
-mecab_stub.cpp.o:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/mecab_wasm_full.dir/build.make CMakeFiles/mecab_wasm_full.dir/mecab_stub.cpp.o
-.PHONY : mecab_stub.cpp.o
+Users/s19447/Desktop/total-piper/piper/src/wasm/mecab/src/mecab_viterbi.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/mecab_wasm_full.dir/build.make CMakeFiles/mecab_wasm_full.dir/Users/s19447/Desktop/total-piper/piper/src/wasm/mecab/src/mecab_viterbi.cpp.o
+.PHONY : Users/s19447/Desktop/total-piper/piper/src/wasm/mecab/src/mecab_viterbi.cpp.o
 
-mecab_stub.i: mecab_stub.cpp.i
-.PHONY : mecab_stub.i
+Users/s19447/Desktop/total-piper/piper/src/wasm/mecab/src/mecab_viterbi.i: Users/s19447/Desktop/total-piper/piper/src/wasm/mecab/src/mecab_viterbi.cpp.i
+.PHONY : Users/s19447/Desktop/total-piper/piper/src/wasm/mecab/src/mecab_viterbi.i
 
 # target to preprocess a source file
-mecab_stub.cpp.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/mecab_wasm_full.dir/build.make CMakeFiles/mecab_wasm_full.dir/mecab_stub.cpp.i
-.PHONY : mecab_stub.cpp.i
+Users/s19447/Desktop/total-piper/piper/src/wasm/mecab/src/mecab_viterbi.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/mecab_wasm_full.dir/build.make CMakeFiles/mecab_wasm_full.dir/Users/s19447/Desktop/total-piper/piper/src/wasm/mecab/src/mecab_viterbi.cpp.i
+.PHONY : Users/s19447/Desktop/total-piper/piper/src/wasm/mecab/src/mecab_viterbi.cpp.i
 
-mecab_stub.s: mecab_stub.cpp.s
-.PHONY : mecab_stub.s
+Users/s19447/Desktop/total-piper/piper/src/wasm/mecab/src/mecab_viterbi.s: Users/s19447/Desktop/total-piper/piper/src/wasm/mecab/src/mecab_viterbi.cpp.s
+.PHONY : Users/s19447/Desktop/total-piper/piper/src/wasm/mecab/src/mecab_viterbi.s
 
 # target to generate assembly for a file
-mecab_stub.cpp.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/mecab_wasm_full.dir/build.make CMakeFiles/mecab_wasm_full.dir/mecab_stub.cpp.s
-.PHONY : mecab_stub.cpp.s
+Users/s19447/Desktop/total-piper/piper/src/wasm/mecab/src/mecab_viterbi.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/mecab_wasm_full.dir/build.make CMakeFiles/mecab_wasm_full.dir/Users/s19447/Desktop/total-piper/piper/src/wasm/mecab/src/mecab_viterbi.cpp.s
+.PHONY : Users/s19447/Desktop/total-piper/piper/src/wasm/mecab/src/mecab_viterbi.cpp.s
 
 # Help Target
 help:
@@ -162,9 +162,9 @@ help:
 	@echo "... edit_cache"
 	@echo "... rebuild_cache"
 	@echo "... mecab_wasm_full"
-	@echo "... mecab_stub.o"
-	@echo "... mecab_stub.i"
-	@echo "... mecab_stub.s"
+	@echo "... Users/s19447/Desktop/total-piper/piper/src/wasm/mecab/src/mecab_viterbi.o"
+	@echo "... Users/s19447/Desktop/total-piper/piper/src/wasm/mecab/src/mecab_viterbi.i"
+	@echo "... Users/s19447/Desktop/total-piper/piper/src/wasm/mecab/src/mecab_viterbi.s"
 .PHONY : help
 
 

@@ -72,29 +72,29 @@ include CMakeFiles/mecab_wasm_full.dir/flags.make
 CMakeFiles/mecab_wasm_full.dir/codegen:
 .PHONY : CMakeFiles/mecab_wasm_full.dir/codegen
 
-CMakeFiles/mecab_wasm_full.dir/mecab_stub.cpp.o: CMakeFiles/mecab_wasm_full.dir/flags.make
-CMakeFiles/mecab_wasm_full.dir/mecab_stub.cpp.o: CMakeFiles/mecab_wasm_full.dir/includes_CXX.rsp
-CMakeFiles/mecab_wasm_full.dir/mecab_stub.cpp.o: mecab_stub.cpp
-CMakeFiles/mecab_wasm_full.dir/mecab_stub.cpp.o: CMakeFiles/mecab_wasm_full.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/Users/s19447/Desktop/total-piper/piper/src/wasm/mecab/build_full/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Building CXX object CMakeFiles/mecab_wasm_full.dir/mecab_stub.cpp.o"
-	/Users/s19447/Desktop/total-piper/piper/tools/emsdk/upstream/emscripten/em++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/mecab_wasm_full.dir/mecab_stub.cpp.o -MF CMakeFiles/mecab_wasm_full.dir/mecab_stub.cpp.o.d -o CMakeFiles/mecab_wasm_full.dir/mecab_stub.cpp.o -c /Users/s19447/Desktop/total-piper/piper/src/wasm/mecab/build_full/mecab_stub.cpp
+CMakeFiles/mecab_wasm_full.dir/Users/s19447/Desktop/total-piper/piper/src/wasm/mecab/src/mecab_viterbi.cpp.o: CMakeFiles/mecab_wasm_full.dir/flags.make
+CMakeFiles/mecab_wasm_full.dir/Users/s19447/Desktop/total-piper/piper/src/wasm/mecab/src/mecab_viterbi.cpp.o: CMakeFiles/mecab_wasm_full.dir/includes_CXX.rsp
+CMakeFiles/mecab_wasm_full.dir/Users/s19447/Desktop/total-piper/piper/src/wasm/mecab/src/mecab_viterbi.cpp.o: /Users/s19447/Desktop/total-piper/piper/src/wasm/mecab/src/mecab_viterbi.cpp
+CMakeFiles/mecab_wasm_full.dir/Users/s19447/Desktop/total-piper/piper/src/wasm/mecab/src/mecab_viterbi.cpp.o: CMakeFiles/mecab_wasm_full.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/Users/s19447/Desktop/total-piper/piper/src/wasm/mecab/build_full/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Building CXX object CMakeFiles/mecab_wasm_full.dir/Users/s19447/Desktop/total-piper/piper/src/wasm/mecab/src/mecab_viterbi.cpp.o"
+	/Users/s19447/Desktop/total-piper/piper/tools/emsdk/upstream/emscripten/em++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/mecab_wasm_full.dir/Users/s19447/Desktop/total-piper/piper/src/wasm/mecab/src/mecab_viterbi.cpp.o -MF CMakeFiles/mecab_wasm_full.dir/Users/s19447/Desktop/total-piper/piper/src/wasm/mecab/src/mecab_viterbi.cpp.o.d -o CMakeFiles/mecab_wasm_full.dir/Users/s19447/Desktop/total-piper/piper/src/wasm/mecab/src/mecab_viterbi.cpp.o -c /Users/s19447/Desktop/total-piper/piper/src/wasm/mecab/src/mecab_viterbi.cpp
 
-CMakeFiles/mecab_wasm_full.dir/mecab_stub.cpp.i: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/mecab_wasm_full.dir/mecab_stub.cpp.i"
-	/Users/s19447/Desktop/total-piper/piper/tools/emsdk/upstream/emscripten/em++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /Users/s19447/Desktop/total-piper/piper/src/wasm/mecab/build_full/mecab_stub.cpp > CMakeFiles/mecab_wasm_full.dir/mecab_stub.cpp.i
+CMakeFiles/mecab_wasm_full.dir/Users/s19447/Desktop/total-piper/piper/src/wasm/mecab/src/mecab_viterbi.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/mecab_wasm_full.dir/Users/s19447/Desktop/total-piper/piper/src/wasm/mecab/src/mecab_viterbi.cpp.i"
+	/Users/s19447/Desktop/total-piper/piper/tools/emsdk/upstream/emscripten/em++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /Users/s19447/Desktop/total-piper/piper/src/wasm/mecab/src/mecab_viterbi.cpp > CMakeFiles/mecab_wasm_full.dir/Users/s19447/Desktop/total-piper/piper/src/wasm/mecab/src/mecab_viterbi.cpp.i
 
-CMakeFiles/mecab_wasm_full.dir/mecab_stub.cpp.s: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/mecab_wasm_full.dir/mecab_stub.cpp.s"
-	/Users/s19447/Desktop/total-piper/piper/tools/emsdk/upstream/emscripten/em++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /Users/s19447/Desktop/total-piper/piper/src/wasm/mecab/build_full/mecab_stub.cpp -o CMakeFiles/mecab_wasm_full.dir/mecab_stub.cpp.s
+CMakeFiles/mecab_wasm_full.dir/Users/s19447/Desktop/total-piper/piper/src/wasm/mecab/src/mecab_viterbi.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/mecab_wasm_full.dir/Users/s19447/Desktop/total-piper/piper/src/wasm/mecab/src/mecab_viterbi.cpp.s"
+	/Users/s19447/Desktop/total-piper/piper/tools/emsdk/upstream/emscripten/em++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /Users/s19447/Desktop/total-piper/piper/src/wasm/mecab/src/mecab_viterbi.cpp -o CMakeFiles/mecab_wasm_full.dir/Users/s19447/Desktop/total-piper/piper/src/wasm/mecab/src/mecab_viterbi.cpp.s
 
 # Object files for target mecab_wasm_full
 mecab_wasm_full_OBJECTS = \
-"CMakeFiles/mecab_wasm_full.dir/mecab_stub.cpp.o"
+"CMakeFiles/mecab_wasm_full.dir/Users/s19447/Desktop/total-piper/piper/src/wasm/mecab/src/mecab_viterbi.cpp.o"
 
 # External object files for target mecab_wasm_full
 mecab_wasm_full_EXTERNAL_OBJECTS =
 
-mecab_wasm_full.js: CMakeFiles/mecab_wasm_full.dir/mecab_stub.cpp.o
+mecab_wasm_full.js: CMakeFiles/mecab_wasm_full.dir/Users/s19447/Desktop/total-piper/piper/src/wasm/mecab/src/mecab_viterbi.cpp.o
 mecab_wasm_full.js: CMakeFiles/mecab_wasm_full.dir/build.make
 mecab_wasm_full.js: CMakeFiles/mecab_wasm_full.dir/objects1.rsp
 mecab_wasm_full.js: CMakeFiles/mecab_wasm_full.dir/link.txt

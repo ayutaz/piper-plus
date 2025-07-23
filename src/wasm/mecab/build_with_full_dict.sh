@@ -48,8 +48,10 @@ set(MECAB_SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../src)
 # Include directories
 include_directories(${MECAB_SRC_DIR})
 
-# Use full implementation if available
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../src/mecab_full.cpp")
+# Use viterbi implementation if available
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../src/mecab_viterbi.cpp")
+    set(SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/../src/mecab_viterbi.cpp")
+elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../src/mecab_full.cpp")
     set(SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/../src/mecab_full.cpp")
 else()
     file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/mecab_stub.cpp" "

@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PyOpenJTalk Accuracy Test</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans JP', sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        .status {
+            padding: 10px 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            font-weight: 500;
+        }
+        .status.loading {
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+        .status.success {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+        .status.error {
+            background: #ffebee;
+            color: #c62828;
+        }
+        .test-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        .test-card {
+            background: #f6f8fa;
+            border: 1px solid #d1d5da;
+            border-radius: 6px;
+            padding: 16px;
+        }
+        .test-card h3 {
+            margin-top: 0;
+            color: #24292e;
+        }
+        .test-input {
+            background: #fff;
+            padding: 8px;
+            border-radius: 4px;
+            margin: 10px 0;
+            font-family: monospace;
+        }
+        .test-output {
+            background: #e1f5fe;
+            padding: 8px;
+            border-radius: 4px;
+            margin: 10px 0;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+        .test-expected {
+            background: #f1f8ff;
+            padding: 8px;
+            border-radius: 4px;
+            margin: 10px 0;
+            font-family: monospace;
+            color: #0366d6;
+        }
+        .match {
+            color: #28a745;
+            font-weight: bold;
+        }
+        .mismatch {
+            color: #dc3545;
+            font-weight: bold;
+        }
+        .dict-stats {
+            background: #e3f2fd;
+            border: 1px solid #2196f3;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 20px 0;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background: #e0e0e0;
+            font-weight: bold;
+        }
+        tr:nth-child(even) {
+            background: #f9f9f9;
+        }
+        .performance-stats {
+            background: #fff3e0;
+            border: 1px solid #ff9800;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎯 PyOpenJTalk Accuracy Test</h1>
+        
+        <div id="status" class="status loading">
+            初期化中...
+        </div>
+        
+        <div id="dictStats" class="dict-stats" style="display: none;">
+            <h3>📊 辞書統計情報</h3>
+            <div id="statsContent"></div>
+        </div>
+        
+        <div id="performanceStats" class="performance-stats" style="display: none;">
+            <h3>⚡ パフォーマンス統計</h3>
+            <div id="perfContent"></div>
+        </div>
+        
+        <h2>精度テストケース</h2>
+        <div class="test-grid" id="testGrid">
+        </div>
+        
+        <h2>詳細解析結果</h2>
+        <table id="detailedTable" style="display: none;">
+            <thead>
+                <tr>
+                    <th>テストケース</th>
+                    <th>入力</th>
+                    <th>出力（分かち書き）</th>
+                    <th>期待値</th>
+                    <th>結果</th>
+                    <th>処理時間</th>
+                </tr>
+            </thead>
+            <tbody id="detailedTableBody">
+            </tbody>
+        </table>
+    </div>
+
+    <script type="module">
+        import { MeCabFull } from '../dist_full/mecab-full.js';
+        
+        let mecab = null;
+        let isInitialized = false;
+        
+        // PyOpenJTalk相当の精度を確認するためのテストケース
+        const testCases = [
+            {
+                name: "基本的な文",
+                input: "今日は良い天気ですね。",
+                expected: "今日 は 良い 天気 です ね 。",
+                description: "基本的な助詞・助動詞の分割"
+            },
+            {
+                name: "固有名詞",
+                input: "東京スカイツリーは高い。",
+                expected: "東京 スカイツリー は 高い 。",
+                description: "固有名詞の認識"
+            },
+            {
+                name: "複合語",
+                input: "人工知能技術の発展",
+                expected: "人工 知能 技術 の 発展",
+                description: "複合語の適切な分割"
+            },
+            {
+                name: "同音異義語",
+                input: "すもももももももものうち",
+                expected: "すもも も もも も もも の うち",
+                description: "文脈による適切な分割"
+            },
+            {
+                name: "数値と単位",
+                input: "東京都渋谷区渋谷2-21-1",
+                expected: "東京 都 渋谷 区 渋谷 2 - 21 - 1",
+                description: "住所の適切な分割"
+            },
+            {
+                name: "カタカナ語",
+                input: "コンピューターサイエンス",
+                expected: "コンピューター サイエンス",
+                description: "カタカナ複合語の分割"
+            },
+            {
+                name: "動詞活用",
+                input: "走っている子供たち",
+                expected: "走っ て いる 子供 たち",
+                description: "動詞の活用形の分割"
+            },
+            {
+                name: "形容詞活用",
+                input: "美しくなりました",
+                expected: "美しく なり まし た",
+                description: "形容詞の活用形の分割"
+            },
+            {
+                name: "敬語",
+                input: "お読みになられますか",
+                expected: "お 読み に なら れ ます か",
+                description: "敬語の適切な分割"
+            },
+            {
+                name: "未知語処理",
+                input: "ポケモンGOをプレイする",
+                expected: "ポケモン GO を プレイ する",
+                description: "未知語の適切な処理"
+            }
+        ];
+        
+        async function initialize() {
+            const statusEl = document.getElementById('status');
+            
+            try {
+                console.log('Initializing MeCab with Viterbi algorithm...');
+                
+                mecab = new MeCabFull();
+                
+                await mecab.initialize({
+                    basePath: '../dist_full/'
+                });
+                
+                // Get dictionary statistics
+                const stats = mecab.getDictStats();
+                if (stats) {
+                    showDictStats(stats);
+                }
+                
+                statusEl.className = 'status success';
+                statusEl.innerHTML = '✅ MeCab Viterbi初期化完了 - ' + mecab.getVersion();
+                
+                isInitialized = true;
+                
+                // Run all tests
+                runAllTests();
+                
+            } catch (error) {
+                console.error('Initialization error:', error);
+                statusEl.className = 'status error';
+                statusEl.innerHTML = '❌ 初期化エラー: ' + error.message;
+            }
+        }
+        
+        function showDictStats(stats) {
+            const statsEl = document.getElementById('dictStats');
+            const content = document.getElementById('statsContent');
+            
+            let html = '<ul>';
+            html += `<li>辞書ロード状態: ${stats.loaded ? '✅ 完了' : '❌ 未完了'}</li>`;
+            html += `<li>トークン数: ${stats.tokenCount?.toLocaleString() || 'N/A'}</li>`;
+            html += `<li>特徴数: ${stats.featureCount?.toLocaleString() || 'N/A'}</li>`;
+            html += `<li>DARTSノード数: ${stats.dartsSize?.toLocaleString() || 'N/A'}</li>`;
+            if (stats.matrixSize) {
+                html += `<li>接続行列サイズ: ${stats.matrixSize[0]} × ${stats.matrixSize[1]}</li>`;
+            }
+            html += `<li>文字種定義数: ${stats.charTypes || 'N/A'}</li>`;
+            html += '</ul>';
+            
+            content.innerHTML = html;
+            statsEl.style.display = 'block';
+        }
+        
+        function runAllTests() {
+            const gridEl = document.getElementById('testGrid');
+            const tableBodyEl = document.getElementById('detailedTableBody');
+            
+            let totalTime = 0;
+            let passedTests = 0;
+            let totalTests = testCases.length;
+            
+            gridEl.innerHTML = '';
+            tableBodyEl.innerHTML = '';
+            
+            for (const testCase of testCases) {
+                const startTime = performance.now();
+                let result = '';
+                let success = false;
+                
+                try {
+                    result = mecab.wakati(testCase.input);
+                    success = result.trim() === testCase.expected.trim();
+                    
+                    if (success) passedTests++;
+                } catch (error) {
+                    result = 'Error: ' + error.message;
+                }
+                
+                const endTime = performance.now();
+                const processingTime = endTime - startTime;
+                totalTime += processingTime;
+                
+                // Add to grid
+                const card = document.createElement('div');
+                card.className = 'test-card';
+                card.innerHTML = `
+                    <h3>${testCase.name}</h3>
+                    <p>${testCase.description}</p>
+                    <div class="test-input">入力: ${testCase.input}</div>
+                    <div class="test-output">出力: ${result}</div>
+                    <div class="test-expected">期待: ${testCase.expected}</div>
+                    <div class="${success ? 'match' : 'mismatch'}">
+                        ${success ? '✅ 一致' : '❌ 不一致'}
+                    </div>
+                `;
+                gridEl.appendChild(card);
+                
+                // Add to table
+                const row = tableBodyEl.insertRow();
+                row.insertCell().textContent = testCase.name;
+                row.insertCell().textContent = testCase.input;
+                row.insertCell().textContent = result;
+                row.insertCell().textContent = testCase.expected;
+                row.insertCell().innerHTML = success ? 
+                    '<span class="match">✅</span>' : 
+                    '<span class="mismatch">❌</span>';
+                row.insertCell().textContent = processingTime.toFixed(2) + 'ms';
+            }
+            
+            // Show performance stats
+            const perfEl = document.getElementById('performanceStats');
+            const perfContent = document.getElementById('perfContent');
+            
+            perfContent.innerHTML = `
+                <ul>
+                    <li>総テスト数: ${totalTests}</li>
+                    <li>成功: ${passedTests} (${(passedTests/totalTests*100).toFixed(1)}%)</li>
+                    <li>失敗: ${totalTests - passedTests}</li>
+                    <li>平均処理時間: ${(totalTime/totalTests).toFixed(2)}ms</li>
+                    <li>総処理時間: ${totalTime.toFixed(2)}ms</li>
+                </ul>
+            `;
+            perfEl.style.display = 'block';
+            
+            document.getElementById('detailedTable').style.display = 'table';
+        }
+        
+        // Initialize on load
+        initialize();
+    </script>
+</body>
+</html>

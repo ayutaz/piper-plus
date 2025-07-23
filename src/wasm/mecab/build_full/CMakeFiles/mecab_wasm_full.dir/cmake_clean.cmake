@@ -1,6 +1,6 @@
 file(REMOVE_RECURSE
-  "CMakeFiles/mecab_wasm_full.dir/mecab_stub.cpp.o"
-  "CMakeFiles/mecab_wasm_full.dir/mecab_stub.cpp.o.d"
+  "CMakeFiles/mecab_wasm_full.dir/Users/s19447/Desktop/total-piper/piper/src/wasm/mecab/src/mecab_viterbi.cpp.o"
+  "CMakeFiles/mecab_wasm_full.dir/Users/s19447/Desktop/total-piper/piper/src/wasm/mecab/src/mecab_viterbi.cpp.o.d"
   "mecab_wasm_full.js"
   "mecab_wasm_full.pdb"
 )

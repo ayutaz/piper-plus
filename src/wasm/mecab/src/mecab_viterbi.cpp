@@ -157,7 +157,7 @@ private:
                   << ", charset=" << sysHeader.charset << std::endl;
         
         // Read DARTS double array
-        darts.resize(sysHeader.dsize / sizeof(DartsNode));
+        darts.resize(sysHeader.dsize / sizeof(int32_t) / 2);  // Each DartsNode has 2 int32_t values
         file.read(reinterpret_cast<char*>(darts.data()), sysHeader.dsize);
         
         // Read tokens
@@ -317,26 +317,42 @@ private:
             return results;
         }
         
+        // MeCab uses raw int32_t array for DARTS
+        const int32_t* array = reinterpret_cast<const int32_t*>(darts.data());
+        size_t array_size = darts.size() * 2; // base and check values
+        
         size_t node_pos = 0;
         size_t key_pos = pos;
+        const unsigned char* key = reinterpret_cast<const unsigned char*>(text + pos);
+        size_t remain = len - pos;
+        size_t key_offset = 0;
         
-        while (key_pos < len) {
-            size_t char_len;
-            char32_t ch = utf8ToCodepoint(text + key_pos, char_len);
+        while (key_offset < remain) {
+            // Get next byte (MeCab DARTS works on bytes, not Unicode)
+            unsigned char c = key[key_offset];
             
-            // Check DARTS transition
-            size_t next_pos = darts[node_pos].base + ch;
-            if (next_pos >= darts.size() || darts[next_pos].check != node_pos) {
+            // Calculate next position
+            size_t t = node_pos + c + 1;  // +1 because index 0 is reserved
+            if (t * 2 + 1 >= array_size) {
                 break;
             }
             
-            node_pos = next_pos;
-            key_pos += char_len;
+            // Check transition
+            if (array[t * 2 + 1] != static_cast<int32_t>(node_pos)) {
+                break;
+            }
             
-            // Check if this is a terminal node
-            size_t terminal = darts[node_pos].base;
-            if (terminal < tokens.size()) {
-                results.push_back({terminal, key_pos - pos});
+            node_pos = t;
+            key_offset++;
+            
+            // Check if this is a terminal node (negative base value)
+            int32_t base = array[node_pos * 2];
+            if (base <= 0) {
+                // Found a match, extract token ID
+                size_t token_id = static_cast<size_t>(-base - 1);
+                if (token_id < tokens.size()) {
+                    results.push_back({token_id, key_offset});
+                }
             }
         }
         

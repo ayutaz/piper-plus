@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>Quick Viterbi Test</title>
+</head>
+<body>
+    <h1>Quick Viterbi Algorithm Test</h1>
+    <div id="status">Loading...</div>
+    <div id="result"></div>
+    
+    <script type="module">
+        import { MeCabFull } from '../dist_full/mecab-full.js';
+        
+        async function test() {
+            const statusEl = document.getElementById('status');
+            const resultEl = document.getElementById('result');
+            
+            try {
+                console.log('Starting test...');
+                const mecab = new MeCabFull();
+                
+                statusEl.textContent = 'Initializing MeCab with Viterbi...';
+                await mecab.initialize({
+                    basePath: '../dist_full/'
+                });
+                
+                // Get stats
+                const stats = mecab.getDictStats();
+                console.log('Dictionary stats:', stats);
+                
+                statusEl.textContent = 'Testing parse...';
+                
+                // Simple tests
+                const tests = [
+                    '今日は良い天気です',
+                    '東京スカイツリー',
+                    'すもももももももものうち'
+                ];
+                
+                let html = '<h2>Results:</h2>';
+                for (const text of tests) {
+                    const result = mecab.parse(text);
+                    html += `<h3>${text}</h3><pre>${result}</pre>`;
+                }
+                
+                resultEl.innerHTML = html;
+                statusEl.textContent = 'Test completed!';
+                
+            } catch (error) {
+                console.error('Error:', error);
+                statusEl.textContent = 'Error: ' + error.message;
+            }
+        }
+        
+        test();
+    </script>
+</body>
+</html>

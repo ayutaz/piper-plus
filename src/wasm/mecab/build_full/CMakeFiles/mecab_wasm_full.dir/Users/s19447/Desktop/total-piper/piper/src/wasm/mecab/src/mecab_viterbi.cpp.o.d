@@ -1,5 +1,5 @@
-CMakeFiles/mecab_wasm_full.dir/mecab_stub.cpp.o: \
-  /Users/s19447/Desktop/total-piper/piper/src/wasm/mecab/build_full/mecab_stub.cpp \
+CMakeFiles/mecab_wasm_full.dir/Users/s19447/Desktop/total-piper/piper/src/wasm/mecab/src/mecab_viterbi.cpp.o: \
+  /Users/s19447/Desktop/total-piper/piper/src/wasm/mecab/src/mecab_viterbi.cpp \
   /Users/s19447/Desktop/total-piper/piper/tools/emsdk/upstream/emscripten/cache/sysroot/include/emscripten/bind.h \
   /Users/s19447/Desktop/total-piper/piper/tools/emsdk/upstream/emscripten/cache/sysroot/include/c++/v1/cassert \
   /Users/s19447/Desktop/total-piper/piper/tools/emsdk/upstream/emscripten/cache/sysroot/include/c++/v1/__config \
@@ -625,6 +625,16 @@ CMakeFiles/mecab_wasm_full.dir/mecab_stub.cpp.o: \
   /Users/s19447/Desktop/total-piper/piper/tools/emsdk/upstream/emscripten/cache/sysroot/include/emscripten/em_asm.h \
   /Users/s19447/Desktop/total-piper/piper/tools/emsdk/upstream/emscripten/cache/sysroot/include/emscripten/val.h \
   /Users/s19447/Desktop/total-piper/piper/tools/emsdk/upstream/emscripten/cache/sysroot/include/emscripten/wire.h \
+  /Users/s19447/Desktop/total-piper/piper/tools/emsdk/upstream/emscripten/cache/sysroot/include/emscripten/emscripten.h \
+  /Users/s19447/Desktop/total-piper/piper/tools/emsdk/upstream/emscripten/cache/sysroot/include/emscripten/em_macros.h \
+  /Users/s19447/Desktop/total-piper/piper/tools/emsdk/upstream/emscripten/cache/sysroot/include/emscripten/em_types.h \
+  /Users/s19447/Desktop/total-piper/piper/tools/emsdk/upstream/emscripten/cache/sysroot/include/c++/v1/stdbool.h \
+  /Users/s19447/Desktop/total-piper/piper/tools/emsdk/upstream/lib/clang/21/include/stdbool.h \
+  /Users/s19447/Desktop/total-piper/piper/tools/emsdk/upstream/emscripten/cache/sysroot/include/stdbool.h \
+  /Users/s19447/Desktop/total-piper/piper/tools/emsdk/upstream/emscripten/cache/sysroot/include/emscripten/em_js.h \
+  /Users/s19447/Desktop/total-piper/piper/tools/emsdk/upstream/emscripten/cache/sysroot/include/emscripten/promise.h \
+  /Users/s19447/Desktop/total-piper/piper/tools/emsdk/upstream/emscripten/cache/sysroot/include/emscripten/wget.h \
+  /Users/s19447/Desktop/total-piper/piper/tools/emsdk/upstream/emscripten/cache/sysroot/include/emscripten/version.h \
   /Users/s19447/Desktop/total-piper/piper/tools/emsdk/upstream/emscripten/cache/sysroot/include/c++/v1/fstream \
   /Users/s19447/Desktop/total-piper/piper/tools/emsdk/upstream/emscripten/cache/sysroot/include/c++/v1/__filesystem/path.h \
   /Users/s19447/Desktop/total-piper/piper/tools/emsdk/upstream/emscripten/cache/sysroot/include/c++/v1/iomanip \
@@ -644,4 +654,5 @@ CMakeFiles/mecab_wasm_full.dir/mecab_stub.cpp.o: \
   /Users/s19447/Desktop/total-piper/piper/tools/emsdk/upstream/emscripten/cache/sysroot/include/c++/v1/print \
   /Users/s19447/Desktop/total-piper/piper/tools/emsdk/upstream/emscripten/cache/sysroot/include/unistd.h \
   /Users/s19447/Desktop/total-piper/piper/tools/emsdk/upstream/emscripten/cache/sysroot/include/c++/v1/filesystem \
-  /Users/s19447/Desktop/total-piper/piper/tools/emsdk/upstream/emscripten/cache/sysroot/include/c++/v1/sstream
+  /Users/s19447/Desktop/total-piper/piper/tools/emsdk/upstream/emscripten/cache/sysroot/include/c++/v1/sstream \
+  /Users/s19447/Desktop/total-piper/piper/tools/emsdk/upstream/emscripten/cache/sysroot/include/c++/v1/iostream
