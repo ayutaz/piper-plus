@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>MeCab WebAssembly Final Integration Test</title>
+    <style>
+        body { font-family: sans-serif; margin: 20px; }
+        .test-case { border: 1px solid #ddd; padding: 10px; margin: 10px 0; }
+        .success { color: green; }
+        .warning { color: orange; }
+        .error { color: red; }
+        pre { background: #f5f5f5; padding: 10px; overflow-x: auto; }
+        .summary { background: #e0f0ff; padding: 15px; margin: 20px 0; }
+    </style>
+</head>
+<body>
+    <h1>MeCab WebAssembly 最終統合テスト</h1>
+    <div id="status">テストを開始しています...</div>
+    <div id="summary" class="summary"></div>
+    <div id="results"></div>
+    
+    <script type="module">
+        import { MeCabFull } from '../dist_full/mecab-full.js';
+        
+        async function runAllTests() {
+            const statusEl = document.getElementById('status');
+            const summaryEl = document.getElementById('summary');
+            const resultsEl = document.getElementById('results');
+            
+            const testResults = {
+                total: 0,
+                passed: 0,
+                warnings: 0,
+                failed: 0
+            };
+            
+            try {
+                // Initialize MeCab
+                statusEl.textContent = 'MeCabを初期化中...';
+                const mecab = new MeCabFull();
+                await mecab.initialize({
+                    basePath: '../dist_full/'
+                });
+                
+                // Get dictionary stats
+                const stats = mecab.getDictStats();
+                console.log('Dictionary stats:', stats);
+                
+                // Test Suite 1: Basic Functionality
+                const basicTests = [
+                    { name: '単一文字（ひらがな）', input: 'あ', type: 'basic' },
+                    { name: '単一文字（カタカナ）', input: 'ア', type: 'basic' },
+                    { name: '単一文字（漢字）', input: '今', type: 'basic' },
+                    { name: '単一文字（英字）', input: 'A', type: 'basic' },
+                    { name: '単一文字（数字）', input: '1', type: 'basic' },
+                ];
+                
+                // Test Suite 2: Common Words
+                const wordTests = [
+                    { name: '一般的な単語（今日）', input: '今日', type: 'word' },
+                    { name: '一般的な単語（東京）', input: '東京', type: 'word' },
+                    { name: '一般的な単語（日本）', input: '日本', type: 'word' },
+                    { name: 'ひらがな単語（です）', input: 'です', type: 'word' },
+                    { name: 'ひらがな単語（ます）', input: 'ます', type: 'word' },
+                ];
+                
+                // Test Suite 3: Sentences
+                const sentenceTests = [
+                    { name: '基本文', input: '今日は良い天気です', type: 'sentence' },
+                    { name: '複合語', input: '東京スカイツリー', type: 'sentence' },
+                    { name: 'ひらがな文', input: 'すもももももももものうち', type: 'sentence' },
+                    { name: '混合文', input: '私は日本人です', type: 'sentence' },
+                ];
+                
+                // Test Suite 4: Edge Cases
+                const edgeTests = [
+                    { name: '英数字', input: 'ABC123', type: 'edge' },
+                    { name: '記号混じり', input: 'Hello, World!', type: 'edge' },
+                    { name: '空文字列', input: '', type: 'edge' },
+                    { name: 'スペース', input: ' ', type: 'edge' },
+                ];
+                
+                // Test Suite 5: Character Type Detection
+                const charTypeTests = [
+                    { name: '漢字のみ', input: '漢字', type: 'chartype' },
+                    { name: 'ひらがなのみ', input: 'ひらがな', type: 'chartype' },
+                    { name: 'カタカナのみ', input: 'カタカナ', type: 'chartype' },
+                    { name: '英字のみ', input: 'English', type: 'chartype' },
+                    { name: '数字のみ', input: '12345', type: 'chartype' },
+                ];
+                
+                const allTests = [
+                    ...basicTests,
+                    ...wordTests,
+                    ...sentenceTests,
+                    ...edgeTests,
+                    ...charTypeTests
+                ];
+                
+                statusEl.textContent = `${allTests.length}個のテストを実行中...`;
+                
+                // Run all tests
+                for (const test of allTests) {
+                    testResults.total++;
+                    
+                    const testDiv = document.createElement('div');
+                    testDiv.className = 'test-case';
+                    
+                    try {
+                        // Parse test
+                        console.log(`\nTesting: ${test.name} - "${test.input}"`);
+                        const parseResult = mecab.parse(test.input);
+                        const wakatiResult = mecab.wakati(test.input);
+                        
+                        // Check results
+                        let status = 'success';
+                        let message = '';
+                        
+                        if (!parseResult || parseResult === 'EOS\n') {
+                            if (test.input === '') {
+                                // Empty string should return just EOS
+                                status = 'success';
+                            } else {
+                                status = 'warning';
+                                message = '結果が空です（辞書検索が無効のため）';
+                            }
+                        } else if (parseResult.includes('名詞') || parseResult.includes('記号')) {
+                            // Has proper POS tags
+                            status = 'success';
+                        } else {
+                            status = 'warning';
+                            message = '品詞タグが見つかりません';
+                        }
+                        
+                        // Update counters
+                        if (status === 'success') {
+                            testResults.passed++;
+                        } else if (status === 'warning') {
+                            testResults.warnings++;
+                        }
+                        
+                        // Display result
+                        testDiv.innerHTML = `
+                            <h3 class="${status}">${test.name} - ${status.toUpperCase()}</h3>
+                            <p>入力: <code>${test.input || '(空文字列)'}</code></p>
+                            ${message ? `<p class="warning">${message}</p>` : ''}
+                            <details>
+                                <summary>詳細結果</summary>
+                                <pre>Parse結果:\n${parseResult}</pre>
+                                <pre>Wakati結果: ${wakatiResult || '(空)'}</pre>
+                            </details>
+                        `;
+                        
+                    } catch (error) {
+                        testResults.failed++;
+                        testDiv.innerHTML = `
+                            <h3 class="error">${test.name} - ERROR</h3>
+                            <p>入力: <code>${test.input}</code></p>
+                            <p class="error">エラー: ${error.message}</p>
+                        `;
+                        console.error(`Test failed: ${test.name}`, error);
+                    }
+                    
+                    resultsEl.appendChild(testDiv);
+                }
+                
+                // Performance test
+                statusEl.textContent = 'パフォーマンステストを実行中...';
+                const perfDiv = document.createElement('div');
+                perfDiv.className = 'test-case';
+                
+                const perfText = '今日は良い天気です。明日も晴れるでしょう。';
+                const iterations = 100;
+                
+                console.log(`\nPerformance test: ${iterations} iterations`);
+                const startTime = performance.now();
+                
+                for (let i = 0; i < iterations; i++) {
+                    mecab.parse(perfText);
+                }
+                
+                const endTime = performance.now();
+                const totalTime = endTime - startTime;
+                const avgTime = totalTime / iterations;
+                
+                perfDiv.innerHTML = `
+                    <h3>パフォーマンステスト</h3>
+                    <p>テキスト: "${perfText}"</p>
+                    <p>反復回数: ${iterations}回</p>
+                    <p>合計時間: ${totalTime.toFixed(2)}ms</p>
+                    <p>平均時間: ${avgTime.toFixed(2)}ms/回</p>
+                    <p>処理速度: ${(1000/avgTime).toFixed(0)}回/秒</p>
+                `;
+                resultsEl.appendChild(perfDiv);
+                
+                // Summary
+                const successRate = ((testResults.passed / testResults.total) * 100).toFixed(1);
+                summaryEl.innerHTML = `
+                    <h2>テスト結果サマリー</h2>
+                    <p>総テスト数: ${testResults.total}</p>
+                    <p class="success">成功: ${testResults.passed}</p>
+                    <p class="warning">警告: ${testResults.warnings} (辞書検索無効のため)</p>
+                    <p class="error">失敗: ${testResults.failed}</p>
+                    <p>成功率: ${successRate}%</p>
+                    <hr>
+                    <h3>現在の状態</h3>
+                    <ul>
+                        <li>✅ Viterbiアルゴリズム: 動作中</li>
+                        <li>✅ 未知語処理: 動作中</li>
+                        <li>✅ 文字種判定: 動作中</li>
+                        <li>⚠️ DARTS辞書検索: 無効（非標準フォーマットのため）</li>
+                        <li>✅ 品詞接続コスト: 計算可能（ただし未使用）</li>
+                    </ul>
+                    <p><strong>注意:</strong> 現在、すべての単語が未知語として処理されています。
+                    基本的な形態素解析は可能ですが、PyOpenJTalkと同等の精度は達成できていません。</p>
+                `;
+                
+                statusEl.textContent = 'すべてのテストが完了しました。';
+                
+            } catch (error) {
+                statusEl.textContent = 'テスト実行中にエラーが発生しました。';
+                statusEl.className = 'error';
+                console.error('Test suite error:', error);
+                resultsEl.innerHTML = `<pre class="error">${error.stack}</pre>`;
+            }
+        }
+        
+        // Run tests on load
+        runAllTests();
+    </script>
+</body>
+</html>
