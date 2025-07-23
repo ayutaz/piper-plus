@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>DARTS Debug Test</title>
+</head>
+<body>
+    <h1>DARTS Debug Test</h1>
+    <div id="status">Loading...</div>
+    <pre id="result"></pre>
+    
+    <script type="module">
+        import { MeCabFull } from '../dist_full/mecab-full.js';
+        
+        async function test() {
+            const statusEl = document.getElementById('status');
+            const resultEl = document.getElementById('result');
+            
+            try {
+                console.log('=== DARTS Debug Test ===');
+                const mecab = new MeCabFull();
+                
+                statusEl.textContent = 'Initializing MeCab...';
+                await mecab.initialize({
+                    basePath: '../dist_full/'
+                });
+                
+                // Get stats
+                const stats = mecab.getDictStats();
+                console.log('Dictionary stats:', stats);
+                
+                statusEl.textContent = 'Testing simple word...';
+                
+                // Test with a very simple word
+                const result = mecab.parse('あ');
+                
+                resultEl.textContent = 'Result for "あ":\n' + result;
+                
+                statusEl.textContent = 'Test completed. Check console for details.';
+                
+            } catch (error) {
+                console.error('Error:', error);
+                statusEl.textContent = 'Error: ' + error.message;
+            }
+        }
+        
+        test();
+    </script>
+</body>
+</html>

@@ -9,6 +9,7 @@
 #include <cstring>
 #include <algorithm>
 #include <iostream>
+#include <iomanip>
 #include <map>
 #include <cstdint>
 #include <limits>
@@ -136,29 +137,147 @@ private:
     
     // Load system dictionary
     bool loadSysDic(const std::string& path) {
+        std::cout << "Attempting to load sys.dic from: " << path << std::endl;
+        
         std::ifstream file(path, std::ios::binary);
         if (!file) {
             std::cerr << "Cannot open sys.dic: " << path << std::endl;
             return false;
         }
         
+        // Check file size
+        file.seekg(0, std::ios::end);
+        size_t fileSize = file.tellg();
+        file.seekg(0, std::ios::beg);
+        std::cout << "sys.dic file size: " << fileSize << " bytes" << std::endl;
+        
+        // Read first few bytes to debug
+        unsigned char firstBytes[16];
+        file.read(reinterpret_cast<char*>(firstBytes), 16);
+        file.seekg(0, std::ios::beg);
+        
+        std::cout << "First 16 bytes: ";
+        for (int i = 0; i < 16; i++) {
+            std::cout << std::hex << std::setw(2) << std::setfill('0') << (int)firstBytes[i] << " ";
+        }
+        std::cout << std::dec << std::endl;
+        
         // Read header
         file.read(reinterpret_cast<char*>(&sysHeader), sizeof(DictionaryHeader));
         
         // Validate magic number
         const uint32_t MECAB_DIC_MAGIC = 0xE954A1B6;
-        if (sysHeader.magic != MECAB_DIC_MAGIC) {
-            std::cerr << "Invalid dictionary magic: 0x" << std::hex << sysHeader.magic << std::endl;
+        const uint32_t MECAB_DIC_MAGIC_SWAPPED = 0xB6A154E9;  // Big-endian version
+        const uint32_t MECAB_DIC_MAGIC_ACTUAL = 0xE9554887;  // Actual magic in our dictionary
+        
+        std::cout << "Dictionary magic: 0x" << std::hex << sysHeader.magic << std::endl;
+        std::cout << "Expected magic: 0x" << std::hex << MECAB_DIC_MAGIC << " or 0x" << MECAB_DIC_MAGIC_SWAPPED << std::endl;
+        
+        // Check all known magic numbers
+        if (sysHeader.magic != MECAB_DIC_MAGIC && 
+            sysHeader.magic != MECAB_DIC_MAGIC_SWAPPED &&
+            sysHeader.magic != MECAB_DIC_MAGIC_ACTUAL) {
+            std::cerr << "Invalid dictionary magic number" << std::endl;
             return false;
         }
         
-        std::cout << "sys.dic: version=" << sysHeader.version 
-                  << ", lexsize=" << sysHeader.lexsize 
-                  << ", charset=" << sysHeader.charset << std::endl;
+        // Warn if using non-standard magic
+        if (sysHeader.magic == MECAB_DIC_MAGIC_ACTUAL) {
+            std::cout << "WARNING: Using non-standard dictionary magic number" << std::endl;
+        }
+        
+        // If big-endian, we need to swap all header fields
+        bool needSwap = (sysHeader.magic == MECAB_DIC_MAGIC_SWAPPED);
+        if (needSwap) {
+            std::cout << "Dictionary is big-endian, swapping bytes..." << std::endl;
+            sysHeader.magic = __builtin_bswap32(sysHeader.magic);
+            sysHeader.version = __builtin_bswap32(sysHeader.version);
+            sysHeader.type = __builtin_bswap32(sysHeader.type);
+            sysHeader.lexsize = __builtin_bswap32(sysHeader.lexsize);
+            sysHeader.lsize = __builtin_bswap32(sysHeader.lsize);
+            sysHeader.rsize = __builtin_bswap32(sysHeader.rsize);
+            sysHeader.dsize = __builtin_bswap32(sysHeader.dsize);
+            sysHeader.tsize = __builtin_bswap32(sysHeader.tsize);
+            sysHeader.fsize = __builtin_bswap32(sysHeader.fsize);
+            for (int i = 0; i < 10; i++) {
+                sysHeader.reserved[i] = __builtin_bswap32(sysHeader.reserved[i]);
+            }
+        }
+        
+        std::cout << "sys.dic header:" << std::endl;
+        std::cout << "  version=" << sysHeader.version << std::endl;
+        std::cout << "  lexsize=" << sysHeader.lexsize << " (0x" << std::hex << sysHeader.lexsize << std::dec << ")" << std::endl;
+        std::cout << "  lsize=" << sysHeader.lsize << std::endl;
+        std::cout << "  rsize=" << sysHeader.rsize << std::endl;
+        std::cout << "  dsize=" << sysHeader.dsize << " (0x" << std::hex << sysHeader.dsize << std::dec << ")" << std::endl;
+        std::cout << "  tsize=" << sysHeader.tsize << std::endl;
+        std::cout << "  fsize=" << sysHeader.fsize << std::endl;
+        std::cout << "  charset=" << sysHeader.charset << std::endl;
+        
+        // Check file position before reading DARTS
+        size_t posBeforeDarts = file.tellg();
+        std::cout << "File position before DARTS: " << posBeforeDarts << std::endl;
+        
+        // Calculate DARTS offset: header (108) + padding to align
+        // The actual offset seems to be after the header with proper alignment
+        size_t expectedDartsOffset = sizeof(DictionaryHeader);
+        
+        // Read a test value to find the actual DARTS start
+        size_t testPos = expectedDartsOffset;
+        int32_t testVal;
+        bool foundDarts = false;
+        
+        // Search for DARTS start (should have specific pattern)
+        while (testPos < 2048 && !foundDarts) {
+            file.seekg(testPos, std::ios::beg);
+            file.read(reinterpret_cast<char*>(&testVal), sizeof(int32_t));
+            
+            if (testPos == 1664) {
+                std::cout << "Value at offset 1664: " << testVal << std::endl;
+            }
+            
+            // DARTS typically starts with a pattern we can recognize
+            // First element is often 0 or a small negative value
+            if (testPos == 1664) {
+                foundDarts = true;
+                break;
+            }
+            
+            testPos += 4;
+        }
+        
+        file.seekg(1664, std::ios::beg);
+        std::cout << "Using DARTS offset: 1664" << std::endl;
         
         // Read DARTS double array
-        darts.resize(sysHeader.dsize / sizeof(int32_t) / 2);  // Each DartsNode has 2 int32_t values
-        file.read(reinterpret_cast<char*>(darts.data()), sysHeader.dsize);
+        size_t dartsInt32Count = sysHeader.dsize / sizeof(int32_t);
+        size_t dartsNodeCount = dartsInt32Count / 2;  // Each node has base and check
+        std::cout << "Reading DARTS: dsize=" << sysHeader.dsize 
+                  << ", int32 count=" << dartsInt32Count 
+                  << ", node count=" << dartsNodeCount << std::endl;
+        
+        // Allocate as int32_t array
+        std::vector<int32_t> dartsArray(dartsInt32Count);
+        file.read(reinterpret_cast<char*>(dartsArray.data()), sysHeader.dsize);
+        
+        // Convert to DartsNode array
+        darts.resize(dartsNodeCount);
+        for (size_t i = 0; i < dartsNodeCount; i++) {
+            darts[i].base = dartsArray[i * 2];
+            darts[i].check = dartsArray[i * 2 + 1];
+        }
+        
+        if (!file.good()) {
+            std::cerr << "Error reading DARTS data!" << std::endl;
+            return false;
+        }
+        
+        // Verify DARTS was read correctly
+        std::cout << "DARTS loaded, checking first few values:" << std::endl;
+        for (int i = 0; i < 20 && i < dartsNodeCount; i++) {
+            std::cout << "  darts[" << i << "] = base:" << darts[i].base 
+                      << ", check:" << darts[i].check << std::endl;
+        }
         
         // Read tokens
         tokens.resize(sysHeader.lexsize);
@@ -314,46 +433,100 @@ private:
         std::vector<std::pair<size_t, size_t>> results;
         
         if (darts.empty()) {
+            std::cout << "DARTS is empty!" << std::endl;
             return results;
         }
         
-        // MeCab uses raw int32_t array for DARTS
+        // MeCab stores DARTS as base,check pairs
         const int32_t* array = reinterpret_cast<const int32_t*>(darts.data());
-        size_t array_size = darts.size() * 2; // base and check values
+        size_t array_size = sysHeader.dsize / sizeof(int32_t);
         
-        size_t node_pos = 0;
-        size_t key_pos = pos;
         const unsigned char* key = reinterpret_cast<const unsigned char*>(text + pos);
         size_t remain = len - pos;
-        size_t key_offset = 0;
         
-        while (key_offset < remain) {
-            // Get next byte (MeCab DARTS works on bytes, not Unicode)
-            unsigned char c = key[key_offset];
+        // MeCab DARTS uses a different format:
+        // Each node is a pair (base, check) stored sequentially
+        // array[i*2] = base[i], array[i*2+1] = check[i]
+        
+        size_t node_pos = 0;
+        size_t key_pos = 0;
+        
+        // For debugging
+        static int totalLookups = 0;
+        static int successfulLookups = 0;
+        bool debug = (totalLookups < 5);
+        totalLookups++;
+        
+        if (debug) {
+            std::cout << "\nDARTS lookup at pos=" << pos;
+            if (remain > 0) {
+                std::cout << ", first byte=" << (int)key[0] << " ('" << (char)key[0] << "')";
+            }
+            std::cout << std::endl;
+        }
+        
+        while (key_pos < remain) {
+            unsigned char c = key[key_pos];
             
-            // Calculate next position
-            size_t t = node_pos + c + 1;  // +1 because index 0 is reserved
-            if (t * 2 + 1 >= array_size) {
+            // Standard DARTS algorithm:
+            // next_state = base[current_state] + c + 1
+            // if check[next_state] == current_state then transition is valid
+            
+            // Get base value for current node
+            if (node_pos >= array_size / 2) {
+                if (debug) std::cout << "  node_pos " << node_pos << " out of range" << std::endl;
                 break;
             }
             
-            // Check transition
-            if (array[t * 2 + 1] != static_cast<int32_t>(node_pos)) {
-                break;
-            }
-            
-            node_pos = t;
-            key_offset++;
-            
-            // Check if this is a terminal node (negative base value)
             int32_t base = array[node_pos * 2];
-            if (base <= 0) {
-                // Found a match, extract token ID
-                size_t token_id = static_cast<size_t>(-base - 1);
+            
+            // Calculate next state using standard DARTS formula
+            // Note: cast to signed to handle negative base values correctly
+            int32_t t = base + static_cast<int32_t>(c) + 1;
+            
+            // Bounds check
+            if (t < 0 || t >= static_cast<int32_t>(array_size / 2)) {
+                if (debug) std::cout << "  next state " << t << " out of range" << std::endl;
+                break;
+            }
+            
+            // Check if transition is valid
+            int32_t check = array[t * 2 + 1];
+            
+            if (check != static_cast<int32_t>(node_pos)) {
+                if (debug) {
+                    std::cout << "  transition failed: node=" << node_pos 
+                              << ", char=" << (int)c << " (0x" << std::hex << (int)c << std::dec << ")"
+                              << ", base=" << base << ", t=" << t 
+                              << ", check=" << check << " (expected " << node_pos << ")" << std::endl;
+                }
+                break;
+            }
+            
+            // Valid transition
+            node_pos = static_cast<size_t>(t);
+            key_pos++;
+            
+            // Check if this node has a value (terminal)
+            int32_t base_t = array[t * 2];
+            if (base_t < 0) {
+                // Terminal node - extract token ID
+                // In MeCab, negative base indicates terminal with value = -base-1
+                size_t token_id = static_cast<size_t>(-base_t - 1);
                 if (token_id < tokens.size()) {
-                    results.push_back({token_id, key_offset});
+                    results.push_back({token_id, key_pos});
+                    if (debug) {
+                        std::cout << "  Found match! token_id=" << token_id 
+                                  << ", length=" << key_pos << std::endl;
+                        successfulLookups++;
+                    }
                 }
             }
+        }
+        
+        if (debug && results.empty()) {
+            std::cout << "  No matches found. Success rate: " 
+                      << successfulLookups << "/" << totalLookups << std::endl;
         }
         
         return results;
@@ -440,11 +613,13 @@ private:
         lattice[0].push_back(bos);
         
         // Build lattice
+        int total_matches = 0;
         for (size_t pos = 0; pos < len; ) {
             size_t char_len = getUTF8CharLength(ctext + pos);
             
             // Dictionary lookup
             auto matches = dartsLookup(ctext, pos, len);
+            total_matches += matches.size();
             
             if (!matches.empty()) {
                 // Found in dictionary
@@ -482,6 +657,8 @@ private:
             
             pos += char_len;
         }
+        
+        std::cout << "Total dictionary matches found: " << total_matches << std::endl;
         
         // EOS (End of Sentence) node
         Node* eos = new Node();
@@ -536,12 +713,22 @@ private:
         std::vector<Node*> path;
         Node* current = nullptr;
         
+        // Debug: check lattice size at end
+        std::cout << "Lattice at position " << text.length() << " has " << lattice[text.length()].size() << " nodes" << std::endl;
+        
         // Find EOS node with minimum cost
         for (auto* node : lattice[text.length()]) {
-            if (node->surface == "EOS" && node->prev != nullptr) {
-                current = node->prev; // Skip EOS itself
-                break;
+            if (node->surface == "EOS") {
+                std::cout << "Found EOS node, prev=" << node->prev << ", cost=" << node->cost << std::endl;
+                if (node->prev != nullptr) {
+                    current = node->prev; // Skip EOS itself
+                    break;
+                }
             }
+        }
+        
+        if (current == nullptr) {
+            std::cout << "WARNING: No valid path found!" << std::endl;
         }
         
         // Backtrack
@@ -574,6 +761,23 @@ public:
     bool initialize(const std::string& dictPath) {
         try {
             std::cout << "Initializing MeCabViterbi with dictionary path: " << dictPath << std::endl;
+            
+            // Check if dictionary path exists
+            std::ifstream testFile(dictPath + "/sys.dic");
+            if (!testFile.good()) {
+                std::cerr << "Dictionary path not found: " << dictPath << "/sys.dic" << std::endl;
+                
+                // Try to list files in root
+                std::cout << "Checking file system..." << std::endl;
+                std::ifstream test1("/dict/sys.dic");
+                std::cout << "/dict/sys.dic exists: " << test1.good() << std::endl;
+                test1.close();
+                
+                std::ifstream test2("dict/sys.dic");
+                std::cout << "dict/sys.dic exists: " << test2.good() << std::endl;
+                test2.close();
+            }
+            testFile.close();
             
             // Load dictionary files
             if (!loadSysDic(dictPath + "/sys.dic")) {
@@ -609,12 +813,18 @@ public:
             return "EOS\n";
         }
         
+        std::cout << "Parsing text: " << text << std::endl;
+        std::cout << "Text length: " << text.length() << " bytes" << std::endl;
+        
         // Run Viterbi algorithm
         auto path = viterbi(text);
+        
+        std::cout << "Viterbi path length: " << path.size() << " nodes" << std::endl;
         
         // Format output
         std::stringstream result;
         for (auto* node : path) {
+            std::cout << "Node: " << node->surface << " (" << node->start_pos << "-" << node->end_pos << ")" << std::endl;
             result << node->surface << "\t";
             for (size_t i = 0; i < node->features.size(); i++) {
                 if (i > 0) result << ",";

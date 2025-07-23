@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>DARTS Format Analysis</title>
+    <style>
+        body { font-family: monospace; }
+        pre { background: #f0f0f0; padding: 10px; }
+        .match { color: green; font-weight: bold; }
+        .fail { color: red; }
+    </style>
+</head>
+<body>
+    <h1>DARTS Format Analysis</h1>
+    <div id="status">Loading...</div>
+    <pre id="result"></pre>
+    
+    <script>
+        async function analyzeDARTS() {
+            const output = document.getElementById('result');
+            const status = document.getElementById('status');
+            
+            try {
+                status.textContent = 'Fetching dictionary...';
+                const response = await fetch('../dict/naist-jdic/sys.dic');
+                const buffer = await response.arrayBuffer();
+                const view = new DataView(buffer);
+                
+                // Skip to DARTS data at offset 1664
+                const dartsOffset = 1664;
+                const dsize = view.getUint32(24, true); // DARTS size from header
+                
+                output.textContent = `DARTS Analysis\n`;
+                output.textContent += `DARTS size: ${dsize} bytes\n`;
+                output.textContent += `DARTS offset: ${dartsOffset} (0x${dartsOffset.toString(16)})\n\n`;
+                
+                // Read first few DARTS entries
+                output.textContent += 'First 20 DARTS entries (base, check):\n';
+                for (let i = 0; i < 20 && (dartsOffset + i * 8) < buffer.byteLength; i++) {
+                    const base = view.getInt32(dartsOffset + i * 8, true);
+                    const check = view.getInt32(dartsOffset + i * 8 + 4, true);
+                    output.textContent += `[${i}] base=${base}, check=${check}\n`;
+                }
+                
+                // Try to trace through DARTS for common characters
+                output.textContent += '\n\nTracing common Japanese characters:\n';
+                const testChars = [
+                    { char: 'あ', bytes: [0xe3, 0x81, 0x82] },
+                    { char: '今', bytes: [0xe4, 0xbb, 0x8a] },
+                    { char: '日', bytes: [0xe6, 0x97, 0xa5] },
+                    { char: '東', bytes: [0xe6, 0x9d, 0xb1] },
+                    { char: 'す', bytes: [0xe3, 0x81, 0x99] }
+                ];
+                
+                for (const test of testChars) {
+                    output.textContent += `\nTracing "${test.char}" [${test.bytes.map(b => '0x' + b.toString(16)).join(', ')}]:\n`;
+                    
+                    let node = 0;
+                    let valid = true;
+                    
+                    for (let i = 0; i < test.bytes.length && valid; i++) {
+                        const byte = test.bytes[i];
+                        const base = view.getInt32(dartsOffset + node * 8, true);
+                        
+                        // Try different DARTS formulas
+                        const t1 = base + byte + 1;  // Standard DARTS
+                        const t2 = base ^ byte;       // XOR variant
+                        const t3 = Math.abs(base) + byte; // Absolute base
+                        
+                        output.textContent += `  Step ${i}: byte=0x${byte.toString(16)}, node=${node}, base=${base}\n`;
+                        
+                        // Check each formula
+                        for (const [formula, t] of [['base+byte+1', t1], ['base^byte', t2], ['abs(base)+byte', t3]]) {
+                            if (t >= 0 && (dartsOffset + t * 8 + 4) < buffer.byteLength) {
+                                const check = view.getInt32(dartsOffset + t * 8 + 4, true);
+                                const nextBase = view.getInt32(dartsOffset + t * 8, true);
+                                output.textContent += `    ${formula}: t=${t}, check=${check}, nextBase=${nextBase}`;
+                                if (check === node) {
+                                    output.textContent += ' ✓\n';
+                                    if (i === test.bytes.length - 1 && nextBase < 0) {
+                                        output.textContent += `      → Terminal! token_id=${-nextBase-1}\n`;
+                                    }
+                                } else {
+                                    output.textContent += ' ✗\n';
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                status.textContent = 'Analysis complete';
+                
+            } catch (error) {
+                status.textContent = 'Error: ' + error.message;
+                output.textContent = error.stack;
+            }
+        }
+        
+        analyzeDARTS();
+    </script>
+</body>
+</html>

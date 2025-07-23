@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>MeCab DARTS Implementation Test</title>
+</head>
+<body>
+    <h1>MeCab DARTS Implementation Test</h1>
+    <div id="status">Loading...</div>
+    <pre id="result"></pre>
+    
+    <script>
+        // MeCab's DARTS implementation reference
+        // Based on MeCab source code analysis
+        
+        async function testMeCabDARTS() {
+            const output = document.getElementById('result');
+            const status = document.getElementById('status');
+            
+            try {
+                status.textContent = 'Loading dictionary...';
+                const response = await fetch('../dict/naist-jdic/sys.dic');
+                const buffer = await response.arrayBuffer();
+                const view = new DataView(buffer);
+                
+                // DARTS offset discovered to be 1664
+                const DARTS_OFFSET = 1664;
+                const dsize = view.getUint32(24, true);
+                
+                output.textContent = 'MeCab DARTS Test\n\n';
+                
+                // MeCab's DARTS lookup algorithm:
+                // 1. Start from root (node 0)
+                // 2. For each byte: t = base[node] + byte + 1
+                // 3. If check[t] == node, transition is valid
+                // 4. If base[t] < 0, it's a terminal with value = -base[t]-1
+                
+                function dartsWalk(bytes) {
+                    let result = [];
+                    let node = 0;
+                    
+                    for (let i = 0; i < bytes.length; i++) {
+                        const byte = bytes[i];
+                        const baseOffset = DARTS_OFFSET + node * 8;
+                        const base = view.getInt32(baseOffset, true);
+                        
+                        // Standard DARTS formula
+                        const t = base + byte + 1;
+                        
+                        // Bounds check
+                        if (t < 0 || (DARTS_OFFSET + t * 8 + 4) >= buffer.byteLength) {
+                            result.push(`Step ${i}: Out of bounds (t=${t})`);
+                            break;
+                        }
+                        
+                        const checkOffset = DARTS_OFFSET + t * 8 + 4;
+                        const check = view.getInt32(checkOffset, true);
+                        
+                        if (check !== node) {
+                            result.push(`Step ${i}: Check failed at node ${node}, byte 0x${byte.toString(16)}, t=${t}, check=${check}`);
+                            break;
+                        }
+                        
+                        // Valid transition
+                        const nextBase = view.getInt32(DARTS_OFFSET + t * 8, true);
+                        result.push(`Step ${i}: node ${node} → ${t} (byte 0x${byte.toString(16)}), nextBase=${nextBase}`);
+                        
+                        // Check if terminal
+                        if (nextBase < 0) {
+                            const tokenId = -nextBase - 1;
+                            result.push(`  → Found token! ID=${tokenId}`);
+                        }
+                        
+                        node = t;
+                    }
+                    
+                    return result;
+                }
+                
+                // Test with known Japanese words
+                const tests = [
+                    { word: '今', bytes: [0xe4, 0xbb, 0x8a] },
+                    { word: '日', bytes: [0xe6, 0x97, 0xa5] },
+                    { word: '本', bytes: [0xe6, 0x9c, 0xac] },
+                    { word: 'の', bytes: [0xe3, 0x81, 0xae] },
+                    { word: 'は', bytes: [0xe3, 0x81, 0xaf] }
+                ];
+                
+                for (const test of tests) {
+                    output.textContent += `\nTesting "${test.word}":\n`;
+                    const results = dartsWalk(test.bytes);
+                    results.forEach(r => output.textContent += `  ${r}\n`);
+                }
+                
+                // Also show raw DARTS data structure
+                output.textContent += '\n\nDARTS Structure (first 10 nodes):\n';
+                for (let i = 0; i < 10; i++) {
+                    const base = view.getInt32(DARTS_OFFSET + i * 8, true);
+                    const check = view.getInt32(DARTS_OFFSET + i * 8 + 4, true);
+                    output.textContent += `Node ${i}: base=${base}, check=${check}\n`;
+                }
+                
+                status.textContent = 'Test complete';
+                
+            } catch (error) {
+                status.textContent = 'Error: ' + error.message;
+                console.error(error);
+            }
+        }
+        
+        testMeCabDARTS();
+    </script>
+</body>
+</html>

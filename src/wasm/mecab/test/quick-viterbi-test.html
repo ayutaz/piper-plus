@@ -21,6 +21,7 @@
                 const mecab = new MeCabFull();
                 
                 statusEl.textContent = 'Initializing MeCab with Viterbi...';
+                console.log('Initializing with basePath:', '../dist_full/');
                 await mecab.initialize({
                     basePath: '../dist_full/'
                 });
@@ -40,8 +41,15 @@
                 
                 let html = '<h2>Results:</h2>';
                 for (const text of tests) {
+                    console.log(`Testing: ${text}`);
                     const result = mecab.parse(text);
+                    console.log(`Result:\n${result}`);
                     html += `<h3>${text}</h3><pre>${result}</pre>`;
+                    
+                    // Also test wakati
+                    const wakatiResult = mecab.wakati(text);
+                    console.log(`Wakati: ${wakatiResult}`);
+                    html += `<p>分かち書き: ${wakatiResult}</p>`;
                 }
                 
                 resultEl.innerHTML = html;
