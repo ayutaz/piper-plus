@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 import wave
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -53,6 +54,12 @@ from .util import audio_float_to_int16
 
 
 _LOGGER = logging.getLogger(__name__)
+
+# Regex patterns for Japanese prosody extraction
+_RE_PHONEME = re.compile(r"-([^+]+)\+")
+_RE_A1 = re.compile(r"/A:([\d-]+)\+")
+_RE_A2 = re.compile(r"\+([0-9]+)\+")
+_RE_A3 = re.compile(r"\+([0-9]+)/")
 
 # Multi-character phoneme to PUA character mapping for Japanese
 # This must match the C++ side and Python training side
@@ -136,91 +143,160 @@ class PiperVoice:
             return phonemize_codepoints(text)
 
         if self.config.phoneme_type == PhonemeType.OPENJTALK:
-            # Piper の学習時と同じアルゴリズム（accent/prosody 付き）で音素化
+            # Use the exact same phonemization as training
             try:
-                # `piper_train` がインストールされていれば専用実装を利用
-                from piper_train.phonemize.japanese import (
-                    phonemize_japanese,  # type: ignore
-                )
-
-                tokens = phonemize_japanese(text)
-                return [tokens]
-            except Exception:  # pragma: no cover – フォールバック
-                # 学習環境に piper_train が無い場合の簡易フォールバック
-                phonemes = pyopenjtalk.g2p(text, kana=False).split()
-
-                converted = []
-                # Add BOS marker
-                converted.append("^")
-
-                for ph in phonemes:
-                    if ph == "pau":
-                        converted.append("_")
-                        continue
-
-                    if ph == "sil":
-                        # Skip sil in the middle, it will be added as EOS
-                        continue
-
-                    # Devoiced vowels come back as upper-case (A,I,U,E,O)
-                    # But NOT 'N' which is a special phoneme
-                    if ph in {"A", "I", "U", "E", "O"}:
-                        ph = ph.lower()
-
-                    # Check if this is a multi-character phoneme that needs PUA mapping
-                    if ph in MULTI_CHAR_TO_PUA:
-                        converted.append(MULTI_CHAR_TO_PUA[ph])
-                    else:
-                        converted.append(ph)
-
-                # Add EOS marker
-                converted.append("$")
-
-                # Log readable phonemes if debug logging is enabled
-                if _LOGGER.isEnabledFor(logging.DEBUG):
-                    readable_phonemes = []
-                    for ph in converted:
-                        if len(ph) == 1 and ord(ph) >= 0xE000 and ord(ph) <= 0xF8FF:
-                            # Find the original multi-char phoneme
-                            for orig, pua in MULTI_CHAR_TO_PUA.items():
-                                if pua == ph:
-                                    readable_phonemes.append(orig)
-                                    break
-                            else:
-                                readable_phonemes.append(ph)
-                        else:
-                            readable_phonemes.append(ph)
-                    _LOGGER.debug(
-                        "Phonemized '%s' to: %s", text, " ".join(readable_phonemes)
-                    )
-
-                return [converted]
+                import sys
+                sys.path.insert(0, '/data/piper/src/python')
+                from piper_train.phonemize.japanese import phonemize_japanese
+                return [phonemize_japanese(text)]
+            except ImportError:
+                _LOGGER.warning("Failed to import piper_train phonemizer, falling back")
+                return [self._phonemize_japanese_with_prosody(text)]
 
         raise ValueError(f"Unexpected phoneme type: {self.config.phoneme_type}")
 
-    def phonemes_to_ids(self, phonemes: list[str]) -> list[int]:
-        """Phonemes to ids."""
+    def _phonemize_japanese_with_prosody(self, text: str) -> list[str]:
+        """Phonemize Japanese text with prosody marks (same as training)."""
+        if not HAS_PYOPENJTALK:
+            raise RuntimeError("pyopenjtalk is required for Japanese phonemization")
+            
+        labels = pyopenjtalk.extract_fullcontext(text)
+        tokens = []
+        
+        def _is_question(text: str) -> bool:
+            """Return True if text ends with a question mark."""
+            return text.strip().endswith("?") or text.strip().endswith("？")
+        
+        for idx, label in enumerate(labels):
+            m_ph = _RE_PHONEME.search(label)
+            if not m_ph:
+                continue
+            phoneme = m_ph.group(1)
+            
+            # Beginning / end silence handling
+            if phoneme == "sil":
+                if idx == 0:
+                    tokens.append("^")
+                elif idx == len(labels) - 1:
+                    tokens.append("?" if _is_question(text) else "$")
+                continue
+                
+            # Short pause
+            if phoneme == "pau":
+                tokens.append("_")
+                continue
+                
+            # Keep unvoiced vowels as uppercase
+            tokens.append(phoneme)
+            
+            # Extract prosody marks
+            m_a1 = _RE_A1.search(label)
+            m_a2 = _RE_A2.search(label)
+            m_a3 = _RE_A3.search(label)
+            if not (m_a1 and m_a2 and m_a3):
+                continue
+                
+            a1 = int(m_a1.group(1))
+            a2 = int(m_a2.group(1))
+            a3 = int(m_a3.group(1))
+            
+            # Look-ahead to next label
+            if idx < len(labels) - 1:
+                m_a2_next = _RE_A2.search(labels[idx + 1])
+                a2_next = int(m_a2_next.group(1)) if m_a2_next else -1
+            else:
+                a2_next = -1
+                
+            # Insert accent nucleus mark "]" at descending point
+            if (a1 == 0) and (a2_next == a2 + 1):
+                tokens.append("]")
+                
+            # Insert accent phrase boundary "#" when current mora is last
+            if (a2 == a3) and (a2_next == 1):
+                tokens.append("#")
+                
+            # Insert rising mark "[" at phrase head
+            if (a2 == 1) and (a2_next == 2):
+                tokens.append("[")
+                
+        # Use the same token mapper as training
+        try:
+            import sys
+            sys.path.insert(0, '/data/piper/src/python')
+            from piper_train.phonemize.token_mapper import map_sequence
+            return map_sequence(tokens)
+        except ImportError:
+            # Fallback to local PUA mapping
+            converted = []
+            for token in tokens:
+                if token in MULTI_CHAR_TO_PUA:
+                    converted.append(MULTI_CHAR_TO_PUA[token])
+                elif len(token) > 1:
+                    _LOGGER.warning("Multi-char token not in PUA map: %s", token)
+                    converted.append(token)
+                else:
+                    converted.append(token)
+            return converted
+
+    def phonemes_to_ids(self, phonemes: list[str]) -> tuple[list[int], list[int]]:
+        """Phonemes to ids with prosody support for Japanese."""
         id_map = self.config.phoneme_id_map
         ids: list[int] = list(id_map[BOS])
+        prosody_ids: list[int] = []
 
         _LOGGER.debug(f"Converting phonemes to IDs: {phonemes}")
         _LOGGER.debug(f"Available phonemes in id_map: {len(id_map)} items")
 
-        for phoneme in phonemes:
-            if phoneme not in id_map:
-                _LOGGER.warning("Missing phoneme from id map: %s", phoneme)
-                continue
+        # For Japanese, we need to match the training AccentProcessor logic
+        if self.config.phoneme_type == PhonemeType.OPENJTALK:
+            # Define prosody mark to ID mapping (must match accent_processor.py)
+            prosody_marks = {
+                "^": 0,  # start
+                "$": 1,  # end_declarative  
+                "?": 2,  # end_question
+                "_": 3,  # pause
+                "#": 4,  # boundary
+                "[": 5,  # rising
+                "]": 6,  # falling
+            }
+            # ID 14 is for regular phonemes (<PAD> in training)
+            
+            for phoneme in phonemes:
+                if phoneme not in id_map:
+                    _LOGGER.warning("Missing phoneme from id map: %s", phoneme)
+                    continue
+                    
+                ids.extend(id_map[phoneme])
+                
+                # Assign prosody ID based on training logic
+                if phoneme in prosody_marks:
+                    prosody_ids.append(prosody_marks[phoneme])
+                else:
+                    # Regular phoneme - use <PAD> ID (14)
+                    prosody_ids.append(14)
+                    
+        else:
+            # Non-Japanese: original logic
+            prosody_ids.append(0)  # BOS prosody
+            
+            for phoneme in phonemes:
+                if phoneme not in id_map:
+                    _LOGGER.warning("Missing phoneme from id map: %s", phoneme)
+                    continue
 
-            ids.extend(id_map[phoneme])
+                ids.extend(id_map[phoneme])
+                prosody_ids.append(14)  # Default prosody
+                
+                # 学習データが PAD("_") を各音素ごとに含んでいるのは eSpeak 方式のみ。
+                if self.config.phoneme_type == PhonemeType.ESPEAK:
+                    ids.extend(id_map[PAD])
+                    prosody_ids.append(14)  # Default prosody for PAD
 
-            # 学習データが PAD("_") を各音素ごとに含んでいるのは eSpeak 方式のみ。
-            # openjtalk で学習したモデルでは PAD は明示的に含まれていないので追加しない。
-            if self.config.phoneme_type != PhonemeType.OPENJTALK:
-                ids.extend(id_map[PAD])
+            prosody_ids.append(1)  # EOS prosody
 
         ids.extend(id_map[EOS])
 
-        return ids
+        return ids, prosody_ids
 
     def synthesize(
         self,
@@ -267,10 +343,11 @@ class PiperVoice:
         silence_bytes = bytes(num_silence_samples * 2)
 
         for phonemes in sentence_phonemes:
-            phoneme_ids = self.phonemes_to_ids(phonemes)
+            phoneme_ids, prosody_ids = self.phonemes_to_ids(phonemes)
             yield (
                 self.synthesize_ids_to_raw(
                     phoneme_ids,
+                    prosody_ids,
                     speaker_id=speaker_id,
                     length_scale=length_scale,
                     noise_scale=noise_scale,
@@ -283,6 +360,7 @@ class PiperVoice:
     def synthesize_ids_to_raw(
         self,
         phoneme_ids: list[int],
+        prosody_ids: list[int] | None = None,
         speaker_id: int | None = None,
         length_scale: float | None = None,
         noise_scale: float | None = None,
@@ -311,6 +389,14 @@ class PiperVoice:
             "input_lengths": phoneme_ids_lengths,
             "scales": scales,
         }
+        
+        # Add prosody_ids if provided and model supports it
+        if prosody_ids is not None:
+            # Check if the ONNX model expects prosody_ids input
+            model_inputs = [input.name for input in self.session.get_inputs()]
+            if "prosody_ids" in model_inputs:
+                prosody_ids_array = np.expand_dims(np.array(prosody_ids, dtype=np.int64), 0)
+                args["prosody_ids"] = prosody_ids_array
 
         if self.config.num_speakers <= 1:
             speaker_id = None
@@ -319,8 +405,11 @@ class PiperVoice:
             # Default speaker
             speaker_id = 0
 
-        if speaker_id is not None:
-            sid = np.array([speaker_id], dtype=np.int64)
+        # Include sid only for multi-speaker models
+        if self.config.num_speakers > 1:
+            if speaker_id is None:
+                speaker_id = 0
+            sid = np.expand_dims(np.array([speaker_id], dtype=np.int64), 0)
             args["sid"] = sid
 
         # Synthesize through Onnx
