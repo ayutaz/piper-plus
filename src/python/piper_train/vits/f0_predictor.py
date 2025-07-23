@@ -3,6 +3,7 @@ import torch.nn.functional as F
 from torch import nn
 
 from .modules import ConvReluNorm
+from .onnx_attention import ONNXFriendlyAttention
 
 
 class F0Predictor(nn.Module):
@@ -48,9 +49,24 @@ class F0Predictor(nn.Module):
                 )
             )
 
-        # Multi-head self-attention for context modeling
-        self.attention = nn.MultiheadAttention(
+        # Use ONNX-friendly attention implementation
+        self.attention = ONNXFriendlyAttention(
+            hidden_channels, n_heads, dropout=p_dropout
+        )
+        
+        # Keep original MultiheadAttention for weight migration (will be removed after migration)
+        self._original_attention = nn.MultiheadAttention(
             hidden_channels, n_heads, dropout=p_dropout, batch_first=True
+        )
+        
+        # Alternative conv path for fallback (keep for compatibility)
+        self.context_conv = nn.Sequential(
+            nn.Conv1d(hidden_channels, hidden_channels, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.Dropout(p_dropout),
+            nn.Conv1d(hidden_channels, hidden_channels, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.Dropout(p_dropout),
         )
 
         # Prosody embedding for Japanese accent marks
@@ -79,13 +95,24 @@ class F0Predictor(nn.Module):
         if gin_channels > 0:
             self.cond = nn.Conv1d(gin_channels, hidden_channels, 1)
 
-    def forward(self, x, x_mask=None, prosody_ids=None, g=None):
+    def forward(self, x, x_mask=None, prosody_ids=None, g=None, use_conv=False):
+        """
+        Forward pass with ONNX-friendly attention.
+        
+        Args:
+            x: Input features [B, hidden_channels, T]
+            x_mask: Mask for valid positions [B, 1, T]
+            prosody_ids: Prosody mark IDs [B, T]
+            g: Speaker embedding [B, gin_channels, 1]
+            use_conv: Legacy parameter for compatibility (now ignored)
+        """
         """
         Args:
             x: Input features [B, hidden_channels, T]
             x_mask: Mask for valid positions [B, 1, T]
             prosody_ids: Prosody mark IDs [B, T]
             g: Speaker embedding [B, gin_channels, 1]
+            use_conv: Use conv instead of attention for ONNX export
 
         Returns:
             f0_prediction: Discrete F0 bins [B, n_bins, T]
@@ -114,15 +141,14 @@ class F0Predictor(nn.Module):
                 x = layer(x, dummy_mask)
             x = x + residual
 
-        # Self-attention for long-range dependencies
-        x_seq = x.transpose(1, 2)  # [B, T, hidden]
-        x_att, _ = self.attention(
-            x_seq,
-            x_seq,
-            x_seq,
-            key_padding_mask=x_mask.squeeze(1) == 0 if x_mask is not None else None,
-        )
-        x = x + x_att.transpose(1, 2)
+        # Use ONNX-friendly attention (no more conv fallback needed)
+        key_padding_mask = None
+        if x_mask is not None:
+            # Convert mask from [B, 1, T] to [B, T] and invert (True = padding)
+            key_padding_mask = (x_mask.squeeze(1) == 0)
+        
+        x_att = self.attention(x, key_padding_mask)
+        x = x + x_att
 
         # F0 prediction
         f0_prediction = self.f0_proj(x)  # [B, n_bins, T]
@@ -139,6 +165,18 @@ class F0Predictor(nn.Module):
             variance = variance * x_mask
 
         return f0_prediction, f0_values, variance
+    
+    def migrate_attention_weights(self):
+        """
+        Migrate weights from original MultiheadAttention to ONNX-friendly attention.
+        This should be called after loading a checkpoint with the old attention weights.
+        """
+        if hasattr(self, '_original_attention'):
+            print("Migrating F0 Predictor attention weights...")
+            self.attention.migrate_from_multihead_attention(self._original_attention)
+            # Remove the original attention to save memory
+            delattr(self, '_original_attention')
+            print("Weight migration completed.")
 
     def _bins_to_f0(self, f0_bins):
         """Convert discrete F0 bins to continuous F0 values."""

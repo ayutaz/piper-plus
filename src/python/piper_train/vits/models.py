@@ -716,7 +716,8 @@ class SynthesizerTrn(nn.Module):
 
         # Apply F0 predictor if prosody_ids are provided
         if prosody_ids is not None:
-            f0_pred, _ = self.f0_predictor(x, prosody_ids, x_mask, g)
+            # F0 predictor now works with ONNX-friendly attention
+            f0_pred_bins, f0_pred, f0_variance = self.f0_predictor(x, x_mask, prosody_ids, g)
             # Incorporate F0 into the latent representation
             x = x + f0_pred  # Simple addition, could be more sophisticated
 
