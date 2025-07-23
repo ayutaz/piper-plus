@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>Viterbi Standalone Test</title>
+</head>
+<body>
+    <h1>Viterbi Algorithm Test (Dictionary Disabled)</h1>
+    <div id="status">Loading...</div>
+    <pre id="result"></pre>
+    
+    <script type="module">
+        import { MeCabFull } from '../dist_full/mecab-full.js';
+        
+        async function test() {
+            const statusEl = document.getElementById('status');
+            const resultEl = document.getElementById('result');
+            
+            try {
+                const mecab = new MeCabFull();
+                
+                statusEl.textContent = 'Initializing...';
+                await mecab.initialize({
+                    basePath: '../dist_full/'
+                });
+                
+                // Test cases
+                const testCases = [
+                    'あ',           // Single hiragana
+                    '今日',         // Common word
+                    '東京',         // Place name
+                    'です',         // Particle
+                    '今日は良い天気です',  // Full sentence
+                    '東京スカイツリー',    // Katakana mixed
+                    'ABC123'        // Alphanumeric
+                ];
+                
+                resultEl.textContent = 'Test Results (All as Unknown Words):\n\n';
+                
+                for (const text of testCases) {
+                    console.log(`\n=== Testing: ${text} ===`);
+                    const result = mecab.parse(text);
+                    const wakati = mecab.wakati(text);
+                    
+                    resultEl.textContent += `Input: "${text}"\n`;
+                    resultEl.textContent += `Parse:\n${result}`;
+                    resultEl.textContent += `Wakati: ${wakati}\n\n`;
+                }
+                
+                statusEl.textContent = 'Test completed! (Note: All words are processed as unknown due to disabled dictionary)';
+                
+            } catch (error) {
+                console.error('Error:', error);
+                statusEl.textContent = 'Error: ' + error.message;
+                resultEl.textContent = error.stack;
+            }
+        }
+        
+        test();
+    </script>
+</body>
+</html>

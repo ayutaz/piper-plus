@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>DARTS Deep Analysis</title>
+</head>
+<body>
+    <h1>DARTS Deep Analysis</h1>
+    <pre id="output"></pre>
+    
+    <script>
+        async function analyze() {
+            const output = document.getElementById('output');
+            
+            try {
+                const response = await fetch('../dict/naist-jdic/sys.dic');
+                const buffer = await response.arrayBuffer();
+                const view = new DataView(buffer);
+                
+                const DARTS_OFFSET = 1664;
+                
+                output.textContent = 'DARTS Deep Analysis\n\n';
+                
+                // Node 0の特殊な値を調査
+                output.textContent += 'Investigating Node 0 (base=-2, check=199):\n';
+                
+                // check=199が指すノードを見る
+                const node199base = view.getInt32(DARTS_OFFSET + 199 * 8, true);
+                const node199check = view.getInt32(DARTS_OFFSET + 199 * 8 + 4, true);
+                output.textContent += `  Node 199: base=${node199base}, check=${node199check}\n`;
+                
+                // さらにその先を見る
+                if (node199base > 0) {
+                    for (let c = 0; c < 256; c++) {
+                        const t = node199base + c + 1;
+                        if (t > 0 && t < 1000) {
+                            const check = view.getInt32(DARTS_OFFSET + t * 8 + 4, true);
+                            if (check === 199) {
+                                output.textContent += `    → byte 0x${c.toString(16)} leads to node ${t}\n`;
+                                if (c >= 0x20 && c < 0x7F) {
+                                    output.textContent += `      (ASCII '${String.fromCharCode(c)}')\n`;
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                // base値の分布を調査
+                output.textContent += '\n\nBase value distribution:\n';
+                let baseStats = { negative: 0, zero: 0, small: 0, large: 0 };
+                for (let i = 0; i < 1000; i++) {
+                    const base = view.getInt32(DARTS_OFFSET + i * 8, true);
+                    if (base < 0) baseStats.negative++;
+                    else if (base === 0) baseStats.zero++;
+                    else if (base < 1000) baseStats.small++;
+                    else baseStats.large++;
+                }
+                output.textContent += `  Negative: ${baseStats.negative}\n`;
+                output.textContent += `  Zero: ${baseStats.zero}\n`;
+                output.textContent += `  Small (1-999): ${baseStats.small}\n`;
+                output.textContent += `  Large (1000+): ${baseStats.large}\n`;
+                
+                // UTF-8の最初のバイトで有効な遷移を探す
+                output.textContent += '\n\nSearching for valid transitions from Node 0:\n';
+                const node0base = view.getInt32(DARTS_OFFSET, true);
+                output.textContent += `  Node 0 base: ${node0base}\n`;
+                
+                // 一般的なUTF-8の最初のバイト
+                const commonBytes = [
+                    0x20, // space
+                    0x30, 0x31, 0x32, // 0,1,2
+                    0x41, 0x61, // A,a
+                    0xe3, 0xe4, 0xe5, 0xe6, 0xe7, 0xe8, 0xe9, // Japanese UTF-8 first bytes
+                    0x81, 0x82, 0x83, // UTF-8 continuation bytes
+                ];
+                
+                for (let byte of commonBytes) {
+                    // 異なる計算式を試す
+                    const formulas = [
+                        { name: 'base+byte+1', value: node0base + byte + 1 },
+                        { name: '|base|+byte', value: Math.abs(node0base) + byte },
+                        { name: 'byte only', value: byte },
+                        { name: 'check+byte', value: 199 + byte },
+                    ];
+                    
+                    output.textContent += `\n  Byte 0x${byte.toString(16)}:\n`;
+                    for (let formula of formulas) {
+                        if (formula.value >= 0 && formula.value < 10000) {
+                            const check = view.getInt32(DARTS_OFFSET + formula.value * 8 + 4, true);
+                            output.textContent += `    ${formula.name} → node ${formula.value}, check=${check}`;
+                            if (check === 0) output.textContent += ' (matches node 0!)';
+                            output.textContent += '\n';
+                        }
+                    }
+                }
+                
+                // 実際のトークンとDARTSの関係を調査
+                output.textContent += '\n\nToken to DARTS mapping:\n';
+                const tokenOffset = DARTS_OFFSET + view.getUint32(24, true);
+                
+                // 最初の数トークンを見る
+                for (let i = 0; i < 5; i++) {
+                    const offset = tokenOffset + i * 16;
+                    const feature = view.getUint32(offset, true);
+                    const lcAttr = view.getUint16(offset + 8, true);
+                    const rcAttr = view.getUint16(offset + 10, true);
+                    const wcost = view.getInt16(offset + 14, true);
+                    
+                    output.textContent += `  Token ${i}: feature=${feature}, lcAttr=${lcAttr}, rcAttr=${rcAttr}, wcost=${wcost}\n`;
+                    
+                    // このトークンIDがDARTSのどこかにあるか探す
+                    let found = false;
+                    for (let j = 0; j < 100 && !found; j++) {
+                        const base = view.getInt32(DARTS_OFFSET + j * 8, true);
+                        if (base < 0 && -base - 1 === i) {
+                            output.textContent += `    → Found at DARTS node ${j} (base=${base})\n`;
+                            found = true;
+                        }
+                    }
+                }
+                
+            } catch (error) {
+                output.textContent = 'Error: ' + error.message;
+            }
+        }
+        
+        analyze();
+    </script>
+</body>
+</html>

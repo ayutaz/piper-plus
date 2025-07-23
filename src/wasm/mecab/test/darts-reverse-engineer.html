@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>DARTS Reverse Engineering</title>
+</head>
+<body>
+    <h1>DARTS Format Reverse Engineering</h1>
+    <pre id="output"></pre>
+    
+    <script>
+        async function analyzeDARTS() {
+            const output = document.getElementById('output');
+            
+            try {
+                const response = await fetch('../dict/naist-jdic/sys.dic');
+                const buffer = await response.arrayBuffer();
+                const view = new DataView(buffer);
+                
+                const DARTS_OFFSET = 1664;
+                
+                output.textContent = 'DARTS Reverse Engineering\n\n';
+                
+                // Analyze first 100 nodes
+                output.textContent += 'First 100 DARTS nodes:\n';
+                let negativeBaseCount = 0;
+                let checkPatterns = new Map();
+                
+                for (let i = 0; i < 100; i++) {
+                    const base = view.getInt32(DARTS_OFFSET + i * 8, true);
+                    const check = view.getInt32(DARTS_OFFSET + i * 8 + 4, true);
+                    
+                    if (base < 0) negativeBaseCount++;
+                    
+                    // Track check value patterns
+                    if (!checkPatterns.has(check)) {
+                        checkPatterns.set(check, []);
+                    }
+                    checkPatterns.get(check).push(i);
+                    
+                    if (i < 20) {
+                        output.textContent += `[${i}] base=${base}, check=${check}\n`;
+                    }
+                }
+                
+                output.textContent += `\nNegative base count: ${negativeBaseCount}/100\n`;
+                
+                // Analyze check patterns
+                output.textContent += '\nCheck value patterns:\n';
+                let sortedChecks = Array.from(checkPatterns.entries()).sort((a, b) => a[0] - b[0]);
+                for (let [check, nodes] of sortedChecks.slice(0, 10)) {
+                    output.textContent += `  check=${check} appears at nodes: ${nodes.join(', ')}\n`;
+                }
+                
+                // Try different DARTS interpretations
+                output.textContent += '\n\nTrying different DARTS interpretations:\n';
+                
+                // Test case: first byte of "今" (0xe4)
+                const testByte = 0xe4;
+                output.textContent += `\nTest byte: 0x${testByte.toString(16)} (first byte of "今")\n`;
+                
+                // Try different formulas from node 0
+                const base0 = view.getInt32(DARTS_OFFSET, true);
+                const formulas = [
+                    { name: 'standard (base+c+1)', calc: base0 + testByte + 1 },
+                    { name: 'no offset (base+c)', calc: base0 + testByte },
+                    { name: 'XOR (base^c)', calc: base0 ^ testByte },
+                    { name: 'absolute base (|base|+c)', calc: Math.abs(base0) + testByte },
+                    { name: 'absolute base+1 (|base|+c+1)', calc: Math.abs(base0) + testByte + 1 },
+                    { name: 'check as base (check+c)', calc: 199 + testByte }  // check[0]=199
+                ];
+                
+                for (let formula of formulas) {
+                    const t = formula.calc;
+                    output.textContent += `\n${formula.name}: t=${t}`;
+                    if (t >= 0 && t < 10000) {
+                        const check = view.getInt32(DARTS_OFFSET + t * 8 + 4, true);
+                        const base = view.getInt32(DARTS_OFFSET + t * 8, true);
+                        output.textContent += ` → check=${check}, base=${base}`;
+                    }
+                }
+                
+                // Look for patterns in the data
+                output.textContent += '\n\nSearching for UTF-8 strings in tokens section:\n';
+                const tokenOffset = DARTS_OFFSET + view.getUint32(24, true); // After DARTS
+                const decoder = new TextDecoder('utf-8', { fatal: false });
+                
+                for (let i = 0; i < 10; i++) {
+                    const start = tokenOffset + i * 16; // Assuming token size
+                    if (start + 16 < buffer.byteLength) {
+                        const bytes = new Uint8Array(buffer, start, 16);
+                        const text = decoder.decode(bytes);
+                        output.textContent += `Token ${i}: ${text.replace(/[\x00-\x1F]/g, '.')}\n`;
+                    }
+                }
+                
+            } catch (error) {
+                output.textContent = 'Error: ' + error.message;
+                console.error(error);
+            }
+        }
+        
+        analyzeDARTS();
+    </script>
+</body>
+</html>

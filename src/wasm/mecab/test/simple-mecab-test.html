@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>Simple MeCab Dictionary Test</title>
+</head>
+<body>
+    <h1>Simple MeCab Dictionary Test</h1>
+    <pre id="output"></pre>
+    
+    <script>
+        async function test() {
+            const output = document.getElementById('output');
+            
+            try {
+                const response = await fetch('../dict/naist-jdic/sys.dic');
+                const buffer = await response.arrayBuffer();
+                const view = new DataView(buffer);
+                const uint8 = new Uint8Array(buffer);
+                
+                output.textContent = 'Simple MeCab Dictionary Test\n\n';
+                
+                // Feature文字列を正しく読む
+                const FEATURE_OFFSET = 35840096; // From previous analysis
+                const decoder = new TextDecoder('utf-8');
+                
+                output.textContent += 'First 10 feature strings:\n';
+                let offset = FEATURE_OFFSET;
+                for (let i = 0; i < 10; i++) {
+                    let end = offset;
+                    while (end < buffer.byteLength && uint8[end] !== 0) end++;
+                    
+                    const feature = decoder.decode(uint8.slice(offset, end));
+                    output.textContent += `  ${i}: "${feature}"\n`;
+                    
+                    offset = end + 1; // Skip null terminator
+                }
+                
+                // Try simple direct lookup approach
+                output.textContent += '\n\nTrying direct dictionary search:\n';
+                
+                // Search for common words in the feature section
+                const searchWords = ['今日', '東京', '日本', 'です', 'ます'];
+                const featureSection = uint8.slice(FEATURE_OFFSET, FEATURE_OFFSET + 100000);
+                const featureText = decoder.decode(featureSection);
+                
+                for (const word of searchWords) {
+                    const index = featureText.indexOf(word);
+                    if (index >= 0) {
+                        output.textContent += `  Found "${word}" at feature offset ${index}\n`;
+                        
+                        // Find nearby comma-separated values
+                        let start = index;
+                        while (start > 0 && featureText[start-1] !== '\0') start--;
+                        let end = index;
+                        while (end < featureText.length && featureText[end] !== '\0') end++;
+                        
+                        const fullFeature = featureText.substring(start, end);
+                        output.textContent += `    Full feature: ${fullFeature}\n`;
+                    }
+                }
+                
+                // Check if this is a different dictionary format
+                output.textContent += '\n\nChecking dictionary format markers:\n';
+                
+                // Look for MeCab version strings
+                const headerChars = decoder.decode(uint8.slice(76, 108));
+                output.textContent += `  Charset field: "${headerChars}"\n`;
+                
+                // Check for any readable strings near the beginning
+                output.textContent += '\n  Readable strings in first 2KB:\n';
+                for (let i = 0; i < 2048; i += 100) {
+                    const chunk = uint8.slice(i, Math.min(i + 100, 2048));
+                    const text = decoder.decode(chunk, { stream: true });
+                    const readable = text.replace(/[\x00-\x1F\x7F-\x9F]/g, '.');
+                    if (readable.match(/[a-zA-Z0-9]{3,}/)) {
+                        output.textContent += `    Offset ${i}: ${readable.substring(0, 50)}\n`;
+                    }
+                }
+                
+            } catch (error) {
+                output.textContent = 'Error: ' + error.message;
+                console.error(error);
+            }
+        }
+        
+        test();
+    </script>
+</body>
+</html>

@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>DARTS Byte-by-Byte Test</title>
+</head>
+<body>
+    <h1>DARTS Byte-by-Byte Test</h1>
+    <pre id="output"></pre>
+    
+    <script>
+        async function test() {
+            const output = document.getElementById('output');
+            
+            try {
+                const response = await fetch('../dict/naist-jdic/sys.dic');
+                const buffer = await response.arrayBuffer();
+                const view = new DataView(buffer);
+                
+                const DARTS_OFFSET = 1664;
+                
+                output.textContent = 'DARTS Byte-by-Byte Test\n\n';
+                
+                // Test specific Japanese characters
+                const testCases = [
+                    { char: '今', bytes: [0xe4, 0xbb, 0x8a] },
+                    { char: '日', bytes: [0xe6, 0x97, 0xa5] },
+                    { char: '東', bytes: [0xe6, 0x9d, 0xb1] },
+                    { char: 'の', bytes: [0xe3, 0x81, 0xae] },
+                    { char: 'は', bytes: [0xe3, 0x81, 0xaf] },
+                ];
+                
+                for (const test of testCases) {
+                    output.textContent += `\nTesting "${test.char}" [${test.bytes.map(b => '0x' + b.toString(16)).join(', ')}]:\n`;
+                    
+                    let node = 0;
+                    let found = false;
+                    
+                    // Try all possible formulas for first byte
+                    const byte0 = test.bytes[0];
+                    output.textContent += `  First byte 0x${byte0.toString(16)}:\n`;
+                    
+                    // Generate all possible target nodes within reasonable range
+                    for (let t = 0; t < 500; t++) {
+                        const check = view.getInt32(DARTS_OFFSET + t * 8 + 4, true);
+                        if (check === 0) {  // Looking for transitions from node 0
+                            const base = view.getInt32(DARTS_OFFSET + t * 8, true);
+                            
+                            // Check if any formula produces this t value
+                            const formulas = [
+                                { name: 'direct', calc: byte0 === t },
+                                { name: 'byte+1', calc: byte0 + 1 === t },
+                                { name: 'byte+2', calc: byte0 + 2 === t },
+                                { name: '2+byte', calc: 2 + byte0 === t },
+                                { name: '|base0|+byte', calc: Math.abs(-2) + byte0 === t },
+                                { name: 'base0+byte+1', calc: -2 + byte0 + 1 === t },
+                            ];
+                            
+                            for (let formula of formulas) {
+                                if (formula.calc) {
+                                    output.textContent += `    ${formula.name} → t=${t}, base=${base} ✓\n`;
+                                    
+                                    // Try second byte
+                                    if (test.bytes.length > 1 && base !== 0) {
+                                        const byte1 = test.bytes[1];
+                                        const t2 = base + byte1 + 1;
+                                        if (t2 > 0 && t2 < 10000) {
+                                            const check2 = view.getInt32(DARTS_OFFSET + t2 * 8 + 4, true);
+                                            const base2 = view.getInt32(DARTS_OFFSET + t2 * 8, true);
+                                            output.textContent += `      Second byte 0x${byte1.toString(16)}: t=${t2}, check=${check2}, base=${base2}`;
+                                            if (check2 === t) {
+                                                output.textContent += ' ✓✓';
+                                                
+                                                // Try third byte
+                                                if (test.bytes.length > 2 && base2 !== 0) {
+                                                    const byte2 = test.bytes[2];
+                                                    const t3 = base2 + byte2 + 1;
+                                                    if (t3 > 0 && t3 < 10000) {
+                                                        const check3 = view.getInt32(DARTS_OFFSET + t3 * 8 + 4, true);
+                                                        const base3 = view.getInt32(DARTS_OFFSET + t3 * 8, true);
+                                                        output.textContent += `\n        Third byte 0x${byte2.toString(16)}: t=${t3}, check=${check3}, base=${base3}`;
+                                                        if (check3 === t2) {
+                                                            output.textContent += ' ✓✓✓';
+                                                            if (base3 < 0) {
+                                                                const tokenId = -base3 - 1;
+                                                                output.textContent += ` → Token ${tokenId}!`;
+                                                                found = true;
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                            output.textContent += '\n';
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    
+                    if (!found) {
+                        output.textContent += '    No valid path found\n';
+                    }
+                }
+                
+                // Also check what nodes have check=0
+                output.textContent += '\n\nNodes with check=0:\n';
+                let count = 0;
+                for (let i = 0; i < 1000 && count < 20; i++) {
+                    const check = view.getInt32(DARTS_OFFSET + i * 8 + 4, true);
+                    if (check === 0) {
+                        const base = view.getInt32(DARTS_OFFSET + i * 8, true);
+                        output.textContent += `  Node ${i}: base=${base}\n`;
+                        count++;
+                    }
+                }
+                
+            } catch (error) {
+                output.textContent = 'Error: ' + error.message;
+            }
+        }
+        
+        test();
+    </script>
+</body>
+</html>

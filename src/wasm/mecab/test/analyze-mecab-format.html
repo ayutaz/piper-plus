@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>MeCab Dictionary Format Analysis</title>
+</head>
+<body>
+    <h1>MeCab Dictionary Format Deep Analysis</h1>
+    <pre id="output"></pre>
+    
+    <script>
+        async function analyze() {
+            const output = document.getElementById('output');
+            
+            try {
+                const response = await fetch('../dict/naist-jdic/sys.dic');
+                const buffer = await response.arrayBuffer();
+                const view = new DataView(buffer);
+                const uint8 = new Uint8Array(buffer);
+                
+                output.textContent = 'MeCab Dictionary Format Analysis\n\n';
+                
+                // Check if this might be ipadic format
+                output.textContent += 'Checking for IPA dictionary markers:\n';
+                
+                // Look for version info
+                const decoder = new TextDecoder('utf-8', { fatal: false });
+                const charset = decoder.decode(uint8.slice(76, 108));
+                output.textContent += `Charset field (offset 76-108): "${charset}"\n`;
+                
+                // Check magic number details
+                const magic = view.getUint32(0, true);
+                output.textContent += `\nMagic number: 0x${magic.toString(16)}\n`;
+                
+                // Try to interpret as different dictionary formats
+                output.textContent += '\nTrying different interpretations:\n';
+                
+                // 1. Check if DARTS might be at a different offset
+                const possibleOffsets = [108, 256, 512, 1024, 1536, 1664, 2048];
+                for (const offset of possibleOffsets) {
+                    if (offset + 16 < buffer.byteLength) {
+                        const val1 = view.getInt32(offset, true);
+                        const val2 = view.getInt32(offset + 4, true);
+                        const val3 = view.getInt32(offset + 8, true);
+                        const val4 = view.getInt32(offset + 12, true);
+                        
+                        // Check if this looks like DARTS data
+                        if (val1 !== 0 || val2 !== 0) {
+                            output.textContent += `\nOffset ${offset}: [${val1}, ${val2}, ${val3}, ${val4}]`;
+                            
+                            // Check if it's a valid DARTS pattern
+                            if (Math.abs(val1) < 10000000 && Math.abs(val2) < 10000) {
+                                output.textContent += ' <- Possible DARTS';
+                            }
+                        }
+                    }
+                }
+                
+                // 2. Analyze token structure more carefully
+                const TOKEN_OFFSET = 1664 + view.getUint32(24, true); // DARTS offset + size
+                output.textContent += `\n\nToken analysis (offset ${TOKEN_OFFSET}):\n`;
+                
+                // Read several tokens
+                for (let i = 0; i < 5; i++) {
+                    const offset = TOKEN_OFFSET + i * 16;
+                    output.textContent += `\nToken ${i}:\n`;
+                    
+                    // Try different interpretations
+                    output.textContent += `  As 4 uint32: [${view.getUint32(offset, true)}, ${view.getUint32(offset+4, true)}, ${view.getUint32(offset+8, true)}, ${view.getUint32(offset+12, true)}]\n`;
+                    output.textContent += `  As 8 uint16: [`;
+                    for (let j = 0; j < 8; j++) {
+                        output.textContent += view.getUint16(offset + j*2, true);
+                        if (j < 7) output.textContent += ', ';
+                    }
+                    output.textContent += ']\n';
+                    
+                    // Check feature string
+                    const featureId = view.getUint32(offset, true);
+                    const FEATURE_OFFSET = TOKEN_OFFSET + view.getUint32(28, true); // token offset + size
+                    if (featureId < 100000) {
+                        let featureStr = '';
+                        let foffset = FEATURE_OFFSET + featureId;
+                        for (let k = 0; k < 100 && foffset + k < buffer.byteLength; k++) {
+                            const byte = uint8[foffset + k];
+                            if (byte === 0) break;
+                            featureStr += String.fromCharCode(byte);
+                        }
+                        output.textContent += `  Feature: "${featureStr}"\n`;
+                    }
+                }
+                
+                // 3. Try to find known words in DARTS
+                output.textContent += '\n\nSearching for patterns in DARTS:\n';
+                const DARTS_OFFSET = 1664;
+                
+                // Look for sequences that might represent common words
+                // In MeCab, terminal nodes have negative base values
+                let terminalCount = 0;
+                for (let i = 0; i < 1000 && terminalCount < 20; i++) {
+                    const base = view.getInt32(DARTS_OFFSET + i * 8, true);
+                    if (base < 0 && base > -1000000) {
+                        const tokenId = -base - 1;
+                        output.textContent += `  Node ${i}: terminal, token_id=${tokenId}\n`;
+                        terminalCount++;
+                    }
+                }
+                
+                // 4. Check endianness
+                output.textContent += '\n\nEndianness check:\n';
+                const testVal = view.getUint32(12, true); // lexsize
+                const testValBE = view.getUint32(12, false);
+                output.textContent += `  lexsize (LE): ${testVal}\n`;
+                output.textContent += `  lexsize (BE): ${testValBE}\n`;
+                if (testValBE < testVal && testValBE > 0 && testValBE < 10000000) {
+                    output.textContent += '  -> Dictionary might be big-endian!\n';
+                }
+                
+            } catch (error) {
+                output.textContent = 'Error: ' + error.message;
+                console.error(error);
+            }
+        }
+        
+        analyze();
+    </script>
+</body>
+</html>

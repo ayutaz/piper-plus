@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>Debug Viterbi</title>
+</head>
+<body>
+    <h1>Debug Viterbi Algorithm</h1>
+    <div id="status">Loading...</div>
+    <pre id="result"></pre>
+    
+    <script type="module">
+        import { MeCabFull } from '../dist_full/mecab-full.js';
+        
+        async function test() {
+            const statusEl = document.getElementById('status');
+            const resultEl = document.getElementById('result');
+            
+            try {
+                console.log('Creating MeCab instance...');
+                const mecab = new MeCabFull();
+                
+                statusEl.textContent = 'Initializing...';
+                await mecab.initialize({
+                    basePath: '../dist_full/'
+                });
+                
+                console.log('MeCab initialized');
+                
+                // Get dictionary stats
+                const stats = mecab.getDictStats();
+                console.log('Dictionary stats:', stats);
+                resultEl.textContent = 'Dictionary stats:\n' + JSON.stringify(stats, null, 2) + '\n\n';
+                
+                // Test single character
+                statusEl.textContent = 'Testing single character...';
+                console.log('Testing single character: あ');
+                const result1 = mecab.parse('あ');
+                console.log('Result:', result1);
+                resultEl.textContent += 'Test "あ":\n' + result1 + '\n';
+                
+                // Test simple word
+                statusEl.textContent = 'Testing simple word...';
+                console.log('Testing: 今日');
+                const result2 = mecab.parse('今日');
+                console.log('Result:', result2);
+                resultEl.textContent += 'Test "今日":\n' + result2 + '\n';
+                
+                // Test wakati
+                console.log('Testing wakati: 今日');
+                const wakati = mecab.wakati('今日');
+                console.log('Wakati:', wakati);
+                resultEl.textContent += 'Wakati "今日": ' + wakati + '\n';
+                
+                statusEl.textContent = 'Done!';
+                
+            } catch (error) {
+                console.error('Error:', error);
+                statusEl.textContent = 'Error: ' + error.message;
+                resultEl.textContent += '\nError: ' + error.stack;
+            }
+        }
+        
+        test();
+    </script>
+</body>
+</html>

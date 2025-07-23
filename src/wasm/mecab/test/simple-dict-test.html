@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>Simple Dictionary Test</title>
+</head>
+<body>
+    <h1>Simple Dictionary Structure Test</h1>
+    <pre id="output"></pre>
+    
+    <script>
+        async function test() {
+            const output = document.getElementById('output');
+            
+            try {
+                const response = await fetch('../dict/naist-jdic/sys.dic');
+                const buffer = await response.arrayBuffer();
+                const view = new DataView(buffer);
+                
+                output.textContent = 'Dictionary Structure Test\n\n';
+                
+                // ヘッダーの後の実際のデータを確認
+                output.textContent += 'Checking data after header (offset 108):\n';
+                for (let offset = 108; offset < 2000; offset += 100) {
+                    let hasData = false;
+                    for (let i = 0; i < 20; i++) {
+                        if (view.getUint8(offset + i) !== 0) {
+                            hasData = true;
+                            break;
+                        }
+                    }
+                    if (hasData) {
+                        output.textContent += `\nOffset ${offset} (0x${offset.toString(16)}):\n`;
+                        // 最初の数値を異なる型で読む
+                        output.textContent += `  uint32: ${view.getUint32(offset, true)}\n`;
+                        output.textContent += `  int32: ${view.getInt32(offset, true)}\n`;
+                        output.textContent += `  uint16: ${view.getUint16(offset, true)}, ${view.getUint16(offset+2, true)}\n`;
+                        
+                        // バイト列
+                        output.textContent += '  bytes: ';
+                        for (let i = 0; i < 16; i++) {
+                            output.textContent += view.getUint8(offset + i).toString(16).padStart(2, '0') + ' ';
+                        }
+                        output.textContent += '\n';
+                    }
+                }
+                
+                // DARTS at 1664の検証
+                output.textContent += '\n\nDARTS structure validation at offset 1664:\n';
+                const DARTS_OFFSET = 1664;
+                
+                // Node 0の周辺を詳しく見る
+                output.textContent += 'DARTS Node 0 and surroundings:\n';
+                for (let i = -2; i <= 2; i++) {
+                    const nodeOffset = DARTS_OFFSET + i * 8;
+                    if (nodeOffset >= 0 && nodeOffset + 8 <= buffer.byteLength) {
+                        const base = view.getInt32(nodeOffset, true);
+                        const check = view.getInt32(nodeOffset + 4, true);
+                        output.textContent += `  Node ${i}: base=${base}, check=${check}\n`;
+                    }
+                }
+                
+                // もしかしたらDARTSは違うフォーマット？
+                output.textContent += '\nTrying alternative DARTS interpretations:\n';
+                
+                // 1. base/checkが逆？
+                const base_alt = view.getInt32(DARTS_OFFSET + 4, true);
+                const check_alt = view.getInt32(DARTS_OFFSET, true);
+                output.textContent += `  Swapped: base=${base_alt}, check=${check_alt}\n`;
+                
+                // 2. 16ビット値？
+                const vals16 = [];
+                for (let i = 0; i < 8; i++) {
+                    vals16.push(view.getInt16(DARTS_OFFSET + i * 2, true));
+                }
+                output.textContent += `  As int16 array: [${vals16.join(', ')}]\n`;
+                
+                // 3. check=199の意味を探る
+                output.textContent += '\nInvestigating check=199:\n';
+                output.textContent += `  199 as char: '${String.fromCharCode(199)}'\n`;
+                output.textContent += `  199 in hex: 0x${(199).toString(16)}\n`;
+                output.textContent += `  Nodes with base=199: `;
+                let found199 = [];
+                for (let i = 0; i < 100; i++) {
+                    const base = view.getInt32(DARTS_OFFSET + i * 8, true);
+                    if (base === 199) found199.push(i);
+                }
+                output.textContent += found199.length > 0 ? found199.join(', ') : 'none';
+                output.textContent += '\n';
+                
+            } catch (error) {
+                output.textContent = 'Error: ' + error.message;
+            }
+        }
+        
+        test();
+    </script>
+</body>
+</html>

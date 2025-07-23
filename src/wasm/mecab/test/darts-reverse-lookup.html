@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>DARTS Reverse Lookup</title>
+</head>
+<body>
+    <h1>DARTS Reverse Lookup</h1>
+    <pre id="output"></pre>
+    
+    <script>
+        async function analyze() {
+            const output = document.getElementById('output');
+            
+            try {
+                const response = await fetch('../dict/naist-jdic/sys.dic');
+                const buffer = await response.arrayBuffer();
+                const view = new DataView(buffer);
+                
+                const DARTS_OFFSET = 1664;
+                const TOKEN_OFFSET = DARTS_OFFSET + view.getUint32(24, true);
+                const FEATURE_OFFSET = TOKEN_OFFSET + view.getUint32(28, true);
+                
+                output.textContent = 'DARTS Reverse Lookup\n\n';
+                
+                // Find nodes with negative base (terminal nodes)
+                output.textContent += 'Finding terminal nodes and tracing back:\n\n';
+                
+                let terminalCount = 0;
+                for (let i = 0; i < 5000 && terminalCount < 10; i++) {
+                    const base = view.getInt32(DARTS_OFFSET + i * 8, true);
+                    const check = view.getInt32(DARTS_OFFSET + i * 8 + 4, true);
+                    
+                    if (base < 0) {
+                        const tokenId = -base - 1;
+                        if (tokenId < 100) {  // Look at first 100 tokens
+                            terminalCount++;
+                            output.textContent += `Terminal node ${i}: token_id=${tokenId}, check=${check}\n`;
+                            
+                            // Get token info
+                            const tokenOffset = TOKEN_OFFSET + tokenId * 16;
+                            const featureOffset = view.getUint32(tokenOffset, true);
+                            
+                            // Read feature string
+                            let feature = '';
+                            for (let j = 0; j < 50; j++) {
+                                const byte = view.getUint8(FEATURE_OFFSET + featureOffset + j);
+                                if (byte === 0) break;
+                                feature += String.fromCharCode(byte);
+                            }
+                            output.textContent += `  Feature: ${feature}\n`;
+                            
+                            // Trace back to find path
+                            output.textContent += `  Searching for path to node ${i}:\n`;
+                            
+                            // Find which node can reach this terminal
+                            for (let prevNode = 0; prevNode < 1000; prevNode++) {
+                                const prevBase = view.getInt32(DARTS_OFFSET + prevNode * 8, true);
+                                
+                                // Try all possible bytes
+                                for (let byte = 0; byte < 256; byte++) {
+                                    // Try different formulas
+                                    let t = -1;
+                                    if (prevNode === 0 && prevBase < 0) {
+                                        // Special case for node 0
+                                        t = Math.abs(prevBase) + byte;
+                                    } else {
+                                        // Standard DARTS
+                                        t = prevBase + byte + 1;
+                                    }
+                                    
+                                    if (t === i && check === prevNode) {
+                                        output.textContent += `    → Found: node ${prevNode} + byte 0x${byte.toString(16)} = node ${i}\n`;
+                                        
+                                        // If prevNode is not 0, trace back further
+                                        if (prevNode !== 0) {
+                                            const prevCheck = view.getInt32(DARTS_OFFSET + prevNode * 8 + 4, true);
+                                            output.textContent += `      (node ${prevNode} has check=${prevCheck})\n`;
+                                        }
+                                    }
+                                }
+                            }
+                            output.textContent += '\n';
+                        }
+                    }
+                }
+                
+                // Check the dictionary format more carefully
+                output.textContent += '\nDictionary format investigation:\n';
+                
+                // Look at the gap between header and DARTS
+                output.textContent += '\nData between header (108) and DARTS (1664):\n';
+                
+                // Check if there's a connection matrix
+                const possibleMatrixOffset = 108;
+                const matrixSize1 = view.getUint16(possibleMatrixOffset, true);
+                const matrixSize2 = view.getUint16(possibleMatrixOffset + 2, true);
+                output.textContent += `  Possible matrix at offset 108: ${matrixSize1}x${matrixSize2}\n`;
+                
+                // Check offset 1024
+                const val1024 = view.getUint32(1024, true);
+                output.textContent += `  Value at offset 1024: ${val1024}\n`;
+                
+                // Check for any structures before DARTS
+                for (let offset = 108; offset < 1664; offset += 256) {
+                    let hasData = false;
+                    for (let i = 0; i < 4; i++) {
+                        if (view.getUint32(offset + i * 4, true) !== 0) {
+                            hasData = true;
+                            break;
+                        }
+                    }
+                    if (hasData) {
+                        output.textContent += `  Data found at offset ${offset}: `;
+                        for (let i = 0; i < 4; i++) {
+                            output.textContent += view.getUint32(offset + i * 4, true) + ' ';
+                        }
+                        output.textContent += '\n';
+                    }
+                }
+                
+            } catch (error) {
+                output.textContent = 'Error: ' + error.message;
+            }
+        }
+        
+        analyze();
+    </script>
+</body>
+</html>

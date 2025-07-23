@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>MeCab Dictionary Analyzer</title>
+</head>
+<body>
+    <h1>MeCab Dictionary Format Analyzer</h1>
+    <pre id="output"></pre>
+    
+    <script>
+        async function analyze() {
+            const output = document.getElementById('output');
+            
+            try {
+                const response = await fetch('../dict/naist-jdic/sys.dic');
+                const buffer = await response.arrayBuffer();
+                const view = new DataView(buffer);
+                const uint8 = new Uint8Array(buffer);
+                
+                output.textContent = 'MeCab Dictionary Analysis\n\n';
+                
+                // Read header
+                const header = {
+                    magic: view.getUint32(0, true),
+                    version: view.getUint32(4, true),
+                    type: view.getUint32(8, true),
+                    lexsize: view.getUint32(12, true),
+                    lsize: view.getUint32(16, true),
+                    rsize: view.getUint32(20, true),
+                    dsize: view.getUint32(24, true),
+                    tsize: view.getUint32(28, true),
+                    fsize: view.getUint32(32, true)
+                };
+                
+                output.textContent += 'Header:\n';
+                for (let [key, value] of Object.entries(header)) {
+                    output.textContent += `  ${key}: ${value} (0x${value.toString(16)})\n`;
+                }
+                
+                // Calculate offsets
+                const headerSize = 108;
+                const dartsOffset = 1664; // Discovered offset
+                const tokenOffset = dartsOffset + header.dsize;
+                const featureOffset = tokenOffset + header.tsize;
+                
+                output.textContent += '\nCalculated offsets:\n';
+                output.textContent += `  DARTS: ${dartsOffset} (0x${dartsOffset.toString(16)})\n`;
+                output.textContent += `  Tokens: ${tokenOffset} (0x${tokenOffset.toString(16)})\n`;
+                output.textContent += `  Features: ${featureOffset} (0x${featureOffset.toString(16)})\n`;
+                
+                // Check what's between header and DARTS
+                output.textContent += '\nData between header and DARTS:\n';
+                const gapStart = headerSize;
+                const gapEnd = dartsOffset;
+                const gapSize = gapEnd - gapStart;
+                output.textContent += `  Gap size: ${gapSize} bytes\n`;
+                
+                // Look for patterns in the gap
+                let nonZeroCount = 0;
+                for (let i = gapStart; i < gapEnd && i < gapStart + 100; i++) {
+                    if (uint8[i] !== 0) nonZeroCount++;
+                }
+                output.textContent += `  Non-zero bytes in first 100: ${nonZeroCount}\n`;
+                
+                // Check if it might be another data structure
+                if (gapSize > 0) {
+                    // Check for possible matrix data
+                    const possibleMatrixSize = view.getUint16(gapStart, true);
+                    const possibleMatrixSize2 = view.getUint16(gapStart + 2, true);
+                    output.textContent += `  Possible matrix dimensions at gap start: ${possibleMatrixSize}x${possibleMatrixSize2}\n`;
+                    
+                    // Check for string data
+                    const decoder = new TextDecoder('utf-8', { fatal: false });
+                    const sampleText = decoder.decode(uint8.slice(gapStart, gapStart + 50));
+                    output.textContent += `  Sample text at gap start: ${sampleText.replace(/[\x00-\x1F]/g, '.')}\n`;
+                }
+                
+                // Analyze token structure
+                output.textContent += '\nToken structure analysis:\n';
+                output.textContent += `  Total tokens: ${header.lexsize}\n`;
+                output.textContent += `  Token data size: ${header.tsize} bytes\n`;
+                output.textContent += `  Bytes per token: ${header.tsize / header.lexsize}\n`;
+                
+                // Sample first few tokens
+                output.textContent += '\nFirst 5 tokens (raw bytes):\n';
+                const tokenSize = 16; // Standard MeCab token size
+                for (let i = 0; i < 5 && tokenOffset + i * tokenSize < buffer.byteLength; i++) {
+                    const offset = tokenOffset + i * tokenSize;
+                    output.textContent += `  Token ${i}: `;
+                    for (let j = 0; j < tokenSize && offset + j < buffer.byteLength; j++) {
+                        output.textContent += uint8[offset + j].toString(16).padStart(2, '0') + ' ';
+                    }
+                    output.textContent += '\n';
+                }
+                
+                // Try to find known words in the dictionary
+                output.textContent += '\nSearching for known words in features:\n';
+                const decoder = new TextDecoder('utf-8', { fatal: false });
+                const featureData = uint8.slice(featureOffset, featureOffset + Math.min(1000, header.fsize));
+                const featureText = decoder.decode(featureData);
+                
+                // Look for common words
+                const searchWords = ['名詞', '動詞', '助詞', '今日', '東京'];
+                for (let word of searchWords) {
+                    const index = featureText.indexOf(word);
+                    if (index >= 0) {
+                        output.textContent += `  Found "${word}" at feature offset ${index}\n`;
+                    }
+                }
+                
+            } catch (error) {
+                output.textContent = 'Error: ' + error.message;
+                console.error(error);
+            }
+        }
+        
+        analyze();
+    </script>
+</body>
+</html>
