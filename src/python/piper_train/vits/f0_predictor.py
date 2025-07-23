@@ -54,6 +54,9 @@ class F0Predictor(nn.Module):
             hidden_channels, n_heads, dropout=p_dropout
         )
         
+        # For backward compatibility with existing checkpoints
+        self._use_onnx_attention = True
+        
         # Keep original MultiheadAttention for weight migration (will be removed after migration)
         self._original_attention = nn.MultiheadAttention(
             hidden_channels, n_heads, dropout=p_dropout, batch_first=True
@@ -177,6 +180,62 @@ class F0Predictor(nn.Module):
             # Remove the original attention to save memory
             delattr(self, '_original_attention')
             print("Weight migration completed.")
+    
+    def _load_from_state_dict(
+        self,
+        state_dict,
+        prefix,
+        local_metadata,
+        strict,
+        missing_keys,
+        unexpected_keys,
+        error_msgs,
+    ):
+        """Custom state dict loading to handle attention module changes."""
+        # Check if we're loading from an old checkpoint with MultiheadAttention
+        attention_keys = [k for k in state_dict.keys() if k.startswith(prefix + "attention.")]
+        
+        if any("in_proj_weight" in k for k in attention_keys):
+            # Old checkpoint with MultiheadAttention
+            print(f"Loading F0 Predictor from old checkpoint with MultiheadAttention")
+            
+            # Check weight shape to handle Conv1d vs Linear differences
+            out_proj_key = prefix + "attention.out_proj.weight"
+            if out_proj_key in state_dict:
+                weight_shape = state_dict[out_proj_key].shape
+                if len(weight_shape) == 2:
+                    # Convert Linear weights to Conv1d format (add kernel dimension)
+                    for key in list(state_dict.keys()):
+                        if key.startswith(prefix + "attention.") and key.endswith(".weight"):
+                            if len(state_dict[key].shape) == 2:
+                                state_dict[key] = state_dict[key].unsqueeze(-1)
+            
+            # Temporarily replace attention with MultiheadAttention for loading
+            old_attention = self.attention
+            self.attention = nn.MultiheadAttention(
+                self.hidden_channels, 2, dropout=0.1, batch_first=True
+            )
+            
+            # Load the state dict
+            super()._load_from_state_dict(
+                state_dict, prefix, local_metadata, strict,
+                missing_keys, unexpected_keys, error_msgs
+            )
+            
+            # Migrate weights to ONNX-friendly attention
+            print("Migrating F0 Predictor attention weights to ONNX-friendly format...")
+            old_attention.migrate_from_multihead_attention(self.attention)
+            
+            # Restore ONNX-friendly attention
+            self._original_attention = self.attention
+            self.attention = old_attention
+            print("Migration completed.")
+        else:
+            # New checkpoint or already migrated
+            super()._load_from_state_dict(
+                state_dict, prefix, local_metadata, strict,
+                missing_keys, unexpected_keys, error_msgs
+            )
 
     def _bins_to_f0(self, f0_bins):
         """Convert discrete F0 bins to continuous F0 values."""
