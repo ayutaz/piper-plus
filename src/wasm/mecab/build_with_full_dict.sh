@@ -48,8 +48,8 @@ set(MECAB_SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../src)
 # Include directories
 include_directories(${MECAB_SRC_DIR})
 
-# Create simple test source if main sources don't exist
-if(NOT EXISTS "${MECAB_SRC_DIR}/mecab_wrapper.cpp")
+# Always use our stub implementation for now
+if(TRUE)  # Force using stub
     file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/mecab_stub.cpp" "
 #include <emscripten/bind.h>
 #include <string>
