@@ -53,15 +53,15 @@ class F0Predictor(nn.Module):
         self.attention = ONNXFriendlyAttention(
             hidden_channels, n_heads, dropout=p_dropout
         )
-        
+
         # For backward compatibility with existing checkpoints
         self._use_onnx_attention = True
-        
+
         # Keep original MultiheadAttention for weight migration (will be removed after migration)
         self._original_attention = nn.MultiheadAttention(
             hidden_channels, n_heads, dropout=p_dropout, batch_first=True
         )
-        
+
         # Alternative conv path for fallback (keep for compatibility)
         self.context_conv = nn.Sequential(
             nn.Conv1d(hidden_channels, hidden_channels, kernel_size=3, padding=1),
@@ -101,7 +101,7 @@ class F0Predictor(nn.Module):
     def forward(self, x, x_mask=None, prosody_ids=None, g=None, use_conv=False):
         """
         Forward pass with ONNX-friendly attention.
-        
+
         Args:
             x: Input features [B, hidden_channels, T]
             x_mask: Mask for valid positions [B, 1, T]
@@ -149,7 +149,7 @@ class F0Predictor(nn.Module):
         if x_mask is not None:
             # Convert mask from [B, 1, T] to [B, T] and invert (True = padding)
             key_padding_mask = (x_mask.squeeze(1) == 0)
-        
+
         x_att = self.attention(x, key_padding_mask)
         x = x + x_att
 
@@ -168,7 +168,7 @@ class F0Predictor(nn.Module):
             variance = variance * x_mask
 
         return f0_prediction, f0_values, variance
-    
+
     def migrate_attention_weights(self):
         """
         Migrate weights from original MultiheadAttention to ONNX-friendly attention.
@@ -180,7 +180,7 @@ class F0Predictor(nn.Module):
             # Remove the original attention to save memory
             delattr(self, '_original_attention')
             print("Weight migration completed.")
-    
+
     def _load_from_state_dict(
         self,
         state_dict,
@@ -194,11 +194,11 @@ class F0Predictor(nn.Module):
         """Custom state dict loading to handle attention module changes."""
         # Check if we're loading from an old checkpoint with MultiheadAttention
         attention_keys = [k for k in state_dict.keys() if k.startswith(prefix + "attention.")]
-        
+
         if any("in_proj_weight" in k for k in attention_keys):
             # Old checkpoint with MultiheadAttention
-            print(f"Loading F0 Predictor from old checkpoint with MultiheadAttention")
-            
+            print("Loading F0 Predictor from old checkpoint with MultiheadAttention")
+
             # Check weight shape to handle Conv1d vs Linear differences
             out_proj_key = prefix + "attention.out_proj.weight"
             if out_proj_key in state_dict:
@@ -209,23 +209,23 @@ class F0Predictor(nn.Module):
                         if key.startswith(prefix + "attention.") and key.endswith(".weight"):
                             if len(state_dict[key].shape) == 2:
                                 state_dict[key] = state_dict[key].unsqueeze(-1)
-            
+
             # Temporarily replace attention with MultiheadAttention for loading
             old_attention = self.attention
             self.attention = nn.MultiheadAttention(
                 self.hidden_channels, 2, dropout=0.1, batch_first=True
             )
-            
+
             # Load the state dict
             super()._load_from_state_dict(
                 state_dict, prefix, local_metadata, strict,
                 missing_keys, unexpected_keys, error_msgs
             )
-            
+
             # Migrate weights to ONNX-friendly attention
             print("Migrating F0 Predictor attention weights to ONNX-friendly format...")
             old_attention.migrate_from_multihead_attention(self.attention)
-            
+
             # Restore ONNX-friendly attention
             self._original_attention = self.attention
             self.attention = old_attention

@@ -120,12 +120,11 @@ def main() -> None:
     model_g = model.model_g
 
     num_symbols = model_g.n_vocab
-    num_speakers = model_g.n_speakers
 
     # Enable F0 predictor with ONNX-friendly attention
     model_g.onnx_export_mode = True
     model_g.skip_f0_predictor = False  # Enable F0 predictor with new attention
-    
+
     # Migrate F0 predictor attention weights from MultiheadAttention to ONNX-friendly version
     if hasattr(model_g, 'f0_predictor') and hasattr(model_g.f0_predictor, 'migrate_attention_weights'):
         print("Migrating F0 Predictor attention weights for ONNX compatibility...")
@@ -216,7 +215,7 @@ def main() -> None:
 
     # noise, noise_w, length
     scales = torch.FloatTensor([0.667, 1.0, 0.8])
-    
+
     # Add prosody_ids for Japanese models
     prosody_ids = torch.randint(
         low=0, high=15, size=(1, dummy_input_length), dtype=torch.long
