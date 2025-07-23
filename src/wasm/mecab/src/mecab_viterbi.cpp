@@ -444,46 +444,100 @@ private:
         static bool tested[4] = {false, false, false, false};
         
         // Only debug first attempt of each algorithm
-        bool debug = !tested[algorithm];
+        bool debug = !tested[algorithm] && pos == 0;
         if (debug) {
             tested[algorithm] = true;
-            std::cout << "\nTrying DARTS algorithm " << algorithm << " at pos " << pos << std::endl;
+            std::cout << "\nDARTS lookup at pos " << pos << " for: ";
+            for (size_t i = 0; i < remain && i < 10; i++) {
+                std::cout << std::hex << (int)key[i] << " ";
+            }
+            std::cout << std::dec << std::endl;
+            
+            // Show what we're looking for
+            if (remain >= 3) {
+                if (key[0] == 0xe4 && key[1] == 0xbb && key[2] == 0x8a) {
+                    std::cout << "  Looking for: 今 (e4 bb 8a)" << std::endl;
+                } else if (key[0] == 0xe7 && key[1] == 0xa7 && key[2] == 0x81) {
+                    std::cout << "  Looking for: 私 (e7 a7 81)" << std::endl;
+                } else if (key[0] == 0xe6 && key[1] == 0x9d && key[2] == 0xb1) {
+                    std::cout << "  Looking for: 東 (e6 9d b1)" << std::endl;
+                }
+            }
         }
         
-        // Algorithm 0: Standard DARTS from node 1 (skip node 0)
+        // Algorithm 0: Improved DARTS with both node 0 and node 1
         if (algorithm == 0) {
-            size_t node_pos = 1;  // Start from node 1 instead of 0
-            size_t key_pos = 0;
-            
-            while (key_pos < remain) {
-                unsigned char c = key[key_pos];
+            // Try both node 0 and node 1 as starting points
+            for (int start_node = 0; start_node <= 1; start_node++) {
+                size_t node_pos = start_node;
+                size_t key_pos = 0;
                 
-                if (node_pos >= darts.size()) break;
-                
-                int32_t base = darts[node_pos].base;
-                
-                // Standard DARTS: t = base + c + 1
-                int32_t t = base + static_cast<int32_t>(c) + 1;
-                if (t < 0 || t >= static_cast<int32_t>(darts.size())) break;
-                
-                if (darts[t].check == static_cast<int32_t>(node_pos)) {
-                    // Valid transition
-                    node_pos = static_cast<size_t>(t);
-                    key_pos++;
+                while (key_pos < remain) {
+                    unsigned char c = key[key_pos];
                     
-                    // Check if new node is terminal
-                    if (darts[t].base < 0) {
-                        size_t token_id = static_cast<size_t>(-darts[t].base - 1);
-                        if (token_id < tokens.size()) {
-                            results.push_back({token_id, key_pos});
-                            if (debug) {
-                                std::cout << "  Found match at pos " << key_pos 
-                                          << ", token_id=" << token_id << std::endl;
+                    if (node_pos >= darts.size()) break;
+                    
+                    int32_t base = darts[node_pos].base;
+                    
+                    // Calculate next node
+                    int32_t t = -1;
+                    
+                    if (node_pos == 0 && base < 0) {
+                        // Special handling for node 0 with negative base
+                        // Try direct mapping first
+                        t = static_cast<int32_t>(c);
+                        
+                        if (debug && key_pos == 0) {
+                            std::cout << "  Node 0 special: byte=" << std::hex << (int)c 
+                                      << ", trying t=" << std::dec << t << std::endl;
+                        }
+                        
+                        // Validate the transition
+                        if (t >= static_cast<int32_t>(darts.size()) || 
+                            darts[t].check != static_cast<int32_t>(node_pos)) {
+                            if (debug && key_pos == 0) {
+                                std::cout << "    Failed: ";
+                                if (t < static_cast<int32_t>(darts.size())) {
+                                    std::cout << "check[" << t << "]=" << darts[t].check 
+                                              << " != " << node_pos << std::endl;
+                                } else {
+                                    std::cout << "t out of bounds" << std::endl;
+                                }
+                            }
+                            // If direct mapping fails, skip to node 1
+                            node_pos = 1;
+                            continue;
+                        }
+                    } else {
+                        // Standard DARTS formula
+                        t = base + static_cast<int32_t>(c) + 1;
+                    }
+                    
+                    // Check bounds
+                    if (t < 0 || t >= static_cast<int32_t>(darts.size())) break;
+                    
+                    // Validate transition
+                    if (darts[t].check == static_cast<int32_t>(node_pos)) {
+                        // Valid transition
+                        node_pos = static_cast<size_t>(t);
+                        key_pos++;
+                        
+                        // Check if terminal node
+                        if (darts[t].base < 0) {
+                            size_t token_id = static_cast<size_t>(-darts[t].base - 1);
+                            if (token_id < tokens.size()) {
+                                results.push_back({token_id, key_pos});
+                                if (debug) {
+                                    std::cout << "  Found match from node " << start_node
+                                              << ", length " << key_pos
+                                              << ", token_id=" << token_id << std::endl;
+                                }
                             }
                         }
+                    } else {
+                        // No valid transition
+                        break;
                     }
-                } else {
-                    break;
                 }
             }
         }

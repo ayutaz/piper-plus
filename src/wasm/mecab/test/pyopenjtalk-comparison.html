@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>PyOpenJTalk Comparison Test</title>
+    <style>
+        body { font-family: sans-serif; margin: 20px; }
+        .match { background: #d4edda; }
+        .mismatch { background: #f8d7da; }
+        .comparison { margin: 20px 0; border: 1px solid #ddd; padding: 10px; }
+        pre { background: #f5f5f5; padding: 10px; margin: 5px 0; }
+        .summary { background: #cfe2ff; padding: 15px; margin: 20px 0; }
+    </style>
+</head>
+<body>
+    <h1>PyOpenJTalkとの精度比較</h1>
+    <div id="status">Loading...</div>
+    <div id="summary"></div>
+    <div id="results"></div>
+    
+    <script type="module">
+        import { MeCabFull } from '../dist_full/mecab-full.js';
+        
+        // PyOpenJTalk expected results (from previous testing)
+        const pyOpenJTalkResults = {
+            '今日は良い天気です': [
+                '今日\t名詞,時相関係,*,*,*,*,今日,キョウ,キョー',
+                'は\t助詞,係助詞,*,*,*,*,は,ワ,ワ',
+                '良い\t形容詞,自立,*,*,形容詞・イイ,基本形,良い,ヨイ,ヨイ',
+                '天気\t名詞,一般,*,*,*,*,天気,テンキ,テンキ',
+                'です\t助動詞,*,*,*,特殊・デス,基本形,です,デス,デス'
+            ],
+            '私は日本人です': [
+                '私\t名詞,代名詞,一般,*,*,*,私,ワタシ,ワタシ',
+                'は\t助詞,係助詞,*,*,*,*,は,ワ,ワ',
+                '日本\t名詞,固有名詞,地域,国,*,*,日本,ニッポン,ニッポン',
+                '人\t名詞,接尾,一般,*,*,*,人,ジン,ジン',
+                'です\t助動詞,*,*,*,特殊・デス,基本形,です,デス,デス'
+            ],
+            '東京スカイツリー': [
+                '東京\t名詞,固有名詞,地域,一般,*,*,東京,トウキョウ,トーキョー',
+                'スカイ\t名詞,一般,*,*,*,*,スカイ,スカイ,スカイ',
+                'ツリー\t名詞,一般,*,*,*,*,ツリー,ツリー,ツリー'
+            ],
+            'すもももももももものうち': [
+                'すもも\t名詞,一般,*,*,*,*,すもも,スモモ,スモモ',
+                'も\t助詞,係助詞,*,*,*,*,も,モ,モ',
+                'もも\t名詞,一般,*,*,*,*,もも,モモ,モモ',
+                'も\t助詞,係助詞,*,*,*,*,も,モ,モ',
+                'もも\t名詞,一般,*,*,*,*,もも,モモ,モモ',
+                'の\t助詞,連体化,*,*,*,*,の,ノ,ノ',
+                'うち\t名詞,非自立,副詞可能,*,*,*,うち,ウチ,ウチ'
+            ]
+        };
+        
+        async function runComparison() {
+            const statusEl = document.getElementById('status');
+            const summaryEl = document.getElementById('summary');
+            const resultsEl = document.getElementById('results');
+            
+            try {
+                const mecab = new MeCabFull();
+                
+                statusEl.textContent = 'Initializing MeCab...';
+                await mecab.initialize({
+                    basePath: '../dist_full/'
+                });
+                
+                statusEl.textContent = 'Running comparison tests...';
+                
+                let totalWords = 0;
+                let matchedWords = 0;
+                let matchedPOS = 0;
+                
+                for (const [text, expected] of Object.entries(pyOpenJTalkResults)) {
+                    const compDiv = document.createElement('div');
+                    compDiv.className = 'comparison';
+                    compDiv.innerHTML = `<h3>Input: "${text}"</h3>`;
+                    
+                    // Parse with our implementation
+                    const result = mecab.parse(text);
+                    const lines = result.split('\n').filter(l => l && l !== 'EOS');
+                    
+                    // Compare results
+                    const table = document.createElement('table');
+                    table.innerHTML = '<tr><th>Word</th><th>Expected (PyOpenJTalk)</th><th>Actual (Our Implementation)</th><th>Match</th></tr>';
+                    
+                    const maxLen = Math.max(expected.length, lines.length);
+                    
+                    for (let i = 0; i < maxLen; i++) {
+                        const row = document.createElement('tr');
+                        totalWords++;
+                        
+                        if (i < expected.length && i < lines.length) {
+                            const expParts = expected[i].split('\t');
+                            const actParts = lines[i].split('\t');
+                            
+                            const expWord = expParts[0];
+                            const actWord = actParts[0];
+                            const expPOS = expParts[1].split(',')[0];
+                            const actPOS = actParts[1] ? actParts[1].split(',')[0] : '';
+                            
+                            const wordMatch = expWord === actWord;
+                            const posMatch = expPOS === actPOS;
+                            
+                            if (wordMatch) matchedWords++;
+                            if (posMatch) matchedPOS++;
+                            
+                            row.className = wordMatch ? 'match' : 'mismatch';
+                            row.innerHTML = `
+                                <td>${actWord}</td>
+                                <td>${expParts[1]}</td>
+                                <td>${actParts[1] || 'N/A'}</td>
+                                <td>${wordMatch ? '✓' : '✗'} ${posMatch ? '(POS ✓)' : '(POS ✗)'}</td>
+                            `;
+                        } else if (i < expected.length) {
+                            row.className = 'mismatch';
+                            row.innerHTML = `<td>-</td><td>${expected[i]}</td><td>Missing</td><td>✗</td>`;
+                        } else {
+                            row.className = 'mismatch';
+                            row.innerHTML = `<td>${lines[i].split('\t')[0]}</td><td>-</td><td>${lines[i]}</td><td>Extra</td>`;
+                        }
+                        
+                        table.appendChild(row);
+                    }
+                    
+                    compDiv.appendChild(table);
+                    resultsEl.appendChild(compDiv);
+                }
+                
+                // Summary
+                const wordAccuracy = ((matchedWords / totalWords) * 100).toFixed(1);
+                const posAccuracy = ((matchedPOS / totalWords) * 100).toFixed(1);
+                
+                summaryEl.innerHTML = `
+                    <h2>精度サマリー</h2>
+                    <p>総単語数: ${totalWords}</p>
+                    <p>単語境界一致率: ${matchedWords}/${totalWords} (${wordAccuracy}%)</p>
+                    <p>品詞一致率: ${matchedPOS}/${totalWords} (${posAccuracy}%)</p>
+                    <hr>
+                    <p><strong>結論:</strong> 
+                    ${wordAccuracy > 90 ? 'PyOpenJTalkに近い精度を達成！' : 
+                     wordAccuracy > 70 ? '良好な精度ですが、改善の余地があります。' :
+                     '精度向上のため、さらなる調整が必要です。'}</p>
+                `;
+                
+                statusEl.textContent = 'Comparison completed!';
+                
+            } catch (error) {
+                statusEl.textContent = 'Error: ' + error.message;
+                console.error(error);
+            }
+        }
+        
+        runComparison();
+    </script>
+</body>
+</html>
