@@ -48,8 +48,10 @@ set(MECAB_SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../src)
 # Include directories
 include_directories(${MECAB_SRC_DIR})
 
-# Always use our stub implementation for now
-if(TRUE)  # Force using stub
+# Use full implementation if available
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../src/mecab_full.cpp")
+    set(SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/../src/mecab_full.cpp")
+else()
     file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/mecab_stub.cpp" "
 #include <emscripten/bind.h>
 #include <string>
@@ -109,8 +111,6 @@ EMSCRIPTEN_BINDINGS(mecab_module) {
 }
 ")
     set(SOURCES "${CMAKE_CURRENT_BINARY_DIR}/mecab_stub.cpp")
-else()
-    set(SOURCES "${MECAB_SRC_DIR}/mecab_wrapper.cpp")
 endif()
 
 # Create executable
