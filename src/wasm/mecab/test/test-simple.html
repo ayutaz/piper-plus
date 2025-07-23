@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MeCab Simple Test</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans JP', sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .success { background: #e8f5e9; color: #2e7d32; }
+        .error { background: #ffebee; color: #c62828; }
+        .info { background: #e3f2fd; color: #1976d2; }
+        pre {
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>MeCab Simple Test</h1>
+    
+    <div id="log"></div>
+    
+    <script type="module">
+        const log = (message, type = 'info') => {
+            const logDiv = document.getElementById('log');
+            const entry = document.createElement('div');
+            entry.className = `status ${type}`;
+            entry.textContent = message;
+            logDiv.appendChild(entry);
+            console.log(message);
+        };
+        
+        const testMeCab = async () => {
+            try {
+                // Test 1: Load module directly
+                log('Test 1: Loading MeCab module directly...');
+                const MeCabModule = (await import('../dist/mecab_wasm.js')).default;
+                
+                const module = await MeCabModule({
+                    locateFile: (path) => {
+                        log(`Locating file: ${path}`);
+                        if (path.endsWith('.wasm')) {
+                            return '../dist/mecab_wasm.wasm';
+                        }
+                        if (path.endsWith('.data')) {
+                            return '../dist/mecab_wasm.data';
+                        }
+                        return path;
+                    }
+                });
+                
+                log('Module loaded successfully', 'success');
+                
+                // Check available exports
+                log('Available module exports:');
+                const exports = Object.keys(module);
+                const pre = document.createElement('pre');
+                pre.textContent = JSON.stringify(exports.sort(), null, 2);
+                document.getElementById('log').appendChild(pre);
+                
+                // Check for FS
+                if (module.FS) {
+                    log('FS is available!', 'success');
+                    
+                    // Test FS operations
+                    try {
+                        module.FS.mkdir('/test');
+                        module.FS.writeFile('/test/hello.txt', 'Hello from FS!');
+                        const content = module.FS.readFile('/test/hello.txt', { encoding: 'utf8' });
+                        log(`FS test successful: ${content}`, 'success');
+                    } catch (e) {
+                        log(`FS test failed: ${e.message}`, 'error');
+                    }
+                } else {
+                    log('FS is NOT available', 'error');
+                }
+                
+                // Test 2: Create MeCab instance
+                log('\nTest 2: Creating MeCab instance...');
+                if (module.MeCab) {
+                    const mecab = new module.MeCab();
+                    log('MeCab instance created', 'success');
+                    
+                    // Initialize
+                    const initResult = mecab.initialize('');
+                    log(`Initialize result: ${initResult}`, initResult ? 'success' : 'error');
+                    
+                    // Test parsing
+                    if (initResult) {
+                        const testText = 'こんにちは世界';
+                        const result = mecab.parse(testText);
+                        log('Parse test:', 'info');
+                        const resultPre = document.createElement('pre');
+                        resultPre.textContent = result;
+                        document.getElementById('log').appendChild(resultPre);
+                    }
+                } else {
+                    log('MeCab class not found', 'error');
+                }
+                
+            } catch (error) {
+                log(`Error: ${error.message}`, 'error');
+                console.error(error);
+            }
+        };
+        
+        // Run test
+        testMeCab();
+    </script>
+</body>
+</html>

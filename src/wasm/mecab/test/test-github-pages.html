@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MeCab for GitHub Pages / Unity WebGL</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans JP', sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        .deployment-info {
+            background: #e8f5e9;
+            border: 1px solid #4caf50;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+        .status {
+            padding: 10px 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            font-weight: 500;
+        }
+        .status.loading {
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+        .status.success {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+        .status.error {
+            background: #ffebee;
+            color: #c62828;
+        }
+        .dict-status {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 3px;
+            font-size: 14px;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+        .dict-status.full {
+            background: #4caf50;
+            color: white;
+        }
+        .dict-status.minimal {
+            background: #ff9800;
+            color: white;
+        }
+        .progress-container {
+            background: #f0f0f0;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            display: none;
+        }
+        .progress-bar-container {
+            width: 100%;
+            height: 30px;
+            background: #ddd;
+            border-radius: 15px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #2196f3 0%, #21cbf3 100%);
+            width: 0%;
+            transition: width 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+        }
+        .progress-info {
+            text-align: center;
+            margin-top: 10px;
+            color: #666;
+        }
+        .cache-info {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+            display: none;
+        }
+        textarea {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+            resize: vertical;
+        }
+        button {
+            background: #2196f3;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-top: 10px;
+            margin-right: 10px;
+        }
+        button:hover {
+            background: #1976d2;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        button.load-dict {
+            background: #4caf50;
+        }
+        button.load-dict:hover {
+            background: #388e3c;
+        }
+        button.clear-cache {
+            background: #f44336;
+        }
+        button.clear-cache:hover {
+            background: #d32f2f;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f5f5f5;
+            border-radius: 4px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            overflow-x: auto;
+        }
+        .unity-info {
+            background: #e3f2fd;
+            border: 1px solid #2196f3;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 20px 0;
+        }
+        code {
+            background: #f5f5f5;
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🌐 MeCab for GitHub Pages / Unity WebGL</h1>
+        
+        <div class="deployment-info">
+            <strong>✅ 完全にクライアントサイドで動作</strong>
+            <ul>
+                <li>サーバー不要 - GitHub PagesやUnity WebGLで直接動作</li>
+                <li>IndexedDBによる辞書キャッシュ（2回目以降は高速）</li>
+                <li>プログレッシブエンハンスメント（段階的機能向上）</li>
+                <li>CDN対応 - 辞書ファイルを任意のCDNから配信可能</li>
+            </ul>
+        </div>
+        
+        <div id="status" class="status loading">
+            MeCabを初期化中...
+        </div>
+        
+        <div id="dictStatus" style="margin: 20px 0;">
+            現在のモード: <span id="currentMode" class="dict-status minimal">最小辞書</span>
+            <button id="loadDictBtn" class="load-dict" onclick="loadFullDictionary()" style="display: none;">
+                完全辞書を読み込む（約100MB）
+            </button>
+        </div>
+        
+        <div id="cacheInfo" class="cache-info"></div>
+        
+        <div id="progressContainer" class="progress-container">
+            <h3>辞書をダウンロード中...</h3>
+            <div class="progress-bar-container">
+                <div id="progressBar" class="progress-bar">0%</div>
+            </div>
+            <div id="progressInfo" class="progress-info">準備中...</div>
+        </div>
+        
+        <div>
+            <h2>テキスト解析</h2>
+            <textarea id="input" rows="5" placeholder="解析したい日本語テキストを入力してください">
+今日は良い天気ですね。桜が綺麗に咲いています。
+私は昨日、友達と一緒に公園へ行きました。
+機械学習は面白い分野です。
+東京スカイツリーは634メートルの高さがあります。
+人工知能技術の発展は目覚ましいものがあります。</textarea>
+            <br>
+            <button id="parseBtn" onclick="parseText()" disabled>解析</button>
+            <button id="readingBtn" onclick="getReading()" disabled>読み取得</button>
+            <button id="wakatiBtn" onclick="parseWakati()" disabled>分かち書き</button>
+            <button id="clearCacheBtn" class="clear-cache" onclick="clearCache()">キャッシュクリア</button>
+        </div>
+        
+        <div id="result"></div>
+    </div>
+    
+    <div class="container">
+        <h2>Unity WebGL 統合ガイド</h2>
+        <div class="unity-info">
+            <h3>Unity WebGLでの使用方法:</h3>
+            <ol>
+                <li><strong>ビルド設定</strong>
+                    <pre><code>Player Settings > Publishing Settings > Compression Format: Gzip
+Player Settings > Publishing Settings > Decompression Fallback: ON</code></pre>
+                </li>
+                <li><strong>WebGLテンプレート</strong>でこのHTMLを参照</li>
+                <li><strong>jslib</strong>でMeCab関数をエクスポート:
+                    <pre><code>mergeInto(LibraryManager.library, {
+    MeCabParse: function(textPtr) {
+        const text = UTF8ToString(textPtr);
+        const result = window.mecab.parse(text);
+        return allocateUTF8(result);
+    }
+});</code></pre>
+                </li>
+                <li><strong>C#</strong>から呼び出し:
+                    <pre><code>[DllImport("__Internal")]
+private static extern string MeCabParse(string text);</code></pre>
+                </li>
+            </ol>
+        </div>
+    </div>
+    
+    <div class="container">
+        <h2>GitHub Pages デプロイ手順</h2>
+        <ol>
+            <li>このディレクトリをGitHubリポジトリにプッシュ</li>
+            <li>Settings → Pages → Source: Deploy from a branch</li>
+            <li>辞書ファイルは <code>dict/naist-jdic/</code> に配置</li>
+            <li>gzip圧縮版（.gz）を用意すると転送量を削減可能</li>
+        </ol>
+    </div>
+
+    <script type="module">
+        import { MeCabMemoryDict } from '../dist/mecab-memory-dict.js';
+        
+        let mecab = null;
+        let isInitialized = false;
+        
+        async function initialize() {
+            const statusEl = document.getElementById('status');
+            
+            try {
+                console.log('Initializing MeCab for GitHub Pages...');
+                
+                mecab = new MeCabMemoryDict();
+                
+                // GitHub Pages用の設定
+                const baseUrl = window.location.origin + window.location.pathname.replace(/[^/]*$/, '');
+                
+                await mecab.initialize({
+                    wasmPath: '../dist/mecab_wasm.wasm',
+                    dataPath: '../dist/mecab_wasm.data',
+                    cdnUrl: baseUrl, // または外部CDN URL
+                    onDictionaryProgress: onDictionaryProgress
+                });
+                
+                statusEl.className = 'status success';
+                statusEl.innerHTML = '✅ MeCab初期化完了（最小辞書モード）';
+                
+                // Enable buttons
+                document.getElementById('parseBtn').disabled = false;
+                document.getElementById('readingBtn').disabled = false;
+                document.getElementById('wakatiBtn').disabled = false;
+                document.getElementById('loadDictBtn').style.display = 'inline-block';
+                
+                isInitialized = true;
+                
+                // Check cache
+                await updateCacheInfo();
+                
+                // Test parse
+                const testResult = mecab.parse('テスト');
+                console.log('Test parse result:', testResult);
+                
+                // Make mecab global for Unity
+                window.mecab = mecab;
+                
+            } catch (error) {
+                console.error('Initialization error:', error);
+                statusEl.className = 'status error';
+                statusEl.innerHTML = '❌ 初期化エラー: ' + error.message;
+            }
+        }
+        
+        function onDictionaryProgress(percent, message) {
+            const progressContainer = document.getElementById('progressContainer');
+            const progressBar = document.getElementById('progressBar');
+            const progressInfo = document.getElementById('progressInfo');
+            
+            progressContainer.style.display = 'block';
+            progressBar.style.width = percent + '%';
+            progressBar.textContent = percent + '%';
+            progressInfo.textContent = message;
+            
+            if (percent === 100) {
+                setTimeout(() => {
+                    progressContainer.style.display = 'none';
+                    updateDictionaryStatus();
+                    updateCacheInfo();
+                    
+                    const statusEl = document.getElementById('status');
+                    statusEl.className = 'status success';
+                    statusEl.innerHTML = '✅ 完全辞書の読み込みが完了しました！';
+                }, 1000);
+            }
+        }
+        
+        function updateDictionaryStatus() {
+            const modeEl = document.getElementById('currentMode');
+            const loadBtn = document.getElementById('loadDictBtn');
+            
+            if (mecab.isUsingFullDictionary()) {
+                modeEl.textContent = '完全辞書（NAIST-JDIC）';
+                modeEl.className = 'dict-status full';
+                loadBtn.style.display = 'none';
+            } else {
+                modeEl.textContent = '最小辞書';
+                modeEl.className = 'dict-status minimal';
+                loadBtn.style.display = 'inline-block';
+            }
+        }
+        
+        async function updateCacheInfo() {
+            const { dictionaryLoader } = await import('../dist/dictionary-loader-cdn.js');
+            const cacheSize = await dictionaryLoader.getCacheSize();
+            
+            const cacheInfoEl = document.getElementById('cacheInfo');
+            if (cacheSize > 0) {
+                cacheInfoEl.style.display = 'block';
+                cacheInfoEl.innerHTML = `
+                    💾 キャッシュサイズ: ${(cacheSize / 1024 / 1024).toFixed(2)} MB
+                    <br>
+                    <small>2回目以降の読み込みはキャッシュから高速に行われます</small>
+                `;
+            }
+        }
+        
+        window.loadFullDictionary = async function() {
+            const loadBtn = document.getElementById('loadDictBtn');
+            loadBtn.disabled = true;
+            loadBtn.textContent = '読み込み中...';
+            
+            try {
+                await mecab.loadDictionaryAsync(onDictionaryProgress);
+            } catch (error) {
+                console.error('Dictionary loading failed:', error);
+                const statusEl = document.getElementById('status');
+                statusEl.className = 'status error';
+                statusEl.innerHTML = '❌ 辞書の読み込みに失敗しました: ' + error.message;
+            }
+            
+            loadBtn.disabled = false;
+            loadBtn.textContent = '完全辞書を読み込む（約100MB）';
+        };
+        
+        window.parseText = async function() {
+            if (!isInitialized) return;
+            
+            const input = document.getElementById('input').value;
+            const resultEl = document.getElementById('result');
+            
+            try {
+                const result = await mecab.parse(input);
+                const mode = mecab.isUsingFullDictionary() ? '（完全辞書）' : '（最小辞書）';
+                resultEl.innerHTML = `<h3>解析結果 ${mode}:</h3><div class="result">${escapeHtml(result)}</div>`;
+            } catch (error) {
+                resultEl.innerHTML = '<div class="status error">エラー: ' + error.message + '</div>';
+            }
+        };
+        
+        window.getReading = async function() {
+            if (!isInitialized) return;
+            
+            const input = document.getElementById('input').value;
+            const resultEl = document.getElementById('result');
+            
+            try {
+                const reading = mecab.getReading(input);
+                const mode = mecab.isUsingFullDictionary() ? '（完全辞書）' : '（最小辞書）';
+                resultEl.innerHTML = `<h3>読み ${mode}:</h3><div class="result">${escapeHtml(reading)}</div>`;
+            } catch (error) {
+                resultEl.innerHTML = '<div class="status error">エラー: ' + error.message + '</div>';
+            }
+        };
+        
+        window.parseWakati = function() {
+            if (!isInitialized) return;
+            
+            const input = document.getElementById('input').value;
+            const resultEl = document.getElementById('result');
+            
+            try {
+                const result = mecab.wakati(input);
+                const mode = mecab.isUsingFullDictionary() ? '（完全辞書）' : '（最小辞書）';
+                resultEl.innerHTML = `<h3>分かち書き結果 ${mode}:</h3><div class="result">${escapeHtml(result)}</div>`;
+            } catch (error) {
+                resultEl.innerHTML = '<div class="status error">エラー: ' + error.message + '</div>';
+            }
+        };
+        
+        window.clearCache = async function() {
+            if (confirm('辞書のキャッシュをクリアしますか？\n次回読み込み時は再ダウンロードが必要になります。')) {
+                const { dictionaryLoader } = await import('../dist/dictionary-loader-cdn.js');
+                await dictionaryLoader.clearCache();
+                await updateCacheInfo();
+                alert('キャッシュをクリアしました');
+            }
+        };
+        
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        // Initialize on load
+        initialize();
+    </script>
+</body>
+</html>

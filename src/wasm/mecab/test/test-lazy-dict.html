@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MeCab with Lazy Dictionary Loading</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans JP', sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        .status {
+            padding: 10px 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            font-weight: 500;
+        }
+        .status.loading {
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+        .status.success {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+        .status.error {
+            background: #ffebee;
+            color: #c62828;
+        }
+        .dict-status {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 3px;
+            font-size: 14px;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+        .dict-status.fallback {
+            background: #ff9800;
+            color: white;
+        }
+        .dict-status.full {
+            background: #4caf50;
+            color: white;
+        }
+        .progress-container {
+            background: #f0f0f0;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            display: none;
+        }
+        .progress-bar-container {
+            width: 100%;
+            height: 30px;
+            background: #ddd;
+            border-radius: 15px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #2196f3 0%, #21cbf3 100%);
+            width: 0%;
+            transition: width 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+        }
+        .progress-info {
+            text-align: center;
+            margin-top: 10px;
+            color: #666;
+        }
+        textarea {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+            resize: vertical;
+        }
+        button {
+            background: #2196f3;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-top: 10px;
+            margin-right: 10px;
+        }
+        button:hover {
+            background: #1976d2;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        button.load-dict {
+            background: #4caf50;
+        }
+        button.load-dict:hover {
+            background: #388e3c;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f5f5f5;
+            border-radius: 4px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            overflow-x: auto;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background: #e0e0e0;
+            font-weight: bold;
+        }
+        tr:nth-child(even) {
+            background: #f9f9f9;
+        }
+        .info-box {
+            background: #e3f2fd;
+            border: 1px solid #2196f3;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 MeCab with Lazy Dictionary Loading</h1>
+        
+        <div id="status" class="status loading">
+            MeCabを初期化中...
+        </div>
+        
+        <div class="info-box">
+            <strong>遅延ローディング方式</strong>
+            <ul>
+                <li>初期起動は簡易辞書（フォールバック）モードで高速に開始</li>
+                <li>「完全辞書を読み込む」ボタンで NAIST-JDIC（98MB）をバックグラウンドでダウンロード</li>
+                <li>IndexedDB にキャッシュされるため、2回目以降は高速</li>
+                <li>辞書読み込み完了後、自動的に高精度モードに切り替わります</li>
+            </ul>
+        </div>
+        
+        <div id="dictStatus" style="margin: 20px 0;">
+            現在のモード: <span id="currentMode" class="dict-status fallback">フォールバック（簡易辞書）</span>
+            <button id="loadDictBtn" class="load-dict" onclick="loadFullDictionary()" style="display: none;">
+                完全辞書を読み込む
+            </button>
+        </div>
+        
+        <div id="progressContainer" class="progress-container">
+            <h3>辞書をダウンロード中...</h3>
+            <div class="progress-bar-container">
+                <div id="progressBar" class="progress-bar">0%</div>
+            </div>
+            <div id="progressInfo" class="progress-info">準備中...</div>
+        </div>
+        
+        <div>
+            <h2>テキスト解析</h2>
+            <textarea id="input" rows="5" placeholder="解析したい日本語テキストを入力してください">
+今日は良い天気ですね。桜が綺麗に咲いています。
+私は昨日、友達と一緒に公園へ行きました。
+機械学習は面白い分野です。
+東京スカイツリーは634メートルの高さがあります。</textarea>
+            <br>
+            <button id="parseBtn" onclick="parseText()" disabled>解析</button>
+            <button id="parseDetailBtn" onclick="parseDetailedText()" disabled>詳細解析</button>
+            <button id="wakatiBtn" onclick="parseWakati()" disabled>分かち書き</button>
+            <button id="compareBtn" onclick="compareModes()" disabled>モード比較</button>
+        </div>
+        
+        <div id="result"></div>
+    </div>
+    
+    <div class="container" id="detailedResults" style="display: none;">
+        <h2>詳細解析結果</h2>
+        <table id="detailedTable">
+            <thead>
+                <tr>
+                    <th>表層形</th>
+                    <th>品詞</th>
+                    <th>品詞細分類1</th>
+                    <th>品詞細分類2</th>
+                    <th>品詞細分類3</th>
+                    <th>活用型</th>
+                    <th>読み</th>
+                    <th>発音</th>
+                </tr>
+            </thead>
+            <tbody id="detailedTableBody">
+            </tbody>
+        </table>
+    </div>
+    
+    <div class="container" id="comparisonResults" style="display: none;">
+        <h2>フォールバックモードとの比較</h2>
+        <div id="comparisonContent"></div>
+    </div>
+
+    <script type="module">
+        import { MeCabWrapper } from '../dist/mecab-wrapper-lazy-v2.js';
+        
+        let mecab = null;
+        let isInitialized = false;
+        let currentResults = {
+            fallback: null,
+            full: null
+        };
+        
+        async function initialize() {
+            const statusEl = document.getElementById('status');
+            
+            try {
+                console.log('Initializing MeCab with lazy loading...');
+                
+                mecab = new MeCabWrapper();
+                await mecab.initialize({
+                    wasmPath: '../dist/mecab_wasm.wasm',
+                    dataPath: '../dist/mecab_wasm.data',
+                    baseUrl: window.location.origin + '/mecab',
+                    onDictionaryProgress: onDictionaryProgress
+                });
+                
+                statusEl.className = 'status success';
+                statusEl.innerHTML = '✅ MeCab初期化完了（フォールバックモード）';
+                
+                // Enable buttons
+                document.getElementById('parseBtn').disabled = false;
+                document.getElementById('parseDetailBtn').disabled = false;
+                document.getElementById('wakatiBtn').disabled = false;
+                document.getElementById('compareBtn').disabled = false;
+                document.getElementById('loadDictBtn').style.display = 'inline-block';
+                
+                isInitialized = true;
+                
+                // Test parse
+                const testResult = mecab.parse('テスト');
+                console.log('Test parse result:', testResult);
+                
+                // Store initial fallback results
+                storeCurrentResults('fallback');
+                
+            } catch (error) {
+                console.error('Initialization error:', error);
+                statusEl.className = 'status error';
+                statusEl.innerHTML = '❌ 初期化エラー: ' + error.message;
+            }
+        }
+        
+        function onDictionaryProgress(percent, message) {
+            const progressContainer = document.getElementById('progressContainer');
+            const progressBar = document.getElementById('progressBar');
+            const progressInfo = document.getElementById('progressInfo');
+            
+            progressContainer.style.display = 'block';
+            progressBar.style.width = percent + '%';
+            progressBar.textContent = percent + '%';
+            progressInfo.textContent = message;
+            
+            if (percent === 100) {
+                setTimeout(() => {
+                    progressContainer.style.display = 'none';
+                    updateDictionaryStatus();
+                    
+                    // Store full dictionary results
+                    storeCurrentResults('full');
+                    
+                    // Show notification
+                    const statusEl = document.getElementById('status');
+                    statusEl.className = 'status success';
+                    statusEl.innerHTML = '✅ NAIST-JDIC完全辞書の読み込みが完了しました！';
+                }, 1000);
+            }
+        }
+        
+        function updateDictionaryStatus() {
+            const modeEl = document.getElementById('currentMode');
+            const loadBtn = document.getElementById('loadDictBtn');
+            
+            if (mecab.isUsingFullDictionary()) {
+                modeEl.textContent = 'NAIST-JDIC完全版';
+                modeEl.className = 'dict-status full';
+                loadBtn.style.display = 'none';
+            } else {
+                modeEl.textContent = 'フォールバック（簡易辞書）';
+                modeEl.className = 'dict-status fallback';
+                loadBtn.style.display = 'inline-block';
+            }
+        }
+        
+        window.loadFullDictionary = async function() {
+            const loadBtn = document.getElementById('loadDictBtn');
+            loadBtn.disabled = true;
+            loadBtn.textContent = '読み込み中...';
+            
+            try {
+                await mecab.loadDictionaryAsync(onDictionaryProgress);
+            } catch (error) {
+                console.error('Dictionary loading failed:', error);
+                const statusEl = document.getElementById('status');
+                statusEl.className = 'status error';
+                statusEl.innerHTML = '❌ 辞書の読み込みに失敗しました: ' + error.message;
+            }
+            
+            loadBtn.disabled = false;
+            loadBtn.textContent = '完全辞書を読み込む';
+        };
+        
+        window.parseText = function() {
+            if (!isInitialized) return;
+            
+            const input = document.getElementById('input').value;
+            const resultEl = document.getElementById('result');
+            
+            try {
+                const result = mecab.parse(input);
+                const mode = mecab.isUsingFullDictionary() ? '（NAIST-JDIC完全版）' : '（フォールバック）';
+                resultEl.innerHTML = `<h3>解析結果 ${mode}:</h3><div class="result">${escapeHtml(result)}</div>`;
+                document.getElementById('detailedResults').style.display = 'none';
+                document.getElementById('comparisonResults').style.display = 'none';
+            } catch (error) {
+                resultEl.innerHTML = '<div class="status error">エラー: ' + error.message + '</div>';
+            }
+        };
+        
+        window.parseDetailedText = function() {
+            if (!isInitialized) return;
+            
+            const input = document.getElementById('input').value;
+            const resultEl = document.getElementById('result');
+            
+            try {
+                const tokens = mecab.parseDetailed(input);
+                
+                // Update table
+                const tbody = document.getElementById('detailedTableBody');
+                tbody.innerHTML = '';
+                
+                tokens.forEach(token => {
+                    const row = tbody.insertRow();
+                    row.insertCell().textContent = token.surface;
+                    row.insertCell().textContent = token.pos;
+                    row.insertCell().textContent = token.pos1;
+                    row.insertCell().textContent = token.pos2;
+                    row.insertCell().textContent = token.pos3;
+                    row.insertCell().textContent = token.inflection;
+                    row.insertCell().textContent = token.reading;
+                    row.insertCell().textContent = token.pronunciation;
+                });
+                
+                document.getElementById('detailedResults').style.display = 'block';
+                document.getElementById('comparisonResults').style.display = 'none';
+                resultEl.innerHTML = '';
+                
+            } catch (error) {
+                resultEl.innerHTML = '<div class="status error">エラー: ' + error.message + '</div>';
+            }
+        };
+        
+        window.parseWakati = function() {
+            if (!isInitialized) return;
+            
+            const input = document.getElementById('input').value;
+            const resultEl = document.getElementById('result');
+            
+            try {
+                const result = mecab.wakati(input);
+                const mode = mecab.isUsingFullDictionary() ? '（NAIST-JDIC完全版）' : '（フォールバック）';
+                resultEl.innerHTML = `<h3>分かち書き結果 ${mode}:</h3><div class="result">${escapeHtml(result)}</div>`;
+                document.getElementById('detailedResults').style.display = 'none';
+                document.getElementById('comparisonResults').style.display = 'none';
+            } catch (error) {
+                resultEl.innerHTML = '<div class="status error">エラー: ' + error.message + '</div>';
+            }
+        };
+        
+        function storeCurrentResults(mode) {
+            const input = document.getElementById('input').value;
+            const result = mecab.parse(input);
+            currentResults[mode] = result;
+        }
+        
+        window.compareModes = function() {
+            if (!isInitialized) return;
+            
+            const input = document.getElementById('input').value;
+            const comparisonEl = document.getElementById('comparisonContent');
+            
+            // Parse with current mode
+            const currentMode = mecab.isUsingFullDictionary() ? 'full' : 'fallback';
+            const currentResult = mecab.parse(input);
+            
+            if (currentMode === 'full' && currentResults.fallback) {
+                // Compare with stored fallback results
+                comparisonEl.innerHTML = `
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                        <div>
+                            <h3>フォールバック（簡易辞書）</h3>
+                            <div class="result">${escapeHtml(currentResults.fallback)}</div>
+                        </div>
+                        <div>
+                            <h3>NAIST-JDIC完全版</h3>
+                            <div class="result">${escapeHtml(currentResult)}</div>
+                        </div>
+                    </div>
+                    <div class="info-box" style="margin-top: 20px;">
+                        完全辞書版では、より正確な品詞分類と読み情報が得られます。
+                    </div>
+                `;
+            } else if (currentMode === 'fallback') {
+                comparisonEl.innerHTML = `
+                    <div class="info-box">
+                        完全辞書を読み込んでから比較機能をお使いください。
+                    </div>
+                `;
+            }
+            
+            document.getElementById('comparisonResults').style.display = 'block';
+            document.getElementById('detailedResults').style.display = 'none';
+            document.getElementById('result').innerHTML = '';
+        };
+        
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        // Initialize on load
+        initialize();
+    </script>
+</body>
+</html>

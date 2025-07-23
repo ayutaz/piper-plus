@@ -63,7 +63,7 @@ if(EMSCRIPTEN)
         -s ALLOW_MEMORY_GROWTH=1 \
         -s MAXIMUM_MEMORY=256MB \
         -s EXPORTED_FUNCTIONS=['_malloc','_free'] \
-        -s EXPORTED_RUNTIME_METHODS=['ccall','cwrap','UTF8ToString','stringToUTF8','allocate','HEAP8','HEAP32'] \
+        -s EXPORTED_RUNTIME_METHODS=['ccall','cwrap','UTF8ToString','stringToUTF8','allocate','HEAP8','HEAP32','FS'] \
         -s FORCE_FILESYSTEM=1 \
         -s SINGLE_FILE=0 \
         -s DISABLE_EXCEPTION_CATCHING=0 \

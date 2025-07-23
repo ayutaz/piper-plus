@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MeCab Hybrid Mode - Full Dictionary Support</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans JP', sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        .status {
+            padding: 10px 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            font-weight: 500;
+        }
+        .status.loading {
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+        .status.success {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+        .status.error {
+            background: #ffebee;
+            color: #c62828;
+        }
+        .mode-indicator {
+            display: inline-flex;
+            align-items: center;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        .mode-indicator.server {
+            background: #4caf50;
+            color: white;
+        }
+        .mode-indicator.local {
+            background: #ff9800;
+            color: white;
+        }
+        .mode-indicator.fallback {
+            background: #f44336;
+            color: white;
+        }
+        textarea {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+            resize: vertical;
+        }
+        button {
+            background: #2196f3;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-top: 10px;
+            margin-right: 10px;
+        }
+        button:hover {
+            background: #1976d2;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f5f5f5;
+            border-radius: 4px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            overflow-x: auto;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background: #e0e0e0;
+            font-weight: bold;
+        }
+        tr:nth-child(even) {
+            background: #f9f9f9;
+        }
+        .info-box {
+            background: #e3f2fd;
+            border: 1px solid #2196f3;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 20px 0;
+        }
+        .server-setup {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 20px 0;
+        }
+        .comparison-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-top: 20px;
+        }
+        .comparison-column {
+            padding: 15px;
+            background: #f5f5f5;
+            border-radius: 4px;
+        }
+        .comparison-column h3 {
+            margin-top: 0;
+            color: #555;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 MeCab Hybrid Mode - 完全辞書サポート</h1>
+        
+        <div id="status" class="status loading">
+            MeCabを初期化中...
+        </div>
+        
+        <div id="modeDisplay" style="display: none;">
+            現在のモード: <span id="modeIndicator" class="mode-indicator"></span>
+        </div>
+        
+        <div class="info-box">
+            <strong>ハイブリッドモード</strong>
+            <ul>
+                <li>ローカル: WebAssembly版MeCab（フォールバック辞書）</li>
+                <li>サーバー: 完全なNAIST-JDIC辞書を使用したMeCab</li>
+                <li>自動フェイルオーバー: サーバーが利用できない場合はローカルにフォールバック</li>
+            </ul>
+        </div>
+        
+        <div class="server-setup">
+            <strong>サーバーセットアップ（オプション）</strong>
+            <p>完全辞書を使用するには、以下のコマンドでサーバーを起動してください:</p>
+            <pre>cd mecab/server && python3 mecab_server.py</pre>
+            <p>または、以下のボタンでサーバー接続をテストできます:</p>
+            <button id="testServerBtn" onclick="testServer()">サーバー接続テスト</button>
+        </div>
+        
+        <div>
+            <h2>テキスト解析</h2>
+            <textarea id="input" rows="5" placeholder="解析したい日本語テキストを入力してください">
+今日は良い天気ですね。桜が綺麗に咲いています。
+私は昨日、友達と一緒に公園へ行きました。
+機械学習は面白い分野です。
+東京スカイツリーは634メートルの高さがあります。
+人工知能技術の発展は目覚ましいものがあります。</textarea>
+            <br>
+            <button id="parseBtn" onclick="parseText()" disabled>解析</button>
+            <button id="parseDetailBtn" onclick="parseDetailedText()" disabled>詳細解析</button>
+            <button id="wakatiBtn" onclick="parseWakati()" disabled>分かち書き</button>
+            <button id="readingBtn" onclick="getReading()" disabled>読み取得</button>
+            <button id="compareBtn" onclick="compareResults()" disabled>モード比較</button>
+        </div>
+        
+        <div id="result"></div>
+    </div>
+    
+    <div class="container" id="detailedResults" style="display: none;">
+        <h2>詳細解析結果</h2>
+        <table id="detailedTable">
+            <thead>
+                <tr>
+                    <th>表層形</th>
+                    <th>品詞</th>
+                    <th>品詞細分類1</th>
+                    <th>品詞細分類2</th>
+                    <th>品詞細分類3</th>
+                    <th>活用型</th>
+                    <th>読み</th>
+                    <th>発音</th>
+                </tr>
+            </thead>
+            <tbody id="detailedTableBody">
+            </tbody>
+        </table>
+    </div>
+    
+    <div class="container" id="comparisonResults" style="display: none;">
+        <h2>モード比較結果</h2>
+        <div class="comparison-grid" id="comparisonGrid"></div>
+    </div>
+
+    <script type="module">
+        import { MeCabWrapper } from '../dist/mecab-wrapper-hybrid.js';
+        
+        let mecab = null;
+        let isInitialized = false;
+        
+        async function initialize() {
+            const statusEl = document.getElementById('status');
+            
+            try {
+                console.log('Initializing MeCab hybrid mode...');
+                
+                mecab = new MeCabWrapper();
+                await mecab.initialize({
+                    wasmPath: '../dist/mecab_wasm.wasm',
+                    dataPath: '../dist/mecab_wasm.data',
+                    serverUrl: 'http://localhost:5000'  // Default server URL
+                });
+                
+                updateModeDisplay();
+                
+                statusEl.className = 'status success';
+                statusEl.innerHTML = '✅ MeCab初期化完了';
+                
+                // Enable buttons
+                document.getElementById('parseBtn').disabled = false;
+                document.getElementById('parseDetailBtn').disabled = false;
+                document.getElementById('wakatiBtn').disabled = false;
+                document.getElementById('readingBtn').disabled = false;
+                document.getElementById('compareBtn').disabled = false;
+                
+                isInitialized = true;
+                
+                // Test parse
+                const testResult = await mecab.parse('テスト');
+                console.log('Test parse result:', testResult);
+                
+            } catch (error) {
+                console.error('Initialization error:', error);
+                statusEl.className = 'status error';
+                statusEl.innerHTML = '❌ 初期化エラー: ' + error.message;
+            }
+        }
+        
+        function updateModeDisplay() {
+            const modeDisplay = document.getElementById('modeDisplay');
+            const modeIndicator = document.getElementById('modeIndicator');
+            
+            modeDisplay.style.display = 'block';
+            
+            const mode = mecab.getMode();
+            switch (mode) {
+                case 'server-full-dictionary':
+                    modeIndicator.textContent = 'サーバー（完全辞書）';
+                    modeIndicator.className = 'mode-indicator server';
+                    break;
+                case 'local-dictionary':
+                    modeIndicator.textContent = 'ローカル（辞書あり）';
+                    modeIndicator.className = 'mode-indicator local';
+                    break;
+                case 'local-fallback':
+                    modeIndicator.textContent = 'ローカル（フォールバック）';
+                    modeIndicator.className = 'mode-indicator fallback';
+                    break;
+            }
+        }
+        
+        window.testServer = async function() {
+            const btn = document.getElementById('testServerBtn');
+            btn.disabled = true;
+            btn.textContent = 'テスト中...';
+            
+            const serverAvailable = await mecab.checkServerHealth();
+            
+            if (serverAvailable) {
+                alert('✅ サーバー接続成功！完全辞書が利用可能です。');
+                mecab.useServer = true;
+                updateModeDisplay();
+            } else {
+                alert('❌ サーバーに接続できません。ローカルモードで動作します。');
+            }
+            
+            btn.disabled = false;
+            btn.textContent = 'サーバー接続テスト';
+        };
+        
+        window.parseText = async function() {
+            if (!isInitialized) return;
+            
+            const input = document.getElementById('input').value;
+            const resultEl = document.getElementById('result');
+            
+            try {
+                const result = await mecab.parse(input);
+                const mode = mecab.getMode();
+                resultEl.innerHTML = `<h3>解析結果（${mode}）:</h3><div class="result">${escapeHtml(result)}</div>`;
+                document.getElementById('detailedResults').style.display = 'none';
+                document.getElementById('comparisonResults').style.display = 'none';
+            } catch (error) {
+                resultEl.innerHTML = '<div class="status error">エラー: ' + error.message + '</div>';
+            }
+        };
+        
+        window.parseDetailedText = async function() {
+            if (!isInitialized) return;
+            
+            const input = document.getElementById('input').value;
+            const resultEl = document.getElementById('result');
+            
+            try {
+                const tokens = await mecab.parseDetailed(input);
+                
+                // Update table
+                const tbody = document.getElementById('detailedTableBody');
+                tbody.innerHTML = '';
+                
+                tokens.forEach(token => {
+                    const row = tbody.insertRow();
+                    row.insertCell().textContent = token.surface;
+                    row.insertCell().textContent = token.pos;
+                    row.insertCell().textContent = token.pos1;
+                    row.insertCell().textContent = token.pos2;
+                    row.insertCell().textContent = token.pos3;
+                    row.insertCell().textContent = token.inflection;
+                    row.insertCell().textContent = token.reading;
+                    row.insertCell().textContent = token.pronunciation;
+                });
+                
+                document.getElementById('detailedResults').style.display = 'block';
+                document.getElementById('comparisonResults').style.display = 'none';
+                resultEl.innerHTML = '';
+                
+            } catch (error) {
+                resultEl.innerHTML = '<div class="status error">エラー: ' + error.message + '</div>';
+            }
+        };
+        
+        window.parseWakati = async function() {
+            if (!isInitialized) return;
+            
+            const input = document.getElementById('input').value;
+            const resultEl = document.getElementById('result');
+            
+            try {
+                const result = await mecab.wakati(input);
+                const mode = mecab.getMode();
+                resultEl.innerHTML = `<h3>分かち書き結果（${mode}）:</h3><div class="result">${escapeHtml(result)}</div>`;
+                document.getElementById('detailedResults').style.display = 'none';
+                document.getElementById('comparisonResults').style.display = 'none';
+            } catch (error) {
+                resultEl.innerHTML = '<div class="status error">エラー: ' + error.message + '</div>';
+            }
+        };
+        
+        window.getReading = async function() {
+            if (!isInitialized) return;
+            
+            const input = document.getElementById('input').value;
+            const resultEl = document.getElementById('result');
+            
+            try {
+                const reading = await mecab.getReading(input);
+                const mode = mecab.getMode();
+                resultEl.innerHTML = `<h3>読み（${mode}）:</h3><div class="result">${escapeHtml(reading)}</div>`;
+                document.getElementById('detailedResults').style.display = 'none';
+                document.getElementById('comparisonResults').style.display = 'none';
+            } catch (error) {
+                resultEl.innerHTML = '<div class="status error">エラー: ' + error.message + '</div>';
+            }
+        };
+        
+        window.compareResults = async function() {
+            if (!isInitialized) return;
+            
+            const input = document.getElementById('input').value;
+            const comparisonGrid = document.getElementById('comparisonGrid');
+            
+            try {
+                // Get results from both modes
+                const serverResult = mecab.isServerAvailable() ? 
+                    await mecab.parse(input, true) : 'サーバー利用不可';
+                const localResult = await mecab.parse(input, false);
+                
+                comparisonGrid.innerHTML = `
+                    <div class="comparison-column">
+                        <h3>サーバー（完全辞書）</h3>
+                        <pre>${escapeHtml(serverResult)}</pre>
+                    </div>
+                    <div class="comparison-column">
+                        <h3>ローカル（フォールバック）</h3>
+                        <pre>${escapeHtml(localResult)}</pre>
+                    </div>
+                `;
+                
+                document.getElementById('comparisonResults').style.display = 'block';
+                document.getElementById('detailedResults').style.display = 'none';
+                document.getElementById('result').innerHTML = '';
+                
+            } catch (error) {
+                document.getElementById('result').innerHTML = '<div class="status error">エラー: ' + error.message + '</div>';
+            }
+        };
+        
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        // Initialize on load
+        initialize();
+    </script>
+</body>
+</html>

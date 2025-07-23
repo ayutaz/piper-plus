@@ -1,0 +1,4 @@
+flask==3.0.0
+flask-cors==4.0.0
+mecab-python3==1.0.8
+unidic-lite==1.0.8
