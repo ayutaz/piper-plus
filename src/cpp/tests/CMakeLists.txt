@@ -99,17 +99,27 @@ foreach(test_source ${TEST_SOURCES})
         target_sources(${test_name} PRIVATE
             ../phoneme_parser.cpp
         )
+        # Set SPDLOG_DIR if not defined
+        if(NOT DEFINED SPDLOG_DIR)
+            set(SPDLOG_DIR "${CMAKE_BINARY_DIR}/si")
+        endif()
         target_include_directories(${test_name} PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/..
-            ${PIPER_PHONEMIZE_DIR}/include
             ${SPDLOG_DIR}/include
         )
-        target_link_libraries(${test_name}
-            ${SPDLOG_DIR}/lib/libspdlog.a
-        )
-        # Add dependency on piper_phonemize_external to ensure headers are available
-        if(TARGET piper_phonemize_external)
-            add_dependencies(${test_name} piper_phonemize_external)
+        if(WIN32)
+            target_link_libraries(${test_name}
+                optimized ${SPDLOG_DIR}/lib/spdlog.lib
+                debug ${SPDLOG_DIR}/lib/spdlogd.lib
+            )
+        else()
+            target_link_libraries(${test_name}
+                ${SPDLOG_DIR}/lib/libspdlog.a
+            )
+        endif()
+        # Add dependency on spdlog_external to ensure headers are available
+        if(TARGET spdlog_external)
+            add_dependencies(${test_name} spdlog_external)
         endif()
     endif()
 

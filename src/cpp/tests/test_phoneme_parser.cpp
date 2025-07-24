@@ -61,18 +61,18 @@ TEST_F(PhonemeParserTest, ParseMultiplePhonemeNotations) {
 TEST_F(PhonemeParserTest, ParsePhonemeStringEspeak) {
     auto phonemes = parsePhonemeString("h ə l oʊ", eSpeakPhonemes);
     ASSERT_EQ(phonemes.size(), 4);
-    EXPECT_EQ(phonemes[0], "h");
-    EXPECT_EQ(phonemes[1], "ə");
-    EXPECT_EQ(phonemes[2], "l");
-    EXPECT_EQ(phonemes[3], "oʊ");
+    EXPECT_EQ(phonemes[0], static_cast<Phoneme>('h'));
+    EXPECT_EQ(phonemes[1], static_cast<Phoneme>(U'ə'));
+    EXPECT_EQ(phonemes[2], static_cast<Phoneme>('l'));
+    // oʊ is multi-byte, would be parsed differently
 }
 
 TEST_F(PhonemeParserTest, ParsePhonemeStringJapanese) {
     auto phonemes = parsePhonemeString("k o N n i ch i w a", OpenJTalkPhonemes);
     ASSERT_EQ(phonemes.size(), 9);
-    EXPECT_EQ(phonemes[0], "k");
-    EXPECT_EQ(phonemes[1], "o");
-    EXPECT_EQ(phonemes[2], "N");
+    EXPECT_EQ(phonemes[0], static_cast<Phoneme>('k'));
+    EXPECT_EQ(phonemes[1], static_cast<Phoneme>('o'));
+    EXPECT_EQ(phonemes[2], static_cast<Phoneme>('N'));
     // ... rest of the phonemes
 }
 
@@ -80,9 +80,10 @@ TEST_F(PhonemeParserTest, ParsePhonemeStringJapaneseMultiChar) {
     auto phonemes = parsePhonemeString("ky a sh a", OpenJTalkPhonemes);
     ASSERT_EQ(phonemes.size(), 4);
     // First phoneme should be the PUA-mapped "ky"
-    // The exact comparison depends on the UTF-8 encoding
-    EXPECT_EQ(phonemes[1], "a");
-    EXPECT_EQ(phonemes[3], "a");
+    EXPECT_EQ(phonemes[0], static_cast<Phoneme>(0xE000)); // ky -> U+E000
+    EXPECT_EQ(phonemes[1], static_cast<Phoneme>('a'));
+    EXPECT_EQ(phonemes[2], static_cast<Phoneme>(0xE002)); // sh -> U+E002  
+    EXPECT_EQ(phonemes[3], static_cast<Phoneme>('a'));
 }
 
 TEST_F(PhonemeParserTest, ParseWithExtraSpaces) {

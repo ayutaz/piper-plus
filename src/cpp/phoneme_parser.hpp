@@ -4,9 +4,17 @@
 #include <string>
 #include <vector>
 #include <regex>
-#include "piper.hpp"
+#include <cstdint>
 
 namespace piper {
+
+// Forward declarations to avoid including piper.hpp
+typedef char32_t Phoneme;
+enum PhonemeType { 
+  eSpeakPhonemes, 
+  TextPhonemes,
+  OpenJTalkPhonemes
+};
 
 // Structure to hold either text or phonemes
 struct TextOrPhonemes {
