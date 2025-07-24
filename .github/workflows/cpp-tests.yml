@@ -67,19 +67,38 @@ jobs:
         run: |
           brew install cmake ccache wget
           
-          # Install ONNX Runtime for Apple Silicon
-          wget https://github.com/microsoft/onnxruntime/releases/download/v1.14.1/onnxruntime-osx-arm64-1.14.1.tgz
-          tar -xzf onnxruntime-osx-arm64-1.14.1.tgz
-          sudo cp -r onnxruntime-osx-arm64-1.14.1/lib/* /usr/local/lib/
-          sudo cp -r onnxruntime-osx-arm64-1.14.1/include/* /usr/local/include/
-          rm -rf onnxruntime-osx-arm64-1.14.1*
+          # Detect architecture and download appropriate ONNX Runtime
+          if [[ $(uname -m) == "arm64" ]]; then
+            echo "Installing ONNX Runtime for Apple Silicon..."
+            wget https://github.com/microsoft/onnxruntime/releases/download/v1.14.1/onnxruntime-osx-arm64-1.14.1.tgz
+            tar -xzf onnxruntime-osx-arm64-1.14.1.tgz
+            sudo cp -r onnxruntime-osx-arm64-1.14.1/lib/* /usr/local/lib/
+            sudo cp -r onnxruntime-osx-arm64-1.14.1/include/* /usr/local/include/
+            rm -rf onnxruntime-osx-arm64-1.14.1*
+          else
+            echo "Installing ONNX Runtime for Intel Mac..."
+            wget https://github.com/microsoft/onnxruntime/releases/download/v1.14.1/onnxruntime-osx-x86_64-1.14.1.tgz
+            tar -xzf onnxruntime-osx-x86_64-1.14.1.tgz
+            sudo cp -r onnxruntime-osx-x86_64-1.14.1/lib/* /usr/local/lib/
+            sudo cp -r onnxruntime-osx-x86_64-1.14.1/include/* /usr/local/include/
+            rm -rf onnxruntime-osx-x86_64-1.14.1*
+          fi
       
       - name: Configure CMake
         run: |
           export PATH="/usr/lib/ccache:/usr/local/opt/ccache/libexec:$PATH"
-          cmake -B build \
-            -DCMAKE_BUILD_TYPE=${{ matrix.build-type }} \
-            -DBUILD_TESTS=ON
+          CMAKE_ARGS="-DCMAKE_BUILD_TYPE=${{ matrix.build-type }} -DBUILD_TESTS=ON"
+          
+          # Add macOS-specific flags
+          if [[ "${{ runner.os }}" == "macOS" ]]; then
+            if [[ $(uname -m) == "arm64" ]]; then
+              CMAKE_ARGS="$CMAKE_ARGS -DCMAKE_OSX_ARCHITECTURES=arm64"
+            else
+              CMAKE_ARGS="$CMAKE_ARGS -DCMAKE_OSX_ARCHITECTURES=x86_64"
+            fi
+          fi
+          
+          cmake -B build $CMAKE_ARGS
       
       - name: Build
         run: |
