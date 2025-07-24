@@ -13,33 +13,33 @@ def test_phoneme_input(piper_binary, model_path):
         {
             "name": "Plain text",
             "input": "Hello world",
-            "description": "Regular text without phoneme notation"
+            "description": "Regular text without phoneme notation",
         },
         {
             "name": "Single phoneme notation",
             "input": "[[ h ə l oʊ ]]",
-            "description": "Direct phoneme input only"
+            "description": "Direct phoneme input only",
         },
         {
             "name": "Mixed text and phonemes",
             "input": "Hello [[ h ə l oʊ ]] world",
-            "description": "Text with embedded phoneme notation"
+            "description": "Text with embedded phoneme notation",
         },
         {
             "name": "Multiple phoneme notations",
             "input": "Say [[ h ə l oʊ ]] and [[ w ɝ l d ]]",
-            "description": "Multiple phoneme segments"
+            "description": "Multiple phoneme segments",
         },
         {
             "name": "Japanese phonemes",
             "input": "こんにちは [[ k o N n i ch i w a ]] です",
-            "description": "Japanese text with phoneme notation"
+            "description": "Japanese text with phoneme notation",
         },
         {
             "name": "Japanese multi-char phonemes",
             "input": "[[ ky a sh a ]]",
-            "description": "Japanese multi-character phonemes"
-        }
+            "description": "Japanese multi-character phonemes",
+        },
     ]
 
     results = []
@@ -56,7 +56,7 @@ def test_phoneme_input(piper_binary, model_path):
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                text=True
+                text=True,
             )
 
             stdout, stderr = process.communicate(input=test["input"])
@@ -67,7 +67,7 @@ def test_phoneme_input(piper_binary, model_path):
                 "success": success,
                 "output_size": os.path.getsize(output_path) if success else 0,
                 "return_code": process.returncode,
-                "stderr": stderr.strip() if stderr else None
+                "stderr": stderr.strip() if stderr else None,
             }
             if success:
                 print(f"✓ Success: Generated {result['output_size']} bytes")
@@ -81,6 +81,7 @@ def test_phoneme_input(piper_binary, model_path):
                 os.unlink(output_path)
 
     return results
+
 
 def main():
     if len(sys.argv) < 3:
@@ -103,9 +104,9 @@ def main():
 
     results = test_phoneme_input(piper_binary, model_path)
     # Summary
-    print("\n" + "="*50)
+    print("\n" + "=" * 50)
     print("TEST SUMMARY")
-    print("="*50)
+    print("=" * 50)
 
     passed = sum(1 for r in results if r["success"])
     total = len(results)
@@ -118,6 +119,7 @@ def main():
     print(f"\nTotal: {passed}/{total} tests passed")
     # Exit with error if any test failed
     sys.exit(0 if passed == total else 1)
+
 
 if __name__ == "__main__":
     main()
