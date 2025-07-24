@@ -146,8 +146,10 @@ class PiperVoice:
             # Use the exact same phonemization as training
             try:
                 import sys
-                sys.path.insert(0, '/data/piper/src/python')
+
+                sys.path.insert(0, "/data/piper/src/python")
                 from piper_train.phonemize.japanese import phonemize_japanese
+
                 return [phonemize_japanese(text)]
             except ImportError:
                 _LOGGER.warning("Failed to import piper_train phonemizer, falling back")
@@ -159,20 +161,20 @@ class PiperVoice:
         """Phonemize Japanese text with prosody marks (same as training)."""
         if not HAS_PYOPENJTALK:
             raise RuntimeError("pyopenjtalk is required for Japanese phonemization")
-            
+
         labels = pyopenjtalk.extract_fullcontext(text)
         tokens = []
-        
+
         def _is_question(text: str) -> bool:
             """Return True if text ends with a question mark."""
             return text.strip().endswith("?") or text.strip().endswith("？")
-        
+
         for idx, label in enumerate(labels):
             m_ph = _RE_PHONEME.search(label)
             if not m_ph:
                 continue
             phoneme = m_ph.group(1)
-            
+
             # Beginning / end silence handling
             if phoneme == "sil":
                 if idx == 0:
@@ -180,50 +182,52 @@ class PiperVoice:
                 elif idx == len(labels) - 1:
                     tokens.append("?" if _is_question(text) else "$")
                 continue
-                
+
             # Short pause
             if phoneme == "pau":
                 tokens.append("_")
                 continue
-                
+
             # Keep unvoiced vowels as uppercase
             tokens.append(phoneme)
-            
+
             # Extract prosody marks
             m_a1 = _RE_A1.search(label)
             m_a2 = _RE_A2.search(label)
             m_a3 = _RE_A3.search(label)
             if not (m_a1 and m_a2 and m_a3):
                 continue
-                
+
             a1 = int(m_a1.group(1))
             a2 = int(m_a2.group(1))
             a3 = int(m_a3.group(1))
-            
+
             # Look-ahead to next label
             if idx < len(labels) - 1:
                 m_a2_next = _RE_A2.search(labels[idx + 1])
                 a2_next = int(m_a2_next.group(1)) if m_a2_next else -1
             else:
                 a2_next = -1
-                
+
             # Insert accent nucleus mark "]" at descending point
             if (a1 == 0) and (a2_next == a2 + 1):
                 tokens.append("]")
-                
+
             # Insert accent phrase boundary "#" when current mora is last
             if (a2 == a3) and (a2_next == 1):
                 tokens.append("#")
-                
+
             # Insert rising mark "[" at phrase head
             if (a2 == 1) and (a2_next == 2):
                 tokens.append("[")
-                
+
         # Use the same token mapper as training
         try:
             import sys
-            sys.path.insert(0, '/data/piper/src/python')
+
+            sys.path.insert(0, "/data/piper/src/python")
             from piper_train.phonemize.token_mapper import map_sequence
+
             return map_sequence(tokens)
         except ImportError:
             # Fallback to local PUA mapping
@@ -252,7 +256,7 @@ class PiperVoice:
             # Define prosody mark to ID mapping (must match accent_processor.py)
             prosody_marks = {
                 "^": 0,  # start
-                "$": 1,  # end_declarative  
+                "$": 1,  # end_declarative
                 "?": 2,  # end_question
                 "_": 3,  # pause
                 "#": 4,  # boundary
@@ -260,25 +264,25 @@ class PiperVoice:
                 "]": 6,  # falling
             }
             # ID 14 is for regular phonemes (<PAD> in training)
-            
+
             for phoneme in phonemes:
                 if phoneme not in id_map:
                     _LOGGER.warning("Missing phoneme from id map: %s", phoneme)
                     continue
-                    
+
                 ids.extend(id_map[phoneme])
-                
+
                 # Assign prosody ID based on training logic
                 if phoneme in prosody_marks:
                     prosody_ids.append(prosody_marks[phoneme])
                 else:
                     # Regular phoneme - use <PAD> ID (14)
                     prosody_ids.append(14)
-                    
+
         else:
             # Non-Japanese: original logic
             prosody_ids.append(0)  # BOS prosody
-            
+
             for phoneme in phonemes:
                 if phoneme not in id_map:
                     _LOGGER.warning("Missing phoneme from id map: %s", phoneme)
@@ -286,7 +290,7 @@ class PiperVoice:
 
                 ids.extend(id_map[phoneme])
                 prosody_ids.append(14)  # Default prosody
-                
+
                 # 学習データが PAD("_") を各音素ごとに含んでいるのは eSpeak 方式のみ。
                 if self.config.phoneme_type == PhonemeType.ESPEAK:
                     ids.extend(id_map[PAD])
@@ -389,13 +393,15 @@ class PiperVoice:
             "input_lengths": phoneme_ids_lengths,
             "scales": scales,
         }
-        
+
         # Add prosody_ids if provided and model supports it
         if prosody_ids is not None:
             # Check if the ONNX model expects prosody_ids input
             model_inputs = [input.name for input in self.session.get_inputs()]
             if "prosody_ids" in model_inputs:
-                prosody_ids_array = np.expand_dims(np.array(prosody_ids, dtype=np.int64), 0)
+                prosody_ids_array = np.expand_dims(
+                    np.array(prosody_ids, dtype=np.int64), 0
+                )
                 args["prosody_ids"] = prosody_ids_array
 
         if self.config.num_speakers <= 1:
