@@ -53,6 +53,7 @@ def phonemize_japanese(text: str) -> list[str]:
             if idx == 0:
                 tokens.append("^")
             elif idx == len(labels) - 1:
+                # Always add end marker when we find the last sil
                 tokens.append("?" if _is_question(text) else "$")
             # Skip adding ordinary phoneme for sil
             continue
