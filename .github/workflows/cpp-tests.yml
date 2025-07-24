@@ -65,22 +65,28 @@ jobs:
       - name: Install dependencies (macOS)
         if: runner.os == 'macOS'
         run: |
-          brew install cmake ccache wget
+          # Update brew and install dependencies (ignore if already installed)
+          brew update || true
+          brew install cmake || brew upgrade cmake || true
+          brew install ccache || brew upgrade ccache || true
+          brew install wget || brew upgrade wget || true
           
           # Detect architecture and download appropriate ONNX Runtime
+          sudo mkdir -p /usr/local/lib /usr/local/include
+          
           if [[ $(uname -m) == "arm64" ]]; then
             echo "Installing ONNX Runtime for Apple Silicon..."
             wget https://github.com/microsoft/onnxruntime/releases/download/v1.14.1/onnxruntime-osx-arm64-1.14.1.tgz
             tar -xzf onnxruntime-osx-arm64-1.14.1.tgz
-            sudo cp -r onnxruntime-osx-arm64-1.14.1/lib/* /usr/local/lib/
-            sudo cp -r onnxruntime-osx-arm64-1.14.1/include/* /usr/local/include/
+            sudo cp -r onnxruntime-osx-arm64-1.14.1/lib/* /usr/local/lib/ 2>/dev/null || true
+            sudo cp -r onnxruntime-osx-arm64-1.14.1/include/* /usr/local/include/ 2>/dev/null || true
             rm -rf onnxruntime-osx-arm64-1.14.1*
           else
             echo "Installing ONNX Runtime for Intel Mac..."
             wget https://github.com/microsoft/onnxruntime/releases/download/v1.14.1/onnxruntime-osx-x86_64-1.14.1.tgz
             tar -xzf onnxruntime-osx-x86_64-1.14.1.tgz
-            sudo cp -r onnxruntime-osx-x86_64-1.14.1/lib/* /usr/local/lib/
-            sudo cp -r onnxruntime-osx-x86_64-1.14.1/include/* /usr/local/include/
+            sudo cp -r onnxruntime-osx-x86_64-1.14.1/lib/* /usr/local/lib/ 2>/dev/null || true
+            sudo cp -r onnxruntime-osx-x86_64-1.14.1/include/* /usr/local/include/ 2>/dev/null || true
             rm -rf onnxruntime-osx-x86_64-1.14.1*
           fi
       
