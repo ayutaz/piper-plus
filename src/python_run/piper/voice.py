@@ -217,6 +217,7 @@ class PiperVoice:
         noise_scale: float | None = None,
         noise_w: float | None = None,
         sentence_silence: float = 0.0,
+        volume: float = 1.0,
     ):
         """Synthesize WAV audio from text."""
         wav_file.setframerate(self.config.sample_rate)
@@ -230,6 +231,7 @@ class PiperVoice:
             noise_scale=noise_scale,
             noise_w=noise_w,
             sentence_silence=sentence_silence,
+            volume=volume,
         ):
             wav_file.writeframes(audio_bytes)
 
@@ -241,6 +243,7 @@ class PiperVoice:
         noise_scale: float | None = None,
         noise_w: float | None = None,
         sentence_silence: float = 0.0,
+        volume: float = 1.0,
     ) -> Iterable[bytes]:
         """Synthesize raw audio per sentence from text."""
         sentence_phonemes = self.phonemize(text)
@@ -258,6 +261,7 @@ class PiperVoice:
                     length_scale=length_scale,
                     noise_scale=noise_scale,
                     noise_w=noise_w,
+                    volume=volume,
                 )
                 + silence_bytes
             )
@@ -269,6 +273,7 @@ class PiperVoice:
         length_scale: float | None = None,
         noise_scale: float | None = None,
         noise_w: float | None = None,
+        volume: float = 1.0,
     ) -> bytes:
         """Synthesize raw audio from phoneme ids."""
         if length_scale is None:
@@ -309,5 +314,5 @@ class PiperVoice:
             None,
             args,
         )[0].squeeze((0, 1))
-        audio = audio_float_to_int16(audio.squeeze())
+        audio = audio_float_to_int16(audio.squeeze(), volume=volume)
         return audio.tobytes()
