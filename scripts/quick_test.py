@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
 """Quick test to verify the implementation works."""
 
-import sys
 import os
-import tempfile
+import sys
 
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src', 'python_run'))
 
 try:
+    import numpy as np
+
     from piper.inference_config import InferenceConfig
     from piper.util import audio_float_to_int16
-    import numpy as np
     print("✅ Imports successful")
 except ImportError as e:
     print(f"❌ Import error: {e}")
@@ -45,22 +45,22 @@ print("\nTest 3: Volume adjustment")
 try:
     # Create test audio data
     test_audio = np.array([0.5, -0.5, 0.3, -0.3], dtype=np.float32)
-    
+
     # Test with volume 1.0 (no change)
     result1 = audio_float_to_int16(test_audio.copy(), volume=1.0)
     print(f"✅ Volume 1.0 result shape: {result1.shape}")
-    
+
     # Test with volume 0.5 (quieter)
     result2 = audio_float_to_int16(test_audio.copy(), volume=0.5)
     print(f"✅ Volume 0.5 result shape: {result2.shape}")
-    
+
     # Verify volume affects output
     # Check if the quieter version has lower values
     if np.mean(np.abs(result2)) < np.mean(np.abs(result1)):
         print("✅ Volume adjustment works correctly (quieter has lower amplitude)")
     else:
         print(f"⚠️  Volume might not be working as expected: mean1={np.mean(np.abs(result1))}, mean2={np.mean(np.abs(result2))}")
-    
+
 except Exception as e:
     print(f"❌ Volume adjustment failed: {e}")
 
@@ -84,14 +84,15 @@ try:
         cuda = False
         input_file = ["test.txt"]
         text = "Hello world"
-    
+
     mock_args = MockArgs()
     config2 = InferenceConfig.from_args(mock_args)
     print(f"✅ Config from args: volume={config2.volume}, text={config2.direct_text}")
-    
+
 except Exception as e:
     print(f"❌ from_args failed: {e}")
 
 print("\n" + "="*50)
 print("Quick test completed!")
 print("All core functionality appears to be working correctly.")
+

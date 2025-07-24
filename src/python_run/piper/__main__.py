@@ -22,7 +22,7 @@ _LOGGER = logging.getLogger(_FILE.stem)
 def play_audio_file(file_path: str, sample_rate: int = 22050) -> None:
     """Play audio file using platform-specific command."""
     system = platform.system()
-    
+
     try:
         if system == "Linux":
             # Try multiple Linux audio players
@@ -33,10 +33,10 @@ def play_audio_file(file_path: str, sample_rate: int = 22050) -> None:
                 except (subprocess.CalledProcessError, FileNotFoundError):
                     continue
             _LOGGER.warning("No audio player found on Linux. Install aplay, sox, or ffmpeg.")
-            
+
         elif system == "Darwin":  # macOS
             subprocess.run(["afplay", file_path], check=True)
-            
+
         elif system == "Windows":
             # Use Windows Media Player
             subprocess.run(
@@ -46,7 +46,7 @@ def play_audio_file(file_path: str, sample_rate: int = 22050) -> None:
             )
         else:
             _LOGGER.warning("Unsupported platform for audio playback: %s", system)
-            
+
     except Exception as e:
         _LOGGER.error("Failed to play audio: %s", e)
 
@@ -154,14 +154,14 @@ def main() -> None:
 
     # Create inference config
     config = InferenceConfig.from_args(args)
-    
+
     # Load voice
     voice = PiperVoice.load(config.model_path, config_path=config.config_path, use_cuda=config.use_cuda)
-    
+
     # Validate volume range
     if config.volume < 0.1 or config.volume > 2.0:
         _LOGGER.warning("Volume should be between 0.1 and 2.0. Using: %s", config.volume)
-    
+
     synthesize_args = config.to_synthesize_args()
 
     # Determine input source
@@ -174,7 +174,7 @@ def main() -> None:
             # Read from files
             for file_path in config.input_files:
                 try:
-                    with open(file_path, "r", encoding="utf-8") as f:
+                    with open(file_path, encoding="utf-8") as f:
                         for line in f:
                             yield line.strip()
                 except Exception as e:
@@ -183,7 +183,7 @@ def main() -> None:
             # Read from stdin
             for line in sys.stdin:
                 yield line.strip()
-    
+
     if config.output_format == "raw":
         # Read line-by-line
         for line in read_input_lines():
@@ -219,7 +219,7 @@ def main() -> None:
             text_parts = []
             for file_path in config.input_files:
                 try:
-                    with open(file_path, "r", encoding="utf-8") as f:
+                    with open(file_path, encoding="utf-8") as f:
                         text_parts.append(f.read())
                 except Exception as e:
                     _LOGGER.error("Failed to read file %s: %s", file_path, e)
@@ -234,13 +234,13 @@ def main() -> None:
                 # Create temporary file for auto-play
                 with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as temp_file:
                     temp_path = temp_file.name
-                    
+
                 with wave.open(temp_path, "wb") as wav_file:
                     voice.synthesize(text, wav_file, **synthesize_args)
-                
+
                 _LOGGER.info("Playing audio...")
                 play_audio_file(temp_path, voice.config.sample_rate)
-                
+
                 # Clean up temp file
                 try:
                     os.unlink(temp_path)
@@ -254,7 +254,7 @@ def main() -> None:
             # Write to file
             with wave.open(str(config.output_file), "wb") as wav_file:
                 voice.synthesize(text, wav_file, **synthesize_args)
-            
+
             # Auto-play if requested
             if config.auto_play:
                 _LOGGER.info("Playing audio file: %s", config.output_file)

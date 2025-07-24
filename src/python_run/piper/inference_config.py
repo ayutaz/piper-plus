@@ -2,45 +2,44 @@
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
 
 
 @dataclass
 class InferenceConfig:
     """Configuration for TTS inference."""
-    
+
     # Model configuration
     model_path: str | Path
-    config_path: Optional[str | Path] = None
-    
+    config_path: str | Path | None = None
+
     # Voice parameters
-    speaker_id: Optional[int] = None
-    
+    speaker_id: int | None = None
+
     # Synthesis parameters
     noise_scale: float = 0.667
     length_scale: float = 1.0
     noise_w: float = 0.8
-    
+
     # Audio parameters
     volume: float = 1.0
     sentence_silence: float = 0.0
-    sample_rate: Optional[int] = None  # Auto-detected from model
-    
+    sample_rate: int | None = None  # Auto-detected from model
+
     # Output configuration
     output_format: str = "wav"  # wav, raw
-    output_file: Optional[str | Path] = None
-    output_dir: Optional[str | Path] = None
-    
+    output_file: str | Path | None = None
+    output_dir: str | Path | None = None
+
     # Playback
     auto_play: bool = False
-    
+
     # Hardware acceleration
     use_cuda: bool = False
-    
+
     # Input configuration
     input_files: list[str | Path] = field(default_factory=list)
-    direct_text: Optional[str] = None
-    
+    direct_text: str | None = None
+
     def to_synthesize_args(self) -> dict:
         """Convert to arguments for synthesize methods."""
         return {
@@ -51,7 +50,7 @@ class InferenceConfig:
             "sentence_silence": self.sentence_silence,
             "volume": self.volume,
         }
-    
+
     @classmethod
     def from_args(cls, args) -> "InferenceConfig":
         """Create from argparse arguments."""
