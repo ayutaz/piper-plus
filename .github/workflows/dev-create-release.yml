@@ -85,7 +85,7 @@ jobs:
             echo "✅ src/python_run/setup.py: $SETUP_VERSION"
           fi
           
-          echo "\n✅ All version files are consistent with version $VERSION"
+          echo -e "\n✅ All version files are consistent with version $VERSION"
 
       # Version update step removed - versions should be updated before release
 
@@ -133,28 +133,43 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          # Create release using gh CLI
-          RELEASE_URL=$(gh release create "${{ steps.get_release_name.outputs.tag_name }}" \
+          TAG_NAME="${{ steps.get_release_name.outputs.tag_name }}"
+          
+          # Check if tag already exists
+          if gh release view "$TAG_NAME" >/dev/null 2>&1; then
+            echo "::warning::Tag $TAG_NAME already exists. Deleting existing release and tag."
+            gh release delete "$TAG_NAME" --yes || true
+            git push origin --delete "$TAG_NAME" || true
+          fi
+          
+          # Create release using gh CLI with JSON output
+          echo "Creating release with tag: $TAG_NAME"
+          RELEASE_OUTPUT=$(gh release create "$TAG_NAME" \
             --title "${{ steps.get_release_name.outputs.name }}" \
             --notes "${{ steps.get_release_notes.outputs.body }}" \
             --draft \
-            --target "${{ github.sha }}")
+            --target "${{ github.sha }}" \
+            --json id,url,uploadUrl 2>&1) || {
+            echo "::error::Failed to create release: $RELEASE_OUTPUT"
+            exit 1
+          }
           
-          # Extract upload URL from release URL
-          # Release URL format: https://github.com/owner/repo/releases/tag/tagname
-          # We need to get the release ID to construct upload URL
-          RELEASE_ID=$(gh api \
-            -H "Accept: application/vnd.github+json" \
-            -H "X-GitHub-Api-Version: 2022-11-28" \
-            "/repos/${{ github.repository }}/releases/tags/${{ steps.get_release_name.outputs.tag_name }}" \
-            --jq '.id')
+          # Parse JSON output to get release information
+          RELEASE_ID=$(echo "$RELEASE_OUTPUT" | jq -r '.id')
+          RELEASE_URL=$(echo "$RELEASE_OUTPUT" | jq -r '.url')
+          UPLOAD_URL=$(echo "$RELEASE_OUTPUT" | jq -r '.uploadUrl')
           
-          # Construct upload URL
-          UPLOAD_URL="https://uploads.github.com/repos/${{ github.repository }}/releases/${RELEASE_ID}/assets{?name,label}"
+          # Verify we got valid values
+          if [ -z "$RELEASE_ID" ] || [ "$RELEASE_ID" = "null" ]; then
+            echo "::error::Failed to get release ID from response"
+            echo "Response was: $RELEASE_OUTPUT"
+            exit 1
+          fi
           
           echo "upload_url=${UPLOAD_URL}" >> $GITHUB_OUTPUT
           echo "release_url=${RELEASE_URL}" >> $GITHUB_OUTPUT
-          echo "Created release: ${RELEASE_URL}"
+          echo "release_id=${RELEASE_ID}" >> $GITHUB_OUTPUT
+          echo "✅ Created release: ${RELEASE_URL}"
 
   # Trigger builds
   build_all:
