@@ -506,6 +506,11 @@ void printUsage(char *argv[]) {
   cerr << "   --sentence_silence      NUM   seconds of silence after each "
           "sentence (default: 0.2)"
        << endl;
+  cerr << "   --phoneme_silence <phoneme> <seconds>  Set silence for a specific phoneme" << endl;
+  cerr << endl;
+  cerr << "   Phoneme input: Use [[ phonemes ]] notation to specify exact pronunciation" << endl;
+  cerr << "                  Example: echo \"Hello [[ h ə l oʊ ]] world\" | piper ..." << endl;
+  cerr << endl;
   cerr << "   --espeak_data           DIR   path to espeak-ng data directory"
        << endl;
   cerr << "   --tashkeel_model        FILE  path to libtashkeel onnx model "

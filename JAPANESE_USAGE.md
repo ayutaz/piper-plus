@@ -232,6 +232,23 @@ afplay test.wav
 - `--output_raw`: WAVヘッダーなしの生の音声データを出力
 - `--debug`: デバッグ情報を表示
 
+### 音素入力機能
+
+`[[ phonemes ]]` 記法を使って、正確な発音を指定できます：
+
+```bash
+# カタカナ語の発音を指定
+echo "私の名前は [[ m a i k u r u ]] です" | ./piper/bin/piper --model ja_JP-test-medium.onnx -f name.wav
+
+# 漢字の読み方を明示的に指定
+echo "今日[[ ky o o ]]は良い天気ですね" | ./piper/bin/piper --model ja_JP-test-medium.onnx -f today.wav
+
+# 複数の音素指定
+echo "[[ k o N n i ch i w a ]]、[[ g e N k i ]] ですか？" | ./piper/bin/piper --model ja_JP-test-medium.onnx -f greeting.wav
+```
+
+詳細は[音素入力ガイド](docs/PHONEME_INPUT.md)を参照してください。
+
 ### 環境変数
 
 辞書ファイルの場所をカスタマイズする場合：

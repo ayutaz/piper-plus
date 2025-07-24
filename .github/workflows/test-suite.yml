@@ -53,6 +53,11 @@ jobs:
     name: C++ Unit Tests
     uses: ./.github/workflows/cpp-tests.yml
 
+  # Phoneme Input Tests
+  test_phoneme_input:
+    name: Phoneme Input Tests
+    uses: ./.github/workflows/test-phoneme-input.yml
+
   # Multilingual TTS Test (from existing workflow)
   test_multilingual_tts:
     name: Test Multilingual TTS

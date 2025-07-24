@@ -122,15 +122,31 @@ jobs:
             # List failed tests
             ctest --rerun-failed --output-on-failure || true
             
-            # Check if our new test passed
+            # Check if our new tests passed
+            GPU_TEST_PASSED=0
+            PHONEME_TEST_PASSED=0
+            
             if ctest -R test_gpu_device_id --output-on-failure; then
               echo "✅ GPU device ID test passed successfully!"
-              # Don't fail the job if only legacy tests failed
-              echo "Note: Some legacy tests failed due to missing dependencies (espeak-ng-data, OpenJTalk binary)"
-              echo "This is expected in the CI environment and does not affect the GPU device ID functionality."
-              exit 0
+              GPU_TEST_PASSED=1
             else
               echo "❌ GPU device ID test failed!"
+            fi
+            
+            if ctest -R test_phoneme_parser --output-on-failure; then
+              echo "✅ Phoneme parser test passed successfully!"
+              PHONEME_TEST_PASSED=1
+            else
+              echo "❌ Phoneme parser test failed!"
+            fi
+            
+            # If both critical tests passed, don't fail on legacy tests
+            if [ $GPU_TEST_PASSED -eq 1 ] && [ $PHONEME_TEST_PASSED -eq 1 ]; then
+              echo "Note: Some legacy tests may have failed due to missing dependencies (espeak-ng-data, OpenJTalk binary)"
+              echo "This is expected in the CI environment and does not affect the functionality."
+              exit 0
+            else
+              echo "Critical tests failed!"
               exit 1
             fi
           fi
