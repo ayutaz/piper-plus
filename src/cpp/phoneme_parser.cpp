@@ -56,7 +56,7 @@ std::vector<TextOrPhonemes> parsePhonemeNotation(const std::string& input) {
     return result;
 }
 
-std::vector<Phoneme> parsePhonemeString(const std::string& phonemeStr, PhonemeType phonemeType) {
+std::vector<Phoneme> parsePhonemeString(const std::string& phonemeStr, PhonemeTypeInt phonemeType) {
     std::vector<Phoneme> phonemes;
     std::istringstream iss(phonemeStr);
     std::string token;
@@ -65,7 +65,7 @@ std::vector<Phoneme> parsePhonemeString(const std::string& phonemeStr, PhonemeTy
     while (iss >> token) {
         if (token.empty()) continue;
         
-        if (phonemeType == OpenJTalkPhonemes) {
+        if (phonemeType == PHONEME_TYPE_OPENJTALK) {
             // For Japanese, check if it's a multi-character phoneme
             auto it = japanesePhonemePUA.find(token);
             if (it != japanesePhonemePUA.end()) {

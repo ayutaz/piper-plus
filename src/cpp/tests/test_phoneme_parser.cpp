@@ -59,7 +59,7 @@ TEST_F(PhonemeParserTest, ParseMultiplePhonemeNotations) {
 }
 
 TEST_F(PhonemeParserTest, ParsePhonemeStringEspeak) {
-    auto phonemes = parsePhonemeString("h ə l oʊ", eSpeakPhonemes);
+    auto phonemes = parsePhonemeString("h ə l oʊ", PHONEME_TYPE_ESPEAK);
     ASSERT_EQ(phonemes.size(), 4);
     EXPECT_EQ(phonemes[0], static_cast<Phoneme>('h'));
     EXPECT_EQ(phonemes[1], static_cast<Phoneme>(U'ə'));
@@ -68,7 +68,7 @@ TEST_F(PhonemeParserTest, ParsePhonemeStringEspeak) {
 }
 
 TEST_F(PhonemeParserTest, ParsePhonemeStringJapanese) {
-    auto phonemes = parsePhonemeString("k o N n i ch i w a", OpenJTalkPhonemes);
+    auto phonemes = parsePhonemeString("k o N n i ch i w a", PHONEME_TYPE_OPENJTALK);
     ASSERT_EQ(phonemes.size(), 9);
     EXPECT_EQ(phonemes[0], static_cast<Phoneme>('k'));
     EXPECT_EQ(phonemes[1], static_cast<Phoneme>('o'));
@@ -77,7 +77,7 @@ TEST_F(PhonemeParserTest, ParsePhonemeStringJapanese) {
 }
 
 TEST_F(PhonemeParserTest, ParsePhonemeStringJapaneseMultiChar) {
-    auto phonemes = parsePhonemeString("ky a sh a", OpenJTalkPhonemes);
+    auto phonemes = parsePhonemeString("ky a sh a", PHONEME_TYPE_OPENJTALK);
     ASSERT_EQ(phonemes.size(), 4);
     // First phoneme should be the PUA-mapped "ky"
     EXPECT_EQ(phonemes[0], static_cast<Phoneme>(0xE000)); // ky -> U+E000

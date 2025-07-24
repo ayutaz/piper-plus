@@ -652,7 +652,7 @@ void textToAudio(PiperConfig &config, Voice &voice, std::string text,
     if (segment.isPhonemes) {
       // Direct phoneme input
       spdlog::debug("Processing direct phoneme input: {}", segment.text);
-      auto parsedPhonemes = parsePhonemeString(segment.text, voice.phonemizeConfig.phonemeType);
+      auto parsedPhonemes = parsePhonemeString(segment.text, static_cast<int>(voice.phonemizeConfig.phonemeType));
       
       // Add as a single "sentence"
       phonemes.push_back(parsedPhonemes);
