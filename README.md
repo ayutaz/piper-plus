@@ -76,6 +76,19 @@ Piper is used in a [variety of projects](#people-using-piper).
   * MCD (Mel-Cepstral Distortion) 評価
   * PESQ (Perceptual Evaluation of Speech Quality) 評価
   * UTMOS評価
+* **🎵 CLI機能強化** - [詳細ドキュメント](docs/CLI_ENHANCEMENTS.md)
+  * **音量調整**: `--volume` オプション (0.1-2.0)
+  * **自動再生**: `--auto-play` で生成後自動再生
+  * **直接テキスト入力**: `piper "テキスト" --model model.onnx`
+  * **ファイル入力**: `--input-file` で複数ファイル対応
+  * **使用例**:
+    ```bash
+    # 音量調整付き自動再生
+    piper "こんにちは" --model ja_JP-test.onnx --volume 1.2 --auto-play
+    
+    # ファイルから読み込み
+    piper --model en_US-lessac.onnx --input-file story.txt -f output.wav
+    ```
 
 ## 関連記事
 * [LJSpeechを使って英語のpiperの事前学習モデルを作成する](https://ayousanz.hatenadiary.jp/entry/2025/05/26/230341)
