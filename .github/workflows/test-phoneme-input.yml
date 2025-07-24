@@ -78,6 +78,8 @@ jobs:
       
       - name: Build Piper
         run: |
+          # Clean build to ensure fresh binary
+          rm -rf build
           cmake -B build -DCMAKE_BUILD_TYPE=Release
           cmake --build build --config Release -j$(nproc 2>/dev/null || sysctl -n hw.ncpu)
       
