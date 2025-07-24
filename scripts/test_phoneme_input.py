@@ -6,6 +6,7 @@ import subprocess
 import sys
 import tempfile
 
+
 def test_phoneme_input(piper_binary, model_path):
     """Test various phoneme input scenarios"""
     tests = [
@@ -45,7 +46,7 @@ def test_phoneme_input(piper_binary, model_path):
     for test in tests:
         print(f"\nRunning test: {test['name']}")
         print(f"Input: {test['input']}")
-        
+
         with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp_file:
             output_path = tmp_file.name
         try:
