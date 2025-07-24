@@ -48,6 +48,11 @@ jobs:
     name: Test Japanese TTS
     uses: ./.github/workflows/test-japanese-tts.yml
 
+  # C++ Unit Tests
+  cpp_tests:
+    name: C++ Unit Tests
+    uses: ./.github/workflows/cpp-tests.yml
+
   # Multilingual TTS Test (from existing workflow)
   test_multilingual_tts:
     name: Test Multilingual TTS
