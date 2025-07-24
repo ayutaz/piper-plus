@@ -8,6 +8,7 @@ set(TEST_SOURCES
     test_openjtalk_error_handling.cpp
     test_openjtalk_optimized.cpp
     test_gpu_device_id.cpp
+    test_phoneme_parser.cpp
 )
 
 # Add dictionary manager test for Unix platforms
@@ -93,6 +94,20 @@ foreach(test_source ${TEST_SOURCES})
         )
     endif()
 
+    # Link additional dependencies for phoneme parser test
+    if(${test_name} STREQUAL "test_phoneme_parser")
+        target_sources(${test_name} PRIVATE
+            ../phoneme_parser.cpp
+        )
+        target_include_directories(${test_name} PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/..
+            ${PIPER_PHONEMIZE_DIR}/include
+            ${SPDLOG_DIR}/include
+        )
+        target_link_libraries(${test_name}
+            ${SPDLOG_DIR}/lib/libspdlog.a
+        )
+    endif()
 
     add_test(NAME ${test_name} COMMAND ${test_name})
 endforeach()
