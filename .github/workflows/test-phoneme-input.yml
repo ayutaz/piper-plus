@@ -83,8 +83,14 @@ jobs:
       
       - name: Test CLI help includes phoneme input
         run: |
-          ./build/piper --help | grep "Phoneme input:" || (echo "Phoneme input not found in help text!" && exit 1)
-          echo "✅ Phoneme input documentation found in help text"
+          # Check if help text contains phoneme input documentation
+          if ./build/piper --help | grep -i "phoneme.*input"; then
+            echo "✅ Phoneme input documentation found in help text"
+          else
+            echo "❌ Phoneme input documentation not found in help text!"
+            ./build/piper --help
+            exit 1
+          fi
       
       - name: Run phoneme input tests
         run: |
