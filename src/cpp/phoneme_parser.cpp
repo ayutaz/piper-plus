@@ -19,7 +19,7 @@ static const std::map<std::string, char32_t> japanesePhonemePUA = {
 
 std::vector<TextOrPhonemes> parsePhonemeNotation(const std::string& input) {
     std::vector<TextOrPhonemes> result;
-    std::regex phonemeRegex(R"(\[\[\s*([^\]]+)\s*\]\])");
+    std::regex phonemeRegex(R"(\[\[\s*([^\]]*)\s*\]\])");
     
     size_t lastPos = 0;
     auto begin = std::sregex_iterator(input.begin(), input.end(), phonemeRegex);
@@ -29,7 +29,7 @@ std::vector<TextOrPhonemes> parsePhonemeNotation(const std::string& input) {
         std::smatch match = *i;
         
         // Add text before the phoneme notation
-        if (match.position() > lastPos) {
+        if (static_cast<size_t>(match.position()) > lastPos) {
             TextOrPhonemes textSegment;
             textSegment.isPhonemes = false;
             textSegment.text = input.substr(lastPos, match.position() - lastPos);
@@ -39,7 +39,10 @@ std::vector<TextOrPhonemes> parsePhonemeNotation(const std::string& input) {
         // Add the phonemes
         TextOrPhonemes phonemeSegment;
         phonemeSegment.isPhonemes = true;
-        phonemeSegment.text = match[1].str(); // Store original phoneme string
+        std::string phonemeStr = match[1].str();
+        // Trim trailing whitespace
+        phonemeStr.erase(phonemeStr.find_last_not_of(" \t\n\r") + 1);
+        phonemeSegment.text = phonemeStr; // Store trimmed phoneme string
         // Phonemes will be parsed later based on the phoneme type
         result.push_back(phonemeSegment);
         

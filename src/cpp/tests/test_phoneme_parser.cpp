@@ -60,11 +60,13 @@ TEST_F(PhonemeParserTest, ParseMultiplePhonemeNotations) {
 
 TEST_F(PhonemeParserTest, ParsePhonemeStringEspeak) {
     auto phonemes = parsePhonemeString("h ə l oʊ", PHONEME_TYPE_ESPEAK);
-    ASSERT_EQ(phonemes.size(), 4);
+    // "oʊ" is parsed as two separate characters in espeak mode
+    ASSERT_EQ(phonemes.size(), 5);
     EXPECT_EQ(phonemes[0], static_cast<Phoneme>('h'));
     EXPECT_EQ(phonemes[1], static_cast<Phoneme>(U'ə'));
     EXPECT_EQ(phonemes[2], static_cast<Phoneme>('l'));
-    // oʊ is multi-byte, would be parsed differently
+    EXPECT_EQ(phonemes[3], static_cast<Phoneme>('o'));
+    EXPECT_EQ(phonemes[4], static_cast<Phoneme>(U'ʊ'));
 }
 
 TEST_F(PhonemeParserTest, ParsePhonemeStringJapanese) {
