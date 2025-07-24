@@ -14,6 +14,7 @@
 #include <cstdint>
 #include <limits>
 #include <queue>
+#include <cstdlib>
 
 using namespace emscripten;
 
@@ -439,14 +440,9 @@ private:
         const unsigned char* key = reinterpret_cast<const unsigned char*>(text + pos);
         size_t remain = len - pos;
         
-        // Try multiple DARTS algorithms since format is unclear
-        static int algorithm = 0;
-        static bool tested[4] = {false, false, false, false};
-        
-        // Only debug first attempt of each algorithm
-        bool debug = !tested[algorithm] && pos == 0;
-        if (debug) {
-            tested[algorithm] = true;
+        // Use simple approach: start from position 1 instead of 0
+        // This dictionary seems to have a special structure where node 0 is not the real root
+        static bool debug = (pos == 0);
             std::cout << "\nDARTS lookup at pos " << pos << " for: ";
             for (size_t i = 0; i < remain && i < 10; i++) {
                 std::cout << std::hex << (int)key[i] << " ";
@@ -465,82 +461,103 @@ private:
             }
         }
         
-        // Algorithm 0: Improved DARTS with both node 0 and node 1
-        if (algorithm == 0) {
-            // Try both node 0 and node 1 as starting points
-            for (int start_node = 0; start_node <= 1; start_node++) {
-                size_t node_pos = start_node;
-                size_t key_pos = 0;
+        // Try starting from position 1 instead of 0
+        // Many MeCab dictionaries use node 1 as the actual starting point
+        for (size_t start_pos = 1; start_pos <= 1; start_pos++) {
+            size_t node_pos = start_pos;
+            size_t key_pos = 0;
+            
+            while (key_pos < remain) {
+                unsigned char c = key[key_pos];
                 
-                while (key_pos < remain) {
-                    unsigned char c = key[key_pos];
+                if (node_pos >= darts.size()) break;
+                
+                int32_t base = darts[node_pos].base;
+                int32_t t;
+                
+                // DARTS lookup from current node
+                // Special handling for root node with negative base
+                if (node_pos == 0 && base < 0) {
+                    // For root node with negative base, use absolute value
+                    t = std::abs(base) + static_cast<int32_t>(c);
+                    if (debug && key_pos == 0) {
+                        std::cout << "  Root special: byte=0x" << std::hex << (int)c 
+                                  << std::dec << ", t=|" << base << "|+" << (int)c 
+                                  << "=" << t << std::endl;
+                    }
+                } else {
+                    // Standard DARTS formula
+                    t = base + static_cast<int32_t>(c) + 1;
+                    if (node_pos == 0 && debug && key_pos == 0) {
+                        std::cout << "  Root standard: byte=0x" << std::hex << (int)c 
+                                  << std::dec << ", t=" << t << " (base=" << base << ")" << std::endl;
+                    }
+                }
+                
+                // Check bounds
+                if (t < 0 || t >= static_cast<int32_t>(darts.size())) {
+                    if (debug) {
+                        std::cout << "  Out of bounds: t=" << t << std::endl;
+                    }
+                    break;
+                }
+                
+                // Validate transition
+                if (darts[t].check == static_cast<int32_t>(node_pos)) {
+                    // Valid transition
+                    node_pos = static_cast<size_t>(t);
+                    key_pos++;
                     
-                    if (node_pos >= darts.size()) break;
-                    
-                    int32_t base = darts[node_pos].base;
-                    
-                    // Calculate next node
-                    int32_t t = -1;
-                    
-                    if (node_pos == 0 && base < 0) {
-                        // Special handling for node 0 with negative base
-                        // Try direct mapping first
-                        t = static_cast<int32_t>(c);
-                        
-                        if (debug && key_pos == 0) {
-                            std::cout << "  Node 0 special: byte=" << std::hex << (int)c 
-                                      << ", trying t=" << std::dec << t << std::endl;
-                        }
-                        
-                        // Validate the transition
-                        if (t >= static_cast<int32_t>(darts.size()) || 
-                            darts[t].check != static_cast<int32_t>(node_pos)) {
-                            if (debug && key_pos == 0) {
-                                std::cout << "    Failed: ";
-                                if (t < static_cast<int32_t>(darts.size())) {
-                                    std::cout << "check[" << t << "]=" << darts[t].check 
-                                              << " != " << node_pos << std::endl;
-                                } else {
-                                    std::cout << "t out of bounds" << std::endl;
-                                }
-                            }
-                            // If direct mapping fails, skip to node 1
-                            node_pos = 1;
-                            continue;
-                        }
-                    } else {
-                        // Standard DARTS formula
-                        t = base + static_cast<int32_t>(c) + 1;
+                    if (debug && key_pos == 1) {
+                        std::cout << "    Success! Moved to node " << t 
+                                  << " (base=" << darts[t].base << ")" << std::endl;
                     }
                     
-                    // Check bounds
-                    if (t < 0 || t >= static_cast<int32_t>(darts.size())) break;
-                    
-                    // Validate transition
-                    if (darts[t].check == static_cast<int32_t>(node_pos)) {
-                        // Valid transition
-                        node_pos = static_cast<size_t>(t);
-                        key_pos++;
-                        
-                        // Check if terminal node
-                        if (darts[t].base < 0) {
-                            size_t token_id = static_cast<size_t>(-darts[t].base - 1);
-                            if (token_id < tokens.size()) {
-                                results.push_back({token_id, key_pos});
-                                if (debug) {
-                                    std::cout << "  Found match from node " << start_node
-                                              << ", length " << key_pos
-                                              << ", token_id=" << token_id << std::endl;
-                                }
+                    // Check if terminal node (negative base means terminal)
+                    if (darts[t].base < 0) {
+                        size_t token_id = static_cast<size_t>(-darts[t].base - 1);
+                        if (token_id < tokens.size()) {
+                            results.push_back({token_id, key_pos});
+                            if (debug) {
+                                std::cout << "  Found match: length=" << key_pos
+                                          << ", token_id=" << token_id << std::endl;
                             }
                         }
-                    } else {
-                        // No valid transition
+                    }
+                } else {
+                    // No valid transition
+                    if (debug && key_pos == 0) {
+                        std::cout << "    Check failed: check[" << t << "]=" << darts[t].check 
+                                  << " != " << node_pos << std::endl;
+                    }
+                    
+                    // If we're at root and first byte failed, no matches possible
+                    if (node_pos == 0) {
                         break;
                     }
+                    
+                    // For non-root nodes, could try backtracking but for now just break
+                    break;
                 }
             }
         }
+        
+        // If no results from standard search, try fallback
+        if (results.empty() && remain > 0) {
+            // Fallback: create simple single character matches
+            size_t char_len = getUTF8CharLength(reinterpret_cast<const char*>(key));
+            if (char_len > 0 && char_len <= remain) {
+                // Create a dummy token for unknown single character
+                results.push_back({0, char_len}); // token_id=0, length=char_len
+            }
+        }
+        
+        return results;
+    }
+    
+    // Disabled algorithms
+    void disabledAlgorithms() {
+        /*
         // Algorithm 1: Modified DARTS with base+c (no +1)
         else if (algorithm == 1) {
             size_t node_pos = 0;
@@ -585,16 +602,25 @@ private:
             }
         }
         
-        // Use algorithm 0 as it shows the best results
-        // algorithm = (algorithm + 1) % 3;
-        algorithm = 0;  // Always use standard DARTS from node 1
+        // Removed algorithm selection - now using fixed approach
         
-        if (debug && results.empty()) {
-            std::cout << "  No matches found with this algorithm" << std::endl;
-        } else if (debug && !results.empty()) {
-            std::cout << "  Found " << results.size() << " matches!" << std::endl;
-            for (const auto& r : results) {
-                std::cout << "    Token " << r.first << ", length " << r.second << std::endl;
+        if (debug) {
+            if (results.empty()) {
+                std::cout << "  No matches found at pos " << pos << std::endl;
+            } else {
+                std::cout << "  Found " << results.size() << " matches at pos " << pos << "!" << std::endl;
+                for (const auto& r : results) {
+                    std::cout << "    Token " << r.first << ", length " << r.second << " bytes";
+                    // Show the matched string
+                    if (r.second <= remain) {
+                        std::cout << " = \"";
+                        for (size_t i = 0; i < r.second; i++) {
+                            std::cout << (char)key[i];
+                        }
+                        std::cout << "\"";
+                    }
+                    std::cout << std::endl;
+                }
             }
         }
         
@@ -819,11 +845,28 @@ private:
         
         // Debug: Check lattice construction
         std::cout << "Lattice construction debug:" << std::endl;
+        std::cout << "Input text: \"" << text << "\" (length=" << len << " bytes)" << std::endl;
+        
+        // Show character positions
+        std::cout << "Character positions:" << std::endl;
+        for (size_t p = 0; p < len; ) {
+            size_t clen = getUTF8CharLength(ctext + p);
+            std::cout << "  pos " << p << ": '";
+            for (size_t i = 0; i < clen; i++) {
+                std::cout << ctext[p + i];
+            }
+            std::cout << "' (" << clen << " bytes)" << std::endl;
+            p += clen;
+        }
+        
+        // Show nodes at each position
+        std::cout << "\nNodes at each position:" << std::endl;
         for (size_t i = 0; i <= len; i++) {
             if (!lattice[i].empty()) {
                 std::cout << "  Position " << i << ": " << lattice[i].size() << " nodes" << std::endl;
                 for (auto* node : lattice[i]) {
-                    std::cout << "    " << node->surface << " (" << node->start_pos << "-" << node->end_pos << ")" << std::endl;
+                    std::cout << "    \"" << node->surface << "\" (start=" << node->start_pos 
+                              << ", end=" << node->end_pos << ", cost=" << node->wcost << ")" << std::endl;
                 }
             }
         }
@@ -863,6 +906,17 @@ private:
                         // Add connection cost
                         if (prev->surface != "BOS" && node->surface != "EOS") {
                             cost += getConnectionCost(prev->right_id, node->left_id);
+                        }
+                        
+                        // Special handling for nodes that don't start from position 0
+                        // Penalize paths that skip the beginning of the text
+                        if (node->start_pos > 0 && prev->surface == "BOS") {
+                            // This node skips the beginning - add penalty
+                            cost += 10000;
+                            if (node->start_pos <= 6) {  // Debug first few positions
+                                std::cout << "  Penalty for skipping start: " << node->surface 
+                                          << " starts at " << node->start_pos << std::endl;
+                            }
                         }
                         
                         if (cost < best_cost) {
@@ -915,11 +969,15 @@ private:
         }
         
         // Backtrack
+        std::cout << "\nBacktracking path:" << std::endl;
         while (current != nullptr && current->surface != "BOS") {
+            std::cout << "  Node: \"" << current->surface << "\" (" 
+                      << current->start_pos << "-" << current->end_pos << ")" << std::endl;
             path.push_back(current);
             current = current->prev;
         }
         
+        std::cout << "\nFinal path has " << path.size() << " nodes" << std::endl;
         std::reverse(path.begin(), path.end());
         
         // Clean up non-path nodes

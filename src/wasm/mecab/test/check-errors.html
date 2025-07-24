@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Error Check</title>
+</head>
+<body>
+    <h1>Error Check</h1>
+    <pre id="output"></pre>
+    
+    <script type="module">
+        const output = document.getElementById('output');
+        output.textContent = 'Testing module import...\n';
+        
+        try {
+            // First check if the module exists
+            const response = await fetch('../dist_full/mecab-full.js');
+            output.textContent += `Module status: ${response.status}\n`;
+            
+            if (response.ok) {
+                output.textContent += 'Module file exists\n';
+                
+                // Try to import
+                const module = await import('../dist_full/mecab-full.js');
+                output.textContent += 'Module imported successfully\n';
+                output.textContent += 'Exports: ' + Object.keys(module).join(', ') + '\n';
+                
+                // Try to create instance
+                if (module.MeCabFull) {
+                    const mecab = new module.MeCabFull();
+                    output.textContent += 'MeCabFull instance created\n';
+                    
+                    // Try to initialize
+                    try {
+                        await mecab.initialize({ basePath: '../dist_full/' });
+                        output.textContent += '✓ Initialization successful!\n';
+                        
+                        // Try simple parse
+                        const result = mecab.parse('テスト');
+                        output.textContent += '\nTest parse result:\n' + result;
+                    } catch (initError) {
+                        output.textContent += '✗ Initialization error: ' + initError.message + '\n';
+                        output.textContent += initError.stack + '\n';
+                    }
+                } else {
+                    output.textContent += '✗ MeCabFull not found in exports\n';
+                }
+            } else {
+                output.textContent += '✗ Module file not found\n';
+            }
+        } catch (error) {
+            output.textContent += '\n✗ Error: ' + error.message + '\n';
+            output.textContent += error.stack;
+        }
+    </script>
+</body>
+</html>

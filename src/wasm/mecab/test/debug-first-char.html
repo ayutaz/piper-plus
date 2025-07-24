@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Debug First Character Issue</title>
+    <style>
+        body { font-family: monospace; margin: 20px; }
+        pre { background: #f0f0f0; padding: 10px; overflow-x: auto; }
+        .input { color: blue; font-weight: bold; }
+        .output { color: green; font-weight: bold; }
+        .debug { color: #666; font-size: 0.9em; }
+    </style>
+</head>
+<body>
+    <h1>文頭文字欠落問題のデバッグ</h1>
+    <div id="status">初期化中...</div>
+    <div id="results"></div>
+    
+    <script type="module">
+        import { MeCabFull } from '../dist_full/mecab-full.js';
+        
+        async function debugFirstChar() {
+            const statusEl = document.getElementById('status');
+            const resultsEl = document.getElementById('results');
+            
+            try {
+                const mecab = new MeCabFull();
+                
+                statusEl.textContent = 'MeCab初期化中...';
+                await mecab.initialize({
+                    basePath: '../dist_full/'
+                });
+                
+                statusEl.textContent = 'テスト実行中...';
+                
+                // 最小限のテストケース
+                const testCases = [
+                    '今',      // 1文字
+                    '今日',    // 2文字
+                    '今日は',  // 3文字
+                    'あ',      // ひらがな1文字
+                    'あい',    // ひらがな2文字
+                    'A',       // 英字1文字
+                    'AB',      // 英字2文字
+                ];
+                
+                resultsEl.innerHTML = '<h2>テスト結果</h2>';
+                
+                // コンソール出力をキャプチャ
+                const originalLog = console.log;
+                let consoleOutput = [];
+                console.log = function(...args) {
+                    consoleOutput.push(args.join(' '));
+                    originalLog.apply(console, args);
+                };
+                
+                for (const input of testCases) {
+                    consoleOutput = [];
+                    
+                    const div = document.createElement('div');
+                    div.innerHTML = `<h3 class="input">入力: "${input}"</h3>`;
+                    
+                    const result = mecab.parse(input);
+                    const lines = result.split('\n').filter(l => l && l !== 'EOS');
+                    const words = lines.map(l => l.split('\t')[0]);
+                    
+                    div.innerHTML += `<p class="output">出力: ${words.join(' / ')}</p>`;
+                    
+                    // コンソール出力を表示
+                    if (consoleOutput.length > 0) {
+                        const debugPre = document.createElement('pre');
+                        debugPre.className = 'debug';
+                        debugPre.textContent = consoleOutput.join('\n');
+                        div.appendChild(debugPre);
+                    }
+                    
+                    // 問題の診断
+                    const inputBytes = new TextEncoder().encode(input);
+                    const outputBytes = new TextEncoder().encode(words.join(''));
+                    
+                    if (inputBytes.length > outputBytes.length) {
+                        div.innerHTML += `<p style="color: red;">⚠️ ${inputBytes.length - outputBytes.length}バイト欠落</p>`;
+                    }
+                    
+                    resultsEl.appendChild(div);
+                }
+                
+                // コンソールを元に戻す
+                console.log = originalLog;
+                
+                statusEl.textContent = 'テスト完了';
+                
+            } catch (error) {
+                statusEl.textContent = 'エラー: ' + error.message;
+                console.error(error);
+            }
+        }
+        
+        debugFirstChar();
+    </script>
+</body>
+</html>

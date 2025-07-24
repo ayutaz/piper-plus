@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>Debug DARTS Path</title>
+</head>
+<body>
+    <h1>DARTS Path Debugging</h1>
+    <pre id="output"></pre>
+    
+    <script>
+        async function debugDARTSPath() {
+            const output = document.getElementById('output');
+            
+            try {
+                const response = await fetch('../dict/naist-jdic/sys.dic');
+                const buffer = await response.arrayBuffer();
+                const view = new DataView(buffer);
+                
+                const DARTS_OFFSET = 1664;
+                
+                output.textContent = 'DARTS Path Debug\n\n';
+                
+                // Test specific characters that are failing
+                const testChars = [
+                    { char: '今', bytes: [0xe4, 0xbb, 0x8a] },
+                    { char: '私', bytes: [0xe7, 0xa7, 0x81] },
+                    { char: '東', bytes: [0xe6, 0x9d, 0xb1] },
+                    { char: 'こ', bytes: [0xe3, 0x81, 0x93] },
+                    { char: 'れ', bytes: [0xe3, 0x82, 0x8c] }
+                ];
+                
+                for (const test of testChars) {
+                    output.textContent += `\nTracing "${test.char}" [${test.bytes.map(b => '0x' + b.toString(16)).join(', ')}]:\n`;
+                    
+                    // Try from node 0
+                    output.textContent += '  From node 0 (base=-2, check=199):\n';
+                    let node = 0;
+                    for (let i = 0; i < test.bytes.length; i++) {
+                        const byte = test.bytes[i];
+                        const base = view.getInt32(DARTS_OFFSET + node * 8, true);
+                        const check = view.getInt32(DARTS_OFFSET + node * 8 + 4, true);
+                        
+                        output.textContent += `    Step ${i}: node=${node}, base=${base}, byte=0x${byte.toString(16)}\n`;
+                        
+                        // Try different calculations
+                        const candidates = [
+                            { formula: 'direct', t: byte },
+                            { formula: 'base+byte+1', t: base + byte + 1 },
+                            { formula: '|base|+byte', t: Math.abs(base) + byte },
+                            { formula: 'byte+1', t: byte + 1 },
+                            { formula: 'byte-base', t: byte - base }
+                        ];
+                        
+                        let found = false;
+                        for (const cand of candidates) {
+                            if (cand.t >= 0 && cand.t < 10000) {
+                                const nextCheck = view.getInt32(DARTS_OFFSET + cand.t * 8 + 4, true);
+                                if (nextCheck === node) {
+                                    const nextBase = view.getInt32(DARTS_OFFSET + cand.t * 8, true);
+                                    output.textContent += `      ✓ ${cand.formula}: t=${cand.t}, check matches! base=${nextBase}\n`;
+                                    node = cand.t;
+                                    found = true;
+                                    break;
+                                }
+                            }
+                        }
+                        
+                        if (!found) {
+                            output.textContent += `      ✗ No valid transition found\n`;
+                            break;
+                        }
+                    }
+                    
+                    // Try from node 1
+                    output.textContent += '  From node 1 (base=201, check=34):\n';
+                    node = 1;
+                    for (let i = 0; i < test.bytes.length; i++) {
+                        const byte = test.bytes[i];
+                        const base = view.getInt32(DARTS_OFFSET + node * 8, true);
+                        
+                        const t = base + byte + 1;
+                        output.textContent += `    Step ${i}: node=${node}, base=${base}, byte=0x${byte.toString(16)}, t=${t}\n`;
+                        
+                        if (t >= 0 && t < 10000) {
+                            const nextCheck = view.getInt32(DARTS_OFFSET + t * 8 + 4, true);
+                            const nextBase = view.getInt32(DARTS_OFFSET + t * 8, true);
+                            if (nextCheck === node) {
+                                output.textContent += `      ✓ Valid transition to node ${t}, base=${nextBase}\n`;
+                                node = t;
+                                if (nextBase < 0) {
+                                    output.textContent += `      → Terminal! token_id=${-nextBase-1}\n`;
+                                }
+                            } else {
+                                output.textContent += `      ✗ Check failed: ${nextCheck} != ${node}\n`;
+                                break;
+                            }
+                        } else {
+                            output.textContent += `      ✗ Out of bounds\n`;
+                            break;
+                        }
+                    }
+                }
+                
+            } catch (error) {
+                output.textContent = 'Error: ' + error.message;
+            }
+        }
+        
+        debugDARTSPath();
+    </script>
+</body>
+</html>

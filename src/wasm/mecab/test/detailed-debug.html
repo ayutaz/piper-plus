@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>Detailed DARTS Debug</title>
+    <style>
+        body { font-family: monospace; margin: 20px; }
+        .success { color: green; }
+        .failure { color: red; }
+        .info { color: blue; }
+        pre { background: #f5f5f5; padding: 10px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1>Detailed DARTS Debug</h1>
+    <div id="status">Initializing...</div>
+    <div id="results"></div>
+    
+    <script type="module">
+        import { MeCabFull } from '../dist_full/mecab-full.js';
+        
+        async function detailedDebug() {
+            const statusEl = document.getElementById('status');
+            const resultsEl = document.getElementById('results');
+            
+            try {
+                const mecab = new MeCabFull();
+                
+                statusEl.textContent = 'Initializing MeCab...';
+                await mecab.initialize({
+                    basePath: '../dist_full/'
+                });
+                
+                statusEl.textContent = 'Running detailed tests...';
+                
+                // Test specific characters
+                const tests = [
+                    { char: '今', hex: 'e4 bb 8a' },
+                    { char: '日', hex: 'e6 97 a5' },
+                    { char: '私', hex: 'e7 a7 81' },
+                    { char: '東', hex: 'e6 9d b1' },
+                    { char: 'こ', hex: 'e3 81 93' },
+                    { char: 'は', hex: 'e3 81 af' }
+                ];
+                
+                resultsEl.innerHTML = '<h2>Character Tests</h2>';
+                
+                for (const test of tests) {
+                    const div = document.createElement('div');
+                    div.innerHTML = `<h3>Testing "${test.char}" (${test.hex})</h3>`;
+                    
+                    // Test single character
+                    const result1 = mecab.parse(test.char);
+                    const lines1 = result1.split('\n').filter(l => l && l !== 'EOS');
+                    
+                    if (lines1.length > 0) {
+                        div.innerHTML += `<p class="success">✓ Single character detected</p>`;
+                        div.innerHTML += `<pre>${result1}</pre>`;
+                    } else {
+                        div.innerHTML += `<p class="failure">✗ Single character not detected</p>`;
+                    }
+                    
+                    // Test in context
+                    const testStr = test.char + 'です';
+                    const result2 = mecab.parse(testStr);
+                    const lines2 = result2.split('\n').filter(l => l && l !== 'EOS');
+                    const words2 = lines2.map(l => l.split('\t')[0]);
+                    
+                    if (words2.includes(test.char)) {
+                        div.innerHTML += `<p class="success">✓ In context: "${testStr}" includes "${test.char}"</p>`;
+                    } else {
+                        div.innerHTML += `<p class="failure">✗ In context: "${testStr}" missing "${test.char}"</p>`;
+                        div.innerHTML += `<p>Found: ${words2.join(', ')}</p>`;
+                    }
+                    
+                    resultsEl.appendChild(div);
+                }
+                
+                // Test full sentences
+                resultsEl.innerHTML += '<h2>Full Sentence Tests</h2>';
+                
+                const sentences = [
+                    '今日は良い天気です',
+                    '私は日本人です',
+                    '東京スカイツリー',
+                    'これはペンです'
+                ];
+                
+                for (const sentence of sentences) {
+                    const div = document.createElement('div');
+                    div.innerHTML = `<h3>${sentence}</h3>`;
+                    
+                    const result = mecab.parse(sentence);
+                    const lines = result.split('\n').filter(l => l && l !== 'EOS');
+                    const words = lines.map(l => l.split('\t')[0]);
+                    
+                    div.innerHTML += `<p>Words found: <strong>${words.join(' / ')}</strong></p>`;
+                    div.innerHTML += `<pre>${result}</pre>`;
+                    
+                    // Check for critical words
+                    const critical = {
+                        '今日は良い天気です': ['今日', 'は', '良い', '天気'],
+                        '私は日本人です': ['私', 'は', '日本', '人'],
+                        '東京スカイツリー': ['東京', 'スカイツリー'],
+                        'これはペンです': ['これ', 'は', 'ペン']
+                    };
+                    
+                    if (critical[sentence]) {
+                        const missing = critical[sentence].filter(w => !words.includes(w));
+                        if (missing.length === 0) {
+                            div.innerHTML += `<p class="success">✓ All critical words found</p>`;
+                        } else {
+                            div.innerHTML += `<p class="failure">✗ Missing: ${missing.join(', ')}</p>`;
+                        }
+                    }
+                    
+                    resultsEl.appendChild(div);
+                }
+                
+                statusEl.textContent = 'Debug complete';
+                
+            } catch (error) {
+                statusEl.textContent = 'Error: ' + error.message;
+                console.error(error);
+            }
+        }
+        
+        detailedDebug();
+    </script>
+</body>
+</html>
