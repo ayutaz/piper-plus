@@ -149,6 +149,26 @@ All existing Piper functionality remains unchanged:
 - Existing command-line options work as before
 - No changes to model loading or synthesis algorithms
 
+## GPU Device Selection (v1.5.0+)
+
+Select specific GPU devices for multi-GPU systems:
+
+```bash
+# Use default GPU (device 0)
+piper "Hello" --model model.onnx --use-cuda -f output.wav
+
+# Use GPU device 1
+piper "Hello" --model model.onnx --use-cuda --gpu-device-id 1 -f output.wav
+
+# Set via environment variable
+export PIPER_GPU_DEVICE_ID=2
+piper "Hello" --model model.onnx --use-cuda -f output.wav
+```
+
+**Priority**: CLI argument > Environment variable > Default (0)
+
+For detailed GPU configuration, see [GPU Configuration Guide](GPU_CONFIGURATION.md).
+
 ## Phoneme Input Support (v1.5.0+)
 
 Direct phoneme input using `[[ phonemes ]]` notation:
