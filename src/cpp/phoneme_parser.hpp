@@ -4,7 +4,6 @@
 #include <string>
 #include <vector>
 #include <regex>
-#include <piper-phonemize/phonemize.hpp>
 #include "piper.hpp"
 
 namespace piper {

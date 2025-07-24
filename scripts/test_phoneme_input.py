@@ -1,16 +1,13 @@
 #!/usr/bin/env python3
 """Test script for phoneme input functionality"""
 
-import subprocess
-import tempfile
 import os
+import subprocess
 import sys
-import json
-from pathlib import Path
+import tempfile
 
 def test_phoneme_input(piper_binary, model_path):
     """Test various phoneme input scenarios"""
-    
     tests = [
         {
             "name": "Plain text",
@@ -43,16 +40,14 @@ def test_phoneme_input(piper_binary, model_path):
             "description": "Japanese multi-character phonemes"
         }
     ]
-    
+
     results = []
-    
     for test in tests:
         print(f"\nRunning test: {test['name']}")
         print(f"Input: {test['input']}")
         
         with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp_file:
             output_path = tmp_file.name
-        
         try:
             # Run piper
             process = subprocess.Popen(
@@ -62,12 +57,10 @@ def test_phoneme_input(piper_binary, model_path):
                 stderr=subprocess.PIPE,
                 text=True
             )
-            
+
             stdout, stderr = process.communicate(input=test["input"])
-            
             # Check if audio file was created
             success = os.path.exists(output_path) and os.path.getsize(output_path) > 0
-            
             result = {
                 "test": test["name"],
                 "success": success,
@@ -75,59 +68,53 @@ def test_phoneme_input(piper_binary, model_path):
                 "return_code": process.returncode,
                 "stderr": stderr.strip() if stderr else None
             }
-            
             if success:
                 print(f"✓ Success: Generated {result['output_size']} bytes")
             else:
                 print(f"✗ Failed: {result['stderr']}")
-            
+
             results.append(result)
-            
         finally:
             # Clean up
             if os.path.exists(output_path):
                 os.unlink(output_path)
-    
+
     return results
 
 def main():
     if len(sys.argv) < 3:
         print(f"Usage: {sys.argv[0]} <piper_binary> <model_path>")
         sys.exit(1)
-    
+
     piper_binary = sys.argv[1]
     model_path = sys.argv[2]
-    
     if not os.path.exists(piper_binary):
         print(f"Error: Piper binary not found: {piper_binary}")
         sys.exit(1)
-    
+
     if not os.path.exists(model_path):
         print(f"Error: Model file not found: {model_path}")
         sys.exit(1)
-    
-    print(f"Testing phoneme input with:")
+
+    print("Testing phoneme input with:")
     print(f"  Binary: {piper_binary}")
     print(f"  Model: {model_path}")
-    
+
     results = test_phoneme_input(piper_binary, model_path)
-    
     # Summary
     print("\n" + "="*50)
     print("TEST SUMMARY")
     print("="*50)
-    
+
     passed = sum(1 for r in results if r["success"])
     total = len(results)
-    
     for result in results:
         status = "PASS" if result["success"] else "FAIL"
         print(f"{status}: {result['test']}")
         if not result["success"] and result["stderr"]:
             print(f"     Error: {result['stderr']}")
-    
+
     print(f"\nTotal: {passed}/{total} tests passed")
-    
     # Exit with error if any test failed
     sys.exit(0 if passed == total else 1)
 

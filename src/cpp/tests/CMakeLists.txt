@@ -107,6 +107,10 @@ foreach(test_source ${TEST_SOURCES})
         target_link_libraries(${test_name}
             ${SPDLOG_DIR}/lib/libspdlog.a
         )
+        # Add dependency on piper_phonemize_external to ensure headers are available
+        if(TARGET piper_phonemize_external)
+            add_dependencies(${test_name} piper_phonemize_external)
+        endif()
     endif()
 
     add_test(NAME ${test_name} COMMAND ${test_name})
