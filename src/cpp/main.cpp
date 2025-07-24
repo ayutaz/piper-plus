@@ -11,6 +11,7 @@
 #include <string>
 #include <thread>
 #include <vector>
+#include <cstdlib>
 
 #ifdef _MSC_VER
 #define WIN32_LEAN_AND_MEAN
@@ -94,6 +95,9 @@ struct RunConfig {
 
   // true to use CUDA execution provider
   bool useCuda = false;
+
+  // GPU device ID for CUDA execution provider (default: 0)
+  int gpuDeviceId = 0;
 };
 
 void parseArgs(int argc, char *argv[], RunConfig &runConfig);
@@ -188,7 +192,7 @@ int main(int argc, char *argv[]) {
   auto startTime = chrono::steady_clock::now();
   loadVoice(piperConfig, runConfig.modelPath.string(),
             runConfig.modelConfigPath.string(), voice, runConfig.speakerId,
-            runConfig.useCuda);
+            runConfig.useCuda, runConfig.gpuDeviceId);
   auto endTime = chrono::steady_clock::now();
   spdlog::info("Loaded voice in {} second(s)",
                chrono::duration<double>(endTime - startTime).count());
@@ -512,6 +516,8 @@ void printUsage(char *argv[]) {
        << endl;
   cerr << "   --use-cuda                    use CUDA execution provider"
        << endl;
+  cerr << "   --gpu-device-id         NUM   GPU device ID for CUDA (default: 0)"
+       << endl;
   cerr << "   --debug                       print DEBUG messages to the console"
        << endl;
   cerr << "   -q       --quiet              disable logging" << endl;
@@ -528,6 +534,17 @@ void ensureArg(int argc, char *argv[], int argi) {
 // Parse command-line arguments
 void parseArgs(int argc, char *argv[], RunConfig &runConfig) {
   optional<filesystem::path> modelConfigPath;
+
+  // Check for GPU device ID environment variable
+  const char* gpuDeviceEnv = std::getenv("PIPER_GPU_DEVICE_ID");
+  if (gpuDeviceEnv != nullptr) {
+    try {
+      runConfig.gpuDeviceId = std::stoi(gpuDeviceEnv);
+      spdlog::debug("GPU device ID set from environment: {}", runConfig.gpuDeviceId);
+    } catch (const std::exception& e) {
+      spdlog::warn("Invalid PIPER_GPU_DEVICE_ID environment variable: {}", gpuDeviceEnv);
+    }
+  }
 
   for (int i = 1; i < argc; i++) {
     std::string arg = argv[i];
@@ -597,6 +614,9 @@ void parseArgs(int argc, char *argv[], RunConfig &runConfig) {
       runConfig.jsonInput = true;
     } else if (arg == "--use_cuda" || arg == "--use-cuda") {
       runConfig.useCuda = true;
+    } else if (arg == "--gpu-device-id" || arg == "--gpu_device_id") {
+      ensureArg(argc, argv, i);
+      runConfig.gpuDeviceId = stoi(argv[++i]);
     } else if (arg == "--version") {
       std::cout << piper::getVersion() << std::endl;
       exit(0);

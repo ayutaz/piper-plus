@@ -289,6 +289,7 @@ For multi-speaker models, use `--speaker <number>` to change speakers (default: 
 ### Additional Options
 
 * `--use-cuda` - Enable GPU acceleration with CUDA
+* `--gpu-device-id <number>` - GPU device ID for CUDA (default: 0)
 * `--quiet` / `-q` - Disable logging output
 * `--phoneme-silence <phoneme> <seconds>` - Set silence duration for specific phonemes
 * `--length-scale <value>` - Adjust speech speed (default: 1.0, smaller = faster)
