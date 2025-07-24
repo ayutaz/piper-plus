@@ -18,15 +18,11 @@ def run_piper(args, input_text=None):
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            text=True
+            text=True,
         )
         stdout, stderr = proc.communicate(input=input_text)
     else:
-        proc = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True, check=False
-        )
+        proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
         stdout, stderr = proc.stdout, proc.stderr
 
     return proc.returncode, stdout, stderr
@@ -43,9 +39,12 @@ def test_volume_adjustment():
     for volume in [0.5, 1.0, 1.5]:
         print(f"  Testing volume={volume}")
         args = [
-            "--model", "en_US-lessac-medium.onnx",
-            "-f", output_file,
-            "--volume", str(volume)
+            "--model",
+            "en_US-lessac-medium.onnx",
+            "-f",
+            output_file,
+            "--volume",
+            str(volume),
         ]
 
         code, _, stderr = run_piper(args, "Testing volume")
@@ -70,8 +69,10 @@ def test_direct_text_input():
 
     args = [
         "Hello from direct input",
-        "--model", "en_US-lessac-medium.onnx",
-        "-f", output_file
+        "--model",
+        "en_US-lessac-medium.onnx",
+        "-f",
+        output_file,
     ]
 
     code, _, stderr = run_piper(args)
@@ -107,9 +108,12 @@ def test_file_input():
     # Test single file
     print("  Testing single file input")
     args = [
-        "--model", "en_US-lessac-medium.onnx",
-        "--input-file", test_file1,
-        "-f", output_file
+        "--model",
+        "en_US-lessac-medium.onnx",
+        "--input-file",
+        test_file1,
+        "-f",
+        output_file,
     ]
 
     code, _, stderr = run_piper(args)
@@ -121,10 +125,14 @@ def test_file_input():
     # Test multiple files
     print("  Testing multiple file input")
     args = [
-        "--model", "en_US-lessac-medium.onnx",
-        "--input-file", test_file1,
-        "--input-file", test_file2,
-        "-f", output_file
+        "--model",
+        "en_US-lessac-medium.onnx",
+        "--input-file",
+        test_file1,
+        "--input-file",
+        test_file2,
+        "-f",
+        output_file,
     ]
 
     code, _, stderr = run_piper(args)
@@ -151,11 +159,16 @@ def test_inference_config():
 
     args = [
         "Testing config",
-        "--model", "en_US-lessac-medium.onnx",
-        "-f", output_file,
-        "--volume", "1.2",
-        "--length-scale", "1.1",
-        "--noise-scale", "0.7"
+        "--model",
+        "en_US-lessac-medium.onnx",
+        "-f",
+        output_file,
+        "--volume",
+        "1.2",
+        "--length-scale",
+        "1.1",
+        "--noise-scale",
+        "0.7",
     ]
 
     code, _, stderr = run_piper(args)
@@ -196,4 +209,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

@@ -31,10 +31,7 @@ def test_stdin_compatibility():
         output_file = f.name
 
     # Legacy usage: echo "text" | piper --model model.onnx -f output.wav
-    args = [
-        "--model", "en_US-lessac-medium.onnx",
-        "-f", output_file
-    ]
+    args = ["--model", "en_US-lessac-medium.onnx", "-f", output_file]
 
     code, stdout, stderr = run_piper_legacy(args, "Testing backward compatibility")
 
@@ -59,10 +56,7 @@ def test_output_raw_compatibility():
     """Test that --output-raw still works."""
     print("\nTesting --output-raw compatibility...")
 
-    args = [
-        "--model", "en_US-lessac-medium.onnx",
-        "--output-raw"
-    ]
+    args = ["--model", "en_US-lessac-medium.onnx", "--output-raw"]
 
     code, stdout, stderr = run_piper_legacy(args, "Test raw output")
 
@@ -89,11 +83,7 @@ def test_legacy_parameters():
         with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
             output_file = f.name
 
-        args = [
-            "--model", "en_US-lessac-medium.onnx",
-            "-f", output_file,
-            param, value
-        ]
+        args = ["--model", "en_US-lessac-medium.onnx", "-f", output_file, param, value]
 
         code, stdout, stderr = run_piper_legacy(args, "Test parameter")
 
@@ -114,10 +104,7 @@ def test_output_dir_compatibility():
     print("\nTesting --output-dir compatibility...")
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        args = [
-            "--model", "en_US-lessac-medium.onnx",
-            "--output-dir", tmpdir
-        ]
+        args = ["--model", "en_US-lessac-medium.onnx", "--output-dir", tmpdir]
 
         # Send multiple lines
         input_text = "First line\nSecond line\nThird line"
@@ -143,10 +130,14 @@ def test_mixed_usage():
 
     # Mix old parameters with new ones
     args = [
-        "--model", "en_US-lessac-medium.onnx",
-        "-f", output_file,
-        "--length-scale", "1.1",  # old
-        "--volume", "1.2"  # new
+        "--model",
+        "en_US-lessac-medium.onnx",
+        "-f",
+        output_file,
+        "--length-scale",
+        "1.1",  # old
+        "--volume",
+        "1.2",  # new
     ]
 
     code, stdout, stderr = run_piper_legacy(args, "Test mixed features")
@@ -188,4 +179,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

@@ -5,13 +5,14 @@ import os
 import sys
 
 # Add parent directory to path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src', 'python_run'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src", "python_run"))
 
 try:
     import numpy as np
 
     from piper.inference_config import InferenceConfig
     from piper.util import audio_float_to_int16
+
     print("✅ Imports successful")
 except ImportError as e:
     print(f"❌ Import error: {e}")
@@ -21,10 +22,7 @@ except ImportError as e:
 print("\nTest 1: InferenceConfig creation")
 try:
     config = InferenceConfig(
-        model_path="test.onnx",
-        volume=1.5,
-        auto_play=True,
-        sentence_silence=0.5
+        model_path="test.onnx", volume=1.5, auto_play=True, sentence_silence=0.5
     )
     print(f"✅ Config created: volume={config.volume}, auto_play={config.auto_play}")
 except Exception as e:
@@ -59,7 +57,9 @@ try:
     if np.mean(np.abs(result2)) < np.mean(np.abs(result1)):
         print("✅ Volume adjustment works correctly (quieter has lower amplitude)")
     else:
-        print(f"⚠️  Volume might not be working as expected: mean1={np.mean(np.abs(result1))}, mean2={np.mean(np.abs(result2))}")
+        print(
+            f"⚠️  Volume might not be working as expected: mean1={np.mean(np.abs(result1))}, mean2={np.mean(np.abs(result2))}"
+        )
 
 except Exception as e:
     print(f"❌ Volume adjustment failed: {e}")
@@ -92,7 +92,6 @@ try:
 except Exception as e:
     print(f"❌ from_args failed: {e}")
 
-print("\n" + "="*50)
+print("\n" + "=" * 50)
 print("Quick test completed!")
 print("All core functionality appears to be working correctly.")
-

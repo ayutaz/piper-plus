@@ -26,13 +26,19 @@ def play_audio_file(file_path: str, sample_rate: int = 22050) -> None:
     try:
         if system == "Linux":
             # Try multiple Linux audio players
-            for cmd in [["aplay", file_path], ["play", file_path], ["ffplay", "-nodisp", "-autoexit", file_path]]:
+            for cmd in [
+                ["aplay", file_path],
+                ["play", file_path],
+                ["ffplay", "-nodisp", "-autoexit", file_path],
+            ]:
                 try:
                     subprocess.run(cmd, check=True, capture_output=True)
                     return
                 except (subprocess.CalledProcessError, FileNotFoundError):
                     continue
-            _LOGGER.warning("No audio player found on Linux. Install aplay, sox, or ffmpeg.")
+            _LOGGER.warning(
+                "No audio player found on Linux. Install aplay, sox, or ffmpeg."
+            )
 
         elif system == "Darwin":  # macOS
             subprocess.run(["afplay", file_path], check=True)
@@ -40,9 +46,13 @@ def play_audio_file(file_path: str, sample_rate: int = 22050) -> None:
         elif system == "Windows":
             # Use Windows Media Player
             subprocess.run(
-                ["powershell", "-c", f"(New-Object Media.SoundPlayer '{file_path}').PlaySync()"],
+                [
+                    "powershell",
+                    "-c",
+                    f"(New-Object Media.SoundPlayer '{file_path}').PlaySync()",
+                ],
                 check=True,
-                shell=True
+                shell=True,
             )
         else:
             _LOGGER.warning("Unsupported platform for audio playback: %s", system)
@@ -53,7 +63,11 @@ def play_audio_file(file_path: str, sample_rate: int = 22050) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("text", nargs="?", help="Text to synthesize (optional, otherwise reads from stdin or file)")
+    parser.add_argument(
+        "text",
+        nargs="?",
+        help="Text to synthesize (optional, otherwise reads from stdin or file)",
+    )
     parser.add_argument("-m", "--model", required=True, help="Path to Onnx model file")
     parser.add_argument("-c", "--config", help="Path to model config file")
     parser.add_argument(
@@ -156,11 +170,15 @@ def main() -> None:
     config = InferenceConfig.from_args(args)
 
     # Load voice
-    voice = PiperVoice.load(config.model_path, config_path=config.config_path, use_cuda=config.use_cuda)
+    voice = PiperVoice.load(
+        config.model_path, config_path=config.config_path, use_cuda=config.use_cuda
+    )
 
     # Validate volume range
     if config.volume < 0.1 or config.volume > 2.0:
-        _LOGGER.warning("Volume should be between 0.1 and 2.0. Using: %s", config.volume)
+        _LOGGER.warning(
+            "Volume should be between 0.1 and 2.0. Using: %s", config.volume
+        )
 
     synthesize_args = config.to_synthesize_args()
 
@@ -232,7 +250,9 @@ def main() -> None:
             # Write to stdout or auto-play
             if config.auto_play:
                 # Create temporary file for auto-play
-                with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as temp_file:
+                with tempfile.NamedTemporaryFile(
+                    suffix=".wav", delete=False
+                ) as temp_file:
                     temp_path = temp_file.name
 
                 with wave.open(temp_path, "wb") as wav_file:
