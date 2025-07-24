@@ -85,12 +85,20 @@ jobs:
       
       - name: Test CLI help includes phoneme input
         run: |
-          # Check if help text contains phoneme input documentation
-          if ./build/piper --help | grep -i "phoneme.*input"; then
+          # Save help text to file and check
+          ./build/piper --help > help.txt
+          if grep -i "phoneme.*input" help.txt; then
             echo "✅ Phoneme input documentation found in help text"
           else
             echo "❌ Phoneme input documentation not found in help text!"
-            ./build/piper --help
+            echo "=== Help text content ==="
+            cat help.txt
+            echo "=== End of help text ==="
+            # Try different patterns
+            echo "Trying pattern 'Phoneme':"
+            grep -i "phoneme" help.txt || true
+            echo "Hex dump of relevant line:"
+            grep -n "phoneme" help.txt | head -1 | xxd || true
             exit 1
           fi
       
