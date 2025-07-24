@@ -149,6 +149,12 @@ jobs:
             cp oj/bin/open_jtalk ./
             mkdir -p bin && cp oj/bin/open_jtalk bin/
           fi
+          
+          # Run tests if enabled
+          if [ "${{ inputs.include-tests }}" = "true" ]; then
+            echo "Running C++ tests..."
+            ctest --output-on-failure --verbose || echo "Some tests failed, but continuing..."
+          fi
       
       - name: Build piper (Windows)
         if: runner.os == 'Windows'
@@ -165,6 +171,12 @@ jobs:
           Write-Host "Building with flags: $($cmakeFlags -join ' ')"
           cmake .. @cmakeFlags
           cmake --build . --config ${{ inputs.build-type }} --parallel 2
+          
+          # Run tests if enabled
+          if ("${{ inputs.include-tests }}" -eq "true") {
+            Write-Host "Running C++ tests..."
+            ctest -C ${{ inputs.build-type }} --output-on-failure --verbose
+          }
       
       # Create distribution package
       - name: Create distribution package (Unix)

@@ -7,6 +7,7 @@ set(TEST_SOURCES
     test_openjtalk_security.cpp
     test_openjtalk_error_handling.cpp
     test_openjtalk_optimized.cpp
+    test_gpu_device_id.cpp
 )
 
 # Add dictionary manager test for Unix platforms
@@ -91,6 +92,7 @@ foreach(test_source ${TEST_SOURCES})
             Threads::Threads
         )
     endif()
+
 
     add_test(NAME ${test_name} COMMAND ${test_name})
 endforeach()

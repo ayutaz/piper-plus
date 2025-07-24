@@ -410,7 +410,7 @@ void terminate(PiperConfig &config) {
   spdlog::info("Terminated piper");
 }
 
-void loadModel(std::string modelPath, ModelSession &session, bool useCuda) {
+void loadModel(std::string modelPath, ModelSession &session, bool useCuda, int gpuDeviceId = 0) {
   spdlog::debug("loadModel called with path: {}", modelPath);
   spdlog::debug("Creating ONNX Runtime environment");
   try {
@@ -425,8 +425,10 @@ void loadModel(std::string modelPath, ModelSession &session, bool useCuda) {
   if (useCuda) {
     // Use CUDA provider
     OrtCUDAProviderOptions cuda_options{};
+    cuda_options.device_id = gpuDeviceId;
     cuda_options.cudnn_conv_algo_search = OrtCudnnConvAlgoSearchHeuristic;
     session.options.AppendExecutionProvider_CUDA(cuda_options);
+    spdlog::info("Using CUDA execution provider with GPU device ID: {}", gpuDeviceId);
   }
 
   // Slows down performance by ~2x
@@ -465,7 +467,8 @@ void loadModel(std::string modelPath, ModelSession &session, bool useCuda) {
 // Load Onnx model and JSON config file
 void loadVoice(PiperConfig &config, std::string modelPath,
                std::string modelConfigPath, Voice &voice,
-               std::optional<SpeakerId> &speakerId, bool useCuda) {
+               std::optional<SpeakerId> &speakerId, bool useCuda,
+               int gpuDeviceId) {
   spdlog::debug("loadVoice called with modelPath={}, configPath={}", modelPath, modelConfigPath);
   spdlog::debug("Parsing voice config at {}", modelConfigPath);
   std::ifstream modelConfigFile(modelConfigPath);
@@ -490,7 +493,7 @@ void loadVoice(PiperConfig &config, std::string modelPath,
 
   spdlog::debug("Voice contains {} speaker(s)", voice.modelConfig.numSpeakers);
 
-  loadModel(modelPath, voice.session, useCuda);
+  loadModel(modelPath, voice.session, useCuda, gpuDeviceId);
 
 } /* loadVoice */
 
