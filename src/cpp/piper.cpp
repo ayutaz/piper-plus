@@ -6,6 +6,7 @@
 #include <stdexcept>
 #include <filesystem>
 #include <unordered_map>
+#include <regex>
 
 #include <espeak-ng/speak_lib.h>
 #include <onnxruntime_cxx_api.h>
@@ -906,5 +907,150 @@ void phonemesToWavFile(PiperConfig &config, Voice &voice,
                   sizeof(int16_t) * audioBuffer.size());
                   
 } /* phonemesToWavFile */
+
+// Streaming text-to-audio synthesis with reduced latency
+void textToAudioStreaming(PiperConfig &config, Voice &voice, std::string text,
+                          std::vector<int16_t> &audioBuffer, SynthesisResult &result,
+                          const std::function<void(const std::vector<int16_t>&)> &chunkCallback,
+                          size_t chunkSize) {
+  spdlog::debug("textToAudioStreaming: text='{}', chunkSize={}", text, chunkSize);
+  
+  // Clear result
+  result.inferSeconds = 0;
+  result.audioSeconds = 0;
+  result.realTimeFactor = 0;
+  
+  // Clear output buffer
+  audioBuffer.clear();
+  
+  if (text.empty()) {
+    return;
+  }
+  
+  // Sentence boundary regex patterns for different languages
+  std::regex sentenceBoundary;
+  if (voice.phonemizeConfig.phonemeType == OpenJTalkPhonemes) {
+    // Japanese: split on punctuation that typically ends clauses/sentences
+    sentenceBoundary = std::regex(u8"([。！？、]+)");
+  } else {
+    // English/other: split on punctuation and conjunctions
+    sentenceBoundary = std::regex("([.!?,;:]+|\\s+(?:and|or|but|because|while|when|if|that|which)\\s+)");
+  }
+  
+  // Split text into chunks at natural boundaries
+  std::vector<std::string> chunks;
+  std::sregex_token_iterator iter(text.begin(), text.end(), sentenceBoundary, {-1, 1});
+  std::sregex_token_iterator end;
+  
+  std::string currentChunk;
+  for (; iter != end; ++iter) {
+    std::string token = *iter;
+    if (token.empty()) continue;
+    
+    // Check if this is a delimiter
+    if (std::regex_match(token, sentenceBoundary)) {
+      // Add delimiter to current chunk
+      currentChunk += token;
+      if (!currentChunk.empty() && 
+          (token.find_first_of(u8"。！？.!?") != std::string::npos ||
+           currentChunk.length() > 100)) {
+        // End of sentence or chunk is getting long
+        chunks.push_back(currentChunk);
+        currentChunk.clear();
+      }
+    } else {
+      // Regular text
+      currentChunk += token;
+    }
+  }
+  
+  // Add any remaining text
+  if (!currentChunk.empty()) {
+    chunks.push_back(currentChunk);
+  }
+  
+  spdlog::debug("Split text into {} chunks", chunks.size());
+  
+  // Process each chunk
+  for (size_t i = 0; i < chunks.size(); ++i) {
+    const auto& chunk = chunks[i];
+    spdlog::debug("Processing chunk {}/{}: '{}'", i+1, chunks.size(), chunk);
+    
+    // Phonemize chunk
+    std::vector<std::vector<Phoneme>> chunkSentences;
+    
+    if (voice.phonemizeConfig.phonemeType == eSpeakPhonemes) {
+      // Use espeak-ng for phonemization
+      eSpeakPhonemeConfig eSpeakConfig;
+      eSpeakConfig.voice = voice.phonemizeConfig.eSpeak.voice;
+      phonemize_eSpeak(chunk, eSpeakConfig, chunkSentences);
+    } else if (voice.phonemizeConfig.phonemeType == OpenJTalkPhonemes) {
+      // Japanese OpenJTalk phonemizer
+      phonemize_openjtalk(chunk, chunkSentences);
+    } else {
+      // Use UTF-8 codepoints as "phonemes"
+      CodepointsPhonemeConfig codepointsConfig;
+      phonemize_codepoints(chunk, codepointsConfig, chunkSentences);
+    }
+    
+    // Process each sentence in the chunk
+    for (auto& sentencePhonemes : chunkSentences) {
+      if (sentencePhonemes.empty()) {
+        continue;
+      }
+      
+      // Convert phonemes to IDs
+      std::vector<PhonemeId> phonemeIds;
+      std::map<Phoneme, std::size_t> missingPhonemes;
+      // Create PhonemeIdConfig from voice config
+      PhonemeIdConfig idConfig;
+      idConfig.phonemeIdMap = 
+          std::make_shared<PhonemeIdMap>(voice.phonemizeConfig.phonemeIdMap);
+      idConfig.interspersePad = voice.phonemizeConfig.interspersePad;
+      idConfig.addBos = true;
+      idConfig.addEos = true;
+      
+      phonemes_to_ids(sentencePhonemes, idConfig, phonemeIds,
+                      missingPhonemes);
+      
+      // Report missing phonemes
+      if (!missingPhonemes.empty()) {
+        for (auto& [phoneme, count] : missingPhonemes) {
+          spdlog::warn("Missing phoneme: '{}' (count={})",
+                       phonemeToString(phoneme), count);
+        }
+      }
+      
+      // Synthesize audio for this chunk
+      std::vector<int16_t> chunkAudioBuffer;
+      SynthesisResult chunkResult;
+      synthesize(phonemeIds, voice.synthesisConfig, voice.session, 
+                 chunkAudioBuffer, chunkResult);
+      
+      // Update cumulative result
+      result.inferSeconds += chunkResult.inferSeconds;
+      result.audioSeconds += chunkResult.audioSeconds;
+      
+      // Append to main buffer
+      audioBuffer.insert(audioBuffer.end(), 
+                         chunkAudioBuffer.begin(), 
+                         chunkAudioBuffer.end());
+      
+      // Call chunk callback if we have enough audio
+      if (chunkCallback && chunkAudioBuffer.size() > 0) {
+        chunkCallback(chunkAudioBuffer);
+      }
+    }
+  }
+  
+  // Calculate final real-time factor
+  if (result.audioSeconds > 0) {
+    result.realTimeFactor = result.audioSeconds / result.inferSeconds;
+  }
+  
+  spdlog::debug("Streaming synthesis complete: {} chunks, {:.2f}s audio, RTF={:.2f}",
+                chunks.size(), result.audioSeconds, result.realTimeFactor);
+  
+} /* textToAudioStreaming */
 
 } // namespace piper

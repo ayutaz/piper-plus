@@ -102,6 +102,9 @@ struct RunConfig {
   
   // true to interpret input as raw phonemes instead of text
   bool rawPhonemes = false;
+  
+  // true to use streaming mode for reduced latency
+  bool streamingMode = false;
 };
 
 void parseArgs(int argc, char *argv[], RunConfig &runConfig);
@@ -426,25 +429,59 @@ int main(int argc, char *argv[]) {
       thread rawOutputThread(rawOutputProc, ref(sharedAudioBuffer),
                              ref(mutAudio), ref(cvAudio), ref(audioReady),
                              ref(audioFinished));
-      auto audioCallback = [&audioBuffer, &sharedAudioBuffer, &mutAudio,
-                            &cvAudio, &audioReady]() {
-        // Signal thread that audio is ready
-        {
-          unique_lock lockAudio(mutAudio);
-          copy(audioBuffer.begin(), audioBuffer.end(),
-               back_inserter(sharedAudioBuffer));
-          audioReady = true;
-          cvAudio.notify_one();
+      if (runConfig.streamingMode) {
+        // Streaming mode - use chunk callback
+        spdlog::info("Using streaming mode for synthesis");
+        auto chunkCallback = [&sharedAudioBuffer, &mutAudio, &cvAudio, &audioReady](const std::vector<int16_t>& chunk) {
+          // Signal thread that audio chunk is ready
+          {
+            unique_lock lockAudio(mutAudio);
+            copy(chunk.begin(), chunk.end(), back_inserter(sharedAudioBuffer));
+            audioReady = true;
+            cvAudio.notify_one();
+          }
+        };
+        
+        if (runConfig.rawPhonemes) {
+          spdlog::warn("Streaming mode not yet supported with raw phonemes");
+          // Fall back to regular mode for now
+          auto phonemeType = static_cast<piper::PhonemeTypeInt>(voice.phonemizeConfig.phonemeType);
+          auto phonemes = piper::parsePhonemeString(line, phonemeType);
+          piper::phonemesToAudio(piperConfig, voice, phonemes, audioBuffer, result);
+          // Send all audio at once
+          {
+            unique_lock lockAudio(mutAudio);
+            copy(audioBuffer.begin(), audioBuffer.end(), back_inserter(sharedAudioBuffer));
+            audioReady = true;
+            cvAudio.notify_one();
+          }
+        } else {
+          // Use streaming synthesis
+          piper::textToAudioStreaming(piperConfig, voice, line, audioBuffer, result, chunkCallback);
         }
-      };
-      if (runConfig.rawPhonemes) {
-        // Parse raw phonemes from input
-        auto phonemeType = static_cast<piper::PhonemeTypeInt>(voice.phonemizeConfig.phonemeType);
-        auto phonemes = piper::parsePhonemeString(line, phonemeType);
-        piper::phonemesToAudio(piperConfig, voice, phonemes, audioBuffer, result, audioCallback);
       } else {
-        piper::textToAudio(piperConfig, voice, line, audioBuffer, result,
-                           audioCallback);
+        // Regular mode - buffer all audio before output
+        auto audioCallback = [&audioBuffer, &sharedAudioBuffer, &mutAudio,
+                              &cvAudio, &audioReady]() {
+          // Signal thread that audio is ready
+          {
+            unique_lock lockAudio(mutAudio);
+            copy(audioBuffer.begin(), audioBuffer.end(),
+                 back_inserter(sharedAudioBuffer));
+            audioReady = true;
+            cvAudio.notify_one();
+          }
+        };
+        
+        if (runConfig.rawPhonemes) {
+          // Parse raw phonemes from input
+          auto phonemeType = static_cast<piper::PhonemeTypeInt>(voice.phonemizeConfig.phonemeType);
+          auto phonemes = piper::parsePhonemeString(line, phonemeType);
+          piper::phonemesToAudio(piperConfig, voice, phonemes, audioBuffer, result, audioCallback);
+        } else {
+          piper::textToAudio(piperConfig, voice, line, audioBuffer, result,
+                             audioCallback);
+        }
       }
 
       // Signal thread that there is no more audio
@@ -557,6 +594,8 @@ void printUsage(char *argv[]) {
        << endl;
   cerr << "   --raw-phonemes                interpret input as raw phonemes (space-separated)"
        << endl;
+  cerr << "   --streaming                   use streaming mode for reduced latency"
+       << endl;
   cerr << "   --debug                       print DEBUG messages to the console"
        << endl;
   cerr << "   -q       --quiet              disable logging" << endl;
@@ -658,6 +697,8 @@ void parseArgs(int argc, char *argv[], RunConfig &runConfig) {
       runConfig.gpuDeviceId = stoi(argv[++i]);
     } else if (arg == "--raw-phonemes" || arg == "--raw_phonemes") {
       runConfig.rawPhonemes = true;
+    } else if (arg == "--streaming") {
+      runConfig.streamingMode = true;
     } else if (arg == "--version") {
       std::cout << piper::getVersion() << std::endl;
       exit(0);

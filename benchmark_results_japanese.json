@@ -1,0 +1,106 @@
+{
+  "model": "test/models/ja_JP-test-medium.onnx",
+  "timestamp": "2025-07-25 15:32:32",
+  "results": [
+    {
+      "text": "Hello world.",
+      "text_length": 12,
+      "raw_latency_avg": 0.45607815265733126,
+      "raw_latency_std": 0.00963394715510318,
+      "wav_latency_avg": 0.47685466666007414,
+      "wav_latency_std": 0.020225396942933828,
+      "total_synthesis_time": 0.45537445903755724,
+      "real_time_factor": null
+    },
+    {
+      "text": "This is a test.",
+      "text_length": 15,
+      "raw_latency_avg": 0.4768344586676297,
+      "raw_latency_std": 0.003983384459917983,
+      "wav_latency_avg": 0.4676592776668258,
+      "wav_latency_std": 0.004950305299626411,
+      "total_synthesis_time": 0.44639720796840265,
+      "real_time_factor": null
+    },
+    {
+      "text": "The quick brown fox jumps over the lazy dog.",
+      "text_length": 44,
+      "raw_latency_avg": 0.45787443065394956,
+      "raw_latency_std": 0.010629279276998863,
+      "wav_latency_avg": 0.4965699586706857,
+      "wav_latency_std": 0.02282799922481969,
+      "total_synthesis_time": 0.4372740829712711,
+      "real_time_factor": null
+    },
+    {
+      "text": "Artificial intelligence is transforming the world in unprecedented ways.",
+      "text_length": 72,
+      "raw_latency_avg": 0.46616601400698227,
+      "raw_latency_std": 0.01728169917270671,
+      "wav_latency_avg": 0.44927408299796906,
+      "wav_latency_std": 0.015752516985709546,
+      "total_synthesis_time": 0.42555037495912984,
+      "real_time_factor": null
+    },
+    {
+      "text": "In recent years, text-to-speech technology has advanced significantly, enabling more natural and expressive synthetic voices that can be used in various applications.",
+      "text_length": 166,
+      "raw_latency_avg": 0.4584279583456616,
+      "raw_latency_std": 0.005958497981099755,
+      "wav_latency_avg": 0.5226430973464934,
+      "wav_latency_std": 0.03205399431231145,
+      "total_synthesis_time": 0.4474486670223996,
+      "real_time_factor": null
+    },
+    {
+      "text": "The development of neural network-based speech synthesis has revolutionized how we interact with computers, making it possible to create voices that are nearly indistinguishable from human speech.",
+      "text_length": 196,
+      "raw_latency_avg": 0.4514241113017003,
+      "raw_latency_std": 0.010425598078638127,
+      "wav_latency_avg": 0.4929716109957856,
+      "wav_latency_std": 0.044444839042931665,
+      "total_synthesis_time": 0.4978973329998553,
+      "real_time_factor": null
+    },
+    {
+      "text": "\u3053\u3093\u306b\u3061\u306f\u3002",
+      "text_length": 6,
+      "raw_latency_avg": 0.4717626386748937,
+      "raw_latency_std": 0.0190971917703874,
+      "wav_latency_avg": 0.4673550136697789,
+      "wav_latency_std": 0.013098714977294475,
+      "total_synthesis_time": 0.46668150002369657,
+      "real_time_factor": null
+    },
+    {
+      "text": "\u4eca\u65e5\u306f\u3068\u3066\u3082\u3044\u3044\u5929\u6c17\u3067\u3059\u306d\u3002",
+      "text_length": 14,
+      "raw_latency_avg": 0.4701766806732242,
+      "raw_latency_std": 0.021654984772754966,
+      "wav_latency_avg": 0.47871458330579725,
+      "wav_latency_std": 0.020923972814354708,
+      "total_synthesis_time": 0.4430319999810308,
+      "real_time_factor": null
+    },
+    {
+      "text": "\u4eba\u5de5\u77e5\u80fd\u6280\u8853\u306e\u767a\u5c55\u306b\u3088\u308a\u3001\u97f3\u58f0\u5408\u6210\u306e\u54c1\u8cea\u304c\u5927\u5e45\u306b\u5411\u4e0a\u3057\u307e\u3057\u305f\u3002",
+      "text_length": 31,
+      "raw_latency_avg": 0.5189289719758866,
+      "raw_latency_std": 0.041831373309994806,
+      "wav_latency_avg": 0.4714905693350981,
+      "wav_latency_std": 0.0009425359300725138,
+      "total_synthesis_time": 0.4623450000071898,
+      "real_time_factor": null
+    },
+    {
+      "text": "\u65e5\u672c\u8a9e\u306e\u97f3\u58f0\u5408\u6210\u306b\u304a\u3044\u3066\u306f\u3001\u30a2\u30af\u30bb\u30f3\u30c8\u3084\u30a4\u30f3\u30c8\u30cd\u30fc\u30b7\u30e7\u30f3\u306e\u6b63\u78ba\u306a\u518d\u73fe\u304c\u91cd\u8981\u306a\u8ab2\u984c\u3068\u306a\u3063\u3066\u3044\u307e\u3059\u3002",
+      "text_length": 48,
+      "raw_latency_avg": 0.4690581666460882,
+      "raw_latency_std": 0.00828845995149965,
+      "wav_latency_avg": 0.47332319465931505,
+      "wav_latency_std": 0.027196528929592265,
+      "total_synthesis_time": 0.4679606669815257,
+      "real_time_factor": null
+    }
+  ]
+}
