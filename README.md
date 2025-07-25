@@ -102,7 +102,18 @@ Piper is used in a [variety of projects](#people-using-piper).
 ``` sh
 echo 'Welcome to the world of speech synthesis!' | \
   ./piper --model en_US-lessac-medium.onnx --output_file welcome.wav
+
+# Streaming mode for reduced latency (outputs audio chunks progressively)
+echo 'This is a long text that will be processed in chunks for lower latency.' | \
+  ./piper --model en_US-lessac-medium.onnx --output_file output.wav --streaming
 ```
+
+### Streaming Mode
+
+The `--streaming` flag enables chunk-based processing for reduced latency:
+- **Dynamic chunk sizing**: Automatically adjusts chunk size based on punctuation density
+- **Audio crossfading**: Smooth transitions between chunks to prevent clicks/artifacts
+- **~15% latency reduction** for long texts
 
 [Listen to voice samples](https://rhasspy.github.io/piper-samples) and check out a [video tutorial by Thorsten Müller](https://youtu.be/rjq5eZoWWSo)
 

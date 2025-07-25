@@ -908,6 +908,73 @@ void phonemesToWavFile(PiperConfig &config, Voice &voice,
                   
 } /* phonemesToWavFile */
 
+// Helper function for calculating dynamic chunk size based on text characteristics
+static size_t calculateDynamicChunkSize(const std::string& text, size_t baseSize = 50) {
+  // Short texts should not be chunked
+  if (text.length() < baseSize * 2) {
+    return text.length();
+  }
+  
+  // Calculate punctuation density
+  size_t punctCount = 0;
+  const std::string punctMarks = u8"。、！？.!?,;:";
+  for (size_t i = 0; i < text.length(); ++i) {
+    if (punctMarks.find(text[i]) != std::string::npos) {
+      punctCount++;
+    }
+  }
+  
+  // Adjust chunk size based on punctuation density
+  float punctDensity = static_cast<float>(punctCount) / text.length();
+  if (punctDensity > 0.05f) {  // More than 5% punctuation - use smaller chunks
+    return baseSize;
+  } else if (punctDensity < 0.02f) {  // Less than 2% punctuation - use larger chunks
+    return baseSize * 3;
+  }
+  return baseSize * 2;  // Medium density
+}
+
+// Helper function for audio crossfade to reduce chunk boundary artifacts
+static void crossfadeAudioChunks(
+    const std::vector<int16_t>& prevChunk,
+    const std::vector<int16_t>& newChunk,
+    std::vector<int16_t>& output,
+    size_t overlapSamples = 220  // 10ms @ 22050Hz
+) {
+  if (prevChunk.empty() || newChunk.empty() || overlapSamples == 0) {
+    // No crossfade possible, just append
+    output.insert(output.end(), newChunk.begin(), newChunk.end());
+    return;
+  }
+  
+  // Ensure we don't exceed chunk boundaries
+  size_t actualOverlap = std::min({overlapSamples, prevChunk.size() / 4, newChunk.size() / 4});
+  if (actualOverlap < 44) {  // Less than 2ms - not worth crossfading
+    output.insert(output.end(), newChunk.begin(), newChunk.end());
+    return;
+  }
+  
+  // Remove the overlap from the output (it was already added with prevChunk)
+  if (output.size() >= actualOverlap) {
+    output.resize(output.size() - actualOverlap);
+  }
+  
+  // Perform crossfade
+  for (size_t i = 0; i < actualOverlap; ++i) {
+    float fadeOut = 1.0f - (static_cast<float>(i) / actualOverlap);
+    float fadeIn = static_cast<float>(i) / actualOverlap;
+    
+    size_t prevIdx = prevChunk.size() - actualOverlap + i;
+    int16_t mixed = static_cast<int16_t>(
+      prevChunk[prevIdx] * fadeOut + newChunk[i] * fadeIn
+    );
+    output.push_back(mixed);
+  }
+  
+  // Append the rest of the new chunk
+  output.insert(output.end(), newChunk.begin() + actualOverlap, newChunk.end());
+}
+
 // Streaming text-to-audio synthesis with reduced latency
 void textToAudioStreaming(PiperConfig &config, Voice &voice, std::string text,
                           std::vector<int16_t> &audioBuffer, SynthesisResult &result,
@@ -926,6 +993,9 @@ void textToAudioStreaming(PiperConfig &config, Voice &voice, std::string text,
   if (text.empty()) {
     return;
   }
+  
+  // Calculate dynamic chunk size based on text characteristics
+  size_t dynamicChunkSize = calculateDynamicChunkSize(text, chunkSize > 0 ? chunkSize : 50);
   
   // Static regex patterns for better performance (cached compilation)
   static const std::regex japaneseSentenceBoundary(u8"([。！？、]+)");
@@ -953,7 +1023,7 @@ void textToAudioStreaming(PiperConfig &config, Voice &voice, std::string text,
       currentChunk += token;
       if (!currentChunk.empty() && 
           (token.find_first_of(u8"。！？.!?") != std::string::npos ||
-           currentChunk.length() > 100)) {
+           currentChunk.length() > dynamicChunkSize)) {
         // End of sentence or chunk is getting long
         chunks.push_back(currentChunk);
         currentChunk.clear();
@@ -969,7 +1039,10 @@ void textToAudioStreaming(PiperConfig &config, Voice &voice, std::string text,
     chunks.push_back(currentChunk);
   }
   
-  spdlog::debug("Split text into {} chunks", chunks.size());
+  spdlog::debug("Split text into {} chunks with dynamic chunk size: {}", chunks.size(), dynamicChunkSize);
+  
+  // Track previous chunk for crossfading
+  std::vector<int16_t> previousChunkAudio;
   
   // Process each chunk
   for (size_t i = 0; i < chunks.size(); ++i) {
@@ -1031,10 +1104,19 @@ void textToAudioStreaming(PiperConfig &config, Voice &voice, std::string text,
       result.inferSeconds += chunkResult.inferSeconds;
       result.audioSeconds += chunkResult.audioSeconds;
       
-      // Append to main buffer
-      audioBuffer.insert(audioBuffer.end(), 
-                         chunkAudioBuffer.begin(), 
-                         chunkAudioBuffer.end());
+      // Apply crossfade if we have a previous chunk
+      if (!previousChunkAudio.empty() && !chunkAudioBuffer.empty()) {
+        // Crossfade with previous chunk to reduce boundary artifacts
+        crossfadeAudioChunks(previousChunkAudio, chunkAudioBuffer, audioBuffer);
+      } else {
+        // No previous chunk or empty current chunk - just append
+        audioBuffer.insert(audioBuffer.end(), 
+                           chunkAudioBuffer.begin(), 
+                           chunkAudioBuffer.end());
+      }
+      
+      // Store current chunk for next iteration's crossfade
+      previousChunkAudio = chunkAudioBuffer;
       
       // Call chunk callback for all chunks (including empty ones for progress tracking)
       if (chunkCallback) {
