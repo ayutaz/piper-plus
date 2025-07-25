@@ -125,6 +125,7 @@ jobs:
             # Check if our new tests passed
             GPU_TEST_PASSED=0
             PHONEME_TEST_PASSED=0
+            STREAMING_TEST_PASSED=0
             
             if ctest -R test_gpu_device_id --output-on-failure; then
               echo "✅ GPU device ID test passed successfully!"
@@ -140,8 +141,15 @@ jobs:
               echo "❌ Phoneme parser test failed!"
             fi
             
-            # If both critical tests passed, don't fail on legacy tests
-            if [ $GPU_TEST_PASSED -eq 1 ] && [ $PHONEME_TEST_PASSED -eq 1 ]; then
+            if ctest -R test_streaming_simple --output-on-failure; then
+              echo "✅ Streaming test passed successfully!"
+              STREAMING_TEST_PASSED=1
+            else
+              echo "❌ Streaming test failed!"
+            fi
+            
+            # If all critical tests passed, don't fail on legacy tests
+            if [ $GPU_TEST_PASSED -eq 1 ] && [ $PHONEME_TEST_PASSED -eq 1 ] && [ $STREAMING_TEST_PASSED -eq 1 ]; then
               echo "Note: Some legacy tests may have failed due to missing dependencies (espeak-ng-data, OpenJTalk binary)"
               echo "This is expected in the CI environment and does not affect the functionality."
               exit 0

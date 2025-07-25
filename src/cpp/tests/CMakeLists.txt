@@ -9,6 +9,7 @@ set(TEST_SOURCES
     test_openjtalk_optimized.cpp
     test_gpu_device_id.cpp
     test_phoneme_parser.cpp
+    test_streaming_simple.cpp
 )
 
 # Add dictionary manager test for Unix platforms
@@ -94,6 +95,35 @@ foreach(test_source ${TEST_SOURCES})
         )
     endif()
 
+    # Link additional dependencies for streaming test
+    if(${test_name} STREQUAL "test_streaming")
+        target_sources(${test_name} PRIVATE
+            ../piper.cpp
+            ../openjtalk_phonemize.cpp
+            ../openjtalk_wrapper.c
+            ../openjtalk_dictionary_manager.c
+            ../openjtalk_error.c
+            ../openjtalk_security.c
+            ../openjtalk_optimized.c
+        )
+        target_include_directories(${test_name} PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/..
+            ${CMAKE_BINARY_DIR}/pi/include
+            ${CMAKE_BINARY_DIR}/e/include
+            ${CMAKE_BINARY_DIR}/o/include
+        )
+        target_link_libraries(${test_name}
+            piper_phonemize
+            espeak-ng
+            onnxruntime
+            spdlog
+        )
+        if(UNIX AND NOT APPLE)
+            find_package(Threads REQUIRED)
+            target_link_libraries(${test_name} Threads::Threads)
+        endif()
+    endif()
+    
     # Link additional dependencies for phoneme parser test
     if(${test_name} STREQUAL "test_phoneme_parser")
         target_sources(${test_name} PRIVATE
