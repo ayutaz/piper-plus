@@ -24,10 +24,10 @@ Piper is used in a [variety of projects](#people-using-piper).
   * 使用例: `echo "Hello [[ h ə l oʊ ]] world" | piper --model en.onnx -f out.wav`
   * 日本語例: `echo "今日は [[ ky o o w a ]] です" | piper --model ja.onnx -f out.wav`
 * 日本語の事前学習及び追加学習/推論対応（OpenJTalk統合）
-  * 詳細な使用方法は[日本語音声合成ガイド](JAPANESE_USAGE.md)を参照
+  * 詳細な使用方法は[日本語音声合成ガイド](docs/guides/JAPANESE_USAGE.md)を参照
   * **Windows対応**: [Windowsセットアップガイド](docs/windows-setup.md)を参照
   * **API ドキュメント**: [OpenJTalk API リファレンス](docs/openjtalk-api.md)を参照
-  * PUA音素マッピングによる日本語TTS精度向上 - [技術詳細](PHONEME_MAPPING.md)を参照
+  * PUA音素マッピングによる日本語TTS精度向上 - [技術詳細](docs/guides/PHONEME_MAPPING.md)を参照
   * **自動ダウンロード機能**: 初回実行時に必要な辞書とHTSボイスファイルを自動ダウンロード
   * 環境変数（オプション）：
     - `OPENJTALK_DICTIONARY_DIR`: OpenJTalk辞書へのパス（未設定時は自動ダウンロード）
@@ -175,7 +175,7 @@ xattr -cr piper/bin/open_jtalk  # 日本語TTSを使用する場合
 
 Our goal is to support Home Assistant and the [Year of Voice](https://www.home-assistant.io/blog/2022/12/20/year-of-voice/).
 
-[Download voices](VOICES.md) for the supported languages:
+[Download voices](docs/guides/VOICES.md) for the supported languages:
 
 * العربية, Jordan (Arabic, ar_JO)
 * Català, Spain (Catalan, ca_ES)
@@ -376,7 +376,7 @@ Piper has been used in the following projects/papers:
 
 ## Training
 
-See the [training guide](TRAINING.md) and the [source code](src/python).
+See the [training guide](docs/guides/TRAINING.md) and the [source code](src/python).
 
 Pretrained checkpoints are available on [Hugging Face](https://huggingface.co/datasets/rhasspy/piper-checkpoints/tree/main)
 
