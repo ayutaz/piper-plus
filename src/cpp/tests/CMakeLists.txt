@@ -96,7 +96,7 @@ foreach(test_source ${TEST_SOURCES})
     endif()
 
     # Link additional dependencies for streaming test
-    if(${test_name} STREQUAL "test_streaming")
+    if(${test_name} STREQUAL "test_streaming_simple")
         target_sources(${test_name} PRIVATE
             ../piper.cpp
             ../openjtalk_phonemize.cpp

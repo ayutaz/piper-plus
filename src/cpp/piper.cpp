@@ -927,15 +927,15 @@ void textToAudioStreaming(PiperConfig &config, Voice &voice, std::string text,
     return;
   }
   
-  // Sentence boundary regex patterns for different languages
-  std::regex sentenceBoundary;
-  if (voice.phonemizeConfig.phonemeType == OpenJTalkPhonemes) {
-    // Japanese: split on punctuation that typically ends clauses/sentences
-    sentenceBoundary = std::regex(u8"([。！？、]+)");
-  } else {
-    // English/other: split on punctuation and conjunctions
-    sentenceBoundary = std::regex("([.!?,;:]+|\\s+(?:and|or|but|because|while|when|if|that|which)\\s+)");
-  }
+  // Static regex patterns for better performance (cached compilation)
+  static const std::regex japaneseSentenceBoundary(u8"([。！？、]+)");
+  static const std::regex englishSentenceBoundary("([.!?,;:]+|\\s+(?:and|or|but|because|while|when|if|that|which)\\s+)");
+  
+  // Select appropriate regex based on language
+  const std::regex& sentenceBoundary = 
+    (voice.phonemizeConfig.phonemeType == OpenJTalkPhonemes) 
+    ? japaneseSentenceBoundary 
+    : englishSentenceBoundary;
   
   // Split text into chunks at natural boundaries
   std::vector<std::string> chunks;
@@ -1036,8 +1036,8 @@ void textToAudioStreaming(PiperConfig &config, Voice &voice, std::string text,
                          chunkAudioBuffer.begin(), 
                          chunkAudioBuffer.end());
       
-      // Call chunk callback if we have enough audio
-      if (chunkCallback && chunkAudioBuffer.size() > 0) {
+      // Call chunk callback for all chunks (including empty ones for progress tracking)
+      if (chunkCallback) {
         chunkCallback(chunkAudioBuffer);
       }
     }

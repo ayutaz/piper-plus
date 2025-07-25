@@ -74,9 +74,6 @@ TEST(StreamingSimpleTest, TextChunkingJapanese) {
         chunks.push_back(currentChunk);
     }
     
-    // Skip the regex-based implementation
-    /*std::regex sentenceBoundary(u8"([。！？、]+)");
-    */ // End of skipped regex implementation
     
     EXPECT_EQ(chunks.size(), 3) << "Expected 3 chunks for 3 sentences";
     EXPECT_EQ(chunks[0], u8"こんにちは。");
