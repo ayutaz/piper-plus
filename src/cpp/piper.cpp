@@ -848,4 +848,63 @@ void textToWavFile(PiperConfig &config, Voice &voice, std::string text,
 
 } /* textToWavFile */
 
+// Synthesize audio directly from phonemes
+void phonemesToAudio(PiperConfig &config, Voice &voice, 
+                     const std::vector<Phoneme> &phonemes,
+                     std::vector<int16_t> &audioBuffer, 
+                     SynthesisResult &result,
+                     const std::function<void()> &audioCallback) {
+  
+  // Convert phonemes to IDs
+  std::vector<PhonemeId> phonemeIds;
+  std::map<Phoneme, std::size_t> missingPhonemes;
+  
+  PhonemeIdConfig idConfig;
+  idConfig.phonemeIdMap = 
+      std::make_shared<PhonemeIdMap>(voice.phonemizeConfig.phonemeIdMap);
+  idConfig.interspersePad = voice.phonemizeConfig.interspersePad;
+  
+  // The phonemes_to_ids function handles BOS/EOS automatically based on addBos/addEos flags
+  idConfig.addBos = true;
+  idConfig.addEos = true;
+  
+  // Convert phonemes to IDs
+  phonemes_to_ids(phonemes, idConfig, phonemeIds, missingPhonemes);
+  
+  // Report missing phonemes
+  if (!missingPhonemes.empty()) {
+    for (auto& [phoneme, count] : missingPhonemes) {
+      spdlog::warn("Missing phoneme: '{}' ({})", phonemeToString(phoneme), count);
+    }
+  }
+  
+  // Synthesize audio
+  synthesize(phonemeIds, voice.synthesisConfig, voice.session, audioBuffer, result);
+  
+  // Call the audio callback if provided
+  if (audioCallback) {
+    audioCallback();
+  }
+  
+} /* phonemesToAudio */
+
+// Synthesize audio directly from phonemes to WAV file
+void phonemesToWavFile(PiperConfig &config, Voice &voice,
+                       const std::vector<Phoneme> &phonemes,
+                       std::ostream &audioFile, SynthesisResult &result) {
+  
+  std::vector<int16_t> audioBuffer;
+  phonemesToAudio(config, voice, phonemes, audioBuffer, result, nullptr);
+  
+  // Write WAV
+  auto synthesisConfig = voice.synthesisConfig;
+  writeWavHeader(synthesisConfig.sampleRate, synthesisConfig.sampleWidth,
+                 synthesisConfig.channels, (int32_t)audioBuffer.size(),
+                 audioFile);
+  
+  audioFile.write((const char *)audioBuffer.data(),
+                  sizeof(int16_t) * audioBuffer.size());
+                  
+} /* phonemesToWavFile */
+
 } // namespace piper

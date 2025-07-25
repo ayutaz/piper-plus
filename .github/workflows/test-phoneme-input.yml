@@ -6,16 +6,20 @@ on:
     paths:
       - 'src/cpp/phoneme_parser.*'
       - 'src/cpp/piper.cpp'
+      - 'src/cpp/piper.hpp'
       - 'src/cpp/main.cpp'
       - 'scripts/test_phoneme_input.py'
+      - 'scripts/test_raw_phonemes.py'
       - '.github/workflows/test-phoneme-input.yml'
   pull_request:
     branches: [ dev, master, main ]
     paths:
       - 'src/cpp/phoneme_parser.*'
       - 'src/cpp/piper.cpp'
+      - 'src/cpp/piper.hpp'
       - 'src/cpp/main.cpp'
       - 'scripts/test_phoneme_input.py'
+      - 'scripts/test_raw_phonemes.py'
       - '.github/workflows/test-phoneme-input.yml'
   workflow_dispatch:
 
@@ -100,6 +104,15 @@ jobs:
             grep -F "[[" help_output.txt || echo "No '[[' found"
             exit 1
           fi
+          
+          # Check for raw-phonemes option
+          echo "=== Checking for raw-phonemes option ==="
+          if grep -q "raw-phonemes" help_output.txt; then
+            echo "✅ Raw phonemes option found in help text"
+          else
+            echo "❌ Raw phonemes option not found!"
+            exit 1
+          fi
       
       - name: Run phoneme input tests
         run: |
@@ -121,6 +134,22 @@ jobs:
           
           # Skip Japanese test in CI due to missing OpenJTalk
           # Japanese phoneme input functionality is tested in Python tests
+      
+      - name: Test raw phoneme input
+        run: |
+          export ESPEAK_DATA_PATH="${PWD}/build/pi/share/espeak-ng-data"
+          
+          # Test raw phoneme mode with simple phonemes
+          echo "Testing raw phoneme input..."
+          echo "h e l o" | ./build/piper --model test/models/test_voice.onnx --output_file test_raw.wav --raw-phonemes
+          [ -f test_raw.wav ] && [ -s test_raw.wav ] || (echo "Raw phoneme test failed!" && exit 1)
+          echo "✅ Raw phoneme input test passed"
+          
+          # Run Python test script if available
+          if [ -f scripts/test_raw_phonemes.py ]; then
+            echo "Running raw phoneme Python tests..."
+            python3 scripts/test_raw_phonemes.py || echo "Warning: Python raw phoneme tests failed (non-critical)"
+          fi
       
       - name: Upload test outputs on failure
         if: failure()

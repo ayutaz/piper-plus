@@ -36,6 +36,7 @@
 
 #include "json.hpp"
 #include "piper.hpp"
+#include "phoneme_parser.hpp"
 
 using namespace std;
 using json = nlohmann::json;
@@ -98,6 +99,9 @@ struct RunConfig {
 
   // GPU device ID for CUDA execution provider (default: 0)
   int gpuDeviceId = 0;
+  
+  // true to interpret input as raw phonemes instead of text
+  bool rawPhonemes = false;
 };
 
 void parseArgs(int argc, char *argv[], RunConfig &runConfig);
@@ -355,7 +359,14 @@ int main(int argc, char *argv[]) {
 
       // Output audio to automatically-named WAV file in a directory
       ofstream audioFile(outputPath.string(), ios::binary);
-      piper::textToWavFile(piperConfig, voice, line, audioFile, result);
+      if (runConfig.rawPhonemes) {
+        // Parse raw phonemes from input
+        auto phonemeType = static_cast<piper::PhonemeTypeInt>(voice.phonemizeConfig.phonemeType);
+        auto phonemes = piper::parsePhonemeString(line, phonemeType);
+        piper::phonemesToWavFile(piperConfig, voice, phonemes, audioFile, result);
+      } else {
+        piper::textToWavFile(piperConfig, voice, line, audioFile, result);
+      }
       cout << outputPath.string() << endl;
     } else if (outputType == OUTPUT_FILE) {
       if (!maybeOutputPath || maybeOutputPath->empty()) {
@@ -378,11 +389,25 @@ int main(int argc, char *argv[]) {
 
       // Output audio to WAV file
       ofstream audioFile(outputPath.string(), ios::binary);
-      piper::textToWavFile(piperConfig, voice, line, audioFile, result);
+      if (runConfig.rawPhonemes) {
+        // Parse raw phonemes from input
+        auto phonemeType = static_cast<piper::PhonemeTypeInt>(voice.phonemizeConfig.phonemeType);
+        auto phonemes = piper::parsePhonemeString(line, phonemeType);
+        piper::phonemesToWavFile(piperConfig, voice, phonemes, audioFile, result);
+      } else {
+        piper::textToWavFile(piperConfig, voice, line, audioFile, result);
+      }
       cout << outputPath.string() << endl;
     } else if (outputType == OUTPUT_STDOUT) {
       // Output WAV to stdout
-      piper::textToWavFile(piperConfig, voice, line, cout, result);
+      if (runConfig.rawPhonemes) {
+        // Parse raw phonemes from input
+        auto phonemeType = static_cast<piper::PhonemeTypeInt>(voice.phonemizeConfig.phonemeType);
+        auto phonemes = piper::parsePhonemeString(line, phonemeType);
+        piper::phonemesToWavFile(piperConfig, voice, phonemes, cout, result);
+      } else {
+        piper::textToWavFile(piperConfig, voice, line, cout, result);
+      }
     } else if (outputType == OUTPUT_RAW) {
       // Raw output to stdout
       mutex mutAudio;
@@ -412,8 +437,15 @@ int main(int argc, char *argv[]) {
           cvAudio.notify_one();
         }
       };
-      piper::textToAudio(piperConfig, voice, line, audioBuffer, result,
-                         audioCallback);
+      if (runConfig.rawPhonemes) {
+        // Parse raw phonemes from input
+        auto phonemeType = static_cast<piper::PhonemeTypeInt>(voice.phonemizeConfig.phonemeType);
+        auto phonemes = piper::parsePhonemeString(line, phonemeType);
+        piper::phonemesToAudio(piperConfig, voice, phonemes, audioBuffer, result, audioCallback);
+      } else {
+        piper::textToAudio(piperConfig, voice, line, audioBuffer, result,
+                           audioCallback);
+      }
 
       // Signal thread that there is no more audio
       {
@@ -523,6 +555,8 @@ void printUsage(char *argv[]) {
        << endl;
   cerr << "   --gpu-device-id         NUM   GPU device ID for CUDA (default: 0)"
        << endl;
+  cerr << "   --raw-phonemes                interpret input as raw phonemes (space-separated)"
+       << endl;
   cerr << "   --debug                       print DEBUG messages to the console"
        << endl;
   cerr << "   -q       --quiet              disable logging" << endl;
@@ -622,6 +656,8 @@ void parseArgs(int argc, char *argv[], RunConfig &runConfig) {
     } else if (arg == "--gpu-device-id" || arg == "--gpu_device_id") {
       ensureArg(argc, argv, i);
       runConfig.gpuDeviceId = stoi(argv[++i]);
+    } else if (arg == "--raw-phonemes" || arg == "--raw_phonemes") {
+      runConfig.rawPhonemes = true;
     } else if (arg == "--version") {
       std::cout << piper::getVersion() << std::endl;
       exit(0);

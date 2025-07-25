@@ -132,6 +132,18 @@ void textToAudio(PiperConfig &config, Voice &voice, std::string text,
 void textToWavFile(PiperConfig &config, Voice &voice, std::string text,
                    std::ostream &audioFile, SynthesisResult &result);
 
+// Synthesize audio directly from phonemes
+void phonemesToAudio(PiperConfig &config, Voice &voice, 
+                     const std::vector<Phoneme> &phonemes,
+                     std::vector<int16_t> &audioBuffer, 
+                     SynthesisResult &result,
+                     const std::function<void()> &audioCallback = nullptr);
+
+// Synthesize audio directly from phonemes to WAV file
+void phonemesToWavFile(PiperConfig &config, Voice &voice,
+                       const std::vector<Phoneme> &phonemes,
+                       std::ostream &audioFile, SynthesisResult &result);
+
 } // namespace piper
 
 #endif // PIPER_H_

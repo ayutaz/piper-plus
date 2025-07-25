@@ -300,8 +300,25 @@ For multi-speaker models, use `--speaker <number>` to change speakers (default: 
 * `--noise-scale <value>` - Control audio variation (default: 0.667)
 * `--noise-w <value>` - Control phoneme duration variation (default: 0.8)
 * `--sentence-silence <seconds>` - Silence between sentences (default: 0.2)
+* `--raw-phonemes` - Interpret input as raw phonemes (space-separated)
 
 See `piper --help` for more options.
+
+### Phoneme Input
+
+Piper supports two methods for direct phoneme input:
+
+1. **Inline phoneme notation** - Mix text with phonemes using `[[ ]]`:
+   ```sh
+   echo 'Hello [[ h ə l oʊ ]] world' | ./piper --model en_US-lessac-medium.onnx -f output.wav
+   ```
+
+2. **Raw phoneme mode** - Input only phonemes with `--raw-phonemes`:
+   ```sh
+   echo 'h ə l oʊ _ w ɜː l d' | ./piper --model en_US-lessac-medium.onnx --raw-phonemes -f output.wav
+   ```
+
+See [RAW_PHONEME_INPUT.md](docs/RAW_PHONEME_INPUT.md) for detailed documentation.
 
 ### Streaming Audio
 
