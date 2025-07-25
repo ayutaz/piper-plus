@@ -50,6 +50,10 @@ build_log.zip
 # Test logs
 *.log
 
+# Benchmark results
+benchmark_results*.json
+streaming_comparison_results.json
+
 # Windows build artifacts
 *.dll
 *.exe
