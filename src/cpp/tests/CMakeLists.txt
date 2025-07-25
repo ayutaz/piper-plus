@@ -110,12 +110,15 @@ foreach(test_source ${TEST_SOURCES})
         if(NOT DEFINED SPDLOG_DIR)
             set(SPDLOG_DIR "${CMAKE_BINARY_DIR}/si")
         endif()
+        # Set espeak-ng include path
+        set(ESPEAK_NG_DIR "${CMAKE_BINARY_DIR}/p/src/piper_phonemize_external-build/ei")
         target_include_directories(${test_name} PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/..
             ${CMAKE_BINARY_DIR}/pi/include
             ${CMAKE_BINARY_DIR}/e/include
             ${CMAKE_BINARY_DIR}/o/include
             ${SPDLOG_DIR}/include
+            ${ESPEAK_NG_DIR}/include
         )
         target_link_libraries(${test_name}
             piper_phonemize
@@ -140,6 +143,10 @@ foreach(test_source ${TEST_SOURCES})
         # Add dependency on spdlog_external to ensure headers are available
         if(TARGET spdlog_external)
             add_dependencies(${test_name} spdlog_external)
+        endif()
+        # Add dependency on espeak-ng to ensure headers are available
+        if(TARGET espeak_ng_external)
+            add_dependencies(${test_name} espeak_ng_external)
         endif()
     endif()
     
