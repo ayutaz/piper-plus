@@ -95,7 +95,7 @@ foreach(test_source ${TEST_SOURCES})
         )
     endif()
 
-    # Link additional dependencies for streaming test
+    # Link additional dependencies for streaming test - using same approach as test_piper
     if(${test_name} STREQUAL "test_streaming_simple")
         target_sources(${test_name} PRIVATE
             ../piper.cpp
@@ -107,100 +107,37 @@ foreach(test_source ${TEST_SOURCES})
             ../openjtalk_security.c
             ../openjtalk_optimized.c
         )
-        # Set SPDLOG_DIR if not defined
-        if(NOT DEFINED SPDLOG_DIR)
-            set(SPDLOG_DIR "${CMAKE_BINARY_DIR}/si")
-        endif()
-        # Set espeak-ng include path
-        set(ESPEAK_NG_DIR "${CMAKE_BINARY_DIR}/p/src/piper_phonemize_external-build/ei")
+        
+        # Use the same include directories as the main piper executable
         target_include_directories(${test_name} PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/..
+            ${FMT_INCLUDES}
+            ${SPDLOG_INCLUDES}
             ${CMAKE_BINARY_DIR}/pi/include
             ${CMAKE_BINARY_DIR}/e/include
             ${CMAKE_BINARY_DIR}/o/include
-            ${SPDLOG_DIR}/include
-            ${ESPEAK_NG_DIR}/include
         )
-        # Link against piper_phonemize library with platform-specific extension
-        if(WIN32)
-            set(PIPER_PHONEMIZE_LIB "${CMAKE_BINARY_DIR}/p/src/piper_phonemize_external-build/piper_phonemize.dll")
-        elseif(APPLE)
-            set(PIPER_PHONEMIZE_LIB "${CMAKE_BINARY_DIR}/p/src/piper_phonemize_external-build/libpiper_phonemize.dylib")
-        else()
-            set(PIPER_PHONEMIZE_LIB "${CMAKE_BINARY_DIR}/p/src/piper_phonemize_external-build/libpiper_phonemize.so")
-        endif()
         
-        # Set espeak-ng library path
-        if(WIN32)
-            set(ESPEAK_NG_LIB "${ESPEAK_NG_DIR}/lib/espeak-ng.dll")
-        elseif(APPLE)
-            set(ESPEAK_NG_LIB "${ESPEAK_NG_DIR}/lib/libespeak-ng.dylib")
-        else()
-            set(ESPEAK_NG_LIB "${ESPEAK_NG_DIR}/lib/libespeak-ng.so")
-        endif()
+        # Link the same libraries as test_piper
+        target_link_libraries(${test_name}
+            ${FMT_LIBRARIES}
+            ${SPDLOG_LIBRARIES}
+            piper_phonemize
+            onnxruntime
+        )
         
-        if(EXISTS ${PIPER_PHONEMIZE_LIB})
-            target_link_libraries(${test_name}
-                ${PIPER_PHONEMIZE_LIB}
-            )
-        else()
-            # Fallback to library name
-            target_link_libraries(${test_name}
-                piper_phonemize
-            )
-        endif()
-        
-        if(EXISTS ${ESPEAK_NG_LIB})
-            target_link_libraries(${test_name}
-                ${ESPEAK_NG_LIB}
-            )
-        else()
-            target_link_libraries(${test_name}
-                espeak-ng
-            )
-        endif()
-        
-        # Set onnxruntime library path
-        if(WIN32)
-            set(ONNXRUNTIME_LIB "${CMAKE_BINARY_DIR}/pi/lib/onnxruntime.dll")
-        elseif(APPLE)
-            set(ONNXRUNTIME_LIB "${CMAKE_BINARY_DIR}/pi/lib/libonnxruntime.dylib")
-        else()
-            set(ONNXRUNTIME_LIB "${CMAKE_BINARY_DIR}/pi/lib/libonnxruntime.so")
-        endif()
-        
-        if(EXISTS ${ONNXRUNTIME_LIB})
-            target_link_libraries(${test_name}
-                ${ONNXRUNTIME_LIB}
-            )
-        else()
-            target_link_libraries(${test_name}
-                onnxruntime
-            )
-        endif()
-        # Link spdlog
-        if(WIN32)
-            target_link_libraries(${test_name}
-                optimized ${SPDLOG_DIR}/lib/spdlog.lib
-                debug ${SPDLOG_DIR}/lib/spdlogd.lib
-            )
-        else()
-            target_link_libraries(${test_name}
-                ${SPDLOG_DIR}/lib/libspdlog.a
-            )
-        endif()
-        if(UNIX AND NOT APPLE)
+        # Platform-specific linking
+        if(UNIX)
             find_package(Threads REQUIRED)
             target_link_libraries(${test_name} Threads::Threads)
         endif()
-        # Add dependency on spdlog_external to ensure headers are available
-        if(TARGET spdlog_external)
-            add_dependencies(${test_name} spdlog_external)
-        endif()
-        # Add dependency on espeak-ng to ensure headers are available
-        if(TARGET espeak_ng_external)
-            add_dependencies(${test_name} espeak_ng_external)
-        endif()
+        
+        # Add dependencies to ensure build order
+        add_dependencies(${test_name} 
+            piper_phonemize_external 
+            fmt_external 
+            spdlog_external
+        )
     endif()
     
     # Link additional dependencies for phoneme parser test
