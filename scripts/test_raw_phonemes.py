@@ -78,7 +78,9 @@ def test_raw_phonemes_english():
         print(f"Command: {' '.join(cmd)}")
         print(f"Input phonemes: {phonemes}")
 
-        result = subprocess.run(cmd, check=False, input=phonemes, text=True, capture_output=True)
+        result = subprocess.run(
+            cmd, check=False, input=phonemes, text=True, capture_output=True
+        )
 
         if result.returncode != 0:
             print(f"Error: {result.stderr}")
@@ -147,7 +149,9 @@ def test_raw_phonemes_japanese():
         print(f"Command: {' '.join(cmd)}")
         print(f"Input phonemes: {phonemes}")
 
-        result = subprocess.run(cmd, check=False, input=phonemes, text=True, capture_output=True)
+        result = subprocess.run(
+            cmd, check=False, input=phonemes, text=True, capture_output=True
+        )
 
         if result.returncode != 0:
             print(f"Error: {result.stderr}")
