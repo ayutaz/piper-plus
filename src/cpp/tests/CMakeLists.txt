@@ -111,45 +111,38 @@ foreach(test_source ${TEST_SOURCES})
         # Include directories
         target_include_directories(${test_name} PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/..
-        )
-        
-        # Find the same libraries used by main piper executable
-        find_library(PIPER_PHONEMIZE_LIB piper_phonemize PATHS ${CMAKE_BINARY_DIR}/pi/lib ${CMAKE_BINARY_DIR}/p/src/piper_phonemize_external-build NO_DEFAULT_PATH)
-        find_library(ONNXRUNTIME_LIB onnxruntime PATHS ${CMAKE_BINARY_DIR}/pi/lib NO_DEFAULT_PATH)
-        find_library(ESPEAK_NG_LIB espeak-ng PATHS ${CMAKE_BINARY_DIR}/pi/lib NO_DEFAULT_PATH)
-        
-        # Link libraries
-        target_link_libraries(${test_name}
-            ${PIPER_PHONEMIZE_LIB}
-            ${ONNXRUNTIME_LIB}
-            ${ESPEAK_NG_LIB}
+            ${CMAKE_BINARY_DIR}/fi/include
+            ${CMAKE_BINARY_DIR}/si/include
+            ${CMAKE_BINARY_DIR}/pi/include
         )
         
         # Add library directories
         target_link_directories(${test_name} PRIVATE
             ${CMAKE_BINARY_DIR}/fi/lib
             ${CMAKE_BINARY_DIR}/si/lib
+            ${CMAKE_BINARY_DIR}/pi/lib
         )
         
-        # Include directories for dependencies
-        target_include_directories(${test_name} PRIVATE
-            ${CMAKE_BINARY_DIR}/fi/include
-            ${CMAKE_BINARY_DIR}/si/include
-            ${CMAKE_BINARY_DIR}/pi/include
-        )
-        
-        # Link fmt and spdlog
+        # Platform-specific library linking (same as main piper)
         if(WIN32)
+            # Windows: Link libraries directly
             target_link_libraries(${test_name}
                 optimized ${CMAKE_BINARY_DIR}/fi/lib/fmt.lib
                 debug ${CMAKE_BINARY_DIR}/fi/lib/fmtd.lib
                 optimized ${CMAKE_BINARY_DIR}/si/lib/spdlog.lib
                 debug ${CMAKE_BINARY_DIR}/si/lib/spdlogd.lib
+                ${CMAKE_BINARY_DIR}/pi/lib/piper_phonemize.lib
+                ${CMAKE_BINARY_DIR}/pi/lib/espeak-ng.lib
+                ${CMAKE_BINARY_DIR}/pi/lib/onnxruntime.lib
             )
         else()
+            # Unix: Use library names and let CMake find them in link directories
             target_link_libraries(${test_name}
-                ${CMAKE_BINARY_DIR}/fi/lib/libfmt.a
-                ${CMAKE_BINARY_DIR}/si/lib/libspdlog.a
+                fmt
+                spdlog
+                piper_phonemize
+                espeak-ng
+                onnxruntime
             )
         endif()
         
