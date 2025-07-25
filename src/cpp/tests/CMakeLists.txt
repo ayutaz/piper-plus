@@ -106,21 +106,40 @@ foreach(test_source ${TEST_SOURCES})
             ../openjtalk_security.c
             ../openjtalk_optimized.c
         )
+        # Set SPDLOG_DIR if not defined
+        if(NOT DEFINED SPDLOG_DIR)
+            set(SPDLOG_DIR "${CMAKE_BINARY_DIR}/si")
+        endif()
         target_include_directories(${test_name} PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/..
             ${CMAKE_BINARY_DIR}/pi/include
             ${CMAKE_BINARY_DIR}/e/include
             ${CMAKE_BINARY_DIR}/o/include
+            ${SPDLOG_DIR}/include
         )
         target_link_libraries(${test_name}
             piper_phonemize
             espeak-ng
             onnxruntime
-            spdlog
         )
+        # Link spdlog
+        if(WIN32)
+            target_link_libraries(${test_name}
+                optimized ${SPDLOG_DIR}/lib/spdlog.lib
+                debug ${SPDLOG_DIR}/lib/spdlogd.lib
+            )
+        else()
+            target_link_libraries(${test_name}
+                ${SPDLOG_DIR}/lib/libspdlog.a
+            )
+        endif()
         if(UNIX AND NOT APPLE)
             find_package(Threads REQUIRED)
             target_link_libraries(${test_name} Threads::Threads)
+        endif()
+        # Add dependency on spdlog_external to ensure headers are available
+        if(TARGET spdlog_external)
+            add_dependencies(${test_name} spdlog_external)
         endif()
     endif()
     
