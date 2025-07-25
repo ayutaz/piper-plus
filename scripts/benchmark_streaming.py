@@ -85,7 +85,9 @@ def measure_total_synthesis_time(
 
         start_time = time.perf_counter()
 
-        result = subprocess.run(cmd, check=False, input=text, text=True, capture_output=True)
+        result = subprocess.run(
+            cmd, check=False, input=text, text=True, capture_output=True
+        )
 
         end_time = time.perf_counter()
         total_time = end_time - start_time
