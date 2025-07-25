@@ -16,6 +16,7 @@
 #include "utf8.h"
 #include "wavfile.hpp"
 #include "openjtalk_phonemize.hpp"
+#include "phoneme_parser.hpp"
 
 #ifdef USE_ARM64_NEON
 #include "audio_neon.hpp"
@@ -639,28 +640,51 @@ void textToAudio(PiperConfig &config, Voice &voice, std::string text,
     text = tashkeel::tashkeel_run(text, *config.tashkeelState);
   }
 
+  // Parse text for [[ phonemes ]] notation
+  auto textSegments = parsePhonemeNotation(text);
+  
   // Phonemes for each sentence
   spdlog::debug("Phonemizing text: {}", text);
   std::vector<std::vector<Phoneme>> phonemes;
-
-  if (voice.phonemizeConfig.phonemeType == eSpeakPhonemes) {
-    // Use espeak-ng for phonemization
-    eSpeakPhonemeConfig eSpeakConfig;
-    eSpeakConfig.voice = voice.phonemizeConfig.eSpeak.voice;
-    phonemize_eSpeak(text, eSpeakConfig, phonemes);
-  } else if (voice.phonemizeConfig.phonemeType == OpenJTalkPhonemes) {
-    // Japanese OpenJTalk phonemizer
-    phonemize_openjtalk(text, phonemes);
-    
-    // If OpenJTalk failed, we cannot process Japanese text
-    if (phonemes.empty()) {
-      throw std::runtime_error("OpenJTalk is not available or failed to process Japanese text. "
-                               "Cannot synthesize Japanese without OpenJTalk.");
+  
+  // Process each segment
+  for (const auto& segment : textSegments) {
+    if (segment.isPhonemes) {
+      // Direct phoneme input
+      spdlog::debug("Processing direct phoneme input: {}", segment.text);
+      auto parsedPhonemes = parsePhonemeString(segment.text, static_cast<int>(voice.phonemizeConfig.phonemeType));
+      
+      // Add as a single "sentence"
+      phonemes.push_back(parsedPhonemes);
+    } else {
+      // Regular text - phonemize as usual
+      std::vector<std::vector<Phoneme>> segmentPhonemes;
+      
+      if (voice.phonemizeConfig.phonemeType == eSpeakPhonemes) {
+        // Use espeak-ng for phonemization
+        eSpeakPhonemeConfig eSpeakConfig;
+        eSpeakConfig.voice = voice.phonemizeConfig.eSpeak.voice;
+        phonemize_eSpeak(segment.text, eSpeakConfig, segmentPhonemes);
+      } else if (voice.phonemizeConfig.phonemeType == OpenJTalkPhonemes) {
+        // Japanese OpenJTalk phonemizer
+        phonemize_openjtalk(segment.text, segmentPhonemes);
+        
+        // If OpenJTalk failed, we cannot process Japanese text
+        if (segmentPhonemes.empty() && !segment.text.empty()) {
+          throw std::runtime_error("OpenJTalk is not available or failed to process Japanese text. "
+                                   "Cannot synthesize Japanese without OpenJTalk.");
+        }
+      } else {
+        // Use UTF-8 codepoints as "phonemes"
+        CodepointsPhonemeConfig codepointsConfig;
+        phonemize_codepoints(segment.text, codepointsConfig, segmentPhonemes);
+      }
+      
+      // Add all sentences from this segment
+      for (auto& sentencePhonemes : segmentPhonemes) {
+        phonemes.push_back(std::move(sentencePhonemes));
+      }
     }
-  } else {
-    // Use UTF-8 codepoints as "phonemes"
-    CodepointsPhonemeConfig codepointsConfig;
-    phonemize_codepoints(text, codepointsConfig, phonemes);
   }
 
   // Synthesize each sentence independently.

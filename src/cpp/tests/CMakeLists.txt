@@ -8,6 +8,7 @@ set(TEST_SOURCES
     test_openjtalk_error_handling.cpp
     test_openjtalk_optimized.cpp
     test_gpu_device_id.cpp
+    test_phoneme_parser.cpp
 )
 
 # Add dictionary manager test for Unix platforms
@@ -93,6 +94,34 @@ foreach(test_source ${TEST_SOURCES})
         )
     endif()
 
+    # Link additional dependencies for phoneme parser test
+    if(${test_name} STREQUAL "test_phoneme_parser")
+        target_sources(${test_name} PRIVATE
+            ../phoneme_parser.cpp
+        )
+        # Set SPDLOG_DIR if not defined
+        if(NOT DEFINED SPDLOG_DIR)
+            set(SPDLOG_DIR "${CMAKE_BINARY_DIR}/si")
+        endif()
+        target_include_directories(${test_name} PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/..
+            ${SPDLOG_DIR}/include
+        )
+        if(WIN32)
+            target_link_libraries(${test_name}
+                optimized ${SPDLOG_DIR}/lib/spdlog.lib
+                debug ${SPDLOG_DIR}/lib/spdlogd.lib
+            )
+        else()
+            target_link_libraries(${test_name}
+                ${SPDLOG_DIR}/lib/libspdlog.a
+            )
+        endif()
+        # Add dependency on spdlog_external to ensure headers are available
+        if(TARGET spdlog_external)
+            add_dependencies(${test_name} spdlog_external)
+        endif()
+    endif()
 
     add_test(NAME ${test_name} COMMAND ${test_name})
 endforeach()

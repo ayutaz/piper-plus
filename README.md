@@ -19,6 +19,10 @@ Piper is used in a [variety of projects](#people-using-piper).
 - [Running in Python](#running-in-python)
 
 ## 追加機能
+* **🎤 音素入力機能** - `[[ phonemes ]]` 記法による直接音素指定
+  * 詳細は[音素入力ガイド](docs/PHONEME_INPUT.md)を参照
+  * 使用例: `echo "Hello [[ h ə l oʊ ]] world" | piper --model en.onnx -f out.wav`
+  * 日本語例: `echo "今日は [[ ky o o w a ]] です" | piper --model ja.onnx -f out.wav`
 * 日本語の事前学習及び追加学習/推論対応（OpenJTalk統合）
   * 詳細な使用方法は[日本語音声合成ガイド](JAPANESE_USAGE.md)を参照
   * **Windows対応**: [Windowsセットアップガイド](docs/windows-setup.md)を参照
