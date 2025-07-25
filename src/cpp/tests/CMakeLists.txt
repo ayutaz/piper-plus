@@ -99,6 +99,7 @@ foreach(test_source ${TEST_SOURCES})
     if(${test_name} STREQUAL "test_streaming_simple")
         target_sources(${test_name} PRIVATE
             ../piper.cpp
+            ../phoneme_parser.cpp
             ../openjtalk_phonemize.cpp
             ../openjtalk_wrapper.c
             ../openjtalk_dictionary_manager.c
@@ -120,11 +121,63 @@ foreach(test_source ${TEST_SOURCES})
             ${SPDLOG_DIR}/include
             ${ESPEAK_NG_DIR}/include
         )
-        target_link_libraries(${test_name}
-            piper_phonemize
-            espeak-ng
-            onnxruntime
-        )
+        # Link against piper_phonemize library with platform-specific extension
+        if(WIN32)
+            set(PIPER_PHONEMIZE_LIB "${CMAKE_BINARY_DIR}/p/src/piper_phonemize_external-build/piper_phonemize.dll")
+        elseif(APPLE)
+            set(PIPER_PHONEMIZE_LIB "${CMAKE_BINARY_DIR}/p/src/piper_phonemize_external-build/libpiper_phonemize.dylib")
+        else()
+            set(PIPER_PHONEMIZE_LIB "${CMAKE_BINARY_DIR}/p/src/piper_phonemize_external-build/libpiper_phonemize.so")
+        endif()
+        
+        # Set espeak-ng library path
+        if(WIN32)
+            set(ESPEAK_NG_LIB "${ESPEAK_NG_DIR}/lib/espeak-ng.dll")
+        elseif(APPLE)
+            set(ESPEAK_NG_LIB "${ESPEAK_NG_DIR}/lib/libespeak-ng.dylib")
+        else()
+            set(ESPEAK_NG_LIB "${ESPEAK_NG_DIR}/lib/libespeak-ng.so")
+        endif()
+        
+        if(EXISTS ${PIPER_PHONEMIZE_LIB})
+            target_link_libraries(${test_name}
+                ${PIPER_PHONEMIZE_LIB}
+            )
+        else()
+            # Fallback to library name
+            target_link_libraries(${test_name}
+                piper_phonemize
+            )
+        endif()
+        
+        if(EXISTS ${ESPEAK_NG_LIB})
+            target_link_libraries(${test_name}
+                ${ESPEAK_NG_LIB}
+            )
+        else()
+            target_link_libraries(${test_name}
+                espeak-ng
+            )
+        endif()
+        
+        # Set onnxruntime library path
+        if(WIN32)
+            set(ONNXRUNTIME_LIB "${CMAKE_BINARY_DIR}/pi/lib/onnxruntime.dll")
+        elseif(APPLE)
+            set(ONNXRUNTIME_LIB "${CMAKE_BINARY_DIR}/pi/lib/libonnxruntime.dylib")
+        else()
+            set(ONNXRUNTIME_LIB "${CMAKE_BINARY_DIR}/pi/lib/libonnxruntime.so")
+        endif()
+        
+        if(EXISTS ${ONNXRUNTIME_LIB})
+            target_link_libraries(${test_name}
+                ${ONNXRUNTIME_LIB}
+            )
+        else()
+            target_link_libraries(${test_name}
+                onnxruntime
+            )
+        endif()
         # Link spdlog
         if(WIN32)
             target_link_libraries(${test_name}
