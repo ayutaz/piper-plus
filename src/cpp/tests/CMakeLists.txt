@@ -108,23 +108,50 @@ foreach(test_source ${TEST_SOURCES})
             ../openjtalk_optimized.c
         )
         
-        # Use the same include directories as the main piper executable
+        # Include directories
         target_include_directories(${test_name} PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/..
-            ${FMT_INCLUDES}
-            ${SPDLOG_INCLUDES}
-            ${CMAKE_BINARY_DIR}/pi/include
-            ${CMAKE_BINARY_DIR}/e/include
-            ${CMAKE_BINARY_DIR}/o/include
         )
         
-        # Link the same libraries as test_piper
+        # Find the same libraries used by main piper executable
+        find_library(PIPER_PHONEMIZE_LIB piper_phonemize PATHS ${CMAKE_BINARY_DIR}/pi/lib ${CMAKE_BINARY_DIR}/p/src/piper_phonemize_external-build NO_DEFAULT_PATH)
+        find_library(ONNXRUNTIME_LIB onnxruntime PATHS ${CMAKE_BINARY_DIR}/pi/lib NO_DEFAULT_PATH)
+        find_library(ESPEAK_NG_LIB espeak-ng PATHS ${CMAKE_BINARY_DIR}/pi/lib NO_DEFAULT_PATH)
+        
+        # Link libraries
         target_link_libraries(${test_name}
-            ${FMT_LIBRARIES}
-            ${SPDLOG_LIBRARIES}
-            piper_phonemize
-            onnxruntime
+            ${PIPER_PHONEMIZE_LIB}
+            ${ONNXRUNTIME_LIB}
+            ${ESPEAK_NG_LIB}
         )
+        
+        # Add library directories
+        target_link_directories(${test_name} PRIVATE
+            ${CMAKE_BINARY_DIR}/fi/lib
+            ${CMAKE_BINARY_DIR}/si/lib
+        )
+        
+        # Include directories for dependencies
+        target_include_directories(${test_name} PRIVATE
+            ${CMAKE_BINARY_DIR}/fi/include
+            ${CMAKE_BINARY_DIR}/si/include
+            ${CMAKE_BINARY_DIR}/pi/include
+        )
+        
+        # Link fmt and spdlog
+        if(WIN32)
+            target_link_libraries(${test_name}
+                optimized ${CMAKE_BINARY_DIR}/fi/lib/fmt.lib
+                debug ${CMAKE_BINARY_DIR}/fi/lib/fmtd.lib
+                optimized ${CMAKE_BINARY_DIR}/si/lib/spdlog.lib
+                debug ${CMAKE_BINARY_DIR}/si/lib/spdlogd.lib
+            )
+        else()
+            target_link_libraries(${test_name}
+                ${CMAKE_BINARY_DIR}/fi/lib/libfmt.a
+                ${CMAKE_BINARY_DIR}/si/lib/libspdlog.a
+            )
+        endif()
         
         # Platform-specific linking
         if(UNIX)
