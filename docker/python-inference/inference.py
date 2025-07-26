@@ -17,6 +17,7 @@ try:
     from fastapi import FastAPI, HTTPException
     from fastapi.responses import FileResponse
     from pydantic import BaseModel
+
     FASTAPI_AVAILABLE = True
 except ImportError:
     FASTAPI_AVAILABLE = False
@@ -38,7 +39,7 @@ def synthesize_text(
     speaker_id: int = 0,
     noise_scale: float = 0.667,
     length_scale: float = 1.0,
-    noise_w: float = 0.8
+    noise_w: float = 0.8,
 ) -> str:
     """
     Synthesize text to speech using Piper TTS
@@ -68,7 +69,7 @@ def synthesize_text(
             speaker_id=speaker_id,
             length_scale=length_scale,
             noise_scale=noise_scale,
-            noise_w=noise_w
+            noise_w=noise_w,
         )
 
         # Convert generator to numpy array
@@ -88,7 +89,9 @@ def main():
     parser.add_argument("--text", type=str, help="Text to synthesize")
     parser.add_argument("--input-file", type=str, help="Text file to read from")
     parser.add_argument("--model", type=str, required=True, help="Path to ONNX model")
-    parser.add_argument("--output", type=str, default="output.wav", help="Output WAV file")
+    parser.add_argument(
+        "--output", type=str, default="output.wav", help="Output WAV file"
+    )
     parser.add_argument("--speaker", type=int, default=0, help="Speaker ID")
     parser.add_argument("--noise-scale", type=float, default=0.667, help="Noise scale")
     parser.add_argument("--length-scale", type=float, default=1.0, help="Length scale")
@@ -123,7 +126,7 @@ def main():
                     request.speaker_id,
                     request.noise_scale,
                     request.length_scale,
-                    request.noise_w
+                    request.noise_w,
                 )
 
                 return FileResponse(output_path, media_type="audio/wav")
@@ -138,7 +141,7 @@ def main():
         if args.text:
             text = args.text
         elif args.input_file:
-            with open(args.input_file, encoding='utf-8') as f:
+            with open(args.input_file, encoding="utf-8") as f:
                 text = f.read()
         else:
             print("Reading from stdin...")
@@ -156,11 +159,10 @@ def main():
             args.speaker,
             args.noise_scale,
             args.length_scale,
-            args.noise_w
+            args.noise_w,
         )
         print(f"Audio saved to: {output_path}")
 
 
 if __name__ == "__main__":
     main()
-
