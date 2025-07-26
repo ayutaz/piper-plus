@@ -1,0 +1,172 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+      - 'feature/*'
+  pull_request:
+    branches:
+      - main
+      - dev
+
+jobs:
+  cpp-tests:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, macos-latest, windows-latest]
+        build_type: [Release, Debug]
+        
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies (Ubuntu)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential cmake ninja-build \
+            libsndfile1-dev libfmt-dev libspdlog-dev \
+            libgtest-dev libgmock-dev
+      
+      - name: Install dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install cmake ninja libsndfile fmt spdlog googletest
+      
+      - name: Install dependencies (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          choco install cmake ninja
+      
+      - name: Configure CMake
+        run: |
+          cmake -B build \
+            -G Ninja \
+            -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+            -DBUILD_TESTS=ON \
+            -DUSE_CUDA=OFF
+      
+      - name: Build
+        run: cmake --build build --config ${{ matrix.build_type }}
+      
+      - name: Test
+        run: |
+          cd build
+          ctest -C ${{ matrix.build_type }} --output-on-failure
+
+  python-tests:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, macos-latest, windows-latest]
+        python-version: ['3.9', '3.10', '3.11', '3.12']
+        
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      
+      - name: Install system dependencies (Ubuntu)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libsndfile1-dev
+      
+      - name: Install system dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install libsndfile
+      
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements_test.txt
+          pip install -e src/python/
+      
+      - name: Run Python tests
+        run: |
+          python scripts/run_tests.py --python --coverage
+      
+      - name: Upload coverage reports
+        uses: codecov/codecov-action@v4
+        if: matrix.python-version == '3.11' && runner.os == 'Linux'
+        with:
+          file: ./coverage.xml
+          flags: python
+          name: Python ${{ matrix.python-version }} - ${{ runner.os }}
+
+  lint:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install ruff black isort mypy
+      
+      - name: Run ruff
+        run: ruff check .
+      
+      - name: Run black
+        run: black --check .
+      
+      - name: Run isort
+        run: isort --check-only .
+
+  docker-test:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Test Python train image build
+        uses: docker/build-push-action@v5
+        with:
+          context: ./docker/python-train
+          push: false
+          tags: piper-python-train:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      
+      - name: Test Python inference image build
+        uses: docker/build-push-action@v5
+        with:
+          context: ./docker/python-inference
+          push: false
+          tags: piper-python-inference:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      
+      - name: Test C++ train image build
+        uses: docker/build-push-action@v5
+        with:
+          context: ./docker/cpp-train
+          push: false
+          tags: piper-cpp-train:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
