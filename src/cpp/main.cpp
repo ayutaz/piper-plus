@@ -113,9 +113,13 @@ struct RunConfig {
   string timingFormat = "json";
   
   // Format constants
-  static const string FORMAT_JSON = "json";
-  static const string FORMAT_TSV = "tsv";
+  static const string FORMAT_JSON;
+  static const string FORMAT_TSV;
 };
+
+// Define static constants
+const string RunConfig::FORMAT_JSON = "json";
+const string RunConfig::FORMAT_TSV = "tsv";
 
 void parseArgs(int argc, char *argv[], RunConfig &runConfig);
 void rawOutputProc(vector<int16_t> &sharedAudioBuffer, mutex &mutAudio,
