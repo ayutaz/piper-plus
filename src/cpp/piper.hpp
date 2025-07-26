@@ -144,6 +144,12 @@ void phonemesToWavFile(PiperConfig &config, Voice &voice,
                        const std::vector<Phoneme> &phonemes,
                        std::ostream &audioFile, SynthesisResult &result);
 
+// Streaming text-to-audio synthesis with reduced latency
+void textToAudioStreaming(PiperConfig &config, Voice &voice, std::string text,
+                          std::vector<int16_t> &audioBuffer, SynthesisResult &result,
+                          const std::function<void(const std::vector<int16_t>&)> &chunkCallback,
+                          size_t chunkSize = 4096);
+
 } // namespace piper
 
 #endif // PIPER_H_

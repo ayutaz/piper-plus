@@ -6,6 +6,7 @@
 #include <stdexcept>
 #include <filesystem>
 #include <unordered_map>
+#include <regex>
 
 #include <espeak-ng/speak_lib.h>
 #include <onnxruntime_cxx_api.h>
@@ -906,5 +907,232 @@ void phonemesToWavFile(PiperConfig &config, Voice &voice,
                   sizeof(int16_t) * audioBuffer.size());
                   
 } /* phonemesToWavFile */
+
+// Helper function for calculating dynamic chunk size based on text characteristics
+static size_t calculateDynamicChunkSize(const std::string& text, size_t baseSize = 50) {
+  // Short texts should not be chunked
+  if (text.length() < baseSize * 2) {
+    return text.length();
+  }
+  
+  // Calculate punctuation density
+  size_t punctCount = 0;
+  const std::string punctMarks = u8"。、！？.!?,;:";
+  for (size_t i = 0; i < text.length(); ++i) {
+    if (punctMarks.find(text[i]) != std::string::npos) {
+      punctCount++;
+    }
+  }
+  
+  // Adjust chunk size based on punctuation density
+  float punctDensity = static_cast<float>(punctCount) / text.length();
+  if (punctDensity > 0.05f) {  // More than 5% punctuation - use smaller chunks
+    return baseSize;
+  } else if (punctDensity < 0.02f) {  // Less than 2% punctuation - use larger chunks
+    return baseSize * 3;
+  }
+  return baseSize * 2;  // Medium density
+}
+
+// Helper function for audio crossfade to reduce chunk boundary artifacts
+static void crossfadeAudioChunks(
+    const std::vector<int16_t>& prevChunk,
+    const std::vector<int16_t>& newChunk,
+    std::vector<int16_t>& output,
+    size_t overlapSamples = 220  // 10ms @ 22050Hz
+) {
+  if (prevChunk.empty() || newChunk.empty() || overlapSamples == 0) {
+    // No crossfade possible, just append
+    output.insert(output.end(), newChunk.begin(), newChunk.end());
+    return;
+  }
+  
+  // Ensure we don't exceed chunk boundaries
+  size_t actualOverlap = std::min({overlapSamples, prevChunk.size() / 4, newChunk.size() / 4});
+  if (actualOverlap < 44) {  // Less than 2ms - not worth crossfading
+    output.insert(output.end(), newChunk.begin(), newChunk.end());
+    return;
+  }
+  
+  // Remove the overlap from the output (it was already added with prevChunk)
+  if (output.size() >= actualOverlap) {
+    output.resize(output.size() - actualOverlap);
+  }
+  
+  // Perform crossfade
+  for (size_t i = 0; i < actualOverlap; ++i) {
+    float fadeOut = 1.0f - (static_cast<float>(i) / actualOverlap);
+    float fadeIn = static_cast<float>(i) / actualOverlap;
+    
+    size_t prevIdx = prevChunk.size() - actualOverlap + i;
+    int16_t mixed = static_cast<int16_t>(
+      prevChunk[prevIdx] * fadeOut + newChunk[i] * fadeIn
+    );
+    output.push_back(mixed);
+  }
+  
+  // Append the rest of the new chunk
+  output.insert(output.end(), newChunk.begin() + actualOverlap, newChunk.end());
+}
+
+// Streaming text-to-audio synthesis with reduced latency
+void textToAudioStreaming(PiperConfig &config, Voice &voice, std::string text,
+                          std::vector<int16_t> &audioBuffer, SynthesisResult &result,
+                          const std::function<void(const std::vector<int16_t>&)> &chunkCallback,
+                          size_t chunkSize) {
+  spdlog::debug("textToAudioStreaming: text='{}', chunkSize={}", text, chunkSize);
+  
+  // Clear result
+  result.inferSeconds = 0;
+  result.audioSeconds = 0;
+  result.realTimeFactor = 0;
+  
+  // Clear output buffer
+  audioBuffer.clear();
+  
+  if (text.empty()) {
+    return;
+  }
+  
+  // Calculate dynamic chunk size based on text characteristics
+  size_t dynamicChunkSize = calculateDynamicChunkSize(text, chunkSize > 0 ? chunkSize : 50);
+  
+  // Static regex patterns for better performance (cached compilation)
+  static const std::regex japaneseSentenceBoundary(u8"([。！？、]+)");
+  static const std::regex englishSentenceBoundary("([.!?,;:]+|\\s+(?:and|or|but|because|while|when|if|that|which)\\s+)");
+  
+  // Select appropriate regex based on language
+  const std::regex& sentenceBoundary = 
+    (voice.phonemizeConfig.phonemeType == OpenJTalkPhonemes) 
+    ? japaneseSentenceBoundary 
+    : englishSentenceBoundary;
+  
+  // Split text into chunks at natural boundaries
+  std::vector<std::string> chunks;
+  std::sregex_token_iterator iter(text.begin(), text.end(), sentenceBoundary, {-1, 1});
+  std::sregex_token_iterator end;
+  
+  std::string currentChunk;
+  for (; iter != end; ++iter) {
+    std::string token = *iter;
+    if (token.empty()) continue;
+    
+    // Check if this is a delimiter
+    if (std::regex_match(token, sentenceBoundary)) {
+      // Add delimiter to current chunk
+      currentChunk += token;
+      if (!currentChunk.empty() && 
+          (token.find_first_of(u8"。！？.!?") != std::string::npos ||
+           currentChunk.length() > dynamicChunkSize)) {
+        // End of sentence or chunk is getting long
+        chunks.push_back(currentChunk);
+        currentChunk.clear();
+      }
+    } else {
+      // Regular text
+      currentChunk += token;
+    }
+  }
+  
+  // Add any remaining text
+  if (!currentChunk.empty()) {
+    chunks.push_back(currentChunk);
+  }
+  
+  spdlog::debug("Split text into {} chunks with dynamic chunk size: {}", chunks.size(), dynamicChunkSize);
+  
+  // Track previous chunk for crossfading
+  std::vector<int16_t> previousChunkAudio;
+  
+  // Process each chunk
+  for (size_t i = 0; i < chunks.size(); ++i) {
+    const auto& chunk = chunks[i];
+    spdlog::debug("Processing chunk {}/{}: '{}'", i+1, chunks.size(), chunk);
+    
+    // Phonemize chunk
+    std::vector<std::vector<Phoneme>> chunkSentences;
+    
+    if (voice.phonemizeConfig.phonemeType == eSpeakPhonemes) {
+      // Use espeak-ng for phonemization
+      eSpeakPhonemeConfig eSpeakConfig;
+      eSpeakConfig.voice = voice.phonemizeConfig.eSpeak.voice;
+      phonemize_eSpeak(chunk, eSpeakConfig, chunkSentences);
+    } else if (voice.phonemizeConfig.phonemeType == OpenJTalkPhonemes) {
+      // Japanese OpenJTalk phonemizer
+      phonemize_openjtalk(chunk, chunkSentences);
+    } else {
+      // Use UTF-8 codepoints as "phonemes"
+      CodepointsPhonemeConfig codepointsConfig;
+      phonemize_codepoints(chunk, codepointsConfig, chunkSentences);
+    }
+    
+    // Process each sentence in the chunk
+    for (auto& sentencePhonemes : chunkSentences) {
+      if (sentencePhonemes.empty()) {
+        continue;
+      }
+      
+      // Convert phonemes to IDs
+      std::vector<PhonemeId> phonemeIds;
+      std::map<Phoneme, std::size_t> missingPhonemes;
+      // Create PhonemeIdConfig from voice config
+      PhonemeIdConfig idConfig;
+      idConfig.phonemeIdMap = 
+          std::make_shared<PhonemeIdMap>(voice.phonemizeConfig.phonemeIdMap);
+      idConfig.interspersePad = voice.phonemizeConfig.interspersePad;
+      idConfig.addBos = true;
+      idConfig.addEos = true;
+      
+      phonemes_to_ids(sentencePhonemes, idConfig, phonemeIds,
+                      missingPhonemes);
+      
+      // Report missing phonemes
+      if (!missingPhonemes.empty()) {
+        for (auto& [phoneme, count] : missingPhonemes) {
+          spdlog::warn("Missing phoneme: '{}' (count={})",
+                       phonemeToString(phoneme), count);
+        }
+      }
+      
+      // Synthesize audio for this chunk
+      std::vector<int16_t> chunkAudioBuffer;
+      SynthesisResult chunkResult;
+      synthesize(phonemeIds, voice.synthesisConfig, voice.session, 
+                 chunkAudioBuffer, chunkResult);
+      
+      // Update cumulative result
+      result.inferSeconds += chunkResult.inferSeconds;
+      result.audioSeconds += chunkResult.audioSeconds;
+      
+      // Apply crossfade if we have a previous chunk
+      if (!previousChunkAudio.empty() && !chunkAudioBuffer.empty()) {
+        // Crossfade with previous chunk to reduce boundary artifacts
+        crossfadeAudioChunks(previousChunkAudio, chunkAudioBuffer, audioBuffer);
+      } else {
+        // No previous chunk or empty current chunk - just append
+        audioBuffer.insert(audioBuffer.end(), 
+                           chunkAudioBuffer.begin(), 
+                           chunkAudioBuffer.end());
+      }
+      
+      // Store current chunk for next iteration's crossfade
+      previousChunkAudio = chunkAudioBuffer;
+      
+      // Call chunk callback for all chunks (including empty ones for progress tracking)
+      if (chunkCallback) {
+        chunkCallback(chunkAudioBuffer);
+      }
+    }
+  }
+  
+  // Calculate final real-time factor
+  if (result.audioSeconds > 0) {
+    result.realTimeFactor = result.audioSeconds / result.inferSeconds;
+  }
+  
+  spdlog::debug("Streaming synthesis complete: {} chunks, {:.2f}s audio, RTF={:.2f}",
+                chunks.size(), result.audioSeconds, result.realTimeFactor);
+  
+} /* textToAudioStreaming */
 
 } // namespace piper

@@ -13,7 +13,9 @@ RUN echo 'Acquire::Retries "3";' > /etc/apt/apt.conf.d/80-retries
 FROM base AS dependencies
 
 # 基本ツールのインストール（レイヤーキャッシュ最適化）
-RUN apt-get update && \
+# ARM64エミュレーション環境でのlibc-binエラー対策
+RUN rm -f /var/cache/ldconfig/aux-cache || true && \
+    apt-get update && \
     apt-get install --yes --no-install-recommends \
         ca-certificates curl gnupg lsb-release && \
     apt-get clean && \
@@ -22,6 +24,8 @@ RUN apt-get update && \
 # メインパッケージのインストール（エラー処理強化）
 RUN for i in 1 2 3; do \
         apt-get update && \
+        # ldconfigのキャッシュをクリア
+        rm -f /var/cache/ldconfig/aux-cache && \
         apt-get install --yes --no-install-recommends \
             build-essential cmake git pkg-config libicu-dev libespeak-ng-dev \
             make ninja-build python3 ccache \
@@ -31,6 +35,8 @@ RUN for i in 1 2 3; do \
         apt-get clean && \
         rm -rf /var/lib/apt/lists/* && break || { \
             echo "Package install failed (attempt $i)"; \
+            # エラー時にlibc-binの設定ファイルを削除
+            rm -f /var/lib/dpkg/info/libc-bin.* || true; \
             sleep 5; \
         }; \
     done
@@ -152,6 +158,7 @@ RUN echo "=== Checking piper-phonemize build ===" && \
 
 # Set up library paths for runtime and create symlinks
 RUN echo "/build/install/lib" > /etc/ld.so.conf.d/piper.conf && \
+    rm -f /var/cache/ldconfig/aux-cache || true && \
     ldconfig || true && \
     if [ -d /build/install/lib ]; then \
         cd /build/install/lib && \

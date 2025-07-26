@@ -1,0 +1,164 @@
+name: Streaming Mode Tests
+
+on:
+  push:
+    branches: [ dev, master, main, 'feature/streaming-*' ]
+    paths:
+      - 'src/cpp/piper.cpp'
+      - 'src/cpp/main.cpp'
+      - 'src/cpp/tests/test_streaming*.cpp'
+      - 'scripts/*streaming*.py'
+      - '.github/workflows/test-streaming-mode.yml'
+  pull_request:
+    branches: [ dev, master, main ]
+    paths:
+      - 'src/cpp/piper.cpp'
+      - 'src/cpp/main.cpp'
+      - 'src/cpp/tests/test_streaming*.cpp'
+      - 'scripts/*streaming*.py'
+      - '.github/workflows/test-streaming-mode.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test-streaming:
+    name: Test Streaming Mode on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    
+    steps:
+      - uses: actions/checkout@v4.2.2
+        with:
+          submodules: true
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      
+      - name: Install dependencies (Ubuntu)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            cmake \
+            wget
+          
+          # Install ONNX Runtime
+          wget https://github.com/microsoft/onnxruntime/releases/download/v1.14.1/onnxruntime-linux-x64-1.14.1.tgz
+          tar -xzf onnxruntime-linux-x64-1.14.1.tgz
+          sudo cp -r onnxruntime-linux-x64-1.14.1/lib/* /usr/local/lib/
+          sudo cp -r onnxruntime-linux-x64-1.14.1/include/* /usr/local/include/
+          sudo ldconfig
+          rm -rf onnxruntime-linux-x64-1.14.1*
+      
+      - name: Install dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew update || true
+          brew install cmake || brew upgrade cmake || true
+          brew install wget || brew upgrade wget || true
+          
+          # Install ONNX Runtime
+          sudo mkdir -p /usr/local/lib /usr/local/include
+          
+          if [[ $(uname -m) == "arm64" ]]; then
+            wget https://github.com/microsoft/onnxruntime/releases/download/v1.14.1/onnxruntime-osx-arm64-1.14.1.tgz
+            tar -xzf onnxruntime-osx-arm64-1.14.1.tgz
+            sudo cp -r onnxruntime-osx-arm64-1.14.1/lib/* /usr/local/lib/ 2>/dev/null || true
+            sudo cp -r onnxruntime-osx-arm64-1.14.1/include/* /usr/local/include/ 2>/dev/null || true
+            rm -rf onnxruntime-osx-arm64-1.14.1*
+          else
+            wget https://github.com/microsoft/onnxruntime/releases/download/v1.14.1/onnxruntime-osx-x86_64-1.14.1.tgz
+            tar -xzf onnxruntime-osx-x86_64-1.14.1.tgz
+            sudo cp -r onnxruntime-osx-x86_64-1.14.1/lib/* /usr/local/lib/ 2>/dev/null || true
+            sudo cp -r onnxruntime-osx-x86_64-1.14.1/include/* /usr/local/include/ 2>/dev/null || true
+            rm -rf onnxruntime-osx-x86_64-1.14.1*
+          fi
+      
+      - name: Configure and Build
+        run: |
+          CMAKE_ARGS="-DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=ON"
+          
+          if [[ "${{ runner.os }}" == "macOS" ]]; then
+            if [[ $(uname -m) == "arm64" ]]; then
+              CMAKE_ARGS="$CMAKE_ARGS -DCMAKE_OSX_ARCHITECTURES=arm64"
+            else
+              CMAKE_ARGS="$CMAKE_ARGS -DCMAKE_OSX_ARCHITECTURES=x86_64"
+            fi
+          fi
+          
+          cmake -B build $CMAKE_ARGS
+          cmake --build build --config Release -j$(nproc 2>/dev/null || sysctl -n hw.ncpu)
+      
+      - name: Run C++ Streaming Tests
+        run: |
+          cd build
+          # Run streaming tests
+          if ctest -R test_streaming_simple --output-on-failure; then
+            echo "✅ Streaming unit tests passed!"
+          else
+            echo "❌ Streaming unit tests failed!"
+            exit 1
+          fi
+      
+      - name: Check Streaming Flag
+        run: |
+          # Verify --streaming flag is available
+          if ./build/piper --help 2>&1 | grep -q "streaming"; then
+            echo "✅ --streaming flag is available in help"
+          else
+            echo "❌ --streaming flag not found in help"
+            exit 1
+          fi
+      
+      - name: Test Streaming with Text Model
+        run: |
+          # Test with text phoneme model (no espeak/openjtalk dependency)
+          echo "Testing streaming mode..."
+          echo "Hello world" | ./build/piper --model test/models/text_voice.onnx --output-raw --streaming > streaming_output.raw 2>streaming.log || true
+          
+          # Check if output was produced
+          if [ -s streaming_output.raw ]; then
+            echo "✅ Streaming mode produced audio output"
+            echo "Output size: $(wc -c < streaming_output.raw) bytes"
+            
+            # Check log for streaming mode activation
+            if grep -q "Using streaming mode" streaming.log; then
+              echo "✅ Streaming mode was activated"
+            else
+              echo "⚠️  Streaming mode message not found in log"
+              cat streaming.log
+            fi
+          else
+            echo "❌ No audio output from streaming mode"
+            echo "=== Log output ==="
+            cat streaming.log
+            exit 1
+          fi
+      
+      - name: Run Python Benchmark (Optional)
+        continue-on-error: true
+        run: |
+          # Install Python dependencies
+          pip install --upgrade pip
+          
+          # Run benchmark comparison
+          python scripts/benchmark_streaming_comparison.py || echo "Benchmark completed with warnings"
+      
+      - name: Upload test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: streaming-test-results-${{ matrix.os }}
+          path: |
+            streaming.log
+            streaming_output.raw
+            streaming_comparison_results.json
+          retention-days: 7
