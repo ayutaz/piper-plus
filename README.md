@@ -93,6 +93,14 @@ Piper is used in a [variety of projects](#people-using-piper).
     # ファイルから読み込み
     piper --model en_US-lessac.onnx --input-file story.txt -f output.wav
     ```
+* **🎯 音素タイミング情報出力** - [詳細ドキュメント](docs/PHONEME_TIMING.md)
+  * リップシンク、カラオケ、字幕同期用のタイミング情報
+  * JSON/TSV形式での出力
+  * 使用例:
+    ```bash
+    echo "Hello world" | piper --model en_US-lessac.onnx \
+      --output-file speech.wav --output-timing timing.json
+    ```
 
 ## 関連記事
 * [LJSpeechを使って英語のpiperの事前学習モデルを作成する](https://ayousanz.hatenadiary.jp/entry/2025/05/26/230341)

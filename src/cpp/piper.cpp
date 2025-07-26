@@ -271,6 +271,97 @@ void parseModelConfig(json &configRoot, ModelConfig &modelConfig) {
 
 } /* parseModelConfig */
 
+// Helper function to extract phoneme timings from duration information
+std::vector<PhonemeInfo> extractTimingsFromDurations(
+    const std::vector<float>& durations,
+    const std::vector<PhonemeId>& phonemeIds,
+    const PhonemeIdMap& idMap,
+    int hopSize,
+    int sampleRate,
+    PhonemeType phonemeType
+) {
+    std::vector<PhonemeInfo> timings;
+    
+    // Build reverse map from phoneme ID to string
+    std::unordered_map<PhonemeId, std::string> idToPhoneme;
+    for (const auto& [phoneme, ids] : idMap) {
+        if (!ids.empty()) {
+            // Handle single-character phonemes
+            if (phoneme.size() == 1) {
+                idToPhoneme[ids[0]] = phoneme;
+            } else {
+                // Multi-character phonemes - need to handle specially
+                idToPhoneme[ids[0]] = phoneme;
+            }
+        }
+    }
+    
+    float frameLength = static_cast<float>(hopSize) / sampleRate;
+    float currentTime = 0.0f;
+    int currentFrame = 0;
+    
+    for (size_t i = 0; i < phonemeIds.size() && i < durations.size(); ++i) {
+        PhonemeId id = phonemeIds[i];
+        float duration = durations[i];  // Duration in frames
+        
+        // Skip special tokens (PAD, BOS, EOS)
+        if (id == 0 || id == 1 || id == 2) {
+            currentFrame += static_cast<int>(duration);
+            currentTime += duration * frameLength;
+            continue;
+        }
+        
+        // Get phoneme string
+        std::string phonemeStr = "?";
+        auto it = idToPhoneme.find(id);
+        if (it != idToPhoneme.end()) {
+            phonemeStr = it->second;
+        } else {
+            // Try to decode single character
+            if (id > 2 && id < 256) {
+                phonemeStr = std::string(1, static_cast<char>(id));
+            }
+        }
+        
+        PhonemeInfo info;
+        info.phoneme = phonemeStr;
+        info.start_time = currentTime;
+        info.start_frame = currentFrame;
+        
+        currentFrame += static_cast<int>(duration);
+        currentTime += duration * frameLength;
+        
+        info.end_time = currentTime;
+        info.end_frame = currentFrame;
+        
+        timings.push_back(info);
+    }
+    
+    // Adjust timings for Japanese if needed
+    if (phonemeType == OpenJTalkPhonemes) {
+        for (size_t i = 0; i < timings.size(); ++i) {
+            // Convert PUA mapped phonemes back to original
+            if (timings[i].phoneme.size() == 1) {
+                Phoneme ph = utf8ToCodepoint(timings[i].phoneme);
+                auto it = puaToPhoneme.find(ph);
+                if (it != puaToPhoneme.end()) {
+                    timings[i].phoneme = it->second;
+                }
+            }
+            
+            // Adjust timing for specific phonemes like 'cl' (促音)
+            if (timings[i].phoneme == "cl" && i > 0) {
+                // Overlap 30% with previous phoneme
+                float overlap = (timings[i].end_time - timings[i].start_time) * 0.3f;
+                timings[i-1].end_time += overlap;
+                timings[i].start_time += overlap;
+            }
+        }
+    }
+    
+    return timings;
+}
+
 // Helper function to find espeak-ng data directory
 std::string findEspeakDataPath() {
     // First, check environment variable
@@ -464,6 +555,17 @@ void loadModel(std::string modelPath, ModelSession &session, bool useCuda, int g
   auto endTime = std::chrono::steady_clock::now();
   spdlog::debug("Loaded onnx model in {} second(s)",
                 std::chrono::duration<double>(endTime - startTime).count());
+  
+  // Check if model has duration output
+  size_t numOutputNodes = session.onnx.GetOutputCount();
+  if (numOutputNodes >= 2) {
+    // Check if second output is named "durations"
+    auto outputName = session.onnx.GetOutputNameAllocated(1, session.allocator);
+    if (std::string(outputName.get()) == "durations") {
+      session.hasDurationOutput = true;
+      spdlog::debug("Model supports duration output for phoneme timing");
+    }
+  }
 }
 
 // Load Onnx model and JSON config file
@@ -502,7 +604,8 @@ void loadVoice(PiperConfig &config, std::string modelPath,
 // Phoneme ids to WAV audio
 void synthesize(std::vector<PhonemeId> &phonemeIds,
                 SynthesisConfig &synthesisConfig, ModelSession &session,
-                std::vector<int16_t> &audioBuffer, SynthesisResult &result) {
+                std::vector<int16_t> &audioBuffer, SynthesisResult &result,
+                Voice *voice = nullptr) {
   spdlog::debug("Synthesizing audio for {} phoneme id(s)", phonemeIds.size());
 
   auto memoryInfo = Ort::MemoryInfo::CreateCpu(
@@ -545,16 +648,22 @@ void synthesize(std::vector<PhonemeId> &phonemeIds,
   // From export_onnx.py
   std::array<const char *, 4> inputNames = {"input", "input_lengths", "scales",
                                             "sid"};
-  std::array<const char *, 1> outputNames = {"output"};
+  
+  // Check if we should get duration output
+  std::vector<const char *> outputNamesVec;
+  outputNamesVec.push_back("output");
+  if (session.hasDurationOutput) {
+    outputNamesVec.push_back("durations");
+  }
 
   // Infer
   auto startTime = std::chrono::steady_clock::now();
   auto outputTensors = session.onnx.Run(
       Ort::RunOptions{nullptr}, inputNames.data(), inputTensors.data(),
-      inputTensors.size(), outputNames.data(), outputNames.size());
+      inputTensors.size(), outputNamesVec.data(), outputNamesVec.size());
   auto endTime = std::chrono::steady_clock::now();
 
-  if ((outputTensors.size() != 1) || (!outputTensors.front().IsTensor())) {
+  if (outputTensors.empty() || (!outputTensors.front().IsTensor())) {
     throw std::runtime_error("Invalid output tensors");
   }
   auto inferDuration = std::chrono::duration<double>(endTime - startTime);
@@ -607,6 +716,41 @@ void synthesize(std::vector<PhonemeId> &phonemeIds,
     audioBuffer.push_back(intAudioValue);
   }
 #endif
+
+  // Extract phoneme timing information if available
+  if (session.hasDurationOutput && outputTensors.size() >= 2 && voice != nullptr) {
+    auto durationTensor = outputTensors[1];
+    if (durationTensor.IsTensor()) {
+      const float *durations = durationTensor.GetTensorData<float>();
+      auto durationShape = durationTensor.GetTensorTypeAndShapeInfo().GetShape();
+      size_t durationCount = 1;
+      for (auto dim : durationShape) {
+        durationCount *= dim;
+      }
+      
+      // Convert durations to vector
+      std::vector<float> durationVec(durations, durations + durationCount);
+      
+      // Extract timing information
+      // Get hop_size from config (default 256)
+      int hopSize = 256;
+      if (voice->configRoot.contains("audio") && 
+          voice->configRoot["audio"].contains("hop_size")) {
+        hopSize = voice->configRoot["audio"]["hop_size"];
+      }
+      
+      result.phonemeTimings = extractTimingsFromDurations(
+          durationVec, phonemeIds,
+          voice->phonemizeConfig.phonemeIdMap,
+          hopSize,
+          voice->synthesisConfig.sampleRate,
+          voice->phonemizeConfig.phonemeType
+      );
+      result.hasTimingInfo = true;
+      
+      spdlog::debug("Extracted timing for {} phonemes", result.phonemeTimings.size());
+    }
+  }
 
   // Clean up
   for (std::size_t i = 0; i < outputTensors.size(); i++) {
@@ -784,7 +928,7 @@ void textToAudio(PiperConfig &config, Voice &voice, std::string text,
 
       // ids -> audio
       synthesize(phonemeIds, voice.synthesisConfig, voice.session, audioBuffer,
-                 phraseResults[phraseIdx]);
+                 phraseResults[phraseIdx], &voice);
 
       // Add end of phrase silence
       for (std::size_t i = 0; i < phraseSilenceSamples[phraseIdx]; i++) {
@@ -880,7 +1024,7 @@ void phonemesToAudio(PiperConfig &config, Voice &voice,
   }
   
   // Synthesize audio
-  synthesize(phonemeIds, voice.synthesisConfig, voice.session, audioBuffer, result);
+  synthesize(phonemeIds, voice.synthesisConfig, voice.session, audioBuffer, result, &voice);
   
   // Call the audio callback if provided
   if (audioCallback) {
@@ -1098,7 +1242,7 @@ void textToAudioStreaming(PiperConfig &config, Voice &voice, std::string text,
       std::vector<int16_t> chunkAudioBuffer;
       SynthesisResult chunkResult;
       synthesize(phonemeIds, voice.synthesisConfig, voice.session, 
-                 chunkAudioBuffer, chunkResult);
+                 chunkAudioBuffer, chunkResult, &voice);
       
       // Update cumulative result
       result.inferSeconds += chunkResult.inferSeconds;
@@ -1134,5 +1278,48 @@ void textToAudioStreaming(PiperConfig &config, Voice &voice, std::string text,
                 chunks.size(), result.audioSeconds, result.realTimeFactor);
   
 } /* textToAudioStreaming */
+
+// Output phoneme timing information as JSON
+void outputTimingsAsJSON(const std::vector<PhonemeInfo> &timings,
+                         std::ostream &output,
+                         const std::string &text,
+                         int sampleRate) {
+    json result;
+    json phonemesArray = json::array();
+    
+    for (const auto &info : timings) {
+        json phonemeObj;
+        phonemeObj["phoneme"] = info.phoneme;
+        phonemeObj["start"] = info.start_time;
+        phonemeObj["end"] = info.end_time;
+        phonemeObj["start_frame"] = info.start_frame;
+        phonemeObj["end_frame"] = info.end_frame;
+        phonemesArray.push_back(phonemeObj);
+    }
+    
+    result["phonemes"] = phonemesArray;
+    if (!text.empty()) {
+        result["text"] = text;
+    }
+    result["total_duration"] = timings.empty() ? 0.0 : timings.back().end_time;
+    result["sample_rate"] = sampleRate;
+    result["frame_shift_ms"] = 256.0 / sampleRate * 1000;  // hop_size in ms
+    
+    output << result.dump(2) << std::endl;
+}
+
+// Output phoneme timing information as TSV
+void outputTimingsAsTSV(const std::vector<PhonemeInfo> &timings,
+                        std::ostream &output) {
+    output << "phoneme\tstart\tend\tstart_frame\tend_frame" << std::endl;
+    
+    for (const auto &info : timings) {
+        output << info.phoneme << "\t"
+               << info.start_time << "\t"
+               << info.end_time << "\t"
+               << info.start_frame << "\t"
+               << info.end_frame << std::endl;
+    }
+}
 
 } // namespace piper

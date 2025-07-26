@@ -191,3 +191,15 @@ foreach(test_source ${TEST_SOURCES})
 
     add_test(NAME ${test_name} COMMAND ${test_name})
 endforeach()
+
+# Add test_phoneme_timing
+add_executable(test_phoneme_timing test_phoneme_timing.cpp)
+target_include_directories(test_phoneme_timing PRIVATE 
+    ${CMAKE_CURRENT_SOURCE_DIR}/../
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../
+)
+target_link_libraries(test_phoneme_timing 
+    gtest_main
+    nlohmann_json
+)
+add_test(NAME test_phoneme_timing COMMAND test_phoneme_timing)

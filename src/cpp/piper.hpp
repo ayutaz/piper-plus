@@ -84,14 +84,25 @@ struct ModelSession {
   Ort::AllocatorWithDefaultOptions allocator;
   Ort::SessionOptions options;
   Ort::Env env;
+  bool hasDurationOutput = false;  // Whether model outputs duration information
 
   ModelSession() : onnx(nullptr){};
+};
+
+struct PhonemeInfo {
+  std::string phoneme;     // Phoneme string
+  float start_time;        // Start time in seconds
+  float end_time;          // End time in seconds
+  int start_frame;         // Start frame index
+  int end_frame;           // End frame index
 };
 
 struct SynthesisResult {
   double inferSeconds;
   double audioSeconds;
   double realTimeFactor;
+  std::vector<PhonemeInfo> phonemeTimings;  // Phoneme timing information
+  bool hasTimingInfo = false;                // Whether timing info is available
 };
 
 struct Voice {
@@ -149,6 +160,16 @@ void textToAudioStreaming(PiperConfig &config, Voice &voice, std::string text,
                           std::vector<int16_t> &audioBuffer, SynthesisResult &result,
                           const std::function<void(const std::vector<int16_t>&)> &chunkCallback,
                           size_t chunkSize = 4096);
+
+// Output phoneme timing information as JSON
+void outputTimingsAsJSON(const std::vector<PhonemeInfo> &timings,
+                         std::ostream &output,
+                         const std::string &text = "",
+                         int sampleRate = 22050);
+
+// Output phoneme timing information as TSV
+void outputTimingsAsTSV(const std::vector<PhonemeInfo> &timings,
+                        std::ostream &output);
 
 } // namespace piper
 
