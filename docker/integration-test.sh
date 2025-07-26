@@ -115,8 +115,8 @@ echo ""
 echo "5. Testing docker-compose integration..."
 echo ""
 
-# Test docker-compose run
-docker-compose run --rm \
+# Test docker compose run
+docker compose run --rm \
     -v $(pwd)/test_models:/app/models:ro \
     -v $(pwd)/test_output:/app/output \
     python-inference \

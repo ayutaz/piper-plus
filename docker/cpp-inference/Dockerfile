@@ -1,7 +1,8 @@
 # Multi-stage build for C++ Inference Environment
 
 # Stage 1: Builder (using cpp-train as base)
-FROM piper-cpp-train:latest AS builder
+ARG BUILDER_IMAGE=piper-cpp-train:latest
+FROM ${BUILDER_IMAGE} AS builder
 
 WORKDIR /workspace
 
@@ -35,6 +36,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libsndfile1 \
     libgomp1 \
     ca-certificates \
+    wget \
     && rm -rf /var/lib/apt/lists/*
 
 # Install ONNX Runtime (runtime libraries only)

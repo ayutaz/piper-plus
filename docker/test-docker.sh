@@ -40,9 +40,9 @@ if ! command -v docker &> /dev/null; then
     exit 1
 fi
 
-# Check if docker-compose is available
-if ! command -v docker-compose &> /dev/null; then
-    echo -e "${YELLOW}Warning: docker-compose not found, skipping compose tests${NC}"
+# Check if docker compose is available
+if ! docker compose version &> /dev/null; then
+    echo -e "${YELLOW}Warning: docker compose not found, skipping compose tests${NC}"
     SKIP_COMPOSE=1
 fi
 
@@ -120,13 +120,13 @@ echo "4. Testing docker-compose..."
 echo ""
 
 if [ -z "$SKIP_COMPOSE" ]; then
-    # Test docker-compose configuration
-    run_test "docker-compose config validation" \
-        "docker-compose config > /dev/null"
+    # Test docker compose configuration
+    run_test "docker compose config validation" \
+        "docker compose config > /dev/null"
     
-    # Test building with docker-compose
-    run_test "docker-compose build (python-inference only)" \
-        "docker-compose build --no-cache python-inference"
+    # Test building with docker compose
+    run_test "docker compose build (python-inference only)" \
+        "docker compose build --no-cache python-inference"
 else
     echo -e "${YELLOW}Skipping docker-compose tests${NC}"
 fi

@@ -122,15 +122,15 @@ cmake --version && ninja --version && echo 'Build tools OK'
       
       - name: Validate docker-compose.yml
         run: |
-          docker-compose config
+          docker compose config
       
       - name: Test docker-compose build (selected services)
         run: |
-          docker-compose build python-inference
+          docker compose build python-inference
       
       - name: Test service startup
         run: |
-          docker-compose run --rm python-inference python -c "print('Service OK')"
+          docker compose run --rm python-inference python -c "print('Service OK')"
 
   run-smoke-tests:
     runs-on: ubuntu-latest
