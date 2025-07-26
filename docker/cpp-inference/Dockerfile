@@ -23,7 +23,7 @@ RUN mkdir -p build && cd build && \
     ninja install
 
 # Stage 2: Runtime (minimal)
-FROM nvidia/cuda:12.4.0-cudnn8-runtime-ubuntu22.04
+FROM nvidia/cuda:12.4.1-cudnn-runtime-ubuntu22.04
 
 # Set environment variables
 ENV DEBIAN_FRONTEND=noninteractive
