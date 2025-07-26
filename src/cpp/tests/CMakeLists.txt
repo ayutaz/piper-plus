@@ -200,6 +200,5 @@ target_include_directories(test_phoneme_timing PRIVATE
 )
 target_link_libraries(test_phoneme_timing 
     gtest_main
-    nlohmann_json
 )
 add_test(NAME test_phoneme_timing COMMAND test_phoneme_timing)

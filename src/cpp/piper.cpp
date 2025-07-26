@@ -289,15 +289,10 @@ std::vector<PhonemeInfo> extractTimingsFromDurations(
     
     // Build reverse map from phoneme ID to string
     std::unordered_map<PhonemeId, std::string> phonemeIdToStringMap;
-    for (const auto& [phoneme, ids] : idMap) {
+    for (const auto& [phonemeStr, ids] : idMap) {
         if (!ids.empty()) {
-            // Handle single-character phonemes
-            if (phoneme.size() == 1) {
-                phonemeIdToStringMap[ids[0]] = phoneme;
-            } else {
-                // Multi-character phonemes - need to handle specially
-                phonemeIdToStringMap[ids[0]] = phoneme;
-            }
+            // Map phoneme ID to its string representation
+            phonemeIdToStringMap[ids[0]] = phonemeStr;
         }
     }
     
@@ -347,7 +342,8 @@ std::vector<PhonemeInfo> extractTimingsFromDurations(
         for (size_t i = 0; i < timings.size(); ++i) {
             // Convert PUA mapped phonemes back to original
             if (timings[i].phoneme.size() == 1) {
-                Phoneme ph = utf8ToCodepoint(timings[i].phoneme);
+                // Get the first character as a codepoint
+                Phoneme ph = static_cast<Phoneme>(timings[i].phoneme[0]);
                 auto it = puaToPhoneme.find(ph);
                 if (it != puaToPhoneme.end()) {
                     timings[i].phoneme = it->second;
@@ -724,7 +720,7 @@ void synthesize(std::vector<PhonemeId> &phonemeIds,
 
   // Extract phoneme timing information if available
   if (session.hasDurationOutput && outputTensors.size() >= 2 && voice != nullptr) {
-    auto durationTensor = outputTensors[1];
+    auto& durationTensor = outputTensors[1];
     if (durationTensor.IsTensor()) {
       const float *durations = durationTensor.GetTensorData<float>();
       auto durationShape = durationTensor.GetTensorTypeAndShapeInfo().GetShape();
