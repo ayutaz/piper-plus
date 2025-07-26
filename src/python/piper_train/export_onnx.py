@@ -89,7 +89,7 @@ def main() -> None:
     parser.add_argument(
         "--with-durations",
         action="store_true",
-        help="Include duration information in ONNX output for phoneme timing"
+        help="Include duration information in ONNX output for phoneme timing",
     )
     args = parser.parse_args()
 
@@ -130,6 +130,7 @@ def main() -> None:
     # old_forward = model_g.infer
 
     if args.with_durations:
+
         def infer_forward_with_durations(text, text_lengths, scales, sid=None):
             """Forward function that returns both audio and duration information"""
             noise_scale = scales[0]
@@ -146,7 +147,9 @@ def main() -> None:
 
             # Get duration predictions
             if model_g.use_sdp:
-                logw = model_g.dp(x, x_mask, g=g, reverse=True, noise_scale=noise_scale_w)
+                logw = model_g.dp(
+                    x, x_mask, g=g, reverse=True, noise_scale=noise_scale_w
+                )
             else:
                 logw = model_g.dp(x, x_mask, g=g)
 
@@ -170,6 +173,7 @@ def main() -> None:
 
         model_g.forward = infer_forward_with_durations
     else:
+
         def infer_forward(text, text_lengths, scales, sid=None):
             noise_scale = scales[0]
             length_scale = scales[1]

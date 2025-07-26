@@ -23,10 +23,12 @@ def test_duration_export():
         try:
             # Export with durations
             cmd = [
-                sys.executable, "-m", "piper_train.export_onnx",
+                sys.executable,
+                "-m",
+                "piper_train.export_onnx",
                 str(checkpoint_path),
                 tmp_model.name,
-                "--with-durations"
+                "--with-durations",
             ]
 
             result = subprocess.run(cmd, check=False, capture_output=True, text=True)
@@ -40,6 +42,7 @@ def test_duration_export():
         finally:
             if os.path.exists(tmp_model.name):
                 os.unlink(tmp_model.name)
+
 
 def test_timing_extraction():
     """Test extracting timing from synthesis"""
@@ -69,24 +72,30 @@ def test_timing_extraction():
     for lang, text in test_texts.items():
         print(f"\nTesting {lang}: {text}")
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.wav', delete=False) as audio_file:
-            with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as timing_file:
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".wav", delete=False
+        ) as audio_file:
+            with tempfile.NamedTemporaryFile(
+                mode="w", suffix=".json", delete=False
+            ) as timing_file:
                 try:
                     # Run piper with timing output
                     cmd = [
                         str(piper_bin),
-                        "--model", str(model_path),
-                        "--config", str(config_path),
-                        "--output-file", audio_file.name,
-                        "--output-timing", timing_file.name,
-                        "--timing-format", "json"
+                        "--model",
+                        str(model_path),
+                        "--config",
+                        str(config_path),
+                        "--output-file",
+                        audio_file.name,
+                        "--output-timing",
+                        timing_file.name,
+                        "--timing-format",
+                        "json",
                     ]
 
                     result = subprocess.run(
-                        cmd,
-                        check=False, input=text,
-                        text=True,
-                        capture_output=True
+                        cmd, check=False, input=text, text=True, capture_output=True
                     )
 
                     if result.returncode != 0:
@@ -107,14 +116,18 @@ def test_timing_extraction():
                         continue
 
                     print(f"Found {len(timing_data['phonemes'])} phonemes")
-                    print(f"Total duration: {timing_data.get('total_duration', 0):.3f}s")
+                    print(
+                        f"Total duration: {timing_data.get('total_duration', 0):.3f}s"
+                    )
 
                     # Show first few phonemes
-                    for _i, phoneme in enumerate(timing_data['phonemes'][:5]):
-                        print(f"  {phoneme['phoneme']}: "
-                              f"{phoneme['start']:.3f} - {phoneme['end']:.3f}s")
+                    for _i, phoneme in enumerate(timing_data["phonemes"][:5]):
+                        print(
+                            f"  {phoneme['phoneme']}: "
+                            f"{phoneme['start']:.3f} - {phoneme['end']:.3f}s"
+                        )
 
-                    if len(timing_data['phonemes']) > 5:
+                    if len(timing_data["phonemes"]) > 5:
                         print("  ...")
 
                 finally:
@@ -122,6 +135,7 @@ def test_timing_extraction():
                     for f in [audio_file.name, timing_file.name]:
                         if os.path.exists(f):
                             os.unlink(f)
+
 
 def test_tsv_format():
     """Test TSV output format"""
@@ -138,32 +152,46 @@ def test_tsv_format():
     model_path = test_models[0]
     config_path = model_path.with_suffix(".onnx.json")
 
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.wav', delete=False) as audio_file:
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.tsv', delete=False) as timing_file:
+    with tempfile.NamedTemporaryFile(
+        mode="w", suffix=".wav", delete=False
+    ) as audio_file:
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".tsv", delete=False
+        ) as timing_file:
             try:
                 cmd = [
                     str(piper_bin),
-                    "--model", str(model_path),
-                    "--config", str(config_path),
-                    "--output-file", audio_file.name,
-                    "--output-timing", timing_file.name,
-                    "--timing-format", "tsv"
+                    "--model",
+                    str(model_path),
+                    "--config",
+                    str(config_path),
+                    "--output-file",
+                    audio_file.name,
+                    "--output-timing",
+                    timing_file.name,
+                    "--timing-format",
+                    "tsv",
                 ]
 
                 result = subprocess.run(
                     cmd,
-                    check=False, input="Test TSV output",
+                    check=False,
+                    input="Test TSV output",
                     text=True,
-                    capture_output=True
+                    capture_output=True,
                 )
 
                 if result.returncode == 0 and os.path.exists(timing_file.name):
                     with open(timing_file.name) as f:
                         lines = f.readlines()
 
-                    if lines and lines[0].strip() == "phoneme\tstart\tend\tstart_frame\tend_frame":
+                    if (
+                        lines
+                        and lines[0].strip()
+                        == "phoneme\tstart\tend\tstart_frame\tend_frame"
+                    ):
                         print("TSV format test passed")
-                        print(f"Generated {len(lines)-1} phoneme entries")
+                        print(f"Generated {len(lines) - 1} phoneme entries")
                         return True
 
             finally:
@@ -172,6 +200,7 @@ def test_tsv_format():
                         os.unlink(f)
 
     return False
+
 
 def main():
     """Run all tests"""
@@ -183,6 +212,7 @@ def main():
     test_tsv_format()
 
     print("\n=== Tests completed ===")
+
 
 if __name__ == "__main__":
     main()
