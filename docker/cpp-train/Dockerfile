@@ -43,8 +43,15 @@ RUN wget https://github.com/microsoft/onnxruntime/releases/download/v1.17.1/onnx
     cp -r onnxruntime-linux-x64-gpu-1.17.1/lib/* /usr/local/lib/ && \
     rm -rf onnxruntime-linux-x64-gpu-1.17.1*
 
-# Install espeak-ng from source
-RUN git clone https://github.com/espeak-ng/espeak-ng.git && \
+# Install espeak-ng dependencies and build from source
+RUN apt-get update && apt-get install -y \
+    autoconf \
+    automake \
+    libtool \
+    make \
+    libpcaudio-dev \
+    && rm -rf /var/lib/apt/lists/* && \
+    git clone https://github.com/espeak-ng/espeak-ng.git && \
     cd espeak-ng && \
     ./autogen.sh && \
     ./configure --prefix=/usr/local && \
