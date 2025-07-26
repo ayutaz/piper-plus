@@ -86,6 +86,11 @@ def main() -> None:
     parser.add_argument(
         "--simplify-only", help="Only simplify existing ONNX model (path to .onnx file)"
     )
+    parser.add_argument(
+        "--with-durations",
+        action="store_true",
+        help="Include duration information in ONNX output for phoneme timing",
+    )
     args = parser.parse_args()
 
     if args.debug:
@@ -124,22 +129,67 @@ def main() -> None:
 
     # old_forward = model_g.infer
 
-    def infer_forward(text, text_lengths, scales, sid=None):
-        noise_scale = scales[0]
-        length_scale = scales[1]
-        noise_scale_w = scales[2]
-        audio = model_g.infer(
-            text,
-            text_lengths,
-            noise_scale=noise_scale,
-            length_scale=length_scale,
-            noise_scale_w=noise_scale_w,
-            sid=sid,
-        )[0].unsqueeze(1)
+    if args.with_durations:
 
-        return audio
+        def infer_forward_with_durations(text, text_lengths, scales, sid=None):
+            """Forward function that returns both audio and duration information"""
+            noise_scale = scales[0]
+            length_scale = scales[1]
+            noise_scale_w = scales[2]
 
-    model_g.forward = infer_forward
+            # Get encoder output
+            x, m_p, logs_p, x_mask = model_g.enc_p(text, text_lengths)
+
+            if model_g.n_speakers > 1 and sid is not None:
+                g = model_g.emb_g(sid).unsqueeze(-1)
+            else:
+                g = None
+
+            # Get duration predictions
+            if model_g.use_sdp:
+                logw = model_g.dp(
+                    x, x_mask, g=g, reverse=True, noise_scale=noise_scale_w
+                )
+            else:
+                logw = model_g.dp(x, x_mask, g=g)
+
+            w = torch.exp(logw) * x_mask * length_scale
+
+            # Get audio using regular inference
+            audio = model_g.infer(
+                text,
+                text_lengths,
+                noise_scale=noise_scale,
+                length_scale=length_scale,
+                noise_scale_w=noise_scale_w,
+                sid=sid,
+            )[0].unsqueeze(1)
+
+            # Return both audio and durations
+            # Squeeze durations to remove channel dimension [batch, 1, phoneme_length] -> [batch, phoneme_length]
+            durations = w.squeeze(1)
+
+            return audio, durations
+
+        model_g.forward = infer_forward_with_durations
+    else:
+
+        def infer_forward(text, text_lengths, scales, sid=None):
+            noise_scale = scales[0]
+            length_scale = scales[1]
+            noise_scale_w = scales[2]
+            audio = model_g.infer(
+                text,
+                text_lengths,
+                noise_scale=noise_scale,
+                length_scale=length_scale,
+                noise_scale_w=noise_scale_w,
+                sid=sid,
+            )[0].unsqueeze(1)
+
+            return audio
+
+        model_g.forward = infer_forward
 
     dummy_input_length = 50
     sequences = torch.randint(
@@ -156,6 +206,22 @@ def main() -> None:
     dummy_input = (sequences, sequence_lengths, scales, sid)
 
     # Export
+    if args.with_durations:
+        output_names = ["output", "durations"]
+        dynamic_axes = {
+            "input": {0: "batch_size", 1: "phonemes"},
+            "input_lengths": {0: "batch_size"},
+            "output": {0: "batch_size", 1: "time"},
+            "durations": {0: "batch_size", 1: "phonemes"},
+        }
+    else:
+        output_names = ["output"]
+        dynamic_axes = {
+            "input": {0: "batch_size", 1: "phonemes"},
+            "input_lengths": {0: "batch_size"},
+            "output": {0: "batch_size", 1: "time"},
+        }
+
     torch.onnx.export(
         model=model_g,
         args=dummy_input,
@@ -163,12 +229,8 @@ def main() -> None:
         verbose=False,
         opset_version=OPSET_VERSION,
         input_names=["input", "input_lengths", "scales", "sid"],
-        output_names=["output"],
-        dynamic_axes={
-            "input": {0: "batch_size", 1: "phonemes"},
-            "input_lengths": {0: "batch_size"},
-            "output": {0: "batch_size", 1: "time"},
-        },
+        output_names=output_names,
+        dynamic_axes=dynamic_axes,
     )
 
     _LOGGER.info("Exported model to %s", args.output)

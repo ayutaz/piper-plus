@@ -105,7 +105,21 @@ struct RunConfig {
   
   // true to use streaming mode for reduced latency
   bool streamingMode = false;
+  
+  // Path for outputting phoneme timing information
+  optional<filesystem::path> outputTimingPath;
+  
+  // Format for timing output (json or tsv)
+  string timingFormat = "json";
+  
+  // Format constants
+  static const string FORMAT_JSON;
+  static const string FORMAT_TSV;
 };
+
+// Define static constants
+const string RunConfig::FORMAT_JSON = "json";
+const string RunConfig::FORMAT_TSV = "tsv";
 
 void parseArgs(int argc, char *argv[], RunConfig &runConfig);
 void rawOutputProc(vector<int16_t> &sharedAudioBuffer, mutex &mutAudio,
@@ -500,6 +514,24 @@ int main(int argc, char *argv[]) {
     spdlog::info("Real-time factor: {} (infer={} sec, audio={} sec)",
                  result.realTimeFactor, result.inferSeconds,
                  result.audioSeconds);
+    
+    // Output phoneme timing information if requested
+    if (runConfig.outputTimingPath && result.hasTimingInfo) {
+      ofstream timingFile(runConfig.outputTimingPath.value());
+      if (timingFile.is_open()) {
+        if (runConfig.timingFormat == RunConfig::FORMAT_JSON) {
+          piper::outputTimingsAsJSON(result.phonemeTimings, timingFile, line,
+                                     voice.synthesisConfig.sampleRate);
+        } else if (runConfig.timingFormat == RunConfig::FORMAT_TSV) {
+          piper::outputTimingsAsTSV(result.phonemeTimings, timingFile);
+        }
+        timingFile.close();
+        spdlog::info("Wrote phoneme timing to {}", runConfig.outputTimingPath.value().string());
+      } else {
+        spdlog::error("Failed to open timing output file: {}", 
+                      runConfig.outputTimingPath.value().string());
+      }
+    }
 
     // Restore config (--json-input)
     voice.synthesisConfig.speakerId = speakerId;
@@ -595,6 +627,10 @@ void printUsage(char *argv[]) {
   cerr << "   --raw-phonemes                interpret input as raw phonemes (space-separated)"
        << endl;
   cerr << "   --streaming                   use streaming mode for reduced latency"
+       << endl;
+  cerr << "   --output-timing         FILE  output phoneme timing to FILE"
+       << endl;
+  cerr << "   --timing-format         FMT   timing output format: json|tsv (default: json)"
        << endl;
   cerr << "   --debug                       print DEBUG messages to the console"
        << endl;
@@ -699,6 +735,16 @@ void parseArgs(int argc, char *argv[], RunConfig &runConfig) {
       runConfig.rawPhonemes = true;
     } else if (arg == "--streaming") {
       runConfig.streamingMode = true;
+    } else if (arg == "--output-timing" || arg == "--output_timing") {
+      ensureArg(argc, argv, i);
+      runConfig.outputTimingPath = filesystem::path(argv[++i]);
+    } else if (arg == "--timing-format" || arg == "--timing_format") {
+      ensureArg(argc, argv, i);
+      runConfig.timingFormat = argv[++i];
+      if (runConfig.timingFormat != RunConfig::FORMAT_JSON && runConfig.timingFormat != RunConfig::FORMAT_TSV) {
+        cerr << "Invalid timing format: " << runConfig.timingFormat << " (must be json or tsv)" << endl;
+        exit(1);
+      }
     } else if (arg == "--version") {
       std::cout << piper::getVersion() << std::endl;
       exit(0);
