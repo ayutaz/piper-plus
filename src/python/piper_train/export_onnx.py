@@ -163,7 +163,7 @@ def main() -> None:
             )[0].unsqueeze(1)
             
             # Return both audio and durations
-            # Squeeze durations to remove channel dimension [batch, 1, time] -> [batch, time]
+            # Squeeze durations to remove channel dimension [batch, 1, phoneme_length] -> [batch, phoneme_length]
             durations = w.squeeze(1)
             
             return audio, durations

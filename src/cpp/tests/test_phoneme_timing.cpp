@@ -97,6 +97,7 @@ TEST(PhonemeTimingTest, TSVFormat) {
     output << "ə\t0.045\t0.120\t4\t10" << std::endl;
     
     // Read back and verify
+    output.seekg(0);  // Reset read position to the beginning
     std::string line;
     std::getline(output, line);
     EXPECT_EQ(line, "phoneme\tstart\tend\tstart_frame\tend_frame");

@@ -111,6 +111,10 @@ struct RunConfig {
   
   // Format for timing output (json or tsv)
   string timingFormat = "json";
+  
+  // Format constants
+  static const string FORMAT_JSON = "json";
+  static const string FORMAT_TSV = "tsv";
 };
 
 void parseArgs(int argc, char *argv[], RunConfig &runConfig);
@@ -511,10 +515,10 @@ int main(int argc, char *argv[]) {
     if (runConfig.outputTimingPath && result.hasTimingInfo) {
       ofstream timingFile(runConfig.outputTimingPath.value());
       if (timingFile.is_open()) {
-        if (runConfig.timingFormat == "json") {
+        if (runConfig.timingFormat == RunConfig::FORMAT_JSON) {
           piper::outputTimingsAsJSON(result.phonemeTimings, timingFile, line,
                                      voice.synthesisConfig.sampleRate);
-        } else if (runConfig.timingFormat == "tsv") {
+        } else if (runConfig.timingFormat == RunConfig::FORMAT_TSV) {
           piper::outputTimingsAsTSV(result.phonemeTimings, timingFile);
         }
         timingFile.close();
@@ -733,7 +737,7 @@ void parseArgs(int argc, char *argv[], RunConfig &runConfig) {
     } else if (arg == "--timing-format" || arg == "--timing_format") {
       ensureArg(argc, argv, i);
       runConfig.timingFormat = argv[++i];
-      if (runConfig.timingFormat != "json" && runConfig.timingFormat != "tsv") {
+      if (runConfig.timingFormat != RunConfig::FORMAT_JSON && runConfig.timingFormat != RunConfig::FORMAT_TSV) {
         cerr << "Invalid timing format: " << runConfig.timingFormat << " (must be json or tsv)" << endl;
         exit(1);
       }

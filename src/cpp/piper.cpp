@@ -271,6 +271,11 @@ void parseModelConfig(json &configRoot, ModelConfig &modelConfig) {
 
 } /* parseModelConfig */
 
+// Constants for phoneme timing
+static const std::string UNKNOWN_PHONEME = "?";
+static const float JAPANESE_CL_OVERLAP_RATIO = 0.3f;
+static const int DEFAULT_HOP_SIZE = 256;
+
 // Helper function to extract phoneme timings from duration information
 std::vector<PhonemeInfo> extractTimingsFromDurations(
     const std::vector<float>& durations,
@@ -283,15 +288,15 @@ std::vector<PhonemeInfo> extractTimingsFromDurations(
     std::vector<PhonemeInfo> timings;
     
     // Build reverse map from phoneme ID to string
-    std::unordered_map<PhonemeId, std::string> idToPhoneme;
+    std::unordered_map<PhonemeId, std::string> phonemeIdToStringMap;
     for (const auto& [phoneme, ids] : idMap) {
         if (!ids.empty()) {
             // Handle single-character phonemes
             if (phoneme.size() == 1) {
-                idToPhoneme[ids[0]] = phoneme;
+                phonemeIdToStringMap[ids[0]] = phoneme;
             } else {
                 // Multi-character phonemes - need to handle specially
-                idToPhoneme[ids[0]] = phoneme;
+                phonemeIdToStringMap[ids[0]] = phoneme;
             }
         }
     }
@@ -312,9 +317,9 @@ std::vector<PhonemeInfo> extractTimingsFromDurations(
         }
         
         // Get phoneme string
-        std::string phonemeStr = "?";
-        auto it = idToPhoneme.find(id);
-        if (it != idToPhoneme.end()) {
+        std::string phonemeStr = UNKNOWN_PHONEME;
+        auto it = phonemeIdToStringMap.find(id);
+        if (it != phonemeIdToStringMap.end()) {
             phonemeStr = it->second;
         } else {
             // Try to decode single character
@@ -351,8 +356,8 @@ std::vector<PhonemeInfo> extractTimingsFromDurations(
             
             // Adjust timing for specific phonemes like 'cl' (促音)
             if (timings[i].phoneme == "cl" && i > 0) {
-                // Overlap 30% with previous phoneme
-                float overlap = (timings[i].end_time - timings[i].start_time) * 0.3f;
+                // Overlap with previous phoneme
+                float overlap = (timings[i].end_time - timings[i].start_time) * JAPANESE_CL_OVERLAP_RATIO;
                 timings[i-1].end_time += overlap;
                 timings[i].start_time += overlap;
             }
@@ -732,8 +737,8 @@ void synthesize(std::vector<PhonemeId> &phonemeIds,
       std::vector<float> durationVec(durations, durations + durationCount);
       
       // Extract timing information
-      // Get hop_size from config (default 256)
-      int hopSize = 256;
+      // Get hop_size from config
+      int hopSize = DEFAULT_HOP_SIZE;
       if (voice->configRoot.contains("audio") && 
           voice->configRoot["audio"].contains("hop_size")) {
         hopSize = voice->configRoot["audio"]["hop_size"];
