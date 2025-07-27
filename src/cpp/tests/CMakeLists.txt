@@ -165,22 +165,22 @@ foreach(test_source ${TEST_SOURCES})
         target_sources(${test_name} PRIVATE
             ../phoneme_parser.cpp
         )
-        # Set SPDLOG_DIR if not defined
-        if(NOT DEFINED SPDLOG_DIR)
-            set(SPDLOG_DIR "${CMAKE_BINARY_DIR}/si")
-        endif()
         target_include_directories(${test_name} PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/..
-            ${SPDLOG_DIR}/include
+            ${CMAKE_BINARY_DIR}/si/include
+        )
+        # Add library directories
+        target_link_directories(${test_name} PRIVATE
+            ${CMAKE_BINARY_DIR}/si/lib
         )
         if(WIN32)
             target_link_libraries(${test_name}
-                optimized ${SPDLOG_DIR}/lib/spdlog.lib
-                debug ${SPDLOG_DIR}/lib/spdlogd.lib
+                optimized spdlog.lib
+                debug spdlogd.lib
             )
         else()
             target_link_libraries(${test_name}
-                ${SPDLOG_DIR}/lib/libspdlog.a
+                spdlog
             )
         endif()
         # Add dependency on spdlog_external to ensure headers are available
