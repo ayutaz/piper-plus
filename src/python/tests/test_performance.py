@@ -93,9 +93,9 @@ class TestPerformance:
                 assert all(len(r) > 0 for r in results)
 
                 # Throughput should be reasonable
-                assert (
-                    batch_size / total_time > 5
-                ), f"Throughput too low: {batch_size / total_time:.1f} texts/sec"
+                assert batch_size / total_time > 5, (
+                    f"Throughput too low: {batch_size / total_time:.1f} texts/sec"
+                )
 
         except ImportError:
             pytest.skip("Japanese phonemizer not available")
@@ -147,9 +147,9 @@ class TestPerformance:
                 print(f"Output size: {len(phonemes)} phonemes")
 
                 # Memory usage should be reasonable
-                assert (
-                    mem_increase < size * 0.001
-                ), f"Memory usage too high: {mem_increase:.2f}MB for {size} chars"
+                assert mem_increase < size * 0.001, (
+                    f"Memory usage too high: {mem_increase:.2f}MB for {size} chars"
+                )
 
                 # Clean up
                 del text, phonemes
@@ -160,9 +160,9 @@ class TestPerformance:
             total_increase = final_mem - baseline_mem
 
             print(f"\nTotal memory increase: {total_increase:.2f}MB")
-            assert (
-                total_increase < 100
-            ), f"Possible memory leak: {total_increase:.2f}MB total increase"
+            assert total_increase < 100, (
+                f"Possible memory leak: {total_increase:.2f}MB total increase"
+            )
 
         except ImportError:
             pytest.skip("Japanese phonemizer not available")
