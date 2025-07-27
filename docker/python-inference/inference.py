@@ -7,6 +7,7 @@ Can be used standalone or as a FastAPI service
 import argparse
 import os
 import sys
+import uuid
 
 import numpy as np
 import soundfile as sf
@@ -116,7 +117,9 @@ def main():
         @app.post("/synthesize")
         async def synthesize(request: TTSRequest):
             try:
-                output_file = request.output_file or f"output_{hash(request.text)}.wav"
+                output_file = (
+                    request.output_file or f"output_{uuid.uuid4().hex[:8]}.wav"
+                )
                 output_path = os.path.join("/app/output", output_file)
 
                 synthesize_text(

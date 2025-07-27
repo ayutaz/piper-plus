@@ -138,13 +138,13 @@ def benchmark_texts(piper_path: str, model_path: str, texts: list[str]) -> dict:
             "text": text,
             "text_length": len(text),
             "raw_latency_avg": statistics.mean(raw_latencies),
-            "raw_latency_std": statistics.stdev(raw_latencies)
-            if len(raw_latencies) > 1
-            else 0,
+            "raw_latency_std": (
+                statistics.stdev(raw_latencies) if len(raw_latencies) > 1 else 0
+            ),
             "wav_latency_avg": statistics.mean(wav_latencies),
-            "wav_latency_std": statistics.stdev(wav_latencies)
-            if len(wav_latencies) > 1
-            else 0,
+            "wav_latency_std": (
+                statistics.stdev(wav_latencies) if len(wav_latencies) > 1 else 0
+            ),
             "total_synthesis_time": total_time,
             "real_time_factor": rtf,
         }

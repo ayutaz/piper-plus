@@ -224,16 +224,16 @@ class JapaneseTTSTester:
             metric = {
                 "test_name": test_name,
                 "text": text,  # Full text for reference
-                "text_preview": text[:50] + "..."
-                if len(text) > 50
-                else text,  # Truncated for display
+                "text_preview": (
+                    text[:50] + "..." if len(text) > 50 else text
+                ),  # Truncated for display
                 "char_count": len(text),
                 "generation_time_ms": round(generation_time * 1000, 2),
                 "audio_duration_ms": round(audio_duration * 1000, 2),
                 "rtf": round(rtf, 4),
-                "chars_per_second": round(len(text) / generation_time, 2)
-                if generation_time > 0
-                else 0,
+                "chars_per_second": (
+                    round(len(text) / generation_time, 2) if generation_time > 0 else 0
+                ),
                 "file_size_bytes": os.path.getsize(audio_path),
                 "audio_file": os.path.basename(audio_path),
             }
@@ -413,17 +413,17 @@ class JapaneseTTSTester:
 
             self.performance_metrics["summary"] = {
                 "total_tests": len(results),
-                "avg_rtf": round(sum(rtf_values) / len(rtf_values), 4)
-                if rtf_values
-                else 0,
+                "avg_rtf": (
+                    round(sum(rtf_values) / len(rtf_values), 4) if rtf_values else 0
+                ),
                 "min_rtf": round(min(rtf_values), 4) if rtf_values else 0,
                 "max_rtf": round(max(rtf_values), 4) if rtf_values else 0,
-                "avg_generation_time_ms": round(sum(gen_times) / len(gen_times), 2)
-                if gen_times
-                else 0,
-                "avg_chars_per_second": round(sum(char_speeds) / len(char_speeds), 2)
-                if char_speeds
-                else 0,
+                "avg_generation_time_ms": (
+                    round(sum(gen_times) / len(gen_times), 2) if gen_times else 0
+                ),
+                "avg_chars_per_second": (
+                    round(sum(char_speeds) / len(char_speeds), 2) if char_speeds else 0
+                ),
             }
 
             # Save to file

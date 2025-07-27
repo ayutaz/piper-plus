@@ -23,7 +23,7 @@ run_test() {
     
     echo -n "Testing $test_name... "
     
-    if eval "$test_command" > /tmp/test_output.log 2>&1; then
+    if bash -c "$test_command" > /tmp/test_output.log 2>&1; then
         echo -e "${GREEN}PASSED${NC}"
         ((TESTS_PASSED++))
     else

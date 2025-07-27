@@ -106,7 +106,8 @@ echo ""
 # Check if output files exist and have content
 for file in test_output/*.wav; do
     if [ -f "$file" ]; then
-        size=$(stat -f%z "$file" 2>/dev/null || stat -c%s "$file" 2>/dev/null)
+        # Portable way to get file size
+        size=$(wc -c < "$file")
         echo "✓ $(basename "$file"): ${size} bytes"
     fi
 done
