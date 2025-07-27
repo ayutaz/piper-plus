@@ -204,12 +204,12 @@ class TestRealIntegration:
             assert isinstance(phonemes, list)
 
             # Performance checks
-            assert process_time < 60.0, (
-                f"Processing too slow: {process_time:.2f}s for 1MB"
-            )
-            assert mem_increase < 500, (
-                f"Memory usage too high: {mem_increase:.2f}MB increase"
-            )
+            assert (
+                process_time < 60.0
+            ), f"Processing too slow: {process_time:.2f}s for 1MB"
+            assert (
+                mem_increase < 500
+            ), f"Memory usage too high: {mem_increase:.2f}MB increase"
 
             print(
                 f"Large text processing: {process_time:.2f}s, Memory: +{mem_increase:.2f}MB"
@@ -246,9 +246,9 @@ class TestRealIntegration:
                 assert len(phonemes) >= 2  # At least start/end markers
 
                 # Should not crash or return empty
-                assert any(p not in ["^", "$", "_"] for p in phonemes), (
-                    f"No phonemes for '{text}'"
-                )
+                assert any(
+                    p not in ["^", "$", "_"] for p in phonemes
+                ), f"No phonemes for '{text}'"
 
         except ImportError:
             pytest.skip("Japanese phonemizer not available")
@@ -301,9 +301,9 @@ class TestRealIntegration:
             for text, phonemes in results:
                 if text in text_to_phonemes:
                     # Compare with previous result
-                    assert phonemes == text_to_phonemes[text], (
-                        f"Inconsistent results for '{text}'"
-                    )
+                    assert (
+                        phonemes == text_to_phonemes[text]
+                    ), f"Inconsistent results for '{text}'"
                 else:
                     text_to_phonemes[text] = phonemes
 
@@ -347,9 +347,9 @@ class TestRealIntegration:
             mem_increase = final_mem - initial_mem
 
             # Memory increase should be minimal
-            assert mem_increase < 50, (
-                f"Possible memory leak: {mem_increase:.2f}MB increase after {iterations} iterations"
-            )
+            assert (
+                mem_increase < 50
+            ), f"Possible memory leak: {mem_increase:.2f}MB increase after {iterations} iterations"
 
             print(
                 f"Memory leak test: {mem_increase:.2f}MB increase after {iterations} iterations"
