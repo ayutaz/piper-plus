@@ -115,9 +115,9 @@ class TestPhonemization:
                 p for p in phonemes if p not in ["^", "$", "_", "[", "]", "#"]
             ]
             for expected in expected_phonemes:
-                assert (
-                    expected in phoneme_list
-                ), f"Expected '{expected}' in phonemes for '{katakana}', got {phoneme_list}"
+                assert expected in phoneme_list, (
+                    f"Expected '{expected}' in phonemes for '{katakana}', got {phoneme_list}"
+                )
 
     @pytest.mark.unit
     @pytest.mark.japanese
@@ -154,9 +154,9 @@ class TestPhonemization:
             # Check if all expected phonemes are present in order
             phoneme_str = "".join(phoneme_list)
             expected_str = "".join(expected_phonemes)
-            assert (
-                expected_str in phoneme_str
-            ), f"Expected phonemes {expected_phonemes} for '{text}', got {phoneme_list}"
+            assert expected_str in phoneme_str, (
+                f"Expected phonemes {expected_phonemes} for '{text}', got {phoneme_list}"
+            )
 
     @pytest.mark.unit
     @pytest.mark.japanese
@@ -214,7 +214,9 @@ class TestPhonemization:
             # Check if 'cl' (small tsu) is present as PUA character
             assert (
                 "\ue005" in phoneme_list  # cl is mapped to \ue005
-            ), f"Expected 'cl' (small tsu as \\ue005) in phonemes for '{text}', got {phoneme_list}"
+            ), (
+                f"Expected 'cl' (small tsu as \\ue005) in phonemes for '{text}', got {phoneme_list}"
+            )
 
     @pytest.mark.unit
     @pytest.mark.japanese
@@ -248,6 +250,6 @@ class TestPhonemization:
             ]
 
             # Check if compound phonemes are handled correctly with PUA mapping
-            assert (
-                expected_phonemes == phoneme_list
-            ), f"Expected phonemes {expected_phonemes} for '{text}', got {phoneme_list}"
+            assert expected_phonemes == phoneme_list, (
+                f"Expected phonemes {expected_phonemes} for '{text}', got {phoneme_list}"
+            )

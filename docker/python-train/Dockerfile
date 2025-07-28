@@ -57,11 +57,12 @@ RUN pip install --no-cache-dir -r /tmp/requirements-train.txt && \
     pip cache purge && \
     rm -rf ~/.cache/pip/*
 
-# Install piper-train from source
-RUN git clone --depth 1 https://github.com/rhasspy/piper.git /tmp/piper && \
-    cd /tmp/piper && \
-    pip install --no-cache-dir -e src/python/ && \
-    rm -rf /tmp/piper/.git && \
+# Copy source code for piper-train installation
+COPY src/python /tmp/piper-src/python
+
+# Install piper-train from local source
+RUN cd /tmp/piper-src/python && \
+    pip install --no-cache-dir -e . && \
     pip cache purge && \
     rm -rf ~/.cache/pip/*
 
@@ -110,7 +111,7 @@ COPY --from=builder /opt/venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
 # Copy piper source
-COPY --from=builder /tmp/piper /opt/piper
+COPY --from=builder /tmp/piper-src /opt/piper
 
 # Create working directory
 WORKDIR /workspace
