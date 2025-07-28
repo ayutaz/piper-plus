@@ -186,6 +186,7 @@ jobs:
       
       # Build piper binary first using cpp-train image
       - name: Build piper binary
+        if: github.event_name != 'pull_request'
         run: |
           docker run --rm -v ${{ github.workspace }}:/workspace \
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/cpp-train:${{ github.sha }} \
