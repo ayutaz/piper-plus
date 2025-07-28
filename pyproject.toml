@@ -87,6 +87,8 @@ ignore = [
 # isort互換設定
 [tool.ruff.lint.isort]
 known-first-party = ["piper", "piper_train"]
+combine-as-imports = true
+lines-after-imports = 2
 
 # flake8-quotes互換設定
 [tool.ruff.lint.flake8-quotes]

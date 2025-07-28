@@ -3,6 +3,7 @@
 
 import sys
 
+
 try:
     from piper_train.phonemize.japanese import phonemize_japanese
     from piper_train.phonemize.jp_id_map import JAPANESE_PHONEMES, get_japanese_id_map

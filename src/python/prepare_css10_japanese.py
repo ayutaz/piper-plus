@@ -8,14 +8,14 @@ import concurrent.futures
 import json
 import os
 import subprocess
-
-# Import from piper_train modules
 import sys
 from pathlib import Path
 
 from tqdm import tqdm
 
+
 sys.path.append(str(Path(__file__).parent))
+
 from piper_train.phonemize.japanese import phonemize_japanese
 from piper_train.phonemize.jp_id_map import get_japanese_id_map
 
