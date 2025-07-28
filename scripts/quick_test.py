@@ -9,6 +9,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src", "python_
 
 try:
     import numpy as np
+
     from piper.inference_config import InferenceConfig
     from piper.util import audio_float_to_int16
 

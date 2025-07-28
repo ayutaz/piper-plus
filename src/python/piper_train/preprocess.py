@@ -8,6 +8,7 @@ import logging
 import os
 import signal
 import sys
+
 # import unicodedata  # noqa: F401 - May be used for text normalization
 from collections import Counter
 from collections.abc import Iterable
@@ -26,6 +27,7 @@ from piper_phonemize import (
     phonemize_espeak,
     tashkeel_run,
 )
+
 # import pyopenjtalk  # noqa: F401 - Used in conditional imports
 from tqdm import tqdm
 

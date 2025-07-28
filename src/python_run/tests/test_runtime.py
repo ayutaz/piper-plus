@@ -5,6 +5,7 @@ Tests actual implementation without excessive mocking
 
 import numpy as np
 import pytest
+
 from piper.util import audio_float_to_int16
 
 
