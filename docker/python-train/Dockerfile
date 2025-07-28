@@ -40,10 +40,14 @@ RUN python -m pip install --upgrade pip setuptools wheel
 RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
-# Copy requirements file
+# Copy requirements files
 COPY requirements-train.txt /tmp/
+COPY requirements-torch.txt /tmp/
 
-# Install Python dependencies in virtual environment
+# Install PyTorch packages first with CUDA support
+RUN pip install --no-cache-dir -r /tmp/requirements-torch.txt
+
+# Install other Python dependencies in virtual environment
 RUN pip install --no-cache-dir -r /tmp/requirements-train.txt
 
 # Install piper-train from source
