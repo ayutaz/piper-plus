@@ -14,7 +14,6 @@ import torch
 import torchaudio
 from transformers import AutoFeatureExtractor, AutoModelForAudioClassification
 
-
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 

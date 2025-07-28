@@ -2,7 +2,8 @@ import math
 
 import torch
 from torch import nn
-from torch.nn import Conv1d, functional as F
+from torch.nn import Conv1d
+from torch.nn import functional as F
 from torch.nn.utils import remove_weight_norm, weight_norm
 
 from .commons import fused_add_tanh_sigmoid_multiply, get_padding, init_weights

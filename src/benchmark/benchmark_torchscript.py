@@ -8,7 +8,6 @@ import time
 
 import torch
 
-
 _NOISE_SCALE = 0.667
 _LENGTH_SCALE = 1.0
 _NOISE_W = 0.8

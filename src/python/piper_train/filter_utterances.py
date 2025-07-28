@@ -18,7 +18,6 @@ import numpy as np
 
 from .norm_audio import make_silence_detector, trim_silence
 
-
 _DIR = Path(__file__).parent
 
 # Removed from the speaking rate calculation

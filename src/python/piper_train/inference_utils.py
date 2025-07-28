@@ -7,7 +7,6 @@ from torch import LongTensor
 from .phonemize.accent_processor import JapaneseAccentProcessor
 from .phonemize.japanese import phonemize_japanese
 
-
 _LOGGER = logging.getLogger("piper_train.inference_utils")
 
 

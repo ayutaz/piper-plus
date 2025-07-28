@@ -6,7 +6,6 @@ from pathlib import Path
 
 import torch
 
-
 _LOGGER = logging.getLogger()
 
 

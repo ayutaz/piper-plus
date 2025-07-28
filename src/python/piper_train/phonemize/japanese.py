@@ -4,7 +4,6 @@ import pyopenjtalk
 
 from .token_mapper import map_sequence
 
-
 __all__ = ["phonemize_japanese"]
 
 # Regular expressions reused many times

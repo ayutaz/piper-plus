@@ -13,7 +13,6 @@ import librosa
 import numpy as np
 from pesq import pesq
 
-
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 

@@ -10,7 +10,6 @@ from pytorch_lightning.callbacks import ModelCheckpoint
 from .vits.ema import EMACallback
 from .vits.lightning import VitsModel
 
-
 _LOGGER = logging.getLogger(__package__)
 
 

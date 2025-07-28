@@ -7,7 +7,6 @@ import numpy as np
 import torch
 import torchaudio
 
-
 _LOGGER = logging.getLogger("piper_train.f0_extraction")
 
 # Try to import pyworld, but make it optional

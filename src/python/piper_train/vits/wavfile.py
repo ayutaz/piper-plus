@@ -17,7 +17,6 @@ from enum import IntEnum
 
 import numpy
 
-
 __all__ = ["WavFileWarning", "read", "write"]
 
 

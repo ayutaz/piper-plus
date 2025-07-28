@@ -8,7 +8,6 @@ import time
 
 import torch
 
-
 _LOGGER = logging.getLogger(__name__)
 
 

@@ -13,7 +13,6 @@ from pathlib import Path
 
 from tqdm import tqdm
 
-
 sys.path.append(str(Path(__file__).parent))
 
 from piper_train.phonemize.japanese import phonemize_japanese

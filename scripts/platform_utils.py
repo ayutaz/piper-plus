@@ -5,7 +5,6 @@ Common platform-related utilities and constants.
 
 import sys
 
-
 # Platform name mapping for consistent naming across scripts
 PLATFORM_NAMES = {"linux": "ubuntu", "darwin": "macos", "win32": "windows"}
 

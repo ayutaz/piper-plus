@@ -4,12 +4,10 @@ from typing import Optional, Union
 
 import librosa
 import torch
-
 from piper_train.vits.mel_processing import spectrogram_torch
 
 from .trim import trim_silence
 from .vad import SileroVoiceActivityDetector
-
 
 _DIR = Path(__file__).parent
 
