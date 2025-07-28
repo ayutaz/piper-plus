@@ -8,7 +8,6 @@ import concurrent.futures
 import json
 import os
 import subprocess
-
 # Import from piper_train modules
 import sys
 from pathlib import Path

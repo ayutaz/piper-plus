@@ -11,7 +11,8 @@ import onnxruntime
 
 # Try to import piper_phonemize, but make it optional
 try:
-    from piper_phonemize import phonemize_codepoints, phonemize_espeak, tashkeel_run
+    from piper_phonemize import (phonemize_codepoints, phonemize_espeak,
+                                 tashkeel_run)
 
     HAS_PIPER_PHONEMIZE = True
 except ImportError:
@@ -128,9 +129,8 @@ class PiperVoice:
             # Piper の学習時と同じアルゴリズム（accent/prosody 付き）で音素化
             try:
                 # `piper_train` がインストールされていれば専用実装を利用
-                from piper_train.phonemize.japanese import (
-                    phonemize_japanese,  # type: ignore
-                )
+                from piper_train.phonemize.japanese import \
+                    phonemize_japanese  # type: ignore
 
                 tokens = phonemize_japanese(text)
                 return [tokens]

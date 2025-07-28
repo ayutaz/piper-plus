@@ -5,7 +5,8 @@ import sys
 
 try:
     from piper_train.phonemize.japanese import phonemize_japanese
-    from piper_train.phonemize.jp_id_map import JAPANESE_PHONEMES, get_japanese_id_map
+    from piper_train.phonemize.jp_id_map import (JAPANESE_PHONEMES,
+                                                 get_japanese_id_map)
 
     print("=== 環境チェック ===")
     print(f"Python: {sys.executable}")
