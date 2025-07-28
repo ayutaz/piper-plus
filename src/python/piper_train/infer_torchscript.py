@@ -11,6 +11,7 @@ import torch
 from .vits.utils import audio_float_to_int16
 from .vits.wavfile import write as write_wav
 
+
 _LOGGER = logging.getLogger("piper_train.infer_torchscript")
 
 

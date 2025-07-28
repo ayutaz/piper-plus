@@ -7,6 +7,7 @@ import torch
 
 from .vits.lightning import VitsModel
 
+
 _LOGGER = logging.getLogger("piper_train.export_onnx")
 
 OPSET_VERSION = 15

@@ -15,6 +15,7 @@ from .losses import discriminator_loss, feature_loss, generator_loss, kl_loss
 from .mel_processing import mel_spectrogram_torch, spec_to_mel_torch
 from .models import MultiPeriodDiscriminator, SynthesizerTrn
 
+
 _LOGGER = logging.getLogger("vits.lightning")
 
 
