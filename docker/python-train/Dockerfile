@@ -1,5 +1,8 @@
 # Python Training Environment for Piper TTS
-FROM nvidia/cuda:12.4.1-cudnn-devel-ubuntu22.04
+# Multi-stage build to reduce final image size
+
+# Build stage
+FROM nvidia/cuda:12.4.1-cudnn-devel-ubuntu22.04 AS builder
 
 # Set environment variables
 ENV DEBIAN_FRONTEND=noninteractive
@@ -8,29 +11,19 @@ ENV CUDA_HOME=/usr/local/cuda
 ENV PATH=$CUDA_HOME/bin:$PATH
 ENV LD_LIBRARY_PATH=$CUDA_HOME/lib64:$LD_LIBRARY_PATH
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
+# Install build dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     cmake \
     git \
     wget \
     curl \
-    libsndfile1 \
-    libsndfile1-dev \
-    libportaudio2 \
-    libportaudiocpp0 \
-    portaudio19-dev \
     python3.11 \
     python3.11-dev \
     python3.11-venv \
     python3-pip \
-    sox \
-    ffmpeg \
-    libsox-dev \
-    libsox-fmt-all \
-    libasound2-dev \
-    libpulse-dev \
-    && rm -rf /var/lib/apt/lists/*
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 # Set Python 3.11 as default
 RUN update-alternatives --install /usr/bin/python python /usr/bin/python3.11 1 && \
@@ -39,28 +32,69 @@ RUN update-alternatives --install /usr/bin/python python /usr/bin/python3.11 1 &
 # Upgrade pip
 RUN python -m pip install --upgrade pip setuptools wheel
 
-# Create working directory
-WORKDIR /workspace
+# Create virtual environment
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
 
-# Copy requirements file (will be created separately)
-COPY requirements-train.txt /workspace/
+# Copy requirements file
+COPY requirements-train.txt /tmp/
 
-# Install Python dependencies
-RUN pip install -r requirements-train.txt
+# Install Python dependencies in virtual environment
+RUN pip install --no-cache-dir -r /tmp/requirements-train.txt
 
 # Install piper-train from source
-RUN git clone https://github.com/rhasspy/piper.git && \
-    cd piper && \
-    pip install -e src/python/
+RUN git clone --depth 1 https://github.com/rhasspy/piper.git /tmp/piper && \
+    cd /tmp/piper && \
+    pip install --no-cache-dir -e src/python/ && \
+    rm -rf /tmp/piper/.git
 
-# Install additional tools for training
-RUN pip install \
+# Install additional tools
+RUN pip install --no-cache-dir \
     tensorboard \
     wandb \
     matplotlib \
     seaborn \
     jupyter \
     ipywidgets
+
+# Runtime stage
+FROM nvidia/cuda:12.4.1-cudnn-runtime-ubuntu22.04
+
+# Set environment variables
+ENV DEBIAN_FRONTEND=noninteractive
+ENV PYTHONUNBUFFERED=1
+ENV CUDA_HOME=/usr/local/cuda
+ENV PATH=$CUDA_HOME/bin:$PATH
+ENV LD_LIBRARY_PATH=$CUDA_HOME/lib64:$LD_LIBRARY_PATH
+
+# Install runtime dependencies only
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3.11 \
+    python3.11-venv \
+    libsndfile1 \
+    libportaudio2 \
+    sox \
+    ffmpeg \
+    libsox-fmt-all \
+    libasound2-dev \
+    libpulse-dev \
+    git \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+# Set Python 3.11 as default
+RUN update-alternatives --install /usr/bin/python python /usr/bin/python3.11 1 && \
+    update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1
+
+# Copy virtual environment from builder
+COPY --from=builder /opt/venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Copy piper source
+COPY --from=builder /tmp/piper /opt/piper
+
+# Create working directory
+WORKDIR /workspace
 
 # Create directories for datasets and checkpoints
 RUN mkdir -p /workspace/datasets /workspace/checkpoints /workspace/logs

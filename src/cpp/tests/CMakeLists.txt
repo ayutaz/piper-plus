@@ -168,24 +168,32 @@ foreach(test_source ${TEST_SOURCES})
         target_include_directories(${test_name} PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/..
             ${CMAKE_BINARY_DIR}/si/include
+            ${CMAKE_BINARY_DIR}/fi/include
         )
         # Add library directories
         target_link_directories(${test_name} PRIVATE
             ${CMAKE_BINARY_DIR}/si/lib
+            ${CMAKE_BINARY_DIR}/fi/lib
         )
         if(WIN32)
             target_link_libraries(${test_name}
                 optimized spdlog.lib
                 debug spdlogd.lib
+                optimized fmt.lib
+                debug fmtd.lib
             )
         else()
             target_link_libraries(${test_name}
                 spdlog
+                fmt
             )
         endif()
-        # Add dependency on spdlog_external to ensure headers are available
+        # Add dependency on spdlog_external and fmt_external to ensure headers are available
         if(TARGET spdlog_external)
             add_dependencies(${test_name} spdlog_external)
+        endif()
+        if(TARGET fmt_external)
+            add_dependencies(${test_name} fmt_external)
         endif()
     endif()
 
