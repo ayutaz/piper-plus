@@ -109,7 +109,9 @@ class TestPhonemization:
             phonemes = phonemize_japanese(katakana)
             # Remove markers for comparison
             # Filter out markers, accent symbols, and other OpenJTalk markers
-            phoneme_list = [p for p in phonemes if p not in ["^", "$", "_", "[", "]", "#"]]
+            phoneme_list = [
+                p for p in phonemes if p not in ["^", "$", "_", "[", "]", "#"]
+            ]
             for expected in expected_phonemes:
                 assert (
                     expected in phoneme_list
@@ -138,10 +140,14 @@ class TestPhonemization:
         for text, expected_phonemes in test_cases:
             phonemes = phonemize_japanese(text)
             # Filter out markers, accent symbols, and other OpenJTalk markers
-            phoneme_list = [p for p in phonemes if p not in ["^", "$", "_", "[", "]", "#"]]
+            phoneme_list = [
+                p for p in phonemes if p not in ["^", "$", "_", "[", "]", "#"]
+            ]
 
             # Normalize devoiced vowels (uppercase to lowercase)
-            phoneme_list = [p.lower() if p in {"A", "I", "U", "E", "O"} else p for p in phoneme_list]
+            phoneme_list = [
+                p.lower() if p in {"A", "I", "U", "E", "O"} else p for p in phoneme_list
+            ]
 
             # Check if all expected phonemes are present in order
             phoneme_str = "".join(phoneme_list)
@@ -199,7 +205,9 @@ class TestPhonemization:
         for text, _expected_phonemes in test_cases:
             phonemes = phonemize_japanese(text)
             # Filter out markers, accent symbols, and other OpenJTalk markers
-            phoneme_list = [p for p in phonemes if p not in ["^", "$", "_", "[", "]", "#"]]
+            phoneme_list = [
+                p for p in phonemes if p not in ["^", "$", "_", "[", "]", "#"]
+            ]
 
             # Check if 'cl' (small tsu) is present as PUA character
             assert (
@@ -233,9 +241,11 @@ class TestPhonemization:
         for text, expected_phonemes in test_cases:
             phonemes = phonemize_japanese(text)
             # Filter out markers, accent symbols, and other OpenJTalk markers
-            phoneme_list = [p for p in phonemes if p not in ["^", "$", "_", "[", "]", "#"]]
+            phoneme_list = [
+                p for p in phonemes if p not in ["^", "$", "_", "[", "]", "#"]
+            ]
 
             # Check if compound phonemes are handled correctly with PUA mapping
-            assert expected_phonemes == phoneme_list, (
-                f"Expected phonemes {expected_phonemes} for '{text}', got {phoneme_list}"
-            )
+            assert (
+                expected_phonemes == phoneme_list
+            ), f"Expected phonemes {expected_phonemes} for '{text}', got {phoneme_list}"

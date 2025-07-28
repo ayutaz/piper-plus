@@ -89,12 +89,18 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libsndfile1-dev
+          sudo apt-get install -y libsndfile1-dev build-essential cmake
       
       - name: Install system dependencies (macOS)
         if: runner.os == 'macOS'
         run: |
-          brew install libsndfile
+          brew install libsndfile cmake
+      
+      - name: Install system dependencies (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          choco install cmake --installargs 'ADD_CMAKE_TO_PATH=System' -y
+          refreshenv
       
       - name: Install Python dependencies
         run: |
@@ -102,12 +108,22 @@ jobs:
           pip install -r src/python/requirements_test.txt
           pip install -e src/python/
       
-      - name: Build C++ executable (needed for some tests)
+      - name: Build C++ executable (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          mkdir build
+          cd build
+          cmake .. -G "Visual Studio 17 2022" -A x64
+          cmake --build . --config Release
+        shell: cmd
+      
+      - name: Build C++ executable (Unix)
+        if: runner.os != 'Windows'
         run: |
           mkdir -p build
           cd build
           cmake ..
-          make -j$(nproc 2>/dev/null || echo 2)
+          make -j$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 2)
       
       - name: Run Python tests
         run: |
