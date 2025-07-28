@@ -102,6 +102,13 @@ jobs:
           pip install -r src/python/requirements_test.txt
           pip install -e src/python/
       
+      - name: Build C++ executable (needed for some tests)
+        run: |
+          mkdir -p build
+          cd build
+          cmake ..
+          make -j$(nproc 2>/dev/null || echo 2)
+      
       - name: Run Python tests
         run: |
           python scripts/run_tests.py --python --coverage
