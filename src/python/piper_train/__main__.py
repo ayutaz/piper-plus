@@ -120,9 +120,7 @@ def main():
     num_gpus = (
         args.devices
         if isinstance(args.devices, int)
-        else len(args.devices)
-        if args.devices
-        else 1
+        else len(args.devices) if args.devices else 1
     )
     _LOGGER.info(f"Training with {num_gpus} GPU(s)")
 
