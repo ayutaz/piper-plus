@@ -315,8 +315,6 @@ class PiperVoice:
         audio = self.session.run(
             None,
             args,
-        )[
-            0
-        ].squeeze((0, 1))
+        )[0].squeeze((0, 1))
         audio = audio_float_to_int16(audio.squeeze(), volume=volume)
         return audio.tobytes()

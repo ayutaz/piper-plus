@@ -111,7 +111,7 @@ RUN mkdir -p /workspace/datasets /workspace/checkpoints /workspace/logs
 EXPOSE 6006 8888
 
 # Set up entrypoint
-COPY entrypoint.sh /entrypoint.sh
+COPY docker/python-train/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
 ENTRYPOINT ["/entrypoint.sh"]

@@ -34,7 +34,7 @@ RUN python -m pip install --upgrade pip setuptools wheel
 WORKDIR /app
 
 # Copy requirements file
-COPY requirements-inference.txt /app/
+COPY docker/python-inference/requirements-inference.txt /app/
 
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements-inference.txt
@@ -46,7 +46,7 @@ RUN pip install --no-cache-dir piper-tts
 RUN mkdir -p /app/models /app/output
 
 # Copy inference script
-COPY inference.py /app/
+COPY docker/python-inference/inference.py /app/
 
 # Expose port for API service (optional)
 EXPOSE 8000
