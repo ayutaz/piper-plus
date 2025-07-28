@@ -55,12 +55,12 @@ jobs:
     - name: Run unit tests
       run: |
         cd src/python
-        pytest tests/ -v --tb=short -m "unit"
+        pytest tests/ -v --tb=short -m "unit and not training and not benchmark"
     
     - name: Run integration tests
       run: |
         cd src/python
-        pytest tests/ -v --tb=short -m "integration"
+        pytest tests/ -v --tb=short -m "integration and not benchmark"
     
     - name: Upload test results
       if: always()

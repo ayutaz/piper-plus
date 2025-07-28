@@ -1,13 +1,12 @@
 #include <gtest/gtest.h>
 #include "../phoneme_parser.hpp"
-#include <spdlog/spdlog.h>
 
 using namespace piper;
 
 class PhonemeParserTest : public ::testing::Test {
 protected:
     void SetUp() override {
-        spdlog::set_level(spdlog::level::debug);
+        // No setup needed for tests
     }
 };
 

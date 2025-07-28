@@ -4,6 +4,9 @@
 # Build stage
 FROM nvidia/cuda:12.1.0-cudnn8-devel-ubuntu22.04 AS builder
 
+# Free up space in the build environment
+RUN rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* || true
+
 # Set environment variables
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONUNBUFFERED=1
@@ -45,16 +48,22 @@ COPY docker/python-train/requirements-train.txt /tmp/
 COPY docker/python-train/requirements-torch.txt /tmp/
 
 # Install PyTorch packages first with CUDA support
-RUN pip install --no-cache-dir -r /tmp/requirements-torch.txt
+RUN pip install --no-cache-dir -r /tmp/requirements-torch.txt && \
+    pip cache purge && \
+    rm -rf ~/.cache/pip/*
 
 # Install other Python dependencies in virtual environment
-RUN pip install --no-cache-dir -r /tmp/requirements-train.txt
+RUN pip install --no-cache-dir -r /tmp/requirements-train.txt && \
+    pip cache purge && \
+    rm -rf ~/.cache/pip/*
 
 # Install piper-train from source
 RUN git clone --depth 1 https://github.com/rhasspy/piper.git /tmp/piper && \
     cd /tmp/piper && \
     pip install --no-cache-dir -e src/python/ && \
-    rm -rf /tmp/piper/.git
+    rm -rf /tmp/piper/.git && \
+    pip cache purge && \
+    rm -rf ~/.cache/pip/*
 
 # Install additional tools
 RUN pip install --no-cache-dir \
@@ -63,7 +72,9 @@ RUN pip install --no-cache-dir \
     matplotlib \
     seaborn \
     jupyter \
-    ipywidgets
+    ipywidgets && \
+    pip cache purge && \
+    rm -rf ~/.cache/pip/*
 
 # Runtime stage
 FROM nvidia/cuda:12.1.0-cudnn8-runtime-ubuntu22.04
