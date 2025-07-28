@@ -37,12 +37,16 @@ jobs:
           sudo apt-get install -y \
             build-essential cmake ninja-build \
             libsndfile1-dev libfmt-dev libspdlog-dev \
-            libgtest-dev libgmock-dev
+            libgtest-dev libgmock-dev \
+            open-jtalk open-jtalk-mecab-naist-jdic \
+            libmecab-dev mecab mecab-naist-jdic \
+            espeak-ng espeak-ng-data
       
       - name: Install dependencies (macOS)
         if: runner.os == 'macOS'
         run: |
           brew install cmake ninja libsndfile fmt spdlog googletest
+          brew install open-jtalk mecab mecab-ipadic
       
       - name: Install dependencies (Windows)
         if: runner.os == 'Windows'
@@ -130,7 +134,7 @@ jobs:
         run: ruff check .
       
       - name: Run black
-        run: black --check .
+        run: black --check --diff .
       
       - name: Run isort
         run: isort --check-only .

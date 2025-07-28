@@ -18,6 +18,11 @@ protected:
 
 // Test that temporary files are created securely
 TEST_F(OpenJTalkSecurityTest, SecureTempFileCreation) {
+    // Skip test if OpenJTalk is not available
+    if (!openjtalk_is_available()) {
+        GTEST_SKIP() << "OpenJTalk binary not available in test environment";
+    }
+    
     const char* test_text = "テストテキスト";
     
     // Run multiple conversions in parallel to test for race conditions
