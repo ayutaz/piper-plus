@@ -191,6 +191,7 @@ if(NOT DEFINED FMT_DIR)
     URL "https://github.com/fmtlib/fmt/archive/refs/tags/${FMT_VERSION}.zip"
     CMAKE_ARGS -DCMAKE_INSTALL_PREFIX:PATH=${FMT_DIR}
                -DFMT_TEST:BOOL=OFF  # Don't build all the tests
+               -DFMT_HEADER_ONLY:BOOL=ON  # Build as header-only library
                -DBUILD_SHARED_LIBS:BOOL=OFF  # Build static libraries
                ${EXTERNAL_CMAKE_ARGS}
   )
@@ -211,6 +212,7 @@ if(NOT DEFINED SPDLOG_DIR)
                -DSPDLOG_BUILD_SHARED:BOOL=OFF  # Build static libraries
                -DSPDLOG_FMT_EXTERNAL:BOOL=ON  # Use external fmt
                -DCMAKE_PREFIX_PATH:PATH=${FMT_DIR}
+               -DFMT_HEADER_ONLY:BOOL=ON  # Use fmt as header-only
                ${EXTERNAL_CMAKE_ARGS}
   )
   add_dependencies(spdlog_external fmt_external)
@@ -586,6 +588,7 @@ target_include_directories(test_piper PUBLIC
 
 target_compile_definitions(piper PUBLIC _PIPER_VERSION=${piper_version})
 target_compile_definitions(piper PUBLIC SPDLOG_FMT_EXTERNAL=1)
+target_compile_definitions(piper PUBLIC FMT_HEADER_ONLY=1)
 
 # Add OpenJTalk dictionary path definition
 if(TRUE)  # HTSEngine and OpenJTalk are built
@@ -595,10 +598,12 @@ if(TRUE)  # HTSEngine and OpenJTalk are built
     target_compile_definitions(piper PUBLIC OPENJTALK_DIC_PATH="..\\\\share\\\\open_jtalk\\\\dic")
     target_compile_definitions(test_piper PUBLIC OPENJTALK_DIC_PATH="${CMAKE_CURRENT_BINARY_DIR}\\\\naist-jdic")
     target_compile_definitions(test_piper PUBLIC SPDLOG_FMT_EXTERNAL=1)
+    target_compile_definitions(test_piper PUBLIC FMT_HEADER_ONLY=1)
   else()
     target_compile_definitions(piper PUBLIC OPENJTALK_DIC_PATH="../share/open_jtalk/dic")
     target_compile_definitions(test_piper PUBLIC OPENJTALK_DIC_PATH="${CMAKE_CURRENT_BINARY_DIR}/naist-jdic")
     target_compile_definitions(test_piper PUBLIC SPDLOG_FMT_EXTERNAL=1)
+    target_compile_definitions(test_piper PUBLIC FMT_HEADER_ONLY=1)
   endif()
 endif()
 
