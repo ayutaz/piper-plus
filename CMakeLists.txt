@@ -209,8 +209,11 @@ if(NOT DEFINED SPDLOG_DIR)
     URL "https://github.com/gabime/spdlog/archive/refs/tags/v${SPDLOG_VERSION}.zip"
     CMAKE_ARGS -DCMAKE_INSTALL_PREFIX:PATH=${SPDLOG_DIR}
                -DSPDLOG_BUILD_SHARED:BOOL=OFF  # Build static libraries
+               -DSPDLOG_FMT_EXTERNAL:BOOL=ON  # Use external fmt
+               -DCMAKE_PREFIX_PATH:PATH=${FMT_DIR}
                ${EXTERNAL_CMAKE_ARGS}
   )
+  add_dependencies(spdlog_external fmt_external)
   add_dependencies(piper spdlog_external)
   add_dependencies(test_piper spdlog_external)
 endif()
