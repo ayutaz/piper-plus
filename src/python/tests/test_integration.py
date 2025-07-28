@@ -2,7 +2,6 @@
 Real integration tests that verify actual functionality
 """
 
-import json
 import tempfile
 from pathlib import Path
 
