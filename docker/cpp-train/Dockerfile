@@ -113,7 +113,7 @@ RUN echo "export CC=clang" >> ~/.bashrc && \
 RUN mkdir -p /workspace/build /workspace/.ccache
 
 # Copy build scripts
-COPY build.sh /workspace/
+COPY docker/cpp-train/build.sh /workspace/
 RUN chmod +x /workspace/build.sh
 
 CMD ["/bin/bash"]

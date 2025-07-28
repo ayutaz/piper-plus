@@ -189,7 +189,7 @@ jobs:
         run: |
           docker run --rm -v ${{ github.workspace }}:/workspace \
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/cpp-train:${{ github.sha }} \
-            /workspace/docker/cpp-train/build.sh || echo "Binary build skipped in CI"
+            /workspace/build.sh || echo "Binary build skipped in CI"
       
       - name: Build and push Docker image
         uses: docker/build-push-action@v5

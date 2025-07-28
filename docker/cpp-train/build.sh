@@ -22,7 +22,7 @@ cd /workspace/build
 
 # Configure with CMake
 echo "Configuring with CMake..."
-cmake /workspace/piper \
+cmake /workspace \
     -G Ninja \
     -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
     -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
@@ -44,7 +44,7 @@ fi
 # Generate coverage report if requested
 if [ "$COVERAGE" = "1" ]; then
     echo "Generating coverage report..."
-    gcovr -r /workspace/piper --html --html-details -o /workspace/build/coverage.html
+    gcovr -r /workspace --html --html-details -o /workspace/build/coverage.html
 fi
 
 echo "Build complete!"
