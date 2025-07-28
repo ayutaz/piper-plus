@@ -1,5 +1,8 @@
 # C++ Tests CMake configuration
 
+# Add global compile definitions for all tests
+add_compile_definitions(SPDLOG_FMT_EXTERNAL=1)
+
 # Test sources
 set(TEST_SOURCES
     test_phonemize.cpp
