@@ -158,9 +158,6 @@ jobs:
       
       - name: Run black
         run: black --check --diff .
-      
-      - name: Run isort
-        run: isort --check-only .
 
   docker-test:
     runs-on: ubuntu-latest

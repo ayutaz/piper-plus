@@ -13,8 +13,7 @@ import wave
 from pathlib import Path
 from typing import Any
 
-from test_text_constants import (MULTILINGUAL_TEST_TEXTS,
-                                 get_test_text_description)
+from test_text_constants import MULTILINGUAL_TEST_TEXTS, get_test_text_description
 
 
 def get_audio_info(wav_path: Path) -> dict[str, Any]:

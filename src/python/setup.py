@@ -4,6 +4,7 @@ from pathlib import Path
 import setuptools
 from setuptools import setup
 
+
 this_dir = Path(__file__).parent
 module_dir = this_dir / "piper_train"
 

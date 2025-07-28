@@ -15,14 +15,21 @@ from enum import Enum
 from multiprocessing import JoinableQueue, Process, Queue
 from pathlib import Path
 
-from piper_phonemize import (get_codepoints_map, get_espeak_map,
-                             get_max_phonemes, phoneme_ids_codepoints,
-                             phoneme_ids_espeak, phonemize_codepoints,
-                             phonemize_espeak, tashkeel_run)
+from piper_phonemize import (
+    get_codepoints_map,
+    get_espeak_map,
+    get_max_phonemes,
+    phoneme_ids_codepoints,
+    phoneme_ids_espeak,
+    phonemize_codepoints,
+    phonemize_espeak,
+    tashkeel_run,
+)
 from tqdm import tqdm
 
 from .f0_extraction import cache_f0
 from .norm_audio import cache_norm_audio, make_silence_detector
+
 
 # Custom Japanese phonemizer with accent/prosody marks
 try:
@@ -30,17 +37,14 @@ try:
     from .phonemize.japanese import phonemize_japanese  # type: ignore
 except ImportError:
     # When running as script, relative import may fail; try absolute import fallback
-    from piper_train.phonemize.accent_processor import \
-        AccentProcessor  # type: ignore
-    from piper_train.phonemize.japanese import \
-        phonemize_japanese  # type: ignore
+    from piper_train.phonemize.accent_processor import AccentProcessor  # type: ignore
+    from piper_train.phonemize.japanese import phonemize_japanese  # type: ignore
 
 # Japanese phoneme id map support
 try:
     from .phonemize.jp_id_map import get_japanese_id_map  # type: ignore
 except ImportError:
-    from piper_train.phonemize.jp_id_map import \
-        get_japanese_id_map  # type: ignore
+    from piper_train.phonemize.jp_id_map import get_japanese_id_map  # type: ignore
 
 _DIR = Path(__file__).parent
 _VERSION = (_DIR / "VERSION").read_text(encoding="utf-8").strip()

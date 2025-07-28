@@ -14,6 +14,7 @@ from . import PiperVoice
 from .download import ensure_voice_exists, find_voice, get_voices
 from .inference_config import InferenceConfig
 
+
 _FILE = Path(__file__)
 _DIR = _FILE.parent
 _LOGGER = logging.getLogger(_FILE.stem)

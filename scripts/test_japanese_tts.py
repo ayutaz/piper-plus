@@ -22,6 +22,7 @@ from pathlib import Path
 # Import platform utilities
 from platform_utils import get_platform_name
 
+
 # Configure stdout for UTF-8 on Windows
 if sys.platform == "win32":
     import io
