@@ -17,6 +17,7 @@ from piper_train.phonemize.token_mapper import (  # noqa: E402
 # Japanese imports are optional
 try:
     import pyopenjtalk  # noqa: F401
+
     from piper_train.phonemize.japanese import phonemize_japanese
 
     HAS_JAPANESE = True
