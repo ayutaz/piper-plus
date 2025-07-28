@@ -9,7 +9,7 @@ onnxruntime>=1.16.0
 soundfile>=0.12.0
 
 # Phonemization
-piper-phonemize>=1.1.0
+piper-phonemize>=1.0.0
 
 # Optional: GPU support
 # onnxruntime-gpu>=1.16.0  # Uncomment for GPU support
