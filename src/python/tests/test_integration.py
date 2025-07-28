@@ -180,7 +180,6 @@ class TestRealIntegration:
             import time
 
             import psutil
-
             from piper_train.phonemize.japanese import phonemize_japanese
 
             # Create 1MB+ of Japanese text
@@ -320,7 +319,6 @@ class TestRealIntegration:
             import os
 
             import psutil
-
             from piper_train.phonemize.japanese import phonemize_japanese
 
             process = psutil.Process(os.getpid())

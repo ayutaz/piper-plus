@@ -34,6 +34,19 @@ jobs:
             dockerfile: ./docker/cpp-train/Dockerfile
     
     steps:
+      - name: Free disk space
+        run: |
+          echo "=== Initial disk space ==="
+          df -h
+          echo "=== Removing unnecessary files ==="
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf "/usr/local/share/boost"
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+          sudo apt-get clean
+          echo "=== Final disk space ==="
+          df -h
+      
       - name: Checkout repository
         uses: actions/checkout@v4
       
@@ -81,6 +94,19 @@ cmake --version && ninja --version && echo 'Build tools OK'
     needs: test-docker-builds
     
     steps:
+      - name: Free disk space
+        run: |
+          echo "=== Initial disk space ==="
+          df -h
+          echo "=== Removing unnecessary files ==="
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf "/usr/local/share/boost"
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+          sudo apt-get clean
+          echo "=== Final disk space ==="
+          df -h
+      
       - name: Checkout repository
         uses: actions/checkout@v4
       

@@ -8,16 +8,12 @@ import pytest
 pytest.importorskip("piper_train.phonemize")
 
 # noqa: E402 - Import after pytest.importorskip
-from piper_train.phonemize.token_mapper import (  # noqa: E402
-    CHAR2TOKEN,
-    TOKEN2CHAR,
-    map_sequence,
-)
+from piper_train.phonemize.token_mapper import (CHAR2TOKEN,  # noqa: E402
+                                                TOKEN2CHAR, map_sequence)
 
 # Japanese imports are optional
 try:
     import pyopenjtalk  # noqa: F401
-
     from piper_train.phonemize.japanese import phonemize_japanese
 
     HAS_JAPANESE = True
