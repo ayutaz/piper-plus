@@ -585,6 +585,7 @@ target_include_directories(test_piper PUBLIC
 # OpenJTalk is used via binary execution, includes not needed
 
 target_compile_definitions(piper PUBLIC _PIPER_VERSION=${piper_version})
+target_compile_definitions(piper PUBLIC SPDLOG_FMT_EXTERNAL=1)
 
 # Add OpenJTalk dictionary path definition
 if(TRUE)  # HTSEngine and OpenJTalk are built
@@ -593,9 +594,11 @@ if(TRUE)  # HTSEngine and OpenJTalk are built
   if(WIN32)
     target_compile_definitions(piper PUBLIC OPENJTALK_DIC_PATH="..\\\\share\\\\open_jtalk\\\\dic")
     target_compile_definitions(test_piper PUBLIC OPENJTALK_DIC_PATH="${CMAKE_CURRENT_BINARY_DIR}\\\\naist-jdic")
+    target_compile_definitions(test_piper PUBLIC SPDLOG_FMT_EXTERNAL=1)
   else()
     target_compile_definitions(piper PUBLIC OPENJTALK_DIC_PATH="../share/open_jtalk/dic")
     target_compile_definitions(test_piper PUBLIC OPENJTALK_DIC_PATH="${CMAKE_CURRENT_BINARY_DIR}/naist-jdic")
+    target_compile_definitions(test_piper PUBLIC SPDLOG_FMT_EXTERNAL=1)
   endif()
 endif()
 
