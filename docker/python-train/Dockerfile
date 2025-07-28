@@ -41,8 +41,8 @@ RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
 # Copy requirements files
-COPY requirements-train.txt /tmp/
-COPY requirements-torch.txt /tmp/
+COPY docker/python-train/requirements-train.txt /tmp/
+COPY docker/python-train/requirements-torch.txt /tmp/
 
 # Install PyTorch packages first with CUDA support
 RUN pip install --no-cache-dir -r /tmp/requirements-torch.txt

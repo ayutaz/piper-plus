@@ -31,6 +31,20 @@ foreach(test_source ${TEST_SOURCES})
         gtest_main
     )
     
+    # Add spdlog/fmt dependencies for all tests
+    if(TARGET spdlog_external)
+        add_dependencies(${test_name} spdlog_external)
+    endif()
+    if(TARGET fmt_external)
+        add_dependencies(${test_name} fmt_external)
+    endif()
+    
+    # Add include directories for spdlog/fmt
+    target_include_directories(${test_name} PRIVATE
+        ${CMAKE_BINARY_DIR}/si/include
+        ${CMAKE_BINARY_DIR}/fi/include
+    )
+    
     # Link additional dependencies for dictionary manager test
     if(${test_name} STREQUAL "test_dictionary_manager" AND NOT WIN32 AND NOT MSVC)
         target_sources(${test_name} PRIVATE
