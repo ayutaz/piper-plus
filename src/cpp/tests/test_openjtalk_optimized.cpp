@@ -13,11 +13,10 @@ class OpenJTalkOptimizedTest : public ::testing::Test {
 protected:
     void SetUp() override {
         // Initialize with cache enabled
-        OpenJTalkCacheConfig config = {
-            .max_entries = 100,
-            .max_memory_bytes = 1024 * 1024,  // 1MB
-            .ttl_seconds = 300  // 5 minutes
-        };
+        OpenJTalkCacheConfig config;
+        config.max_entries = 100;
+        config.max_memory_bytes = 1024 * 1024;  // 1MB
+        config.ttl_seconds = 300;  // 5 minutes
         ASSERT_TRUE(openjtalk_optimized_init(&config));
     }
     
@@ -192,11 +191,10 @@ TEST_F(OpenJTalkOptimizedTest, CacheEviction) {
     // Reinitialize with small cache
     openjtalk_optimized_cleanup();
     
-    OpenJTalkCacheConfig config = {
-        .max_entries = 3,
-        .max_memory_bytes = 1024,  // 1KB
-        .ttl_seconds = 300
-    };
+    OpenJTalkCacheConfig config;
+    config.max_entries = 3;
+    config.max_memory_bytes = 1024;  // 1KB
+    config.ttl_seconds = 300;
     ASSERT_TRUE(openjtalk_optimized_init(&config));
     
     if (!openjtalk_is_available()) {

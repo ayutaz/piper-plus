@@ -5,6 +5,7 @@ Only test critical functionality that affects inference
 
 import pytest
 
+
 try:
     import torch
 except ImportError:

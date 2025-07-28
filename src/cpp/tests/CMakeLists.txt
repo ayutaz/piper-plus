@@ -206,13 +206,8 @@ foreach(test_source ${TEST_SOURCES})
                 fmt
             )
         endif()
-        # Add dependency on spdlog_external and fmt_external to ensure headers are available
-        if(TARGET spdlog_external)
-            add_dependencies(${test_name} spdlog_external)
-        endif()
-        if(TARGET fmt_external)
-            add_dependencies(${test_name} fmt_external)
-        endif()
+        # Ensure dependencies are built first
+        add_dependencies(${test_name} spdlog_external fmt_external)
     endif()
 
     add_test(NAME ${test_name} COMMAND ${test_name})
