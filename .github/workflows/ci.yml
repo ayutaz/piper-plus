@@ -87,8 +87,8 @@ jobs:
         run: |
           cd build
           if [ "${{ runner.os }}" == "Windows" ]; then
-            # Skip tests on Windows for now due to path issues
-            echo "Skipping tests on Windows"
+            # Run tests on Windows with proper configuration
+            ctest -C ${{ matrix.build_type }} --output-on-failure -V --exclude-regex "test_openjtalk"
           else
             # Set environment variables for OpenJTalk tests
             export OPENJTALK_VOICE="dummy.htsvoice"
@@ -96,7 +96,7 @@ jobs:
             export OPENJTALK_DICTIONARY_DIR="${PWD}/naist-jdic"
             
             # Run tests with verbose output
-            ctest -C ${{ matrix.build_type }} --output-on-failure -V || true
+            ctest -C ${{ matrix.build_type }} --output-on-failure -V
           fi
         shell: bash
 
@@ -170,9 +170,13 @@ jobs:
       
       - name: Run Python tests
         run: |
-          # Run basic tests without full coverage
+          # Run tests properly
           cd src/python
-          python -m pytest tests/ -v --tb=short || true
+          if [ "${{ runner.os }}" == "Windows" ]; then
+            python -m pytest tests/ -v --tb=short -m "unit and not phonemize and not training" -k "not test_phonemize and not test_japanese"
+          else
+            python -m pytest tests/ -v --tb=short -m "unit and not training and not benchmark"
+          fi
       
       - name: Upload coverage reports
         uses: codecov/codecov-action@v4
@@ -226,7 +230,25 @@ jobs:
       
       - uses: actions/checkout@v4
       
-      - name: Test Docker availability
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Test Python train image build
         run: |
-          docker --version
-          docker run --rm hello-world
+          docker build -t piper-python-train:test -f docker/python-train/Dockerfile .
+          echo "Python train image built successfully"
+      
+      - name: Test Python inference image build
+        run: |
+          docker build -t piper-python-inference:test -f docker/python-inference/Dockerfile .
+          echo "Python inference image built successfully"
+      
+      - name: Test C++ train image build
+        run: |
+          docker build -t piper-cpp-train:test -f docker/cpp-train/Dockerfile .
+          echo "C++ train image built successfully"
+      
+      - name: Verify Docker images
+        run: |
+          docker images | grep piper
+          echo "All Docker images built successfully"

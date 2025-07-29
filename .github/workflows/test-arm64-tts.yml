@@ -16,7 +16,6 @@ jobs:
     name: Test Linux ARM64 TTS (Emulated)
     runs-on: ubuntu-22.04
     timeout-minutes: 60
-    continue-on-error: true  # Allow failure for emulated tests
     
     steps:
       - name: Checkout code
@@ -30,19 +29,50 @@ jobs:
           platforms: arm64
           image: tonistiigi/binfmt:latest
           
-      - name: Test ARM64 emulation only
+      - name: Test ARM64 emulation with basic build
         run: |
-          # Skip complex Docker build for emulated tests
-          echo "Testing basic ARM64 emulation..."
+          echo "Testing ARM64 emulation with lightweight build..."
           docker run --rm --platform linux/arm64 alpine:latest uname -m
-          docker run --rm --platform linux/arm64 alpine:latest echo "ARM64 emulation works"
-            
+          
+          # Test basic compilation in ARM64 environment
+          docker run --rm --platform linux/arm64 ubuntu:22.04 bash -c "
+            apt-get update && apt-get install -y build-essential cmake
+            echo 'int main() { return 0; }' > test.c
+            gcc test.c -o test
+            ./test && echo 'ARM64 compilation works'
+          "
+          
+      - name: Build minimal piper components for ARM64
+        run: |
+          # Build a minimal Docker image to test ARM64 compatibility
+          cat > Dockerfile.arm64test << 'EOF'
+          FROM --platform=linux/arm64 ubuntu:22.04
+          RUN apt-get update && apt-get install -y \
+              build-essential cmake git wget \
+              && rm -rf /var/lib/apt/lists/*
+          WORKDIR /workspace
+          COPY CMakeLists.txt .
+          COPY cmake ./cmake
+          COPY src/cpp ./src/cpp
+          RUN mkdir build && cd build && \
+              cmake .. -DBUILD_TESTS=OFF -DCMAKE_BUILD_TYPE=Release && \
+              make -j2
+          EOF
+          
+          # Build with proper error handling
+          if docker buildx build --platform linux/arm64 -f Dockerfile.arm64test -t piper-arm64-minimal:test .; then
+            echo "ARM64 build successful"
+          else
+            echo "ARM64 build failed - this may indicate compatibility issues"
+            exit 1
+          fi
+          
       - name: Summary
         run: |
           echo "=== ARM64 Emulation Test Summary ==="
           echo "✅ Basic ARM64 emulation verified"
-          echo "⚠️  Complex tests skipped due to QEMU limitations"
-          echo "ℹ️  Full ARM64 testing requires native hardware"
+          echo "✅ ARM64 compilation tested"
+          echo "⚠️  Full TTS tests limited by QEMU performance"
               
             
   test-linux-arm64-native:
