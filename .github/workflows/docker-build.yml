@@ -1,7 +1,7 @@
 name: Docker Build and Push
 
 on:
-  workflow_dispatch:  # Only manual trigger for now
+  workflow_dispatch:  # Keep manual only due to complexity
 
 env:
   REGISTRY: ghcr.io

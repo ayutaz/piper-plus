@@ -1,7 +1,11 @@
 name: Docker Tests
 
 on:
-  workflow_dispatch:  # Only manual trigger for now
+  pull_request:
+    paths:
+      - 'docker/**'
+      - '.github/workflows/docker-*.yml'
+      - '.dockerignore'
 
 jobs:
   test-docker-builds:
@@ -150,7 +154,7 @@ cmake --version && ninja --version && echo 'Build tools OK'
       - name: Checkout repository
         uses: actions/checkout@v4
       
-      - name: Skip Docker smoke tests temporarily
+      - name: Run minimal Docker tests
         run: |
-          echo "Docker smoke tests temporarily disabled for CI stability"
-          exit 0
+          chmod +x docker/test-docker-minimal.sh
+          ./docker/test-docker-minimal.sh

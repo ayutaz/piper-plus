@@ -1,0 +1,37 @@
+name: Docker Build Minimal
+
+on:
+  pull_request:
+    branches:
+      - main
+      - dev
+  workflow_dispatch:
+
+jobs:
+  build-python-inference:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Build Python inference image (test only)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./docker/python-inference/Dockerfile
+          push: false
+          tags: piper-python-inference:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64
+      
+      - name: Test the built image
+        run: |
+          docker run --rm piper-python-inference:test python -c "print('Image test passed')"

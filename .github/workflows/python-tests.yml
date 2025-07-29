@@ -17,7 +17,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-22.04, macos-latest]  # Temporarily disable Windows
+        os: [ubuntu-22.04, windows-latest, macos-latest]
         python-version: ["3.11", "3.12"]
     
     steps:
@@ -42,13 +42,17 @@ jobs:
     - name: Install Python dependencies (Windows)
       if: runner.os == 'Windows'
       run: |
-        python -m pip install --upgrade pip
+        python -m pip install --upgrade pip setuptools wheel
         cd src/python
-        # Install test dependencies individually to avoid conflicts
-        pip install pytest pytest-cov pytest-timeout pytest-mock
-        # Install core dependencies without optional ones
-        pip install cython numpy onnxruntime librosa soundfile tqdm pyyaml scipy scikit-learn
-        pip install -e .
+        # Install Cython first for building
+        pip install "cython>=0.29.0,<1"
+        # Install test requirements
+        pip install -r requirements_test.txt
+        # Install core dependencies, skip optional ones
+        pip install numpy "onnxruntime>=1.11.0" "librosa>=0.9.2,<1" "soundfile>=0.12.0"
+        pip install "tqdm>=4.60.0" "pyyaml>=6.0" "scipy>=1.9.0" "scikit-learn>=1.0.0"
+        # Install in development mode
+        pip install --no-deps -e .
     
     - name: Install Python dependencies (Unix)
       if: runner.os != 'Windows'
