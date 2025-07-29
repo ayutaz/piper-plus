@@ -35,13 +35,15 @@ RUN cd /tmp && \
 
 # Build and install espeak-ng
 RUN cd /tmp && \
-    git clone --depth 1 --branch 1.51.1 https://github.com/espeak-ng/espeak-ng.git && \
+    git clone --depth 1 --branch 1.51 https://github.com/espeak-ng/espeak-ng.git && \
     cd espeak-ng && \
+    apt-get update && apt-get install -y --no-install-recommends autoconf automake libtool && \
     ./autogen.sh && \
     ./configure --prefix=/usr/local && \
     make -j$(nproc) && \
     make install && \
-    cd / && rm -rf /tmp/espeak-ng
+    cd / && rm -rf /tmp/espeak-ng && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Build and install piper-phonemize
 RUN cd /tmp && \

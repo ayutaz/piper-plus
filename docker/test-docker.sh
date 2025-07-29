@@ -40,26 +40,23 @@ if ! command -v docker &> /dev/null; then
     exit 1
 fi
 
-# Check if docker compose is available
-if ! docker compose version &> /dev/null; then
-    echo -e "${YELLOW}Warning: docker compose not found, skipping compose tests${NC}"
-    SKIP_COMPOSE=1
-fi
+# Docker compose was removed, skip compose tests
+SKIP_COMPOSE=1
 
 echo "1. Building Docker images..."
 echo ""
 
 # Build Python training image
 run_test "Python training image build" \
-    "docker build -t piper-python-train:test -f docker/python-train/Dockerfile docker/python-train"
+    "docker build -t piper-python-train:test -f docker/python-train/Dockerfile ."
 
 # Build Python inference image
 run_test "Python inference image build" \
-    "docker build -t piper-python-inference:test -f docker/python-inference/Dockerfile docker/python-inference"
+    "docker build -t piper-python-inference:test -f docker/python-inference/Dockerfile ."
 
 # Build C++ training image
 run_test "C++ training image build" \
-    "docker build -t piper-cpp-train:test -f docker/cpp-train/Dockerfile docker/cpp-train"
+    "docker build -t piper-cpp-train:test -f docker/cpp-train/Dockerfile ."
 
 # Build C++ inference image (depends on cpp-train)
 run_test "C++ inference image build" \
