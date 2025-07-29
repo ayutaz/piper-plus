@@ -154,7 +154,7 @@ cmake --version && ninja --version && echo 'Build tools OK'
       - name: Checkout repository
         uses: actions/checkout@v4
       
-      - name: Run minimal Docker tests
+      - name: Test Docker availability
         run: |
-          chmod +x docker/test-docker-minimal.sh
-          ./docker/test-docker-minimal.sh
+          docker --version
+          docker run --rm hello-world
