@@ -190,15 +190,9 @@ if(NOT DEFINED FMT_DIR)
     PREFIX "${CMAKE_CURRENT_BINARY_DIR}/f"
     URL "https://github.com/fmtlib/fmt/archive/refs/tags/${FMT_VERSION}.zip"
     DOWNLOAD_NO_PROGRESS TRUE
-    TIMEOUT 300  # 5 minutes timeout
+    TIMEOUT 600  # 10 minutes timeout
     TLS_VERIFY ON
-    # Add multiple retries for download
-    DOWNLOAD_COMMAND ${CMAKE_COMMAND} -E echo "Downloading fmt..." 
-      COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/download_with_retry.cmake
-        "https://github.com/fmtlib/fmt/archive/refs/tags/10.0.0.zip"
-        "${CMAKE_CURRENT_BINARY_DIR}/f/src/10.0.0.zip"
-        3  # retry count
-        30 # delay between retries
+    DOWNLOAD_TRIES 3  # Retry download 3 times
     CMAKE_ARGS -DCMAKE_INSTALL_PREFIX:PATH=${FMT_DIR}
                -DFMT_TEST:BOOL=OFF  # Don't build all the tests
                -DFMT_HEADER_ONLY:BOOL=ON  # Build as header-only library
@@ -219,15 +213,9 @@ if(NOT DEFINED SPDLOG_DIR)
     PREFIX "${CMAKE_CURRENT_BINARY_DIR}/s"
     URL "https://github.com/gabime/spdlog/archive/refs/tags/v${SPDLOG_VERSION}.zip"
     DOWNLOAD_NO_PROGRESS TRUE
-    TIMEOUT 300  # 5 minutes timeout
+    TIMEOUT 600  # 10 minutes timeout
     TLS_VERIFY ON
-    # Add multiple retries for download
-    DOWNLOAD_COMMAND ${CMAKE_COMMAND} -E echo "Downloading spdlog..." 
-      COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/download_with_retry.cmake
-        "https://github.com/gabime/spdlog/archive/refs/tags/v1.12.0.zip"
-        "${CMAKE_CURRENT_BINARY_DIR}/s/src/v1.12.0.zip"
-        3  # retry count
-        30 # delay between retries
+    DOWNLOAD_TRIES 3  # Retry download 3 times
     CMAKE_ARGS -DCMAKE_INSTALL_PREFIX:PATH=${SPDLOG_DIR}
                -DSPDLOG_BUILD_SHARED:BOOL=OFF  # Build static libraries
                -DSPDLOG_FMT_EXTERNAL:BOOL=ON  # Use external fmt
@@ -257,15 +245,9 @@ if(NOT DEFINED PIPER_PHONEMIZE_DIR)
     PREFIX "${CMAKE_CURRENT_BINARY_DIR}/p"
     URL "https://github.com/rhasspy/piper-phonemize/archive/refs/heads/master.zip"
     DOWNLOAD_NO_PROGRESS TRUE
-    TIMEOUT 300  # 5 minutes timeout
+    TIMEOUT 600  # 10 minutes timeout
     TLS_VERIFY ON
-    # Add multiple retries for download
-    DOWNLOAD_COMMAND ${CMAKE_COMMAND} -E echo "Downloading piper-phonemize..." 
-      COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/download_with_retry.cmake
-        "https://github.com/rhasspy/piper-phonemize/archive/refs/heads/master.zip"
-        "${CMAKE_CURRENT_BINARY_DIR}/p/src/master.zip"
-        3  # retry count
-        30 # delay between retries
+    DOWNLOAD_TRIES 3  # Retry download 3 times
     CMAKE_ARGS -DCMAKE_INSTALL_PREFIX:PATH=${PIPER_PHONEMIZE_DIR}
     CMAKE_ARGS -DBUILD_SHARED_LIBS:BOOL=${PIPER_PHONEMIZE_SHARED_LIBS}
     CMAKE_ARGS -DESPEAK_NG_BUILD_SHARED:BOOL=${PIPER_PHONEMIZE_SHARED_LIBS}
