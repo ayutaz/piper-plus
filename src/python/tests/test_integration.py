@@ -126,9 +126,9 @@ class TestRealIntegration:
 
             # Performance checks
             assert process_time < 10.0, f"Processing too slow: {process_time:.2f}s"
-            assert mem_increase < 100, (
-                f"Memory usage too high: {mem_increase:.2f}MB increase"
-            )
+            assert (
+                mem_increase < 100
+            ), f"Memory usage too high: {mem_increase:.2f}MB increase"
 
             print(
                 f"Large text processing: {process_time:.2f}s, Memory: +{mem_increase:.2f}MB"
@@ -162,9 +162,9 @@ class TestRealIntegration:
                     # OpenJTalk may return empty list for some inputs
                     if len(phonemes) > 0:
                         # Should have actual phonemes, not just markers
-                        assert any(p not in ["^", "$", "_"] for p in phonemes), (
-                            f"No phonemes for '{text}'"
-                        )
+                        assert any(
+                            p not in ["^", "$", "_"] for p in phonemes
+                        ), f"No phonemes for '{text}'"
                 except RuntimeError as e:
                     # OpenJTalk can fail with certain special characters
                     print(f"OpenJTalk failed for '{text}': {e}")
@@ -221,9 +221,9 @@ class TestRealIntegration:
             for text, phonemes in results:
                 if text in text_to_phonemes:
                     # Compare with previous result
-                    assert phonemes == text_to_phonemes[text], (
-                        f"Inconsistent results for '{text}'"
-                    )
+                    assert (
+                        phonemes == text_to_phonemes[text]
+                    ), f"Inconsistent results for '{text}'"
                 else:
                     text_to_phonemes[text] = phonemes
 
@@ -267,9 +267,9 @@ class TestRealIntegration:
             mem_increase = final_mem - initial_mem
 
             # Memory increase should be minimal
-            assert mem_increase < 50, (
-                f"Possible memory leak: {mem_increase:.2f}MB increase after {iterations} iterations"
-            )
+            assert (
+                mem_increase < 50
+            ), f"Possible memory leak: {mem_increase:.2f}MB increase after {iterations} iterations"
 
             print(
                 f"Memory leak test: {mem_increase:.2f}MB increase after {iterations} iterations"

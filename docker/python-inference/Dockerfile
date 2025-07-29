@@ -33,11 +33,16 @@ RUN python -m pip install --upgrade pip setuptools wheel
 # Create working directory
 WORKDIR /app
 
-# Copy requirements file
-COPY docker/python-inference/requirements-inference.txt /app/
+# Copy requirements files
+COPY docker/python-inference/requirements-inference*.txt /app/
 
-# Install Python dependencies
-RUN pip install --no-cache-dir -r requirements-inference.txt
+# Install Python dependencies based on architecture
+ARG TARGETARCH
+RUN if [ "$TARGETARCH" = "arm64" ]; then \
+        pip install --no-cache-dir -r requirements-inference-arm64.txt; \
+    else \
+        pip install --no-cache-dir -r requirements-inference.txt; \
+    fi
 
 # Install piper-tts
 RUN pip install --no-cache-dir piper-tts
