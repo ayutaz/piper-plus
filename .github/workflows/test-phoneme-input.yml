@@ -1,16 +1,6 @@
 name: Phoneme Input Tests
 
 on:
-  push:
-    branches: [ dev, master, main ]
-    paths:
-      - 'src/cpp/phoneme_parser.*'
-      - 'src/cpp/piper.cpp'
-      - 'src/cpp/piper.hpp'
-      - 'src/cpp/main.cpp'
-      - 'scripts/test_phoneme_input.py'
-      - 'scripts/test_raw_phonemes.py'
-      - '.github/workflows/test-phoneme-input.yml'
   pull_request:
     branches: [ dev, master, main ]
     paths:

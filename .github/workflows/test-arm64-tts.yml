@@ -9,14 +9,6 @@ on:
       - 'CMakeLists.txt'
       - 'Dockerfile'
       - '.github/workflows/test-arm64-tts.yml'
-  push:
-    branches: [dev, feat/*, fix/*]
-    paths:
-      - 'src/**'
-      - 'test/**'
-      - 'CMakeLists.txt'
-      - 'Dockerfile'
-      - '.github/workflows/test-arm64-tts.yml'
   workflow_dispatch:
 
 jobs:

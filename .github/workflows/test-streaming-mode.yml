@@ -1,14 +1,6 @@
 name: Streaming Mode Tests
 
 on:
-  push:
-    branches: [ dev, master, main, 'feature/streaming-*' ]
-    paths:
-      - 'src/cpp/piper.cpp'
-      - 'src/cpp/main.cpp'
-      - 'src/cpp/tests/test_streaming*.cpp'
-      - 'scripts/*streaming*.py'
-      - '.github/workflows/test-streaming-mode.yml'
   pull_request:
     branches: [ dev, master, main ]
     paths:

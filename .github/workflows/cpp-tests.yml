@@ -1,12 +1,6 @@
 name: C++ Tests
 
 on:
-  push:
-    branches: [ dev, master, main ]
-    paths:
-      - 'src/cpp/**'
-      - 'CMakeLists.txt'
-      - '.github/workflows/cpp-tests.yml'
   pull_request:
     branches: [ dev, master, main ]
     paths:

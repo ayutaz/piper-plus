@@ -9,14 +9,6 @@ on:
       - '.github/workflows/test-multilingual-tts.yml'
       - '.github/workflows/build-piper.yml'
       - 'test/test_dictionary_download*.sh'
-  push:
-    branches: [dev, feat/*, fix/*]
-    paths:
-      - 'src/**'
-      - 'test/**'
-      - '.github/workflows/test-multilingual-tts.yml'
-      - '.github/workflows/build-piper.yml'
-      - 'test/test_dictionary_download*.sh'
   workflow_dispatch:
     inputs:
       languages:
