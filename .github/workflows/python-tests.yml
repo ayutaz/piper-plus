@@ -44,8 +44,10 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         cd src/python
-        pip install -r requirements_test.txt
-        pip install -r requirements-windows.txt
+        # Install test dependencies individually to avoid conflicts
+        pip install pytest pytest-cov pytest-timeout pytest-mock
+        # Install core dependencies without optional ones
+        pip install cython numpy onnxruntime librosa soundfile tqdm pyyaml scipy scikit-learn
         pip install -e .
     
     - name: Install Python dependencies (Unix)
