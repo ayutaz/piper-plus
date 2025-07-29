@@ -70,7 +70,7 @@ jobs:
           path: |
             /usr/local/lib/libonnxruntime*
             /usr/local/include/onnxruntime*
-          key: ${{ inputs.cache-key-prefix }}-linux-onnxruntime-1.14.1
+          key: ${{ inputs.cache-key-prefix }}-linux-onnxruntime-1.14.1-v2
       
       # Cache for macOS dependencies
       - name: Cache macOS dependencies
@@ -80,7 +80,7 @@ jobs:
           path: |
             /usr/local/lib/libonnxruntime*
             /usr/local/include/onnxruntime*
-          key: ${{ inputs.cache-key-prefix }}-macos-${{ runner.arch }}-onnxruntime-1.14.1
+          key: ${{ inputs.cache-key-prefix }}-macos-${{ runner.arch }}-onnxruntime-1.14.1-v2
       
       # Install dependencies
       - name: Install dependencies (Ubuntu)
