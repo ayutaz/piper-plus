@@ -1,8 +1,83 @@
 # Multi-stage build for C++ Inference Environment
 
-# Stage 1: Builder (using cpp-train as base)
-ARG BUILDER_IMAGE=piper-cpp-train:latest
-FROM ${BUILDER_IMAGE} AS builder
+# Stage 1: Builder
+FROM nvidia/cuda:12.4.1-cudnn-devel-ubuntu22.04 AS builder
+
+# Set environment variables
+ENV DEBIAN_FRONTEND=noninteractive
+ENV CUDA_HOME=/usr/local/cuda
+ENV PATH=$CUDA_HOME/bin:$PATH
+ENV LD_LIBRARY_PATH=$CUDA_HOME/lib64:$LD_LIBRARY_PATH
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    cmake \
+    git \
+    wget \
+    ninja-build \
+    libsndfile1-dev \
+    libfmt-dev \
+    libspdlog-dev \
+    libeigen3-dev \
+    pkg-config \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install ONNX Runtime
+RUN cd /tmp && \
+    wget -q https://github.com/microsoft/onnxruntime/releases/download/v1.17.1/onnxruntime-linux-x64-gpu-1.17.1.tgz && \
+    tar -xzf onnxruntime-linux-x64-gpu-1.17.1.tgz && \
+    cp -r onnxruntime-linux-x64-gpu-1.17.1/include/* /usr/local/include/ && \
+    cp onnxruntime-linux-x64-gpu-1.17.1/lib/*.so* /usr/local/lib/ && \
+    rm -rf onnxruntime-linux-x64-gpu-1.17.1* && \
+    ldconfig
+
+# Build and install espeak-ng
+RUN cd /tmp && \
+    git clone --depth 1 --branch 1.51.1 https://github.com/espeak-ng/espeak-ng.git && \
+    cd espeak-ng && \
+    ./autogen.sh && \
+    ./configure --prefix=/usr/local && \
+    make -j$(nproc) && \
+    make install && \
+    cd / && rm -rf /tmp/espeak-ng
+
+# Build and install piper-phonemize
+RUN cd /tmp && \
+    git clone --depth 1 https://github.com/rhasspy/piper-phonemize.git && \
+    cd piper-phonemize && \
+    mkdir build && cd build && \
+    cmake .. -DCMAKE_INSTALL_PREFIX=/usr/local && \
+    make -j$(nproc) && \
+    make install && \
+    cd / && rm -rf /tmp/piper-phonemize
+
+# Install Japanese support
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libmecab-dev \
+    mecab \
+    mecab-ipadic-utf8 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Build and install OpenJTalk
+RUN cd /tmp && \
+    # HTS Engine
+    wget -q http://downloads.sourceforge.net/hts-engine/hts_engine_API-1.10.tar.gz && \
+    tar -xzf hts_engine_API-1.10.tar.gz && \
+    cd hts_engine_API-1.10 && \
+    ./configure --prefix=/usr/local && \
+    make -j$(nproc) && \
+    make install && \
+    cd .. && \
+    # OpenJTalk  
+    wget -q http://downloads.sourceforge.net/open-jtalk/open_jtalk-1.11.tar.gz && \
+    tar -xzf open_jtalk-1.11.tar.gz && \
+    cd open_jtalk-1.11 && \
+    ./configure --prefix=/usr/local --with-hts-engine-header-path=/usr/local/include --with-hts-engine-library-path=/usr/local/lib && \
+    make -j$(nproc) && \
+    make install && \
+    cd / && rm -rf /tmp/*
 
 WORKDIR /workspace
 

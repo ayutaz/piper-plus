@@ -39,10 +39,22 @@ jobs:
       run: |
         brew install libsndfile sox
     
-    - name: Install Python dependencies
+    - name: Install Python dependencies (Windows)
+      if: runner.os == 'Windows'
       run: |
         python -m pip install --upgrade pip
-        cd src/python && pip install -r requirements_test.txt
+        cd src/python
+        pip install -r requirements_test.txt
+        pip install -r requirements-windows.txt
+        pip install -e .
+    
+    - name: Install Python dependencies (Unix)
+      if: runner.os != 'Windows'
+      run: |
+        python -m pip install --upgrade pip
+        cd src/python
+        pip install -r requirements_test.txt
+        pip install -r requirements.txt
         pip install -e .
     
     - name: Run unit tests

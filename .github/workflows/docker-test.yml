@@ -118,7 +118,7 @@ cmake --version && ninja --version && echo 'Build tools OK'
       - name: Build cpp-train image
         uses: docker/build-push-action@v5
         with:
-          context: ./docker/cpp-train
+          context: .
           file: ./docker/cpp-train/Dockerfile
           push: false
           tags: piper-cpp-train:test
@@ -132,8 +132,6 @@ cmake --version && ninja --version && echo 'Build tools OK'
           file: ./docker/cpp-inference/Dockerfile
           push: false
           tags: piper-cpp-inference:test
-          build-args: |
-            BUILDER_IMAGE=piper-cpp-train:test
           cache-from: type=gha
           cache-to: type=gha,mode=max
       
