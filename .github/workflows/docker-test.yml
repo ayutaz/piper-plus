@@ -4,7 +4,6 @@ on:
   pull_request:
     paths:
       - 'docker/**'
-      - 'docker-compose.yml'
       - '.github/workflows/docker-*.yml'
       - '.dockerignore'
   push:
@@ -13,7 +12,6 @@ on:
       - dev
     paths:
       - 'docker/**'
-      - 'docker-compose.yml'
       - '.github/workflows/docker-*.yml'
       - '.dockerignore'
 
@@ -24,13 +22,13 @@ jobs:
       matrix:
         image:
           - name: python-train
-            context: ./docker/python-train
+            context: .
             dockerfile: ./docker/python-train/Dockerfile
           - name: python-inference
-            context: ./docker/python-inference
+            context: .
             dockerfile: ./docker/python-inference/Dockerfile
           - name: cpp-train
-            context: ./docker/cpp-train
+            context: .
             dockerfile: ./docker/cpp-train/Dockerfile
     
     steps:
@@ -43,6 +41,9 @@ jobs:
           sudo rm -rf /opt/ghc
           sudo rm -rf "/usr/local/share/boost"
           sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          sudo docker image prune --all --force
           sudo apt-get clean
           echo "=== Final disk space ==="
           df -h
@@ -88,6 +89,12 @@ cmake --version && ninja --version && echo 'Build tools OK'
 "
               ;;
           esac
+      
+      - name: Clean up Docker images
+        if: always()
+        run: |
+          docker image rm piper-${{ matrix.image.name }}:test || true
+          docker system prune -f
 
   test-multi-stage-build:
     runs-on: ubuntu-latest
@@ -103,6 +110,9 @@ cmake --version && ninja --version && echo 'Build tools OK'
           sudo rm -rf /opt/ghc
           sudo rm -rf "/usr/local/share/boost"
           sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          sudo docker image prune --all --force
           sudo apt-get clean
           echo "=== Final disk space ==="
           df -h
@@ -140,25 +150,12 @@ cmake --version && ninja --version && echo 'Build tools OK'
           docker run --rm --entrypoint /bin/bash piper-cpp-inference:test -c "
             ldconfig -p | grep -E '(onnxruntime|espeak|HTSEngine)' && echo 'Libraries OK'
           "
-
-  test-docker-compose:
-    runs-on: ubuntu-latest
-    
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
       
-      - name: Validate docker-compose.yml
+      - name: Clean up Docker images
+        if: always()
         run: |
-          docker compose config
-      
-      - name: Test docker-compose build (selected services)
-        run: |
-          docker compose build python-inference
-      
-      - name: Test service startup
-        run: |
-          docker compose run --rm python-inference python -c "print('Service OK')"
+          docker image rm piper-cpp-train:test piper-cpp-inference:test || true
+          docker system prune -f
 
   run-smoke-tests:
     runs-on: ubuntu-latest
