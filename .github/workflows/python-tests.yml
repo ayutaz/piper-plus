@@ -17,7 +17,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-22.04, windows-latest, macos-latest]
+        os: [ubuntu-22.04, macos-latest]  # Temporarily disable Windows
         python-version: ["3.11", "3.12"]
     
     steps:

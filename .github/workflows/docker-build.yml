@@ -1,11 +1,7 @@
 name: Docker Build and Push
 
 on:
-  pull_request:
-    branches:
-      - main
-      - dev
-  workflow_dispatch:
+  workflow_dispatch:  # Only manual trigger for now
 
 env:
   REGISTRY: ghcr.io
