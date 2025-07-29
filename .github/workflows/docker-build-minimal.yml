@@ -31,6 +31,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           platforms: linux/amd64
+          load: true  # Load the image into docker daemon
       
       - name: Test the built image
         run: |
