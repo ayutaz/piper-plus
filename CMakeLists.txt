@@ -189,6 +189,8 @@ if(NOT DEFINED FMT_DIR)
     fmt_external
     PREFIX "${CMAKE_CURRENT_BINARY_DIR}/f"
     URL "https://github.com/fmtlib/fmt/archive/refs/tags/${FMT_VERSION}.zip"
+    DOWNLOAD_NO_PROGRESS TRUE
+    TIMEOUT 120  # 2 minutes timeout
     CMAKE_ARGS -DCMAKE_INSTALL_PREFIX:PATH=${FMT_DIR}
                -DFMT_TEST:BOOL=OFF  # Don't build all the tests
                -DFMT_HEADER_ONLY:BOOL=ON  # Build as header-only library
@@ -208,6 +210,8 @@ if(NOT DEFINED SPDLOG_DIR)
     spdlog_external
     PREFIX "${CMAKE_CURRENT_BINARY_DIR}/s"
     URL "https://github.com/gabime/spdlog/archive/refs/tags/v${SPDLOG_VERSION}.zip"
+    DOWNLOAD_NO_PROGRESS TRUE
+    TIMEOUT 120  # 2 minutes timeout
     CMAKE_ARGS -DCMAKE_INSTALL_PREFIX:PATH=${SPDLOG_DIR}
                -DSPDLOG_BUILD_SHARED:BOOL=OFF  # Build static libraries
                -DSPDLOG_FMT_EXTERNAL:BOOL=ON  # Use external fmt
@@ -236,6 +240,8 @@ if(NOT DEFINED PIPER_PHONEMIZE_DIR)
     piper_phonemize_external
     PREFIX "${CMAKE_CURRENT_BINARY_DIR}/p"
     URL "https://github.com/rhasspy/piper-phonemize/archive/refs/heads/master.zip"
+    DOWNLOAD_NO_PROGRESS TRUE
+    TIMEOUT 120  # 2 minutes timeout
     CMAKE_ARGS -DCMAKE_INSTALL_PREFIX:PATH=${PIPER_PHONEMIZE_DIR}
     CMAKE_ARGS -DBUILD_SHARED_LIBS:BOOL=${PIPER_PHONEMIZE_SHARED_LIBS}
     CMAKE_ARGS -DESPEAK_NG_BUILD_SHARED:BOOL=${PIPER_PHONEMIZE_SHARED_LIBS}

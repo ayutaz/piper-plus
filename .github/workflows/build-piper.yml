@@ -141,7 +141,23 @@ jobs:
           fi
           
           echo "Building with flags: $CMAKE_FLAGS"
-          cmake .. $CMAKE_FLAGS
+          
+          # Retry cmake configuration up to 3 times with delay for rate limiting
+          for i in 1 2 3; do
+            if cmake .. $CMAKE_FLAGS; then
+              break
+            else
+              echo "CMake configuration failed (attempt $i/3)"
+              if [ $i -lt 3 ]; then
+                echo "Waiting 30 seconds before retry..."
+                sleep 30
+              else
+                echo "CMake configuration failed after 3 attempts"
+                exit 1
+              fi
+            fi
+          done
+          
           make -j$(nproc 2>/dev/null || sysctl -n hw.ncpu)
           
           # For test builds, ensure OpenJTalk binary is in expected locations
@@ -169,7 +185,27 @@ jobs:
           }
           
           Write-Host "Building with flags: $($cmakeFlags -join ' ')"
-          cmake .. @cmakeFlags
+          
+          # Retry cmake configuration up to 3 times with delay for rate limiting
+          $retryCount = 3
+          for ($i = 1; $i -le $retryCount; $i++) {
+            try {
+              cmake .. @cmakeFlags
+              break
+            }
+            catch {
+              Write-Host "CMake configuration failed (attempt $i/$retryCount)"
+              if ($i -lt $retryCount) {
+                Write-Host "Waiting 30 seconds before retry..."
+                Start-Sleep -Seconds 30
+              }
+              else {
+                Write-Host "CMake configuration failed after $retryCount attempts"
+                exit 1
+              }
+            }
+          }
+          
           cmake --build . --config ${{ inputs.build-type }} --parallel 2
           
           # Run tests if enabled
