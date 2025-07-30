@@ -134,7 +134,11 @@ jobs:
           mkdir -p build/hts_stub/lib
           mkdir -p build/hts_stub/include
           cd build/hts_stub/lib
-          ar rcs libHTSEngine.a
+          # Create empty object file for macOS compatibility
+          echo "" > empty.c
+          cc -c empty.c -o empty.o
+          ar rcs libHTSEngine.a empty.o
+          rm -f empty.c empty.o
           cd -
           
       # Build Piper

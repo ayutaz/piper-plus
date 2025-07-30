@@ -106,6 +106,20 @@ jobs:
           fi
         shell: bash
       
+      - name: Create HTS Engine stub
+        run: |
+          # Create the HTS Engine stub for tests
+          mkdir -p build/hts_stub/lib
+          mkdir -p build/hts_stub/include
+          cd build/hts_stub/lib
+          # Create empty object file for macOS compatibility
+          echo "" > empty.c
+          cc -c empty.c -o empty.o
+          ar rcs libHTSEngine.a empty.o
+          rm -f empty.c empty.o
+          cd -
+        shell: bash
+          
       - name: Build
         run: cmake --build build --config ${{ matrix.build_type }}
       
