@@ -106,7 +106,8 @@ jobs:
           fi
         shell: bash
       
-      - name: Create HTS Engine stub
+      - name: Create HTS Engine stub (Unix)
+        if: runner.os != 'Windows'
         run: |
           # Create the HTS Engine stub for tests
           mkdir -p build/hts_stub/lib
@@ -119,6 +120,15 @@ jobs:
           rm -f empty.c empty.o
           cd -
         shell: bash
+        
+      - name: Create HTS Engine stub (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          # Create the HTS Engine stub for tests on Windows
+          New-Item -ItemType Directory -Force -Path build\hts_stub\lib
+          New-Item -ItemType Directory -Force -Path build\hts_stub\include
+          # Windows doesn't need HTS Engine stub for testing
+        shell: pwsh
           
       - name: Build
         run: cmake --build build --config ${{ matrix.build_type }}

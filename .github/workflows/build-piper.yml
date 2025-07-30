@@ -128,7 +128,8 @@ jobs:
         uses: ilammy/msvc-dev-cmd@v1
       
       # Create HTS Engine stub
-      - name: Create HTS Engine stub
+      - name: Create HTS Engine stub (Unix)
+        if: runner.os != 'Windows'
         run: |
           # Create the HTS Engine stub
           mkdir -p build/hts_stub/lib
@@ -140,6 +141,15 @@ jobs:
           ar rcs libHTSEngine.a empty.o
           rm -f empty.c empty.o
           cd -
+          
+      - name: Create HTS Engine stub (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          # Create the HTS Engine stub for Windows
+          New-Item -ItemType Directory -Force -Path build\hts_stub\lib
+          New-Item -ItemType Directory -Force -Path build\hts_stub\include
+          # Windows doesn't need actual HTS Engine stub
+        shell: pwsh
           
       # Build Piper
       - name: Build piper (Unix)
