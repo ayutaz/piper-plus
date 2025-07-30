@@ -198,7 +198,6 @@ jobs:
       - name: Build piper (Windows)
         if: runner.os == 'Windows'
         run: |
-          mkdir build
           cd build
           
           # Set CMAKE flags
