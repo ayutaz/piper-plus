@@ -72,10 +72,10 @@ jobs:
       - name: Install dependencies (Windows)
         if: runner.os == 'Windows'
         run: |
-          choco install cmake ninja wget
+          choco install cmake ninja
           
-          # Download and extract ONNX Runtime
-          wget https://github.com/microsoft/onnxruntime/releases/download/v1.14.1/onnxruntime-win-x64-1.14.1.zip
+          # Download and extract ONNX Runtime using PowerShell
+          Invoke-WebRequest -Uri https://github.com/microsoft/onnxruntime/releases/download/v1.14.1/onnxruntime-win-x64-1.14.1.zip -OutFile onnxruntime-win-x64-1.14.1.zip
           Expand-Archive -Path onnxruntime-win-x64-1.14.1.zip -DestinationPath .
           
           # Set environment variables for CMake to find ONNX Runtime
@@ -125,6 +125,7 @@ jobs:
           fi
           
       - name: Download espeak-ng-data
+        if: runner.os != 'Windows'
         run: |
           echo "Downloading espeak-ng-data..."
           mkdir -p build
@@ -139,6 +140,13 @@ jobs:
             mkdir -p espeak-ng-data
           fi
           cd ..
+        shell: bash
+        
+      - name: Download espeak-ng-data (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          echo "Skipping espeak-ng-data download on Windows (not required for build verification)"
+          New-Item -ItemType Directory -Force -Path build\espeak-ng-data
 
       - name: Test
         run: |
