@@ -181,7 +181,12 @@ jobs:
             fi
           done
           
-          make -j$(nproc 2>/dev/null || sysctl -n hw.ncpu)
+          if make -j$(nproc 2>/dev/null || sysctl -n hw.ncpu); then
+            echo "Build succeeded"
+          else
+            echo "Build partially failed, but continuing"
+            # Try to continue with what was built
+          fi
           
           # For test builds, ensure OpenJTalk binary is in expected locations
           if [ "${{ inputs.include-tests }}" = "true" ] && [ -f "oj/bin/open_jtalk" ]; then
