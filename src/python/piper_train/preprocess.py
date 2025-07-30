@@ -256,6 +256,17 @@ def main() -> None:
                 "num_speakers": len(speaker_counts),
                 "speaker_id_map": speaker_ids,
                 "piper_version": _VERSION,
+                # Add prosody information for Japanese
+                **(
+                    {
+                        "prosody_num_symbols": 11,
+                        "prosody_id_map": {
+                            str(i): [i] for i in range(11)
+                        }
+                    }
+                    if args.language == "ja"
+                    else {}
+                ),
             },
             config_file,
             ensure_ascii=True,

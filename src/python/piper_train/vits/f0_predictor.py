@@ -97,6 +97,25 @@ class F0Predictor(nn.Module):
         # Speaker conditioning if multi-speaker
         if gin_channels > 0:
             self.cond = nn.Conv1d(gin_channels, hidden_channels, 1)
+        
+        # Initialize weights
+        self._init_weights()
+    
+    def _init_weights(self):
+        """Initialize weights for better training stability."""
+        # Initialize prosody embedding with small values
+        nn.init.normal_(self.prosody_embed.weight, mean=0.0, std=0.02)
+        
+        # Initialize conv layers
+        for module in self.modules():
+            if isinstance(module, nn.Conv1d):
+                nn.init.kaiming_normal_(module.weight, mode='fan_out', nonlinearity='relu')
+                if module.bias is not None:
+                    nn.init.constant_(module.bias, 0)
+            elif isinstance(module, nn.Linear):
+                nn.init.xavier_uniform_(module.weight)
+                if module.bias is not None:
+                    nn.init.constant_(module.bias, 0)
 
     def forward(self, x, x_mask=None, prosody_ids=None, g=None, use_conv=False):
         """
