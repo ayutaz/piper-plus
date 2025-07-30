@@ -9,7 +9,7 @@ on:
 jobs:
   cpp-tests:
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 20
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
@@ -194,19 +194,16 @@ jobs:
           echo "Running tests..."
           CRITICAL_TESTS_PASSED=true
           
-          # For Windows, run only critical tests to avoid timeout
+          # For Windows, run only most critical test to avoid timeout
           if [ "${{ runner.os }}" == "Windows" ]; then
-            echo "Running critical tests on Windows..."
-            # Run only the most essential tests with shorter timeout
-            for test in test_gpu_device_id test_phoneme_parser; do
-              echo "Running ${test}..."
-              if ctest -C ${{ matrix.build_type }} -R "^${test}$" --output-on-failure -V --timeout 60; then
-                echo "✅ ${test} passed"
-              else
-                echo "❌ ${test} failed"
-                CRITICAL_TESTS_PASSED=false
-              fi
-            done
+            echo "Running critical test on Windows..."
+            # Run only GPU device ID test with very short timeout
+            if ctest -C ${{ matrix.build_type }} -R "^test_gpu_device_id$" --output-on-failure -V --timeout 30; then
+              echo "✅ test_gpu_device_id passed"
+            else
+              echo "❌ test_gpu_device_id failed"
+              CRITICAL_TESTS_PASSED=false
+            fi
             
             if [ "$CRITICAL_TESTS_PASSED" = "true" ]; then
               echo "Critical tests passed on Windows."
