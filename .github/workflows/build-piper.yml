@@ -127,11 +127,20 @@ jobs:
         if: runner.os == 'Windows'
         uses: ilammy/msvc-dev-cmd@v1
       
+      # Create HTS Engine stub
+      - name: Create HTS Engine stub
+        run: |
+          # Create the HTS Engine stub
+          mkdir -p build/hts_stub/lib
+          mkdir -p build/hts_stub/include
+          cd build/hts_stub/lib
+          ar rcs libHTSEngine.a
+          cd -
+          
       # Build Piper
       - name: Build piper (Unix)
         if: runner.os != 'Windows'
         run: |
-          mkdir -p build
           cd build
           
           # Set CMAKE flags

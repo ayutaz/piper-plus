@@ -84,6 +84,14 @@ jobs:
             rm -rf onnxruntime-osx-x86_64-1.14.1*
           fi
       
+      - name: Create HTS Engine stub
+        run: |
+          # Create the HTS Engine stub
+          mkdir -p build/hts_stub/lib
+          mkdir -p build/hts_stub/include
+          cd build/hts_stub/lib
+          ar rcs libHTSEngine.a
+          
       - name: Configure CMake
         run: |
           export PATH="/usr/lib/ccache:/usr/local/opt/ccache/libexec:$PATH"
