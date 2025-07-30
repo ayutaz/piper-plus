@@ -110,6 +110,10 @@ jobs:
       - name: Run C++ Streaming Tests
         run: |
           cd build
+          # Check test location first
+          echo "Looking for test executables..."
+          find . -name "test_streaming*" -type f 2>/dev/null || echo "No streaming test executables found"
+          
           # Check if streaming test exists and run it
           if ctest -N -R test_streaming_simple 2>/dev/null | grep -q "test_streaming_simple"; then
             echo "Running streaming tests..."

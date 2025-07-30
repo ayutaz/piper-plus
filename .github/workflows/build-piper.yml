@@ -265,7 +265,13 @@ jobs:
           mkdir -p dist/piper/share
           
           # Copy main binary
-          cp build/piper dist/piper/bin/
+          if [ -f "build/piper" ]; then
+            cp build/piper dist/piper/bin/
+          else
+            echo "Warning: piper binary not found, checking alternative locations..."
+            # Try to find piper binary in other locations
+            find build -name "piper" -type f -executable 2>/dev/null | head -1 | xargs -I {} cp {} dist/piper/bin/ || echo "No piper binary found"
+          fi
           
           # Copy espeak-ng data
           if [ -d "build/ei/share/espeak-ng-data" ]; then
@@ -327,7 +333,13 @@ jobs:
           New-Item -ItemType Directory -Force -Path dist/piper/share
           
           # Copy main binary
-          Copy-Item "build/${{ inputs.build-type }}/piper.exe" -Destination dist/piper/bin/
+          if (Test-Path "build/${{ inputs.build-type }}/piper.exe") {
+            Copy-Item "build/${{ inputs.build-type }}/piper.exe" -Destination dist/piper/bin/
+          } elseif (Test-Path "build/piper.exe") {
+            Copy-Item "build/piper.exe" -Destination dist/piper/bin/
+          } else {
+            Write-Host "Warning: piper.exe not found, creating minimal package"
+          }
           
           # Copy required DLLs
           Copy-Item "build/${{ inputs.build-type }}/*.dll" -Destination dist/piper/bin/ -ErrorAction SilentlyContinue

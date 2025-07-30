@@ -124,6 +124,10 @@ jobs:
       - name: Run tests
         run: |
           cd build
+          # Check test location
+          echo "Looking for test executables..."
+          find . -name "test_*" -type f 2>/dev/null | head -20 || echo "No test executables found"
+          
           # Run only critical tests
           echo "Running critical C++ tests..."
           CRITICAL_TESTS_PASSED=true

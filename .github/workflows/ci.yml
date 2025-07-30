@@ -183,6 +183,16 @@ jobs:
           cd build
           echo "Running C++ tests for ${{ runner.os }} ${{ matrix.build_type }}"
           
+          # Check if tests were built
+          if [ -d "src/cpp/tests" ]; then
+            echo "Tests directory found at src/cpp/tests"
+          elif [ -d "tests" ]; then
+            echo "Tests directory found at tests"
+          else
+            echo "No tests directory found, trying to list what exists:"
+            find . -name "test_*" -type f 2>/dev/null | head -20 || echo "No test files found"
+          fi
+          
           # Set environment variables for tests
           if [ "${{ runner.os }}" == "Windows" ]; then
             export ESPEAK_NG_DATA="${PWD}/espeak-ng-data"
