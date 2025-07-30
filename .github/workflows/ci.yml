@@ -9,7 +9,7 @@ on:
 jobs:
   cpp-tests:
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 10
+    timeout-minutes: ${{ matrix.os == 'windows-latest' && 8 || 10 }}
     strategy:
       fail-fast: false
       matrix:
@@ -132,7 +132,14 @@ jobs:
           
       - name: Build
         run: |
-          if cmake --build build --config ${{ matrix.build_type }}; then
+          # Windows needs less parallelism to avoid timeout
+          if [ "${{ runner.os }}" == "Windows" ]; then
+            PARALLEL_JOBS="--parallel 2"
+          else
+            PARALLEL_JOBS=""
+          fi
+          
+          if cmake --build build --config ${{ matrix.build_type }} $PARALLEL_JOBS; then
             echo "Build succeeded"
           else
             echo "Build failed, but continuing to check what was built"
