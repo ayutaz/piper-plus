@@ -87,10 +87,6 @@ jobs:
           CMAKE_ARGS="-DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -DBUILD_TESTS=ON -DUSE_CUDA=OFF"
           
           if [ "${{ runner.os }}" == "Windows" ]; then
-            # Add optimization flags for Windows to reduce test runtime
-            if [ "${{ matrix.build_type }}" == "Debug" ]; then
-              CMAKE_ARGS="${CMAKE_ARGS} -DCMAKE_CXX_FLAGS_DEBUG='/MDd /Od /Zi /RTC1'"
-            fi
             cmake -B build \
               -G "Visual Studio 17 2022" \
               -A x64 \
