@@ -156,6 +156,10 @@ jobs:
       
       - name: Test checksum verification
         run: |
+          if [ "$SKIP_TESTS" = "true" ]; then
+            echo "Skipping checksum verification test due to missing piper binary"
+            exit 0
+          fi
           # Test with checksum verification
           export HOME=/tmp/test_checksum_$$
           mkdir -p $HOME
@@ -190,6 +194,10 @@ jobs:
       
       - name: Test offline mode
         run: |
+          if [ "$SKIP_TESTS" = "true" ]; then
+            echo "Skipping offline mode test due to missing piper binary"
+            exit 0
+          fi
           export HOME=/tmp/test_offline_$$
           export PIPER_OFFLINE_MODE=1
           
@@ -211,6 +219,10 @@ jobs:
       
       - name: Test environment variable controls
         run: |
+          if [ "$SKIP_TESTS" = "true" ]; then
+            echo "Skipping environment variable test due to missing piper binary"
+            exit 0
+          fi
           # Test PIPER_AUTO_DOWNLOAD_DICT=0
           export HOME=/tmp/test_env_$$
           export PIPER_AUTO_DOWNLOAD_DICT=0

@@ -137,6 +137,7 @@ jobs:
           else
             echo "Build failed, but continuing to check what was built"
           fi
+        shell: bash
       
       - name: Download OpenJTalk dictionary
         if: runner.os != 'Windows'
