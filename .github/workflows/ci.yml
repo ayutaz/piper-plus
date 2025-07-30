@@ -195,8 +195,16 @@ jobs:
           CRITICAL_TESTS_PASSED=true
           
           # Run the most basic tests that should always work
+          # First, list available tests
+          echo "Available tests:"
+          ctest -C ${{ matrix.build_type }} -N | grep -E "Test #" || echo "No tests found"
+          
+          # Run critical tests if they exist
+          TESTS_FOUND=false
           for test in test_gpu_device_id test_phoneme_parser; do
-            if [ -f "test/${test}" ] || [ -f "test/${test}.exe" ] || [ -f "${test}" ] || [ -f "${test}.exe" ]; then
+            echo "Checking for ${test}..."
+            if ctest -C ${{ matrix.build_type }} -N | grep -q "${test}"; then
+              TESTS_FOUND=true
               echo "Running ${test}..."
               if ctest -C ${{ matrix.build_type }} -R "^${test}$" --output-on-failure -V --timeout 60; then
                 echo "✅ ${test} passed"
@@ -205,9 +213,15 @@ jobs:
                 CRITICAL_TESTS_PASSED=false
               fi
             else
-              echo "⚠️ ${test} not found, skipping"
+              echo "⚠️ ${test} not found in test list"
             fi
           done
+          
+          # If no tests were found, that's OK for CI
+          if [ "$TESTS_FOUND" = "false" ]; then
+            echo "No critical tests found, but build succeeded. This is acceptable."
+            CRITICAL_TESTS_PASSED=true
+          fi
           
           if [ "$CRITICAL_TESTS_PASSED" = "true" ]; then
             echo "Critical tests passed!"
