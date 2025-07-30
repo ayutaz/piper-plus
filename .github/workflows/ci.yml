@@ -33,18 +33,53 @@ jobs:
             build-essential cmake ninja-build \
             libsndfile1-dev \
             open-jtalk open-jtalk-mecab-naist-jdic \
-            libmecab-dev mecab mecab-naist-jdic
+            libmecab-dev mecab mecab-naist-jdic \
+            wget
+          
+          # Install ONNX Runtime
+          wget https://github.com/microsoft/onnxruntime/releases/download/v1.14.1/onnxruntime-linux-x64-1.14.1.tgz
+          tar -xzf onnxruntime-linux-x64-1.14.1.tgz
+          sudo cp -r onnxruntime-linux-x64-1.14.1/lib/* /usr/local/lib/
+          sudo cp -r onnxruntime-linux-x64-1.14.1/include/* /usr/local/include/
+          sudo ldconfig
+          rm -rf onnxruntime-linux-x64-1.14.1*
       
       - name: Install dependencies (macOS)
         if: runner.os == 'macOS'
         run: |
-          brew install cmake ninja libsndfile
+          brew install cmake ninja libsndfile wget
           brew install open-jtalk mecab mecab-ipadic || true
+          
+          # Install ONNX Runtime based on architecture
+          sudo mkdir -p /usr/local/lib /usr/local/include
+          
+          if [[ $(uname -m) == "arm64" ]]; then
+            echo "Installing ONNX Runtime for Apple Silicon..."
+            wget https://github.com/microsoft/onnxruntime/releases/download/v1.14.1/onnxruntime-osx-arm64-1.14.1.tgz
+            tar -xzf onnxruntime-osx-arm64-1.14.1.tgz
+            sudo cp -r onnxruntime-osx-arm64-1.14.1/lib/* /usr/local/lib/ 2>/dev/null || true
+            sudo cp -r onnxruntime-osx-arm64-1.14.1/include/* /usr/local/include/ 2>/dev/null || true
+            rm -rf onnxruntime-osx-arm64-1.14.1*
+          else
+            echo "Installing ONNX Runtime for Intel Mac..."
+            wget https://github.com/microsoft/onnxruntime/releases/download/v1.14.1/onnxruntime-osx-x86_64-1.14.1.tgz
+            tar -xzf onnxruntime-osx-x86_64-1.14.1.tgz
+            sudo cp -r onnxruntime-osx-x86_64-1.14.1/lib/* /usr/local/lib/ 2>/dev/null || true
+            sudo cp -r onnxruntime-osx-x86_64-1.14.1/include/* /usr/local/include/ 2>/dev/null || true
+            rm -rf onnxruntime-osx-x86_64-1.14.1*
+          fi
       
       - name: Install dependencies (Windows)
         if: runner.os == 'Windows'
         run: |
-          choco install cmake ninja
+          choco install cmake ninja wget
+          
+          # Download and extract ONNX Runtime
+          wget https://github.com/microsoft/onnxruntime/releases/download/v1.14.1/onnxruntime-win-x64-1.14.1.zip
+          Expand-Archive -Path onnxruntime-win-x64-1.14.1.zip -DestinationPath .
+          
+          # Set environment variables for CMake to find ONNX Runtime
+          echo "ONNXRUNTIME_ROOT_PATH=$PWD/onnxruntime-win-x64-1.14.1" >> $env:GITHUB_ENV
       
       - name: Configure CMake
         run: |
@@ -54,7 +89,8 @@ jobs:
               -A x64 \
               -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
               -DBUILD_TESTS=ON \
-              -DUSE_CUDA=OFF
+              -DUSE_CUDA=OFF \
+              -DONNXRUNTIME_ROOT_PATH="$ONNXRUNTIME_ROOT_PATH"
           else
             cmake -B build \
               -G Ninja \
@@ -82,11 +118,23 @@ jobs:
             curl -L https://sourceforge.net/projects/open-jtalk/files/Dictionary/open_jtalk_dic-1.11/open_jtalk_dic_utf_8-1.11.tar.gz/download | tar xzf - -C build/
             mv build/open_jtalk_dic_utf_8-1.11/* build/naist-jdic/
           fi
+          
+      - name: Download espeak-ng-data
+        run: |
+          echo "Downloading espeak-ng-data..."
+          mkdir -p build/espeak-ng-data
+          cd build
+          wget -q https://github.com/rhasspy/espeak-ng/releases/download/2023.9.7-4/espeak-ng-data.tar.gz
+          tar -xzf espeak-ng-data.tar.gz
+          rm espeak-ng-data.tar.gz
+          cd ..
 
       - name: Test
         run: |
           cd build
           if [ "${{ runner.os }}" == "Windows" ]; then
+            # Set environment variables for Windows
+            export ESPEAK_NG_DATA="${PWD}/espeak-ng-data"
             # Run tests on Windows with proper configuration
             ctest -C ${{ matrix.build_type }} --output-on-failure -V --exclude-regex "test_openjtalk"
           else
@@ -94,6 +142,7 @@ jobs:
             export OPENJTALK_VOICE="dummy.htsvoice"
             export OPENJTALK_SKIP_TESTS_IF_UNAVAILABLE=1
             export OPENJTALK_DICTIONARY_DIR="${PWD}/naist-jdic"
+            export ESPEAK_NG_DATA="${PWD}/espeak-ng-data"
             
             # Run tests with verbose output
             ctest -C ${{ matrix.build_type }} --output-on-failure -V
