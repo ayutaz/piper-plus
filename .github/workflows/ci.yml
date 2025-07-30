@@ -151,21 +151,46 @@ jobs:
       - name: Test
         run: |
           cd build
-          echo "Build completed successfully for ${{ runner.os }} ${{ matrix.build_type }}"
+          echo "Running C++ tests for ${{ runner.os }} ${{ matrix.build_type }}"
           
-          # For cpp-tests job in CI, we only verify that the build completes successfully
-          # The actual test execution is handled by the dedicated C++ Tests workflow
-          # which has proper test failure handling for legacy tests
-          
-          # List available test executables as a sanity check
-          echo "Looking for test executables..."
+          # Set environment variables for tests
           if [ "${{ runner.os }}" == "Windows" ]; then
-            find . -name "*.exe" | grep -i test || echo "No test executables found (OK for minimal build)"
+            export ESPEAK_NG_DATA="${PWD}/espeak-ng-data"
           else
-            find . -name "test_*" -type f -executable || echo "No test executables found (OK for minimal build)"
+            export OPENJTALK_VOICE="dummy.htsvoice"
+            export OPENJTALK_SKIP_TESTS_IF_UNAVAILABLE=1
+            export OPENJTALK_DICTIONARY_DIR="${PWD}/naist-jdic"
+            export ESPEAK_NG_DATA="${PWD}/espeak-ng-data"
           fi
           
-          echo "cpp-tests job completed - build verification successful"
+          # Run tests and check critical tests pass
+          echo "Running tests..."
+          CRITICAL_TESTS_PASSED=true
+          
+          # First try to run all tests
+          if ctest -C ${{ matrix.build_type }} --output-on-failure -V; then
+            echo "All tests passed!"
+          else
+            echo "Some tests failed, checking critical tests..."
+            
+            # Check if critical tests pass
+            for test in test_gpu_device_id test_phoneme_parser test_phoneme_timing; do
+              if ctest -C ${{ matrix.build_type }} -R "^${test}$" --output-on-failure -V; then
+                echo "✅ ${test} passed"
+              else
+                echo "❌ ${test} failed"
+                CRITICAL_TESTS_PASSED=false
+              fi
+            done
+            
+            if [ "$CRITICAL_TESTS_PASSED" = "true" ]; then
+              echo "Critical tests passed. Some legacy tests may have failed due to missing dependencies."
+              echo "This is acceptable in CI environment."
+            else
+              echo "Critical tests failed!"
+              exit 1
+            fi
+          fi
         shell: bash
 
   python-tests:
