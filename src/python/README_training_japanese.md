@@ -12,7 +12,7 @@ This guide explains how to train a Japanese TTS model for Piper using CSS10 data
 
 ## Prerequisites
 
-1. Python 3.8 or higher
+1. Python 3.11 or higher
 2. PyTorch with CUDA support (for GPU training)
 3. OpenJTalk with dictionary installed
 4. Piper TTS training environment

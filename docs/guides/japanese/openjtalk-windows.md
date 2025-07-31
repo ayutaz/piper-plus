@@ -9,7 +9,7 @@ OpenJTalk is a Japanese text-to-speech system that enables Piper to synthesize J
 ## Prerequisites
 
 - Windows 10 or later (Windows 10+ recommended for native tar support)
-- Visual Studio 2019 or later (for building from source)
+- Visual Studio 2022 or later (for building from source)
 - CMake 3.13 or later
 
 ## Building from Source
