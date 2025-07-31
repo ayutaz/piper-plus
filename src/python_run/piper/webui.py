@@ -426,22 +426,37 @@ def create_interface(data_dir: Path) -> gr.Blocks:
                         - Speaker ID only works with multi-speaker models
                         """)
                 
+                # Prepare model paths for examples
+                # Find English and Japanese models
+                en_model_path = ""
+                ja_model_path = ""
+                for name, path in available_models:
+                    if "English" in name and not en_model_path:
+                        en_model_path = path
+                    elif "Japanese" in name and not ja_model_path:
+                        ja_model_path = path
+                
+                # Default to first model if specific language not found
+                if not en_model_path and available_models:
+                    en_model_path = available_models[0][1]
+                if not ja_model_path and available_models:
+                    ja_model_path = available_models[0][1]
+                
                 # Examples
                 gr.Examples(
                     examples=[
-                        # English examples
-                        ["Hello, welcome to Piper text to speech system.", available_models[0][1] if available_models else "", 0, 1.0, 0.667, 0.8],
-                        ["The quick brown fox jumps over the lazy dog.", available_models[0][1] if available_models else "", 0, 0.8, 0.5, 0.8],
-                        ["Good morning! Today's weather is perfect for a walk in the park.", available_models[0][1] if available_models else "", 0, 1.0, 0.667, 0.8],
-                        ["Artificial intelligence is transforming how we interact with technology.", available_models[0][1] if available_models else "", 0, 0.9, 0.7, 0.8],
-                        # Japanese examples
-                        ["こんにちは。今日はいい天気ですね。", available_models[0][1] if available_models else "", 0, 1.0, 0.667, 0.8],
-                        ["人工知能による音声合成のデモンストレーションです。", available_models[0][1] if available_models else "", 0, 1.0, 0.667, 0.8],
-                        ["明日の会議は午後3時から始まります。よろしくお願いします。", available_models[0][1] if available_models else "", 0, 0.9, 0.667, 0.8],
-                        ["春の桜は本当に美しいです。日本の四季は素晴らしいですね。", available_models[0][1] if available_models else "", 0, 1.1, 0.7, 0.8],
-                        # Mixed examples for testing
-                        ["Testing speech synthesis with numbers: 1, 2, 3, 4, 5.", available_models[0][1] if available_models else "", 0, 1.0, 0.667, 0.8],
-                        ["2024年の技術トレンドについて説明します。", available_models[0][1] if available_models else "", 0, 1.0, 0.667, 0.8],
+                        # English examples with English model
+                        ["Hello, welcome to Piper text to speech system.", en_model_path, 0, 1.0, 0.667, 0.8],
+                        ["The quick brown fox jumps over the lazy dog.", en_model_path, 0, 0.8, 0.5, 0.8],
+                        ["Good morning! Today's weather is perfect for a walk in the park.", en_model_path, 0, 1.0, 0.667, 0.8],
+                        ["Artificial intelligence is transforming how we interact with technology.", en_model_path, 0, 0.9, 0.7, 0.8],
+                        ["Testing speech synthesis with numbers: 1, 2, 3, 4, 5.", en_model_path, 0, 1.0, 0.667, 0.8],
+                        # Japanese examples with Japanese model
+                        ["こんにちは。今日はいい天気ですね。", ja_model_path, 0, 1.0, 0.667, 0.8],
+                        ["人工知能による音声合成のデモンストレーションです。", ja_model_path, 0, 1.0, 0.667, 0.8],
+                        ["明日の会議は午後3時から始まります。よろしくお願いします。", ja_model_path, 0, 0.9, 0.667, 0.8],
+                        ["春の桜は本当に美しいです。日本の四季は素晴らしいですね。", ja_model_path, 0, 1.1, 0.7, 0.8],
+                        ["2024年の技術トレンドについて説明します。", ja_model_path, 0, 1.0, 0.667, 0.8],
                     ],
                     inputs=[text_input, model_dropdown, speaker_id, length_scale, noise_scale, noise_w],
                     label="Example Texts (English & Japanese)",
