@@ -1,0 +1,7 @@
+# Piper TTS Demo Requirements
+gradio>=4.0.0
+numpy>=1.19.0
+onnxruntime>=1.16.0
+pyopenjtalk>=0.3.0
+# Note: espeak-phonemizer requires system espeak-ng library
+# For simplified deployment, using character-based fallback for English

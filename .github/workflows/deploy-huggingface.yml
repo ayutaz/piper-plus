@@ -1,0 +1,96 @@
+name: Deploy to Hugging Face Spaces
+
+on:
+  workflow_dispatch:
+    inputs:
+      deployment_message:
+        description: 'Deployment message (optional)'
+        required: false
+        default: ''
+        type: string
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          lfs: true
+
+      - name: Setup deployment
+        run: |
+          echo "Manual deployment triggered"
+          if [ -n "${{ github.event.inputs.deployment_message }}" ]; then
+            echo "Deployment message: ${{ github.event.inputs.deployment_message }}"
+          fi
+
+      - name: Prepare Space files
+        run: |
+          # Create a temporary directory for the Space
+          mkdir -p hf-space-deploy
+          
+          # Copy all files from huggingface-space
+          cp -r huggingface-space/* hf-space-deploy/
+          
+          # Ensure models directory exists and has files
+          if [ ! -d "hf-space-deploy/models" ] || [ -z "$(ls -A hf-space-deploy/models)" ]; then
+            echo "Error: Models directory is missing or empty"
+            exit 1
+          fi
+          
+          # List files to be deployed
+          echo "Files to deploy:"
+          find hf-space-deploy -type f -name "*.py" -o -name "*.txt" -o -name "*.md" -o -name "*.onnx*" | sort
+
+      - name: Push to Hugging Face
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          # Configure git
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
+          
+          # Clone the Space repository
+          git clone https://huggingface.co/spaces/ayousanz/piper-plus hf-space-repo
+          
+          # Remove old files (except .git)
+          cd hf-space-repo
+          find . -mindepth 1 -maxdepth 1 ! -name '.git' -exec rm -rf {} +
+          
+          # Copy new files
+          cp -r ../hf-space-deploy/* .
+          
+          # Check if there are changes
+          if git diff --quiet && git diff --staged --quiet; then
+            echo "No changes to deploy"
+            exit 0
+          fi
+          
+          # Add all files
+          git add -A
+          
+          # Commit changes
+          COMMIT_MSG="Update from GitHub Actions - $(date +'%Y-%m-%d %H:%M:%S')"
+          if [ -n "${{ github.event.inputs.deployment_message }}" ]; then
+            COMMIT_MSG="$COMMIT_MSG\n\nDeployment message: ${{ github.event.inputs.deployment_message }}"
+          fi
+          git commit -m "$COMMIT_MSG"
+          
+          # Push to Hugging Face
+          git push https://ayousanz:$HF_TOKEN@huggingface.co/spaces/ayousanz/piper-plus main
+
+      - name: Deploy summary
+        run: |
+          echo "## Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Successfully deployed to Hugging Face Spaces" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Space URL**: https://huggingface.co/spaces/ayousanz/piper-plus" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Deployed files**:" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          find hf-space-deploy -type f | sort >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+
