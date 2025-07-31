@@ -19,6 +19,12 @@ Piper is used in a [variety of projects](#people-using-piper).
 - [Running in Python](#running-in-python)
 
 ## 追加機能
+* **🌐 WebUI (Gradio)** - ブラウザベースの使いやすいインターフェース
+  * 詳細は[WebUI使用ガイド](docs/webui-usage.md)を参照
+  * 推論と学習の両方に対応
+  * 多言語テンプレートシステム（日本語、英語、ドイツ語、フランス語）
+  * Docker対応で簡単デプロイ
+  * 使用例: `python -m piper.webui --data-dir ./models`
 * **🎤 音素入力機能** - `[[ phonemes ]]` 記法による直接音素指定
   * 詳細は[音素入力ガイド](docs/PHONEME_INPUT.md)を参照
   * 使用例: `echo "Hello [[ h ə l oʊ ]] world" | piper --model en.onnx -f out.wav`
@@ -246,6 +252,28 @@ You will need two files per voice:
 
 The `MODEL_CARD` file for each voice contains important licensing information. Piper is intended for text to speech research, and does not impose any additional restrictions on voice models. Some voices may have restrictive licenses, however, so please review them carefully!
 
+
+## Quick Start - WebUI
+
+The easiest way to get started with Piper is using the WebUI:
+
+```bash
+# Install WebUI dependencies
+pip install gradio>=4.0.0
+
+# Run WebUI
+cd src/python_run
+python -m piper.webui --data-dir /path/to/models
+```
+
+Or using Docker:
+
+```bash
+# Run with Docker
+docker run -p 7860:7860 -v ./models:/models ghcr.io/rhasspy/piper-webui
+```
+
+Access the WebUI at http://localhost:7860
 
 ## Installation
 
