@@ -54,54 +54,33 @@ jobs:
           echo "Files to deploy:"
           find hf-space-deploy -type f -name "*.py" -o -name "*.txt" -o -name "*.md" -o -name "*.onnx*" | sort
 
-      - name: Setup Git LFS
+      - name: Install Hugging Face CLI
         run: |
-          git lfs install
+          pip install -U huggingface_hub
           
-      - name: Push to Hugging Face with Git LFS
+      - name: Push to Hugging Face using CLI
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
-          # Clone the Space repository with LFS
-          git clone https://hf.co/spaces/ayousanz/piper-plus hf-space-repo
-          cd hf-space-repo
+          # Login to Hugging Face
+          huggingface-cli login --token $HF_TOKEN
           
-          # Configure git
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git config user.name "github-actions[bot]"
+          # Upload files to the Space
+          cd hf-space-deploy
           
-          # Remove old files (except .git and .gitattributes)
-          find . -mindepth 1 -maxdepth 1 ! -name '.git' ! -name '.gitattributes' -exec rm -rf {} +
+          # Create a deployment message
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ github.event.inputs.deployment_message }}" ]; then
+            COMMIT_MSG="Update from GitHub Actions - $(date +'%Y-%m-%d %H:%M:%S')\n\nDeployment message: ${{ github.event.inputs.deployment_message }}"
+          elif [ "${{ github.event_name }}" = "push" ]; then
+            COMMIT_MSG="Update from GitHub Actions - $(date +'%Y-%m-%d %H:%M:%S')\n\nTriggered by push to dev branch"
+          else
+            COMMIT_MSG="Update from GitHub Actions - $(date +'%Y-%m-%d %H:%M:%S')"
+          fi
           
-          # Copy new files EXCEPT models first
-          cp -r ../hf-space-deploy/* . 2>/dev/null || true
-          rm -rf models/
+          # Upload all files to Hugging Face Space
+          huggingface-cli upload ayousanz/piper-plus . --repo-type space --commit-message "$COMMIT_MSG"
           
-          # Track ONNX files with Git LFS
-          echo "*.onnx filter=lfs diff=lfs merge=lfs -text" >> .gitattributes
-          echo "*.onnx.json -text" >> .gitattributes
-          
-          # Add and commit non-model files first
-          git add .gitattributes *.py *.txt *.md
-          git commit -m "Update code and configuration files" || echo "No changes to code files"
-          
-          # Now copy and add model files
-          mkdir -p models
-          cp ../hf-space-deploy/models/*.json models/
-          git add models/*.json
-          git commit -m "Add model configuration files" || echo "No changes to config files"
-          
-          # Add ONNX files with LFS
-          cp ../hf-space-deploy/models/*.onnx models/
-          git lfs track "models/*.onnx"
-          git add models/*.onnx
-          git commit -m "Add ONNX model files via Git LFS" || echo "No changes to model files"
-          
-          # Push with authentication
-          git remote set-url origin https://ayousanz:${HF_TOKEN}@huggingface.co/spaces/ayousanz/piper-plus
-          git push origin main
-          
-          echo "✅ Successfully deployed to Hugging Face Spaces using Git LFS"
+          echo "✅ Successfully deployed to Hugging Face Spaces using CLI"
 
       - name: Deploy summary
         run: |
