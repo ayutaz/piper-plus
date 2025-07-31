@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>wasm_open_jtalk Browser Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .container {
+            background: #f5f5f5;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        textarea {
+            width: 100%;
+            min-height: 100px;
+            margin: 10px 0;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        button:disabled {
+            background: #cccccc;
+            cursor: not-allowed;
+        }
+        #status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .info {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+        pre {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>wasm_open_jtalk Browser実装実験</h1>
+
+    <div class="container">
+        <h2>実験の目的</h2>
+        <p>wasm_open_jtalkをブラウザで動作させる可能性を検証する</p>
+        <ul>
+            <li>Node.js専用実装からブラウザ対応への変換</li>
+            <li>辞書ファイルの読み込み方法の検証</li>
+            <li>メモリ使用量とパフォーマンスの測定</li>
+        </ul>
+    </div>
+
+    <div class="container">
+        <h2>実装アプローチ</h2>
+        <h3>1. 既存のwasm_open_jtalkを直接読み込む（失敗予想）</h3>
+        <button id="loadOriginal" onclick="loadOriginalWasm()">
+            オリジナルのwasm_open_jtalkを読み込む
+        </button>
+        <div id="originalStatus"></div>
+
+        <h3>2. ブラウザ対応版のビルド（要実装）</h3>
+        <button id="loadBrowser" onclick="loadBrowserWasm()" disabled>
+            ブラウザ対応版を読み込む（未実装）
+        </button>
+        <div id="browserStatus"></div>
+    </div>
+
+    <div class="container">
+        <h2>テスト入力</h2>
+        <textarea id="inputText" placeholder="変換したい日本語テキストを入力">
+今日は良い天気です。
+OpenJTalkのWebAssembly実装をテストしています。
+        </textarea>
+        <button id="convertBtn" onclick="convertText()" disabled>
+            音素変換
+        </button>
+        <div id="result"></div>
+    </div>
+
+    <div class="container">
+        <h2>技術的な考察</h2>
+        <h3>必要な変更点</h3>
+        <pre id="modifications">
+1. Emscripten設定の変更:
+   - ENVIRONMENT='web,worker'
+   - MODULARIZE=1
+   - EXPORT_ES6=1
+
+2. ファイルシステムの対応:
+   - --preload-file で辞書を埋め込み
+   - またはEmscripten FSを使用した動的ロード
+
+3. APIの変更:
+   - process.argvの代わりにJavaScript関数引数
+   - console.logの代わりに戻り値
+
+4. メモリ設定:
+   - INITIAL_MEMORY=256MB
+   - ALLOW_MEMORY_GROWTH=1
+        </pre>
+    </div>
+
+    <script>
+        function updateStatus(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            element.className = type;
+            element.innerHTML = message;
+        }
+
+        async function loadOriginalWasm() {
+            updateStatus('originalStatus', '読み込み中...', 'info');
+            
+            try {
+                // 実際にはwasm_open_jtalkのファイルが必要
+                // ここではエラーになることを想定
+                const script = document.createElement('script');
+                script.src = 'https://unpkg.com/wasm_open_jtalk@0.0.1/js/open_jtalk.js';
+                script.onerror = () => {
+                    updateStatus('originalStatus', 
+                        'エラー: Node.js専用のため、ブラウザでは動作しません。<br>' +
+                        'Error: require is not defined (Node.js modules)',
+                        'error'
+                    );
+                };
+                script.onload = () => {
+                    updateStatus('originalStatus', 
+                        '予期しない成功？実際にはNode.js依存のためエラーになるはず',
+                        'info'
+                    );
+                };
+                document.head.appendChild(script);
+            } catch (error) {
+                updateStatus('originalStatus', 
+                    `エラー: ${error.message}`,
+                    'error'
+                );
+            }
+        }
+
+        function loadBrowserWasm() {
+            updateStatus('browserStatus', 
+                'ブラウザ対応版は未実装です。実装手順は上記を参照してください。',
+                'info'
+            );
+        }
+
+        function convertText() {
+            const text = document.getElementById('inputText').value;
+            document.getElementById('result').innerHTML = `
+                <h3>変換結果（未実装）</h3>
+                <p>入力: ${text}</p>
+                <p>音素列: （WebAssembly実装後に表示）</p>
+            `;
+        }
+
+        // ページ読み込み時の説明
+        window.onload = () => {
+            updateStatus('originalStatus', 
+                'ボタンをクリックして、オリジナルのwasm_open_jtalkの読み込みを試みます',
+                'info'
+            );
+            updateStatus('browserStatus', 
+                'ブラウザ対応版は、上記の変更を実装後に利用可能になります',
+                'info'
+            );
+        };
+    </script>
+</body>
+</html>
