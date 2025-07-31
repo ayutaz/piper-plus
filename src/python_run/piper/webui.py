@@ -4,6 +4,7 @@
 import argparse
 import json
 import logging
+import sys
 import time
 from pathlib import Path
 
@@ -19,6 +20,7 @@ except ImportError:
     PiperVoice = None
 
 from .training_manager import training_manager
+
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -157,6 +159,9 @@ def get_language_from_model(model_path: str) -> str:
     if not model_path or model_path == "":
         return "en_US"
 
+    lang_code = None
+
+    # Try to get from config file
     try:
         config_path = Path(model_path).with_suffix(".onnx.json")
         if config_path.exists():
@@ -167,37 +172,44 @@ def get_language_from_model(model_path: str) -> str:
                 lang_code = language.get("code", "en_US")
             else:
                 lang_code = str(language)
-
-            # Map language codes to our template keys
-            if lang_code == "ja":
-                return "ja_JP"
-            elif lang_code == "en":
-                return "en_US"
-            elif lang_code == "de":
-                return "de_DE"
-            elif lang_code == "fr":
-                return "fr_FR"
-            elif lang_code in TEMPLATES:
-                return lang_code
-            else:
-                # Try to find a matching template
-                for template_key in TEMPLATES.keys():
-                    if lang_code.startswith(template_key.split("_")[0]):
-                        return template_key
-                return "en_US"
     except Exception as e:
         logger.error(f"Error getting language from model: {e}")
 
-    # Try to extract from filename
-    model_name = Path(model_path).stem.lower()
-    if "ja" in model_name or "japanese" in model_name:
-        return "ja_JP"
-    elif "de" in model_name or "german" in model_name:
-        return "de_DE"
-    elif "fr" in model_name or "french" in model_name:
-        return "fr_FR"
-    elif "en" in model_name or "english" in model_name:
-        return "en_US"
+    # If no lang_code from config, try filename
+    if not lang_code:
+        model_name = Path(model_path).stem.lower()
+        filename_mapping = {
+            ("ja", "japanese"): "ja",
+            ("de", "german"): "de",
+            ("fr", "french"): "fr",
+            ("en", "english"): "en",
+        }
+        for keywords, code in filename_mapping.items():
+            if any(kw in model_name for kw in keywords):
+                lang_code = code
+                break
+
+    # Map language codes to template keys
+    if lang_code:
+        code_mapping = {
+            "ja": "ja_JP",
+            "en": "en_US",
+            "de": "de_DE",
+            "fr": "fr_FR",
+        }
+
+        # Direct mapping
+        if lang_code in code_mapping:
+            return code_mapping[lang_code]
+
+        # Already a template key
+        if lang_code in TEMPLATES:
+            return lang_code
+
+        # Try prefix matching
+        for template_key in TEMPLATES.keys():
+            if lang_code.startswith(template_key.split("_")[0]):
+                return template_key
 
     return "en_US"
 
@@ -351,30 +363,34 @@ def validate_dataset(dataset_path: str) -> dict:
 def check_training_dependencies():
     """Check if training dependencies are installed"""
     missing_deps = []
-    
+
     try:
-        import pytorch_lightning
-    except ImportError:
+        import importlib.util
+        if importlib.util.find_spec("pytorch_lightning") is None:
+            missing_deps.append("pytorch-lightning")
+    except Exception:
         missing_deps.append("pytorch-lightning")
-    
+
     try:
-        import torch
-    except ImportError:
+        import importlib.util
+        if importlib.util.find_spec("torch") is None:
+            missing_deps.append("torch")
+    except Exception:
         missing_deps.append("torch")
-        
+
     try:
         # Check if piper_train is accessible
         import subprocess
         result = subprocess.run(
             [sys.executable, "-m", "piper_train", "--help"],
-            capture_output=True,
+            check=False, capture_output=True,
             text=True
         )
         if result.returncode != 0 and "No module named piper_train" in result.stderr:
             missing_deps.append("piper_train (not in Python path)")
     except Exception:
         missing_deps.append("piper_train (check failed)")
-    
+
     return missing_deps
 
 
@@ -393,16 +409,16 @@ def start_training(
     """Start training process"""
     if not dataset_path or not Path(dataset_path).exists():
         return "❌ Error: Dataset path does not exist"
-    
+
     # Check dependencies
     missing_deps = check_training_dependencies()
     if missing_deps:
         deps_list = "\n  - ".join(missing_deps)
         return f"❌ Missing training dependencies:\n  - {deps_list}\n\nPlease install them first:\n  cd src/python && pip install -r requirements_train.txt"
-    
+
     if training_manager.is_running():
         return "⚠️ Training is already running. Please stop the current training first."
-    
+
     # Start training
     success = training_manager.start_training(
         dataset_path=dataset_path,
@@ -416,7 +432,7 @@ def start_training(
         checkpoint_interval=checkpoint_interval,
         validation_split=validation_split,
     )
-    
+
     if success:
         return "✅ Training started successfully! Check the progress below."
     else:
@@ -428,7 +444,7 @@ def stop_training() -> str:
     """Stop current training process"""
     if not training_manager.is_running():
         return "ℹ️ No training is currently running."
-    
+
     if training_manager.stop_training():
         return "✅ Training stopped successfully."
     else:
@@ -438,12 +454,12 @@ def stop_training() -> str:
 def get_training_status() -> dict:
     """Get current training status"""
     status = training_manager.get_status()
-    
+
     # Calculate progress
     progress = 0.0
     if status.total_epochs > 0:
         progress = status.current_epoch / status.total_epochs
-    
+
     # Calculate ETA
     eta_text = "N/A"
     if status.is_running and status.start_time and status.current_epoch > 0:
@@ -454,7 +470,7 @@ def get_training_status() -> dict:
         eta_hours = int(eta_seconds // 3600)
         eta_minutes = int((eta_seconds % 3600) // 60)
         eta_text = f"{eta_hours}h {eta_minutes}m"
-    
+
     return {
         "is_running": status.is_running,
         "progress": progress,
@@ -706,7 +722,7 @@ def create_interface(data_dir: Path) -> gr.Blocks:
                     interactive=False,
                     autoscroll=True,
                 )
-                
+
                 # Auto-refresh checkbox
                 auto_refresh = gr.Checkbox(
                     label="Auto-refresh logs (every 2 seconds)",
@@ -771,23 +787,23 @@ def create_interface(data_dir: Path) -> gr.Blocks:
             ],
             outputs=[training_status],
         )
-        
+
         stop_training_btn.click(
             fn=stop_training,
             outputs=[training_status],
         )
-        
+
         # Auto-refresh training status
         def refresh_training_ui(should_refresh):
             """Refresh training UI components"""
             if not should_refresh:
                 return gr.update(), gr.update(), gr.update()
-                
+
             status_dict = get_training_status()
-            
+
             # Update progress bar
             progress_update = gr.update(value=status_dict["progress"])
-            
+
             # Update status text
             if status_dict["error"]:
                 status_text = f"❌ Error: {status_dict['error']}"
@@ -795,14 +811,14 @@ def create_interface(data_dir: Path) -> gr.Blocks:
                 status_text = f"🏃 Running: {status_dict['status_text']}"
             else:
                 status_text = "⏹️ Not running"
-            
+
             status_update = gr.update(value=status_text)
-            
+
             # Update logs
             logs_update = gr.update(value=status_dict["logs"])
-            
+
             return progress_update, status_update, logs_update
-        
+
         # Set up periodic refresh
         # Note: Using a button click loop as Timer might not be available in all Gradio versions
         refresh_btn = gr.Button("Refresh Status", visible=False)
@@ -811,7 +827,7 @@ def create_interface(data_dir: Path) -> gr.Blocks:
             inputs=[auto_refresh],
             outputs=[training_progress, training_status, training_logs],
         )
-        
+
         # Automatic refresh using JavaScript (if supported)
         interface.load(
             fn=None,
