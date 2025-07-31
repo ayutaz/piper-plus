@@ -8,6 +8,7 @@ on:
       - 'src/python_run/piper/sample_texts.py'
       - 'src/python_run/requirements_webui.txt'
       - 'docker/webui/**'
+      - 'tests/test_webui.py'
       - '.github/workflows/webui-test.yml'
   push:
     branches: [ dev, master, main ]
@@ -16,6 +17,7 @@ on:
       - 'src/python_run/piper/sample_texts.py'
       - 'src/python_run/requirements_webui.txt'
       - 'docker/webui/**'
+      - 'tests/test_webui.py'
       - '.github/workflows/webui-test.yml'
   workflow_dispatch:
 
@@ -45,6 +47,8 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r src/python_run/requirements_webui.txt
           pip install pytest pytest-cov
+          # Install piper package for tests
+          pip install -r src/python_run/requirements.txt
       
       - name: Test WebUI imports
         run: |
@@ -93,6 +97,10 @@ print(f'Sample text languages: {list(SAMPLE_TEXTS.keys())}')
 sample = get_sample_by_category('ja_JP', 'greeting', 0)
 print(f'Japanese greeting: {sample}')
 "
+      
+      - name: Run pytest for WebUI
+        run: |
+          python -m pytest tests/test_webui.py -v --tb=short --cov=src/python_run/piper --cov-report=term-missing
 
   docker-webui-test:
     name: Test WebUI Docker Build
