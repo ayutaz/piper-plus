@@ -15,7 +15,17 @@ FROM base AS dependencies
 # 基本ツールのインストール（レイヤーキャッシュ最適化）
 # ARM64エミュレーション環境でのlibc-binエラー対策
 RUN rm -f /var/cache/ldconfig/aux-cache || true && \
+    # libc-binのpost-installスクリプトエラーを回避
+    mkdir -p /etc/apt/apt.conf.d && \
+    echo 'DPkg::Post-Invoke { "rm -f /var/cache/ldconfig/aux-cache || true"; };' > /etc/apt/apt.conf.d/00apt-post-invoke && \
+    # dpkgオプションでトリガーを遅延
+    echo 'APT::Immediate-Configure "false";' > /etc/apt/apt.conf.d/00postpone && \
     apt-get update && \
+    # 最初にlibc-binを単独でインストール（エラーを無視）
+    apt-get install --yes --no-install-recommends libc-bin || true && \
+    # 再設定を試行
+    dpkg --configure -a || true && \
+    # 通常のパッケージインストール
     apt-get install --yes --no-install-recommends \
         ca-certificates curl gnupg lsb-release && \
     apt-get clean && \

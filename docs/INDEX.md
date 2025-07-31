@@ -7,12 +7,14 @@
 - [CHANGELOG](CHANGELOG.md) - Version history
 
 ## User Guides
+- [WebUI Usage Guide](webui-usage.md) - Browser-based interface guide
 - [Japanese Usage Guide](guides/JAPANESE_USAGE.md) - 日本語音声合成ガイド
 - [Phoneme Mapping](guides/PHONEME_MAPPING.md) - Phoneme mapping details
 - [Training Guide](guides/TRAINING.md) - Model training instructions
 - [Voices](guides/VOICES.md) - Available voice models
 
 ## Development Documentation
+- [WebUI Technical Design](WEBUI_TECHNICAL_DESIGN.md) - WebUI architecture and implementation
 - [Streaming Optimization Analysis](development/STREAMING_OPTIMIZATION_ANALYSIS.md) - Streaming implementation analysis
 - [Streaming Progress](development/STREAMING_PROGRESS.md) - Streaming feature progress
 - [ONNX Optimization Comparison](development/onnx_optimization_comparison.md) - ONNX optimization benchmarks

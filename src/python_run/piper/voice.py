@@ -24,8 +24,15 @@ except ImportError:
         return list(text)
 
     def phonemize_espeak(text, voice=None):
-        # Simple fallback: return text as list of characters
-        return list(text)
+        # Try to use espeak-ng command if available
+        try:
+            from .espeak_phonemizer import phonemize_espeak_ng
+
+            return phonemize_espeak_ng(text, voice or "en-us")
+        except ImportError:
+            # Simple fallback: return text as list of characters
+            _LOGGER.warning("espeak_phonemizer not available, using character fallback")
+            return [list(text)]
 
     def tashkeel_run(text):
         # Simple fallback: return original text
@@ -121,7 +128,9 @@ class PiperVoice:
                 # https://github.com/mush42/libtashkeel/
                 text = tashkeel_run(text)
 
-            return phonemize_espeak(text, self.config.espeak_voice)
+            phonemes = phonemize_espeak(text, self.config.espeak_voice)
+            _LOGGER.debug(f"Phonemized '{text}' to: {phonemes}")
+            return phonemes
 
         if self.config.phoneme_type == PhonemeType.TEXT:
             return phonemize_codepoints(text)
@@ -193,6 +202,9 @@ class PiperVoice:
         """Phonemes to ids."""
         id_map = self.config.phoneme_id_map
         ids: list[int] = list(id_map[BOS])
+
+        _LOGGER.debug(f"Converting phonemes to IDs: {phonemes}")
+        _LOGGER.debug(f"Available phonemes in id_map: {len(id_map)} items")
 
         for phoneme in phonemes:
             if phoneme not in id_map:
