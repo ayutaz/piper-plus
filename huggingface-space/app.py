@@ -6,11 +6,18 @@ Supports Japanese and English text-to-speech using ONNX models
 
 import json
 import logging
+from pathlib import Path
 
 import gradio as gr
 import numpy as np
 import onnxruntime
 from app_imports import ESPEAK_AVAILABLE, PYOPENJTALK_AVAILABLE
+
+# Download models if not present
+from download_models import download_models
+
+# Ensure models are downloaded
+download_models()
 
 
 # Import optional dependencies

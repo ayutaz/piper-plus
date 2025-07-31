@@ -41,14 +41,13 @@ jobs:
           # Create a temporary directory for the Space
           mkdir -p hf-space-deploy
           
-          # Copy all files from huggingface-space
-          cp -r huggingface-space/* hf-space-deploy/
+          # Copy all files from huggingface-space EXCEPT models directory
+          cp huggingface-space/*.py hf-space-deploy/
+          cp huggingface-space/*.txt hf-space-deploy/
+          cp huggingface-space/*.md hf-space-deploy/
           
-          # Ensure models directory exists and has files
-          if [ ! -d "hf-space-deploy/models" ] || [ -z "$(ls -A hf-space-deploy/models)" ]; then
-            echo "Error: Models directory is missing or empty"
-            exit 1
-          fi
+          # Create empty models directory (models will be downloaded at runtime)
+          mkdir -p hf-space-deploy/models
           
           # List files to be deployed
           echo "Files to deploy:"
