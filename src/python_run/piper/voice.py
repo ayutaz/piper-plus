@@ -201,7 +201,7 @@ class PiperVoice:
         """Phonemes to ids."""
         id_map = self.config.phoneme_id_map
         ids: list[int] = list(id_map[BOS])
-        
+
         _LOGGER.debug(f"Converting phonemes to IDs: {phonemes}")
         _LOGGER.debug(f"Available phonemes in id_map: {len(id_map)} items")
 

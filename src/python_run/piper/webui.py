@@ -4,10 +4,9 @@
 import argparse
 import json
 import logging
-import os
 import sys
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+
 
 # Check Python version
 if sys.version_info < (3, 11):
@@ -16,6 +15,7 @@ if sys.version_info < (3, 11):
 
 import gradio as gr
 import numpy as np
+
 
 try:
     from piper import PiperVoice
@@ -74,7 +74,7 @@ TEMPLATES = {
 # Template descriptions for UI
 TEMPLATE_DESCRIPTIONS = {
     "greeting": "Greeting",
-    "news": "News Reading", 
+    "news": "News Reading",
     "story": "Story Telling",
     "product": "Product Description",
     "assistant": "Voice Assistant",
@@ -88,34 +88,34 @@ TEMPLATE_DESCRIPTIONS = {
 }
 
 
-def get_available_models(data_dir: Path) -> List[Tuple[str, str]]:
+def get_available_models(data_dir: Path) -> list[tuple[str, str]]:
     """Scan directory for available ONNX models"""
     models = []
-    
+
     if not data_dir.exists():
         logger.warning(f"Data directory {data_dir} does not exist")
         return [("No models found", "")]
-    
+
     for onnx_file in data_dir.rglob("*.onnx"):
         # Skip .onnx.json files
         if onnx_file.suffix == ".json":
             continue
-            
+
         config_file = onnx_file.with_suffix(".onnx.json")
         if config_file.exists():
             try:
-                with open(config_file, "r", encoding="utf-8") as f:
+                with open(config_file, encoding="utf-8") as f:
                     config = json.load(f)
                 language = config.get("language", {})
                 if isinstance(language, dict):
                     lang_code = language.get("code", "en")
                 else:
                     lang_code = str(language) if language else "en"
-                
+
                 # Create user-friendly display names
                 lang_names = {
                     "ja": "Japanese",
-                    "en": "English", 
+                    "en": "English",
                     "de": "German",
                     "fr": "French",
                     "es": "Spanish",
@@ -123,7 +123,7 @@ def get_available_models(data_dir: Path) -> List[Tuple[str, str]]:
                     "ko": "Korean",
                 }
                 lang_display = lang_names.get(lang_code, lang_code.upper())
-                
+
                 # Extract quality from filename if present
                 quality = ""
                 if "high" in onnx_file.stem.lower():
@@ -132,7 +132,7 @@ def get_available_models(data_dir: Path) -> List[Tuple[str, str]]:
                     quality = " (Medium)"
                 elif "low" in onnx_file.stem.lower():
                     quality = " (Low)"
-                
+
                 display_name = f"{lang_display}{quality} - {onnx_file.stem}"
                 models.append((display_name, str(onnx_file)))
             except Exception as e:
@@ -148,10 +148,10 @@ def get_available_models(data_dir: Path) -> List[Tuple[str, str]]:
             else:
                 display_name = model_name
             models.append((display_name, str(onnx_file)))
-    
+
     # Sort models by language name for better UX
     models.sort(key=lambda x: x[0])
-    
+
     return models if models else [("No models found", "")]
 
 
@@ -159,18 +159,18 @@ def get_language_from_model(model_path: str) -> str:
     """Extract language code from model path or config"""
     if not model_path or model_path == "":
         return "en_US"
-    
+
     try:
         config_path = Path(model_path).with_suffix(".onnx.json")
         if config_path.exists():
-            with open(config_path, "r", encoding="utf-8") as f:
+            with open(config_path, encoding="utf-8") as f:
                 config = json.load(f)
             language = config.get("language", {})
             if isinstance(language, dict):
                 lang_code = language.get("code", "en_US")
             else:
                 lang_code = str(language)
-            
+
             # Map language codes to our template keys
             if lang_code == "ja":
                 return "ja_JP"
@@ -190,7 +190,7 @@ def get_language_from_model(model_path: str) -> str:
                 return "en_US"
     except Exception as e:
         logger.error(f"Error getting language from model: {e}")
-    
+
     # Try to extract from filename
     model_name = Path(model_path).stem.lower()
     if "ja" in model_name or "japanese" in model_name:
@@ -201,21 +201,21 @@ def get_language_from_model(model_path: str) -> str:
         return "fr_FR"
     elif "en" in model_name or "english" in model_name:
         return "en_US"
-    
+
     return "en_US"
 
 
 def update_templates(model_path: str) -> gr.Dropdown:
     """Update template choices based on selected model"""
     language = get_language_from_model(model_path)
-    
+
     options = ["Custom Text"]
     if language in TEMPLATES:
         options.extend([
             f"{TEMPLATE_DESCRIPTIONS[key]} ({key})"
             for key in TEMPLATES[language].keys()
         ])
-    
+
     return gr.Dropdown(choices=options, value="Custom Text")
 
 
@@ -223,19 +223,19 @@ def apply_template(template_choice: str, model_path: str) -> str:
     """Apply selected template to text input"""
     if template_choice == "Custom Text":
         return ""
-    
+
     language = get_language_from_model(model_path)
-    
+
     # Extract template key from choice
     template_key = None
     for key in TEMPLATE_DESCRIPTIONS:
         if f"({key})" in template_choice:
             template_key = key
             break
-    
+
     if template_key and language in TEMPLATES:
         return TEMPLATES[language].get(template_key, "")
-    
+
     return ""
 
 
@@ -246,14 +246,14 @@ def synthesize_speech(
     length_scale: float,
     noise_scale: float,
     noise_w: float,
-) -> Tuple[int, np.ndarray]:
+) -> tuple[int, np.ndarray]:
     """Generate speech from text"""
     if not text.strip():
         raise gr.Error("Please enter some text")
-    
+
     if not model_path or model_path == "" or not Path(model_path).exists():
         raise gr.Error("Please select a valid model")
-    
+
     if PiperVoice is None:
         # Return dummy audio for UI testing
         logger.warning("PiperVoice not available, returning dummy audio")
@@ -262,22 +262,22 @@ def synthesize_speech(
         t = np.linspace(0, duration, int(sample_rate * duration))
         audio = np.sin(2 * np.pi * 440 * t) * 0.3  # 440 Hz sine wave
         return sample_rate, (audio * 32767).astype(np.int16)
-    
+
     try:
         import io
         import wave
-        
+
         # Load voice
         voice = PiperVoice.load(model_path)
-        
+
         # Create in-memory WAV file
         wav_buffer = io.BytesIO()
-        
+
         with wave.open(wav_buffer, 'wb') as wav_file:
             wav_file.setnchannels(1)  # mono
             wav_file.setsampwidth(2)  # 16-bit
             wav_file.setframerate(voice.config.sample_rate)
-            
+
             # Synthesize to WAV
             voice.synthesize(
                 text,
@@ -287,36 +287,36 @@ def synthesize_speech(
                 noise_scale=noise_scale,
                 noise_w=noise_w,
             )
-        
+
         # Read audio data from buffer
         wav_buffer.seek(0)
         with wave.open(wav_buffer, 'rb') as wav_file:
             frames = wav_file.readframes(wav_file.getnframes())
             audio = np.frombuffer(frames, dtype=np.int16)
-        
+
         return voice.config.sample_rate, audio
     except Exception as e:
         logger.error(f"Synthesis error: {e}")
-        raise gr.Error(f"Synthesis failed: {str(e)}")
+        raise gr.Error(f"Synthesis failed: {str(e)}") from e
 
 
-def validate_dataset(dataset_path: str) -> Dict:
+def validate_dataset(dataset_path: str) -> dict:
     """Validate dataset structure and return statistics"""
     if not dataset_path:
         return {"error": "Please specify a dataset path"}
-    
+
     dataset_dir = Path(dataset_path)
     if not dataset_dir.exists():
         return {"error": f"Directory {dataset_path} does not exist"}
-    
+
     if not dataset_dir.is_dir():
         return {"error": f"{dataset_path} is not a directory"}
-    
+
     # Check for metadata.csv
     metadata_file = dataset_dir / "metadata.csv"
     if not metadata_file.exists():
         return {"error": "metadata.csv not found in dataset directory"}
-    
+
     # Analyze dataset
     stats = {
         "path": dataset_path,
@@ -326,19 +326,19 @@ def validate_dataset(dataset_path: str) -> Dict:
         "speakers": [],
         "sample_rate": "Unknown",
     }
-    
+
     # Count audio files
     audio_extensions = {".wav", ".mp3", ".flac", ".ogg"}
     audio_files = []
     for ext in audio_extensions:
         audio_files.extend(dataset_dir.rglob(f"*{ext}"))
     stats["files"] = len(audio_files)
-    
+
     # Try to read metadata.csv for speaker info
     try:
         import csv
         speakers = set()
-        with open(metadata_file, "r", encoding="utf-8") as f:
+        with open(metadata_file, encoding="utf-8") as f:
             reader = csv.reader(f, delimiter="|")
             for row in reader:
                 if len(row) >= 3:  # speaker|filename|text format
@@ -346,7 +346,7 @@ def validate_dataset(dataset_path: str) -> Dict:
         stats["speakers"] = list(speakers)
     except Exception as e:
         logger.error(f"Error reading metadata.csv: {e}")
-    
+
     return stats
 
 
@@ -369,11 +369,11 @@ def start_training(
 def create_interface(data_dir: Path) -> gr.Blocks:
     """Create Gradio interface with tabs for inference and training"""
     available_models = get_available_models(data_dir)
-    
+
     with gr.Blocks(title="Piper TTS WebUI") as interface:
         gr.Markdown("# Piper TTS WebUI")
         gr.Markdown("Generate high-quality speech from text using Piper TTS models.")
-        
+
         with gr.Tabs():
             # Inference Tab
             with gr.TabItem("Inference"):
@@ -384,7 +384,7 @@ def create_interface(data_dir: Path) -> gr.Blocks:
                             label="Select Model",
                             value=available_models[0][1] if available_models and available_models[0][1] else None,
                         )
-                        
+
                         with gr.Row():
                             template_dropdown = gr.Dropdown(
                                 choices=["Custom Text"],
@@ -392,13 +392,13 @@ def create_interface(data_dir: Path) -> gr.Blocks:
                                 value="Custom Text",
                             )
                             reset_btn = gr.Button("Reset", size="sm")
-                        
+
                         text_input = gr.Textbox(
                             label="Text to synthesize",
                             placeholder="Enter your text here...",
                             lines=5,
                         )
-                        
+
                         with gr.Accordion("Advanced Settings", open=False):
                             speaker_id = gr.Number(
                                 label="Speaker ID",
@@ -407,7 +407,7 @@ def create_interface(data_dir: Path) -> gr.Blocks:
                                 minimum=0,
                                 maximum=99,
                             )
-                            
+
                             length_scale = gr.Slider(
                                 label="Speed (Length Scale)",
                                 minimum=0.5,
@@ -416,7 +416,7 @@ def create_interface(data_dir: Path) -> gr.Blocks:
                                 step=0.1,
                                 info="Lower = faster speech",
                             )
-                            
+
                             noise_scale = gr.Slider(
                                 label="Noise Scale",
                                 minimum=0.0,
@@ -425,7 +425,7 @@ def create_interface(data_dir: Path) -> gr.Blocks:
                                 step=0.01,
                                 info="Higher = more expressive",
                             )
-                            
+
                             noise_w = gr.Slider(
                                 label="Noise Width",
                                 minimum=0.0,
@@ -433,22 +433,22 @@ def create_interface(data_dir: Path) -> gr.Blocks:
                                 value=0.8,
                                 step=0.01,
                             )
-                        
+
                         synthesize_btn = gr.Button("Generate Speech", variant="primary")
-                    
+
                     with gr.Column(scale=1):
                         audio_output = gr.Audio(
                             label="Generated Speech",
                             type="numpy",
                         )
-                        
+
                         gr.Markdown("""
                         ### Tips:
                         - Lower speed values = faster speech
                         - Higher noise scale = more expressive
                         - Speaker ID only works with multi-speaker models
                         """)
-                
+
                 # Prepare model paths for examples
                 # Find English and Japanese models
                 en_model_path = ""
@@ -458,13 +458,13 @@ def create_interface(data_dir: Path) -> gr.Blocks:
                         en_model_path = path
                     elif "Japanese" in name and not ja_model_path:
                         ja_model_path = path
-                
+
                 # Default to first model if specific language not found
                 if not en_model_path and available_models:
                     en_model_path = available_models[0][1]
                 if not ja_model_path and available_models:
                     ja_model_path = available_models[0][1]
-                
+
                 # Examples
                 gr.Examples(
                     examples=[
@@ -484,26 +484,26 @@ def create_interface(data_dir: Path) -> gr.Blocks:
                     inputs=[text_input, model_dropdown, speaker_id, length_scale, noise_scale, noise_w],
                     label="Example Texts (English & Japanese)",
                 )
-            
+
             # Training Tab
             with gr.TabItem("Training"):
                 with gr.Row():
                     with gr.Column():
                         gr.Markdown("## Dataset Configuration")
-                        
+
                         dataset_path = gr.Textbox(
                             label="Dataset Directory Path",
                             placeholder="/path/to/your/dataset",
                             info="Folder containing audio files and metadata.csv",
                         )
-                        
+
                         validate_btn = gr.Button("Validate Dataset")
-                        
+
                         dataset_info = gr.JSON(
                             label="Dataset Information",
                             visible=False,
                         )
-                        
+
                         gr.Markdown("""
                         ### Expected folder structure:
                         ```
@@ -516,17 +516,17 @@ def create_interface(data_dir: Path) -> gr.Blocks:
                         └── speaker_info.json (optional)
                         ```
                         """)
-                    
+
                     with gr.Column():
                         gr.Markdown("## Training Configuration")
-                        
+
                         base_model_dropdown = gr.Dropdown(
                             choices=["New Model"] + [m[0] for m in available_models],
                             label="Base Model",
                             value="New Model",
                             info="Start from scratch or fine-tune existing model",
                         )
-                        
+
                         num_speakers = gr.Number(
                             label="Number of Speakers",
                             value=1,
@@ -534,14 +534,14 @@ def create_interface(data_dir: Path) -> gr.Blocks:
                             minimum=1,
                             maximum=100,
                         )
-                        
+
                         quality = gr.Radio(
                             choices=["low", "medium", "high"],
                             label="Model Quality",
                             value="medium",
                             info="Higher quality = longer training time",
                         )
-                        
+
                         with gr.Accordion("Training Parameters", open=False):
                             batch_size = gr.Number(
                                 label="Batch Size",
@@ -550,13 +550,13 @@ def create_interface(data_dir: Path) -> gr.Blocks:
                                 minimum=1,
                                 maximum=64,
                             )
-                            
+
                             learning_rate = gr.Number(
                                 label="Learning Rate",
                                 value=1e-4,
                                 info="Default: 1e-4",
                             )
-                            
+
                             num_epochs = gr.Number(
                                 label="Number of Epochs",
                                 value=100,
@@ -564,14 +564,14 @@ def create_interface(data_dir: Path) -> gr.Blocks:
                                 minimum=1,
                                 maximum=1000,
                             )
-                            
+
                             checkpoint_interval = gr.Number(
                                 label="Checkpoint Interval (epochs)",
                                 value=10,
                                 precision=0,
                                 minimum=1,
                             )
-                            
+
                             validation_split = gr.Slider(
                                 label="Validation Split",
                                 minimum=0.05,
@@ -579,51 +579,51 @@ def create_interface(data_dir: Path) -> gr.Blocks:
                                 value=0.1,
                                 step=0.05,
                             )
-                
+
                 with gr.Row():
                     start_training_btn = gr.Button("Start Training", variant="primary")
-                    stop_training_btn = gr.Button("Stop Training", variant="stop")
-                
+                    gr.Button("Stop Training", variant="stop")  # stop_training_btn
+
                 with gr.Row():
-                    training_progress = gr.Progress()
+                    gr.Progress()  # training_progress
                     training_status = gr.Textbox(
                         label="Training Status",
                         value="Not started",
                         interactive=False,
                     )
-                
+
                 with gr.Row():
-                    loss_plot = gr.LinePlot(
+                    gr.LinePlot(  # loss_plot
                         label="Training Loss",
                         x="epoch",
                         y="loss",
                         visible=False,
                     )
-                    
-                    validation_audio = gr.Audio(
+
+                    gr.Audio(  # validation_audio
                         label="Validation Sample",
                         visible=False,
                     )
-        
+
         # Event handlers
         model_dropdown.change(
             fn=update_templates,
             inputs=[model_dropdown],
             outputs=[template_dropdown],
         )
-        
+
         template_dropdown.change(
             fn=apply_template,
             inputs=[template_dropdown, model_dropdown],
             outputs=[text_input],
         )
-        
+
         reset_btn.click(
             fn=apply_template,
             inputs=[template_dropdown, model_dropdown],
             outputs=[text_input],
         )
-        
+
         synthesize_btn.click(
             fn=synthesize_speech,
             inputs=[
@@ -636,7 +636,7 @@ def create_interface(data_dir: Path) -> gr.Blocks:
             ],
             outputs=audio_output,
         )
-        
+
         validate_btn.click(
             fn=validate_dataset,
             inputs=[dataset_path],
@@ -645,7 +645,7 @@ def create_interface(data_dir: Path) -> gr.Blocks:
             lambda: gr.update(visible=True),
             outputs=[dataset_info],
         )
-        
+
         start_training_btn.click(
             fn=start_training,
             inputs=[
@@ -661,7 +661,7 @@ def create_interface(data_dir: Path) -> gr.Blocks:
             ],
             outputs=[training_status],
         )
-    
+
     return interface
 
 
@@ -694,15 +694,15 @@ def main():
         action="store_true",
         help="Enable debug logging",
     )
-    
+
     args = parser.parse_args()
-    
+
     if args.debug:
         logging.getLogger().setLevel(logging.DEBUG)
-    
+
     # Create data directory if it doesn't exist
     args.data_dir.mkdir(parents=True, exist_ok=True)
-    
+
     # Create and launch interface
     interface = create_interface(args.data_dir)
     interface.launch(

@@ -129,8 +129,8 @@ def get_all_samples_flat(language: str) -> list:
     """Get all samples for a language as a flat list"""
     if language not in SAMPLE_TEXTS:
         return []
-    
+
     all_samples = []
-    for category, samples in SAMPLE_TEXTS[language].items():
+    for _category, samples in SAMPLE_TEXTS[language].items():
         all_samples.extend(samples)
     return all_samples
