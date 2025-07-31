@@ -264,18 +264,35 @@ def synthesize_speech(
         return sample_rate, (audio * 32767).astype(np.int16)
     
     try:
-        # Load voice and generate audio
-        voice = PiperVoice.load(model_path)
-        audio_generator = voice.synthesize(
-            text,
-            speaker_id=speaker_id,
-            length_scale=length_scale,
-            noise_scale=noise_scale,
-            noise_w=noise_w,
-        )
+        import io
+        import wave
         
-        # Convert generator to numpy array
-        audio = np.array(list(audio_generator), dtype=np.int16)
+        # Load voice
+        voice = PiperVoice.load(model_path)
+        
+        # Create in-memory WAV file
+        wav_buffer = io.BytesIO()
+        
+        with wave.open(wav_buffer, 'wb') as wav_file:
+            wav_file.setnchannels(1)  # mono
+            wav_file.setsampwidth(2)  # 16-bit
+            wav_file.setframerate(voice.config.sample_rate)
+            
+            # Synthesize to WAV
+            voice.synthesize(
+                text,
+                wav_file,
+                speaker_id=speaker_id,
+                length_scale=length_scale,
+                noise_scale=noise_scale,
+                noise_w=noise_w,
+            )
+        
+        # Read audio data from buffer
+        wav_buffer.seek(0)
+        with wave.open(wav_buffer, 'rb') as wav_file:
+            frames = wav_file.readframes(wav_file.getnframes())
+            audio = np.frombuffer(frames, dtype=np.int16)
         
         return voice.config.sample_rate, audio
     except Exception as e:
