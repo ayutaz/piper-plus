@@ -38,17 +38,19 @@ class TestEspeakPhonemizerFallback:
 
         # Check that we get IPA symbols (not just characters)
         phonemes = result[0]
-        phoneme_str = ''.join(phonemes)
+        phoneme_str = "".join(phonemes)
 
         # Should contain IPA symbols like ə, ˈ, ʊ, ɜ, etc.
-        assert any(char in phoneme_str for char in ['ə', 'ˈ', 'ʊ', 'ɜ', 'ː', 'ɹ', 'ɔ', 'æ'])
+        assert any(
+            char in phoneme_str for char in ["ə", "ˈ", "ʊ", "ɜ", "ː", "ɹ", "ɔ", "æ"]
+        )
 
         # Should NOT be just the original text split into characters
         assert phonemes != list("Hello world")
 
     def test_phonemize_espeak_ng_fallback(self):
         """Test fallback when espeak-ng is not available"""
-        with patch('subprocess.run', side_effect=FileNotFoundError()):
+        with patch("subprocess.run", side_effect=FileNotFoundError()):
             result = phonemize_espeak_ng("Hello", "en-us")
 
             # Should fall back to character list
@@ -59,7 +61,10 @@ class TestEspeakPhonemizerFallback:
         mock_result = MagicMock()
         mock_result.stdout = ""
 
-        with patch('subprocess.run', side_effect=subprocess.CalledProcessError(1, ['espeak-ng'])):
+        with patch(
+            "subprocess.run",
+            side_effect=subprocess.CalledProcessError(1, ["espeak-ng"]),
+        ):
             result = phonemize_espeak_ng("Test", "en-us")
 
             # Should fall back to character list
@@ -90,10 +95,21 @@ class TestVoicePhonemizerIntegration:
         config.espeak_voice = "en-us"
         config.sample_rate = 16000
         config.phoneme_id_map = {
-            "^": [1], "$": [2], "_": [0], " ": [3],
-            "h": [20], "ə": [59], "l": [24], "ˈ": [120],
-            "o": [27], "ʊ": [100], "w": [35], "ɜ": [62],
-            "ː": [122], "d": [17], "ɹ": [88]
+            "^": [1],
+            "$": [2],
+            "_": [0],
+            " ": [3],
+            "h": [20],
+            "ə": [59],
+            "l": [24],
+            "ˈ": [120],
+            "o": [27],
+            "ʊ": [100],
+            "w": [35],
+            "ɜ": [62],
+            "ː": [122],
+            "d": [17],
+            "ɹ": [88],
         }
         return config
 
@@ -103,11 +119,12 @@ class TestVoicePhonemizerIntegration:
             pytest.skip("PiperVoice not available")
 
         # Patch the import to simulate piper_phonemize not available
-        with patch.dict(sys.modules, {'piper_phonemize': None}):
+        with patch.dict(sys.modules, {"piper_phonemize": None}):
             # Need to reload voice module to pick up the import change
             import importlib
 
             import piper.voice
+
             importlib.reload(piper.voice)
 
             # Create a mock voice
@@ -122,9 +139,14 @@ class TestVoicePhonemizerIntegration:
             assert len(phonemes) > 0
 
             # If espeak-ng is available, should get IPA phonemes
-            if subprocess.run(['which', 'espeak-ng'], check=False, capture_output=True).returncode == 0:
-                phoneme_str = ''.join(phonemes[0])
-                assert any(char in phoneme_str for char in ['ə', 'ˈ', 'ʊ', 'ɜ'])
+            if (
+                subprocess.run(
+                    ["which", "espeak-ng"], check=False, capture_output=True
+                ).returncode
+                == 0
+            ):
+                phoneme_str = "".join(phonemes[0])
+                assert any(char in phoneme_str for char in ["ə", "ˈ", "ʊ", "ɜ"])
 
     def test_phonemes_to_ids_with_ipa(self, mock_config):
         """Test conversion of IPA phonemes to IDs"""
@@ -135,9 +157,10 @@ class TestVoicePhonemizerIntegration:
         voice.config = mock_config
 
         # Test with IPA phonemes
-        test_phonemes = ['h', 'ə', 'l', 'ˈ', 'o', 'ʊ']
+        test_phonemes = ["h", "ə", "l", "ˈ", "o", "ʊ"]
 
         import piper.voice
+
         ids = piper.voice.PiperVoice.phonemes_to_ids(voice, test_phonemes)
 
         # Should start with BOS
@@ -157,22 +180,43 @@ class TestCLIIntegration:
     """Test CLI integration with English models"""
 
     @pytest.mark.skipif(
-        not (Path(__file__).parent.parent.parent.parent / "test" / "models" / "test_voice.onnx").exists(),
-        reason="Test model not available"
+        not (
+            Path(__file__).parent.parent.parent.parent
+            / "test"
+            / "models"
+            / "test_voice.onnx"
+        ).exists(),
+        reason="Test model not available",
     )
     def test_cli_english_synthesis(self, tmp_path):
         """Test English synthesis via CLI"""
         output_file = tmp_path / "test_output.wav"
 
         # Construct the model path dynamically
-        model_path = Path(__file__).parent.parent.parent.parent / "test" / "models" / "test_voice.onnx"
+        model_path = (
+            Path(__file__).parent.parent.parent.parent
+            / "test"
+            / "models"
+            / "test_voice.onnx"
+        )
 
         # Run piper CLI
-        result = subprocess.run([
-            sys.executable, "-m", "piper",
-            "--model", str(model_path),
-            "--output_file", str(output_file)
-        ], check=False, input="Hello world", text=True, capture_output=True, cwd=Path(__file__).parent.parent)
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "piper",
+                "--model",
+                str(model_path),
+                "--output_file",
+                str(output_file),
+            ],
+            check=False,
+            input="Hello world",
+            text=True,
+            capture_output=True,
+            cwd=Path(__file__).parent.parent,
+        )
 
         # Should succeed
         assert result.returncode == 0, f"CLI failed with: {result.stderr}"
@@ -183,7 +227,8 @@ class TestCLIIntegration:
 
         # Verify it's a valid WAV file
         import wave
-        with wave.open(str(output_file), 'rb') as wav:
+
+        with wave.open(str(output_file), "rb") as wav:
             assert wav.getnchannels() == 1  # Mono
             assert wav.getsampwidth() == 2  # 16-bit
             assert wav.getframerate() in [16000, 22050]  # Common TTS sample rates

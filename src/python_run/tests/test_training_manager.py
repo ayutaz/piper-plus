@@ -25,7 +25,7 @@ class TestTrainingStatus:
         assert status.current_epoch == 0
         assert status.total_epochs == 0
         assert status.current_loss == 0.0
-        assert status.best_loss == float('inf')
+        assert status.best_loss == float("inf")
         assert status.start_time is None
         assert status.last_update is None
         assert status.error is None
@@ -44,7 +44,7 @@ class TestTrainingStatus:
             start_time=datetime.now(),
             last_update=datetime.now(),
             error=None,
-            log_messages=["test1", "test2"]
+            log_messages=["test1", "test2"],
         )
 
         result = status.to_dict()
@@ -75,7 +75,9 @@ class TestTrainingManager:
 
         # Create metadata.csv
         metadata_file = dataset_dir / "metadata.csv"
-        metadata_file.write_text("speaker|audio_001|Hello world\nspeaker|audio_002|Test")
+        metadata_file.write_text(
+            "speaker|audio_001|Hello world\nspeaker|audio_002|Test"
+        )
 
         # Create wavs directory
         wavs_dir = dataset_dir / "wavs"
@@ -105,7 +107,7 @@ class TestTrainingManager:
         assert "test" in manager.callbacks
         assert manager.callbacks["test"] == callback
 
-    @patch('subprocess.Popen')
+    @patch("subprocess.Popen")
     def test_start_training_success(self, mock_popen, manager, test_dataset, tmp_path):
         """Test successful training start"""
         # Mock the process
@@ -124,7 +126,7 @@ class TestTrainingManager:
             learning_rate=1e-4,
             num_epochs=2,
             checkpoint_interval=1,
-            validation_split=0.1
+            validation_split=0.1,
         )
 
         assert success
@@ -151,7 +153,7 @@ class TestTrainingManager:
             learning_rate=1e-4,
             num_epochs=100,
             checkpoint_interval=10,
-            validation_split=0.1
+            validation_split=0.1,
         )
 
         # Should still return True as path validation is done elsewhere
@@ -159,7 +161,7 @@ class TestTrainingManager:
 
     def test_start_training_while_running(self, manager, test_dataset, tmp_path):
         """Test starting training while already running"""
-        with patch('subprocess.Popen') as mock_popen:
+        with patch("subprocess.Popen") as mock_popen:
             mock_process = MagicMock()
             mock_process.poll.return_value = None
             mock_process.stdout.readline.return_value = ""
@@ -174,7 +176,7 @@ class TestTrainingManager:
                 learning_rate=1e-4,
                 num_epochs=1,
                 checkpoint_interval=1,
-                validation_split=0.1
+                validation_split=0.1,
             )
 
             # Try to start second training
@@ -186,7 +188,7 @@ class TestTrainingManager:
                 learning_rate=1e-4,
                 num_epochs=1,
                 checkpoint_interval=1,
-                validation_split=0.1
+                validation_split=0.1,
             )
 
             assert not success
@@ -265,7 +267,7 @@ class TestTrainingManager:
         good_callback.assert_called_once()
         bad_callback.assert_called_once()
 
-    @patch('subprocess.Popen')
+    @patch("subprocess.Popen")
     def test_monitor_process_success(self, mock_popen, manager, test_dataset, tmp_path):
         """Test monitoring a successful process"""
         # Mock process that outputs some lines then exits successfully
@@ -289,7 +291,7 @@ class TestTrainingManager:
             learning_rate=1e-4,
             num_epochs=10,
             checkpoint_interval=1,
-            validation_split=0.1
+            validation_split=0.1,
         )
 
         # Wait for monitoring to process
@@ -300,7 +302,7 @@ class TestTrainingManager:
         assert any("Starting training" in log for log in logs)
         assert any("Epoch 1/10" in log for log in logs)
 
-    @patch('subprocess.Popen')
+    @patch("subprocess.Popen")
     def test_stop_training_success(self, mock_popen, manager, test_dataset, tmp_path):
         """Test stopping training successfully"""
         mock_process = MagicMock()
@@ -317,7 +319,7 @@ class TestTrainingManager:
             learning_rate=1e-4,
             num_epochs=1,
             checkpoint_interval=1,
-            validation_split=0.1
+            validation_split=0.1,
         )
 
         # Stop training
@@ -336,7 +338,7 @@ class TestTrainingWebUIIntegration:
         from piper.webui import check_training_dependencies
 
         # Test with mocked imports
-        with patch.dict(sys.modules, {'pytorch_lightning': None, 'torch': None}):
+        with patch.dict(sys.modules, {"pytorch_lightning": None, "torch": None}):
             deps = check_training_dependencies()
             assert "pytorch-lightning" in deps
             assert "torch" in deps
@@ -355,7 +357,7 @@ class TestTrainingWebUIIntegration:
             num_epochs=100,
             checkpoint_interval=10,
             validation_split=0.1,
-            output_dir="output"
+            output_dir="output",
         )
 
         assert "❌" in result
@@ -375,7 +377,7 @@ class TestTrainingWebUIIntegration:
             current_loss=0.5,
             start_time=datetime.now(),
             last_update=datetime.now(),
-            log_messages=["Log 1", "Log 2", "Log 3"]
+            log_messages=["Log 1", "Log 2", "Log 3"],
         )
 
         status_dict = get_training_status()

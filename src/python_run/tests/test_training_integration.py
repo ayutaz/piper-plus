@@ -50,13 +50,20 @@ class TestTrainingIntegration:
 
         # Register a callback to track status updates
         status_updates = []
-        manager.register_callback("test", lambda status: status_updates.append(status.to_dict()))
+        manager.register_callback(
+            "test", lambda status: status_updates.append(status.to_dict())
+        )
 
         # Mock subprocess to simulate training
-        with patch('subprocess.Popen') as mock_popen:
+        with patch("subprocess.Popen") as mock_popen:
             # Create mock process
             mock_process = Mock()
-            mock_process.poll.side_effect = [None, None, None, 0]  # Running 3 times, then done
+            mock_process.poll.side_effect = [
+                None,
+                None,
+                None,
+                0,
+            ]  # Running 3 times, then done
             mock_process.returncode = 0
             mock_process.stdout.readline.side_effect = [
                 "Initializing training...\n",
@@ -81,7 +88,7 @@ class TestTrainingIntegration:
                 learning_rate=1e-4,
                 num_epochs=3,
                 checkpoint_interval=1,
-                validation_split=0.3
+                validation_split=0.3,
             )
 
             assert success
@@ -110,7 +117,7 @@ class TestTrainingIntegration:
 
         manager = TrainingManager()
 
-        with patch('subprocess.Popen') as mock_popen:
+        with patch("subprocess.Popen") as mock_popen:
             # Simulate process that fails immediately
             mock_process = Mock()
             mock_process.poll.return_value = 1  # Non-zero exit code
@@ -130,7 +137,7 @@ class TestTrainingIntegration:
                 learning_rate=1e-4,
                 num_epochs=100,
                 checkpoint_interval=10,
-                validation_split=0.1
+                validation_split=0.1,
             )
 
             assert success  # Start succeeds even if process fails later
@@ -156,10 +163,10 @@ class TestTrainingIntegration:
         training_manager.status.is_running = False
 
         # Check dependencies (mocked)
-        with patch('piper.webui.check_training_dependencies') as mock_check:
+        with patch("piper.webui.check_training_dependencies") as mock_check:
             mock_check.return_value = []  # No missing dependencies
 
-            with patch('piper.training_manager.subprocess.Popen') as mock_popen:
+            with patch("piper.training_manager.subprocess.Popen") as mock_popen:
                 # Mock successful process
                 mock_process = Mock()
                 mock_process.poll.return_value = None
@@ -177,7 +184,7 @@ class TestTrainingIntegration:
                     num_epochs=5,
                     checkpoint_interval=1,
                     validation_split=0.1,
-                    output_dir=str(tmp_path / "output")
+                    output_dir=str(tmp_path / "output"),
                 )
 
                 assert "✅" in result
@@ -198,14 +205,14 @@ class TestTrainingIntegration:
         """Test that concurrent training is prevented"""
         from piper.webui import start_training
 
-        with patch('piper.training_manager.subprocess.Popen') as mock_popen:
+        with patch("piper.training_manager.subprocess.Popen") as mock_popen:
             mock_process = Mock()
             mock_process.poll.return_value = None  # Process is running
             mock_process.stdout.readline.return_value = ""
             mock_popen.return_value = mock_process
 
             # Mock dependencies check
-            with patch('piper.webui.check_training_dependencies') as mock_check:
+            with patch("piper.webui.check_training_dependencies") as mock_check:
                 mock_check.return_value = []
 
                 # Start first training
@@ -219,7 +226,7 @@ class TestTrainingIntegration:
                     num_epochs=1,
                     checkpoint_interval=1,
                     validation_split=0.1,
-                    output_dir=str(tmp_path / "output1")
+                    output_dir=str(tmp_path / "output1"),
                 )
 
                 assert "✅" in result1
@@ -235,15 +242,17 @@ class TestTrainingIntegration:
                     num_epochs=1,
                     checkpoint_interval=1,
                     validation_split=0.1,
-                    output_dir=str(tmp_path / "output2")
+                    output_dir=str(tmp_path / "output2"),
                 )
 
                 assert "⚠️" in result2
                 assert "already running" in result2
 
     @pytest.mark.skipif(
-        not Path("/Users/s19447/Desktop/total-piper/piper/src/python/piper_train").exists(),
-        reason="piper_train not available"
+        not Path(
+            "/Users/s19447/Desktop/total-piper/piper/src/python/piper_train"
+        ).exists(),
+        reason="piper_train not available",
     )
     def test_real_piper_train_invocation(self, create_test_dataset, tmp_path):
         """Test with real piper_train (if available)"""
@@ -262,7 +271,7 @@ class TestTrainingIntegration:
             checkpoint_interval=1,
             validation_split=0.5,
             accelerator="cpu",  # Force CPU for testing
-            devices=1
+            devices=1,
         )
 
         assert success

@@ -10,7 +10,7 @@ import pytest
 
 
 # Add parent directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src', 'python_run'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src", "python_run"))
 
 try:
     import gradio as gr
@@ -25,6 +25,7 @@ try:
         synthesize_speech,
         update_templates,
     )
+
     WEBUI_AVAILABLE = True
 except ImportError:
     WEBUI_AVAILABLE = False
@@ -82,24 +83,30 @@ class TestWebUI:
         """Test template dropdown updates based on model"""
         # Test with Japanese model
         ja_dropdown = update_templates("test/models/ja_JP-test-medium.onnx")
-        assert hasattr(ja_dropdown, 'choices')
+        assert hasattr(ja_dropdown, "choices")
 
         # Test with English model
         en_dropdown = update_templates("test/models/en_US-test.onnx")
-        assert hasattr(en_dropdown, 'choices')
+        assert hasattr(en_dropdown, "choices")
 
     def test_template_application(self):
         """Test applying templates to text input"""
         # Test custom text
-        custom_text = apply_template("Custom Text", "test/models/ja_JP-test-medium.onnx")
+        custom_text = apply_template(
+            "Custom Text", "test/models/ja_JP-test-medium.onnx"
+        )
         assert custom_text == ""
 
         # Test Japanese greeting
-        ja_greeting = apply_template("Greeting (greeting)", "test/models/ja_JP-test-medium.onnx")
+        ja_greeting = apply_template(
+            "Greeting (greeting)", "test/models/ja_JP-test-medium.onnx"
+        )
         assert "こんにちは" in ja_greeting
 
         # Test English greeting
-        en_greeting = apply_template("Greeting (greeting)", "test/models/en_US-test.onnx")
+        en_greeting = apply_template(
+            "Greeting (greeting)", "test/models/en_US-test.onnx"
+        )
         assert "Hello" in en_greeting
 
     def test_sample_texts(self):
@@ -139,7 +146,14 @@ class TestWebUI:
         params = list(sig.parameters.keys())
 
         # Check required parameters
-        expected_params = ['text', 'model_path', 'speaker_id', 'length_scale', 'noise_scale', 'noise_w']
+        expected_params = [
+            "text",
+            "model_path",
+            "speaker_id",
+            "length_scale",
+            "noise_scale",
+            "noise_w",
+        ]
         assert params == expected_params
 
         # Check return type annotation
