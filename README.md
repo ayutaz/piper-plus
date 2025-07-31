@@ -3,7 +3,7 @@
 A fast, local neural text to speech system that sounds great and is optimized for the Raspberry Pi 4.
 Piper is used in a [variety of projects](#people-using-piper).
 
-🎙️ **[Try Piper TTS Demo on Hugging Face](https://huggingface.co/spaces/ayousanz/piper-plus)** - Experience Japanese and English text-to-speech in your browser!
+🎙️ **[Try Piper TTS Demo on Hugging Face](https://huggingface.co/spaces/ayousanz/piper-plus-demo)** - Experience Japanese and English text-to-speech in your browser!
 
 ## 目次
 - [追加機能](#追加機能)
@@ -22,7 +22,7 @@ Piper is used in a [variety of projects](#people-using-piper).
 
 ## 追加機能
 * **🌐 WebUI (Gradio)** - ブラウザベースの使いやすいインターフェース
-  * 🚀 **[オンラインデモ](https://huggingface.co/spaces/ayousanz/piper-plus)** - Hugging Face Spacesで今すぐ試せます！
+  * 🚀 **[オンラインデモ](https://huggingface.co/spaces/ayousanz/piper-plus-demo)** - Hugging Face Spacesで今すぐ試せます！
   * 詳細は[WebUI使用ガイド](docs/webui-usage.md)を参照
   * 推論と学習の両方に対応
   * 多言語テンプレートシステム（日本語、英語、ドイツ語、フランス語）

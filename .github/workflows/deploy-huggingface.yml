@@ -77,7 +77,7 @@ jobs:
           fi
           
           # Upload all files to Hugging Face Space
-          huggingface-cli upload ayousanz/piper-plus . --repo-type space --commit-message "$COMMIT_MSG"
+          huggingface-cli upload ayousanz/piper-plus-demo . --repo-type space --commit-message "$COMMIT_MSG"
           
           echo "✅ Successfully deployed to Hugging Face Spaces using CLI"
 
@@ -87,7 +87,7 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "✅ Successfully deployed to Hugging Face Spaces" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Space URL**: https://huggingface.co/spaces/ayousanz/piper-plus" >> $GITHUB_STEP_SUMMARY
+          echo "**Space URL**: https://huggingface.co/spaces/ayousanz/piper-plus-demo" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Deployed files**:" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
