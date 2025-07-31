@@ -102,16 +102,49 @@ def get_available_models(data_dir: Path) -> List[Tuple[str, str]]:
                     config = json.load(f)
                 language = config.get("language", {})
                 if isinstance(language, dict):
-                    lang_code = language.get("code", "unknown")
+                    lang_code = language.get("code", "en")
                 else:
-                    lang_code = str(language)
-                display_name = f"{lang_code} - {onnx_file.stem}"
+                    lang_code = str(language) if language else "en"
+                
+                # Create user-friendly display names
+                lang_names = {
+                    "ja": "Japanese",
+                    "en": "English", 
+                    "de": "German",
+                    "fr": "French",
+                    "es": "Spanish",
+                    "zh": "Chinese",
+                    "ko": "Korean",
+                }
+                lang_display = lang_names.get(lang_code, lang_code.upper())
+                
+                # Extract quality from filename if present
+                quality = ""
+                if "high" in onnx_file.stem.lower():
+                    quality = " (High)"
+                elif "medium" in onnx_file.stem.lower():
+                    quality = " (Medium)"
+                elif "low" in onnx_file.stem.lower():
+                    quality = " (Low)"
+                
+                display_name = f"{lang_display}{quality} - {onnx_file.stem}"
                 models.append((display_name, str(onnx_file)))
             except Exception as e:
                 logger.error(f"Error reading config for {onnx_file}: {e}")
                 models.append((onnx_file.stem, str(onnx_file)))
         else:
-            models.append((onnx_file.stem, str(onnx_file)))
+            # No config file, try to guess from filename
+            model_name = onnx_file.stem
+            if "ja" in model_name.lower():
+                display_name = f"Japanese - {model_name}"
+            elif "en" in model_name.lower():
+                display_name = f"English - {model_name}"
+            else:
+                display_name = model_name
+            models.append((display_name, str(onnx_file)))
+    
+    # Sort models by language name for better UX
+    models.sort(key=lambda x: x[0])
     
     return models if models else [("No models found", "")]
 
@@ -128,16 +161,40 @@ def get_language_from_model(model_path: str) -> str:
                 config = json.load(f)
             language = config.get("language", {})
             if isinstance(language, dict):
-                return language.get("code", "en_US")
-            return str(language)
+                lang_code = language.get("code", "en_US")
+            else:
+                lang_code = str(language)
+            
+            # Map language codes to our template keys
+            if lang_code == "ja":
+                return "ja_JP"
+            elif lang_code == "en":
+                return "en_US"
+            elif lang_code == "de":
+                return "de_DE"
+            elif lang_code == "fr":
+                return "fr_FR"
+            elif lang_code in TEMPLATES:
+                return lang_code
+            else:
+                # Try to find a matching template
+                for template_key in TEMPLATES.keys():
+                    if lang_code.startswith(template_key.split("_")[0]):
+                        return template_key
+                return "en_US"
     except Exception as e:
         logger.error(f"Error getting language from model: {e}")
     
     # Try to extract from filename
-    model_name = Path(model_path).stem
-    for lang_code in TEMPLATES.keys():
-        if lang_code.lower() in model_name.lower():
-            return lang_code
+    model_name = Path(model_path).stem.lower()
+    if "ja" in model_name or "japanese" in model_name:
+        return "ja_JP"
+    elif "de" in model_name or "german" in model_name:
+        return "de_DE"
+    elif "fr" in model_name or "french" in model_name:
+        return "fr_FR"
+    elif "en" in model_name or "english" in model_name:
+        return "en_US"
     
     return "en_US"
 
@@ -302,7 +359,7 @@ def create_interface(data_dir: Path) -> gr.Blocks:
                         model_dropdown = gr.Dropdown(
                             choices=available_models,
                             label="Select Model",
-                            value=available_models[0][1] if available_models else None,
+                            value=available_models[0][1] if available_models and available_models[0][1] else None,
                         )
                         
                         with gr.Row():
