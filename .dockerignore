@@ -1,35 +1,69 @@
+# Git
+.git
+.gitignore
+.github
+
 # Build artifacts
 build/
-_install/
-*.tar.gz
-
-# Development files
-.git/
-.github/
-.vscode/
-.idea/
-
-# Documentation and notebooks (keep essential files only)
-notebooks/
-TRAINING.md
-VOICES.md
-
-# Test files
-etc/test_sentences/
-etc/test_*.jsonl
-
-# Python cache
+dist/
+*.egg-info/
 __pycache__/
 *.pyc
 *.pyo
-.pytest_cache/
+*.pyd
+.Python
+pip-log.txt
+pip-delete-this-directory.txt
 
-# Large binary files
-*.onnx
-*.wav
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
 
-# Temporary files
+# OS
 .DS_Store
 Thumbs.db
+
+# Documentation
+docs/
+*.md
+!docker/README.md
+
+# Test files
+test/
+tests/
+*_test.py
+test_*.py
+*.test
+
+# Models and data (should be mounted as volumes)
+models/
+datasets/
+checkpoints/
+logs/
+output/
+
+# Docker
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.travis.yml
+
+# Temporary files
 *.tmp
+*.temp
 *.log
+
+# Large files
+*.wav
+*.mp3
+*.onnx
+*.pt
+*.pth
+*.ckpt

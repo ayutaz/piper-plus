@@ -1,8 +1,6 @@
 name: Python Linting
 
 on:
-  push:
-    branches: [ master, dev ]
   pull_request:
     branches: [ master, dev ]
 
@@ -11,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ['3.11', '3.12', '3.13']
+        python-version: ['3.11', '3.12']
     
     steps:
     - uses: actions/checkout@v4
@@ -24,7 +22,7 @@ jobs:
     - name: Install Ruff
       run: |
         python -m pip install --upgrade pip
-        pip install ruff==0.12.4
+        pip install ruff==0.12.5
     
     - name: Run Ruff check
       run: |

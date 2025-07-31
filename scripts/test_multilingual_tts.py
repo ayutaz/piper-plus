@@ -19,6 +19,7 @@ from pathlib import Path
 # Import platform utilities
 from platform_utils import get_platform_name
 
+
 # Configure stdout for UTF-8 on Windows
 if sys.platform == "win32":
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
@@ -302,11 +303,11 @@ class MultilingualTTSTester:
                             "generation_time_ms": round(generation_time * 1000, 2),
                             "audio_duration_ms": round(audio_duration * 1000, 2),
                             "rtf": round(rtf, 4),
-                            "chars_per_second": round(
-                                len(config["test_text"]) / generation_time, 2
-                            )
-                            if generation_time > 0
-                            else 0,
+                            "chars_per_second": (
+                                round(len(config["test_text"]) / generation_time, 2)
+                                if generation_time > 0
+                                else 0
+                            ),
                             "text_length": len(config["test_text"]),
                             "audio_file": os.path.basename(output_file),
                             "test_text": config["test_text"],  # Add test text
@@ -503,11 +504,9 @@ class MultilingualTTSTester:
             metrics["summary"] = {
                 "total_languages": len(metrics["languages"]),
                 "avg_rtf": round(sum(all_rtf) / len(all_rtf), 4) if all_rtf else 0,
-                "avg_speed_chars_per_second": round(
-                    sum(all_speeds) / len(all_speeds), 2
-                )
-                if all_speeds
-                else 0,
+                "avg_speed_chars_per_second": (
+                    round(sum(all_speeds) / len(all_speeds), 2) if all_speeds else 0
+                ),
             }
 
         # Save to file

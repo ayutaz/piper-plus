@@ -1,6 +1,7 @@
 import sys
 from pathlib import Path
 
+
 # Add <repo>/src/python to PYTHONPATH during tests so that
 # `import piper_train ...` works when tests are executed from project root.
 _current = Path(__file__).resolve()

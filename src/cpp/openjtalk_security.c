@@ -8,11 +8,12 @@ int openjtalk_is_safe_path(const char* path) {
     if (!path) return 0;
     
     // Check for common command injection characters
+    // Note: Parentheses are allowed as they appear in valid paths like "Program Files (x86)"
 #ifdef _WIN32
     // On Windows, backslash is a valid path separator
-    const char* dangerous_chars = ";|&<>`$(){}[]!";
+    const char* dangerous_chars = ";|&<>`${}[]!";
 #else
-    const char* dangerous_chars = ";|&<>`$(){}[]!\\";
+    const char* dangerous_chars = ";|&<>`${}[]!\\";
 #endif
     
     for (const char* p = path; *p; p++) {

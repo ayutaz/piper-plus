@@ -9,6 +9,7 @@ from typing import Any
 import numpy as np
 import onnxruntime
 
+
 # Try to import piper_phonemize, but make it optional
 try:
     from piper_phonemize import phonemize_codepoints, phonemize_espeak, tashkeel_run
@@ -42,6 +43,7 @@ except ImportError:
 from .config import PhonemeType, PiperConfig
 from .const import BOS, EOS, PAD
 from .util import audio_float_to_int16
+
 
 _LOGGER = logging.getLogger(__name__)
 

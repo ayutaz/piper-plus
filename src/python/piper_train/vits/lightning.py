@@ -15,6 +15,7 @@ from .losses import discriminator_loss, feature_loss, generator_loss, kl_loss
 from .mel_processing import mel_spectrogram_torch, spec_to_mel_torch
 from .models import MultiPeriodDiscriminator, SynthesizerTrn
 
+
 _LOGGER = logging.getLogger("vits.lightning")
 
 
@@ -171,9 +172,9 @@ class VitsModel(pl.LightningModule):
             num_workers=self.hparams.num_workers,
             batch_size=self.hparams.batch_size,
             pin_memory=True,
-            persistent_workers=True
-            if self.hparams.num_workers > 0
-            else False,  # Multi-GPU optimization
+            persistent_workers=(
+                True if self.hparams.num_workers > 0 else False
+            ),  # Multi-GPU optimization
         )
 
     def val_dataloader(self):
@@ -186,9 +187,9 @@ class VitsModel(pl.LightningModule):
             num_workers=self.hparams.num_workers,
             batch_size=self.hparams.batch_size,
             pin_memory=True,
-            persistent_workers=True
-            if self.hparams.num_workers > 0
-            else False,  # Multi-GPU optimization
+            persistent_workers=(
+                True if self.hparams.num_workers > 0 else False
+            ),  # Multi-GPU optimization
         )
 
     def test_dataloader(self):

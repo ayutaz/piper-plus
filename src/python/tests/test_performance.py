@@ -6,8 +6,13 @@ import os
 import statistics
 import time
 
-import psutil
 import pytest
+
+
+try:
+    import psutil
+except ImportError:
+    psutil = None
 
 
 class TestPerformance:
@@ -16,6 +21,7 @@ class TestPerformance:
     @pytest.mark.benchmark
     @pytest.mark.japanese
     @pytest.mark.requires_openjtalk
+    @pytest.mark.skipif(psutil is None, reason="psutil not installed")
     def test_phonemization_single_conversion(self):
         """Benchmark single text to phoneme conversion"""
         try:
@@ -101,6 +107,7 @@ class TestPerformance:
             pytest.skip("Japanese phonemizer not available")
 
     @pytest.mark.benchmark
+    @pytest.mark.skipif(psutil is None, reason="psutil not installed")
     def test_memory_usage_measurement(self):
         """Measure memory usage during operations"""
         try:

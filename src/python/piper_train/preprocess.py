@@ -8,8 +8,6 @@ import logging
 import os
 import signal
 import sys
-
-# import unicodedata  # noqa: F401 - May be used for text normalization
 from collections import Counter
 from collections.abc import Iterable
 from dataclasses import dataclass, field
@@ -27,12 +25,11 @@ from piper_phonemize import (
     phonemize_espeak,
     tashkeel_run,
 )
-
-# import pyopenjtalk  # noqa: F401 - Used in conditional imports
 from tqdm import tqdm
 
 from .f0_extraction import cache_f0
 from .norm_audio import cache_norm_audio, make_silence_detector
+
 
 # Custom Japanese phonemizer with accent/prosody marks
 try:
@@ -43,9 +40,7 @@ except ImportError:
     from piper_train.phonemize.accent_processor import AccentProcessor  # type: ignore
     from piper_train.phonemize.japanese import phonemize_japanese  # type: ignore
 
-# -----------------------------------------------------------------------------
 # Japanese phoneme id map support
-# -----------------------------------------------------------------------------
 try:
     from .phonemize.jp_id_map import get_japanese_id_map  # type: ignore
 except ImportError:

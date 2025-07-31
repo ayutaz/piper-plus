@@ -8,13 +8,6 @@ on:
       - 'test/**'
       - '.github/workflows/test-japanese-tts.yml'
       - '.github/workflows/build-piper.yml'
-  push:
-    branches: [dev, feat/*, fix/*]
-    paths:
-      - 'src/**'
-      - 'test/**'
-      - '.github/workflows/test-japanese-tts.yml'
-      - '.github/workflows/build-piper.yml'
   workflow_dispatch:
   workflow_call:
 

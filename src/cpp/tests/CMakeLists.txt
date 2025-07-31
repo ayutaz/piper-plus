@@ -1,5 +1,9 @@
 # C++ Tests CMake configuration
 
+# Add global compile definitions for all tests
+add_compile_definitions(SPDLOG_FMT_EXTERNAL=1)
+add_compile_definitions(FMT_HEADER_ONLY=1)
+
 # Test sources
 set(TEST_SOURCES
     test_phonemize.cpp
@@ -22,9 +26,32 @@ foreach(test_source ${TEST_SOURCES})
     get_filename_component(test_name ${test_source} NAME_WE)
     add_executable(${test_name} ${test_source})
 
+    # Base libraries
     target_link_libraries(${test_name}
         gtest
         gtest_main
+    )
+    
+    # Add Windows-specific library directories for all tests
+    if(WIN32)
+        target_link_directories(${test_name} PRIVATE
+            ${CMAKE_BINARY_DIR}/fi/lib
+            ${CMAKE_BINARY_DIR}/si/lib
+        )
+    endif()
+    
+    # Add spdlog/fmt dependencies for all tests
+    if(TARGET spdlog_external)
+        add_dependencies(${test_name} spdlog_external)
+    endif()
+    if(TARGET fmt_external)
+        add_dependencies(${test_name} fmt_external)
+    endif()
+    
+    # Add include directories for spdlog/fmt
+    target_include_directories(${test_name} PRIVATE
+        ${CMAKE_BINARY_DIR}/si/include
+        ${CMAKE_BINARY_DIR}/fi/include
     )
     
     # Link additional dependencies for dictionary manager test
@@ -165,28 +192,31 @@ foreach(test_source ${TEST_SOURCES})
         target_sources(${test_name} PRIVATE
             ../phoneme_parser.cpp
         )
-        # Set SPDLOG_DIR if not defined
-        if(NOT DEFINED SPDLOG_DIR)
-            set(SPDLOG_DIR "${CMAKE_BINARY_DIR}/si")
-        endif()
         target_include_directories(${test_name} PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/..
-            ${SPDLOG_DIR}/include
+            ${CMAKE_BINARY_DIR}/si/include
+            ${CMAKE_BINARY_DIR}/fi/include
+        )
+        # Add library directories
+        target_link_directories(${test_name} PRIVATE
+            ${CMAKE_BINARY_DIR}/si/lib
+            ${CMAKE_BINARY_DIR}/fi/lib
         )
         if(WIN32)
             target_link_libraries(${test_name}
-                optimized ${SPDLOG_DIR}/lib/spdlog.lib
-                debug ${SPDLOG_DIR}/lib/spdlogd.lib
+                optimized spdlog.lib
+                debug spdlogd.lib
+                optimized fmt.lib
+                debug fmtd.lib
             )
         else()
             target_link_libraries(${test_name}
-                ${SPDLOG_DIR}/lib/libspdlog.a
+                spdlog
+                fmt
             )
         endif()
-        # Add dependency on spdlog_external to ensure headers are available
-        if(TARGET spdlog_external)
-            add_dependencies(${test_name} spdlog_external)
-        endif()
+        # Ensure dependencies are built first
+        add_dependencies(${test_name} spdlog_external fmt_external)
     endif()
 
     add_test(NAME ${test_name} COMMAND ${test_name})
@@ -197,8 +227,33 @@ add_executable(test_phoneme_timing test_phoneme_timing.cpp)
 target_include_directories(test_phoneme_timing PRIVATE 
     ${CMAKE_CURRENT_SOURCE_DIR}/../
     ${CMAKE_CURRENT_SOURCE_DIR}/../../
+    ${CMAKE_BINARY_DIR}/si/include
+    ${CMAKE_BINARY_DIR}/fi/include
 )
-target_link_libraries(test_phoneme_timing 
-    gtest_main
-)
+
+# Add library dependencies for test_phoneme_timing
+if(TARGET spdlog_external)
+    add_dependencies(test_phoneme_timing spdlog_external)
+endif()
+if(TARGET fmt_external)
+    add_dependencies(test_phoneme_timing fmt_external)
+endif()
+
+# Link libraries based on platform
+if(WIN32)
+    target_link_libraries(test_phoneme_timing 
+        gtest_main
+        optimized ${CMAKE_BINARY_DIR}/fi/lib/fmt.lib
+        debug ${CMAKE_BINARY_DIR}/fi/lib/fmtd.lib
+        optimized ${CMAKE_BINARY_DIR}/si/lib/spdlog.lib
+        debug ${CMAKE_BINARY_DIR}/si/lib/spdlogd.lib
+    )
+else()
+    target_link_libraries(test_phoneme_timing 
+        gtest_main
+        fmt
+        spdlog
+    )
+endif()
+
 add_test(NAME test_phoneme_timing COMMAND test_phoneme_timing)

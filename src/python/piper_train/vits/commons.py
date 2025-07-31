@@ -4,6 +4,7 @@ import math
 import torch
 from torch.nn import functional as F
 
+
 _LOGGER = logging.getLogger("vits.commons")
 
 

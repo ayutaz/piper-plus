@@ -1,0 +1,265 @@
+name: Docker Tests
+
+on:
+  pull_request:
+    paths:
+      - 'docker/**'
+      - '.github/workflows/docker-*.yml'
+      - '.dockerignore'
+
+jobs:
+  test-docker-builds:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        image:
+          - name: python-train
+            context: .
+            dockerfile: ./docker/python-train/Dockerfile
+          - name: python-inference
+            context: .
+            dockerfile: ./docker/python-inference/Dockerfile
+          - name: cpp-train
+            context: .
+            dockerfile: ./docker/cpp-train/Dockerfile
+    
+    steps:
+      - name: Free disk space
+        run: |
+          echo "=== Initial disk space ==="
+          df -h
+          echo "=== Removing unnecessary files ==="
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf "/usr/local/share/boost"
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          sudo docker image prune --all --force
+          sudo apt-get clean
+          echo "=== Final disk space ==="
+          df -h
+      
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Build ${{ matrix.image.name }}
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ matrix.image.context }}
+          file: ${{ matrix.image.dockerfile }}
+          push: false
+          tags: piper-${{ matrix.image.name }}:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      
+      - name: Test ${{ matrix.image.name }} container
+        run: |
+          case "${{ matrix.image.name }}" in
+            python-train)
+              docker run --rm piper-${{ matrix.image.name }}:test python -c "
+import torch
+import numpy
+import librosa
+import soundfile
+print('All imports successful')
+"
+              ;;
+            python-inference)
+              docker run --rm piper-${{ matrix.image.name }}:test python -c "
+import torch
+import onnxruntime
+print('Inference environment OK')
+"
+              ;;
+            cpp-train)
+              docker run --rm piper-${{ matrix.image.name }}:test bash -c "
+cmake --version && ninja --version && echo 'Build tools OK'
+"
+              ;;
+          esac
+      
+      - name: Clean up Docker images
+        if: always()
+        run: |
+          docker image rm piper-${{ matrix.image.name }}:test || true
+          docker system prune -f
+
+  # Test inference with test models
+  test-inference-functionality:
+    runs-on: ubuntu-latest
+    needs: test-docker-builds
+    
+    steps:
+      - name: Free disk space
+        run: |
+          echo "=== Initial disk space ==="
+          df -h
+          echo "=== Removing unnecessary files ==="
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf "/usr/local/share/boost"
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          sudo docker image prune --all --force
+          sudo apt-get clean
+          echo "=== Final disk space ==="
+          df -h
+      
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Build Python inference image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./docker/python-inference/Dockerfile
+          push: false
+          tags: piper-python-inference:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      
+      - name: Test Python inference with test model
+        run: |
+          # Test basic text-to-phoneme model
+          docker run --rm \
+            -v ${{ github.workspace }}/test/models:/models:ro \
+            piper-python-inference:test \
+            python -c "
+import onnxruntime as ort
+import numpy as np
+import json
+
+# Load model config
+with open('/models/text_voice.onnx.json', 'r') as f:
+    config = json.load(f)
+print('Model config loaded successfully')
+
+# Create session
+session = ort.InferenceSession('/models/text_voice.onnx')
+print('ONNX model loaded successfully')
+
+# Simple inference test with dummy input
+# This model expects text phonemes as input
+input_ids = np.array([[1, 14, 15, 16, 2]], dtype=np.int64)  # Simple 'abc' phonemes
+scales = np.array([config['inference']['noise_scale'], 
+                   config['inference']['length_scale']], dtype=np.float32)
+
+# Run inference
+outputs = session.run(None, {
+    'input': input_ids,
+    'scales': scales
+})
+print(f'Inference successful! Output shape: {outputs[0].shape}')
+"
+      
+      - name: Test Python inference API functionality
+        run: |
+          # Test that FastAPI can be imported and basic server structure works
+          docker run --rm \
+            piper-python-inference:test \
+            python -c "
+from fastapi import FastAPI
+import uvicorn
+
+app = FastAPI()
+
+@app.get('/health')
+def health_check():
+    return {'status': 'healthy'}
+
+print('FastAPI server structure OK')
+"
+      
+      - name: Run comprehensive inference tests
+        run: |
+          # Run the comprehensive test script
+          docker run --rm \
+            -v ${{ github.workspace }}/test/models:/models:ro \
+            -v ${{ github.workspace }}/docker/test-inference.py:/test-inference.py:ro \
+            piper-python-inference:test \
+            python /test-inference.py
+      
+      - name: Clean up
+        if: always()
+        run: |
+          docker image rm piper-python-inference:test || true
+          docker system prune -f
+
+  test-multi-stage-build:
+    runs-on: ubuntu-latest
+    needs: test-docker-builds
+    
+    steps:
+      - name: Free disk space
+        run: |
+          echo "=== Initial disk space ==="
+          df -h
+          echo "=== Removing unnecessary files ==="
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf "/usr/local/share/boost"
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          sudo docker image prune --all --force
+          sudo apt-get clean
+          echo "=== Final disk space ==="
+          df -h
+      
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Build cpp-train image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./docker/cpp-train/Dockerfile
+          push: false
+          tags: piper-cpp-train:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      
+      - name: Build cpp-inference image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./docker/cpp-inference/Dockerfile
+          push: false
+          tags: piper-cpp-inference:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      
+      - name: Test cpp-inference container
+        run: |
+          docker run --rm --entrypoint /bin/bash piper-cpp-inference:test -c "
+            ldconfig -p | grep -E '(onnxruntime|espeak|HTSEngine)' && echo 'Libraries OK'
+          "
+      
+      - name: Clean up Docker images
+        if: always()
+        run: |
+          docker image rm piper-cpp-train:test piper-cpp-inference:test || true
+          docker system prune -f
+
+  run-smoke-tests:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Test Docker availability
+        run: |
+          docker --version
+          docker run --rm hello-world

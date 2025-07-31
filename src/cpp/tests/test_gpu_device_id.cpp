@@ -3,6 +3,18 @@
 #include <sstream>
 #include <string>
 
+// Platform-specific environment variable functions
+#ifdef _WIN32
+#include <windows.h>
+// Windows doesn't have setenv/unsetenv, use _putenv_s instead
+int setenv(const char* name, const char* value, int) {
+    return _putenv_s(name, value);
+}
+int unsetenv(const char* name) {
+    return _putenv_s(name, "");
+}
+#endif
+
 // Test fixture for GPU device ID tests
 class GPUDeviceIdTest : public ::testing::Test {
 protected:
