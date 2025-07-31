@@ -6,11 +6,18 @@ Supports Japanese and English text-to-speech using ONNX models
 
 import json
 import logging
-from pathlib import Path
 
 import gradio as gr
 import numpy as np
 import onnxruntime
+from app_imports import ESPEAK_AVAILABLE, PYOPENJTALK_AVAILABLE
+
+
+# Import optional dependencies
+if PYOPENJTALK_AVAILABLE:
+    import pyopenjtalk
+if ESPEAK_AVAILABLE:
+    from espeak_phonemizer import Phonemizer
 
 
 # Configure logging
@@ -25,7 +32,7 @@ MODELS = {
         "language": "ja",
     },
     "English (Test)": {
-        "path": "models/test_voice.onnx", 
+        "path": "models/test_voice.onnx",
         "config": "models/test_voice.onnx.json",
         "language": "en",
     },
@@ -34,57 +41,51 @@ MODELS = {
 
 def load_model_config(config_path: str) -> dict:
     """Load model configuration from JSON file"""
-    with open(config_path, "r", encoding="utf-8") as f:
+    with open(config_path, encoding="utf-8") as f:
         return json.load(f)
 
 
-def text_to_phonemes(text: str, language: str) -> list[int]:
-    """Convert text to phoneme IDs based on language"""
-    
+def text_to_phonemes(text: str, language: str) -> list[str]:
+    """Convert text to phoneme strings based on language"""
+
     if language == "ja":
-        try:
-            import pyopenjtalk
-            
+        if PYOPENJTALK_AVAILABLE:
             # Get phonemes from OpenJTalk
             labels = pyopenjtalk.extract_fullcontext(text)
             phonemes = []
-            
+
             for label in labels:
                 # Extract phoneme from label
                 if "-" in label and "+" in label:
                     phoneme = label.split("-")[1].split("+")[0]
                     if phoneme not in ["sil", "pau"]:
                         phonemes.append(phoneme)
-            
+
             # Add sentence markers
             phonemes = ["^"] + phonemes + ["$"]
-            
-        except ImportError:
+        else:
             logger.warning("pyopenjtalk not available, using fallback")
             # Simple fallback - just use dummy phonemes
             phonemes = ["^"] + list("aiueo") * 5 + ["$"]
-            
-    else:  # English
-        try:
-            from espeak_phonemizer import Phonemizer
-            
-            phonemizer = Phonemizer("en-us")
-            phoneme_str = phonemizer.phonemize(text)
-            # Convert phoneme string to list
-            phonemes = ["^"] + list(phoneme_str.replace(" ", "")) + ["$"]
-            
-        except ImportError:
-            logger.warning("espeak_phonemizer not available, using character fallback")
-            # Character-based fallback
-            phonemes = ["^"] + list(text.lower()) + ["$"]
-    
+
+    elif ESPEAK_AVAILABLE:  # English
+        phonemizer = Phonemizer("en-us")
+        phoneme_str = phonemizer.phonemize(text)
+        # Convert phoneme string to list
+        phonemes = ["^"] + list(phoneme_str.replace(" ", "")) + ["$"]
+    else:
+        logger.warning("espeak_phonemizer not available, using character fallback")
+        # Character-based fallback - filter non-alphabetic characters
+        cleaned_text = ''.join(c.lower() for c in text if c.isalpha() or c.isspace())
+        phonemes = ["^"] + list(cleaned_text) + ["$"]
+
     return phonemes
 
 
 def phonemes_to_ids(phonemes: list[str], config: dict) -> list[int]:
     """Convert phonemes to model input IDs"""
     phoneme_id_map = config.get("phoneme_id_map", {})
-    
+
     ids = []
     for phoneme in phonemes:
         if phoneme in phoneme_id_map:
@@ -92,7 +93,7 @@ def phonemes_to_ids(phonemes: list[str], config: dict) -> list[int]:
         else:
             # Use pad token for unknown phonemes
             ids.append(0)
-    
+
     return ids
 
 
@@ -105,48 +106,48 @@ def synthesize_speech(
     noise_w: float = 0.8,
 ) -> tuple[int, np.ndarray]:
     """Generate speech from text using selected model"""
-    
+
     if not text.strip():
         raise gr.Error("Please enter some text")
-    
+
     if model_name not in MODELS:
         raise gr.Error("Invalid model selected")
-    
+
     model_info = MODELS[model_name]
     config = load_model_config(model_info["config"])
-    
+
     # Convert text to phoneme IDs
     phonemes = text_to_phonemes(text, model_info["language"])
     phoneme_ids = phonemes_to_ids(phonemes, config)
-    
+
     if not phoneme_ids:
         raise gr.Error("Failed to convert text to phonemes")
-    
+
     # Load ONNX model
     sess_options = onnxruntime.SessionOptions()
     sess_options.inter_op_num_threads = 1
     sess_options.intra_op_num_threads = 1
-    
+
     try:
         model = onnxruntime.InferenceSession(
-            model_info["path"], 
+            model_info["path"],
             sess_options=sess_options,
             providers=["CPUExecutionProvider"]
         )
     except Exception as e:
         logger.error(f"Failed to load model: {e}")
-        raise gr.Error(f"Failed to load model: {str(e)}")
-    
+        raise gr.Error(f"Failed to load model: {str(e)}") from e
+
     # Prepare inputs
     text_array = np.expand_dims(np.array(phoneme_ids, dtype=np.int64), 0)
     text_lengths = np.array([text_array.shape[1]], dtype=np.int64)
     scales = np.array([noise_scale, length_scale, noise_w], dtype=np.float32)
-    
+
     # Handle speaker ID for multi-speaker models
     sid = None
     if config.get("num_speakers", 1) > 1:
         sid = np.array([speaker_id], dtype=np.int64)
-    
+
     # Run inference
     try:
         inputs = {
@@ -154,39 +155,39 @@ def synthesize_speech(
             "input_lengths": text_lengths,
             "scales": scales,
         }
-        
+
         if sid is not None:
             inputs["sid"] = sid
-            
+
         audio = model.run(None, inputs)[0]
-        
+
         # Remove batch and channel dimensions
         audio = audio.squeeze()
-        
+
         # Convert to int16
         audio = np.clip(audio * 32767, -32768, 32767).astype(np.int16)
-        
+
         sample_rate = config.get("audio", {}).get("sample_rate", 22050)
-        
+
         return sample_rate, audio
-        
+
     except Exception as e:
         logger.error(f"Inference failed: {e}")
-        raise gr.Error(f"Failed to generate speech: {str(e)}")
+        raise gr.Error(f"Failed to generate speech: {str(e)}") from e
 
 
 def create_interface():
     """Create Gradio interface"""
-    
+
     with gr.Blocks(title="Piper TTS Demo") as interface:
         gr.Markdown("""
         # 🎙️ Piper TTS Demo
-        
+
         High-quality text-to-speech synthesis supporting Japanese and English.
-        
+
         This demo uses ONNX models for fast CPU inference.
         """)
-        
+
         with gr.Row():
             with gr.Column(scale=2):
                 model_dropdown = gr.Dropdown(
@@ -194,23 +195,23 @@ def create_interface():
                     label="Select Model",
                     value=list(MODELS.keys())[0],
                 )
-                
+
                 text_input = gr.Textbox(
                     label="Text to synthesize",
                     placeholder="Enter text here...",
                     lines=3,
                 )
-                
+
                 with gr.Accordion("Advanced Settings", open=False):
                     speaker_id = gr.Number(
-                        label="Speaker ID", 
-                        value=0, 
+                        label="Speaker ID",
+                        value=0,
                         precision=0,
                         minimum=0,
                         maximum=10,
                         info="For multi-speaker models only"
                     )
-                    
+
                     length_scale = gr.Slider(
                         label="Speed",
                         minimum=0.5,
@@ -219,15 +220,15 @@ def create_interface():
                         step=0.1,
                         info="Lower = faster speech"
                     )
-                    
+
                     noise_scale = gr.Slider(
-                        label="Expressiveness", 
+                        label="Expressiveness",
                         minimum=0.0,
                         maximum=1.0,
                         value=0.667,
                         step=0.01,
                     )
-                    
+
                     noise_w = gr.Slider(
                         label="Phoneme Duration Variance",
                         minimum=0.0,
@@ -235,16 +236,16 @@ def create_interface():
                         value=0.8,
                         step=0.01,
                     )
-                
+
                 synthesize_btn = gr.Button("Generate Speech", variant="primary")
-                
+
             with gr.Column(scale=1):
                 audio_output = gr.Audio(
                     label="Generated Speech",
                     type="numpy",
                     autoplay=True,
                 )
-                
+
                 gr.Markdown("""
                 ### Tips:
                 - Japanese model expects hiragana/kanji text
@@ -252,7 +253,7 @@ def create_interface():
                 - Adjust speed for faster/slower speech
                 - Higher expressiveness = more natural variation
                 """)
-        
+
         # Examples
         gr.Examples(
             examples=[
@@ -263,7 +264,7 @@ def create_interface():
             ],
             inputs=[text_input, model_dropdown],
         )
-        
+
         # Event handlers
         synthesize_btn.click(
             fn=synthesize_speech,
@@ -277,7 +278,7 @@ def create_interface():
             ],
             outputs=audio_output,
         )
-    
+
     return interface
 
 
@@ -286,3 +287,4 @@ interface = create_interface()
 
 if __name__ == "__main__":
     interface.launch()
+
