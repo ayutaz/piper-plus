@@ -54,50 +54,33 @@ jobs:
           echo "Files to deploy:"
           find hf-space-deploy -type f -name "*.py" -o -name "*.txt" -o -name "*.md" -o -name "*.onnx*" | sort
 
-      - name: Push to Hugging Face
+      - name: Install Hugging Face CLI
+        run: |
+          pip install -U huggingface_hub
+          
+      - name: Push to Hugging Face using CLI
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
-          # Configure git
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git config --global user.name "github-actions[bot]"
+          # Login to Hugging Face
+          huggingface-cli login --token $HF_TOKEN
           
-          # Configure git credentials
-          git config --global credential.helper '!f() { echo "username=ayousanz"; echo "password=$HF_TOKEN"; }; f'
+          # Upload files to the Space
+          cd hf-space-deploy
           
-          # Clone the Space repository
-          git clone https://huggingface.co/spaces/ayousanz/piper-plus hf-space-repo
-          
-          # Remove old files (except .git)
-          cd hf-space-repo
-          find . -mindepth 1 -maxdepth 1 ! -name '.git' -exec rm -rf {} +
-          
-          # Copy new files
-          cp -r ../hf-space-deploy/* .
-          
-          # Check if there are changes
-          if git diff --quiet && git diff --staged --quiet; then
-            echo "No changes to deploy"
-            exit 0
-          fi
-          
-          # Add all files
-          git add -A
-          
-          # Commit changes
-          COMMIT_MSG="Update from GitHub Actions - $(date +'%Y-%m-%d %H:%M:%S')"
+          # Create a deployment message
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ github.event.inputs.deployment_message }}" ]; then
-            COMMIT_MSG="$COMMIT_MSG\n\nDeployment message: ${{ github.event.inputs.deployment_message }}"
+            COMMIT_MSG="Update from GitHub Actions - $(date +'%Y-%m-%d %H:%M:%S')\n\nDeployment message: ${{ github.event.inputs.deployment_message }}"
           elif [ "${{ github.event_name }}" = "push" ]; then
-            COMMIT_MSG="$COMMIT_MSG\n\nTriggered by push to dev branch"
-            if [ -n "${{ github.event.head_commit.message }}" ]; then
-              COMMIT_MSG="$COMMIT_MSG\nOriginal commit: ${{ github.event.head_commit.message }}"
-            fi
+            COMMIT_MSG="Update from GitHub Actions - $(date +'%Y-%m-%d %H:%M:%S')\n\nTriggered by push to dev branch"
+          else
+            COMMIT_MSG="Update from GitHub Actions - $(date +'%Y-%m-%d %H:%M:%S')"
           fi
-          git commit -m "$COMMIT_MSG"
           
-          # Push to Hugging Face
-          git push https://huggingface.co/spaces/ayousanz/piper-plus main
+          # Upload all files to Hugging Face Space
+          huggingface-cli upload ayousanz/piper-plus . --repo-type space --commit-message "$COMMIT_MSG"
+          
+          echo "✅ Successfully deployed to Hugging Face Spaces using CLI"
 
       - name: Deploy summary
         run: |
