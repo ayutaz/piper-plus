@@ -458,3 +458,16 @@ If you'd like to use a GPU, install the `onnxruntime-gpu` package:
 ```
 
 and then run `piper` with the `--cuda` argument. You will need to have a functioning CUDA environment, such as what's available in [NVIDIA's PyTorch containers](https://catalog.ngc.nvidia.com/orgs/nvidia/containers/pytorch).
+
+
+## Documentation
+
+For detailed documentation, see the [docs/](docs/) directory.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on how to contribute to this project.
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for version history and release notes.

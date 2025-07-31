@@ -35,12 +35,12 @@
 - [Multilingual Test Results](guides/testing/multilingual-test-results.md) - Test results
 
 ## 🔧 Development
-- [Contributing](development/contributing.md) - Contribution guidelines
-- [Changelog](development/changelog.md) - Version history
-- [License](development/license.md) - Project license
+- [Contributing](/CONTRIBUTING.md) - Contribution guidelines
+- [Changelog](/CHANGELOG.md) - Version history
+- [License](/LICENSE.md) - Project license (MIT)
 - [License Compliance](development/license-compliance.md) - License compliance info
 - [Workflow Migration](development/workflow-migration.md) - CI/CD workflow migration
-- [Development Plans](development/) - Development documentation
+- [Development Docs](development/) - Technical development documentation
 
 ## 📖 API Reference
 - [API Documentation](api-reference/README.md) - API reference overview
