@@ -4,6 +4,7 @@
 # to allow the app to work with fallback methods
 try:
     import importlib.util
+
     if importlib.util.find_spec("pyopenjtalk") is not None:
         PYOPENJTALK_AVAILABLE = True
     else:
@@ -13,6 +14,7 @@ except ImportError:
 
 try:
     import importlib.util
+
     if importlib.util.find_spec("espeak_phonemizer") is not None:
         ESPEAK_AVAILABLE = True
     else:

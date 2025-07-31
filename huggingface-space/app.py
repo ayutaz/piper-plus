@@ -76,7 +76,7 @@ def text_to_phonemes(text: str, language: str) -> list[str]:
     else:
         logger.warning("espeak_phonemizer not available, using character fallback")
         # Character-based fallback - filter non-alphabetic characters
-        cleaned_text = ''.join(c.lower() for c in text if c.isalpha() or c.isspace())
+        cleaned_text = "".join(c.lower() for c in text if c.isalpha() or c.isspace())
         phonemes = ["^"] + list(cleaned_text) + ["$"]
 
     return phonemes
@@ -132,7 +132,7 @@ def synthesize_speech(
         model = onnxruntime.InferenceSession(
             model_info["path"],
             sess_options=sess_options,
-            providers=["CPUExecutionProvider"]
+            providers=["CPUExecutionProvider"],
         )
     except Exception as e:
         logger.error(f"Failed to load model: {e}")
@@ -209,7 +209,7 @@ def create_interface():
                         precision=0,
                         minimum=0,
                         maximum=10,
-                        info="For multi-speaker models only"
+                        info="For multi-speaker models only",
                     )
 
                     length_scale = gr.Slider(
@@ -218,7 +218,7 @@ def create_interface():
                         maximum=2.0,
                         value=1.0,
                         step=0.1,
-                        info="Lower = faster speech"
+                        info="Lower = faster speech",
                     )
 
                     noise_scale = gr.Slider(
@@ -258,9 +258,15 @@ def create_interface():
         gr.Examples(
             examples=[
                 ["こんにちは、世界！今日はいい天気ですね。", "Japanese (Medium)"],
-                ["おはようございます。本日の会議は午後3時から始まります。", "Japanese (Medium)"],
+                [
+                    "おはようございます。本日の会議は午後3時から始まります。",
+                    "Japanese (Medium)",
+                ],
                 ["Hello world! This is a text to speech demo.", "English (Test)"],
-                ["Welcome to Piper TTS. Enjoy high quality speech synthesis.", "English (Test)"],
+                [
+                    "Welcome to Piper TTS. Enjoy high quality speech synthesis.",
+                    "English (Test)",
+                ],
             ],
             inputs=[text_input, model_dropdown],
         )
@@ -287,4 +293,3 @@ interface = create_interface()
 
 if __name__ == "__main__":
     interface.launch()
-
