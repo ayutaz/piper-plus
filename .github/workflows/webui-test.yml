@@ -6,18 +6,22 @@ on:
     paths:
       - 'src/python_run/piper/webui.py'
       - 'src/python_run/piper/sample_texts.py'
+      - 'src/python_run/piper/training_manager.py'
       - 'src/python_run/requirements_webui.txt'
       - 'docker/webui/**'
       - 'tests/test_webui.py'
+      - 'src/python_run/tests/test_training_*.py'
       - '.github/workflows/webui-test.yml'
   push:
     branches: [ dev, master, main ]
     paths:
       - 'src/python_run/piper/webui.py'
       - 'src/python_run/piper/sample_texts.py'
+      - 'src/python_run/piper/training_manager.py'
       - 'src/python_run/requirements_webui.txt'
       - 'docker/webui/**'
       - 'tests/test_webui.py'
+      - 'src/python_run/tests/test_training_*.py'
       - '.github/workflows/webui-test.yml'
   workflow_dispatch:
 
@@ -101,6 +105,17 @@ print(f'Japanese greeting: {sample}')
       - name: Run pytest for WebUI
         run: |
           python -m pytest tests/test_webui.py -v --tb=short --cov=src/python_run/piper --cov-report=term-missing
+      
+      - name: Run training manager tests
+        run: |
+          cd src/python_run
+          python -m pytest tests/test_training_manager.py -v --tb=short
+      
+      - name: Run training integration tests
+        run: |
+          cd src/python_run
+          python -m pytest tests/test_training_integration.py -v -m integration --tb=short || true
+        # Allow integration tests to fail as they require full environment
 
   docker-webui-test:
     name: Test WebUI Docker Build
