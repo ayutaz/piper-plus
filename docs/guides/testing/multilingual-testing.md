@@ -37,7 +37,7 @@ Additional languages are available and can be tested using the local test script
 ### Prerequisites
 
 1. Download or build Piper binary for your platform
-2. Python 3.7+ installed
+2. Python 3.11+ installed
 3. Internet connection for downloading voice models
 
 ### Basic Testing

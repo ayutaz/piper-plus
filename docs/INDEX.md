@@ -1,39 +1,53 @@
 # Piper Documentation Index
 
-## Core Documentation
-- [README](../README.md) - Main project documentation
-- [LICENSE](LICENSE.md) - Project license
-- [CONTRIBUTING](CONTRIBUTING.md) - Contribution guidelines
-- [CHANGELOG](CHANGELOG.md) - Version history
+## 🚀 Getting Started
+- [Quick Start (Japanese)](getting-started/quick_start_japanese.md) - 日本語クイックスタート
+- [Windows Setup](getting-started/windows-setup.md) - Windows platform setup guide
+- [Environment Variables](getting-started/environment-variables.md) - Configuration options
+- [Troubleshooting](getting-started/troubleshooting.md) - Common issues and solutions
 
-## User Guides
-- [WebUI Usage Guide](webui-usage.md) - Browser-based interface guide
-- [Japanese Usage Guide](guides/JAPANESE_USAGE.md) - 日本語音声合成ガイド
-- [Phoneme Mapping](guides/PHONEME_MAPPING.md) - Phoneme mapping details
-- [Training Guide](guides/TRAINING.md) - Model training instructions
-- [Voices](guides/VOICES.md) - Available voice models
+## 🎯 Features
+- [CLI Enhancements](features/cli-enhancements.md) - Enhanced command-line features
+- [Phoneme Input](features/phoneme-input.md) - Direct phoneme specification guide
+- [Raw Phoneme Input](features/raw-phoneme-input.md) - Raw phoneme input feature
+- [Phoneme Timing](features/phoneme-timing.md) - Phoneme timing control
+- [Streaming Mode](features/streaming-mode.md) - Real-time streaming support
+- [GPU Configuration](features/gpu-configuration.md) - Multi-GPU support
+- [WebUI](features/webui-usage.md) - Browser-based interface
 
-## Development Documentation
-- [WebUI Technical Design](WEBUI_TECHNICAL_DESIGN.md) - WebUI architecture and implementation
-- [Streaming Optimization Analysis](development/STREAMING_OPTIMIZATION_ANALYSIS.md) - Streaming implementation analysis
-- [Streaming Progress](development/STREAMING_PROGRESS.md) - Streaming feature progress
-- [ONNX Optimization Comparison](development/onnx_optimization_comparison.md) - ONNX optimization benchmarks
-- [ONNX Simplifier Integration Plan](development/onnx_simplifier_integration_plan.md) - ONNX simplifier integration
+## 📚 Guides
 
-## API Documentation
-- [Architecture](Architecture.md) - System architecture overview
-- [CLI Enhancements](CLI_ENHANCEMENTS.md) - Command-line interface improvements
-- [OpenJTalk API](openjtalk-api.md) - OpenJTalk integration API
-- [Raw Phoneme Input](RAW_PHONEME_INPUT.md) - Raw phoneme input feature
-- [Phoneme Input Guide](PHONEME_INPUT.md) - Phoneme input syntax guide
+### Training
+- [Training Guide](guides/training/training-guide.md) - General training instructions
+- [Multi-GPU Training](guides/training/multi-gpu-training.md) - Training with multiple GPUs
+- [Japanese Training Guide](guides/training/japanese-training-guide.md) - Training Japanese models
+- [Model Size Impact Analysis](guides/training/model-size-impact-analysis-ja.md) - Model size vs quality
 
-## Platform-Specific Documentation
-- [Windows Setup](windows-setup.md) - Windows platform setup guide
-- [Package Structure](PackageStructure.md) - Package organization
+### Japanese Language Support
+- [Japanese Usage Guide](guides/japanese/japanese-usage.md) - Comprehensive Japanese TTS guide
+- [OpenJTalk API](guides/japanese/openjtalk-api.md) - OpenJTalk integration
+- [OpenJTalk Windows](guides/japanese/openjtalk-windows.md) - Windows-specific setup
+- [OpenJTalk ARM64 Linux](guides/japanese/openjtalk-arm64-linux.md) - ARM64 Linux support
 
-## Testing Documentation
-- [Multilingual Testing](MULTILINGUAL_TESTING.md) - Multilingual test infrastructure
+### Optimization
+- [ARM64 Optimization](guides/optimization/arm64-optimization.md) - NEON optimizations
 
-## Additional Resources
-- [Quick Start Japanese](quick_start_japanese.md) - 日本語クイックスタート
-- [License Compliance](LICENSE_COMPLIANCE.md) - License compliance information
+### Testing
+- [Multilingual Testing](guides/testing/multilingual-testing.md) - Testing infrastructure
+- [Multilingual Test Results](guides/testing/multilingual-test-results.md) - Test results
+
+## 🔧 Development
+- [Contributing](/CONTRIBUTING.md) - Contribution guidelines
+- [Changelog](/CHANGELOG.md) - Version history
+- [License](/LICENSE.md) - Project license (MIT)
+- [License Compliance](development/license-compliance.md) - License compliance info
+- [Workflow Migration](development/workflow-migration.md) - CI/CD workflow migration
+- [Development Docs](development/) - Technical development documentation
+
+## 📖 API Reference
+- [API Documentation](api-reference/README.md) - API reference overview
+- [Phoneme Mapping](api-reference/phoneme-mapping.md) - Phoneme reference for all languages
+- [Available Voices](api-reference/available-voices.md) - Voice model catalog
+
+## 🌐 Additional Resources
+- [Competitive Analysis](competitive-analysis/) - Market analysis

@@ -8,7 +8,7 @@
 ### 必須ソフトウェア
 
 - **OS**: Windows 10 (64ビット) 以降
-- **Visual Studio**: 2019以降（Community版でも可）
+- **Visual Studio**: 2022以降（Community版でも可）
   - インストール時に「**C++によるデスクトップ開発**」ワークロードを選択
   - コンポーネント: MSVC v143, Windows 10 SDK
 - **CMake**: 3.13以降
@@ -19,7 +19,7 @@
 
 ### 推奨ソフトウェア
 
-- **Python**: 3.8以降（テストやスクリプト実行用）
+- **Python**: 3.11以降（テストやスクリプト実行用）
 - **PowerShell**: 7.0以降（Windows PowerShell 5.1でも動作します）
 
 ## ビルド手順
@@ -58,12 +58,8 @@ Set-Location piper
 New-Item -ItemType Directory -Path build -Force
 Set-Location build
 
-# Visual Studioのバージョンに合わせて選択
-# VS 2022の場合：
+# Visual Studio 2022を使用
 cmake .. -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release
-
-# VS 2019の場合：
-# cmake .. -G "Visual Studio 16 2019" -A x64 -DCMAKE_BUILD_TYPE=Release
 
 # ビルド実行
 cmake --build . --config Release --parallel
