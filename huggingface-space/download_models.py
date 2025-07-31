@@ -11,28 +11,19 @@ def create_dummy_onnx_model(output_path: Path, num_symbols: int = 130):
     """Create a minimal dummy ONNX model for testing"""
 
     # Define input tensors
-    input_ids = helper.make_tensor_value_info(
-        "input", TensorProto.INT64, [1, None]
-    )
+    input_ids = helper.make_tensor_value_info("input", TensorProto.INT64, [1, None])
     input_lengths = helper.make_tensor_value_info(
         "input_lengths", TensorProto.INT64, [1]
     )
-    scales = helper.make_tensor_value_info(
-        "scales", TensorProto.FLOAT, [3]
-    )
+    scales = helper.make_tensor_value_info("scales", TensorProto.FLOAT, [3])
 
     # Define output tensor
-    output = helper.make_tensor_value_info(
-        "output", TensorProto.FLOAT, [1, 1, None]
-    )
+    output = helper.make_tensor_value_info("output", TensorProto.FLOAT, [1, 1, None])
 
     # Create a simple identity-like operation
     # This is just a placeholder - real model would have complex operations
     identity_node = helper.make_node(
-        "Identity",
-        inputs=["input"],
-        outputs=["identity_out"],
-        name="identity"
+        "Identity", inputs=["input"], outputs=["identity_out"], name="identity"
     )
 
     # Create a constant output shape
@@ -40,15 +31,12 @@ def create_dummy_onnx_model(output_path: Path, num_symbols: int = 130):
         "shape_const",
         TensorProto.INT64,
         dims=[3],
-        vals=[1, 1, 22050]  # 1 second at 22050 Hz
+        vals=[1, 1, 22050],  # 1 second at 22050 Hz
     )
 
     # Create a constant fill node
     const_fill = helper.make_node(
-        "ConstantOfShape",
-        inputs=["shape_const"],
-        outputs=["output"],
-        name="const_fill"
+        "ConstantOfShape", inputs=["shape_const"], outputs=["output"], name="const_fill"
     )
 
     # Create the graph
@@ -57,7 +45,7 @@ def create_dummy_onnx_model(output_path: Path, num_symbols: int = 130):
         "dummy_tts_model",
         [input_ids, input_lengths, scales],
         [output],
-        [shape_const]
+        [shape_const],
     )
 
     # Create the model
@@ -71,29 +59,26 @@ def create_dummy_onnx_model(output_path: Path, num_symbols: int = 130):
 def create_dummy_config(output_path: Path, language: str = "en"):
     """Create a dummy model configuration"""
     config = {
-        "audio": {
-            "sample_rate": 22050
-        },
-        "espeak": {
-            "voice": "en-us" if language == "en" else "ja"
-        },
-        "language": {
-            "code": language
-        },
-        "inference": {
-            "noise_scale": 0.667,
-            "length_scale": 1,
-            "noise_w": 0.8
-        },
+        "audio": {"sample_rate": 22050},
+        "espeak": {"voice": "en-us" if language == "en" else "ja"},
+        "language": {"code": language},
+        "inference": {"noise_scale": 0.667, "length_scale": 1, "noise_w": 0.8},
         "phoneme_type": "espeak" if language == "en" else "openjtalk",
         "phoneme_map": {},
         "phoneme_id_map": {
-            "_": [0], "^": [1], "$": [2], " ": [3],
-            "a": [4], "b": [5], "c": [6], "d": [7], "e": [8]
+            "_": [0],
+            "^": [1],
+            "$": [2],
+            " ": [3],
+            "a": [4],
+            "b": [5],
+            "c": [6],
+            "d": [7],
+            "e": [8],
         },
         "num_symbols": 10,
         "num_speakers": 1,
-        "speaker_id_map": {}
+        "speaker_id_map": {},
     }
 
     with open(output_path, "w", encoding="utf-8") as f:

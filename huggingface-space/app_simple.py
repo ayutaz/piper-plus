@@ -6,7 +6,9 @@ Simplified Piper TTS Demo - Lightweight version without models
 import gradio as gr
 
 
-def synthesize_speech_demo(text, model_name, speaker_id, length_scale, noise_scale, noise_w):
+def synthesize_speech_demo(
+    text, model_name, speaker_id, length_scale, noise_scale, noise_w
+):
     """Demo function that returns a placeholder message"""
     return f"""
     🎙️ Piper TTS Demo (Simplified Version)
@@ -128,4 +130,3 @@ interface = create_interface()
 
 if __name__ == "__main__":
     interface.launch(server_name="0.0.0.0", server_port=7860)
-
