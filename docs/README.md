@@ -24,7 +24,6 @@ Resources for contributors including coding guidelines, architecture docs, and d
 Technical API documentation for developers integrating Piper.
 
 ### 🌐 [Additional Resources](.)
-- [WebAssembly Investigation](webassembly-investigation/) - Research on browser support
 - [Competitive Analysis](competitive-analysis/) - Market positioning
 
 ## Quick Links

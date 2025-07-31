@@ -46,5 +46,4 @@
 - [API Documentation](api-reference/README.md) - API reference overview
 
 ## 🌐 Additional Resources
-- [WebAssembly Investigation](webassembly-investigation/) - WebAssembly/WebGL research
 - [Competitive Analysis](competitive-analysis/) - Market analysis
