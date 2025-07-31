@@ -1,0 +1,120 @@
+name: Deploy to Hugging Face Spaces
+
+on:
+  push:
+    branches:
+      - dev
+    paths:
+      - 'huggingface-space/**'
+      - '.github/workflows/deploy-huggingface.yml'
+  workflow_dispatch:
+    inputs:
+      deployment_message:
+        description: 'Deployment message (optional)'
+        required: false
+        default: ''
+        type: string
+      deployment_mode:
+        description: 'Deployment mode'
+        required: true
+        default: 'full'
+        type: choice
+        options:
+          - full
+          - simple
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          lfs: true
+
+      - name: Setup deployment
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "Manual deployment triggered"
+            if [ -n "${{ github.event.inputs.deployment_message }}" ]; then
+              echo "Deployment message: ${{ github.event.inputs.deployment_message }}"
+            fi
+          else
+            echo "Automatic deployment triggered by push to dev branch"
+          fi
+
+      - name: Prepare Space files
+        run: |
+          # Create a temporary directory for the Space
+          mkdir -p hf-space-deploy
+          
+          # Set deployment mode (default to 'full' for automatic deployments)
+          DEPLOY_MODE="${{ github.event.inputs.deployment_mode || 'full' }}"
+          echo "Deployment mode: $DEPLOY_MODE"
+          
+          # Copy common files
+          cp huggingface-space/requirements.txt hf-space-deploy/
+          cp huggingface-space/README.md hf-space-deploy/
+          
+          # Copy mode-specific files
+          if [ "$DEPLOY_MODE" = "simple" ]; then
+            echo "Deploying simplified version (no models)"
+            cp huggingface-space/app_simple.py hf-space-deploy/app.py
+          else
+            echo "Deploying full version"
+            cp huggingface-space/app.py hf-space-deploy/
+            cp huggingface-space/app_imports.py hf-space-deploy/
+            cp huggingface-space/download_models.py hf-space-deploy/
+            # Create empty models directory (models will be downloaded at runtime)
+            mkdir -p hf-space-deploy/models
+          fi
+          
+          # List files to be deployed
+          echo "Files to deploy:"
+          find hf-space-deploy -type f -name "*.py" -o -name "*.txt" -o -name "*.md" | sort
+
+      - name: Install Hugging Face CLI
+        run: |
+          pip install -U huggingface_hub
+          
+      - name: Push to Hugging Face using CLI
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          # Login to Hugging Face
+          huggingface-cli login --token $HF_TOKEN
+          
+          # Upload files to the Space
+          cd hf-space-deploy
+          
+          # Create a deployment message
+          DEPLOY_MODE="${{ github.event.inputs.deployment_mode || 'full' }}"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ github.event.inputs.deployment_message }}" ]; then
+            COMMIT_MSG="Update from GitHub Actions - $(date +'%Y-%m-%d %H:%M:%S')\n\nDeployment mode: $DEPLOY_MODE\nDeployment message: ${{ github.event.inputs.deployment_message }}"
+          elif [ "${{ github.event_name }}" = "push" ]; then
+            COMMIT_MSG="Update from GitHub Actions - $(date +'%Y-%m-%d %H:%M:%S')\n\nDeployment mode: $DEPLOY_MODE\nTriggered by push to dev branch"
+          else
+            COMMIT_MSG="Update from GitHub Actions - $(date +'%Y-%m-%d %H:%M:%S')\n\nDeployment mode: $DEPLOY_MODE"
+          fi
+          
+          # Upload all files to Hugging Face Space
+          huggingface-cli upload ayousanz/piper-plus-demo . --repo-type space --commit-message "$COMMIT_MSG"
+          
+          echo "✅ Successfully deployed to Hugging Face Spaces using CLI"
+
+      - name: Deploy summary
+        run: |
+          DEPLOY_MODE="${{ github.event.inputs.deployment_mode || 'full' }}"
+          echo "## Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Successfully deployed to Hugging Face Spaces" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Deployment Mode**: $DEPLOY_MODE" >> $GITHUB_STEP_SUMMARY
+          echo "**Space URL**: https://huggingface.co/spaces/ayousanz/piper-plus-demo" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Deployed files**:" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          find hf-space-deploy -type f | sort >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+
