@@ -2,6 +2,12 @@
 
 ## Quick Start
 
+### Requirements
+
+- Python 3.11 or higher
+- Piper TTS installed
+- ONNX models downloaded
+
 ### Installation
 
 ```bash
@@ -91,12 +97,26 @@ Templates automatically switch based on the selected model's language:
 ### Docker Usage
 
 ```bash
-# Build Docker image (future implementation)
+# Build Docker image
 docker build -t piper-webui -f docker/webui/Dockerfile .
 
 # Run container
 docker run -p 7860:7860 -v ./models:/models piper-webui
+
+# Or use the helper script
+cd docker/webui
+./run.sh
+
+# Using docker-compose
+cd docker/webui
+docker-compose up
 ```
+
+#### Environment Variables for Docker
+
+- `MODELS_DIR`: Path to models directory (default: ./models)
+- `OUTPUT_DIR`: Path to output directory (default: ./output)
+- `PORT`: WebUI port (default: 7860)
 
 ## Troubleshooting
 
