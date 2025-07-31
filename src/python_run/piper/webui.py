@@ -4,15 +4,9 @@
 import argparse
 import json
 import logging
-import sys
 from pathlib import Path
 
-
-# Check Python version
-if sys.version_info < (3, 11):
-    print("Error: Python 3.11 or higher is required for WebUI")
-    sys.exit(1)
-
+# Python 3.11+ is required for this module
 import gradio as gr
 import numpy as np
 
