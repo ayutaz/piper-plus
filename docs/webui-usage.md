@@ -4,7 +4,7 @@
 
 ### Requirements
 
-- Python 3.11 or higher
+- Python 3.11 or higher (required for improved error messages, performance optimizations, and modern type annotations used in the WebUI)
 - Piper TTS installed
 - ONNX models downloaded
 

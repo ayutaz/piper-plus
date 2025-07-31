@@ -254,6 +254,7 @@ def synthesize_speech(
     if PiperVoice is None:
         # Return dummy audio for UI testing
         logger.warning("PiperVoice not available, returning dummy audio")
+        raise gr.Warning("PiperVoice is not available. Generating synthetic audio for testing purposes.")
         sample_rate = 22050
         duration = 2.0  # seconds
         t = np.linspace(0, duration, int(sample_rate * duration))

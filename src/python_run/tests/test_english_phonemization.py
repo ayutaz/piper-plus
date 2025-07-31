@@ -157,17 +157,20 @@ class TestCLIIntegration:
     """Test CLI integration with English models"""
 
     @pytest.mark.skipif(
-        not Path("/Users/s19447/Desktop/total-piper/piper/test/models/test_voice.onnx").exists(),
+        not (Path(__file__).parent.parent.parent.parent / "test" / "models" / "test_voice.onnx").exists(),
         reason="Test model not available"
     )
     def test_cli_english_synthesis(self, tmp_path):
         """Test English synthesis via CLI"""
         output_file = tmp_path / "test_output.wav"
+        
+        # Construct the model path dynamically
+        model_path = Path(__file__).parent.parent.parent.parent / "test" / "models" / "test_voice.onnx"
 
         # Run piper CLI
         result = subprocess.run([
             sys.executable, "-m", "piper",
-            "--model", "/Users/s19447/Desktop/total-piper/piper/test/models/test_voice.onnx",
+            "--model", str(model_path),
             "--output_file", str(output_file)
         ], check=False, input="Hello world", text=True, capture_output=True, cwd=Path(__file__).parent.parent)
 
