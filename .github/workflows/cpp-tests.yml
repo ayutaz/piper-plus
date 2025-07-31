@@ -2,7 +2,7 @@ name: C++ Tests
 
 on:
   pull_request:
-    branches: [ dev, master, main ]
+    branches: [ dev, main ]
     paths:
       - 'src/cpp/**'
       - 'CMakeLists.txt'

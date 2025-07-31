@@ -6,6 +6,12 @@ on:
       - 'docker/**'
       - '.github/workflows/docker-*.yml'
       - '.dockerignore'
+  push:
+    branches: [dev]
+    paths:
+      - 'docker/**'
+      - '.github/workflows/docker-*.yml'
+      - '.dockerignore'
 
 jobs:
   test-docker-builds:
