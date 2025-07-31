@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Integration tests for Piper WebUI"""
 
+import inspect
 import os
 import sys
 from pathlib import Path
@@ -21,6 +22,7 @@ try:
         create_interface,
         get_available_models,
         get_language_from_model,
+        synthesize_speech,
         update_templates,
     )
     WEBUI_AVAILABLE = True
@@ -132,9 +134,6 @@ class TestWebUI:
 
     def test_synthesis_function_signature(self):
         """Test that synthesis function has correct signature"""
-        import inspect
-        from piper.webui import synthesize_speech
-
         # Get function signature
         sig = inspect.signature(synthesize_speech)
         params = list(sig.parameters.keys())
