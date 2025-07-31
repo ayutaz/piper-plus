@@ -129,7 +129,37 @@ else
 fi
 
 echo ""
-echo "5. Cleanup test images..."
+echo "5. Testing inference with test models..."
+echo ""
+
+# Test Python inference with actual model if test models exist
+if [ -f "test/models/text_voice.onnx" ]; then
+    run_test "Python inference with test model" \
+        "docker run --rm -v $(pwd)/test/models:/models:ro piper-python-inference:test python -c '
+import onnxruntime as ort
+import numpy as np
+import json
+
+# Load model
+with open(\"/models/text_voice.onnx.json\", \"r\") as f:
+    config = json.load(f)
+    
+session = ort.InferenceSession(\"/models/text_voice.onnx\")
+
+# Simple inference test
+input_ids = np.array([[1, 20, 18, 24, 24, 27, 2]], dtype=np.int64)  # \"hello\" in phonemes
+scales = np.array([config[\"inference\"][\"noise_scale\"], 
+                   config[\"inference\"][\"length_scale\"]], dtype=np.float32)
+
+outputs = session.run(None, {\"input\": input_ids, \"scales\": scales})
+print(f\"Inference successful! Generated audio shape: {outputs[0].shape}\")
+'"
+else
+    echo -e "${YELLOW}Skipping model inference test (test models not found)${NC}"
+fi
+
+echo ""
+echo "6. Cleanup test images..."
 echo ""
 
 # Remove test images
