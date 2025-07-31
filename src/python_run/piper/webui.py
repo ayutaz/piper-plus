@@ -29,6 +29,11 @@ TEMPLATES = {
         "story": "Once upon a time, in a small village nestled between mountains, there lived a curious young inventor.",
         "product": "Introducing our latest innovation - a revolutionary device that will transform your daily routine.",
         "assistant": "I understand your request. Let me help you with that information.",
+        "weather": "Today's weather forecast shows partly cloudy skies with a high of 72 degrees Fahrenheit. There's a 20% chance of afternoon showers.",
+        "podcast": "Welcome to today's episode of Tech Talk, where we explore the latest innovations in artificial intelligence and machine learning.",
+        "audiobook": "Chapter One. The morning sun cast long shadows across the cobblestone streets as Sarah made her way to the ancient library.",
+        "commercial": "Experience the difference with our premium quality products. Visit our store today and save 20% on your first purchase.",
+        "tutorial": "In this tutorial, we'll learn how to create beautiful presentations using simple design principles. Let's begin with the basics.",
     },
     "ja_JP": {
         "greeting": "こんにちは。本日はどのようなご用件でしょうか。お気軽にお申し付けください。",
@@ -36,6 +41,13 @@ TEMPLATES = {
         "story": "昔々、山に囲まれた小さな村に、好奇心旺盛な若い発明家が住んでいました。",
         "product": "新製品のご紹介です。この革新的なデバイスは、あなたの日常を劇的に変えることでしょう。",
         "assistant": "承知いたしました。そちらの情報についてお手伝いさせていただきます。",
+        "weather": "本日の天気予報です。晴れ時々曇り、最高気温は22度、降水確率は20パーセントとなっております。",
+        "podcast": "テクノロジートークへようこそ。今回は、最新のAI技術と、それが私たちの生活に与える影響について探っていきます。",
+        "audiobook": "第一章。朝の光が石畳の道に長い影を落とす中、さくらは古い図書館へと足を向けていた。",
+        "commercial": "品質にこだわった商品を、特別価格でご提供いたします。初回ご購入の方は20パーセント割引となります。",
+        "tutorial": "このチュートリアルでは、シンプルなデザイン原則を使って、美しいプレゼンテーションを作成する方法を学びます。",
+        "announcement": "お客様各位。本日は定期メンテナンスのため、午後3時から5時まで一部サービスを停止させていただきます。",
+        "navigation": "次の交差点を右に曲がってください。目的地まであと500メートルです。到着予定時刻は午後2時30分です。",
     },
     "de_DE": {
         "greeting": "Guten Tag! Willkommen bei unserem Service. Wie kann ich Ihnen heute helfen?",
@@ -60,6 +72,13 @@ TEMPLATE_DESCRIPTIONS = {
     "story": "Story Telling",
     "product": "Product Description",
     "assistant": "Voice Assistant",
+    "weather": "Weather Report",
+    "podcast": "Podcast Intro",
+    "audiobook": "Audiobook Narration",
+    "commercial": "Commercial",
+    "tutorial": "Tutorial",
+    "announcement": "Public Announcement",
+    "navigation": "Navigation Guide",
 }
 
 
@@ -353,10 +372,22 @@ def create_interface(data_dir: Path) -> gr.Blocks:
                 # Examples
                 gr.Examples(
                     examples=[
+                        # English examples
                         ["Hello, welcome to Piper text to speech system.", available_models[0][1] if available_models else "", 0, 1.0, 0.667, 0.8],
                         ["The quick brown fox jumps over the lazy dog.", available_models[0][1] if available_models else "", 0, 0.8, 0.5, 0.8],
+                        ["Good morning! Today's weather is perfect for a walk in the park.", available_models[0][1] if available_models else "", 0, 1.0, 0.667, 0.8],
+                        ["Artificial intelligence is transforming how we interact with technology.", available_models[0][1] if available_models else "", 0, 0.9, 0.7, 0.8],
+                        # Japanese examples
+                        ["こんにちは。今日はいい天気ですね。", available_models[0][1] if available_models else "", 0, 1.0, 0.667, 0.8],
+                        ["人工知能による音声合成のデモンストレーションです。", available_models[0][1] if available_models else "", 0, 1.0, 0.667, 0.8],
+                        ["明日の会議は午後3時から始まります。よろしくお願いします。", available_models[0][1] if available_models else "", 0, 0.9, 0.667, 0.8],
+                        ["春の桜は本当に美しいです。日本の四季は素晴らしいですね。", available_models[0][1] if available_models else "", 0, 1.1, 0.7, 0.8],
+                        # Mixed examples for testing
+                        ["Testing speech synthesis with numbers: 1, 2, 3, 4, 5.", available_models[0][1] if available_models else "", 0, 1.0, 0.667, 0.8],
+                        ["2024年の技術トレンドについて説明します。", available_models[0][1] if available_models else "", 0, 1.0, 0.667, 0.8],
                     ],
                     inputs=[text_input, model_dropdown, speaker_id, length_scale, noise_scale, noise_w],
+                    label="Example Texts (English & Japanese)",
                 )
             
             # Training Tab
