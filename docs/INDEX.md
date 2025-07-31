@@ -18,11 +18,13 @@
 ## 📚 Guides
 
 ### Training
+- [Training Guide](guides/training/training-guide.md) - General training instructions
 - [Multi-GPU Training](guides/training/multi-gpu-training.md) - Training with multiple GPUs
 - [Japanese Training Guide](guides/training/japanese-training-guide.md) - Training Japanese models
 - [Model Size Impact Analysis](guides/training/model-size-impact-analysis-ja.md) - Model size vs quality
 
 ### Japanese Language Support
+- [Japanese Usage Guide](guides/japanese/japanese-usage.md) - Comprehensive Japanese TTS guide
 - [OpenJTalk API](guides/japanese/openjtalk-api.md) - OpenJTalk integration
 - [OpenJTalk Windows](guides/japanese/openjtalk-windows.md) - Windows-specific setup
 - [OpenJTalk ARM64 Linux](guides/japanese/openjtalk-arm64-linux.md) - ARM64 Linux support
@@ -44,6 +46,8 @@
 
 ## 📖 API Reference
 - [API Documentation](api-reference/README.md) - API reference overview
+- [Phoneme Mapping](api-reference/phoneme-mapping.md) - Phoneme reference for all languages
+- [Available Voices](api-reference/available-voices.md) - Voice model catalog
 
 ## 🌐 Additional Resources
 - [Competitive Analysis](competitive-analysis/) - Market analysis
