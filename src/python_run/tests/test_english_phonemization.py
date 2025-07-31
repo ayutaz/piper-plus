@@ -163,7 +163,7 @@ class TestCLIIntegration:
     def test_cli_english_synthesis(self, tmp_path):
         """Test English synthesis via CLI"""
         output_file = tmp_path / "test_output.wav"
-        
+
         # Construct the model path dynamically
         model_path = Path(__file__).parent.parent.parent.parent / "test" / "models" / "test_voice.onnx"
 

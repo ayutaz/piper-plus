@@ -132,12 +132,7 @@ class TestWebUI:
 
     def test_synthesis_function_signature(self):
         """Test that synthesis function has correct signature"""
-        # This test needs inspect module
-        try:
-            import inspect
-        except ImportError:
-            pytest.skip("inspect module not available")
-
+        import inspect
         from piper.webui import synthesize_speech
 
         # Get function signature
