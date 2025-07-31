@@ -4,6 +4,7 @@
 import argparse
 import json
 import logging
+import time
 from pathlib import Path
 
 # Python 3.11+ is required for this module
@@ -16,6 +17,8 @@ try:
 except ImportError:
     # For testing UI without piper installed
     PiperVoice = None
+
+from .training_manager import training_manager
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -344,6 +347,36 @@ def validate_dataset(dataset_path: str) -> dict:
     return stats
 
 
+def check_training_dependencies():
+    """Check if training dependencies are installed"""
+    missing_deps = []
+    
+    try:
+        import pytorch_lightning
+    except ImportError:
+        missing_deps.append("pytorch-lightning")
+    
+    try:
+        import torch
+    except ImportError:
+        missing_deps.append("torch")
+        
+    try:
+        # Check if piper_train is accessible
+        import subprocess
+        result = subprocess.run(
+            [sys.executable, "-m", "piper_train", "--help"],
+            capture_output=True,
+            text=True
+        )
+        if result.returncode != 0 and "No module named piper_train" in result.stderr:
+            missing_deps.append("piper_train (not in Python path)")
+    except Exception:
+        missing_deps.append("piper_train (check failed)")
+    
+    return missing_deps
+
+
 def start_training(
     dataset_path: str,
     base_model: str,
@@ -354,10 +387,80 @@ def start_training(
     num_epochs: int,
     checkpoint_interval: int,
     validation_split: float,
+    output_dir: str = "models/training",
 ) -> str:
-    """Start training process (mock implementation for UI)"""
-    # This is a placeholder - actual implementation would start a background process
-    return "Training started! (This is a UI demo - actual training not implemented)"
+    """Start training process"""
+    if not dataset_path or not Path(dataset_path).exists():
+        return "❌ Error: Dataset path does not exist"
+    
+    # Check dependencies
+    missing_deps = check_training_dependencies()
+    if missing_deps:
+        deps_list = "\n  - ".join(missing_deps)
+        return f"❌ Missing training dependencies:\n  - {deps_list}\n\nPlease install them first:\n  cd src/python && pip install -r requirements_train.txt"
+    
+    if training_manager.is_running():
+        return "⚠️ Training is already running. Please stop the current training first."
+    
+    # Start training
+    success = training_manager.start_training(
+        dataset_path=dataset_path,
+        output_dir=output_dir,
+        base_model=base_model if base_model != "New Model" else None,
+        num_speakers=num_speakers,
+        quality=quality,
+        batch_size=batch_size,
+        learning_rate=learning_rate,
+        num_epochs=num_epochs,
+        checkpoint_interval=checkpoint_interval,
+        validation_split=validation_split,
+    )
+    
+    if success:
+        return "✅ Training started successfully! Check the progress below."
+    else:
+        error = training_manager.get_status().error
+        return f"❌ Failed to start training: {error}"
+
+
+def stop_training() -> str:
+    """Stop current training process"""
+    if not training_manager.is_running():
+        return "ℹ️ No training is currently running."
+    
+    if training_manager.stop_training():
+        return "✅ Training stopped successfully."
+    else:
+        return "❌ Failed to stop training."
+
+
+def get_training_status() -> dict:
+    """Get current training status"""
+    status = training_manager.get_status()
+    
+    # Calculate progress
+    progress = 0.0
+    if status.total_epochs > 0:
+        progress = status.current_epoch / status.total_epochs
+    
+    # Calculate ETA
+    eta_text = "N/A"
+    if status.is_running and status.start_time and status.current_epoch > 0:
+        elapsed = (status.last_update or time.time()) - status.start_time.timestamp()
+        per_epoch = elapsed / status.current_epoch
+        remaining_epochs = status.total_epochs - status.current_epoch
+        eta_seconds = per_epoch * remaining_epochs
+        eta_hours = int(eta_seconds // 3600)
+        eta_minutes = int((eta_seconds % 3600) // 60)
+        eta_text = f"{eta_hours}h {eta_minutes}m"
+    
+    return {
+        "is_running": status.is_running,
+        "progress": progress,
+        "status_text": f"Epoch {status.current_epoch}/{status.total_epochs} | Loss: {status.current_loss:.4f} | ETA: {eta_text}",
+        "logs": "\n".join(status.log_messages[-20:]),  # Last 20 log lines
+        "error": status.error,
+    }
 
 
 def create_interface(data_dir: Path) -> gr.Blocks:
@@ -574,30 +677,40 @@ def create_interface(data_dir: Path) -> gr.Blocks:
                                 step=0.05,
                             )
 
-                with gr.Row():
-                    start_training_btn = gr.Button("Start Training", variant="primary")
-                    gr.Button("Stop Training", variant="stop")  # stop_training_btn
+                # Output directory for trained models
+                output_dir = gr.Textbox(
+                    label="Output Directory",
+                    value="models/training",
+                    placeholder="Directory to save trained models",
+                )
 
                 with gr.Row():
-                    gr.Progress()  # training_progress
+                    start_training_btn = gr.Button("Start Training", variant="primary")
+                    stop_training_btn = gr.Button("Stop Training", variant="stop")
+
+                with gr.Row():
+                    training_progress = gr.Progress()
                     training_status = gr.Textbox(
                         label="Training Status",
                         value="Not started",
                         interactive=False,
                     )
 
-                with gr.Row():
-                    gr.LinePlot(  # loss_plot
-                        label="Training Loss",
-                        x="epoch",
-                        y="loss",
-                        visible=False,
-                    )
-
-                    gr.Audio(  # validation_audio
-                        label="Validation Sample",
-                        visible=False,
-                    )
+                # Training logs
+                training_logs = gr.Textbox(
+                    label="Training Logs",
+                    value="",
+                    lines=15,
+                    max_lines=20,
+                    interactive=False,
+                    autoscroll=True,
+                )
+                
+                # Auto-refresh checkbox
+                auto_refresh = gr.Checkbox(
+                    label="Auto-refresh logs (every 2 seconds)",
+                    value=True,
+                )
 
         # Event handlers
         model_dropdown.change(
@@ -640,6 +753,7 @@ def create_interface(data_dir: Path) -> gr.Blocks:
             outputs=[dataset_info],
         )
 
+        # Training control handlers
         start_training_btn.click(
             fn=start_training,
             inputs=[
@@ -652,8 +766,64 @@ def create_interface(data_dir: Path) -> gr.Blocks:
                 num_epochs,
                 checkpoint_interval,
                 validation_split,
+                output_dir,
             ],
             outputs=[training_status],
+        )
+        
+        stop_training_btn.click(
+            fn=stop_training,
+            outputs=[training_status],
+        )
+        
+        # Auto-refresh training status
+        def refresh_training_ui(should_refresh):
+            """Refresh training UI components"""
+            if not should_refresh:
+                return gr.update(), gr.update(), gr.update()
+                
+            status_dict = get_training_status()
+            
+            # Update progress bar
+            progress_update = gr.update(value=status_dict["progress"])
+            
+            # Update status text
+            if status_dict["error"]:
+                status_text = f"❌ Error: {status_dict['error']}"
+            elif status_dict["is_running"]:
+                status_text = f"🏃 Running: {status_dict['status_text']}"
+            else:
+                status_text = "⏹️ Not running"
+            
+            status_update = gr.update(value=status_text)
+            
+            # Update logs
+            logs_update = gr.update(value=status_dict["logs"])
+            
+            return progress_update, status_update, logs_update
+        
+        # Set up periodic refresh
+        # Note: Using a button click loop as Timer might not be available in all Gradio versions
+        refresh_btn = gr.Button("Refresh Status", visible=False)
+        refresh_btn.click(
+            fn=refresh_training_ui,
+            inputs=[auto_refresh],
+            outputs=[training_progress, training_status, training_logs],
+        )
+        
+        # Automatic refresh using JavaScript (if supported)
+        interface.load(
+            fn=None,
+            js="""
+            () => {
+                setInterval(() => {
+                    const refreshBtn = document.querySelector('button:contains("Refresh Status")');
+                    if (refreshBtn && document.querySelector('input[type="checkbox"][aria-label*="Auto-refresh"]')?.checked) {
+                        refreshBtn.click();
+                    }
+                }, 2000);
+            }
+            """
         )
 
     return interface

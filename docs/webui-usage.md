@@ -13,6 +13,10 @@
 ```bash
 # Install WebUI dependencies
 pip install -r src/python_run/requirements_webui.txt
+
+# For training functionality (optional)
+cd src/python
+pip install -r requirements_train.txt
 ```
 
 ### Running the WebUI
@@ -64,11 +68,23 @@ python -m piper.webui \
    - Base model selection or new model training
    - Number of speakers configuration
    - Quality selection (low/medium/high)
+   - Output directory for trained models
 
 3. **Advanced Parameters**:
    - Batch size, learning rate, epochs
    - Checkpoint intervals
    - Validation split ratio
+
+4. **Training Control**:
+   - Start/Stop training buttons
+   - Real-time training status display
+   - Live training logs with auto-refresh
+   - Progress tracking (current epoch, loss, ETA)
+
+5. **Requirements for Training**:
+   - PyTorch and pytorch-lightning must be installed
+   - Run from directory with access to piper_train module
+   - Sufficient disk space for checkpoints
 
 ## Examples
 
