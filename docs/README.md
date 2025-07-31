@@ -23,8 +23,6 @@ Welcome to the Piper documentation. This directory contains detailed guides and 
 - [OpenJTalk ARM64 Linux](openjtalk-arm64-linux.md) - ARM64 Linux support
 
 ### 🔧 Development & Training
-- [Architecture Overview](Architecture.md) - System architecture and design
-- [Package Structure](PackageStructure.md) - Project organization
 - [Multi-GPU Training](MULTI_GPU_TRAINING.md) - Training with multiple GPUs
 - [Model Size Impact Analysis](model-size-impact-analysis-ja.md) - Model size vs quality analysis
 
@@ -40,12 +38,6 @@ Welcome to the Piper documentation. This directory contains detailed guides and 
 
 ### 🔄 Migration & Integration
 - [Workflow Migration](workflow-migration.md) - CI/CD workflow migration guide
-- [Unity Plugin Investigation](unity-plugin-investigation-ja.md) - Unity integration research
-- [Unity Development](unity-piper-tts-*.md) - Unity TTS development docs
-
-### 📋 Project Management
-- [Phase 1 Kickoff](phase1-kickoff.md) - Project phase 1 overview
-- [Phase 1 Progress](phase1-progress.md) - Development progress tracking
 
 ## Quick Start
 
