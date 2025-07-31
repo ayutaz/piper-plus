@@ -14,6 +14,14 @@ on:
         required: false
         default: ''
         type: string
+      deployment_mode:
+        description: 'Deployment mode'
+        required: true
+        default: 'full'
+        type: choice
+        options:
+          - full
+          - simple
 
 jobs:
   deploy:
@@ -41,17 +49,30 @@ jobs:
           # Create a temporary directory for the Space
           mkdir -p hf-space-deploy
           
-          # Copy all files from huggingface-space EXCEPT models directory
-          cp huggingface-space/*.py hf-space-deploy/
-          cp huggingface-space/*.txt hf-space-deploy/
-          cp huggingface-space/*.md hf-space-deploy/
+          # Set deployment mode (default to 'full' for automatic deployments)
+          DEPLOY_MODE="${{ github.event.inputs.deployment_mode || 'full' }}"
+          echo "Deployment mode: $DEPLOY_MODE"
           
-          # Create empty models directory (models will be downloaded at runtime)
-          mkdir -p hf-space-deploy/models
+          # Copy common files
+          cp huggingface-space/requirements.txt hf-space-deploy/
+          cp huggingface-space/README.md hf-space-deploy/
+          
+          # Copy mode-specific files
+          if [ "$DEPLOY_MODE" = "simple" ]; then
+            echo "Deploying simplified version (no models)"
+            cp huggingface-space/app_simple.py hf-space-deploy/app.py
+          else
+            echo "Deploying full version"
+            cp huggingface-space/app.py hf-space-deploy/
+            cp huggingface-space/app_imports.py hf-space-deploy/
+            cp huggingface-space/download_models.py hf-space-deploy/
+            # Create empty models directory (models will be downloaded at runtime)
+            mkdir -p hf-space-deploy/models
+          fi
           
           # List files to be deployed
           echo "Files to deploy:"
-          find hf-space-deploy -type f -name "*.py" -o -name "*.txt" -o -name "*.md" -o -name "*.onnx*" | sort
+          find hf-space-deploy -type f -name "*.py" -o -name "*.txt" -o -name "*.md" | sort
 
       - name: Install Hugging Face CLI
         run: |
@@ -68,12 +89,13 @@ jobs:
           cd hf-space-deploy
           
           # Create a deployment message
+          DEPLOY_MODE="${{ github.event.inputs.deployment_mode || 'full' }}"
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ github.event.inputs.deployment_message }}" ]; then
-            COMMIT_MSG="Update from GitHub Actions - $(date +'%Y-%m-%d %H:%M:%S')\n\nDeployment message: ${{ github.event.inputs.deployment_message }}"
+            COMMIT_MSG="Update from GitHub Actions - $(date +'%Y-%m-%d %H:%M:%S')\n\nDeployment mode: $DEPLOY_MODE\nDeployment message: ${{ github.event.inputs.deployment_message }}"
           elif [ "${{ github.event_name }}" = "push" ]; then
-            COMMIT_MSG="Update from GitHub Actions - $(date +'%Y-%m-%d %H:%M:%S')\n\nTriggered by push to dev branch"
+            COMMIT_MSG="Update from GitHub Actions - $(date +'%Y-%m-%d %H:%M:%S')\n\nDeployment mode: $DEPLOY_MODE\nTriggered by push to dev branch"
           else
-            COMMIT_MSG="Update from GitHub Actions - $(date +'%Y-%m-%d %H:%M:%S')"
+            COMMIT_MSG="Update from GitHub Actions - $(date +'%Y-%m-%d %H:%M:%S')\n\nDeployment mode: $DEPLOY_MODE"
           fi
           
           # Upload all files to Hugging Face Space
@@ -83,10 +105,12 @@ jobs:
 
       - name: Deploy summary
         run: |
+          DEPLOY_MODE="${{ github.event.inputs.deployment_mode || 'full' }}"
           echo "## Deployment Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "✅ Successfully deployed to Hugging Face Spaces" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Deployment Mode**: $DEPLOY_MODE" >> $GITHUB_STEP_SUMMARY
           echo "**Space URL**: https://huggingface.co/spaces/ayousanz/piper-plus-demo" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Deployed files**:" >> $GITHUB_STEP_SUMMARY
