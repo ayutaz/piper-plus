@@ -27,6 +27,7 @@ except ImportError:
         # Try to use espeak-ng command if available
         try:
             from .espeak_phonemizer import phonemize_espeak_ng
+
             return phonemize_espeak_ng(text, voice or "en-us")
         except ImportError:
             # Simple fallback: return text as list of characters

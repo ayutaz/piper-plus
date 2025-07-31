@@ -19,11 +19,12 @@ logger = logging.getLogger(__name__)
 @dataclass
 class TrainingStatus:
     """Training process status"""
+
     is_running: bool = False
     current_epoch: int = 0
     total_epochs: int = 0
     current_loss: float = 0.0
-    best_loss: float = float('inf')
+    best_loss: float = float("inf")
     start_time: datetime | None = None
     last_update: datetime | None = None
     error: str | None = None
@@ -44,7 +45,7 @@ class TrainingStatus:
             "start_time": self.start_time.isoformat() if self.start_time else None,
             "last_update": self.last_update.isoformat() if self.last_update else None,
             "error": self.error,
-            "log_messages": self.log_messages[-100:]  # Keep last 100 messages
+            "log_messages": self.log_messages[-100:],  # Keep last 100 messages
         }
 
 
@@ -89,16 +90,27 @@ class TrainingManager:
 
         # Build command
         cmd = [
-            sys.executable, "-m", "piper_train",
-            "--dataset-dir", dataset_path,
-            "--quality", quality,
-            "--batch-size", str(batch_size),
-            "--learning-rate", str(learning_rate),
-            "--epochs", str(num_epochs),
-            "--validation-split", str(validation_split),
-            "--checkpoint-epochs", str(checkpoint_interval),
-            "--accelerator", accelerator,
-            "--devices", str(devices),
+            sys.executable,
+            "-m",
+            "piper_train",
+            "--dataset-dir",
+            dataset_path,
+            "--quality",
+            quality,
+            "--batch-size",
+            str(batch_size),
+            "--learning-rate",
+            str(learning_rate),
+            "--epochs",
+            str(num_epochs),
+            "--validation-split",
+            str(validation_split),
+            "--checkpoint-epochs",
+            str(checkpoint_interval),
+            "--accelerator",
+            accelerator,
+            "--devices",
+            str(devices),
         ]
 
         # Add environment variables to find piper_train
@@ -117,9 +129,7 @@ class TrainingManager:
 
         # Reset status
         self.status = TrainingStatus(
-            is_running=True,
-            total_epochs=num_epochs,
-            start_time=datetime.now()
+            is_running=True, total_epochs=num_epochs, start_time=datetime.now()
         )
         self._stop_event.clear()
 
@@ -134,7 +144,7 @@ class TrainingManager:
                 bufsize=1,
                 universal_newlines=True,
                 env=env,
-                cwd=piper_python_path if piper_python_path.exists() else None
+                cwd=piper_python_path if piper_python_path.exists() else None,
             )
 
             # Start monitoring thread
@@ -182,7 +192,11 @@ class TrainingManager:
 
     def is_running(self) -> bool:
         """Check if training is running"""
-        return self.status.is_running and self.process is not None and self.process.poll() is None
+        return (
+            self.status.is_running
+            and self.process is not None
+            and self.process.poll() is None
+        )
 
     def get_status(self) -> TrainingStatus:
         """Get current training status"""
@@ -202,7 +216,7 @@ class TrainingManager:
             return
 
         try:
-            for line in iter(self.process.stdout.readline, ''):
+            for line in iter(self.process.stdout.readline, ""):
                 if self._stop_event.is_set():
                     break
 
@@ -249,9 +263,11 @@ class TrainingManager:
                 for i, part in enumerate(parts):
                     if "loss:" in part.lower() and i + 1 < len(parts):
                         try:
-                            loss_value = float(parts[i + 1].rstrip(','))
+                            loss_value = float(parts[i + 1].rstrip(","))
                             self.status.current_loss = loss_value
-                            self.status.best_loss = min(self.status.best_loss, loss_value)
+                            self.status.best_loss = min(
+                                self.status.best_loss, loss_value
+                            )
                         except ValueError:
                             pass
 

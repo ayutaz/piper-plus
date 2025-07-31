@@ -14,11 +14,7 @@ def phonemize_espeak_ng(text: str, voice: str = "en-us") -> list[list[str]]:
         # Run espeak-ng with IPA output
         cmd = ["espeak-ng", "-v", voice, "-x", "-q", "--ipa"]
         result = subprocess.run(
-            cmd,
-            input=text,
-            text=True,
-            capture_output=True,
-            check=True
+            cmd, input=text, text=True, capture_output=True, check=True
         )
 
         # Parse IPA output
@@ -28,10 +24,10 @@ def phonemize_espeak_ng(text: str, voice: str = "en-us") -> list[list[str]]:
         # Convert IPA to phoneme list
         phonemes = []
         for char in ipa_text:
-            if char not in [' ', '\n', '\t']:
+            if char not in [" ", "\n", "\t"]:
                 phonemes.append(char)
-            elif char == ' ' and phonemes and phonemes[-1] != ' ':
-                phonemes.append(' ')
+            elif char == " " and phonemes and phonemes[-1] != " ":
+                phonemes.append(" ")
 
         # Group by sentences (simple approach)
         return [phonemes]
@@ -52,11 +48,7 @@ def phonemize_espeak_phonemes(text: str, voice: str = "en-us") -> list[list[str]
         # Run espeak-ng with phoneme output
         cmd = ["espeak-ng", "-v", voice, "-x", "-q"]
         result = subprocess.run(
-            cmd,
-            input=text,
-            text=True,
-            capture_output=True,
-            check=True
+            cmd, input=text, text=True, capture_output=True, check=True
         )
 
         # Parse phoneme output
@@ -73,11 +65,11 @@ def phonemize_espeak_phonemes(text: str, voice: str = "en-us") -> list[list[str]
                     phonemes.append(current_phoneme)
                     current_phoneme = ""
                 phonemes.append(char)
-            elif char == ' ':
+            elif char == " ":
                 if current_phoneme:
                     phonemes.append(current_phoneme)
                     current_phoneme = ""
-                phonemes.append(' ')
+                phonemes.append(" ")
             else:
                 current_phoneme += char
 

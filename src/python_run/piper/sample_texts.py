@@ -118,12 +118,14 @@ EMOTION_SAMPLES = {
     },
 }
 
+
 def get_sample_by_category(language: str, category: str, index: int = 0) -> str:
     """Get a sample text by language and category"""
     if language in SAMPLE_TEXTS and category in SAMPLE_TEXTS[language]:
         samples = SAMPLE_TEXTS[language][category]
         return samples[index % len(samples)]
     return ""
+
 
 def get_all_samples_flat(language: str) -> list:
     """Get all samples for a language as a flat list"""

@@ -220,10 +220,12 @@ def update_templates(model_path: str) -> gr.Dropdown:
 
     options = ["Custom Text"]
     if language in TEMPLATES:
-        options.extend([
-            f"{TEMPLATE_DESCRIPTIONS[key]} ({key})"
-            for key in TEMPLATES[language].keys()
-        ])
+        options.extend(
+            [
+                f"{TEMPLATE_DESCRIPTIONS[key]} ({key})"
+                for key in TEMPLATES[language].keys()
+            ]
+        )
 
     return gr.Dropdown(choices=options, value="Custom Text")
 
@@ -266,7 +268,9 @@ def synthesize_speech(
     if PiperVoice is None:
         # Return dummy audio for UI testing
         logger.warning("PiperVoice not available, returning dummy audio")
-        raise gr.Warning("PiperVoice is not available. Generating synthetic audio for testing purposes.")
+        raise gr.Warning(
+            "PiperVoice is not available. Generating synthetic audio for testing purposes."
+        )
         sample_rate = 22050
         duration = 2.0  # seconds
         t = np.linspace(0, duration, int(sample_rate * duration))
@@ -283,7 +287,7 @@ def synthesize_speech(
         # Create in-memory WAV file
         wav_buffer = io.BytesIO()
 
-        with wave.open(wav_buffer, 'wb') as wav_file:
+        with wave.open(wav_buffer, "wb") as wav_file:
             wav_file.setnchannels(1)  # mono
             wav_file.setsampwidth(2)  # 16-bit
             wav_file.setframerate(voice.config.sample_rate)
@@ -300,7 +304,7 @@ def synthesize_speech(
 
         # Read audio data from buffer
         wav_buffer.seek(0)
-        with wave.open(wav_buffer, 'rb') as wav_file:
+        with wave.open(wav_buffer, "rb") as wav_file:
             frames = wav_file.readframes(wav_file.getnframes())
             audio = np.frombuffer(frames, dtype=np.int16)
 
@@ -347,6 +351,7 @@ def validate_dataset(dataset_path: str) -> dict:
     # Try to read metadata.csv for speaker info
     try:
         import csv
+
         speakers = set()
         with open(metadata_file, encoding="utf-8") as f:
             reader = csv.reader(f, delimiter="|")
@@ -366,6 +371,7 @@ def check_training_dependencies():
 
     try:
         import importlib.util
+
         if importlib.util.find_spec("pytorch_lightning") is None:
             missing_deps.append("pytorch-lightning")
     except Exception:
@@ -373,6 +379,7 @@ def check_training_dependencies():
 
     try:
         import importlib.util
+
         if importlib.util.find_spec("torch") is None:
             missing_deps.append("torch")
     except Exception:
@@ -381,10 +388,12 @@ def check_training_dependencies():
     try:
         # Check if piper_train is accessible
         import subprocess
+
         result = subprocess.run(
             [sys.executable, "-m", "piper_train", "--help"],
-            check=False, capture_output=True,
-            text=True
+            check=False,
+            capture_output=True,
+            text=True,
         )
         if result.returncode != 0 and "No module named piper_train" in result.stderr:
             missing_deps.append("piper_train (not in Python path)")
@@ -496,7 +505,9 @@ def create_interface(data_dir: Path) -> gr.Blocks:
                         model_dropdown = gr.Dropdown(
                             choices=available_models,
                             label="Select Model",
-                            value=available_models[0][1] if available_models and available_models[0][1] else None,
+                            value=available_models[0][1]
+                            if available_models and available_models[0][1]
+                            else None,
                         )
 
                         with gr.Row():
@@ -583,19 +594,96 @@ def create_interface(data_dir: Path) -> gr.Blocks:
                 gr.Examples(
                     examples=[
                         # English examples with English model
-                        ["Hello, welcome to Piper text to speech system.", en_model_path, 0, 1.0, 0.667, 0.8],
-                        ["The quick brown fox jumps over the lazy dog.", en_model_path, 0, 0.8, 0.5, 0.8],
-                        ["Good morning! Today's weather is perfect for a walk in the park.", en_model_path, 0, 1.0, 0.667, 0.8],
-                        ["Artificial intelligence is transforming how we interact with technology.", en_model_path, 0, 0.9, 0.7, 0.8],
-                        ["Testing speech synthesis with numbers: 1, 2, 3, 4, 5.", en_model_path, 0, 1.0, 0.667, 0.8],
+                        [
+                            "Hello, welcome to Piper text to speech system.",
+                            en_model_path,
+                            0,
+                            1.0,
+                            0.667,
+                            0.8,
+                        ],
+                        [
+                            "The quick brown fox jumps over the lazy dog.",
+                            en_model_path,
+                            0,
+                            0.8,
+                            0.5,
+                            0.8,
+                        ],
+                        [
+                            "Good morning! Today's weather is perfect for a walk in the park.",
+                            en_model_path,
+                            0,
+                            1.0,
+                            0.667,
+                            0.8,
+                        ],
+                        [
+                            "Artificial intelligence is transforming how we interact with technology.",
+                            en_model_path,
+                            0,
+                            0.9,
+                            0.7,
+                            0.8,
+                        ],
+                        [
+                            "Testing speech synthesis with numbers: 1, 2, 3, 4, 5.",
+                            en_model_path,
+                            0,
+                            1.0,
+                            0.667,
+                            0.8,
+                        ],
                         # Japanese examples with Japanese model
-                        ["こんにちは。今日はいい天気ですね。", ja_model_path, 0, 1.0, 0.667, 0.8],
-                        ["人工知能による音声合成のデモンストレーションです。", ja_model_path, 0, 1.0, 0.667, 0.8],
-                        ["明日の会議は午後3時から始まります。よろしくお願いします。", ja_model_path, 0, 0.9, 0.667, 0.8],
-                        ["春の桜は本当に美しいです。日本の四季は素晴らしいですね。", ja_model_path, 0, 1.1, 0.7, 0.8],
-                        ["2024年の技術トレンドについて説明します。", ja_model_path, 0, 1.0, 0.667, 0.8],
+                        [
+                            "こんにちは。今日はいい天気ですね。",
+                            ja_model_path,
+                            0,
+                            1.0,
+                            0.667,
+                            0.8,
+                        ],
+                        [
+                            "人工知能による音声合成のデモンストレーションです。",
+                            ja_model_path,
+                            0,
+                            1.0,
+                            0.667,
+                            0.8,
+                        ],
+                        [
+                            "明日の会議は午後3時から始まります。よろしくお願いします。",
+                            ja_model_path,
+                            0,
+                            0.9,
+                            0.667,
+                            0.8,
+                        ],
+                        [
+                            "春の桜は本当に美しいです。日本の四季は素晴らしいですね。",
+                            ja_model_path,
+                            0,
+                            1.1,
+                            0.7,
+                            0.8,
+                        ],
+                        [
+                            "2024年の技術トレンドについて説明します。",
+                            ja_model_path,
+                            0,
+                            1.0,
+                            0.667,
+                            0.8,
+                        ],
                     ],
-                    inputs=[text_input, model_dropdown, speaker_id, length_scale, noise_scale, noise_w],
+                    inputs=[
+                        text_input,
+                        model_dropdown,
+                        speaker_id,
+                        length_scale,
+                        noise_scale,
+                        noise_w,
+                    ],
                     label="Example Texts (English & Japanese)",
                 )
 
@@ -840,7 +928,7 @@ def create_interface(data_dir: Path) -> gr.Blocks:
                     }
                 }, 2000);
             }
-            """
+            """,
         )
 
     return interface
