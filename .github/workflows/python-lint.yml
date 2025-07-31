@@ -2,7 +2,9 @@ name: Python Linting
 
 on:
   pull_request:
-    branches: [ master, dev ]
+    branches: [ dev ]
+  push:
+    branches: [ dev ]
 
 jobs:
   ruff:

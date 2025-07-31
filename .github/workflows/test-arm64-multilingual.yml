@@ -2,7 +2,7 @@ name: Test ARM64 Multilingual TTS
 
 on:
   pull_request:
-    branches: [master, dev]
+    branches: [dev]
     paths:
       - 'src/**'
       - 'test/**'

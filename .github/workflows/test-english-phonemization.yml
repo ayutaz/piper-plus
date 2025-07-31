@@ -3,14 +3,14 @@ name: Test English Phonemization
 on:
   workflow_call:
   pull_request:
-    branches: [ main, dev, master ]
+    branches: [ main, dev ]
     paths:
       - 'src/python_run/piper/voice.py'
       - 'src/python_run/piper/espeak_phonemizer.py'
       - 'src/python_run/tests/test_english_phonemization.py'
       - '.github/workflows/test-english-phonemization.yml'
   push:
-    branches: [ main, dev, master ]
+    branches: [ main, dev ]
     paths:
       - 'src/python_run/piper/voice.py'
       - 'src/python_run/piper/espeak_phonemizer.py'

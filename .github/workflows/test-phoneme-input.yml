@@ -2,7 +2,7 @@ name: Phoneme Input Tests
 
 on:
   pull_request:
-    branches: [ dev, master, main ]
+    branches: [ dev, main ]
     paths:
       - 'src/cpp/phoneme_parser.*'
       - 'src/cpp/piper.cpp'
