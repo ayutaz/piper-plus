@@ -1,6 +1,12 @@
 name: Deploy to Hugging Face Spaces
 
 on:
+  push:
+    branches:
+      - dev
+    paths:
+      - 'huggingface-space/**'
+      - '.github/workflows/deploy-huggingface.yml'
   workflow_dispatch:
     inputs:
       deployment_message:
@@ -21,9 +27,13 @@ jobs:
 
       - name: Setup deployment
         run: |
-          echo "Manual deployment triggered"
-          if [ -n "${{ github.event.inputs.deployment_message }}" ]; then
-            echo "Deployment message: ${{ github.event.inputs.deployment_message }}"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "Manual deployment triggered"
+            if [ -n "${{ github.event.inputs.deployment_message }}" ]; then
+              echo "Deployment message: ${{ github.event.inputs.deployment_message }}"
+            fi
+          else
+            echo "Automatic deployment triggered by push to dev branch"
           fi
 
       - name: Prepare Space files
@@ -73,8 +83,13 @@ jobs:
           
           # Commit changes
           COMMIT_MSG="Update from GitHub Actions - $(date +'%Y-%m-%d %H:%M:%S')"
-          if [ -n "${{ github.event.inputs.deployment_message }}" ]; then
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ github.event.inputs.deployment_message }}" ]; then
             COMMIT_MSG="$COMMIT_MSG\n\nDeployment message: ${{ github.event.inputs.deployment_message }}"
+          elif [ "${{ github.event_name }}" = "push" ]; then
+            COMMIT_MSG="$COMMIT_MSG\n\nTriggered by push to dev branch"
+            if [ -n "${{ github.event.head_commit.message }}" ]; then
+              COMMIT_MSG="$COMMIT_MSG\nOriginal commit: ${{ github.event.head_commit.message }}"
+            fi
           fi
           git commit -m "$COMMIT_MSG"
           
