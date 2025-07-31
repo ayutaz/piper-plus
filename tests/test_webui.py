@@ -127,6 +127,23 @@ class TestWebUI:
             
             # Check that interface has components
             assert len(interface.blocks) > 0
+    
+    def test_synthesis_function_signature(self):
+        """Test that synthesis function has correct signature"""
+        from piper.webui import synthesize_speech
+        import inspect
+        
+        # Get function signature
+        sig = inspect.signature(synthesize_speech)
+        params = list(sig.parameters.keys())
+        
+        # Check required parameters
+        expected_params = ['text', 'model_path', 'speaker_id', 'length_scale', 'noise_scale', 'noise_w']
+        assert params == expected_params
+        
+        # Check return type annotation
+        return_annotation = sig.return_annotation
+        assert return_annotation != inspect.Signature.empty
 
 
 if __name__ == "__main__":
