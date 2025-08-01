@@ -123,7 +123,7 @@ jobs:
       - name: Test Python inference with test model
         run: |
           # Test basic text-to-phoneme model
-          cat > /tmp/test_inference.py << 'EOF'
+          cat > ${{ github.workspace }}/test_inference.py << 'EOF'
           import onnxruntime as ort
           import numpy as np
           import json
@@ -153,7 +153,7 @@ jobs:
           
           docker run --rm \
             -v ${{ github.workspace }}/test/models:/models:ro \
-            -v /tmp/test_inference.py:/test_inference.py:ro \
+            -v ${{ github.workspace }}/test_inference.py:/test_inference.py:ro \
             piper-python-inference:test \
             python /test_inference.py
       
