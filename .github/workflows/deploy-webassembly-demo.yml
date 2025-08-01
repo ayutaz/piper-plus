@@ -109,6 +109,12 @@ jobs:
           if [ -d "src/wasm/openjtalk-web/test/js" ]; then
             mkdir -p deploy/test/js
             cp -r src/wasm/openjtalk-web/test/js/* deploy/test/js/ || true
+            # Update paths in JavaScript files for GitHub Pages
+            if [ -f "deploy/test/js/openjtalk-piper-integration.js" ]; then
+              sed -i 's|../../dist/|./dist/|g' deploy/test/js/openjtalk-piper-integration.js
+              sed -i 's|../../assets/|./assets/|g' deploy/test/js/openjtalk-piper-integration.js
+              sed -i 's|../../models/|./models/|g' deploy/test/js/openjtalk-piper-integration.js
+            fi
           fi
           
           # Create 404 page

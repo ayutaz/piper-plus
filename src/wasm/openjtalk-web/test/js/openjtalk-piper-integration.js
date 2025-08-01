@@ -41,7 +41,11 @@ class OpenJTalkPiperTTS {
         console.log('Loading OpenJTalk WebAssembly...');
         
         // Import OpenJTalk module
-        const OpenJTalkModule = (await import(config.jsPath)).default;
+        // Ensure proper relative path for dynamic imports
+        const jsPath = config.jsPath.startsWith('./') || config.jsPath.startsWith('../') || config.jsPath.startsWith('/') 
+            ? config.jsPath 
+            : `./${config.jsPath}`;
+        const OpenJTalkModule = (await import(jsPath)).default;
         
         this.openjtalkModule = await OpenJTalkModule({
             locateFile: (path) => {
