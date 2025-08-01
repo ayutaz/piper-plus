@@ -274,14 +274,14 @@
                 // Configuration
                 const config = {
                     openjtalk: {
-                        jsPath: '../dist/openjtalk.js',
-                        wasmPath: '../dist/openjtalk.wasm',
-                        dictPath: '../assets/dict',
-                        voicePath: '../assets/voice/mei_normal.htsvoice'
+                        jsPath: '../../dist/openjtalk.js',
+                        wasmPath: '../../dist/openjtalk.wasm',
+                        dictPath: '../../assets/dict',
+                        voicePath: '../../assets/voice/mei_normal.htsvoice'
                     },
                     onnx: {
-                        modelPath: '../models/ja_JP-test-medium.onnx',
-                        modelConfigPath: '../models/ja_JP-test-medium.onnx.json'
+                        modelPath: '../../models/ja_JP-test-medium.onnx',
+                        modelConfigPath: '../../models/ja_JP-test-medium.onnx.json'
                     }
                 };
                 
@@ -415,6 +415,17 @@
         
         // Make functions available globally
         window.tts = tts;
+        
+        // Auto-initialize on page load
+        window.addEventListener('DOMContentLoaded', async () => {
+            console.log('Page loaded, auto-initializing TTS...');
+            try {
+                await initializeTTS();
+            } catch (error) {
+                console.error('Auto-initialization failed:', error);
+                // User can still manually retry with the button
+            }
+        });
     </script>
 </body>
 </html>

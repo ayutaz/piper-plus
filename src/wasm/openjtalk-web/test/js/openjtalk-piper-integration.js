@@ -184,8 +184,52 @@ class OpenJTalkPiperTTS {
     phonemesToIds(phonemes) {
         const ids = [];
         
+        // Multi-character phoneme mappings for OpenJTalk
+        const multiCharPhonemeMap = {
+            // Long vowels
+            'a:': '\ue000',  // 長音あ
+            'i:': '\ue001',  // 長音い
+            'u:': '\ue002',  // 長音う
+            'e:': '\ue003',  // 長音え
+            'o:': '\ue004',  // 長音お
+            // Special consonants
+            'N:': '\ue005',  // 長音ん（モデル側ではclのマッピング）
+            // Palatalized consonants
+            'ky': '\ue006',  // きゃ行
+            'kw': '\ue007',  // くゎ
+            'gy': '\ue008',  // ぎゃ行
+            'gw': '\ue009',  // ぐゎ
+            'ty': '\ue00a',  // ちゃ行
+            'dy': '\ue00b',  // ぢゃ行
+            'py': '\ue00c',  // ぴゃ行
+            'by': '\ue00d',  // びゃ行
+            'ts': '\ue00e',  // つ
+            'ch': '\ue00f',  // ち
+            'sy': '\ue010',  // しゃ行
+            'sh': '\ue010',  // しゃ行（別表記）
+            'zy': '\ue011',  // じゃ行
+            'hy': '\ue012',  // ひゃ行
+            'ny': '\ue013',  // にゃ行
+            'my': '\ue014',  // みゃ行
+            'ry': '\ue015',  // りゃ行
+            // Special mappings
+            'cl': '\ue005',  // 促音（っ）- Python側のマッピングに合わせる
+            'pau': '#',      // ポーズ
+            'sp': '#',       // 短いポーズ
+            'sil': '_'       // 無音
+        };
+        
         for (const phoneme of phonemes) {
-            if (this.phonemeIdMap[phoneme]) {
+            // Check multi-character mappings first
+            const mapped = multiCharPhonemeMap[phoneme];
+            if (mapped) {
+                if (this.phonemeIdMap[mapped]) {
+                    ids.push(...this.phonemeIdMap[mapped]);
+                } else {
+                    console.warn(`Mapped phoneme not found in ID map: ${phoneme} -> ${mapped}`);
+                    ids.push(0);
+                }
+            } else if (this.phonemeIdMap[phoneme]) {
                 ids.push(...this.phonemeIdMap[phoneme]);
             } else {
                 console.warn(`Unknown phoneme: ${phoneme}`);
@@ -323,6 +367,4 @@ class OpenJTalkPiperTTS {
 }
 
 // Export for use in other modules
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = OpenJTalkPiperTTS;
-}
+export default OpenJTalkPiperTTS;

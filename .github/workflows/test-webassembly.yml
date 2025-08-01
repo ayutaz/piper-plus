@@ -1,0 +1,89 @@
+name: Test WebAssembly
+
+on:
+  push:
+    branches: [ main, master, develop, 'feature/**' ]
+    paths:
+      - 'src/wasm/**'
+      - '.github/workflows/test-webassembly.yml'
+  pull_request:
+    branches: [ main, master, develop ]
+    paths:
+      - 'src/wasm/**'
+      - '.github/workflows/test-webassembly.yml'
+
+jobs:
+  test-openjtalk-web:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: recursive
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+    
+    - name: Setup Emscripten
+      uses: mymindstorm/setup-emsdk@v14
+      with:
+        version: '3.1.47'
+    
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y cmake build-essential
+    
+    - name: Build OpenJTalk WebAssembly
+      working-directory: src/wasm/openjtalk-web
+      run: |
+        cd build
+        ./build-production.sh
+    
+    - name: Verify build outputs
+      working-directory: src/wasm/openjtalk-web
+      run: |
+        ls -la dist/
+        test -f dist/openjtalk.js
+        test -f dist/openjtalk.wasm
+        echo "Build outputs verified"
+    
+    - name: Run JavaScript tests
+      working-directory: src/wasm/openjtalk-web
+      run: npm test
+    
+    - name: Check file sizes
+      working-directory: src/wasm/openjtalk-web
+      run: |
+        echo "Build artifact sizes:"
+        ls -lh dist/openjtalk.js dist/openjtalk.wasm
+        
+        # Check that files are reasonably sized
+        wasm_size=$(stat -c%s dist/openjtalk.wasm)
+        js_size=$(stat -c%s dist/openjtalk.js)
+        
+        echo "WASM size: $wasm_size bytes"
+        echo "JS size: $js_size bytes"
+        
+        # Fail if WASM is larger than 1MB (reasonable for OpenJTalk)
+        if [ $wasm_size -gt 1048576 ]; then
+          echo "ERROR: WASM file is larger than 1MB"
+          exit 1
+        fi
+        
+        # Fail if JS is larger than 100KB
+        if [ $js_size -gt 102400 ]; then
+          echo "ERROR: JS file is larger than 100KB"
+          exit 1
+        fi
+    
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: openjtalk-web-build
+        path: |
+          src/wasm/openjtalk-web/dist/
+        retention-days: 7

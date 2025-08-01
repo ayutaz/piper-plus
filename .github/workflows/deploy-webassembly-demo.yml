@@ -1,0 +1,282 @@
+name: Deploy WebAssembly Demo to GitHub Pages
+
+on:
+  push:
+    branches:
+      - dev
+    paths:
+      - 'src/wasm/**'
+      - '.github/workflows/deploy-webassembly-demo.yml'
+  workflow_dispatch:
+    inputs:
+      deploy_message:
+        description: 'Deployment message'
+        required: false
+        default: 'Manual deployment'
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      
+      - name: Setup Emscripten
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: '3.1.47'
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake build-essential
+      
+      - name: Build OpenJTalk WebAssembly
+        working-directory: src/wasm/openjtalk-web
+        run: |
+          cd build
+          ./build-production.sh
+      
+      - name: Run tests
+        working-directory: src/wasm/openjtalk-web
+        run: npm test
+      
+      - name: Download test model
+        working-directory: src/wasm/openjtalk-web
+        run: |
+          # Download a small Japanese TTS model for demo
+          mkdir -p models
+          cd models
+          
+          # Use the test model from the project
+          if [ -f "../../../../models/ja_JP-test-medium.onnx" ]; then
+            cp ../../../../models/ja_JP-test-medium.onnx ./
+            cp ../../../../models/ja_JP-test-medium.onnx.json ./
+          else
+            echo "Warning: Test model not found, demo will need manual model upload"
+            # Create a placeholder config
+            echo '{"audio":{"sample_rate":22050},"phoneme_id_map":{}}' > ja_JP-test-medium.onnx.json
+          fi
+      
+      - name: Prepare deployment directory
+        run: |
+          mkdir -p deploy
+          
+          # Copy WebAssembly build artifacts
+          cp -r src/wasm/openjtalk-web/dist deploy/
+          cp -r src/wasm/openjtalk-web/assets deploy/
+          cp -r src/wasm/openjtalk-web/models deploy/
+          
+          # Copy demo files
+          cp src/wasm/openjtalk-web/test/production-audio-test.html deploy/index.html
+          mkdir -p deploy/test/js
+          cp src/wasm/openjtalk-web/test/js/openjtalk-piper-integration.js deploy/test/js/
+          
+          # Create GitHub Pages specific index
+          cat > deploy/demos.html << 'EOF'
+          <!DOCTYPE html>
+          <html lang="ja">
+          <head>
+              <meta charset="UTF-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <title>Piper TTS WebAssembly Demos</title>
+              <style>
+                  body {
+                      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+                      line-height: 1.6;
+                      color: #333;
+                      max-width: 800px;
+                      margin: 0 auto;
+                      padding: 20px;
+                      background-color: #f5f5f5;
+                  }
+                  .container {
+                      background: white;
+                      border-radius: 10px;
+                      padding: 30px;
+                      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                  }
+                  h1 {
+                      color: #2c3e50;
+                      border-bottom: 3px solid #3498db;
+                      padding-bottom: 10px;
+                  }
+                  .demo-card {
+                      background: #f8f9fa;
+                      border: 1px solid #e9ecef;
+                      border-radius: 8px;
+                      padding: 20px;
+                      margin: 20px 0;
+                      transition: transform 0.2s, box-shadow 0.2s;
+                  }
+                  .demo-card:hover {
+                      transform: translateY(-2px);
+                      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+                  }
+                  .demo-card h2 {
+                      color: #495057;
+                      margin-top: 0;
+                  }
+                  .demo-card p {
+                      color: #6c757d;
+                      margin: 10px 0;
+                  }
+                  .demo-link {
+                      display: inline-block;
+                      background: #3498db;
+                      color: white;
+                      padding: 10px 20px;
+                      border-radius: 5px;
+                      text-decoration: none;
+                      margin-top: 10px;
+                      transition: background 0.3s;
+                  }
+                  .demo-link:hover {
+                      background: #2980b9;
+                  }
+                  .tech-stack {
+                      display: flex;
+                      flex-wrap: wrap;
+                      gap: 10px;
+                      margin-top: 10px;
+                  }
+                  .tech-badge {
+                      background: #e9ecef;
+                      color: #495057;
+                      padding: 5px 10px;
+                      border-radius: 20px;
+                      font-size: 14px;
+                  }
+                  .status {
+                      display: inline-block;
+                      padding: 5px 10px;
+                      border-radius: 20px;
+                      font-size: 14px;
+                      font-weight: bold;
+                  }
+                  .status.ready {
+                      background: #d4edda;
+                      color: #155724;
+                  }
+                  .status.experimental {
+                      background: #fff3cd;
+                      color: #856404;
+                  }
+                  footer {
+                      text-align: center;
+                      margin-top: 40px;
+                      color: #6c757d;
+                  }
+                  .github-link {
+                      color: #3498db;
+                      text-decoration: none;
+                  }
+                  .github-link:hover {
+                      text-decoration: underline;
+                  }
+              </style>
+          </head>
+          <body>
+              <div class="container">
+                  <h1>🎤 Piper TTS WebAssembly Demos</h1>
+                  
+                  <p>Welcome to the Piper TTS WebAssembly demos. These demos showcase browser-based text-to-speech synthesis using WebAssembly technology.</p>
+                  
+                  <div class="demo-card">
+                      <h2>Japanese TTS with OpenJTalk</h2>
+                      <span class="status ready">Ready</span>
+                      <p>Full-featured Japanese text-to-speech synthesis running entirely in your browser. Uses OpenJTalk for phonemization and Piper ONNX models for neural synthesis.</p>
+                      <div class="tech-stack">
+                          <span class="tech-badge">WebAssembly</span>
+                          <span class="tech-badge">OpenJTalk</span>
+                          <span class="tech-badge">ONNX Runtime</span>
+                          <span class="tech-badge">Web Audio API</span>
+                      </div>
+                      <a href="index.html" class="demo-link">Launch Demo →</a>
+                  </div>
+                  
+                  <div class="demo-card">
+                      <h2>Technical Details</h2>
+                      <h3>Features</h3>
+                      <ul>
+                          <li>🚀 Runs entirely in the browser - no server required</li>
+                          <li>🇯🇵 High-quality Japanese speech synthesis</li>
+                          <li>📦 Compact size: WASM < 400KB, JS < 40KB</li>
+                          <li>🎯 Real-time synthesis with low latency</li>
+                          <li>📱 Works on mobile devices</li>
+                      </ul>
+                      
+                      <h3>Browser Requirements</h3>
+                      <ul>
+                          <li>WebAssembly support (all modern browsers)</li>
+                          <li>Web Audio API support</li>
+                          <li>Recommended: Chrome 90+, Firefox 89+, Safari 14.1+</li>
+                      </ul>
+                  </div>
+                  
+                  <footer>
+                      <p>
+                          Part of the <a href="https://github.com/rhasspy/piper" class="github-link">Piper TTS</a> project
+                      </p>
+                      <p>
+                          <small>Last updated: <span id="last-updated"></span></small>
+                      </p>
+                  </footer>
+              </div>
+              
+              <script>
+                  // Show last updated date
+                  document.getElementById('last-updated').textContent = new Date().toLocaleDateString();
+              </script>
+          </body>
+          </html>
+          EOF
+          
+          # Update paths in index.html for GitHub Pages
+          sed -i 's|../../dist/|dist/|g' deploy/index.html
+          sed -i 's|../../assets/|assets/|g' deploy/index.html
+          sed -i 's|../../models/|models/|g' deploy/index.html
+          sed -i 's|../test/js/|test/js/|g' deploy/index.html
+          
+          # Create a simple 404 page
+          cp deploy/demos.html deploy/404.html
+          
+          # Add deployment info
+          echo "Deployment: ${{ github.event.inputs.deploy_message || 'Automated deployment' }}" > deploy/deployment-info.txt
+          echo "Commit: ${{ github.sha }}" >> deploy/deployment-info.txt
+          echo "Date: $(date -u +"%Y-%m-%d %H:%M:%S UTC")" >> deploy/deployment-info.txt
+      
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+      
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./deploy
+  
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
