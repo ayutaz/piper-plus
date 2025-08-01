@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpenJTalk WebAssembly Production Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .test-area {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        input[type="text"] {
+            width: 300px;
+            padding: 5px;
+            font-size: 16px;
+        }
+        button {
+            padding: 5px 15px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 10px;
+            background: #f0f0f0;
+            border-radius: 3px;
+            font-family: monospace;
+        }
+        .phonemes {
+            font-size: 20px;
+            font-weight: bold;
+            color: #0066cc;
+        }
+        .loading {
+            color: #666;
+            font-style: italic;
+        }
+        .error {
+            color: #cc0000;
+        }
+        .success {
+            color: #00cc00;
+        }
+    </style>
+</head>
+<body>
+    <h1>OpenJTalk WebAssembly 本番テスト</h1>
+    
+    <div class="test-area">
+        <h2>初期化</h2>
+        <button onclick="initialize()">OpenJTalkを初期化</button>
+        <div id="initStatus"></div>
+    </div>
+    
+    <div class="test-area">
+        <h2>テキスト→音素変換</h2>
+        <input type="text" id="inputText" value="こんにちは、世界！" placeholder="変換したいテキスト">
+        <button onclick="convertText()" id="convertBtn" disabled>変換</button>
+        <div id="convertResult" class="result"></div>
+    </div>
+    
+    <div class="test-area">
+        <h2>サンプルテキスト</h2>
+        <button onclick="testSample('おはようございます')" class="sample-btn" disabled>おはようございます</button>
+        <button onclick="testSample('ありがとうございました')" class="sample-btn" disabled>ありがとうございました</button>
+        <button onclick="testSample('明日は晴れるでしょう')" class="sample-btn" disabled>明日は晴れるでしょう</button>
+        <button onclick="testSample('123個のりんご')" class="sample-btn" disabled>123個のりんご</button>
+    </div>
+
+    <script type="module">
+        let Module = null;
+        let initialized = false;
+        
+        window.initialize = async function() {
+            try {
+                document.getElementById('initStatus').innerHTML = '<span class="loading">初期化中...</span>';
+                
+                // モジュールの読み込み
+                const OpenJTalkModule = (await import('../dist/openjtalk.js')).default;
+                
+                Module = await OpenJTalkModule({
+                    locateFile: (path) => {
+                        if (path.endsWith('.wasm')) {
+                            return '../dist/openjtalk.wasm';
+                        }
+                        return path;
+                    }
+                });
+                
+                // ファイルシステムの準備
+                Module.FS.mkdir('/dict');
+                Module.FS.mkdir('/voice');
+                
+                // 辞書ファイルの読み込み
+                const dictFiles = ['char.bin', 'matrix.bin', 'sys.dic', 'unk.dic',
+                                   'left-id.def', 'pos-id.def', 'rewrite.def', 'right-id.def'];
+                
+                for (const file of dictFiles) {
+                    const response = await fetch(`../assets/dict/${file}`);
+                    const data = await response.arrayBuffer();
+                    Module.FS.writeFile(`/dict/${file}`, new Uint8Array(data));
+                }
+                
+                // 音声ファイルの読み込み
+                const voiceResponse = await fetch('../assets/voice/mei_normal.htsvoice');
+                const voiceData = await voiceResponse.arrayBuffer();
+                Module.FS.writeFile('/voice/mei_normal.htsvoice', new Uint8Array(voiceData));
+                
+                // OpenJTalkの初期化
+                const dictPtr = Module.allocateUTF8('/dict');
+                const voicePtr = Module.allocateUTF8('/voice/mei_normal.htsvoice');
+                const result = Module._openjtalk_initialize(dictPtr, voicePtr);
+                Module._free(dictPtr);
+                Module._free(voicePtr);
+                
+                if (result === 0) {
+                    initialized = true;
+                    document.getElementById('initStatus').innerHTML = '<span class="success">✓ 初期化完了</span>';
+                    document.getElementById('convertBtn').disabled = false;
+                    document.querySelectorAll('.sample-btn').forEach(btn => btn.disabled = false);
+                    
+                    // バージョン情報
+                    if (Module._get_version) {
+                        const versionPtr = Module._get_version();
+                        const version = Module.UTF8ToString(versionPtr);
+                        document.getElementById('initStatus').innerHTML += '<br>Version: ' + version;
+                    }
+                } else {
+                    throw new Error(`初期化失敗: ${result}`);
+                }
+                
+            } catch (error) {
+                document.getElementById('initStatus').innerHTML = 
+                    '<span class="error">✗ エラー: ' + error.message + '</span>';
+            }
+        };
+        
+        window.convertText = function() {
+            if (!initialized) return;
+            
+            const text = document.getElementById('inputText').value;
+            if (!text) return;
+            
+            try {
+                // テキストを音素ラベルに変換
+                const textPtr = Module.allocateUTF8(text);
+                const labelsPtr = Module._openjtalk_synthesis_labels(textPtr);
+                const labels = Module.UTF8ToString(labelsPtr);
+                Module._openjtalk_free_string(labelsPtr);
+                Module._free(textPtr);
+                
+                // エラーチェック
+                if (labels.startsWith('ERROR:')) {
+                    throw new Error(labels);
+                }
+                
+                // 音素の抽出
+                const lines = labels.split('\n').filter(line => line.trim());
+                const phonemes = [];
+                
+                for (const line of lines) {
+                    const match = line.match(/\-([^+]+)\+/);
+                    if (match && match[1] !== 'sil') {
+                        phonemes.push(match[1]);
+                    }
+                }
+                
+                // 結果表示
+                document.getElementById('convertResult').innerHTML = 
+                    `<div>入力: ${text}</div>` +
+                    `<div class="phonemes">音素: ${phonemes.join(' ')}</div>` +
+                    `<div style="margin-top: 10px; font-size: 12px;">ラベル数: ${lines.length}</div>`;
+                
+            } catch (error) {
+                document.getElementById('convertResult').innerHTML = 
+                    '<span class="error">エラー: ' + error.message + '</span>';
+            }
+        };
+        
+        window.testSample = function(text) {
+            document.getElementById('inputText').value = text;
+            convertText();
+        };
+    </script>
+</body>
+</html>
