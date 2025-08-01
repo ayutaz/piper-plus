@@ -1,151 +1,166 @@
 # OpenJTalk WebAssembly
 
-OpenJTalkをWebAssemblyで動作させるための実装です。ブラウザ上で日本語テキストから音素ラベルを生成できます。
+Browser-based Japanese text-to-speech synthesis using OpenJTalk and Piper ONNX models.
 
-## 特徴
+## 🚀 Live Demo
 
-- ブラウザで動作する完全なOpenJTalk実装
-- UTF-8エンコーディング対応
-- 軽量なファイルサイズ（WASM: 376KB、JS: 33KB）
-- ES6モジュール形式でのエクスポート
+Visit the live demo: [https://[your-github-username].github.io/piper/](https://[your-github-username].github.io/piper/)
 
-## プロジェクト構造
+## 📋 Features
+
+- **Pure Browser-Based**: Runs entirely in the browser without server dependencies
+- **Japanese TTS**: High-quality Japanese speech synthesis using OpenJTalk phonemization
+- **ONNX Runtime**: Neural synthesis using Piper ONNX models
+- **Compact Size**: WASM < 400KB, JS < 40KB
+- **Cross-Platform**: Works on desktop and mobile browsers
+
+## 🛠️ Development
+
+### Prerequisites
+
+- Node.js 18+
+- Emscripten 3.1.47
+- CMake 3.10+
+- Python 3.8+ (for build scripts)
+
+### Building
+
+```bash
+# Clone the repository
+git clone https://github.com/rhasspy/piper.git
+cd piper/src/wasm/openjtalk-web
+
+# Build for production
+npm run build
+
+# Build for development (with debug symbols)
+npm run build:debug
+```
+
+### Testing
+
+```bash
+# Run unit tests
+npm test
+
+# Run tests in watch mode
+npm run test:watch
+```
+
+### Local Development
+
+```bash
+# Start local HTTP server
+npm run serve
+
+# Open browser at http://localhost:8081/test/production-audio-test.html
+```
+
+## 📦 Project Structure
 
 ```
 openjtalk-web/
-├── build/          # ビルドスクリプト
-├── src/            # C++ソースコード
-├── dist/           # ビルド成果物（JS、WASM）
-├── assets/         # 辞書・音声ファイル
-│   ├── dict/       # MeCab辞書ファイル
-│   └── voice/      # HTSVoiceファイル
-└── test/           # テストファイル
+├── assets/           # Dictionary and voice files
+│   ├── dict/        # NAIST Japanese Dictionary
+│   └── voice/       # HTS voice (for initialization)
+├── build/           # Build scripts
+│   ├── build-production.sh
+│   └── build-safe.sh (debug)
+├── dist/            # Build output
+│   ├── openjtalk.js
+│   └── openjtalk.wasm
+├── models/          # ONNX models
+├── src/             # C source files
+│   └── openjtalk_safe.c
+└── test/            # Test files
+    ├── production-audio-test.html
+    └── js/
+        ├── openjtalk-piper-integration.js
+        └── test-openjtalk-integration.js
 ```
 
-## ビルド
-
-### 必要なもの
-
-- Emscripten 3.1.x以降
-- CMake 3.10以降
-- Make
-
-### ビルド手順
-
-```bash
-# 依存関係のビルド（初回のみ）
-./build/build-dependencies.sh
-
-# OpenJTalkライブラリのビルド  
-./build/build-with-wasm-openjtalk.sh
-
-# デバッグビルド（コンソールログ付き）
-./build/build-safe.sh
-
-# プロダクションビルド（最適化済み）
-./build/build-production.sh
-```
-
-## 使用方法
+## 🔧 API Usage
 
 ```javascript
-// モジュールのインポート
-import OpenJTalkModule from './dist/openjtalk.js';
+import OpenJTalkPiperTTS from './openjtalk-piper-integration.js';
 
-// 初期化
-const Module = await OpenJTalkModule({
-    locateFile: (path) => {
-        if (path.endsWith('.wasm')) {
-            return './dist/openjtalk.wasm';
-        }
-        return path;
+// Initialize TTS
+const tts = new OpenJTalkPiperTTS();
+await tts.initialize({
+    openjtalk: {
+        jsPath: 'dist/openjtalk.js',
+        wasmPath: 'dist/openjtalk.wasm',
+        dictPath: 'assets/dict',
+        voicePath: 'assets/voice/mei_normal.htsvoice'
+    },
+    onnx: {
+        modelPath: 'models/ja_JP-test-medium.onnx',
+        modelConfigPath: 'models/ja_JP-test-medium.onnx.json'
     }
 });
 
-// ファイルシステムの準備
-Module.FS.mkdir('/dict');
-Module.FS.mkdir('/voice');
+// Generate speech
+const audioData = await tts.textToSpeech('こんにちは、世界！');
 
-// 辞書ファイルの読み込み
-const dictFiles = ['char.bin', 'matrix.bin', 'sys.dic', 'unk.dic', 
-                   'left-id.def', 'pos-id.def', 'rewrite.def', 'right-id.def'];
-for (const file of dictFiles) {
-    const response = await fetch(`./assets/dict/${file}`);
-    const data = await response.arrayBuffer();
-    Module.FS.writeFile(`/dict/${file}`, new Uint8Array(data));
-}
+// Create WAV file
+const wavBlob = tts.createWAV(audioData, 22050);
+const audioUrl = URL.createObjectURL(wavBlob);
 
-// 音声ファイルの読み込み
-const voiceResponse = await fetch('./assets/voice/mei_normal.htsvoice');
-const voiceData = await voiceResponse.arrayBuffer();
-Module.FS.writeFile('/voice/mei_normal.htsvoice', new Uint8Array(voiceData));
-
-// OpenJTalkの初期化
-const dictPtr = Module.allocateUTF8('/dict');
-const voicePtr = Module.allocateUTF8('/voice/mei_normal.htsvoice');
-const result = Module._openjtalk_initialize(dictPtr, voicePtr);
-Module._free(dictPtr);
-Module._free(voicePtr);
-
-// テキストから音素ラベルへの変換
-const text = "こんにちは";
-const textPtr = Module.allocateUTF8(text);
-const labelsPtr = Module._openjtalk_synthesis_labels(textPtr);
-const labels = Module.UTF8ToString(labelsPtr);
-Module._openjtalk_free_string(labelsPtr);
-Module._free(textPtr);
-
-// 音素の抽出
-const lines = labels.split('\n').filter(line => line.trim());
-const phonemes = [];
-for (const line of lines) {
-    const match = line.match(/\-([^+]+)\+/);
-    if (match && match[1] !== 'sil') {
-        phonemes.push(match[1]);
-    }
-}
-console.log(phonemes); // ['k', 'o', 'N', 'n', 'i', 'ch', 'i', 'w', 'a']
+// Play audio
+const audio = new Audio(audioUrl);
+audio.play();
 ```
 
-## API
+## 🚀 Deployment
 
-### 関数
+### GitHub Pages
 
-- `openjtalk_initialize(dic_dir, voice_path)` - OpenJTalkを初期化
-- `openjtalk_synthesis_labels(text)` - テキストから音素ラベルを生成
-- `openjtalk_clear()` - リソースを解放
-- `openjtalk_free_string(str)` - 文字列メモリを解放
-- `get_version()` - バージョン情報を取得
-- `test_function(a, b)` - テスト関数（a + bを返す）
+The project includes automated deployment to GitHub Pages:
 
-## 開発状況
-
-- [x] Phase 1: 基本実装
-  - [x] プロジェクトセットアップ
-  - [x] wasm_open_jtalkソース分析
-  - [x] ビルド環境構築
-  - [x] ブラウザ対応ビルド
-  
-- [x] Phase 2: 最適化
-  - [x] メモリ最適化（Open_JTalk構造体使用）
-  - [x] プロダクションビルド（376KB WASM）
-  - [x] デバッグログの削除
-
-- [ ] Phase 3: 統合
-  - [ ] Piper ONNX Runtime統合
-  - [ ] ストリーミングサポート
-  - [ ] 本番デプロイ
-
-## テスト
+1. **Automatic deployment**: Push to `dev` branch triggers deployment
+2. **Manual deployment**: Use GitHub Actions workflow dispatch
 
 ```bash
-# テストサーバーの起動
-python3 -m http.server 8081
+# Push to dev branch for automatic deployment
+git push origin dev
 
-# ブラウザでアクセス
-# http://localhost:8081/test/debug-test.html
+# Or trigger manual deployment from GitHub Actions UI
 ```
 
-## ライセンス
+### Self-Hosting
 
-このプロジェクトはOpenJTalkおよびpiper-plusのライセンス条項に従います。
+To host on your own server:
+
+1. Build the project: `npm run build`
+2. Copy these directories to your web server:
+   - `dist/`
+   - `assets/`
+   - `models/`
+   - `test/` (for demo pages)
+3. Ensure your server has proper CORS headers for WASM files
+
+## 📄 License
+
+This project is part of Piper TTS and follows the same license terms.
+
+## 🤝 Contributing
+
+Contributions are welcome! Please:
+
+1. Fork the repository
+2. Create a feature branch
+3. Run tests: `npm test`
+4. Submit a pull request
+
+## 🐛 Known Issues
+
+- Some browsers may require user interaction before playing audio
+- iOS Safari requires specific handling for Web Audio API
+- Large models may take time to load on slower connections
+
+## 📚 References
+
+- [OpenJTalk](http://open-jtalk.sourceforge.net/)
+- [Piper TTS](https://github.com/rhasspy/piper)
+- [ONNX Runtime Web](https://onnxruntime.ai/docs/get-started/with-javascript.html)
+- [Emscripten](https://emscripten.org/)

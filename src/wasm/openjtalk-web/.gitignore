@@ -1,26 +1,36 @@
-# Reference repositories
-wasm_open_jtalk_reference/
-
-# Build tools
-tools/
-
-# Build output
+# Build outputs
 dist/
+build/build-*/
 build/CMakeFiles/
 build/CMakeCache.txt
-build/*.cmake
+build/cmake_install.cmake
+build/Makefile
 
-# Dependencies
+# Downloaded models (large files)
+models/*.onnx
+!models/.gitkeep
+
+# Node modules (if any get added)
 node_modules/
-
-# OS files
-.DS_Store
-Thumbs.db
 
 # IDE files
 .vscode/
 .idea/
 
+# OS files
+.DS_Store
+Thumbs.db
+
 # Temporary files
 *.tmp
 *.log
+*~
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# Downloaded tools (separate git repositories)
+tools/hts_engine_API/
+tools/wasm_open_jtalk/
+wasm_open_jtalk_reference/
