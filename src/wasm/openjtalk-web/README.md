@@ -4,7 +4,7 @@ Browser-based Japanese text-to-speech synthesis using OpenJTalk and Piper ONNX m
 
 ## 🚀 Live Demo
 
-Visit the live demo: [https://[your-github-username].github.io/piper/](https://[your-github-username].github.io/piper/)
+Visit the live demo: [https://ayutaz.github.io/piper-plus/](https://ayutaz.github.io/piper-plus/)
 
 ## 📋 Features
 
