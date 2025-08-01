@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Simple OpenJTalk WASM Test</title>
+</head>
+<body>
+    <h1>Simple OpenJTalk WASM Test</h1>
+    <div id="output"></div>
+    <script type="module">
+        async function test() {
+            const output = document.getElementById('output');
+            try {
+                const Module = await import('./openjtalk.js');
+                const instance = await Module.default();
+                
+                output.innerHTML += '<p>Module loaded!</p>';
+                output.innerHTML += `<p>Version: ${instance.UTF8ToString(instance._get_version())}</p>`;
+                output.innerHTML += `<p>Test function (5 + 3): ${instance._test_function(5, 3)}</p>`;
+                
+                const echoPtr = instance._echo_string(instance.allocateUTF8("Hello WASM!"));
+                output.innerHTML += `<p>Echo: ${instance.UTF8ToString(echoPtr)}</p>`;
+                instance._free_string(echoPtr);
+                
+            } catch (e) {
+                output.innerHTML += `<p style="color: red;">Error: ${e.message}</p>`;
+            }
+        }
+        test();
+    </script>
+</body>
+</html>

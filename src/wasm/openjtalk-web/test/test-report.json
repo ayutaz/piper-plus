@@ -1,0 +1,137 @@
+{
+  "timestamp": "2025-08-01T01:13:36.082Z",
+  "results": [
+    {
+      "timestamp": "2025-08-01T01:13:36.078Z",
+      "status": "INFO",
+      "message": "=== プロジェクト構造テスト ==="
+    },
+    {
+      "timestamp": "2025-08-01T01:13:36.079Z",
+      "status": "INFO",
+      "message": "必須ディレクトリの確認:"
+    },
+    {
+      "timestamp": "2025-08-01T01:13:36.079Z",
+      "status": "PASS",
+      "message": "  src/: 存在"
+    },
+    {
+      "timestamp": "2025-08-01T01:13:36.079Z",
+      "status": "PASS",
+      "message": "  build/: 存在"
+    },
+    {
+      "timestamp": "2025-08-01T01:13:36.079Z",
+      "status": "PASS",
+      "message": "  dist/: 存在"
+    },
+    {
+      "timestamp": "2025-08-01T01:13:36.079Z",
+      "status": "PASS",
+      "message": "  test/: 存在"
+    },
+    {
+      "timestamp": "2025-08-01T01:13:36.079Z",
+      "status": "PASS",
+      "message": "  demo/: 存在"
+    },
+    {
+      "timestamp": "2025-08-01T01:13:36.079Z",
+      "status": "INFO",
+      "message": "必須ファイルの確認:"
+    },
+    {
+      "timestamp": "2025-08-01T01:13:36.079Z",
+      "status": "PASS",
+      "message": "  build/build.sh: 存在"
+    },
+    {
+      "timestamp": "2025-08-01T01:13:36.079Z",
+      "status": "PASS",
+      "message": "  build/build-simple.sh: 存在"
+    },
+    {
+      "timestamp": "2025-08-01T01:13:36.079Z",
+      "status": "PASS",
+      "message": "  build/build-openjtalk.sh: 存在"
+    },
+    {
+      "timestamp": "2025-08-01T01:13:36.079Z",
+      "status": "PASS",
+      "message": "  build/emscripten-flags.mk: 存在"
+    },
+    {
+      "timestamp": "2025-08-01T01:13:36.079Z",
+      "status": "PASS",
+      "message": "  build/docker-build-simple.sh: 存在"
+    },
+    {
+      "timestamp": "2025-08-01T01:13:36.079Z",
+      "status": "PASS",
+      "message": "  src/api.js: 存在"
+    },
+    {
+      "timestamp": "2025-08-01T01:13:36.079Z",
+      "status": "PASS",
+      "message": "  src/dictionary-loader.js: 存在"
+    },
+    {
+      "timestamp": "2025-08-01T01:13:36.079Z",
+      "status": "PASS",
+      "message": "  src/simple_wrapper.cpp: 存在"
+    },
+    {
+      "timestamp": "2025-08-01T01:13:36.080Z",
+      "status": "INFO",
+      "message": "=== WASMモジュールロードテスト ==="
+    },
+    {
+      "timestamp": "2025-08-01T01:13:36.080Z",
+      "status": "PASS",
+      "message": "JavaScriptファイル: 存在"
+    },
+    {
+      "timestamp": "2025-08-01T01:13:36.080Z",
+      "status": "PASS",
+      "message": "WASMファイル: 存在"
+    },
+    {
+      "timestamp": "2025-08-01T01:13:36.080Z",
+      "status": "INFO",
+      "message": "JSファイルサイズ: 87676 bytes"
+    },
+    {
+      "timestamp": "2025-08-01T01:13:36.080Z",
+      "status": "INFO",
+      "message": "WASMファイルサイズ: 10661 bytes"
+    },
+    {
+      "timestamp": "2025-08-01T01:13:36.080Z",
+      "status": "INFO",
+      "message": "モジュールをロード中..."
+    },
+    {
+      "timestamp": "2025-08-01T01:13:36.082Z",
+      "status": "ERROR",
+      "message": "モジュールロードエラー: Module is not a function"
+    },
+    {
+      "timestamp": "2025-08-01T01:13:36.082Z",
+      "status": "ERROR",
+      "message": "スタックトレース: TypeError: Module is not a function\n    at testModuleLoad (/Users/s19447/Desktop/total-piper/piper/src/wasm/openjtalk-web/test/test-current-build.js:53:32)\n    at main (/Users/s19447/Desktop/total-piper/piper/src/wasm/openjtalk-web/test/test-current-build.js:189:11)\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)"
+    },
+    {
+      "timestamp": "2025-08-01T01:13:36.082Z",
+      "status": "INFO",
+      "message": "=== テストレポート生成 ==="
+    }
+  ],
+  "summary": {
+    "total": 25,
+    "passed": 15,
+    "failed": 0,
+    "warnings": 0,
+    "errors": 2
+  }
+}

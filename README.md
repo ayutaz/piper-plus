@@ -23,6 +23,7 @@ Piper is used in a [variety of projects](#people-using-piper).
 ## 追加機能
 * **🌐 WebUI (Gradio)** - ブラウザベースの使いやすいインターフェース
   * 🚀 **[オンラインデモ](https://huggingface.co/spaces/ayousanz/piper-plus-demo)** - Hugging Face Spacesで今すぐ試せます！
+  * 🌏 **[WebAssemblyデモ](https://ayutaz.github.io/piper-plus/)** - ブラウザで動作する日本語TTSデモ（サーバー不要）
   * 詳細は[WebUI使用ガイド](docs/webui-usage.md)を参照
   * 推論と学習の両方に対応
   * 多言語テンプレートシステム（日本語、英語、ドイツ語、フランス語）
@@ -53,6 +54,12 @@ Piper is used in a [variety of projects](#people-using-piper).
 * PyPI パッケージ `piper-tts-plus` として公開し、`pip install` で簡単インストール可能に
 * 多言語TTSテストインフラストラクチャーを追加し、CI/CDで自動テスト実行 - [詳細](docs/MULTILINGUAL_TESTING.md)
 * OpenJTalk辞書とHTSボイスモデルの自動ダウンロード機能を追加し、日本語TTSのセットアップを簡略化
+* **🌏 WebAssembly対応** - ブラウザで直接動作する日本語TTS実装
+  * OpenJTalk WebAssembly版による日本語音素化
+  * ONNX Runtime WebAssemblyによるニューラル音声合成
+  * サーバー不要で完全にブラウザ内で動作
+  * コンパクトサイズ: WASM < 400KB、JS < 40KB
+  * 詳細: [OpenJTalk WebAssembly README](src/wasm/openjtalk-web/README.md)
 * **🎯 音声品質向上コンポーネント統合 (PR #98)**
   * **EMA (Exponential Moving Average)**: 学習安定性とファインチューニング品質向上
   * **AccentProcessor**: 日本語韻律・アクセント処理の高精度化

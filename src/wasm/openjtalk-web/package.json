@@ -1,0 +1,31 @@
+{
+  "name": "openjtalk-web",
+  "version": "1.0.0",
+  "description": "OpenJTalk WebAssembly implementation for browser-based Japanese TTS",
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/js/test-openjtalk-integration.js test/js/test-github-pages-paths.js",
+    "test:integration": "node --test test/js/test-openjtalk-integration.js",
+    "test:paths": "node --test test/js/test-github-pages-paths.js",
+    "test:watch": "node --test --watch test/js/test-openjtalk-integration.js",
+    "build:debug": "cd build && ./build-safe.sh",
+    "build:production": "cd build && ./build-production.sh",
+    "build": "npm run build:production",
+    "serve": "python3 -m http.server 8081",
+    "clean": "rm -rf dist build/build-*"
+  },
+  "keywords": [
+    "openjtalk",
+    "tts",
+    "japanese",
+    "webassembly",
+    "wasm",
+    "speech-synthesis"
+  ],
+  "author": "Piper TTS Project",
+  "license": "MIT",
+  "devDependencies": {},
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

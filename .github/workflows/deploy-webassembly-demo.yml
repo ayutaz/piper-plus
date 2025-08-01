@@ -1,0 +1,146 @@
+name: Deploy WebAssembly Demo to GitHub Pages
+
+on:
+  push:
+    branches:
+      - dev
+    paths:
+      - 'src/wasm/**'
+      - '.github/workflows/deploy-webassembly-demo.yml'
+  workflow_dispatch:
+    inputs:
+      deploy_message:
+        description: 'Deployment message'
+        required: false
+        default: 'Manual deployment'
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      
+      - name: Prepare deployment directory
+        run: |
+          mkdir -p deploy
+          
+          # Create placeholder index.html
+          echo '<!DOCTYPE html>' > deploy/index.html
+          echo '<html lang="ja">' >> deploy/index.html
+          echo '<head>' >> deploy/index.html
+          echo '    <meta charset="UTF-8">' >> deploy/index.html
+          echo '    <meta name="viewport" content="width=device-width, initial-scale=1.0">' >> deploy/index.html
+          echo '    <title>Piper TTS WebAssembly Demo</title>' >> deploy/index.html
+          echo '    <style>' >> deploy/index.html
+          echo '        body {' >> deploy/index.html
+          echo '            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;' >> deploy/index.html
+          echo '            display: flex;' >> deploy/index.html
+          echo '            justify-content: center;' >> deploy/index.html
+          echo '            align-items: center;' >> deploy/index.html
+          echo '            height: 100vh;' >> deploy/index.html
+          echo '            margin: 0;' >> deploy/index.html
+          echo '            background-color: #f5f5f5;' >> deploy/index.html
+          echo '        }' >> deploy/index.html
+          echo '        .container {' >> deploy/index.html
+          echo '            text-align: center;' >> deploy/index.html
+          echo '            background: white;' >> deploy/index.html
+          echo '            padding: 40px;' >> deploy/index.html
+          echo '            border-radius: 10px;' >> deploy/index.html
+          echo '            box-shadow: 0 2px 10px rgba(0,0,0,0.1);' >> deploy/index.html
+          echo '        }' >> deploy/index.html
+          echo '        h1 { color: #2c3e50; }' >> deploy/index.html
+          echo '        p { color: #6c757d; margin: 20px 0; }' >> deploy/index.html
+          echo '        a { color: #3498db; text-decoration: none; }' >> deploy/index.html
+          echo '        a:hover { text-decoration: underline; }' >> deploy/index.html
+          echo '    </style>' >> deploy/index.html
+          echo '</head>' >> deploy/index.html
+          echo '<body>' >> deploy/index.html
+          echo '    <div class="container">' >> deploy/index.html
+          echo '        <h1>🎤 Piper TTS WebAssembly Demo</h1>' >> deploy/index.html
+          echo '        <p>WebAssembly版の日本語音声合成デモを準備中です。</p>' >> deploy/index.html
+          echo '        <p>詳細は <a href="https://github.com/ayutaz/piper-plus">GitHub リポジトリ</a> をご覧ください。</p>' >> deploy/index.html
+          echo '    </div>' >> deploy/index.html
+          echo '</body>' >> deploy/index.html
+          echo '</html>' >> deploy/index.html
+          
+          # Copy WebAssembly artifacts
+          if [ -d "src/wasm/openjtalk-web/dist" ]; then
+            cp -r src/wasm/openjtalk-web/dist deploy/
+          else
+            echo "ERROR: WebAssembly dist directory not found!"
+            echo "Please build the WebAssembly files before deployment."
+            exit 1
+          fi
+          
+          if [ -d "src/wasm/openjtalk-web/assets" ]; then
+            cp -r src/wasm/openjtalk-web/assets deploy/
+          else
+            mkdir -p deploy/assets
+          fi
+          
+          if [ -d "src/wasm/openjtalk-web/models" ]; then
+            cp -r src/wasm/openjtalk-web/models deploy/
+          else
+            mkdir -p deploy/models
+          fi
+          
+          # Copy demo page and service worker if they exist
+          if [ -f "src/wasm/openjtalk-web/test/index.html" ]; then
+            cp src/wasm/openjtalk-web/test/index.html deploy/index.html
+            cp src/wasm/openjtalk-web/test/service-worker.js deploy/service-worker.js
+            
+            # Update paths for GitHub Pages - use ./ prefix for proper relative paths
+            for file in deploy/*.html; do
+              if [ -f "$file" ]; then
+                sed -i 's|../../dist/|./dist/|g' "$file"
+                sed -i 's|../../assets/|./assets/|g' "$file"
+                sed -i 's|../../models/|./models/|g' "$file"
+                sed -i 's|./js/|./test/js/|g' "$file"
+              fi
+            done
+          fi
+          
+          # Copy only lazy loading JavaScript file
+          if [ -f "src/wasm/openjtalk-web/test/js/openjtalk-piper-integration-lazy.js" ]; then
+            mkdir -p deploy/test/js
+            cp src/wasm/openjtalk-web/test/js/openjtalk-piper-integration-lazy.js deploy/test/js/
+          fi
+          
+          # Create 404 page
+          cp deploy/index.html deploy/404.html
+          
+          # Add deployment info
+          echo "Deployment: ${{ github.event.inputs.deploy_message || 'Automated deployment' }}" > deploy/deployment-info.txt
+          echo "Commit: ${{ github.sha }}" >> deploy/deployment-info.txt
+          echo "Date: $(date -u +"%Y-%m-%d %H:%M:%S UTC")" >> deploy/deployment-info.txt
+      
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+      
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./deploy
+  
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

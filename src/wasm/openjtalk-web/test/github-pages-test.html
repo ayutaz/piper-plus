@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <title>GitHub Pages Path Test</title>
+</head>
+<body>
+    <h1>GitHub Pages Path Resolution Test</h1>
+    <pre id="result"></pre>
+    
+    <script type="module">
+        // Simulate the exact code from openjtalk-piper-integration.js
+        function testPathResolution() {
+            const result = document.getElementById('result');
+            
+            // Test with the exact path from GitHub Pages
+            const config = {
+                openjtalk: {
+                    jsPath: './dist/openjtalk.js'  // This is what we see in the error
+                }
+            };
+            
+            let jsPath = config.openjtalk.jsPath;
+            
+            result.textContent += `Original jsPath: ${jsPath}\n`;
+            result.textContent += `Current hostname: ${window.location.hostname}\n`;
+            
+            // Simulate GitHub Pages environment
+            const isGitHubPages = true; // In real: window.location.hostname.includes('github.io')
+            result.textContent += `Is GitHub Pages: ${isGitHubPages}\n\n`;
+            
+            if (isGitHubPages) {
+                result.textContent += 'GitHub Pages path conversion check:\n';
+                result.textContent += `  jsPath === "./dist/openjtalk.js": ${jsPath === './dist/openjtalk.js'}\n`;
+                result.textContent += `  jsPath === "dist/openjtalk.js": ${jsPath === 'dist/openjtalk.js'}\n`;
+                
+                // The exact logic from our code
+                if (jsPath === 'dist/openjtalk.js' || 
+                    jsPath === './dist/openjtalk.js' || 
+                    jsPath === '../dist/openjtalk.js' ||
+                    jsPath.endsWith('/dist/openjtalk.js')) {
+                    jsPath = '../../dist/openjtalk.js';
+                    result.textContent += `  ✓ Path converted to: ${jsPath}\n`;
+                } else {
+                    result.textContent += `  ✗ No conversion applied, path remains: ${jsPath}\n`;
+                }
+            }
+            
+            result.textContent += `\nFinal jsPath: ${jsPath}\n`;
+            
+            // Test URL resolution
+            const importMetaUrl = 'https://ayutaz.github.io/piper-plus/test/js/openjtalk-piper-integration.js';
+            try {
+                const resolvedUrl = new URL(jsPath, importMetaUrl);
+                result.textContent += `Import URL will be: ${resolvedUrl.href}\n`;
+                
+                const expectedUrl = 'https://ayutaz.github.io/piper-plus/dist/openjtalk.js';
+                if (resolvedUrl.href === expectedUrl) {
+                    result.textContent += `✓ SUCCESS: URL resolves correctly!\n`;
+                } else {
+                    result.textContent += `✗ ERROR: Expected ${expectedUrl}\n`;
+                }
+            } catch (e) {
+                result.textContent += `Error: ${e.message}\n`;
+            }
+        }
+        
+        testPathResolution();
+    </script>
+</body>
+</html>

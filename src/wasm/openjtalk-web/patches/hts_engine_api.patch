@@ -1,0 +1,14 @@
+--- a/src/lib/HTS_misc.c
++++ b/src/lib/HTS_misc.c
+@@ -247,7 +247,11 @@ static size_t HTS_ftell_fp(HTS_File * fp)
+       fgetpos((FILE *) fp->pointer, &pos);
+ #if defined(_WIN32) || defined(__CYGWIN__) || defined(__APPLE__) || defined(__ANDROID__)
+       return (size_t) pos;
+-#else
++#elif defined(__EMSCRIPTEN__)
++      // Emscripten uses a different fpos_t structure
++      return (size_t) ftell((FILE *) fp->pointer);
++#else 
+       return (size_t) pos.__pos;
+ #endif                          /* _WIN32 || __CYGWIN__ || __APPLE__ || __ANDROID__ */
+    } else if (fp->type == HTS_DATA) {
