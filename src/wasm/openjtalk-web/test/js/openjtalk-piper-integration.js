@@ -144,6 +144,12 @@ class OpenJTalkPiperTTS {
             }
         }
         
+        // Convert to absolute URLs to avoid path resolution issues
+        const absoluteDictPath = new URL(dictPath, import.meta.url).href;
+        const absoluteVoicePath = new URL(voicePath, import.meta.url).href;
+        console.log('Absolute dict path:', absoluteDictPath);
+        console.log('Absolute voice path:', absoluteVoicePath);
+        
         // Load dictionary files
         const dictFiles = [
             'char.bin', 'matrix.bin', 'sys.dic', 'unk.dic',
@@ -151,13 +157,13 @@ class OpenJTalkPiperTTS {
         ];
         
         for (const file of dictFiles) {
-            const response = await fetch(`${dictPath}/${file}`);
+            const response = await fetch(`${absoluteDictPath}/${file}`);
             const data = await response.arrayBuffer();
             this.openjtalkModule.FS.writeFile(`/dict/${file}`, new Uint8Array(data));
         }
         
         // Load voice file (needed for OpenJTalk initialization)
-        const voiceResponse = await fetch(voicePath);
+        const voiceResponse = await fetch(absoluteVoicePath);
         const voiceData = await voiceResponse.arrayBuffer();
         this.openjtalkModule.FS.writeFile('/voice/voice.htsvoice', new Uint8Array(voiceData));
         
@@ -199,13 +205,19 @@ class OpenJTalkPiperTTS {
             }
         }
         
+        // Convert to absolute URLs
+        const absoluteModelPath = new URL(modelPath, import.meta.url).href;
+        const absoluteModelConfigPath = new URL(modelConfigPath, import.meta.url).href;
+        console.log('Absolute model path:', absoluteModelPath);
+        console.log('Absolute model config path:', absoluteModelConfigPath);
+        
         // Load model configuration
-        const configResponse = await fetch(modelConfigPath);
+        const configResponse = await fetch(absoluteModelConfigPath);
         this.modelConfig = await configResponse.json();
         this.phonemeIdMap = this.modelConfig.phoneme_id_map;
         
         // Create ONNX session
-        this.onnxSession = await ort.InferenceSession.create(modelPath, {
+        this.onnxSession = await ort.InferenceSession.create(absoluteModelPath, {
             executionProviders: ['wasm'],
             graphOptimizationLevel: 'all'
         });
