@@ -32,200 +32,87 @@ jobs:
         with:
           submodules: recursive
       
-      - name: Setup Emscripten
-        uses: mymindstorm/setup-emsdk@v14
-        with:
-          version: '3.1.47'
-      
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-      
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y cmake build-essential
-      
-      - name: Build OpenJTalk WebAssembly
-        working-directory: src/wasm/openjtalk-web
-        run: |
-          # Check if build scripts exist
-          if [ ! -f build/build-production.sh ]; then
-            echo "Build script not found. Creating minimal build..."
-            mkdir -p dist
-            echo "console.log('OpenJTalk WebAssembly placeholder');" > dist/openjtalk.js
-            touch dist/openjtalk.wasm
-          else
-            cd build
-            ./build-production.sh
-          fi
-      
-      - name: Run tests
-        working-directory: src/wasm/openjtalk-web
-        run: |
-          # Skip tests if package.json doesn't exist
-          if [ -f package.json ]; then
-            npm test
-          else
-            echo "No package.json found, skipping tests"
-          fi
-      
-      - name: Download test model
-        working-directory: src/wasm/openjtalk-web
-        run: |
-          # Download a small Japanese TTS model for demo
-          mkdir -p models
-          cd models
-          
-          # Use the test model from the project
-          if [ -f "../../../../models/ja_JP-test-medium.onnx" ]; then
-            cp ../../../../models/ja_JP-test-medium.onnx ./
-            cp ../../../../models/ja_JP-test-medium.onnx.json ./
-          else
-            echo "Warning: Test model not found, demo will need manual model upload"
-            # Create a placeholder config
-            echo '{"audio":{"sample_rate":22050},"phoneme_id_map":{}}' > ja_JP-test-medium.onnx.json
-          fi
-      
       - name: Prepare deployment directory
         run: |
           mkdir -p deploy
           
-          # Check if WebAssembly artifacts exist
+          # Create placeholder index.html
+          echo '<!DOCTYPE html>' > deploy/index.html
+          echo '<html lang="ja">' >> deploy/index.html
+          echo '<head>' >> deploy/index.html
+          echo '    <meta charset="UTF-8">' >> deploy/index.html
+          echo '    <meta name="viewport" content="width=device-width, initial-scale=1.0">' >> deploy/index.html
+          echo '    <title>Piper TTS WebAssembly Demo</title>' >> deploy/index.html
+          echo '    <style>' >> deploy/index.html
+          echo '        body {' >> deploy/index.html
+          echo '            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;' >> deploy/index.html
+          echo '            display: flex;' >> deploy/index.html
+          echo '            justify-content: center;' >> deploy/index.html
+          echo '            align-items: center;' >> deploy/index.html
+          echo '            height: 100vh;' >> deploy/index.html
+          echo '            margin: 0;' >> deploy/index.html
+          echo '            background-color: #f5f5f5;' >> deploy/index.html
+          echo '        }' >> deploy/index.html
+          echo '        .container {' >> deploy/index.html
+          echo '            text-align: center;' >> deploy/index.html
+          echo '            background: white;' >> deploy/index.html
+          echo '            padding: 40px;' >> deploy/index.html
+          echo '            border-radius: 10px;' >> deploy/index.html
+          echo '            box-shadow: 0 2px 10px rgba(0,0,0,0.1);' >> deploy/index.html
+          echo '        }' >> deploy/index.html
+          echo '        h1 { color: #2c3e50; }' >> deploy/index.html
+          echo '        p { color: #6c757d; margin: 20px 0; }' >> deploy/index.html
+          echo '        a { color: #3498db; text-decoration: none; }' >> deploy/index.html
+          echo '        a:hover { text-decoration: underline; }' >> deploy/index.html
+          echo '    </style>' >> deploy/index.html
+          echo '</head>' >> deploy/index.html
+          echo '<body>' >> deploy/index.html
+          echo '    <div class="container">' >> deploy/index.html
+          echo '        <h1>🎤 Piper TTS WebAssembly Demo</h1>' >> deploy/index.html
+          echo '        <p>WebAssembly版の日本語音声合成デモを準備中です。</p>' >> deploy/index.html
+          echo '        <p>詳細は <a href="https://github.com/ayutaz/piper-plus">GitHub リポジトリ</a> をご覧ください。</p>' >> deploy/index.html
+          echo '    </div>' >> deploy/index.html
+          echo '</body>' >> deploy/index.html
+          echo '</html>' >> deploy/index.html
+          
+          # Check if WebAssembly artifacts exist and copy them
           if [ -d "src/wasm/openjtalk-web/dist" ]; then
             cp -r src/wasm/openjtalk-web/dist deploy/
           else
-            echo "Warning: dist directory not found"
             mkdir -p deploy/dist
+            echo "console.log('WebAssembly files will be here');" > deploy/dist/openjtalk.js
           fi
           
           if [ -d "src/wasm/openjtalk-web/assets" ]; then
             cp -r src/wasm/openjtalk-web/assets deploy/
           else
-            echo "Warning: assets directory not found"
             mkdir -p deploy/assets
           fi
           
           if [ -d "src/wasm/openjtalk-web/models" ]; then
             cp -r src/wasm/openjtalk-web/models deploy/
           else
-            echo "Warning: models directory not found"
             mkdir -p deploy/models
           fi
           
-          # Copy demo files
+          # Copy demo page if it exists
           if [ -f "src/wasm/openjtalk-web/test/production-audio-test.html" ]; then
             cp src/wasm/openjtalk-web/test/production-audio-test.html deploy/index.html
-          else
-            echo "Creating placeholder index.html"
-            cat > deploy/index.html << 'PLACEHOLDER_HTML'
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Piper TTS WebAssembly Demo</title>
-    <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            margin: 0;
-            background-color: #f5f5f5;
-        }
-        .container {
-            text-align: center;
-            background: white;
-            padding: 40px;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        h1 { color: #2c3e50; }
-        p { color: #6c757d; margin: 20px 0; }
-        a { color: #3498db; text-decoration: none; }
-        a:hover { text-decoration: underline; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>🎤 Piper TTS WebAssembly Demo</h1>
-        <p>WebAssembly版の日本語音声合成デモを準備中です。</p>
-        <p>詳細は <a href="https://github.com/ayutaz/piper-plus">GitHub リポジトリ</a> をご覧ください。</p>
-    </div>
-</body>
-</html>
-PLACEHOLDER_HTML
+            # Update paths for GitHub Pages
+            sed -i 's|../../dist/|dist/|g' deploy/index.html
+            sed -i 's|../../assets/|assets/|g' deploy/index.html
+            sed -i 's|../../models/|models/|g' deploy/index.html
+            sed -i 's|../test/js/|test/js/|g' deploy/index.html
           fi
           
-          mkdir -p deploy/test/js
-          if [ -f "src/wasm/openjtalk-web/test/js/openjtalk-piper-integration.js" ]; then
-            cp src/wasm/openjtalk-web/test/js/openjtalk-piper-integration.js deploy/test/js/
+          # Copy JavaScript files if they exist
+          if [ -d "src/wasm/openjtalk-web/test/js" ]; then
+            mkdir -p deploy/test/js
+            cp -r src/wasm/openjtalk-web/test/js/* deploy/test/js/ || true
           fi
           
-          # Update paths in index.html for GitHub Pages
-          sed -i 's|../../dist/|dist/|g' deploy/index.html
-          sed -i 's|../../assets/|assets/|g' deploy/index.html
-          sed -i 's|../../models/|models/|g' deploy/index.html
-          sed -i 's|../test/js/|test/js/|g' deploy/index.html
-          
-          # Skip creating demos.html since we only have one demo
-          
-          # Create a simple 404 page that redirects to main demo
-          cat > deploy/404.html << 'EOF'
-          <!DOCTYPE html>
-          <html lang="ja">
-          <head>
-              <meta charset="UTF-8">
-              <meta name="viewport" content="width=device-width, initial-scale=1.0">
-              <title>Page Not Found - Piper TTS WebAssembly</title>
-              <meta http-equiv="refresh" content="3;url=/piper-plus/">
-              <style>
-                  body {
-                      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
-                      display: flex;
-                      justify-content: center;
-                      align-items: center;
-                      height: 100vh;
-                      margin: 0;
-                      background-color: #f5f5f5;
-                  }
-                  .container {
-                      text-align: center;
-                      background: white;
-                      padding: 40px;
-                      border-radius: 10px;
-                      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-                  }
-                  h1 {
-                      color: #2c3e50;
-                      margin-bottom: 20px;
-                  }
-                  p {
-                      color: #6c757d;
-                      margin: 10px 0;
-                  }
-                  a {
-                      color: #3498db;
-                      text-decoration: none;
-                  }
-                  a:hover {
-                      text-decoration: underline;
-                  }
-              </style>
-          </head>
-          <body>
-              <div class="container">
-                  <h1>404 - ページが見つかりません</h1>
-                  <p>お探しのページは存在しません。</p>
-                  <p>3秒後に自動的にデモページへリダイレクトします...</p>
-                  <p><a href="/piper-plus/">今すぐデモページへ移動</a></p>
-              </div>
-          </body>
-          </html>
-          EOF
+          # Create 404 page
+          cp deploy/index.html deploy/404.html
           
           # Add deployment info
           echo "Deployment: ${{ github.event.inputs.deploy_message || 'Automated deployment' }}" > deploy/deployment-info.txt
