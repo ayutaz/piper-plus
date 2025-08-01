@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpenJTalk-Piper WebAssembly TTS Demo</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #e0e0e0;
+            border-radius: 5px;
+            background: #fafafa;
+        }
+        .input-group {
+            margin: 15px 0;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+            resize: vertical;
+        }
+        button {
+            padding: 12px 24px;
+            font-size: 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+            transition: background-color 0.3s;
+        }
+        .primary-btn {
+            background-color: #4CAF50;
+            color: white;
+        }
+        .primary-btn:hover {
+            background-color: #45a049;
+        }
+        .primary-btn:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        .secondary-btn {
+            background-color: #008CBA;
+            color: white;
+        }
+        .secondary-btn:hover {
+            background-color: #007399;
+        }
+        .danger-btn {
+            background-color: #f44336;
+            color: white;
+        }
+        .danger-btn:hover {
+            background-color: #da190b;
+        }
+        .status {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+        .status.info {
+            background-color: #e3f2fd;
+            color: #1976d2;
+        }
+        .status.success {
+            background-color: #e8f5e9;
+            color: #388e3c;
+        }
+        .status.error {
+            background-color: #ffebee;
+            color: #c62828;
+        }
+        .status.warning {
+            background-color: #fff3e0;
+            color: #f57c00;
+        }
+        .samples {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .sample-btn {
+            padding: 8px 16px;
+            background-color: #e0e0e0;
+            color: #333;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .sample-btn:hover {
+            background-color: #d0d0d0;
+        }
+        .audio-controls {
+            margin-top: 20px;
+            padding: 20px;
+            background-color: #f0f0f0;
+            border-radius: 5px;
+        }
+        audio {
+            width: 100%;
+            margin-top: 10px;
+        }
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-left: 10px;
+            vertical-align: middle;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .phoneme-display {
+            font-family: monospace;
+            font-size: 18px;
+            color: #2196F3;
+            margin: 10px 0;
+            padding: 10px;
+            background-color: #f0f8ff;
+            border-radius: 4px;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .stat-item {
+            text-align: center;
+            padding: 15px;
+            background-color: #fff;
+            border-radius: 5px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #333;
+        }
+        .stat-label {
+            font-size: 14px;
+            color: #666;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎤 OpenJTalk-Piper WebAssembly 音声合成デモ</h1>
+        
+        <div class="section">
+            <h2>初期化</h2>
+            <button id="initBtn" class="primary-btn" onclick="initializeTTS()">TTSシステムを初期化</button>
+            <button id="resetBtn" class="danger-btn" onclick="resetTTS()" style="display: none;">リセット</button>
+            <div id="initStatus" class="status info">初期化待機中...</div>
+        </div>
+        
+        <div class="section" id="mainSection" style="display: none;">
+            <h2>テキスト入力</h2>
+            <div class="input-group">
+                <label for="inputText">日本語テキストを入力してください：</label>
+                <textarea id="inputText" rows="4" placeholder="ここにテキストを入力...">こんにちは、OpenJTalkとPiperを使った音声合成のデモです。</textarea>
+            </div>
+            
+            <div class="samples">
+                <button class="sample-btn" onclick="setSampleText('おはようございます。今日はいい天気ですね。')">挨拶</button>
+                <button class="sample-btn" onclick="setSampleText('人工知能の分野で、音声合成技術が急速に進歩しています。')">ニュース</button>
+                <button class="sample-btn" onclick="setSampleText('本日は晴れ時々曇り、最高気温は25度の予想です。')">天気予報</button>
+                <button class="sample-btn" onclick="setSampleText('ご注文はこちらでよろしいでしょうか。')">接客</button>
+                <button class="sample-btn" onclick="setSampleText('電車は5分遅れで運行しております。')">アナウンス</button>
+                <button class="sample-btn" onclick="setSampleText('123個のりんごがあります。')">数字</button>
+            </div>
+            
+            <div style="margin-top: 20px;">
+                <button id="synthesizeBtn" class="primary-btn" onclick="synthesizeSpeech()">
+                    音声合成
+                </button>
+                <button class="secondary-btn" onclick="clearText()">クリア</button>
+            </div>
+            
+            <div id="phonemeDisplay" class="phoneme-display" style="display: none;"></div>
+            
+            <div id="synthesisStatus" class="status info" style="display: none;"></div>
+            
+            <div id="audioControls" class="audio-controls" style="display: none;">
+                <h3>生成された音声</h3>
+                <audio id="audioPlayer" controls></audio>
+                <div style="margin-top: 10px;">
+                    <button class="secondary-btn" onclick="downloadAudio()">WAVファイルをダウンロード</button>
+                </div>
+            </div>
+            
+            <div id="stats" class="stats" style="display: none;">
+                <div class="stat-item">
+                    <div class="stat-value" id="phonemeCount">-</div>
+                    <div class="stat-label">音素数</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="inferenceTime">-</div>
+                    <div class="stat-label">推論時間</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="audioDuration">-</div>
+                    <div class="stat-label">音声長</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="rtFactor">-</div>
+                    <div class="stat-label">リアルタイム係数</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ONNX Runtime Web -->
+    <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.16.3/dist/ort.min.js"></script>
+    
+    <!-- OpenJTalk-Piper Integration -->
+    <script type="module">
+        import OpenJTalkPiperTTS from './js/openjtalk-piper-integration.js';
+        
+        let tts = null;
+        let currentAudioBlob = null;
+        
+        window.initializeTTS = async function() {
+            const initBtn = document.getElementById('initBtn');
+            const initStatus = document.getElementById('initStatus');
+            const mainSection = document.getElementById('mainSection');
+            const resetBtn = document.getElementById('resetBtn');
+            
+            try {
+                initBtn.disabled = true;
+                initBtn.innerHTML = '初期化中... <span class="loading"></span>';
+                initStatus.className = 'status warning';
+                initStatus.textContent = 'TTSシステムを初期化しています...';
+                
+                tts = new OpenJTalkPiperTTS();
+                
+                // Configuration
+                const config = {
+                    openjtalk: {
+                        jsPath: '../dist/openjtalk.js',
+                        wasmPath: '../dist/openjtalk.wasm',
+                        dictPath: '../assets/dict',
+                        voicePath: '../assets/voice/mei_normal.htsvoice'
+                    },
+                    onnx: {
+                        modelPath: '../models/ja_JP-test-medium.onnx',
+                        modelConfigPath: '../models/ja_JP-test-medium.onnx.json'
+                    }
+                };
+                
+                await tts.initialize(config);
+                
+                initStatus.className = 'status success';
+                initStatus.textContent = '✅ TTSシステムが正常に初期化されました';
+                initBtn.style.display = 'none';
+                resetBtn.style.display = 'inline-block';
+                mainSection.style.display = 'block';
+                
+            } catch (error) {
+                console.error('Initialization error:', error);
+                initStatus.className = 'status error';
+                initStatus.textContent = `❌ 初期化エラー: ${error.message}`;
+                initBtn.disabled = false;
+                initBtn.innerHTML = 'TTSシステムを初期化';
+            }
+        };
+        
+        window.resetTTS = function() {
+            if (tts) {
+                tts.dispose();
+                tts = null;
+            }
+            
+            document.getElementById('initBtn').style.display = 'inline-block';
+            document.getElementById('resetBtn').style.display = 'none';
+            document.getElementById('mainSection').style.display = 'none';
+            document.getElementById('initStatus').className = 'status info';
+            document.getElementById('initStatus').textContent = '初期化待機中...';
+            document.getElementById('initBtn').disabled = false;
+            document.getElementById('initBtn').innerHTML = 'TTSシステムを初期化';
+        };
+        
+        window.setSampleText = function(text) {
+            document.getElementById('inputText').value = text;
+        };
+        
+        window.clearText = function() {
+            document.getElementById('inputText').value = '';
+        };
+        
+        window.synthesizeSpeech = async function() {
+            if (!tts || !tts.initialized) {
+                alert('TTSシステムが初期化されていません');
+                return;
+            }
+            
+            const text = document.getElementById('inputText').value.trim();
+            if (!text) {
+                alert('テキストを入力してください');
+                return;
+            }
+            
+            const synthesizeBtn = document.getElementById('synthesizeBtn');
+            const synthesisStatus = document.getElementById('synthesisStatus');
+            const phonemeDisplay = document.getElementById('phonemeDisplay');
+            const audioControls = document.getElementById('audioControls');
+            const stats = document.getElementById('stats');
+            
+            try {
+                synthesizeBtn.disabled = true;
+                synthesizeBtn.innerHTML = '音声生成中... <span class="loading"></span>';
+                synthesisStatus.style.display = 'block';
+                synthesisStatus.className = 'status warning';
+                synthesisStatus.textContent = '音声を生成しています...';
+                audioControls.style.display = 'none';
+                stats.style.display = 'none';
+                
+                const startTime = performance.now();
+                
+                // Generate speech
+                const audioData = await tts.textToSpeech(text);
+                
+                const endTime = performance.now();
+                const inferenceTime = endTime - startTime;
+                
+                // Get phonemes for display
+                const labels = await tts.textToLabels(text);
+                const phonemes = tts.extractPhonemes(labels);
+                phonemeDisplay.style.display = 'block';
+                phonemeDisplay.textContent = `音素: ${phonemes.join(' ')}`;
+                
+                // Create WAV
+                const sampleRate = tts.modelConfig.audio.sample_rate || 22050;
+                currentAudioBlob = tts.createWAV(audioData, sampleRate);
+                const audioUrl = URL.createObjectURL(currentAudioBlob);
+                
+                // Set audio player
+                const audioPlayer = document.getElementById('audioPlayer');
+                audioPlayer.src = audioUrl;
+                
+                // Calculate statistics
+                const audioDuration = audioData.length / sampleRate;
+                const rtFactor = inferenceTime / 1000 / audioDuration;
+                
+                // Update UI
+                document.getElementById('phonemeCount').textContent = phonemes.length - 2; // Exclude ^ and $
+                document.getElementById('inferenceTime').textContent = `${inferenceTime.toFixed(0)}ms`;
+                document.getElementById('audioDuration').textContent = `${audioDuration.toFixed(2)}秒`;
+                document.getElementById('rtFactor').textContent = rtFactor.toFixed(2);
+                
+                synthesisStatus.className = 'status success';
+                synthesisStatus.textContent = '✅ 音声生成が完了しました';
+                audioControls.style.display = 'block';
+                stats.style.display = 'grid';
+                
+            } catch (error) {
+                console.error('Synthesis error:', error);
+                synthesisStatus.className = 'status error';
+                synthesisStatus.textContent = `❌ 音声生成エラー: ${error.message}`;
+            } finally {
+                synthesizeBtn.disabled = false;
+                synthesizeBtn.innerHTML = '音声合成';
+            }
+        };
+        
+        window.downloadAudio = function() {
+            if (!currentAudioBlob) return;
+            
+            const url = URL.createObjectURL(currentAudioBlob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `tts_output_${new Date().getTime()}.wav`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        };
+        
+        // Make functions available globally
+        window.tts = tts;
+    </script>
+</body>
+</html>
