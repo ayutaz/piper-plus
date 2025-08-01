@@ -102,7 +102,7 @@ jobs:
             sed -i 's|../../dist/|dist/|g' deploy/index.html
             sed -i 's|../../assets/|assets/|g' deploy/index.html
             sed -i 's|../../models/|models/|g' deploy/index.html
-            sed -i 's|../test/js/|test/js/|g' deploy/index.html
+            sed -i 's|./js/|test/js/|g' deploy/index.html
           fi
           
           # Copy JavaScript files if they exist
