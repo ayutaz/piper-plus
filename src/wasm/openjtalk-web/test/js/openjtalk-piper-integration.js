@@ -44,10 +44,16 @@ class OpenJTalkPiperTTS {
         // Handle both local development and GitHub Pages deployment
         let jsPath = config.jsPath;
         
+        console.log('Original jsPath:', jsPath);
+        console.log('Current hostname:', window.location.hostname);
+        console.log('Is GitHub Pages:', window.location.hostname.includes('github.io'));
+        
         // If we're on GitHub Pages and the path doesn't start with relative indicator
         if (window.location.hostname.includes('github.io')) {
             // Convert paths for GitHub Pages deployment
-            if (jsPath === 'dist/openjtalk.js' || jsPath === './dist/openjtalk.js') {
+            // The paths from HTML are already transformed by workflow (e.g., ./dist/openjtalk.js)
+            // We need to convert them to be relative from test/js/ directory
+            if (jsPath === './dist/openjtalk.js' || jsPath === 'dist/openjtalk.js') {
                 jsPath = '../../dist/openjtalk.js';
             }
         } else {
@@ -57,12 +63,15 @@ class OpenJTalkPiperTTS {
             }
         }
         
+        console.log('Final jsPath:', jsPath);
+        console.log('Import URL will be:', new URL(jsPath, import.meta.url).href);
+        
         const OpenJTalkModule = (await import(jsPath)).default;
         
         // Adjust wasmPath for GitHub Pages
         let wasmPath = config.wasmPath;
         if (window.location.hostname.includes('github.io')) {
-            if (wasmPath === 'dist/openjtalk.wasm' || wasmPath === './dist/openjtalk.wasm') {
+            if (wasmPath === './dist/openjtalk.wasm' || wasmPath === 'dist/openjtalk.wasm') {
                 wasmPath = '../../dist/openjtalk.wasm';
             }
         }
@@ -84,11 +93,11 @@ class OpenJTalkPiperTTS {
         let dictPath = config.dictPath;
         let voicePath = config.voicePath;
         if (window.location.hostname.includes('github.io')) {
-            if (dictPath === 'dict' || dictPath === './dict') {
-                dictPath = '../../dict';
+            if (dictPath === './assets/dict' || dictPath === 'assets/dict') {
+                dictPath = '../../assets/dict';
             }
-            if (voicePath.startsWith('assets/') || voicePath.startsWith('./assets/')) {
-                voicePath = '../../' + voicePath.replace(/^\.?\//, '');
+            if (voicePath === './assets/voice/mei_normal.htsvoice' || voicePath === 'assets/voice/mei_normal.htsvoice') {
+                voicePath = '../../assets/voice/mei_normal.htsvoice';
             }
         }
         
@@ -133,11 +142,11 @@ class OpenJTalkPiperTTS {
         let modelPath = config.modelPath;
         let modelConfigPath = config.modelConfigPath;
         if (window.location.hostname.includes('github.io')) {
-            if (modelPath.startsWith('models/') || modelPath.startsWith('./models/')) {
-                modelPath = '../../' + modelPath.replace(/^\.?\//, '');
+            if (modelPath === './models/ja_JP-test-medium.onnx' || modelPath === 'models/ja_JP-test-medium.onnx') {
+                modelPath = '../../models/ja_JP-test-medium.onnx';
             }
-            if (modelConfigPath.startsWith('models/') || modelConfigPath.startsWith('./models/')) {
-                modelConfigPath = '../../' + modelConfigPath.replace(/^\.?\//, '');
+            if (modelConfigPath === './models/ja_JP-test-medium.onnx.json' || modelConfigPath === 'models/ja_JP-test-medium.onnx.json') {
+                modelConfigPath = '../../models/ja_JP-test-medium.onnx.json';
             }
         }
         

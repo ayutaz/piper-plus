@@ -98,10 +98,10 @@ jobs:
           # Copy demo page if it exists
           if [ -f "src/wasm/openjtalk-web/test/production-audio-test.html" ]; then
             cp src/wasm/openjtalk-web/test/production-audio-test.html deploy/index.html
-            # Update paths for GitHub Pages
-            sed -i 's|../../dist/|dist/|g' deploy/index.html
-            sed -i 's|../../assets/|assets/|g' deploy/index.html
-            sed -i 's|../../models/|models/|g' deploy/index.html
+            # Update paths for GitHub Pages - use ./ prefix for proper relative paths
+            sed -i 's|../../dist/|./dist/|g' deploy/index.html
+            sed -i 's|../../assets/|./assets/|g' deploy/index.html
+            sed -i 's|../../models/|./models/|g' deploy/index.html
             sed -i 's|./js/|./test/js/|g' deploy/index.html
           fi
           
