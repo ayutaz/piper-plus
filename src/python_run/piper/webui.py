@@ -794,7 +794,13 @@ def create_interface(data_dir: Path) -> gr.Blocks:
                     stop_training_btn = gr.Button("Stop Training", variant="stop")
 
                 with gr.Row():
-                    training_progress = gr.Progress()
+                    training_progress = gr.Slider(
+                        label="Training Progress",
+                        minimum=0,
+                        maximum=1,
+                        value=0,
+                        interactive=False,
+                    )
                     training_status = gr.Textbox(
                         label="Training Status",
                         value="Not started",
