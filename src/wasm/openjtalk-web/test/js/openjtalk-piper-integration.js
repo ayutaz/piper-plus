@@ -57,8 +57,11 @@ class OpenJTalkPiperTTS {
             console.log('  jsPath === "./dist/openjtalk.js":', jsPath === './dist/openjtalk.js');
             console.log('  jsPath === "dist/openjtalk.js":', jsPath === 'dist/openjtalk.js');
             
-            // More flexible path matching for GitHub Pages
-            if (jsPath.includes('dist/openjtalk.js')) {
+            // More precise path matching for GitHub Pages
+            if (jsPath === 'dist/openjtalk.js' || 
+                jsPath === './dist/openjtalk.js' || 
+                jsPath === '../dist/openjtalk.js' ||
+                jsPath.endsWith('/dist/openjtalk.js')) {
                 jsPath = '../../dist/openjtalk.js';
                 console.log('  Path converted to:', jsPath);
             } else {
@@ -79,7 +82,10 @@ class OpenJTalkPiperTTS {
         // Adjust wasmPath for GitHub Pages
         let wasmPath = config.wasmPath;
         if (window.location.hostname.includes('github.io')) {
-            if (wasmPath.includes('dist/openjtalk.wasm')) {
+            if (wasmPath === 'dist/openjtalk.wasm' || 
+                wasmPath === './dist/openjtalk.wasm' || 
+                wasmPath === '../dist/openjtalk.wasm' ||
+                wasmPath.endsWith('/dist/openjtalk.wasm')) {
                 wasmPath = '../../dist/openjtalk.wasm';
             }
         }
@@ -101,11 +107,17 @@ class OpenJTalkPiperTTS {
         let dictPath = config.dictPath;
         let voicePath = config.voicePath;
         if (window.location.hostname.includes('github.io')) {
-            if (dictPath.includes('assets/dict')) {
+            if (dictPath === 'assets/dict' || 
+                dictPath === './assets/dict' || 
+                dictPath === '../assets/dict' ||
+                dictPath.endsWith('/assets/dict')) {
                 dictPath = '../../assets/dict';
             }
-            if (voicePath.includes('assets/voice/')) {
-                voicePath = '../../' + voicePath.replace(/^(\.?\/)?/, '');
+            if (voicePath === 'assets/voice/mei_normal.htsvoice' || 
+                voicePath === './assets/voice/mei_normal.htsvoice' || 
+                voicePath === '../assets/voice/mei_normal.htsvoice' ||
+                voicePath.endsWith('/assets/voice/mei_normal.htsvoice')) {
+                voicePath = '../../assets/voice/mei_normal.htsvoice';
             }
         }
         
@@ -150,11 +162,17 @@ class OpenJTalkPiperTTS {
         let modelPath = config.modelPath;
         let modelConfigPath = config.modelConfigPath;
         if (window.location.hostname.includes('github.io')) {
-            if (modelPath.includes('models/')) {
-                modelPath = '../../' + modelPath.replace(/^(\.?\/)?/, '');
+            if (modelPath === 'models/ja_JP-test-medium.onnx' || 
+                modelPath === './models/ja_JP-test-medium.onnx' || 
+                modelPath === '../models/ja_JP-test-medium.onnx' ||
+                modelPath.endsWith('/models/ja_JP-test-medium.onnx')) {
+                modelPath = '../../models/ja_JP-test-medium.onnx';
             }
-            if (modelConfigPath.includes('models/')) {
-                modelConfigPath = '../../' + modelConfigPath.replace(/^(\.?\/)?/, '');
+            if (modelConfigPath === 'models/ja_JP-test-medium.onnx.json' || 
+                modelConfigPath === './models/ja_JP-test-medium.onnx.json' || 
+                modelConfigPath === '../models/ja_JP-test-medium.onnx.json' ||
+                modelConfigPath.endsWith('/models/ja_JP-test-medium.onnx.json')) {
+                modelConfigPath = '../../models/ja_JP-test-medium.onnx.json';
             }
         }
         

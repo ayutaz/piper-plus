@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Manual Path Test</title>
+</head>
+<body>
+    <h1>Manual Path Resolution Test</h1>
+    <pre id="output"></pre>
+    
+    <script type="module">
+        const output = document.getElementById('output');
+        
+        // Simulate GitHub Pages environment
+        const isGitHubPages = true; // window.location.hostname.includes('github.io');
+        
+        // Test paths from actual deployment
+        const testPaths = [
+            'dist/openjtalk.js',
+            './dist/openjtalk.js',
+            '../dist/openjtalk.js'
+        ];
+        
+        output.textContent += 'Testing path resolution logic:\n\n';
+        
+        testPaths.forEach(jsPath => {
+            output.textContent += `Original path: ${jsPath}\n`;
+            
+            // Exact logic from openjtalk-piper-integration.js
+            if (isGitHubPages) {
+                if (jsPath.includes('dist/openjtalk.js')) {
+                    jsPath = '../../dist/openjtalk.js';
+                    output.textContent += `  ✓ Converted to: ${jsPath}\n`;
+                } else {
+                    output.textContent += `  ✗ No conversion applied\n`;
+                }
+            }
+            
+            // Test URL resolution
+            const baseUrl = 'https://ayutaz.github.io/piper-plus/test/js/openjtalk-piper-integration.js';
+            try {
+                const resolvedUrl = new URL(jsPath, baseUrl);
+                output.textContent += `  Resolved URL: ${resolvedUrl.href}\n`;
+                
+                const expectedUrl = 'https://ayutaz.github.io/piper-plus/dist/openjtalk.js';
+                if (resolvedUrl.href === expectedUrl) {
+                    output.textContent += `  ✓ URL is correct!\n`;
+                } else {
+                    output.textContent += `  ✗ URL is wrong, expected: ${expectedUrl}\n`;
+                }
+            } catch (e) {
+                output.textContent += `  Error: ${e.message}\n`;
+            }
+            
+            output.textContent += '\n';
+        });
+    </script>
+</body>
+</html>
