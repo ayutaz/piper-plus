@@ -1,0 +1,26 @@
+# Reference repositories
+wasm_open_jtalk_reference/
+
+# Build tools
+tools/
+
+# Build output
+dist/
+build/CMakeFiles/
+build/CMakeCache.txt
+build/*.cmake
+
+# Dependencies
+node_modules/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+
+# Temporary files
+*.tmp
+*.log
