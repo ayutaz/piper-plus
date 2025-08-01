@@ -78,6 +78,7 @@ class OpenJTalkPiperTTS {
         console.log('Import URL will be:', new URL(jsPath, import.meta.url).href);
         
         const OpenJTalkModule = (await import(jsPath)).default;
+        console.log('OpenJTalkModule loaded successfully');
         
         // Adjust wasmPath for GitHub Pages
         let wasmPath = config.wasmPath;
@@ -90,13 +91,35 @@ class OpenJTalkPiperTTS {
             }
         }
         
+        // Convert wasmPath to absolute URL to avoid path resolution issues
+        const absoluteWasmPath = new URL(wasmPath, import.meta.url).href;
+        console.log('Absolute WASM path:', absoluteWasmPath);
+        
+        // Fetch the WASM binary directly to bypass path resolution issues
+        let wasmBinary = null;
+        if (window.location.hostname.includes('github.io')) {
+            try {
+                console.log('Fetching WASM binary from:', absoluteWasmPath);
+                const wasmResponse = await fetch(absoluteWasmPath);
+                if (wasmResponse.ok) {
+                    wasmBinary = await wasmResponse.arrayBuffer();
+                    console.log('WASM binary fetched successfully, size:', wasmBinary.byteLength);
+                }
+            } catch (error) {
+                console.error('Failed to fetch WASM binary:', error);
+            }
+        }
+        
         this.openjtalkModule = await OpenJTalkModule({
             locateFile: (path) => {
                 if (path.endsWith('.wasm')) {
-                    return wasmPath;
+                    console.log('locateFile called for:', path);
+                    console.log('Returning absoluteWasmPath:', absoluteWasmPath);
+                    return absoluteWasmPath;
                 }
                 return path;
-            }
+            },
+            wasmBinary: wasmBinary
         });
         
         // Create directories
