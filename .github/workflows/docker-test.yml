@@ -66,25 +66,13 @@ jobs:
         run: |
           case "${{ matrix.image.name }}" in
             python-train)
-              docker run --rm piper-${{ matrix.image.name }}:test python -c "
-import torch
-import numpy
-import librosa
-import soundfile
-print('All imports successful')
-"
+              docker run --rm piper-${{ matrix.image.name }}:test python -c "import torch; import numpy; import librosa; import soundfile; print('All imports successful')"
               ;;
             python-inference)
-              docker run --rm piper-${{ matrix.image.name }}:test python -c "
-import torch
-import onnxruntime
-print('Inference environment OK')
-"
+              docker run --rm piper-${{ matrix.image.name }}:test python -c "import torch; import onnxruntime; print('Inference environment OK')"
               ;;
             cpp-train)
-              docker run --rm piper-${{ matrix.image.name }}:test bash -c "
-cmake --version && ninja --version && echo 'Build tools OK'
-"
+              docker run --rm piper-${{ matrix.image.name }}:test bash -c "cmake --version && ninja --version && echo 'Build tools OK'"
               ;;
           esac
       
@@ -135,54 +123,46 @@ cmake --version && ninja --version && echo 'Build tools OK'
       - name: Test Python inference with test model
         run: |
           # Test basic text-to-phoneme model
+          cat > /tmp/test_inference.py << 'EOF'
+          import onnxruntime as ort
+          import numpy as np
+          import json
+          
+          # Load model config
+          with open('/models/text_voice.onnx.json', 'r') as f:
+              config = json.load(f)
+          print('Model config loaded successfully')
+          
+          # Create session
+          session = ort.InferenceSession('/models/text_voice.onnx')
+          print('ONNX model loaded successfully')
+          
+          # Simple inference test with dummy input
+          # This model expects text phonemes as input
+          input_ids = np.array([[1, 14, 15, 16, 2]], dtype=np.int64)  # Simple 'abc' phonemes
+          scales = np.array([config['inference']['noise_scale'], 
+                             config['inference']['length_scale']], dtype=np.float32)
+          
+          # Run inference
+          outputs = session.run(None, {
+              'input': input_ids,
+              'scales': scales
+          })
+          print(f'Inference successful! Output shape: {outputs[0].shape}')
+          EOF
+          
           docker run --rm \
             -v ${{ github.workspace }}/test/models:/models:ro \
+            -v /tmp/test_inference.py:/test_inference.py:ro \
             piper-python-inference:test \
-            python -c "
-import onnxruntime as ort
-import numpy as np
-import json
-
-# Load model config
-with open('/models/text_voice.onnx.json', 'r') as f:
-    config = json.load(f)
-print('Model config loaded successfully')
-
-# Create session
-session = ort.InferenceSession('/models/text_voice.onnx')
-print('ONNX model loaded successfully')
-
-# Simple inference test with dummy input
-# This model expects text phonemes as input
-input_ids = np.array([[1, 14, 15, 16, 2]], dtype=np.int64)  # Simple 'abc' phonemes
-scales = np.array([config['inference']['noise_scale'], 
-                   config['inference']['length_scale']], dtype=np.float32)
-
-# Run inference
-outputs = session.run(None, {
-    'input': input_ids,
-    'scales': scales
-})
-print(f'Inference successful! Output shape: {outputs[0].shape}')
-"
+            python /test_inference.py
       
       - name: Test Python inference API functionality
         run: |
           # Test that FastAPI can be imported and basic server structure works
           docker run --rm \
             piper-python-inference:test \
-            python -c "
-from fastapi import FastAPI
-import uvicorn
-
-app = FastAPI()
-
-@app.get('/health')
-def health_check():
-    return {'status': 'healthy'}
-
-print('FastAPI server structure OK')
-"
+            python -c "from fastapi import FastAPI; import uvicorn; app = FastAPI(); print('FastAPI server structure OK')"
       
       - name: Run comprehensive inference tests
         run: |
