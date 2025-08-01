@@ -75,12 +75,13 @@ jobs:
           echo '</body>' >> deploy/index.html
           echo '</html>' >> deploy/index.html
           
-          # Check if WebAssembly artifacts exist and copy them
+          # Copy WebAssembly artifacts
           if [ -d "src/wasm/openjtalk-web/dist" ]; then
             cp -r src/wasm/openjtalk-web/dist deploy/
           else
-            mkdir -p deploy/dist
-            echo "console.log('WebAssembly files will be here');" > deploy/dist/openjtalk.js
+            echo "ERROR: WebAssembly dist directory not found!"
+            echo "Please build the WebAssembly files before deployment."
+            exit 1
           fi
           
           if [ -d "src/wasm/openjtalk-web/assets" ]; then

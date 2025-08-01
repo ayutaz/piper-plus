@@ -1,5 +1,5 @@
 # Build outputs
-dist/
+# dist/ # Need to include dist for GitHub Pages deployment
 build/build-*/
 build/CMakeFiles/
 build/CMakeCache.txt
