@@ -16,6 +16,7 @@ from urllib import request
 PORT = 8889
 TIMEOUT = 30
 
+
 class QuietHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
     def log_message(self, format, *args):
         # Suppress server logs
@@ -23,12 +24,13 @@ class QuietHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
 
     def end_headers(self):
         # Add CORS and MIME type headers
-        if self.path.endswith('.wasm'):
-            self.send_header('Content-Type', 'application/wasm')
-        elif self.path.endswith('.js'):
-            self.send_header('Content-Type', 'application/javascript')
-        self.send_header('Access-Control-Allow-Origin', '*')
+        if self.path.endswith(".wasm"):
+            self.send_header("Content-Type", "application/wasm")
+        elif self.path.endswith(".js"):
+            self.send_header("Content-Type", "application/javascript")
+        self.send_header("Access-Control-Allow-Origin", "*")
         super().end_headers()
+
 
 def start_server():
     """Start HTTP server in background"""
@@ -43,6 +45,7 @@ def start_server():
 
     return httpd
 
+
 def test_server_files():
     """Test if required files are accessible"""
     base_url = f"http://localhost:{PORT}"
@@ -51,7 +54,7 @@ def test_server_files():
         "/dist/openjtalk.js",
         "/dist/openjtalk.wasm",
         "/assets/dict/char.bin",
-        "/assets/voice/mei_normal.htsvoice"
+        "/assets/voice/mei_normal.htsvoice",
     ]
 
     print("Checking required files...")
@@ -68,6 +71,7 @@ def test_server_files():
             all_ok = False
 
     return all_ok
+
 
 def run_browser_test():
     """Run actual browser test"""
@@ -103,7 +107,7 @@ test();
 """
 
     # Write test file
-    with open('test/quick-test.html', 'w') as f:
+    with open("test/quick-test.html", "w") as f:
         f.write(test_html)
 
     print("\nRunning browser test...")
@@ -111,8 +115,10 @@ test();
     # Use curl to fetch the page (simpler than launching Chrome)
     try:
         # First, just check if the server responds
-        cmd = f'curl -s http://localhost:{PORT}/test/quick-test.html'
-        result = subprocess.run(cmd, check=False, shell=True, capture_output=True, text=True, timeout=10)
+        cmd = f"curl -s http://localhost:{PORT}/test/quick-test.html"
+        result = subprocess.run(
+            cmd, check=False, shell=True, capture_output=True, text=True, timeout=10
+        )
 
         if result.returncode == 0:
             print("  ✓ Server is responding")
@@ -134,24 +140,25 @@ test();
         return False
     finally:
         # Cleanup
-        if os.path.exists('test/quick-test.html'):
-            os.remove('test/quick-test.html')
+        if os.path.exists("test/quick-test.html"):
+            os.remove("test/quick-test.html")
+
 
 def main():
     print("=== OpenJTalk WebAssembly Quick Test ===\n")
 
     # Check if build exists
-    if not os.path.exists('dist/openjtalk.wasm'):
+    if not os.path.exists("dist/openjtalk.wasm"):
         print("✗ Build not found. Run build script first.")
         return 1
 
     # Get file sizes
-    js_size = os.path.getsize('dist/openjtalk.js')
-    wasm_size = os.path.getsize('dist/openjtalk.wasm')
+    js_size = os.path.getsize("dist/openjtalk.js")
+    wasm_size = os.path.getsize("dist/openjtalk.wasm")
 
     print("Build info:")
-    print(f"  openjtalk.js: {js_size:,} bytes ({js_size/1024:.1f} KB)")
-    print(f"  openjtalk.wasm: {wasm_size:,} bytes ({wasm_size/1024:.1f} KB)")
+    print(f"  openjtalk.js: {js_size:,} bytes ({js_size / 1024:.1f} KB)")
+    print(f"  openjtalk.wasm: {wasm_size:,} bytes ({wasm_size / 1024:.1f} KB)")
 
     # Start server
     print(f"\nStarting test server on port {PORT}...")
@@ -187,5 +194,6 @@ def main():
     finally:
         httpd.shutdown()
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     sys.exit(main())

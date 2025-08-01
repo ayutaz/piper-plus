@@ -12,15 +12,16 @@ from pathlib import Path
 
 PORT = 8080
 
+
 class CORSRequestHandler(http.server.SimpleHTTPRequestHandler):
     def end_headers(self):
         # Add CORS headers
-        self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
         # Required for SharedArrayBuffer if needed in future
-        self.send_header('Cross-Origin-Embedder-Policy', 'require-corp')
-        self.send_header('Cross-Origin-Opener-Policy', 'same-origin')
+        self.send_header("Cross-Origin-Embedder-Policy", "require-corp")
+        self.send_header("Cross-Origin-Opener-Policy", "same-origin")
         super().end_headers()
 
     def do_OPTIONS(self):
@@ -30,9 +31,10 @@ class CORSRequestHandler(http.server.SimpleHTTPRequestHandler):
     def guess_type(self, path):
         mimetype = super().guess_type(path)
         # Set proper MIME type for WebAssembly
-        if path.endswith('.wasm'):
-            return 'application/wasm'
+        if path.endswith(".wasm"):
+            return "application/wasm"
         return mimetype
+
 
 def main():
     # Change to demo directory
@@ -50,6 +52,7 @@ def main():
             httpd.serve_forever()
         except KeyboardInterrupt:
             print("\nServer stopped.")
+
 
 if __name__ == "__main__":
     main()

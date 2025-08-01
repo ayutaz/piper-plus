@@ -9,23 +9,24 @@ import socketserver
 class MyHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
     def end_headers(self):
         # Add CORS headers
-        self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
 
         # Add proper MIME types
-        if self.path.endswith('.wasm'):
-            self.send_header('Content-Type', 'application/wasm')
-        elif self.path.endswith('.js'):
-            self.send_header('Content-Type', 'application/javascript')
+        if self.path.endswith(".wasm"):
+            self.send_header("Content-Type", "application/wasm")
+        elif self.path.endswith(".js"):
+            self.send_header("Content-Type", "application/javascript")
 
         super().end_headers()
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     PORT = 8080
 
     # Change to the dist directory
-    os.chdir('dist')
+    os.chdir("dist")
 
     with socketserver.TCPServer(("", PORT), MyHTTPRequestHandler) as httpd:
         print(f"Server running at http://localhost:{PORT}/")
