@@ -2,12 +2,15 @@
  * OpenJTalk WebAssembly API for browsers
  */
 
+import { DictionaryLoader } from './dictionary-loader.js';
+
 export class OpenJTalkWeb {
   constructor() {
     this.module = null;
     this.initialized = false;
     this.dictLoaded = false;
     this.voiceLoaded = false;
+    this.dictLoader = null;
   }
 
   /**
@@ -38,9 +41,18 @@ export class OpenJTalkWeb {
       console.log('WebAssembly module loaded');
       
       // Create virtual file system directories
-      this.module.FS.mkdir('/tmp');
-      this.module.FS.mkdir('/dict');
-      this.module.FS.mkdir('/voice');
+      try {
+        this.module.FS.mkdir('/tmp');
+      } catch (e) { /* may already exist */ }
+      try {
+        this.module.FS.mkdir('/dict');
+      } catch (e) { /* may already exist */ }
+      try {
+        this.module.FS.mkdir('/voice');
+      } catch (e) { /* may already exist */ }
+      
+      // Initialize dictionary loader
+      this.dictLoader = new DictionaryLoader(this.module);
       
       // Load dictionary
       if (config.dictUrl) {
@@ -75,33 +87,28 @@ export class OpenJTalkWeb {
 
   /**
    * Load dictionary files from URL
-   * @param {string} url - Dictionary archive URL
+   * @param {string} url - Dictionary archive URL or directory URL
    * @returns {Promise<void>}
    */
   async loadDictionary(url) {
     console.log('Loading dictionary from:', url);
     
     try {
-      const response = await fetch(url);
-      if (!response.ok) {
-        throw new Error(`Failed to fetch dictionary: ${response.statusText}`);
+      if (url.endsWith('.tar.gz') || url.endsWith('.tgz')) {
+        // Load from archive
+        await this.dictLoader.loadFromArchive(url);
+      } else {
+        // Load individual files from directory
+        await this.dictLoader.loadIndividualFiles(url);
       }
       
-      const arrayBuffer = await response.arrayBuffer();
-      const data = new Uint8Array(arrayBuffer);
-      
-      // For now, assume the dictionary is pre-extracted
-      // In production, we would decompress and extract files here
-      const dictFiles = [
-        'char.bin', 'matrix.bin', 'sys.dic', 'unk.dic',
-        'left-id.def', 'pos-id.def', 'rewrite.def', 'right-id.def'
-      ];
-      
-      // TODO: Implement proper dictionary extraction
-      // For MVP, we'll need to serve individual files
-      console.warn('Dictionary loading not fully implemented - need extraction logic');
+      // Verify all files are loaded
+      if (!this.dictLoader.verify()) {
+        throw new Error('Dictionary verification failed');
+      }
       
       this.dictLoaded = true;
+      console.log('Dictionary loaded successfully');
       
     } catch (error) {
       console.error('Failed to load dictionary:', error);
