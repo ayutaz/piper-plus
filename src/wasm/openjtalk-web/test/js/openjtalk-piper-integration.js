@@ -53,8 +53,16 @@ class OpenJTalkPiperTTS {
             // Convert paths for GitHub Pages deployment
             // The paths from HTML are already transformed by workflow (e.g., ./dist/openjtalk.js)
             // We need to convert them to be relative from test/js/ directory
-            if (jsPath === './dist/openjtalk.js' || jsPath === 'dist/openjtalk.js') {
+            console.log('GitHub Pages path conversion check:');
+            console.log('  jsPath === "./dist/openjtalk.js":', jsPath === './dist/openjtalk.js');
+            console.log('  jsPath === "dist/openjtalk.js":', jsPath === 'dist/openjtalk.js');
+            
+            // More flexible path matching for GitHub Pages
+            if (jsPath.includes('dist/openjtalk.js')) {
                 jsPath = '../../dist/openjtalk.js';
+                console.log('  Path converted to:', jsPath);
+            } else {
+                console.log('  No conversion applied, path remains:', jsPath);
             }
         } else {
             // For local development, ensure proper relative path for dynamic imports
@@ -71,7 +79,7 @@ class OpenJTalkPiperTTS {
         // Adjust wasmPath for GitHub Pages
         let wasmPath = config.wasmPath;
         if (window.location.hostname.includes('github.io')) {
-            if (wasmPath === './dist/openjtalk.wasm' || wasmPath === 'dist/openjtalk.wasm') {
+            if (wasmPath.includes('dist/openjtalk.wasm')) {
                 wasmPath = '../../dist/openjtalk.wasm';
             }
         }
@@ -93,11 +101,11 @@ class OpenJTalkPiperTTS {
         let dictPath = config.dictPath;
         let voicePath = config.voicePath;
         if (window.location.hostname.includes('github.io')) {
-            if (dictPath === './assets/dict' || dictPath === 'assets/dict') {
+            if (dictPath.includes('assets/dict')) {
                 dictPath = '../../assets/dict';
             }
-            if (voicePath === './assets/voice/mei_normal.htsvoice' || voicePath === 'assets/voice/mei_normal.htsvoice') {
-                voicePath = '../../assets/voice/mei_normal.htsvoice';
+            if (voicePath.includes('assets/voice/')) {
+                voicePath = '../../' + voicePath.replace(/^(\.?\/)?/, '');
             }
         }
         
@@ -142,11 +150,11 @@ class OpenJTalkPiperTTS {
         let modelPath = config.modelPath;
         let modelConfigPath = config.modelConfigPath;
         if (window.location.hostname.includes('github.io')) {
-            if (modelPath === './models/ja_JP-test-medium.onnx' || modelPath === 'models/ja_JP-test-medium.onnx') {
-                modelPath = '../../models/ja_JP-test-medium.onnx';
+            if (modelPath.includes('models/')) {
+                modelPath = '../../' + modelPath.replace(/^(\.?\/)?/, '');
             }
-            if (modelConfigPath === './models/ja_JP-test-medium.onnx.json' || modelConfigPath === 'models/ja_JP-test-medium.onnx.json') {
-                modelConfigPath = '../../models/ja_JP-test-medium.onnx.json';
+            if (modelConfigPath.includes('models/')) {
+                modelConfigPath = '../../' + modelConfigPath.replace(/^(\.?\/)?/, '');
             }
         }
         
