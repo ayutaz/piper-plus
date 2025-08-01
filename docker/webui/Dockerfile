@@ -11,12 +11,13 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 
 # Copy requirements first for better caching
-COPY src/python_run/requirements.txt /tmp/requirements.txt
 COPY src/python_run/requirements_webui.txt /tmp/requirements_webui.txt
 
 # Install Python dependencies
-RUN pip install --no-cache-dir -r /tmp/requirements.txt && \
-    pip install --no-cache-dir -r /tmp/requirements_webui.txt
+# Note: requirements.txt contains piper-phonemize which is not available on PyPI
+# Install only webui requirements and onnxruntime separately
+RUN pip install --no-cache-dir -r /tmp/requirements_webui.txt && \
+    pip install --no-cache-dir onnxruntime
 
 # Copy the application code
 COPY src/python_run /app/python_run
