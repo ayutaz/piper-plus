@@ -50,11 +50,11 @@ class OpenJTalkPiperTTS {
             if (jsPath === 'dist/openjtalk.js' || jsPath === './dist/openjtalk.js') {
                 jsPath = '../../dist/openjtalk.js';
             }
-        }
-        
-        // Ensure proper relative path for dynamic imports
-        if (!jsPath.startsWith('./') && !jsPath.startsWith('../') && !jsPath.startsWith('/')) {
-            jsPath = `./${jsPath}`;
+        } else {
+            // For local development, ensure proper relative path for dynamic imports
+            if (!jsPath.startsWith('./') && !jsPath.startsWith('../') && !jsPath.startsWith('/')) {
+                jsPath = `./${jsPath}`;
+            }
         }
         
         const OpenJTalkModule = (await import(jsPath)).default;

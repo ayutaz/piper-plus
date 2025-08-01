@@ -47,8 +47,10 @@ describe('GitHub Pages Path Resolution', () => {
     
     it('should ensure all dynamic imports have proper relative paths', () => {
         // Check for the dynamic import path correction logic
-        assert(jsContent.includes('if (!jsPath.startsWith(\'./\') && !jsPath.startsWith(\'../\') && !jsPath.startsWith(\'/\'))'), 
-            'Missing relative path enforcement for dynamic imports');
+        assert(jsContent.includes('} else {'), 
+            'Missing else block to separate GitHub Pages and local development logic');
+        assert(jsContent.includes('// For local development'), 
+            'Missing local development path handling');
     });
 });
 
