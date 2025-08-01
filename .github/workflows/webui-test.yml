@@ -62,8 +62,7 @@ jobs:
       - name: Test model detection
         run: |
           cd src/python_run
-          python -c "from pathlib import Path; from piper.webui import get_available_models; models = get_available_models(Path('../../test/models')); print(f'Found {len(models)} test models')
-          for name, path in models: print(f'  - {name}')"
+          python -c "from pathlib import Path; from piper.webui import get_available_models; models = get_available_models(Path('../../test/models')); print(f'Found {len(models)} test models'); [print(f'  - {name}') for name, path in models]"
       
       - name: Test interface creation
         run: |
