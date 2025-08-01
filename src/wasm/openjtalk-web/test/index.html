@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OpenJTalk-Piper WebAssembly TTS デモ</title>
+    <title>OpenJTalk-Piper WebAssembly 日本語音声合成デモ</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -22,36 +22,48 @@
             border-radius: 10px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
-        .demo-list {
-            list-style: none;
-            padding: 0;
-        }
-        .demo-item {
-            margin: 20px 0;
-            padding: 20px;
-            background-color: #f8f9fa;
-            border-radius: 8px;
-            border: 1px solid #dee2e6;
-        }
-        .demo-item h3 {
-            margin-top: 0;
-            color: #495057;
-        }
-        .demo-item p {
-            color: #6c757d;
+        .status {
+            padding: 10px;
             margin: 10px 0;
-        }
-        .demo-link {
-            display: inline-block;
-            padding: 10px 20px;
-            background-color: #007bff;
-            color: white;
-            text-decoration: none;
             border-radius: 5px;
-            transition: background-color 0.3s;
+            text-align: center;
         }
-        .demo-link:hover {
-            background-color: #0056b3;
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        .warning {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+        .info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+        }
+        .cache-status {
+            margin: 20px 0;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+        }
+        .cache-control {
+            margin-top: 10px;
+        }
+        .cache-control button {
+            margin: 0 5px;
+            padding: 5px 15px;
+            background-color: #6c757d;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        .cache-control button:hover {
+            background-color: #5a6268;
         }
         .badge {
             display: inline-block;
@@ -60,49 +72,324 @@
             font-size: 12px;
             font-weight: bold;
             border-radius: 3px;
-        }
-        .badge-new {
             background-color: #28a745;
             color: white;
         }
-        .badge-beta {
-            background-color: #ffc107;
-            color: #212529;
+        .badge-lazy {
+            background-color: #17a2b8;
+        }
+        .badge-cached {
+            background-color: #6c757d;
+        }
+        /* ... (rest of styles same as original) ... */
+        #mainSection {
+            display: none;
+            margin-top: 30px;
+        }
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-left: 10px;
+            vertical-align: middle;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>🎤 OpenJTalk-Piper WebAssembly TTS デモ</h1>
+        <h1>🎤 OpenJTalk-Piper 音声合成デモ</h1>
         
-        <p style="text-align: center; color: #6c757d;">
-            ブラウザで動作する日本語音声合成システムのデモンストレーション
-        </p>
-
-        <div style="text-align: center; margin: 30px 0;">
-            <h2>🚀 高速音声合成デモ</h2>
-            <a href="production-audio-test-lazy.html" class="demo-link" style="font-size: 20px; padding: 20px 40px;">
-                デモを開始する
-            </a>
-            <p style="margin-top: 15px; color: #6c757d;">
-                最新のWeb技術で超高速な初期化を実現<br>
-                <small>Service Workerによるキャッシュ機能付き</small>
-            </p>
+        <div id="cacheStatus" class="cache-status">
+            <strong>Service Worker状態:</strong> <span id="swStatus">確認中...</span>
+            <div class="cache-control">
+                <button onclick="checkCacheStatus()">キャッシュ状態を確認</button>
+                <button onclick="clearCache()">キャッシュをクリア</button>
+            </div>
+            <div id="cacheInfo" style="margin-top: 10px; font-size: 14px;"></div>
         </div>
 
-        <hr style="margin: 40px 0; border: 0; border-top: 1px solid #dee2e6;">
+        <div id="initSection">
+            <h2>初期化</h2>
+            <button id="initBtn" onclick="initializeTTS()">TTSシステムを初期化（高速）</button>
+            <button id="resetBtn" onclick="resetTTS()" style="display: none;">リセット</button>
+            <div id="initStatus" class="status warning" style="display: none;"></div>
+        </div>
 
-        <h2>技術仕様</h2>
-        <ul style="color: #6c757d;">
-            <li>音素化エンジン: OpenJTalk (WebAssembly)</li>
-            <li>音声合成モデル: Piper VITS (ONNX Runtime Web)</li>
-            <li>辞書: NAIST Japanese Dictionary</li>
-            <li>音声: HTS Voice "Mei (Normal)"</li>
-        </ul>
+        <div id="mainSection">
+            <h2>テキスト入力</h2>
+            <textarea id="textInput" rows="4" style="width: 100%; padding: 10px; font-size: 16px;">
+こんにちは、OpenJTalkとPiperを使った音声合成のデモです。</textarea>
+            
+            <div style="margin: 20px 0;">
+                <button id="synthesizeBtn" onclick="synthesizeText()" disabled>
+                    音声を生成
+                </button>
+                <span id="modelLoadStatus" class="status info" style="display: none; margin-left: 10px;">
+                    ※ 初回実行時にONNXモデルを読み込みます（数秒かかります）
+                </span>
+            </div>
 
-        <p style="text-align: center; margin-top: 30px; color: #6c757d;">
-            <a href="https://github.com/ayutaz/piper-plus" style="color: #007bff;">GitHub Repository</a>
-        </p>
+            <div id="synthesisStatus" class="status" style="display: none;"></div>
+            
+            <div class="phoneme-display" id="phonemeDisplay" style="display: none;"></div>
+            
+            <div class="audio-controls" id="audioControls" style="display: none;">
+                <h3>生成された音声</h3>
+                <audio id="audioPlayer" controls style="width: 100%;"></audio>
+                <button onclick="downloadAudio()" style="margin-top: 10px;">
+                    音声をダウンロード
+                </button>
+            </div>
+
+            <div class="stats" id="statsDisplay"></div>
+        </div>
     </div>
+
+    <!-- Load ONNX Runtime Web -->
+    <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.16.3/dist/ort.min.js"></script>
+    
+    <script type="module">
+        // Import the lazy loading TTS module
+        import OpenJTalkPiperTTSLazy from './js/openjtalk-piper-integration-lazy.js';
+        
+        let tts = null;
+        let isProcessing = false;
+        let generatedBlob = null;
+        
+        // Service Worker registration
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('./service-worker.js')
+                .then(registration => {
+                    console.log('Service Worker registered:', registration);
+                    document.getElementById('swStatus').textContent = '有効';
+                    document.getElementById('swStatus').style.color = '#28a745';
+                })
+                .catch(error => {
+                    console.error('Service Worker registration failed:', error);
+                    document.getElementById('swStatus').textContent = 'エラー';
+                    document.getElementById('swStatus').style.color = '#dc3545';
+                });
+        } else {
+            document.getElementById('swStatus').textContent = '非対応';
+            document.getElementById('swStatus').style.color = '#6c757d';
+        }
+        
+        window.checkCacheStatus = async function() {
+            if (!navigator.serviceWorker || !navigator.serviceWorker.controller) {
+                document.getElementById('cacheInfo').textContent = 'Service Workerが利用できません';
+                return;
+            }
+            
+            const channel = new MessageChannel();
+            channel.port1.onmessage = (event) => {
+                if (event.data.status === 'success') {
+                    document.getElementById('cacheInfo').innerHTML = 
+                        `キャッシュ済みファイル数: ${event.data.count}<br>` +
+                        `<details><summary>詳細</summary><pre style="font-size: 12px;">${event.data.urls.join('\n')}</pre></details>`;
+                }
+            };
+            
+            navigator.serviceWorker.controller.postMessage(
+                { action: 'getCacheSize' },
+                [channel.port2]
+            );
+        };
+        
+        window.clearCache = async function() {
+            if (!navigator.serviceWorker || !navigator.serviceWorker.controller) {
+                alert('Service Workerが利用できません');
+                return;
+            }
+            
+            const channel = new MessageChannel();
+            channel.port1.onmessage = (event) => {
+                alert('キャッシュをクリアしました');
+                document.getElementById('cacheInfo').textContent = '';
+            };
+            
+            navigator.serviceWorker.controller.postMessage(
+                { action: 'clearCache' },
+                [channel.port2]
+            );
+        };
+        
+        window.initializeTTS = async function() {
+            const initBtn = document.getElementById('initBtn');
+            const initStatus = document.getElementById('initStatus');
+            const mainSection = document.getElementById('mainSection');
+            const resetBtn = document.getElementById('resetBtn');
+            const synthesizeBtn = document.getElementById('synthesizeBtn');
+            
+            try {
+                initBtn.disabled = true;
+                initBtn.innerHTML = '初期化中... <span class="loading"></span>';
+                initStatus.style.display = 'block';
+                initStatus.className = 'status warning';
+                initStatus.textContent = 'OpenJTalkを初期化しています...';
+                
+                const startTime = performance.now();
+                
+                tts = new OpenJTalkPiperTTSLazy();
+                
+                // Configuration
+                const config = {
+                    openjtalk: {
+                        jsPath: '../../dist/openjtalk.js',
+                        wasmPath: '../../dist/openjtalk.wasm',
+                        dictPath: '../../assets/dict',
+                        voicePath: '../../assets/voice/mei_normal.htsvoice'
+                    },
+                    onnx: {
+                        modelPath: '../../models/ja_JP-test-medium.onnx',
+                        modelConfigPath: '../../models/ja_JP-test-medium.onnx.json'
+                    }
+                };
+                
+                await tts.initialize(config);
+                
+                const initTime = performance.now() - startTime;
+                
+                initStatus.className = 'status success';
+                initStatus.innerHTML = `✅ OpenJTalkの初期化が完了しました！（${initTime.toFixed(0)}ms）<br>` +
+                    `<small>※ ONNXモデルは最初の音声生成時に読み込まれます</small>`;
+                initBtn.style.display = 'none';
+                resetBtn.style.display = 'inline-block';
+                mainSection.style.display = 'block';
+                synthesizeBtn.disabled = false;
+                document.getElementById('modelLoadStatus').style.display = 'inline-block';
+                
+            } catch (error) {
+                console.error('Initialization error:', error);
+                initStatus.className = 'status error';
+                initStatus.textContent = `❌ 初期化エラー: ${error.message}`;
+                initBtn.disabled = false;
+                initBtn.innerHTML = 'TTSシステムを初期化（高速）';
+            }
+        };
+        
+        window.resetTTS = function() {
+            if (tts) {
+                tts.dispose();
+                tts = null;
+            }
+            document.getElementById('initBtn').style.display = 'inline-block';
+            document.getElementById('initBtn').disabled = false;
+            document.getElementById('initBtn').innerHTML = 'TTSシステムを初期化（高速）';
+            document.getElementById('resetBtn').style.display = 'none';
+            document.getElementById('mainSection').style.display = 'none';
+            document.getElementById('initStatus').style.display = 'none';
+            document.getElementById('synthesizeBtn').disabled = true;
+        };
+        
+        window.synthesizeText = async function() {
+            if (!tts || isProcessing) return;
+            
+            const text = document.getElementById('textInput').value.trim();
+            if (!text) {
+                alert('テキストを入力してください');
+                return;
+            }
+            
+            isProcessing = true;
+            const synthesizeBtn = document.getElementById('synthesizeBtn');
+            const synthesisStatus = document.getElementById('synthesisStatus');
+            const audioControls = document.getElementById('audioControls');
+            const phonemeDisplay = document.getElementById('phonemeDisplay');
+            const statsDisplay = document.getElementById('statsDisplay');
+            
+            synthesizeBtn.disabled = true;
+            synthesizeBtn.innerHTML = '生成中... <span class="loading"></span>';
+            synthesisStatus.style.display = 'block';
+            synthesisStatus.className = 'status warning';
+            synthesisStatus.textContent = '音声を生成しています...';
+            audioControls.style.display = 'none';
+            phonemeDisplay.style.display = 'none';
+            document.getElementById('modelLoadStatus').style.display = 'none';
+            
+            try {
+                const startTime = performance.now();
+                
+                // Generate audio (ONNX model will be loaded on first call)
+                const audioData = await tts.textToSpeech(text);
+                
+                const totalTime = performance.now() - startTime;
+                
+                // Create WAV blob
+                const sampleRate = tts.modelConfig.audio.sample_rate || 22050;
+                generatedBlob = tts.createWAV(audioData, sampleRate);
+                
+                // Create URL for audio playback
+                const audioUrl = URL.createObjectURL(generatedBlob);
+                const audioPlayer = document.getElementById('audioPlayer');
+                audioPlayer.src = audioUrl;
+                
+                // Update UI
+                synthesisStatus.className = 'status success';
+                synthesisStatus.textContent = '✅ 音声生成が完了しました！';
+                audioControls.style.display = 'block';
+                
+                // Display stats
+                statsDisplay.innerHTML = `
+                    <div class="stat-item">
+                        <div class="stat-label">処理時間</div>
+                        <div class="stat-value">${totalTime.toFixed(0)}ms</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">音声長</div>
+                        <div class="stat-value">${(audioData.length / sampleRate).toFixed(2)}秒</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">サンプル数</div>
+                        <div class="stat-value">${audioData.length.toLocaleString()}</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">リアルタイム率</div>
+                        <div class="stat-value">${((audioData.length / sampleRate) / (totalTime / 1000)).toFixed(1)}x</div>
+                    </div>
+                `;
+                
+            } catch (error) {
+                console.error('Synthesis error:', error);
+                synthesisStatus.className = 'status error';
+                synthesisStatus.textContent = `❌ エラー: ${error.message}`;
+            } finally {
+                isProcessing = false;
+                synthesizeBtn.disabled = false;
+                synthesizeBtn.innerHTML = '音声を生成';
+            }
+        };
+        
+        window.downloadAudio = function() {
+            if (!generatedBlob) return;
+            
+            const url = URL.createObjectURL(generatedBlob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `tts_output_${new Date().getTime()}.wav`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        };
+        
+        // Auto-initialize on page load
+        window.addEventListener('DOMContentLoaded', async () => {
+            console.log('Page loaded, auto-initializing lazy TTS...');
+            try {
+                await initializeTTS();
+                await checkCacheStatus();
+            } catch (error) {
+                console.error('Auto-initialization failed:', error);
+            }
+        });
+    </script>
 </body>
 </html>

@@ -96,10 +96,9 @@ jobs:
             mkdir -p deploy/models
           fi
           
-          # Copy demo pages and service worker if they exist
+          # Copy demo page and service worker if they exist
           if [ -f "src/wasm/openjtalk-web/test/index.html" ]; then
             cp src/wasm/openjtalk-web/test/index.html deploy/index.html
-            cp src/wasm/openjtalk-web/test/production-audio-test-lazy.html deploy/production-audio-test-lazy.html
             cp src/wasm/openjtalk-web/test/service-worker.js deploy/service-worker.js
             
             # Update paths for GitHub Pages - use ./ prefix for proper relative paths
