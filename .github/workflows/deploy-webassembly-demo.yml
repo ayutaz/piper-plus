@@ -96,14 +96,21 @@ jobs:
             mkdir -p deploy/models
           fi
           
-          # Copy demo page if it exists
-          if [ -f "src/wasm/openjtalk-web/test/production-audio-test.html" ]; then
-            cp src/wasm/openjtalk-web/test/production-audio-test.html deploy/index.html
+          # Copy demo pages if they exist
+          if [ -f "src/wasm/openjtalk-web/test/index.html" ]; then
+            cp src/wasm/openjtalk-web/test/index.html deploy/index.html
+            cp src/wasm/openjtalk-web/test/production-audio-test.html deploy/production-audio-test.html
+            cp src/wasm/openjtalk-web/test/production-audio-test-optimized.html deploy/production-audio-test-optimized.html || true
+            
             # Update paths for GitHub Pages - use ./ prefix for proper relative paths
-            sed -i 's|../../dist/|./dist/|g' deploy/index.html
-            sed -i 's|../../assets/|./assets/|g' deploy/index.html
-            sed -i 's|../../models/|./models/|g' deploy/index.html
-            sed -i 's|./js/|./test/js/|g' deploy/index.html
+            for file in deploy/*.html; do
+              if [ -f "$file" ]; then
+                sed -i 's|../../dist/|./dist/|g' "$file"
+                sed -i 's|../../assets/|./assets/|g' "$file"
+                sed -i 's|../../models/|./models/|g' "$file"
+                sed -i 's|./js/|./test/js/|g' "$file"
+              fi
+            done
           fi
           
           # Copy JavaScript files if they exist

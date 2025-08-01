@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpenJTalk-Piper WebAssembly TTS デモ</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .demo-list {
+            list-style: none;
+            padding: 0;
+        }
+        .demo-item {
+            margin: 20px 0;
+            padding: 20px;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            border: 1px solid #dee2e6;
+        }
+        .demo-item h3 {
+            margin-top: 0;
+            color: #495057;
+        }
+        .demo-item p {
+            color: #6c757d;
+            margin: 10px 0;
+        }
+        .demo-link {
+            display: inline-block;
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            transition: background-color 0.3s;
+        }
+        .demo-link:hover {
+            background-color: #0056b3;
+        }
+        .badge {
+            display: inline-block;
+            padding: 4px 8px;
+            margin-left: 10px;
+            font-size: 12px;
+            font-weight: bold;
+            border-radius: 3px;
+        }
+        .badge-new {
+            background-color: #28a745;
+            color: white;
+        }
+        .badge-beta {
+            background-color: #ffc107;
+            color: #212529;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎤 OpenJTalk-Piper WebAssembly TTS デモ</h1>
+        
+        <p style="text-align: center; color: #6c757d;">
+            ブラウザで動作する日本語音声合成システムのデモンストレーション
+        </p>
+
+        <ul class="demo-list">
+            <li class="demo-item">
+                <h3>標準版デモ</h3>
+                <p>OpenJTalkとPiper ONNXを組み合わせた基本的な音声合成デモです。安定した動作を提供します。</p>
+                <a href="production-audio-test.html" class="demo-link">標準版を開く</a>
+            </li>
+
+            <li class="demo-item">
+                <h3>最適化版デモ <span class="badge badge-new">NEW</span></h3>
+                <p>並列ダウンロードとモデルウォームアップにより、初期化時間を大幅に短縮した高速版です。</p>
+                <a href="production-audio-test-optimized.html" class="demo-link">最適化版を開く</a>
+                <span class="badge badge-beta">BETA</span>
+            </li>
+        </ul>
+
+        <hr style="margin: 40px 0; border: 0; border-top: 1px solid #dee2e6;">
+
+        <h2>技術仕様</h2>
+        <ul style="color: #6c757d;">
+            <li>音素化エンジン: OpenJTalk (WebAssembly)</li>
+            <li>音声合成モデル: Piper VITS (ONNX Runtime Web)</li>
+            <li>辞書: NAIST Japanese Dictionary</li>
+            <li>音声: HTS Voice "Mei (Normal)"</li>
+        </ul>
+
+        <p style="text-align: center; margin-top: 30px; color: #6c757d;">
+            <a href="https://github.com/ayutaz/piper-plus" style="color: #007bff;">GitHub Repository</a>
+        </p>
+    </div>
+</body>
+</html>
