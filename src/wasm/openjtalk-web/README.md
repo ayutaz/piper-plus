@@ -26,7 +26,16 @@ openjtalk-web/
 
 ## Quick Start
 
-### Using Docker (Recommended)
+### 1. Prepare Assets
+
+```bash
+# Download dictionary and voice files
+./prepare-assets.sh
+```
+
+### 2. Build
+
+#### Using Docker (Recommended)
 
 ```bash
 # Build the Docker image
@@ -38,22 +47,27 @@ docker run -v $(pwd):/src piper-openjtalk-web
 # Output files will be in dist/
 ```
 
-### Local Build
+#### Local Build
 
 ```bash
-# Install Emscripten
-git clone https://github.com/emscripten-core/emsdk.git
-cd emsdk
-./emsdk install latest
-./emsdk activate latest
-source ./emsdk_env.sh
-cd ..
+# Install Emscripten first
+# See: https://emscripten.org/docs/getting_started/downloads.html
 
-# Build OpenJTalk Web
-cd build
-./build.sh
+# Run local build
+./build-local.sh
 
-# Output files will be in ../dist/
+# Output files will be in dist/
+```
+
+### 3. Test the Demo
+
+```bash
+# Start the development server
+cd demo
+python3 server.py
+
+# Open in browser
+# http://localhost:8080/
 ```
 
 ## Development Status
