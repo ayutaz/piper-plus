@@ -66,25 +66,13 @@ jobs:
         run: |
           case "${{ matrix.image.name }}" in
             python-train)
-              docker run --rm piper-${{ matrix.image.name }}:test python -c "
-import torch
-import numpy
-import librosa
-import soundfile
-print('All imports successful')
-"
+              docker run --rm piper-${{ matrix.image.name }}:test python -c "import torch; import numpy; import librosa; import soundfile; print('All imports successful')"
               ;;
             python-inference)
-              docker run --rm piper-${{ matrix.image.name }}:test python -c "
-import torch
-import onnxruntime
-print('Inference environment OK')
-"
+              docker run --rm piper-${{ matrix.image.name }}:test python -c "import torch; import onnxruntime; print('Inference environment OK')"
               ;;
             cpp-train)
-              docker run --rm piper-${{ matrix.image.name }}:test bash -c "
-cmake --version && ninja --version && echo 'Build tools OK'
-"
+              docker run --rm piper-${{ matrix.image.name }}:test bash -c "cmake --version && ninja --version && echo 'Build tools OK'"
               ;;
           esac
       
@@ -171,18 +159,7 @@ print(f'Inference successful! Output shape: {outputs[0].shape}')
           # Test that FastAPI can be imported and basic server structure works
           docker run --rm \
             piper-python-inference:test \
-            python -c "
-from fastapi import FastAPI
-import uvicorn
-
-app = FastAPI()
-
-@app.get('/health')
-def health_check():
-    return {'status': 'healthy'}
-
-print('FastAPI server structure OK')
-"
+            python -c "from fastapi import FastAPI; import uvicorn; app = FastAPI(); print('FastAPI server structure OK')"
       
       - name: Run comprehensive inference tests
         run: |
