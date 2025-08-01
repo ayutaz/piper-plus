@@ -5,9 +5,10 @@ Serves with proper CORS and MIME types for WASM
 """
 
 import http.server
-import socketserver
 import os
+import socketserver
 from pathlib import Path
+
 
 PORT = 8080
 
@@ -21,11 +22,11 @@ class CORSRequestHandler(http.server.SimpleHTTPRequestHandler):
         self.send_header('Cross-Origin-Embedder-Policy', 'require-corp')
         self.send_header('Cross-Origin-Opener-Policy', 'same-origin')
         super().end_headers()
-    
+
     def do_OPTIONS(self):
         self.send_response(200)
         self.end_headers()
-    
+
     def guess_type(self, path):
         mimetype = super().guess_type(path)
         # Set proper MIME type for WebAssembly
@@ -37,14 +38,14 @@ def main():
     # Change to demo directory
     demo_dir = Path(__file__).parent
     os.chdir(demo_dir)
-    
+
     with socketserver.TCPServer(("", PORT), CORSRequestHandler) as httpd:
-        print(f"OpenJTalk WebAssembly Demo Server")
+        print("OpenJTalk WebAssembly Demo Server")
         print(f"Serving at: http://localhost:{PORT}")
-        print(f"Demo page: http://localhost:{PORT}/index.html")
-        print(f"")
-        print(f"Press Ctrl+C to stop the server")
-        
+        print("Demo page: http://localhost:{PORT}/index.html")
+        print("")
+        print("Press Ctrl+C to stop the server")
+
         try:
             httpd.serve_forever()
         except KeyboardInterrupt:

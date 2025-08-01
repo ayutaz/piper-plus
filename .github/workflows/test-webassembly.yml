@@ -40,6 +40,9 @@ jobs:
       working-directory: src/wasm/openjtalk-web
       run: |
         cd build
+        # First build dependencies
+        ./build-with-wasm-openjtalk.sh
+        # Then build production
         ./build-production.sh
     
     - name: Verify build outputs
