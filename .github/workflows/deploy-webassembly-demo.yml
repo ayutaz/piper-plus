@@ -99,10 +99,8 @@ jobs:
           # Copy demo pages and service worker if they exist
           if [ -f "src/wasm/openjtalk-web/test/index.html" ]; then
             cp src/wasm/openjtalk-web/test/index.html deploy/index.html
-            cp src/wasm/openjtalk-web/test/production-audio-test.html deploy/production-audio-test.html
-            cp src/wasm/openjtalk-web/test/production-audio-test-optimized.html deploy/production-audio-test-optimized.html || true
-            cp src/wasm/openjtalk-web/test/production-audio-test-lazy.html deploy/production-audio-test-lazy.html || true
-            cp src/wasm/openjtalk-web/test/service-worker.js deploy/service-worker.js || true
+            cp src/wasm/openjtalk-web/test/production-audio-test-lazy.html deploy/production-audio-test-lazy.html
+            cp src/wasm/openjtalk-web/test/service-worker.js deploy/service-worker.js
             
             # Update paths for GitHub Pages - use ./ prefix for proper relative paths
             for file in deploy/*.html; do
@@ -115,12 +113,10 @@ jobs:
             done
           fi
           
-          # Copy JavaScript files if they exist
-          if [ -d "src/wasm/openjtalk-web/test/js" ]; then
+          # Copy only lazy loading JavaScript file
+          if [ -f "src/wasm/openjtalk-web/test/js/openjtalk-piper-integration-lazy.js" ]; then
             mkdir -p deploy/test/js
-            cp -r src/wasm/openjtalk-web/test/js/* deploy/test/js/ || true
-            # JavaScript files already have correct path handling logic
-            # No need to modify paths in JavaScript files
+            cp src/wasm/openjtalk-web/test/js/openjtalk-piper-integration-lazy.js deploy/test/js/
           fi
           
           # Create 404 page
