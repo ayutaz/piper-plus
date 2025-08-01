@@ -472,7 +472,10 @@ def get_training_status() -> dict:
     # Calculate ETA
     eta_text = "N/A"
     if status.is_running and status.start_time and status.current_epoch > 0:
-        elapsed = (status.last_update or time.time()) - status.start_time.timestamp()
+        if status.last_update:
+            elapsed = (status.last_update - status.start_time).total_seconds()
+        else:
+            elapsed = time.time() - status.start_time.timestamp()
         per_epoch = elapsed / status.current_epoch
         remaining_epochs = status.total_epochs - status.current_epoch
         eta_seconds = per_epoch * remaining_epochs
