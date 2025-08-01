@@ -92,7 +92,7 @@ jobs:
         run: |
           cd src/python_run
           # Debug: Show directory structure
-          ls -la tests/
+          python -c "import os; print('Tests directory:', os.listdir('tests') if os.path.exists('tests') else 'Not found')"
           python -m pytest tests/test_training_manager.py -v --tb=short || echo "Training manager tests failed with exit code $?"
       
       - name: Run training integration tests
