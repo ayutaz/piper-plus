@@ -4,7 +4,9 @@
   "description": "OpenJTalk WebAssembly implementation for browser-based Japanese TTS",
   "type": "module",
   "scripts": {
-    "test": "node --test test/js/test-openjtalk-integration.js",
+    "test": "node --test test/js/test-openjtalk-integration.js test/js/test-github-pages-paths.js",
+    "test:integration": "node --test test/js/test-openjtalk-integration.js",
+    "test:paths": "node --test test/js/test-github-pages-paths.js",
     "test:watch": "node --test --watch test/js/test-openjtalk-integration.js",
     "build:debug": "cd build && ./build-safe.sh",
     "build:production": "cd build && ./build-production.sh",

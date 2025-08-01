@@ -41,16 +41,36 @@ class OpenJTalkPiperTTS {
         console.log('Loading OpenJTalk WebAssembly...');
         
         // Import OpenJTalk module
+        // Handle both local development and GitHub Pages deployment
+        let jsPath = config.jsPath;
+        
+        // If we're on GitHub Pages and the path doesn't start with relative indicator
+        if (window.location.hostname.includes('github.io')) {
+            // Convert paths for GitHub Pages deployment
+            if (jsPath === 'dist/openjtalk.js' || jsPath === './dist/openjtalk.js') {
+                jsPath = '../../dist/openjtalk.js';
+            }
+        }
+        
         // Ensure proper relative path for dynamic imports
-        const jsPath = config.jsPath.startsWith('./') || config.jsPath.startsWith('../') || config.jsPath.startsWith('/') 
-            ? config.jsPath 
-            : `./${config.jsPath}`;
+        if (!jsPath.startsWith('./') && !jsPath.startsWith('../') && !jsPath.startsWith('/')) {
+            jsPath = `./${jsPath}`;
+        }
+        
         const OpenJTalkModule = (await import(jsPath)).default;
+        
+        // Adjust wasmPath for GitHub Pages
+        let wasmPath = config.wasmPath;
+        if (window.location.hostname.includes('github.io')) {
+            if (wasmPath === 'dist/openjtalk.wasm' || wasmPath === './dist/openjtalk.wasm') {
+                wasmPath = '../../dist/openjtalk.wasm';
+            }
+        }
         
         this.openjtalkModule = await OpenJTalkModule({
             locateFile: (path) => {
                 if (path.endsWith('.wasm')) {
-                    return config.wasmPath;
+                    return wasmPath;
                 }
                 return path;
             }
@@ -60,6 +80,18 @@ class OpenJTalkPiperTTS {
         this.openjtalkModule.FS.mkdir('/dict');
         this.openjtalkModule.FS.mkdir('/voice');
         
+        // Adjust paths for GitHub Pages
+        let dictPath = config.dictPath;
+        let voicePath = config.voicePath;
+        if (window.location.hostname.includes('github.io')) {
+            if (dictPath === 'dict' || dictPath === './dict') {
+                dictPath = '../../dict';
+            }
+            if (voicePath.startsWith('assets/') || voicePath.startsWith('./assets/')) {
+                voicePath = '../../' + voicePath.replace(/^\.?\//, '');
+            }
+        }
+        
         // Load dictionary files
         const dictFiles = [
             'char.bin', 'matrix.bin', 'sys.dic', 'unk.dic',
@@ -67,13 +99,13 @@ class OpenJTalkPiperTTS {
         ];
         
         for (const file of dictFiles) {
-            const response = await fetch(`${config.dictPath}/${file}`);
+            const response = await fetch(`${dictPath}/${file}`);
             const data = await response.arrayBuffer();
             this.openjtalkModule.FS.writeFile(`/dict/${file}`, new Uint8Array(data));
         }
         
         // Load voice file (needed for OpenJTalk initialization)
-        const voiceResponse = await fetch(config.voicePath);
+        const voiceResponse = await fetch(voicePath);
         const voiceData = await voiceResponse.arrayBuffer();
         this.openjtalkModule.FS.writeFile('/voice/voice.htsvoice', new Uint8Array(voiceData));
         
@@ -97,13 +129,25 @@ class OpenJTalkPiperTTS {
     async initializeONNX(config) {
         console.log('Loading ONNX Runtime...');
         
+        // Adjust paths for GitHub Pages
+        let modelPath = config.modelPath;
+        let modelConfigPath = config.modelConfigPath;
+        if (window.location.hostname.includes('github.io')) {
+            if (modelPath.startsWith('models/') || modelPath.startsWith('./models/')) {
+                modelPath = '../../' + modelPath.replace(/^\.?\//, '');
+            }
+            if (modelConfigPath.startsWith('models/') || modelConfigPath.startsWith('./models/')) {
+                modelConfigPath = '../../' + modelConfigPath.replace(/^\.?\//, '');
+            }
+        }
+        
         // Load model configuration
-        const configResponse = await fetch(config.modelConfigPath);
+        const configResponse = await fetch(modelConfigPath);
         this.modelConfig = await configResponse.json();
         this.phonemeIdMap = this.modelConfig.phoneme_id_map;
         
         // Create ONNX session
-        this.onnxSession = await ort.InferenceSession.create(config.modelPath, {
+        this.onnxSession = await ort.InferenceSession.create(modelPath, {
             executionProviders: ['wasm'],
             graphOptimizationLevel: 'all'
         });
