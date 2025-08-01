@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpenJTalk WebAssembly Demo</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            border-radius: 8px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+        }
+        .input-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #555;
+        }
+        textarea {
+            width: 100%;
+            min-height: 120px;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            font-size: 16px;
+            font-family: inherit;
+            resize: vertical;
+            transition: border-color 0.3s;
+        }
+        textarea:focus {
+            outline: none;
+            border-color: #4CAF50;
+        }
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        button:hover:not(:disabled) {
+            background: #45a049;
+        }
+        button:disabled {
+            background: #cccccc;
+            cursor: not-allowed;
+        }
+        button.secondary {
+            background: #757575;
+        }
+        button.secondary:hover:not(:disabled) {
+            background: #616161;
+        }
+        .status {
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+        .status.info {
+            background: #e3f2fd;
+            color: #1976d2;
+            border: 1px solid #bbdefb;
+        }
+        .status.success {
+            background: #e8f5e9;
+            color: #388e3c;
+            border: 1px solid #c8e6c9;
+        }
+        .status.error {
+            background: #ffebee;
+            color: #c62828;
+            border: 1px solid #ffcdd2;
+        }
+        .status.loading {
+            background: #fff3e0;
+            color: #f57c00;
+            border: 1px solid #ffe0b2;
+        }
+        .output-section {
+            margin-top: 30px;
+            padding-top: 30px;
+            border-top: 2px solid #f0f0f0;
+        }
+        .output-group {
+            margin-bottom: 20px;
+        }
+        pre {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-size: 14px;
+            line-height: 1.5;
+            border: 1px solid #e9ecef;
+        }
+        .phoneme-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 10px;
+        }
+        .phoneme {
+            background: #e8f5e9;
+            color: #2e7d32;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        .examples {
+            margin-top: 20px;
+        }
+        .example-button {
+            background: #f5f5f5;
+            color: #333;
+            border: 1px solid #ddd;
+            padding: 8px 16px;
+            margin: 4px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+        .example-button:hover {
+            background: #e0e0e0;
+            border-color: #bbb;
+        }
+        .loading-spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #333;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-left: 8px;
+            vertical-align: middle;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>OpenJTalk WebAssembly Demo</h1>
+        <p class="subtitle">ブラウザで動作する日本語音声合成エンジン</p>
+        
+        <div id="status" class="status info">
+            初期化中... <span class="loading-spinner"></span>
+        </div>
+
+        <div class="input-group">
+            <label for="inputText">テキスト入力</label>
+            <textarea id="inputText" placeholder="ここに日本語テキストを入力してください">今日は良い天気です。</textarea>
+        </div>
+
+        <div class="button-group">
+            <button id="convertBtn" disabled>音素変換</button>
+            <button id="clearBtn" class="secondary">クリア</button>
+        </div>
+
+        <div class="examples">
+            <label>例文:</label>
+            <button class="example-button" data-text="こんにちは、世界！">挨拶</button>
+            <button class="example-button" data-text="吾輩は猫である。名前はまだ無い。">文学</button>
+            <button class="example-button" data-text="人工知能による音声合成技術">技術用語</button>
+            <button class="example-button" data-text="東京スカイツリーの高さは634メートルです。">数字</button>
+        </div>
+
+        <div class="output-section" id="outputSection" style="display: none;">
+            <h2>変換結果</h2>
+            
+            <div class="output-group">
+                <label>フルコンテキストラベル:</label>
+                <pre id="labelsOutput"></pre>
+            </div>
+
+            <div class="output-group">
+                <label>抽出された音素列:</label>
+                <div id="phonemeOutput" class="phoneme-list"></div>
+            </div>
+
+            <div class="output-group">
+                <label>音素テキスト:</label>
+                <pre id="phonemeTextOutput"></pre>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { OpenJTalkWeb } from '../src/api.js';
+        
+        let openjtalk = null;
+        const statusEl = document.getElementById('status');
+        const convertBtn = document.getElementById('convertBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const inputText = document.getElementById('inputText');
+        const outputSection = document.getElementById('outputSection');
+        const labelsOutput = document.getElementById('labelsOutput');
+        const phonemeOutput = document.getElementById('phonemeOutput');
+        const phonemeTextOutput = document.getElementById('phonemeTextOutput');
+        
+        // Status update helper
+        function updateStatus(message, type = 'info') {
+            statusEl.className = `status ${type}`;
+            statusEl.innerHTML = message;
+            if (type === 'loading') {
+                statusEl.innerHTML += ' <span class="loading-spinner"></span>';
+            }
+        }
+        
+        // Initialize OpenJTalk
+        async function init() {
+            try {
+                updateStatus('OpenJTalk WebAssemblyモジュールを読み込んでいます...', 'loading');
+                
+                openjtalk = new OpenJTalkWeb();
+                await openjtalk.initialize({
+                    wasmUrl: '../dist/openjtalk.wasm',
+                    jsUrl: '../dist/openjtalk.js',
+                    dictUrl: '../assets/dict.tar.gz',
+                    voiceUrl: '../assets/mei_normal.htsvoice'
+                });
+                
+                updateStatus('準備完了！テキストを入力して「音素変換」をクリックしてください。', 'success');
+                convertBtn.disabled = false;
+                
+            } catch (error) {
+                console.error('Initialization failed:', error);
+                updateStatus(`初期化エラー: ${error.message}`, 'error');
+            }
+        }
+        
+        // Convert text to phonemes
+        async function convert() {
+            const text = inputText.value.trim();
+            if (!text) {
+                updateStatus('テキストを入力してください。', 'error');
+                return;
+            }
+            
+            try {
+                updateStatus('変換中...', 'loading');
+                convertBtn.disabled = true;
+                
+                // Get full context labels
+                const labels = await openjtalk.textToPhonemes(text);
+                
+                // Extract phonemes
+                const phonemes = openjtalk.extractPhonemes(labels);
+                
+                // Display results
+                labelsOutput.textContent = labels;
+                
+                phonemeOutput.innerHTML = '';
+                phonemes.forEach(phoneme => {
+                    const span = document.createElement('span');
+                    span.className = 'phoneme';
+                    span.textContent = phoneme;
+                    phonemeOutput.appendChild(span);
+                });
+                
+                phonemeTextOutput.textContent = phonemes.join(' ');
+                
+                outputSection.style.display = 'block';
+                updateStatus('変換完了！', 'success');
+                
+            } catch (error) {
+                console.error('Conversion failed:', error);
+                updateStatus(`変換エラー: ${error.message}`, 'error');
+            } finally {
+                convertBtn.disabled = false;
+            }
+        }
+        
+        // Clear all
+        function clear() {
+            inputText.value = '';
+            outputSection.style.display = 'none';
+            labelsOutput.textContent = '';
+            phonemeOutput.innerHTML = '';
+            phonemeTextOutput.textContent = '';
+        }
+        
+        // Event listeners
+        convertBtn.addEventListener('click', convert);
+        clearBtn.addEventListener('click', clear);
+        
+        // Example buttons
+        document.querySelectorAll('.example-button').forEach(btn => {
+            btn.addEventListener('click', () => {
+                inputText.value = btn.dataset.text;
+            });
+        });
+        
+        // Enter key to convert
+        inputText.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && e.ctrlKey && !convertBtn.disabled) {
+                convert();
+            }
+        });
+        
+        // Initialize on load
+        init();
+    </script>
+</body>
+</html>
