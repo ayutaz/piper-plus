@@ -46,8 +46,8 @@ self.addEventListener('install', event => {
                 const essentialUrls = [
                     './',
                     './index.html',
-                    './test/js/openjtalk-piper-integration.js',
-                    './test/js/openjtalk-piper-integration-optimized.js'
+                    './test/js/openjtalk-piper-integration-lazy.js',
+                    './service-worker.js'
                 ];
                 return cache.addAll(essentialUrls);
             })
