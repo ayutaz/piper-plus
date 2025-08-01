@@ -119,8 +119,7 @@ jobs:
             cp src/wasm/openjtalk-web/test/production-audio-test.html deploy/index.html
           else
             echo "Creating placeholder index.html"
-            cat > deploy/index.html << 'HTML_EOF'
-<!DOCTYPE html>
+            echo '<!DOCTYPE html>
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
@@ -128,7 +127,7 @@ jobs:
     <title>Piper TTS WebAssembly Demo</title>
     <style>
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
             display: flex;
             justify-content: center;
             align-items: center;
@@ -156,8 +155,7 @@ jobs:
         <p>詳細は <a href="https://github.com/ayutaz/piper-plus">GitHub リポジトリ</a> をご覧ください。</p>
     </div>
 </body>
-</html>
-HTML_EOF
+</html>' > deploy/index.html
           fi
           
           mkdir -p deploy/test/js
