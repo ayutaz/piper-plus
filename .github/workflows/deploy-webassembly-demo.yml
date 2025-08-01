@@ -119,7 +119,8 @@ jobs:
             cp src/wasm/openjtalk-web/test/production-audio-test.html deploy/index.html
           else
             echo "Creating placeholder index.html"
-            echo '<!DOCTYPE html>
+            cat > deploy/index.html << 'PLACEHOLDER_HTML'
+<!DOCTYPE html>
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
@@ -155,7 +156,8 @@ jobs:
         <p>詳細は <a href="https://github.com/ayutaz/piper-plus">GitHub リポジトリ</a> をご覧ください。</p>
     </div>
 </body>
-</html>' > deploy/index.html
+</html>
+PLACEHOLDER_HTML
           fi
           
           mkdir -p deploy/test/js
