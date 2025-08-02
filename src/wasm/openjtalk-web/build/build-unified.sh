@@ -14,9 +14,14 @@ echo "Project directory: $PROJECT_DIR"
 # Create directories
 mkdir -p "$DIST_DIR"
 
-# Build OpenJTalk first
-echo "=== Building OpenJTalk ==="
-"$SCRIPT_DIR/build-openjtalk.sh"
+# Build OpenJTalk first (if build script exists)
+if [ -f "$SCRIPT_DIR/build-openjtalk.sh" ]; then
+    echo "=== Building OpenJTalk ==="
+    "$SCRIPT_DIR/build-openjtalk.sh"
+else
+    echo "=== Using existing build.sh for OpenJTalk ==="
+    "$SCRIPT_DIR/build.sh"
+fi
 
 # Build eSpeak-ng
 echo "=== Building eSpeak-ng ==="
