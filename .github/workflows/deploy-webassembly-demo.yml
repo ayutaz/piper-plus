@@ -112,10 +112,34 @@ jobs:
             done
           fi
           
+          # Copy multilingual demo
+          if [ -d "src/wasm/openjtalk-web/test/multilingual-demo" ]; then
+            mkdir -p deploy/multilingual-demo
+            cp -r src/wasm/openjtalk-web/test/multilingual-demo/* deploy/multilingual-demo/
+            
+            # Update paths for multilingual demo
+            for file in deploy/multilingual-demo/*.html; do
+              if [ -f "$file" ]; then
+                sed -i 's|../../dist/|../dist/|g' "$file"
+                sed -i 's|../../assets/|../assets/|g' "$file"
+                sed -i 's|../../models/|../models/|g' "$file"
+                sed -i 's|../../src/|../src/|g' "$file"
+              fi
+            done
+          fi
+          
           # Copy only lazy loading JavaScript file
           if [ -f "src/wasm/openjtalk-web/test/js/openjtalk-piper-integration-lazy.js" ]; then
             mkdir -p deploy/test/js
             cp src/wasm/openjtalk-web/test/js/openjtalk-piper-integration-lazy.js deploy/test/js/
+          fi
+          
+          # Copy src files for multilingual demo
+          if [ -d "src/wasm/openjtalk-web/src" ]; then
+            mkdir -p deploy/src
+            cp src/wasm/openjtalk-web/src/simple_unified_api.js deploy/src/
+            cp src/wasm/openjtalk-web/src/espeak_phoneme_extractor.js deploy/src/
+            cp src/wasm/openjtalk-web/src/custom_dictionary.js deploy/src/
           fi
           
           # Create 404 page
