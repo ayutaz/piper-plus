@@ -38,6 +38,10 @@ fi
 # Run autogen if needed
 if [ ! -f "configure" ]; then
     echo "Running autogen.sh..."
+    # Fix missing ChangeLog.md issue
+    if [ ! -f "ChangeLog.md" ] && [ -f "CHANGELOG.md" ]; then
+        ln -sf CHANGELOG.md ChangeLog.md
+    fi
     ./autogen.sh
 fi
 

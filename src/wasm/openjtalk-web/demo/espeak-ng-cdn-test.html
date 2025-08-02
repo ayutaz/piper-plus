@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>eSpeak-ng CDN Test</title>
+    <meta charset="utf-8">
+    <script type="text/javascript" src="../dist/espeak-ng/espeakng.min.js"></script>
+</head>
+<body>
+    <h1>eSpeak-ng from CDN Test</h1>
+    <p>This uses the pre-built eSpeak-ng from CDN</p>
+    
+    <div>
+        <label>Text: <input type="text" id="text" value="Hello world" size="40"></label>
+        <label>Voice: 
+            <select id="voice">
+                <option value="en">English</option>
+                <option value="es">Spanish</option>
+                <option value="fr">French</option>
+                <option value="de">German</option>
+                <option value="it">Italian</option>
+            </select>
+        </label>
+        <button onclick="speak()">Speak</button>
+        <button onclick="getVoices()">List Voices</button>
+    </div>
+    
+    <div>
+        <h3>Result:</h3>
+        <pre id="result"></pre>
+    </div>
+    
+    <script>
+        let tts;
+        
+        // Initialize eSpeak-ng
+        window.onload = function() {
+            tts = new eSpeakNG('../dist/espeak-ng/espeakng.worker.js', function() {
+                document.getElementById('result').textContent = 'eSpeak-ng ready!';
+            });
+        };
+        
+        function speak() {
+            const text = document.getElementById('text').value;
+            const voice = document.getElementById('voice').value;
+            
+            tts.set_voice.apply(tts, [voice]);
+            tts.synthesize(text, function(samples, events) {
+                // Create audio from samples
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const buffer = audioContext.createBuffer(1, samples.length, 22050);
+                buffer.getChannelData(0).set(samples);
+                
+                const source = audioContext.createBufferSource();
+                source.buffer = buffer;
+                source.connect(audioContext.destination);
+                source.start();
+                
+                // Show events
+                document.getElementById('result').textContent = 
+                    'Events: ' + JSON.stringify(events, null, 2);
+            });
+        }
+        
+        function getVoices() {
+            tts.list_voices(function(voices) {
+                document.getElementById('result').textContent = 
+                    'Available voices:\n' + JSON.stringify(voices, null, 2);
+            });
+        }
+    </script>
+</body>
+</html>
