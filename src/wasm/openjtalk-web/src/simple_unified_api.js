@@ -6,11 +6,16 @@
 import { SimpleEnglishPhonemizer, createEnglishPhonemeMap } from './simple_english_phonemizer.js';
 
 export class SimpleUnifiedPhonemizer {
-    constructor() {
+    constructor(options = {}) {
         this.openjtalkModule = null;
         this.englishPhonemizer = new SimpleEnglishPhonemizer();
         this.englishPhonemeMap = createEnglishPhonemeMap();
         this.initialized = false;
+        // GitHub Pages deployment configuration
+        this.deploymentConfig = options.deploymentConfig || {
+            isGitHubPages: false,
+            basePath: ''
+        };
     }
 
     /**
@@ -42,8 +47,8 @@ export class SimpleUnifiedPhonemizer {
         
         // Import OpenJTalk module
         let jsPath = config.jsPath;
-        if (window.location.hostname.includes('github.io')) {
-            jsPath = this.adjustPathForGitHubPages(jsPath);
+        if (this.deploymentConfig.isGitHubPages && this.deploymentConfig.basePath) {
+            jsPath = this.adjustPathForDeployment(jsPath);
         }
         
         const OpenJTalkModule = (await import(jsPath)).default;
@@ -325,7 +330,18 @@ export class SimpleUnifiedPhonemizer {
     }
 
     /**
-     * Adjust path for GitHub Pages
+     * Adjust path for deployment
+     */
+    adjustPathForDeployment(path) {
+        if (this.deploymentConfig.basePath) {
+            // Remove leading ../ and add base path
+            return this.deploymentConfig.basePath + path.replace(/^\.\.\//, '');
+        }
+        return path;
+    }
+    
+    /**
+     * Adjust path for GitHub Pages (deprecated - use adjustPathForDeployment)
      */
     adjustPathForGitHubPages(path) {
         if (path.startsWith('./') || path.startsWith('../')) {

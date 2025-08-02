@@ -6,6 +6,7 @@ export class CustomDictionary {
     constructor() {
         this.entries = new Map();
         this.initialized = false;
+        this.compiledRegexCache = new Map();
     }
 
     /**
@@ -21,11 +22,20 @@ export class CustomDictionary {
             
             const data = await response.json();
             
+            // データ検証
+            if (!data.entries || typeof data.entries !== 'object') {
+                throw new Error('Invalid dictionary format: missing entries object');
+            }
+            
             // エントリーをMapに変換
             this.entries.clear();
+            this.compiledRegexCache.clear();
             for (const [word, reading] of Object.entries(data.entries)) {
                 this.entries.set(word, reading);
             }
+            
+            // 正規表現を事前コンパイル
+            this.compileRegexPatterns();
             
             this.initialized = true;
             console.log(`Loaded custom dictionary with ${this.entries.size} entries`);
@@ -33,6 +43,10 @@ export class CustomDictionary {
             return true;
         } catch (error) {
             console.error('Failed to load custom dictionary:', error);
+            // ネットワークエラーの場合は初期化フラグを維持
+            if (error.name !== 'NetworkError') {
+                this.initialized = false;
+            }
             return false;
         }
     }
@@ -52,6 +66,9 @@ export class CustomDictionary {
         if (word !== word.toUpperCase()) {
             this.entries.set(word.toUpperCase(), reading);
         }
+        
+        // 正規表現を再コンパイル
+        this.compileRegexPatterns();
     }
 
     /**
@@ -62,6 +79,24 @@ export class CustomDictionary {
         this.entries.delete(word);
         this.entries.delete(word.toLowerCase());
         this.entries.delete(word.toUpperCase());
+    }
+
+    /**
+     * 正規表現パターンを事前コンパイル
+     */
+    compileRegexPatterns() {
+        // 長い単語から優先的に処理するためにソート
+        const sortedEntries = Array.from(this.entries.entries())
+            .sort((a, b) => b[0].length - a[0].length);
+        
+        for (const [word, reading] of sortedEntries) {
+            // 単語境界を考慮した正規表現
+            const regex = new RegExp(
+                `(?<=[\\s。、！？「」（）\\[\\]【】]|^)${this.escapeRegExp(word)}(?=[\\s。、！？「」（）\\[\\]【】]|$)`,
+                'g'
+            );
+            this.compiledRegexCache.set(word, { regex, reading });
+        }
     }
 
     /**
@@ -76,18 +111,8 @@ export class CustomDictionary {
 
         let processedText = text;
         
-        // 単語境界を考慮した置換
-        // 長い単語から優先的に置換（例: "JavaScript" を "Java" より先に）
-        const sortedEntries = Array.from(this.entries.entries())
-            .sort((a, b) => b[0].length - a[0].length);
-        
-        for (const [word, reading] of sortedEntries) {
-            // 単語境界を考慮した正規表現
-            // 前後が日本語文字、スペース、句読点、または文字列の始端/終端の場合のみ置換
-            const regex = new RegExp(
-                `(?<=[\\s。、！？「」（）\\[\\]【】]|^)${this.escapeRegExp(word)}(?=[\\s。、！？「」（）\\[\\]【】]|$)`,
-                'g'
-            );
+        // 事前コンパイルされた正規表現を使用
+        for (const { regex, reading } of this.compiledRegexCache.values()) {
             processedText = processedText.replace(regex, reading);
         }
         
