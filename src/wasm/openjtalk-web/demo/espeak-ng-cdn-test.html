@@ -43,21 +43,42 @@
             const text = document.getElementById('text').value;
             const voice = document.getElementById('voice').value;
             
+            console.log('Speaking:', text, 'with voice:', voice);
+            
             tts.set_voice.apply(tts, [voice]);
             tts.synthesize(text, function(samples, events) {
+                console.log('Synthesis callback received');
+                console.log('Samples:', samples);
+                console.log('Events:', events);
+                
+                // Check if samples exist
+                if (!samples || samples.length === 0) {
+                    document.getElementById('result').textContent = 
+                        'Error: No audio samples received\n' +
+                        'Events: ' + JSON.stringify(events, null, 2);
+                    return;
+                }
+                
                 // Create audio from samples
-                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                const buffer = audioContext.createBuffer(1, samples.length, 22050);
-                buffer.getChannelData(0).set(samples);
-                
-                const source = audioContext.createBufferSource();
-                source.buffer = buffer;
-                source.connect(audioContext.destination);
-                source.start();
-                
-                // Show events
-                document.getElementById('result').textContent = 
-                    'Events: ' + JSON.stringify(events, null, 2);
+                try {
+                    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    const buffer = audioContext.createBuffer(1, samples.length, 22050);
+                    buffer.getChannelData(0).set(samples);
+                    
+                    const source = audioContext.createBufferSource();
+                    source.buffer = buffer;
+                    source.connect(audioContext.destination);
+                    source.start();
+                    
+                    // Show events
+                    document.getElementById('result').textContent = 
+                        'Playing audio (' + samples.length + ' samples)\n' +
+                        'Events: ' + JSON.stringify(events, null, 2);
+                } catch (error) {
+                    console.error('Audio playback error:', error);
+                    document.getElementById('result').textContent = 
+                        'Audio playback error: ' + error.message;
+                }
             });
         }
         

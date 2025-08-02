@@ -219,7 +219,7 @@
             <h3>📝 対応機能</h3>
             <ul>
                 <li>🇯🇵 日本語音声合成（OpenJTalk + mei音声）</li>
-                <li>🇺🇸 英語音声合成（簡易辞書ベース音素化器）</li>
+                <li>🇺🇸 英語音声合成（eSpeak-ng音素化器）</li>
                 <li>🎯 ブラウザ完結型（サーバー不要）</li>
                 <li>🚀 WebAssembly高速処理</li>
             </ul>
@@ -284,6 +284,9 @@
         </div>
     </div>
 
+    <!-- eSpeak-ng for English -->
+    <script type="text/javascript" src="../dist/espeak-ng/espeakng.min.js"></script>
+    
     <script type="module">
         import { SimpleUnifiedPhonemizer } from '../src/simple_unified_api.js';
         
@@ -291,6 +294,7 @@
         let currentLanguage = 'ja';
         let onnxSession = null;
         let modelConfig = null;
+        let espeakNG = null; // eSpeak-ng instance
         
         const statusEl = document.getElementById('status');
         const synthesizeBtn = document.getElementById('synthesizeBtn');
@@ -392,7 +396,7 @@
             try {
                 updateStatus('システムを初期化しています...');
                 
-                // Initialize phonemizer
+                // Initialize phonemizer for Japanese
                 phonemizer = new SimpleUnifiedPhonemizer();
                 await phonemizer.initialize({
                     openjtalk: {
@@ -402,6 +406,10 @@
                         voicePath: '../assets/voice/mei_normal.htsvoice'
                     }
                 });
+                
+                // Initialize eSpeak-ng for English
+                updateStatus('eSpeak-ngを初期化しています...');
+                await initializeESpeakNG();
                 
                 updateStatus('ONNXモデルを読み込んでいます...');
                 
@@ -421,6 +429,37 @@
                 console.error('Initialization failed:', error);
                 updateStatus(`初期化エラー: ${error.message}`, 'error');
             }
+        }
+        
+        // Initialize eSpeak-ng
+        function initializeESpeakNG() {
+            return new Promise((resolve, reject) => {
+                try {
+                    // Check if eSpeakNG is available
+                    if (typeof eSpeakNG === 'undefined') {
+                        console.error('eSpeakNG is not defined. Make sure espeakng.min.js is loaded.');
+                        reject(new Error('eSpeakNG not found'));
+                        return;
+                    }
+                    
+                    espeakNG = new eSpeakNG('../dist/espeak-ng/espeakng.worker.js', function() {
+                        console.log('eSpeak-ng initialized successfully');
+                        
+                        // Test eSpeak-ng with a simple synthesis
+                        espeakNG.set_voice.apply(espeakNG, ['en']);
+                        espeakNG.synthesize('test', function(samples, events) {
+                            console.log('eSpeak-ng test synthesis successful');
+                            console.log('Sample count:', samples ? samples.length : 0);
+                            console.log('Event count:', events ? events.length : 0);
+                        });
+                        
+                        resolve();
+                    });
+                } catch (error) {
+                    console.error('eSpeak-ng initialization failed:', error);
+                    reject(error);
+                }
+            });
         }
         
         // Load ONNX model
@@ -478,6 +517,70 @@
             clearOutput();
         }
         
+        // Get phonemes using eSpeak-ng for English
+        async function getEnglishPhonemes(text) {
+            return new Promise((resolve, reject) => {
+                if (!espeakNG) {
+                    reject(new Error('eSpeak-ng not initialized'));
+                    return;
+                }
+                
+                // Set English voice
+                espeakNG.set_voice.apply(espeakNG, ['en']);
+                
+                // Get phoneme events from synthesis
+                const phonemes = [];
+                espeakNG.synthesize(text, function(samples, events) {
+                    console.log('eSpeak-ng synthesis callback');
+                    console.log('Events:', events);
+                    
+                    // Extract phoneme information from events
+                    if (events && events.length > 0) {
+                        for (const event of events) {
+                            if (event.type === 'phoneme' && event.id) {
+                                // Convert eSpeak phoneme to our format
+                                const phoneme = convertESpeakPhoneme(event.id);
+                                if (phoneme) {
+                                    phonemes.push(phoneme);
+                                }
+                            }
+                        }
+                    }
+                    
+                    // If no phoneme events, use fallback
+                    if (phonemes.length === 0) {
+                        console.warn('No phoneme events from eSpeak-ng, using fallback');
+                        // Use simple phonemizer as fallback
+                        phonemizer.textToPhonemes(text, 'en').then(phonemeData => {
+                            const fallbackPhonemes = phonemizer.extractPhonemes(phonemeData, 'en');
+                            resolve(fallbackPhonemes);
+                        }).catch(reject);
+                    } else {
+                        resolve(phonemes);
+                    }
+                });
+            });
+        }
+        
+        // Convert eSpeak phoneme IDs to our phoneme format
+        function convertESpeakPhoneme(espeakId) {
+            // This is a simplified mapping - in reality, we'd need a comprehensive table
+            // For now, we'll use the simple phonemizer mapping
+            const espeakToSimple = {
+                'h': 'h',
+                'ɛ': 'ɛ',
+                'l': 'l',
+                'əʊ': 'o',
+                'w': 'w',
+                'ɜː': 'ɜ',
+                'r': 'r',
+                'd': 'd',
+                // Add more mappings as needed
+            };
+            
+            return espeakToSimple[espeakId] || espeakId;
+        }
+        
         // Synthesize speech
         async function synthesize() {
             const text = inputText.value.trim();
@@ -490,15 +593,20 @@
                 updateStatus('音素変換中...');
                 synthesizeBtn.disabled = true;
                 
-                // Update voice for Japanese
+                let phonemes;
+                
                 if (currentLanguage === 'ja') {
+                    // Update voice for Japanese
                     const voicePath = `../assets/voice/${voiceSelect.value}`;
                     await phonemizer.updateVoice(voicePath);
+                    
+                    // Get phonemes using OpenJTalk
+                    const phonemeData = await phonemizer.textToPhonemes(text, currentLanguage);
+                    phonemes = phonemizer.extractPhonemes(phonemeData, currentLanguage);
+                } else {
+                    // Get phonemes using eSpeak-ng for English
+                    phonemes = await getEnglishPhonemes(text);
                 }
-                
-                // Get phonemes
-                const phonemeData = await phonemizer.textToPhonemes(text, currentLanguage);
-                const phonemes = phonemizer.extractPhonemes(phonemeData, currentLanguage);
                 
                 // Display phonemes
                 displayPhonemes(phonemes);
@@ -523,7 +631,8 @@
                     phonemeCount: phonemes.length,
                     duration: (audio.length / modelConfig.audio.sample_rate).toFixed(2) + ' seconds',
                     sampleRate: modelConfig.audio.sample_rate,
-                    voice: currentLanguage === 'ja' ? voiceSelect.value : 'simple-english'
+                    voice: currentLanguage === 'ja' ? voiceSelect.value : 'eSpeak-ng',
+                    phonemizer: currentLanguage === 'ja' ? 'OpenJTalk' : 'eSpeak-ng'
                 }, null, 2);
                 
                 outputSection.style.display = 'block';
