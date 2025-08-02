@@ -377,6 +377,8 @@
             // Always use model's phoneme_id_map for consistency
             const phonemeIdMap = modelConfig.phoneme_id_map;
             
+            console.log('Input phonemes:', phonemes);
+            
             for (const phoneme of phonemes) {
                 if (phonemeIdMap[phoneme]) {
                     ids.push(...phonemeIdMap[phoneme]);
@@ -387,6 +389,7 @@
                 }
             }
             
+            console.log('Output IDs:', ids);
             return ids;
         }
         
