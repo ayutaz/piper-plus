@@ -56,6 +56,13 @@ exclude = [
     "dist",
     "*.egg-info",
     "src/python/piper_train/vits/monotonic_align",  # Cython generated
+    # Temporary debug/test scripts in root directory
+    "check_*.py",
+    "debug_*.py",
+    "test_*.py",
+    "analyze_*.py",
+    "verify_*.py",
+    "export_*.sh",
 ]
 
 [tool.ruff.lint]
