@@ -62,6 +62,17 @@
             background: #f8f9fa;
             border-radius: 6px;
         }
+        .template-selector {
+            margin-bottom: 10px;
+        }
+        .template-selector select {
+            width: 100%;
+            padding: 8px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            font-size: 14px;
+            background: white;
+        }
         label {
             display: block;
             margin-bottom: 8px;
@@ -239,6 +250,12 @@
 
         <div class="input-group">
             <label for="inputText">テキスト入力 / Text Input</label>
+            <div class="template-selector">
+                <label for="templateSelect">テンプレート選択 / Template Selection</label>
+                <select id="templateSelect">
+                    <option value="">-- 自由入力 / Free Input --</option>
+                </select>
+            </div>
             <textarea id="inputText" placeholder="ここにテキストを入力してください / Enter text here">こんにちは、世界！今日は良い天気ですね。</textarea>
         </div>
 
@@ -281,15 +298,94 @@
         const inputText = document.getElementById('inputText');
         const voiceSelect = document.getElementById('voiceSelect');
         const voiceGroup = document.getElementById('voiceGroup');
+        const templateSelect = document.getElementById('templateSelect');
         const outputSection = document.getElementById('outputSection');
         const phonemeOutput = document.getElementById('phonemeOutput');
         const detailsOutput = document.getElementById('detailsOutput');
         const audioPlayer = document.getElementById('audioPlayer');
         
+        // Template texts for each language
+        const templates = {
+            ja: [
+                { value: 'greeting1', text: 'こんにちは、世界！今日は良い天気ですね。' },
+                { value: 'greeting2', text: 'おはようございます。本日もよろしくお願いいたします。' },
+                { value: 'weather', text: '今日は晴れで、気温は25度です。過ごしやすい一日になりそうです。' },
+                { value: 'introduction', text: '私は音声合成システムです。日本語を自然に話すことができます。' },
+                { value: 'thanks', text: 'ご利用ありがとうございました。またのご利用をお待ちしております。' },
+                { value: 'time', text: '現在の時刻は午後3時30分です。' },
+                { value: 'emotion1', text: 'わー！すごい！これは本当に素晴らしいですね！' },
+                { value: 'emotion2', text: 'そうですか…それは少し残念ですね。' },
+                { value: 'question', text: 'どのような音声をお試しになりたいですか？' },
+                { value: 'long', text: '日本の四季は美しく、春には桜が咲き、夏には青い海と空が広がり、秋には紅葉が山々を彩り、冬には雪が静かに降り積もります。' }
+            ],
+            en: [
+                { value: 'greeting1', text: 'Hello world! This is a test.' },
+                { value: 'greeting2', text: 'Good morning! How are you today?' },
+                { value: 'weather', text: 'The weather is nice today. It is sunny and warm.' },
+                { value: 'introduction', text: 'I am a text to speech system. I can speak English.' },
+                { value: 'thanks', text: 'Thank you for using our service. Have a great day!' },
+                { value: 'time', text: 'The current time is three thirty in the afternoon.' },
+                { value: 'emotion1', text: 'Wow! This is amazing! I love it!' },
+                { value: 'emotion2', text: 'Oh, I see. That is a bit disappointing.' },
+                { value: 'question', text: 'What kind of voice would you like to try?' },
+                { value: 'pangram', text: 'The quick brown fox jumps over the lazy dog.' }
+            ]
+        };
+        
         // Language buttons
         document.querySelectorAll('.lang-button').forEach(btn => {
             btn.addEventListener('click', () => switchLanguage(btn.dataset.lang));
         });
+        
+        // Template selector
+        templateSelect.addEventListener('change', (e) => {
+            const selectedValue = e.target.value;
+            if (selectedValue) {
+                const template = templates[currentLanguage].find(t => t.value === selectedValue);
+                if (template) {
+                    inputText.value = template.text;
+                }
+            }
+        });
+        
+        // Update template options based on language
+        function updateTemplateOptions() {
+            templateSelect.innerHTML = '<option value="">-- 自由入力 / Free Input --</option>';
+            
+            const templateNames = {
+                ja: {
+                    greeting1: '挨拶（基本）',
+                    greeting2: '挨拶（丁寧）',
+                    weather: '天気予報',
+                    introduction: '自己紹介',
+                    thanks: 'お礼',
+                    time: '時刻案内',
+                    emotion1: '感情表現（喜び）',
+                    emotion2: '感情表現（残念）',
+                    question: '質問',
+                    long: '長文（四季の説明）'
+                },
+                en: {
+                    greeting1: 'Greeting (Basic)',
+                    greeting2: 'Greeting (Morning)',
+                    weather: 'Weather Report',
+                    introduction: 'Self Introduction',
+                    thanks: 'Thank You',
+                    time: 'Time Announcement',
+                    emotion1: 'Emotion (Excited)',
+                    emotion2: 'Emotion (Disappointed)',
+                    question: 'Question',
+                    pangram: 'Pangram'
+                }
+            };
+            
+            templates[currentLanguage].forEach(template => {
+                const option = document.createElement('option');
+                option.value = template.value;
+                option.textContent = templateNames[currentLanguage][template.value] || template.value;
+                templateSelect.appendChild(option);
+            });
+        }
         
         // Initialize
         async function init() {
@@ -314,6 +410,9 @@
                 
                 // Load initial model
                 await loadModel('ja');
+                
+                // Initialize template options
+                updateTemplateOptions();
                 
                 updateStatus('準備完了！', 'success');
                 synthesizeBtn.disabled = false;
@@ -355,7 +454,11 @@
             // Show/hide voice selector (only for Japanese)
             voiceGroup.style.display = lang === 'ja' ? 'block' : 'none';
             
-            // Update example text
+            // Update template options
+            updateTemplateOptions();
+            
+            // Reset template selector and update example text
+            templateSelect.value = '';
             if (lang === 'ja') {
                 inputText.value = 'こんにちは、世界！今日は良い天気ですね。';
             } else {
