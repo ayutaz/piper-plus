@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>eSpeak-ng PushAudio Test</title>
+    <meta charset="utf-8">
+    <script type="text/javascript" src="../dist/espeak-ng/espeakng.min.js"></script>
+    <script type="text/javascript" src="../dist/demo.js"></script>
+</head>
+<body>
+    <h1>eSpeak-ng with PushAudioNode Test</h1>
+    <p>This uses the same approach as the official demo</p>
+    
+    <div>
+        <label>Text: <input type="text" id="text" value="Hello world" size="40"></label>
+        <button onclick="speak()">Speak</button>
+        <button onclick="stop()">Stop</button>
+    </div>
+    
+    <div>
+        <h3>Result:</h3>
+        <pre id="result"></pre>
+    </div>
+    
+    <script>
+        let tts;
+        let ctx;
+        let pusher;
+        
+        // Initialize
+        window.onload = function() {
+            ctx = new (window.AudioContext || window.webkitAudioContext)();
+            document.getElementById('result').textContent = 'AudioContext sample rate: ' + ctx.sampleRate + '\n';
+            
+            tts = new eSpeakNG('../dist/espeak-ng/espeakng.worker.js', function() {
+                document.getElementById('result').textContent += 'eSpeak-ng ready!\n';
+            });
+        };
+        
+        function stop() {
+            if (pusher) {
+                pusher.disconnect();
+                pusher = null;
+            }
+        }
+        
+        function speak() {
+            const text = document.getElementById('text').value;
+            
+            if (ctx.state === 'suspended') {
+                ctx.resume();
+            }
+            
+            stop();
+            
+            // Create PushAudioNode
+            pusher = new PushAudioNode(ctx);
+            pusher.connect(ctx.destination);
+            
+            // Set voice and synthesize
+            tts.set_voice.apply(tts, ['en']);
+            
+            let chunkCount = 0;
+            let totalSamples = 0;
+            
+            tts.synthesize(text, function(samples, events) {
+                if (!samples) {
+                    // Synthesis complete
+                    if (pusher) {
+                        pusher.close();
+                    }
+                    document.getElementById('result').textContent += 
+                        '\nSynthesis complete!\n' +
+                        'Total chunks: ' + chunkCount + '\n' +
+                        'Total samples: ' + totalSamples + '\n' +
+                        'Duration: ' + (totalSamples / 22050).toFixed(2) + ' seconds';
+                    return;
+                }
+                
+                // Handle samples
+                if (samples instanceof ArrayBuffer) {
+                    const floatSamples = new Float32Array(samples);
+                    if (floatSamples.length > 0) {
+                        pusher.push(floatSamples);
+                        chunkCount++;
+                        totalSamples += floatSamples.length;
+                        console.log('Pushed chunk', chunkCount, 'with', floatSamples.length, 'samples');
+                    }
+                }
+            });
+            
+            document.getElementById('result').textContent = 
+                'Speaking: ' + text + '\n' +
+                'AudioContext sample rate: ' + ctx.sampleRate + '\n';
+        }
+    </script>
+</body>
+</html>

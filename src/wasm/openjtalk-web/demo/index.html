@@ -444,15 +444,7 @@
                     
                     espeakNG = new eSpeakNG('../dist/espeak-ng/espeakng.worker.js', function() {
                         console.log('eSpeak-ng initialized successfully');
-                        
-                        // Test eSpeak-ng with a simple synthesis
-                        espeakNG.set_voice.apply(espeakNG, ['en']);
-                        espeakNG.synthesize('test', function(samples, events) {
-                            console.log('eSpeak-ng test synthesis successful');
-                            console.log('Sample count:', samples ? samples.length : 0);
-                            console.log('Event count:', events ? events.length : 0);
-                        });
-                        
+                        // Don't test synthesis here - just resolve
                         resolve();
                     });
                 } catch (error) {
@@ -528,58 +520,93 @@
                 // Set English voice
                 espeakNG.set_voice.apply(espeakNG, ['en']);
                 
-                // Get phoneme events from synthesis
-                const phonemes = [];
-                espeakNG.synthesize(text, function(samples, events) {
-                    console.log('eSpeak-ng synthesis callback');
-                    console.log('Events:', events);
-                    
-                    // Extract phoneme information from events
-                    if (events && events.length > 0) {
-                        for (const event of events) {
-                            if (event.type === 'phoneme' && event.id) {
-                                // Convert eSpeak phoneme to our format
-                                const phoneme = convertESpeakPhoneme(event.id);
-                                if (phoneme) {
-                                    phonemes.push(phoneme);
-                                }
-                            }
+                // Get IPA phonemes from eSpeak-ng
+                espeakNG.synthesize_ipa(text, function(result) {
+                    try {
+                        console.log('eSpeak-ng IPA result:', result);
+                        
+                        if (result && result.ipa) {
+                            // Extract phonemes from IPA
+                            const phonemes = extractPhonemesFromIPA(result.ipa);
+                            resolve(phonemes);
+                        } else {
+                            // Fallback to simple phonemizer
+                            console.log('No IPA result, using simple phonemizer as fallback');
+                            phonemizer.textToPhonemes(text, 'en').then(phonemeData => {
+                                const phonemes = phonemizer.extractPhonemes(phonemeData, 'en');
+                                resolve(phonemes);
+                            }).catch(reject);
                         }
-                    }
-                    
-                    // If no phoneme events, use fallback
-                    if (phonemes.length === 0) {
-                        console.warn('No phoneme events from eSpeak-ng, using fallback');
-                        // Use simple phonemizer as fallback
-                        phonemizer.textToPhonemes(text, 'en').then(phonemeData => {
-                            const fallbackPhonemes = phonemizer.extractPhonemes(phonemeData, 'en');
-                            resolve(fallbackPhonemes);
-                        }).catch(reject);
-                    } else {
-                        resolve(phonemes);
+                    } catch (error) {
+                        console.error('Error processing IPA:', error);
+                        reject(error);
                     }
                 });
             });
         }
         
-        // Convert eSpeak phoneme IDs to our phoneme format
-        function convertESpeakPhoneme(espeakId) {
-            // This is a simplified mapping - in reality, we'd need a comprehensive table
-            // For now, we'll use the simple phonemizer mapping
-            const espeakToSimple = {
-                'h': 'h',
-                'ɛ': 'ɛ',
-                'l': 'l',
-                'əʊ': 'o',
-                'w': 'w',
-                'ɜː': 'ɜ',
-                'r': 'r',
-                'd': 'd',
-                // Add more mappings as needed
-            };
+        // Extract phonemes from IPA string
+        function extractPhonemesFromIPA(ipaString) {
+            console.log('Extracting phonemes from IPA:', ipaString);
             
-            return espeakToSimple[espeakId] || espeakId;
+            // Simple IPA to phoneme mapping for demo
+            // In a real implementation, this would be more comprehensive
+            const phonemes = [];
+            
+            // Remove stress marks and other diacritics for simplicity
+            const cleanIPA = ipaString.replace(/ˈ|ˌ|ː|ˑ|‿|‖|\.|\|/g, '');
+            
+            // Split into individual phonemes
+            for (let i = 0; i < cleanIPA.length; i++) {
+                const char = cleanIPA[i];
+                
+                // Map common IPA symbols to simple phonemes
+                const ipaToPhoneme = {
+                    'h': 'h',
+                    'ɛ': 'ɛ',
+                    'l': 'l',
+                    'ə': 'ə',
+                    'ʊ': 'ʊ',
+                    'w': 'w',
+                    'ɜ': 'ɜ',
+                    'r': 'r',
+                    'd': 'd',
+                    'o': 'o',
+                    'u': 'u',
+                    'a': 'a',
+                    'i': 'i',
+                    'e': 'e',
+                    'n': 'n',
+                    't': 't',
+                    'k': 'k',
+                    's': 's',
+                    'p': 'p',
+                    'b': 'b',
+                    'm': 'm',
+                    'f': 'f',
+                    'v': 'v',
+                    'θ': 'θ',
+                    'ð': 'ð',
+                    'ʃ': 'ʃ',
+                    'ʒ': 'ʒ',
+                    'tʃ': 'tʃ',
+                    'dʒ': 'dʒ',
+                    'ŋ': 'ŋ',
+                    'j': 'j',
+                    'g': 'g',
+                    'z': 'z'
+                };
+                
+                const phoneme = ipaToPhoneme[char] || char;
+                if (phoneme && phoneme !== ' ') {
+                    phonemes.push(phoneme);
+                }
+            }
+            
+            console.log('Extracted phonemes:', phonemes);
+            return phonemes;
         }
+        
         
         // Synthesize speech
         async function synthesize() {

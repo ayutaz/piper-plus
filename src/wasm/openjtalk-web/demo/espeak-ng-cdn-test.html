@@ -39,11 +39,25 @@
             });
         };
         
+        let audioContext;
+        let allSamples = [];
+        let isPlaying = false;
+        
         function speak() {
             const text = document.getElementById('text').value;
             const voice = document.getElementById('voice').value;
             
             console.log('Speaking:', text, 'with voice:', voice);
+            
+            // Reset samples
+            allSamples = [];
+            isPlaying = false;
+            
+            // Initialize audio context if needed
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                console.log('AudioContext sample rate:', audioContext.sampleRate);
+            }
             
             tts.set_voice.apply(tts, [voice]);
             tts.synthesize(text, function(samples, events) {
@@ -51,33 +65,104 @@
                 console.log('Samples:', samples);
                 console.log('Events:', events);
                 
-                // Check if samples exist
-                if (!samples || samples.length === 0) {
-                    document.getElementById('result').textContent = 
-                        'Error: No audio samples received\n' +
-                        'Events: ' + JSON.stringify(events, null, 2);
-                    return;
-                }
-                
-                // Create audio from samples
-                try {
-                    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                    const buffer = audioContext.createBuffer(1, samples.length, 22050);
-                    buffer.getChannelData(0).set(samples);
+                // Handle samples
+                if (samples) {
+                    // Convert ArrayBuffer to Float32Array if needed
+                    let audioData;
+                    if (samples instanceof ArrayBuffer) {
+                        // eSpeak-ng actually returns Float32 data at 44100Hz
+                        audioData = new Float32Array(samples);
+                        console.log('Converted ArrayBuffer to Float32Array, length:', audioData.length);
+                    } else if (samples instanceof Float32Array) {
+                        audioData = samples;
+                    } else {
+                        console.error('Unknown sample format:', Object.prototype.toString.call(samples));
+                        return;
+                    }
                     
-                    const source = audioContext.createBufferSource();
-                    source.buffer = buffer;
-                    source.connect(audioContext.destination);
-                    source.start();
+                    // Accumulate samples
+                    if (audioData.length > 0) {
+                        allSamples.push(audioData);
+                    }
+                } else {
+                    // No more samples - synthesis complete
+                    console.log('Synthesis complete, total chunks:', allSamples.length);
                     
-                    // Show events
-                    document.getElementById('result').textContent = 
-                        'Playing audio (' + samples.length + ' samples)\n' +
-                        'Events: ' + JSON.stringify(events, null, 2);
-                } catch (error) {
-                    console.error('Audio playback error:', error);
-                    document.getElementById('result').textContent = 
-                        'Audio playback error: ' + error.message;
+                    if (allSamples.length === 0) {
+                        document.getElementById('result').textContent = 
+                            'Error: No audio samples received';
+                        return;
+                    }
+                    
+                    // Combine all samples
+                    let totalLength = 0;
+                    for (const chunk of allSamples) {
+                        totalLength += chunk.length;
+                    }
+                    
+                    const combinedSamples = new Float32Array(totalLength);
+                    let offset = 0;
+                    for (const chunk of allSamples) {
+                        combinedSamples.set(chunk, offset);
+                        offset += chunk.length;
+                    }
+                    
+                    console.log('Combined samples length:', combinedSamples.length);
+                    
+                    // Normalize audio samples
+                    let maxValue = 0;
+                    for (let i = 0; i < combinedSamples.length; i++) {
+                        maxValue = Math.max(maxValue, Math.abs(combinedSamples[i]));
+                    }
+                    console.log('Max sample value:', maxValue);
+                    
+                    // If samples are too quiet, normalize them
+                    if (maxValue < 0.5 && maxValue > 0) {
+                        const scale = 0.8 / maxValue;
+                        for (let i = 0; i < combinedSamples.length; i++) {
+                            combinedSamples[i] *= scale;
+                        }
+                        console.log('Normalized audio with scale:', scale);
+                    }
+                    
+                    // Play audio
+                    try {
+                        // eSpeak-ng uses 44100Hz sample rate, not 22050Hz!
+                        const espeakSampleRate = 44100;
+                        
+                        // Create buffer with the correct sample rate
+                        const buffer = audioContext.createBuffer(1, combinedSamples.length, espeakSampleRate);
+                        buffer.getChannelData(0).set(combinedSamples);
+                        
+                        const source = audioContext.createBufferSource();
+                        source.buffer = buffer;
+                        source.connect(audioContext.destination);
+                        source.start();
+                        
+                        // Show results with event details
+                        let eventTypes = {};
+                        for (const chunk of allSamples) {
+                            if (chunk.events) {
+                                for (const event of chunk.events) {
+                                    eventTypes[event.type] = (eventTypes[event.type] || 0) + 1;
+                                }
+                            }
+                        }
+                        
+                        document.getElementById('result').textContent = 
+                            'Playing audio:\n' +
+                            'Samples: ' + combinedSamples.length + ' @ 44100 Hz (eSpeak-ng native rate)\n' +
+                            'Duration: ' + (combinedSamples.length / 44100).toFixed(2) + ' seconds\n' +
+                            'Chunks: ' + allSamples.length + '\n' +
+                            'Max amplitude: ' + maxValue.toFixed(3) + '\n' +
+                            'AudioContext sample rate: ' + audioContext.sampleRate;
+                        
+                        isPlaying = true;
+                    } catch (error) {
+                        console.error('Audio playback error:', error);
+                        document.getElementById('result').textContent = 
+                            'Audio playback error: ' + error.message;
+                    }
                 }
             });
         }
