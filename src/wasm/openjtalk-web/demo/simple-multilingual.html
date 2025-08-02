@@ -335,9 +335,7 @@
                 const phonemeMapping = {};
                 for (let i = 0; i < Math.min(phonemes.length, 10); i++) {
                     const ph = phonemes[i];
-                    const idMap = currentLanguage === 'en' ? 
-                        phonemizer.getPhonemeIdMap('en') : 
-                        modelConfig.phoneme_id_map;
+                    const idMap = modelConfig.phoneme_id_map;
                     phonemeMapping[ph] = idMap[ph] || 'NOT FOUND';
                 }
                 
