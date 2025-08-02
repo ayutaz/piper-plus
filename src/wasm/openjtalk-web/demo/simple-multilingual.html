@@ -331,15 +331,26 @@
                 // Convert phonemes to IDs
                 const phonemeIds = phonemesToIds(phonemes);
                 
-                // Debug info
+                // Debug info with phoneme mapping details
+                const phonemeMapping = {};
+                for (let i = 0; i < Math.min(phonemes.length, 10); i++) {
+                    const ph = phonemes[i];
+                    const idMap = currentLanguage === 'en' ? 
+                        phonemizer.getPhonemeIdMap('en') : 
+                        modelConfig.phoneme_id_map;
+                    phonemeMapping[ph] = idMap[ph] || 'NOT FOUND';
+                }
+                
                 debugOutput.textContent = JSON.stringify({
                     language: currentLanguage,
                     text: text,
                     phonemes: phonemes,
-                    phonemeIds: phonemeIds.slice(0, 20) + '...',
+                    phonemeIds: phonemeIds.slice(0, 30),
+                    phonemeMapping: phonemeMapping,
                     modelConfig: {
                         sampleRate: modelConfig.audio.sample_rate,
-                        numSymbols: modelConfig.num_symbols
+                        numSymbols: modelConfig.num_symbols,
+                        availablePhonemes: Object.keys(modelConfig.phoneme_id_map).slice(0, 20)
                     }
                 }, null, 2);
                 
@@ -365,28 +376,16 @@
         // Convert phonemes to IDs
         function phonemesToIds(phonemes) {
             const ids = [];
-            const phonemeIdMap = currentLanguage === 'en' ? 
-                phonemizer.getPhonemeIdMap('en') : 
-                modelConfig.phoneme_id_map;
+            // Always use model's phoneme_id_map for consistency
+            const phonemeIdMap = modelConfig.phoneme_id_map;
             
             for (const phoneme of phonemes) {
                 if (phonemeIdMap[phoneme]) {
                     ids.push(...phonemeIdMap[phoneme]);
                 } else {
                     console.warn(`Unknown phoneme: ${phoneme}`);
-                    // Try to find a close match
-                    let matched = false;
-                    // For English, try lowercase
-                    if (currentLanguage === 'en' && phoneme !== phoneme.toLowerCase()) {
-                        const lower = phoneme.toLowerCase();
-                        if (phonemeIdMap[lower]) {
-                            ids.push(...phonemeIdMap[lower]);
-                            matched = true;
-                        }
-                    }
-                    if (!matched) {
-                        ids.push(0); // Use padding ID
-                    }
+                    // Use space/silence for unknown
+                    ids.push(...(phonemeIdMap[' '] || [3]));
                 }
             }
             

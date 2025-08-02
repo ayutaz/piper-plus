@@ -6,23 +6,24 @@
 export class SimpleEnglishPhonemizer {
     constructor() {
         // Basic pronunciation dictionary for common words
+        // Using only phonemes available in the test model
         this.dictionary = {
             // Common words
-            'hello': ['h', 'ɛ', 'l', 'oʊ'],
-            'world': ['w', 'ɜː', 'l', 'd'],
+            'hello': ['h', 'ɛ', 'l', 'o'],
+            'world': ['w', 'ɜ', 'r', 'l', 'd'],
             'the': ['ð', 'ə'],
             'a': ['ə'],
             'an': ['æ', 'n'],
             'and': ['æ', 'n', 'd'],
             'is': ['ɪ', 'z'],
-            'are': ['ɑː', 'r'],
+            'are': ['ɑ', 'r'],
             'was': ['w', 'ʌ', 'z'],
-            'were': ['w', 'ɜː', 'r'],
+            'were': ['w', 'ɜ', 'r'],
             'been': ['b', 'ɪ', 'n'],
             'have': ['h', 'æ', 'v'],
             'has': ['h', 'æ', 'z'],
             'had': ['h', 'æ', 'd'],
-            'do': ['d', 'uː'],
+            'do': ['d', 'u'],
             'does': ['d', 'ʌ', 'z'],
             'did': ['d', 'ɪ', 'd'],
             'will': ['w', 'ɪ', 'l'],
@@ -30,46 +31,46 @@ export class SimpleEnglishPhonemizer {
             'can': ['k', 'æ', 'n'],
             'could': ['k', 'ʊ', 'd'],
             'should': ['ʃ', 'ʊ', 'd'],
-            'may': ['m', 'eɪ'],
-            'might': ['m', 'aɪ', 't'],
+            'may': ['m', 'e', 'i'],
+            'might': ['m', 'a', 'i', 't'],
             'must': ['m', 'ʌ', 's', 't'],
-            'to': ['t', 'uː'],
+            'to': ['t', 'u'],
             'of': ['ʌ', 'v'],
             'in': ['ɪ', 'n'],
             'on': ['ɒ', 'n'],
             'at': ['æ', 't'],
-            'by': ['b', 'aɪ'],
-            'for': ['f', 'ɔː', 'r'],
+            'by': ['b', 'a', 'i'],
+            'for': ['f', 'ɔ', 'r'],
             'with': ['w', 'ɪ', 'θ'],
             'from': ['f', 'r', 'ʌ', 'm'],
             'up': ['ʌ', 'p'],
-            'out': ['aʊ', 't'],
-            'over': ['oʊ', 'v', 'ər'],
-            'under': ['ʌ', 'n', 'd', 'ər'],
+            'out': ['a', 'u', 't'],
+            'over': ['o', 'v', 'ə', 'r'],
+            'under': ['ʌ', 'n', 'd', 'ə', 'r'],
             'not': ['n', 'ɒ', 't'],
-            'all': ['ɔː', 'l'],
+            'all': ['ɔ', 'l'],
             'one': ['w', 'ʌ', 'n'],
-            'two': ['t', 'uː'],
-            'three': ['θ', 'r', 'iː'],
-            'four': ['f', 'ɔː', 'r'],
-            'five': ['f', 'aɪ', 'v'],
-            'good': ['g', 'ʊ', 'd'],
+            'two': ['t', 'u'],
+            'three': ['θ', 'r', 'i'],
+            'four': ['f', 'ɔ', 'r'],
+            'five': ['f', 'a', 'i', 'v'],
+            'good': ['ɡ', 'ʊ', 'd'],
             'bad': ['b', 'æ', 'd'],
-            'new': ['n', 'juː'],
-            'old': ['oʊ', 'l', 'd'],
-            'big': ['b', 'ɪ', 'g'],
-            'small': ['s', 'm', 'ɔː', 'l'],
+            'new': ['n', 'j', 'u'],
+            'old': ['o', 'l', 'd'],
+            'big': ['b', 'ɪ', 'ɡ'],
+            'small': ['s', 'm', 'ɔ', 'l'],
             
             // Tech terms
             'text': ['t', 'ɛ', 'k', 's', 't'],
-            'speech': ['s', 'p', 'iː', 'tʃ'],
-            'voice': ['v', 'ɔɪ', 's'],
-            'audio': ['ɔː', 'd', 'i', 'oʊ'],
+            'speech': ['s', 'p', 'i', 'ʃ'],
+            'voice': ['v', 'ɔ', 'i', 's'],
+            'audio': ['ɔ', 'd', 'i', 'o'],
             'system': ['s', 'ɪ', 's', 't', 'ə', 'm'],
-            'computer': ['k', 'ə', 'm', 'p', 'juː', 't', 'ər'],
-            'artificial': ['ɑː', 'r', 't', 'ɪ', 'f', 'ɪ', 'ʃ', 'əl'],
-            'intelligence': ['ɪ', 'n', 't', 'ɛ', 'l', 'ɪ', 'dʒ', 'ə', 'n', 's'],
-            'technology': ['t', 'ɛ', 'k', 'n', 'ɒ', 'l', 'ə', 'dʒ', 'i'],
+            'computer': ['k', 'ə', 'm', 'p', 'j', 'u', 't', 'ə', 'r'],
+            'artificial': ['ɑ', 'r', 't', 'ɪ', 'f', 'ɪ', 'ʃ', 'ə', 'l'],
+            'intelligence': ['ɪ', 'n', 't', 'ɛ', 'l', 'ɪ', 'ʒ', 'ə', 'n', 's'],
+            'technology': ['t', 'ɛ', 'k', 'n', 'ɒ', 'l', 'ə', 'ʒ', 'i'],
             'synthesis': ['s', 'ɪ', 'n', 'θ', 'ə', 's', 'ɪ', 's']
         };
         
@@ -126,7 +127,8 @@ export class SimpleEnglishPhonemizer {
      * Convert phonemes to a format similar to eSpeak IPA output
      */
     phonemesToIPA(phonemes) {
-        return phonemes.join('');
+        // Keep spaces as separate elements for proper word boundaries
+        return phonemes;
     }
 }
 
