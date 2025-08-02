@@ -146,11 +146,11 @@ class PiperVoice:
             # Use the exact same phonemization as training
             try:
                 import sys
+                import os
 
                 # Try to import from relative path first
-            import os
-            piper_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
-            sys.path.insert(0, os.path.join(piper_root, "src", "python"))
+                piper_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+                sys.path.insert(0, os.path.join(piper_root, "src", "python"))
                 from piper_train.phonemize.japanese import phonemize_japanese
 
                 return [phonemize_japanese(text)]

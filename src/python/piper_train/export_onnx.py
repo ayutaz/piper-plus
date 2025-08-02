@@ -120,6 +120,7 @@ def main() -> None:
     model_g = model.model_g
 
     num_symbols = model_g.n_vocab
+    num_speakers = model_g.n_speakers
 
     # Enable F0 predictor with ONNX-friendly attention
     model_g.onnx_export_mode = True
@@ -222,7 +223,7 @@ def main() -> None:
     prosody_ids = torch.randint(
         low=0, high=15, size=(1, dummy_input_length), dtype=torch.long
     )
-    
+
     # Include all inputs for compatibility
     if num_speakers > 1:
         dummy_input = (sequences, sequence_lengths, scales, sid, prosody_ids)
