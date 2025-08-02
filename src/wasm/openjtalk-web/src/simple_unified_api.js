@@ -360,8 +360,9 @@ export class SimpleUnifiedPhonemizer {
      */
     adjustPathForDeployment(path) {
         if (this.deploymentConfig.basePath) {
-            // Remove leading ../ and add base path
-            return this.deploymentConfig.basePath + path.replace(/^\.\.\//, '');
+            // Remove leading ../ or ./ and add base path with proper slash
+            const cleanPath = path.replace(/^\.\.?\//, '');
+            return this.deploymentConfig.basePath + '/' + cleanPath;
         }
         return path;
     }
