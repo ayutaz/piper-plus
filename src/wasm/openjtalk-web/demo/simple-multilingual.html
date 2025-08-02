@@ -405,8 +405,8 @@
                 [1]
             );
             
-            // For English, increase length_scale to get longer audio
-            const lengthScale = currentLanguage === 'en' ? 1.5 : (modelConfig.inference.length_scale || 1.0);
+            // Use default length_scale from model config
+            const lengthScale = modelConfig.inference.length_scale || 1.0;
             
             const scalesTensor = new ort.Tensor('float32', 
                 new Float32Array([
@@ -419,17 +419,10 @@
             
             console.log('Using length_scale:', lengthScale);
             
-            // Speaker ID tensor (single speaker = 0)
-            const speakerTensor = new ort.Tensor('int64',
-                new BigInt64Array([BigInt(0)]),
-                [1]
-            );
-            
             const feeds = {
                 'input': inputTensor,
                 'input_lengths': lengthTensor,
-                'scales': scalesTensor,
-                'sid': speakerTensor
+                'scales': scalesTensor
             };
             
             console.log('Running ONNX inference...');
