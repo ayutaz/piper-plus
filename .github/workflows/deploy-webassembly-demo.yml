@@ -88,6 +88,12 @@ jobs:
             sed -i "s|'../assets/|'./assets/|g" deploy/index.html
             sed -i "s|'../dist/|'./dist/|g" deploy/index.html
             
+            # Also update template string paths (backtick strings)
+            sed -i "s|\`../../models/|\`./models/|g" deploy/index.html
+            sed -i "s|\`../../assets/|\`./assets/|g" deploy/index.html
+            sed -i "s|\`../models/|\`./models/|g" deploy/index.html
+            sed -i "s|\`../assets/|\`./assets/|g" deploy/index.html
+            
             echo "Multilingual demo deployed as main page"
           fi
           
