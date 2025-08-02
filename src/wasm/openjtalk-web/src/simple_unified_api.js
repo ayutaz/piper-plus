@@ -223,19 +223,30 @@ export class SimpleUnifiedPhonemizer {
             if (match && match[1] !== 'sil') {
                 let phoneme = match[1];
                 
-                // Replace multi-character phonemes with Unicode
+                // Debug log for multi-character phonemes
                 if (multiCharPhonemes[phoneme]) {
+                    console.log(`Converting multi-char phoneme: ${phoneme} → U+${multiCharPhonemes[phoneme].charCodeAt(0).toString(16)}`);
                     phoneme = multiCharPhonemes[phoneme];
                 }
                 
                 // Skip 'pau' (pause) - it should not be included in phonemes
                 if (phoneme !== 'pau') {
                     phonemes.push(phoneme);
+                } else {
+                    console.log('Skipping pau');
                 }
             }
         }
         
         phonemes.push('$');
+        
+        console.log('Extracted phonemes:', phonemes.map(p => {
+            const code = p.charCodeAt(0);
+            if (code >= 0xe000 && code <= 0xe00d) {
+                return `${p}(U+${code.toString(16)})`;
+            }
+            return p;
+        }).join(' '));
         
         return phonemes;
     }

@@ -551,6 +551,10 @@
                 // Get phonemes
                 const phonemes = await getPhonemes(text, currentLanguage);
                 console.log('Got phonemes:', phonemes);
+                console.log('Phoneme details:', phonemes.map((p, i) => {
+                    const code = p.charCodeAt(0);
+                    return `[${i}] "${p}" (U+${code.toString(16).padStart(4, '0')})`;
+                }));
                 
                 // Display phonemes
                 displayPhonemes(phonemes);
@@ -560,6 +564,12 @@
                 // Convert phonemes to IDs
                 const phonemeIds = phonemesToIds(phonemes);
                 console.log('Phoneme IDs:', phonemeIds);
+                console.log('Phoneme to ID mapping for ch:', {
+                    phoneme: phonemes[6],
+                    charCode: phonemes[6] ? phonemes[6].charCodeAt(0) : null,
+                    hex: phonemes[6] ? '0x' + phonemes[6].charCodeAt(0).toString(16) : null,
+                    mappedIds: currentModelConfig.phoneme_id_map[phonemes[6]] || 'NOT FOUND'
+                });
                 
                 // Synthesize audio
                 const audio = await synthesizeAudio(phonemeIds);
@@ -593,10 +603,24 @@
         
         // Convert phonemes to IDs
         function phonemesToIds(phonemes) {
+            // Apply padding for short Japanese text to improve synthesis quality
+            let processedPhonemes = phonemes;
+            if (currentLanguage === 'ja' && phonemes.length < 20) {
+                // Add silence tokens for short text
+                processedPhonemes = [
+                    phonemes[0],  // Keep BOS (^)
+                    '_', '_',     // Add silence padding
+                    ...phonemes.slice(1, -1),  // Original phonemes without BOS/EOS
+                    '_', '_',     // Add silence padding
+                    phonemes[phonemes.length - 1]  // Keep EOS ($)
+                ];
+                console.log('Applied padding for short text:', processedPhonemes);
+            }
+            
             const ids = [];
             const phonemeIdMap = currentModelConfig.phoneme_id_map;
             
-            for (const phoneme of phonemes) {
+            for (const phoneme of processedPhonemes) {
                 if (phonemeIdMap[phoneme]) {
                     ids.push(...phonemeIdMap[phoneme]);
                 } else {
