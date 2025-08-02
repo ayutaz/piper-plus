@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>英単語音素変換テスト</title>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .test-box {
+            border: 1px solid #ccc;
+            padding: 20px;
+            margin: 10px 0;
+            border-radius: 8px;
+        }
+        pre {
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+        .word-analysis {
+            background: #e3f2fd;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .phoneme {
+            background: #4CAF50;
+            color: white;
+            padding: 2px 6px;
+            margin: 0 2px;
+            border-radius: 3px;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #45a049;
+        }
+    </style>
+</head>
+<body>
+    <h1>英単語音素変換テスト</h1>
+    
+    <div class="test-box">
+        <h2>テスト文章</h2>
+        <button onclick="analyzeText()">分析実行</button>
+        
+        <div id="results"></div>
+    </div>
+
+    <script type="module">
+        import { SimpleUnifiedPhonemizer } from '../src/simple_unified_api.js';
+        
+        let phonemizer = null;
+        
+        async function init() {
+            phonemizer = new SimpleUnifiedPhonemizer();
+            await phonemizer.initialize({
+                openjtalk: {
+                    jsPath: '../dist/openjtalk.js',
+                    wasmPath: '../dist/openjtalk.wasm',
+                    dictPath: '../assets/dict',
+                    voicePath: '../assets/voice/mei_normal.htsvoice'
+                }
+            });
+            console.log('Initialized');
+        }
+        
+        window.analyzeText = async function() {
+            const testTexts = [
+                'OpenJTalkとPiperを使った音声合成のデモです。',
+                'OpenJTalkを使った音声合成のデモです。',
+                'Piperを使った音声合成のデモです。',
+                'オープンジェートークとパイパーを使った音声合成のデモです。',
+                'OPENJTALKとPIPERを使った音声合成のデモです。'
+            ];
+            
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '';
+            
+            for (const text of testTexts) {
+                const analysis = document.createElement('div');
+                analysis.className = 'word-analysis';
+                
+                try {
+                    // Get raw labels
+                    const labels = await phonemizer.textToPhonemes(text, 'ja');
+                    const phonemes = phonemizer.extractPhonemes(labels, 'ja');
+                    
+                    // MeCab分析結果を取得するため、ラベルから情報を抽出
+                    const lines = labels.split('\n').filter(line => line.trim());
+                    
+                    // 詳細な分析
+                    let html = `<h3>${text}</h3>`;
+                    html += `<p><strong>音素数:</strong> ${phonemes.length}</p>`;
+                    html += `<p><strong>音素列:</strong> ${phonemes.map(p => `<span class="phoneme">${p}</span>`).join(' ')}</p>`;
+                    
+                    // OpenJTalkとPiperの部分を特定
+                    html += '<h4>詳細分析:</h4>';
+                    html += '<pre>';
+                    
+                    // ラベルから単語境界を推定
+                    let currentWord = [];
+                    let wordBoundaries = [];
+                    let prevPhoneme = '';
+                    
+                    for (let i = 0; i < lines.length; i++) {
+                        const line = lines[i];
+                        const match = line.match(/\-([^+]+)\+/);
+                        if (match && match[1] !== 'sil' && match[1] !== 'pau') {
+                            const phoneme = match[1];
+                            
+                            // 特定のパターンを検出
+                            if (line.includes('o^o-p+e=N') || line.includes('o^p-e+N')) {
+                                html += `行${i}: ${phoneme} → "Open"の一部\n`;
+                            } else if (line.includes('j^e-i+t')) {
+                                html += `行${i}: ${phoneme} → "JTalk"の一部\n`;
+                            } else if (line.includes('p^a-i+p') || line.includes('p^i-i+p')) {
+                                html += `行${i}: ${phoneme} → "Piper"の一部\n`;
+                            } else {
+                                const contextMatch = line.match(/([^-]+)\^([^-]+)-([^+]+)\+([^=]+)=/);
+                                if (contextMatch) {
+                                    html += `行${i}: ${phoneme} (前:${contextMatch[2]}, 後:${contextMatch[4]})\n`;
+                                }
+                            }
+                        }
+                    }
+                    
+                    html += '</pre>';
+                    
+                    // OpenJTalkのログから単語の読み方を確認
+                    html += '<h4>OpenJTalkの処理結果（推定）:</h4>';
+                    html += '<p>※ OpenJTalkは英単語を以下のように処理している可能性があります：</p>';
+                    html += '<ul>';
+                    html += '<li>OpenJTalk → 英語読み（オープンジェートーク）として処理</li>';
+                    html += '<li>Piper → カタカナ読み（パイパー）ではなく、アルファベット個別読み（ピー・アイ・ピー・イー・アール）として処理</li>';
+                    html += '</ul>';
+                    
+                    analysis.innerHTML = html;
+                    
+                } catch (error) {
+                    analysis.innerHTML = `<p style="color: red;">エラー: ${error.message}</p>`;
+                    console.error(error);
+                }
+                
+                resultsDiv.appendChild(analysis);
+            }
+        }
+        
+        init();
+    </script>
+</body>
+</html>

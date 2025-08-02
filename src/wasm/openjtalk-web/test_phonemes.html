@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>音素比較テスト</title>
+</head>
+<body>
+    <h1>音素比較テスト</h1>
+    <button id="test1">テスト1: こんにちは、世界！</button>
+    <button id="test2">テスト2: こんにちは、OpenJTalkとPiperを使った音声合成のデモです。</button>
+    <pre id="output"></pre>
+
+    <script type="module">
+        import { SimpleUnifiedPhonemizer } from './src/simple_unified_api.js';
+        
+        let phonemizer = null;
+        const output = document.getElementById('output');
+        
+        async function init() {
+            phonemizer = new SimpleUnifiedPhonemizer();
+            await phonemizer.initialize({
+                openjtalk: {
+                    jsPath: './dist/openjtalk.js',
+                    wasmPath: './dist/openjtalk.wasm',
+                    dictPath: './assets/dict',
+                    voicePath: './assets/voice/mei_normal.htsvoice'
+                }
+            });
+            console.log('Initialized');
+        }
+        
+        async function testPhonemes(text) {
+            const labels = await phonemizer.textToPhonemes(text, 'ja');
+            const phonemes = phonemizer.extractPhonemes(labels, 'ja');
+            
+            output.textContent += '\nテキスト: ' + text + '\n';
+            output.textContent += '音素: ' + phonemes.join(' ') + '\n';
+            output.textContent += '音素数: ' + phonemes.length + '\n';
+            output.textContent += '詳細: ' + JSON.stringify(phonemes) + '\n';
+            output.textContent += '-'.repeat(80) + '\n';
+            
+            console.log('Text:', text);
+            console.log('Phonemes:', phonemes);
+            
+            // 音素の詳細を確認
+            phonemes.forEach((p, i) => {
+                console.log(`音素[${i}]: "${p}" (charCode: ${p.charCodeAt(0)})`);
+            });
+        }
+        
+        document.getElementById('test1').addEventListener('click', () => {
+            testPhonemes('こんにちは、世界！');
+        });
+        
+        document.getElementById('test2').addEventListener('click', () => {
+            testPhonemes('こんにちは、OpenJTalkとPiperを使った音声合成のデモです。');
+        });
+        
+        init();
+    </script>
+</body>
+</html>

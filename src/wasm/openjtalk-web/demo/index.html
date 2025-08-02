@@ -308,10 +308,12 @@
     <script type="module">
         import { SimpleUnifiedPhonemizer } from '../src/simple_unified_api.js';
         import { ESpeakPhonemeExtractor } from '../src/espeak_phoneme_extractor.js';
+        import { CustomDictionary } from '../src/custom_dictionary.js';
         
         let unifiedPhonemizer = null;
         let espeakExtractor = null;
         let onnxSession = null;
+        let customDict = null;
         let currentModelConfig = null;
         let currentLanguage = 'ja';
         
@@ -359,6 +361,16 @@
         async function init() {
             try {
                 updateStatus('初期化中...');
+                
+                // Initialize custom dictionary
+                updateStatus('カスタム辞書を読み込んでいます...');
+                customDict = new CustomDictionary();
+                const dictLoaded = await customDict.loadFromJSON('../assets/custom_dictionary.json');
+                if (dictLoaded) {
+                    console.log(`カスタム辞書を読み込みました（${customDict.size}エントリー）`);
+                } else {
+                    console.warn('カスタム辞書の読み込みに失敗しました。デフォルト設定を使用します。');
+                }
                 
                 // Initialize Simple Unified Phonemizer
                 updateStatus('音素化エンジンを初期化しています...');
@@ -518,8 +530,16 @@
         async function getPhonemes(text, lang) {
             return new Promise((resolve, reject) => {
                 if (lang === 'ja') {
+                    // Use custom dictionary to preprocess text
+                    let processedText = text;
+                    if (customDict && customDict.initialized) {
+                        processedText = customDict.processText(text);
+                        console.log('Original text:', text);
+                        console.log('Processed text (after custom dictionary):', processedText);
+                    }
+                    
                     // Use OpenJTalk for Japanese
-                    unifiedPhonemizer.textToPhonemes(text, 'ja').then(labels => {
+                    unifiedPhonemizer.textToPhonemes(processedText, 'ja').then(labels => {
                         console.log('OpenJTalk labels:', labels);
                         const phonemes = unifiedPhonemizer.extractPhonemes(labels, 'ja');
                         console.log('Extracted phonemes:', phonemes);
