@@ -36,6 +36,7 @@ jobs:
       - name: Prepare deployment directory
         run: |
           mkdir -p deploy
+          echo "Deploying WebAssembly demo with English model support"
           
           # Create placeholder index.html
           echo '<!DOCTYPE html>' > deploy/index.html
@@ -92,9 +93,14 @@ jobs:
           fi
           
           if [ -d "src/wasm/openjtalk-web/models" ]; then
+            echo "Copying models directory..."
+            ls -la src/wasm/openjtalk-web/models/
             cp -r src/wasm/openjtalk-web/models deploy/
+            echo "Models copied to deploy/models"
+            ls -la deploy/models/
           else
             mkdir -p deploy/models
+            echo "WARNING: models directory not found!"
           fi
           
           # Copy demo page and service worker if they exist
