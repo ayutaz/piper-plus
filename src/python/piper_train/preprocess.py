@@ -260,9 +260,7 @@ def main() -> None:
                 **(
                     {
                         "prosody_num_symbols": 11,
-                        "prosody_id_map": {
-                            str(i): [i] for i in range(11)
-                        }
+                        "prosody_id_map": {str(i): [i] for i in range(11)},
                     }
                     if args.language == "ja"
                     else {}

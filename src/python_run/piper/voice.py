@@ -149,7 +149,9 @@ class PiperVoice:
                 import sys
 
                 # Try to import from relative path first
-                piper_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+                piper_root = os.path.dirname(
+                    os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+                )
                 sys.path.insert(0, os.path.join(piper_root, "src", "python"))
                 from piper_train.phonemize.japanese import phonemize_japanese
 
@@ -229,7 +231,10 @@ class PiperVoice:
             # Try to import from relative path first
             import os
             import sys
-            piper_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+
+            piper_root = os.path.dirname(
+                os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+            )
             sys.path.insert(0, os.path.join(piper_root, "src", "python"))
             from piper_train.phonemize.token_mapper import map_sequence
 

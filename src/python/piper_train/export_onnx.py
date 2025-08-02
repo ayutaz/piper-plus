@@ -144,7 +144,9 @@ def main() -> None:
 
     if args.with_durations:
 
-        def infer_forward_with_durations(text, text_lengths, scales, sid=None, prosody_ids=None):
+        def infer_forward_with_durations(
+            text, text_lengths, scales, sid=None, prosody_ids=None
+        ):
             """Forward function that returns both audio and duration information"""
             noise_scale = scales[0]
             length_scale = scales[1]
