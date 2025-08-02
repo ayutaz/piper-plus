@@ -33,6 +33,7 @@ except ImportError:
         except ImportError:
             # Simple fallback: return text as list of characters
             import logging
+
             logging.warning("espeak_phonemizer not available, using character fallback")
             return [list(text)]
 
