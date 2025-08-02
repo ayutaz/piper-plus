@@ -392,6 +392,9 @@
         
         // Synthesize audio using ONNX
         async function synthesizeAudio(phonemeIds) {
+            console.log('Synthesizing with phoneme IDs:', phonemeIds);
+            console.log('Phoneme IDs length:', phonemeIds.length);
+            
             const inputTensor = new ort.Tensor('int64', 
                 new BigInt64Array(phonemeIds.map(id => BigInt(id))), 
                 [1, phonemeIds.length]
@@ -417,8 +420,12 @@
                 'scales': scalesTensor
             };
             
+            console.log('Running ONNX inference...');
             const results = await onnxSession.run(feeds);
             const audioTensor = results['output'] || results[Object.keys(results)[0]];
+            
+            console.log('Audio tensor shape:', audioTensor.dims);
+            console.log('Audio data length:', audioTensor.data.length);
             
             return new Float32Array(audioTensor.data);
         }
@@ -461,6 +468,9 @@
         
         function createWAV(audioData, sampleRate) {
             const length = audioData.length;
+            console.log('Creating WAV with', length, 'samples at', sampleRate, 'Hz');
+            console.log('Duration:', (length / sampleRate).toFixed(2), 'seconds');
+            
             const arrayBuffer = new ArrayBuffer(44 + length * 2);
             const view = new DataView(arrayBuffer);
             
