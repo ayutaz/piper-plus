@@ -56,14 +56,28 @@ export class SimpleUnifiedPhonemizer {
         // Adjust wasmPath for GitHub Pages
         let wasmPath = config.wasmPath;
         if (window.location.hostname.includes('github.io')) {
-            wasmPath = this.adjustPathForGitHubPages(wasmPath);
+            // Get repository base path from URL
+            const pathParts = window.location.pathname.split('/').filter(p => p);
+            const repoName = pathParts.length > 0 ? pathParts[0] : '';
+            const basePath = repoName ? `/${repoName}` : '';
+            
+            // Convert relative path to absolute path with repo base
+            if (wasmPath.startsWith('./') || wasmPath.startsWith('../')) {
+                wasmPath = basePath + '/dist/openjtalk.wasm';
+            }
+            console.log('GitHub Pages WASM path:', wasmPath);
         }
         
         // Fetch the WASM binary for GitHub Pages
         let wasmBinary = null;
         if (window.location.hostname.includes('github.io')) {
-            const absoluteWasmPath = new URL(wasmPath, import.meta.url).href;
+            // Use absolute URL with origin
+            const absoluteWasmPath = new URL(wasmPath, window.location.origin).href;
+            console.log('Fetching WASM from:', absoluteWasmPath);
             const wasmResponse = await fetch(absoluteWasmPath);
+            if (!wasmResponse.ok) {
+                throw new Error(`Failed to load WASM: ${wasmResponse.status} ${wasmResponse.statusText}`);
+            }
             wasmBinary = await wasmResponse.arrayBuffer();
         }
         
@@ -107,13 +121,25 @@ export class SimpleUnifiedPhonemizer {
         let voicePath = config.voicePath;
         
         if (window.location.hostname.includes('github.io')) {
-            dictPath = this.adjustPathForGitHubPages(dictPath);
-            voicePath = this.adjustPathForGitHubPages(voicePath);
+            // Get repository base path from URL
+            const pathParts = window.location.pathname.split('/').filter(p => p);
+            const repoName = pathParts.length > 0 ? pathParts[0] : '';
+            const basePath = repoName ? `/${repoName}` : '';
+            
+            // Convert relative paths to absolute paths with repo base
+            if (dictPath.startsWith('./') || dictPath.startsWith('../')) {
+                dictPath = basePath + '/assets/naist-jdic';
+            }
+            if (voicePath.startsWith('./') || voicePath.startsWith('../')) {
+                voicePath = basePath + '/assets/voice.htsvoice';
+            }
+            console.log('GitHub Pages dict path:', dictPath);
+            console.log('GitHub Pages voice path:', voicePath);
         }
         
         // Convert to absolute URLs
-        const absoluteDictPath = new URL(dictPath, import.meta.url).href;
-        const absoluteVoicePath = new URL(voicePath, import.meta.url).href;
+        const absoluteDictPath = new URL(dictPath, window.location.origin).href;
+        const absoluteVoicePath = new URL(voicePath, window.location.origin).href;
         
         // Load dictionary files
         const dictFiles = [
@@ -344,10 +370,7 @@ export class SimpleUnifiedPhonemizer {
      * Adjust path for GitHub Pages (deprecated - use adjustPathForDeployment)
      */
     adjustPathForGitHubPages(path) {
-        if (path.startsWith('./') || path.startsWith('../')) {
-            // Navigate up two levels for GitHub Pages structure
-            return '../../' + path.replace(/^\.\.?\//, '');
-        }
+        // This method is deprecated, but kept for compatibility
         return path;
     }
 

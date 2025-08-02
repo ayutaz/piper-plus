@@ -374,7 +374,15 @@
                 
                 // Initialize Simple Unified Phonemizer
                 updateStatus('音素化エンジンを初期化しています...');
-                unifiedPhonemizer = new SimpleUnifiedPhonemizer();
+                
+                // Check if running on GitHub Pages
+                const isGitHubPages = window.location.hostname.includes('github.io');
+                const deploymentConfig = {
+                    isGitHubPages: isGitHubPages,
+                    basePath: isGitHubPages ? '/' + window.location.pathname.split('/')[1] : ''
+                };
+                
+                unifiedPhonemizer = new SimpleUnifiedPhonemizer({ deploymentConfig });
                 await unifiedPhonemizer.initialize({
                     openjtalk: {
                         jsPath: '../../dist/openjtalk.js',

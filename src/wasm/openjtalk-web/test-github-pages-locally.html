@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GitHub Pages Local Test</title>
+    <script>
+        // Simulate GitHub Pages environment
+        const originalHostname = window.location.hostname;
+        const originalPathname = window.location.pathname;
+        
+        // Override to simulate GitHub Pages
+        Object.defineProperty(window.location, 'hostname', {
+            get: function() { return 'ayutaz.github.io'; }
+        });
+        
+        Object.defineProperty(window.location, 'pathname', {
+            get: function() { return '/piper-plus/multilingual-demo/'; }
+        });
+    </script>
+</head>
+<body>
+    <h1>Testing GitHub Pages Path Resolution Locally</h1>
+    <div id="status"></div>
+    
+    <script type="module">
+        import { SimpleUnifiedPhonemizer } from './src/simple_unified_api.js';
+        
+        const statusEl = document.getElementById('status');
+        
+        async function test() {
+            try {
+                statusEl.innerHTML += '<p>Testing GitHub Pages path resolution...</p>';
+                
+                // Check if running on GitHub Pages
+                const isGitHubPages = window.location.hostname.includes('github.io');
+                const deploymentConfig = {
+                    isGitHubPages: isGitHubPages,
+                    basePath: isGitHubPages ? '/' + window.location.pathname.split('/')[1] : ''
+                };
+                
+                statusEl.innerHTML += `<p>Detected GitHub Pages: ${isGitHubPages}</p>`;
+                statusEl.innerHTML += `<p>Base path: ${deploymentConfig.basePath}</p>`;
+                
+                const unifiedPhonemizer = new SimpleUnifiedPhonemizer({ deploymentConfig });
+                
+                // Test path resolution without actual initialization
+                const testConfig = {
+                    openjtalk: {
+                        jsPath: '../../dist/openjtalk.js',
+                        wasmPath: '../../dist/openjtalk.wasm',
+                        dictPath: '../../assets/dict',
+                        voicePath: '../../assets/voice/mei_normal.htsvoice'
+                    }
+                };
+                
+                // Test WASM path resolution
+                let wasmPath = testConfig.openjtalk.wasmPath;
+                if (window.location.hostname.includes('github.io')) {
+                    const pathParts = window.location.pathname.split('/').filter(p => p);
+                    const repoName = pathParts.length > 0 ? pathParts[0] : '';
+                    const basePath = repoName ? `/${repoName}` : '';
+                    
+                    if (wasmPath.startsWith('./') || wasmPath.startsWith('../')) {
+                        wasmPath = basePath + '/dist/openjtalk.wasm';
+                    }
+                }
+                
+                const absoluteWasmPath = new URL(wasmPath, window.location.origin).href;
+                
+                statusEl.innerHTML += `<p>Original WASM path: ${testConfig.openjtalk.wasmPath}</p>`;
+                statusEl.innerHTML += `<p>Resolved WASM path: ${wasmPath}</p>`;
+                statusEl.innerHTML += `<p>Absolute WASM URL: ${absoluteWasmPath}</p>`;
+                
+                statusEl.innerHTML += '<p style="color: green;">✓ Path resolution test completed</p>';
+                
+            } catch (error) {
+                statusEl.innerHTML += `<p style="color: red;">Error: ${error.message}</p>`;
+            }
+        }
+        
+        test();
+    </script>
+</body>
+</html>
