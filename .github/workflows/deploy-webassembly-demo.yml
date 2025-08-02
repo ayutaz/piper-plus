@@ -138,6 +138,7 @@ jobs:
           if [ -d "src/wasm/openjtalk-web/src" ]; then
             mkdir -p deploy/src
             cp src/wasm/openjtalk-web/src/simple_unified_api.js deploy/src/
+            cp src/wasm/openjtalk-web/src/simple_english_phonemizer.js deploy/src/
             cp src/wasm/openjtalk-web/src/espeak_phoneme_extractor.js deploy/src/
             cp src/wasm/openjtalk-web/src/custom_dictionary.js deploy/src/
           fi
