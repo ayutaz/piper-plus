@@ -215,35 +215,40 @@ export class SimpleUnifiedPhonemizer {
     /**
      * Extract phonemes from IPA text
      */
-    extractPhonemesFromIPA(ipaText) {
+    extractPhonemesFromIPA(ipaData) {
         const phonemes = [];
         
         // Add BOS marker
         phonemes.push('^');
         
-        // Split IPA text into individual phonemes
-        // This is simplified - in reality, we need to handle multi-char phonemes
-        let i = 0;
-        while (i < ipaText.length) {
-            const char = ipaText[i];
-            
-            // Check for two-character phonemes
-            if (i + 1 < ipaText.length) {
-                const twoChar = ipaText.substr(i, 2);
-                if (this.englishPhonemeMap[twoChar]) {
-                    phonemes.push(twoChar);
-                    i += 2;
-                    continue;
+        // Handle both array and string input
+        if (Array.isArray(ipaData)) {
+            // Already an array of phonemes
+            phonemes.push(...ipaData);
+        } else if (typeof ipaData === 'string') {
+            // Split IPA text into individual phonemes
+            let i = 0;
+            while (i < ipaData.length) {
+                const char = ipaData[i];
+                
+                // Check for two-character phonemes
+                if (i + 1 < ipaData.length) {
+                    const twoChar = ipaData.substr(i, 2);
+                    if (this.englishPhonemeMap[twoChar]) {
+                        phonemes.push(twoChar);
+                        i += 2;
+                        continue;
+                    }
                 }
+                
+                // Single character or space
+                if (char === ' ') {
+                    phonemes.push(' ');
+                } else if (this.englishPhonemeMap[char]) {
+                    phonemes.push(char);
+                }
+                i++;
             }
-            
-            // Single character or space
-            if (char === ' ') {
-                phonemes.push(' ');
-            } else if (this.englishPhonemeMap[char]) {
-                phonemes.push(char);
-            }
-            i++;
         }
         
         // Add EOS marker
