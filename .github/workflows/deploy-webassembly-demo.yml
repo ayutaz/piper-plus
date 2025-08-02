@@ -69,12 +69,24 @@ jobs:
           if [ -f "src/wasm/openjtalk-web/test/multilingual-demo/index.html" ]; then
             cp src/wasm/openjtalk-web/test/multilingual-demo/index.html deploy/index.html
             
-            # Update paths for root level
-            sed -i 's|../../dist/|./dist/|g' deploy/index.html
-            sed -i 's|../../assets/|./assets/|g' deploy/index.html
-            sed -i 's|../../models/|./models/|g' deploy/index.html
-            sed -i 's|../../src/|./src/|g' deploy/index.html
-            sed -i 's|../dist/|./dist/|g' deploy/index.html
+            # Update paths for root level using more specific patterns
+            sed -i 's|src="../../dist/|src="./dist/|g' deploy/index.html
+            sed -i 's|src="../../assets/|src="./assets/|g' deploy/index.html
+            sed -i 's|src="../../models/|src="./models/|g' deploy/index.html
+            sed -i 's|src="../../src/|src="./src/|g' deploy/index.html
+            sed -i 's|src="../dist/|src="./dist/|g' deploy/index.html
+            
+            # Also update paths in import statements and other references
+            sed -i "s|from '../../|from './|g" deploy/index.html
+            sed -i "s|from '../|from './|g" deploy/index.html
+            
+            # Update model paths in JavaScript strings
+            sed -i "s|'../../models/|'./models/|g" deploy/index.html
+            sed -i "s|'../../assets/|'./assets/|g" deploy/index.html
+            sed -i "s|'../../dist/|'./dist/|g" deploy/index.html
+            sed -i "s|'../models/|'./models/|g" deploy/index.html
+            sed -i "s|'../assets/|'./assets/|g" deploy/index.html
+            sed -i "s|'../dist/|'./dist/|g" deploy/index.html
             
             echo "Multilingual demo deployed as main page"
           fi
