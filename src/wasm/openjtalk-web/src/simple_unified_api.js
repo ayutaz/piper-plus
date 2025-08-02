@@ -128,10 +128,10 @@ export class SimpleUnifiedPhonemizer {
             
             // Convert relative paths to absolute paths with repo base
             if (dictPath.startsWith('./') || dictPath.startsWith('../')) {
-                dictPath = basePath + '/assets/naist-jdic';
+                dictPath = basePath + '/assets/dict';
             }
             if (voicePath.startsWith('./') || voicePath.startsWith('../')) {
-                voicePath = basePath + '/assets/voice.htsvoice';
+                voicePath = basePath + '/assets/voice/mei_normal.htsvoice';
             }
             console.log('GitHub Pages dict path:', dictPath);
             console.log('GitHub Pages voice path:', voicePath);

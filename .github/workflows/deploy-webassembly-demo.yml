@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - dev
+      - feat/english-model-support
     paths:
       - 'src/wasm/**'
       - '.github/workflows/deploy-webassembly-demo.yml'
