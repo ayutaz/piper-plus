@@ -293,15 +293,6 @@
                 <audio id="audioPlayer" controls style="width: 100%;"></audio>
             </div>
             
-            <div class="output-group">
-                <label>音素列 / Phoneme Sequence:</label>
-                <div id="phonemeOutput" class="phoneme-list"></div>
-            </div>
-
-            <div class="output-group">
-                <label>詳細情報 / Details:</label>
-                <pre id="detailsOutput"></pre>
-            </div>
         </div>
     </div>
 
@@ -351,8 +342,6 @@
         const stopBtn = document.getElementById('stopBtn');
         const inputText = document.getElementById('inputText');
         const outputSection = document.getElementById('outputSection');
-        const phonemeOutput = document.getElementById('phonemeOutput');
-        const detailsOutput = document.getElementById('detailsOutput');
         const audioPlayer = document.getElementById('audioPlayer');
         const templateSelect = document.getElementById('templateSelect');
         const languageInfo = document.getElementById('languageInfo');
@@ -366,9 +355,7 @@
                 updateStatus('カスタム辞書を読み込んでいます...');
                 customDict = new CustomDictionary();
                 const dictLoaded = await customDict.loadFromJSON('../../assets/custom_dictionary.json');
-                if (dictLoaded) {
-                    console.log(`カスタム辞書を読み込みました（${customDict.size}エントリー）`);
-                } else {
+                if (!dictLoaded) {
                     console.warn('カスタム辞書の読み込みに失敗しました。デフォルト設定を使用します。');
                 }
                 
@@ -391,13 +378,11 @@
                         voicePath: '../../assets/voice/mei_normal.htsvoice'
                     }
                 });
-                console.log('Simple Unified Phonemizer initialized');
                 
                 // Initialize eSpeak-ng for English
                 updateStatus('eSpeak-ngを初期化しています...');
                 espeakExtractor = new ESpeakPhonemeExtractor();
                 await espeakExtractor.initialize();
-                console.log('eSpeak-ng initialized');
                 
                 // Load ONNX Runtime
                 await loadScript('https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.1/dist/ort.min.js');
@@ -531,7 +516,6 @@
                 graphOptimizationLevel: 'all'
             });
             
-            console.log(`Loaded ${config.name} model:`, modelPath);
         }
         
         // Get phonemes based on language
@@ -542,22 +526,16 @@
                     let processedText = text;
                     if (customDict && customDict.initialized) {
                         processedText = customDict.processText(text);
-                        console.log('Original text:', text);
-                        console.log('Processed text (after custom dictionary):', processedText);
                     }
                     
                     // Use OpenJTalk for Japanese
                     unifiedPhonemizer.textToPhonemes(processedText, 'ja').then(labels => {
-                        console.log('OpenJTalk labels:', labels);
                         const phonemes = unifiedPhonemizer.extractPhonemes(labels, 'ja');
-                        console.log('Extracted phonemes:', phonemes);
                         resolve(phonemes);
                     }).catch(reject);
                 } else if (lang === 'en') {
                     // Use eSpeak-ng phoneme extractor for Python-compatible phonemization
-                    console.log('Using eSpeak-ng phoneme extractor for English');
                     espeakExtractor.phonemize(text, 'en-us').then(phonemes => {
-                        console.log('eSpeak-ng phonemes:', phonemes);
                         resolve(phonemes);
                     }).catch(reject);
                 }
@@ -578,26 +556,12 @@
                 
                 // Get phonemes
                 const phonemes = await getPhonemes(text, currentLanguage);
-                console.log('Got phonemes:', phonemes);
-                console.log('Phoneme details:', phonemes.map((p, i) => {
-                    const code = p.charCodeAt(0);
-                    return `[${i}] "${p}" (U+${code.toString(16).padStart(4, '0')})`;
-                }));
                 
-                // Display phonemes
-                displayPhonemes(phonemes);
                 
                 updateStatus('音声合成中...');
                 
                 // Convert phonemes to IDs
                 const phonemeIds = phonemesToIds(phonemes);
-                console.log('Phoneme IDs:', phonemeIds);
-                console.log('Phoneme to ID mapping for ch:', {
-                    phoneme: phonemes[6],
-                    charCode: phonemes[6] ? phonemes[6].charCodeAt(0) : null,
-                    hex: phonemes[6] ? '0x' + phonemes[6].charCodeAt(0).toString(16) : null,
-                    mappedIds: currentModelConfig.phoneme_id_map[phonemes[6]] || 'NOT FOUND'
-                });
                 
                 // Synthesize audio
                 const audio = await synthesizeAudio(phonemeIds);
@@ -607,16 +571,6 @@
                 const audioUrl = URL.createObjectURL(wavBlob);
                 audioPlayer.src = audioUrl;
                 
-                // Show details
-                detailsOutput.textContent = JSON.stringify({
-                    text: text,
-                    language: currentLanguage,
-                    phonemes: phonemes,
-                    phonemeIds: phonemeIds,
-                    audioLength: audio.length,
-                    duration: (audio.length / currentModelConfig.audio.sample_rate).toFixed(2) + ' seconds',
-                    sampleRate: currentModelConfig.audio.sample_rate
-                }, null, 2);
                 
                 outputSection.style.display = 'block';
                 updateStatus('合成完了！', 'success');
@@ -642,7 +596,6 @@
                     '_', '_',     // Add silence padding
                     phonemes[phonemes.length - 1]  // Keep EOS ($)
                 ];
-                console.log('Applied padding for short text:', processedPhonemes);
             }
             
             const ids = [];
@@ -652,7 +605,6 @@
                 if (phonemeIdMap[phoneme]) {
                     ids.push(...phonemeIdMap[phoneme]);
                 } else {
-                    console.warn(`Unknown phoneme: ${phoneme}`);
                     // Use padding token as fallback for Japanese
                     if (currentLanguage === 'ja') {
                         ids.push(...(phonemeIdMap['_'] || [0]));
@@ -699,16 +651,6 @@
             return new Float32Array(audioTensor.data);
         }
         
-        // Display phonemes
-        function displayPhonemes(phonemes) {
-            phonemeOutput.innerHTML = '';
-            phonemes.forEach(phoneme => {
-                const span = document.createElement('span');
-                span.className = 'phoneme';
-                span.textContent = phoneme;
-                phonemeOutput.appendChild(span);
-            });
-        }
         
         // Utility functions
         function updateStatus(message, type = 'info') {

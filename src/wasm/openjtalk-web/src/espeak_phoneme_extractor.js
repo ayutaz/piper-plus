@@ -15,7 +15,6 @@ export class ESpeakPhonemeExtractor {
                 // CDN版のeSpeak-ngを使用
                 this.espeakNG = new eSpeakNG('../dist/espeak-ng/espeakng.worker.js', () => {
                     this.initialized = true;
-                    console.log('ESpeakPhonemeExtractor initialized');
                     resolve();
                 });
             } catch (error) {
@@ -261,7 +260,6 @@ export class ESpeakPhonemeExtractor {
             }
             
             const ipaText = ipaPhonemes.join('');
-            console.log('Generated IPA:', ipaText);
             resolve(ipaText);
         });
     }
