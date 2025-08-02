@@ -22,7 +22,7 @@ except ImportError:
     # Provide fallback implementations
     def phonemize_codepoints(text, lang=None):
         # Simple fallback: return text as list of characters
-        return list(text)
+        return [list(text)]
 
     def phonemize_espeak(text, voice=None):
         # Try to use espeak-ng command if available
@@ -32,7 +32,8 @@ except ImportError:
             return phonemize_espeak_ng(text, voice or "en-us")
         except ImportError:
             # Simple fallback: return text as list of characters
-            _LOGGER.warning("espeak_phonemizer not available, using character fallback")
+            import logging
+            logging.warning("espeak_phonemizer not available, using character fallback")
             return [list(text)]
 
     def tashkeel_run(text):
