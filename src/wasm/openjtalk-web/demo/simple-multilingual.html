@@ -405,19 +405,31 @@
                 [1]
             );
             
+            // For English, increase length_scale to get longer audio
+            const lengthScale = currentLanguage === 'en' ? 1.5 : (modelConfig.inference.length_scale || 1.0);
+            
             const scalesTensor = new ort.Tensor('float32', 
                 new Float32Array([
                     modelConfig.inference.noise_scale || 0.667,
-                    modelConfig.inference.length_scale || 1.0,
+                    lengthScale,
                     modelConfig.inference.noise_w || 0.8
                 ]), 
                 [3]
             );
             
+            console.log('Using length_scale:', lengthScale);
+            
+            // Speaker ID tensor (single speaker = 0)
+            const speakerTensor = new ort.Tensor('int64',
+                new BigInt64Array([BigInt(0)]),
+                [1]
+            );
+            
             const feeds = {
                 'input': inputTensor,
                 'input_lengths': lengthTensor,
-                'scales': scalesTensor
+                'scales': scalesTensor,
+                'sid': speakerTensor
             };
             
             console.log('Running ONNX inference...');
