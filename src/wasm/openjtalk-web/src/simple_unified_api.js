@@ -198,12 +198,40 @@ export class SimpleUnifiedPhonemizer {
         const lines = labels.split('\n').filter(line => line.trim());
         const phonemes = [];
         
+        // Multi-character phoneme to Unicode mapping
+        const multiCharPhonemes = {
+            'br': '\ue000',
+            'ch': '\ue001',
+            'cl': '\ue002',
+            'dy': '\ue003',
+            'gy': '\ue004',
+            'hy': '\ue005',
+            'ky': '\ue006',
+            'my': '\ue007',
+            'ny': '\ue008',
+            'py': '\ue009',
+            'ry': '\ue00a',
+            'sh': '\ue00b',
+            'ts': '\ue00c',
+            'ty': '\ue00d'
+        };
+        
         phonemes.push('^');
         
         for (const line of lines) {
             const match = line.match(/\-([^+]+)\+/);
             if (match && match[1] !== 'sil') {
-                phonemes.push(match[1]);
+                let phoneme = match[1];
+                
+                // Replace multi-character phonemes with Unicode
+                if (multiCharPhonemes[phoneme]) {
+                    phoneme = multiCharPhonemes[phoneme];
+                }
+                
+                // Skip 'pau' (pause) - it should not be included in phonemes
+                if (phoneme !== 'pau') {
+                    phonemes.push(phoneme);
+                }
             }
         }
         

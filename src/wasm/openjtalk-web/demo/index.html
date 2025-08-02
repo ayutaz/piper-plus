@@ -41,12 +41,14 @@
             padding: 8px 16px;
             border: 2px solid #ddd;
             background: white;
+            color: #333;
             border-radius: 6px;
             cursor: pointer;
             transition: all 0.3s;
         }
         .lang-button:hover {
             border-color: #4CAF50;
+            background: #f8f8f8;
         }
         .lang-button.active {
             background: #4CAF50;
@@ -266,16 +268,6 @@
             <p>MeCab形態素解析とHTS音声合成エンジンを使用した高精度な日本語音素化</p>
         </div>
 
-        <div class="voice-group" id="voiceGroup">
-            <label for="voiceSelect">音声選択 / Voice Selection</label>
-            <select id="voiceSelect">
-                <option value="mei_normal.htsvoice">めい（通常）</option>
-                <option value="mei_happy.htsvoice">めい（喜び）</option>
-                <option value="mei_bashful.htsvoice">めい（照れ）</option>
-                <option value="mei_angry.htsvoice">めい（怒り）</option>
-                <option value="mei_sad.htsvoice">めい（悲しみ）</option>
-            </select>
-        </div>
 
         <div class="input-group">
             <label for="inputText">テキスト入力 / Text Input</label>
@@ -314,12 +306,10 @@
     </div>
 
     <script type="module">
-        import { OpenJTalkWrapper } from '../dist/openjtalk.js';
-        import { Phonemizer } from '../src/phonemizer.js';
+        import { SimpleUnifiedPhonemizer } from '../src/simple_unified_api.js';
         import { ESpeakPhonemeExtractor } from '../src/espeak_phoneme_extractor.js';
         
-        let openjtalk = null;
-        let phonemizer = null;
+        let unifiedPhonemizer = null;
         let espeakExtractor = null;
         let onnxSession = null;
         let currentModelConfig = null;
@@ -358,28 +348,30 @@
         const synthesizeBtn = document.getElementById('synthesizeBtn');
         const stopBtn = document.getElementById('stopBtn');
         const inputText = document.getElementById('inputText');
-        const voiceSelect = document.getElementById('voiceSelect');
         const outputSection = document.getElementById('outputSection');
         const phonemeOutput = document.getElementById('phonemeOutput');
         const detailsOutput = document.getElementById('detailsOutput');
         const audioPlayer = document.getElementById('audioPlayer');
         const templateSelect = document.getElementById('templateSelect');
         const languageInfo = document.getElementById('languageInfo');
-        const voiceGroup = document.getElementById('voiceGroup');
         
         // Initialize
         async function init() {
             try {
                 updateStatus('初期化中...');
                 
-                // Initialize OpenJTalk for Japanese
-                updateStatus('OpenJTalkを初期化しています...');
-                openjtalk = new OpenJTalkWrapper();
-                await openjtalk.initialize('../dist/openjtalk.js');
-                
-                // Initialize Phonemizer
-                phonemizer = new Phonemizer(openjtalk);
-                console.log('Phonemizer initialized');
+                // Initialize Simple Unified Phonemizer
+                updateStatus('音素化エンジンを初期化しています...');
+                unifiedPhonemizer = new SimpleUnifiedPhonemizer();
+                await unifiedPhonemizer.initialize({
+                    openjtalk: {
+                        jsPath: '../dist/openjtalk.js',
+                        wasmPath: '../dist/openjtalk.wasm',
+                        dictPath: '../assets/dict',
+                        voicePath: '../assets/voice/mei_normal.htsvoice'
+                    }
+                });
+                console.log('Simple Unified Phonemizer initialized');
                 
                 // Initialize eSpeak-ng for English
                 updateStatus('eSpeak-ngを初期化しています...');
@@ -395,6 +387,9 @@
                 
                 updateStatus('準備完了！', 'success');
                 synthesizeBtn.disabled = false;
+                
+                // Initialize templates for default language
+                updateTemplates(currentLanguage);
                 
                 // Setup event listeners
                 setupEventListeners();
@@ -461,8 +456,6 @@
             // Update language info
             updateLanguageInfo(lang);
             
-            // Update voice selector visibility
-            voiceGroup.style.display = lang === 'ja' ? 'block' : 'none';
             
             // Load model
             updateStatus(`${config.name}モデルを読み込んでいます...`);
@@ -526,8 +519,10 @@
             return new Promise((resolve, reject) => {
                 if (lang === 'ja') {
                     // Use OpenJTalk for Japanese
-                    phonemizer.textToPhonemes(text, 'ja').then(phonemeData => {
-                        const phonemes = phonemizer.extractPhonemes(phonemeData, 'ja');
+                    unifiedPhonemizer.textToPhonemes(text, 'ja').then(labels => {
+                        console.log('OpenJTalk labels:', labels);
+                        const phonemes = unifiedPhonemizer.extractPhonemes(labels, 'ja');
+                        console.log('Extracted phonemes:', phonemes);
                         resolve(phonemes);
                     }).catch(reject);
                 } else if (lang === 'en') {
@@ -555,6 +550,7 @@
                 
                 // Get phonemes
                 const phonemes = await getPhonemes(text, currentLanguage);
+                console.log('Got phonemes:', phonemes);
                 
                 // Display phonemes
                 displayPhonemes(phonemes);
@@ -563,6 +559,7 @@
                 
                 // Convert phonemes to IDs
                 const phonemeIds = phonemesToIds(phonemes);
+                console.log('Phoneme IDs:', phonemeIds);
                 
                 // Synthesize audio
                 const audio = await synthesizeAudio(phonemeIds);
@@ -604,8 +601,13 @@
                     ids.push(...phonemeIdMap[phoneme]);
                 } else {
                     console.warn(`Unknown phoneme: ${phoneme}`);
-                    // Use space as fallback
-                    ids.push(...(phonemeIdMap[' '] || [3]));
+                    // Use padding token as fallback for Japanese
+                    if (currentLanguage === 'ja') {
+                        ids.push(...(phonemeIdMap['_'] || [0]));
+                    } else {
+                        // Use space as fallback for English
+                        ids.push(...(phonemeIdMap[' '] || [3]));
+                    }
                 }
             }
             
