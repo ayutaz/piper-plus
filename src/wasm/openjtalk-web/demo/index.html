@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🎤 OpenJTalk-Piper 音声合成デモ</title>
+    <title>🎤 Piper 多言語音声合成デモ</title>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -99,8 +99,14 @@
             padding: 10px;
             border: 2px solid #e0e0e0;
             border-radius: 6px;
-            font-size: 16px;
+            font-size: 14px;
             background: white;
+            cursor: pointer;
+            transition: border-color 0.3s;
+        }
+        select:focus {
+            outline: none;
+            border-color: #4CAF50;
         }
         .button-group {
             display: flex;
@@ -161,13 +167,12 @@
             margin-bottom: 20px;
         }
         pre {
-            background: #f8f9fa;
+            background: #f5f5f5;
             padding: 15px;
             border-radius: 6px;
             overflow-x: auto;
             font-size: 14px;
             line-height: 1.5;
-            border: 1px solid #e9ecef;
         }
         .phoneme-list {
             display: flex;
@@ -204,12 +209,31 @@
             margin-bottom: 5px;
             color: #666;
         }
+        .language-info {
+            background: #f0f7ff;
+            border: 1px solid #bbdefb;
+            border-radius: 6px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        .language-info h3 {
+            color: #1565c0;
+            margin-top: 0;
+            margin-bottom: 8px;
+            font-size: 16px;
+        }
+        .language-info p {
+            margin: 0;
+            color: #555;
+            font-size: 14px;
+        }
     </style>
+    <script type="text/javascript" src="../dist/espeak-ng/espeakng.min.js"></script>
 </head>
 <body>
     <div class="container">
-        <h1>🎤 OpenJTalk-Piper 音声合成デモ</h1>
-        <p class="subtitle">WebAssemblyで動作する日本語・英語音声合成システム</p>
+        <h1>🎤 Piper 多言語音声合成デモ</h1>
+        <p class="subtitle">WebAssemblyとONNX Runtimeを使用した日本語・英語のニューラル音声合成</p>
         
         <div id="status" class="status info">
             初期化中...
@@ -218,10 +242,10 @@
         <div class="feature-list">
             <h3>📝 対応機能</h3>
             <ul>
-                <li>🇯🇵 日本語音声合成（OpenJTalk + mei音声）</li>
-                <li>🇺🇸 英語音声合成（eSpeak-ng音素化器）</li>
-                <li>🎯 ブラウザ完結型（サーバー不要）</li>
-                <li>🚀 WebAssembly高速処理</li>
+                <li>🇯🇵 日本語音声合成（OpenJTalk + Piperニューラルモデル）</li>
+                <li>🇺🇸 英語音声合成（eSpeak-ng + Piperニューラルモデル）</li>
+                <li>🎯 完全ブラウザ実装（サーバー不要）</li>
+                <li>⚡ WebAssembly + ONNX Runtime Webによる高速処理</li>
             </ul>
         </div>
 
@@ -235,6 +259,11 @@
                     🇺🇸 English
                 </button>
             </div>
+        </div>
+
+        <div class="language-info" id="languageInfo">
+            <h3>日本語：OpenJTalkによる音素化</h3>
+            <p>MeCab形態素解析とHTS音声合成エンジンを使用した高精度な日本語音素化</p>
         </div>
 
         <div class="voice-group" id="voiceGroup">
@@ -260,21 +289,21 @@
         </div>
 
         <div class="button-group">
-            <button id="synthesizeBtn" disabled>🎵 音声生成 / Generate</button>
-            <button id="clearBtn" class="secondary">🗑️ クリア / Clear</button>
+            <button id="synthesizeBtn" disabled>🎵 音声合成 / Synthesize</button>
+            <button id="stopBtn" class="secondary" disabled>⏹️ 停止 / Stop</button>
         </div>
 
         <div class="output-section" id="outputSection" style="display: none;">
-            <h2>生成結果 / Results</h2>
+            <h2>出力結果 / Output</h2>
             
-            <div class="output-group">
-                <label>音素列 / Phonemes:</label>
-                <div id="phonemeOutput" class="phoneme-list"></div>
-            </div>
-
             <div class="output-group">
                 <label>音声 / Audio:</label>
                 <audio id="audioPlayer" controls style="width: 100%;"></audio>
+            </div>
+            
+            <div class="output-group">
+                <label>音素列 / Phoneme Sequence:</label>
+                <div id="phonemeOutput" class="phoneme-list"></div>
             </div>
 
             <div class="output-group">
@@ -284,146 +313,91 @@
         </div>
     </div>
 
-    <!-- eSpeak-ng for English -->
-    <script type="text/javascript" src="../dist/espeak-ng/espeakng.min.js"></script>
-    
     <script type="module">
-        import { SimpleUnifiedPhonemizer } from '../src/simple_unified_api.js';
+        import { OpenJTalkWrapper } from '../dist/openjtalk.js';
+        import { Phonemizer } from '../src/phonemizer.js';
+        import { ESpeakPhonemeExtractor } from '../src/espeak_phoneme_extractor.js';
         
+        let openjtalk = null;
         let phonemizer = null;
-        let currentLanguage = 'ja';
+        let espeakExtractor = null;
         let onnxSession = null;
-        let modelConfig = null;
-        let espeakNG = null; // eSpeak-ng instance
+        let currentModelConfig = null;
+        let currentLanguage = 'ja';
+        
+        const languageConfigs = {
+            'ja': {
+                name: '日本語',
+                model: 'ja_JP-test-medium.onnx',
+                phonemizer: 'openjtalk',
+                testText: 'こんにちは、世界！今日は良い天気ですね。',
+                templates: [
+                    'こんにちは、世界！',
+                    '今日は良い天気ですね。',
+                    'OpenJTalkとPiperを使った音声合成のデモです。',
+                    '日本語の音声合成は、とても自然に聞こえます。',
+                    '桜の花が美しく咲いています。'
+                ]
+            },
+            'en': {
+                name: '英語 (eSpeak-ng)',
+                model: 'test_voice.onnx',
+                phonemizer: 'espeak-ng',
+                testText: 'Hello world! This is a test of the Piper text to speech system.',
+                templates: [
+                    'Hello world!',
+                    'This is a test of the Piper text to speech system.',
+                    'How are you today?',
+                    'Welcome to the Piper speech synthesis demo.',
+                    'The quick brown fox jumps over the lazy dog.'
+                ]
+            }
+        };
         
         const statusEl = document.getElementById('status');
         const synthesizeBtn = document.getElementById('synthesizeBtn');
-        const clearBtn = document.getElementById('clearBtn');
+        const stopBtn = document.getElementById('stopBtn');
         const inputText = document.getElementById('inputText');
         const voiceSelect = document.getElementById('voiceSelect');
-        const voiceGroup = document.getElementById('voiceGroup');
-        const templateSelect = document.getElementById('templateSelect');
         const outputSection = document.getElementById('outputSection');
         const phonemeOutput = document.getElementById('phonemeOutput');
         const detailsOutput = document.getElementById('detailsOutput');
         const audioPlayer = document.getElementById('audioPlayer');
-        
-        // Template texts for each language
-        const templates = {
-            ja: [
-                { value: 'greeting1', text: 'こんにちは、世界！今日は良い天気ですね。' },
-                { value: 'greeting2', text: 'おはようございます。本日もよろしくお願いいたします。' },
-                { value: 'weather', text: '今日は晴れで、気温は25度です。過ごしやすい一日になりそうです。' },
-                { value: 'introduction', text: '私は音声合成システムです。日本語を自然に話すことができます。' },
-                { value: 'thanks', text: 'ご利用ありがとうございました。またのご利用をお待ちしております。' },
-                { value: 'time', text: '現在の時刻は午後3時30分です。' },
-                { value: 'emotion1', text: 'わー！すごい！これは本当に素晴らしいですね！' },
-                { value: 'emotion2', text: 'そうですか…それは少し残念ですね。' },
-                { value: 'question', text: 'どのような音声をお試しになりたいですか？' },
-                { value: 'long', text: '日本の四季は美しく、春には桜が咲き、夏には青い海と空が広がり、秋には紅葉が山々を彩り、冬には雪が静かに降り積もります。' }
-            ],
-            en: [
-                { value: 'greeting1', text: 'Hello world! This is a test.' },
-                { value: 'greeting2', text: 'Good morning! How are you today?' },
-                { value: 'weather', text: 'The weather is nice today. It is sunny and warm.' },
-                { value: 'introduction', text: 'I am a text to speech system. I can speak English.' },
-                { value: 'thanks', text: 'Thank you for using our service. Have a great day!' },
-                { value: 'time', text: 'The current time is three thirty in the afternoon.' },
-                { value: 'emotion1', text: 'Wow! This is amazing! I love it!' },
-                { value: 'emotion2', text: 'Oh, I see. That is a bit disappointing.' },
-                { value: 'question', text: 'What kind of voice would you like to try?' },
-                { value: 'pangram', text: 'The quick brown fox jumps over the lazy dog.' }
-            ]
-        };
-        
-        // Language buttons
-        document.querySelectorAll('.lang-button').forEach(btn => {
-            btn.addEventListener('click', () => switchLanguage(btn.dataset.lang));
-        });
-        
-        // Template selector
-        templateSelect.addEventListener('change', (e) => {
-            const selectedValue = e.target.value;
-            if (selectedValue) {
-                const template = templates[currentLanguage].find(t => t.value === selectedValue);
-                if (template) {
-                    inputText.value = template.text;
-                }
-            }
-        });
-        
-        // Update template options based on language
-        function updateTemplateOptions() {
-            templateSelect.innerHTML = '<option value="">-- 自由入力 / Free Input --</option>';
-            
-            const templateNames = {
-                ja: {
-                    greeting1: '挨拶（基本）',
-                    greeting2: '挨拶（丁寧）',
-                    weather: '天気予報',
-                    introduction: '自己紹介',
-                    thanks: 'お礼',
-                    time: '時刻案内',
-                    emotion1: '感情表現（喜び）',
-                    emotion2: '感情表現（残念）',
-                    question: '質問',
-                    long: '長文（四季の説明）'
-                },
-                en: {
-                    greeting1: 'Greeting (Basic)',
-                    greeting2: 'Greeting (Morning)',
-                    weather: 'Weather Report',
-                    introduction: 'Self Introduction',
-                    thanks: 'Thank You',
-                    time: 'Time Announcement',
-                    emotion1: 'Emotion (Excited)',
-                    emotion2: 'Emotion (Disappointed)',
-                    question: 'Question',
-                    pangram: 'Pangram'
-                }
-            };
-            
-            templates[currentLanguage].forEach(template => {
-                const option = document.createElement('option');
-                option.value = template.value;
-                option.textContent = templateNames[currentLanguage][template.value] || template.value;
-                templateSelect.appendChild(option);
-            });
-        }
+        const templateSelect = document.getElementById('templateSelect');
+        const languageInfo = document.getElementById('languageInfo');
+        const voiceGroup = document.getElementById('voiceGroup');
         
         // Initialize
         async function init() {
             try {
-                updateStatus('システムを初期化しています...');
+                updateStatus('初期化中...');
                 
-                // Initialize phonemizer for Japanese
-                phonemizer = new SimpleUnifiedPhonemizer();
-                await phonemizer.initialize({
-                    openjtalk: {
-                        jsPath: '../dist/openjtalk.js',
-                        wasmPath: '../dist/openjtalk.wasm',
-                        dictPath: '../assets/dict',
-                        voicePath: '../assets/voice/mei_normal.htsvoice'
-                    }
-                });
+                // Initialize OpenJTalk for Japanese
+                updateStatus('OpenJTalkを初期化しています...');
+                openjtalk = new OpenJTalkWrapper();
+                await openjtalk.initialize('../dist/openjtalk.js');
+                
+                // Initialize Phonemizer
+                phonemizer = new Phonemizer(openjtalk);
+                console.log('Phonemizer initialized');
                 
                 // Initialize eSpeak-ng for English
                 updateStatus('eSpeak-ngを初期化しています...');
-                await initializeESpeakNG();
-                
-                updateStatus('ONNXモデルを読み込んでいます...');
+                espeakExtractor = new ESpeakPhonemeExtractor();
+                await espeakExtractor.initialize();
+                console.log('eSpeak-ng initialized');
                 
                 // Load ONNX Runtime
                 await loadScript('https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.1/dist/ort.min.js');
                 
-                // Load initial model
-                await loadModel('ja');
-                
-                // Initialize template options
-                updateTemplateOptions();
+                // Load default model
+                await loadModel(currentLanguage);
                 
                 updateStatus('準備完了！', 'success');
                 synthesizeBtn.disabled = false;
+                
+                // Setup event listeners
+                setupEventListeners();
                 
             } catch (error) {
                 console.error('Initialization failed:', error);
@@ -431,46 +405,41 @@
             }
         }
         
-        // Initialize eSpeak-ng
-        function initializeESpeakNG() {
-            return new Promise((resolve, reject) => {
-                try {
-                    // Check if eSpeakNG is available
-                    if (typeof eSpeakNG === 'undefined') {
-                        console.error('eSpeakNG is not defined. Make sure espeakng.min.js is loaded.');
-                        reject(new Error('eSpeakNG not found'));
-                        return;
-                    }
-                    
-                    espeakNG = new eSpeakNG('../dist/espeak-ng/espeakng.worker.js', function() {
-                        console.log('eSpeak-ng initialized successfully');
-                        // Don't test synthesis here - just resolve
-                        resolve();
-                    });
-                } catch (error) {
-                    console.error('eSpeak-ng initialization failed:', error);
-                    reject(error);
+        // Setup event listeners
+        function setupEventListeners() {
+            // Language buttons
+            document.querySelectorAll('.lang-button').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    const lang = e.target.getAttribute('data-lang');
+                    await switchLanguage(lang);
+                });
+            });
+            
+            // Template selector
+            templateSelect.addEventListener('change', (e) => {
+                if (e.target.value) {
+                    inputText.value = e.target.value;
                 }
             });
-        }
-        
-        // Load ONNX model
-        async function loadModel(lang) {
-            const modelName = lang === 'ja' ? 'ja_JP-test-medium' : 'en_US-test-medium';
-            const modelPath = `../models/${modelName}.onnx`;
-            const configPath = `../models/${modelName}.onnx.json`;
             
-            // Load model config
-            const configResponse = await fetch(configPath);
-            modelConfig = await configResponse.json();
+            // Synthesis button
+            synthesizeBtn.addEventListener('click', synthesize);
             
-            // Create ONNX session
-            onnxSession = await ort.InferenceSession.create(modelPath, {
-                executionProviders: ['wasm'],
-                graphOptimizationLevel: 'all'
+            // Stop button
+            stopBtn.addEventListener('click', () => {
+                audioPlayer.pause();
+                audioPlayer.currentTime = 0;
+                stopBtn.disabled = true;
             });
             
-            console.log(`Loaded model: ${modelName}`);
+            // Audio player events
+            audioPlayer.addEventListener('play', () => {
+                stopBtn.disabled = false;
+            });
+            
+            audioPlayer.addEventListener('ended', () => {
+                stopBtn.disabled = true;
+            });
         }
         
         // Switch language
@@ -479,134 +448,98 @@
             
             // Update UI
             document.querySelectorAll('.lang-button').forEach(btn => {
-                btn.classList.toggle('active', btn.dataset.lang === lang);
+                btn.classList.toggle('active', btn.getAttribute('data-lang') === lang);
             });
             
-            // Show/hide voice selector (only for Japanese)
+            // Update text
+            const config = languageConfigs[lang];
+            inputText.value = config.testText;
+            
+            // Update templates
+            updateTemplates(lang);
+            
+            // Update language info
+            updateLanguageInfo(lang);
+            
+            // Update voice selector visibility
             voiceGroup.style.display = lang === 'ja' ? 'block' : 'none';
             
-            // Update template options
-            updateTemplateOptions();
-            
-            // Reset template selector and update example text
-            templateSelect.value = '';
-            if (lang === 'ja') {
-                inputText.value = 'こんにちは、世界！今日は良い天気ですね。';
-            } else {
-                inputText.value = 'Hello world! This is a test.';
-            }
-            
-            // Load new model
-            updateStatus('モデルを切り替えています...');
+            // Load model
+            updateStatus(`${config.name}モデルを読み込んでいます...`);
             try {
                 await loadModel(lang);
                 updateStatus('準備完了！', 'success');
             } catch (error) {
-                updateStatus(`モデル読み込みエラー: ${error.message}`, 'error');
+                updateStatus(`モデルロードエラー: ${error.message}`, 'error');
             }
-            
-            // Clear output
-            clearOutput();
         }
         
-        // Get phonemes using eSpeak-ng for English
-        async function getEnglishPhonemes(text) {
-            return new Promise((resolve, reject) => {
-                if (!espeakNG) {
-                    reject(new Error('eSpeak-ng not initialized'));
-                    return;
-                }
-                
-                // Set English voice
-                espeakNG.set_voice.apply(espeakNG, ['en']);
-                
-                // Get IPA phonemes from eSpeak-ng
-                espeakNG.synthesize_ipa(text, function(result) {
-                    try {
-                        console.log('eSpeak-ng IPA result:', result);
-                        
-                        if (result && result.ipa) {
-                            // Extract phonemes from IPA
-                            const phonemes = extractPhonemesFromIPA(result.ipa);
-                            resolve(phonemes);
-                        } else {
-                            // Fallback to simple phonemizer
-                            console.log('No IPA result, using simple phonemizer as fallback');
-                            phonemizer.textToPhonemes(text, 'en').then(phonemeData => {
-                                const phonemes = phonemizer.extractPhonemes(phonemeData, 'en');
-                                resolve(phonemes);
-                            }).catch(reject);
-                        }
-                    } catch (error) {
-                        console.error('Error processing IPA:', error);
-                        reject(error);
-                    }
-                });
+        // Update templates
+        function updateTemplates(lang) {
+            const config = languageConfigs[lang];
+            templateSelect.innerHTML = '<option value="">-- 自由入力 / Free Input --</option>';
+            
+            config.templates.forEach((template, index) => {
+                const option = document.createElement('option');
+                option.value = template;
+                option.textContent = template;
+                templateSelect.appendChild(option);
             });
         }
         
-        // Extract phonemes from IPA string
-        function extractPhonemesFromIPA(ipaString) {
-            console.log('Extracting phonemes from IPA:', ipaString);
-            
-            // Simple IPA to phoneme mapping for demo
-            // In a real implementation, this would be more comprehensive
-            const phonemes = [];
-            
-            // Remove stress marks and other diacritics for simplicity
-            const cleanIPA = ipaString.replace(/ˈ|ˌ|ː|ˑ|‿|‖|\.|\|/g, '');
-            
-            // Split into individual phonemes
-            for (let i = 0; i < cleanIPA.length; i++) {
-                const char = cleanIPA[i];
-                
-                // Map common IPA symbols to simple phonemes
-                const ipaToPhoneme = {
-                    'h': 'h',
-                    'ɛ': 'ɛ',
-                    'l': 'l',
-                    'ə': 'ə',
-                    'ʊ': 'ʊ',
-                    'w': 'w',
-                    'ɜ': 'ɜ',
-                    'r': 'r',
-                    'd': 'd',
-                    'o': 'o',
-                    'u': 'u',
-                    'a': 'a',
-                    'i': 'i',
-                    'e': 'e',
-                    'n': 'n',
-                    't': 't',
-                    'k': 'k',
-                    's': 's',
-                    'p': 'p',
-                    'b': 'b',
-                    'm': 'm',
-                    'f': 'f',
-                    'v': 'v',
-                    'θ': 'θ',
-                    'ð': 'ð',
-                    'ʃ': 'ʃ',
-                    'ʒ': 'ʒ',
-                    'tʃ': 'tʃ',
-                    'dʒ': 'dʒ',
-                    'ŋ': 'ŋ',
-                    'j': 'j',
-                    'g': 'g',
-                    'z': 'z'
-                };
-                
-                const phoneme = ipaToPhoneme[char] || char;
-                if (phoneme && phoneme !== ' ') {
-                    phonemes.push(phoneme);
-                }
+        // Update language info
+        function updateLanguageInfo(lang) {
+            if (lang === 'ja') {
+                languageInfo.innerHTML = `
+                    <h3>日本語：OpenJTalkによる音素化</h3>
+                    <p>MeCab形態素解析とHTS音声合成エンジンを使用した高精度な日本語音素化</p>
+                `;
+            } else if (lang === 'en') {
+                languageInfo.innerHTML = `
+                    <h3>英語：eSpeak-ng + Piperによる音声合成</h3>
+                    <p>Python版と同等のeSpeak-ng音素化とPiperニューラル音声合成</p>
+                `;
             }
-            
-            console.log('Extracted phonemes:', phonemes);
-            return phonemes;
         }
         
+        // Load ONNX model
+        async function loadModel(lang) {
+            const config = languageConfigs[lang];
+            const modelPath = `../models/${config.model}`;
+            const configPath = `../models/${config.model}.json`;
+            
+            // Load model config
+            const configResponse = await fetch(configPath);
+            currentModelConfig = await configResponse.json();
+            
+            // Create ONNX session
+            onnxSession = await ort.InferenceSession.create(modelPath, {
+                executionProviders: ['wasm'],
+                graphOptimizationLevel: 'all'
+            });
+            
+            console.log(`Loaded ${config.name} model:`, modelPath);
+        }
+        
+        // Get phonemes based on language
+        async function getPhonemes(text, lang) {
+            return new Promise((resolve, reject) => {
+                if (lang === 'ja') {
+                    // Use OpenJTalk for Japanese
+                    phonemizer.textToPhonemes(text, 'ja').then(phonemeData => {
+                        const phonemes = phonemizer.extractPhonemes(phonemeData, 'ja');
+                        resolve(phonemes);
+                    }).catch(reject);
+                } else if (lang === 'en') {
+                    // Use eSpeak-ng phoneme extractor for Python-compatible phonemization
+                    console.log('Using eSpeak-ng phoneme extractor for English');
+                    espeakExtractor.phonemize(text, 'en-us').then(phonemes => {
+                        console.log('eSpeak-ng phonemes:', phonemes);
+                        resolve(phonemes);
+                    }).catch(reject);
+                }
+            });
+        }
         
         // Synthesize speech
         async function synthesize() {
@@ -617,23 +550,11 @@
             }
             
             try {
-                updateStatus('音素変換中...');
+                updateStatus('音素を抽出中...');
                 synthesizeBtn.disabled = true;
                 
-                let phonemes;
-                
-                if (currentLanguage === 'ja') {
-                    // Update voice for Japanese
-                    const voicePath = `../assets/voice/${voiceSelect.value}`;
-                    await phonemizer.updateVoice(voicePath);
-                    
-                    // Get phonemes using OpenJTalk
-                    const phonemeData = await phonemizer.textToPhonemes(text, currentLanguage);
-                    phonemes = phonemizer.extractPhonemes(phonemeData, currentLanguage);
-                } else {
-                    // Get phonemes using eSpeak-ng for English
-                    phonemes = await getEnglishPhonemes(text);
-                }
+                // Get phonemes
+                const phonemes = await getPhonemes(text, currentLanguage);
                 
                 // Display phonemes
                 displayPhonemes(phonemes);
@@ -647,27 +568,27 @@
                 const audio = await synthesizeAudio(phonemeIds);
                 
                 // Create WAV and play
-                const wavBlob = createWAV(audio, modelConfig.audio.sample_rate);
+                const wavBlob = createWAV(audio, currentModelConfig.audio.sample_rate);
                 const audioUrl = URL.createObjectURL(wavBlob);
                 audioPlayer.src = audioUrl;
                 
                 // Show details
                 detailsOutput.textContent = JSON.stringify({
-                    language: currentLanguage,
                     text: text,
-                    phonemeCount: phonemes.length,
-                    duration: (audio.length / modelConfig.audio.sample_rate).toFixed(2) + ' seconds',
-                    sampleRate: modelConfig.audio.sample_rate,
-                    voice: currentLanguage === 'ja' ? voiceSelect.value : 'eSpeak-ng',
-                    phonemizer: currentLanguage === 'ja' ? 'OpenJTalk' : 'eSpeak-ng'
+                    language: currentLanguage,
+                    phonemes: phonemes,
+                    phonemeIds: phonemeIds,
+                    audioLength: audio.length,
+                    duration: (audio.length / currentModelConfig.audio.sample_rate).toFixed(2) + ' seconds',
+                    sampleRate: currentModelConfig.audio.sample_rate
                 }, null, 2);
                 
                 outputSection.style.display = 'block';
-                updateStatus('生成完了！', 'success');
+                updateStatus('合成完了！', 'success');
                 
             } catch (error) {
                 console.error('Synthesis failed:', error);
-                updateStatus(`生成エラー: ${error.message}`, 'error');
+                updateStatus(`合成エラー: ${error.message}`, 'error');
             } finally {
                 synthesizeBtn.disabled = false;
             }
@@ -676,13 +597,14 @@
         // Convert phonemes to IDs
         function phonemesToIds(phonemes) {
             const ids = [];
-            const phonemeIdMap = modelConfig.phoneme_id_map;
+            const phonemeIdMap = currentModelConfig.phoneme_id_map;
             
             for (const phoneme of phonemes) {
                 if (phonemeIdMap[phoneme]) {
                     ids.push(...phonemeIdMap[phoneme]);
                 } else {
                     console.warn(`Unknown phoneme: ${phoneme}`);
+                    // Use space as fallback
                     ids.push(...(phonemeIdMap[' '] || [3]));
                 }
             }
@@ -704,9 +626,9 @@
             
             const scalesTensor = new ort.Tensor('float32', 
                 new Float32Array([
-                    modelConfig.inference.noise_scale || 0.667,
-                    modelConfig.inference.length_scale || 1.0,
-                    modelConfig.inference.noise_w || 0.8
+                    currentModelConfig.inference.noise_scale || 0.667,
+                    currentModelConfig.inference.length_scale || 1.0,
+                    currentModelConfig.inference.noise_w || 0.8
                 ]), 
                 [3]
             );
@@ -732,15 +654,6 @@
                 span.textContent = phoneme;
                 phonemeOutput.appendChild(span);
             });
-        }
-        
-        // Clear output
-        function clearOutput() {
-            inputText.value = '';
-            outputSection.style.display = 'none';
-            phonemeOutput.innerHTML = '';
-            detailsOutput.textContent = '';
-            audioPlayer.src = '';
         }
         
         // Utility functions
@@ -795,10 +708,6 @@
             
             return new Blob([arrayBuffer], { type: 'audio/wav' });
         }
-        
-        // Event listeners
-        synthesizeBtn.addEventListener('click', synthesize);
-        clearBtn.addEventListener('click', clearOutput);
         
         // Initialize on load
         init();
