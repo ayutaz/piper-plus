@@ -84,13 +84,13 @@ jobs:
           echo "=== Testing ${{ matrix.image.name }} container ==="
           case "${{ matrix.image.name }}" in
             python-train)
-              docker run --rm piper-${{ matrix.image.name }}:test python /test.py
+              docker run --rm --entrypoint python piper-${{ matrix.image.name }}:test /test.py
               ;;
             python-inference)
-              docker run --rm piper-${{ matrix.image.name }}:test python /app/test.py
+              docker run --rm --entrypoint python piper-${{ matrix.image.name }}:test /app/test.py
               ;;
             cpp-train)
-              docker run --rm piper-${{ matrix.image.name }}:test bash /workspace/test.sh
+              docker run --rm --entrypoint /bin/bash piper-${{ matrix.image.name }}:test /workspace/test.sh
               ;;
           esac
       
