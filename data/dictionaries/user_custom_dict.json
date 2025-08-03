@@ -1,0 +1,21 @@
+{
+  "version": "2.0",
+  "description": "ユーザーカスタム辞書テンプレート",
+  "metadata": {
+    "created": "2025-01-03",
+    "author": "User",
+    "license": "User defined",
+    "notes": "このファイルに独自の単語と読みを追加してください"
+  },
+  "entries": {
+    "// 例: 会社名・プロジェクト名": "",
+    "MyCompany": {"pronunciation": "マイカンパニー", "priority": 10},
+    
+    "// 例: 独自の技術用語": "",
+    "CustomAPI": {"pronunciation": "カスタムエーピーアイ", "priority": 9},
+    
+    "// 例: 人名": "",
+    "Tanaka": {"pronunciation": "タナカ", "priority": 8},
+    "田中": {"pronunciation": "タナカ", "priority": 8}
+  }
+}
