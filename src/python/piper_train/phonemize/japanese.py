@@ -1,10 +1,9 @@
 import re
-from typing import Optional, Union, List
 
 import pyopenjtalk
 
-from .token_mapper import map_sequence
 from .custom_dict import CustomDictionary
+from .token_mapper import map_sequence
 
 
 __all__ = ["phonemize_japanese"]
@@ -21,7 +20,7 @@ def _is_question(text: str) -> bool:
     return text.strip().endswith("?") or text.strip().endswith("？")
 
 
-def phonemize_japanese(text: str, custom_dict: Optional[Union[CustomDictionary, str, List[str]]] = None) -> list[str]:
+def phonemize_japanese(text: str, custom_dict: CustomDictionary | str | list[str] | None = None) -> list[str]:
     """Convert *text* into a list of phoneme/prosody tokens that Piper can ingest.
 
     The algorithm follows the so-called "Kurihara method" that inserts the
@@ -47,7 +46,7 @@ def phonemize_japanese(text: str, custom_dict: Optional[Union[CustomDictionary, 
     2. "sil" at the beginning / end of the utterance is converted into ^ / $ or ?.
     3. Custom dictionary is applied before OpenJTalk processing for better pronunciation.
     """
-    
+
     # カスタム辞書を適用
     if custom_dict is not None:
         if isinstance(custom_dict, CustomDictionary):
@@ -55,10 +54,10 @@ def phonemize_japanese(text: str, custom_dict: Optional[Union[CustomDictionary, 
         else:
             # パスが渡された場合は辞書を作成
             dictionary = CustomDictionary(custom_dict)
-        
+
         # テキストに辞書を適用
         text = dictionary.apply_to_text(text)
-    
+
     labels = pyopenjtalk.extract_fullcontext(text)
     tokens: list[str] = []
 
