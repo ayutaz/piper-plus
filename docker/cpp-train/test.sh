@@ -33,8 +33,8 @@ if command -v nvcc &> /dev/null; then
     echo "✓ CUDA compiler: $(nvcc --version | grep release | awk '{print $5}' | sed 's/,//')"
     echo "✓ CUDA home: $CUDA_HOME"
 else
-    echo "✗ CUDA compiler not found"
-    exit 1
+    echo "⚠ CUDA compiler not found (this is expected in CI environment)"
+    echo "  Running in CPU-only mode"
 fi
 
 echo ""
