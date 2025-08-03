@@ -63,6 +63,12 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD python -c "import torch; import piper; print('Health check passed')" || exit 1
 
-# Set ENTRYPOINT to /bin/sh for flexibility
-ENTRYPOINT ["/bin/sh", "-c"]
-CMD ["echo 'No command specified'"]
+# Run tests during build to verify the container is working
+RUN echo "=== Running build-time tests ===" && \
+    python --version && \
+    python -c "import onnxruntime as ort; print(f'ONNX Runtime: {ort.__version__}')" && \
+    python -c "import piper; print('piper installed successfully')" && \
+    echo "=== Build-time tests passed ==="
+
+# Default command for runtime
+CMD ["/bin/bash"]

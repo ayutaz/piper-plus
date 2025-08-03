@@ -125,6 +125,12 @@ EXPOSE 6006 8888
 # Copy test script
 COPY docker/python-train/test.py /test.py
 
-# Set ENTRYPOINT to /bin/sh for flexibility
-ENTRYPOINT ["/bin/sh", "-c"]
-CMD ["echo 'No command specified'"]
+# Run tests during build to verify the container is working
+RUN echo "=== Running build-time tests ===" && \
+    python --version && \
+    python -c "import torch; print(f'PyTorch: {torch.__version__}')" && \
+    python -c "import piper_train; print('piper_train installed successfully')" && \
+    echo "=== Build-time tests passed ==="
+
+# Default command for runtime
+CMD ["/bin/bash"]

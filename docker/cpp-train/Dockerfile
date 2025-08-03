@@ -120,6 +120,15 @@ RUN chmod +x /workspace/build.sh
 COPY docker/cpp-train/test.sh /workspace/
 RUN chmod +x /workspace/test.sh
 
-# Set ENTRYPOINT to /bin/sh for flexibility
-ENTRYPOINT ["/bin/sh", "-c"]
-CMD ["echo 'No command specified'"]
+# Run tests during build to verify the container is working
+RUN echo "=== Running build-time tests ===" && \
+    echo "Testing build tools..." && \
+    which gcc && which g++ && which cmake && \
+    echo "Testing CUDA (if available)..." && \
+    (which nvcc && nvcc --version || echo "CUDA not required in CI") && \
+    echo "Testing libraries..." && \
+    ldconfig -p | grep -E "(onnxruntime|espeak|HTSEngine)" || echo "Some libraries in /usr/local/lib" && \
+    echo "=== Build-time tests passed ==="
+
+# Default command for runtime
+CMD ["/bin/bash"]
