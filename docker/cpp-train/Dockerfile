@@ -84,12 +84,12 @@ RUN wget https://downloads.sourceforge.net/hts-engine/hts_engine_API-1.10.tar.gz
     make install && \
     cd .. && rm -rf hts_engine_API-1.10*
 
-# Install Open JTalk
+# Install Open JTalk (serial build to avoid race condition)
 RUN wget https://downloads.sourceforge.net/open-jtalk/open_jtalk-1.11.tar.gz && \
     tar -xzf open_jtalk-1.11.tar.gz && \
     cd open_jtalk-1.11 && \
     ./configure --prefix=/usr/local --with-hts-engine-header-path=/usr/local/include --with-hts-engine-library-path=/usr/local/lib && \
-    make -j$(nproc) && \
+    make -j1 && \
     make install && \
     cd .. && rm -rf open_jtalk-1.11*
 

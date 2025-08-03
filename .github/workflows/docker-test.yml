@@ -18,6 +18,7 @@ jobs:
   test-docker-builds:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         image:
           - name: python-train
