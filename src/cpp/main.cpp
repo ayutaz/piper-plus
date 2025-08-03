@@ -37,6 +37,7 @@
 #include "json.hpp"
 #include "piper.hpp"
 #include "phoneme_parser.hpp"
+#include "custom_dictionary.hpp"
 
 using namespace std;
 using json = nlohmann::json;
@@ -115,6 +116,9 @@ struct RunConfig {
   // Format constants
   static const string FORMAT_JSON;
   static const string FORMAT_TSV;
+  
+  // Paths to custom dictionary files
+  vector<filesystem::path> customDictPaths;
 };
 
 // Define static constants
@@ -318,6 +322,21 @@ int main(int argc, char *argv[]) {
 
   } // if phonemeSilenceSeconds
 
+  // カスタム辞書の初期化
+  std::unique_ptr<piper::CustomDictionary> customDict;
+  if (!runConfig.customDictPaths.empty()) {
+    customDict = std::make_unique<piper::CustomDictionary>();
+    for (const auto& dictPath : runConfig.customDictPaths) {
+      try {
+        customDict->loadDictionary(dictPath.string());
+        spdlog::info("Loaded custom dictionary: {}", dictPath.string());
+      } catch (const std::exception& e) {
+        spdlog::error("Failed to load custom dictionary {}: {}", 
+                      dictPath.string(), e.what());
+      }
+    }
+  }
+
   if (runConfig.outputType == OUTPUT_DIRECTORY) {
     runConfig.outputPath = filesystem::absolute(runConfig.outputPath.value());
     spdlog::info("Output directory: {}", runConfig.outputPath.value().string());
@@ -359,6 +378,11 @@ int main(int argc, char *argv[]) {
           spdlog::warn("No speaker named: {}", speakerName);
         }
       }
+    }
+    
+    // カスタム辞書を適用
+    if (customDict && !line.empty()) {
+      line = customDict->applyToText(line);
     }
 
     // Timestamp is used for path to output WAV file
@@ -608,6 +632,9 @@ void printUsage(char *argv[]) {
           "sentence (default: 0.2)"
        << endl;
   cerr << "   --phoneme_silence <phoneme> <seconds>  Set silence for a specific phoneme" << endl;
+  cerr << "   --custom-dict       FILE       path to custom dictionary file(s), "
+          "comma-separated"
+       << endl;
   cerr << endl;
   cerr << "   Phoneme input: Use [[ phonemes ]] notation to specify exact pronunciation" << endl;
   cerr << "                  Example: echo \"Hello [[ h ə l oʊ ]] world\" | piper ..." << endl;
@@ -744,6 +771,15 @@ void parseArgs(int argc, char *argv[], RunConfig &runConfig) {
       if (runConfig.timingFormat != RunConfig::FORMAT_JSON && runConfig.timingFormat != RunConfig::FORMAT_TSV) {
         cerr << "Invalid timing format: " << runConfig.timingFormat << " (must be json or tsv)" << endl;
         exit(1);
+      }
+    } else if (arg == "--custom-dict" || arg == "--custom_dict") {
+      ensureArg(argc, argv, i);
+      string dictPaths = argv[++i];
+      // カンマ区切りで複数の辞書パスを分割
+      stringstream ss(dictPaths);
+      string path;
+      while (getline(ss, path, ',')) {
+        runConfig.customDictPaths.push_back(filesystem::path(path));
       }
     } else if (arg == "--version") {
       std::cout << piper::getVersion() << std::endl;
