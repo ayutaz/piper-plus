@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - dev
+      - feat/english-model-support
     paths:
       - 'src/wasm/**'
       - '.github/workflows/deploy-webassembly-demo.yml'
@@ -35,45 +36,8 @@ jobs:
       - name: Prepare deployment directory
         run: |
           mkdir -p deploy
+          echo "Deploying WebAssembly demo with English model support"
           
-          # Create placeholder index.html
-          echo '<!DOCTYPE html>' > deploy/index.html
-          echo '<html lang="ja">' >> deploy/index.html
-          echo '<head>' >> deploy/index.html
-          echo '    <meta charset="UTF-8">' >> deploy/index.html
-          echo '    <meta name="viewport" content="width=device-width, initial-scale=1.0">' >> deploy/index.html
-          echo '    <title>Piper TTS WebAssembly Demo</title>' >> deploy/index.html
-          echo '    <style>' >> deploy/index.html
-          echo '        body {' >> deploy/index.html
-          echo '            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;' >> deploy/index.html
-          echo '            display: flex;' >> deploy/index.html
-          echo '            justify-content: center;' >> deploy/index.html
-          echo '            align-items: center;' >> deploy/index.html
-          echo '            height: 100vh;' >> deploy/index.html
-          echo '            margin: 0;' >> deploy/index.html
-          echo '            background-color: #f5f5f5;' >> deploy/index.html
-          echo '        }' >> deploy/index.html
-          echo '        .container {' >> deploy/index.html
-          echo '            text-align: center;' >> deploy/index.html
-          echo '            background: white;' >> deploy/index.html
-          echo '            padding: 40px;' >> deploy/index.html
-          echo '            border-radius: 10px;' >> deploy/index.html
-          echo '            box-shadow: 0 2px 10px rgba(0,0,0,0.1);' >> deploy/index.html
-          echo '        }' >> deploy/index.html
-          echo '        h1 { color: #2c3e50; }' >> deploy/index.html
-          echo '        p { color: #6c757d; margin: 20px 0; }' >> deploy/index.html
-          echo '        a { color: #3498db; text-decoration: none; }' >> deploy/index.html
-          echo '        a:hover { text-decoration: underline; }' >> deploy/index.html
-          echo '    </style>' >> deploy/index.html
-          echo '</head>' >> deploy/index.html
-          echo '<body>' >> deploy/index.html
-          echo '    <div class="container">' >> deploy/index.html
-          echo '        <h1>🎤 Piper TTS WebAssembly Demo</h1>' >> deploy/index.html
-          echo '        <p>WebAssembly版の日本語音声合成デモを準備中です。</p>' >> deploy/index.html
-          echo '        <p>詳細は <a href="https://github.com/ayutaz/piper-plus">GitHub リポジトリ</a> をご覧ください。</p>' >> deploy/index.html
-          echo '    </div>' >> deploy/index.html
-          echo '</body>' >> deploy/index.html
-          echo '</html>' >> deploy/index.html
           
           # Copy WebAssembly artifacts
           if [ -d "src/wasm/openjtalk-web/dist" ]; then
@@ -91,31 +55,78 @@ jobs:
           fi
           
           if [ -d "src/wasm/openjtalk-web/models" ]; then
+            echo "Copying models directory..."
+            ls -la src/wasm/openjtalk-web/models/
             cp -r src/wasm/openjtalk-web/models deploy/
+            echo "Models copied to deploy/models"
+            ls -la deploy/models/
           else
             mkdir -p deploy/models
+            echo "WARNING: models directory not found!"
           fi
           
-          # Copy demo page and service worker if they exist
-          if [ -f "src/wasm/openjtalk-web/test/index.html" ]; then
-            cp src/wasm/openjtalk-web/test/index.html deploy/index.html
-            cp src/wasm/openjtalk-web/test/service-worker.js deploy/service-worker.js
+          # Copy multilingual demo as the main index page
+          if [ -f "src/wasm/openjtalk-web/test/multilingual-demo/index.html" ]; then
+            cp src/wasm/openjtalk-web/test/multilingual-demo/index.html deploy/index.html
             
-            # Update paths for GitHub Pages - use ./ prefix for proper relative paths
-            for file in deploy/*.html; do
+            # Update paths for root level using more specific patterns
+            sed -i 's|src="../../dist/|src="./dist/|g' deploy/index.html
+            sed -i 's|src="../../assets/|src="./assets/|g' deploy/index.html
+            sed -i 's|src="../../models/|src="./models/|g' deploy/index.html
+            sed -i 's|src="../../src/|src="./src/|g' deploy/index.html
+            sed -i 's|src="../dist/|src="./dist/|g' deploy/index.html
+            
+            # Also update paths in import statements and other references
+            sed -i "s|from '../../|from './|g" deploy/index.html
+            sed -i "s|from '../|from './|g" deploy/index.html
+            
+            # Update model paths in JavaScript strings
+            sed -i "s|'../../models/|'./models/|g" deploy/index.html
+            sed -i "s|'../../assets/|'./assets/|g" deploy/index.html
+            sed -i "s|'../../dist/|'./dist/|g" deploy/index.html
+            sed -i "s|'../models/|'./models/|g" deploy/index.html
+            sed -i "s|'../assets/|'./assets/|g" deploy/index.html
+            sed -i "s|'../dist/|'./dist/|g" deploy/index.html
+            
+            # Also update template string paths (backtick strings)
+            sed -i "s|\`../../models/|\`./models/|g" deploy/index.html
+            sed -i "s|\`../../assets/|\`./assets/|g" deploy/index.html
+            sed -i "s|\`../models/|\`./models/|g" deploy/index.html
+            sed -i "s|\`../assets/|\`./assets/|g" deploy/index.html
+            
+            echo "Multilingual demo deployed as main page"
+          fi
+          
+          # Copy multilingual demo
+          if [ -d "src/wasm/openjtalk-web/test/multilingual-demo" ]; then
+            mkdir -p deploy/multilingual-demo
+            cp -r src/wasm/openjtalk-web/test/multilingual-demo/* deploy/multilingual-demo/
+            
+            # Update paths for multilingual demo
+            for file in deploy/multilingual-demo/*.html; do
               if [ -f "$file" ]; then
-                sed -i 's|../../dist/|./dist/|g' "$file"
-                sed -i 's|../../assets/|./assets/|g' "$file"
-                sed -i 's|../../models/|./models/|g' "$file"
-                sed -i 's|./js/|./test/js/|g' "$file"
+                sed -i 's|../../dist/|../dist/|g' "$file"
+                sed -i 's|../../assets/|../assets/|g' "$file"
+                sed -i 's|../../models/|../models/|g' "$file"
+                sed -i 's|../../src/|../src/|g' "$file"
               fi
             done
           fi
           
-          # Copy only lazy loading JavaScript file
-          if [ -f "src/wasm/openjtalk-web/test/js/openjtalk-piper-integration-lazy.js" ]; then
-            mkdir -p deploy/test/js
-            cp src/wasm/openjtalk-web/test/js/openjtalk-piper-integration-lazy.js deploy/test/js/
+          
+          # Copy src files for multilingual demo
+          if [ -d "src/wasm/openjtalk-web/src" ]; then
+            mkdir -p deploy/src
+            cp src/wasm/openjtalk-web/src/simple_unified_api.js deploy/src/
+            cp src/wasm/openjtalk-web/src/simple_english_phonemizer.js deploy/src/
+            cp src/wasm/openjtalk-web/src/espeak_phoneme_extractor.js deploy/src/
+            cp src/wasm/openjtalk-web/src/custom_dictionary.js deploy/src/
+            
+            # Fix paths in src files for root deployment
+            sed -i "s|'../dist/|'./dist/|g" deploy/src/espeak_phoneme_extractor.js
+            sed -i "s|'../../dist/|'./dist/|g" deploy/src/*.js
+            sed -i "s|'../../assets/|'./assets/|g" deploy/src/*.js
+            sed -i "s|'../../models/|'./models/|g" deploy/src/*.js
           fi
           
           # Create 404 page

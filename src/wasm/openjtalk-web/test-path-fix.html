@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Path Fix Test</title>
+</head>
+<body>
+    <h1>Testing Path Fix</h1>
+    <pre id="output"></pre>
+    
+    <script type="module">
+        const output = document.getElementById('output');
+        
+        // Test adjustPathForDeployment function
+        function adjustPathForDeployment(path, deploymentConfig) {
+            if (deploymentConfig.basePath) {
+                // Remove leading ../ and add base path with proper slash
+                const cleanPath = path.replace(/^\.\.\//, '');
+                return deploymentConfig.basePath + '/' + cleanPath;
+            }
+            return path;
+        }
+        
+        // Test cases
+        const testCases = [
+            {
+                path: '../../dist/openjtalk.js',
+                deploymentConfig: { basePath: '/piper-plus' },
+                expected: '/piper-plus/dist/openjtalk.js'
+            },
+            {
+                path: '../dist/openjtalk.js',
+                deploymentConfig: { basePath: '/piper-plus' },
+                expected: '/piper-plus/dist/openjtalk.js'
+            },
+            {
+                path: './dist/openjtalk.js',
+                deploymentConfig: { basePath: '/piper-plus' },
+                expected: '/piper-plus/./dist/openjtalk.js'
+            },
+            {
+                path: 'dist/openjtalk.js',
+                deploymentConfig: { basePath: '/piper-plus' },
+                expected: '/piper-plus/dist/openjtalk.js'
+            }
+        ];
+        
+        let allPassed = true;
+        
+        testCases.forEach((test, index) => {
+            const result = adjustPathForDeployment(test.path, test.deploymentConfig);
+            const passed = result === test.expected;
+            allPassed = allPassed && passed;
+            
+            output.innerHTML += `Test ${index + 1}:\n`;
+            output.innerHTML += `  Input: ${test.path}\n`;
+            output.innerHTML += `  Base: ${test.deploymentConfig.basePath}\n`;
+            output.innerHTML += `  Expected: ${test.expected}\n`;
+            output.innerHTML += `  Got: ${result}\n`;
+            output.innerHTML += `  ${passed ? '✅ PASSED' : '❌ FAILED'}\n\n`;
+        });
+        
+        output.innerHTML += `\n${allPassed ? '✅ All tests passed!' : '❌ Some tests failed!'}\n`;
+    </script>
+</body>
+</html>

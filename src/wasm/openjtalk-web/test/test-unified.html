@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Unified Phonemizer Test</title>
+    <meta charset="UTF-8">
+</head>
+<body>
+    <h1>Unified Phonemizer Test</h1>
+    <div id="status">Initializing...</div>
+    <div id="results"></div>
+
+    <script type="module">
+        async function runTests() {
+            const status = document.getElementById('status');
+            const results = document.getElementById('results');
+            
+            try {
+                // Test module loading
+                status.textContent = 'Loading unified phonemizer module...';
+                const module = await import('../src/unified_api.js');
+                results.innerHTML += '<p>✓ Module loaded successfully</p>';
+                
+                // Test class instantiation
+                const phonemizer = new module.UnifiedPhonemizer();
+                results.innerHTML += '<p>✓ UnifiedPhonemizer instantiated</p>';
+                
+                // Note: Full initialization would require the compiled WASM files
+                status.textContent = 'Basic tests completed. Full tests require compiled WASM modules.';
+                
+            } catch (error) {
+                status.textContent = 'Test failed';
+                results.innerHTML += `<p style="color: red;">✗ Error: ${error.message}</p>`;
+                console.error(error);
+            }
+        }
+        
+        runTests();
+    </script>
+</body>
+</html>

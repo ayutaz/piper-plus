@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OpenJTalk WebAssembly Demo</title>
+    <title>🎤 Piper 多言語音声合成デモ</title>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            max-width: 800px;
+            max-width: 900px;
             margin: 0 auto;
             padding: 20px;
             background: #f5f5f5;
@@ -26,8 +26,54 @@
             color: #666;
             margin-bottom: 30px;
         }
+        .language-selector {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 6px;
+        }
+        .language-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .lang-button {
+            padding: 8px 16px;
+            border: 2px solid #ddd;
+            background: white;
+            color: #333;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .lang-button:hover {
+            border-color: #4CAF50;
+            background: #f8f8f8;
+        }
+        .lang-button.active {
+            background: #4CAF50;
+            color: white;
+            border-color: #4CAF50;
+        }
         .input-group {
             margin-bottom: 20px;
+        }
+        .voice-group {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 6px;
+        }
+        .template-selector {
+            margin-bottom: 10px;
+        }
+        .template-selector select {
+            width: 100%;
+            padding: 8px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            font-size: 14px;
+            background: white;
         }
         label {
             display: block;
@@ -47,6 +93,20 @@
             transition: border-color 0.3s;
         }
         textarea:focus {
+            outline: none;
+            border-color: #4CAF50;
+        }
+        select {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            font-size: 14px;
+            background: white;
+            cursor: pointer;
+            transition: border-color 0.3s;
+        }
+        select:focus {
             outline: none;
             border-color: #4CAF50;
         }
@@ -100,11 +160,6 @@
             color: #c62828;
             border: 1px solid #ffcdd2;
         }
-        .status.loading {
-            background: #fff3e0;
-            color: #f57c00;
-            border: 1px solid #ffe0b2;
-        }
         .output-section {
             margin-top: 30px;
             padding-top: 30px;
@@ -114,13 +169,12 @@
             margin-bottom: 20px;
         }
         pre {
-            background: #f8f9fa;
+            background: #f5f5f5;
             padding: 15px;
             border-radius: 6px;
             overflow-x: auto;
             font-size: 14px;
             line-height: 1.5;
-            border: 1px solid #e9ecef;
         }
         .phoneme-list {
             display: flex;
@@ -136,125 +190,229 @@
             font-size: 14px;
             font-weight: 500;
         }
-        .examples {
-            margin-top: 20px;
+        .feature-list {
+            background: #fff3e0;
+            border: 1px solid #ffe0b2;
+            border-radius: 6px;
+            padding: 15px;
+            margin-bottom: 20px;
         }
-        .example-button {
-            background: #f5f5f5;
-            color: #333;
-            border: 1px solid #ddd;
-            padding: 8px 16px;
-            margin: 4px;
-            border-radius: 4px;
-            cursor: pointer;
+        .feature-list h3 {
+            color: #e65100;
+            margin-top: 0;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+        .feature-list ul {
+            margin: 0;
+            padding-left: 20px;
+        }
+        .feature-list li {
+            margin-bottom: 5px;
+            color: #666;
+        }
+        .language-info {
+            background: #f0f7ff;
+            border: 1px solid #bbdefb;
+            border-radius: 6px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        .language-info h3 {
+            color: #1565c0;
+            margin-top: 0;
+            margin-bottom: 8px;
+            font-size: 16px;
+        }
+        .language-info p {
+            margin: 0;
+            color: #555;
             font-size: 14px;
-            transition: all 0.2s;
-        }
-        .example-button:hover {
-            background: #e0e0e0;
-            border-color: #bbb;
-        }
-        .loading-spinner {
-            display: inline-block;
-            width: 16px;
-            height: 16px;
-            border: 2px solid #f3f3f3;
-            border-top: 2px solid #333;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-            margin-left: 8px;
-            vertical-align: middle;
-        }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
         }
     </style>
+    <script type="text/javascript" src="../dist/espeak-ng/espeakng.min.js"></script>
 </head>
 <body>
     <div class="container">
-        <h1>OpenJTalk WebAssembly Demo</h1>
-        <p class="subtitle">ブラウザで動作する日本語音声合成エンジン</p>
+        <h1>🎤 Piper 多言語音声合成デモ</h1>
+        <p class="subtitle">WebAssemblyとONNX Runtimeを使用した日本語・英語のニューラル音声合成</p>
         
         <div id="status" class="status info">
-            初期化中... <span class="loading-spinner"></span>
+            初期化中...
         </div>
 
+        <div class="feature-list">
+            <h3>📝 対応機能</h3>
+            <ul>
+                <li>🇯🇵 日本語音声合成（OpenJTalk + Piperニューラルモデル）</li>
+                <li>🇺🇸 英語音声合成（eSpeak-ng + Piperニューラルモデル）</li>
+                <li>🎯 完全ブラウザ実装（サーバー不要）</li>
+                <li>⚡ WebAssembly + ONNX Runtime Webによる高速処理</li>
+            </ul>
+        </div>
+
+        <div class="language-selector">
+            <label>言語選択 / Language Selection</label>
+            <div class="language-buttons">
+                <button class="lang-button active" data-lang="ja">
+                    🇯🇵 日本語
+                </button>
+                <button class="lang-button" data-lang="en">
+                    🇺🇸 English
+                </button>
+            </div>
+        </div>
+
+        <div class="language-info" id="languageInfo">
+            <h3>日本語：OpenJTalkによる音素化</h3>
+            <p>MeCab形態素解析とHTS音声合成エンジンを使用した高精度な日本語音素化</p>
+        </div>
+
+
         <div class="input-group">
-            <label for="inputText">テキスト入力</label>
-            <textarea id="inputText" placeholder="ここに日本語テキストを入力してください">今日は良い天気です。</textarea>
+            <label for="inputText">テキスト入力 / Text Input</label>
+            <div class="template-selector">
+                <label for="templateSelect">テンプレート選択 / Template Selection</label>
+                <select id="templateSelect">
+                    <option value="">-- 自由入力 / Free Input --</option>
+                </select>
+            </div>
+            <textarea id="inputText" placeholder="ここにテキストを入力してください / Enter text here">こんにちは、世界！今日は良い天気ですね。</textarea>
         </div>
 
         <div class="button-group">
-            <button id="convertBtn" disabled>音素変換</button>
-            <button id="clearBtn" class="secondary">クリア</button>
-        </div>
-
-        <div class="examples">
-            <label>例文:</label>
-            <button class="example-button" data-text="こんにちは、世界！">挨拶</button>
-            <button class="example-button" data-text="吾輩は猫である。名前はまだ無い。">文学</button>
-            <button class="example-button" data-text="人工知能による音声合成技術">技術用語</button>
-            <button class="example-button" data-text="東京スカイツリーの高さは634メートルです。">数字</button>
+            <button id="synthesizeBtn" disabled>🎵 音声合成 / Synthesize</button>
+            <button id="stopBtn" class="secondary" disabled>⏹️ 停止 / Stop</button>
         </div>
 
         <div class="output-section" id="outputSection" style="display: none;">
-            <h2>変換結果</h2>
+            <h2>出力結果 / Output</h2>
             
             <div class="output-group">
-                <label>フルコンテキストラベル:</label>
-                <pre id="labelsOutput"></pre>
+                <label>音声 / Audio:</label>
+                <audio id="audioPlayer" controls style="width: 100%;"></audio>
             </div>
-
+            
             <div class="output-group">
-                <label>抽出された音素列:</label>
+                <label>音素列 / Phoneme Sequence:</label>
                 <div id="phonemeOutput" class="phoneme-list"></div>
             </div>
 
             <div class="output-group">
-                <label>音素テキスト:</label>
-                <pre id="phonemeTextOutput"></pre>
+                <label>詳細情報 / Details:</label>
+                <pre id="detailsOutput"></pre>
             </div>
         </div>
     </div>
 
     <script type="module">
-        import { OpenJTalkWeb } from '../src/api.js';
+        import { SimpleUnifiedPhonemizer } from '../src/simple_unified_api.js';
+        import { ESpeakPhonemeExtractor } from '../src/espeak_phoneme_extractor.js';
+        import { CustomDictionary } from '../src/custom_dictionary.js';
         
-        let openjtalk = null;
+        let unifiedPhonemizer = null;
+        let espeakExtractor = null;
+        let onnxSession = null;
+        let customDict = null;
+        let currentModelConfig = null;
+        let currentLanguage = 'ja';
+        
+        const languageConfigs = {
+            'ja': {
+                name: '日本語',
+                model: 'ja_JP-test-medium.onnx',
+                phonemizer: 'openjtalk',
+                testText: 'こんにちは、世界！今日は良い天気ですね。',
+                templates: [
+                    'こんにちは、世界！',
+                    '今日は良い天気ですね。',
+                    'OpenJTalkとPiperを使った音声合成のデモです。',
+                    '日本語の音声合成は、とても自然に聞こえます。',
+                    '桜の花が美しく咲いています。'
+                ]
+            },
+            'en': {
+                name: '英語 (eSpeak-ng)',
+                model: 'test_voice.onnx',
+                phonemizer: 'espeak-ng',
+                testText: 'Hello world! This is a test of the Piper text to speech system.',
+                templates: [
+                    'Hello world!',
+                    'This is a test of the Piper text to speech system.',
+                    'How are you today?',
+                    'Welcome to the Piper speech synthesis demo.',
+                    'The quick brown fox jumps over the lazy dog.'
+                ]
+            }
+        };
+        
         const statusEl = document.getElementById('status');
-        const convertBtn = document.getElementById('convertBtn');
-        const clearBtn = document.getElementById('clearBtn');
+        const synthesizeBtn = document.getElementById('synthesizeBtn');
+        const stopBtn = document.getElementById('stopBtn');
         const inputText = document.getElementById('inputText');
         const outputSection = document.getElementById('outputSection');
-        const labelsOutput = document.getElementById('labelsOutput');
         const phonemeOutput = document.getElementById('phonemeOutput');
-        const phonemeTextOutput = document.getElementById('phonemeTextOutput');
+        const detailsOutput = document.getElementById('detailsOutput');
+        const audioPlayer = document.getElementById('audioPlayer');
+        const templateSelect = document.getElementById('templateSelect');
+        const languageInfo = document.getElementById('languageInfo');
         
-        // Status update helper
-        function updateStatus(message, type = 'info') {
-            statusEl.className = `status ${type}`;
-            statusEl.innerHTML = message;
-            if (type === 'loading') {
-                statusEl.innerHTML += ' <span class="loading-spinner"></span>';
-            }
-        }
-        
-        // Initialize OpenJTalk
+        // Initialize
         async function init() {
             try {
-                updateStatus('OpenJTalk WebAssemblyモジュールを読み込んでいます...', 'loading');
+                updateStatus('初期化中...');
                 
-                openjtalk = new OpenJTalkWeb();
-                await openjtalk.initialize({
-                    wasmUrl: '../dist/openjtalk.wasm',
-                    jsUrl: '../dist/openjtalk.js',
-                    dictUrl: '../assets/dict.tar.gz',
-                    voiceUrl: '../assets/mei_normal.htsvoice'
+                // Initialize custom dictionary
+                updateStatus('カスタム辞書を読み込んでいます...');
+                customDict = new CustomDictionary();
+                const dictLoaded = await customDict.loadFromJSON('../assets/custom_dictionary.json');
+                if (dictLoaded) {
+                    console.log(`カスタム辞書を読み込みました（${customDict.size}エントリー）`);
+                } else {
+                    console.warn('カスタム辞書の読み込みに失敗しました。デフォルト設定を使用します。');
+                }
+                
+                // Initialize Simple Unified Phonemizer
+                updateStatus('音素化エンジンを初期化しています...');
+                
+                // Check if running on GitHub Pages
+                const isGitHubPages = window.location.hostname.includes('github.io');
+                const deploymentConfig = {
+                    isGitHubPages: isGitHubPages,
+                    basePath: isGitHubPages ? '/' + window.location.pathname.split('/')[1] : ''
+                };
+                
+                unifiedPhonemizer = new SimpleUnifiedPhonemizer({ deploymentConfig });
+                await unifiedPhonemizer.initialize({
+                    openjtalk: {
+                        jsPath: '../dist/openjtalk.js',
+                        wasmPath: '../dist/openjtalk.wasm',
+                        dictPath: '../assets/dict',
+                        voicePath: '../assets/voice/mei_normal.htsvoice'
+                    }
                 });
+                console.log('Simple Unified Phonemizer initialized');
                 
-                updateStatus('準備完了！テキストを入力して「音素変換」をクリックしてください。', 'success');
-                convertBtn.disabled = false;
+                // Initialize eSpeak-ng for English
+                updateStatus('eSpeak-ngを初期化しています...');
+                espeakExtractor = new ESpeakPhonemeExtractor();
+                await espeakExtractor.initialize();
+                console.log('eSpeak-ng initialized');
+                
+                // Load ONNX Runtime
+                await loadScript('https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.1/dist/ort.min.js');
+                
+                // Load default model
+                await loadModel(currentLanguage);
+                
+                updateStatus('準備完了！', 'success');
+                synthesizeBtn.disabled = false;
+                
+                // Initialize templates for default language
+                updateTemplates(currentLanguage);
+                
+                // Setup event listeners
+                setupEventListeners();
                 
             } catch (error) {
                 console.error('Initialization failed:', error);
@@ -262,8 +420,152 @@
             }
         }
         
-        // Convert text to phonemes
-        async function convert() {
+        // Setup event listeners
+        function setupEventListeners() {
+            // Language buttons
+            document.querySelectorAll('.lang-button').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    const lang = e.target.getAttribute('data-lang');
+                    await switchLanguage(lang);
+                });
+            });
+            
+            // Template selector
+            templateSelect.addEventListener('change', (e) => {
+                if (e.target.value) {
+                    inputText.value = e.target.value;
+                }
+            });
+            
+            // Synthesis button
+            synthesizeBtn.addEventListener('click', synthesize);
+            
+            // Stop button
+            stopBtn.addEventListener('click', () => {
+                audioPlayer.pause();
+                audioPlayer.currentTime = 0;
+                stopBtn.disabled = true;
+            });
+            
+            // Audio player events
+            audioPlayer.addEventListener('play', () => {
+                stopBtn.disabled = false;
+            });
+            
+            audioPlayer.addEventListener('ended', () => {
+                stopBtn.disabled = true;
+            });
+        }
+        
+        // Switch language
+        async function switchLanguage(lang) {
+            currentLanguage = lang;
+            
+            // Update UI
+            document.querySelectorAll('.lang-button').forEach(btn => {
+                btn.classList.toggle('active', btn.getAttribute('data-lang') === lang);
+            });
+            
+            // Update text
+            const config = languageConfigs[lang];
+            inputText.value = config.testText;
+            
+            // Update templates
+            updateTemplates(lang);
+            
+            // Update language info
+            updateLanguageInfo(lang);
+            
+            
+            // Load model
+            updateStatus(`${config.name}モデルを読み込んでいます...`);
+            try {
+                await loadModel(lang);
+                updateStatus('準備完了！', 'success');
+            } catch (error) {
+                updateStatus(`モデルロードエラー: ${error.message}`, 'error');
+            }
+        }
+        
+        // Update templates
+        function updateTemplates(lang) {
+            const config = languageConfigs[lang];
+            templateSelect.innerHTML = '<option value="">-- 自由入力 / Free Input --</option>';
+            
+            config.templates.forEach((template, index) => {
+                const option = document.createElement('option');
+                option.value = template;
+                option.textContent = template;
+                templateSelect.appendChild(option);
+            });
+        }
+        
+        // Update language info
+        function updateLanguageInfo(lang) {
+            if (lang === 'ja') {
+                languageInfo.innerHTML = `
+                    <h3>日本語：OpenJTalkによる音素化</h3>
+                    <p>MeCab形態素解析とHTS音声合成エンジンを使用した高精度な日本語音素化</p>
+                `;
+            } else if (lang === 'en') {
+                languageInfo.innerHTML = `
+                    <h3>英語：eSpeak-ng + Piperによる音声合成</h3>
+                    <p>Python版と同等のeSpeak-ng音素化とPiperニューラル音声合成</p>
+                `;
+            }
+        }
+        
+        // Load ONNX model
+        async function loadModel(lang) {
+            const config = languageConfigs[lang];
+            const modelPath = `../models/${config.model}`;
+            const configPath = `../models/${config.model}.json`;
+            
+            // Load model config
+            const configResponse = await fetch(configPath);
+            currentModelConfig = await configResponse.json();
+            
+            // Create ONNX session
+            onnxSession = await ort.InferenceSession.create(modelPath, {
+                executionProviders: ['wasm'],
+                graphOptimizationLevel: 'all'
+            });
+            
+            console.log(`Loaded ${config.name} model:`, modelPath);
+        }
+        
+        // Get phonemes based on language
+        async function getPhonemes(text, lang) {
+            return new Promise((resolve, reject) => {
+                if (lang === 'ja') {
+                    // Use custom dictionary to preprocess text
+                    let processedText = text;
+                    if (customDict && customDict.initialized) {
+                        processedText = customDict.processText(text);
+                        console.log('Original text:', text);
+                        console.log('Processed text (after custom dictionary):', processedText);
+                    }
+                    
+                    // Use OpenJTalk for Japanese
+                    unifiedPhonemizer.textToPhonemes(processedText, 'ja').then(labels => {
+                        console.log('OpenJTalk labels:', labels);
+                        const phonemes = unifiedPhonemizer.extractPhonemes(labels, 'ja');
+                        console.log('Extracted phonemes:', phonemes);
+                        resolve(phonemes);
+                    }).catch(reject);
+                } else if (lang === 'en') {
+                    // Use eSpeak-ng phoneme extractor for Python-compatible phonemization
+                    console.log('Using eSpeak-ng phoneme extractor for English');
+                    espeakExtractor.phonemize(text, 'en-us').then(phonemes => {
+                        console.log('eSpeak-ng phonemes:', phonemes);
+                        resolve(phonemes);
+                    }).catch(reject);
+                }
+            });
+        }
+        
+        // Synthesize speech
+        async function synthesize() {
             const text = inputText.value.trim();
             if (!text) {
                 updateStatus('テキストを入力してください。', 'error');
@@ -271,65 +573,195 @@
             }
             
             try {
-                updateStatus('変換中...', 'loading');
-                convertBtn.disabled = true;
+                updateStatus('音素を抽出中...');
+                synthesizeBtn.disabled = true;
                 
-                // Get full context labels
-                const labels = await openjtalk.textToPhonemes(text);
+                // Get phonemes
+                const phonemes = await getPhonemes(text, currentLanguage);
+                console.log('Got phonemes:', phonemes);
+                console.log('Phoneme details:', phonemes.map((p, i) => {
+                    const code = p.charCodeAt(0);
+                    return `[${i}] "${p}" (U+${code.toString(16).padStart(4, '0')})`;
+                }));
                 
-                // Extract phonemes
-                const phonemes = openjtalk.extractPhonemes(labels);
+                // Display phonemes
+                displayPhonemes(phonemes);
                 
-                // Display results
-                labelsOutput.textContent = labels;
+                updateStatus('音声合成中...');
                 
-                phonemeOutput.innerHTML = '';
-                phonemes.forEach(phoneme => {
-                    const span = document.createElement('span');
-                    span.className = 'phoneme';
-                    span.textContent = phoneme;
-                    phonemeOutput.appendChild(span);
+                // Convert phonemes to IDs
+                const phonemeIds = phonemesToIds(phonemes);
+                console.log('Phoneme IDs:', phonemeIds);
+                console.log('Phoneme to ID mapping for ch:', {
+                    phoneme: phonemes[6],
+                    charCode: phonemes[6] ? phonemes[6].charCodeAt(0) : null,
+                    hex: phonemes[6] ? '0x' + phonemes[6].charCodeAt(0).toString(16) : null,
+                    mappedIds: currentModelConfig.phoneme_id_map[phonemes[6]] || 'NOT FOUND'
                 });
                 
-                phonemeTextOutput.textContent = phonemes.join(' ');
+                // Synthesize audio
+                const audio = await synthesizeAudio(phonemeIds);
+                
+                // Create WAV and play
+                const wavBlob = createWAV(audio, currentModelConfig.audio.sample_rate);
+                const audioUrl = URL.createObjectURL(wavBlob);
+                audioPlayer.src = audioUrl;
+                
+                // Show details
+                detailsOutput.textContent = JSON.stringify({
+                    text: text,
+                    language: currentLanguage,
+                    phonemes: phonemes,
+                    phonemeIds: phonemeIds,
+                    audioLength: audio.length,
+                    duration: (audio.length / currentModelConfig.audio.sample_rate).toFixed(2) + ' seconds',
+                    sampleRate: currentModelConfig.audio.sample_rate
+                }, null, 2);
                 
                 outputSection.style.display = 'block';
-                updateStatus('変換完了！', 'success');
+                updateStatus('合成完了！', 'success');
                 
             } catch (error) {
-                console.error('Conversion failed:', error);
-                updateStatus(`変換エラー: ${error.message}`, 'error');
+                console.error('Synthesis failed:', error);
+                updateStatus(`合成エラー: ${error.message}`, 'error');
             } finally {
-                convertBtn.disabled = false;
+                synthesizeBtn.disabled = false;
             }
         }
         
-        // Clear all
-        function clear() {
-            inputText.value = '';
-            outputSection.style.display = 'none';
-            labelsOutput.textContent = '';
+        // Convert phonemes to IDs
+        function phonemesToIds(phonemes) {
+            // Apply padding for short Japanese text to improve synthesis quality
+            let processedPhonemes = phonemes;
+            if (currentLanguage === 'ja' && phonemes.length < 20) {
+                // Add silence tokens for short text
+                processedPhonemes = [
+                    phonemes[0],  // Keep BOS (^)
+                    '_', '_',     // Add silence padding
+                    ...phonemes.slice(1, -1),  // Original phonemes without BOS/EOS
+                    '_', '_',     // Add silence padding
+                    phonemes[phonemes.length - 1]  // Keep EOS ($)
+                ];
+                console.log('Applied padding for short text:', processedPhonemes);
+            }
+            
+            const ids = [];
+            const phonemeIdMap = currentModelConfig.phoneme_id_map;
+            
+            for (const phoneme of processedPhonemes) {
+                if (phonemeIdMap[phoneme]) {
+                    ids.push(...phonemeIdMap[phoneme]);
+                } else {
+                    console.warn(`Unknown phoneme: ${phoneme}`);
+                    // Use padding token as fallback for Japanese
+                    if (currentLanguage === 'ja') {
+                        ids.push(...(phonemeIdMap['_'] || [0]));
+                    } else {
+                        // Use space as fallback for English
+                        ids.push(...(phonemeIdMap[' '] || [3]));
+                    }
+                }
+            }
+            
+            return ids;
+        }
+        
+        // Synthesize audio using ONNX
+        async function synthesizeAudio(phonemeIds) {
+            const inputTensor = new ort.Tensor('int64', 
+                new BigInt64Array(phonemeIds.map(id => BigInt(id))), 
+                [1, phonemeIds.length]
+            );
+            
+            const lengthTensor = new ort.Tensor('int64', 
+                new BigInt64Array([BigInt(phonemeIds.length)]), 
+                [1]
+            );
+            
+            const scalesTensor = new ort.Tensor('float32', 
+                new Float32Array([
+                    currentModelConfig.inference.noise_scale || 0.667,
+                    currentModelConfig.inference.length_scale || 1.0,
+                    currentModelConfig.inference.noise_w || 0.8
+                ]), 
+                [3]
+            );
+            
+            const feeds = {
+                'input': inputTensor,
+                'input_lengths': lengthTensor,
+                'scales': scalesTensor
+            };
+            
+            const results = await onnxSession.run(feeds);
+            const audioTensor = results['output'] || results[Object.keys(results)[0]];
+            
+            return new Float32Array(audioTensor.data);
+        }
+        
+        // Display phonemes
+        function displayPhonemes(phonemes) {
             phonemeOutput.innerHTML = '';
-            phonemeTextOutput.textContent = '';
+            phonemes.forEach(phoneme => {
+                const span = document.createElement('span');
+                span.className = 'phoneme';
+                span.textContent = phoneme;
+                phonemeOutput.appendChild(span);
+            });
         }
         
-        // Event listeners
-        convertBtn.addEventListener('click', convert);
-        clearBtn.addEventListener('click', clear);
+        // Utility functions
+        function updateStatus(message, type = 'info') {
+            statusEl.className = `status ${type}`;
+            statusEl.textContent = message;
+        }
         
-        // Example buttons
-        document.querySelectorAll('.example-button').forEach(btn => {
-            btn.addEventListener('click', () => {
-                inputText.value = btn.dataset.text;
+        function loadScript(src) {
+            return new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = src;
+                script.onload = resolve;
+                script.onerror = reject;
+                document.head.appendChild(script);
             });
-        });
+        }
         
-        // Enter key to convert
-        inputText.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && e.ctrlKey && !convertBtn.disabled) {
-                convert();
+        function createWAV(audioData, sampleRate) {
+            const length = audioData.length;
+            const arrayBuffer = new ArrayBuffer(44 + length * 2);
+            const view = new DataView(arrayBuffer);
+            
+            // WAV header
+            const writeString = (offset, string) => {
+                for (let i = 0; i < string.length; i++) {
+                    view.setUint8(offset + i, string.charCodeAt(i));
+                }
+            };
+            
+            writeString(0, 'RIFF');
+            view.setUint32(4, 36 + length * 2, true);
+            writeString(8, 'WAVE');
+            writeString(12, 'fmt ');
+            view.setUint32(16, 16, true);
+            view.setUint16(20, 1, true);
+            view.setUint16(22, 1, true);
+            view.setUint32(24, sampleRate, true);
+            view.setUint32(28, sampleRate * 2, true);
+            view.setUint16(32, 2, true);
+            view.setUint16(34, 16, true);
+            writeString(36, 'data');
+            view.setUint32(40, length * 2, true);
+            
+            // Convert float to int16
+            const offset = 44;
+            for (let i = 0; i < length; i++) {
+                const val = Math.max(-1, Math.min(1, audioData[i]));
+                const int16 = val < 0 ? val * 0x8000 : val * 0x7FFF;
+                view.setInt16(offset + i * 2, int16, true);
             }
-        });
+            
+            return new Blob([arrayBuffer], { type: 'audio/wav' });
+        }
         
         // Initialize on load
         init();

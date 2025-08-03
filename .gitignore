@@ -59,3 +59,7 @@ streaming_comparison_results.json
 *.exe
 windows_build_artifacts/
 CLAUDE.md
+
+# WebAssembly temp directories
+src/wasm/openjtalk-web/temp/
+src/wasm/openjtalk-web/tools/

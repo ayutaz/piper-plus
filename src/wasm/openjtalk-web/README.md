@@ -9,9 +9,11 @@ Visit the live demo: [https://ayutaz.github.io/piper-plus/](https://ayutaz.githu
 ## 📋 Features
 
 - **Pure Browser-Based**: Runs entirely in the browser without server dependencies
-- **Japanese TTS**: High-quality Japanese speech synthesis using OpenJTalk phonemization
+- **Multilingual Support**: 
+  - Japanese TTS using OpenJTalk phonemization
+  - English TTS using eSpeak-ng phonemization (experimental)
 - **ONNX Runtime**: Neural synthesis using Piper ONNX models
-- **Compact Size**: WASM < 400KB, JS < 40KB
+- **Compact Size**: WASM < 400KB, JS < 40KB (OpenJTalk only)
 - **Cross-Platform**: Works on desktop and mobile browsers
 
 ## 🛠️ Development
@@ -30,8 +32,14 @@ Visit the live demo: [https://ayutaz.github.io/piper-plus/](https://ayutaz.githu
 git clone https://github.com/rhasspy/piper.git
 cd piper/src/wasm/openjtalk-web
 
-# Build for production
+# Build OpenJTalk only (Japanese)
 npm run build
+
+# Build with eSpeak-ng support (Multilingual)
+./build/build-unified.sh
+
+# Prepare English model
+./scripts/prepare-english-model.sh
 
 # Build for development (with debug symbols)
 npm run build:debug
@@ -64,19 +72,26 @@ openjtalk-web/
 │   ├── dict/        # NAIST Japanese Dictionary
 │   └── voice/       # HTS voice (for initialization)
 ├── build/           # Build scripts
-│   ├── build-production.sh
-│   └── build-safe.sh (debug)
+│   ├── build.sh
+│   ├── build-openjtalk.sh
+│   ├── build-espeak.sh
+│   └── build-unified.sh
 ├── dist/            # Build output
 │   ├── openjtalk.js
-│   └── openjtalk.wasm
+│   ├── openjtalk.wasm
+│   ├── unified_phonemizer.js (multilingual)
+│   └── unified_phonemizer.wasm
 ├── models/          # ONNX models
-├── src/             # C source files
-│   └── openjtalk_safe.c
+│   ├── ja_JP-test-medium.onnx
+│   └── en_US-test-medium.onnx
+├── src/             # Source files
+│   ├── openjtalk_wrapper.cpp
+│   ├── phonemizer_wrapper.cpp (multilingual)
+│   └── unified_api.js
+├── demo/            # Demo pages
+│   ├── index.html
+│   └── multilingual.html
 └── test/            # Test files
-    ├── production-audio-test.html
-    └── js/
-        ├── openjtalk-piper-integration.js
-        └── test-openjtalk-integration.js
 ```
 
 ## 🔧 API Usage
@@ -109,6 +124,35 @@ const audioUrl = URL.createObjectURL(wavBlob);
 // Play audio
 const audio = new Audio(audioUrl);
 audio.play();
+```
+
+### Multilingual Usage (Experimental)
+
+```javascript
+import { UnifiedPhonemizer } from './unified_api.js';
+
+// Initialize unified phonemizer
+const phonemizer = new UnifiedPhonemizer();
+await phonemizer.initialize({
+    jsUrl: 'dist/unified_phonemizer.js',
+    wasmUrl: 'dist/unified_phonemizer.wasm',
+    openjtalk: {
+        dictPath: 'assets/dict',
+        voicePath: 'assets/voice/mei_normal.htsvoice'
+    },
+    espeak: {
+        // eSpeak data is embedded
+    }
+});
+
+// Japanese text
+const jpPhonemes = await phonemizer.textToPhonemes('こんにちは', 'ja');
+
+// English text
+const enPhonemes = await phonemizer.textToPhonemes('Hello world', 'en');
+
+// Auto-detect language
+const autoPhonemes = await phonemizer.textToPhonemes('Mixed text 混合テキスト');
 ```
 
 ## 🚀 Deployment

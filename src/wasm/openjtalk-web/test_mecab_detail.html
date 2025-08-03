@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>MeCab詳細解析</title>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .analysis-box {
+            border: 1px solid #ccc;
+            padding: 20px;
+            margin: 10px 0;
+            border-radius: 8px;
+            background: #f9f9f9;
+        }
+        pre {
+            background: #fff;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+        .word-info {
+            background: #e3f2fd;
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 4px;
+        }
+        .phoneme-info {
+            background: #fff3e0;
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <h1>MeCab詳細解析 - OpenJTalk vs Piper</h1>
+    
+    <div class="analysis-box">
+        <h2>音素パターン分析</h2>
+        
+        <div class="word-info">
+            <h3>OpenJTalk: o o p u N j e e t o o k U</h3>
+            <p>これは「オープンジェートーク」の音素パターンです：</p>
+            <ul>
+                <li>o o → オー</li>
+                <li>p u N → プン</li>
+                <li>j e e → ジェー</li>
+                <li>t o o → トー</li>
+                <li>k U → ク</li>
+            </ul>
+            <p><strong>結論：</strong> OpenJTalkは辞書に登録されているか、カタカナ読みとして認識されている</p>
+        </div>
+        
+        <div class="word-info">
+            <h3>Piper: p i i a i p i i i i a a r u</h3>
+            <p>これはアルファベット個別読みのパターンです：</p>
+            <ul>
+                <li>p i i → ピー (P)</li>
+                <li>a i → アイ (I)</li>
+                <li>p i i → ピー (P)</li>
+                <li>i i → イー (E)</li>
+                <li>a a r u → アール (R)</li>
+            </ul>
+            <p><strong>結論：</strong> Piperは未知語として扱われ、アルファベット一文字ずつ読まれている</p>
+        </div>
+        
+        <div class="phoneme-info">
+            <h3>問題の原因</h3>
+            <p>MeCabの辞書に以下の違いがあります：</p>
+            <ul>
+                <li><strong>OpenJTalk</strong>: 辞書に登録済み、または一般的な外来語として認識</li>
+                <li><strong>Piper</strong>: 辞書に未登録で、アルファベット文字列として処理</li>
+            </ul>
+        </div>
+        
+        <div class="phoneme-info">
+            <h3>解決方法</h3>
+            <ol>
+                <li><strong>ユーザー辞書の追加</strong>: MeCabのユーザー辞書にPiperを登録</li>
+                <li><strong>カタカナ表記</strong>: 「パイパー」とカタカナで書く</li>
+                <li><strong>読み仮名の指定</strong>: HTMLのrubyタグのような方法で読みを指定</li>
+            </ol>
+        </div>
+        
+        <div class="word-info">
+            <h3>実験：大文字と小文字の違い</h3>
+            <p>大文字（OPENJTALK、PIPER）でも同じ結果なので、大文字小文字は関係ありません。</p>
+            <p>カタカナ表記では：</p>
+            <ul>
+                <li>「オープンジェートーク」→ o o p u N j e e t o o k u (正しい)</li>
+                <li>「パイパー」→ p a i p a a (正しい)</li>
+            </ul>
+        </div>
+    </div>
+    
+    <div class="analysis-box">
+        <h2>推奨される対処法</h2>
+        
+        <div class="word-info">
+            <h3>1. テキスト前処理（推奨）</h3>
+            <pre>
+// 英単語をカタカナに変換
+text = text.replace(/Piper/g, 'パイパー');
+text = text.replace(/PIPER/g, 'パイパー');
+            </pre>
+        </div>
+        
+        <div class="word-info">
+            <h3>2. MeCabユーザー辞書（より高度）</h3>
+            <p>ユーザー辞書ファイルに以下を追加：</p>
+            <pre>
+Piper,,,1,名詞,固有名詞,一般,*,*,*,パイパー,パイパー,パイパー
+            </pre>
+            <p>※ ただし、WebAssembly版では辞書の動的追加は難しい</p>
+        </div>
+        
+        <div class="word-info">
+            <h3>3. 音素レベルでの修正（最も複雑）</h3>
+            <p>音素列を検出して置換：</p>
+            <pre>
+// "p i i a i p i i i i a a r u" → "p a i p a a"
+if (phonemes.includes('p i i a i p i i i i a a r u')) {
+    // Piperのアルファベット読みを検出して修正
+}
+            </pre>
+        </div>
+    </div>
+</body>
+</html>

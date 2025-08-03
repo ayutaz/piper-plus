@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>eSpeak-ng Official Implementation Test</title>
+    <meta charset="utf-8">
+    <script type="text/javascript" src="../dist/espeak-ng/espeakng.min.js"></script>
+</head>
+<body>
+    <h1>eSpeak-ng Official Implementation Test</h1>
+    <p>Direct implementation based on official demo</p>
+    
+    <div>
+        <label>Text: <input type="text" id="text" value="Hello world" size="40"></label>
+        <button onclick="speak()">Speak</button>
+    </div>
+    
+    <div>
+        <h3>Log:</h3>
+        <pre id="log" style="background: #f0f0f0; padding: 10px; height: 300px; overflow-y: auto;"></pre>
+    </div>
+    
+    <script>
+        let tts;
+        let log = '';
+        
+        function addLog(msg) {
+            log += msg + '\n';
+            document.getElementById('log').textContent = log;
+        }
+        
+        window.onload = function() {
+            tts = new eSpeakNG('../dist/espeak-ng/espeakng.worker.js', function() {
+                addLog('eSpeak-ng ready!');
+            });
+        };
+        
+        function speak() {
+            const text = document.getElementById('text').value;
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            
+            log = ''; // Clear log
+            addLog('Speaking: ' + text);
+            addLog('AudioContext sample rate: ' + audioContext.sampleRate);
+            
+            tts.set_voice.apply(tts, ['en']);
+            
+            let callCount = 0;
+            let totalSamples = 0;
+            
+            // Create a simple audio player
+            const audioChunks = [];
+            
+            tts.synthesize(text, function(samples, events) {
+                callCount++;
+                addLog('\nCallback #' + callCount + ':');
+                
+                if (samples === undefined) {
+                    addLog('  Synthesis complete');
+                    addLog('  Total callbacks: ' + callCount);
+                    addLog('  Total samples collected: ' + totalSamples);
+                    
+                    // Play all audio
+                    if (audioChunks.length > 0) {
+                        playAudio(audioChunks, audioContext);
+                    }
+                    return;
+                }
+                
+                if (samples) {
+                    addLog('  Samples type: ' + Object.prototype.toString.call(samples));
+                    addLog('  Samples byteLength: ' + samples.byteLength);
+                    
+                    // The official demo expects Float32Array
+                    let floatSamples;
+                    if (samples instanceof Float32Array) {
+                        floatSamples = samples;
+                        addLog('  Already Float32Array, length: ' + floatSamples.length);
+                    } else if (samples instanceof ArrayBuffer) {
+                        // Try as Float32 first (as the official demo does)
+                        floatSamples = new Float32Array(samples);
+                        addLog('  Converted ArrayBuffer to Float32Array, length: ' + floatSamples.length);
+                        
+                        // Check if the data makes sense
+                        let min = Infinity, max = -Infinity;
+                        for (let i = 0; i < Math.min(100, floatSamples.length); i++) {
+                            min = Math.min(min, floatSamples[i]);
+                            max = Math.max(max, floatSamples[i]);
+                        }
+                        addLog('  Sample range (first 100): [' + min.toFixed(4) + ', ' + max.toFixed(4) + ']');
+                    }
+                    
+                    if (floatSamples && floatSamples.length > 0) {
+                        audioChunks.push(floatSamples);
+                        totalSamples += floatSamples.length;
+                    }
+                }
+                
+                if (events) {
+                    addLog('  Events: ' + JSON.stringify(events));
+                }
+            });
+        }
+        
+        function playAudio(chunks, audioContext) {
+            addLog('\nPlaying audio...');
+            
+            // Calculate total length
+            let totalLength = 0;
+            for (const chunk of chunks) {
+                totalLength += chunk.length;
+            }
+            
+            // Combine all chunks
+            const combinedAudio = new Float32Array(totalLength);
+            let offset = 0;
+            for (const chunk of chunks) {
+                combinedAudio.set(chunk, offset);
+                offset += chunk.length;
+            }
+            
+            addLog('Combined audio length: ' + combinedAudio.length);
+            addLog('Duration @ 22050Hz: ' + (combinedAudio.length / 22050).toFixed(3) + ' seconds');
+            addLog('Duration @ 44100Hz: ' + (combinedAudio.length / 44100).toFixed(3) + ' seconds');
+            
+            // Try different sample rates
+            const sampleRates = [22050, 44100, audioContext.sampleRate];
+            
+            for (const rate of sampleRates) {
+                try {
+                    const buffer = audioContext.createBuffer(1, combinedAudio.length, rate);
+                    buffer.getChannelData(0).set(combinedAudio);
+                    
+                    const source = audioContext.createBufferSource();
+                    source.buffer = buffer;
+                    source.connect(audioContext.destination);
+                    source.start();
+                    
+                    addLog('\nSuccessfully playing at ' + rate + 'Hz');
+                    break;
+                } catch (e) {
+                    addLog('Failed to play at ' + rate + 'Hz: ' + e.message);
+                }
+            }
+        }
+    </script>
+</body>
+</html>

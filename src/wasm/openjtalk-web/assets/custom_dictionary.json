@@ -1,0 +1,31 @@
+{
+  "version": "1.0",
+  "description": "カスタム辞書 - 英単語とカタカナ読みの対応",
+  "entries": {
+    "Piper": "パイパー",
+    "PIPER": "パイパー",
+    "piper": "パイパー",
+    "Docker": "ドッカー",
+    "DOCKER": "ドッカー",
+    "docker": "ドッカー",
+    "GitHub": "ギットハブ",
+    "GITHUB": "ギットハブ",
+    "github": "ギットハブ",
+    "Python": "パイソン",
+    "PYTHON": "パイソン",
+    "python": "パイソン",
+    "JavaScript": "ジャバスクリプト",
+    "JAVASCRIPT": "ジャバスクリプト",
+    "javascript": "ジャバスクリプト",
+    "API": "エーピーアイ",
+    "api": "エーピーアイ",
+    "JSON": "ジェイソン",
+    "json": "ジェイソン",
+    "YAML": "ヤムル",
+    "yaml": "ヤムル",
+    "WebAssembly": "ウェブアセンブリ",
+    "webassembly": "ウェブアセンブリ",
+    "WASM": "ワズム",
+    "wasm": "ワズム"
+  }
+}
