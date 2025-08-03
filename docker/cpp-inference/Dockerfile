@@ -160,6 +160,10 @@ WORKDIR /app
 COPY docker/cpp-inference/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
+# Copy test script
+COPY docker/cpp-inference/test.sh /test.sh
+RUN chmod +x /test.sh
+
 # Verify installation
 RUN piper --version || echo "Piper not found, will be mounted at runtime"
 
@@ -168,4 +172,4 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD piper --version || exit 1
 
 ENTRYPOINT ["/entrypoint.sh"]
-CMD ["piper", "--help"]
+CMD ["/bin/bash"]
