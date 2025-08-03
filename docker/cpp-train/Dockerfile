@@ -122,3 +122,4 @@ RUN chmod +x /workspace/test.sh
 
 # Set ENTRYPOINT to /bin/sh for flexibility
 ENTRYPOINT ["/bin/sh", "-c"]
+CMD ["echo 'No command specified'"]

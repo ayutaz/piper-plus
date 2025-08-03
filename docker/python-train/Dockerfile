@@ -127,3 +127,4 @@ COPY docker/python-train/test.py /test.py
 
 # Set ENTRYPOINT to /bin/sh for flexibility
 ENTRYPOINT ["/bin/sh", "-c"]
+CMD ["echo 'No command specified'"]

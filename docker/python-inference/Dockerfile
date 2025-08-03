@@ -65,3 +65,4 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
 
 # Set ENTRYPOINT to /bin/sh for flexibility
 ENTRYPOINT ["/bin/sh", "-c"]
+CMD ["echo 'No command specified'"]
