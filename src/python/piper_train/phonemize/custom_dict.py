@@ -36,7 +36,11 @@ class CustomDictionary:
     
     def _load_default_dictionaries(self):
         """デフォルト辞書を読み込む"""
-        default_dicts = ["default_tech_dict.json", "default_common_dict.json"]
+        default_dicts = [
+            "default_tech_dict.json", 
+            "default_common_dict.json",
+            "additional_tech_dict.json"  # 最新トレンドの技術用語
+        ]
         
         for dict_name in default_dicts:
             dict_path = self.default_dict_dir / dict_name

@@ -110,6 +110,17 @@ Piperには以下のデフォルト辞書が含まれています：
 - ステータス: Online, Offline, Active など
 - セキュリティ: Password, Authentication など
 
+### additional_tech_dict.json（新規追加）
+- **最新AI/LLM用語**: ChatGPT, Claude, Anthropic, OpenAI, Gemini, Copilot, Stable Diffusion, Midjourney など
+- **最新フレームワーク**: Next.js, Vite, Svelte, Bun, Deno, Prisma, tRPC, Tailwind など
+- **クラウド/DevOps**: GitHub Actions, Terraform, ArgoCD, Prometheus, Grafana など
+- **データ分析**: BigQuery, Snowflake, Databricks, Kafka, Airflow など
+- **セキュリティ**: OWASP, Zero Trust, MFA, SSO, WAF など
+- **モバイル開発**: Flutter, React Native, SwiftUI など
+- **その他トレンド**: Web3, NFT, Webhook, gRPC, SaaS, DX など
+
+合計で**300以上の技術用語**が登録されており、MeCabの標準辞書では対応できない最新の技術用語も正確に読み上げることができます。
+
 ## 優先度について
 
 優先度は0から10の整数で、大きいほど優先されます：

@@ -112,7 +112,8 @@ CustomDictionary::CustomDictionary(const std::vector<std::string>& dictPaths) : 
 void CustomDictionary::loadDefaultDictionaries() {
     std::vector<std::string> defaultDicts = {
         "default_tech_dict.json",
-        "default_common_dict.json"
+        "default_common_dict.json",
+        "additional_tech_dict.json"  // 最新トレンドの技術用語
     };
     
     for (const auto& dictName : defaultDicts) {
