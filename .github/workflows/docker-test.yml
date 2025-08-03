@@ -64,33 +64,33 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
       
-      - name: Debug container contents
+      - name: Debug container
         run: |
-          echo "Checking contents of ${{ matrix.image.name }} container..."
-          # First check if the image exists
-          docker images | grep piper-${{ matrix.image.name }}
-          # Inspect the image to see what's configured
-          docker inspect piper-${{ matrix.image.name }}:test | jq '.[0].Config' || true
-          # Try running with different approaches
-          echo "Trying with /bin/bash directly..."
-          docker run --rm piper-${{ matrix.image.name }}:test /bin/bash -c "echo 'Test with bash'" || echo "Bash failed with exit code $?"
-          echo "Trying with /bin/sh directly..."
-          docker run --rm piper-${{ matrix.image.name }}:test /bin/sh -c "echo 'Test with sh'" || echo "Sh failed with exit code $?"
+          echo "=== Debugging ${{ matrix.image.name }} container ==="
+          # List images
+          docker images | grep piper || true
+          
+          # Get detailed image info
+          echo "=== Image config ==="
+          docker inspect piper-${{ matrix.image.name }}:test --format='{{json .Config}}' | jq . || true
+          
+          # Try the simplest possible command
+          echo "=== Testing basic execution ==="
+          docker run --rm piper-${{ matrix.image.name }}:test echo hello || echo "Basic echo failed: $?"
       
-      - name: Test ${{ matrix.image.name }} container
+      - name: Test container
+        if: success()
         run: |
+          echo "=== Testing ${{ matrix.image.name }} container ==="
           case "${{ matrix.image.name }}" in
             python-train)
-              echo "Testing python-train container..."
-              docker run --rm --entrypoint="" piper-${{ matrix.image.name }}:test /bin/sh -c "python /test.py"
+              docker run --rm piper-${{ matrix.image.name }}:test python /test.py
               ;;
             python-inference)
-              echo "Testing python-inference container..."
-              docker run --rm --entrypoint="" piper-${{ matrix.image.name }}:test /bin/sh -c "python /app/test.py"
+              docker run --rm piper-${{ matrix.image.name }}:test python /app/test.py
               ;;
             cpp-train)
-              echo "Testing cpp-train container..."
-              docker run --rm --entrypoint="" piper-${{ matrix.image.name }}:test /bin/bash -c "bash /workspace/test.sh"
+              docker run --rm piper-${{ matrix.image.name }}:test bash /workspace/test.sh
               ;;
           esac
       
