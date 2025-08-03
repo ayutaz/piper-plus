@@ -9,10 +9,6 @@ on:
       - '.dockerignore'
   push:
     branches: [dev, fix/docker-test-workflow]
-    # paths:
-    #   - 'docker/**'
-    #   - '.github/workflows/docker-*.yml'
-    #   - '.dockerignore'
 
 jobs:
   test-docker-builds:
@@ -124,36 +120,39 @@ jobs:
       - name: Test Python inference with test model
         run: |
           # Test basic text-to-phoneme model
+          cat << 'EOF' > /tmp/test_inference.py
+          import onnxruntime as ort
+          import numpy as np
+          import json
+          
+          # Load model config
+          with open('/models/text_voice.onnx.json', 'r') as f:
+              config = json.load(f)
+          print('Model config loaded successfully')
+          
+          # Create session
+          session = ort.InferenceSession('/models/text_voice.onnx')
+          print('ONNX model loaded successfully')
+          
+          # Simple inference test with dummy input
+          # This model expects text phonemes as input
+          input_ids = np.array([[1, 14, 15, 16, 2]], dtype=np.int64)  # Simple 'abc' phonemes
+          scales = np.array([config['inference']['noise_scale'], 
+                             config['inference']['length_scale']], dtype=np.float32)
+          
+          # Run inference
+          outputs = session.run(None, {
+              'input': input_ids,
+              'scales': scales
+          })
+          print(f'Inference successful! Output shape: {outputs[0].shape}')
+          EOF
+          
           docker run --rm \
             -v ${{ github.workspace }}/test/models:/models:ro \
+            -v /tmp/test_inference.py:/test_inference.py:ro \
             piper-python-inference:test \
-            python -c "
-import onnxruntime as ort
-import numpy as np
-import json
-
-# Load model config
-with open('/models/text_voice.onnx.json', 'r') as f:
-    config = json.load(f)
-print('Model config loaded successfully')
-
-# Create session
-session = ort.InferenceSession('/models/text_voice.onnx')
-print('ONNX model loaded successfully')
-
-# Simple inference test with dummy input
-# This model expects text phonemes as input
-input_ids = np.array([[1, 14, 15, 16, 2]], dtype=np.int64)  # Simple 'abc' phonemes
-scales = np.array([config['inference']['noise_scale'], 
-                   config['inference']['length_scale']], dtype=np.float32)
-
-# Run inference
-outputs = session.run(None, {
-    'input': input_ids,
-    'scales': scales
-})
-print(f'Inference successful! Output shape: {outputs[0].shape}')
-"
+            python /test_inference.py
       
       - name: Test Python inference API functionality
         run: |
