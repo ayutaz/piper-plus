@@ -69,16 +69,16 @@ jobs:
           echo "Checking contents of ${{ matrix.image.name }} container..."
           case "${{ matrix.image.name }}" in
             python-train)
-              docker run --rm piper-${{ matrix.image.name }}:test /bin/sh -c "ls -la /"
-              docker run --rm piper-${{ matrix.image.name }}:test /bin/sh -c "ls -la /test.py" || echo "test.py not found"
+              docker run --rm piper-${{ matrix.image.name }}:test sh -c "echo 'Container is running' && ls -la / | head -5"
+              docker run --rm piper-${{ matrix.image.name }}:test sh -c "test -f /test.py && echo 'test.py found' || echo 'test.py not found'"
               ;;
             python-inference)
-              docker run --rm piper-${{ matrix.image.name }}:test /bin/sh -c "ls -la /app/"
-              docker run --rm piper-${{ matrix.image.name }}:test /bin/sh -c "ls -la /app/test.py" || echo "test.py not found"
+              docker run --rm piper-${{ matrix.image.name }}:test sh -c "echo 'Container is running' && ls -la /app/ | head -5"
+              docker run --rm piper-${{ matrix.image.name }}:test sh -c "test -f /app/test.py && echo 'test.py found' || echo 'test.py not found'"
               ;;
             cpp-train)
-              docker run --rm piper-${{ matrix.image.name }}:test /bin/sh -c "ls -la /workspace/"
-              docker run --rm piper-${{ matrix.image.name }}:test /bin/sh -c "ls -la /workspace/test.sh" || echo "test.sh not found"
+              docker run --rm piper-${{ matrix.image.name }}:test sh -c "echo 'Container is running' && ls -la /workspace/ | head -5"
+              docker run --rm piper-${{ matrix.image.name }}:test sh -c "test -f /workspace/test.sh && echo 'test.sh found' || echo 'test.sh not found'"
               ;;
           esac
       
@@ -87,15 +87,15 @@ jobs:
           case "${{ matrix.image.name }}" in
             python-train)
               echo "Testing python-train container..."
-              docker run --rm piper-${{ matrix.image.name }}:test /bin/sh -c "python /test.py"
+              docker run --rm piper-${{ matrix.image.name }}:test sh -c "python /test.py"
               ;;
             python-inference)
               echo "Testing python-inference container..."
-              docker run --rm piper-${{ matrix.image.name }}:test /bin/sh -c "python /app/test.py"
+              docker run --rm piper-${{ matrix.image.name }}:test sh -c "python /app/test.py"
               ;;
             cpp-train)
               echo "Testing cpp-train container..."
-              docker run --rm piper-${{ matrix.image.name }}:test /bin/sh -c "bash /workspace/test.sh"
+              docker run --rm piper-${{ matrix.image.name }}:test sh -c "bash /workspace/test.sh"
               ;;
           esac
       
