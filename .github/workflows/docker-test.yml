@@ -22,20 +22,20 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
       
-      - name: Build and test with docker-compose
+      - name: Build and test with docker compose
         run: |
-          echo "=== Building and testing containers with docker-compose ==="
-          docker-compose -f docker-compose.test.yml build
+          echo "=== Building and testing containers with docker compose ==="
+          docker compose -f docker-compose.test.yml build
           echo "=== Running containers ==="
-          docker-compose -f docker-compose.test.yml run --rm cpp-train-test
-          docker-compose -f docker-compose.test.yml run --rm python-train-test
-          docker-compose -f docker-compose.test.yml run --rm python-inference-test
+          docker compose -f docker-compose.test.yml run --rm cpp-train-test
+          docker compose -f docker-compose.test.yml run --rm python-train-test
+          docker compose -f docker-compose.test.yml run --rm python-inference-test
           echo "=== All containers ran successfully ==="
       
       - name: Clean up
         if: always()
         run: |
-          docker-compose -f docker-compose.test.yml down -v
+          docker compose -f docker-compose.test.yml down -v || true
           docker system prune -f
 
   run-smoke-tests:
