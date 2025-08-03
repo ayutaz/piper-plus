@@ -70,7 +70,8 @@ jobs:
               ;;
             cpp-train)
               echo "Testing cpp-train container..."
-              docker run --rm piper-${{ matrix.image.name }}:test echo "Container started successfully"
+              docker images | grep piper-cpp-train
+              docker run --rm -t piper-${{ matrix.image.name }}:test true
               ;;
           esac
       
