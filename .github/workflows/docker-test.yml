@@ -69,8 +69,13 @@ jobs:
           echo "Checking contents of ${{ matrix.image.name }} container..."
           # First check if the image exists
           docker images | grep piper-${{ matrix.image.name }}
-          # Try running with explicit entrypoint override
-          docker run --rm --entrypoint="" piper-${{ matrix.image.name }}:test /bin/sh -c "echo 'Container started successfully'"
+          # Inspect the image to see what's configured
+          docker inspect piper-${{ matrix.image.name }}:test | jq '.[0].Config' || true
+          # Try running with different approaches
+          echo "Trying with /bin/bash directly..."
+          docker run --rm piper-${{ matrix.image.name }}:test /bin/bash -c "echo 'Test with bash'" || echo "Bash failed with exit code $?"
+          echo "Trying with /bin/sh directly..."
+          docker run --rm piper-${{ matrix.image.name }}:test /bin/sh -c "echo 'Test with sh'" || echo "Sh failed with exit code $?"
       
       - name: Test ${{ matrix.image.name }} container
         run: |
