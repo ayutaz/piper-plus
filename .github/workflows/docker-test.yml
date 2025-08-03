@@ -67,34 +67,14 @@ jobs:
       - name: Verify container can run
         run: |
           echo "=== Verifying ${{ matrix.image.name }} container ==="
-          # Check if image was built successfully
-          docker images | grep piper-${{ matrix.image.name }} || exit 1
+          # Simply run the container with its default CMD
+          docker run --rm piper-${{ matrix.image.name }}:test
           
-          # Debug: Show Docker version and info
-          echo "Docker version:"
-          docker version
-          echo "Docker info:"
-          docker info | head -20
+          # If that works, try overriding with a custom command
+          echo "Testing with custom command..."
+          docker run --rm piper-${{ matrix.image.name }}:test /bin/bash -c "python --version || echo 'Not a Python container'"
           
-          # Debug: Inspect the image
-          echo "Image details:"
-          docker inspect piper-${{ matrix.image.name }}:test | jq '.[0].Config.Cmd, .[0].Config.Entrypoint' || true
-          
-          # Try different execution methods
-          echo "Method 1: Direct bash command"
-          docker run --rm piper-${{ matrix.image.name }}:test /bin/bash -c "echo 'Method 1 Success'" || echo "Method 1 failed with exit code: $?"
-          
-          echo "Method 2: Using sh instead of bash"
-          docker run --rm piper-${{ matrix.image.name }}:test /bin/sh -c "echo 'Method 2 Success'" || echo "Method 2 failed with exit code: $?"
-          
-          echo "Method 3: Direct echo without shell"
-          docker run --rm piper-${{ matrix.image.name }}:test echo "Method 3 Success" || echo "Method 3 failed with exit code: $?"
-          
-          # If all methods fail, exit with error
-          if [ $? -ne 0 ]; then
-            echo "All container execution methods failed"
-            exit 1
-          fi
+          echo "Container verification passed!"
       
       - name: Clean up Docker images
         if: always()
