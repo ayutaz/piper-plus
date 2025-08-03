@@ -120,6 +120,4 @@ RUN chmod +x /workspace/build.sh
 COPY docker/cpp-train/test.sh /workspace/
 RUN chmod +x /workspace/test.sh
 
-# Default command is bash for interactive use
-# For automated tests, specify command explicitly
-CMD ["/bin/bash"]
+# No default CMD - must specify command at runtime

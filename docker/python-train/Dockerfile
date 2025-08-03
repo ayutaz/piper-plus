@@ -125,4 +125,4 @@ EXPOSE 6006 8888
 # Copy test script
 COPY docker/python-train/test.py /test.py
 
-CMD ["/bin/bash"]
+# No default CMD - must specify command at runtime

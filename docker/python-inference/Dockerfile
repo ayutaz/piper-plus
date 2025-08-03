@@ -63,5 +63,4 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD python -c "import torch; import piper; print('Health check passed')" || exit 1
 
-# Default to bash, can be overridden to run inference.py with proper args
-CMD ["/bin/bash"]
+# No default CMD - must specify command at runtime
