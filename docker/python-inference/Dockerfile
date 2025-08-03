@@ -63,4 +63,5 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD python -c "import torch; import piper; print('Health check passed')" || exit 1
 
-# No default CMD - must specify command at runtime
+# Set ENTRYPOINT to /bin/sh for flexibility
+ENTRYPOINT ["/bin/sh", "-c"]

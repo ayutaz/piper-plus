@@ -125,4 +125,5 @@ EXPOSE 6006 8888
 # Copy test script
 COPY docker/python-train/test.py /test.py
 
-# No default CMD - must specify command at runtime
+# Set ENTRYPOINT to /bin/sh for flexibility
+ENTRYPOINT ["/bin/sh", "-c"]

@@ -82,14 +82,14 @@ jobs:
         if: success()
         run: |
           echo "=== Simple echo test for ${{ matrix.image.name }} container ==="
-          # Disable TTY allocation and use non-interactive mode
-          docker run --rm -i piper-${{ matrix.image.name }}:test /bin/sh -c "echo 'Container is working'"
+          # Use the ENTRYPOINT we set in Dockerfile
+          docker run --rm piper-${{ matrix.image.name }}:test "echo 'Container is working'"
       
       - name: Test container - Python version
         if: success() && (matrix.image.name == 'python-train' || matrix.image.name == 'python-inference')
         run: |
           echo "=== Python version test ==="
-          docker run --rm -i piper-${{ matrix.image.name }}:test python --version
+          docker run --rm piper-${{ matrix.image.name }}:test "python --version"
       
       - name: Test container - Actual tests
         if: success()
@@ -97,13 +97,13 @@ jobs:
           echo "=== Running actual tests for ${{ matrix.image.name }} ==="
           case "${{ matrix.image.name }}" in
             python-train)
-              docker run --rm -i piper-${{ matrix.image.name }}:test /bin/bash -c "cd / && python test.py"
+              docker run --rm piper-${{ matrix.image.name }}:test "cd / && python test.py"
               ;;
             python-inference)
-              docker run --rm -i piper-${{ matrix.image.name }}:test /bin/bash -c "cd /app && python test.py"
+              docker run --rm piper-${{ matrix.image.name }}:test "cd /app && python test.py"
               ;;
             cpp-train)
-              docker run --rm -i piper-${{ matrix.image.name }}:test /bin/bash -c "cd /workspace && ./test.sh"
+              docker run --rm piper-${{ matrix.image.name }}:test "cd /workspace && ./test.sh"
               ;;
           esac
       

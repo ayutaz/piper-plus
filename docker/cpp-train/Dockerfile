@@ -120,4 +120,5 @@ RUN chmod +x /workspace/build.sh
 COPY docker/cpp-train/test.sh /workspace/
 RUN chmod +x /workspace/test.sh
 
-# No default CMD - must specify command at runtime
+# Set ENTRYPOINT to /bin/sh for flexibility
+ENTRYPOINT ["/bin/sh", "-c"]
