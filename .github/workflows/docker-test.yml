@@ -78,19 +78,31 @@ jobs:
           echo "=== Testing basic execution ==="
           docker run --rm piper-${{ matrix.image.name }}:test echo hello || echo "Basic echo failed: $?"
       
-      - name: Test container
+      - name: Test container - Simple echo test
         if: success()
         run: |
-          echo "=== Testing ${{ matrix.image.name }} container ==="
+          echo "=== Simple echo test for ${{ matrix.image.name }} container ==="
+          docker run --rm piper-${{ matrix.image.name }}:test echo "Container is working"
+      
+      - name: Test container - Python version
+        if: success() && (matrix.image.name == 'python-train' || matrix.image.name == 'python-inference')
+        run: |
+          echo "=== Python version test ==="
+          docker run --rm piper-${{ matrix.image.name }}:test python --version
+      
+      - name: Test container - Actual tests
+        if: success()
+        run: |
+          echo "=== Running actual tests for ${{ matrix.image.name }} ==="
           case "${{ matrix.image.name }}" in
             python-train)
-              docker run --rm --entrypoint python piper-${{ matrix.image.name }}:test /test.py
+              docker run --rm piper-${{ matrix.image.name }}:test /bin/bash -c "cd / && python test.py"
               ;;
             python-inference)
-              docker run --rm --entrypoint python piper-${{ matrix.image.name }}:test /app/test.py
+              docker run --rm piper-${{ matrix.image.name }}:test /bin/bash -c "cd /app && python test.py"
               ;;
             cpp-train)
-              docker run --rm --entrypoint /bin/bash piper-${{ matrix.image.name }}:test /workspace/test.sh
+              docker run --rm piper-${{ matrix.image.name }}:test /bin/bash -c "cd /workspace && ./test.sh"
               ;;
           esac
       
