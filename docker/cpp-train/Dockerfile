@@ -116,4 +116,8 @@ RUN mkdir -p /workspace/build /workspace/.ccache
 COPY docker/cpp-train/build.sh /workspace/
 RUN chmod +x /workspace/build.sh
 
+# Copy test script
+COPY docker/cpp-train/test.sh /workspace/
+RUN chmod +x /workspace/test.sh
+
 CMD ["/bin/bash"]

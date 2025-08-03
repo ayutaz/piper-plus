@@ -122,6 +122,9 @@ RUN mkdir -p /workspace/datasets /workspace/checkpoints /workspace/logs
 # Expose ports for tensorboard and jupyter
 EXPOSE 6006 8888
 
+# Copy test script
+COPY docker/python-train/test.py /test.py
+
 # Set up entrypoint
 COPY docker/python-train/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh

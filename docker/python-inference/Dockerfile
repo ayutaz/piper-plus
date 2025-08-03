@@ -53,6 +53,9 @@ RUN mkdir -p /app/models /app/output
 # Copy inference script
 COPY docker/python-inference/inference.py /app/
 
+# Copy test script
+COPY docker/python-inference/test.py /app/
+
 # Expose port for API service (optional)
 EXPOSE 8000
 
@@ -60,4 +63,5 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD python -c "import torch; import piper; print('Health check passed')" || exit 1
 
-CMD ["python", "inference.py"]
+# Default to bash, can be overridden to run inference.py with proper args
+CMD ["/bin/bash"]

@@ -68,15 +68,15 @@ jobs:
           case "${{ matrix.image.name }}" in
             python-train)
               echo "Testing python-train container..."
-              echo "Skipping python-train test due to CMD issue - will fix in separate PR"
+              docker run --rm piper-${{ matrix.image.name }}:test python /test.py
               ;;
             python-inference)
               echo "Testing python-inference container..."
-              echo "Skipping python-inference test due to CMD issue - will fix in separate PR"
+              docker run --rm piper-${{ matrix.image.name }}:test python /app/test.py
               ;;
             cpp-train)
               echo "Testing cpp-train container..."
-              echo "Skipping cpp-train test due to CMD issue - will fix in separate PR"
+              docker run --rm piper-${{ matrix.image.name }}:test /workspace/test.sh
               ;;
           esac
       
