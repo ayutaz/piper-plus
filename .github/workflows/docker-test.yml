@@ -64,20 +64,38 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
       
+      - name: Debug container contents
+        run: |
+          echo "Checking contents of ${{ matrix.image.name }} container..."
+          case "${{ matrix.image.name }}" in
+            python-train)
+              docker run --rm --entrypoint /bin/bash piper-${{ matrix.image.name }}:test -c "ls -la /"
+              docker run --rm --entrypoint /bin/bash piper-${{ matrix.image.name }}:test -c "ls -la /test.py" || echo "test.py not found"
+              ;;
+            python-inference)
+              docker run --rm --entrypoint /bin/bash piper-${{ matrix.image.name }}:test -c "ls -la /app/"
+              docker run --rm --entrypoint /bin/bash piper-${{ matrix.image.name }}:test -c "ls -la /app/test.py" || echo "test.py not found"
+              ;;
+            cpp-train)
+              docker run --rm --entrypoint /bin/bash piper-${{ matrix.image.name }}:test -c "ls -la /workspace/"
+              docker run --rm --entrypoint /bin/bash piper-${{ matrix.image.name }}:test -c "ls -la /workspace/test.sh" || echo "test.sh not found"
+              ;;
+          esac
+      
       - name: Test ${{ matrix.image.name }} container
         run: |
           case "${{ matrix.image.name }}" in
             python-train)
               echo "Testing python-train container..."
-              docker run --rm --entrypoint python piper-${{ matrix.image.name }}:test /test.py
+              docker run --rm --entrypoint /bin/bash piper-${{ matrix.image.name }}:test -c "python /test.py"
               ;;
             python-inference)
               echo "Testing python-inference container..."
-              docker run --rm --entrypoint python piper-${{ matrix.image.name }}:test /app/test.py
+              docker run --rm --entrypoint /bin/bash piper-${{ matrix.image.name }}:test -c "python /app/test.py"
               ;;
             cpp-train)
               echo "Testing cpp-train container..."
-              docker run --rm --entrypoint bash piper-${{ matrix.image.name }}:test /workspace/test.sh
+              docker run --rm --entrypoint /bin/bash piper-${{ matrix.image.name }}:test -c "bash /workspace/test.sh"
               ;;
           esac
       
