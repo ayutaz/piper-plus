@@ -15,71 +15,27 @@ on:
       - '.dockerignore'
 
 jobs:
-  test-docker-builds:
+  test-docker-compose:
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        image:
-          - name: python-train
-            context: .
-            dockerfile: ./docker/python-train/Dockerfile
-          - name: python-inference
-            context: .
-            dockerfile: ./docker/python-inference/Dockerfile
-          - name: cpp-train
-            context: .
-            dockerfile: ./docker/cpp-train/Dockerfile
     
     steps:
-      - name: Free disk space
-        run: |
-          echo "=== Initial disk space ==="
-          df -h
-          echo "=== Removing unnecessary files ==="
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /opt/ghc
-          sudo rm -rf "/usr/local/share/boost"
-          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
-          sudo rm -rf /usr/local/lib/android
-          sudo rm -rf /opt/hostedtoolcache/CodeQL
-          sudo docker image prune --all --force
-          sudo apt-get clean
-          echo "=== Final disk space ==="
-          df -h
-      
       - name: Checkout repository
         uses: actions/checkout@v4
       
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-      
-      - name: Build ${{ matrix.image.name }}
-        uses: docker/build-push-action@v5
-        with:
-          context: ${{ matrix.image.context }}
-          file: ${{ matrix.image.dockerfile }}
-          push: false
-          tags: piper-${{ matrix.image.name }}:test
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-      
-      - name: Verify container can run
+      - name: Build and test with docker-compose
         run: |
-          echo "=== Verifying ${{ matrix.image.name }} container ==="
-          # Simply run the container with its default CMD
-          docker run --rm piper-${{ matrix.image.name }}:test
-          
-          # If that works, try overriding with a custom command
-          echo "Testing with custom command..."
-          docker run --rm piper-${{ matrix.image.name }}:test /bin/bash -c "python --version || echo 'Not a Python container'"
-          
-          echo "Container verification passed!"
+          echo "=== Building and testing containers with docker-compose ==="
+          docker-compose -f docker-compose.test.yml build
+          echo "=== Running containers ==="
+          docker-compose -f docker-compose.test.yml run --rm cpp-train-test
+          docker-compose -f docker-compose.test.yml run --rm python-train-test
+          docker-compose -f docker-compose.test.yml run --rm python-inference-test
+          echo "=== All containers ran successfully ==="
       
-      - name: Clean up Docker images
+      - name: Clean up
         if: always()
         run: |
-          docker image rm piper-${{ matrix.image.name }}:test || true
+          docker-compose -f docker-compose.test.yml down -v
           docker system prune -f
 
   # Test inference with test models

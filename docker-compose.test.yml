@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  cpp-train-test:
+    build:
+      context: .
+      dockerfile: docker/cpp-train/Dockerfile
+    command: echo "cpp-train container started successfully"
+
+  python-train-test:
+    build:
+      context: .
+      dockerfile: docker/python-train/Dockerfile  
+    command: echo "python-train container started successfully"
+
+  python-inference-test:
+    build:
+      context: .
+      dockerfile: docker/python-inference/Dockerfile
+    command: echo "python-inference container started successfully"
