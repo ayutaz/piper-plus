@@ -70,5 +70,8 @@ RUN echo "=== Running build-time tests ===" && \
     python -c "import piper; print('piper installed successfully')" && \
     echo "=== Build-time tests passed ==="
 
-# Default command for runtime - using exec form
-CMD ["/bin/bash", "-c", "echo 'Container started successfully'"]
+# Ensure we have a valid working directory
+WORKDIR /app
+
+# Default command for runtime
+CMD ["echo", "Container started successfully"]

@@ -133,5 +133,8 @@ RUN echo "=== Running build-time tests ===" && \
     cd /opt/piper/python && python -c "import piper_train; print('piper_train accessible')" || echo "piper_train will be available at runtime" && \
     echo "=== Build-time tests passed ==="
 
-# Default command for runtime - using exec form
-CMD ["/bin/bash", "-c", "echo 'Container started successfully'"]
+# Ensure we have a valid working directory
+WORKDIR /workspace
+
+# Default command for runtime
+CMD ["echo", "Container started successfully"]

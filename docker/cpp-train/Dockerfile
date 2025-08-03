@@ -130,5 +130,8 @@ RUN echo "=== Running build-time tests ===" && \
     ldconfig -p | grep -E "(onnxruntime|espeak|HTSEngine)" || echo "Some libraries in /usr/local/lib" && \
     echo "=== Build-time tests passed ==="
 
-# Default command for runtime - using exec form
-CMD ["/bin/bash", "-c", "echo 'Container started successfully'"]
+# Ensure we're in a valid directory
+WORKDIR /workspace
+
+# Default command for runtime
+CMD ["echo", "Container started successfully"]
