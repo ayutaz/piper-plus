@@ -20,7 +20,7 @@ std::unordered_map<std::string, std::string> parseSimpleJsonDict(const std::stri
     std::unordered_map<std::string, std::string> result;
     
     // 非常に簡略化された解析 - "key": "value" のパターンを探す
-    std::regex pattern(R"("([^"]+)"\s*:\s*"([^"]+)")");
+    std::regex pattern("\"([^\"]+)\"\\s*:\\s*\"([^\"]+)\"");
     std::sregex_iterator it(content.begin(), content.end(), pattern);
     std::sregex_iterator end;
     
@@ -35,9 +35,9 @@ std::unordered_map<std::string, DictionaryEntry> parseJsonDictV2(const std::stri
     std::unordered_map<std::string, DictionaryEntry> result;
     
     // "word": {"pronunciation": "...", "priority": N} のパターンを探す
-    std::regex wordPattern(R"("([^"]+)"\s*:\s*\{([^}]+)\})");
-    std::regex pronPattern(R"("pronunciation"\s*:\s*"([^"]+)")");
-    std::regex prioPattern(R"("priority"\s*:\s*(\d+))");
+    std::regex wordPattern("\"([^\"]+)\"\\s*:\\s*\\{([^}]+)\\}");
+    std::regex pronPattern("\"pronunciation\"\\s*:\\s*\"([^\"]+)\"");
+    std::regex prioPattern("\"priority\"\\s*:\\s*(\\d+)");
     
     std::sregex_iterator it(content.begin(), content.end(), wordPattern);
     std::sregex_iterator end;
@@ -73,7 +73,7 @@ std::unordered_map<std::string, DictionaryEntry> parseJsonDictV2(const std::stri
     }
     
     // 簡易的な文字列値も処理（後方互換性のため）
-    std::regex simplePattern(R"("([^"]+)"\s*:\s*"([^"]+)")");
+    std::regex simplePattern("\"([^\"]+)\"\\s*:\\s*\"([^\"]+)\"");
     std::sregex_iterator simpleIt(content.begin(), content.end(), simplePattern);
     
     for (; simpleIt != end; ++simpleIt) {
