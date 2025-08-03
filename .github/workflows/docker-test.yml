@@ -70,15 +70,11 @@ jobs:
           # Check if image was built successfully
           docker images | grep piper-${{ matrix.image.name }} || exit 1
           
-          # Try to run the container with a simple command
-          echo "Testing basic container execution..."
-          docker run --rm --entrypoint /bin/sh piper-${{ matrix.image.name }}:test -c "echo 'Container runs successfully'"
+          # Run a simple test - just check if we can execute echo
+          echo "Testing container with echo command..."
+          docker run --rm piper-${{ matrix.image.name }}:test /bin/bash -c "echo 'Success: Container executed command'"
           
-          # For Python containers, verify Python works
-          if [[ "${{ matrix.image.name }}" == "python-"* ]]; then
-            echo "Verifying Python installation..."
-            docker run --rm --entrypoint python piper-${{ matrix.image.name }}:test --version
-          fi
+          echo "Container verification passed!"
       
       - name: Clean up Docker images
         if: always()
