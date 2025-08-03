@@ -365,7 +365,15 @@
                 // Initialize custom dictionary
                 updateStatus('カスタム辞書を読み込んでいます...');
                 customDict = new CustomDictionary();
-                const dictLoaded = await customDict.loadFromJSON('../assets/custom_dictionary.json');
+                
+                // 複数の辞書を読み込む（優先度順）
+                const dictionaries = [
+                    '../assets/custom_dictionary.json',  // 既存の辞書（互換性のため）
+                    '../assets/default_tech_dict.json',  // 技術用語辞書
+                    '../assets/default_common_dict.json' // 一般用語辞書
+                ];
+                
+                const dictLoaded = await customDict.loadFromJSON(dictionaries);
                 if (dictLoaded) {
                     console.log(`カスタム辞書を読み込みました（${customDict.size}エントリー）`);
                 } else {
