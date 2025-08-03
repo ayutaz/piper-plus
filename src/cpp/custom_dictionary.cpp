@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <cctype>
 #include <sstream>
+#include <regex>
 
 // JSON parsing - we'll use a simple approach for now
 // In production, consider using nlohmann/json or rapidjson
