@@ -20,7 +20,9 @@ def _is_question(text: str) -> bool:
     return text.strip().endswith("?") or text.strip().endswith("？")
 
 
-def phonemize_japanese(text: str, custom_dict: CustomDictionary | str | list[str] | None = None) -> list[str]:
+def phonemize_japanese(
+    text: str, custom_dict: CustomDictionary | str | list[str] | None = None
+) -> list[str]:
     """Convert *text* into a list of phoneme/prosody tokens that Piper can ingest.
 
     The algorithm follows the so-called "Kurihara method" that inserts the
