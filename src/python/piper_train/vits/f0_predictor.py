@@ -3,6 +3,7 @@ import torch.nn.functional as F
 from torch import nn
 
 from .modules import ConvReluNorm
+from .onnx_attention import ONNXFriendlyAttention
 
 
 class F0Predictor(nn.Module):
@@ -48,9 +49,27 @@ class F0Predictor(nn.Module):
                 )
             )
 
-        # Multi-head self-attention for context modeling
-        self.attention = nn.MultiheadAttention(
+        # Use ONNX-friendly attention implementation
+        self.attention = ONNXFriendlyAttention(
+            hidden_channels, n_heads, dropout=p_dropout
+        )
+
+        # For backward compatibility with existing checkpoints
+        self._use_onnx_attention = True
+
+        # Keep original MultiheadAttention for weight migration (will be removed after migration)
+        self._original_attention = nn.MultiheadAttention(
             hidden_channels, n_heads, dropout=p_dropout, batch_first=True
+        )
+
+        # Alternative conv path for fallback (keep for compatibility)
+        self.context_conv = nn.Sequential(
+            nn.Conv1d(hidden_channels, hidden_channels, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.Dropout(p_dropout),
+            nn.Conv1d(hidden_channels, hidden_channels, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.Dropout(p_dropout),
         )
 
         # Prosody embedding for Japanese accent marks
@@ -79,13 +98,45 @@ class F0Predictor(nn.Module):
         if gin_channels > 0:
             self.cond = nn.Conv1d(gin_channels, hidden_channels, 1)
 
-    def forward(self, x, x_mask=None, prosody_ids=None, g=None):
+        # Initialize weights
+        self._init_weights()
+
+    def _init_weights(self):
+        """Initialize weights for better training stability."""
+        # Initialize prosody embedding with small values
+        nn.init.normal_(self.prosody_embed.weight, mean=0.0, std=0.02)
+
+        # Initialize conv layers
+        for module in self.modules():
+            if isinstance(module, nn.Conv1d):
+                nn.init.kaiming_normal_(
+                    module.weight, mode="fan_out", nonlinearity="relu"
+                )
+                if module.bias is not None:
+                    nn.init.constant_(module.bias, 0)
+            elif isinstance(module, nn.Linear):
+                nn.init.xavier_uniform_(module.weight)
+                if module.bias is not None:
+                    nn.init.constant_(module.bias, 0)
+
+    def forward(self, x, x_mask=None, prosody_ids=None, g=None, use_conv=False):
+        """
+        Forward pass with ONNX-friendly attention.
+
+        Args:
+            x: Input features [B, hidden_channels, T]
+            x_mask: Mask for valid positions [B, 1, T]
+            prosody_ids: Prosody mark IDs [B, T]
+            g: Speaker embedding [B, gin_channels, 1]
+            use_conv: Legacy parameter for compatibility (now ignored)
+        """
         """
         Args:
             x: Input features [B, hidden_channels, T]
             x_mask: Mask for valid positions [B, 1, T]
             prosody_ids: Prosody mark IDs [B, T]
             g: Speaker embedding [B, gin_channels, 1]
+            use_conv: Use conv instead of attention for ONNX export
 
         Returns:
             f0_prediction: Discrete F0 bins [B, n_bins, T]
@@ -114,15 +165,14 @@ class F0Predictor(nn.Module):
                 x = layer(x, dummy_mask)
             x = x + residual
 
-        # Self-attention for long-range dependencies
-        x_seq = x.transpose(1, 2)  # [B, T, hidden]
-        x_att, _ = self.attention(
-            x_seq,
-            x_seq,
-            x_seq,
-            key_padding_mask=x_mask.squeeze(1) == 0 if x_mask is not None else None,
-        )
-        x = x + x_att.transpose(1, 2)
+        # Use ONNX-friendly attention (no more conv fallback needed)
+        key_padding_mask = None
+        if x_mask is not None:
+            # Convert mask from [B, 1, T] to [B, T] and invert (True = padding)
+            key_padding_mask = x_mask.squeeze(1) == 0
+
+        x_att = self.attention(x, key_padding_mask)
+        x = x + x_att
 
         # F0 prediction
         f0_prediction = self.f0_proj(x)  # [B, n_bins, T]
@@ -139,6 +189,88 @@ class F0Predictor(nn.Module):
             variance = variance * x_mask
 
         return f0_prediction, f0_values, variance
+
+    def migrate_attention_weights(self):
+        """
+        Migrate weights from original MultiheadAttention to ONNX-friendly attention.
+        This should be called after loading a checkpoint with the old attention weights.
+        """
+        if hasattr(self, "_original_attention"):
+            print("Migrating F0 Predictor attention weights...")
+            self.attention.migrate_from_multihead_attention(self._original_attention)
+            # Remove the original attention to save memory
+            delattr(self, "_original_attention")
+            print("Weight migration completed.")
+
+    def _load_from_state_dict(
+        self,
+        state_dict,
+        prefix,
+        local_metadata,
+        strict,
+        missing_keys,
+        unexpected_keys,
+        error_msgs,
+    ):
+        """Custom state dict loading to handle attention module changes."""
+        # Check if we're loading from an old checkpoint with MultiheadAttention
+        attention_keys = [
+            k for k in state_dict.keys() if k.startswith(prefix + "attention.")
+        ]
+
+        if any("in_proj_weight" in k for k in attention_keys):
+            # Old checkpoint with MultiheadAttention
+            print("Loading F0 Predictor from old checkpoint with MultiheadAttention")
+
+            # Check weight shape to handle Conv1d vs Linear differences
+            out_proj_key = prefix + "attention.out_proj.weight"
+            if out_proj_key in state_dict:
+                weight_shape = state_dict[out_proj_key].shape
+                if len(weight_shape) == 2:
+                    # Convert Linear weights to Conv1d format (add kernel dimension)
+                    for key in list(state_dict.keys()):
+                        if key.startswith(prefix + "attention.") and key.endswith(
+                            ".weight"
+                        ):
+                            if len(state_dict[key].shape) == 2:
+                                state_dict[key] = state_dict[key].unsqueeze(-1)
+
+            # Temporarily replace attention with MultiheadAttention for loading
+            old_attention = self.attention
+            self.attention = nn.MultiheadAttention(
+                self.hidden_channels, 2, dropout=0.1, batch_first=True
+            )
+
+            # Load the state dict
+            super()._load_from_state_dict(
+                state_dict,
+                prefix,
+                local_metadata,
+                strict,
+                missing_keys,
+                unexpected_keys,
+                error_msgs,
+            )
+
+            # Migrate weights to ONNX-friendly attention
+            print("Migrating F0 Predictor attention weights to ONNX-friendly format...")
+            old_attention.migrate_from_multihead_attention(self.attention)
+
+            # Restore ONNX-friendly attention
+            self._original_attention = self.attention
+            self.attention = old_attention
+            print("Migration completed.")
+        else:
+            # New checkpoint or already migrated
+            super()._load_from_state_dict(
+                state_dict,
+                prefix,
+                local_metadata,
+                strict,
+                missing_keys,
+                unexpected_keys,
+                error_msgs,
+            )
 
     def _bins_to_f0(self, f0_bins):
         """Convert discrete F0 bins to continuous F0 values."""

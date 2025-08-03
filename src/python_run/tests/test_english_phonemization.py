@@ -161,7 +161,10 @@ class TestVoicePhonemizerIntegration:
 
         import piper.voice
 
-        ids = piper.voice.PiperVoice.phonemes_to_ids(voice, test_phonemes)
+        result = piper.voice.PiperVoice.phonemes_to_ids(voice, test_phonemes)
+        
+        # phonemes_to_ids now returns tuple (ids, prosody_ids)
+        ids, prosody_ids = result
 
         # Should start with BOS
         assert ids[0] == 1  # BOS = ^
@@ -174,6 +177,10 @@ class TestVoicePhonemizerIntegration:
 
         # Should end with EOS
         assert ids[-1] == 2  # EOS = $
+        
+        # Check prosody_ids are also returned
+        assert isinstance(prosody_ids, list)
+        assert len(prosody_ids) > 0
 
 
 class TestCLIIntegration:
