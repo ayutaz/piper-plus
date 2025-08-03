@@ -69,15 +69,15 @@ jobs:
           case "${{ matrix.image.name }}" in
             python-train)
               echo "Testing python-train container..."
-              docker run --rm piper-${{ matrix.image.name }}:test python /test.py
+              docker run --rm --entrypoint python piper-${{ matrix.image.name }}:test /test.py
               ;;
             python-inference)
               echo "Testing python-inference container..."
-              docker run --rm piper-${{ matrix.image.name }}:test python /app/test.py
+              docker run --rm --entrypoint python piper-${{ matrix.image.name }}:test /app/test.py
               ;;
             cpp-train)
               echo "Testing cpp-train container..."
-              docker run --rm piper-${{ matrix.image.name }}:test /workspace/test.sh
+              docker run --rm --entrypoint bash piper-${{ matrix.image.name }}:test /workspace/test.sh
               ;;
           esac
       
