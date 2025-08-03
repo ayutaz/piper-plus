@@ -125,9 +125,4 @@ EXPOSE 6006 8888
 # Copy test script
 COPY docker/python-train/test.py /test.py
 
-# Set up entrypoint
-COPY docker/python-train/entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
-
-ENTRYPOINT ["/entrypoint.sh"]
 CMD ["/bin/bash"]
