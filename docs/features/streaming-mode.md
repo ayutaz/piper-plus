@@ -7,14 +7,24 @@ Piper now supports a streaming synthesis mode that reduces latency by processing
 Add the `--streaming` flag when using raw audio output:
 
 ```bash
+# Text input
 echo "Your text here" | piper --model model.onnx --output-raw --streaming
+
+# Raw phonemes input (also supported)
+echo "h ə l oʊ w ɜː l d" | piper --model model.onnx --output-raw --streaming --raw-phonemes
 ```
 
 ## How It Works
 
+### Text Mode
 1. **Text Chunking**: Input text is split into smaller chunks at natural boundaries (punctuation, conjunctions)
 2. **Progressive Synthesis**: Each chunk is phonemized and synthesized independently
 3. **Immediate Output**: Audio is output as soon as each chunk is ready
+
+### Raw Phonemes Mode
+1. **Phoneme Chunking**: Input phonemes are split into configurable chunks (default: 10 phonemes)
+2. **Progressive Synthesis**: Each chunk is synthesized with proper BOS/EOS token handling
+3. **Immediate Output**: Audio chunks are output progressively
 
 ## Performance
 
@@ -32,7 +42,6 @@ Streaming mode provides the most benefit for longer texts:
 ## Limitations
 
 - Currently only works with `--output-raw` mode
-- Not yet supported with `--raw-phonemes` input
 - Audio quality at chunk boundaries may vary slightly
 
 ## API Usage
@@ -56,4 +65,4 @@ piper::textToAudioStreaming(config, voice, text, audioBuffer,
 - Fine-grained chunking at word/syllable level
 - Progressive phonemization for even lower latency
 - Support for WAV output mode
-- Configurable chunk size
+- Configurable chunk size for raw phonemes mode via command-line flag
