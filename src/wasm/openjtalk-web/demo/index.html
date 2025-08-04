@@ -235,7 +235,7 @@
 <body>
     <div class="container">
         <h1>🎤 Piper 多言語音声合成デモ</h1>
-        <p class="subtitle">WebAssemblyとONNX Runtimeを使用した日本語・英語のニューラル音声合成</p>
+        <p class="subtitle">WebAssemblyとONNX Runtimeを使用した日本語・英語・中国語のニューラル音声合成</p>
         
         <div id="status" class="status info">
             初期化中...
@@ -246,6 +246,7 @@
             <ul>
                 <li>🇯🇵 日本語音声合成（OpenJTalk + Piperニューラルモデル）</li>
                 <li>🇺🇸 英語音声合成（eSpeak-ng + Piperニューラルモデル）</li>
+                <li>🇨🇳 中国語音声合成（eSpeak-ng + Piperニューラルモデル）</li>
                 <li>🎯 完全ブラウザ実装（サーバー不要）</li>
                 <li>⚡ WebAssembly + ONNX Runtime Webによる高速処理</li>
             </ul>
@@ -259,6 +260,9 @@
                 </button>
                 <button class="lang-button" data-lang="en">
                     🇺🇸 English
+                </button>
+                <button class="lang-button" data-lang="zh">
+                    🇨🇳 中文
                 </button>
             </div>
         </div>
@@ -342,6 +346,19 @@
                     'How are you today?',
                     'Welcome to the Piper speech synthesis demo.',
                     'The quick brown fox jumps over the lazy dog.'
+                ]
+            },
+            'zh': {
+                name: '中文',
+                model: 'zh_CN-huayan-medium.onnx',
+                phonemizer: 'espeak',
+                testText: '你好，世界！今天天气真好。',
+                templates: [
+                    '你好，世界！',
+                    '今天天气真好。',
+                    '人工智能语音合成技术',
+                    '欢迎使用Piper语音合成系统。',
+                    '春眠不觉晓，处处闻啼鸟。'
                 ]
             }
         };
