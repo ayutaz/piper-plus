@@ -481,20 +481,12 @@ int main(int argc, char *argv[]) {
         };
         
         if (runConfig.rawPhonemes) {
-          spdlog::warn("Streaming mode not yet supported with raw phonemes");
-          // Fall back to regular mode for now
+          // Use streaming synthesis for raw phonemes
           auto phonemeType = static_cast<piper::PhonemeTypeInt>(voice.phonemizeConfig.phonemeType);
           auto phonemes = piper::parsePhonemeString(line, phonemeType);
-          piper::phonemesToAudio(piperConfig, voice, phonemes, audioBuffer, result);
-          // Send all audio at once
-          {
-            unique_lock lockAudio(mutAudio);
-            copy(audioBuffer.begin(), audioBuffer.end(), back_inserter(sharedAudioBuffer));
-            audioReady = true;
-            cvAudio.notify_one();
-          }
+          piper::phonemesToAudioStreaming(piperConfig, voice, phonemes, audioBuffer, result, chunkCallback);
         } else {
-          // Use streaming synthesis
+          // Use streaming synthesis for text
           piper::textToAudioStreaming(piperConfig, voice, line, audioBuffer, result, chunkCallback);
         }
       } else {

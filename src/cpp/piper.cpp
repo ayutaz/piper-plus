@@ -1280,6 +1280,119 @@ void textToAudioStreaming(PiperConfig &config, Voice &voice, std::string text,
   
 } /* textToAudioStreaming */
 
+// Streaming phonemes-to-audio synthesis with reduced latency
+void phonemesToAudioStreaming(PiperConfig &config, Voice &voice,
+                              const std::vector<Phoneme> &phonemes,
+                              std::vector<int16_t> &audioBuffer,
+                              SynthesisResult &result,
+                              const std::function<void(const std::vector<int16_t>&)> &chunkCallback,
+                              size_t phonemesPerChunk) {
+  spdlog::debug("phonemesToAudioStreaming: {} phonemes, chunk size={}",
+                phonemes.size(), phonemesPerChunk);
+  
+  // Clear result
+  result.inferSeconds = 0;
+  result.audioSeconds = 0;
+  result.realTimeFactor = 0;
+  
+  // Clear output buffer
+  audioBuffer.clear();
+  
+  if (phonemes.empty()) {
+    return;
+  }
+  
+  // Setup phoneme ID configuration
+  PhonemeIdConfig idConfig;
+  idConfig.phonemeIdMap = 
+      std::make_shared<PhonemeIdMap>(voice.phonemizeConfig.phonemeIdMap);
+  idConfig.interspersePad = voice.phonemizeConfig.interspersePad;
+  idConfig.addBos = true;
+  idConfig.addEos = false;  // We'll add EOS only to the last chunk
+  
+  std::vector<PhonemeId> phonemeIds;
+  std::map<Phoneme, std::size_t> missingPhonemes;
+  std::vector<int16_t> chunkAudioBuffer;
+  
+  // Process phonemes in chunks
+  size_t processedPhonemes = 0;
+  while (processedPhonemes < phonemes.size()) {
+    // Determine chunk boundaries
+    size_t chunkStart = processedPhonemes;
+    size_t chunkEnd = std::min(processedPhonemes + phonemesPerChunk, phonemes.size());
+    bool isLastChunk = (chunkEnd == phonemes.size());
+    
+    // Extract chunk phonemes
+    std::vector<Phoneme> chunkPhonemes(phonemes.begin() + chunkStart,
+                                        phonemes.begin() + chunkEnd);
+    
+    // Add EOS only to the last chunk
+    idConfig.addEos = isLastChunk;
+    
+    // Convert chunk phonemes to IDs
+    phonemeIds.clear();
+    phonemes_to_ids(chunkPhonemes, idConfig, phonemeIds, missingPhonemes);
+    
+    // Log phoneme IDs for debugging
+    if (spdlog::should_log(spdlog::level::debug)) {
+      std::stringstream phonemeIdsStr;
+      for (auto phonemeId : phonemeIds) {
+        phonemeIdsStr << phonemeId << ", ";
+      }
+      spdlog::debug("Chunk {}: {} phonemes -> {} IDs: {}", 
+                    (processedPhonemes / phonemesPerChunk) + 1,
+                    chunkPhonemes.size(), phonemeIds.size(), phonemeIdsStr.str());
+    }
+    
+    // Synthesize chunk
+    chunkAudioBuffer.clear();
+    SynthesisResult chunkResult;
+    synthesize(phonemeIds, voice.synthesisConfig, voice.session, 
+               chunkAudioBuffer, chunkResult, &voice);
+    
+    // Accumulate results
+    result.audioSeconds += chunkResult.audioSeconds;
+    result.inferSeconds += chunkResult.inferSeconds;
+    
+    // Append to main buffer
+    audioBuffer.insert(audioBuffer.end(), 
+                       chunkAudioBuffer.begin(), 
+                       chunkAudioBuffer.end());
+    
+    // Call chunk callback
+    if (chunkCallback && !chunkAudioBuffer.empty()) {
+      chunkCallback(chunkAudioBuffer);
+    }
+    
+    // Move to next chunk
+    processedPhonemes = chunkEnd;
+    
+    // For subsequent chunks, don't add BOS
+    idConfig.addBos = false;
+  }
+  
+  // Report missing phonemes
+  if (!missingPhonemes.empty()) {
+    spdlog::warn("Missing {} phoneme(s) from phoneme/id map!", missingPhonemes.size());
+    for (auto& [phoneme, count] : missingPhonemes) {
+      std::string phonemeStr;
+      utf8::append(phoneme, std::back_inserter(phonemeStr));
+      spdlog::warn("Missing \"{}\" (\\u{:04X}): {} time(s)", phonemeStr,
+                   (uint32_t)phoneme, count);
+    }
+  }
+  
+  // Calculate final real-time factor
+  if (result.audioSeconds > 0) {
+    result.realTimeFactor = result.inferSeconds / result.audioSeconds;
+  }
+  
+  spdlog::debug("Streaming phoneme synthesis complete: {} chunks, {:.2f}s audio, RTF={:.2f}",
+                (phonemes.size() + phonemesPerChunk - 1) / phonemesPerChunk,
+                result.audioSeconds, result.realTimeFactor);
+  
+} /* phonemesToAudioStreaming */
+
 // Output phoneme timing information as JSON
 void outputTimingsAsJSON(const std::vector<PhonemeInfo> &timings,
                          std::ostream &output,

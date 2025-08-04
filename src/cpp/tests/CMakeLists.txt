@@ -14,6 +14,7 @@ set(TEST_SOURCES
     test_gpu_device_id.cpp
     test_phoneme_parser.cpp
     test_streaming_simple.cpp
+    test_streaming_raw_phonemes.cpp
 )
 
 # Add dictionary manager test for Unix platforms
@@ -124,6 +125,71 @@ foreach(test_source ${TEST_SOURCES})
 
     # Link additional dependencies for streaming test - using same approach as test_piper
     if(${test_name} STREQUAL "test_streaming_simple")
+        target_sources(${test_name} PRIVATE
+            ../piper.cpp
+            ../phoneme_parser.cpp
+            ../openjtalk_phonemize.cpp
+            ../openjtalk_wrapper.c
+            ../openjtalk_dictionary_manager.c
+            ../openjtalk_error.c
+            ../openjtalk_security.c
+            ../openjtalk_optimized.c
+        )
+        
+        # Include directories
+        target_include_directories(${test_name} PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/..
+            ${CMAKE_BINARY_DIR}/fi/include
+            ${CMAKE_BINARY_DIR}/si/include
+            ${CMAKE_BINARY_DIR}/pi/include
+        )
+        
+        # Add library directories
+        target_link_directories(${test_name} PRIVATE
+            ${CMAKE_BINARY_DIR}/fi/lib
+            ${CMAKE_BINARY_DIR}/si/lib
+            ${CMAKE_BINARY_DIR}/pi/lib
+        )
+        
+        # Platform-specific library linking (same as main piper)
+        if(WIN32)
+            # Windows: Link libraries directly
+            target_link_libraries(${test_name}
+                optimized ${CMAKE_BINARY_DIR}/fi/lib/fmt.lib
+                debug ${CMAKE_BINARY_DIR}/fi/lib/fmtd.lib
+                optimized ${CMAKE_BINARY_DIR}/si/lib/spdlog.lib
+                debug ${CMAKE_BINARY_DIR}/si/lib/spdlogd.lib
+                ${CMAKE_BINARY_DIR}/pi/lib/piper_phonemize.lib
+                ${CMAKE_BINARY_DIR}/pi/lib/espeak-ng.lib
+                ${CMAKE_BINARY_DIR}/pi/lib/onnxruntime.lib
+            )
+        else()
+            # Unix: Use library names and let CMake find them in link directories
+            target_link_libraries(${test_name}
+                fmt
+                spdlog
+                piper_phonemize
+                espeak-ng
+                onnxruntime
+            )
+        endif()
+        
+        # Platform-specific linking
+        if(UNIX)
+            find_package(Threads REQUIRED)
+            target_link_libraries(${test_name} Threads::Threads)
+        endif()
+        
+        # Add dependencies to ensure build order
+        add_dependencies(${test_name} 
+            piper_phonemize_external 
+            fmt_external 
+            spdlog_external
+        )
+    endif()
+    
+    # Link additional dependencies for streaming raw phonemes test
+    if(${test_name} STREQUAL "test_streaming_raw_phonemes")
         target_sources(${test_name} PRIVATE
             ../piper.cpp
             ../phoneme_parser.cpp

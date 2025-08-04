@@ -161,6 +161,14 @@ void textToAudioStreaming(PiperConfig &config, Voice &voice, std::string text,
                           const std::function<void(const std::vector<int16_t>&)> &chunkCallback,
                           size_t chunkSize = 4096);
 
+// Streaming phonemes-to-audio synthesis with reduced latency
+void phonemesToAudioStreaming(PiperConfig &config, Voice &voice,
+                              const std::vector<Phoneme> &phonemes,
+                              std::vector<int16_t> &audioBuffer,
+                              SynthesisResult &result,
+                              const std::function<void(const std::vector<int16_t>&)> &chunkCallback,
+                              size_t phonemesPerChunk = 10);
+
 // Output phoneme timing information as JSON
 void outputTimingsAsJSON(const std::vector<PhonemeInfo> &timings,
                          std::ostream &output,
