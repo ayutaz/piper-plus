@@ -209,7 +209,7 @@
 <body>
     <div class="container">
         <h1>Multilingual TTS WebAssembly Demo</h1>
-        <p class="subtitle">多言語対応音声合成エンジン - 日本語（OpenJTalk）・英語（eSpeak-ng）</p>
+        <p class="subtitle">多言語対応音声合成エンジン - 日本語（OpenJTalk）・英語・中国語（eSpeak-ng）</p>
         
         <div id="status" class="status info">
             初期化中... <span class="loading-spinner"></span>
@@ -224,6 +224,9 @@
                 <button class="lang-button" data-lang="en" data-model="en_US-test-medium">
                     🇺🇸 English
                 </button>
+                <button class="lang-button" data-lang="zh" data-model="zh_CN-huayan-medium">
+                    🇨🇳 中文
+                </button>
             </div>
             <div class="model-info" id="modelInfo">
                 モデル: ja_JP-test-medium.onnx (OpenJTalk)
@@ -232,7 +235,7 @@
 
         <div class="input-group">
             <label for="inputText">テキスト入力 / Text Input</label>
-            <textarea id="inputText" placeholder="ここにテキストを入力してください / Enter text here">今日は良い天気です。</textarea>
+            <textarea id="inputText" placeholder="ここにテキストを入力してください / Enter text here / 请输入文字">今日は良い天気です。</textarea>
         </div>
 
         <div class="button-group">
@@ -283,6 +286,12 @@
                 { text: 'Artificial intelligence text-to-speech technology', label: 'Technical' },
                 { text: 'The quick brown fox jumps over the lazy dog.', label: 'Pangram' },
                 { text: 'To be or not to be, that is the question.', label: 'Literature' }
+            ],
+            'zh': [
+                { text: '你好，世界！', label: '问候' },
+                { text: '人工智能语音合成技术', label: '技术' },
+                { text: '今天天气真好。', label: '日常' },
+                { text: '春眠不觉晓，处处闻啼鸟。', label: '诗词' }
             ]
         };
         
@@ -429,7 +438,7 @@
                     // Extract phonemes from OpenJTalk labels
                     phonemes = phonemizer.extractPhonemesFromLabels(phonemeData);
                 } else {
-                    // Extract phonemes from eSpeak IPA
+                    // Extract phonemes from eSpeak IPA (English and Chinese)
                     phonemes = phonemizer.extractPhonemesFromIPA(phonemeData);
                 }
                 

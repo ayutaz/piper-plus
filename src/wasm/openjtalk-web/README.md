@@ -11,7 +11,8 @@ Visit the live demo: [https://ayutaz.github.io/piper-plus/](https://ayutaz.githu
 - **Pure Browser-Based**: Runs entirely in the browser without server dependencies
 - **Multilingual Support**: 
   - Japanese TTS using OpenJTalk phonemization
-  - English TTS using eSpeak-ng phonemization (experimental)
+  - English TTS using eSpeak-ng phonemization
+  - Chinese (Mandarin) TTS using eSpeak-ng phonemization
 - **ONNX Runtime**: Neural synthesis using Piper ONNX models
 - **Compact Size**: WASM < 400KB, JS < 40KB (OpenJTalk only)
 - **Cross-Platform**: Works on desktop and mobile browsers
