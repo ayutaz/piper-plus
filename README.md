@@ -231,7 +231,7 @@ Piper-plusはWebAssemblyを使用してブラウザで直接動作します：
 
 Our goal is to support Home Assistant and the [Year of Voice](https://www.home-assistant.io/blog/2022/12/20/year-of-voice/).
 
-[Download voices](docs/guides/VOICES.md) for the supported languages:
+[Download voices](docs/api-reference/available-voices.md) for the supported languages:
 
 * العربية, Jordan (Arabic, ar_JO)
 * Català, Spain (Catalan, ca_ES)
