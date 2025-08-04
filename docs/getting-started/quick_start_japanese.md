@@ -37,7 +37,23 @@ echo "こんにちは" | ./piper/bin/piper --model your_model.onnx --output_file
 afplay hello.wav
 ```
 
-## 4. 実用的な例
+## 4. カスタム辞書を使った技術用語の正確な読み上げ
+
+Piper-plusには300以上の技術用語が登録されたデフォルト辞書が含まれています：
+
+```bash
+# 技術用語を含むテキストの読み上げ（自動的にデフォルト辞書を使用）
+echo "DockerとGitHubを使ってCI/CDパイプラインを構築します" | \
+  ./piper/bin/piper --model your_model.onnx --output_file tech.wav
+
+# カスタム辞書を指定する場合
+echo "我が社のAPIはRESTfulです" | \
+  ./piper/bin/piper --model your_model.onnx --custom-dict my_dict.json --output_file custom.wav
+```
+
+詳細は[カスタム辞書ガイド](../features/custom_dictionary.md)を参照してください。
+
+## 5. 実用的な例
 
 ### テキストファイルから音声生成
 ```bash
