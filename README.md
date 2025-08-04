@@ -160,6 +160,7 @@ Voices are trained with [VITS](https://github.com/jaywalnut310/vits/) and export
 | Linux | ARM64 | ✅ | フルサポート (CMakeビルド使用) |
 | macOS | **ARM64 (Apple Silicon)のみ** | ✅ | M1/M2/M3以降のMac専用 |
 | Windows | x64 | ✅ | フルサポート |
+| **Web (ブラウザ)** | WebAssembly | ✅ | Chrome/Edge/Firefox/Safari対応 |
 
 ### ⚠️ 重要: macOSユーザーへのお知らせ
 
@@ -210,6 +211,21 @@ xattr -cr piper/bin/open_jtalk  # 日本語TTSを使用する場合
 ```
 
 これにより、Gatekeeperの警告なしに実行できるようになります。
+
+### 🌐 WebAssembly版（ブラウザ対応）
+
+Piper-plusはWebAssemblyを使用してブラウザで直接動作します：
+
+#### 特徴
+- **完全ブラウザ動作**: サーバー不要、オフライン対応
+- **日本語対応**: OpenJTalk WebAssembly版による高精度な音素化
+- **軽量**: WASM < 400KB、JS < 40KB
+- **対応ブラウザ**: Chrome、Edge、Firefox、Safari（最新版）
+
+#### デモ・使用方法
+- 🌏 **[オンラインデモ](https://ayutaz.github.io/piper-plus/)** - 今すぐブラウザで試せます
+- 📖 **[技術詳細](docs/webassembly/openjtalk-approach/README.md)** - 実装の詳細情報
+- 🔧 **[統合ガイド](src/wasm/openjtalk-web/README.md)** - Webアプリへの組み込み方法
 
 ## Voices
 
