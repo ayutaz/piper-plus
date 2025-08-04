@@ -101,7 +101,7 @@ Piper is used in a [variety of projects](#people-using-piper).
   * MCD (Mel-Cepstral Distortion) 評価
   * PESQ (Perceptual Evaluation of Speech Quality) 評価
   * UTMOS評価
-* **🎵 CLI機能強化** - [詳細ドキュメント](docs/CLI_ENHANCEMENTS.md)
+* **🎵 CLI機能強化** - [詳細ドキュメント](docs/features/cli-enhancements.md)
   * **音量調整**: `--volume` オプション (0.1-2.0)
   * **自動再生**: `--auto-play` で生成後自動再生
   * **直接テキスト入力**: `piper "テキスト" --model model.onnx`
@@ -114,7 +114,7 @@ Piper is used in a [variety of projects](#people-using-piper).
     # ファイルから読み込み
     piper --model en_US-lessac.onnx --input-file story.txt -f output.wav
     ```
-* **🎯 音素タイミング情報出力** - [詳細ドキュメント](docs/PHONEME_TIMING.md)
+* **🎯 音素タイミング情報出力** - [詳細ドキュメント](docs/features/phoneme-timing.md)
   * リップシンク、カラオケ、字幕同期用のタイミング情報
   * JSON/TSV形式での出力
   * 使用例:
@@ -316,7 +316,7 @@ You can [run Piper with Python](#running-in-python) or download a binary release
 
 ### Building from Source
 
-If you want to build from source, see the [Makefile](Makefile) and [C++ source](src/cpp).
+If you want to build from source, see the [CMakeLists.txt](CMakeLists.txt) and [C++ source](src/cpp).
 
 #### Prerequisites
 
@@ -349,7 +349,7 @@ If you want to build from source, see the [Makefile](Makefile) and [C++ source](
 **Linux**: You must download and extract [piper-phonemize](https://github.com/rhasspy/piper-phonemize) to `lib/Linux-$(uname -m)/piper_phonemize` before building.
 For example, `lib/Linux-x86_64/piper_phonemize/lib/libpiper_phonemize.so` should exist for AMD/Intel machines.
 
-**Windows**: See the [Windows Setup Guide](docs/windows-setup.md) for detailed instructions.
+**Windows**: See the [Windows Setup Guide](docs/getting-started/windows-setup.md) for detailed instructions.
 
 **macOS**: The build process will automatically download required dependencies.
 
@@ -396,7 +396,7 @@ Piper supports two methods for direct phoneme input:
    echo 'h ə l oʊ _ w ɜː l d' | ./piper --model en_US-lessac-medium.onnx --raw-phonemes -f output.wav
    ```
 
-See [RAW_PHONEME_INPUT.md](docs/RAW_PHONEME_INPUT.md) for detailed documentation.
+See [raw-phoneme-input.md](docs/features/raw-phoneme-input.md) for detailed documentation.
 
 ### Streaming Audio
 
@@ -454,7 +454,7 @@ Piper has been used in the following projects/papers:
 
 ## Training
 
-See the [training guide](docs/guides/TRAINING.md) and the [source code](src/python).
+See the [training guide](docs/guides/training/training-guide.md) and the [source code](src/python).
 
 Pretrained checkpoints are available on [Hugging Face](https://huggingface.co/datasets/rhasspy/piper-checkpoints/tree/main)
 
