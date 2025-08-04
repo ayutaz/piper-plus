@@ -514,6 +514,11 @@
                     <h3>英語：eSpeak-ng + Piperによる音声合成</h3>
                     <p>Python版と同等のeSpeak-ng音素化とPiperニューラル音声合成</p>
                 `;
+            } else if (lang === 'zh') {
+                languageInfo.innerHTML = `
+                    <h3>中国語：eSpeak-ng + Piperによる音声合成</h3>
+                    <p>eSpeak-ngによる中国語（北京語）音素化とPiperニューラル音声合成</p>
+                `;
             }
         }
         
@@ -553,6 +558,11 @@
                 } else if (lang === 'en') {
                     // Use eSpeak-ng phoneme extractor for Python-compatible phonemization
                     espeakExtractor.phonemize(text, 'en-us').then(phonemes => {
+                        resolve(phonemes);
+                    }).catch(reject);
+                } else if (lang === 'zh') {
+                    // Use eSpeak-ng phoneme extractor for Chinese
+                    espeakExtractor.phonemize(text, 'cmn').then(phonemes => {
                         resolve(phonemes);
                     }).catch(reject);
                 }
