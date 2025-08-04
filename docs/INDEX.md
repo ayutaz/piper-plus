@@ -8,6 +8,7 @@
 
 ## 🎯 Features
 - [CLI Enhancements](features/cli-enhancements.md) - Enhanced command-line features
+- [Custom Dictionary](features/custom_dictionary.md) - Custom dictionary for technical terms and proper nouns
 - [Phoneme Input](features/phoneme-input.md) - Direct phoneme specification guide
 - [Raw Phoneme Input](features/raw-phoneme-input.md) - Raw phoneme input feature
 - [Phoneme Timing](features/phoneme-timing.md) - Phoneme timing control
@@ -36,12 +37,18 @@
 - [Multilingual Testing](guides/testing/multilingual-testing.md) - Testing infrastructure
 - [Multilingual Test Results](guides/testing/multilingual-test-results.md) - Test results
 
+## 🌐 WebAssembly Support
+- [WebAssembly Overview](webassembly/openjtalk-approach/README.md) - Browser-based TTS
+- [Technical Approach](webassembly/openjtalk-approach/technical-approach.md) - Architecture design
+- [Implementation Plan](webassembly/openjtalk-approach/implementation-plan.md) - Development roadmap
+- [Technical Investigation](webassembly/openjtalk-approach/technical-investigation.md) - Research findings
+
 ## 🔧 Development
 - [Contributing](/CONTRIBUTING.md) - Contribution guidelines
 - [Changelog](/CHANGELOG.md) - Version history
 - [License](/LICENSE.md) - Project license (MIT)
 - [License Compliance](development/license-compliance.md) - License compliance info
-- [Workflow Migration](development/workflow-migration.md) - CI/CD workflow migration
+- [Workflow Migration](development/workflow-migration-completed.md) - CI/CD workflow migration
 - [Development Docs](development/) - Technical development documentation
 
 ## 📖 API Reference
@@ -51,3 +58,4 @@
 
 ## 🌐 Additional Resources
 - [Competitive Analysis](competitive-analysis/) - Market analysis
+- [Archive](archive/) - Historical documentation

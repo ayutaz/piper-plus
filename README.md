@@ -24,25 +24,25 @@ Piper is used in a [variety of projects](#people-using-piper).
 * **🌐 WebUI (Gradio)** - ブラウザベースの使いやすいインターフェース
   * 🚀 **[オンラインデモ](https://huggingface.co/spaces/ayousanz/piper-plus-demo)** - Hugging Face Spacesで今すぐ試せます！
   * 🌏 **[WebAssemblyデモ](https://ayutaz.github.io/piper-plus/)** - ブラウザで動作する日本語TTSデモ（サーバー不要）
-  * 詳細は[WebUI使用ガイド](docs/webui-usage.md)を参照
+  * 詳細は[WebUI使用ガイド](docs/features/webui-usage.md)を参照
   * 推論と学習の両方に対応
   * 多言語テンプレートシステム（日本語、英語、ドイツ語、フランス語）
   * Docker対応で簡単デプロイ
   * 使用例: `python -m piper.webui --data-dir ./models`
 * **🎤 音素入力機能** - `[[ phonemes ]]` 記法による直接音素指定
-  * 詳細は[音素入力ガイド](docs/PHONEME_INPUT.md)を参照
+  * 詳細は[音素入力ガイド](docs/features/phoneme-input.md)を参照
   * 使用例: `echo "Hello [[ h ə l oʊ ]] world" | piper --model en.onnx -f out.wav`
   * 日本語例: `echo "今日は [[ ky o o w a ]] です" | piper --model ja.onnx -f out.wav`
 * **📚 カスタム辞書機能** - 技術用語や固有名詞の読みを正確に制御
-  * 詳細は[カスタム辞書ガイド](docs/custom_dictionary.md)を参照
+  * 詳細は[カスタム辞書ガイド](docs/features/custom_dictionary.md)を参照
   * 200以上の技術用語を含むデフォルト辞書（Docker→ドッカー、GitHub→ギットハブ等）
   * 使用例: `echo "DockerとGitHubを使います" | piper --model ja.onnx --custom-dict my_dict.json -f out.wav`
   * Python/C++両対応、複数辞書の同時使用可能
 * 日本語の事前学習及び追加学習/推論対応（OpenJTalk統合）
-  * 詳細な使用方法は[日本語音声合成ガイド](docs/guides/JAPANESE_USAGE.md)を参照
-  * **Windows対応**: [Windowsセットアップガイド](docs/windows-setup.md)を参照
-  * **API ドキュメント**: [OpenJTalk API リファレンス](docs/openjtalk-api.md)を参照
-  * PUA音素マッピングによる日本語TTS精度向上 - [技術詳細](docs/guides/PHONEME_MAPPING.md)を参照
+  * 詳細な使用方法は[日本語音声合成ガイド](docs/guides/japanese/japanese-usage.md)を参照
+  * **Windows対応**: [Windowsセットアップガイド](docs/getting-started/windows-setup.md)を参照
+  * **API ドキュメント**: [OpenJTalk API リファレンス](docs/guides/japanese/openjtalk-api.md)を参照
+  * PUA音素マッピングによる日本語TTS精度向上 - [技術詳細](docs/api-reference/phoneme-mapping.md)を参照
   * **自動ダウンロード機能**: 初回実行時に必要な辞書とHTSボイスファイルを自動ダウンロード
   * 環境変数（オプション）：
     - `OPENJTALK_DICTIONARY_DIR`: OpenJTalk辞書へのパス（未設定時は自動ダウンロード）
@@ -57,7 +57,7 @@ Piper is used in a [variety of projects](#people-using-piper).
 * `piper_train` に `--num-workers` を追加し、DataLoader のワーカー数をコマンドラインから指定可能に
 * `piper_train` に `--save-top-k` を追加し、チェックポイント保存個数をコマンドラインから指定可能に
 * PyPI パッケージ `piper-tts-plus` として公開し、`pip install` で簡単インストール可能に
-* 多言語TTSテストインフラストラクチャーを追加し、CI/CDで自動テスト実行 - [詳細](docs/MULTILINGUAL_TESTING.md)
+* 多言語TTSテストインフラストラクチャーを追加し、CI/CDで自動テスト実行 - [詳細](docs/guides/testing/multilingual-testing.md)
 * OpenJTalk辞書とHTSボイスモデルの自動ダウンロード機能を追加し、日本語TTSのセットアップを簡略化
 * **🌏 WebAssembly対応** - ブラウザで直接動作する日本語TTS実装
   * OpenJTalk WebAssembly版による日本語音素化
