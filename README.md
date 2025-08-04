@@ -33,6 +33,11 @@ Piper is used in a [variety of projects](#people-using-piper).
   * 詳細は[音素入力ガイド](docs/PHONEME_INPUT.md)を参照
   * 使用例: `echo "Hello [[ h ə l oʊ ]] world" | piper --model en.onnx -f out.wav`
   * 日本語例: `echo "今日は [[ ky o o w a ]] です" | piper --model ja.onnx -f out.wav`
+* **📚 カスタム辞書機能** - 技術用語や固有名詞の読みを正確に制御
+  * 詳細は[カスタム辞書ガイド](docs/custom_dictionary.md)を参照
+  * 200以上の技術用語を含むデフォルト辞書（Docker→ドッカー、GitHub→ギットハブ等）
+  * 使用例: `echo "DockerとGitHubを使います" | piper --model ja.onnx --custom-dict my_dict.json -f out.wav`
+  * Python/C++両対応、複数辞書の同時使用可能
 * 日本語の事前学習及び追加学習/推論対応（OpenJTalk統合）
   * 詳細な使用方法は[日本語音声合成ガイド](docs/guides/JAPANESE_USAGE.md)を参照
   * **Windows対応**: [Windowsセットアップガイド](docs/windows-setup.md)を参照
