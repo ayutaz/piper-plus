@@ -648,6 +648,7 @@ class SynthesizerTrn(nn.Module):
             g = None
 
         # Apply F0 predictor if prosody_ids are provided
+        f0_pred_bins = None
         f0_pred = None
         f0_variance = None
         if prosody_ids is not None:
