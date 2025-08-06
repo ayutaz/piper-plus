@@ -452,6 +452,25 @@ Piper has been used in the following projects/papers:
 * [mintPiper](https://github.com/evuraan/mintPiper)
 * [Vim-Piper](https://github.com/wolandark/vim-piper)
 
+## Unity Integration - uPiper
+
+PiperをUnityで使用するためのプラグイン「uPiper」が開発されています：
+
+* **GitHub**: https://github.com/ayutaz/uPiper
+* **Unity 6000.0.35f1以降対応**
+* **Unity.InferenceEngine**を使用したONNXモデル実行
+* 非同期APIとストリーミングサポート
+* 現在は日本語と英語に対応（他言語は今後対応予定）
+* **対応プラットフォーム**:
+  - Windows (x64)
+  - macOS (Apple Silicon対応、IntelはDocker環境でのみ)
+  - Linux (x64)
+  - Android (ARM64)
+  - iOS（未対応）
+  - WebGL（計画中）
+
+uPiperは、ゲーム開発やインタラクティブアプリケーションでPiper TTSを活用するための包括的なソリューションを提供します。
+
 ## Training
 
 See the [training guide](docs/guides/training/training-guide.md) and the [source code](src/python).
