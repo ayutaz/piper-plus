@@ -108,6 +108,8 @@ class VitsModel(pl.LightningModule):
             n_speakers=self.hparams.num_speakers,
             gin_channels=self.hparams.gin_channels,
             use_sdp=self.hparams.use_sdp,
+            prosody_vocab_size=getattr(self.hparams, 'prosody_vocab_size', 16),
+            f0_scale_factor=getattr(self.hparams, 'f0_scale_factor', 0.1),
         )
         self.model_d = MultiPeriodDiscriminator(
             use_spectral_norm=self.hparams.use_spectral_norm
@@ -422,5 +424,17 @@ class VitsModel(pl.LightningModule):
             type=int,
             default=min(16, os.cpu_count()),
             help="Number of workers for DataLoader",
+        )
+        parser.add_argument(
+            "--prosody-vocab-size",
+            type=int,
+            default=16,
+            help="Size of prosody vocabulary for F0 predictor (default: 16)",
+        )
+        parser.add_argument(
+            "--f0-scale-factor",
+            type=float,
+            default=0.1,
+            help="Scale factor for F0 predictor output (default: 0.1)",
         )
         return parent_parser

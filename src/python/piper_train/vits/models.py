@@ -175,6 +175,7 @@ class TextEncoder(nn.Module):
         n_layers: int,
         kernel_size: int,
         p_dropout: float,
+        prosody_vocab_size: int = 16,
     ):
         super().__init__()
         self.n_vocab = n_vocab
@@ -188,14 +189,25 @@ class TextEncoder(nn.Module):
 
         self.emb = nn.Embedding(n_vocab, hidden_channels)
         nn.init.normal_(self.emb.weight, 0.0, hidden_channels**-0.5)
+        
+        # Add prosody embedding for F0 predictor support
+        self.prosody_vocab_size = prosody_vocab_size
+        self.prosody_emb = nn.Embedding(prosody_vocab_size, hidden_channels)
+        nn.init.normal_(self.prosody_emb.weight, 0.0, hidden_channels**-0.5)
 
         self.encoder = attentions.Encoder(
             hidden_channels, filter_channels, n_heads, n_layers, kernel_size, p_dropout
         )
         self.proj = nn.Conv1d(hidden_channels, out_channels * 2, 1)
 
-    def forward(self, x, x_lengths):
+    def forward(self, x, x_lengths, prosody_ids=None):
         x = self.emb(x) * math.sqrt(self.hidden_channels)  # [b, t, h]
+        
+        # Add prosody embedding if provided
+        if prosody_ids is not None and self.prosody_emb is not None:
+            prosody_emb = self.prosody_emb(prosody_ids) * math.sqrt(self.hidden_channels)
+            x = x + prosody_emb
+        
         x = torch.transpose(x, 1, -1)  # [b, h, t]
         x_mask = torch.unsqueeze(
             commons.sequence_mask(x_lengths, x.size(2)), 1
@@ -546,6 +558,8 @@ class SynthesizerTrn(nn.Module):
         n_speakers: int = 1,
         gin_channels: int = 0,
         use_sdp: bool = True,
+        prosody_vocab_size: int = 16,
+        f0_scale_factor: float = 0.1,
     ):
         super().__init__()
         self.n_vocab = n_vocab
@@ -568,6 +582,7 @@ class SynthesizerTrn(nn.Module):
         self.gin_channels = gin_channels
 
         self.use_sdp = use_sdp
+        self.f0_scale_factor = f0_scale_factor
 
         self.enc_p = TextEncoder(
             n_vocab,
@@ -578,6 +593,7 @@ class SynthesizerTrn(nn.Module):
             n_layers,
             kernel_size,
             p_dropout,
+            prosody_vocab_size,
         )
         self.dec = Generator(
             inter_channels,
@@ -625,7 +641,7 @@ class SynthesizerTrn(nn.Module):
             self.emb_g = nn.Embedding(n_speakers, gin_channels)
 
     def forward(self, x, x_lengths, y, y_lengths, sid=None, prosody_ids=None):
-        x, m_p, logs_p, x_mask = self.enc_p(x, x_lengths)
+        x, m_p, logs_p, x_mask = self.enc_p(x, x_lengths, prosody_ids)
         if self.n_speakers > 1:
             g = self.emb_g(sid).unsqueeze(-1)  # [b, h, 1]
         else:
@@ -707,7 +723,7 @@ class SynthesizerTrn(nn.Module):
         max_len=None,
         prosody_ids=None,
     ):
-        x, m_p, logs_p, x_mask = self.enc_p(x, x_lengths)
+        x, m_p, logs_p, x_mask = self.enc_p(x, x_lengths, prosody_ids)
         if self.n_speakers > 1:
             assert sid is not None, "Missing speaker id"
             g = self.emb_g(sid).unsqueeze(-1)  # [b, h, 1]
@@ -720,11 +736,8 @@ class SynthesizerTrn(nn.Module):
             f0_pred_bins, f0_pred, f0_variance = self.f0_predictor(
                 x, x_mask, prosody_ids, g
             )
-            # IMPORTANT: During training, F0 was not added to encoder output
-            # To maintain compatibility with trained model, we skip F0 addition
-            # This preserves the prosody benefits through the F0 predictor's internal processing
-            # without disrupting the duration prediction
-            pass  # F0 predictor effects are already incorporated internally
+            # Add F0 predictor output to encoder output for prosody enhancement
+            x = x + f0_pred * self.f0_scale_factor
 
         if self.use_sdp:
             logw = self.dp(x, x_mask, g=g, reverse=True, noise_scale=noise_scale_w)

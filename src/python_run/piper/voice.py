@@ -145,8 +145,22 @@ class PiperVoice:
             return phonemize_codepoints(text)
 
         if self.config.phoneme_type == PhonemeType.OPENJTALK:
-            # Use the built-in Japanese phonemizer with proper PUA conversion
-            return [self._phonemize_japanese_with_prosody(text)]
+            # Use the exact same phonemization as training
+            try:
+                import os
+                import sys
+
+                # Try to import from relative path first
+                piper_root = os.path.dirname(
+                    os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+                )
+                sys.path.insert(0, os.path.join(piper_root, "src", "python"))
+                from piper_train.phonemize.japanese import phonemize_japanese
+
+                return [phonemize_japanese(text)]
+            except ImportError:
+                _LOGGER.warning("Failed to import piper_train phonemizer, falling back")
+                return [self._phonemize_japanese_with_prosody(text)]
 
         raise ValueError(f"Unexpected phoneme type: {self.config.phoneme_type}")
 
@@ -214,17 +228,31 @@ class PiperVoice:
             if (a2 == 1) and (a2_next == 2):
                 tokens.append("[")
 
-        # Apply PUA mapping for multi-character tokens
-        converted = []
-        for token in tokens:
-            if token in MULTI_CHAR_TO_PUA:
-                converted.append(MULTI_CHAR_TO_PUA[token])
-            elif len(token) > 1:
-                _LOGGER.warning("Multi-char token not in PUA map: %s", token)
-                converted.append(token)
-            else:
-                converted.append(token)
-        return converted
+        # Use the same token mapper as training
+        try:
+            # Try to import from relative path first
+            import os
+            import sys
+
+            piper_root = os.path.dirname(
+                os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+            )
+            sys.path.insert(0, os.path.join(piper_root, "src", "python"))
+            from piper_train.phonemize.token_mapper import map_sequence
+
+            return map_sequence(tokens)
+        except ImportError:
+            # Fallback to local PUA mapping
+            converted = []
+            for token in tokens:
+                if token in MULTI_CHAR_TO_PUA:
+                    converted.append(MULTI_CHAR_TO_PUA[token])
+                elif len(token) > 1:
+                    _LOGGER.warning("Multi-char token not in PUA map: %s", token)
+                    converted.append(token)
+                else:
+                    converted.append(token)
+            return converted
 
     def phonemes_to_ids(self, phonemes: list[str]) -> tuple[list[int], list[int]]:
         """Phonemes to ids with prosody support for Japanese."""
