@@ -81,8 +81,8 @@ if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|ARM64")
   # add_compile_definitions(USE_ARM64_NEON)
 endif()
 
-add_executable(piper src/cpp/main.cpp src/cpp/piper.cpp src/cpp/phoneme_parser.cpp src/cpp/custom_dictionary.cpp)
-add_executable(test_piper src/cpp/test.cpp src/cpp/piper.cpp src/cpp/phoneme_parser.cpp src/cpp/custom_dictionary.cpp)
+add_executable(piper src/cpp/main.cpp src/cpp/piper.cpp src/cpp/phoneme_parser.cpp src/cpp/custom_dictionary.cpp src/cpp/prosody_ids.cpp)
+add_executable(test_piper src/cpp/test.cpp src/cpp/piper.cpp src/cpp/phoneme_parser.cpp src/cpp/custom_dictionary.cpp src/cpp/prosody_ids.cpp)
 
 # Add NEON optimized audio processing for ARM64
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|ARM64")
