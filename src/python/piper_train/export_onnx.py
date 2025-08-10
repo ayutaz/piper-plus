@@ -122,17 +122,8 @@ def main() -> None:
     num_symbols = model_g.n_vocab
     num_speakers = model_g.n_speakers
 
-    # Enable F0 predictor with ONNX-friendly attention
+    # Enable ONNX export mode
     model_g.onnx_export_mode = True
-    model_g.skip_f0_predictor = False  # Enable F0 predictor with new attention
-
-    # Migrate F0 predictor attention weights from MultiheadAttention to ONNX-friendly version
-    if hasattr(model_g, "f0_predictor") and hasattr(
-        model_g.f0_predictor, "migrate_attention_weights"
-    ):
-        print("Migrating F0 Predictor attention weights for ONNX compatibility...")
-        model_g.f0_predictor.migrate_attention_weights()
-        print("F0 Predictor is now ready for ONNX export with full functionality.")
 
     # Inference only
     model_g.eval()
