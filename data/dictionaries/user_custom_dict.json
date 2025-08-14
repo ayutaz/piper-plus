@@ -16,6 +16,16 @@
     
     "// 例: 人名": "",
     "Tanaka": {"pronunciation": "タナカ", "priority": 8},
-    "田中": {"pronunciation": "タナカ", "priority": 8}
+    "田中": {"pronunciation": "タナカ", "priority": 8},
+    
+    "// 音声合成関連の修正": "",
+    "音声": {"pronunciation": "おんせい", "priority": 10},
+    "合成": {"pronunciation": "ごうせい", "priority": 10},
+    "音声合成": {"pronunciation": "おんせいごうせい", "priority": 10},
+    "生成": {"pronunciation": "せいせい", "priority": 10},
+    "構成": {"pronunciation": "こうせい", "priority": 10},
+    "作成": {"pronunciation": "さくせい", "priority": 10},
+    "編成": {"pronunciation": "へんせい", "priority": 10},
+    "形成": {"pronunciation": "けいせい", "priority": 10}
   }
 }

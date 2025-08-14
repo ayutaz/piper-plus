@@ -162,9 +162,15 @@ class CustomDictionary:
         """
         cache_key = f"{word}_{case_sensitive}"
         if cache_key not in self.pattern_cache:
-            # 単語境界を考慮したパターン
             escaped_word = re.escape(word)
-            pattern_str = r"\b" + escaped_word + r"\b"
+            
+            # 日本語の場合は単語境界を使わない（\bは日本語で機能しない）
+            if any(ord(c) > 127 for c in word):
+                # 日本語を含む場合はそのまま置換
+                pattern_str = escaped_word
+            else:
+                # 英語の場合は単語境界を使用
+                pattern_str = r"\b" + escaped_word + r"\b"
 
             flags = 0 if case_sensitive else re.IGNORECASE
             self.pattern_cache[cache_key] = re.compile(pattern_str, flags)

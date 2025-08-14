@@ -150,8 +150,12 @@ class PiperVoice:
                 )
                 sys.path.insert(0, os.path.join(piper_root, "src", "python"))
                 from piper_train.phonemize.japanese import phonemize_japanese
+                from piper_train.phonemize.custom_dict import CustomDictionary
 
-                return [phonemize_japanese(text)]
+                # カスタム辞書を適用（user_custom_dict.jsonを明示的に読み込む）
+                dict_path = os.path.join(piper_root, "data", "dictionaries", "user_custom_dict.json")
+                dictionary = CustomDictionary(dict_path)
+                return [phonemize_japanese(text, custom_dict=dictionary)]
             except ImportError:
                 _LOGGER.warning("Failed to import piper_train phonemizer, falling back")
                 return [self._phonemize_japanese_simple(text)]
