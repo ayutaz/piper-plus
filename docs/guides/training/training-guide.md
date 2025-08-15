@@ -264,14 +264,22 @@ If you're training a multi-speaker model, use `--resume_from_single_speaker_chec
 
 ### Testing
 
-To test your voice during training, you can use [these test sentences](https://github.com/rhasspy/piper/tree/master/etc/test_sentences) or generate your own with [piper-phonemize](https://github.com/rhasspy/piper-phonemize/). Run the following command to generate audio files:
+To test your voice during training, you can use test sentences from `test/fixtures/` or generate your own with [piper-phonemize](https://github.com/rhasspy/piper-phonemize/). Run the following command to generate audio files:
 
 ```sh
-cat test_en-us.jsonl | \
+# For Japanese testing
+cat test/fixtures/test_japanese.txt | \
     python3 -m piper_train.infer \
         --sample-rate 22050 \
         --checkpoint /path/to/training_dir/lightning_logs/version_0/checkpoints/*.ckpt \
-        --output-dir /path/to/training_dir/output"
+        --output-dir /path/to/training_dir/output
+
+# For English testing  
+cat test/fixtures/test_english.txt | \
+    python3 -m piper_train.infer \
+        --sample-rate 22050 \
+        --checkpoint /path/to/training_dir/lightning_logs/version_0/checkpoints/*.ckpt \
+        --output-dir /path/to/training_dir/output
 ```
 
 The input format to `piper_train.infer` is the same as `dataset.jsonl`: one line of JSON per utterance with `phoneme_ids` and `speaker_id` (multi-speaker only). Generate your own test file with [piper-phonemize](https://github.com/rhasspy/piper-phonemize/):
