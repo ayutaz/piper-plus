@@ -7,14 +7,14 @@
    xmlns="http://www.w3.org/2000/svg"
    xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
    xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
-   width="118.3606mm"
+   width="140mm"
    height="41.577671mm"
-   viewBox="0 0 118.36058 41.577671"
+   viewBox="0 0 140 41.577671"
    version="1.1"
    id="svg120"
    inkscape:version="1.0.2 (e86c870879, 2021-01-15)"
-   sodipodi:docname="logo.svg"
-   inkscape:export-filename="./logo.png"
+   sodipodi:docname="logo_with_plus_symbol.svg"
+   inkscape:export-filename="./logo_with_plus_symbol.png"
    inkscape:export-xdpi="100"
    inkscape:export-ydpi="100">
   <defs
@@ -77,6 +77,11 @@
        d="m 150.33107,151.90663 q 1.91585,0 2.73918,-0.7125 0.83917,-0.7125 0.83917,-2.34334 0,-1.61501 -0.83917,-2.31168 -0.82333,-0.69667 -2.73918,-0.69667 h -2.56501 v 6.06419 z m -2.56501,4.21169 v 8.94587 h -6.09585 v -23.63926 h 9.31003 q 4.67086,0 6.84003,1.5675 2.18501,1.56751 2.18501,4.95586 0,2.34334 -1.14,3.84751 -1.12417,1.50417 -3.40418,2.21668 1.25083,0.285 2.2325,1.29834 0.99751,0.9975 2.01085,3.04001 l 3.30918,6.71336 h -6.4917 L 153.64025,159.19 q -0.87083,-1.77334 -1.77334,-2.42251 -0.88667,-0.64917 -2.37501,-0.64917 z"
        style="font-style:normal;font-variant:normal;font-weight:bold;font-stretch:normal;font-size:32.4268px;line-height:1.25;font-family:sans-serif;-inkscape-font-specification:'sans-serif, Bold';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.264583"
        id="path2229" />
+    <!-- Plus symbol -->
+    <path
+       d="m 168,147 h 3 v -6 h 4 v 6 h 3 v 4 h -3 v 6 h -4 v -6 h -3 z"
+       style="font-style:normal;font-variant:normal;font-weight:bold;font-stretch:normal;font-size:32.4268px;line-height:1.25;font-family:sans-serif;-inkscape-font-specification:'sans-serif, Bold';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.264583"
+       id="plus-symbol" />
     <g
        id="g2239"
        transform="translate(42.041608,11.459915)">
