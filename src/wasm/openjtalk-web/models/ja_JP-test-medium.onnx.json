@@ -1,8 +1,8 @@
 {
-    "dataset": "data",
+    "dataset": "piper",
     "audio": {
         "sample_rate": 22050,
-        "quality": "piper_css10_ja_preprocessed_v2"
+        "quality": "dataset-css10-ja-with-dict"
     },
     "espeak": {
         "voice": "ja"
@@ -196,5 +196,41 @@
     "num_symbols": 58,
     "num_speakers": 1,
     "speaker_id_map": {},
-    "piper_version": "1.0.0"
+    "piper_version": "1.4.0",
+    "prosody_num_symbols": 11,
+    "prosody_id_map": {
+        "0": [
+            0
+        ],
+        "1": [
+            1
+        ],
+        "2": [
+            2
+        ],
+        "3": [
+            3
+        ],
+        "4": [
+            4
+        ],
+        "5": [
+            5
+        ],
+        "6": [
+            6
+        ],
+        "7": [
+            7
+        ],
+        "8": [
+            8
+        ],
+        "9": [
+            9
+        ],
+        "10": [
+            10
+        ]
+    }
 }
