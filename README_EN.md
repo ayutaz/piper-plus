@@ -68,12 +68,11 @@ Piper is used in a [variety of projects](#people-using-piper).
   * Runs completely in-browser without server
   * Compact size: WASM < 400KB, JS < 40KB
   * Details: [OpenJTalk WebAssembly README](src/wasm/openjtalk-web/README.md)
-* **🎯 Voice Quality Enhancement Components Integration (PR #98)**
-  * **EMA (Exponential Moving Average)**: Improved training stability and fine-tuning quality
-  * **AccentProcessor**: High-precision Japanese prosody and accent processing
-  * **F0 Predictor**: FastSpeech2-based pitch prediction for intonation control
-  * **Expected Impact**: Overall MOS improvement +0.18-0.26
-  * Details: [Integrated Components Documentation](src/python/docs/integrated-components-ja.md)
+* **🎯 Voice Quality Enhancement Features**
+  * **EMA (Exponential Moving Average)**: Improved training stability and fine-tuning quality (enabled by default)
+  * **Custom Dictionary**: Enhanced Japanese pronunciation accuracy (478 pronunciation entries included)
+  * **Benefits**: Improved training stability, accurate pronunciation of Japanese compound words
+  * Details: [EMA Implementation Documentation](src/python/docs/integrated-components-ja.md)
 * Multi-GPU training support (PyTorch Lightning 2.4.0)
   * Multiple GPU parallel training with DDP (Distributed Data Parallel) strategy
   * Automatic learning rate scaling (`--auto_lr_scaling`)

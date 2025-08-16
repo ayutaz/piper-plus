@@ -67,12 +67,11 @@ Piper is used in a [variety of projects](#people-using-piper).
   * サーバー不要で完全にブラウザ内で動作
   * コンパクトサイズ: WASM < 400KB、JS < 40KB
   * 詳細: [OpenJTalk WebAssembly README](src/wasm/openjtalk-web/README.md)
-* **🎯 音声品質向上コンポーネント統合 (PR #98)**
-  * **EMA (Exponential Moving Average)**: 学習安定性とファインチューニング品質向上
-  * **AccentProcessor**: 日本語韻律・アクセント処理の高精度化
-  * **F0 Predictor**: FastSpeech2ベースのピッチ予測によるイントネーション制御
-  * **期待効果**: 総合MOS向上 +0.18-0.26
-  * 詳細: [統合コンポーネントドキュメント](src/python/docs/integrated-components-ja.md)
+* **🎯 音声品質向上機能**
+  * **EMA (Exponential Moving Average)**: 学習安定性とファインチューニング品質向上（デフォルトで有効）
+  * **カスタム辞書機能**: 日本語発音の精度向上（478エントリの発音辞書を標準搭載）
+  * **効果**: 学習の安定性向上、日本語複合語の正確な発音
+  * 詳細: [EMA実装ドキュメント](src/python/docs/integrated-components-ja.md)
 * マルチGPU学習対応（PyTorch Lightning 2.4.0）
   * DDP (Distributed Data Parallel) 戦略による複数GPU並列学習
   * 学習率の自動スケーリング機能（`--auto_lr_scaling`）
