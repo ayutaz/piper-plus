@@ -127,16 +127,7 @@ python -m piper_train \
 - チェックポイントサイズが大きい場合: `--save-ema-weights-in-callback-state`をfalseに設定
 - 学習初期の不安定性: `--ema-start-step`で開始ステップを調整
 
-## 6. 削除されたコンポーネント
-
-以下のコンポーネントは、実装が不完全だったため削除されました：
-
-- **AccentProcessor** (`accent_processor.py`) - 日本語韻律処理（削除済み）
-- **F0 Predictor** (`f0_predictor.py`) - ピッチ予測（削除済み）
-
-これらの機能の完全な実装については、Issue #159で追跡されています。
-
-## 7. 今後の改善点
+## 6. 今後の改善点
 
 1. **EMA**: Discriminatorへの適用オプション
 2. **カスタム辞書**: より多くの専門用語・方言対応
