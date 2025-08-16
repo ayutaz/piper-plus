@@ -154,8 +154,19 @@ class PiperVoice:
 
                 # カスタム辞書を適用（user_custom_dict.jsonを明示的に読み込む）
                 dict_path = os.path.join(piper_root, "data", "dictionaries", "user_custom_dict.json")
-                dictionary = CustomDictionary(dict_path)
-                return [phonemize_japanese(text, custom_dict=dictionary)]
+                
+                # 辞書ファイルの存在確認
+                if os.path.exists(dict_path):
+                    try:
+                        dictionary = CustomDictionary(dict_path)
+                        return [phonemize_japanese(text, custom_dict=dictionary)]
+                    except Exception as e:
+                        _LOGGER.warning(f"Failed to load custom dictionary from {dict_path}: {e}")
+                        # 辞書なしで音素化を続行
+                        return [phonemize_japanese(text)]
+                else:
+                    _LOGGER.debug(f"Custom dictionary not found at {dict_path}, using default phonemization")
+                    return [phonemize_japanese(text)]
             except ImportError:
                 _LOGGER.warning("Failed to import piper_train phonemizer, falling back")
                 return [self._phonemize_japanese_simple(text)]
