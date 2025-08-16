@@ -142,27 +142,30 @@ jobs:
             git push origin --delete "$TAG_NAME" || true
           fi
           
-          # Create release using gh CLI with JSON output
+          # Create release without --json flag (not supported by gh release create)
           echo "Creating release with tag: $TAG_NAME"
-          RELEASE_OUTPUT=$(gh release create "$TAG_NAME" \
+          gh release create "$TAG_NAME" \
             --title "${{ steps.get_release_name.outputs.name }}" \
             --notes "${{ steps.get_release_notes.outputs.body }}" \
             --draft \
-            --target "${{ github.sha }}" \
-            --json id,url,uploadUrl 2>&1) || {
-            echo "::error::Failed to create release: $RELEASE_OUTPUT"
+            --target "${{ github.sha }}" || {
+            echo "::error::Failed to create release"
             exit 1
           }
           
+          # Get release information using gh release view with --json
+          echo "Fetching release information..."
+          RELEASE_JSON=$(gh release view "$TAG_NAME" --json id,url,uploadUrl)
+          
           # Parse JSON output to get release information
-          RELEASE_ID=$(echo "$RELEASE_OUTPUT" | jq -r '.id')
-          RELEASE_URL=$(echo "$RELEASE_OUTPUT" | jq -r '.url')
-          UPLOAD_URL=$(echo "$RELEASE_OUTPUT" | jq -r '.uploadUrl')
+          RELEASE_ID=$(echo "$RELEASE_JSON" | jq -r '.id')
+          RELEASE_URL=$(echo "$RELEASE_JSON" | jq -r '.url')
+          UPLOAD_URL=$(echo "$RELEASE_JSON" | jq -r '.uploadUrl')
           
           # Verify we got valid values
           if [ -z "$RELEASE_ID" ] || [ "$RELEASE_ID" = "null" ]; then
-            echo "::error::Failed to get release ID from response"
-            echo "Response was: $RELEASE_OUTPUT"
+            echo "::error::Failed to get release ID"
+            echo "Response was: $RELEASE_JSON"
             exit 1
           fi
           
