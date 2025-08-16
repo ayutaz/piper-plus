@@ -122,17 +122,8 @@ def main() -> None:
     num_symbols = model_g.n_vocab
     num_speakers = model_g.n_speakers
 
-    # Enable F0 predictor with ONNX-friendly attention
+    # Enable ONNX export mode
     model_g.onnx_export_mode = True
-    model_g.skip_f0_predictor = False  # Enable F0 predictor with new attention
-
-    # Migrate F0 predictor attention weights from MultiheadAttention to ONNX-friendly version
-    if hasattr(model_g, "f0_predictor") and hasattr(
-        model_g.f0_predictor, "migrate_attention_weights"
-    ):
-        print("Migrating F0 Predictor attention weights for ONNX compatibility...")
-        model_g.f0_predictor.migrate_attention_weights()
-        print("F0 Predictor is now ready for ONNX export with full functionality.")
 
     # Inference only
     model_g.eval()
@@ -144,9 +135,7 @@ def main() -> None:
 
     if args.with_durations:
 
-        def infer_forward_with_durations(
-            text, text_lengths, scales, sid=None, prosody_ids=None
-        ):
+        def infer_forward_with_durations(text, text_lengths, scales, sid=None):
             """Forward function that returns both audio and duration information"""
             noise_scale = scales[0]
             length_scale = scales[1]
@@ -178,7 +167,6 @@ def main() -> None:
                 length_scale=length_scale,
                 noise_scale_w=noise_scale_w,
                 sid=sid,
-                prosody_ids=prosody_ids,
             )[0].unsqueeze(1)
 
             # Return both audio and durations
@@ -190,7 +178,7 @@ def main() -> None:
         model_g.forward = infer_forward_with_durations
     else:
 
-        def infer_forward(text, text_lengths, scales, sid=None, prosody_ids=None):
+        def infer_forward(text, text_lengths, scales, sid=None):
             noise_scale = scales[0]
             length_scale = scales[1]
             noise_scale_w = scales[2]
@@ -201,7 +189,6 @@ def main() -> None:
                 length_scale=length_scale,
                 noise_scale_w=noise_scale_w,
                 sid=sid,
-                prosody_ids=prosody_ids,
             )[0].unsqueeze(1)
 
             return audio
@@ -221,16 +208,11 @@ def main() -> None:
     # noise, noise_w, length
     scales = torch.FloatTensor([0.667, 1.0, 0.8])
 
-    # Add prosody_ids for Japanese models
-    prosody_ids = torch.randint(
-        low=0, high=15, size=(1, dummy_input_length), dtype=torch.long
-    )
-
     # Include all inputs for compatibility
     if num_speakers > 1:
-        dummy_input = (sequences, sequence_lengths, scales, sid, prosody_ids)
+        dummy_input = (sequences, sequence_lengths, scales, sid)
     else:
-        dummy_input = (sequences, sequence_lengths, scales, prosody_ids)
+        dummy_input = (sequences, sequence_lengths, scales)
 
     # Export
     if args.with_durations:
@@ -251,13 +233,11 @@ def main() -> None:
 
     # Configure input names based on model type
     if num_speakers > 1:
-        input_names = ["input", "input_lengths", "scales", "sid", "prosody_ids"]
+        input_names = ["input", "input_lengths", "scales", "sid"]
         if args.with_durations:
             dynamic_axes["sid"] = {0: "batch_size"}
-        dynamic_axes["prosody_ids"] = {0: "batch_size", 1: "phonemes"}
     else:
-        input_names = ["input", "input_lengths", "scales", "prosody_ids"]
-        dynamic_axes["prosody_ids"] = {0: "batch_size", 1: "phonemes"}
+        input_names = ["input", "input_lengths", "scales"]
 
     torch.onnx.export(
         model=model_g,

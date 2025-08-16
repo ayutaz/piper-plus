@@ -1,6 +1,5 @@
 import json
 import logging
-import re
 import wave
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -56,12 +55,6 @@ from .util import audio_float_to_int16
 
 
 _LOGGER = logging.getLogger(__name__)
-
-# Regex patterns for Japanese prosody extraction
-_RE_PHONEME = re.compile(r"-([^+]+)\+")
-_RE_A1 = re.compile(r"/A:([\d-]+)\+")
-_RE_A2 = re.compile(r"\+([0-9]+)\+")
-_RE_A3 = re.compile(r"\+([0-9]+)/")
 
 # Multi-character phoneme to PUA character mapping for Japanese
 # This must match the C++ side and Python training side
@@ -155,78 +148,44 @@ class PiperVoice:
                     os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
                 )
                 sys.path.insert(0, os.path.join(piper_root, "src", "python"))
+                from piper_train.phonemize.custom_dict import CustomDictionary
                 from piper_train.phonemize.japanese import phonemize_japanese
 
-                return [phonemize_japanese(text)]
+                # カスタム辞書を適用（user_custom_dict.jsonを明示的に読み込む）
+                dict_path = os.path.join(
+                    piper_root, "data", "dictionaries", "user_custom_dict.json"
+                )
+
+                # 辞書ファイルの存在確認
+                if os.path.exists(dict_path):
+                    try:
+                        dictionary = CustomDictionary(dict_path)
+                        return [phonemize_japanese(text, custom_dict=dictionary)]
+                    except Exception as e:
+                        _LOGGER.warning(
+                            f"Failed to load custom dictionary from {dict_path}: {e}"
+                        )
+                        # 辞書なしで音素化を続行
+                        return [phonemize_japanese(text)]
+                else:
+                    _LOGGER.debug(
+                        f"Custom dictionary not found at {dict_path}, using default phonemization"
+                    )
+                    return [phonemize_japanese(text)]
             except ImportError:
                 _LOGGER.warning("Failed to import piper_train phonemizer, falling back")
-                return [self._phonemize_japanese_with_prosody(text)]
+                return [self._phonemize_japanese_simple(text)]
 
         raise ValueError(f"Unexpected phoneme type: {self.config.phoneme_type}")
 
-    def _phonemize_japanese_with_prosody(self, text: str) -> list[str]:
-        """Phonemize Japanese text with prosody marks (same as training)."""
+    def _phonemize_japanese_simple(self, text: str) -> list[str]:
+        """Phonemize Japanese text without prosody marks."""
         if not HAS_PYOPENJTALK:
             raise RuntimeError("pyopenjtalk is required for Japanese phonemization")
 
-        labels = pyopenjtalk.extract_fullcontext(text)
-        tokens = []
-
-        def _is_question(text: str) -> bool:
-            """Return True if text ends with a question mark."""
-            return text.strip().endswith("?") or text.strip().endswith("？")
-
-        for idx, label in enumerate(labels):
-            m_ph = _RE_PHONEME.search(label)
-            if not m_ph:
-                continue
-            phoneme = m_ph.group(1)
-
-            # Beginning / end silence handling
-            if phoneme == "sil":
-                if idx == 0:
-                    tokens.append("^")
-                elif idx == len(labels) - 1:
-                    tokens.append("?" if _is_question(text) else "$")
-                continue
-
-            # Short pause
-            if phoneme == "pau":
-                tokens.append("_")
-                continue
-
-            # Keep unvoiced vowels as uppercase
-            tokens.append(phoneme)
-
-            # Extract prosody marks
-            m_a1 = _RE_A1.search(label)
-            m_a2 = _RE_A2.search(label)
-            m_a3 = _RE_A3.search(label)
-            if not (m_a1 and m_a2 and m_a3):
-                continue
-
-            a1 = int(m_a1.group(1))
-            a2 = int(m_a2.group(1))
-            a3 = int(m_a3.group(1))
-
-            # Look-ahead to next label
-            if idx < len(labels) - 1:
-                m_a2_next = _RE_A2.search(labels[idx + 1])
-                a2_next = int(m_a2_next.group(1)) if m_a2_next else -1
-            else:
-                a2_next = -1
-
-            # Insert accent nucleus mark "]" at descending point
-            if (a1 == 0) and (a2_next == a2 + 1):
-                tokens.append("]")
-
-            # Insert accent phrase boundary "#" when current mora is last
-            if (a2 == a3) and (a2_next == 1):
-                tokens.append("#")
-
-            # Insert rising mark "[" at phrase head
-            if (a2 == 1) and (a2_next == 2):
-                tokens.append("[")
+        # Simple phonemization without prosody marks
+        phonemes = pyopenjtalk.g2p(text)
+        tokens = phonemes.split()
 
         # Use the same token mapper as training
         try:
@@ -254,65 +213,25 @@ class PiperVoice:
                     converted.append(token)
             return converted
 
-    def phonemes_to_ids(self, phonemes: list[str]) -> tuple[list[int], list[int]]:
-        """Phonemes to ids with prosody support for Japanese."""
+    def phonemes_to_ids(self, phonemes: list[str]) -> list[int]:
+        """Phonemes to ids."""
         id_map = self.config.phoneme_id_map
         ids: list[int] = list(id_map[BOS])
-        prosody_ids: list[int] = []
 
-        _LOGGER.debug(f"Converting phonemes to IDs: {phonemes}")
-        _LOGGER.debug(f"Available phonemes in id_map: {len(id_map)} items")
+        for phoneme in phonemes:
+            if phoneme not in id_map:
+                _LOGGER.warning("Missing phoneme from id map: %s", phoneme)
+                continue
 
-        # For Japanese, we need to match the training AccentProcessor logic
-        if self.config.phoneme_type == PhonemeType.OPENJTALK:
-            # Define prosody mark to ID mapping (must match accent_processor.py)
-            prosody_marks = {
-                "^": 0,  # start
-                "$": 1,  # end_declarative
-                "?": 2,  # end_question
-                "_": 3,  # pause
-                "#": 4,  # boundary
-                "[": 5,  # rising
-                "]": 6,  # falling
-            }
-            # ID 14 is for regular phonemes (<PAD> in training)
+            ids.extend(id_map[phoneme])
 
-            for phoneme in phonemes:
-                if phoneme not in id_map:
-                    _LOGGER.warning("Missing phoneme from id map: %s", phoneme)
-                    continue
-
-                ids.extend(id_map[phoneme])
-
-                # Assign prosody ID based on training logic
-                if phoneme in prosody_marks:
-                    prosody_ids.append(prosody_marks[phoneme])
-                else:
-                    # Regular phoneme - use <PAD> ID (14)
-                    prosody_ids.append(14)
-
-        else:
-            # Non-Japanese: original logic
-            prosody_ids.append(0)  # BOS prosody
-
-            for phoneme in phonemes:
-                if phoneme not in id_map:
-                    _LOGGER.warning("Missing phoneme from id map: %s", phoneme)
-                    continue
-
-                ids.extend(id_map[phoneme])
-                prosody_ids.append(14)  # Default prosody
-
-                # 学習データが PAD("_") を各音素ごとに含んでいるのは eSpeak 方式のみ。
-                if self.config.phoneme_type == PhonemeType.ESPEAK:
-                    ids.extend(id_map[PAD])
-                    prosody_ids.append(14)  # Default prosody for PAD
-
-            prosody_ids.append(1)  # EOS prosody
+            # 学習データが PAD("_") を各音素ごとに含んでいるのは eSpeak 方式のみ。
+            if self.config.phoneme_type == PhonemeType.ESPEAK:
+                ids.extend(id_map[PAD])
 
         ids.extend(id_map[EOS])
 
-        return ids, prosody_ids
+        return ids
 
     def synthesize(
         self,
@@ -359,11 +278,10 @@ class PiperVoice:
         silence_bytes = bytes(num_silence_samples * 2)
 
         for phonemes in sentence_phonemes:
-            phoneme_ids, prosody_ids = self.phonemes_to_ids(phonemes)
+            phoneme_ids = self.phonemes_to_ids(phonemes)
             yield (
                 self.synthesize_ids_to_raw(
                     phoneme_ids,
-                    prosody_ids,
                     speaker_id=speaker_id,
                     length_scale=length_scale,
                     noise_scale=noise_scale,
@@ -376,7 +294,6 @@ class PiperVoice:
     def synthesize_ids_to_raw(
         self,
         phoneme_ids: list[int],
-        prosody_ids: list[int] | None = None,
         speaker_id: int | None = None,
         length_scale: float | None = None,
         noise_scale: float | None = None,
@@ -405,16 +322,6 @@ class PiperVoice:
             "input_lengths": phoneme_ids_lengths,
             "scales": scales,
         }
-
-        # Add prosody_ids if provided and model supports it
-        if prosody_ids is not None:
-            # Check if the ONNX model expects prosody_ids input
-            model_inputs = [input.name for input in self.session.get_inputs()]
-            if "prosody_ids" in model_inputs:
-                prosody_ids_array = np.expand_dims(
-                    np.array(prosody_ids, dtype=np.int64), 0
-                )
-                args["prosody_ids"] = prosody_ids_array
 
         if self.config.num_speakers <= 1:
             speaker_id = None

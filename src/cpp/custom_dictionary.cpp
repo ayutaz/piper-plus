@@ -114,7 +114,8 @@ void CustomDictionary::loadDefaultDictionaries() {
     std::vector<std::string> defaultDicts = {
         "default_tech_dict.json",
         "default_common_dict.json",
-        "additional_tech_dict.json"  // 最新トレンドの技術用語
+        "additional_tech_dict.json",  // 最新トレンドの技術用語
+        "user_custom_dict.json"        // ユーザーカスタム辞書（日本語発音修正用）
     };
     
     for (const auto& dictName : defaultDicts) {
