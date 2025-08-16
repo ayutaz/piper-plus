@@ -31,14 +31,14 @@ from .f0_extraction import cache_f0
 from .norm_audio import cache_norm_audio, make_silence_detector
 
 
-# Custom Japanese phonemizer with accent/prosody marks
+# Custom Japanese phonemizer
 try:
-    from .phonemize.accent_processor import AccentProcessor  # type: ignore
     from .phonemize.japanese import phonemize_japanese  # type: ignore
+    from .phonemize.custom_dict import CustomDictionary  # type: ignore
 except ImportError:
     # When running as script, relative import may fail; try absolute import fallback
-    from piper_train.phonemize.accent_processor import AccentProcessor  # type: ignore
     from piper_train.phonemize.japanese import phonemize_japanese  # type: ignore
+    from piper_train.phonemize.custom_dict import CustomDictionary  # type: ignore
 
 # Japanese phoneme id map support
 try:
@@ -532,7 +532,15 @@ def phonemize_batch_openjtalk(
 
         casing = get_text_casing(args.text_casing)
         silence_detector = make_silence_detector()
-        accent_processor = AccentProcessor()
+        
+        # カスタム辞書を読み込む（存在する場合）
+        custom_dict = None
+        dict_path = Path(__file__).parent.parent.parent.parent / "data" / "dictionaries" / "user_custom_dict.json"
+        if dict_path.exists():
+            _LOGGER.info(f"Loading custom dictionary from {dict_path}")
+            custom_dict = CustomDictionary(str(dict_path))
+        else:
+            _LOGGER.debug(f"No custom dictionary found at {dict_path}")
 
         timeout_sec = getattr(args, "timeout_seconds", 0)
 
@@ -552,8 +560,8 @@ def phonemize_batch_openjtalk(
                     if timeout_sec > 0:
                         signal.alarm(timeout_sec)
                     _LOGGER.debug(utt)
-                    # 高低アクセントを含む日本語 phonemizer
-                    utt.phonemes = phonemize_japanese(casing(utt.text))
+                    # 高低アクセントを含む日本語 phonemizer（カスタム辞書適用）
+                    utt.phonemes = phonemize_japanese(casing(utt.text), custom_dict=custom_dict)
                     # phoneme_ids は phoneme_id_map から取得
                     utt.phoneme_ids = []
                     for phoneme in utt.phonemes:
@@ -563,8 +571,8 @@ def phonemize_batch_openjtalk(
                             utt.missing_phonemes[phoneme] += 1
                             _LOGGER.warning(f"Missing phoneme: {phoneme}")
 
-                    # Extract prosody IDs using AccentProcessor
-                    utt.prosody_ids = accent_processor.extract_prosody_ids(utt.phonemes)
+                    # prosody_ids は現在使用していない（削除済み）
+                    utt.prosody_ids = []
 
                     if not args.skip_audio:
                         utt.audio_norm_path, utt.audio_spec_path = cache_norm_audio(
