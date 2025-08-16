@@ -33,12 +33,12 @@ from .norm_audio import cache_norm_audio, make_silence_detector
 
 # Custom Japanese phonemizer
 try:
-    from .phonemize.japanese import phonemize_japanese  # type: ignore
     from .phonemize.custom_dict import CustomDictionary  # type: ignore
+    from .phonemize.japanese import phonemize_japanese  # type: ignore
 except ImportError:
     # When running as script, relative import may fail; try absolute import fallback
-    from piper_train.phonemize.japanese import phonemize_japanese  # type: ignore
     from piper_train.phonemize.custom_dict import CustomDictionary  # type: ignore
+    from piper_train.phonemize.japanese import phonemize_japanese  # type: ignore
 
 # Japanese phoneme id map support
 try:
@@ -532,10 +532,15 @@ def phonemize_batch_openjtalk(
 
         casing = get_text_casing(args.text_casing)
         silence_detector = make_silence_detector()
-        
+
         # カスタム辞書を読み込む（存在する場合）
         custom_dict = None
-        dict_path = Path(__file__).parent.parent.parent.parent / "data" / "dictionaries" / "user_custom_dict.json"
+        dict_path = (
+            Path(__file__).parent.parent.parent.parent
+            / "data"
+            / "dictionaries"
+            / "user_custom_dict.json"
+        )
         if dict_path.exists():
             _LOGGER.info(f"Loading custom dictionary from {dict_path}")
             custom_dict = CustomDictionary(str(dict_path))
@@ -561,7 +566,9 @@ def phonemize_batch_openjtalk(
                         signal.alarm(timeout_sec)
                     _LOGGER.debug(utt)
                     # 高低アクセントを含む日本語 phonemizer（カスタム辞書適用）
-                    utt.phonemes = phonemize_japanese(casing(utt.text), custom_dict=custom_dict)
+                    utt.phonemes = phonemize_japanese(
+                        casing(utt.text), custom_dict=custom_dict
+                    )
                     # phoneme_ids は phoneme_id_map から取得
                     utt.phoneme_ids = []
                     for phoneme in utt.phonemes:

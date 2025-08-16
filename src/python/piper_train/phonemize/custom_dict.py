@@ -163,15 +163,15 @@ class CustomDictionary:
         cache_key = f"{word}_{case_sensitive}"
         if cache_key not in self.pattern_cache:
             escaped_word = re.escape(word)
-            
+
             # 日本語の場合は単語境界を使わない（\bは日本語で機能しない）
             # 最初の1文字だけチェックすることで高速化
             has_japanese = bool(word) and ord(word[0]) > 127
-            
+
             # より確実にするため、全文字チェックが必要な場合のみ実行
             if not has_japanese and len(word) > 1:
                 has_japanese = any(ord(c) > 127 for c in word[1:])
-            
+
             if has_japanese:
                 # 日本語を含む場合はそのまま置換
                 pattern_str = escaped_word

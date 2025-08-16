@@ -1,6 +1,5 @@
 import json
 import logging
-import re
 import wave
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -149,23 +148,29 @@ class PiperVoice:
                     os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
                 )
                 sys.path.insert(0, os.path.join(piper_root, "src", "python"))
-                from piper_train.phonemize.japanese import phonemize_japanese
                 from piper_train.phonemize.custom_dict import CustomDictionary
+                from piper_train.phonemize.japanese import phonemize_japanese
 
                 # カスタム辞書を適用（user_custom_dict.jsonを明示的に読み込む）
-                dict_path = os.path.join(piper_root, "data", "dictionaries", "user_custom_dict.json")
-                
+                dict_path = os.path.join(
+                    piper_root, "data", "dictionaries", "user_custom_dict.json"
+                )
+
                 # 辞書ファイルの存在確認
                 if os.path.exists(dict_path):
                     try:
                         dictionary = CustomDictionary(dict_path)
                         return [phonemize_japanese(text, custom_dict=dictionary)]
                     except Exception as e:
-                        _LOGGER.warning(f"Failed to load custom dictionary from {dict_path}: {e}")
+                        _LOGGER.warning(
+                            f"Failed to load custom dictionary from {dict_path}: {e}"
+                        )
                         # 辞書なしで音素化を続行
                         return [phonemize_japanese(text)]
                 else:
-                    _LOGGER.debug(f"Custom dictionary not found at {dict_path}, using default phonemization")
+                    _LOGGER.debug(
+                        f"Custom dictionary not found at {dict_path}, using default phonemization"
+                    )
                     return [phonemize_japanese(text)]
             except ImportError:
                 _LOGGER.warning("Failed to import piper_train phonemizer, falling back")
@@ -219,7 +224,7 @@ class PiperVoice:
                 continue
 
             ids.extend(id_map[phoneme])
-            
+
             # 学習データが PAD("_") を各音素ごとに含んでいるのは eSpeak 方式のみ。
             if self.config.phoneme_type == PhonemeType.ESPEAK:
                 ids.extend(id_map[PAD])
