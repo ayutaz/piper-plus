@@ -60,7 +60,7 @@ jobs:
         python -m pip install --upgrade pip
         cd src/python
         pip install -r requirements_test.txt
-        pip install -r requirements.txt
+        pip install -r ../../requirements-train.txt
         pip install -e .
     
     - name: Run unit tests (Windows)

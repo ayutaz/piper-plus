@@ -5,4 +5,10 @@ from .custom_dict import (  # noqa: F401
     apply_custom_dictionary,
     create_default_dictionary,
 )
-from .japanese import phonemize_japanese  # noqa: F401
+
+# Import Japanese phonemizer only if pyopenjtalk is available
+try:
+    from .japanese import phonemize_japanese  # noqa: F401
+except ImportError:
+    # pyopenjtalk not available (e.g., on Windows)
+    phonemize_japanese = None
