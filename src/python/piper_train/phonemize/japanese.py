@@ -1,6 +1,13 @@
 import re
 
-import pyopenjtalk
+# Try to import pyopenjtalk-plus first (Windows compatible), fall back to pyopenjtalk
+try:
+    import pyopenjtalk_plus as pyopenjtalk
+except ImportError:
+    try:
+        import pyopenjtalk
+    except ImportError:
+        raise ImportError("Neither pyopenjtalk nor pyopenjtalk-plus is installed")
 
 from .custom_dict import CustomDictionary
 from .token_mapper import map_sequence
