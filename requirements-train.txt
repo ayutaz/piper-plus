@@ -1,4 +1,9 @@
-# Core dependencies for piper-tts
+# Piper TTS - Training Requirements
+# Dependencies for training custom models and fine-tuning
+# For inference only, see requirements.txt
+# For development tools, see requirements-dev.txt
+
+# Core dependencies for training
 cython>=0.29.0,<1
 # piper-phonemize>=1.0.0  # Optional: Install separately if available
 librosa>=0.9.2,<1
