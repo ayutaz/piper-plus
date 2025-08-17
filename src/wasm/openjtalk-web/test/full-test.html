@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpenJTalk WebAssembly Full Test</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f0f2f5;
+        }
+        h1 {
+            color: #1a1a1a;
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            margin: 20px 0;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.07);
+        }
+        .status {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        .status.ready { background: #d4edda; color: #155724; }
+        .status.loading { background: #fff3cd; color: #856404; }
+        .status.error { background: #f8d7da; color: #721c24; }
+        .status.not-ready { background: #e7e7e7; color: #666; }
+        
+        button {
+            background: #007acc;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background 0.2s;
+        }
+        button:hover { background: #005a9e; }
+        button:disabled { background: #ccc; cursor: not-allowed; }
+        
+        .input-group {
+            margin: 20px 0;
+        }
+        .input-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #333;
+        }
+        .input-group input, .input-group textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 16px;
+        }
+        .input-group textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+        
+        .output {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            padding: 16px;
+            margin: 16px 0;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            max-height: 400px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+        
+        .test-results {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 16px;
+            margin: 20px 0;
+        }
+        .test-item {
+            padding: 12px;
+            border-radius: 6px;
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+        }
+        .test-item.pass { border-color: #28a745; background: #d4edda; }
+        .test-item.fail { border-color: #dc3545; background: #f8d7da; }
+        
+        .progress {
+            width: 100%;
+            height: 8px;
+            background: #e9ecef;
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 20px 0;
+        }
+        .progress-bar {
+            height: 100%;
+            background: #007acc;
+            transition: width 0.3s ease;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎌 OpenJTalk WebAssembly Full Test</h1>
+    
+    <div class="card">
+        <h2>モジュール状態</h2>
+        <div style="display: flex; gap: 20px; align-items: center;">
+            <div>
+                <strong>WASM Module:</strong> 
+                <span id="wasmStatus" class="status not-ready">Not Loaded</span>
+            </div>
+            <div>
+                <strong>Dictionary:</strong> 
+                <span id="dictStatus" class="status not-ready">Not Loaded</span>
+            </div>
+            <div>
+                <strong>Voice:</strong> 
+                <span id="voiceStatus" class="status not-ready">Not Loaded</span>
+            </div>
+        </div>
+        <div class="progress">
+            <div id="progressBar" class="progress-bar" style="width: 0%"></div>
+        </div>
+        <button onclick="initializeAll()">Initialize All Components</button>
+    </div>
+    
+    <div class="card">
+        <h2>テキスト音素変換</h2>
+        <div class="input-group">
+            <label for="testText">日本語テキスト:</label>
+            <textarea id="testText">こんにちは、世界！OpenJTalkをWebAssemblyで動かしています。</textarea>
+        </div>
+        <button id="convertBtn" onclick="convertToPhonemes()" disabled>音素ラベルに変換</button>
+        
+        <div id="phonemeOutput" class="output" style="display: none;"></div>
+    </div>
+    
+    <div class="card">
+        <h2>自動テスト</h2>
+        <button onclick="runAllTests()">Run All Tests</button>
+        <div id="testResults" class="test-results"></div>
+    </div>
+    
+    <div class="card">
+        <h2>ログ</h2>
+        <div id="logOutput" class="output"></div>
+    </div>
+
+    <script type="module">
+        let moduleInstance = null;
+        let isInitialized = false;
+        
+        function log(message, type = 'info') {
+            const timestamp = new Date().toISOString().split('T')[1].split('.')[0];
+            const logDiv = document.getElementById('logOutput');
+            const color = {
+                info: '#0066cc',
+                success: '#28a745',
+                error: '#dc3545',
+                warn: '#ffc107'
+            }[type] || '#333';
+            
+            logDiv.innerHTML += `<span style="color: ${color}">[${timestamp}] ${message}</span>\n`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+        
+        function updateProgress(percent) {
+            document.getElementById('progressBar').style.width = `${percent}%`;
+        }
+        
+        function updateStatus(element, status, text) {
+            const el = document.getElementById(element);
+            el.textContent = text;
+            el.className = `status ${status}`;
+        }
+        
+        window.initializeAll = async function() {
+            try {
+                updateProgress(0);
+                
+                // Load WASM module
+                log('Loading WebAssembly module...', 'info');
+                updateStatus('wasmStatus', 'loading', 'Loading...');
+                
+                const Module = (await import('../dist/openjtalk.js')).default;
+                moduleInstance = await Module({
+                    locateFile: (path) => {
+                        if (path.endsWith('.wasm')) {
+                            return '../dist/openjtalk.wasm';
+                        }
+                        return path;
+                    }
+                });
+                
+                updateStatus('wasmStatus', 'ready', 'Loaded');
+                log('WASM module loaded successfully', 'success');
+                updateProgress(30);
+                
+                // Load dictionary
+                log('Loading dictionary files...', 'info');
+                updateStatus('dictStatus', 'loading', 'Loading...');
+                
+                const dictFiles = [
+                    'char.bin', 'matrix.bin', 'sys.dic', 'unk.dic',
+                    'left-id.def', 'pos-id.def', 'rewrite.def', 'right-id.def'
+                ];
+                
+                const FS = moduleInstance.FS;
+                try {
+                    FS.mkdir('/dict');
+                } catch (e) {}
+                
+                for (let i = 0; i < dictFiles.length; i++) {
+                    const file = dictFiles[i];
+                    const response = await fetch(`../assets/dict/${file}`);
+                    if (!response.ok) {
+                        throw new Error(`Failed to load ${file}`);
+                    }
+                    const data = await response.arrayBuffer();
+                    FS.writeFile(`/dict/${file}`, new Uint8Array(data));
+                    log(`Loaded: ${file} (${data.byteLength} bytes)`, 'info');
+                    updateProgress(30 + (i + 1) * 5);
+                }
+                
+                updateStatus('dictStatus', 'ready', 'Loaded');
+                log('Dictionary files loaded successfully', 'success');
+                
+                // Load voice
+                log('Loading voice file...', 'info');
+                updateStatus('voiceStatus', 'loading', 'Loading...');
+                
+                try {
+                    FS.mkdir('/voice');
+                } catch (e) {}
+                
+                const voiceResponse = await fetch('../assets/voice/mei_normal.htsvoice');
+                if (!voiceResponse.ok) {
+                    throw new Error('Failed to load voice file');
+                }
+                const voiceData = await voiceResponse.arrayBuffer();
+                FS.writeFile('/voice/mei_normal.htsvoice', new Uint8Array(voiceData));
+                
+                updateStatus('voiceStatus', 'ready', 'Loaded');
+                log(`Voice file loaded: ${voiceData.byteLength} bytes`, 'success');
+                updateProgress(80);
+                
+                // Initialize OpenJTalk
+                log('Initializing OpenJTalk...', 'info');
+                
+                const dictPtr = moduleInstance.allocateUTF8("/dict");
+                const voicePtr = moduleInstance.allocateUTF8("/voice/mei_normal.htsvoice");
+                const result = moduleInstance._openjtalk_initialize(dictPtr, voicePtr);
+                moduleInstance._free(dictPtr);
+                moduleInstance._free(voicePtr);
+                
+                if (result === 0) {
+                    isInitialized = true;
+                    document.getElementById('convertBtn').disabled = false;
+                    log('OpenJTalk initialized successfully!', 'success');
+                    updateProgress(100);
+                } else {
+                    throw new Error(`OpenJTalk initialization failed with code: ${result}`);
+                }
+                
+            } catch (error) {
+                log(`Error: ${error.message}`, 'error');
+                updateStatus('wasmStatus', 'error', 'Error');
+                console.error(error);
+            }
+        };
+        
+        window.convertToPhonemes = async function() {
+            if (!isInitialized) {
+                log('OpenJTalk not initialized', 'error');
+                return;
+            }
+            
+            const text = document.getElementById('testText').value;
+            if (!text.trim()) {
+                log('Please enter some text', 'warn');
+                return;
+            }
+            
+            try {
+                log(`Converting text: "${text}"`, 'info');
+                
+                const textPtr = moduleInstance.allocateUTF8(text);
+                const labelsPtr = moduleInstance._openjtalk_synthesis_labels(textPtr);
+                const labels = moduleInstance.UTF8ToString(labelsPtr);
+                
+                moduleInstance._openjtalk_free_string(labelsPtr);
+                moduleInstance._free(textPtr);
+                
+                const outputDiv = document.getElementById('phonemeOutput');
+                outputDiv.textContent = labels;
+                outputDiv.style.display = 'block';
+                
+                // Extract phonemes
+                const phonemes = [];
+                const lines = labels.split('\n').filter(line => line.trim());
+                for (const line of lines) {
+                    const match = line.match(/\-([^+]+)\+/);
+                    if (match && match[1] !== 'sil') {
+                        phonemes.push(match[1]);
+                    }
+                }
+                
+                log(`Extracted phonemes: ${phonemes.join(' ')}`, 'success');
+                
+            } catch (error) {
+                log(`Conversion error: ${error.message}`, 'error');
+                console.error(error);
+            }
+        };
+        
+        window.runAllTests = async function() {
+            const resultsDiv = document.getElementById('testResults');
+            resultsDiv.innerHTML = '';
+            
+            if (!isInitialized) {
+                log('Please initialize OpenJTalk first', 'error');
+                return;
+            }
+            
+            const tests = [
+                {
+                    name: 'Basic Conversion',
+                    text: 'こんにちは',
+                    expectedPhonemes: ['k', 'o', 'N', 'n', 'i', 'ch', 'i', 'w', 'a']
+                },
+                {
+                    name: 'Numbers',
+                    text: '123',
+                    expectedPhonemes: ['i', 'ch', 'i', 'n', 'i', 's', 'a', 'N']
+                },
+                {
+                    name: 'Mixed Text',
+                    text: '今日は2024年です',
+                    expectedPhonemes: ['ky', 'o', 'o', 'w', 'a']
+                },
+                {
+                    name: 'English Words',
+                    text: 'OpenJTalk',
+                    expectedPhonemes: ['o', 'o', 'p', 'u', 'N']
+                }
+            ];
+            
+            for (const test of tests) {
+                const resultDiv = document.createElement('div');
+                resultDiv.className = 'test-item';
+                
+                try {
+                    const textPtr = moduleInstance.allocateUTF8(test.text);
+                    const labelsPtr = moduleInstance._openjtalk_synthesis_labels(textPtr);
+                    const labels = moduleInstance.UTF8ToString(labelsPtr);
+                    
+                    moduleInstance._openjtalk_free_string(labelsPtr);
+                    moduleInstance._free(textPtr);
+                    
+                    // Extract phonemes
+                    const phonemes = [];
+                    const lines = labels.split('\n').filter(line => line.trim());
+                    for (const line of lines) {
+                        const match = line.match(/\-([^+]+)\+/);
+                        if (match && match[1] !== 'sil') {
+                            phonemes.push(match[1]);
+                        }
+                    }
+                    
+                    const passed = phonemes.length > 0;
+                    resultDiv.className += passed ? ' pass' : ' fail';
+                    resultDiv.innerHTML = `
+                        <strong>${test.name}</strong><br>
+                        Input: "${test.text}"<br>
+                        Phonemes: ${phonemes.join(' ')}<br>
+                        Status: ${passed ? '✅ Pass' : '❌ Fail'}
+                    `;
+                    
+                } catch (error) {
+                    resultDiv.className += ' fail';
+                    resultDiv.innerHTML = `
+                        <strong>${test.name}</strong><br>
+                        Error: ${error.message}
+                    `;
+                }
+                
+                resultsDiv.appendChild(resultDiv);
+            }
+        };
+        
+        // Version check on load
+        window.addEventListener('load', () => {
+            log('OpenJTalk WebAssembly Test Page Ready', 'info');
+            log('Click "Initialize All Components" to begin', 'info');
+        });
+    </script>
+</body>
+</html>

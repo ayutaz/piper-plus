@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>MeCab解析テスト</title>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .test-box {
+            border: 1px solid #ccc;
+            padding: 20px;
+            margin: 10px 0;
+            border-radius: 8px;
+        }
+        pre {
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+        }
+        .analysis {
+            background: #fff3e0;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <h1>MeCab解析テスト - 英単語の処理</h1>
+    
+    <div class="test-box">
+        <button onclick="runTests()">テスト実行</button>
+        <div id="results"></div>
+    </div>
+
+    <script type="module">
+        // OpenJTalkのJavaScriptモジュールを直接インポート
+        window.runTests = async function() {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<p>処理中...</p>';
+            
+            try {
+                // OpenJTalkモジュールをロード
+                const OpenJTalkModule = (await import('../dist/openjtalk.js')).default;
+                const openjtalkModule = await OpenJTalkModule({
+                    locateFile: (path) => {
+                        if (path.endsWith('.wasm')) {
+                            return '../dist/openjtalk.wasm';
+                        }
+                        return path;
+                    }
+                });
+                
+                // 辞書とボイスファイルをロード（簡略化のため省略）
+                console.log('OpenJTalk module loaded');
+                
+                // テストケース
+                const testCases = [
+                    'OpenJTalkとPiperを使った',
+                    'OpenJTalkを使った',
+                    'Piperを使った',
+                    'OPENJTALK',
+                    'PIPER',
+                    'Open',
+                    'Piper',
+                    'オープンジェートーク',
+                    'パイパー'
+                ];
+                
+                let html = '<h2>MeCab解析結果（コンソールログを確認）</h2>';
+                
+                for (const text of testCases) {
+                    html += `<div class="analysis">`;
+                    html += `<h3>${text}</h3>`;
+                    html += `<p>※ コンソールログでMeCabの解析結果を確認してください</p>`;
+                    
+                    // OpenJTalkに渡してログを観察
+                    console.log(`\n=== Testing: "${text}" ===`);
+                    
+                    const textPtr = openjtalkModule.allocateUTF8(text);
+                    try {
+                        const labelsPtr = openjtalkModule._openjtalk_synthesis_labels(textPtr);
+                        const labels = openjtalkModule.UTF8ToString(labelsPtr);
+                        openjtalkModule._openjtalk_free_string(labelsPtr);
+                        
+                        // ラベルから音素を抽出
+                        const lines = labels.split('\n').filter(line => line.trim());
+                        const phonemes = [];
+                        
+                        for (const line of lines) {
+                            const match = line.match(/\-([^+]+)\+/);
+                            if (match && match[1] !== 'sil' && match[1] !== 'pau') {
+                                phonemes.push(match[1]);
+                            }
+                        }
+                        
+                        html += `<p><strong>音素:</strong> ${phonemes.join(' ')}</p>`;
+                        html += `<p><strong>音素数:</strong> ${phonemes.length}</p>`;
+                        
+                        // 英単語の特徴を分析
+                        if (text.includes('OpenJTalk')) {
+                            const openPhonemes = phonemes.slice(0, 10).join(' ');
+                            html += `<p><strong>"OpenJTalk"部分（推定）:</strong> ${openPhonemes}</p>`;
+                        }
+                        if (text.includes('Piper')) {
+                            // Piperの位置を推定
+                            let piperStart = -1;
+                            for (let i = 0; i < phonemes.length - 4; i++) {
+                                if (phonemes[i] === 'p' && phonemes[i+1] === 'i') {
+                                    piperStart = i;
+                                    break;
+                                }
+                            }
+                            if (piperStart >= 0) {
+                                const piperPhonemes = phonemes.slice(piperStart, piperStart + 10).join(' ');
+                                html += `<p><strong>"Piper"部分（推定）:</strong> ${piperPhonemes}</p>`;
+                            }
+                        }
+                        
+                    } catch (error) {
+                        html += `<p style="color: red;">エラー: ${error.message}</p>`;
+                    } finally {
+                        openjtalkModule._free(textPtr);
+                    }
+                    
+                    html += `</div>`;
+                }
+                
+                resultsDiv.innerHTML = html;
+                
+            } catch (error) {
+                resultsDiv.innerHTML = `<p style="color: red;">エラー: ${error.message}</p>`;
+                console.error(error);
+            }
+        }
+    </script>
+</body>
+</html>

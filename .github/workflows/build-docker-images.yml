@@ -1,19 +1,10 @@
 name: Build and Push Docker Images
 
 on:
-  push:
-    branches:
-      - dev
-      - master
-    paths:
-      - 'Dockerfile'
-      - 'CMakeLists.txt'
-      - 'src/**'
-      - '.github/workflows/build-docker-images.yml'
   pull_request:
     branches:
       - dev
-      - master
+      - dev
     paths:
       - 'Dockerfile'
       - 'CMakeLists.txt'

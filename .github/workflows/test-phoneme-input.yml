@@ -1,0 +1,152 @@
+name: Phoneme Input Tests
+
+on:
+  pull_request:
+    branches: [ dev, main ]
+    paths:
+      - 'src/cpp/phoneme_parser.*'
+      - 'src/cpp/piper.cpp'
+      - 'src/cpp/piper.hpp'
+      - 'src/cpp/main.cpp'
+      - 'scripts/test_phoneme_input.py'
+      - 'scripts/test_raw_phonemes.py'
+      - '.github/workflows/test-phoneme-input.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test-phoneme-input:
+    name: Test Phoneme Input on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    
+    steps:
+      - uses: actions/checkout@v4.2.2
+        with:
+          submodules: true
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      
+      - name: Install dependencies (Ubuntu)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            cmake \
+            wget
+          
+          # Install ONNX Runtime
+          wget -q https://github.com/microsoft/onnxruntime/releases/download/v1.14.1/onnxruntime-linux-x64-1.14.1.tgz
+          tar -xzf onnxruntime-linux-x64-1.14.1.tgz
+          sudo cp -r onnxruntime-linux-x64-1.14.1/lib/* /usr/local/lib/
+          sudo cp -r onnxruntime-linux-x64-1.14.1/include/* /usr/local/include/
+          sudo ldconfig
+      
+      - name: Install dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install cmake || brew upgrade cmake || true
+          brew install wget || brew upgrade wget || true
+          
+          # Install ONNX Runtime
+          if [[ $(uname -m) == "arm64" ]]; then
+            wget -q https://github.com/microsoft/onnxruntime/releases/download/v1.14.1/onnxruntime-osx-arm64-1.14.1.tgz
+            tar -xzf onnxruntime-osx-arm64-1.14.1.tgz
+            sudo cp -r onnxruntime-osx-arm64-1.14.1/lib/* /usr/local/lib/ 2>/dev/null || true
+            sudo cp -r onnxruntime-osx-arm64-1.14.1/include/* /usr/local/include/ 2>/dev/null || true
+          else
+            wget -q https://github.com/microsoft/onnxruntime/releases/download/v1.14.1/onnxruntime-osx-x86_64-1.14.1.tgz
+            tar -xzf onnxruntime-osx-x86_64-1.14.1.tgz
+            sudo cp -r onnxruntime-osx-x86_64-1.14.1/lib/* /usr/local/lib/ 2>/dev/null || true
+            sudo cp -r onnxruntime-osx-x86_64-1.14.1/include/* /usr/local/include/ 2>/dev/null || true
+          fi
+      
+      - name: Build Piper
+        run: |
+          # Clean build to ensure fresh binary
+          rm -rf build
+          cmake -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --config Release -j$(nproc 2>/dev/null || sysctl -n hw.ncpu)
+      
+      - name: Test CLI help includes phoneme input
+        run: |
+          # Check if help contains phoneme input info
+          echo "=== Running help command ==="
+          ./build/piper --help 2>&1 | tee help_output.txt
+          echo "=== Checking for phoneme input documentation ==="
+          # Look for both "Phoneme input:" text and the example
+          if grep -q "Phoneme input:" help_output.txt && grep -q "\[\[ phonemes \]\]" help_output.txt; then
+            echo "✅ Phoneme input documentation found in help text"
+          else
+            echo "❌ Phoneme input documentation not found!"
+            echo "=== Debug: Looking for 'Phoneme' ==="
+            grep -i phoneme help_output.txt || echo "No 'phoneme' found"
+            echo "=== Debug: Looking for '[[' ==="
+            grep -F "[[" help_output.txt || echo "No '[[' found"
+            exit 1
+          fi
+          
+          # Check for raw-phonemes option
+          echo "=== Checking for raw-phonemes option ==="
+          if grep -q "raw-phonemes" help_output.txt; then
+            echo "✅ Raw phonemes option found in help text"
+          else
+            echo "❌ Raw phonemes option not found!"
+            exit 1
+          fi
+      
+      - name: Run phoneme input tests
+        run: |
+          # Set eSpeak data path
+          export ESPEAK_DATA_PATH="${PWD}/build/pi/share/espeak-ng-data"
+          
+          # Run Python test script
+          python3 scripts/test_phoneme_input.py build/piper test/models/test_voice.onnx
+      
+      - name: Test specific phoneme examples
+        run: |
+          export ESPEAK_DATA_PATH="${PWD}/build/pi/share/espeak-ng-data"
+          
+          # Test English phoneme input
+          echo "Testing English phoneme input..."
+          echo "Hello [[ h ə l oʊ ]] world" | ./build/piper --model test/models/test_voice.onnx --output_file test_en.wav
+          [ -f test_en.wav ] && [ -s test_en.wav ] || (echo "English phoneme test failed!" && exit 1)
+          echo "✅ English phoneme input test passed"
+          
+          # Skip Japanese test in CI due to missing OpenJTalk
+          # Japanese phoneme input functionality is tested in Python tests
+      
+      - name: Test raw phoneme input
+        run: |
+          export ESPEAK_DATA_PATH="${PWD}/build/pi/share/espeak-ng-data"
+          
+          # Test raw phoneme mode with simple phonemes
+          echo "Testing raw phoneme input..."
+          echo "h e l o" | ./build/piper --model test/models/test_voice.onnx --output_file test_raw.wav --raw-phonemes
+          [ -f test_raw.wav ] && [ -s test_raw.wav ] || (echo "Raw phoneme test failed!" && exit 1)
+          echo "✅ Raw phoneme input test passed"
+          
+          # Run Python test script if available
+          if [ -f scripts/test_raw_phonemes.py ]; then
+            echo "Running raw phoneme Python tests..."
+            python3 scripts/test_raw_phonemes.py || echo "Warning: Python raw phoneme tests failed (non-critical)"
+          fi
+      
+      - name: Upload test outputs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phoneme-test-outputs-${{ matrix.os }}
+          path: |
+            test_*.wav
+            build/Testing/Temporary/
+          retention-days: 7

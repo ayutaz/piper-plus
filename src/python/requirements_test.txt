@@ -1,5 +1,5 @@
 # Testing requirements for piper-tts
--r requirements.txt
+-r ../../requirements-train.txt
 
 # Testing frameworks
 pytest==7.4.3
@@ -16,3 +16,6 @@ mypy==1.7.1
 # Type stubs
 types-requests==2.31.0
 types-PyYAML==6.0.12
+
+# System monitoring for performance tests
+psutil==5.9.6

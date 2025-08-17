@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Unicode文字デバッグ</title>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 20px;
+        }
+        .test-box {
+            border: 1px solid #ccc;
+            padding: 20px;
+            margin: 10px 0;
+            border-radius: 8px;
+        }
+        pre {
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Unicode文字デバッグ</h1>
+    
+    <div class="test-box">
+        <button onclick="testUnicode()">Unicode テスト</button>
+        <pre id="result"></pre>
+    </div>
+
+    <script>
+        window.testUnicode = function() {
+            const resultEl = document.getElementById('result');
+            let output = '';
+            
+            // Test Unicode character
+            const chUnicode = '\ue001';
+            output += `Unicode文字テスト:\n`;
+            output += `文字: "${chUnicode}"\n`;
+            output += `charCodeAt(0): ${chUnicode.charCodeAt(0)}\n`;
+            output += `16進数: U+${chUnicode.charCodeAt(0).toString(16)}\n`;
+            output += `長さ: ${chUnicode.length}\n`;
+            output += `=== 0xe001: ${chUnicode.charCodeAt(0) === 0xe001}\n\n`;
+            
+            // Test string with Unicode
+            const testString = '^koNni\ue001iwasekai$';
+            output += `文字列テスト:\n`;
+            output += `元の文字列: "${testString}"\n`;
+            output += `長さ: ${testString.length}\n`;
+            output += `各文字:\n`;
+            
+            for (let i = 0; i < testString.length; i++) {
+                const char = testString[i];
+                const code = char.charCodeAt(0);
+                output += `  [${i}]: "${char}" (U+${code.toString(16).padStart(4, '0')})\n`;
+            }
+            
+            // Test split
+            output += `\nsplit('')の結果:\n`;
+            const splitArray = testString.split('');
+            splitArray.forEach((char, i) => {
+                const code = char.charCodeAt(0);
+                output += `  [${i}]: "${char}" (U+${code.toString(16).padStart(4, '0')})\n`;
+            });
+            
+            // Test array with Unicode
+            output += `\n配列テスト:\n`;
+            const testArray = ['^', 'k', 'o', 'N', 'n', 'i', '\ue001', 'i', 'w', 'a', 's', 'e', 'k', 'a', 'i', '$'];
+            output += `配列: [${testArray.map(c => `"${c}"`).join(', ')}]\n`;
+            output += `join(''): "${testArray.join('')}"\n`;
+            output += `join(' '): "${testArray.join(' ')}"\n`;
+            
+            // Check if Unicode character is preserved
+            output += `\nUnicode文字の保持確認:\n`;
+            const joined = testArray.join('');
+            for (let i = 0; i < joined.length; i++) {
+                if (joined.charCodeAt(i) >= 0xe000 && joined.charCodeAt(i) <= 0xe00d) {
+                    output += `位置 ${i}: Unicode文字検出 U+${joined.charCodeAt(i).toString(16)}\n`;
+                }
+            }
+            
+            resultEl.textContent = output;
+        }
+    </script>
+</body>
+</html>

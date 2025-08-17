@@ -1,0 +1,38 @@
+# Build outputs
+# dist/ # Need to include dist for GitHub Pages deployment
+build/build-*/
+build/CMakeFiles/
+build/CMakeCache.txt
+build/cmake_install.cmake
+build/Makefile
+
+# Downloaded models (large files)
+models/*.onnx
+!models/.gitkeep
+!models/test_voice.onnx
+!models/en_US-test-medium.onnx
+
+# Node modules (if any get added)
+node_modules/
+
+# IDE files
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.log
+*~
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# Downloaded tools (separate git repositories)
+tools/hts_engine_API/
+tools/wasm_open_jtalk/
+wasm_open_jtalk_reference/

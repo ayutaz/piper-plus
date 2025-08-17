@@ -2,6 +2,7 @@ import torch
 import torch.utils.data
 from librosa.filters import mel as librosa_mel_fn
 
+
 MAX_WAV_VALUE = 32768.0
 
 
@@ -43,7 +44,7 @@ def spectrogram_torch(y, n_fft, sampling_rate, hop_size, win_size, center=False)
     if torch.max(y) > 1.0:
         print("max value is ", torch.max(y))
 
-    global hann_window  # noqa: F824
+    global hann_window  # noqa: PLW0602
     dtype_device = str(y.dtype) + "_" + str(y.device)
     wnsize_dtype_device = str(win_size) + "_" + dtype_device
     if wnsize_dtype_device not in hann_window:
@@ -77,7 +78,7 @@ def spectrogram_torch(y, n_fft, sampling_rate, hop_size, win_size, center=False)
 
 
 def spec_to_mel_torch(spec, n_fft, num_mels, sampling_rate, fmin, fmax):
-    global mel_basis  # noqa: F824
+    global mel_basis  # noqa: PLW0602
     dtype_device = str(spec.dtype) + "_" + str(spec.device)
     fmax_dtype_device = str(fmax) + "_" + dtype_device
     if fmax_dtype_device not in mel_basis:
@@ -98,7 +99,7 @@ def mel_spectrogram_torch(
     if torch.max(y) > 1.0:
         print("max value is ", torch.max(y))
 
-    global mel_basis, hann_window  # noqa: F824
+    global mel_basis, hann_window  # noqa: PLW0602
     dtype_device = str(y.dtype) + "_" + str(y.device)
     fmax_dtype_device = str(fmax) + "_" + dtype_device
     wnsize_dtype_device = str(win_size) + "_" + dtype_device

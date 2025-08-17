@@ -1,0 +1,157 @@
+name: Deploy WebAssembly Demo to GitHub Pages
+
+on:
+  push:
+    branches:
+      - dev
+      - feat/english-model-support
+    paths:
+      - 'src/wasm/**'
+      - '.github/workflows/deploy-webassembly-demo.yml'
+  workflow_dispatch:
+    inputs:
+      deploy_message:
+        description: 'Deployment message'
+        required: false
+        default: 'Manual deployment'
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      
+      - name: Prepare deployment directory
+        run: |
+          mkdir -p deploy
+          echo "Deploying WebAssembly demo with English model support"
+          
+          
+          # Copy WebAssembly artifacts
+          if [ -d "src/wasm/openjtalk-web/dist" ]; then
+            cp -r src/wasm/openjtalk-web/dist deploy/
+          else
+            echo "ERROR: WebAssembly dist directory not found!"
+            echo "Please build the WebAssembly files before deployment."
+            exit 1
+          fi
+          
+          if [ -d "src/wasm/openjtalk-web/assets" ]; then
+            cp -r src/wasm/openjtalk-web/assets deploy/
+          else
+            mkdir -p deploy/assets
+          fi
+          
+          if [ -d "src/wasm/openjtalk-web/models" ]; then
+            echo "Copying models directory..."
+            ls -la src/wasm/openjtalk-web/models/
+            cp -r src/wasm/openjtalk-web/models deploy/
+            echo "Models copied to deploy/models"
+            ls -la deploy/models/
+          else
+            mkdir -p deploy/models
+            echo "WARNING: models directory not found!"
+          fi
+          
+          # Copy multilingual demo as the main index page
+          if [ -f "src/wasm/openjtalk-web/test/multilingual-demo/index.html" ]; then
+            cp src/wasm/openjtalk-web/test/multilingual-demo/index.html deploy/index.html
+            
+            # Update paths for root level using more specific patterns
+            sed -i 's|src="../../dist/|src="./dist/|g' deploy/index.html
+            sed -i 's|src="../../assets/|src="./assets/|g' deploy/index.html
+            sed -i 's|src="../../models/|src="./models/|g' deploy/index.html
+            sed -i 's|src="../../src/|src="./src/|g' deploy/index.html
+            sed -i 's|src="../dist/|src="./dist/|g' deploy/index.html
+            
+            # Also update paths in import statements and other references
+            sed -i "s|from '../../|from './|g" deploy/index.html
+            sed -i "s|from '../|from './|g" deploy/index.html
+            
+            # Update model paths in JavaScript strings
+            sed -i "s|'../../models/|'./models/|g" deploy/index.html
+            sed -i "s|'../../assets/|'./assets/|g" deploy/index.html
+            sed -i "s|'../../dist/|'./dist/|g" deploy/index.html
+            sed -i "s|'../models/|'./models/|g" deploy/index.html
+            sed -i "s|'../assets/|'./assets/|g" deploy/index.html
+            sed -i "s|'../dist/|'./dist/|g" deploy/index.html
+            
+            # Also update template string paths (backtick strings)
+            sed -i "s|\`../../models/|\`./models/|g" deploy/index.html
+            sed -i "s|\`../../assets/|\`./assets/|g" deploy/index.html
+            sed -i "s|\`../models/|\`./models/|g" deploy/index.html
+            sed -i "s|\`../assets/|\`./assets/|g" deploy/index.html
+            
+            echo "Multilingual demo deployed as main page"
+          fi
+          
+          # Copy multilingual demo
+          if [ -d "src/wasm/openjtalk-web/test/multilingual-demo" ]; then
+            mkdir -p deploy/multilingual-demo
+            cp -r src/wasm/openjtalk-web/test/multilingual-demo/* deploy/multilingual-demo/
+            
+            # Update paths for multilingual demo
+            for file in deploy/multilingual-demo/*.html; do
+              if [ -f "$file" ]; then
+                sed -i 's|../../dist/|../dist/|g' "$file"
+                sed -i 's|../../assets/|../assets/|g' "$file"
+                sed -i 's|../../models/|../models/|g' "$file"
+                sed -i 's|../../src/|../src/|g' "$file"
+              fi
+            done
+          fi
+          
+          
+          # Copy src files for multilingual demo
+          if [ -d "src/wasm/openjtalk-web/src" ]; then
+            mkdir -p deploy/src
+            cp src/wasm/openjtalk-web/src/simple_unified_api.js deploy/src/
+            cp src/wasm/openjtalk-web/src/simple_english_phonemizer.js deploy/src/
+            cp src/wasm/openjtalk-web/src/espeak_phoneme_extractor.js deploy/src/
+            cp src/wasm/openjtalk-web/src/custom_dictionary.js deploy/src/
+            
+            # Fix paths in src files for root deployment
+            sed -i "s|'../dist/|'./dist/|g" deploy/src/espeak_phoneme_extractor.js
+            sed -i "s|'../../dist/|'./dist/|g" deploy/src/*.js
+            sed -i "s|'../../assets/|'./assets/|g" deploy/src/*.js
+            sed -i "s|'../../models/|'./models/|g" deploy/src/*.js
+          fi
+          
+          # Create 404 page
+          cp deploy/index.html deploy/404.html
+          
+          # Add deployment info
+          echo "Deployment: ${{ github.event.inputs.deploy_message || 'Automated deployment' }}" > deploy/deployment-info.txt
+          echo "Commit: ${{ github.sha }}" >> deploy/deployment-info.txt
+          echo "Date: $(date -u +"%Y-%m-%d %H:%M:%S UTC")" >> deploy/deployment-info.txt
+      
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+      
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./deploy
+  
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

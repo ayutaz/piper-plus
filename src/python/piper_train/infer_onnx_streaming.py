@@ -14,6 +14,7 @@ import onnxruntime
 
 from .vits.utils import audio_float_to_int16
 
+
 _LOGGER = logging.getLogger("piper_train.infer_onnx")
 
 

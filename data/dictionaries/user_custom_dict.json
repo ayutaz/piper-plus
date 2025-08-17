@@ -1,0 +1,1912 @@
+{
+  "version": "2.0",
+  "description": "ユーザーカスタム辞書テンプレート",
+  "metadata": {
+    "created": "2025-01-03",
+    "author": "User",
+    "license": "User defined",
+    "notes": "このファイルに独自の単語と読みを追加してください"
+  },
+  "entries": {
+    "// 例: 会社名・プロジェクト名": "",
+    "MyCompany": {
+      "pronunciation": "マイカンパニー",
+      "priority": 10
+    },
+    "// 例: 独自の技術用語": "",
+    "CustomAPI": {
+      "pronunciation": "カスタムエーピーアイ",
+      "priority": 9
+    },
+    "// 例: 人名": "",
+    "Tanaka": {
+      "pronunciation": "タナカ",
+      "priority": 8
+    },
+    "田中": {
+      "pronunciation": "タナカ",
+      "priority": 8
+    },
+    "// 音声合成関連の修正": "",
+    "音声": {
+      "pronunciation": "おんせい",
+      "priority": 10
+    },
+    "合成": {
+      "pronunciation": "ごうせい",
+      "priority": 10
+    },
+    "音声合成": {
+      "pronunciation": "おんせいごうせい",
+      "priority": 10
+    },
+    "生成": {
+      "pronunciation": "せいせい",
+      "priority": 10
+    },
+    "構成": {
+      "pronunciation": "こうせい",
+      "priority": 10
+    },
+    "作成": {
+      "pronunciation": "さくせい",
+      "priority": 10
+    },
+    "編成": {
+      "pronunciation": "へんせい",
+      "priority": 10
+    },
+    "形成": {
+      "pronunciation": "けいせい",
+      "priority": 10
+    },
+    "成功": {
+      "pronunciation": "せいこう",
+      "priority": 10
+    },
+    "成長": {
+      "pronunciation": "せいちょう",
+      "priority": 10
+    },
+    "成果": {
+      "pronunciation": "せいか",
+      "priority": 10
+    },
+    "成分": {
+      "pronunciation": "せいぶん",
+      "priority": 10
+    },
+    "成立": {
+      "pronunciation": "せいりつ",
+      "priority": 10
+    },
+    "成人": {
+      "pronunciation": "せいじん",
+      "priority": 10
+    },
+    "成績": {
+      "pronunciation": "せいせき",
+      "priority": 10
+    },
+    "完成": {
+      "pronunciation": "かんせい",
+      "priority": 10
+    },
+    "達成": {
+      "pronunciation": "たっせい",
+      "priority": 10
+    },
+    "養成": {
+      "pronunciation": "ようせい",
+      "priority": 10
+    },
+    "賛成": {
+      "pronunciation": "さんせい",
+      "priority": 10
+    },
+    "成約": {
+      "pronunciation": "せいやく",
+      "priority": 10
+    },
+    "成就": {
+      "pronunciation": "じょうじゅ",
+      "priority": 10
+    },
+    "育成": {
+      "pronunciation": "いくせい",
+      "priority": 10
+    },
+    "造成": {
+      "pronunciation": "ぞうせい",
+      "priority": 10
+    },
+    "組成": {
+      "pronunciation": "そせい",
+      "priority": 10
+    },
+    "成型": {
+      "pronunciation": "せいけい",
+      "priority": 10
+    },
+    "成形": {
+      "pronunciation": "せいけい",
+      "priority": 10
+    },
+    "声優": {
+      "pronunciation": "せいゆう",
+      "priority": 10
+    },
+    "声明": {
+      "pronunciation": "せいめい",
+      "priority": 10
+    },
+    "声援": {
+      "pronunciation": "せいえん",
+      "priority": 10
+    },
+    "声調": {
+      "pronunciation": "せいちょう",
+      "priority": 10
+    },
+    "声域": {
+      "pronunciation": "せいいき",
+      "priority": 10
+    },
+    "声量": {
+      "pronunciation": "せいりょう",
+      "priority": 10
+    },
+    "発声": {
+      "pronunciation": "はっせい",
+      "priority": 10
+    },
+    "歓声": {
+      "pronunciation": "かんせい",
+      "priority": 10
+    },
+    "怒声": {
+      "pronunciation": "どせい",
+      "priority": 10
+    },
+    "叫声": {
+      "pronunciation": "きょうせい",
+      "priority": 10
+    },
+    "嗄声": {
+      "pronunciation": "させい",
+      "priority": 10
+    },
+    "声帯": {
+      "pronunciation": "せいたい",
+      "priority": 10
+    },
+    "声紋": {
+      "pronunciation": "せいもん",
+      "priority": 10
+    },
+    "声色": {
+      "pronunciation": "こわいろ",
+      "priority": 10
+    },
+    "大声": {
+      "pronunciation": "おおごえ",
+      "priority": 10
+    },
+    "小声": {
+      "pronunciation": "こごえ",
+      "priority": 10
+    },
+    "歌声": {
+      "pronunciation": "うたごえ",
+      "priority": 10
+    },
+    "鳴声": {
+      "pronunciation": "なきごえ",
+      "priority": 10
+    },
+    "泣声": {
+      "pronunciation": "なきごえ",
+      "priority": 10
+    },
+    "笑声": {
+      "pronunciation": "わらいごえ",
+      "priority": 10
+    },
+    "話声": {
+      "pronunciation": "はなしごえ",
+      "priority": 10
+    },
+    "生産": {
+      "pronunciation": "せいさん",
+      "priority": 10
+    },
+    "生活": {
+      "pronunciation": "せいかつ",
+      "priority": 10
+    },
+    "生命": {
+      "pronunciation": "せいめい",
+      "priority": 10
+    },
+    "生物": {
+      "pronunciation": "せいぶつ",
+      "priority": 10
+    },
+    "生徒": {
+      "pronunciation": "せいと",
+      "priority": 10
+    },
+    "生存": {
+      "pronunciation": "せいぞん",
+      "priority": 10
+    },
+    "生育": {
+      "pronunciation": "せいいく",
+      "priority": 10
+    },
+    "発生": {
+      "pronunciation": "はっせい",
+      "priority": 10
+    },
+    "誕生": {
+      "pronunciation": "たんじょう",
+      "priority": 10
+    },
+    "再生": {
+      "pronunciation": "さいせい",
+      "priority": 10
+    },
+    "衛生": {
+      "pronunciation": "えいせい",
+      "priority": 10
+    },
+    "厚生": {
+      "pronunciation": "こうせい",
+      "priority": 10
+    },
+    "共生": {
+      "pronunciation": "きょうせい",
+      "priority": 10
+    },
+    "寄生": {
+      "pronunciation": "きせい",
+      "priority": 10
+    },
+    "派生": {
+      "pronunciation": "はせい",
+      "priority": 10
+    },
+    "生理": {
+      "pronunciation": "せいり",
+      "priority": 10
+    },
+    "生態": {
+      "pronunciation": "せいたい",
+      "priority": 10
+    },
+    "生薬": {
+      "pronunciation": "しょうやく",
+      "priority": 10
+    },
+    "生検": {
+      "pronunciation": "せいけん",
+      "priority": 10
+    },
+    "生体": {
+      "pronunciation": "せいたい",
+      "priority": 10
+    },
+    "生前": {
+      "pronunciation": "せいぜん",
+      "priority": 10
+    },
+    "生後": {
+      "pronunciation": "せいご",
+      "priority": 10
+    },
+    "性能": {
+      "pronunciation": "せいのう",
+      "priority": 10
+    },
+    "性格": {
+      "pronunciation": "せいかく",
+      "priority": 10
+    },
+    "性質": {
+      "pronunciation": "せいしつ",
+      "priority": 10
+    },
+    "性別": {
+      "pronunciation": "せいべつ",
+      "priority": 10
+    },
+    "特性": {
+      "pronunciation": "とくせい",
+      "priority": 10
+    },
+    "属性": {
+      "pronunciation": "ぞくせい",
+      "priority": 10
+    },
+    "個性": {
+      "pronunciation": "こせい",
+      "priority": 10
+    },
+    "理性": {
+      "pronunciation": "りせい",
+      "priority": 10
+    },
+    "感性": {
+      "pronunciation": "かんせい",
+      "priority": 10
+    },
+    "本性": {
+      "pronunciation": "ほんしょう",
+      "priority": 10
+    },
+    "悪性": {
+      "pronunciation": "あくせい",
+      "priority": 10
+    },
+    "良性": {
+      "pronunciation": "りょうせい",
+      "priority": 10
+    },
+    "急性": {
+      "pronunciation": "きゅうせい",
+      "priority": 10
+    },
+    "慢性": {
+      "pronunciation": "まんせい",
+      "priority": 10
+    },
+    "毒性": {
+      "pronunciation": "どくせい",
+      "priority": 10
+    },
+    "塑性": {
+      "pronunciation": "そせい",
+      "priority": 10
+    },
+    "制作": {
+      "pronunciation": "せいさく",
+      "priority": 10
+    },
+    "制度": {
+      "pronunciation": "せいど",
+      "priority": 10
+    },
+    "制限": {
+      "pronunciation": "せいげん",
+      "priority": 10
+    },
+    "制御": {
+      "pronunciation": "せいぎょ",
+      "priority": 10
+    },
+    "制定": {
+      "pronunciation": "せいてい",
+      "priority": 10
+    },
+    "制覇": {
+      "pronunciation": "せいは",
+      "priority": 10
+    },
+    "制服": {
+      "pronunciation": "せいふく",
+      "priority": 10
+    },
+    "制裁": {
+      "pronunciation": "せいさい",
+      "priority": 10
+    },
+    "体制": {
+      "pronunciation": "たいせい",
+      "priority": 10
+    },
+    "規制": {
+      "pronunciation": "きせい",
+      "priority": 10
+    },
+    "強制": {
+      "pronunciation": "きょうせい",
+      "priority": 10
+    },
+    "管制": {
+      "pronunciation": "かんせい",
+      "priority": 10
+    },
+    "統制": {
+      "pronunciation": "とうせい",
+      "priority": 10
+    },
+    "自制": {
+      "pronunciation": "じせい",
+      "priority": 10
+    },
+    "節制": {
+      "pronunciation": "せっせい",
+      "priority": 10
+    },
+    "制圧": {
+      "pronunciation": "せいあつ",
+      "priority": 10
+    },
+    "政治": {
+      "pronunciation": "せいじ",
+      "priority": 10
+    },
+    "政府": {
+      "pronunciation": "せいふ",
+      "priority": 10
+    },
+    "政策": {
+      "pronunciation": "せいさく",
+      "priority": 10
+    },
+    "政権": {
+      "pronunciation": "せいけん",
+      "priority": 10
+    },
+    "行政": {
+      "pronunciation": "ぎょうせい",
+      "priority": 10
+    },
+    "財政": {
+      "pronunciation": "ざいせい",
+      "priority": 10
+    },
+    "市政": {
+      "pronunciation": "しせい",
+      "priority": 10
+    },
+    "県政": {
+      "pronunciation": "けんせい",
+      "priority": 10
+    },
+    "政令": {
+      "pronunciation": "せいれい",
+      "priority": 10
+    },
+    "政党": {
+      "pronunciation": "せいとう",
+      "priority": 10
+    },
+    "政界": {
+      "pronunciation": "せいかい",
+      "priority": 10
+    },
+    "政変": {
+      "pronunciation": "せいへん",
+      "priority": 10
+    },
+    "政情": {
+      "pronunciation": "せいじょう",
+      "priority": 10
+    },
+    "内政": {
+      "pronunciation": "ないせい",
+      "priority": 10
+    },
+    "外政": {
+      "pronunciation": "がいせい",
+      "priority": 10
+    },
+    "正解": {
+      "pronunciation": "せいかい",
+      "priority": 10
+    },
+    "正常": {
+      "pronunciation": "せいじょう",
+      "priority": 10
+    },
+    "正確": {
+      "pronunciation": "せいかく",
+      "priority": 10
+    },
+    "正式": {
+      "pronunciation": "せいしき",
+      "priority": 10
+    },
+    "正面": {
+      "pronunciation": "しょうめん",
+      "priority": 10
+    },
+    "正体": {
+      "pronunciation": "しょうたい",
+      "priority": 10
+    },
+    "正規": {
+      "pronunciation": "せいき",
+      "priority": 10
+    },
+    "正直": {
+      "pronunciation": "しょうじき",
+      "priority": 10
+    },
+    "訂正": {
+      "pronunciation": "ていせい",
+      "priority": 10
+    },
+    "修正": {
+      "pronunciation": "しゅうせい",
+      "priority": 10
+    },
+    "矯正": {
+      "pronunciation": "きょうせい",
+      "priority": 10
+    },
+    "補正": {
+      "pronunciation": "ほせい",
+      "priority": 10
+    },
+    "改正": {
+      "pronunciation": "かいせい",
+      "priority": 10
+    },
+    "是正": {
+      "pronunciation": "ぜせい",
+      "priority": 10
+    },
+    "更正": {
+      "pronunciation": "こうせい",
+      "priority": 10
+    },
+    "校正": {
+      "pronunciation": "こうせい",
+      "priority": 10
+    },
+    "精神": {
+      "pronunciation": "せいしん",
+      "priority": 10
+    },
+    "精密": {
+      "pronunciation": "せいみつ",
+      "priority": 10
+    },
+    "精度": {
+      "pronunciation": "せいど",
+      "priority": 10
+    },
+    "精巧": {
+      "pronunciation": "せいこう",
+      "priority": 10
+    },
+    "精査": {
+      "pronunciation": "せいさ",
+      "priority": 10
+    },
+    "精算": {
+      "pronunciation": "せいさん",
+      "priority": 10
+    },
+    "精進": {
+      "pronunciation": "しょうじん",
+      "priority": 10
+    },
+    "精錬": {
+      "pronunciation": "せいれん",
+      "priority": 10
+    },
+    "精油": {
+      "pronunciation": "せいゆ",
+      "priority": 10
+    },
+    "精米": {
+      "pronunciation": "せいまい",
+      "priority": 10
+    },
+    "精肉": {
+      "pronunciation": "せいにく",
+      "priority": 10
+    },
+    "精魂": {
+      "pronunciation": "せいこん",
+      "priority": 10
+    },
+    "精霊": {
+      "pronunciation": "せいれい",
+      "priority": 10
+    },
+    "精力": {
+      "pronunciation": "せいりょく",
+      "priority": 10
+    },
+    "酒精": {
+      "pronunciation": "しゅせい",
+      "priority": 10
+    },
+    "清潔": {
+      "pronunciation": "せいけつ",
+      "priority": 10
+    },
+    "清浄": {
+      "pronunciation": "せいじょう",
+      "priority": 10
+    },
+    "清掃": {
+      "pronunciation": "せいそう",
+      "priority": 10
+    },
+    "清算": {
+      "pronunciation": "せいさん",
+      "priority": 10
+    },
+    "清書": {
+      "pronunciation": "せいしょ",
+      "priority": 10
+    },
+    "清涼": {
+      "pronunciation": "せいりょう",
+      "priority": 10
+    },
+    "清流": {
+      "pronunciation": "せいりゅう",
+      "priority": 10
+    },
+    "清酒": {
+      "pronunciation": "せいしゅ",
+      "priority": 10
+    },
+    "清水": {
+      "pronunciation": "しみず",
+      "priority": 10
+    },
+    "清純": {
+      "pronunciation": "せいじゅん",
+      "priority": 10
+    },
+    "清楚": {
+      "pronunciation": "せいそ",
+      "priority": 10
+    },
+    "清貧": {
+      "pronunciation": "せいひん",
+      "priority": 10
+    },
+    "清濁": {
+      "pronunciation": "せいだく",
+      "priority": 10
+    },
+    "清談": {
+      "pronunciation": "せいだん",
+      "priority": 10
+    },
+    "静止": {
+      "pronunciation": "せいし",
+      "priority": 10
+    },
+    "静寂": {
+      "pronunciation": "せいじゃく",
+      "priority": 10
+    },
+    "静電": {
+      "pronunciation": "せいでん",
+      "priority": 10
+    },
+    "静脈": {
+      "pronunciation": "じょうみゃく",
+      "priority": 10
+    },
+    "静養": {
+      "pronunciation": "せいよう",
+      "priority": 10
+    },
+    "静観": {
+      "pronunciation": "せいかん",
+      "priority": 10
+    },
+    "冷静": {
+      "pronunciation": "れいせい",
+      "priority": 10
+    },
+    "平静": {
+      "pronunciation": "へいせい",
+      "priority": 10
+    },
+    "鎮静": {
+      "pronunciation": "ちんせい",
+      "priority": 10
+    },
+    "静的": {
+      "pronunciation": "せいてき",
+      "priority": 10
+    },
+    "静圧": {
+      "pronunciation": "せいあつ",
+      "priority": 10
+    },
+    "静音": {
+      "pronunciation": "せいおん",
+      "priority": 10
+    },
+    "静粛": {
+      "pronunciation": "せいしゅく",
+      "priority": 10
+    },
+    "製品": {
+      "pronunciation": "せいひん",
+      "priority": 10
+    },
+    "製造": {
+      "pronunciation": "せいぞう",
+      "priority": 10
+    },
+    "製作": {
+      "pronunciation": "せいさく",
+      "priority": 10
+    },
+    "青年": {
+      "pronunciation": "せいねん",
+      "priority": 10
+    },
+    "青春": {
+      "pronunciation": "せいしゅん",
+      "priority": 10
+    },
+    "誠実": {
+      "pronunciation": "せいじつ",
+      "priority": 10
+    },
+    "誠意": {
+      "pronunciation": "せいい",
+      "priority": 10
+    },
+    "整理": {
+      "pronunciation": "せいり",
+      "priority": 10
+    },
+    "整備": {
+      "pronunciation": "せいび",
+      "priority": 10
+    },
+    "整形": {
+      "pronunciation": "せいけい",
+      "priority": 10
+    },
+    "西洋": {
+      "pronunciation": "せいよう",
+      "priority": 10
+    },
+    "西暦": {
+      "pronunciation": "せいれき",
+      "priority": 10
+    },
+    "聖書": {
+      "pronunciation": "せいしょ",
+      "priority": 10
+    },
+    "聖地": {
+      "pronunciation": "せいち",
+      "priority": 10
+    },
+    "聖人": {
+      "pronunciation": "せいじん",
+      "priority": 10
+    },
+    "勢力": {
+      "pronunciation": "せいりょく",
+      "priority": 10
+    },
+    "勢い": {
+      "pronunciation": "いきおい",
+      "priority": 10
+    },
+    "税金": {
+      "pronunciation": "ぜいきん",
+      "priority": 10
+    },
+    "税制": {
+      "pronunciation": "ぜいせい",
+      "priority": 10
+    },
+    "サーバー": {
+      "pronunciation": "さーばー",
+      "priority": 10
+    },
+    "データベース": {
+      "pronunciation": "でーたべーす",
+      "priority": 10
+    },
+    "アプリケーション": {
+      "pronunciation": "あぷりけーしょん",
+      "priority": 10
+    },
+    "インターフェース": {
+      "pronunciation": "いんたーふぇーす",
+      "priority": 10
+    },
+    "ソースコード": {
+      "pronunciation": "そーすこーど",
+      "priority": 10
+    },
+    "フレームワーク": {
+      "pronunciation": "ふれーむわーく",
+      "priority": 10
+    },
+    "マーケティング": {
+      "pronunciation": "まーけてぃんぐ",
+      "priority": 10
+    },
+    "プレゼンテーション": {
+      "pronunciation": "ぷれぜんてーしょん",
+      "priority": 10
+    },
+    "ミーティング": {
+      "pronunciation": "みーてぃんぐ",
+      "priority": 10
+    },
+    "ブレインストーミング": {
+      "pronunciation": "ぶれいんすとーみんぐ",
+      "priority": 10
+    },
+    "イノベーション": {
+      "pronunciation": "いのべーしょん",
+      "priority": 10
+    },
+    "ソリューション": {
+      "pronunciation": "そりゅーしょん",
+      "priority": 10
+    },
+    "ストラテジー": {
+      "pronunciation": "すとらてじー",
+      "priority": 10
+    },
+    "コーヒー": {
+      "pronunciation": "こーひー",
+      "priority": 10
+    },
+    "ケーキ": {
+      "pronunciation": "けーき",
+      "priority": 10
+    },
+    "バター": {
+      "pronunciation": "ばたー",
+      "priority": 10
+    },
+    "チーズ": {
+      "pronunciation": "ちーず",
+      "priority": 10
+    },
+    "ビール": {
+      "pronunciation": "びーる",
+      "priority": 10
+    },
+    "ジュース": {
+      "pronunciation": "じゅーす",
+      "priority": 10
+    },
+    "スープ": {
+      "pronunciation": "すーぷ",
+      "priority": 10
+    },
+    "ハンバーガー": {
+      "pronunciation": "はんばーがー",
+      "priority": 10
+    },
+    "アイスクリーム": {
+      "pronunciation": "あいすくりーむ",
+      "priority": 10
+    },
+    "ゲーム": {
+      "pronunciation": "げーむ",
+      "priority": 10
+    },
+    "ミュージック": {
+      "pronunciation": "みゅーじっく",
+      "priority": 10
+    },
+    "スポーツ": {
+      "pronunciation": "すぽーつ",
+      "priority": 10
+    },
+    "サッカー": {
+      "pronunciation": "さっかー",
+      "priority": 10
+    },
+    "ベースボール": {
+      "pronunciation": "べーすぼーる",
+      "priority": 10
+    },
+    "バスケットボール": {
+      "pronunciation": "ばすけっとぼーる",
+      "priority": 10
+    },
+    "パソコン": {
+      "pronunciation": "ぱそこん",
+      "priority": 10
+    },
+    "スマホ": {
+      "pronunciation": "すまほ",
+      "priority": 10
+    },
+    "デジカメ": {
+      "pronunciation": "でじかめ",
+      "priority": 10
+    },
+    "エアコン": {
+      "pronunciation": "えあこん",
+      "priority": 10
+    },
+    "リモコン": {
+      "pronunciation": "りもこん",
+      "priority": 10
+    },
+    "コンビニ": {
+      "pronunciation": "こんびに",
+      "priority": 10
+    },
+    "スーパー": {
+      "pronunciation": "すーぱー",
+      "priority": 10
+    },
+    "デパート": {
+      "pronunciation": "でぱーと",
+      "priority": 10
+    },
+    "ファミレス": {
+      "pronunciation": "ふぁみれす",
+      "priority": 10
+    },
+    "カラオケ": {
+      "pronunciation": "からおけ",
+      "priority": 10
+    },
+    "コスパ": {
+      "pronunciation": "こすぱ",
+      "priority": 10
+    },
+    "タイパ": {
+      "pronunciation": "たいぱ",
+      "priority": 10
+    },
+    "ワンオペ": {
+      "pronunciation": "わんおぺ",
+      "priority": 10
+    },
+    "テレワーク": {
+      "pronunciation": "てれわーく",
+      "priority": 10
+    },
+    "リモワ": {
+      "pronunciation": "りもわ",
+      "priority": 10
+    },
+    "ChatGPT": {
+      "pronunciation": "ちゃっとじーぴーてぃー",
+      "priority": 10
+    },
+    "GPT": {
+      "pronunciation": "じーぴーてぃー",
+      "priority": 10
+    },
+    "GPT-4": {
+      "pronunciation": "じーぴーてぃーふぉー",
+      "priority": 10
+    },
+    "Claude": {
+      "pronunciation": "くろーど",
+      "priority": 10
+    },
+    "Gemini": {
+      "pronunciation": "じぇみに",
+      "priority": 10
+    },
+    "Copilot": {
+      "pronunciation": "こぱいろっと",
+      "priority": 10
+    },
+    "LLM": {
+      "pronunciation": "えるえるえむ",
+      "priority": 10
+    },
+    "生成AI": {
+      "pronunciation": "せいせいえーあい",
+      "priority": 10
+    },
+    "対話型AI": {
+      "pronunciation": "たいわがたえーあい",
+      "priority": 10
+    },
+    "プロンプト": {
+      "pronunciation": "ぷろんぷと",
+      "priority": 10
+    },
+    "プロンプトエンジニアリング": {
+      "pronunciation": "ぷろんぷとえんじにありんぐ",
+      "priority": 10
+    },
+    "ファインチューニング": {
+      "pronunciation": "ふぁいんちゅーにんぐ",
+      "priority": 10
+    },
+    "RAG": {
+      "pronunciation": "らぐ",
+      "priority": 10
+    },
+    "ベクトルデータベース": {
+      "pronunciation": "べくとるでーたべーす",
+      "priority": 10
+    },
+    "エンベディング": {
+      "pronunciation": "えんべでぃんぐ",
+      "priority": 10
+    },
+    "トークン": {
+      "pronunciation": "とーくん",
+      "priority": 10
+    },
+    "ハルシネーション": {
+      "pronunciation": "はるしねーしょん",
+      "priority": 10
+    },
+    "マルチモーダル": {
+      "pronunciation": "まるちもーだる",
+      "priority": 10
+    },
+    "トランスフォーマー": {
+      "pronunciation": "とらんすふぉーまー",
+      "priority": 10
+    },
+    "Web3": {
+      "pronunciation": "うぇぶすりー",
+      "priority": 10
+    },
+    "Web3.0": {
+      "pronunciation": "うぇぶさんてんぜろ",
+      "priority": 10
+    },
+    "NFT": {
+      "pronunciation": "えぬえふてぃー",
+      "priority": 10
+    },
+    "メタバース": {
+      "pronunciation": "めたばーす",
+      "priority": 10
+    },
+    "ブロックチェーン": {
+      "pronunciation": "ぶろっくちぇーん",
+      "priority": 10
+    },
+    "DX": {
+      "pronunciation": "でぃーえっくす",
+      "priority": 10
+    },
+    "デジタルトランスフォーメーション": {
+      "pronunciation": "でじたるとらんすふぉーめーしょん",
+      "priority": 10
+    },
+    "リスキリング": {
+      "pronunciation": "りすきりんぐ",
+      "priority": 10
+    },
+    "アップスキリング": {
+      "pronunciation": "あっぷすきりんぐ",
+      "priority": 10
+    },
+    "サステナビリティ": {
+      "pronunciation": "さすてなびりてぃ",
+      "priority": 10
+    },
+    "カーボンニュートラル": {
+      "pronunciation": "かーぼんにゅーとらる",
+      "priority": 10
+    },
+    "SDGs": {
+      "pronunciation": "えすでぃーじーず",
+      "priority": 10
+    },
+    "ESG": {
+      "pronunciation": "いーえすじー",
+      "priority": 10
+    },
+    "GX": {
+      "pronunciation": "じーえっくす",
+      "priority": 10
+    },
+    "サブスク": {
+      "pronunciation": "さぶすく",
+      "priority": 10
+    },
+    "サブスクリプション": {
+      "pronunciation": "さぶすくりぷしょん",
+      "priority": 10
+    },
+    "インフルエンサー": {
+      "pronunciation": "いんふるえんさー",
+      "priority": 10
+    },
+    "バズる": {
+      "pronunciation": "ばずる",
+      "priority": 10
+    },
+    "エモい": {
+      "pronunciation": "えもい",
+      "priority": 10
+    },
+    "チルい": {
+      "pronunciation": "ちるい",
+      "priority": 10
+    },
+    "チル": {
+      "pronunciation": "ちる",
+      "priority": 10
+    },
+    "ガチャ": {
+      "pronunciation": "がちゃ",
+      "priority": 10
+    },
+    "ソシャゲ": {
+      "pronunciation": "そしゃげ",
+      "priority": 10
+    },
+    "推し": {
+      "pronunciation": "おし",
+      "priority": 10
+    },
+    "推し活": {
+      "pronunciation": "おしかつ",
+      "priority": 10
+    },
+    "オタ活": {
+      "pronunciation": "おたかつ",
+      "priority": 10
+    },
+    "沼": {
+      "pronunciation": "ぬま",
+      "priority": 10
+    },
+    "沼る": {
+      "pronunciation": "ぬまる",
+      "priority": 10
+    },
+    "ガチ勢": {
+      "pronunciation": "がちぜい",
+      "priority": 10
+    },
+    "エンジョイ勢": {
+      "pronunciation": "えんじょいぜい",
+      "priority": 10
+    },
+    "ソーシャルディスタンス": {
+      "pronunciation": "そーしゃるでぃすたんす",
+      "priority": 10
+    },
+    "リモートワーク": {
+      "pronunciation": "りもーとわーく",
+      "priority": 10
+    },
+    "ハイブリッドワーク": {
+      "pronunciation": "はいぶりっどわーく",
+      "priority": 10
+    },
+    "ワーケーション": {
+      "pronunciation": "わーけーしょん",
+      "priority": 10
+    },
+    "ステイホーム": {
+      "pronunciation": "すていほーむ",
+      "priority": 10
+    },
+    "オンライン会議": {
+      "pronunciation": "おんらいんかいぎ",
+      "priority": 10
+    },
+    "Zoom": {
+      "pronunciation": "ずーむ",
+      "priority": 10
+    },
+    "Teams": {
+      "pronunciation": "ちーむず",
+      "priority": 10
+    },
+    "インスタ": {
+      "pronunciation": "いんすた",
+      "priority": 10
+    },
+    "インスタグラム": {
+      "pronunciation": "いんすたぐらむ",
+      "priority": 10
+    },
+    "TikTok": {
+      "pronunciation": "てぃっくとっく",
+      "priority": 10
+    },
+    "ティックトック": {
+      "pronunciation": "てぃっくとっく",
+      "priority": 10
+    },
+    "YouTube": {
+      "pronunciation": "ゆーちゅーぶ",
+      "priority": 10
+    },
+    "ユーチューブ": {
+      "pronunciation": "ゆーちゅーぶ",
+      "priority": 10
+    },
+    "ユーチューバー": {
+      "pronunciation": "ゆーちゅーばー",
+      "priority": 10
+    },
+    "YouTuber": {
+      "pronunciation": "ゆーちゅーばー",
+      "priority": 10
+    },
+    "サムネ": {
+      "pronunciation": "さむね",
+      "priority": 10
+    },
+    "サムネイル": {
+      "pronunciation": "さむねいる",
+      "priority": 10
+    },
+    "バン": {
+      "pronunciation": "ばん",
+      "priority": 10
+    },
+    "シャドウバン": {
+      "pronunciation": "しゃどうばん",
+      "priority": 10
+    },
+    "スパチャ": {
+      "pronunciation": "すぱちゃ",
+      "priority": 10
+    },
+    "スーパーチャット": {
+      "pronunciation": "すーぱーちゃっと",
+      "priority": 10
+    },
+    "スタートアップ": {
+      "pronunciation": "すたーとあっぷ",
+      "priority": 10
+    },
+    "ユニコーン": {
+      "pronunciation": "ゆにこーん",
+      "priority": 10
+    },
+    "ユニコーン企業": {
+      "pronunciation": "ゆにこーんきぎょう",
+      "priority": 10
+    },
+    "ベンチャーキャピタル": {
+      "pronunciation": "べんちゃーきゃぴたる",
+      "priority": 10
+    },
+    "VC": {
+      "pronunciation": "ぶいしー",
+      "priority": 10
+    },
+    "IPO": {
+      "pronunciation": "あいぴーおー",
+      "priority": 10
+    },
+    "M&A": {
+      "pronunciation": "えむあんどえー",
+      "priority": 10
+    },
+    "アジャイル": {
+      "pronunciation": "あじゃいる",
+      "priority": 10
+    },
+    "スクラム": {
+      "pronunciation": "すくらむ",
+      "priority": 10
+    },
+    "DevOps": {
+      "pronunciation": "でぶおぷす",
+      "priority": 10
+    },
+    "eスポーツ": {
+      "pronunciation": "いーすぽーつ",
+      "priority": 10
+    },
+    "eSports": {
+      "pronunciation": "いーすぽーつ",
+      "priority": 10
+    },
+    "5G": {
+      "pronunciation": "ふぁいぶじー",
+      "priority": 10
+    },
+    "6G": {
+      "pronunciation": "しっくすじー",
+      "priority": 10
+    },
+    "IoT": {
+      "pronunciation": "あいおーてぃー",
+      "priority": 10
+    },
+    "DeFi": {
+      "pronunciation": "でぃーふぁい",
+      "priority": 10
+    },
+    "DAO": {
+      "pronunciation": "だお",
+      "priority": 10
+    },
+    "P2E": {
+      "pronunciation": "ぴーつーいー",
+      "priority": 10
+    },
+    "スマートコントラクト": {
+      "pronunciation": "すまーとこんとらくと",
+      "priority": 10
+    },
+    "ウォレット": {
+      "pronunciation": "うぉれっと",
+      "priority": 10
+    },
+    "パン": {
+      "pronunciation": "ぱん",
+      "priority": 10
+    },
+    "ワイン": {
+      "pronunciation": "わいん",
+      "priority": 10
+    },
+    "サラダ": {
+      "pronunciation": "さらだ",
+      "priority": 10
+    },
+    "パスタ": {
+      "pronunciation": "ぱすた",
+      "priority": 10
+    },
+    "ピザ": {
+      "pronunciation": "ぴざ",
+      "priority": 10
+    },
+    "サンドイッチ": {
+      "pronunciation": "さんどいっち",
+      "priority": 10
+    },
+    "アニメ": {
+      "pronunciation": "あにめ",
+      "priority": 10
+    },
+    "マンガ": {
+      "pronunciation": "まんが",
+      "priority": 10
+    },
+    "ドラマ": {
+      "pronunciation": "どらま",
+      "priority": 10
+    },
+    "ダンス": {
+      "pronunciation": "だんす",
+      "priority": 10
+    },
+    "テニス": {
+      "pronunciation": "てにす",
+      "priority": 10
+    },
+    "ゴルフ": {
+      "pronunciation": "ごるふ",
+      "priority": 10
+    },
+    "スイミング": {
+      "pronunciation": "すいみんぐ",
+      "priority": 10
+    },
+    "ランニング": {
+      "pronunciation": "らんにんぐ",
+      "priority": 10
+    },
+    "AI": {
+      "pronunciation": "えーあい",
+      "priority": 10
+    },
+    "ML": {
+      "pronunciation": "えむえる",
+      "priority": 10
+    },
+    "DL": {
+      "pronunciation": "でぃーえる",
+      "priority": 10
+    },
+    "AR": {
+      "pronunciation": "えーあーる",
+      "priority": 10
+    },
+    "VR": {
+      "pronunciation": "ぶいあーる",
+      "priority": 10
+    },
+    "XR": {
+      "pronunciation": "えっくすあーる",
+      "priority": 10
+    },
+    "API": {
+      "pronunciation": "えーぴーあい",
+      "priority": 10
+    },
+    "SDK": {
+      "pronunciation": "えすでぃーけー",
+      "priority": 10
+    },
+    "IDE": {
+      "pronunciation": "あいでぃーいー",
+      "priority": 10
+    },
+    "GUI": {
+      "pronunciation": "じーゆーあい",
+      "priority": 10
+    },
+    "CLI": {
+      "pronunciation": "しーえるあい",
+      "priority": 10
+    },
+    "OS": {
+      "pronunciation": "おーえす",
+      "priority": 10
+    },
+    "CPU": {
+      "pronunciation": "しーぴーゆー",
+      "priority": 10
+    },
+    "GPU": {
+      "pronunciation": "じーぴーゆー",
+      "priority": 10
+    },
+    "クライアント": {
+      "pronunciation": "くらいあんと",
+      "priority": 10
+    },
+    "アルゴリズム": {
+      "pronunciation": "あるごりずむ",
+      "priority": 10
+    },
+    "プログラミング": {
+      "pronunciation": "ぷろぐらみんぐ",
+      "priority": 10
+    },
+    "デバッグ": {
+      "pronunciation": "でばっぐ",
+      "priority": 10
+    },
+    "コンパイル": {
+      "pronunciation": "こんぱいる",
+      "priority": 10
+    },
+    "ライブラリ": {
+      "pronunciation": "らいぶらり",
+      "priority": 10
+    },
+    "東京": {
+      "pronunciation": "とうきょう",
+      "priority": 10
+    },
+    "大阪": {
+      "pronunciation": "おおさか",
+      "priority": 10
+    },
+    "名古屋": {
+      "pronunciation": "なごや",
+      "priority": 10
+    },
+    "横浜": {
+      "pronunciation": "よこはま",
+      "priority": 10
+    },
+    "京都": {
+      "pronunciation": "きょうと",
+      "priority": 10
+    },
+    "神戸": {
+      "pronunciation": "こうべ",
+      "priority": 10
+    },
+    "福岡": {
+      "pronunciation": "ふくおか",
+      "priority": 10
+    },
+    "札幌": {
+      "pronunciation": "さっぽろ",
+      "priority": 10
+    },
+    "仙台": {
+      "pronunciation": "せんだい",
+      "priority": 10
+    },
+    "広島": {
+      "pronunciation": "ひろしま",
+      "priority": 10
+    },
+    "北海道": {
+      "pronunciation": "ほっかいどう",
+      "priority": 10
+    },
+    "本州": {
+      "pronunciation": "ほんしゅう",
+      "priority": 10
+    },
+    "四国": {
+      "pronunciation": "しこく",
+      "priority": 10
+    },
+    "九州": {
+      "pronunciation": "きゅうしゅう",
+      "priority": 10
+    },
+    "沖縄": {
+      "pronunciation": "おきなわ",
+      "priority": 10
+    },
+    "トヨタ": {
+      "pronunciation": "とよた",
+      "priority": 10
+    },
+    "ソニー": {
+      "pronunciation": "そにー",
+      "priority": 10
+    },
+    "パナソニック": {
+      "pronunciation": "ぱなそにっく",
+      "priority": 10
+    },
+    "任天堂": {
+      "pronunciation": "にんてんどう",
+      "priority": 10
+    },
+    "ホンダ": {
+      "pronunciation": "ほんだ",
+      "priority": 10
+    },
+    "日産": {
+      "pronunciation": "にっさん",
+      "priority": 10
+    },
+    "三菱": {
+      "pronunciation": "みつびし",
+      "priority": 10
+    },
+    "三井": {
+      "pronunciation": "みつい",
+      "priority": 10
+    },
+    "住友": {
+      "pronunciation": "すみとも",
+      "priority": 10
+    },
+    "楽天": {
+      "pronunciation": "らくてん",
+      "priority": 10
+    },
+    "ソフトバンク": {
+      "pronunciation": "そふとばんく",
+      "priority": 10
+    },
+    "ドコモ": {
+      "pronunciation": "どこも",
+      "priority": 10
+    },
+    "佐藤": {
+      "pronunciation": "さとう",
+      "priority": 10
+    },
+    "鈴木": {
+      "pronunciation": "すずき",
+      "priority": 10
+    },
+    "高橋": {
+      "pronunciation": "たかはし",
+      "priority": 10
+    },
+    "渡辺": {
+      "pronunciation": "わたなべ",
+      "priority": 10
+    },
+    "伊藤": {
+      "pronunciation": "いとう",
+      "priority": 10
+    },
+    "山本": {
+      "pronunciation": "やまもと",
+      "priority": 10
+    },
+    "中村": {
+      "pronunciation": "なかむら",
+      "priority": 10
+    },
+    "小林": {
+      "pronunciation": "こばやし",
+      "priority": 10
+    },
+    "加藤": {
+      "pronunciation": "かとう",
+      "priority": 10
+    },
+    "吉田": {
+      "pronunciation": "よしだ",
+      "priority": 10
+    },
+    "山田": {
+      "pronunciation": "やまだ",
+      "priority": 10
+    },
+    "佐々木": {
+      "pronunciation": "ささき",
+      "priority": 10
+    },
+    "山口": {
+      "pronunciation": "やまぐち",
+      "priority": 10
+    },
+    "松本": {
+      "pronunciation": "まつもと",
+      "priority": 10
+    },
+    "いらっしゃる": {
+      "pronunciation": "いらっしゃる",
+      "priority": 10
+    },
+    "おっしゃる": {
+      "pronunciation": "おっしゃる",
+      "priority": 10
+    },
+    "召し上がる": {
+      "pronunciation": "めしあがる",
+      "priority": 10
+    },
+    "ご覧になる": {
+      "pronunciation": "ごらんになる",
+      "priority": 10
+    },
+    "申し上げる": {
+      "pronunciation": "もうしあげる",
+      "priority": 10
+    },
+    "伺う": {
+      "pronunciation": "うかがう",
+      "priority": 10
+    },
+    "拝見する": {
+      "pronunciation": "はいけんする",
+      "priority": 10
+    },
+    "承る": {
+      "pronunciation": "うけたまわる",
+      "priority": 10
+    },
+    "いただく": {
+      "pronunciation": "いただく",
+      "priority": 10
+    },
+    "させていただく": {
+      "pronunciation": "させていただく",
+      "priority": 10
+    },
+    "お願いいたします": {
+      "pronunciation": "おねがいいたします",
+      "priority": 10
+    },
+    "ありがとうございます": {
+      "pronunciation": "ありがとうございます",
+      "priority": 10
+    },
+    "ガタガタ": {
+      "pronunciation": "がたがた",
+      "priority": 10
+    },
+    "ゴロゴロ": {
+      "pronunciation": "ごろごろ",
+      "priority": 10
+    },
+    "ザーザー": {
+      "pronunciation": "ざーざー",
+      "priority": 10
+    },
+    "シトシト": {
+      "pronunciation": "しとしと",
+      "priority": 10
+    },
+    "ドキドキ": {
+      "pronunciation": "どきどき",
+      "priority": 10
+    },
+    "バタバタ": {
+      "pronunciation": "ばたばた",
+      "priority": 10
+    },
+    "ピカピカ": {
+      "pronunciation": "ぴかぴか",
+      "priority": 10
+    },
+    "フワフワ": {
+      "pronunciation": "ふわふわ",
+      "priority": 10
+    },
+    "ペラペラ": {
+      "pronunciation": "ぺらぺら",
+      "priority": 10
+    },
+    "ワクワク": {
+      "pronunciation": "わくわく",
+      "priority": 10
+    },
+    "キラキラ": {
+      "pronunciation": "きらきら",
+      "priority": 10
+    },
+    "ツルツル": {
+      "pronunciation": "つるつる",
+      "priority": 10
+    },
+    "ヌルヌル": {
+      "pronunciation": "ぬるぬる",
+      "priority": 10
+    },
+    "ベタベタ": {
+      "pronunciation": "べたべた",
+      "priority": 10
+    },
+    "サラサラ": {
+      "pronunciation": "さらさら",
+      "priority": 10
+    },
+    "あいさつ": {
+      "pronunciation": "あいさつ",
+      "priority": 10
+    },
+    "ありがとう": {
+      "pronunciation": "ありがとう",
+      "priority": 10
+    },
+    "こんにちは": {
+      "pronunciation": "こんにちは",
+      "priority": 10
+    },
+    "さようなら": {
+      "pronunciation": "さようなら",
+      "priority": 10
+    },
+    "おはよう": {
+      "pronunciation": "おはよう",
+      "priority": 10
+    },
+    "おやすみ": {
+      "pronunciation": "おやすみ",
+      "priority": 10
+    },
+    "いただきます": {
+      "pronunciation": "いただきます",
+      "priority": 10
+    },
+    "ごちそうさま": {
+      "pronunciation": "ごちそうさま",
+      "priority": 10
+    },
+    "すみません": {
+      "pronunciation": "すみません",
+      "priority": 10
+    },
+    "ごめんなさい": {
+      "pronunciation": "ごめんなさい",
+      "priority": 10
+    },
+    "1個": {
+      "pronunciation": "いっこ",
+      "priority": 10
+    },
+    "2つ": {
+      "pronunciation": "ふたつ",
+      "priority": 10
+    },
+    "3人": {
+      "pronunciation": "さんにん",
+      "priority": 10
+    },
+    "4回": {
+      "pronunciation": "よんかい",
+      "priority": 10
+    },
+    "5分": {
+      "pronunciation": "ごふん",
+      "priority": 10
+    },
+    "6時間": {
+      "pronunciation": "ろくじかん",
+      "priority": 10
+    },
+    "7日": {
+      "pronunciation": "なのか",
+      "priority": 10
+    },
+    "8ヶ月": {
+      "pronunciation": "はちかげつ",
+      "priority": 10
+    },
+    "9年": {
+      "pronunciation": "きゅうねん",
+      "priority": 10
+    },
+    "10倍": {
+      "pronunciation": "じゅうばい",
+      "priority": 10
+    },
+    "100円": {
+      "pronunciation": "ひゃくえん",
+      "priority": 10
+    },
+    "1000個": {
+      "pronunciation": "せんこ",
+      "priority": 10
+    },
+    "1万人": {
+      "pronunciation": "いちまんにん",
+      "priority": 10
+    },
+    "10万円": {
+      "pronunciation": "じゅうまんえん",
+      "priority": 10
+    },
+    "100万回": {
+      "pronunciation": "ひゃくまんかい",
+      "priority": 10
+    },
+    "1億円": {
+      "pronunciation": "いちおくえん",
+      "priority": 10
+    },
+    "10億人": {
+      "pronunciation": "じゅうおくにん",
+      "priority": 10
+    },
+    "1兆円": {
+      "pronunciation": "いっちょうえん",
+      "priority": 10
+    },
+    "お寿司": {
+      "pronunciation": "おすし",
+      "priority": 10
+    },
+    "お茶": {
+      "pronunciation": "おちゃ",
+      "priority": 10
+    },
+    "お酒": {
+      "pronunciation": "おさけ",
+      "priority": 10
+    },
+    "お箸": {
+      "pronunciation": "おはし",
+      "priority": 10
+    },
+    "お皿": {
+      "pronunciation": "おさら",
+      "priority": 10
+    },
+    "お弁当": {
+      "pronunciation": "おべんとう",
+      "priority": 10
+    },
+    "お菓子": {
+      "pronunciation": "おかし",
+      "priority": 10
+    },
+    "素早い": {
+      "pronunciation": "すばやい",
+      "priority": 10
+    },
+    "美しい": {
+      "pronunciation": "うつくしい",
+      "priority": 10
+    },
+    "楽しい": {
+      "pronunciation": "たのしい",
+      "priority": 10
+    },
+    "嬉しい": {
+      "pronunciation": "うれしい",
+      "priority": 10
+    },
+    "悲しい": {
+      "pronunciation": "かなしい",
+      "priority": 10
+    },
+    "寂しい": {
+      "pronunciation": "さびしい",
+      "priority": 10
+    }
+  }
+}

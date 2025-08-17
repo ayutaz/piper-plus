@@ -13,7 +13,6 @@ import wave
 from pathlib import Path
 from typing import Any
 
-# Import test text information
 from test_text_constants import MULTILINGUAL_TEST_TEXTS, get_test_text_description
 
 

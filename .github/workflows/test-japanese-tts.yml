@@ -2,14 +2,7 @@ name: Test Japanese TTS
 
 on:
   pull_request:
-    branches: [master, dev]
-    paths:
-      - 'src/**'
-      - 'test/**'
-      - '.github/workflows/test-japanese-tts.yml'
-      - '.github/workflows/build-piper.yml'
-  push:
-    branches: [dev, feat/*, fix/*]
+    branches: [dev]
     paths:
       - 'src/**'
       - 'test/**'

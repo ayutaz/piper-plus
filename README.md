@@ -1,7 +1,11 @@
 ![Piper logo](etc/logo.png)
 
+[English](README_EN.md) | 日本語
+
 A fast, local neural text to speech system that sounds great and is optimized for the Raspberry Pi 4.
 Piper is used in a [variety of projects](#people-using-piper).
+
+🎙️ **[Try Piper TTS Demo on Hugging Face](https://huggingface.co/spaces/ayousanz/piper-plus-demo)** - Experience Japanese and English text-to-speech in your browser!
 
 ## 目次
 - [追加機能](#追加機能)
@@ -19,11 +23,28 @@ Piper is used in a [variety of projects](#people-using-piper).
 - [Running in Python](#running-in-python)
 
 ## 追加機能
+* **🌐 WebUI (Gradio)** - ブラウザベースの使いやすいインターフェース
+  * 🚀 **[オンラインデモ](https://huggingface.co/spaces/ayousanz/piper-plus-demo)** - Hugging Face Spacesで今すぐ試せます！
+  * 🌏 **[WebAssemblyデモ](https://ayutaz.github.io/piper-plus/)** - ブラウザで動作する日本語TTSデモ（サーバー不要）
+  * 詳細は[WebUI使用ガイド](docs/features/webui-usage.md)を参照
+  * 推論と学習の両方に対応
+  * 多言語テンプレートシステム（日本語、英語、ドイツ語、フランス語）
+  * Docker対応で簡単デプロイ
+  * 使用例: `python -m piper.webui --data-dir ./models`
+* **🎤 音素入力機能** - `[[ phonemes ]]` 記法による直接音素指定
+  * 詳細は[音素入力ガイド](docs/features/phoneme-input.md)を参照
+  * 使用例: `echo "Hello [[ h ə l oʊ ]] world" | piper --model en.onnx -f out.wav`
+  * 日本語例: `echo "今日は [[ ky o o w a ]] です" | piper --model ja.onnx -f out.wav`
+* **📚 カスタム辞書機能** - 技術用語や固有名詞の読みを正確に制御
+  * 詳細は[カスタム辞書ガイド](docs/features/custom_dictionary.md)を参照
+  * 200以上の技術用語を含むデフォルト辞書（Docker→ドッカー、GitHub→ギットハブ等）
+  * 使用例: `echo "DockerとGitHubを使います" | piper --model ja.onnx --custom-dict my_dict.json -f out.wav`
+  * Python/C++両対応、複数辞書の同時使用可能
 * 日本語の事前学習及び追加学習/推論対応（OpenJTalk統合）
-  * 詳細な使用方法は[日本語音声合成ガイド](JAPANESE_USAGE.md)を参照
-  * **Windows対応**: [Windowsセットアップガイド](docs/windows-setup.md)を参照
-  * **API ドキュメント**: [OpenJTalk API リファレンス](docs/openjtalk-api.md)を参照
-  * PUA音素マッピングによる日本語TTS精度向上 - [技術詳細](PHONEME_MAPPING.md)を参照
+  * 詳細な使用方法は[日本語音声合成ガイド](docs/guides/japanese/japanese-usage.md)を参照
+  * **Windows対応**: [Windowsセットアップガイド](docs/getting-started/windows-setup.md)を参照
+  * **API ドキュメント**: [OpenJTalk API リファレンス](docs/guides/japanese/openjtalk-api.md)を参照
+  * PUA音素マッピングによる日本語TTS精度向上 - [技術詳細](docs/api-reference/phoneme-mapping.md)を参照
   * **自動ダウンロード機能**: 初回実行時に必要な辞書とHTSボイスファイルを自動ダウンロード
   * 環境変数（オプション）：
     - `OPENJTALK_DICTIONARY_DIR`: OpenJTalk辞書へのパス（未設定時は自動ダウンロード）
@@ -38,14 +59,19 @@ Piper is used in a [variety of projects](#people-using-piper).
 * `piper_train` に `--num-workers` を追加し、DataLoader のワーカー数をコマンドラインから指定可能に
 * `piper_train` に `--save-top-k` を追加し、チェックポイント保存個数をコマンドラインから指定可能に
 * PyPI パッケージ `piper-tts-plus` として公開し、`pip install` で簡単インストール可能に
-* 多言語TTSテストインフラストラクチャーを追加し、CI/CDで自動テスト実行 - [詳細](docs/MULTILINGUAL_TESTING.md)
+* 多言語TTSテストインフラストラクチャーを追加し、CI/CDで自動テスト実行 - [詳細](docs/guides/testing/multilingual-testing.md)
 * OpenJTalk辞書とHTSボイスモデルの自動ダウンロード機能を追加し、日本語TTSのセットアップを簡略化
-* **🎯 音声品質向上コンポーネント統合 (PR #98)**
-  * **EMA (Exponential Moving Average)**: 学習安定性とファインチューニング品質向上
-  * **AccentProcessor**: 日本語韻律・アクセント処理の高精度化
-  * **F0 Predictor**: FastSpeech2ベースのピッチ予測によるイントネーション制御
-  * **期待効果**: 総合MOS向上 +0.18-0.26
-  * 詳細: [統合コンポーネントドキュメント](src/python/docs/integrated-components-ja.md)
+* **🌏 WebAssembly対応** - ブラウザで直接動作する日本語TTS実装
+  * OpenJTalk WebAssembly版による日本語音素化
+  * ONNX Runtime WebAssemblyによるニューラル音声合成
+  * サーバー不要で完全にブラウザ内で動作
+  * コンパクトサイズ: WASM < 400KB、JS < 40KB
+  * 詳細: [OpenJTalk WebAssembly README](src/wasm/openjtalk-web/README.md)
+* **🎯 音声品質向上機能**
+  * **EMA (Exponential Moving Average)**: 学習安定性とファインチューニング品質向上（デフォルトで有効）
+  * **カスタム辞書機能**: 日本語発音の精度向上（478エントリの発音辞書を標準搭載）
+  * **効果**: 学習の安定性向上、日本語複合語の正確な発音
+  * 詳細: [EMA実装ドキュメント](src/python/docs/integrated-components-ja.md)
 * マルチGPU学習対応（PyTorch Lightning 2.4.0）
   * DDP (Distributed Data Parallel) 戦略による複数GPU並列学習
   * 学習率の自動スケーリング機能（`--auto_lr_scaling`）
@@ -76,7 +102,7 @@ Piper is used in a [variety of projects](#people-using-piper).
   * MCD (Mel-Cepstral Distortion) 評価
   * PESQ (Perceptual Evaluation of Speech Quality) 評価
   * UTMOS評価
-* **🎵 CLI機能強化** - [詳細ドキュメント](docs/CLI_ENHANCEMENTS.md)
+* **🎵 CLI機能強化** - [詳細ドキュメント](docs/features/cli-enhancements.md)
   * **音量調整**: `--volume` オプション (0.1-2.0)
   * **自動再生**: `--auto-play` で生成後自動再生
   * **直接テキスト入力**: `piper "テキスト" --model model.onnx`
@@ -89,6 +115,14 @@ Piper is used in a [variety of projects](#people-using-piper).
     # ファイルから読み込み
     piper --model en_US-lessac.onnx --input-file story.txt -f output.wav
     ```
+* **🎯 音素タイミング情報出力** - [詳細ドキュメント](docs/features/phoneme-timing.md)
+  * リップシンク、カラオケ、字幕同期用のタイミング情報
+  * JSON/TSV形式での出力
+  * 使用例:
+    ```bash
+    echo "Hello world" | piper --model en_US-lessac.onnx \
+      --output-file speech.wav --output-timing timing.json
+    ```
 
 ## 関連記事
 * [LJSpeechを使って英語のpiperの事前学習モデルを作成する](https://ayousanz.hatenadiary.jp/entry/2025/05/26/230341)
@@ -98,7 +132,18 @@ Piper is used in a [variety of projects](#people-using-piper).
 ``` sh
 echo 'Welcome to the world of speech synthesis!' | \
   ./piper --model en_US-lessac-medium.onnx --output_file welcome.wav
+
+# Streaming mode for reduced latency (outputs audio chunks progressively)
+echo 'This is a long text that will be processed in chunks for lower latency.' | \
+  ./piper --model en_US-lessac-medium.onnx --output_file output.wav --streaming
 ```
+
+### Streaming Mode
+
+The `--streaming` flag enables chunk-based processing for reduced latency:
+- **Dynamic chunk sizing**: Automatically adjusts chunk size based on punctuation density
+- **Audio crossfading**: Smooth transitions between chunks to prevent clicks/artifacts
+- **~15% latency reduction** for long texts
 
 [Listen to voice samples](https://rhasspy.github.io/piper-samples) and check out a [video tutorial by Thorsten Müller](https://youtu.be/rjq5eZoWWSo)
 
@@ -116,6 +161,7 @@ Voices are trained with [VITS](https://github.com/jaywalnut310/vits/) and export
 | Linux | ARM64 | ✅ | フルサポート (CMakeビルド使用) |
 | macOS | **ARM64 (Apple Silicon)のみ** | ✅ | M1/M2/M3以降のMac専用 |
 | Windows | x64 | ✅ | フルサポート |
+| **Web (ブラウザ)** | WebAssembly | ✅ | Chrome/Edge/Firefox/Safari対応 |
 
 ### ⚠️ 重要: macOSユーザーへのお知らせ
 
@@ -167,11 +213,26 @@ xattr -cr piper/bin/open_jtalk  # 日本語TTSを使用する場合
 
 これにより、Gatekeeperの警告なしに実行できるようになります。
 
+### 🌐 WebAssembly版（ブラウザ対応）
+
+Piper-plusはWebAssemblyを使用してブラウザで直接動作します：
+
+#### 特徴
+- **完全ブラウザ動作**: サーバー不要、オフライン対応
+- **日本語対応**: OpenJTalk WebAssembly版による高精度な音素化
+- **軽量**: WASM < 400KB、JS < 40KB
+- **対応ブラウザ**: Chrome、Edge、Firefox、Safari（最新版）
+
+#### デモ・使用方法
+- 🌏 **[オンラインデモ](https://ayutaz.github.io/piper-plus/)** - 今すぐブラウザで試せます
+- 📖 **[技術詳細](docs/webassembly/openjtalk-approach/README.md)** - 実装の詳細情報
+- 🔧 **[統合ガイド](src/wasm/openjtalk-web/README.md)** - Webアプリへの組み込み方法
+
 ## Voices
 
 Our goal is to support Home Assistant and the [Year of Voice](https://www.home-assistant.io/blog/2022/12/20/year-of-voice/).
 
-[Download voices](VOICES.md) for the supported languages:
+[Download voices](docs/api-reference/available-voices.md) for the supported languages:
 
 * العربية, Jordan (Arabic, ar_JO)
 * Català, Spain (Catalan, ca_ES)
@@ -226,6 +287,48 @@ The `MODEL_CARD` file for each voice contains important licensing information. P
 
 ## Installation
 
+### Dependencies
+
+Piper has different requirements depending on your use case:
+
+```bash
+# For inference only (using pre-trained models)
+pip install -r requirements.txt
+
+# For training custom models
+pip install -r requirements-train.txt
+
+# For development (includes testing and linting tools)
+pip install -r requirements-dev.txt
+```
+
+## Quick Start - WebUI
+
+The easiest way to get started with Piper is using the WebUI:
+
+```bash
+# Install inference dependencies first
+pip install -r requirements.txt
+
+# Install WebUI dependencies
+pip install gradio>=4.0.0
+
+# Run WebUI
+cd src/python_run
+python -m piper.webui --data-dir /path/to/models
+```
+
+Or using Docker:
+
+```bash
+# Run with Docker
+docker run -p 7860:7860 -v ./models:/models ghcr.io/rhasspy/piper-webui
+```
+
+Access the WebUI at http://localhost:7860
+
+## Installation
+
 You can [run Piper with Python](#running-in-python) or download a binary release:
 
 * [amd64](https://github.com/rhasspy/piper/releases/download/v1.2.0/piper_amd64.tar.gz) (64-bit desktop Linux)
@@ -234,7 +337,7 @@ You can [run Piper with Python](#running-in-python) or download a binary release
 
 ### Building from Source
 
-If you want to build from source, see the [Makefile](Makefile) and [C++ source](src/cpp).
+If you want to build from source, see the [CMakeLists.txt](CMakeLists.txt) and [C++ source](src/cpp).
 
 #### Prerequisites
 
@@ -267,7 +370,7 @@ If you want to build from source, see the [Makefile](Makefile) and [C++ source](
 **Linux**: You must download and extract [piper-phonemize](https://github.com/rhasspy/piper-phonemize) to `lib/Linux-$(uname -m)/piper_phonemize` before building.
 For example, `lib/Linux-x86_64/piper_phonemize/lib/libpiper_phonemize.so` should exist for AMD/Intel machines.
 
-**Windows**: See the [Windows Setup Guide](docs/windows-setup.md) for detailed instructions.
+**Windows**: See the [Windows Setup Guide](docs/getting-started/windows-setup.md) for detailed instructions.
 
 **macOS**: The build process will automatically download required dependencies.
 
@@ -289,14 +392,32 @@ For multi-speaker models, use `--speaker <number>` to change speakers (default: 
 ### Additional Options
 
 * `--use-cuda` - Enable GPU acceleration with CUDA
+* `--gpu-device-id <number>` - GPU device ID for CUDA (default: 0)
 * `--quiet` / `-q` - Disable logging output
 * `--phoneme-silence <phoneme> <seconds>` - Set silence duration for specific phonemes
 * `--length-scale <value>` - Adjust speech speed (default: 1.0, smaller = faster)
 * `--noise-scale <value>` - Control audio variation (default: 0.667)
 * `--noise-w <value>` - Control phoneme duration variation (default: 0.8)
 * `--sentence-silence <seconds>` - Silence between sentences (default: 0.2)
+* `--raw-phonemes` - Interpret input as raw phonemes (space-separated)
 
 See `piper --help` for more options.
+
+### Phoneme Input
+
+Piper supports two methods for direct phoneme input:
+
+1. **Inline phoneme notation** - Mix text with phonemes using `[[ ]]`:
+   ```sh
+   echo 'Hello [[ h ə l oʊ ]] world' | ./piper --model en_US-lessac-medium.onnx -f output.wav
+   ```
+
+2. **Raw phoneme mode** - Input only phonemes with `--raw-phonemes`:
+   ```sh
+   echo 'h ə l oʊ _ w ɜː l d' | ./piper --model en_US-lessac-medium.onnx --raw-phonemes -f output.wav
+   ```
+
+See [raw-phoneme-input.md](docs/features/raw-phoneme-input.md) for detailed documentation.
 
 ### Streaming Audio
 
@@ -352,9 +473,28 @@ Piper has been used in the following projects/papers:
 * [mintPiper](https://github.com/evuraan/mintPiper)
 * [Vim-Piper](https://github.com/wolandark/vim-piper)
 
+## Unity Integration - uPiper
+
+PiperをUnityで使用するためのプラグイン「uPiper」が開発されています：
+
+* **GitHub**: https://github.com/ayutaz/uPiper
+* **Unity 6000.0.35f1以降対応**
+* **Unity.InferenceEngine**を使用したONNXモデル実行
+* 非同期APIとストリーミングサポート
+* 現在は日本語と英語に対応（他言語は今後対応予定）
+* **対応プラットフォーム**:
+  - Windows (x64)
+  - macOS (Apple Silicon対応、IntelはDocker環境でのみ)
+  - Linux (x64)
+  - Android (ARM64)
+  - iOS（未対応）
+  - WebGL（計画中）
+
+uPiperは、ゲーム開発やインタラクティブアプリケーションでPiper TTSを活用するための包括的なソリューションを提供します。
+
 ## Training
 
-See the [training guide](TRAINING.md) and the [source code](src/python).
+See the [training guide](docs/guides/training/training-guide.md) and the [source code](src/python).
 
 Pretrained checkpoints are available on [Hugging Face](https://huggingface.co/datasets/rhasspy/piper-checkpoints/tree/main)
 
@@ -389,3 +529,16 @@ If you'd like to use a GPU, install the `onnxruntime-gpu` package:
 ```
 
 and then run `piper` with the `--cuda` argument. You will need to have a functioning CUDA environment, such as what's available in [NVIDIA's PyTorch containers](https://catalog.ngc.nvidia.com/orgs/nvidia/containers/pytorch).
+
+
+## Documentation
+
+For detailed documentation, see the [docs/](docs/) directory.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on how to contribute to this project.
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for version history and release notes.

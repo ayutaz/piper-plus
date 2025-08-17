@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎤 eSpeak-ng 英語音声合成デモ</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            border-radius: 8px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+        }
+        .input-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #555;
+        }
+        textarea {
+            width: 100%;
+            min-height: 120px;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            font-size: 16px;
+            font-family: inherit;
+            resize: vertical;
+        }
+        textarea:focus {
+            outline: none;
+            border-color: #4CAF50;
+        }
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        button:hover:not(:disabled) {
+            background: #45a049;
+        }
+        button:disabled {
+            background: #cccccc;
+            cursor: not-allowed;
+        }
+        button.secondary {
+            background: #757575;
+        }
+        button.secondary:hover:not(:disabled) {
+            background: #616161;
+        }
+        .status {
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+        .status.info {
+            background: #e3f2fd;
+            color: #1976d2;
+            border: 1px solid #bbdefb;
+        }
+        .status.success {
+            background: #e8f5e9;
+            color: #388e3c;
+            border: 1px solid #c8e6c9;
+        }
+        .status.error {
+            background: #ffebee;
+            color: #c62828;
+            border: 1px solid #ffcdd2;
+        }
+        .feature-list {
+            background: #fff3e0;
+            border: 1px solid #ffe0b2;
+            border-radius: 6px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        .feature-list h3 {
+            color: #e65100;
+            margin-top: 0;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+        .feature-list ul {
+            margin: 0;
+            padding-left: 20px;
+        }
+        .feature-list li {
+            margin-bottom: 5px;
+            color: #666;
+        }
+        .voice-selector {
+            margin-bottom: 20px;
+        }
+        select {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            font-size: 16px;
+            background: white;
+        }
+    </style>
+    <script type="text/javascript" src="../dist/espeak-ng/espeakng.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <h1>🎤 eSpeak-ng 英語音声合成デモ</h1>
+        <p class="subtitle">eSpeak-ngのみを使用した英語音声合成</p>
+        
+        <div id="status" class="status info">
+            初期化中...
+        </div>
+
+        <div class="feature-list">
+            <h3>📝 機能説明</h3>
+            <ul>
+                <li>🔊 eSpeak-ng単体での英語音声生成</li>
+                <li>🌍 複数の言語・アクセントに対応</li>
+                <li>⚡ 軽量で高速な音声合成</li>
+                <li>🎯 ブラウザ完結型（サーバー不要）</li>
+            </ul>
+        </div>
+
+        <div class="voice-selector">
+            <label for="voiceSelect">音声選択 / Voice Selection</label>
+            <select id="voiceSelect">
+                <option value="en">English (default)</option>
+                <option value="en-us">English (US)</option>
+                <option value="en-gb">English (GB)</option>
+                <option value="en-au">English (Australian)</option>
+                <option value="en-sc">English (Scottish)</option>
+            </select>
+        </div>
+
+        <div class="input-group">
+            <label for="inputText">テキスト入力 / Text Input</label>
+            <textarea id="inputText" placeholder="Enter English text here">Hello world! This is a test of the eSpeak-ng text-to-speech system.</textarea>
+        </div>
+
+        <div class="button-group">
+            <button id="speakBtn" disabled>🔊 音声生成 / Speak</button>
+            <button id="stopBtn" class="secondary" disabled>⏹️ 停止 / Stop</button>
+        </div>
+    </div>
+
+    <script>
+        let espeakNG = null;
+        let audioContext = null;
+        let allSamples = [];
+        let isPlaying = false;
+        let currentSource = null;
+        
+        const statusEl = document.getElementById('status');
+        const speakBtn = document.getElementById('speakBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const inputText = document.getElementById('inputText');
+        const voiceSelect = document.getElementById('voiceSelect');
+        
+        // Initialize
+        window.onload = function() {
+            updateStatus('eSpeak-ngを初期化しています...');
+            
+            espeakNG = new eSpeakNG('../dist/espeak-ng/espeakng.worker.js', function() {
+                updateStatus('準備完了！', 'success');
+                speakBtn.disabled = false;
+            });
+        };
+        
+        // Speak function
+        function speak() {
+            const text = inputText.value.trim();
+            if (!text) {
+                updateStatus('テキストを入力してください。', 'error');
+                return;
+            }
+            
+            updateStatus('音声を生成中...');
+            speakBtn.disabled = true;
+            stopBtn.disabled = false;
+            
+            // Reset samples
+            allSamples = [];
+            isPlaying = false;
+            
+            // Initialize audio context if needed
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            
+            // Set voice
+            const voice = voiceSelect.value;
+            espeakNG.set_voice.apply(espeakNG, [voice]);
+            
+            // Synthesize
+            espeakNG.synthesize(text, function(samples, events) {
+                if (samples) {
+                    // Convert ArrayBuffer to Float32Array
+                    let audioData;
+                    if (samples instanceof ArrayBuffer) {
+                        audioData = new Float32Array(samples);
+                    } else if (samples instanceof Float32Array) {
+                        audioData = samples;
+                    } else {
+                        console.error('Unknown sample format:', Object.prototype.toString.call(samples));
+                        return;
+                    }
+                    
+                    // Accumulate samples
+                    if (audioData.length > 0) {
+                        allSamples.push(audioData);
+                    }
+                } else {
+                    // No more samples - synthesis complete
+                    if (allSamples.length === 0) {
+                        updateStatus('音声生成に失敗しました。', 'error');
+                        speakBtn.disabled = false;
+                        stopBtn.disabled = true;
+                        return;
+                    }
+                    
+                    // Combine all samples
+                    let totalLength = 0;
+                    for (const chunk of allSamples) {
+                        totalLength += chunk.length;
+                    }
+                    
+                    const combinedSamples = new Float32Array(totalLength);
+                    let offset = 0;
+                    for (const chunk of allSamples) {
+                        combinedSamples.set(chunk, offset);
+                        offset += chunk.length;
+                    }
+                    
+                    // Play audio
+                    playAudio(combinedSamples);
+                }
+            });
+        }
+        
+        // Play audio
+        function playAudio(samples) {
+            try {
+                // eSpeak-ng uses 44100Hz sample rate
+                const sampleRate = 44100;
+                const buffer = audioContext.createBuffer(1, samples.length, sampleRate);
+                buffer.getChannelData(0).set(samples);
+                
+                currentSource = audioContext.createBufferSource();
+                currentSource.buffer = buffer;
+                currentSource.connect(audioContext.destination);
+                
+                currentSource.onended = function() {
+                    updateStatus('再生完了', 'success');
+                    speakBtn.disabled = false;
+                    stopBtn.disabled = true;
+                    isPlaying = false;
+                    currentSource = null;
+                };
+                
+                currentSource.start();
+                isPlaying = true;
+                
+                const duration = samples.length / sampleRate;
+                updateStatus(`再生中... (${duration.toFixed(2)}秒)`, 'info');
+                
+            } catch (error) {
+                console.error('Audio playback error:', error);
+                updateStatus(`再生エラー: ${error.message}`, 'error');
+                speakBtn.disabled = false;
+                stopBtn.disabled = true;
+            }
+        }
+        
+        // Stop playback
+        function stop() {
+            if (currentSource) {
+                currentSource.stop();
+                currentSource = null;
+            }
+            updateStatus('停止しました', 'info');
+            speakBtn.disabled = false;
+            stopBtn.disabled = true;
+            isPlaying = false;
+        }
+        
+        // Utility function
+        function updateStatus(message, type = 'info') {
+            statusEl.className = `status ${type}`;
+            statusEl.textContent = message;
+        }
+        
+        // Event listeners
+        speakBtn.addEventListener('click', speak);
+        stopBtn.addEventListener('click', stop);
+    </script>
+</body>
+</html>

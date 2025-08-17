@@ -4,9 +4,18 @@ Only test critical functionality that affects inference
 """
 
 import pytest
-import torch
 
-from piper_train.vits import commons
+
+try:
+    import torch
+except ImportError:
+    torch = None
+
+# Skip all tests in this module if torch is not available
+pytestmark = pytest.mark.skipif(torch is None, reason="torch not installed")
+
+if torch is not None:
+    from piper_train.vits import commons
 
 
 class TestVITSUtils:

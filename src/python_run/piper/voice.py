@@ -9,6 +9,7 @@ from typing import Any
 import numpy as np
 import onnxruntime
 
+
 # Try to import piper_phonemize, but make it optional
 try:
     from piper_phonemize import phonemize_codepoints, phonemize_espeak, tashkeel_run
@@ -20,11 +21,20 @@ except ImportError:
     # Provide fallback implementations
     def phonemize_codepoints(text, lang=None):
         # Simple fallback: return text as list of characters
-        return list(text)
+        return [list(text)]
 
     def phonemize_espeak(text, voice=None):
-        # Simple fallback: return text as list of characters
-        return list(text)
+        # Try to use espeak-ng command if available
+        try:
+            from .espeak_phonemizer import phonemize_espeak_ng
+
+            return phonemize_espeak_ng(text, voice or "en-us")
+        except ImportError:
+            # Simple fallback: return text as list of characters
+            import logging
+
+            logging.warning("espeak_phonemizer not available, using character fallback")
+            return [list(text)]
 
     def tashkeel_run(text):
         # Simple fallback: return original text
@@ -42,6 +52,7 @@ except ImportError:
 from .config import PhonemeType, PiperConfig
 from .const import BOS, EOS, PAD
 from .util import audio_float_to_int16
+
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -119,73 +130,88 @@ class PiperVoice:
                 # https://github.com/mush42/libtashkeel/
                 text = tashkeel_run(text)
 
-            return phonemize_espeak(text, self.config.espeak_voice)
+            phonemes = phonemize_espeak(text, self.config.espeak_voice)
+            _LOGGER.debug(f"Phonemized '{text}' to: {phonemes}")
+            return phonemes
 
         if self.config.phoneme_type == PhonemeType.TEXT:
             return phonemize_codepoints(text)
 
         if self.config.phoneme_type == PhonemeType.OPENJTALK:
-            # Piper の学習時と同じアルゴリズム（accent/prosody 付き）で音素化
+            # Use the exact same phonemization as training
             try:
-                # `piper_train` がインストールされていれば専用実装を利用
-                from piper_train.phonemize.japanese import (
-                    phonemize_japanese,  # type: ignore
+                import os
+                import sys
+
+                # Try to import from relative path first
+                piper_root = os.path.dirname(
+                    os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+                )
+                sys.path.insert(0, os.path.join(piper_root, "src", "python"))
+                from piper_train.phonemize.custom_dict import CustomDictionary
+                from piper_train.phonemize.japanese import phonemize_japanese
+
+                # カスタム辞書を適用（user_custom_dict.jsonを明示的に読み込む）
+                dict_path = os.path.join(
+                    piper_root, "data", "dictionaries", "user_custom_dict.json"
                 )
 
-                tokens = phonemize_japanese(text)
-                return [tokens]
-            except Exception:  # pragma: no cover – フォールバック
-                # 学習環境に piper_train が無い場合の簡易フォールバック
-                phonemes = pyopenjtalk.g2p(text, kana=False).split()
-
-                converted = []
-                # Add BOS marker
-                converted.append("^")
-
-                for ph in phonemes:
-                    if ph == "pau":
-                        converted.append("_")
-                        continue
-
-                    if ph == "sil":
-                        # Skip sil in the middle, it will be added as EOS
-                        continue
-
-                    # Devoiced vowels come back as upper-case (A,I,U,E,O)
-                    # But NOT 'N' which is a special phoneme
-                    if ph in {"A", "I", "U", "E", "O"}:
-                        ph = ph.lower()
-
-                    # Check if this is a multi-character phoneme that needs PUA mapping
-                    if ph in MULTI_CHAR_TO_PUA:
-                        converted.append(MULTI_CHAR_TO_PUA[ph])
-                    else:
-                        converted.append(ph)
-
-                # Add EOS marker
-                converted.append("$")
-
-                # Log readable phonemes if debug logging is enabled
-                if _LOGGER.isEnabledFor(logging.DEBUG):
-                    readable_phonemes = []
-                    for ph in converted:
-                        if len(ph) == 1 and ord(ph) >= 0xE000 and ord(ph) <= 0xF8FF:
-                            # Find the original multi-char phoneme
-                            for orig, pua in MULTI_CHAR_TO_PUA.items():
-                                if pua == ph:
-                                    readable_phonemes.append(orig)
-                                    break
-                            else:
-                                readable_phonemes.append(ph)
-                        else:
-                            readable_phonemes.append(ph)
+                # 辞書ファイルの存在確認
+                if os.path.exists(dict_path):
+                    try:
+                        dictionary = CustomDictionary(dict_path)
+                        return [phonemize_japanese(text, custom_dict=dictionary)]
+                    except Exception as e:
+                        _LOGGER.warning(
+                            f"Failed to load custom dictionary from {dict_path}: {e}"
+                        )
+                        # 辞書なしで音素化を続行
+                        return [phonemize_japanese(text)]
+                else:
                     _LOGGER.debug(
-                        "Phonemized '%s' to: %s", text, " ".join(readable_phonemes)
+                        f"Custom dictionary not found at {dict_path}, using default phonemization"
                     )
-
-                return [converted]
+                    return [phonemize_japanese(text)]
+            except ImportError:
+                _LOGGER.warning("Failed to import piper_train phonemizer, falling back")
+                return [self._phonemize_japanese_simple(text)]
 
         raise ValueError(f"Unexpected phoneme type: {self.config.phoneme_type}")
+
+    def _phonemize_japanese_simple(self, text: str) -> list[str]:
+        """Phonemize Japanese text without prosody marks."""
+        if not HAS_PYOPENJTALK:
+            raise RuntimeError("pyopenjtalk is required for Japanese phonemization")
+
+        # Simple phonemization without prosody marks
+        phonemes = pyopenjtalk.g2p(text)
+        tokens = phonemes.split()
+
+        # Use the same token mapper as training
+        try:
+            # Try to import from relative path first
+            import os
+            import sys
+
+            piper_root = os.path.dirname(
+                os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+            )
+            sys.path.insert(0, os.path.join(piper_root, "src", "python"))
+            from piper_train.phonemize.token_mapper import map_sequence
+
+            return map_sequence(tokens)
+        except ImportError:
+            # Fallback to local PUA mapping
+            converted = []
+            for token in tokens:
+                if token in MULTI_CHAR_TO_PUA:
+                    converted.append(MULTI_CHAR_TO_PUA[token])
+                elif len(token) > 1:
+                    _LOGGER.warning("Multi-char token not in PUA map: %s", token)
+                    converted.append(token)
+                else:
+                    converted.append(token)
+            return converted
 
     def phonemes_to_ids(self, phonemes: list[str]) -> list[int]:
         """Phonemes to ids."""
@@ -200,8 +226,7 @@ class PiperVoice:
             ids.extend(id_map[phoneme])
 
             # 学習データが PAD("_") を各音素ごとに含んでいるのは eSpeak 方式のみ。
-            # openjtalk で学習したモデルでは PAD は明示的に含まれていないので追加しない。
-            if self.config.phoneme_type != PhonemeType.OPENJTALK:
+            if self.config.phoneme_type == PhonemeType.ESPEAK:
                 ids.extend(id_map[PAD])
 
         ids.extend(id_map[EOS])
@@ -305,8 +330,11 @@ class PiperVoice:
             # Default speaker
             speaker_id = 0
 
-        if speaker_id is not None:
-            sid = np.array([speaker_id], dtype=np.int64)
+        # Include sid only for multi-speaker models
+        if self.config.num_speakers > 1:
+            if speaker_id is None:
+                speaker_id = 0
+            sid = np.expand_dims(np.array([speaker_id], dtype=np.int64), 0)
             args["sid"] = sid
 
         # Synthesize through Onnx

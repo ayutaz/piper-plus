@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GitHub Pages Path Test</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .test-item {
+            background: white;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .success { background-color: #d4edda; }
+        .error { background-color: #f8d7da; }
+        pre {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 3px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>GitHub Pages Path Resolution Test</h1>
+    <div id="results"></div>
+
+    <script type="module">
+        const results = document.getElementById('results');
+        
+        function log(message, isError = false) {
+            const div = document.createElement('div');
+            div.className = `test-item ${isError ? 'error' : 'success'}`;
+            div.innerHTML = `<pre>${message}</pre>`;
+            results.appendChild(div);
+        }
+
+        // Test current location
+        log(`Current location:
+  href: ${window.location.href}
+  hostname: ${window.location.hostname}
+  pathname: ${window.location.pathname}
+  Is GitHub Pages: ${window.location.hostname.includes('github.io')}`);
+
+        // Determine base path
+        let basePath = '';
+        if (window.location.hostname.includes('github.io')) {
+            // Extract repository name from pathname
+            const pathParts = window.location.pathname.split('/').filter(p => p);
+            if (pathParts.length > 0) {
+                basePath = '/' + pathParts[0];
+            }
+        }
+        log(`Detected base path: "${basePath}"`);
+
+        // Test various path resolutions
+        const testPaths = [
+            './dist/openjtalk.wasm',
+            '../dist/openjtalk.wasm',
+            '../../dist/openjtalk.wasm',
+            '/dist/openjtalk.wasm',
+            `${basePath}/dist/openjtalk.wasm`
+        ];
+
+        log('Testing path resolutions:');
+        for (const path of testPaths) {
+            try {
+                const url = new URL(path, window.location.href);
+                log(`  ${path} → ${url.href}`);
+            } catch (e) {
+                log(`  ${path} → ERROR: ${e.message}`, true);
+            }
+        }
+
+        // Test import.meta.url
+        log(`import.meta.url: ${import.meta.url}`);
+
+        // Test actual file loading
+        async function testFileLoading() {
+            log('\nTesting actual file loading:');
+            
+            const testUrls = [
+                `${basePath}/dist/openjtalk.wasm`,
+                new URL(`${basePath}/dist/openjtalk.wasm`, window.location.origin).href
+            ];
+
+            for (const url of testUrls) {
+                try {
+                    log(`Fetching: ${url}`);
+                    const response = await fetch(url);
+                    const contentType = response.headers.get('content-type');
+                    const contentLength = response.headers.get('content-length');
+                    
+                    if (response.ok) {
+                        // Check if it's actually a WASM file
+                        const buffer = await response.arrayBuffer();
+                        const view = new Uint8Array(buffer, 0, 4);
+                        const magic = Array.from(view).map(b => b.toString(16).padStart(2, '0')).join(' ');
+                        
+                        log(`  Status: ${response.status} OK
+  Content-Type: ${contentType}
+  Content-Length: ${contentLength} bytes
+  Magic bytes: ${magic}
+  Is WASM: ${magic === '00 61 73 6d'}`);
+                    } else {
+                        log(`  Status: ${response.status} ${response.statusText}`, true);
+                    }
+                } catch (e) {
+                    log(`  Error: ${e.message}`, true);
+                }
+            }
+        }
+
+        await testFileLoading();
+
+        // Recommended solution
+        log(`\nRecommended solution for GitHub Pages:
+Use absolute paths with repository name:
+  const basePath = window.location.hostname.includes('github.io') 
+    ? '/' + window.location.pathname.split('/')[1] 
+    : '';
+  const wasmPath = basePath + '/dist/openjtalk.wasm';`);
+    </script>
+</body>
+</html>

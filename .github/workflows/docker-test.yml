@@ -1,0 +1,49 @@
+name: Docker Tests
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'docker/**'
+      - '.github/workflows/docker-*.yml'
+      - '.dockerignore'
+  push:
+    branches: [dev]
+    paths:
+      - 'docker/**'
+      - '.github/workflows/docker-*.yml'
+      - '.dockerignore'
+
+jobs:
+  test-docker-minimal:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Test basic Docker functionality
+        run: |
+          echo "=== Testing Docker is available ==="
+          docker --version
+          docker info | head -10
+          
+          echo "=== Testing basic Ubuntu container ==="
+          docker run --rm ubuntu:22.04 echo "Ubuntu container works"
+          
+          echo "=== Testing with Python ==="
+          docker run --rm python:3.11-slim python -c "print('Python container works')"
+          
+      - name: Build minimal test container
+        run: |
+          echo "=== Building minimal test container ==="
+          cat > Dockerfile.test << 'EOF'
+          FROM ubuntu:22.04
+          RUN apt-get update && apt-get install -y python3 && rm -rf /var/lib/apt/lists/*
+          CMD ["python3", "-c", "print('Test container built and ran successfully')"]
+          EOF
+          
+          docker build -f Dockerfile.test -t test-minimal .
+          docker run --rm test-minimal
+          
+          echo "=== Docker tests passed ==="#

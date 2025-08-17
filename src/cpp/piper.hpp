@@ -84,14 +84,25 @@ struct ModelSession {
   Ort::AllocatorWithDefaultOptions allocator;
   Ort::SessionOptions options;
   Ort::Env env;
+  bool hasDurationOutput = false;  // Whether model outputs duration information
 
   ModelSession() : onnx(nullptr){};
+};
+
+struct PhonemeInfo {
+  std::string phoneme;     // Phoneme string
+  float start_time;        // Start time in seconds
+  float end_time;          // End time in seconds
+  int start_frame;         // Start frame index
+  int end_frame;           // End frame index
 };
 
 struct SynthesisResult {
   double inferSeconds;
   double audioSeconds;
   double realTimeFactor;
+  std::vector<PhonemeInfo> phonemeTimings;  // Phoneme timing information
+  bool hasTimingInfo = false;                // Whether timing info is available
 };
 
 struct Voice {
@@ -120,7 +131,8 @@ void terminate(PiperConfig &config);
 // Load Onnx model and JSON config file
 void loadVoice(PiperConfig &config, std::string modelPath,
                std::string modelConfigPath, Voice &voice,
-               std::optional<SpeakerId> &speakerId, bool useCuda);
+               std::optional<SpeakerId> &speakerId, bool useCuda,
+               int gpuDeviceId = 0);
 
 // Phonemize text and synthesize audio
 void textToAudio(PiperConfig &config, Voice &voice, std::string text,
@@ -130,6 +142,42 @@ void textToAudio(PiperConfig &config, Voice &voice, std::string text,
 // Phonemize text and synthesize audio to WAV file
 void textToWavFile(PiperConfig &config, Voice &voice, std::string text,
                    std::ostream &audioFile, SynthesisResult &result);
+
+// Synthesize audio directly from phonemes
+void phonemesToAudio(PiperConfig &config, Voice &voice, 
+                     const std::vector<Phoneme> &phonemes,
+                     std::vector<int16_t> &audioBuffer, 
+                     SynthesisResult &result,
+                     const std::function<void()> &audioCallback = nullptr);
+
+// Synthesize audio directly from phonemes to WAV file
+void phonemesToWavFile(PiperConfig &config, Voice &voice,
+                       const std::vector<Phoneme> &phonemes,
+                       std::ostream &audioFile, SynthesisResult &result);
+
+// Streaming text-to-audio synthesis with reduced latency
+void textToAudioStreaming(PiperConfig &config, Voice &voice, std::string text,
+                          std::vector<int16_t> &audioBuffer, SynthesisResult &result,
+                          const std::function<void(const std::vector<int16_t>&)> &chunkCallback,
+                          size_t chunkSize = 4096);
+
+// Streaming phonemes-to-audio synthesis with reduced latency
+void phonemesToAudioStreaming(PiperConfig &config, Voice &voice,
+                              const std::vector<Phoneme> &phonemes,
+                              std::vector<int16_t> &audioBuffer,
+                              SynthesisResult &result,
+                              const std::function<void(const std::vector<int16_t>&)> &chunkCallback,
+                              size_t phonemesPerChunk = 10);
+
+// Output phoneme timing information as JSON
+void outputTimingsAsJSON(const std::vector<PhonemeInfo> &timings,
+                         std::ostream &output,
+                         const std::string &text = "",
+                         int sampleRate = 22050);
+
+// Output phoneme timing information as TSV
+void outputTimingsAsTSV(const std::vector<PhonemeInfo> &timings,
+                        std::ostream &output);
 
 } // namespace piper
 

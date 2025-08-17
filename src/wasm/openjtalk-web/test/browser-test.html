@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpenJTalk WebAssembly ブラウザテスト</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        h1 {
+            color: #333;
+            border-bottom: 2px solid #007acc;
+            padding-bottom: 10px;
+        }
+        .test-section {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .test-result {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .pass {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .fail {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .warn {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeeba;
+        }
+        .info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        button {
+            background: #007acc;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #005a9e;
+        }
+        pre {
+            background: #f8f8f8;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+            border: 1px solid #ddd;
+        }
+        .summary {
+            display: flex;
+            gap: 20px;
+            margin: 20px 0;
+        }
+        .summary-item {
+            flex: 1;
+            text-align: center;
+            padding: 15px;
+            border-radius: 8px;
+            color: white;
+        }
+        .summary-pass { background: #28a745; }
+        .summary-fail { background: #dc3545; }
+        .summary-warn { background: #ffc107; }
+        .summary-info { background: #17a2b8; }
+    </style>
+</head>
+<body>
+    <h1>OpenJTalk WebAssembly ブラウザテスト</h1>
+    
+    <div class="test-section">
+        <h2>テストコントロール</h2>
+        <button onclick="runAllTests()">すべてのテストを実行</button>
+        <button onclick="clearResults()">結果をクリア</button>
+    </div>
+    
+    <div id="summary" class="test-section" style="display: none;">
+        <h2>テストサマリー</h2>
+        <div class="summary">
+            <div class="summary-item summary-pass">
+                <div style="font-size: 24px;" id="passCount">0</div>
+                <div>成功</div>
+            </div>
+            <div class="summary-item summary-fail">
+                <div style="font-size: 24px;" id="failCount">0</div>
+                <div>失敗</div>
+            </div>
+            <div class="summary-item summary-warn">
+                <div style="font-size: 24px;" id="warnCount">0</div>
+                <div>警告</div>
+            </div>
+            <div class="summary-item summary-info">
+                <div style="font-size: 24px;" id="totalCount">0</div>
+                <div>合計</div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="results"></div>
+
+    <script type="module">
+        let moduleInstance = null;
+        let testResults = [];
+        
+        function log(message, status = 'info') {
+            const timestamp = new Date().toISOString();
+            const result = { timestamp, message, status };
+            testResults.push(result);
+            
+            const resultsDiv = document.getElementById('results');
+            const resultDiv = document.createElement('div');
+            resultDiv.className = `test-result ${status}`;
+            resultDiv.innerHTML = `<strong>[${timestamp}]</strong> ${message}`;
+            resultsDiv.appendChild(resultDiv);
+        }
+        
+        function updateSummary() {
+            const passCount = testResults.filter(r => r.status === 'pass').length;
+            const failCount = testResults.filter(r => r.status === 'fail').length;
+            const warnCount = testResults.filter(r => r.status === 'warn').length;
+            const totalCount = testResults.length;
+            
+            document.getElementById('passCount').textContent = passCount;
+            document.getElementById('failCount').textContent = failCount;
+            document.getElementById('warnCount').textContent = warnCount;
+            document.getElementById('totalCount').textContent = totalCount;
+            document.getElementById('summary').style.display = 'block';
+        }
+        
+        async function testModuleLoad() {
+            const section = createSection('モジュールロードテスト');
+            
+            try {
+                log('WASMモジュールをロード中...', 'info');
+                
+                const jsResponse = await fetch('../dist/openjtalk.js');
+                if (!jsResponse.ok) {
+                    throw new Error(`JSファイルが見つかりません: ${jsResponse.status}`);
+                }
+                log(`JSファイル: ${jsResponse.headers.get('content-length')} bytes`, 'pass');
+                
+                const wasmResponse = await fetch('../dist/openjtalk.wasm');
+                if (!wasmResponse.ok) {
+                    throw new Error(`WASMファイルが見つかりません: ${wasmResponse.status}`);
+                }
+                log(`WASMファイル: ${wasmResponse.headers.get('content-length')} bytes`, 'pass');
+                
+                const Module = (await import('../dist/openjtalk.js')).default;
+                moduleInstance = await Module({
+                    locateFile: (path) => {
+                        if (path.endsWith('.wasm')) {
+                            return '../dist/openjtalk.wasm';
+                        }
+                        return path;
+                    }
+                });
+                
+                log('モジュールのロードに成功', 'pass');
+                
+                // エクスポートされた関数の確認
+                const functions = Object.keys(moduleInstance).filter(k => k.startsWith('_'));
+                log(`エクスポートされた関数: ${functions.length}個`, 'info');
+                
+                section.appendChild(createFunctionList(functions));
+                
+                return true;
+            } catch (error) {
+                log(`エラー: ${error.message}`, 'fail');
+                return false;
+            }
+        }
+        
+        async function testBasicFunctions() {
+            const section = createSection('基本関数テスト');
+            
+            if (!moduleInstance) {
+                log('モジュールがロードされていません', 'fail');
+                return false;
+            }
+            
+            try {
+                // バージョン取得
+                if (moduleInstance._get_version) {
+                    const versionPtr = moduleInstance._get_version();
+                    const version = moduleInstance.UTF8ToString(versionPtr);
+                    log(`バージョン: ${version}`, 'pass');
+                } else {
+                    log('get_version関数が見つかりません', 'warn');
+                }
+                
+                // テスト関数
+                if (moduleInstance._test_function) {
+                    const result = moduleInstance._test_function(25, 17);
+                    const expected = 42;
+                    if (result === expected) {
+                        log(`計算テスト (25 + 17): ${result} ✓`, 'pass');
+                    } else {
+                        log(`計算テスト失敗: 期待値 ${expected}, 実際 ${result}`, 'fail');
+                    }
+                } else {
+                    log('test_function関数が見つかりません', 'warn');
+                }
+                
+                // エコー関数
+                if (moduleInstance._echo_string) {
+                    const testStr = "こんにちは、WebAssembly!";
+                    const strPtr = moduleInstance.allocateUTF8(testStr);
+                    const echoPtr = moduleInstance._echo_string(strPtr);
+                    const echo = moduleInstance.UTF8ToString(echoPtr);
+                    log(`エコーテスト: "${echo}"`, 'pass');
+                    moduleInstance._free_string(echoPtr);
+                    moduleInstance._free(strPtr);
+                } else {
+                    log('echo_string関数が見つかりません', 'warn');
+                }
+                
+                return true;
+            } catch (error) {
+                log(`エラー: ${error.message}`, 'fail');
+                return false;
+            }
+        }
+        
+        async function testFileSystem() {
+            const section = createSection('ファイルシステムテスト');
+            
+            if (!moduleInstance) {
+                log('モジュールがロードされていません', 'fail');
+                return false;
+            }
+            
+            try {
+                const FS = moduleInstance.FS;
+                
+                // テストディレクトリ作成
+                try {
+                    FS.mkdir('/test');
+                    log('/testディレクトリを作成', 'pass');
+                } catch (e) {
+                    if (e.message.includes('File exists')) {
+                        log('/testディレクトリは既に存在', 'info');
+                    } else {
+                        throw e;
+                    }
+                }
+                
+                // ファイル書き込み
+                const content = '日本語のテストテキスト';
+                FS.writeFile('/test/japanese.txt', content);
+                log('日本語ファイルを書き込み', 'pass');
+                
+                // ファイル読み込み
+                const readContent = FS.readFile('/test/japanese.txt', { encoding: 'utf8' });
+                if (readContent === content) {
+                    log(`ファイル読み込み成功: "${readContent}"`, 'pass');
+                } else {
+                    log('ファイル内容が一致しません', 'fail');
+                }
+                
+                // 辞書ディレクトリの準備
+                try {
+                    FS.mkdir('/dict');
+                    log('/dictディレクトリを作成', 'pass');
+                } catch (e) {
+                    if (e.message.includes('File exists')) {
+                        log('/dictディレクトリは既に存在', 'info');
+                    }
+                }
+                
+                // 音声ディレクトリの準備
+                try {
+                    FS.mkdir('/voice');
+                    log('/voiceディレクトリを作成', 'pass');
+                } catch (e) {
+                    if (e.message.includes('File exists')) {
+                        log('/voiceディレクトリは既に存在', 'info');
+                    }
+                }
+                
+                return true;
+            } catch (error) {
+                log(`エラー: ${error.message}`, 'fail');
+                return false;
+            }
+        }
+        
+        async function testOpenJTalkFunctions() {
+            const section = createSection('OpenJTalk関数テスト');
+            
+            if (!moduleInstance) {
+                log('モジュールがロードされていません', 'fail');
+                return false;
+            }
+            
+            try {
+                // OpenJTalk関数の存在確認
+                const functions = [
+                    '_openjtalk_initialize',
+                    '_openjtalk_synthesis_labels',
+                    '_openjtalk_clear',
+                    '_openjtalk_free_string'
+                ];
+                
+                functions.forEach(func => {
+                    const exists = func in moduleInstance;
+                    log(`${func}: ${exists ? '存在' : '不在'}`, exists ? 'pass' : 'warn');
+                });
+                
+                // 初期化テスト（辞書なしで失敗することを確認）
+                if (moduleInstance._openjtalk_initialize) {
+                    const dictPtr = moduleInstance.allocateUTF8("/dict");
+                    const voicePtr = moduleInstance.allocateUTF8("/voice/test.htsvoice");
+                    const result = moduleInstance._openjtalk_initialize(dictPtr, voicePtr);
+                    log(`初期化結果: ${result} (辞書なしのため失敗が期待される)`, result !== 0 ? 'pass' : 'warn');
+                    moduleInstance._free(dictPtr);
+                    moduleInstance._free(voicePtr);
+                }
+                
+                // ラベル生成テスト
+                if (moduleInstance._openjtalk_synthesis_labels) {
+                    const textPtr = moduleInstance.allocateUTF8("テストテキスト");
+                    const labelsPtr = moduleInstance._openjtalk_synthesis_labels(textPtr);
+                    const labels = moduleInstance.UTF8ToString(labelsPtr);
+                    log(`ラベル生成: "${labels}"`, 'info');
+                    moduleInstance._openjtalk_free_string(labelsPtr);
+                    moduleInstance._free(textPtr);
+                }
+                
+                return true;
+            } catch (error) {
+                log(`エラー: ${error.message}`, 'fail');
+                return false;
+            }
+        }
+        
+        function createSection(title) {
+            const section = document.createElement('div');
+            section.className = 'test-section';
+            section.innerHTML = `<h2>${title}</h2>`;
+            document.getElementById('results').appendChild(section);
+            return section;
+        }
+        
+        function createFunctionList(functions) {
+            const details = document.createElement('details');
+            details.innerHTML = `<summary>関数一覧 (${functions.length}個)</summary>`;
+            const list = document.createElement('pre');
+            list.textContent = functions.join('\n');
+            details.appendChild(list);
+            return details;
+        }
+        
+        window.runAllTests = async function() {
+            clearResults();
+            log('=== テスト開始 ===', 'info');
+            
+            await testModuleLoad();
+            await testBasicFunctions();
+            await testFileSystem();
+            await testOpenJTalkFunctions();
+            
+            log('=== テスト完了 ===', 'info');
+            updateSummary();
+            
+            // レポートをコンソールに出力
+            console.log('Test Report:', testResults);
+        };
+        
+        window.clearResults = function() {
+            document.getElementById('results').innerHTML = '';
+            document.getElementById('summary').style.display = 'none';
+            testResults = [];
+            moduleInstance = null;
+        };
+    </script>
+</body>
+</html>

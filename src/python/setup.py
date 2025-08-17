@@ -4,6 +4,7 @@ from pathlib import Path
 import setuptools
 from setuptools import setup
 
+
 this_dir = Path(__file__).parent
 module_dir = this_dir / "piper_train"
 
@@ -16,7 +17,8 @@ if readme_path.is_file():
     long_description = readme_path.read_text(encoding="utf-8")
 
 requirements = []
-requirements_path = this_dir / "requirements.txt"
+# Use requirements-train.txt from project root
+requirements_path = this_dir.parent.parent / "requirements-train.txt"
 if requirements_path.is_file():
     with open(requirements_path, encoding="utf-8") as requirements_file:
         requirements = requirements_file.read().splitlines()

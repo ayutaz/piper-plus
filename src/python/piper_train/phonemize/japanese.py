@@ -1,8 +1,20 @@
 import re
 
-import pyopenjtalk
 
+# Try to import pyopenjtalk-plus first (Windows compatible), fall back to pyopenjtalk
+try:
+    import pyopenjtalk_plus as pyopenjtalk
+except ImportError:
+    try:
+        import pyopenjtalk
+    except ImportError:
+        raise ImportError(
+            "Neither pyopenjtalk nor pyopenjtalk-plus is installed"
+        ) from None
+
+from .custom_dict import CustomDictionary
 from .token_mapper import map_sequence
+
 
 __all__ = ["phonemize_japanese"]
 
@@ -18,7 +30,9 @@ def _is_question(text: str) -> bool:
     return text.strip().endswith("?") or text.strip().endswith("？")
 
 
-def phonemize_japanese(text: str) -> list[str]:
+def phonemize_japanese(
+    text: str, custom_dict: CustomDictionary | str | list[str] | None = None
+) -> list[str]:
     """Convert *text* into a list of phoneme/prosody tokens that Piper can ingest.
 
     The algorithm follows the so-called "Kurihara method" that inserts the
@@ -31,11 +45,30 @@ def phonemize_japanese(text: str) -> list[str]:
     [   : rising-pitch mark (accent phrase head)
     ]   : falling-pitch mark (accent nucleus)
 
+    Parameters
+    ----------
+    text : str
+        Input text to phonemize
+    custom_dict : CustomDictionary, str, List[str], optional
+        Custom dictionary instance or path(s) to dictionary file(s)
+
     Notes
     -----
     1. We rely on *pyopenjtalk.extract_fullcontext* to obtain full-context labels.
     2. "sil" at the beginning / end of the utterance is converted into ^ / $ or ?.
+    3. Custom dictionary is applied before OpenJTalk processing for better pronunciation.
     """
+
+    # カスタム辞書を適用
+    if custom_dict is not None:
+        if isinstance(custom_dict, CustomDictionary):
+            dictionary = custom_dict
+        else:
+            # パスが渡された場合は辞書を作成
+            dictionary = CustomDictionary(custom_dict)
+
+        # テキストに辞書を適用
+        text = dictionary.apply_to_text(text)
 
     labels = pyopenjtalk.extract_fullcontext(text)
     tokens: list[str] = []
@@ -52,6 +85,7 @@ def phonemize_japanese(text: str) -> list[str]:
             if idx == 0:
                 tokens.append("^")
             elif idx == len(labels) - 1:
+                # Always add end marker when we find the last sil
                 tokens.append("?" if _is_question(text) else "$")
             # Skip adding ordinary phoneme for sil
             continue

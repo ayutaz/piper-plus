@@ -4,6 +4,7 @@ from pathlib import Path
 import numpy
 from Cython.Build import cythonize
 
+
 _DIR = Path(__file__).parent
 
 setup(

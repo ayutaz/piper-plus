@@ -1,60 +1,45 @@
 # Piper Documentation
 
-Welcome to the Piper documentation. This directory contains detailed guides and references for using Piper.
+Welcome to the Piper documentation. This directory contains comprehensive guides and references for using and developing with Piper TTS.
 
-## Available Documentation
+## 📁 Documentation Structure
 
-### Getting Started
-- [OpenJTalk Windows Guide](openjtalk-windows.md) - How to use Japanese TTS on Windows
-- [Environment Variables Reference](environment-variables.md) - Complete list of configuration options
-- [Troubleshooting Guide](troubleshooting.md) - Solutions to common problems
+### 🚀 [Getting Started](getting-started/)
+Quick start guides, installation instructions, and troubleshooting for new users.
 
-### Japanese Language Support
-- [Japanese Usage Guide](../JAPANESE_USAGE.md) - Comprehensive Japanese TTS guide
-- [Phoneme Mapping](../PHONEME_MAPPING.md) - Technical details on Japanese phoneme handling
+### 🎯 [Features](features/)
+Detailed documentation for all Piper features including CLI enhancements, custom dictionary, phoneme input, streaming, and WebUI.
 
-### Technical Analysis
-- [WebAssembly Investigation](webassembly-investigation/README.md) - WebGL/WebAssembly support research
-- [Competitive Analysis](competitive-analysis/README.md) - Market positioning and competitor analysis
+### 📚 [Guides](guides/)
+In-depth guides organized by topic:
+- **[Training](guides/training/)** - Model training guides
+- **[Japanese](guides/japanese/)** - Japanese language support
+- **[Optimization](guides/optimization/)** - Performance optimization
+- **[Testing](guides/testing/)** - Testing and validation
 
-### Quick Links
+### 🌐 [WebAssembly](webassembly/)
+Browser-based TTS implementation:
+- **[OpenJTalk Approach](webassembly/openjtalk-approach/)** - Japanese TTS in the browser
 
-#### For Windows Users
-Start with the [OpenJTalk Windows Guide](openjtalk-windows.md) to set up Japanese text-to-speech on Windows.
+### 🔧 [Development](development/)
+Resources for contributors including coding guidelines, architecture docs, and development workflows.
 
-#### Environment Configuration
-See [Environment Variables Reference](environment-variables.md) for all available configuration options.
+### 📖 [API Reference](api-reference/)
+Technical API documentation for developers integrating Piper.
 
-#### Having Issues?
-Check the [Troubleshooting Guide](troubleshooting.md) for solutions to common problems.
+### 🌐 [Additional Resources](.)
+- [Competitive Analysis](competitive-analysis/) - Market positioning
 
-## Key Features
+## Quick Links
 
-### Auto-Download Support
-Piper can automatically download required files:
-- OpenJTalk dictionary (~10MB)
-- HTS voice files (~2MB)
+- 🎤 **Basic Usage**: See [CLI Enhancements](features/cli-enhancements.md)
+- 📚 **Custom Dictionary**: Configure [technical terms](features/custom_dictionary.md)
+- 🇯🇵 **Japanese TTS**: Start with [Quick Start Japanese](getting-started/quick_start_japanese.md)
+- 🎓 **Training Models**: Check [Training Guides](guides/training/)
+- 🌐 **WebUI**: Try the [Web Interface](features/webui-usage.md)
+- 🌏 **WebAssembly**: Run [TTS in browser](webassembly/openjtalk-approach/README.md)
+- 🤝 **Contributing**: Read [Contributing Guidelines](/CONTRIBUTING.md)
 
-No manual setup required for most users!
+## Navigation
 
-### Cross-Platform
-- Windows (x64) - Full OpenJTalk support
-- macOS (x64, arm64) - Full OpenJTalk support  
-- Linux (amd64) - Full OpenJTalk support
-- Linux (arm64) - Coming soon
-
-### Offline Mode
-After initial setup, Piper works completely offline. Set `PIPER_OFFLINE_MODE=1` to prevent any network access.
-
-## Contributing
-
-To improve documentation:
-1. Fork the repository
-2. Make your changes
-3. Submit a pull request
-
-Please ensure all documentation:
-- Uses clear, simple language
-- Includes practical examples
-- Covers common error cases
-- Is tested and accurate
+Use the [Documentation Index](INDEX.md) for a complete list of all documentation with descriptions.

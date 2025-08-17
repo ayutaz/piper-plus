@@ -1,0 +1,40 @@
+{
+  "version": "2.0",
+  "description": "WebAssemblyデフォルト辞書 - 旧形式との互換性維持",
+  "metadata": {
+    "created": "2025-01-03",
+    "author": "Piper Project",
+    "license": "MIT",
+    "compatibility": "legacy"
+  },
+  "entries": {
+    "// 音声合成関連": "",
+    "Piper": {"pronunciation": "パイパー", "priority": 10},
+    "PIPER": {"pronunciation": "パイパー", "priority": 10},
+    "piper": {"pronunciation": "パイパー", "priority": 10},
+    
+    "// 基本的な技術用語": "",
+    "Docker": {"pronunciation": "ドッカー", "priority": 9},
+    "DOCKER": {"pronunciation": "ドッカー", "priority": 9},
+    "docker": {"pronunciation": "ドッカー", "priority": 9},
+    "GitHub": {"pronunciation": "ギットハブ", "priority": 9},
+    "GITHUB": {"pronunciation": "ギットハブ", "priority": 9},
+    "github": {"pronunciation": "ギットハブ", "priority": 9},
+    "Python": {"pronunciation": "パイソン", "priority": 9},
+    "PYTHON": {"pronunciation": "パイソン", "priority": 9},
+    "python": {"pronunciation": "パイソン", "priority": 9},
+    "JavaScript": {"pronunciation": "ジャバスクリプト", "priority": 9},
+    "JAVASCRIPT": {"pronunciation": "ジャバスクリプト", "priority": 9},
+    "javascript": {"pronunciation": "ジャバスクリプト", "priority": 9},
+    "API": {"pronunciation": "エーピーアイ", "priority": 9},
+    "api": {"pronunciation": "エーピーアイ", "priority": 9},
+    "JSON": {"pronunciation": "ジェイソン", "priority": 9},
+    "json": {"pronunciation": "ジェイソン", "priority": 9},
+    "YAML": {"pronunciation": "ヤムル", "priority": 8},
+    "yaml": {"pronunciation": "ヤムル", "priority": 8},
+    "WebAssembly": {"pronunciation": "ウェブアセンブリ", "priority": 8},
+    "webassembly": {"pronunciation": "ウェブアセンブリ", "priority": 8},
+    "WASM": {"pronunciation": "ワズム", "priority": 8},
+    "wasm": {"pronunciation": "ワズム", "priority": 8}
+  }
+}

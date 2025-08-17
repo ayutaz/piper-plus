@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Multilingual TTS Demo</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            border-radius: 8px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+        }
+        .language-selector {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 6px;
+        }
+        .language-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .lang-button {
+            padding: 8px 16px;
+            border: 2px solid #ddd;
+            background: white;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .lang-button:hover {
+            border-color: #4CAF50;
+        }
+        .lang-button.active {
+            background: #4CAF50;
+            color: white;
+            border-color: #4CAF50;
+        }
+        .input-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #555;
+        }
+        textarea {
+            width: 100%;
+            min-height: 120px;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            font-size: 16px;
+            font-family: inherit;
+            resize: vertical;
+            transition: border-color 0.3s;
+        }
+        textarea:focus {
+            outline: none;
+            border-color: #4CAF50;
+        }
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        button:hover:not(:disabled) {
+            background: #45a049;
+        }
+        button:disabled {
+            background: #cccccc;
+            cursor: not-allowed;
+        }
+        .status {
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+        .status.info {
+            background: #e3f2fd;
+            color: #1976d2;
+            border: 1px solid #bbdefb;
+        }
+        .status.success {
+            background: #e8f5e9;
+            color: #388e3c;
+            border: 1px solid #c8e6c9;
+        }
+        .status.error {
+            background: #ffebee;
+            color: #c62828;
+            border: 1px solid #ffcdd2;
+        }
+        .output-section {
+            margin-top: 30px;
+            padding-top: 30px;
+            border-top: 2px solid #f0f0f0;
+        }
+        .output-group {
+            margin-bottom: 20px;
+        }
+        pre {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-size: 14px;
+            line-height: 1.5;
+            border: 1px solid #e9ecef;
+        }
+        .phoneme-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 10px;
+        }
+        .phoneme {
+            background: #e8f5e9;
+            color: #2e7d32;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Simple Multilingual TTS Demo</h1>
+        <p class="subtitle">簡易多言語音声合成デモ - 日本語（OpenJTalk）・英語（Simple Phonemizer）</p>
+        
+        <div id="status" class="status info">
+            初期化中...
+        </div>
+
+        <div class="language-selector">
+            <label>言語選択 / Language Selection</label>
+            <div class="language-buttons">
+                <button class="lang-button active" data-lang="ja">
+                    🇯🇵 日本語
+                </button>
+                <button class="lang-button" data-lang="en">
+                    🇺🇸 English
+                </button>
+            </div>
+        </div>
+
+        <div class="input-group">
+            <label for="inputText">テキスト入力 / Text Input</label>
+            <textarea id="inputText" placeholder="ここにテキストを入力してください / Enter text here">今日は良い天気です。</textarea>
+        </div>
+
+        <div class="button-group">
+            <button id="generateBtn" disabled>音声生成 / Generate</button>
+            <button id="clearBtn" style="background: #757575;">クリア / Clear</button>
+        </div>
+
+        <div class="output-section" id="outputSection" style="display: none;">
+            <h2>Results</h2>
+            
+            <div class="output-group">
+                <label>Phonemes:</label>
+                <div id="phonemeOutput" class="phoneme-list"></div>
+            </div>
+
+            <div class="output-group">
+                <label>Audio:</label>
+                <audio id="audioPlayer" controls style="width: 100%;"></audio>
+            </div>
+
+            <div class="output-group">
+                <label>Debug Info:</label>
+                <pre id="debugOutput"></pre>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { SimpleUnifiedPhonemizer } from '../src/simple_unified_api.js';
+        
+        let phonemizer = null;
+        let currentLanguage = 'ja';
+        let onnxSession = null;
+        let modelConfig = null;
+        
+        const statusEl = document.getElementById('status');
+        const generateBtn = document.getElementById('generateBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const inputText = document.getElementById('inputText');
+        const outputSection = document.getElementById('outputSection');
+        const phonemeOutput = document.getElementById('phonemeOutput');
+        const debugOutput = document.getElementById('debugOutput');
+        const audioPlayer = document.getElementById('audioPlayer');
+        
+        // Language buttons
+        document.querySelectorAll('.lang-button').forEach(btn => {
+            btn.addEventListener('click', () => switchLanguage(btn.dataset.lang));
+        });
+        
+        // Initialize
+        async function init() {
+            try {
+                updateStatus('音素化エンジンを初期化しています...');
+                
+                phonemizer = new SimpleUnifiedPhonemizer();
+                await phonemizer.initialize({
+                    openjtalk: {
+                        jsPath: '../dist/openjtalk.js',
+                        wasmPath: '../dist/openjtalk.wasm',
+                        dictPath: '../assets/dict',
+                        voicePath: '../assets/voice/mei_normal.htsvoice'
+                    }
+                });
+                
+                updateStatus('ONNXモデルを読み込んでいます...');
+                
+                // Load ONNX Runtime
+                await loadScript('https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.1/dist/ort.min.js');
+                
+                // Load initial model
+                await loadModel('ja');
+                
+                updateStatus('準備完了！', 'success');
+                generateBtn.disabled = false;
+                
+            } catch (error) {
+                console.error('Initialization failed:', error);
+                updateStatus(`初期化エラー: ${error.message}`, 'error');
+            }
+        }
+        
+        // Load ONNX model
+        async function loadModel(lang) {
+            const modelName = lang === 'ja' ? 'ja_JP-test-medium' : 'en_US-test-medium';
+            const modelPath = `../models/${modelName}.onnx`;
+            const configPath = `../models/${modelName}.onnx.json`;
+            
+            // Load model config
+            const configResponse = await fetch(configPath);
+            modelConfig = await configResponse.json();
+            
+            // Create ONNX session
+            onnxSession = await ort.InferenceSession.create(modelPath, {
+                executionProviders: ['wasm'],
+                graphOptimizationLevel: 'all'
+            });
+            
+            console.log(`Loaded model: ${modelName}`);
+        }
+        
+        // Switch language
+        async function switchLanguage(lang) {
+            currentLanguage = lang;
+            
+            // Update UI
+            document.querySelectorAll('.lang-button').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.lang === lang);
+            });
+            
+            // Update example text
+            if (lang === 'ja') {
+                inputText.value = '今日は良い天気です。';
+            } else {
+                inputText.value = 'Hello world! This is a test.';
+            }
+            
+            // Load new model
+            updateStatus('モデルを切り替えています...');
+            try {
+                await loadModel(lang);
+                updateStatus('準備完了！', 'success');
+            } catch (error) {
+                updateStatus(`モデル読み込みエラー: ${error.message}`, 'error');
+            }
+            
+            // Clear output
+            clearOutput();
+        }
+        
+        // Generate speech
+        async function generate() {
+            const text = inputText.value.trim();
+            if (!text) {
+                updateStatus('テキストを入力してください。', 'error');
+                return;
+            }
+            
+            try {
+                updateStatus('音素変換中...');
+                generateBtn.disabled = true;
+                
+                // Get phonemes
+                const phonemeData = await phonemizer.textToPhonemes(text, currentLanguage);
+                const phonemes = phonemizer.extractPhonemes(phonemeData, currentLanguage);
+                
+                // Display phonemes
+                displayPhonemes(phonemes);
+                
+                updateStatus('音声合成中...');
+                
+                // Convert phonemes to IDs
+                const phonemeIds = phonemesToIds(phonemes);
+                
+                // Debug info with phoneme mapping details
+                const phonemeMapping = {};
+                for (let i = 0; i < Math.min(phonemes.length, 10); i++) {
+                    const ph = phonemes[i];
+                    const idMap = modelConfig.phoneme_id_map;
+                    phonemeMapping[ph] = idMap[ph] || 'NOT FOUND';
+                }
+                
+                debugOutput.textContent = JSON.stringify({
+                    language: currentLanguage,
+                    text: text,
+                    phonemes: phonemes,
+                    phonemeIds: phonemeIds.slice(0, 30),
+                    phonemeMapping: phonemeMapping,
+                    modelConfig: {
+                        sampleRate: modelConfig.audio.sample_rate,
+                        numSymbols: modelConfig.num_symbols,
+                        availablePhonemes: Object.keys(modelConfig.phoneme_id_map).slice(0, 20)
+                    }
+                }, null, 2);
+                
+                // Synthesize audio
+                const audio = await synthesizeAudio(phonemeIds);
+                
+                // Create WAV and play
+                const wavBlob = createWAV(audio, modelConfig.audio.sample_rate);
+                const audioUrl = URL.createObjectURL(wavBlob);
+                audioPlayer.src = audioUrl;
+                
+                outputSection.style.display = 'block';
+                updateStatus('生成完了！', 'success');
+                
+            } catch (error) {
+                console.error('Generation failed:', error);
+                updateStatus(`生成エラー: ${error.message}`, 'error');
+            } finally {
+                generateBtn.disabled = false;
+            }
+        }
+        
+        // Convert phonemes to IDs
+        function phonemesToIds(phonemes) {
+            const ids = [];
+            // Always use model's phoneme_id_map for consistency
+            const phonemeIdMap = modelConfig.phoneme_id_map;
+            
+            console.log('Input phonemes:', phonemes);
+            
+            for (const phoneme of phonemes) {
+                if (phonemeIdMap[phoneme]) {
+                    ids.push(...phonemeIdMap[phoneme]);
+                } else {
+                    console.warn(`Unknown phoneme: ${phoneme}`);
+                    // Use space/silence for unknown
+                    ids.push(...(phonemeIdMap[' '] || [3]));
+                }
+            }
+            
+            console.log('Output IDs:', ids);
+            return ids;
+        }
+        
+        // Synthesize audio using ONNX
+        async function synthesizeAudio(phonemeIds) {
+            console.log('Synthesizing with phoneme IDs:', phonemeIds);
+            console.log('Phoneme IDs length:', phonemeIds.length);
+            
+            const inputTensor = new ort.Tensor('int64', 
+                new BigInt64Array(phonemeIds.map(id => BigInt(id))), 
+                [1, phonemeIds.length]
+            );
+            
+            const lengthTensor = new ort.Tensor('int64', 
+                new BigInt64Array([BigInt(phonemeIds.length)]), 
+                [1]
+            );
+            
+            // Use default length_scale from model config
+            const lengthScale = modelConfig.inference.length_scale || 1.0;
+            
+            const scalesTensor = new ort.Tensor('float32', 
+                new Float32Array([
+                    modelConfig.inference.noise_scale || 0.667,
+                    lengthScale,
+                    modelConfig.inference.noise_w || 0.8
+                ]), 
+                [3]
+            );
+            
+            console.log('Using length_scale:', lengthScale);
+            
+            const feeds = {
+                'input': inputTensor,
+                'input_lengths': lengthTensor,
+                'scales': scalesTensor
+            };
+            
+            console.log('Running ONNX inference...');
+            const results = await onnxSession.run(feeds);
+            const audioTensor = results['output'] || results[Object.keys(results)[0]];
+            
+            console.log('Audio tensor shape:', audioTensor.dims);
+            console.log('Audio data length:', audioTensor.data.length);
+            
+            return new Float32Array(audioTensor.data);
+        }
+        
+        // Display phonemes
+        function displayPhonemes(phonemes) {
+            phonemeOutput.innerHTML = '';
+            phonemes.forEach(phoneme => {
+                const span = document.createElement('span');
+                span.className = 'phoneme';
+                span.textContent = phoneme;
+                phonemeOutput.appendChild(span);
+            });
+        }
+        
+        // Clear output
+        function clearOutput() {
+            inputText.value = '';
+            outputSection.style.display = 'none';
+            phonemeOutput.innerHTML = '';
+            debugOutput.textContent = '';
+            audioPlayer.src = '';
+        }
+        
+        // Utility functions
+        function updateStatus(message, type = 'info') {
+            statusEl.className = `status ${type}`;
+            statusEl.textContent = message;
+        }
+        
+        function loadScript(src) {
+            return new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = src;
+                script.onload = resolve;
+                script.onerror = reject;
+                document.head.appendChild(script);
+            });
+        }
+        
+        function createWAV(audioData, sampleRate) {
+            const length = audioData.length;
+            console.log('Creating WAV with', length, 'samples at', sampleRate, 'Hz');
+            console.log('Duration:', (length / sampleRate).toFixed(2), 'seconds');
+            
+            const arrayBuffer = new ArrayBuffer(44 + length * 2);
+            const view = new DataView(arrayBuffer);
+            
+            // WAV header
+            const writeString = (offset, string) => {
+                for (let i = 0; i < string.length; i++) {
+                    view.setUint8(offset + i, string.charCodeAt(i));
+                }
+            };
+            
+            writeString(0, 'RIFF');
+            view.setUint32(4, 36 + length * 2, true);
+            writeString(8, 'WAVE');
+            writeString(12, 'fmt ');
+            view.setUint32(16, 16, true);
+            view.setUint16(20, 1, true);
+            view.setUint16(22, 1, true);
+            view.setUint32(24, sampleRate, true);
+            view.setUint32(28, sampleRate * 2, true);
+            view.setUint16(32, 2, true);
+            view.setUint16(34, 16, true);
+            writeString(36, 'data');
+            view.setUint32(40, length * 2, true);
+            
+            // Convert float to int16
+            const offset = 44;
+            for (let i = 0; i < length; i++) {
+                const val = Math.max(-1, Math.min(1, audioData[i]));
+                const int16 = val < 0 ? val * 0x8000 : val * 0x7FFF;
+                view.setInt16(offset + i * 2, int16, true);
+            }
+            
+            return new Blob([arrayBuffer], { type: 'audio/wav' });
+        }
+        
+        // Event listeners
+        generateBtn.addEventListener('click', generate);
+        clearBtn.addEventListener('click', clearOutput);
+        
+        // Initialize on load
+        init();
+    </script>
+</body>
+</html>

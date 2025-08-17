@@ -12,6 +12,7 @@ from .export_onnx import simplify_onnx_model
 from .vits import commons
 from .vits.lightning import VitsModel
 
+
 _LOGGER = logging.getLogger("piper_train.export_onnx")
 OPSET_VERSION = 15
 

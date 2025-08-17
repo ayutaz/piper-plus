@@ -1,0 +1,92 @@
+name: Test English Phonemization
+
+on:
+  workflow_call:
+  pull_request:
+    branches: [ main, dev ]
+    paths:
+      - 'src/python_run/piper/voice.py'
+      - 'src/python_run/piper/espeak_phonemizer.py'
+      - 'src/python_run/tests/test_english_phonemization.py'
+      - '.github/workflows/test-english-phonemization.yml'
+  push:
+    branches: [ main, dev ]
+    paths:
+      - 'src/python_run/piper/voice.py'
+      - 'src/python_run/piper/espeak_phonemizer.py'
+      - 'src/python_run/tests/test_english_phonemization.py'
+      - '.github/workflows/test-english-phonemization.yml'
+
+jobs:
+  test-english-phonemization:
+    name: Test English Phonemization (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, macos-latest]
+        python-version: ["3.11"]
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+    
+    - name: Install system dependencies (Ubuntu)
+      if: runner.os == 'Linux'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y espeak-ng
+    
+    - name: Install system dependencies (macOS)
+      if: runner.os == 'macOS'
+      run: |
+        brew install espeak-ng
+    
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        cd src/python_run
+        # Install minimal dependencies for testing
+        pip install onnxruntime>=1.11.0
+        pip install pytest pytest-cov
+        # Install package without piper_phonemize to test fallback
+        pip install --no-deps -e .
+    
+    - name: Verify espeak-ng installation
+      run: |
+        which espeak-ng
+        espeak-ng --version
+        # Test basic espeak-ng functionality
+        echo "Test" | espeak-ng -x -q --ipa
+    
+    - name: Run English phonemization tests
+      run: |
+        cd src/python_run
+        pytest tests/test_english_phonemization.py -v --tb=short
+    
+    - name: Test CLI with English model (if available)
+      if: runner.os == 'Linux'
+      run: |
+        cd src/python_run
+        # Download a small test model if needed
+        if [ ! -f "../../test/models/test_voice.onnx" ]; then
+          echo "Test model not found, skipping CLI test"
+        else
+          echo "Hello world" | python -m piper --model ../../test/models/test_voice.onnx --output_file test_output.wav
+          # Verify output file was created
+          test -f test_output.wav && echo "CLI test passed"
+        fi
+    
+    - name: Upload test results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: english-phonemization-test-results-${{ matrix.os }}
+        path: |
+          src/python_run/.pytest_cache
+          src/python_run/test_output.wav
+        retention-days: 7

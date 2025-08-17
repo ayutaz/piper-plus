@@ -48,6 +48,21 @@ jobs:
     name: Test Japanese TTS
     uses: ./.github/workflows/test-japanese-tts.yml
 
+  # C++ Unit Tests
+  cpp_tests:
+    name: C++ Unit Tests
+    uses: ./.github/workflows/cpp-tests.yml
+
+  # Phoneme Input Tests
+  test_phoneme_input:
+    name: Phoneme Input Tests
+    uses: ./.github/workflows/test-phoneme-input.yml
+
+  # English Phonemization Tests
+  test_english_phonemization:
+    name: English Phonemization Tests
+    uses: ./.github/workflows/test-english-phonemization.yml
+
   # Multilingual TTS Test (from existing workflow)
   test_multilingual_tts:
     name: Test Multilingual TTS
@@ -116,7 +131,7 @@ jobs:
   # Test Summary
   test_summary:
     name: Test Suite Summary
-    needs: [python_lint, python_tests, test_japanese_tts, test_multilingual_tts, performance_benchmark]
+    needs: [python_lint, python_tests, test_japanese_tts, test_english_phonemization, test_multilingual_tts, performance_benchmark]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -130,6 +145,7 @@ jobs:
           echo "| Python Linting | ${{ needs.python_lint.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Python Unit Tests | ${{ needs.python_tests.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Japanese TTS | ${{ needs.test_japanese_tts.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| English Phonemization | ${{ needs.test_english_phonemization.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Multilingual TTS | ${{ needs.test_multilingual_tts.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Performance Benchmark | ${{ needs.performance_benchmark.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY

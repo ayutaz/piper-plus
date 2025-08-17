@@ -1,9 +1,9 @@
-# 統合コンポーネントドキュメント
+# 音声品質向上機能ドキュメント
 
-このドキュメントでは、Piper TTSトレーニングパイプラインに統合された主要コンポーネントについて説明します。
+このドキュメントでは、Piper TTSで利用可能な音声品質向上機能について説明します。
 
-**更新日**: 2024年7月 (PR #98統合版)  
-**対応バージョン**: piper-plus v1.3.0  
+**更新日**: 2025年8月  
+**対応バージョン**: piper-plus v1.4.0  
 **PyTorch Lightning**: 2.4.0対応
 
 ## 1. EMA (Exponential Moving Average)
@@ -41,80 +41,48 @@ python -m piper_train \
 - デフォルトのdecay率: 0.9995
 - HiFi-GANデコーダー部分にのみ適用
 
-## 2. AccentProcessor
+## 2. カスタム辞書機能
 
-日本語音声合成のためのアクセント・プロソディ処理コンポーネントです。
-**✅ PR #98により統合完了。前処理パイプラインに組み込み済み。**
+日本語の複合語や技術用語の発音精度を向上させるカスタム辞書機能です。
 
-### 機能
+### 特徴
 
-- 日本語テキストからアクセント情報を抽出
-- プロソディIDの生成と管理
-- 高低アクセントパターンの分析
+- 478エントリの日本語発音辞書を標準搭載
+- 「音声」「合成」などの複合漢字語の正確な発音
+- ユーザー独自の辞書追加も可能
 
-### 使用される場面
+### 辞書ファイルの場所
 
-- 前処理時 (`preprocess.py`): テキストからプロソディ情報を抽出
-- データセット作成時: `prosody_ids`フィールドとして保存
-
-### データ形式
-
-```json
-{
-  "text": "こんにちは",
-  "phoneme_ids": [1, 2, 3, ...],
-  "prosody_ids": [0, 1, 0, ...],
-  "audio_norm_path": "path/to/audio.pt",
-  "audio_spec_path": "path/to/spec.pt"
-}
+```
+data/dictionaries/
+├── user_custom_dict.json  # ユーザーカスタム辞書（478エントリ）
+├── default_tech_dict.json  # 技術用語辞書
+└── default_common_dict.json  # 一般用語辞書
 ```
 
-## 3. F0 Predictor
+### 使用方法
 
-基本周波数（F0）予測モジュールで、より自然な音声合成を実現します。
-**✅ PR #98により統合完了。SynthesizerTrnに組み込み済み。**
+カスタム辞書は自動的に適用されます。追加のエントリが必要な場合は、`user_custom_dict.json`を編集してください。
 
-### アーキテクチャ
-
-- Multi-head attentionベースの設計
-- テキスト特徴量から直接F0を予測
-- スピーカー埋め込みに対応（マルチスピーカーモデル）
-
-### 統合箇所
-
-- `vits/models.py`: SynthesizerTrnクラスに統合
-- Duration Predictorの後に配置
-- 学習時に自動的に使用される
-
-### パラメータ
-
-- `hidden_channels`: 隠れ層のチャンネル数
-- `filter_channels`: フィルターチャンネル数（デフォルト: 256）
-- `n_heads`: アテンションヘッド数
-- `kernel_size`: 畳み込みカーネルサイズ（デフォルト: 3）
-- `p_dropout`: ドロップアウト率
-
-## 4. データフローの概要
+## 3. データフローの概要
 
 ```
 入力テキスト
     ↓
-AccentProcessor（前処理時）
+カスタム辞書適用（推論時）
     ↓
-phoneme_ids + prosody_ids
+phoneme_ids
     ↓
 TextEncoder
     ↓
 Duration Predictor
-    ↓
-F0 Predictor（NEW）
     ↓
 Flow + Decoder
     ↓
 音声出力
 ```
 
-## 5. 訓練時の推奨設定
+## 4. 訓練時の推奨設定
 
 ### 日本語モデルの場合
 
@@ -152,26 +120,15 @@ python -m piper_train \
   --learning-rate 0.0001
 ```
 
-## 6. トラブルシューティング
+## 5. トラブルシューティング
 
 ### EMA関連
 
 - チェックポイントサイズが大きい場合: `--save-ema-weights-in-callback-state`をfalseに設定
 - 学習初期の不安定性: `--ema-start-step`で開始ステップを調整
 
-### プロソディ関連
-
-- アクセント情報が正しく抽出されない: 入力テキストの正規化を確認
-- プロソディIDが欠落: `preprocess.py`のログを確認
-
-### F0予測関連
-
-- 音程が不自然: `--f0-loss-weight`で損失の重みを調整
-- 学習が収束しない: 学習率を下げて試す
-
-## 7. 今後の改善点
+## 6. 今後の改善点
 
 1. **EMA**: Discriminatorへの適用オプション
-2. **AccentProcessor**: より詳細なプロソディ特徴の抽出
-3. **F0 Predictor**: ピッチレンジの制御機能
-4. **全体**: エンドツーエンドのプロソディ制御インターフェース
+2. **カスタム辞書**: より多くの専門用語・方言対応
+3. **プロソディ制御**: C++ランタイムを含む完全実装（Issue #159）

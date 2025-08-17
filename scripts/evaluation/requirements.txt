@@ -4,7 +4,7 @@
 librosa>=0.10.0
 soundfile>=0.12.1
 scipy>=1.10.0
-numpy>=1.24.0
+numpy>=1.24.0,<3.0
 
 # Evaluation metrics
 pesq>=0.0.3

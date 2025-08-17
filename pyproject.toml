@@ -10,7 +10,7 @@ dev = [
     "flake8==6.1.0",
     "mypy==1.7.1",
     "pylint==3.0.2",
-    "ruff==0.12.4",
+    "ruff==0.12.5",
     "pytest==7.4.3",
     "pytest-cov==4.1.0",
     "pytest-xdist==3.5.0",
@@ -31,7 +31,7 @@ test = [
     "pytest-timeout==2.2.0",
     "pytest-mock==3.12.0",
     "coverage[toml]==7.3.2",
-    "ruff==0.12.4",
+    "ruff==0.12.5",
     "mypy==1.7.1",
     "types-requests==2.31.0",
     "types-PyYAML==6.0.12",
@@ -39,7 +39,7 @@ test = [
 
 [tool.uv]
 dev-dependencies = [
-    "ruff==0.12.4",
+    "ruff==0.12.5",
     "pytest==7.4.3",
 ]
 
@@ -56,6 +56,13 @@ exclude = [
     "dist",
     "*.egg-info",
     "src/python/piper_train/vits/monotonic_align",  # Cython generated
+    # Temporary debug/test scripts in root directory
+    "check_*.py",
+    "debug_*.py",
+    "test_*.py",
+    "analyze_*.py",
+    "verify_*.py",
+    "export_*.sh",
 ]
 
 [tool.ruff.lint]
@@ -87,6 +94,8 @@ ignore = [
 # isort互換設定
 [tool.ruff.lint.isort]
 known-first-party = ["piper", "piper_train"]
+combine-as-imports = true
+lines-after-imports = 2
 
 # flake8-quotes互換設定
 [tool.ruff.lint.flake8-quotes]

@@ -1,5 +1,5 @@
 # Development dependencies
--r requirements.txt
+-r ../../requirements-train.txt
 
 # Code formatting and linting
 black==23.11.0
@@ -26,3 +26,6 @@ sphinx-rtd-theme>=1.0.0
 
 # Pre-commit
 pre-commit>=3.0.0
+
+# Performance benchmarking
+psutil>=5.9.0

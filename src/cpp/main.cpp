@@ -11,6 +11,7 @@
 #include <string>
 #include <thread>
 #include <vector>
+#include <cstdlib>
 
 #ifdef _MSC_VER
 #define WIN32_LEAN_AND_MEAN
@@ -35,6 +36,8 @@
 
 #include "json.hpp"
 #include "piper.hpp"
+#include "phoneme_parser.hpp"
+#include "custom_dictionary.hpp"
 
 using namespace std;
 using json = nlohmann::json;
@@ -94,7 +97,33 @@ struct RunConfig {
 
   // true to use CUDA execution provider
   bool useCuda = false;
+
+  // GPU device ID for CUDA execution provider (default: 0)
+  int gpuDeviceId = 0;
+  
+  // true to interpret input as raw phonemes instead of text
+  bool rawPhonemes = false;
+  
+  // true to use streaming mode for reduced latency
+  bool streamingMode = false;
+  
+  // Path for outputting phoneme timing information
+  optional<filesystem::path> outputTimingPath;
+  
+  // Format for timing output (json or tsv)
+  string timingFormat = "json";
+  
+  // Format constants
+  static const string FORMAT_JSON;
+  static const string FORMAT_TSV;
+  
+  // Paths to custom dictionary files
+  vector<filesystem::path> customDictPaths;
 };
+
+// Define static constants
+const string RunConfig::FORMAT_JSON = "json";
+const string RunConfig::FORMAT_TSV = "tsv";
 
 void parseArgs(int argc, char *argv[], RunConfig &runConfig);
 void rawOutputProc(vector<int16_t> &sharedAudioBuffer, mutex &mutAudio,
@@ -188,7 +217,7 @@ int main(int argc, char *argv[]) {
   auto startTime = chrono::steady_clock::now();
   loadVoice(piperConfig, runConfig.modelPath.string(),
             runConfig.modelConfigPath.string(), voice, runConfig.speakerId,
-            runConfig.useCuda);
+            runConfig.useCuda, runConfig.gpuDeviceId);
   auto endTime = chrono::steady_clock::now();
   spdlog::info("Loaded voice in {} second(s)",
                chrono::duration<double>(endTime - startTime).count());
@@ -293,6 +322,21 @@ int main(int argc, char *argv[]) {
 
   } // if phonemeSilenceSeconds
 
+  // カスタム辞書の初期化
+  std::unique_ptr<piper::CustomDictionary> customDict;
+  if (!runConfig.customDictPaths.empty()) {
+    customDict = std::make_unique<piper::CustomDictionary>();
+    for (const auto& dictPath : runConfig.customDictPaths) {
+      try {
+        customDict->loadDictionary(dictPath.string());
+        spdlog::info("Loaded custom dictionary: {}", dictPath.string());
+      } catch (const std::exception& e) {
+        spdlog::error("Failed to load custom dictionary {}: {}", 
+                      dictPath.string(), e.what());
+      }
+    }
+  }
+
   if (runConfig.outputType == OUTPUT_DIRECTORY) {
     runConfig.outputPath = filesystem::absolute(runConfig.outputPath.value());
     spdlog::info("Output directory: {}", runConfig.outputPath.value().string());
@@ -335,6 +379,11 @@ int main(int argc, char *argv[]) {
         }
       }
     }
+    
+    // カスタム辞書を適用
+    if (customDict && !line.empty()) {
+      line = customDict->applyToText(line);
+    }
 
     // Timestamp is used for path to output WAV file
     const auto now = chrono::system_clock::now();
@@ -351,7 +400,14 @@ int main(int argc, char *argv[]) {
 
       // Output audio to automatically-named WAV file in a directory
       ofstream audioFile(outputPath.string(), ios::binary);
-      piper::textToWavFile(piperConfig, voice, line, audioFile, result);
+      if (runConfig.rawPhonemes) {
+        // Parse raw phonemes from input
+        auto phonemeType = static_cast<piper::PhonemeTypeInt>(voice.phonemizeConfig.phonemeType);
+        auto phonemes = piper::parsePhonemeString(line, phonemeType);
+        piper::phonemesToWavFile(piperConfig, voice, phonemes, audioFile, result);
+      } else {
+        piper::textToWavFile(piperConfig, voice, line, audioFile, result);
+      }
       cout << outputPath.string() << endl;
     } else if (outputType == OUTPUT_FILE) {
       if (!maybeOutputPath || maybeOutputPath->empty()) {
@@ -374,11 +430,25 @@ int main(int argc, char *argv[]) {
 
       // Output audio to WAV file
       ofstream audioFile(outputPath.string(), ios::binary);
-      piper::textToWavFile(piperConfig, voice, line, audioFile, result);
+      if (runConfig.rawPhonemes) {
+        // Parse raw phonemes from input
+        auto phonemeType = static_cast<piper::PhonemeTypeInt>(voice.phonemizeConfig.phonemeType);
+        auto phonemes = piper::parsePhonemeString(line, phonemeType);
+        piper::phonemesToWavFile(piperConfig, voice, phonemes, audioFile, result);
+      } else {
+        piper::textToWavFile(piperConfig, voice, line, audioFile, result);
+      }
       cout << outputPath.string() << endl;
     } else if (outputType == OUTPUT_STDOUT) {
       // Output WAV to stdout
-      piper::textToWavFile(piperConfig, voice, line, cout, result);
+      if (runConfig.rawPhonemes) {
+        // Parse raw phonemes from input
+        auto phonemeType = static_cast<piper::PhonemeTypeInt>(voice.phonemizeConfig.phonemeType);
+        auto phonemes = piper::parsePhonemeString(line, phonemeType);
+        piper::phonemesToWavFile(piperConfig, voice, phonemes, cout, result);
+      } else {
+        piper::textToWavFile(piperConfig, voice, line, cout, result);
+      }
     } else if (outputType == OUTPUT_RAW) {
       // Raw output to stdout
       mutex mutAudio;
@@ -397,19 +467,52 @@ int main(int argc, char *argv[]) {
       thread rawOutputThread(rawOutputProc, ref(sharedAudioBuffer),
                              ref(mutAudio), ref(cvAudio), ref(audioReady),
                              ref(audioFinished));
-      auto audioCallback = [&audioBuffer, &sharedAudioBuffer, &mutAudio,
-                            &cvAudio, &audioReady]() {
-        // Signal thread that audio is ready
-        {
-          unique_lock lockAudio(mutAudio);
-          copy(audioBuffer.begin(), audioBuffer.end(),
-               back_inserter(sharedAudioBuffer));
-          audioReady = true;
-          cvAudio.notify_one();
+      if (runConfig.streamingMode) {
+        // Streaming mode - use chunk callback
+        spdlog::info("Using streaming mode for synthesis");
+        auto chunkCallback = [&sharedAudioBuffer, &mutAudio, &cvAudio, &audioReady](const std::vector<int16_t>& chunk) {
+          // Signal thread that audio chunk is ready
+          {
+            unique_lock lockAudio(mutAudio);
+            copy(chunk.begin(), chunk.end(), back_inserter(sharedAudioBuffer));
+            audioReady = true;
+            cvAudio.notify_one();
+          }
+        };
+        
+        if (runConfig.rawPhonemes) {
+          // Use streaming synthesis for raw phonemes
+          auto phonemeType = static_cast<piper::PhonemeTypeInt>(voice.phonemizeConfig.phonemeType);
+          auto phonemes = piper::parsePhonemeString(line, phonemeType);
+          piper::phonemesToAudioStreaming(piperConfig, voice, phonemes, audioBuffer, result, chunkCallback);
+        } else {
+          // Use streaming synthesis for text
+          piper::textToAudioStreaming(piperConfig, voice, line, audioBuffer, result, chunkCallback);
         }
-      };
-      piper::textToAudio(piperConfig, voice, line, audioBuffer, result,
-                         audioCallback);
+      } else {
+        // Regular mode - buffer all audio before output
+        auto audioCallback = [&audioBuffer, &sharedAudioBuffer, &mutAudio,
+                              &cvAudio, &audioReady]() {
+          // Signal thread that audio is ready
+          {
+            unique_lock lockAudio(mutAudio);
+            copy(audioBuffer.begin(), audioBuffer.end(),
+                 back_inserter(sharedAudioBuffer));
+            audioReady = true;
+            cvAudio.notify_one();
+          }
+        };
+        
+        if (runConfig.rawPhonemes) {
+          // Parse raw phonemes from input
+          auto phonemeType = static_cast<piper::PhonemeTypeInt>(voice.phonemizeConfig.phonemeType);
+          auto phonemes = piper::parsePhonemeString(line, phonemeType);
+          piper::phonemesToAudio(piperConfig, voice, phonemes, audioBuffer, result, audioCallback);
+        } else {
+          piper::textToAudio(piperConfig, voice, line, audioBuffer, result,
+                             audioCallback);
+        }
+      }
 
       // Signal thread that there is no more audio
       {
@@ -427,6 +530,24 @@ int main(int argc, char *argv[]) {
     spdlog::info("Real-time factor: {} (infer={} sec, audio={} sec)",
                  result.realTimeFactor, result.inferSeconds,
                  result.audioSeconds);
+    
+    // Output phoneme timing information if requested
+    if (runConfig.outputTimingPath && result.hasTimingInfo) {
+      ofstream timingFile(runConfig.outputTimingPath.value());
+      if (timingFile.is_open()) {
+        if (runConfig.timingFormat == RunConfig::FORMAT_JSON) {
+          piper::outputTimingsAsJSON(result.phonemeTimings, timingFile, line,
+                                     voice.synthesisConfig.sampleRate);
+        } else if (runConfig.timingFormat == RunConfig::FORMAT_TSV) {
+          piper::outputTimingsAsTSV(result.phonemeTimings, timingFile);
+        }
+        timingFile.close();
+        spdlog::info("Wrote phoneme timing to {}", runConfig.outputTimingPath.value().string());
+      } else {
+        spdlog::error("Failed to open timing output file: {}", 
+                      runConfig.outputTimingPath.value().string());
+      }
+    }
 
     // Restore config (--json-input)
     voice.synthesisConfig.speakerId = speakerId;
@@ -502,6 +623,14 @@ void printUsage(char *argv[]) {
   cerr << "   --sentence_silence      NUM   seconds of silence after each "
           "sentence (default: 0.2)"
        << endl;
+  cerr << "   --phoneme_silence <phoneme> <seconds>  Set silence for a specific phoneme" << endl;
+  cerr << "   --custom-dict       FILE       path to custom dictionary file(s), "
+          "comma-separated"
+       << endl;
+  cerr << endl;
+  cerr << "   Phoneme input: Use [[ phonemes ]] notation to specify exact pronunciation" << endl;
+  cerr << "                  Example: echo \"Hello [[ h ə l oʊ ]] world\" | piper ..." << endl;
+  cerr << endl;
   cerr << "   --espeak_data           DIR   path to espeak-ng data directory"
        << endl;
   cerr << "   --tashkeel_model        FILE  path to libtashkeel onnx model "
@@ -511,6 +640,16 @@ void printUsage(char *argv[]) {
           "instead of plain text"
        << endl;
   cerr << "   --use-cuda                    use CUDA execution provider"
+       << endl;
+  cerr << "   --gpu-device-id         NUM   GPU device ID for CUDA (default: 0)"
+       << endl;
+  cerr << "   --raw-phonemes                interpret input as raw phonemes (space-separated)"
+       << endl;
+  cerr << "   --streaming                   use streaming mode for reduced latency"
+       << endl;
+  cerr << "   --output-timing         FILE  output phoneme timing to FILE"
+       << endl;
+  cerr << "   --timing-format         FMT   timing output format: json|tsv (default: json)"
        << endl;
   cerr << "   --debug                       print DEBUG messages to the console"
        << endl;
@@ -528,6 +667,17 @@ void ensureArg(int argc, char *argv[], int argi) {
 // Parse command-line arguments
 void parseArgs(int argc, char *argv[], RunConfig &runConfig) {
   optional<filesystem::path> modelConfigPath;
+
+  // Check for GPU device ID environment variable
+  const char* gpuDeviceEnv = std::getenv("PIPER_GPU_DEVICE_ID");
+  if (gpuDeviceEnv != nullptr) {
+    try {
+      runConfig.gpuDeviceId = std::stoi(gpuDeviceEnv);
+      spdlog::debug("GPU device ID set from environment: {}", runConfig.gpuDeviceId);
+    } catch (const std::exception& e) {
+      spdlog::warn("Invalid PIPER_GPU_DEVICE_ID environment variable: {}", gpuDeviceEnv);
+    }
+  }
 
   for (int i = 1; i < argc; i++) {
     std::string arg = argv[i];
@@ -597,6 +747,32 @@ void parseArgs(int argc, char *argv[], RunConfig &runConfig) {
       runConfig.jsonInput = true;
     } else if (arg == "--use_cuda" || arg == "--use-cuda") {
       runConfig.useCuda = true;
+    } else if (arg == "--gpu-device-id" || arg == "--gpu_device_id") {
+      ensureArg(argc, argv, i);
+      runConfig.gpuDeviceId = stoi(argv[++i]);
+    } else if (arg == "--raw-phonemes" || arg == "--raw_phonemes") {
+      runConfig.rawPhonemes = true;
+    } else if (arg == "--streaming") {
+      runConfig.streamingMode = true;
+    } else if (arg == "--output-timing" || arg == "--output_timing") {
+      ensureArg(argc, argv, i);
+      runConfig.outputTimingPath = filesystem::path(argv[++i]);
+    } else if (arg == "--timing-format" || arg == "--timing_format") {
+      ensureArg(argc, argv, i);
+      runConfig.timingFormat = argv[++i];
+      if (runConfig.timingFormat != RunConfig::FORMAT_JSON && runConfig.timingFormat != RunConfig::FORMAT_TSV) {
+        cerr << "Invalid timing format: " << runConfig.timingFormat << " (must be json or tsv)" << endl;
+        exit(1);
+      }
+    } else if (arg == "--custom-dict" || arg == "--custom_dict") {
+      ensureArg(argc, argv, i);
+      string dictPaths = argv[++i];
+      // カンマ区切りで複数の辞書パスを分割
+      stringstream ss(dictPaths);
+      string path;
+      while (getline(ss, path, ',')) {
+        runConfig.customDictPaths.push_back(filesystem::path(path));
+      }
     } else if (arg == "--version") {
       std::cout << piper::getVersion() << std::endl;
       exit(0);

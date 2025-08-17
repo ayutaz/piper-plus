@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>音素抽出デバッグ</title>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .test-box {
+            border: 1px solid #ccc;
+            padding: 20px;
+            margin: 10px 0;
+            border-radius: 8px;
+        }
+        pre {
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+        }
+        .phoneme {
+            background: #e8f5e9;
+            color: #2e7d32;
+            padding: 4px 8px;
+            margin: 2px;
+            border-radius: 4px;
+            display: inline-block;
+        }
+        .unicode {
+            color: #888;
+            font-size: 0.9em;
+        }
+        .debug-log {
+            background: #f0f0f0;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <h1>音素抽出デバッグ</h1>
+    
+    <div class="test-box">
+        <h2>短いテキスト: こんにちは、世界！</h2>
+        <button onclick="testShort()">デバッグ実行</button>
+        <div id="shortDebug" class="debug-log"></div>
+        <div id="shortResult"></div>
+    </div>
+
+    <script type="module">
+        import { SimpleUnifiedPhonemizer } from '../src/simple_unified_api.js';
+        
+        let phonemizer = null;
+        
+        async function init() {
+            phonemizer = new SimpleUnifiedPhonemizer();
+            await phonemizer.initialize({
+                openjtalk: {
+                    jsPath: '../dist/openjtalk.js',
+                    wasmPath: '../dist/openjtalk.wasm',
+                    dictPath: '../assets/dict',
+                    voicePath: '../assets/voice/mei_normal.htsvoice'
+                }
+            });
+            console.log('Initialized');
+        }
+        
+        window.testShort = async function() {
+            const text = 'こんにちは、世界！';
+            const debugEl = document.getElementById('shortDebug');
+            const resultEl = document.getElementById('shortResult');
+            
+            debugEl.innerHTML = '<strong>デバッグ実行開始...</strong><br>';
+            
+            try {
+                // Get raw labels
+                const labels = await phonemizer.textToPhonemes(text, 'ja');
+                debugEl.innerHTML += `<br><strong>取得したラベル数:</strong> ${labels.split('\n').filter(line => line.trim()).length}<br>`;
+                
+                // Manual phoneme extraction with debug
+                const lines = labels.split('\n').filter(line => line.trim());
+                const phonemes = [];
+                
+                const multiCharPhonemes = {
+                    'br': '\ue000',
+                    'ch': '\ue001',
+                    'cl': '\ue002',
+                    'dy': '\ue003',
+                    'gy': '\ue004',
+                    'hy': '\ue005',
+                    'ky': '\ue006',
+                    'my': '\ue007',
+                    'ny': '\ue008',
+                    'py': '\ue009',
+                    'ry': '\ue00a',
+                    'sh': '\ue00b',
+                    'ts': '\ue00c',
+                    'ty': '\ue00d'
+                };
+                
+                phonemes.push('^');
+                debugEl.innerHTML += '<br><strong>音素抽出:</strong><br>';
+                
+                for (let i = 0; i < lines.length; i++) {
+                    const line = lines[i];
+                    const match = line.match(/\-([^+]+)\+/);
+                    if (match) {
+                        const rawPhoneme = match[1];
+                        debugEl.innerHTML += `行 ${i}: "${rawPhoneme}"`;
+                        
+                        if (rawPhoneme === 'sil') {
+                            debugEl.innerHTML += ' → スキップ (sil)<br>';
+                            continue;
+                        }
+                        
+                        if (rawPhoneme === 'pau') {
+                            debugEl.innerHTML += ' → スキップ (pau)<br>';
+                            continue;
+                        }
+                        
+                        let phoneme = rawPhoneme;
+                        if (multiCharPhonemes[rawPhoneme]) {
+                            const unicode = multiCharPhonemes[rawPhoneme];
+                            debugEl.innerHTML += ` → Unicode変換: U+${unicode.charCodeAt(0).toString(16)}<br>`;
+                            phoneme = unicode;
+                        } else {
+                            debugEl.innerHTML += ' → そのまま追加<br>';
+                        }
+                        
+                        phonemes.push(phoneme);
+                    }
+                }
+                
+                phonemes.push('$');
+                
+                // Display result
+                resultEl.innerHTML = '<h3>抽出結果:</h3>';
+                resultEl.innerHTML += '<div>';
+                phonemes.forEach((p, i) => {
+                    const code = p.charCodeAt(0);
+                    let display = p;
+                    if (code >= 0xe000 && code <= 0xe00d) {
+                        display = `<span class="phoneme">${p} <span class="unicode">(U+${code.toString(16)})</span></span>`;
+                    } else {
+                        display = `<span class="phoneme">${p}</span>`;
+                    }
+                    resultEl.innerHTML += display;
+                });
+                resultEl.innerHTML += '</div>';
+                
+                // Compare with API result
+                const apiPhonemes = phonemizer.extractPhonemes(labels, 'ja');
+                resultEl.innerHTML += '<h3>API結果との比較:</h3>';
+                resultEl.innerHTML += '<p><strong>手動抽出:</strong> ' + phonemes.join(' ') + '</p>';
+                resultEl.innerHTML += '<p><strong>API抽出:</strong> ' + apiPhonemes.join(' ') + '</p>';
+                
+                if (phonemes.join('') !== apiPhonemes.join('')) {
+                    resultEl.innerHTML += '<p style="color: red;">⚠️ 結果が異なります！</p>';
+                }
+                
+            } catch (error) {
+                debugEl.innerHTML += `<br><span style="color: red;">エラー: ${error.message}</span>`;
+                console.error(error);
+            }
+        }
+        
+        init();
+    </script>
+</body>
+</html>

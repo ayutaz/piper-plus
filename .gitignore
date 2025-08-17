@@ -50,8 +50,28 @@ build_log.zip
 # Test logs
 *.log
 
+# Benchmark results
+benchmark_results*.json
+streaming_comparison_results.json
+
 # Windows build artifacts
 *.dll
 *.exe
 windows_build_artifacts/
 CLAUDE.md
+
+# WebAssembly temp directories
+src/wasm/openjtalk-web/temp/
+src/wasm/openjtalk-web/tools/
+
+# Debug and development scripts
+scripts/debug/
+debug_*.py
+test_phoneme*.py
+verify_*.py
+analyze_*.py
+check_*.py
+create_comprehensive_*.py
+add_missing_*.py
+retrain_*.py
+comprehensive_*.py

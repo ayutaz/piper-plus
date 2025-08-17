@@ -81,8 +81,8 @@ if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|ARM64")
   # add_compile_definitions(USE_ARM64_NEON)
 endif()
 
-add_executable(piper src/cpp/main.cpp src/cpp/piper.cpp)
-add_executable(test_piper src/cpp/test.cpp src/cpp/piper.cpp)
+add_executable(piper src/cpp/main.cpp src/cpp/piper.cpp src/cpp/phoneme_parser.cpp src/cpp/custom_dictionary.cpp)
+add_executable(test_piper src/cpp/test.cpp src/cpp/piper.cpp src/cpp/phoneme_parser.cpp src/cpp/custom_dictionary.cpp)
 
 # Add NEON optimized audio processing for ARM64
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|ARM64")
@@ -189,8 +189,13 @@ if(NOT DEFINED FMT_DIR)
     fmt_external
     PREFIX "${CMAKE_CURRENT_BINARY_DIR}/f"
     URL "https://github.com/fmtlib/fmt/archive/refs/tags/${FMT_VERSION}.zip"
+    DOWNLOAD_NO_PROGRESS TRUE
+    TIMEOUT 600  # 10 minutes timeout
+    TLS_VERIFY ON
+    DOWNLOAD_TRIES 3  # Retry download 3 times
     CMAKE_ARGS -DCMAKE_INSTALL_PREFIX:PATH=${FMT_DIR}
                -DFMT_TEST:BOOL=OFF  # Don't build all the tests
+               -DFMT_HEADER_ONLY:BOOL=ON  # Build as header-only library
                -DBUILD_SHARED_LIBS:BOOL=OFF  # Build static libraries
                ${EXTERNAL_CMAKE_ARGS}
   )
@@ -207,10 +212,18 @@ if(NOT DEFINED SPDLOG_DIR)
     spdlog_external
     PREFIX "${CMAKE_CURRENT_BINARY_DIR}/s"
     URL "https://github.com/gabime/spdlog/archive/refs/tags/v${SPDLOG_VERSION}.zip"
+    DOWNLOAD_NO_PROGRESS TRUE
+    TIMEOUT 600  # 10 minutes timeout
+    TLS_VERIFY ON
+    DOWNLOAD_TRIES 3  # Retry download 3 times
     CMAKE_ARGS -DCMAKE_INSTALL_PREFIX:PATH=${SPDLOG_DIR}
                -DSPDLOG_BUILD_SHARED:BOOL=OFF  # Build static libraries
+               -DSPDLOG_FMT_EXTERNAL:BOOL=ON  # Use external fmt
+               -DCMAKE_PREFIX_PATH:PATH=${FMT_DIR}
+               -DFMT_HEADER_ONLY:BOOL=ON  # Use fmt as header-only
                ${EXTERNAL_CMAKE_ARGS}
   )
+  add_dependencies(spdlog_external fmt_external)
   add_dependencies(piper spdlog_external)
   add_dependencies(test_piper spdlog_external)
 endif()
@@ -231,6 +244,10 @@ if(NOT DEFINED PIPER_PHONEMIZE_DIR)
     piper_phonemize_external
     PREFIX "${CMAKE_CURRENT_BINARY_DIR}/p"
     URL "https://github.com/rhasspy/piper-phonemize/archive/refs/heads/master.zip"
+    DOWNLOAD_NO_PROGRESS TRUE
+    TIMEOUT 600  # 10 minutes timeout
+    TLS_VERIFY ON
+    DOWNLOAD_TRIES 3  # Retry download 3 times
     CMAKE_ARGS -DCMAKE_INSTALL_PREFIX:PATH=${PIPER_PHONEMIZE_DIR}
     CMAKE_ARGS -DBUILD_SHARED_LIBS:BOOL=${PIPER_PHONEMIZE_SHARED_LIBS}
     CMAKE_ARGS -DESPEAK_NG_BUILD_SHARED:BOOL=${PIPER_PHONEMIZE_SHARED_LIBS}
@@ -582,6 +599,8 @@ target_include_directories(test_piper PUBLIC
 # OpenJTalk is used via binary execution, includes not needed
 
 target_compile_definitions(piper PUBLIC _PIPER_VERSION=${piper_version})
+target_compile_definitions(piper PUBLIC SPDLOG_FMT_EXTERNAL=1)
+target_compile_definitions(piper PUBLIC FMT_HEADER_ONLY=1)
 
 # Add OpenJTalk dictionary path definition
 if(TRUE)  # HTSEngine and OpenJTalk are built
@@ -590,9 +609,13 @@ if(TRUE)  # HTSEngine and OpenJTalk are built
   if(WIN32)
     target_compile_definitions(piper PUBLIC OPENJTALK_DIC_PATH="..\\\\share\\\\open_jtalk\\\\dic")
     target_compile_definitions(test_piper PUBLIC OPENJTALK_DIC_PATH="${CMAKE_CURRENT_BINARY_DIR}\\\\naist-jdic")
+    target_compile_definitions(test_piper PUBLIC SPDLOG_FMT_EXTERNAL=1)
+    target_compile_definitions(test_piper PUBLIC FMT_HEADER_ONLY=1)
   else()
     target_compile_definitions(piper PUBLIC OPENJTALK_DIC_PATH="../share/open_jtalk/dic")
     target_compile_definitions(test_piper PUBLIC OPENJTALK_DIC_PATH="${CMAKE_CURRENT_BINARY_DIR}/naist-jdic")
+    target_compile_definitions(test_piper PUBLIC SPDLOG_FMT_EXTERNAL=1)
+    target_compile_definitions(test_piper PUBLIC FMT_HEADER_ONLY=1)
   endif()
 endif()
 

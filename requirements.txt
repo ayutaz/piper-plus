@@ -1,0 +1,17 @@
+# Piper TTS - Inference Requirements
+# Minimal dependencies for running inference with pre-trained models
+# For training requirements, see requirements-train.txt
+# For development requirements, see requirements-dev.txt
+
+# Core dependencies for inference
+numpy>=1.24.0,<3.0
+onnxruntime>=1.16.0
+
+# Audio processing
+soundfile>=0.12.0
+
+# Phonemization
+piper-phonemize>=1.0.0
+
+# Optional: GPU inference support
+# onnxruntime-gpu>=1.16.0  # Uncomment for GPU support
