@@ -214,7 +214,7 @@ def main():
     # Show some examples
     print("\nExample utterances:")
     for i, utt in enumerate(utterances[:3]):
-        print(f"\n--- Utterance {i+1} ---")
+        print(f"\n--- Utterance {i + 1} ---")
         print(f"Text: {utt.text}")
         print(f"Language: {utt.text_language}")
         print(f"Segments: {len(utt.segments)}")

@@ -296,7 +296,7 @@ if __name__ == "__main__":
         utt = formatter.format_utterance(text, audio_path, duration, speaker_id, lang)
         utterances.append(utt)
 
-        print(f"\n{'='*50}")
+        print(f"\n{'=' * 50}")
         print(f"Text: {text}")
         print(f"Language: {utt.text_language}")
         print(f"Segments: {utt.segments}")
