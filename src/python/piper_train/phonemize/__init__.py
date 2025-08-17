@@ -6,6 +6,7 @@ from .custom_dict import (  # noqa: F401
     create_default_dictionary,
 )
 
+
 # Import Japanese phonemizer only if pyopenjtalk is available
 try:
     from .japanese import phonemize_japanese  # noqa: F401
