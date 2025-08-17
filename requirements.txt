@@ -2,7 +2,7 @@
 # For complete environments, see docker/*/requirements-*.txt
 
 # Core dependencies
-numpy>=1.24.0,<2.0
+numpy>=1.24.0,<3.0
 onnxruntime>=1.16.0
 
 # Audio processing

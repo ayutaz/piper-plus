@@ -1,6 +1,6 @@
 # Piper TTS Demo Requirements
 gradio==4.44.1
-numpy>=1.19.0
+numpy>=1.24.0,<3.0
 onnxruntime>=1.16.0
 pyopenjtalk>=0.3.0
 onnx>=1.14.0
