@@ -8,7 +8,9 @@ except ImportError:
     try:
         import pyopenjtalk
     except ImportError:
-        raise ImportError("Neither pyopenjtalk nor pyopenjtalk-plus is installed") from None
+        raise ImportError(
+            "Neither pyopenjtalk nor pyopenjtalk-plus is installed"
+        ) from None
 
 from .custom_dict import CustomDictionary
 from .token_mapper import map_sequence
