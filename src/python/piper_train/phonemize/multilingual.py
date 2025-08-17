@@ -5,6 +5,7 @@ import logging
 from dataclasses import dataclass
 from enum import Enum
 
+
 # Language-specific phonemizers
 try:
     from .japanese import phonemize_japanese
@@ -18,6 +19,7 @@ except ImportError:
     )
 
 from piper_phonemize import phonemize_espeak
+
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -75,7 +77,7 @@ class LanguageDetector:
     def detect_language(self, text: str) -> Language:
         """Detect the primary language of a text segment."""
         # Count characters by script
-        script_counts = {lang: 0 for lang in Language}
+        script_counts = dict.fromkeys(Language, 0)
 
         for char in text:
             code_point = ord(char)

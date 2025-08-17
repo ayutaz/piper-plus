@@ -4,6 +4,7 @@
 import json
 from pathlib import Path
 
+
 # Special tokens
 SPECIAL_TOKENS = {
     "<pad>": 0,

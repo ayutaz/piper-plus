@@ -15,6 +15,7 @@ from pytorch_lightning.callbacks import ModelCheckpoint
 
 from .vits.lightning_multilingual import MultilingualVitsModel
 
+
 _LOGGER = logging.getLogger(__name__)
 
 

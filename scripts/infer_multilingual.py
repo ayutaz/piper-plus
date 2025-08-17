@@ -11,6 +11,7 @@ from pathlib import Path
 import numpy as np
 import torch
 
+
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src" / "python"))
 
@@ -18,6 +19,7 @@ from piper_train.phonemize.multilingual_phoneme_map import (
     get_multilingual_phoneme_mapper,
 )
 from piper_train.vits.models_multilingual import MultilingualSynthesizerTrn
+
 
 try:
     from piper_train.phonemize.multilingual import phonemize_multilingual

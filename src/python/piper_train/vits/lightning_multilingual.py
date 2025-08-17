@@ -23,6 +23,7 @@ from .mel_processing import mel_spectrogram_torch
 from .models import MultiPeriodDiscriminator
 from .models_multilingual import MultilingualSynthesizerTrn
 
+
 _LOGGER = logging.getLogger("vits.lightning_multilingual")
 
 

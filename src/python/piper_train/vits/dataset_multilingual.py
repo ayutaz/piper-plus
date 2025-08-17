@@ -16,6 +16,7 @@ from torch.utils.data import Dataset
 
 from ..norm_audio import load_audio
 
+
 _LOGGER = logging.getLogger(__name__)
 
 

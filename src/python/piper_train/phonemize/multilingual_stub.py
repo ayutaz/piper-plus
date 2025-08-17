@@ -8,6 +8,7 @@ import logging
 from dataclasses import dataclass
 from enum import Enum
 
+
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -108,14 +109,14 @@ class MultilingualPhonemizerStub:
     ) -> list[str]:
         """Phonemize text (Japanese only in stub mode)."""
         try:
-            from .japanese import phonemize_japanese
+            from .japanese import phonemize_japanese  # noqa: PLC0415
         except ImportError:
-            from piper_train.phonemize.japanese import phonemize_japanese
+            from piper_train.phonemize.japanese import phonemize_japanese  # noqa: PLC0415, I001
 
         try:
-            from .multilingual_phoneme_map import get_multilingual_phoneme_mapper
+            from .multilingual_phoneme_map import get_multilingual_phoneme_mapper  # noqa: PLC0415, I001
         except ImportError:
-            from piper_train.phonemize.multilingual_phoneme_map import (
+            from piper_train.phonemize.multilingual_phoneme_map import (  # noqa: PLC0415
                 get_multilingual_phoneme_mapper,
             )
 
@@ -164,7 +165,7 @@ def get_multilingual_phonemizer(stub_mode: bool = False):
 
     try:
         # Try to import the full implementation
-        from .multilingual import MultilingualPhonemizer
+        from .multilingual import MultilingualPhonemizer  # noqa: PLC0415
 
         return MultilingualPhonemizer()
     except ImportError as e:

@@ -7,6 +7,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
+
 try:
     from .multilingual import Language, MultilingualPhonemizer
     from .multilingual_phoneme_map import get_multilingual_phoneme_mapper
