@@ -1,5 +1,5 @@
 # Testing requirements for piper-tts
--r requirements.txt
+-r ../../requirements-train.txt
 
 # Testing frameworks
 pytest==7.4.3
