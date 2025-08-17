@@ -1,4 +1,4 @@
 # Gradio WebUI requirements
 # Requires Python 3.11+
 gradio>=4.0.0
-numpy>=1.19.0
+numpy>=1.24.0,<3.0

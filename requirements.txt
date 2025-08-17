@@ -1,8 +1,10 @@
-# Piper TTS Python Requirements
-# For complete environments, see docker/*/requirements-*.txt
+# Piper TTS - Inference Requirements
+# Minimal dependencies for running inference with pre-trained models
+# For training requirements, see requirements-train.txt
+# For development requirements, see requirements-dev.txt
 
-# Core dependencies
-numpy>=1.24.0,<2.0
+# Core dependencies for inference
+numpy>=1.24.0,<3.0
 onnxruntime>=1.16.0
 
 # Audio processing
@@ -11,10 +13,5 @@ soundfile>=0.12.0
 # Phonemization
 piper-phonemize>=1.0.0
 
-# Optional: GPU support
+# Optional: GPU inference support
 # onnxruntime-gpu>=1.16.0  # Uncomment for GPU support
-
-# Optional: Development
-# pytest>=7.0.0
-# black>=23.0.0
-# ruff>=0.1.0

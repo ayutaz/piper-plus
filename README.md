@@ -285,11 +285,31 @@ You will need two files per voice:
 The `MODEL_CARD` file for each voice contains important licensing information. Piper is intended for text to speech research, and does not impose any additional restrictions on voice models. Some voices may have restrictive licenses, however, so please review them carefully!
 
 
+## Installation
+
+### Dependencies
+
+Piper has different requirements depending on your use case:
+
+```bash
+# For inference only (using pre-trained models)
+pip install -r requirements.txt
+
+# For training custom models
+pip install -r requirements-train.txt
+
+# For development (includes testing and linting tools)
+pip install -r requirements-dev.txt
+```
+
 ## Quick Start - WebUI
 
 The easiest way to get started with Piper is using the WebUI:
 
 ```bash
+# Install inference dependencies first
+pip install -r requirements.txt
+
 # Install WebUI dependencies
 pip install gradio>=4.0.0
 

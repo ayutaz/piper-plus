@@ -46,13 +46,11 @@ jobs:
         cd src/python
         # Install test dependencies
         pip install -r requirements_test.txt
-        # Install core dependencies manually to avoid problematic ones
-        pip install numpy scipy soundfile librosa
-        pip install onnxruntime
-        pip install pytest pytest-cov
-        # Install piper_train without problematic dependencies
-        pip install --no-deps -e .
-        echo "Windows tests will run with available dependencies"
+        # Install training dependencies including pyopenjtalk-plus
+        pip install -r ../../requirements-train.txt
+        # Install piper_train
+        pip install -e .
+        echo "Windows tests will run with pyopenjtalk-plus support"
     
     - name: Install Python dependencies (Unix)
       if: runner.os != 'Windows'
@@ -60,15 +58,15 @@ jobs:
         python -m pip install --upgrade pip
         cd src/python
         pip install -r requirements_test.txt
-        pip install -r requirements.txt
+        pip install -r ../../requirements-train.txt
         pip install -e .
     
     - name: Run unit tests (Windows)
       if: runner.os == 'Windows'
       run: |
         cd src/python
-        # Run unit tests, excluding those that require unavailable dependencies
-        pytest tests/ -v --tb=short -m "unit and not phonemize and not training" -k "not test_phonemize and not test_japanese"
+        # Run unit tests including Japanese tests (pyopenjtalk-plus is now available)
+        pytest tests/ -v --tb=short -m "unit and not training and not benchmark"
     
     - name: Run unit tests (Unix)
       if: runner.os != 'Windows'
