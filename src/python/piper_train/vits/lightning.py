@@ -213,7 +213,7 @@ class VitsModel(pl.LightningModule):
         loss_d = self.training_step_d(batch)
         self.manual_backward(loss_d)
         opt_d.step()
-        
+
         # Periodic memory cleanup to prevent fragmentation (every 100 iterations)
         if batch_idx % 100 == 0:
             if torch.cuda.is_available():
@@ -282,7 +282,7 @@ class VitsModel(pl.LightningModule):
             ids_slice * self.hparams.hop_length,
             self.hparams.segment_size,
         )  # slice
-        
+
         # Ensure contiguous memory layout to prevent fragmentation
         y = y.contiguous()
         y_hat = y_hat.contiguous()
