@@ -38,6 +38,35 @@ jobs:
           mkdir -p deploy
           echo "Deploying WebAssembly demo with English model support"
           
+          # Function to copy model files from fallback location
+          copy_models_fallback() {
+            local source_dir="$1"
+            local dest_dir="$2"
+            
+            if [ -d "$source_dir" ]; then
+              echo "Attempting to copy models from $source_dir..."
+              
+              # Copy ONNX files with explicit error handling
+              if ls "$source_dir"/*.onnx 1>/dev/null 2>&1; then
+                cp "$source_dir"/*.onnx "$dest_dir/"
+                echo "ONNX model files copied from $source_dir"
+              else
+                echo "WARNING: No .onnx model files found in $source_dir"
+              fi
+              
+              # Copy JSON files with explicit error handling
+              if ls "$source_dir"/*.json 1>/dev/null 2>&1; then
+                cp "$source_dir"/*.json "$dest_dir/"
+                echo "JSON config files copied from $source_dir"
+              else
+                echo "WARNING: No .json config files found in $source_dir"
+              fi
+              
+              ls -la "$dest_dir/"
+            else
+              echo "WARNING: Fallback directory $source_dir does not exist"
+            fi
+          }
           
           # Copy WebAssembly artifacts
           if [ -d "src/wasm/openjtalk-web/dist" ]; then
@@ -54,6 +83,7 @@ jobs:
             mkdir -p deploy/assets
           fi
           
+          # Handle models directory
           if [ -d "src/wasm/openjtalk-web/models" ]; then
             echo "Copying models directory..."
             ls -la src/wasm/openjtalk-web/models/
@@ -74,25 +104,39 @@ jobs:
               fi
             fi
             
-            # Verify all required model files are present
-            REQUIRED_FILES="ja_JP-test-medium.onnx ja_JP-test-medium.onnx.json test_voice.onnx test_voice.onnx.json"
-            for file in $REQUIRED_FILES; do
-              if [ ! -f "deploy/models/$file" ]; then
-                echo "ERROR: Required model file $file is missing!"
+            # Dynamically verify all model files from source are present in deploy
+            echo "Verifying model files..."
+            if [ -d "src/wasm/openjtalk-web/models" ]; then
+              for model_file in src/wasm/openjtalk-web/models/*.onnx src/wasm/openjtalk-web/models/*.json; do
+                if [ -f "$model_file" ]; then
+                  filename=$(basename "$model_file")
+                  if [ ! -f "deploy/models/$filename" ]; then
+                    echo "ERROR: Model file $filename is missing in deploy/models!"
+                    exit 1
+                  fi
+                fi
+              done
+            fi
+            
+            # Additionally verify critical model files are present
+            CRITICAL_MODELS="ja_JP-test-medium.onnx test_voice.onnx"
+            for model in $CRITICAL_MODELS; do
+              if [ ! -f "deploy/models/$model" ]; then
+                echo "ERROR: Critical model file $model is missing!"
+                exit 1
+              fi
+              # Also check for corresponding JSON config
+              if [ ! -f "deploy/models/${model}.json" ]; then
+                echo "ERROR: Config file ${model}.json is missing!"
                 exit 1
               fi
             done
-            echo "All required model files verified"
+            echo "All model files verified successfully"
           else
             mkdir -p deploy/models
             echo "WARNING: models directory not found!"
-            # Try to copy from test/models as fallback
-            if [ -d "test/models" ]; then
-              echo "Copying models from test/models..."
-              cp test/models/*.onnx deploy/models/ 2>/dev/null || true
-              cp test/models/*.json deploy/models/ 2>/dev/null || true
-              ls -la deploy/models/
-            fi
+            # Use the fallback function to copy from test/models
+            copy_models_fallback "test/models" "deploy/models"
           fi
           
           # Copy multilingual demo as the main index page
