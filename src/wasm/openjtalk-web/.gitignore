@@ -11,6 +11,7 @@ models/*.onnx
 !models/.gitkeep
 !models/test_voice.onnx
 !models/en_US-test-medium.onnx
+!models/ja_JP-test-medium.onnx
 
 # Node modules (if any get added)
 node_modules/

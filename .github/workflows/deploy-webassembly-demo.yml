@@ -60,9 +60,39 @@ jobs:
             cp -r src/wasm/openjtalk-web/models deploy/
             echo "Models copied to deploy/models"
             ls -la deploy/models/
+            
+            # Ensure Japanese model is present, fallback to test/models if needed
+            if [ ! -f "deploy/models/ja_JP-test-medium.onnx" ]; then
+              echo "WARNING: ja_JP-test-medium.onnx not found in src/wasm/openjtalk-web/models"
+              if [ -f "test/models/ja_JP-test-medium.onnx" ]; then
+                echo "Copying ja_JP-test-medium.onnx from test/models..."
+                cp test/models/ja_JP-test-medium.onnx deploy/models/
+                echo "Japanese model copied from test/models"
+              else
+                echo "ERROR: ja_JP-test-medium.onnx not found in either location!"
+                exit 1
+              fi
+            fi
+            
+            # Verify all required model files are present
+            REQUIRED_FILES="ja_JP-test-medium.onnx ja_JP-test-medium.onnx.json test_voice.onnx test_voice.onnx.json"
+            for file in $REQUIRED_FILES; do
+              if [ ! -f "deploy/models/$file" ]; then
+                echo "ERROR: Required model file $file is missing!"
+                exit 1
+              fi
+            done
+            echo "All required model files verified"
           else
             mkdir -p deploy/models
             echo "WARNING: models directory not found!"
+            # Try to copy from test/models as fallback
+            if [ -d "test/models" ]; then
+              echo "Copying models from test/models..."
+              cp test/models/*.onnx deploy/models/ 2>/dev/null || true
+              cp test/models/*.json deploy/models/ 2>/dev/null || true
+              ls -la deploy/models/
+            fi
           fi
           
           # Copy multilingual demo as the main index page
