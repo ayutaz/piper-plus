@@ -223,7 +223,9 @@ class VitsModel(pl.LightningModule):
                 torch.cuda.empty_cache()
                 # Use info level only for first cleanup, then debug
                 if batch_idx == 0:
-                    _LOGGER.info(f"Memory cache clearing enabled every {MEMORY_CLEANUP_FREQUENCY} iterations")
+                    _LOGGER.info(
+                        f"Memory cache clearing enabled every {MEMORY_CLEANUP_FREQUENCY} iterations"
+                    )
                 else:
                     _LOGGER.debug(f"Memory cache cleared at iteration {batch_idx}")
 
