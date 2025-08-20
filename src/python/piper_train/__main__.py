@@ -80,6 +80,12 @@ def main():
         default=2e-4,
         help="Base learning rate for single GPU training",
     )
+    parser.add_argument(
+        "--accumulate_grad_batches",
+        type=int,
+        default=1,
+        help="Number of batches to accumulate gradients (default: 1 = no accumulation)",
+    )
     # Trainer arguments
     parser.add_argument("--accelerator", default="gpu", help="Accelerator to use")
     parser.add_argument("--devices", type=int, default=1, help="Number of devices")
@@ -178,6 +184,7 @@ def main():
         "max_epochs": args.max_epochs,
         "callbacks": callbacks,
         "default_root_dir": args.default_root_dir,
+        "accumulate_grad_batches": getattr(args, "accumulate_grad_batches", 1),
     }
     if args.strategy:
         trainer_kwargs["strategy"] = args.strategy
@@ -314,6 +321,7 @@ def main():
                 "max_epochs": args.max_epochs,
                 "callbacks": callbacks,
                 "default_root_dir": args.default_root_dir,
+                "accumulate_grad_batches": getattr(args, "accumulate_grad_batches", 1),
             }
             if args.strategy:
                 trainer_kwargs["strategy"] = args.strategy
