@@ -24,12 +24,6 @@ def calculate_learning_rate(base_lr, effective_batch_size, base_batch_size=16):
     return base_lr * (effective_batch_size / base_batch_size)
 
 
-def get_optimal_num_workers(num_gpus=1):
-    """Get optimal number of DataLoader workers for multi-GPU training."""
-    # 4 workers per GPU is generally optimal
-    return min(4 * num_gpus, torch.get_num_threads())
-
-
 def main():
     logging.basicConfig(level=logging.DEBUG)
 
@@ -218,14 +212,10 @@ def main():
     if num_speakers > 1 and "gin_channels" not in dict_args:
         dict_args["gin_channels"] = 768
 
-    # Multi-GPU DataLoader optimization
-    if num_gpus > 1 and "num_workers" in dict_args:
-        optimal_workers = get_optimal_num_workers(num_gpus)
-        if dict_args["num_workers"] < optimal_workers:
-            _LOGGER.info(
-                f"Adjusting num_workers from {dict_args['num_workers']} to {optimal_workers} for multi-GPU training"
-            )
-            dict_args["num_workers"] = optimal_workers
+    # num_workers自動調整機能を削除
+    # ユーザー指定のnum_workersをそのまま使用する
+    # 大規模マルチスピーカーモデルでは共有メモリ制約のため、
+    # ユーザーが適切な値を設定する必要がある
 
     model = VitsModel(
         num_symbols=num_symbols,
