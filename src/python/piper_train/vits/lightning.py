@@ -17,6 +17,9 @@ from .models import MultiPeriodDiscriminator, SynthesizerTrn
 
 _LOGGER = logging.getLogger("vits.lightning")
 
+# Memory cleanup frequency (iterations)
+MEMORY_CLEANUP_FREQUENCY = 100
+
 
 class VitsModel(pl.LightningModule):
     def __init__(
@@ -214,11 +217,15 @@ class VitsModel(pl.LightningModule):
         self.manual_backward(loss_d)
         opt_d.step()
 
-        # Periodic memory cleanup to prevent fragmentation (every 100 iterations)
-        if batch_idx % 100 == 0:
+        # Periodic memory cleanup to prevent fragmentation
+        if batch_idx % MEMORY_CLEANUP_FREQUENCY == 0:
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
-                _LOGGER.debug(f"Memory cache cleared at iteration {batch_idx}")
+                # Use info level only for first cleanup, then debug
+                if batch_idx == 0:
+                    _LOGGER.info(f"Memory cache clearing enabled every {MEMORY_CLEANUP_FREQUENCY} iterations")
+                else:
+                    _LOGGER.debug(f"Memory cache cleared at iteration {batch_idx}")
 
     def _log_with_batch_info(
         self, key: str, value, batch: Batch = None, batch_size: int = None
