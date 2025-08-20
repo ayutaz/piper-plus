@@ -184,7 +184,7 @@ def main():
         "max_epochs": args.max_epochs,
         "callbacks": callbacks,
         "default_root_dir": args.default_root_dir,
-        "accumulate_grad_batches": getattr(args, "accumulate_grad_batches", 1),
+        "accumulate_grad_batches": args.accumulate_grad_batches,
     }
     if args.strategy:
         trainer_kwargs["strategy"] = args.strategy
@@ -321,7 +321,7 @@ def main():
                 "max_epochs": args.max_epochs,
                 "callbacks": callbacks,
                 "default_root_dir": args.default_root_dir,
-                "accumulate_grad_batches": getattr(args, "accumulate_grad_batches", 1),
+                "accumulate_grad_batches": args.accumulate_grad_batches,
             }
             if args.strategy:
                 trainer_kwargs["strategy"] = args.strategy
