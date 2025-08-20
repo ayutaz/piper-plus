@@ -272,7 +272,7 @@ def main():
 
             # モデルの重みだけをロードする (不一致は許容)
             checkpoint = torch.load(
-                args.resume_from_checkpoint, map_location="cpu", weights_only=True
+                args.resume_from_checkpoint, map_location="cpu", weights_only=False
             )
             model.load_state_dict(checkpoint["state_dict"], strict=False)
 
