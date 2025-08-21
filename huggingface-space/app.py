@@ -300,8 +300,7 @@ def synthesize_speech(
 
 def create_interface():
     """Create Gradio interface"""
-    try:
-        with gr.Blocks(title="Piper TTS Demo") as interface:
+    with gr.Blocks(title="Piper TTS Demo") as interface:
             gr.Markdown("""
             # 🎙️ Piper TTS Demo
 
@@ -406,17 +405,13 @@ def create_interface():
             outputs=audio_output,
         )
 
-        return interface
-    except Exception as e:
-        logger.error(f"Failed to create main interface: {e}")
-        # Fallback to minimal interface
-        return create_minimal_interface()
+    return interface
 
 
 def create_minimal_interface():
     """Create a minimal fallback interface if main interface fails"""
-    with gr.Blocks(title="Piper TTS Demo - Minimal") as interface:
-        gr.Markdown("# Piper TTS Demo (Minimal Mode)")
+    with gr.Blocks(title="Piper TTS Demo") as interface:
+        gr.Markdown("# 🎙️ Piper TTS Demo")
 
         text_input = gr.Textbox(
             label="Text to synthesize",
@@ -451,22 +446,10 @@ def create_minimal_interface():
 interface = None
 
 if __name__ == "__main__":
-    # Create interface inside main block
+    # Create and launch interface
     interface = create_interface()
-
-    try:
-        # Launch with settings for Gradio 5.x
-        interface.launch(
-            server_name="0.0.0.0",
-            server_port=7860,
-            show_api=False,  # Disable API documentation for cleaner UI
-        )
-    except Exception as e:
-        logger.error(f"Failed to launch interface: {e}")
-        # Try minimal launch
-        minimal_interface = create_minimal_interface()
-        minimal_interface.launch(
-            server_name="0.0.0.0",
-            server_port=7860,
-            show_api=False,
-        )
+    interface.launch(
+        server_name="0.0.0.0",
+        server_port=7860,
+        show_api=False,  # Disable API documentation for cleaner UI
+    )
