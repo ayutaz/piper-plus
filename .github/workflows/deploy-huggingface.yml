@@ -14,14 +14,6 @@ on:
         required: false
         default: ''
         type: string
-      deployment_mode:
-        description: 'Deployment mode'
-        required: true
-        default: 'full'
-        type: choice
-        options:
-          - full
-          - simple
 
 jobs:
   deploy:
@@ -48,45 +40,35 @@ jobs:
           # Create a temporary directory for the Space
           mkdir -p hf-space-deploy
           
-          # Set deployment mode (default to 'full' for automatic deployments)
-          DEPLOY_MODE="${{ github.event.inputs.deployment_mode || 'full' }}"
-          echo "Deployment mode: $DEPLOY_MODE"
+          echo "Preparing Hugging Face Space deployment..."
           
-          # Copy common files
+          # Copy application files
+          cp huggingface-space/app.py hf-space-deploy/
+          cp huggingface-space/app_imports.py hf-space-deploy/
+          cp huggingface-space/download_models.py hf-space-deploy/
           cp huggingface-space/requirements.txt hf-space-deploy/
           cp huggingface-space/README.md hf-space-deploy/
           
-          # Copy mode-specific files
-          if [ "$DEPLOY_MODE" = "simple" ]; then
-            echo "Deploying simplified version (no models)"
-            cp huggingface-space/app_simple.py hf-space-deploy/app.py
-          else
-            echo "Deploying full version with actual models"
-            cp huggingface-space/app.py hf-space-deploy/
-            cp huggingface-space/app_imports.py hf-space-deploy/
-            cp huggingface-space/download_models.py hf-space-deploy/
-            
-            # Copy actual model files from test/models
-            mkdir -p hf-space-deploy/models
-            echo "Copying model files..."
-            
-            # Copy Japanese model
-            if [ -f "test/models/ja_JP-test-medium.onnx" ]; then
-              cp test/models/ja_JP-test-medium.onnx hf-space-deploy/models/
-              cp test/models/ja_JP-test-medium.onnx.json hf-space-deploy/models/
-              echo "✓ Copied Japanese model ($(du -h test/models/ja_JP-test-medium.onnx | cut -f1))"
-            fi
-            
-            # Copy English model
-            if [ -f "test/models/test_voice.onnx" ]; then
-              cp test/models/test_voice.onnx hf-space-deploy/models/
-              cp test/models/test_voice.onnx.json hf-space-deploy/models/
-              echo "✓ Copied English model ($(du -h test/models/test_voice.onnx | cut -f1))"
-            fi
-            
-            # Show total size of models
-            echo "Total model size: $(du -sh hf-space-deploy/models | cut -f1)"
+          # Copy actual model files from test/models
+          mkdir -p hf-space-deploy/models
+          echo "Copying model files..."
+          
+          # Copy Japanese model
+          if [ -f "test/models/ja_JP-test-medium.onnx" ]; then
+            cp test/models/ja_JP-test-medium.onnx hf-space-deploy/models/
+            cp test/models/ja_JP-test-medium.onnx.json hf-space-deploy/models/
+            echo "✓ Copied Japanese model ($(du -h test/models/ja_JP-test-medium.onnx | cut -f1))"
           fi
+          
+          # Copy English model
+          if [ -f "test/models/test_voice.onnx" ]; then
+            cp test/models/test_voice.onnx hf-space-deploy/models/
+            cp test/models/test_voice.onnx.json hf-space-deploy/models/
+            echo "✓ Copied English model ($(du -h test/models/test_voice.onnx | cut -f1))"
+          fi
+          
+          # Show total size of models
+          echo "Total model size: $(du -sh hf-space-deploy/models | cut -f1)"
           
           # List files to be deployed
           echo "Files to deploy:"
@@ -110,13 +92,12 @@ jobs:
           cd hf-space-deploy
           
           # Create a deployment message
-          DEPLOY_MODE="${{ github.event.inputs.deployment_mode || 'full' }}"
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ github.event.inputs.deployment_message }}" ]; then
-            COMMIT_MSG="Update from GitHub Actions - $(date +'%Y-%m-%d %H:%M:%S')\n\nDeployment mode: $DEPLOY_MODE\nDeployment message: ${{ github.event.inputs.deployment_message }}"
+            COMMIT_MSG="Update from GitHub Actions - $(date +'%Y-%m-%d %H:%M:%S')\n\nDeployment message: ${{ github.event.inputs.deployment_message }}"
           elif [ "${{ github.event_name }}" = "push" ]; then
-            COMMIT_MSG="Update from GitHub Actions - $(date +'%Y-%m-%d %H:%M:%S')\n\nDeployment mode: $DEPLOY_MODE\nTriggered by push to dev branch"
+            COMMIT_MSG="Update from GitHub Actions - $(date +'%Y-%m-%d %H:%M:%S')\n\nTriggered by push to dev branch"
           else
-            COMMIT_MSG="Update from GitHub Actions - $(date +'%Y-%m-%d %H:%M:%S')\n\nDeployment mode: $DEPLOY_MODE"
+            COMMIT_MSG="Update from GitHub Actions - $(date +'%Y-%m-%d %H:%M:%S')"
           fi
           
           # Upload all files to Hugging Face Space
@@ -126,26 +107,22 @@ jobs:
 
       - name: Deploy summary
         run: |
-          DEPLOY_MODE="${{ github.event.inputs.deployment_mode || 'full' }}"
           echo "## Deployment Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "✅ Successfully deployed to Hugging Face Spaces" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Deployment Mode**: $DEPLOY_MODE" >> $GITHUB_STEP_SUMMARY
           echo "**Space URL**: https://huggingface.co/spaces/ayousanz/piper-plus-demo" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           
-          # Show model information for full deployments
-          if [ "$DEPLOY_MODE" != "simple" ]; then
-            echo "**Deployed Models**:" >> $GITHUB_STEP_SUMMARY
-            if [ -f "hf-space-deploy/models/ja_JP-test-medium.onnx" ]; then
-              echo "- Japanese Model: $(du -h hf-space-deploy/models/ja_JP-test-medium.onnx | cut -f1)" >> $GITHUB_STEP_SUMMARY
-            fi
-            if [ -f "hf-space-deploy/models/test_voice.onnx" ]; then
-              echo "- English Model: $(du -h hf-space-deploy/models/test_voice.onnx | cut -f1)" >> $GITHUB_STEP_SUMMARY
-            fi
-            echo "" >> $GITHUB_STEP_SUMMARY
+          # Show model information
+          echo "**Deployed Models**:" >> $GITHUB_STEP_SUMMARY
+          if [ -f "hf-space-deploy/models/ja_JP-test-medium.onnx" ]; then
+            echo "- Japanese Model: $(du -h hf-space-deploy/models/ja_JP-test-medium.onnx | cut -f1)" >> $GITHUB_STEP_SUMMARY
           fi
+          if [ -f "hf-space-deploy/models/test_voice.onnx" ]; then
+            echo "- English Model: $(du -h hf-space-deploy/models/test_voice.onnx | cut -f1)" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
           
           echo "**Deployed files**:" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
