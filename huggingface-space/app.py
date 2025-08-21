@@ -45,6 +45,57 @@ MODELS = {
     },
 }
 
+# Basic English word to IPA mapping for common words
+# This is a simplified fallback when espeak-ng is not available
+ENGLISH_IPA_MAP = {
+    "hello": "hɛloʊ",
+    "world": "wɜrld",
+    "this": "ðɪs",
+    "is": "ɪz",
+    "a": "ə",
+    "test": "tɛst",
+    "text": "tɛkst",
+    "to": "tu",
+    "speech": "spitʃ",
+    "demo": "dɛmoʊ",
+    "welcome": "wɛlkəm",
+    "piper": "paɪpər",
+    "tts": "titiɛs",
+    "enjoy": "ɛndʒɔɪ",
+    "high": "haɪ",
+    "quality": "kwɑləti",
+    "synthesis": "sɪnθəsɪs",
+    "the": "ðə",
+    "and": "ænd",
+    "for": "fɔr",
+    "with": "wɪð",
+    "you": "ju",
+    "can": "kæn",
+    "it": "ɪt",
+    "that": "ðæt",
+    "have": "hæv",
+    "from": "frʌm",
+    "or": "ɔr",
+    "which": "wɪtʃ",
+    "one": "wʌn",
+    "would": "wʊd",
+    "all": "ɔl",
+    "will": "wɪl",
+    "there": "ðɛr",
+    "say": "seɪ",
+    "who": "hu",
+    "make": "meɪk",
+    "when": "wɛn",
+    "time": "taɪm",
+    "if": "ɪf",
+    "no": "noʊ",
+    "way": "weɪ",
+    "has": "hæz",
+    "yes": "jɛs",
+    "good": "gʊd",
+    "very": "vɛri",
+}
+
 # Japanese multi-character phoneme to Unicode PUA mapping
 # This mapping must match the C++ implementation and training data
 PHONEME_TO_PUA = {
@@ -127,10 +178,28 @@ def text_to_phonemes(text: str, language: str) -> list[str]:
         # Convert phoneme string to list
         phonemes = ["^"] + list(phoneme_str.replace(" ", "")) + ["$"]
     else:
-        logger.warning("espeak_phonemizer not available, using character fallback")
-        # Character-based fallback - filter non-alphabetic characters
-        cleaned_text = "".join(c.lower() for c in text if c.isalpha() or c.isspace())
-        phonemes = ["^"] + list(cleaned_text) + ["$"]
+        logger.warning("espeak_phonemizer not available, using IPA fallback")
+        # IPA-based fallback for better English pronunciation
+        words = text.lower().split()
+        phonemes = ["^"]
+        
+        for i, word in enumerate(words):
+            # Add space between words
+            if i > 0:
+                phonemes.append(" ")
+            
+            # Remove punctuation from word
+            clean_word = "".join(c for c in word if c.isalpha())
+            
+            if clean_word in ENGLISH_IPA_MAP:
+                # Use IPA mapping if available
+                ipa = ENGLISH_IPA_MAP[clean_word]
+                phonemes.extend(list(ipa))
+            else:
+                # Fall back to character-by-character for unknown words
+                phonemes.extend(list(clean_word))
+        
+        phonemes.append("$")
 
     return phonemes
 
