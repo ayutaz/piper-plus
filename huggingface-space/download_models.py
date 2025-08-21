@@ -106,7 +106,7 @@ def download_models():
         if onnx_path.exists():
             # Verify it's a real ONNX model
             try:
-                model = onnx.load(str(onnx_path))
+                onnx.load(str(onnx_path))  # Validate the model
                 print(f"✓ Found existing {description}: {onnx_path} ({onnx_path.stat().st_size / 1024 / 1024:.1f} MB)")
             except Exception as e:
                 print(f"⚠ Invalid ONNX model {onnx_path}, creating dummy model: {e}")
