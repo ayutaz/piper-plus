@@ -56,23 +56,46 @@ jobs:
           # Copy common files
           cp huggingface-space/requirements.txt hf-space-deploy/
           cp huggingface-space/README.md hf-space-deploy/
+          cp huggingface-space/.gitattributes hf-space-deploy/
           
           # Copy mode-specific files
           if [ "$DEPLOY_MODE" = "simple" ]; then
             echo "Deploying simplified version (no models)"
             cp huggingface-space/app_simple.py hf-space-deploy/app.py
           else
-            echo "Deploying full version"
+            echo "Deploying full version with actual models"
             cp huggingface-space/app.py hf-space-deploy/
             cp huggingface-space/app_imports.py hf-space-deploy/
             cp huggingface-space/download_models.py hf-space-deploy/
-            # Create empty models directory (models will be downloaded at runtime)
+            
+            # Copy actual model files from test/models
             mkdir -p hf-space-deploy/models
+            echo "Copying model files..."
+            
+            # Copy Japanese model
+            if [ -f "test/models/ja_JP-test-medium.onnx" ]; then
+              cp test/models/ja_JP-test-medium.onnx hf-space-deploy/models/
+              cp test/models/ja_JP-test-medium.onnx.json hf-space-deploy/models/
+              echo "✓ Copied Japanese model ($(du -h test/models/ja_JP-test-medium.onnx | cut -f1))"
+            fi
+            
+            # Copy English model
+            if [ -f "test/models/test_voice.onnx" ]; then
+              cp test/models/test_voice.onnx hf-space-deploy/models/
+              cp test/models/test_voice.onnx.json hf-space-deploy/models/
+              echo "✓ Copied English model ($(du -h test/models/test_voice.onnx | cut -f1))"
+            fi
+            
+            # Show total size of models
+            echo "Total model size: $(du -sh hf-space-deploy/models | cut -f1)"
           fi
           
           # List files to be deployed
           echo "Files to deploy:"
-          find hf-space-deploy -type f -name "*.py" -o -name "*.txt" -o -name "*.md" | sort
+          find hf-space-deploy -type f \( -name "*.py" -o -name "*.txt" -o -name "*.md" -o -name "*.onnx" -o -name "*.json" \) | sort
+          echo ""
+          echo "Directory structure:"
+          tree -h hf-space-deploy 2>/dev/null || ls -lah hf-space-deploy/
 
       - name: Install Hugging Face CLI
         run: |
@@ -113,6 +136,19 @@ jobs:
           echo "**Deployment Mode**: $DEPLOY_MODE" >> $GITHUB_STEP_SUMMARY
           echo "**Space URL**: https://huggingface.co/spaces/ayousanz/piper-plus-demo" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Show model information for full deployments
+          if [ "$DEPLOY_MODE" != "simple" ]; then
+            echo "**Deployed Models**:" >> $GITHUB_STEP_SUMMARY
+            if [ -f "hf-space-deploy/models/ja_JP-test-medium.onnx" ]; then
+              echo "- Japanese Model: $(du -h hf-space-deploy/models/ja_JP-test-medium.onnx | cut -f1)" >> $GITHUB_STEP_SUMMARY
+            fi
+            if [ -f "hf-space-deploy/models/test_voice.onnx" ]; then
+              echo "- English Model: $(du -h hf-space-deploy/models/test_voice.onnx | cut -f1)" >> $GITHUB_STEP_SUMMARY
+            fi
+            echo "" >> $GITHUB_STEP_SUMMARY
+          fi
+          
           echo "**Deployed files**:" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
           find hf-space-deploy -type f | sort >> $GITHUB_STEP_SUMMARY

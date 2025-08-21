@@ -87,27 +87,41 @@ def create_dummy_config(output_path: Path, language: str = "en"):
 
 
 def download_models():
-    """Create dummy models for demo purposes"""
+    """Setup models - use existing models if available, otherwise create dummy models"""
     models_dir = Path("models")
     models_dir.mkdir(exist_ok=True)
 
-    # Create dummy models
+    # Model configurations
     models = [
         ("ja_JP-test-medium.onnx", "ja", "Japanese medium quality model"),
         ("test_voice.onnx", "en", "English test model"),
     ]
 
-    print("Creating dummy models for demo...")
+    print("Setting up models for demo...")
     for filename, lang, description in models:
         onnx_path = models_dir / filename
         json_path = models_dir / f"{filename}.json"
 
-        if not onnx_path.exists():
-            print(f"Creating {description}...")
+        # Check if actual model exists
+        if onnx_path.exists():
+            # Verify it's a real ONNX model
+            try:
+                model = onnx.load(str(onnx_path))
+                print(f"✓ Found existing {description}: {onnx_path} ({onnx_path.stat().st_size / 1024 / 1024:.1f} MB)")
+            except Exception as e:
+                print(f"⚠ Invalid ONNX model {onnx_path}, creating dummy model: {e}")
+                create_dummy_onnx_model(onnx_path)
+        else:
+            # Create dummy model as fallback
+            print(f"Creating dummy {description}...")
             create_dummy_onnx_model(onnx_path)
 
+        # Always ensure config exists
         if not json_path.exists():
+            print(f"Creating config for {filename}...")
             create_dummy_config(json_path, language=lang)
+        else:
+            print(f"✓ Found existing config: {json_path}")
 
     print("Model setup complete!")
 
