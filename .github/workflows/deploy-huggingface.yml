@@ -93,7 +93,7 @@ jobs:
           find hf-space-deploy -type f \( -name "*.py" -o -name "*.txt" -o -name "*.md" -o -name "*.onnx" -o -name "*.json" \) | sort
           echo ""
           echo "Directory structure:"
-          tree -h hf-space-deploy 2>/dev/null || ls -lah hf-space-deploy/
+          tree -h hf-space-deploy 2>/dev/null || ls -lah hf-space-deploy/ 2>/dev/null || echo "Directory not found"
 
       - name: Install Hugging Face CLI
         run: |

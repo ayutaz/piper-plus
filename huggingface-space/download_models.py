@@ -104,9 +104,11 @@ def download_models():
 
         # Check if actual model exists
         if onnx_path.exists():
-            # Verify it's a real ONNX model
+            # Verify it's a real ONNX model (efficiently check without loading entire model)
             try:
-                onnx.load(str(onnx_path))  # Validate the model
+                # Use onnx.checker for efficient validation without loading entire model
+                with open(onnx_path, "rb") as f:
+                    onnx.checker.check_model(f.read(), full_check=False)
                 print(
                     f"✓ Found existing {description}: {onnx_path} ({onnx_path.stat().st_size / 1024 / 1024:.1f} MB)"
                 )
