@@ -299,4 +299,9 @@ def create_interface():
 interface = create_interface()
 
 if __name__ == "__main__":
-    interface.launch(server_name="0.0.0.0", server_port=7860)
+    # Disable API for Hugging Face Spaces to avoid json_schema_to_python_type errors
+    interface.launch(
+        server_name="0.0.0.0", 
+        server_port=7860,
+        show_api=False  # Disable API documentation to avoid schema errors
+    )

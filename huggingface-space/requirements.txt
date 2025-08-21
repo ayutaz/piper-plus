@@ -1,5 +1,5 @@
 # Piper TTS Demo Requirements
-gradio==4.42.0  # Downgraded from 4.44.1 to avoid json_schema_to_python_type bug
+gradio==4.36.1  # Using stable version to avoid json_schema_to_python_type bug
 numpy>=1.24.0,<3.0
 onnxruntime>=1.16.0
 pyopenjtalk>=0.3.0
