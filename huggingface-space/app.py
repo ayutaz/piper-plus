@@ -113,7 +113,7 @@ def text_to_phonemes(text: str, language: str) -> list[str]:
 
             # Add sentence markers
             phonemes = ["^"] + phonemes + ["$"]
-            
+
             # Convert multi-character phonemes to Unicode PUA
             phonemes = map_phonemes(phonemes)
         else:
@@ -383,7 +383,7 @@ interface = None
 if __name__ == "__main__":
     # Create interface inside main block
     interface = create_interface()
-    
+
     try:
         # Launch with minimal settings for Gradio 3.x
         interface.launch(
