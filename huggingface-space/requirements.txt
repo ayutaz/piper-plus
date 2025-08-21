@@ -1,9 +1,8 @@
 # Piper TTS Demo Requirements
-gradio==3.50.2  # Stable Gradio 3.x version to avoid TypeError
-pydantic==1.10.18  # Compatible with Gradio 3.x
+gradio>=5.0.0  # Latest Gradio 5.x with security fixes
 numpy>=1.24.0,<3.0
 onnxruntime>=1.16.0
 pyopenjtalk>=0.3.0
 onnx>=1.14.0
 # Note: espeak-phonemizer requires system espeak-ng library
-# For simplified deployment, using character-based fallback for English
+# For simplified deployment, using IPA-based fallback for English

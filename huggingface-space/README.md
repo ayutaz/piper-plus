@@ -4,7 +4,7 @@ emoji: 🎙️
 colorFrom: blue
 colorTo: purple
 sdk: gradio
-sdk_version: 3.50.2
+sdk_version: 5.0.0
 app_file: app.py
 pinned: false
 license: mit
@@ -67,4 +67,4 @@ python app.py
 This project is licensed under the MIT License. See the original [Piper repository](https://github.com/rhasspy/piper) for more details.
 
 ---
-_Last updated: 2025-01-21 - Cache rebuild for Gradio 3.50.2_
+_Last updated: 2025-01-21 - Upgraded to Gradio 5.0.0 for security fixes_
