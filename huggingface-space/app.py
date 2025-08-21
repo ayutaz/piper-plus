@@ -211,7 +211,7 @@ def create_interface():
 
                     # Advanced Settings without Accordion (flattened)
                     gr.Markdown("### Advanced Settings")
-                    
+
                     speaker_id = gr.Number(
                         label="Speaker ID (for multi-speaker models)",
                         value=0,
@@ -301,32 +301,32 @@ def create_minimal_interface():
     """Create a minimal fallback interface if main interface fails"""
     with gr.Blocks(title="Piper TTS Demo - Minimal") as interface:
         gr.Markdown("# Piper TTS Demo (Minimal Mode)")
-        
+
         text_input = gr.Textbox(
             label="Text to synthesize",
             placeholder="Enter text here...",
             lines=3,
         )
-        
+
         model_dropdown = gr.Dropdown(
             choices=list(MODELS.keys()),
             label="Select Model",
             value=list(MODELS.keys())[0],
         )
-        
+
         synthesize_btn = gr.Button("Generate Speech", variant="primary")
-        
+
         audio_output = gr.Audio(
             label="Generated Speech",
             type="numpy",
         )
-        
+
         synthesize_btn.click(
             fn=lambda text, model: synthesize_speech(text, model, 0, 1.0, 0.667, 0.8),
             inputs=[text_input, model_dropdown],
             outputs=audio_output,
         )
-    
+
     return interface
 
 
@@ -337,7 +337,7 @@ if __name__ == "__main__":
     try:
         # Launch with minimal settings for Gradio 3.x
         interface.launch(
-            server_name="0.0.0.0", 
+            server_name="0.0.0.0",
             server_port=7860,
             show_api=False,  # Disable API documentation
             show_error=True,
