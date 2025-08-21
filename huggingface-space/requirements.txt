@@ -1,5 +1,6 @@
 # Piper TTS Demo Requirements
-gradio==4.36.1  # Using stable version to avoid json_schema_to_python_type bug
+gradio==3.50.2  # Stable Gradio 3.x version to avoid TypeError
+pydantic==1.10.18  # Compatible with Gradio 3.x
 numpy>=1.24.0,<3.0
 onnxruntime>=1.16.0
 pyopenjtalk>=0.3.0

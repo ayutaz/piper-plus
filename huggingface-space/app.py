@@ -185,47 +185,45 @@ def synthesize_speech(
 
 def create_interface():
     """Create Gradio interface"""
+    try:
+        with gr.Blocks(title="Piper TTS Demo") as interface:
+            gr.Markdown("""
+            # 🎙️ Piper TTS Demo
 
-    with gr.Blocks(title="Piper TTS Demo") as interface:
-        gr.Markdown("""
-        # 🎙️ Piper TTS Demo
+            High-quality text-to-speech synthesis supporting Japanese and English.
 
-        High-quality text-to-speech synthesis supporting Japanese and English.
+            This demo uses ONNX models for fast CPU inference.
+            """)
 
-        This demo uses ONNX models for fast CPU inference.
-        """)
+            with gr.Row():
+                with gr.Column(scale=2):
+                    model_dropdown = gr.Dropdown(
+                        choices=list(MODELS.keys()),
+                        label="Select Model",
+                        value=list(MODELS.keys())[0],
+                    )
 
-        with gr.Row():
-            with gr.Column(scale=2):
-                model_dropdown = gr.Dropdown(
-                    choices=list(MODELS.keys()),
-                    label="Select Model",
-                    value=list(MODELS.keys())[0],
-                )
+                    text_input = gr.Textbox(
+                        label="Text to synthesize",
+                        placeholder="Enter text here...",
+                        lines=3,
+                    )
 
-                text_input = gr.Textbox(
-                    label="Text to synthesize",
-                    placeholder="Enter text here...",
-                    lines=3,
-                )
-
-                with gr.Accordion("Advanced Settings", open=False):
+                    # Advanced Settings without Accordion (flattened)
+                    gr.Markdown("### Advanced Settings")
+                    
                     speaker_id = gr.Number(
-                        label="Speaker ID",
+                        label="Speaker ID (for multi-speaker models)",
                         value=0,
                         precision=0,
-                        minimum=0,
-                        maximum=10,
-                        info="For multi-speaker models only",
                     )
 
                     length_scale = gr.Slider(
-                        label="Speed",
+                        label="Speed (Lower = faster speech)",
                         minimum=0.5,
                         maximum=2.0,
                         value=1.0,
                         step=0.1,
-                        info="Lower = faster speech",
                     )
 
                     noise_scale = gr.Slider(
@@ -292,6 +290,43 @@ def create_interface():
             outputs=audio_output,
         )
 
+        return interface
+    except Exception as e:
+        logger.error(f"Failed to create main interface: {e}")
+        # Fallback to minimal interface
+        return create_minimal_interface()
+
+
+def create_minimal_interface():
+    """Create a minimal fallback interface if main interface fails"""
+    with gr.Blocks(title="Piper TTS Demo - Minimal") as interface:
+        gr.Markdown("# Piper TTS Demo (Minimal Mode)")
+        
+        text_input = gr.Textbox(
+            label="Text to synthesize",
+            placeholder="Enter text here...",
+            lines=3,
+        )
+        
+        model_dropdown = gr.Dropdown(
+            choices=list(MODELS.keys()),
+            label="Select Model",
+            value=list(MODELS.keys())[0],
+        )
+        
+        synthesize_btn = gr.Button("Generate Speech", variant="primary")
+        
+        audio_output = gr.Audio(
+            label="Generated Speech",
+            type="numpy",
+        )
+        
+        synthesize_btn.click(
+            fn=lambda text, model: synthesize_speech(text, model, 0, 1.0, 0.667, 0.8),
+            inputs=[text_input, model_dropdown],
+            outputs=audio_output,
+        )
+    
     return interface
 
 
@@ -299,9 +334,21 @@ def create_interface():
 interface = create_interface()
 
 if __name__ == "__main__":
-    # Disable API for Hugging Face Spaces to avoid json_schema_to_python_type errors
-    interface.launch(
-        server_name="0.0.0.0", 
-        server_port=7860,
-        show_api=False  # Disable API documentation to avoid schema errors
-    )
+    try:
+        # Launch with minimal settings for Gradio 3.x
+        interface.launch(
+            server_name="0.0.0.0", 
+            server_port=7860,
+            show_api=False,  # Disable API documentation
+            show_error=True,
+            quiet=False,
+        )
+    except Exception as e:
+        logger.error(f"Failed to launch interface: {e}")
+        # Try minimal launch
+        minimal_interface = create_minimal_interface()
+        minimal_interface.launch(
+            server_name="0.0.0.0",
+            server_port=7860,
+            show_api=False,
+        )
