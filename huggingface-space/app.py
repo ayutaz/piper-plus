@@ -329,6 +329,7 @@ def create_interface():
                 speaker_id = gr.Number(
                     label="Speaker ID (for multi-speaker models)",
                     value=0,
+                    precision=0,
                     minimum=0,
                     maximum=10,
                 )
@@ -452,4 +453,5 @@ if __name__ == "__main__":
         server_name="0.0.0.0",
         server_port=7860,
         show_api=False,  # Disable API documentation for cleaner UI
+        show_error=True,
     )
