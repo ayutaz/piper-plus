@@ -182,15 +182,15 @@ def text_to_phonemes(text: str, language: str) -> list[str]:
         # IPA-based fallback for better English pronunciation
         words = text.lower().split()
         phonemes = ["^"]
-        
+
         for i, word in enumerate(words):
             # Add space between words
             if i > 0:
                 phonemes.append(" ")
-            
+
             # Remove punctuation from word
             clean_word = "".join(c for c in word if c.isalpha())
-            
+
             if clean_word in ENGLISH_IPA_MAP:
                 # Use IPA mapping if available
                 ipa = ENGLISH_IPA_MAP[clean_word]
@@ -198,7 +198,7 @@ def text_to_phonemes(text: str, language: str) -> list[str]:
             else:
                 # Fall back to character-by-character for unknown words
                 phonemes.extend(list(clean_word))
-        
+
         phonemes.append("$")
 
     return phonemes
