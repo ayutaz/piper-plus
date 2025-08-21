@@ -301,7 +301,7 @@ def synthesize_speech(
 def create_interface():
     """Create Gradio interface"""
     with gr.Blocks(title="Piper TTS Demo") as interface:
-            gr.Markdown("""
+        gr.Markdown("""
             # 🎙️ Piper TTS Demo
 
             High-quality text-to-speech synthesis supporting Japanese and English.
@@ -309,64 +309,64 @@ def create_interface():
             This demo uses ONNX models for fast CPU inference.
             """)
 
-            with gr.Row():
-                with gr.Column(scale=2):
-                    model_dropdown = gr.Dropdown(
-                        choices=list(MODELS.keys()),
-                        label="Select Model",
-                        value=list(MODELS.keys())[0],
-                    )
-
-                    text_input = gr.Textbox(
-                        label="Text to synthesize",
-                        placeholder="Enter text here...",
-                        lines=3,
-                    )
-
-                    # Advanced Settings without Accordion (flattened)
-                    gr.Markdown("### Advanced Settings")
-
-                    speaker_id = gr.Number(
-                        label="Speaker ID (for multi-speaker models)",
-                        value=0,
-                        minimum=0,
-                        maximum=10,
-                    )
-
-                    length_scale = gr.Slider(
-                        label="Speed (Lower = faster speech)",
-                        minimum=0.5,
-                        maximum=2.0,
-                        value=1.0,
-                        step=0.1,
-                    )
-
-                    noise_scale = gr.Slider(
-                        label="Expressiveness",
-                        minimum=0.0,
-                        maximum=1.0,
-                        value=0.667,
-                        step=0.01,
-                    )
-
-                    noise_w = gr.Slider(
-                        label="Phoneme Duration Variance",
-                        minimum=0.0,
-                        maximum=1.0,
-                        value=0.8,
-                        step=0.01,
-                    )
-
-                synthesize_btn = gr.Button("Generate Speech", variant="primary")
-
-            with gr.Column(scale=1):
-                audio_output = gr.Audio(
-                    label="Generated Speech",
-                    type="numpy",
-                    autoplay=True,
+        with gr.Row():
+            with gr.Column(scale=2):
+                model_dropdown = gr.Dropdown(
+                    choices=list(MODELS.keys()),
+                    label="Select Model",
+                    value=list(MODELS.keys())[0],
                 )
 
-                gr.Markdown("""
+                text_input = gr.Textbox(
+                    label="Text to synthesize",
+                    placeholder="Enter text here...",
+                    lines=3,
+                )
+
+                # Advanced Settings without Accordion (flattened)
+                gr.Markdown("### Advanced Settings")
+
+                speaker_id = gr.Number(
+                    label="Speaker ID (for multi-speaker models)",
+                    value=0,
+                    minimum=0,
+                    maximum=10,
+                )
+
+                length_scale = gr.Slider(
+                    label="Speed (Lower = faster speech)",
+                    minimum=0.5,
+                    maximum=2.0,
+                    value=1.0,
+                    step=0.1,
+                )
+
+                noise_scale = gr.Slider(
+                    label="Expressiveness",
+                    minimum=0.0,
+                    maximum=1.0,
+                    value=0.667,
+                    step=0.01,
+                )
+
+                noise_w = gr.Slider(
+                    label="Phoneme Duration Variance",
+                    minimum=0.0,
+                    maximum=1.0,
+                    value=0.8,
+                    step=0.01,
+                )
+
+            synthesize_btn = gr.Button("Generate Speech", variant="primary")
+
+        with gr.Column(scale=1):
+            audio_output = gr.Audio(
+                label="Generated Speech",
+                type="numpy",
+                autoplay=True,
+            )
+
+            gr.Markdown("""
                 ### Tips:
                 - Japanese model expects hiragana/kanji text
                 - English model works with standard text
