@@ -45,11 +45,54 @@ MODELS = {
     },
 }
 
+# Japanese multi-character phoneme to Unicode PUA mapping
+# This mapping must match the C++ implementation and training data
+PHONEME_TO_PUA = {
+    # Long vowels
+    "a:": "\ue000",
+    "i:": "\ue001",
+    "u:": "\ue002",
+    "e:": "\ue003",
+    "o:": "\ue004",
+    # Special consonants
+    "cl": "\ue005",  # Geminate/glottal stop
+    # Palatalized consonants
+    "ky": "\ue006",
+    "kw": "\ue007",
+    "gy": "\ue008",
+    "gw": "\ue009",
+    "ty": "\ue00a",
+    "dy": "\ue00b",
+    "py": "\ue00c",
+    "by": "\ue00d",
+    # Affricates and special sounds
+    "ch": "\ue00e",
+    "ts": "\ue00f",
+    "sh": "\ue010",
+    "zy": "\ue011",
+    "hy": "\ue012",
+    # Palatalized nasals/liquids
+    "ny": "\ue013",
+    "my": "\ue014",
+    "ry": "\ue015",
+}
+
 
 def load_model_config(config_path: str) -> dict:
     """Load model configuration from JSON file"""
     with open(config_path, encoding="utf-8") as f:
         return json.load(f)
+
+
+def map_phonemes(phonemes: list[str]) -> list[str]:
+    """Map multi-character phonemes to Unicode PUA characters"""
+    result = []
+    for phoneme in phonemes:
+        if phoneme in PHONEME_TO_PUA:
+            result.append(PHONEME_TO_PUA[phoneme])
+        else:
+            result.append(phoneme)
+    return result
 
 
 def text_to_phonemes(text: str, language: str) -> list[str]:
@@ -70,6 +113,9 @@ def text_to_phonemes(text: str, language: str) -> list[str]:
 
             # Add sentence markers
             phonemes = ["^"] + phonemes + ["$"]
+            
+            # Convert multi-character phonemes to Unicode PUA
+            phonemes = map_phonemes(phonemes)
         else:
             logger.warning("pyopenjtalk not available, using fallback")
             # Simple fallback - just use dummy phonemes
@@ -331,9 +377,13 @@ def create_minimal_interface():
 
 
 # Create and launch the app
-interface = create_interface()
+# Move interface creation inside main block to avoid context issues
+interface = None
 
 if __name__ == "__main__":
+    # Create interface inside main block
+    interface = create_interface()
+    
     try:
         # Launch with minimal settings for Gradio 3.x
         interface.launch(
