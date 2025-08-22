@@ -449,9 +449,13 @@ interface = None
 if __name__ == "__main__":
     # Create and launch interface
     interface = create_interface()
+    # Hugging Face Spaces requires share=False and specific server configuration
     interface.launch(
         server_name="0.0.0.0",
         server_port=7860,
-        show_api=False,  # Disable API documentation for cleaner UI
+        share=False,  # Required for Hugging Face Spaces
+        show_api=False,  # Disable API documentation to avoid schema errors
         show_error=True,
+        quiet=False,  # Show startup logs
+        allowed_paths=["/home/user/app"],  # Allow access to app directory
     )

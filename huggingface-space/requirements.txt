@@ -1,5 +1,5 @@
 # Piper TTS Demo Requirements
-gradio==4.44.1  # Latest stable Gradio 4.x to avoid CSS/HTTP2 issues
+gradio==4.39.0  # Stable version without API schema bug
 numpy>=1.24.0,<3.0
 onnxruntime>=1.16.0
 pyopenjtalk>=0.3.0
