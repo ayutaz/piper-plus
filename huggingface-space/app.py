@@ -360,7 +360,7 @@ def create_interface():
 
             synthesize_btn = gr.Button("Generate Speech", variant="primary")
 
-        with gr.Column(scale=1):
+        with gr.Column(scale=2):
             audio_output = gr.Audio(
                 label="Generated Speech",
                 type="numpy",
@@ -449,13 +449,5 @@ interface = None
 if __name__ == "__main__":
     # Create and launch interface
     interface = create_interface()
-    # Hugging Face Spaces requires share=False and specific server configuration
-    interface.launch(
-        server_name="0.0.0.0",
-        server_port=7860,
-        share=False,  # Required for Hugging Face Spaces
-        show_api=False,  # Disable API documentation to avoid schema errors
-        show_error=True,
-        quiet=False,  # Show startup logs
-        allowed_paths=["/home/user/app"],  # Allow access to app directory
-    )
+    # Launch with minimal configuration for Hugging Face Spaces
+    interface.launch()
