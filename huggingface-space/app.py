@@ -45,11 +45,105 @@ MODELS = {
     },
 }
 
+# Basic English word to IPA mapping for common words
+# This is a simplified fallback when espeak-ng is not available
+ENGLISH_IPA_MAP = {
+    "hello": "hɛloʊ",
+    "world": "wɜrld",
+    "this": "ðɪs",
+    "is": "ɪz",
+    "a": "ə",
+    "test": "tɛst",
+    "text": "tɛkst",
+    "to": "tu",
+    "speech": "spitʃ",
+    "demo": "dɛmoʊ",
+    "welcome": "wɛlkəm",
+    "piper": "paɪpər",
+    "tts": "titiɛs",
+    "enjoy": "ɛndʒɔɪ",
+    "high": "haɪ",
+    "quality": "kwɑləti",
+    "synthesis": "sɪnθəsɪs",
+    "the": "ðə",
+    "and": "ænd",
+    "for": "fɔr",
+    "with": "wɪð",
+    "you": "ju",
+    "can": "kæn",
+    "it": "ɪt",
+    "that": "ðæt",
+    "have": "hæv",
+    "from": "frʌm",
+    "or": "ɔr",
+    "which": "wɪtʃ",
+    "one": "wʌn",
+    "would": "wʊd",
+    "all": "ɔl",
+    "will": "wɪl",
+    "there": "ðɛr",
+    "say": "seɪ",
+    "who": "hu",
+    "make": "meɪk",
+    "when": "wɛn",
+    "time": "taɪm",
+    "if": "ɪf",
+    "no": "noʊ",
+    "way": "weɪ",
+    "has": "hæz",
+    "yes": "jɛs",
+    "good": "gʊd",
+    "very": "vɛri",
+}
+
+# Japanese multi-character phoneme to Unicode PUA mapping
+# This mapping must match the C++ implementation and training data
+PHONEME_TO_PUA = {
+    # Long vowels
+    "a:": "\ue000",
+    "i:": "\ue001",
+    "u:": "\ue002",
+    "e:": "\ue003",
+    "o:": "\ue004",
+    # Special consonants
+    "cl": "\ue005",  # Geminate/glottal stop
+    # Palatalized consonants
+    "ky": "\ue006",
+    "kw": "\ue007",
+    "gy": "\ue008",
+    "gw": "\ue009",
+    "ty": "\ue00a",
+    "dy": "\ue00b",
+    "py": "\ue00c",
+    "by": "\ue00d",
+    # Affricates and special sounds
+    "ch": "\ue00e",
+    "ts": "\ue00f",
+    "sh": "\ue010",
+    "zy": "\ue011",
+    "hy": "\ue012",
+    # Palatalized nasals/liquids
+    "ny": "\ue013",
+    "my": "\ue014",
+    "ry": "\ue015",
+}
+
 
 def load_model_config(config_path: str) -> dict:
     """Load model configuration from JSON file"""
     with open(config_path, encoding="utf-8") as f:
         return json.load(f)
+
+
+def map_phonemes(phonemes: list[str]) -> list[str]:
+    """Map multi-character phonemes to Unicode PUA characters"""
+    result = []
+    for phoneme in phonemes:
+        if phoneme in PHONEME_TO_PUA:
+            result.append(PHONEME_TO_PUA[phoneme])
+        else:
+            result.append(phoneme)
+    return result
 
 
 def text_to_phonemes(text: str, language: str) -> list[str]:
@@ -70,6 +164,9 @@ def text_to_phonemes(text: str, language: str) -> list[str]:
 
             # Add sentence markers
             phonemes = ["^"] + phonemes + ["$"]
+
+            # Convert multi-character phonemes to Unicode PUA
+            phonemes = map_phonemes(phonemes)
         else:
             logger.warning("pyopenjtalk not available, using fallback")
             # Simple fallback - just use dummy phonemes
@@ -81,10 +178,28 @@ def text_to_phonemes(text: str, language: str) -> list[str]:
         # Convert phoneme string to list
         phonemes = ["^"] + list(phoneme_str.replace(" ", "")) + ["$"]
     else:
-        logger.warning("espeak_phonemizer not available, using character fallback")
-        # Character-based fallback - filter non-alphabetic characters
-        cleaned_text = "".join(c.lower() for c in text if c.isalpha() or c.isspace())
-        phonemes = ["^"] + list(cleaned_text) + ["$"]
+        logger.warning("espeak_phonemizer not available, using IPA fallback")
+        # IPA-based fallback for better English pronunciation
+        words = text.lower().split()
+        phonemes = ["^"]
+
+        for i, word in enumerate(words):
+            # Add space between words
+            if i > 0:
+                phonemes.append(" ")
+
+            # Remove punctuation from word
+            clean_word = "".join(c for c in word if c.isalpha())
+
+            if clean_word in ENGLISH_IPA_MAP:
+                # Use IPA mapping if available
+                ipa = ENGLISH_IPA_MAP[clean_word]
+                phonemes.extend(list(ipa))
+            else:
+                # Fall back to character-by-character for unknown words
+                phonemes.extend(list(clean_word))
+
+        phonemes.append("$")
 
     return phonemes
 
@@ -185,15 +300,14 @@ def synthesize_speech(
 
 def create_interface():
     """Create Gradio interface"""
-
     with gr.Blocks(title="Piper TTS Demo") as interface:
         gr.Markdown("""
-        # 🎙️ Piper TTS Demo
+            # 🎙️ Piper TTS Demo
 
-        High-quality text-to-speech synthesis supporting Japanese and English.
+            High-quality text-to-speech synthesis supporting Japanese and English.
 
-        This demo uses ONNX models for fast CPU inference.
-        """)
+            This demo uses ONNX models for fast CPU inference.
+            """)
 
         with gr.Row():
             with gr.Column(scale=2):
@@ -209,51 +323,51 @@ def create_interface():
                     lines=3,
                 )
 
-                with gr.Accordion("Advanced Settings", open=False):
-                    speaker_id = gr.Number(
-                        label="Speaker ID",
-                        value=0,
-                        precision=0,
-                        minimum=0,
-                        maximum=10,
-                        info="For multi-speaker models only",
-                    )
+                # Advanced Settings without Accordion (flattened)
+                gr.Markdown("### Advanced Settings")
 
-                    length_scale = gr.Slider(
-                        label="Speed",
-                        minimum=0.5,
-                        maximum=2.0,
-                        value=1.0,
-                        step=0.1,
-                        info="Lower = faster speech",
-                    )
-
-                    noise_scale = gr.Slider(
-                        label="Expressiveness",
-                        minimum=0.0,
-                        maximum=1.0,
-                        value=0.667,
-                        step=0.01,
-                    )
-
-                    noise_w = gr.Slider(
-                        label="Phoneme Duration Variance",
-                        minimum=0.0,
-                        maximum=1.0,
-                        value=0.8,
-                        step=0.01,
-                    )
-
-                synthesize_btn = gr.Button("Generate Speech", variant="primary")
-
-            with gr.Column(scale=1):
-                audio_output = gr.Audio(
-                    label="Generated Speech",
-                    type="numpy",
-                    autoplay=True,
+                speaker_id = gr.Number(
+                    label="Speaker ID (for multi-speaker models)",
+                    value=0,
+                    precision=0,
+                    minimum=0,
+                    maximum=10,
                 )
 
-                gr.Markdown("""
+                length_scale = gr.Slider(
+                    label="Speed (Lower = faster speech)",
+                    minimum=0.5,
+                    maximum=2.0,
+                    value=1.0,
+                    step=0.1,
+                )
+
+                noise_scale = gr.Slider(
+                    label="Expressiveness",
+                    minimum=0.0,
+                    maximum=1.0,
+                    value=0.667,
+                    step=0.01,
+                )
+
+                noise_w = gr.Slider(
+                    label="Phoneme Duration Variance",
+                    minimum=0.0,
+                    maximum=1.0,
+                    value=0.8,
+                    step=0.01,
+                )
+
+            synthesize_btn = gr.Button("Generate Speech", variant="primary")
+
+        with gr.Column(scale=2):
+            audio_output = gr.Audio(
+                label="Generated Speech",
+                type="numpy",
+                autoplay=True,
+            )
+
+            gr.Markdown("""
                 ### Tips:
                 - Japanese model expects hiragana/kanji text
                 - English model works with standard text
@@ -295,8 +409,45 @@ def create_interface():
     return interface
 
 
+def create_minimal_interface():
+    """Create a minimal fallback interface if main interface fails"""
+    with gr.Blocks(title="Piper TTS Demo") as interface:
+        gr.Markdown("# 🎙️ Piper TTS Demo")
+
+        text_input = gr.Textbox(
+            label="Text to synthesize",
+            placeholder="Enter text here...",
+            lines=3,
+        )
+
+        model_dropdown = gr.Dropdown(
+            choices=list(MODELS.keys()),
+            label="Select Model",
+            value=list(MODELS.keys())[0],
+        )
+
+        synthesize_btn = gr.Button("Generate Speech", variant="primary")
+
+        audio_output = gr.Audio(
+            label="Generated Speech",
+            type="numpy",
+        )
+
+        synthesize_btn.click(
+            fn=lambda text, model: synthesize_speech(text, model, 0, 1.0, 0.667, 0.8),
+            inputs=[text_input, model_dropdown],
+            outputs=audio_output,
+        )
+
+    return interface
+
+
 # Create and launch the app
-interface = create_interface()
+# Move interface creation inside main block to avoid context issues
+interface = None
 
 if __name__ == "__main__":
-    interface.launch(server_name="0.0.0.0", server_port=7860)
+    # Create and launch interface
+    interface = create_interface()
+    # Launch with minimal configuration for Hugging Face Spaces
+    interface.launch()
