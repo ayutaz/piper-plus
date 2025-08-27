@@ -271,8 +271,10 @@ def main():
             _LOGGER.info("Attempting to load weights only (strict=False)...")
 
             # モデルの重みだけをロードする (不一致は許容)
+            # NOTE: weights_only=False is required to handle PosixPath objects in checkpoints
+            # This poses a security risk - only load trusted checkpoints
             checkpoint = torch.load(
-                args.resume_from_checkpoint, map_location="cpu", weights_only=True
+                args.resume_from_checkpoint, map_location="cpu", weights_only=False
             )
             model.load_state_dict(checkpoint["state_dict"], strict=False)
 

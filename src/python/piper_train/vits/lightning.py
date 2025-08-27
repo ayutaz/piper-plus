@@ -17,6 +17,9 @@ from .models import MultiPeriodDiscriminator, SynthesizerTrn
 
 _LOGGER = logging.getLogger("vits.lightning")
 
+# Memory cleanup frequency (iterations)
+MEMORY_CLEANUP_FREQUENCY = 100
+
 
 class VitsModel(pl.LightningModule):
     def __init__(
@@ -214,6 +217,18 @@ class VitsModel(pl.LightningModule):
         self.manual_backward(loss_d)
         opt_d.step()
 
+        # Periodic memory cleanup to prevent fragmentation
+        if batch_idx % MEMORY_CLEANUP_FREQUENCY == 0:
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+                # Use info level only for first cleanup, then debug
+                if batch_idx == 0:
+                    _LOGGER.info(
+                        f"Memory cache clearing enabled every {MEMORY_CLEANUP_FREQUENCY} iterations"
+                    )
+                else:
+                    _LOGGER.debug(f"Memory cache cleared at iteration {batch_idx}")
+
     def _log_with_batch_info(
         self, key: str, value, batch: Batch = None, batch_size: int = None
     ):
@@ -246,7 +261,7 @@ class VitsModel(pl.LightningModule):
             z_mask,
             (_z, z_p, m_p, logs_p, _m_q, logs_q),
         ) = self.model_g(x, x_lengths, spec, spec_lengths, speaker_ids)
-        self._y_hat = y_hat
+        self._y_hat = y_hat.contiguous()
 
         mel = spec_to_mel_torch(
             spec,
@@ -277,6 +292,10 @@ class VitsModel(pl.LightningModule):
             self.hparams.segment_size,
         )  # slice
 
+        # Ensure contiguous memory layout to prevent fragmentation
+        y = y.contiguous()
+        y_hat = y_hat.contiguous()
+
         # Save for training_step_d
         self._y = y
 
@@ -301,7 +320,9 @@ class VitsModel(pl.LightningModule):
         # From training_step_g
         y = self._y
         y_hat = self._y_hat
-        y_d_hat_r, y_d_hat_g, _, _ = self.model_d(y, y_hat.detach())
+        # Ensure detached tensors are contiguous
+        y_hat_detached = y_hat.detach().contiguous()
+        y_d_hat_r, y_d_hat_g, _, _ = self.model_d(y, y_hat_detached)
 
         with autocast(self.device.type, enabled=False):
             # Discriminator
