@@ -106,7 +106,10 @@ jobs:
       - name: Install dependencies (macOS)
         if: runner.os == 'macOS'
         run: |
-          brew install cmake ninja wget
+          # Unlink conflicting cmake if exists
+          brew unlink cmake || true
+          # Install or upgrade cmake from homebrew/core
+          brew install --overwrite cmake ninja wget || brew upgrade cmake ninja wget
           
           # Check if ONNX Runtime is already cached
           if [ ! -f "/usr/local/lib/libonnxruntime.dylib" ]; then
