@@ -12,25 +12,29 @@
 
 ## 使用方法
 
-### 1. スクリプトの実行
+### 1. 基本的な実行
 
 ```bash
+# デフォルトパスで実行
+python scripts/convert_multi_to_single_speaker.py
+
+# カスタムパスを指定
+python scripts/convert_multi_to_single_speaker.py \
+  --input-checkpoint /path/to/multi_speaker_model.ckpt \
+  --output-checkpoint /path/to/base_model.ckpt
+
+# 環境変数を使用
+export INPUT_CHECKPOINT=/path/to/multi_speaker_model.ckpt
+export OUTPUT_CHECKPOINT=/path/to/base_model.ckpt
 python scripts/convert_multi_to_single_speaker.py
 ```
 
-デフォルトでは以下のパスを使用します：
-- 入力: 既存のマルチスピーカーチェックポイント
-- 出力: `/data/piper/base_model/model.ckpt`
+### 2. コマンドライン引数
 
-### 2. カスタムパスの指定
+- `--input-checkpoint`: 入力マルチスピーカーモデルのパス
+- `--output-checkpoint`: 出力単一話者ベースモデルのパス
 
-スクリプト内の設定箇所を編集することで、異なるモデルを変換できます：
-
-```python
-# --- 設定箇所 ---
-original_checkpoint = "path/to/your/multi_speaker_model.ckpt"
-partial_checkpoint = "path/to/output/single_speaker_base.ckpt"
-```
+環境変数 `INPUT_CHECKPOINT` と `OUTPUT_CHECKPOINT` でデフォルト値を設定可能です。
 
 ### 3. config.jsonの作成
 
