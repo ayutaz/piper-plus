@@ -138,42 +138,21 @@ class PiperVoice:
             return phonemize_codepoints(text)
 
         if self.config.phoneme_type == PhonemeType.OPENJTALK:
-            # Use the exact same phonemization as training
+            # Use the local phonemization module
             try:
-                import os
-                import sys
-
-                # Try to import from relative path first
-                piper_root = os.path.dirname(
-                    os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-                )
-                sys.path.insert(0, os.path.join(piper_root, "src", "python"))
-                from piper_train.phonemize.custom_dict import CustomDictionary
-                from piper_train.phonemize.japanese import phonemize_japanese
-
-                # カスタム辞書を適用（user_custom_dict.jsonを明示的に読み込む）
-                dict_path = os.path.join(
-                    piper_root, "data", "dictionaries", "user_custom_dict.json"
-                )
-
-                # 辞書ファイルの存在確認
-                if os.path.exists(dict_path):
-                    try:
-                        dictionary = CustomDictionary(dict_path)
-                        return [phonemize_japanese(text, custom_dict=dictionary)]
-                    except Exception as e:
-                        _LOGGER.warning(
-                            f"Failed to load custom dictionary from {dict_path}: {e}"
-                        )
-                        # 辞書なしで音素化を続行
-                        return [phonemize_japanese(text)]
+                from .phonemize.japanese import phonemize_japanese, get_default_dictionary
+                
+                # Try to load default custom dictionary
+                custom_dict = get_default_dictionary()
+                
+                if custom_dict:
+                    _LOGGER.debug("Using custom dictionary for phonemization")
+                    return [phonemize_japanese(text, custom_dict=custom_dict)]
                 else:
-                    _LOGGER.debug(
-                        f"Custom dictionary not found at {dict_path}, using default phonemization"
-                    )
+                    _LOGGER.debug("Using default phonemization without custom dictionary")
                     return [phonemize_japanese(text)]
-            except ImportError:
-                _LOGGER.warning("Failed to import piper_train phonemizer, falling back")
+            except ImportError as e:
+                _LOGGER.warning(f"Failed to import phonemizer: {e}")
                 return [self._phonemize_japanese_simple(text)]
 
         raise ValueError(f"Unexpected phoneme type: {self.config.phoneme_type}")
@@ -187,18 +166,9 @@ class PiperVoice:
         phonemes = pyopenjtalk.g2p(text)
         tokens = phonemes.split()
 
-        # Use the same token mapper as training
+        # Use the local token mapper
         try:
-            # Try to import from relative path first
-            import os
-            import sys
-
-            piper_root = os.path.dirname(
-                os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-            )
-            sys.path.insert(0, os.path.join(piper_root, "src", "python"))
-            from piper_train.phonemize.token_mapper import map_sequence
-
+            from .phonemize.token_mapper import map_sequence
             return map_sequence(tokens)
         except ImportError:
             # Fallback to local PUA mapping
