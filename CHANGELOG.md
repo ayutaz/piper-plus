@@ -5,6 +5,80 @@ All notable changes to piper-plus will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] - 2025-01-02
+
+### 🚀 Major Features
+
+#### Added
+- **マルチスピーカー → 単一話者モデル変換** (#170)
+  - マルチスピーカーモデルから特定話者を抽出
+  - 単一話者モデルとしてエクスポート可能
+  - メモリ使用量の最適化
+
+- **Hugging Face Spaces対応** (#168)
+  - 実際のモデルファイルのアップロード機能
+  - Web UIでのモデルデプロイメント
+  - GitHub Pages対応の改善
+
+- **ストリーミングTTS** (#151)
+  - Raw phonemesモードでのストリーミング対応
+  - リアルタイム音声合成の遅延削減
+  - バッファリング最適化
+
+- **カスタム辞書機能の大幅拡張** (#143, #149)
+  - 拡張辞書フォーマット対応
+  - ユーザー定義辞書の優先度制御
+  - 音素マッピングの改善
+
+### 🔧 Improvements
+
+#### Changed
+- **メモリ管理最適化** (#166, #164)
+  - マルチスピーカーモデル学習時のメモリ効率改善
+  - num_workers自動調整機能の削除（共有メモリ問題対応）
+  - GPUメモリフラグメンテーション対策
+
+- **日本語TTS改善** (#167, #160)
+  - GitHub PagesでのWebデモ日本語モデル読み込み修正
+  - カスタム辞書機能の有効化による発音改善
+  - OpenJTalk統合の最適化
+
+#### Fixed
+- NumPy 2.x互換性対応 (#163)
+- GitHub Actionsリリースワークフロー修正 (#162)
+- Docker環境でのテスト改善 (#147)
+- WebAssembly版の各種修正 (#136, #144)
+
+### 📚 Documentation
+
+#### Added
+- Unity統合プラグイン「uPiper」情報追加 (#154)
+- 英語版README作成
+- WebAssembly対応ドキュメント (#150)
+- ドキュメント構造の大規模再編成 (#133, #150)
+
+### 🎯 Performance
+- **音素タイミング情報出力** (#128)
+  - リップシンク用タイミング情報
+  - フレーム単位の音素境界情報
+
+- **GPU最適化** (#124)
+  - device_id選択機能
+  - マルチGPU環境での安定性向上
+
+### 🧪 Developer Experience
+
+#### Added
+- WebUI実装 (#131)
+- Docker環境とCI/CDパイプライン構築 (#129)
+- Hugging Face Spaces自動デプロイ (#134)
+- GitHubスポンサーボタン追加 (#148)
+
+#### Changed
+- piper-plusブランディング更新 (#161)
+- プロジェクト構造のクリーンアップ
+- CSS10日本語データセット対応強化 (#117)
+
 ## [1.3.0] - 2024-07-20
 
 ### 🎯 音声品質向上コンポーネント統合 (PR #98)
