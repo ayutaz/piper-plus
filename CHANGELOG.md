@@ -79,7 +79,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - プロジェクト構造のクリーンアップ
 - CSS10日本語データセット対応強化 (#117)
 
-## [1.3.0] - 2025-07-21
+## [1.4.0] - 2024-08-17
+
+### 🚀 Major Features
+
+#### Added
+- **カスタム辞書機能の大幅拡張** (#143, #149)
+  - 拡張辞書フォーマット対応
+  - ユーザー定義辞書の優先度制御
+  - 音素マッピングの改善
+
+- **Raw phonemesモードでのストリーミング対応** (#151)
+  - リアルタイム音声合成の遅延削減
+  - バッファリング最適化
+
+- **Unity統合プラグイン「uPiper」情報追加** (#154)
+  - Unity向けTTS統合
+  - 英語版README作成
+
+#### Fixed
+- **日本語音声合成の発音問題を修正** (#160)
+  - カスタム辞書機能の有効化
+  - 発音精度の向上
+
+- **Docker container tests改善** (#147)
+  - テストスクリプトの最適化
+  - CI/CD安定性向上
+
+#### Changed
+- **piper-plusブランディング更新** (#161)
+  - プロジェクトクリーンアップ
+  - ドキュメント構造の整理
+
+- **ドキュメント構造の大規模再編成** (#150)
+  - WebAssembly対応の追加
+  - ナビゲーション改善
+
+#### Documentation
+- GitHubスポンサーボタン追加 (#148)
+- Unity統合ガイド追加
+- WebAssembly実装ドキュメント
+
+## [1.3.0] - 2024-07-20
 
 ### 🎯 音声品質向上コンポーネント統合 (PR #98)
 
@@ -139,7 +180,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 自動学習率スケーリング (0.0002 → 0.0032)
 - 有効バッチサイズ: 256
 
-## [1.2.0] - 2024-06
+## [1.2.0] - 2024-06-29
 
 ### Added
 - マルチGPU学習対応（PyTorch Lightning 2.x）
@@ -150,9 +191,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 前処理済み .pt ファイル破損時の自動スキップ
 - DataLoader GPU転送最適化
 
-## [1.0.0] - 2024-01
+## [1.0.0] - 2024-01-15
 
 ### Added
 - 初期リリース
 - 基本的なTTS機能
 - VITS アーキテクチャ実装
+- 英語音声合成サポート
+- Raspberry Pi 4 最適化
