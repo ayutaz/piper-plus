@@ -49,7 +49,7 @@ _next = _PUA_START
 
 def register(token: str) -> str:
     """Register *token* and return its single-codepoint replacement."""
-    global _next
+    global _next  # noqa: PLW0603
     if token in TOKEN2CHAR:
         return TOKEN2CHAR[token]
 
