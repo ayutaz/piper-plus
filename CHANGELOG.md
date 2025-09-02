@@ -79,7 +79,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - プロジェクト構造のクリーンアップ
 - CSS10日本語データセット対応強化 (#117)
 
-## [1.4.0] - 2024-08-17
+## [1.4.0] - 2025-08-17
 
 ### 🚀 Major Features
 
@@ -120,7 +120,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Unity統合ガイド追加
 - WebAssembly実装ドキュメント
 
-## [1.3.0] - 2024-07-20
+## [1.3.0] - 2025-07-20
 
 ### 🎯 音声品質向上コンポーネント統合 (PR #98)
 
@@ -180,7 +180,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 自動学習率スケーリング (0.0002 → 0.0032)
 - 有効バッチサイズ: 256
 
-## [1.2.0] - 2024-06-29
+## [1.2.0] - 2025-06-29
 
 ### Added
 - マルチGPU学習対応（PyTorch Lightning 2.x）
@@ -190,12 +190,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - 前処理済み .pt ファイル破損時の自動スキップ
 - DataLoader GPU転送最適化
-
-## [1.0.0] - 2024-01-15
-
-### Added
-- 初期リリース
-- 基本的なTTS機能
-- VITS アーキテクチャ実装
-- 英語音声合成サポート
-- Raspberry Pi 4 最適化
