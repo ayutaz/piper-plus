@@ -142,6 +142,10 @@ jobs:
 
       - name: Install dependencies
         run: |
+          # Workaround for GitHub Actions cmake pinning issue
+          # See: https://github.com/actions/runner-images/issues/12912
+          brew uninstall cmake 2>/dev/null || true
+          brew untap local/pinned 2>/dev/null || true
           brew install cmake pkg-config espeak-ng onnxruntime mecab
 
       - name: Build piper

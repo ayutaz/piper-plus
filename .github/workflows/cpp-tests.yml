@@ -59,9 +59,14 @@ jobs:
       - name: Install dependencies (macOS)
         if: runner.os == 'macOS'
         run: |
+          # Workaround for GitHub Actions cmake pinning issue
+          # See: https://github.com/actions/runner-images/issues/12912
+          brew uninstall cmake 2>/dev/null || true
+          brew untap local/pinned 2>/dev/null || true
+          
           # Update brew and install dependencies (ignore if already installed)
           brew update || true
-          brew install cmake || brew upgrade cmake || true
+          brew install cmake || true
           brew install ccache || brew upgrade ccache || true
           brew install wget || brew upgrade wget || true
           
