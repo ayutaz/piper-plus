@@ -2,14 +2,10 @@
 """Test Japanese phonemization functionality for piper-tts-plus"""
 
 import json
-import sys
 from pathlib import Path
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
-
-# Add parent directory to path
-sys.path.insert(0, str(Path(__file__).parent.parent))
 
 
 class TestTokenMapper:

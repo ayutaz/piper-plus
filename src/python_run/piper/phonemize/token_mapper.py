@@ -1,4 +1,4 @@
-# 新規追加ファイル: 多文字音素→1文字(コードポイント) 変換を共通提供
+# Token mapper: multi-character phonemes to single codepoint conversion
 # This mapping must match the C++ implementation in openjtalk_phonemize.cpp
 
 # Fixed PUA mapping table to ensure consistency between Python and C++
@@ -53,13 +53,13 @@ def register(token: str) -> str:
     if token in TOKEN2CHAR:
         return TOKEN2CHAR[token]
 
-    # 既に1コードポイントの場合はそのまま流用
+    # If already single codepoint, use as-is
     if len(token) == 1:
         TOKEN2CHAR[token] = token
         CHAR2TOKEN[token] = token
         return token
 
-    # 動的割り当て（固定マッピングに含まれていない場合）
+    # Dynamic allocation (if not in fixed mapping)
     ch = chr(_next)
     _next += 1
     TOKEN2CHAR[token] = ch
@@ -68,5 +68,5 @@ def register(token: str) -> str:
 
 
 def map_sequence(seq):
-    """seq は List[str]。各要素を1文字に置換したリストを返す"""
+    """seq is List[str]. Returns a list with each element replaced by a single character."""
     return [register(t) for t in seq]

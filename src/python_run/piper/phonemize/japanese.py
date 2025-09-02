@@ -140,13 +140,28 @@ def phonemize_japanese_simple(text: str) -> list[str]:
 
 
 # Load default custom dictionary if available
+def find_upwards(filename: str, start_dir: Path = None, max_depth: int = 10) -> Optional[Path]:
+    """
+    Search upward from start_dir for a file with the given filename.
+    Returns the Path if found, else None.
+    """
+    if start_dir is None:
+        start_dir = Path(__file__).parent
+    current = start_dir.resolve()
+    for _ in range(max_depth):
+        candidate = current / filename
+        if candidate.exists():
+            return candidate
+        if current.parent == current:
+            break
+        current = current.parent
+    return None
+
+
 def get_default_dictionary() -> Optional[CustomDictionary]:
     """Get the default custom dictionary if available."""
-    # Try to find the custom dictionary in the data directory
-    piper_root = Path(__file__).parent.parent.parent.parent.parent
-    dict_path = piper_root / "data" / "dictionaries" / "user_custom_dict.json"
-    
-    if dict_path.exists():
+    # Search upward for the custom dictionary file
+    dict_path = find_upwards("data/dictionaries/user_custom_dict.json")
+    if dict_path:
         return CustomDictionary(str(dict_path))
-    
     return None
