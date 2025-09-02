@@ -140,11 +140,14 @@ class PiperVoice:
         if self.config.phoneme_type == PhonemeType.OPENJTALK:
             # Use the local phonemization module
             try:
-                from .phonemize.japanese import phonemize_japanese, get_default_dictionary
-                
+                from .phonemize.japanese import (
+                    get_default_dictionary,
+                    phonemize_japanese,
+                )
+
                 # Try to load default custom dictionary
                 custom_dict = get_default_dictionary()
-                
+
                 if custom_dict:
                     _LOGGER.debug("Using custom dictionary for phonemization")
                     return [phonemize_japanese(text, custom_dict=custom_dict)]
