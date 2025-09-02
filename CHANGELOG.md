@@ -5,7 +5,7 @@ All notable changes to piper-plus will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.5.0] - 2025-01-02
+## [1.5.0] - 2025-09-02
 
 ### 🚀 Major Features
 
@@ -79,7 +79,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - プロジェクト構造のクリーンアップ
 - CSS10日本語データセット対応強化 (#117)
 
-## [1.3.0] - 2024-07-20
+## [1.3.0] - 2025-07-21
 
 ### 🎯 音声品質向上コンポーネント統合 (PR #98)
 
