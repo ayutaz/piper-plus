@@ -13,6 +13,7 @@ _LOGGER = logging.getLogger(__name__)
 # Try to import pyopenjtalk
 try:
     import pyopenjtalk
+
     HAS_PYOPENJTALK = True
 except ImportError:
     HAS_PYOPENJTALK = False
@@ -27,10 +28,12 @@ class CustomDictionary:
 
         if dict_path and os.path.exists(dict_path):
             try:
-                with open(dict_path, encoding='utf-8') as f:
+                with open(dict_path, encoding="utf-8") as f:
                     data = json.load(f)
-                    self.replacements = data.get('replacements', {})
-                _LOGGER.info(f"Loaded custom dictionary with {len(self.replacements)} entries")
+                    self.replacements = data.get("replacements", {})
+                _LOGGER.info(
+                    f"Loaded custom dictionary with {len(self.replacements)} entries"
+                )
             except Exception as e:
                 _LOGGER.warning(f"Failed to load custom dictionary: {e}")
 
@@ -42,9 +45,7 @@ class CustomDictionary:
 
 
 def phonemize_japanese(
-    text: str,
-    custom_dict: CustomDictionary | None = None,
-    prosody: bool = True
+    text: str, custom_dict: CustomDictionary | None = None, prosody: bool = True
 ) -> list[str]:
     """
     Phonemize Japanese text for inference.
@@ -140,7 +141,9 @@ def phonemize_japanese_simple(text: str) -> list[str]:
 
 
 # Load default custom dictionary if available
-def find_upwards(filename: str, start_dir: Path = None, max_depth: int = 10) -> Path | None:
+def find_upwards(
+    filename: str, start_dir: Path = None, max_depth: int = 10
+) -> Path | None:
     """
     Search upward from start_dir for a file with the given filename.
     Returns the Path if found, else None.
@@ -165,4 +168,3 @@ def get_default_dictionary() -> CustomDictionary | None:
     if dict_path:
         return CustomDictionary(str(dict_path))
     return None
-

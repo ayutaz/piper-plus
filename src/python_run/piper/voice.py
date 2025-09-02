@@ -152,7 +152,9 @@ class PiperVoice:
                     _LOGGER.debug("Using custom dictionary for phonemization")
                     return [phonemize_japanese(text, custom_dict=custom_dict)]
                 else:
-                    _LOGGER.debug("Using default phonemization without custom dictionary")
+                    _LOGGER.debug(
+                        "Using default phonemization without custom dictionary"
+                    )
                     return [phonemize_japanese(text)]
             except ImportError as e:
                 _LOGGER.warning(f"Failed to import phonemizer: {e}")
@@ -172,6 +174,7 @@ class PiperVoice:
         # Use the local token mapper
         try:
             from .phonemize.token_mapper import map_sequence
+
             return map_sequence(tokens)
         except ImportError:
             # Fallback to local PUA mapping
