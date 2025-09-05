@@ -44,8 +44,10 @@ RUN if [ "$TARGETARCH" = "arm64" ]; then \
         pip install --no-cache-dir -r requirements-inference.txt; \
     fi
 
-# Install piper-tts
-RUN pip install --no-cache-dir piper-tts
+# Copy and install local piper package
+COPY src/python_run /tmp/piper_src
+RUN pip install --no-cache-dir /tmp/piper_src && \
+    rm -rf /tmp/piper_src
 
 # Create directories for models and output
 RUN mkdir -p /app/models /app/output
