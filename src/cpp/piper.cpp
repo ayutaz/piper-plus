@@ -376,9 +376,15 @@ std::string findEspeakDataPath() {
     char exe_path[4096] = {0};
     
 #ifdef _WIN32
-    DWORD size = ::GetModuleFileNameA(NULL, exe_path, sizeof(exe_path));
-    if (size == 0 || size >= sizeof(exe_path)) {
-        exe_path[0] = '\0';
+    // Use wide char API for better Unicode support on Windows
+    wchar_t exe_path_w[4096] = {0};
+    DWORD size = ::GetModuleFileNameW(NULL, exe_path_w, sizeof(exe_path_w) / sizeof(wchar_t));
+    if (size > 0 && size < sizeof(exe_path_w) / sizeof(wchar_t)) {
+        // Convert to UTF-8
+        int utf8_size = WideCharToMultiByte(CP_UTF8, 0, exe_path_w, -1, nullptr, 0, nullptr, nullptr);
+        if (utf8_size > 0 && utf8_size < sizeof(exe_path)) {
+            WideCharToMultiByte(CP_UTF8, 0, exe_path_w, -1, exe_path, utf8_size, nullptr, nullptr);
+        }
     }
 #elif defined(__APPLE__)
     uint32_t size = sizeof(exe_path);
@@ -400,31 +406,69 @@ std::string findEspeakDataPath() {
         
         // Try different relative locations
         std::vector<std::filesystem::path> candidates = {
+#ifdef _WIN32
+            // Windows-specific search paths - prioritize exe directory
+            exeDir / "espeak-ng-data",                    // Same directory as exe (highest priority)
+            exeDir / ".." / "share" / "espeak-ng-data",   // Standard distribution location
+            exeDir / "share" / "espeak-ng-data",          // Alternative share location
+            exeDir / ".." / "espeak-ng-data",             // Parent directory
+            exeDir / ".." / "lib" / "espeak-ng-data",     // lib directory
+            // Try to find in build directories (for development)
+            exeDir / ".." / ".." / "share" / "espeak-ng-data",
+            // Common installation paths
+            "C:\\Program Files\\eSpeak NG\\espeak-ng-data",
+            "C:\\Program Files (x86)\\eSpeak NG\\espeak-ng-data",
+            "C:\\espeak-ng-data"
+#else
             exeDir / "espeak-ng-data",                    // Same directory as exe
             exeDir / ".." / "share" / "espeak-ng-data",   // Installed location
             exeDir / ".." / "espeak-ng-data",             // Alternative location
-#ifdef _WIN32
-            // Additional Windows-specific search paths
-            exeDir / ".." / "lib" / "espeak-ng-data",     // lib directory (for distribution)
-            exeDir / "share" / "espeak-ng-data",          // share subdirectory
-            "C:\\espeak-ng-data",                          // Common installation path
-            "C:\\Program Files\\eSpeak NG\\espeak-ng-data" // Default eSpeak NG path
-#else
             exeDir / ".." / "lib" / "espeak-ng-data"      // Another alternative for Unix
 #endif
         };
         
         for (const auto& candidate : candidates) {
-            auto absPath = std::filesystem::absolute(candidate);
-            if (std::filesystem::exists(absPath)) {
-                spdlog::debug("Found espeak-ng-data at: {}", absPath.string());
-                return absPath.string();
+            try {
+                auto absPath = std::filesystem::absolute(candidate);
+                // Normalize the path to avoid issues with mixed separators
+                auto normalizedPath = absPath.lexically_normal();
+                
+                if (std::filesystem::exists(normalizedPath)) {
+                    // Verify it's actually a directory with expected content
+                    auto phontabPath = normalizedPath / "phontab";
+                    if (std::filesystem::exists(phontabPath)) {
+                        spdlog::info("Found valid espeak-ng-data at: {}", normalizedPath.string());
+                        
+#ifdef _WIN32
+                        // On Windows, convert to native path separators
+                        auto nativePath = normalizedPath.make_preferred();
+                        return nativePath.string();
+#else
+                        return normalizedPath.string();
+#endif
+                    } else {
+                        spdlog::debug("Directory {} exists but missing phontab file", normalizedPath.string());
+                    }
+                }
+            } catch (const std::exception& e) {
+                spdlog::debug("Error checking path {}: {}", candidate.string(), e.what());
+            }
+        }
+        
+        // Log all paths we tried for debugging
+        spdlog::warn("Could not find espeak-ng-data directory. Searched in:");
+        for (const auto& candidate : candidates) {
+            try {
+                auto absPath = std::filesystem::absolute(candidate).lexically_normal();
+                spdlog::warn("  - {}", absPath.string());
+            } catch (...) {
+                spdlog::warn("  - {} (invalid path)", candidate.string());
             }
         }
     }
     
     // If nothing found, return empty string (espeak will use its default)
-    spdlog::warn("Could not find espeak-ng-data directory; espeak-ng will use its built-in default");
+    spdlog::warn("espeak-ng will attempt to use its built-in default data");
     return "";
 }
 
@@ -439,10 +483,24 @@ void initialize(PiperConfig &config) {
         config.eSpeakDataPath = findEspeakDataPath();
     }
     
+#ifdef _WIN32
+    // On Windows, normalize the path to use native separators
+    if (!config.eSpeakDataPath.empty()) {
+        try {
+            std::filesystem::path dataPath(config.eSpeakDataPath);
+            dataPath = dataPath.lexically_normal().make_preferred();
+            config.eSpeakDataPath = dataPath.string();
+            spdlog::debug("Normalized espeak-ng-data path: {}", config.eSpeakDataPath);
+        } catch (const std::exception& e) {
+            spdlog::warn("Failed to normalize espeak-ng-data path: {}", e.what());
+        }
+    }
+#endif
+    
     const char* espeak_path = config.eSpeakDataPath.empty() ? nullptr : config.eSpeakDataPath.c_str();
     
-    spdlog::debug("Calling espeak_Initialize with path: {}", 
-                  espeak_path ? espeak_path : "(null)");
+    spdlog::info("Calling espeak_Initialize with path: {}", 
+                 espeak_path ? espeak_path : "(using built-in default)");
     
 #ifdef _WIN32
     // On Windows, add extra debugging for DLL loading issues
@@ -455,6 +513,18 @@ void initialize(PiperConfig &config) {
                       }
                       return "(not set)";
                   }());
+                  
+    // Verify espeak-ng.dll is loaded
+    HMODULE espeakModule = ::GetModuleHandleA("espeak-ng.dll");
+    if (espeakModule) {
+        wchar_t dllPath[MAX_PATH] = {0};
+        if (::GetModuleFileNameW(espeakModule, dllPath, MAX_PATH) > 0) {
+            spdlog::debug("espeak-ng.dll loaded from: {}", 
+                         std::filesystem::path(dllPath).string());
+        }
+    } else {
+        spdlog::warn("espeak-ng.dll not yet loaded");
+    }
 #endif
     
     int result = espeak_Initialize(AUDIO_OUTPUT_SYNCHRONOUS,
@@ -463,15 +533,29 @@ void initialize(PiperConfig &config) {
                                    /*options*/ 0);
     if (result < 0) {
       spdlog::error("espeak_Initialize failed with code: {}", result);
+      
 #ifdef _WIN32
       DWORD lastError = ::GetLastError();
-      spdlog::error("Windows last error code: {} (0x{:X})", lastError, lastError);
+      if (lastError != 0) {
+          spdlog::error("Windows last error code: {} (0x{:X})", lastError, lastError);
+      }
+      
+      // Provide helpful error messages based on the error code
+      if (result == -1) {
+          spdlog::error("eSpeak initialization failed: Unable to access espeak-ng-data directory");
+          spdlog::error("Please ensure espeak-ng-data directory is present in one of these locations:");
+          spdlog::error("  1. Same directory as piper.exe");
+          spdlog::error("  2. ../share/espeak-ng-data relative to piper.exe");
+          spdlog::error("  3. Set ESPEAK_DATA_PATH environment variable");
+          spdlog::error("  4. Use --espeak_data command line option");
+      }
 #endif
-      throw std::runtime_error("Failed to initialize eSpeak-ng");
+      
+      throw std::runtime_error("Failed to initialize eSpeak-ng. Check logs for details.");
     }
 
-    spdlog::debug("Initialized eSpeak with data path: {}", 
-                  espeak_path ? espeak_path : "(default)");
+    spdlog::info("Successfully initialized eSpeak with data path: {}", 
+                 espeak_path ? espeak_path : "(built-in default)");
   }
 
   // Load onnx model for libtashkeel

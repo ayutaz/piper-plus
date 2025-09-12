@@ -65,10 +65,19 @@ set(ESPEAK_DATA_SEARCH_PATHS
   "${PIPER_BUILD_DIR}/p/src/piper_phonemize_external-build/espeak-ng-data"
 )
 
+set(ESPEAK_DATA_FOUND FALSE)
 foreach(data_path ${ESPEAK_DATA_SEARCH_PATHS})
   if(EXISTS "${data_path}")
     message("Copying espeak-ng-data from ${data_path}")
+    # Copy to the target directory (same as exe)
     file(COPY "${data_path}" DESTINATION "${TARGET_DIR}")
+    # Also copy to ../share for standard distribution layout
+    file(COPY "${data_path}" DESTINATION "${TARGET_DIR}/../share")
+    set(ESPEAK_DATA_FOUND TRUE)
     break()
   endif()
 endforeach()
+
+if(NOT ESPEAK_DATA_FOUND)
+  message(WARNING "Could not find espeak-ng-data directory. The application may not work correctly without it.")
+endif()

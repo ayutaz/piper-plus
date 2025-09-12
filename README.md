@@ -419,6 +419,41 @@ Piper supports two methods for direct phoneme input:
 
 See [raw-phoneme-input.md](docs/features/raw-phoneme-input.md) for detailed documentation.
 
+### Windows Troubleshooting
+
+If you encounter the error "Could not find espeak-ng-data directory" on Windows:
+
+1. **Check Directory Structure**: Ensure your Piper installation has the following structure:
+   ```
+   piper/
+   ├── piper.exe
+   ├── espeak-ng.dll
+   ├── piper_phonemize.dll
+   └── espeak-ng-data/       # This directory must be present
+       └── phontab            # This file must exist
+   ```
+
+2. **Alternative Locations**: The program also searches for `espeak-ng-data` in:
+   - `../share/espeak-ng-data` (relative to piper.exe)
+   - Standard eSpeak NG installation paths
+
+3. **Manual Configuration**: If the automatic detection fails, you can:
+   - Set the `ESPEAK_DATA_PATH` environment variable:
+     ```cmd
+     set ESPEAK_DATA_PATH=C:\path\to\espeak-ng-data
+     piper.exe --model en_US-lessac-medium.onnx -f output.wav
+     ```
+   - Or use the `--espeak_data` command-line option:
+     ```cmd
+     piper.exe --espeak_data C:\path\to\espeak-ng-data --model en_US-lessac-medium.onnx -f output.wav
+     ```
+
+4. **Download Missing Data**: If `espeak-ng-data` is missing from your distribution:
+   - Download it from the [official releases](https://github.com/ayutaz/piper-plus/releases)
+   - Extract it to the same directory as `piper.exe`
+
+For more Windows-specific information, see the [Windows Setup Guide](docs/getting-started/windows-setup.md).
+
 ### Streaming Audio
 
 Piper can stream raw audio to stdout as its produced:
