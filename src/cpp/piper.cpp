@@ -379,10 +379,10 @@ std::string findEspeakDataPath() {
     // Use wide char API for better Unicode support on Windows
     wchar_t exe_path_w[4096] = {0};
     DWORD size = ::GetModuleFileNameW(NULL, exe_path_w, sizeof(exe_path_w) / sizeof(wchar_t));
-    if (size > 0 && size < sizeof(exe_path_w) / sizeof(wchar_t)) {
+    if (size > 0 && size <= (sizeof(exe_path_w) / sizeof(wchar_t) - 1)) {
         // Convert to UTF-8
         int utf8_size = WideCharToMultiByte(CP_UTF8, 0, exe_path_w, -1, nullptr, 0, nullptr, nullptr);
-        if (utf8_size > 0 && utf8_size < sizeof(exe_path)) {
+        if (utf8_size > 0 && utf8_size <= sizeof(exe_path)) {
             WideCharToMultiByte(CP_UTF8, 0, exe_path_w, -1, exe_path, utf8_size, nullptr, nullptr);
         }
     }
@@ -457,11 +457,15 @@ std::string findEspeakDataPath() {
         
         // Log all paths we tried for debugging
         spdlog::warn("Could not find espeak-ng-data directory. Searched in:");
+        // Store normalized paths to avoid duplicate operations
+        std::vector<std::pair<std::filesystem::path, std::string>> searchedPaths;
         for (const auto& candidate : candidates) {
             try {
                 auto absPath = std::filesystem::absolute(candidate).lexically_normal();
+                searchedPaths.push_back({candidate, absPath.string()});
                 spdlog::warn("  - {}", absPath.string());
             } catch (...) {
+                searchedPaths.push_back({candidate, candidate.string() + " (invalid path)"});
                 spdlog::warn("  - {} (invalid path)", candidate.string());
             }
         }
@@ -519,8 +523,9 @@ void initialize(PiperConfig &config) {
     if (espeakModule) {
         wchar_t dllPath[MAX_PATH] = {0};
         if (::GetModuleFileNameW(espeakModule, dllPath, MAX_PATH) > 0) {
-            spdlog::debug("espeak-ng.dll loaded from: {}", 
-                         std::filesystem::path(dllPath).string());
+            // Convert once and store the result
+            std::string dllPathStr = std::filesystem::path(dllPath).string();
+            spdlog::debug("espeak-ng.dll loaded from: {}", dllPathStr);
         }
     } else {
         spdlog::warn("espeak-ng.dll not yet loaded");
