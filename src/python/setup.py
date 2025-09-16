@@ -23,9 +23,13 @@ if requirements_path.is_file():
     with open(requirements_path, encoding="utf-8") as requirements_file:
         requirements = requirements_file.read().splitlines()
 
-version_path = module_dir / "VERSION"
-with open(version_path, encoding="utf-8") as version_file:
-    version = version_file.read().strip()
+# ルートのVERSIONファイルから動的にバージョンを読み込む
+version_path = this_dir.parent.parent / "VERSION"
+if version_path.is_file():
+    with open(version_path, encoding="utf-8") as version_file:
+        version = version_file.read().strip()
+else:
+    version = "0.0.0"  # デフォルト値
 
 # -----------------------------------------------------------------------------
 
@@ -40,7 +44,7 @@ setup(
     license="MIT",
     packages=setuptools.find_packages(),
     package_data={
-        "piper_train": ["VERSION", "py.typed"],
+        "piper_train": ["py.typed"],
     },
     install_requires=requirements,
     extras_require={':python_version<"3.9"': ["importlib_resources"]},

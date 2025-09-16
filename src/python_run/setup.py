@@ -8,6 +8,18 @@ from setuptools import setup
 this_dir = Path(__file__).parent
 module_dir = this_dir / "piper"
 
+# VERSIONファイルから動的にバージョンを読み込む
+version_file = this_dir.parent.parent / "VERSION"
+if version_file.is_file():
+    version = version_file.read_text(encoding="utf-8").strip()
+else:
+    # フォールバック: src/python/piper_train/VERSIONから読み込み
+    version_file_alt = this_dir.parent / "python" / "piper_train" / "VERSION"
+    if version_file_alt.is_file():
+        version = version_file_alt.read_text(encoding="utf-8").strip()
+    else:
+        version = "0.0.0"  # デフォルト値
+
 requirements = []
 requirements_path = this_dir / "requirements.txt"
 if requirements_path.is_file():
@@ -26,7 +38,7 @@ data_files = [module_dir / "voices.json"]
 
 setup(
     name="piper-tts-plus",
-    version="1.5.1",
+    version=version,
     description=(
         "A fast, local neural text to speech system that sounds great and is "
         "optimized for the Raspberry Pi 4."
