@@ -253,6 +253,12 @@ if(NOT DEFINED PIPER_PHONEMIZE_DIR)
     CMAKE_ARGS -DESPEAK_NG_BUILD_SHARED:BOOL=${PIPER_PHONEMIZE_SHARED_LIBS}
     CMAKE_ARGS -DCMAKE_MSVC_RUNTIME_LIBRARY:STRING=${CMAKE_MSVC_RUNTIME_LIBRARY}
     CMAKE_ARGS ${EXTERNAL_CMAKE_ARGS}
+    # Patch piper-phonemize sources to force UTF-8 on MSVC for all subprojects
+    PATCH_COMMAND
+      ${CMAKE_COMMAND} -D SOURCE_DIR=<SOURCE_DIR> -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/apply_piper_phonemize_patch.cmake
+    # Ensure nested builds (e.g., espeak-ng) receive MSVC UTF-8 option even if flags are overridden
+    BUILD_COMMAND ${CMAKE_COMMAND} -E env CL=/utf-8 ${CMAKE_COMMAND} --build <BINARY_DIR> --config $<CONFIG>
+    INSTALL_COMMAND ${CMAKE_COMMAND} -E env CL=/utf-8 ${CMAKE_COMMAND} --build <BINARY_DIR> --target install --config $<CONFIG>
   )
   add_dependencies(piper piper_phonemize_external)
   add_dependencies(test_piper piper_phonemize_external)
