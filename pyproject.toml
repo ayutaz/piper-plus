@@ -1,6 +1,6 @@
 [project]
 name = "piper-plus"
-version = "1.5.0"
+version = "1.5.1"
 description = "Training environment for Piper TTS"
 requires-python = ">=3.11"
 
