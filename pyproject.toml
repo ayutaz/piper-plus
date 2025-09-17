@@ -1,6 +1,10 @@
+[build-system]
+requires = ["setuptools>=45", "wheel", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "piper-plus"
-version = "1.5.0"
+dynamic = ["version"]
 description = "Training environment for Piper TTS"
 requires-python = ">=3.11"
 
@@ -118,3 +122,6 @@ inline-quotes = "double"
 "src/python/prepare_*.py" = ["PLC0415"]
 # runtime files: 条件付きインポートを許可
 "src/python_run/*" = ["PLC0415"]
+
+[tool.setuptools.dynamic]
+version = {file = "VERSION"}

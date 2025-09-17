@@ -5,6 +5,38 @@ All notable changes to piper-plus will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.1] - 2025-09-17
+
+### 🔧 Improvements
+
+#### Fixed
+- **piper_phonemize UTF-8エンコーディング対応** (#178)
+  - テキスト処理でのエンコーディング問題を解決
+  - 多言語テキストの安定した処理を実現
+
+- **Windows 11 espeak-ng-dataディレクトリ検出問題** (#177)
+  - Windows 11環境でのディレクトリ検出ロジックを改善
+  - 自動ダウンロード機能との互換性向上
+
+### 📚 Documentation
+
+#### Added
+- **日本語TTS品質向上の技術レポート** (#176)
+  - 品質問題の詳細な分析
+  - 改善提案と実装ロードマップ
+
+#### Changed
+- **ブランディング更新** (#175)
+  - プロジェクトロゴの刷新
+  - 視覚的アイデンティティの強化
+
+### 🧪 Developer Experience
+
+#### Added
+- **PyPiパッケージ改善** (#172)
+  - 音素マップモジュールをパッケージに含める
+  - インストール後すぐに使える完全な機能セット
+
 ## [1.5.0] - 2025-09-02
 
 ### 🚀 Major Features

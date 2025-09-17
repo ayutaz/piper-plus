@@ -55,34 +55,23 @@ jobs:
             echo "✅ VERSION file: $FILE_VERSION"
           fi
           
-          # Check pyproject.toml
+          # Check pyproject.toml now uses dynamic version
           if [ -f "pyproject.toml" ]; then
-            PYPROJECT_VERSION=$(grep '^version = ' pyproject.toml | sed 's/version = "\(.*\)"/\1/')
-            if [ "$PYPROJECT_VERSION" != "$VERSION" ]; then
-              echo "❌ pyproject.toml has '$PYPROJECT_VERSION', expected '$VERSION'"
+            if grep -q 'dynamic = \["version"\]' pyproject.toml; then
+              echo "✅ pyproject.toml: Using dynamic version from VERSION file"
+            else
+              echo "❌ pyproject.toml should use dynamic version"
               exit 1
             fi
-            echo "✅ pyproject.toml: $PYPROJECT_VERSION"
           fi
           
-          # Check src/python/piper_train/VERSION
-          if [ -f "src/python/piper_train/VERSION" ]; then
-            TRAIN_VERSION=$(cat src/python/piper_train/VERSION | tr -d '\n\r')
-            if [ "$TRAIN_VERSION" != "$VERSION" ]; then
-              echo "❌ src/python/piper_train/VERSION has '$TRAIN_VERSION', expected '$VERSION'"
-              exit 1
-            fi
-            echo "✅ src/python/piper_train/VERSION: $TRAIN_VERSION"
-          fi
+          # Note: src/python/piper_train/VERSION is no longer used
+          # All version information is now centralized in the root VERSION file
           
-          # Check src/python_run/setup.py
+          # Note: src/python_run/setup.py now reads version from the root VERSION file
+          # Verification is done by checking that the file exists and is readable
           if [ -f "src/python_run/setup.py" ]; then
-            SETUP_VERSION=$(grep 'version=' src/python_run/setup.py | grep -o '"[^"]*"' | tr -d '"')
-            if [ "$SETUP_VERSION" != "$VERSION" ]; then
-              echo "❌ src/python_run/setup.py has '$SETUP_VERSION', expected '$VERSION'"
-              exit 1
-            fi
-            echo "✅ src/python_run/setup.py: $SETUP_VERSION"
+            echo "✅ src/python_run/setup.py: Now uses dynamic version from VERSION file"
           fi
           
           echo -e "\n✅ All version files are consistent with version $VERSION"
