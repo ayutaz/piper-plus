@@ -1,0 +1,246 @@
+name: 'Package Piper Distribution'
+description: 'Creates a distribution package for Piper with all necessary components including OpenJTalk and dictionary'
+inputs:
+  build-type:
+    description: 'Build type (Release or Debug)'
+    required: false
+    default: 'Release'
+  os:
+    description: 'Operating system (automatically detected if not specified)'
+    required: false
+    default: ''
+  include-dictionary:
+    description: 'Include OpenJTalk dictionary in the package'
+    required: false
+    default: 'true'
+  artifact-path:
+    description: 'Path where the artifact will be created'
+    required: false
+    default: ''
+
+outputs:
+  artifact-path:
+    description: 'Path to the created artifact'
+    value: ${{ steps.package.outputs.artifact-path }}
+  package-size:
+    description: 'Size of the created package'
+    value: ${{ steps.package.outputs.size }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Package for Windows
+      id: package-windows
+      if: runner.os == 'Windows'
+      shell: pwsh
+      run: |
+        # Create directory structure
+        New-Item -ItemType Directory -Force -Path dist/piper/bin
+        New-Item -ItemType Directory -Force -Path dist/piper/lib
+        New-Item -ItemType Directory -Force -Path dist/piper/share
+
+        if ("${{ inputs.include-dictionary }}" -eq "true") {
+          New-Item -ItemType Directory -Force -Path dist/piper/share/open_jtalk
+        }
+
+        # Copy main binary
+        $buildType = "${{ inputs.build-type }}"
+        if (Test-Path "build/$buildType/piper.exe") {
+          Copy-Item "build/$buildType/piper.exe" -Destination dist/piper/bin/
+        } elseif (Test-Path "build/Release/piper.exe") {
+          Copy-Item "build/Release/piper.exe" -Destination dist/piper/bin/
+        } elseif (Test-Path "build/piper.exe") {
+          Copy-Item "build/piper.exe" -Destination dist/piper/bin/
+        } else {
+          Write-Host "Warning: piper.exe not found, creating minimal package"
+        }
+
+        # Copy required DLLs
+        if (Test-Path "build/$buildType") {
+          Copy-Item "build/$buildType/*.dll" -Destination dist/piper/bin/ -ErrorAction SilentlyContinue
+        }
+        Copy-Item "build/Release/*.dll" -Destination dist/piper/bin/ -ErrorAction SilentlyContinue
+
+        # Copy ONNX Runtime DLLs if available
+        if (Test-Path "onnxruntime/lib/*.dll") {
+          Copy-Item "onnxruntime/lib/*.dll" -Destination dist/piper/bin/ -ErrorAction SilentlyContinue
+        }
+
+        # Copy espeak-ng data
+        $espeakPaths = @(
+          "build/ei/share/espeak-ng-data",
+          "build/p/src/piper_phonemize_external-build/install/share/espeak-ng-data",
+          "build/pi/share/espeak-ng-data"
+        )
+        foreach ($path in $espeakPaths) {
+          if (Test-Path $path) {
+            Write-Host "Copying espeak-ng data from $path"
+            Copy-Item -Recurse $path dist/piper/share/
+            break
+          }
+        }
+
+        # Copy OpenJTalk binaries
+        $ojPaths = @(
+          "build/oj/bin/open_jtalk.exe",
+          "build/open_jtalk.exe",
+          "build/bin/open_jtalk.exe",
+          "build/$buildType/open_jtalk.exe"
+        )
+        foreach ($path in $ojPaths) {
+          if (Test-Path $path) {
+            Write-Host "Copying OpenJTalk from $path"
+            Copy-Item $path -Destination dist/piper/bin/
+            break
+          }
+        }
+
+        # Copy OpenJTalk phonemizer
+        $ojPhonemizerPaths = @(
+          "build/oj/bin/open_jtalk_phonemizer.exe",
+          "build/open_jtalk_phonemizer.exe",
+          "build/bin/open_jtalk_phonemizer.exe",
+          "build/$buildType/open_jtalk_phonemizer.exe"
+        )
+        foreach ($path in $ojPhonemizerPaths) {
+          if (Test-Path $path) {
+            Write-Host "Copying OpenJTalk phonemizer from $path"
+            Copy-Item $path -Destination dist/piper/bin/
+            break
+          }
+        }
+
+        # Download and install OpenJTalk dictionary if requested
+        if ("${{ inputs.include-dictionary }}" -eq "true") {
+          Write-Host "Downloading OpenJTalk dictionary..."
+          try {
+            Invoke-WebRequest -Uri "https://downloads.sourceforge.net/project/open-jtalk/Dictionary/open_jtalk_dic-1.11/open_jtalk_dic_utf_8-1.11.tar.gz" -OutFile "naist-jdic.tar.gz"
+
+            # Extract using tar
+            tar -xzf naist-jdic.tar.gz
+
+            # Install dictionary
+            if (Test-Path "open_jtalk_dic_utf_8-1.11") {
+              Write-Host "Installing OpenJTalk dictionary..."
+              Copy-Item -Recurse open_jtalk_dic_utf_8-1.11/* dist/piper/share/open_jtalk/dic/
+            } else {
+              Write-Host "Warning: Failed to extract OpenJTalk dictionary"
+            }
+          }
+          catch {
+            Write-Host "Warning: Failed to download OpenJTalk dictionary: $_"
+          }
+          finally {
+            # Clean up
+            Remove-Item -Force naist-jdic.tar.gz -ErrorAction SilentlyContinue
+            Remove-Item -Recurse -Force open_jtalk_dic_utf_8-1.11 -ErrorAction SilentlyContinue
+          }
+        }
+
+        # Create archive
+        $artifactName = "piper-windows-x64.zip"
+        Compress-Archive -Path dist/piper -DestinationPath $artifactName
+
+        # Output artifact info
+        $size = (Get-Item $artifactName).Length / 1MB
+        echo "artifact-path=$artifactName" >> $env:GITHUB_OUTPUT
+        echo "size=$([math]::Round($size, 2))MB" >> $env:GITHUB_OUTPUT
+
+    - name: Package for Unix
+      id: package-unix
+      if: runner.os != 'Windows'
+      shell: bash
+      run: |
+        # Create directory structure
+        mkdir -p dist/piper/bin
+        mkdir -p dist/piper/lib
+        mkdir -p dist/piper/share
+
+        # Copy main binary
+        if [ -f "build/piper" ]; then
+          cp build/piper dist/piper/bin/
+        else
+          echo "Warning: piper binary not found, checking alternative locations..."
+          find build -name "piper" -type f -executable 2>/dev/null | head -1 | xargs -I {} cp {} dist/piper/bin/ || echo "No piper binary found"
+        fi
+
+        # Copy libraries
+        if [ "${{ runner.os }}" = "Linux" ]; then
+          find build -name "*.so*" -type f -exec cp {} dist/piper/lib/ \; 2>/dev/null || true
+        elif [ "${{ runner.os }}" = "macOS" ]; then
+          find build -name "*.dylib" -type f -exec cp {} dist/piper/lib/ \; 2>/dev/null || true
+        fi
+
+        # Copy espeak-ng data
+        for path in build/ei/share/espeak-ng-data \
+                   build/p/src/piper_phonemize_external-build/install/share/espeak-ng-data \
+                   build/pi/share/espeak-ng-data; do
+          if [ -d "$path" ]; then
+            echo "Copying espeak-ng data from $path"
+            cp -r "$path" dist/piper/share/
+            break
+          fi
+        done
+
+        # Copy OpenJTalk binary
+        for oj_path in build/oj/bin/open_jtalk build/open_jtalk build/bin/open_jtalk; do
+          if [ -f "$oj_path" ]; then
+            echo "Copying OpenJTalk from $oj_path"
+            cp "$oj_path" dist/piper/bin/
+            chmod +x dist/piper/bin/open_jtalk
+            break
+          fi
+        done
+
+        # Copy OpenJTalk phonemizer
+        for oj_path in build/oj/bin/open_jtalk_phonemizer build/open_jtalk_phonemizer build/bin/open_jtalk_phonemizer; do
+          if [ -f "$oj_path" ]; then
+            echo "Copying OpenJTalk phonemizer from $oj_path"
+            cp "$oj_path" dist/piper/bin/
+            chmod +x dist/piper/bin/open_jtalk_phonemizer
+            break
+          fi
+        done
+
+        # Download and install OpenJTalk dictionary if requested
+        if [ "${{ inputs.include-dictionary }}" = "true" ]; then
+          echo "Downloading OpenJTalk dictionary..."
+          if curl -L https://downloads.sourceforge.net/project/open-jtalk/Dictionary/open_jtalk_dic-1.11/open_jtalk_dic_utf_8-1.11.tar.gz -o naist-jdic.tar.gz; then
+            tar -xzf naist-jdic.tar.gz
+
+            if [ -d "open_jtalk_dic_utf_8-1.11" ]; then
+              echo "Installing OpenJTalk dictionary..."
+              mkdir -p dist/piper/share/open_jtalk/dic
+              cp -r open_jtalk_dic_utf_8-1.11/* dist/piper/share/open_jtalk/dic/
+            else
+              echo "Warning: Failed to extract OpenJTalk dictionary"
+            fi
+          else
+            echo "Warning: Failed to download OpenJTalk dictionary"
+          fi
+
+          # Clean up
+          rm -f naist-jdic.tar.gz
+          rm -rf open_jtalk_dic_utf_8-1.11
+        fi
+
+        # Create archive
+        artifact_name="piper-${{ runner.os }}.tar.gz"
+        tar -czf "$artifact_name" -C dist piper
+
+        # Output artifact info
+        size=$(du -h "$artifact_name" | cut -f1)
+        echo "artifact-path=$artifact_name" >> $GITHUB_OUTPUT
+        echo "size=$size" >> $GITHUB_OUTPUT
+
+    - name: Create distribution info
+      shell: bash
+      run: |
+        echo "Distribution package contents:" > dist-contents.txt
+        if [ "${{ runner.os }}" = "Windows" ]; then
+          pwsh -Command "Get-ChildItem -Path dist -Recurse | Select-Object FullName | Sort-Object FullName" >> dist-contents.txt
+        else
+          find dist -type f | sort >> dist-contents.txt
+        fi
+        echo "" >> dist-contents.txt
+        echo "Package size: ${{ steps.package-unix.outputs.size }}${{ steps.package-windows.outputs.size }}" >> dist-contents.txt
