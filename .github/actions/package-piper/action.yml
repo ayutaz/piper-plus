@@ -21,10 +21,10 @@ inputs:
 outputs:
   artifact-path:
     description: 'Path to the created artifact'
-    value: ${{ steps.package.outputs.artifact-path }}
+    value: ${{ steps.package-windows.outputs.artifact-path }}${{ steps.package-unix.outputs.artifact-path }}
   package-size:
     description: 'Size of the created package'
-    value: ${{ steps.package.outputs.size }}
+    value: ${{ steps.package-windows.outputs.size }}${{ steps.package-unix.outputs.size }}
 
 runs:
   using: 'composite'
@@ -233,14 +233,20 @@ runs:
         echo "artifact-path=$artifact_name" >> $GITHUB_OUTPUT
         echo "size=$size" >> $GITHUB_OUTPUT
 
-    - name: Create distribution info
+    - name: Create distribution info (Windows)
+      if: runner.os == 'Windows'
+      shell: pwsh
+      run: |
+        "Distribution package contents:" | Out-File -FilePath dist-contents.txt
+        Get-ChildItem -Path dist -Recurse | Select-Object FullName | Sort-Object FullName | Out-File -FilePath dist-contents.txt -Append
+        "" | Out-File -FilePath dist-contents.txt -Append
+        "Package size: ${{ steps.package-windows.outputs.size }}" | Out-File -FilePath dist-contents.txt -Append
+
+    - name: Create distribution info (Unix)
+      if: runner.os != 'Windows'
       shell: bash
       run: |
         echo "Distribution package contents:" > dist-contents.txt
-        if [ "${{ runner.os }}" = "Windows" ]; then
-          pwsh -Command "Get-ChildItem -Path dist -Recurse | Select-Object FullName | Sort-Object FullName" >> dist-contents.txt
-        else
-          find dist -type f | sort >> dist-contents.txt
-        fi
+        find dist -type f | sort >> dist-contents.txt
         echo "" >> dist-contents.txt
-        echo "Package size: ${{ steps.package-unix.outputs.size }}${{ steps.package-windows.outputs.size }}" >> dist-contents.txt
+        echo "Package size: ${{ steps.package-unix.outputs.size }}" >> dist-contents.txt
