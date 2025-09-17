@@ -286,12 +286,55 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path dist/piper
-          
+          New-Item -ItemType Directory -Force -Path dist/piper/share
+          New-Item -ItemType Directory -Force -Path dist/piper/share/open_jtalk
+
           # Copy executables and libraries
           Copy-Item build/Release/*.exe dist/piper/
           Copy-Item build/Release/*.dll dist/piper/
           Copy-Item onnxruntime/lib/*.dll dist/piper/
-          
+
+          # Copy OpenJTalk binaries if they exist
+          if (Test-Path "build/oj/bin/open_jtalk.exe") {
+            Write-Host "Copying OpenJTalk binaries..."
+            Copy-Item build/oj/bin/open_jtalk.exe dist/piper/
+            if (Test-Path "build/oj/bin/open_jtalk_phonemizer.exe") {
+              Copy-Item build/oj/bin/open_jtalk_phonemizer.exe dist/piper/
+            }
+          } else {
+            Write-Host "Warning: OpenJTalk binaries not found in build/oj/bin/"
+          }
+
+          # Copy espeak-ng data if it exists
+          if (Test-Path "build/pi/share/espeak-ng-data") {
+            Write-Host "Copying espeak-ng data..."
+            Copy-Item -Recurse build/pi/share/espeak-ng-data dist/piper/share/
+          } elseif (Test-Path "build/p/src/piper_phonemize_external-build/install/share/espeak-ng-data") {
+            Write-Host "Copying espeak-ng data from alternate location..."
+            Copy-Item -Recurse build/p/src/piper_phonemize_external-build/install/share/espeak-ng-data dist/piper/share/
+          } else {
+            Write-Host "Warning: espeak-ng data not found"
+          }
+
+          # Download and extract OpenJTalk dictionary
+          Write-Host "Downloading OpenJTalk dictionary..."
+          Invoke-WebRequest -Uri "https://downloads.sourceforge.net/project/open-jtalk/Dictionary/open_jtalk_dic-1.11/open_jtalk_dic_utf_8-1.11.tar.gz" -OutFile "naist-jdic.tar.gz"
+
+          # Extract using tar (available in Windows 10+)
+          tar -xzf naist-jdic.tar.gz
+
+          # Move dictionary files to the correct location
+          if (Test-Path "open_jtalk_dic_utf_8-1.11") {
+            Write-Host "Installing OpenJTalk dictionary..."
+            Copy-Item -Recurse open_jtalk_dic_utf_8-1.11/* dist/piper/share/open_jtalk/dic/
+          } else {
+            Write-Host "Warning: Failed to extract OpenJTalk dictionary"
+          }
+
+          # Clean up temporary files
+          Remove-Item -Force naist-jdic.tar.gz -ErrorAction SilentlyContinue
+          Remove-Item -Recurse -Force open_jtalk_dic_utf_8-1.11 -ErrorAction SilentlyContinue
+
           # Create zip
           Compress-Archive -Path dist/piper -DestinationPath dist/piper-windows-x64.zip
 
