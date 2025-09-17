@@ -114,7 +114,8 @@ runs:
         if ("${{ inputs.include-dictionary }}" -eq "true") {
           Write-Host "Downloading OpenJTalk dictionary..."
           try {
-            Invoke-WebRequest -Uri "https://downloads.sourceforge.net/project/open-jtalk/Dictionary/open_jtalk_dic-1.11/open_jtalk_dic_utf_8-1.11.tar.gz" -OutFile "naist-jdic.tar.gz"
+            # Use curl for better redirect handling on SourceForge
+            & curl -L -o naist-jdic.tar.gz "https://sourceforge.net/projects/open-jtalk/files/Dictionary/open_jtalk_dic-1.11/open_jtalk_dic_utf_8-1.11.tar.gz/download"
 
             # Extract using tar
             tar -xzf naist-jdic.tar.gz
@@ -205,7 +206,7 @@ runs:
         # Download and install OpenJTalk dictionary if requested
         if [ "${{ inputs.include-dictionary }}" = "true" ]; then
           echo "Downloading OpenJTalk dictionary..."
-          if curl -L https://downloads.sourceforge.net/project/open-jtalk/Dictionary/open_jtalk_dic-1.11/open_jtalk_dic_utf_8-1.11.tar.gz -o naist-jdic.tar.gz; then
+          if curl -L -o naist-jdic.tar.gz "https://sourceforge.net/projects/open-jtalk/files/Dictionary/open_jtalk_dic-1.11/open_jtalk_dic_utf_8-1.11.tar.gz/download"; then
             tar -xzf naist-jdic.tar.gz
 
             if [ -d "open_jtalk_dic_utf_8-1.11" ]; then
