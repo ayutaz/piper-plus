@@ -317,7 +317,21 @@ jobs:
               break
             fi
           done
-          
+
+          # Download and install OpenJTalk dictionary
+          echo "Downloading OpenJTalk dictionary..."
+          if curl -L -o naist-jdic.tar.gz "https://sourceforge.net/projects/open-jtalk/files/Dictionary/open_jtalk_dic-1.11/open_jtalk_dic_utf_8-1.11.tar.gz/download"; then
+            tar -xzf naist-jdic.tar.gz
+            if [ -d "open_jtalk_dic_utf_8-1.11" ]; then
+              echo "Installing OpenJTalk dictionary..."
+              mkdir -p dist/piper/share/open_jtalk/dic
+              cp -r open_jtalk_dic_utf_8-1.11/* dist/piper/share/open_jtalk/dic/
+            fi
+            # Clean up
+            rm -f naist-jdic.tar.gz
+            rm -rf open_jtalk_dic_utf_8-1.11
+          fi
+
           # Create archive
           tar -czf piper-${{ runner.os }}.tar.gz -C dist piper
           
@@ -387,7 +401,28 @@ jobs:
               break
             }
           }
-          
+
+          # Download and install OpenJTalk dictionary
+          Write-Host "Downloading OpenJTalk dictionary..."
+          # Use curl for better redirect handling on SourceForge
+          & curl -L -o naist-jdic.tar.gz "https://sourceforge.net/projects/open-jtalk/files/Dictionary/open_jtalk_dic-1.11/open_jtalk_dic_utf_8-1.11.tar.gz/download"
+
+          # Extract using tar (available in Windows 10+)
+          tar -xzf naist-jdic.tar.gz
+
+          # Move dictionary files to the correct location
+          if (Test-Path "open_jtalk_dic_utf_8-1.11") {
+            Write-Host "Installing OpenJTalk dictionary..."
+            New-Item -ItemType Directory -Force -Path dist/piper/share/open_jtalk/dic
+            Copy-Item -Recurse open_jtalk_dic_utf_8-1.11/* dist/piper/share/open_jtalk/dic/
+          } else {
+            Write-Host "Warning: Failed to extract OpenJTalk dictionary"
+          }
+
+          # Clean up
+          Remove-Item -Force naist-jdic.tar.gz -ErrorAction SilentlyContinue
+          Remove-Item -Recurse -Force open_jtalk_dic_utf_8-1.11 -ErrorAction SilentlyContinue
+
           # Create archive
           Compress-Archive -Path dist/piper -DestinationPath piper-${{ runner.os }}.zip
           
