@@ -72,30 +72,72 @@ jobs:
             fi
           fi
 
-      - name: Build piper
+      - name: Create dist package
         run: |
-          # Build piper with ccache
+          # Create distribution package with ccache
           export CMAKE_C_COMPILER_LAUNCHER=ccache
           export CMAKE_CXX_COMPILER_LAUNCHER=ccache
-
+          
+          # Build piper
           mkdir -p build
           cd build
           cmake .. -DCMAKE_BUILD_TYPE=Release
           make -j$(nproc)
-
-      - name: Create dist package
-        uses: ./.github/actions/package-piper
-        with:
-          build-type: 'Release'
-          include-dictionary: 'true'
-
-      - name: Create Linux distribution archive
-        run: |
-          # アクションが作成したpiper-Linux.tar.gzをdist/piper-linux-x64.tar.gzに移動
-          mkdir -p dist
-          if [ -f "piper-Linux.tar.gz" ]; then
-            mv piper-Linux.tar.gz dist/piper-linux-x64.tar.gz
+          cd ..
+          
+          # Create distribution
+          mkdir -p dist/piper/bin
+          mkdir -p dist/piper/lib
+          mkdir -p dist/piper/share
+          
+          # Copy binary and libraries
+          cp build/piper dist/piper/bin/
+          find build -name "*.so*" -type f -exec cp {} dist/piper/lib/ \; 2>/dev/null || true
+          
+          # Copy espeak-ng data
+          if [ -d "build/pi/share/espeak-ng-data" ]; then
+            cp -r build/pi/share/espeak-ng-data dist/piper/share/
+          elif [ -d "build/p/src/piper_phonemize_external-build/install/share/espeak-ng-data" ]; then
+            cp -r build/p/src/piper_phonemize_external-build/install/share/espeak-ng-data dist/piper/share/
+          elif [ -d "build/ei/share/espeak-ng-data" ]; then
+            cp -r build/ei/share/espeak-ng-data dist/piper/share/
           fi
+
+          # Copy OpenJTalk binaries
+          for oj_path in "build/oj/bin/open_jtalk" "build/open_jtalk" "build/bin/open_jtalk"; do
+            if [ -f "$oj_path" ]; then
+              echo "Copying OpenJTalk from $oj_path"
+              cp "$oj_path" dist/piper/bin/
+              chmod +x dist/piper/bin/open_jtalk
+              break
+            fi
+          done
+
+          # Copy OpenJTalk phonemizer
+          for oj_path in "build/oj/bin/open_jtalk_phonemizer" "build/open_jtalk_phonemizer" "build/bin/open_jtalk_phonemizer"; do
+            if [ -f "$oj_path" ]; then
+              echo "Copying OpenJTalk phonemizer from $oj_path"
+              cp "$oj_path" dist/piper/bin/
+              chmod +x dist/piper/bin/open_jtalk_phonemizer
+              break
+            fi
+          done
+
+          # Download and install OpenJTalk dictionary
+          echo "Downloading OpenJTalk dictionary..."
+          if curl -L -o naist-jdic.tar.gz "https://sourceforge.net/projects/open-jtalk/files/Dictionary/open_jtalk_dic-1.11/open_jtalk_dic_utf_8-1.11.tar.gz/download"; then
+            tar -xzf naist-jdic.tar.gz
+            if [ -d "open_jtalk_dic_utf_8-1.11" ]; then
+              echo "Installing OpenJTalk dictionary..."
+              mkdir -p dist/piper/share/open_jtalk/dic
+              cp -r open_jtalk_dic_utf_8-1.11/* dist/piper/share/open_jtalk/dic/
+            fi
+            # Clean up
+            rm -f naist-jdic.tar.gz
+            rm -rf open_jtalk_dic_utf_8-1.11
+          fi
+
+          cd dist && tar czf piper-linux-x64.tar.gz piper/
           
           # Show cache statistics
           ccache -s
@@ -165,17 +207,56 @@ jobs:
           mkdir -p dist/piper/bin
           mkdir -p dist/piper/lib
           mkdir -p dist/piper/share
-          
+
           # Copy binary and libraries
           cp build/piper dist/piper/bin/
           find build -name "*.dylib" -type f -exec cp {} dist/piper/lib/ \; 2>/dev/null || true
-          
+
           # Copy espeak-ng data
           if [ -d "build/pi/share/espeak-ng-data" ]; then
             cp -r build/pi/share/espeak-ng-data dist/piper/share/
+          elif [ -d "build/p/src/piper_phonemize_external-build/install/share/espeak-ng-data" ]; then
+            cp -r build/p/src/piper_phonemize_external-build/install/share/espeak-ng-data dist/piper/share/
+          elif [ -d "build/ei/share/espeak-ng-data" ]; then
+            cp -r build/ei/share/espeak-ng-data dist/piper/share/
           fi
+
+          # Copy OpenJTalk binaries
+          for oj_path in "build/oj/bin/open_jtalk" "build/open_jtalk" "build/bin/open_jtalk"; do
+            if [ -f "$oj_path" ]; then
+              echo "Copying OpenJTalk from $oj_path"
+              cp "$oj_path" dist/piper/bin/
+              chmod +x dist/piper/bin/open_jtalk
+              break
+            fi
+          done
+
+          # Copy OpenJTalk phonemizer
+          for oj_path in "build/oj/bin/open_jtalk_phonemizer" "build/open_jtalk_phonemizer" "build/bin/open_jtalk_phonemizer"; do
+            if [ -f "$oj_path" ]; then
+              echo "Copying OpenJTalk phonemizer from $oj_path"
+              cp "$oj_path" dist/piper/bin/
+              chmod +x dist/piper/bin/open_jtalk_phonemizer
+              break
+            fi
+          done
+
+          # Download and install OpenJTalk dictionary
+          echo "Downloading OpenJTalk dictionary..."
+          if curl -L -o naist-jdic.tar.gz "https://sourceforge.net/projects/open-jtalk/files/Dictionary/open_jtalk_dic-1.11/open_jtalk_dic_utf_8-1.11.tar.gz/download"; then
+            tar -xzf naist-jdic.tar.gz
+            if [ -d "open_jtalk_dic_utf_8-1.11" ]; then
+              echo "Installing OpenJTalk dictionary..."
+              mkdir -p dist/piper/share/open_jtalk/dic
+              cp -r open_jtalk_dic_utf_8-1.11/* dist/piper/share/open_jtalk/dic/
+            fi
+            # Clean up
+            rm -f naist-jdic.tar.gz
+            rm -rf open_jtalk_dic_utf_8-1.11
+          fi
+
           cd dist
-          
+
           # Fix library paths
           # Fix espeak-ng path
           if [ -f "piper/lib/libespeak-ng.2.dylib" ]; then
@@ -184,7 +265,7 @@ jobs:
               @loader_path/../lib/libespeak-ng.2.dylib \
               piper/bin/piper
           fi
-          
+
           # Fix onnxruntime paths
           for lib in piper/lib/libonnxruntime*.dylib; do
             if [ -f "$lib" ]; then
@@ -195,7 +276,7 @@ jobs:
                 piper/bin/piper
             fi
           done
-          
+
           tar czf piper-macos-arm64.tar.gz piper/
 
       - name: Build wheels
@@ -279,19 +360,61 @@ jobs:
           }
 
       - name: Create dist package
-        uses: ./.github/actions/package-piper
-        with:
-          build-type: 'Release'
-          include-dictionary: 'true'
-
-      # Windows版では追加でdist/piper-windows-x64.zipを作成
-      - name: Create Windows distribution zip
         shell: pwsh
         run: |
-          # アクションが作成したpiper-Windows.zipをdist/piper-windows-x64.zipにコピー（リリース用）
-          if (Test-Path "piper-Windows.zip") {
-            Copy-Item piper-Windows.zip dist/piper-windows-x64.zip
+          New-Item -ItemType Directory -Force -Path dist/piper
+          New-Item -ItemType Directory -Force -Path dist/piper/share
+          New-Item -ItemType Directory -Force -Path dist/piper/share/open_jtalk
+
+          # Copy executables and libraries
+          Copy-Item build/Release/*.exe dist/piper/
+          Copy-Item build/Release/*.dll dist/piper/
+          Copy-Item onnxruntime/lib/*.dll dist/piper/
+
+          # Copy OpenJTalk binaries if they exist
+          if (Test-Path "build/oj/bin/open_jtalk.exe") {
+            Write-Host "Copying OpenJTalk binaries..."
+            Copy-Item build/oj/bin/open_jtalk.exe dist/piper/
+            if (Test-Path "build/oj/bin/open_jtalk_phonemizer.exe") {
+              Copy-Item build/oj/bin/open_jtalk_phonemizer.exe dist/piper/
+            }
+          } else {
+            Write-Host "Warning: OpenJTalk binaries not found in build/oj/bin/"
           }
+
+          # Copy espeak-ng data if it exists
+          if (Test-Path "build/pi/share/espeak-ng-data") {
+            Write-Host "Copying espeak-ng data..."
+            Copy-Item -Recurse build/pi/share/espeak-ng-data dist/piper/share/
+          } elseif (Test-Path "build/p/src/piper_phonemize_external-build/install/share/espeak-ng-data") {
+            Write-Host "Copying espeak-ng data from alternate location..."
+            Copy-Item -Recurse build/p/src/piper_phonemize_external-build/install/share/espeak-ng-data dist/piper/share/
+          } else {
+            Write-Host "Warning: espeak-ng data not found"
+          }
+
+          # Download and extract OpenJTalk dictionary
+          Write-Host "Downloading OpenJTalk dictionary..."
+          # Use curl for better redirect handling on SourceForge
+          & curl -L -o naist-jdic.tar.gz "https://sourceforge.net/projects/open-jtalk/files/Dictionary/open_jtalk_dic-1.11/open_jtalk_dic_utf_8-1.11.tar.gz/download"
+
+          # Extract using tar (available in Windows 10+)
+          tar -xzf naist-jdic.tar.gz
+
+          # Move dictionary files to the correct location
+          if (Test-Path "open_jtalk_dic_utf_8-1.11") {
+            Write-Host "Installing OpenJTalk dictionary..."
+            Copy-Item -Recurse open_jtalk_dic_utf_8-1.11/* dist/piper/share/open_jtalk/dic/
+          } else {
+            Write-Host "Warning: Failed to extract OpenJTalk dictionary"
+          }
+
+          # Clean up temporary files
+          Remove-Item -Force naist-jdic.tar.gz -ErrorAction SilentlyContinue
+          Remove-Item -Recurse -Force open_jtalk_dic_utf_8-1.11 -ErrorAction SilentlyContinue
+
+          # Create zip
+          Compress-Archive -Path dist/piper -DestinationPath dist/piper-windows-x64.zip
 
       - name: Build wheels
         shell: pwsh
