@@ -475,11 +475,21 @@ static OpenJTalkError create_temp_files(char* input_file, char* output_file, siz
     if (GetTempFileName(temp_path, "ojt_in", 0, input_file) == 0) {
         return OPENJTALK_ERROR_TEMP_FILE;
     }
-    
+
     if (GetTempFileName(temp_path, "ojt_out", 0, output_file) == 0) {
         // Clean up the input file that was already created
         unlink(input_file);
         return OPENJTALK_ERROR_TEMP_FILE;
+    }
+
+    // Convert to short path names to avoid issues with spaces in paths
+    char short_input[OPENJTALK_MAX_TEMP_PATH];
+    char short_output[OPENJTALK_MAX_TEMP_PATH];
+    if (GetShortPathName(input_file, short_input, OPENJTALK_MAX_TEMP_PATH) > 0) {
+        strcpy(input_file, short_input);
+    }
+    if (GetShortPathName(output_file, short_output, OPENJTALK_MAX_TEMP_PATH) > 0) {
+        strcpy(output_file, short_output);
     }
 #else
     strcpy(input_file, "/tmp/openjtalk_input_XXXXXX");
