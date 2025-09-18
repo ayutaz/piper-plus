@@ -120,7 +120,17 @@ static const char* find_openjtalk_binary() {
     
     for (int i = 0; paths[i] != NULL; i++) {
         if (access(paths[i], F_OK) == 0) {
+#ifdef _WIN32
+            // Get absolute path on Windows to avoid execution issues
+            char abs_path[OPENJTALK_MAX_PATH];
+            if (_fullpath(abs_path, paths[i], OPENJTALK_MAX_PATH) != NULL) {
+                strcpy(g_openjtalk_bin_path, abs_path);
+            } else {
+                strcpy(g_openjtalk_bin_path, paths[i]);
+            }
+#else
             strcpy(g_openjtalk_bin_path, paths[i]);
+#endif
 #ifdef _WIN32
             LeaveCriticalSection(&g_path_mutex);
 #else
@@ -212,11 +222,19 @@ char* openjtalk_text_to_phonemes(const char* text) {
     // Get dictionary path
     const char* dic_path = get_openjtalk_dictionary_path();
     if (!dic_path) {
-        openjtalk_set_result(&result, OPENJTALK_ERROR_DICTIONARY_NOT_FOUND, 
+        openjtalk_set_result(&result, OPENJTALK_ERROR_DICTIONARY_NOT_FOUND,
                             "Failed to get OpenJTalk dictionary path");
         fprintf(stderr, "Error: %s\n", result.message);
         return NULL;
     }
+
+#ifdef _WIN32
+    // Convert dictionary path to absolute path on Windows
+    char abs_dic_path[OPENJTALK_MAX_PATH];
+    if (_fullpath(abs_dic_path, dic_path, OPENJTALK_MAX_PATH) != NULL) {
+        dic_path = abs_dic_path;
+    }
+#endif
     
     // Create temporary files
     OpenJTalkError err = create_temp_files(input_file, output_file, OPENJTALK_MAX_TEMP_PATH);
@@ -256,13 +274,19 @@ char* openjtalk_text_to_phonemes(const char* text) {
     // Construct and execute OpenJTalk command
     char command[OPENJTALK_MAX_COMMAND];
     int is_phonemizer = strstr(openjtalk_bin, "phonemizer") != NULL ? 1 : 0;
-    
+
     if (is_phonemizer) {
         // Use phonemizer binary - no HTS voice needed
 #ifdef _WIN32
+        // Convert all paths to short form on Windows to avoid space issues
+        char short_bin[OPENJTALK_MAX_PATH];
+        char short_dic[OPENJTALK_MAX_PATH];
+        GetShortPathName(openjtalk_bin, short_bin, OPENJTALK_MAX_PATH);
+        GetShortPathName(dic_path, short_dic, OPENJTALK_MAX_PATH);
+
         snprintf(command, sizeof(command),
-                 "cmd /c \"\"%s\" -x \"%s\" -ot \"%s\" \"%s\"\"",
-                 openjtalk_bin, dic_path, output_file, input_file);
+                 "%s -x %s -ot %s %s",
+                 short_bin, short_dic, output_file, input_file);
 #else
         snprintf(command, sizeof(command),
                  "\"%s\" -x \"%s\" -ot \"%s\" \"%s\"",
@@ -278,11 +302,11 @@ char* openjtalk_text_to_phonemes(const char* text) {
 #ifdef _WIN32
         if (voice_path) {
             snprintf(command, sizeof(command),
-                     "cmd /c \"\"%s\" -x \"%s\" -m \"%s\" -ow NUL -ot \"%s\" \"%s\"\"",
+                     "\"%s\" -x \"%s\" -m \"%s\" -ow NUL -ot \"%s\" \"%s\"",
                      openjtalk_bin, dic_path, voice_path, output_file, input_file);
         } else {
             snprintf(command, sizeof(command),
-                     "cmd /c \"\"%s\" -x \"%s\" -ow NUL -ot \"%s\" \"%s\"\"",
+                     "\"%s\" -x \"%s\" -ow NUL -ot \"%s\" \"%s\"",
                      openjtalk_bin, dic_path, output_file, input_file);
         }
 #else
@@ -298,6 +322,9 @@ char* openjtalk_text_to_phonemes(const char* text) {
 #endif
     }
     
+    // Log the command for debugging
+    fprintf(stderr, "DEBUG: Executing command: %s\n", command);
+
     // Execute command
     err = execute_openjtalk_command(command, &result);
     unlink(input_file);  // Clean up input file immediately
@@ -454,23 +481,26 @@ static OpenJTalkError create_temp_files(char* input_file, char* output_file, siz
     }
     
 #ifdef _WIN32
-    // Use GetTempFileName for secure temporary file creation
-    char temp_path[OPENJTALK_MAX_PATH];
-    DWORD path_len = GetTempPath(OPENJTALK_MAX_PATH, temp_path);
-    if (path_len == 0 || path_len > OPENJTALK_MAX_PATH) {
-        return OPENJTALK_ERROR_TEMP_FILE;
-    }
-    
-    // Create unique temporary files
-    if (GetTempFileName(temp_path, "ojt_in", 0, input_file) == 0) {
-        return OPENJTALK_ERROR_TEMP_FILE;
-    }
-    
-    if (GetTempFileName(temp_path, "ojt_out", 0, output_file) == 0) {
-        // Clean up the input file that was already created
+    // Create temp files in current directory to avoid path issues
+    static int temp_counter = 0;
+    DWORD pid = GetCurrentProcessId();
+
+    // Generate unique filenames based on process ID and counter
+    snprintf(input_file, OPENJTALK_MAX_TEMP_PATH, "ojt_in_%u_%d.txt", pid, temp_counter);
+    snprintf(output_file, OPENJTALK_MAX_TEMP_PATH, "ojt_out_%u_%d.txt", pid, temp_counter);
+    temp_counter++;
+
+    // Touch the files to ensure they exist
+    FILE* fp = fopen(input_file, "w");
+    if (!fp) return OPENJTALK_ERROR_TEMP_FILE;
+    fclose(fp);
+
+    fp = fopen(output_file, "w");
+    if (!fp) {
         unlink(input_file);
         return OPENJTALK_ERROR_TEMP_FILE;
     }
+    fclose(fp);
 #else
     strcpy(input_file, "/tmp/openjtalk_input_XXXXXX");
     strcpy(output_file, "/tmp/openjtalk_output_XXXXXX");
@@ -534,10 +564,10 @@ static OpenJTalkError execute_openjtalk_command(const char* command, OpenJTalkRe
     
     // Use system() for simplicity and compatibility
     int exit_code = system(command);
-    
+
     if (exit_code != 0) {
         if (result) {
-            openjtalk_set_result(result, OPENJTALK_ERROR_COMMAND_FAILED, 
+            openjtalk_set_result(result, OPENJTALK_ERROR_COMMAND_FAILED,
                                 "OpenJTalk command failed with exit code: %d", exit_code);
         }
         return OPENJTALK_ERROR_COMMAND_FAILED;
