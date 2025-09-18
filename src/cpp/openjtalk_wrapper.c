@@ -261,7 +261,7 @@ char* openjtalk_text_to_phonemes(const char* text) {
         // Use phonemizer binary - no HTS voice needed
 #ifdef _WIN32
         snprintf(command, sizeof(command),
-                 "cmd /c \"\"%s\" -x \"%s\" -ot \"%s\" \"%s\"\"",
+                 "\"%s\" -x \"%s\" -ot \"%s\" \"%s\"",
                  openjtalk_bin, dic_path, output_file, input_file);
 #else
         snprintf(command, sizeof(command),
@@ -278,11 +278,11 @@ char* openjtalk_text_to_phonemes(const char* text) {
 #ifdef _WIN32
         if (voice_path) {
             snprintf(command, sizeof(command),
-                     "cmd /c \"\"%s\" -x \"%s\" -m \"%s\" -ow NUL -ot \"%s\" \"%s\"\"",
+                     "\"%s\" -x \"%s\" -m \"%s\" -ow NUL -ot \"%s\" \"%s\"",
                      openjtalk_bin, dic_path, voice_path, output_file, input_file);
         } else {
             snprintf(command, sizeof(command),
-                     "cmd /c \"\"%s\" -x \"%s\" -ow NUL -ot \"%s\" \"%s\"\"",
+                     "\"%s\" -x \"%s\" -ow NUL -ot \"%s\" \"%s\"",
                      openjtalk_bin, dic_path, output_file, input_file);
         }
 #else
