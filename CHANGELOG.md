@@ -5,6 +5,32 @@ All notable changes to piper-plus will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.2] - 2025-09-18
+
+### 🚀 Major Features
+
+#### Added
+- **Windows版日本語音声合成の完全サポート** (#180)
+  - OpenJTalkバイナリをWindows版リリースに含める
+  - naist-jdic辞書（40MB）を全プラットフォームに自動同梱
+  - Windows環境での日本語TTSが追加設定なしで動作
+
+### 🔧 Improvements
+
+#### Fixed
+- **Windows環境でのパス処理の改善**
+  - スペースを含むパスでの実行問題を解決
+  - 8.3形式短縮パス名の自動使用
+  - 一時ファイル処理の最適化
+
+### 📦 Build System
+
+#### Changed
+- **CI/CDワークフローの強化**
+  - 全プラットフォームでOpenJTalk辞書を自動ダウンロード
+  - ビルドアーティファクトに日本語TTS機能を含める
+  - Windows/Linux/macOSで統一された日本語音声合成機能
+
 ## [1.5.1] - 2025-09-17
 
 ### 🔧 Improvements
