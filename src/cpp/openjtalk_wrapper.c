@@ -464,33 +464,26 @@ static OpenJTalkError create_temp_files(char* input_file, char* output_file, siz
     }
     
 #ifdef _WIN32
-    // Use GetTempFileName for secure temporary file creation
-    char temp_path[OPENJTALK_MAX_PATH];
-    DWORD path_len = GetTempPath(OPENJTALK_MAX_PATH, temp_path);
-    if (path_len == 0 || path_len > OPENJTALK_MAX_PATH) {
-        return OPENJTALK_ERROR_TEMP_FILE;
-    }
-    
-    // Create unique temporary files
-    if (GetTempFileName(temp_path, "ojt_in", 0, input_file) == 0) {
-        return OPENJTALK_ERROR_TEMP_FILE;
-    }
+    // Create temp files in current directory to avoid path issues
+    static int temp_counter = 0;
+    DWORD pid = GetCurrentProcessId();
 
-    if (GetTempFileName(temp_path, "ojt_out", 0, output_file) == 0) {
-        // Clean up the input file that was already created
+    // Generate unique filenames based on process ID and counter
+    snprintf(input_file, OPENJTALK_MAX_TEMP_PATH, "ojt_in_%u_%d.txt", pid, temp_counter);
+    snprintf(output_file, OPENJTALK_MAX_TEMP_PATH, "ojt_out_%u_%d.txt", pid, temp_counter);
+    temp_counter++;
+
+    // Touch the files to ensure they exist
+    FILE* fp = fopen(input_file, "w");
+    if (!fp) return OPENJTALK_ERROR_TEMP_FILE;
+    fclose(fp);
+
+    fp = fopen(output_file, "w");
+    if (!fp) {
         unlink(input_file);
         return OPENJTALK_ERROR_TEMP_FILE;
     }
-
-    // Convert to short path names to avoid issues with spaces in paths
-    char short_input[OPENJTALK_MAX_TEMP_PATH];
-    char short_output[OPENJTALK_MAX_TEMP_PATH];
-    if (GetShortPathName(input_file, short_input, OPENJTALK_MAX_TEMP_PATH) > 0) {
-        strcpy(input_file, short_input);
-    }
-    if (GetShortPathName(output_file, short_output, OPENJTALK_MAX_TEMP_PATH) > 0) {
-        strcpy(output_file, short_output);
-    }
+    fclose(fp);
 #else
     strcpy(input_file, "/tmp/openjtalk_input_XXXXXX");
     strcpy(output_file, "/tmp/openjtalk_output_XXXXXX");
