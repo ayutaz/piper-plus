@@ -222,11 +222,19 @@ char* openjtalk_text_to_phonemes(const char* text) {
     // Get dictionary path
     const char* dic_path = get_openjtalk_dictionary_path();
     if (!dic_path) {
-        openjtalk_set_result(&result, OPENJTALK_ERROR_DICTIONARY_NOT_FOUND, 
+        openjtalk_set_result(&result, OPENJTALK_ERROR_DICTIONARY_NOT_FOUND,
                             "Failed to get OpenJTalk dictionary path");
         fprintf(stderr, "Error: %s\n", result.message);
         return NULL;
     }
+
+#ifdef _WIN32
+    // Convert dictionary path to absolute path on Windows
+    char abs_dic_path[OPENJTALK_MAX_PATH];
+    if (_fullpath(abs_dic_path, dic_path, OPENJTALK_MAX_PATH) != NULL) {
+        dic_path = abs_dic_path;
+    }
+#endif
     
     // Create temporary files
     OpenJTalkError err = create_temp_files(input_file, output_file, OPENJTALK_MAX_TEMP_PATH);
