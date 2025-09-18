@@ -274,13 +274,19 @@ char* openjtalk_text_to_phonemes(const char* text) {
     // Construct and execute OpenJTalk command
     char command[OPENJTALK_MAX_COMMAND];
     int is_phonemizer = strstr(openjtalk_bin, "phonemizer") != NULL ? 1 : 0;
-    
+
     if (is_phonemizer) {
         // Use phonemizer binary - no HTS voice needed
 #ifdef _WIN32
+        // Convert all paths to short form on Windows to avoid space issues
+        char short_bin[OPENJTALK_MAX_PATH];
+        char short_dic[OPENJTALK_MAX_PATH];
+        GetShortPathName(openjtalk_bin, short_bin, OPENJTALK_MAX_PATH);
+        GetShortPathName(dic_path, short_dic, OPENJTALK_MAX_PATH);
+
         snprintf(command, sizeof(command),
-                 "\"%s\" -x \"%s\" -ot \"%s\" \"%s\"",
-                 openjtalk_bin, dic_path, output_file, input_file);
+                 "%s -x %s -ot %s %s",
+                 short_bin, short_dic, output_file, input_file);
 #else
         snprintf(command, sizeof(command),
                  "\"%s\" -x \"%s\" -ot \"%s\" \"%s\"",
