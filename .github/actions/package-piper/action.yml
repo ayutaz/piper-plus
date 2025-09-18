@@ -61,6 +61,22 @@ runs:
         }
         Copy-Item "build/Release/*.dll" -Destination dist/piper/bin/ -ErrorAction SilentlyContinue
 
+        # Copy piper_phonemize DLLs specifically
+        $phonemizePaths = @(
+          "build/pi/bin/piper_phonemize.dll",
+          "build/pi/lib/piper_phonemize.dll",
+          "build/$buildType/piper_phonemize.dll",
+          "build/Release/piper_phonemize.dll",
+          "build/bin/piper_phonemize.dll"
+        )
+        foreach ($path in $phonemizePaths) {
+          if (Test-Path $path) {
+            Write-Host "Copying phonemize DLL from $path"
+            Copy-Item $path -Destination dist/piper/bin/
+            break
+          }
+        }
+
         # Copy ONNX Runtime DLLs if available
         if (Test-Path "onnxruntime/lib/*.dll") {
           Copy-Item "onnxruntime/lib/*.dll" -Destination dist/piper/bin/ -ErrorAction SilentlyContinue
@@ -138,8 +154,8 @@ runs:
           }
         }
 
-        # Create archive
-        $artifactName = "piper-windows-x64.zip"
+        # Create archive (use piper-Windows.zip for consistency with workflows)
+        $artifactName = "piper-Windows.zip"
         Compress-Archive -Path dist/piper -DestinationPath $artifactName
 
         # Output artifact info
@@ -168,8 +184,22 @@ runs:
         # Copy libraries
         if [ "${{ runner.os }}" = "Linux" ]; then
           find build -name "*.so*" -type f -exec cp {} dist/piper/lib/ \; 2>/dev/null || true
+          # Copy piper_phonemize libraries specifically
+          for lib in build/pi/lib/libpiper_phonemize.so* build/lib/libpiper_phonemize.so* build/*/libpiper_phonemize.so*; do
+            if [ -f "$lib" ]; then
+              echo "Copying phonemize library: $lib"
+              cp "$lib" dist/piper/lib/
+            fi
+          done
         elif [ "${{ runner.os }}" = "macOS" ]; then
           find build -name "*.dylib" -type f -exec cp {} dist/piper/lib/ \; 2>/dev/null || true
+          # Copy piper_phonemize libraries specifically
+          for lib in build/pi/lib/libpiper_phonemize*.dylib build/lib/libpiper_phonemize*.dylib build/*/libpiper_phonemize*.dylib; do
+            if [ -f "$lib" ]; then
+              echo "Copying phonemize library: $lib"
+              cp "$lib" dist/piper/lib/
+            fi
+          done
         fi
 
         # Copy espeak-ng data

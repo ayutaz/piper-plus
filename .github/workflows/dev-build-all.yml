@@ -288,9 +288,9 @@ jobs:
       - name: Create Windows distribution zip
         shell: pwsh
         run: |
-          # アクションが作成したpiper-Windows.zipをpiper-windows-x64.zipにリネーム
+          # アクションが作成したpiper-Windows.zipをdist/piper-windows-x64.zipにコピー（リリース用）
           if (Test-Path "piper-Windows.zip") {
-            Move-Item -Force piper-Windows.zip dist/piper-windows-x64.zip
+            Copy-Item piper-Windows.zip dist/piper-windows-x64.zip
           }
 
       - name: Build wheels
