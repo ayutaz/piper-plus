@@ -533,11 +533,18 @@ static OpenJTalkError execute_openjtalk_command(const char* command, OpenJTalkRe
     }
     
     // Use system() for simplicity and compatibility
+#ifdef _WIN32
+    // On Windows, we need to wrap the entire command in quotes for proper escaping
+    char escaped_command[OPENJTALK_MAX_COMMAND + 10];
+    snprintf(escaped_command, sizeof(escaped_command), "cmd /c \"%s\"", command);
+    int exit_code = system(escaped_command);
+#else
     int exit_code = system(command);
-    
+#endif
+
     if (exit_code != 0) {
         if (result) {
-            openjtalk_set_result(result, OPENJTALK_ERROR_COMMAND_FAILED, 
+            openjtalk_set_result(result, OPENJTALK_ERROR_COMMAND_FAILED,
                                 "OpenJTalk command failed with exit code: %d", exit_code);
         }
         return OPENJTALK_ERROR_COMMAND_FAILED;
