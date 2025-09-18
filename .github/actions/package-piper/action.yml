@@ -77,6 +77,22 @@ runs:
           }
         }
 
+        # Copy espeak-ng DLLs specifically
+        $espeakDllPaths = @(
+          "build/ei/bin/espeak-ng.dll",
+          "build/ei/lib/espeak-ng.dll",
+          "build/$buildType/espeak-ng.dll",
+          "build/Release/espeak-ng.dll",
+          "build/bin/espeak-ng.dll"
+        )
+        foreach ($path in $espeakDllPaths) {
+          if (Test-Path $path) {
+            Write-Host "Copying espeak-ng DLL from $path"
+            Copy-Item $path -Destination dist/piper/bin/
+            break
+          }
+        }
+
         # Copy ONNX Runtime DLLs if available
         if (Test-Path "onnxruntime/lib/*.dll") {
           Copy-Item "onnxruntime/lib/*.dll" -Destination dist/piper/bin/ -ErrorAction SilentlyContinue
@@ -191,12 +207,26 @@ runs:
               cp "$lib" dist/piper/lib/
             fi
           done
+          # Copy espeak-ng libraries specifically
+          for lib in build/ei/lib/libespeak-ng.so* build/lib/libespeak-ng.so* build/*/libespeak-ng.so*; do
+            if [ -f "$lib" ]; then
+              echo "Copying espeak-ng library: $lib"
+              cp "$lib" dist/piper/lib/
+            fi
+          done
         elif [ "${{ runner.os }}" = "macOS" ]; then
           find build -name "*.dylib" -type f -exec cp {} dist/piper/lib/ \; 2>/dev/null || true
           # Copy piper_phonemize libraries specifically
           for lib in build/pi/lib/libpiper_phonemize*.dylib build/lib/libpiper_phonemize*.dylib build/*/libpiper_phonemize*.dylib; do
             if [ -f "$lib" ]; then
               echo "Copying phonemize library: $lib"
+              cp "$lib" dist/piper/lib/
+            fi
+          done
+          # Copy espeak-ng libraries specifically
+          for lib in build/ei/lib/libespeak-ng*.dylib build/lib/libespeak-ng*.dylib build/*/libespeak-ng*.dylib; do
+            if [ -f "$lib" ]; then
+              echo "Copying espeak-ng library: $lib"
               cp "$lib" dist/piper/lib/
             fi
           done
