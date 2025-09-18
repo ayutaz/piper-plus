@@ -316,6 +316,9 @@ char* openjtalk_text_to_phonemes(const char* text) {
 #endif
     }
     
+    // Log the command for debugging
+    fprintf(stderr, "DEBUG: Executing command: %s\n", command);
+
     // Execute command
     err = execute_openjtalk_command(command, &result);
     unlink(input_file);  // Clean up input file immediately
