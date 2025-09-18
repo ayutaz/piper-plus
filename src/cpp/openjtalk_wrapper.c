@@ -120,7 +120,17 @@ static const char* find_openjtalk_binary() {
     
     for (int i = 0; paths[i] != NULL; i++) {
         if (access(paths[i], F_OK) == 0) {
+#ifdef _WIN32
+            // Get absolute path on Windows to avoid execution issues
+            char abs_path[OPENJTALK_MAX_PATH];
+            if (_fullpath(abs_path, paths[i], OPENJTALK_MAX_PATH) != NULL) {
+                strcpy(g_openjtalk_bin_path, abs_path);
+            } else {
+                strcpy(g_openjtalk_bin_path, paths[i]);
+            }
+#else
             strcpy(g_openjtalk_bin_path, paths[i]);
+#endif
 #ifdef _WIN32
             LeaveCriticalSection(&g_path_mutex);
 #else
@@ -533,14 +543,7 @@ static OpenJTalkError execute_openjtalk_command(const char* command, OpenJTalkRe
     }
     
     // Use system() for simplicity and compatibility
-#ifdef _WIN32
-    // On Windows, we need to wrap the entire command in quotes for proper escaping
-    char escaped_command[OPENJTALK_MAX_COMMAND + 10];
-    snprintf(escaped_command, sizeof(escaped_command), "cmd /c \"%s\"", command);
-    int exit_code = system(escaped_command);
-#else
     int exit_code = system(command);
-#endif
 
     if (exit_code != 0) {
         if (result) {
