@@ -414,7 +414,7 @@ jobs:
           if (Test-Path "open_jtalk_dic_utf_8-1.11") {
             Write-Host "Installing OpenJTalk dictionary..."
             New-Item -ItemType Directory -Force -Path dist/piper/share/open_jtalk/dic
-            Copy-Item -Recurse open_jtalk_dic_utf_8-1.11/* dist/piper/share/open_jtalk/dic/
+            Copy-Item -Path "open_jtalk_dic_utf_8-1.11\*" -Destination "dist/piper/share/open_jtalk/dic/" -Recurse -Force
           } else {
             Write-Host "Warning: Failed to extract OpenJTalk dictionary"
           }
