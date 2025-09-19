@@ -70,7 +70,7 @@ jobs:
             --platform linux/arm/v7 \
             --build-arg CMAKE_BUILD_TYPE=Release \
             --tag piper-armv7 \
-            --file Dockerfile.armv7 \
+            --file Dockerfile \
             --output type=local,dest=dist \
             .
 
@@ -107,7 +107,7 @@ jobs:
             --platform linux/arm64 \
             --build-arg CMAKE_BUILD_TYPE=Release \
             --tag piper-arm64 \
-            --file Dockerfile.arm64 \
+            --file Dockerfile \
             --output type=local,dest=dist \
             .
 
