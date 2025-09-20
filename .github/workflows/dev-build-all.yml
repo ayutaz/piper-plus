@@ -75,8 +75,7 @@ jobs:
             bash -c "
               apt-get update && apt-get install -y \
                 build-essential cmake git pkg-config \
-                libicu-dev libespeak-ng-dev libmecab-dev \
-                mecab mecab-ipadic-utf8 ninja-build ccache
+                libicu-dev libespeak-ng-dev ninja-build ccache
               mkdir -p build && cd build
               cmake .. -DCMAKE_BUILD_TYPE=Release -GNinja
               ninja -j1
@@ -88,12 +87,6 @@ jobs:
               # Copy espeak-ng-data if available
               if [ -d /usr/share/espeak-ng-data ]; then
                 cp -r /usr/share/espeak-ng-data dist/piper/share/
-              fi
-
-              # Copy OpenJTalk dictionary if available
-              if [ -d /usr/share/mecab/dic/ipadic-utf8 ]; then
-                mkdir -p dist/piper/share/open_jtalk/dic
-                cp -r /usr/share/mecab/dic/ipadic-utf8/* dist/piper/share/open_jtalk/dic/
               fi
 
               cd dist && tar czf piper-linux-armv7.tar.gz piper/
