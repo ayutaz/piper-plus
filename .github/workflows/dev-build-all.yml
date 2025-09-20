@@ -177,6 +177,24 @@ jobs:
       - name: List downloaded files
         run: ls -la dist/
 
+      - name: Fix artifact names
+        run: |
+          # Rename downloaded artifacts to match expected names
+          if [ -f "dist/piper-Linux.tar.gz" ]; then
+            mv dist/piper-Linux.tar.gz dist/piper-linux-x64.tar.gz
+            echo "Renamed piper-Linux.tar.gz to piper-linux-x64.tar.gz"
+          fi
+          if [ -f "dist/piper-macOS.tar.gz" ]; then
+            mv dist/piper-macOS.tar.gz dist/piper-macos-arm64.tar.gz
+            echo "Renamed piper-macOS.tar.gz to piper-macos-arm64.tar.gz"
+          fi
+          if [ -f "dist/piper-Windows.zip" ]; then
+            mv dist/piper-Windows.zip dist/piper-windows-x64.zip
+            echo "Renamed piper-Windows.zip to piper-windows-x64.zip"
+          fi
+          echo "Final dist contents:"
+          ls -la dist/
+
       - name: Upload to release
         uses: ./.github/actions/retry-upload
         with:
