@@ -206,10 +206,16 @@ RUN if [ "$TARGETARCH" = "amd64" ]; then \
 WORKDIR /dist
 RUN mkdir -p piper && \
     cp -dR /build/install/* ./piper/ && \
-    tar -czf "piper_${TARGETARCH}.tar.gz" piper/
+    if [ "$TARGETARCH" = "arm" ] && [ "$TARGETVARIANT" = "v7" ]; then \
+        tar -czf "piper-linux-armv7.tar.gz" piper/; \
+    elif [ "$TARGETARCH" = "arm64" ]; then \
+        tar -czf "piper-linux-arm64.tar.gz" piper/; \
+    else \
+        tar -czf "piper_${TARGETARCH}.tar.gz" piper/; \
+    fi
 
 # Add an alias for backward compatibility
 FROM builder AS build
 
 FROM scratch
-COPY --from=build /dist/piper_*.tar.gz ./
+COPY --from=build /dist/piper*.tar.gz ./
