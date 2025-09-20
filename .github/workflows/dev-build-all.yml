@@ -51,47 +51,67 @@ jobs:
       cache-key-prefix: piper-windows-x64
 
   # ARM builds still need custom Docker-based build
-  # ARMv7 build temporarily disabled due to cross-compilation issues
-  # TODO: Fix ARMv7 build issues with QEMU emulation
-  # build_linux_armv7:
-  #   name: Build Linux ARMv7
-  #   runs-on: ubuntu-22.04
-  #   steps:
-  #     - uses: actions/checkout@v4.2.2
-  #       with:
-  #         submodules: true
-  #
-  #     - name: Set up QEMU
-  #       uses: docker/setup-qemu-action@v3.2.0
-  #       with:
-  #         platforms: arm
-  #
-  #     - name: Build in Docker
-  #       run: |
-  #         docker build \
-  #           --platform linux/arm/v7 \
-  #           --build-arg CMAKE_BUILD_TYPE=Release \
-  #           --build-arg TARGETARCH=arm \
-  #           --build-arg TARGETVARIANT=v7 \
-  #           --tag piper-armv7 \
-  #           --file Dockerfile \
-  #           --progress=plain \
-  #           --output type=local,dest=dist \
-  #           .
-  #
-  #     - name: Upload binary artifact
-  #       uses: actions/upload-artifact@v4.6.0
-  #       with:
-  #         name: piper-linux-armv7
-  #         path: dist/piper-linux-armv7.tar.gz
-  #
-  #     - name: Upload to release
-  #       if: inputs.release_upload_url != '' && inputs.release_upload_url != null
-  #       uses: ./.github/actions/retry-upload
-  #       with:
-  #         upload_url: ${{ inputs.release_upload_url }}
-  #         asset_path: dist/piper-linux-armv7.tar.gz
-  #         asset_name: piper-linux-armv7.tar.gz
+  build_linux_armv7:
+    name: Build Linux ARMv7
+    runs-on: ubuntu-22.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4.2.2
+        with:
+          submodules: true
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3.2.0
+        with:
+          platforms: arm
+
+      - name: Build in Docker
+        run: |
+          docker run --rm \
+            --platform linux/arm/v7 \
+            -v "$(pwd)":/workspace \
+            -w /workspace \
+            debian:bookworm \
+            bash -c "
+              apt-get update && apt-get install -y \
+                build-essential cmake git pkg-config \
+                libicu-dev libespeak-ng-dev libmecab-dev \
+                mecab mecab-ipadic-utf8 ninja-build ccache
+              mkdir -p build && cd build
+              cmake .. -DCMAKE_BUILD_TYPE=Release -GNinja
+              ninja -j1
+              cd ..
+              mkdir -p dist/piper/bin dist/piper/lib dist/piper/share
+              cp build/piper dist/piper/bin/
+              find build -name '*.so*' -type f -exec cp {} dist/piper/lib/ \; 2>/dev/null || true
+
+              # Copy espeak-ng-data if available
+              if [ -d /usr/share/espeak-ng-data ]; then
+                cp -r /usr/share/espeak-ng-data dist/piper/share/
+              fi
+
+              # Copy OpenJTalk dictionary if available
+              if [ -d /usr/share/mecab/dic/ipadic-utf8 ]; then
+                mkdir -p dist/piper/share/open_jtalk/dic
+                cp -r /usr/share/mecab/dic/ipadic-utf8/* dist/piper/share/open_jtalk/dic/
+              fi
+
+              cd dist && tar czf piper-linux-armv7.tar.gz piper/
+            "
+
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4.6.0
+        with:
+          name: piper-linux-armv7
+          path: dist/piper-linux-armv7.tar.gz
+
+      - name: Upload to release
+        if: inputs.release_upload_url != '' && inputs.release_upload_url != null
+        uses: ./.github/actions/retry-upload
+        with:
+          upload_url: ${{ inputs.release_upload_url }}
+          asset_path: dist/piper-linux-armv7.tar.gz
+          asset_name: piper-linux-armv7.tar.gz
 
   build_linux_arm64:
     name: Build Linux ARM64
@@ -167,8 +187,7 @@ jobs:
   # Summary job
   summary:
     name: Build Summary
-    # ARMv7 temporarily removed from dependencies
-    needs: [build_linux_x64, build_macos_arm64, build_windows_x64, build_linux_arm64]
+    needs: [build_linux_x64, build_macos_arm64, build_windows_x64, build_linux_armv7, build_linux_arm64]
     if: always()
     runs-on: ubuntu-22.04
     outputs:
@@ -180,6 +199,7 @@ jobs:
           if [[ "${{ needs.build_linux_x64.result }}" == "success" ]] && \
              [[ "${{ needs.build_macos_arm64.result }}" == "success" ]] && \
              [[ "${{ needs.build_windows_x64.result }}" == "success" ]] && \
+             [[ "${{ needs.build_linux_armv7.result }}" == "success" ]] && \
              [[ "${{ needs.build_linux_arm64.result }}" == "success" ]]; then
             echo "success=true" >> $GITHUB_OUTPUT
             echo "✅ All builds succeeded!"
@@ -189,7 +209,7 @@ jobs:
             echo "  Linux x64: ${{ needs.build_linux_x64.result }}"
             echo "  macOS ARM64: ${{ needs.build_macos_arm64.result }}"
             echo "  Windows x64: ${{ needs.build_windows_x64.result }}"
+            echo "  Linux ARMv7: ${{ needs.build_linux_armv7.result }}"
             echo "  Linux ARM64: ${{ needs.build_linux_arm64.result }}"
-            echo "  ⚠️ Linux ARMv7: Temporarily disabled"
             exit 1
           fi
