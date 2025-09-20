@@ -151,10 +151,11 @@ COPY . .
 
 # Build step (with architecture-specific optimizations)
 RUN if [ "$TARGETARCH" = "arm" ]; then \
-        # ARMv7 builds: optimized for Cortex-A7/A15 \
+        # ARMv7 builds: Use more conservative optimization to avoid build failures \
         echo "Starting ARMv7 build..." && \
-        export CFLAGS="-O2 -march=armv7-a -mfpu=neon-vfpv4 -mfloat-abi=hard -fomit-frame-pointer" && \
-        export CXXFLAGS="-O2 -march=armv7-a -mfpu=neon-vfpv4 -mfloat-abi=hard -fomit-frame-pointer" && \
+        export CFLAGS="-O1 -march=armv7-a -mfpu=neon -mfloat-abi=hard" && \
+        export CXXFLAGS="-O1 -march=armv7-a -mfpu=neon -mfloat-abi=hard" && \
+        export LDFLAGS="-Wl,--no-undefined" && \
         timeout 2400 cmake --build build --config Release --parallel 1 --verbose || \
         (echo "Build failed, retrying..." && cmake --build build --config Release --parallel 1 --verbose); \
     elif [ "$TARGETARCH" = "arm64" ]; then \
