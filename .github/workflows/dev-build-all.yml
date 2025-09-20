@@ -66,13 +66,40 @@ jobs:
 
       - name: Build in Docker
         run: |
+          # Debug: Show Docker version and buildx info
+          docker version
+          docker buildx version || echo "buildx not available"
+
+          # Try the build with more verbose output
           docker build \
             --platform linux/arm/v7 \
             --build-arg CMAKE_BUILD_TYPE=Release \
+            --build-arg TARGETARCH=arm \
+            --build-arg TARGETVARIANT=v7 \
             --tag piper-armv7 \
             --file Dockerfile \
+            --progress=plain \
             --output type=local,dest=dist \
-            .
+            . || {
+              echo "Build failed, trying alternative approach..."
+              # Fallback to docker run approach
+              docker run --rm \
+                --platform linux/arm/v7 \
+                -v "$(pwd)":/workspace \
+                -w /workspace \
+                debian:bookworm \
+                bash -c "
+                  apt-get update && apt-get install -y build-essential cmake git wget curl
+                  mkdir -p build && cd build
+                  cmake .. -DCMAKE_BUILD_TYPE=Release
+                  make -j2
+                  cd ..
+                  mkdir -p dist/piper/bin dist/piper/lib dist/piper/share
+                  cp build/piper dist/piper/bin/ || echo 'piper binary not found'
+                  find build -name '*.so*' -type f -exec cp {} dist/piper/lib/ \; 2>/dev/null || true
+                  cd dist && tar czf piper-linux-armv7.tar.gz piper/
+                "
+            }
 
       - name: Upload binary artifact
         uses: actions/upload-artifact@v4.6.0

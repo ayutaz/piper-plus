@@ -12,6 +12,9 @@ RUN echo 'Acquire::Retries "3";' > /etc/apt/apt.conf.d/80-retries
 # ========== DEPENDENCIES STAGE ==========
 FROM base AS dependencies
 
+# Debug: Show build arguments
+RUN echo "Build arguments - TARGETARCH: ${TARGETARCH}, TARGETVARIANT: ${TARGETVARIANT}"
+
 # 基本ツールのインストール（レイヤーキャッシュ最適化）
 # ARM64エミュレーション環境でのlibc-binエラー対策
 RUN rm -f /var/cache/ldconfig/aux-cache || true && \
@@ -206,11 +209,20 @@ RUN if [ "$TARGETARCH" = "amd64" ]; then \
 WORKDIR /dist
 RUN mkdir -p piper && \
     cp -dR /build/install/* ./piper/ && \
-    if [ "$TARGETARCH" = "arm" ] && [ "$TARGETVARIANT" = "v7" ]; then \
-        tar -czf "piper-linux-armv7.tar.gz" piper/; \
-    elif [ "$TARGETARCH" = "arm64" ]; then \
+    echo "TARGETARCH=${TARGETARCH}, TARGETVARIANT=${TARGETVARIANT}" && \
+    if [ "$TARGETARCH" = "arm" ]; then \
+        if [ "$TARGETVARIANT" = "v7" ] || [ "$TARGETVARIANT" = "7" ] || [ -z "$TARGETVARIANT" ]; then \
+            echo "Creating ARMv7 tarball..." && \
+            tar -czf "piper-linux-armv7.tar.gz" piper/; \
+        else \
+            echo "Unknown ARM variant: $TARGETVARIANT" && \
+            tar -czf "piper-linux-arm-${TARGETVARIANT}.tar.gz" piper/; \
+        fi \
+    elif [ "$TARGETARCH" = "arm64" ] || [ "$TARGETARCH" = "aarch64" ]; then \
+        echo "Creating ARM64 tarball..." && \
         tar -czf "piper-linux-arm64.tar.gz" piper/; \
     else \
+        echo "Creating generic tarball for arch: $TARGETARCH" && \
         tar -czf "piper_${TARGETARCH}.tar.gz" piper/; \
     fi
 
