@@ -150,6 +150,39 @@ jobs:
           asset_path: dist/piper-linux-arm64.tar.gz
           asset_name: piper-linux-arm64.tar.gz
 
+  # Build Python wheels for PyPI
+  build_python_wheels:
+    name: Build Python Wheels
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4.2.2
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install build dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install build wheel setuptools
+
+      - name: Build wheel
+        working-directory: src/python_run
+        run: |
+          python -m build --wheel --outdir ../../dist/
+
+      - name: List built wheels
+        run: ls -la dist/
+
+      - name: Upload wheel artifact
+        uses: actions/upload-artifact@v4.6.0
+        with:
+          name: wheels-3.11
+          path: dist/*.whl
+
   # Upload built artifacts to release if URL is provided
   upload_to_release:
     name: Upload to Release
@@ -205,7 +238,7 @@ jobs:
   # Summary job
   summary:
     name: Build Summary
-    needs: [build_linux_x64, build_macos_arm64, build_windows_x64, build_linux_armv7, build_linux_arm64]
+    needs: [build_linux_x64, build_macos_arm64, build_windows_x64, build_linux_armv7, build_linux_arm64, build_python_wheels]
     if: always()
     runs-on: ubuntu-22.04
     outputs:
@@ -218,7 +251,8 @@ jobs:
              [[ "${{ needs.build_macos_arm64.result }}" == "success" ]] && \
              [[ "${{ needs.build_windows_x64.result }}" == "success" ]] && \
              [[ "${{ needs.build_linux_armv7.result }}" == "success" ]] && \
-             [[ "${{ needs.build_linux_arm64.result }}" == "success" ]]; then
+             [[ "${{ needs.build_linux_arm64.result }}" == "success" ]] && \
+             [[ "${{ needs.build_python_wheels.result }}" == "success" ]]; then
             echo "success=true" >> $GITHUB_OUTPUT
             echo "✅ All builds succeeded!"
           else
@@ -229,5 +263,6 @@ jobs:
             echo "  Windows x64: ${{ needs.build_windows_x64.result }}"
             echo "  Linux ARMv7: ${{ needs.build_linux_armv7.result }}"
             echo "  Linux ARM64: ${{ needs.build_linux_arm64.result }}"
+            echo "  Python Wheels: ${{ needs.build_python_wheels.result }}"
             exit 1
           fi
