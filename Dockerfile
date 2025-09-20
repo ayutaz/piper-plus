@@ -211,8 +211,11 @@ RUN mkdir -p piper && \
     cp -dR /build/install/* ./piper/ && \
     echo "TARGETARCH=${TARGETARCH}, TARGETVARIANT=${TARGETVARIANT}" && \
     if [ "$TARGETARCH" = "arm" ]; then \
-        if [ "$TARGETVARIANT" = "v7" ] || [ "$TARGETVARIANT" = "7" ] || [ -z "$TARGETVARIANT" ]; then \
+        if [ "$TARGETVARIANT" = "v7" ] || [ "$TARGETVARIANT" = "7" ]; then \
             echo "Creating ARMv7 tarball..." && \
+            tar -czf "piper-linux-armv7.tar.gz" piper/; \
+        elif [ -z "$TARGETVARIANT" ]; then \
+            echo "ARM architecture with no variant specified, defaulting to ARMv7..." && \
             tar -czf "piper-linux-armv7.tar.gz" piper/; \
         else \
             echo "Unknown ARM variant: $TARGETVARIANT" && \
