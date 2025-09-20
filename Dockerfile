@@ -12,6 +12,9 @@ RUN echo 'Acquire::Retries "3";' > /etc/apt/apt.conf.d/80-retries
 # ========== DEPENDENCIES STAGE ==========
 FROM base AS dependencies
 
+# Debug: Show build arguments
+RUN echo "Build arguments - TARGETARCH: ${TARGETARCH}, TARGETVARIANT: ${TARGETVARIANT}"
+
 # 基本ツールのインストール（レイヤーキャッシュ最適化）
 # ARM64エミュレーション環境でのlibc-binエラー対策
 RUN rm -f /var/cache/ldconfig/aux-cache || true && \
@@ -105,6 +108,15 @@ RUN if [ "$TARGETARCH" = "amd64" ]; then \
               -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
               -DCMAKE_BUILD_PARALLEL_LEVEL=2 \
               -GNinja; \
+    elif [ "$TARGETARCH" = "arm" ]; then \
+        echo "Building for ARMv7 (arm)..." && \
+        cmake -Bbuild -DCMAKE_INSTALL_PREFIX=install \
+              -DCMAKE_BUILD_TYPE=Release \
+              -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+              -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+              -DCMAKE_BUILD_PARALLEL_LEVEL=1 \
+              -DCMAKE_VERBOSE_MAKEFILE=ON \
+              -GNinja; \
     elif [ "$TARGETARCH" = "arm64" ]; then \
         HOST_ARCH=$(dpkg --print-architecture) && \
         echo "Host architecture: $HOST_ARCH, Target: $TARGETARCH" && \
@@ -138,7 +150,15 @@ RUN if [ "$TARGETARCH" = "amd64" ]; then \
 COPY . .
 
 # Build step (with architecture-specific optimizations)
-RUN if [ "$TARGETARCH" = "arm64" ]; then \
+RUN if [ "$TARGETARCH" = "arm" ]; then \
+        # ARMv7 builds: Use more conservative optimization to avoid build failures \
+        echo "Starting ARMv7 build..." && \
+        export CFLAGS="-O1 -march=armv7-a -mfpu=neon -mfloat-abi=hard" && \
+        export CXXFLAGS="-O1 -march=armv7-a -mfpu=neon -mfloat-abi=hard" && \
+        export LDFLAGS="-Wl,--no-undefined" && \
+        timeout 2400 cmake --build build --config Release --parallel 1 --verbose || \
+        (echo "Build failed, retrying..." && cmake --build build --config Release --parallel 1 --verbose); \
+    elif [ "$TARGETARCH" = "arm64" ]; then \
         # ARM64 builds: optimized with NEON support \
         echo "Starting optimized ARM64 build..." && \
         export CFLAGS="-O2 -march=armv8-a+simd -mtune=cortex-a72 -fomit-frame-pointer" && \
@@ -206,11 +226,23 @@ RUN if [ "$TARGETARCH" = "amd64" ]; then \
 WORKDIR /dist
 RUN mkdir -p piper && \
     cp -dR /build/install/* ./piper/ && \
-    if [ "$TARGETARCH" = "arm" ] && [ "$TARGETVARIANT" = "v7" ]; then \
-        tar -czf "piper-linux-armv7.tar.gz" piper/; \
-    elif [ "$TARGETARCH" = "arm64" ]; then \
+    echo "TARGETARCH=${TARGETARCH}, TARGETVARIANT=${TARGETVARIANT}" && \
+    if [ "$TARGETARCH" = "arm" ]; then \
+        if [ "$TARGETVARIANT" = "v7" ] || [ "$TARGETVARIANT" = "7" ]; then \
+            echo "Creating ARMv7 tarball..." && \
+            tar -czf "piper-linux-armv7.tar.gz" piper/; \
+        elif [ -z "$TARGETVARIANT" ]; then \
+            echo "ARM architecture with no variant specified, defaulting to ARMv7..." && \
+            tar -czf "piper-linux-armv7.tar.gz" piper/; \
+        else \
+            echo "Unknown ARM variant: $TARGETVARIANT" && \
+            tar -czf "piper-linux-arm-${TARGETVARIANT}.tar.gz" piper/; \
+        fi \
+    elif [ "$TARGETARCH" = "arm64" ] || [ "$TARGETARCH" = "aarch64" ]; then \
+        echo "Creating ARM64 tarball..." && \
         tar -czf "piper-linux-arm64.tar.gz" piper/; \
     else \
+        echo "Creating generic tarball for arch: $TARGETARCH" && \
         tar -czf "piper_${TARGETARCH}.tar.gz" piper/; \
     fi
 
