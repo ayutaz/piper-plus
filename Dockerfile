@@ -108,6 +108,15 @@ RUN if [ "$TARGETARCH" = "amd64" ]; then \
               -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
               -DCMAKE_BUILD_PARALLEL_LEVEL=2 \
               -GNinja; \
+    elif [ "$TARGETARCH" = "arm" ]; then \
+        echo "Building for ARMv7 (arm)..." && \
+        cmake -Bbuild -DCMAKE_INSTALL_PREFIX=install \
+              -DCMAKE_BUILD_TYPE=Release \
+              -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+              -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+              -DCMAKE_BUILD_PARALLEL_LEVEL=1 \
+              -DCMAKE_VERBOSE_MAKEFILE=ON \
+              -GNinja; \
     elif [ "$TARGETARCH" = "arm64" ]; then \
         HOST_ARCH=$(dpkg --print-architecture) && \
         echo "Host architecture: $HOST_ARCH, Target: $TARGETARCH" && \
@@ -141,7 +150,14 @@ RUN if [ "$TARGETARCH" = "amd64" ]; then \
 COPY . .
 
 # Build step (with architecture-specific optimizations)
-RUN if [ "$TARGETARCH" = "arm64" ]; then \
+RUN if [ "$TARGETARCH" = "arm" ]; then \
+        # ARMv7 builds: optimized for Cortex-A7/A15 \
+        echo "Starting ARMv7 build..." && \
+        export CFLAGS="-O2 -march=armv7-a -mfpu=neon-vfpv4 -mfloat-abi=hard -fomit-frame-pointer" && \
+        export CXXFLAGS="-O2 -march=armv7-a -mfpu=neon-vfpv4 -mfloat-abi=hard -fomit-frame-pointer" && \
+        timeout 2400 cmake --build build --config Release --parallel 1 --verbose || \
+        (echo "Build failed, retrying..." && cmake --build build --config Release --parallel 1 --verbose); \
+    elif [ "$TARGETARCH" = "arm64" ]; then \
         # ARM64 builds: optimized with NEON support \
         echo "Starting optimized ARM64 build..." && \
         export CFLAGS="-O2 -march=armv8-a+simd -mtune=cortex-a72 -fomit-frame-pointer" && \
