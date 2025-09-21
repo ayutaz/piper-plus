@@ -138,6 +138,7 @@ int main(int argc, char *argv[]) {
 
 #ifdef _WIN32
   // Initialize Windows subsystems early
+  SetConsoleCP(CP_UTF8);       // Set input console to UTF-8
   SetConsoleOutputCP(CP_UTF8);
   
   // Enhanced DLL loading for Windows
