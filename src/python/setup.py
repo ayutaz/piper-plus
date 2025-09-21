@@ -47,7 +47,8 @@ setup(
         "piper_train": ["py.typed"],
     },
     install_requires=requirements,
-    extras_require={':python_version<"3.9"': ["importlib_resources"]},
+    python_requires=">=3.11",
+    extras_require={},
     entry_points={
         "console_scripts": [
             "piper-train = piper_train.__main__:main",
@@ -58,9 +59,9 @@ setup(
         "Intended Audience :: Developers",
         "Topic :: Text Processing :: Linguistic",
         "License :: OSI Approved :: MIT License",
-        "Programming Language :: Python :: 3.7",
-        "Programming Language :: Python :: 3.8",
-        "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.11",
+        "Programming Language :: Python :: 3.12",
+        "Programming Language :: Python :: 3.13",
     ],
     keywords="rhasspy tts speech voice",
 )
