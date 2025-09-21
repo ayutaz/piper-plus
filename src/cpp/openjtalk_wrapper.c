@@ -83,6 +83,7 @@ static const char* find_openjtalk_binary() {
     }
 
     // Check environment variable first
+    // Debug logging is essential for troubleshooting Japanese TTS issues on Windows
     const char* env_path = getenv("OPENJTALK_PHONEMIZER_PATH");
     if (env_path) {
         fprintf(stderr, "DEBUG: OPENJTALK_PHONEMIZER_PATH = %s\n", env_path);

@@ -13,7 +13,6 @@
 #include <vector>
 #include <cstdlib>
 #include <locale>
-#include <codecvt>
 
 #ifdef _MSC_VER
 #define WIN32_LEAN_AND_MEAN
@@ -139,9 +138,18 @@ int main(int argc, char *argv[]) {
   spdlog::set_default_logger(spdlog::stderr_color_st("piper"));
 
   // Set locale for proper UTF-8 handling
-  std::locale::global(std::locale(""));
-  std::cin.imbue(std::locale());
-  std::cout.imbue(std::locale());
+  try {
+    std::locale utf8_locale("en_US.UTF-8");
+    std::locale::global(utf8_locale);
+    std::cin.imbue(utf8_locale);
+    std::cout.imbue(utf8_locale);
+  } catch (const std::runtime_error& e) {
+    spdlog::warn("Unable to set UTF-8 locale: {}", e.what());
+    // Fallback to default locale
+    std::locale::global(std::locale());
+    std::cin.imbue(std::locale());
+    std::cout.imbue(std::locale());
+  }
 
 #ifdef _WIN32
   // Initialize Windows subsystems early
