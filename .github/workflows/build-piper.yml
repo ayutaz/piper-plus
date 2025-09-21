@@ -358,8 +358,8 @@ jobs:
             Write-Host "Warning: piper.exe not found, creating minimal package"
           }
           
-          # Copy required DLLs
-          Copy-Item "build/${{ inputs.build-type }}/*.dll" -Destination dist/piper/bin/ -ErrorAction SilentlyContinue
+          # Copy required DLLs (exclude test files like .wav)
+          Get-ChildItem "build/${{ inputs.build-type }}/*.dll" -ErrorAction SilentlyContinue | Copy-Item -Destination dist/piper/bin/
           
           # Copy espeak-ng data
           $espeakPaths = @(
