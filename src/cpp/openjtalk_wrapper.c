@@ -72,7 +72,7 @@ static const char* find_openjtalk_binary() {
 #else
     pthread_mutex_lock(&g_path_mutex);
 #endif
-    
+
     if (g_openjtalk_bin_path[0] != 0) {
 #ifdef _WIN32
         LeaveCriticalSection(&g_path_mutex);
@@ -81,7 +81,27 @@ static const char* find_openjtalk_binary() {
 #endif
         return g_openjtalk_bin_path;
     }
-    
+
+    // Check environment variable first
+    const char* env_path = getenv("OPENJTALK_PHONEMIZER_PATH");
+    if (env_path) {
+        fprintf(stderr, "DEBUG: OPENJTALK_PHONEMIZER_PATH = %s\n", env_path);
+        if (access(env_path, F_OK) == 0) {
+            strncpy(g_openjtalk_bin_path, env_path, sizeof(g_openjtalk_bin_path) - 1);
+            g_openjtalk_bin_path[sizeof(g_openjtalk_bin_path) - 1] = '\0';
+#ifdef _WIN32
+            LeaveCriticalSection(&g_path_mutex);
+#else
+            pthread_mutex_unlock(&g_path_mutex);
+#endif
+            return g_openjtalk_bin_path;
+        } else {
+            fprintf(stderr, "DEBUG: File not found at OPENJTALK_PHONEMIZER_PATH\n");
+        }
+    } else {
+        fprintf(stderr, "DEBUG: OPENJTALK_PHONEMIZER_PATH not set\n");
+    }
+
     // Check if open_jtalk_phonemizer binary exists (preferred)
     const char* paths[] = {
 #ifdef _WIN32
@@ -525,20 +545,16 @@ static OpenJTalkError write_input_text(const char* filename, const char* text) {
     if (!filename || !text) {
         return OPENJTALK_ERROR_NULL_INPUT;
     }
-    
+
 #ifdef _WIN32
-    // Use binary mode and UTF-8 BOM for Windows
+    // Use binary mode WITHOUT BOM for Windows - OpenJTalk expects plain UTF-8
     FILE* fp = fopen(filename, "wb");
     if (!fp) {
         return OPENJTALK_ERROR_IO_WRITE;
     }
-    // Write UTF-8 BOM for better compatibility
-    const unsigned char utf8_bom[] = {0xEF, 0xBB, 0xBF};
-    if (fwrite(utf8_bom, 1, 3, fp) != 3) {
-        fclose(fp);
-        return OPENJTALK_ERROR_IO_WRITE;
-    }
-    if (fputs(text, fp) == EOF) {
+    // Write text directly without BOM
+    size_t len = strlen(text);
+    if (fwrite(text, 1, len, fp) != len) {
         fclose(fp);
         return OPENJTALK_ERROR_IO_WRITE;
     }

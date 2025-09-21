@@ -12,6 +12,8 @@
 #include <thread>
 #include <vector>
 #include <cstdlib>
+#include <locale>
+#include <codecvt>
 
 #ifdef _MSC_VER
 #define WIN32_LEAN_AND_MEAN
@@ -135,6 +137,11 @@ void rawOutputProc(vector<int16_t> &sharedAudioBuffer, mutex &mutAudio,
 int main(int argc, char *argv[]) {
 
   spdlog::set_default_logger(spdlog::stderr_color_st("piper"));
+
+  // Set locale for proper UTF-8 handling
+  std::locale::global(std::locale(""));
+  std::cin.imbue(std::locale());
+  std::cout.imbue(std::locale());
 
 #ifdef _WIN32
   // Initialize Windows subsystems early
