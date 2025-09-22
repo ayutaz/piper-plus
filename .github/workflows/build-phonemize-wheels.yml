@@ -133,7 +133,7 @@ jobs:
       - name: Install wheel
         run: |
           python -m pip install --upgrade pip
-          python -m pip install --find-links dist/ piper-phonemize-bundled
+          python -m pip install --find-links dist/ piper-phonemize
 
       - name: Test import and basic functionality
         run: |
@@ -163,7 +163,7 @@ jobs:
 
     environment:
       name: pypi
-      url: https://pypi.org/project/piper-phonemize-bundled/
+      url: https://pypi.org/project/piper-phonemize/
 
     steps:
       - name: Download all wheels
@@ -192,9 +192,9 @@ jobs:
           files: dist/*.whl
           generate_release_notes: true
           tag_name: ${{ github.ref_name }}
-          name: piper-phonemize-bundled ${{ github.ref_name }}
+          name: piper-phonemize ${{ github.ref_name }}
           body: |
-            ## piper-phonemize-bundled Release
+            ## piper-phonemize Release
 
             Cross-platform wheels for piper-phonemize with bundled espeak-ng.
 
@@ -210,5 +210,5 @@ jobs:
 
             ### Installation
             ```bash
-            pip install piper-phonemize-bundled
+            pip install piper-phonemize
             ```
