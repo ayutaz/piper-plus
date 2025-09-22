@@ -1,0 +1,24 @@
+include README.md
+include LICENSE
+include pyproject.toml
+include build_dependencies.py
+include prepare_sources.py
+
+# Include all C++ source files
+recursive-include piper_phonemize/cpp/src *.cpp *.hpp *.h
+
+# Include espeak-ng data files
+recursive-include piper_phonemize/data/espeak-ng-data *
+
+# Include compiled libraries
+recursive-include piper_phonemize *.dll *.so *.dylib *.pyd
+
+# Exclude build artifacts
+recursive-exclude build *
+recursive-exclude dist *
+recursive-exclude *.egg-info *
+global-exclude __pycache__
+global-exclude *.pyc
+global-exclude *.pyo
+global-exclude .git*
+global-exclude .DS_Store

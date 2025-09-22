@@ -1,0 +1,256 @@
+name: Build piper-phonemize-bundled wheels
+
+on:
+  push:
+    tags:
+      - 'phonemize-v*'
+  pull_request:
+    paths:
+      - 'src/piper_phonemize_bundled/**'
+      - '.github/workflows/build-phonemize-wheels.yml'
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: 'Publish to PyPI'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  CIBW_BUILD_VERBOSITY: 1
+
+jobs:
+  build_wheels:
+    name: Build wheels on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-2022, macos-12, ubuntu-22.04]
+        python: ["cp311", "cp312", "cp313"]
+
+    steps:
+      - uses: actions/checkout@v4.2.2
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      # Windows: Setup MSVC
+      - name: Setup MSVC (Windows)
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1.13.0
+        with:
+          arch: x64
+
+      # Windows: Install dependencies
+      - name: Install Windows dependencies
+        if: runner.os == 'Windows'
+        run: |
+          choco install cmake --installargs 'ADD_CMAKE_TO_PATH=System' -y
+          refreshenv
+
+      # macOS: Install dependencies
+      - name: Install macOS dependencies
+        if: runner.os == 'macOS'
+        run: |
+          brew install automake autoconf libtool pkg-config cmake
+
+      # Linux: Set up QEMU for cross-compilation
+      - name: Set up QEMU
+        if: runner.os == 'Linux'
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: all
+
+      # Python setup
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # Install cibuildwheel
+      - name: Install cibuildwheel
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install cibuildwheel==2.16.2
+
+      # Prepare source files
+      - name: Prepare source files
+        working-directory: src/piper_phonemize_bundled
+        run: |
+          # Copy C++ source files from piper-phonemize external
+          python prepare_sources.py
+
+      # Build wheels
+      - name: Build wheels
+        working-directory: src/piper_phonemize_bundled
+        env:
+          CIBW_BUILD: "${{ matrix.python }}-*"
+          CIBW_SKIP: "*-win32 *-musllinux_* *i686"
+          CIBW_ARCHS_WINDOWS: AMD64
+          CIBW_ARCHS_MACOS: x86_64 arm64 universal2
+          CIBW_ARCHS_LINUX: x86_64 aarch64
+
+          # Windows-specific environment
+          CIBW_ENVIRONMENT_WINDOWS: >
+            PATH="C:\\Program Files\\CMake\\bin;$PATH"
+            CIBUILDWHEEL=1
+
+          # macOS-specific environment
+          CIBW_ENVIRONMENT_MACOS: >
+            MACOSX_DEPLOYMENT_TARGET=10.14
+            CIBUILDWHEEL=1
+
+          # Linux-specific environment
+          CIBW_ENVIRONMENT_LINUX: >
+            CIBUILDWHEEL=1
+
+          # Before build commands
+          CIBW_BEFORE_BUILD_WINDOWS: >
+            pip install pybind11 cmake ninja &&
+            python build_dependencies.py --platform windows
+
+          CIBW_BEFORE_BUILD_MACOS: >
+            pip install pybind11 cmake ninja &&
+            python build_dependencies.py --platform macos
+
+          CIBW_BEFORE_BUILD_LINUX: >
+            yum install -y automake autoconf libtool pkgconfig &&
+            pip install pybind11 cmake ninja &&
+            python build_dependencies.py --platform linux
+
+          # Test commands
+          CIBW_TEST_COMMAND: >
+            python -c "import piper_phonemize;
+            result = piper_phonemize.phonemize_espeak('Hello world', 'en-us');
+            print(f'Phonemized: {result}');
+            assert result, 'Phonemization failed'"
+
+          # Repair wheel commands
+          CIBW_REPAIR_WHEEL_COMMAND_WINDOWS: >
+            pip install delvewheel &&
+            delvewheel repair -w {dest_dir} {wheel}
+
+          CIBW_REPAIR_WHEEL_COMMAND_MACOS: >
+            pip install delocate &&
+            delocate-wheel --require-archs {delocate_archs} -w {dest_dir} -v {wheel}
+
+          CIBW_REPAIR_WHEEL_COMMAND_LINUX: >
+            auditwheel repair -w {dest_dir} {wheel}
+        run: |
+          python -m cibuildwheel --output-dir wheelhouse
+
+      # Upload artifacts
+      - uses: actions/upload-artifact@v4.6.0
+        with:
+          name: wheels-${{ matrix.os }}-${{ matrix.python }}
+          path: src/piper_phonemize_bundled/wheelhouse/*.whl
+
+  # Test wheels on different platforms
+  test_wheels:
+    name: Test wheels on ${{ matrix.os }}
+    needs: build_wheels
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+        python-version: ['3.11', '3.12']
+
+    steps:
+      - uses: actions/checkout@v4.2.2
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Download wheels
+        uses: actions/download-artifact@v4
+        with:
+          pattern: wheels-*
+          path: dist/
+          merge-multiple: true
+
+      - name: Install wheel
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install --find-links dist/ piper-phonemize-bundled
+
+      - name: Test import and basic functionality
+        run: |
+          python -c "
+          import piper_phonemize
+          print('Testing English phonemization...')
+          result = piper_phonemize.phonemize_espeak('Hello world', 'en-us')
+          print(f'Result: {result}')
+          assert result, 'English phonemization failed'
+
+          print('Testing phoneme to IDs conversion...')
+          ids = piper_phonemize.phonemize_codepoints('Test')
+          print(f'Codepoint IDs: {ids}')
+          assert ids, 'Codepoint conversion failed'
+
+          print('All tests passed!')
+          "
+
+  # Publish to PyPI
+  publish:
+    name: Publish to PyPI
+    needs: [build_wheels, test_wheels]
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'push' && startsWith(github.ref, 'refs/tags/phonemize-v') ||
+      github.event_name == 'workflow_dispatch' && github.event.inputs.publish == 'true'
+
+    environment:
+      name: pypi
+      url: https://pypi.org/project/piper-phonemize-bundled/
+
+    steps:
+      - name: Download all wheels
+        uses: actions/download-artifact@v4
+        with:
+          pattern: wheels-*
+          path: dist/
+          merge-multiple: true
+
+      - name: List wheels
+        run: |
+          ls -la dist/
+          echo "Total wheels: $(ls -1 dist/*.whl | wc -l)"
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          password: ${{ secrets.PYPI_API_TOKEN }}
+          skip-existing: true
+          verbose: true
+
+      - name: Create GitHub Release
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: dist/*.whl
+          generate_release_notes: true
+          tag_name: ${{ github.ref_name }}
+          name: piper-phonemize-bundled ${{ github.ref_name }}
+          body: |
+            ## piper-phonemize-bundled Release
+
+            Cross-platform wheels for piper-phonemize with bundled espeak-ng.
+
+            ### Supported Platforms
+            - Windows (x64)
+            - macOS (x86_64, arm64, universal2)
+            - Linux (x86_64, aarch64)
+
+            ### Supported Python Versions
+            - Python 3.11
+            - Python 3.12
+            - Python 3.13
+
+            ### Installation
+            ```bash
+            pip install piper-phonemize-bundled
+            ```
