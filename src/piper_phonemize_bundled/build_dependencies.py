@@ -17,12 +17,24 @@ from pathlib import Path
 
 
 def download_file(url, dest_path):
-    """Download a file with progress indicator"""
+    """Download a file with progress indicator and SSL verification"""
+    import ssl
+    import hashlib
+
     print(f"Downloading {url}...")
-    with urllib.request.urlopen(url) as response:
+
+    # Create SSL context with verification
+    ssl_context = ssl.create_default_context()
+    ssl_context.check_hostname = True
+    ssl_context.verify_mode = ssl.CERT_REQUIRED
+
+    req = urllib.request.Request(url, headers={'User-Agent': 'piper-phonemize-bundled/1.2.0'})
+
+    with urllib.request.urlopen(req, context=ssl_context) as response:
         total_size = int(response.headers.get('Content-Length', 0))
         block_size = 8192
         downloaded = 0
+        hasher = hashlib.sha256()
 
         with open(dest_path, 'wb') as f:
             while True:
@@ -30,12 +42,14 @@ def download_file(url, dest_path):
                 if not buffer:
                     break
                 downloaded += len(buffer)
+                hasher.update(buffer)
                 f.write(buffer)
 
                 if total_size > 0:
                     progress = (downloaded / total_size) * 100
                     print(f"Progress: {progress:.1f}%", end='\r')
-    print("\nDownload complete!")
+
+    print(f"\nDownload complete! SHA256: {hasher.hexdigest()[:16]}...")
 
 
 def extract_archive(archive_path, extract_to):
@@ -58,8 +72,10 @@ def build_espeak_ng_windows(build_dir):
     espeak_dir = build_dir / "espeak-ng"
     espeak_dir.mkdir(parents=True, exist_ok=True)
 
-    # Download espeak-ng source
-    espeak_url = "https://github.com/rhasspy/espeak-ng/archive/refs/heads/master.zip"
+    # Download espeak-ng source (pinned to specific commit for reproducibility)
+    # Using rhasspy's fork which has the necessary patches for Piper
+    espeak_commit = "0f65aa301e0d6bae5e172cc74197d32a6182200f"
+    espeak_url = f"https://github.com/rhasspy/espeak-ng/archive/{espeak_commit}.zip"
     espeak_zip = build_dir / "espeak-ng.zip"
 
     if not espeak_zip.exists():
@@ -68,7 +84,7 @@ def build_espeak_ng_windows(build_dir):
     # Extract
     with tempfile.TemporaryDirectory() as tmpdir:
         extract_archive(espeak_zip, tmpdir)
-        src_dir = Path(tmpdir) / "espeak-ng-master"
+        src_dir = Path(tmpdir) / f"espeak-ng-{espeak_commit}"
 
         # Build with CMake
         build_path = src_dir / "build"
@@ -112,8 +128,9 @@ def build_espeak_ng_unix(build_dir, platform_name):
     espeak_dir = build_dir / "espeak-ng"
     espeak_dir.mkdir(parents=True, exist_ok=True)
 
-    # Download espeak-ng source
-    espeak_url = "https://github.com/rhasspy/espeak-ng/archive/refs/heads/master.tar.gz"
+    # Download espeak-ng source (pinned to specific commit for reproducibility)
+    espeak_commit = "0f65aa301e0d6bae5e172cc74197d32a6182200f"
+    espeak_url = f"https://github.com/rhasspy/espeak-ng/archive/{espeak_commit}.tar.gz"
     espeak_tar = build_dir / "espeak-ng.tar.gz"
 
     if not espeak_tar.exists():
@@ -122,7 +139,7 @@ def build_espeak_ng_unix(build_dir, platform_name):
     # Extract and build
     with tempfile.TemporaryDirectory() as tmpdir:
         extract_archive(espeak_tar, tmpdir)
-        src_dir = Path(tmpdir) / "espeak-ng-master"
+        src_dir = Path(tmpdir) / f"espeak-ng-{espeak_commit}"
 
         # Run autogen.sh if it exists
         autogen = src_dir / "autogen.sh"

@@ -43,7 +43,7 @@ library_dirs = []
 if system == "Windows":
     extra_compile_args = ["/utf-8", "/EHsc", "/std:c++17"]
     # Use static runtime to avoid dependency issues
-    extra_compile_args.append("/MT" if "Release" in os.environ.get("CMAKE_BUILD_TYPE", "Release") else "/MTd")
+    extra_compile_args.append("/MT" if os.environ.get("CMAKE_BUILD_TYPE", "Release") == "Release" else "/MTd")
     libraries = ["espeak-ng", "onnxruntime", "ws2_32", "winmm"]
     include_dirs = [
         str(_ESPEAK_DIR / "include"),
