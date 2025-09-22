@@ -6,10 +6,11 @@ Provides text-to-phoneme conversion using espeak-ng
 __version__ = "1.2.0"
 __author__ = "Piper-Plus Contributors"
 
-import sys
 import os
+import sys
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import Optional
+
 
 # Add the module directory to DLL search path on Windows
 if sys.platform == "win32":
@@ -25,33 +26,33 @@ if sys.platform == "win32":
 # Import the C++ extension
 try:
     from ._cpp import (
-        # Main functions
-        phonemize_espeak,
-        phonemize_codepoints,
-        phoneme_ids_espeak,
-        # Tashkeel functions (Arabic support)
-        tashkeel_run,
         # Constants
         DEFAULT_PHONEME_ID_MAP,
+        phoneme_ids_espeak,
+        phonemize_codepoints,
+        # Main functions
+        phonemize_espeak,
+        # Tashkeel functions (Arabic support)
+        tashkeel_run,
     )
     _cpp_available = True
 except ImportError as e:
     _cpp_available = False
     _import_error = str(e)
-    
+
     # Provide stub functions when C++ module is not available
-    def phonemize_espeak(text: str, voice: str = "en-us") -> List[str]:
+    def phonemize_espeak(text: str, voice: str = "en-us") -> list[str]:
         raise ImportError(f"piper_phonemize C++ extension not available: {_import_error}")
-    
-    def phonemize_codepoints(text: str) -> List[int]:
+
+    def phonemize_codepoints(text: str) -> list[int]:
         raise ImportError(f"piper_phonemize C++ extension not available: {_import_error}")
-    
-    def phoneme_ids_espeak(phonemes: List[str]) -> List[int]:
+
+    def phoneme_ids_espeak(phonemes: list[str]) -> list[int]:
         raise ImportError(f"piper_phonemize C++ extension not available: {_import_error}")
-    
+
     def tashkeel_run(text: str) -> str:
         raise ImportError(f"piper_phonemize C++ extension not available: {_import_error}")
-    
+
     DEFAULT_PHONEME_ID_MAP = {}
 
 
@@ -80,28 +81,28 @@ def phonemize(
 ) -> tuple:
     """
     High-level phonemization function
-    
+
     Args:
         text: Text to phonemize
         language: Language/voice code (e.g., "en-us", "de", "fr")
         return_phonemes: Whether to return phoneme strings
         return_ids: Whether to return phoneme IDs
-    
+
     Returns:
         Tuple of (phonemes, ids) based on flags.
         Returns None for disabled options.
     """
     if not _cpp_available:
         raise ImportError(f"piper_phonemize C++ extension not available: {_import_error}")
-    
+
     result = []
-    
+
     if return_phonemes:
         phonemes = phonemize_espeak(text, language)
         result.append(phonemes)
     else:
         result.append(None)
-    
+
     if return_ids:
         if return_phonemes:
             # Use the phonemes we already got
@@ -113,14 +114,14 @@ def phonemize(
         result.append(ids)
     else:
         result.append(None)
-    
+
     if len(result) == 1:
         return result[0]
     return tuple(result)
 
 
 # Backwards compatibility
-def phonemize_text(text: str, voice: str = "en-us") -> List[str]:
+def phonemize_text(text: str, voice: str = "en-us") -> list[str]:
     """Legacy function name for compatibility"""
     return phonemize_espeak(text, voice)
 

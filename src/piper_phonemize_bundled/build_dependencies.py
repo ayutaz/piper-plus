@@ -4,22 +4,20 @@ Build dependencies for piper-phonemize-bundled
 Downloads and builds espeak-ng and onnxruntime for the target platform
 """
 import argparse
-import os
+import hashlib
 import platform
 import shutil
+import ssl
 import subprocess
-import sys
+import tarfile
 import tempfile
 import urllib.request
 import zipfile
-import tarfile
 from pathlib import Path
 
 
 def download_file(url, dest_path):
     """Download a file with progress indicator and SSL verification"""
-    import ssl
-    import hashlib
 
     print(f"Downloading {url}...")
 

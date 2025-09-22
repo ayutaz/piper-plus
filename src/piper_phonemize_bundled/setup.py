@@ -4,10 +4,11 @@ Cross-platform build of piper-phonemize with bundled espeak-ng
 """
 import os
 import platform
-import subprocess
 import sys
 from pathlib import Path
-from setuptools import setup, Extension, find_packages
+
+from setuptools import find_packages, setup
+
 
 # Check for pybind11
 try:
@@ -66,7 +67,7 @@ elif system == "Darwin":  # macOS
     ]
     # Add rpath for bundled libraries
     extra_link_args = [
-        f"-Wl,-rpath,@loader_path",
+        "-Wl,-rpath,@loader_path",
         "-framework", "CoreFoundation",
         "-framework", "CoreServices",
     ]

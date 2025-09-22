@@ -4,21 +4,20 @@ Prepare C++ source files for piper-phonemize-bundled
 Copies source files from piper-phonemize external dependency
 """
 import shutil
-import sys
 from pathlib import Path
 
 
 def copy_sources():
     """Copy C++ source files from piper-phonemize external"""
     src_dir = Path(__file__).parent
-    
+
     # Destination directory for C++ sources
     cpp_dir = src_dir / "piper_phonemize" / "cpp" / "src"
     cpp_dir.mkdir(parents=True, exist_ok=True)
-    
+
     # Try to find sources in the main build directory
     project_root = src_dir.parent.parent
-    
+
     # Possible source locations
     source_locations = [
         # From CMake build
@@ -27,7 +26,7 @@ def copy_sources():
         # From lib directory
         project_root / "lib" / "piper-phonemize" / "src",
     ]
-    
+
     # Find the first existing source location
     source_dir = None
     for location in source_locations:
@@ -35,14 +34,14 @@ def copy_sources():
             source_dir = location
             print(f"Found source files at: {source_dir}")
             break
-    
+
     if not source_dir:
         print("Error: Could not find piper-phonemize source files")
         print("Searched in:")
         for location in source_locations:
             print(f"  - {location}")
         return False
-    
+
     # List of required source files
     required_files = [
         "phonemize.cpp",
@@ -53,7 +52,7 @@ def copy_sources():
         "tashkeel.hpp",
         "python.cpp",
     ]
-    
+
     # Copy each required file
     copied_files = []
     for filename in required_files:
@@ -63,18 +62,17 @@ def copy_sources():
             shutil.copy2(src_file, dst_file)
             copied_files.append(filename)
             print(f"  Copied: {filename}")
-        else:
-            # Some files might be optional
-            if filename not in ["python.cpp"]:
-                print(f"  Warning: {filename} not found (might be optional)")
-    
+        # Some files might be optional
+        elif filename not in ["python.cpp"]:
+            print(f"  Warning: {filename} not found (might be optional)")
+
     # Also copy any additional headers
     for header_file in source_dir.glob("*.h"):
         dst_file = cpp_dir / header_file.name
         shutil.copy2(header_file, dst_file)
         copied_files.append(header_file.name)
         print(f"  Copied: {header_file.name}")
-    
+
     print(f"\nSuccessfully copied {len(copied_files)} files")
     return True
 
@@ -84,17 +82,17 @@ def copy_data_files():
     src_dir = Path(__file__).parent
     data_dir = src_dir / "piper_phonemize" / "data" / "espeak-ng-data"
     data_dir.mkdir(parents=True, exist_ok=True)
-    
+
     # Try to find espeak-ng-data in the build directory
     project_root = src_dir.parent.parent
-    
+
     # Possible data locations
     data_locations = [
         project_root / "build" / "_deps" / "piper_phonemize-src" / "espeak-ng" / "espeak-ng-data",
         project_root / "build" / "p" / "src" / "piper_phonemize_external" / "espeak-ng" / "espeak-ng-data",
         project_root / "lib" / "piper-phonemize" / "espeak-ng" / "espeak-ng-data",
     ]
-    
+
     # Find the first existing data location
     source_data = None
     for location in data_locations:
@@ -102,7 +100,7 @@ def copy_data_files():
             source_data = location
             print(f"Found espeak-ng-data at: {source_data}")
             break
-    
+
     if source_data:
         # Copy the entire data directory
         shutil.copytree(source_data, data_dir, dirs_exist_ok=True)
@@ -115,14 +113,14 @@ def copy_data_files():
 
 def main():
     print("Preparing source files for piper-phonemize-bundled...")
-    
+
     # Copy C++ sources
     if not copy_sources():
         print("\nNote: Source files will need to be downloaded during CI build")
-    
+
     # Copy data files
     copy_data_files()
-    
+
     print("\nPreparation complete!")
 
 
