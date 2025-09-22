@@ -42,12 +42,19 @@ jobs:
         with:
           arch: x64
 
-      # Windows: Install dependencies
-      - name: Install Windows dependencies
+      # Windows: Check dependencies
+      - name: Check Windows dependencies
         if: runner.os == 'Windows'
+        shell: pwsh
         run: |
-          choco install cmake --installargs 'ADD_CMAKE_TO_PATH=System' -y
-          refreshenv
+          # CMake should be pre-installed on GitHub Actions Windows runners
+          cmake --version
+          # If cmake is not found, install it
+          if (-not (Get-Command cmake -ErrorAction SilentlyContinue)) {
+            choco install cmake --installargs 'ADD_CMAKE_TO_PATH=System' -y
+            $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+            cmake --version
+          }
 
       # macOS: Install dependencies
       - name: Install macOS dependencies
@@ -93,7 +100,6 @@ jobs:
 
           # Windows-specific environment
           CIBW_ENVIRONMENT_WINDOWS: >
-            PATH="C:\\Program Files\\CMake\\bin;$PATH"
             CIBUILDWHEEL=1
 
           # macOS-specific environment
