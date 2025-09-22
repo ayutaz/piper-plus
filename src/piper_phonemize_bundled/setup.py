@@ -134,7 +134,7 @@ else:
     package_data["piper_phonemize"].extend(["*.so", "*.so.*"])
 
 setup(
-    name="piper-phonemize-bundled",
+    name="piper-phonemize",
     version=__version__,
     author="Piper-Plus Contributors",
     author_email="",

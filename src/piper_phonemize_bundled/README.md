@@ -1,4 +1,4 @@
-# piper-phonemize-bundled
+# piper-phonemize (Piper-Plus Edition)
 
 Cross-platform Python package for text phonemization with bundled espeak-ng, designed for Piper TTS.
 
@@ -13,7 +13,7 @@ Cross-platform Python package for text phonemization with bundled espeak-ng, des
 ## Installation
 
 ```bash
-pip install piper-phonemize-bundled
+pip install piper-phonemize
 ```
 
 ## Usage

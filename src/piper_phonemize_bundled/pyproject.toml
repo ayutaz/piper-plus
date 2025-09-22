@@ -8,7 +8,7 @@ requires = [
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "piper-phonemize-bundled"
+name = "piper-phonemize"
 version = "1.2.0"
 description = "Phonemization library for Piper TTS with bundled espeak-ng"
 readme = "README.md"
