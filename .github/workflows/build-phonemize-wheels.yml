@@ -87,6 +87,8 @@ jobs:
         run: |
           # Copy C++ source files from piper-phonemize external
           python prepare_sources.py
+          # Create python.cpp binding file if needed
+          python create_python_stub.py
 
       # Build wheels
       - name: Build wheels

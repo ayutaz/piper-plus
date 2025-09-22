@@ -15,6 +15,17 @@ def copy_sources():
     cpp_dir = src_dir / "piper_phonemize" / "cpp" / "src"
     cpp_dir.mkdir(parents=True, exist_ok=True)
 
+    # List of required source files
+    required_files = [
+        "phonemize.cpp",
+        "phonemize.hpp",
+        "phoneme_ids.cpp",
+        "phoneme_ids.hpp",
+        "tashkeel.cpp",
+        "tashkeel.hpp",
+        "python.cpp",
+    ]
+
     # Try to find sources in the main build directory
     project_root = src_dir.parent.parent
 
@@ -36,23 +47,55 @@ def copy_sources():
             break
 
     if not source_dir:
-        print("Error: Could not find piper-phonemize source files")
-        print("Searched in:")
-        for location in source_locations:
-            print(f"  - {location}")
-        return False
+        print("Local source files not found, downloading from GitHub...")
+        import tempfile
+        import urllib.request
+        import zipfile
 
-    # List of required source files
-    required_files = [
-        "phonemize.cpp",
-        "phonemize.hpp",
-        "phoneme_ids.cpp",
-        "phoneme_ids.hpp",
-        "tashkeel.cpp",
-        "tashkeel.hpp",
-        "python.cpp",
-    ]
+        # Download from piper-phonemize GitHub repository
+        url = "https://github.com/rhasspy/piper-phonemize/archive/refs/heads/master.zip"
 
+        with tempfile.TemporaryDirectory() as tmpdir:
+            zip_path = Path(tmpdir) / "piper-phonemize.zip"
+            print(f"Downloading {url}...")
+            urllib.request.urlretrieve(url, zip_path)
+
+            print("Extracting source files...")
+            with zipfile.ZipFile(zip_path, 'r') as z:
+                z.extractall(tmpdir)
+
+            source_dir = Path(tmpdir) / "piper-phonemize-master" / "src"
+            if not source_dir.exists():
+                print(f"Error: Source directory not found in downloaded archive")
+                return False
+
+            # Copy files from the downloaded source
+            print(f"Found source files in downloaded archive")
+
+            # Copy required files
+            copied_files = []
+            for filename in required_files:
+                src_file = source_dir / filename
+                if src_file.exists():
+                    dst_file = cpp_dir / filename
+                    shutil.copy2(src_file, dst_file)
+                    copied_files.append(filename)
+                    print(f"  Copied: {filename}")
+                # Some files might be optional
+                elif filename not in ["python.cpp"]:
+                    print(f"  Warning: {filename} not found (might be optional)")
+
+            # Also copy any additional headers
+            for header_file in source_dir.glob("*.h"):
+                dst_file = cpp_dir / header_file.name
+                shutil.copy2(header_file, dst_file)
+                copied_files.append(header_file.name)
+                print(f"  Copied: {header_file.name}")
+
+            print(f"\nSuccessfully copied {len(copied_files)} files from GitHub")
+            return True
+
+    # If we get here, we have a local source directory
     # Copy each required file
     copied_files = []
     for filename in required_files:
