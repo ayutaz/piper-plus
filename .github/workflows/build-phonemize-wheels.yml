@@ -84,6 +84,7 @@ jobs:
       # Prepare source files
       - name: Prepare source files
         working-directory: src/piper_phonemize_bundled
+        shell: bash
         run: |
           # For now, use dummy setup to test CI
           cp setup_dummy.py setup.py
