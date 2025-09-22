@@ -26,8 +26,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-2022, macos-12, ubuntu-22.04]
-        python: ["cp311", "cp312", "cp313"]
+        os: [windows-latest, ubuntu-latest]  # Skip macOS for now to save resources
+        python: ["3.11"]  # Test with single Python version first
 
     steps:
       - uses: actions/checkout@v4.2.2
@@ -73,7 +73,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: ${{ matrix.python }}
 
       # Install cibuildwheel
       - name: Install cibuildwheel
