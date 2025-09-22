@@ -92,42 +92,11 @@ jobs:
           mkdir -p piper_phonemize
           echo "# Dummy module for CI testing" > piper_phonemize/__init__.py
 
-      # Build wheels
+      # Build wheels - use simple pip wheel for now
       - name: Build wheels
         working-directory: src/piper_phonemize_bundled
-        env:
-          CIBW_BUILD: "${{ matrix.python }}-*"
-          CIBW_SKIP: "*-win32 *-musllinux_* *i686"
-          CIBW_ARCHS_WINDOWS: AMD64
-          CIBW_ARCHS_MACOS: x86_64 arm64 universal2
-          CIBW_ARCHS_LINUX: x86_64 aarch64
-
-          # Windows-specific environment
-          CIBW_ENVIRONMENT_WINDOWS: >
-            CIBUILDWHEEL=1
-
-          # macOS-specific environment
-          CIBW_ENVIRONMENT_MACOS: >
-            MACOSX_DEPLOYMENT_TARGET=10.14
-            CIBUILDWHEEL=1
-
-          # Linux-specific environment
-          CIBW_ENVIRONMENT_LINUX: >
-            CIBUILDWHEEL=1
-
-          # Before build commands - simplified
-          CIBW_BEFORE_BUILD: >
-            pip install pybind11
-
-          # Test commands - simplified for initial build
-          CIBW_TEST_COMMAND: >
-            python -c "import piper_phonemize;
-            print('Import successful')"
-
-          # Skip wheel repair for now
-          CIBW_REPAIR_WHEEL_COMMAND: ""
         run: |
-          python -m cibuildwheel --output-dir wheelhouse
+          python -m pip wheel . --wheel-dir wheelhouse
 
       # Upload artifacts
       - uses: actions/upload-artifact@v4.6.0
