@@ -134,6 +134,15 @@ class BuildExtWindows(build_ext):
             shutil.copy2(dll, package_dir)
             print(f"Copied {dll} to package")
 
+        # Copy espeak-ng-data directory
+        espeak_data_src = _ESPEAK_DIR / "share" / "espeak-ng-data"
+        espeak_data_dst = package_dir / "data" / "espeak-ng-data"
+        if espeak_data_src.exists():
+            if espeak_data_dst.exists():
+                shutil.rmtree(espeak_data_dst)
+            shutil.copytree(espeak_data_src, espeak_data_dst)
+            print(f"Copied espeak-ng-data to package")
+
 
 setup(
     name="piper-phonemize",

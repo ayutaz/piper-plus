@@ -43,9 +43,16 @@ try:
         """Phonemize text using espeak-ng with automatic data path detection"""
         if not dataPath:
             # Use the bundled data directory if available
-            _data_dir = Path(__file__).parent / "data" / "espeak-ng-data"
+            _data_dir = Path(__file__).parent / "data"
             if _data_dir.exists():
-                dataPath = str(_data_dir.parent)
+                # Convert to absolute Windows path and replace backslashes
+                dataPath = str(_data_dir.resolve())
+                # On Windows, ensure we use the correct separator
+                if sys.platform == "win32":
+                    dataPath = dataPath.replace("/", "\\")
+            else:
+                # Fall back to empty string - espeak-ng will use its default
+                dataPath = ""
         return _phonemize_espeak_raw(text, voice, dataPath)
 
     def phonemize_codepoints(text: str, casing: str = "lower") -> list:
