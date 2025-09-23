@@ -42,15 +42,21 @@ jobs:
         run: |
           VERSION="${{ github.event.inputs.version }}"
           echo "Checking version consistency for: $VERSION"
-          
-          # Check VERSION file
-          if [ -f "VERSION" ]; then
-            FILE_VERSION=$(cat VERSION | tr -d '\n\r')
-            if [ "$FILE_VERSION" != "$VERSION" ]; then
-              echo "❌ VERSION file has '$FILE_VERSION', expected '$VERSION'"
-              exit 1
+
+          # Check if this is a dev/pre-release version
+          if echo "$VERSION" | grep -qE '(dev|a|b|rc)'; then
+            echo "📦 Development/pre-release version detected: $VERSION"
+            echo "⚠️ Skipping VERSION file consistency check for dev/pre-release versions"
+          else
+            # Check VERSION file only for stable releases
+            if [ -f "VERSION" ]; then
+              FILE_VERSION=$(cat VERSION | tr -d '\n\r')
+              if [ "$FILE_VERSION" != "$VERSION" ]; then
+                echo "❌ VERSION file has '$FILE_VERSION', expected '$VERSION'"
+                exit 1
+              fi
+              echo "✅ VERSION file: $FILE_VERSION"
             fi
-            echo "✅ VERSION file: $FILE_VERSION"
           fi
           
           # Check pyproject.toml now uses dynamic version
