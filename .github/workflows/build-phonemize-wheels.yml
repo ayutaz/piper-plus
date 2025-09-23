@@ -141,11 +141,22 @@ jobs:
       - name: Test import and basic functionality
         shell: pwsh
         run: |
+          # Set UTF-8 encoding for PowerShell
+          [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+          $env:PYTHONIOENCODING = "utf-8"
+
           python -c @"
+          import sys
           import piper_phonemize
+
+          # Ensure UTF-8 encoding
+          sys.stdout.reconfigure(encoding='utf-8')
+
           print('Testing English phonemization on Windows...')
           result = piper_phonemize.phonemize_espeak('Hello world', 'en-us')
-          print(f'Result: {result}')
+          # Convert result to ASCII-safe representation for display
+          result_str = str(result).encode('ascii', 'backslashreplace').decode('ascii')
+          print(f'Result: {result_str}')
           assert result, 'English phonemization failed'
 
           print('Testing phoneme to IDs conversion...')
