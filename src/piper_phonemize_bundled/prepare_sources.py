@@ -73,12 +73,16 @@ def copy_sources():
             # Copy files from the downloaded source
             print("Found source files in downloaded archive")
 
-            # Copy required files
+            # Copy required files (skip python.cpp if it already exists)
             copied_files = []
             for filename in required_files:
+                dst_file = cpp_dir / filename
+                if filename == "python.cpp" and dst_file.exists():
+                    print(f"  Skipped: {filename} (already exists)")
+                    continue
+
                 src_file = source_dir / filename
                 if src_file.exists():
-                    dst_file = cpp_dir / filename
                     shutil.copy2(src_file, dst_file)
                     copied_files.append(filename)
                     print(f"  Copied: {filename}")
@@ -97,12 +101,17 @@ def copy_sources():
             return True
 
     # If we get here, we have a local source directory
-    # Copy each required file
+    # Copy each required file (skip python.cpp if it already exists)
     copied_files = []
     for filename in required_files:
+        dst_file = cpp_dir / filename
+        if filename == "python.cpp" and dst_file.exists():
+            print(f"  Skipped: {filename} (already exists)")
+            copied_files.append(filename)
+            continue
+
         src_file = source_dir / filename
         if src_file.exists():
-            dst_file = cpp_dir / filename
             shutil.copy2(src_file, dst_file)
             copied_files.append(filename)
             print(f"  Copied: {filename}")
