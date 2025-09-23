@@ -8,8 +8,8 @@ __version__ = "1.2.0"
 
 def phonemize_espeak(text: str, voice: str = "en-us") -> list:
     """Stub implementation for testing"""
-    # Return a simple phoneme-like result for testing
-    return ["h", "ɛ", "l", "oʊ"] if text.lower().startswith("hello") else ["t", "ɛ", "s", "t"]
+    # Return ASCII-only phonemes to avoid Windows encoding issues
+    return ["h", "e", "l", "o"] if text.lower().startswith("hello") else ["t", "e", "s", "t"]
 
 
 def phonemize_codepoints(text: str) -> list:
