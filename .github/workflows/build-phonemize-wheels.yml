@@ -1,4 +1,4 @@
-name: Build piper-phonemize-bundled wheels
+name: Build piper-phonemize Windows wheels
 
 on:
   push:
@@ -21,13 +21,12 @@ env:
 
 jobs:
   build_wheels:
-    name: Build wheels on ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
+    name: Build Windows wheels for Python ${{ matrix.python }}
+    runs-on: windows-latest
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, ubuntu-latest]  # Skip macOS for now to save resources
-        python: ["3.11"]  # Test with single Python version first
+        python: ["3.11", "3.12"]  # Start with 3.11 and 3.12
 
     steps:
       - uses: actions/checkout@v4.2.2
@@ -35,39 +34,26 @@ jobs:
           submodules: recursive
           fetch-depth: 0
 
-      # Windows: Setup MSVC
-      - name: Setup MSVC (Windows)
-        if: runner.os == 'Windows'
+      # Setup MSVC for Windows C++ compilation
+      - name: Setup MSVC
         uses: ilammy/msvc-dev-cmd@v1.13.0
         with:
           arch: x64
 
-      # Windows: Check dependencies
+      # Check and install Windows build dependencies
       - name: Check Windows dependencies
-        if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          # CMake should be pre-installed on GitHub Actions Windows runners
+          # Check for CMake
           cmake --version
-          # If cmake is not found, install it
           if (-not (Get-Command cmake -ErrorAction SilentlyContinue)) {
             choco install cmake --installargs 'ADD_CMAKE_TO_PATH=System' -y
             $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
-            cmake --version
           }
 
-      # macOS: Install dependencies
-      - name: Install macOS dependencies
-        if: runner.os == 'macOS'
-        run: |
-          brew install automake autoconf libtool pkg-config cmake
-
-      # Linux: Set up QEMU for cross-compilation
-      - name: Set up QEMU
-        if: runner.os == 'Linux'
-        uses: docker/setup-qemu-action@v3
-        with:
-          platforms: all
+          # Check for build tools
+          where cl
+          where nmake
 
       # Python setup
       - name: Set up Python
@@ -75,43 +61,51 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
 
-      # Install cibuildwheel
-      - name: Install cibuildwheel
+      # Install build dependencies
+      - name: Install build dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install cibuildwheel==2.16.2
+          python -m pip install wheel build pybind11>=2.10.0
 
-      # Prepare source files
-      - name: Prepare source files
+      # Prepare source and build dependencies
+      - name: Prepare source and build dependencies
         working-directory: src/piper_phonemize_bundled
-        shell: bash
+        shell: pwsh
         run: |
-          # Use Python-only setup for initial CI testing
-          cp setup_python_only.py setup.py
-          # Use stub implementation for testing
-          cp piper_phonemize/__init__stub.py piper_phonemize/__init__.py
+          # Download C++ source files from piper-phonemize
+          python prepare_sources.py
 
-      # Build wheels - use simple pip wheel for now
-      - name: Build wheels
+          # Download and build espeak-ng and ONNX Runtime for Windows
+          python build_dependencies.py --platform windows
+
+          # Use Windows-specific setup
+          Copy-Item setup_windows.py setup.py -Force
+
+      # Build Windows wheel
+      - name: Build Windows wheel
         working-directory: src/piper_phonemize_bundled
+        shell: pwsh
         run: |
-          python -m pip wheel . --wheel-dir wheelhouse
+          # Build the wheel with proper C++ compilation
+          python -m build --wheel --outdir wheelhouse
+
+          # List generated wheels
+          Get-ChildItem wheelhouse/*.whl
 
       # Upload artifacts
       - uses: actions/upload-artifact@v4.6.0
         with:
-          name: wheels-${{ matrix.os }}-${{ matrix.python }}
+          name: wheels-windows-${{ matrix.python }}
           path: src/piper_phonemize_bundled/wheelhouse/*.whl
 
-  # Test wheels on different platforms
-  test_wheels:
-    name: Test wheels on ${{ matrix.os }}
+  # Test Windows wheels
+  test_windows_wheels:
+    name: Test Windows wheels on Python ${{ matrix.python-version }}
     needs: build_wheels
-    runs-on: ${{ matrix.os }}
+    runs-on: windows-latest
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, macos-latest, ubuntu-latest]
         python-version: ['3.11', '3.12']
 
     steps:
@@ -122,23 +116,27 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Download wheels
+      - name: Download Windows wheels
         uses: actions/download-artifact@v4
         with:
-          pattern: wheels-*
+          pattern: wheels-windows-*
           path: dist/
           merge-multiple: true
 
       - name: Install wheel
+        shell: pwsh
         run: |
           python -m pip install --upgrade pip
-          python -m pip install --find-links dist/ piper-phonemize
+          # Install from local wheel
+          $wheel = Get-ChildItem dist/*.whl | Select-Object -First 1
+          python -m pip install $wheel.FullName
 
       - name: Test import and basic functionality
+        shell: pwsh
         run: |
-          python -c "
+          python -c @"
           import piper_phonemize
-          print('Testing English phonemization...')
+          print('Testing English phonemization on Windows...')
           result = piper_phonemize.phonemize_espeak('Hello world', 'en-us')
           print(f'Result: {result}')
           assert result, 'English phonemization failed'
@@ -148,13 +146,47 @@ jobs:
           print(f'Codepoint IDs: {ids}')
           assert ids, 'Codepoint conversion failed'
 
-          print('All tests passed!')
+          print('Windows tests passed!')
+          "@
+
+  # Test on macOS/Linux with existing PyPI package
+  test_other_platforms:
+    name: Test existing PyPI package on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest]
+        python-version: ['3.11', '3.12']
+
+    steps:
+      - uses: actions/checkout@v4.2.2
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install existing piper-phonemize from PyPI
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install piper-phonemize==1.1.0
+
+      - name: Test import and basic functionality
+        run: |
+          python -c "
+          import piper_phonemize
+          print(f'Testing piper-phonemize 1.1.0 on {matrix.os}...')
+          result = piper_phonemize.phonemize_espeak('Hello world', 'en-us')
+          print(f'Result: {result}')
+          assert result, 'Phonemization failed'
+          print('Test passed!')
           "
 
   # Publish to PyPI
   publish:
-    name: Publish to PyPI
-    needs: [build_wheels, test_wheels]
+    name: Publish Windows wheels to PyPI
+    needs: [build_wheels, test_windows_wheels]
     runs-on: ubuntu-latest
     if: |
       github.event_name == 'push' && startsWith(github.ref, 'refs/tags/phonemize-v') ||
