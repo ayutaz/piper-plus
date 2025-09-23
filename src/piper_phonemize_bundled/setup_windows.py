@@ -3,13 +3,13 @@ Setup script for piper-phonemize on Windows
 Based on Marc56K's piper-phonemize-win32 implementation
 """
 
-import os
 import platform
-import subprocess
+import shutil
 import sys
 from pathlib import Path
 
-from setuptools import Extension, find_packages, setup
+from setuptools import find_packages, setup
+
 
 try:
     from pybind11.setup_helpers import Pybind11Extension, build_ext
@@ -125,16 +125,12 @@ class BuildExtWindows(build_ext):
         # Copy espeak-ng DLL
         espeak_dll = _ESPEAK_DIR / "bin" / "espeak-ng.dll"
         if espeak_dll.exists():
-            import shutil
-
             shutil.copy2(espeak_dll, package_dir)
             print(f"Copied {espeak_dll} to package")
 
         # Copy ONNX Runtime DLLs
         onnx_dlls = list((_ONNXRUNTIME_DIR / "lib").glob("*.dll"))
         for dll in onnx_dlls:
-            import shutil
-
             shutil.copy2(dll, package_dir)
             print(f"Copied {dll} to package")
 
