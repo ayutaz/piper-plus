@@ -88,7 +88,7 @@ ext_modules = []
 if not missing_sources:
     ext_modules = [
         Pybind11Extension(
-            "piper_phonemize._cpp",
+            "piper_phonemize_cpp",
             sources=sources,
             include_dirs=include_dirs,
             library_dirs=library_dirs,

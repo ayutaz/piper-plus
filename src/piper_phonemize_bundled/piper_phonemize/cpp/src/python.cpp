@@ -117,7 +117,7 @@ std::string tashkeel_run(std::string modelPath, std::string text) {
 
 // ----------------------------------------------------------------------------
 
-PYBIND11_MODULE(_cpp, m) {
+PYBIND11_MODULE(piper_phonemize_cpp, m) {
   m.doc() = R"pbdoc(
         Pybind11 example plugin
         -----------------------

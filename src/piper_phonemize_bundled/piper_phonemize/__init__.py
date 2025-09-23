@@ -25,9 +25,9 @@ if sys.platform == "win32":
 
 # Import the C++ extension
 try:
-    from ._cpp import (
+    from piper_phonemize_cpp import (
         # Constants
-        DEFAULT_PHONEME_ID_MAP,
+        get_espeak_map as DEFAULT_PHONEME_ID_MAP,
         phoneme_ids_espeak,
         phonemize_codepoints,
         # Main functions
