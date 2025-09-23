@@ -4,6 +4,9 @@ Prepare C++ source files for piper-phonemize-bundled
 Copies source files from piper-phonemize external dependency
 """
 import shutil
+import tempfile
+import urllib.request
+import zipfile
 from pathlib import Path
 
 
@@ -48,9 +51,6 @@ def copy_sources():
 
     if not source_dir:
         print("Local source files not found, downloading from GitHub...")
-        import tempfile
-        import urllib.request
-        import zipfile
 
         # Download from piper-phonemize GitHub repository
         url = "https://github.com/rhasspy/piper-phonemize/archive/refs/heads/master.zip"
@@ -66,11 +66,11 @@ def copy_sources():
 
             source_dir = Path(tmpdir) / "piper-phonemize-master" / "src"
             if not source_dir.exists():
-                print(f"Error: Source directory not found in downloaded archive")
+                print("Error: Source directory not found in downloaded archive")
                 return False
 
             # Copy files from the downloaded source
-            print(f"Found source files in downloaded archive")
+            print("Found source files in downloaded archive")
 
             # Copy required files
             copied_files = []

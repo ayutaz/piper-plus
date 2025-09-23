@@ -3,6 +3,7 @@ Dummy setup for testing CI - no C++ extensions
 """
 from setuptools import find_packages, setup
 
+
 __version__ = "1.2.0"
 
 setup(

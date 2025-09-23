@@ -5,7 +5,8 @@ Builds without external espeak-ng/onnxruntime dependencies
 import sys
 from pathlib import Path
 
-from setuptools import Extension, find_packages, setup
+from setuptools import find_packages, setup
+
 
 try:
     from pybind11.setup_helpers import Pybind11Extension, build_ext

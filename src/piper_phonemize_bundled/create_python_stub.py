@@ -33,7 +33,7 @@ PYBIND11_MODULE(_cpp, m) {
     m.doc() = "Piper phonemization library";
 
     // Main phonemization function
-    m.def("phonemize_espeak", 
+    m.def("phonemize_espeak",
         [](const std::string& text, const std::string& voice) {
             std::vector<std::string> phonemes;
             piper::phonemize_espeak(text, voice, phonemes);
