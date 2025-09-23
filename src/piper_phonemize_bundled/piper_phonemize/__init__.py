@@ -64,7 +64,9 @@ except ImportError as e:
     _import_error = str(e)
 
     # Provide stub functions when C++ module is not available
-    def phonemize_espeak(text: str, voice: str = "en-us", dataPath: str = "") -> list[str]:
+    def phonemize_espeak(
+        text: str, voice: str = "en-us", dataPath: str = ""
+    ) -> list[str]:
         raise ImportError(
             f"piper_phonemize C++ extension not available: {_import_error}"
         )
