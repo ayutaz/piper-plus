@@ -140,11 +140,16 @@ PYBIND11_MODULE(piper_phonemize_cpp, m) {
 
   m.def("phonemize_espeak", &phonemize_espeak, R"pbdoc(
         Phonemize text using espeak-ng
-    )pbdoc");
+    )pbdoc",
+    py::arg("text"),
+    py::arg("voice"),
+    py::arg("dataPath") = "");
 
   m.def("phonemize_codepoints", &phonemize_codepoints, R"pbdoc(
         Phonemize text as UTF-8 codepoints
-    )pbdoc");
+    )pbdoc",
+    py::arg("text"),
+    py::arg("casing") = "lower");
 
   m.def("phoneme_ids_espeak", &phoneme_ids_espeak, R"pbdoc(
         Get ids for espeak-ng phonemes

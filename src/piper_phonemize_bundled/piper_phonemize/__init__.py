@@ -29,25 +29,40 @@ try:
         # Constants
         get_espeak_map as DEFAULT_PHONEME_ID_MAP,
         phoneme_ids_espeak,
-        phonemize_codepoints,
+        phonemize_codepoints as _phonemize_codepoints_raw,
         # Main functions
-        phonemize_espeak,
+        phonemize_espeak as _phonemize_espeak_raw,
         # Tashkeel functions (Arabic support)
         tashkeel_run,
     )
 
     _cpp_available = True
+
+    # Wrapper functions with automatic dataPath handling
+    def phonemize_espeak(text: str, voice: str = "en-us", dataPath: str = "") -> list:
+        """Phonemize text using espeak-ng with automatic data path detection"""
+        if not dataPath:
+            # Use the bundled data directory if available
+            _data_dir = Path(__file__).parent / "data" / "espeak-ng-data"
+            if _data_dir.exists():
+                dataPath = str(_data_dir.parent)
+        return _phonemize_espeak_raw(text, voice, dataPath)
+
+    def phonemize_codepoints(text: str, casing: str = "lower") -> list:
+        """Phonemize text as UTF-8 codepoints"""
+        return _phonemize_codepoints_raw(text, casing)
+
 except ImportError as e:
     _cpp_available = False
     _import_error = str(e)
 
     # Provide stub functions when C++ module is not available
-    def phonemize_espeak(text: str, voice: str = "en-us") -> list[str]:
+    def phonemize_espeak(text: str, voice: str = "en-us", dataPath: str = "") -> list[str]:
         raise ImportError(
             f"piper_phonemize C++ extension not available: {_import_error}"
         )
 
-    def phonemize_codepoints(text: str) -> list[int]:
+    def phonemize_codepoints(text: str, casing: str = "lower") -> list[int]:
         raise ImportError(
             f"piper_phonemize C++ extension not available: {_import_error}"
         )

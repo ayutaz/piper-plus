@@ -127,9 +127,16 @@ jobs:
         shell: pwsh
         run: |
           python -m pip install --upgrade pip
-          # Install from local wheel
-          $wheel = Get-ChildItem dist/*.whl | Select-Object -First 1
-          python -m pip install $wheel.FullName
+          # Install the wheel matching Python version
+          $pythonVersion = "${{ matrix.python-version }}".Replace(".", "")
+          $wheel = Get-ChildItem dist/*.whl | Where-Object { $_.Name -like "*cp$pythonVersion*" } | Select-Object -First 1
+          if ($wheel) {
+            Write-Host "Installing wheel: $($wheel.Name)"
+            python -m pip install $wheel.FullName
+          } else {
+            Write-Host "No matching wheel found for Python ${{ matrix.python-version }}"
+            exit 1
+          }
 
       - name: Test import and basic functionality
         shell: pwsh
