@@ -69,16 +69,16 @@ library_dirs = [
     str(_ONNXRUNTIME_DIR / "lib"),
 ]
 
-# Source files
+# Source files - use relative paths for setuptools
 sources = [
-    str(_CPP_DIR / "python.cpp"),
-    str(_CPP_DIR / "phonemize.cpp"),
-    str(_CPP_DIR / "phoneme_ids.cpp"),
-    str(_CPP_DIR / "tashkeel.cpp"),
+    "piper_phonemize/cpp/src/python.cpp",
+    "piper_phonemize/cpp/src/phonemize.cpp",
+    "piper_phonemize/cpp/src/phoneme_ids.cpp",
+    "piper_phonemize/cpp/src/tashkeel.cpp",
 ]
 
 # Check if sources exist
-missing_sources = [src for src in sources if not Path(src).exists()]
+missing_sources = [src for src in sources if not (_DIR / src).exists()]
 if missing_sources:
     print(f"Warning: Missing source files: {missing_sources}")
     print("Run prepare_sources.py to download them.")
