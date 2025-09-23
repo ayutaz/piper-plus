@@ -2,6 +2,7 @@
 Setup script for piper-phonemize-bundled
 Cross-platform build of piper-phonemize with bundled espeak-ng
 """
+
 import os
 import platform
 import sys
@@ -44,7 +45,9 @@ library_dirs = []
 if system == "Windows":
     extra_compile_args = ["/utf-8", "/EHsc", "/std:c++17"]
     # Use static runtime to avoid dependency issues
-    extra_compile_args.append("/MT" if os.environ.get("CMAKE_BUILD_TYPE", "Release") == "Release" else "/MTd")
+    extra_compile_args.append(
+        "/MT" if os.environ.get("CMAKE_BUILD_TYPE", "Release") == "Release" else "/MTd"
+    )
     libraries = ["espeak-ng", "onnxruntime", "ws2_32", "winmm"]
     include_dirs = [
         str(_ESPEAK_DIR / "include"),
@@ -68,8 +71,10 @@ elif system == "Darwin":  # macOS
     # Add rpath for bundled libraries
     extra_link_args = [
         "-Wl,-rpath,@loader_path",
-        "-framework", "CoreFoundation",
-        "-framework", "CoreServices",
+        "-framework",
+        "CoreFoundation",
+        "-framework",
+        "CoreServices",
     ]
 else:  # Linux
     extra_compile_args = ["-std=c++17"]
@@ -141,7 +146,9 @@ setup(
     author_email="",
     url="https://github.com/ayutaz/piper-plus",
     description="Phonemization library for Piper TTS with bundled espeak-ng (Windows/macOS/Linux)",
-    long_description=open("README.md", encoding="utf-8").read() if Path("README.md").exists() else "",
+    long_description=open("README.md", encoding="utf-8").read()
+    if Path("README.md").exists()
+    else "",
     long_description_content_type="text/markdown",
     packages=find_packages(),
     ext_modules=ext_modules,

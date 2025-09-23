@@ -35,6 +35,7 @@ try:
         # Tashkeel functions (Arabic support)
         tashkeel_run,
     )
+
     _cpp_available = True
 except ImportError as e:
     _cpp_available = False
@@ -42,16 +43,24 @@ except ImportError as e:
 
     # Provide stub functions when C++ module is not available
     def phonemize_espeak(text: str, voice: str = "en-us") -> list[str]:
-        raise ImportError(f"piper_phonemize C++ extension not available: {_import_error}")
+        raise ImportError(
+            f"piper_phonemize C++ extension not available: {_import_error}"
+        )
 
     def phonemize_codepoints(text: str) -> list[int]:
-        raise ImportError(f"piper_phonemize C++ extension not available: {_import_error}")
+        raise ImportError(
+            f"piper_phonemize C++ extension not available: {_import_error}"
+        )
 
     def phoneme_ids_espeak(phonemes: list[str]) -> list[int]:
-        raise ImportError(f"piper_phonemize C++ extension not available: {_import_error}")
+        raise ImportError(
+            f"piper_phonemize C++ extension not available: {_import_error}"
+        )
 
     def tashkeel_run(text: str) -> str:
-        raise ImportError(f"piper_phonemize C++ extension not available: {_import_error}")
+        raise ImportError(
+            f"piper_phonemize C++ extension not available: {_import_error}"
+        )
 
     DEFAULT_PHONEME_ID_MAP = {}
 
@@ -93,7 +102,9 @@ def phonemize(
         Returns None for disabled options.
     """
     if not _cpp_available:
-        raise ImportError(f"piper_phonemize C++ extension not available: {_import_error}")
+        raise ImportError(
+            f"piper_phonemize C++ extension not available: {_import_error}"
+        )
 
     result = []
 

@@ -3,6 +3,7 @@
 Prepare C++ source files for piper-phonemize-bundled
 Copies source files from piper-phonemize external dependency
 """
+
 import shutil
 import tempfile
 import urllib.request
@@ -61,7 +62,7 @@ def copy_sources():
             urllib.request.urlretrieve(url, zip_path)
 
             print("Extracting source files...")
-            with zipfile.ZipFile(zip_path, 'r') as z:
+            with zipfile.ZipFile(zip_path, "r") as z:
                 z.extractall(tmpdir)
 
             source_dir = Path(tmpdir) / "piper-phonemize-master" / "src"
@@ -131,8 +132,19 @@ def copy_data_files():
 
     # Possible data locations
     data_locations = [
-        project_root / "build" / "_deps" / "piper_phonemize-src" / "espeak-ng" / "espeak-ng-data",
-        project_root / "build" / "p" / "src" / "piper_phonemize_external" / "espeak-ng" / "espeak-ng-data",
+        project_root
+        / "build"
+        / "_deps"
+        / "piper_phonemize-src"
+        / "espeak-ng"
+        / "espeak-ng-data",
+        project_root
+        / "build"
+        / "p"
+        / "src"
+        / "piper_phonemize_external"
+        / "espeak-ng"
+        / "espeak-ng-data",
         project_root / "lib" / "piper-phonemize" / "espeak-ng" / "espeak-ng-data",
     ]
 

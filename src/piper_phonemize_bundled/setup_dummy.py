@@ -1,6 +1,7 @@
 """
 Dummy setup for testing CI - no C++ extensions
 """
+
 from setuptools import find_packages, setup
 
 

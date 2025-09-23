@@ -9,7 +9,11 @@ __version__ = "1.2.0"
 def phonemize_espeak(text: str, voice: str = "en-us") -> list:
     """Stub implementation for testing"""
     # Return ASCII-only phonemes to avoid Windows encoding issues
-    return ["h", "e", "l", "o"] if text.lower().startswith("hello") else ["t", "e", "s", "t"]
+    return (
+        ["h", "e", "l", "o"]
+        if text.lower().startswith("hello")
+        else ["t", "e", "s", "t"]
+    )
 
 
 def phonemize_codepoints(text: str) -> list:
@@ -32,13 +36,19 @@ def tashkeel_run(text: str) -> str:
 # Constants
 DEFAULT_PHONEME_ID_MAP = {}
 
+
 # Backwards compatibility
 def phonemize_text(text: str, voice: str = "en-us") -> list:
     """Legacy function name for compatibility"""
     return phonemize_espeak(text, voice)
 
 
-def phonemize(text: str, language: str = "en-us", return_phonemes: bool = True, return_ids: bool = False) -> tuple:
+def phonemize(
+    text: str,
+    language: str = "en-us",
+    return_phonemes: bool = True,
+    return_ids: bool = False,
+) -> tuple:
     """High-level phonemization function"""
     result = []
 

@@ -2,6 +2,7 @@
 Python-only setup for piper-phonemize (for CI testing)
 Provides stub implementations of required functions
 """
+
 from setuptools import find_packages, setup
 
 

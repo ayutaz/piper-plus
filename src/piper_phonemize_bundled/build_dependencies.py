@@ -3,6 +3,7 @@
 Build dependencies for piper-phonemize-bundled
 Downloads and builds espeak-ng and onnxruntime for the target platform
 """
+
 import argparse
 import hashlib
 import platform
@@ -26,15 +27,17 @@ def download_file(url, dest_path):
     ssl_context.check_hostname = True
     ssl_context.verify_mode = ssl.CERT_REQUIRED
 
-    req = urllib.request.Request(url, headers={'User-Agent': 'piper-phonemize-bundled/1.2.0'})
+    req = urllib.request.Request(
+        url, headers={"User-Agent": "piper-phonemize-bundled/1.2.0"}
+    )
 
     with urllib.request.urlopen(req, context=ssl_context) as response:
-        total_size = int(response.headers.get('Content-Length', 0))
+        total_size = int(response.headers.get("Content-Length", 0))
         block_size = 8192
         downloaded = 0
         hasher = hashlib.sha256()
 
-        with open(dest_path, 'wb') as f:
+        with open(dest_path, "wb") as f:
             while True:
                 buffer = response.read(block_size)
                 if not buffer:
@@ -45,7 +48,7 @@ def download_file(url, dest_path):
 
                 if total_size > 0:
                     progress = (downloaded / total_size) * 100
-                    print(f"Progress: {progress:.1f}%", end='\r')
+                    print(f"Progress: {progress:.1f}%", end="\r")
 
     print(f"\nDownload complete! SHA256: {hasher.hexdigest()[:16]}...")
 
@@ -53,11 +56,11 @@ def download_file(url, dest_path):
 def extract_archive(archive_path, extract_to):
     """Extract zip or tar.gz archive"""
     print(f"Extracting {archive_path}...")
-    if archive_path.endswith('.zip'):
-        with zipfile.ZipFile(archive_path, 'r') as z:
+    if archive_path.endswith(".zip"):
+        with zipfile.ZipFile(archive_path, "r") as z:
             z.extractall(extract_to)
-    elif archive_path.endswith('.tar.gz') or archive_path.endswith('.tgz'):
-        with tarfile.open(archive_path, 'r:gz') as t:
+    elif archive_path.endswith(".tar.gz") or archive_path.endswith(".tgz"):
+        with tarfile.open(archive_path, "r:gz") as t:
             t.extractall(extract_to)
     else:
         raise ValueError(f"Unknown archive format: {archive_path}")
@@ -89,28 +92,35 @@ def build_espeak_ng_windows(build_dir):
         build_path.mkdir(exist_ok=True)
 
         # Configure
-        subprocess.run([
-            "cmake", "..",
-            "-DCMAKE_BUILD_TYPE=Release",
-            "-DCMAKE_INSTALL_PREFIX=" + str(espeak_dir),
-            "-DBUILD_SHARED_LIBS=ON",
-            "-DUSE_ASYNC=OFF",
-            "-DUSE_MBROLA=OFF",
-            "-DUSE_LIBSONIC=OFF",
-            "-DUSE_LIBPCAUDIO=OFF",
-            "-DEXTRA_cmn=OFF",
-            "-DEXTRA_ru=OFF",
-        ], cwd=build_path, check=True)
+        subprocess.run(
+            [
+                "cmake",
+                "..",
+                "-DCMAKE_BUILD_TYPE=Release",
+                "-DCMAKE_INSTALL_PREFIX=" + str(espeak_dir),
+                "-DBUILD_SHARED_LIBS=ON",
+                "-DUSE_ASYNC=OFF",
+                "-DUSE_MBROLA=OFF",
+                "-DUSE_LIBSONIC=OFF",
+                "-DUSE_LIBPCAUDIO=OFF",
+                "-DEXTRA_cmn=OFF",
+                "-DEXTRA_ru=OFF",
+            ],
+            cwd=build_path,
+            check=True,
+        )
 
         # Build
-        subprocess.run([
-            "cmake", "--build", ".", "--config", "Release"
-        ], cwd=build_path, check=True)
+        subprocess.run(
+            ["cmake", "--build", ".", "--config", "Release"], cwd=build_path, check=True
+        )
 
         # Install
-        subprocess.run([
-            "cmake", "--install", ".", "--config", "Release"
-        ], cwd=build_path, check=True)
+        subprocess.run(
+            ["cmake", "--install", ".", "--config", "Release"],
+            cwd=build_path,
+            check=True,
+        )
 
         # Copy espeak-ng-data
         data_src = src_dir / "espeak-ng-data"
@@ -242,7 +252,14 @@ def copy_source_files():
     cpp_dir.mkdir(parents=True, exist_ok=True)
 
     # Try to copy from build directory
-    build_src = src_dir.parent.parent / "build" / "p" / "src" / "piper_phonemize_external" / "src"
+    build_src = (
+        src_dir.parent.parent
+        / "build"
+        / "p"
+        / "src"
+        / "piper_phonemize_external"
+        / "src"
+    )
 
     if build_src.exists():
         for cpp_file in build_src.glob("*.cpp"):
@@ -275,7 +292,15 @@ def copy_data_files():
     data_dir.mkdir(parents=True, exist_ok=True)
 
     # Try to copy from build directory
-    build_data = src_dir.parent.parent / "build" / "p" / "src" / "piper_phonemize_external" / "espeak-ng" / "espeak-ng-data"
+    build_data = (
+        src_dir.parent.parent
+        / "build"
+        / "p"
+        / "src"
+        / "piper_phonemize_external"
+        / "espeak-ng"
+        / "espeak-ng-data"
+    )
 
     if build_data.exists():
         shutil.copytree(build_data, data_dir, dirs_exist_ok=True)
@@ -285,13 +310,20 @@ def copy_data_files():
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Build dependencies for piper-phonemize-bundled")
-    parser.add_argument("--platform", choices=["windows", "macos", "linux"],
-                        help="Target platform (auto-detect if not specified)")
-    parser.add_argument("--skip-source-copy", action="store_true",
-                        help="Skip copying source files")
-    parser.add_argument("--skip-data-copy", action="store_true",
-                        help="Skip copying data files")
+    parser = argparse.ArgumentParser(
+        description="Build dependencies for piper-phonemize-bundled"
+    )
+    parser.add_argument(
+        "--platform",
+        choices=["windows", "macos", "linux"],
+        help="Target platform (auto-detect if not specified)",
+    )
+    parser.add_argument(
+        "--skip-source-copy", action="store_true", help="Skip copying source files"
+    )
+    parser.add_argument(
+        "--skip-data-copy", action="store_true", help="Skip copying data files"
+    )
 
     args = parser.parse_args()
 

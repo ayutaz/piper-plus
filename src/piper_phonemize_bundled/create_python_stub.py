@@ -2,6 +2,7 @@
 """
 Create a basic python.cpp stub file for pybind11 binding
 """
+
 import sys
 from pathlib import Path
 
@@ -19,7 +20,7 @@ def create_python_cpp():
     if not phonemize_header.exists():
         print(f"Warning: {phonemize_header} not found")
 
-    python_cpp_content = '''#include <pybind11/pybind11.h>
+    python_cpp_content = """#include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 #include <pybind11/numpy.h>
 
@@ -80,10 +81,10 @@ PYBIND11_MODULE(_cpp, m) {
     // Constants
     m.attr("DEFAULT_PHONEME_ID_MAP") = py::dict();
 }
-'''
+"""
 
     # Write the file
-    with open(python_cpp_path, 'w', encoding='utf-8') as f:
+    with open(python_cpp_path, "w", encoding="utf-8") as f:
         f.write(python_cpp_content)
 
     print(f"Created {python_cpp_path}")

@@ -2,6 +2,7 @@
 Minimal setup script for piper-phonemize
 Builds without external espeak-ng/onnxruntime dependencies
 """
+
 import sys
 from pathlib import Path
 

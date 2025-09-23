@@ -3,6 +3,7 @@
 Download pre-built espeak-ng and ONNX Runtime libraries
 Simpler approach for CI builds
 """
+
 import argparse
 import shutil
 import tarfile
@@ -22,11 +23,11 @@ def download_file(url, dest_path):
 def extract_archive(archive_path, extract_to):
     """Extract zip or tar.gz archive"""
     print(f"Extracting {archive_path}...")
-    if str(archive_path).endswith('.zip'):
-        with zipfile.ZipFile(archive_path, 'r') as z:
+    if str(archive_path).endswith(".zip"):
+        with zipfile.ZipFile(archive_path, "r") as z:
             z.extractall(extract_to)
-    elif str(archive_path).endswith(('.tar.gz', '.tgz')):
-        with tarfile.open(archive_path, 'r:gz') as t:
+    elif str(archive_path).endswith((".tar.gz", ".tgz")):
+        with tarfile.open(archive_path, "r:gz") as t:
             t.extractall(extract_to)
     else:
         raise ValueError(f"Unknown archive format: {archive_path}")
@@ -53,7 +54,11 @@ def download_espeak_data():
         extract_archive(zip_path, tmpdir)
 
         # Copy espeak-ng-data
-        src_data = Path(tmpdir) / "espeak-ng-0f65aa301e0d6bae5e172cc74197d32a6182200f" / "espeak-ng-data"
+        src_data = (
+            Path(tmpdir)
+            / "espeak-ng-0f65aa301e0d6bae5e172cc74197d32a6182200f"
+            / "espeak-ng-data"
+        )
         if src_data.exists():
             shutil.copytree(src_data, data_dir, dirs_exist_ok=True)
             print(f"Copied espeak-ng-data to {data_dir}")
@@ -63,8 +68,11 @@ def download_espeak_data():
 
 def main():
     parser = argparse.ArgumentParser(description="Download pre-built dependencies")
-    parser.add_argument("--data-only", action="store_true",
-                        help="Only download data files, not libraries")
+    parser.add_argument(
+        "--data-only",
+        action="store_true",
+        help="Only download data files, not libraries",
+    )
 
     parser.parse_args()  # Parse arguments even though not used currently
 
