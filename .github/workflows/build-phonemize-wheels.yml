@@ -67,22 +67,26 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install wheel build pybind11>=2.10.0
 
-      # Prepare source and build dependencies
-      - name: Prepare source and build dependencies
+      # Build espeak-ng and dependencies
+      - name: Build espeak-ng and dependencies
         working-directory: src/piper_phonemize_bundled
         shell: pwsh
         run: |
-          # For now, use Python-only stub implementation to avoid build complexity
-          # TODO: Implement proper C++ build in future
-          Copy-Item setup_python_only.py setup.py -Force
-          Copy-Item piper_phonemize/__init__stub.py piper_phonemize/__init__.py -Force
+          # Build espeak-ng from source
+          python build_dependencies.py --platform windows
+
+          # Prepare source files
+          python prepare_sources.py
 
       # Build Windows wheel
       - name: Build Windows wheel
         working-directory: src/piper_phonemize_bundled
         shell: pwsh
         run: |
-          # Build Python-only wheel for Windows
+          # Use Windows-specific setup
+          Copy-Item setup_windows.py setup.py -Force
+
+          # Build C++ extension wheel for Windows
           python -m pip wheel . --wheel-dir wheelhouse --no-deps
 
           # List generated wheels
@@ -153,7 +157,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest]  # Only Ubuntu for now, macOS has compatibility issues
-        python-version: ['3.12']  # Only Python 3.12 which has better support
+        python-version: ['3.11']  # Use Python 3.11 which has better wheel support
 
     steps:
       - uses: actions/checkout@v4.2.2
@@ -166,7 +170,8 @@ jobs:
       - name: Install existing piper-phonemize from PyPI
         run: |
           python -m pip install --upgrade pip
-          python -m pip install piper-phonemize==1.1.0
+          # Install with relaxed version requirement for better compatibility
+          python -m pip install 'piper-phonemize>=1.0.0'
 
       - name: Test import and basic functionality
         run: |
@@ -174,7 +179,7 @@ jobs:
           import piper_phonemize
           import sys
           import platform
-          print(f'Testing piper-phonemize 1.1.0 on {platform.system()}...')
+          print(f'Testing piper-phonemize on {platform.system()}...')
           result = piper_phonemize.phonemize_espeak('Hello world', 'en-us')
           print(f'Result: {result}')
           assert result, 'Phonemization failed'

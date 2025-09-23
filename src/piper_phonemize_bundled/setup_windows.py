@@ -22,7 +22,9 @@ __version__ = "1.2.0"
 
 # Only proceed if on Windows
 if platform.system() != "Windows":
-    print("This setup is for Windows only. Use pip install piper-phonemize for other platforms.")
+    print(
+        "This setup is for Windows only. Use pip install piper-phonemize for other platforms."
+    )
     sys.exit(1)
 
 # Paths
@@ -38,10 +40,10 @@ _BUILD_DIR.mkdir(parents=True, exist_ok=True)
 # Windows-specific compiler flags
 extra_compile_args = [
     "/utf-8",  # UTF-8 source encoding
-    "/EHsc",   # Enable C++ exceptions
+    "/EHsc",  # Enable C++ exceptions
     "/std:c++17",  # C++17 standard
-    "/O2",     # Optimize for speed
-    "/MT",     # Static runtime library
+    "/O2",  # Optimize for speed
+    "/MT",  # Static runtime library
     "/D_USE_MATH_DEFINES",  # Math constants
     "/DNOMINMAX",  # Prevent Windows.h min/max macros
 ]
@@ -51,7 +53,7 @@ libraries = [
     "espeak-ng",
     "onnxruntime",
     "ws2_32",  # Windows sockets
-    "winmm",   # Windows multimedia
+    "winmm",  # Windows multimedia
 ]
 
 # Include directories
@@ -124,6 +126,7 @@ class BuildExtWindows(build_ext):
         espeak_dll = _ESPEAK_DIR / "bin" / "espeak-ng.dll"
         if espeak_dll.exists():
             import shutil
+
             shutil.copy2(espeak_dll, package_dir)
             print(f"Copied {espeak_dll} to package")
 
@@ -131,6 +134,7 @@ class BuildExtWindows(build_ext):
         onnx_dlls = list((_ONNXRUNTIME_DIR / "lib").glob("*.dll"))
         for dll in onnx_dlls:
             import shutil
+
             shutil.copy2(dll, package_dir)
             print(f"Copied {dll} to package")
 
