@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'バージョン（X.X.X形式、例: 1.4.0） - タグ名はvを付けて自動生成されます'
+        description: 'バージョン（例: 1.4.0, 1.4.0.dev1, 1.4.0a1） - タグ名はvを付けて自動生成されます'
         required: true
         type: string
       release_name:
@@ -33,12 +33,10 @@ jobs:
       - name: Validate version format
         run: |
           VERSION="${{ github.event.inputs.version }}"
-          if ! echo "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
-            echo "Error: Version must be in format X.X.X (e.g., 1.4.0)"
-            echo "Provided version: $VERSION"
-            exit 1
-          fi
-          echo "Version format is valid: $VERSION"
+          # Allow any version format (including dev, alpha, beta, rc versions)
+          # Examples: 1.4.0, 1.4.0.dev1, 1.4.0a1, 1.4.0b2, 1.4.0rc1
+          echo "Version provided: $VERSION"
+          echo "Version format validation removed - accepting all PEP 440 compatible formats"
 
       - name: Validate version consistency across files
         run: |
