@@ -56,10 +56,11 @@ def download_file(url, dest_path):
 def extract_archive(archive_path, extract_to):
     """Extract zip or tar.gz archive"""
     print(f"Extracting {archive_path}...")
-    if archive_path.endswith(".zip"):
+    archive_path_str = str(archive_path)
+    if archive_path_str.endswith(".zip"):
         with zipfile.ZipFile(archive_path, "r") as z:
             z.extractall(extract_to)
-    elif archive_path.endswith(".tar.gz") or archive_path.endswith(".tgz"):
+    elif archive_path_str.endswith(".tar.gz") or archive_path_str.endswith(".tgz"):
         with tarfile.open(archive_path, "r:gz") as t:
             t.extractall(extract_to)
     else:
