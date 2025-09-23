@@ -86,11 +86,10 @@ jobs:
         working-directory: src/piper_phonemize_bundled
         shell: bash
         run: |
-          # For now, use dummy setup to test CI
-          cp setup_dummy.py setup.py
-          # Ensure piper_phonemize package exists
-          mkdir -p piper_phonemize
-          echo "# Dummy module for CI testing" > piper_phonemize/__init__.py
+          # Use Python-only setup for initial CI testing
+          cp setup_python_only.py setup.py
+          # Use stub implementation for testing
+          cp piper_phonemize/__init__stub.py piper_phonemize/__init__.py
 
       # Build wheels - use simple pip wheel for now
       - name: Build wheels
