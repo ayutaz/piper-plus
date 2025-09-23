@@ -141,7 +141,7 @@ class BuildExtWindows(build_ext):
             if espeak_data_dst.exists():
                 shutil.rmtree(espeak_data_dst)
             shutil.copytree(espeak_data_src, espeak_data_dst)
-            print(f"Copied espeak-ng-data to package")
+            print("Copied espeak-ng-data to package")
 
 
 setup(
