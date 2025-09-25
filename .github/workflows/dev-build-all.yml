@@ -7,6 +7,10 @@ on:
         description: 'GitHub Release upload URL'
         required: false
         type: string
+      version:
+        description: 'Version to build'
+        required: false
+        type: string
     outputs:
       artifacts_built:
         description: 'Whether artifacts were successfully built'
@@ -65,8 +69,13 @@ jobs:
         with:
           platforms: arm
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3.8.0
+
       - name: Build in Docker
         run: |
+          # Pull the image first to handle any authentication issues
+          docker pull --platform linux/arm/v7 debian:bookworm || docker pull debian:bookworm
           docker run --rm \
             --platform linux/arm/v7 \
             -v "$(pwd)":/workspace \
@@ -119,9 +128,12 @@ jobs:
         with:
           platforms: arm64
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3.8.0
+
       - name: Build in Docker
         run: |
-          docker build \
+          docker buildx build \
             --platform linux/arm64 \
             --build-arg CMAKE_BUILD_TYPE=Release \
             --tag piper-arm64 \
@@ -151,6 +163,14 @@ jobs:
       - uses: actions/checkout@v4.2.2
         with:
           fetch-depth: 0
+
+      - name: Update VERSION file if provided
+        if: inputs.version != '' && inputs.version != null
+        run: |
+          echo "Updating VERSION file to: ${{ inputs.version }}"
+          echo "${{ inputs.version }}" > VERSION
+          echo "VERSION file updated:"
+          cat VERSION
 
       - name: Set up Python
         uses: actions/setup-python@v5

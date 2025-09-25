@@ -80,7 +80,25 @@ jobs:
           
           echo -e "\n✅ All version files are consistent with version $VERSION"
 
-      # Version update step removed - versions should be updated before release
+      # Dynamic version update for dev/pre-release builds
+      - name: Update VERSION file dynamically
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          echo "Updating VERSION file to: $VERSION"
+
+          # Backup original VERSION file
+          if [ -f "VERSION" ]; then
+            cp VERSION VERSION.backup
+            echo "Backed up original VERSION file"
+          fi
+
+          # Update VERSION file with the input version
+          echo "$VERSION" > VERSION
+          echo "✅ VERSION file updated to: $VERSION"
+
+          # Show the change
+          echo "VERSION file contents:"
+          cat VERSION
 
       - name: Generate release name
         id: get_release_name
@@ -174,6 +192,7 @@ jobs:
     uses: ./.github/workflows/dev-build-all.yml
     with:
       release_upload_url: ${{ needs.create_release.outputs.upload_url }}
+      version: ${{ github.event.inputs.version }}
     permissions:
       contents: write
       packages: read
