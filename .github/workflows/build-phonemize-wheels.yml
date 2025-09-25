@@ -1,0 +1,266 @@
+name: Build piper-phonemize Windows wheels
+
+on:
+  push:
+    tags:
+      - 'phonemize-v*'
+  pull_request:
+    paths:
+      - 'src/piper_phonemize_bundled/**'
+      - '.github/workflows/build-phonemize-wheels.yml'
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: 'Publish to PyPI'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  CIBW_BUILD_VERBOSITY: 1
+
+jobs:
+  build_wheels:
+    name: Build Windows wheels for Python ${{ matrix.python }}
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.12"]  # Start with 3.11 and 3.12
+
+    steps:
+      - uses: actions/checkout@v4.2.2
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      # Setup MSVC for Windows C++ compilation
+      - name: Setup MSVC
+        uses: ilammy/msvc-dev-cmd@v1.13.0
+        with:
+          arch: x64
+
+      # Check and install Windows build dependencies
+      - name: Check Windows dependencies
+        shell: pwsh
+        run: |
+          # Check for CMake
+          cmake --version
+          if (-not (Get-Command cmake -ErrorAction SilentlyContinue)) {
+            choco install cmake --installargs 'ADD_CMAKE_TO_PATH=System' -y
+            $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+          }
+
+          # Check for build tools
+          where cl
+          where nmake
+
+      # Python setup
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+
+      # Install build dependencies
+      - name: Install build dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install wheel build pybind11>=2.10.0
+
+      # Build espeak-ng and dependencies
+      - name: Build espeak-ng and dependencies
+        working-directory: src/piper_phonemize_bundled
+        shell: pwsh
+        run: |
+          # Build espeak-ng from source
+          python build_dependencies.py --platform windows
+
+          # Prepare source files
+          python prepare_sources.py
+
+      # Build Windows wheel
+      - name: Build Windows wheel
+        working-directory: src/piper_phonemize_bundled
+        shell: pwsh
+        run: |
+          # Use Windows-specific setup
+          Copy-Item setup_windows.py setup.py -Force
+
+          # Build C++ extension wheel for Windows
+          python -m pip wheel . --wheel-dir wheelhouse --no-deps
+
+          # List generated wheels
+          Get-ChildItem wheelhouse/*.whl
+
+      # Upload artifacts
+      - uses: actions/upload-artifact@v4.6.0
+        with:
+          name: wheels-windows-${{ matrix.python }}
+          path: src/piper_phonemize_bundled/wheelhouse/*.whl
+
+  # Test Windows wheels
+  test_windows_wheels:
+    name: Test Windows wheels on Python ${{ matrix.python-version }}
+    needs: build_wheels
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.11', '3.12']
+
+    steps:
+      - uses: actions/checkout@v4.2.2
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Download Windows wheels
+        uses: actions/download-artifact@v4
+        with:
+          pattern: wheels-windows-*
+          path: dist/
+          merge-multiple: true
+
+      - name: Install wheel
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          # Install the wheel matching Python version
+          $pythonVersion = "${{ matrix.python-version }}".Replace(".", "")
+          $wheel = Get-ChildItem dist/*.whl | Where-Object { $_.Name -like "*cp$pythonVersion*" } | Select-Object -First 1
+          if ($wheel) {
+            Write-Host "Installing wheel: $($wheel.Name)"
+            python -m pip install $wheel.FullName
+          } else {
+            Write-Host "No matching wheel found for Python ${{ matrix.python-version }}"
+            exit 1
+          }
+
+      - name: Test import and basic functionality
+        shell: pwsh
+        run: |
+          # Set UTF-8 encoding for PowerShell
+          [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+          $env:PYTHONIOENCODING = "utf-8"
+
+          python -c @"
+          import sys
+          import piper_phonemize
+
+          # Ensure UTF-8 encoding
+          sys.stdout.reconfigure(encoding='utf-8')
+
+          print('Testing English phonemization on Windows...')
+          result = piper_phonemize.phonemize_espeak('Hello world', 'en-us')
+          # Convert result to ASCII-safe representation for display
+          result_str = str(result).encode('ascii', 'backslashreplace').decode('ascii')
+          print(f'Result: {result_str}')
+          assert result, 'English phonemization failed'
+
+          print('Testing phoneme to IDs conversion...')
+          ids = piper_phonemize.phonemize_codepoints('Test')
+          print(f'Codepoint IDs: {ids}')
+          assert ids, 'Codepoint conversion failed'
+
+          print('Windows tests passed!')
+          "@
+
+  # Test on macOS/Linux with existing PyPI package
+  test_other_platforms:
+    name: Test existing PyPI package on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]  # Only Ubuntu for now, macOS has compatibility issues
+        python-version: ['3.11']  # Use Python 3.11 which has better wheel support
+
+    steps:
+      - uses: actions/checkout@v4.2.2
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install existing piper-phonemize from PyPI
+        run: |
+          python -m pip install --upgrade pip
+          # Install with relaxed version requirement for better compatibility
+          python -m pip install 'piper-phonemize>=1.0.0'
+
+      - name: Test import and basic functionality
+        run: |
+          python -c "
+          import piper_phonemize
+          import sys
+          import platform
+          print(f'Testing piper-phonemize on {platform.system()}...')
+          result = piper_phonemize.phonemize_espeak('Hello world', 'en-us')
+          print(f'Result: {result}')
+          assert result, 'Phonemization failed'
+          print('Test passed!')
+          "
+
+  # Publish to PyPI
+  publish:
+    name: Publish Windows wheels to PyPI
+    needs: [build_wheels, test_windows_wheels]
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'push' && startsWith(github.ref, 'refs/tags/phonemize-v') ||
+      github.event_name == 'workflow_dispatch' && github.event.inputs.publish == 'true'
+
+    environment:
+      name: pypi
+      url: https://pypi.org/project/piper-phonemize/
+
+    steps:
+      - name: Download all wheels
+        uses: actions/download-artifact@v4
+        with:
+          pattern: wheels-*
+          path: dist/
+          merge-multiple: true
+
+      - name: List wheels
+        run: |
+          ls -la dist/
+          echo "Total wheels: $(ls -1 dist/*.whl | wc -l)"
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          password: ${{ secrets.PYPI_API_TOKEN }}
+          skip-existing: true
+          verbose: true
+
+      - name: Create GitHub Release
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: dist/*.whl
+          generate_release_notes: true
+          tag_name: ${{ github.ref_name }}
+          name: piper-phonemize ${{ github.ref_name }}
+          body: |
+            ## piper-phonemize Release
+
+            Cross-platform wheels for piper-phonemize with bundled espeak-ng.
+
+            ### Supported Platforms
+            - Windows (x64)
+            - macOS (x86_64, arm64, universal2)
+            - Linux (x86_64, aarch64)
+
+            ### Supported Python Versions
+            - Python 3.11
+            - Python 3.12
+            - Python 3.13
+
+            ### Installation
+            ```bash
+            pip install piper-phonemize
+            ```

@@ -1,0 +1,120 @@
+[build-system]
+requires = [
+    "setuptools>=61.0",
+    "wheel",
+    "pybind11>=2.10.0",
+    "cmake>=3.18",
+]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "piper-phonemize"
+version = "1.2.0"
+description = "Phonemization library for Piper TTS with bundled espeak-ng"
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+authors = [
+    {name = "Piper-Plus Contributors"},
+]
+keywords = ["tts", "speech", "phonemization", "espeak", "piper"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Topic :: Multimedia :: Sound/Audio :: Speech",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: C++",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: MacOS",
+    "Operating System :: POSIX :: Linux",
+]
+
+dependencies = [
+    "pybind11>=2.10.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "wheel",
+    "build",
+    "cibuildwheel>=2.16.0",
+]
+test = [
+    "pytest>=7.0",
+    "numpy>=1.24.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/ayutaz/piper-plus"
+Repository = "https://github.com/ayutaz/piper-plus"
+Issues = "https://github.com/ayutaz/piper-plus/issues"
+
+[tool.setuptools]
+packages = ["piper_phonemize"]
+include-package-data = true
+
+[tool.setuptools.package-data]
+piper_phonemize = [
+    "data/espeak-ng-data/**/*",
+    "*.dll",
+    "*.so",
+    "*.dylib",
+    "*.pyd",
+]
+
+[tool.cibuildwheel]
+# Build for Python 3.11, 3.12, and 3.13
+build = "cp311-* cp312-* cp313-*"
+
+# Skip 32-bit builds and musl linux
+skip = "*-win32 *-musllinux_* *i686"
+
+# Test command to verify the wheel works
+test-command = "python -c \"import piper_phonemize; print('Import successful')\""
+
+# Don't test on emulated architectures
+test-skip = "*-*linux_{aarch64,ppc64le,s390x} *-macosx_arm64 *-macosx_universal2:arm64"
+
+[tool.cibuildwheel.windows]
+before-build = [
+    "pip install pybind11 cmake",
+    "python build_dependencies.py --platform windows",
+]
+# Use delvewheel to bundle dependencies on Windows
+repair-wheel-command = "delvewheel repair -w {dest_dir} {wheel}"
+
+[tool.cibuildwheel.macos]
+before-build = [
+    "pip install pybind11 cmake",
+    "brew install automake autoconf libtool pkg-config",
+    "python build_dependencies.py --platform macos",
+]
+# Use delocate to bundle dependencies on macOS
+repair-wheel-command = "delocate-wheel --require-archs {delocate_archs} -w {dest_dir} -v {wheel}"
+# Build for both x86_64 and arm64
+archs = ["x86_64", "arm64", "universal2"]
+
+[tool.cibuildwheel.linux]
+before-build = [
+    "pip install pybind11 cmake",
+    "yum install -y automake autoconf libtool pkgconfig",
+    "python build_dependencies.py --platform linux",
+]
+# Use auditwheel to bundle dependencies on Linux
+repair-wheel-command = "auditwheel repair -w {dest_dir} {wheel}"
+# Build for multiple architectures
+archs = ["x86_64", "aarch64"]
+
+# Use newer manylinux image for better compatibility
+manylinux-x86_64-image = "manylinux2014"
+manylinux-aarch64-image = "manylinux2014"
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+testpaths = ["tests"]
+pythonpath = ["."]

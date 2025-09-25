@@ -1,3 +1,10 @@
-piper-phonemize>=1.0.0
+# Core dependencies
 onnxruntime>=1.11.0
 numpy>=1.24.0,<3.0
+
+# Phonemization library
+# For Windows: use our custom build (will be provided as wheel)
+# For macOS/Linux: use the official PyPI package
+piper-phonemize>=1.0.0; sys_platform != 'win32'
+# Note: Windows users need to install piper-phonemize wheel separately
+# or it will be bundled with the Windows release
