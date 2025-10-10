@@ -13,6 +13,7 @@ except ImportError:
         ) from None
 
 from .custom_dict import CustomDictionary
+from .japanese_utils import preprocess_japanese_text
 from .token_mapper import map_sequence
 
 
@@ -31,7 +32,9 @@ def _is_question(text: str) -> bool:
 
 
 def phonemize_japanese(
-    text: str, custom_dict: CustomDictionary | str | list[str] | None = None
+    text: str,
+    custom_dict: CustomDictionary | str | list[str] | None = None,
+    use_kabosu_preprocessing: bool = True,
 ) -> list[str]:
     """Convert *text* into a list of phoneme/prosody tokens that Piper can ingest.
 
@@ -51,15 +54,23 @@ def phonemize_japanese(
         Input text to phonemize
     custom_dict : CustomDictionary, str, List[str], optional
         Custom dictionary instance or path(s) to dictionary file(s)
+    use_kabosu_preprocessing : bool, optional
+        If True, apply enhanced preprocessing (variant kanji normalization,
+        English→Katakana conversion). Default: True
 
     Notes
     -----
     1. We rely on *pyopenjtalk.extract_fullcontext* to obtain full-context labels.
     2. "sil" at the beginning / end of the utterance is converted into ^ / $ or ?.
-    3. Custom dictionary is applied before OpenJTalk processing for better pronunciation.
+    3. Enhanced preprocessing (kabosu-core features) is applied first for better accuracy.
+    4. Custom dictionary is applied before OpenJTalk processing for better pronunciation.
     """
 
-    # カスタム辞書を適用
+    # Step 1: Apply enhanced preprocessing (kabosu-core features)
+    if use_kabosu_preprocessing:
+        text = preprocess_japanese_text(text)
+
+    # Step 2: カスタム辞書を適用
     if custom_dict is not None:
         if isinstance(custom_dict, CustomDictionary):
             dictionary = custom_dict
