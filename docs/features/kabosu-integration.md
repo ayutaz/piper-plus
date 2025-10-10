@@ -410,13 +410,72 @@ pytest src/python/tests/test_japanese_kabosu.py -v
 - `test_modify_kanji_yomi_nani` - Multi-reading kanji: 何 with ONNX (NEW)
 - `test_complete_phase3_pipeline` - All 5 functions together (NEW)
 
-## Future Enhancements (Phase 4)
+## Phase 4: Marine Integration (Optional, Not Implemented)
 
-Planned features from kabosu-core:
+### Overview
 
-### Phase 4: Optional Marine Integration
-- Accent prediction using deep learning
-- ~500MB model (optional, GPU-accelerated)
+Phase 4 would integrate **Marine**, a deep learning-based accent prediction model from kabosu-core. **This phase is currently not implemented**, but can be added in the future if needed.
+
+### Why Phase 4 is Not Implemented
+
+1. **Phase 1-3 provides sufficient accuracy** for practical TTS applications
+2. **Large dependencies**: Requires PyTorch (~500MB) + marine-plus model (~500MB)
+3. **GPU recommended**: CPU-only operation is impractically slow
+4. **Optional in kabosu-core**: Even the original project treats Marine as optional
+
+### What is Marine?
+
+Marine is a multi-task learning model for Japanese accent prediction:
+
+- **Architecture**: LSTM + CRF with attention mechanism
+- **Accuracy**: Higher than OpenJTalk's rule-based accent prediction
+- **Model size**: ~500MB pre-trained model
+- **Performance**: GPU recommended (10-50x faster than CPU)
+
+### Dependencies (if implementing)
+
+```bash
+# Large dependencies required
+pip install torch>=1.7.0                    # ~500MB
+pip install marine-plus>=0.0.6              # ~500MB model download
+```
+
+**Total additional size: ~1GB**
+
+### When You Might Need Phase 4
+
+- Maximum accent prediction accuracy required
+- GPU environment available
+- Professional/commercial TTS production
+- Research applications
+
+### How to Integrate (For Advanced Users)
+
+If you need Marine integration, refer to kabosu-core's implementation:
+
+1. **Install dependencies**:
+   ```bash
+   pip install marine-plus
+   ```
+
+2. **Reference implementation**:
+   - GitHub: https://github.com/q9uri/kabosu-core
+   - File: `src/kabosu_core/ojt_plus.py`
+   - Functions: `estimate_accent()`, `load_marine_model()`
+
+3. **Integration points**:
+   - Call `estimate_accent()` after `jpreprocess.run_frontend()`
+   - Apply `preserve_noun_accent()` to merge results
+   - Continue with Phase 3 postprocessing
+
+### Performance Impact (If Implemented)
+
+- **Memory**: +1GB (PyTorch + Marine model)
+- **Speed**:
+  - GPU: +10-30ms per utterance
+  - CPU: +500-2000ms per utterance (not recommended)
+- **Initialization**: ~2-5 seconds (first call, model loading)
+- **Accuracy**: Marginal improvement over Phase 3 (already high quality)
 
 ## License
 
