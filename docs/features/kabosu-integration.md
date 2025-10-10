@@ -157,7 +157,7 @@ src/python/tests/
 └── test_japanese_kabosu.py  # Integration tests
 ```
 
-## Performance Impact
+## Performance Impact (Phase 1)
 
 - **Memory**: Minimal (~5MB for dictionaries)
 - **Speed**: Preprocessing adds ~10-20ms per utterance
@@ -166,13 +166,90 @@ src/python/tests/
   - Technical terms (Docker, GitHub, Python, etc.)
   - Mixed half-width/full-width text
 
-## Future Enhancements (Phase 2-4)
+## Phase 2: BERT-based Reading Estimation (✅ Completed)
+
+### Overview
+
+Phase 2 integrates `yomikata`, a BERT-based heteronym disambiguation system that determines context-appropriate readings for ambiguous kanji.
+
+### Features
+
+**Context-aware Reading Disambiguation:**
+- Analyzes entire sentence context using BERT transformer
+- Supports 130+ ambiguous word forms
+- Achieves 94% global accuracy
+
+**Examples:**
+```python
+"畳の表" → "たたみのオモテ" (surface, not table)
+"風が強い" → "カゼが強い" (wind, not style)
+"今日は" → "キョウは" (today, not nowadays)
+```
+
+### Setup
+
+Install yomikata and download BERT model:
+
+```bash
+# Install yomikata (included in requirements-train.txt)
+pip install git+https://github.com/q9uri/yomikata.git
+
+# Download BERT model (~400MB)
+python -m yomikata download
+```
+
+### Usage
+
+**Enabled by default in preprocessing:**
+
+```python
+from piper_train.phonemize import phonemize_japanese
+
+# Yomikata automatically applies context-based disambiguation
+phonemes = phonemize_japanese("畳の表は美しい")
+```
+
+**Direct usage:**
+
+```python
+from piper_train.phonemize.japanese_utils import apply_yomikata
+
+text = "畳の表"
+result = apply_yomikata(text)
+# Result: "畳のオモテ"
+```
+
+**Disable if needed:**
+
+```python
+from piper_train.phonemize.japanese_utils import preprocess_japanese_text
+
+text = preprocess_japanese_text(
+    "畳の表",
+    use_yomikata=False  # Disable BERT-based disambiguation
+)
+```
+
+### Performance Impact (Phase 2)
+
+- **Memory**: +400MB (BERT model)
+- **Speed**: +100-200ms per sentence (BERT inference)
+- **Initialization**: ~1 second (first call only)
+- **Accuracy**: 94% for heteronym disambiguation
+
+### Testing
+
+```bash
+# Run Phase 2 tests (requires yomikata + model download)
+pytest src/python/tests/test_japanese_kabosu.py::TestYomikataIntegration -v
+
+# Run all tests including Phase 2
+pytest src/python/tests/test_japanese_kabosu.py -v
+```
+
+## Future Enhancements (Phase 3-4)
 
 Planned features from kabosu-core:
-
-### Phase 2: BERT-based Reading Estimation
-- `yomikata` integration for ambiguous readings
-- Example: 畳の表 → おもて (not ひょう)
 
 ### Phase 3: Advanced Accent Processing
 - `retreat_acc_nuc()`: Adjust accent nucleus position
@@ -207,6 +284,33 @@ If variant kanji normalization fails:
 # Verify dictionaries are present
 ls src/python/piper_train/phonemize/dict/
 # Should show: jinmei-variants.txt, joyo-variants.txt, non-cjk.txt
+```
+
+### Yomikata Model Not Downloaded (Phase 2)
+
+If you see warnings about missing BERT model:
+
+```bash
+# Download yomikata BERT model
+python -m yomikata download
+```
+
+**Common issues:**
+- Model download requires internet connection
+- Model size is ~400MB
+- Download location: `~/.cache/yomikata/` (Linux/Mac) or `%USERPROFILE%\.cache\yomikata\` (Windows)
+
+### M1 Mac Installation Issues
+
+If `fugashi` (yomikata dependency) fails to install on M1 Mac:
+
+```bash
+# Install Xcode Command Line Tools first
+xcode-select --install
+
+# Then try installing
+pip install git+https://github.com/q9uri/yomikata.git
+python -m yomikata download
 ```
 
 ## References

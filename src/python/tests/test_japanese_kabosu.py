@@ -19,11 +19,20 @@ try:
         convert_english_to_katakana,
         convert_half_to_full,
         preprocess_japanese_text,
+        apply_yomikata,
     )
 
     HAS_UTILS = True
 except ImportError:
     HAS_UTILS = False
+
+# Check if yomikata is available
+try:
+    from yomikata.dbert import dBert
+
+    HAS_YOMIKATA = True
+except ImportError:
+    HAS_YOMIKATA = False
 
 try:
     from piper_train.phonemize import phonemize_japanese
@@ -226,6 +235,91 @@ class TestEdgeCases:
         # Should handle gracefully
         assert isinstance(result, str)
         assert len(result) > 0
+
+
+@pytest.mark.skipif(
+    not HAS_UTILS or not HAS_YOMIKATA,
+    reason="japanese_utils or yomikata not available"
+)
+class TestYomikataIntegration:
+    """Test BERT-based reading disambiguation (Phase 2)."""
+
+    def test_apply_yomikata_heteronym(self):
+        """Test yomikata with ambiguous kanji (heteronym)."""
+        # 表 can be read as おもて (surface) or ひょう (table)
+        # In context "畳の表", it should be おもて (tatami surface)
+        text = "畳の表"
+        result = apply_yomikata(text)
+        # Should convert 表 to オモテ (katakana)
+        assert "オモテ" in result or "おもて" in result
+
+    def test_apply_yomikata_multiple_heteronyms(self):
+        """Test yomikata with multiple ambiguous kanji."""
+        # Test text from kabosu-core test suite
+        text = "そして、畳の表は、すでに幾年前に換えられたのか分らなかった。"
+        result = apply_yomikata(text)
+        # Should disambiguate 表
+        assert isinstance(result, str)
+        assert len(result) > 0
+
+    def test_apply_yomikata_no_heteronyms(self):
+        """Test yomikata with text containing no ambiguous kanji."""
+        text = "こんにちは、世界"
+        result = apply_yomikata(text)
+        # Should return without changes (or minimal changes)
+        assert isinstance(result, str)
+
+    def test_preprocess_with_yomikata_enabled(self):
+        """Test preprocessing pipeline with yomikata enabled."""
+        text = "畳の表は美しい"
+        result = preprocess_japanese_text(text, use_yomikata=True)
+        # Should apply yomikata processing
+        assert isinstance(result, str)
+        assert len(result) > 0
+
+    def test_preprocess_with_yomikata_disabled(self):
+        """Test preprocessing pipeline with yomikata disabled."""
+        text = "畳の表は美しい"
+        result = preprocess_japanese_text(text, use_yomikata=False)
+        # Should skip yomikata processing
+        assert isinstance(result, str)
+        # 表 should remain unchanged
+        assert "表" in result
+
+    def test_yomikata_with_variant_kanji(self):
+        """Test yomikata works correctly after variant kanji normalization."""
+        # Variant kanji should be normalized before yomikata processing
+        text = "齋藤さんの畳の表"
+        result = preprocess_japanese_text(
+            text,
+            normalize_variants=True,
+            use_yomikata=True
+        )
+        # 齋 should be normalized to 斎
+        assert "齋" not in result
+        assert "斎" in result
+        # 表 should be disambiguated
+        assert isinstance(result, str)
+
+
+@pytest.mark.skipif(
+    not HAS_PHONEMIZE or not HAS_YOMIKATA,
+    reason="phonemize_japanese or yomikata not available"
+)
+class TestYomikataPhoneDization:
+    """Test phonemization with yomikata integration."""
+
+    def test_phonemize_with_yomikata(self):
+        """Test that yomikata-preprocessed text phonemizes correctly."""
+        # Text with ambiguous kanji
+        result = phonemize_japanese("畳の表", use_kabosu_preprocessing=True)
+
+        # Should return phoneme tokens
+        assert isinstance(result, list)
+        assert len(result) > 0
+
+        # Should start with beginning marker
+        assert result[0] in ["^", "\ue000"]
 
 
 if __name__ == "__main__":

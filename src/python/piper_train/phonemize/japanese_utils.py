@@ -5,7 +5,7 @@ before OpenJTalk phonemization, including:
 - Half-width to full-width conversion
 - Variant kanji normalization
 - English to Katakana conversion
-- (Future) BERT-based reading estimation
+- BERT-based reading disambiguation (Phase 2)
 
 Original source: kabosu-core (https://github.com/q9uri/kabosu-core)
 """
@@ -28,6 +28,16 @@ try:
 except ImportError:
     HAS_KANALIZER = False
 
+try:
+    from yomikata.dbert import dBert
+
+    HAS_YOMIKATA = True
+    # Global instance of yomikata reader (lazy initialization)
+    _global_yomikata_reader: Optional[dBert] = None
+except ImportError:
+    HAS_YOMIKATA = False
+    _global_yomikata_reader = None
+
 from .itaiji import normalize_itaiji
 
 
@@ -35,11 +45,15 @@ __all__ = [
     "preprocess_japanese_text",
     "convert_half_to_full",
     "convert_english_to_katakana",
+    "apply_yomikata",
 ]
 
 
 # Regular expression to find English alphabet sequences
 _RE_ALPHABET = re.compile(r"[a-z]+", re.IGNORECASE)
+
+# Regular expression to find furigana patterns: {word/yomi}
+_RE_FURIGANA = re.compile(r"\{(.+?)/(.+?)\}")
 
 
 def convert_half_to_full(text: str) -> str:
@@ -108,11 +122,84 @@ def convert_english_to_katakana(text: str) -> str:
     return text
 
 
+def apply_yomikata(text: str) -> str:
+    """Apply BERT-based reading disambiguation using yomikata.
+
+    Uses yomikata library to determine context-appropriate readings for
+    ambiguous kanji (heteronyms). For example:
+    - 表 → おもて (surface) vs ひょう (table)
+    - 風 → かぜ (wind) vs ふう (style)
+    - 今日 → きょう (today) vs こんにち (nowadays)
+
+    Args:
+        text: Input text with potential ambiguous kanji
+
+    Returns:
+        Text with ambiguous kanji converted to katakana based on context
+
+    Examples:
+        >>> apply_yomikata("畳の表は美しい")
+        "畳のオモテは美しい"
+        >>> apply_yomikata("風が強い")
+        "カゼが強い"
+
+    Note:
+        Requires yomikata library and BERT model download:
+        $ pip install git+https://github.com/q9uri/yomikata.git
+        $ python -m yomikata download
+    """
+    if not HAS_YOMIKATA:
+        return text
+
+    global _global_yomikata_reader
+
+    # Lazy initialization of yomikata reader
+    if _global_yomikata_reader is None:
+        try:
+            _global_yomikata_reader = dBert()
+        except Exception as e:
+            # If model not downloaded, provide helpful error message
+            if "model" in str(e).lower() or "download" in str(e).lower():
+                import warnings
+
+                warnings.warn(
+                    "yomikata BERT model not found. Please download it with: "
+                    "python -m yomikata download"
+                )
+            return text
+
+    try:
+        # Generate furigana text with {word/yomi} format
+        furigana_text = _global_yomikata_reader.furigana(text)
+
+        # Extract all {word/yomi} patterns
+        matches = _RE_FURIGANA.findall(furigana_text)
+
+        # Replace each word with its reading in katakana
+        for word, yomi in matches:
+            # Convert hiragana reading to katakana
+            if HAS_JACONV:
+                yomi_katakana = jaconv.hira2kata(yomi)
+            else:
+                # If jaconv not available, use hiragana as-is
+                yomi_katakana = yomi
+
+            # Replace the word with its reading
+            text = text.replace(word, yomi_katakana)
+
+    except Exception:
+        # If yomikata fails, return original text
+        pass
+
+    return text
+
+
 def preprocess_japanese_text(
     text: str,
     normalize_variants: bool = True,
     convert_hankaku: bool = True,
     convert_english: bool = True,
+    use_yomikata: bool = True,
 ) -> str:
     """Apply comprehensive preprocessing to Japanese text before phonemization.
 
@@ -124,6 +211,7 @@ def preprocess_japanese_text(
         normalize_variants: If True, normalize variant kanji to standard forms
         convert_hankaku: If True, convert half-width to full-width characters
         convert_english: If True, convert English words to Katakana
+        use_yomikata: If True, apply BERT-based reading disambiguation
 
     Returns:
         Preprocessed text ready for OpenJTalk phonemization
@@ -133,6 +221,8 @@ def preprocess_japanese_text(
         "ドッカーを使います"
         >>> preprocess_japanese_text("齋藤さんはpythonが好きです")
         "斎藤さんはパイソンが好きです"
+        >>> preprocess_japanese_text("畳の表は美しい")
+        "畳のオモテは美しい"
     """
     # Step 1: Convert half-width to full-width
     if convert_hankaku and HAS_JACONV:
@@ -142,9 +232,14 @@ def preprocess_japanese_text(
     if normalize_variants:
         text = normalize_itaiji(text)
 
-    # Step 3: Convert English to Katakana
-    # Note: This should be done before any other processing that might
-    # interfere with English word detection
+    # Step 3: Apply BERT-based reading disambiguation (Phase 2)
+    # This should be done after normalization but before English conversion
+    if use_yomikata and HAS_YOMIKATA:
+        text = apply_yomikata(text)
+
+    # Step 4: Convert English to Katakana
+    # Note: This should be done after yomikata to avoid interfering with
+    # BERT-based reading estimation
     if convert_english and HAS_KANALIZER:
         text = convert_english_to_katakana(text)
 
@@ -152,16 +247,7 @@ def preprocess_japanese_text(
 
 
 # Future enhancements placeholder
-# These features from kabosu-core can be added in Phase 2:
-#
-# def apply_yomikata(text: str) -> str:
-#     """Apply BERT-based reading estimation using yomikata.
-#
-#     Handles ambiguous readings like:
-#     - 畳の表 (たたみのおもて vs たたみのひょう)
-#     - 今日 (きょう vs こんにち)
-#     """
-#     pass
+# These features from kabosu-core can be added in Phase 3:
 #
 # def apply_advanced_postprocessing(labels: list[str]) -> list[str]:
 #     """Apply advanced postprocessing from kabosu-core:

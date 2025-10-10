@@ -27,3 +27,6 @@ sudachipy>=0.6.10  # Japanese morphological analyzer
 sudachidict-core>=20250825  # Sudachi dictionary
 jaconv>=0.4.0  # Japanese character conversion utilities
 jpreprocess>=0.1.5  # Japanese preprocessing library
+
+# Phase 2: BERT-based reading disambiguation
+git+https://github.com/q9uri/yomikata.git  # BERT-based heteronym disambiguation (requires: python -m yomikata download)
