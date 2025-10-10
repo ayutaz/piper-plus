@@ -145,16 +145,24 @@ New files added:
 
 ```
 src/python/piper_train/phonemize/
-├── itaiji.py              # Variant kanji normalization
-├── japanese_utils.py      # Preprocessing utilities
-├── japanese.py            # Updated with kabosu integration
-└── dict/                  # Variant kanji dictionaries
-    ├── jinmei-variants.txt
-    ├── joyo-variants.txt
-    └── non-cjk.txt
+├── itaiji.py              # Variant kanji normalization (Phase 1)
+├── japanese_utils.py      # Preprocessing utilities (Phase 1-2)
+├── japanese.py            # Updated with kabosu integration (Phase 1-3)
+├── types.py               # NJD type definitions (Phase 3)
+├── ojt_plus.py            # Advanced postprocessing (Phase 3)
+├── dict/                  # Variant kanji dictionaries (Phase 1)
+│   ├── jinmei-variants.txt
+│   ├── joyo-variants.txt
+│   └── non-cjk.txt
+└── yomi_model/            # ONNX models for reading disambiguation (Phase 3)
+    ├── __init__.py
+    ├── nani_predict.py    # "何" nani/nan prediction
+    ├── nani_enc.onnx      # ONNX encoder model
+    ├── nani_model.onnx    # ONNX classifier model
+    └── COPYING            # License file
 
 src/python/tests/
-└── test_japanese_kabosu.py  # Integration tests
+└── test_japanese_kabosu.py  # Integration tests (Phase 1-3)
 ```
 
 ## Performance Impact (Phase 1)
@@ -251,7 +259,7 @@ pytest src/python/tests/test_japanese_kabosu.py -v
 
 ### Overview
 
-Phase 3 integrates advanced postprocessing functions that improve accent handling and iteration mark processing for more accurate Japanese phonemization.
+Phase 3 integrates 5 advanced postprocessing functions that improve accent handling, filler processing, multi-reading kanji disambiguation, and iteration mark processing for more accurate Japanese phonemization.
 
 ### Features
 
@@ -265,7 +273,32 @@ Adjusts accent nucleus position when long vowels (ー), geminates (ッ), or mora
 "マッチ" with nucleus on "ッ" → nucleus shifts to "マ"
 ```
 
-**2. Conjugation Accent Correction (`modify_acc_after_chaining`)**
+**2. Filler Accent Modification (`modify_filler_accent`)**
+
+Modifies accent for filler words (フィラー) like "えー", "あのー" and ensures proper accent phrase boundaries after fillers.
+
+**Examples:**
+```python
+"えーと、それは" → Filler accent adjusted, boundary inserted before "それは"
+Filler with invalid accent → Reset to flat accent (0)
+```
+
+**3. Multi-Reading Kanji Disambiguation (`modify_kanji_yomi`)**
+
+Uses Sudachi morphological analyzer to determine correct readings for 68+ kanji with multiple readings. Special ONNX-based model for "何" (nani/nan) disambiguation.
+
+**Examples:**
+```python
+"風が強い" → "カゼが強い" (wind, not style)
+"何ですか" → Context-based nani/nan determination
+"方向" → "ホウコウ" (direction, correct reading)
+```
+
+**Multi-reading kanji list (68 characters):**
+- Common: 風、何、観、方、出、時、上、下、君、手、嫌、表、対、色、人、前、後、角、金、頭...
+- Total: 68 kanji with context-dependent readings
+
+**4. Conjugation Accent Correction (`modify_acc_after_chaining`)**
 
 Modifies accent for verb + auxiliary verb combinations, particularly for the special auxiliary "マス" (masu).
 
@@ -275,7 +308,7 @@ Modifies accent for verb + auxiliary verb combinations, particularly for the spe
 "参ります" → "ま[いりま]す" (nucleus on "いりま")
 ```
 
-**3. Iteration Mark Processing (`process_odori_features`)**
+**5. Iteration Mark Processing (`process_odori_features`)**
 
 Handles two types of iteration marks:
 - **々 (odoriji)**: Repeats the previous kanji
@@ -298,12 +331,18 @@ Handles two types of iteration marks:
 
 ### Setup
 
-Phase 3 requires `jpreprocess` which is already in requirements-train.txt:
+Phase 3 requires `jpreprocess` and `sudachipy` which are already in requirements-train.txt:
 
 ```bash
 cd /data/piper
 pip install -r requirements-train.txt
 ```
+
+**Dependencies:**
+- `jpreprocess>=0.1.5` - NJD feature processing
+- `sudachipy>=0.6.10` - Multi-reading kanji analysis
+- `sudachidict-core>=20250825` - Sudachi dictionary
+- `onnxruntime>=1.16.0` - ONNX model inference for "何" disambiguation
 
 ### Usage
 
@@ -338,23 +377,38 @@ phonemes = phonemize_japanese(
 
 ### Performance Impact (Phase 3)
 
-- **Memory**: +10MB (jpreprocess additional data)
-- **Speed**: +20-30ms per utterance (postprocessing operations)
-- **Initialization**: ~500ms (first call only, jpreprocess loading)
+- **Memory**: +25MB (jpreprocess + sudachipy data + ONNX models)
+- **Speed**: +30-50ms per utterance (postprocessing + Sudachi analysis)
+- **Initialization**: ~1000ms (first call only, jpreprocess + sudachipy + ONNX loading)
 - **Accuracy**: Significant improvement for:
   - Iteration marks (々, ゝ, ゞ, ヽ, ヾ)
   - Verb conjugations with auxiliary verbs
   - Words with long vowels and accent markers
+  - Filler words (えー, あのー, etc.)
+  - Multi-reading kanji (68+ characters)
 
 ### Testing
 
 ```bash
-# Run Phase 3 tests (requires jpreprocess)
+# Run Phase 3 tests (requires jpreprocess + sudachipy + onnxruntime)
 pytest src/python/tests/test_japanese_kabosu.py::TestAdvancedPostprocessing -v
 
 # Run all kabosu integration tests
 pytest src/python/tests/test_japanese_kabosu.py -v
 ```
+
+**Phase 3 test coverage (13 tests):**
+- `test_retreat_acc_nuc` - Long vowel accent adjustment
+- `test_modify_acc_after_chaining` - Masu form accent correction
+- `test_process_odori_features_single_kanji` - Single kanji iteration (叙々苑)
+- `test_process_odori_features_multiple_kanji` - Multiple kanji iteration (民主々義)
+- `test_process_repetition_marks` - Repetition marks (こゝろ)
+- `test_advanced_postprocessing_disabled` - Graceful degradation
+- `test_integrated_preprocessing_and_postprocessing` - Full pipeline test
+- `test_modify_filler_accent` - Filler accent modification (NEW)
+- `test_modify_kanji_yomi_kaze` - Multi-reading kanji: 風 (NEW)
+- `test_modify_kanji_yomi_nani` - Multi-reading kanji: 何 with ONNX (NEW)
+- `test_complete_phase3_pipeline` - All 5 functions together (NEW)
 
 ## Future Enhancements (Phase 4)
 

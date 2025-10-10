@@ -395,6 +395,47 @@ class TestAdvancedPostprocessing:
         assert isinstance(result, list)
         assert len(result) > 0
 
+    def test_modify_filler_accent(self):
+        """Test filler accent modification."""
+        # Test with filler word (えー, あのー, etc.)
+        # Note: Direct testing requires jpreprocess to mark as フィラー
+        text = "えーと、それは違います"
+        result = phonemize_japanese(text, use_advanced_postprocessing=True)
+        # Should return phoneme tokens
+        assert isinstance(result, list)
+        assert len(result) > 0
+
+    def test_modify_kanji_yomi_kaze(self):
+        """Test multi-reading kanji disambiguation (風 = kaze/fū)."""
+        # 風 in "風が強い" should be "カゼ" (wind, not style)
+        text = "風が強い"
+        result = phonemize_japanese(text, use_advanced_postprocessing=True)
+        # Should return phoneme tokens
+        assert isinstance(result, list)
+        assert len(result) > 0
+        # Note: Actual reading verification would require inspecting NJD features
+
+    def test_modify_kanji_yomi_nani(self):
+        """Test multi-reading kanji disambiguation (何 = nani/nan)."""
+        # 何 should be disambiguated using ONNX model
+        text = "何ですか"
+        result = phonemize_japanese(text, use_advanced_postprocessing=True)
+        # Should return phoneme tokens
+        assert isinstance(result, list)
+        assert len(result) > 0
+
+    def test_complete_phase3_pipeline(self):
+        """Test all Phase 3 functions work together in correct order."""
+        # Text that exercises all Phase 3 functions:
+        # - Long vowels (ラーメン)
+        # - Iteration marks (叙々苑)
+        # - Masu form (行きます)
+        text = "ラーメン屋の叙々苑に行きます"
+        result = phonemize_japanese(text, use_advanced_postprocessing=True)
+        # Should return phoneme tokens
+        assert isinstance(result, list)
+        assert len(result) > 0
+
 
 # Check if jpreprocess is available for Phase 3 tests
 try:

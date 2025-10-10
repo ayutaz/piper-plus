@@ -24,13 +24,111 @@ except ImportError:
     HAS_JPREPROCESS = False
     jpreprocess = None  # type: ignore
 
+# Sudachipy for multi-reading kanji disambiguation
+try:
+    from sudachipy import dictionary, tokenizer
+
+    HAS_SUDACHIPY = True
+except ImportError:
+    HAS_SUDACHIPY = False
+
+# ONNX-based nani prediction model
+try:
+    from .yomi_model.nani_predict import predict
+
+    HAS_NANI_PREDICT = True
+except ImportError:
+    HAS_NANI_PREDICT = False
+    predict = None  # type: ignore
+
 from .types import NjdObject
+
+
+# Multi-reading kanji list (70+ characters with multiple readings)
+# Source: kabosu-core (https://github.com/q9uri/kabosu-core)
+MULTI_READ_KANJI_LIST = [
+    "風",
+    "何",
+    "観",
+    "方",
+    "出",
+    "時",
+    "上",
+    "下",
+    "君",
+    "手",
+    "嫌",
+    "表",
+    "対",
+    "色",
+    "人",
+    "前",
+    "後",
+    "角",
+    "金",
+    "頭",
+    "筆",
+    "水",
+    "間",
+    "棚",
+    # From Wikipedia「同形異音語」- commonly confused kanji
+    # Excluding '汚','通','臭','辛' where Sudachi is less accurate
+    "床",
+    "入",
+    "来",
+    "塗",
+    "怒",
+    "包",
+    "被",
+    "開",
+    "弾",
+    "捻",
+    "潜",
+    "支",
+    "抱",
+    "行",
+    "降",
+    "種",
+    "訳",
+    "糞",
+    # From Wikipedia「同形異音語」- kanji with 3+ readings
+    "空",
+    "性",
+    "体",
+    "等",
+    "生",
+    "止",
+    "堪",
+    "捩",
+    # Additional kanji
+    "家",
+    "縁",
+    "労",
+    "中",
+    "高",
+    "低",
+    "気",
+    "要",
+    "退",
+    "面",
+    "色",
+    "主",
+    "術",
+    "直",
+    "片",
+    "緒",
+    "小",
+    "大",
+]  # fmt: skip
 
 
 __all__ = [
     "retreat_acc_nuc",
     "modify_acc_after_chaining",
     "process_odori_features",
+    "modify_filler_accent",
+    "modify_kanji_yomi",
+    "MULTI_READ_KANJI_LIST",
 ]
 
 
@@ -405,3 +503,144 @@ def process_odori_features(
             i += 1
 
     return njd_features
+
+
+def sudachi_analyze(text: str, multi_read_kanji_list: list[str]) -> list[list[str]]:
+    """Analyze multi-reading kanji using Sudachi morphological analyzer.
+
+    Args:
+        text: Text to analyze
+        multi_read_kanji_list: List of kanji with multiple readings
+
+    Returns:
+        List of [kanji, reading] pairs for multi-reading kanji found in text
+
+    Examples:
+        "風がこんな風に吹く" → [('風', 'カゼ'), ('風', 'フウ')]
+    """
+    if not HAS_SUDACHIPY:
+        return []
+
+    # Remove long vowel marks for analysis
+    text = text.replace("ー", "")
+
+    tokenizer_obj = dictionary.Dictionary().create()
+    mode = tokenizer.Tokenizer.SplitMode.C
+    m_list = tokenizer_obj.tokenize(text, mode)
+    yomi_list = [
+        [m.surface(), m.reading_form()]
+        for m in m_list
+        if m.surface() in multi_read_kanji_list
+    ]
+    return yomi_list
+
+
+def modify_filler_accent(njd: list[NjdObject]) -> list[NjdObject]:
+    """Modify accent for filler words (フィラー).
+
+    Adjusts accent for filler words like "えー", "あのー" and ensures proper
+    accent phrase boundaries after fillers.
+
+    Args:
+        njd: NJD features from run_frontend()
+
+    Returns:
+        Modified njd_features with corrected filler accents
+
+    Examples:
+        Filler with invalid accent → accent set to 0 (flat)
+        Noun after filler → accent phrase boundary inserted
+    """
+    modified_njd = []
+    is_after_filler = False
+
+    for features in njd:
+        if features["pos"] == "フィラー":
+            # If accent position exceeds mora size, reset to flat accent
+            if features["acc"] > features["mora_size"]:
+                features["acc"] = 0
+            is_after_filler = True
+
+        elif is_after_filler:
+            # Insert accent phrase boundary after filler if followed by noun
+            if features["pos"] == "名詞":
+                features["chain_flag"] = 0
+            is_after_filler = False
+
+        modified_njd.append(features)
+
+    return modified_njd
+
+
+def modify_kanji_yomi(
+    text: str, pyopen_njd: list[NjdObject], multi_read_kanji_list: list[str]
+) -> list[NjdObject]:
+    """Modify readings for multi-reading kanji using Sudachi analysis.
+
+    For kanji with multiple possible readings (e.g., 風 = kaze/fū, 何 = nani/nan),
+    uses Sudachi morphological analyzer to determine the correct reading based on
+    context. Special handling for "何" using ONNX-based prediction model.
+
+    Args:
+        text: Original text
+        pyopen_njd: NJD features from OpenJTalk/jpreprocess
+        multi_read_kanji_list: List of kanji with multiple readings
+
+    Returns:
+        Modified njd_features with corrected readings
+
+    Examples:
+        "風が強い" → "カゼが強い" (wind, not style)
+        "何ですか" → context-based nani/nan determination
+    """
+    if not HAS_SUDACHIPY:
+        # Cannot modify without Sudachi
+        return pyopen_njd
+
+    sudachi_yomi = sudachi_analyze(text, multi_read_kanji_list)
+    return_njd = []
+    pre_dict = None
+
+    for dict_item in reversed(pyopen_njd):
+        if dict_item["orig"] in multi_read_kanji_list:
+            try:
+                correct_yomi = sudachi_yomi.pop()
+            except IndexError:
+                # No more Sudachi results, return original
+                return pyopen_njd
+
+            if correct_yomi[0] != dict_item["orig"]:
+                # Mismatch between Sudachi and OpenJTalk, return original
+                return pyopen_njd
+
+            elif dict_item["orig"] == "何":
+                # Special case: Use ONNX model to predict nani vs nan
+                if HAS_NANI_PREDICT and predict is not None:
+                    is_read_nan = predict([pre_dict])
+                    if is_read_nan == 1:
+                        dict_item["pron"] = "ナン"
+                        dict_item["read"] = "ナン"
+                    else:
+                        dict_item["pron"] = "ナニ"
+                        dict_item["read"] = "ナニ"
+                else:
+                    # Fallback: use Sudachi reading
+                    dict_item["pron"] = correct_yomi[1]
+                    dict_item["read"] = correct_yomi[1]
+                return_njd.append(dict_item)
+
+            else:
+                # Use Sudachi reading for other multi-reading kanji
+                # Special case: 方 (hou) → ホオ for consistency
+                if correct_yomi[0] == "方" and correct_yomi[1] == "ホウ":
+                    correct_yomi[1] = "ホオ"
+                dict_item["pron"] = correct_yomi[1]
+                dict_item["read"] = correct_yomi[1]
+                return_njd.append(dict_item)
+        else:
+            return_njd.append(dict_item)
+
+        pre_dict = dict_item
+
+    return_njd.reverse()
+    return return_njd

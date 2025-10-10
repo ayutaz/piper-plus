@@ -31,8 +31,11 @@ from .token_mapper import map_sequence
 try:
     from .ojt_plus import (
         retreat_acc_nuc,
+        modify_filler_accent,
+        modify_kanji_yomi,
         modify_acc_after_chaining,
         process_odori_features,
+        MULTI_READ_KANJI_LIST,
     )
 
     HAS_ADVANCED_POSTPROCESSING = True
@@ -124,8 +127,11 @@ def phonemize_japanese(
         # Get NJD features
         njd_features = _global_jpreprocess_instance.run_frontend(text)
 
-        # Apply advanced postprocessing functions
+        # Apply advanced postprocessing functions (Phase 3 complete)
+        # Order is important: follows kabosu-core's apply_postprocessing
         njd_features = retreat_acc_nuc(njd_features)
+        njd_features = modify_filler_accent(njd_features)
+        njd_features = modify_kanji_yomi(text, njd_features, MULTI_READ_KANJI_LIST)
         njd_features = modify_acc_after_chaining(njd_features)
         njd_features = process_odori_features(
             njd_features, _global_jpreprocess_instance
