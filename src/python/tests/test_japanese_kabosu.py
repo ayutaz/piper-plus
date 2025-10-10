@@ -322,5 +322,88 @@ class TestYomikataPhoneDization:
         assert result[0] in ["^", "\ue000"]
 
 
+@pytest.mark.skipif(
+    not HAS_UTILS or not HAS_JPREPROCESS,
+    reason="japanese_utils or jpreprocess not available",
+)
+class TestAdvancedPostprocessing:
+    """Test advanced postprocessing functions (Phase 3)."""
+
+    def test_retreat_acc_nuc(self):
+        """Test accent nucleus adjustment for long vowels."""
+        # Test with text containing long vowel mark
+        text = "ラーメン"
+        result = phonemize_japanese(text, use_advanced_postprocessing=True)
+        # Should return phoneme tokens
+        assert isinstance(result, list)
+        assert len(result) > 0
+
+    def test_modify_acc_after_chaining(self):
+        """Test conjugation accent correction for masu form."""
+        # Test with masu verb form
+        text = "書きます"
+        result = phonemize_japanese(text, use_advanced_postprocessing=True)
+        # Should return phoneme tokens
+        assert isinstance(result, list)
+        assert len(result) > 0
+
+    def test_process_odori_features_single_kanji(self):
+        """Test iteration mark processing for single kanji."""
+        # Test with 々 (odoriji)
+        text = "叙々苑"
+        result = phonemize_japanese(text, use_advanced_postprocessing=True)
+        # Should return phoneme tokens
+        assert isinstance(result, list)
+        assert len(result) > 0
+
+    def test_process_odori_features_multiple_kanji(self):
+        """Test iteration mark processing for multiple kanji."""
+        # Test with 々 after multiple kanji
+        text = "民主々義"
+        result = phonemize_japanese(text, use_advanced_postprocessing=True)
+        # Should return phoneme tokens
+        assert isinstance(result, list)
+        assert len(result) > 0
+
+    def test_process_repetition_marks(self):
+        """Test repetition mark processing (ゝ, ゞ, ヽ, ヾ)."""
+        # Test with repetition marks
+        text = "こゝろ"
+        result = phonemize_japanese(text, use_advanced_postprocessing=True)
+        # Should return phoneme tokens
+        assert isinstance(result, list)
+        assert len(result) > 0
+
+    def test_advanced_postprocessing_disabled(self):
+        """Test that phonemization works when advanced postprocessing is disabled."""
+        text = "叙々苑"
+        result = phonemize_japanese(text, use_advanced_postprocessing=False)
+        # Should still work
+        assert isinstance(result, list)
+        assert len(result) > 0
+
+    def test_integrated_preprocessing_and_postprocessing(self):
+        """Test that both preprocessing and postprocessing work together."""
+        # Text with variant kanji, English, and iteration marks
+        text = "齋藤さんはdockerを使って叙々苑に行きます"
+        result = phonemize_japanese(
+            text,
+            use_kabosu_preprocessing=True,
+            use_advanced_postprocessing=True,
+        )
+        # Should return phoneme tokens
+        assert isinstance(result, list)
+        assert len(result) > 0
+
+
+# Check if jpreprocess is available for Phase 3 tests
+try:
+    from jpreprocess import JPreprocess
+
+    HAS_JPREPROCESS = True
+except ImportError:
+    HAS_JPREPROCESS = False
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

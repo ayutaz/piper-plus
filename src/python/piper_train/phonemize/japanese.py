@@ -12,9 +12,32 @@ except ImportError:
             "Neither pyopenjtalk nor pyopenjtalk-plus is installed"
         ) from None
 
+# Optional jpreprocess support for advanced postprocessing
+try:
+    import jpreprocess
+
+    HAS_JPREPROCESS = True
+    _global_jpreprocess_instance = None
+except ImportError:
+    HAS_JPREPROCESS = False
+    jpreprocess = None  # type: ignore
+    _global_jpreprocess_instance = None
+
 from .custom_dict import CustomDictionary
 from .japanese_utils import preprocess_japanese_text
 from .token_mapper import map_sequence
+
+# Phase 3: Advanced postprocessing functions
+try:
+    from .ojt_plus import (
+        retreat_acc_nuc,
+        modify_acc_after_chaining,
+        process_odori_features,
+    )
+
+    HAS_ADVANCED_POSTPROCESSING = True
+except ImportError:
+    HAS_ADVANCED_POSTPROCESSING = False
 
 
 __all__ = ["phonemize_japanese"]
@@ -35,6 +58,7 @@ def phonemize_japanese(
     text: str,
     custom_dict: CustomDictionary | str | list[str] | None = None,
     use_kabosu_preprocessing: bool = True,
+    use_advanced_postprocessing: bool = True,
 ) -> list[str]:
     """Convert *text* into a list of phoneme/prosody tokens that Piper can ingest.
 
@@ -57,13 +81,18 @@ def phonemize_japanese(
     use_kabosu_preprocessing : bool, optional
         If True, apply enhanced preprocessing (variant kanji normalization,
         English→Katakana conversion). Default: True
+    use_advanced_postprocessing : bool, optional
+        If True, apply advanced postprocessing (accent nucleus adjustment,
+        conjugation accent correction, iteration mark processing).
+        Requires jpreprocess. Default: True
 
     Notes
     -----
-    1. We rely on *pyopenjtalk.extract_fullcontext* to obtain full-context labels.
+    1. We rely on *pyopenjtalk.extract_fullcontext* or *jpreprocess* to obtain full-context labels.
     2. "sil" at the beginning / end of the utterance is converted into ^ / $ or ?.
     3. Enhanced preprocessing (kabosu-core features) is applied first for better accuracy.
     4. Custom dictionary is applied before OpenJTalk processing for better pronunciation.
+    5. Advanced postprocessing (Phase 3) is applied when jpreprocess is available.
     """
 
     # Step 1: Apply enhanced preprocessing (kabosu-core features)
@@ -81,7 +110,32 @@ def phonemize_japanese(
         # テキストに辞書を適用
         text = dictionary.apply_to_text(text)
 
-    labels = pyopenjtalk.extract_fullcontext(text)
+    # Step 3: Get labels (with or without advanced postprocessing)
+    if (
+        use_advanced_postprocessing
+        and HAS_JPREPROCESS
+        and HAS_ADVANCED_POSTPROCESSING
+    ):
+        # Use jpreprocess for advanced postprocessing (Phase 3)
+        global _global_jpreprocess_instance
+        if _global_jpreprocess_instance is None:
+            _global_jpreprocess_instance = jpreprocess.jpreprocess()
+
+        # Get NJD features
+        njd_features = _global_jpreprocess_instance.run_frontend(text)
+
+        # Apply advanced postprocessing functions
+        njd_features = retreat_acc_nuc(njd_features)
+        njd_features = modify_acc_after_chaining(njd_features)
+        njd_features = process_odori_features(
+            njd_features, _global_jpreprocess_instance
+        )
+
+        # Convert NJD features back to labels
+        labels = _global_jpreprocess_instance.make_label(njd_features)
+    else:
+        # Use standard pyopenjtalk (backward compatible)
+        labels = pyopenjtalk.extract_fullcontext(text)
     tokens: list[str] = []
 
     for idx, label in enumerate(labels):
