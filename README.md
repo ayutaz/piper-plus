@@ -289,6 +289,9 @@ The `MODEL_CARD` file for each voice contains important licensing information. P
 
 ### Dependencies
 
+**Requirements:**
+- Python 3.11 or higher (Python 3.12 not yet supported due to kabosu-core dependencies)
+
 Piper has different requirements depending on your use case:
 
 ```bash
