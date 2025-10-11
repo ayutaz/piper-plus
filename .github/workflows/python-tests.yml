@@ -18,7 +18,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-22.04, windows-latest, macos-latest]
-        python-version: ["3.11", "3.12"]
+        python-version: ["3.11"]  # kabosu-core dependencies not compatible with 3.12 yet
     
     steps:
     - uses: actions/checkout@v4
