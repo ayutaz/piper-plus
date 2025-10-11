@@ -21,7 +21,17 @@ requirements = []
 requirements_path = this_dir.parent.parent / "requirements-train.txt"
 if requirements_path.is_file():
     with open(requirements_path, encoding="utf-8") as requirements_file:
-        requirements = requirements_file.read().splitlines()
+        # Parse requirements, removing comments and empty lines
+        for line in requirements_file:
+            line = line.strip()
+            # Skip empty lines, comment-only lines, and git+ URLs
+            # (git+ URLs must be installed separately, not via install_requires)
+            if not line or line.startswith('#') or line.startswith('git+'):
+                continue
+            # Remove inline comments
+            line = line.split('#')[0].strip()
+            if line:
+                requirements.append(line)
 
 # ルートのVERSIONファイルから動的にバージョンを読み込む
 version_path = this_dir.parent.parent / "VERSION"
