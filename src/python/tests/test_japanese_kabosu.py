@@ -41,6 +41,14 @@ try:
 except ImportError:
     HAS_PHONEMIZE = False
 
+# Check if jpreprocess is available for Phase 3 tests
+try:
+    from jpreprocess import JPreprocess
+
+    HAS_JPREPROCESS = True
+except ImportError:
+    HAS_JPREPROCESS = False
+
 
 class TestVariantKanjiNormalization:
     """Test variant kanji (異体字) normalization."""
@@ -435,15 +443,6 @@ class TestAdvancedPostprocessing:
         # Should return phoneme tokens
         assert isinstance(result, list)
         assert len(result) > 0
-
-
-# Check if jpreprocess is available for Phase 3 tests
-try:
-    from jpreprocess import JPreprocess
-
-    HAS_JPREPROCESS = True
-except ImportError:
-    HAS_JPREPROCESS = False
 
 
 if __name__ == "__main__":
