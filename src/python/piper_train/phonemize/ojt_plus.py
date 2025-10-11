@@ -16,6 +16,9 @@ Copyright (c) 2018: Ryuichi Yamamoto
 
 from typing import Union
 
+from .types import NjdObject
+
+# Optional jpreprocess support
 try:
     import jpreprocess
 
@@ -24,7 +27,7 @@ except ImportError:
     HAS_JPREPROCESS = False
     jpreprocess = None  # type: ignore
 
-# Sudachipy for multi-reading kanji disambiguation
+# Optional sudachipy for multi-reading kanji disambiguation
 try:
     from sudachipy import dictionary, tokenizer
 
@@ -32,7 +35,7 @@ try:
 except ImportError:
     HAS_SUDACHIPY = False
 
-# ONNX-based nani prediction model
+# Optional ONNX-based nani prediction model
 try:
     from .yomi_model.nani_predict import predict
 
@@ -40,8 +43,6 @@ try:
 except ImportError:
     HAS_NANI_PREDICT = False
     predict = None  # type: ignore
-
-from .types import NjdObject
 
 
 # Multi-reading kanji list (70+ characters with multiple readings)

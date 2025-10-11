@@ -164,7 +164,8 @@ def apply_yomikata(text: str) -> str:
 
                 warnings.warn(
                     "yomikata BERT model not found. Please download it with: "
-                    "python -m yomikata download"
+                    "python -m yomikata download",
+                    stacklevel=2,
                 )
             return text
 
