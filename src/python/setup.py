@@ -26,10 +26,10 @@ if requirements_path.is_file():
             line = line.strip()
             # Skip empty lines, comment-only lines, and git+ URLs
             # (git+ URLs must be installed separately, not via install_requires)
-            if not line or line.startswith('#') or line.startswith('git+'):
+            if not line or line.startswith("#") or line.startswith("git+"):
                 continue
             # Remove inline comments
-            line = line.split('#')[0].strip()
+            line = line.split("#")[0].strip()
             if line:
                 requirements.append(line)
 
