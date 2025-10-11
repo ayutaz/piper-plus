@@ -60,22 +60,28 @@ _RE_FURIGANA = re.compile(r"\{(.+?)/(.+?)\}")
 def convert_half_to_full(text: str) -> str:
     """Convert half-width characters to full-width (全角).
 
+    Note: ASCII alphabets are NOT converted by this function, as they should be
+    handled by convert_english_to_katakana() instead. Only kana, digits, and
+    symbols are converted.
+
     Args:
         text: Input text with potential half-width characters
 
     Returns:
-        Text with all half-width characters converted to full-width
+        Text with half-width kana, digits, and symbols converted to full-width
 
     Examples:
         >>> convert_half_to_full("ｱｲｳｴｵ")
         "アイウエオ"
-        >>> convert_half_to_full("ABC123")
-        "ＡＢＣ１２３"
+        >>> convert_half_to_full("123")
+        "１２３"
     """
     if not HAS_JACONV:
         return text
 
-    return jaconv.h2z(text)
+    # Convert kana and digits, but NOT ascii alphabets
+    # ASCII alphabets should be handled by convert_english_to_katakana
+    return jaconv.h2z(text, kana=True, ascii=False, digit=True)
 
 
 def convert_english_to_katakana(text: str) -> str:
@@ -224,24 +230,25 @@ def preprocess_japanese_text(
         >>> preprocess_japanese_text("畳の表は美しい")
         "畳のオモテは美しい"
     """
-    # Step 1: Convert half-width to full-width
-    if convert_hankaku and HAS_JACONV:
-        text = convert_half_to_full(text)
-
-    # Step 2: Normalize variant kanji
+    # Step 1: Normalize variant kanji first
     if normalize_variants:
         text = normalize_itaiji(text)
 
-    # Step 3: Apply BERT-based reading disambiguation (Phase 2)
-    # This should be done after normalization but before English conversion
+    # Step 2: Apply BERT-based reading disambiguation (Phase 2)
+    # This should be done after normalization but before other conversions
     if use_yomikata and HAS_YOMIKATA:
         text = apply_yomikata(text)
 
-    # Step 4: Convert English to Katakana
-    # Note: This should be done after yomikata to avoid interfering with
-    # BERT-based reading estimation
+    # Step 3: Convert English to Katakana
+    # IMPORTANT: This must be done BEFORE convert_half_to_full
+    # to avoid converting ASCII letters to full-width before katakana conversion
     if convert_english and HAS_KANALIZER:
         text = convert_english_to_katakana(text)
+
+    # Step 4: Convert half-width to full-width
+    # This should be done last to handle any remaining half-width characters
+    if convert_hankaku and HAS_JACONV:
+        text = convert_half_to_full(text)
 
     return text
 
