@@ -16,7 +16,6 @@ License:
 MIT License
 """
 
-import os
 from pathlib import Path
 
 

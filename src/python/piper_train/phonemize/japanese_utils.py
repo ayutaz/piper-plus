@@ -11,7 +11,8 @@ Original source: kabosu-core (https://github.com/q9uri/kabosu-core)
 """
 
 import re
-from typing import Optional
+import warnings
+
 
 # Optional dependencies
 try:
@@ -33,7 +34,7 @@ try:
 
     HAS_YOMIKATA = True
     # Global instance of yomikata reader (lazy initialization)
-    _global_yomikata_reader: Optional[dBert] = None
+    _global_yomikata_reader: dBert | None = None
 except ImportError:
     HAS_YOMIKATA = False
     _global_yomikata_reader = None
@@ -160,8 +161,6 @@ def apply_yomikata(text: str) -> str:
         except Exception as e:
             # If model not downloaded, provide helpful error message
             if "model" in str(e).lower() or "download" in str(e).lower():
-                import warnings
-
                 warnings.warn(
                     "yomikata BERT model not found. Please download it with: "
                     "python -m yomikata download",

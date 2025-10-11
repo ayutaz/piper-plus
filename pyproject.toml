@@ -112,6 +112,8 @@ inline-quotes = "double"
 "scripts/*" = ["ARG", "PLC0415"]  # Allow conditional imports in scripts  
 # token_mapper.py: グローバル変数を使用した音素マッピングシステム
 "src/python/piper_train/phonemize/token_mapper.py" = ["PLW0603"]
+# japanese.py: jpreprocessインスタンスのグローバルキャッシュ（遅延初期化）
+"src/python/piper_train/phonemize/japanese.py" = ["PLW0603"]
 # japanese_utils.py: yomikataリーダーのグローバルキャッシュ（遅延初期化）
 "src/python/piper_train/phonemize/japanese_utils.py" = ["PLW0603"]
 # mel_processing.py: パフォーマンス最適化のためのグローバルキャッシュ

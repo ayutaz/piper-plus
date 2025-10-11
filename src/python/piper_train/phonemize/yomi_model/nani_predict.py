@@ -8,7 +8,6 @@ License: MIT (see COPYING file)
 """
 
 from pathlib import Path
-from typing import Union
 
 import numpy as np
 
@@ -41,7 +40,7 @@ except ImportError:
     model_session = None
 
 
-def predict(input_njd: list[Union[NjdObject, None]]) -> int:
+def predict(input_njd: list[NjdObject | None]) -> int:
     """Predict whether "何" should be read as "ナニ" (0) or "ナン" (1).
 
     Args:

@@ -9,4 +9,5 @@ License: MIT (see COPYING file)
 
 from .nani_predict import predict
 
+
 __all__ = ["predict"]

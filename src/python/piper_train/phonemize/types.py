@@ -34,6 +34,7 @@ class NjdObject(TypedDict):
         chain_rule: Chaining rule
         chain_flag: Accent phrase boundary flag (0 = boundary, -1 = chain)
     """
+
     string: str
     pos: str
     pos_group1: str

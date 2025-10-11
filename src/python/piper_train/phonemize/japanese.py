@@ -27,15 +27,16 @@ from .custom_dict import CustomDictionary
 from .japanese_utils import preprocess_japanese_text
 from .token_mapper import map_sequence
 
+
 # Phase 3: Advanced postprocessing functions
 try:
     from .ojt_plus import (
-        retreat_acc_nuc,
+        MULTI_READ_KANJI_LIST,
+        modify_acc_after_chaining,
         modify_filler_accent,
         modify_kanji_yomi,
-        modify_acc_after_chaining,
         process_odori_features,
-        MULTI_READ_KANJI_LIST,
+        retreat_acc_nuc,
     )
 
     HAS_ADVANCED_POSTPROCESSING = True
@@ -114,11 +115,7 @@ def phonemize_japanese(
         text = dictionary.apply_to_text(text)
 
     # Step 3: Get labels (with or without advanced postprocessing)
-    if (
-        use_advanced_postprocessing
-        and HAS_JPREPROCESS
-        and HAS_ADVANCED_POSTPROCESSING
-    ):
+    if use_advanced_postprocessing and HAS_JPREPROCESS and HAS_ADVANCED_POSTPROCESSING:
         # Use jpreprocess for advanced postprocessing (Phase 3)
         global _global_jpreprocess_instance
         if _global_jpreprocess_instance is None:

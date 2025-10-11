@@ -14,9 +14,8 @@ License: MIT
 Copyright (c) 2018: Ryuichi Yamamoto
 """
 
-from typing import Union
-
 from .types import NjdObject
+
 
 # Optional jpreprocess support
 try:
@@ -226,7 +225,9 @@ def modify_acc_after_chaining(njd_features: list[NjdObject]) -> list[NjdObject]:
         elif is_after_nuc:
             if njd["ctype"] == "特殊・マス":
                 # Shift nucleus to "ま" in masu
-                head["acc"] = phase_len + 1 if njd["cform"] != "未然形" else phase_len + 2
+                head["acc"] = (
+                    phase_len + 1 if njd["cform"] != "未然形" else phase_len + 2
+                )
             elif njd["ctype"] == "特殊・ナイ":
                 # Shift nucleus for nai auxiliary
                 head["acc"] = phase_len
@@ -249,7 +250,7 @@ def modify_acc_after_chaining(njd_features: list[NjdObject]) -> list[NjdObject]:
 
 def process_odori_features(
     njd_features: list[NjdObject],
-    jpreprocess_instance = None,
+    jpreprocess_instance=None,
 ) -> list[NjdObject]:
     """Process iteration marks (踊り字) and repetition marks appropriately.
 
@@ -310,8 +311,8 @@ def process_odori_features(
     def needs_reanalysis(
         odori_feature: NjdObject,
         prev_feature: NjdObject,
-        next_feature: Union[NjdObject, None] = None,
-    ) -> tuple[bool, str, Union[str, None]]:
+        next_feature: NjdObject | None = None,
+    ) -> tuple[bool, str, str | None]:
         """Determine if re-analysis of previous kanji is needed."""
         if count_odori(odori_feature["orig"]) != 1:
             return False, "", None
@@ -413,14 +414,18 @@ def process_odori_features(
         if is_dancing(njd_features[i]["orig"]):
             # Check if re-analysis is needed for single iteration mark
             if i > 0 and jpreprocess_instance is not None and HAS_JPREPROCESS:
-                next_feature = njd_features[i + 1] if i + 1 < len(njd_features) else None
+                next_feature = (
+                    njd_features[i + 1] if i + 1 < len(njd_features) else None
+                )
                 needs_reanalysis_flag, target_kanji, next_kanji = needs_reanalysis(
                     njd_features[i], njd_features[i - 1], next_feature
                 )
                 if needs_reanalysis_flag:
                     if next_kanji is not None:
                         # Re-analyze with following kanji
-                        analyzed = reanalyze_kanji(target_kanji + next_kanji, jpreprocess_instance)
+                        analyzed = reanalyze_kanji(
+                            target_kanji + next_kanji, jpreprocess_instance
+                        )
                         njd_features[i : i + 2] = analyzed
                         i += len(analyzed)
                         continue
@@ -498,7 +503,9 @@ def process_odori_features(
         elif is_odoriji(njd_features[i]["orig"]):
             # Process repetition marks (ゝ, ゞ, ヽ, ヾ)
             if i > 0:
-                njd_features[i] = process_odoriji_mark(njd_features[i], njd_features[i - 1])
+                njd_features[i] = process_odoriji_mark(
+                    njd_features[i], njd_features[i - 1]
+                )
             i += 1
         else:
             i += 1
