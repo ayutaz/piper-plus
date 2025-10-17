@@ -31,8 +31,8 @@ def test_phase4_tokens_defined():
     print("Test 1: Phase 4トークン定義の確認")
     print("=" * 70)
 
-    # Check PROSODY_TOKENS_PHASE4 contains 47 tokens
-    expected_count = 47  # 13 prev_pos + 13 next_pos + 5 intn_pos + 10 prev_mora + 6 prev_acc
+    # Check PROSODY_TOKENS_PHASE4 contains 63 tokens (B,E,G fields)
+    expected_count = 63  # 13 prev_pos + 13 next_pos + 5 intn_pos + 10 prev_mora + 6 prev_acc + 10 next_mora + 6 next_acc
 
     print(f"\n期待されるPhase 4トークン数: {expected_count}")
     print(f"実際のPhase 4トークン数: {len(PROSODY_TOKENS_PHASE4)}")
@@ -44,6 +44,8 @@ def test_phase4_tokens_defined():
     intn_pos_tokens = [t for t in PROSODY_TOKENS_PHASE4 if t.startswith("<INTN_POS:")]
     prev_mora_tokens = [t for t in PROSODY_TOKENS_PHASE4 if t.startswith("<PREV_MORA:")]
     prev_acc_tokens = [t for t in PROSODY_TOKENS_PHASE4 if t.startswith("<PREV_ACC:")]
+    next_mora_tokens = [t for t in PROSODY_TOKENS_PHASE4 if t.startswith("<NEXT_MORA:")]
+    next_acc_tokens = [t for t in PROSODY_TOKENS_PHASE4 if t.startswith("<NEXT_ACC:")]
 
     print(f"\nトークンカテゴリ別集計:")
     print(f"  前アクセント句POS: {len(prev_pos_tokens)} (期待: 13)")
@@ -51,12 +53,16 @@ def test_phase4_tokens_defined():
     print(f"  イントネーション句内位置: {len(intn_pos_tokens)} (期待: 5)")
     print(f"  前アクセント句モーラ数: {len(prev_mora_tokens)} (期待: 10)")
     print(f"  前アクセント句アクセント型: {len(prev_acc_tokens)} (期待: 6)")
+    print(f"  次アクセント句モーラ数: {len(next_mora_tokens)} (期待: 10) - G field")
+    print(f"  次アクセント句アクセント型: {len(next_acc_tokens)} (期待: 6) - G field")
 
     assert len(prev_pos_tokens) == 13, "前アクセント句POSトークン数が正しくありません"
     assert len(next_pos_tokens) == 13, "後アクセント句POSトークン数が正しくありません"
     assert len(intn_pos_tokens) == 5, "イントネーション句内位置トークン数が正しくありません"
     assert len(prev_mora_tokens) == 10, "前アクセント句モーラ数トークン数が正しくありません"
     assert len(prev_acc_tokens) == 6, "前アクセント句アクセント型トークン数が正しくありません"
+    assert len(next_mora_tokens) == 10, "次アクセント句モーラ数トークン数が正しくありません"
+    assert len(next_acc_tokens) == 6, "次アクセント句アクセント型トークン数が正しくありません"
 
     print("\n✅ Phase 4トークン定義: 正常")
     return True
@@ -68,8 +74,8 @@ def test_phase4_pua_mapping():
     print("Test 2: Phase 4 PUAマッピングの確認")
     print("=" * 70)
 
-    # Verify mapping count
-    expected_count = 47
+    # Verify mapping count (B,E,G fields)
+    expected_count = 63
     actual_count = len(PROSODY_PUA_MAPPING_PHASE4)
     print(f"\nPhase 4 PUAマッピング数: {actual_count} (期待: {expected_count})")
     assert actual_count == expected_count, f"PUAマッピング数が正しくありません (期待: {expected_count}, 実際: {actual_count})"
@@ -81,6 +87,8 @@ def test_phase4_pua_mapping():
         "イントネーション位置": (0xE0C0, 0xE0C4, 5),
         "前モーラ": (0xE0D0, 0xE0D9, 10),
         "前アクセント": (0xE0E0, 0xE0E5, 6),
+        "次モーラ (G field)": (0xE0F0, 0xE0F9, 10),
+        "次アクセント (G field)": (0xE100, 0xE105, 6),
     }
 
     print("\nPUA範囲チェック:")
@@ -97,7 +105,7 @@ def test_phase4_pua_mapping():
 
 
 def test_total_token_count():
-    """Test that total token count is 144 after Phase 4"""
+    """Test that total token count is 160 after Phase 4 with G field"""
     print("\n" + "=" * 70)
     print("Test 3: トークン総数の確認")
     print("=" * 70)
@@ -106,12 +114,12 @@ def test_total_token_count():
     basic_special = 7  # _, ^, $, ?, #, [, ]
     phase1_count = len(PROSODY_TOKENS_PHASE1)  # 31 tokens
     phase2_count = len(PROSODY_TOKENS_PHASE2)  # 8 tokens
-    phase4_count = len(PROSODY_TOKENS_PHASE4)  # 47 tokens
+    phase4_count = len(PROSODY_TOKENS_PHASE4)  # 63 tokens (47 B,E + 16 G)
     phoneme_count = len(JAPANESE_PHONEMES)  # 51 phonemes
 
     total_special = basic_special + phase1_count + phase2_count + phase4_count
     total_tokens = total_special + phoneme_count
-    expected_total = 144  # 7 + 31 + 8 + 47 + 51 = 144
+    expected_total = 160  # 7 + 31 + 8 + 63 + 51 = 160
 
     print(f"\n基本特殊トークン: {basic_special}")
     print(f"Phase 1韻律トークン: {phase1_count}")

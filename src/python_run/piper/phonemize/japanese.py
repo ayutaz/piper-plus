@@ -42,6 +42,7 @@ _RE_I = re.compile(r"/I:([^-]+)-([^@]+)@([^+]+)\+([^&]+)&([^-]+)-([^\|]+)\|([^+]
 # Phase 4: Context prosody patterns
 _RE_B = re.compile(r"/B:([^-]+)-([^_]+)_([^/]+)")
 _RE_E = re.compile(r"/E:([^_]+)_([^!]+)")
+_RE_G = re.compile(r"/G:([^_]+)_([^%]+)")
 
 # Part-of-speech mapping (Phase 1)
 POS_MAP = {
@@ -78,6 +79,7 @@ def extract_prosody_features(label: str, labels: list[str] = None, idx: int = -1
     - I field: Breath group information (i3, i4) - Phase 2
     - B field: Previous/next POS (b1, b2), intonation position (b3) - Phase 4
     - E field: Previous accent phrase info (e1, e2) - Phase 4
+    - G field: Next accent phrase info (g1, g2) - Phase 4
 
     Parameters
     ----------
@@ -103,6 +105,8 @@ def extract_prosody_features(label: str, labels: list[str] = None, idx: int = -1
         - "intn_pos": Intonation position token (if available) - Phase 4
         - "prev_mora": Previous mora count token (if available) - Phase 4
         - "prev_accent": Previous accent type token (if available) - Phase 4
+        - "next_mora": Next mora count token (if available) - Phase 4
+        - "next_accent": Next accent type token (if available) - Phase 4
     """
     features = {}
 
@@ -202,6 +206,26 @@ def extract_prosody_features(label: str, labels: list[str] = None, idx: int = -1
                 features["prev_accent"] = "<PREV_ACC:5>"
             else:
                 features["prev_accent"] = f"<PREV_ACC:{e2_int}>"
+
+    # Phase 4: Gフィールド - 次アクセント句のモーラ数とアクセント型
+    m_g = _RE_G.search(label)
+    if m_g:
+        g1 = m_g.group(1)  # 次アクセント句のモーラ数
+        g2 = m_g.group(2)  # 次アクセント句のアクセント型
+
+        if g1 != "xx":
+            g1_int = int(g1)
+            if g1_int >= 10:
+                features["next_mora"] = "<NEXT_MORA:10+>"
+            else:
+                features["next_mora"] = f"<NEXT_MORA:{g1_int}>"
+
+        if g2 != "xx":
+            g2_int = int(g2)
+            if g2_int >= 5:
+                features["next_accent"] = "<NEXT_ACC:5>"
+            else:
+                features["next_accent"] = f"<NEXT_ACC:{g2_int}>"
 
     return features
 
@@ -324,19 +348,28 @@ def phonemize_japanese(
                     current_accent_phrase_start = idx
                     features = extract_prosody_features(label, labels, idx)
 
-                    # Phase 4: Insert context tokens first (PREV_POS, NEXT_POS, INTN_POS, PREV_MORA, PREV_ACC)
+                    # Phase 4: Insert context tokens first
+                    # Previous accent phrase info
                     if "prev_pos" in features:
                         tokens.append(features["prev_pos"])
-                    if "next_pos" in features:
-                        tokens.append(features["next_pos"])
-                    if "intn_pos" in features:
-                        tokens.append(features["intn_pos"])
                     if "prev_mora" in features:
                         tokens.append(features["prev_mora"])
                     if "prev_accent" in features:
                         tokens.append(features["prev_accent"])
 
-                    # Phase 1: Insert in order: POS → ACC → MORA → INTN
+                    # Next accent phrase info
+                    if "next_pos" in features:
+                        tokens.append(features["next_pos"])
+                    if "next_mora" in features:
+                        tokens.append(features["next_mora"])
+                    if "next_accent" in features:
+                        tokens.append(features["next_accent"])
+
+                    # Intonation phrase position
+                    if "intn_pos" in features:
+                        tokens.append(features["intn_pos"])
+
+                    # Phase 1: Insert current accent phrase info
                     if "pos" in features:
                         tokens.append(features["pos"])
                     if "accent" in features:

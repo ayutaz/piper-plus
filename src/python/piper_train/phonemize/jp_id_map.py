@@ -34,7 +34,7 @@ PROSODY_TOKENS_PHASE2: list[str] = [
     "<BG:1/1>", "<BG:1/2>", "<BG:2/2>",
 ]
 
-# Phase 4: Context prosody tokens (B,E field information)
+# Phase 4: Context prosody tokens (B,E,G field information)
 PROSODY_TOKENS_PHASE4: list[str] = [
     # Previous accent phrase POS (13 types)
     "<PREV_POS:ADJ>", "<PREV_POS:NOUN>", "<PREV_POS:ADV>", "<PREV_POS:PRON>",
@@ -53,6 +53,11 @@ PROSODY_TOKENS_PHASE4: list[str] = [
     "<PREV_MORA:6>", "<PREV_MORA:7>", "<PREV_MORA:8>", "<PREV_MORA:9>", "<PREV_MORA:10+>",
     # Previous accent phrase accent type (0-5)
     "<PREV_ACC:0>", "<PREV_ACC:1>", "<PREV_ACC:2>", "<PREV_ACC:3>", "<PREV_ACC:4>", "<PREV_ACC:5>",
+    # Next accent phrase mora count (1-10+) - G field
+    "<NEXT_MORA:1>", "<NEXT_MORA:2>", "<NEXT_MORA:3>", "<NEXT_MORA:4>", "<NEXT_MORA:5>",
+    "<NEXT_MORA:6>", "<NEXT_MORA:7>", "<NEXT_MORA:8>", "<NEXT_MORA:9>", "<NEXT_MORA:10+>",
+    # Next accent phrase accent type (0-5) - G field
+    "<NEXT_ACC:0>", "<NEXT_ACC:1>", "<NEXT_ACC:2>", "<NEXT_ACC:3>", "<NEXT_ACC:4>", "<NEXT_ACC:5>",
 ]
 
 # Prosody / sentence boundary tokens inserted by `phonemize_japanese`

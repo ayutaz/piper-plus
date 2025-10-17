@@ -85,7 +85,7 @@ PROSODY_PUA_MAPPING_PHASE2 = {
     "<BG:2/2>": 0xE082,
 }
 
-# Phase 4: Context prosody tokens PUA mapping
+# Phase 4: Context prosody tokens PUA mapping (B,E,G fields)
 PROSODY_PUA_MAPPING_PHASE4 = {
     # Previous accent phrase POS (0xE0A0-0xE0AC)
     "<PREV_POS:ADJ>": 0xE0A0,
@@ -139,6 +139,24 @@ PROSODY_PUA_MAPPING_PHASE4 = {
     "<PREV_ACC:3>": 0xE0E3,
     "<PREV_ACC:4>": 0xE0E4,
     "<PREV_ACC:5>": 0xE0E5,
+    # Next accent phrase mora count (0xE0F0-0xE0F9) - G field
+    "<NEXT_MORA:1>": 0xE0F0,
+    "<NEXT_MORA:2>": 0xE0F1,
+    "<NEXT_MORA:3>": 0xE0F2,
+    "<NEXT_MORA:4>": 0xE0F3,
+    "<NEXT_MORA:5>": 0xE0F4,
+    "<NEXT_MORA:6>": 0xE0F5,
+    "<NEXT_MORA:7>": 0xE0F6,
+    "<NEXT_MORA:8>": 0xE0F7,
+    "<NEXT_MORA:9>": 0xE0F8,
+    "<NEXT_MORA:10+>": 0xE0F9,
+    # Next accent phrase accent type (0xE100-0xE105) - G field
+    "<NEXT_ACC:0>": 0xE100,
+    "<NEXT_ACC:1>": 0xE101,
+    "<NEXT_ACC:2>": 0xE102,
+    "<NEXT_ACC:3>": 0xE103,
+    "<NEXT_ACC:4>": 0xE104,
+    "<NEXT_ACC:5>": 0xE105,
 }
 
 # Build bidirectional mappings
@@ -170,7 +188,7 @@ for token, codepoint in PROSODY_PUA_MAPPING_PHASE4.items():
     CHAR2TOKEN[ch] = token
 
 # Private Use Area for dynamic allocation (starting after fixed mappings)
-_PUA_START = 0xE0F0  # Start after Phase 4 prosody tokens (0xE0E5 + margin)
+_PUA_START = 0xE110  # Start after Phase 4 prosody tokens with G field (0xE105 + margin)
 _next = _PUA_START
 
 
