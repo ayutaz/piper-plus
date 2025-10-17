@@ -1,4 +1,4 @@
-# Token mapper: multi-character phonemes to single codepoint conversion
+# 新規追加ファイル: 多文字音素→1文字(コードポイント) 変換を共通提供
 # This mapping must match the C++ implementation in openjtalk_phonemize.cpp
 
 # Fixed PUA mapping table to ensure consistency between Python and C++
@@ -159,6 +159,65 @@ PROSODY_PUA_MAPPING_PHASE4 = {
     "<NEXT_ACC:5>": 0xE105,
 }
 
+# Phase 5: Complete field extraction PUA mapping (D,H,K fields)
+PROSODY_PUA_MAPPING_PHASE5 = {
+    # Previous word POS (0xE120-0xE12C) - D field
+    "<PREV_WORD_POS:ADJ>": 0xE120,
+    "<PREV_WORD_POS:NOUN>": 0xE121,
+    "<PREV_WORD_POS:ADV>": 0xE122,
+    "<PREV_WORD_POS:PRON>": 0xE123,
+    "<PREV_WORD_POS:CONJ>": 0xE124,
+    "<PREV_WORD_POS:RENTAI>": 0xE125,
+    "<PREV_WORD_POS:PREFIX>": 0xE126,
+    "<PREV_WORD_POS:SUFFIX>": 0xE127,
+    "<PREV_WORD_POS:PART>": 0xE128,
+    "<PREV_WORD_POS:AUX>": 0xE129,
+    "<PREV_WORD_POS:VERB>": 0xE12A,
+    "<PREV_WORD_POS:SYM>": 0xE12B,
+    "<PREV_WORD_POS:OTHER>": 0xE12C,
+    # Next word POS (0xE130-0xE13C) - D field
+    "<NEXT_WORD_POS:ADJ>": 0xE130,
+    "<NEXT_WORD_POS:NOUN>": 0xE131,
+    "<NEXT_WORD_POS:ADV>": 0xE132,
+    "<NEXT_WORD_POS:PRON>": 0xE133,
+    "<NEXT_WORD_POS:CONJ>": 0xE134,
+    "<NEXT_WORD_POS:RENTAI>": 0xE135,
+    "<NEXT_WORD_POS:PREFIX>": 0xE136,
+    "<NEXT_WORD_POS:SUFFIX>": 0xE137,
+    "<NEXT_WORD_POS:PART>": 0xE138,
+    "<NEXT_WORD_POS:AUX>": 0xE139,
+    "<NEXT_WORD_POS:VERB>": 0xE13A,
+    "<NEXT_WORD_POS:SYM>": 0xE13B,
+    "<NEXT_WORD_POS:OTHER>": 0xE13C,
+    # Bunsetsu position (0xE140-0xE147) - H field
+    "<BUNSETSU:1/1>": 0xE140,
+    "<BUNSETSU:1/2>": 0xE141,
+    "<BUNSETSU:2/2>": 0xE142,
+    "<BUNSETSU:1/3>": 0xE143,
+    "<BUNSETSU:2/3>": 0xE144,
+    "<BUNSETSU:3/3>": 0xE145,
+    "<BUNSETSU:1/4>": 0xE146,
+    "<BUNSETSU:4/4>": 0xE147,
+    # Utterance breath group count (0xE150-0xE153) - K field
+    "<UTT_BG:1>": 0xE150,
+    "<UTT_BG:2>": 0xE151,
+    "<UTT_BG:3>": 0xE152,
+    "<UTT_BG:4+>": 0xE153,
+    # Utterance intonation phrase count (0xE154-0xE159) - K field
+    "<UTT_IP:1>": 0xE154,
+    "<UTT_IP:2>": 0xE155,
+    "<UTT_IP:3>": 0xE156,
+    "<UTT_IP:4>": 0xE157,
+    "<UTT_IP:5>": 0xE158,
+    "<UTT_IP:6+>": 0xE159,
+    # Utterance total mora count (0xE15A-0xE15E) - K field
+    "<UTT_MORA:1-10>": 0xE15A,
+    "<UTT_MORA:11-20>": 0xE15B,
+    "<UTT_MORA:21-30>": 0xE15C,
+    "<UTT_MORA:31-50>": 0xE15D,
+    "<UTT_MORA:51+>": 0xE15E,
+}
+
 # Build bidirectional mappings
 TOKEN2CHAR = {}
 CHAR2TOKEN = {}
@@ -187,24 +246,30 @@ for token, codepoint in PROSODY_PUA_MAPPING_PHASE4.items():
     TOKEN2CHAR[token] = ch
     CHAR2TOKEN[ch] = token
 
+# Initialize with Phase 5 prosody mappings
+for token, codepoint in PROSODY_PUA_MAPPING_PHASE5.items():
+    ch = chr(codepoint)
+    TOKEN2CHAR[token] = ch
+    CHAR2TOKEN[ch] = token
+
 # Private Use Area for dynamic allocation (starting after fixed mappings)
-_PUA_START = 0xE110  # Start after Phase 4 prosody tokens with G field (0xE105 + margin)
+_PUA_START = 0xE160  # Start after Phase 5 prosody tokens (0xE15E + margin)
 _next = _PUA_START
 
 
 def register(token: str) -> str:
     """Register *token* and return its single-codepoint replacement."""
-    global _next  # noqa: PLW0603
+    global _next
     if token in TOKEN2CHAR:
         return TOKEN2CHAR[token]
 
-    # If already single codepoint, use as-is
+    # 既に1コードポイントの場合はそのまま流用
     if len(token) == 1:
         TOKEN2CHAR[token] = token
         CHAR2TOKEN[token] = token
         return token
 
-    # Dynamic allocation (if not in fixed mapping)
+    # 動的割り当て（固定マッピングに含まれていない場合）
     ch = chr(_next)
     _next += 1
     TOKEN2CHAR[token] = ch
@@ -213,5 +278,5 @@ def register(token: str) -> str:
 
 
 def map_sequence(seq):
-    """seq is List[str]. Returns a list with each element replaced by a single character."""
+    """seq は List[str]。各要素を1文字に置換したリストを返す"""
     return [register(t) for t in seq]

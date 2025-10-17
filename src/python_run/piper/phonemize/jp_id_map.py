@@ -1,7 +1,7 @@
 from .token_mapper import register
 
 
-__all__ = ["get_japanese_id_map", "JAPANESE_PHONEMES", "SPECIAL_TOKENS"]
+__all__ = ["get_japanese_id_map", "JAPANESE_PHONEMES", "SPECIAL_TOKENS", "PROSODY_TOKENS_PHASE1", "PROSODY_TOKENS_PHASE2", "PROSODY_TOKENS_PHASE4", "PROSODY_TOKENS_PHASE5"]
 
 # -----------------------------------------------------------------------------
 # Japanese phoneme inventory (Open JTalk style) + prosody/special tokens
@@ -60,6 +60,30 @@ PROSODY_TOKENS_PHASE4: list[str] = [
     "<NEXT_ACC:0>", "<NEXT_ACC:1>", "<NEXT_ACC:2>", "<NEXT_ACC:3>", "<NEXT_ACC:4>", "<NEXT_ACC:5>",
 ]
 
+# Phase 5: Complete field extraction (D,H,K fields)
+PROSODY_TOKENS_PHASE5: list[str] = [
+    # Previous word POS (13 types) - D field
+    "<PREV_WORD_POS:ADJ>", "<PREV_WORD_POS:NOUN>", "<PREV_WORD_POS:ADV>", "<PREV_WORD_POS:PRON>",
+    "<PREV_WORD_POS:CONJ>", "<PREV_WORD_POS:RENTAI>", "<PREV_WORD_POS:PREFIX>", "<PREV_WORD_POS:SUFFIX>",
+    "<PREV_WORD_POS:PART>", "<PREV_WORD_POS:AUX>", "<PREV_WORD_POS:VERB>", "<PREV_WORD_POS:SYM>",
+    "<PREV_WORD_POS:OTHER>",
+    # Next word POS (13 types) - D field
+    "<NEXT_WORD_POS:ADJ>", "<NEXT_WORD_POS:NOUN>", "<NEXT_WORD_POS:ADV>", "<NEXT_WORD_POS:PRON>",
+    "<NEXT_WORD_POS:CONJ>", "<NEXT_WORD_POS:RENTAI>", "<NEXT_WORD_POS:PREFIX>", "<NEXT_WORD_POS:SUFFIX>",
+    "<NEXT_WORD_POS:PART>", "<NEXT_WORD_POS:AUX>", "<NEXT_WORD_POS:VERB>", "<NEXT_WORD_POS:SYM>",
+    "<NEXT_WORD_POS:OTHER>",
+    # Bunsetsu position (fixed patterns) - H field
+    "<BUNSETSU:1/1>", "<BUNSETSU:1/2>", "<BUNSETSU:2/2>",
+    "<BUNSETSU:1/3>", "<BUNSETSU:2/3>", "<BUNSETSU:3/3>",
+    "<BUNSETSU:1/4>", "<BUNSETSU:4/4>",
+    # Utterance breath group count (1-4+) - K field
+    "<UTT_BG:1>", "<UTT_BG:2>", "<UTT_BG:3>", "<UTT_BG:4+>",
+    # Utterance intonation phrase count (1-6+) - K field
+    "<UTT_IP:1>", "<UTT_IP:2>", "<UTT_IP:3>", "<UTT_IP:4>", "<UTT_IP:5>", "<UTT_IP:6+>",
+    # Utterance total mora count (binned) - K field
+    "<UTT_MORA:1-10>", "<UTT_MORA:11-20>", "<UTT_MORA:21-30>", "<UTT_MORA:31-50>", "<UTT_MORA:51+>",
+]
+
 # Prosody / sentence boundary tokens inserted by `phonemize_japanese`
 SPECIAL_TOKENS: list[str] = [
     "_",  # short pause (pau)
@@ -69,7 +93,7 @@ SPECIAL_TOKENS: list[str] = [
     "#",  # accent phrase boundary
     "[",  # rising pitch mark (accent phrase head)
     "]",  # falling pitch mark (accent nucleus)
-] + PROSODY_TOKENS_PHASE1 + PROSODY_TOKENS_PHASE2 + PROSODY_TOKENS_PHASE4  # Phase 1-4 prosody tokens
+] + PROSODY_TOKENS_PHASE1 + PROSODY_TOKENS_PHASE2 + PROSODY_TOKENS_PHASE4 + PROSODY_TOKENS_PHASE5  # Phase 1-5 prosody tokens
 
 # Core phoneme set – based on Open JTalk definitions and common practice in
 # Japanese TTS front-ends (Tacotron, VITS, etc.)
@@ -143,7 +167,7 @@ def get_japanese_id_map() -> dict[str, list[int]]:
     padding symbol, mirroring the convention used in Piper's English mapping.
     """
 
-    # Map each token to a single character
+    # 各トークンを1文字へ写像
     symbols: list[str] = [register(s) for s in (SPECIAL_TOKENS + JAPANESE_PHONEMES)]
     id_map: dict[str, list[int]] = {}
     for idx, symbol in enumerate(symbols):

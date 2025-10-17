@@ -37,6 +37,11 @@ _RE_B = re.compile(r"/B:([^-]+)-([^_]+)_([^/]+)")
 _RE_E = re.compile(r"/E:([^_]+)_([^!]+)")
 _RE_G = re.compile(r"/G:([^_]+)_([^%]+)")
 
+# Phase 5: Complete field extraction
+_RE_D = re.compile(r"/D:([^+]+)\+([^_]+)_([^/]+)")
+_RE_H = re.compile(r"/H:([^_]+)_([^/]+)")
+_RE_K = re.compile(r"/K:([^+]+)\+([^-]+)-([^/]+)")
+
 # Part-of-speech mapping (Phase 1)
 POS_MAP = {
     "01": "<POS:ADJ>",     # 形容詞
@@ -63,7 +68,7 @@ def _is_question(text: str) -> bool:
 
 
 def extract_prosody_features(label: str, labels: list[str] = None, idx: int = -1) -> dict:
-    """Extract prosody features from OpenJTalk full-context label (Phase 1-4).
+    """Extract prosody features from OpenJTalk full-context label (Phase 1-5).
 
     Extracts:
     - C field: Part-of-speech information (c1)
@@ -73,15 +78,18 @@ def extract_prosody_features(label: str, labels: list[str] = None, idx: int = -1
     - B field: Previous/next POS (b1, b2), intonation position (b3) - Phase 4
     - E field: Previous accent phrase info (e1, e2) - Phase 4
     - G field: Next accent phrase info (g1, g2) - Phase 4
+    - D field: Word-level previous/next POS (d1, d2) - Phase 5
+    - H field: Bunsetsu information (h1, h2) - Phase 5
+    - K field: Utterance statistics (k1, k2, k3) - Phase 5
 
     Parameters
     ----------
     label : str
         OpenJTalk full-context label
     labels : list[str], optional
-        Full label list (required for Phase 4 context extraction)
+        Full label list (required for Phase 4-5 context extraction)
     idx : int, optional
-        Current label index in labels (required for Phase 4 context extraction)
+        Current label index in labels (required for Phase 4-5 context extraction)
 
     Returns
     -------
@@ -100,6 +108,12 @@ def extract_prosody_features(label: str, labels: list[str] = None, idx: int = -1
         - "prev_accent": Previous accent type token (if available) - Phase 4
         - "next_mora": Next mora count token (if available) - Phase 4
         - "next_accent": Next accent type token (if available) - Phase 4
+        - "prev_word_pos": Previous word POS token (if available) - Phase 5
+        - "next_word_pos": Next word POS token (if available) - Phase 5
+        - "bunsetsu": Bunsetsu position token (if available) - Phase 5
+        - "utt_bg": Utterance breath group count (if available) - Phase 5
+        - "utt_ip": Utterance intonation phrase count (if available) - Phase 5
+        - "utt_mora": Utterance total mora count (if available) - Phase 5
     """
     features = {}
 
@@ -220,6 +234,68 @@ def extract_prosody_features(label: str, labels: list[str] = None, idx: int = -1
             else:
                 features["next_accent"] = f"<NEXT_ACC:{g2_int}>"
 
+    # Phase 5: Dフィールド - 単語レベルの前後品詞
+    m_d = _RE_D.search(label)
+    if m_d:
+        d1 = m_d.group(1)  # 前の単語の品詞
+        d2 = m_d.group(2)  # 後の単語の品詞
+
+        if d1 != "xx":
+            features["prev_word_pos"] = POS_MAP.get(d1, "<PREV_WORD_POS:OTHER>").replace("<POS:", "<PREV_WORD_POS:")
+
+        if d2 != "xx":
+            features["next_word_pos"] = POS_MAP.get(d2, "<NEXT_WORD_POS:OTHER>").replace("<POS:", "<NEXT_WORD_POS:")
+
+    # Phase 5: Hフィールド - 文節情報
+    m_h = _RE_H.search(label)
+    if m_h:
+        h1 = m_h.group(1)  # 文節内位置
+        h2 = m_h.group(2)  # 文節内アクセント句総数
+        if h1 != "xx" and h2 != "xx":
+            bunsetsu_token = f"<BUNSETSU:{h1}/{h2}>"
+            # 固定パターンのみ使用（動的生成を避ける）
+            if bunsetsu_token in [
+                "<BUNSETSU:1/1>", "<BUNSETSU:1/2>", "<BUNSETSU:2/2>",
+                "<BUNSETSU:1/3>", "<BUNSETSU:2/3>", "<BUNSETSU:3/3>",
+                "<BUNSETSU:1/4>", "<BUNSETSU:4/4>"
+            ]:
+                features["bunsetsu"] = bunsetsu_token
+
+    # Phase 5: Kフィールド - 発話統計（文頭のsilでのみ有効）
+    if idx == 0:  # 最初のsilでのみ
+        m_k = _RE_K.search(label)
+        if m_k:
+            k1 = m_k.group(1)  # 発話内の呼気段落数
+            k2 = m_k.group(2)  # 発話内のイントネーション句数
+            k3 = m_k.group(3)  # 発話内のモーラ総数
+
+            if k1 != "xx":
+                k1_int = int(k1)
+                if k1_int >= 4:
+                    features["utt_bg"] = "<UTT_BG:4+>"
+                else:
+                    features["utt_bg"] = f"<UTT_BG:{k1_int}>"
+
+            if k2 != "xx":
+                k2_int = int(k2)
+                if k2_int >= 6:
+                    features["utt_ip"] = "<UTT_IP:6+>"
+                else:
+                    features["utt_ip"] = f"<UTT_IP:{k2_int}>"
+
+            if k3 != "xx":
+                k3_int = int(k3)
+                if k3_int <= 10:
+                    features["utt_mora"] = "<UTT_MORA:1-10>"
+                elif k3_int <= 20:
+                    features["utt_mora"] = "<UTT_MORA:11-20>"
+                elif k3_int <= 30:
+                    features["utt_mora"] = "<UTT_MORA:21-30>"
+                elif k3_int <= 50:
+                    features["utt_mora"] = "<UTT_MORA:31-50>"
+                else:
+                    features["utt_mora"] = "<UTT_MORA:51+>"
+
     return features
 
 
@@ -280,12 +356,19 @@ def phonemize_japanese(
         if phoneme == "sil":
             if idx == 0:
                 tokens.append("^")
-                # Phase 2: 文頭でイントネーション句・呼気段落情報を追加
+                # Phase 2 & Phase 5: 文頭でイントネーション句・呼気段落・発話統計情報を追加
                 features = extract_prosody_features(label, labels, idx)
                 if "intn_phrase" in features:
                     tokens.append(features["intn_phrase"])
                 if "breath" in features:
                     tokens.append(features["breath"])
+                # Phase 5: 発話統計情報
+                if "utt_bg" in features:
+                    tokens.append(features["utt_bg"])
+                if "utt_ip" in features:
+                    tokens.append(features["utt_ip"])
+                if "utt_mora" in features:
+                    tokens.append(features["utt_mora"])
             elif idx == len(labels) - 1:
                 # Always add end marker when we find the last sil
                 tokens.append("?" if _is_question(text) else "$")
@@ -313,7 +396,17 @@ def phonemize_japanese(
                 current_accent_phrase_start = idx
                 features = extract_prosody_features(label, labels, idx)
 
-                # Phase 4: Insert context tokens first
+                # Phase 5: Insert word-level context tokens first
+                if "prev_word_pos" in features:
+                    tokens.append(features["prev_word_pos"])
+                if "next_word_pos" in features:
+                    tokens.append(features["next_word_pos"])
+
+                # Phase 5: Insert bunsetsu info
+                if "bunsetsu" in features:
+                    tokens.append(features["bunsetsu"])
+
+                # Phase 4: Insert accent phrase context tokens
                 # Previous accent phrase info
                 if "prev_pos" in features:
                     tokens.append(features["prev_pos"])
