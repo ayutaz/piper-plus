@@ -34,6 +34,27 @@ PROSODY_TOKENS_PHASE2: list[str] = [
     "<BG:1/1>", "<BG:1/2>", "<BG:2/2>",
 ]
 
+# Phase 4: Context prosody tokens (B,E field information)
+PROSODY_TOKENS_PHASE4: list[str] = [
+    # Previous accent phrase POS (13 types)
+    "<PREV_POS:ADJ>", "<PREV_POS:NOUN>", "<PREV_POS:ADV>", "<PREV_POS:PRON>",
+    "<PREV_POS:CONJ>", "<PREV_POS:RENTAI>", "<PREV_POS:PREFIX>", "<PREV_POS:SUFFIX>",
+    "<PREV_POS:PART>", "<PREV_POS:AUX>", "<PREV_POS:VERB>", "<PREV_POS:SYM>",
+    "<PREV_POS:OTHER>",
+    # Next accent phrase POS (13 types)
+    "<NEXT_POS:ADJ>", "<NEXT_POS:NOUN>", "<NEXT_POS:ADV>", "<NEXT_POS:PRON>",
+    "<NEXT_POS:CONJ>", "<NEXT_POS:RENTAI>", "<NEXT_POS:PREFIX>", "<NEXT_POS:SUFFIX>",
+    "<NEXT_POS:PART>", "<NEXT_POS:AUX>", "<NEXT_POS:VERB>", "<NEXT_POS:SYM>",
+    "<NEXT_POS:OTHER>",
+    # Intonation phrase position (1-5+)
+    "<INTN_POS:1>", "<INTN_POS:2>", "<INTN_POS:3>", "<INTN_POS:4>", "<INTN_POS:5+>",
+    # Previous accent phrase mora count (1-10+)
+    "<PREV_MORA:1>", "<PREV_MORA:2>", "<PREV_MORA:3>", "<PREV_MORA:4>", "<PREV_MORA:5>",
+    "<PREV_MORA:6>", "<PREV_MORA:7>", "<PREV_MORA:8>", "<PREV_MORA:9>", "<PREV_MORA:10+>",
+    # Previous accent phrase accent type (0-5)
+    "<PREV_ACC:0>", "<PREV_ACC:1>", "<PREV_ACC:2>", "<PREV_ACC:3>", "<PREV_ACC:4>", "<PREV_ACC:5>",
+]
+
 # Prosody / sentence boundary tokens inserted by `phonemize_japanese`
 SPECIAL_TOKENS: list[str] = [
     "_",  # short pause (pau)
@@ -43,7 +64,7 @@ SPECIAL_TOKENS: list[str] = [
     "#",  # accent phrase boundary
     "[",  # rising pitch mark (accent phrase head)
     "]",  # falling pitch mark (accent nucleus)
-] + PROSODY_TOKENS_PHASE1 + PROSODY_TOKENS_PHASE2  # Phase 1 + Phase 2 prosody tokens
+] + PROSODY_TOKENS_PHASE1 + PROSODY_TOKENS_PHASE2 + PROSODY_TOKENS_PHASE4  # Phase 1-4 prosody tokens
 
 # Core phoneme set – based on Open JTalk definitions and common practice in
 # Japanese TTS front-ends (Tacotron, VITS, etc.)

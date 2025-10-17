@@ -32,6 +32,10 @@ _RE_F = re.compile(r"/F:([^_]+)_([^#]+)#([^_]+)_([^@]+)@([^_]+)_([^\|]+)\|([^_]+
 _RE_J = re.compile(r"/J:([^_]+)_([^/]+)")
 _RE_I = re.compile(r"/I:([^-]+)-([^@]+)@([^+]+)\+([^&]+)&([^-]+)-([^\|]+)\|([^+]+)\+([^/]+)")
 
+# Phase 4: Context prosody patterns
+_RE_B = re.compile(r"/B:([^-]+)-([^_]+)_([^/]+)")
+_RE_E = re.compile(r"/E:([^_]+)_([^!]+)")
+
 # Part-of-speech mapping (Phase 1)
 POS_MAP = {
     "01": "<POS:ADJ>",     # 形容詞
@@ -57,17 +61,25 @@ def _is_question(text: str) -> bool:
     return text.strip().endswith("?") or text.strip().endswith("？")
 
 
-def extract_prosody_features(label: str) -> dict:
-    """Extract prosody features from OpenJTalk full-context label (Phase 1).
+def extract_prosody_features(label: str, labels: list[str] = None, idx: int = -1) -> dict:
+    """Extract prosody features from OpenJTalk full-context label (Phase 1-4).
 
     Extracts:
     - C field: Part-of-speech information (c1)
     - F field: Accent type (f2), mora count (f1), intonation boundary (f3)
+    - J field: Intonation phrase information (j1) - Phase 2
+    - I field: Breath group information (i3, i4) - Phase 2
+    - B field: Previous/next POS (b1, b2), intonation position (b3) - Phase 4
+    - E field: Previous accent phrase info (e1, e2) - Phase 4
 
     Parameters
     ----------
     label : str
         OpenJTalk full-context label
+    labels : list[str], optional
+        Full label list (required for Phase 4 context extraction)
+    idx : int, optional
+        Current label index in labels (required for Phase 4 context extraction)
 
     Returns
     -------
@@ -77,6 +89,13 @@ def extract_prosody_features(label: str) -> dict:
         - "accent": Accent type token (if available)
         - "mora": Mora count token (if available)
         - "intonation": Intonation boundary token (if available)
+        - "intn_phrase": Intonation phrase token (if available) - Phase 2
+        - "breath": Breath group token (if available) - Phase 2
+        - "prev_pos": Previous POS token (if available) - Phase 4
+        - "next_pos": Next POS token (if available) - Phase 4
+        - "intn_pos": Intonation position token (if available) - Phase 4
+        - "prev_mora": Previous mora count token (if available) - Phase 4
+        - "prev_accent": Previous accent type token (if available) - Phase 4
     """
     features = {}
 
@@ -136,6 +155,46 @@ def extract_prosody_features(label: str) -> dict:
             # 固定パターンに含まれるもののみ使用
             if breath_token in ["<BG:1/1>", "<BG:1/2>", "<BG:2/2>"]:
                 features["breath"] = breath_token
+
+    # Phase 4: Bフィールド - 前後アクセント句の品詞とイントネーション句内位置
+    m_b = _RE_B.search(label)
+    if m_b:
+        b1 = m_b.group(1)  # 前アクセント句の品詞
+        b2 = m_b.group(2)  # 後アクセント句の品詞
+        b3 = m_b.group(3)  # イントネーション句内位置
+
+        if b1 != "xx":
+            features["prev_pos"] = POS_MAP.get(b1, "<PREV_POS:OTHER>").replace("<POS:", "<PREV_POS:")
+
+        if b2 != "xx":
+            features["next_pos"] = POS_MAP.get(b2, "<NEXT_POS:OTHER>").replace("<POS:", "<NEXT_POS:")
+
+        if b3 != "xx":
+            b3_int = int(b3)
+            if b3_int >= 5:
+                features["intn_pos"] = "<INTN_POS:5+>"
+            else:
+                features["intn_pos"] = f"<INTN_POS:{b3_int}>"
+
+    # Phase 4: Eフィールド - 前アクセント句のモーラ数とアクセント型
+    m_e = _RE_E.search(label)
+    if m_e:
+        e1 = m_e.group(1)  # 前アクセント句のモーラ数
+        e2 = m_e.group(2)  # 前アクセント句のアクセント型
+
+        if e1 != "xx":
+            e1_int = int(e1)
+            if e1_int >= 10:
+                features["prev_mora"] = "<PREV_MORA:10+>"
+            else:
+                features["prev_mora"] = f"<PREV_MORA:{e1_int}>"
+
+        if e2 != "xx":
+            e2_int = int(e2)
+            if e2_int >= 5:
+                features["prev_accent"] = "<PREV_ACC:5>"
+            else:
+                features["prev_accent"] = f"<PREV_ACC:{e2_int}>"
 
     return features
 
@@ -198,7 +257,7 @@ def phonemize_japanese(
             if idx == 0:
                 tokens.append("^")
                 # Phase 2: 文頭でイントネーション句・呼気段落情報を追加
-                features = extract_prosody_features(label)
+                features = extract_prosody_features(label, labels, idx)
                 if "intn_phrase" in features:
                     tokens.append(features["intn_phrase"])
                 if "breath" in features:
@@ -228,9 +287,21 @@ def phonemize_japanese(
             # Insert prosody tokens at accent phrase start (a2==1)
             if a2 == 1 and current_accent_phrase_start != idx:
                 current_accent_phrase_start = idx
-                features = extract_prosody_features(label)
+                features = extract_prosody_features(label, labels, idx)
 
-                # Insert in order: POS → ACC → MORA → INTN
+                # Phase 4: Insert context tokens first (PREV_POS, NEXT_POS, INTN_POS, PREV_MORA, PREV_ACC)
+                if "prev_pos" in features:
+                    tokens.append(features["prev_pos"])
+                if "next_pos" in features:
+                    tokens.append(features["next_pos"])
+                if "intn_pos" in features:
+                    tokens.append(features["intn_pos"])
+                if "prev_mora" in features:
+                    tokens.append(features["prev_mora"])
+                if "prev_accent" in features:
+                    tokens.append(features["prev_accent"])
+
+                # Phase 1: Insert in order: POS → ACC → MORA → INTN
                 if "pos" in features:
                     tokens.append(features["pos"])
                 if "accent" in features:
