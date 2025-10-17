@@ -35,6 +35,10 @@ _RE_A3 = re.compile(r"\+([0-9]+)/")
 _RE_C = re.compile(r"/C:([^_]+)_([^+]+)\+([^/]+)")
 _RE_F = re.compile(r"/F:([^_]+)_([^#]+)#([^_]+)_([^@]+)@([^_]+)_([^\|]+)\|([^_]+)_([^/]+)")
 
+# Phase 2: Sentence-level prosody patterns
+_RE_J = re.compile(r"/J:([^_]+)_([^/]+)")
+_RE_I = re.compile(r"/I:([^-]+)-([^@]+)@([^+]+)\+([^&]+)&([^-]+)-([^\|]+)\|([^+]+)\+([^/]+)")
+
 # Part-of-speech mapping (Phase 1)
 POS_MAP = {
     "01": "<POS:ADJ>",     # 形容詞
@@ -113,6 +117,32 @@ def extract_prosody_features(label: str) -> dict:
 
         if f3 != "xx":
             features["intonation"] = f"<INTN:{f3}>"
+
+    # Phase 2: Jフィールド - イントネーション句（最初のsilでのみ有効）
+    # 注意: Jフィールドは最初のsil（Label 0）でのみ有効値を持つ
+    # 他のラベルではJ:xx_xxとなる
+    m_j = _RE_J.search(label)
+    if m_j:
+        j1 = m_j.group(1)
+        if j1 != "xx":
+            # 固定パターントークンを使用（動的生成を避ける）
+            j1_int = int(j1)
+            if j1_int >= 5:
+                features["intn_phrase"] = "<IP:5+>"
+            else:
+                features["intn_phrase"] = f"<IP:{j1_int}>"
+
+    # Phase 2: Iフィールド - 呼気段落
+    m_i = _RE_I.search(label)
+    if m_i:
+        i3 = m_i.group(3)  # 現在位置
+        i4 = m_i.group(4)  # 総数
+        if i3 != "xx" and i4 != "xx":
+            # よく使われるパターンのみ定義
+            breath_token = f"<BG:{i3}/{i4}>"
+            # 固定パターンに含まれるもののみ使用
+            if breath_token in ["<BG:1/1>", "<BG:1/2>", "<BG:2/2>"]:
+                features["breath"] = breath_token
 
     return features
 
@@ -201,6 +231,12 @@ def phonemize_japanese(
         if phoneme == "sil":
             if idx == 0:
                 tokens.append("^")
+                # Phase 2: 文頭でイントネーション句・呼気段落情報を追加
+                features = extract_prosody_features(label)
+                if "intn_phrase" in features:
+                    tokens.append(features["intn_phrase"])
+                if "breath" in features:
+                    tokens.append(features["breath"])
             elif idx == len(labels) - 1:
                 # Always add end marker when we find the last sil
                 tokens.append("?" if _is_question(text) else "$")

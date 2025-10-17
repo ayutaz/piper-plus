@@ -71,6 +71,20 @@ PROSODY_PUA_MAPPING_PHASE1 = {
     "<INTN:1>": 0xE061,
 }
 
+# Phase 2: Sentence-level prosody tokens PUA mapping
+PROSODY_PUA_MAPPING_PHASE2 = {
+    # Intonation phrase (0xE070-0xE074)
+    "<IP:1>": 0xE070,
+    "<IP:2>": 0xE071,
+    "<IP:3>": 0xE072,
+    "<IP:4>": 0xE073,
+    "<IP:5+>": 0xE074,
+    # Breath group (0xE080-0xE082)
+    "<BG:1/1>": 0xE080,
+    "<BG:1/2>": 0xE081,
+    "<BG:2/2>": 0xE082,
+}
+
 # Build bidirectional mappings
 TOKEN2CHAR = {}
 CHAR2TOKEN = {}
@@ -87,8 +101,14 @@ for token, codepoint in PROSODY_PUA_MAPPING_PHASE1.items():
     TOKEN2CHAR[token] = ch
     CHAR2TOKEN[ch] = token
 
+# Initialize with Phase 2 prosody mappings
+for token, codepoint in PROSODY_PUA_MAPPING_PHASE2.items():
+    ch = chr(codepoint)
+    TOKEN2CHAR[token] = ch
+    CHAR2TOKEN[ch] = token
+
 # Private Use Area for dynamic allocation (starting after fixed mappings)
-_PUA_START = 0xE070  # Start after Phase 1 prosody tokens
+_PUA_START = 0xE090  # Start after Phase 2 prosody tokens
 _next = _PUA_START
 
 

@@ -26,6 +26,14 @@ PROSODY_TOKENS_PHASE1: list[str] = [
     "<INTN:0>", "<INTN:1>",
 ]
 
+# Phase 2: Sentence-level prosody tokens
+PROSODY_TOKENS_PHASE2: list[str] = [
+    # Intonation phrase (fixed patterns)
+    "<IP:1>", "<IP:2>", "<IP:3>", "<IP:4>", "<IP:5+>",
+    # Breath group (fixed patterns)
+    "<BG:1/1>", "<BG:1/2>", "<BG:2/2>",
+]
+
 # Prosody / sentence boundary tokens inserted by `phonemize_japanese`
 SPECIAL_TOKENS: list[str] = [
     "_",  # short pause (pau)
@@ -35,7 +43,7 @@ SPECIAL_TOKENS: list[str] = [
     "#",  # accent phrase boundary
     "[",  # rising pitch mark (accent phrase head)
     "]",  # falling pitch mark (accent nucleus)
-] + PROSODY_TOKENS_PHASE1  # Phase 1 prosody tokens
+] + PROSODY_TOKENS_PHASE1 + PROSODY_TOKENS_PHASE2  # Phase 1 + Phase 2 prosody tokens
 
 # Core phoneme set – based on Open JTalk definitions and common practice in
 # Japanese TTS front-ends (Tacotron, VITS, etc.)
