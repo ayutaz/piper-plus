@@ -5,7 +5,7 @@
 2. [実装完了状態のサマリー](#実装完了状態のサマリー)
 3. [OpenJTalk Full-Context Label 詳細解析](#openjtalk-full-context-label-詳細解析)
 4. [フィールド別実装状況](#フィールド別実装状況)
-5. [Phase 1-4 実装詳細](#phase-1-4-実装詳細)
+5. [Phase 1-5 実装詳細](#phase-1-5-実装詳細)
 6. [トークン設計と PUA マッピング](#トークン設計と-pua-マッピング)
 7. [実装例とコードスニペット](#実装例とコードスニペット)
 8. [テスト結果](#テスト結果)
@@ -1071,6 +1071,8 @@ python -m piper_train \
 
 **テスト**:
 - `scripts/test_prosody_phase4.py`
+- `scripts/test_prosody_phase5.py`
+- `scripts/test_phase5_cross_check.py`
 - `scripts/test_phase3_cross_check.py`
 
 ### Kuriharaメソッド
