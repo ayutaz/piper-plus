@@ -32,6 +32,45 @@ FIXED_PUA_MAPPING = {
     "ry": 0xE015,
 }
 
+# Phase 1: Prosody tokens PUA mapping
+PROSODY_PUA_MAPPING_PHASE1 = {
+    # Accent type (0xE030-0xE035)
+    "<ACC:0>": 0xE030,
+    "<ACC:1>": 0xE031,
+    "<ACC:2>": 0xE032,
+    "<ACC:3>": 0xE033,
+    "<ACC:4>": 0xE034,
+    "<ACC:5>": 0xE035,
+    # Mora count (0xE040-0xE049)
+    "<MORA:1>": 0xE040,
+    "<MORA:2>": 0xE041,
+    "<MORA:3>": 0xE042,
+    "<MORA:4>": 0xE043,
+    "<MORA:5>": 0xE044,
+    "<MORA:6>": 0xE045,
+    "<MORA:7>": 0xE046,
+    "<MORA:8>": 0xE047,
+    "<MORA:9>": 0xE048,
+    "<MORA:10+>": 0xE049,
+    # Part-of-speech (0xE050-0xE05C)
+    "<POS:ADJ>": 0xE050,
+    "<POS:NOUN>": 0xE051,
+    "<POS:ADV>": 0xE052,
+    "<POS:PRON>": 0xE053,
+    "<POS:CONJ>": 0xE054,
+    "<POS:RENTAI>": 0xE055,
+    "<POS:PREFIX>": 0xE056,
+    "<POS:SUFFIX>": 0xE057,
+    "<POS:PART>": 0xE058,
+    "<POS:AUX>": 0xE059,
+    "<POS:VERB>": 0xE05A,
+    "<POS:SYM>": 0xE05B,
+    "<POS:OTHER>": 0xE05C,
+    # Intonation boundary (0xE060-0xE061)
+    "<INTN:0>": 0xE060,
+    "<INTN:1>": 0xE061,
+}
+
 # Build bidirectional mappings
 TOKEN2CHAR = {}
 CHAR2TOKEN = {}
@@ -42,8 +81,14 @@ for token, codepoint in FIXED_PUA_MAPPING.items():
     TOKEN2CHAR[token] = ch
     CHAR2TOKEN[ch] = token
 
+# Initialize with Phase 1 prosody mappings
+for token, codepoint in PROSODY_PUA_MAPPING_PHASE1.items():
+    ch = chr(codepoint)
+    TOKEN2CHAR[token] = ch
+    CHAR2TOKEN[ch] = token
+
 # Private Use Area for dynamic allocation (starting after fixed mappings)
-_PUA_START = 0xE020  # Start after the last fixed mapping
+_PUA_START = 0xE070  # Start after Phase 1 prosody tokens
 _next = _PUA_START
 
 

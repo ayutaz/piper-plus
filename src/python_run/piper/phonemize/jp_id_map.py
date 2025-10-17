@@ -8,8 +8,23 @@ __all__ = ["get_japanese_id_map", "JAPANESE_PHONEMES", "SPECIAL_TOKENS"]
 # -----------------------------------------------------------------------------
 # NOTE: This list purposely errs on the side of *including* more phonemes than
 # may actually appear in the corpus so that we avoid "Missing phoneme" warnings
-# at training time.  If some of these tokens never appear they are simply unused.
+# at学習時.  If some of these tokens never appear they are simply unused.
 # -----------------------------------------------------------------------------
+
+# Phase 1: Prosody tokens for enhanced Japanese TTS
+PROSODY_TOKENS_PHASE1: list[str] = [
+    # Accent type (0-5)
+    "<ACC:0>", "<ACC:1>", "<ACC:2>", "<ACC:3>", "<ACC:4>", "<ACC:5>",
+    # Mora count (1-10+)
+    "<MORA:1>", "<MORA:2>", "<MORA:3>", "<MORA:4>", "<MORA:5>",
+    "<MORA:6>", "<MORA:7>", "<MORA:8>", "<MORA:9>", "<MORA:10+>",
+    # Part-of-speech (13 types)
+    "<POS:ADJ>", "<POS:NOUN>", "<POS:ADV>", "<POS:PRON>", "<POS:CONJ>",
+    "<POS:RENTAI>", "<POS:PREFIX>", "<POS:SUFFIX>", "<POS:PART>",
+    "<POS:AUX>", "<POS:VERB>", "<POS:SYM>", "<POS:OTHER>",
+    # Intonation boundary (0-1)
+    "<INTN:0>", "<INTN:1>",
+]
 
 # Prosody / sentence boundary tokens inserted by `phonemize_japanese`
 SPECIAL_TOKENS: list[str] = [
@@ -20,7 +35,7 @@ SPECIAL_TOKENS: list[str] = [
     "#",  # accent phrase boundary
     "[",  # rising pitch mark (accent phrase head)
     "]",  # falling pitch mark (accent nucleus)
-]
+] + PROSODY_TOKENS_PHASE1  # Phase 1 prosody tokens
 
 # Core phoneme set – based on Open JTalk definitions and common practice in
 # Japanese TTS front-ends (Tacotron, VITS, etc.)
