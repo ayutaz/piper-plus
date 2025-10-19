@@ -47,7 +47,12 @@ except ImportError:
     from piper_train.phonemize.jp_id_map import get_japanese_id_map  # type: ignore
 
 _DIR = Path(__file__).parent
-_VERSION = (_DIR / "VERSION").read_text(encoding="utf-8").strip()
+# Load VERSION from project root
+_VERSION_PATH = _DIR.parent.parent.parent / "VERSION"
+if _VERSION_PATH.exists():
+    _VERSION = _VERSION_PATH.read_text(encoding="utf-8").strip()
+else:
+    _VERSION = "0.0.0"  # Fallback
 _LOGGER = logging.getLogger("preprocess")
 
 

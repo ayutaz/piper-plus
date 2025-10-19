@@ -407,8 +407,7 @@ wheels = [
 
 [[package]]
 name = "piper-plus"
-version = "1.4.0"
-source = { virtual = "." }
+source = { editable = "." }
 
 [package.optional-dependencies]
 dev = [

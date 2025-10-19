@@ -58,6 +58,60 @@ def _is_question(text: str) -> bool:
     return text.strip().endswith("?") or text.strip().endswith("？")
 
 
+def merge_consecutive_vowels(tokens: list[str]) -> list[str]:
+    """Merge consecutive identical vowels to fix long vowel pronunciation.
+
+    Japanese long vowels (e.g., 'kou', 'sei') are represented by OpenJTalk
+    as duplicate vowels (e.g., 'o o', 'e e'). This causes TTS models to
+    pronounce them as two separate sounds instead of a smooth long vowel.
+
+    This function merges consecutive identical vowels, preserving accent marks
+    between them, to produce more natural long vowel pronunciation.
+
+    Args:
+        tokens: List of phoneme tokens including accent marks
+
+    Returns:
+        List of tokens with consecutive vowels merged
+
+    Examples:
+        >>> merge_consecutive_vowels(['o', ']', '[', 'o'])
+        ['o', ']', '[']
+        >>> merge_consecutive_vowels(['s', 'e', 'e'])
+        ['s', 'e']
+        >>> merge_consecutive_vowels(['k', 'o', '[', 'o'])
+        ['k', 'o', '[']
+    """
+    VOWELS = {'a', 'i', 'u', 'e', 'o', 'A', 'I', 'U', 'E', 'O'}
+    ACCENT_MARKS = {'[', ']', '#'}
+
+    result = []
+    i = 0
+
+    while i < len(tokens):
+        current = tokens[i]
+        result.append(current)
+
+        # If current token is a vowel, check for consecutive same vowel
+        if current in VOWELS:
+            # Look ahead to find next vowel, skipping accent marks
+            j = i + 1
+
+            # Skip accent marks
+            while j < len(tokens) and tokens[j] in ACCENT_MARKS:
+                result.append(tokens[j])
+                j += 1
+
+            # If we found the same vowel, skip it (merge)
+            if j < len(tokens) and tokens[j] == current:
+                # Skip the duplicate vowel by advancing i
+                i = j
+
+        i += 1
+
+    return result
+
+
 def phonemize_japanese(
     text: str,
     custom_dict: CustomDictionary | str | list[str] | None = None,
@@ -206,6 +260,9 @@ def phonemize_japanese(
         # Insert rising mark "[" at phrase head (a2==1) when next mora is 2
         if (a2 == 1) and (a2_next == 2):
             tokens.append("[")
+
+    # Merge consecutive vowels for natural long vowel pronunciation
+    tokens = merge_consecutive_vowels(tokens)
 
     # 多文字トークンを1コードポイントへ変換
     return map_sequence(tokens)
