@@ -19,6 +19,7 @@ class Utterance:
     audio_spec_path: Path
     speaker_id: int | None = None
     text: str | None = None
+    prosody_features: list[list[int]] | None = None  # 16-dimensional prosody vectors
 
 
 @dataclass
@@ -28,6 +29,7 @@ class UtteranceTensors:
     audio_norm: FloatTensor
     speaker_id: LongTensor | None = None
     text: str | None = None
+    prosody_features: FloatTensor | None = None  # [seq_len, 16] prosody features
 
     @property
     def spec_length(self) -> int:
@@ -43,6 +45,7 @@ class Batch:
     audios: FloatTensor
     audio_lengths: LongTensor
     speaker_ids: LongTensor | None = None
+    prosody_features: FloatTensor | None = None  # [batch, max_seq_len, 16]
 
 
 class PiperDataset(Dataset):
@@ -86,6 +89,11 @@ class PiperDataset(Dataset):
                     utt.audio_spec_path, map_location="cpu", weights_only=True
                 )
 
+                # Convert prosody features to tensor if available
+                prosody_tensor = None
+                if utt.prosody_features is not None:
+                    prosody_tensor = FloatTensor(utt.prosody_features)  # [seq_len, 16]
+
                 return UtteranceTensors(
                     phoneme_ids=LongTensor(utt.phoneme_ids),
                     audio_norm=audio_norm,
@@ -96,6 +104,7 @@ class PiperDataset(Dataset):
                         else None
                     ),
                     text=utt.text,
+                    prosody_features=prosody_tensor,
                 )
             except Exception as e:
                 _LOGGER.error(

@@ -34,11 +34,11 @@ from .norm_audio import cache_norm_audio, make_silence_detector
 # Custom Japanese phonemizer
 try:
     from .phonemize.custom_dict import CustomDictionary  # type: ignore
-    from .phonemize.japanese import phonemize_japanese  # type: ignore
+    from .phonemize.japanese import phonemize_japanese, OpenJTalkProsodyFeatures  # type: ignore
 except ImportError:
     # When running as script, relative import may fail; try absolute import fallback
     from piper_train.phonemize.custom_dict import CustomDictionary  # type: ignore
-    from piper_train.phonemize.japanese import phonemize_japanese  # type: ignore
+    from piper_train.phonemize.japanese import phonemize_japanese, OpenJTalkProsodyFeatures  # type: ignore
 
 # Japanese phoneme id map support
 try:
@@ -565,10 +565,15 @@ def phonemize_batch_openjtalk(
                     if timeout_sec > 0:
                         signal.alarm(timeout_sec)
                     _LOGGER.debug(utt)
-                    # 高低アクセントを含む日本語 phonemizer（カスタム辞書適用）
-                    utt.phonemes = phonemize_japanese(
+                    # 日本語 phonemizer（カスタム辞書適用）
+                    # Returns (phonemes, prosody_features) tuple
+                    utt.phonemes, prosody_features_obj = phonemize_japanese(
                         casing(utt.text), custom_dict=custom_dict
                     )
+
+                    # Convert prosody features to list of 16-dim vectors
+                    utt.prosody_features = [f.to_list() for f in prosody_features_obj]
+
                     # phoneme_ids は phoneme_id_map から取得
                     utt.phoneme_ids = []
                     for phoneme in utt.phonemes:
@@ -578,7 +583,7 @@ def phonemize_batch_openjtalk(
                             utt.missing_phonemes[phoneme] += 1
                             _LOGGER.warning(f"Missing phoneme: {phoneme}")
 
-                    # prosody_ids は現在使用していない（削除済み）
+                    # prosody_ids は後方互換性のため保持（空リスト）
                     utt.prosody_ids = []
 
                     if not args.skip_audio:
@@ -625,7 +630,8 @@ class Utterance:
     speaker_id: int | None = None
     phonemes: list[str] | None = None
     phoneme_ids: list[int] | None = None
-    prosody_ids: list[int] | None = None
+    prosody_features: list[list[int]] | None = None  # 16-dimensional prosody vectors
+    prosody_ids: list[int] | None = None  # Deprecated, kept for backwards compatibility
     audio_norm_path: Path | None = None
     audio_spec_path: Path | None = None
     f0_path: Path | None = None  # Path to cached F0 values
