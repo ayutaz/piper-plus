@@ -77,6 +77,7 @@ class VitsModel(pl.LightningModule):
         num_test_examples: int = 5,
         validation_split: float = 0.1,
         max_phoneme_ids: int | None = None,
+        use_japanese_prosody: bool = False,  # Enable Japanese prosody features
         **kwargs,
     ):
         super().__init__()
@@ -110,6 +111,7 @@ class VitsModel(pl.LightningModule):
             n_speakers=self.hparams.num_speakers,
             gin_channels=self.hparams.gin_channels,
             use_sdp=self.hparams.use_sdp,
+            use_japanese_prosody=self.hparams.use_japanese_prosody,
         )
         self.model_d = MultiPeriodDiscriminator(
             use_spectral_norm=self.hparams.use_spectral_norm
@@ -145,7 +147,7 @@ class VitsModel(pl.LightningModule):
             full_dataset, [train_set_size, num_test_examples, valid_set_size]
         )
 
-    def forward(self, text, text_lengths, scales, sid=None):
+    def forward(self, text, text_lengths, scales, sid=None, prosody_features=None):
         noise_scale = scales[0]
         length_scale = scales[1]
         noise_scale_w = scales[2]
@@ -156,6 +158,7 @@ class VitsModel(pl.LightningModule):
             length_scale=length_scale,
             noise_scale_w=noise_scale_w,
             sid=sid,
+            prosody_features=prosody_features,
         )
 
         return audio
@@ -252,6 +255,10 @@ class VitsModel(pl.LightningModule):
             batch.spectrogram_lengths,
             batch.speaker_ids if batch.speaker_ids is not None else None,
         )
+
+        # Extract prosody features if available
+        prosody_features = batch.prosody_features if hasattr(batch, 'prosody_features') else None
+
         (
             y_hat,
             l_length,
@@ -260,7 +267,7 @@ class VitsModel(pl.LightningModule):
             _x_mask,
             z_mask,
             (_z, z_p, m_p, logs_p, _m_q, logs_q),
-        ) = self.model_g(x, x_lengths, spec, spec_lengths, speaker_ids)
+        ) = self.model_g(x, x_lengths, spec, spec_lengths, speaker_ids, prosody_features)
         self._y_hat = y_hat.contiguous()
 
         mel = spec_to_mel_torch(
@@ -349,7 +356,13 @@ class VitsModel(pl.LightningModule):
                 if test_utt.speaker_id is not None
                 else None
             )
-            test_audio = self(text, text_lengths, scales, sid=sid).detach()
+
+            # Extract prosody features if available
+            prosody_features = None
+            if hasattr(test_utt, 'prosody_features') and test_utt.prosody_features is not None:
+                prosody_features = test_utt.prosody_features.unsqueeze(0).to(self.device)
+
+            test_audio = self(text, text_lengths, scales, sid=sid, prosody_features=prosody_features).detach()
 
             # Scale to make louder in [-1, 1]
             test_audio = test_audio * (1.0 / max(0.01, abs(test_audio.max())))

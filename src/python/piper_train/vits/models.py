@@ -207,6 +207,176 @@ class TextEncoder(nn.Module):
         return x, m, logs, x_mask
 
 
+class ProsodyEncoder(nn.Module):
+    """Lightweight 2-layer Transformer encoder for prosody features.
+
+    Takes 16-dimensional prosody feature vectors (OpenJTalk A~K fields)
+    and encodes them to hidden_channels dimensional embeddings.
+
+    Architecture:
+        Input: [batch, seq_len, 16] prosody vectors
+        -> Linear projection: [batch, hidden_channels, seq_len]
+        -> 2-layer Transformer encoder
+        Output: [batch, hidden_channels, seq_len] prosody embeddings
+    """
+    def __init__(
+        self,
+        prosody_dim: int,  # 16 for OpenJTalk A~K fields
+        out_channels: int,
+        hidden_channels: int,
+        filter_channels: int,
+        n_heads: int,
+        kernel_size: int,
+        p_dropout: float,
+    ):
+        super().__init__()
+        self.prosody_dim = prosody_dim
+        self.out_channels = out_channels
+        self.hidden_channels = hidden_channels
+        self.filter_channels = filter_channels
+        self.n_heads = n_heads
+        self.kernel_size = kernel_size
+        self.p_dropout = p_dropout
+
+        # Project 16-dim prosody to hidden_channels
+        self.pre = nn.Conv1d(prosody_dim, hidden_channels, 1)
+
+        # 2-layer Transformer encoder (lightweight)
+        self.encoder = attentions.Encoder(
+            hidden_channels, filter_channels, n_heads, 2, kernel_size, p_dropout
+        )
+
+    def forward(self, prosody_features, x_lengths):
+        """
+        Args:
+            prosody_features: [batch, seq_len, 16] prosody feature vectors
+            x_lengths: [batch] sequence lengths
+        Returns:
+            prosody_emb: [batch, hidden_channels, seq_len]
+            x_mask: [batch, 1, seq_len]
+        """
+        # prosody_features: [b, t, 16] -> [b, 16, t]
+        prosody = torch.transpose(prosody_features, 1, -1)
+
+        # Create mask
+        x_mask = torch.unsqueeze(
+            commons.sequence_mask(x_lengths, prosody.size(2)), 1
+        ).type_as(prosody)
+
+        # Project to hidden_channels: [b, 16, t] -> [b, h, t]
+        prosody = self.pre(prosody) * x_mask
+
+        # Encode with 2-layer Transformer: [b, h, t] -> [b, h, t]
+        prosody_emb = self.encoder(prosody, x_mask)
+
+        return prosody_emb, x_mask
+
+
+class JapaneseTextEncoder(nn.Module):
+    """Japanese-specific text encoder with prosody features.
+
+    Implements Section 5.2 of the technical report by separating phoneme
+    and prosody encoding into different streams, then integrating them
+    with cross-attention.
+
+    Architecture:
+        1. Phoneme encoding: TextEncoder (existing multi-layer Transformer)
+        2. Prosody encoding: ProsodyEncoder (lightweight 2-layer Transformer)
+        3. Cross-attention: Phoneme attends to prosody
+        4. Projection: Combined features -> mean and log-variance
+
+    This allows the model to properly learn from both phoneme and prosody
+    information without mixing them into a single token sequence.
+    """
+    def __init__(
+        self,
+        n_vocab: int,
+        out_channels: int,
+        hidden_channels: int,
+        filter_channels: int,
+        n_heads: int,
+        n_layers: int,
+        kernel_size: int,
+        p_dropout: float,
+        prosody_dim: int = 16,  # OpenJTalk A~K fields
+    ):
+        super().__init__()
+        self.n_vocab = n_vocab
+        self.out_channels = out_channels
+        self.hidden_channels = hidden_channels
+        self.filter_channels = filter_channels
+        self.n_heads = n_heads
+        self.n_layers = n_layers
+        self.kernel_size = kernel_size
+        self.p_dropout = p_dropout
+        self.prosody_dim = prosody_dim
+
+        # Phoneme encoder (existing TextEncoder)
+        self.phoneme_encoder = TextEncoder(
+            n_vocab, out_channels, hidden_channels, filter_channels,
+            n_heads, n_layers, kernel_size, p_dropout
+        )
+
+        # Prosody encoder (new 2-layer Transformer)
+        self.prosody_encoder = ProsodyEncoder(
+            prosody_dim, out_channels, hidden_channels, filter_channels,
+            n_heads, kernel_size, p_dropout
+        )
+
+        # Cross-attention to integrate phoneme and prosody
+        self.cross_attn = attentions.MultiHeadAttention(
+            hidden_channels, hidden_channels, n_heads, p_dropout=p_dropout
+        )
+        self.norm = modules.LayerNorm(hidden_channels)
+        self.drop = nn.Dropout(p_dropout)
+
+        # Final projection (replaces TextEncoder.proj)
+        self.proj = nn.Conv1d(hidden_channels, out_channels * 2, 1)
+
+    def forward(self, x, x_lengths, prosody_features=None):
+        """
+        Args:
+            x: [batch, seq_len] phoneme IDs
+            x_lengths: [batch] sequence lengths
+            prosody_features: [batch, seq_len, 16] prosody feature vectors (optional)
+        Returns:
+            x: [batch, hidden_channels, seq_len] encoded features
+            m: [batch, out_channels, seq_len] mean
+            logs: [batch, out_channels, seq_len] log-variance
+            x_mask: [batch, 1, seq_len] mask
+        """
+        # Encode phonemes
+        phoneme_enc, _, _, x_mask = self.phoneme_encoder(x, x_lengths)
+        # phoneme_enc: [b, h, t]
+
+        # If no prosody features, return phoneme encoding only (backward compatible)
+        if prosody_features is None:
+            stats = self.proj(phoneme_enc) * x_mask
+            m, logs = torch.split(stats, self.out_channels, dim=1)
+            return phoneme_enc, m, logs, x_mask
+
+        # Encode prosody features
+        prosody_emb, _ = self.prosody_encoder(prosody_features, x_lengths)
+        # prosody_emb: [b, h, t]
+
+        # Cross-attention: phoneme attends to prosody
+        # attentions.MultiHeadAttention expects [b, h, t] format (Conv1d)
+        attn_mask = x_mask.unsqueeze(2) * x_mask.unsqueeze(-1)  # [b, 1, t, t]
+
+        # Cross-attention
+        prosody_attended = self.cross_attn(phoneme_enc, prosody_emb, attn_mask)
+        prosody_attended = self.drop(prosody_attended)
+
+        # Residual connection and normalization
+        combined = self.norm(phoneme_enc + prosody_attended)
+
+        # Final projection to mean and log-variance
+        stats = self.proj(combined) * x_mask
+        m, logs = torch.split(stats, self.out_channels, dim=1)
+
+        return combined, m, logs, x_mask
+
+
 class ResidualCouplingBlock(nn.Module):
     def __init__(
         self,
@@ -545,6 +715,7 @@ class SynthesizerTrn(nn.Module):
         n_speakers: int = 1,
         gin_channels: int = 0,
         use_sdp: bool = True,
+        use_japanese_prosody: bool = False,  # Enable Japanese prosody features
     ):
         super().__init__()
         self.n_vocab = n_vocab
@@ -567,17 +738,32 @@ class SynthesizerTrn(nn.Module):
         self.gin_channels = gin_channels
 
         self.use_sdp = use_sdp
+        self.use_japanese_prosody = use_japanese_prosody
 
-        self.enc_p = TextEncoder(
-            n_vocab,
-            inter_channels,
-            hidden_channels,
-            filter_channels,
-            n_heads,
-            n_layers,
-            kernel_size,
-            p_dropout,
-        )
+        # Use JapaneseTextEncoder if prosody features are enabled
+        if use_japanese_prosody:
+            self.enc_p = JapaneseTextEncoder(
+                n_vocab,
+                inter_channels,
+                hidden_channels,
+                filter_channels,
+                n_heads,
+                n_layers,
+                kernel_size,
+                p_dropout,
+                prosody_dim=16,  # OpenJTalk A~K fields
+            )
+        else:
+            self.enc_p = TextEncoder(
+                n_vocab,
+                inter_channels,
+                hidden_channels,
+                filter_channels,
+                n_heads,
+                n_layers,
+                kernel_size,
+                p_dropout,
+            )
         self.dec = Generator(
             inter_channels,
             resblock,
@@ -613,8 +799,12 @@ class SynthesizerTrn(nn.Module):
         if n_speakers > 1:
             self.emb_g = nn.Embedding(n_speakers, gin_channels)
 
-    def forward(self, x, x_lengths, y, y_lengths, sid=None):
-        x, m_p, logs_p, x_mask = self.enc_p(x, x_lengths)
+    def forward(self, x, x_lengths, y, y_lengths, sid=None, prosody_features=None):
+        # Pass prosody features to encoder if Japanese prosody is enabled
+        if self.use_japanese_prosody:
+            x, m_p, logs_p, x_mask = self.enc_p(x, x_lengths, prosody_features)
+        else:
+            x, m_p, logs_p, x_mask = self.enc_p(x, x_lengths)
         if self.n_speakers > 1:
             g = self.emb_g(sid).unsqueeze(-1)  # [b, h, 1]
         else:
@@ -685,8 +875,13 @@ class SynthesizerTrn(nn.Module):
         length_scale=1,
         noise_scale_w=0.8,
         max_len=None,
+        prosody_features=None,
     ):
-        x, m_p, logs_p, x_mask = self.enc_p(x, x_lengths)
+        # Pass prosody features to encoder if Japanese prosody is enabled
+        if self.use_japanese_prosody:
+            x, m_p, logs_p, x_mask = self.enc_p(x, x_lengths, prosody_features)
+        else:
+            x, m_p, logs_p, x_mask = self.enc_p(x, x_lengths)
         if self.n_speakers > 1:
             assert sid is not None, "Missing speaker id"
             g = self.emb_g(sid).unsqueeze(-1)  # [b, h, 1]

@@ -224,6 +224,16 @@ class UtteranceCollate:
         if self.is_multispeaker:
             speaker_ids = LongTensor(num_utterances)
 
+        # Check if prosody features are available
+        has_prosody = any(
+            utt.prosody_features is not None for utt in utterances
+        )
+        prosody_padded: FloatTensor | None = None
+        if has_prosody:
+            # Prosody features: [batch, max_seq_len, 16]
+            prosody_padded = FloatTensor(num_utterances, max_phonemes_length, 16)
+            prosody_padded.zero_()
+
         # Sort by decreasing spectrogram length
         sorted_utterances = sorted(
             utterances, key=lambda u: u.spectrogram.size(1), reverse=True
@@ -246,6 +256,11 @@ class UtteranceCollate:
                 assert speaker_ids is not None
                 speaker_ids[utt_idx] = utt.speaker_id
 
+            # Handle prosody features
+            if has_prosody and utt.prosody_features is not None:
+                prosody_len = utt.prosody_features.size(0)
+                prosody_padded[utt_idx, :prosody_len, :] = utt.prosody_features
+
         return Batch(
             phoneme_ids=phonemes_padded,
             phoneme_lengths=phoneme_lengths,
@@ -254,4 +269,5 @@ class UtteranceCollate:
             audios=audio_padded,
             audio_lengths=audio_lengths,
             speaker_ids=speaker_ids,
+            prosody_features=prosody_padded,
         )
