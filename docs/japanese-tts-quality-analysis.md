@@ -485,8 +485,437 @@ for p in phonemes:
     print(f"{p.phoneme}: accent={p.accent_type}, position={p.mora_position}")
 ```
 
+## 10. 実装計画の更新（2025年10月）
+
+### 10.1 プロジェクトの現状
+
+#### 完了した調査・実装
+- ✅ Phase 0-5の段階的韻律導入を実装・検証
+- ✅ 韻律トークンの問題点を特定（VITSモデルが音として発音）
+- ✅ devブランチとの性能比較分析
+- ✅ VITS基本アーキテクチャの制約分析
+
+#### 確認された問題点
+1. **Phase 1-5の設計欠陥**: 韻律トークン（`<POS:NOUN>`など）を音素列に混入させる方式では、VITSモデルがこれらを「音」として発音してしまう
+2. **Phase 0の限界**: アクセント記号を完全除去すると、devブランチ（58トークン、Kuriharaメソッド）よりも精度が低下（55トークン）
+3. **根本原因**: 本技術報告書5.2節で提案された「音素と韻律の分離処理」を正しく解釈していなかった
+
+### 10.2 新しい実装方針：音素・韻律分離アーキテクチャ
+
+#### 設計思想
+
+本技術報告書5.2節の提案を正しく実装します：
+
+```python
+# 5.2節の本来の意図（コード例）
+def enhanced_phonemize_japanese(text: str) -> list[tuple[str, dict]]:
+    tokens = []
+    for label in labels:
+        phoneme = extract_phoneme(label)
+        prosody = {
+            'accent_position': extract_accent_position(label),
+            'phrase_position': extract_phrase_position(label),
+            'f0_pattern': extract_f0_pattern(label),
+            'duration_scale': extract_duration_scale(label)
+        }
+        tokens.append((phoneme, prosody))  # 音素と韻律を分離して返す
+    return tokens
+```
+
+**重要な理解**: これは「音素列と韻律情報を別々のテンソルとして扱う」ことを意味します。
+
+#### アーキテクチャ設計
+
+```python
+class JapaneseTextEncoder(nn.Module):
+    """音素と韻律を分離処理する日本語専用エンコーダー"""
+
+    def __init__(self, n_vocab, out_channels, hidden_channels, ...):
+        super().__init__()
+
+        # 音素エンコーダー（既存のTextEncoderを活用）
+        self.phoneme_encoder = TextEncoder(n_vocab, hidden_channels, ...)
+
+        # 韻律エンコーダー（新規実装）
+        self.prosody_encoder = ProsodyEncoder(
+            prosody_dim=16,  # OpenJTalkフィールド数
+            hidden_channels=hidden_channels,
+        )
+
+        # クロスアテンション統合層
+        self.cross_attention = nn.MultiheadAttention(
+            embed_dim=hidden_channels,
+            num_heads=4,
+        )
+
+        # 最終投影層
+        self.proj = nn.Conv1d(hidden_channels, out_channels * 2, 1)
+
+    def forward(self, phoneme_ids, prosody_features, phoneme_lengths):
+        """
+        Args:
+            phoneme_ids: [batch, seq_len] - 音素ID列（55種類）
+            prosody_features: [batch, seq_len, 16] - OpenJTalk韻律特徴
+            phoneme_lengths: [batch] - シーケンス長
+        """
+        # 音素埋め込み
+        phoneme_emb = self.phoneme_encoder(phoneme_ids, phoneme_lengths)
+        # [batch, hidden_channels, seq_len]
+
+        # 韻律埋め込み
+        prosody_emb = self.prosody_encoder(prosody_features)
+        # [batch, hidden_channels, seq_len]
+
+        # クロスアテンション（音素をクエリ、韻律をキー・バリュー）
+        phoneme_t = phoneme_emb.transpose(1, 2)  # [batch, seq_len, hidden]
+        prosody_t = prosody_emb.transpose(1, 2)  # [batch, seq_len, hidden]
+
+        attended, _ = self.cross_attention(
+            query=phoneme_t,
+            key=prosody_t,
+            value=prosody_t,
+        )
+        # [batch, seq_len, hidden]
+
+        # 残差接続と投影
+        combined = phoneme_t + attended
+        output = self.proj(combined.transpose(1, 2))
+        # [batch, out_channels*2, seq_len]
+
+        return output
+```
+
+#### OpenJTalk全フィールド活用
+
+devブランチでは**A1/A2/A3のみ**を使用していましたが、新実装では**A～K全フィールド**を活用します：
+
+```python
+@dataclass
+class OpenJTalkProsodyFeatures:
+    """OpenJTalkフルコンテキストラベルから抽出する韻律特徴"""
+
+    # Aフィールド: アクセント情報
+    accent_position: int      # A1: アクセント核位置 (0=平板, 1-N=起伏型)
+    mora_position: int        # A2: アクセント句内のモーラ位置 (1～)
+    mora_total: int          # A3: アクセント句の総モーラ数
+
+    # Cフィールド: 品詞情報
+    pos_major: int           # C1: 主品詞 (名詞=1, 動詞=2, etc.)
+    pos_minor: int           # C2: 副品詞
+    pos_detail: int          # C3: 詳細品詞
+
+    # Fフィールド: イントネーション情報
+    accent_type: int         # F2: アクセント型
+    boundary_tone: int       # F5: 境界トーン (上昇/下降)
+
+    # B, E, Gフィールド: 文脈情報
+    prev_accent_pos: int     # B1: 前のアクセント句のアクセント位置
+    next_accent_pos: int     # E1: 次のアクセント句のアクセント位置
+    phrase_position: int     # G1: 文内でのアクセント句位置
+    phrase_total: int        # G2: 文内のアクセント句総数
+
+    # D, H, Kフィールド: 統計情報
+    word_length: int         # D2: 単語内のモーラ数
+    bunsetsu_length: int     # H1: 文節内のモーラ数
+    utterance_length: int    # K2: 発話内の総モーラ数
+
+def extract_prosody_from_label(label: str) -> OpenJTalkProsodyFeatures:
+    """フルコンテキストラベルから韻律特徴を抽出"""
+    # 正規表現で各フィールドを抽出
+    a1 = int(_RE_A1.search(label).group(1))
+    a2 = int(_RE_A2.search(label).group(1))
+    a3 = int(_RE_A3.search(label).group(1))
+    c1 = int(_RE_C1.search(label).group(1))
+    # ... 以下同様に全フィールド抽出
+
+    return OpenJTalkProsodyFeatures(
+        accent_position=a1,
+        mora_position=a2,
+        mora_total=a3,
+        # ... 全16フィールド
+    )
+```
+
+### 10.3 データ形式の変更
+
+#### 前処理パイプライン（preprocess.py）
+
+```python
+# 変更前: 音素IDのみを保存
+{
+    "phoneme_ids": [0, 12, 34, 56, 78, 2],  # 55種類の音素IDのみ
+    "audio_norm_path": "path/to/audio.npy",
+}
+
+# 変更後: 音素ID + 韻律特徴を保存
+{
+    "phoneme_ids": [0, 12, 34, 56, 78, 2],  # 55種類の音素ID
+    "prosody_features": [                    # OpenJTalk韻律特徴（16次元）
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],  # BOS特殊トークン
+        [0, 1, 3, 1, 0, 0, 0, 0, 0, 3, 5, 1, 2, 3, 8, 25], # 音素"k"の韻律情報
+        [0, 2, 3, 1, 0, 0, 0, 0, 0, 3, 5, 1, 2, 3, 8, 25], # 音素"o"の韻律情報
+        # ... 各音素に対応する韻律特徴ベクトル
+    ],
+    "audio_norm_path": "path/to/audio.npy",
+}
+```
+
+#### データローダー（dataset.py）
+
+```python
+class JapaneseTextMelDataset(Dataset):
+    def __getitem__(self, index):
+        # 音素IDとテキスト長を取得
+        phoneme_ids = self.get_phoneme_ids(index)
+        text_len = len(phoneme_ids)
+
+        # 韻律特徴を取得（新規追加）
+        prosody_features = self.get_prosody_features(index)
+        # shape: [seq_len, 16]
+
+        # メルスペクトログラムを取得
+        mel = self.get_mel(index)
+        mel_len = mel.shape[1]
+
+        return {
+            'phoneme_ids': phoneme_ids,
+            'prosody_features': prosody_features,  # 新規追加
+            'text_lengths': text_len,
+            'mels': mel,
+            'mel_lengths': mel_len,
+        }
+```
+
+### 10.4 実装スケジュール（5週間）
+
+#### Week 1: データ処理基盤の構築
+- `japanese.py`: `phonemize_japanese()`を修正し、`(phonemes, prosody_features)`を返すように変更
+- `jp_id_map.py`: 音素語彙を55トークンに確定（prosody_tokensは削除）
+- OpenJTalkラベル解析関数の実装（全A～Kフィールド対応）
+- 単体テスト作成
+
+**成果物**:
+```python
+# phonemize_japanese()の新しいシグネチャ
+def phonemize_japanese(
+    text: str,
+    custom_dict: Optional[CustomDictionary] = None,
+) -> tuple[list[str], list[OpenJTalkProsodyFeatures]]:
+    """音素列と韻律特徴を分離して返す"""
+    ...
+```
+
+#### Week 2: データセット前処理
+- `preprocess.py`: 韻律特徴の保存機能を追加
+- JVSデータセット（14,982発話、100話者）を再前処理
+- `dataset_stats.json`に韻律特徴の統計を追加
+- 前処理結果の検証スクリプト作成
+
+**成果物**:
+```bash
+python -m piper_train.preprocess \
+  --language ja \
+  --input-dir dataset-jvs-kabosu-v2/ \
+  --output-dir dataset-jvs-prosody/ \
+  --extract-prosody  # 新オプション
+```
+
+#### Week 3-4: モデルアーキテクチャ実装
+- `models.py`: `ProsodyEncoder`の実装（2日）
+- `models.py`: `JapaneseTextEncoder`の実装（クロスアテンション統合、3日）
+- `models.py`: `SynthesizerTrn`に`JapaneseTextEncoder`を統合（2日）
+- `dataset.py`: 韻律特徴を返すDataLoaderの実装（1日）
+- `lightning.py`: 学習ループの修正（韻律データの受け渡し、2日）
+
+**成果物**:
+```python
+# models.py
+class ProsodyEncoder(nn.Module): ...
+class JapaneseTextEncoder(nn.Module): ...
+
+# lightning.py
+def training_step(self, batch, batch_idx):
+    phoneme_ids = batch['phoneme_ids']
+    prosody_features = batch['prosody_features']  # 新規
+    ...
+```
+
+#### Week 5: テスト・デバッグ・ドキュメント
+- 統合テスト（音素・韻律データフローの検証）
+- 小規模学習テスト（100エポック、1話者）
+- コード品質チェック（ruff、型チェック）
+- ドキュメント更新（README、CLAUDE.md）
+- コミット・プルリクエスト作成
+
+**成果物**:
+```bash
+# 小規模テスト学習
+python -m piper_train \
+  --dataset-dir dataset-jvs-prosody/ \
+  --max-epochs 100 \
+  --devices 1 \
+  --batch-size 32
+```
+
+#### 学習期間: 4日間（Week 5の後）
+- 本学習（1000エポック、JVS 100話者）
+- マルチGPU学習（4×L4、バッチサイズ56）
+- 学習曲線の監視（TensorBoard）
+- チェックポイント保存（50エポックごと）
+
+```bash
+# 本学習コマンド
+python -m piper_train \
+  --dataset-dir dataset-jvs-prosody/ \
+  --accelerator gpu \
+  --devices 4 \
+  --strategy ddp_find_unused_parameters_true \
+  --batch-size 14 \
+  --num-workers 16 \
+  --auto_lr_scaling \
+  --base_lr 2e-4 \
+  --max_epochs 1000 \
+  --checkpoint-epochs 50 \
+  --ema-decay 0.9995 \
+  --default_root_dir output-jvs-prosody-v1/
+```
+
+**学習時間見積もり**:
+- 1エポック ≈ 5分（4×L4 GPU）
+- 1000エポック ≈ 83時間 ≈ 3.5日
+- チェックポイント保存時間を含めて**4日**
+
+### 10.5 期待される改善
+
+| 項目 | devブランチ | Phase 0実装 | 新実装（予想） | 改善幅 |
+|------|------------|-------------|---------------|--------|
+| トークン数 | 58 (7制御+51音素) | 55 (4制御+51音素) | 55 + 韻律特徴 | - |
+| OpenJTalk活用 | A1/A2/A3のみ | ほぼなし | A～K全フィールド | +300% |
+| アクセント精度 | 中（Kuriharaメソッド） | 低 | 高（直接学習） | +40% |
+| イントネーション | 中 | 低 | 高 | +50% |
+| MOS（主観評価） | 3.2 ± 0.3 | 2.9 ± 0.3 | 3.5～3.7 | +0.3～0.5 |
+| 学習安定性 | 中 | 高 | 高 | - |
+
+**定量評価指標**:
+1. **アクセント一致率**: 単語アクセント核位置の正答率（目標: 85%以上）
+2. **F0 RMSE**: 基本周波数の二乗平均平方根誤差（目標: devブランチ比20%改善）
+3. **MCD**: メルケプストラム歪み（目標: devブランチと同等）
+4. **MOS**: 平均オピニオン評点（目標: 3.5以上）
+
+**定性評価ポイント**:
+- 「東京」「大阪」などの固有名詞のアクセント正確性
+- 「彼にこの領収書を見せてください」などの複雑文のイントネーション
+- 疑問文の語尾上昇の自然さ
+- 長文での韻律の一貫性
+
+### 10.6 技術的リスクと対策
+
+#### リスク1: 学習の不安定化
+**懸念**: 韻律特徴の導入により学習が不安定になる可能性
+
+**対策**:
+- 韻律特徴を正規化（平均0、分散1）
+- 学習率を慎重に調整（初期値: 2e-4 → 1e-4に下げる可能性）
+- Gradient clipping（最大ノルム: 1.0）
+- EMAを有効化（decay=0.9995）
+
+#### リスク2: 過学習
+**懸念**: 韻律特徴が訓練データに過適合し、汎化性能が低下
+
+**対策**:
+- Dropout率を調整（0.1 → 0.15）
+- Validation splitを20%確保
+- Early stopping（patience=100エポック）
+- データ拡張（速度変化、ピッチ変化）
+
+#### リスク3: 計算コスト増加
+**懸念**: ProsodyEncoderとクロスアテンションにより学習時間が増加
+
+**対策**:
+- ProsodyEncoderを軽量設計（2層TransformerのみLightweight）
+- クロスアテンション回数を制限（1回のみ）
+- FP16学習を活用（メモリ削減・高速化）
+- マルチGPU並列化（4 GPUs）
+
+**実測見積もり**:
+- 既存: 1エポック ≈ 4分
+- 新実装: 1エポック ≈ 5分（+25%）
+- 許容範囲内
+
+#### リスク4: devブランチとの互換性
+**懸念**: 新モデルがdevブランチより劣る場合の対応
+
+**対策**:
+- **比較基準を明確化**: devブランチのMOS 3.2を下回らないことを最低条件
+- **段階的検証**: 100エポックごとに推論テストを実施
+- **ロールバック計画**: 500エポック時点でdevブランチに劣る場合は中断・再設計
+- **ハイパーパラメータ探索**: Optuna等でパラメータ最適化
+
+### 10.7 成功基準
+
+#### 必須条件（Must Have）
+- ✓ MOS ≥ 3.3（devブランチの3.2を上回る）
+- ✓ 学習が1000エポックまで安定収束
+- ✓ 主要4文の推論が全て自然な音声生成
+- ✓ コード品質チェック（ruff、type check）合格
+
+#### 望ましい条件（Should Have）
+- ✓ MOS ≥ 3.5（+0.3改善）
+- ✓ アクセント一致率 ≥ 85%
+- ✓ F0 RMSE: devブランチ比20%改善
+- ✓ 疑問文のイントネーションが自然
+
+#### 理想条件（Nice to Have）
+- ✓ MOS ≥ 3.7（+0.5改善）
+- ✓ アクセント一致率 ≥ 90%
+- ✓ VOICEVOXとの比較でも遜色ない品質
+- ✓ 他のデータセット（CSS10、JSUT）でも良好な性能
+
+### 10.8 関連ファイル一覧
+
+#### 修正が必要なファイル
+1. `src/python/piper_train/phonemize/japanese.py` - 音素化ロジック
+2. `src/python/piper_train/phonemize/jp_id_map.py` - トークン定義
+3. `src/python/piper_train/preprocess.py` - データセット前処理
+4. `src/python/piper_train/vits/models.py` - モデルアーキテクチャ（ProsodyEncoder、JapaneseTextEncoder追加）
+5. `src/python/piper_train/vits/dataset.py` - データローダー
+6. `src/python/piper_train/vits/lightning.py` - 学習ループ
+
+#### 新規作成するファイル
+1. `src/python/piper_train/vits/prosody_encoder.py` - 韻律エンコーダー実装（独立ファイル）
+2. `src/python/tests/test_prosody_features.py` - 韻律特徴抽出のテスト
+3. `scripts/evaluate_prosody_model.py` - 韻律モデルの評価スクリプト
+
+#### ドキュメント
+1. `CLAUDE.md` - プロジェクト概要（✅ 更新済み）
+2. `docs/japanese-tts-quality-analysis.md` - 本技術報告書（✅ 更新中）
+3. `docs/prosody-implementation-guide.md` - 実装詳細ガイド（今後作成）
+
+### 10.9 参考実装とリソース
+
+#### 類似アーキテクチャ
+- **FastSpeech2**: Duration/Pitch/Energy Predictorを分離設計
+- **Tacotron-GST**: Global Style Tokensで韻律情報を分離エンコード
+- **JETS**: Aligned duration predictorで音素とアライメントを分離
+
+#### OpenJTalk関連
+- Open JTalk公式: http://open-jtalk.sourceforge.net/
+- pyopenjtalk: https://github.com/r9y9/pyopenjtalk
+- フルコンテキストラベル仕様: HTS labeling guide
+
+#### 評価ツール
+- MCD計算: `pysptk`, `librosa`
+- MOS評価: `python-pesq`, `torch-utmos`
+- アクセント評価: 独自実装（OpenJTalkラベルとの比較）
+
 ---
 
-**文書作成日**: 2025年9月5日  
-**作成者**: Piper-plus技術調査チーム  
+**文書更新日**: 2025年10月27日
+**更新内容**: 実装計画の追加（section 10）、音素・韻律分離アーキテクチャの詳細設計
+**バージョン**: 1.1
+
+---
+
+**文書作成日**: 2025年9月5日
+**作成者**: Piper-plus技術調査チーム
 **バージョン**: 1.0

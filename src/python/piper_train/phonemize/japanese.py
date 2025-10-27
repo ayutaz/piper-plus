@@ -1,4 +1,5 @@
 import re
+from dataclasses import dataclass
 
 
 # Try to import pyopenjtalk-plus first (Windows compatible), fall back to pyopenjtalk
@@ -16,7 +17,64 @@ from .custom_dict import CustomDictionary
 from .token_mapper import map_sequence
 
 
-__all__ = ["phonemize_japanese"]
+__all__ = ["phonemize_japanese", "OpenJTalkProsodyFeatures", "extract_prosody_from_label"]
+
+
+@dataclass
+class OpenJTalkProsodyFeatures:
+    """Prosody features extracted from OpenJTalk full-context labels.
+
+    All fields are integers representing linguistic features. Use -1 for unknown/undefined values.
+    Total: 16 features covering A~K fields from OpenJTalk labels.
+    """
+    # A field: Accent information (mora and accent phrase level)
+    accent_position: int      # A1: Accent nucleus position (0=flat, 1-N=downstep position)
+    mora_position: int        # A2: Position of current mora in accent phrase (1-based)
+    mora_total: int          # A3: Total number of mora in accent phrase
+
+    # C field: Part-of-speech information
+    pos_major: int           # C1: Major POS category (1=adj, 2=noun, 11=verb, etc.)
+    pos_minor: int           # C2: Minor POS category
+    pos_detail: int          # C3: Detailed POS category
+
+    # F field: Intonation information
+    accent_type: int         # F2: Accent type of accent phrase
+    boundary_tone: int       # F5: Boundary tone (pitch pattern at phrase boundary)
+
+    # B, E, G fields: Context information (previous/next accent phrases)
+    prev_accent_pos: int     # B1: Accent position of previous accent phrase
+    next_accent_pos: int     # E1: Accent position of next accent phrase
+    phrase_position: int     # G1: Position of current accent phrase in sentence (1-based)
+    phrase_total: int        # G2: Total number of accent phrases in sentence
+
+    # D, H, K fields: Higher-level statistics
+    word_length: int         # D2: Number of mora in current word
+    bunsetsu_length: int     # H1: Number of mora in current bunsetsu (phrase)
+    utterance_length: int    # K2: Total number of mora in utterance
+
+    # Additional field for normalization
+    is_special_token: bool = False  # True for BOS/EOS/pause tokens
+
+    def to_list(self) -> list[int]:
+        """Convert to list representation for model input (16 integers)."""
+        return [
+            self.accent_position,
+            self.mora_position,
+            self.mora_total,
+            self.pos_major,
+            self.pos_minor,
+            self.pos_detail,
+            self.accent_type,
+            self.boundary_tone,
+            self.prev_accent_pos,
+            self.next_accent_pos,
+            self.phrase_position,
+            self.phrase_total,
+            self.word_length,
+            self.bunsetsu_length,
+            self.utterance_length,
+            1 if self.is_special_token else 0,
+        ]
 
 # Regular expressions reused many times
 _RE_PHONEME = re.compile(r"-([^+]+)\+")
@@ -60,6 +118,118 @@ POS_MAP = {
     "18": "<POS:NOUN>",    # 固有名詞 → 名詞に統合
     "24": "<POS:PART>",    # 接続助詞 → 助詞に統合
 }
+
+
+def extract_prosody_from_label(label: str) -> OpenJTalkProsodyFeatures:
+    """Extract numerical prosody features from OpenJTalk full-context label.
+
+    Extracts features from A, B, C, D, E, F, G, H, K fields of OpenJTalk labels.
+    Returns a 16-dimensional feature vector suitable for neural network input.
+
+    Parameters
+    ----------
+    label : str
+        OpenJTalk full-context label string
+
+    Returns
+    -------
+    OpenJTalkProsodyFeatures
+        Prosody features with 16 integer values (-1 for undefined/unknown)
+
+    Notes
+    -----
+    OpenJTalk label format (excerpt):
+        xx^xx-phoneme+yy=zz/A:a1+a2+a3/B:b1-b2_b3/C:c1_c2+c3/D:d1+d2_d3/
+        E:e1_e2!e3_e4-e5/F:f1_f2#f3_f4@f5_f6|f7_f8/G:g1_g2%g3_g4_g5/
+        H:h1_h2/I:i1-i2@i3+i4&i5-i6|i7+i8/J:j1_j2/K:k1+k2-k3
+    """
+    # Helper function to safely parse integer from regex match
+    def safe_int(match_obj, group_idx: int, default: int = -1) -> int:
+        if match_obj:
+            value = match_obj.group(group_idx)
+            if value and value != "xx":
+                try:
+                    return int(value)
+                except ValueError:
+                    pass
+        return default
+
+    # A field: Accent information
+    m_a1 = _RE_A1.search(label)
+    m_a2 = _RE_A2.search(label)
+    m_a3 = _RE_A3.search(label)
+    accent_position = safe_int(m_a1, 1, 0)
+    mora_position = safe_int(m_a2, 1, 0)
+    mora_total = safe_int(m_a3, 1, 0)
+
+    # C field: Part-of-speech (/C:c1_c2+c3/)
+    m_c = _RE_C.search(label)
+    pos_major = safe_int(m_c, 1, 0)
+    pos_minor = safe_int(m_c, 2, 0)
+    pos_detail = safe_int(m_c, 3, 0)
+
+    # F field: Intonation (/F:f1_f2#f3_f4@f5_f6|f7_f8/)
+    # f1=mora count, f2=accent type, f5=boundary tone
+    m_f = _RE_F.search(label)
+    accent_type = safe_int(m_f, 2, 0)
+    boundary_tone = safe_int(m_f, 5, 0)
+
+    # B field: Previous/next POS and phrase position (/B:b1-b2_b3/)
+    # b1=prev accent phrase POS, b2=next accent phrase POS, b3=phrase position in IP
+    m_b = _RE_B.search(label)
+    prev_pos_b1 = safe_int(m_b, 1, 0)  # Not directly used, we use E1 for prev accent pos
+    # For prev_accent_pos, we use E field instead
+
+    # E field: Previous accent phrase info (/E:e1_e2!...)
+    # e1=mora count of prev phrase, e2=accent type of prev phrase
+    m_e = _RE_E.search(label)
+    prev_accent_pos = safe_int(m_e, 2, 0)  # e2: accent type of previous accent phrase
+
+    # G field: Next accent phrase info (/G:g1_g2%...)
+    # g1=mora count of next phrase, g2=accent type of next phrase
+    m_g = _RE_G.search(label)
+    next_accent_pos = safe_int(m_g, 2, 0)  # g2: accent type of next accent phrase
+
+    # For phrase position and total, we need to extract from I field or calculate
+    # I field: /I:i1-i2@i3+i4&i5-i6|i7+i8/
+    # i3=position of current AP in IP (1-based), i4=total APs in IP
+    m_i = _RE_I.search(label)
+    phrase_position = safe_int(m_i, 3, 0)
+    phrase_total = safe_int(m_i, 4, 0)
+
+    # D field: Word-level POS (/D:d1+d2_d3/)
+    # d2=mora count in word
+    m_d = _RE_D.search(label)
+    word_length = safe_int(m_d, 2, 0)
+
+    # H field: Bunsetsu info (/H:h1_h2/)
+    # h1=mora count in bunsetsu
+    m_h = _RE_H.search(label)
+    bunsetsu_length = safe_int(m_h, 1, 0)
+
+    # K field: Utterance statistics (/K:k1+k2-k3/)
+    # k2=total mora in utterance
+    m_k = _RE_K.search(label)
+    utterance_length = safe_int(m_k, 2, 0)
+
+    return OpenJTalkProsodyFeatures(
+        accent_position=accent_position,
+        mora_position=mora_position,
+        mora_total=mora_total,
+        pos_major=pos_major,
+        pos_minor=pos_minor,
+        pos_detail=pos_detail,
+        accent_type=accent_type,
+        boundary_tone=boundary_tone,
+        prev_accent_pos=prev_accent_pos,
+        next_accent_pos=next_accent_pos,
+        phrase_position=phrase_position,
+        phrase_total=phrase_total,
+        word_length=word_length,
+        bunsetsu_length=bunsetsu_length,
+        utterance_length=utterance_length,
+        is_special_token=False,
+    )
 
 
 def _is_question(text: str) -> bool:
@@ -300,19 +470,21 @@ def extract_prosody_features(label: str, labels: list[str] = None, idx: int = -1
 
 
 def phonemize_japanese(
-    text: str, custom_dict: CustomDictionary | str | list[str] | None = None
-) -> list[str]:
-    """Convert *text* into a list of phoneme/prosody tokens that Piper can ingest.
+    text: str,
+    custom_dict: CustomDictionary | str | list[str] | None = None,
+) -> tuple[list[str], list[OpenJTalkProsodyFeatures]]:
+    """Convert *text* into phonemes and prosody features separated.
 
-    The algorithm follows the so-called "Kurihara method" that inserts the
-    following extra symbols in the phoneme sequence:
+    Returns
+    -------
+    tuple[list[str], list[OpenJTalkProsodyFeatures]]
+        - phonemes: List of phoneme symbols (55-token vocabulary)
+        - prosody_features: List of prosody features (16-dimensional vectors)
 
+    Control symbols in phoneme sequence:
     ^   : beginning of sentence
     $/?: end of sentence (choose ? for interrogative)
     _   : short pause (pau)
-    #   : accent phrase boundary
-    [   : rising-pitch mark (accent phrase head)
-    ]   : falling-pitch mark (accent nucleus)
 
     Parameters
     ----------
@@ -326,6 +498,8 @@ def phonemize_japanese(
     1. We rely on *pyopenjtalk.extract_fullcontext* to obtain full-context labels.
     2. "sil" at the beginning / end of the utterance is converted into ^ / $ or ?.
     3. Custom dictionary is applied before OpenJTalk processing for better pronunciation.
+    4. Returns phonemes and prosody features separately for proper neural encoding.
+    5. Each phoneme has a corresponding prosody feature vector (16 integers).
     """
 
     # カスタム辞書を適用
@@ -340,10 +514,29 @@ def phonemize_japanese(
         text = dictionary.apply_to_text(text)
 
     labels = pyopenjtalk.extract_fullcontext(text)
-    tokens: list[str] = []
+    phonemes: list[str] = []
+    prosody_features: list[OpenJTalkProsodyFeatures] = []
 
-    # Track accent phrase start to insert prosody tokens only once per phrase
-    current_accent_phrase_start = -1
+    # Special token prosody (all zeros with is_special_token=True)
+    def special_token_prosody() -> OpenJTalkProsodyFeatures:
+        return OpenJTalkProsodyFeatures(
+            accent_position=0,
+            mora_position=0,
+            mora_total=0,
+            pos_major=0,
+            pos_minor=0,
+            pos_detail=0,
+            accent_type=0,
+            boundary_tone=0,
+            prev_accent_pos=0,
+            next_accent_pos=0,
+            phrase_position=0,
+            phrase_total=0,
+            word_length=0,
+            bunsetsu_length=0,
+            utterance_length=0,
+            is_special_token=True,
+        )
 
     for idx, label in enumerate(labels):
         m_ph = _RE_PHONEME.search(label)
@@ -355,129 +548,27 @@ def phonemize_japanese(
         # Beginning / end silence handling
         if phoneme == "sil":
             if idx == 0:
-                tokens.append("^")
-                # Phase 2 & Phase 5: 文頭でイントネーション句・呼気段落・発話統計情報を追加
-                features = extract_prosody_features(label, labels, idx)
-                if "intn_phrase" in features:
-                    tokens.append(features["intn_phrase"])
-                if "breath" in features:
-                    tokens.append(features["breath"])
-                # Phase 5: 発話統計情報
-                if "utt_bg" in features:
-                    tokens.append(features["utt_bg"])
-                if "utt_ip" in features:
-                    tokens.append(features["utt_ip"])
-                if "utt_mora" in features:
-                    tokens.append(features["utt_mora"])
+                phonemes.append("^")
+                prosody_features.append(special_token_prosody())
             elif idx == len(labels) - 1:
                 # Always add end marker when we find the last sil
-                tokens.append("?" if _is_question(text) else "$")
+                phonemes.append("?" if _is_question(text) else "$")
+                prosody_features.append(special_token_prosody())
             # Skip adding ordinary phoneme for sil
             continue
 
         # Short pause
         if phoneme == "pau":
-            tokens.append("_")
+            phonemes.append("_")
+            prosody_features.append(special_token_prosody())
             continue
 
-        # ------------------------------------------------------------------
-        # Phase 1: Extract prosody features before adding phoneme
-        # ------------------------------------------------------------------
-        # Get accent info first to determine if this is accent phrase start
-        m_a1 = _RE_A1.search(label)
-        m_a2 = _RE_A2.search(label)
-        m_a3 = _RE_A3.search(label)
+        # Extract prosody features from label
+        prosody = extract_prosody_from_label(label)
 
-        if m_a1 and m_a2 and m_a3:
-            a2 = int(m_a2.group(1))
+        # Add phoneme and its prosody feature
+        phonemes.append(phoneme)
+        prosody_features.append(prosody)
 
-            # Insert prosody tokens at accent phrase start (a2==1)
-            if a2 == 1 and current_accent_phrase_start != idx:
-                current_accent_phrase_start = idx
-                features = extract_prosody_features(label, labels, idx)
-
-                # Phase 5: Insert word-level context tokens first
-                if "prev_word_pos" in features:
-                    tokens.append(features["prev_word_pos"])
-                if "next_word_pos" in features:
-                    tokens.append(features["next_word_pos"])
-
-                # Phase 5: Insert bunsetsu info
-                if "bunsetsu" in features:
-                    tokens.append(features["bunsetsu"])
-
-                # Phase 4: Insert accent phrase context tokens
-                # Previous accent phrase info
-                if "prev_pos" in features:
-                    tokens.append(features["prev_pos"])
-                if "prev_mora" in features:
-                    tokens.append(features["prev_mora"])
-                if "prev_accent" in features:
-                    tokens.append(features["prev_accent"])
-
-                # Next accent phrase info
-                if "next_pos" in features:
-                    tokens.append(features["next_pos"])
-                if "next_mora" in features:
-                    tokens.append(features["next_mora"])
-                if "next_accent" in features:
-                    tokens.append(features["next_accent"])
-
-                # Intonation phrase position
-                if "intn_pos" in features:
-                    tokens.append(features["intn_pos"])
-
-                # Phase 1: Insert current accent phrase info
-                if "pos" in features:
-                    tokens.append(features["pos"])
-                if "accent" in features:
-                    tokens.append(features["accent"])
-                if "mora" in features:
-                    tokens.append(features["mora"])
-                if "intonation" in features:
-                    tokens.append(features["intonation"])
-
-        # Keep unvoiced vowels as uppercase for linguistic accuracy
-
-        tokens.append(phoneme)
-
-        # ------------------------------------------------------------------
-        # Prosody mark extraction – see Open JTalk label definition
-        # ------------------------------------------------------------------
-        # A1 : accented? 1 if accented mora else 0
-        # A2 : position of current mora in the accent phrase (1-based)
-        # A3 : number of mora in the accent phrase
-        #
-        # A2_next is needed to detect accent nucleus and phrase boundary.
-        # ------------------------------------------------------------------
-        # Note: m_a1, m_a2, m_a3 already extracted above for prosody tokens
-        if not (m_a1 and m_a2 and m_a3):
-            # Cannot get accent info – continue
-            continue
-
-        a1 = int(m_a1.group(1))
-        a2 = int(m_a2.group(1))
-        a3 = int(m_a3.group(1))
-
-        # Look-ahead to next label to fetch a2_next
-        if idx < len(labels) - 1:
-            m_a2_next = _RE_A2.search(labels[idx + 1])
-            a2_next = int(m_a2_next.group(1)) if m_a2_next else -1
-        else:
-            a2_next = -1
-
-        # Insert accent nucleus mark "]" at the descending point.
-        # Kurihara rule: a1==0 && a2_next == a2 + 1 (i.e., pitch goes from H to L)
-        if (a1 == 0) and (a2_next == a2 + 1):
-            tokens.append("]")
-
-        # Insert accent phrase boundary "#" when current mora is last in phrase
-        if (a2 == a3) and (a2_next == 1):
-            tokens.append("#")
-
-        # Insert rising mark "[" at phrase head (a2==1) when next mora is 2
-        if (a2 == 1) and (a2_next == 2):
-            tokens.append("[")
-
-    # 多文字トークンを1コードポイントへ変換
-    return map_sequence(tokens)
+    # 多文字音素をそのまま使用（PUA変換なし）
+    return phonemes, prosody_features

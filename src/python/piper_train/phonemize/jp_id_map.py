@@ -1,7 +1,7 @@
 from .token_mapper import register
 
 
-__all__ = ["get_japanese_id_map", "JAPANESE_PHONEMES", "SPECIAL_TOKENS", "PROSODY_TOKENS_PHASE1", "PROSODY_TOKENS_PHASE2", "PROSODY_TOKENS_PHASE4", "PROSODY_TOKENS_PHASE5"]
+__all__ = ["get_japanese_id_map", "JAPANESE_PHONEMES", "SPECIAL_TOKENS"]
 
 # -----------------------------------------------------------------------------
 # Japanese phoneme inventory (Open JTalk style) + prosody/special tokens
@@ -11,89 +11,13 @@ __all__ = ["get_japanese_id_map", "JAPANESE_PHONEMES", "SPECIAL_TOKENS", "PROSOD
 # at学習時.  If some of these tokens never appear they are simply unused.
 # -----------------------------------------------------------------------------
 
-# Phase 1: Prosody tokens for enhanced Japanese TTS
-PROSODY_TOKENS_PHASE1: list[str] = [
-    # Accent type (0-5)
-    "<ACC:0>", "<ACC:1>", "<ACC:2>", "<ACC:3>", "<ACC:4>", "<ACC:5>",
-    # Mora count (1-10+)
-    "<MORA:1>", "<MORA:2>", "<MORA:3>", "<MORA:4>", "<MORA:5>",
-    "<MORA:6>", "<MORA:7>", "<MORA:8>", "<MORA:9>", "<MORA:10+>",
-    # Part-of-speech (13 types)
-    "<POS:ADJ>", "<POS:NOUN>", "<POS:ADV>", "<POS:PRON>", "<POS:CONJ>",
-    "<POS:RENTAI>", "<POS:PREFIX>", "<POS:SUFFIX>", "<POS:PART>",
-    "<POS:AUX>", "<POS:VERB>", "<POS:SYM>", "<POS:OTHER>",
-    # Intonation boundary (0-1)
-    "<INTN:0>", "<INTN:1>",
-]
-
-# Phase 2: Sentence-level prosody tokens
-PROSODY_TOKENS_PHASE2: list[str] = [
-    # Intonation phrase (fixed patterns)
-    "<IP:1>", "<IP:2>", "<IP:3>", "<IP:4>", "<IP:5+>",
-    # Breath group (fixed patterns)
-    "<BG:1/1>", "<BG:1/2>", "<BG:2/2>",
-]
-
-# Phase 4: Context prosody tokens (B,E,G field information)
-PROSODY_TOKENS_PHASE4: list[str] = [
-    # Previous accent phrase POS (13 types)
-    "<PREV_POS:ADJ>", "<PREV_POS:NOUN>", "<PREV_POS:ADV>", "<PREV_POS:PRON>",
-    "<PREV_POS:CONJ>", "<PREV_POS:RENTAI>", "<PREV_POS:PREFIX>", "<PREV_POS:SUFFIX>",
-    "<PREV_POS:PART>", "<PREV_POS:AUX>", "<PREV_POS:VERB>", "<PREV_POS:SYM>",
-    "<PREV_POS:OTHER>",
-    # Next accent phrase POS (13 types)
-    "<NEXT_POS:ADJ>", "<NEXT_POS:NOUN>", "<NEXT_POS:ADV>", "<NEXT_POS:PRON>",
-    "<NEXT_POS:CONJ>", "<NEXT_POS:RENTAI>", "<NEXT_POS:PREFIX>", "<NEXT_POS:SUFFIX>",
-    "<NEXT_POS:PART>", "<NEXT_POS:AUX>", "<NEXT_POS:VERB>", "<NEXT_POS:SYM>",
-    "<NEXT_POS:OTHER>",
-    # Intonation phrase position (1-5+)
-    "<INTN_POS:1>", "<INTN_POS:2>", "<INTN_POS:3>", "<INTN_POS:4>", "<INTN_POS:5+>",
-    # Previous accent phrase mora count (1-10+)
-    "<PREV_MORA:1>", "<PREV_MORA:2>", "<PREV_MORA:3>", "<PREV_MORA:4>", "<PREV_MORA:5>",
-    "<PREV_MORA:6>", "<PREV_MORA:7>", "<PREV_MORA:8>", "<PREV_MORA:9>", "<PREV_MORA:10+>",
-    # Previous accent phrase accent type (0-5)
-    "<PREV_ACC:0>", "<PREV_ACC:1>", "<PREV_ACC:2>", "<PREV_ACC:3>", "<PREV_ACC:4>", "<PREV_ACC:5>",
-    # Next accent phrase mora count (1-10+) - G field
-    "<NEXT_MORA:1>", "<NEXT_MORA:2>", "<NEXT_MORA:3>", "<NEXT_MORA:4>", "<NEXT_MORA:5>",
-    "<NEXT_MORA:6>", "<NEXT_MORA:7>", "<NEXT_MORA:8>", "<NEXT_MORA:9>", "<NEXT_MORA:10+>",
-    # Next accent phrase accent type (0-5) - G field
-    "<NEXT_ACC:0>", "<NEXT_ACC:1>", "<NEXT_ACC:2>", "<NEXT_ACC:3>", "<NEXT_ACC:4>", "<NEXT_ACC:5>",
-]
-
-# Phase 5: Complete field extraction (D,H,K fields)
-PROSODY_TOKENS_PHASE5: list[str] = [
-    # Previous word POS (13 types) - D field
-    "<PREV_WORD_POS:ADJ>", "<PREV_WORD_POS:NOUN>", "<PREV_WORD_POS:ADV>", "<PREV_WORD_POS:PRON>",
-    "<PREV_WORD_POS:CONJ>", "<PREV_WORD_POS:RENTAI>", "<PREV_WORD_POS:PREFIX>", "<PREV_WORD_POS:SUFFIX>",
-    "<PREV_WORD_POS:PART>", "<PREV_WORD_POS:AUX>", "<PREV_WORD_POS:VERB>", "<PREV_WORD_POS:SYM>",
-    "<PREV_WORD_POS:OTHER>",
-    # Next word POS (13 types) - D field
-    "<NEXT_WORD_POS:ADJ>", "<NEXT_WORD_POS:NOUN>", "<NEXT_WORD_POS:ADV>", "<NEXT_WORD_POS:PRON>",
-    "<NEXT_WORD_POS:CONJ>", "<NEXT_WORD_POS:RENTAI>", "<NEXT_WORD_POS:PREFIX>", "<NEXT_WORD_POS:SUFFIX>",
-    "<NEXT_WORD_POS:PART>", "<NEXT_WORD_POS:AUX>", "<NEXT_WORD_POS:VERB>", "<NEXT_WORD_POS:SYM>",
-    "<NEXT_WORD_POS:OTHER>",
-    # Bunsetsu position (fixed patterns) - H field
-    "<BUNSETSU:1/1>", "<BUNSETSU:1/2>", "<BUNSETSU:2/2>",
-    "<BUNSETSU:1/3>", "<BUNSETSU:2/3>", "<BUNSETSU:3/3>",
-    "<BUNSETSU:1/4>", "<BUNSETSU:4/4>",
-    # Utterance breath group count (1-4+) - K field
-    "<UTT_BG:1>", "<UTT_BG:2>", "<UTT_BG:3>", "<UTT_BG:4+>",
-    # Utterance intonation phrase count (1-6+) - K field
-    "<UTT_IP:1>", "<UTT_IP:2>", "<UTT_IP:3>", "<UTT_IP:4>", "<UTT_IP:5>", "<UTT_IP:6+>",
-    # Utterance total mora count (binned) - K field
-    "<UTT_MORA:1-10>", "<UTT_MORA:11-20>", "<UTT_MORA:21-30>", "<UTT_MORA:31-50>", "<UTT_MORA:51+>",
-]
-
-# Prosody / sentence boundary tokens inserted by `phonemize_japanese`
+# Control tokens inserted by `phonemize_japanese`
 SPECIAL_TOKENS: list[str] = [
     "_",  # short pause (pau)
     "^",  # BOS
     "$",  # EOS (declarative)
     "?",  # EOS (interrogative)
-    "#",  # accent phrase boundary
-    "[",  # rising pitch mark (accent phrase head)
-    "]",  # falling pitch mark (accent nucleus)
-] + PROSODY_TOKENS_PHASE1 + PROSODY_TOKENS_PHASE2 + PROSODY_TOKENS_PHASE4 + PROSODY_TOKENS_PHASE5  # Phase 1-5 prosody tokens
+]
 
 # Core phoneme set – based on Open JTalk definitions and common practice in
 # Japanese TTS front-ends (Tacotron, VITS, etc.)
@@ -165,10 +89,16 @@ def get_japanese_id_map() -> dict[str, list[int]]:
 
     The first token (id=0) is always the pause "_" so that it functions as the
     padding symbol, mirroring the convention used in Piper's English mapping.
+
+    Returns baseline phoneme-only mapping with 55 tokens (4 control + 51 phonemes).
+    No prosody tokens, no PUA conversion, no accent marks.
     """
 
-    # 各トークンを1文字へ写像
-    symbols: list[str] = [register(s) for s in (SPECIAL_TOKENS + JAPANESE_PHONEMES)]
+    # Baseline: 韻律トークンなし（純粋な音素のみ）
+    # アクセント記号なし（#, [, ]）、PUA変換なし
+    # 多文字音素（ch, sh, ny等）をそのまま使用
+    symbols: list[str] = SPECIAL_TOKENS + JAPANESE_PHONEMES
+
     id_map: dict[str, list[int]] = {}
     for idx, symbol in enumerate(symbols):
         id_map[symbol] = [idx]

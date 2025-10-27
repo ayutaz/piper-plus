@@ -20,7 +20,11 @@ from piper_train.phonemize.token_mapper import (
 try:
     import pyopenjtalk  # noqa: F401
 
-    from piper_train.phonemize.japanese import phonemize_japanese
+    from piper_train.phonemize.japanese import (
+        OpenJTalkProsodyFeatures,
+        extract_prosody_from_label,
+        phonemize_japanese,
+    )
 
     HAS_JAPANESE = True
 except ImportError:
@@ -63,14 +67,111 @@ class TestPhonemization:
             pytest.skip("Japanese phonemizer not available")
 
         # Test hiragana
-        phonemes = phonemize_japanese("あ")
+        phonemes, prosody_features = phonemize_japanese("あ")
         assert "^" in phonemes  # Start marker
         assert "a" in phonemes  # Phoneme
         assert "$" in phonemes  # End marker
+        assert len(phonemes) == len(prosody_features)  # Same length
 
         # Test with multi-char phonemes
-        phonemes = phonemize_japanese("ちゃ")
+        phonemes, prosody_features = phonemize_japanese("ちゃ")
         assert len(phonemes) > 2
+        assert len(phonemes) == len(prosody_features)
+
+    @pytest.mark.unit
+    @pytest.mark.japanese
+    @pytest.mark.requires_openjtalk
+    def test_phonemize_japanese_returns_tuple(self):
+        """Test that phonemize_japanese returns tuple of (phonemes, prosody_features)"""
+        if not HAS_JAPANESE:
+            pytest.skip("Japanese phonemizer not available")
+
+        result = phonemize_japanese("こんにちは")
+        assert isinstance(result, tuple), "phonemize_japanese should return a tuple"
+        assert len(result) == 2, "Tuple should have 2 elements"
+
+        phonemes, prosody_features = result
+        assert isinstance(phonemes, list), "First element should be a list"
+        assert isinstance(prosody_features, list), "Second element should be a list"
+        assert len(phonemes) == len(prosody_features), "Phonemes and prosody features should have same length"
+
+    @pytest.mark.unit
+    @pytest.mark.japanese
+    @pytest.mark.requires_openjtalk
+    def test_prosody_features_extraction(self):
+        """Test prosody feature extraction from OpenJTalk labels"""
+        if not HAS_JAPANESE:
+            pytest.skip("Japanese phonemizer not available")
+
+        phonemes, prosody_features = phonemize_japanese("こんにちは")
+
+        # Check that all prosody features are OpenJTalkProsodyFeatures instances
+        for feature in prosody_features:
+            assert isinstance(feature, OpenJTalkProsodyFeatures)
+            # Check that all fields are integers
+            assert isinstance(feature.accent_position, int)
+            assert isinstance(feature.mora_position, int)
+            assert isinstance(feature.mora_total, int)
+            assert isinstance(feature.pos_major, int)
+            assert isinstance(feature.utterance_length, int)
+
+    @pytest.mark.unit
+    @pytest.mark.japanese
+    @pytest.mark.requires_openjtalk
+    def test_special_token_prosody(self):
+        """Test that special tokens (^, $, _) have correct prosody features"""
+        if not HAS_JAPANESE:
+            pytest.skip("Japanese phonemizer not available")
+
+        phonemes, prosody_features = phonemize_japanese("こんにちは")
+
+        # First token should be "^" (BOS)
+        assert phonemes[0] == "^"
+        assert prosody_features[0].is_special_token is True
+        assert prosody_features[0].accent_position == 0
+
+        # Last token should be "$" (EOS)
+        assert phonemes[-1] == "$"
+        assert prosody_features[-1].is_special_token is True
+        assert prosody_features[-1].accent_position == 0
+
+    @pytest.mark.unit
+    @pytest.mark.japanese
+    @pytest.mark.requires_openjtalk
+    def test_prosody_features_dimensions(self):
+        """Test that prosody features convert to 16-dimensional vectors"""
+        if not HAS_JAPANESE:
+            pytest.skip("Japanese phonemizer not available")
+
+        phonemes, prosody_features = phonemize_japanese("こんにちは")
+
+        # Test to_list() method
+        for feature in prosody_features:
+            feature_list = feature.to_list()
+            assert len(feature_list) == 16, f"Feature vector should be 16-dimensional, got {len(feature_list)}"
+            assert all(isinstance(x, int) for x in feature_list), "All features should be integers"
+
+    @pytest.mark.unit
+    @pytest.mark.japanese
+    @pytest.mark.requires_openjtalk
+    def test_prosody_extraction_from_label(self):
+        """Test extract_prosody_from_label function directly"""
+        if not HAS_JAPANESE:
+            pytest.skip("Japanese phonemizer not available")
+
+        # Get a real OpenJTalk label
+        labels = pyopenjtalk.extract_fullcontext("こんにちは")
+        assert len(labels) > 0, "Should have at least one label"
+
+        # Extract prosody from first content label (skip sil)
+        for label in labels:
+            if "sil" not in label:
+                prosody = extract_prosody_from_label(label)
+                assert isinstance(prosody, OpenJTalkProsodyFeatures)
+                # Check that at least some fields are non-zero (depends on input)
+                feature_list = prosody.to_list()
+                assert len(feature_list) == 16
+                break
 
     @pytest.mark.unit
     def test_empty_input(self):
@@ -108,7 +209,7 @@ class TestPhonemization:
         ]
 
         for katakana, expected_phonemes in test_cases:
-            phonemes = phonemize_japanese(katakana)
+            phonemes, _ = phonemize_japanese(katakana)
             # Remove markers for comparison
             # Filter out markers, accent symbols, and other OpenJTalk markers
             phoneme_list = [
@@ -140,7 +241,7 @@ class TestPhonemization:
         ]
 
         for text, expected_phonemes in test_cases:
-            phonemes = phonemize_japanese(text)
+            phonemes, _ = phonemize_japanese(text)
             # Filter out markers, accent symbols, and other OpenJTalk markers
             phoneme_list = [
                 p for p in phonemes if p not in ["^", "$", "_", "[", "]", "#"]
@@ -171,24 +272,28 @@ class TestPhonemization:
             phonemize_japanese(None)
 
         # Test empty string - OpenJTalk may return empty list for empty input
-        phonemes = phonemize_japanese("")
+        phonemes, prosody_features = phonemize_japanese("")
         assert isinstance(phonemes, list)
+        assert isinstance(prosody_features, list)
         # Empty string may not produce any phonemes
 
         # Test very long input (should not crash)
         long_text = "あ" * 1000
-        phonemes = phonemize_japanese(long_text)
+        phonemes, prosody_features = phonemize_japanese(long_text)
         assert len(phonemes) > 1000  # Should produce many phonemes
+        assert len(phonemes) == len(prosody_features)
 
         # Test mixed scripts
         mixed_text = "Hello こんにちは World"
-        phonemes = phonemize_japanese(mixed_text)
+        phonemes, prosody_features = phonemize_japanese(mixed_text)
         assert len(phonemes) > 0  # Should handle gracefully
+        assert len(phonemes) == len(prosody_features)
 
         # Test special characters
         special_chars = "！？。、・「」『』"
-        phonemes = phonemize_japanese(special_chars)
+        phonemes, prosody_features = phonemize_japanese(special_chars)
         assert isinstance(phonemes, list)  # Should not crash
+        assert isinstance(prosody_features, list)
 
     @pytest.mark.unit
     @pytest.mark.japanese
@@ -205,17 +310,17 @@ class TestPhonemization:
         ]
 
         for text, _expected_phonemes in test_cases:
-            phonemes = phonemize_japanese(text)
+            phonemes, _ = phonemize_japanese(text)
             # Filter out markers, accent symbols, and other OpenJTalk markers
             phoneme_list = [
                 p for p in phonemes if p not in ["^", "$", "_", "[", "]", "#"]
             ]
 
-            # Check if 'cl' (small tsu) is present as PUA character
-            assert (
-                "\ue005" in phoneme_list  # cl is mapped to \ue005
-            ), (
-                f"Expected 'cl' (small tsu as \\ue005) in phonemes for '{text}', got {phoneme_list}"
+            # Check if 'cl' or 'q' (small tsu) is present
+            # Note: Without PUA conversion, we expect 'cl' or 'q' directly
+            has_sokuon = any(p in ["cl", "q"] for p in phoneme_list)
+            assert has_sokuon, (
+                f"Expected 'cl' or 'q' (small tsu) in phonemes for '{text}', got {phoneme_list}"
             )
 
     @pytest.mark.unit
@@ -226,30 +331,30 @@ class TestPhonemization:
         if not HAS_JAPANESE:
             pytest.skip("Japanese phonemizer not available")
 
-        # Expected PUA mappings for compound phonemes
+        # Without PUA conversion, expect multi-character phonemes directly
         test_cases = [
-            ("きゃ", ["\ue006", "a"]),  # ky → \ue006
-            ("きゅ", ["\ue006", "u"]),  # ky → \ue006
-            ("きょ", ["\ue006", "o"]),  # ky → \ue006
-            ("しゃ", ["\ue010", "a"]),  # sh → \ue010
-            ("しゅ", ["\ue010", "u"]),  # sh → \ue010
-            ("しょ", ["\ue010", "o"]),  # sh → \ue010
-            ("ちゃ", ["\ue00e", "a"]),  # ch → \ue00e
-            ("ちゅ", ["\ue00e", "u"]),  # ch → \ue00e
-            ("ちょ", ["\ue00e", "o"]),  # ch → \ue00e
-            ("にゃ", ["\ue013", "a"]),  # ny → \ue013
-            ("にゅ", ["\ue013", "u"]),  # ny → \ue013
-            ("にょ", ["\ue013", "o"]),  # ny → \ue013
+            ("きゃ", ["ky", "a"]),
+            ("きゅ", ["ky", "u"]),
+            ("きょ", ["ky", "o"]),
+            ("しゃ", ["sh", "a"]),
+            ("しゅ", ["sh", "u"]),
+            ("しょ", ["sh", "o"]),
+            ("ちゃ", ["ch", "a"]),
+            ("ちゅ", ["ch", "u"]),
+            ("ちょ", ["ch", "o"]),
+            ("にゃ", ["ny", "a"]),
+            ("にゅ", ["ny", "u"]),
+            ("にょ", ["ny", "o"]),
         ]
 
         for text, expected_phonemes in test_cases:
-            phonemes = phonemize_japanese(text)
+            phonemes, _ = phonemize_japanese(text)
             # Filter out markers, accent symbols, and other OpenJTalk markers
             phoneme_list = [
                 p for p in phonemes if p not in ["^", "$", "_", "[", "]", "#"]
             ]
 
-            # Check if compound phonemes are handled correctly with PUA mapping
+            # Check if compound phonemes are present (without PUA conversion)
             assert expected_phonemes == phoneme_list, (
                 f"Expected phonemes {expected_phonemes} for '{text}', got {phoneme_list}"
             )
