@@ -168,6 +168,7 @@ class PiperDataset(Dataset):
             audio_spec_path=Path(utt_dict["audio_spec_path"]),
             speaker_id=utt_dict.get("speaker_id"),
             text=utt_dict.get("text"),
+            prosody_features=utt_dict.get("prosody_features"),  # Load prosody features
         )
 
 
