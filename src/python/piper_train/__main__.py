@@ -98,6 +98,11 @@ def main():
         help="Path to checkpoint to resume from",
     )
     VitsModel.add_model_specific_args(parser)
+    parser.add_argument(
+        "--use-japanese-prosody",
+        action="store_true",
+        help="Enable Japanese prosody features (16-dim OpenJTalk prosody vectors)",
+    )
     parser.add_argument("--seed", type=int, default=1234)
     args = parser.parse_args()
     _LOGGER.debug(args)
@@ -215,6 +220,11 @@ def main():
             "Multi-speaker model detected (%s speakers). Setting gin_channels=768",
             num_speakers,
         )
+
+    # Japanese prosody features
+    dict_args["use_japanese_prosody"] = args.use_japanese_prosody
+    if args.use_japanese_prosody:
+        _LOGGER.info("Japanese prosody features enabled (16-dim OpenJTalk prosody)")
 
     # num_workers自動調整機能を削除
     # ユーザー指定のnum_workersをそのまま使用する
