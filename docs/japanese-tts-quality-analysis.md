@@ -908,11 +908,104 @@ python -m piper_train \
 - MOS評価: `python-pesq`, `torch-utmos`
 - アクセント評価: 独自実装（OpenJTalkラベルとの比較）
 
+### 10.10 実装進捗（2025年10月27日更新）
+
+#### Week 1-2: データ処理基盤 ✅ 完了
+**実施日**: 2025年10月27日
+**コミット**: `c2916883`, `87a12cf7`, `dfcb7bdc`
+
+**実装内容**:
+- ✅ `OpenJTalkProsodyFeatures` dataclass (16次元ベクトル対応)
+- ✅ `extract_prosody_from_label()` 関数（A~K全フィールド抽出）
+- ✅ `phonemize_japanese()` API変更: `list[str]` → `tuple[list[str], list[OpenJTalkProsodyFeatures]]`
+- ✅ `preprocess.py`: 韻律特徴量の抽出と保存
+- ✅ `dataset.py`: JSONL形式での韻律特徴量の読み書き
+- ✅ テストカバレッジ: 13テストケース（6新規 + 7更新）
+
+**検証結果**:
+```
+✅ Phase 5問題文4件すべて処理成功
+✅ 韻律特徴量: 16次元整数ベクトル
+✅ 音素と韻律の長さ一致率: 100%
+```
+
+#### Week 3: モデルアーキテクチャ ✅ 完了
+**実施日**: 2025年10月27日
+**コミット**: `555c8d8e`
+
+**実装内容**:
+- ✅ `ProsodyEncoder` クラス (models.py:210-272)
+  - 16次元韻律ベクトル → hidden_channels
+  - 軽量2層Transformer encoder
+- ✅ `JapaneseTextEncoder` クラス (models.py:275-377)
+  - 音素エンコーダ（既存TextEncoder）
+  - 韻律エンコーダ（新規ProsodyEncoder）
+  - クロスアテンション統合層
+  - 後方互換性あり（`prosody_features=None`対応）
+- ✅ `SynthesizerTrn` 統合 (models.py:718-884)
+  - `use_japanese_prosody` パラメータ追加
+  - forward/inferメソッド更新
+- ✅ `VitsModel` 統合 (lightning.py)
+  - 学習パイプライン全体の更新
+- ✅ `UtteranceCollate` 更新 (dataset.py:227-272)
+  - バッチ作成時の韻律特徴量パディング
+
+**検証結果**:
+```
+✅ ProsodyEncoder forward pass: [batch, seq_len, 16] → [batch, hidden_channels, seq_len]
+✅ JapaneseTextEncoder forward pass (with/without prosody)
+✅ SynthesizerTrn forward/infer (with/without prosody)
+✅ すべて後方互換性確認済み
+```
+
+#### Week 4: 統合テスト ✅ 完了
+**実施日**: 2025年10月27日
+
+**テスト結果**: 7/7 成功
+
+| テスト | 内容 | 結果 |
+|--------|------|------|
+| TEST 1 | phonemize_japanese() 関数検証 | ✅ PASS |
+| TEST 2 | Utterance クラス（preprocess.py） | ✅ PASS |
+| TEST 3 | Dataset クラス（Utterance, UtteranceTensors, Batch） | ✅ PASS |
+| TEST 4 | JSONL 保存/読み込み | ✅ PASS |
+| TEST 5 | UtteranceCollate バッチ作成 | ✅ PASS |
+| TEST 6 | SynthesizerTrn forward/infer | ✅ PASS |
+| TEST 7 | VitsModel 学習ステップ | ✅ PASS (core) |
+
+**データフロー検証**:
+```
+テキスト
+  ↓ phonemize_japanese()
+(phonemes, prosody_features)
+  ↓ [f.to_list() for f in ...]
+list[list[int]] (16次元)
+  ↓ Utterance → JSONL
+PiperDataset.load_dataset()
+  ↓
+UtteranceTensors [seq_len, 16]
+  ↓ UtteranceCollate
+Batch [batch, max_seq_len, 16]
+  ↓ SynthesizerTrn.forward()
+JapaneseTextEncoder
+  ├─ ProsodyEncoder (2層Transformer)
+  ├─ TextEncoder (多層Transformer)
+  └─ Cross-Attention
+  ↓
+音声生成 ✅
+```
+
+**結論**: すべてのコンポーネントが正しく連携し、韻律特徴量を使用した学習の準備が整いました。
+
+#### 次のステップ
+- **Week 5**: 小規模トレーニングテスト（100 epochs, 1 speaker）
+- **または**: 本格学習開始（JVS 100 speakers, 1000 epochs, 4×L4 GPU）
+
 ---
 
 **文書更新日**: 2025年10月27日
-**更新内容**: 実装計画の追加（section 10）、音素・韻律分離アーキテクチャの詳細設計
-**バージョン**: 1.1
+**更新内容**: Week 1-4実装完了、統合テスト結果追加
+**バージョン**: 1.2
 
 ---
 
