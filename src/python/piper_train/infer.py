@@ -50,14 +50,20 @@ def main():
         utt_id = str(i)
         phoneme_ids = utt["phoneme_ids"]
         speaker_id = utt.get("speaker_id")
+        prosody_features = utt.get("prosody_features")
 
         text = torch.LongTensor(phoneme_ids).unsqueeze(0)
         text_lengths = torch.LongTensor([len(phoneme_ids)])
         scales = [args.noise_scale, args.length_scale, args.noise_w]
         sid = torch.LongTensor([speaker_id]) if speaker_id is not None else None
 
+        # Convert prosody_features to tensor if available
+        prosody_tensor = None
+        if prosody_features is not None:
+            prosody_tensor = torch.FloatTensor(prosody_features).unsqueeze(0)
+
         start_time = time.perf_counter()
-        audio = model(text, text_lengths, scales, sid=sid).detach().numpy()
+        audio = model(text, text_lengths, scales, sid=sid, prosody_features=prosody_tensor).detach().numpy()
         audio = audio_float_to_int16(audio)
         end_time = time.perf_counter()
 
