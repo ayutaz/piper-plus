@@ -83,11 +83,13 @@ class VitsModel(pl.LightningModule):
         self.automatic_optimization = (
             False  # Multiple optimizers require manual optimization
         )
-        self.save_hyperparameters()
 
-        if (self.hparams.num_speakers > 1) and (self.hparams.gin_channels <= 0):
-            # Default gin_channels for multi-speaker model
-            self.hparams.gin_channels = 512
+        # Fix gin_channels BEFORE save_hyperparameters() so the correct value is saved
+        # This fixes the bug where gin_channels=0 was saved for multi-speaker models
+        if (num_speakers > 1) and (gin_channels <= 0):
+            gin_channels = 512
+
+        self.save_hyperparameters()
 
         # Set up models
         self.model_g = SynthesizerTrn(
