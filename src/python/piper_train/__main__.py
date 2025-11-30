@@ -87,6 +87,12 @@ def main():
         "--strategy", default=None, help="Training strategy (e.g., ddp)"
     )
     parser.add_argument(
+        "--precision",
+        default="16-mixed",
+        choices=("32-true", "16-mixed", "bf16-mixed"),
+        help="Floating point precision (default: 16-mixed for faster training with minimal quality impact)",
+    )
+    parser.add_argument(
         "--max_epochs", type=int, default=1000, help="Maximum number of epochs"
     )
     parser.add_argument(
@@ -120,6 +126,7 @@ def main():
         else 1
     )
     _LOGGER.info(f"Training with {num_gpus} GPU(s)")
+    _LOGGER.info(f"Using precision: {args.precision}")
 
     # Initialize scaled_lr
     scaled_lr = args.base_lr
@@ -175,6 +182,7 @@ def main():
     trainer_kwargs = {
         "accelerator": args.accelerator,
         "devices": args.devices,
+        "precision": args.precision,
         "max_epochs": args.max_epochs,
         "callbacks": callbacks,
         "default_root_dir": args.default_root_dir,
@@ -313,6 +321,7 @@ def main():
             trainer_kwargs = {
                 "accelerator": args.accelerator,
                 "devices": args.devices,
+                "precision": args.precision,
                 "max_epochs": args.max_epochs,
                 "callbacks": callbacks,
                 "default_root_dir": args.default_root_dir,
