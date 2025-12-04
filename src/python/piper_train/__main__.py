@@ -6,6 +6,7 @@ from pathlib import Path
 import torch
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import ModelCheckpoint
+from pytorch_lightning.strategies import DDPStrategy
 
 from .vits.ema import EMACallback
 from .vits.lightning import VitsModel
@@ -85,6 +86,11 @@ def main():
     parser.add_argument("--devices", type=int, default=1, help="Number of devices")
     parser.add_argument(
         "--strategy", default=None, help="Training strategy (e.g., ddp)"
+    )
+    parser.add_argument(
+        "--no-pin-memory",
+        action="store_true",
+        help="Disable pin_memory in DataLoader (reduces CPU RAM for 4+ GPUs)",
     )
     parser.add_argument(
         "--precision",
@@ -187,8 +193,23 @@ def main():
         "callbacks": callbacks,
         "default_root_dir": args.default_root_dir,
     }
+
+    # Multi-GPU DDP optimization
+    # Use DDPStrategy with gradient_as_bucket_view=True for memory efficiency
+    # find_unused_parameters=True is required for GAN training (Generator/Discriminator alternate)
+    # Only apply DDPStrategy if user didn't explicitly specify a strategy
     if args.strategy:
+        # User explicitly specified a strategy (e.g., dp, ddp)
         trainer_kwargs["strategy"] = args.strategy
+        _LOGGER.info(f"Using user-specified strategy: {args.strategy}")
+    elif num_gpus >= 2:
+        trainer_kwargs["strategy"] = DDPStrategy(
+            find_unused_parameters=True,
+            gradient_as_bucket_view=True,
+        )
+        _LOGGER.info(
+            "Using optimized DDPStrategy with gradient_as_bucket_view=True for memory efficiency"
+        )
 
     trainer = Trainer(**trainer_kwargs)
 
@@ -326,7 +347,14 @@ def main():
                 "callbacks": callbacks,
                 "default_root_dir": args.default_root_dir,
             }
-            if args.strategy:
+
+            # Multi-GPU DDP optimization (same as above)
+            if num_gpus >= 2:
+                trainer_kwargs["strategy"] = DDPStrategy(
+                    find_unused_parameters=True,
+                    gradient_as_bucket_view=True,
+                )
+            elif args.strategy:
                 trainer_kwargs["strategy"] = args.strategy
 
             trainer = Trainer(**trainer_kwargs)

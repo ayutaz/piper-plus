@@ -163,6 +163,8 @@ class VitsModel(pl.LightningModule):
         return audio
 
     def train_dataloader(self):
+        # Check if pin_memory should be disabled (for memory-constrained multi-GPU setups)
+        pin_memory = not getattr(self.hparams, "no_pin_memory", False)
         return DataLoader(
             self._train_dataset,
             collate_fn=UtteranceCollate(
@@ -171,13 +173,15 @@ class VitsModel(pl.LightningModule):
             ),
             num_workers=self.hparams.num_workers,
             batch_size=self.hparams.batch_size,
-            pin_memory=True,
+            pin_memory=pin_memory,
             persistent_workers=(
                 True if self.hparams.num_workers > 0 else False
             ),  # Multi-GPU optimization
         )
 
     def val_dataloader(self):
+        # Check if pin_memory should be disabled (for memory-constrained multi-GPU setups)
+        pin_memory = not getattr(self.hparams, "no_pin_memory", False)
         return DataLoader(
             self._val_dataset,
             collate_fn=UtteranceCollate(
@@ -186,7 +190,7 @@ class VitsModel(pl.LightningModule):
             ),
             num_workers=self.hparams.num_workers,
             batch_size=self.hparams.batch_size,
-            pin_memory=True,
+            pin_memory=pin_memory,
             persistent_workers=(
                 True if self.hparams.num_workers > 0 else False
             ),  # Multi-GPU optimization
