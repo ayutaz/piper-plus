@@ -25,6 +25,30 @@ def calculate_learning_rate(base_lr, effective_batch_size, base_batch_size=16):
     return base_lr * (effective_batch_size / base_batch_size)
 
 
+def configure_ddp_strategy(num_gpus, user_strategy=None):
+    """Configure DDP strategy for multi-GPU training.
+
+    Args:
+        num_gpus: Number of GPUs to use
+        user_strategy: User-specified strategy (optional)
+
+    Returns:
+        Strategy configuration or None
+    """
+    if user_strategy:
+        _LOGGER.info(f"Using user-specified strategy: {user_strategy}")
+        return user_strategy
+    elif num_gpus >= 2:
+        _LOGGER.info(
+            "Using optimized DDPStrategy with gradient_as_bucket_view=True for memory efficiency"
+        )
+        return DDPStrategy(
+            find_unused_parameters=True,
+            gradient_as_bucket_view=True,
+        )
+    return None
+
+
 def main():
     logging.basicConfig(level=logging.DEBUG)
 
@@ -197,19 +221,9 @@ def main():
     # Multi-GPU DDP optimization
     # Use DDPStrategy with gradient_as_bucket_view=True for memory efficiency
     # find_unused_parameters=True is required for GAN training (Generator/Discriminator alternate)
-    # Only apply DDPStrategy if user didn't explicitly specify a strategy
-    if args.strategy:
-        # User explicitly specified a strategy (e.g., dp, ddp)
-        trainer_kwargs["strategy"] = args.strategy
-        _LOGGER.info(f"Using user-specified strategy: {args.strategy}")
-    elif num_gpus >= 2:
-        trainer_kwargs["strategy"] = DDPStrategy(
-            find_unused_parameters=True,
-            gradient_as_bucket_view=True,
-        )
-        _LOGGER.info(
-            "Using optimized DDPStrategy with gradient_as_bucket_view=True for memory efficiency"
-        )
+    strategy = configure_ddp_strategy(num_gpus, args.strategy)
+    if strategy:
+        trainer_kwargs["strategy"] = strategy
 
     trainer = Trainer(**trainer_kwargs)
 
@@ -348,14 +362,10 @@ def main():
                 "default_root_dir": args.default_root_dir,
             }
 
-            # Multi-GPU DDP optimization (same as above)
-            if num_gpus >= 2:
-                trainer_kwargs["strategy"] = DDPStrategy(
-                    find_unused_parameters=True,
-                    gradient_as_bucket_view=True,
-                )
-            elif args.strategy:
-                trainer_kwargs["strategy"] = args.strategy
+            # Multi-GPU DDP optimization
+            strategy = configure_ddp_strategy(num_gpus, args.strategy)
+            if strategy:
+                trainer_kwargs["strategy"] = strategy
 
             trainer = Trainer(**trainer_kwargs)
 
