@@ -117,6 +117,15 @@ def main():
         help="Disable pin_memory in DataLoader (reduces CPU RAM for 4+ GPUs)",
     )
     parser.add_argument(
+        "--samples-per-speaker",
+        type=int,
+        default=0,
+        help="Number of samples per speaker in each batch for multi-speaker models. "
+        "When set > 0, enables speaker-balanced batch sampling to stabilize Duration Predictor training. "
+        "Recommended: 4 (e.g., batch_size=32 with samples_per_speaker=4 → 8 speakers × 4 samples). "
+        "Set to 0 to disable (default: 0).",
+    )
+    parser.add_argument(
         "--precision",
         default="16-mixed",
         choices=("32-true", "16-mixed", "bf16-mixed"),

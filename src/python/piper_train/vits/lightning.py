@@ -9,7 +9,7 @@ from torch.nn import functional as F
 from torch.utils.data import DataLoader, Dataset, random_split
 
 from .commons import slice_segments
-from .dataset import Batch, PiperDataset, UtteranceCollate
+from .dataset import Batch, PiperDataset, SpeakerBalancedBatchSampler, UtteranceCollate
 from .losses import discriminator_loss, feature_loss, generator_loss, kl_loss
 from .mel_processing import mel_spectrogram_torch, spec_to_mel_torch
 from .models import MultiPeriodDiscriminator, SynthesizerTrn
@@ -165,19 +165,51 @@ class VitsModel(pl.LightningModule):
     def train_dataloader(self):
         # Check if pin_memory should be disabled (for memory-constrained multi-GPU setups)
         pin_memory = not getattr(self.hparams, "no_pin_memory", False)
-        return DataLoader(
-            self._train_dataset,
-            collate_fn=UtteranceCollate(
-                is_multispeaker=self.hparams.num_speakers > 1,
-                segment_size=self.hparams.segment_size,
-            ),
-            num_workers=self.hparams.num_workers,
-            batch_size=self.hparams.batch_size,
-            pin_memory=pin_memory,
-            persistent_workers=(
-                True if self.hparams.num_workers > 0 else False
-            ),  # Multi-GPU optimization
+
+        collate_fn = UtteranceCollate(
+            is_multispeaker=self.hparams.num_speakers > 1,
+            segment_size=self.hparams.segment_size,
         )
+
+        # マルチスピーカーでsamples_per_speakerが設定されている場合は
+        # SpeakerBalancedBatchSamplerを使用
+        samples_per_speaker = getattr(self.hparams, "samples_per_speaker", 0)
+        if self.hparams.num_speakers > 1 and samples_per_speaker > 0:
+            batch_sampler = SpeakerBalancedBatchSampler(
+                self._train_dataset,
+                batch_size=self.hparams.batch_size,
+                samples_per_speaker=samples_per_speaker,
+                drop_last=True,
+            )
+            _LOGGER.info(
+                "Using SpeakerBalancedBatchSampler: batch_size=%d, samples_per_speaker=%d, "
+                "speakers_per_batch=%d",
+                self.hparams.batch_size,
+                samples_per_speaker,
+                self.hparams.batch_size // samples_per_speaker,
+            )
+            return DataLoader(
+                self._train_dataset,
+                collate_fn=collate_fn,
+                batch_sampler=batch_sampler,
+                num_workers=self.hparams.num_workers,
+                pin_memory=pin_memory,
+                persistent_workers=(
+                    True if self.hparams.num_workers > 0 else False
+                ),
+            )
+        else:
+            # 従来の動作（ランダムサンプリング）
+            return DataLoader(
+                self._train_dataset,
+                collate_fn=collate_fn,
+                num_workers=self.hparams.num_workers,
+                batch_size=self.hparams.batch_size,
+                pin_memory=pin_memory,
+                persistent_workers=(
+                    True if self.hparams.num_workers > 0 else False
+                ),  # Multi-GPU optimization
+            )
 
     def val_dataloader(self):
         # Check if pin_memory should be disabled (for memory-constrained multi-GPU setups)
