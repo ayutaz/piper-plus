@@ -50,6 +50,7 @@ def count_speakers_in_batch(batch: list[int], dataset: MockDataset) -> Counter:
     return Counter(speaker_ids)
 
 
+@pytest.mark.training
 class TestSpeakerBalancedBatchSampler:
     """Tests for SpeakerBalancedBatchSampler"""
 

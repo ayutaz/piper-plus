@@ -326,7 +326,7 @@ class SpeakerBalancedBatchSampler:
             spk: random.sample(indices, len(indices))
             for spk, indices in self.speaker_to_indices.items()
         }
-        speaker_pointers = {spk: 0 for spk in self.speakers}
+        speaker_pointers = dict.fromkeys(self.speakers, 0)
 
         while True:
             # 十分なサンプルが残っている話者を選択
