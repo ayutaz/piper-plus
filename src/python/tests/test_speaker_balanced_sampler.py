@@ -13,6 +13,9 @@ Test guarantees:
 5. All speakers are sampled across batches
 6. Different sampling order between epochs
 7. __len__ returns accurate batch count
+
+Note: These tests require torch. They are skipped in CI environments
+where torch is not installed.
 """
 
 from collections import Counter
@@ -20,12 +23,19 @@ from dataclasses import dataclass
 
 import pytest
 
-from piper_train.vits.dataset import SpeakerBalancedBatchSampler
+
+# Skip entire module if torch is not available (required by piper_train.vits.dataset)
+torch = pytest.importorskip(
+    "torch", reason="torch is required for SpeakerBalancedBatchSampler tests"
+)
+
+from piper_train.vits.dataset import SpeakerBalancedBatchSampler  # noqa: E402
 
 
 @dataclass
 class MockUtterance:
     """Mock utterance for testing"""
+
     speaker_id: int
 
 
@@ -78,7 +88,9 @@ class TestSpeakerBalancedBatchSampler:
 
         batch_count = 0
         for batch in sampler:
-            assert len(batch) == batch_size, f"Batch size is not {batch_size}: {len(batch)}"
+            assert len(batch) == batch_size, (
+                f"Batch size is not {batch_size}: {len(batch)}"
+            )
             batch_count += 1
 
         assert batch_count > 0, "No batches were generated"
@@ -119,9 +131,9 @@ class TestSpeakerBalancedBatchSampler:
         )
 
         for batch in sampler:
-            speakers = set(
+            speakers = {
                 mock_dataset_20speakers.utterances[idx].speaker_id for idx in batch
-            )
+            }
             assert len(speakers) == expected_speakers_per_batch, (
                 f"Batch has {len(speakers)} speakers, expected {expected_speakers_per_batch}"
             )
@@ -163,9 +175,9 @@ class TestSpeakerBalancedBatchSampler:
         for batch in sampler:
             all_indices.extend(batch)
 
-        sampled_speakers = set(
+        sampled_speakers = {
             mock_dataset_20speakers.utterances[idx].speaker_id for idx in all_indices
-        )
+        }
         expected_speakers = set(range(num_speakers))
 
         assert sampled_speakers == expected_speakers, (
@@ -255,9 +267,9 @@ class TestSpeakerBalancedBatchSampler:
         batch_count = 0
         for batch in sampler:
             assert len(batch) == batch_size
-            speakers = set(
+            speakers = {
                 mock_dataset_5speakers.utterances[idx].speaker_id for idx in batch
-            )
+            }
             assert len(speakers) == expected_speakers_per_batch
             batch_count += 1
 

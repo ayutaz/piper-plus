@@ -360,5 +360,7 @@ class SpeakerBalancedBatchSampler:
         batches_per_speaker = min_samples // self.samples_per_speaker
         # 全バッチ数 = 話者数 × 各話者の参加回数 ÷ バッチあたり話者数
         # 保守的に見積もるため、切り捨てを使用
-        total_batches = (len(self.speakers) * batches_per_speaker) // self.speakers_per_batch
+        total_batches = (
+            len(self.speakers) * batches_per_speaker
+        ) // self.speakers_per_batch
         return max(1, total_batches)
