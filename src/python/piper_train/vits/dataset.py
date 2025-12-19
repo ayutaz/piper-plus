@@ -260,6 +260,11 @@ class SpeakerBalancedBatchSampler:
     このサンプラーは各バッチに同一話者からsamples_per_speaker個のサンプルを
     含めることで、SDPの学習を安定化させる。
 
+    DDP (Distributed Data Parallel) 対応:
+    - torch.distributedが初期化されている場合、各GPUが異なるバッチを取得
+    - 全GPUで同じseedを使用してバッチ生成順序を揃え、
+      rank番目のバッチのみを各GPUが取得
+
     Args:
         dataset: PiperDataset (utterancesリストを持つ) または torch.utils.data.Subset
         batch_size: バッチサイズ
@@ -306,6 +311,16 @@ class SpeakerBalancedBatchSampler:
         self.speakers_per_batch = batch_size // samples_per_speaker
         self.drop_last = drop_last
 
+        # DDP対応: rank と world_size を取得
+        if torch.distributed.is_initialized():
+            self.rank = torch.distributed.get_rank()
+            self.world_size = torch.distributed.get_world_size()
+        else:
+            self.rank = 0
+            self.world_size = 1
+
+        self.epoch = 0  # エポックごとにシャッフルを変えるため
+
         # バリデーション
         if self.speakers_per_batch <= 0:
             raise ValueError(
@@ -320,14 +335,23 @@ class SpeakerBalancedBatchSampler:
                 self.speakers_per_batch,
             )
 
+    def set_epoch(self, epoch: int):
+        """エポック番号を設定（DDP時のシャッフル制御用）"""
+        self.epoch = epoch
+
     def __iter__(self):
+        # DDP対応: エポックに基づいた固定シードを使用して全GPUで同じバッチ順序を生成
+        # 各GPUは rank 番目のバッチのみを取得
+        rng = random.Random(self.epoch)
+
         # 各話者のインデックスをシャッフル
         speaker_indices = {
-            spk: random.sample(indices, len(indices))
+            spk: rng.sample(indices, len(indices))
             for spk, indices in self.speaker_to_indices.items()
         }
         speaker_pointers = dict.fromkeys(self.speakers, 0)
 
+        batch_idx = 0
         while True:
             # 十分なサンプルが残っている話者を選択
             available_speakers = [
@@ -341,7 +365,7 @@ class SpeakerBalancedBatchSampler:
                 break
 
             # ランダムに話者を選択
-            batch_speakers = random.sample(available_speakers, self.speakers_per_batch)
+            batch_speakers = rng.sample(available_speakers, self.speakers_per_batch)
             batch = []
 
             for spk in batch_speakers:
@@ -350,7 +374,10 @@ class SpeakerBalancedBatchSampler:
                 batch.extend(speaker_indices[spk][start:end])
                 speaker_pointers[spk] = end
 
-            yield batch
+            # DDP: このGPUが担当するバッチのみを返す
+            if batch_idx % self.world_size == self.rank:
+                yield batch
+            batch_idx += 1
 
     def __len__(self) -> int:
         # より正確な計算: 各話者から取れるバッチ数を計算
@@ -363,4 +390,6 @@ class SpeakerBalancedBatchSampler:
         total_batches = (
             len(self.speakers) * batches_per_speaker
         ) // self.speakers_per_batch
-        return max(1, total_batches)
+        # DDP: 各GPUが担当するバッチ数を返す
+        batches_per_gpu = total_batches // self.world_size
+        return max(1, batches_per_gpu)

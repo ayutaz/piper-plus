@@ -234,6 +234,12 @@ def main():
     if strategy:
         trainer_kwargs["strategy"] = strategy
 
+    # When using SpeakerBalancedBatchSampler, disable Lightning's automatic distributed sampler
+    # The batch sampler handles DDP-awareness internally
+    if args.samples_per_speaker > 0 and num_speakers > 1:
+        trainer_kwargs["use_distributed_sampler"] = False
+        _LOGGER.info("Disabled distributed sampler for SpeakerBalancedBatchSampler")
+
     trainer = Trainer(**trainer_kwargs)
 
     dict_args = vars(args)
@@ -375,6 +381,10 @@ def main():
             strategy = configure_ddp_strategy(num_gpus, args.strategy)
             if strategy:
                 trainer_kwargs["strategy"] = strategy
+
+            # When using SpeakerBalancedBatchSampler, disable Lightning's automatic distributed sampler
+            if args.samples_per_speaker > 0 and num_speakers > 1:
+                trainer_kwargs["use_distributed_sampler"] = False
 
             trainer = Trainer(**trainer_kwargs)
 

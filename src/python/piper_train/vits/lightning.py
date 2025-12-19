@@ -162,6 +162,17 @@ class VitsModel(pl.LightningModule):
 
         return audio
 
+    def on_train_epoch_start(self):
+        """エポック開始時にSpeakerBalancedBatchSamplerのepochを更新"""
+        if (
+            hasattr(self, "_train_batch_sampler")
+            and self._train_batch_sampler is not None
+        ):
+            self._train_batch_sampler.set_epoch(self.current_epoch)
+            _LOGGER.debug(
+                "Set SpeakerBalancedBatchSampler epoch to %d", self.current_epoch
+            )
+
     def train_dataloader(self):
         # Check if pin_memory should be disabled (for memory-constrained multi-GPU setups)
         pin_memory = not getattr(self.hparams, "no_pin_memory", False)
@@ -175,7 +186,7 @@ class VitsModel(pl.LightningModule):
         # SpeakerBalancedBatchSamplerを使用
         samples_per_speaker = getattr(self.hparams, "samples_per_speaker", 0)
         if self.hparams.num_speakers > 1 and samples_per_speaker > 0:
-            batch_sampler = SpeakerBalancedBatchSampler(
+            self._train_batch_sampler = SpeakerBalancedBatchSampler(
                 self._train_dataset,
                 batch_size=self.hparams.batch_size,
                 samples_per_speaker=samples_per_speaker,
@@ -191,13 +202,14 @@ class VitsModel(pl.LightningModule):
             return DataLoader(
                 self._train_dataset,
                 collate_fn=collate_fn,
-                batch_sampler=batch_sampler,
+                batch_sampler=self._train_batch_sampler,
                 num_workers=self.hparams.num_workers,
                 pin_memory=pin_memory,
                 persistent_workers=(True if self.hparams.num_workers > 0 else False),
             )
         else:
             # 従来の動作（ランダムサンプリング）
+            self._train_batch_sampler = None
             return DataLoader(
                 self._train_dataset,
                 collate_fn=collate_fn,
