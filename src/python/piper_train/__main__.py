@@ -6,7 +6,17 @@ from pathlib import Path
 import torch
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import ModelCheckpoint
+from pytorch_lightning.loggers import TensorBoardLogger
 from pytorch_lightning.strategies import DDPStrategy
+
+# Optional wandb integration
+try:
+    import wandb
+    from pytorch_lightning.loggers import WandbLogger
+
+    WANDB_AVAILABLE = True
+except ImportError:
+    WANDB_AVAILABLE = False
 
 from .vits.ema import EMACallback
 from .vits.lightning import VitsModel
@@ -218,6 +228,30 @@ def main():
     else:
         _LOGGER.info("EMA disabled by user request")
 
+    # Setup loggers
+    loggers = []
+
+    # TensorBoard logger (always enabled)
+    tb_logger = TensorBoardLogger(
+        save_dir=args.default_root_dir,
+        name="lightning_logs",
+    )
+    loggers.append(tb_logger)
+
+    # Wandb logger (if available)
+    if WANDB_AVAILABLE:
+        dataset_name = args.dataset_dir.name
+        wandb_logger = WandbLogger(
+            project="piper-tts",
+            name=dataset_name,
+            save_dir=args.default_root_dir,
+            log_model=False,
+        )
+        loggers.append(wandb_logger)
+        _LOGGER.info("Wandb logging enabled: project=piper-tts, name=%s", dataset_name)
+    else:
+        _LOGGER.info("Wandb not available, using TensorBoard only")
+
     trainer_kwargs = {
         "accelerator": args.accelerator,
         "devices": args.devices,
@@ -225,6 +259,7 @@ def main():
         "max_epochs": args.max_epochs,
         "callbacks": callbacks,
         "default_root_dir": args.default_root_dir,
+        "logger": loggers,
     }
 
     # Multi-GPU DDP optimization
@@ -375,6 +410,7 @@ def main():
                 "max_epochs": args.max_epochs,
                 "callbacks": callbacks,
                 "default_root_dir": args.default_root_dir,
+                "logger": loggers,
             }
 
             # Multi-GPU DDP optimization
