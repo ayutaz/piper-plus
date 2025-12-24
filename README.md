@@ -88,6 +88,12 @@ Piper is used in a [variety of projects](#people-using-piper).
     # 注: --auto_lr_scaling はデフォルトで有効
     # EMAもデフォルトで有効、--no-emaで無効化可能
     ```
+* **📊 Wandb統合** - 学習メトリクスのリアルタイム監視
+  * wandbがインストールされていれば自動的にログを送信
+  * TensorBoardと並行して使用可能
+  * プロジェクト名: `piper-tts`、run名: データセットディレクトリ名
+  * インストール: `pip install wandb`
+  * 設定: `wandb login`でAPIキーを設定
 * チェックポイント管理機能の強化
   * `--resume_from_checkpoint` でチェックポイントからの学習再開
   * `--resume_from_single_speaker_checkpoint` でシングルスピーカーモデルからマルチスピーカーへの変換

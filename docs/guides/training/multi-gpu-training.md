@@ -367,6 +367,36 @@ L4 24GB での実際の使用量:
 nvidia-smi -l 1
 ```
 
+### TensorBoard
+
+```bash
+tensorboard --logdir /path/to/training_dir/lightning_logs
+```
+
+### Wandb (Weights & Biases)
+
+Piper supports automatic logging to [Weights & Biases](https://wandb.ai/) for real-time monitoring:
+
+```bash
+# Install and setup
+pip install wandb
+wandb login
+
+# Training automatically logs to wandb if installed
+python -m piper_train --dataset-dir /path/to/dataset ...
+```
+
+**Features:**
+- Automatic integration (no additional flags needed)
+- Works alongside TensorBoard
+- Project: `piper-tts`, Run name: dataset directory name
+- Real-time loss curves, learning rate, GPU metrics
+
+**Disable wandb:**
+```bash
+export WANDB_MODE=disabled
+```
+
 ### ログ確認
 
 ```bash
