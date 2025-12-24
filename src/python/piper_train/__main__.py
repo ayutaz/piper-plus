@@ -9,9 +9,9 @@ from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import TensorBoardLogger
 from pytorch_lightning.strategies import DDPStrategy
 
+
 # Optional wandb integration
 try:
-    import wandb
     from pytorch_lightning.loggers import WandbLogger
 
     WANDB_AVAILABLE = True
