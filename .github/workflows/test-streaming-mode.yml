@@ -104,12 +104,11 @@ jobs:
           fi
           
           cmake -B build $CMAKE_ARGS
-          if cmake --build build --config Release -j$(nproc 2>/dev/null || sysctl -n hw.ncpu); then
-            echo "Build succeeded"
-          else
-            echo "Build failed, but continuing"
-            exit 0
+          if ! cmake --build build --config Release -j$(nproc 2>/dev/null || sysctl -n hw.ncpu); then
+            echo "❌ Build failed"
+            exit 1
           fi
+          echo "Build succeeded"
       
       - name: Run C++ Streaming Tests
         run: |

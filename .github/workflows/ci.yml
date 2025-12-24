@@ -148,11 +148,11 @@ jobs:
             PARALLEL_JOBS=""
           fi
           
-          if cmake --build build --config ${{ matrix.build_type }} $PARALLEL_JOBS; then
-            echo "Build succeeded"
-          else
-            echo "Build failed, but continuing to check what was built"
+          if ! cmake --build build --config ${{ matrix.build_type }} $PARALLEL_JOBS; then
+            echo "❌ Build failed"
+            exit 1
           fi
+          echo "Build succeeded"
         shell: bash
       
       - name: Download OpenJTalk dictionary

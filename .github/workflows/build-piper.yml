@@ -240,13 +240,12 @@ jobs:
             }
           }
           
-          try {
-            cmake --build . --config ${{ inputs.build-type }} --parallel 2
-            Write-Host "Build succeeded"
+          $buildResult = cmake --build . --config ${{ inputs.build-type }} --parallel 2
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "❌ Build failed"
+            exit 1
           }
-          catch {
-            Write-Host "Build failed, but continuing"
-          }
+          Write-Host "Build succeeded"
           
           # Run tests if enabled
           if ("${{ inputs.include-tests }}" -eq "true") {
