@@ -4,68 +4,48 @@
 
 Piper TTSは高品質なニューラルテキスト音声合成システムです。VITSアーキテクチャを採用し、日本語を含む多言語に対応しています。
 
-## 現在の作業状態（2025-12-18）
+## 現在の作業状態（2025-12-24）
 
-### 🔴 進行中: 20話者モデル追加学習（epoch=75→200）
+### 🔴 進行中: 20話者モデル一から学習（学習率固定）
 
-**状況**: 100エポック学習済みだが発音品質が不十分。epoch=75から200エポックまで追加学習が必要。
+**状況**: 過去の学習は全て学習率が高すぎたため失敗。5話者モデルと同等の学習率で一から学習。
 
-#### 完了した学習 (SpeakerBalancedBatchSampler + lr=1e-4)
-- **学習期間**: 2025-12-16 完了
-- **エポック**: 100 (epoch=0-99)
-- **設定**: batch_size=32, samples_per_speaker=4, lr=1e-4
-- **チェックポイント**: `/data/piper/output-moe-speech-20speakers-balanced-lr1e4/lightning_logs/version_0/checkpoints/`
+#### 過去の失敗分析
 
-#### 評価結果
-| テスト | 結果 |
-|--------|------|
-| epoch=25 推論 | ❌ 日本語発音になっていない |
-| epoch=75 推論 | ❌ 日本語発音になっていない |
-| epoch=99 Duration Predictor | ❌ 崩壊の兆候（avg 56.2フレーム） |
+| 試行 | 設定 | 実効学習率 | 結果 |
+|------|------|----------|------|
+| 5話者（成功） | `--disable_auto_lr_scaling` | **0.0002** | ✅ 正常 |
+| 20話者 #1 | batch=5, lr=2e-4 | ~0.00225 | ❌ 9x高い |
+| 20話者 #2 | batch=32, lr=1e-4 | 0.0008 | ❌ 3.2x高い |
 
-#### Duration Predictor診断結果
+**根本原因**: 自動学習率スケーリングにより、20話者モデルは5話者より3-9倍高い学習率で学習されていた。
 
-| Epoch | Sp0 | Sp5 | Sp10 | Sp15 | Sp19 | Avg | Status |
-|-------|-----|-----|------|------|------|-----|--------|
-| 25 | 98.2 | 116.9 | 161.1 | 96.5 | 123.5 | **119.2** | 5/5 OK |
-| 50 | 84.0 | 141.2 | 116.4 | 49.9 | 130.6 | 104.4 | 4/5 OK |
-| **75** | 86.3 | 59.3 | 124.9 | 148.7 | 168.0 | **117.4** | **5/5 OK** |
-| 99 | 35.0 | 37.2 | 79.6 | 76.6 | 52.4 | 56.2 | 3/5 NG |
-
-**分析**: Duration Predictor数値は良好だが、発音品質が低い → **学習ステップ数不足**
-
-#### 学習ステップ数比較（根本原因）
-
-| 項目 | 5話者モデル | 20話者モデル |
-|------|------------|-------------|
-| 発話数 | 19,617 | 60,164 |
-| バッチサイズ | 5×4GPU=20 | 32×4GPU=128 |
-| ステップ/epoch | 883 | 644 |
-| **100epoch総ステップ** | **88,300** | **64,400** |
-
-**結論**: 20話者モデルは100エポックでも5話者より**27%少ないステップ数**
-- 同等ステップ数に到達 → 137エポック必要
-- 20話者の複雑さ考慮 → **200エポック以上推奨**
-
-#### 次のアクション: epoch=75から200エポックまで追加学習
+#### 今回の学習設定
 
 ```bash
 NCCL_DEBUG=INFO NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 uv run python -m piper_train \
   --dataset-dir /data/piper/dataset-moe-speech-20speakers \
   --accelerator gpu --devices 4 --precision 16-mixed \
   --max_epochs 200 --batch-size 32 --samples-per-speaker 4 \
-  --checkpoint-epochs 1 --quality medium --base_lr 1e-4 \
+  --checkpoint-epochs 1 --quality medium \
+  --base_lr 2e-4 --disable_auto_lr_scaling \
   --ema-decay 0.9995 --num-workers 0 --no-pin-memory \
-  --resume_from_checkpoint /data/piper/output-moe-speech-20speakers-balanced-lr1e4/lightning_logs/version_0/checkpoints/epoch=75-step=48944.ckpt \
-  --default_root_dir /data/piper/output-moe-speech-20speakers-balanced-lr1e4-200ep \
-  2>&1 | tee /data/piper/training_20speakers_balanced_lr1e4_200ep.log
+  --default_root_dir /data/piper/output-moe-speech-20speakers-lr2e4-fixed \
+  2>&1 | tee /data/piper/training_20speakers_lr2e4_fixed.log
 ```
 
-**予想所要時間**: 125エポック (76→200) ≈ 約25時間 (12分/epoch × 125)
-
-**注意**: epoch=75を選択した理由
-- Duration Predictorが良好な状態（avg 117.4フレーム）
-- epoch=99は崩壊の兆候あり（avg 56.2フレーム）
+| 項目 | 値 |
+|------|-----|
+| 開始エポック | 0（新規） |
+| 終了エポック | 200 |
+| batch_size | 32 |
+| samples_per_speaker | 4 |
+| **base_lr** | **2e-4** |
+| **auto_lr_scaling** | **無効** |
+| 実効学習率 | **0.0002**（5話者と同等） |
+| GPUs | 4 |
+| 予想時間 | 約40時間（12分/epoch × 200） |
+| 出力先 | `/data/piper/output-moe-speech-20speakers-lr2e4-fixed/` |
 
 ---
 
@@ -331,13 +311,10 @@ Speaker 15-19: 2,631 - 2,310 utterances
 |------|------|
 | LJSpeech形式データ | `/data/moe-speech-20speakers-ljspeech/` |
 | 前処理済データ | `/data/piper/dataset-moe-speech-20speakers/` |
-| 学習出力（lr=2e-4、失敗） | `/data/piper/output-moe-speech-20speakers/` |
-| **学習出力（balanced + lr=1e-4）** | `/data/piper/output-moe-speech-20speakers-balanced-lr1e4/` |
-| **追加学習出力（200ep）** | `/data/piper/output-moe-speech-20speakers-balanced-lr1e4-200ep/` |
-| チェックポイント（100ep） | `/data/piper/output-moe-speech-20speakers-balanced-lr1e4/lightning_logs/version_0/checkpoints/` |
-| 学習ログ（100ep） | `/data/piper/training_20speakers_balanced_lr1e4.log` |
-| epoch=75 ONNX | `/data/piper/output-moe-speech-20speakers-balanced-lr1e4/moe-speech-20speakers-balanced-lr1e4-epoch75.onnx` |
-| 推論音声（epoch=75長文） | `/home/jovyan/inference_epoch75_long/` |
+| **🔴 現在の学習出力** | `/data/piper/output-moe-speech-20speakers-lr2e4-fixed/` |
+| **🔴 学習ログ** | `/data/piper/training_20speakers_lr2e4_fixed.log` |
+| 過去の学習出力（lr=2e-4、失敗） | `/data/piper/output-moe-speech-20speakers/` |
+| 過去の学習出力（balanced + lr=1e-4、失敗） | `/data/piper/output-moe-speech-20speakers-balanced-lr1e4/` |
 
 ### 共通
 | 用途 | パス |
@@ -407,33 +384,26 @@ learning_rate = base_lr × (effective_batch_size / 16)
 
 **結論**: 20話者モデルは全て5話者より**3-9倍高い学習率**で学習されていた。
 
-### 推奨設定
+### 推奨設定（重要）
 
-**マルチスピーカーモデルの場合:**
+**マルチスピーカーモデルの場合、自動スケーリングを無効にすることを強く推奨:**
+
 ```bash
 --base_lr 2e-4 --disable_auto_lr_scaling
 ```
 
-または
-
-```bash
---base_lr 5e-5  # 自動スケーリングで0.00025程度になるように調整
-```
+**理由:**
+- 5話者モデル（成功）はこの設定で学習された
+- 自動スケーリング有効時、バッチサイズ×GPU数で学習率が変動し、意図しない高学習率になる
+- 明示的に学習率を固定することで再現性が向上
 
 ### 引数
 
-| 引数 | 説明 | デフォルト |
-|------|------|---------|
-| `--base_lr` | ベース学習率 | 2e-4 |
-| `--auto_lr_scaling` | 自動スケーリング有効 | True |
-| `--disable_auto_lr_scaling` | 自動スケーリング無効 | False |
-
-### 次回試行予定
-
-5話者モデルと同等の学習率（0.00025）で20話者を学習:
-```bash
---base_lr 2e-4 --disable_auto_lr_scaling
-```
+| 引数 | 説明 | デフォルト | 推奨 |
+|------|------|---------|------|
+| `--base_lr` | ベース学習率 | 2e-4 | 2e-4 |
+| `--auto_lr_scaling` | 自動スケーリング有効 | True | - |
+| `--disable_auto_lr_scaling` | 自動スケーリング無効 | False | **✅ 使用推奨** |
 
 ---
 
@@ -718,18 +688,17 @@ cat /data/piper/dataset-moe-speech-5speakers/config.json | python3 -m json.tool
 - [x] 5話者ONNX変換・推論テスト
 - [x] 5話者モデルHuggingFaceアップロード
 
-### フェーズ2: 20話者モデル（🔴 追加学習中）
+### フェーズ2: 20話者モデル（🔴 一から学習中）
 - [x] 20話者データセット作成（60,233発話、90.6時間）
 - [x] 20話者データセットHuggingFaceアップロード
 - [x] 20話者前処理完了
-- [x] 20話者モデル200エポック学習完了（lr=2e-4、❌ 失敗）
+- [x] 20話者モデル200エポック学習（lr=2e-4、❌ 失敗）
 - [x] **問題調査完了** - Duration Predictorの学習失敗を特定
 - [x] SpeakerBalancedBatchSampler実装
-- [x] 20話者モデル100エポック学習完了（SpeakerBalancedBatchSampler + lr=1e-4）
-- [x] epoch=25, 75で推論テスト → ❌ 発音品質不十分
-- [x] **原因特定** - 学習ステップ数不足（5話者より27%少ない）
-- [ ] **epoch=75から200エポックまで追加学習** ← 次のアクション
-- [ ] 追加学習後の推論テスト・品質評価
+- [x] 20話者モデル100エポック学習（SpeakerBalancedBatchSampler + lr=1e-4、❌ 学習率高すぎ）
+- [x] **根本原因特定** - 自動学習率スケーリングにより実効学習率が3-9倍高かった
+- [ ] **20話者モデル一から学習（`--disable_auto_lr_scaling`）** ← 現在実行中
+- [ ] 学習後の推論テスト・品質評価
 - [ ] 20話者モデルHuggingFaceアップロード
 
 ### フェーズ3: データセット拡張（計画中）
@@ -743,31 +712,44 @@ cat /data/piper/dataset-moe-speech-5speakers/config.json | python3 -m json.tool
 
 ## 次のステップ
 
-### 🔴 最優先: epoch=75から200エポックまで追加学習
+### 🔴 最優先: 20話者モデル一から学習（学習率固定）
 
-**現状（2025-12-18）**:
-- SpeakerBalancedBatchSampler + lr=1e-4で100エポック学習完了
-- Duration Predictor数値は良好だが、発音が日本語になっていない
-- **根本原因**: 学習ステップ数が5話者モデルより27%少ない
+**現状（2025-12-24）**:
+- 過去の全試行は学習率が高すぎて失敗
+- 5話者モデル成功時の設定（`--disable_auto_lr_scaling`）で一から学習
 
-#### 追加学習コマンド
+#### 学習コマンド
 
 ```bash
 NCCL_DEBUG=INFO NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 uv run python -m piper_train \
   --dataset-dir /data/piper/dataset-moe-speech-20speakers \
   --accelerator gpu --devices 4 --precision 16-mixed \
   --max_epochs 200 --batch-size 32 --samples-per-speaker 4 \
-  --checkpoint-epochs 1 --quality medium --base_lr 1e-4 \
+  --checkpoint-epochs 1 --quality medium \
+  --base_lr 2e-4 --disable_auto_lr_scaling \
   --ema-decay 0.9995 --num-workers 0 --no-pin-memory \
-  --resume_from_checkpoint /data/piper/output-moe-speech-20speakers-balanced-lr1e4/lightning_logs/version_0/checkpoints/epoch=75-step=48944.ckpt \
-  --default_root_dir /data/piper/output-moe-speech-20speakers-balanced-lr1e4-200ep \
-  2>&1 | tee /data/piper/training_20speakers_balanced_lr1e4_200ep.log
+  --default_root_dir /data/piper/output-moe-speech-20speakers-lr2e4-fixed \
+  2>&1 | tee /data/piper/training_20speakers_lr2e4_fixed.log
 ```
 
 **設定理由:**
-- **epoch=75から再開**: Duration Predictorが良好（avg 117.4フレーム）、epoch=99は崩壊の兆候あり
-- **200エポックまで**: 5話者モデルと同等以上のステップ数に到達するため
-- **予想時間**: 約25時間（12分/epoch × 125エポック）
+- **`--disable_auto_lr_scaling`**: 5話者モデル成功時と同じ設定
+- **`--base_lr 2e-4`**: 実効学習率0.0002で5話者と同等
+- **`--samples-per-speaker 4`**: Duration Predictor崩壊防止
+- **予想時間**: 約40時間（12分/epoch × 200エポック）
+
+#### 監視コマンド
+
+```bash
+# ログ監視
+tail -f /data/piper/training_20speakers_lr2e4_fixed.log
+
+# GPU監視
+watch -n 1 nvidia-smi
+
+# チェックポイント確認
+ls -la /data/piper/output-moe-speech-20speakers-lr2e4-fixed/lightning_logs/version_0/checkpoints/
+```
 
 #### 学習完了後の確認手順
 
@@ -777,7 +759,7 @@ CUDA_VISIBLE_DEVICES="" uv run python -c "
 import torch
 from piper_train.vits.lightning import VitsModel
 
-ckpt = '/data/piper/output-moe-speech-20speakers-balanced-lr1e4-200ep/lightning_logs/version_0/checkpoints/epoch=199-step=XXXXX.ckpt'
+ckpt = '/data/piper/output-moe-speech-20speakers-lr2e4-fixed/lightning_logs/version_0/checkpoints/epoch=99-step=XXXXX.ckpt'
 model = VitsModel.load_from_checkpoint(ckpt, dataset=None, strict=False, map_location='cpu')
 model.eval()
 
@@ -795,15 +777,17 @@ for sid in [0, 5, 10, 15, 19]:
 "
 ```
 
+期待値: 50-80フレーム以上（5話者モデルと同等）
+
 2. **ONNX変換・推論テスト**
 ```bash
 # ONNX変換
 CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
-  /data/piper/output-moe-speech-20speakers-balanced-lr1e4-200ep/lightning_logs/version_0/checkpoints/epoch=199-step=XXXXX.ckpt \
-  /data/piper/output-moe-speech-20speakers-balanced-lr1e4-200ep/moe-speech-20speakers-200ep.onnx
+  /data/piper/output-moe-speech-20speakers-lr2e4-fixed/lightning_logs/version_0/checkpoints/epoch=199-step=XXXXX.ckpt \
+  /data/piper/output-moe-speech-20speakers-lr2e4-fixed/moe-speech-20speakers-lr2e4-fixed.onnx
 ```
 
-### 今後の方針（追加学習完了後）
+### 今後の方針（学習完了後）
 
 1. **推論テスト・品質評価**
    - 長文での発音品質確認
