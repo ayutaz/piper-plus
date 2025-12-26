@@ -18,22 +18,23 @@ protected:
   void SetUp() override {
     // Use the test model if available
     modelPath = "test/models/text_voice.onnx";
-    
+
     // Initialize minimal voice configuration
-    voice.phonemizeConfig.phonemeType = PHONEME_TYPE_ESPEAK;
+    voice.phonemizeConfig.phonemeType = eSpeakPhonemes;
     voice.phonemizeConfig.interspersePad = true;
-    
-    // Create basic phoneme map
-    voice.phonemizeConfig.phonemeIdMap[PHONEME_PAD] = 0;
-    voice.phonemizeConfig.phonemeIdMap[PHONEME_BOS] = 1;
-    voice.phonemizeConfig.phonemeIdMap[PHONEME_EOS] = 2;
-    
+
+    // Set pad/bos/eos IDs (these are already default values, but explicit for clarity)
+    voice.phonemizeConfig.idPad = 0;
+    voice.phonemizeConfig.idBos = 1;
+    voice.phonemizeConfig.idEos = 2;
+
     // Add some basic phonemes for testing
+    // phonemeIdMap maps Phoneme (char32_t) to vector<PhonemeId>
     PhonemeId id = 3;
     for (char c = 'a'; c <= 'z'; c++) {
-      voice.phonemizeConfig.phonemeIdMap[c] = id++;
+      voice.phonemizeConfig.phonemeIdMap[static_cast<Phoneme>(c)] = {id++};
     }
-    
+
     // Set synthesis config
     voice.synthesisConfig.sampleRate = 22050;
     voice.synthesisConfig.sampleWidth = 2;
