@@ -288,38 +288,14 @@ foreach(test_source ${TEST_SOURCES})
     add_test(NAME ${test_name} COMMAND ${test_name})
 endforeach()
 
-# Add test_phoneme_timing
+# Add test_phoneme_timing - only uses gtest and json.hpp (no spdlog/fmt)
 add_executable(test_phoneme_timing test_phoneme_timing.cpp)
-target_include_directories(test_phoneme_timing PRIVATE 
+target_include_directories(test_phoneme_timing PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../
     ${CMAKE_CURRENT_SOURCE_DIR}/../../
-    ${CMAKE_BINARY_DIR}/si/include
-    ${CMAKE_BINARY_DIR}/fi/include
 )
-
-# Add library dependencies for test_phoneme_timing
-if(TARGET spdlog_external)
-    add_dependencies(test_phoneme_timing spdlog_external)
-endif()
-if(TARGET fmt_external)
-    add_dependencies(test_phoneme_timing fmt_external)
-endif()
-
-# Link libraries based on platform
-if(WIN32)
-    target_link_libraries(test_phoneme_timing 
-        gtest_main
-        optimized ${CMAKE_BINARY_DIR}/fi/lib/fmt.lib
-        debug ${CMAKE_BINARY_DIR}/fi/lib/fmtd.lib
-        optimized ${CMAKE_BINARY_DIR}/si/lib/spdlog.lib
-        debug ${CMAKE_BINARY_DIR}/si/lib/spdlogd.lib
-    )
-else()
-    target_link_libraries(test_phoneme_timing 
-        gtest_main
-        fmt
-        spdlog
-    )
-endif()
+target_link_libraries(test_phoneme_timing
+    gtest_main
+)
 
 add_test(NAME test_phoneme_timing COMMAND test_phoneme_timing)
