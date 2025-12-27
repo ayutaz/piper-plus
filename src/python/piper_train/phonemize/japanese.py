@@ -27,8 +27,8 @@ class ProsodyInfo:
     Attributes
     ----------
     a1 : int
-        Accent nucleus indicator. 0 if accented mora, 1 otherwise.
-        Used to detect pitch fall points (accent nucleus).
+        Relative position from accent nucleus. Can be negative (before nucleus),
+        zero (at nucleus), or positive (after nucleus). Example: -4, -3, ..., 0, 1, ...
     a2 : int
         Position of current mora in the accent phrase (1-based).
         Resets to 1 at each accent phrase boundary.
@@ -37,7 +37,7 @@ class ProsodyInfo:
         Useful for phrase-level prosody control.
     """
 
-    a1: int  # アクセント核の有無 (0=アクセント核, 1=それ以外)
+    a1: int  # アクセント核からの相対位置 (負値=核より前, 0=核, 正値=核より後)
     a2: int  # アクセント句内のモーラ位置 (1-based)
     a3: int  # アクセント句内の総モーラ数
 
