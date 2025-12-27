@@ -234,11 +234,23 @@ python -m piper_train \
 
 ## メモリ最適化
 
-### Mixed Precision Training
+### Mixed Precision Training（デフォルト有効）
 
 ```bash
---precision 16-mixed
+--precision 16-mixed  # デフォルト: 2-3倍高速化、メモリ50%削減
 ```
+
+**利用可能な精度オプション:**
+| オプション | 説明 | 用途 |
+|-----------|------|------|
+| `16-mixed` | FP16混合精度（デフォルト） | 推奨: 最高効率 |
+| `bf16-mixed` | BFloat16混合精度 | 数値安定性重視 |
+| `32-true` | 完全FP32 | デバッグ用 |
+
+**なぜFP16がデフォルトか:**
+- V100/A100/L4のTensor Coreで最大8倍スループット向上
+- VITS実装では損失計算がFP32で維持され、品質低下なし
+- OOM問題の軽減
 
 ### Gradient Accumulation
 
@@ -353,6 +365,36 @@ L4 24GB での実際の使用量:
 
 ```bash
 nvidia-smi -l 1
+```
+
+### TensorBoard
+
+```bash
+tensorboard --logdir /path/to/training_dir/lightning_logs
+```
+
+### Wandb (Weights & Biases)
+
+Piper supports automatic logging to [Weights & Biases](https://wandb.ai/) for real-time monitoring:
+
+```bash
+# Install and setup
+pip install wandb
+wandb login
+
+# Training automatically logs to wandb if installed
+python -m piper_train --dataset-dir /path/to/dataset ...
+```
+
+**Features:**
+- Automatic integration (no additional flags needed)
+- Works alongside TensorBoard
+- Project: `piper-tts`, Run name: dataset directory name
+- Real-time loss curves, learning rate, GPU metrics
+
+**Disable wandb:**
+```bash
+export WANDB_MODE=disabled
 ```
 
 ### ログ確認

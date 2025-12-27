@@ -6,6 +6,17 @@ from pathlib import Path
 import torch
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import ModelCheckpoint
+from pytorch_lightning.loggers import TensorBoardLogger
+from pytorch_lightning.strategies import DDPStrategy
+
+
+# Optional wandb integration
+try:
+    from pytorch_lightning.loggers import WandbLogger
+
+    WANDB_AVAILABLE = True
+except ImportError:
+    WANDB_AVAILABLE = False
 
 from .vits.ema import EMACallback
 from .vits.lightning import VitsModel
@@ -22,6 +33,30 @@ def calculate_effective_batch_size(batch_size, num_gpus=1):
 def calculate_learning_rate(base_lr, effective_batch_size, base_batch_size=16):
     """Calculate learning rate with linear scaling for multi-GPU training."""
     return base_lr * (effective_batch_size / base_batch_size)
+
+
+def configure_ddp_strategy(num_gpus, user_strategy=None):
+    """Configure DDP strategy for multi-GPU training.
+
+    Args:
+        num_gpus: Number of GPUs to use
+        user_strategy: User-specified strategy (optional)
+
+    Returns:
+        Strategy configuration or None
+    """
+    if user_strategy:
+        _LOGGER.info(f"Using user-specified strategy: {user_strategy}")
+        return user_strategy
+    elif num_gpus >= 2:
+        _LOGGER.info(
+            "Using optimized DDPStrategy with gradient_as_bucket_view=True for memory efficiency"
+        )
+        return DDPStrategy(
+            find_unused_parameters=True,
+            gradient_as_bucket_view=True,
+        )
+    return None
 
 
 def main():
@@ -87,6 +122,26 @@ def main():
         "--strategy", default=None, help="Training strategy (e.g., ddp)"
     )
     parser.add_argument(
+        "--no-pin-memory",
+        action="store_true",
+        help="Disable pin_memory in DataLoader (reduces CPU RAM for 4+ GPUs)",
+    )
+    parser.add_argument(
+        "--samples-per-speaker",
+        type=int,
+        default=0,
+        help="Number of samples per speaker in each batch for multi-speaker models. "
+        "When set > 0, enables speaker-balanced batch sampling to stabilize Duration Predictor training. "
+        "Recommended: 4 (e.g., batch_size=32 with samples_per_speaker=4 → 8 speakers × 4 samples). "
+        "Set to 0 to disable (default: 0).",
+    )
+    parser.add_argument(
+        "--precision",
+        default="16-mixed",
+        choices=("32-true", "16-mixed", "bf16-mixed"),
+        help="Floating point precision (default: 16-mixed for faster training with minimal quality impact)",
+    )
+    parser.add_argument(
         "--max_epochs", type=int, default=1000, help="Maximum number of epochs"
     )
     parser.add_argument(
@@ -120,6 +175,7 @@ def main():
         else 1
     )
     _LOGGER.info(f"Training with {num_gpus} GPU(s)")
+    _LOGGER.info(f"Using precision: {args.precision}")
 
     # Initialize scaled_lr
     scaled_lr = args.base_lr
@@ -172,15 +228,52 @@ def main():
     else:
         _LOGGER.info("EMA disabled by user request")
 
+    # Setup loggers
+    loggers = []
+
+    # TensorBoard logger (always enabled)
+    tb_logger = TensorBoardLogger(
+        save_dir=args.default_root_dir,
+        name="lightning_logs",
+    )
+    loggers.append(tb_logger)
+
+    # Wandb logger (if available)
+    if WANDB_AVAILABLE:
+        dataset_name = args.dataset_dir.name
+        wandb_logger = WandbLogger(
+            project="piper-tts",
+            name=dataset_name,
+            save_dir=args.default_root_dir,
+            log_model=False,
+        )
+        loggers.append(wandb_logger)
+        _LOGGER.info("Wandb logging enabled: project=piper-tts, name=%s", dataset_name)
+    else:
+        _LOGGER.info("Wandb not available, using TensorBoard only")
+
     trainer_kwargs = {
         "accelerator": args.accelerator,
         "devices": args.devices,
+        "precision": args.precision,
         "max_epochs": args.max_epochs,
         "callbacks": callbacks,
         "default_root_dir": args.default_root_dir,
+        "logger": loggers,
     }
-    if args.strategy:
-        trainer_kwargs["strategy"] = args.strategy
+
+    # Multi-GPU DDP optimization
+    # Use DDPStrategy with gradient_as_bucket_view=True for memory efficiency
+    # find_unused_parameters=True is required for GAN training (Generator/Discriminator alternate)
+    strategy = configure_ddp_strategy(num_gpus, args.strategy)
+    if strategy:
+        trainer_kwargs["strategy"] = strategy
+
+    # When using SpeakerBalancedBatchSampler, disable Lightning's automatic distributed sampler
+    # The batch sampler handles DDP-awareness internally
+    if args.samples_per_speaker > 0 and num_speakers > 1:
+        trainer_kwargs["use_distributed_sampler"] = False
+        _LOGGER.info("Disabled distributed sampler for SpeakerBalancedBatchSampler")
 
     trainer = Trainer(**trainer_kwargs)
 
@@ -313,12 +406,21 @@ def main():
             trainer_kwargs = {
                 "accelerator": args.accelerator,
                 "devices": args.devices,
+                "precision": args.precision,
                 "max_epochs": args.max_epochs,
                 "callbacks": callbacks,
                 "default_root_dir": args.default_root_dir,
+                "logger": loggers,
             }
-            if args.strategy:
-                trainer_kwargs["strategy"] = args.strategy
+
+            # Multi-GPU DDP optimization
+            strategy = configure_ddp_strategy(num_gpus, args.strategy)
+            if strategy:
+                trainer_kwargs["strategy"] = strategy
+
+            # When using SpeakerBalancedBatchSampler, disable Lightning's automatic distributed sampler
+            if args.samples_per_speaker > 0 and num_speakers > 1:
+                trainer_kwargs["use_distributed_sampler"] = False
 
             trainer = Trainer(**trainer_kwargs)
 

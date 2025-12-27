@@ -7,6 +7,11 @@ name = "piper-plus"
 dynamic = ["version"]
 description = "Training environment for Piper TTS"
 requires-python = ">=3.11"
+dependencies = [
+    "huggingface-hub>=0.30.0,<1.0",
+    "numpy<2.3",
+    "tensorboard>=2.20.0",
+]
 
 [project.optional-dependencies]
 dev = [

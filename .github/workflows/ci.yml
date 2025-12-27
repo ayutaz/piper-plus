@@ -92,9 +92,11 @@ jobs:
           echo "ONNXRUNTIME_ROOT_PATH=$PWD/onnxruntime-win-x64-1.14.1" >> $env:GITHUB_ENV
       
       - name: Configure CMake
+        # Note: HTS Engine stub is built by CMake automatically (USE_HTS_ENGINE_STUB=ON by default)
+        # Do not create manual stubs as they interfere with CMake's proper stub with real symbols
         run: |
           CMAKE_ARGS="-DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -DBUILD_TESTS=ON -DUSE_CUDA=OFF"
-          
+
           if [ "${{ runner.os }}" == "Windows" ]; then
             cmake -B build \
               -G "Visual Studio 17 2022" \
@@ -114,31 +116,7 @@ jobs:
             cmake -B build ${CMAKE_ARGS}
           fi
         shell: bash
-      
-      - name: Create HTS Engine stub (Unix)
-        if: runner.os != 'Windows'
-        run: |
-          # Create the HTS Engine stub for tests
-          mkdir -p build/hts_stub/lib
-          mkdir -p build/hts_stub/include
-          cd build/hts_stub/lib
-          # Create empty object file for macOS compatibility
-          echo "" > empty.c
-          cc -c empty.c -o empty.o
-          ar rcs libHTSEngine.a empty.o
-          rm -f empty.c empty.o
-          cd -
-        shell: bash
-        
-      - name: Create HTS Engine stub (Windows)
-        if: runner.os == 'Windows'
-        run: |
-          # Create the HTS Engine stub for tests on Windows
-          New-Item -ItemType Directory -Force -Path build\hts_stub\lib
-          New-Item -ItemType Directory -Force -Path build\hts_stub\include
-          # Windows doesn't need HTS Engine stub for testing
-        shell: pwsh
-          
+
       - name: Build
         run: |
           # Windows needs less parallelism to avoid timeout
@@ -148,11 +126,11 @@ jobs:
             PARALLEL_JOBS=""
           fi
           
-          if cmake --build build --config ${{ matrix.build_type }} $PARALLEL_JOBS; then
-            echo "Build succeeded"
-          else
-            echo "Build failed, but continuing to check what was built"
+          if ! cmake --build build --config ${{ matrix.build_type }} $PARALLEL_JOBS; then
+            echo "❌ Build failed"
+            exit 1
           fi
+          echo "Build succeeded"
         shell: bash
       
       - name: Download OpenJTalk dictionary

@@ -87,7 +87,8 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake build-essential curl wget
+          sudo apt-get install -y cmake build-essential curl wget \
+            autoconf automake libtool m4 pkg-config
           
           # Check if ONNX Runtime is already cached
           if [ ! -f "/usr/local/lib/libonnxruntime.so" ]; then
@@ -184,12 +185,11 @@ jobs:
             fi
           done
           
-          if make -j$(nproc 2>/dev/null || sysctl -n hw.ncpu); then
-            echo "Build succeeded"
-          else
-            echo "Build partially failed, but continuing"
-            # Try to continue with what was built
+          if ! make -j$(nproc 2>/dev/null || sysctl -n hw.ncpu); then
+            echo "❌ Build failed"
+            exit 1
           fi
+          echo "Build succeeded"
           
           # For test builds, ensure OpenJTalk binary is in expected locations
           if [ "${{ inputs.include-tests }}" = "true" ] && [ -f "oj/bin/open_jtalk" ]; then
@@ -240,13 +240,12 @@ jobs:
             }
           }
           
-          try {
-            cmake --build . --config ${{ inputs.build-type }} --parallel 2
-            Write-Host "Build succeeded"
+          $buildResult = cmake --build . --config ${{ inputs.build-type }} --parallel 2
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "❌ Build failed"
+            exit 1
           }
-          catch {
-            Write-Host "Build failed, but continuing"
-          }
+          Write-Host "Build succeeded"
           
           # Run tests if enabled
           if ("${{ inputs.include-tests }}" -eq "true") {
@@ -271,9 +270,18 @@ jobs:
           if [ -f "build/piper" ]; then
             cp build/piper dist/piper/bin/
           else
-            echo "Warning: piper binary not found, checking alternative locations..."
+            echo "Warning: piper binary not found at build/piper, checking alternative locations..."
             # Try to find piper binary in other locations
-            find build -name "piper" -type f -executable 2>/dev/null | head -1 | xargs -I {} cp {} dist/piper/bin/ || echo "No piper binary found"
+            PIPER_BIN=$(find build -name "piper" -type f -executable 2>/dev/null | head -1)
+            if [ -n "$PIPER_BIN" ]; then
+              echo "Found piper at: $PIPER_BIN"
+              cp "$PIPER_BIN" dist/piper/bin/
+            else
+              echo "❌ Error: piper binary not found anywhere in build directory"
+              echo "Build directory contents:"
+              find build -type f -executable 2>/dev/null | head -20 || echo "No executables found"
+              exit 1
+            fi
           fi
           
           # Copy espeak-ng data

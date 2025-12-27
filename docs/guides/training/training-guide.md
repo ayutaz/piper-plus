@@ -299,6 +299,54 @@ tensorboard --logdir /path/to/training_dir/lightning_logs
 
 Click on the scalars tab and look at both `loss_disc_all` and `loss_gen_all`. In general, the model is "done" when `loss_disc_all` levels off. We've found that 2000 epochs is usually good for models trained from scratch, and an additional 1000 epochs when fine-tuning.
 
+### Wandb (Weights & Biases)
+
+Piper supports automatic logging to [Weights & Biases](https://wandb.ai/) for real-time monitoring of training metrics.
+
+#### Setup
+
+```sh
+# Install wandb
+pip install wandb
+
+# Login with your API key
+wandb login
+```
+
+#### Features
+
+- **Automatic integration**: If wandb is installed, logging is automatically enabled
+- **Parallel logging**: Works alongside TensorBoard
+- **Project name**: `piper-tts`
+- **Run name**: Automatically set to dataset directory name
+
+#### Logged Metrics
+
+- `loss_gen_all`: Generator total loss
+- `loss_disc_all`: Discriminator total loss
+- `loss_dur`: Duration predictor loss
+- `loss_mel`: Mel spectrogram loss
+- `loss_kl`: KL divergence loss
+- `val_loss`: Validation loss
+- `learning_rate`: Current learning rate
+- `epoch`: Current epoch
+
+#### Disabling Wandb
+
+If wandb is installed but you want to disable logging:
+
+```sh
+# Set environment variable
+export WANDB_MODE=disabled
+
+# Or use offline mode
+export WANDB_MODE=offline
+```
+
+#### Dashboard
+
+Access your training runs at: https://wandb.ai/your-username/piper-tts
+
 
 ## Exporting a Model
 

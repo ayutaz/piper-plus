@@ -104,12 +104,11 @@ jobs:
           fi
           
           cmake -B build $CMAKE_ARGS
-          if cmake --build build --config Release -j$(nproc 2>/dev/null || sysctl -n hw.ncpu); then
-            echo "Build succeeded"
-          else
-            echo "Build failed, but continuing"
-            exit 0
+          if ! cmake --build build --config Release -j$(nproc 2>/dev/null || sysctl -n hw.ncpu); then
+            echo "❌ Build failed"
+            exit 1
           fi
+          echo "Build succeeded"
       
       - name: Run C++ Streaming Tests
         run: |
@@ -151,16 +150,23 @@ jobs:
             echo "⚠️ piper binary not found, skipping streaming test"
             exit 0
           fi
-          
+
+          # Check if test model exists
+          if [ ! -f "test/models/text_voice.onnx" ]; then
+            echo "⚠️ Test model test/models/text_voice.onnx not found, skipping model test"
+            echo "This is expected - the test model is not included in the repository"
+            exit 0
+          fi
+
           # Test with text phoneme model (no espeak/openjtalk dependency)
           echo "Testing streaming mode..."
           echo "Hello world" | ./build/piper --model test/models/text_voice.onnx --output-raw --streaming > streaming_output.raw 2>streaming.log || true
-          
+
           # Check if output was produced
           if [ -s streaming_output.raw ]; then
             echo "✅ Streaming mode produced audio output"
             echo "Output size: $(wc -c < streaming_output.raw) bytes"
-            
+
             # Check log for streaming mode activation
             if grep -q "Using streaming mode" streaming.log; then
               echo "✅ Streaming mode was activated"

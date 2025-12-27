@@ -120,21 +120,14 @@ jobs:
       - name: Build
         run: |
           export PATH="/usr/lib/ccache:/usr/local/opt/ccache/libexec:$PATH"
-          if cmake --build build --config ${{ matrix.build-type }} -j$(nproc 2>/dev/null || sysctl -n hw.ncpu); then
-            echo "Build succeeded"
-            echo "BUILD_SUCCESS=true" >> $GITHUB_ENV
-          else
-            echo "Build failed, but continuing to allow partial success"
-            echo "BUILD_SUCCESS=false" >> $GITHUB_ENV
+          if ! cmake --build build --config ${{ matrix.build-type }} -j$(nproc 2>/dev/null || sysctl -n hw.ncpu); then
+            echo "❌ Build failed"
+            exit 1
           fi
-      
+          echo "Build succeeded"
+
       - name: Run tests
         run: |
-          # Skip tests if build failed
-          if [ "$BUILD_SUCCESS" = "false" ]; then
-            echo "Skipping tests due to build failure"
-            exit 0
-          fi
           
           cd build
           # Check test location
