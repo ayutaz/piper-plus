@@ -1,4 +1,5 @@
 import re
+from dataclasses import dataclass
 
 
 # Try to import pyopenjtalk-plus first (Windows compatible), fall back to pyopenjtalk
@@ -16,7 +17,29 @@ from .custom_dict import CustomDictionary
 from .token_mapper import map_sequence
 
 
-__all__ = ["phonemize_japanese"]
+__all__ = ["phonemize_japanese", "phonemize_japanese_with_prosody", "ProsodyInfo"]
+
+
+@dataclass
+class ProsodyInfo:
+    """Prosody information extracted from OpenJTalk labels.
+
+    Attributes
+    ----------
+    a1 : int
+        Accent nucleus indicator. 0 if accented mora, 1 otherwise.
+        Used to detect pitch fall points (accent nucleus).
+    a2 : int
+        Position of current mora in the accent phrase (1-based).
+        Resets to 1 at each accent phrase boundary.
+    a3 : int
+        Total number of morae in the current accent phrase.
+        Useful for phrase-level prosody control.
+    """
+
+    a1: int  # アクセント核の有無 (0=アクセント核, 1=それ以外)
+    a2: int  # アクセント句内のモーラ位置 (1-based)
+    a3: int  # アクセント句内の総モーラ数
 
 # Regular expressions reused many times
 _RE_PHONEME = re.compile(r"-([^+]+)\+")
@@ -141,3 +164,119 @@ def phonemize_japanese(
 
     # 多文字トークンを1コードポイントへ変換
     return map_sequence(tokens)
+
+
+def phonemize_japanese_with_prosody(
+    text: str, custom_dict: CustomDictionary | str | list[str] | None = None
+) -> tuple[list[str], list[ProsodyInfo | None]]:
+    """Convert *text* into phoneme tokens with prosody information.
+
+    This function extends phonemize_japanese() by also returning A1/A2/A3
+    prosody values from OpenJTalk labels for each phoneme token.
+
+    Parameters
+    ----------
+    text : str
+        Input text to phonemize
+    custom_dict : CustomDictionary, str, List[str], optional
+        Custom dictionary instance or path(s) to dictionary file(s)
+
+    Returns
+    -------
+    tuple[list[str], list[ProsodyInfo | None]]
+        A tuple containing:
+        - tokens: List of phoneme/prosody tokens (same as phonemize_japanese)
+        - prosody_info: List of ProsodyInfo for each token, or None for
+          special tokens (^, $, ?, _, #, [, ])
+
+    Notes
+    -----
+    The prosody information (A1/A2/A3) is useful for:
+    - A1: Detecting accent nucleus position
+    - A2: Position-aware duration prediction
+    - A3: Phrase-level prosody control
+
+    Example
+    -------
+    >>> tokens, prosody = phonemize_japanese_with_prosody("こんにちは")
+    >>> for t, p in zip(tokens, prosody):
+    ...     if p:
+    ...         print(f"{t}: A1={p.a1}, A2={p.a2}, A3={p.a3}")
+    """
+    # カスタム辞書を適用
+    if custom_dict is not None:
+        if isinstance(custom_dict, CustomDictionary):
+            dictionary = custom_dict
+        else:
+            dictionary = CustomDictionary(custom_dict)
+        text = dictionary.apply_to_text(text)
+
+    labels = pyopenjtalk.extract_fullcontext(text)
+    tokens: list[str] = []
+    prosody_info: list[ProsodyInfo | None] = []
+
+    for idx, label in enumerate(labels):
+        m_ph = _RE_PHONEME.search(label)
+        if not m_ph:
+            continue
+        phoneme = m_ph.group(1)
+
+        # Beginning / end silence handling
+        if phoneme == "sil":
+            if idx == 0:
+                tokens.append("^")
+                prosody_info.append(None)
+            elif idx == len(labels) - 1:
+                tokens.append("?" if _is_question(text) else "$")
+                prosody_info.append(None)
+            continue
+
+        # Short pause
+        if phoneme == "pau":
+            tokens.append("_")
+            prosody_info.append(None)
+            continue
+
+        # Add phoneme token
+        tokens.append(phoneme)
+
+        # Extract A1/A2/A3 values
+        m_a1 = _RE_A1.search(label)
+        m_a2 = _RE_A2.search(label)
+        m_a3 = _RE_A3.search(label)
+
+        if m_a1 and m_a2 and m_a3:
+            a1 = int(m_a1.group(1))
+            a2 = int(m_a2.group(1))
+            a3 = int(m_a3.group(1))
+            prosody_info.append(ProsodyInfo(a1=a1, a2=a2, a3=a3))
+
+            # Look-ahead for prosody marks
+            if idx < len(labels) - 1:
+                m_a2_next = _RE_A2.search(labels[idx + 1])
+                a2_next = int(m_a2_next.group(1)) if m_a2_next else -1
+            else:
+                a2_next = -1
+
+            # Insert accent nucleus mark "]"
+            if (a1 == 0) and (a2_next == a2 + 1):
+                tokens.append("]")
+                prosody_info.append(None)
+
+            # Insert accent phrase boundary "#"
+            if (a2 == a3) and (a2_next == 1):
+                tokens.append("#")
+                prosody_info.append(None)
+
+            # Insert rising mark "["
+            if (a2 == 1) and (a2_next == 2):
+                tokens.append("[")
+                prosody_info.append(None)
+        else:
+            # No prosody info available
+            prosody_info.append(None)
+
+    # Map multi-character tokens to single codepoints
+    mapped_tokens = map_sequence(tokens)
+
+    return mapped_tokens, prosody_info
