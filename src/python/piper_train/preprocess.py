@@ -34,15 +34,11 @@ from .norm_audio import cache_norm_audio, make_silence_detector
 # Custom Japanese phonemizer
 try:
     from .phonemize.custom_dict import CustomDictionary  # type: ignore
-    from .phonemize.japanese import (  # type: ignore
-        phonemize_japanese,
-        phonemize_japanese_with_prosody,
-    )
+    from .phonemize.japanese import phonemize_japanese_with_prosody  # type: ignore
 except ImportError:
     # When running as script, relative import may fail; try absolute import fallback
     from piper_train.phonemize.custom_dict import CustomDictionary  # type: ignore
     from piper_train.phonemize.japanese import (  # type: ignore
-        phonemize_japanese,
         phonemize_japanese_with_prosody,
     )
 
