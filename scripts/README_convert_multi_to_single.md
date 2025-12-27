@@ -8,7 +8,8 @@
 
 1. **話者埋め込み層の削除** - マルチスピーカーモデルの話者関連レイヤーを削除
 2. **オプティマイザ状態の初期化** - 新しい学習のためオプティマイザをリセット
-3. **設定の更新** - `num_speakers`を0に変更
+3. **エポックカウンタのリセット** - 学習を0エポックから開始するためリセット
+4. **設定の更新** - `num_speakers`を0に変更
 
 ## 使用方法
 
@@ -112,3 +113,21 @@ python -m piper_train \
 ### サイズ不一致エラー
 
 モデルアーキテクチャが異なる場合（例：品質設定が異なる）、レイヤーサイズが一致しないことがあります。同じ品質設定（medium/high）のモデルを使用してください。
+
+### エポック不一致エラー
+
+「You restored a checkpoint with current_epoch=X, but you have set Trainer(max_epochs=Y)」というエラーが発生した場合、エポックカウンタが正しくリセットされていません。
+
+以下の項目がリセットされている必要があります：
+
+```python
+checkpoint["epoch"] = 0
+checkpoint["global_step"] = 0
+checkpoint["loops"]["fit_loop"]["epoch_loop.current_epoch"] = 0
+checkpoint["loops"]["fit_loop"]["epoch_progress"] = {
+    'total': {'ready': 0, 'completed': 0, 'started': 0, 'processed': 0},
+    'current': {'ready': 0, 'completed': 0, 'started': 0, 'processed': 0}
+}
+```
+
+変換スクリプト `convert_multi_to_single_speaker.py` はこれらを自動的にリセットします。手動で変換した場合は上記の項目を確認してください。
