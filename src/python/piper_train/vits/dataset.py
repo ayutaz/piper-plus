@@ -94,7 +94,9 @@ class PiperDataset(Dataset):
                 # Convert prosody_features to tensor if available
                 prosody_tensor = None
                 if utt.prosody_features is not None:
-                    prosody_tensor = self._prosody_features_to_tensor(utt.prosody_features)
+                    prosody_tensor = self._prosody_features_to_tensor(
+                        utt.prosody_features
+                    )
 
                 return UtteranceTensors(
                     phoneme_ids=LongTensor(utt.phoneme_ids),

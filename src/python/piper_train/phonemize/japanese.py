@@ -41,6 +41,7 @@ class ProsodyInfo:
     a2: int  # アクセント句内のモーラ位置 (1-based)
     a3: int  # アクセント句内の総モーラ数
 
+
 # Regular expressions reused many times
 _RE_PHONEME = re.compile(r"-([^+]+)\+")
 _RE_A1 = re.compile(r"/A:([\d-]+)\+")
