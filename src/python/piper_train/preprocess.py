@@ -592,6 +592,23 @@ def phonemize_batch_openjtalk(
                     # prosody_ids は将来の拡張用（現在は空）
                     utt.prosody_ids = []
 
+                    # 長さ検証: phoneme_ids と prosody_features の長さが一致することを確認
+                    # これが一致しないと学習時にSIGSEGVが発生する可能性がある
+                    if len(utt.phoneme_ids) != len(utt.prosody_features):
+                        _LOGGER.error(
+                            "Length mismatch: phoneme_ids=%d, prosody_features=%d, text='%s'",
+                            len(utt.phoneme_ids),
+                            len(utt.prosody_features),
+                            utt.text[:50],
+                        )
+                        # 長さを揃える（短い方に合わせる）
+                        min_len = min(len(utt.phoneme_ids), len(utt.prosody_features))
+                        utt.phoneme_ids = utt.phoneme_ids[:min_len]
+                        utt.prosody_features = utt.prosody_features[:min_len]
+                        _LOGGER.warning(
+                            "Truncated to %d elements to avoid training crash", min_len
+                        )
+
                     if not args.skip_audio:
                         utt.audio_norm_path, utt.audio_spec_path = cache_norm_audio(
                             utt.audio_path,

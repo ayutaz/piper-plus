@@ -401,3 +401,139 @@ class TestDatasetProsodyIntegration:
 
         assert batch.prosody_features is not None
         assert batch.prosody_features.shape == (2, 10, 3)
+
+
+class TestProsodyDatasetValidation:
+    """Tests for prosody features validation to prevent length mismatch issues."""
+
+    @pytest.mark.unit
+    @pytest.mark.japanese
+    @pytest.mark.requires_openjtalk
+    def test_prosody_length_matches_phoneme_ids_various_texts(self):
+        """Test that prosody_features length always matches phoneme_ids for various texts.
+
+        This test ensures the issue where add_prosody_features.py script creates
+        mismatched lengths does not occur when using phonemize_japanese_with_prosody.
+        """
+        if not HAS_JAPANESE:
+            pytest.skip("Japanese phonemizer not available")
+
+        # Various test cases including edge cases
+        test_texts = [
+            "こんにちは",
+            "今日は良い天気です",
+            "何をしている。たかがパンツが、どうして気になる",  # Known problematic text
+            "これは何ですか？",
+            "はい、そうです。",
+            "東京都渋谷区",
+            "１２３４５",  # Numbers
+            "ＡＢＣＤＥ",  # Full-width alphabet
+            "あ",  # Single character
+            "あいうえおかきくけこさしすせそ",  # Long text
+            "",  # Empty string
+        ]
+
+        for text in test_texts:
+            tokens, prosody_info = phonemize_japanese_with_prosody(text)
+
+            assert len(tokens) == len(prosody_info), (
+                f"Length mismatch for text '{text}': "
+                f"tokens={len(tokens)}, prosody_info={len(prosody_info)}"
+            )
+
+    @pytest.mark.unit
+    @pytest.mark.japanese
+    @pytest.mark.requires_openjtalk
+    def test_prosody_and_phoneme_ids_generated_together(self):
+        """Test that phoneme_ids and prosody_features generated together always match.
+
+        This simulates what preprocess.py should do - generate both at the same time.
+        """
+        if not HAS_JAPANESE:
+            pytest.skip("Japanese phonemizer not available")
+
+        from piper_train.phonemize.jp_id_map import phoneme_to_id
+
+        text = "何をしている。たかがパンツが、どうして気になる"
+
+        # Generate both together (like preprocess.py should)
+        tokens, prosody_info = phonemize_japanese_with_prosody(text)
+
+        # Convert tokens to IDs
+        phoneme_ids = [phoneme_to_id.get(token, 0) for token in tokens]
+
+        # Convert prosody_info to features format
+        prosody_features = []
+        for p in prosody_info:
+            if p is None:
+                prosody_features.append({"a1": 0, "a2": 0, "a3": 0})
+            else:
+                prosody_features.append({"a1": p.a1, "a2": p.a2, "a3": p.a3})
+
+        # Verify lengths match
+        assert len(phoneme_ids) == len(prosody_features), (
+            f"phoneme_ids ({len(phoneme_ids)}) != prosody_features ({len(prosody_features)})"
+        )
+
+    @pytest.mark.unit
+    def test_validate_dataset_prosody_lengths(self):
+        """Test validation function for dataset prosody/phoneme_ids length matching."""
+        import json
+        import tempfile
+        from pathlib import Path
+
+        # Create a test dataset with valid data
+        valid_data = [
+            {
+                "phoneme_ids": [1, 2, 3, 4, 5],
+                "prosody_features": [
+                    {"a1": 0, "a2": 0, "a3": 0},
+                    {"a1": -1, "a2": 1, "a3": 3},
+                    {"a1": 0, "a2": 2, "a3": 3},
+                    {"a1": 1, "a2": 3, "a3": 3},
+                    {"a1": 0, "a2": 0, "a3": 0},
+                ],
+                "text": "test",
+                "audio_spec_path": "/tmp/test.pt"
+            }
+        ]
+
+        # Create a test dataset with INVALID data (length mismatch)
+        invalid_data = [
+            {
+                "phoneme_ids": [1, 2, 3, 4, 5],  # 5 items
+                "prosody_features": [
+                    {"a1": 0, "a2": 0, "a3": 0},
+                    {"a1": -1, "a2": 1, "a3": 3},
+                    {"a1": 0, "a2": 2, "a3": 3},
+                ],  # Only 3 items - MISMATCH!
+                "text": "test",
+                "audio_spec_path": "/tmp/test.pt"
+            }
+        ]
+
+        def validate_dataset_prosody(dataset_lines):
+            """Validate that all prosody_features match phoneme_ids lengths."""
+            errors = []
+            for i, line in enumerate(dataset_lines):
+                data = json.loads(line) if isinstance(line, str) else line
+                pids = data.get("phoneme_ids", [])
+                pf = data.get("prosody_features", [])
+                if pf and len(pids) != len(pf):
+                    errors.append({
+                        "line": i,
+                        "phoneme_ids_len": len(pids),
+                        "prosody_features_len": len(pf),
+                        "text": data.get("text", "")[:50]
+                    })
+            return errors
+
+        # Valid data should have no errors
+        valid_errors = validate_dataset_prosody([json.dumps(d) for d in valid_data])
+        assert len(valid_errors) == 0, f"Valid data should have no errors: {valid_errors}"
+
+        # Invalid data should be detected
+        invalid_errors = validate_dataset_prosody([json.dumps(d) for d in invalid_data])
+        assert len(invalid_errors) == 1, f"Invalid data should have 1 error: {invalid_errors}"
+        assert invalid_errors[0]["phoneme_ids_len"] == 5
+        assert invalid_errors[0]["prosody_features_len"] == 3
