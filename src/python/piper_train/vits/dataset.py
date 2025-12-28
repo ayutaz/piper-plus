@@ -364,7 +364,11 @@ class SpeakerBalancedBatchSampler:
         self.speakers = list(self.speaker_to_indices.keys())
         self.batch_size = batch_size
         self.samples_per_speaker = samples_per_speaker
-        self.speakers_per_batch = batch_size // samples_per_speaker
+        # 話者数が少ない場合は実際の話者数を使用
+        calculated_speakers_per_batch = batch_size // samples_per_speaker
+        self.speakers_per_batch = min(calculated_speakers_per_batch, len(self.speakers))
+        # 実際のバッチサイズを調整
+        self.effective_batch_size = self.speakers_per_batch * samples_per_speaker
         self.drop_last = drop_last
 
         # DDP対応: rank と world_size を取得
@@ -383,12 +387,14 @@ class SpeakerBalancedBatchSampler:
                 f"batch_size ({batch_size}) must be >= samples_per_speaker ({samples_per_speaker})"
             )
 
-        if len(self.speakers) < self.speakers_per_batch:
+        if len(self.speakers) < calculated_speakers_per_batch:
             _LOGGER.warning(
-                "Number of speakers (%d) is less than speakers_per_batch (%d). "
-                "Some batches may have fewer speakers.",
+                "Number of speakers (%d) is less than requested speakers_per_batch (%d). "
+                "Using %d speakers per batch (effective batch_size=%d).",
                 len(self.speakers),
+                calculated_speakers_per_batch,
                 self.speakers_per_batch,
+                self.effective_batch_size,
             )
 
     def set_epoch(self, epoch: int):
