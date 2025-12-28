@@ -85,6 +85,7 @@ struct ModelSession {
   Ort::SessionOptions options;
   Ort::Env env;
   bool hasDurationOutput = false;  // Whether model outputs duration information
+  bool hasProsodyInput = false;    // Whether model accepts prosody_features input
 
   ModelSession() : onnx(nullptr){};
 };

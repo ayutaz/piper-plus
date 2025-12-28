@@ -100,8 +100,95 @@ void phonemize_openjtalk(const std::string &text, std::vector<std::vector<Phonem
     if (!sentencePhonemes.empty()) {
         phonemes.push_back(sentencePhonemes);
     }
-    
+
     spdlog::debug("OpenJTalk phonemization complete: {} sentences", phonemes.size());
+}
+
+void phonemize_openjtalk_with_prosody(
+    const std::string &text,
+    std::vector<std::vector<Phoneme>> &phonemes,
+    std::vector<std::vector<ProsodyFeature>> &prosodyFeatures) {
+
+    spdlog::debug("OpenJTalk phonemizer with prosody called with text: {}", text);
+
+    // Clear any existing data
+    phonemes.clear();
+    prosodyFeatures.clear();
+
+    // Check if OpenJTalk is available
+    if (!openjtalk_is_available()) {
+        spdlog::warn("OpenJTalk is not available on this system");
+        return;
+    }
+
+    // Ensure dictionary is available
+    if (!openjtalk_ensure_dictionary()) {
+        spdlog::error("Failed to ensure OpenJTalk dictionary is available");
+        return;
+    }
+
+    // Get phonemes with prosody from OpenJTalk
+    OpenJTalkProsodyResult* result = openjtalk_text_to_phonemes_with_prosody(text.c_str());
+    if (!result) {
+        spdlog::error("OpenJTalk failed to convert text to phonemes with prosody");
+        return;
+    }
+
+    std::string phoneme_string(result->phonemes);
+    spdlog::debug("OpenJTalk returned {} phonemes with prosody", result->count);
+
+    // Parse phoneme string - phonemes are space-separated, sil marks sentence boundaries
+    std::vector<Phoneme> sentencePhonemes;
+    std::vector<ProsodyFeature> sentenceProsody;
+    std::stringstream phonemeStream(phoneme_string);
+    std::string phoneme;
+    int phonemeIdx = 0;
+
+    while (phonemeStream >> phoneme && phonemeIdx < result->count) {
+        // Get prosody values for current phoneme
+        ProsodyFeature pf;
+        pf.a1 = result->prosody_a1[phonemeIdx];
+        pf.a2 = result->prosody_a2[phonemeIdx];
+        pf.a3 = result->prosody_a3[phonemeIdx];
+
+        if (phoneme == "sil") {
+            // Sentence boundary
+            if (!sentencePhonemes.empty()) {
+                phonemes.push_back(sentencePhonemes);
+                prosodyFeatures.push_back(sentenceProsody);
+                sentencePhonemes.clear();
+                sentenceProsody.clear();
+            }
+        } else if (phoneme == "pau") {
+            // Short pause within sentence - add a special pause marker with zero prosody
+            sentencePhonemes.push_back(static_cast<Phoneme>('_'));
+            sentenceProsody.push_back({0, 0, 0});
+        } else {
+            // Regular phoneme
+            auto it = phonemeToPua.find(phoneme);
+            if (it != phonemeToPua.end()) {
+                sentencePhonemes.push_back(it->second);
+                sentenceProsody.push_back(pf);
+            } else if (phoneme.length() == 1) {
+                sentencePhonemes.push_back(static_cast<Phoneme>(phoneme[0]));
+                sentenceProsody.push_back(pf);
+            } else {
+                spdlog::warn("Unknown multi-character phoneme: '{}' (length: {})", phoneme, phoneme.length());
+            }
+        }
+        phonemeIdx++;
+    }
+
+    // Add any remaining phonemes as final sentence
+    if (!sentencePhonemes.empty()) {
+        phonemes.push_back(sentencePhonemes);
+        prosodyFeatures.push_back(sentenceProsody);
+    }
+
+    // Clean up
+    openjtalk_free_prosody_result(result);
+
+    spdlog::debug("OpenJTalk phonemization with prosody complete: {} sentences", phonemes.size());
 }
 
 } // namespace piper

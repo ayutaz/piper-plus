@@ -60,6 +60,7 @@ class VitsModel(pl.LightningModule):
         gin_channels: int = 0,
         use_sdp: bool = True,
         segment_size: int = 8192,
+        prosody_dim: int = 0,
         # training
         dataset: list[str | Path] | None = None,
         learning_rate: float = 2e-4,
@@ -112,6 +113,7 @@ class VitsModel(pl.LightningModule):
             n_speakers=self.hparams.num_speakers,
             gin_channels=self.hparams.gin_channels,
             use_sdp=self.hparams.use_sdp,
+            prosody_dim=self.hparams.prosody_dim,
         )
         self.model_d = MultiPeriodDiscriminator(
             use_spectral_norm=self.hparams.use_spectral_norm
@@ -147,7 +149,7 @@ class VitsModel(pl.LightningModule):
             full_dataset, [train_set_size, num_test_examples, valid_set_size]
         )
 
-    def forward(self, text, text_lengths, scales, sid=None):
+    def forward(self, text, text_lengths, scales, sid=None, prosody_features=None):
         noise_scale = scales[0]
         length_scale = scales[1]
         noise_scale_w = scales[2]
@@ -158,6 +160,7 @@ class VitsModel(pl.LightningModule):
             length_scale=length_scale,
             noise_scale_w=noise_scale_w,
             sid=sid,
+            prosody_features=prosody_features,
         )
 
         return audio
@@ -291,7 +294,7 @@ class VitsModel(pl.LightningModule):
         self.log(key, value, batch_size=batch_size, sync_dist=sync_dist)
 
     def training_step_g(self, batch: Batch):
-        x, x_lengths, y, _, spec, spec_lengths, speaker_ids = (
+        x, x_lengths, y, _, spec, spec_lengths, speaker_ids, prosody_features = (
             batch.phoneme_ids,
             batch.phoneme_lengths,
             batch.audios,
@@ -299,6 +302,7 @@ class VitsModel(pl.LightningModule):
             batch.spectrograms,
             batch.spectrogram_lengths,
             batch.speaker_ids if batch.speaker_ids is not None else None,
+            batch.prosody_features if batch.prosody_features is not None else None,
         )
         (
             y_hat,
@@ -308,7 +312,14 @@ class VitsModel(pl.LightningModule):
             _x_mask,
             z_mask,
             (_z, z_p, m_p, logs_p, _m_q, logs_q),
-        ) = self.model_g(x, x_lengths, spec, spec_lengths, speaker_ids)
+        ) = self.model_g(
+            x,
+            x_lengths,
+            spec,
+            spec_lengths,
+            speaker_ids,
+            prosody_features=prosody_features,
+        )
         self._y_hat = y_hat.contiguous()
 
         mel = spec_to_mel_torch(
@@ -456,6 +467,13 @@ class VitsModel(pl.LightningModule):
             type=int,
             default=0,
             help="Speaker embedding size for multi-speaker models (default: 0 for single, 768 for multi)",
+        )
+        parser.add_argument(
+            "--prosody-dim",
+            type=int,
+            default=0,
+            help="Dimension for prosody feature projection (A1/A2/A3). "
+            "Set to 16 to enable prosody-aware duration prediction. Default: 0 (disabled)",
         )
         parser.add_argument(
             "--num-workers",
