@@ -4,15 +4,24 @@ These tests verify that the adaptive chunking in monotonic_align.maximum_path
 correctly handles large matrices that would otherwise cause SIGSEGV crashes.
 
 Issue: https://github.com/ayutaz/piper-plus/issues/197
+
+Note: These tests require torch and piper_train to be installed.
+They are skipped in CI environments without GPU/training dependencies.
 """
 
 import subprocess
 import sys
 
 import pytest
-import torch
 
-from piper_train.vits import monotonic_align
+# Skip entire module if torch is not available (e.g., in CI without training deps)
+torch = pytest.importorskip("torch", reason="torch required for monotonic_align tests")
+
+# Also skip if monotonic_align is not available (Cython extension)
+try:
+    from piper_train.vits import monotonic_align
+except ImportError:
+    pytest.skip("piper_train.vits.monotonic_align not available", allow_module_level=True)
 
 
 class TestMonotonicAlignChunking:
