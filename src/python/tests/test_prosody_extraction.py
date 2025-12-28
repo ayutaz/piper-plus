@@ -452,15 +452,23 @@ class TestProsodyDatasetValidation:
         if not HAS_JAPANESE:
             pytest.skip("Japanese phonemizer not available")
 
-        from piper_train.phonemize.jp_id_map import phoneme_to_id
+        from piper_train.phonemize.jp_id_map import get_japanese_id_map
 
         text = "何をしている。たかがパンツが、どうして気になる"
 
         # Generate both together (like preprocess.py should)
         tokens, prosody_info = phonemize_japanese_with_prosody(text)
 
+        # Get the phoneme ID map
+        phoneme_id_map = get_japanese_id_map()
+
         # Convert tokens to IDs
-        phoneme_ids = [phoneme_to_id.get(token, 0) for token in tokens]
+        phoneme_ids = []
+        for token in tokens:
+            if token in phoneme_id_map:
+                phoneme_ids.extend(phoneme_id_map[token])
+            else:
+                phoneme_ids.append(0)
 
         # Convert prosody_info to features format
         prosody_features = []
