@@ -289,7 +289,9 @@ class UtteranceCollate:
                 # prosody_features の長さが phoneme_length と異なる場合に対応
                 prosody_length = min(len(utt.prosody_features), phoneme_length)
                 if prosody_length > 0:
-                    prosody_padded[utt_idx, :prosody_length, :] = utt.prosody_features[:prosody_length]
+                    prosody_padded[utt_idx, :prosody_length, :] = utt.prosody_features[
+                        :prosody_length
+                    ]
 
         return Batch(
             phoneme_ids=phonemes_padded,
