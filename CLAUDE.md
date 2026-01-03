@@ -121,6 +121,23 @@ uv run python /data/piper/add_prosody_features.py --input-dataset ... --output-d
 
 **デフォルト有効:** prosodyはデフォルトで有効（`--prosody-dim 16`）
 
+**🔧 2026-01-03 修正: ONNXエクスポート/推論のデータ型を統一**
+
+**問題:** PyTorch推論とONNX推論で音質・イントネーションが異なる
+
+**根本原因:**
+- ONNX export時に prosody_features が int64 でエクスポートされていた
+- PyTorch推論では `.float()` 変換されるが、ONNXでは型が固定される
+- Duration Predictorが異なる数値精度を受け取り、継続時間予測が変わる
+
+**修正内容:**
+1. `export_onnx.py`: prosody_features を `torch.float32` でエクスポート
+2. `infer_onnx.py`: prosody_features を `np.float32` で渡す
+3. `export_onnx.py`: prosody有効時に ONNX simplification を無効化（数値精度保持）
+4. `infer.py`: CLI引数を `--noise-scale-w` に統一（ONNX推論と一貫性）
+
+**検証結果:** PyTorchとONNXの音声ファイルサイズがほぼ一致（116K→111K、76K→79K、68K→67K）
+
 ### SpeakerBalancedBatchSampler
 
 マルチスピーカーモデルのDuration Predictor崩壊問題を解決するカスタムバッチサンプラー。
