@@ -347,7 +347,8 @@ jobs:
           if [ "${{ runner.os }}" == "Windows" ]; then
             python -m pytest tests/ -v --tb=short -m "unit and not phonemize and not training" -k "not test_phonemize and not test_japanese"
           else
-            python -m pytest tests/ -v --tb=short -m "unit and not training and not benchmark"
+            # Exclude inference tests - they require PyTorch and are covered by python-tests.yml
+            python -m pytest tests/ -v --tb=short -m "unit and not training and not benchmark and not inference"
           fi
       
       - name: Upload coverage reports
