@@ -121,22 +121,37 @@ uv run python /data/piper/add_prosody_features.py --input-dataset ... --output-d
 
 **デフォルト有効:** prosodyはデフォルトで有効（`--prosody-dim 16`）
 
-**🔧 2026-01-03 修正: ONNXエクスポート/推論のデータ型を統一**
+**🔧 2026-01-03 修正: prosody_features データ型をint64に統一（commit 812016a）**
 
-**問題:** PyTorch推論とONNX推論で音質・イントネーションが異なる
+**問題:** commit 3340825でfloat32に変更後、ONNX推論で不自然な音声が生成される
 
 **根本原因:**
-- ONNX export時に prosody_features が int64 でエクスポートされていた
-- PyTorch推論では `.float()` 変換されるが、ONNXでは型が固定される
-- Duration Predictorが異なる数値精度を受け取り、継続時間予測が変わる
+- **float32入力**: `.float()`がno-opとなり、ONNXグラフにCastノードが含まれない/最適化される
+- **int64入力**: `.float()`が明示的なCastノードを生成し、正しい動作
+- グラフ構造の違いがDuration Predictorの数値計算に影響
+- A1/A2/A3は本来整数値なので、**int64が意味論的に正しい型**
 
-**修正内容:**
-1. `export_onnx.py`: prosody_features を `torch.float32` でエクスポート
-2. `infer_onnx.py`: prosody_features を `np.float32` で渡す
-3. `export_onnx.py`: prosody有効時に ONNX simplification を無効化（数値精度保持）
-4. `infer.py`: CLI引数を `--noise-scale-w` に統一（ONNX推論と一貫性）
+**models.py Line 654 の `.float()` 呼び出しが重要:**
+```python
+prosody_proj = self.prosody_proj(prosody_features.float())
+```
+- **int64でexport**: `[int64 input] → [Cast to float32] → [Linear layer]` (正常)
+- **float32でexport**: `[float32 input] → [Linear layer]` (Castがno-op、異常)
 
-**検証結果:** PyTorchとONNXの音声ファイルサイズがほぼ一致（116K→111K、76K→79K、68K→67K）
+**修正内容（commit 812016a）:**
+1. `export_onnx.py`: prosody_features を `torch.long` (int64) でエクスポート
+2. `infer_onnx.py`: prosody_features を `np.int64` で渡す
+3. `test_pytorch_onnx_parity.py`: テストをint64に更新
+4. `piper.cpp`: C++推論をint64に統一
+5. `conftest.py`: テストfixtureをint64に更新
+
+**検証結果:**
+- 長文3種類（10-14秒）でテスト
+- PyTorch推論: 625KB/607KB/544KB（全て自然 ✅）
+- ONNX float32: 563KB/548KB/565KB（全て不自然 ❌）
+- ONNX int64（修正後）: 615KB/621KB/585KB（PyTorchと同等 ✅）
+- ユーザー評価: "PyTorchは全て問題なし、int64も問題ないです"
+- テスト結果: 7 passed ✅
 
 ### SpeakerBalancedBatchSampler
 
