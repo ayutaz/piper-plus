@@ -65,21 +65,34 @@ jobs:
       if: runner.os == 'Windows'
       run: |
         cd src/python
-        # Run unit tests including Japanese tests (pyopenjtalk-plus is now available)
-        pytest tests/ -v --tb=short -m "unit and not training and not benchmark"
-    
+        # Run unit tests excluding inference tests (which require torch)
+        pytest tests/ -v --tb=short -m "unit and not training and not benchmark and not inference"
+
     - name: Run unit tests (Unix)
       if: runner.os != 'Windows'
       run: |
         cd src/python
-        pytest tests/ -v --tb=short -m "unit and not training and not benchmark"
+        # Run unit tests excluding inference tests (which require torch)
+        pytest tests/ -v --tb=short -m "unit and not training and not benchmark and not inference"
     
     - name: Run integration tests (Unix only)
       if: runner.os != 'Windows'
       run: |
         cd src/python
         pytest tests/ -v --tb=short -m "integration and not benchmark"
-    
+
+    - name: Install PyTorch dependencies for inference tests (Unix only)
+      if: runner.os != 'Windows'
+      run: |
+        cd src/python
+        pip install -r requirements_torch.txt
+
+    - name: Run inference tests (Unix only)
+      if: runner.os != 'Windows'
+      run: |
+        cd src/python
+        pytest tests/ -v --tb=short -m "inference and unit"
+
     - name: Upload test results
       if: always()
       uses: actions/upload-artifact@v4
