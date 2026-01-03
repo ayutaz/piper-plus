@@ -657,14 +657,17 @@ void loadModel(std::string modelPath, ModelSession &session, bool useCuda, int g
     }
   }
 
-  // Check if model has prosody_features input
+  // Check model inputs for optional features
   size_t numInputNodes = session.onnx.GetInputCount();
   for (size_t i = 0; i < numInputNodes; i++) {
     auto inputName = session.onnx.GetInputNameAllocated(i, session.allocator);
-    if (std::string(inputName.get()) == "prosody_features") {
+    std::string name(inputName.get());
+    if (name == "prosody_features") {
       session.hasProsodyInput = true;
       spdlog::debug("Model supports prosody features input (A1/A2/A3)");
-      break;
+    } else if (name == "sid") {
+      session.hasMultiSpeaker = true;
+      spdlog::debug("Model supports multi-speaker (sid input)");
     }
   }
 }
@@ -735,21 +738,21 @@ void synthesize(std::vector<PhonemeId> &phonemeIds,
       Ort::Value::CreateTensor<float>(memoryInfo, scales.data(), scales.size(),
                                       scalesShape.data(), scalesShape.size()));
 
-  // Add speaker id.
+  // Build input names dynamically based on model capabilities
+  std::vector<const char *> inputNamesVec = {"input", "input_lengths", "scales"};
+
+  // Add speaker id only for multi-speaker models
   // NOTE: These must be kept outside the "if" below to avoid being deallocated.
   std::vector<int64_t> speakerId{
       (int64_t)synthesisConfig.speakerId.value_or(0)};
   std::vector<int64_t> speakerIdShape{(int64_t)speakerId.size()};
 
-  if (synthesisConfig.speakerId) {
+  if (session.hasMultiSpeaker) {
     inputTensors.push_back(Ort::Value::CreateTensor<int64_t>(
         memoryInfo, speakerId.data(), speakerId.size(), speakerIdShape.data(),
         speakerIdShape.size()));
+    inputNamesVec.push_back("sid");
   }
-
-  // Build input names dynamically based on model capabilities
-  std::vector<const char *> inputNamesVec = {"input", "input_lengths", "scales",
-                                              "sid"};
 
   // Add prosody features if model supports them and they are provided
   // prosodyFeatures is a flat array of [a1, a2, a3, a1, a2, a3, ...] for each phoneme
