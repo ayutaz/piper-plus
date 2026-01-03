@@ -89,9 +89,13 @@ def main():
             _LOGGER.debug("Using prosody features for utterance %d", i)
 
         start_time = time.perf_counter()
-        audio = model(
-            text, text_lengths, scales, sid=sid, prosody_features=prosody_features
-        ).detach().numpy()
+        audio = (
+            model(
+                text, text_lengths, scales, sid=sid, prosody_features=prosody_features
+            )
+            .detach()
+            .numpy()
+        )
         audio = audio_float_to_int16(audio)
         end_time = time.perf_counter()
 
