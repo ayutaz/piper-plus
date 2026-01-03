@@ -60,7 +60,7 @@ class VitsModel(pl.LightningModule):
         gin_channels: int = 0,
         use_sdp: bool = True,
         segment_size: int = 8192,
-        prosody_dim: int = 0,
+        prosody_dim: int = 16,
         # training
         dataset: list[str | Path] | None = None,
         learning_rate: float = 2e-4,
@@ -471,9 +471,8 @@ class VitsModel(pl.LightningModule):
         parser.add_argument(
             "--prosody-dim",
             type=int,
-            default=0,
-            help="Dimension for prosody feature projection (A1/A2/A3). "
-            "Set to 16 to enable prosody-aware duration prediction. Default: 0 (disabled)",
+            default=16,
+            help="Dimension for prosody feature projection (A1/A2/A3). Default: 16 (enabled)",
         )
         parser.add_argument(
             "--num-workers",

@@ -552,7 +552,7 @@ class SynthesizerTrn(nn.Module):
         n_speakers: int = 1,
         gin_channels: int = 0,
         use_sdp: bool = True,
-        prosody_dim: int = 0,
+        prosody_dim: int = 16,
     ):
         super().__init__()
         self.n_vocab = n_vocab
