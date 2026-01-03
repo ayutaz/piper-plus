@@ -219,10 +219,10 @@ def main() -> None:
     scales = torch.FloatTensor([0.667, 1.0, 0.8])
 
     # Prosody features [batch, phonemes, 3] - A1/A2/A3 values
-    # Use float32 to match PyTorch inference where prosody_features.float() is called
-    prosody_features: torch.FloatTensor | None = None
+    # Use int64 (long) so that .float() in models.py creates explicit Cast node in ONNX graph
+    prosody_features: torch.Tensor | None = None
     if has_prosody:
-        prosody_features = torch.zeros(1, dummy_input_length, 3, dtype=torch.float32)
+        prosody_features = torch.zeros(1, dummy_input_length, 3, dtype=torch.long)
 
     # Include all inputs for compatibility
     if num_speakers > 1 and has_prosody:

@@ -1092,6 +1092,27 @@ void textToAudio(PiperConfig &config, Voice &voice, std::string text,
         size_t numPhonemeIds = phonemeIds.size();
         prosodyFlat.resize(numPhonemeIds * 3, 0);  // Initialize with zeros
 
+        // Debug: Log prosody mapping details (PHASE 2)
+        spdlog::debug("Prosody mapping debug (BEFORE fix):");
+        spdlog::debug("  phonemeIds.size() = {}", phonemeIds.size());
+        spdlog::debug("  sentenceProsody.size() = {}", sentenceProsody.size());
+        spdlog::debug("  interspersePad = {}", voice.phonemizeConfig.interspersePad);
+
+        // Log first 10 phonemeIds
+        spdlog::debug("  First 10 phonemeIds:");
+        for (size_t i = 0; i < std::min(size_t(10), phonemeIds.size()); i++) {
+          spdlog::debug("    phonemeIds[{}] = {}", i, phonemeIds[i]);
+        }
+
+        // Log sentenceProsody contents
+        spdlog::debug("  sentenceProsody contents:");
+        for (size_t i = 0; i < std::min(size_t(10), sentenceProsody.size()); i++) {
+          spdlog::debug("    prosody[{}] = [{}, {}, {}]", i,
+                        sentenceProsody[i].a1,
+                        sentenceProsody[i].a2,
+                        sentenceProsody[i].a3);
+        }
+
         if (voice.phonemizeConfig.interspersePad) {
           // Map prosody to odd positions (1, 3, 5, ...) which are real phonemes
           size_t prosodyIdx = 0;
@@ -1102,12 +1123,59 @@ void textToAudio(PiperConfig &config, Voice &voice, std::string text,
             prosodyIdx++;
           }
         } else {
-          // Direct mapping (no padding)
-          for (size_t i = 0; i < numPhonemeIds && i < sentenceProsody.size(); i++) {
-            prosodyFlat[i * 3 + 0] = sentenceProsody[i].a1;
-            prosodyFlat[i * 3 + 1] = sentenceProsody[i].a2;
-            prosodyFlat[i * 3 + 2] = sentenceProsody[i].a3;
+          // Direct mapping - detect special tokens by ID (Option B)
+          // Special tokens (^=1, $=2, ?=3, #=4, [=5, ]=6) get zero prosody
+          // Real phonemes get prosody from sentenceProsody in order
+          prosodyFlat.clear();
+          prosodyFlat.reserve(numPhonemeIds * 3);
+
+          size_t prosodyIdx = 0;
+
+          for (size_t i = 0; i < phonemeIds.size(); i++) {
+            PhonemeId id = phonemeIds[i];
+
+            // Special tokens: ^=1, $=2, ?=3, #=4, [=5, ]=6
+            if (id >= 1 && id <= 6) {
+              // Special token → zero prosody
+              prosodyFlat.push_back(0.0f);
+              prosodyFlat.push_back(0.0f);
+              prosodyFlat.push_back(0.0f);
+
+              spdlog::debug("  phonemeIds[{}] = {} (special token) → prosody [0, 0, 0]", i, id);
+            } else {
+              // Real phoneme → use prosody data
+              if (prosodyIdx < sentenceProsody.size()) {
+                int64_t a1 = sentenceProsody[prosodyIdx].a1;
+                int64_t a2 = sentenceProsody[prosodyIdx].a2;
+                int64_t a3 = sentenceProsody[prosodyIdx].a3;
+
+                prosodyFlat.push_back(a1);
+                prosodyFlat.push_back(a2);
+                prosodyFlat.push_back(a3);
+
+                spdlog::debug("  phonemeIds[{}] = {} (real phoneme) → prosody [{:.1f}, {:.1f}, {:.1f}]",
+                              i, id, a1, a2, a3);
+
+                prosodyIdx++;
+              } else {
+                // Safety fallback: zero prosody
+                prosodyFlat.push_back(0.0f);
+                prosodyFlat.push_back(0.0f);
+                prosodyFlat.push_back(0.0f);
+
+                spdlog::warn("  phonemeIds[{}] = {} (out of range) → prosody [0, 0, 0]", i, id);
+              }
+            }
           }
+
+          // Verification
+          if (prosodyFlat.size() != phonemeIds.size() * 3) {
+            spdlog::error("Prosody flat size mismatch: {} != {} * 3",
+                          prosodyFlat.size(), phonemeIds.size());
+          }
+
+          spdlog::debug("Final prosodyFlat size: {} (phonemeIds: {})",
+                        prosodyFlat.size(), phonemeIds.size());
         }
 
         prosodyPtr = &prosodyFlat;

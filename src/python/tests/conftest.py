@@ -102,7 +102,7 @@ def temp_onnx_model(mock_vits_model, tmp_path_factory):
     sequences = torch.randint(0, 50, (1, dummy_input_length), dtype=torch.long)
     sequence_lengths = torch.LongTensor([dummy_input_length])
     scales = torch.FloatTensor([0.667, 1.0, 0.8])
-    prosody_features = torch.zeros(1, dummy_input_length, 3, dtype=torch.float32)
+    prosody_features = torch.zeros(1, dummy_input_length, 3, dtype=torch.long)
 
     # Define infer_forward for export (single-speaker, no sid)
     def infer_forward(

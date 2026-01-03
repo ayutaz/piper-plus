@@ -43,15 +43,15 @@ def prepare_prosody_array(prosody_features: list[dict | None]) -> np.ndarray:
         prosody_features: [{"a1": int, "a2": int, "a3": int}, ...] または None
 
     Returns:
-        np.ndarray of shape (1, num_phonemes, 3), dtype=float32
+        np.ndarray of shape (1, num_phonemes, 3), dtype=int64
     """
     result = []
     for feat in prosody_features:
         if feat is None:
-            result.append([0.0, 0.0, 0.0])
+            result.append([0, 0, 0])
         else:
-            result.append([float(feat["a1"]), float(feat["a2"]), float(feat["a3"])])
-    return np.expand_dims(np.array(result, dtype=np.float32), 0)
+            result.append([feat["a1"], feat["a2"], feat["a3"]])
+    return np.expand_dims(np.array(result, dtype=np.int64), 0)
 
 
 def pytorch_inference(
@@ -154,8 +154,8 @@ def onnx_inference(
         if prosody_features is not None:
             prosody_array = prepare_prosody_array(prosody_features)
         else:
-            # prosody無しの場合はゼロで埋める
-            prosody_array = np.zeros((1, text.shape[1], 3), dtype=np.float32)
+            # prosody無しの場合はゼロで埋める（int64）
+            prosody_array = np.zeros((1, text.shape[1], 3), dtype=np.int64)
         inputs["prosody_features"] = prosody_array
 
     audio = session.run(None, inputs)[0]
@@ -184,7 +184,7 @@ class TestPyTorchONNXParity:
         """prosody付きでPyTorchとONNX推論が正常に動作することを検証
 
         注: モックモデルの乱数により音声長は完全には一致しないが、
-        prosody_featuresが正しくfloat32として処理され、推論が成功することを確認する。
+        prosody_featuresが正しくint64として処理され、推論が成功することを確認する。
         """
         pt_audio = pytorch_inference(
             mock_vits_model,
@@ -251,7 +251,7 @@ class TestPyTorchONNXParity:
         assert np.abs(onnx_audio).max() < 1.0, "ONNX音声の振幅が異常"
 
     def test_prosody_data_type_consistency(self, temp_onnx_model):
-        """ONNXモデルのprosody_features入力がfloat32であることを確認"""
+        """ONNXモデルのprosody_features入力がint64であることを確認"""
         import onnxruntime
 
         session = onnxruntime.InferenceSession(str(temp_onnx_model))
@@ -264,8 +264,8 @@ class TestPyTorchONNXParity:
                 break
 
         assert prosody_input is not None, "prosody_features入力が見つかりません"
-        assert prosody_input.type == "tensor(float)", (
-            f"prosody_featuresの型がfloatではありません: {prosody_input.type}"
+        assert prosody_input.type == "tensor(int64)", (
+            f"prosody_featuresの型がint64ではありません: {prosody_input.type}"
         )
 
     @pytest.mark.parametrize(
