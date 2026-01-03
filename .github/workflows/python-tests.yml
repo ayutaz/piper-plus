@@ -51,7 +51,13 @@ jobs:
         # Install piper_train
         pip install -e .
         echo "Windows tests will run with pyopenjtalk-plus support"
-    
+
+    - name: Install PyTorch for all tests (Windows)
+      if: runner.os == 'Windows'
+      run: |
+        cd src/python
+        pip install -r requirements_torch.txt
+
     - name: Install Python dependencies (Unix)
       if: runner.os != 'Windows'
       run: |
@@ -60,7 +66,13 @@ jobs:
         pip install -r requirements_test.txt
         pip install -r ../../requirements-train.txt
         pip install -e .
-    
+
+    - name: Install PyTorch for all tests (Unix)
+      if: runner.os != 'Windows'
+      run: |
+        cd src/python
+        pip install -r requirements_torch.txt
+
     - name: Run unit tests (Windows)
       if: runner.os == 'Windows'
       run: |
@@ -80,12 +92,6 @@ jobs:
       run: |
         cd src/python
         pytest tests/ -v --tb=short -m "integration and not benchmark"
-
-    - name: Install PyTorch dependencies for inference tests (Unix only)
-      if: runner.os != 'Windows'
-      run: |
-        cd src/python
-        pip install -r requirements_torch.txt
 
     - name: Run inference tests (Unix only)
       if: runner.os != 'Windows'
