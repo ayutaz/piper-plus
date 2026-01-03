@@ -45,7 +45,7 @@ def main():
     parser.add_argument("--sample-rate", type=int, default=22050)
     parser.add_argument("--noise-scale", type=float, default=0.667)
     parser.add_argument("--length-scale", type=float, default=1.0)
-    parser.add_argument("--noise-w", type=float, default=0.8)
+    parser.add_argument("--noise-scale-w", type=float, default=0.8)
     args = parser.parse_args()
 
     args.output_dir = Path(args.output_dir)
@@ -79,7 +79,7 @@ def main():
 
         text = torch.LongTensor(phoneme_ids).unsqueeze(0)
         text_lengths = torch.LongTensor([len(phoneme_ids)])
-        scales = [args.noise_scale, args.length_scale, args.noise_w]
+        scales = [args.noise_scale, args.length_scale, args.noise_scale_w]
         sid = torch.LongTensor([speaker_id]) if speaker_id is not None else None
 
         # Prepare prosody features if model supports them

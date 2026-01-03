@@ -219,9 +219,10 @@ def main() -> None:
     scales = torch.FloatTensor([0.667, 1.0, 0.8])
 
     # Prosody features [batch, phonemes, 3] - A1/A2/A3 values
-    prosody_features: torch.LongTensor | None = None
+    # Use float32 to match PyTorch inference where prosody_features.float() is called
+    prosody_features: torch.FloatTensor | None = None
     if has_prosody:
-        prosody_features = torch.zeros(1, dummy_input_length, 3, dtype=torch.long)
+        prosody_features = torch.zeros(1, dummy_input_length, 3, dtype=torch.float32)
 
     # Include all inputs for compatibility
     if num_speakers > 1 and has_prosody:
@@ -281,8 +282,15 @@ def main() -> None:
     _LOGGER.info("Exported model to %s", args.output)
 
     # Apply ONNX simplification if requested
+    # Skip simplification for prosody models to avoid numerical precision issues
     if args.simplify:
-        simplify_onnx_model(args.output)
+        if has_prosody:
+            _LOGGER.info(
+                "Prosody features enabled (prosody_dim=%d) - skipping ONNX simplification to preserve numerical accuracy",
+                model_g.prosody_dim,
+            )
+        else:
+            simplify_onnx_model(args.output)
 
 
 # -----------------------------------------------------------------------------

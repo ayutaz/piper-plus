@@ -91,21 +91,21 @@ def main():
         # Handle prosody features if model supports them
         if has_prosody:
             if prosody_features_data is not None:
-                # Convert prosody_features to numpy array
+                # Convert prosody_features to numpy array (float32 to match ONNX export)
                 # Format: [[a1, a2, a3], [a1, a2, a3], ...]
                 # Each element may be None for special tokens
                 prosody_array = []
                 for pf in prosody_features_data:
                     if pf is None:
-                        prosody_array.append([0, 0, 0])
+                        prosody_array.append([0.0, 0.0, 0.0])
                     else:
-                        prosody_array.append([pf["a1"], pf["a2"], pf["a3"]])
+                        prosody_array.append([float(pf["a1"]), float(pf["a2"]), float(pf["a3"])])
                 prosody_features = np.expand_dims(
-                    np.array(prosody_array, dtype=np.int64), 0
+                    np.array(prosody_array, dtype=np.float32), 0
                 )
             else:
-                # No prosody data provided - use zeros
-                prosody_features = np.zeros((1, text.shape[1], 3), dtype=np.int64)
+                # No prosody data provided - use zeros (float32)
+                prosody_features = np.zeros((1, text.shape[1], 3), dtype=np.float32)
             inputs["prosody_features"] = prosody_features
 
         start_time = time.perf_counter()
