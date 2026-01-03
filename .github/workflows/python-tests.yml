@@ -32,7 +32,7 @@ jobs:
       if: runner.os == 'Linux'
       run: |
         sudo apt-get update
-        sudo apt-get install -y libsndfile1 sox
+        sudo apt-get install -y libsndfile1 sox build-essential
     
     - name: Install system dependencies (macOS)
       if: runner.os == 'macOS'
@@ -65,6 +65,7 @@ jobs:
         cd src/python
         pip install -r requirements_test.txt
         pip install -r ../../requirements-train.txt
+        pip install cython
         pip install -e .
 
     - name: Install PyTorch for all tests (Unix)
@@ -72,6 +73,12 @@ jobs:
       run: |
         cd src/python
         pip install -r requirements_torch.txt
+
+    - name: Build Cython extensions (Unix)
+      if: runner.os != 'Windows'
+      run: |
+        cd src/python
+        python piper_train/vits/monotonic_align/setup.py build_ext --inplace
 
     - name: Run unit tests (Windows)
       if: runner.os == 'Windows'
