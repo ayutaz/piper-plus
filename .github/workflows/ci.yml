@@ -228,7 +228,7 @@ jobs:
             # Unix platforms
             # Run critical tests if they exist
             TESTS_FOUND=false
-            for test in test_gpu_device_id test_phoneme_parser; do
+            for test in test_gpu_device_id test_phoneme_parser test_model_speaker_detection test_prosody_inference; do
               echo "Checking for ${test}..."
               if ctest -C ${{ matrix.build_type }} -N | grep -q "${test}"; then
                 TESTS_FOUND=true
