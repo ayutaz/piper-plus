@@ -34,11 +34,13 @@ from .norm_audio import cache_norm_audio, make_silence_detector
 # Custom Japanese phonemizer
 try:
     from .phonemize.custom_dict import CustomDictionary  # type: ignore
-    from .phonemize.japanese import phonemize_japanese  # type: ignore
+    from .phonemize.japanese import phonemize_japanese_with_prosody  # type: ignore
 except ImportError:
     # When running as script, relative import may fail; try absolute import fallback
     from piper_train.phonemize.custom_dict import CustomDictionary  # type: ignore
-    from piper_train.phonemize.japanese import phonemize_japanese  # type: ignore
+    from piper_train.phonemize.japanese import (  # type: ignore
+        phonemize_japanese_with_prosody,
+    )
 
 # Japanese phoneme id map support
 try:
@@ -566,7 +568,8 @@ def phonemize_batch_openjtalk(
                         signal.alarm(timeout_sec)
                     _LOGGER.debug(utt)
                     # 高低アクセントを含む日本語 phonemizer（カスタム辞書適用）
-                    utt.phonemes = phonemize_japanese(
+                    # プロソディ情報 (A1/A2/A3) も同時に抽出
+                    utt.phonemes, prosody_info_list = phonemize_japanese_with_prosody(
                         casing(utt.text), custom_dict=custom_dict
                     )
                     # phoneme_ids は phoneme_id_map から取得
@@ -578,8 +581,33 @@ def phonemize_batch_openjtalk(
                             utt.missing_phonemes[phoneme] += 1
                             _LOGGER.warning(f"Missing phoneme: {phoneme}")
 
-                    # prosody_ids は現在使用していない（削除済み）
+                    # prosody_features: A1/A2/A3 値を辞書形式で保存
+                    # A1: アクセント核からの相対位置（負値可）
+                    # A2: アクセント句内のモーラ位置（1-based）
+                    # A3: アクセント句内の総モーラ数
+                    utt.prosody_features = [
+                        {"a1": p.a1, "a2": p.a2, "a3": p.a3} if p is not None else None
+                        for p in prosody_info_list
+                    ]
+                    # prosody_ids は将来の拡張用（現在は空）
                     utt.prosody_ids = []
+
+                    # 長さ検証: phoneme_ids と prosody_features の長さが一致することを確認
+                    # これが一致しないと学習時にSIGSEGVが発生する可能性がある
+                    if len(utt.phoneme_ids) != len(utt.prosody_features):
+                        _LOGGER.error(
+                            "Length mismatch: phoneme_ids=%d, prosody_features=%d, text='%s'",
+                            len(utt.phoneme_ids),
+                            len(utt.prosody_features),
+                            utt.text[:50],
+                        )
+                        # 長さを揃える（短い方に合わせる）
+                        min_len = min(len(utt.phoneme_ids), len(utt.prosody_features))
+                        utt.phoneme_ids = utt.phoneme_ids[:min_len]
+                        utt.prosody_features = utt.prosody_features[:min_len]
+                        _LOGGER.warning(
+                            "Truncated to %d elements to avoid training crash", min_len
+                        )
 
                     if not args.skip_audio:
                         utt.audio_norm_path, utt.audio_spec_path = cache_norm_audio(
@@ -626,6 +654,7 @@ class Utterance:
     phonemes: list[str] | None = None
     phoneme_ids: list[int] | None = None
     prosody_ids: list[int] | None = None
+    prosody_features: list[dict | None] | None = None  # A1/A2/A3 per phoneme
     audio_norm_path: Path | None = None
     audio_spec_path: Path | None = None
     f0_path: Path | None = None  # Path to cached F0 values

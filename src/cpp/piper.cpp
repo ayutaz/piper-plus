@@ -656,6 +656,20 @@ void loadModel(std::string modelPath, ModelSession &session, bool useCuda, int g
       spdlog::debug("Model supports duration output for phoneme timing");
     }
   }
+
+  // Check model inputs for optional features
+  size_t numInputNodes = session.onnx.GetInputCount();
+  for (size_t i = 0; i < numInputNodes; i++) {
+    auto inputName = session.onnx.GetInputNameAllocated(i, session.allocator);
+    std::string name(inputName.get());
+    if (name == "prosody_features") {
+      session.hasProsodyInput = true;
+      spdlog::debug("Model supports prosody features input (A1/A2/A3)");
+    } else if (name == "sid") {
+      session.hasMultiSpeaker = true;
+      spdlog::debug("Model supports multi-speaker (sid input)");
+    }
+  }
 }
 
 // Load Onnx model and JSON config file
@@ -695,7 +709,8 @@ void loadVoice(PiperConfig &config, std::string modelPath,
 void synthesize(std::vector<PhonemeId> &phonemeIds,
                 SynthesisConfig &synthesisConfig, ModelSession &session,
                 std::vector<int16_t> &audioBuffer, SynthesisResult &result,
-                Voice *voice = nullptr) {
+                Voice *voice = nullptr,
+                std::vector<int64_t> *prosodyFeatures = nullptr) {
   spdlog::debug("Synthesizing audio for {} phoneme id(s)", phonemeIds.size());
 
   auto memoryInfo = Ort::MemoryInfo::CreateCpu(
@@ -723,21 +738,40 @@ void synthesize(std::vector<PhonemeId> &phonemeIds,
       Ort::Value::CreateTensor<float>(memoryInfo, scales.data(), scales.size(),
                                       scalesShape.data(), scalesShape.size()));
 
-  // Add speaker id.
+  // Build input names dynamically based on model capabilities
+  std::vector<const char *> inputNamesVec = {"input", "input_lengths", "scales"};
+
+  // Add speaker id only for multi-speaker models
   // NOTE: These must be kept outside the "if" below to avoid being deallocated.
   std::vector<int64_t> speakerId{
       (int64_t)synthesisConfig.speakerId.value_or(0)};
   std::vector<int64_t> speakerIdShape{(int64_t)speakerId.size()};
 
-  if (synthesisConfig.speakerId) {
+  if (session.hasMultiSpeaker) {
     inputTensors.push_back(Ort::Value::CreateTensor<int64_t>(
         memoryInfo, speakerId.data(), speakerId.size(), speakerIdShape.data(),
         speakerIdShape.size()));
+    inputNamesVec.push_back("sid");
   }
 
-  // From export_onnx.py
-  std::array<const char *, 4> inputNames = {"input", "input_lengths", "scales",
-                                            "sid"};
+  // Add prosody features if model supports them and they are provided
+  // prosodyFeatures is a flat array of [a1, a2, a3, a1, a2, a3, ...] for each phoneme
+  std::vector<int64_t> zeroProsody;
+  if (session.hasProsodyInput) {
+    std::vector<int64_t> prosodyShape{1, (int64_t)phonemeIds.size(), 3};
+    if (prosodyFeatures && prosodyFeatures->size() == phonemeIds.size() * 3) {
+      inputTensors.push_back(Ort::Value::CreateTensor<int64_t>(
+          memoryInfo, prosodyFeatures->data(), prosodyFeatures->size(),
+          prosodyShape.data(), prosodyShape.size()));
+    } else {
+      // Use zeros if no prosody features provided
+      zeroProsody.resize(phonemeIds.size() * 3, 0);
+      inputTensors.push_back(Ort::Value::CreateTensor<int64_t>(
+          memoryInfo, zeroProsody.data(), zeroProsody.size(),
+          prosodyShape.data(), prosodyShape.size()));
+    }
+    inputNamesVec.push_back("prosody_features");
+  }
   
   // Check if we should get duration output
   std::vector<const char *> outputNamesVec;
@@ -749,7 +783,7 @@ void synthesize(std::vector<PhonemeId> &phonemeIds,
   // Infer
   auto startTime = std::chrono::steady_clock::now();
   auto outputTensors = session.onnx.Run(
-      Ort::RunOptions{nullptr}, inputNames.data(), inputTensors.data(),
+      Ort::RunOptions{nullptr}, inputNamesVec.data(), inputTensors.data(),
       inputTensors.size(), outputNamesVec.data(), outputNamesVec.size());
   auto endTime = std::chrono::steady_clock::now();
 
@@ -881,20 +915,32 @@ void textToAudio(PiperConfig &config, Voice &voice, std::string text,
   // Phonemes for each sentence
   spdlog::debug("Phonemizing text: {}", text);
   std::vector<std::vector<Phoneme>> phonemes;
-  
+
+  // Prosody features for each sentence (only used for OpenJTalk with prosody-enabled models)
+  std::vector<std::vector<ProsodyFeature>> allProsodyFeatures;
+  bool useProsody = voice.session.hasProsodyInput &&
+                    voice.phonemizeConfig.phonemeType == OpenJTalkPhonemes;
+
   // Process each segment
   for (const auto& segment : textSegments) {
     if (segment.isPhonemes) {
       // Direct phoneme input
       spdlog::debug("Processing direct phoneme input: {}", segment.text);
       auto parsedPhonemes = parsePhonemeString(segment.text, static_cast<int>(voice.phonemizeConfig.phonemeType));
-      
+
       // Add as a single "sentence"
       phonemes.push_back(parsedPhonemes);
+
+      // Add empty prosody features for direct phoneme input
+      if (useProsody) {
+        std::vector<ProsodyFeature> emptyProsody(parsedPhonemes.size(), {0, 0, 0});
+        allProsodyFeatures.push_back(std::move(emptyProsody));
+      }
     } else {
       // Regular text - phonemize as usual
       std::vector<std::vector<Phoneme>> segmentPhonemes;
-      
+      std::vector<std::vector<ProsodyFeature>> segmentProsody;
+
       if (voice.phonemizeConfig.phonemeType == eSpeakPhonemes) {
         // Use espeak-ng for phonemization
         eSpeakPhonemeConfig eSpeakConfig;
@@ -902,8 +948,13 @@ void textToAudio(PiperConfig &config, Voice &voice, std::string text,
         phonemize_eSpeak(segment.text, eSpeakConfig, segmentPhonemes);
       } else if (voice.phonemizeConfig.phonemeType == OpenJTalkPhonemes) {
         // Japanese OpenJTalk phonemizer
-        phonemize_openjtalk(segment.text, segmentPhonemes);
-        
+        if (useProsody) {
+          // Use prosody-aware phonemizer
+          phonemize_openjtalk_with_prosody(segment.text, segmentPhonemes, segmentProsody);
+        } else {
+          phonemize_openjtalk(segment.text, segmentPhonemes);
+        }
+
         // If OpenJTalk failed, we cannot process Japanese text
         if (segmentPhonemes.empty() && !segment.text.empty()) {
           throw std::runtime_error("OpenJTalk is not available or failed to process Japanese text. "
@@ -914,10 +965,20 @@ void textToAudio(PiperConfig &config, Voice &voice, std::string text,
         CodepointsPhonemeConfig codepointsConfig;
         phonemize_codepoints(segment.text, codepointsConfig, segmentPhonemes);
       }
-      
+
       // Add all sentences from this segment
-      for (auto& sentencePhonemes : segmentPhonemes) {
-        phonemes.push_back(std::move(sentencePhonemes));
+      for (size_t i = 0; i < segmentPhonemes.size(); i++) {
+        phonemes.push_back(std::move(segmentPhonemes[i]));
+
+        if (useProsody) {
+          if (i < segmentProsody.size()) {
+            allProsodyFeatures.push_back(std::move(segmentProsody[i]));
+          } else {
+            // Fallback: create zero prosody features
+            std::vector<ProsodyFeature> zeroProsody(phonemes.back().size(), {0, 0, 0});
+            allProsodyFeatures.push_back(std::move(zeroProsody));
+          }
+        }
       }
     }
   }
@@ -925,8 +986,9 @@ void textToAudio(PiperConfig &config, Voice &voice, std::string text,
   // Synthesize each sentence independently.
   std::vector<PhonemeId> phonemeIds;
   std::map<Phoneme, std::size_t> missingPhonemes;
+  size_t sentenceIdx = 0;
   for (auto phonemesIter = phonemes.begin(); phonemesIter != phonemes.end();
-       ++phonemesIter) {
+       ++phonemesIter, ++sentenceIdx) {
     std::vector<Phoneme> &sentencePhonemes = *phonemesIter;
 
     if (spdlog::should_log(spdlog::level::debug)) {
@@ -1017,8 +1079,115 @@ void textToAudio(PiperConfig &config, Voice &voice, std::string text,
       }
 
       // ids -> audio
+      std::vector<int64_t> *prosodyPtr = nullptr;
+      std::vector<int64_t> prosodyFlat;
+
+      if (useProsody && sentenceIdx < allProsodyFeatures.size()) {
+        // Convert prosody features to flat array matching phonemeIds length
+        // Format: [a1, a2, a3, a1, a2, a3, ...] for each phoneme ID
+        const auto &sentenceProsody = allProsodyFeatures[sentenceIdx];
+
+        // With intersperse padding, phonemeIds has format:
+        // PAD, P1, PAD, P2, PAD, ..., PN, PAD
+        // So phonemeIds.size() = 2 * num_phonemes + 1 (when interspersePad=true)
+        // Prosody features are per original phoneme (before padding)
+
+        size_t numPhonemeIds = phonemeIds.size();
+        prosodyFlat.resize(numPhonemeIds * 3, 0);  // Initialize with zeros
+
+        // Debug: Log prosody mapping details (PHASE 2)
+        spdlog::debug("Prosody mapping debug (BEFORE fix):");
+        spdlog::debug("  phonemeIds.size() = {}", phonemeIds.size());
+        spdlog::debug("  sentenceProsody.size() = {}", sentenceProsody.size());
+        spdlog::debug("  interspersePad = {}", voice.phonemizeConfig.interspersePad);
+
+        // Log first 10 phonemeIds
+        spdlog::debug("  First 10 phonemeIds:");
+        for (size_t i = 0; i < std::min(size_t(10), phonemeIds.size()); i++) {
+          spdlog::debug("    phonemeIds[{}] = {}", i, phonemeIds[i]);
+        }
+
+        // Log sentenceProsody contents
+        spdlog::debug("  sentenceProsody contents:");
+        for (size_t i = 0; i < std::min(size_t(10), sentenceProsody.size()); i++) {
+          spdlog::debug("    prosody[{}] = [{}, {}, {}]", i,
+                        sentenceProsody[i].a1,
+                        sentenceProsody[i].a2,
+                        sentenceProsody[i].a3);
+        }
+
+        if (voice.phonemizeConfig.interspersePad) {
+          // Map prosody to odd positions (1, 3, 5, ...) which are real phonemes
+          size_t prosodyIdx = 0;
+          for (size_t i = 1; i < numPhonemeIds && prosodyIdx < sentenceProsody.size(); i += 2) {
+            prosodyFlat[i * 3 + 0] = sentenceProsody[prosodyIdx].a1;
+            prosodyFlat[i * 3 + 1] = sentenceProsody[prosodyIdx].a2;
+            prosodyFlat[i * 3 + 2] = sentenceProsody[prosodyIdx].a3;
+            prosodyIdx++;
+          }
+        } else {
+          // Direct mapping - detect special tokens by ID (Option B)
+          // Special tokens (^=1, $=2, ?=3, #=4, [=5, ]=6) get zero prosody
+          // Real phonemes get prosody from sentenceProsody in order
+          prosodyFlat.clear();
+          prosodyFlat.reserve(numPhonemeIds * 3);
+
+          size_t prosodyIdx = 0;
+
+          for (size_t i = 0; i < phonemeIds.size(); i++) {
+            PhonemeId id = phonemeIds[i];
+
+            // Special tokens: ^=1, $=2, ?=3, #=4, [=5, ]=6
+            if (id >= 1 && id <= 6) {
+              // Special token → zero prosody
+              prosodyFlat.push_back(0.0f);
+              prosodyFlat.push_back(0.0f);
+              prosodyFlat.push_back(0.0f);
+
+              spdlog::debug("  phonemeIds[{}] = {} (special token) → prosody [0, 0, 0]", i, id);
+            } else {
+              // Real phoneme → use prosody data
+              if (prosodyIdx < sentenceProsody.size()) {
+                int64_t a1 = sentenceProsody[prosodyIdx].a1;
+                int64_t a2 = sentenceProsody[prosodyIdx].a2;
+                int64_t a3 = sentenceProsody[prosodyIdx].a3;
+
+                prosodyFlat.push_back(a1);
+                prosodyFlat.push_back(a2);
+                prosodyFlat.push_back(a3);
+
+                spdlog::debug("  phonemeIds[{}] = {} (real phoneme) → prosody [{:.1f}, {:.1f}, {:.1f}]",
+                              i, id, a1, a2, a3);
+
+                prosodyIdx++;
+              } else {
+                // Safety fallback: zero prosody
+                prosodyFlat.push_back(0.0f);
+                prosodyFlat.push_back(0.0f);
+                prosodyFlat.push_back(0.0f);
+
+                spdlog::warn("  phonemeIds[{}] = {} (out of range) → prosody [0, 0, 0]", i, id);
+              }
+            }
+          }
+
+          // Verification
+          if (prosodyFlat.size() != phonemeIds.size() * 3) {
+            spdlog::error("Prosody flat size mismatch: {} != {} * 3",
+                          prosodyFlat.size(), phonemeIds.size());
+          }
+
+          spdlog::debug("Final prosodyFlat size: {} (phonemeIds: {})",
+                        prosodyFlat.size(), phonemeIds.size());
+        }
+
+        prosodyPtr = &prosodyFlat;
+        spdlog::debug("Using prosody features: {} phoneme IDs, {} original prosody values",
+                      numPhonemeIds, sentenceProsody.size());
+      }
+
       synthesize(phonemeIds, voice.synthesisConfig, voice.session, audioBuffer,
-                 phraseResults[phraseIdx], &voice);
+                 phraseResults[phraseIdx], &voice, prosodyPtr);
 
       // Add end of phrase silence
       for (std::size_t i = 0; i < phraseSilenceSamples[phraseIdx]; i++) {
@@ -1285,7 +1454,12 @@ void textToAudioStreaming(PiperConfig &config, Voice &voice, std::string text,
     
     // Phonemize chunk
     std::vector<std::vector<Phoneme>> chunkSentences;
-    
+    std::vector<std::vector<ProsodyFeature>> chunkProsody;
+
+    // Check if model supports prosody input
+    bool useProsody = voice.session.hasProsodyInput &&
+                      voice.phonemizeConfig.phonemeType == OpenJTalkPhonemes;
+
     if (voice.phonemizeConfig.phonemeType == eSpeakPhonemes) {
       // Use espeak-ng for phonemization
       eSpeakPhonemeConfig eSpeakConfig;
@@ -1293,33 +1467,38 @@ void textToAudioStreaming(PiperConfig &config, Voice &voice, std::string text,
       phonemize_eSpeak(chunk, eSpeakConfig, chunkSentences);
     } else if (voice.phonemizeConfig.phonemeType == OpenJTalkPhonemes) {
       // Japanese OpenJTalk phonemizer
-      phonemize_openjtalk(chunk, chunkSentences);
+      if (useProsody) {
+        phonemize_openjtalk_with_prosody(chunk, chunkSentences, chunkProsody);
+      } else {
+        phonemize_openjtalk(chunk, chunkSentences);
+      }
     } else {
       // Use UTF-8 codepoints as "phonemes"
       CodepointsPhonemeConfig codepointsConfig;
       phonemize_codepoints(chunk, codepointsConfig, chunkSentences);
     }
-    
+
     // Process each sentence in the chunk
-    for (auto& sentencePhonemes : chunkSentences) {
+    for (size_t sentIdx = 0; sentIdx < chunkSentences.size(); sentIdx++) {
+      auto& sentencePhonemes = chunkSentences[sentIdx];
       if (sentencePhonemes.empty()) {
         continue;
       }
-      
+
       // Convert phonemes to IDs
       std::vector<PhonemeId> phonemeIds;
       std::map<Phoneme, std::size_t> missingPhonemes;
       // Create PhonemeIdConfig from voice config
       PhonemeIdConfig idConfig;
-      idConfig.phonemeIdMap = 
+      idConfig.phonemeIdMap =
           std::make_shared<PhonemeIdMap>(voice.phonemizeConfig.phonemeIdMap);
       idConfig.interspersePad = voice.phonemizeConfig.interspersePad;
       idConfig.addBos = true;
       idConfig.addEos = true;
-      
+
       phonemes_to_ids(sentencePhonemes, idConfig, phonemeIds,
                       missingPhonemes);
-      
+
       // Report missing phonemes
       if (!missingPhonemes.empty()) {
         for (auto& [phoneme, count] : missingPhonemes) {
@@ -1327,12 +1506,39 @@ void textToAudioStreaming(PiperConfig &config, Voice &voice, std::string text,
                        phonemeToString(phoneme), count);
         }
       }
-      
+
+      // Prepare prosody features if available
+      std::vector<int64_t> *prosodyPtr = nullptr;
+      std::vector<int64_t> prosodyFlat;
+
+      if (useProsody && sentIdx < chunkProsody.size()) {
+        const auto &sentenceProsody = chunkProsody[sentIdx];
+        size_t numPhonemeIds = phonemeIds.size();
+        prosodyFlat.resize(numPhonemeIds * 3, 0);
+
+        if (voice.phonemizeConfig.interspersePad) {
+          size_t prosodyIdx = 0;
+          for (size_t i = 1; i < numPhonemeIds && prosodyIdx < sentenceProsody.size(); i += 2) {
+            prosodyFlat[i * 3 + 0] = sentenceProsody[prosodyIdx].a1;
+            prosodyFlat[i * 3 + 1] = sentenceProsody[prosodyIdx].a2;
+            prosodyFlat[i * 3 + 2] = sentenceProsody[prosodyIdx].a3;
+            prosodyIdx++;
+          }
+        } else {
+          for (size_t i = 0; i < numPhonemeIds && i < sentenceProsody.size(); i++) {
+            prosodyFlat[i * 3 + 0] = sentenceProsody[i].a1;
+            prosodyFlat[i * 3 + 1] = sentenceProsody[i].a2;
+            prosodyFlat[i * 3 + 2] = sentenceProsody[i].a3;
+          }
+        }
+        prosodyPtr = &prosodyFlat;
+      }
+
       // Synthesize audio for this chunk
       std::vector<int16_t> chunkAudioBuffer;
       SynthesisResult chunkResult;
-      synthesize(phonemeIds, voice.synthesisConfig, voice.session, 
-                 chunkAudioBuffer, chunkResult, &voice);
+      synthesize(phonemeIds, voice.synthesisConfig, voice.session,
+                 chunkAudioBuffer, chunkResult, &voice, prosodyPtr);
       
       // Update cumulative result
       result.inferSeconds += chunkResult.inferSeconds;

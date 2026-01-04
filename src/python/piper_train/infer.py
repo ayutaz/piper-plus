@@ -16,6 +16,24 @@ from .vits.wavfile import write as write_wav
 _LOGGER = logging.getLogger("piper_train.infer")
 
 
+def _prosody_features_to_tensor(prosody_features: list) -> torch.LongTensor:
+    """Convert prosody features list to tensor.
+
+    Args:
+        prosody_features: List of {"a1": int, "a2": int, "a3": int} or None
+
+    Returns:
+        Tensor of shape (1, num_phonemes, 3)
+    """
+    result = []
+    for feat in prosody_features:
+        if feat is None:
+            result.append([0, 0, 0])
+        else:
+            result.append([feat["a1"], feat["a2"], feat["a3"]])
+    return torch.LongTensor(result).unsqueeze(0)
+
+
 def main():
     """Main entry point"""
     logging.basicConfig(level=logging.DEBUG)
@@ -27,13 +45,20 @@ def main():
     parser.add_argument("--sample-rate", type=int, default=22050)
     parser.add_argument("--noise-scale", type=float, default=0.667)
     parser.add_argument("--length-scale", type=float, default=1.0)
-    parser.add_argument("--noise-w", type=float, default=0.8)
+    parser.add_argument("--noise-scale-w", type=float, default=0.8)
     args = parser.parse_args()
 
     args.output_dir = Path(args.output_dir)
     args.output_dir.mkdir(parents=True, exist_ok=True)
 
     model = VitsModel.load_from_checkpoint(args.checkpoint, dataset=None)
+
+    # Check if model uses prosody features
+    has_prosody = getattr(model.model_g, "prosody_dim", 0) > 0
+    if has_prosody:
+        _LOGGER.info(
+            "Model uses prosody features (prosody_dim=%d)", model.model_g.prosody_dim
+        )
 
     # Inference only
     model.eval()
@@ -50,14 +75,27 @@ def main():
         utt_id = str(i)
         phoneme_ids = utt["phoneme_ids"]
         speaker_id = utt.get("speaker_id")
+        prosody_features_data = utt.get("prosody_features")
 
         text = torch.LongTensor(phoneme_ids).unsqueeze(0)
         text_lengths = torch.LongTensor([len(phoneme_ids)])
-        scales = [args.noise_scale, args.length_scale, args.noise_w]
+        scales = [args.noise_scale, args.length_scale, args.noise_scale_w]
         sid = torch.LongTensor([speaker_id]) if speaker_id is not None else None
 
+        # Prepare prosody features if model supports them
+        prosody_features = None
+        if has_prosody and prosody_features_data is not None:
+            prosody_features = _prosody_features_to_tensor(prosody_features_data)
+            _LOGGER.debug("Using prosody features for utterance %d", i)
+
         start_time = time.perf_counter()
-        audio = model(text, text_lengths, scales, sid=sid).detach().numpy()
+        audio = (
+            model(
+                text, text_lengths, scales, sid=sid, prosody_features=prosody_features
+            )
+            .detach()
+            .numpy()
+        )
         audio = audio_float_to_int16(audio)
         end_time = time.perf_counter()
 

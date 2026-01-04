@@ -37,6 +37,12 @@ def main():
     model = onnxruntime.InferenceSession(str(args.model), sess_options=sess_options)
     _LOGGER.info("Loaded model from %s", args.model)
 
+    # Check if model supports prosody features
+    input_names = [inp.name for inp in model.get_inputs()]
+    has_prosody = "prosody_features" in input_names
+    if has_prosody:
+        _LOGGER.info("Model supports prosody features (A1/A2/A3)")
+
     # text_empty = np.zeros((1, 300), dtype=np.int64)
     # text_lengths_empty = np.array([text_empty.shape[1]], dtype=np.int64)
     # scales = np.array(
@@ -59,6 +65,7 @@ def main():
         utt_id = str(i)
         phoneme_ids = utt["phoneme_ids"]
         speaker_id = utt.get("speaker_id")
+        prosody_features_data = utt.get("prosody_features")
 
         text = np.expand_dims(np.array(phoneme_ids, dtype=np.int64), 0)
         text_lengths = np.array([text.shape[1]], dtype=np.int64)
@@ -71,16 +78,38 @@ def main():
         if speaker_id is not None:
             sid = np.array([speaker_id], dtype=np.int64)
 
+        # Build input dictionary
+        inputs = {
+            "input": text,
+            "input_lengths": text_lengths,
+            "scales": scales,
+        }
+
+        if sid is not None:
+            inputs["sid"] = sid
+
+        # Handle prosody features if model supports them
+        if has_prosody:
+            if prosody_features_data is not None:
+                # Convert prosody_features to numpy array (float32 to match ONNX export)
+                # Format: [[a1, a2, a3], [a1, a2, a3], ...]
+                # Each element may be None for special tokens
+                prosody_array = []
+                for pf in prosody_features_data:
+                    if pf is None:
+                        prosody_array.append([0, 0, 0])
+                    else:
+                        prosody_array.append([pf["a1"], pf["a2"], pf["a3"]])
+                prosody_features = np.expand_dims(
+                    np.array(prosody_array, dtype=np.int64), 0
+                )
+            else:
+                # No prosody data provided - use zeros (int64)
+                prosody_features = np.zeros((1, text.shape[1], 3), dtype=np.int64)
+            inputs["prosody_features"] = prosody_features
+
         start_time = time.perf_counter()
-        audio = model.run(
-            None,
-            {
-                "input": text,
-                "input_lengths": text_lengths,
-                "scales": scales,
-                "sid": sid,
-            },
-        )[0].squeeze((0, 1))
+        audio = model.run(None, inputs)[0].squeeze((0, 1))
         # audio = denoise(audio, bias_spec, 10)
         audio = audio_float_to_int16(audio.squeeze())
         end_time = time.perf_counter()

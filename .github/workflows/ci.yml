@@ -228,7 +228,7 @@ jobs:
             # Unix platforms
             # Run critical tests if they exist
             TESTS_FOUND=false
-            for test in test_gpu_device_id test_phoneme_parser; do
+            for test in test_gpu_device_id test_phoneme_parser test_model_speaker_detection test_prosody_inference; do
               echo "Checking for ${test}..."
               if ctest -C ${{ matrix.build_type }} -N | grep -q "${test}"; then
                 TESTS_FOUND=true
@@ -347,7 +347,9 @@ jobs:
           if [ "${{ runner.os }}" == "Windows" ]; then
             python -m pytest tests/ -v --tb=short -m "unit and not phonemize and not training" -k "not test_phonemize and not test_japanese"
           else
-            python -m pytest tests/ -v --tb=short -m "unit and not training and not benchmark"
+            # Exclude inference tests - they require PyTorch and are covered by python-tests.yml
+            # Use --ignore to prevent collection (import) of files that require torch
+            python -m pytest tests/ -v --tb=short -m "unit and not training and not benchmark and not inference" --ignore=tests/test_pytorch_onnx_parity.py
           fi
       
       - name: Upload coverage reports

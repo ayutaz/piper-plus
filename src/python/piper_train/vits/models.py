@@ -522,6 +522,13 @@ class MultiPeriodDiscriminator(torch.nn.Module):
 class SynthesizerTrn(nn.Module):
     """
     Synthesizer for Training
+
+    Parameters
+    ----------
+    prosody_dim : int, optional
+        Dimension for prosody feature projection. If > 0, enables prosody-aware
+        duration prediction using A1/A2/A3 values from OpenJTalk labels.
+        Default is 0 (disabled for backward compatibility).
     """
 
     def __init__(
@@ -545,6 +552,7 @@ class SynthesizerTrn(nn.Module):
         n_speakers: int = 1,
         gin_channels: int = 0,
         use_sdp: bool = True,
+        prosody_dim: int = 16,
     ):
         super().__init__()
         self.n_vocab = n_vocab
@@ -565,6 +573,7 @@ class SynthesizerTrn(nn.Module):
         self.segment_size = segment_size
         self.n_speakers = n_speakers
         self.gin_channels = gin_channels
+        self.prosody_dim = prosody_dim
 
         self.use_sdp = use_sdp
 
@@ -601,19 +610,65 @@ class SynthesizerTrn(nn.Module):
             inter_channels, hidden_channels, 5, 1, 4, gin_channels=gin_channels
         )
 
+        # Prosody feature projection (A1/A2/A3 → prosody_dim)
+        if prosody_dim > 0:
+            self.prosody_proj = nn.Linear(3, prosody_dim)
+            dp_in_channels = hidden_channels + prosody_dim
+        else:
+            self.prosody_proj = None
+            dp_in_channels = hidden_channels
+
         if use_sdp:
             self.dp = StochasticDurationPredictor(
-                hidden_channels, 192, 3, 0.5, 4, gin_channels=gin_channels
+                dp_in_channels, 192, 3, 0.5, 4, gin_channels=gin_channels
             )
         else:
             self.dp = DurationPredictor(
-                hidden_channels, 256, 3, 0.5, gin_channels=gin_channels
+                dp_in_channels, 256, 3, 0.5, gin_channels=gin_channels
             )
 
         if n_speakers > 1:
             self.emb_g = nn.Embedding(n_speakers, gin_channels)
 
-    def forward(self, x, x_lengths, y, y_lengths, sid=None):
+    def _prepare_prosody_input(self, x, x_mask, prosody_features):
+        """Prepare encoder output with prosody features for duration predictor.
+
+        Parameters
+        ----------
+        x : torch.Tensor
+            Encoder output [batch, hidden_channels, time]
+        x_mask : torch.Tensor
+            Mask [batch, 1, time]
+        prosody_features : torch.Tensor or None
+            Prosody features [batch, time, 3] containing A1/A2/A3 values
+
+        Returns
+        -------
+        torch.Tensor
+            Input for duration predictor, with prosody features concatenated
+            if prosody_dim > 0.
+        """
+        if self.prosody_dim > 0:
+            if prosody_features is not None:
+                # prosody_features: [batch, time, 3] → [batch, prosody_dim, time]
+                prosody_proj = self.prosody_proj(prosody_features.float())
+                prosody_proj = prosody_proj.transpose(1, 2)
+            else:
+                # No prosody features provided - use zeros for backward compat
+                prosody_proj = torch.zeros(
+                    x.size(0),
+                    self.prosody_dim,
+                    x.size(2),
+                    device=x.device,
+                    dtype=x.dtype,
+                )
+            # Concatenate with encoder output
+            x_dp = torch.cat([x, prosody_proj * x_mask], dim=1)
+        else:
+            x_dp = x
+        return x_dp
+
+    def forward(self, x, x_lengths, y, y_lengths, sid=None, prosody_features=None):
         x, m_p, logs_p, x_mask = self.enc_p(x, x_lengths)
         if self.n_speakers > 1:
             g = self.emb_g(sid).unsqueeze(-1)  # [b, h, 1]
@@ -647,13 +702,16 @@ class SynthesizerTrn(nn.Module):
                 .detach()
             )
 
+        # Prepare input for duration predictor with prosody features
+        x_dp = self._prepare_prosody_input(x, x_mask, prosody_features)
+
         w = attn.sum(2)
         if self.use_sdp:
-            l_length = self.dp(x, x_mask, w, g=g)
+            l_length = self.dp(x_dp, x_mask, w, g=g)
             l_length = l_length / torch.sum(x_mask)
         else:
             logw_ = torch.log(w + 1e-6) * x_mask
-            logw = self.dp(x, x_mask, g=g)
+            logw = self.dp(x_dp, x_mask, g=g)
             l_length = torch.sum((logw - logw_) ** 2, [1, 2]) / torch.sum(
                 x_mask
             )  # for averaging
@@ -685,6 +743,7 @@ class SynthesizerTrn(nn.Module):
         length_scale=1,
         noise_scale_w=0.8,
         max_len=None,
+        prosody_features=None,
     ):
         x, m_p, logs_p, x_mask = self.enc_p(x, x_lengths)
         if self.n_speakers > 1:
@@ -693,10 +752,13 @@ class SynthesizerTrn(nn.Module):
         else:
             g = None
 
+        # Prepare input for duration predictor with prosody features
+        x_dp = self._prepare_prosody_input(x, x_mask, prosody_features)
+
         if self.use_sdp:
-            logw = self.dp(x, x_mask, g=g, reverse=True, noise_scale=noise_scale_w)
+            logw = self.dp(x_dp, x_mask, g=g, reverse=True, noise_scale=noise_scale_w)
         else:
-            logw = self.dp(x, x_mask, g=g)
+            logw = self.dp(x_dp, x_mask, g=g)
         w = torch.exp(logw) * x_mask * length_scale
         w_ceil = torch.ceil(w)
         y_lengths = torch.clamp_min(torch.sum(w_ceil, [1, 2]), 1).long()

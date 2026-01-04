@@ -21,6 +21,7 @@ class Utterance:
     audio_spec_path: Path
     speaker_id: int | None = None
     text: str | None = None
+    prosody_features: list[dict | None] | None = None  # A1/A2/A3 per phoneme
 
 
 @dataclass
@@ -30,6 +31,7 @@ class UtteranceTensors:
     audio_norm: FloatTensor
     speaker_id: LongTensor | None = None
     text: str | None = None
+    prosody_features: LongTensor | None = None  # Shape: (num_phonemes, 3) for A1/A2/A3
 
     @property
     def spec_length(self) -> int:
@@ -45,6 +47,7 @@ class Batch:
     audios: FloatTensor
     audio_lengths: LongTensor
     speaker_ids: LongTensor | None = None
+    prosody_features: LongTensor | None = None  # Shape: (batch, max_phonemes, 3)
 
 
 class PiperDataset(Dataset):
@@ -88,6 +91,13 @@ class PiperDataset(Dataset):
                     utt.audio_spec_path, map_location="cpu", weights_only=True
                 )
 
+                # Convert prosody_features to tensor if available
+                prosody_tensor = None
+                if utt.prosody_features is not None:
+                    prosody_tensor = self._prosody_features_to_tensor(
+                        utt.prosody_features
+                    )
+
                 return UtteranceTensors(
                     phoneme_ids=LongTensor(utt.phoneme_ids),
                     audio_norm=audio_norm,
@@ -98,6 +108,7 @@ class PiperDataset(Dataset):
                         else None
                     ),
                     text=utt.text,
+                    prosody_features=prosody_tensor,
                 )
             except Exception as e:
                 _LOGGER.error(
@@ -119,6 +130,31 @@ class PiperDataset(Dataset):
                     idx = len(self.utterances) - 1
                 utt = self.utterances[idx]
                 # 次のファイルでリトライ（ログは出さない）
+
+    @staticmethod
+    def _prosody_features_to_tensor(
+        prosody_features: list[dict | None],
+    ) -> LongTensor:
+        """Convert prosody features (list of dicts) to tensor.
+
+        Args:
+            prosody_features: List of {"a1": int, "a2": int, "a3": int} or None
+
+        Returns:
+            LongTensor of shape (num_phonemes, 3) where:
+            - [:, 0] = A1 values (accent nucleus relative position)
+            - [:, 1] = A2 values (mora position in phrase, 1-based)
+            - [:, 2] = A3 values (total morae in phrase)
+            - Special tokens (None) are encoded as (0, 0, 0)
+        """
+        result = []
+        for feat in prosody_features:
+            if feat is not None:
+                result.append([feat["a1"], feat["a2"], feat["a3"]])
+            else:
+                # Special tokens (^, $, ?, _, #, [, ]) have no prosody info
+                result.append([0, 0, 0])
+        return LongTensor(result)
 
     @staticmethod
     def load_dataset(
@@ -161,6 +197,7 @@ class PiperDataset(Dataset):
             audio_spec_path=Path(utt_dict["audio_spec_path"]),
             speaker_id=utt_dict.get("speaker_id"),
             text=utt_dict.get("text"),
+            prosody_features=utt_dict.get("prosody_features"),
         )
 
 
@@ -178,6 +215,7 @@ class UtteranceCollate:
         max_audio_length = 0
 
         num_mels = 0
+        has_prosody = False
 
         # Determine lengths
         for _utt_idx, utt in enumerate(utterances):
@@ -195,6 +233,9 @@ class UtteranceCollate:
             num_mels = utt.spectrogram.size(0)
             if self.is_multispeaker:
                 assert utt.speaker_id is not None, "Missing speaker id"
+
+            if utt.prosody_features is not None:
+                has_prosody = True
 
         # Audio cannot be smaller than segment size (8192)
         max_audio_length = max(max_audio_length, self.segment_size)
@@ -215,6 +256,12 @@ class UtteranceCollate:
         speaker_ids: LongTensor | None = None
         if self.is_multispeaker:
             speaker_ids = LongTensor(num_utterances)
+
+        # Create prosody tensor if any utterance has prosody features
+        prosody_padded: LongTensor | None = None
+        if has_prosody:
+            prosody_padded = LongTensor(num_utterances, max_phonemes_length, 3)
+            prosody_padded.zero_()
 
         # Sort by decreasing spectrogram length
         sorted_utterances = sorted(
@@ -238,6 +285,14 @@ class UtteranceCollate:
                 assert speaker_ids is not None
                 speaker_ids[utt_idx] = utt.speaker_id
 
+            if prosody_padded is not None and utt.prosody_features is not None:
+                # prosody_features の長さが phoneme_length と異なる場合に対応
+                prosody_length = min(len(utt.prosody_features), phoneme_length)
+                if prosody_length > 0:
+                    prosody_padded[utt_idx, :prosody_length, :] = utt.prosody_features[
+                        :prosody_length
+                    ]
+
         return Batch(
             phoneme_ids=phonemes_padded,
             phoneme_lengths=phoneme_lengths,
@@ -246,6 +301,7 @@ class UtteranceCollate:
             audios=audio_padded,
             audio_lengths=audio_lengths,
             speaker_ids=speaker_ids,
+            prosody_features=prosody_padded,
         )
 
 
@@ -308,7 +364,11 @@ class SpeakerBalancedBatchSampler:
         self.speakers = list(self.speaker_to_indices.keys())
         self.batch_size = batch_size
         self.samples_per_speaker = samples_per_speaker
-        self.speakers_per_batch = batch_size // samples_per_speaker
+        # 話者数が少ない場合は実際の話者数を使用
+        calculated_speakers_per_batch = batch_size // samples_per_speaker
+        self.speakers_per_batch = min(calculated_speakers_per_batch, len(self.speakers))
+        # 実際のバッチサイズを調整
+        self.effective_batch_size = self.speakers_per_batch * samples_per_speaker
         self.drop_last = drop_last
 
         # DDP対応: rank と world_size を取得
@@ -327,12 +387,14 @@ class SpeakerBalancedBatchSampler:
                 f"batch_size ({batch_size}) must be >= samples_per_speaker ({samples_per_speaker})"
             )
 
-        if len(self.speakers) < self.speakers_per_batch:
+        if len(self.speakers) < calculated_speakers_per_batch:
             _LOGGER.warning(
-                "Number of speakers (%d) is less than speakers_per_batch (%d). "
-                "Some batches may have fewer speakers.",
+                "Number of speakers (%d) is less than requested speakers_per_batch (%d). "
+                "Using %d speakers per batch (effective batch_size=%d).",
                 len(self.speakers),
+                calculated_speakers_per_batch,
                 self.speakers_per_batch,
+                self.effective_batch_size,
             )
 
     def set_epoch(self, epoch: int):

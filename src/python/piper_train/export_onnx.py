@@ -133,9 +133,14 @@ def main() -> None:
 
     # old_forward = model_g.infer
 
+    # Check if model uses prosody features
+    has_prosody = getattr(model_g, "prosody_dim", 0) > 0
+
     if args.with_durations:
 
-        def infer_forward_with_durations(text, text_lengths, scales, sid=None):
+        def infer_forward_with_durations(
+            text, text_lengths, scales, sid=None, prosody_features=None
+        ):
             """Forward function that returns both audio and duration information"""
             noise_scale = scales[0]
             length_scale = scales[1]
@@ -149,13 +154,16 @@ def main() -> None:
             else:
                 g = None
 
+            # Prepare prosody input for duration predictor
+            x_dp = model_g._prepare_prosody_input(x, x_mask, prosody_features)
+
             # Get duration predictions
             if model_g.use_sdp:
                 logw = model_g.dp(
-                    x, x_mask, g=g, reverse=True, noise_scale=noise_scale_w
+                    x_dp, x_mask, g=g, reverse=True, noise_scale=noise_scale_w
                 )
             else:
-                logw = model_g.dp(x, x_mask, g=g)
+                logw = model_g.dp(x_dp, x_mask, g=g)
 
             w = torch.exp(logw) * x_mask * length_scale
 
@@ -167,6 +175,7 @@ def main() -> None:
                 length_scale=length_scale,
                 noise_scale_w=noise_scale_w,
                 sid=sid,
+                prosody_features=prosody_features,
             )[0].unsqueeze(1)
 
             # Return both audio and durations
@@ -178,7 +187,7 @@ def main() -> None:
         model_g.forward = infer_forward_with_durations
     else:
 
-        def infer_forward(text, text_lengths, scales, sid=None):
+        def infer_forward(text, text_lengths, scales, sid=None, prosody_features=None):
             noise_scale = scales[0]
             length_scale = scales[1]
             noise_scale_w = scales[2]
@@ -189,6 +198,7 @@ def main() -> None:
                 length_scale=length_scale,
                 noise_scale_w=noise_scale_w,
                 sid=sid,
+                prosody_features=prosody_features,
             )[0].unsqueeze(1)
 
             return audio
@@ -208,9 +218,19 @@ def main() -> None:
     # noise, noise_w, length
     scales = torch.FloatTensor([0.667, 1.0, 0.8])
 
+    # Prosody features [batch, phonemes, 3] - A1/A2/A3 values
+    # Use int64 (long) so that .float() in models.py creates explicit Cast node in ONNX graph
+    prosody_features: torch.Tensor | None = None
+    if has_prosody:
+        prosody_features = torch.zeros(1, dummy_input_length, 3, dtype=torch.long)
+
     # Include all inputs for compatibility
-    if num_speakers > 1:
+    if num_speakers > 1 and has_prosody:
+        dummy_input = (sequences, sequence_lengths, scales, sid, prosody_features)
+    elif num_speakers > 1:
         dummy_input = (sequences, sequence_lengths, scales, sid)
+    elif has_prosody:
+        dummy_input = (sequences, sequence_lengths, scales, None, prosody_features)
     else:
         dummy_input = (sequences, sequence_lengths, scales)
 
@@ -239,6 +259,15 @@ def main() -> None:
     else:
         input_names = ["input", "input_lengths", "scales"]
 
+    # Add prosody_features if model uses prosody
+    if has_prosody:
+        input_names.append("prosody_features")
+        dynamic_axes["prosody_features"] = {0: "batch_size", 1: "phonemes"}
+        _LOGGER.info(
+            "Exporting model with prosody features support (prosody_dim=%d)",
+            model_g.prosody_dim,
+        )
+
     torch.onnx.export(
         model=model_g,
         args=dummy_input,
@@ -253,8 +282,15 @@ def main() -> None:
     _LOGGER.info("Exported model to %s", args.output)
 
     # Apply ONNX simplification if requested
+    # Skip simplification for prosody models to avoid numerical precision issues
     if args.simplify:
-        simplify_onnx_model(args.output)
+        if has_prosody:
+            _LOGGER.info(
+                "Prosody features enabled (prosody_dim=%d) - skipping ONNX simplification to preserve numerical accuracy",
+                model_g.prosody_dim,
+            )
+        else:
+            simplify_onnx_model(args.output)
 
 
 # -----------------------------------------------------------------------------
