@@ -11,10 +11,15 @@ from pathlib import Path
 class CustomDictionary:
     """カスタム辞書クラス"""
 
-    def __init__(self, dict_paths: str | list[str] | None = None):
+    def __init__(
+        self,
+        dict_paths: str | list[str] | None = None,
+        load_defaults: bool = True,
+    ):
         """
         Args:
             dict_paths: 辞書ファイルのパス（単一または複数）
+            load_defaults: デフォルト辞書を読み込むかどうか（デフォルト: True）
         """
         self.entries: dict[str, dict[str, str | int]] = {}
         self.case_sensitive_entries: dict[str, dict[str, str | int]] = {}
@@ -26,7 +31,8 @@ class CustomDictionary:
         )
 
         # デフォルト辞書を読み込む
-        self._load_default_dictionaries()
+        if load_defaults:
+            self._load_default_dictionaries()
 
         # ユーザー指定の辞書を読み込む
         if dict_paths:
@@ -175,8 +181,11 @@ class CustomDictionary:
                 # 日本語を含む場合はそのまま置換
                 pattern_str = escaped_word
             else:
-                # 英語の場合は単語境界を使用
-                pattern_str = r"\b" + escaped_word + r"\b"
+                # 英語の場合: \bは日本語文字の境界では機能しないため、
+                # 前後が英数字でないことを確認する
+                # (?<![a-zA-Z0-9]) = 前が英数字でない
+                # (?![a-zA-Z0-9]) = 後が英数字でない
+                pattern_str = r"(?<![a-zA-Z0-9])" + escaped_word + r"(?![a-zA-Z0-9])"
 
             flags = 0 if case_sensitive else re.IGNORECASE
             self.pattern_cache[cache_key] = re.compile(pattern_str, flags)

@@ -10,12 +10,13 @@ import pytest
 from piper_train.phonemize.custom_dict import CustomDictionary, apply_custom_dictionary
 
 
+@pytest.mark.unit
 class TestCustomDictionary:
     """CustomDictionaryクラスのテスト"""
-    
+
     def test_basic_replacement(self):
         """基本的な単語置換のテスト"""
-        dict_obj = CustomDictionary()
+        dict_obj = CustomDictionary(load_defaults=False)
         dict_obj.add_word("Docker", "ドッカー", priority=9)
         dict_obj.add_word("GitHub", "ギットハブ", priority=9)
         
@@ -25,7 +26,7 @@ class TestCustomDictionary:
     
     def test_case_insensitive(self):
         """大文字小文字を区別しない置換のテスト"""
-        dict_obj = CustomDictionary()
+        dict_obj = CustomDictionary(load_defaults=False)
         dict_obj.add_word("docker", "ドッカー", priority=9)
         
         text = "Docker, DOCKER, docker"
@@ -34,7 +35,7 @@ class TestCustomDictionary:
     
     def test_case_sensitive(self):
         """大文字小文字を区別する置換のテスト"""
-        dict_obj = CustomDictionary()
+        dict_obj = CustomDictionary(load_defaults=False)
         dict_obj.add_word("PyTorch", "パイトーチ", priority=8)
         dict_obj.add_word("pytorch", "パイトーチ小文字", priority=8)
         
@@ -44,7 +45,7 @@ class TestCustomDictionary:
     
     def test_word_boundary(self):
         """単語境界の処理テスト"""
-        dict_obj = CustomDictionary()
+        dict_obj = CustomDictionary(load_defaults=False)
         dict_obj.add_word("AI", "エーアイ", priority=9)
         
         text = "AI技術とAIDS（エイズ）は違う"
@@ -53,7 +54,7 @@ class TestCustomDictionary:
     
     def test_priority(self):
         """優先度のテスト"""
-        dict_obj = CustomDictionary()
+        dict_obj = CustomDictionary(load_defaults=False)
         dict_obj.add_word("test", "テスト１", priority=5)
         dict_obj.add_word("test", "テスト２", priority=8)  # より高い優先度
         
@@ -103,7 +104,7 @@ class TestCustomDictionary:
     
     def test_japanese_text(self):
         """日本語テキストとの混在テスト"""
-        dict_obj = CustomDictionary()
+        dict_obj = CustomDictionary(load_defaults=False)
         dict_obj.add_word("Piper", "パイパー", priority=10)
         dict_obj.add_word("TTS", "ティーティーエス", priority=10)
         
@@ -162,10 +163,10 @@ class TestCustomDictionary:
     
     def test_stats(self):
         """統計情報のテスト"""
-        dict_obj = CustomDictionary()
+        dict_obj = CustomDictionary(load_defaults=False)
         dict_obj.add_word("docker", "ドッカー")  # case insensitive
         dict_obj.add_word("PyTorch", "パイトーチ")  # case sensitive
-        
+
         stats = dict_obj.get_stats()
         assert stats["total_entries"] == 2
         assert stats["case_insensitive_entries"] == 1
@@ -212,3 +213,110 @@ class TestJapaneseIntegration:
         # （実際の音素は環境により異なる可能性があるため、基本的な動作確認のみ）
         assert isinstance(phonemes, list)
         assert len(phonemes) > 0
+
+
+@pytest.mark.unit
+class TestDefaultDictionaryLoading:
+    """デフォルト辞書の自動読み込みテスト"""
+
+    def test_load_all_default_dictionaries(self):
+        """全てのデフォルト辞書が読み込まれることを確認"""
+        dict_obj = CustomDictionary()
+        stats = dict_obj.get_stats()
+
+        # 複数の辞書が読み込まれている場合、エントリ数は多くなる
+        # 最低でも500エントリ以上あることを確認（5つの辞書合計）
+        assert stats["total_entries"] >= 500, (
+            f"Expected at least 500 entries, got {stats['total_entries']}. "
+            "All dictionary files should be loaded."
+        )
+
+    def test_default_dictionary_entries_common(self):
+        """default_common_dict.jsonのエントリが読み込まれていることを確認"""
+        dict_obj = CustomDictionary()
+
+        # 誤読防止エントリ（成、声、生を含む語）
+        assert dict_obj.get_pronunciation("成功") == "せいこう"
+        assert dict_obj.get_pronunciation("音声") == "おんせい"
+        assert dict_obj.get_pronunciation("生成") == "せいせい"
+
+        # 地名
+        assert dict_obj.get_pronunciation("東京") == "とうきょう"
+        assert dict_obj.get_pronunciation("大阪") == "おおさか"
+
+    def test_default_dictionary_entries_ai(self):
+        """AI関連用語が読み込まれていることを確認"""
+        dict_obj = CustomDictionary()
+
+        # AI関連用語（default_common_dict.jsonに追加済み）
+        assert dict_obj.get_pronunciation("Llama") == "ラマ"
+        assert dict_obj.get_pronunciation("Mistral") == "ミストラル"
+        assert dict_obj.get_pronunciation("Sora") == "ソラ"
+        assert dict_obj.get_pronunciation("Cursor") == "カーソル"
+
+    def test_default_dictionary_entries_tech(self):
+        """技術用語が読み込まれていることを確認"""
+        dict_obj = CustomDictionary()
+
+        # default_tech_dict.jsonまたはadditional_tech_dict.jsonのエントリ
+        # 基本的なIT用語が読み込まれていることを確認
+        ai_pronunciation = dict_obj.get_pronunciation("AI")
+        assert ai_pronunciation is not None, "AI should be in the dictionary"
+
+    def test_glob_pattern_only_json(self):
+        """globパターンで.jsonファイルのみ読み込むことを確認"""
+        import tempfile
+        import shutil
+
+        # 一時ディレクトリを作成
+        temp_dir = tempfile.mkdtemp()
+        try:
+            # .jsonファイルを作成
+            json_path = Path(temp_dir) / "test_dict.json"
+            with open(json_path, "w", encoding="utf-8") as f:
+                json.dump({
+                    "version": "2.0",
+                    "entries": {"TestWord": {"pronunciation": "テストワード", "priority": 10}}
+                }, f, ensure_ascii=False)
+
+            # .txtファイルを作成（読み込まれないはず）
+            txt_path = Path(temp_dir) / "not_a_dict.txt"
+            with open(txt_path, "w", encoding="utf-8") as f:
+                f.write("This is not a dictionary")
+
+            # .json.bakファイルを作成（読み込まれないはず）
+            bak_path = Path(temp_dir) / "backup.json.bak"
+            with open(bak_path, "w", encoding="utf-8") as f:
+                json.dump({
+                    "version": "2.0",
+                    "entries": {"BackupWord": {"pronunciation": "バックアップ", "priority": 10}}
+                }, f, ensure_ascii=False)
+
+            # 辞書を読み込み
+            dict_obj = CustomDictionary()
+            # 一時ディレクトリのパスを設定して再読み込み
+            dict_obj.default_dict_dir = Path(temp_dir)
+            dict_obj.entries.clear()
+            dict_obj.case_sensitive_entries.clear()
+            dict_obj._load_default_dictionaries()
+
+            # .jsonファイルのエントリのみが読み込まれていることを確認
+            assert dict_obj.get_pronunciation("TestWord") == "テストワード"
+            assert dict_obj.get_pronunciation("BackupWord") is None
+
+        finally:
+            shutil.rmtree(temp_dir)
+
+    def test_dictionary_directory_not_exists(self):
+        """辞書ディレクトリが存在しない場合もエラーにならないことを確認"""
+        dict_obj = CustomDictionary()
+        # 存在しないディレクトリを設定
+        dict_obj.default_dict_dir = Path("/nonexistent/path/to/dictionaries")
+        dict_obj.entries.clear()
+        dict_obj.case_sensitive_entries.clear()
+
+        # エラーなく実行されることを確認
+        dict_obj._load_default_dictionaries()
+
+        # エントリは空のまま
+        assert len(dict_obj.entries) == 0
