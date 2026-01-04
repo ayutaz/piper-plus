@@ -15,6 +15,8 @@ set(TEST_SOURCES
     test_phoneme_parser.cpp
     test_streaming_simple.cpp
     test_streaming_raw_phonemes.cpp
+    test_prosody_inference.cpp
+    test_model_speaker_detection.cpp
 )
 
 # Add dictionary manager test for Unix platforms
@@ -181,13 +183,51 @@ foreach(test_source ${TEST_SOURCES})
         endif()
         
         # Add dependencies to ensure build order
-        add_dependencies(${test_name} 
-            piper_phonemize_external 
-            fmt_external 
+        add_dependencies(${test_name}
+            piper_phonemize_external
+            fmt_external
             spdlog_external
         )
     endif()
-    
+
+    # Link additional dependencies for prosody inference test
+    if(${test_name} STREQUAL "test_prosody_inference")
+        # Test-only: No additional source files needed (pure unit tests)
+        # Just needs ONNX Runtime headers and libraries
+
+        # Include directories
+        target_include_directories(${test_name} PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/..
+            ${CMAKE_BINARY_DIR}/fi/include
+            ${CMAKE_BINARY_DIR}/si/include
+            ${CMAKE_BINARY_DIR}/pi/include
+        )
+
+        # Add library directories
+        target_link_directories(${test_name} PRIVATE
+            ${CMAKE_BINARY_DIR}/fi/lib
+            ${CMAKE_BINARY_DIR}/si/lib
+            ${CMAKE_BINARY_DIR}/pi/lib
+        )
+
+        # Platform-specific library linking
+        if(WIN32)
+            target_link_libraries(${test_name}
+                ${CMAKE_BINARY_DIR}/pi/lib/onnxruntime.lib
+            )
+        else()
+            target_link_libraries(${test_name}
+                onnxruntime
+            )
+        endif()
+
+        # Platform-specific linking
+        if(UNIX)
+            find_package(Threads REQUIRED)
+            target_link_libraries(${test_name} Threads::Threads)
+        endif()
+    endif()
+
     # Link additional dependencies for streaming raw phonemes test
     if(${test_name} STREQUAL "test_streaming_raw_phonemes")
         target_sources(${test_name} PRIVATE
