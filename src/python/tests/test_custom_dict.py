@@ -64,7 +64,7 @@ class TestCustomDictionary:
     
     def test_load_v1_format(self):
         """V1形式の辞書読み込みテスト"""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False, encoding='utf-8') as f:
             data = {
                 "version": "1.0",
                 "entries": {
@@ -84,7 +84,7 @@ class TestCustomDictionary:
     
     def test_load_v2_format(self):
         """V2形式の辞書読み込みテスト"""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False, encoding='utf-8') as f:
             data = {
                 "version": "2.0",
                 "entries": {
@@ -115,7 +115,7 @@ class TestCustomDictionary:
     def test_multiple_dictionaries(self):
         """複数辞書の読み込みテスト"""
         # 辞書1を作成
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f1:
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False, encoding='utf-8') as f1:
             data1 = {
                 "version": "2.0",
                 "entries": {
@@ -126,7 +126,7 @@ class TestCustomDictionary:
             temp_path1 = f1.name
         
         # 辞書2を作成
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f2:
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False, encoding='utf-8') as f2:
             data2 = {
                 "version": "2.0",
                 "entries": {
@@ -174,7 +174,7 @@ class TestCustomDictionary:
     
     def test_apply_function(self):
         """apply_custom_dictionary関数のテスト"""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False, encoding='utf-8') as f:
             data = {
                 "version": "2.0",
                 "entries": {
