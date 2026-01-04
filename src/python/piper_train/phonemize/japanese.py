@@ -54,6 +54,87 @@ def _is_question(text: str) -> bool:
     return text.strip().endswith("?") or text.strip().endswith("？")
 
 
+def _get_question_type(text: str) -> str:
+    """Return the appropriate question marker based on text ending.
+
+    Returns one of: "?!", "?.", "?~", "?", or "$" (for non-questions).
+
+    Markers:
+    - "?!" : Emphatic question (強調疑問) - ends with ?! or ！？
+    - "?." : Neutral/rhetorical question (平叙疑問) - ends with ?. or 。？
+    - "?~" : Tag question (確認疑問) - ends with ?~ or ～？ or ？～
+    - "?"  : Generic question - ends with ? or ？
+    - "$"  : Declarative (non-question)
+    """
+    stripped = text.strip()
+
+    # Multi-char patterns first (check longer patterns before shorter)
+    if stripped.endswith("?!") or stripped.endswith("！？") or stripped.endswith("？！"):
+        return "?!"
+    if stripped.endswith("?.") or stripped.endswith("。？") or stripped.endswith("？。"):
+        return "?."
+    if stripped.endswith("?~") or stripped.endswith("～？") or stripped.endswith("？～"):
+        return "?~"
+
+    # Single ? fallback
+    if stripped.endswith("?") or stripped.endswith("？"):
+        return "?"
+
+    return "$"  # Not a question
+
+
+# Set of tokens that should be skipped when looking for next phoneme
+_SKIP_TOKENS = frozenset(("_", "#", "[", "]", "^", "$", "?", "?!", "?.", "?~"))
+
+
+def _apply_n_phoneme_rules(tokens: list[str]) -> list[str]:
+    """Apply context-dependent rules to replace 'N' with specific variants.
+
+    Japanese 'ん' (N) has different pronunciations depending on the following
+    phoneme:
+    - N_m     : before m/b/p (bilabial assimilation)
+    - N_n     : before n/t/d/ts/ch (alveolar assimilation)
+    - N_ng    : before k/g (velar assimilation)
+    - N_uvular: at phrase end or before vowels/other consonants
+
+    Parameters
+    ----------
+    tokens : list[str]
+        List of phoneme tokens (before map_sequence)
+
+    Returns
+    -------
+    list[str]
+        List with 'N' replaced by context-appropriate variants
+    """
+    result = []
+    for i, token in enumerate(tokens):
+        if token != "N":
+            result.append(token)
+            continue
+
+        # Look ahead to find next actual phoneme
+        next_phoneme = None
+        for j in range(i + 1, len(tokens)):
+            if tokens[j] not in _SKIP_TOKENS:
+                next_phoneme = tokens[j]
+                break
+
+        # Determine N variant based on next phoneme
+        if next_phoneme is None:
+            result.append("N_uvular")  # End of phrase
+        elif next_phoneme in ("m", "my", "b", "by", "p", "py"):
+            result.append("N_m")  # Bilabial
+        elif next_phoneme in ("n", "ny", "t", "ty", "d", "dy", "ts", "ch"):
+            result.append("N_n")  # Alveolar
+        elif next_phoneme in ("k", "ky", "kw", "g", "gy", "gw"):
+            result.append("N_ng")  # Velar
+        else:
+            result.append("N_uvular")  # Vowels, other consonants
+
+    return result
+
+
 def phonemize_japanese(
     text: str, custom_dict: CustomDictionary | str | list[str] | None = None
 ) -> list[str]:
@@ -110,7 +191,7 @@ def phonemize_japanese(
                 tokens.append("^")
             elif idx == len(labels) - 1:
                 # Always add end marker when we find the last sil
-                tokens.append("?" if _is_question(text) else "$")
+                tokens.append(_get_question_type(text))
             # Skip adding ordinary phoneme for sil
             continue
 
@@ -162,6 +243,9 @@ def phonemize_japanese(
         # Insert rising mark "[" at phrase head (a2==1) when next mora is 2
         if (a2 == 1) and (a2_next == 2):
             tokens.append("[")
+
+    # Apply context-dependent N phoneme rules
+    tokens = _apply_n_phoneme_rules(tokens)
 
     # 多文字トークンを1コードポイントへ変換
     return map_sequence(tokens)
@@ -228,7 +312,7 @@ def phonemize_japanese_with_prosody(
                 tokens.append("^")
                 prosody_info.append(None)
             elif idx == len(labels) - 1:
-                tokens.append("?" if _is_question(text) else "$")
+                tokens.append(_get_question_type(text))
                 prosody_info.append(None)
             continue
 
@@ -276,6 +360,10 @@ def phonemize_japanese_with_prosody(
         else:
             # No prosody info available
             prosody_info.append(None)
+
+    # Apply context-dependent N phoneme rules
+    # Note: This only replaces 'N' with variants in-place, so prosody_info alignment is preserved
+    tokens = _apply_n_phoneme_rules(tokens)
 
     # Map multi-character tokens to single codepoints
     mapped_tokens = map_sequence(tokens)

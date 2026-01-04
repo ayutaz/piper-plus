@@ -104,15 +104,17 @@ class TestPhonemization:
             ("ヤ", ["y", "a"]),
             ("ラ", ["r", "a"]),
             ("ワ", ["w", "a"]),
-            ("ン", ["N"]),
+            ("ン", ["\ue01c"]),  # N at end → N_uvular (PUA 0xE01C)
         ]
 
         for katakana, expected_phonemes in test_cases:
             phonemes = phonemize_japanese(katakana)
             # Remove markers for comparison
             # Filter out markers, accent symbols, and other OpenJTalk markers
+            # Also filter question markers which are now PUA characters
             phoneme_list = [
-                p for p in phonemes if p not in ["^", "$", "_", "[", "]", "#"]
+                p for p in phonemes if p not in ["^", "$", "_", "[", "]", "#", "?",
+                                                  "\ue016", "\ue017", "\ue018"]
             ]
             for expected in expected_phonemes:
                 assert expected in phoneme_list, (
@@ -253,3 +255,162 @@ class TestPhonemization:
             assert expected_phonemes == phoneme_list, (
                 f"Expected phonemes {expected_phonemes} for '{text}', got {phoneme_list}"
             )
+
+    # =========================================================================
+    # Question Type Marker Tests (Issue #204)
+    # =========================================================================
+
+    @pytest.mark.unit
+    @pytest.mark.japanese
+    @pytest.mark.requires_openjtalk
+    def test_question_type_generic(self):
+        """Test generic question marker ?"""
+        if not HAS_JAPANESE:
+            pytest.skip("Japanese phonemizer not available")
+
+        phonemes = phonemize_japanese("本当？")
+        # Generic question marker should be present
+        assert "?" in phonemes
+
+    @pytest.mark.unit
+    @pytest.mark.japanese
+    @pytest.mark.requires_openjtalk
+    def test_question_type_emphatic(self):
+        """Test emphatic question marker ?!"""
+        if not HAS_JAPANESE:
+            pytest.skip("Japanese phonemizer not available")
+
+        phonemes = phonemize_japanese("本当?!")
+        # Check that ?! marker is present (as PUA character 0xE016)
+        assert "\ue016" in phonemes
+
+    @pytest.mark.unit
+    @pytest.mark.japanese
+    @pytest.mark.requires_openjtalk
+    def test_question_type_neutral(self):
+        """Test neutral/rhetorical question marker ?."""
+        if not HAS_JAPANESE:
+            pytest.skip("Japanese phonemizer not available")
+
+        phonemes = phonemize_japanese("そうですか?.")
+        # Check that ?. marker is present (as PUA character 0xE017)
+        assert "\ue017" in phonemes
+
+    @pytest.mark.unit
+    @pytest.mark.japanese
+    @pytest.mark.requires_openjtalk
+    def test_question_type_tag(self):
+        """Test tag question marker ?~"""
+        if not HAS_JAPANESE:
+            pytest.skip("Japanese phonemizer not available")
+
+        phonemes = phonemize_japanese("行くよね?~")
+        # Check that ?~ marker is present (as PUA character 0xE018)
+        assert "\ue018" in phonemes
+
+    @pytest.mark.unit
+    @pytest.mark.japanese
+    @pytest.mark.requires_openjtalk
+    def test_question_type_japanese_emphatic(self):
+        """Test Japanese style emphatic question ！？"""
+        if not HAS_JAPANESE:
+            pytest.skip("Japanese phonemizer not available")
+
+        phonemes = phonemize_japanese("本当！？")
+        # Japanese-style emphatic should also map to ?! (0xE016)
+        assert "\ue016" in phonemes
+
+    # =========================================================================
+    # N Phoneme Variant Tests (Issue #207)
+    # =========================================================================
+
+    @pytest.mark.unit
+    @pytest.mark.japanese
+    @pytest.mark.requires_openjtalk
+    def test_n_variant_before_bilabial_p(self):
+        """Test N_m variant before p (bilabial)"""
+        if not HAS_JAPANESE:
+            pytest.skip("Japanese phonemizer not available")
+
+        # さんぽ: ん before p → N_m
+        phonemes = phonemize_japanese("さんぽ")
+        # N_m is mapped to PUA 0xE019
+        assert "\ue019" in phonemes
+
+    @pytest.mark.unit
+    @pytest.mark.japanese
+    @pytest.mark.requires_openjtalk
+    def test_n_variant_before_bilabial_b(self):
+        """Test N_m variant before b (bilabial)"""
+        if not HAS_JAPANESE:
+            pytest.skip("Japanese phonemizer not available")
+
+        # しんぶん: first ん before b → N_m
+        phonemes = phonemize_japanese("しんぶん")
+        # N_m is mapped to PUA 0xE019
+        assert "\ue019" in phonemes
+
+    @pytest.mark.unit
+    @pytest.mark.japanese
+    @pytest.mark.requires_openjtalk
+    def test_n_variant_before_alveolar_t(self):
+        """Test N_n variant before t (alveolar)"""
+        if not HAS_JAPANESE:
+            pytest.skip("Japanese phonemizer not available")
+
+        # あんない: ん before n → N_n
+        phonemes = phonemize_japanese("あんない")
+        # N_n is mapped to PUA 0xE01A
+        assert "\ue01a" in phonemes
+
+    @pytest.mark.unit
+    @pytest.mark.japanese
+    @pytest.mark.requires_openjtalk
+    def test_n_variant_before_velar_k(self):
+        """Test N_ng variant before k (velar)"""
+        if not HAS_JAPANESE:
+            pytest.skip("Japanese phonemizer not available")
+
+        # ぎんこう: ん before k → N_ng
+        phonemes = phonemize_japanese("ぎんこう")
+        # N_ng is mapped to PUA 0xE01B
+        assert "\ue01b" in phonemes
+
+    @pytest.mark.unit
+    @pytest.mark.japanese
+    @pytest.mark.requires_openjtalk
+    def test_n_variant_before_velar_g(self):
+        """Test N_ng variant before g (velar)"""
+        if not HAS_JAPANESE:
+            pytest.skip("Japanese phonemizer not available")
+
+        # てんごく: ん before g → N_ng
+        phonemes = phonemize_japanese("てんごく")
+        # N_ng is mapped to PUA 0xE01B
+        assert "\ue01b" in phonemes
+
+    @pytest.mark.unit
+    @pytest.mark.japanese
+    @pytest.mark.requires_openjtalk
+    def test_n_variant_uvular_at_end(self):
+        """Test N_uvular variant at phrase end"""
+        if not HAS_JAPANESE:
+            pytest.skip("Japanese phonemizer not available")
+
+        # ほん: ん at end → N_uvular
+        phonemes = phonemize_japanese("ほん")
+        # N_uvular is mapped to PUA 0xE01C
+        assert "\ue01c" in phonemes
+
+    @pytest.mark.unit
+    @pytest.mark.japanese
+    @pytest.mark.requires_openjtalk
+    def test_n_variant_uvular_before_vowel(self):
+        """Test N_uvular variant before vowel"""
+        if not HAS_JAPANESE:
+            pytest.skip("Japanese phonemizer not available")
+
+        # れんあい: ん before a → N_uvular
+        phonemes = phonemize_japanese("れんあい")
+        # N_uvular is mapped to PUA 0xE01C
+        assert "\ue01c" in phonemes
