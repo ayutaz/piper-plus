@@ -36,22 +36,21 @@ class CustomDictionary:
                 self.load_dictionary(path)
 
     def _load_default_dictionaries(self):
-        """デフォルト辞書を読み込む"""
-        default_dicts = [
-            "default_tech_dict.json",
-            "default_common_dict.json",
-            "additional_tech_dict.json",  # 最新トレンドの技術用語
-        ]
+        """デフォルト辞書を読み込む
 
-        for dict_name in default_dicts:
-            dict_path = self.default_dict_dir / dict_name
-            if dict_path.exists():
-                try:
-                    self.load_dictionary(str(dict_path))
-                except Exception as e:
-                    print(
-                        f"Warning: Failed to load default dictionary {dict_path}: {e}"
-                    )
+        data/dictionaries/ 内の全ての .json ファイルを自動的に読み込む。
+        ファイル名順にソートして読み込むため、優先度の高い辞書は
+        ファイル名でソート順を制御できる。
+        """
+        if not self.default_dict_dir.exists():
+            return
+
+        # 全ての.jsonファイルを読み込む（ファイル名順）
+        for dict_path in sorted(self.default_dict_dir.glob("*.json")):
+            try:
+                self.load_dictionary(str(dict_path))
+            except Exception as e:
+                print(f"Warning: Failed to load dictionary {dict_path}: {e}")
 
     def load_dictionary(self, dict_path: str) -> None:
         """辞書ファイルを読み込む
