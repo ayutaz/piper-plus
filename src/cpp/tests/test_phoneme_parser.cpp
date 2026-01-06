@@ -189,8 +189,9 @@ TEST_F(PhonemeParserTest, ParseJapaneseAffricates) {
 
 TEST_F(PhonemeParserTest, ParseJapaneseGeminate) {
     // Test geminate consonant (っ) - cl
+    // がっこう (gakkou) - "g a cl k o u" has 6 tokens
     auto phonemes = parsePhonemeString("g a cl k o u", PHONEME_TYPE_OPENJTALK);
-    ASSERT_EQ(phonemes.size(), 5);
+    ASSERT_EQ(phonemes.size(), 6);
     // cl -> 0xE005
     EXPECT_EQ(phonemes[2], static_cast<Phoneme>(0xE005));
 }
