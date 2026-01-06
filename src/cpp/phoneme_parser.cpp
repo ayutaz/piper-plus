@@ -7,14 +7,44 @@
 namespace piper {
 
 // Japanese multi-character phoneme mappings (PUA)
+// Must match Python token_mapper.py FIXED_PUA_MAPPING
 static const std::map<std::string, char32_t> japanesePhonemePUA = {
-    {"ky", 0xE000}, {"gy", 0xE001}, {"sy", 0xE002}, {"sh", 0xE002},
-    {"zy", 0xE003}, {"jy", 0xE003}, {"ty", 0xE004}, {"ch", 0xE004},
-    {"dy", 0xE005}, {"ny", 0xE006}, {"hy", 0xE007}, {"by", 0xE008},
-    {"py", 0xE009}, {"my", 0xE00A}, {"ry", 0xE00B}, {"ts", 0xE00C},
-    {"dz", 0xE00D}, {"kw", 0xE00E}, {"f", 0xE00F}, {"gw", 0xE010},
-    {"v", 0xE011}, {"dy", 0xE012}, {"mh", 0xE013}, {"nh", 0xE014},
-    {"nw", 0xE015}
+    // Long vowels
+    {"a:", 0xE000},
+    {"i:", 0xE001},
+    {"u:", 0xE002},
+    {"e:", 0xE003},
+    {"o:", 0xE004},
+    // Special consonants
+    {"cl", 0xE005},
+    // Palatalized consonants
+    {"ky", 0xE006},
+    {"kw", 0xE007},
+    {"gy", 0xE008},
+    {"gw", 0xE009},
+    {"ty", 0xE00A},
+    {"dy", 0xE00B},
+    {"py", 0xE00C},
+    {"by", 0xE00D},
+    // Affricates and special sounds
+    {"ch", 0xE00E},
+    {"ts", 0xE00F},
+    {"sh", 0xE010},
+    {"zy", 0xE011},
+    {"hy", 0xE012},
+    // Palatalized nasals/liquids
+    {"ny", 0xE013},
+    {"my", 0xE014},
+    {"ry", 0xE015},
+    // Question type markers (Issue #204)
+    {"?!", 0xE016},  // Emphatic question - 強調疑問
+    {"?.", 0xE017},  // Neutral/rhetorical question - 平叙疑問
+    {"?~", 0xE018},  // Tag question - 確認疑問
+    // N phoneme variants (Issue #207)
+    {"N_m", 0xE019},      // ん before m/b/p (bilabial)
+    {"N_n", 0xE01A},      // ん before n/t/d/ts/ch (alveolar)
+    {"N_ng", 0xE01B},     // ん before k/g (velar)
+    {"N_uvular", 0xE01C}, // ん at end or before vowels
 };
 
 std::vector<TextOrPhonemes> parsePhonemeNotation(const std::string& input) {

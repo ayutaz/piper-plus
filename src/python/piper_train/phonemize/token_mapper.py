@@ -30,6 +30,15 @@ FIXED_PUA_MAPPING = {
     "ny": 0xE013,
     "my": 0xE014,
     "ry": 0xE015,
+    # Question type markers (Issue #204)
+    "?!": 0xE016,  # Emphatic question - 強調疑問
+    "?.": 0xE017,  # Neutral/rhetorical question - 平叙疑問
+    "?~": 0xE018,  # Tag question - 確認疑問
+    # N phoneme variants (Issue #207)
+    "N_m": 0xE019,  # ん before m/b/p (bilabial)
+    "N_n": 0xE01A,  # ん before n/t/d/ts/ch (alveolar)
+    "N_ng": 0xE01B,  # ん before k/g (velar)
+    "N_uvular": 0xE01C,  # ん at end or before vowels
 }
 
 # Build bidirectional mappings
