@@ -69,11 +69,23 @@ def _get_question_type(text: str) -> str:
     stripped = text.strip()
 
     # Multi-char patterns first (check longer patterns before shorter)
-    if stripped.endswith("?!") or stripped.endswith("！？") or stripped.endswith("？！"):
+    if (
+        stripped.endswith("?!")
+        or stripped.endswith("！？")
+        or stripped.endswith("？！")
+    ):
         return "?!"
-    if stripped.endswith("?.") or stripped.endswith("。？") or stripped.endswith("？。"):
+    if (
+        stripped.endswith("?.")
+        or stripped.endswith("。？")
+        or stripped.endswith("？。")
+    ):
         return "?."
-    if stripped.endswith("?~") or stripped.endswith("～？") or stripped.endswith("？～"):
+    if (
+        stripped.endswith("?~")
+        or stripped.endswith("～？")
+        or stripped.endswith("？～")
+    ):
         return "?~"
 
     # Single ? fallback
