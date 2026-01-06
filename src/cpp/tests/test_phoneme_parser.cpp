@@ -81,9 +81,10 @@ TEST_F(PhonemeParserTest, ParsePhonemeStringJapaneseMultiChar) {
     auto phonemes = parsePhonemeString("ky a sh a", PHONEME_TYPE_OPENJTALK);
     ASSERT_EQ(phonemes.size(), 4);
     // First phoneme should be the PUA-mapped "ky"
-    EXPECT_EQ(phonemes[0], static_cast<Phoneme>(0xE000)); // ky -> U+E000
+    // Must match Python token_mapper.py FIXED_PUA_MAPPING
+    EXPECT_EQ(phonemes[0], static_cast<Phoneme>(0xE006)); // ky -> U+E006
     EXPECT_EQ(phonemes[1], static_cast<Phoneme>('a'));
-    EXPECT_EQ(phonemes[2], static_cast<Phoneme>(0xE002)); // sh -> U+E002  
+    EXPECT_EQ(phonemes[2], static_cast<Phoneme>(0xE010)); // sh -> U+E010
     EXPECT_EQ(phonemes[3], static_cast<Phoneme>('a'));
 }
 
@@ -107,4 +108,89 @@ TEST_F(PhonemeParserTest, EmptyPhonemeNotation) {
     ASSERT_EQ(result.size(), 3);
     EXPECT_TRUE(result[1].isPhonemes);
     EXPECT_EQ(result[1].text, "");
+}
+
+// =========================================================================
+// Issue #204: Question Type Marker Tests
+// =========================================================================
+
+TEST_F(PhonemeParserTest, ParseQuestionMarkerEmphatic) {
+    // Test emphatic question marker ?! (Issue #204)
+    auto phonemes = parsePhonemeString("h o N t o u ?!", PHONEME_TYPE_OPENJTALK);
+    ASSERT_GE(phonemes.size(), 7);
+    // Last phoneme should be ?! mapped to 0xE016
+    EXPECT_EQ(phonemes[phonemes.size() - 1], static_cast<Phoneme>(0xE016));
+}
+
+TEST_F(PhonemeParserTest, ParseQuestionMarkerNeutral) {
+    // Test neutral/rhetorical question marker ?. (Issue #204)
+    auto phonemes = parsePhonemeString("s o u d e s u k a ?.", PHONEME_TYPE_OPENJTALK);
+    ASSERT_GE(phonemes.size(), 9);
+    // Last phoneme should be ?. mapped to 0xE017
+    EXPECT_EQ(phonemes[phonemes.size() - 1], static_cast<Phoneme>(0xE017));
+}
+
+TEST_F(PhonemeParserTest, ParseQuestionMarkerTag) {
+    // Test tag question marker ?~ (Issue #204)
+    auto phonemes = parsePhonemeString("i k u y o n e ?~", PHONEME_TYPE_OPENJTALK);
+    ASSERT_GE(phonemes.size(), 7);
+    // Last phoneme should be ?~ mapped to 0xE018
+    EXPECT_EQ(phonemes[phonemes.size() - 1], static_cast<Phoneme>(0xE018));
+}
+
+// =========================================================================
+// Issue #207: N Phoneme Variant Tests
+// =========================================================================
+
+TEST_F(PhonemeParserTest, ParseNVariantBilabial) {
+    // Test N_m variant before m/b/p (Issue #207)
+    // さんぽ (sanpo) - ん before p
+    auto phonemes = parsePhonemeString("s a N_m p o", PHONEME_TYPE_OPENJTALK);
+    ASSERT_EQ(phonemes.size(), 5);
+    // N_m should be mapped to 0xE019
+    EXPECT_EQ(phonemes[2], static_cast<Phoneme>(0xE019));
+}
+
+TEST_F(PhonemeParserTest, ParseNVariantAlveolar) {
+    // Test N_n variant before n/t/d/ts/ch (Issue #207)
+    // あんない (annai) - ん before n
+    auto phonemes = parsePhonemeString("a N_n n a i", PHONEME_TYPE_OPENJTALK);
+    ASSERT_EQ(phonemes.size(), 5);
+    // N_n should be mapped to 0xE01A
+    EXPECT_EQ(phonemes[1], static_cast<Phoneme>(0xE01A));
+}
+
+TEST_F(PhonemeParserTest, ParseNVariantVelar) {
+    // Test N_ng variant before k/g (Issue #207)
+    // ぎんこう (ginkou) - ん before k
+    auto phonemes = parsePhonemeString("g i N_ng k o u", PHONEME_TYPE_OPENJTALK);
+    ASSERT_EQ(phonemes.size(), 6);
+    // N_ng should be mapped to 0xE01B
+    EXPECT_EQ(phonemes[2], static_cast<Phoneme>(0xE01B));
+}
+
+TEST_F(PhonemeParserTest, ParseNVariantUvular) {
+    // Test N_uvular variant at phrase end (Issue #207)
+    // ほん (hon) - ん at end
+    auto phonemes = parsePhonemeString("h o N_uvular", PHONEME_TYPE_OPENJTALK);
+    ASSERT_EQ(phonemes.size(), 3);
+    // N_uvular should be mapped to 0xE01C
+    EXPECT_EQ(phonemes[2], static_cast<Phoneme>(0xE01C));
+}
+
+TEST_F(PhonemeParserTest, ParseJapaneseAffricates) {
+    // Test common affricates - ch and ts
+    auto phonemes = parsePhonemeString("ch a ts u", PHONEME_TYPE_OPENJTALK);
+    ASSERT_EQ(phonemes.size(), 4);
+    // ch -> 0xE00E, ts -> 0xE00F
+    EXPECT_EQ(phonemes[0], static_cast<Phoneme>(0xE00E));
+    EXPECT_EQ(phonemes[2], static_cast<Phoneme>(0xE00F));
+}
+
+TEST_F(PhonemeParserTest, ParseJapaneseGeminate) {
+    // Test geminate consonant (っ) - cl
+    auto phonemes = parsePhonemeString("g a cl k o u", PHONEME_TYPE_OPENJTALK);
+    ASSERT_EQ(phonemes.size(), 5);
+    // cl -> 0xE005
+    EXPECT_EQ(phonemes[2], static_cast<Phoneme>(0xE005));
 }
