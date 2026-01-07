@@ -616,6 +616,10 @@ class WavLMDiscriminator(torch.nn.Module):
         # Resample to 16kHz for WavLM
         audio_16k = self._resample(audio)
 
+        # WavLM requires float32 input (doesn't support FP16)
+        # Convert from FP16 to FP32 for mixed precision training compatibility
+        audio_16k = audio_16k.float()
+
         # WavLM forward pass with hidden states
         outputs = self.wavlm(
             audio_16k,
