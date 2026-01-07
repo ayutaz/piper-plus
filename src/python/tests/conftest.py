@@ -154,8 +154,8 @@ def temp_onnx_model(mock_vits_model, tmp_path_factory):
         m_p = torch.matmul(attn.squeeze(1), m_p.transpose(1, 2)).transpose(1, 2)
         logs_p = torch.matmul(attn.squeeze(1), logs_p.transpose(1, 2)).transpose(1, 2)
 
-        # 5. Sample z_p (deterministic in ONNX export mode)
-        z_p = m_p  # onnx_export_mode uses mean only
+        # 5. Sample z_p: in this test we always use the mean to mimic ONNX export mode
+        z_p = m_p  # deterministic behavior matching when onnx_export_mode is enabled
 
         # 6. Flow + Decoder
         z = mock_vits_model.flow(z_p, y_mask, g=g, reverse=True)

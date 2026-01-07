@@ -136,7 +136,7 @@ def main() -> None:
     def infer_forward(text, text_lengths, scales, sid=None, prosody_features=None):
         """
         Efficient forward function that returns both audio and duration information.
-        Duration predictor is called only once (not twice as in the previous implementation).
+        The duration predictor is called once to compute both durations and audio output.
         """
         # noise_scale = scales[0]  # unused in ONNX export (deterministic mode)
         length_scale = scales[1]
@@ -175,8 +175,8 @@ def main() -> None:
         m_p = torch.matmul(attn.squeeze(1), m_p.transpose(1, 2)).transpose(1, 2)
         logs_p = torch.matmul(attn.squeeze(1), logs_p.transpose(1, 2)).transpose(1, 2)
 
-        # 5. Sample z_p (deterministic in ONNX export mode)
-        z_p = m_p  # onnx_export_mode uses mean only
+        # 5. Sample z_p (deterministic: use mean instead of stochastic sampling)
+        z_p = m_p  # use mean only (no sampling)
 
         # 6. Flow + Decoder
         z = model_g.flow(z_p, y_mask, g=g, reverse=True)
