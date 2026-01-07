@@ -78,8 +78,8 @@ class VitsModel(pl.LightningModule):
         num_test_examples: int = 5,
         validation_split: float = 0.1,
         max_phoneme_ids: int | None = None,
-        # WavLM Discriminator
-        use_wavlm_discriminator: bool = False,
+        # WavLM Discriminator (enabled by default for improved audio quality)
+        use_wavlm_discriminator: bool = True,
         wavlm_model_name: str = "microsoft/wavlm-base-plus",
         c_wavlm: float = 0.5,
         **kwargs,
