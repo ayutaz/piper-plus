@@ -158,9 +158,12 @@ def onnx_inference(
             prosody_array = np.zeros((1, text.shape[1], 3), dtype=np.int64)
         inputs["prosody_features"] = prosody_array
 
-    audio = session.run(None, inputs)[0]
+    outputs = session.run(None, inputs)
+    audio = outputs[0]
+    # durations is the second output (if available)
+    durations = outputs[1] if len(outputs) > 1 else None
     # Remove batch and channel dimensions: (1, 1, time) -> (time,)
-    return audio.squeeze()
+    return audio.squeeze(), durations
 
 
 # ============================================================================
@@ -193,7 +196,7 @@ class TestPyTorchONNXParity:
             **inference_params,
         )
 
-        onnx_audio = onnx_inference(
+        onnx_audio, onnx_durations = onnx_inference(
             temp_onnx_model,
             sample_phoneme_ids,
             prosody_features=sample_prosody_features,
@@ -211,6 +214,9 @@ class TestPyTorchONNXParity:
         # 音声の値が妥当な範囲にあることを確認
         assert np.abs(pt_audio).max() < 1.0, "PyTorch音声の振幅が異常"
         assert np.abs(onnx_audio).max() < 1.0, "ONNX音声の振幅が異常"
+
+        # durations出力が存在することを確認
+        assert onnx_durations is not None, "ONNX durations出力が見つかりません"
 
     def test_audio_output_without_prosody(
         self,
@@ -231,7 +237,7 @@ class TestPyTorchONNXParity:
             **inference_params,
         )
 
-        onnx_audio = onnx_inference(
+        onnx_audio, onnx_durations = onnx_inference(
             temp_onnx_model,
             sample_phoneme_ids,
             prosody_features=None,
@@ -250,6 +256,9 @@ class TestPyTorchONNXParity:
         assert np.abs(pt_audio).max() < 1.0, "PyTorch音声の振幅が異常"
         assert np.abs(onnx_audio).max() < 1.0, "ONNX音声の振幅が異常"
 
+        # durations出力が存在することを確認
+        assert onnx_durations is not None, "ONNX durations出力が見つかりません"
+
     def test_prosody_data_type_consistency(self, temp_onnx_model):
         """ONNXモデルのprosody_features入力がint64であることを確認"""
         import onnxruntime
@@ -267,6 +276,58 @@ class TestPyTorchONNXParity:
         assert prosody_input.type == "tensor(int64)", (
             f"prosody_featuresの型がint64ではありません: {prosody_input.type}"
         )
+
+    def test_onnx_outputs_include_durations(self, temp_onnx_model):
+        """ONNXモデルの出力にdurationsが含まれることを確認"""
+        import onnxruntime
+
+        session = onnxruntime.InferenceSession(str(temp_onnx_model))
+        output_names = [out.name for out in session.get_outputs()]
+
+        assert "output" in output_names, "ONNX出力に'output'が見つかりません"
+        assert "durations" in output_names, "ONNX出力に'durations'が見つかりません"
+        assert len(output_names) == 2, f"ONNX出力数が2ではありません: {output_names}"
+
+    def test_durations_shape_matches_input(
+        self,
+        temp_onnx_model,
+        sample_phoneme_ids,
+        sample_prosody_features,
+        inference_params,
+    ):
+        """durationsの形状が入力音素数と一致することを確認"""
+        _, onnx_durations = onnx_inference(
+            temp_onnx_model,
+            sample_phoneme_ids,
+            prosody_features=sample_prosody_features,
+            **inference_params,
+        )
+
+        assert onnx_durations is not None, "durations出力がNone"
+        # durations shape should be (batch, phonemes) = (1, num_phoneme_ids)
+        expected_phonemes = len(sample_phoneme_ids)
+        assert onnx_durations.shape[-1] == expected_phonemes, (
+            f"durations長({onnx_durations.shape[-1]})が音素数({expected_phonemes})と不一致"
+        )
+
+    def test_durations_are_positive(
+        self,
+        temp_onnx_model,
+        sample_phoneme_ids,
+        sample_prosody_features,
+        inference_params,
+    ):
+        """durationsの値が非負であることを確認"""
+        _, onnx_durations = onnx_inference(
+            temp_onnx_model,
+            sample_phoneme_ids,
+            prosody_features=sample_prosody_features,
+            **inference_params,
+        )
+
+        assert onnx_durations is not None, "durations出力がNone"
+        # durations should be non-negative (they represent time durations)
+        assert np.all(onnx_durations >= 0), "durationsに負の値が含まれています"
 
     @pytest.mark.parametrize(
         "noise_scale,length_scale,noise_scale_w",
@@ -305,7 +366,7 @@ class TestPyTorchONNXParity:
             **params,
         )
 
-        onnx_audio = onnx_inference(
+        onnx_audio, onnx_durations = onnx_inference(
             temp_onnx_model,
             sample_phoneme_ids,
             prosody_features=sample_prosody_features,
@@ -323,3 +384,6 @@ class TestPyTorchONNXParity:
         # 音声の値が妥当な範囲にあることを確認
         assert np.abs(pt_audio).max() < 1.0, "PyTorch音声の振幅が異常"
         assert np.abs(onnx_audio).max() < 1.0, "ONNX音声の振幅が異常"
+
+        # durations出力が存在することを確認
+        assert onnx_durations is not None, "ONNX durations出力が見つかりません"

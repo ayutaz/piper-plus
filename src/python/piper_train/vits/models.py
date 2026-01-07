@@ -106,7 +106,11 @@ class StochasticDurationPredictor(nn.Module):
         else:
             flows = list(reversed(self.flows))
             flows = flows[:-2] + [flows[-1]]  # remove a useless vflow
-            z = torch.randn(x.size(0), 2, x.size(2)).type_as(x) * noise_scale
+            # Use zeros for deterministic ONNX export
+            if getattr(self, "onnx_export_mode", False):
+                z = torch.zeros(x.size(0), 2, x.size(2)).type_as(x)
+            else:
+                z = torch.randn(x.size(0), 2, x.size(2)).type_as(x) * noise_scale
 
             for flow in flows:
                 z = flow(z, x_mask, g=x, reverse=reverse)
@@ -775,7 +779,11 @@ class SynthesizerTrn(nn.Module):
             1, 2
         )  # [b, t', t], [b, t, d] -> [b, d, t']
 
-        z_p = m_p + torch.randn_like(m_p) * torch.exp(logs_p) * noise_scale
+        # Use mean only for deterministic ONNX export
+        if getattr(self, "onnx_export_mode", False):
+            z_p = m_p
+        else:
+            z_p = m_p + torch.randn_like(m_p) * torch.exp(logs_p) * noise_scale
         z = self.flow(z_p, y_mask, g=g, reverse=True)
         o = self.dec((z * y_mask)[:, :, :max_len], g=g)
 

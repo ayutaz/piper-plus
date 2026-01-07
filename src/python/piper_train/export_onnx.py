@@ -5,6 +5,7 @@ from pathlib import Path
 
 import torch
 
+from .vits import commons
 from .vits.lightning import VitsModel
 
 
@@ -87,11 +88,6 @@ def main() -> None:
     parser.add_argument(
         "--simplify-only", help="Only simplify existing ONNX model (path to .onnx file)"
     )
-    parser.add_argument(
-        "--with-durations",
-        action="store_true",
-        help="Include duration information in ONNX output for phoneme timing",
-    )
     args = parser.parse_args()
 
     if args.debug:
@@ -122,8 +118,11 @@ def main() -> None:
     num_symbols = model_g.n_vocab
     num_speakers = model_g.n_speakers
 
-    # Enable ONNX export mode
+    # Enable ONNX export mode for deterministic output
     model_g.onnx_export_mode = True
+    # Propagate to Duration Predictor (StochasticDurationPredictor)
+    if hasattr(model_g, "dp"):
+        model_g.dp.onnx_export_mode = True
 
     # Inference only
     model_g.eval()
@@ -131,79 +130,62 @@ def main() -> None:
     with torch.no_grad():
         model_g.dec.remove_weight_norm()
 
-    # old_forward = model_g.infer
-
     # Check if model uses prosody features
     has_prosody = getattr(model_g, "prosody_dim", 0) > 0
 
-    if args.with_durations:
+    def infer_forward(text, text_lengths, scales, sid=None, prosody_features=None):
+        """
+        Efficient forward function that returns both audio and duration information.
+        The duration predictor is called once to compute both durations and audio output.
+        """
+        # noise_scale = scales[0]  # unused in ONNX export (deterministic mode)
+        length_scale = scales[1]
+        noise_scale_w = scales[2]
 
-        def infer_forward_with_durations(
-            text, text_lengths, scales, sid=None, prosody_features=None
-        ):
-            """Forward function that returns both audio and duration information"""
-            noise_scale = scales[0]
-            length_scale = scales[1]
-            noise_scale_w = scales[2]
+        # 1. Encoder
+        x, m_p, logs_p, x_mask = model_g.enc_p(text, text_lengths)
 
-            # Get encoder output
-            x, m_p, logs_p, x_mask = model_g.enc_p(text, text_lengths)
+        if model_g.n_speakers > 1 and sid is not None:
+            g = model_g.emb_g(sid).unsqueeze(-1)
+        else:
+            g = None
 
-            if model_g.n_speakers > 1 and sid is not None:
-                g = model_g.emb_g(sid).unsqueeze(-1)
-            else:
-                g = None
+        # 2. Duration Predictor (called only once)
+        x_dp = model_g._prepare_prosody_input(x, x_mask, prosody_features)
+        if model_g.use_sdp:
+            logw = model_g.dp(
+                x_dp, x_mask, g=g, reverse=True, noise_scale=noise_scale_w
+            )
+        else:
+            logw = model_g.dp(x_dp, x_mask, g=g)
 
-            # Prepare prosody input for duration predictor
-            x_dp = model_g._prepare_prosody_input(x, x_mask, prosody_features)
+        w = torch.exp(logw) * x_mask * length_scale
+        durations = w.squeeze(1)  # [batch, phoneme_length]
 
-            # Get duration predictions
-            if model_g.use_sdp:
-                logw = model_g.dp(
-                    x_dp, x_mask, g=g, reverse=True, noise_scale=noise_scale_w
-                )
-            else:
-                logw = model_g.dp(x_dp, x_mask, g=g)
+        # 3. Attention/Alignment
+        w_ceil = torch.ceil(w)
+        y_lengths = torch.clamp_min(torch.sum(w_ceil, [1, 2]), 1).long()
+        y_mask = torch.unsqueeze(
+            commons.sequence_mask(y_lengths, y_lengths.max()), 1
+        ).type_as(x_mask)
+        attn_mask = torch.unsqueeze(x_mask, 2) * torch.unsqueeze(y_mask, -1)
+        attn = commons.generate_path(w_ceil, attn_mask)
 
-            w = torch.exp(logw) * x_mask * length_scale
+        # 4. Expand prior
+        m_p = torch.matmul(attn.squeeze(1), m_p.transpose(1, 2)).transpose(1, 2)
+        logs_p = torch.matmul(attn.squeeze(1), logs_p.transpose(1, 2)).transpose(1, 2)
 
-            # Get audio using regular inference
-            audio = model_g.infer(
-                text,
-                text_lengths,
-                noise_scale=noise_scale,
-                length_scale=length_scale,
-                noise_scale_w=noise_scale_w,
-                sid=sid,
-                prosody_features=prosody_features,
-            )[0].unsqueeze(1)
+        # 5. Sample z_p (deterministic: use mean instead of stochastic sampling)
+        z_p = m_p  # use mean only (no sampling)
 
-            # Return both audio and durations
-            # Squeeze durations to remove channel dimension [batch, 1, phoneme_length] -> [batch, phoneme_length]
-            durations = w.squeeze(1)
+        # 6. Flow + Decoder
+        z = model_g.flow(z_p, y_mask, g=g, reverse=True)
+        o = model_g.dec((z * y_mask), g=g)
+        audio = o.unsqueeze(1)
 
-            return audio, durations
+        return audio, durations
 
-        model_g.forward = infer_forward_with_durations
-    else:
-
-        def infer_forward(text, text_lengths, scales, sid=None, prosody_features=None):
-            noise_scale = scales[0]
-            length_scale = scales[1]
-            noise_scale_w = scales[2]
-            audio = model_g.infer(
-                text,
-                text_lengths,
-                noise_scale=noise_scale,
-                length_scale=length_scale,
-                noise_scale_w=noise_scale_w,
-                sid=sid,
-                prosody_features=prosody_features,
-            )[0].unsqueeze(1)
-
-            return audio
-
-        model_g.forward = infer_forward
+    model_g.forward = infer_forward
 
     dummy_input_length = 50
     sequences = torch.randint(
@@ -234,28 +216,19 @@ def main() -> None:
     else:
         dummy_input = (sequences, sequence_lengths, scales)
 
-    # Export
-    if args.with_durations:
-        output_names = ["output", "durations"]
-        dynamic_axes = {
-            "input": {0: "batch_size", 1: "phonemes"},
-            "input_lengths": {0: "batch_size"},
-            "output": {0: "batch_size", 1: "time"},
-            "durations": {0: "batch_size", 1: "phonemes"},
-        }
-    else:
-        output_names = ["output"]
-        dynamic_axes = {
-            "input": {0: "batch_size", 1: "phonemes"},
-            "input_lengths": {0: "batch_size"},
-            "output": {0: "batch_size", 1: "time"},
-        }
+    # Export - always include durations output
+    output_names = ["output", "durations"]
+    dynamic_axes = {
+        "input": {0: "batch_size", 1: "phonemes"},
+        "input_lengths": {0: "batch_size"},
+        "output": {0: "batch_size", 1: "time"},
+        "durations": {0: "batch_size", 1: "phonemes"},
+    }
 
     # Configure input names based on model type
     if num_speakers > 1:
         input_names = ["input", "input_lengths", "scales", "sid"]
-        if args.with_durations:
-            dynamic_axes["sid"] = {0: "batch_size"}
+        dynamic_axes["sid"] = {0: "batch_size"}
     else:
         input_names = ["input", "input_lengths", "scales"]
 
