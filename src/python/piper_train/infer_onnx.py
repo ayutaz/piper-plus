@@ -109,7 +109,10 @@ def main():
             inputs["prosody_features"] = prosody_features
 
         start_time = time.perf_counter()
-        audio = model.run(None, inputs)[0].squeeze((0, 1))
+        outputs = model.run(None, inputs)
+        audio = outputs[0].squeeze((0, 1))
+        # durations output is available for phoneme timing (e.g., lip-sync, karaoke)
+        durations = outputs[1] if len(outputs) > 1 else None
         # audio = denoise(audio, bias_spec, 10)
         audio = audio_float_to_int16(audio.squeeze())
         end_time = time.perf_counter()
@@ -127,6 +130,10 @@ def main():
             infer_sec,
             audio_duration_sec,
         )
+
+        # Log phoneme durations if available (useful for debugging/timing)
+        if durations is not None:
+            _LOGGER.debug("Phoneme durations shape: %s", durations.shape)
 
         output_path = args.output_dir / f"{utt_id}.wav"
         write_wav(str(output_path), args.sample_rate, audio)

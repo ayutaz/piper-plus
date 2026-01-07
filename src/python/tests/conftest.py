@@ -91,8 +91,10 @@ def mock_vits_model():
 
 @pytest.fixture(scope="module")
 def temp_onnx_model(mock_vits_model, tmp_path_factory):
-    """モックモデルをONNXにエクスポート"""
+    """モックモデルをONNXにエクスポート（durations出力付き）"""
     import torch
+
+    from piper_train.vits import commons
 
     tmp_dir = tmp_path_factory.mktemp("models")
     onnx_path = tmp_dir / "mock_model.onnx"
@@ -104,7 +106,13 @@ def temp_onnx_model(mock_vits_model, tmp_path_factory):
     scales = torch.FloatTensor([0.667, 1.0, 0.8])
     prosody_features = torch.zeros(1, dummy_input_length, 3, dtype=torch.long)
 
+    # Enable ONNX export mode for deterministic output
+    mock_vits_model.onnx_export_mode = True
+    if hasattr(mock_vits_model, "dp"):
+        mock_vits_model.dp.onnx_export_mode = True
+
     # Define infer_forward for export (single-speaker, no sid)
+    # Returns both audio and durations
     def infer_forward(
         input_tensor,
         input_lengths,
@@ -115,33 +123,63 @@ def temp_onnx_model(mock_vits_model, tmp_path_factory):
         length_scale = scales_tensor[1]
         noise_scale_w = scales_tensor[2]
 
-        audio = mock_vits_model.infer(
-            input_tensor,
-            input_lengths,
-            noise_scale=noise_scale,
-            length_scale=length_scale,
-            noise_scale_w=noise_scale_w,
-            sid=None,  # Single speaker model
-            prosody_features=prosody_features_tensor,
-        )[0].unsqueeze(1)
+        # 1. Encoder
+        x, m_p, logs_p, x_mask = mock_vits_model.enc_p(input_tensor, input_lengths)
+        g = None  # Single speaker model
 
-        return audio
+        # 2. Duration Predictor (called only once)
+        x_dp = mock_vits_model._prepare_prosody_input(
+            x, x_mask, prosody_features_tensor
+        )
+        if mock_vits_model.use_sdp:
+            logw = mock_vits_model.dp(
+                x_dp, x_mask, g=g, reverse=True, noise_scale=noise_scale_w
+            )
+        else:
+            logw = mock_vits_model.dp(x_dp, x_mask, g=g)
+
+        w = torch.exp(logw) * x_mask * length_scale
+        durations = w.squeeze(1)  # [batch, phoneme_length]
+
+        # 3. Attention/Alignment
+        w_ceil = torch.ceil(w)
+        y_lengths = torch.clamp_min(torch.sum(w_ceil, [1, 2]), 1).long()
+        y_mask = torch.unsqueeze(
+            commons.sequence_mask(y_lengths, y_lengths.max()), 1
+        ).type_as(x_mask)
+        attn_mask = torch.unsqueeze(x_mask, 2) * torch.unsqueeze(y_mask, -1)
+        attn = commons.generate_path(w_ceil, attn_mask)
+
+        # 4. Expand prior
+        m_p = torch.matmul(attn.squeeze(1), m_p.transpose(1, 2)).transpose(1, 2)
+        logs_p = torch.matmul(attn.squeeze(1), logs_p.transpose(1, 2)).transpose(1, 2)
+
+        # 5. Sample z_p (deterministic in ONNX export mode)
+        z_p = m_p  # onnx_export_mode uses mean only
+
+        # 6. Flow + Decoder
+        z = mock_vits_model.flow(z_p, y_mask, g=g, reverse=True)
+        o = mock_vits_model.dec((z * y_mask), g=g)
+        audio = o.unsqueeze(1)
+
+        return audio, durations
 
     mock_vits_model.forward = infer_forward
 
-    # ONNX export (single-speaker, no sid input)
+    # ONNX export (single-speaker, no sid input) with durations output
     torch.onnx.export(
         mock_vits_model,
         (sequences, sequence_lengths, scales, prosody_features),
         str(onnx_path),
         opset_version=15,
         input_names=["input", "input_lengths", "scales", "prosody_features"],
-        output_names=["output"],
+        output_names=["output", "durations"],
         dynamic_axes={
             "input": {0: "batch_size", 1: "phonemes"},
             "input_lengths": {0: "batch_size"},
             "prosody_features": {0: "batch_size", 1: "phonemes"},
             "output": {0: "batch_size", 1: "time"},
+            "durations": {0: "batch_size", 1: "phonemes"},
         },
         verbose=False,
     )
