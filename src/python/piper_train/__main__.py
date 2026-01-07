@@ -115,6 +115,23 @@ def main():
         default=2e-4,
         help="Base learning rate for single GPU training",
     )
+    # WavLM Discriminator arguments
+    parser.add_argument(
+        "--use-wavlm-discriminator",
+        action="store_true",
+        help="Enable WavLM-based perceptual discriminator for improved audio quality (training only)",
+    )
+    parser.add_argument(
+        "--wavlm-model-name",
+        default="microsoft/wavlm-base-plus",
+        help="WavLM model name from HuggingFace (default: microsoft/wavlm-base-plus)",
+    )
+    parser.add_argument(
+        "--c-wavlm",
+        type=float,
+        default=0.5,
+        help="WavLM discriminator loss weight (default: 0.5)",
+    )
     # Trainer arguments
     parser.add_argument("--accelerator", default="gpu", help="Accelerator to use")
     parser.add_argument("--devices", type=int, default=1, help="Number of devices")
@@ -176,6 +193,12 @@ def main():
     )
     _LOGGER.info(f"Training with {num_gpus} GPU(s)")
     _LOGGER.info(f"Using precision: {args.precision}")
+
+    # Log WavLM Discriminator status
+    if args.use_wavlm_discriminator:
+        _LOGGER.info(
+            f"WavLM Discriminator enabled: model={args.wavlm_model_name}, weight={args.c_wavlm}"
+        )
 
     # Initialize scaled_lr
     scaled_lr = args.base_lr

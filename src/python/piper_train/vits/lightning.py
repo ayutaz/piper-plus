@@ -12,7 +12,7 @@ from .commons import slice_segments
 from .dataset import Batch, PiperDataset, SpeakerBalancedBatchSampler, UtteranceCollate
 from .losses import discriminator_loss, feature_loss, generator_loss, kl_loss
 from .mel_processing import mel_spectrogram_torch, spec_to_mel_torch
-from .models import MultiPeriodDiscriminator, SynthesizerTrn
+from .models import MultiPeriodDiscriminator, SynthesizerTrn, WavLMDiscriminator
 
 
 _LOGGER = logging.getLogger("vits.lightning")
@@ -78,6 +78,10 @@ class VitsModel(pl.LightningModule):
         num_test_examples: int = 5,
         validation_split: float = 0.1,
         max_phoneme_ids: int | None = None,
+        # WavLM Discriminator
+        use_wavlm_discriminator: bool = False,
+        wavlm_model_name: str = "microsoft/wavlm-base-plus",
+        c_wavlm: float = 0.5,
         **kwargs,
     ):
         super().__init__()
@@ -118,6 +122,17 @@ class VitsModel(pl.LightningModule):
         self.model_d = MultiPeriodDiscriminator(
             use_spectral_norm=self.hparams.use_spectral_norm
         )
+
+        # WavLM Discriminator (optional)
+        self.model_d_wavlm = None
+        if self.hparams.use_wavlm_discriminator:
+            _LOGGER.info(
+                f"Initializing WavLM Discriminator with model: {self.hparams.wavlm_model_name}"
+            )
+            self.model_d_wavlm = WavLMDiscriminator(
+                model_name=self.hparams.wavlm_model_name,
+                source_sample_rate=self.hparams.sample_rate,
+            )
 
         # Dataset splits
         self._train_dataset: Dataset | None = None
@@ -371,6 +386,20 @@ class VitsModel(pl.LightningModule):
 
             loss_gen_all = loss_gen + loss_fm + loss_mel + loss_dur + loss_kl
 
+            # WavLM Discriminator loss (optional)
+            if self.model_d_wavlm is not None:
+                _y_d_hat_r_wlm, y_d_hat_g_wlm, fmap_r_wlm, fmap_g_wlm = self.model_d_wavlm(
+                    y, y_hat
+                )
+                loss_fm_wavlm = feature_loss(fmap_r_wlm, fmap_g_wlm)
+                loss_gen_wavlm, _ = generator_loss(y_d_hat_g_wlm)
+                loss_wavlm = (loss_gen_wavlm + loss_fm_wavlm) * self.hparams.c_wavlm
+                loss_gen_all = loss_gen_all + loss_wavlm
+
+                # Log WavLM losses
+                self._log_with_batch_info("loss_gen_wavlm", loss_gen_wavlm, batch)
+                self._log_with_batch_info("loss_fm_wavlm", loss_fm_wavlm, batch)
+
             self._log_with_batch_info("loss_gen_all", loss_gen_all, batch)
 
             return loss_gen_all
@@ -389,6 +418,19 @@ class VitsModel(pl.LightningModule):
                 y_d_hat_r, y_d_hat_g
             )
             loss_disc_all = loss_disc
+
+            # WavLM Discriminator loss (optional)
+            if self.model_d_wavlm is not None:
+                y_d_hat_r_wlm, y_d_hat_g_wlm, _, _ = self.model_d_wavlm(
+                    y, y_hat_detached
+                )
+                loss_disc_wavlm, _, _ = discriminator_loss(
+                    y_d_hat_r_wlm, y_d_hat_g_wlm
+                )
+                loss_disc_all = loss_disc_all + loss_disc_wavlm * self.hparams.c_wavlm
+
+                # Log WavLM discriminator loss
+                self._log_with_batch_info("loss_disc_wavlm", loss_disc_wavlm)
 
             self._log_with_batch_info("loss_disc_all", loss_disc_all)
 
@@ -421,6 +463,11 @@ class VitsModel(pl.LightningModule):
         return val_loss
 
     def configure_optimizers(self):
+        # Collect discriminator parameters (including WavLM if enabled)
+        d_params = list(self.model_d.parameters())
+        if self.model_d_wavlm is not None:
+            d_params = d_params + list(self.model_d_wavlm.parameters())
+
         optimizers = [
             torch.optim.AdamW(
                 self.model_g.parameters(),
@@ -429,7 +476,7 @@ class VitsModel(pl.LightningModule):
                 eps=self.hparams.eps,
             ),
             torch.optim.AdamW(
-                self.model_d.parameters(),
+                d_params,
                 lr=self.hparams.learning_rate,
                 betas=self.hparams.betas,
                 eps=self.hparams.eps,
