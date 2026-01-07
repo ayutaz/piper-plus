@@ -5,6 +5,7 @@ from pathlib import Path
 
 import torch
 
+from .vits import commons
 from .vits.lightning import VitsModel
 
 
@@ -132,15 +133,12 @@ def main() -> None:
     # Check if model uses prosody features
     has_prosody = getattr(model_g, "prosody_dim", 0) > 0
 
-    # Import commons for sequence_mask and generate_path
-    from .vits import commons
-
     def infer_forward(text, text_lengths, scales, sid=None, prosody_features=None):
         """
         Efficient forward function that returns both audio and duration information.
         Duration predictor is called only once (not twice as in the previous implementation).
         """
-        noise_scale = scales[0]
+        # noise_scale = scales[0]  # unused in ONNX export (deterministic mode)
         length_scale = scales[1]
         noise_scale_w = scales[2]
 

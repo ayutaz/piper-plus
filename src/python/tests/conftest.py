@@ -119,7 +119,7 @@ def temp_onnx_model(mock_vits_model, tmp_path_factory):
         scales_tensor,
         prosody_features_tensor,
     ):
-        noise_scale = scales_tensor[0]
+        # noise_scale = scales_tensor[0]  # unused in ONNX export (deterministic mode)
         length_scale = scales_tensor[1]
         noise_scale_w = scales_tensor[2]
 
