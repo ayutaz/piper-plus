@@ -4,13 +4,13 @@ Piper can output timing information for each phoneme during text-to-speech synth
 
 ## Overview
 
-When enabled, Piper extracts phoneme duration information from the synthesis process and outputs start/end times for each phoneme. This feature requires models exported with the `--with-durations` flag.
+Piper extracts phoneme duration information from the synthesis process and outputs start/end times for each phoneme. Duration information is automatically included in all ONNX model exports.
 
 ## Requirements
 
-1. **Model Support**: The ONNX model must be exported with duration information:
+1. **Model Support**: All ONNX models exported with piper_train include duration information by default:
    ```bash
-   python -m piper_train.export_onnx checkpoint.ckpt model.onnx --with-durations
+   python -m piper_train.export_onnx checkpoint.ckpt model.onnx
    ```
 
 2. **Piper Version**: Requires Piper built from this branch or later
@@ -131,13 +131,12 @@ for word in words:
 - No impact on audio quality
 
 ### Limitations
-1. **Model Dependency**: Only works with models exported with `--with-durations`
-2. **Frame Granularity**: Timing precision limited by hop size
-3. **No Sub-phoneme Information**: Cannot provide timing for phoneme parts
+1. **Frame Granularity**: Timing precision limited by hop size
+2. **No Sub-phoneme Information**: Cannot provide timing for phoneme parts
 
-## Fallback for Older Models
+## Compatibility with Older Models
 
-For models without duration support, timing is not available. The synthesis will complete normally but no timing file will be generated.
+Models exported before this change (without duration output) will still work for audio synthesis, but timing information will not be available. Re-export such models to enable timing support.
 
 ## Integration Example
 
