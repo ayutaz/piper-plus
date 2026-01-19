@@ -17,6 +17,50 @@ from .vits.wavfile import write as write_wav
 _LOGGER = logging.getLogger("piper_train.infer_onnx")
 
 
+def text_to_phoneme_ids_and_prosody(
+    text: str,
+    phoneme_id_map: dict[str, list[int]],
+) -> tuple[list[int], list[dict | None]]:
+    """Convert Japanese text to phoneme IDs and prosody features.
+
+    Args:
+        text: Input Japanese text
+        phoneme_id_map: Mapping from phoneme symbols to IDs
+
+    Returns:
+        tuple of (phoneme_ids, prosody_features)
+        - phoneme_ids: List of phoneme IDs
+        - prosody_features: List of {"a1": int, "a2": int, "a3": int} or None
+    """
+    from .phonemize.japanese import phonemize_japanese_with_prosody
+
+    # Get phonemes and prosody info from text
+    phonemes, prosody_info_list = phonemize_japanese_with_prosody(text)
+
+    # Convert phonemes to IDs
+    phoneme_ids = []
+    prosody_features = []
+
+    for phoneme, prosody_info in zip(phonemes, prosody_info_list):
+        if phoneme in phoneme_id_map:
+            ids = phoneme_id_map[phoneme]
+            phoneme_ids.extend(ids)
+            # Each phoneme ID gets the same prosody info
+            for _ in ids:
+                if prosody_info is not None:
+                    prosody_features.append({
+                        "a1": prosody_info.a1,
+                        "a2": prosody_info.a2,
+                        "a3": prosody_info.a3,
+                    })
+                else:
+                    prosody_features.append(None)
+        else:
+            _LOGGER.warning("Unknown phoneme: %s", phoneme)
+
+    return phoneme_ids, prosody_features
+
+
 def main():
     """Main entry point"""
     logging.basicConfig(level=logging.DEBUG)
@@ -27,6 +71,22 @@ def main():
     parser.add_argument("--noise-scale", type=float, default=0.667)
     parser.add_argument("--noise-scale-w", type=float, default=0.8)
     parser.add_argument("--length-scale", type=float, default=1.0)
+    # Text input options
+    parser.add_argument(
+        "--text",
+        help="Japanese text to synthesize (alternative to JSONL stdin input)",
+    )
+    parser.add_argument(
+        "--config",
+        help="Path to config.json with phoneme_id_map (required with --text). "
+        "If not specified, looks for config.json next to the model.",
+    )
+    parser.add_argument(
+        "--speaker-id",
+        type=int,
+        default=0,
+        help="Speaker ID for multi-speaker models (default: 0)",
+    )
     args = parser.parse_args()
 
     args.output_dir = Path(args.output_dir)
@@ -40,28 +100,66 @@ def main():
     # Check if model supports prosody features
     input_names = [inp.name for inp in model.get_inputs()]
     has_prosody = "prosody_features" in input_names
+    has_sid = "sid" in input_names
     if has_prosody:
         _LOGGER.info("Model supports prosody features (A1/A2/A3)")
+    if has_sid:
+        _LOGGER.info("Model supports multi-speaker (sid input)")
 
-    # text_empty = np.zeros((1, 300), dtype=np.int64)
-    # text_lengths_empty = np.array([text_empty.shape[1]], dtype=np.int64)
-    # scales = np.array(
-    #     [args.noise_scale, args.length_scale, args.noise_scale_w],
-    #     dtype=np.float32,
-    # )
-    # bias_audio = model.run(
-    #     None,
-    #     {"input": text_empty, "input_lengths": text_lengths_empty, "scales": scales},
-    # )[0].squeeze((0, 1))
-    # bias_spec, _ = transform(bias_audio)
+    # Handle --text mode: convert text to phoneme_ids and prosody_features
+    phoneme_id_map = None
+    if args.text:
+        # Load config.json for phoneme_id_map
+        if args.config:
+            config_path = Path(args.config)
+        else:
+            # Look for config.json next to the model
+            model_path = Path(args.model)
+            config_path = model_path.parent / "config.json"
 
-    for i, line in enumerate(sys.stdin):
-        line = line.strip()
-        if not line:
-            continue
+        if not config_path.exists():
+            _LOGGER.error(
+                "config.json not found at %s. Use --config to specify path.", config_path
+            )
+            sys.exit(1)
 
-        utt = json.loads(line)
-        # utt_id = utt["id"]
+        with open(config_path, encoding="utf-8") as f:
+            config = json.load(f)
+
+        phoneme_id_map = config.get("phoneme_id_map")
+        if not phoneme_id_map:
+            _LOGGER.error("phoneme_id_map not found in config.json")
+            sys.exit(1)
+
+        _LOGGER.info("Loaded phoneme_id_map from %s", config_path)
+
+        # Convert text to phoneme_ids and prosody_features
+        phoneme_ids, prosody_features_data = text_to_phoneme_ids_and_prosody(
+            args.text, phoneme_id_map
+        )
+        _LOGGER.info(
+            "Converted text to %d phoneme IDs: %s",
+            len(phoneme_ids),
+            args.text[:50] + "..." if len(args.text) > 50 else args.text,
+        )
+
+        # Create single utterance
+        utterances = [
+            {
+                "phoneme_ids": phoneme_ids,
+                "speaker_id": args.speaker_id if has_sid else None,
+                "prosody_features": prosody_features_data,
+            }
+        ]
+    else:
+        # Read from stdin (JSONL mode)
+        utterances = []
+        for line in sys.stdin:
+            line = line.strip()
+            if line:
+                utterances.append(json.loads(line))
+
+    for i, utt in enumerate(utterances):
         utt_id = str(i)
         phoneme_ids = utt["phoneme_ids"]
         speaker_id = utt.get("speaker_id")
