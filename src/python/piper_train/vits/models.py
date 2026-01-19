@@ -553,6 +553,7 @@ class WavLMDiscriminator(torch.nn.Module):
         source_sample_rate: int = 22050,
     ):
         super().__init__()
+        import torchaudio  # noqa: PLC0415 - lazy import
         from transformers import WavLMModel  # noqa: PLC0415, I001 - lazy import for optional dependency
 
         self.use_layers = use_layers if use_layers is not None else [6, 9, 12]
@@ -571,6 +572,18 @@ class WavLMDiscriminator(torch.nn.Module):
             for param in self.wavlm.feature_extractor.parameters():
                 param.requires_grad = False
 
+        # Initialize resampler with sinc interpolation for high-quality audio resampling
+        # This avoids aliasing artifacts that occur with linear interpolation
+        self.resampler = None
+        if source_sample_rate != target_sample_rate:
+            self.resampler = torchaudio.transforms.Resample(
+                orig_freq=source_sample_rate,
+                new_freq=target_sample_rate,
+                resampling_method="sinc_interp_hann",
+                lowpass_filter_width=64,
+                dtype=torch.float32,
+            )
+
         # Classification head: concatenated features -> discrimination score
         feature_dim = self.hidden_size * len(self.use_layers)
         self.classifier = nn.Sequential(
@@ -580,22 +593,25 @@ class WavLMDiscriminator(torch.nn.Module):
         )
 
     def _resample(self, audio: torch.Tensor) -> torch.Tensor:
-        """Resample audio from source to target sample rate."""
-        if self.source_sample_rate == self.target_sample_rate:
-            return audio
+        """Resample audio from source to target sample rate using sinc interpolation.
+
+        Uses torchaudio.transforms.Resample with sinc_interp_hann method for
+        high-quality resampling that avoids aliasing artifacts.
+        """
+        if self.resampler is None:
+            # No resampling needed (same sample rate)
+            return audio.squeeze(1)
 
         # audio shape: (batch, 1, time) -> (batch, time) for resampling
         audio_2d = audio.squeeze(1)
 
-        # Calculate new length
-        new_length = int(audio_2d.size(-1) * self.target_sample_rate / self.source_sample_rate)
+        # Convert to float32 for resampling (resampler expects float32)
+        audio_float = audio_2d.float()
 
-        # Use torch.nn.functional.interpolate for resampling
-        # Reshape for interpolate: (batch, 1, time)
-        audio_3d = audio_2d.unsqueeze(1)
-        resampled = F.interpolate(audio_3d, size=new_length, mode="linear", align_corners=False)
+        # Apply sinc interpolation resampling
+        resampled = self.resampler(audio_float)
 
-        return resampled.squeeze(1)  # (batch, time)
+        return resampled  # (batch, time)
 
     def _extract_features(self, audio: torch.Tensor) -> tuple[torch.Tensor, list[torch.Tensor]]:
         """
@@ -611,7 +627,8 @@ class WavLMDiscriminator(torch.nn.Module):
         output : torch.Tensor
             Discrimination score of shape (batch, 1)
         fmap : list[torch.Tensor]
-            Feature maps from selected layers
+            Feature maps from selected layers, each with shape (batch, hidden_size, seq_len)
+            This format is compatible with feature_loss() which expects (batch, channels, time)
         """
         # Resample to 16kHz for WavLM
         audio_16k = self._resample(audio)
@@ -631,15 +648,22 @@ class WavLMDiscriminator(torch.nn.Module):
         # hidden_states is tuple of (embedding + num_layers) tensors
         # Each tensor shape: (batch, seq_len, hidden_size)
         hidden_states = outputs.hidden_states
-        fmap = [hidden_states[i] for i in self.use_layers]
 
-        # Concatenate selected layer features
-        # Shape: (batch, seq_len, hidden_size * num_layers)
-        concatenated = torch.cat(fmap, dim=-1)
+        # Format feature maps for compatibility with feature_loss()
+        # Transform from (batch, seq_len, hidden_size) to (batch, hidden_size, seq_len)
+        # This matches the format used by MultiPeriodDiscriminator: (batch, channels, time)
+        fmap = []
+        for i in self.use_layers:
+            # Transpose to (batch, hidden_size, seq_len) for feature_loss compatibility
+            fmap.append(hidden_states[i].transpose(1, 2))
 
-        # Global average pooling over time
+        # For classification, concatenate and pool
+        # Use original format for concatenation: (batch, seq_len, hidden_size * num_layers)
+        concat_features = torch.cat([hidden_states[i] for i in self.use_layers], dim=-1)
+
+        # Global average pooling over time for classification
         # Shape: (batch, hidden_size * num_layers)
-        pooled = concatenated.mean(dim=1)
+        pooled = concat_features.mean(dim=1)
 
         # Classification
         output = self.classifier(pooled)
