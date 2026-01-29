@@ -4,8 +4,6 @@ import numpy as np
 import pytest
 import torch
 
-from piper_train.export_onnx import main as export_main
-
 
 def _onnx_inference(onnx_path, phoneme_ids, prosody_features, noise_scale=0.667):
     """Run ONNX inference and return audio output."""
