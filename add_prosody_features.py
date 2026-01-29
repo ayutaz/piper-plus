@@ -3,11 +3,13 @@
 既存データセットにprosody_featuresを追加する最適化スクリプト
 音声処理をスキップし、phonemize_japanese_with_prosodyのみ実行
 """
-import json
+
 import argparse
+import json
 import shutil
-from pathlib import Path
 from multiprocessing import Pool, cpu_count
+from pathlib import Path
+
 from tqdm import tqdm
 
 from piper_train.phonemize.japanese import phonemize_japanese_with_prosody
@@ -50,9 +52,13 @@ def process_utterance(item: dict) -> dict | None:
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--input-dataset", required=True, help="既存dataset.jsonlのパス")
+    parser.add_argument(
+        "--input-dataset", required=True, help="既存dataset.jsonlのパス"
+    )
     parser.add_argument("--output-dir", required=True, help="出力ディレクトリ")
-    parser.add_argument("--workers", type=int, default=cpu_count(), help="並列ワーカー数")
+    parser.add_argument(
+        "--workers", type=int, default=cpu_count(), help="並列ワーカー数"
+    )
     args = parser.parse_args()
 
     input_path = Path(args.input_dataset)
@@ -64,7 +70,7 @@ def main():
     config_src = input_dir / "config.json"
     if config_src.exists():
         shutil.copy(config_src, output_dir / "config.json")
-        print(f"Copied config.json")
+        print("Copied config.json")
 
     # cacheディレクトリをシンボリックリンク
     cache_src = input_dir / "cache"
@@ -75,18 +81,20 @@ def main():
 
     # データセット読み込み
     print(f"Loading dataset from {input_path}")
-    with open(input_path, "r", encoding="utf-8") as f:
+    with open(input_path, encoding="utf-8") as f:
         items = [json.loads(line) for line in f if line.strip()]
     print(f"Loaded {len(items)} utterances")
 
     # 並列処理
     print(f"Processing with {args.workers} workers...")
     with Pool(args.workers) as pool:
-        results = list(tqdm(
-            pool.imap(process_utterance, items, chunksize=100),
-            total=len(items),
-            desc="Adding prosody"
-        ))
+        results = list(
+            tqdm(
+                pool.imap(process_utterance, items, chunksize=100),
+                total=len(items),
+                desc="Adding prosody",
+            )
+        )
 
     # 結果を書き込み
     output_path = output_dir / "dataset.jsonl"
@@ -102,7 +110,7 @@ def main():
     # config.jsonにprosody設定と新しいphoneme_id_mapを追加
     config_path = output_dir / "config.json"
     if config_path.exists():
-        with open(config_path, "r", encoding="utf-8") as f:
+        with open(config_path, encoding="utf-8") as f:
             config = json.load(f)
 
         # 新しいトークン体系でphoneme_id_mapを更新

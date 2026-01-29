@@ -4,10 +4,11 @@
 事前学習モデルから話者埋め込み層を削除し、オプティマイザ状態を初期化します
 """
 
-import torch
 import sys
-import os
 from pathlib import Path
+
+import torch
+
 
 def create_partial_checkpoint_for_finetuning(original_ckpt_path, new_ckpt_path):
     """
@@ -15,11 +16,13 @@ def create_partial_checkpoint_for_finetuning(original_ckpt_path, new_ckpt_path):
     オプティマイザの状態を削除した新しいチェックポイントを作成します。
     """
     print(f"Loading original checkpoint from: {original_ckpt_path}")
-    
+
     if not Path(original_ckpt_path).exists():
-        print(f"ERROR: Checkpoint file not found at {original_ckpt_path}", file=sys.stderr)
+        print(
+            f"ERROR: Checkpoint file not found at {original_ckpt_path}", file=sys.stderr
+        )
         return False
-    
+
     try:
         # CPUにロードしてGPUメモリを節約
         checkpoint = torch.load(original_ckpt_path, map_location="cpu")
@@ -30,21 +33,21 @@ def create_partial_checkpoint_for_finetuning(original_ckpt_path, new_ckpt_path):
     # チェックポイントの内容を確認
     print("\n--- Original Checkpoint Info ---")
     print(f"Keys in checkpoint: {list(checkpoint.keys())}")
-    
+
     # ハイパーパラメータの確認と更新
     if "hyper_parameters" in checkpoint:
         hp = checkpoint["hyper_parameters"]
         print(f"Original num_speakers: {hp.get('num_speakers', 'N/A')}")
         print(f"Original batch_size: {hp.get('batch_size', 'N/A')}")
         print(f"Original learning_rate: {hp.get('learning_rate', 'N/A')}")
-        
+
         # 単一話者用に更新
-        hp['num_speakers'] = 0  # または1
-        hp['speaker_id'] = None
+        hp["num_speakers"] = 0  # または1
+        hp["speaker_id"] = None
         print(f"Updated num_speakers to: {hp['num_speakers']}")
 
     original_state_dict = checkpoint["state_dict"]
-    
+
     # 削除するキーのリスト
     # これらは主に、話者数が変わったことで不要になったレイヤーです
     keys_to_remove = [
@@ -58,24 +61,24 @@ def create_partial_checkpoint_for_finetuning(original_ckpt_path, new_ckpt_path):
         "model_g.dp.cond.weight",
         "model_g.dp.cond.bias",
     ]
-    
+
     # フローの条件付けレイヤーも動的にリストに追加
     for i in [0, 2, 4, 6]:
         for suffix in ["bias", "weight_g", "weight_v"]:
             keys_to_remove.append(f"model_g.flow.flows.{i}.enc.cond_layer.{suffix}")
-    
+
     # discriminatorの話者関連レイヤーも削除（存在する場合）
     discriminator_keys_to_check = [
         "model_d.emb",
         "model_d.cond",
     ]
-    
+
     # 実際に存在するキーのみを削除対象に追加
     keys_to_remove_set = set()
     for key in keys_to_remove:
         if key in original_state_dict:
             keys_to_remove_set.add(key)
-    
+
     # discriminator関連のキーも確認
     for key in original_state_dict.keys():
         for pattern in discriminator_keys_to_check:
@@ -83,22 +86,25 @@ def create_partial_checkpoint_for_finetuning(original_ckpt_path, new_ckpt_path):
                 keys_to_remove_set.add(key)
 
     # 新しいstate_dictから、削除対象のキーを除外して作成
-    new_state_dict = {key: value for key, value in original_state_dict.items() 
-                      if key not in keys_to_remove_set}
+    new_state_dict = {
+        key: value
+        for key, value in original_state_dict.items()
+        if key not in keys_to_remove_set
+    }
 
     # チェックポイントのstate_dictを新しいものに更新
     checkpoint["state_dict"] = new_state_dict
-    
+
     # オプティマイザの状態を削除（新しい学習のため）
     if "optimizer_states" in checkpoint:
         del checkpoint["optimizer_states"]
         print("Removed optimizer states from the checkpoint.")
-    
+
     # LRスケジューラの状態も削除
     if "lr_schedulers" in checkpoint:
         del checkpoint["lr_schedulers"]
         print("Removed lr_schedulers from the checkpoint.")
-    
+
     # EMA状態も確認して削除（必要に応じて）
     ema_keys_removed = []
     for key in ["ema_generator_state", "ema_discriminator_state"]:
@@ -109,17 +115,20 @@ def create_partial_checkpoint_for_finetuning(original_ckpt_path, new_ckpt_path):
                 ema_keys_to_remove = []
                 for ema_key in ema_state.keys():
                     for pattern in keys_to_remove_set:
-                        if pattern.replace("model_g.", "") in ema_key or pattern.replace("model_d.", "") in ema_key:
+                        if (
+                            pattern.replace("model_g.", "") in ema_key
+                            or pattern.replace("model_d.", "") in ema_key
+                        ):
                             ema_keys_to_remove.append(ema_key)
-                
+
                 for ema_key in ema_keys_to_remove:
                     if ema_key in ema_state:
                         del ema_state[ema_key]
                         ema_keys_removed.append(ema_key)
-    
+
     if ema_keys_removed:
         print(f"Removed {len(ema_keys_removed)} keys from EMA states")
-    
+
     # エポック数とステップ数をリセット（ファインチューニング用）
     checkpoint["epoch"] = 0
     checkpoint["global_step"] = 0
@@ -131,28 +140,38 @@ def create_partial_checkpoint_for_finetuning(original_ckpt_path, new_ckpt_path):
             # epoch_progressをリセット（重要！）
             if "epoch_progress" in fit_loop:
                 fit_loop["epoch_progress"] = {
-                    'total': {'ready': 0, 'completed': 0, 'started': 0, 'processed': 0},
-                    'current': {'ready': 0, 'completed': 0, 'started': 0, 'processed': 0}
+                    "total": {"ready": 0, "completed": 0, "started": 0, "processed": 0},
+                    "current": {
+                        "ready": 0,
+                        "completed": 0,
+                        "started": 0,
+                        "processed": 0,
+                    },
                 }
             # batch_progressをリセット
             if "epoch_loop.batch_progress" in fit_loop:
                 fit_loop["epoch_loop.batch_progress"] = {
-                    'total': {'ready': 0, 'completed': 0, 'started': 0, 'processed': 0},
-                    'current': {'ready': 0, 'completed': 0, 'started': 0, 'processed': 0},
-                    'is_last_batch': False
+                    "total": {"ready": 0, "completed": 0, "started": 0, "processed": 0},
+                    "current": {
+                        "ready": 0,
+                        "completed": 0,
+                        "started": 0,
+                        "processed": 0,
+                    },
+                    "is_last_batch": False,
                 }
             # manual_optimization進捗をリセット
             if "epoch_loop.manual_optimization.optim_step_progress" in fit_loop:
                 fit_loop["epoch_loop.manual_optimization.optim_step_progress"] = {
-                    'total': {'ready': 0, 'completed': 0},
-                    'current': {'ready': 0, 'completed': 0}
+                    "total": {"ready": 0, "completed": 0},
+                    "current": {"ready": 0, "completed": 0},
                 }
         print("Reset epoch and step counters to 0")
-    
+
     # 新しいチェックポイントディレクトリの作成
     output_path = Path(new_ckpt_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    
+
     # 新しい部分的なチェックポイントを保存
     torch.save(checkpoint, new_ckpt_path)
 
@@ -164,8 +183,10 @@ def create_partial_checkpoint_for_finetuning(original_ckpt_path, new_ckpt_path):
     print(f"New state_dict has {len(new_state_dict)} keys.")
     print("---------------------------------------")
     print(f"\nPartial checkpoint for fine-tuning saved to: {new_ckpt_path}")
-    print("\nNow, use this new partial checkpoint path for the --resume_from_checkpoint argument.")
-    
+    print(
+        "\nNow, use this new partial checkpoint path for the --resume_from_checkpoint argument."
+    )
+
     return True
 
 
@@ -177,13 +198,15 @@ if __name__ == "__main__":
     # 保存する新しい「部分的チェックポイント」のパスとファイル名
     partial_checkpoint = "/data/piper/base_model_prosody/model.ckpt"
     # --- 設定ここまで ---
-    
-    success = create_partial_checkpoint_for_finetuning(original_checkpoint, partial_checkpoint)
-    
+
+    success = create_partial_checkpoint_for_finetuning(
+        original_checkpoint, partial_checkpoint
+    )
+
     if success:
-        print("\n" + "="*60)
+        print("\n" + "=" * 60)
         print("✓ 変換成功！")
-        print("="*60)
+        print("=" * 60)
         print("\n次のステップ:")
         print("1. tsukuyomi-chanデータセットの前処理:")
         print("   python -m piper_train.preprocess \\")
