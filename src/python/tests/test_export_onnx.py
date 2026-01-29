@@ -101,8 +101,6 @@ class TestEMAWeightApplication:
 
     def test_ema_weights_applied(self, mock_vits_model, tmp_path):
         """EMA state があればデコーダパラメータに適用される"""
-        from piper_train.export_onnx import _LOGGER  # noqa: F401
-
         # デコーダの元パラメータを記録
         original_params = {}
         for name, param in mock_vits_model.dec.named_parameters():

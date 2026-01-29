@@ -32,7 +32,7 @@ def text_to_phoneme_ids_and_prosody(
         - phoneme_ids: List of phoneme IDs
         - prosody_features: List of {"a1": int, "a2": int, "a3": int} or None
     """
-    from .phonemize.japanese import phonemize_japanese_with_prosody
+    from .phonemize.japanese import phonemize_japanese_with_prosody  # noqa: PLC0415
 
     # Get phonemes and prosody info from text
     phonemes, prosody_info_list = phonemize_japanese_with_prosody(text)
@@ -41,7 +41,7 @@ def text_to_phoneme_ids_and_prosody(
     phoneme_ids = []
     prosody_features = []
 
-    for phoneme, prosody_info in zip(phonemes, prosody_info_list):
+    for phoneme, prosody_info in zip(phonemes, prosody_info_list, strict=True):
         if phoneme in phoneme_id_map:
             ids = phoneme_id_map[phoneme]
             phoneme_ids.extend(ids)
