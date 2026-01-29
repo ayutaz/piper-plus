@@ -28,9 +28,7 @@ def _onnx_inference(onnx_path, phoneme_ids, prosody_features, noise_scale=0.667)
                 pf.append([0, 0, 0])
             else:
                 pf.append([feat["a1"], feat["a2"], feat["a3"]])
-        inputs["prosody_features"] = np.expand_dims(
-            np.array(pf, dtype=np.int64), 0
-        )
+        inputs["prosody_features"] = np.expand_dims(np.array(pf, dtype=np.int64), 0)
 
     outputs = session.run(None, inputs)
     return outputs[0].squeeze()
@@ -45,16 +43,21 @@ class TestDeterministicExport:
     ):
         """Deterministic モードでは noise_scale を変えても出力が同一"""
         audio_low = _onnx_inference(
-            temp_onnx_model, sample_phoneme_ids, sample_prosody_features,
+            temp_onnx_model,
+            sample_phoneme_ids,
+            sample_prosody_features,
             noise_scale=0.0,
         )
         audio_high = _onnx_inference(
-            temp_onnx_model, sample_phoneme_ids, sample_prosody_features,
+            temp_onnx_model,
+            sample_phoneme_ids,
+            sample_prosody_features,
             noise_scale=0.667,
         )
 
         np.testing.assert_array_equal(
-            audio_low, audio_high,
+            audio_low,
+            audio_high,
             err_msg="Deterministic export should produce identical output regardless of noise_scale",
         )
 
@@ -64,21 +67,30 @@ class TestStochasticExport:
     """Stochastic モードのテスト"""
 
     def test_stochastic_with_zero_noise_scale(
-        self, temp_onnx_model, temp_onnx_model_stochastic,
-        sample_phoneme_ids, sample_prosody_features,
+        self,
+        temp_onnx_model,
+        temp_onnx_model_stochastic,
+        sample_phoneme_ids,
+        sample_prosody_features,
     ):
         """Stochastic モードで noise_scale=0 なら deterministic と同等の出力"""
         audio_det = _onnx_inference(
-            temp_onnx_model, sample_phoneme_ids, sample_prosody_features,
+            temp_onnx_model,
+            sample_phoneme_ids,
+            sample_prosody_features,
             noise_scale=0.0,
         )
         audio_stoch = _onnx_inference(
-            temp_onnx_model_stochastic, sample_phoneme_ids, sample_prosody_features,
+            temp_onnx_model_stochastic,
+            sample_phoneme_ids,
+            sample_prosody_features,
             noise_scale=0.0,
         )
 
         np.testing.assert_allclose(
-            audio_det, audio_stoch, atol=1e-4,
+            audio_det,
+            audio_stoch,
+            atol=1e-4,
             err_msg="Stochastic with noise_scale=0 should match deterministic output",
         )
 
@@ -87,7 +99,9 @@ class TestStochasticExport:
     ):
         """Stochastic モードで有効な音声が生成される"""
         audio = _onnx_inference(
-            temp_onnx_model_stochastic, sample_phoneme_ids, sample_prosody_features,
+            temp_onnx_model_stochastic,
+            sample_phoneme_ids,
+            sample_prosody_features,
             noise_scale=0.5,
         )
         assert audio.ndim == 1
@@ -99,16 +113,22 @@ class TestStochasticExport:
 class TestEMAWeightApplication:
     """EMA 重み適用のテスト"""
 
-    def test_ema_weights_applied(self, mock_vits_model, tmp_path):
+    def test_ema_weights_applied(self, tmp_path):
         """EMA state があればデコーダパラメータに適用される"""
+        # VITSモデルの代わりにシンプルなモジュールを使用（Windows互換性のため）
+        dec = torch.nn.Sequential(
+            torch.nn.Linear(10, 10),
+            torch.nn.Linear(10, 5),
+        )
+
         # デコーダの元パラメータを記録
         original_params = {}
-        for name, param in mock_vits_model.dec.named_parameters():
+        for name, param in dec.named_parameters():
             original_params[name] = param.data.clone()
 
         # EMA shadow params を作成（元のパラメータ + 0.1）
         shadow_params = {}
-        for name, param in mock_vits_model.dec.named_parameters():
+        for name, param in dec.named_parameters():
             shadow_params[name] = param.data.clone() + 0.1
 
         ema_state = {"shadow_params": shadow_params}
@@ -117,13 +137,13 @@ class TestEMAWeightApplication:
         ckpt_path = tmp_path / "test_ema.ckpt"
         torch.save({"ema_generator_state": ema_state}, str(ckpt_path))
 
-        # EMA適用ロジックを直接テスト
+        # EMA適用ロジックを直接テスト（export_onnx.pyと同じロジック）
         ckpt = torch.load(str(ckpt_path), map_location="cpu")
         ema = ckpt.get("ema_generator_state")
         assert ema is not None
 
         applied = 0
-        dec_params = dict(mock_vits_model.dec.named_parameters())
+        dec_params = dict(dec.named_parameters())
         for name, shadow_param in ema["shadow_params"].items():
             if name in dec_params:
                 dec_params[name].data.copy_(shadow_param)
@@ -132,16 +152,11 @@ class TestEMAWeightApplication:
         assert applied > 0, "No EMA parameters were applied"
 
         # パラメータが変更されたことを確認
-        for name, param in mock_vits_model.dec.named_parameters():
+        for name, param in dec.named_parameters():
             if name in original_params:
                 assert not torch.equal(param.data, original_params[name]), (
                     f"Parameter {name} was not updated by EMA"
                 )
-
-        # 元に戻す
-        for name, param in mock_vits_model.dec.named_parameters():
-            if name in original_params:
-                param.data.copy_(original_params[name])
 
     def test_no_ema_state_is_handled(self, tmp_path):
         """チェックポイントに EMA state がない場合はスキップされる"""
