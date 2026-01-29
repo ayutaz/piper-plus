@@ -48,11 +48,13 @@ def text_to_phoneme_ids_and_prosody(
             # Each phoneme ID gets the same prosody info
             for _ in ids:
                 if prosody_info is not None:
-                    prosody_features.append({
-                        "a1": prosody_info.a1,
-                        "a2": prosody_info.a2,
-                        "a3": prosody_info.a3,
-                    })
+                    prosody_features.append(
+                        {
+                            "a1": prosody_info.a1,
+                            "a2": prosody_info.a2,
+                            "a3": prosody_info.a3,
+                        }
+                    )
                 else:
                     prosody_features.append(None)
         else:
@@ -119,7 +121,8 @@ def main():
 
         if not config_path.exists():
             _LOGGER.error(
-                "config.json not found at %s. Use --config to specify path.", config_path
+                "config.json not found at %s. Use --config to specify path.",
+                config_path,
             )
             sys.exit(1)
 

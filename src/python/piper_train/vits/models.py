@@ -554,6 +554,7 @@ class WavLMDiscriminator(torch.nn.Module):
     ):
         super().__init__()
         import torchaudio  # noqa: PLC0415 - lazy import
+
         try:
             from transformers import WavLMModel  # noqa: PLC0415, I001
         except ImportError as exc:
@@ -619,7 +620,9 @@ class WavLMDiscriminator(torch.nn.Module):
 
         return resampled  # (batch, time)
 
-    def _extract_features(self, audio: torch.Tensor) -> tuple[torch.Tensor, list[torch.Tensor]]:
+    def _extract_features(
+        self, audio: torch.Tensor
+    ) -> tuple[torch.Tensor, list[torch.Tensor]]:
         """
         Extract features from WavLM for given audio.
 
@@ -678,7 +681,12 @@ class WavLMDiscriminator(torch.nn.Module):
 
     def forward(
         self, y: torch.Tensor, y_hat: torch.Tensor
-    ) -> tuple[list[torch.Tensor], list[torch.Tensor], list[list[torch.Tensor]], list[list[torch.Tensor]]]:
+    ) -> tuple[
+        list[torch.Tensor],
+        list[torch.Tensor],
+        list[list[torch.Tensor]],
+        list[list[torch.Tensor]],
+    ]:
         """
         Forward pass for discriminator.
 

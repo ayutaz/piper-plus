@@ -388,8 +388,8 @@ class VitsModel(pl.LightningModule):
 
             # WavLM Discriminator loss (optional)
             if self.model_d_wavlm is not None:
-                _y_d_hat_r_wlm, y_d_hat_g_wlm, fmap_r_wlm, fmap_g_wlm = self.model_d_wavlm(
-                    y, y_hat
+                _y_d_hat_r_wlm, y_d_hat_g_wlm, fmap_r_wlm, fmap_g_wlm = (
+                    self.model_d_wavlm(y, y_hat)
                 )
                 loss_fm_wavlm = feature_loss(fmap_r_wlm, fmap_g_wlm)
                 loss_gen_wavlm, _ = generator_loss(y_d_hat_g_wlm)
@@ -424,9 +424,7 @@ class VitsModel(pl.LightningModule):
                 y_d_hat_r_wlm, y_d_hat_g_wlm, _, _ = self.model_d_wavlm(
                     y, y_hat_detached
                 )
-                loss_disc_wavlm, _, _ = discriminator_loss(
-                    y_d_hat_r_wlm, y_d_hat_g_wlm
-                )
+                loss_disc_wavlm, _, _ = discriminator_loss(y_d_hat_r_wlm, y_d_hat_g_wlm)
                 loss_disc_all = loss_disc_all + loss_disc_wavlm * self.hparams.c_wavlm
 
                 # Log WavLM discriminator loss
