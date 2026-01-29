@@ -349,7 +349,12 @@ jobs:
           else
             # Exclude inference tests - they require PyTorch and are covered by python-tests.yml
             # Use --ignore to prevent collection (import) of files that require torch
-            python -m pytest tests/ -v --tb=short -m "unit and not training and not benchmark and not inference" --ignore=tests/test_pytorch_onnx_parity.py
+            python -m pytest tests/ -v --tb=short -m "unit and not training and not benchmark and not inference" \
+              --ignore=tests/test_pytorch_onnx_parity.py \
+              --ignore=tests/test_export_onnx.py \
+              --ignore=tests/test_infer_onnx.py \
+              --ignore=tests/test_vits.py \
+              --ignore=tests/test_wavlm_discriminator.py
           fi
       
       - name: Upload coverage reports
