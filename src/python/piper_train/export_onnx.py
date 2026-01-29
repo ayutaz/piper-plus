@@ -88,7 +88,27 @@ def main() -> None:
     parser.add_argument(
         "--simplify-only", help="Only simplify existing ONNX model (path to .onnx file)"
     )
+    parser.add_argument(
+        "--stochastic",
+        action="store_true",
+        help="Enable stochastic sampling (z_p = m_p + noise * noise_scale). "
+        "Recommended for WavLM-trained models to avoid mechanical artifacts.",
+    )
+    parser.add_argument(
+        "--use-ema",
+        action="store_true",
+        default=True,
+        help="Apply EMA weights to decoder if available in checkpoint (default: enabled)",
+    )
+    parser.add_argument(
+        "--no-ema",
+        action="store_true",
+        help="Disable EMA weight application",
+    )
     args = parser.parse_args()
+
+    if args.no_ema:
+        args.use_ema = False
 
     if args.debug:
         logging.basicConfig(level=logging.DEBUG)
@@ -130,8 +150,29 @@ def main() -> None:
     with torch.no_grad():
         model_g.dec.remove_weight_norm()
 
+    # Apply EMA weights to decoder if available
+    if args.use_ema:
+        ckpt = torch.load(args.checkpoint, map_location="cpu")
+        ema_state = ckpt.get("ema_generator_state")
+        if ema_state and "shadow_params" in ema_state:
+            applied = 0
+            dec_params = dict(model_g.dec.named_parameters())
+            for name, shadow_param in ema_state["shadow_params"].items():
+                if name in dec_params:
+                    dec_params[name].data.copy_(shadow_param)
+                    applied += 1
+            if applied > 0:
+                _LOGGER.info("Applied EMA weights to decoder: %d parameters", applied)
+            else:
+                _LOGGER.warning("EMA state found but no matching decoder parameters")
+        else:
+            _LOGGER.info("No EMA state found in checkpoint, skipping EMA")
+        del ckpt
+
     # Check if model uses prosody features
     has_prosody = getattr(model_g, "prosody_dim", 0) > 0
+
+    stochastic = args.stochastic
 
     def infer_forward(text, text_lengths, scales, sid=None, prosody_features=None):
         """
@@ -175,8 +216,12 @@ def main() -> None:
         m_p = torch.matmul(attn.squeeze(1), m_p.transpose(1, 2)).transpose(1, 2)
         logs_p = torch.matmul(attn.squeeze(1), logs_p.transpose(1, 2)).transpose(1, 2)
 
-        # 5. Sample z_p (deterministic: use mean instead of stochastic sampling)
-        z_p = m_p  # use mean only (no sampling)
+        # 5. Sample z_p
+        if stochastic:
+            noise_scale = scales[0]
+            z_p = m_p + torch.randn_like(m_p) * torch.exp(logs_p) * noise_scale
+        else:
+            z_p = m_p
 
         # 6. Flow + Decoder
         z = model_g.flow(z_p, y_mask, g=g, reverse=True)
@@ -252,7 +297,8 @@ def main() -> None:
         dynamic_axes=dynamic_axes,
     )
 
-    _LOGGER.info("Exported model to %s", args.output)
+    mode = "stochastic" if args.stochastic else "deterministic"
+    _LOGGER.info("Exported model to %s (mode: %s, ema: %s)", args.output, mode, args.use_ema)
 
     # Apply ONNX simplification if requested
     # Skip simplification for prosody models to avoid numerical precision issues

@@ -79,21 +79,22 @@ uv run python -m piper_train \
 
 ### 学習完了後の手順
 
-1. **ONNX変換**
+1. **ONNX変換**（WavLMモデルは `--stochastic` 必須）
 ```bash
 CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
+  --stochastic \
   /data/piper/output-moe-speech-20speakers-wavlm/lightning_logs/version_2/checkpoints/last.ckpt \
   /data/piper/output-moe-speech-20speakers-wavlm/moe-speech-20speakers-wavlm-200epoch.onnx
 ```
 
-2. **推論テスト**
+2. **推論テスト**（WavLMモデルは `--noise-scale 0.5` 推奨）
 ```bash
 CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.infer_onnx \
   --model /data/piper/output-moe-speech-20speakers-wavlm/moe-speech-20speakers-wavlm-200epoch.onnx \
   --config /data/piper/dataset-moe-speech-20speakers-v2/config.json \
   --output-dir /home/jovyan \
   --text "こんにちは、今日は良い天気ですね。" \
-  --speaker-id 0
+  --speaker-id 0 --noise-scale 0.5
 ```
 
 3. **音割れ確認** - v2モデルと比較して改善されているか確認
@@ -296,6 +297,7 @@ NCCL_IB_DISABLE=1
 | 日本語音素化 | `src/python/piper_train/phonemize/japanese.py` |
 | IDマップ | `src/python/piper_train/phonemize/jp_id_map.py` |
 | トークンマッパー | `src/python/piper_train/phonemize/token_mapper.py` |
+| ONNXエクスポート | `src/python/piper_train/export_onnx.py` |
 | 推論スクリプト | `src/python/piper_train/infer_onnx.py` |
 
 ### データセット
@@ -334,10 +336,24 @@ uv run python /data/piper/add_prosody_features.py \
 ### ONNX変換
 
 ```bash
+# ベースラインモデル（deterministic、従来通り）
 CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
+  --no-ema \
+  /path/to/checkpoint.ckpt \
+  /path/to/output.onnx
+
+# WavLMモデル（stochastic + EMA重み適用）
+CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
+  --stochastic \
   /path/to/checkpoint.ckpt \
   /path/to/output.onnx
 ```
+
+| オプション | デフォルト | 説明 |
+|-----------|----------|------|
+| `--stochastic` | off | noise_scaleによるサンプリングを有効化（WavLMモデル推奨） |
+| `--use-ema` | on | チェックポイントのEMA重みをデコーダに適用 |
+| `--no-ema` | - | EMA重み適用を無効化 |
 
 ### 推論テスト
 
