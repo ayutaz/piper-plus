@@ -430,9 +430,9 @@ class VitsModel(pl.LightningModule):
                 loss_disc_all = loss_disc_all + loss_disc_wavlm * self.hparams.c_wavlm
 
                 # Log WavLM discriminator loss
-                self._log_with_batch_info("loss_disc_wavlm", loss_disc_wavlm)
+                self._log_with_batch_info("loss_disc_wavlm", loss_disc_wavlm, batch)
 
-            self._log_with_batch_info("loss_disc_all", loss_disc_all)
+            self._log_with_batch_info("loss_disc_all", loss_disc_all, batch)
 
             return loss_disc_all
 

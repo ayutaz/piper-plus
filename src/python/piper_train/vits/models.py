@@ -547,14 +547,20 @@ class WavLMDiscriminator(torch.nn.Module):
     def __init__(
         self,
         model_name: str = "microsoft/wavlm-base-plus",
-        use_layers: list = None,
+        use_layers: list[int] | None = None,
         freeze_feature_extractor: bool = True,
         target_sample_rate: int = 16000,
         source_sample_rate: int = 22050,
     ):
         super().__init__()
         import torchaudio  # noqa: PLC0415 - lazy import
-        from transformers import WavLMModel  # noqa: PLC0415, I001 - lazy import for optional dependency
+        try:
+            from transformers import WavLMModel  # noqa: PLC0415, I001
+        except ImportError as exc:
+            raise ImportError(
+                "The 'transformers' package is required to use WavLMDiscriminator. "
+                "Install it with: pip install transformers"
+            ) from exc
 
         self.use_layers = use_layers if use_layers is not None else [6, 9, 12]
         self.target_sample_rate = target_sample_rate

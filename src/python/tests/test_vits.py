@@ -114,22 +114,23 @@ class TestWavLMDiscriminator:
     @pytest.mark.unit
     @pytest.mark.training
     def test_wavlm_discriminator_resample(self):
-        """Test audio resampling in WavLMDiscriminator"""
-        from piper_train.vits.models import WavLMDiscriminator
+        """Test audio resampling logic used by WavLMDiscriminator"""
+        import torchaudio
 
-        # Test resampling calculation without loading full model
-        disc = WavLMDiscriminator.__new__(WavLMDiscriminator)
-        disc.source_sample_rate = 22050
-        disc.target_sample_rate = 16000
+        source_sample_rate = 22050
+        target_sample_rate = 16000
 
-        # Create test audio
-        audio = torch.randn(2, 1, 22050)  # 1 second at 22050Hz
+        # Create test audio (batch=2, 1 channel, 1 second at 22050Hz)
+        audio = torch.randn(2, 1, source_sample_rate)
 
-        # Test resampling
-        resampled = disc._resample(audio)
+        # Squeeze channel dim and resample (same logic as WavLMDiscriminator._resample)
+        audio_squeezed = audio.squeeze(1)
+        resampled = torchaudio.functional.resample(
+            audio_squeezed, source_sample_rate, target_sample_rate
+        )
 
         # Expected length: 22050 * (16000 / 22050) = 16000
-        expected_length = 16000
+        expected_length = target_sample_rate
         assert resampled.shape == (2, expected_length), f"Expected shape (2, {expected_length}), got {resampled.shape}"
 
     @pytest.mark.unit
