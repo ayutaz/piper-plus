@@ -138,27 +138,25 @@ export class CustomDictionary {
     compileRegexPatterns() {
         this.compiledRegexCache.clear();
         
+        // Word boundary: ASCII word chars use \b, but we also need to match
+        // when adjacent to Japanese characters (hiragana, katakana, kanji, punctuation).
+        // Use a broad approach: match the word anywhere (longer words first prevents partial matches).
+
         // 大文字小文字を区別するエントリ
         const caseSensitiveSorted = Array.from(this.caseSensitiveEntries.entries())
             .sort((a, b) => b[0].length - a[0].length);
-        
+
         for (const [word, entry] of caseSensitiveSorted) {
-            const regex = new RegExp(
-                `(?<=[\\s。、！？「」（）\\[\\]【】]|^)${this.escapeRegExp(word)}(?=[\\s。、！？「」（）\\[\\]【】]|$)`,
-                'g'
-            );
+            const regex = new RegExp(this.escapeRegExp(word), 'g');
             this.compiledRegexCache.set(word + '_cs', { regex, reading: entry.pronunciation });
         }
-        
+
         // 大文字小文字を区別しないエントリ
         const normalSorted = Array.from(this.entries.entries())
             .sort((a, b) => b[0].length - a[0].length);
-        
+
         for (const [word, entry] of normalSorted) {
-            const regex = new RegExp(
-                `(?<=[\\s。、！？「」（）\\[\\]【】]|^)${this.escapeRegExp(word)}(?=[\\s。、！？「」（）\\[\\]【】]|$)`,
-                'gi'  // 大文字小文字を区別しない
-            );
+            const regex = new RegExp(this.escapeRegExp(word), 'gi');
             this.compiledRegexCache.set(word, { regex, reading: entry.pronunciation });
         }
     }

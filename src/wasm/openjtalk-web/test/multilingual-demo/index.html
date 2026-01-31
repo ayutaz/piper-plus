@@ -531,12 +531,12 @@
                     // Use OpenJTalk for Japanese
                     unifiedPhonemizer.textToPhonemes(processedText, 'ja').then(labels => {
                         const phonemes = unifiedPhonemizer.extractPhonemes(labels, 'ja');
-                        resolve(phonemes);
+                        resolve({ phonemes, labels });
                     }).catch(reject);
                 } else if (lang === 'en') {
                     // Use eSpeak-ng phoneme extractor for Python-compatible phonemization
                     espeakExtractor.phonemize(text, 'en-us').then(phonemes => {
-                        resolve(phonemes);
+                        resolve({ phonemes, labels: null });
                     }).catch(reject);
                 }
             });
@@ -555,16 +555,23 @@
                 synthesizeBtn.disabled = true;
                 
                 // Get phonemes
-                const phonemes = await getPhonemes(text, currentLanguage);
-                
-                
+                const result = await getPhonemes(text, currentLanguage);
+                const phonemes = result.phonemes;
+                const labels = result.labels;
+
                 updateStatus('音声合成中...');
-                
+
                 // Convert phonemes to IDs
                 const phonemeIds = phonemesToIds(phonemes);
-                
+
+                // Extract prosody features if available
+                let prosodyFeatures = null;
+                if (labels && currentModelConfig.prosody_id_map) {
+                    prosodyFeatures = extractProsodyFromLabels(labels, phonemeIds.length);
+                }
+
                 // Synthesize audio
-                const audio = await synthesizeAudio(phonemeIds);
+                const audio = await synthesizeAudio(phonemeIds, prosodyFeatures);
                 
                 // Create WAV and play
                 const wavBlob = createWAV(audio, currentModelConfig.audio.sample_rate);
@@ -583,6 +590,41 @@
             }
         }
         
+        // Extract prosody features (A1/A2/A3) from OpenJTalk labels
+        function extractProsodyFromLabels(labels, phonemeCount) {
+            const lines = labels.split('\n').filter(line => line.trim());
+            const prosodyPerPhoneme = [];
+            const reA1 = /\/A:([\d-]+)\+/;
+            const reA2 = /\+([0-9]+)\+/;
+            const reA3 = /\+([0-9]+)\//;
+
+            // BOS token
+            prosodyPerPhoneme.push([0, 0, 0]);
+
+            for (const line of lines) {
+                const match = line.match(/\-([^+]+)\+/);
+                if (match && match[1] !== 'sil' && match[1] !== 'pau') {
+                    const mA1 = reA1.exec(line);
+                    const mA2 = reA2.exec(line);
+                    const mA3 = reA3.exec(line);
+                    const a1 = mA1 ? Math.max(0, Math.min(10, parseInt(mA1[1]) + 5)) : 0;
+                    const a2 = mA2 ? Math.min(10, parseInt(mA2[1])) : 0;
+                    const a3 = mA3 ? Math.min(10, parseInt(mA3[1])) : 0;
+                    prosodyPerPhoneme.push([a1, a2, a3]);
+                }
+            }
+
+            // EOS token
+            prosodyPerPhoneme.push([0, 0, 0]);
+
+            // Pad to match phoneme count
+            while (prosodyPerPhoneme.length < phonemeCount) {
+                prosodyPerPhoneme.push([0, 0, 0]);
+            }
+
+            return prosodyPerPhoneme.slice(0, phonemeCount);
+        }
+
         // Convert phonemes to IDs
         function phonemesToIds(phonemes) {
             // Apply padding for short Japanese text to improve synthesis quality
@@ -619,32 +661,44 @@
         }
         
         // Synthesize audio using ONNX
-        async function synthesizeAudio(phonemeIds) {
-            const inputTensor = new ort.Tensor('int64', 
-                new BigInt64Array(phonemeIds.map(id => BigInt(id))), 
+        async function synthesizeAudio(phonemeIds, prosodyFeatures) {
+            const inputTensor = new ort.Tensor('int64',
+                new BigInt64Array(phonemeIds.map(id => BigInt(id))),
                 [1, phonemeIds.length]
             );
-            
-            const lengthTensor = new ort.Tensor('int64', 
-                new BigInt64Array([BigInt(phonemeIds.length)]), 
+
+            const lengthTensor = new ort.Tensor('int64',
+                new BigInt64Array([BigInt(phonemeIds.length)]),
                 [1]
             );
-            
-            const scalesTensor = new ort.Tensor('float32', 
+
+            const scalesTensor = new ort.Tensor('float32',
                 new Float32Array([
                     currentModelConfig.inference.noise_scale || 0.667,
                     currentModelConfig.inference.length_scale || 1.0,
                     currentModelConfig.inference.noise_w || 0.8
-                ]), 
+                ]),
                 [3]
             );
-            
+
             const feeds = {
                 'input': inputTensor,
                 'input_lengths': lengthTensor,
                 'scales': scalesTensor
             };
-            
+
+            // Add prosody features if model supports it
+            if (prosodyFeatures && currentModelConfig.prosody_id_map) {
+                const flatProsody = [];
+                for (const [a1, a2, a3] of prosodyFeatures) {
+                    flatProsody.push(BigInt(a1), BigInt(a2), BigInt(a3));
+                }
+                feeds['prosody_features'] = new ort.Tensor('int64',
+                    new BigInt64Array(flatProsody),
+                    [1, phonemeIds.length, 3]
+                );
+            }
+
             const results = await onnxSession.run(feeds);
             const audioTensor = results['output'] || results[Object.keys(results)[0]];
             

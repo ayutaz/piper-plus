@@ -3,6 +3,7 @@
  */
 
 import { DictionaryLoader } from './dictionary-loader.js';
+import { extractPhonemesFromLabels as extractJaPhonemes } from './japanese_phoneme_extract.js';
 
 export class OpenJTalkWeb {
   constructor() {
@@ -194,22 +195,10 @@ export class OpenJTalkWeb {
   /**
    * Extract phonemes from labels
    * @param {string} labels - Full context labels from OpenJTalk
-   * @returns {string[]} Array of phonemes
+   * @returns {string[]} Array of phonemes (with PUA mapping, Kurihara markers, N variants)
    */
   extractPhonemes(labels) {
-    const lines = labels.split('\n').filter(line => line.trim());
-    const phonemes = [];
-    
-    for (const line of lines) {
-      // Extract phoneme from full context label
-      // Format: xx^xx-phoneme+xx=xx/A:...
-      const match = line.match(/\-([^+]+)\+/);
-      if (match && match[1] !== 'sil') {
-        phonemes.push(match[1]);
-      }
-    }
-    
-    return phonemes;
+    return extractJaPhonemes(labels);
   }
 
   /**

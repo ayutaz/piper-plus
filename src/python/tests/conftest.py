@@ -187,6 +187,91 @@ def temp_onnx_model(mock_vits_model, tmp_path_factory):
     return onnx_path
 
 
+@pytest.fixture(scope="module")
+def temp_onnx_model_stochastic(mock_vits_model, tmp_path_factory):
+    """モックモデルをstochasticモードでONNXにエクスポート"""
+    import torch
+
+    from piper_train.vits import commons
+
+    tmp_dir = tmp_path_factory.mktemp("models_stochastic")
+    onnx_path = tmp_dir / "mock_model_stochastic.onnx"
+
+    dummy_input_length = 10
+    sequences = torch.randint(0, 50, (1, dummy_input_length), dtype=torch.long)
+    sequence_lengths = torch.LongTensor([dummy_input_length])
+    scales = torch.FloatTensor([0.667, 1.0, 0.8])
+    prosody_features = torch.zeros(1, dummy_input_length, 3, dtype=torch.long)
+
+    mock_vits_model.onnx_export_mode = True
+    if hasattr(mock_vits_model, "dp"):
+        mock_vits_model.dp.onnx_export_mode = True
+
+    def infer_forward_stochastic(
+        input_tensor, input_lengths, scales_tensor, prosody_features_tensor
+    ):
+        length_scale = scales_tensor[1]
+        noise_scale_w = scales_tensor[2]
+
+        x, m_p, logs_p, x_mask = mock_vits_model.enc_p(input_tensor, input_lengths)
+        g = None
+
+        x_dp = mock_vits_model._prepare_prosody_input(
+            x, x_mask, prosody_features_tensor
+        )
+        if mock_vits_model.use_sdp:
+            logw = mock_vits_model.dp(
+                x_dp, x_mask, g=g, reverse=True, noise_scale=noise_scale_w
+            )
+        else:
+            logw = mock_vits_model.dp(x_dp, x_mask, g=g)
+
+        w = torch.exp(logw) * x_mask * length_scale
+        durations = w.squeeze(1)
+
+        w_ceil = torch.ceil(w)
+        y_lengths = torch.clamp_min(torch.sum(w_ceil, [1, 2]), 1).long()
+        y_mask = torch.unsqueeze(
+            commons.sequence_mask(y_lengths, y_lengths.max()), 1
+        ).type_as(x_mask)
+        attn_mask = torch.unsqueeze(x_mask, 2) * torch.unsqueeze(y_mask, -1)
+        attn = commons.generate_path(w_ceil, attn_mask)
+
+        m_p = torch.matmul(attn.squeeze(1), m_p.transpose(1, 2)).transpose(1, 2)
+        logs_p = torch.matmul(attn.squeeze(1), logs_p.transpose(1, 2)).transpose(1, 2)
+
+        # Stochastic: use noise_scale from scales
+        noise_scale = scales_tensor[0]
+        z_p = m_p + torch.randn_like(m_p) * torch.exp(logs_p) * noise_scale
+
+        z = mock_vits_model.flow(z_p, y_mask, g=g, reverse=True)
+        o = mock_vits_model.dec((z * y_mask), g=g)
+        audio = o.unsqueeze(1)
+
+        return audio, durations
+
+    mock_vits_model.forward = infer_forward_stochastic
+
+    torch.onnx.export(
+        mock_vits_model,
+        (sequences, sequence_lengths, scales, prosody_features),
+        str(onnx_path),
+        opset_version=15,
+        input_names=["input", "input_lengths", "scales", "prosody_features"],
+        output_names=["output", "durations"],
+        dynamic_axes={
+            "input": {0: "batch_size", 1: "phonemes"},
+            "input_lengths": {0: "batch_size"},
+            "prosody_features": {0: "batch_size", 1: "phonemes"},
+            "output": {0: "batch_size", 1: "time"},
+            "durations": {0: "batch_size", 1: "phonemes"},
+        },
+        verbose=False,
+    )
+
+    return onnx_path
+
+
 @pytest.fixture
 def sample_phoneme_ids():
     """標準的なテスト用音素ID列"""
