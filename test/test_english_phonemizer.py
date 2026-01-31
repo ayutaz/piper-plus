@@ -101,13 +101,14 @@ class TestPhonemizeEnglish:
             assert isinstance(p, EnglishProsodyInfo)
 
     def test_a3_is_word_phoneme_count(self):
-        """A3 should reflect the number of ARPAbet phonemes in the word."""
-        _, prosody = phonemize_english_with_prosody("cat")
-        # "cat" → K AE1 T → 3 ARPAbet tokens
-        # All IPA chars from this word should have a3=3
+        """A3 should reflect the total IPA character count for the word."""
+        phonemes, prosody = phonemize_english_with_prosody("cat")
+        # "cat" → K AE1 T → k æ t → 3 IPA chars
+        # All phonemes from this single word should have the same a3
         a3_values = {p.a3 for p in prosody}
         assert len(a3_values) == 1  # Single word, single a3 value
-        assert a3_values.pop() >= 2  # At least 2 phonemes
+        # a3 should equal the actual number of phoneme tokens produced
+        assert a3_values.pop() == len(phonemes)
 
     def test_empty_string(self):
         phonemes, prosody = phonemize_english_with_prosody("")

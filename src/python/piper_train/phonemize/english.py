@@ -146,7 +146,8 @@ def phonemize_english_with_prosody(
             ipa, stress = _arpabet_to_ipa(token)
             word_ipas.append((ipa, stress))
 
-        word_phoneme_count = len(word_ipas)
+        # A3 = total IPA character count for the word (actual phoneme tokens)
+        word_phoneme_count = sum(len(ipa) for ipa, _ in word_ipas)
 
         for ipa, stress in word_ipas:
             # stress → A2: primary(1)→2, secondary(2)→1, none(0)→0, consonant(-1)→0
