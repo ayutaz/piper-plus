@@ -275,53 +275,95 @@ class OpenJTalkPiperTTSLazy {
         return labels;
     }
 
+    /**
+     * Extract phonemes from OpenJTalk labels.
+     * Matches Python phonemize_japanese() with Kurihara markers, N variants, PUA mapping.
+     */
     extractPhonemes(labels) {
+        const RE_PHONEME = /-([^+]+)\+/;
+        const RE_A1 = /\/A:([\d-]+)\+/;
+        const RE_A2 = /\+([0-9]+)\+/;
+        const RE_A3 = /\+([0-9]+)\//;
+        const SKIP_TOKENS = new Set(['_', '#', '[', ']', '^', '$', '?', '?!', '?.', '?~']);
+        const PUA_MAP = {
+            'a:': '\ue000', 'i:': '\ue001', 'u:': '\ue002', 'e:': '\ue003', 'o:': '\ue004',
+            'cl': '\ue005',
+            'ky': '\ue006', 'kw': '\ue007', 'gy': '\ue008', 'gw': '\ue009',
+            'ty': '\ue00a', 'dy': '\ue00b', 'py': '\ue00c', 'by': '\ue00d',
+            'ch': '\ue00e', 'ts': '\ue00f', 'sh': '\ue010', 'zy': '\ue011', 'hy': '\ue012',
+            'ny': '\ue013', 'my': '\ue014', 'ry': '\ue015',
+            'N_m': '\ue019', 'N_n': '\ue01a', 'N_ng': '\ue01b', 'N_uvular': '\ue01c'
+        };
+
         const lines = labels.split('\n').filter(line => line.trim());
-        const phonemes = [];
-        
-        phonemes.push('^');
-        
-        for (const line of lines) {
-            const match = line.match(/\-([^+]+)\+/);
-            if (match && match[1] !== 'sil') {
-                phonemes.push(match[1]);
+        const tokens = [];
+
+        for (let idx = 0; idx < lines.length; idx++) {
+            const line = lines[idx];
+            const mPh = line.match(RE_PHONEME);
+            if (!mPh) continue;
+            const phoneme = mPh[1];
+
+            if (phoneme === 'sil') {
+                if (idx === 0) tokens.push('^');
+                else if (idx === lines.length - 1) tokens.push('$');
+                continue;
             }
+            if (phoneme === 'pau') { tokens.push('_'); continue; }
+
+            tokens.push(phoneme);
+
+            const mA1 = line.match(RE_A1);
+            const mA2 = line.match(RE_A2);
+            const mA3 = line.match(RE_A3);
+            if (!(mA1 && mA2 && mA3)) continue;
+
+            const a1 = parseInt(mA1[1], 10);
+            const a2 = parseInt(mA2[1], 10);
+            const a3 = parseInt(mA3[1], 10);
+
+            let a2Next = -1;
+            if (idx < lines.length - 1) {
+                const m = lines[idx + 1].match(RE_A2);
+                if (m) a2Next = parseInt(m[1], 10);
+            }
+
+            if (a1 === 0 && a2Next === a2 + 1) tokens.push(']');
+            if (a2 === a3 && a2Next === 1) tokens.push('#');
+            if (a2 === 1 && a2Next === 2) tokens.push('[');
         }
-        
-        phonemes.push('$');
-        
-        return phonemes;
+
+        // Apply N phoneme rules
+        const result = [];
+        for (let i = 0; i < tokens.length; i++) {
+            if (tokens[i] !== 'N') { result.push(tokens[i]); continue; }
+            let next = null;
+            for (let j = i + 1; j < tokens.length; j++) {
+                if (!SKIP_TOKENS.has(tokens[j])) { next = tokens[j]; break; }
+            }
+            if (next === null) result.push('N_uvular');
+            else if (['m', 'my', 'b', 'by', 'p', 'py'].includes(next)) result.push('N_m');
+            else if (['n', 'ny', 't', 'ty', 'd', 'dy', 'ts', 'ch'].includes(next)) result.push('N_n');
+            else if (['k', 'ky', 'kw', 'g', 'gy', 'gw'].includes(next)) result.push('N_ng');
+            else result.push('N_uvular');
+        }
+
+        // Map to PUA
+        return result.map(t => PUA_MAP[t] || t);
     }
 
     phonemesToIds(phonemes) {
         const ids = [];
-        
-        const multiCharPhonemeMap = {
-            'a:': '\ue000', 'i:': '\ue001', 'u:': '\ue002', 'e:': '\ue003', 'o:': '\ue004',
-            'N:': '\ue005', 'ky': '\ue006', 'kw': '\ue007', 'gy': '\ue008', 'gw': '\ue009',
-            'ty': '\ue00a', 'dy': '\ue00b', 'py': '\ue00c', 'by': '\ue00d', 'ts': '\ue00e',
-            'ch': '\ue00f', 'sy': '\ue010', 'sh': '\ue010', 'zy': '\ue011', 'hy': '\ue012',
-            'ny': '\ue013', 'my': '\ue014', 'ry': '\ue015', 'cl': '\ue005',
-            'pau': '#', 'sp': '#', 'sil': '_'
-        };
-        
+
         for (const phoneme of phonemes) {
-            const mapped = multiCharPhonemeMap[phoneme];
-            if (mapped) {
-                if (this.phonemeIdMap[mapped]) {
-                    ids.push(...this.phonemeIdMap[mapped]);
-                } else {
-                    console.warn(`Mapped phoneme not found in ID map: ${phoneme} -> ${mapped}`);
-                    ids.push(0);
-                }
-            } else if (this.phonemeIdMap[phoneme]) {
+            if (this.phonemeIdMap[phoneme]) {
                 ids.push(...this.phonemeIdMap[phoneme]);
             } else {
                 console.warn(`Unknown phoneme: ${phoneme}`);
                 ids.push(0);
             }
         }
-        
+
         return ids;
     }
 

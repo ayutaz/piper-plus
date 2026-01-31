@@ -53,20 +53,22 @@ describe('OpenJTalkPiperTTS', () => {
                 i^ch-i+w=a/A:xx+xx+xx/B:xx-xx_xx/C:xx_xx+xx/D:xx+xx_xx/E:xx_xx!xx_xx-xx/F:xx_xx#xx_xx@xx_xx|xx_xx/G:xx_xx%xx_xx_xx/H:xx_xx/I:xx-xx@xx+xx&xx-xx|xx+xx/J:xx_xx/K:xx+xx-xx
                 ch^i-w+a=sil/A:xx+xx+xx/B:xx-xx_xx/C:xx_xx+xx/D:xx+xx_xx/E:xx_xx!xx_xx-xx/F:xx_xx#xx_xx@xx_xx|xx_xx/G:xx_xx%xx_xx_xx/H:xx_xx/I:xx-xx@xx+xx&xx-xx|xx+xx/J:xx_xx/K:xx+xx-xx
                 i^w-a+sil=xx/A:xx+xx+xx/B:xx-xx_xx/C:xx_xx+xx/D:xx+xx_xx/E:xx_xx!xx_xx-xx/F:xx_xx#xx_xx@xx_xx|xx_xx/G:xx_xx%xx_xx_xx/H:xx_xx/I:xx-xx@xx+xx&xx-xx|xx+xx/J:xx_xx/K:xx+xx-xx
+                w^a-sil+xx=xx/A:xx+xx+xx/B:xx-xx_xx/C:xx_xx+xx/D:xx+xx_xx/E:xx_xx!xx_xx-xx/F:xx_xx#xx_xx@xx_xx|xx_xx/G:xx_xx%xx_xx_xx/H:xx_xx/I:xx-xx@xx+xx&xx-xx|xx+xx/J:xx_xx/K:xx+xx-xx
             `.trim();
             
             const phonemes = tts.extractPhonemes(labels);
             
-            assert.deepEqual(phonemes, ['^', 'k', 'o', 'N', 'n', 'i', 'ch', 'i', 'w', 'a', '$']);
+            // N before n → N_n (\ue01a), ch → \ue00e (PUA mapped)
+            assert.deepEqual(phonemes, ['^', 'k', 'o', '\ue01a', 'n', 'i', '\ue00e', 'i', 'w', 'a', '$']);
         });
         
         it('should handle empty labels', () => {
             const phonemes = tts.extractPhonemes('');
-            assert.deepEqual(phonemes, ['^', '$']);
+            assert.deepEqual(phonemes, []);
         });
-        
-        it('should skip sil phonemes', () => {
-            const labels = 'xx^xx-sil+k=o/A:xx\nxx^sil-k+o=N/A:xx\nsil^k-o+N=n/A:xx';
+
+        it('should skip sil phonemes and add BOS/EOS from first/last sil', () => {
+            const labels = 'xx^xx-sil+k=o/A:xx\nxx^sil-k+o=N/A:xx\nsil^k-o+N=n/A:xx\nk^o-sil+xx=xx/A:xx';
             const phonemes = tts.extractPhonemes(labels);
             assert.deepEqual(phonemes, ['^', 'k', 'o', '$']);
         });
@@ -74,14 +76,26 @@ describe('OpenJTalkPiperTTS', () => {
     
     describe('Phoneme to ID Conversion', () => {
         beforeEach(() => {
-            // Mock phoneme ID map
+            // Mock phoneme ID map - PUA codes match token_mapper.py FIXED_PUA_MAPPING
             tts.phonemeIdMap = {
                 '_': [0], '^': [1], '$': [2], '?': [3], '#': [4],
+                '[': [5], ']': [6],
                 'a': [7], 'i': [8], 'u': [9], 'e': [10], 'o': [11],
                 'k': [25], 'g': [28], 'n': [50], 'm': [52], 'r': [54], 'w': [56],
                 'N': [22], 'q': [24],
-                '\ue000': [17], '\ue001': [18], '\ue002': [19], '\ue003': [20], '\ue004': [21],
-                '\ue005': [23], '\ue006': [26], '\ue00e': [39], '\ue00f': [40]
+                '\ue000': [17],  // a:
+                '\ue001': [18],  // i:
+                '\ue002': [19],  // u:
+                '\ue003': [20],  // e:
+                '\ue004': [21],  // o:
+                '\ue005': [23],  // cl
+                '\ue006': [26],  // ky
+                '\ue00e': [39],  // ch
+                '\ue00f': [40],  // ts
+                '\ue019': [60],  // N_m
+                '\ue01a': [61],  // N_n
+                '\ue01b': [62],  // N_ng
+                '\ue01c': [63],  // N_uvular
             };
         });
         
@@ -91,16 +105,18 @@ describe('OpenJTalkPiperTTS', () => {
             assert.deepEqual(ids, [25, 11, 50, 8, 56, 7]);
         });
         
-        it('should convert multi-character phonemes', () => {
-            const phonemes = ['k', 'a:', 'ts', 'u'];
+        it('should convert PUA-mapped phonemes', () => {
+            // After extractPhonemes, multi-char phonemes are already PUA-mapped
+            const phonemes = ['k', '\ue000', '\ue00f', 'u']; // a: → \ue000, ts → \ue00f
             const ids = tts.phonemesToIds(phonemes);
-            assert.deepEqual(ids, [25, 17, 39, 9]); // a: -> \ue000 -> 17, ts -> \ue00e -> 39
+            assert.deepEqual(ids, [25, 17, 40, 9]);
         });
-        
+
         it('should handle special phonemes', () => {
-            const phonemes = ['^', 'pau', 'cl', '$'];
+            // After extractPhonemes: pau → _, cl → \ue005
+            const phonemes = ['^', '_', '\ue005', '$'];
             const ids = tts.phonemesToIds(phonemes);
-            assert.deepEqual(ids, [1, 4, 23, 2]); // pau -> #, cl -> \ue005
+            assert.deepEqual(ids, [1, 0, 23, 2]);
         });
         
         it('should handle unknown phonemes with padding', () => {

@@ -3,6 +3,8 @@
  * Supports both Japanese (OpenJTalk) and English/Other languages (eSpeak-ng)
  */
 
+import { extractPhonemesFromLabels as extractJaPhonemes } from './japanese_phoneme_extract.js';
+
 export class UnifiedPhonemizer {
     constructor() {
         this.module = null;
@@ -179,26 +181,10 @@ export class UnifiedPhonemizer {
 
     /**
      * Extract phonemes from OpenJTalk labels
+     * Uses shared japanese_phoneme_extract module (matches Python phonemize_japanese)
      */
     extractPhonemesFromLabels(labels) {
-        const lines = labels.split('\n').filter(line => line.trim());
-        const phonemes = [];
-        
-        // Add BOS marker
-        phonemes.push('^');
-        
-        for (const line of lines) {
-            // Extract phoneme from label (between - and +)
-            const match = line.match(/\-([^+]+)\+/);
-            if (match && match[1] !== 'sil') {
-                phonemes.push(match[1]);
-            }
-        }
-        
-        // Add EOS marker
-        phonemes.push('$');
-        
-        return phonemes;
+        return extractJaPhonemes(labels);
     }
 
     /**

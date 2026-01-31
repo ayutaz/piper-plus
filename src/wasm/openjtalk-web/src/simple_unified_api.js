@@ -4,6 +4,7 @@
  */
 
 import { SimpleEnglishPhonemizer, createEnglishPhonemeMap } from './simple_english_phonemizer.js';
+import { extractPhonemesFromLabels as extractJaPhonemes } from './japanese_phoneme_extract.js';
 
 export class SimpleUnifiedPhonemizer {
     constructor(options = {}) {
@@ -224,62 +225,10 @@ export class SimpleUnifiedPhonemizer {
 
     /**
      * Extract phonemes from OpenJTalk labels
+     * Uses shared japanese_phoneme_extract module (matches Python phonemize_japanese)
      */
     extractPhonemesFromLabels(labels) {
-        const lines = labels.split('\n').filter(line => line.trim());
-        const phonemes = [];
-        
-        // Multi-character phoneme to Unicode mapping
-        const multiCharPhonemes = {
-            'br': '\ue000',
-            'ch': '\ue001',
-            'cl': '\ue002',
-            'dy': '\ue003',
-            'gy': '\ue004',
-            'hy': '\ue005',
-            'ky': '\ue006',
-            'my': '\ue007',
-            'ny': '\ue008',
-            'py': '\ue009',
-            'ry': '\ue00a',
-            'sh': '\ue00b',
-            'ts': '\ue00c',
-            'ty': '\ue00d'
-        };
-        
-        phonemes.push('^');
-        
-        for (const line of lines) {
-            const match = line.match(/\-([^+]+)\+/);
-            if (match && match[1] !== 'sil') {
-                let phoneme = match[1];
-                
-                // Debug log for multi-character phonemes
-                if (multiCharPhonemes[phoneme]) {
-                    console.log(`Converting multi-char phoneme: ${phoneme} → U+${multiCharPhonemes[phoneme].charCodeAt(0).toString(16)}`);
-                    phoneme = multiCharPhonemes[phoneme];
-                }
-                
-                // Skip 'pau' (pause) - it should not be included in phonemes
-                if (phoneme !== 'pau') {
-                    phonemes.push(phoneme);
-                } else {
-                    console.log('Skipping pau');
-                }
-            }
-        }
-        
-        phonemes.push('$');
-        
-        console.log('Extracted phonemes:', phonemes.map(p => {
-            const code = p.charCodeAt(0);
-            if (code >= 0xe000 && code <= 0xe00d) {
-                return `${p}(U+${code.toString(16)})`;
-            }
-            return p;
-        }).join(' '));
-        
-        return phonemes;
+        return extractJaPhonemes(labels);
     }
 
     /**
