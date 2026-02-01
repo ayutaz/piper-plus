@@ -1,7 +1,6 @@
 """Tests for English G2P module (g2p-en based)."""
 
-import pytest
-
+from piper_train.infer_onnx import text_to_phoneme_ids_and_prosody
 from piper_train.phonemize.english import (
     ARPABET_TO_IPA,
     EnglishProsodyInfo,
@@ -10,7 +9,6 @@ from piper_train.phonemize.english import (
     phonemize_english,
     phonemize_english_with_prosody,
 )
-from piper_train.infer_onnx import text_to_phoneme_ids_and_prosody
 
 
 class TestArpabetToIpa:
@@ -133,7 +131,7 @@ class TestFunctionWordStress:
         # Find "are" region (ɑːɹ) - should have no stress marker
         phoneme_str = " ".join(phonemes)
         # "are" as function word should not have ˈ before ɑ
-        assert "ˈ ɑ" not in phoneme_str or "t ə d ˈ e" in phoneme_str
+        assert "ˈ ɑ" not in phoneme_str
 
     def test_content_word_keeps_stress(self):
         """Content words should keep their stress."""
@@ -175,7 +173,6 @@ class TestPunctuationHandling:
     def test_comma_attached_to_previous_word(self):
         """Comma should follow previous word without space before it."""
         phonemes, _ = phonemize_english_with_prosody("Hello, world")
-        phoneme_str = "".join(phonemes)
         # There should be no space before comma
         comma_idx = phonemes.index(",")
         assert phonemes[comma_idx - 1] != " "
@@ -199,7 +196,7 @@ class TestEspeakCompatibility:
     def test_the_cat(self):
         """'the cat' should exactly match espeak-ng output."""
         phonemes, _ = phonemize_english_with_prosody("the cat")
-        assert " ".join(phonemes) == "ð ə   k ˈ æ t"
+        assert phonemes == ["ð", "ə", " ", "k", "ˈ", "æ", "t"]
 
     def test_car(self):
         """'car' should exactly match espeak-ng: k ˈ ɑ ː ɹ"""
@@ -247,7 +244,9 @@ class TestBosEos:
             "o": [33],
             "ʊ": [34],
         }
-        ids, prosody = text_to_phoneme_ids_and_prosody("hello", phoneme_id_map, language="en")
+        ids, prosody = text_to_phoneme_ids_and_prosody(
+            "hello", phoneme_id_map, language="en"
+        )
         assert ids[0] == 1, "First ID should be BOS (^)"
         assert ids[-1] == 2, "Last ID should be EOS ($)"
         assert prosody[0] is None
@@ -268,8 +267,8 @@ class TestBosEos:
         }
         ids, _ = text_to_phoneme_ids_and_prosody("hello", phoneme_id_map, language="en")
         # Pattern: BOS, 0, phoneme, 0, phoneme, 0, ..., phoneme, 0, EOS
-        assert ids[0] == 1   # BOS
-        assert ids[1] == 0   # pad after BOS
+        assert ids[0] == 1  # BOS
+        assert ids[1] == 0  # pad after BOS
         assert ids[-1] == 2  # EOS
         # Every odd-indexed element (1, 3, 5, ...) before EOS should be pad=0
         for i in range(1, len(ids) - 1, 2):

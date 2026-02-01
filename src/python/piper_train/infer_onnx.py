@@ -76,9 +76,11 @@ def text_to_phoneme_ids_and_prosody(
         # Insert pad between every phoneme ID
         padded_ids = []
         padded_prosody = []
-        for pid, pf in zip(phoneme_ids, prosody_features, strict=True):
-            padded_ids.append(pid)
-            padded_prosody.append(pf)
+        for phoneme_id, prosody_feature in zip(
+            phoneme_ids, prosody_features, strict=True
+        ):
+            padded_ids.append(phoneme_id)
+            padded_prosody.append(prosody_feature)
             padded_ids.extend(pad_ids)
             padded_prosody.extend([None] * len(pad_ids))
 
