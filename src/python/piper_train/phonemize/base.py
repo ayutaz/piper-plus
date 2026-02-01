@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 @dataclass
 class ProsodyInfo:
-    """共通prosody情報 (全言語共通).
+    """Common prosody information shared across all languages.
 
     Attributes
     ----------
@@ -30,21 +30,21 @@ class ProsodyInfo:
 
 
 class Phonemizer(ABC):
-    """言語phonemizerの抽象基底クラス."""
+    """Abstract base class for language phonemizers."""
 
     @abstractmethod
     def phonemize(self, text: str) -> list[str]:
-        """テキスト→音素リスト."""
+        """Convert text to a list of phoneme tokens."""
 
     @abstractmethod
     def phonemize_with_prosody(
         self, text: str
     ) -> tuple[list[str], list[ProsodyInfo | None]]:
-        """テキスト→(音素リスト, prosody情報リスト)."""
+        """Convert text to phoneme tokens with prosody information."""
 
     @abstractmethod
     def get_phoneme_id_map(self) -> dict[str, list[int]] | None:
-        """言語固有のphoneme_id_mapを返す。Noneならconfig由来のmapを使用."""
+        """Return language-specific phoneme_id_map, or None to use config-provided map."""
 
     def post_process_ids(
         self,
@@ -52,5 +52,5 @@ class Phonemizer(ABC):
         prosody_features: list[dict | None],
         phoneme_id_map: dict[str, list[int]],
     ) -> tuple[list[int], list[dict | None]]:
-        """BOS/EOS/パディング等の後処理。デフォルトはno-op."""
+        """Post-process phoneme IDs (e.g. BOS/EOS/padding). Default is no-op."""
         return phoneme_ids, prosody_features
