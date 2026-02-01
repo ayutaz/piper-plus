@@ -1,5 +1,4 @@
 import re
-from dataclasses import dataclass
 
 
 # Try to import pyopenjtalk-plus first (Windows compatible), fall back to pyopenjtalk
@@ -13,33 +12,17 @@ except ImportError:
             "Neither pyopenjtalk nor pyopenjtalk-plus is installed"
         ) from None
 
+from .base import Phonemizer, ProsodyInfo
 from .custom_dict import CustomDictionary
 from .token_mapper import map_sequence
 
 
-__all__ = ["phonemize_japanese", "phonemize_japanese_with_prosody", "ProsodyInfo"]
-
-
-@dataclass
-class ProsodyInfo:
-    """Prosody information extracted from OpenJTalk labels.
-
-    Attributes
-    ----------
-    a1 : int
-        Relative position from accent nucleus. Can be negative (before nucleus),
-        zero (at nucleus), or positive (after nucleus). Example: -4, -3, ..., 0, 1, ...
-    a2 : int
-        Position of current mora in the accent phrase (1-based).
-        Resets to 1 at each accent phrase boundary.
-    a3 : int
-        Total number of morae in the current accent phrase.
-        Useful for phrase-level prosody control.
-    """
-
-    a1: int  # アクセント核からの相対位置 (負値=核より前, 0=核, 正値=核より後)
-    a2: int  # アクセント句内のモーラ位置 (1-based)
-    a3: int  # アクセント句内の総モーラ数
+__all__ = [
+    "phonemize_japanese",
+    "phonemize_japanese_with_prosody",
+    "ProsodyInfo",
+    "JapanesePhonemizer",
+]
 
 
 # Regular expressions reused many times
@@ -381,3 +364,18 @@ def phonemize_japanese_with_prosody(
     mapped_tokens = map_sequence(tokens)
 
     return mapped_tokens, prosody_info
+
+
+class JapanesePhonemizer(Phonemizer):
+    """Japanese phonemizer using OpenJTalk."""
+
+    def phonemize(self, text: str) -> list[str]:
+        return phonemize_japanese(text)
+
+    def phonemize_with_prosody(
+        self, text: str
+    ) -> tuple[list[str], list[ProsodyInfo | None]]:
+        return phonemize_japanese_with_prosody(text)
+
+    def get_phoneme_id_map(self) -> dict[str, list[int]] | None:
+        return None
