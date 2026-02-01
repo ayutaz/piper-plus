@@ -6,12 +6,18 @@ requiring espeak-ng or piper-phonemize (GPL dependencies).
 
 import logging
 import re
-from dataclasses import dataclass
+
+from .base import Phonemizer, ProsodyInfo
 
 
 _LOGGER = logging.getLogger(__name__)
 
-__all__ = ["phonemize_english", "phonemize_english_with_prosody", "EnglishProsodyInfo"]
+__all__ = [
+    "phonemize_english",
+    "phonemize_english_with_prosody",
+    "EnglishProsodyInfo",
+    "EnglishPhonemizer",
+]
 
 # ARPAbet to espeak-compatible IPA mapping
 ARPABET_TO_IPA: dict[str, str] = {
@@ -169,13 +175,8 @@ _FUNCTION_WORDS = {
 }
 
 
-@dataclass
-class EnglishProsodyInfo:
-    """Prosody information for English phonemes."""
-
-    a1: int  # Fixed at 0 (no accent nucleus concept in English)
-    a2: int  # Stress level: 0=none, 1=secondary, 2=primary
-    a3: int  # Number of phonemes in the word
+# Backward-compatible alias
+EnglishProsodyInfo = ProsodyInfo
 
 
 def _g2p_en_to_arpabet_tokens(text: str) -> list[list[str]]:
@@ -379,3 +380,53 @@ def phonemize_english(text: str) -> list[str]:
     """Convert English text to phoneme list (without prosody)."""
     phonemes, _ = phonemize_english_with_prosody(text)
     return phonemes
+
+
+class EnglishPhonemizer(Phonemizer):
+    """English phonemizer using g2p-en."""
+
+    def phonemize(self, text: str) -> list[str]:
+        return phonemize_english(text)
+
+    def phonemize_with_prosody(
+        self, text: str
+    ) -> tuple[list[str], list[ProsodyInfo | None]]:
+        return phonemize_english_with_prosody(text)
+
+    def get_phoneme_id_map(self) -> dict[str, list[int]] | None:
+        return None
+
+    def post_process_ids(
+        self,
+        phoneme_ids: list[int],
+        prosody_features: list[dict | None],
+        phoneme_id_map: dict[str, list[int]],
+    ) -> tuple[list[int], list[dict | None]]:
+        """Add BOS/EOS and inter-phoneme padding for English (espeak-ng compat)."""
+        pad_ids = phoneme_id_map.get("_", [0])
+        bos_ids = phoneme_id_map.get("^")
+        eos_ids = phoneme_id_map.get("$")
+
+        # Insert pad between every phoneme ID
+        padded_ids: list[int] = []
+        padded_prosody: list[dict | None] = []
+        for phoneme_id, prosody_feature in zip(
+            phoneme_ids, prosody_features, strict=True
+        ):
+            padded_ids.append(phoneme_id)
+            padded_prosody.append(prosody_feature)
+            padded_ids.extend(pad_ids)
+            padded_prosody.extend([None] * len(pad_ids))
+
+        phoneme_ids = padded_ids
+        prosody_features = padded_prosody
+
+        # Wrap with BOS/EOS
+        if bos_ids:
+            phoneme_ids = bos_ids + [pad_ids[0]] + phoneme_ids
+            prosody_features = [None] * (len(bos_ids) + 1) + prosody_features
+        if eos_ids:
+            phoneme_ids = phoneme_ids + eos_ids
+            prosody_features = prosody_features + [None] * len(eos_ids)
+
+        return phoneme_ids, prosody_features

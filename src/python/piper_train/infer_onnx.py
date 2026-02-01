@@ -34,24 +34,19 @@ def text_to_phoneme_ids_and_prosody(
         - phoneme_ids: List of phoneme IDs
         - prosody_features: List of {"a1": int, "a2": int, "a3": int} or None
     """
-    if language == "en":
-        from .phonemize.english import phonemize_english_with_prosody  # noqa: PLC0415
+    from .phonemize.registry import get_phonemizer  # noqa: PLC0415
 
-        phonemes, prosody_info_list = phonemize_english_with_prosody(text)
-    else:
-        from .phonemize.japanese import phonemize_japanese_with_prosody  # noqa: PLC0415
-
-        phonemes, prosody_info_list = phonemize_japanese_with_prosody(text)
+    phonemizer = get_phonemizer(language)
+    phonemes, prosody_info_list = phonemizer.phonemize_with_prosody(text)
 
     # Convert phonemes to IDs
-    phoneme_ids = []
-    prosody_features = []
+    phoneme_ids: list[int] = []
+    prosody_features: list[dict | None] = []
 
     for phoneme, prosody_info in zip(phonemes, prosody_info_list, strict=True):
         if phoneme in phoneme_id_map:
             ids = phoneme_id_map[phoneme]
             phoneme_ids.extend(ids)
-            # Each phoneme ID gets the same prosody info
             for _ in ids:
                 if prosody_info is not None:
                     prosody_features.append(
@@ -66,34 +61,10 @@ def text_to_phoneme_ids_and_prosody(
         else:
             _LOGGER.warning("Unknown phoneme: %s", phoneme)
 
-    # Add BOS/EOS and inter-phoneme padding for English
-    # piper/espeak-ng models expect: BOS, pad, id1, pad, id2, pad, ..., idN, pad, EOS
-    if language == "en":
-        pad_ids = phoneme_id_map.get("_", [0])
-        bos_ids = phoneme_id_map.get("^")
-        eos_ids = phoneme_id_map.get("$")
-
-        # Insert pad between every phoneme ID
-        padded_ids = []
-        padded_prosody = []
-        for phoneme_id, prosody_feature in zip(
-            phoneme_ids, prosody_features, strict=True
-        ):
-            padded_ids.append(phoneme_id)
-            padded_prosody.append(prosody_feature)
-            padded_ids.extend(pad_ids)
-            padded_prosody.extend([None] * len(pad_ids))
-
-        phoneme_ids = padded_ids
-        prosody_features = padded_prosody
-
-        # Wrap with BOS/EOS
-        if bos_ids:
-            phoneme_ids = bos_ids + [pad_ids[0]] + phoneme_ids
-            prosody_features = [None] * (len(bos_ids) + 1) + prosody_features
-        if eos_ids:
-            phoneme_ids = phoneme_ids + eos_ids
-            prosody_features = prosody_features + [None] * len(eos_ids)
+    # Language-specific post-processing (BOS/EOS/padding)
+    phoneme_ids, prosody_features = phonemizer.post_process_ids(
+        phoneme_ids, prosody_features, phoneme_id_map
+    )
 
     return phoneme_ids, prosody_features
 
@@ -118,11 +89,13 @@ def main():
         help="Path to config.json with phoneme_id_map (required with --text). "
         "If not specified, looks for config.json next to the model.",
     )
+    from .phonemize.registry import available_languages  # noqa: PLC0415
+
     parser.add_argument(
         "--language",
-        choices=["ja", "en"],
+        choices=available_languages(),
         default="ja",
-        help="Language for --text mode: ja (Japanese, default) or en (English, uses g2p-en)",
+        help="Language for --text mode (default: ja)",
     )
     parser.add_argument(
         "--speaker-id",

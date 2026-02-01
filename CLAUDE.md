@@ -134,6 +134,28 @@ cat test.jsonl | CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.infer_onnx
 
 ## 実装済み機能
 
+### Phonemizer ABC + 言語レジストリ ✅ NEW (2026-02-01)
+
+`Phonemizer` 抽象基底クラスと言語レジストリにより、if/elif分岐を解消。新言語追加が容易に。
+
+**新言語追加手順:**
+1. `Phonemizer` を継承したクラスを作成 (`phonemize`, `phonemize_with_prosody`, `get_phoneme_id_map` を実装)
+2. 必要に応じて `post_process_ids` をオーバーライド (BOS/EOS等)
+3. `registry.py` の `_auto_register()` に登録
+
+**実装ファイル:**
+- `src/python/piper_train/phonemize/base.py` — `Phonemizer` ABC, 共通 `ProsodyInfo`
+- `src/python/piper_train/phonemize/registry.py` — 言語レジストリ
+- `src/python/piper_train/phonemize/japanese.py` — `JapanesePhonemizer`
+- `src/python/piper_train/phonemize/english.py` — `EnglishPhonemizer`
+- `test/test_phonemizer_registry.py` — レジストリ・ABCテスト
+
+**変更点:**
+- `ProsodyInfo` を `base.py` に統一 (日本語/英語共通)
+- `EnglishProsodyInfo` は `ProsodyInfo` のエイリアス (後方互換)
+- `infer_onnx.py` の言語分岐をレジストリ経由に変更
+- BOS/EOS/パディング処理を `EnglishPhonemizer.post_process_ids()` に移動
+
 ### GPL-free 英語G2P (g2p-en) ✅ NEW (2026-01-31)
 
 g2p-en (Apache-2.0) を使用したespeak-ng互換の英語音素化。espeak-ng/piper-phonemize (GPL) なしで英語推論が可能。
@@ -328,6 +350,8 @@ NCCL_IB_DISABLE=1
 |------|------|
 | 学習スクリプト | `src/python/piper_train/__main__.py` |
 | VITS実装 | `src/python/piper_train/vits/` |
+| Phonemizer ABC | `src/python/piper_train/phonemize/base.py` |
+| 言語レジストリ | `src/python/piper_train/phonemize/registry.py` |
 | 英語音素化 | `src/python/piper_train/phonemize/english.py` |
 | 日本語音素化 | `src/python/piper_train/phonemize/japanese.py` |
 | IDマップ | `src/python/piper_train/phonemize/jp_id_map.py` |
