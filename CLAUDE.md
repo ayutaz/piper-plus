@@ -134,6 +134,40 @@ cat test.jsonl | CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.infer_onnx
 
 ## 実装済み機能
 
+### GPL-free 英語G2P (g2p-en) ✅ NEW (2026-01-31)
+
+g2p-en (Apache-2.0) を使用したespeak-ng互換の英語音素化。espeak-ng/piper-phonemize (GPL) なしで英語推論が可能。
+
+**espeak-ng互換の処理:**
+- ストレスマーカー (`ˈ`/`ˌ`) を母音の前に挿入
+- 単語間スペース挿入、句読点は前の単語に付着
+- 機能語 (are, you, the等) のストレス除去
+- AA+R → ɑːɹ、ER0 → ɚ、ER1 → ɜː の文脈依存変換
+- BOS (`^`) / EOS (`$`) + phoneme間パディング (`_`=ID 0)
+
+**実装ファイル:**
+- `src/python/piper_train/phonemize/english.py` — G2P変換
+- `src/python/piper_train/infer_onnx.py` — BOS/EOS・パディング挿入
+- `test/test_english_phonemizer.py` — 42テスト
+
+**推論コマンド:**
+```bash
+CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.infer_onnx \
+  --model /path/to/en_model.onnx \
+  --config /path/to/en_model.onnx.json \
+  --output-dir /path/to/output \
+  --text "Hello, how are you today?" \
+  --language en
+```
+
+**espeak-ngとの完全一致:**
+hello, the cat, car, information, bird（検証済み）
+
+**既知の差異（G2Pエンジン由来）:**
+- 疑問詞 (how) のストレス種類: g2p-en=ˈ vs espeak-ng=ˌ
+- フラッピング: g2p-en=t vs espeak-ng=ɾ (letter等)
+- 縮約形: g2p-en=分離 vs espeak-ng=結合 (I am等)
+
 ### WavLM Discriminator ✅ NEW (2026-01-08)
 
 Microsoft WavLMベースの知覚品質判別器。音質向上のためデフォルトで有効。
@@ -294,6 +328,7 @@ NCCL_IB_DISABLE=1
 |------|------|
 | 学習スクリプト | `src/python/piper_train/__main__.py` |
 | VITS実装 | `src/python/piper_train/vits/` |
+| 英語音素化 | `src/python/piper_train/phonemize/english.py` |
 | 日本語音素化 | `src/python/piper_train/phonemize/japanese.py` |
 | IDマップ | `src/python/piper_train/phonemize/jp_id_map.py` |
 | トークンマッパー | `src/python/piper_train/phonemize/token_mapper.py` |
