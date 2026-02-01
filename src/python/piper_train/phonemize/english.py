@@ -191,7 +191,7 @@ def _convert_word_to_ipa(tokens: list[str]) -> list[tuple[str, int]]:
                 continue
 
             # Stressed ER → ɜː
-            if base == "ER" and stress >= 1:
+            if base == "ER" and stress == 1:
                 result.append(("ɜː", stress))
                 i += 1
                 continue
@@ -209,7 +209,7 @@ def _get_source_words(text: str) -> list[str]:
     Returns only alphabetic words (no punctuation), matching the order
     of non-punctuation word groups from g2p-en.
     """
-    return [w for w in re.findall(r"[a-zA-Z']+", text.lower())]
+    return re.findall(r"[a-zA-Z']+", text.lower())
 
 
 def phonemize_english_with_prosody(
@@ -261,6 +261,7 @@ def phonemize_english_with_prosody(
         # Convert all tokens in the word to IPA (with context-dependent rules)
         word_ipas = _convert_word_to_ipa(word_tokens)
         if is_func:
+            # Remove primary/secondary stress from function words (are, you, the, etc.)
             word_ipas = [(ipa, 0 if stress >= 1 else stress) for ipa, stress in word_ipas]
 
         # A3 = total IPA character count for the word (actual phoneme tokens)
