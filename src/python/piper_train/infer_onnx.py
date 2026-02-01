@@ -66,6 +66,33 @@ def text_to_phoneme_ids_and_prosody(
         else:
             _LOGGER.warning("Unknown phoneme: %s", phoneme)
 
+    # Add BOS/EOS and inter-phoneme padding for English
+    # piper/espeak-ng models expect: BOS, pad, id1, pad, id2, pad, ..., idN, pad, EOS
+    if language == "en":
+        pad_ids = phoneme_id_map.get("_", [0])
+        bos_ids = phoneme_id_map.get("^")
+        eos_ids = phoneme_id_map.get("$")
+
+        # Insert pad between every phoneme ID
+        padded_ids = []
+        padded_prosody = []
+        for pid, pf in zip(phoneme_ids, prosody_features, strict=True):
+            padded_ids.append(pid)
+            padded_prosody.append(pf)
+            padded_ids.extend(pad_ids)
+            padded_prosody.extend([None] * len(pad_ids))
+
+        phoneme_ids = padded_ids
+        prosody_features = padded_prosody
+
+        # Wrap with BOS/EOS
+        if bos_ids:
+            phoneme_ids = bos_ids + [pad_ids[0]] + phoneme_ids
+            prosody_features = [None] * (len(bos_ids) + 1) + prosody_features
+        if eos_ids:
+            phoneme_ids = phoneme_ids + eos_ids
+            prosody_features = prosody_features + [None] * len(eos_ids)
+
     return phoneme_ids, prosody_features
 
 
