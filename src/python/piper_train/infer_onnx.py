@@ -20,22 +20,28 @@ _LOGGER = logging.getLogger("piper_train.infer_onnx")
 def text_to_phoneme_ids_and_prosody(
     text: str,
     phoneme_id_map: dict[str, list[int]],
+    language: str = "ja",
 ) -> tuple[list[int], list[dict | None]]:
-    """Convert Japanese text to phoneme IDs and prosody features.
+    """Convert text to phoneme IDs and prosody features.
 
     Args:
-        text: Input Japanese text
+        text: Input text
         phoneme_id_map: Mapping from phoneme symbols to IDs
+        language: "ja" for Japanese (OpenJTalk), "en" for English (g2p-en)
 
     Returns:
         tuple of (phoneme_ids, prosody_features)
         - phoneme_ids: List of phoneme IDs
         - prosody_features: List of {"a1": int, "a2": int, "a3": int} or None
     """
-    from .phonemize.japanese import phonemize_japanese_with_prosody  # noqa: PLC0415
+    if language == "en":
+        from .phonemize.english import phonemize_english_with_prosody  # noqa: PLC0415
 
-    # Get phonemes and prosody info from text
-    phonemes, prosody_info_list = phonemize_japanese_with_prosody(text)
+        phonemes, prosody_info_list = phonemize_english_with_prosody(text)
+    else:
+        from .phonemize.japanese import phonemize_japanese_with_prosody  # noqa: PLC0415
+
+        phonemes, prosody_info_list = phonemize_japanese_with_prosody(text)
 
     # Convert phonemes to IDs
     phoneme_ids = []
@@ -82,6 +88,12 @@ def main():
         "--config",
         help="Path to config.json with phoneme_id_map (required with --text). "
         "If not specified, looks for config.json next to the model.",
+    )
+    parser.add_argument(
+        "--language",
+        choices=["ja", "en"],
+        default="ja",
+        help="Language for --text mode: ja (Japanese, default) or en (English, uses g2p-en)",
     )
     parser.add_argument(
         "--speaker-id",
@@ -138,7 +150,7 @@ def main():
 
         # Convert text to phoneme_ids and prosody_features
         phoneme_ids, prosody_features_data = text_to_phoneme_ids_and_prosody(
-            args.text, phoneme_id_map
+            args.text, phoneme_id_map, language=args.language
         )
         _LOGGER.info(
             "Converted text to %d phoneme IDs: %s",

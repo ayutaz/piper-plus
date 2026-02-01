@@ -11,9 +11,14 @@ dependencies = [
     "huggingface-hub>=0.30.0,<1.0",
     "numpy<2.3",
     "tensorboard>=2.20.0",
+    "g2p-en>=2.1.0",
 ]
 
 [project.optional-dependencies]
+preprocess = [
+    "piper-phonemize>=1.1.0",
+]
+
 dev = [
     "black==23.11.0",
     "flake8==6.1.0",
@@ -123,6 +128,7 @@ inline-quotes = "double"
 "src/python/tests/test_phonemize.py" = ["E402"]
 # preprocess.py: 条件付きインポートで警告を抑制
 "src/python/piper_train/preprocess.py" = ["PLC0415"]
+"src/python/piper_train/phonemize/english.py" = ["PLC0415"]
 # prepare scripts: 条件付きインポートを許可
 "src/python/prepare_*.py" = ["PLC0415"]
 # runtime files: 条件付きインポートを許可
