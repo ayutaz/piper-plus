@@ -26,6 +26,7 @@ class VitsModel(pl.LightningModule):
         self,
         num_symbols: int,
         num_speakers: int,
+        num_languages: int = 1,
         # audio
         resblock="2",
         resblock_kernel_sizes=(3, 5, 7),
@@ -91,7 +92,7 @@ class VitsModel(pl.LightningModule):
 
         # Fix gin_channels BEFORE save_hyperparameters() so the correct value is saved
         # This fixes the bug where gin_channels=0 was saved for multi-speaker models
-        if (num_speakers > 1) and (gin_channels <= 0):
+        if (num_speakers > 1 or num_languages > 1) and (gin_channels <= 0):
             gin_channels = 512
 
         self.save_hyperparameters()
@@ -115,6 +116,7 @@ class VitsModel(pl.LightningModule):
             upsample_initial_channel=self.hparams.upsample_initial_channel,
             upsample_kernel_sizes=self.hparams.upsample_kernel_sizes,
             n_speakers=self.hparams.num_speakers,
+            n_languages=self.hparams.num_languages,
             gin_channels=self.hparams.gin_channels,
             use_sdp=self.hparams.use_sdp,
             prosody_dim=self.hparams.prosody_dim,
@@ -164,7 +166,7 @@ class VitsModel(pl.LightningModule):
             full_dataset, [train_set_size, num_test_examples, valid_set_size]
         )
 
-    def forward(self, text, text_lengths, scales, sid=None, prosody_features=None):
+    def forward(self, text, text_lengths, scales, sid=None, lid=None, prosody_features=None):
         noise_scale = scales[0]
         length_scale = scales[1]
         noise_scale_w = scales[2]
@@ -175,6 +177,7 @@ class VitsModel(pl.LightningModule):
             length_scale=length_scale,
             noise_scale_w=noise_scale_w,
             sid=sid,
+            lid=lid,
             prosody_features=prosody_features,
         )
 
@@ -198,6 +201,7 @@ class VitsModel(pl.LightningModule):
         collate_fn = UtteranceCollate(
             is_multispeaker=self.hparams.num_speakers > 1,
             segment_size=self.hparams.segment_size,
+            is_multilanguage=self.hparams.num_languages > 1,
         )
 
         # マルチスピーカーでsamples_per_speakerが設定されている場合は
@@ -247,6 +251,7 @@ class VitsModel(pl.LightningModule):
             collate_fn=UtteranceCollate(
                 is_multispeaker=self.hparams.num_speakers > 1,
                 segment_size=self.hparams.segment_size,
+                is_multilanguage=self.hparams.num_languages > 1,
             ),
             num_workers=self.hparams.num_workers,
             batch_size=self.hparams.batch_size,
@@ -262,6 +267,7 @@ class VitsModel(pl.LightningModule):
             collate_fn=UtteranceCollate(
                 is_multispeaker=self.hparams.num_speakers > 1,
                 segment_size=self.hparams.segment_size,
+                is_multilanguage=self.hparams.num_languages > 1,
             ),
             num_workers=self.hparams.num_workers,
             batch_size=self.hparams.batch_size,
@@ -309,7 +315,7 @@ class VitsModel(pl.LightningModule):
         self.log(key, value, batch_size=batch_size, sync_dist=sync_dist)
 
     def training_step_g(self, batch: Batch):
-        x, x_lengths, y, _, spec, spec_lengths, speaker_ids, prosody_features = (
+        x, x_lengths, y, _, spec, spec_lengths, speaker_ids, language_ids, prosody_features = (
             batch.phoneme_ids,
             batch.phoneme_lengths,
             batch.audios,
@@ -317,6 +323,7 @@ class VitsModel(pl.LightningModule):
             batch.spectrograms,
             batch.spectrogram_lengths,
             batch.speaker_ids if batch.speaker_ids is not None else None,
+            batch.language_ids if batch.language_ids is not None else None,
             batch.prosody_features if batch.prosody_features is not None else None,
         )
         (
@@ -333,6 +340,7 @@ class VitsModel(pl.LightningModule):
             spec,
             spec_lengths,
             speaker_ids,
+            lid=language_ids,
             prosody_features=prosody_features,
         )
         self._y_hat = y_hat.contiguous()

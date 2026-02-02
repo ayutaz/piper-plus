@@ -20,6 +20,7 @@ class Utterance:
     audio_norm_path: Path
     audio_spec_path: Path
     speaker_id: int | None = None
+    language_id: int | None = None
     text: str | None = None
     prosody_features: list[dict | None] | None = None  # A1/A2/A3 per phoneme
 
@@ -30,6 +31,7 @@ class UtteranceTensors:
     spectrogram: FloatTensor
     audio_norm: FloatTensor
     speaker_id: LongTensor | None = None
+    language_id: LongTensor | None = None
     text: str | None = None
     prosody_features: LongTensor | None = None  # Shape: (num_phonemes, 3) for A1/A2/A3
 
@@ -47,6 +49,7 @@ class Batch:
     audios: FloatTensor
     audio_lengths: LongTensor
     speaker_ids: LongTensor | None = None
+    language_ids: LongTensor | None = None
     prosody_features: LongTensor | None = None  # Shape: (batch, max_phonemes, 3)
 
 
@@ -105,6 +108,11 @@ class PiperDataset(Dataset):
                     speaker_id=(
                         LongTensor([utt.speaker_id])
                         if utt.speaker_id is not None
+                        else None
+                    ),
+                    language_id=(
+                        LongTensor([utt.language_id])
+                        if utt.language_id is not None
                         else None
                     ),
                     text=utt.text,
@@ -196,14 +204,16 @@ class PiperDataset(Dataset):
             audio_norm_path=Path(utt_dict["audio_norm_path"]),
             audio_spec_path=Path(utt_dict["audio_spec_path"]),
             speaker_id=utt_dict.get("speaker_id"),
+            language_id=utt_dict.get("language_id"),
             text=utt_dict.get("text"),
             prosody_features=utt_dict.get("prosody_features"),
         )
 
 
 class UtteranceCollate:
-    def __init__(self, is_multispeaker: bool, segment_size: int):
+    def __init__(self, is_multispeaker: bool, segment_size: int, is_multilanguage: bool = False):
         self.is_multispeaker = is_multispeaker
+        self.is_multilanguage = is_multilanguage
         self.segment_size = segment_size
 
     def __call__(self, utterances: Sequence[UtteranceTensors]) -> Batch:
@@ -257,6 +267,10 @@ class UtteranceCollate:
         if self.is_multispeaker:
             speaker_ids = LongTensor(num_utterances)
 
+        language_ids: LongTensor | None = None
+        if self.is_multilanguage:
+            language_ids = LongTensor(num_utterances)
+
         # Create prosody tensor if any utterance has prosody features
         prosody_padded: LongTensor | None = None
         if has_prosody:
@@ -285,6 +299,10 @@ class UtteranceCollate:
                 assert speaker_ids is not None
                 speaker_ids[utt_idx] = utt.speaker_id
 
+            if utt.language_id is not None:
+                assert language_ids is not None
+                language_ids[utt_idx] = utt.language_id
+
             if prosody_padded is not None and utt.prosody_features is not None:
                 # prosody_features の長さが phoneme_length と異なる場合に対応
                 prosody_length = min(len(utt.prosody_features), phoneme_length)
@@ -301,6 +319,7 @@ class UtteranceCollate:
             audios=audio_padded,
             audio_lengths=audio_lengths,
             speaker_ids=speaker_ids,
+            language_ids=language_ids,
             prosody_features=prosody_padded,
         )
 

@@ -222,6 +222,7 @@ def main():
         config = json.load(config_file)
         num_symbols = int(config["num_symbols"])
         num_speakers = int(config["num_speakers"])
+        num_languages = int(config.get("num_languages", 1))
         sample_rate = int(config["audio"]["sample_rate"])
 
     # Setup callbacks
@@ -330,6 +331,7 @@ def main():
     model = VitsModel(
         num_symbols=num_symbols,
         num_speakers=num_speakers,
+        num_languages=num_languages,
         sample_rate=sample_rate,
         dataset=[dataset_path],
         **dict_args,

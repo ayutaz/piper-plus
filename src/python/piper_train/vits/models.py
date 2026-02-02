@@ -747,6 +747,7 @@ class SynthesizerTrn(nn.Module):
         upsample_initial_channel: int,
         upsample_kernel_sizes: tuple[int, ...],
         n_speakers: int = 1,
+        n_languages: int = 1,
         gin_channels: int = 0,
         use_sdp: bool = True,
         prosody_dim: int = 16,
@@ -769,6 +770,7 @@ class SynthesizerTrn(nn.Module):
         self.upsample_kernel_sizes = upsample_kernel_sizes
         self.segment_size = segment_size
         self.n_speakers = n_speakers
+        self.n_languages = n_languages
         self.gin_channels = gin_channels
         self.prosody_dim = prosody_dim
 
@@ -827,6 +829,32 @@ class SynthesizerTrn(nn.Module):
         if n_speakers > 1:
             self.emb_g = nn.Embedding(n_speakers, gin_channels)
 
+        if n_languages > 1:
+            self.emb_lang = nn.Embedding(n_languages, gin_channels)
+
+    def _get_global_conditioning(self, sid=None, lid=None):
+        """Compute global conditioning vector from speaker and language embeddings.
+
+        Parameters
+        ----------
+        sid : torch.LongTensor or None
+            Speaker IDs [batch]
+        lid : torch.LongTensor or None
+            Language IDs [batch]
+
+        Returns
+        -------
+        torch.Tensor or None
+            Global conditioning [batch, gin_channels, 1]
+        """
+        g = None
+        if self.n_speakers > 1 and sid is not None:
+            g = self.emb_g(sid).unsqueeze(-1)  # [b, h, 1]
+        if self.n_languages > 1 and lid is not None:
+            lang_emb = self.emb_lang(lid).unsqueeze(-1)  # [b, h, 1]
+            g = (g + lang_emb) if g is not None else lang_emb
+        return g
+
     def _prepare_prosody_input(self, x, x_mask, prosody_features):
         """Prepare encoder output with prosody features for duration predictor.
 
@@ -865,12 +893,9 @@ class SynthesizerTrn(nn.Module):
             x_dp = x
         return x_dp
 
-    def forward(self, x, x_lengths, y, y_lengths, sid=None, prosody_features=None):
+    def forward(self, x, x_lengths, y, y_lengths, sid=None, lid=None, prosody_features=None):
         x, m_p, logs_p, x_mask = self.enc_p(x, x_lengths)
-        if self.n_speakers > 1:
-            g = self.emb_g(sid).unsqueeze(-1)  # [b, h, 1]
-        else:
-            g = None
+        g = self._get_global_conditioning(sid, lid)
 
         z, m_q, logs_q, y_mask = self.enc_q(y, y_lengths, g=g)
         z_p = self.flow(z, y_mask, g=g)
@@ -936,6 +961,7 @@ class SynthesizerTrn(nn.Module):
         x,
         x_lengths,
         sid=None,
+        lid=None,
         noise_scale=0.667,
         length_scale=1,
         noise_scale_w=0.8,
@@ -945,9 +971,7 @@ class SynthesizerTrn(nn.Module):
         x, m_p, logs_p, x_mask = self.enc_p(x, x_lengths)
         if self.n_speakers > 1:
             assert sid is not None, "Missing speaker id"
-            g = self.emb_g(sid).unsqueeze(-1)  # [b, h, 1]
-        else:
-            g = None
+        g = self._get_global_conditioning(sid, lid)
 
         # Prepare input for duration predictor with prosody features
         x_dp = self._prepare_prosody_input(x, x_mask, prosody_features)
@@ -982,10 +1006,10 @@ class SynthesizerTrn(nn.Module):
 
         return o, attn, y_mask, (z, z_p, m_p, logs_p)
 
-    def voice_conversion(self, y, y_lengths, sid_src, sid_tgt):
+    def voice_conversion(self, y, y_lengths, sid_src, sid_tgt, lid=None):
         assert self.n_speakers > 1, "n_speakers have to be larger than 1."
-        g_src = self.emb_g(sid_src).unsqueeze(-1)
-        g_tgt = self.emb_g(sid_tgt).unsqueeze(-1)
+        g_src = self._get_global_conditioning(sid_src, lid)
+        g_tgt = self._get_global_conditioning(sid_tgt, lid)
         z, m_q, logs_q, y_mask = self.enc_q(y, y_lengths, g=g_src)
         z_p = self.flow(z, y_mask, g=g_src)
         z_hat = self.flow(z_p, y_mask, g=g_tgt, reverse=True)

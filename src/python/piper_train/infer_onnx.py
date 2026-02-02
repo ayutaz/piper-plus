@@ -117,10 +117,13 @@ def main():
     input_names = [inp.name for inp in model.get_inputs()]
     has_prosody = "prosody_features" in input_names
     has_sid = "sid" in input_names
+    has_lid = "lid" in input_names
     if has_prosody:
         _LOGGER.info("Model supports prosody features (A1/A2/A3)")
     if has_sid:
         _LOGGER.info("Model supports multi-speaker (sid input)")
+    if has_lid:
+        _LOGGER.info("Model supports multi-language (lid input)")
 
     # Handle --text mode: convert text to phoneme_ids and prosody_features
     phoneme_id_map = None
@@ -202,6 +205,11 @@ def main():
 
         if sid is not None:
             inputs["sid"] = sid
+
+        # Handle language ID if model supports it
+        if has_lid:
+            language_id = utt.get("language_id", 0)
+            inputs["lid"] = np.array([language_id], dtype=np.int64)
 
         # Handle prosody features if model supports them
         if has_prosody:
