@@ -134,6 +134,36 @@ cat test.jsonl | CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.infer_onnx
 
 ## 実装済み機能
 
+### バイリンガル (JA+EN) Phonemizer ✅ NEW (2026-02-02)
+
+文内コードスイッチング対応のバイリンガル音素化。Unicode範囲で言語セグメントを自動検出し、各言語のPhonemizerに委譲。
+
+**機能:**
+- 統一phoneme_id_map (JA+EN ~110記号、ID衝突なし)
+- Unicode範囲ベースの言語自動検出 (CJK→ja、Latin→en)
+- 混合テキスト対応: 「今日はgood morningですね」→ JA+EN音素を正しい順序で出力
+- BOS/EOS/パディングの統一処理
+
+**実装ファイル:**
+- `src/python/piper_train/phonemize/bilingual_id_map.py` — 統一phoneme_id_map生成
+- `src/python/piper_train/phonemize/bilingual.py` — `BilingualPhonemizer` (言語検出+混合phonemize)
+- `src/python/piper_train/phonemize/registry.py` — `ja-en` 登録
+- `test/test_bilingual_phonemizer.py` — 18テスト
+
+**推論コマンド (将来のバイリンガルモデル用):**
+```bash
+CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.infer_onnx \
+  --model /path/to/bilingual_model.onnx \
+  --config /path/to/bilingual_config.json \
+  --output-dir /path/to/output \
+  --text "今日はgood morningですね" \
+  --language ja-en --speaker-id 0
+```
+
+**次のステップ (Phase B/C):**
+- Phase B: 学習パイプライン拡張 (language_id, language embedding, バッチサンプラー)
+- Phase C: データ準備 + 学習実験 (LJSpeech + moe-speech混合)
+
 ### Phonemizer ABC + 言語レジストリ ✅ NEW (2026-02-01)
 
 `Phonemizer` 抽象基底クラスと言語レジストリにより、if/elif分岐を解消。新言語追加が容易に。
@@ -358,6 +388,8 @@ NCCL_IB_DISABLE=1
 | トークンマッパー | `src/python/piper_train/phonemize/token_mapper.py` |
 | ONNXエクスポート | `src/python/piper_train/export_onnx.py` |
 | 推論スクリプト | `src/python/piper_train/infer_onnx.py` |
+| バイリンガルPhonemizer | `src/python/piper_train/phonemize/bilingual.py` |
+| バイリンガルIDマップ | `src/python/piper_train/phonemize/bilingual_id_map.py` |
 
 ### データセット
 

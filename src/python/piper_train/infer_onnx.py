@@ -82,7 +82,7 @@ def main():
     # Text input options
     parser.add_argument(
         "--text",
-        help="Japanese text to synthesize (alternative to JSONL stdin input)",
+        help="Text to synthesize (alternative to JSONL stdin input)",
     )
     parser.add_argument(
         "--config",

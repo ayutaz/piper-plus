@@ -39,6 +39,12 @@ def _auto_register():
         register_language("en", EnglishPhonemizer())
     except ImportError:
         pass
+    try:
+        from .bilingual import BilingualPhonemizer  # noqa: PLC0415
+
+        register_language("ja-en", BilingualPhonemizer(["ja", "en"]))
+    except ImportError:
+        pass
 
 
 _auto_register()

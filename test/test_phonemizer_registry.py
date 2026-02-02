@@ -73,10 +73,16 @@ class TestABCInterface:
         phonemes, prosody = p.phonemize_with_prosody("hello")
         assert len(phonemes) == len(prosody)
 
-    def test_get_phoneme_id_map_returns_none(self):
-        for lang in available_languages():
+    def test_get_phoneme_id_map_monolingual_returns_none(self):
+        for lang in ("ja", "en"):
             p = get_phonemizer(lang)
             assert p.get_phoneme_id_map() is None
+
+    def test_get_phoneme_id_map_bilingual_returns_map(self):
+        p = get_phonemizer("ja-en")
+        id_map = p.get_phoneme_id_map()
+        assert id_map is not None
+        assert len(id_map) > 0
 
 
 class TestDefaultPostProcessIds:
