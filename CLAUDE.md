@@ -160,9 +160,44 @@ CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.infer_onnx \
   --language ja-en --speaker-id 0
 ```
 
-**次のステップ (Phase B/C):**
-- Phase B: 学習パイプライン拡張 (language_id, language embedding, バッチサンプラー)
-- Phase C: データ準備 + 学習実験 (LJSpeech + moe-speech混合)
+### バイリンガル学習パイプライン (Phase B) ✅ NEW (2026-02-02)
+
+日英混合データセットでの学習を可能にする学習パイプライン拡張。
+
+**機能:**
+- `language_id` フィールド: Dataset/Batch/preprocessに追加 (0=ja, 1=en)
+- 言語embedding: `nn.Embedding(n_languages, gin_channels)` をSynthesizerTrnに追加
+- speaker embedding + language embeddingを加算して全サブモジュールに注入
+- config.jsonに`num_languages`, `language_id_map`フィールド追加
+- ONNX export/推論に`lid`入力対応
+- preprocess.pyに`--language ja-en`バイリンガルモード追加
+
+**変更ファイル:**
+- `vits/dataset.py` — Utterance, UtteranceTensors, Batchにlanguage_id追加
+- `vits/models.py` — SynthesizerTrnにn_languages, emb_lang, _get_global_conditioning追加
+- `vits/lightning.py` — VitsModelにnum_languages、training loopでlanguage_ids伝播
+- `export_onnx.py` — lid入力のONNXエクスポート対応
+- `infer_onnx.py` — lid入力の推論対応
+- `__main__.py` — config.jsonからnum_languages読み込み
+- `preprocess.py` — PhonemeType.BILINGUAL + phonemize_batch_bilingual追加
+
+**学習コマンド例 (バイリンガル):**
+```bash
+# 1. 前処理
+uv run python -m piper_train.preprocess \
+  --input-dir /path/to/bilingual_dataset \
+  --output-dir /path/to/output \
+  --language ja-en --sample-rate 22050 --dataset-format ljspeech
+
+# 2. 学習
+uv run python -m piper_train \
+  --dataset-dir /path/to/output \
+  --prosody-dim 16 --accelerator gpu --devices 4 \
+  --max_epochs 200 --batch-size 12 --samples-per-speaker 2
+```
+
+**次のステップ (Phase C):**
+- Phase C: データ準備 + 学習実験 (LJSpeech + moe-speech混合) (LJSpeech + moe-speech混合)
 
 ### Phonemizer ABC + 言語レジストリ ✅ NEW (2026-02-01)
 

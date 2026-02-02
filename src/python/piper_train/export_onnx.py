@@ -147,6 +147,7 @@ def main() -> None:
 
     num_symbols = model_g.n_vocab
     num_speakers = model_g.n_speakers
+    num_languages = getattr(model_g, "n_languages", 1)
 
     # Enable ONNX export mode for deterministic output
     model_g.onnx_export_mode = True
@@ -184,7 +185,7 @@ def main() -> None:
 
     stochastic = args.stochastic
 
-    def infer_forward(text, text_lengths, scales, sid=None, prosody_features=None):
+    def infer_forward(text, text_lengths, scales, sid=None, lid=None, prosody_features=None):
         """
         Efficient forward function that returns both audio and duration information.
         The duration predictor is called once to compute both durations and audio output.
@@ -196,10 +197,7 @@ def main() -> None:
         # 1. Encoder
         x, m_p, logs_p, x_mask = model_g.enc_p(text, text_lengths)
 
-        if model_g.n_speakers > 1 and sid is not None:
-            g = model_g.emb_g(sid).unsqueeze(-1)
-        else:
-            g = None
+        g = model_g._get_global_conditioning(sid, lid)
 
         # 2. Duration Predictor (called only once)
         x_dp = model_g._prepare_prosody_input(x, x_mask, prosody_features)
@@ -252,6 +250,10 @@ def main() -> None:
     if num_speakers > 1:
         sid = torch.LongTensor([0])
 
+    lid: torch.LongTensor | None = None
+    if num_languages > 1:
+        lid = torch.LongTensor([0])
+
     # noise, noise_w, length
     scales = torch.FloatTensor([0.667, 1.0, 0.8])
 
@@ -261,15 +263,13 @@ def main() -> None:
     if has_prosody:
         prosody_features = torch.zeros(1, dummy_input_length, 3, dtype=torch.long)
 
-    # Include all inputs for compatibility
-    if num_speakers > 1 and has_prosody:
-        dummy_input = (sequences, sequence_lengths, scales, sid, prosody_features)
-    elif num_speakers > 1:
-        dummy_input = (sequences, sequence_lengths, scales, sid)
-    elif has_prosody:
-        dummy_input = (sequences, sequence_lengths, scales, None, prosody_features)
-    else:
-        dummy_input = (sequences, sequence_lengths, scales)
+    # Build dummy input tuple dynamically
+    dummy_input_list: list = [sequences, sequence_lengths, scales]
+    dummy_input_list.append(sid)
+    dummy_input_list.append(lid)
+    if has_prosody:
+        dummy_input_list.append(prosody_features)
+    dummy_input = tuple(dummy_input_list)
 
     # Export - always include durations output
     output_names = ["output", "durations"]
@@ -281,11 +281,13 @@ def main() -> None:
     }
 
     # Configure input names based on model type
+    input_names = ["input", "input_lengths", "scales"]
     if num_speakers > 1:
-        input_names = ["input", "input_lengths", "scales", "sid"]
+        input_names.append("sid")
         dynamic_axes["sid"] = {0: "batch_size"}
-    else:
-        input_names = ["input", "input_lengths", "scales"]
+    if num_languages > 1:
+        input_names.append("lid")
+        dynamic_axes["lid"] = {0: "batch_size"}
 
     # Add prosody_features if model uses prosody
     if has_prosody:
