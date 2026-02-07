@@ -456,7 +456,12 @@ class VitsModel(pl.LightningModule):
                 if test_utt.speaker_id is not None
                 else None
             )
-            test_audio = self(text, text_lengths, scales, sid=sid).detach()
+            lid = (
+                test_utt.language_id.to(self.device)
+                if test_utt.language_id is not None
+                else None
+            )
+            test_audio = self(text, text_lengths, scales, sid=sid, lid=lid).detach()
 
             # Scale to make louder in [-1, 1]
             test_audio = test_audio * (1.0 / max(0.01, abs(test_audio.max())))

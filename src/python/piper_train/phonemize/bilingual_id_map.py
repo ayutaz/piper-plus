@@ -17,27 +17,22 @@ __all__ = ["get_bilingual_id_map", "ENGLISH_PHONEMES"]
 # letters like "a", "k"; English uses IPA like "ɑ", "æ", "ʃ").
 # -----------------------------------------------------------------------
 ENGLISH_PHONEMES: list[str] = [
-    # Vowels (monophthongs)
+    # Vowels (monophthongs) — individual tokens as output by EnglishPhonemizer
     "ɑ",
     "æ",
     "ʌ",
     "ə",
-    "ɔː",
+    "ɔ",
     "ɛ",
     "ɚ",
-    "ɜː",
+    "ɜ",
     "ɪ",
-    "iː",
     "ʊ",
-    "uː",
-    # Diphthongs
-    "aʊ",
-    "aɪ",
-    "eɪ",
-    "oʊ",
-    "ɔɪ",
-    # Combined vowel+r
-    "ɑːɹ",
+    # Length marker (used after vowels: ɔː, ɜː, iː, uː, ɑː)
+    "ː",
+    # Diphthongs — output as individual tokens by EnglishPhonemizer
+    # (e.g., "aɪ" → "a", "ɪ" — "a" shared with JA, "ɪ" listed above)
+    "ɔɪ",  # only used as composite in some contexts
     # Consonants
     "b",  # shared with JA but same symbol, same ID
     "d",  # shared
@@ -75,6 +70,10 @@ ENGLISH_PHONEMES: list[str] = [
     ":",
     "!",
     "?",  # already in SPECIAL_TOKENS but also used standalone by EN
+    # Rare characters that may appear in text
+    "-",
+    "'",
+    "'",
 ]
 
 
