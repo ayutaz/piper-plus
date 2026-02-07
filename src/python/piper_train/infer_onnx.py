@@ -163,11 +163,23 @@ def main():
             args.text[:50] + "..." if len(args.text) > 50 else args.text,
         )
 
+        # Determine language_id from config
+        language_id = 0  # default
+        if has_lid:
+            language_id_map = config.get("language_id_map", {})
+            if args.language in language_id_map:
+                language_id = language_id_map[args.language]
+            elif args.language == "ja-en":
+                # Bilingual mode: default to 0 (ja), speaker_id determines voice
+                language_id = language_id_map.get("ja", 0)
+            _LOGGER.info("Using language_id=%d for language=%s", language_id, args.language)
+
         # Create single utterance
         utterances = [
             {
                 "phoneme_ids": phoneme_ids,
                 "speaker_id": args.speaker_id if has_sid else None,
+                "language_id": language_id if has_lid else None,
                 "prosody_features": prosody_features_data,
             }
         ]

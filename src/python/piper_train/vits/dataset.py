@@ -269,7 +269,7 @@ class UtteranceCollate:
 
         language_ids: LongTensor | None = None
         if self.is_multilanguage:
-            language_ids = LongTensor(num_utterances)
+            language_ids = LongTensor(num_utterances).zero_()
 
         # Create prosody tensor if any utterance has prosody features
         prosody_padded: LongTensor | None = None
