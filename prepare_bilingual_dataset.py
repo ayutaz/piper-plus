@@ -362,35 +362,53 @@ def process_en_dataset(
     _LOGGER.info("Phonemized %d EN utterances (%d skipped)", len(phonemized), skipped_parse)
 
     # Phase 2: Audio normalization (slow, parallel)
-    _LOGGER.info("Caching audio for %d EN utterances with %d workers...", len(phonemized), workers)
+    # First, check which files already have cached audio
+    from hashlib import sha256 as _sha256
 
-    audio_map: dict[str, tuple[str, str]] = {}  # wav_path -> (norm_path, spec_path)
-    worker_args = [(p["wav_path"], str(cache_dir), sample_rate) for p in phonemized]
+    audio_map: dict[str, tuple[str, str]] = {}
+    need_caching: list[tuple[str, str, int]] = []
 
-    if workers > 1:
-        with ProcessPoolExecutor(max_workers=workers) as executor:
-            futures = {executor.submit(_cache_audio_worker, a): i for i, a in enumerate(worker_args)}
-            done = 0
-            for future in as_completed(futures):
+    for p in phonemized:
+        wav_path_str = p["wav_path"]
+        audio_cache_id = _sha256(str(Path(wav_path_str).absolute()).encode()).hexdigest()
+        norm_path = cache_dir / f"{audio_cache_id}.pt"
+        spec_path = cache_dir / f"{audio_cache_id}.spec.pt"
+        if norm_path.exists() and spec_path.exists():
+            audio_map[wav_path_str] = (str(norm_path), str(spec_path))
+        else:
+            need_caching.append((wav_path_str, str(cache_dir), sample_rate))
+
+    _LOGGER.info(
+        "Audio cache: %d already cached, %d need processing",
+        len(audio_map), len(need_caching),
+    )
+
+    if need_caching:
+        _LOGGER.info("Caching audio for %d EN utterances with %d workers...", len(need_caching), workers)
+        if workers > 1:
+            with ProcessPoolExecutor(max_workers=workers) as executor:
+                futures = {executor.submit(_cache_audio_worker, a): i for i, a in enumerate(need_caching)}
+                done = 0
+                for future in as_completed(futures):
+                    try:
+                        wav_str, norm_str, spec_str = future.result()
+                        audio_map[wav_str] = (norm_str, spec_str)
+                    except Exception as e:
+                        _LOGGER.warning("Audio cache failed: %s", e)
+                    done += 1
+                    if done % 1000 == 0:
+                        _LOGGER.info("Cached audio %d/%d", done, len(need_caching))
+        else:
+            from piper_train.norm_audio import cache_norm_audio, make_silence_detector
+            detector = make_silence_detector()
+            for i, (wav_path_str, _, sr) in enumerate(need_caching):
                 try:
-                    wav_str, norm_str, spec_str = future.result()
-                    audio_map[wav_str] = (norm_str, spec_str)
+                    norm_path, spec_path = cache_norm_audio(wav_path_str, cache_dir, detector, sr)
+                    audio_map[wav_path_str] = (str(norm_path), str(spec_path))
                 except Exception as e:
-                    _LOGGER.warning("Audio cache failed: %s", e)
-                done += 1
-                if done % 1000 == 0:
-                    _LOGGER.info("Cached audio %d/%d", done, len(phonemized))
-    else:
-        from piper_train.norm_audio import cache_norm_audio, make_silence_detector
-        detector = make_silence_detector()
-        for i, (wav_path_str, _, sr) in enumerate(worker_args):
-            try:
-                norm_path, spec_path = cache_norm_audio(wav_path_str, cache_dir, detector, sr)
-                audio_map[wav_path_str] = (str(norm_path), str(spec_path))
-            except Exception as e:
-                _LOGGER.warning("Audio cache failed for %s: %s", wav_path_str, e)
-            if (i + 1) % 1000 == 0:
-                _LOGGER.info("Cached audio %d/%d", i + 1, len(phonemized))
+                    _LOGGER.warning("Audio cache failed for %s: %s", wav_path_str, e)
+                if (i + 1) % 1000 == 0:
+                    _LOGGER.info("Cached audio %d/%d", i + 1, len(need_caching))
 
     # Phase 3: Assemble utterances
     utterances = []
