@@ -18,6 +18,8 @@ dependencies = [
     "cython>=3.0",
     "pyopenjtalk-plus>=0.4",
     "wandb>=0.19",
+    "torchaudio>=2.5.0",
+    "transformers>=4.30",
 ]
 
 [project.optional-dependencies]
