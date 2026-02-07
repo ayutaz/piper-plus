@@ -12,6 +12,12 @@ dependencies = [
     "numpy<2.3",
     "tensorboard>=2.20.0",
     "g2p-en>=2.1.0",
+    "torch>=2.5.0",
+    "pytorch-lightning>=2.0",
+    "librosa>=0.10",
+    "cython>=3.0",
+    "pyopenjtalk-plus>=0.4",
+    "wandb>=0.19",
 ]
 
 [project.optional-dependencies]
@@ -133,6 +139,9 @@ inline-quotes = "double"
 "src/python/prepare_*.py" = ["PLC0415"]
 # runtime files: 条件付きインポートを許可
 "src/python_run/*" = ["PLC0415"]
+
+[tool.setuptools.packages.find]
+where = ["src/python"]
 
 [tool.setuptools.dynamic]
 version = {file = "VERSION"}
