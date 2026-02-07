@@ -14,8 +14,12 @@ dependencies = [
     "g2p-en>=2.1.0",
     "torch>=2.10",
     "torchaudio>=2.10",
-    "piper-train[train]",
+    "pytorch-lightning>=2.0",
+    "librosa>=0.10",
     "cython>=3.2.4",
+    "pyopenjtalk-plus>=0.4",
+    "wandb>=0.19",
+    "piper-train[train]",
     "onnxscript>=0.6.2",
 ]
 
@@ -201,6 +205,9 @@ inline-quotes = "double"
 "src/python_run/*" = ["PLC0415"]
 # Docker test scripts: テスト関数内での条件付きインポートを許可
 "docker/**/test.py" = ["PLC0415"]
+
+[tool.setuptools.packages.find]
+where = ["src/python"]
 
 [tool.setuptools.dynamic]
 version = {file = "VERSION"}
