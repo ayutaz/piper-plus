@@ -19,6 +19,7 @@ dependencies = [
     "cython>=3.2.4",
     "pyopenjtalk-plus>=0.4",
     "wandb>=0.19",
+    "transformers>=4.30",
     "piper-train[train]",
     "onnxscript>=0.6.2",
 ]
