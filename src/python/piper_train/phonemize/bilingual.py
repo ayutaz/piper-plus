@@ -79,6 +79,7 @@ class BilingualPhonemizer(Phonemizer):
     def __init__(self, languages: list[str]):
         self._languages = languages
         self._id_map: dict[str, list[int]] | None = None
+        self._last_eos: str = "$"  # EOS marker from last phonemize call
 
     def phonemize(self, text: str) -> list[str]:
         """Convert mixed-language text to a list of phoneme tokens."""
@@ -100,6 +101,7 @@ class BilingualPhonemizer(Phonemizer):
 
         all_phonemes: list[str] = []
         all_prosody: list[ProsodyInfo | None] = []
+        last_eos = "$"  # default EOS marker
 
         for lang, segment_text in segments:
             phonemizer = get_phonemizer(lang)
@@ -111,12 +113,17 @@ class BilingualPhonemizer(Phonemizer):
             stripped_prosody: list[ProsodyInfo | None] = []
             for ph, pr in zip(phonemes, prosody_list, strict=True):
                 if ph in ("^", "$", "?"):
+                    if ph in ("$", "?"):
+                        last_eos = ph  # capture EOS from this segment
                     continue
                 stripped_phonemes.append(ph)
                 stripped_prosody.append(pr)
 
             all_phonemes.extend(stripped_phonemes)
             all_prosody.extend(stripped_prosody)
+
+        # Store the EOS from the last segment for post_process_ids
+        self._last_eos = last_eos
 
         return all_phonemes, all_prosody
 
@@ -135,7 +142,7 @@ class BilingualPhonemizer(Phonemizer):
         """Add BOS/EOS and inter-phoneme padding (espeak-ng compatible)."""
         pad_ids = phoneme_id_map.get("_", [0])
         bos_ids = phoneme_id_map.get("^")
-        eos_ids = phoneme_id_map.get("$")
+        eos_ids = phoneme_id_map.get(self._last_eos, phoneme_id_map.get("$"))
 
         # Insert pad between every phoneme ID
         padded_ids: list[int] = []
