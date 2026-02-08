@@ -45,7 +45,7 @@ uv run python -m piper_train \
   --dataset-dir /data/piper/dataset-bilingual-ja-en \
   --prosody-dim 16 \
   --accelerator gpu --devices 4 --precision 16-mixed \
-  --max_epochs 200 --batch-size 12 --samples-per-speaker 2 \
+  --max_epochs 200 --batch-size 20 --samples-per-speaker 2 \
   --checkpoint-epochs 1 --quality medium \
   --base_lr 2e-4 --disable_auto_lr_scaling \
   --ema-decay 0.9995 --num-workers 0 --no-pin-memory \
@@ -157,7 +157,7 @@ uv run python -m piper_train.preprocess \
 uv run python -m piper_train \
   --dataset-dir /path/to/output \
   --prosody-dim 16 --accelerator gpu --devices 4 \
-  --max_epochs 200 --batch-size 12 --samples-per-speaker 2
+  --max_epochs 200 --batch-size 20 --samples-per-speaker 2
 ```
 
 **Phase C 状況:** データセット修正 (JA phoneme padding追加) 完了、0 epochから再学習開始
@@ -344,7 +344,7 @@ uv run python -m piper_train \
   --dataset-dir /data/piper/dataset-moe-speech-20speakers-v2 \
   --prosody-dim 16 \
   --accelerator gpu --devices 4 --precision 16-mixed \
-  --max_epochs 200 --batch-size 12 --samples-per-speaker 2 \
+  --max_epochs 200 --batch-size 20 --samples-per-speaker 2 \
   --checkpoint-epochs 1 --quality medium \
   --base_lr 2e-4 --disable_auto_lr_scaling \
   --ema-decay 0.9995 --num-workers 0 --no-pin-memory \
