@@ -2,6 +2,13 @@
 
 English | [日本語](README.md)
 
+[![CI](https://github.com/ayutaz/piper-plus/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/ayutaz/piper-plus/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/piper-tts-plus)](https://pypi.org/project/piper-tts-plus/)
+[![Python](https://img.shields.io/pypi/pyversions/piper-tts-plus)](https://pypi.org/project/piper-tts-plus/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Hugging Face Demo](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Demo-blue)](https://huggingface.co/spaces/ayousanz/piper-plus-demo)
+[![Hugging Face Model](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Model-orange)](https://huggingface.co/ayousanz/piper-plus-base)
+
 A fast, local neural text to speech system that sounds great and is optimized for the Raspberry Pi 4.
 Piper is used in a [variety of projects](#people-using-piper).
 
@@ -20,6 +27,7 @@ Piper is used in a [variety of projects](#people-using-piper).
   - [JSON Input](#json-input)
 - [People using Piper](#people-using-piper)
 - [Unity Integration - uPiper](#unity-integration---upiper)
+- [Pre-trained Models](#pre-trained-models)
 - [Training](#training)
 - [Running in Python](#running-in-python)
 
@@ -472,6 +480,26 @@ A Unity plugin called "uPiper" has been developed for using Piper in Unity:
   - WebGL (planned)
 
 uPiper provides a comprehensive solution for leveraging Piper TTS in game development and interactive applications.
+
+## Pre-trained Models
+
+Pre-trained base models for Japanese TTS fine-tuning are available on Hugging Face.
+
+| Model | Description | License |
+|-------|-------------|---------|
+| [piper-plus-base](https://huggingface.co/ayousanz/piper-plus-base) | Japanese TTS base model (VITS + WavLM Discriminator + Prosody) | CC-BY-SA-4.0 |
+| [piper-plus-tsukuyomi-chan](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan) | Tsukuyomi-chan fine-tuned model | See model card |
+
+### piper-plus-base Features
+
+- **Architecture**: VITS + WavLM Discriminator
+- **Training data**: 60,164 utterances (20 speakers)
+- **Sample rate**: 22,050 Hz
+- **Prosody Features**: A1/A2/A3 prosody information (`--prosody-dim 16`)
+- **Extended phonemes**: Question markers, context-dependent "N" variants
+- **Total phonemes**: 65
+
+For details, see the [Hugging Face model card](https://huggingface.co/ayousanz/piper-plus-base) and the [training guide](docs/guides/training/training-guide.md).
 
 ## Training
 
