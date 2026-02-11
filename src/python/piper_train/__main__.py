@@ -6,6 +6,8 @@ import platform
 from pathlib import Path
 
 import torch
+import pathlib
+torch.serialization.add_safe_globals([pathlib.PosixPath])
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import TensorBoardLogger
@@ -136,6 +138,17 @@ def main():
         default=0.5,
         help="WavLM discriminator loss weight (default: 0.5)",
     )
+    parser.add_argument(
+        "--wavlm-every-n-steps",
+        type=int,
+        default=1,
+        help="Compute WavLM loss every N steps (default: 1, higher = faster training)",
+    )
+    parser.add_argument(
+        "--no-wavlm",
+        action="store_true",
+        help="Disable WavLM discriminator (faster training, slightly lower quality)",
+    )
     # Trainer arguments
     parser.add_argument("--accelerator", default="gpu", help="Accelerator to use")
     parser.add_argument("--devices", type=int, default=1, help="Number of devices")
@@ -198,10 +211,13 @@ def main():
     _LOGGER.info(f"Training with {num_gpus} GPU(s)")
     _LOGGER.info(f"Using precision: {args.precision}")
 
-    # Log WavLM Discriminator status (always enabled)
-    _LOGGER.info(
-        f"WavLM Discriminator enabled: model={args.wavlm_model_name}, weight={args.c_wavlm}"
-    )
+    # Log WavLM Discriminator status
+    if args.no_wavlm:
+        _LOGGER.info("WavLM Discriminator disabled by --no-wavlm flag")
+    else:
+        _LOGGER.info(
+            f"WavLM Discriminator enabled: model={args.wavlm_model_name}, weight={args.c_wavlm}"
+        )
 
     # Initialize scaled_lr
     scaled_lr = args.base_lr
@@ -305,6 +321,9 @@ def main():
     trainer = Trainer(**trainer_kwargs)
 
     dict_args = vars(args)
+
+    if args.no_wavlm:
+        dict_args["use_wavlm_discriminator"] = False
 
     # Set learning rate (either scaled or base)
     if hasattr(args, "auto_lr_scaling") and args.auto_lr_scaling and num_gpus > 1:

@@ -18,7 +18,7 @@ from .models import MultiPeriodDiscriminator, SynthesizerTrn, WavLMDiscriminator
 _LOGGER = logging.getLogger("vits.lightning")
 
 # Memory cleanup frequency (iterations)
-MEMORY_CLEANUP_FREQUENCY = 100
+MEMORY_CLEANUP_FREQUENCY = 500
 
 
 class VitsModel(pl.LightningModule):
@@ -83,6 +83,7 @@ class VitsModel(pl.LightningModule):
         use_wavlm_discriminator: bool = True,
         wavlm_model_name: str = "microsoft/wavlm-base-plus",
         c_wavlm: float = 0.5,
+        wavlm_every_n_steps: int = 1,
         **kwargs,
     ):
         super().__init__()
@@ -394,14 +395,17 @@ class VitsModel(pl.LightningModule):
 
             loss_gen_all = loss_gen + loss_fm + loss_mel + loss_dur + loss_kl
 
-            # WavLM Discriminator loss (optional)
-            if self.model_d_wavlm is not None:
+            # WavLM Discriminator loss (optional, computed every N steps)
+            if self.model_d_wavlm is not None and (
+                self.global_step % self.hparams.wavlm_every_n_steps == 0
+            ):
                 _y_d_hat_r_wlm, y_d_hat_g_wlm, fmap_r_wlm, fmap_g_wlm = (
                     self.model_d_wavlm(y, y_hat)
                 )
                 loss_fm_wavlm = feature_loss(fmap_r_wlm, fmap_g_wlm)
                 loss_gen_wavlm, _ = generator_loss(y_d_hat_g_wlm)
-                loss_wavlm = (loss_gen_wavlm + loss_fm_wavlm) * self.hparams.c_wavlm
+                # Scale up loss to compensate for reduced frequency
+                loss_wavlm = (loss_gen_wavlm + loss_fm_wavlm) * self.hparams.c_wavlm * self.hparams.wavlm_every_n_steps
                 loss_gen_all = loss_gen_all + loss_wavlm
 
                 # Log WavLM losses
@@ -427,13 +431,15 @@ class VitsModel(pl.LightningModule):
             )
             loss_disc_all = loss_disc
 
-            # WavLM Discriminator loss (optional)
-            if self.model_d_wavlm is not None:
+            # WavLM Discriminator loss (optional, computed every N steps)
+            if self.model_d_wavlm is not None and (
+                self.global_step % self.hparams.wavlm_every_n_steps == 0
+            ):
                 y_d_hat_r_wlm, y_d_hat_g_wlm, _, _ = self.model_d_wavlm(
                     y, y_hat_detached
                 )
                 loss_disc_wavlm, _, _ = discriminator_loss(y_d_hat_r_wlm, y_d_hat_g_wlm)
-                loss_disc_all = loss_disc_all + loss_disc_wavlm * self.hparams.c_wavlm
+                loss_disc_all = loss_disc_all + loss_disc_wavlm * self.hparams.c_wavlm * self.hparams.wavlm_every_n_steps
 
                 # Log WavLM discriminator loss
                 self._log_with_batch_info("loss_disc_wavlm", loss_disc_wavlm, batch)

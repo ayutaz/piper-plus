@@ -148,6 +148,9 @@ def process_ja_dataset(
 
             # Remap phoneme_ids
             old_ids = utt.get("phoneme_ids", [])
+            if not old_ids:
+                skipped += 1
+                continue
             new_ids = remap_ja_phoneme_ids(old_ids, ja_id_map, bilingual_id_map)
 
             # Add inter-phoneme padding to match inference-time pattern
