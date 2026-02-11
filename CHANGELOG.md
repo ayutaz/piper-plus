@@ -5,6 +5,60 @@ All notable changes to piper-plus will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0] - 2026-02-11
+
+### 🚀 Major Features
+
+#### Added
+- **FP16 Mixed Precisionデフォルト化** + マルチスピーカーモデル修正 (#195)
+  - 学習速度2-3倍向上、GPUメモリ約50%削減
+  - デフォルトで有効 (`--precision 16-mixed`)
+- **OpenJTalk A1/A2/A3 prosody values** の抽出・活用 (#196)
+  - Duration Predictorへの韻律情報注入
+  - `--prosody-dim 16` でデフォルト有効
+- **WavLM Discriminator** (#198, #212)
+  - WavLMベースの知覚品質判別器
+  - デフォルトで有効（学習時のみ使用、推論に影響なし）
+  - FP16 Mixed Precision対応済み
+- **GPL-free 英語G2P** - g2p-en (Apache-2.0) ベース (#213)
+  - espeak-ng/piper-phonemize (GPL) なしで英語推論が可能
+  - ストレスマーカー、機能語処理、文脈依存変換対応
+- **Phonemizer ABC + 言語レジストリ** (#215)
+  - 抽象基底クラスによるif/elif分岐の解消
+  - 新言語追加が容易なプラグイン構造
+- **疑問詞マーカー拡張 + 文脈依存「ん」バリアント** (#204, #207, #210)
+  - 強調疑問 (`?!`)、平叙疑問 (`?.`)、確認疑問 (`?~`) の区別
+  - 後続音に応じた「ん」の発音バリアント (N_m, N_n, N_ng, N_uvular)
+
+#### Changed
+- **デフォルト辞書の拡充** — 誤読防止エントリ追加 (#208)
+
+### 🔧 Improvements
+
+#### Fixed
+- **ONNXエクスポートで常にdurationsを出力** (#209, #211)
+- **英語G2P espeak-ng互換性の改善** (#214)
+
+## [1.5.5] - 2025-09-25
+
+### 🔧 Improvements
+
+#### Fixed
+- **Windows環境での日本語TTS文字化け問題** を修正 (#185)
+- **Windows PowerShellビルドエラー** 修正 + ワークフローリファクタリング (#182)
+- **ARMv7ビルド失敗の修正** + デバッグ機能追加 (#184)
+
+### 📦 Build System
+
+#### Added
+- **piper-phonemize-bundled パッケージ** — クロスプラットフォームwheel対応 (#189)
+- **ARMビルド用Dockerfile** の追加 (#183)
+
+#### Changed
+- PyPIリリースバージョン形式制限の削除 (#190)
+- 動的VERSIONファイル更新対応 (dev/pre-release builds) (#191)
+- リリースワークフローのバージョン検証順序修正 (#192)
+
 ## [1.5.2] - 2025-09-18
 
 ### 🚀 Major Features
