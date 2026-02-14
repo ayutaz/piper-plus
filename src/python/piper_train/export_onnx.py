@@ -7,6 +7,8 @@ from pathlib import Path
 
 import torch
 
+torch.serialization.add_safe_globals([pathlib.PosixPath])
+
 from .vits import commons
 from .vits.lightning import VitsModel
 
