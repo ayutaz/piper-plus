@@ -358,14 +358,14 @@ uv run python /data/piper/add_prosody_features.py --input-dataset ... --output-d
 
 ## 学習設定
 
-### 推奨設定 (20話者、L4 GPU 16GB × 4、WavLM無効)
+### 推奨設定 (20話者、V100 GPU 16GB × 4、WavLM無効)
 
 ```bash
 NCCL_DEBUG=WARN NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 \
 uv run python -m piper_train \
   --dataset-dir /data/piper/dataset-moe-speech-20speakers-v2 \
   --prosody-dim 16 \
-  --accelerator gpu --devices 4 --precision 16-mixed \
+  --accelerator gpu --devices 4 --precision 32-true \
   --max_epochs 200 --batch-size 20 --samples-per-speaker 2 \
   --checkpoint-epochs 1 --quality medium \
   --base_lr 2e-4 --disable_auto_lr_scaling \
@@ -374,7 +374,7 @@ uv run python -m piper_train \
   --default_root_dir /data/piper/output-moe-speech-20speakers-v2
 ```
 
-**注意:** WavLMはデフォルトで有効。`--no-wavlm` で無効化するとbatch-size 20が使用可能に。WavLM有効時はL4 16GBでbatch-size 20でOOM発生するため batch-size 12 が必要。
+**注意:** V100では `--precision 32-true` を使用すること（FP16-mixedはbackward passが極端に遅くなる）。WavLMはデフォルトで有効。`--no-wavlm` で無効化するとbatch-size 20が使用可能に。WavLM有効時は16GBでbatch-size 20でOOM発生するため batch-size 12 が必要。
 
 ### 話者数別の推奨設定
 
