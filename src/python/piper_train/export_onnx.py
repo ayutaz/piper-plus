@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 import argparse
 import logging
+import pathlib
 from pathlib import Path
 
 import torch
+
+torch.serialization.add_safe_globals([pathlib.PosixPath])
 
 from .vits import commons
 from .vits.lightning import VitsModel
@@ -297,6 +300,7 @@ def main() -> None:
         input_names=input_names,
         output_names=output_names,
         dynamic_axes=dynamic_axes,
+        dynamo=False,
     )
 
     mode = "stochastic" if args.stochastic else "deterministic"

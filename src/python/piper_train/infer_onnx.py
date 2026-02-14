@@ -170,8 +170,14 @@ def main():
             if args.language in language_id_map:
                 language_id = language_id_map[args.language]
             elif args.language == "ja-en":
-                # Bilingual mode: default to 0 (ja), speaker_id determines voice
-                language_id = language_id_map.get("ja", 0)
+                # Bilingual mode: detect dominant language from text
+                has_cjk = any(
+                    ("\u3040" <= ch <= "\u309f")  # Hiragana
+                    or ("\u30a0" <= ch <= "\u30ff")  # Katakana
+                    or ("\u4e00" <= ch <= "\u9fff")  # CJK
+                    for ch in args.text
+                )
+                language_id = language_id_map.get("ja", 0) if has_cjk else language_id_map.get("en", 1)
             _LOGGER.info("Using language_id=%d for language=%s", language_id, args.language)
 
         # Create single utterance

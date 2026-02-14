@@ -20,6 +20,8 @@ dependencies = [
     "wandb>=0.19",
     "torchaudio>=2.5.0",
     "transformers>=4.30",
+    "onnxscript>=0.6.2",
+    "onnxruntime>=1.24.1",
 ]
 
 [project.optional-dependencies]
