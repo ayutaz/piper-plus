@@ -14,6 +14,12 @@ from .losses import discriminator_loss, feature_loss, generator_loss, kl_loss
 from .mel_processing import mel_spectrogram_torch, spec_to_mel_torch
 from .models import MultiPeriodDiscriminator, SynthesizerTrn, WavLMDiscriminator
 
+# Optional wandb import with graceful fallback
+try:
+    import wandb
+    WANDB_AVAILABLE = True
+except ImportError:
+    WANDB_AVAILABLE = False
 
 _LOGGER = logging.getLogger("vits.lightning")
 
@@ -27,6 +33,7 @@ class VitsModel(pl.LightningModule):
         num_symbols: int,
         num_speakers: int,
         num_languages: int = 1,
+        audio_log_epochs: int = 1,  # Log audio samples to WandB every N epochs
         # audio
         resblock="2",
         resblock_kernel_sizes=(3, 5, 7),
@@ -76,7 +83,7 @@ class VitsModel(pl.LightningModule):
         grad_clip: float | None = None,
         num_workers: int = 1,
         seed: int = 1234,
-        num_test_examples: int = 5,
+        num_test_examples: int = 2,
         validation_split: float = 0.1,
         max_phoneme_ids: int | None = None,
         # WavLM Discriminator (enabled by default for improved audio quality)
@@ -290,9 +297,14 @@ class VitsModel(pl.LightningModule):
         self.manual_backward(loss_d)
         opt_d.step()
 
+        # Clear instance variables to release references
+        self._y = None
+        self._y_hat = None
+
         # Periodic memory cleanup to prevent fragmentation
         if batch_idx % MEMORY_CLEANUP_FREQUENCY == 0:
             if torch.cuda.is_available():
+                torch.cuda.synchronize()  # Wait for GPU operations to complete
                 torch.cuda.empty_cache()
                 # Use info level only for first cleanup, then debug
                 if batch_idx == 0:
@@ -314,6 +326,30 @@ class VitsModel(pl.LightningModule):
 
         sync_dist = self.trainer.world_size > 1
         self.log(key, value, batch_size=batch_size, sync_dist=sync_dist)
+
+    def _get_wandb_logger(self):
+        """Get WandB logger from trainer's logger list, if available.
+
+        Returns:
+            WandbLogger instance or None if not found/unavailable
+        """
+        if not WANDB_AVAILABLE:
+            return None
+
+        # PyTorch Lightning 2.x uses trainer.loggers (plural) for multiple loggers
+        if hasattr(self.trainer, 'loggers') and self.trainer.loggers:
+            loggers = self.trainer.loggers
+        else:
+            # Fallback to trainer.logger (singular)
+            trainer_logger = self.trainer.logger
+            loggers = trainer_logger if isinstance(trainer_logger, list) else [trainer_logger]
+
+        for logger in loggers:
+            # Check by class name to avoid import dependency
+            if logger.__class__.__name__ == 'WandbLogger':
+                return logger
+
+        return None
 
     def training_step_g(self, batch: Batch):
         x, x_lengths, y, _, spec, spec_lengths, speaker_ids, language_ids, prosody_features = (
@@ -451,33 +487,82 @@ class VitsModel(pl.LightningModule):
     def validation_step(self, batch: Batch, batch_idx: int):
         val_loss = self.training_step_g(batch) + self.training_step_d(batch)
         self._log_with_batch_info("val_loss", val_loss, batch)
-
-        # Generate audio examples
-        for utt_idx, test_utt in enumerate(self._test_dataset):
-            text = test_utt.phoneme_ids.unsqueeze(0).to(self.device)
-            text_lengths = torch.LongTensor([len(test_utt.phoneme_ids)]).to(self.device)
-            scales = [0.667, 1.0, 0.8]
-            sid = (
-                test_utt.speaker_id.to(self.device)
-                if test_utt.speaker_id is not None
-                else None
-            )
-            lid = (
-                test_utt.language_id.to(self.device)
-                if test_utt.language_id is not None
-                else None
-            )
-            test_audio = self(text, text_lengths, scales, sid=sid, lid=lid).detach()
-
-            # Scale to make louder in [-1, 1]
-            test_audio = test_audio * (1.0 / max(0.01, abs(test_audio.max())))
-
-            tag = test_utt.text or str(utt_idx)
-            self.logger.experiment.add_audio(
-                tag, test_audio, sample_rate=self.hparams.sample_rate
-            )
-
         return val_loss
+
+    def on_validation_epoch_end(self):
+        """Log audio samples to WandB at the end of validation epoch.
+
+        This is called after all validation batches are processed,
+        avoiding blocking the validation loop with audio generation.
+        """
+        # Check if we should log this epoch
+        if self.hparams.audio_log_epochs <= 0:
+            return  # Logging disabled
+
+        if self.current_epoch % self.hparams.audio_log_epochs != 0:
+            return  # Not this epoch
+
+        # Get WandB logger
+        wandb_logger = self._get_wandb_logger()
+        if wandb_logger is None or not WANDB_AVAILABLE:
+            return
+
+        # Generate and log audio samples with memory-efficient processing
+        try:
+            wandb_audio_data = []
+
+            with torch.no_grad():  # Disable gradient computation
+                for utt_idx, test_utt in enumerate(self._test_dataset):
+                    # Generate audio
+                    text = test_utt.phoneme_ids.unsqueeze(0).to(self.device)
+                    text_lengths = torch.LongTensor([len(test_utt.phoneme_ids)]).to(self.device)
+                    scales = [0.667, 1.0, 0.8]
+                    sid = test_utt.speaker_id.to(self.device) if test_utt.speaker_id is not None else None
+                    lid = test_utt.language_id.to(self.device) if test_utt.language_id is not None else None
+
+                    test_audio = self(text, text_lengths, scales, sid=sid, lid=lid).detach()
+                    test_audio = test_audio * (1.0 / max(0.01, abs(test_audio.max())))
+
+                    # Convert to numpy (CPU)
+                    audio_np = test_audio.squeeze().cpu().numpy()
+
+                    # Build metadata
+                    text_str = test_utt.text if test_utt.text else f"sample_{utt_idx}"
+                    speaker_str = f"spk={sid.item()}" if sid is not None else "single"
+                    language_map = {0: "ja", 1: "en"}
+                    lang_str = language_map.get(lid.item() if lid is not None else 0, "unknown")
+                    noise_scale, length_scale, noise_scale_w = scales
+
+                    # Create WandB audio
+                    caption = f"{text_str} | {speaker_str} | {lang_str} | noise={noise_scale:.3f},len={length_scale:.2f},noisew={noise_scale_w:.2f}"
+                    wandb_audio = wandb.Audio(audio_np, sample_rate=self.hparams.sample_rate, caption=caption)
+
+                    wandb_audio_data.append([text_str, speaker_str, lang_str, self.current_epoch, self.global_step, wandb_audio])
+
+                    # Aggressive per-sample GPU memory cleanup
+                    del test_audio, text, text_lengths, sid, lid
+                    if torch.cuda.is_available():
+                        torch.cuda.synchronize()  # Wait for GPU operations to complete
+                        torch.cuda.empty_cache()
+
+            # Log all samples as table
+            if wandb_audio_data:
+                columns = ["text", "speaker", "language", "epoch", "step", "audio"]
+                table = wandb.Table(columns=columns, data=wandb_audio_data)
+                wandb_logger.experiment.log({
+                    "validation_audio_samples": table,
+                    "epoch": self.current_epoch
+                })
+                _LOGGER.info(f"Logged {len(wandb_audio_data)} audio samples to WandB at epoch {self.current_epoch}")
+
+            # Final cleanup
+            del wandb_audio_data
+            if torch.cuda.is_available():
+                torch.cuda.synchronize()
+                torch.cuda.empty_cache()
+
+        except Exception as e:
+            _LOGGER.warning(f"Failed to log audio to WandB: {e}")
 
     def configure_optimizers(self):
         # Collect discriminator parameters (including WavLM if enabled)
@@ -515,7 +600,13 @@ class VitsModel(pl.LightningModule):
         parser = parent_parser.add_argument_group("VitsModel")
         parser.add_argument("--batch-size", type=int, required=True)
         parser.add_argument("--validation-split", type=float, default=0.1)
-        parser.add_argument("--num-test-examples", type=int, default=5)
+        parser.add_argument("--num-test-examples", type=int, default=2)
+        parser.add_argument(
+            "--audio-log-epochs",
+            type=int,
+            default=1,
+            help="Log audio samples to WandB every N epochs (default: 1, 0=disable)",
+        )
         parser.add_argument(
             "--max-phoneme-ids",
             type=int,
