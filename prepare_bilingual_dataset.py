@@ -125,12 +125,16 @@ def _add_inter_phoneme_padding(
 def process_ja_dataset(
     ja_jsonl_path: Path,
     bilingual_id_map: dict[str, list[int]],
+    sample_rate: int,
+    cache_dir: Path,
     ja_speaker_offset: int = 0,
+    workers: int = 1,
 ) -> tuple[list[dict], dict[str, int]]:
-    """Read existing JA dataset and remap to bilingual ID space."""
+    """Process JA dataset with bilingual phonemizer and cache generation."""
     ja_id_map = get_japanese_id_map()
 
-    utterances = []
+    # ===== Phase 1: Phoneme remapping =====
+    phonemized: list[dict] = []
     speaker_ids_seen: dict[str, int] = {}
     skipped = 0
 
@@ -146,14 +150,14 @@ def process_ja_dataset(
                 skipped += 1
                 continue
 
-            # Remap phoneme_ids
+            # Remap phoneme_ids to bilingual space
             old_ids = utt.get("phoneme_ids", [])
             if not old_ids:
                 skipped += 1
                 continue
             new_ids = remap_ja_phoneme_ids(old_ids, ja_id_map, bilingual_id_map)
 
-            # Add inter-phoneme padding to match inference-time pattern
+            # Add inter-phoneme padding
             prosody = utt.get("prosody_features", [None] * len(new_ids))
             new_ids, prosody = _add_inter_phoneme_padding(
                 new_ids, prosody, bilingual_id_map
@@ -164,15 +168,101 @@ def process_ja_dataset(
             if speaker not in speaker_ids_seen:
                 speaker_ids_seen[speaker] = len(speaker_ids_seen) + ja_speaker_offset
 
-            utt["phoneme_ids"] = new_ids
-            utt["prosody_features"] = prosody
-            utt["speaker_id"] = speaker_ids_seen[speaker]
-            utt["language_id"] = 0  # Japanese
-            utterances.append(utt)
+            # Store intermediate result
+            phonemized.append({
+                "text": utt.get("text", ""),
+                "wav_path": utt.get("audio_path", ""),
+                "speaker": speaker,
+                "speaker_id": speaker_ids_seen[speaker],
+                "phoneme_ids": new_ids,
+                "prosody_features": prosody,
+            })
 
     _LOGGER.info(
-        "Loaded %d JA utterances (%d skipped), %d speakers",
-        len(utterances), skipped, len(speaker_ids_seen),
+        "Remapped %d JA utterances (%d skipped), %d speakers",
+        len(phonemized), skipped, len(speaker_ids_seen),
+    )
+
+    # ===== Phase 2: Audio normalization (parallel) =====
+    from hashlib import sha256 as _sha256
+
+    audio_map: dict[str, tuple[str, str]] = {}
+    need_caching: list[tuple[str, str, int]] = []
+
+    for p in phonemized:
+        wav_path_str = p["wav_path"]
+        if not wav_path_str or not Path(wav_path_str).exists():
+            _LOGGER.warning("Missing wav file: %s", wav_path_str)
+            continue
+
+        audio_cache_id = _sha256(str(Path(wav_path_str).absolute()).encode()).hexdigest()
+        norm_path = cache_dir / f"{audio_cache_id}.pt"
+        spec_path = cache_dir / f"{audio_cache_id}.spec.pt"
+
+        if norm_path.exists() and spec_path.exists():
+            audio_map[wav_path_str] = (str(norm_path), str(spec_path))
+        else:
+            need_caching.append((wav_path_str, str(cache_dir), sample_rate))
+
+    _LOGGER.info(
+        "Audio cache: %d already cached, %d need processing",
+        len(audio_map), len(need_caching),
+    )
+
+    if need_caching:
+        _LOGGER.info("Caching audio for %d JA utterances with %d workers...", len(need_caching), workers)
+        if workers > 1:
+            with ProcessPoolExecutor(max_workers=workers) as executor:
+                futures = {executor.submit(_cache_audio_worker, a): i for i, a in enumerate(need_caching)}
+                done = 0
+                for future in as_completed(futures):
+                    try:
+                        wav_str, norm_str, spec_str = future.result()
+                        audio_map[wav_str] = (norm_str, spec_str)
+                    except Exception as e:
+                        _LOGGER.warning("Audio cache failed: %s", e)
+                    done += 1
+                    if done % 1000 == 0:
+                        _LOGGER.info("Cached audio %d/%d", done, len(need_caching))
+        else:
+            from piper_train.norm_audio import cache_norm_audio, make_silence_detector
+            detector = make_silence_detector()
+            for i, (wav_path_str, _, sr) in enumerate(need_caching):
+                try:
+                    norm_path, spec_path = cache_norm_audio(wav_path_str, cache_dir, detector, sr)
+                    audio_map[wav_path_str] = (str(norm_path), str(spec_path))
+                except Exception as e:
+                    _LOGGER.warning("Audio cache failed for %s: %s", wav_path_str, e)
+                if (i + 1) % 1000 == 0:
+                    _LOGGER.info("Cached audio %d/%d", i + 1, len(need_caching))
+
+    # ===== Phase 3: Assemble utterances =====
+    utterances = []
+    skipped_audio = 0
+    for p in phonemized:
+        wav_key = p["wav_path"]
+        if wav_key not in audio_map:
+            skipped_audio += 1
+            continue
+        norm_path, spec_path = audio_map[wav_key]
+        utterances.append({
+            "text": p["text"],
+            "audio_path": wav_key,
+            "speaker": p["speaker"],
+            "speaker_id": p["speaker_id"],
+            "language_id": 0,  # Japanese
+            "phonemes": [],
+            "phoneme_ids": p["phoneme_ids"],
+            "prosody_ids": [],
+            "prosody_features": p["prosody_features"],
+            "audio_norm_path": norm_path,
+            "audio_spec_path": spec_path,
+            "f0_path": None,
+        })
+
+    _LOGGER.info(
+        "Loaded %d JA utterances (%d audio-skipped), %d speakers",
+        len(utterances), skipped_audio, len(speaker_ids_seen),
     )
     return utterances, speaker_ids_seen
 
@@ -200,9 +290,9 @@ def _init_phonemize_worker(bilingual_id_map: dict[str, list[int]]):
     _phonemize_worker_state["id_map"] = bilingual_id_map
 
 
-def _phonemize_en_worker(args: tuple[str, str, str]) -> dict:
+def _phonemize_en_worker(args: tuple[str, str, str, int]) -> dict:
     """Phonemize a single EN utterance in a worker process."""
-    filename, text, wav_path_str = args
+    filename, text, wav_path_str, speaker_id = args
     phonemizer = _phonemize_worker_state["phonemizer"]
     id_map = _phonemize_worker_state["id_map"]
 
@@ -232,6 +322,7 @@ def _phonemize_en_worker(args: tuple[str, str, str]) -> dict:
             "filename": filename,
             "text": text,
             "wav_path": wav_path_str,
+            "speaker_id": speaker_id,  # NEW
             "phonemes": phonemes,
             "phoneme_ids": phoneme_ids,
             "prosody_features": prosody_features,
@@ -246,33 +337,93 @@ def process_en_dataset(
     bilingual_id_map: dict[str, list[int]],
     sample_rate: int,
     cache_dir: Path,
-    en_speaker_id: int,
+    en_speaker_id_offset: int,  # Changed: offset instead of fixed ID
     max_utterances: int | None = None,
     workers: int = 1,
-) -> list[dict]:
-    """Process LJSpeech English dataset with bilingual phonemizer."""
+    max_speakers: int | None = None,  # NEW: speaker count limit
+    multi_speaker: bool = True,  # NEW: multi-speaker mode
+) -> tuple[list[dict], dict[str, int]]:  # Changed: also return speaker_id_map
+    """Process English dataset with optional multi-speaker support.
+
+    Args:
+        en_input_dir: Path to LibriTTS-R directory (converted to LJSpeech format)
+        bilingual_id_map: Unified bilingual phoneme ID map
+        sample_rate: Audio sample rate
+        cache_dir: Audio cache directory
+        en_speaker_id_offset: Starting speaker ID (offset from JA speakers)
+        max_utterances: Maximum utterances to process (None = all)
+        workers: Number of parallel workers
+        max_speakers: Maximum speakers to include (top N by utterance count)
+        multi_speaker: Enable multi-speaker mode (extract speaker IDs from filenames)
+
+    Returns:
+        Tuple of (utterances list, speaker_id_map dict)
+    """
     metadata_path = en_input_dir / "metadata.csv"
     wav_dir = en_input_dir / "wavs"
 
     if not metadata_path.exists():
         _LOGGER.error("metadata.csv not found at %s", metadata_path)
-        return []
+        return [], {}
 
-    # Phase 1: Parse metadata and phonemize (parallel)
+    # ===== Phase 0: Speaker analysis (multi_speaker mode) =====
+    speaker_counts: dict[str, int] = {}
+    selected_speakers: set[str] = set()
+    speaker_id_map: dict[str, int] = {}
+
+    if multi_speaker:
+        _LOGGER.info("Analyzing speakers in LibriTTS-R...")
+        with open(metadata_path, encoding="utf-8") as f:
+            f.readline()  # Skip header
+            for line in f:
+                parts = line.strip().split("|")
+                if len(parts) < 2:
+                    continue
+                audio_filename = parts[0]
+                # Extract speaker ID from filename: "{speaker_id}_{utterance_id}_...wav"
+                speaker_id = audio_filename.split("_")[0]
+                speaker_counts[speaker_id] = speaker_counts.get(speaker_id, 0) + 1
+
+        # Sort speakers by utterance count (descending)
+        sorted_speakers = sorted(speaker_counts.items(), key=lambda x: x[1], reverse=True)
+
+        # Select top N speakers
+        n_speakers = max_speakers if max_speakers else len(sorted_speakers)
+        selected_speakers = {spk for spk, _ in sorted_speakers[:n_speakers]}
+
+        # Create speaker ID mapping: original_speaker → sequential_id
+        for i, (spk, count) in enumerate(sorted_speakers[:n_speakers]):
+            speaker_id_map[spk] = en_speaker_id_offset + i
+
+        _LOGGER.info(
+            "Selected top %d speakers (total available: %d)",
+            len(selected_speakers), len(speaker_counts)
+        )
+        _LOGGER.info(
+            "Speaker utterance range: %d-%d",
+            sorted_speakers[n_speakers-1][1] if n_speakers <= len(sorted_speakers) else 0,
+            sorted_speakers[0][1]
+        )
+    else:
+        # Single speaker mode (backward compatibility)
+        speaker_id_map["ljspeech"] = en_speaker_id_offset
+
+    # ===== Phase 1: Parse metadata and phonemize (parallel) =====
     missing_phonemes: Counter[str] = Counter()
     phonemized: list[dict] = []
     skipped_parse = 0
+    skipped_speaker = 0  # NEW
 
     with open(metadata_path, encoding="utf-8") as f:
         reader = csv.reader(f, delimiter="|")
         rows = list(reader)
 
-    if max_utterances and max_utterances < len(rows):
-        rows = rows[:max_utterances]
-
-    # Parse rows and filter missing wavs
-    tasks: list[tuple[str, str, str]] = []
+    # Parse rows and filter by speaker + missing wavs
+    tasks: list[tuple[str, str, str, int]] = []  # (filename, text, wav_path, speaker_id)
     for row in rows:
+        if max_utterances and len(tasks) >= max_utterances:
+            break
+
         if len(row) < 3:
             if len(row) >= 2:
                 filename, text = row[0], row[-1]
@@ -282,11 +433,26 @@ def process_en_dataset(
         else:
             filename, _, text = row[0], row[1], row[2]
 
-        wav_path = wav_dir / f"{filename}.wav"
+        # Multi-speaker filtering
+        if multi_speaker:
+            speaker_id_str = filename.split("_")[0]
+            if speaker_id_str not in selected_speakers:
+                skipped_speaker += 1
+                continue
+            speaker_id = speaker_id_map[speaker_id_str]
+        else:
+            speaker_id = en_speaker_id_offset
+
+        # Handle both formats: with and without .wav extension
+        if filename.endswith('.wav'):
+            wav_path = wav_dir / filename
+        else:
+            wav_path = wav_dir / f"{filename}.wav"
+
         if not wav_path.exists():
             skipped_parse += 1
             continue
-        tasks.append((filename, text, str(wav_path)))
+        tasks.append((filename, text, str(wav_path), speaker_id))
 
     _LOGGER.info("Phonemizing %d EN utterances with %d workers...", len(tasks), workers)
 
@@ -314,6 +480,7 @@ def process_en_dataset(
                         phonemized.append({
                             "text": result["text"],
                             "wav_path": result["wav_path"],
+                            "speaker_id": result["speaker_id"],  # NEW
                             "phonemes": result["phonemes"],
                             "phoneme_ids": result["phoneme_ids"],
                             "prosody_features": result["prosody_features"],
@@ -323,7 +490,7 @@ def process_en_dataset(
     else:
         from piper_train.phonemize.bilingual import BilingualPhonemizer
         phonemizer = BilingualPhonemizer(["ja", "en"])
-        for task_idx, (filename, text, wav_path_str) in enumerate(tasks):
+        for task_idx, (filename, text, wav_path_str, speaker_id) in enumerate(tasks):
             try:
                 phonemes, prosody_list = phonemizer.phonemize_with_prosody(text)
                 phoneme_ids = []
@@ -348,6 +515,7 @@ def process_en_dataset(
                 phonemized.append({
                     "text": text,
                     "wav_path": wav_path_str,
+                    "speaker_id": speaker_id,  # NEW
                     "phonemes": phonemes,
                     "phoneme_ids": phoneme_ids,
                     "prosody_features": prosody_features,
@@ -362,7 +530,10 @@ def process_en_dataset(
         for ph, count in missing_phonemes.most_common(10):
             _LOGGER.warning("Missing EN phoneme: '%s' (%d times)", ph, count)
 
-    _LOGGER.info("Phonemized %d EN utterances (%d skipped)", len(phonemized), skipped_parse)
+    _LOGGER.info(
+        "Phonemized %d EN utterances (%d parse-skipped, %d speaker-filtered)",
+        len(phonemized), skipped_parse, skipped_speaker,
+    )
 
     # Phase 2: Audio normalization (slow, parallel)
     # First, check which files already have cached audio
@@ -422,11 +593,21 @@ def process_en_dataset(
             skipped_audio += 1
             continue
         norm_path, spec_path = audio_map[wav_key]
+
+        # Determine speaker name from speaker_id
+        speaker_name = "ljspeech"  # default for backward compatibility
+        if multi_speaker:
+            # Find speaker name from speaker_id_map (reverse lookup)
+            for spk_name, spk_id in speaker_id_map.items():
+                if spk_id == p["speaker_id"]:
+                    speaker_name = spk_name
+                    break
+
         utterances.append({
             "text": p["text"],
             "audio_path": wav_key,
-            "speaker": "ljspeech",
-            "speaker_id": en_speaker_id,
+            "speaker": speaker_name,
+            "speaker_id": p["speaker_id"],  # Use dynamic speaker_id
             "language_id": 1,
             "phonemes": p["phonemes"],
             "phoneme_ids": p["phoneme_ids"],
@@ -438,10 +619,10 @@ def process_en_dataset(
         })
 
     _LOGGER.info(
-        "Loaded %d EN utterances (%d parse-skipped, %d audio-skipped)",
-        len(utterances), skipped_parse, skipped_audio,
+        "Loaded %d EN utterances (%d speakers)",
+        len(utterances), len(speaker_id_map),
     )
-    return utterances
+    return utterances, speaker_id_map  # Return speaker_id_map
 
 
 def main():
@@ -449,13 +630,21 @@ def main():
 
     parser = argparse.ArgumentParser(description="Prepare bilingual JA+EN dataset")
     parser.add_argument("--ja-dataset", required=True, help="Path to JA dataset.jsonl")
-    parser.add_argument("--en-input-dir", required=True, help="Path to LJSpeech-1.1 directory")
+    parser.add_argument("--en-input-dir", help="Path to LJSpeech-1.1 directory")
+    parser.add_argument("--en-libritts", help="Path to LibriTTS-R directory (converted to LJSpeech format)")
     parser.add_argument("--output-dir", required=True, help="Output directory")
     parser.add_argument("--sample-rate", type=int, default=22050)
-    parser.add_argument("--max-en-utterances", type=int, default=13000,
-                        help="Max EN utterances (default: 13000, ~24h of LJSpeech)")
+    parser.add_argument("--max-en-utterances", type=int, default=None,
+                        help="Max EN utterances per source (default: None = use all)")
+    parser.add_argument("--max-en-speakers", type=int, default=60,
+                        help="Maximum number of EN speakers to include (top N by utterance count, default: 60)")
+    parser.add_argument("--en-single-speaker", action="store_true",
+                        help="Force single-speaker EN mode (combine all EN data into one speaker)")
     parser.add_argument("--workers", type=int, default=1)
     args = parser.parse_args()
+
+    if not args.en_input_dir and not args.en_libritts:
+        parser.error("At least one of --en-input-dir or --en-libritts must be specified")
 
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -467,23 +656,58 @@ def main():
 
     # Process JA
     ja_utts, ja_speakers = process_ja_dataset(
-        Path(args.ja_dataset), bilingual_id_map, ja_speaker_offset=0
-    )
-
-    # EN speaker ID = next after JA speakers
-    en_speaker_id = len(ja_speakers)
-    _LOGGER.info("EN speaker ID: %d", en_speaker_id)
-
-    # Process EN
-    en_utts = process_en_dataset(
-        Path(args.en_input_dir),
+        Path(args.ja_dataset),
         bilingual_id_map,
         args.sample_rate,
         cache_dir,
-        en_speaker_id,
-        max_utterances=args.max_en_utterances,
+        ja_speaker_offset=0,
         workers=args.workers,
     )
+
+    # EN speaker ID offset = next after JA speakers
+    en_speaker_id_offset = len(ja_speakers)
+    _LOGGER.info("EN speaker ID offset: %d", en_speaker_id_offset)
+
+    # Process EN datasets (LJSpeech and/or LibriTTS-R)
+    en_utts = []
+    en_speaker_id_map = {}
+
+    if args.en_input_dir:
+        _LOGGER.info("Processing LJSpeech from %s", args.en_input_dir)
+        ljspeech_utts, ljspeech_speakers = process_en_dataset(
+            Path(args.en_input_dir),
+            bilingual_id_map,
+            args.sample_rate,
+            cache_dir,
+            en_speaker_id_offset=en_speaker_id_offset,
+            max_utterances=args.max_en_utterances,
+            workers=args.workers,
+            max_speakers=None,  # Use all speakers (LJSpeech has only 1)
+            multi_speaker=False,  # LJSpeech is single-speaker
+        )
+        en_utts.extend(ljspeech_utts)
+        en_speaker_id_map.update(ljspeech_speakers)
+        en_speaker_id_offset = max(en_speaker_id_map.values()) + 1  # Update offset
+
+    if args.en_libritts:
+        _LOGGER.info("Processing LibriTTS-R from %s", args.en_libritts)
+        # Determine multi-speaker mode
+        multi_speaker_mode = not args.en_single_speaker
+        max_speakers_arg = None if args.en_single_speaker else args.max_en_speakers
+
+        libritts_utts, libritts_speakers = process_en_dataset(
+            Path(args.en_libritts),
+            bilingual_id_map,
+            args.sample_rate,
+            cache_dir,
+            en_speaker_id_offset=en_speaker_id_offset,
+            max_utterances=args.max_en_utterances,
+            workers=args.workers,
+            max_speakers=max_speakers_arg,
+            multi_speaker=multi_speaker_mode,
+        )
+        en_utts.extend(libritts_utts)
+        en_speaker_id_map.update(libritts_speakers)
 
     # Merge and write
     all_utts = ja_utts + en_utts
@@ -497,9 +721,14 @@ def main():
             f.write("\n")
     _LOGGER.info("Wrote %s", dataset_path)
 
-    # Write config.json
-    num_speakers = len(ja_speakers) + 1  # +1 for LJSpeech
-    speaker_id_map = {**{s: sid for s, sid in ja_speakers.items()}, "ljspeech": en_speaker_id}
+    # Merge JA and EN speaker maps
+    speaker_id_map = {**ja_speakers, **en_speaker_id_map}
+    num_speakers = len(speaker_id_map)
+
+    _LOGGER.info(
+        "Total speakers: %d (JA=%d, EN=%d)",
+        num_speakers, len(ja_speakers), len(en_speaker_id_map)
+    )
 
     config = {
         "dataset": "bilingual-ja-en",
