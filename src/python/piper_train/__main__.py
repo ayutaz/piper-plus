@@ -187,6 +187,11 @@ def main():
         help="Path to checkpoint to resume from",
     )
     VitsModel.add_model_specific_args(parser)
+    parser.add_argument(
+        "--compile",
+        action="store_true",
+        help="Enable torch.compile() for potential training speedup (requires PyTorch 2.0+)",
+    )
     parser.add_argument("--seed", type=int, default=1234)
     args = parser.parse_args()
     _LOGGER.debug(args)
@@ -364,6 +369,10 @@ def main():
         dataset=[dataset_path],
         **dict_args,
     )
+
+    if args.compile:
+        _LOGGER.info("Compiling model with torch.compile(mode='reduce-overhead', dynamic=True)")
+        model = torch.compile(model, mode="reduce-overhead", dynamic=True)
 
     if args.resume_from_single_speaker_checkpoint:
         assert num_speakers > 1, (

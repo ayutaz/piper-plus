@@ -81,7 +81,7 @@ class VitsModel(pl.LightningModule):
         c_mel: int = 45,
         c_kl: float = 1.0,
         grad_clip: float | None = None,
-        num_workers: int = 1,
+        num_workers: int = 0,
         seed: int = 1234,
         num_test_examples: int = 2,
         validation_split: float = 0.1,
@@ -154,6 +154,76 @@ class VitsModel(pl.LightningModule):
         self._y = None
         self._y_hat = None
 
+    def _load_test_dataset(self, test_utterances_path: Path):
+        """Load fixed test dataset for WandB audio logging.
+
+        Ensures Japanese, English, and mixed sentences are all covered.
+        Mixed sentences (language_id == -1) are automatically phonemized with ja-en.
+        """
+        import json
+        from .dataset import Utterance
+
+        utterances = []
+
+        with open(test_utterances_path, 'r', encoding='utf-8') as f:
+            for line in f:
+                data = json.loads(line.strip())
+
+                # Mixed sentences (language_id == -1) need phonemization
+                if data.get('language_id', 0) == -1:
+                    from ..phonemize.registry import get_phonemizer
+
+                    phonemizer = get_phonemizer('ja-en')
+                    phonemes, prosody_info_list = phonemizer.phonemize_with_prosody(data['text'])
+
+                    # Load phoneme_id_map from config.json
+                    config_path = self.hparams.dataset_dir / 'config.json'
+                    with open(config_path, 'r', encoding='utf-8') as cfg:
+                        config = json.load(cfg)
+                        pid_map = config['phoneme_id_map']
+
+                    # Convert phonemes to IDs
+                    phoneme_ids = []
+                    prosody_features = []
+                    for phoneme, prosody_info in zip(phonemes, prosody_info_list, strict=True):
+                        if phoneme in pid_map:
+                            ids = pid_map[phoneme]
+                            phoneme_ids.extend(ids)
+                            for _ in ids:
+                                if prosody_info is not None:
+                                    prosody_features.append({
+                                        'a1': prosody_info.a1,
+                                        'a2': prosody_info.a2,
+                                        'a3': prosody_info.a3,
+                                    })
+                                else:
+                                    prosody_features.append(None)
+
+                    # Apply post-processing (BOS/EOS/padding)
+                    phoneme_ids, prosody_features = phonemizer.post_process_ids(
+                        phoneme_ids, prosody_features, pid_map
+                    )
+
+                    data['phoneme_ids'] = phoneme_ids
+                    data['prosody_features'] = prosody_features
+                    # Set language_id to ja (0) for mixed sentences (or detect from text)
+                    data['language_id'] = config.get('language_id_map', {}).get('ja', 0)
+
+                # Create Utterance object
+                utt = Utterance(
+                    phoneme_ids=torch.LongTensor(data['phoneme_ids']),
+                    audio_norm_path=None,  # Not needed for test set
+                    audio_spec_path=None,
+                    speaker_id=torch.LongTensor([data.get('speaker_id', 0)]),
+                    language_id=torch.LongTensor([data.get('language_id', 0)]),
+                    prosody_features=data.get('prosody_features'),
+                    text=data['text'],  # Store original text for logging
+                )
+                utterances.append(utt)
+
+        _LOGGER.info(f"Loaded {len(utterances)} fixed test utterances from {test_utterances_path}")
+        return utterances
+
     def _load_datasets(
         self,
         validation_split: float,
@@ -164,15 +234,33 @@ class VitsModel(pl.LightningModule):
             _LOGGER.debug("No dataset to load")
             return
 
-        full_dataset = PiperDataset(
-            self.hparams.dataset, max_phoneme_ids=max_phoneme_ids
-        )
-        valid_set_size = int(len(full_dataset) * validation_split)
-        train_set_size = len(full_dataset) - valid_set_size - num_test_examples
+        # Try to load fixed test dataset first
+        test_utterances_path = self.hparams.dataset_dir / 'test_utterances.jsonl'
+        if test_utterances_path.exists():
+            self._test_dataset = self._load_test_dataset(test_utterances_path)
+            # Load train/val datasets without test examples
+            full_dataset = PiperDataset(
+                self.hparams.dataset, max_phoneme_ids=max_phoneme_ids
+            )
+            valid_set_size = int(len(full_dataset) * validation_split)
+            train_set_size = len(full_dataset) - valid_set_size
+            self._train_dataset, self._val_dataset = random_split(
+                full_dataset, [train_set_size, valid_set_size]
+            )
+        else:
+            # Fallback: use random split (old behavior)
+            _LOGGER.warning(
+                f"Fixed test dataset not found at {test_utterances_path}, using random split"
+            )
+            full_dataset = PiperDataset(
+                self.hparams.dataset, max_phoneme_ids=max_phoneme_ids
+            )
+            valid_set_size = int(len(full_dataset) * validation_split)
+            train_set_size = len(full_dataset) - valid_set_size - num_test_examples
 
-        self._train_dataset, self._test_dataset, self._val_dataset = random_split(
-            full_dataset, [train_set_size, num_test_examples, valid_set_size]
-        )
+            self._train_dataset, self._test_dataset, self._val_dataset = random_split(
+                full_dataset, [train_set_size, num_test_examples, valid_set_size]
+            )
 
     def forward(self, text, text_lengths, scales, sid=None, lid=None, prosody_features=None):
         noise_scale = scales[0]
@@ -235,7 +323,8 @@ class VitsModel(pl.LightningModule):
                 batch_sampler=self._train_batch_sampler,
                 num_workers=self.hparams.num_workers,
                 pin_memory=pin_memory,
-                persistent_workers=(True if self.hparams.num_workers > 0 else False),
+                persistent_workers=(self.hparams.num_workers > 0),
+                prefetch_factor=(2 if self.hparams.num_workers > 0 else None),
             )
         else:
             # 従来の動作（ランダムサンプリング）
@@ -246,9 +335,8 @@ class VitsModel(pl.LightningModule):
                 num_workers=self.hparams.num_workers,
                 batch_size=self.hparams.batch_size,
                 pin_memory=pin_memory,
-                persistent_workers=(
-                    True if self.hparams.num_workers > 0 else False
-                ),  # Multi-GPU optimization
+                persistent_workers=(self.hparams.num_workers > 0),
+                prefetch_factor=(2 if self.hparams.num_workers > 0 else None),
             )
 
     def val_dataloader(self):
@@ -264,9 +352,8 @@ class VitsModel(pl.LightningModule):
             num_workers=self.hparams.num_workers,
             batch_size=self.hparams.batch_size,
             pin_memory=pin_memory,
-            persistent_workers=(
-                True if self.hparams.num_workers > 0 else False
-            ),  # Multi-GPU optimization
+            persistent_workers=(self.hparams.num_workers > 0),
+            prefetch_factor=(2 if self.hparams.num_workers > 0 else None),
         )
 
     def test_dataloader(self):
@@ -576,12 +663,14 @@ class VitsModel(pl.LightningModule):
                 lr=self.hparams.learning_rate,
                 betas=self.hparams.betas,
                 eps=self.hparams.eps,
+                fused=True,
             ),
             torch.optim.AdamW(
                 d_params,
                 lr=self.hparams.learning_rate,
                 betas=self.hparams.betas,
                 eps=self.hparams.eps,
+                fused=True,
             ),
         ]
         schedulers = [
@@ -632,7 +721,7 @@ class VitsModel(pl.LightningModule):
         parser.add_argument(
             "--num-workers",
             type=int,
-            default=min(16, os.cpu_count()),
-            help="Number of workers for DataLoader",
+            default=0,
+            help="Number of workers for DataLoader (default: 0, increase to 2-4 for faster data loading at the cost of more memory)",
         )
         return parent_parser
