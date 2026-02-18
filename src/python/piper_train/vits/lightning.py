@@ -722,14 +722,14 @@ class VitsModel(pl.LightningModule):
                 lr=self.hparams.learning_rate,
                 betas=self.hparams.betas,
                 eps=self.hparams.eps,
-                fused=True,
+                fused=torch.cuda.is_available(),
             ),
             torch.optim.AdamW(
                 d_params,
                 lr=self.hparams.learning_rate,
                 betas=self.hparams.betas,
                 eps=self.hparams.eps,
-                fused=True,
+                fused=torch.cuda.is_available(),
             ),
         ]
         schedulers = [
