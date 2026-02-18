@@ -353,7 +353,8 @@ def main():
         dict_args["upsample_kernel_sizes"] = (16, 16, 4, 4)
 
     # マルチスピーカーモデルの場合、gin_channelsを768に設定（品質向上のため）
-    if num_speakers > 1 and "gin_channels" not in dict_args:
+    # argparseは常にdefault値(0)をdict_argsに含めるため、"not in"ではなく値チェック
+    if num_speakers > 1 and dict_args.get("gin_channels", 0) == 0:
         dict_args["gin_channels"] = 768
 
     # num_workers自動調整機能を削除
