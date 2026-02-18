@@ -7,6 +7,7 @@ from pathlib import Path
 
 import torch
 
+
 torch.serialization.add_safe_globals([pathlib.PosixPath])
 
 from .vits import commons
@@ -187,7 +188,9 @@ def main() -> None:
 
     stochastic = args.stochastic
 
-    def infer_forward(text, text_lengths, scales, sid=None, lid=None, prosody_features=None):
+    def infer_forward(
+        text, text_lengths, scales, sid=None, lid=None, prosody_features=None
+    ):
         """
         Efficient forward function that returns both audio and duration information.
         The duration predictor is called once to compute both durations and audio output.

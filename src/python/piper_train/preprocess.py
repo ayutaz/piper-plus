@@ -738,15 +738,11 @@ def phonemize_batch_bilingual(
 
                     # Post-process (BOS/EOS/padding)
                     prosody_features_raw = [
-                        {"a1": p.a1, "a2": p.a2, "a3": p.a3}
-                        if p is not None
-                        else None
+                        {"a1": p.a1, "a2": p.a2, "a3": p.a3} if p is not None else None
                         for p in prosody_info_list
                     ]
-                    utt.phoneme_ids, prosody_features_raw = (
-                        phonemizer.post_process_ids(
-                            utt.phoneme_ids, prosody_features_raw, args.phoneme_id_map
-                        )
+                    utt.phoneme_ids, prosody_features_raw = phonemizer.post_process_ids(
+                        utt.phoneme_ids, prosody_features_raw, args.phoneme_id_map
                     )
                     utt.prosody_features = prosody_features_raw
                     utt.prosody_ids = []

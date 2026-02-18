@@ -207,6 +207,12 @@ inline-quotes = "double"
 "src/python_run/*" = ["PLC0415"]
 # Docker test scripts: テスト関数内での条件付きインポートを許可
 "docker/**/test.py" = ["PLC0415"]
+# __main__.py: torch.serialization.add_safe_globals() がimport前に必要
+"src/python/piper_train/__main__.py" = ["E402"]
+# export_onnx.py: 同上
+"src/python/piper_train/export_onnx.py" = ["E402"]
+# lightning.py: メソッド内の遅延import（循環import回避、オプショナル依存）
+"src/python/piper_train/vits/lightning.py" = ["PLC0415"]
 
 [tool.setuptools.packages.find]
 where = ["src/python"]

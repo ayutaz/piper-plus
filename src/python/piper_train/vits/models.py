@@ -893,7 +893,9 @@ class SynthesizerTrn(nn.Module):
             x_dp = x
         return x_dp
 
-    def forward(self, x, x_lengths, y, y_lengths, sid=None, lid=None, prosody_features=None):
+    def forward(
+        self, x, x_lengths, y, y_lengths, sid=None, lid=None, prosody_features=None
+    ):
         x, m_p, logs_p, x_mask = self.enc_p(x, x_lengths)
         g = self._get_global_conditioning(sid, lid)
 
