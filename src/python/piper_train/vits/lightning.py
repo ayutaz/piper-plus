@@ -1,5 +1,4 @@
 import logging
-import os
 from pathlib import Path
 
 import pytorch_lightning as pl
@@ -14,9 +13,11 @@ from .losses import discriminator_loss, feature_loss, generator_loss, kl_loss
 from .mel_processing import mel_spectrogram_torch, spec_to_mel_torch
 from .models import MultiPeriodDiscriminator, SynthesizerTrn, WavLMDiscriminator
 
+
 # Optional wandb import with graceful fallback
 try:
     import wandb
+
     WANDB_AVAILABLE = True
 except ImportError:
     WANDB_AVAILABLE = False
@@ -161,41 +162,48 @@ class VitsModel(pl.LightningModule):
         Mixed sentences (language_id == -1) are automatically phonemized with ja-en.
         """
         import json
+
         from .dataset import Utterance
 
         utterances = []
 
-        with open(test_utterances_path, 'r', encoding='utf-8') as f:
+        with open(test_utterances_path, encoding="utf-8") as f:
             for line in f:
                 data = json.loads(line.strip())
 
                 # Mixed sentences (language_id == -1) need phonemization
-                if data.get('language_id', 0) == -1:
+                if data.get("language_id", 0) == -1:
                     from ..phonemize.registry import get_phonemizer
 
-                    phonemizer = get_phonemizer('ja-en')
-                    phonemes, prosody_info_list = phonemizer.phonemize_with_prosody(data['text'])
+                    phonemizer = get_phonemizer("ja-en")
+                    phonemes, prosody_info_list = phonemizer.phonemize_with_prosody(
+                        data["text"]
+                    )
 
                     # Load phoneme_id_map from config.json
-                    config_path = self.hparams.dataset_dir / 'config.json'
-                    with open(config_path, 'r', encoding='utf-8') as cfg:
+                    config_path = self.hparams.dataset_dir / "config.json"
+                    with open(config_path, encoding="utf-8") as cfg:
                         config = json.load(cfg)
-                        pid_map = config['phoneme_id_map']
+                        pid_map = config["phoneme_id_map"]
 
                     # Convert phonemes to IDs
                     phoneme_ids = []
                     prosody_features = []
-                    for phoneme, prosody_info in zip(phonemes, prosody_info_list, strict=True):
+                    for phoneme, prosody_info in zip(
+                        phonemes, prosody_info_list, strict=True
+                    ):
                         if phoneme in pid_map:
                             ids = pid_map[phoneme]
                             phoneme_ids.extend(ids)
                             for _ in ids:
                                 if prosody_info is not None:
-                                    prosody_features.append({
-                                        'a1': prosody_info.a1,
-                                        'a2': prosody_info.a2,
-                                        'a3': prosody_info.a3,
-                                    })
+                                    prosody_features.append(
+                                        {
+                                            "a1": prosody_info.a1,
+                                            "a2": prosody_info.a2,
+                                            "a3": prosody_info.a3,
+                                        }
+                                    )
                                 else:
                                     prosody_features.append(None)
 
@@ -204,24 +212,26 @@ class VitsModel(pl.LightningModule):
                         phoneme_ids, prosody_features, pid_map
                     )
 
-                    data['phoneme_ids'] = phoneme_ids
-                    data['prosody_features'] = prosody_features
+                    data["phoneme_ids"] = phoneme_ids
+                    data["prosody_features"] = prosody_features
                     # Set language_id to ja (0) for mixed sentences (or detect from text)
-                    data['language_id'] = config.get('language_id_map', {}).get('ja', 0)
+                    data["language_id"] = config.get("language_id_map", {}).get("ja", 0)
 
                 # Create Utterance object
                 utt = Utterance(
-                    phoneme_ids=torch.LongTensor(data['phoneme_ids']),
+                    phoneme_ids=torch.LongTensor(data["phoneme_ids"]),
                     audio_norm_path=None,  # Not needed for test set
                     audio_spec_path=None,
-                    speaker_id=torch.LongTensor([data.get('speaker_id', 0)]),
-                    language_id=torch.LongTensor([data.get('language_id', 0)]),
-                    prosody_features=data.get('prosody_features'),
-                    text=data['text'],  # Store original text for logging
+                    speaker_id=torch.LongTensor([data.get("speaker_id", 0)]),
+                    language_id=torch.LongTensor([data.get("language_id", 0)]),
+                    prosody_features=data.get("prosody_features"),
+                    text=data["text"],  # Store original text for logging
                 )
                 utterances.append(utt)
 
-        _LOGGER.info(f"Loaded {len(utterances)} fixed test utterances from {test_utterances_path}")
+        _LOGGER.info(
+            f"Loaded {len(utterances)} fixed test utterances from {test_utterances_path}"
+        )
         return utterances
 
     def _load_datasets(
@@ -235,7 +245,7 @@ class VitsModel(pl.LightningModule):
             return
 
         # Try to load fixed test dataset first
-        test_utterances_path = self.hparams.dataset_dir / 'test_utterances.jsonl'
+        test_utterances_path = self.hparams.dataset_dir / "test_utterances.jsonl"
         if test_utterances_path.exists():
             self._test_dataset = self._load_test_dataset(test_utterances_path)
             # Load train/val datasets without test examples
@@ -262,7 +272,9 @@ class VitsModel(pl.LightningModule):
                 full_dataset, [train_set_size, num_test_examples, valid_set_size]
             )
 
-    def forward(self, text, text_lengths, scales, sid=None, lid=None, prosody_features=None):
+    def forward(
+        self, text, text_lengths, scales, sid=None, lid=None, prosody_features=None
+    ):
         noise_scale = scales[0]
         length_scale = scales[1]
         noise_scale_w = scales[2]
@@ -424,22 +436,34 @@ class VitsModel(pl.LightningModule):
             return None
 
         # PyTorch Lightning 2.x uses trainer.loggers (plural) for multiple loggers
-        if hasattr(self.trainer, 'loggers') and self.trainer.loggers:
+        if hasattr(self.trainer, "loggers") and self.trainer.loggers:
             loggers = self.trainer.loggers
         else:
             # Fallback to trainer.logger (singular)
             trainer_logger = self.trainer.logger
-            loggers = trainer_logger if isinstance(trainer_logger, list) else [trainer_logger]
+            loggers = (
+                trainer_logger if isinstance(trainer_logger, list) else [trainer_logger]
+            )
 
         for logger in loggers:
             # Check by class name to avoid import dependency
-            if logger.__class__.__name__ == 'WandbLogger':
+            if logger.__class__.__name__ == "WandbLogger":
                 return logger
 
         return None
 
     def training_step_g(self, batch: Batch):
-        x, x_lengths, y, _, spec, spec_lengths, speaker_ids, language_ids, prosody_features = (
+        (
+            x,
+            x_lengths,
+            y,
+            _,
+            spec,
+            spec_lengths,
+            speaker_ids,
+            language_ids,
+            prosody_features,
+        ) = (
             batch.phoneme_ids,
             batch.phoneme_lengths,
             batch.audios,
@@ -528,7 +552,11 @@ class VitsModel(pl.LightningModule):
                 loss_fm_wavlm = feature_loss(fmap_r_wlm, fmap_g_wlm)
                 loss_gen_wavlm, _ = generator_loss(y_d_hat_g_wlm)
                 # Scale up loss to compensate for reduced frequency
-                loss_wavlm = (loss_gen_wavlm + loss_fm_wavlm) * self.hparams.c_wavlm * self.hparams.wavlm_every_n_steps
+                loss_wavlm = (
+                    (loss_gen_wavlm + loss_fm_wavlm)
+                    * self.hparams.c_wavlm
+                    * self.hparams.wavlm_every_n_steps
+                )
                 loss_gen_all = loss_gen_all + loss_wavlm
 
                 # Log WavLM losses
@@ -562,7 +590,12 @@ class VitsModel(pl.LightningModule):
                     y, y_hat_detached
                 )
                 loss_disc_wavlm, _, _ = discriminator_loss(y_d_hat_r_wlm, y_d_hat_g_wlm)
-                loss_disc_all = loss_disc_all + loss_disc_wavlm * self.hparams.c_wavlm * self.hparams.wavlm_every_n_steps
+                loss_disc_all = (
+                    loss_disc_all
+                    + loss_disc_wavlm
+                    * self.hparams.c_wavlm
+                    * self.hparams.wavlm_every_n_steps
+                )
 
                 # Log WavLM discriminator loss
                 self._log_with_batch_info("loss_disc_wavlm", loss_disc_wavlm, batch)
@@ -602,12 +635,24 @@ class VitsModel(pl.LightningModule):
                 for utt_idx, test_utt in enumerate(self._test_dataset):
                     # Generate audio
                     text = test_utt.phoneme_ids.unsqueeze(0).to(self.device)
-                    text_lengths = torch.LongTensor([len(test_utt.phoneme_ids)]).to(self.device)
+                    text_lengths = torch.LongTensor([len(test_utt.phoneme_ids)]).to(
+                        self.device
+                    )
                     scales = [0.667, 1.0, 0.8]
-                    sid = test_utt.speaker_id.to(self.device) if test_utt.speaker_id is not None else None
-                    lid = test_utt.language_id.to(self.device) if test_utt.language_id is not None else None
+                    sid = (
+                        test_utt.speaker_id.to(self.device)
+                        if test_utt.speaker_id is not None
+                        else None
+                    )
+                    lid = (
+                        test_utt.language_id.to(self.device)
+                        if test_utt.language_id is not None
+                        else None
+                    )
 
-                    test_audio = self(text, text_lengths, scales, sid=sid, lid=lid).detach()
+                    test_audio = self(
+                        text, text_lengths, scales, sid=sid, lid=lid
+                    ).detach()
                     test_audio = test_audio * (1.0 / max(0.01, abs(test_audio.max())))
 
                     # Convert to numpy (CPU)
@@ -617,14 +662,27 @@ class VitsModel(pl.LightningModule):
                     text_str = test_utt.text if test_utt.text else f"sample_{utt_idx}"
                     speaker_str = f"spk={sid.item()}" if sid is not None else "single"
                     language_map = {0: "ja", 1: "en"}
-                    lang_str = language_map.get(lid.item() if lid is not None else 0, "unknown")
+                    lang_str = language_map.get(
+                        lid.item() if lid is not None else 0, "unknown"
+                    )
                     noise_scale, length_scale, noise_scale_w = scales
 
                     # Create WandB audio
                     caption = f"{text_str} | {speaker_str} | {lang_str} | noise={noise_scale:.3f},len={length_scale:.2f},noisew={noise_scale_w:.2f}"
-                    wandb_audio = wandb.Audio(audio_np, sample_rate=self.hparams.sample_rate, caption=caption)
+                    wandb_audio = wandb.Audio(
+                        audio_np, sample_rate=self.hparams.sample_rate, caption=caption
+                    )
 
-                    wandb_audio_data.append([text_str, speaker_str, lang_str, self.current_epoch, self.global_step, wandb_audio])
+                    wandb_audio_data.append(
+                        [
+                            text_str,
+                            speaker_str,
+                            lang_str,
+                            self.current_epoch,
+                            self.global_step,
+                            wandb_audio,
+                        ]
+                    )
 
                     # Aggressive per-sample GPU memory cleanup
                     del test_audio, text, text_lengths, sid, lid
@@ -636,11 +694,12 @@ class VitsModel(pl.LightningModule):
             if wandb_audio_data:
                 columns = ["text", "speaker", "language", "epoch", "step", "audio"]
                 table = wandb.Table(columns=columns, data=wandb_audio_data)
-                wandb_logger.experiment.log({
-                    "validation_audio_samples": table,
-                    "epoch": self.current_epoch
-                })
-                _LOGGER.info(f"Logged {len(wandb_audio_data)} audio samples to WandB at epoch {self.current_epoch}")
+                wandb_logger.experiment.log(
+                    {"validation_audio_samples": table, "epoch": self.current_epoch}
+                )
+                _LOGGER.info(
+                    f"Logged {len(wandb_audio_data)} audio samples to WandB at epoch {self.current_epoch}"
+                )
 
             # Final cleanup
             del wandb_audio_data

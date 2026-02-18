@@ -211,7 +211,9 @@ class PiperDataset(Dataset):
 
 
 class UtteranceCollate:
-    def __init__(self, is_multispeaker: bool, segment_size: int, is_multilanguage: bool = False):
+    def __init__(
+        self, is_multispeaker: bool, segment_size: int, is_multilanguage: bool = False
+    ):
         self.is_multispeaker = is_multispeaker
         self.is_multilanguage = is_multilanguage
         self.segment_size = segment_size

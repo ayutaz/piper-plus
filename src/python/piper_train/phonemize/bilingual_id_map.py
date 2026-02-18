@@ -7,6 +7,7 @@ with no collisions. Shared special tokens (_, ^, $) use common IDs.
 from .jp_id_map import JAPANESE_PHONEMES, SPECIAL_TOKENS
 from .token_mapper import register
 
+
 __all__ = ["get_bilingual_id_map", "ENGLISH_PHONEMES"]
 
 # -----------------------------------------------------------------------

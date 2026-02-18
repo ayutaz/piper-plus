@@ -177,8 +177,14 @@ def main():
                     or ("\u4e00" <= ch <= "\u9fff")  # CJK
                     for ch in args.text
                 )
-                language_id = language_id_map.get("ja", 0) if has_cjk else language_id_map.get("en", 1)
-            _LOGGER.info("Using language_id=%d for language=%s", language_id, args.language)
+                language_id = (
+                    language_id_map.get("ja", 0)
+                    if has_cjk
+                    else language_id_map.get("en", 1)
+                )
+            _LOGGER.info(
+                "Using language_id=%d for language=%s", language_id, args.language
+            )
 
         # Create single utterance
         utterances = [

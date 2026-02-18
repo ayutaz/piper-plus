@@ -1,10 +1,12 @@
 import argparse
 import json
 import logging
+import pathlib
 from pathlib import Path
 
 import torch
-import pathlib
+
+
 torch.serialization.add_safe_globals([pathlib.PosixPath])
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import ModelCheckpoint
@@ -363,7 +365,9 @@ def main():
     )
 
     if args.compile:
-        _LOGGER.info("Compiling model with torch.compile(mode='reduce-overhead', dynamic=True)")
+        _LOGGER.info(
+            "Compiling model with torch.compile(mode='reduce-overhead', dynamic=True)"
+        )
         model = torch.compile(model, mode="reduce-overhead", dynamic=True)
 
     if args.resume_from_single_speaker_checkpoint:

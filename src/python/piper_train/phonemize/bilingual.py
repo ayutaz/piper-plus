@@ -10,6 +10,7 @@ from .base import Phonemizer, ProsodyInfo
 from .bilingual_id_map import get_bilingual_id_map
 from .registry import get_phonemizer
 
+
 __all__ = ["BilingualPhonemizer"]
 
 # Regex patterns for language detection
