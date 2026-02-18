@@ -15,24 +15,30 @@ import argparse
 import csv
 import json
 import logging
-import sys
 from collections import Counter
 from concurrent.futures import ProcessPoolExecutor, as_completed
+from hashlib import sha256 as _sha256
 from pathlib import Path
 
-import numpy as np
+from piper_train.norm_audio import cache_norm_audio, make_silence_detector
+from piper_train.phonemize.bilingual import BilingualPhonemizer
+from piper_train.phonemize.bilingual_id_map import (
+    get_bilingual_id_map as _get_bilingual_id_map,
+)
+from piper_train.phonemize.jp_id_map import (
+    get_japanese_id_map as _get_japanese_id_map,
+)
+
 
 _LOGGER = logging.getLogger("prepare_bilingual")
 
 
 def get_bilingual_id_map():
-    from piper_train.phonemize.bilingual_id_map import get_bilingual_id_map as _get
-    return _get()
+    return _get_bilingual_id_map()
 
 
 def get_japanese_id_map():
-    from piper_train.phonemize.jp_id_map import get_japanese_id_map as _get
-    return _get()
+    return _get_japanese_id_map()
 
 
 def remap_ja_phoneme_ids(
@@ -102,7 +108,7 @@ def _add_inter_phoneme_padding(
     # Insert pad between every phoneme ID, skipping existing padding
     padded_ids: list[int] = []
     padded_prosody: list[dict | None] = []
-    for pid, pf in zip(core_ids, core_prosody):
+    for pid, pf in zip(core_ids, core_prosody, strict=True):
         padded_ids.append(pid)
         padded_prosody.append(pf)
         if pid != pad_id:  # Don't add padding after existing padding
@@ -169,23 +175,25 @@ def process_ja_dataset(
                 speaker_ids_seen[speaker] = len(speaker_ids_seen) + ja_speaker_offset
 
             # Store intermediate result
-            phonemized.append({
-                "text": utt.get("text", ""),
-                "wav_path": utt.get("audio_path", ""),
-                "speaker": speaker,
-                "speaker_id": speaker_ids_seen[speaker],
-                "phoneme_ids": new_ids,
-                "prosody_features": prosody,
-            })
+            phonemized.append(
+                {
+                    "text": utt.get("text", ""),
+                    "wav_path": utt.get("audio_path", ""),
+                    "speaker": speaker,
+                    "speaker_id": speaker_ids_seen[speaker],
+                    "phoneme_ids": new_ids,
+                    "prosody_features": prosody,
+                }
+            )
 
     _LOGGER.info(
         "Remapped %d JA utterances (%d skipped), %d speakers",
-        len(phonemized), skipped, len(speaker_ids_seen),
+        len(phonemized),
+        skipped,
+        len(speaker_ids_seen),
     )
 
     # ===== Phase 2: Audio normalization (parallel) =====
-    from hashlib import sha256 as _sha256
-
     audio_map: dict[str, tuple[str, str]] = {}
     need_caching: list[tuple[str, str, int]] = []
 
@@ -195,7 +203,9 @@ def process_ja_dataset(
             _LOGGER.warning("Missing wav file: %s", wav_path_str)
             continue
 
-        audio_cache_id = _sha256(str(Path(wav_path_str).absolute()).encode()).hexdigest()
+        audio_cache_id = _sha256(
+            str(Path(wav_path_str).absolute()).encode()
+        ).hexdigest()
         norm_path = cache_dir / f"{audio_cache_id}.pt"
         spec_path = cache_dir / f"{audio_cache_id}.spec.pt"
 
@@ -206,14 +216,22 @@ def process_ja_dataset(
 
     _LOGGER.info(
         "Audio cache: %d already cached, %d need processing",
-        len(audio_map), len(need_caching),
+        len(audio_map),
+        len(need_caching),
     )
 
     if need_caching:
-        _LOGGER.info("Caching audio for %d JA utterances with %d workers...", len(need_caching), workers)
+        _LOGGER.info(
+            "Caching audio for %d JA utterances with %d workers...",
+            len(need_caching),
+            workers,
+        )
         if workers > 1:
             with ProcessPoolExecutor(max_workers=workers) as executor:
-                futures = {executor.submit(_cache_audio_worker, a): i for i, a in enumerate(need_caching)}
+                futures = {
+                    executor.submit(_cache_audio_worker, a): i
+                    for i, a in enumerate(need_caching)
+                }
                 done = 0
                 for future in as_completed(futures):
                     try:
@@ -225,11 +243,12 @@ def process_ja_dataset(
                     if done % 1000 == 0:
                         _LOGGER.info("Cached audio %d/%d", done, len(need_caching))
         else:
-            from piper_train.norm_audio import cache_norm_audio, make_silence_detector
             detector = make_silence_detector()
             for i, (wav_path_str, _, sr) in enumerate(need_caching):
                 try:
-                    norm_path, spec_path = cache_norm_audio(wav_path_str, cache_dir, detector, sr)
+                    norm_path, spec_path = cache_norm_audio(
+                        wav_path_str, cache_dir, detector, sr
+                    )
                     audio_map[wav_path_str] = (str(norm_path), str(spec_path))
                 except Exception as e:
                     _LOGGER.warning("Audio cache failed for %s: %s", wav_path_str, e)
@@ -245,24 +264,28 @@ def process_ja_dataset(
             skipped_audio += 1
             continue
         norm_path, spec_path = audio_map[wav_key]
-        utterances.append({
-            "text": p["text"],
-            "audio_path": wav_key,
-            "speaker": p["speaker"],
-            "speaker_id": p["speaker_id"],
-            "language_id": 0,  # Japanese
-            "phonemes": [],
-            "phoneme_ids": p["phoneme_ids"],
-            "prosody_ids": [],
-            "prosody_features": p["prosody_features"],
-            "audio_norm_path": norm_path,
-            "audio_spec_path": spec_path,
-            "f0_path": None,
-        })
+        utterances.append(
+            {
+                "text": p["text"],
+                "audio_path": wav_key,
+                "speaker": p["speaker"],
+                "speaker_id": p["speaker_id"],
+                "language_id": 0,  # Japanese
+                "phonemes": [],
+                "phoneme_ids": p["phoneme_ids"],
+                "prosody_ids": [],
+                "prosody_features": p["prosody_features"],
+                "audio_norm_path": norm_path,
+                "audio_spec_path": spec_path,
+                "f0_path": None,
+            }
+        )
 
     _LOGGER.info(
         "Loaded %d JA utterances (%d audio-skipped), %d speakers",
-        len(utterances), skipped_audio, len(speaker_ids_seen),
+        len(utterances),
+        skipped_audio,
+        len(speaker_ids_seen),
     )
     return utterances, speaker_ids_seen
 
@@ -270,7 +293,11 @@ def process_ja_dataset(
 def _cache_audio_worker(args):
     """Worker function for parallel audio caching."""
     wav_path, cache_dir, sample_rate = args
-    from piper_train.norm_audio import cache_norm_audio, make_silence_detector
+    from piper_train.norm_audio import (  # noqa: PLC0415
+        cache_norm_audio,
+        make_silence_detector,
+    )
+
     detector = make_silence_detector()
     audio_norm_path, audio_spec_path = cache_norm_audio(
         wav_path, cache_dir, detector, sample_rate
@@ -285,7 +312,8 @@ _phonemize_worker_state: dict = {}
 
 def _init_phonemize_worker(bilingual_id_map: dict[str, list[int]]):
     """Initialize BilingualPhonemizer once per worker process."""
-    from piper_train.phonemize.bilingual import BilingualPhonemizer
+    from piper_train.phonemize.bilingual import BilingualPhonemizer  # noqa: PLC0415
+
     _phonemize_worker_state["phonemizer"] = BilingualPhonemizer(["ja", "en"])
     _phonemize_worker_state["id_map"] = bilingual_id_map
 
@@ -385,24 +413,29 @@ def process_en_dataset(
                 speaker_counts[speaker_id] = speaker_counts.get(speaker_id, 0) + 1
 
         # Sort speakers by utterance count (descending)
-        sorted_speakers = sorted(speaker_counts.items(), key=lambda x: x[1], reverse=True)
+        sorted_speakers = sorted(
+            speaker_counts.items(), key=lambda x: x[1], reverse=True
+        )
 
         # Select top N speakers
         n_speakers = max_speakers if max_speakers else len(sorted_speakers)
         selected_speakers = {spk for spk, _ in sorted_speakers[:n_speakers]}
 
         # Create speaker ID mapping: original_speaker → sequential_id
-        for i, (spk, count) in enumerate(sorted_speakers[:n_speakers]):
+        for i, (spk, _count) in enumerate(sorted_speakers[:n_speakers]):
             speaker_id_map[spk] = en_speaker_id_offset + i
 
         _LOGGER.info(
             "Selected top %d speakers (total available: %d)",
-            len(selected_speakers), len(speaker_counts)
+            len(selected_speakers),
+            len(speaker_counts),
         )
         _LOGGER.info(
             "Speaker utterance range: %d-%d",
-            sorted_speakers[n_speakers-1][1] if n_speakers <= len(sorted_speakers) else 0,
-            sorted_speakers[0][1]
+            sorted_speakers[n_speakers - 1][1]
+            if n_speakers <= len(sorted_speakers)
+            else 0,
+            sorted_speakers[0][1],
         )
     else:
         # Single speaker mode (backward compatibility)
@@ -419,7 +452,9 @@ def process_en_dataset(
         rows = list(reader)
 
     # Parse rows and filter by speaker + missing wavs
-    tasks: list[tuple[str, str, str, int]] = []  # (filename, text, wav_path, speaker_id)
+    tasks: list[
+        tuple[str, str, str, int]
+    ] = []  # (filename, text, wav_path, speaker_id)
     for row in rows:
         if max_utterances and len(tasks) >= max_utterances:
             break
@@ -444,7 +479,7 @@ def process_en_dataset(
             speaker_id = en_speaker_id_offset
 
         # Handle both formats: with and without .wav extension
-        if filename.endswith('.wav'):
+        if filename.endswith(".wav"):
             wav_path = wav_dir / filename
         else:
             wav_path = wav_dir / f"{filename}.wav"
@@ -468,7 +503,11 @@ def process_en_dataset(
                 result = future.result()
                 done += 1
                 if "error" in result:
-                    _LOGGER.warning("Failed to phonemize %s: %s", result["filename"], result["error"])
+                    _LOGGER.warning(
+                        "Failed to phonemize %s: %s",
+                        result["filename"],
+                        result["error"],
+                    )
                     skipped_parse += 1
                 else:
                     if result["missing"]:
@@ -477,18 +516,19 @@ def process_en_dataset(
                     if len(result["phoneme_ids"]) == 0:
                         skipped_parse += 1
                     else:
-                        phonemized.append({
-                            "text": result["text"],
-                            "wav_path": result["wav_path"],
-                            "speaker_id": result["speaker_id"],  # NEW
-                            "phonemes": result["phonemes"],
-                            "phoneme_ids": result["phoneme_ids"],
-                            "prosody_features": result["prosody_features"],
-                        })
+                        phonemized.append(
+                            {
+                                "text": result["text"],
+                                "wav_path": result["wav_path"],
+                                "speaker_id": result["speaker_id"],  # NEW
+                                "phonemes": result["phonemes"],
+                                "phoneme_ids": result["phoneme_ids"],
+                                "prosody_features": result["prosody_features"],
+                            }
+                        )
                 if done % 1000 == 0:
                     _LOGGER.info("Phonemized %d/%d EN utterances", done, len(tasks))
     else:
-        from piper_train.phonemize.bilingual import BilingualPhonemizer
         phonemizer = BilingualPhonemizer(["ja", "en"])
         for task_idx, (filename, text, wav_path_str, speaker_id) in enumerate(tasks):
             try:
@@ -501,7 +541,9 @@ def process_en_dataset(
                         phoneme_ids.extend(ids)
                         for _ in ids:
                             if pr is not None:
-                                prosody_features.append({"a1": pr.a1, "a2": pr.a2, "a3": pr.a3})
+                                prosody_features.append(
+                                    {"a1": pr.a1, "a2": pr.a2, "a3": pr.a3}
+                                )
                             else:
                                 prosody_features.append(None)
                     else:
@@ -512,14 +554,16 @@ def process_en_dataset(
                 if len(phoneme_ids) == 0:
                     skipped_parse += 1
                     continue
-                phonemized.append({
-                    "text": text,
-                    "wav_path": wav_path_str,
-                    "speaker_id": speaker_id,  # NEW
-                    "phonemes": phonemes,
-                    "phoneme_ids": phoneme_ids,
-                    "prosody_features": prosody_features,
-                })
+                phonemized.append(
+                    {
+                        "text": text,
+                        "wav_path": wav_path_str,
+                        "speaker_id": speaker_id,  # NEW
+                        "phonemes": phonemes,
+                        "phoneme_ids": phoneme_ids,
+                        "prosody_features": prosody_features,
+                    }
+                )
             except Exception as e:
                 _LOGGER.warning("Failed to phonemize %s: %s", filename, e)
                 skipped_parse += 1
@@ -532,19 +576,21 @@ def process_en_dataset(
 
     _LOGGER.info(
         "Phonemized %d EN utterances (%d parse-skipped, %d speaker-filtered)",
-        len(phonemized), skipped_parse, skipped_speaker,
+        len(phonemized),
+        skipped_parse,
+        skipped_speaker,
     )
 
     # Phase 2: Audio normalization (slow, parallel)
     # First, check which files already have cached audio
-    from hashlib import sha256 as _sha256
-
     audio_map: dict[str, tuple[str, str]] = {}
     need_caching: list[tuple[str, str, int]] = []
 
     for p in phonemized:
         wav_path_str = p["wav_path"]
-        audio_cache_id = _sha256(str(Path(wav_path_str).absolute()).encode()).hexdigest()
+        audio_cache_id = _sha256(
+            str(Path(wav_path_str).absolute()).encode()
+        ).hexdigest()
         norm_path = cache_dir / f"{audio_cache_id}.pt"
         spec_path = cache_dir / f"{audio_cache_id}.spec.pt"
         if norm_path.exists() and spec_path.exists():
@@ -554,14 +600,22 @@ def process_en_dataset(
 
     _LOGGER.info(
         "Audio cache: %d already cached, %d need processing",
-        len(audio_map), len(need_caching),
+        len(audio_map),
+        len(need_caching),
     )
 
     if need_caching:
-        _LOGGER.info("Caching audio for %d EN utterances with %d workers...", len(need_caching), workers)
+        _LOGGER.info(
+            "Caching audio for %d EN utterances with %d workers...",
+            len(need_caching),
+            workers,
+        )
         if workers > 1:
             with ProcessPoolExecutor(max_workers=workers) as executor:
-                futures = {executor.submit(_cache_audio_worker, a): i for i, a in enumerate(need_caching)}
+                futures = {
+                    executor.submit(_cache_audio_worker, a): i
+                    for i, a in enumerate(need_caching)
+                }
                 done = 0
                 for future in as_completed(futures):
                     try:
@@ -573,11 +627,12 @@ def process_en_dataset(
                     if done % 1000 == 0:
                         _LOGGER.info("Cached audio %d/%d", done, len(need_caching))
         else:
-            from piper_train.norm_audio import cache_norm_audio, make_silence_detector
             detector = make_silence_detector()
             for i, (wav_path_str, _, sr) in enumerate(need_caching):
                 try:
-                    norm_path, spec_path = cache_norm_audio(wav_path_str, cache_dir, detector, sr)
+                    norm_path, spec_path = cache_norm_audio(
+                        wav_path_str, cache_dir, detector, sr
+                    )
                     audio_map[wav_path_str] = (str(norm_path), str(spec_path))
                 except Exception as e:
                     _LOGGER.warning("Audio cache failed for %s: %s", wav_path_str, e)
@@ -603,48 +658,69 @@ def process_en_dataset(
                     speaker_name = spk_name
                     break
 
-        utterances.append({
-            "text": p["text"],
-            "audio_path": wav_key,
-            "speaker": speaker_name,
-            "speaker_id": p["speaker_id"],  # Use dynamic speaker_id
-            "language_id": 1,
-            "phonemes": p["phonemes"],
-            "phoneme_ids": p["phoneme_ids"],
-            "prosody_ids": [],
-            "prosody_features": p["prosody_features"],
-            "audio_norm_path": norm_path,
-            "audio_spec_path": spec_path,
-            "f0_path": None,
-        })
+        utterances.append(
+            {
+                "text": p["text"],
+                "audio_path": wav_key,
+                "speaker": speaker_name,
+                "speaker_id": p["speaker_id"],  # Use dynamic speaker_id
+                "language_id": 1,
+                "phonemes": p["phonemes"],
+                "phoneme_ids": p["phoneme_ids"],
+                "prosody_ids": [],
+                "prosody_features": p["prosody_features"],
+                "audio_norm_path": norm_path,
+                "audio_spec_path": spec_path,
+                "f0_path": None,
+            }
+        )
 
     _LOGGER.info(
         "Loaded %d EN utterances (%d speakers)",
-        len(utterances), len(speaker_id_map),
+        len(utterances),
+        len(speaker_id_map),
     )
     return utterances, speaker_id_map  # Return speaker_id_map
 
 
 def main():
-    logging.basicConfig(level=logging.INFO, format="%(name)s - %(levelname)s - %(message)s")
+    logging.basicConfig(
+        level=logging.INFO, format="%(name)s - %(levelname)s - %(message)s"
+    )
 
     parser = argparse.ArgumentParser(description="Prepare bilingual JA+EN dataset")
     parser.add_argument("--ja-dataset", required=True, help="Path to JA dataset.jsonl")
     parser.add_argument("--en-input-dir", help="Path to LJSpeech-1.1 directory")
-    parser.add_argument("--en-libritts", help="Path to LibriTTS-R directory (converted to LJSpeech format)")
+    parser.add_argument(
+        "--en-libritts",
+        help="Path to LibriTTS-R directory (converted to LJSpeech format)",
+    )
     parser.add_argument("--output-dir", required=True, help="Output directory")
     parser.add_argument("--sample-rate", type=int, default=22050)
-    parser.add_argument("--max-en-utterances", type=int, default=None,
-                        help="Max EN utterances per source (default: None = use all)")
-    parser.add_argument("--max-en-speakers", type=int, default=60,
-                        help="Maximum number of EN speakers to include (top N by utterance count, default: 60)")
-    parser.add_argument("--en-single-speaker", action="store_true",
-                        help="Force single-speaker EN mode (combine all EN data into one speaker)")
+    parser.add_argument(
+        "--max-en-utterances",
+        type=int,
+        default=None,
+        help="Max EN utterances per source (default: None = use all)",
+    )
+    parser.add_argument(
+        "--max-en-speakers",
+        type=int,
+        default=60,
+        help="Maximum number of EN speakers to include (top N by utterance count, default: 60)",
+    )
+    parser.add_argument(
+        "--en-single-speaker",
+        action="store_true",
+        help="Force single-speaker EN mode (combine all EN data into one speaker)",
+    )
     parser.add_argument("--workers", type=int, default=1)
     args = parser.parse_args()
 
     if not args.en_input_dir and not args.en_libritts:
-        parser.error("At least one of --en-input-dir or --en-libritts must be specified")
+        parser.error(
+            "At least one of --en-input-dir or --en-libritts must be specified"
+        )
 
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -711,7 +787,9 @@ def main():
 
     # Merge and write
     all_utts = ja_utts + en_utts
-    _LOGGER.info("Total utterances: %d (JA=%d, EN=%d)", len(all_utts), len(ja_utts), len(en_utts))
+    _LOGGER.info(
+        "Total utterances: %d (JA=%d, EN=%d)", len(all_utts), len(ja_utts), len(en_utts)
+    )
 
     # Write dataset.jsonl
     dataset_path = output_dir / "dataset.jsonl"
@@ -727,7 +805,9 @@ def main():
 
     _LOGGER.info(
         "Total speakers: %d (JA=%d, EN=%d)",
-        num_speakers, len(ja_speakers), len(en_speaker_id_map)
+        num_speakers,
+        len(ja_speakers),
+        len(en_speaker_id_map),
     )
 
     config = {
@@ -750,7 +830,12 @@ def main():
     config_path = output_dir / "config.json"
     with open(config_path, "w", encoding="utf-8") as f:
         json.dump(config, f, ensure_ascii=True, indent=4)
-    _LOGGER.info("Wrote %s (speakers=%d, symbols=%d, languages=2)", config_path, num_speakers, len(bilingual_id_map))
+    _LOGGER.info(
+        "Wrote %s (speakers=%d, symbols=%d, languages=2)",
+        config_path,
+        num_speakers,
+        len(bilingual_id_map),
+    )
 
 
 if __name__ == "__main__":
