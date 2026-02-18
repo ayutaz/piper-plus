@@ -74,7 +74,6 @@ ENGLISH_PHONEMES: list[str] = [
     # Rare characters that may appear in text
     "-",
     "'",
-    "'",
 ]
 
 

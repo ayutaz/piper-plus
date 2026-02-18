@@ -261,8 +261,10 @@ def main() -> None:
 
     # Build dummy input tuple dynamically
     dummy_input_list: list = [sequences, sequence_lengths, scales]
-    dummy_input_list.append(sid)
-    dummy_input_list.append(lid)
+    if num_speakers > 1:
+        dummy_input_list.append(sid)
+    if num_languages > 1:
+        dummy_input_list.append(lid)
     if has_prosody:
         dummy_input_list.append(prosody_features)
     dummy_input = tuple(dummy_input_list)
