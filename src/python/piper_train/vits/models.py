@@ -5,8 +5,7 @@ from torch import nn
 from torch.nn import Conv1d, Conv2d, ConvTranspose1d, functional as F
 from torch.nn.utils import remove_weight_norm, spectral_norm, weight_norm
 
-from . import attentions, commons, modules
-from super_monotonic_align import maximum_path
+from . import attentions, commons, modules, monotonic_align
 from .commons import get_padding, init_weights
 
 
@@ -920,7 +919,7 @@ class SynthesizerTrn(nn.Module):
 
             attn_mask = torch.unsqueeze(x_mask, 2) * torch.unsqueeze(y_mask, -1)
             attn = (
-                maximum_path(neg_cent, attn_mask.squeeze(1))
+                monotonic_align.maximum_path(neg_cent, attn_mask.squeeze(1))
                 .unsqueeze(1)
                 .detach()
             )
