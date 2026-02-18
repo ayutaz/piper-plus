@@ -46,13 +46,15 @@ def test_models_imports_local_monotonic_align():
 
 
 @pytest.mark.unit
-@pytest.mark.skipif(
-    not importlib.util.find_spec("torch"),
-    reason="torch required for module import test",
-)
 def test_models_module_importable():
     """Ensure piper_train.vits.models can be imported without errors."""
-    mod = importlib.import_module("piper_train.vits.models")
+    torch = pytest.importorskip("torch", reason="torch required")
+    try:
+        mod = importlib.import_module("piper_train.vits.models")
+    except ImportError as e:
+        if "monotonic_align" in str(e):
+            pytest.skip(f"Cython monotonic_align extension not built: {e}")
+        raise
     assert hasattr(mod, "SynthesizerTrn")
 
 
