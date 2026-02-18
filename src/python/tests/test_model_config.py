@@ -46,6 +46,10 @@ def test_models_imports_local_monotonic_align():
 
 
 @pytest.mark.unit
+@pytest.mark.skipif(
+    not importlib.util.find_spec("torch"),
+    reason="torch required for module import test",
+)
 def test_models_module_importable():
     """Ensure piper_train.vits.models can be imported without errors."""
     mod = importlib.import_module("piper_train.vits.models")
