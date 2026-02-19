@@ -206,9 +206,9 @@ python -m piper_train \
 
 以下の最適化が自動的に適用されます：
 
-- `find_unused_parameters=False`: パフォーマンス向上
+- `find_unused_parameters=True`: GAN学習（Generator/Discriminator交互最適化）に必須
 - `gradient_as_bucket_view=True`: メモリ効率向上
-- `static_graph=True`: VITSの固定グラフ構造に最適化
+- `static_graph=True`: `--no-wavlm` 時のみ有効（WavLM有効時はグラフが動的に変化するため無効）
 
 ### DataLoader最適化
 

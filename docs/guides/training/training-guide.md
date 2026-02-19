@@ -400,7 +400,7 @@ echo 'This is a test.' | \
 
 ### DataLoader ワーカー数 (`--num-workers`)
 
-`DataLoader` が使用するワーカー数はデフォルトで `min(16, CPU コア数)` に設定されています。
+`DataLoader` が使用するワーカー数はデフォルトで `2` に設定されています。
 必要に応じて学習コマンドに `--num-workers <N>` を追加することで変更できます。
 
 ```sh
@@ -413,6 +413,22 @@ python3 -m piper_train \
 ```
 
 ワーカー数を増やしすぎると、ディスク I/O や CPU ボトルネックによって逆に遅くなることがあります。マシンのコア数や負荷を確認しながら調整してください。
+
+### Validation制御
+
+Validation頻度とバッチ数を制御することで学習スループットを向上できます。
+
+| 引数 | デフォルト | 説明 |
+|------|-----------|------|
+| `--val-every-n-epochs N` | 5 | N エポックごとにValidationを実行 |
+| `--limit-val-batches N` | 50 | Validation時の最大バッチ数 |
+
+```sh
+python3 -m piper_train \
+  --dataset-dir /path/to/training_dir/ \
+  --val-every-n-epochs 10 \   # 10エポックごとにValidation
+  --limit-val-batches 20       # Validationを20バッチに制限
+```
 
 ### チェックポイント保存個数 (`--save-top-k`)
 
