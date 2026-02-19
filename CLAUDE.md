@@ -66,7 +66,7 @@ nohup /data/piper/.venv/bin/python -m piper_train \
   --max_epochs 200 --batch-size 20 --samples-per-speaker 2 \
   --checkpoint-epochs 1 --quality medium \
   --base_lr 2e-4 --disable_auto_lr_scaling \
-  --ema-decay 0.9995 --num-workers 0 --no-pin-memory \
+  --ema-decay 0.9995 \
   --max-phoneme-ids 400 \
   --no-wavlm \
   --default_root_dir /data/piper/output-bilingual-ja-en \
@@ -120,6 +120,41 @@ CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.infer_onnx \
 ---
 
 ## 実装済み機能
+
+### 学習高速化 ✅ NEW (2026-02-19)
+
+Validation頻度削減、DataLoader最適化、LRスケジューラ修正、DDP最適化により学習スループットを向上。
+
+**変更内容:**
+
+| 項目 | 変更前 | 変更後 | 効果 |
+|------|--------|--------|------|
+| Validation頻度 | 毎エポック | 5エポックごと (`--val-every-n-epochs 5`) | Validation overhead 80%削減 |
+| Validation バッチ数 | 全データ | 50バッチ (`--limit-val-batches 50`) | Validation時間短縮 |
+| DataLoader num_workers | 0 | 2 | データ読み込み並列化 |
+| DataLoader pin_memory | 無効 | 有効（デフォルト） | GPU転送高速化 |
+| LRスケジューラ | エポック終了時に未ステップ | `on_train_epoch_end` で手動ステップ | 学習率が正しく減衰 |
+| DDP static_graph | 未使用 | `--no-wavlm` 時に有効 | DDP通信最適化 |
+| `__getitem__` スレッドセーフ | `pop(idx)` でリスト変更 | インデックスアクセスのみ | マルチワーカー安全 |
+
+**新規CLIオプション:**
+- `--val-every-n-epochs N` — Validation実行頻度（デフォルト: 5）
+- `--limit-val-batches N` — Validation時の最大バッチ数（デフォルト: 50）
+
+**デフォルト変更:**
+- `--num-workers`: 0 → 2（明示的に `--num-workers 0` で旧動作に戻せる）
+- `pin_memory`: 無効 → 有効（`--no-pin-memory` で無効化可能）
+
+**実装ファイル:**
+- `src/python/piper_train/__main__.py` — 新CLI引数追加、num_workersデフォルト変更
+- `src/python/piper_train/vits/lightning.py` — `on_train_epoch_end()` LRスケジューラ修正、DDP `static_graph=True`
+- `src/python/piper_train/vits/dataset.py` — `__getitem__` スレッドセーフ修正
+
+**テストファイル (19テスト、4ファイル):**
+- `src/python/tests/test_model_config.py` — CLI引数デフォルト値テスト
+- `src/python/tests/test_dataset_getitem.py` — `__getitem__` スレッドセーフテスト
+- `src/python/tests/test_ddp_strategy.py` — DDP static_graph条件テスト
+- `src/python/tests/test_lr_scheduler.py` — LRスケジューラステップテスト
 
 ### バイリンガル (JA+EN) Phonemizer ✅ NEW (2026-02-02)
 
@@ -449,7 +484,7 @@ uv run python -m piper_train \
   --max_epochs 200 --batch-size 20 --samples-per-speaker 2 \
   --checkpoint-epochs 1 --quality medium \
   --base_lr 2e-4 --disable_auto_lr_scaling \
-  --ema-decay 0.9995 --num-workers 0 --no-pin-memory \
+  --ema-decay 0.9995 \
   --no-wavlm \
   --default_root_dir /data/piper/output-moe-speech-20speakers-v2
 ```
@@ -597,6 +632,8 @@ cat /path/to/test.jsonl | \
 1. ゾンビGPUプロセスを確認: `nvidia-smi --query-compute-apps=pid,used_memory --format=csv` でOSプロセスに対応しないPIDがないか確認。`kill -9` で終了したプロセスがGPUメモリを占有し続けることがある
 2. `--max-phoneme-ids 400` で長いシーケンスを除外しメモリスパイクを防止
 3. `MEMORY_CLEANUP_FREQUENCY` を調整（`lightning.py`、デフォルト: 500）
+4. `--val-every-n-epochs 10` でValidation頻度を下げる（デフォルト: 5エポックごと）
+5. `--limit-val-batches 20` でValidationバッチ数を削減（デフォルト: 50）
 
 **注意**: WavLM有効時の学習速度は ~0.03 it/s と遅い (WavLM無効時の 3-5倍)。速度を優先する場合は `--no-wavlm` で無効化推奨。マルチGPU環境で `--wavlm-every-n-steps N` (N>1) は使用しないこと。`find_unused_parameters=True` との相互作用でWavLMパラメータ（~94M）の未使用同期が発生し、逆に~3x遅くなる
 
