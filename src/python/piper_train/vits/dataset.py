@@ -1,5 +1,6 @@
 import json
 import logging
+import pickle
 import random
 from collections import defaultdict
 from collections.abc import Iterable, Sequence
@@ -69,6 +70,7 @@ class PiperDataset(Dataset):
         self,
         dataset_paths: list[str | Path],
         max_phoneme_ids: int | None = None,
+        validate_cache: bool = False,
     ):
         self.utterances: list[Utterance] = []
 
@@ -79,65 +81,62 @@ class PiperDataset(Dataset):
                 PiperDataset.load_dataset(dataset_path, max_phoneme_ids=max_phoneme_ids)
             )
 
+        if validate_cache:
+            before = len(self.utterances)
+            self.utterances = [
+                utt
+                for utt in self.utterances
+                if PiperDataset._validate_cache_files(utt)
+            ]
+            removed = before - len(self.utterances)
+            if removed:
+                _LOGGER.warning(
+                    "validate_cache: removed %d corrupted/missing cache file(s) "
+                    "out of %d utterances.",
+                    removed,
+                    before,
+                )
+            else:
+                _LOGGER.info(
+                    "validate_cache: all %d cache files are intact.", before
+                )
+
     def __len__(self):
         return len(self.utterances)
 
     def __getitem__(self, idx) -> UtteranceTensors:
         utt = self.utterances[idx]
-        # 問題のあるファイルでロードが失敗した場合はスキップして次を試す
-        while True:
-            try:
-                audio_norm = torch.load(
-                    utt.audio_norm_path, map_location="cpu", weights_only=True
-                )
-                spectrogram = torch.load(
-                    utt.audio_spec_path, map_location="cpu", weights_only=True
-                )
+        audio_norm = torch.load(
+            utt.audio_norm_path, map_location="cpu", weights_only=True
+        )
+        spectrogram = torch.load(
+            utt.audio_spec_path, map_location="cpu", weights_only=True
+        )
 
-                # Convert prosody_features to tensor if available
-                prosody_tensor = None
-                if utt.prosody_features is not None:
-                    prosody_tensor = self._prosody_features_to_tensor(
-                        utt.prosody_features
-                    )
+        # Convert prosody_features to tensor if available
+        prosody_tensor = None
+        if utt.prosody_features is not None:
+            prosody_tensor = self._prosody_features_to_tensor(
+                utt.prosody_features
+            )
 
-                return UtteranceTensors(
-                    phoneme_ids=LongTensor(utt.phoneme_ids),
-                    audio_norm=audio_norm,
-                    spectrogram=spectrogram,
-                    speaker_id=(
-                        LongTensor([utt.speaker_id])
-                        if utt.speaker_id is not None
-                        else None
-                    ),
-                    language_id=(
-                        LongTensor([utt.language_id])
-                        if utt.language_id is not None
-                        else None
-                    ),
-                    text=utt.text,
-                    prosody_features=prosody_tensor,
-                )
-            except Exception as e:
-                _LOGGER.error(
-                    "Failed to load tensors for %s (spec: %s): %s",
-                    utt.audio_norm_path,
-                    utt.audio_spec_path,
-                    e,
-                )
-
-                # 破損ファイルとみなし、データセットから除外
-                self.utterances.pop(idx)
-
-                # データがすべて無効になった場合はエラー
-                if len(self.utterances) == 0:
-                    raise RuntimeError("All utterances failed to load") from e
-
-                # 同じインデックスで次の要素を再試行
-                if idx >= len(self.utterances):
-                    idx = len(self.utterances) - 1
-                utt = self.utterances[idx]
-                # 次のファイルでリトライ（ログは出さない）
+        return UtteranceTensors(
+            phoneme_ids=LongTensor(utt.phoneme_ids),
+            audio_norm=audio_norm,
+            spectrogram=spectrogram,
+            speaker_id=(
+                LongTensor([utt.speaker_id])
+                if utt.speaker_id is not None
+                else None
+            ),
+            language_id=(
+                LongTensor([utt.language_id])
+                if utt.language_id is not None
+                else None
+            ),
+            text=utt.text,
+            prosody_features=prosody_tensor,
+        )
 
     @staticmethod
     def _prosody_features_to_tensor(
@@ -163,6 +162,33 @@ class PiperDataset(Dataset):
                 # Special tokens (^, $, ?, _, #, [, ]) have no prosody info
                 result.append([0, 0, 0])
         return LongTensor(result)
+
+    @staticmethod
+    def _validate_cache_files(utt: Utterance) -> bool:
+        """Return True if both cache files exist and load without error."""
+        try:
+            if not utt.audio_norm_path.exists() or not utt.audio_spec_path.exists():
+                _LOGGER.debug(
+                    "Cache validation failed (missing): %s", utt.audio_spec_path.name
+                )
+                return False
+            torch.load(utt.audio_norm_path, map_location="cpu", weights_only=True)
+            torch.load(utt.audio_spec_path, map_location="cpu", weights_only=True)
+            return True
+        except (RuntimeError, EOFError, pickle.UnpicklingError) as e:
+            _LOGGER.debug(
+                "Cache validation failed (%s) for %s",
+                type(e).__name__,
+                utt.audio_spec_path.name,
+            )
+            return False
+        except Exception as e:
+            _LOGGER.warning(
+                "Unexpected error validating cache %s: %s",
+                utt.audio_spec_path.name,
+                e,
+            )
+            return False
 
     @staticmethod
     def load_dataset(

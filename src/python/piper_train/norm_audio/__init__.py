@@ -1,3 +1,5 @@
+import os
+import tempfile
 from hashlib import sha256
 from pathlib import Path
 from typing import Optional, Union
@@ -12,6 +14,28 @@ from .vad import SileroVoiceActivityDetector
 
 
 _DIR = Path(__file__).parent
+
+
+def _atomic_torch_save(obj, path: Path) -> None:
+    """Save a tensor to *path* atomically using a temp file + rename.
+
+    ``torch.save`` writes directly to the target path, so a crash mid-write
+    leaves a truncated (corrupt) file.  Writing to a sibling temp file first
+    and then renaming (which is atomic on POSIX) avoids this.
+    """
+    path = Path(path)
+    tmp_fd, tmp_path = tempfile.mkstemp(dir=path.parent, suffix=".tmp")
+    try:
+        os.close(tmp_fd)
+        torch.save(obj, tmp_path)
+        os.replace(tmp_path, path)  # atomic on POSIX
+    except Exception:
+        # Clean up temp file if anything went wrong
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+        raise
 
 
 def make_silence_detector() -> SileroVoiceActivityDetector:
@@ -70,9 +94,9 @@ def cache_norm_audio(
             duration=duration_sec,
         )
 
-        # Save to cache directory
+        # Save to cache directory (atomic write: temp file → rename)
         audio_norm_tensor = torch.FloatTensor(audio_norm_array).unsqueeze(0)
-        torch.save(audio_norm_tensor, audio_norm_path)
+        _atomic_torch_save(audio_norm_tensor, audio_norm_path)
 
     # Compute spectrogram
     if ignore_cache or (not audio_spec_path.exists()):
@@ -88,6 +112,6 @@ def cache_norm_audio(
             win_size=window_length,
             center=False,
         ).squeeze(0)
-        torch.save(audio_spec_tensor, audio_spec_path)
+        _atomic_torch_save(audio_spec_tensor, audio_spec_path)
 
     return audio_norm_path, audio_spec_path
