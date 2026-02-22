@@ -623,106 +623,119 @@ class VitsModel(pl.LightningModule):
 
         This is called after all validation batches are processed,
         avoiding blocking the validation loop with audio generation.
+
+        DDP safety: rank 0 performs audio generation and WandB upload inside
+        the is_global_zero block, then ALL ranks sync at a barrier. Without
+        the barrier, Lightning may advance ranks 1-3 to the next training step
+        while rank 0 is still uploading to WandB, causing NCCL ALLREDUCE timeout.
         """
-        # Only run on rank 0 to avoid NCCL desync from WandB network I/O on all ranks
-        if not self.trainer.is_global_zero:
-            return
+        # Only rank 0 does audio generation and WandB logging.
+        # Wrapped in a block (not early return) so the barrier below runs on all ranks.
+        if self.trainer.is_global_zero:
+            should_log = (
+                self.hparams.audio_log_epochs > 0
+                and self.current_epoch % self.hparams.audio_log_epochs == 0
+            )
+            wandb_logger = self._get_wandb_logger() if should_log else None
 
-        # Check if we should log this epoch
-        if self.hparams.audio_log_epochs <= 0:
-            return  # Logging disabled
+            if should_log and wandb_logger is not None and WANDB_AVAILABLE:
+                try:
+                    wandb_audio_data = []
 
-        if self.current_epoch % self.hparams.audio_log_epochs != 0:
-            return  # Not this epoch
+                    with torch.no_grad():  # Disable gradient computation
+                        for utt_idx, test_utt in enumerate(self._test_dataset):
+                            # Generate audio
+                            text = test_utt.phoneme_ids.unsqueeze(0).to(self.device)
+                            text_lengths = torch.LongTensor(
+                                [len(test_utt.phoneme_ids)]
+                            ).to(self.device)
+                            scales = [0.667, 1.0, 0.8]
+                            sid = (
+                                test_utt.speaker_id.to(self.device)
+                                if test_utt.speaker_id is not None
+                                else None
+                            )
+                            lid = (
+                                test_utt.language_id.to(self.device)
+                                if test_utt.language_id is not None
+                                else None
+                            )
 
-        # Get WandB logger
-        wandb_logger = self._get_wandb_logger()
-        if wandb_logger is None or not WANDB_AVAILABLE:
-            return
+                            test_audio = self(
+                                text, text_lengths, scales, sid=sid, lid=lid
+                            ).detach()
+                            test_audio = test_audio * (
+                                1.0 / max(0.01, abs(test_audio.max()))
+                            )
 
-        # Generate and log audio samples with memory-efficient processing
-        try:
-            wandb_audio_data = []
+                            # Convert to numpy (CPU)
+                            audio_np = test_audio.squeeze().cpu().numpy()
 
-            with torch.no_grad():  # Disable gradient computation
-                for utt_idx, test_utt in enumerate(self._test_dataset):
-                    # Generate audio
-                    text = test_utt.phoneme_ids.unsqueeze(0).to(self.device)
-                    text_lengths = torch.LongTensor([len(test_utt.phoneme_ids)]).to(
-                        self.device
-                    )
-                    scales = [0.667, 1.0, 0.8]
-                    sid = (
-                        test_utt.speaker_id.to(self.device)
-                        if test_utt.speaker_id is not None
-                        else None
-                    )
-                    lid = (
-                        test_utt.language_id.to(self.device)
-                        if test_utt.language_id is not None
-                        else None
-                    )
+                            # Build metadata
+                            text_str = (
+                                test_utt.text if test_utt.text else f"sample_{utt_idx}"
+                            )
+                            speaker_str = (
+                                f"spk={sid.item()}" if sid is not None else "single"
+                            )
+                            language_map = {0: "ja", 1: "en"}
+                            lang_str = language_map.get(
+                                lid.item() if lid is not None else 0, "unknown"
+                            )
+                            noise_scale, length_scale, noise_scale_w = scales
 
-                    test_audio = self(
-                        text, text_lengths, scales, sid=sid, lid=lid
-                    ).detach()
-                    test_audio = test_audio * (1.0 / max(0.01, abs(test_audio.max())))
+                            # Create WandB audio
+                            caption = f"{text_str} | {speaker_str} | {lang_str} | noise={noise_scale:.3f},len={length_scale:.2f},noisew={noise_scale_w:.2f}"
+                            wandb_audio = wandb.Audio(
+                                audio_np,
+                                sample_rate=self.hparams.sample_rate,
+                                caption=caption,
+                            )
 
-                    # Convert to numpy (CPU)
-                    audio_np = test_audio.squeeze().cpu().numpy()
+                            wandb_audio_data.append(
+                                [
+                                    text_str,
+                                    speaker_str,
+                                    lang_str,
+                                    self.current_epoch,
+                                    self.global_step,
+                                    wandb_audio,
+                                ]
+                            )
 
-                    # Build metadata
-                    text_str = test_utt.text if test_utt.text else f"sample_{utt_idx}"
-                    speaker_str = f"spk={sid.item()}" if sid is not None else "single"
-                    language_map = {0: "ja", 1: "en"}
-                    lang_str = language_map.get(
-                        lid.item() if lid is not None else 0, "unknown"
-                    )
-                    noise_scale, length_scale, noise_scale_w = scales
+                            # Aggressive per-sample GPU memory cleanup
+                            del test_audio, text, text_lengths, sid, lid
+                            if torch.cuda.is_available():
+                                torch.cuda.synchronize()
+                                torch.cuda.empty_cache()
 
-                    # Create WandB audio
-                    caption = f"{text_str} | {speaker_str} | {lang_str} | noise={noise_scale:.3f},len={length_scale:.2f},noisew={noise_scale_w:.2f}"
-                    wandb_audio = wandb.Audio(
-                        audio_np, sample_rate=self.hparams.sample_rate, caption=caption
-                    )
+                    # Log all samples as table
+                    if wandb_audio_data:
+                        columns = ["text", "speaker", "language", "epoch", "step", "audio"]
+                        table = wandb.Table(columns=columns, data=wandb_audio_data)
+                        wandb_logger.experiment.log(
+                            {
+                                f"validation_audio_samples/epoch_{self.current_epoch}": table
+                            },
+                            step=self.global_step,
+                        )
+                        _LOGGER.info(
+                            f"Logged {len(wandb_audio_data)} audio samples to WandB at epoch {self.current_epoch}"
+                        )
 
-                    wandb_audio_data.append(
-                        [
-                            text_str,
-                            speaker_str,
-                            lang_str,
-                            self.current_epoch,
-                            self.global_step,
-                            wandb_audio,
-                        ]
-                    )
-
-                    # Aggressive per-sample GPU memory cleanup
-                    del test_audio, text, text_lengths, sid, lid
+                    # Final cleanup
+                    del wandb_audio_data
                     if torch.cuda.is_available():
-                        torch.cuda.synchronize()  # Wait for GPU operations to complete
+                        torch.cuda.synchronize()
                         torch.cuda.empty_cache()
 
-            # Log all samples as table
-            if wandb_audio_data:
-                columns = ["text", "speaker", "language", "epoch", "step", "audio"]
-                table = wandb.Table(columns=columns, data=wandb_audio_data)
-                wandb_logger.experiment.log(
-                    {f"validation_audio_samples/epoch_{self.current_epoch}": table},
-                    step=self.global_step,
-                )
-                _LOGGER.info(
-                    f"Logged {len(wandb_audio_data)} audio samples to WandB at epoch {self.current_epoch}"
-                )
+                except Exception as e:
+                    _LOGGER.warning(f"Failed to log audio to WandB: {e}")
 
-            # Final cleanup
-            del wandb_audio_data
-            if torch.cuda.is_available():
-                torch.cuda.synchronize()
-                torch.cuda.empty_cache()
-
-        except Exception as e:
-            _LOGGER.warning(f"Failed to log audio to WandB: {e}")
+        # DDP barrier: all ranks wait here so rank 0's WandB I/O completes before
+        # any rank advances to the next training step.
+        if self.trainer.world_size > 1:
+            torch.distributed.barrier()
 
     def configure_optimizers(self):
         # Collect discriminator parameters (including WavLM if enabled)
