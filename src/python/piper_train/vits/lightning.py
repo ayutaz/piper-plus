@@ -87,6 +87,7 @@ class VitsModel(pl.LightningModule):
         num_test_examples: int = 2,
         validation_split: float = 0.1,
         max_phoneme_ids: int | None = None,
+        validate_cache: bool = False,
         # WavLM Discriminator (enabled by default for improved audio quality)
         use_wavlm_discriminator: bool = True,
         wavlm_model_name: str = "microsoft/wavlm-base-plus",
@@ -244,13 +245,17 @@ class VitsModel(pl.LightningModule):
             _LOGGER.debug("No dataset to load")
             return
 
+        validate_cache = self.hparams.get("validate_cache", False)
+
         # Try to load fixed test dataset first
         test_utterances_path = self.hparams.dataset_dir / "test_utterances.jsonl"
         if test_utterances_path.exists():
             self._test_dataset = self._load_test_dataset(test_utterances_path)
             # Load train/val datasets without test examples
             full_dataset = PiperDataset(
-                self.hparams.dataset, max_phoneme_ids=max_phoneme_ids
+                self.hparams.dataset,
+                max_phoneme_ids=max_phoneme_ids,
+                validate_cache=validate_cache,
             )
             valid_set_size = int(len(full_dataset) * validation_split)
             train_set_size = len(full_dataset) - valid_set_size
@@ -263,7 +268,9 @@ class VitsModel(pl.LightningModule):
                 f"Fixed test dataset not found at {test_utterances_path}, using random split"
             )
             full_dataset = PiperDataset(
-                self.hparams.dataset, max_phoneme_ids=max_phoneme_ids
+                self.hparams.dataset,
+                max_phoneme_ids=max_phoneme_ids,
+                validate_cache=validate_cache,
             )
             valid_set_size = int(len(full_dataset) * validation_split)
             train_set_size = len(full_dataset) - valid_set_size - num_test_examples
@@ -786,6 +793,13 @@ class VitsModel(pl.LightningModule):
             "--max-phoneme-ids",
             type=int,
             help="Exclude utterances with phoneme id lists longer than this",
+        )
+        parser.add_argument(
+            "--validate-cache",
+            action="store_true",
+            default=False,
+            help="At startup, load-test every cached .pt file and skip corrupted ones "
+            "(slow for large datasets; use once after suspected corruption).",
         )
         parser.add_argument("--hidden-channels", type=int, default=192)
         parser.add_argument("--inter-channels", type=int, default=192)
