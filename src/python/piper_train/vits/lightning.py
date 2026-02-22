@@ -82,7 +82,7 @@ class VitsModel(pl.LightningModule):
         c_mel: int = 45,
         c_kl: float = 1.0,
         grad_clip: float | None = None,
-        num_workers: int = 0,
+        num_workers: int = 2,
         seed: int = 1234,
         num_test_examples: int = 2,
         validation_split: float = 0.1,
@@ -290,6 +290,15 @@ class VitsModel(pl.LightningModule):
         )
 
         return audio
+
+    def on_train_epoch_end(self):
+        """Step LR schedulers at the end of each epoch.
+
+        With automatic_optimization=False, Lightning does not step schedulers
+        automatically. We must do it manually.
+        """
+        for sch in self.lr_schedulers():
+            sch.step()
 
     def on_train_epoch_start(self):
         """エポック開始時にSpeakerBalancedBatchSamplerのepochを更新"""
@@ -615,6 +624,10 @@ class VitsModel(pl.LightningModule):
         This is called after all validation batches are processed,
         avoiding blocking the validation loop with audio generation.
         """
+        # Only run on rank 0 to avoid NCCL desync from WandB network I/O on all ranks
+        if not self.trainer.is_global_zero:
+            return
+
         # Check if we should log this epoch
         if self.hparams.audio_log_epochs <= 0:
             return  # Logging disabled
@@ -695,7 +708,8 @@ class VitsModel(pl.LightningModule):
                 columns = ["text", "speaker", "language", "epoch", "step", "audio"]
                 table = wandb.Table(columns=columns, data=wandb_audio_data)
                 wandb_logger.experiment.log(
-                    {"validation_audio_samples": table, "epoch": self.current_epoch}
+                    {f"validation_audio_samples/epoch_{self.current_epoch}": table},
+                    step=self.global_step,
                 )
                 _LOGGER.info(
                     f"Logged {len(wandb_audio_data)} audio samples to WandB at epoch {self.current_epoch}"
@@ -780,7 +794,8 @@ class VitsModel(pl.LightningModule):
         parser.add_argument(
             "--num-workers",
             type=int,
-            default=0,
-            help="Number of workers for DataLoader (default: 0, increase to 2-4 for faster data loading at the cost of more memory)",
+            default=2,
+            help="Number of workers for DataLoader (default: 2 for parallel data loading). "
+            "Set to 0 for single-threaded loading if shared memory is limited.",
         )
         return parent_parser
