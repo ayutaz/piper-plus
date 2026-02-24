@@ -604,24 +604,22 @@ uv run python /data/piper/prepare_bilingual_dataset.py \
 ### ONNX変換
 
 ```bash
-# WavLM無効モデル（deterministic、--no-ema）
+# 通常エクスポート（EMA + stochastic、デフォルト推奨）
 CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
-  --no-ema \
   /path/to/checkpoint.ckpt \
   /path/to/output.onnx
 
-# WavLM有効モデル（stochastic + EMA重み適用）
+# deterministic（デバッグ用）
 CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
-  --stochastic \
+  --no-stochastic \
   /path/to/checkpoint.ckpt \
   /path/to/output.onnx
 ```
 
 | オプション | デフォルト | 説明 |
 |-----------|----------|------|
-| `--stochastic` | off | noise_scaleによるサンプリングを有効化（WavLMモデル推奨） |
-| `--use-ema` | on | チェックポイントのEMA重みをデコーダに適用 |
-| `--no-ema` | - | EMA重み適用を無効化 |
+| `--no-stochastic` | - | deterministic エクスポート（デバッグ用） |
+| EMA | 常時有効 | チェックポイントに EMA state があれば自動適用 |
 
 ### 推論テスト
 
