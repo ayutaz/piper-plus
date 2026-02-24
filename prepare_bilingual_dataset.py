@@ -135,8 +135,22 @@ def process_ja_dataset(
     cache_dir: Path,
     ja_speaker_offset: int = 0,
     workers: int = 1,
+    already_bilingual: bool = False,
 ) -> tuple[list[dict], dict[str, int]]:
-    """Process JA dataset with bilingual phonemizer and cache generation."""
+    """Process JA dataset with bilingual phonemizer and cache generation.
+
+    Args:
+        already_bilingual: If True, the input dataset is already a bilingual dataset
+            (e.g., dataset-bilingual-ja-en-enhanced-fixed). In this mode:
+            - Only language_id==0 (JA) entries are processed
+            - Phoneme IDs are used as-is (already in bilingual space, already padded)
+            - audio_norm_path / audio_spec_path are read directly from the entry
+    """
+    if already_bilingual:
+        return _process_ja_from_bilingual_dataset(
+            ja_jsonl_path, ja_speaker_offset
+        )
+
     ja_id_map = get_japanese_id_map()
 
     # ===== Phase 1: Phoneme remapping =====
@@ -285,6 +299,80 @@ def process_ja_dataset(
         "Loaded %d JA utterances (%d audio-skipped), %d speakers",
         len(utterances),
         skipped_audio,
+        len(speaker_ids_seen),
+    )
+    return utterances, speaker_ids_seen
+
+
+def _process_ja_from_bilingual_dataset(
+    jsonl_path: Path,
+    ja_speaker_offset: int = 0,
+) -> tuple[list[dict], dict[str, int]]:
+    """Read JA entries directly from an already-processed bilingual dataset.
+
+    Used when --ja-already-bilingual is specified. Phoneme IDs and audio caches
+    are already in the correct format; only language_id==0 entries are kept.
+    Speaker IDs are reassigned starting from ja_speaker_offset.
+    """
+    utterances: list[dict] = []
+    speaker_ids_seen: dict[str, int] = {}
+    skipped = 0
+
+    with open(jsonl_path, encoding="utf-8") as f:
+        for line_no, line in enumerate(f):
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                utt = json.loads(line)
+            except json.JSONDecodeError:
+                _LOGGER.warning("Skipping invalid JSON at line %d", line_no + 1)
+                skipped += 1
+                continue
+
+            # Only JA entries
+            if utt.get("language_id", 0) != 0:
+                continue
+
+            phoneme_ids = utt.get("phoneme_ids", [])
+            if not phoneme_ids:
+                skipped += 1
+                continue
+
+            norm_path = utt.get("audio_norm_path", "")
+            spec_path = utt.get("audio_spec_path", "")
+            if not norm_path or not Path(norm_path).exists():
+                skipped += 1
+                continue
+            if not spec_path or not Path(spec_path).exists():
+                skipped += 1
+                continue
+
+            speaker = utt.get("speaker", "unknown")
+            if speaker not in speaker_ids_seen:
+                speaker_ids_seen[speaker] = len(speaker_ids_seen) + ja_speaker_offset
+
+            utterances.append(
+                {
+                    "text": utt.get("text", ""),
+                    "audio_path": utt.get("audio_path", ""),
+                    "speaker": speaker,
+                    "speaker_id": speaker_ids_seen[speaker],
+                    "language_id": 0,
+                    "phonemes": utt.get("phonemes", []),
+                    "phoneme_ids": phoneme_ids,
+                    "prosody_ids": utt.get("prosody_ids", []),
+                    "prosody_features": utt.get("prosody_features", []),
+                    "audio_norm_path": norm_path,
+                    "audio_spec_path": spec_path,
+                    "f0_path": utt.get("f0_path"),
+                }
+            )
+
+    _LOGGER.info(
+        "Loaded %d JA utterances from bilingual dataset (%d skipped), %d speakers",
+        len(utterances),
+        skipped,
         len(speaker_ids_seen),
     )
     return utterances, speaker_ids_seen
@@ -690,6 +778,12 @@ def main():
 
     parser = argparse.ArgumentParser(description="Prepare bilingual JA+EN dataset")
     parser.add_argument("--ja-dataset", required=True, help="Path to JA dataset.jsonl")
+    parser.add_argument(
+        "--ja-already-bilingual",
+        action="store_true",
+        help="Input JA dataset is already a bilingual dataset (e.g., enhanced-fixed). "
+        "Skips phoneme ID remapping and padding; reads audio caches directly.",
+    )
     parser.add_argument("--en-input-dir", help="Path to LJSpeech-1.1 directory")
     parser.add_argument(
         "--en-libritts",
@@ -738,6 +832,7 @@ def main():
         cache_dir,
         ja_speaker_offset=0,
         workers=args.workers,
+        already_bilingual=args.ja_already_bilingual,
     )
 
     # EN speaker ID offset = next after JA speakers
