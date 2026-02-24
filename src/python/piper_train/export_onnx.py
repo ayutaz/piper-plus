@@ -103,25 +103,12 @@ def main() -> None:
     )
     parser.add_argument(
         "--stochastic",
-        action="store_true",
-        help="Enable stochastic sampling (z_p = m_p + noise * noise_scale). "
-        "Recommended for WavLM-trained models to avoid mechanical artifacts.",
-    )
-    parser.add_argument(
-        "--use-ema",
-        action="store_true",
+        action=argparse.BooleanOptionalAction,
         default=True,
-        help="Apply EMA weights to decoder if available in checkpoint (default: enabled)",
-    )
-    parser.add_argument(
-        "--no-ema",
-        action="store_true",
-        help="Disable EMA weight application",
+        help="Enable stochastic sampling (z_p = m_p + noise * noise_scale). "
+        "Default: enabled. Use --no-stochastic for deterministic (debugging用).",
     )
     args = parser.parse_args()
-
-    if args.no_ema:
-        args.use_ema = False
 
     if args.debug:
         logging.basicConfig(level=logging.DEBUG)
@@ -161,27 +148,36 @@ def main() -> None:
     # Inference only
     model_g.eval()
 
+    # Apply EMA weights to decoder if available (always applied when present)
+    # IMPORTANT: EMA must be applied BEFORE remove_weight_norm(), because EMA shadow
+    # params use weight_g/weight_v keys. remove_weight_norm() fuses them into a single
+    # "weight" tensor, making EMA keys unmatchable.
+    ckpt = torch.load(args.checkpoint, map_location="cpu")
+    ema_state = ckpt.get("ema_generator_state")
+    if ema_state and "shadow_params" in ema_state:
+        applied = 0
+        skipped = 0
+        dec_params = dict(model_g.dec.named_parameters())
+        for name, shadow_param in ema_state["shadow_params"].items():
+            if name in dec_params:
+                dec_params[name].data.copy_(shadow_param)
+                applied += 1
+            else:
+                skipped += 1
+        if applied > 0:
+            _LOGGER.info(
+                "Applied EMA weights to decoder: %d parameters (skipped %d)",
+                applied,
+                skipped,
+            )
+        else:
+            _LOGGER.warning("EMA state found but no matching decoder parameters")
+    else:
+        _LOGGER.info("No EMA state found in checkpoint, skipping EMA")
+    del ckpt
+
     with torch.no_grad():
         model_g.dec.remove_weight_norm()
-
-    # Apply EMA weights to decoder if available
-    if args.use_ema:
-        ckpt = torch.load(args.checkpoint, map_location="cpu")
-        ema_state = ckpt.get("ema_generator_state")
-        if ema_state and "shadow_params" in ema_state:
-            applied = 0
-            dec_params = dict(model_g.dec.named_parameters())
-            for name, shadow_param in ema_state["shadow_params"].items():
-                if name in dec_params:
-                    dec_params[name].data.copy_(shadow_param)
-                    applied += 1
-            if applied > 0:
-                _LOGGER.info("Applied EMA weights to decoder: %d parameters", applied)
-            else:
-                _LOGGER.warning("EMA state found but no matching decoder parameters")
-        else:
-            _LOGGER.info("No EMA state found in checkpoint, skipping EMA")
-        del ckpt
 
     # Check if model uses prosody features
     has_prosody = getattr(model_g, "prosody_dim", 0) > 0
@@ -319,7 +315,7 @@ def main() -> None:
 
     mode = "stochastic" if args.stochastic else "deterministic"
     _LOGGER.info(
-        "Exported model to %s (mode: %s, ema: %s)", args.output, mode, args.use_ema
+        "Exported model to %s (mode: %s)", args.output, mode
     )
 
     # Apply ONNX simplification if requested
