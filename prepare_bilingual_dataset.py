@@ -758,8 +758,8 @@ def main():
             en_speaker_id_offset=en_speaker_id_offset,
             max_utterances=args.max_en_utterances,
             workers=args.workers,
-            max_speakers=None,  # Use all speakers (LJSpeech has only 1)
-            multi_speaker=False,  # LJSpeech is single-speaker
+            max_speakers=args.max_en_speakers,
+            multi_speaker=not args.en_single_speaker,
         )
         en_utts.extend(ljspeech_utts)
         en_speaker_id_map.update(ljspeech_speakers)

@@ -192,7 +192,7 @@ def main() -> None:
         g = model_g._get_global_conditioning(sid, lid)
 
         # 2. Duration Predictor (called only once)
-        x_dp = model_g._prepare_prosody_input(x, x_mask, prosody_features)
+        x_dp = model_g._prepare_prosody_input(x, x_mask, prosody_features, lid=lid)
         if model_g.use_sdp:
             logw = model_g.dp(
                 x_dp, x_mask, g=g, reverse=True, noise_scale=noise_scale_w
