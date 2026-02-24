@@ -47,12 +47,13 @@ def calculate_learning_rate(base_lr, effective_batch_size, base_batch_size=16):
     return base_lr * (effective_batch_size / base_batch_size)
 
 
-def configure_ddp_strategy(num_gpus, user_strategy=None):
+def configure_ddp_strategy(num_gpus, user_strategy=None, no_wavlm=False):
     """Configure DDP strategy for multi-GPU training.
 
     Args:
         num_gpus: Number of GPUs to use
         user_strategy: User-specified strategy (optional)
+        no_wavlm: Whether WavLM is disabled (unused, kept for API compatibility).
 
     Returns:
         Strategy configuration or None
@@ -61,13 +62,14 @@ def configure_ddp_strategy(num_gpus, user_strategy=None):
         _LOGGER.info(f"Using user-specified strategy: {user_strategy}")
         return user_strategy
     elif num_gpus >= 2:
+        ddp_kwargs = {
+            "find_unused_parameters": True,
+            "gradient_as_bucket_view": True,
+        }
         _LOGGER.info(
-            "Using optimized DDPStrategy with gradient_as_bucket_view=True for memory efficiency"
+            "Using DDPStrategy with find_unused_parameters=True, gradient_as_bucket_view=True"
         )
-        return DDPStrategy(
-            find_unused_parameters=True,
-            gradient_as_bucket_view=True,
-        )
+        return DDPStrategy(**ddp_kwargs)
     return None
 
 
@@ -175,6 +177,20 @@ def main():
         default="16-mixed",
         choices=("32-true", "16-mixed", "bf16-mixed"),
         help="Floating point precision (default: 16-mixed for faster training with minimal quality impact)",
+    )
+    parser.add_argument(
+        "--val-every-n-epochs",
+        type=int,
+        default=5,
+        help="Run validation every N epochs (default: 5). Training loss is monitored via WandB every step, "
+        "so validation is only needed for quality trend checks.",
+    )
+    parser.add_argument(
+        "--limit-val-batches",
+        type=int,
+        default=50,
+        help="Limit validation to N batches per validation run (default: 50). "
+        "50 batches (~1000 samples) is statistically sufficient for trend monitoring.",
     )
     parser.add_argument(
         "--max_epochs", type=int, default=1000, help="Maximum number of epochs"
@@ -309,12 +325,14 @@ def main():
         "callbacks": callbacks,
         "default_root_dir": args.default_root_dir,
         "logger": loggers,
+        "check_val_every_n_epoch": args.val_every_n_epochs,
+        "limit_val_batches": args.limit_val_batches,
     }
 
     # Multi-GPU DDP optimization
     # Use DDPStrategy with gradient_as_bucket_view=True for memory efficiency
     # find_unused_parameters=True is required for GAN training (Generator/Discriminator alternate)
-    strategy = configure_ddp_strategy(num_gpus, args.strategy)
+    strategy = configure_ddp_strategy(num_gpus, args.strategy, no_wavlm=args.no_wavlm)
     if strategy:
         trainer_kwargs["strategy"] = strategy
 
@@ -353,10 +371,13 @@ def main():
         dict_args["upsample_initial_channel"] = 512
         dict_args["upsample_kernel_sizes"] = (16, 16, 4, 4)
 
-    # マルチスピーカーモデルの場合、gin_channelsを768に設定（品質向上のため）
+    # マルチスピーカーモデルの場合、gin_channelsを512に設定
+    # 768はONNXエクスポート時の数値精度低下を引き起こす（PyTorch↔ONNX相関が0.97→0.70に低下）
+    # 21話者バイリンガルモデル(gin_channels=512)では正常だが、80話者(768)でガビガビ音が発生
+    # VitsModel.__init__のフォールバック(512)と一致させる
     # argparseは常にdefault値(0)をdict_argsに含めるため、"not in"ではなく値チェック
     if num_speakers > 1 and dict_args.get("gin_channels", 0) == 0:
-        dict_args["gin_channels"] = 768
+        dict_args["gin_channels"] = 512
 
     # num_workers自動調整機能を削除
     # ユーザー指定のnum_workersをそのまま使用する
@@ -471,10 +492,12 @@ def main():
                 "callbacks": callbacks,
                 "default_root_dir": args.default_root_dir,
                 "logger": loggers,
+                "check_val_every_n_epoch": args.val_every_n_epochs,
+                "limit_val_batches": args.limit_val_batches,
             }
 
             # Multi-GPU DDP optimization
-            strategy = configure_ddp_strategy(num_gpus, args.strategy)
+            strategy = configure_ddp_strategy(num_gpus, args.strategy, no_wavlm=args.no_wavlm)
             if strategy:
                 trainer_kwargs["strategy"] = strategy
 
