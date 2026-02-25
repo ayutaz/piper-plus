@@ -173,6 +173,14 @@ def main():
         "Set to 0 to disable (default: 0).",
     )
     parser.add_argument(
+        "--language-balanced-sampling",
+        action="store_true",
+        default=False,
+        help="Balance batches by language group (JA 50%% / EN 50%%) instead of by speaker count. "
+        "Recommended when EN speakers >> JA speakers (e.g., 1133 EN + 20 JA) to prevent JA quality degradation. "
+        "Requires --samples-per-speaker > 0 and num_languages > 1.",
+    )
+    parser.add_argument(
         "--precision",
         default="16-mixed",
         choices=("32-true", "16-mixed", "bf16-mixed"),

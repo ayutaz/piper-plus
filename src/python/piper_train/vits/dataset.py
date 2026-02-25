@@ -104,6 +104,9 @@ class PiperDataset(Dataset):
                 if audio_norm.dim() == 1:
                     audio_norm = audio_norm.unsqueeze(0)
                 spectrogram = _load_tensor(utt.audio_spec_path)
+                # Convert float16 spec to float32 (new caches are saved as float16 to save disk space)
+                if spectrogram.dtype == torch.float16:
+                    spectrogram = spectrogram.float()
 
                 # Convert prosody_features to tensor if available
                 prosody_tensor = None
@@ -360,6 +363,11 @@ class SpeakerBalancedBatchSampler:
     このサンプラーは各バッチに同一話者からsamples_per_speaker個のサンプルを
     含めることで、SDPの学習を安定化させる。
 
+    language_group_balance=True の場合:
+        言語グループ (JA/EN) を 50:50 でバランスする。
+        EN 話者数 >> JA 話者数の場合に JA 音質が劣化するのを防ぐ。
+        例: 20 JA話者 + 1133 EN話者 → 各バッチで JA 5話者 + EN 5話者 を保証
+
     DDP (Distributed Data Parallel) 対応:
     - torch.distributedが初期化されている場合、各GPUが異なるバッチを取得
     - 全GPUで同じseedを使用してバッチ生成順序を揃え、
@@ -370,13 +378,14 @@ class SpeakerBalancedBatchSampler:
         batch_size: バッチサイズ
         samples_per_speaker: 各話者からのサンプル数 (デフォルト: 4)
         drop_last: 最後の不完全バッチを捨てるか (デフォルト: True)
+        language_group_balance: 言語グループ (JA/EN) を 50:50 でバランスするか (デフォルト: False)
 
     Example:
         batch_size=32, samples_per_speaker=4 の場合:
         → 8話者 × 4サンプル = 32サンプル/バッチ
 
-        バッチ構成例:
-        [話者0×4, 話者3×4, 話者7×4, 話者12×4, 話者5×4, 話者18×4, 話者9×4, 話者15×4]
+        language_group_balance=True の場合:
+        → JA 4話者 × 4サンプル + EN 4話者 × 4サンプル = 32サンプル/バッチ
     """
 
     def __init__(
@@ -385,10 +394,12 @@ class SpeakerBalancedBatchSampler:
         batch_size: int,
         samples_per_speaker: int = 4,
         drop_last: bool = True,
+        language_group_balance: bool = False,
     ):
         # 話者ごとにインデックスをグループ化
         # Subsetの場合は元のデータセットのutterancesを参照
         self.speaker_to_indices: dict[int, list[int]] = defaultdict(list)
+        speaker_to_language: dict[int, int] = {}
 
         # datasetがSubsetの場合の対応
         if hasattr(dataset, "indices") and hasattr(dataset, "dataset"):
@@ -399,11 +410,19 @@ class SpeakerBalancedBatchSampler:
                 utt = original_dataset.utterances[original_idx]
                 speaker_id = utt.speaker_id if utt.speaker_id is not None else 0
                 self.speaker_to_indices[speaker_id].append(subset_idx)
+                if speaker_id not in speaker_to_language:
+                    speaker_to_language[speaker_id] = (
+                        utt.language_id if utt.language_id is not None else 0
+                    )
         else:
             # PiperDataset または utterances属性を持つデータセット
             for idx, utt in enumerate(dataset.utterances):
                 speaker_id = utt.speaker_id if utt.speaker_id is not None else 0
                 self.speaker_to_indices[speaker_id].append(idx)
+                if speaker_id not in speaker_to_language:
+                    speaker_to_language[speaker_id] = (
+                        utt.language_id if utt.language_id is not None else 0
+                    )
 
         self.speakers = list(self.speaker_to_indices.keys())
         self.batch_size = batch_size
@@ -414,6 +433,26 @@ class SpeakerBalancedBatchSampler:
         # 実際のバッチサイズを調整
         self.effective_batch_size = self.speakers_per_batch * samples_per_speaker
         self.drop_last = drop_last
+        self.language_group_balance = language_group_balance
+
+        # 言語グループ均等サンプリングの準備
+        self.lang_groups: dict[int, list[int]] = defaultdict(list)
+        if language_group_balance:
+            for spk_id in self.speakers:
+                lang = speaker_to_language.get(spk_id, 0)
+                self.lang_groups[lang].append(spk_id)
+            # JA/EN スロット数を計算 (50:50)
+            self.ja_slots = self.speakers_per_batch // 2
+            self.en_slots = self.speakers_per_batch - self.ja_slots
+            lang_counts = {
+                lang: len(spks) for lang, spks in self.lang_groups.items()
+            }
+            _LOGGER.info(
+                "Language group balance enabled: %s, ja_slots=%d, en_slots=%d",
+                lang_counts,
+                self.ja_slots,
+                self.en_slots,
+            )
 
         # DDP対応: rank と world_size を取得
         if torch.distributed.is_initialized():
@@ -459,21 +498,37 @@ class SpeakerBalancedBatchSampler:
 
         batch_idx = 0
         while True:
-            # 十分なサンプルが残っている話者を選択
-            available_speakers = [
-                spk
-                for spk in self.speakers
-                if speaker_pointers[spk] + self.samples_per_speaker
-                <= len(speaker_indices[spk])
-            ]
+            if self.language_group_balance:
+                # 言語グループ均等サンプリング: JA 50% + EN 50%
+                ja_available = [
+                    spk for spk in self.lang_groups.get(0, [])
+                    if speaker_pointers[spk] + self.samples_per_speaker
+                    <= len(speaker_indices[spk])
+                ]
+                en_available = [
+                    spk for spk in self.lang_groups.get(1, [])
+                    if speaker_pointers[spk] + self.samples_per_speaker
+                    <= len(speaker_indices[spk])
+                ]
+                if len(ja_available) < self.ja_slots or len(en_available) < self.en_slots:
+                    break
+                batch_speakers = (
+                    rng.sample(ja_available, self.ja_slots)
+                    + rng.sample(en_available, self.en_slots)
+                )
+            else:
+                # 従来の全話者均等サンプリング
+                available_speakers = [
+                    spk
+                    for spk in self.speakers
+                    if speaker_pointers[spk] + self.samples_per_speaker
+                    <= len(speaker_indices[spk])
+                ]
+                if len(available_speakers) < self.speakers_per_batch:
+                    break
+                batch_speakers = rng.sample(available_speakers, self.speakers_per_batch)
 
-            if len(available_speakers) < self.speakers_per_batch:
-                break
-
-            # ランダムに話者を選択
-            batch_speakers = rng.sample(available_speakers, self.speakers_per_batch)
             batch = []
-
             for spk in batch_speakers:
                 start = speaker_pointers[spk]
                 end = start + self.samples_per_speaker
@@ -486,6 +541,27 @@ class SpeakerBalancedBatchSampler:
             batch_idx += 1
 
     def __len__(self) -> int:
+        if self.language_group_balance:
+            # 言語グループ均等サンプリング: JA グループと EN グループ それぞれの制約で計算
+            ja_speakers = self.lang_groups.get(0, [])
+            en_speakers = self.lang_groups.get(1, [])
+            if not ja_speakers or not en_speakers:
+                # フォールバック: 通常計算
+                pass
+            else:
+                ja_min = min(
+                    len(self.speaker_to_indices[s]) for s in ja_speakers
+                )
+                en_min = min(
+                    len(self.speaker_to_indices[s]) for s in en_speakers
+                )
+                # JA グループが 1 epoch で提供できるバッチ数
+                ja_batches = (len(ja_speakers) * (ja_min // self.samples_per_speaker)) // self.ja_slots
+                # EN グループが 1 epoch で提供できるバッチ数
+                en_batches = (len(en_speakers) * (en_min // self.samples_per_speaker)) // self.en_slots
+                total_batches = min(ja_batches, en_batches)
+                return max(1, total_batches // self.world_size)
+
         # より正確な計算: 各話者から取れるバッチ数を計算
         # 話者間でサンプル消費のタイミングがずれるため、最小話者のサンプル数で制限
         min_samples = min(len(indices) for indices in self.speaker_to_indices.values())
