@@ -332,11 +332,15 @@ class VitsModel(pl.LightningModule):
         # SpeakerBalancedBatchSamplerを使用
         samples_per_speaker = getattr(self.hparams, "samples_per_speaker", 0)
         if self.hparams.num_speakers > 1 and samples_per_speaker > 0:
+            language_group_balance = getattr(
+                self.hparams, "language_balanced_sampling", False
+            )
             self._train_batch_sampler = SpeakerBalancedBatchSampler(
                 self._train_dataset,
                 batch_size=self.hparams.batch_size,
                 samples_per_speaker=samples_per_speaker,
                 drop_last=True,
+                language_group_balance=language_group_balance,
             )
             _LOGGER.info(
                 "Using SpeakerBalancedBatchSampler: batch_size=%d, samples_per_speaker=%d, "
