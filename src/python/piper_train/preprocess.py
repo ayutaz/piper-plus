@@ -15,16 +15,20 @@ from enum import Enum
 from multiprocessing import JoinableQueue, Process, Queue
 from pathlib import Path
 
-from piper_phonemize import (
-    get_codepoints_map,
-    get_espeak_map,
-    get_max_phonemes,
-    phoneme_ids_codepoints,
-    phoneme_ids_espeak,
-    phonemize_codepoints,
-    phonemize_espeak,
-    tashkeel_run,
-)
+try:
+    from piper_phonemize import (
+        get_codepoints_map,
+        get_espeak_map,
+        get_max_phonemes,
+        phoneme_ids_codepoints,
+        phoneme_ids_espeak,
+        phonemize_codepoints,
+        phonemize_espeak,
+        tashkeel_run,
+    )
+    _PIPER_PHONEMIZE_AVAILABLE = True
+except ImportError:
+    _PIPER_PHONEMIZE_AVAILABLE = False
 from tqdm import tqdm
 
 from .f0_extraction import cache_f0
