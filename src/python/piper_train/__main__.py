@@ -88,6 +88,13 @@ def main():
         help="For multi-speaker models only. Converts a single-speaker checkpoint to multi-speaker and resumes training",  # noqa: E501
     )
     parser.add_argument(
+        "--resume-from-multispeaker-checkpoint",
+        help="For single-speaker models only. Loads a multi-speaker checkpoint with strict=False "
+        "(emb_g is skipped), adds emb_g mean to emb_lang for conditioning correction, "
+        "and initializes emb_lang[1] (EN) from emb_lang[0] (JA). "
+        "Optimizer state is reset (training starts from epoch 0).",
+    )
+    parser.add_argument(
         "--save-top-k",
         type=int,
         default=-1,
@@ -414,21 +421,82 @@ def main():
             dataset=None,
         )
         g_dict = model_single.model_g.state_dict()
-        for key in list(g_dict.keys()):
-            # Remove keys that can't be copied over due to missing speaker embedding
-            if (
-                key.startswith("dec.cond")
-                or key.startswith("dp.cond")
-                or ("enc.cond_layer" in key)
-            ):
-                g_dict.pop(key, None)
+        # NOTE: cond 層 (dec.cond, dp.cond, enc.cond_layer 等) は
+        # single/multi-speaker どちらも gin_channels=512 で形状が同一のため
+        # 除外不要。全重みを転移してよい。
 
-        # Copy over the multi-speaker model, excluding keys related to the
-        # speaker embedding (which is missing from the single-speaker model).
+        # Copy over the single-speaker weights; keys missing in g_dict
+        # (e.g. emb_g of the multi-speaker target) will keep their
+        # randomly-initialized values.
         load_state_dict(model.model_g, g_dict)
         load_state_dict(model.model_d, model_single.model_d.state_dict())
         _LOGGER.info(
             "Successfully converted single-speaker checkpoint to multi-speaker"
+        )
+
+    if args.resume_from_multispeaker_checkpoint:
+        assert num_speakers == 1, (
+            "--resume-from-multispeaker-checkpoint はシングルスピーカーモデル専用です。"
+            "マルチスピーカーへの転移には --resume_from_single_speaker_checkpoint を使用してください。"
+        )
+        _LOGGER.info(
+            "Resuming from multispeaker checkpoint: %s",
+            args.resume_from_multispeaker_checkpoint,
+        )
+
+        # 1. strict=False でロード（emb_g は自動スキップ）
+        # NOTE: weights_only=False is required to handle PosixPath objects in checkpoints
+        # This poses a security risk - only load trusted checkpoints
+        checkpoint = torch.load(
+            args.resume_from_multispeaker_checkpoint,
+            map_location="cpu",
+            weights_only=False,
+        )
+        missing, unexpected = model.load_state_dict(
+            checkpoint["state_dict"], strict=False
+        )
+        _LOGGER.info(
+            "Weights loaded (strict=False). Missing keys: %s. Unexpected keys: %s.",
+            missing,
+            unexpected,
+        )
+
+        # 2. emb_g 平均を emb_lang に加算（conditioning 分布補正）
+        #    emb_g は平均ノルム ~0.68 でほぼゼロ中心のため影響は軽微だが、
+        #    conceptual correctness のため実施する。
+        saved_sd = checkpoint["state_dict"]
+        emb_g_weight = saved_sd.get("model_g.emb_g.weight")
+        if emb_g_weight is not None and hasattr(model.model_g, "emb_lang"):
+            emb_g_mean = emb_g_weight.mean(dim=0)  # [gin_channels]
+            _LOGGER.info(
+                "emb_g mean norm: %.4f → adding to all emb_lang rows for conditioning correction",
+                emb_g_mean.norm().item(),
+            )
+            with torch.no_grad():
+                model.model_g.emb_lang.weight.add_(emb_g_mean.unsqueeze(0))
+            _LOGGER.info("emb_g_mean added to emb_lang.")
+        else:
+            _LOGGER.info(
+                "emb_g not found in checkpoint or model has no emb_lang; skipping conditioning correction."
+            )
+
+        # 3. emb_lang[1] (EN) を emb_lang[0] (JA) で初期化
+        #    シングル話者 fine-tuning は JA データのみのため emb_lang[1] は学習されない。
+        #    JA conditioning を EN の初期値としてコピーすることで EN 推論時も
+        #    fine-tuning 済み声質を反映させる。
+        if hasattr(model.model_g, "emb_lang") and model.model_g.n_languages > 1:
+            with torch.no_grad():
+                model.model_g.emb_lang.weight[1] = (
+                    model.model_g.emb_lang.weight[0].clone()
+                )
+            _LOGGER.info(
+                "emb_lang[1] (EN) initialized from emb_lang[0] (JA) "
+                "for single-speaker multilingual fine-tuning."
+            )
+
+        _LOGGER.info(
+            "Multispeaker → single-speaker transfer complete. "
+            "Starting training from epoch 0 (optimizer state reset)."
         )
 
     # チェックポイントからの再開処理を修正
