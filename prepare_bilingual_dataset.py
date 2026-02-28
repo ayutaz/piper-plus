@@ -147,9 +147,7 @@ def process_ja_dataset(
             - audio_norm_path / audio_spec_path are read directly from the entry
     """
     if already_bilingual:
-        return _process_ja_from_bilingual_dataset(
-            ja_jsonl_path, ja_speaker_offset
-        )
+        return _process_ja_from_bilingual_dataset(ja_jsonl_path, ja_speaker_offset)
 
     ja_id_map = get_japanese_id_map()
 
@@ -561,7 +559,8 @@ def process_en_dataset(
         if min_utterances_per_speaker > 0:
             before_filter = len(sorted_speakers)
             sorted_speakers = [
-                (spk, cnt) for spk, cnt in sorted_speakers
+                (spk, cnt)
+                for spk, cnt in sorted_speakers
                 if cnt >= min_utterances_per_speaker
             ]
             _LOGGER.info(
