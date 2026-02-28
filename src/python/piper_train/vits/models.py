@@ -892,7 +892,7 @@ class SynthesizerTrn(nn.Module):
                 # to avoid polluting the JA Duration Predictor learning signal.
                 if lid is not None and self.n_languages > 1:
                     is_en = (lid == 1).float().view(-1, 1, 1)  # [b, 1, 1]
-                    prosody_f = prosody_f * (1.0 - is_en)      # EN → zero
+                    prosody_f = prosody_f * (1.0 - is_en)  # EN → zero
                 prosody_proj = self.prosody_proj(prosody_f)
                 prosody_proj = prosody_proj.transpose(1, 2)
             else:
