@@ -250,6 +250,11 @@ def main() -> None:
     sid: torch.LongTensor | None = None
     if num_speakers > 1:
         sid = torch.LongTensor([0])
+    elif num_languages > 1:
+        # Single-speaker multilingual: include sid=0 to maintain correct
+        # positional argument order in infer_forward (sid before lid).
+        # The model ignores sid since n_speakers <= 1.
+        sid = torch.LongTensor([0])
 
     lid: torch.LongTensor | None = None
     if num_languages > 1:
@@ -266,7 +271,7 @@ def main() -> None:
 
     # Build dummy input tuple dynamically
     dummy_input_list: list = [sequences, sequence_lengths, scales]
-    if num_speakers > 1:
+    if sid is not None:
         dummy_input_list.append(sid)
     if num_languages > 1:
         dummy_input_list.append(lid)
@@ -285,7 +290,7 @@ def main() -> None:
 
     # Configure input names based on model type
     input_names = ["input", "input_lengths", "scales"]
-    if num_speakers > 1:
+    if sid is not None:
         input_names.append("sid")
         dynamic_axes["sid"] = {0: "batch_size"}
     if num_languages > 1:
