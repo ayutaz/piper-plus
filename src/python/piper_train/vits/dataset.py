@@ -97,9 +97,7 @@ class PiperDataset(Dataset):
                     before,
                 )
             else:
-                _LOGGER.info(
-                    "validate_cache: all %d cache files are intact.", before
-                )
+                _LOGGER.info("validate_cache: all %d cache files are intact.", before)
 
     def __len__(self):
         return len(self.utterances)
@@ -119,23 +117,17 @@ class PiperDataset(Dataset):
         # Convert prosody_features to tensor if available
         prosody_tensor = None
         if utt.prosody_features is not None:
-            prosody_tensor = self._prosody_features_to_tensor(
-                utt.prosody_features
-            )
+            prosody_tensor = self._prosody_features_to_tensor(utt.prosody_features)
 
         return UtteranceTensors(
             phoneme_ids=LongTensor(utt.phoneme_ids),
             audio_norm=audio_norm,
             spectrogram=spectrogram,
             speaker_id=(
-                LongTensor([utt.speaker_id])
-                if utt.speaker_id is not None
-                else None
+                LongTensor([utt.speaker_id]) if utt.speaker_id is not None else None
             ),
             language_id=(
-                LongTensor([utt.language_id])
-                if utt.language_id is not None
-                else None
+                LongTensor([utt.language_id]) if utt.language_id is not None else None
             ),
             text=utt.text,
             prosody_features=prosody_tensor,
@@ -447,9 +439,7 @@ class SpeakerBalancedBatchSampler:
             # JA/EN スロット数を計算 (50:50)
             self.ja_slots = self.speakers_per_batch // 2
             self.en_slots = self.speakers_per_batch - self.ja_slots
-            lang_counts = {
-                lang: len(spks) for lang, spks in self.lang_groups.items()
-            }
+            lang_counts = {lang: len(spks) for lang, spks in self.lang_groups.items()}
             _LOGGER.info(
                 "Language group balance enabled: %s, ja_slots=%d, en_slots=%d",
                 lang_counts,
@@ -504,20 +494,24 @@ class SpeakerBalancedBatchSampler:
             if self.language_group_balance:
                 # 言語グループ均等サンプリング: JA 50% + EN 50%
                 ja_available = [
-                    spk for spk in self.lang_groups.get(0, [])
+                    spk
+                    for spk in self.lang_groups.get(0, [])
                     if speaker_pointers[spk] + self.samples_per_speaker
                     <= len(speaker_indices[spk])
                 ]
                 en_available = [
-                    spk for spk in self.lang_groups.get(1, [])
+                    spk
+                    for spk in self.lang_groups.get(1, [])
                     if speaker_pointers[spk] + self.samples_per_speaker
                     <= len(speaker_indices[spk])
                 ]
-                if len(ja_available) < self.ja_slots or len(en_available) < self.en_slots:
+                if (
+                    len(ja_available) < self.ja_slots
+                    or len(en_available) < self.en_slots
+                ):
                     break
-                batch_speakers = (
-                    rng.sample(ja_available, self.ja_slots)
-                    + rng.sample(en_available, self.en_slots)
+                batch_speakers = rng.sample(ja_available, self.ja_slots) + rng.sample(
+                    en_available, self.en_slots
                 )
             else:
                 # 従来の全話者均等サンプリング
@@ -552,16 +546,16 @@ class SpeakerBalancedBatchSampler:
                 # フォールバック: 通常計算
                 pass
             else:
-                ja_min = min(
-                    len(self.speaker_to_indices[s]) for s in ja_speakers
-                )
-                en_min = min(
-                    len(self.speaker_to_indices[s]) for s in en_speakers
-                )
+                ja_min = min(len(self.speaker_to_indices[s]) for s in ja_speakers)
+                en_min = min(len(self.speaker_to_indices[s]) for s in en_speakers)
                 # JA グループが 1 epoch で提供できるバッチ数
-                ja_batches = (len(ja_speakers) * (ja_min // self.samples_per_speaker)) // self.ja_slots
+                ja_batches = (
+                    len(ja_speakers) * (ja_min // self.samples_per_speaker)
+                ) // self.ja_slots
                 # EN グループが 1 epoch で提供できるバッチ数
-                en_batches = (len(en_speakers) * (en_min // self.samples_per_speaker)) // self.en_slots
+                en_batches = (
+                    len(en_speakers) * (en_min // self.samples_per_speaker)
+                ) // self.en_slots
                 total_batches = min(ja_batches, en_batches)
                 return max(1, total_batches // self.world_size)
 

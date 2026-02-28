@@ -722,7 +722,14 @@ class VitsModel(pl.LightningModule):
 
                     # Log all samples as table
                     if wandb_audio_data:
-                        columns = ["text", "speaker", "language", "epoch", "step", "audio"]
+                        columns = [
+                            "text",
+                            "speaker",
+                            "language",
+                            "epoch",
+                            "step",
+                            "audio",
+                        ]
                         table = wandb.Table(columns=columns, data=wandb_audio_data)
                         wandb_logger.experiment.log(
                             {

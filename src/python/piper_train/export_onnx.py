@@ -310,9 +310,7 @@ def main() -> None:
     )
 
     mode = "stochastic" if args.stochastic else "deterministic"
-    _LOGGER.info(
-        "Exported model to %s (mode: %s)", args.output, mode
-    )
+    _LOGGER.info("Exported model to %s (mode: %s)", args.output, mode)
 
     # Apply ONNX simplification if requested
     # Skip simplification for prosody models to avoid numerical precision issues

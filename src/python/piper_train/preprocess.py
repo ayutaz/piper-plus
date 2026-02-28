@@ -15,6 +15,7 @@ from enum import Enum
 from multiprocessing import JoinableQueue, Process, Queue
 from pathlib import Path
 
+
 try:
     from piper_phonemize import (
         get_codepoints_map,
@@ -26,6 +27,7 @@ try:
         phonemize_espeak,
         tashkeel_run,
     )
+
     _PIPER_PHONEMIZE_AVAILABLE = True
 except ImportError:
     _PIPER_PHONEMIZE_AVAILABLE = False

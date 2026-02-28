@@ -486,9 +486,9 @@ def main():
         #    fine-tuning 済み声質を反映させる。
         if hasattr(model.model_g, "emb_lang") and model.model_g.n_languages > 1:
             with torch.no_grad():
-                model.model_g.emb_lang.weight[1] = (
-                    model.model_g.emb_lang.weight[0].clone()
-                )
+                model.model_g.emb_lang.weight[1] = model.model_g.emb_lang.weight[
+                    0
+                ].clone()
             _LOGGER.info(
                 "emb_lang[1] (EN) initialized from emb_lang[0] (JA) "
                 "for single-speaker multilingual fine-tuning."
@@ -565,7 +565,9 @@ def main():
             }
 
             # Multi-GPU DDP optimization
-            strategy = configure_ddp_strategy(num_gpus, args.strategy, no_wavlm=args.no_wavlm)
+            strategy = configure_ddp_strategy(
+                num_gpus, args.strategy, no_wavlm=args.no_wavlm
+            )
             if strategy:
                 trainer_kwargs["strategy"] = strategy
 

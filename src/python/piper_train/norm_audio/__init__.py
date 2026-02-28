@@ -61,14 +61,14 @@ def energy_vad_numpy(
     if n == 0:
         return 0.0, None
     chunks = audio_16k[: n * chunk_size].reshape(n, chunk_size)
-    rms = np.sqrt(np.mean(chunks ** 2, axis=1))
+    rms = np.sqrt(np.mean(chunks**2, axis=1))
     idx = np.where(rms >= threshold)[0]
     if len(idx) == 0:
         return 0.0, None
-    f = max(0, idx[0] - keep_before)
-    l = min(n - 1, idx[-1] + keep_after)
+    first = max(0, idx[0] - keep_before)
+    last = min(n - 1, idx[-1] + keep_after)
     s = chunk_size / sr
-    return f * s, (l + 1) * s - f * s
+    return first * s, (last + 1) * s - first * s
 
 
 def cache_norm_audio_fast(
@@ -86,7 +86,7 @@ def cache_norm_audio_fast(
     ~61x faster single-thread, ~7.7x faster in parallel vs Silero-based pipeline.
     Recommended for LibriTTS-R (pre-cleaned, virtually no silence).
     """
-    import soxr  # lazy import: not needed for Silero path
+    import soxr  # noqa: PLC0415 — lazy import: not needed for Silero path
 
     audio_path = Path(audio_path).absolute()
     cache_dir = Path(cache_dir)
@@ -108,7 +108,9 @@ def cache_norm_audio_fast(
             if src_sr != 16000
             else audio_data
         )
-        offset_sec, duration_sec = energy_vad_numpy(audio_16k, threshold=energy_vad_threshold)
+        offset_sec, duration_sec = energy_vad_numpy(
+            audio_16k, threshold=energy_vad_threshold
+        )
 
         # Trim at source sample rate
         offset_samples = int(offset_sec * src_sr)
