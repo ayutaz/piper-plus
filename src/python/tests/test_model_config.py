@@ -9,7 +9,6 @@ Prevents regressions:
 import ast
 import importlib
 from pathlib import Path
-from unittest.mock import patch
 
 import pytest
 
@@ -17,7 +16,9 @@ import pytest
 @pytest.mark.unit
 def test_models_no_super_monotonic_align_import():
     """Ensure models.py does not import from super_monotonic_align (not on PyPI)."""
-    models_path = Path(__file__).resolve().parent.parent / "piper_train" / "vits" / "models.py"
+    models_path = (
+        Path(__file__).resolve().parent.parent / "piper_train" / "vits" / "models.py"
+    )
     source = models_path.read_text()
     tree = ast.parse(source)
 
@@ -39,7 +40,9 @@ def test_models_no_super_monotonic_align_import():
 @pytest.mark.unit
 def test_models_imports_local_monotonic_align():
     """Ensure models.py uses the local Cython monotonic_align module."""
-    models_path = Path(__file__).resolve().parent.parent / "piper_train" / "vits" / "models.py"
+    models_path = (
+        Path(__file__).resolve().parent.parent / "piper_train" / "vits" / "models.py"
+    )
     source = models_path.read_text()
 
     assert "monotonic_align" in source, (
@@ -50,7 +53,7 @@ def test_models_imports_local_monotonic_align():
 @pytest.mark.unit
 def test_models_module_importable():
     """Ensure piper_train.vits.models can be imported without errors."""
-    torch = pytest.importorskip("torch", reason="torch required")
+    pytest.importorskip("torch", reason="torch required")
     try:
         mod = importlib.import_module("piper_train.vits.models")
     except ImportError as e:
@@ -121,14 +124,18 @@ def _parse_main_args(cli_args):
     """Parse CLI args using __main__.py's argparser (without running main())."""
     import argparse
 
-    from piper_train.__main__ import main
-    from piper_train.vits.lightning import VitsModel
+    try:
+        from piper_train.vits.lightning import VitsModel
+    except ImportError as e:
+        pytest.skip(f"Training dependencies not available: {e}")
 
     parser = argparse.ArgumentParser()
     # Replicate the parser setup from __main__.py
     parser.add_argument("--dataset-dir", required=True)
     parser.add_argument("--checkpoint-epochs", type=int)
-    parser.add_argument("--quality", default="medium", choices=("x-low", "medium", "high"))
+    parser.add_argument(
+        "--quality", default="medium", choices=("x-low", "medium", "high")
+    )
     parser.add_argument("--save-top-k", type=int, default=-1)
     parser.add_argument("--no-ema", action="store_true")
     parser.add_argument("--ema-decay", type=float, default=0.9995)
@@ -149,10 +156,14 @@ def _parse_main_args(cli_args):
     parser.add_argument("--default_root_dir", default=None)
     parser.add_argument("--resume_from_checkpoint", default=None)
     parser.add_argument(
-        "--val-every-n-epochs", type=int, default=5,
+        "--val-every-n-epochs",
+        type=int,
+        default=5,
     )
     parser.add_argument(
-        "--limit-val-batches", type=int, default=50,
+        "--limit-val-batches",
+        type=int,
+        default=50,
     )
     VitsModel.add_model_specific_args(parser)
     parser.add_argument("--compile", action="store_true")
@@ -178,20 +189,32 @@ def test_limit_val_batches_default():
 @pytest.mark.unit
 def test_val_every_n_epochs_custom():
     """--val-every-n-epochs should accept custom values."""
-    args = _parse_main_args([
-        "--dataset-dir", "/tmp/test", "--batch-size", "4",
-        "--val-every-n-epochs", "10",
-    ])
+    args = _parse_main_args(
+        [
+            "--dataset-dir",
+            "/tmp/test",
+            "--batch-size",
+            "4",
+            "--val-every-n-epochs",
+            "10",
+        ]
+    )
     assert args.val_every_n_epochs == 10
 
 
 @pytest.mark.unit
 def test_limit_val_batches_custom():
     """--limit-val-batches should accept custom values."""
-    args = _parse_main_args([
-        "--dataset-dir", "/tmp/test", "--batch-size", "4",
-        "--limit-val-batches", "100",
-    ])
+    args = _parse_main_args(
+        [
+            "--dataset-dir",
+            "/tmp/test",
+            "--batch-size",
+            "4",
+            "--limit-val-batches",
+            "100",
+        ]
+    )
     assert args.limit_val_batches == 100
 
 
