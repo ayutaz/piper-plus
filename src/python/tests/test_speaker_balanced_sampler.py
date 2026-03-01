@@ -37,6 +37,7 @@ class MockUtterance:
     """Mock utterance for testing"""
 
     speaker_id: int
+    language_id: int | None = None
 
 
 class MockDataset:
@@ -52,6 +53,30 @@ class MockDataset:
         for speaker_id in range(num_speakers):
             for _ in range(samples_per_speaker):
                 self.utterances.append(MockUtterance(speaker_id=speaker_id))
+
+
+class MockBilingualDataset:
+    """Mock bilingual dataset with language_id support for testing"""
+
+    def __init__(
+        self,
+        ja_speakers: int,
+        en_speakers: int,
+        samples_per_speaker: int,
+    ):
+        self.utterances = []
+        # JA speakers: speaker_id 0..ja_speakers-1, language_id=0
+        for speaker_id in range(ja_speakers):
+            for _ in range(samples_per_speaker):
+                self.utterances.append(
+                    MockUtterance(speaker_id=speaker_id, language_id=0)
+                )
+        # EN speakers: speaker_id ja_speakers..ja_speakers+en_speakers-1, language_id=1
+        for speaker_id in range(ja_speakers, ja_speakers + en_speakers):
+            for _ in range(samples_per_speaker):
+                self.utterances.append(
+                    MockUtterance(speaker_id=speaker_id, language_id=1)
+                )
 
 
 def count_speakers_in_batch(batch: list[int], dataset: MockDataset) -> Counter:
@@ -274,3 +299,61 @@ class TestSpeakerBalancedBatchSampler:
             batch_count += 1
 
         assert batch_count > 0
+
+    @pytest.mark.unit
+    def test_auto_enable_language_balance_when_imbalanced(self):
+        """Auto-enable when speaker ratio >= 3:1 and language_group_balance=None"""
+        # 20 JA + 310 EN → ratio 15.5:1 → auto-enable
+        dataset = MockBilingualDataset(
+            ja_speakers=20, en_speakers=310, samples_per_speaker=50
+        )
+        sampler = SpeakerBalancedBatchSampler(
+            dataset,
+            batch_size=20,
+            samples_per_speaker=2,
+            language_group_balance=None,
+        )
+        assert sampler.language_group_balance is True
+
+    @pytest.mark.unit
+    def test_no_auto_enable_when_balanced(self):
+        """No auto-enable when speaker ratio < 3:1 and language_group_balance=None"""
+        # 20 JA + 20 EN → ratio 1:1 → no auto-enable
+        dataset = MockBilingualDataset(
+            ja_speakers=20, en_speakers=20, samples_per_speaker=50
+        )
+        sampler = SpeakerBalancedBatchSampler(
+            dataset,
+            batch_size=20,
+            samples_per_speaker=2,
+            language_group_balance=None,
+        )
+        assert sampler.language_group_balance is False
+
+    @pytest.mark.unit
+    def test_explicit_true_overrides_auto(self):
+        """Explicit True skips auto-detection"""
+        # Even with balanced speakers, explicit True forces it on
+        dataset = MockBilingualDataset(
+            ja_speakers=20, en_speakers=20, samples_per_speaker=50
+        )
+        sampler = SpeakerBalancedBatchSampler(
+            dataset,
+            batch_size=20,
+            samples_per_speaker=2,
+            language_group_balance=True,
+        )
+        assert sampler.language_group_balance is True
+
+    @pytest.mark.unit
+    def test_single_language_no_auto_enable(self):
+        """No auto-enable with single language and language_group_balance=None"""
+        # All speakers same language → no auto-enable
+        dataset = MockDataset(num_speakers=20, samples_per_speaker=50)
+        sampler = SpeakerBalancedBatchSampler(
+            dataset,
+            batch_size=20,
+            samples_per_speaker=2,
+            language_group_balance=None,
+        )
+        assert sampler.language_group_balance is False

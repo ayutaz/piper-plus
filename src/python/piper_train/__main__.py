@@ -183,8 +183,8 @@ def main():
         "--language-balanced-sampling",
         action="store_true",
         default=False,
-        help="Balance batches by language group (JA 50%% / EN 50%%) instead of by speaker count. "
-        "Recommended when EN speakers >> JA speakers (e.g., 1133 EN + 20 JA) to prevent JA quality degradation. "
+        help="Force language-balanced sampling (JA 50%% / EN 50%%). "
+        "If not specified, auto-enabled when speaker count ratio between languages >= 3:1. "
         "Requires --samples-per-speaker > 0 and num_languages > 1.",
     )
     parser.add_argument(

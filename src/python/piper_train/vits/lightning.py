@@ -333,8 +333,11 @@ class VitsModel(pl.LightningModule):
         samples_per_speaker = getattr(self.hparams, "samples_per_speaker", 0)
         if self.hparams.num_speakers > 1 and samples_per_speaker > 0:
             language_group_balance = getattr(
-                self.hparams, "language_balanced_sampling", False
+                self.hparams, "language_balanced_sampling", None
             )
+            # CLI default is False (store_true); convert to None for auto-detection
+            if language_group_balance is False:
+                language_group_balance = None
             self._train_batch_sampler = SpeakerBalancedBatchSampler(
                 self._train_dataset,
                 batch_size=self.hparams.batch_size,

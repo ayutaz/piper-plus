@@ -1,7 +1,7 @@
 import json
 import logging
 import random
-from collections import defaultdict
+from collections import Counter, defaultdict
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -381,10 +381,12 @@ class SpeakerBalancedBatchSampler:
     このサンプラーは各バッチに同一話者からsamples_per_speaker個のサンプルを
     含めることで、SDPの学習を安定化させる。
 
-    language_group_balance=True の場合:
-        言語グループ (JA/EN) を 50:50 でバランスする。
+    language_group_balance の動作:
+        - True: 言語グループ (JA/EN) を 50:50 でバランスする（強制有効化）
+        - False: バランスしない（強制無効化）
+        - None (デフォルト): 自動判定。言語間の話者数比が 3:1 以上の場合に自動有効化。
         EN 話者数 >> JA 話者数の場合に JA 音質が劣化するのを防ぐ。
-        例: 20 JA話者 + 1133 EN話者 → 各バッチで JA 5話者 + EN 5話者 を保証
+        例: 20 JA話者 + 310 EN話者 → 各バッチで JA 5話者 + EN 5話者 を保証
 
     DDP (Distributed Data Parallel) 対応:
     - torch.distributedが初期化されている場合、各GPUが異なるバッチを取得
@@ -396,7 +398,7 @@ class SpeakerBalancedBatchSampler:
         batch_size: バッチサイズ
         samples_per_speaker: 各話者からのサンプル数 (デフォルト: 4)
         drop_last: 最後の不完全バッチを捨てるか (デフォルト: True)
-        language_group_balance: 言語グループ (JA/EN) を 50:50 でバランスするか (デフォルト: False)
+        language_group_balance: 言語グループ (JA/EN) を 50:50 でバランスするか (デフォルト: None=自動判定)
 
     Example:
         batch_size=32, samples_per_speaker=4 の場合:
@@ -412,7 +414,7 @@ class SpeakerBalancedBatchSampler:
         batch_size: int,
         samples_per_speaker: int = 4,
         drop_last: bool = True,
-        language_group_balance: bool = False,
+        language_group_balance: bool | None = None,
     ):
         # 話者ごとにインデックスをグループ化
         # Subsetの場合は元のデータセットのutterancesを参照
@@ -451,6 +453,26 @@ class SpeakerBalancedBatchSampler:
         # 実際のバッチサイズを調整
         self.effective_batch_size = self.speakers_per_batch * samples_per_speaker
         self.drop_last = drop_last
+
+        # 自動判定: language_group_balance が None の場合
+        if language_group_balance is None:
+            lang_speaker_counts = Counter(speaker_to_language.values())
+            if len(lang_speaker_counts) >= 2:
+                majority = max(lang_speaker_counts.values())
+                minority = min(lang_speaker_counts.values())
+                ratio = majority / minority if minority > 0 else float("inf")
+                if ratio >= 3.0:
+                    language_group_balance = True
+                    _LOGGER.info(
+                        "Auto-enabled language-balanced sampling "
+                        "(speaker ratio %.1f:1, threshold 3.0)",
+                        ratio,
+                    )
+                else:
+                    language_group_balance = False
+            else:
+                language_group_balance = False
+
         self.language_group_balance = language_group_balance
 
         # 言語グループ均等サンプリングの準備
