@@ -492,18 +492,16 @@ def main():
                 "emb_g not found in checkpoint or model has no emb_lang; skipping conditioning correction."
             )
 
-        # 3. emb_lang[1] (EN) を emb_lang[0] (JA) で初期化
-        #    シングル話者 fine-tuning は JA データのみのため emb_lang[1] は学習されない。
-        #    JA conditioning を EN の初期値としてコピーすることで EN 推論時も
-        #    fine-tuning 済み声質を反映させる。
+        # 3. emb_lang[1] (EN) は元の値 + emb_g_mean をそのまま保持する。
+        #    以前は emb_lang[0] (JA) でコピー上書きしていたが、これにより
+        #    凍結された Duration Predictor が EN conditioning を認識できず
+        #    英語の duration が崩壊する問題があった。
+        #    emb_g_mean 補正済みの元の EN embedding を保持することで、
+        #    DP が正しい EN duration パターンを予測できる。
         if hasattr(model.model_g, "emb_lang") and model.model_g.n_languages > 1:
-            with torch.no_grad():
-                model.model_g.emb_lang.weight[1] = model.model_g.emb_lang.weight[
-                    0
-                ].clone()
             _LOGGER.info(
-                "emb_lang[1] (EN) initialized from emb_lang[0] (JA) "
-                "for single-speaker multilingual fine-tuning."
+                "emb_lang[1] (EN) preserved with emb_g_mean correction "
+                "(not overwritten by JA) for correct EN duration prediction."
             )
 
         _LOGGER.info(
