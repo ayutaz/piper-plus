@@ -450,6 +450,11 @@ def main():
         )
 
     if args.resume_from_multispeaker_checkpoint:
+        if not args.freeze_dp:
+            args.freeze_dp = True
+            _LOGGER.info(
+                "Auto-enabled --freeze-dp for multispeaker→single-speaker transfer"
+            )
         assert num_speakers == 1, (
             "--resume-from-multispeaker-checkpoint はシングルスピーカーモデル専用です。"
             "マルチスピーカーへの転移には --resume_from_single_speaker_checkpoint を使用してください。"
