@@ -328,8 +328,9 @@ CUDA_VISIBLE_DEVICES="" .venv/bin/python -m piper_train.infer_onnx \
 |---------|-----|---------------------|
 | 通常学習 (デフォルト) | 学習される | 学習される |
 | `--freeze-dp` 指定 | **凍結** | 学習される |
+| `--resume-from-multispeaker-checkpoint` 使用時 | **自動凍結** | 学習される |
 
-**CLIオプション:** `--freeze-dp` — Duration Predictor パラメータを凍結（デフォルト: 無効）
+**CLIオプション:** `--freeze-dp` — Duration Predictor パラメータを凍結（デフォルト: 無効）。`--resume-from-multispeaker-checkpoint` 使用時は自動有効化。
 
 **実装ファイル:**
 - `src/python/piper_train/__main__.py` — `--freeze-dp` CLI引数追加
