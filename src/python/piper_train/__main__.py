@@ -159,6 +159,13 @@ def main():
         action="store_true",
         help="Disable WavLM discriminator (faster training, slightly lower quality)",
     )
+    parser.add_argument(
+        "--freeze-dp",
+        action="store_true",
+        default=False,
+        help="Freeze Duration Predictor parameters during training. "
+        "Use for fine-tuning to prevent duration prediction degradation.",
+    )
     # Trainer arguments
     parser.add_argument("--accelerator", default="gpu", help="Accelerator to use")
     parser.add_argument("--devices", type=int, default=1, help="Number of devices")
