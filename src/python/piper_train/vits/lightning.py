@@ -759,6 +759,22 @@ class VitsModel(pl.LightningModule):
             torch.distributed.barrier()
 
     def configure_optimizers(self):
+        # Freeze Duration Predictor if requested
+        freeze_dp = getattr(self.hparams, "freeze_dp", False)
+        if freeze_dp:
+            dp_frozen_count = 0
+            for name, param in self.model_g.named_parameters():
+                if name.startswith("dp."):
+                    param.requires_grad = False
+                    dp_frozen_count += 1
+            _LOGGER.info(
+                "Frozen %d Duration Predictor parameters (--freeze-dp)",
+                dp_frozen_count,
+            )
+
+        # Generator optimizer: only trainable parameters
+        gen_params = [p for p in self.model_g.parameters() if p.requires_grad]
+
         # Collect discriminator parameters (including WavLM if enabled)
         d_params = list(self.model_d.parameters())
         if self.model_d_wavlm is not None:
@@ -766,7 +782,7 @@ class VitsModel(pl.LightningModule):
 
         optimizers = [
             torch.optim.AdamW(
-                self.model_g.parameters(),
+                gen_params,
                 lr=self.hparams.learning_rate,
                 betas=self.hparams.betas,
                 eps=self.hparams.eps,
