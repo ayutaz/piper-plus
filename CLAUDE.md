@@ -180,9 +180,10 @@ v4バイリンガルモデル (330話者, 150 epoch) をベースとして、つ
 - v4 では**事前にチェックポイントを変換**してからロード:
   1. `emb_g` (330×512) を除去
   2. `emb_g` 全話者平均を `emb_lang` に加算 (conditioning 分布補正)
-  3. `emb_lang[1]` (EN) を `emb_lang[0]` (JA) でコピー初期化
+  3. `emb_lang[1]` (EN) は元の値 + emb_g_mean をそのまま保持（~~JA でコピー上書き~~ → EN conditioning 保持に変更）
   4. optimizer/scheduler/epoch/EMA state をリセット
   5. 変換後チェックポイント: `bilingual-ja-en-v4-150epoch-single-speaker.ckpt` (302MB)
+- **推奨:** 今後は `--resume-from-multispeaker-checkpoint` を使用すれば変換不要（自動で上記処理 + freeze-dp 有効化）
 
 **データセット:** `/data/piper/dataset-tsukuyomi-finetune-v3/` (100発話, 1話者, 97シンボル — v3と同じ)
 
@@ -758,14 +759,13 @@ LibriTTS-R の音声キャッシュ処理を Silero ONNX VAD から numpy エネ
 処理ステップ:
 1. `strict=False` でロード（`emb_g` は自動スキップ）
 2. `emb_g` の全話者平均を `emb_lang` に加算（conditioning 分布補正）
-3. `emb_lang[1]` (EN) を `emb_lang[0]` (JA) でコピー初期化（シングル話者 fine-tuning では JA データのみ学習されるため EN 声質を保護）
+3. `emb_lang[1]` (EN) は元の値 + emb_g_mean 補正をそのまま保持（JA でコピー上書きしない）
+4. `--freeze-dp` を自動有効化（DP catastrophic forgetting 防止）
+
+**注意:** 以前は `emb_lang[1] = emb_lang[0].clone()` で JA→EN コピーしていたが、凍結された DP が EN conditioning を認識できず英語 duration が崩壊する問題があったため、元の EN embedding を保持する方式に変更。
 
 **実装ファイル:**
-- `src/python/piper_train/__main__.py` — `--resume-from-multispeaker-checkpoint` 追加、cond 層削除ロジック除去
-
-**検証結果 (つくよみちゃん v3):**
-- `emb_lang[1]` ノルム: 14.71（fine-tuning 後） → 17.07（修正後）
-- EN 声質がつくよみちゃんに近似することを推論テストで確認
+- `src/python/piper_train/__main__.py` — `--resume-from-multispeaker-checkpoint` 追加、freeze-dp 自動有効化
 
 ### preprocess.py: piper_phonemize 条件付きインポート ✅ NEW (2026-02-27)
 
