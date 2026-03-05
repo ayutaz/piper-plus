@@ -17,6 +17,39 @@ from .vits.wavfile import write as write_wav
 _LOGGER = logging.getLogger("piper_train.infer_onnx")
 
 
+def _detect_dominant_language(
+    text: str, language_id_map: dict[str, int]
+) -> int:
+    """Detect the dominant language in text using Unicode ranges.
+
+    Returns the language_id for the most common script in the text.
+    """
+    import re  # noqa: PLC0415
+
+    # Count characters by script
+    counts: dict[str, int] = {}
+    for ch in text:
+        if re.match(r"[\u3040-\u309F\u30A0-\u30FF]", ch):
+            counts["ja"] = counts.get("ja", 0) + 1
+        elif re.match(r"[\uAC00-\uD7AF]", ch):
+            counts["ko"] = counts.get("ko", 0) + 1
+        elif re.match(r"[\u4E00-\u9FFF\u3400-\u4DBF]", ch):
+            # CJK: could be ja or zh, prefer ja if kana present
+            if counts.get("ja", 0) > 0:
+                counts["ja"] = counts.get("ja", 0) + 1
+            else:
+                counts["zh"] = counts.get("zh", 0) + 1
+        elif re.match(r"[A-Za-z]", ch):
+            counts["en"] = counts.get("en", 0) + 1
+
+    if not counts:
+        return language_id_map.get("en", 0)
+
+    # Return language_id for the dominant language
+    dominant = max(counts, key=lambda k: counts[k])
+    return language_id_map.get(dominant, 0)
+
+
 def text_to_phoneme_ids_and_prosody(
     text: str,
     phoneme_id_map: dict[str, list[int]],
@@ -89,13 +122,11 @@ def main():
         help="Path to config.json with phoneme_id_map (required with --text). "
         "If not specified, looks for config.json next to the model.",
     )
-    from .phonemize.registry import available_languages  # noqa: PLC0415
-
     parser.add_argument(
         "--language",
-        choices=available_languages(),
         default="ja",
-        help="Language for --text mode (default: ja)",
+        help="Language for --text mode. Single (ja, en, zh, ko, es, pt, fr) "
+        "or multilingual combo (ja-en, ja-en-zh-ko, etc.) (default: ja)",
     )
     parser.add_argument(
         "--speaker-id",
@@ -169,18 +200,10 @@ def main():
             language_id_map = config.get("language_id_map", {})
             if args.language in language_id_map:
                 language_id = language_id_map[args.language]
-            elif args.language == "ja-en":
-                # Bilingual mode: detect dominant language from text
-                has_cjk = any(
-                    ("\u3040" <= ch <= "\u309f")  # Hiragana
-                    or ("\u30a0" <= ch <= "\u30ff")  # Katakana
-                    or ("\u4e00" <= ch <= "\u9fff")  # CJK
-                    for ch in args.text
-                )
-                language_id = (
-                    language_id_map.get("ja", 0)
-                    if has_cjk
-                    else language_id_map.get("en", 1)
+            elif "-" in args.language:
+                # Multilingual mode: detect dominant language from text
+                language_id = _detect_dominant_language(
+                    args.text, language_id_map
                 )
             _LOGGER.info(
                 "Using language_id=%d for language=%s", language_id, args.language

@@ -29,6 +29,11 @@ preprocess = [
     "piper-phonemize>=1.1.0",
 ]
 
+multilingual = [
+    "pypinyin>=0.50",
+    "g2pk2>=0.0.3",
+]
+
 dev = [
     "black==23.11.0",
     "flake8==6.1.0",

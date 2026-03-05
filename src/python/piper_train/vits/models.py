@@ -780,6 +780,9 @@ class SynthesizerTrn(nn.Module):
         self.n_languages = n_languages
         self.gin_channels = gin_channels
         self.prosody_dim = prosody_dim
+        # Language IDs with real prosody features (others are zeroed).
+        # Default: {0} (JA only). Add zh (Chinese tone) if needed.
+        self.prosody_language_ids: set[int] = {0}
 
         self.use_sdp = use_sdp
 
@@ -888,11 +891,18 @@ class SynthesizerTrn(nn.Module):
             if prosody_features is not None:
                 # prosody_features: [batch, time, 3] → [batch, prosody_dim, time]
                 prosody_f = prosody_features.float()
-                # EN (lid=1) prosody features are all dummy values (a1=0), so zero them
-                # to avoid polluting the JA Duration Predictor learning signal.
+                # Zero prosody features for languages without prosody data.
+                # Only languages in prosody_language_ids have real prosody values;
+                # others (e.g., EN, ES, FR) use dummy values that should be zeroed.
                 if lid is not None and self.n_languages > 1:
-                    is_en = (lid == 1).float().view(-1, 1, 1)  # [b, 1, 1]
-                    prosody_f = prosody_f * (1.0 - is_en)  # EN → zero
+                    # prosody_language_ids: set of language IDs with real prosody
+                    # Default: {0} (JA only) — same as previous `lid == 1` check
+                    prosody_langs = getattr(self, "prosody_language_ids", {0})
+                    # Build mask: 1.0 for languages WITH prosody, 0.0 for others
+                    has_prosody = sum(
+                        (lid == lang_id).float() for lang_id in prosody_langs
+                    ).clamp(max=1.0).view(-1, 1, 1)
+                    prosody_f = prosody_f * has_prosody
                 prosody_proj = self.prosody_proj(prosody_f)
                 prosody_proj = prosody_proj.transpose(1, 2)
             else:
