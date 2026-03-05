@@ -758,6 +758,7 @@ class SynthesizerTrn(nn.Module):
         gin_channels: int = 0,
         use_sdp: bool = True,
         prosody_dim: int = 16,
+        prosody_language_ids: "set[int] | None" = None,
     ):
         super().__init__()
         self.n_vocab = n_vocab
@@ -781,8 +782,10 @@ class SynthesizerTrn(nn.Module):
         self.gin_channels = gin_channels
         self.prosody_dim = prosody_dim
         # Language IDs with real prosody features (others are zeroed).
-        # Default: {0} (JA only). Add zh (Chinese tone) if needed.
-        self.prosody_language_ids: set[int] = {0}
+        # Default: {0} (JA only). Configurable via prosody_language_ids param.
+        self.prosody_language_ids: set[int] = (
+            prosody_language_ids if prosody_language_ids is not None else {0}
+        )
 
         self.use_sdp = use_sdp
 

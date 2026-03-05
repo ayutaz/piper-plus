@@ -13,11 +13,16 @@ FRENCH_PHONEMES: list[str] = [
     "ɑ̃",  # an, en, am, em (France, temps)
     "ɔ̃",  # on, om (bon, nom)
     # Front rounded vowels
-    "ø",  # eu/œu closed (peu, jeu)
-    "œ",  # eu/œu open (peur, fleur)
-    "y",  # u (lune, rue) — note: 'y' is used as IPA symbol, distinct from EN 'j'
+    "ø",   # eu/œu closed (peu, jeu)
+    "œ",   # eu/œu open (peur, fleur); also euille (feuille)
+    "y_vowel",  # Close front rounded vowel [y] (lune, tu) — avoids JA glide collision
+    # Open vowels
+    "ɔ",   # Open o (porte, or, homme)
     # Schwa
     "ə",  # e muet (le, de)
     # Semi-vowel
     "ɥ",  # u semi-vowel (nuit, lui)
+    # Consonants
+    "ɲ",   # gn digraph (montagne, cognac)
+    "ʁ",   # French uvular r
 ]

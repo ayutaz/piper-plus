@@ -92,18 +92,18 @@ class TestPortuguesePhonemizer:
         from piper_train.phonemize.portuguese import _convert_word
 
         phonemes, _ = _convert_word("gente")
-        # Expected: ʒ ẽ n t ʃ i
+        # Expected: ʒ ẽ tʃ i  (tʃ is a single affricate token)
         joined = " ".join(phonemes)
-        assert "t ʃ i" in joined, f"Expected 'tʃi' in gente, got: {joined}"
+        assert "tʃ i" in joined, f"Expected 'tʃ i' in gente, got: {joined}"
 
     def test_palatalization_d_cidade(self):
         """'cidade' should have d -> dʒ before unstressed final -e -> i."""
         from piper_train.phonemize.portuguese import _convert_word
 
         phonemes, _ = _convert_word("cidade")
-        # Expected: s i d a d ʒ i
+        # Expected: s i d a dʒ i  (dʒ is a single affricate token)
         joined = " ".join(phonemes)
-        assert "d ʒ i" in joined, f"Expected 'dʒi' in cidade, got: {joined}"
+        assert "dʒ i" in joined, f"Expected 'dʒ i' in cidade, got: {joined}"
 
     def test_palatalization_preserves_stress(self):
         """Palatalization should not affect the stressed vowel."""
@@ -306,3 +306,130 @@ class TestPortuguesePhonemizer:
             f"Expected stress on 'i' in ouvir, got stress on "
             f"'{phonemes[stress_idx]}' at idx {stress_idx}"
         )
+
+    # --- Coda-r → ʁ (uvular fricative) ---
+
+    def test_coda_r_uvular_word_final(self):
+        """Word-final r (coda) should be ʁ (uvular fricative)."""
+        from piper_train.phonemize.portuguese import phonemize_portuguese
+
+        phonemes = phonemize_portuguese("mar")
+        assert "ʁ" in phonemes, f"Expected ʁ in 'mar', got: {phonemes}"
+
+    def test_coda_r_uvular_before_consonant(self):
+        """Coda r before consonant should be ʁ."""
+        from piper_train.phonemize.portuguese import phonemize_portuguese
+
+        # 'carta': c-a-r-t-a — r before consonant t
+        phonemes = phonemize_portuguese("carta")
+        assert "ʁ" in phonemes, f"Expected ʁ in 'carta', got: {phonemes}"
+
+    def test_intervocalic_r_tap(self):
+        """Intervocalic single r should be ɾ (tap)."""
+        from piper_train.phonemize.portuguese import phonemize_portuguese
+
+        # 'para': p-a-r-a — r between two vowels
+        phonemes = phonemize_portuguese("para")
+        assert "ɾ" in phonemes, f"Expected ɾ in 'para', got: {phonemes}"
+        assert "ʁ" not in phonemes, (
+            f"Should not have ʁ in 'para' (intervocalic r), got: {phonemes}"
+        )
+
+    def test_intervocalic_r_caro(self):
+        """'caro' should have ɾ (tap) for the intervocalic r."""
+        from piper_train.phonemize.portuguese import phonemize_portuguese
+
+        phonemes = phonemize_portuguese("caro")
+        assert "ɾ" in phonemes, f"Expected ɾ in 'caro', got: {phonemes}"
+
+    # --- ʎ and ɲ digraphs ---
+
+    def test_lh_produces_palatal_lateral(self):
+        """lh digraph should produce ʎ (palatal lateral approximant)."""
+        from piper_train.phonemize.portuguese import phonemize_portuguese
+
+        phonemes = phonemize_portuguese("trabalho")
+        assert "ʎ" in phonemes, f"Expected ʎ in 'trabalho', got: {phonemes}"
+
+    def test_nh_produces_palatal_nasal(self):
+        """nh digraph should produce ɲ (palatal nasal)."""
+        from piper_train.phonemize.portuguese import phonemize_portuguese
+
+        phonemes = phonemize_portuguese("banho")
+        assert "ɲ" in phonemes, f"Expected ɲ in 'banho', got: {phonemes}"
+
+    # --- ʃ and ʒ ---
+
+    def test_ch_produces_postalveolar(self):
+        """ch digraph should produce ʃ (voiceless postalveolar fricative)."""
+        from piper_train.phonemize.portuguese import phonemize_portuguese
+
+        phonemes = phonemize_portuguese("chave")
+        assert "ʃ" in phonemes, f"Expected ʃ in 'chave', got: {phonemes}"
+
+    def test_j_produces_voiced_postalveolar(self):
+        """j should produce ʒ (voiced postalveolar fricative)."""
+        from piper_train.phonemize.portuguese import phonemize_portuguese
+
+        phonemes = phonemize_portuguese("jogo")
+        assert "ʒ" in phonemes, f"Expected ʒ in 'jogo', got: {phonemes}"
+
+    def test_g_before_e_produces_voiced_postalveolar(self):
+        """g before e/i should produce ʒ."""
+        from piper_train.phonemize.portuguese import phonemize_portuguese
+
+        phonemes = phonemize_portuguese("gente")
+        assert "ʒ" in phonemes, f"Expected ʒ in 'gente', got: {phonemes}"
+
+    # --- tʃ / dʒ single-token palatalization ---
+
+    def test_ti_palatalization_single_token(self):
+        """Palatalized ti should use single tʃ token (not t + ʃ separately)."""
+        from piper_train.phonemize.portuguese import _convert_word
+
+        phonemes, _ = _convert_word("tipo")
+        assert "tʃ" in phonemes, f"Expected 'tʃ' token in 'tipo', got: {phonemes}"
+        # The separate t and ʃ should NOT appear as consecutive tokens
+        for idx in range(len(phonemes) - 1):
+            assert not (phonemes[idx] == "t" and phonemes[idx + 1] == "ʃ"), (
+                f"Should not have separate t + ʃ tokens in 'tipo', got: {phonemes}"
+            )
+
+    def test_di_palatalization_single_token(self):
+        """Palatalized di should use single dʒ token (not d + ʒ separately)."""
+        from piper_train.phonemize.portuguese import _convert_word
+
+        phonemes, _ = _convert_word("dia")
+        assert "dʒ" in phonemes, f"Expected 'dʒ' token in 'dia', got: {phonemes}"
+        for idx in range(len(phonemes) - 1):
+            assert not (phonemes[idx] == "d" and phonemes[idx + 1] == "ʒ"), (
+                f"Should not have separate d + ʒ tokens in 'dia', got: {phonemes}"
+            )
+
+    # --- Nasal coda suppression in word-medial position ---
+
+    def test_nasal_coda_suppressed_banco(self):
+        """'banco' nasal coda n should be suppressed (absorbed into nasal vowel)."""
+        from piper_train.phonemize.portuguese import _convert_word
+
+        phonemes, _ = _convert_word("banco")
+        joined = " ".join(phonemes)
+        # Should produce ã (nasal a) but NOT a following n
+        assert "ã" in phonemes, f"Expected nasal ã in 'banco', got: {phonemes}"
+        # ã should not be followed by n in the phoneme sequence
+        for idx in range(len(phonemes) - 1):
+            assert not (phonemes[idx] == "ã" and phonemes[idx + 1] == "n"), (
+                f"Nasal coda n should be suppressed in 'banco', got: {joined}"
+            )
+
+    def test_nasal_coda_suppressed_campo(self):
+        """'campo' nasal coda m should be suppressed (absorbed into nasal vowel)."""
+        from piper_train.phonemize.portuguese import _convert_word
+
+        phonemes, _ = _convert_word("campo")
+        joined = " ".join(phonemes)
+        # ã should not be followed by m
+        for idx in range(len(phonemes) - 1):
+            assert not (phonemes[idx] == "ã" and phonemes[idx + 1] == "m"), (
+                f"Nasal coda m should be suppressed in 'campo', got: {joined}"
+            )

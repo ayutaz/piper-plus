@@ -42,8 +42,8 @@ CHINESE_PHONEMES: list[str] = [
     "x",     # pinyin h (voiceless velar fricative)
 
     # --- Vowels unique to Chinese ---
-    "ɤ",     # pinyin e (close-mid back unrounded)
-    "y",     # pinyin ü (close front rounded)
+    "ɤ",       # pinyin e (close-mid back unrounded)
+    "y_vowel", # Close front rounded vowel [y] (pinyin ü) — "y_vowel" avoids collision with JA glide "y"
 
     # --- Diphthongs (compound finals as single tokens) ---
     "aɪ",    # pinyin ai
@@ -58,8 +58,8 @@ CHINESE_PHONEMES: list[str] = [
     "əŋ",    # pinyin eng
     "uŋ",    # pinyin ong
 
-    # --- Retroflex final ---
-    "ɑɻ",   # pinyin er (儿化音)
+    # --- Retroflex final / rhotacized schwa ---
+    "ɚ",    # pinyin er and erhua (rhotacized schwa, U+025A)
 
     # --- i- (齐齿呼) compound finals ---
     "ia",    # pinyin ia/ya

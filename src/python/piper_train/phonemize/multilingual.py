@@ -5,12 +5,16 @@ Detects language segments via Unicode ranges, delegates to language-specific
 phonemizers, and returns unified phoneme IDs.
 """
 
+import logging
 import re
 
 from .base import Phonemizer, ProsodyInfo
 from .multilingual_id_map import get_multilingual_id_map
 from .registry import get_phonemizer
 from .token_mapper import TOKEN2CHAR
+
+
+_LOGGER = logging.getLogger(__name__)
 
 
 __all__ = ["MultilingualPhonemizer", "UnicodeLanguageDetector"]
@@ -175,6 +179,19 @@ def _segment_text_multilingual(
 
     if current_chars and current_lang is not None:
         segments.append((current_lang, "".join(current_chars)))
+
+    # If no language-specific characters were detected (e.g., text is only
+    # numbers, URLs, or punctuation), fall back to the default language so
+    # the text is processed rather than silently dropped.
+    if not segments and text.strip():
+        default_lang = detector.default_latin_language
+        _LOGGER.debug(
+            "No language-specific characters detected in %r; "
+            "falling back to default language '%s'.",
+            text,
+            default_lang,
+        )
+        segments = [(default_lang, text)]
 
     return segments
 

@@ -17,33 +17,55 @@ from .vits.wavfile import write as write_wav
 _LOGGER = logging.getLogger("piper_train.infer_onnx")
 
 
+class _DominantLanguageDetector:
+    """Cached wrapper around UnicodeLanguageDetector for dominant-language detection.
+
+    The detector is instantiated once per unique set of languages and reused
+    across calls to avoid repeated object construction overhead.
+    """
+
+    _cache: "dict[tuple[str, ...], _DominantLanguageDetector]" = {}
+
+    def __init__(self, language_id_map: dict[str, int]):
+        from .phonemize.multilingual import UnicodeLanguageDetector  # noqa: PLC0415
+
+        self._language_id_map = language_id_map
+        languages = list(language_id_map.keys())
+        self._detector = UnicodeLanguageDetector(
+            languages, default_latin_language="en"
+        )
+
+    @classmethod
+    def get(cls, language_id_map: dict[str, int]) -> "_DominantLanguageDetector":
+        """Return a cached instance for this language_id_map."""
+        key = tuple(sorted(language_id_map.items()))
+        if key not in cls._cache:
+            cls._cache[key] = cls(language_id_map)
+        return cls._cache[key]
+
+    def detect(self, text: str) -> int:
+        """Return the language_id for the dominant language in text."""
+        context_has_kana = self._detector.has_kana(text)
+        counts: dict[str, int] = {}
+        for ch in text:
+            lang = self._detector.detect_char(ch, context_has_kana=context_has_kana)
+            if lang is not None:
+                counts[lang] = counts.get(lang, 0) + 1
+        if not counts:
+            return self._language_id_map.get("en", 0)
+        dominant = max(counts, key=lambda k: counts[k])
+        return self._language_id_map.get(dominant, 0)
+
+
 def _detect_dominant_language(
     text: str, language_id_map: dict[str, int]
 ) -> int:
     """Detect the dominant language in text using Unicode ranges.
 
     Returns the language_id for the most common script in the text.
-    Delegates to UnicodeLanguageDetector for consistent detection logic.
+    Uses a cached UnicodeLanguageDetector instance for efficiency.
     """
-    from .phonemize.multilingual import UnicodeLanguageDetector  # noqa: PLC0415
-
-    languages = list(language_id_map.keys())
-    detector = UnicodeLanguageDetector(languages, default_latin_language="en")
-    context_has_kana = detector.has_kana(text)
-
-    # Count characters by detected language
-    counts: dict[str, int] = {}
-    for ch in text:
-        lang = detector.detect_char(ch, context_has_kana=context_has_kana)
-        if lang is not None:
-            counts[lang] = counts.get(lang, 0) + 1
-
-    if not counts:
-        return language_id_map.get("en", 0)
-
-    # Return language_id for the dominant language
-    dominant = max(counts, key=lambda k: counts[k])
-    return language_id_map.get(dominant, 0)
+    return _DominantLanguageDetector.get(language_id_map).detect(text)
 
 
 def text_to_phoneme_ids_and_prosody(

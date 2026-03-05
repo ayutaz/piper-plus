@@ -75,6 +75,17 @@ def _is_vowel_char(ch: str) -> bool:
     return ch in _VOWELS
 
 
+def _is_intervocalic(i: int, word: str) -> bool:
+    """Return True if position i in word has a vowel immediately before and after.
+
+    Used for context-dependent r: intervocalic r → ɾ (tap), coda r → ʁ.
+    """
+    if i <= 0 or i >= len(word) - 1:
+        # Cannot be intervocalic at word edge
+        return False
+    return _is_vowel_char(word[i - 1]) and _is_vowel_char(word[i + 1])
+
+
 def _has_accent(word: str) -> bool:
     """Check if word has any accent mark."""
     for ch in word:
@@ -270,12 +281,13 @@ def _convert_word(word: str) -> tuple[list[str], int]:
         # --- Consonants ---
 
         if ch == "r":
-            # Initial r or after n/l/s -> ʁ
-            if i == 0 or (i > 0 and word[i - 1] in "nls"):
-                phonemes.append("ʁ")
-            else:
-                # Intervocalic r -> ɾ (tap)
+            # Intervocalic r (vowel before AND vowel after) -> ɾ (tap)
+            # All other positions (word-initial, word-final, after consonant,
+            # before consonant / coda) -> ʁ (uvular fricative)
+            if _is_intervocalic(i, word):
                 phonemes.append("ɾ")
+            else:
+                phonemes.append("ʁ")
             i += 1
             continue
 
@@ -339,24 +351,22 @@ def _convert_word(word: str) -> tuple[list[str], int]:
             continue
 
         if ch == "t":
-            # Brazilian Portuguese: t before i -> tʃ
+            # Brazilian Portuguese: t before i -> tʃ (single affricate token)
             # (palatalization before unstressed final -e is handled in
             # _apply_br_postprocessing)
             if i + 1 < n and word[i + 1] in "ií":
-                phonemes.append("t")
-                phonemes.append("ʃ")
+                phonemes.append("tʃ")
             else:
                 phonemes.append("t")
             i += 1
             continue
 
         if ch == "d":
-            # Brazilian Portuguese: d before i -> dʒ
+            # Brazilian Portuguese: d before i -> dʒ (single affricate token)
             # (palatalization before unstressed final -e is handled in
             # _apply_br_postprocessing)
             if i + 1 < n and word[i + 1] in "ií":
-                phonemes.append("d")
-                phonemes.append("ʒ")
+                phonemes.append("dʒ")
             else:
                 phonemes.append("d")
             i += 1
@@ -392,6 +402,7 @@ def _convert_word(word: str) -> tuple[list[str], int]:
             # Check for nasalization: tilde or vowel before n/m + consonant/end
             # Exception: vowel before "nh" digraph is NOT nasal (nh = /ɲ/)
             is_nasal = False
+            nasal_absorbed = False  # True when n/m is absorbed into nasalization
             if ch in _TILDE:
                 is_nasal = True
             elif i + 1 < n and word[i + 1] in "nm":
@@ -399,11 +410,13 @@ def _convert_word(word: str) -> tuple[list[str], int]:
                 if word[i + 1] == "n" and i + 2 < n and word[i + 2] == "h":
                     is_nasal = False
                 elif i + 2 >= n:
-                    # Nasal: n/m at end of word
+                    # Nasal: n/m at end of word — absorb the nasal consonant
                     is_nasal = True
+                    nasal_absorbed = True
                 elif not _is_vowel_char(word[i + 2]):
-                    # Nasal: n/m followed by consonant
+                    # Nasal: n/m followed by consonant — absorb the nasal coda
                     is_nasal = True
+                    nasal_absorbed = True
 
             if is_nasal:
                 nasal_map = {"a": "ã", "e": "ẽ", "i": "ĩ", "o": "õ", "u": "ũ"}
@@ -429,7 +442,12 @@ def _convert_word(word: str) -> tuple[list[str], int]:
                 stress_idx = len(phonemes)
             phonemes.append(phoneme)
             current_vowel_group += 1
-            i += 1
+            # Advance past the absorbed nasal consonant (n/m already encoded
+            # in the nasal vowel; skip it to avoid redundant coda)
+            if nasal_absorbed:
+                i += 2  # skip vowel + nasal consonant
+            else:
+                i += 1
             continue
 
         # Punctuation or unknown: pass through
@@ -546,17 +564,15 @@ def _apply_br_postprocessing(
         if result[last_phoneme_idx] == "e" and last_phoneme_idx != stress_idx:
             # Check if preceded by 't'
             if last_phoneme_idx >= start + 1 and result[last_phoneme_idx - 1] == "t":
-                # t + unstressed final e -> t ʃ i
-                result[last_phoneme_idx - 1] = "t"
+                # t + unstressed final e -> tʃ i (single affricate token)
+                result[last_phoneme_idx - 1] = "tʃ"
                 result[last_phoneme_idx] = "i"
-                result.insert(last_phoneme_idx, "ʃ")
                 continue
             # Check if preceded by 'd'
             if last_phoneme_idx >= start + 1 and result[last_phoneme_idx - 1] == "d":
-                # d + unstressed final e -> d ʒ i
-                result[last_phoneme_idx - 1] = "d"
+                # d + unstressed final e -> dʒ i (single affricate token)
+                result[last_phoneme_idx - 1] = "dʒ"
                 result[last_phoneme_idx] = "i"
-                result.insert(last_phoneme_idx, "ʒ")
                 continue
             # Unstressed final e -> i (general reduction)
             result[last_phoneme_idx] = "i"

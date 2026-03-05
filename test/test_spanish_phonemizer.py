@@ -213,3 +213,54 @@ class TestSpanishPhonemizer:
         units = _segment_graphemes("pingüino")
         graphemes = [u[0] for u in units]
         assert "gü" in graphemes
+
+    # ---------------------------------------------------------------
+    # Fix 1: Accented weak vowel forces hiatus
+    # ---------------------------------------------------------------
+
+    def test_hiatus_accented_weak_vowel(self):
+        """Accented weak vowel forces hiatus."""
+        # día should be 2 syllables with stress on í
+        phonemes = phonemize_spanish("día")
+        assert "ˈ" in phonemes
+        i_idx = phonemes.index("ˈ")
+        assert phonemes[i_idx + 1] == "i"
+
+    def test_pais_hiatus(self):
+        """país has hiatus: pa-ís (2 syllables)."""
+        phonemes = phonemize_spanish("país")
+        assert "ˈ" in phonemes
+
+    # ---------------------------------------------------------------
+    # Fix 2: xc+e/i produces no double /s/
+    # ---------------------------------------------------------------
+
+    def test_xc_no_double_s(self):
+        """exceso should not produce double s."""
+        phonemes = phonemize_spanish("exceso")
+        # Count s phonemes - should be exactly 2 (from x→ks and final s)
+        s_count = sum(1 for p in phonemes if p == "s")
+        assert s_count == 2, f"expected 2 's' but got {s_count}: {phonemes}"
+
+    # ---------------------------------------------------------------
+    # Fix 3: Spirantization after lateral and rhotic
+    # ---------------------------------------------------------------
+
+    def test_spirantization_after_lateral(self):
+        """b after l should produce β."""
+        phonemes = phonemize_spanish("alba")
+        assert "β" in phonemes
+
+    def test_spirantization_after_rhotic(self):
+        """b after r should produce β."""
+        phonemes = phonemize_spanish("árbol")
+        assert "β" in phonemes
+
+    # ---------------------------------------------------------------
+    # Fix 5: Function word stress suppression
+    # ---------------------------------------------------------------
+
+    def test_function_word_no_stress(self):
+        """Common function words should not have stress marker."""
+        phonemes = phonemize_spanish("el")
+        assert "ˈ" not in phonemes

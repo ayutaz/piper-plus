@@ -28,9 +28,6 @@ _VOWELS = set("aeiouyàâæéèêëîïôùûüœ")
 # Consonant letters
 _CONSONANTS = set("bcdfghjklmnpqrstvwxz")
 
-# "CaReFuL" consonants that are often pronounced at end of word
-_CAREFUL = set("crfl")
-
 # Common silent final consonants
 _SILENT_FINAL = set("dghmnpstxz")
 
@@ -81,17 +78,22 @@ def _convert_word(word: str) -> list[str]:
         # ---------------------------------------------------------------
 
         # -er word-final: verb infinitive ending -> /e/
-        # Also -ier -> /je/, -yer -> /je/
+        # Only apply to polysyllabic words (parler, manger); monosyllabic words
+        # like mer, fer, ver keep /ɛʁ/ pronunciation.
         if ch == "e" and i + 1 == n - 1 and word[i + 1] == "r":
-            # Word ends in "er"
-            if i > 0 and word[i - 1] in "iy":
-                # -ier/-yer: the 'i'/'y' already produced 'j' (or 'i'),
-                # just produce /e/ for 'er' and skip 'r'
-                phonemes.append("e")
-            else:
-                phonemes.append("e")
-            i += 2
-            continue
+            # Only apply -er→/e/ for words with at least 2 vowel groups
+            vowel_count = sum(1 for c in word if c in _VOWELS)
+            if vowel_count >= 2:
+                # Word ends in "er" (polysyllabic)
+                if i > 0 and word[i - 1] in "iy":
+                    # -ier/-yer: the 'i'/'y' already produced 'j' (or 'i'),
+                    # just produce /e/ for 'er' and skip 'r'
+                    phonemes.append("e")
+                else:
+                    phonemes.append("e")
+                i += 2
+                continue
+            # else: monosyllabic -er (mer, fer) — fall through to normal e handling
 
         # "eau" -> o
         if ch == "e" and i + 2 < n and word[i + 1 : i + 3] == "au":
@@ -122,6 +124,30 @@ def _convert_word(word: str) -> list[str]:
             phonemes.append("a")
             phonemes.append("j")
             i += 5
+            continue
+
+        # "euille" -> /œj/ (feuille, écureuil)
+        if (
+            ch == "e"
+            and i + 5 <= n
+            and word[i + 1 : i + 6] == "uille"
+            and i + 6 >= n
+        ):
+            phonemes.append("œ")
+            phonemes.append("j")
+            i += 6
+            continue
+
+        # "eil" at word end -> /ɛj/ (soleil, réveil)
+        if (
+            ch == "e"
+            and i + 2 < n
+            and word[i + 1 : i + 3] == "il"
+            and i + 3 >= n
+        ):
+            phonemes.append("ɛ")
+            phonemes.append("j")
+            i += 3
             continue
 
         # "eille" -> /ɛj/
@@ -229,7 +255,7 @@ def _convert_word(word: str) -> list[str]:
 
         # "gu" before e/i -> ɡ (u silent)
         if ch == "g" and i + 1 < n and word[i + 1] == "u":
-            if i + 2 < n and word[i + 2] in "eeiéèêë":
+            if i + 2 < n and word[i + 2] in "eiéèêëîï":
                 phonemes.append("ɡ")
                 i += 2
                 continue
@@ -274,6 +300,17 @@ def _convert_word(word: str) -> list[str]:
 
         # "un", "um" -> ɛ̃ (modern French merger)
         if ch == "u" and i + 1 < n and word[i + 1] in "nm":
+            if i + 2 >= n:
+                phonemes.append("ɛ̃")
+                i += 2
+                continue
+            if not _is_vowel_char(word[i + 2]) and word[i + 2] != word[i + 1]:
+                phonemes.append("ɛ̃")
+                i += 2
+                continue
+
+        # "yn", "ym" before consonant -> ɛ̃ (syndicat, symbole)
+        if ch == "y" and i + 1 < n and word[i + 1] in "nm":
             if i + 2 >= n:
                 phonemes.append("ɛ̃")
                 i += 2
@@ -383,17 +420,31 @@ def _convert_word(word: str) -> list[str]:
             continue
 
         if ch == "o":
-            phonemes.append("o")
+            # Open /ɔ/ before a pronounced consonant at word end (porte, or, homme).
+            # Closed /o/ elsewhere (mot, beau already handled above).
+            # Strip a trailing silent 'e' (or 'es') for the check, e.g. "porte" → "rt".
+            remaining = word[i + 1 :]
+            effective = remaining
+            if effective.endswith("es"):
+                effective = effective[:-2]
+            elif effective.endswith("e"):
+                effective = effective[:-1]
+            if effective and all(c in _CONSONANTS for c in effective) and any(
+                c not in _SILENT_FINAL for c in effective
+            ):
+                phonemes.append("ɔ")
+            else:
+                phonemes.append("o")
             i += 1
             continue
 
         if ch in "ùû":
-            phonemes.append("y")
+            phonemes.append("y_vowel")
             i += 1
             continue
 
         if ch == "ü":
-            phonemes.append("y")
+            phonemes.append("y_vowel")
             i += 1
             continue
 
@@ -404,8 +455,8 @@ def _convert_word(word: str) -> list[str]:
                 phonemes.append("i")
                 i += 2
                 continue
-            # "u" after g/q already handled; standalone u -> y
-            phonemes.append("y")
+            # "u" after g/q already handled; standalone u -> y_vowel
+            phonemes.append("y_vowel")
             i += 1
             continue
 
@@ -435,10 +486,25 @@ def _convert_word(word: str) -> list[str]:
                 # Word-final 'e' is usually silent
                 i += 1
                 continue
-            # Before final consonant(s) -> ɛ
             remaining = word[i + 1 :]
-            if all(c in _CONSONANTS or c == "s" for c in remaining):
-                phonemes.append("ɛ")
+            # ɛ in closed syllable:
+            #   (a) before 2+ leading consonants (merci, service, berceau)
+            #   (b) before only consonant(s) with at least one pronounced final one
+            if remaining:
+                consonant_count = 0
+                for c in remaining:
+                    if c in _CONSONANTS:
+                        consonant_count += 1
+                    else:
+                        break
+                if consonant_count >= 2:
+                    phonemes.append("ɛ")
+                elif all(c in _CONSONANTS for c in remaining) and any(
+                    c not in _SILENT_FINAL for c in remaining
+                ):
+                    phonemes.append("ɛ")
+                else:
+                    phonemes.append("ə")
             else:
                 phonemes.append("ə")
             i += 1
@@ -578,7 +644,16 @@ def _convert_word(word: str) -> list[str]:
 
 
 def _split_words(text: str) -> list[str]:
-    """Split text into words and punctuation tokens."""
+    """Split text into words and punctuation tokens.
+
+    Apostrophes (both straight ' and curly '\u2019) act as word boundaries in French
+    elision (l'ami → ["l", "ami"]). They are normalised away before splitting so
+    that "l\u2019ami" and "l'ami" both tokenise identically.
+    """
+    # Normalise curly/typographic apostrophes to straight apostrophe, then drop them
+    # (apostrophe is not in the letter character class, so it already acts as a
+    # word boundary — this just ensures curly variants behave the same way).
+    text = text.replace("\u2019", "'").replace("\u2018", "'")
     tokens = re.findall(
         r"[a-zàâæéèêëîïôùûüœçñ]+|[,.;:!?¡¿—–…«»]", text, re.IGNORECASE
     )
@@ -621,7 +696,7 @@ def phonemize_french_with_prosody(
             # French: stress always on last syllable (last vowel phoneme)
             # Find last vowel-like phoneme for stress marking
             vowel_phonemes = {
-                "a", "e", "ɛ", "i", "o", "u", "y", "ə", "ø", "œ",
+                "a", "e", "ɛ", "i", "o", "ɔ", "u", "y_vowel", "ə", "ø", "œ",
                 "ɛ̃", "ɑ̃", "ɔ̃",
             }
             last_vowel_idx = -1

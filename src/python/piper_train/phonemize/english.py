@@ -19,6 +19,30 @@ __all__ = [
     "EnglishPhonemizer",
 ]
 
+# ---------------------------------------------------------------------------
+# G2p instance cache — instantiating G2p() takes 100–500 ms; cache it at
+# module level so repeated calls to phonemize_english() are fast.
+# ---------------------------------------------------------------------------
+_g2p_instance = None
+_g2p_unavailable = False
+
+
+def _get_g2p():
+    """Return a cached G2p instance (or None if g2p_en is unavailable)."""
+    global _g2p_instance, _g2p_unavailable
+    if _g2p_unavailable:
+        return None
+    if _g2p_instance is None:
+        try:
+            from g2p_en import G2p  # noqa: PLC0415
+
+            _g2p_instance = G2p()
+        except (ImportError, Exception) as exc:
+            _LOGGER.warning("g2p_en unavailable: %s", exc)
+            _g2p_unavailable = True
+            return None
+    return _g2p_instance
+
 # ARPAbet to espeak-compatible IPA mapping
 ARPABET_TO_IPA: dict[str, str] = {
     "AA": "ɑ",
@@ -186,9 +210,12 @@ def _g2p_en_to_arpabet_tokens(text: str) -> list[list[str]]:
     (e.g. ["HH", "AH0", "L", "OW1"]).
     Punctuation-only groups are kept as separate "words".
     """
-    from g2p_en import G2p  # noqa: PLC0415
-
-    g2p = G2p()
+    g2p = _get_g2p()
+    if g2p is None:
+        raise ImportError(
+            "g2p_en is required for English phonemization. "
+            "Install it with: pip install g2p-en"
+        )
     raw = g2p(text)
 
     # g2p-en returns a flat list of phonemes with spaces as word boundaries

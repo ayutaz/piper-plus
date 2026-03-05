@@ -35,6 +35,19 @@ _STRESS_FINAL_EXCEPTIONS = {"n", "s"}
 # Regex: split text into word tokens and punctuation
 _RE_TOKEN = re.compile(r"([a-záéíóúüñ]+|[,.;:!?¡¿]+)", re.IGNORECASE)
 
+# Common monosyllabic function words that are phonologically unstressed
+# in connected speech and should not receive the primary stress marker ˈ.
+_UNSTRESSED_FUNCTION_WORDS: frozenset[str] = frozenset({
+    "el", "la", "los", "las", "un", "una", "de", "del", "al",
+    "a", "en", "con", "por", "y", "o", "que", "se", "me", "te",
+    "le", "lo", "nos", "su", "mi", "tu", "es", "no", "si",
+})
+
+
+def _has_accent_on_char(grapheme: str) -> bool:
+    """Return True if *grapheme* is an accented vowel character."""
+    return grapheme in ("á", "é", "í", "ó", "ú")
+
 
 def _normalize(text: str) -> str:
     """Lowercase and normalize unicode."""
@@ -208,10 +221,19 @@ def _find_syllable_boundaries(word: str) -> list[int]:
             if i > 0 and is_vowel_ns[i - 1]:
                 # Check hiatus vs diphthong: strong+strong = hiatus
                 strong = set("aeo")
-                prev_base = _get_base_vowel(units[non_silent_idx[i - 1]][0][-1])
-                curr_base = _get_base_vowel(units[non_silent_idx[i]][0][-1])
+                prev_grapheme = units[non_silent_idx[i - 1]][0][-1]
+                curr_grapheme = units[non_silent_idx[i]][0][-1]
+                prev_base = _get_base_vowel(prev_grapheme)
+                curr_base = _get_base_vowel(curr_grapheme)
                 if prev_base in strong and curr_base in strong:
                     ns_boundaries.append(i)
+                else:
+                    # Accented weak vowel forces hiatus (diphthong breaking)
+                    weak = {"i", "u"}
+                    if curr_base in weak and _has_accent_on_char(curr_grapheme):
+                        ns_boundaries.append(i)
+                    elif prev_base in weak and _has_accent_on_char(prev_grapheme):
+                        ns_boundaries.append(i)
             i += 1
         else:
             # Consonant cluster before next vowel
@@ -418,10 +440,8 @@ def _g2p_word(word: str) -> tuple[list[str], int]:
         if base_ch in ("b", "v"):
             if _is_word_initial() or _is_after_nasal():
                 phonemes.append("b")
-            elif _prev_is_vowel():
-                phonemes.append("β")
             else:
-                phonemes.append("b")
+                phonemes.append("β")  # fricative in all other positions
             i += 1
             continue
 
@@ -434,16 +454,10 @@ def _g2p_word(word: str) -> tuple[list[str], int]:
             continue
 
         if base_ch == "d":
-            if _is_word_initial() or _is_after_nasal():
+            if _is_word_initial() or _is_after_nasal() or (i > 0 and base_word[i - 1] == "l"):
                 phonemes.append("d")
-            elif i > 0 and base_word[i - 1] == "l":
-                phonemes.append("d")
-            elif _prev_is_vowel():
-                phonemes.append("ð")
-            elif i == n - 1:
-                phonemes.append("ð")
             else:
-                phonemes.append("d")
+                phonemes.append("ð")  # fricative in all other positions
             i += 1
             continue
 
@@ -457,10 +471,8 @@ def _g2p_word(word: str) -> tuple[list[str], int]:
                 phonemes.append("x")
             elif _is_word_initial() or _is_after_nasal():
                 phonemes.append("ɡ")
-            elif _prev_is_vowel():
-                phonemes.append("ɣ")
             else:
-                phonemes.append("ɡ")
+                phonemes.append("ɣ")  # fricative in all other positions
             i += 1
             continue
 
@@ -530,6 +542,18 @@ def _g2p_word(word: str) -> tuple[list[str], int]:
             continue
 
         if base_ch == "x":
+            # Check for xc+e/i: the following c is silent (x already provides /ks/)
+            if (
+                i + 1 < n
+                and base_word[i + 1] == "c"
+                and i + 2 < n
+                and base_word[i + 2] in ("e", "i")
+            ):
+                phonemes.append("k")
+                phonemes.append("s")
+                i += 2  # skip both x and c
+                continue
+            # Normal x → /ks/
             phonemes.append("k")
             phonemes.append("s")
             i += 1
@@ -678,7 +702,11 @@ def phonemize_spanish_with_prosody(
             prosody_list.append(ProsodyInfo(a1=0, a2=0, a3=0))
 
         word_phonemes, stressed_syl = _g2p_word(token)
-        word_with_stress = _insert_stress_marker(word_phonemes, token)
+        # Skip stress marker for common unstressed function words
+        if token in _UNSTRESSED_FUNCTION_WORDS:
+            word_with_stress = word_phonemes
+        else:
+            word_with_stress = _insert_stress_marker(word_phonemes, token)
 
         word_phoneme_count = len(word_phonemes)  # count without stress marker
 
@@ -719,4 +747,9 @@ class SpanishPhonemizer(Phonemizer):
         return phonemize_spanish_with_prosody(text)
 
     def get_phoneme_id_map(self) -> dict[str, list[int]] | None:
+        # Returns None because Spanish is designed for multilingual (trilingual)
+        # use, where the ID map is managed by the unified multilingual ID map
+        # builder (which calls get_spanish_id_map() from es_id_map.py directly).
+        # For standalone ES models, callers should use es_id_map.get_spanish_id_map()
+        # explicitly.
         return None

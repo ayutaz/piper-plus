@@ -753,6 +753,28 @@ def _phonemize_batch_multilingual_impl(
         if timeout_sec > 0:
             signal.signal(signal.SIGALRM, _timeout_handler)
 
+        # Build language_id_map and detector once per worker for multilingual mode
+        language_id_map: dict[str, int] = {}
+        _lang_detector = None
+        if hasattr(args, "lang_parts") and args.lang_parts:
+            language_id_map = {
+                lang: idx for idx, lang in enumerate(args.lang_parts)
+            }
+            from .phonemize.multilingual import UnicodeLanguageDetector  # noqa: PLC0415
+
+            _lang_detector = UnicodeLanguageDetector(
+                args.lang_parts,
+                default_latin_language="en" if "en" in args.lang_parts else args.lang_parts[0],
+            )
+        elif getattr(args, "phoneme_type", None) == PhonemeType.BILINGUAL:
+            language_id_map = {"ja": 0, "en": 1}
+            from .phonemize.multilingual import UnicodeLanguageDetector  # noqa: PLC0415
+
+            _lang_detector = UnicodeLanguageDetector(
+                ["ja", "en"],
+                default_latin_language="en",
+            )
+
         while True:
             utt_batch = queue_in.get()
             if utt_batch is None:
@@ -775,6 +797,20 @@ def _phonemize_batch_multilingual_impl(
                         else:
                             utt.missing_phonemes[phoneme] += 1
                             _LOGGER.warning(f"Missing phoneme: {phoneme}")
+
+                    # Detect and set language_id for multilingual/bilingual utterances
+                    if _lang_detector is not None and language_id_map:
+                        context_has_kana = _lang_detector.has_kana(utt.text)
+                        counts: dict[str, int] = {}
+                        for ch in utt.text:
+                            lang = _lang_detector.detect_char(ch, context_has_kana=context_has_kana)
+                            if lang is not None:
+                                counts[lang] = counts.get(lang, 0) + 1
+                        if counts:
+                            dominant = max(counts, key=lambda k: counts[k])
+                            utt.language_id = language_id_map.get(dominant, 0)
+                        else:
+                            utt.language_id = 0
 
                     # Post-process (BOS/EOS/padding)
                     prosody_features_raw = [

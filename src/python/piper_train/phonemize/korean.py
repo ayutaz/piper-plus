@@ -192,6 +192,11 @@ def _apply_g2p(text: str) -> str:
             "be applied. Install with: pip install python-mecab-ko"
         )
         return text
+    except Exception as exc:  # noqa: BLE001
+        # Catch any other runtime error (IndexError, KeyError, ValueError, etc.)
+        # that can occur with unusual or mixed-script input.
+        _LOGGER.debug("g2pk2 failed on input %r: %s", text, exc)
+        return text
 
 
 def _count_hangul_syllables(word: str) -> int:

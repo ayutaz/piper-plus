@@ -5,6 +5,8 @@ Merges phoneme inventories from multiple languages into a single ID space
 with no collisions. Shared symbols get a single ID.
 """
 
+import unicodedata
+
 from .jp_id_map import JAPANESE_PHONEMES, SPECIAL_TOKENS
 from .token_mapper import register
 
@@ -103,7 +105,8 @@ def get_multilingual_id_map(languages: list[str]) -> dict[str, list[int]]:
 
     # Start with shared special tokens
     for s in SPECIAL_TOKENS:
-        mapped = register(s)
+        phoneme = unicodedata.normalize("NFC", s)
+        mapped = register(phoneme)
         if mapped not in seen:
             all_symbols.append(mapped)
             seen.add(mapped)
@@ -117,7 +120,8 @@ def get_multilingual_id_map(languages: list[str]) -> dict[str, list[int]]:
                 f"Available: {list(LANGUAGE_PHONEMES.keys())}"
             )
         for s in phonemes:
-            mapped = register(s)
+            phoneme = unicodedata.normalize("NFC", s)
+            mapped = register(phoneme)
             if mapped not in seen:
                 all_symbols.append(mapped)
                 seen.add(mapped)

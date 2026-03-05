@@ -338,3 +338,161 @@ class TestFrenchPhonemizer:
         phonemes = _convert_word("nation")
         assert "s" in phonemes, f"Expected /s/ in 'nation', got: {phonemes}"
         assert "j" in phonemes, f"Expected /j/ in 'nation', got: {phonemes}"
+
+    # -----------------------------------------------------------------
+    # Fix 1/2: y_vowel (French /y/) — no bare "y" from French u
+    # -----------------------------------------------------------------
+
+    def test_y_vowel_not_bare_y(self):
+        """French u vowel should use y_vowel, not bare y."""
+        from piper_train.phonemize.french import phonemize_french
+
+        phonemes = phonemize_french("lune")
+        assert "y" not in phonemes, f"Bare 'y' should not appear for French /y/: {phonemes}"
+        assert "y_vowel" in phonemes, f"Expected 'y_vowel' in 'lune': {phonemes}"
+
+    def test_y_vowel_tu(self):
+        """tu: u -> y_vowel."""
+        from piper_train.phonemize.french import _convert_word
+
+        phonemes = _convert_word("tu")
+        assert "y_vowel" in phonemes, f"Expected 'y_vowel' in 'tu': {phonemes}"
+        assert "y" not in phonemes, f"Bare 'y' should not appear: {phonemes}"
+
+    # -----------------------------------------------------------------
+    # Fix 3: -er rule restricted to polysyllabic words
+    # -----------------------------------------------------------------
+
+    def test_er_monosyllabic_not_verb(self):
+        """Monosyllabic -er words should keep /\u025b\u0281/, not /e/."""
+        from piper_train.phonemize.french import _convert_word
+
+        phonemes = _convert_word("mer")
+        assert "\u025b" in phonemes or "e" not in phonemes or "\u0281" in phonemes, (
+            f"'mer' should pronounce r and use open-e: {phonemes}"
+        )
+        # Specifically: the 'r' must be pronounced (ʁ present)
+        assert "\u0281" in phonemes, f"Expected /\u0281/ in 'mer', got: {phonemes}"
+
+    def test_er_verb_infinitive(self):
+        """Polysyllabic -er verbs should use /e/."""
+        from piper_train.phonemize.french import _convert_word
+
+        phonemes = _convert_word("parler")
+        assert phonemes[-1] == "e", f"Expected final /e/ in 'parler', got: {phonemes}"
+
+    # -----------------------------------------------------------------
+    # Fix 4: Apostrophe handling
+    # -----------------------------------------------------------------
+
+    def test_apostrophe_handling(self):
+        """Apostrophe should not crash and should produce phonemes."""
+        from piper_train.phonemize.french import phonemize_french
+
+        phonemes = phonemize_french("l'ami")
+        assert len(phonemes) > 0, "Apostrophe handling should not produce empty output"
+
+    def test_curly_apostrophe_handling(self):
+        """Curly apostrophe (U+2019) should behave the same as straight apostrophe."""
+        from piper_train.phonemize.french import phonemize_french
+
+        phonemes_straight = phonemize_french("l'ami")
+        phonemes_curly = phonemize_french("l\u2019ami")
+        assert phonemes_straight == phonemes_curly, (
+            f"Straight and curly apostrophe should produce same result: "
+            f"{phonemes_straight} vs {phonemes_curly}"
+        )
+
+    # -----------------------------------------------------------------
+    # Fix 5: Open o (ɔ)
+    # -----------------------------------------------------------------
+
+    def test_open_o_porte(self):
+        """Open o before pronounced consonant: porte -> /pɔʁt/."""
+        from piper_train.phonemize.french import _convert_word
+
+        phonemes = _convert_word("porte")
+        assert "\u0254" in phonemes, f"Expected /\u0254/ in 'porte', got: {phonemes}"
+
+    def test_open_o_or(self):
+        """Open o word-final before r: or -> /\u0254\u0281/."""
+        from piper_train.phonemize.french import _convert_word
+
+        phonemes = _convert_word("or")
+        assert "\u0254" in phonemes, f"Expected /\u0254/ in 'or', got: {phonemes}"
+
+    # -----------------------------------------------------------------
+    # Fix 6: gu before i — u is silent
+    # -----------------------------------------------------------------
+
+    def test_gu_before_i_guide(self):
+        """gu before i: u is silent — guide should not contain y_vowel."""
+        from piper_train.phonemize.french import _convert_word
+
+        phonemes = _convert_word("guide")
+        assert "y_vowel" not in phonemes, (
+            f"gu+i: u should be silent in 'guide', got: {phonemes}"
+        )
+        assert "\u0261" in phonemes or "g" in str(phonemes), (
+            f"Expected /ɡ/ in 'guide', got: {phonemes}"
+        )
+
+    # -----------------------------------------------------------------
+    # Fix 7: euille and eil patterns
+    # -----------------------------------------------------------------
+
+    def test_feuille(self):
+        """euille -> /\u0153j/: feuille."""
+        from piper_train.phonemize.french import _convert_word
+
+        phonemes = _convert_word("feuille")
+        assert "\u0153" in phonemes, f"Expected /\u0153/ in 'feuille', got: {phonemes}"
+        assert "j" in phonemes, f"Expected /j/ in 'feuille', got: {phonemes}"
+
+    def test_soleil(self):
+        """eil -> /\u025bj/: soleil."""
+        from piper_train.phonemize.french import _convert_word
+
+        phonemes = _convert_word("soleil")
+        assert "\u025b" in phonemes, f"Expected /\u025b/ in 'soleil', got: {phonemes}"
+        assert "j" in phonemes, f"Expected /j/ in 'soleil', got: {phonemes}"
+
+    # -----------------------------------------------------------------
+    # Fix 9: yn/ym -> ɛ̃
+    # -----------------------------------------------------------------
+
+    def test_syndicat_nasal(self):
+        """yn before consonant -> \u025b\u0303: syndicat."""
+        from piper_train.phonemize.french import _convert_word
+
+        phonemes = _convert_word("syndicat")
+        assert "\u025b\u0303" in phonemes, (
+            f"Expected /\u025b\u0303/ in 'syndicat', got: {phonemes}"
+        )
+
+    def test_symbole_nasal(self):
+        """ym before consonant -> \u025b\u0303: symbole."""
+        from piper_train.phonemize.french import _convert_word
+
+        phonemes = _convert_word("symbole")
+        assert "\u025b\u0303" in phonemes, (
+            f"Expected /\u025b\u0303/ in 'symbole', got: {phonemes}"
+        )
+
+    # -----------------------------------------------------------------
+    # Fix 1: Declared phonemes — ɲ and ʁ must appear
+    # -----------------------------------------------------------------
+
+    def test_gn_produces_palatal_nasal(self):
+        """gn -> \u0272: montagne."""
+        from piper_train.phonemize.french import phonemize_french
+
+        phonemes = phonemize_french("montagne")
+        assert "\u0272" in phonemes, f"Expected /\u0272/ in 'montagne', got: {phonemes}"
+
+    def test_r_produces_uvular(self):
+        """r -> \u0281 consistently."""
+        from piper_train.phonemize.french import phonemize_french
+
+        phonemes = phonemize_french("rouge")
+        assert "\u0281" in phonemes, f"Expected /\u0281/ in 'rouge', got: {phonemes}"

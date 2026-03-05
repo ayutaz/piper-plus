@@ -111,3 +111,103 @@ class TestChinesePhonemizer:
         assert p.a1 == 0
         assert p.a2 == 0
         assert p.a3 == 1
+
+    def test_er_final_uses_schwa(self):
+        """er final should produce ɚ (rhotacized schwa), not ɑɻ."""
+        from piper_train.phonemize.chinese import phonemize_chinese
+        from piper_train.phonemize.token_mapper import register
+
+        # 二 (èr) uses pinyin "er"
+        phonemes = phonemize_chinese("二")
+        schwa_char = register("ɚ")
+        assert schwa_char in phonemes, (
+            f"Expected ɚ (rhotacized schwa) in phonemes for 二, got: {phonemes}"
+        )
+
+    def test_er_final_not_old_aer(self):
+        """er final should NOT produce ɑɻ (old incorrect mapping)."""
+        from piper_train.phonemize.chinese import phonemize_chinese
+        from piper_train.phonemize.token_mapper import register
+
+        phonemes = phonemize_chinese("二")
+        old_char = register("ɑɻ")
+        assert old_char not in phonemes, (
+            f"ɑɻ should no longer appear for 二; phonemes: {phonemes}"
+        )
+
+    def test_u_umlaut_uses_y_vowel(self):
+        """Pinyin ü should use y_vowel token, not bare y."""
+        from piper_train.phonemize.chinese import phonemize_chinese
+        from piper_train.phonemize.token_mapper import TOKEN2CHAR
+
+        # 女 (nǚ) uses ü vowel
+        phonemes = phonemize_chinese("女")
+        y_vowel_char = TOKEN2CHAR.get("y_vowel")
+        assert y_vowel_char is not None, "y_vowel should be registered in TOKEN2CHAR"
+        assert y_vowel_char in phonemes, (
+            f"Expected y_vowel token in phonemes for 女, got: {phonemes}"
+        )
+        # bare "y" should not appear as a standalone phoneme
+        assert "y" not in phonemes, (
+            f"Bare 'y' should not appear; phonemes: {phonemes}"
+        )
+
+    def test_yi_tone_sandhi_before_tone4(self):
+        """一 (yi T1) before T4 should become T2: 一定 yī dìng → yí dìng."""
+        from piper_train.phonemize.chinese import phonemize_chinese_with_prosody
+        from piper_train.phonemize.token_mapper import register
+
+        phonemes, _ = phonemize_chinese_with_prosody("一定")
+        tone2_char = register("tone2")
+        tone4_char = register("tone4")
+        tones = [p for p in phonemes if p in (tone2_char, tone4_char)]
+        assert len(tones) >= 2, f"Expected at least 2 tone markers, got: {tones}"
+        assert tones[0] == tone2_char, (
+            "一 before T4 should become T2 (sandhi)"
+        )
+        assert tones[1] == tone4_char, "定 should remain T4"
+
+    def test_yi_tone_sandhi_before_tone1(self):
+        """一 (yi T1) before T1 should become T4: 一般 yī bān → yì bān."""
+        from piper_train.phonemize.chinese import phonemize_chinese_with_prosody
+        from piper_train.phonemize.token_mapper import register
+
+        phonemes, _ = phonemize_chinese_with_prosody("一般")
+        tone1_char = register("tone1")
+        tone4_char = register("tone4")
+        tones = [p for p in phonemes if p in (tone1_char, tone4_char)]
+        assert len(tones) >= 2, f"Expected at least 2 tone markers, got: {tones}"
+        assert tones[0] == tone4_char, (
+            "一 before T1 should become T4 (sandhi)"
+        )
+
+    def test_bu_tone_sandhi_before_tone4(self):
+        """不 (bu T4) before T4 should become T2: 不对 bù duì → bú duì."""
+        from piper_train.phonemize.chinese import phonemize_chinese_with_prosody
+        from piper_train.phonemize.token_mapper import register
+
+        phonemes, _ = phonemize_chinese_with_prosody("不对")
+        tone2_char = register("tone2")
+        tone4_char = register("tone4")
+        tones = [p for p in phonemes if p in (tone2_char, tone4_char)]
+        assert len(tones) >= 2, f"Expected at least 2 tone markers, got: {tones}"
+        assert tones[0] == tone2_char, (
+            "不 before T4 should become T2 (sandhi)"
+        )
+        assert tones[1] == tone4_char, "对 should remain T4"
+
+    def test_erhua_basic(self):
+        """Erhua r-coloring should produce ɚ appended to base syllable."""
+        from piper_train.phonemize.chinese import phonemize_chinese
+        from piper_train.phonemize.token_mapper import register
+
+        # 哪儿 (nǎr) — pypinyin may output "nar3" indicating erhua
+        # We test with 儿 standalone which pypinyin outputs as "er5"
+        # For erhua test use a word known to produce r-suffixed pinyin
+        # 这儿 (zhèr): pypinyin often gives "zher4" for erhua
+        phonemes = phonemize_chinese("这儿")
+        schwa_char = register("ɚ")
+        # Either the ɚ appears from erhua processing or from standalone 儿
+        assert schwa_char in phonemes, (
+            f"Expected ɚ token for erhua in 这儿, got: {phonemes}"
+        )

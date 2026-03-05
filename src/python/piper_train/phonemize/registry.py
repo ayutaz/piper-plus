@@ -5,10 +5,13 @@ multilingual combo codes (e.g., "ja-en-zh-ko") which automatically
 create a MultilingualPhonemizer.
 """
 
+import logging
+
 from .base import Phonemizer
 
 
 _REGISTRY: dict[str, Phonemizer] = {}
+_LOGGER = logging.getLogger(__name__)
 
 
 def register_language(code: str, phonemizer: Phonemizer):
@@ -28,15 +31,35 @@ def get_phonemizer(language: str) -> Phonemizer:
     # Try to create a multilingual combo phonemizer
     parts = language.split("-")
     if len(parts) >= 2:
+        # Canonicalize language order (sorted) so "en-ja" and "ja-en" share one instance
+        canonical_parts = sorted(parts)
+        canonical_key = "-".join(canonical_parts)
+        if parts != canonical_parts:
+            _LOGGER.warning(
+                "Language code '%s' is not in canonical sorted order; "
+                "using canonical form '%s' for cache lookup.",
+                language,
+                canonical_key,
+            )
+        # Check cache with canonical key first
+        if canonical_key in _REGISTRY:
+            # Also register the original key for direct lookup next time
+            _REGISTRY[language] = _REGISTRY[canonical_key]
+            return _REGISTRY[canonical_key]
+
         # Verify all component languages are registered
-        missing = [p for p in parts if p not in _REGISTRY]
+        missing = [p for p in canonical_parts if p not in _REGISTRY]
         if not missing:
             from .multilingual import MultilingualPhonemizer  # noqa: PLC0415
 
             phonemizer = MultilingualPhonemizer(
-                parts, default_latin_language=_detect_default_latin(parts)
+                canonical_parts,
+                default_latin_language=_detect_default_latin(canonical_parts),
             )
-            _REGISTRY[language] = phonemizer
+            # Register under canonical key and original key
+            _REGISTRY[canonical_key] = phonemizer
+            if language != canonical_key:
+                _REGISTRY[language] = phonemizer
             return phonemizer
 
         raise ValueError(
@@ -109,11 +132,16 @@ def _auto_register():
     except ImportError:
         pass
     # Register ja-en bilingual combo (backward compatibility)
+    # Also register under the canonical sorted key "en-ja" so that both
+    # "ja-en" and "en-ja" resolve to the same instance.
     if "ja" in _REGISTRY and "en" in _REGISTRY:
         try:
             from .bilingual import BilingualPhonemizer  # noqa: PLC0415
 
-            register_language("ja-en", BilingualPhonemizer(["ja", "en"]))
+            _bilingual_ja_en = BilingualPhonemizer(["ja", "en"])
+            register_language("ja-en", _bilingual_ja_en)
+            # Canonical sorted key: sorted(["ja","en"]) == ["en","ja"] → "en-ja"
+            register_language("en-ja", _bilingual_ja_en)
         except ImportError:
             pass
 

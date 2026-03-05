@@ -73,8 +73,8 @@ _FINAL_TO_IPA: dict[str, str] = {
     "e": "ɤ",
     "i": "i",
     "u": "u",
-    "\u00fc": "y",   # ü
-    "v": "y",
+    "\u00fc": "y_vowel",   # ü → y_vowel (avoids collision with JA glide "y")
+    "v": "y_vowel",
     # Diphthongs
     "ai": "aɪ",
     "ei": "eɪ",
@@ -87,7 +87,7 @@ _FINAL_TO_IPA: dict[str, str] = {
     "eng": "əŋ",
     "ong": "uŋ",
     # Retroflex final
-    "er": "ɑɻ",
+    "er": "ɚ",
     # i- compound finals (齐齿呼)
     "ia": "ia",
     "ie": "iɛ",
@@ -143,14 +143,30 @@ def _apply_tone_sandhi(
 ) -> list[tuple[str, int]]:
     """Apply basic Mandarin tone sandhi rules.
 
-    Rule: T3 + T3 -> T2 + T3 (third tone sandhi)
+    Rules applied in order:
+      1. T3 + T3 → T2 + T3 (third tone sandhi: 你好 nǐhǎo → níhǎo)
+      2. 一 (yi T1) before T4 → T2  (一定 yī dìng → yí dìng)
+      3. 一 (yi T1) before T1/T2/T3 → T4  (一般 yī bān → yì bān)
+      4. 不 (bu T4) before T4 → T2  (不对 bù duì → bú duì)
     """
     result = list(py_tones)
     for i in range(len(result) - 1):
         syllable_i, tone_i = result[i]
         _, tone_next = result[i + 1]
+        # Rule 1: third tone sandhi
         if tone_i == 3 and tone_next == 3:
             result[i] = (syllable_i, 2)
+            continue
+        # Rule 2 & 3: 一 tone sandhi (identified by pinyin "yi" + tone 1)
+        if syllable_i == "yi" and tone_i == 1:
+            if tone_next == 4:
+                result[i] = (syllable_i, 2)  # T1 → T2 before T4
+            elif tone_next in (1, 2, 3):
+                result[i] = (syllable_i, 4)  # T1 → T4 before T1/T2/T3
+            continue
+        # Rule 4: 不 tone sandhi (identified by pinyin "bu" + tone 4)
+        if syllable_i == "bu" and tone_i == 4 and tone_next == 4:
+            result[i] = (syllable_i, 2)  # T4 → T2 before T4
     return result
 
 
@@ -349,8 +365,23 @@ def phonemize_chinese_with_prosody(
         # Chinese character: use tone-sandhi-corrected data
         normalized, tone = char_tones[char_idx]
 
+        # Erhua (儿化音): if the normalized pinyin ends with "r" but is not
+        # the standalone "er" syllable, strip the trailing "r", convert the
+        # base syllable, then append ɚ for the r-coloring.
+        erhua_token: str | None = None
+        if normalized.endswith("r") and len(normalized) > 1 and normalized != "er":
+            erhua_token = "ɚ"
+            normalized = normalized[:-1]
+
         # Convert to IPA tokens
         ipa_tokens = _pinyin_to_ipa(normalized, tone)
+        if erhua_token is not None:
+            # Insert ɚ after the vowel tokens but before the tone marker
+            tone_marker = ipa_tokens[-1] if ipa_tokens and ipa_tokens[-1].startswith("tone") else None
+            if tone_marker is not None:
+                ipa_tokens = ipa_tokens[:-1] + [erhua_token] + [tone_marker]
+            else:
+                ipa_tokens.append(erhua_token)
 
         # Prosody: a1=tone, a2=position in word, a3=word length
         syl_pos, word_len = word_info.get(char_idx, (1, 1))

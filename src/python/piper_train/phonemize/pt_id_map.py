@@ -2,6 +2,13 @@
 
 Only phonemes unique to Portuguese that are NOT already present in the
 JA + EN + ES inventories are listed here.
+
+Phonemes shared with other inventories (NOT listed here):
+  ʒ  — voiced postalveolar fricative: shared with EN (bilingual_id_map.py)
+  ʃ  — voiceless postalveolar fricative: shared with EN (bilingual_id_map.py)
+  ɲ  — palatal nasal: shared with ES (es_id_map.py)
+  ɾ  — alveolar tap: shared with ES (es_id_map.py)
+  ɡ  — voiced velar plosive (IPA U+0261): shared with EN
 """
 
 __all__ = ["PORTUGUESE_PHONEMES"]
@@ -15,4 +22,8 @@ PORTUGUESE_PHONEMES: list[str] = [
     "ĩ",  # nasalized i (sim, fim)
     "õ",  # nasalized o (bom, som)
     "ũ",  # nasalized u (um, algum)
+    # Palatal lateral approximant — unique to PT among JA/EN/ES inventories
+    "ʎ",  # lh digraph (trabalho, filho) - palatal lateral approximant
+    # Uvular fricative — shared with FR (fr_id_map.py), not in JA/EN/ES
+    "ʁ",  # rr, word-initial r, coda r (carro, rio, mar) - uvular fricative
 ]
