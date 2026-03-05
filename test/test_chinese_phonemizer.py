@@ -62,3 +62,52 @@ class TestChinesePhonemizer:
         assert len(tone_values) > 0
         for t in tone_values:
             assert 1 <= t <= 5
+
+    def test_tone_sandhi_t3_t3(self):
+        """T3+T3 should become T2+T3 (third tone sandhi): 你好."""
+        from piper_train.phonemize.chinese import phonemize_chinese_with_prosody
+        from piper_train.phonemize.token_mapper import register
+
+        phonemes, prosody = phonemize_chinese_with_prosody("你好")
+        # 你 is tone3, 好 is tone3 → sandhi: 你 becomes tone2
+        tone2_char = register("tone2")
+        tone3_char = register("tone3")
+        # Find all tone markers in the phoneme sequence
+        tones_found = [p for p in phonemes if p in (tone2_char, tone3_char)]
+        # First Chinese syllable should have tone2 (sandhi), second tone3
+        assert len(tones_found) >= 2
+        assert tones_found[0] == tone2_char, "First syllable should be tone2 after sandhi"
+        assert tones_found[1] == tone3_char, "Second syllable should remain tone3"
+
+    def test_uan_mapping_yuan(self):
+        """üan final should map to yɛn IPA (not yan): 元 yuan."""
+        from piper_train.phonemize.chinese import phonemize_chinese_with_prosody
+        from piper_train.phonemize.token_mapper import register
+
+        phonemes, _ = phonemize_chinese_with_prosody("元")
+        yen_char = register("yɛn")
+        assert yen_char in phonemes, (
+            f"Expected yɛn (üan) in phonemes for 元, got: {phonemes}"
+        )
+
+    def test_digit_passthrough(self):
+        """Digits should pass through as-is."""
+        from piper_train.phonemize.chinese import phonemize_chinese_with_prosody
+
+        phonemes, prosody = phonemize_chinese_with_prosody("有3个")
+        assert len(phonemes) == len(prosody)
+        # The digit '3' should appear in the phoneme output
+        assert "3" in phonemes, f"Digit 3 should be in phonemes, got: {phonemes}"
+
+    def test_digit_prosody(self):
+        """Digits should have neutral prosody (a1=0, a2=0, a3=1)."""
+        from piper_train.phonemize.chinese import phonemize_chinese_with_prosody
+
+        phonemes, prosody = phonemize_chinese_with_prosody("有3个")
+        # Find the index of the digit '3'
+        digit_idx = phonemes.index("3")
+        p = prosody[digit_idx]
+        assert p is not None
+        assert p.a1 == 0
+        assert p.a2 == 0
+        assert p.a3 == 1

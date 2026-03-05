@@ -11,6 +11,7 @@ import re
 from .base import Phonemizer, ProsodyInfo
 from .token_mapper import map_sequence
 
+
 _LOGGER = logging.getLogger(__name__)
 
 __all__ = [
@@ -112,8 +113,8 @@ _FINAL_TO_IPA: dict[str, str] = {
     # ü- compound finals (撮口呼)
     "\u00fce": "yɛ",   # üe
     "ve": "yɛ",
-    "\u00fcan": "yan",  # üan
-    "van": "yan",
+    "\u00fcan": "yɛn",  # üan
+    "van": "yɛn",
     "\u00fcn": "yn",    # ün
     "vn": "yn",
     # Syllabic consonants (internal keys set by _split_pinyin)
@@ -135,6 +136,22 @@ _RETROFLEX_INITIALS = frozenset(("zh", "ch", "sh", "r"))
 _ALVEOLAR_INITIALS = frozenset(("z", "c", "s"))
 
 _RE_CHINESE_CHAR = re.compile(r"[\u4e00-\u9fff\u3400-\u4dbf]")
+
+
+def _apply_tone_sandhi(
+    py_tones: list[tuple[str, int]],
+) -> list[tuple[str, int]]:
+    """Apply basic Mandarin tone sandhi rules.
+
+    Rule: T3 + T3 -> T2 + T3 (third tone sandhi)
+    """
+    result = list(py_tones)
+    for i in range(len(result) - 1):
+        syllable_i, tone_i = result[i]
+        _, tone_next = result[i + 1]
+        if tone_i == 3 and tone_next == 3:
+            result[i] = (syllable_i, 2)
+    return result
 
 
 def _normalize_pinyin(py: str) -> str:
@@ -257,9 +274,47 @@ def phonemize_chinese_with_prosody(
     # Build word groups: contiguous Chinese character ranges for prosody
     word_info = _build_word_info(text)
 
+    # --- First pass: extract tones for Chinese characters ---
+    # Collect (normalized_pinyin, tone) per char_idx for tone sandhi
+    char_tones: dict[int, tuple[str, int]] = {}
+    chinese_indices: list[int] = []
     for char_idx, syllable_list in enumerate(py_result):
         ch = text[char_idx] if char_idx < len(text) else ""
+        if not _RE_CHINESE_CHAR.match(ch):
+            continue
         syllable = syllable_list[0]
+        tone = 5  # default neutral
+        if syllable and syllable[-1].isdigit():
+            tone = int(syllable[-1])
+            syllable_base = syllable[:-1]
+        else:
+            syllable_base = syllable
+        normalized = _normalize_pinyin(syllable_base)
+        char_tones[char_idx] = (normalized, tone)
+        chinese_indices.append(char_idx)
+
+    # Apply tone sandhi to consecutive Chinese character sequences
+    if chinese_indices:
+        # Group consecutive Chinese character indices
+        groups: list[list[int]] = []
+        current_group: list[int] = [chinese_indices[0]]
+        for k in range(1, len(chinese_indices)):
+            if chinese_indices[k] == chinese_indices[k - 1] + 1:
+                current_group.append(chinese_indices[k])
+            else:
+                groups.append(current_group)
+                current_group = [chinese_indices[k]]
+        groups.append(current_group)
+
+        for group in groups:
+            py_tones = [char_tones[idx] for idx in group]
+            sandhi_result = _apply_tone_sandhi(py_tones)
+            for idx, (norm, tone) in zip(group, sandhi_result, strict=False):
+                char_tones[idx] = (norm, tone)
+
+    # --- Second pass: generate phonemes ---
+    for char_idx, _syllable_list in enumerate(py_result):
+        ch = text[char_idx] if char_idx < len(text) else ""
 
         # Handle punctuation
         if ch in _ZH_PUNCT_MAP:
@@ -278,6 +333,12 @@ def phonemize_chinese_with_prosody(
             prosody_list.append(ProsodyInfo(a1=0, a2=0, a3=0))
             continue
 
+        # Handle digits (pass through as-is)
+        if ch.isdigit():
+            phonemes.append(ch)
+            prosody_list.append(ProsodyInfo(a1=0, a2=0, a3=1))
+            continue
+
         # Handle non-Chinese characters (pass through)
         if not _RE_CHINESE_CHAR.match(ch):
             if ch.isalpha():
@@ -285,16 +346,8 @@ def phonemize_chinese_with_prosody(
                 prosody_list.append(ProsodyInfo(a1=0, a2=0, a3=1))
             continue
 
-        # Chinese character: extract tone and convert to IPA
-        tone = 5  # default neutral
-        if syllable and syllable[-1].isdigit():
-            tone = int(syllable[-1])
-            syllable_base = syllable[:-1]
-        else:
-            syllable_base = syllable
-
-        # Normalize pinyin conventions
-        normalized = _normalize_pinyin(syllable_base)
+        # Chinese character: use tone-sandhi-corrected data
+        normalized, tone = char_tones[char_idx]
 
         # Convert to IPA tokens
         ipa_tokens = _pinyin_to_ipa(normalized, tone)
@@ -329,13 +382,12 @@ def _build_word_info(text: str) -> dict[int, tuple[int, int]]:
                 group_start = i
                 group_indices = []
             group_indices.append(i)
-        else:
-            if group_start is not None:
-                word_len = len(group_indices)
-                for pos, idx in enumerate(group_indices):
-                    info[idx] = (pos + 1, word_len)
-                group_start = None
-                group_indices = []
+        elif group_start is not None:
+            word_len = len(group_indices)
+            for pos, idx in enumerate(group_indices):
+                info[idx] = (pos + 1, word_len)
+            group_start = None
+            group_indices = []
 
     # Handle trailing group
     if group_start is not None:
@@ -365,36 +417,3 @@ class ChinesePhonemizer(Phonemizer):
 
     def get_phoneme_id_map(self) -> dict[str, list[int]] | None:
         return None
-
-    def post_process_ids(
-        self,
-        phoneme_ids: list[int],
-        prosody_features: list[dict | None],
-        phoneme_id_map: dict[str, list[int]],
-    ) -> tuple[list[int], list[dict | None]]:
-        """Add BOS/EOS and inter-phoneme padding."""
-        pad_ids = phoneme_id_map.get("_", [0])
-        bos_ids = phoneme_id_map.get("^")
-        eos_ids = phoneme_id_map.get("$")
-
-        padded_ids: list[int] = []
-        padded_prosody: list[dict | None] = []
-        for phoneme_id, prosody_feature in zip(
-            phoneme_ids, prosody_features, strict=True
-        ):
-            padded_ids.append(phoneme_id)
-            padded_prosody.append(prosody_feature)
-            padded_ids.extend(pad_ids)
-            padded_prosody.extend([None] * len(pad_ids))
-
-        phoneme_ids = padded_ids
-        prosody_features = padded_prosody
-
-        if bos_ids:
-            phoneme_ids = bos_ids + [pad_ids[0]] + phoneme_ids
-            prosody_features = [None] * (len(bos_ids) + 1) + prosody_features
-        if eos_ids:
-            phoneme_ids = phoneme_ids + eos_ids
-            prosody_features = prosody_features + [None] * len(eos_ids)
-
-        return phoneme_ids, prosody_features

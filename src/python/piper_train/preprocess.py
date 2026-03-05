@@ -187,7 +187,9 @@ def main() -> None:
     if len(lang_parts) >= 3:
         # Multilingual mode: 3+ languages (e.g., ja-en-zh-ko)
         args.phoneme_type = PhonemeType.MULTILINGUAL
-        from .phonemize.multilingual_id_map import get_multilingual_id_map  # noqa: PLC0415
+        from .phonemize.multilingual_id_map import (
+            get_multilingual_id_map,  # noqa: PLC0415
+        )
 
         multilingual_id_map = get_multilingual_id_map(lang_parts)
         args.phoneme_id_map = multilingual_id_map
@@ -719,10 +721,22 @@ def phonemize_batch_openjtalk(
         _LOGGER.exception("phonemize_batch_openjtalk")
 
 
-def phonemize_batch_multilingual(
-    args: argparse.Namespace, queue_in: JoinableQueue, queue_out: Queue
+def _phonemize_batch_multilingual_impl(
+    args: argparse.Namespace,
+    queue_in: JoinableQueue,
+    queue_out: Queue,
+    phonemizer,
+    label: str,
 ):
-    """Multilingual (N languages) phonemization using MultilingualPhonemizer."""
+    """Shared implementation for multilingual/bilingual batch phonemization.
+
+    Parameters
+    ----------
+    phonemizer : MultilingualPhonemizer or BilingualPhonemizer
+        The phonemizer instance to use for text conversion.
+    label : str
+        Label for error logging (e.g. "multilingual" or "bilingual").
+    """
     try:
         if not getattr(args, "debug", False):
             devnull_fd = os.open(os.devnull, os.O_RDWR)
@@ -738,11 +752,6 @@ def phonemize_batch_multilingual(
 
         if timeout_sec > 0:
             signal.signal(signal.SIGALRM, _timeout_handler)
-
-        from .phonemize.multilingual import MultilingualPhonemizer  # noqa: PLC0415
-
-        lang_parts = getattr(args, "lang_parts", args.language.split("-"))
-        phonemizer = MultilingualPhonemizer(lang_parts)
 
         while True:
             utt_batch = queue_in.get()
@@ -818,109 +827,36 @@ def phonemize_batch_multilingual(
 
             queue_in.task_done()
     except Exception:
-        _LOGGER.exception("phonemize_batch_multilingual")
+        _LOGGER.exception("phonemize_batch_%s", label)
+
+
+def phonemize_batch_multilingual(
+    args: argparse.Namespace, queue_in: JoinableQueue, queue_out: Queue
+):
+    """Multilingual (N languages) phonemization using MultilingualPhonemizer."""
+    from .phonemize.multilingual import MultilingualPhonemizer  # noqa: PLC0415
+
+    lang_parts = getattr(args, "lang_parts", args.language.split("-"))
+    phonemizer = MultilingualPhonemizer(lang_parts)
+    _phonemize_batch_multilingual_impl(
+        args, queue_in, queue_out, phonemizer, "multilingual"
+    )
 
 
 def phonemize_batch_bilingual(
     args: argparse.Namespace, queue_in: JoinableQueue, queue_out: Queue
 ):
-    """Bilingual (JA+EN) phonemization using BilingualPhonemizer."""
-    try:
-        if not getattr(args, "debug", False):
-            devnull_fd = os.open(os.devnull, os.O_RDWR)
-            os.dup2(devnull_fd, 2)
+    """Bilingual (JA+EN) phonemization using BilingualPhonemizer.
 
-        casing = get_text_casing(args.text_casing)
-        silence_detector = make_silence_detector()
+    Delegates to the shared multilingual implementation since
+    BilingualPhonemizer is a subclass of MultilingualPhonemizer.
+    """
+    from .phonemize.bilingual import BilingualPhonemizer  # noqa: PLC0415
 
-        timeout_sec = getattr(args, "timeout_seconds", 0)
-
-        def _timeout_handler(signum, frame):
-            raise TimeoutError()
-
-        if timeout_sec > 0:
-            signal.signal(signal.SIGALRM, _timeout_handler)
-
-        # Detect language from text using bilingual segmenter
-        from .phonemize.bilingual import BilingualPhonemizer  # noqa: PLC0415
-
-        phonemizer = BilingualPhonemizer(["ja", "en"])
-
-        while True:
-            utt_batch = queue_in.get()
-            if utt_batch is None:
-                break
-
-            for utt in utt_batch:
-                try:
-                    if timeout_sec > 0:
-                        signal.alarm(timeout_sec)
-                    _LOGGER.debug(utt)
-                    text = casing(utt.text)
-                    utt.phonemes, prosody_info_list = phonemizer.phonemize_with_prosody(
-                        text
-                    )
-                    # phoneme_ids from phoneme_id_map
-                    utt.phoneme_ids = []
-                    for phoneme in utt.phonemes:
-                        if phoneme in args.phoneme_id_map:
-                            utt.phoneme_ids.extend(args.phoneme_id_map[phoneme])
-                        else:
-                            utt.missing_phonemes[phoneme] += 1
-                            _LOGGER.warning(f"Missing phoneme: {phoneme}")
-
-                    # Post-process (BOS/EOS/padding)
-                    prosody_features_raw = [
-                        {"a1": p.a1, "a2": p.a2, "a3": p.a3} if p is not None else None
-                        for p in prosody_info_list
-                    ]
-                    utt.phoneme_ids, prosody_features_raw = phonemizer.post_process_ids(
-                        utt.phoneme_ids, prosody_features_raw, args.phoneme_id_map
-                    )
-                    utt.prosody_features = prosody_features_raw
-                    utt.prosody_ids = []
-
-                    # Length validation
-                    if len(utt.phoneme_ids) != len(utt.prosody_features):
-                        _LOGGER.error(
-                            "Length mismatch: phoneme_ids=%d, prosody_features=%d",
-                            len(utt.phoneme_ids),
-                            len(utt.prosody_features),
-                        )
-                        min_len = min(len(utt.phoneme_ids), len(utt.prosody_features))
-                        utt.phoneme_ids = utt.phoneme_ids[:min_len]
-                        utt.prosody_features = utt.prosody_features[:min_len]
-
-                    if not args.skip_audio:
-                        utt.audio_norm_path, utt.audio_spec_path = cache_norm_audio(
-                            utt.audio_path,
-                            args.cache_dir,
-                            silence_detector,
-                            args.sample_rate,
-                        )
-
-                        if getattr(args, "extract_f0", False):
-                            utt.f0_path = cache_f0(
-                                utt.audio_path,
-                                args.cache_dir,
-                                args.sample_rate,
-                                hop_length=args.hop_length,
-                                f0_min=getattr(args, "f0_min", 80.0),
-                                f0_max=getattr(args, "f0_max", 880.0),
-                            )
-                    queue_out.put(utt)
-                    if timeout_sec > 0:
-                        signal.alarm(0)
-                except TimeoutError:
-                    _LOGGER.error("Skipping utterance due to timeout: %s", utt)
-                    queue_out.put(None)
-                except Exception:
-                    _LOGGER.exception("Failed to process utterance: %s", utt)
-                    queue_out.put(None)
-
-            queue_in.task_done()
-    except Exception:
-        _LOGGER.exception("phonemize_batch_bilingual")
+    phonemizer = BilingualPhonemizer(["ja", "en"])
+    _phonemize_batch_multilingual_impl(
+        args, queue_in, queue_out, phonemizer, "bilingual"
+    )
 
 
 # -----------------------------------------------------------------------------

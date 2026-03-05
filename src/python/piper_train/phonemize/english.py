@@ -395,38 +395,3 @@ class EnglishPhonemizer(Phonemizer):
 
     def get_phoneme_id_map(self) -> dict[str, list[int]] | None:
         return None
-
-    def post_process_ids(
-        self,
-        phoneme_ids: list[int],
-        prosody_features: list[dict | None],
-        phoneme_id_map: dict[str, list[int]],
-    ) -> tuple[list[int], list[dict | None]]:
-        """Add BOS/EOS and inter-phoneme padding for English (espeak-ng compat)."""
-        pad_ids = phoneme_id_map.get("_", [0])
-        bos_ids = phoneme_id_map.get("^")
-        eos_ids = phoneme_id_map.get("$")
-
-        # Insert pad between every phoneme ID
-        padded_ids: list[int] = []
-        padded_prosody: list[dict | None] = []
-        for phoneme_id, prosody_feature in zip(
-            phoneme_ids, prosody_features, strict=True
-        ):
-            padded_ids.append(phoneme_id)
-            padded_prosody.append(prosody_feature)
-            padded_ids.extend(pad_ids)
-            padded_prosody.extend([None] * len(pad_ids))
-
-        phoneme_ids = padded_ids
-        prosody_features = padded_prosody
-
-        # Wrap with BOS/EOS
-        if bos_ids:
-            phoneme_ids = bos_ids + [pad_ids[0]] + phoneme_ids
-            prosody_features = [None] * (len(bos_ids) + 1) + prosody_features
-        if eos_ids:
-            phoneme_ids = phoneme_ids + eos_ids
-            prosody_features = prosody_features + [None] * len(eos_ids)
-
-        return phoneme_ids, prosody_features

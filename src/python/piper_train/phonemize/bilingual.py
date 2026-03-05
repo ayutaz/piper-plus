@@ -56,7 +56,7 @@ class BilingualPhonemizer(MultilingualPhonemizer):
             if set(self._languages) == {"ja", "en"}:
                 self._id_map = get_bilingual_id_map()
             else:
-                from .multilingual_id_map import get_multilingual_id_map  # noqa: PLC0415
+                from .multilingual_id_map import get_multilingual_id_map
 
                 self._id_map = get_multilingual_id_map(self._languages)
         return self._id_map

@@ -12,6 +12,7 @@ import unicodedata
 
 from .base import Phonemizer, ProsodyInfo
 
+
 __all__ = [
     "phonemize_spanish",
     "phonemize_spanish_with_prosody",
@@ -51,74 +52,205 @@ def _has_accent(word: str) -> int | None:
     return None
 
 
-def _find_syllable_boundaries(word: str) -> list[int]:
-    """Return list of character indices where each syllable starts.
+# ---------------------------------------------------------------------------
+# Grapheme segmentation — shared by G2P, syllabification, and stress mapping.
+# ---------------------------------------------------------------------------
 
-    Uses a simplified Spanish syllabification algorithm:
-    - V = vowel, C = consonant
-    - Split between V.CV, VC.CV, VCC.CV patterns
+# Each grapheme unit is a tuple of (grapheme_str, is_vowel, is_silent).
+# ``is_vowel`` marks vowels for syllabification; ``is_silent`` marks letters
+# that produce no phoneme output (e.g. silent ``u`` in ``qu``/``gu``).
+_GraphemeUnit = tuple[str, bool, bool]
+
+
+def _segment_graphemes(word: str) -> list[_GraphemeUnit]:
+    """Split *word* into grapheme units respecting Spanish digraphs.
+
+    Multi-character graphemes (``ch``, ``ll``, ``rr``, ``qu``, ``gu``,
+    ``gü``, ``sc`` before e/i) are kept as single units so that
+    syllabification and the char-to-phoneme walker never tear them apart.
+
+    The original (un-normalised) characters are used so that accented
+    vowels can be detected downstream, but an ``is_vowel`` flag is also
+    stored for convenience (based on the *base* form of the character).
     """
-    base = ""
+    base_word = ""
     for ch in word:
-        base += _ACCENT_MAP.get(ch, ch)
+        base_word += _ACCENT_MAP.get(ch, ch)
 
-    is_vowel = [c in _VOWELS for c in base]
-    n = len(base)
-    boundaries = [0]
+    units: list[_GraphemeUnit] = []
+    n = len(word)
+    i = 0
+    while i < n:
+        bch = base_word[i]
+
+        # --- Multi-character graphemes (longest match first) ---
+
+        # ``qu`` (u is silent; the following vowel is separate)
+        if bch == "q" and i + 1 < n and base_word[i + 1] == "u":
+            units.append((word[i : i + 2], False, False))
+            i += 2
+            continue
+
+        # ``gü`` before e/i — diaeresis makes the u pronounced (/gw/)
+        if (
+            bch == "g"
+            and i + 1 < n
+            and word[i + 1] == "ü"
+            and i + 2 < n
+            and base_word[i + 2] in ("e", "i")
+        ):
+            units.append((word[i : i + 2], False, False))
+            i += 2
+            continue
+
+        # ``gu`` before e/i — u is silent
+        if (
+            bch == "g"
+            and i + 1 < n
+            and base_word[i + 1] == "u"
+            and i + 2 < n
+            and base_word[i + 2] in ("e", "i")
+        ):
+            units.append((word[i : i + 2], False, False))
+            i += 2
+            continue
+
+        # ``ch`` → single consonant unit
+        if bch == "c" and i + 1 < n and base_word[i + 1] == "h":
+            units.append((word[i : i + 2], False, False))
+            i += 2
+            continue
+
+        # ``ll`` → single consonant unit
+        if bch == "l" and i + 1 < n and base_word[i + 1] == "l":
+            units.append((word[i : i + 2], False, False))
+            i += 2
+            continue
+
+        # ``rr`` → single consonant unit
+        if bch == "r" and i + 1 < n and base_word[i + 1] == "r":
+            units.append((word[i : i + 2], False, False))
+            i += 2
+            continue
+
+        # ``sc`` before e/i → single consonant unit (seseo: /s/, no geminate)
+        if (
+            bch == "s"
+            and i + 1 < n
+            and base_word[i + 1] == "c"
+            and i + 2 < n
+            and base_word[i + 2] in ("e", "i")
+        ):
+            units.append((word[i : i + 2], False, False))
+            i += 2
+            continue
+
+        # --- Single characters ---
+
+        # Silent ``h``
+        if bch == "h":
+            units.append((word[i], False, True))
+            i += 1
+            continue
+
+        # Vowels (including accented)
+        if bch in _VOWELS:
+            units.append((word[i], True, False))
+            i += 1
+            continue
+
+        # All other consonants
+        units.append((word[i], False, False))
+        i += 1
+
+    return units
+
+
+# ---------------------------------------------------------------------------
+# Syllabification
+# ---------------------------------------------------------------------------
+
+
+def _find_syllable_boundaries(word: str) -> list[int]:
+    """Return list of *grapheme-unit* indices where each syllable starts.
+
+    Operates on grapheme units produced by ``_segment_graphemes`` so that
+    digraphs (``ch``, ``ll``, ``rr``, ``qu``, ``gu``, ``gü``) are treated
+    as single consonant units and are never split across syllables.
+    """
+    units = _segment_graphemes(word)
+
+    # Build a simple vowel/consonant mask, skipping silent units
+    # (silent letters like ``h`` are attached to the previous unit and
+    # don't affect syllable structure).
+    #
+    # However we need to track the *unit index* for each non-silent unit
+    # so that the boundaries we return refer to grapheme-unit positions.
+    non_silent_idx: list[int] = []
+    is_vowel_ns: list[bool] = []
+    for idx, (_grapheme, is_v, is_silent) in enumerate(units):
+        if is_silent:
+            continue
+        non_silent_idx.append(idx)
+        is_vowel_ns.append(is_v)
+
+    ns_n = len(non_silent_idx)
+    if ns_n == 0:
+        return [0]
+
+    # We'll track syllable start positions in the non-silent index list,
+    # then map back to grapheme-unit indices.
+    ns_boundaries: list[int] = [0]
 
     i = 1
-    while i < n:
-        if is_vowel[i]:
-            # Check for hiatus vs diphthong
-            if i > 0 and is_vowel[i - 1]:
-                # Strong+strong vowel = hiatus (new syllable)
+    while i < ns_n:
+        if is_vowel_ns[i]:
+            if i > 0 and is_vowel_ns[i - 1]:
+                # Check hiatus vs diphthong: strong+strong = hiatus
                 strong = set("aeo")
-                if base[i - 1] in strong and base[i] in strong:
-                    boundaries.append(i)
+                prev_base = _get_base_vowel(units[non_silent_idx[i - 1]][0][-1])
+                curr_base = _get_base_vowel(units[non_silent_idx[i]][0][-1])
+                if prev_base in strong and curr_base in strong:
+                    ns_boundaries.append(i)
             i += 1
         else:
-            # Consonant — find how many consonants before next vowel
+            # Consonant cluster before next vowel
             cons_start = i
-            while i < n and not is_vowel[i]:
+            while i < ns_n and not is_vowel_ns[i]:
                 i += 1
             cons_count = i - cons_start
-            if i < n:  # there's a vowel after
+            if i < ns_n:  # vowel follows
                 if cons_count == 1:
                     # V.CV
-                    boundaries.append(cons_start)
+                    ns_boundaries.append(cons_start)
                 elif cons_count >= 2:
-                    # Check for inseparable clusters
-                    cluster = base[cons_start : cons_start + 2]
-                    inseparable = {
-                        "bl",
-                        "br",
-                        "cl",
-                        "cr",
-                        "dr",
-                        "fl",
-                        "fr",
-                        "gl",
-                        "gr",
-                        "pl",
-                        "pr",
-                        "tr",
-                        "tl",
-                    }
-                    if cons_count == 2 and cluster in inseparable:
-                        # VC.CV where CC is inseparable → V.CCV
-                        boundaries.append(cons_start)
-                    elif cons_count == 2:
-                        # VC.CV
-                        boundaries.append(cons_start + 1)
-                    elif cons_count >= 3:
-                        # Put split before last 2 if they form cluster
-                        last2 = base[i - 2 : i]
-                        if last2 in inseparable:
-                            boundaries.append(i - 2)
-                        else:
-                            boundaries.append(i - 1)
+                    # Check inseparable onset cluster (last 2 consonants)
+                    def _base_cons(ns_idx: int) -> str:
+                        """Return the base consonant letter for an ns index."""
+                        g = units[non_silent_idx[ns_idx]][0]
+                        return _ACCENT_MAP.get(g[-1], g[-1])
 
-    return boundaries
+                    inseparable = {
+                        "bl", "br", "cl", "cr", "dr", "fl",
+                        "fr", "gl", "gr", "pl", "pr", "tr", "tl",
+                    }
+                    if cons_count == 2:
+                        pair = _base_cons(cons_start) + _base_cons(cons_start + 1)
+                        if pair in inseparable:
+                            ns_boundaries.append(cons_start)
+                        else:
+                            ns_boundaries.append(cons_start + 1)
+                    else:
+                        # 3+ consonants — split before last 2 if they form
+                        # an inseparable cluster, else before last 1.
+                        last2 = _base_cons(i - 2) + _base_cons(i - 1)
+                        if last2 in inseparable:
+                            ns_boundaries.append(i - 2)
+                        else:
+                            ns_boundaries.append(i - 1)
+
+    # Map non-silent indices back to grapheme-unit indices
+    return [non_silent_idx[b] for b in ns_boundaries]
 
 
 def _get_stressed_syllable(word: str) -> int:
@@ -129,6 +261,7 @@ def _get_stressed_syllable(word: str) -> int:
     2. Words ending in vowel, n, s → penultimate syllable
     3. Words ending in other consonant → final syllable
     """
+    units = _segment_graphemes(word)
     boundaries = _find_syllable_boundaries(word)
     num_syllables = len(boundaries)
     if num_syllables == 0:
@@ -137,9 +270,19 @@ def _get_stressed_syllable(word: str) -> int:
     # Check for explicit accent mark
     accent_idx = _has_accent(word)
     if accent_idx is not None:
-        # Find which syllable contains this index
+        # Find which grapheme-unit contains this character index.
+        # Walk through units accumulating character offsets.
+        char_offset = 0
+        accent_unit_idx = 0
+        for uid, (grapheme, _is_v, _is_s) in enumerate(units):
+            if char_offset <= accent_idx < char_offset + len(grapheme):
+                accent_unit_idx = uid
+                break
+            char_offset += len(grapheme)
+
+        # Find which syllable contains this unit index
         for syl_idx in range(len(boundaries) - 1, -1, -1):
-            if boundaries[syl_idx] <= accent_idx:
+            if boundaries[syl_idx] <= accent_unit_idx:
                 return syl_idx
         return 0
 
@@ -147,17 +290,11 @@ def _get_stressed_syllable(word: str) -> int:
         return 0
 
     # Get base form of last character
-    base_word = ""
-    for ch in word:
-        base_word += _ACCENT_MAP.get(ch, ch)
+    base_last = _get_base_vowel(word[-1])
 
-    last_char = base_word[-1] if base_word else ""
-
-    if last_char in _VOWELS or last_char in _STRESS_FINAL_EXCEPTIONS:
-        # Penultimate
+    if base_last in _VOWELS or base_last in _STRESS_FINAL_EXCEPTIONS:
         return max(0, num_syllables - 2)
     else:
-        # Final
         return num_syllables - 1
 
 
@@ -171,6 +308,11 @@ def _get_base_vowel(ch: str) -> str:
     return _ACCENT_MAP.get(ch, ch)
 
 
+# ---------------------------------------------------------------------------
+# G2P — grapheme to phoneme conversion
+# ---------------------------------------------------------------------------
+
+
 def _g2p_word(word: str) -> tuple[list[str], int]:
     """Convert a Spanish word to IPA phonemes.
 
@@ -180,22 +322,15 @@ def _g2p_word(word: str) -> tuple[list[str], int]:
     n = len(word)
     i = 0
 
-    # Track position for allophonic rules
-    # We need the base form for consonant context
+    # Base form for consonant context checks
     base_word = ""
     for ch in word:
         base_word += _ACCENT_MAP.get(ch, ch)
 
     def _prev_is_vowel() -> bool:
-        """Check if previous character in word is a vowel."""
         return i > 0 and _is_vowel_char(word[i - 1])
 
-    def _next_is_vowel() -> bool:
-        """Check if next character in word is a vowel."""
-        return i + 1 < n and _is_vowel_char(word[i + 1])
-
     def _is_after_nasal() -> bool:
-        """Check if previous phoneme is a nasal."""
         return i > 0 and base_word[i - 1] in ("m", "n")
 
     def _is_word_initial() -> bool:
@@ -215,14 +350,9 @@ def _g2p_word(word: str) -> tuple[list[str], int]:
 
         # "qu" before e/i → k
         if base_ch == "q" and i + 1 < n and base_word[i + 1] == "u":
-            if i + 2 < n and base_word[i + 2] in ("e", "i"):
-                phonemes.append("k")
-                i += 2  # skip "qu", vowel handled next iteration
-                continue
-            else:
-                phonemes.append("k")
-                i += 2
-                continue
+            phonemes.append("k")
+            i += 2  # skip "qu", vowel handled next iteration
+            continue
 
         # "ch" → tʃ
         if base_ch == "c" and i + 1 < n and base_word[i + 1] == "h":
@@ -263,7 +393,6 @@ def _g2p_word(word: str) -> tuple[list[str], int]:
             and i + 2 < n
             and base_word[i + 2] in ("e", "i")
         ):
-            # g with allophonic variation
             if _prev_is_vowel() and not _is_after_nasal():
                 phonemes.append("ɣ")
             else:
@@ -271,10 +400,22 @@ def _g2p_word(word: str) -> tuple[list[str], int]:
             i += 2  # skip "gu"
             continue
 
+        # "sc" before e/i → s (seseo: avoid geminate ss)
+        if (
+            base_ch == "s"
+            and i + 1 < n
+            and base_word[i + 1] == "c"
+            and i + 2 < n
+            and base_word[i + 2] in ("e", "i")
+        ):
+            # Latin American seseo: sc + e/i → just /s/ (no geminate)
+            phonemes.append("s")
+            i += 2  # skip "sc", vowel handled next
+            continue
+
         # --- Single character rules ---
 
-        if base_ch == "b" or base_ch == "v":
-            # b/v → b (word-initial, after nasal) or β (intervocalic)
+        if base_ch in ("b", "v"):
             if _is_word_initial() or _is_after_nasal():
                 phonemes.append("b")
             elif _prev_is_vowel():
@@ -285,17 +426,14 @@ def _g2p_word(word: str) -> tuple[list[str], int]:
             continue
 
         if base_ch == "c":
-            # c before e/i → s (Latin American seseo)
             if i + 1 < n and base_word[i + 1] in ("e", "i"):
                 phonemes.append("s")
             else:
-                # c before a/o/u or consonant → k
                 phonemes.append("k")
             i += 1
             continue
 
         if base_ch == "d":
-            # d → d (word-initial, after n/l) or ð (intervocalic, word-final)
             if _is_word_initial() or _is_after_nasal():
                 phonemes.append("d")
             elif i > 0 and base_word[i - 1] == "l":
@@ -303,7 +441,6 @@ def _g2p_word(word: str) -> tuple[list[str], int]:
             elif _prev_is_vowel():
                 phonemes.append("ð")
             elif i == n - 1:
-                # Word-final d → ð (often silent, but we keep ð)
                 phonemes.append("ð")
             else:
                 phonemes.append("d")
@@ -316,7 +453,6 @@ def _g2p_word(word: str) -> tuple[list[str], int]:
             continue
 
         if base_ch == "g":
-            # g before e/i → x (jota sound)
             if i + 1 < n and base_word[i + 1] in ("e", "i"):
                 phonemes.append("x")
             elif _is_word_initial() or _is_after_nasal():
@@ -369,14 +505,11 @@ def _g2p_word(word: str) -> tuple[list[str], int]:
             continue
 
         if base_ch == "r":
-            # r at word start → trill
             if _is_word_initial():
                 phonemes.append("rr")
             elif i > 0 and base_word[i - 1] in ("l", "n", "s"):
-                # r after l/n/s → trill
                 phonemes.append("rr")
             else:
-                # r elsewhere → tap
                 phonemes.append("ɾ")
             i += 1
             continue
@@ -397,32 +530,21 @@ def _g2p_word(word: str) -> tuple[list[str], int]:
             continue
 
         if base_ch == "x":
-            # x → ks (general), but in some words like "México" → x
-            # Default to ks for simplicity
             phonemes.append("k")
             phonemes.append("s")
             i += 1
             continue
 
         if base_ch == "y":
-            # y as consonant → ʝ, as vowel (word-final "y") → i
             if i == n - 1:
                 phonemes.append("i")
-            elif _next_is_vowel():
-                phonemes.append("ʝ")
             else:
                 phonemes.append("ʝ")
             i += 1
             continue
 
         if base_ch == "z":
-            # z → s (Latin American seseo)
             phonemes.append("s")
-            i += 1
-            continue
-
-        if base_ch == "ñ":
-            phonemes.append("ɲ")
             i += 1
             continue
 
@@ -433,98 +555,95 @@ def _g2p_word(word: str) -> tuple[list[str], int]:
     return phonemes, stressed_syl
 
 
+# ---------------------------------------------------------------------------
+# Phoneme count per grapheme unit — used by the stress-marker walker.
+# ---------------------------------------------------------------------------
+
+
+def _phoneme_count_for_unit(grapheme: str, word: str, unit_idx: int,  # noqa: ARG001
+                            units: list[_GraphemeUnit]) -> int:  # noqa: ARG001
+    """Return the number of phonemes produced by a single grapheme unit.
+
+    Most units produce exactly 1 phoneme.  Exceptions:
+    - ``gü`` before e/i → 2 phonemes (ɡ + w)
+    - ``x`` → 2 phonemes (k + s)
+    - silent ``h`` → 0 phonemes
+    """
+    base = ""
+    for ch in grapheme:
+        base += _ACCENT_MAP.get(ch, ch)
+
+    # Silent h
+    if base == "h":
+        return 0
+
+    # gü digraph → 2 phonemes
+    if len(base) == 2 and base[0] == "g" and grapheme[1] == "ü":
+        return 2
+
+    # x → ks (2 phonemes)
+    if base == "x":
+        return 2
+
+    # sc digraph (consumed as single unit in _g2p_word when before e/i)
+    # This doesn't apply here because _segment_graphemes doesn't produce
+    # an "sc" unit — it's handled by the G2P loop.  So "s" alone → 1.
+
+    # Everything else (single chars, ch, ll, rr, qu, gu) → 1
+    return 1
+
+
 def _insert_stress_marker(
     phonemes: list[str], word: str
 ) -> list[str]:
-    """Insert stress marker ˈ before the stressed syllable's first vowel."""
+    """Insert stress marker ˈ before the stressed syllable's first vowel.
+
+    Uses ``_segment_graphemes`` for reliable char-to-phoneme mapping so
+    that digraphs like ``qu``, ``gu``, ``gü`` are handled correctly.
+    """
     if not phonemes:
         return phonemes
 
+    units = _segment_graphemes(word)
     boundaries = _find_syllable_boundaries(word)
     stressed_syl = _get_stressed_syllable(word)
 
     if not boundaries:
         return phonemes
 
-    # Map syllable boundaries (character indices) to phoneme indices.
-    # We need to find which phoneme corresponds to the start of the
-    # stressed syllable, then insert ˈ before that syllable's first vowel.
+    num_units = len(units)
 
-    # Build character-to-phoneme index mapping
-    # Walk through the word and phoneme list in parallel
-    base_word = ""
-    for ch in word:
-        base_word += _ACCENT_MAP.get(ch, ch)
+    if stressed_syl >= len(boundaries):
+        return phonemes
 
-    # Find the vowel in the stressed syllable
-    if stressed_syl < len(boundaries):
-        syl_start = boundaries[stressed_syl]
-        syl_end = boundaries[stressed_syl + 1] if stressed_syl + 1 < len(boundaries) else len(base_word)
+    syl_start = boundaries[stressed_syl]
+    syl_end = (
+        boundaries[stressed_syl + 1]
+        if stressed_syl + 1 < len(boundaries)
+        else num_units
+    )
 
-        # Find first vowel in this syllable range
-        stressed_vowel_char_idx = None
-        for ci in range(syl_start, syl_end):
-            if ci < len(base_word) and base_word[ci] in _VOWELS:
-                stressed_vowel_char_idx = ci
-                break
+    # Find first vowel grapheme-unit in the stressed syllable
+    stressed_unit_idx = None
+    for uid in range(syl_start, syl_end):
+        if uid < num_units and units[uid][1]:  # is_vowel
+            stressed_unit_idx = uid
+            break
 
-        if stressed_vowel_char_idx is None:
-            return phonemes
+    if stressed_unit_idx is None:
+        return phonemes
 
-        # Now map character index to phoneme index
-        # Walk through word chars and phonemes together
-        char_i = 0
-        ph_i = 0
-        target_ph_i = None
-
-        while char_i < len(base_word) and ph_i < len(phonemes):
-            if char_i == stressed_vowel_char_idx:
-                target_ph_i = ph_i
-                break
-
-            ch = base_word[char_i]
-
-            # Skip silent h
-            if ch == "h":
-                char_i += 1
-                continue
-
-            # Multi-char graphemes that produce one phoneme
-            if ch == "c" and char_i + 1 < len(base_word) and base_word[char_i + 1] == "h":
-                char_i += 2
-                ph_i += 1
-                continue
-            if ch == "l" and char_i + 1 < len(base_word) and base_word[char_i + 1] == "l":
-                char_i += 2
-                ph_i += 1
-                continue
-            if ch == "r" and char_i + 1 < len(base_word) and base_word[char_i + 1] == "r":
-                char_i += 2
-                ph_i += 1
-                continue
-            if ch == "q" and char_i + 1 < len(base_word) and base_word[char_i + 1] == "u":
-                char_i += 2
-                ph_i += 1
-                continue
-            if ch == "g" and char_i + 1 < len(base_word) and base_word[char_i + 1] == "u":
-                if char_i + 2 < len(base_word) and base_word[char_i + 2] in ("e", "i"):
-                    char_i += 2
-                    ph_i += 1
-                    continue
-            if ch == "x":
-                # x → k + s (2 phonemes)
-                char_i += 1
-                ph_i += 2
-                continue
-
-            char_i += 1
-            # Vowels and consonants each produce one phoneme
-            if ch in _VOWELS or ch not in ("h",):
-                ph_i += 1
-
-        if target_ph_i is not None:
-            result = phonemes[:target_ph_i] + ["ˈ"] + phonemes[target_ph_i:]
-            return result
+    # Walk grapheme units and accumulate phoneme count to map
+    # the stressed unit index to a phoneme index.
+    ph_i = 0
+    for uid in range(num_units):
+        if uid == stressed_unit_idx:
+            # ph_i now points to the phoneme for this vowel
+            return phonemes[:ph_i] + ["ˈ"] + phonemes[ph_i:]
+        count = _phoneme_count_for_unit(
+            units[uid][0], word, uid, units
+        )
+        ph_i += count
 
     return phonemes
 
@@ -601,38 +720,3 @@ class SpanishPhonemizer(Phonemizer):
 
     def get_phoneme_id_map(self) -> dict[str, list[int]] | None:
         return None
-
-    def post_process_ids(
-        self,
-        phoneme_ids: list[int],
-        prosody_features: list[dict | None],
-        phoneme_id_map: dict[str, list[int]],
-    ) -> tuple[list[int], list[dict | None]]:
-        """Add BOS/EOS and inter-phoneme padding for Spanish."""
-        pad_ids = phoneme_id_map.get("_", [0])
-        bos_ids = phoneme_id_map.get("^")
-        eos_ids = phoneme_id_map.get("$")
-
-        # Insert pad between every phoneme ID
-        padded_ids: list[int] = []
-        padded_prosody: list[dict | None] = []
-        for phoneme_id, prosody_feature in zip(
-            phoneme_ids, prosody_features, strict=True
-        ):
-            padded_ids.append(phoneme_id)
-            padded_prosody.append(prosody_feature)
-            padded_ids.extend(pad_ids)
-            padded_prosody.extend([None] * len(pad_ids))
-
-        phoneme_ids = padded_ids
-        prosody_features = padded_prosody
-
-        # Wrap with BOS/EOS
-        if bos_ids:
-            phoneme_ids = bos_ids + [pad_ids[0]] + phoneme_ids
-            prosody_features = [None] * (len(bos_ids) + 1) + prosody_features
-        if eos_ids:
-            phoneme_ids = phoneme_ids + eos_ids
-            prosody_features = prosody_features + [None] * len(eos_ids)
-
-        return phoneme_ids, prosody_features

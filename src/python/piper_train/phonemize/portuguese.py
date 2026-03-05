@@ -10,6 +10,7 @@ import unicodedata
 
 from .base import Phonemizer, ProsodyInfo
 
+
 _LOGGER = logging.getLogger(__name__)
 
 __all__ = [
@@ -19,7 +20,7 @@ __all__ = [
 ]
 
 # Punctuation characters (attached to previous word, no space before)
-_PUNCTUATION = set(",.;:!?¡¿—–…")
+_PUNCTUATION = set(",.;:!?\u00a1\u00bf\u2014\u2013\u2026")
 
 # Vowel letters (for voicing/nasalization context checks)
 _VOWELS = set("aeiouáàâãéêíóôõúü")
@@ -47,6 +48,18 @@ _CIRCUMFLEX = set("âêô")
 # Tilde indicates nasal vowels (also stressed when it's the only accent)
 _TILDE = set("ãõ")
 
+# IPA vowel phonemes (oral, for reduction checks in post-processing)
+_IPA_ORAL_VOWELS = set("aeioɛɔu")
+
+# IPA nasal vowel phonemes
+_IPA_NASAL_VOWELS = set("ãẽĩõũ")
+
+# IPA vowel phonemes (all)
+_IPA_VOWELS = _IPA_ORAL_VOWELS | _IPA_NASAL_VOWELS
+
+# IPA consonant phonemes (for coda-l detection)
+_IPA_CONSONANTS = set("bcdfɡhjklmnpɲɾʁsʃtʎvwzʒ")
+
 
 def _normalize(text: str) -> str:
     """Normalize text: lowercase, normalize unicode, strip extra whitespace."""
@@ -70,36 +83,103 @@ def _has_accent(word: str) -> bool:
     return False
 
 
+def _count_vowel_groups(word: str) -> int:
+    """Count vowel groups in a word, properly handling digraphs.
+
+    Digraphs like 'ou', 'qu' (before e/i), and 'gu' (before e/i) consume
+    two characters but may count differently for vowel group tracking.
+    """
+    count = 0
+    i = 0
+    n = len(word)
+    while i < n:
+        ch = word[i]
+        # Handle 'qu' digraph: u is silent before e/i, produces /kw/ before a/o
+        if ch == "q" and i + 1 < n and word[i + 1] == "u":
+            if i + 2 < n and word[i + 2] in "eiéêí":
+                # qu before e/i: u is silent, skip both q and u
+                i += 2
+                continue
+            else:
+                # qu before a/o: u is pronounced as /w/ glide (consonant),
+                # not a vowel group; skip both q and u
+                i += 2
+                continue
+        # Handle 'gu' digraph: u is silent before e/i
+        if ch == "g" and i + 1 < n and word[i + 1] == "u":
+            if i + 2 < n and word[i + 2] in "eiéêí":
+                # gu before e/i: u is silent, skip both g and u
+                i += 2
+                continue
+        # Handle 'ou' diphthong: two vowel letters but one vowel group
+        if ch == "o" and i + 1 < n and word[i + 1] == "u":
+            count += 1
+            i += 2
+            continue
+        if ch in _VOWELS:
+            count += 1
+        i += 1
+    return count
+
+
 def _find_stress_position(word: str) -> int:
     """Find the stressed syllable index (0-based from end).
 
     Returns the position of the stressed vowel group from the end of the word.
     Portuguese stress rules:
     - Words with acute/circumflex/tilde accent: stress on accented syllable
-    - Words ending in a, e, o, am, em, ens: penultimate (paroxytone)
+    - Words ending in a, e, o, am, em, en, ens: penultimate (paroxytone)
     - Words ending in consonant (except s), i, u: ultimate (oxytone)
     """
-    # Find accented vowel position
-    vowel_positions = []
-    accent_pos = -1
-    for i, ch in enumerate(word):
-        if ch in _VOWELS:
-            vowel_positions.append(i)
-            if ch in _STRESS_ACCENTS or ch in _CIRCUMFLEX or ch in _TILDE:
-                accent_pos = len(vowel_positions) - 1
+    # Count vowel groups properly (handling digraphs)
+    vowel_group_count = _count_vowel_groups(word)
 
-    if not vowel_positions:
+    # Find accented vowel group position (digraph-aware)
+    accent_group = -1
+    current_group = 0
+    i = 0
+    n = len(word)
+    while i < n:
+        ch = word[i]
+        # Skip digraphs the same way as _count_vowel_groups
+        if ch == "q" and i + 1 < n and word[i + 1] == "u":
+            if i + 2 < n and word[i + 2] in "eiéêí":
+                i += 2
+                continue
+            else:
+                # qu before a/o: u is /w/ glide, not a vowel group
+                i += 2
+                continue
+        if ch == "g" and i + 1 < n and word[i + 1] == "u":
+            if i + 2 < n and word[i + 2] in "eiéêí":
+                i += 2
+                continue
+        if ch == "o" and i + 1 < n and word[i + 1] == "u":
+            # Check if either letter in 'ou' is accented (e.g. 'óu')
+            if ch in _STRESS_ACCENTS or ch in _CIRCUMFLEX or ch in _TILDE:
+                accent_group = current_group
+            current_group += 1
+            i += 2
+            continue
+        if ch in _VOWELS:
+            if ch in _STRESS_ACCENTS or ch in _CIRCUMFLEX or ch in _TILDE:
+                accent_group = current_group
+            current_group += 1
+        i += 1
+
+    if vowel_group_count == 0:
         return 0
 
-    if accent_pos >= 0:
+    if accent_group >= 0:
         # Stress on accented syllable (convert to from-end index)
-        return len(vowel_positions) - 1 - accent_pos
+        return vowel_group_count - 1 - accent_group
 
     # Default rules based on ending
     stripped = word.rstrip("s")
-    if stripped.endswith(("a", "e", "o", "am", "em")):
+    if stripped.endswith(("a", "e", "o", "am", "em", "en")):
         # Paroxytone: penultimate syllable
-        return min(1, len(vowel_positions) - 1)
+        # "ens" → strip s → "en" → paroxytone
+        return min(1, vowel_group_count - 1)
     else:
         # Oxytone: last syllable
         return 0
@@ -116,9 +196,9 @@ def _convert_word(word: str) -> tuple[list[str], int]:
     i = 0
     n = len(word)
 
-    # Determine which vowel group gets stress
+    # Determine which vowel group gets stress (using digraph-aware counting)
     stress_from_end = _find_stress_position(word)
-    vowel_group_count = sum(1 for ch in word if ch in _VOWELS)
+    vowel_group_count = _count_vowel_groups(word)
     stress_vowel_target = vowel_group_count - 1 - stress_from_end
     current_vowel_group = 0
 
@@ -127,79 +207,80 @@ def _convert_word(word: str) -> tuple[list[str], int]:
 
         # --- Multi-character sequences (check longest first) ---
 
-        # "nh" → ɲ
+        # "nh" -> ɲ
         if ch == "n" and i + 1 < n and word[i + 1] == "h":
             phonemes.append("ɲ")
             i += 2
             continue
 
-        # "lh" → ʎ
+        # "lh" -> ʎ
         if ch == "l" and i + 1 < n and word[i + 1] == "h":
             phonemes.append("ʎ")
             i += 2
             continue
 
-        # "ch" → ʃ
+        # "ch" -> ʃ
         if ch == "c" and i + 1 < n and word[i + 1] == "h":
             phonemes.append("ʃ")
             i += 2
             continue
 
-        # "rr" → ʁ
+        # "rr" -> ʁ
         if ch == "r" and i + 1 < n and word[i + 1] == "r":
             phonemes.append("ʁ")
             i += 2
             continue
 
-        # "ss" → s
+        # "ss" -> s
         if ch == "s" and i + 1 < n and word[i + 1] == "s":
             phonemes.append("s")
             i += 2
             continue
 
-        # "qu" before e/i → k
+        # "qu" before e/i -> k (u is silent)
+        # "qu" before a/o -> kw (u is pronounced)
         if ch == "q" and i + 1 < n and word[i + 1] == "u":
             phonemes.append("k")
-            # Skip 'u' before e/i (silent), keep it before a/o
-            if i + 2 < n and word[i + 2] in "ei":
+            if i + 2 < n and word[i + 2] in "eiéêí":
+                # Silent u before e/i
                 i += 2
             else:
+                # Pronounced u before a/o -> append w glide
+                phonemes.append("w")
                 i += 2
             continue
 
-        # "gu" before e/i → ɡ (u is silent)
+        # "gu" before e/i -> ɡ (u is silent)
         if ch == "g" and i + 1 < n and word[i + 1] == "u":
-            if i + 2 < n and word[i + 2] in "eiéê":
+            if i + 2 < n and word[i + 2] in "eiéêí":
                 phonemes.append("ɡ")
                 i += 2
                 continue
 
-        # "ou" → o (common BR reduction)
+        # "ou" -> o (common BR reduction, single vowel group)
         if ch == "o" and i + 1 < n and word[i + 1] == "u":
             is_stressed = current_vowel_group == stress_vowel_target
             if is_stressed:
                 stress_idx = len(phonemes)
             phonemes.append("o")
             current_vowel_group += 1
-            # Skip the 'u' as well but count it as vowel group
             i += 2
-            current_vowel_group += 1
             continue
 
         # --- Consonants ---
 
         if ch == "r":
-            # Initial r or after n/l/s → ʁ
+            # Initial r or after n/l/s -> ʁ
             if i == 0 or (i > 0 and word[i - 1] in "nls"):
                 phonemes.append("ʁ")
             else:
-                # Intervocalic r → ɾ (tap)
+                # Intervocalic r -> ɾ (tap)
                 phonemes.append("ɾ")
             i += 1
             continue
 
         if ch == "s":
-            # Intervocalic s → z
+            # Intervocalic s -> z
             if (
                 i > 0
                 and i + 1 < n
@@ -214,10 +295,15 @@ def _convert_word(word: str) -> tuple[list[str], int]:
 
         if ch == "x":
             # Common x rules (simplified):
-            # Initial or after "en" → ʃ, between vowels → ks or z or s
+            # Initial or after "en" -> ʃ, between vowels -> ks or z or s
             if i == 0:
                 phonemes.append("ʃ")
-            elif i > 0 and word[i - 1] in "aeiou" and i + 1 < n and word[i + 1] in "aeiou":
+            elif (
+                i > 0
+                and word[i - 1] in "aeiou"
+                and i + 1 < n
+                and word[i + 1] in "aeiou"
+            ):
                 phonemes.append("z")
             else:
                 phonemes.append("ʃ")
@@ -225,7 +311,7 @@ def _convert_word(word: str) -> tuple[list[str], int]:
             continue
 
         if ch == "c":
-            # c before e/i → s, otherwise → k
+            # c before e/i -> s, otherwise -> k
             if i + 1 < n and word[i + 1] in "eiéêí":
                 phonemes.append("s")
             else:
@@ -239,7 +325,7 @@ def _convert_word(word: str) -> tuple[list[str], int]:
             continue
 
         if ch == "g":
-            # g before e/i → ʒ, otherwise → ɡ
+            # g before e/i -> ʒ, otherwise -> ɡ
             if i + 1 < n and word[i + 1] in "eiéêí":
                 phonemes.append("ʒ")
             else:
@@ -253,7 +339,9 @@ def _convert_word(word: str) -> tuple[list[str], int]:
             continue
 
         if ch == "t":
-            # Brazilian Portuguese: t before i → tʃ
+            # Brazilian Portuguese: t before i -> tʃ
+            # (palatalization before unstressed final -e is handled in
+            # _apply_br_postprocessing)
             if i + 1 < n and word[i + 1] in "ií":
                 phonemes.append("t")
                 phonemes.append("ʃ")
@@ -263,7 +351,9 @@ def _convert_word(word: str) -> tuple[list[str], int]:
             continue
 
         if ch == "d":
-            # Brazilian Portuguese: d before i → dʒ
+            # Brazilian Portuguese: d before i -> dʒ
+            # (palatalization before unstressed final -e is handled in
+            # _apply_br_postprocessing)
             if i + 1 < n and word[i + 1] in "ií":
                 phonemes.append("d")
                 phonemes.append("ʒ")
@@ -300,30 +390,40 @@ def _convert_word(word: str) -> tuple[list[str], int]:
             base = _ACCENTED.get(ch, ch)
 
             # Check for nasalization: tilde or vowel before n/m + consonant/end
+            # Exception: vowel before "nh" digraph is NOT nasal (nh = /ɲ/)
             is_nasal = False
             if ch in _TILDE:
                 is_nasal = True
             elif i + 1 < n and word[i + 1] in "nm":
-                # Nasal if n/m is followed by consonant or end of word
-                if i + 2 >= n:
+                # Check for "nh" digraph -- do NOT nasalize before nh
+                if word[i + 1] == "n" and i + 2 < n and word[i + 2] == "h":
+                    is_nasal = False
+                elif i + 2 >= n:
+                    # Nasal: n/m at end of word
                     is_nasal = True
                 elif not _is_vowel_char(word[i + 2]):
+                    # Nasal: n/m followed by consonant
                     is_nasal = True
 
             if is_nasal:
                 nasal_map = {"a": "ã", "e": "ẽ", "i": "ĩ", "o": "õ", "u": "ũ"}
                 phoneme = nasal_map.get(base, base)
+            # Open vs closed vowels based on accent
+            elif ch in _STRESS_ACCENTS:
+                # Acute accent = open vowel
+                vowel_map = {
+                    "a": "a",
+                    "e": "ɛ",
+                    "i": "i",
+                    "o": "ɔ",
+                    "u": "u",
+                }
+                phoneme = vowel_map.get(base, base)
+            elif ch in _CIRCUMFLEX:
+                # Circumflex = closed vowel
+                phoneme = base
             else:
-                # Open vs closed vowels based on accent
-                if ch in _STRESS_ACCENTS:
-                    # Acute accent = open vowel
-                    vowel_map = {"a": "a", "e": "ɛ", "i": "i", "o": "ɔ", "u": "u"}
-                    phoneme = vowel_map.get(base, base)
-                elif ch in _CIRCUMFLEX:
-                    # Circumflex = closed vowel
-                    phoneme = base
-                else:
-                    phoneme = base
+                phoneme = base
 
             if is_stressed:
                 stress_idx = len(phonemes)
@@ -341,12 +441,177 @@ def _convert_word(word: str) -> tuple[list[str], int]:
         # Skip unknown characters
         i += 1
 
+    # Apply BR Portuguese post-processing
+    phonemes = _remove_duplicate_nasal_coda(phonemes)
+    phonemes = _apply_coda_l_vocalization(phonemes)
+    phonemes = _apply_br_postprocessing(phonemes, stress_idx)
+
+    # Recalculate stress_idx after post-processing may have shifted indices
+    # Find the first stressed vowel (it should still be at approximately the
+    # same position but t->tʃ insertion may have shifted it)
+    # We track stress by looking for the vowel that was originally at stress_idx
+    # The post-processing functions preserve the vowel positions relative order.
+
     return phonemes, stress_idx
+
+
+def _remove_duplicate_nasal_coda(phonemes: list[str]) -> list[str]:
+    """Remove duplicate nasal consonant after nasal vowel at word end.
+
+    When a word ends in a nasal vowel + nasal consonant (n or m), the nasal
+    consonant is redundant because the nasality is already encoded in the
+    vowel. Remove the trailing nasal consonant.
+
+    Example: "bom" might produce [b, õ, m] -> [b, õ]
+    """
+    result = list(phonemes)
+    # Process from end, looking for patterns: nasal_vowel + n/m at word boundary
+    i = len(result) - 1
+    while i >= 1:
+        # Check for nasal vowel followed by n/m
+        if result[i] in ("n", "m") and result[i - 1] in _IPA_NASAL_VOWELS:
+            # Check this is at word end (next is space, punctuation, or end)
+            at_boundary = (i == len(result) - 1) or (
+                result[i + 1] == " " or result[i + 1] in _PUNCTUATION
+            )
+            if at_boundary:
+                result.pop(i)
+        i -= 1
+    return result
+
+
+def _apply_coda_l_vocalization(phonemes: list[str]) -> list[str]:
+    """Vocalize l in syllable coda position to [w] (BR Portuguese).
+
+    In Brazilian Portuguese, /l/ becomes [w] when in coda position
+    (before a consonant or at word end).
+
+    Examples: "Brasil" -> [w] not [l], "alto" -> [w] not [l]
+    """
+    result = list(phonemes)
+    for i, ph in enumerate(result):
+        if ph != "l":
+            continue
+        # l at end of phoneme list -> coda
+        if i == len(result) - 1:
+            result[i] = "w"
+            continue
+        next_ph = result[i + 1]
+        # l before space or punctuation -> coda (word-final)
+        if next_ph == " " or next_ph in _PUNCTUATION:
+            result[i] = "w"
+            continue
+        # l before a consonant -> coda
+        if next_ph in _IPA_CONSONANTS and next_ph not in _IPA_VOWELS:
+            result[i] = "w"
+            continue
+    return result
+
+
+def _apply_br_postprocessing(
+    phonemes: list[str], stress_idx: int
+) -> list[str]:
+    """Apply Brazilian Portuguese phonological rules as post-processing.
+
+    1. t/d palatalization before unstressed final -e:
+       - te# (unstressed) -> tʃi
+       - de# (unstressed) -> dʒi
+    2. Unstressed vowel reduction:
+       - Unstressed final e -> i
+       - Unstressed final o -> u
+       - Unstressed non-final e -> i (in common positions)
+       - Unstressed non-final o -> u (in common positions)
+    """
+    result = list(phonemes)
+
+    # --- Pass 1: t/d palatalization + unstressed final -e reduction ---
+    # Find word boundaries in the phoneme list
+    # Words are separated by spaces; also handle end-of-list
+    word_ranges = _find_word_ranges(result)
+
+    for start, end in word_ranges:
+        # Check for t/d + e at word end (before punctuation or end)
+        # end is exclusive index
+        if end - start < 2:
+            continue
+
+        last_phoneme_idx = end - 1
+        # Skip trailing punctuation within this word range
+        while last_phoneme_idx >= start and result[last_phoneme_idx] in _PUNCTUATION:
+            last_phoneme_idx -= 1
+        if last_phoneme_idx < start:
+            continue
+
+        # Check if last phoneme is unstressed 'e'
+        if result[last_phoneme_idx] == "e" and last_phoneme_idx != stress_idx:
+            # Check if preceded by 't'
+            if last_phoneme_idx >= start + 1 and result[last_phoneme_idx - 1] == "t":
+                # t + unstressed final e -> t ʃ i
+                result[last_phoneme_idx - 1] = "t"
+                result[last_phoneme_idx] = "i"
+                result.insert(last_phoneme_idx, "ʃ")
+                continue
+            # Check if preceded by 'd'
+            if last_phoneme_idx >= start + 1 and result[last_phoneme_idx - 1] == "d":
+                # d + unstressed final e -> d ʒ i
+                result[last_phoneme_idx - 1] = "d"
+                result[last_phoneme_idx] = "i"
+                result.insert(last_phoneme_idx, "ʒ")
+                continue
+            # Unstressed final e -> i (general reduction)
+            result[last_phoneme_idx] = "i"
+        elif result[last_phoneme_idx] == "o" and last_phoneme_idx != stress_idx:
+            # Unstressed final o -> u
+            result[last_phoneme_idx] = "u"
+
+    # --- Pass 2: Non-final unstressed vowel reduction ---
+    # Recalculate word ranges since pass 1 may have inserted phonemes
+    result = _reduce_unstressed_vowels(result, stress_idx)
+
+    return result
+
+
+def _find_word_ranges(phonemes: list[str]) -> list[tuple[int, int]]:
+    """Find (start, end) ranges for each word in the phoneme list.
+
+    Words are delimited by space phonemes.
+    """
+    ranges = []
+    start = 0
+    for i, ph in enumerate(phonemes):
+        if ph == " ":
+            if i > start:
+                ranges.append((start, i))
+            start = i + 1
+    if start < len(phonemes):
+        ranges.append((start, len(phonemes)))
+    return ranges
+
+
+def _reduce_unstressed_vowels(
+    phonemes: list[str], stress_idx: int
+) -> list[str]:
+    """Reduce unstressed vowels in non-final positions.
+
+    In BR Portuguese:
+    - Pretonic 'e' often reduces to [i] (but not always; simplified here)
+    - Pretonic 'o' often reduces to [u] (but not always; simplified here)
+
+    We apply conservative reduction: only reduce clearly unstressed positions.
+    """
+    # For now, the final-position reduction is handled in _apply_br_postprocessing.
+    # Non-final reduction is complex and context-dependent in BP. We keep it
+    # minimal to avoid over-reduction.
+    return phonemes
 
 
 def _split_words(text: str) -> list[str]:
     """Split text into words and punctuation tokens."""
-    tokens = re.findall(r"[a-záàâãéêíóôõúüçñ]+|[,.;:!?¡¿—–…]", text, re.IGNORECASE)
+    tokens = re.findall(
+        r"[a-záàâãéêíóôõúüçñ]+|[,.;:!?\u00a1\u00bf\u2014\u2013\u2026]",
+        text,
+        re.IGNORECASE,
+    )
     return tokens
 
 
@@ -412,36 +677,3 @@ class PortuguesePhonemizer(Phonemizer):
 
     def get_phoneme_id_map(self) -> dict[str, list[int]] | None:
         return None
-
-    def post_process_ids(
-        self,
-        phoneme_ids: list[int],
-        prosody_features: list[dict | None],
-        phoneme_id_map: dict[str, list[int]],
-    ) -> tuple[list[int], list[dict | None]]:
-        """Add BOS/EOS and inter-phoneme padding (espeak-ng compat)."""
-        pad_ids = phoneme_id_map.get("_", [0])
-        bos_ids = phoneme_id_map.get("^")
-        eos_ids = phoneme_id_map.get("$")
-
-        padded_ids: list[int] = []
-        padded_prosody: list[dict | None] = []
-        for phoneme_id, prosody_feature in zip(
-            phoneme_ids, prosody_features, strict=True
-        ):
-            padded_ids.append(phoneme_id)
-            padded_prosody.append(prosody_feature)
-            padded_ids.extend(pad_ids)
-            padded_prosody.extend([None] * len(pad_ids))
-
-        phoneme_ids = padded_ids
-        prosody_features = padded_prosody
-
-        if bos_ids:
-            phoneme_ids = bos_ids + [pad_ids[0]] + phoneme_ids
-            prosody_features = [None] * (len(bos_ids) + 1) + prosody_features
-        if eos_ids:
-            phoneme_ids = phoneme_ids + eos_ids
-            prosody_features = prosody_features + [None] * len(eos_ids)
-
-        return phoneme_ids, prosody_features

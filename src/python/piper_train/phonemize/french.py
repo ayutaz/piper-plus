@@ -10,6 +10,7 @@ import unicodedata
 
 from .base import Phonemizer, ProsodyInfo
 
+
 _LOGGER = logging.getLogger(__name__)
 
 __all__ = [
@@ -32,6 +33,9 @@ _CAREFUL = set("crfl")
 
 # Common silent final consonants
 _SILENT_FINAL = set("dghmnpstxz")
+
+# Words where "ille" is pronounced /il/ not /ij/
+_ILLE_AS_IL = {"ville", "mille", "tranquille"}
 
 
 def _normalize(text: str) -> str:
@@ -59,6 +63,11 @@ def _convert_word(word: str) -> list[str]:
     - Vowel digraphs (ou, au, eau, ai, ei, eu, oi, etc.)
     - Silent letters and final consonants
     - Consonant digraphs (ch, gn, ph, th, qu, gu)
+    - Intervocalic s voicing (s between vowels -> z)
+    - -er verb endings
+    - Context-dependent x handling
+    - Semi-vowel ɥ (u before i after consonant)
+    - -aille/-eille/-ouille/-ille patterns
     """
     phonemes: list[str] = []
     i = 0
@@ -71,27 +80,77 @@ def _convert_word(word: str) -> list[str]:
         # Multi-character sequences (longest match first)
         # ---------------------------------------------------------------
 
-        # "eau" → o
+        # -er word-final: verb infinitive ending -> /e/
+        # Also -ier -> /je/, -yer -> /je/
+        if ch == "e" and i + 1 == n - 1 and word[i + 1] == "r":
+            # Word ends in "er"
+            if i > 0 and word[i - 1] in "iy":
+                # -ier/-yer: the 'i'/'y' already produced 'j' (or 'i'),
+                # just produce /e/ for 'er' and skip 'r'
+                phonemes.append("e")
+            else:
+                phonemes.append("e")
+            i += 2
+            continue
+
+        # "eau" -> o
         if ch == "e" and i + 2 < n and word[i + 1 : i + 3] == "au":
             phonemes.append("o")
             i += 3
             continue
 
-        # "ain", "aim" → ɛ̃ (before consonant or end)
+        # "ouille" -> /uj/ (before end or consonant)
+        if (
+            ch == "o"
+            and i + 5 <= n
+            and word[i + 1 : i + 6] == "uille"
+            and (i + 6 >= n or not _is_vowel_char(word[i + 6]))
+        ):
+            phonemes.append("u")
+            phonemes.append("j")
+            i += 6
+            # Skip final silent 'e' already consumed
+            continue
+
+        # "aille" -> /aj/
+        if (
+            ch == "a"
+            and i + 4 <= n
+            and word[i + 1 : i + 5] == "ille"
+            and (i + 5 >= n or not _is_vowel_char(word[i + 5]))
+        ):
+            phonemes.append("a")
+            phonemes.append("j")
+            i += 5
+            continue
+
+        # "eille" -> /ɛj/
+        if (
+            ch == "e"
+            and i + 4 <= n
+            and word[i + 1 : i + 5] == "ille"
+            and (i + 5 >= n or not _is_vowel_char(word[i + 5]))
+        ):
+            phonemes.append("ɛ")
+            phonemes.append("j")
+            i += 5
+            continue
+
+        # "ain", "aim" -> ɛ̃ (before consonant or end)
         if ch == "a" and i + 2 < n and word[i + 1] == "i" and word[i + 2] in "nm":
             if i + 3 >= n or not _is_vowel_char(word[i + 3]):
                 phonemes.append("ɛ̃")
                 i += 3
                 continue
 
-        # "ein", "eim" → ɛ̃
+        # "ein", "eim" -> ɛ̃
         if ch == "e" and i + 2 < n and word[i + 1] == "i" and word[i + 2] in "nm":
             if i + 3 >= n or not _is_vowel_char(word[i + 3]):
                 phonemes.append("ɛ̃")
                 i += 3
                 continue
 
-        # "oin" → wɛ̃
+        # "oin" -> wɛ̃
         if ch == "o" and i + 2 < n and word[i + 1 : i + 3] == "in":
             if i + 3 >= n or not _is_vowel_char(word[i + 3]):
                 phonemes.append("w")
@@ -99,7 +158,7 @@ def _convert_word(word: str) -> list[str]:
                 i += 3
                 continue
 
-        # "ien" → jɛ̃
+        # "ien" -> jɛ̃
         if ch == "i" and i + 2 < n and word[i + 1 : i + 3] == "en":
             if i + 3 >= n or not _is_vowel_char(word[i + 3]):
                 phonemes.append("j")
@@ -107,58 +166,68 @@ def _convert_word(word: str) -> list[str]:
                 i += 3
                 continue
 
-        # "tion" → sjɔ̃
+        # "stion" -> /stjɔ̃/ (NOT /ssjɔ̃/)
+        # "tion" -> /sjɔ̃/ (only when NOT preceded by 's')
         if ch == "t" and i + 3 < n and word[i + 1 : i + 4] == "ion":
             if i + 4 >= n or not _is_vowel_char(word[i + 4]):
-                phonemes.append("s")
+                # Check if preceded by 's' — if so, produce /tjɔ̃/
+                # (the 's' already produced /s/, so we just need /t/)
+                if i > 0 and word[i - 1] == "s":
+                    phonemes.append("t")
+                else:
+                    phonemes.append("s")
                 phonemes.append("j")
                 phonemes.append("ɔ̃")
                 i += 4
                 continue
 
-        # "ille" → ij (after vowel) e.g. fille, famille
+        # "ille" -> /ij/ by default, but /il/ for exceptions (ville, mille, etc.)
         if (
             ch == "i"
             and i + 3 < n
             and word[i + 1 : i + 4] == "lle"
             and (i + 4 >= n or not _is_vowel_char(word[i + 4]))
         ):
-            phonemes.append("i")
-            phonemes.append("j")
+            if word in _ILLE_AS_IL:
+                phonemes.append("i")
+                phonemes.append("l")
+            else:
+                phonemes.append("i")
+                phonemes.append("j")
             i += 4
             continue
 
-        # "gn" → ɲ
+        # "gn" -> ɲ
         if ch == "g" and i + 1 < n and word[i + 1] == "n":
             phonemes.append("ɲ")
             i += 2
             continue
 
-        # "ph" → f
+        # "ph" -> f
         if ch == "p" and i + 1 < n and word[i + 1] == "h":
             phonemes.append("f")
             i += 2
             continue
 
-        # "th" → t
+        # "th" -> t
         if ch == "t" and i + 1 < n and word[i + 1] == "h":
             phonemes.append("t")
             i += 2
             continue
 
-        # "ch" → ʃ
+        # "ch" -> ʃ
         if ch == "c" and i + 1 < n and word[i + 1] == "h":
             phonemes.append("ʃ")
             i += 2
             continue
 
-        # "qu" → k
+        # "qu" -> k
         if ch == "q" and i + 1 < n and word[i + 1] == "u":
             phonemes.append("k")
             i += 2
             continue
 
-        # "gu" before e/i → ɡ (u silent)
+        # "gu" before e/i -> ɡ (u silent)
         if ch == "g" and i + 1 < n and word[i + 1] == "u":
             if i + 2 < n and word[i + 2] in "eeiéèêë":
                 phonemes.append("ɡ")
@@ -169,7 +238,7 @@ def _convert_word(word: str) -> list[str]:
         # Nasal vowels: vowel + n/m before consonant or end
         # ---------------------------------------------------------------
 
-        # "an", "am", "en", "em" → ɑ̃
+        # "an", "am", "en", "em" -> ɑ̃
         if ch in "ae" and i + 1 < n and word[i + 1] in "nm":
             # Not nasal if followed by another vowel or doubled n/m
             if i + 2 >= n:
@@ -181,7 +250,7 @@ def _convert_word(word: str) -> list[str]:
                 i += 2
                 continue
 
-        # "in", "im" → ɛ̃
+        # "in", "im" -> ɛ̃
         if ch == "i" and i + 1 < n and word[i + 1] in "nm":
             if i + 2 >= n:
                 phonemes.append("ɛ̃")
@@ -192,7 +261,7 @@ def _convert_word(word: str) -> list[str]:
                 i += 2
                 continue
 
-        # "on", "om" → ɔ̃
+        # "on", "om" -> ɔ̃
         if ch == "o" and i + 1 < n and word[i + 1] in "nm":
             if i + 2 >= n:
                 phonemes.append("ɔ̃")
@@ -203,7 +272,7 @@ def _convert_word(word: str) -> list[str]:
                 i += 2
                 continue
 
-        # "un", "um" → ɛ̃ (modern French merger)
+        # "un", "um" -> ɛ̃ (modern French merger)
         if ch == "u" and i + 1 < n and word[i + 1] in "nm":
             if i + 2 >= n:
                 phonemes.append("ɛ̃")
@@ -218,43 +287,47 @@ def _convert_word(word: str) -> list[str]:
         # Vowel digraphs
         # ---------------------------------------------------------------
 
-        # "ou" → u
+        # "ou" -> u
         if ch == "o" and i + 1 < n and word[i + 1] == "u":
             phonemes.append("u")
             i += 2
             continue
 
-        # "au" → o
+        # "au" -> o
         if ch == "a" and i + 1 < n and word[i + 1] == "u":
             phonemes.append("o")
             i += 2
             continue
 
-        # "oi" → wa
+        # "oi" -> wa
         if ch == "o" and i + 1 < n and word[i + 1] == "i":
             phonemes.append("w")
             phonemes.append("a")
             i += 2
             continue
 
-        # "ai" → ɛ
+        # "ai" -> ɛ
         if ch == "a" and i + 1 < n and word[i + 1] == "i":
             phonemes.append("ɛ")
             i += 2
             continue
 
-        # "ei" → ɛ
+        # "ei" -> ɛ
         if ch == "e" and i + 1 < n and word[i + 1] == "i":
             phonemes.append("ɛ")
             i += 2
             continue
 
-        # "eu", "œu" → ø (closed) or œ (open, before pronounced consonant)
+        # "eu", "œu" -> ø (closed) or œ (open, before pronounced consonant)
         if (ch == "e" and i + 1 < n and word[i + 1] == "u") or (
             ch == "œ" and i + 1 < n and word[i + 1] == "u"
         ):
             # Open before pronounced consonant in same syllable
-            if i + 2 < n and _is_consonant_char(word[i + 2]) and word[i + 2] not in _SILENT_FINAL:
+            if (
+                i + 2 < n
+                and _is_consonant_char(word[i + 2])
+                and word[i + 2] not in _SILENT_FINAL
+            ):
                 phonemes.append("œ")
             else:
                 phonemes.append("ø")
@@ -296,7 +369,7 @@ def _convert_word(word: str) -> list[str]:
             continue
 
         if ch == "i":
-            # "i" before vowel → j (semi-vowel)
+            # "i" before vowel -> j (semi-vowel)
             if i + 1 < n and _is_vowel_char(word[i + 1]):
                 phonemes.append("j")
             else:
@@ -325,7 +398,13 @@ def _convert_word(word: str) -> list[str]:
             continue
 
         if ch == "u":
-            # "u" after g/q already handled; standalone u → y
+            # Semi-vowel ɥ: u before i (after consonant) -> ɥ
+            if i + 1 < n and word[i + 1] == "i":
+                phonemes.append("ɥ")
+                phonemes.append("i")
+                i += 2
+                continue
+            # "u" after g/q already handled; standalone u -> y
             phonemes.append("y")
             i += 1
             continue
@@ -351,12 +430,12 @@ def _convert_word(word: str) -> list[str]:
 
         # "e" context-dependent
         if ch == "e":
-            # Final silent e (e muet) — skip at word end
+            # Final silent e (e muet) -- skip at word end
             if i == n - 1:
                 # Word-final 'e' is usually silent
                 i += 1
                 continue
-            # Before final consonant(s) → ɛ
+            # Before final consonant(s) -> ɛ
             remaining = word[i + 1 :]
             if all(c in _CONSONANTS or c == "s" for c in remaining):
                 phonemes.append("ɛ")
@@ -370,7 +449,7 @@ def _convert_word(word: str) -> list[str]:
         # ---------------------------------------------------------------
 
         if ch == "c":
-            # c before e, i, y → s
+            # c before e, i, y -> s
             if i + 1 < n and word[i + 1] in "eiyéèêë":
                 phonemes.append("s")
             else:
@@ -384,7 +463,7 @@ def _convert_word(word: str) -> list[str]:
             continue
 
         if ch == "g":
-            # g before e, i, y → ʒ
+            # g before e, i, y -> ʒ
             if i + 1 < n and word[i + 1] in "eiyéèêë":
                 phonemes.append("ʒ")
             else:
@@ -402,8 +481,26 @@ def _convert_word(word: str) -> list[str]:
             i += 1
             continue
 
+        # x: context-dependent handling
         if ch == "x":
-            # Simplified: x → ks (most common)
+            # Word-final x is usually silent
+            if i == n - 1:
+                i += 1
+                continue
+            # Also silent before final silent 'e'/'es'
+            remaining_after = word[i + 1 :]
+            if remaining_after in ("e", "es"):
+                i += 1
+                continue
+            # "ex" + vowel -> /ɛgz/ (handled: x is after e, next is vowel)
+            if i > 0 and word[i - 1] == "e" and i + 1 < n and _is_vowel_char(
+                word[i + 1]
+            ):
+                phonemes.append("ɡ")
+                phonemes.append("z")
+                i += 1
+                continue
+            # Default: x -> /ks/
             phonemes.append("k")
             phonemes.append("s")
             i += 1
@@ -414,7 +511,7 @@ def _convert_word(word: str) -> list[str]:
             i += 1
             continue
 
-        # Double consonants → single
+        # Double consonants -> single
         if i + 1 < n and word[i + 1] == ch and ch in _CONSONANTS:
             # Just produce one consonant sound
             pass  # fall through to simple mapping below
@@ -438,10 +535,28 @@ def _convert_word(word: str) -> list[str]:
 
         if ch in simple_consonants:
             # Handle final silent consonants
-            is_final = i == n - 1 or (i == n - 2 and word[n - 1] in "es")
+            # A consonant is "final" if it's word-final or before final silent e/es
+            # BUT: consonant before final 'e' should be PRONOUNCED (e is silent,
+            # not the consonant). Only truly word-final consonants may be silent.
+            is_word_final = i == n - 1
+            # Before final 's' (e.g., "temps") — the consonant+s are both silent
+            is_before_final_s = i == n - 2 and word[n - 1] == "s"
+            is_final = is_word_final or is_before_final_s
+
             if is_final and ch in _SILENT_FINAL:
                 i += 1
                 continue
+
+            # Intervocalic s voicing: single 's' between two vowels -> /z/
+            if ch == "s":
+                prev_is_vowel = i > 0 and _is_vowel_char(word[i - 1])
+                next_is_vowel = i + 1 < n and _is_vowel_char(word[i + 1])
+                is_single = not (i + 1 < n and word[i + 1] == "s")
+                if prev_is_vowel and next_is_vowel and is_single:
+                    phonemes.append("z")
+                    i += 1
+                    continue
+
             phonemes.append(simple_consonants[ch])
             # Skip doubled consonant
             if i + 1 < n and word[i + 1] == ch:
@@ -505,8 +620,10 @@ def phonemize_french_with_prosody(
 
             # French: stress always on last syllable (last vowel phoneme)
             # Find last vowel-like phoneme for stress marking
-            vowel_phonemes = {"a", "e", "ɛ", "i", "o", "u", "y", "ə", "ø", "œ",
-                              "ɛ̃", "ɑ̃", "ɔ̃"}
+            vowel_phonemes = {
+                "a", "e", "ɛ", "i", "o", "u", "y", "ə", "ø", "œ",
+                "ɛ̃", "ɑ̃", "ɔ̃",
+            }
             last_vowel_idx = -1
             for j in range(len(word_phonemes) - 1, -1, -1):
                 if word_phonemes[j] in vowel_phonemes:
@@ -544,36 +661,3 @@ class FrenchPhonemizer(Phonemizer):
 
     def get_phoneme_id_map(self) -> dict[str, list[int]] | None:
         return None
-
-    def post_process_ids(
-        self,
-        phoneme_ids: list[int],
-        prosody_features: list[dict | None],
-        phoneme_id_map: dict[str, list[int]],
-    ) -> tuple[list[int], list[dict | None]]:
-        """Add BOS/EOS and inter-phoneme padding (espeak-ng compat)."""
-        pad_ids = phoneme_id_map.get("_", [0])
-        bos_ids = phoneme_id_map.get("^")
-        eos_ids = phoneme_id_map.get("$")
-
-        padded_ids: list[int] = []
-        padded_prosody: list[dict | None] = []
-        for phoneme_id, prosody_feature in zip(
-            phoneme_ids, prosody_features, strict=True
-        ):
-            padded_ids.append(phoneme_id)
-            padded_prosody.append(prosody_feature)
-            padded_ids.extend(pad_ids)
-            padded_prosody.extend([None] * len(pad_ids))
-
-        phoneme_ids = padded_ids
-        prosody_features = padded_prosody
-
-        if bos_ids:
-            phoneme_ids = bos_ids + [pad_ids[0]] + phoneme_ids
-            prosody_features = [None] * (len(bos_ids) + 1) + prosody_features
-        if eos_ids:
-            phoneme_ids = phoneme_ids + eos_ids
-            prosody_features = prosody_features + [None] * len(eos_ids)
-
-        return phoneme_ids, prosody_features

@@ -10,6 +10,7 @@ import re
 from .base import Phonemizer, ProsodyInfo
 from .multilingual_id_map import get_multilingual_id_map
 from .registry import get_phonemizer
+from .token_mapper import TOKEN2CHAR
 
 
 __all__ = ["MultilingualPhonemizer", "UnicodeLanguageDetector"]
@@ -37,12 +38,23 @@ class UnicodeLanguageDetector:
     _RE_CJK = re.compile(r"[\u4E00-\u9FFF\u3400-\u4DBF\uF900-\uFAFF]")
 
     # Japanese-specific: CJK punctuation (。、「」etc) + fullwidth forms
-    _RE_JA_PUNCT = re.compile(r"[\u3000-\u303F\uFF00-\uFFEF]")
+    # Excludes fullwidth Latin letters (U+FF21-FF3A, U+FF41-FF5A) which are
+    # handled separately as Latin characters.
+    _RE_JA_PUNCT = re.compile(
+        r"[\u3000-\u303F"
+        r"\uFF00-\uFF20"   # Fullwidth digits and symbols (！＂...＠)
+        r"\uFF3B-\uFF40"   # Fullwidth brackets and symbols (［＼...｀)
+        r"\uFF5B-\uFFEF"   # Fullwidth braces onwards (｛｜...halfwidth/fullwidth forms)
+        r"]"
+    )
+
+    # Fullwidth Latin letters: U+FF21-FF3A (Ａ-Ｚ), U+FF41-FF5A (ａ-ｚ)
+    _RE_FULLWIDTH_LATIN = re.compile(r"[\uFF21-\uFF3A\uFF41-\uFF5A]")
 
     # Hangul Syllables: U+AC00-D7AF, Jamo: U+1100-11FF, Compat Jamo: U+3130-318F
     _RE_HANGUL = re.compile(r"[\uAC00-\uD7AF\u1100-\u11FF\u3130-\u318F]")
 
-    # Basic Latin letters
+    # Basic Latin letters (including extended Latin with diacritics)
     _RE_LATIN = re.compile(r"[A-Za-zÀ-ÿ]")
 
     def __init__(self, languages: list[str], default_latin_language: str = "en"):
@@ -59,7 +71,7 @@ class UnicodeLanguageDetector:
             lang for lang in languages if lang in ("en", "es", "pt", "fr")
         }
 
-    def detect_char(self, ch: str, context_has_kana: bool = False) -> str | None:
+    def detect_char(self, ch: str, context_has_kana: bool = False) -> str | None:  # noqa: PLR0911
         """Detect language for a single character.
 
         Parameters
@@ -93,7 +105,14 @@ class UnicodeLanguageDetector:
                 return "zh"
             return None
 
-        # Japanese-specific punctuation
+        # Fullwidth Latin letters (Ａ-Ｚ, ａ-ｚ) → treat as Latin, not Japanese
+        if self._RE_FULLWIDTH_LATIN.match(ch):
+            if self.default_latin_language in self.languages:
+                return self.default_latin_language
+            return None
+
+        # Japanese-specific punctuation (CJK punct + fullwidth forms,
+        # excluding fullwidth Latin already handled above)
         if self._RE_JA_PUNCT.match(ch):
             if self._has_ja:
                 return "ja"
@@ -214,16 +233,29 @@ class MultilingualPhonemizer(Phonemizer):
         all_prosody: list[ProsodyInfo | None] = []
         last_eos = "$"
 
+        # Build set of BOS/EOS tokens to strip (including PUA-mapped variants)
+        # Japanese question markers ?!, ?., ?~ are PUA-encoded single chars
+        _bos_eos_tokens = {"^", "$", "?"}
+        for marker in ("?!", "?.", "?~"):
+            if marker in TOKEN2CHAR:
+                _bos_eos_tokens.add(TOKEN2CHAR[marker])
+        # Also track which ones are EOS-like (for last_eos tracking)
+        _eos_tokens = {"$", "?"}
+        for marker in ("?!", "?.", "?~"):
+            if marker in TOKEN2CHAR:
+                _eos_tokens.add(TOKEN2CHAR[marker])
+
         for lang, segment_text in segments:
             phonemizer = get_phonemizer(lang)
             phonemes, prosody_list = phonemizer.phonemize_with_prosody(segment_text)
 
             # Strip BOS/EOS from individual segments
+            # This includes PUA-encoded question markers from Japanese
             stripped_phonemes: list[str] = []
             stripped_prosody: list[ProsodyInfo | None] = []
             for ph, pr in zip(phonemes, prosody_list, strict=True):
-                if ph in ("^", "$", "?"):
-                    if ph in ("$", "?"):
+                if ph in _bos_eos_tokens:
+                    if ph in _eos_tokens:
                         last_eos = ph
                     continue
                 stripped_phonemes.append(ph)

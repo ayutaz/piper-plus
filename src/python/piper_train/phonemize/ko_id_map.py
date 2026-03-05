@@ -8,6 +8,7 @@ by multilingual_id_map.py.
 
 from .token_mapper import register
 
+
 __all__ = ["KOREAN_PHONEMES"]
 
 

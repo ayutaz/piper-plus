@@ -7,6 +7,7 @@ automatically when building the unified ID map.
 
 from .token_mapper import register
 
+
 __all__ = ["get_spanish_id_map", "SPANISH_PHONEMES"]
 
 # -----------------------------------------------------------------------

@@ -7,6 +7,7 @@ by multilingual_id_map.py.
 
 from .token_mapper import register
 
+
 __all__ = ["CHINESE_PHONEMES"]
 
 # -------------------------------------------------------------------------
@@ -83,7 +84,7 @@ CHINESE_PHONEMES: list[str] = [
 
     # --- ü- (撮口呼) compound finals ---
     "yɛ",    # pinyin üe/yue
-    "yan",   # pinyin üan/yuan
+    "yɛn",   # pinyin üan/yuan
     "yn",    # pinyin ün/yun
 
     # --- Syllabic consonants ---

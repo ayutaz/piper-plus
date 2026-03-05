@@ -1,15 +1,32 @@
 """Tests for Korean phonemizer."""
 
+import types
+from unittest.mock import patch
+
 import pytest
 
 
+def _reset_g2p_state():
+    """Reset the module-level G2p cache and unavailable flag."""
+    import piper_train.phonemize.korean as mod
+
+    mod._g2p_instance = None
+    mod._g2p_unavailable = False
+
+
 class TestKoreanPhonemizer:
-    """Tests for Korean G2P."""
+    """Tests for Korean G2P.
+
+    These tests exercise phonemize_korean() which falls back to raw Hangul
+    decomposition when g2pk2/mecab is unavailable. The tests verify that
+    output is produced (either with or without g2pk2 phonological rules).
+    """
 
     @pytest.fixture(autouse=True)
-    def skip_if_no_deps(self):
-        # Korean phonemizer may use g2pk2 or fallback to Hangul decomposition
-        pass
+    def _reset(self):
+        _reset_g2p_state()
+        yield
+        _reset_g2p_state()
 
     def test_simple_word(self):
         from piper_train.phonemize.korean import phonemize_korean
@@ -49,3 +66,122 @@ class TestKoreanPhonemizer:
 
         phonemes = phonemize_korean("안녕 하세요")
         assert " " in phonemes
+
+
+class TestG2pCaching:
+    """Tests for G2p instance caching and error handling."""
+
+    @pytest.fixture(autouse=True)
+    def _reset(self):
+        """Reset the module-level G2p cache before/after each test."""
+        _reset_g2p_state()
+        yield
+        _reset_g2p_state()
+
+    def test_g2p_unavailable_flag_set_on_import_error(self):
+        """When g2pk2 is not importable, _g2p_unavailable is set to True."""
+        import piper_train.phonemize.korean as korean_mod
+        from piper_train.phonemize.korean import _apply_g2p
+
+        with patch.dict("sys.modules", {"g2pk2": None}):
+            result = _apply_g2p("테스트")
+            assert result == "테스트"
+            assert korean_mod._g2p_unavailable is True
+            assert korean_mod._g2p_instance is None
+
+    def test_g2p_unavailable_flag_prevents_retry(self):
+        """Once _g2p_unavailable is True, subsequent calls skip import."""
+        import piper_train.phonemize.korean as korean_mod
+        from piper_train.phonemize.korean import _apply_g2p
+
+        korean_mod._g2p_unavailable = True
+        # Should return text immediately without trying to import
+        result = _apply_g2p("테스트")
+        assert result == "테스트"
+
+    def test_g2p_instance_is_cached_when_working(self):
+        """If g2pk2+mecab works, instance is cached across calls."""
+        import piper_train.phonemize.korean as korean_mod
+        from piper_train.phonemize.korean import _apply_g2p
+
+        # Create a mock G2p that works
+        mock_g2p = lambda text: text + "_processed"  # noqa: E731
+        fake_module = types.ModuleType("g2pk2")
+        fake_module.G2p = lambda: mock_g2p
+
+        with patch.dict("sys.modules", {"g2pk2": fake_module}):
+            result1 = _apply_g2p("테스트")
+            assert result1 == "테스트_processed"
+            cached = korean_mod._g2p_instance
+            assert cached is not None
+
+            result2 = _apply_g2p("두번째")
+            assert result2 == "두번째_processed"
+            # Same instance reused
+            assert korean_mod._g2p_instance is cached
+
+    def test_fallback_on_import_error(self):
+        """_apply_g2p returns original text when g2pk2 import fails."""
+        from piper_train.phonemize.korean import _apply_g2p
+
+        with patch.dict("sys.modules", {"g2pk2": None}):
+            result = _apply_g2p("테스트")
+            assert result == "테스트"
+
+    def test_fallback_on_attribute_error_during_init(self):
+        """_apply_g2p catches AttributeError from G2p() constructor."""
+        from piper_train.phonemize.korean import _apply_g2p
+
+        fake_module = types.ModuleType("g2pk2")
+
+        def _bad_g2p():
+            raise AttributeError("'NoneType' object has no attribute 'parse'")
+
+        fake_module.G2p = _bad_g2p
+
+        with patch.dict("sys.modules", {"g2pk2": fake_module}):
+            result = _apply_g2p("테스트")
+            assert result == "테스트"
+
+    def test_fallback_on_attribute_error_during_call(self):
+        """_apply_g2p catches AttributeError when G2p()(text) fails.
+
+        This happens when g2pk2 imports and G2p() succeeds but mecab
+        is None internally (python-mecab-ko not installed).
+        """
+        import piper_train.phonemize.korean as korean_mod
+        from piper_train.phonemize.korean import _apply_g2p
+
+        # Simulate: G2p() creates an object whose __call__ raises
+        class BrokenG2p:
+            def __call__(self, text):
+                raise AttributeError(
+                    "'NoneType' object has no attribute 'pos'"
+                )
+
+        fake_module = types.ModuleType("g2pk2")
+        fake_module.G2p = BrokenG2p
+
+        with patch.dict("sys.modules", {"g2pk2": fake_module}):
+            result = _apply_g2p("테스트")
+            assert result == "테스트"
+            # Should mark as unavailable
+            assert korean_mod._g2p_unavailable is True
+            assert korean_mod._g2p_instance is None
+
+    def test_fallback_on_syntax_error(self):
+        """_apply_g2p catches SyntaxError from g2pk2 import."""
+        import builtins
+
+        from piper_train.phonemize.korean import _apply_g2p
+
+        real_import = builtins.__import__
+
+        def _raise_syntax(name, *args, **kwargs):
+            if name == "g2pk2":
+                raise SyntaxError("mock syntax error")
+            return real_import(name, *args, **kwargs)
+
+        with patch("builtins.__import__", side_effect=_raise_syntax):
+            result = _apply_g2p("테스트")
+            assert result == "테스트"

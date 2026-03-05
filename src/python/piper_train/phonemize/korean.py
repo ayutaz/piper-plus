@@ -12,6 +12,7 @@ import re
 from .base import Phonemizer, ProsodyInfo
 from .token_mapper import map_sequence
 
+
 _LOGGER = logging.getLogger(__name__)
 
 __all__ = [
@@ -152,22 +153,45 @@ def _syllable_to_ipa(ch: str) -> list[str]:
     return phonemes
 
 
+_g2p_instance = None
+_g2p_unavailable = False
+
+
 def _apply_g2p(text: str) -> str:
     """Apply g2pk2 phonological rules to Korean text.
 
-    Falls back to returning the original text if g2pk2 is not installed.
+    Falls back to returning the original text if g2pk2 is not installed
+    or if mecab is missing (G2p() succeeds but internal mecab is None).
+    The G2p() instance is cached at module level to avoid re-initialization
+    on every call (G2p() loads a mecab dictionary which is expensive).
     """
+    global _g2p_instance, _g2p_unavailable  # noqa: PLW0603
+    if _g2p_unavailable:
+        return text
+    if _g2p_instance is None:
+        try:
+            from g2pk2 import G2p  # noqa: PLC0415
+
+            _g2p_instance = G2p()
+        except (ImportError, SyntaxError, AttributeError):
+            _g2p_unavailable = True
+            _LOGGER.warning(
+                "g2pk2 not available; phonological rules will not be applied. "
+                "Install with: pip install g2pk2"
+            )
+            return text
     try:
-        from g2pk2 import G2p  # noqa: PLC0415
-    except (ImportError, SyntaxError):
+        return _g2p_instance(text)
+    except AttributeError:
+        # G2p() succeeded but mecab is None (python-mecab-ko not installed).
+        # The instance is broken; mark as unavailable so we don't retry.
+        _g2p_instance = None
+        _g2p_unavailable = True
         _LOGGER.warning(
-            "g2pk2 not available; phonological rules will not be applied. "
-            "Install with: pip install g2pk2"
+            "g2pk2 mecab backend not available; phonological rules will not "
+            "be applied. Install with: pip install python-mecab-ko"
         )
         return text
-
-    g2p = G2p()
-    return g2p(text)
 
 
 def _count_hangul_syllables(word: str) -> int:
@@ -260,36 +284,3 @@ class KoreanPhonemizer(Phonemizer):
 
     def get_phoneme_id_map(self) -> dict[str, list[int]] | None:
         return None
-
-    def post_process_ids(
-        self,
-        phoneme_ids: list[int],
-        prosody_features: list[dict | None],
-        phoneme_id_map: dict[str, list[int]],
-    ) -> tuple[list[int], list[dict | None]]:
-        """Add BOS/EOS and inter-phoneme padding (espeak-ng compat)."""
-        pad_ids = phoneme_id_map.get("_", [0])
-        bos_ids = phoneme_id_map.get("^")
-        eos_ids = phoneme_id_map.get("$")
-
-        padded_ids: list[int] = []
-        padded_prosody: list[dict | None] = []
-        for phoneme_id, prosody_feature in zip(
-            phoneme_ids, prosody_features, strict=True
-        ):
-            padded_ids.append(phoneme_id)
-            padded_prosody.append(prosody_feature)
-            padded_ids.extend(pad_ids)
-            padded_prosody.extend([None] * len(pad_ids))
-
-        phoneme_ids = padded_ids
-        prosody_features = padded_prosody
-
-        if bos_ids:
-            phoneme_ids = bos_ids + [pad_ids[0]] + phoneme_ids
-            prosody_features = [None] * (len(bos_ids) + 1) + prosody_features
-        if eos_ids:
-            phoneme_ids = phoneme_ids + eos_ids
-            prosody_features = prosody_features + [None] * len(eos_ids)
-
-        return phoneme_ids, prosody_features

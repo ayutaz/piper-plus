@@ -23,24 +23,20 @@ def _detect_dominant_language(
     """Detect the dominant language in text using Unicode ranges.
 
     Returns the language_id for the most common script in the text.
+    Delegates to UnicodeLanguageDetector for consistent detection logic.
     """
-    import re  # noqa: PLC0415
+    from .phonemize.multilingual import UnicodeLanguageDetector  # noqa: PLC0415
 
-    # Count characters by script
+    languages = list(language_id_map.keys())
+    detector = UnicodeLanguageDetector(languages, default_latin_language="en")
+    context_has_kana = detector.has_kana(text)
+
+    # Count characters by detected language
     counts: dict[str, int] = {}
     for ch in text:
-        if re.match(r"[\u3040-\u309F\u30A0-\u30FF]", ch):
-            counts["ja"] = counts.get("ja", 0) + 1
-        elif re.match(r"[\uAC00-\uD7AF]", ch):
-            counts["ko"] = counts.get("ko", 0) + 1
-        elif re.match(r"[\u4E00-\u9FFF\u3400-\u4DBF]", ch):
-            # CJK: could be ja or zh, prefer ja if kana present
-            if counts.get("ja", 0) > 0:
-                counts["ja"] = counts.get("ja", 0) + 1
-            else:
-                counts["zh"] = counts.get("zh", 0) + 1
-        elif re.match(r"[A-Za-z]", ch):
-            counts["en"] = counts.get("en", 0) + 1
+        lang = detector.detect_char(ch, context_has_kana=context_has_kana)
+        if lang is not None:
+            counts[lang] = counts.get(lang, 0) + 1
 
     if not counts:
         return language_id_map.get("en", 0)
