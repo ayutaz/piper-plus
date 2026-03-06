@@ -25,11 +25,11 @@ class TestSpanishPhonemizer:
         assert "ɲ" in phonemes
 
     def test_rr_trill(self):
-        phonemes, _ = _g2p_word("perro")
+        phonemes, *_ = _g2p_word("perro")
         assert "rr" in phonemes  # trilled r (rr digraph)
 
     def test_initial_r_trill(self):
-        phonemes, _ = _g2p_word("rojo")
+        phonemes, *_ = _g2p_word("rojo")
         assert "rr" in phonemes  # initial r is trilled
 
     def test_intervocalic_r_tap(self):

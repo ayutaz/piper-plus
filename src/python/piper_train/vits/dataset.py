@@ -7,6 +7,7 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
+import numpy as np
 import torch
 from torch import FloatTensor, LongTensor
 from torch.utils.data import Dataset
@@ -17,13 +18,13 @@ _LOGGER = logging.getLogger("vits.dataset")
 
 @dataclass
 class Utterance:
-    phoneme_ids: list[int]
+    phoneme_ids: np.ndarray  # dtype=int16, shape=(num_phonemes,)
     audio_norm_path: Path
     audio_spec_path: Path
     speaker_id: int | None = None
     language_id: int | None = None
     text: str | None = None
-    prosody_features: list[dict | None] | None = None  # A1/A2/A3 per phoneme
+    prosody_features: np.ndarray | None = None  # dtype=int16, shape=(num_phonemes, 3) for A1/A2/A3
 
 
 @dataclass
@@ -120,7 +121,7 @@ class PiperDataset(Dataset):
             prosody_tensor = self._prosody_features_to_tensor(utt.prosody_features)
 
         return UtteranceTensors(
-            phoneme_ids=LongTensor(utt.phoneme_ids),
+            phoneme_ids=torch.from_numpy(utt.phoneme_ids).long(),
             audio_norm=audio_norm,
             spectrogram=spectrogram,
             speaker_id=(
@@ -135,12 +136,14 @@ class PiperDataset(Dataset):
 
     @staticmethod
     def _prosody_features_to_tensor(
-        prosody_features: list[dict | None],
+        prosody_features: np.ndarray,
     ) -> LongTensor:
-        """Convert prosody features (list of dicts) to tensor.
+        """Convert prosody features (numpy array) to tensor.
 
         Args:
-            prosody_features: List of {"a1": int, "a2": int, "a3": int} or None
+            prosody_features: numpy int16 array of shape (num_phonemes, 3)
+                where columns are A1, A2, A3 values.
+                Special tokens are encoded as (0, 0, 0).
 
         Returns:
             LongTensor of shape (num_phonemes, 3) where:
@@ -149,14 +152,7 @@ class PiperDataset(Dataset):
             - [:, 2] = A3 values (total morae in phrase)
             - Special tokens (None) are encoded as (0, 0, 0)
         """
-        result = []
-        for feat in prosody_features:
-            if feat is not None:
-                result.append([feat["a1"], feat["a2"], feat["a3"]])
-            else:
-                # Special tokens (^, $, ?, _, #, [, ]) have no prosody info
-                result.append([0, 0, 0])
-        return LongTensor(result)
+        return torch.from_numpy(prosody_features).long()
 
     @staticmethod
     def _validate_cache_files(utt: Utterance) -> bool:
@@ -220,14 +216,26 @@ class PiperDataset(Dataset):
     @staticmethod
     def load_utterance(line: str) -> Utterance:
         utt_dict = json.loads(line)
+
+        phoneme_ids = np.array(utt_dict["phoneme_ids"], dtype=np.int16)
+
+        prosody_raw = utt_dict.get("prosody_features")
+        prosody_features: np.ndarray | None = None
+        if prosody_raw is not None:
+            prosody_arr = [
+                [f["a1"], f["a2"], f["a3"]] if f is not None else [0, 0, 0]
+                for f in prosody_raw
+            ]
+            prosody_features = np.array(prosody_arr, dtype=np.int16)
+
         return Utterance(
-            phoneme_ids=utt_dict["phoneme_ids"],
+            phoneme_ids=phoneme_ids,
             audio_norm_path=Path(utt_dict["audio_norm_path"]),
             audio_spec_path=Path(utt_dict["audio_spec_path"]),
             speaker_id=utt_dict.get("speaker_id"),
             language_id=utt_dict.get("language_id"),
             text=utt_dict.get("text"),
-            prosody_features=utt_dict.get("prosody_features"),
+            prosody_features=prosody_features,
         )
 
 

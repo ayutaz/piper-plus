@@ -201,14 +201,22 @@ def _segment_graphemes(word: str) -> list[_GraphemeUnit]:
 # ---------------------------------------------------------------------------
 
 
-def _find_syllable_boundaries(word: str) -> list[int]:
+def _find_syllable_boundaries(
+    word: str,
+    *,
+    units: list[_GraphemeUnit] | None = None,
+) -> list[int]:
     """Return list of *grapheme-unit* indices where each syllable starts.
 
     Operates on grapheme units produced by ``_segment_graphemes`` so that
     digraphs (``ch``, ``ll``, ``rr``, ``qu``, ``gu``, ``gü``) are treated
     as single consonant units and are never split across syllables.
+
+    If *units* is provided, it is used directly instead of calling
+    ``_segment_graphemes(word)`` again (performance optimisation).
     """
-    units = _segment_graphemes(word)
+    if units is None:
+        units = _segment_graphemes(word)
 
     # Build a simple vowel/consonant mask, skipping silent units
     # (silent letters like ``h`` are attached to the previous unit and
@@ -292,16 +300,26 @@ def _find_syllable_boundaries(word: str) -> list[int]:
     return [non_silent_idx[b] for b in ns_boundaries]
 
 
-def _get_stressed_syllable(word: str) -> int:
+def _get_stressed_syllable(
+    word: str,
+    *,
+    units: list[_GraphemeUnit] | None = None,
+    boundaries: list[int] | None = None,
+) -> int:
     """Return the 0-based syllable index that receives stress.
 
     Spanish stress rules:
     1. If accent mark → stressed syllable contains that vowel
     2. Words ending in vowel, n, s → penultimate syllable
     3. Words ending in other consonant → final syllable
+
+    If *units* and/or *boundaries* are provided, they are used directly
+    instead of recomputing them (performance optimisation).
     """
-    units = _segment_graphemes(word)
-    boundaries = _find_syllable_boundaries(word)
+    if units is None:
+        units = _segment_graphemes(word)
+    if boundaries is None:
+        boundaries = _find_syllable_boundaries(word, units=units)
     num_syllables = len(boundaries)
     if num_syllables == 0:
         return 0
@@ -352,10 +370,13 @@ def _get_base_vowel(ch: str) -> str:
 # ---------------------------------------------------------------------------
 
 
-def _g2p_word(word: str) -> tuple[list[str], int]:
+def _g2p_word(
+    word: str,
+) -> tuple[list[str], int, list[_GraphemeUnit], list[int]]:
     """Convert a Spanish word to IPA phonemes.
 
-    Returns (phonemes, stressed_syllable_index).
+    Returns (phonemes, stressed_syllable_index, grapheme_units, syllable_boundaries).
+    The extra return values allow callers to avoid redundant recomputation.
     """
     phonemes: list[str] = []
     n = len(word)
@@ -592,8 +613,10 @@ def _g2p_word(word: str) -> tuple[list[str], int]:
         # Unknown character — skip
         i += 1
 
-    stressed_syl = _get_stressed_syllable(word)
-    return phonemes, stressed_syl
+    units = _segment_graphemes(word)
+    boundaries = _find_syllable_boundaries(word, units=units)
+    stressed_syl = _get_stressed_syllable(word, units=units, boundaries=boundaries)
+    return phonemes, stressed_syl, units, boundaries
 
 
 # ---------------------------------------------------------------------------
@@ -635,19 +658,30 @@ def _phoneme_count_for_unit(grapheme: str, word: str, unit_idx: int,  # noqa: AR
 
 
 def _insert_stress_marker(
-    phonemes: list[str], word: str
+    phonemes: list[str],
+    word: str,
+    *,
+    units: list[_GraphemeUnit] | None = None,
+    boundaries: list[int] | None = None,
+    stressed_syl: int | None = None,
 ) -> list[str]:
     """Insert stress marker ˈ before the stressed syllable's first vowel.
 
     Uses ``_segment_graphemes`` for reliable char-to-phoneme mapping so
     that digraphs like ``qu``, ``gu``, ``gü`` are handled correctly.
+
+    If *units*, *boundaries*, and/or *stressed_syl* are provided, they
+    are used directly instead of recomputing them (performance optimisation).
     """
     if not phonemes:
         return phonemes
 
-    units = _segment_graphemes(word)
-    boundaries = _find_syllable_boundaries(word)
-    stressed_syl = _get_stressed_syllable(word)
+    if units is None:
+        units = _segment_graphemes(word)
+    if boundaries is None:
+        boundaries = _find_syllable_boundaries(word, units=units)
+    if stressed_syl is None:
+        stressed_syl = _get_stressed_syllable(word, units=units, boundaries=boundaries)
 
     if not boundaries:
         return phonemes
@@ -718,12 +752,15 @@ def phonemize_spanish_with_prosody(
             phonemes.append(" ")
             prosody_list.append(ProsodyInfo(a1=0, a2=0, a3=0))
 
-        word_phonemes, stressed_syl = _g2p_word(token)
+        word_phonemes, stressed_syl, units, boundaries = _g2p_word(token)
         # Skip stress marker for common unstressed function words
         if token in _UNSTRESSED_FUNCTION_WORDS:
             word_with_stress = word_phonemes
         else:
-            word_with_stress = _insert_stress_marker(word_phonemes, token)
+            word_with_stress = _insert_stress_marker(
+                word_phonemes, token,
+                units=units, boundaries=boundaries, stressed_syl=stressed_syl,
+            )
 
         word_phoneme_count = len(word_phonemes)  # count without stress marker
 

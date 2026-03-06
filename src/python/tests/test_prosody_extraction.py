@@ -323,20 +323,23 @@ class TestDatasetProsodyIntegration:
 
     @pytest.mark.unit
     def test_prosody_features_to_tensor(self):
-        """Test conversion of prosody features list to tensor."""
+        """Test conversion of prosody features numpy array to tensor."""
         try:
             from piper_train.vits.dataset import PiperDataset
         except ImportError:
             pytest.skip("Dataset module not available")
 
-        # Test data with mixed None and dict values
-        prosody_features = [
-            None,  # ^ (start)
-            {"a1": -2, "a2": 1, "a3": 3},
-            {"a1": -1, "a2": 2, "a3": 3},
-            {"a1": 0, "a2": 3, "a3": 3},
-            None,  # $ (end)
-        ]
+        import numpy as np
+
+        # Test data with mixed None and dict values (pre-converted to numpy)
+        # None entries are encoded as [0, 0, 0]
+        prosody_features = np.array([
+            [0, 0, 0],   # ^ (start) - was None
+            [-2, 1, 3],
+            [-1, 2, 3],
+            [0, 3, 3],
+            [0, 0, 0],   # $ (end) - was None
+        ], dtype=np.int16)
 
         tensor = PiperDataset._prosody_features_to_tensor(prosody_features)
 
@@ -357,26 +360,28 @@ class TestDatasetProsodyIntegration:
         """Test Utterance dataclass with prosody_features field."""
         from pathlib import Path
 
+        import numpy as np
+
         try:
             from piper_train.vits.dataset import Utterance
         except ImportError:
             pytest.skip("Dataset module not available")
 
         utt = Utterance(
-            phoneme_ids=[1, 2, 3],
+            phoneme_ids=np.array([1, 2, 3], dtype=np.int16),
             audio_norm_path=Path("/tmp/test.pt"),
             audio_spec_path=Path("/tmp/spec.pt"),
-            prosody_features=[
-                {"a1": 0, "a2": 1, "a3": 2},
-                {"a1": 1, "a2": 2, "a3": 2},
-                None,
-            ],
+            prosody_features=np.array([
+                [0, 1, 2],
+                [1, 2, 2],
+                [0, 0, 0],  # was None, encoded as zeros
+            ], dtype=np.int16),
         )
 
         assert utt.prosody_features is not None
         assert len(utt.prosody_features) == 3
-        assert utt.prosody_features[0] == {"a1": 0, "a2": 1, "a3": 2}
-        assert utt.prosody_features[2] is None
+        assert utt.prosody_features[0].tolist() == [0, 1, 2]
+        assert utt.prosody_features[2].tolist() == [0, 0, 0]
 
     @pytest.mark.unit
     def test_batch_prosody_features_field(self):
