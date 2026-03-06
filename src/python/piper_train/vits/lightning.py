@@ -692,7 +692,13 @@ class VitsModel(pl.LightningModule):
                             speaker_str = (
                                 f"spk={sid.item()}" if sid is not None else "single"
                             )
-                            language_map = {0: "ja", 1: "en"}
+                            # Build language map from config (supports N languages)
+                            language_map = {}
+                            lid_map = config.get("language_id_map", {})
+                            for lang_name, lang_id in lid_map.items():
+                                language_map[lang_id] = lang_name
+                            if not language_map:
+                                language_map = {0: "ja", 1: "en"}
                             lang_str = language_map.get(
                                 lid.item() if lid is not None else 0, "unknown"
                             )

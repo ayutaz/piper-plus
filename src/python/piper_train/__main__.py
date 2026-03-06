@@ -89,10 +89,11 @@ def main():
     )
     parser.add_argument(
         "--resume-from-multispeaker-checkpoint",
-        help="For single-speaker models only. Loads a multi-speaker checkpoint with strict=False "
-        "(emb_g is skipped), adds emb_g mean to emb_lang for conditioning correction, "
-        "and initializes emb_lang[1] (EN) from emb_lang[0] (JA). "
-        "Optimizer state is reset (training starts from epoch 0).",
+        help="For single-speaker fine-tuning. Loads a multi-speaker checkpoint with strict=False "
+        "(emb_g is skipped), adds emb_g mean to all emb_lang rows for conditioning correction, "
+        "and preserves original language embeddings. "
+        "Optimizer state is reset (training starts from epoch 0). "
+        "Automatically enables --freeze-dp.",
     )
     parser.add_argument(
         "--save-top-k",
@@ -492,16 +493,15 @@ def main():
                 "emb_g not found in checkpoint or model has no emb_lang; skipping conditioning correction."
             )
 
-        # 3. emb_lang[1] (EN) は元の値 + emb_g_mean をそのまま保持する。
-        #    以前は emb_lang[0] (JA) でコピー上書きしていたが、これにより
-        #    凍結された Duration Predictor が EN conditioning を認識できず
-        #    英語の duration が崩壊する問題があった。
-        #    emb_g_mean 補正済みの元の EN embedding を保持することで、
-        #    DP が正しい EN duration パターンを予測できる。
+        # 3. All emb_lang rows are preserved with emb_g_mean correction.
+        #    Previously emb_lang[0] (JA) was copied to emb_lang[1] (EN), but this
+        #    caused the frozen Duration Predictor to lose EN conditioning, breaking
+        #    English duration prediction. Keeping original embeddings + correction
+        #    lets the DP predict correct duration patterns for all languages.
         if hasattr(model.model_g, "emb_lang") and model.model_g.n_languages > 1:
             _LOGGER.info(
-                "emb_lang[1] (EN) preserved with emb_g_mean correction "
-                "(not overwritten by JA) for correct EN duration prediction."
+                "All emb_lang rows preserved with emb_g_mean correction "
+                "for correct duration prediction across languages."
             )
 
         _LOGGER.info(
