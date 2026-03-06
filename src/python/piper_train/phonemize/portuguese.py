@@ -248,6 +248,13 @@ def _convert_word(word: str) -> tuple[list[str], int]:
             i += 2
             continue
 
+        # "sc" before e/i -> s (no geminate; like Spanish seseo)
+        if ch == "s" and i + 1 < n and word[i + 1] == "c":
+            if i + 2 < n and word[i + 2] in "eiéêí":
+                phonemes.append("s")
+                i += 2  # skip "sc", vowel handled next
+                continue
+
         # "qu" before e/i -> k (u is silent)
         # "qu" before a/o -> kw (u is pronounced)
         if ch == "q" and i + 1 < n and word[i + 1] == "u":
@@ -520,7 +527,8 @@ def _apply_coda_l_vocalization(phonemes: list[str]) -> list[str]:
             result[i] = "w"
             continue
         # l before a consonant -> coda
-        if next_ph in _IPA_CONSONANTS and next_ph not in _IPA_VOWELS:
+        # Check first character for multi-char phonemes like tʃ, dʒ
+        if (next_ph in _IPA_CONSONANTS or (len(next_ph) > 1 and next_ph[0] in _IPA_CONSONANTS)) and next_ph not in _IPA_VOWELS:
             result[i] = "w"
             continue
     return result

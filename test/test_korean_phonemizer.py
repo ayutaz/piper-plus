@@ -299,6 +299,15 @@ class TestHangulDecomposition:
         phonemes = phonemize_korean("말")
         assert "l" in phonemes
 
+    def test_oe_vowel_modern_diphthong(self):
+        """ㅚ should produce [we] diphthong (modern Seoul pronunciation)."""
+        from piper_train.phonemize.korean import phonemize_korean
+
+        # 회 = ㅎ+ㅚ+∅ → h + w + e (modern diphthong, not monophthong ø)
+        phonemes = phonemize_korean("회")
+        assert "w" in phonemes, f"Expected 'w' for ㅚ diphthong, got: {phonemes}"
+        assert "e" in phonemes, f"Expected 'e' for ㅚ diphthong, got: {phonemes}"
+
     def test_g2p_error_resilience_mixed_script(self):
         """G2P should handle mixed Hangul+ASCII input gracefully."""
         from piper_train.phonemize.korean import phonemize_korean

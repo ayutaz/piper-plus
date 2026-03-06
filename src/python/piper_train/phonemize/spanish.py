@@ -58,9 +58,14 @@ def _normalize(text: str) -> str:
 
 
 def _has_accent(word: str) -> int | None:
-    """Return index of the accented vowel in *word*, or None."""
+    """Return index of the accented vowel in *word*, or None.
+
+    Only stress-indicating accents (á é í ó ú) are considered.
+    The diaeresis (ü) changes pronunciation but does NOT affect stress.
+    """
+    _STRESS_ACCENTS = {"á", "é", "í", "ó", "ú"}
     for i, ch in enumerate(word):
-        if ch in _ACCENT_MAP:
+        if ch in _STRESS_ACCENTS:
             return i
     return None
 
@@ -438,7 +443,7 @@ def _g2p_word(word: str) -> tuple[list[str], int]:
         # --- Single character rules ---
 
         if base_ch in ("b", "v"):
-            if _is_word_initial() or _is_after_nasal():
+            if _is_word_initial() or _is_after_nasal() or (i > 0 and base_word[i - 1] == "l"):
                 phonemes.append("b")
             else:
                 phonemes.append("β")  # fricative in all other positions
@@ -469,7 +474,7 @@ def _g2p_word(word: str) -> tuple[list[str], int]:
         if base_ch == "g":
             if i + 1 < n and base_word[i + 1] in ("e", "i"):
                 phonemes.append("x")
-            elif _is_word_initial() or _is_after_nasal():
+            elif _is_word_initial() or _is_after_nasal() or (i > 0 and base_word[i - 1] == "l"):
                 phonemes.append("ɡ")
             else:
                 phonemes.append("ɣ")  # fricative in all other positions

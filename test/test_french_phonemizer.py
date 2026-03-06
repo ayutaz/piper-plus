@@ -496,3 +496,64 @@ class TestFrenchPhonemizer:
 
         phonemes = phonemize_french("rouge")
         assert "\u0281" in phonemes, f"Expected /\u0281/ in 'rouge', got: {phonemes}"
+
+    # -----------------------------------------------------------------
+    # Fix: -er exception words (hiver, enfer)
+    # -----------------------------------------------------------------
+
+    def test_er_exception_hiver(self):
+        """hiver should keep /\u025b\u0281/, not use verb -er\u2192/e/ rule."""
+        from piper_train.phonemize.french import _convert_word
+
+        phonemes = _convert_word("hiver")
+        assert "\u0281" in phonemes, f"Expected /\u0281/ in 'hiver', got: {phonemes}"
+
+    def test_er_exception_enfer(self):
+        """enfer should keep /\u025b\u0281/, not use verb -er\u2192/e/ rule."""
+        from piper_train.phonemize.french import _convert_word
+
+        phonemes = _convert_word("enfer")
+        assert "\u0281" in phonemes, f"Expected /\u0281/ in 'enfer', got: {phonemes}"
+
+    # -----------------------------------------------------------------
+    # Fix: i before word-final silent e -> /i/ not /j/
+    # -----------------------------------------------------------------
+
+    def test_i_before_final_e_vie(self):
+        """vie: i before final silent e should be /i/, not /j/."""
+        from piper_train.phonemize.french import _convert_word
+
+        phonemes = _convert_word("vie")
+        assert "i" in phonemes, f"Expected /i/ in 'vie', got: {phonemes}"
+        assert "j" not in phonemes, f"Should not have /j/ in 'vie', got: {phonemes}"
+
+    def test_i_before_final_e_amie(self):
+        """amie: i before final silent e should be /i/, not /j/."""
+        from piper_train.phonemize.french import _convert_word
+
+        phonemes = _convert_word("amie")
+        assert "i" in phonemes, f"Expected /i/ in 'amie', got: {phonemes}"
+
+    # -----------------------------------------------------------------
+    # Fix: double r -> single /\u0281/
+    # -----------------------------------------------------------------
+
+    def test_double_r_terre(self):
+        """terre: rr should produce single /\u0281/, not /\u0281\u0281/."""
+        from piper_train.phonemize.french import _convert_word
+
+        phonemes = _convert_word("terre")
+        r_count = phonemes.count("\u0281")
+        assert r_count == 1, (
+            f"Expected exactly 1 /\u0281/ in 'terre', got {r_count}: {phonemes}"
+        )
+
+    def test_double_r_guerre(self):
+        """guerre: rr should produce single /\u0281/."""
+        from piper_train.phonemize.french import _convert_word
+
+        phonemes = _convert_word("guerre")
+        r_count = phonemes.count("\u0281")
+        assert r_count == 1, (
+            f"Expected exactly 1 /\u0281/ in 'guerre', got {r_count}: {phonemes}"
+        )

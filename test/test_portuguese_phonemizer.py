@@ -433,3 +433,38 @@ class TestPortuguesePhonemizer:
             assert not (phonemes[idx] == "ã" and phonemes[idx + 1] == "m"), (
                 f"Nasal coda m should be suppressed in 'campo', got: {joined}"
             )
+
+    # --- sc digraph before e/i ---
+
+    def test_sc_digraph_piscina(self):
+        """sc before i: 'piscina' should produce single /s/, not /ss/."""
+        from piper_train.phonemize.portuguese import _convert_word
+
+        phonemes, _ = _convert_word("piscina")
+        # Count 's' phonemes; should have exactly 1 for the 'sc' digraph
+        s_count = phonemes.count("s")
+        assert s_count == 1, (
+            f"Expected exactly 1 /s/ for 'sc' in 'piscina', got {s_count}: {phonemes}"
+        )
+
+    def test_sc_digraph_crescer(self):
+        """sc before e: 'crescer' should produce single /s/, not /ss/."""
+        from piper_train.phonemize.portuguese import _convert_word
+
+        phonemes, _ = _convert_word("crescer")
+        # The 'sc' before 'e' should produce one /s/
+        # (There's also an initial 's' from 'cre' → k,ɾ,ɛ then 'sc' → s)
+        # Actually 'crescer': c=k, r=ɾ, e, sc=s, e, r=ʁ
+        assert "s" in phonemes, f"Expected /s/ in 'crescer', got: {phonemes}"
+
+    # --- Coda-l vocalization before affricates ---
+
+    def test_coda_l_before_affricate(self):
+        """l before tʃ affricate should vocalize to [w]."""
+        from piper_train.phonemize.portuguese import _convert_word, _apply_coda_l_vocalization
+
+        # Simulate: ['w', 'tʃ', 'i'] — l before tʃ should become w
+        result = _apply_coda_l_vocalization(["a", "l", "tʃ", "i"])
+        assert result[1] == "w", (
+            f"Expected l → w before affricate tʃ, got: {result}"
+        )

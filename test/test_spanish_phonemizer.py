@@ -247,10 +247,10 @@ class TestSpanishPhonemizer:
     # Fix 3: Spirantization after lateral and rhotic
     # ---------------------------------------------------------------
 
-    def test_spirantization_after_lateral(self):
-        """b after l should produce β."""
+    def test_stop_after_lateral(self):
+        """b after l should produce stop [b] (not spirant β)."""
         phonemes = phonemize_spanish("alba")
-        assert "β" in phonemes
+        assert "b" in phonemes
 
     def test_spirantization_after_rhotic(self):
         """b after r should produce β."""
@@ -265,3 +265,24 @@ class TestSpanishPhonemizer:
         """Common function words should not have stress marker."""
         phonemes = phonemize_spanish("el")
         assert "ˈ" not in phonemes
+
+    # ---------------------------------------------------------------
+    # Fix 6: ü diaeresis should NOT affect stress
+    # ---------------------------------------------------------------
+
+    def test_diaeresis_no_stress_shift(self):
+        """ü (diaeresis) should not shift stress position."""
+        # bilingüe: stress on "lin" (penultimate), not on "gü"
+        phonemes = phonemize_spanish("bilingüe")
+        # Should have stress marker before the penultimate vowel
+        assert "ˈ" in phonemes
+
+    # ---------------------------------------------------------------
+    # Fix 7: g after l should produce stop [ɡ]
+    # ---------------------------------------------------------------
+
+    def test_g_stop_after_lateral(self):
+        """g after l should produce stop [ɡ], not spirant [ɣ]."""
+        phonemes = phonemize_spanish("algo")
+        assert "ɡ" in phonemes
+        assert "ɣ" not in phonemes

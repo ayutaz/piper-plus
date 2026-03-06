@@ -59,7 +59,8 @@ class UnicodeLanguageDetector:
     _RE_HANGUL = re.compile(r"[\uAC00-\uD7AF\u1100-\u11FF\u3130-\u318F]")
 
     # Basic Latin letters (including extended Latin with diacritics)
-    _RE_LATIN = re.compile(r"[A-Za-zÀ-ÿ]")
+    # Excludes × (U+00D7) and ÷ (U+00F7) which are in the À-ÿ range
+    _RE_LATIN = re.compile(r"[A-Za-zÀ-ÖØ-öø-ÿ]")
 
     def __init__(self, languages: list[str], default_latin_language: str = "en"):
         self.languages = set(languages)
@@ -221,6 +222,9 @@ class MultilingualPhonemizer(Phonemizer):
             languages, default_latin_language=default_latin_language
         )
         self._id_map: dict[str, list[int]] | None = None
+        # Note: _last_eos is set by phonemize_with_prosody and read by
+        # post_process_ids. This is NOT thread-safe. For concurrent use,
+        # callers must use a separate MultilingualPhonemizer per thread.
         self._last_eos: str = "$"
 
     @property

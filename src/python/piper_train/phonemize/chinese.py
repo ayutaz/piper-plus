@@ -158,8 +158,9 @@ def _apply_tone_sandhi(
         if tone_i == 3 and tone_next == 3:
             result[i] = (syllable_i, 2)
             continue
-        # Rule 2 & 3: 一 tone sandhi (identified by pinyin "yi" + tone 1)
-        if syllable_i == "yi" and tone_i == 1:
+        # Rule 2 & 3: 一 tone sandhi
+        # Note: _normalize_pinyin("yi") → "i", so we match normalized form
+        if syllable_i == "i" and tone_i == 1:
             if tone_next == 4:
                 result[i] = (syllable_i, 2)  # T1 → T2 before T4
             elif tone_next in (1, 2, 3):

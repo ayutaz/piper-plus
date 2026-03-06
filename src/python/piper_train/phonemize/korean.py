@@ -72,7 +72,7 @@ _MEDIAL_TO_IPA: list[list[str]] = [
     ["o"],       # 8: ㅗ
     ["w", "a"],  # 9: ㅘ
     ["w", "ɛ"],  # 10: ㅙ
-    ["ø"],       # 11: ㅚ
+    ["w", "e"],  # 11: ㅚ (modern Seoul: diphthong [we], not monophthong [ø])
     ["j", "o"],  # 12: ㅛ
     ["u"],       # 13: ㅜ
     ["w", "ʌ"],  # 14: ㅝ

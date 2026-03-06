@@ -34,6 +34,14 @@ _SILENT_FINAL = set("dghmnpstxz")
 # Words where "ille" is pronounced /il/ not /ij/
 _ILLE_AS_IL = {"ville", "mille", "tranquille"}
 
+# Polysyllabic words ending in -er that are pronounced /ɛʁ/ (not /e/)
+# These are exceptions to the verb infinitive -er → /e/ rule.
+_ER_AS_EHR = {
+    "hiver", "enfer", "amer", "cancer", "super", "laser",
+    "hamster", "master", "poster", "cluster", "starter",
+    "leader", "transfer", "fer",
+}
+
 
 def _normalize(text: str) -> str:
     """Normalize text: lowercase, normalize unicode, strip extra whitespace."""
@@ -80,10 +88,13 @@ def _convert_word(word: str) -> list[str]:
         # -er word-final: verb infinitive ending -> /e/
         # Only apply to polysyllabic words (parler, manger); monosyllabic words
         # like mer, fer, ver keep /ɛʁ/ pronunciation.
+        # Exception list (_ER_AS_EHR): polysyllabic words like "hiver", "enfer"
+        # that keep /ɛʁ/ pronunciation.
         if ch == "e" and i + 1 == n - 1 and word[i + 1] == "r":
             # Only apply -er→/e/ for words with at least 2 vowel groups
+            # AND not in the exception list
             vowel_count = sum(1 for c in word if c in _VOWELS)
-            if vowel_count >= 2:
+            if vowel_count >= 2 and word not in _ER_AS_EHR:
                 # Word ends in "er" (polysyllabic)
                 if i > 0 and word[i - 1] in "iy":
                     # -ier/-yer: the 'i'/'y' already produced 'j' (or 'i'),
@@ -406,9 +417,14 @@ def _convert_word(word: str) -> list[str]:
             continue
 
         if ch == "i":
-            # "i" before vowel -> j (semi-vowel)
+            # "i" before vowel -> j (semi-vowel), EXCEPT before word-final
+            # silent 'e' (vie→/vi/, amie→/ami/, not */vj/, */amj/)
             if i + 1 < n and _is_vowel_char(word[i + 1]):
-                phonemes.append("j")
+                # Don't glide before word-final silent 'e'
+                if i + 1 == n - 1 and word[i + 1] == "e":
+                    phonemes.append("i")
+                else:
+                    phonemes.append("j")
             else:
                 phonemes.append("i")
             i += 1
@@ -544,7 +560,11 @@ def _convert_word(word: str) -> list[str]:
 
         if ch == "r":
             phonemes.append("ʁ")
-            i += 1
+            # Skip doubled r (terre, guerre → single /ʁ/)
+            if i + 1 < n and word[i + 1] == "r":
+                i += 2
+            else:
+                i += 1
             continue
 
         # x: context-dependent handling
