@@ -332,3 +332,27 @@ class TestHangulDecomposition:
 
         phonemes = phonemize_korean("!?")
         assert isinstance(phonemes, list)
+
+    def test_nfd_input_normalized_to_nfc(self):
+        """NFD-decomposed Hangul jamo should be normalized to NFC before processing.
+
+        Some systems (e.g., macOS) may produce NFD-decomposed Hangul where
+        syllable blocks are represented as separate jamo codepoints.
+        The phonemizer must NFC-normalize first to get composed syllables.
+        """
+        import unicodedata
+
+        from piper_train.phonemize.korean import phonemize_korean
+
+        text_nfc = "한글"
+        text_nfd = unicodedata.normalize("NFD", text_nfc)
+        # NFD should be different from NFC for Hangul
+        assert text_nfc != text_nfd, "NFD should differ from NFC for Hangul"
+
+        phonemes_nfc = phonemize_korean(text_nfc)
+        phonemes_nfd = phonemize_korean(text_nfd)
+        # Both should produce identical output
+        assert phonemes_nfc == phonemes_nfd, (
+            f"NFC and NFD inputs should produce identical phonemes.\n"
+            f"NFC: {phonemes_nfc}\nNFD: {phonemes_nfd}"
+        )

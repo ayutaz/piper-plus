@@ -163,6 +163,18 @@ def _segment_graphemes(word: str) -> list[_GraphemeUnit]:
             i += 2
             continue
 
+        # ``xc`` before e/i → single consonant unit (/ks/, c is absorbed)
+        if (
+            bch == "x"
+            and i + 1 < n
+            and base_word[i + 1] == "c"
+            and i + 2 < n
+            and base_word[i + 2] in ("e", "i")
+        ):
+            units.append((word[i : i + 2], False, False))
+            i += 2
+            continue
+
         # --- Single characters ---
 
         # Silent ``h``

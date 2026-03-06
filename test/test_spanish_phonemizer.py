@@ -286,3 +286,20 @@ class TestSpanishPhonemizer:
         phonemes = phonemize_spanish("algo")
         assert "ɡ" in phonemes
         assert "ɣ" not in phonemes
+
+    # ---------------------------------------------------------------
+    # Fix 8: xc digraph segmentation for stress alignment
+    # ---------------------------------------------------------------
+
+    def test_xc_digraph_segmentation(self):
+        """'excepción': xc+e should be segmented as digraph in _segment_graphemes."""
+        units = _segment_graphemes("excepción")
+        graphemes = [u[0] for u in units]
+        assert "xc" in graphemes, (
+            f"'xc' should be a digraph in _segment_graphemes, got: {graphemes}"
+        )
+
+    def test_xc_stress_alignment(self):
+        """'excepción': stress should be correctly placed despite xc digraph."""
+        phonemes = phonemize_spanish("excepción")
+        assert "ˈ" in phonemes, f"stress marker missing for 'excepción': {phonemes}"

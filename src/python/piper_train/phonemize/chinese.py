@@ -292,15 +292,31 @@ def phonemize_chinese_with_prosody(
     # Build word groups: contiguous Chinese character ranges for prosody
     word_info = _build_word_info(text)
 
+    # --- Build per-character pinyin lookup ---
+    # pypinyin groups consecutive non-Chinese characters into single entries,
+    # so len(py_result) can be less than len(text). We build a mapping from
+    # text character index to pinyin syllable for Chinese characters only.
+    char_pinyin: dict[int, str] = {}
+    text_pos = 0
+    for syllable_list in py_result:
+        syllable = syllable_list[0]
+        if text_pos < len(text) and _RE_CHINESE_CHAR.match(text[text_pos]):
+            # Chinese char: 1:1 mapping
+            char_pinyin[text_pos] = syllable
+            text_pos += 1
+        else:
+            # Non-Chinese group: pypinyin merges consecutive non-Chinese chars
+            # into one entry. Skip past all non-Chinese chars in the text.
+            while text_pos < len(text) and not _RE_CHINESE_CHAR.match(
+                text[text_pos]
+            ):
+                text_pos += 1
+
     # --- First pass: extract tones for Chinese characters ---
-    # Collect (normalized_pinyin, tone) per char_idx for tone sandhi
+    # Collect (normalized_pinyin, tone) per text char_idx for tone sandhi
     char_tones: dict[int, tuple[str, int]] = {}
     chinese_indices: list[int] = []
-    for char_idx, syllable_list in enumerate(py_result):
-        ch = text[char_idx] if char_idx < len(text) else ""
-        if not _RE_CHINESE_CHAR.match(ch):
-            continue
-        syllable = syllable_list[0]
+    for char_idx, syllable in char_pinyin.items():
         tone = 5  # default neutral
         if syllable and syllable[-1].isdigit():
             tone = int(syllable[-1])
@@ -331,8 +347,10 @@ def phonemize_chinese_with_prosody(
                 char_tones[idx] = (norm, tone)
 
     # --- Second pass: generate phonemes ---
-    for char_idx, _syllable_list in enumerate(py_result):
-        ch = text[char_idx] if char_idx < len(text) else ""
+    # Iterate through the original text character by character (not pypinyin
+    # results) to avoid index misalignment when non-Chinese characters are
+    # grouped by pypinyin.
+    for char_idx, ch in enumerate(text):
 
         # Handle punctuation
         if ch in _ZH_PUNCT_MAP:

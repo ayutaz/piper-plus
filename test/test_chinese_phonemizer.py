@@ -211,3 +211,40 @@ class TestChinesePhonemizer:
         assert schwa_char in phonemes, (
             f"Expected ɚ token for erhua in 这儿, got: {phonemes}"
         )
+
+    def test_mixed_chinese_latin_alignment(self):
+        """Mixed Chinese+Latin text should not cause index misalignment.
+
+        pypinyin groups consecutive non-Chinese chars into single entries,
+        so len(py_result) can be less than len(text). The phonemizer must
+        iterate by text character index, not pypinyin result index.
+        """
+        from piper_train.phonemize.chinese import phonemize_chinese_with_prosody
+
+        # "你好ABC世界" — ABC is non-Chinese, pypinyin merges it into 1 entry
+        phonemes, prosody = phonemize_chinese_with_prosody("你好ABC世界")
+        assert len(phonemes) == len(prosody)
+        assert len(phonemes) > 0
+        # Latin chars A, B, C should pass through
+        assert "A" in phonemes
+        assert "B" in phonemes
+        assert "C" in phonemes
+
+    def test_mixed_chinese_digits_alignment(self):
+        """Mixed Chinese+digits should not cause index misalignment."""
+        from piper_train.phonemize.chinese import phonemize_chinese_with_prosody
+
+        # "第123章" — digits 1,2,3 are non-Chinese
+        phonemes, prosody = phonemize_chinese_with_prosody("第123章")
+        assert len(phonemes) == len(prosody)
+        assert "1" in phonemes
+        assert "2" in phonemes
+        assert "3" in phonemes
+
+    def test_mixed_chinese_punctuation_alignment(self):
+        """Mixed Chinese+punctuation should maintain prosody alignment."""
+        from piper_train.phonemize.chinese import phonemize_chinese_with_prosody
+
+        phonemes, prosody = phonemize_chinese_with_prosody("你好，世界！")
+        assert len(phonemes) == len(prosody)
+        assert len(phonemes) > 0

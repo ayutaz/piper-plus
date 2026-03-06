@@ -8,6 +8,7 @@ syllables are decomposed into jamo and mapped to IPA.
 
 import logging
 import re
+import unicodedata
 
 from .base import Phonemizer, ProsodyInfo
 from .token_mapper import map_sequence
@@ -220,6 +221,9 @@ def phonemize_korean_with_prosody(
     Returns:
         (phonemes, prosody_list) where phonemes are PUA-mapped tokens.
     """
+    # Normalize to NFC to handle NFD-decomposed Hangul jamo
+    text = unicodedata.normalize("NFC", text)
+
     # Apply phonological rules via g2pk2
     processed = _apply_g2p(text)
 
