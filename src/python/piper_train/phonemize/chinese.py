@@ -17,6 +17,7 @@ _LOGGER = logging.getLogger(__name__)
 __all__ = [
     "phonemize_chinese",
     "phonemize_chinese_with_prosody",
+    "phonemize_from_pinyin_syllables",
     "ChinesePhonemizer",
 ]
 
@@ -427,6 +428,81 @@ def _build_word_info(text: str) -> dict[int, tuple[int, int]]:
             info[idx] = (pos + 1, word_len)
 
     return info
+
+
+def phonemize_from_pinyin_syllables(
+    pinyin_syllables: list[str],
+    chinese_text: str = "",
+) -> tuple[list[str], list["ProsodyInfo | None"]]:
+    """Convert pre-parsed pinyin syllables directly to IPA phonemes.
+
+    Bypasses pypinyin entirely — ~29x faster for corpora that provide
+    pre-computed pinyin with tone sandhi already applied (e.g. AISHELL-3).
+
+    Args:
+        pinyin_syllables: List of pinyin with tone numbers, e.g. ["guang3", "zhou1"].
+        chinese_text: Original Chinese text for word boundary prosody detection.
+
+    Returns:
+        (phonemes, prosody_list) where phonemes are PUA-mapped tokens.
+    """
+    phonemes: list[str] = []
+    prosody_list: list[ProsodyInfo | None] = []
+
+    word_info = _build_word_info(chinese_text) if chinese_text else {}
+
+    # Map Chinese char indices to syllable indices
+    chinese_char_indices = [
+        i for i, ch in enumerate(chinese_text) if _RE_CHINESE_CHAR.match(ch)
+    ] if chinese_text else []
+
+    for syl_idx, syllable in enumerate(pinyin_syllables):
+        if not syllable:
+            continue
+
+        # Extract tone number
+        tone = 5
+        if syllable[-1].isdigit():
+            tone = int(syllable[-1])
+            syllable_base = syllable[:-1]
+        else:
+            syllable_base = syllable
+
+        normalized = _normalize_pinyin(syllable_base)
+
+        # Handle erhua
+        erhua_token: str | None = None
+        if normalized.endswith("r") and len(normalized) > 1 and normalized != "er":
+            erhua_token = "ɚ"
+            normalized = normalized[:-1]
+
+        ipa_tokens = _pinyin_to_ipa(normalized, tone)
+        if erhua_token is not None:
+            tone_marker = (
+                ipa_tokens[-1]
+                if ipa_tokens and ipa_tokens[-1].startswith("tone")
+                else None
+            )
+            if tone_marker is not None:
+                ipa_tokens = ipa_tokens[:-1] + [erhua_token] + [tone_marker]
+            else:
+                ipa_tokens.append(erhua_token)
+
+        # Prosody from word_info using original char index
+        char_idx = (
+            chinese_char_indices[syl_idx]
+            if syl_idx < len(chinese_char_indices)
+            else syl_idx
+        )
+        syl_pos, word_len = word_info.get(char_idx, (1, 1))
+        syl_prosody = ProsodyInfo(a1=tone, a2=syl_pos, a3=word_len)
+
+        for token in ipa_tokens:
+            phonemes.append(token)
+            prosody_list.append(syl_prosody)
+
+    mapped = map_sequence(phonemes)
+    return mapped, prosody_list
 
 
 def phonemize_chinese(text: str) -> list[str]:

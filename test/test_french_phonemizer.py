@@ -11,21 +11,21 @@ class TestFrenchPhonemizer:
         assert len(phonemes) > 0
 
     def test_nasal_vowel_an(self):
-        from piper_train.phonemize.french import phonemize_french
+        from piper_train.phonemize.french import _convert_word
 
-        phonemes = phonemize_french("france")
+        phonemes = _convert_word("france")
         assert "\u0251\u0303" in phonemes
 
     def test_nasal_vowel_on(self):
-        from piper_train.phonemize.french import phonemize_french
+        from piper_train.phonemize.french import _convert_word
 
-        phonemes = phonemize_french("bon")
+        phonemes = _convert_word("bon")
         assert "\u0254\u0303" in phonemes
 
     def test_nasal_vowel_in(self):
-        from piper_train.phonemize.french import phonemize_french
+        from piper_train.phonemize.french import _convert_word
 
-        phonemes = phonemize_french("vin")
+        phonemes = _convert_word("vin")
         assert "\u025b\u0303" in phonemes
 
     def test_ou_digraph(self):
@@ -345,9 +345,9 @@ class TestFrenchPhonemizer:
 
     def test_y_vowel_not_bare_y(self):
         """French u vowel should use y_vowel, not bare y."""
-        from piper_train.phonemize.french import phonemize_french
+        from piper_train.phonemize.french import _convert_word
 
-        phonemes = phonemize_french("lune")
+        phonemes = _convert_word("lune")
         assert "y" not in phonemes, f"Bare 'y' should not appear for French /y/: {phonemes}"
         assert "y_vowel" in phonemes, f"Expected 'y_vowel' in 'lune': {phonemes}"
 

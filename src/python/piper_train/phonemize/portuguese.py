@@ -671,7 +671,11 @@ def phonemize_portuguese_with_prosody(
 
         need_space = True
 
-    return phonemes, prosody_list
+    # Map multi-character tokens to PUA codepoints
+    from .token_mapper import map_sequence  # noqa: PLC0415
+
+    mapped = map_sequence(phonemes)
+    return mapped, prosody_list
 
 
 def phonemize_portuguese(text: str) -> list[str]:

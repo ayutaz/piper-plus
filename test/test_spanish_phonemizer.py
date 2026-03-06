@@ -3,6 +3,7 @@
 from piper_train.phonemize.spanish import (
     SpanishPhonemizer,
     _find_syllable_boundaries,
+    _g2p_word,
     _segment_graphemes,
     phonemize_spanish,
     phonemize_spanish_with_prosody,
@@ -24,11 +25,11 @@ class TestSpanishPhonemizer:
         assert "ɲ" in phonemes
 
     def test_rr_trill(self):
-        phonemes = phonemize_spanish("perro")
+        phonemes, _ = _g2p_word("perro")
         assert "rr" in phonemes  # trilled r (rr digraph)
 
     def test_initial_r_trill(self):
-        phonemes = phonemize_spanish("rojo")
+        phonemes, _ = _g2p_word("rojo")
         assert "rr" in phonemes  # initial r is trilled
 
     def test_intervocalic_r_tap(self):
@@ -105,15 +106,15 @@ class TestSpanishPhonemizer:
         """'guerra' (war): gu before e is silent u, stress on first syllable."""
         phonemes = phonemize_spanish("guerra")
         assert "ˈ" in phonemes, "stress marker missing for 'guerra'"
-        # gu+e -> g (u silent), so: ɡ ˈe rr a
-        assert phonemes == ["ɡ", "ˈ", "e", "rr", "a"]
+        # gu+e -> g (u silent), so: ɡ ˈe rr a (rr is PUA-encoded)
+        assert phonemes == ["ɡ", "ˈ", "e", "\ue01d", "a"]
 
     def test_gu_guitarra_stress(self):
         """'guitarra' (guitar): gu before i is silent u, stress on 2nd syl."""
         phonemes = phonemize_spanish("guitarra")
         assert "ˈ" in phonemes, "stress marker missing for 'guitarra'"
-        # gui-ta-rra: ɡ i t ˈa rr a
-        assert phonemes == ["ɡ", "i", "t", "ˈ", "a", "rr", "a"]
+        # gui-ta-rra: ɡ i t ˈa rr a (rr is PUA-encoded)
+        assert phonemes == ["ɡ", "i", "t", "ˈ", "a", "\ue01d", "a"]
 
     # ---------------------------------------------------------------
     # Issue #2: gü (diaeresis) — must produce /gw/

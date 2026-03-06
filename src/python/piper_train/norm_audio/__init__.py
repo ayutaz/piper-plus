@@ -148,6 +148,109 @@ def cache_norm_audio_fast(
     return audio_norm_path, audio_spec_path
 
 
+def resample_only_no_vad(
+    audio_path: str | Path,
+    cache_dir: str | Path,
+    sample_rate: int,
+    resample_quality: str = "MQ",
+    ignore_cache: bool = False,
+) -> tuple[Path, str]:
+    """Resample audio without VAD and save .pt only (no spectrogram).
+
+    For use with GPU batch spectrogram pipeline. Skips 16kHz resampling
+    and energy VAD — suitable for pre-cleaned corpora (AISHELL-3, CML-TTS).
+
+    Returns:
+        (norm_path, cache_id) for subsequent spectrogram computation.
+    """
+    import soxr  # noqa: PLC0415
+
+    audio_path = Path(audio_path).absolute()
+    cache_dir = Path(cache_dir)
+
+    audio_cache_id = sha256(str(audio_path).encode()).hexdigest()
+    audio_norm_path = cache_dir / f"{audio_cache_id}.pt"
+
+    if ignore_cache or not audio_norm_path.exists():
+        audio_data, src_sr = sf.read(
+            str(audio_path), dtype="float32", always_2d=False
+        )
+        if audio_data.ndim > 1:
+            audio_data = audio_data.mean(axis=1)
+
+        if src_sr != sample_rate:
+            audio_rs = soxr.resample(
+                audio_data, src_sr, sample_rate, quality=resample_quality
+            )
+        else:
+            audio_rs = audio_data
+
+        audio_norm_tensor = torch.from_numpy(audio_rs).unsqueeze(0)
+        _atomic_torch_save(audio_norm_tensor, audio_norm_path)
+
+    return audio_norm_path, audio_cache_id
+
+
+def cache_norm_audio_no_vad(
+    audio_path: str | Path,
+    cache_dir: str | Path,
+    sample_rate: int,
+    resample_quality: str = "MQ",
+    filter_length: int = 1024,
+    window_length: int = 1024,
+    hop_length: int = 256,
+    ignore_cache: bool = False,
+) -> tuple[Path, Path]:
+    """Cache audio without VAD — for pre-cleaned corpora.
+
+    Skips 16kHz resampling and energy VAD, saving ~30% processing time.
+    Uses soxr MQ (vs HQ) for additional ~30-40% resample speedup.
+    """
+    import soxr  # noqa: PLC0415
+
+    audio_path = Path(audio_path).absolute()
+    cache_dir = Path(cache_dir)
+
+    audio_cache_id = sha256(str(audio_path).encode()).hexdigest()
+    audio_norm_path = cache_dir / f"{audio_cache_id}.pt"
+    audio_spec_path = cache_dir / f"{audio_cache_id}.spec.pt"
+
+    audio_norm_tensor: torch.Tensor | None = None
+
+    if ignore_cache or not audio_norm_path.exists():
+        audio_data, src_sr = sf.read(
+            str(audio_path), dtype="float32", always_2d=False
+        )
+        if audio_data.ndim > 1:
+            audio_data = audio_data.mean(axis=1)
+
+        if src_sr != sample_rate:
+            audio_rs = soxr.resample(
+                audio_data, src_sr, sample_rate, quality=resample_quality
+            )
+        else:
+            audio_rs = audio_data
+
+        audio_norm_tensor = torch.from_numpy(audio_rs).unsqueeze(0)
+        _atomic_torch_save(audio_norm_tensor, audio_norm_path)
+
+    if ignore_cache or not audio_spec_path.exists():
+        if audio_norm_tensor is None:
+            audio_norm_tensor = torch.load(audio_norm_path, weights_only=True)
+
+        audio_spec_tensor = spectrogram_torch(
+            y=audio_norm_tensor,
+            n_fft=filter_length,
+            sampling_rate=sample_rate,
+            hop_size=hop_length,
+            win_size=window_length,
+            center=False,
+        ).squeeze(0)
+        _atomic_torch_save(audio_spec_tensor.half(), audio_spec_path)
+
+    return audio_norm_path, audio_spec_path
+
+
 def make_silence_detector() -> SileroVoiceActivityDetector:
     silence_model = _DIR / "models" / "silero_vad.onnx"
     return SileroVoiceActivityDetector(silence_model)

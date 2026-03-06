@@ -221,7 +221,9 @@ class TestSpeakerBalancedBatchSampler:
             samples_per_speaker=samples_per_speaker,
         )
 
+        sampler.set_epoch(0)
         batches_epoch1 = [batch.copy() for batch in sampler]
+        sampler.set_epoch(1)
         batches_epoch2 = [batch.copy() for batch in sampler]
 
         # At least some batches should be different

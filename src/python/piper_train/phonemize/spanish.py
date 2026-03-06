@@ -726,7 +726,11 @@ def phonemize_spanish_with_prosody(
 
         need_space = True
 
-    return phonemes, prosody_list
+    # Map multi-character tokens (rr, tʃ, etc.) to PUA codepoints
+    from .token_mapper import map_sequence  # noqa: PLC0415
+
+    mapped = map_sequence(phonemes)
+    return mapped, prosody_list
 
 
 def phonemize_spanish(text: str) -> list[str]:
