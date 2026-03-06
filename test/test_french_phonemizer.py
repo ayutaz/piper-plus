@@ -557,3 +557,48 @@ class TestFrenchPhonemizer:
         assert r_count == 1, (
             f"Expected exactly 1 /\u0281/ in 'guerre', got {r_count}: {phonemes}"
         )
+
+    # -----------------------------------------------------------------
+    # Typographic punctuation passthrough
+    # -----------------------------------------------------------------
+
+    def test_em_dash_passthrough(self):
+        """Em dash (U+2014) should pass through in phoneme output."""
+        from piper_train.phonemize.french import phonemize_french
+
+        phonemes = phonemize_french("oui \u2014 non")
+        assert "\u2014" in phonemes, f"Em dash missing from output: {phonemes}"
+
+    def test_en_dash_passthrough(self):
+        """En dash (U+2013) should pass through in phoneme output."""
+        from piper_train.phonemize.french import phonemize_french
+
+        phonemes = phonemize_french("oui \u2013 non")
+        assert "\u2013" in phonemes, f"En dash missing from output: {phonemes}"
+
+    def test_ellipsis_passthrough(self):
+        """Horizontal ellipsis (U+2026) should pass through in phoneme output."""
+        from piper_train.phonemize.french import phonemize_french
+
+        phonemes = phonemize_french("bonjour\u2026")
+        assert "\u2026" in phonemes, f"Ellipsis missing from output: {phonemes}"
+
+    def test_guillemets_passthrough(self):
+        """French guillemets should pass through in phoneme output."""
+        from piper_train.phonemize.french import phonemize_french
+
+        phonemes = phonemize_french("\u00abbonjour\u00bb")
+        assert "\u00ab" in phonemes, f"Left guillemet missing from output: {phonemes}"
+        assert "\u00bb" in phonemes, f"Right guillemet missing from output: {phonemes}"
+
+    def test_typographic_punctuation_prosody_alignment(self):
+        """Typographic punctuation should maintain prosody alignment."""
+        from piper_train.phonemize.french import phonemize_french_with_prosody
+
+        phonemes, prosody = phonemize_french_with_prosody(
+            "\u00abbonjour\u00bb \u2014 oui\u2026"
+        )
+        assert len(phonemes) == len(prosody), (
+            f"Prosody alignment broken: "
+            f"{len(phonemes)} phonemes vs {len(prosody)} prosody"
+        )

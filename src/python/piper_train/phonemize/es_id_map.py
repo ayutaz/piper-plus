@@ -30,6 +30,9 @@ SPANISH_PHONEMES: list[str] = [
     "ɣ",   # allophone of /ɡ/ (intervocalic)
     "x",   # jota (/x/ as in "jardín")
     "ʝ",   # palatal fricative (y, ll — yeísmo)
+    # Inverted punctuation (unique to Spanish orthography)
+    "¡",   # inverted exclamation mark (U+00A1)
+    "¿",   # inverted question mark (U+00BF)
 ]
 
 

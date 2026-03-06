@@ -26,4 +26,8 @@ PORTUGUESE_PHONEMES: list[str] = [
     "ʎ",  # lh digraph (trabalho, filho) - palatal lateral approximant
     # Uvular fricative — shared with FR (fr_id_map.py), not in JA/EN/ES
     "ʁ",  # rr, word-initial r, coda r (carro, rio, mar) - uvular fricative
+    # Punctuation not in JA/EN inventories (deduplicated with FR by multilingual_id_map)
+    "—",  # em dash (U+2014)
+    "–",  # en dash (U+2013)
+    "…",  # horizontal ellipsis (U+2026)
 ]

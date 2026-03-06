@@ -468,3 +468,40 @@ class TestPortuguesePhonemizer:
         assert result[1] == "w", (
             f"Expected l → w before affricate tʃ, got: {result}"
         )
+
+    # --- Typographic punctuation passthrough (em dash, en dash, ellipsis) ---
+
+    def test_em_dash_passthrough(self):
+        """Em dash (U+2014) should pass through in phoneme output."""
+        from piper_train.phonemize.portuguese import phonemize_portuguese
+
+        phonemes = phonemize_portuguese("sim \u2014 n\u00e3o")
+        assert "\u2014" in phonemes, f"Em dash missing from output: {phonemes}"
+
+    def test_en_dash_passthrough(self):
+        """En dash (U+2013) should pass through in phoneme output."""
+        from piper_train.phonemize.portuguese import phonemize_portuguese
+
+        phonemes = phonemize_portuguese("sim \u2013 n\u00e3o")
+        assert "\u2013" in phonemes, f"En dash missing from output: {phonemes}"
+
+    def test_ellipsis_passthrough(self):
+        """Horizontal ellipsis (U+2026) should pass through in phoneme output."""
+        from piper_train.phonemize.portuguese import phonemize_portuguese
+
+        phonemes = phonemize_portuguese("ol\u00e1\u2026")
+        assert "\u2026" in phonemes, f"Ellipsis missing from output: {phonemes}"
+
+    def test_typographic_punctuation_prosody_alignment(self):
+        """Typographic punctuation should maintain prosody alignment."""
+        from piper_train.phonemize.portuguese import (
+            phonemize_portuguese_with_prosody,
+        )
+
+        phonemes, prosody = phonemize_portuguese_with_prosody(
+            "sim \u2014 n\u00e3o\u2026"
+        )
+        assert len(phonemes) == len(prosody), (
+            f"Prosody alignment broken: "
+            f"{len(phonemes)} phonemes vs {len(prosody)} prosody"
+        )

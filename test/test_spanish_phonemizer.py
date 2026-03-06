@@ -303,3 +303,26 @@ class TestSpanishPhonemizer:
         """'excepción': stress should be correctly placed despite xc digraph."""
         phonemes = phonemize_spanish("excepción")
         assert "ˈ" in phonemes, f"stress marker missing for 'excepción': {phonemes}"
+
+    # ---------------------------------------------------------------
+    # Inverted punctuation passthrough (¡, ¿)
+    # ---------------------------------------------------------------
+
+    def test_inverted_exclamation_passthrough(self):
+        """Inverted exclamation mark ¡ should pass through in phoneme output."""
+        phonemes = phonemize_spanish("¡hola!")
+        assert "¡" in phonemes, f"'¡' missing from output: {phonemes}"
+        assert "!" in phonemes, f"'!' missing from output: {phonemes}"
+
+    def test_inverted_question_passthrough(self):
+        """Inverted question mark ¿ should pass through in phoneme output."""
+        phonemes = phonemize_spanish("¿cómo estás?")
+        assert "¿" in phonemes, f"'¿' missing from output: {phonemes}"
+        assert "?" in phonemes, f"'?' missing from output: {phonemes}"
+
+    def test_inverted_punctuation_prosody_alignment(self):
+        """Inverted punctuation should maintain prosody alignment."""
+        phonemes, prosody = phonemize_spanish_with_prosody("¡hola!")
+        assert len(phonemes) == len(prosody), (
+            f"Prosody alignment broken: {len(phonemes)} phonemes vs {len(prosody)} prosody"
+        )

@@ -99,3 +99,132 @@ class TestMultilingualIdMap:
         for ids in id_map.values():
             all_ids.extend(ids)
         assert len(all_ids) == len(set(all_ids)), "Duplicate IDs in multilingual map"
+
+    # -------------------------------------------------------------------
+    # New punctuation characters: ES (¡, ¿), FR (—, –, …, «, »), PT (—, –, …)
+    # -------------------------------------------------------------------
+
+    def test_new_punctuation_in_full_map(self):
+        """All new punctuation chars should be present in the full multilingual map."""
+        from piper_train.phonemize.multilingual_id_map import (
+            LANGUAGE_PHONEMES,
+            get_multilingual_id_map,
+        )
+        from piper_train.phonemize.token_mapper import register
+
+        all_langs = ["ja", "en", "zh", "ko", "es", "pt", "fr"]
+        available = [lang for lang in all_langs if lang in LANGUAGE_PHONEMES]
+        # Need at least ES, PT, FR
+        for lang in ["es", "pt", "fr"]:
+            if lang not in available:
+                pytest.skip(f"Language '{lang}' not registered")
+
+        id_map = get_multilingual_id_map(available)
+
+        new_punct = ["¡", "¿", "\u2014", "\u2013", "\u2026", "\u00ab", "\u00bb"]
+        for char in new_punct:
+            mapped = register(char)
+            assert mapped in id_map, (
+                f"Punctuation '{char}' (U+{ord(char):04X}) missing from multilingual map"
+            )
+
+    def test_new_punctuation_unique_ids(self):
+        """Each new punctuation char should have a unique ID (no collisions)."""
+        from piper_train.phonemize.multilingual_id_map import (
+            LANGUAGE_PHONEMES,
+            get_multilingual_id_map,
+        )
+        from piper_train.phonemize.token_mapper import register
+
+        all_langs = ["ja", "en", "zh", "ko", "es", "pt", "fr"]
+        available = [lang for lang in all_langs if lang in LANGUAGE_PHONEMES]
+        for lang in ["es", "pt", "fr"]:
+            if lang not in available:
+                pytest.skip(f"Language '{lang}' not registered")
+
+        id_map = get_multilingual_id_map(available)
+
+        new_punct = ["¡", "¿", "\u2014", "\u2013", "\u2026", "\u00ab", "\u00bb"]
+        punct_ids = []
+        for char in new_punct:
+            mapped = register(char)
+            char_id = id_map[mapped][0]
+            punct_ids.append(char_id)
+
+        assert len(punct_ids) == len(set(punct_ids)), (
+            f"Duplicate IDs among new punctuation chars: {punct_ids}"
+        )
+
+    def test_shared_punct_fr_pt_deduplicated(self):
+        """Chars shared between FR and PT (em dash, en dash, ellipsis) get the same ID."""
+        from piper_train.phonemize.multilingual_id_map import (
+            LANGUAGE_PHONEMES,
+            get_multilingual_id_map,
+        )
+        from piper_train.phonemize.token_mapper import register
+
+        for lang in ["es", "pt", "fr"]:
+            if lang not in LANGUAGE_PHONEMES:
+                pytest.skip(f"Language '{lang}' not registered")
+
+        # Build two maps: one with PT first, one with FR first
+        # Both should produce the same ID for shared chars
+        map_pt_fr = get_multilingual_id_map(["ja", "en", "es", "pt", "fr"])
+        map_fr_pt = get_multilingual_id_map(["ja", "en", "es", "fr", "pt"])
+
+        shared_chars = ["\u2014", "\u2013", "\u2026"]  # em dash, en dash, ellipsis
+        for char in shared_chars:
+            mapped = register(char)
+            # Both maps should contain the char
+            assert mapped in map_pt_fr, f"'{char}' missing from pt-first map"
+            assert mapped in map_fr_pt, f"'{char}' missing from fr-first map"
+
+        # Verify deduplication: total unique IDs should be the same regardless of order
+        ids_pt_fr = set()
+        ids_fr_pt = set()
+        for ids in map_pt_fr.values():
+            ids_pt_fr.update(ids)
+        for ids in map_fr_pt.values():
+            ids_fr_pt.update(ids)
+        assert len(ids_pt_fr) == len(ids_fr_pt), (
+            "Different language order should produce same number of unique IDs"
+        )
+
+    def test_es_inverted_punctuation_in_map(self):
+        """Spanish inverted punctuation (¡, ¿) should be in the map when ES is included."""
+        from piper_train.phonemize.multilingual_id_map import (
+            LANGUAGE_PHONEMES,
+            get_multilingual_id_map,
+        )
+        from piper_train.phonemize.token_mapper import register
+
+        if "es" not in LANGUAGE_PHONEMES:
+            pytest.skip("Spanish not registered")
+
+        id_map = get_multilingual_id_map(["ja", "en", "es"])
+
+        for char in ["¡", "¿"]:
+            mapped = register(char)
+            assert mapped in id_map, (
+                f"Spanish inverted punctuation '{char}' missing from ja+en+es map"
+            )
+
+    def test_fr_typographic_punctuation_in_map(self):
+        """French typographic punctuation (guillemets, dashes, ellipsis) should be in the map."""
+        from piper_train.phonemize.multilingual_id_map import (
+            LANGUAGE_PHONEMES,
+            get_multilingual_id_map,
+        )
+        from piper_train.phonemize.token_mapper import register
+
+        if "fr" not in LANGUAGE_PHONEMES:
+            pytest.skip("French not registered")
+
+        id_map = get_multilingual_id_map(["ja", "en", "fr"])
+
+        fr_punct = ["\u2014", "\u2013", "\u2026", "\u00ab", "\u00bb"]
+        for char in fr_punct:
+            mapped = register(char)
+            assert mapped in id_map, (
+                f"French punctuation '{char}' (U+{ord(char):04X}) missing from ja+en+fr map"
+            )

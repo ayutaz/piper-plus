@@ -25,4 +25,10 @@ FRENCH_PHONEMES: list[str] = [
     # Consonants
     "ɲ",   # gn digraph (montagne, cognac)
     "ʁ",   # French uvular r
+    # Punctuation not in JA/EN inventories
+    "—",   # em dash (U+2014)
+    "–",   # en dash (U+2013)
+    "…",   # horizontal ellipsis (U+2026)
+    "«",   # left-pointing double angle quotation mark (U+00AB)
+    "»",   # right-pointing double angle quotation mark (U+00BB)
 ]
