@@ -22,8 +22,6 @@ libs=(
     "libonnxruntime.so"
     "libespeak-ng.so"
     "libpiper_phonemize.so"
-    "libHTSEngine.so"
-    "libsndfile.so"
 )
 
 all_libs_found=true
@@ -39,7 +37,7 @@ done
 if [ "$all_libs_found" = false ]; then
     echo "Warning: Some libraries missing from ldconfig cache"
     echo "Checking /usr/local/lib..."
-    ls -la /usr/local/lib/ | grep -E "(onnx|espeak|piper|HTS|sndfile)" || true
+    ls -la /usr/local/lib/ | grep -E "(onnx|espeak|piper)" || true
 fi
 
 echo ""
