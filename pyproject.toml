@@ -166,6 +166,8 @@ inline-quotes = "double"
 "src/python/prepare_*.py" = ["PLC0415"]
 # runtime files: 条件付きインポートを許可
 "src/python_run/*" = ["PLC0415"]
+# Docker test scripts: テスト関数内での条件付きインポートを許可
+"docker/**/test.py" = ["PLC0415"]
 
 [tool.setuptools.dynamic]
 version = {file = "VERSION"}
