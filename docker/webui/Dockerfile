@@ -18,7 +18,7 @@ COPY pyproject.toml /app/pyproject.toml
 COPY src/python /app/src/python
 
 # Install piper_train with inference extras + gradio
-RUN uv pip install --system "/app/src/python/[inference]" && \
+RUN uv pip install --system "/app/src/python[inference]" && \
     uv pip install --system "gradio>=4.0"
 
 # Copy WebUI application

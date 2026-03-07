@@ -20,7 +20,7 @@ COPY pyproject.toml /app/pyproject.toml
 COPY src/python/ /app/src/python/
 
 # Install piper_train with inference extras
-RUN uv pip install --system "/app/src/python/[inference]"
+RUN uv pip install --system "/app/src/python[inference]"
 
 # Create directories for models and output
 RUN mkdir -p /app/models /app/output

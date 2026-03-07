@@ -44,7 +44,7 @@ RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
 # PyTorch (CUDA 12.1)
-RUN uv pip install --system \
+RUN uv pip install \
     --extra-index-url https://download.pytorch.org/whl/cu121 \
     "torch==2.2.1+cu121" "torchaudio==2.2.1+cu121" "torchvision==0.17.1+cu121"
 
@@ -53,7 +53,7 @@ COPY src/python /tmp/piper-src/python
 COPY VERSION /tmp/piper-src/VERSION
 
 # Install piper_train with training extras
-RUN uv pip install --system "/tmp/piper-src/python/[train]"
+RUN uv pip install "/tmp/piper-src/python[train]"
 
 # Runtime stage
 FROM nvidia/cuda:12.1.0-cudnn8-runtime-ubuntu22.04
