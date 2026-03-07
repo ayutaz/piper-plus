@@ -12,11 +12,10 @@
 
 ```bash
 # Install WebUI dependencies
-pip install -r src/python_run/requirements_webui.txt
+uv pip install -r src/python_run/requirements_webui.txt
 
 # For training functionality (optional)
-cd src/python
-pip install -r requirements_train.txt
+uv pip install ".[train]"
 ```
 
 ### Running the WebUI
@@ -141,8 +140,8 @@ docker-compose up
 - Model files must have corresponding .onnx.json config files
 
 ### Import errors
-- Install requirements: `pip install -r requirements_webui.txt`
-- For full functionality, install piper: `pip install -e .`
+- Install requirements: `uv pip install -r src/python_run/requirements_webui.txt`
+- For full functionality, install piper: `uv pip install -e .`
 
 ### Port already in use
 - Use a different port: `--port 8080`

@@ -12,15 +12,17 @@ This project uses [Ruff](https://github.com/astral-sh/ruff) for Python linting a
 
 #### Installing Development Dependencies
 
+Dependencies are managed via [uv](https://docs.astral.sh/uv/) and defined as optional-dependencies in `pyproject.toml`:
+
 ```bash
-# For src/python
-pip install -r src/python/requirements_dev.txt
+# Development tools (linting, formatting, type checking)
+uv pip install ".[dev]"
+
+# Test dependencies only
+uv pip install ".[test]"
 
 # For src/python_run
-pip install -r src/python_run/requirements_dev.txt
-
-# For tests
-pip install -r src/python/requirements_test.txt
+uv pip install -r src/python_run/requirements_dev.txt
 ```
 
 #### Running Ruff
@@ -44,7 +46,7 @@ ruff format
 To automatically run Ruff before each commit:
 
 ```bash
-pip install pre-commit
+uv pip install pre-commit
 pre-commit install
 ```
 

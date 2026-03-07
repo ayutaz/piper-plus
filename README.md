@@ -303,17 +303,18 @@ The `MODEL_CARD` file for each voice contains important licensing information. P
 
 ### Dependencies
 
-Piper has different requirements depending on your use case:
+Piper has different requirements depending on your use case.
+Dependencies are managed via [uv](https://docs.astral.sh/uv/) and defined as optional-dependencies in `pyproject.toml`:
 
 ```bash
 # For inference only (using pre-trained models)
-pip install -r requirements.txt
+uv pip install ".[inference]"
 
 # For training custom models
-pip install -r requirements-train.txt
+uv pip install ".[train]"
 
 # For development (includes testing and linting tools)
-pip install -r requirements-dev.txt
+uv pip install ".[dev]"
 ```
 
 ## Quick Start - WebUI
@@ -322,10 +323,10 @@ The easiest way to get started with Piper is using the WebUI:
 
 ```bash
 # Install inference dependencies first
-pip install -r requirements.txt
+uv pip install ".[inference]"
 
 # Install WebUI dependencies
-pip install gradio>=4.0.0
+uv pip install -r src/python_run/requirements_webui.txt
 
 # Run WebUI
 cd src/python_run

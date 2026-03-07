@@ -26,7 +26,7 @@ echo 'Installing Python dependencies'
 pip3 install --upgrade pip
 pip3 install --upgrade wheel setuptools
 
-pip3 install -r "${base_dir}/requirements.txt"
+uv pip install -r "${base_dir}/requirements.txt"
 
 # -----------------------------------------------------------------------------
 

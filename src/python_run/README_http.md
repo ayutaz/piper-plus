@@ -3,7 +3,7 @@
 Install the requirements into your virtual environment:
 
 ```sh
-.venv/bin/pip3 install -r requirements_http.txt
+uv pip install -r requirements_http.txt
 ```
 
 Run the web server:

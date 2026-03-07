@@ -175,7 +175,8 @@ jobs:
 
       - name: Run Python linting
         run: |
-          pip install ruff
+          pip install --no-cache-dir uv
+          uv pip install --system ruff
           ruff check .
           ruff format --check .
 

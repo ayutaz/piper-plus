@@ -51,7 +51,7 @@ git clone https://github.com/ayutaz/piper-plus.git
 cd piper-plus/huggingface-space
 
 # Install requirements
-pip install -r requirements.txt
+uv pip install -r requirements.txt
 
 # Run the app
 python app.py
