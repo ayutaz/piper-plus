@@ -36,8 +36,8 @@ RUN mkdir -p build && cd build && \
     ninja -j$(nproc) && \
     ninja install
 
-# Stage 2: Runtime (minimal with CUDA support)
-FROM nvidia/cuda:12.4.1-cudnn-runtime-ubuntu22.04
+# Stage 2: Runtime (CPU only)
+FROM ubuntu:22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
@@ -45,22 +45,11 @@ ENV LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
 # Install minimal runtime dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libgomp1 \
-    ca-certificates \
-    wget \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy build artifacts from builder
+# Copy build artifacts from builder (includes CPU ONNX Runtime built via ExternalProject)
 COPY --from=builder /install/ /usr/local/
-
-# Install ONNX Runtime GPU (auto-detect version to match builder)
-RUN ONNX_VERSION=$(ls /usr/local/lib/libonnxruntime.so.* 2>/dev/null | grep -oP '\d+\.\d+\.\d+' | head -1) && \
-    echo "Detected ONNX Runtime version: $ONNX_VERSION" && \
-    cd /tmp && \
-    wget -q "https://github.com/microsoft/onnxruntime/releases/download/v${ONNX_VERSION}/onnxruntime-linux-x64-gpu-${ONNX_VERSION}.tgz" && \
-    tar -xzf "onnxruntime-linux-x64-gpu-${ONNX_VERSION}.tgz" && \
-    cp onnxruntime-linux-x64-gpu-${ONNX_VERSION}/lib/*.so* /usr/local/lib/ && \
-    rm -rf onnxruntime-linux-x64-gpu-${ONNX_VERSION}* && \
-    ldconfig
+RUN ldconfig
 
 # Create directories
 RUN mkdir -p /app/models /app/output /app/config

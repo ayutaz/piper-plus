@@ -4,7 +4,6 @@ set -e
 # Build script for Piper C++ in Docker environment
 
 echo "=== Piper C++ Build Script ==="
-echo "CUDA Version: $(nvcc --version | grep release | awk '{print $5}' | sed 's/,//')"
 echo ""
 
 # Set build type
@@ -26,10 +25,7 @@ cmake /workspace \
     -G Ninja \
     -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
     -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
-    -DBUILD_TESTS=ON \
-    -DUSE_CUDA=ON \
-    -DCUDA_ARCH_LIST="70;75;80;86;89;90" \
-    -DCMAKE_CUDA_COMPILER=/usr/local/cuda/bin/nvcc
+    -DBUILD_TESTS=ON
 
 # Build
 echo "Building..."

@@ -2,16 +2,7 @@
 set -e
 
 # Set up environment
-export CUDA_HOME=/usr/local/cuda
-export PATH=$CUDA_HOME/bin:$PATH
-export LD_LIBRARY_PATH=$CUDA_HOME/lib64:/usr/local/lib:$LD_LIBRARY_PATH
-
-# Check if running with NVIDIA GPU
-if command -v nvidia-smi &> /dev/null; then
-    echo "=== GPU Information ==="
-    nvidia-smi --query-gpu=name,driver_version,memory.total --format=csv,noheader
-    echo ""
-fi
+export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
 
 # Check piper installation
 if command -v piper &> /dev/null; then

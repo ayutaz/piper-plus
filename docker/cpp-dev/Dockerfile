@@ -1,15 +1,8 @@
-# C++ Development Environment for Piper TTS
-FROM nvidia/cuda:12.4.1-cudnn-devel-ubuntu22.04
-
-# ONNX Runtime version (cpp-inference uses auto-detection from CMake ExternalProject;
-# this dev image pre-installs manually, so keep in sync when updating)
-ARG ONNX_RUNTIME_VERSION=1.17.1
+# C++ Development Environment for Piper TTS (CPU-only)
+FROM ubuntu:22.04
 
 # Set environment variables
 ENV DEBIAN_FRONTEND=noninteractive
-ENV CUDA_HOME=/usr/local/cuda
-ENV PATH=$CUDA_HOME/bin:$PATH
-ENV LD_LIBRARY_PATH=$CUDA_HOME/lib64:$LD_LIBRARY_PATH
 
 # Install system dependencies and development tools
 RUN apt-get update && apt-get install -y \
@@ -39,14 +32,6 @@ RUN apt-get update && apt-get install -y \
     python3.11-dev \
     python3-pip \
     && rm -rf /var/lib/apt/lists/*
-
-# Install ONNX Runtime GPU
-RUN wget -q https://github.com/microsoft/onnxruntime/releases/download/v${ONNX_RUNTIME_VERSION}/onnxruntime-linux-x64-gpu-${ONNX_RUNTIME_VERSION}.tgz && \
-    tar -xzf onnxruntime-linux-x64-gpu-${ONNX_RUNTIME_VERSION}.tgz && \
-    cp -r onnxruntime-linux-x64-gpu-${ONNX_RUNTIME_VERSION}/include/* /usr/local/include/ && \
-    cp -r onnxruntime-linux-x64-gpu-${ONNX_RUNTIME_VERSION}/lib/* /usr/local/lib/ && \
-    rm -rf onnxruntime-linux-x64-gpu-${ONNX_RUNTIME_VERSION}* && \
-    ldconfig
 
 # Install espeak-ng dependencies and build from source
 RUN apt-get update && apt-get install -y \
@@ -129,10 +114,8 @@ RUN chmod +x /workspace/test.sh
 RUN echo "=== Running build-time tests ===" && \
     echo "Testing build tools..." && \
     which gcc && which g++ && which cmake && \
-    echo "Testing CUDA (if available)..." && \
-    (which nvcc && nvcc --version || echo "CUDA not required in CI") && \
     echo "Testing libraries..." && \
-    ldconfig -p | grep -E "(onnxruntime|espeak|HTSEngine)" || echo "Some libraries in /usr/local/lib" && \
+    ldconfig -p | grep -E "(espeak|HTSEngine)" || echo "Some libraries in /usr/local/lib" && \
     echo "=== Build-time tests passed ==="
 
 # Ensure we're in a valid directory
