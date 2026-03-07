@@ -75,3 +75,17 @@ create_comprehensive_*.py
 add_missing_*.py
 retrain_*.py
 comprehensive_*.py
+
+# Local working files
+checkpoints/
+output/
+pip-test/
+upiper_comparison_samples/
+compare_phonemes.txt
+phoneme_map.txt
+training_phonemes.txt
+id_check.txt
+sh_check.txt
+generate_upiper_samples.py
+nul
+test/models/tsukuyomi-chan/
