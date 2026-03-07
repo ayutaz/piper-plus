@@ -1,4 +1,4 @@
-# C++ Training/Development Environment for Piper TTS
+# C++ Development Environment for Piper TTS
 FROM nvidia/cuda:12.4.1-cudnn-devel-ubuntu22.04
 
 # Set environment variables
@@ -113,11 +113,11 @@ RUN echo "export CC=clang" >> ~/.bashrc && \
 RUN mkdir -p /workspace/build /workspace/.ccache
 
 # Copy build scripts
-COPY docker/cpp-train/build.sh /workspace/
+COPY docker/cpp-dev/build.sh /workspace/
 RUN chmod +x /workspace/build.sh
 
 # Copy test script
-COPY docker/cpp-train/test.sh /workspace/
+COPY docker/cpp-dev/test.sh /workspace/
 RUN chmod +x /workspace/test.sh
 
 # Run tests during build to verify the container is working
