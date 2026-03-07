@@ -242,6 +242,8 @@ if(NOT DEFINED PIPER_PHONEMIZE_DIR)
     set(PIPER_PHONEMIZE_SHARED_LIBS OFF)
   endif()
   
+  # NOTE: Using master branch HEAD. For reproducible builds, pin to a specific commit:
+  # URL "https://github.com/rhasspy/piper-phonemize/archive/<commit-hash>.zip"
   ExternalProject_Add(
     piper_phonemize_external
     PREFIX "${CMAKE_CURRENT_BINARY_DIR}/p"

@@ -71,6 +71,8 @@ FROM dependencies AS builder
 WORKDIR /build
 
 # ccacheの設定（ARM64ビルド用に増量）
+# TIP: For faster rebuilds with BuildKit, use cache mounts:
+# RUN --mount=type=cache,target=/tmp/ccache cmake --build build ...
 ENV CCACHE_DIR=/tmp/ccache
 ENV CCACHE_MAXSIZE=2G
 ENV CCACHE_COMPRESS=1
