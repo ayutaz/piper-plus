@@ -54,7 +54,11 @@ def text_to_phoneme_ids_and_prosody(
             for _ in ids:
                 if prosody_info is not None:
                     prosody_features.append(
-                        {"a1": prosody_info.a1, "a2": prosody_info.a2, "a3": prosody_info.a3}
+                        {
+                            "a1": prosody_info.a1,
+                            "a2": prosody_info.a2,
+                            "a3": prosody_info.a3,
+                        }
                     )
                 else:
                     prosody_features.append(None)
@@ -100,7 +104,12 @@ class PiperInferenceEngine:
         self.has_prosody = "prosody_features" in input_names
         self.has_sid = "sid" in input_names
 
-        _LOGGER.info("Model loaded: %s (prosody=%s, sid=%s)", model_path, self.has_prosody, self.has_sid)
+        _LOGGER.info(
+            "Model loaded: %s (prosody=%s, sid=%s)",
+            model_path,
+            self.has_prosody,
+            self.has_sid,
+        )
 
     def synthesize(
         self,
@@ -113,7 +122,9 @@ class PiperInferenceEngine:
     ) -> np.ndarray:
         """Synthesize text to int16 audio array."""
         phoneme_ids, prosody_features_data = text_to_phoneme_ids_and_prosody(
-            text, self.phoneme_id_map, language=language,
+            text,
+            self.phoneme_id_map,
+            language=language,
         )
 
         text_input = np.expand_dims(np.array(phoneme_ids, dtype=np.int64), 0)
@@ -150,7 +161,9 @@ class PiperInferenceEngine:
 
         duration_sec = len(audio) / self.sample_rate
         rtf = elapsed / duration_sec if duration_sec > 0 else 0.0
-        _LOGGER.info("Synthesized %.2fs audio in %.2fs (RTF=%.2f)", duration_sec, elapsed, rtf)
+        _LOGGER.info(
+            "Synthesized %.2fs audio in %.2fs (RTF=%.2f)", duration_sec, elapsed, rtf
+        )
 
         return audio
 
@@ -163,7 +176,9 @@ def main():
     parser.add_argument("--text", help="Text to synthesize")
     parser.add_argument("--output", default="output.wav", help="Output WAV path")
     parser.add_argument("--speaker-id", type=int, default=0, help="Speaker ID")
-    parser.add_argument("--language", default="ja", choices=["ja", "en"], help="Language")
+    parser.add_argument(
+        "--language", default="ja", choices=["ja", "en"], help="Language"
+    )
     parser.add_argument("--noise-scale", type=float, default=0.667)
     parser.add_argument("--length-scale", type=float, default=1.0)
     parser.add_argument("--noise-w", type=float, default=0.8)

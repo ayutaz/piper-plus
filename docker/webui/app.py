@@ -124,12 +124,8 @@ def create_ui(model_dir: str, output_dir: str):
                 speaker_id = gr.Number(label="Speaker ID", value=0, precision=0)
 
                 with gr.Accordion("Advanced", open=False):
-                    noise_scale = gr.Slider(
-                        0.0, 1.0, value=0.667, label="Noise Scale"
-                    )
-                    length_scale = gr.Slider(
-                        0.1, 3.0, value=1.0, label="Length Scale"
-                    )
+                    noise_scale = gr.Slider(0.0, 1.0, value=0.667, label="Noise Scale")
+                    length_scale = gr.Slider(0.1, 3.0, value=1.0, label="Length Scale")
                     noise_scale_w = gr.Slider(
                         0.0, 1.0, value=0.8, label="Noise Scale W"
                     )
