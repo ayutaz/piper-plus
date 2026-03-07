@@ -575,18 +575,19 @@ class SpeakerBalancedBatchSampler:
 
     def __len__(self) -> int:
         if self.language_group_balance:
-            # N言語グループ均等サンプリング: 各言語グループの制約で計算
+            # N言語グループ均等サンプリング: 各言語の総利用可能バッチ数で推定
+            # __iter__ は話者が使い切られても他の話者が残っていれば継続するため、
+            # 各言語の「全話者の合計利用可能サンプル数 / slots」で推定する
             lang_batches_list = []
             for lang_id, slots in self.lang_slots.items():
                 speakers_in_lang = self.lang_groups.get(lang_id, [])
                 if not speakers_in_lang or slots == 0:
                     continue
-                min_samples = min(
-                    len(self.speaker_to_indices[s]) for s in speakers_in_lang
+                total_usable = sum(
+                    (len(self.speaker_to_indices[s]) // self.samples_per_speaker)
+                    for s in speakers_in_lang
                 )
-                batches = (
-                    len(speakers_in_lang) * (min_samples // self.samples_per_speaker)
-                ) // slots
+                batches = total_usable // slots
                 lang_batches_list.append(batches)
             if lang_batches_list:
                 total_batches = min(lang_batches_list)
