@@ -19,6 +19,39 @@ preprocess = [
     "piper-phonemize>=1.1.0",
 ]
 
+inference = [
+    "onnxruntime>=1.17",
+    "soundfile>=0.12",
+    "pyopenjtalk-plus",
+    "g2p-en>=2.1.0",
+    "fastapi>=0.110",
+    "uvicorn>=0.27",
+]
+
+train = [
+    "scipy>=1.12",
+    "librosa>=0.10",
+    "soundfile>=0.12",
+    "pytorch-lightning>=2.0",
+    "torchmetrics>=1.0",
+    "transformers>=4.38",
+    "onnx>=1.15",
+    "onnxruntime-gpu>=1.17",
+    "pyopenjtalk-plus",
+    "mecab-python3>=1.0",
+    "unidic-lite>=1.0",
+    "g2p-en>=2.1.0",
+    "tensorboard>=2.16",
+    "wandb>=0.16",
+    "tqdm>=4.66",
+    "einops>=0.7",
+    "numba>=0.59",
+    "matplotlib>=3.8",
+    "seaborn>=0.13",
+    "pyyaml>=6.0",
+    "onnxsim-prebuilt",
+]
+
 dev = [
     "black==23.11.0",
     "flake8==6.1.0",

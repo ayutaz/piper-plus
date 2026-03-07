@@ -192,8 +192,9 @@ RUN echo "/build/install/lib" > /etc/ld.so.conf.d/piper.conf && \
     ldconfig || true && \
     if [ -d /build/install/lib ]; then \
         cd /build/install/lib && \
-        if [ -f libonnxruntime.so.1.14.1 ]; then \
-            ln -sf libonnxruntime.so.1.14.1 libonnxruntime.so.1 && \
+        ONNX_SO=$(ls libonnxruntime.so.1.* 2>/dev/null | head -1) && \
+        if [ -n "$ONNX_SO" ]; then \
+            ln -sf "$ONNX_SO" libonnxruntime.so.1 && \
             ln -sf libonnxruntime.so.1 libonnxruntime.so; \
         fi \
     fi

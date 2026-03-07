@@ -304,18 +304,10 @@ jobs:
           cd src/python
           # Install test requirements first
           pip install -r requirements_test.txt
-          # Install core dependencies manually to avoid conflicts
-          pip install numpy scipy soundfile librosa onnxruntime pytest pytest-cov
+          # Install piper_train with inference extras
+          pip install -e ".[inference]"
           # For pyopenjtalk-plus dependencies (optional)
           pip install sudachipy sudachidict_core || echo "Japanese dependencies optional"
-          # Install requirements, filtering out problematic ones on Windows
-          if [ "${{ runner.os }}" == "Windows" ]; then
-            grep -v "piper-phonemize" requirements.txt | pip install -r /dev/stdin || true
-          else
-            pip install -r requirements.txt || true
-          fi
-          # Install package in development mode
-          pip install -e .
       
       - name: Build C++ executable (Windows)
         if: runner.os == 'Windows'

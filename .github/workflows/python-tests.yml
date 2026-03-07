@@ -47,9 +47,7 @@ jobs:
         # Install test dependencies
         pip install -r requirements_test.txt
         # Install training dependencies including pyopenjtalk-plus
-        pip install -r ../../requirements-train.txt
-        # Install piper_train
-        pip install -e .
+        pip install -e ".[train]"
         echo "Windows tests will run with pyopenjtalk-plus support"
 
     - name: Install PyTorch for all tests (Windows)
@@ -64,9 +62,7 @@ jobs:
         python -m pip install --upgrade pip
         cd src/python
         pip install -r requirements_test.txt
-        pip install -r ../../requirements-train.txt
-        pip install cython
-        pip install -e .
+        pip install -e ".[train]"
 
     - name: Install PyTorch for all tests (Unix)
       if: runner.os != 'Windows'

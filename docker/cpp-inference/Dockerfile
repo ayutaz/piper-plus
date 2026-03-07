@@ -68,15 +68,15 @@ RUN cd /tmp && \
     wget -q http://downloads.sourceforge.net/hts-engine/hts_engine_API-1.10.tar.gz && \
     tar -xzf hts_engine_API-1.10.tar.gz && \
     cd hts_engine_API-1.10 && \
-    ./configure --prefix=/usr/local && \
+    ./configure --prefix=/usr/local --enable-shared && \
     make -j$(nproc) && \
     make install && \
     cd .. && \
-    # OpenJTalk  
+    # OpenJTalk
     wget -q http://downloads.sourceforge.net/open-jtalk/open_jtalk-1.11.tar.gz && \
     tar -xzf open_jtalk-1.11.tar.gz && \
     cd open_jtalk-1.11 && \
-    ./configure --prefix=/usr/local --with-hts-engine-header-path=/usr/local/include --with-hts-engine-library-path=/usr/local/lib && \
+    ./configure --prefix=/usr/local --enable-shared --with-hts-engine-header-path=/usr/local/include --with-hts-engine-library-path=/usr/local/lib && \
     make -j$(nproc) && \
     make install && \
     cd / && rm -rf /tmp/*

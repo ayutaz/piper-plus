@@ -1,6 +1,9 @@
 # WebUI Docker image for Piper TTS
 FROM python:3.11-slim
 
+# Install uv
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+
 # Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libsndfile1 \
@@ -14,14 +17,9 @@ COPY VERSION /app/VERSION
 COPY pyproject.toml /app/pyproject.toml
 COPY src/python /app/src/python
 
-# Install piper_train and dependencies
-RUN cd /app/src/python && pip install --no-cache-dir . && \
-    pip install --no-cache-dir \
-    "onnxruntime>=1.17" \
-    "pyopenjtalk-plus" \
-    "g2p-en>=2.1.0" \
-    "gradio>=4.0" \
-    "soundfile>=0.12"
+# Install piper_train with inference extras + gradio
+RUN uv pip install --system "/app/src/python/[inference]" && \
+    uv pip install --system "gradio>=4.0"
 
 # Copy WebUI application
 COPY docker/webui/app.py /app/app.py

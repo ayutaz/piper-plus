@@ -36,46 +36,24 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN update-alternatives --install /usr/bin/python python /usr/bin/python3.11 1 && \
     update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1
 
-# Upgrade pip
-RUN python -m pip install --upgrade pip setuptools wheel
+# Install uv
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
 # Create virtual environment
 RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
-# Copy requirements files
-COPY docker/python-train/requirements-train.txt /tmp/
-COPY docker/python-train/requirements-torch.txt /tmp/
-
-# Install PyTorch packages first with CUDA support
-RUN pip install --no-cache-dir -r /tmp/requirements-torch.txt && \
-    pip cache purge && \
-    rm -rf ~/.cache/pip/*
-
-# Install other Python dependencies in virtual environment
-RUN pip install --no-cache-dir -r /tmp/requirements-train.txt && \
-    pip cache purge && \
-    rm -rf ~/.cache/pip/*
+# PyTorch (CUDA 12.1)
+RUN uv pip install --system \
+    --extra-index-url https://download.pytorch.org/whl/cu121 \
+    "torch==2.2.1+cu121" "torchaudio==2.2.1+cu121" "torchvision==0.17.1+cu121"
 
 # Copy source code for piper-train installation
 COPY src/python /tmp/piper-src/python
+COPY VERSION /tmp/piper-src/VERSION
 
-# Install piper-train from local source
-RUN cd /tmp/piper-src/python && \
-    pip install --no-cache-dir -e . && \
-    pip cache purge && \
-    rm -rf ~/.cache/pip/*
-
-# Install additional tools
-RUN pip install --no-cache-dir \
-    tensorboard \
-    wandb \
-    matplotlib \
-    seaborn \
-    jupyter \
-    ipywidgets && \
-    pip cache purge && \
-    rm -rf ~/.cache/pip/*
+# Install piper_train with training extras
+RUN uv pip install --system "/tmp/piper-src/python/[train]"
 
 # Runtime stage
 FROM nvidia/cuda:12.1.0-cudnn8-runtime-ubuntu22.04

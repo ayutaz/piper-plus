@@ -3,6 +3,9 @@ FROM python:3.11-slim
 
 ENV PYTHONUNBUFFERED=1
 
+# Install uv
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+
 # System dependencies (libsndfile for soundfile)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libsndfile1 \
@@ -10,18 +13,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-# Copy requirements and install Python dependencies
-COPY docker/python-inference/requirements-inference.txt /app/
-RUN pip install --no-cache-dir -r requirements-inference.txt
-
 # Copy source tree for piper_train install
 # setup.py reads ../../VERSION relative to src/python/
 COPY VERSION /app/VERSION
 COPY pyproject.toml /app/pyproject.toml
 COPY src/python/ /app/src/python/
 
-# Install piper_train package
-RUN pip install --no-cache-dir /app/src/python/
+# Install piper_train with inference extras
+RUN uv pip install --system "/app/src/python/[inference]"
 
 # Create directories for models and output
 RUN mkdir -p /app/models /app/output
