@@ -122,15 +122,12 @@ RUN mkdir -p /workspace/datasets /workspace/checkpoints /workspace/logs
 # Expose ports for tensorboard and jupyter
 EXPOSE 6006 8888
 
-# Copy test script
-COPY docker/python-train/test.py /test.py
-
 # Run tests during build to verify the container is working
 RUN echo "=== Running build-time tests ===" && \
     python --version && \
     python -c "import torch; print(f'PyTorch: {torch.__version__}')" && \
-    # piper_train is installed in editable mode, so check if it exists
-    cd /opt/piper/python && python -c "import piper_train; print('piper_train accessible')" || echo "piper_train will be available at runtime" && \
+    python -c "import pytorch_lightning; print(f'PyTorch Lightning: {pytorch_lightning.__version__}')" && \
+    cd /opt/piper/python && python -c "import piper_train; print('piper_train accessible')" && \
     echo "=== Build-time tests passed ==="
 
 # Ensure we have a valid working directory

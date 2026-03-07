@@ -1,5 +1,5 @@
 # ========== BASE STAGE ==========
-FROM debian:bullseye AS base
+FROM debian:bookworm AS base
 ARG TARGETARCH
 ARG TARGETVARIANT
 

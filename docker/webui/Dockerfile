@@ -2,35 +2,39 @@
 FROM python:3.11-slim
 
 # Install system dependencies
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     libsndfile1 \
-    git \
     && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
 WORKDIR /app
 
-# Copy requirements first for better caching
-COPY src/python_run/requirements.txt /tmp/requirements.txt
-COPY src/python_run/requirements_webui.txt /tmp/requirements_webui.txt
+# Copy source for piper_train installation
+COPY VERSION /app/VERSION
+COPY pyproject.toml /app/pyproject.toml
+COPY src/python /app/src/python
 
-# Install Python dependencies
-RUN pip install --no-cache-dir -r /tmp/requirements.txt && \
-    pip install --no-cache-dir -r /tmp/requirements_webui.txt
+# Install piper_train and dependencies
+RUN cd /app/src/python && pip install --no-cache-dir . && \
+    pip install --no-cache-dir \
+    "onnxruntime>=1.17" \
+    "pyopenjtalk-plus" \
+    "g2p-en>=2.1.0" \
+    "gradio>=4.0" \
+    "soundfile>=0.12"
 
-# Copy the application code
-COPY src/python_run /app/python_run
+# Copy WebUI application
+COPY docker/webui/app.py /app/app.py
 
 # Create models directory
-RUN mkdir -p /models
+RUN mkdir -p /models /output
 
 # Expose Gradio default port
 EXPOSE 7860
 
 # Set environment variables
-ENV PYTHONPATH=/app
 ENV GRADIO_SERVER_NAME=0.0.0.0
 ENV GRADIO_SERVER_PORT=7860
 
 # Run the WebUI
-CMD ["python", "-m", "python_run.piper.webui", "--data-dir", "/models", "--host", "0.0.0.0"]
+CMD ["python", "/app/app.py", "--model-dir", "/models", "--output-dir", "/output"]
