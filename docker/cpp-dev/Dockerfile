@@ -1,6 +1,10 @@
 # C++ Development Environment for Piper TTS
 FROM nvidia/cuda:12.4.1-cudnn-devel-ubuntu22.04
 
+# ONNX Runtime version (cpp-inference uses auto-detection from CMake ExternalProject;
+# this dev image pre-installs manually, so keep in sync when updating)
+ARG ONNX_RUNTIME_VERSION=1.17.1
+
 # Set environment variables
 ENV DEBIAN_FRONTEND=noninteractive
 ENV CUDA_HOME=/usr/local/cuda
@@ -36,12 +40,13 @@ RUN apt-get update && apt-get install -y \
     python3-pip \
     && rm -rf /var/lib/apt/lists/*
 
-# Install ONNX Runtime
-RUN wget https://github.com/microsoft/onnxruntime/releases/download/v1.17.1/onnxruntime-linux-x64-gpu-1.17.1.tgz && \
-    tar -xzf onnxruntime-linux-x64-gpu-1.17.1.tgz && \
-    cp -r onnxruntime-linux-x64-gpu-1.17.1/include/* /usr/local/include/ && \
-    cp -r onnxruntime-linux-x64-gpu-1.17.1/lib/* /usr/local/lib/ && \
-    rm -rf onnxruntime-linux-x64-gpu-1.17.1*
+# Install ONNX Runtime GPU
+RUN wget -q https://github.com/microsoft/onnxruntime/releases/download/v${ONNX_RUNTIME_VERSION}/onnxruntime-linux-x64-gpu-${ONNX_RUNTIME_VERSION}.tgz && \
+    tar -xzf onnxruntime-linux-x64-gpu-${ONNX_RUNTIME_VERSION}.tgz && \
+    cp -r onnxruntime-linux-x64-gpu-${ONNX_RUNTIME_VERSION}/include/* /usr/local/include/ && \
+    cp -r onnxruntime-linux-x64-gpu-${ONNX_RUNTIME_VERSION}/lib/* /usr/local/lib/ && \
+    rm -rf onnxruntime-linux-x64-gpu-${ONNX_RUNTIME_VERSION}* && \
+    ldconfig
 
 # Install espeak-ng dependencies and build from source
 RUN apt-get update && apt-get install -y \
