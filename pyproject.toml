@@ -36,7 +36,7 @@ train = [
     "torchmetrics>=1.0",
     "transformers>=4.38",
     "onnx>=1.15",
-    "onnxruntime-gpu>=1.17",
+    "onnxruntime>=1.17",
     "pyopenjtalk-plus",
     "mecab-python3>=1.0",
     "unidic-lite>=1.0",

@@ -76,6 +76,7 @@ jobs:
       if: runner.os != 'Windows'
       run: |
         cd src/python
+        uv pip install --system cython
         python piper_train/vits/monotonic_align/setup.py build_ext --inplace
 
     - name: Run unit tests (Windows)
