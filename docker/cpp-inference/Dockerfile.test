@@ -1,0 +1,49 @@
+# Test Dockerfile for C++ unit tests
+# Builds with -DBUILD_TESTS=ON and runs ctest
+
+FROM ubuntu:22.04 AS builder
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    cmake \
+    git \
+    wget \
+    ninja-build \
+    pkg-config \
+    ca-certificates \
+    autoconf automake libtool \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /workspace
+
+# Copy build files and source code
+COPY CMakeLists.txt VERSION ./
+COPY cmake/ cmake/
+COPY src/cpp/ src/cpp/
+
+# Build piper with tests enabled
+# Use -k0 to continue building even if some targets fail (e.g. test_prosody_inference needs onnxruntime headers)
+RUN mkdir -p build && cd build && \
+    cmake .. \
+        -G Ninja \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DBUILD_TESTS=ON && \
+    ninja -k0 -j$(nproc) 2>&1 | tee /tmp/build.log; \
+    echo "=== BUILD EXIT CODE: $? ==="
+
+# Show what was built
+RUN echo "=== BUILT TEST EXECUTABLES ===" && \
+    find /workspace/build/src/cpp/tests -type f -executable 2>/dev/null || echo "No test executables found" && \
+    echo "=== OTHER EXECUTABLES ===" && \
+    find /workspace/build -maxdepth 1 -type f -executable 2>/dev/null || echo "No top-level executables found"
+
+# Show build errors summary
+RUN echo "=== BUILD ERRORS ===" && \
+    grep -E "FAILED:|error:" /tmp/build.log 2>/dev/null || echo "No build errors found"
+
+# Run tests - allow failure to see results
+RUN cd build && ctest --output-on-failure --timeout 60 2>&1; \
+    echo "=== TEST EXIT CODE: $? ==="
