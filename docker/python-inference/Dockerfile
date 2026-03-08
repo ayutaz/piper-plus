@@ -15,8 +15,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && ln -sf /usr/bin/python3.11 /usr/bin/python \
     && rm -rf /var/lib/apt/lists/*
 
-# Install uv
-RUN pip install --no-cache-dir --break-system-packages uv
+# Install uv (Ubuntu 22.04's pip doesn't support --break-system-packages)
+RUN pip install --no-cache-dir uv
 
 WORKDIR /app
 
