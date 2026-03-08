@@ -27,22 +27,9 @@ fi
 
 echo ""
 
-# Test 2: Check CUDA
-echo "--- CUDA Test ---"
-if command -v nvcc &> /dev/null; then
-    echo "✓ CUDA compiler: $(nvcc --version | grep release | awk '{print $5}' | sed 's/,//')"
-    echo "✓ CUDA home: $CUDA_HOME"
-else
-    echo "⚠ CUDA compiler not found (this is expected in CI environment)"
-    echo "  Running in CPU-only mode"
-fi
-
-echo ""
-
-# Test 3: Check libraries
+# Test 2: Check libraries
 echo "--- Library Test ---"
 libs=(
-    "onnxruntime"
     "espeak-ng"
     "HTSEngine"
     "OpenJTalk"
@@ -65,7 +52,7 @@ done
 
 echo ""
 
-# Test 4: Check phonemizers
+# Test 3: Check phonemizers
 echo "--- Phonemizer Test ---"
 if command -v piper_phonemize &> /dev/null; then
     echo "✓ piper_phonemize available"
@@ -87,7 +74,7 @@ fi
 
 echo ""
 
-# Test 5: Simple build test
+# Test 4: Simple build test
 echo "--- Build Test ---"
 cat > /tmp/test_build.cpp << 'EOF'
 #include <iostream>
@@ -110,7 +97,7 @@ rm -f /tmp/test_build.cpp /tmp/test_build
 
 echo ""
 
-# Test 6: CMake test
+# Test 5: CMake test
 echo "--- CMake Test ---"
 mkdir -p /tmp/cmake_test && cd /tmp/cmake_test
 cat > CMakeLists.txt << 'EOF'

@@ -1,11 +1,8 @@
-# C++ Training/Development Environment for Piper TTS
-FROM nvidia/cuda:12.4.1-cudnn-devel-ubuntu22.04
+# C++ Development Environment for Piper TTS (CPU-only)
+FROM ubuntu:22.04
 
 # Set environment variables
 ENV DEBIAN_FRONTEND=noninteractive
-ENV CUDA_HOME=/usr/local/cuda
-ENV PATH=$CUDA_HOME/bin:$PATH
-ENV LD_LIBRARY_PATH=$CUDA_HOME/lib64:$LD_LIBRARY_PATH
 
 # Install system dependencies and development tools
 RUN apt-get update && apt-get install -y \
@@ -35,13 +32,6 @@ RUN apt-get update && apt-get install -y \
     python3.11-dev \
     python3-pip \
     && rm -rf /var/lib/apt/lists/*
-
-# Install ONNX Runtime
-RUN wget https://github.com/microsoft/onnxruntime/releases/download/v1.17.1/onnxruntime-linux-x64-gpu-1.17.1.tgz && \
-    tar -xzf onnxruntime-linux-x64-gpu-1.17.1.tgz && \
-    cp -r onnxruntime-linux-x64-gpu-1.17.1/include/* /usr/local/include/ && \
-    cp -r onnxruntime-linux-x64-gpu-1.17.1/lib/* /usr/local/lib/ && \
-    rm -rf onnxruntime-linux-x64-gpu-1.17.1*
 
 # Install espeak-ng dependencies and build from source
 RUN apt-get update && apt-get install -y \
@@ -113,21 +103,19 @@ RUN echo "export CC=clang" >> ~/.bashrc && \
 RUN mkdir -p /workspace/build /workspace/.ccache
 
 # Copy build scripts
-COPY docker/cpp-train/build.sh /workspace/
+COPY docker/cpp-dev/build.sh /workspace/
 RUN chmod +x /workspace/build.sh
 
 # Copy test script
-COPY docker/cpp-train/test.sh /workspace/
+COPY docker/cpp-dev/test.sh /workspace/
 RUN chmod +x /workspace/test.sh
 
 # Run tests during build to verify the container is working
 RUN echo "=== Running build-time tests ===" && \
     echo "Testing build tools..." && \
     which gcc && which g++ && which cmake && \
-    echo "Testing CUDA (if available)..." && \
-    (which nvcc && nvcc --version || echo "CUDA not required in CI") && \
     echo "Testing libraries..." && \
-    ldconfig -p | grep -E "(onnxruntime|espeak|HTSEngine)" || echo "Some libraries in /usr/local/lib" && \
+    ldconfig -p | grep -E "(espeak|HTSEngine)" || echo "Some libraries in /usr/local/lib" && \
     echo "=== Build-time tests passed ==="
 
 # Ensure we're in a valid directory

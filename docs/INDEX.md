@@ -58,4 +58,3 @@
 
 ## 🌐 Additional Resources
 - [Competitive Analysis](competitive-analysis/) - Market analysis
-- [Archive](archive/) - Historical documentation

@@ -103,15 +103,29 @@ def main():
         default=0,
         help="Speaker ID for multi-speaker models (default: 0)",
     )
+    parser.add_argument(
+        "--device",
+        choices=["auto", "cpu", "gpu"],
+        default="auto",
+        help="Device to run inference on (default: auto)",
+    )
     args = parser.parse_args()
 
     args.output_dir = Path(args.output_dir)
     args.output_dir.mkdir(parents=True, exist_ok=True)
 
     sess_options = onnxruntime.SessionOptions()
+    if args.device == "cpu":
+        providers = ["CPUExecutionProvider"]
+    else:  # "auto" or "gpu"
+        providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
     _LOGGER.debug("Loading model from %s", args.model)
-    model = onnxruntime.InferenceSession(str(args.model), sess_options=sess_options)
-    _LOGGER.info("Loaded model from %s", args.model)
+    model = onnxruntime.InferenceSession(
+        str(args.model), sess_options=sess_options, providers=providers
+    )
+    _LOGGER.info(
+        "Loaded model from %s (providers: %s)", args.model, model.get_providers()
+    )
 
     # Check if model supports prosody features
     input_names = [inp.name for inp in model.get_inputs()]

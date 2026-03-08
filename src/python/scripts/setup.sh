@@ -4,8 +4,11 @@ set -eo pipefail
 # Directory of *this* script
 this_dir="$( cd "$( dirname "$0" )" && pwd )"
 
-# Base directory of repo
+# Base directory of repo (src/python)
 base_dir="$(realpath "${this_dir}/..")"
+
+# Repository root
+repo_root="$(realpath "${base_dir}/../..")"
 
 # Path to virtual environment
 : "${venv:=${base_dir}/.venv}"
@@ -24,9 +27,9 @@ source "${venv}/bin/activate"
 # Install Python dependencies
 echo 'Installing Python dependencies'
 pip3 install --upgrade pip
-pip3 install --upgrade wheel setuptools
+pip3 install --upgrade wheel setuptools uv
 
-pip3 install -r "${base_dir}/requirements.txt"
+uv pip install "${base_dir}[train]"
 
 # -----------------------------------------------------------------------------
 

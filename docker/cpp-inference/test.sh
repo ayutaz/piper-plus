@@ -22,8 +22,6 @@ libs=(
     "libonnxruntime.so"
     "libespeak-ng.so"
     "libpiper_phonemize.so"
-    "libHTSEngine.so"
-    "libsndfile.so"
 )
 
 all_libs_found=true
@@ -39,7 +37,7 @@ done
 if [ "$all_libs_found" = false ]; then
     echo "Warning: Some libraries missing from ldconfig cache"
     echo "Checking /usr/local/lib..."
-    ls -la /usr/local/lib/ | grep -E "(onnx|espeak|piper|HTS|sndfile)" || true
+    ls -la /usr/local/lib/ | grep -E "(onnx|espeak|piper)" || true
 fi
 
 echo ""
@@ -55,22 +53,7 @@ fi
 
 echo ""
 
-# Test 4: Check CUDA (optional)
-echo "--- CUDA Test ---"
-if command -v nvidia-smi &> /dev/null; then
-    if nvidia-smi &> /dev/null; then
-        echo "✓ CUDA GPU available"
-        nvidia-smi --query-gpu=name --format=csv,noheader | head -1
-    else
-        echo "ℹ nvidia-smi command failed (no GPU or driver issue)"
-    fi
-else
-    echo "ℹ CUDA not available (CPU inference only)"
-fi
-
-echo ""
-
-# Test 5: Help command test
+# Test 4: Help command test
 echo "--- Help Command Test ---"
 if piper --help &> /dev/null; then
     echo "✓ piper --help works"
@@ -81,7 +64,7 @@ fi
 
 echo ""
 
-# Test 6: Model directory check
+# Test 5: Model directory check
 echo "--- Model Directory Test ---"
 if [ -d "/app/models" ]; then
     echo "✓ /app/models directory exists"

@@ -1,5 +1,5 @@
 # ========== BASE STAGE ==========
-FROM debian:bullseye AS base
+FROM debian:bookworm AS base
 ARG TARGETARCH
 ARG TARGETVARIANT
 
@@ -71,6 +71,8 @@ FROM dependencies AS builder
 WORKDIR /build
 
 # ccacheの設定（ARM64ビルド用に増量）
+# TIP: For faster rebuilds with BuildKit, use cache mounts:
+# RUN --mount=type=cache,target=/tmp/ccache cmake --build build ...
 ENV CCACHE_DIR=/tmp/ccache
 ENV CCACHE_MAXSIZE=2G
 ENV CCACHE_COMPRESS=1
@@ -192,8 +194,9 @@ RUN echo "/build/install/lib" > /etc/ld.so.conf.d/piper.conf && \
     ldconfig || true && \
     if [ -d /build/install/lib ]; then \
         cd /build/install/lib && \
-        if [ -f libonnxruntime.so.1.14.1 ]; then \
-            ln -sf libonnxruntime.so.1.14.1 libonnxruntime.so.1 && \
+        ONNX_SO=$(ls libonnxruntime.so.1.* 2>/dev/null | head -1) && \
+        if [ -n "$ONNX_SO" ]; then \
+            ln -sf "$ONNX_SO" libonnxruntime.so.1 && \
             ln -sf libonnxruntime.so.1 libonnxruntime.so; \
         fi \
     fi

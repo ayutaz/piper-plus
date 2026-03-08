@@ -1,171 +1,272 @@
 #!/usr/bin/env python3
 """
-Simple inference script for Piper TTS
-Can be used standalone or as a FastAPI service
+Inference script for Piper TTS.
+CLI and FastAPI server modes supported.
+
+Uses piper_train.phonemize for text-to-phoneme conversion
+and ONNX Runtime for inference (CPU, no PyTorch required).
 """
 
 import argparse
-import os
+import io
+import json
+import logging
 import sys
-import uuid
+import time
+from pathlib import Path
 
 import numpy as np
+import onnxruntime
 import soundfile as sf
 
+from piper_train.phonemize.registry import get_phonemizer
 
-# Optional: FastAPI support
+
+_LOGGER = logging.getLogger(__name__)
+
+# FastAPI (optional)
 try:
     import uvicorn
-    from fastapi import FastAPI, HTTPException
-    from fastapi.responses import FileResponse
-    from pydantic import BaseModel
+    from fastapi import FastAPI, HTTPException, Query
+    from fastapi.responses import StreamingResponse
 
     FASTAPI_AVAILABLE = True
 except ImportError:
     FASTAPI_AVAILABLE = False
 
 
-class TTSRequest(BaseModel):
-    text: str
-    speaker_id: int | None = 0
-    output_file: str | None = None
-    noise_scale: float | None = 0.667
-    length_scale: float | None = 1.0
-    noise_w: float | None = 0.8
-
-
-def synthesize_text(
+def text_to_phoneme_ids_and_prosody(
     text: str,
-    model_path: str,
-    output_path: str,
-    speaker_id: int = 0,
-    noise_scale: float = 0.667,
-    length_scale: float = 1.0,
-    noise_w: float = 0.8,
-) -> str:
-    """
-    Synthesize text to speech using Piper TTS
+    phoneme_id_map: dict[str, list[int]],
+    language: str = "ja",
+) -> tuple[list[int], list[dict | None]]:
+    """Convert text to phoneme IDs and prosody features."""
+    phonemizer = get_phonemizer(language)
+    phonemes, prosody_info_list = phonemizer.phonemize_with_prosody(text)
 
-    Args:
-        text: Input text to synthesize
-        model_path: Path to the ONNX model file
-        output_path: Path for output WAV file
-        speaker_id: Speaker ID for multi-speaker models
-        noise_scale: Generator noise scale
-        length_scale: Phoneme length scale
-        noise_w: Phoneme width noise scale
+    phoneme_ids: list[int] = []
+    prosody_features: list[dict | None] = []
 
-    Returns:
-        Path to the generated audio file
-    """
-    try:
-        # Import here to allow script to show help without loading heavy libraries
-        import piper  # noqa: PLC0415
+    for phoneme, prosody_info in zip(phonemes, prosody_info_list, strict=True):
+        if phoneme in phoneme_id_map:
+            ids = phoneme_id_map[phoneme]
+            phoneme_ids.extend(ids)
+            for _ in ids:
+                if prosody_info is not None:
+                    prosody_features.append(
+                        {
+                            "a1": prosody_info.a1,
+                            "a2": prosody_info.a2,
+                            "a3": prosody_info.a3,
+                        }
+                    )
+                else:
+                    prosody_features.append(None)
+        else:
+            _LOGGER.warning("Unknown phoneme: %s", phoneme)
 
-        # Load voice
-        voice = piper.PiperVoice.load(model_path)
+    phoneme_ids, prosody_features = phonemizer.post_process_ids(
+        phoneme_ids, prosody_features, phoneme_id_map
+    )
+    return phoneme_ids, prosody_features
 
-        # Synthesize audio
-        audio = voice.synthesize(
-            text,
-            speaker_id=speaker_id,
-            length_scale=length_scale,
-            noise_scale=noise_scale,
-            noise_w=noise_w,
+
+def audio_float_to_int16(
+    audio: np.ndarray, max_wav_value: float = 32767.0
+) -> np.ndarray:
+    """Normalize audio and convert to int16 range."""
+    audio_norm = audio * (max_wav_value / max(0.01, np.max(np.abs(audio))))
+    audio_norm = np.clip(audio_norm, -max_wav_value, max_wav_value)
+    return audio_norm.astype("int16")
+
+
+class PiperInferenceEngine:
+    """Wraps ONNX model loading and synthesis."""
+
+    def __init__(
+        self,
+        model_path: str,
+        config_path: str,
+        sample_rate: int = 22050,
+        device: str = "auto",
+    ):
+        self.sample_rate = sample_rate
+
+        # Load config
+        with open(config_path, encoding="utf-8") as f:
+            config = json.load(f)
+        self.phoneme_id_map = config["phoneme_id_map"]
+
+        # Determine providers based on device
+        if device == "cpu":
+            providers = ["CPUExecutionProvider"]
+        else:  # "auto" or "gpu"
+            providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
+
+        # Load ONNX model
+        sess_options = onnxruntime.SessionOptions()
+        self.model = onnxruntime.InferenceSession(
+            model_path, sess_options=sess_options, providers=providers
         )
 
-        # Convert generator to numpy array
-        audio_data = np.array(list(audio), dtype=np.int16)
+        active_providers = self.model.get_providers()
+        _LOGGER.info("ONNX Runtime providers: %s", active_providers)
 
-        # Save audio
-        sf.write(output_path, audio_data, voice.config.sample_rate)
+        input_names = [inp.name for inp in self.model.get_inputs()]
+        self.has_prosody = "prosody_features" in input_names
+        self.has_sid = "sid" in input_names
 
-        return output_path
+        _LOGGER.info(
+            "Model loaded: %s (prosody=%s, sid=%s)",
+            model_path,
+            self.has_prosody,
+            self.has_sid,
+        )
 
-    except Exception as e:
-        raise RuntimeError(f"Synthesis failed: {str(e)}") from e
+    def synthesize(
+        self,
+        text: str,
+        language: str = "ja",
+        speaker_id: int = 0,
+        noise_scale: float = 0.667,
+        length_scale: float = 1.0,
+        noise_scale_w: float = 0.8,
+    ) -> np.ndarray:
+        """Synthesize text to int16 audio array."""
+        phoneme_ids, prosody_features_data = text_to_phoneme_ids_and_prosody(
+            text,
+            self.phoneme_id_map,
+            language=language,
+        )
+
+        text_input = np.expand_dims(np.array(phoneme_ids, dtype=np.int64), 0)
+        text_lengths = np.array([text_input.shape[1]], dtype=np.int64)
+        scales = np.array([noise_scale, length_scale, noise_scale_w], dtype=np.float32)
+
+        inputs = {
+            "input": text_input,
+            "input_lengths": text_lengths,
+            "scales": scales,
+        }
+
+        if self.has_sid:
+            inputs["sid"] = np.array([speaker_id], dtype=np.int64)
+
+        if self.has_prosody:
+            if prosody_features_data:
+                prosody_array = []
+                for pf in prosody_features_data:
+                    if pf is None:
+                        prosody_array.append([0, 0, 0])
+                    else:
+                        prosody_array.append([pf["a1"], pf["a2"], pf["a3"]])
+                prosody_np = np.expand_dims(np.array(prosody_array, dtype=np.int64), 0)
+            else:
+                prosody_np = np.zeros((1, text_input.shape[1], 3), dtype=np.int64)
+            inputs["prosody_features"] = prosody_np
+
+        start = time.perf_counter()
+        outputs = self.model.run(None, inputs)
+        audio = outputs[0].squeeze((0, 1))
+        audio = audio_float_to_int16(audio.squeeze())
+        elapsed = time.perf_counter() - start
+
+        duration_sec = len(audio) / self.sample_rate
+        rtf = elapsed / duration_sec if duration_sec > 0 else 0.0
+        _LOGGER.info(
+            "Synthesized %.2fs audio in %.2fs (RTF=%.2f)", duration_sec, elapsed, rtf
+        )
+
+        return audio
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Piper TTS Inference Script")
-    parser.add_argument("--text", type=str, help="Text to synthesize")
-    parser.add_argument("--input-file", type=str, help="Text file to read from")
-    parser.add_argument("--model", type=str, required=True, help="Path to ONNX model")
+    logging.basicConfig(level=logging.INFO)
+    parser = argparse.ArgumentParser(description="Piper TTS Inference")
+    parser.add_argument("--model", required=True, help="Path to ONNX model")
+    parser.add_argument("--config", help="Path to config.json (default: next to model)")
+    parser.add_argument("--text", help="Text to synthesize")
+    parser.add_argument("--output", default="output.wav", help="Output WAV path")
+    parser.add_argument("--speaker-id", type=int, default=0, help="Speaker ID")
     parser.add_argument(
-        "--output", type=str, default="output.wav", help="Output WAV file"
+        "--language", default="ja", choices=["ja", "en"], help="Language"
     )
-    parser.add_argument("--speaker", type=int, default=0, help="Speaker ID")
-    parser.add_argument("--noise-scale", type=float, default=0.667, help="Noise scale")
-    parser.add_argument("--length-scale", type=float, default=1.0, help="Length scale")
-    parser.add_argument("--noise-w", type=float, default=0.8, help="Noise W")
-    parser.add_argument("--server", action="store_true", help="Run as API server")
-    parser.add_argument("--port", type=int, default=8000, help="API server port")
-
+    parser.add_argument("--noise-scale", type=float, default=0.667)
+    parser.add_argument("--length-scale", type=float, default=1.0)
+    parser.add_argument("--noise-w", type=float, default=0.8)
+    parser.add_argument("--sample-rate", type=int, default=22050)
+    parser.add_argument(
+        "--device",
+        default="auto",
+        choices=["auto", "cpu", "gpu"],
+        help="Device for inference (default: auto)",
+    )
+    parser.add_argument("--server", action="store_true", help="Run as FastAPI server")
+    parser.add_argument("--port", type=int, default=8000, help="Server port")
     args = parser.parse_args()
 
-    # Run as API server
+    # Resolve config path
+    config_path = args.config or str(Path(args.model).parent / "config.json")
+
+    engine = PiperInferenceEngine(
+        args.model, config_path, sample_rate=args.sample_rate, device=args.device
+    )
+
     if args.server:
         if not FASTAPI_AVAILABLE:
-            print("FastAPI not available. Install with: pip install fastapi uvicorn")
+            print("FastAPI not installed. Install with: pip install fastapi uvicorn")
             sys.exit(1)
-
-        app = FastAPI(title="Piper TTS API")
-
-        @app.get("/health")
-        def health_check():
-            return {"status": "healthy"}
-
-        @app.post("/synthesize")
-        async def synthesize(request: TTSRequest):
-            try:
-                output_file = (
-                    request.output_file or f"output_{uuid.uuid4().hex[:8]}.wav"
-                )
-                output_path = os.path.join("/app/output", output_file)
-
-                synthesize_text(
-                    request.text,
-                    args.model,
-                    output_path,
-                    request.speaker_id,
-                    request.noise_scale,
-                    request.length_scale,
-                    request.noise_w,
-                )
-
-                return FileResponse(output_path, media_type="audio/wav")
-
-            except Exception as e:
-                raise HTTPException(status_code=500, detail=str(e)) from e
-
-        uvicorn.run(app, host="0.0.0.0", port=args.port)
-
-    # Run as CLI tool
+        _run_server(engine, args)
     else:
-        if args.text:
-            text = args.text
-        elif args.input_file:
-            with open(args.input_file, encoding="utf-8") as f:
-                text = f.read()
-        else:
-            print("Reading from stdin...")
-            text = sys.stdin.read()
-
-        if not text.strip():
-            print("No text provided")
+        if not args.text:
+            print("--text is required in CLI mode")
             sys.exit(1)
-
-        print(f"Synthesizing: {text[:50]}...")
-        output_path = synthesize_text(
-            text,
-            args.model,
-            args.output,
-            args.speaker,
-            args.noise_scale,
-            args.length_scale,
-            args.noise_w,
+        audio = engine.synthesize(
+            args.text,
+            language=args.language,
+            speaker_id=args.speaker_id,
+            noise_scale=args.noise_scale,
+            length_scale=args.length_scale,
+            noise_scale_w=args.noise_w,
         )
-        print(f"Audio saved to: {output_path}")
+        sf.write(args.output, audio, args.sample_rate)
+        print(f"Audio saved to: {args.output}")
+
+
+def _run_server(engine: PiperInferenceEngine, args):
+    """Run FastAPI server."""
+    app = FastAPI(title="Piper TTS API")
+
+    @app.get("/health")
+    def health_check():
+        return {"status": "healthy"}
+
+    @app.get("/synthesize")
+    def synthesize(
+        text: str = Query(...),
+        speaker_id: int = Query(0),
+        language: str = Query("ja"),
+        noise_scale: float = Query(0.667),
+        length_scale: float = Query(1.0),
+        noise_w: float = Query(0.8),
+    ):
+        try:
+            audio = engine.synthesize(
+                text,
+                language=language,
+                speaker_id=speaker_id,
+                noise_scale=noise_scale,
+                length_scale=length_scale,
+                noise_scale_w=noise_w,
+            )
+            buf = io.BytesIO()
+            sf.write(buf, audio, engine.sample_rate, format="WAV")
+            buf.seek(0)
+            return StreamingResponse(buf, media_type="audio/wav")
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e)) from e
+
+    uvicorn.run(app, host="0.0.0.0", port=args.port)
 
 
 if __name__ == "__main__":

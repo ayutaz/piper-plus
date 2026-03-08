@@ -423,7 +423,7 @@ def start_training(
     missing_deps = check_training_dependencies()
     if missing_deps:
         deps_list = "\n  - ".join(missing_deps)
-        return f"❌ Missing training dependencies:\n  - {deps_list}\n\nPlease install them first:\n  cd src/python && pip install -r requirements_train.txt"
+        return f'❌ Missing training dependencies:\n  - {deps_list}\n\nPlease install them first:\n  uv pip install ".[train]"'
 
     if training_manager.is_running():
         return "⚠️ Training is already running. Please stop the current training first."

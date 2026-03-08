@@ -47,6 +47,8 @@ else()
   set(CMAKE_BUILD_WITH_INSTALL_RPATH FALSE)
 endif()
 
+option(USE_CUDA "Enable CUDA support for GPU acceleration" OFF)
+
 # ARM64-specific optimizations
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|ARM64")
   message(STATUS "Detected ARM64 architecture, enabling optimizations")
@@ -60,8 +62,8 @@ if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|ARM64")
     string(APPEND CMAKE_C_FLAGS " ${ARM64_FLAGS}")
     
     # Conservative optimization for QEMU compatibility
-    set(CMAKE_CXX_FLAGS_RELEASE "-O0 -DNDEBUG")
-    set(CMAKE_C_FLAGS_RELEASE "-O0 -DNDEBUG")
+    set(CMAKE_CXX_FLAGS_RELEASE "-O2 -DNDEBUG")
+    set(CMAKE_C_FLAGS_RELEASE "-O2 -DNDEBUG")
     
     # Enable Link Time Optimization for release builds
     if(CMAKE_BUILD_TYPE STREQUAL "Release")
@@ -240,6 +242,8 @@ if(NOT DEFINED PIPER_PHONEMIZE_DIR)
     set(PIPER_PHONEMIZE_SHARED_LIBS OFF)
   endif()
   
+  # NOTE: Using master branch HEAD. For reproducible builds, pin to a specific commit:
+  # URL "https://github.com/rhasspy/piper-phonemize/archive/<commit-hash>.zip"
   ExternalProject_Add(
     piper_phonemize_external
     PREFIX "${CMAKE_CURRENT_BINARY_DIR}/p"

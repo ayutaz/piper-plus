@@ -185,7 +185,7 @@ Options:
    - Ensure .onnx and .onnx.json pairs
 
 2. **Import errors**
-   - Install requirements_webui.txt
+   - Install dependencies: `uv pip install -r src/python_run/requirements_webui.txt`
    - Python 3.11+ required
 
 3. **Docker issues**

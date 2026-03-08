@@ -303,17 +303,18 @@ The `MODEL_CARD` file for each voice contains important licensing information. P
 
 ### Dependencies
 
-Piper has different requirements depending on your use case:
+Piper has different requirements depending on your use case.
+Dependencies are managed via [uv](https://docs.astral.sh/uv/) and defined as optional-dependencies in `pyproject.toml`:
 
 ```bash
 # For inference only (using pre-trained models)
-pip install -r requirements.txt
+uv pip install ".[inference]"
 
 # For training custom models
-pip install -r requirements-train.txt
+uv pip install ".[train]"
 
 # For development (includes testing and linting tools)
-pip install -r requirements-dev.txt
+uv pip install ".[dev]"
 ```
 
 ## Quick Start - WebUI
@@ -322,10 +323,10 @@ The easiest way to get started with Piper is using the WebUI:
 
 ```bash
 # Install inference dependencies first
-pip install -r requirements.txt
+uv pip install ".[inference]"
 
 # Install WebUI dependencies
-pip install gradio>=4.0.0
+uv pip install -r src/python_run/requirements_webui.txt
 
 # Run WebUI
 cd src/python_run
@@ -335,8 +336,23 @@ python -m piper.webui --data-dir /path/to/models
 Or using Docker:
 
 ```bash
-# Run with Docker
-docker run -p 7860:7860 -v ./models:/models ghcr.io/rhasspy/piper-webui
+# WebUI
+docker run -p 7860:7860 -v ./models:/models ghcr.io/ayutaz/piper-webui
+
+# Python推論（CPU/GPU両対応、nvidia/cuda:12.4.1ベース）
+# CPU で実行
+docker run --rm -v ./models:/app/models -v ./output:/app/output \
+  ghcr.io/ayutaz/piper-python-inference \
+  python -m piper_train.infer_onnx \
+    --model /app/models/model.onnx --config /app/models/config.json \
+    --output-dir /app/output --text "こんにちは" --device cpu
+
+# GPU で実行（--gpus all を追加）
+docker run --rm --gpus all -v ./models:/app/models -v ./output:/app/output \
+  ghcr.io/ayutaz/piper-python-inference \
+  python -m piper_train.infer_onnx \
+    --model /app/models/model.onnx --config /app/models/config.json \
+    --output-dir /app/output --text "こんにちは" --device gpu
 ```
 
 Access the WebUI at http://localhost:7860
@@ -572,32 +588,34 @@ Pretrained checkpoints are available on [Hugging Face](https://huggingface.co/da
 
 See [src/python_run](src/python_run)
 
-Install with `pip`:
+Install with `uv pip`:
 
 ``` sh
-# 基本機能のみ
-pip install piper-tts-plus
+# CPU推論（onnxruntime）
+uv pip install "./src/python[inference]"
 
-# GPU 版 (CUDA 環境がある場合)
-pip install "piper-tts-plus[gpu]"
+# GPU推論（onnxruntime-gpu、CUDA環境が必要）
+uv pip install "./src/python[inference-gpu]"
 
-# HTTP サーバー機能を含む場合
-pip install "piper-tts-plus[http]"
-
-# GPU + HTTP
-pip install "piper-tts-plus[gpu,http]"
+# 学習用
+uv pip install "./src/python[train]"
 ```
 
 This will automatically download [voice files](https://huggingface.co/rhasspy/piper-voices/tree/v1.0.0) the first time they're used. Use `--data-dir` and `--download-dir` to adjust where voices are found/downloaded.
 
-If you'd like to use a GPU, install the `onnxruntime-gpu` package:
-
+GPU推論を使用する場合は `inference-gpu` extras でインストールし、`--device gpu` を指定してください。CUDA環境が必要です。
 
 ``` sh
-.venv/bin/pip3 install onnxruntime-gpu
+# GPU推論の例
+uv run python -m piper_train.infer_onnx \
+  --model /path/to/model.onnx \
+  --config /path/to/config.json \
+  --output-dir /path/to/output \
+  --text "Hello world" \
+  --device gpu
 ```
 
-and then run `piper` with the `--cuda` argument. You will need to have a functioning CUDA environment, such as what's available in [NVIDIA's PyTorch containers](https://catalog.ngc.nvidia.com/orgs/nvidia/containers/pytorch).
+`--device` オプションは `auto`（デフォルト）、`cpu`、`gpu` から選択できます。`auto` の場合は利用可能なGPUを自動検出します。
 
 
 ## Documentation

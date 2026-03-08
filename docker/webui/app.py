@@ -1,0 +1,172 @@
+#!/usr/bin/env python3
+"""Piper TTS WebUI - Gradio-based interface for text-to-speech synthesis."""
+
+import argparse
+import json
+from pathlib import Path
+
+import gradio as gr
+import numpy as np
+import onnxruntime
+
+from piper_train.infer_onnx import text_to_phoneme_ids_and_prosody
+from piper_train.vits.utils import audio_float_to_int16
+
+
+def find_models(model_dir: str) -> list[str]:
+    """Find all ONNX models in the given directory."""
+    model_dir_path = Path(model_dir)
+    models = sorted(model_dir_path.glob("**/*.onnx"))
+    return [str(m) for m in models]
+
+
+def load_config(model_path: str) -> dict | None:
+    """Load config.json associated with a model."""
+    model_p = Path(model_path)
+    for config_path in [
+        model_p.with_suffix(".onnx.json"),
+        model_p.parent / "config.json",
+    ]:
+        if config_path.exists():
+            with open(config_path, encoding="utf-8") as f:
+                return json.load(f)
+    return None
+
+
+def synthesize(
+    text: str,
+    model_path: str,
+    speaker_id: int,
+    language: str,
+    noise_scale: float,
+    length_scale: float,
+    noise_scale_w: float,
+) -> tuple[int, np.ndarray] | None:
+    """Synthesize text to speech."""
+    if not text.strip() or not model_path:
+        return None
+
+    config = load_config(model_path)
+    if config is None:
+        raise gr.Error("config.json not found for selected model")
+
+    phoneme_id_map = config.get("phoneme_id_map")
+    if not phoneme_id_map:
+        raise gr.Error("phoneme_id_map not found in config.json")
+
+    sample_rate = config.get("audio", {}).get("sample_rate", 22050)
+
+    phoneme_ids, prosody_features_data = text_to_phoneme_ids_and_prosody(
+        text, phoneme_id_map, language=language
+    )
+
+    session = onnxruntime.InferenceSession(model_path)
+    input_names = [inp.name for inp in session.get_inputs()]
+    has_prosody = "prosody_features" in input_names
+    has_sid = "sid" in input_names
+
+    text_array = np.expand_dims(np.array(phoneme_ids, dtype=np.int64), 0)
+    text_lengths = np.array([text_array.shape[1]], dtype=np.int64)
+    scales = np.array([noise_scale, length_scale, noise_scale_w], dtype=np.float32)
+
+    inputs = {
+        "input": text_array,
+        "input_lengths": text_lengths,
+        "scales": scales,
+    }
+
+    if has_sid:
+        inputs["sid"] = np.array([int(speaker_id)], dtype=np.int64)
+
+    if has_prosody and prosody_features_data:
+        prosody_array = []
+        for pf in prosody_features_data:
+            if pf is None:
+                prosody_array.append([0, 0, 0])
+            else:
+                prosody_array.append([pf["a1"], pf["a2"], pf["a3"]])
+        inputs["prosody_features"] = np.expand_dims(
+            np.array(prosody_array, dtype=np.int64), 0
+        )
+
+    outputs = session.run(None, inputs)
+    audio = outputs[0].squeeze((0, 1))
+    audio = audio_float_to_int16(audio.squeeze())
+
+    return (sample_rate, audio)
+
+
+def create_ui(model_dir: str, output_dir: str):
+    """Create the Gradio UI."""
+    models = find_models(model_dir)
+    model_choices = models if models else ["No models found"]
+
+    with gr.Blocks(title="Piper TTS") as demo:
+        gr.Markdown("# Piper TTS WebUI")
+
+        with gr.Row():
+            with gr.Column():
+                text_input = gr.Textbox(
+                    label="Text",
+                    placeholder="Enter text to synthesize...",
+                    lines=3,
+                )
+                model_dropdown = gr.Dropdown(
+                    choices=model_choices,
+                    label="Model",
+                    value=model_choices[0] if models else None,
+                )
+                language = gr.Radio(
+                    choices=["ja", "en"],
+                    label="Language",
+                    value="ja",
+                )
+                speaker_id = gr.Number(label="Speaker ID", value=0, precision=0)
+
+                with gr.Accordion("Advanced", open=False):
+                    noise_scale = gr.Slider(0.0, 1.0, value=0.667, label="Noise Scale")
+                    length_scale = gr.Slider(0.1, 3.0, value=1.0, label="Length Scale")
+                    noise_scale_w = gr.Slider(
+                        0.0, 1.0, value=0.8, label="Noise Scale W"
+                    )
+
+                btn = gr.Button("Synthesize", variant="primary")
+
+            with gr.Column():
+                audio_output = gr.Audio(label="Output", type="numpy")
+
+        btn.click(
+            fn=synthesize,
+            inputs=[
+                text_input,
+                model_dropdown,
+                speaker_id,
+                language,
+                noise_scale,
+                length_scale,
+                noise_scale_w,
+            ],
+            outputs=audio_output,
+        )
+
+    return demo
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Piper TTS WebUI")
+    parser.add_argument(
+        "--model-dir", default="/models", help="Directory containing ONNX models"
+    )
+    parser.add_argument(
+        "--output-dir", default="/output", help="Directory for output files"
+    )
+    parser.add_argument("--host", default="0.0.0.0")
+    parser.add_argument("--port", type=int, default=7860)
+    args = parser.parse_args()
+
+    demo = create_ui(args.model_dir, args.output_dir)
+    demo.launch(server_name=args.host, server_port=args.port)
+
+
+if __name__ == "__main__":
+    main()

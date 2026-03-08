@@ -43,41 +43,40 @@ jobs:
       if: runner.os == 'Windows'
       run: |
         python -m pip install --upgrade pip setuptools wheel
+        pip install --no-cache-dir uv
         cd src/python
         # Install test dependencies
-        pip install -r requirements_test.txt
+        uv pip install --system -r requirements_test.txt
         # Install training dependencies including pyopenjtalk-plus
-        pip install -r ../../requirements-train.txt
-        # Install piper_train
-        pip install -e .
+        uv pip install --system -e ".[train]"
         echo "Windows tests will run with pyopenjtalk-plus support"
 
     - name: Install PyTorch for all tests (Windows)
       if: runner.os == 'Windows'
       run: |
         cd src/python
-        pip install -r requirements_torch.txt
+        uv pip install --system -r requirements_torch.txt
 
     - name: Install Python dependencies (Unix)
       if: runner.os != 'Windows'
       run: |
         python -m pip install --upgrade pip
+        pip install --no-cache-dir uv
         cd src/python
-        pip install -r requirements_test.txt
-        pip install -r ../../requirements-train.txt
-        pip install cython
-        pip install -e .
+        uv pip install --system -r requirements_test.txt
+        uv pip install --system -e ".[train]"
 
     - name: Install PyTorch for all tests (Unix)
       if: runner.os != 'Windows'
       run: |
         cd src/python
-        pip install -r requirements_torch.txt
+        uv pip install --system -r requirements_torch.txt
 
     - name: Build Cython extensions (Unix)
       if: runner.os != 'Windows'
       run: |
         cd src/python
+        uv pip install --system cython
         python piper_train/vits/monotonic_align/setup.py build_ext --inplace
 
     - name: Run unit tests (Windows)

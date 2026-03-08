@@ -54,13 +54,13 @@ run_test "Python training image build" \
 run_test "Python inference image build" \
     "docker build -t piper-python-inference:test -f docker/python-inference/Dockerfile ."
 
-# Build C++ training image
-run_test "C++ training image build" \
-    "docker build -t piper-cpp-train:test -f docker/cpp-train/Dockerfile ."
+# Build C++ development image
+run_test "C++ dev image build" \
+    "docker build -t piper-cpp-dev:test -f docker/cpp-dev/Dockerfile ."
 
-# Build C++ inference image (depends on cpp-train)
+# Build C++ inference image (depends on cpp-dev)
 run_test "C++ inference image build" \
-    "docker build -t piper-cpp-inference:test --build-arg BUILDER_IMAGE=piper-cpp-train:test -f docker/cpp-inference/Dockerfile ."
+    "docker build -t piper-cpp-inference:test --build-arg BUILDER_IMAGE=piper-cpp-dev:test -f docker/cpp-inference/Dockerfile ."
 
 echo ""
 echo "2. Running container health checks..."
@@ -72,11 +72,11 @@ run_test "Python training container startup" \
 
 # Test Python inference container
 run_test "Python inference container startup" \
-    "docker run --rm piper-python-inference:test python -c 'import torch; import onnxruntime; print(\"OK\")'"
+    "docker run --rm piper-python-inference:test python -c 'import piper_train; import onnxruntime; print(\"OK\")'"
 
-# Test C++ training container
-run_test "C++ training container startup" \
-    "docker run --rm piper-cpp-train:test bash -c 'which cmake && which ninja && echo OK'"
+# Test C++ dev container
+run_test "C++ dev container startup" \
+    "docker run --rm piper-cpp-dev:test bash -c 'which cmake && which ninja && echo OK'"
 
 # Test C++ inference container
 run_test "C++ inference container health" \
@@ -106,7 +106,7 @@ fi
 
 # Test build tools in C++ environment
 run_test "C++ build tools" \
-    "docker run --rm piper-cpp-train:test bash -c '
+    "docker run --rm piper-cpp-dev:test bash -c '
 cmake --version && \
 ninja --version && \
 clang++ --version | head -n1
@@ -164,7 +164,7 @@ echo ""
 
 # Remove test images
 docker rmi -f piper-python-train:test piper-python-inference:test \
-    piper-cpp-train:test piper-cpp-inference:test 2>/dev/null || true
+    piper-cpp-dev:test piper-cpp-inference:test 2>/dev/null || true
 
 echo ""
 echo "=== Test Summary ==="

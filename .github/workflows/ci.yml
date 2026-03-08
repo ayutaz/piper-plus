@@ -301,21 +301,14 @@ jobs:
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip setuptools wheel
+          pip install --no-cache-dir uv
           cd src/python
           # Install test requirements first
-          pip install -r requirements_test.txt
-          # Install core dependencies manually to avoid conflicts
-          pip install numpy scipy soundfile librosa onnxruntime pytest pytest-cov
+          uv pip install --system -r requirements_test.txt
+          # Install piper_train with inference extras
+          uv pip install --system -e ".[inference]"
           # For pyopenjtalk-plus dependencies (optional)
-          pip install sudachipy sudachidict_core || echo "Japanese dependencies optional"
-          # Install requirements, filtering out problematic ones on Windows
-          if [ "${{ runner.os }}" == "Windows" ]; then
-            grep -v "piper-phonemize" requirements.txt | pip install -r /dev/stdin || true
-          else
-            pip install -r requirements.txt || true
-          fi
-          # Install package in development mode
-          pip install -e .
+          uv pip install --system sudachipy sudachidict_core || echo "Japanese dependencies optional"
       
       - name: Build C++ executable (Windows)
         if: runner.os == 'Windows'
@@ -379,72 +372,11 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install ruff==0.12.5 mypy
+          pip install --no-cache-dir uv
+          uv pip install --system ruff==0.12.5 mypy
       
       - name: Run ruff check
         run: ruff check .
       
       - name: Run ruff format check
         run: ruff format --check
-
-  docker-test:
-    runs-on: ubuntu-latest
-    
-    steps:
-      - name: Free disk space
-        run: |
-          echo "=== Initial disk space ==="
-          df -h
-          echo "=== Removing unnecessary files ==="
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /opt/ghc
-          sudo rm -rf "/usr/local/share/boost"
-          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
-          sudo rm -rf /usr/local/lib/android
-          sudo rm -rf /opt/hostedtoolcache/CodeQL
-          sudo docker image prune --all --force
-          sudo apt-get clean
-          echo "=== Final disk space ==="
-          df -h
-      
-      - uses: actions/checkout@v4
-      
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-      
-      - name: Test Python train image build
-        run: |
-          echo "Building Python train image..."
-          docker build -t piper-python-train:test -f docker/python-train/Dockerfile . --progress=plain
-          echo "Python train image built successfully"
-          # Clean up to save space
-          docker system prune -f
-      
-      - name: Test Python inference image build
-        run: |
-          echo "Building Python inference image..."
-          docker build -t piper-python-inference:test -f docker/python-inference/Dockerfile . --progress=plain
-          echo "Python inference image built successfully"
-          # Clean up intermediate layers
-          docker system prune -f
-      
-      - name: Test C++ train image build (lightweight)
-        run: |
-          echo "Testing C++ build environment..."
-          # Create a minimal Dockerfile for testing
-          cat > Dockerfile.cpp-test << 'EOF'
-          FROM ubuntu:22.04
-          RUN apt-get update && apt-get install -y build-essential cmake ninja-build
-          WORKDIR /test
-          RUN echo "int main() { return 0; }" > test.cpp && \
-              g++ test.cpp -o test && \
-              ./test && \
-              echo "C++ environment OK"
-          EOF
-          docker build -t piper-cpp-test:minimal -f Dockerfile.cpp-test .
-          echo "C++ build environment verified"
-      
-      - name: Summary
-        run: |
-          echo "Docker build tests completed"
-          echo "Note: Full C++ image build skipped due to resource constraints"

@@ -66,8 +66,8 @@ if [ ! -f "build/piper" ]; then
     echo "Building C++ binary..."
     docker run --rm \
         -v $(pwd):/workspace \
-        piper-cpp-train:test \
-        /workspace/docker/cpp-train/build.sh
+        piper-cpp-dev:test \
+        /workspace/docker/cpp-dev/build.sh
 fi
 
 # Test C++ inference

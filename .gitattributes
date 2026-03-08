@@ -1,0 +1,19 @@
+# Ensure shell scripts always use LF line endings (required for Docker/Linux)
+*.sh text eol=lf
+
+# Ensure Python scripts use LF
+*.py text eol=lf
+
+# C/C++ source files
+*.c text eol=lf
+*.cpp text eol=lf
+*.h text eol=lf
+*.hpp text eol=lf
+
+# CMake files
+CMakeLists.txt text eol=lf
+*.cmake text eol=lf
+
+# Docker files
+Dockerfile* text eol=lf
+.dockerignore text eol=lf

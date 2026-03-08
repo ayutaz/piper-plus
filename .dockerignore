@@ -60,6 +60,31 @@ docker-compose*.yml
 *.temp
 *.log
 
+# Python virtual environments
+.venv/
+venv/
+env/
+
+# Training artifacts
+lightning_logs/
+wandb/
+
+# Local working files
+pip-test/
+upiper_comparison_samples/
+
+# HuggingFace
+huggingface-space/
+
+# Scripts not needed in Docker
+scripts/evaluation/
+scripts/debug/
+
+# Windows artifacts
+nul
+*.exe
+*.dll
+
 # Large files
 *.wav
 *.mp3

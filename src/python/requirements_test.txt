@@ -1,5 +1,5 @@
 # Testing requirements for piper-tts
--r ../../requirements-train.txt
+# Training dependencies are managed via pyproject.toml [train] extra
 
 # Testing frameworks
 pytest==7.4.3
