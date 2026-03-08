@@ -524,7 +524,9 @@ class SpeakerBalancedBatchSampler:
         }
         speaker_pointers = dict.fromkeys(self.speakers, 0)
 
-        batch_idx = 0
+        # 全バッチを先に生成してから world_size の倍数に切り詰める
+        # これにより全 DDP rank が同じバッチ数を受け取ることを保証する
+        all_batches = []
         while True:
             if self.language_group_balance:
                 # N言語グループ均等サンプリング
@@ -568,10 +570,13 @@ class SpeakerBalancedBatchSampler:
                 batch.extend(speaker_indices[spk][start:end])
                 speaker_pointers[spk] = end
 
-            # DDP: このGPUが担当するバッチのみを返す
+            all_batches.append(batch)
+
+        # DDP: world_size の倍数に切り詰めて全 rank が同じバッチ数を受け取る
+        usable = (len(all_batches) // self.world_size) * self.world_size
+        for batch_idx in range(usable):
             if batch_idx % self.world_size == self.rank:
-                yield batch
-            batch_idx += 1
+                yield all_batches[batch_idx]
 
     def __len__(self) -> int:
         if self.language_group_balance:
