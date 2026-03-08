@@ -77,33 +77,46 @@ jobs:
           echo "Directory structure:"
           tree -h hf-space-deploy 2>/dev/null || ls -lah hf-space-deploy/ 2>/dev/null || echo "Directory not found"
 
-      - name: Install Hugging Face CLI
-        run: |
-          pip install -U huggingface_hub
-          
-      - name: Push to Hugging Face using CLI
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install and deploy to Hugging Face
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          EVENT_NAME: ${{ github.event_name }}
+          DEPLOY_MSG: ${{ github.event.inputs.deployment_message }}
         run: |
-          # Login to Hugging Face
-          huggingface-cli login --token $HF_TOKEN
-          
-          # Upload files to the Space
-          cd hf-space-deploy
-          
-          # Create a deployment message
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ github.event.inputs.deployment_message }}" ]; then
-            COMMIT_MSG="Update from GitHub Actions - $(date +'%Y-%m-%d %H:%M:%S')\n\nDeployment message: ${{ github.event.inputs.deployment_message }}"
-          elif [ "${{ github.event_name }}" = "push" ]; then
-            COMMIT_MSG="Update from GitHub Actions - $(date +'%Y-%m-%d %H:%M:%S')\n\nTriggered by push to dev branch"
-          else
-            COMMIT_MSG="Update from GitHub Actions - $(date +'%Y-%m-%d %H:%M:%S')"
-          fi
-          
-          # Upload all files to Hugging Face Space
-          huggingface-cli upload ayousanz/piper-plus-demo . --repo-type space --commit-message "$COMMIT_MSG"
-          
-          echo "✅ Successfully deployed to Hugging Face Spaces using CLI"
+          pip install -U huggingface_hub
+
+          python << 'PYEOF'
+          import os
+          from datetime import datetime
+          from huggingface_hub import HfApi, login
+
+          login(token=os.environ["HF_TOKEN"])
+
+          event = os.environ.get("EVENT_NAME", "")
+          deploy_msg = os.environ.get("DEPLOY_MSG", "")
+          timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+          if event == "workflow_dispatch" and deploy_msg:
+              commit_msg = f"Update from GitHub Actions - {timestamp}\n\nDeployment message: {deploy_msg}"
+          elif event == "push":
+              commit_msg = f"Update from GitHub Actions - {timestamp}\n\nTriggered by push to dev branch"
+          else:
+              commit_msg = f"Update from GitHub Actions - {timestamp}"
+
+          api = HfApi()
+          api.upload_folder(
+              repo_id="ayousanz/piper-plus-demo",
+              folder_path="hf-space-deploy",
+              repo_type="space",
+              commit_message=commit_msg,
+          )
+          print("Successfully deployed to Hugging Face Spaces")
+          PYEOF
 
       - name: Deploy summary
         run: |
