@@ -53,6 +53,14 @@ setup(
             "fastapi>=0.110",
             "uvicorn>=0.27",
         ],
+        "inference-gpu": [
+            "onnxruntime-gpu>=1.17",
+            "soundfile>=0.12",
+            "pyopenjtalk-plus",
+            "g2p-en>=2.1.0",
+            "fastapi>=0.110",
+            "uvicorn>=0.27",
+        ],
         "train": [
             "scipy>=1.12",
             "librosa>=0.10",
