@@ -39,9 +39,21 @@ jobs:
         run: |
           docker run --rm piper-python-inference:test python -c "
           import piper_train; print('piper_train OK')
-          import onnxruntime; print(f'onnxruntime {onnxruntime.__version__} OK')
+          import onnxruntime as ort; print(f'onnxruntime {ort.__version__} OK')
+          print(f'Available providers: {ort.get_available_providers()}')
           import soundfile; print('soundfile OK')
           print('All smoke tests passed')
+          "
+
+      - name: Test --device cpu providers
+        run: |
+          docker run --rm piper-python-inference:test python -c "
+          import onnxruntime as ort
+          # Verify CPUExecutionProvider is available (CUDA not expected on CI)
+          providers = ort.get_available_providers()
+          assert 'CPUExecutionProvider' in providers, f'CPUExecutionProvider not found in {providers}'
+          print(f'CPU provider available: OK')
+          print('--device cpu test passed')
           "
 
   test-cpp-inference:

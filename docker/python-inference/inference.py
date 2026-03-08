@@ -88,6 +88,7 @@ class PiperInferenceEngine:
         model_path: str,
         config_path: str,
         sample_rate: int = 22050,
+        device: str = "auto",
     ):
         self.sample_rate = sample_rate
 
@@ -96,9 +97,20 @@ class PiperInferenceEngine:
             config = json.load(f)
         self.phoneme_id_map = config["phoneme_id_map"]
 
+        # Determine providers based on device
+        if device == "cpu":
+            providers = ["CPUExecutionProvider"]
+        else:  # "auto" or "gpu"
+            providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
+
         # Load ONNX model
         sess_options = onnxruntime.SessionOptions()
-        self.model = onnxruntime.InferenceSession(model_path, sess_options=sess_options)
+        self.model = onnxruntime.InferenceSession(
+            model_path, sess_options=sess_options, providers=providers
+        )
+
+        active_providers = self.model.get_providers()
+        _LOGGER.info("ONNX Runtime providers: %s", active_providers)
 
         input_names = [inp.name for inp in self.model.get_inputs()]
         self.has_prosody = "prosody_features" in input_names
@@ -183,6 +195,12 @@ def main():
     parser.add_argument("--length-scale", type=float, default=1.0)
     parser.add_argument("--noise-w", type=float, default=0.8)
     parser.add_argument("--sample-rate", type=int, default=22050)
+    parser.add_argument(
+        "--device",
+        default="auto",
+        choices=["auto", "cpu", "gpu"],
+        help="Device for inference (default: auto)",
+    )
     parser.add_argument("--server", action="store_true", help="Run as FastAPI server")
     parser.add_argument("--port", type=int, default=8000, help="Server port")
     args = parser.parse_args()
@@ -190,7 +208,9 @@ def main():
     # Resolve config path
     config_path = args.config or str(Path(args.model).parent / "config.json")
 
-    engine = PiperInferenceEngine(args.model, config_path, sample_rate=args.sample_rate)
+    engine = PiperInferenceEngine(
+        args.model, config_path, sample_rate=args.sample_rate, device=args.device
+    )
 
     if args.server:
         if not FASTAPI_AVAILABLE:
