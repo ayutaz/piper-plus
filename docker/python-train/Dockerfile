@@ -49,11 +49,12 @@ RUN uv pip install \
     "torch==2.2.1+cu121" "torchaudio==2.2.1+cu121" "torchvision==0.17.1+cu121"
 
 # Copy source code for piper-train installation
-COPY src/python /tmp/piper-src/python
-COPY VERSION /tmp/piper-src/VERSION
+# setup.py reads ../../VERSION relative to src/python/
+COPY src/python /tmp/src/python
+COPY VERSION /tmp/VERSION
 
 # Install piper_train with training extras
-RUN uv pip install "/tmp/piper-src/python[train]"
+RUN uv pip install "/tmp/src/python[train]"
 
 # Runtime stage
 FROM nvidia/cuda:12.1.0-cudnn8-runtime-ubuntu22.04
@@ -89,7 +90,8 @@ COPY --from=builder /opt/venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
 # Copy piper source
-COPY --from=builder /tmp/piper-src /opt/piper
+COPY --from=builder /tmp/src /opt/piper/src
+COPY --from=builder /tmp/VERSION /opt/piper/VERSION
 
 # Create working directory
 WORKDIR /workspace
@@ -105,7 +107,7 @@ RUN echo "=== Running build-time tests ===" && \
     python --version && \
     python -c "import torch; print(f'PyTorch: {torch.__version__}')" && \
     python -c "import pytorch_lightning; print(f'PyTorch Lightning: {pytorch_lightning.__version__}')" && \
-    cd /opt/piper/python && python -c "import piper_train; print('piper_train accessible')" && \
+    cd /opt/piper/src/python && python -c "import piper_train; print('piper_train accessible')" && \
     echo "=== Build-time tests passed ==="
 
 # Ensure we have a valid working directory

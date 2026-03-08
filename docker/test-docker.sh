@@ -72,7 +72,7 @@ run_test "Python training container startup" \
 
 # Test Python inference container
 run_test "Python inference container startup" \
-    "docker run --rm piper-python-inference:test python -c 'import torch; import onnxruntime; print(\"OK\")'"
+    "docker run --rm piper-python-inference:test python -c 'import piper_train; import onnxruntime; print(\"OK\")'"
 
 # Test C++ dev container
 run_test "C++ dev container startup" \
