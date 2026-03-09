@@ -42,7 +42,7 @@ RUN apt-get update && apt-get install -y \
     make \
     libpcaudio-dev \
     && rm -rf /var/lib/apt/lists/* && \
-    git clone https://github.com/espeak-ng/espeak-ng.git && \
+    git clone --branch 1.51.1 --depth 1 https://github.com/espeak-ng/espeak-ng.git && \
     cd espeak-ng && \
     ./autogen.sh && \
     ./configure --prefix=/usr/local && \
