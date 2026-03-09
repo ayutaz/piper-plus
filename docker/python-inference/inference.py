@@ -299,15 +299,15 @@ def _run_server(engine: PiperInferenceEngine, args):
 def _run_webui(args):
     """Launch the Gradio WebUI."""
     try:
-        from webui import create_ui  # noqa: WPS433
+        from webui import create_ui  # noqa: PLC0415
     except ImportError:
         try:
             # Fallback: try absolute import path
+            import importlib.util  # noqa: PLC0415
+
             script_dir = Path(__file__).resolve().parent
             webui_path = script_dir / "webui.py"
             if webui_path.exists():
-                import importlib.util
-
                 spec = importlib.util.spec_from_file_location("webui", webui_path)
                 webui_mod = importlib.util.module_from_spec(spec)
                 spec.loader.exec_module(webui_mod)
