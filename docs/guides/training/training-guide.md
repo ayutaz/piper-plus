@@ -348,6 +348,43 @@ export WANDB_MODE=offline
 Access your training runs at: https://wandb.ai/your-username/piper-tts
 
 
+## Japanese Model Training
+
+For Japanese model training, there are additional considerations:
+
+### Data Format
+
+LJ Speech compatible format:
+```
+dataset/
+├── wavs/           # Audio files (.wav, 22050Hz, mono, 16-bit PCM)
+└── metadata.csv    # Single speaker: id|text / Multi speaker: id|speaker|text
+```
+
+### Preprocessing
+
+```sh
+python3 -m piper_train.preprocess \
+  --language ja \
+  --input-dir /path/to/dataset \
+  --output-dir /path/to/preprocessed_data \
+  --dataset-format ljspeech \
+  --sample-rate 22050 \
+  --max-workers 45
+```
+
+Using `--language ja` enables pyopenjtalk-based phonemization via the Phonemizer registry, which handles Japanese accent and prosody more accurately than espeak-ng.
+
+For single-speaker datasets, add `--single-speaker`.
+
+### License Notes
+
+- **JVS corpus**: Free download is non-commercial only; commercial use requires separate license
+- **CSS10 corpus**: Apache License 2.0, commercial use OK
+- **piper-tts / pyopenjtalk**: MIT/BSD license
+
+---
+
 ## Exporting a Model
 
 When your model is finished training, export it to onnx with:
