@@ -4,7 +4,7 @@ This document lists all environment variables that can be used to configure Pipe
 
 ## OpenJTalk Configuration
 
-### OPENJTALK_DICTIONARY_DIR
+### OPENJTALK_DICTIONARY_PATH
 - **Description**: Path to OpenJTalk dictionary directory
 - **Default**: Auto-downloaded to user data directory
 - **Platform defaults**:
@@ -14,20 +14,21 @@ This document lists all environment variables that can be used to configure Pipe
 - **Example**:
   ```bash
   # Windows
-  set OPENJTALK_DICTIONARY_DIR=C:\openjtalk\dictionary
-  
+  set OPENJTALK_DICTIONARY_PATH=C:\openjtalk\dictionary
+
   # Linux/macOS
-  export OPENJTALK_DICTIONARY_DIR=/usr/share/open_jtalk/dic
+  export OPENJTALK_DICTIONARY_PATH=/usr/share/open_jtalk/dic
   ```
 
 ### OPENJTALK_VOICE
 - **Description**: Path to HTS voice file (.htsvoice)
 - **Default**: Auto-downloaded nitech_jp_atr503_m001.htsvoice
+- **Note**: HTS voice functionality is currently disabled. Piper operates in phonemizer-only mode, so this variable has no effect at present.
 - **Example**:
   ```bash
   # Windows
   set OPENJTALK_VOICE=C:\voices\mei_normal.htsvoice
-  
+
   # Linux/macOS
   export OPENJTALK_VOICE=/usr/share/hts-voice/mei_normal.htsvoice
   ```
@@ -108,12 +109,12 @@ echo "こんにちは" | piper --model ja_JP-model.onnx --output_file hello.wav
 ### Custom dictionary location
 ```bash
 # Windows
-set OPENJTALK_DICTIONARY_DIR=C:\my-dictionary
+set OPENJTALK_DICTIONARY_PATH=C:\my-dictionary
 set OPENJTALK_VOICE=C:\my-voice.htsvoice
 echo "テスト" | piper --model ja_JP-model.onnx --output_file test.wav
 
 # Linux/macOS
-export OPENJTALK_DICTIONARY_DIR=/opt/my-dictionary
+export OPENJTALK_DICTIONARY_PATH=/opt/my-dictionary
 export OPENJTALK_VOICE=/opt/my-voice.htsvoice
 echo "テスト" | piper --model ja_JP-model.onnx --output_file test.wav
 ```
@@ -122,7 +123,7 @@ echo "テスト" | piper --model ja_JP-model.onnx --output_file test.wav
 ```bash
 # Must have dictionary and voice files already installed
 export PIPER_OFFLINE_MODE=1
-export OPENJTALK_DICTIONARY_DIR=/path/to/existing/dictionary
+export OPENJTALK_DICTIONARY_PATH=/path/to/existing/dictionary
 export OPENJTALK_VOICE=/path/to/existing/voice.htsvoice
 echo "オフライン" | piper --model ja_JP-model.onnx --output_file offline.wav
 ```
@@ -130,7 +131,7 @@ echo "オフライン" | piper --model ja_JP-model.onnx --output_file offline.wa
 ## Precedence Order
 
 Environment variables are checked in the following order:
-1. User-specified paths (OPENJTALK_DICTIONARY_DIR, OPENJTALK_VOICE)
+1. User-specified paths (OPENJTALK_DICTIONARY_PATH, OPENJTALK_VOICE)
 2. System-installed locations (/usr/share/*, /usr/local/share/*)
 3. Auto-download to user data directory (if enabled)
 
@@ -138,7 +139,7 @@ Environment variables are checked in the following order:
 
 ### Dictionary not found
 1. Check if `PIPER_AUTO_DOWNLOAD_DICT=0` is set
-2. Verify `OPENJTALK_DICTIONARY_DIR` points to valid directory
+2. Verify `OPENJTALK_DICTIONARY_PATH` points to valid directory
 3. Ensure dictionary files exist (sys.dic, unk.dic, etc.)
 
 ### Download failures

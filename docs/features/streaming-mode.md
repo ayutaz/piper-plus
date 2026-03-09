@@ -1,16 +1,18 @@
 # Streaming Mode
 
-Piper now supports a streaming synthesis mode that reduces latency by processing text in chunks and outputting audio progressively.
+Piper supports a streaming synthesis mode that reduces latency by processing text in chunks and outputting audio progressively.
 
-## Usage
+> **Note:** The `--streaming` flag is available in the **C++ CLI** (`piper` binary) only. It is not exposed as a flag in the Python training CLI. For Python programmatic streaming, see the [Python Streaming API](#python-streaming-api) section below.
 
-Add the `--streaming` flag when using raw audio output:
+## C++ CLI Usage
+
+Add the `--streaming` flag when using the C++ `piper` binary with raw audio output:
 
 ```bash
-# Text input
+# Text input (C++ CLI)
 echo "Your text here" | piper --model model.onnx --output-raw --streaming
 
-# Raw phonemes input (also supported)
+# Raw phonemes input (C++ CLI)
 echo "h ə l oʊ w ɜː l d" | piper --model model.onnx --output-raw --streaming --raw-phonemes
 ```
 
@@ -44,7 +46,7 @@ Streaming mode provides the most benefit for longer texts:
 - Currently only works with `--output-raw` mode
 - Audio quality at chunk boundaries may vary slightly
 
-## API Usage
+## C++ API Usage
 
 For developers using the C++ API:
 
@@ -56,9 +58,40 @@ auto chunkCallback = [](const std::vector<int16_t>& chunk) {
     // Process or output chunk immediately
 };
 
-piper::textToAudioStreaming(config, voice, text, audioBuffer, 
+piper::textToAudioStreaming(config, voice, text, audioBuffer,
                             result, chunkCallback);
 ```
+
+## Python Streaming API
+
+Python streaming infrastructure is available in `piper_train.infer_onnx_streaming` for programmatic use. It requires split encoder/decoder ONNX models and provides a `SpeechStreamer` class that yields audio chunks progressively.
+
+```python
+from piper_train.infer_onnx_streaming import SpeechStreamer
+
+streamer = SpeechStreamer(
+    encoder_path="encoder.onnx",
+    decoder_path="decoder.onnx",
+    sample_rate=22050,
+    chunk_size=45,       # mel frames per decode step
+    chunk_padding=10,    # overlap frames to reduce boundary artifacts
+)
+
+# encoder_input is a dict with keys: input, input_lengths, scales, sid
+for wav_chunk in streamer.stream(encoder_input):
+    # wav_chunk is raw int16 PCM bytes
+    output_buffer.write(wav_chunk)
+```
+
+The module can also be invoked from the command line via JSONL input:
+
+```bash
+cat input.jsonl | python -m piper_train.infer_onnx_streaming \
+    --encoder encoder.onnx --decoder decoder.onnx \
+    > output.raw
+```
+
+Note that this Python streaming path operates on split encoder/decoder models and is separate from the C++ CLI `--streaming` flag.
 
 ## Future Improvements
 

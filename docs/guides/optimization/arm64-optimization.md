@@ -4,6 +4,8 @@
 
 This document describes the ARM64-specific optimizations implemented for Piper TTS to improve performance and reduce binary size on ARM64 platforms, particularly for embedded devices like Raspberry Pi.
 
+> **Note (current build status):** The NEON SIMD optimizations described below are currently **disabled** in the build. The `USE_ARM64_NEON` flag is commented out in `CMakeLists.txt`, so the NEON-optimized code paths are not compiled. The current ARM64 build uses only `-march=armv8-a -mtune=generic`. The compiler flags and NEON intrinsics described in this document are **aspirational/reference** material for when these optimizations are re-enabled.
+
 ## Optimization Goals (Issue #33)
 
 1. **Reduce ARM64 build size by 20%**

@@ -5,7 +5,7 @@
 ### macOS (Apple Silicon) の場合
 ```bash
 # Piperをダウンロード
-curl -L https://github.com/ayutaz/piper-plus/releases/latest/download/piper_macos_aarch64.tar.gz -o piper.tar.gz
+curl -L https://github.com/ayutaz/piper-plus/releases/latest/download/piper-macos-arm64.tar.gz -o piper.tar.gz
 tar -xzf piper.tar.gz
 
 # セキュリティ警告を回避
@@ -14,7 +14,7 @@ xattr -cr piper/
 
 ### macOS (Intel) の場合
 ```bash
-curl -L https://github.com/ayutaz/piper-plus/releases/latest/download/piper_macos_x64.tar.gz -o piper.tar.gz
+curl -L https://github.com/ayutaz/piper-plus/releases/latest/download/piper-macos-x64.tar.gz -o piper.tar.gz
 tar -xzf piper.tar.gz
 xattr -cr piper/
 ```
@@ -30,7 +30,7 @@ xattr -cr piper/
 ```bash
 # シンプルな例
 # espeak-ngのデータパスを設定
-export ESPEAK_DATA_PATH="$(pwd)/piper/espeak-ng-data"
+export ESPEAK_DATA_PATH="$(pwd)/piper/share/espeak-ng-data"
 echo "こんにちは" | ./piper/bin/piper --model your_model.onnx --output_file hello.wav
 
 # 再生（macOSの場合）
@@ -88,7 +88,7 @@ xattr -d com.apple.quarantine piper/bin/piper
 ```
 
 ### OpenJTalk辞書が見つからないエラー
-辞書は自動的に `piper/share/piper/openjtalk-dict/` に含まれています。
+辞書は自動的に `piper/share/open_jtalk/dic/` に含まれています。
 エラーが出る場合は、ファイルが正しく解凍されているか確認してください。
 
 ## 詳細情報

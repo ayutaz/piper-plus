@@ -169,9 +169,33 @@ python -m piper_train \
 
 ## 推奨設定
 
+### NCCL環境変数（マルチGPU必須）
+
+マルチGPU学習の安定性のため、以下の環境変数を必ず設定してください：
+
+```bash
+export NCCL_DEBUG=WARN
+export NCCL_P2P_DISABLE=1
+export NCCL_IB_DISABLE=1
+```
+
+これらを設定しないと、GPU間通信でハングやクラッシュが発生する場合があります。学習コマンドの前に付与するか、事前にexportしてください。
+
+### 重要なオプション
+
+| オプション | デフォルト | 説明 |
+|-----------|----------|------|
+| `--prosody-dim 16` | 16（有効） | A1/A2/A3 prosody特徴量の次元数。prosody_features付きデータセットで使用 |
+| `--samples-per-speaker N` | なし | SpeakerBalancedBatchSamplerを有効化。マルチスピーカーモデルでDuration Predictor崩壊を防ぐ |
+| `--disable_auto_lr_scaling` | 自動スケーリング有効 | 学習率の自動スケーリングを無効化し、`--base_lr`をそのまま使用 |
+| `--no-pin-memory` | pin_memory有効 | メモリ制約のある環境でホストメモリ使用量を削減 |
+
+**WavLM Discriminatorについて:** デフォルトで有効です。学習時のみ使用され推論には影響しませんが、GPUメモリを約1-2GB追加で消費します。メモリが不足する場合は`batch-size`を下げてください。
+
 ### 2-4 GPUs環境
 
 ```bash
+NCCL_DEBUG=WARN NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 \
 python -m piper_train \
     --dataset-dir /path/to/dataset \
     --batch-size 8 \
@@ -187,6 +211,7 @@ python -m piper_train \
 ### 8+ GPUs環境
 
 ```bash
+NCCL_DEBUG=WARN NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 \
 python -m piper_train \
     --dataset-dir /path/to/dataset \
     --batch-size 4 \
@@ -206,7 +231,7 @@ python -m piper_train \
 
 以下の最適化が自動的に適用されます：
 
-- `find_unused_parameters=False`: パフォーマンス向上
+- `find_unused_parameters=True`: GAN学習で必須（Generator/Discriminatorが交互に最適化されるため、各ステップで一部のパラメータが未使用になる）
 - `gradient_as_bucket_view=True`: メモリ効率向上
 - `static_graph=True`: VITSの固定グラフ構造に最適化
 

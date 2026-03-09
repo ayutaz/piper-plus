@@ -47,8 +47,8 @@ New-Item -ItemType Directory -Path C:\workspace -Force
 Set-Location C:\workspace
 
 # リポジトリをクローン
-git clone https://github.com/rhasspy/piper.git
-Set-Location piper
+git clone https://github.com/ayutaz/piper-plus.git
+Set-Location piper-plus
 ```
 
 ### 3. ビルドの実行

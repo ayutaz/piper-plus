@@ -61,7 +61,8 @@ pip3 install -e .
 
 Run the `build_monotonic_align.sh` script in the `src/python` directory to build the extension.
 
-Ensure you have [espeak-ng](https://github.com/espeak-ng/espeak-ng/) installed (`sudo apt-get install espeak-ng`).
+Optionally install [espeak-ng](https://github.com/espeak-ng/espeak-ng/) (`sudo apt-get install espeak-ng`).
+espeak-ng is **not required** for Japanese (`ja`) or English (`en`) — the Phonemizer registry uses pyopenjtalk and g2p-en (Apache-2.0) respectively.
 
 
 ## Preparing a Dataset
@@ -155,7 +156,7 @@ python3 -m piper_train.preprocess \
   --sample-rate 22050
 ```
 
-The `--language` argument refers to an [espeak-ng voice](https://github.com/espeak-ng/espeak-ng/) by default, such as `de` for German.
+The `--language` argument selects the G2P backend via the Phonemizer registry. Japanese (`ja`) uses pyopenjtalk and English (`en`) uses g2p-en (Apache-2.0) -- neither requires espeak-ng. For other languages (e.g. `de` for German), espeak-ng is used.
 
 To pre-process a multi-speaker dataset, remove the `--single-speaker` flag and ensure that your dataset has the 3 columns: `id|speaker|text`
 Verify the number of speakers in the generated `config.json` file before proceeding.
@@ -215,6 +216,14 @@ python3 -m piper_train \
 ```
 
 
+#### New defaults
+
+The following features are enabled by default and do not need explicit flags:
+
+- **Prosody features** (`--prosody-dim 16`): A1/A2/A3 accent features from OpenJTalk are fed into the Duration Predictor.
+- **EMA weights** (`--ema-decay 0.9995`): Exponential Moving Average is applied to the decoder for smoother convergence.
+- **WavLM Discriminator**: A perceptual quality discriminator that improves MOS by +0.15-0.25. It is used during training only (no impact on inference speed). Adds ~1-2 GB GPU memory; reduce `--batch-size` if needed. Control its weight with `--c-wavlm` (default 0.5).
+
 追加対応機能を踏まえて学習をする場合は、以下のようになります。学習を再開する際には `  --resume_from_checkpoint "${LATEST_CHECKPOINT_PATH}"` をつけて実行します
 
 ```sh
@@ -223,7 +232,7 @@ python3 -m piper_train \
   --accelerator 'gpu' \
   --devices 1 \
   --quality medium \
-  --precision 16 \
+  --precision 16-mixed \
   --batch-size 64 \
   --max_epochs 150 \
   --checkpoint-epochs 10 \
@@ -261,6 +270,8 @@ python3 -m piper_train \
 
 If you're training a multi-speaker model, use `--resume_from_single_speaker_checkpoint` instead of `--resume_from_checkpoint`. This will be *much* faster than training your multi-speaker model from scratch.
 
+For multi-speaker models, use `--samples-per-speaker <N>` to activate the `SpeakerBalancedBatchSampler`, which ensures each batch contains balanced speaker representation and prevents Duration Predictor collapse. For example, `--batch-size 20 --samples-per-speaker 2` with 10 speakers gives an effective batch of 20.
+
 
 ### Testing
 
@@ -269,20 +280,20 @@ To test your voice during training, you can use test sentences from `test/fixtur
 ```sh
 # For Japanese testing
 cat test/fixtures/test_japanese.txt | \
-    python3 -m piper_train.infer \
+    python3 -m piper_train.infer_onnx \
         --sample-rate 22050 \
         --checkpoint /path/to/training_dir/lightning_logs/version_0/checkpoints/*.ckpt \
         --output-dir /path/to/training_dir/output
 
 # For English testing  
 cat test/fixtures/test_english.txt | \
-    python3 -m piper_train.infer \
+    python3 -m piper_train.infer_onnx \
         --sample-rate 22050 \
         --checkpoint /path/to/training_dir/lightning_logs/version_0/checkpoints/*.ckpt \
         --output-dir /path/to/training_dir/output
 ```
 
-The input format to `piper_train.infer` is the same as `dataset.jsonl`: one line of JSON per utterance with `phoneme_ids` and `speaker_id` (multi-speaker only). Generate your own test file with [piper-phonemize](https://github.com/rhasspy/piper-phonemize/):
+The input format to `piper_train.infer_onnx` is the same as `dataset.jsonl`: one line of JSON per utterance with `phoneme_ids` and `speaker_id` (multi-speaker only). Generate your own test file with [piper-phonemize](https://github.com/rhasspy/piper-phonemize/):
 
 ```sh
 lib/piper_phonemize -l en-us --espeak-data lib/espeak-ng-data/ < my_test_sentences.txt > my_test_phonemes.jsonl
@@ -393,9 +404,26 @@ When your model is finished training, export it to onnx with:
 python3 -m piper_train.export_onnx \
     /path/to/model.ckpt \
     /path/to/model.onnx
-    
+
 cp /path/to/training_dir/config.json \
    /path/to/model.onnx.json
+```
+
+#### Export options
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--stochastic` | off | Enable noise_scale sampling in the exported graph. **Recommended for WavLM-trained models.** |
+| `--use-ema` | on | Apply EMA weights to the decoder in the exported model. |
+| `--no-ema` | - | Disable EMA weight application. |
+
+Example for a WavLM-trained model:
+
+```sh
+python3 -m piper_train.export_onnx \
+    --stochastic \
+    /path/to/model.ckpt \
+    /path/to/model.onnx
 ```
 
 ### ONNX Model Optimization (New Feature)
