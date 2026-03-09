@@ -11,6 +11,7 @@ import argparse
 import io
 import json
 import logging
+import os
 import sys
 import time
 from pathlib import Path
@@ -183,7 +184,7 @@ class PiperInferenceEngine:
 def main():
     logging.basicConfig(level=logging.INFO)
     parser = argparse.ArgumentParser(description="Piper TTS Inference")
-    parser.add_argument("--model", required=True, help="Path to ONNX model")
+    parser.add_argument("--model", help="Path to ONNX model (required for CLI/server mode)")
     parser.add_argument("--config", help="Path to config.json (default: next to model)")
     parser.add_argument("--text", help="Text to synthesize")
     parser.add_argument("--output", default="output.wav", help="Output WAV path")
@@ -203,7 +204,33 @@ def main():
     )
     parser.add_argument("--server", action="store_true", help="Run as FastAPI server")
     parser.add_argument("--port", type=int, default=8000, help="Server port")
+    parser.add_argument(
+        "--webui",
+        action="store_true",
+        help="Run Gradio WebUI (also enabled by PIPER_WEBUI=1 env var)",
+    )
+    parser.add_argument(
+        "--model-dir",
+        default="/app/models",
+        help="Directory containing ONNX models (WebUI mode)",
+    )
+    parser.add_argument(
+        "--output-dir",
+        default="/app/output",
+        help="Directory for output files (WebUI mode)",
+    )
+    parser.add_argument("--webui-port", type=int, default=7860, help="Gradio WebUI port")
     args = parser.parse_args()
+
+    # Check for WebUI mode (flag or env var)
+    webui_mode = args.webui or os.environ.get("PIPER_WEBUI", "").strip() in ("1", "true")
+    if webui_mode:
+        _run_webui(args)
+        return
+
+    # --model is required for CLI and server modes
+    if not args.model:
+        parser.error("--model is required for CLI and server modes")
 
     # Resolve config path
     config_path = args.config or str(Path(args.model).parent / "config.json")
@@ -267,6 +294,39 @@ def _run_server(engine: PiperInferenceEngine, args):
             raise HTTPException(status_code=500, detail=str(e)) from e
 
     uvicorn.run(app, host="0.0.0.0", port=args.port)
+
+
+def _run_webui(args):
+    """Launch the Gradio WebUI."""
+    try:
+        from webui import create_ui  # noqa: WPS433
+    except ImportError:
+        try:
+            # Fallback: try absolute import path
+            script_dir = Path(__file__).resolve().parent
+            webui_path = script_dir / "webui.py"
+            if webui_path.exists():
+                import importlib.util
+
+                spec = importlib.util.spec_from_file_location("webui", webui_path)
+                webui_mod = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(webui_mod)
+                create_ui = webui_mod.create_ui
+            else:
+                print("WebUI not available. Ensure webui.py is in the same directory.")
+                sys.exit(1)
+        except Exception as e:
+            print(f"Failed to import WebUI: {e}")
+            sys.exit(1)
+
+    host = "0.0.0.0"
+    port = args.webui_port
+    model_dir = args.model_dir
+    output_dir = args.output_dir
+
+    _LOGGER.info("Starting Gradio WebUI on %s:%d (model_dir=%s)", host, port, model_dir)
+    demo = create_ui(model_dir, output_dir)
+    demo.launch(server_name=host, server_port=port)
 
 
 if __name__ == "__main__":

@@ -45,6 +45,14 @@ jobs:
           print('All smoke tests passed')
           "
 
+      - name: WebUI smoke test
+        run: |
+          docker run --rm piper-python-inference:test python -c "
+          import gradio; print(f'gradio {gradio.__version__} OK')
+          from webui import create_ui; print('WebUI create_ui importable: OK')
+          print('WebUI smoke test passed')
+          "
+
       - name: Test --device cpu providers
         run: |
           docker run --rm piper-python-inference:test python -c "
@@ -316,33 +324,3 @@ jobs:
           fi
           echo "C++ dev - Japanese inference test passed"
 
-  test-webui:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Free disk space
-        run: |
-          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost "$AGENT_TOOLSDIRECTORY" /usr/local/lib/android /opt/hostedtoolcache/CodeQL
-          sudo docker image prune --all --force
-          sudo apt-get clean
-
-      - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
-
-      - name: Build WebUI image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ./docker/webui/Dockerfile
-          push: false
-          tags: piper-webui:test
-          load: true
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Smoke test
-        run: |
-          docker run --rm piper-webui:test python -c "
-          import piper_train; print('piper_train OK')
-          import gradio; print(f'gradio {gradio.__version__} OK')
-          print('All smoke tests passed')
-          "
