@@ -1,20 +1,21 @@
 # C++ / Python 実装差分調査レポート
 
-> **調査日**: 2026-03-08（初版）/ 2026-03-09（M1+M1.5完了更新）/ 2026-03-10（M2+M3完了更新）
+> **調査日**: 2026-03-08（初版）/ 2026-03-09（M1+M1.5完了更新）/ 2026-03-10（M2+M3+M4完了更新）
 > **対象ブランチ**: `fix/cpp-python-sync`（PR #229）
 > **調査方法**: 15エージェント並行調査 + Docker推論実測比較
 > **検証モデル**: `ayousanz/piper-plus-tsukuyomi-chan` (tsukuyomi-wavlm-300epoch.onnx)
 
 ---
 
-## M1 + M1.5 + M2 + M3 完了サマリー（2026-03-10）
+## 全マイルストーン完了サマリー（2026-03-10）
 
-**全差分が解消済み。** M1（コミット `c251b1d`）およびM1.5（コミット `2997b1b`）により、C++推論パイプラインとPython学習パイプラインの音素化処理が完全に同期された。**全8テストケースで phoneme_ids が完全一致（PASS）** を確認。
+**全差分が解消済み。全マイルストーン（M1〜M4）完了。** M1（コミット `c251b1d`）およびM1.5（コミット `2997b1b`）により、C++推論パイプラインとPython学習パイプラインの音素化処理が完全に同期された。**全8テストケースで phoneme_ids が完全一致（PASS）** を確認。
 
 - **M1**: 疑問詞マーカー、Nバリアント、プロソディマーク挿入を C++ に実装
 - **M1.5**: OpenJTalkフロントエンドを pyopenjtalk-plus（Cライブラリ直接リンク）に統一し、A1/A2/A3値の差異を解消
 - **M2**: テスト・ログ整合性を確保。新規テスト58件（Nバリアント38件 + 疑問詞マーカー20件）を追加し全てPASS。prosody_features型テストもint64に修正済み。openjtalk_phonemize_utils.cpp として独立ユーティリティに分離。
 - **M3**: インターフェース改善。JSON入力でprosody_featuresをサポート（ProsodyFeatureをpiper.hppに移動、textToAudio/textToWavFileにexternalProsodyパラメータ追加）。カスタム辞書の日本語単語境界をマルチバイトUTF-8対応に修正。
+- **M4**: Docker回帰テスト。`regression_test.sh`（8テストケース、ハードコード期待値）を作成し8/8 PASS。CI（`docker-test.yml`）にC++ユニットテストジョブを追加。
 
 ---
 
@@ -30,8 +31,8 @@
 | ~~**Critical**~~ | ~~Nバリアント未実装~~ | ✅ 解消 | M1で実装済み（`c251b1d`） |
 | ~~**Critical**~~ | ~~プロソディマーク未実装~~ | ✅ 解消 | M1で実装済み（`c251b1d`） |
 | ~~**Critical**~~ | ~~OpenJTalkフロントエンド差異~~ | ✅ 解消 | M1.5で pyopenjtalk-plus に統一（`2997b1b`） |
-| **Medium** | JSON入力で prosody_features 未サポート | 🔲 未対応 | M3で対応予定 |
-| **Medium** | カスタム辞書の日本語単語境界 | 🔲 未対応 | M3で対応予定 |
+| ~~**Medium**~~ | ~~JSON入力で prosody_features 未サポート~~ | ✅ 解消 | M3で実装済み |
+| ~~**Medium**~~ | ~~カスタム辞書の日本語単語境界~~ | ✅ 解消 | M3で実装済み |
 | ~~**Low**~~ | ~~puaToPhoneme未登録~~ | ✅ 解消 | M1で実装済み（`c251b1d`） |
 | ~~**Info**~~ | ~~prosody_features テンソル型の整合性~~ | ✅ 解消 | テスト修正済み（`31b586c`） |
 
