@@ -13,10 +13,21 @@ xattr -cr piper/
 ```
 
 ### macOS (Intel) の場合
+
+> **注意:** Intel Mac 用のバイナリは CI でビルドされていません。Docker またはソースからのビルドをご利用ください。
+
 ```bash
-curl -L https://github.com/ayutaz/piper-plus/releases/latest/download/piper-macos-x64.tar.gz -o piper.tar.gz
-tar -xzf piper.tar.gz
-xattr -cr piper/
+# Docker を使用する場合
+docker build -t piper-cpp -f docker/cpp-inference/Dockerfile .
+docker run --rm -v $(pwd)/models:/app/models:ro -v $(pwd)/output:/app/output \
+  piper-cpp bash -c 'echo "こんにちは" | piper --model /app/models/model.onnx --output_file /app/output/output.wav'
+
+# ソースからビルドする場合
+brew install cmake onnxruntime
+git clone https://github.com/ayutaz/piper-plus.git
+cd piper-plus && mkdir build && cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release
+make -j$(sysctl -n hw.ncpu)
 ```
 
 ## 2. 日本語モデルの準備

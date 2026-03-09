@@ -74,7 +74,7 @@ streamer = SpeechStreamer(
     decoder_path="decoder.onnx",
     sample_rate=22050,
     chunk_size=45,       # mel frames per decode step
-    chunk_padding=10,    # overlap frames to reduce boundary artifacts
+    chunk_padding=5,     # overlap frames to reduce boundary artifacts (CLI default: 5, class default: 10)
 )
 
 # encoder_input is a dict with keys: input, input_lengths, scales, sid

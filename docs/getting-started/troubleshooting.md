@@ -68,9 +68,9 @@ Error: Model file not found: model.onnx
 
 3. **Using wrong model type**
    - Ensure you're using a Japanese model (ja_JP-*.onnx)
-   - Piper-plus now uses a Phonemizer registry system (`registry.get_phonemizer(language)`) instead of `phoneme_type` in config.json
-   - espeak-ng is optional: English uses g2p-en (Apache-2.0), Japanese uses pyopenjtalk
-   - If using a legacy model, check that config.json has `"phoneme_type": "openjtalk"`
+   - For Python inference (`infer_onnx`), the Phonemizer registry selects the G2P backend via `--language` (ja→pyopenjtalk, en→g2p-en)
+   - For the C++ CLI and preprocessing, `phoneme_type` in `config.json` is still used to choose how text is phonemized
+   - Ensure config.json has the correct `"phoneme_type"`: `"openjtalk"` for Japanese models, `"espeak"` for other languages
 
 ### "Failed to download dictionary" Error
 

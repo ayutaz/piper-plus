@@ -61,8 +61,8 @@ pip3 install -e .
 
 Run the `build_monotonic_align.sh` script in the `src/python` directory to build the extension.
 
-Optionally install [espeak-ng](https://github.com/espeak-ng/espeak-ng/) (`sudo apt-get install espeak-ng`).
-espeak-ng is **not required** for Japanese (`ja`) or English (`en`) — the Phonemizer registry uses pyopenjtalk and g2p-en (Apache-2.0) respectively.
+Install [espeak-ng](https://github.com/espeak-ng/espeak-ng/) (`sudo apt-get install espeak-ng`).
+espeak-ng is **required for preprocessing** all languages except Japanese (`ja`), which uses pyopenjtalk. English preprocessing also requires espeak-ng. Note: at inference time (`infer_onnx`), the Phonemizer registry allows English to use g2p-en (Apache-2.0) without espeak-ng, but the `preprocess` step still depends on it.
 
 
 ## Preparing a Dataset
@@ -156,7 +156,7 @@ python3 -m piper_train.preprocess \
   --sample-rate 22050
 ```
 
-The `--language` argument selects the G2P backend via the Phonemizer registry. Japanese (`ja`) uses pyopenjtalk and English (`en`) uses g2p-en (Apache-2.0) -- neither requires espeak-ng. For other languages (e.g. `de` for German), espeak-ng is used.
+The `--language` argument refers to an [espeak-ng voice](https://github.com/espeak-ng/espeak-ng/) for preprocessing (e.g. `en-us` for English, `de` for German). Japanese (`ja`) is special-cased to use pyopenjtalk instead of espeak-ng. Note: the GPL-free g2p-en backend is available at inference time (`infer_onnx --language en`) but is not yet integrated into the preprocessing pipeline.
 
 To pre-process a multi-speaker dataset, remove the `--single-speaker` flag and ensure that your dataset has the 3 columns: `id|speaker|text`
 Verify the number of speakers in the generated `config.json` file before proceeding.
