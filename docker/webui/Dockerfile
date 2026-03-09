@@ -19,7 +19,7 @@ COPY src/python /app/src/python
 
 # Install piper_train with inference extras + gradio
 RUN uv pip install --system "/app/src/python[inference]" && \
-    uv pip install --system "gradio>=4.0"
+    uv pip install --system "gradio==6.9.0" "numpy>=1.24.0,<2.3"
 
 # Copy WebUI application
 COPY docker/webui/app.py /app/app.py
