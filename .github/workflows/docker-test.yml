@@ -267,19 +267,7 @@ jobs:
           echo 'All smoke tests passed'
           "
 
-      - name: Build piper from source
-        run: |
-          docker run --rm \
-            -v ${{ github.workspace }}:/src \
-            piper-cpp-dev:test \
-            bash -c "
-              cd /src && mkdir -p build-test && cd build-test && \
-              cmake .. -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=OFF && \
-              ninja -j\$(nproc) && \
-              echo 'Piper build from source: OK'
-            "
-
-      - name: Inference test - English
+      - name: Build and inference test (English + Japanese)
         run: |
           mkdir -p /tmp/output
           docker run --rm \
@@ -290,37 +278,22 @@ jobs:
               cd /src && mkdir -p build-test && cd build-test && \
               cmake .. -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=OFF && \
               ninja -j\$(nproc) && \
+              echo 'Piper build from source: OK' && \
               echo 'Hello, how are you today?' | ./piper \
                 --model /src/test/models/test_voice.onnx \
-                --output_file /output/test_en.wav
-            "
-
-          FILE_SIZE=$(stat --format=%s /tmp/output/test_en.wav)
-          echo "Output: test_en.wav ($FILE_SIZE bytes)"
-          if [ "$FILE_SIZE" -lt 1000 ]; then
-            echo "ERROR: Output file too small ($FILE_SIZE bytes)"
-            exit 1
-          fi
-          echo "C++ dev - English inference test passed"
-
-      - name: Inference test - Japanese
-        run: |
-          docker run --rm \
-            -v ${{ github.workspace }}:/src \
-            -v /tmp/output:/output \
-            piper-cpp-dev:test \
-            bash -c "
-              cd /src/build-test && \
+                --output_file /output/test_en.wav && \
               echo 'こんにちは、今日は良い天気ですね。' | ./piper \
                 --model /src/test/models/ja_JP-test-medium.onnx \
                 --output_file /output/test_ja.wav
             "
 
-          FILE_SIZE=$(stat --format=%s /tmp/output/test_ja.wav)
-          echo "Output: test_ja.wav ($FILE_SIZE bytes)"
-          if [ "$FILE_SIZE" -lt 1000 ]; then
-            echo "ERROR: Output file too small ($FILE_SIZE bytes)"
-            exit 1
-          fi
-          echo "C++ dev - Japanese inference test passed"
+          for f in test_en.wav test_ja.wav; do
+            FILE_SIZE=$(stat --format=%s /tmp/output/$f)
+            echo "Output: $f ($FILE_SIZE bytes)"
+            if [ "$FILE_SIZE" -lt 1000 ]; then
+              echo "ERROR: $f too small ($FILE_SIZE bytes)"
+              exit 1
+            fi
+          done
+          echo "C++ dev - Build and inference tests passed"
 
