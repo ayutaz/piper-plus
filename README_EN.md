@@ -1,6 +1,6 @@
 ![Piper logo](etc/logo.png)
 
-English | [日本語](README.md)
+English | [日本語](README.md) | [中文](README_ZH.md) | [Français](README_FR.md)
 
 [![CI](https://github.com/ayutaz/piper-plus/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/ayutaz/piper-plus/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/piper-tts-plus)](https://pypi.org/project/piper-tts-plus/)
