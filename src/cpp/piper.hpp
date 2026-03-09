@@ -34,10 +34,17 @@ struct PiperConfig {
   std::unique_ptr<tashkeel::State> tashkeelState;
 };
 
-enum PhonemeType { 
-  eSpeakPhonemes, 
+enum PhonemeType {
+  eSpeakPhonemes,
   TextPhonemes,
   OpenJTalkPhonemes
+};
+
+// Prosody info for a phoneme (A1/A2/A3 values from OpenJTalk)
+struct ProsodyFeature {
+    int a1;  // Relative position from accent nucleus
+    int a2;  // Position in accent phrase (1-based)
+    int a3;  // Total morae in accent phrase
 };
 
 struct PhonemizeConfig {
@@ -139,11 +146,13 @@ void loadVoice(PiperConfig &config, std::string modelPath,
 // Phonemize text and synthesize audio
 void textToAudio(PiperConfig &config, Voice &voice, std::string text,
                  std::vector<int16_t> &audioBuffer, SynthesisResult &result,
-                 const std::function<void()> &audioCallback);
+                 const std::function<void()> &audioCallback,
+                 const std::vector<ProsodyFeature> *externalProsody = nullptr);
 
 // Phonemize text and synthesize audio to WAV file
 void textToWavFile(PiperConfig &config, Voice &voice, std::string text,
-                   std::ostream &audioFile, SynthesisResult &result);
+                   std::ostream &audioFile, SynthesisResult &result,
+                   const std::vector<ProsodyFeature> *externalProsody = nullptr);
 
 // Synthesize audio directly from phonemes
 void phonemesToAudio(PiperConfig &config, Voice &voice, 

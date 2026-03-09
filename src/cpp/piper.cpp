@@ -895,7 +895,8 @@ void synthesize(std::vector<PhonemeId> &phonemeIds,
 // Phonemize text and synthesize audio
 void textToAudio(PiperConfig &config, Voice &voice, std::string text,
                  std::vector<int16_t> &audioBuffer, SynthesisResult &result,
-                 const std::function<void()> &audioCallback) {
+                 const std::function<void()> &audioCallback,
+                 const std::vector<ProsodyFeature> *externalProsody) {
 
   std::size_t sentenceSilenceSamples = 0;
   if (voice.synthesisConfig.sentenceSilenceSeconds > 0) {
@@ -985,6 +986,13 @@ void textToAudio(PiperConfig &config, Voice &voice, std::string text,
         }
       }
     }
+  }
+
+  // Override prosody features with external data if provided
+  if (externalProsody && !externalProsody->empty() && useProsody) {
+    allProsodyFeatures.clear();
+    allProsodyFeatures.push_back(*externalProsody);
+    spdlog::debug("Using {} external prosody features", externalProsody->size());
   }
 
   // Synthesize each sentence independently.
@@ -1183,10 +1191,11 @@ void textToAudio(PiperConfig &config, Voice &voice, std::string text,
 
 // Phonemize text and synthesize audio to WAV file
 void textToWavFile(PiperConfig &config, Voice &voice, std::string text,
-                   std::ostream &audioFile, SynthesisResult &result) {
+                   std::ostream &audioFile, SynthesisResult &result,
+                   const std::vector<ProsodyFeature> *externalProsody) {
 
   std::vector<int16_t> audioBuffer;
-  textToAudio(config, voice, text, audioBuffer, result, NULL);
+  textToAudio(config, voice, text, audioBuffer, result, NULL, externalProsody);
 
   // Write WAV
   auto synthesisConfig = voice.synthesisConfig;

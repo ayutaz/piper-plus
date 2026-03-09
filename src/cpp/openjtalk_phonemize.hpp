@@ -29,13 +29,6 @@ extern "C" {
 
 namespace piper {
 
-// Prosody info for a phoneme (A1/A2/A3 values from OpenJTalk)
-struct ProsodyFeature {
-    int a1;  // Relative position from accent nucleus
-    int a2;  // Position in accent phrase (1-based)
-    int a3;  // Total morae in accent phrase
-};
-
 // Phonemize Japanese text using OpenJTalk
 void phonemize_openjtalk(const std::string &text,
                         std::vector<std::vector<Phoneme>> &phonemes);

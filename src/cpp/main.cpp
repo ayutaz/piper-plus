@@ -90,6 +90,7 @@ struct RunConfig {
   //   "speaker_id": int,         (optional)
   //   "speaker": str,            (optional)
   //   "output_file": str,        (optional)
+  //   "prosody_features": [[a1,a2,a3], ...],  (optional)
   // }
   bool jsonInput = false;
 
@@ -365,6 +366,10 @@ int main(int argc, char *argv[]) {
     auto speakerId = voice.synthesisConfig.speakerId;
     std::optional<filesystem::path> maybeOutputPath = runConfig.outputPath;
 
+    // External prosody features (from JSON input)
+    std::vector<piper::ProsodyFeature> externalProsody;
+    const std::vector<piper::ProsodyFeature> *externalProsodyPtr = nullptr;
+
     if (runConfig.jsonInput) {
       // Each line is a JSON object
       json lineRoot = json::parse(line);
@@ -394,6 +399,17 @@ int main(int argc, char *argv[]) {
           spdlog::warn("No speaker named: {}", speakerName);
         }
       }
+
+      if (lineRoot.contains("prosody_features")) {
+        for (const auto& item : lineRoot["prosody_features"]) {
+          piper::ProsodyFeature pf;
+          pf.a1 = item[0].get<int>();
+          pf.a2 = item[1].get<int>();
+          pf.a3 = item[2].get<int>();
+          externalProsody.push_back(pf);
+        }
+        externalProsodyPtr = &externalProsody;
+      }
     }
     
     // カスタム辞書を適用
@@ -422,7 +438,7 @@ int main(int argc, char *argv[]) {
         auto phonemes = piper::parsePhonemeString(line, phonemeType);
         piper::phonemesToWavFile(piperConfig, voice, phonemes, audioFile, result);
       } else {
-        piper::textToWavFile(piperConfig, voice, line, audioFile, result);
+        piper::textToWavFile(piperConfig, voice, line, audioFile, result, externalProsodyPtr);
       }
       cout << outputPath.string() << endl;
     } else if (outputType == OUTPUT_FILE) {
@@ -452,7 +468,7 @@ int main(int argc, char *argv[]) {
         auto phonemes = piper::parsePhonemeString(line, phonemeType);
         piper::phonemesToWavFile(piperConfig, voice, phonemes, audioFile, result);
       } else {
-        piper::textToWavFile(piperConfig, voice, line, audioFile, result);
+        piper::textToWavFile(piperConfig, voice, line, audioFile, result, externalProsodyPtr);
       }
       cout << outputPath.string() << endl;
     } else if (outputType == OUTPUT_STDOUT) {
@@ -463,7 +479,7 @@ int main(int argc, char *argv[]) {
         auto phonemes = piper::parsePhonemeString(line, phonemeType);
         piper::phonemesToWavFile(piperConfig, voice, phonemes, cout, result);
       } else {
-        piper::textToWavFile(piperConfig, voice, line, cout, result);
+        piper::textToWavFile(piperConfig, voice, line, cout, result, externalProsodyPtr);
       }
     } else if (outputType == OUTPUT_RAW) {
       // Raw output to stdout
@@ -526,7 +542,7 @@ int main(int argc, char *argv[]) {
           piper::phonemesToAudio(piperConfig, voice, phonemes, audioBuffer, result, audioCallback);
         } else {
           piper::textToAudio(piperConfig, voice, line, audioBuffer, result,
-                             audioCallback);
+                             audioCallback, externalProsodyPtr);
         }
       }
 
