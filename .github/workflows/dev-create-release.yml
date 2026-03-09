@@ -192,23 +192,10 @@ jobs:
       contents: write
       packages: read
 
-  # Run comprehensive test suite
-  # TODO: Fix test suite issues:
-  # 1. Python linting errors (33 errors found)
-  # 2. Performance benchmarks can't find piper binary
-  # Temporarily disabled until fixed
-  # run_tests:
-  #   name: Run Test Suite
-  #   needs: build_all
-  #   uses: ./.github/workflows/test-suite.yml
-  #   with:
-  #     release_name: ${{ needs.create_release.outputs.release_name }}
-  #   continue-on-error: true  # Allow workflow to continue even if tests fail
-
   # Publish to PyPI
   publish_pypi:
     name: Publish to PyPI
-    needs: [build_all]  # run_tests removed temporarily
+    needs: [build_all]
     if: |
       always() && 
       needs.build_all.result == 'success'
