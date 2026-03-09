@@ -2,7 +2,7 @@ name: WebUI Tests
 
 on:
   pull_request:
-    branches: [ dev, main ]
+    branches: [ dev ]
     paths:
       - 'src/python_run/piper/webui.py'
       - 'src/python_run/piper/sample_texts.py'
@@ -13,7 +13,7 @@ on:
       - 'src/python_run/tests/test_training_*.py'
       - '.github/workflows/webui-test.yml'
   push:
-    branches: [ dev, main ]
+    branches: [ dev ]
     paths:
       - 'src/python_run/piper/webui.py'
       - 'src/python_run/piper/sample_texts.py'
