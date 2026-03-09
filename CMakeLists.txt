@@ -115,6 +115,7 @@ endif()
 # Add OpenJTalk support on all platforms
 target_sources(piper PRIVATE
   src/cpp/openjtalk_phonemize.cpp
+  src/cpp/openjtalk_phonemize_utils.cpp
   src/cpp/openjtalk_wrapper.c
   src/cpp/openjtalk_dictionary_manager.c
   src/cpp/openjtalk_error.c
@@ -124,6 +125,7 @@ target_sources(piper PRIVATE
 )
 target_sources(test_piper PRIVATE
   src/cpp/openjtalk_phonemize.cpp
+  src/cpp/openjtalk_phonemize_utils.cpp
   src/cpp/openjtalk_wrapper.c
   src/cpp/openjtalk_dictionary_manager.c
   src/cpp/openjtalk_error.c

@@ -16,6 +16,8 @@ set(TEST_SOURCES
     test_streaming_simple.cpp
     test_streaming_raw_phonemes.cpp
     test_prosody_inference.cpp
+    test_n_variants.cpp
+    test_question_markers.cpp
     test_model_speaker_detection.cpp
     test_custom_dictionary.cpp
 )
@@ -184,6 +186,7 @@ foreach(test_source ${TEST_SOURCES})
             ../piper.cpp
             ../phoneme_parser.cpp
             ../openjtalk_phonemize.cpp
+            ../openjtalk_phonemize_utils.cpp
             ../openjtalk_wrapper.c
             ../openjtalk_dictionary_manager.c
             ../openjtalk_error.c
@@ -304,6 +307,7 @@ foreach(test_source ${TEST_SOURCES})
             ../piper.cpp
             ../phoneme_parser.cpp
             ../openjtalk_phonemize.cpp
+            ../openjtalk_phonemize_utils.cpp
             ../openjtalk_wrapper.c
             ../openjtalk_dictionary_manager.c
             ../openjtalk_error.c
@@ -410,6 +414,16 @@ foreach(test_source ${TEST_SOURCES})
         endif()
         # Ensure dependencies are built first
         add_dependencies(${test_name} spdlog_external fmt_external)
+    endif()
+
+    # Link utils source for N variants and question markers tests
+    if(${test_name} STREQUAL "test_n_variants" OR ${test_name} STREQUAL "test_question_markers")
+        target_sources(${test_name} PRIVATE
+            ../openjtalk_phonemize_utils.cpp
+        )
+        target_include_directories(${test_name} PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/..
+        )
     endif()
 
     add_test(NAME ${test_name} COMMAND ${test_name})
