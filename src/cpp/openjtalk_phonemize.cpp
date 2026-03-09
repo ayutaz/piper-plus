@@ -188,6 +188,7 @@ void phonemize_openjtalk_with_prosody(
 
     // Get question type from text
     std::string eosType = getQuestionType(text);
+    spdlog::debug("getQuestionType('{}') = '{}'", text, eosType);
 
     // Add BOS unconditionally
     sentenceTokens.push_back("^");
@@ -269,6 +270,16 @@ void phonemize_openjtalk_with_prosody(
         sentenceProsody.push_back({0, 0, 0});
 
         applyNPhonemeRules(sentenceTokens);
+
+        // Debug: dump final sentence tokens
+        {
+            std::string tokenDump;
+            for (const auto& tok : sentenceTokens) {
+                if (!tokenDump.empty()) tokenDump += " ";
+                tokenDump += tok;
+            }
+            spdlog::debug("Final sentenceTokens: {}", tokenDump);
+        }
 
         std::vector<Phoneme> sentPhonemes;
         for (const auto& tok : sentenceTokens) {

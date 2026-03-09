@@ -88,15 +88,29 @@ foreach(test_source ${TEST_SOURCES})
             ../openjtalk_dictionary_manager.c
             ../openjtalk_error.c
             ../openjtalk_security.c
-            # ../openjtalk_api.c  # Temporarily disabled - requires OpenJTalk static libs
+            ../openjtalk_api.c
         )
         target_include_directories(${test_name} PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/..
+            ${CMAKE_BINARY_DIR}/oj/include
+            ${CMAKE_BINARY_DIR}/oj/include/openjtalk
+            ${CMAKE_BINARY_DIR}/hts_stub/include
         )
         find_package(Threads REQUIRED)
         target_link_libraries(${test_name}
             Threads::Threads
         )
+        if(WIN32)
+            target_link_libraries(${test_name} ${CMAKE_BINARY_DIR}/oj/lib/openjtalk.lib)
+        else()
+            target_link_libraries(${test_name} ${CMAKE_BINARY_DIR}/oj/lib/libopenjtalk.a)
+        endif()
+        if(TARGET hts_engine_stub)
+            target_link_libraries(${test_name} hts_engine_stub)
+        endif()
+        if(TARGET openjtalk_external)
+            add_dependencies(${test_name} openjtalk_external)
+        endif()
     endif()
     
     # Link additional dependencies for error handling test
@@ -106,15 +120,29 @@ foreach(test_source ${TEST_SOURCES})
             ../openjtalk_dictionary_manager.c
             ../openjtalk_error.c
             ../openjtalk_security.c
-            # ../openjtalk_api.c  # Temporarily disabled - requires OpenJTalk static libs
+            ../openjtalk_api.c
         )
         target_include_directories(${test_name} PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/..
+            ${CMAKE_BINARY_DIR}/oj/include
+            ${CMAKE_BINARY_DIR}/oj/include/openjtalk
+            ${CMAKE_BINARY_DIR}/hts_stub/include
         )
         find_package(Threads REQUIRED)
         target_link_libraries(${test_name}
             Threads::Threads
         )
+        if(WIN32)
+            target_link_libraries(${test_name} ${CMAKE_BINARY_DIR}/oj/lib/openjtalk.lib)
+        else()
+            target_link_libraries(${test_name} ${CMAKE_BINARY_DIR}/oj/lib/libopenjtalk.a)
+        endif()
+        if(TARGET hts_engine_stub)
+            target_link_libraries(${test_name} hts_engine_stub)
+        endif()
+        if(TARGET openjtalk_external)
+            add_dependencies(${test_name} openjtalk_external)
+        endif()
     endif()
     
     # Link additional dependencies for optimized test
@@ -125,15 +153,29 @@ foreach(test_source ${TEST_SOURCES})
             ../openjtalk_error.c
             ../openjtalk_security.c
             ../openjtalk_optimized.c
-            # ../openjtalk_api.c  # Temporarily disabled - requires OpenJTalk static libs
+            ../openjtalk_api.c
         )
         target_include_directories(${test_name} PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/..
+            ${CMAKE_BINARY_DIR}/oj/include
+            ${CMAKE_BINARY_DIR}/oj/include/openjtalk
+            ${CMAKE_BINARY_DIR}/hts_stub/include
         )
         find_package(Threads REQUIRED)
         target_link_libraries(${test_name}
             Threads::Threads
         )
+        if(WIN32)
+            target_link_libraries(${test_name} ${CMAKE_BINARY_DIR}/oj/lib/openjtalk.lib)
+        else()
+            target_link_libraries(${test_name} ${CMAKE_BINARY_DIR}/oj/lib/libopenjtalk.a)
+        endif()
+        if(TARGET hts_engine_stub)
+            target_link_libraries(${test_name} hts_engine_stub)
+        endif()
+        if(TARGET openjtalk_external)
+            add_dependencies(${test_name} openjtalk_external)
+        endif()
     endif()
 
     # Link additional dependencies for streaming test - using same approach as test_piper
@@ -147,14 +189,18 @@ foreach(test_source ${TEST_SOURCES})
             ../openjtalk_error.c
             ../openjtalk_security.c
             ../openjtalk_optimized.c
+            ../openjtalk_api.c
         )
-        
+
         # Include directories
         target_include_directories(${test_name} PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/..
             ${CMAKE_BINARY_DIR}/fi/include
             ${CMAKE_BINARY_DIR}/si/include
             ${CMAKE_BINARY_DIR}/pi/include
+            ${CMAKE_BINARY_DIR}/oj/include
+            ${CMAKE_BINARY_DIR}/oj/include/openjtalk
+            ${CMAKE_BINARY_DIR}/hts_stub/include
         )
         
         # Add library directories
@@ -193,12 +239,25 @@ foreach(test_source ${TEST_SOURCES})
             target_link_libraries(${test_name} Threads::Threads)
         endif()
         
+        # Link OpenJTalk static library
+        if(WIN32)
+            target_link_libraries(${test_name} ${CMAKE_BINARY_DIR}/oj/lib/openjtalk.lib)
+        else()
+            target_link_libraries(${test_name} ${CMAKE_BINARY_DIR}/oj/lib/libopenjtalk.a)
+        endif()
+        if(TARGET hts_engine_stub)
+            target_link_libraries(${test_name} hts_engine_stub)
+        endif()
+
         # Add dependencies to ensure build order
         add_dependencies(${test_name}
             piper_phonemize_external
             fmt_external
             spdlog_external
         )
+        if(TARGET openjtalk_external)
+            add_dependencies(${test_name} openjtalk_external)
+        endif()
     endif()
 
     # Link additional dependencies for prosody inference test
@@ -250,14 +309,18 @@ foreach(test_source ${TEST_SOURCES})
             ../openjtalk_error.c
             ../openjtalk_security.c
             ../openjtalk_optimized.c
+            ../openjtalk_api.c
         )
-        
+
         # Include directories
         target_include_directories(${test_name} PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/..
             ${CMAKE_BINARY_DIR}/fi/include
             ${CMAKE_BINARY_DIR}/si/include
             ${CMAKE_BINARY_DIR}/pi/include
+            ${CMAKE_BINARY_DIR}/oj/include
+            ${CMAKE_BINARY_DIR}/oj/include/openjtalk
+            ${CMAKE_BINARY_DIR}/hts_stub/include
         )
         
         # Add library directories
@@ -296,14 +359,27 @@ foreach(test_source ${TEST_SOURCES})
             target_link_libraries(${test_name} Threads::Threads)
         endif()
         
+        # Link OpenJTalk static library
+        if(WIN32)
+            target_link_libraries(${test_name} ${CMAKE_BINARY_DIR}/oj/lib/openjtalk.lib)
+        else()
+            target_link_libraries(${test_name} ${CMAKE_BINARY_DIR}/oj/lib/libopenjtalk.a)
+        endif()
+        if(TARGET hts_engine_stub)
+            target_link_libraries(${test_name} hts_engine_stub)
+        endif()
+
         # Add dependencies to ensure build order
-        add_dependencies(${test_name} 
-            piper_phonemize_external 
-            fmt_external 
+        add_dependencies(${test_name}
+            piper_phonemize_external
+            fmt_external
             spdlog_external
         )
+        if(TARGET openjtalk_external)
+            add_dependencies(${test_name} openjtalk_external)
+        endif()
     endif()
-    
+
     # Link additional dependencies for phoneme parser test
     if(${test_name} STREQUAL "test_phoneme_parser")
         target_sources(${test_name} PRIVATE
