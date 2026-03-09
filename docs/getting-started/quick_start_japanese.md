@@ -5,7 +5,7 @@
 ### macOS (Apple Silicon) の場合
 ```bash
 # Piperをダウンロード
-curl -L https://github.com/ayutaz/piper-plus/releases/latest/download/piper_macos_aarch64.tar.gz -o piper.tar.gz
+curl -L https://github.com/ayutaz/piper-plus/releases/latest/download/piper-macos-arm64.tar.gz -o piper.tar.gz
 tar -xzf piper.tar.gz
 
 # セキュリティ警告を回避
@@ -13,10 +13,21 @@ xattr -cr piper/
 ```
 
 ### macOS (Intel) の場合
+
+> **注意:** Intel Mac 用のバイナリは CI でビルドされていません。Docker またはソースからのビルドをご利用ください。
+
 ```bash
-curl -L https://github.com/ayutaz/piper-plus/releases/latest/download/piper_macos_x64.tar.gz -o piper.tar.gz
-tar -xzf piper.tar.gz
-xattr -cr piper/
+# Docker を使用する場合
+docker build -t piper-cpp -f docker/cpp-inference/Dockerfile .
+docker run --rm -v $(pwd)/models:/app/models:ro -v $(pwd)/output:/app/output \
+  piper-cpp bash -c 'echo "こんにちは" | piper --model /app/models/model.onnx --output_file /app/output/output.wav'
+
+# ソースからビルドする場合
+brew install cmake onnxruntime
+git clone https://github.com/ayutaz/piper-plus.git
+cd piper-plus && mkdir build && cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release
+make -j$(sysctl -n hw.ncpu)
 ```
 
 ## 2. 日本語モデルの準備
@@ -30,7 +41,7 @@ xattr -cr piper/
 ```bash
 # シンプルな例
 # espeak-ngのデータパスを設定
-export ESPEAK_DATA_PATH="$(pwd)/piper/espeak-ng-data"
+export ESPEAK_DATA_PATH="$(pwd)/piper/share/espeak-ng-data"
 echo "こんにちは" | ./piper/bin/piper --model your_model.onnx --output_file hello.wav
 
 # 再生（macOSの場合）
@@ -88,7 +99,7 @@ xattr -d com.apple.quarantine piper/bin/piper
 ```
 
 ### OpenJTalk辞書が見つからないエラー
-辞書は自動的に `piper/share/piper/openjtalk-dict/` に含まれています。
+辞書は自動的に `piper/share/open_jtalk/dic/` に含まれています。
 エラーが出る場合は、ファイルが正しく解凍されているか確認してください。
 
 ## 詳細情報

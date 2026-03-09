@@ -175,7 +175,7 @@ When contributing multilingual support:
 
 ## Related Documentation
 
-- [Main README](../README.md)
-- [Japanese Usage Guide](../JAPANESE_USAGE.md)
-- [Voice Models](../VOICES.md)
-- [Training Guide](../TRAINING.md)
+- [Main README](../../README.md)
+- [Japanese Usage Guide](../japanese/japanese-usage.md)
+- [Voice Models on HuggingFace](https://huggingface.co/rhasspy/piper-voices)
+- [Training Guide](../training/training-guide.md)

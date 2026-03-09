@@ -8,6 +8,7 @@ This guide helps resolve common issues when using Piper, especially with Japanes
 - [Platform-Specific Issues](#platform-specific-issues)
 - [Build Issues](#build-issues)
 - [Performance Issues](#performance-issues)
+- [Training Troubleshooting](#training-troubleshooting)
 
 ## General Issues
 
@@ -67,7 +68,9 @@ Error: Model file not found: model.onnx
 
 3. **Using wrong model type**
    - Ensure you're using a Japanese model (ja_JP-*.onnx)
-   - Check model's config.json has `"phoneme_type": "openjtalk"`
+   - For Python inference (`infer_onnx`), the Phonemizer registry selects the G2P backend via `--language` (ja→pyopenjtalk, en→g2p-en)
+   - For the C++ CLI and preprocessing, `phoneme_type` in `config.json` is still used to choose how text is phonemized
+   - Ensure config.json has the correct `"phoneme_type"`: `"openjtalk"` for Japanese models, `"espeak"` for other languages
 
 ### "Failed to download dictionary" Error
 
@@ -289,7 +292,7 @@ If issues persist:
 2. **Version info**: Include `piper --version` output
 3. **System info**: Include OS, architecture, installation method
 4. **Reproduction steps**: Provide minimal example
-5. **Report issue**: https://github.com/rhasspy/piper/issues
+5. **Report issue**: https://github.com/ayutaz/piper-plus/issues
 
 ## Common Error Messages Reference
 
@@ -303,3 +306,61 @@ If issues persist:
 | "Cannot open shared object" | Missing library | Set LD_LIBRARY_PATH |
 | "Library not loaded" (macOS) | Missing dylib | Set DYLD_LIBRARY_PATH |
 | "UnicodeEncodeError" (Windows) | Console encoding | Use chcp 65001 |
+
+## Training Troubleshooting
+
+### Duration Predictor Collapse (Audio Becomes a Beep/Tone)
+
+**Symptoms**: Inference audio is a continuous "beep" tone instead of speech. This indicates the Duration Predictor failed to learn properly.
+
+**Solutions**:
+1. Use `--samples-per-speaker` to ensure balanced batches across speakers:
+   ```bash
+   --batch-size 20 --samples-per-speaker 4  # 5 speakers x 4 samples = 20
+   ```
+2. Disable automatic learning rate scaling:
+   ```bash
+   --disable_auto_lr_scaling
+   ```
+3. Lower the learning rate:
+   ```bash
+   --base_lr 1e-4
+   ```
+
+### GPU Out of Memory (OOM)
+
+**Symptoms**: Training crashes with CUDA OOM errors.
+
+**Solutions**:
+1. Set NCCL environment variables (required for multi-GPU):
+   ```bash
+   export NCCL_DEBUG=WARN
+   export NCCL_P2P_DISABLE=1
+   export NCCL_IB_DISABLE=1
+   ```
+2. Reduce `batch_size` and `samples_per_speaker`:
+   ```bash
+   --batch-size 12 --samples-per-speaker 2
+   ```
+3. Avoid resuming training from a checkpoint that was saved with a different batch size, as this can cause memory allocation issues.
+
+### ONNX Conversion Errors
+
+**Symptoms**: Errors during `export_onnx.py`, especially on GPU machines.
+
+**Solutions**:
+1. Run ONNX conversion in CPU mode to avoid GPU-related issues:
+   ```bash
+   CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
+     /path/to/checkpoint.ckpt /path/to/output.onnx
+   ```
+2. For WavLM-trained models, use `--stochastic` to enable noise-scale sampling:
+   ```bash
+   CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
+     --stochastic /path/to/checkpoint.ckpt /path/to/output.onnx
+   ```
+3. Use `--no-ema` for baseline models without EMA weights:
+   ```bash
+   CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
+     --no-ema /path/to/checkpoint.ckpt /path/to/output.onnx
+   ```

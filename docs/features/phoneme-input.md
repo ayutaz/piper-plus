@@ -85,26 +85,37 @@ echo "Say [[ h ə l oʊ ]] and [[ g ʊ d b aɪ ]]" | piper --model en_US-lessac-
 ### Japanese Multi-Character Phonemes
 Japanese phonemes like `ky`, `sh`, `ts` are automatically mapped to Private Use Area (PUA) Unicode codepoints for consistency with the training data:
 
-| Phoneme | PUA Codepoint |
-|---------|---------------|
-| ky      | U+E000        |
-| gy      | U+E001        |
-| sy/sh   | U+E002        |
-| zy/jy   | U+E003        |
-| ty/ch   | U+E004        |
-| dy      | U+E005        |
-| ny      | U+E006        |
-| hy      | U+E007        |
-| by      | U+E008        |
-| py      | U+E009        |
-| my      | U+E00A        |
-| ry      | U+E00B        |
-| ts      | U+E00C        |
-| dz      | U+E00D        |
-| kw      | U+E00E        |
-| f       | U+E00F        |
-| gw      | U+E010        |
-| v       | U+E011        |
+| Phoneme    | PUA Codepoint | Description                    |
+|------------|---------------|--------------------------------|
+| a:         | U+E000        | Long vowel                     |
+| i:         | U+E001        | Long vowel                     |
+| u:         | U+E002        | Long vowel                     |
+| e:         | U+E003        | Long vowel                     |
+| o:         | U+E004        | Long vowel                     |
+| cl         | U+E005        | Special consonant              |
+| ky         | U+E006        | Palatalized consonant          |
+| kw         | U+E007        | Palatalized consonant          |
+| gy         | U+E008        | Palatalized consonant          |
+| gw         | U+E009        | Palatalized consonant          |
+| ty         | U+E00A        | Palatalized consonant          |
+| dy         | U+E00B        | Palatalized consonant          |
+| py         | U+E00C        | Palatalized consonant          |
+| by         | U+E00D        | Palatalized consonant          |
+| ch         | U+E00E        | Affricate                      |
+| ts         | U+E00F        | Affricate                      |
+| sh         | U+E010        | Special sound                  |
+| zy         | U+E011        | Special sound                  |
+| hy         | U+E012        | Special sound                  |
+| ny         | U+E013        | Palatalized nasal              |
+| my         | U+E014        | Palatalized nasal              |
+| ry         | U+E015        | Palatalized liquid             |
+| ?!         | U+E016        | Emphatic question marker       |
+| ?.         | U+E017        | Neutral/rhetorical question    |
+| ?~         | U+E018        | Tag question marker            |
+| N_m        | U+E019        | N before m/b/p (bilabial)      |
+| N_n        | U+E01A        | N before n/t/d/ts/ch (alveolar)|
+| N_ng       | U+E01B        | N before k/g (velar)           |
+| N_uvular   | U+E01C        | N at end or before vowels      |
 
 ### Limitations
 
@@ -140,6 +151,6 @@ echo "Test [[ t ɛ s t ]]" | piper --model model.onnx --debug -f test.wav
 
 ## See Also
 
-- [PHONEME_MAPPING.md](../PHONEME_MAPPING.md) - Technical details on phoneme mapping
-- [JAPANESE_USAGE.md](../JAPANESE_USAGE.md) - Japanese-specific features
-- [TRAINING.md](../TRAINING.md) - Training models with custom phoneme sets
+- [Phoneme Mapping](../api-reference/phoneme-mapping.md) - Technical details on phoneme mapping
+- [Japanese Usage](../guides/japanese/japanese-usage.md) - Japanese-specific features
+- [Training Guide](../guides/training/training-guide.md) - Training models with custom phoneme sets

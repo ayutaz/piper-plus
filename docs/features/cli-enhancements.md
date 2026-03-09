@@ -153,6 +153,8 @@ All existing Piper functionality remains unchanged:
 
 Select specific GPU devices for multi-GPU systems:
 
+> **Note**: `--gpu-device-id` and the `PIPER_GPU_DEVICE_ID` environment variable are available in the **C++ CLI only**, not the Python CLI.
+
 ```bash
 # Use default GPU (device 0)
 piper "Hello" --model model.onnx --use-cuda -f output.wav
@@ -167,7 +169,7 @@ piper "Hello" --model model.onnx --use-cuda -f output.wav
 
 **Priority**: CLI argument > Environment variable > Default (0)
 
-For detailed GPU configuration, see [GPU Configuration Guide](GPU_CONFIGURATION.md).
+For detailed GPU configuration, see [GPU Configuration Guide](gpu-configuration.md).
 
 ## Phoneme Input Support (v1.5.0+)
 
@@ -180,7 +182,7 @@ echo "Say [[ h ə l oʊ ]] clearly" | piper --model en_US-lessac.onnx -f hello.w
 echo "名前は [[ m a i k u r u ]] です" | piper --model ja_JP-test.onnx -f name.wav
 ```
 
-For detailed usage, see [Phoneme Input Guide](PHONEME_INPUT.md).
+For detailed usage, see [Phoneme Input Guide](phoneme-input.md).
 
 ## Future Enhancements
 

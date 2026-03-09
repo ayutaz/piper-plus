@@ -1,45 +1,45 @@
 # Piper Documentation
 
-Welcome to the Piper documentation. This directory contains comprehensive guides and references for using and developing with Piper TTS.
+Piper TTS documentation. Guides and references for using and developing with Piper Plus.
 
-## 📁 Documentation Structure
+## Getting Started
+- [Quick Start (Japanese)](getting-started/quick_start_japanese.md) - 日本語クイックスタート
+- [Windows Setup](getting-started/windows-setup.md) - Windows platform setup guide
+- [Environment Variables](getting-started/environment-variables.md) - Configuration options
+- [Troubleshooting](getting-started/troubleshooting.md) - Common issues and solutions
 
-### 🚀 [Getting Started](getting-started/)
-Quick start guides, installation instructions, and troubleshooting for new users.
+## Features
+- [CLI Enhancements](features/cli-enhancements.md) - Enhanced command-line features
+- [Custom Dictionary](features/custom_dictionary.md) - Custom dictionary for technical terms and proper nouns
+- [Phoneme Input](features/phoneme-input.md) - Direct phoneme specification guide
+- [Streaming Mode](features/streaming-mode.md) - Real-time streaming support
+- [GPU Configuration](features/gpu-configuration.md) - Multi-GPU support
+- [WebUI](features/webui.md) - Browser-based interface
 
-### 🎯 [Features](features/)
-Detailed documentation for all Piper features including CLI enhancements, custom dictionary, phoneme input, streaming, and WebUI.
+## Guides
 
-### 📚 [Guides](guides/)
-In-depth guides organized by topic:
-- **[Training](guides/training/)** - Model training guides
-- **[Japanese](guides/japanese/)** - Japanese language support
-- **[Optimization](guides/optimization/)** - Performance optimization
-- **[Testing](guides/testing/)** - Testing and validation
+### Training
+- [Training Guide](guides/training/training-guide.md) - General training instructions
+- [Multi-GPU Training](guides/training/multi-gpu-training.md) - Training with multiple GPUs
+- [Model Size Impact Analysis](guides/training/model-size-impact-analysis-ja.md) - Model size vs quality
 
-### 🌐 [WebAssembly](webassembly/)
-Browser-based TTS implementation:
-- **[OpenJTalk Approach](webassembly/openjtalk-approach/)** - Japanese TTS in the browser
+### Japanese Language Support
+- [Japanese Usage Guide](guides/japanese/japanese-usage.md) - Comprehensive Japanese TTS guide
 
-### 🔧 [Development](development/)
-Resources for contributors including coding guidelines, architecture docs, and development workflows.
+### Optimization
+- [ARM64 Optimization](guides/optimization/arm64-optimization.md) - NEON optimizations
 
-### 📖 [API Reference](api-reference/)
-Technical API documentation for developers integrating Piper.
+### Testing
+- [Multilingual Testing](guides/testing/multilingual-testing.md) - Testing infrastructure
 
-### 🌐 [Additional Resources](.)
-- [Competitive Analysis](competitive-analysis/) - Market positioning
+## API Reference
+- [Phoneme Mapping](api-reference/phoneme-mapping.md) - Phoneme reference for all languages
 
-## Quick Links
+## Development
+- [Contributing](/CONTRIBUTING.md) - Contribution guidelines
+- [Changelog](/CHANGELOG.md) - Version history
+- [License](/LICENSE.md) - Project license (MIT)
+- [License Compliance](development/license-compliance.md) - License compliance info
 
-- 🎤 **Basic Usage**: See [CLI Enhancements](features/cli-enhancements.md)
-- 📚 **Custom Dictionary**: Configure [technical terms](features/custom_dictionary.md)
-- 🇯🇵 **Japanese TTS**: Start with [Quick Start Japanese](getting-started/quick_start_japanese.md)
-- 🎓 **Training Models**: Check [Training Guides](guides/training/)
-- 🌐 **WebUI**: Try the [Web Interface](features/webui-usage.md)
-- 🌏 **WebAssembly**: Run [TTS in browser](webassembly/openjtalk-approach/README.md)
-- 🤝 **Contributing**: Read [Contributing Guidelines](/CONTRIBUTING.md)
-
-## Navigation
-
-Use the [Documentation Index](INDEX.md) for a complete list of all documentation with descriptions.
+## WebAssembly
+Browser-based TTS implementation is in [src/wasm/openjtalk-web/](../src/wasm/openjtalk-web/).
