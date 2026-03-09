@@ -243,7 +243,7 @@ jobs:
   release_summary:
     name: Release Summary
     runs-on: ubuntu-latest
-    needs: [create_release, build_all, publish_pypi]  # run_tests removed temporarily
+    needs: [create_release, build_all, publish_pypi]
     if: always()
     steps:
       - name: Summary
@@ -256,7 +256,6 @@ jobs:
           echo "### Build Status"
           echo "- Create Release: ${{ needs.create_release.result }}"
           echo "- Build All: ${{ needs.build_all.result }}"
-          echo "- Test Suite: SKIPPED (temporarily disabled)"
           echo "- Publish PyPI: ${{ needs.publish_pypi.result }}"
           echo ""
           
@@ -265,5 +264,3 @@ jobs:
           else
             echo "❌ Some builds failed"
           fi
-          
-          echo "⚠️ Test suite temporarily disabled - needs fixing"
