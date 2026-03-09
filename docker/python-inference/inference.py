@@ -184,7 +184,9 @@ class PiperInferenceEngine:
 def main():
     logging.basicConfig(level=logging.INFO)
     parser = argparse.ArgumentParser(description="Piper TTS Inference")
-    parser.add_argument("--model", help="Path to ONNX model (required for CLI/server mode)")
+    parser.add_argument(
+        "--model", help="Path to ONNX model (required for CLI/server mode)"
+    )
     parser.add_argument("--config", help="Path to config.json (default: next to model)")
     parser.add_argument("--text", help="Text to synthesize")
     parser.add_argument("--output", default="output.wav", help="Output WAV path")
@@ -219,11 +221,16 @@ def main():
         default="/app/output",
         help="Directory for output files (WebUI mode)",
     )
-    parser.add_argument("--webui-port", type=int, default=7860, help="Gradio WebUI port")
+    parser.add_argument(
+        "--webui-port", type=int, default=7860, help="Gradio WebUI port"
+    )
     args = parser.parse_args()
 
     # Check for WebUI mode (flag or env var)
-    webui_mode = args.webui or os.environ.get("PIPER_WEBUI", "").strip() in ("1", "true")
+    webui_mode = args.webui or os.environ.get("PIPER_WEBUI", "").strip() in (
+        "1",
+        "true",
+    )
     if webui_mode:
         _run_webui(args)
         return
