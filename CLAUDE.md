@@ -376,10 +376,10 @@ NCCL_IB_DISABLE=1
 
 ### 便利ツール
 
-| ツール | パス | 用途 |
-|--------|------|------|
-| `add_prosody_features` | `src/python/piper_train/tools/add_prosody_features.py` | 既存データセットにprosody_features追加＋phoneme_ids再生成 |
-| `convert_multi_to_single_speaker` | `scripts/convert_multi_to_single_speaker.py` | マルチスピーカーモデルから単一話者用ckpt作成 |
+| ツール | 実行コマンド | 用途 |
+|--------|-------------|------|
+| `piper_train.tools.add_prosody_features` | `uv run python -m piper_train.tools.add_prosody_features` | 既存データセットにprosody_features追加＋phoneme_ids再生成 |
+| `convert_multi_to_single_speaker` | `python scripts/convert_multi_to_single_speaker.py` | マルチスピーカーモデルから単一話者用ckpt作成 |
 
 **使用例**:
 ```bash

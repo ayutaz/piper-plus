@@ -25,13 +25,10 @@ except ImportError:
     HAS_JAPANESE = False
 
 
-# Import the function under test
-try:
-    from piper_train.tools.add_prosody_features import process_utterance
+# Import the function under test (internal module - ImportError should fail the test)
+from piper_train.tools.add_prosody_features import process_utterance
 
-    HAS_SCRIPT = True
-except ImportError:
-    HAS_SCRIPT = False
+HAS_SCRIPT = True
 
 
 class TestProcessUtterance:
