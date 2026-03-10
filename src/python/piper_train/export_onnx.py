@@ -7,15 +7,16 @@ from pathlib import Path
 
 import torch
 
+from .vits import commons
+from .vits.lightning import VitsModel
+
+
 # Allow Path objects in checkpoints (PyTorch 2.6+ weights_only=True)
 torch.serialization.add_safe_globals([pathlib.PosixPath, pathlib.WindowsPath])
 
 # Fix PosixPath instantiation error when loading Linux checkpoints on Windows
 if platform.system() == "Windows":
     pathlib.PosixPath = pathlib.WindowsPath
-
-from .vits import commons
-from .vits.lightning import VitsModel
 
 
 _LOGGER = logging.getLogger("piper_train.export_onnx")

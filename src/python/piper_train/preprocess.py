@@ -15,8 +15,11 @@ from enum import Enum
 from multiprocessing import JoinableQueue, Process, Queue
 from pathlib import Path
 
+from tqdm import tqdm
+
+
 try:
-    from piper_phonemize import (
+    from piper_phonemize import (  # noqa: PLC0415
         get_codepoints_map,
         get_espeak_map,
         get_max_phonemes,
@@ -36,7 +39,6 @@ except ImportError:
     phonemize_codepoints = None
     phonemize_espeak = None
     tashkeel_run = None
-from tqdm import tqdm
 
 from .f0_extraction import cache_f0
 from .norm_audio import cache_norm_audio, make_silence_detector

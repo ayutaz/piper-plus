@@ -1,5 +1,3 @@
-import numpy as np
-
 try:
     import torch
 
@@ -8,6 +6,8 @@ try:
 
 except ImportError:
     pass
+
+import numpy as np
 
 
 def audio_float_to_int16(
