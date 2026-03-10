@@ -1,6 +1,0 @@
-# PyTorch dependencies (optional for training)
-pytorch-lightning>=2.4.0,<2.5.0
-torch>=2.0.0,<2.6.0
-torchaudio>=2.0.0,<2.6.0
-tensorboard>=2.10.0
-torchmetrics>=0.11.0
