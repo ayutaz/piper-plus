@@ -36,6 +36,22 @@ RUN mkdir -p build && cd build && \
     ninja -j$(nproc) && \
     ninja install
 
+# Ensure OpenJTalk dictionary is present for Japanese TTS support.
+# The CMake install may have already copied it from the build output.
+# If not, download it explicitly so the runtime image is self-contained.
+RUN if [ ! -d /install/share/open_jtalk/dic ]; then \
+      echo "OpenJTalk dictionary not found in install prefix, downloading..." && \
+      mkdir -p /install/share/open_jtalk && \
+      wget -q -O /tmp/open_jtalk_dic.tar.gz \
+        "https://github.com/r9y9/open_jtalk/releases/download/v1.11.1/open_jtalk_dic_utf_8-1.11.tar.gz" && \
+      tar -xzf /tmp/open_jtalk_dic.tar.gz -C /install/share/open_jtalk && \
+      mv /install/share/open_jtalk/open_jtalk_dic_utf_8-1.11 /install/share/open_jtalk/dic && \
+      rm -f /tmp/open_jtalk_dic.tar.gz && \
+      echo "OpenJTalk dictionary installed successfully"; \
+    else \
+      echo "OpenJTalk dictionary already present at /install/share/open_jtalk/dic"; \
+    fi
+
 # Stage 2: Runtime (CPU only)
 FROM ubuntu:22.04
 
@@ -63,6 +79,11 @@ RUN chmod +x /entrypoint.sh /test.sh
 
 # Verify installation
 RUN piper --version || echo "Piper not found, will be mounted at runtime"
+
+# Verify OpenJTalk dictionary is available for Japanese TTS
+RUN test -d /usr/local/share/open_jtalk/dic && \
+    echo "OpenJTalk dictionary verified at /usr/local/share/open_jtalk/dic" || \
+    echo "WARNING: OpenJTalk dictionary not found, Japanese TTS may not work"
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
