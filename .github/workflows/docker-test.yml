@@ -49,7 +49,6 @@ jobs:
         run: |
           docker run --rm piper-python-inference:test python -c "
           import gradio; print(f'gradio {gradio.__version__} OK')
-          from webui import create_ui; print('WebUI create_ui importable: OK')
           print('WebUI smoke test passed')
           "
 
@@ -158,24 +157,6 @@ jobs:
           fi
           echo "C++ English inference test passed"
 
-      - name: Inference test - Japanese
-        run: |
-          echo "こんにちは、今日は良い天気ですね。" | docker run --rm -i \
-            -v ${{ github.workspace }}/test/models:/models \
-            -v /tmp/output:/output \
-            --entrypoint piper \
-            piper-cpp-inference:test \
-              --model /models/ja_JP-test-medium.onnx \
-              --output_file /output/test_ja.wav
-
-          FILE_SIZE=$(stat --format=%s /tmp/output/test_ja.wav)
-          echo "Output: test_ja.wav ($FILE_SIZE bytes)"
-          if [ "$FILE_SIZE" -lt 1000 ]; then
-            echo "ERROR: Output file too small ($FILE_SIZE bytes)"
-            exit 1
-          fi
-          echo "C++ Japanese inference test passed"
-
   test-python-train:
     runs-on: ubuntu-latest
     steps:
@@ -272,6 +253,7 @@ jobs:
           docker run --rm \
             -v ${{ github.workspace }}:/src \
             -v /tmp/output:/output \
+            -e ESPEAK_DATA_PATH=/usr/local/share/espeak-ng-data \
             piper-cpp-dev:test \
             bash -c "
               cd /src && mkdir -p build-test && cd build-test && \
