@@ -344,6 +344,7 @@ jobs:
               --ignore=tests/test_pytorch_onnx_parity.py \
               --ignore=tests/test_export_onnx.py \
               --ignore=tests/test_infer_onnx.py \
+              --ignore=tests/test_english_phonemizer.py \
               --ignore=tests/test_vits.py \
               --ignore=tests/test_wavlm_discriminator.py
           fi
