@@ -75,8 +75,7 @@ WORKDIR /app
 # Copy entrypoint and test scripts
 COPY docker/cpp-inference/entrypoint.sh /entrypoint.sh
 COPY docker/cpp-inference/test.sh /test.sh
-COPY docker/cpp-inference/regression_test.sh /regression_test.sh
-RUN chmod +x /entrypoint.sh /test.sh /regression_test.sh
+RUN chmod +x /entrypoint.sh /test.sh
 
 # Verify installation
 RUN piper --version || echo "Piper not found, will be mounted at runtime"
