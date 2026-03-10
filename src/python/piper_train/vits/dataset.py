@@ -6,12 +6,25 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
+import numpy as np
 import torch
 from torch import FloatTensor, LongTensor
 from torch.utils.data import Dataset
 
 
 _LOGGER = logging.getLogger("vits.dataset")
+
+
+def _load_tensor(path: Path) -> torch.Tensor:
+    """Load a tensor from either numpy (.npy) or torch format."""
+    path = Path(path)
+    if path.suffix == ".npy":
+        return torch.from_numpy(np.load(str(path)))
+    try:
+        return torch.load(path, map_location="cpu", weights_only=False)
+    except Exception:
+        # Fallback: try numpy load for .npy files saved with wrong extension
+        return torch.from_numpy(np.load(str(path)))
 
 
 @dataclass
@@ -84,12 +97,10 @@ class PiperDataset(Dataset):
         # 問題のあるファイルでロードが失敗した場合はスキップして次を試す
         while True:
             try:
-                audio_norm = torch.load(
-                    utt.audio_norm_path, map_location="cpu", weights_only=True
-                )
-                spectrogram = torch.load(
-                    utt.audio_spec_path, map_location="cpu", weights_only=True
-                )
+                audio_norm = _load_tensor(utt.audio_norm_path)
+                if audio_norm.dim() == 1:
+                    audio_norm = audio_norm.unsqueeze(0)
+                spectrogram = _load_tensor(utt.audio_spec_path)
 
                 # Convert prosody_features to tensor if available
                 prosody_tensor = None
@@ -163,6 +174,8 @@ class PiperDataset(Dataset):
     ) -> Iterable[Utterance]:
         num_skipped = 0
 
+        dataset_dir = dataset_path.parent
+
         with open(dataset_path, encoding="utf-8") as dataset_file:
             for line_idx, line in enumerate(dataset_file):
                 line = line.strip()
@@ -170,7 +183,7 @@ class PiperDataset(Dataset):
                     continue
 
                 try:
-                    utt = PiperDataset.load_utterance(line)
+                    utt = PiperDataset.load_utterance(line, dataset_dir)
                     if (max_phoneme_ids is None) or (
                         len(utt.phoneme_ids) <= max_phoneme_ids
                     ):
@@ -189,12 +202,22 @@ class PiperDataset(Dataset):
             _LOGGER.warning("Skipped %s utterance(s)", num_skipped)
 
     @staticmethod
-    def load_utterance(line: str) -> Utterance:
+    def load_utterance(line: str, dataset_dir: Path | None = None) -> Utterance:
         utt_dict = json.loads(line)
+        audio_norm_path = Path(utt_dict["audio_norm_path"])
+        audio_spec_path = Path(utt_dict["audio_spec_path"])
+
+        # Resolve relative paths against dataset directory
+        if dataset_dir is not None:
+            if not audio_norm_path.is_absolute():
+                audio_norm_path = dataset_dir / audio_norm_path
+            if not audio_spec_path.is_absolute():
+                audio_spec_path = dataset_dir / audio_spec_path
+
         return Utterance(
             phoneme_ids=utt_dict["phoneme_ids"],
-            audio_norm_path=Path(utt_dict["audio_norm_path"]),
-            audio_spec_path=Path(utt_dict["audio_spec_path"]),
+            audio_norm_path=audio_norm_path,
+            audio_spec_path=audio_spec_path,
             speaker_id=utt_dict.get("speaker_id"),
             text=utt_dict.get("text"),
             prosody_features=utt_dict.get("prosody_features"),
@@ -281,7 +304,7 @@ class UtteranceCollate:
             audio_padded[utt_idx, :, :audio_length] = utt.audio_norm
             audio_lengths[utt_idx] = audio_length
 
-            if utt.speaker_id is not None:
+            if self.is_multispeaker and utt.speaker_id is not None:
                 assert speaker_ids is not None
                 speaker_ids[utt_idx] = utt.speaker_id
 

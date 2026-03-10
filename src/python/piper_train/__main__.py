@@ -1,9 +1,18 @@
 import argparse
 import json
 import logging
+import pathlib
+import platform
 from pathlib import Path
 
 import torch
+
+# Allow Path objects in checkpoints (PyTorch 2.6+ weights_only=True)
+torch.serialization.add_safe_globals([pathlib.PosixPath, pathlib.WindowsPath])
+
+# Fix PosixPath instantiation error when loading Linux checkpoints on Windows
+if platform.system() == "Windows":
+    pathlib.PosixPath = pathlib.WindowsPath
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import TensorBoardLogger
@@ -375,7 +384,7 @@ def main():
         try:
             # まずは通常のResumeを試みる
             trainer.fit(model, ckpt_path=args.resume_from_checkpoint)
-        except (RuntimeError, KeyError) as e:
+        except (RuntimeError, KeyError, NotImplementedError) as e:
             # RuntimeError (size mismatchなど) や KeyError (optimizer stateなし) が発生した場合
             _LOGGER.warning("Graceful resume failed with error: %s", e)
             _LOGGER.info("Attempting to load weights only (strict=False)...")
