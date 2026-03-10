@@ -7,7 +7,6 @@ on:
     paths:
       - 'src/python/**'
       - 'src/python_run/**'
-      - 'requirements*.txt'
       - '.github/workflows/python-tests.yml'
 
 jobs:
@@ -45,17 +44,7 @@ jobs:
         python -m pip install --upgrade pip setuptools wheel
         pip install --no-cache-dir uv
         cd src/python
-        # Install test dependencies
-        uv pip install --system -r requirements_test.txt
-        # Install training dependencies including pyopenjtalk-plus
-        uv pip install --system -e ".[train]"
-        echo "Windows tests will run with pyopenjtalk-plus support"
-
-    - name: Install PyTorch for all tests (Windows)
-      if: runner.os == 'Windows'
-      run: |
-        cd src/python
-        uv pip install --system -r requirements_torch.txt
+        uv pip install --system -e ".[test,train]"
 
     - name: Install Python dependencies (Unix)
       if: runner.os != 'Windows'
@@ -63,14 +52,7 @@ jobs:
         python -m pip install --upgrade pip
         pip install --no-cache-dir uv
         cd src/python
-        uv pip install --system -r requirements_test.txt
-        uv pip install --system -e ".[train]"
-
-    - name: Install PyTorch for all tests (Unix)
-      if: runner.os != 'Windows'
-      run: |
-        cd src/python
-        uv pip install --system -r requirements_torch.txt
+        uv pip install --system -e ".[test,train]"
 
     - name: Build Cython extensions (Unix)
       if: runner.os != 'Windows'

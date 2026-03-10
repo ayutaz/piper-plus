@@ -1,6 +1,6 @@
 # Getting Started
 
-This section contains everything you need to get started with Piper TTS.
+This section contains everything you need to get started with piper-plus.
 
 ## Contents
 

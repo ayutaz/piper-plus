@@ -185,7 +185,7 @@ To host on your own server:
 
 ## 📄 License
 
-This project is part of Piper TTS and follows the same license terms.
+This project is part of piper-plus and follows the same license terms.
 
 ## 🤝 Contributing
 

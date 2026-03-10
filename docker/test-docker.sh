@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-# Docker smoke tests for Piper TTS environments
+# Docker smoke tests for piper-plus environments
 
 echo "=== Piper Docker Environment Tests ==="
 echo ""

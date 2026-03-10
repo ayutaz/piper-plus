@@ -1,6 +1,6 @@
 # Guides
 
-Comprehensive guides for various aspects of Piper TTS.
+Comprehensive guides for various aspects of piper-plus.
 
 ## Categories
 

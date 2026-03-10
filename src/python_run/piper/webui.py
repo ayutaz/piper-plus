@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Gradio WebUI for Piper TTS"""
+"""Gradio WebUI for piper-plus"""
 
 import argparse
 import json
@@ -496,9 +496,9 @@ def create_interface(data_dir: Path) -> gr.Blocks:
     """Create Gradio interface with tabs for inference and training"""
     available_models = get_available_models(data_dir)
 
-    with gr.Blocks(title="Piper TTS WebUI") as interface:
-        gr.Markdown("# Piper TTS WebUI")
-        gr.Markdown("Generate high-quality speech from text using Piper TTS models.")
+    with gr.Blocks(title="piper-plus") as interface:
+        gr.Markdown("# piper-plus")
+        gr.Markdown("Generate high-quality speech from text using piper-plus models.")
 
         with gr.Tabs():
             # Inference Tab
@@ -944,7 +944,7 @@ def create_interface(data_dir: Path) -> gr.Blocks:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Piper TTS WebUI")
+    parser = argparse.ArgumentParser(description="piper-plus WebUI")
     parser.add_argument(
         "--data-dir",
         type=Path,

@@ -577,7 +577,7 @@ def main():
 
         # Add footer
         summary_parts.append("---")
-        summary_parts.append("*Piper TTS パフォーマンステストスイートによって生成*")
+        summary_parts.append("*piper-plus パフォーマンステストスイートによって生成*")
 
         summary = "\n".join(summary_parts)
 

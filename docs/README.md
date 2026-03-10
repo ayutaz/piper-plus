@@ -1,6 +1,6 @@
 # Piper Documentation
 
-Piper TTS documentation. Guides and references for using and developing with Piper Plus.
+Piper Plus documentation. Guides and references for using and developing with Piper Plus.
 
 ## Getting Started
 - [Windows Setup](getting-started/windows-setup.md) - Windows platform setup guide

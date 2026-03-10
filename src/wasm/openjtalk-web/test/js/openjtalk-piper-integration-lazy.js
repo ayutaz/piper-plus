@@ -20,7 +20,7 @@ class OpenJTalkPiperTTSLazy {
      */
     async initialize(config) {
         try {
-            console.log('Initializing OpenJTalk-Piper TTS (Lazy Loading)...');
+            console.log('Initializing OpenJTalk-piper-plus (Lazy Loading)...');
             
             // Store config for later use
             this.config = config;

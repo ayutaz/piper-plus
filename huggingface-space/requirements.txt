@@ -1,4 +1,4 @@
-# Piper TTS Demo Requirements
+# piper-plus Demo Requirements
 gradio==6.9.0
 numpy>=1.24.0,<2.3
 onnxruntime>=1.16.0

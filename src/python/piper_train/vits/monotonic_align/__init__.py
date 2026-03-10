@@ -1,7 +1,10 @@
 import numpy as np
 import torch
 
-from .core import maximum_path_c
+try:
+    from .core import maximum_path_c  # Cython or numba fallback
+except ImportError:
+    from .core import maximum_path_c  # noqa: F811
 
 # Memory threshold for adaptive chunking (t_t * t_s)
 # When matrix size exceeds this, use batch_size=1

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Inference script for Piper TTS.
+Inference script for piper-plus.
 CLI and FastAPI server modes supported.
 
 Uses piper_train.phonemize for text-to-phoneme conversion
@@ -183,7 +183,7 @@ class PiperInferenceEngine:
 
 def main():
     logging.basicConfig(level=logging.INFO)
-    parser = argparse.ArgumentParser(description="Piper TTS Inference")
+    parser = argparse.ArgumentParser(description="piper-plus Inference")
     parser.add_argument(
         "--model", help="Path to ONNX model (required for CLI/server mode)"
     )
@@ -269,7 +269,7 @@ def main():
 
 def _run_server(engine: PiperInferenceEngine, args):
     """Run FastAPI server."""
-    app = FastAPI(title="Piper TTS API")
+    app = FastAPI(title="piper-plus API")
 
     @app.get("/health")
     def health_check():

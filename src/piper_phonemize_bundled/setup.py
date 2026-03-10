@@ -145,7 +145,7 @@ setup(
     author="Piper-Plus Contributors",
     author_email="",
     url="https://github.com/ayutaz/piper-plus",
-    description="Phonemization library for Piper TTS with bundled espeak-ng (Windows/macOS/Linux)",
+    description="Phonemization library for piper-plus with bundled espeak-ng (Windows/macOS/Linux)",
     long_description=open("README.md", encoding="utf-8").read()
     if Path("README.md").exists()
     else "",

@@ -1,4 +1,4 @@
-"""Inference configuration for Piper TTS."""
+"""Inference configuration for piper-plus."""
 
 from dataclasses import dataclass, field
 from pathlib import Path

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Piper TTS Gradio Demo for Hugging Face Spaces
+piper-plus Gradio Demo for Hugging Face Spaces
 Supports Japanese and English text-to-speech using ONNX models
 """
 
@@ -300,9 +300,9 @@ def synthesize_speech(
 
 def create_interface():
     """Create Gradio interface"""
-    with gr.Blocks(title="Piper TTS Demo") as interface:
+    with gr.Blocks(title="piper-plus Demo") as interface:
         gr.Markdown("""
-            # 🎙️ Piper TTS Demo
+            # piper-plus Demo
 
             High-quality text-to-speech synthesis supporting Japanese and English.
 
@@ -385,7 +385,7 @@ def create_interface():
                 ],
                 ["Hello world! This is a text to speech demo.", "English (Test)"],
                 [
-                    "Welcome to Piper TTS. Enjoy high quality speech synthesis.",
+                    "Welcome to piper-plus. Enjoy high quality speech synthesis.",
                     "English (Test)",
                 ],
             ],
@@ -411,8 +411,8 @@ def create_interface():
 
 def create_minimal_interface():
     """Create a minimal fallback interface if main interface fails"""
-    with gr.Blocks(title="Piper TTS Demo") as interface:
-        gr.Markdown("# 🎙️ Piper TTS Demo")
+    with gr.Blocks(title="piper-plus Demo") as interface:
+        gr.Markdown("# piper-plus Demo")
 
         text_input = gr.Textbox(
             label="Text to synthesize",

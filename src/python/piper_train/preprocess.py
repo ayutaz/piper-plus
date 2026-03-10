@@ -15,17 +15,30 @@ from enum import Enum
 from multiprocessing import JoinableQueue, Process, Queue
 from pathlib import Path
 
-from piper_phonemize import (
-    get_codepoints_map,
-    get_espeak_map,
-    get_max_phonemes,
-    phoneme_ids_codepoints,
-    phoneme_ids_espeak,
-    phonemize_codepoints,
-    phonemize_espeak,
-    tashkeel_run,
-)
 from tqdm import tqdm
+
+
+try:
+    from piper_phonemize import (  # noqa: PLC0415
+        get_codepoints_map,
+        get_espeak_map,
+        get_max_phonemes,
+        phoneme_ids_codepoints,
+        phoneme_ids_espeak,
+        phonemize_codepoints,
+        phonemize_espeak,
+        tashkeel_run,
+    )
+except ImportError:
+    # piper_phonemize is not available on Windows; only needed for espeak languages
+    get_codepoints_map = None
+    get_espeak_map = None
+    get_max_phonemes = None
+    phoneme_ids_codepoints = None
+    phoneme_ids_espeak = None
+    phonemize_codepoints = None
+    phonemize_espeak = None
+    tashkeel_run = None
 
 from .f0_extraction import cache_f0
 from .norm_audio import cache_norm_audio, make_silence_detector

@@ -182,6 +182,7 @@ def temp_onnx_model(mock_vits_model, tmp_path_factory):
             "durations": {0: "batch_size", 1: "phonemes"},
         },
         verbose=False,
+        dynamo=False,
     )
 
     return onnx_path
@@ -267,6 +268,7 @@ def temp_onnx_model_stochastic(mock_vits_model, tmp_path_factory):
             "durations": {0: "batch_size", 1: "phonemes"},
         },
         verbose=False,
+        dynamo=False,
     )
 
     return onnx_path

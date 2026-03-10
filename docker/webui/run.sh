@@ -13,7 +13,7 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-echo -e "${GREEN}Starting Piper TTS WebUI...${NC}"
+echo -e "${GREEN}Starting piper-plus WebUI...${NC}"
 
 # Create directories if they don't exist
 mkdir -p "$MODELS_DIR" "$OUTPUT_DIR"

@@ -1,13 +1,13 @@
 # Piper WebUI
 
-Gradio-based web interface for Piper TTS inference and training.
+Gradio-based web interface for piper-plus inference and training.
 
 ## Quick Start
 
 ### Requirements
 
 - Python 3.11+
-- Piper TTS installed
+- piper-plus installed
 - ONNX models downloaded
 
 ### Installation

@@ -1,4 +1,4 @@
-# C++ Development Environment for Piper TTS (CPU-only)
+# C++ Development Environment for piper-plus (CPU-only)
 FROM ubuntu:22.04
 
 # Set environment variables

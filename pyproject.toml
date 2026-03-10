@@ -5,13 +5,18 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "piper-plus"
 dynamic = ["version"]
-description = "Training environment for Piper TTS"
+description = "Training environment for piper-plus"
 requires-python = ">=3.11"
 dependencies = [
     "huggingface-hub>=0.30.0,<1.0",
     "numpy<2.3",
     "tensorboard>=2.20.0",
     "g2p-en>=2.1.0",
+    "torch>=2.10",
+    "torchaudio>=2.10",
+    "piper-train[train]",
+    "cython>=3.2.4",
+    "onnxscript>=0.6.2",
 ]
 
 [project.optional-dependencies]
@@ -72,7 +77,7 @@ dev = [
     "pytest-xdist==3.5.0",
     "pytest-timeout==2.2.0",
     "pytest-mock==3.12.0",
-    "coverage[toml]==7.3.2",
+    "coverage[toml]>=7.3",
     "types-requests==2.31.0",
     "types-PyYAML==6.0.12",
     "sphinx>=4.0.0",
@@ -86,11 +91,30 @@ test = [
     "pytest-xdist==3.5.0",
     "pytest-timeout==2.2.0",
     "pytest-mock==3.12.0",
-    "coverage[toml]==7.3.2",
+    "coverage[toml]>=7.3",
     "ruff==0.12.5",
     "mypy==1.7.1",
     "types-requests==2.31.0",
     "types-PyYAML==6.0.12",
+]
+
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
+
+[tool.uv.sources]
+torch = [
+    { index = "pytorch-cu128" },
+]
+torchaudio = [
+    { index = "pytorch-cu128" },
+]
+piper-train = { workspace = true, editable = true }
+
+[tool.uv.workspace]
+members = [
+    "src/python",
 ]
 
 [tool.uv]

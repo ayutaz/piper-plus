@@ -1,5 +1,5 @@
 """
-piper_phonemize - Phonemization library for Piper TTS
+piper_phonemize - Phonemization library for piper-plus
 Provides text-to-phoneme conversion using espeak-ng
 """
 

@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Sample texts for Piper TTS WebUI demonstrations"""
+"""Sample texts for piper-plus WebUI demonstrations"""
 
 # Categorized sample texts for different use cases
 SAMPLE_TEXTS = {
     "en_US": {
         "short": [
             "Hello world!",
-            "Welcome to Piper TTS.",
+            "Welcome to piper-plus.",
             "How are you today?",
             "Thank you very much.",
             "Have a great day!",
