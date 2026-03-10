@@ -416,7 +416,7 @@ upstream Piper の音声モデル (30+言語) も利用可能: [piper-voices](ht
 | 学習 | [学習ガイド](docs/guides/training/training-guide.md) · [マルチGPU](docs/guides/training/multi-gpu-training.md) |
 | API | [音素マッピング](docs/api-reference/phoneme-mapping.md) · [環境変数](docs/getting-started/environment-variables.md) |
 | 機能 | [WebUI](docs/features/webui.md) · [CLI強化](docs/features/cli-enhancements.md) · [ストリーミング](docs/features/streaming-mode.md) |
-| セットアップ | [クイックスタート (日本語)](docs/getting-started/quick_start_japanese.md) · [Windows](docs/getting-started/windows-setup.md) · [トラブルシューティング](docs/getting-started/troubleshooting.md) |
+| セットアップ | [クイックスタート (日本語)](docs/guides/japanese/japanese-usage.md) · [Windows](docs/getting-started/windows-setup.md) · [トラブルシューティング](docs/getting-started/troubleshooting.md) |
 | Docker | [Docker環境](docker/README.md) |
 | WebAssembly | [技術詳細](src/wasm/openjtalk-web/README.md) |
 
