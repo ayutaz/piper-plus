@@ -65,23 +65,23 @@ jobs:
 
       - name: Inference test - Japanese
         run: |
+          mkdir -p /tmp/output
           docker run --rm \
             -v ${{ github.workspace }}/test/models:/models \
             -v /tmp/output:/output \
             -e CUDA_VISIBLE_DEVICES="" \
             piper-python-inference:test \
-            python -m piper_train.infer_onnx \
+            python inference.py \
               --model /models/ja_JP-test-medium.onnx \
               --config /models/ja_JP-test-medium.onnx.json \
-              --output-dir /output \
+              --output /output/test_ja.wav \
               --text "こんにちは、今日は良い天気ですね。" \
               --language ja \
-              --speaker-id 0
+              --speaker-id 0 \
+              --device cpu
 
-          # Verify output WAV exists and has valid size
-          OUTPUT_FILE=$(ls /tmp/output/*.wav | head -1)
-          FILE_SIZE=$(stat --format=%s "$OUTPUT_FILE")
-          echo "Output: $OUTPUT_FILE ($FILE_SIZE bytes)"
+          FILE_SIZE=$(stat --format=%s /tmp/output/test_ja.wav)
+          echo "Output: test_ja.wav ($FILE_SIZE bytes)"
           if [ "$FILE_SIZE" -lt 1000 ]; then
             echo "ERROR: Output file too small ($FILE_SIZE bytes)"
             exit 1
@@ -90,22 +90,21 @@ jobs:
 
       - name: Inference test - English
         run: |
-          rm -rf /tmp/output && mkdir -p /tmp/output
           docker run --rm \
             -v ${{ github.workspace }}/test/models:/models \
             -v /tmp/output:/output \
             -e CUDA_VISIBLE_DEVICES="" \
             piper-python-inference:test \
-            python -m piper_train.infer_onnx \
+            python inference.py \
               --model /models/test_voice.onnx \
               --config /models/test_voice.onnx.json \
-              --output-dir /output \
+              --output /output/test_en.wav \
               --text "Hello, how are you today?" \
               --language en \
-              --speaker-id 0
+              --speaker-id 0 \
+              --device cpu
 
-          OUTPUT_FILE=$(ls /tmp/output/*.wav | head -1)
-          FILE_SIZE=$(stat --format=%s "$OUTPUT_FILE")
+          FILE_SIZE=$(stat --format=%s /tmp/output/test_en.wav)
           echo "Output: $OUTPUT_FILE ($FILE_SIZE bytes)"
           if [ "$FILE_SIZE" -lt 1000 ]; then
             echo "ERROR: Output file too small ($FILE_SIZE bytes)"
@@ -143,13 +142,13 @@ jobs:
       - name: Inference test - English
         run: |
           mkdir -p /tmp/output
-          docker run --rm \
+          echo "Hello, how are you today?" | docker run --rm -i \
             -v ${{ github.workspace }}/test/models:/models \
             -v /tmp/output:/output \
             --entrypoint piper \
             piper-cpp-inference:test \
               --model /models/test_voice.onnx \
-              --output_file /output/test_en.wav <<< "Hello, how are you today?"
+              --output_file /output/test_en.wav
 
           FILE_SIZE=$(stat --format=%s /tmp/output/test_en.wav)
           echo "Output: test_en.wav ($FILE_SIZE bytes)"
@@ -161,13 +160,13 @@ jobs:
 
       - name: Inference test - Japanese
         run: |
-          docker run --rm \
+          echo "こんにちは、今日は良い天気ですね。" | docker run --rm -i \
             -v ${{ github.workspace }}/test/models:/models \
             -v /tmp/output:/output \
             --entrypoint piper \
             piper-cpp-inference:test \
               --model /models/ja_JP-test-medium.onnx \
-              --output_file /output/test_ja.wav <<< "こんにちは、今日は良い天気ですね。"
+              --output_file /output/test_ja.wav
 
           FILE_SIZE=$(stat --format=%s /tmp/output/test_ja.wav)
           echo "Output: test_ja.wav ($FILE_SIZE bytes)"
