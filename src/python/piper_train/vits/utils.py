@@ -1,9 +1,13 @@
 import numpy as np
-import torch
 
+try:
+    import torch
 
-def to_gpu(x: torch.Tensor) -> torch.Tensor:
-    return x.contiguous().cuda(non_blocking=True)
+    def to_gpu(x: torch.Tensor) -> torch.Tensor:
+        return x.contiguous().cuda(non_blocking=True)
+
+except ImportError:
+    pass
 
 
 def audio_float_to_int16(
