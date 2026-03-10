@@ -9,7 +9,7 @@ on:
       - 'src/python_run/piper/training_manager.py'
       - 'src/python_run/requirements_webui.txt'
       - 'docker/webui/**'
-      - 'tests/test_webui.py'
+      - 'src/python_run/tests/test_webui.py'
       - 'src/python_run/tests/test_training_*.py'
       - '.github/workflows/webui-test.yml'
   push:
@@ -20,7 +20,7 @@ on:
       - 'src/python_run/piper/training_manager.py'
       - 'src/python_run/requirements_webui.txt'
       - 'docker/webui/**'
-      - 'tests/test_webui.py'
+      - 'src/python_run/tests/test_webui.py'
       - 'src/python_run/tests/test_training_*.py'
       - '.github/workflows/webui-test.yml'
   workflow_dispatch:
@@ -87,7 +87,7 @@ jobs:
           pwd
           python -c "import sys; print('Python path:', sys.path)"
           # Run from project root to ensure correct path resolution
-          python -m pytest tests/test_webui.py -v --tb=short || true
+          python -m pytest src/python_run/tests/test_webui.py -v --tb=short || true
       
       - name: Run training manager tests
         run: |

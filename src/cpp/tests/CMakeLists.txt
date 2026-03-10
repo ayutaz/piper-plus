@@ -17,6 +17,7 @@ set(TEST_SOURCES
     test_streaming_raw_phonemes.cpp
     test_prosody_inference.cpp
     test_model_speaker_detection.cpp
+    test_custom_dictionary.cpp
 )
 
 # Add dictionary manager test for Unix platforms
@@ -70,6 +71,16 @@ foreach(test_source ${TEST_SOURCES})
         )
     endif()
     
+    # Link additional dependencies for custom dictionary test
+    if(${test_name} STREQUAL "test_custom_dictionary")
+        target_sources(${test_name} PRIVATE
+            ../custom_dictionary.cpp
+        )
+        target_include_directories(${test_name} PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/..
+        )
+    endif()
+
     # Link additional dependencies for security test
     if(${test_name} STREQUAL "test_openjtalk_security")
         target_sources(${test_name} PRIVATE
