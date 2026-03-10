@@ -287,7 +287,7 @@ OpenJTalkから抽出されるA1/A2/A3値をDuration Predictorの入力として
 uv run python -m piper_train --prosody-dim 16 ...
 
 # 前処理時（prosody_features 付きデータセット作成）
-uv run python /data/piper/add_prosody_features.py --input-dataset ... --output-dir ...
+uv run python -m piper_train.tools.add_prosody_features --input-dataset ... --output-dir ...
 ```
 
 **デフォルト有効:** prosodyはデフォルトで有効（`--prosody-dim 16`）
@@ -378,11 +378,12 @@ NCCL_IB_DISABLE=1
 
 | ツール | パス | 用途 |
 |--------|------|------|
-| `add_prosody_features.py` | `/data/piper/add_prosody_features.py` | 既存データセットにprosody_features追加＋phoneme_ids再生成 |
+| `add_prosody_features` | `src/python/piper_train/tools/add_prosody_features.py` | 既存データセットにprosody_features追加＋phoneme_ids再生成 |
+| `convert_multi_to_single_speaker` | `scripts/convert_multi_to_single_speaker.py` | マルチスピーカーモデルから単一話者用ckpt作成 |
 
 **使用例**:
 ```bash
-uv run python /data/piper/add_prosody_features.py \
+uv run python -m piper_train.tools.add_prosody_features \
   --input-dataset /data/piper/dataset-moe-speech-20speakers/dataset.jsonl \
   --output-dir /data/piper/dataset-moe-speech-20speakers-v2 \
   --workers 8

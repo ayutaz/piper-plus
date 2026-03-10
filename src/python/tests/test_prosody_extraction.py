@@ -412,7 +412,7 @@ class TestProsodyDatasetValidation:
     def test_prosody_length_matches_phoneme_ids_various_texts(self):
         """Test that prosody_features length always matches phoneme_ids for various texts.
 
-        This test ensures the issue where add_prosody_features.py script creates
+        This test ensures the issue where piper_train.tools.add_prosody_features script creates
         mismatched lengths does not occur when using phonemize_japanese_with_prosody.
         """
         if not HAS_JAPANESE:
