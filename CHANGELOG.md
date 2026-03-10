@@ -5,6 +5,25 @@ All notable changes to piper-plus will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **M1: C++/Python音素化パイプライン同期** — プロソディマーク挿入(`[`/`]`/`#`)、文脈依存Nバリアント(`N_m`/`N_n`/`N_ng`/`N_uvular`)、疑問詞タイプEOSマーカー(`?!`/`?.`/`?~`)、BOS/EOS制御をC++に実装
+- **M1.5: OpenJTalkフロントエンド統一** — SourceForge版OpenJTalkバイナリ(`system()`呼び出し)からpyopenjtalk-plusのr9y9/open_jtalk Cライブラリ(API直接呼び出し)に移行。NJD後処理ルールをCにポート
+- **M2: ログ・テスト整合性** — Nバリアント/疑問詞マーカーの58ユニットテスト追加
+- **M3: インターフェース改善** — JSON prosody_features出力、日本語辞書境界修正
+- **M4: Docker回帰テスト** — 8テキスト比較テスト(8/8 PASS)、`Dockerfile.test`、CI統合
+
+### Changed
+- CMake ExternalProjectをpyopenjtalk-plus PyPI sdistベースに統一（全プラットフォーム共通）
+- OpenJTalkをスタンドアロンバイナリから静的ライブラリリンクに変更
+- `openjtalk_dictionary_manager.c`にバイナリ相対パスでの辞書検索を追加
+
+### Fixed
+- ExternalProject並列ダウンロードのレースコンディション修正
+- `phoneme_ids.cpp`の`interspersePad=false`パスで未知phonemeによるクラッシュを防止
+- CIテストをM1.5のアーキテクチャ変更(静的リンク)に適合
+
 ## [1.6.0] - 2026-02-11
 
 ### 🚀 Major Features

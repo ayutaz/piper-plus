@@ -616,6 +616,41 @@ TEST: FullwidthEmphasis     — 「マジ！？」→ EOS = ?!
 
 ---
 
+## CI/インテグレーション修正
+
+M4完了後、PR #229のCI全チェック通過のために以下の修正を実施:
+
+### Copilotレビュー対応 (de94e47)
+- `openjtalk_wrapper.c`: WARNING fprintfを`if (dic_path)`ブロック内に移動
+- `tests/CMakeLists.txt`: OpenJTalkリンク設定を`link_openjtalk_to_test()`マクロに統一
+- `CMakeLists.txt`: 重複ダウンロードについて`DEPENDS`による直列化で対応（`DOWNLOAD_DIR`共有はレースコンディションのため不採用）
+
+### ExternalProjectレースコンディション修正 (9db0dfe)
+- `DOWNLOAD_DIR`共有による並列ビルド競合を解消
+- `URL_HASH SHA256`追加でキャッシュ検証を強化
+- `DEPENDS openjtalk_external`でダウンロードを直列化
+
+### OpenJTalk辞書パス検索の改善 (768c7e9)
+- `openjtalk_dictionary_manager.c`に`get_exe_relative_dict_path()`を追加
+- Windows: `GetModuleFileNameA`、Linux: `/proc/self/exe`、macOS: `_NSGetExecutablePath`
+- 検索順序: 環境変数 → バイナリ相対パス → システムパス → ローカルデータディレクトリ
+- CIワークフローに`OPENJTALK_DICTIONARY_PATH`環境変数を追加
+
+### phoneme_idsクラッシュ防止 (35c2e87)
+- `phoneme_ids.cpp`の`interspersePad=false`パスに欠落phonemeガードを追加
+- テストモデル`ja_JP-test-medium.onnx.json`にPUAトークン（Nバリアント、疑問詞マーカー）を追加
+
+### CIテストのM1.5アーキテクチャ適合 (0cb7b42, 8ced3d2)
+- `test_japanese_tts.py`: `test_openjtalk_binary()`をスタンドアロンバイナリ確認からpiper存在確認に変更
+- `test_dictionary_download_ci.sh`: 環境変数名を`OPENJTALK_DICTIONARY_PATH`に統一
+- 辞書ダウンロードテスト: バンドル辞書削除ステップ追加、grepパターン更新
+
+### devリベース (2026-03-10)
+- PR #230 (Docker テスト強化・ブランチ統一) マージ後のdevにリベース完了
+- `CMakeLists.txt`と`.github/workflows/docker-test.yml`のコンフリクトを解決
+
+---
+
 ## 実装順序（推奨）
 
 ```
