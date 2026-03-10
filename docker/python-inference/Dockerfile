@@ -34,6 +34,9 @@ RUN uv pip install --system "/app/src/python[inference-gpu]"
 COPY src/python_run/requirements_webui.txt /app/requirements_webui.txt
 RUN uv pip install --system -r /app/requirements_webui.txt
 
+# Pre-download NLTK data for g2p-en (both old and new resource names for NLTK compatibility)
+RUN python -c "import nltk; nltk.download('averaged_perceptron_tagger'); nltk.download('averaged_perceptron_tagger_eng'); nltk.download('cmudict')"
+
 # Create directories for models and output
 RUN mkdir -p /app/models /app/output
 
