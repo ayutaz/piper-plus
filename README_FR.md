@@ -412,7 +412,7 @@ Chaque voix necessite un fichier `.onnx` et un fichier de configuration `.onnx.j
 | Entrainement | [Guide d'entrainement](docs/guides/training/training-guide.md) · [Multi-GPU](docs/guides/training/multi-gpu-training.md) |
 | API | [Mappage phonemique](docs/api-reference/phoneme-mapping.md) · [Variables d'environnement](docs/getting-started/environment-variables.md) |
 | Fonctionnalites | [WebUI](docs/features/webui.md) · [CLI ameliore](docs/features/cli-enhancements.md) · [Streaming](docs/features/streaming-mode.md) |
-| Configuration | [Demarrage rapide (japonais)](docs/getting-started/quick_start_japanese.md) · [Windows](docs/getting-started/windows-setup.md) · [Depannage](docs/getting-started/troubleshooting.md) |
+| Configuration | [Demarrage rapide (japonais)](docs/guides/japanese/japanese-usage.md) · [Windows](docs/getting-started/windows-setup.md) · [Depannage](docs/getting-started/troubleshooting.md) |
 | Docker | [Environnements Docker](docker/README.md) |
 | WebAssembly | [Details techniques](src/wasm/openjtalk-web/README.md) |
 

@@ -337,7 +337,14 @@ std::regex CustomDictionary::getWordPattern(const std::string& word, bool caseSe
     }
     
     // 単語境界を考慮したパターン
-    std::string patternStr = "\\b" + escapedWord + "\\b";
+    // 日本語等のマルチバイトUTF-8文字では \b が正しく動作しないため、
+    // 先頭バイトが非ASCIIの場合はワードバウンダリを付けない
+    std::string patternStr;
+    if (!word.empty() && static_cast<unsigned char>(word[0]) > 0x7F) {
+        patternStr = escapedWord;  // マルチバイト: バウンダリなし
+    } else {
+        patternStr = "\\b" + escapedWord + "\\b";  // ASCII: 従来通り
+    }
     
     auto flags = std::regex::ECMAScript;
     if (!caseSensitive) {

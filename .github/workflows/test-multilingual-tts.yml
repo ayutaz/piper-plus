@@ -126,6 +126,14 @@ jobs:
           which open_jtalk || echo "open_jtalk not in PATH"
           ls -la piper/bin/open_jtalk 2>/dev/null || echo "open_jtalk not found"
       
+      - name: Remove bundled dictionary for download tests
+        run: |
+          # Remove the bundled dictionary so we can test auto-download and offline behavior
+          echo "Removing bundled dictionary at piper/share/open_jtalk/dic..."
+          rm -rf piper/share/open_jtalk/dic
+          echo "Bundled dictionary removed"
+        if: env.SKIP_TESTS != 'true'
+
       - name: Run basic dictionary download tests
         run: |
           if [ "$SKIP_TESTS" = "true" ]; then
@@ -199,6 +207,7 @@ jobs:
             exit 0
           fi
           export HOME=/tmp/test_offline_$$
+          unset OPENJTALK_DICTIONARY_PATH
           export PIPER_OFFLINE_MODE=1
           
           echo "Testing offline mode..."
@@ -206,7 +215,7 @@ jobs:
           echo "オフライン" | piper --model ./test/models/ja_JP-test-medium.onnx --output_file /tmp/test_offline.wav 2>&1 | tee /tmp/offline_log.txt || true
           
           # Check for expected error messages
-          if grep -E "(dictionary manually|Failed to ensure OpenJTalk dictionary|Offline mode)" /tmp/offline_log.txt; then
+          if grep -E "(dictionary manually|Failed to ensure OpenJTalk dictionary|Offline mode|OpenJTalk is not available)" /tmp/offline_log.txt; then
             echo "✓ Offline mode correctly prevents download"
           else
             echo "✗ Offline mode did not show expected error"
@@ -225,12 +234,13 @@ jobs:
           fi
           # Test PIPER_AUTO_DOWNLOAD_DICT=0
           export HOME=/tmp/test_env_$$
+          unset OPENJTALK_DICTIONARY_PATH
           export PIPER_AUTO_DOWNLOAD_DICT=0
           
           echo "Testing auto-download disable..."
           echo "環境変数" | piper --model ./test/models/ja_JP-test-medium.onnx --output_file /tmp/test_env.wav 2>&1 | tee /tmp/env_log.txt || true
           
-          if grep -E "(download.*manually|auto.*download.*disabled|Failed to ensure OpenJTalk dictionary)" /tmp/env_log.txt; then
+          if grep -E "(download.*manually|auto.*download.*disabled|Failed to ensure OpenJTalk dictionary|OpenJTalk is not available)" /tmp/env_log.txt; then
             echo "✓ PIPER_AUTO_DOWNLOAD_DICT=0 works correctly"
           else
             echo "✗ Auto-download disable did not work as expected"
@@ -274,7 +284,9 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-    
+    env:
+      OPENJTALK_DICTIONARY_PATH: ${{ github.workspace }}/piper/share/open_jtalk/dic
+
     steps:
       - uses: actions/checkout@v4.2.2
       

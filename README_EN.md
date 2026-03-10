@@ -416,7 +416,7 @@ Each voice requires a `.onnx` model and `.onnx.json` config file. [Voice samples
 | Training | [Training Guide](docs/guides/training/training-guide.md) · [Multi-GPU](docs/guides/training/multi-gpu-training.md) |
 | API | [Phoneme Mapping](docs/api-reference/phoneme-mapping.md) · [Environment Variables](docs/getting-started/environment-variables.md) |
 | Features | [WebUI](docs/features/webui.md) · [CLI Enhancements](docs/features/cli-enhancements.md) · [Streaming](docs/features/streaming-mode.md) |
-| Setup | [Quick Start (Japanese)](docs/getting-started/quick_start_japanese.md) · [Windows](docs/getting-started/windows-setup.md) · [Troubleshooting](docs/getting-started/troubleshooting.md) |
+| Setup | [Quick Start (Japanese)](docs/guides/japanese/japanese-usage.md) · [Windows](docs/getting-started/windows-setup.md) · [Troubleshooting](docs/getting-started/troubleshooting.md) |
 | Docker | [Docker Environments](docker/README.md) |
 | WebAssembly | [Technical Details](src/wasm/openjtalk-web/README.md) |
 

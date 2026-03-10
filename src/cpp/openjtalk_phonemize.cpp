@@ -1,4 +1,5 @@
 #include "openjtalk_phonemize.hpp"
+#include "openjtalk_phonemize_utils.hpp"
 #include <spdlog/spdlog.h>
 #include <filesystem>
 #include <cstdlib>
@@ -14,94 +15,18 @@
 
 namespace piper {
 
-// Convert OpenJTalk phonemes to PUA characters for multi-phoneme support
-// This MUST match the Python implementation in jp_id_map.py exactly
-static const std::unordered_map<std::string, char32_t> phonemeToPua = {
-    // Long vowels (matches Python order)
-    {"a:", 0xE000}, {"i:", 0xE001}, {"u:", 0xE002}, {"e:", 0xE003}, {"o:", 0xE004},
-    // Special consonants
-    {"cl", 0xE005}, // 促音/終止閉鎖
-    // Palatalized consonants - matches Python order exactly
-    {"ky", 0xE006}, {"kw", 0xE007}, {"gy", 0xE008}, {"gw", 0xE009},
-    {"ty", 0xE00A}, {"dy", 0xE00B}, {"py", 0xE00C}, {"by", 0xE00D}, 
-    {"ch", 0xE00E}, {"ts", 0xE00F}, {"sh", 0xE010}, 
-    {"zy", 0xE011}, {"hy", 0xE012}, {"ny", 0xE013}, 
-    {"my", 0xE014}, {"ry", 0xE015}
-    // Note: N, q, j are single characters and don't need PUA mapping
-};
-
-void phonemize_openjtalk(const std::string &text, std::vector<std::vector<Phoneme>> &phonemes) {
-    spdlog::debug("OpenJTalk phonemizer called with text: {}", text);
-    
-    // Clear any existing phonemes
-    phonemes.clear();
-    
-    // Check if OpenJTalk is available
-    if (!openjtalk_is_available()) {
-        spdlog::warn("OpenJTalk is not available on this system");
-        return;
+// Convert a string token to a PUA phoneme (char32_t)
+static Phoneme toPuaPhoneme(const std::string& token) {
+    auto it = phonemeToPua.find(token);
+    if (it != phonemeToPua.end()) {
+        return it->second;
     }
-    
-    // Ensure dictionary is available
-    if (!openjtalk_ensure_dictionary()) {
-        spdlog::error("Failed to ensure OpenJTalk dictionary is available");
-        return;
+    if (token.length() == 1) {
+        return static_cast<Phoneme>(token[0]);
     }
-    
-    // Get phonemes from OpenJTalk
-    char* phoneme_str = openjtalk_text_to_phonemes(text.c_str());
-    if (!phoneme_str) {
-        spdlog::error("OpenJTalk failed to convert text to phonemes");
-        return;
-    }
-    
-    // Parse phoneme string
-    std::string phoneme_string(phoneme_str);
-    openjtalk_free_phonemes(phoneme_str);
-    
-    spdlog::debug("OpenJTalk returned phonemes: {}", phoneme_string);
-    
-    // Parse phoneme string - phonemes are space-separated, sil marks sentence boundaries
-    std::vector<Phoneme> sentencePhonemes;
-    std::stringstream phonemeStream(phoneme_string);
-    std::string phoneme;
-    
-    while (phonemeStream >> phoneme) {
-        if (phoneme == "sil") {
-            // Sentence boundary
-            if (!sentencePhonemes.empty()) {
-                phonemes.push_back(sentencePhonemes);
-                sentencePhonemes.clear();
-            }
-        } else if (phoneme == "pau") {
-            // Short pause within sentence - add a special pause marker
-            sentencePhonemes.push_back(static_cast<Phoneme>('_'));
-        } else {
-            // Regular phoneme
-            spdlog::debug("Processing phoneme: '{}' (length: {})", phoneme, phoneme.length());
-            
-            // Check if this is a multi-character phoneme that needs PUA
-            auto it = phonemeToPua.find(phoneme);
-            if (it != phonemeToPua.end()) {
-                spdlog::debug("Found PUA mapping for '{}': U+{:04X}", phoneme, static_cast<uint32_t>(it->second));
-                sentencePhonemes.push_back(it->second);
-            } else if (phoneme.length() == 1) {
-                // Single character phoneme
-                spdlog::debug("Single character phoneme '{}': U+{:04X}", phoneme, static_cast<uint32_t>(phoneme[0]));
-                sentencePhonemes.push_back(static_cast<Phoneme>(phoneme[0]));
-            } else {
-                // Unknown multi-character phoneme, skip
-                spdlog::warn("Unknown multi-character phoneme: '{}' (length: {})", phoneme, phoneme.length());
-            }
-        }
-    }
-    
-    // Add any remaining phonemes as final sentence
-    if (!sentencePhonemes.empty()) {
-        phonemes.push_back(sentencePhonemes);
-    }
-
-    spdlog::debug("OpenJTalk phonemization complete: {} sentences", phonemes.size());
+    // Unknown multi-character token
+    spdlog::warn("Unknown multi-character phoneme in toPuaPhoneme: '{}'", token);
+    return static_cast<Phoneme>('?');
 }
 
 void phonemize_openjtalk_with_prosody(
@@ -110,85 +35,169 @@ void phonemize_openjtalk_with_prosody(
     std::vector<std::vector<ProsodyFeature>> &prosodyFeatures) {
 
     spdlog::debug("OpenJTalk phonemizer with prosody called with text: {}", text);
-
-    // Clear any existing data
     phonemes.clear();
     prosodyFeatures.clear();
 
-    // Check if OpenJTalk is available
     if (!openjtalk_is_available()) {
-        spdlog::warn("OpenJTalk is not available on this system");
+        spdlog::warn("OpenJTalk is not available");
         return;
     }
-
-    // Ensure dictionary is available
     if (!openjtalk_ensure_dictionary()) {
-        spdlog::error("Failed to ensure OpenJTalk dictionary is available");
+        spdlog::error("Failed to ensure OpenJTalk dictionary");
         return;
     }
 
-    // Get phonemes with prosody from OpenJTalk
+    // Get raw phonemes with prosody from OpenJTalk
     OpenJTalkProsodyResult* result = openjtalk_text_to_phonemes_with_prosody(text.c_str());
     if (!result) {
-        spdlog::error("OpenJTalk failed to convert text to phonemes with prosody");
+        spdlog::error("OpenJTalk failed to convert text with prosody");
         return;
     }
 
-    std::string phoneme_string(result->phonemes);
-    spdlog::debug("OpenJTalk returned {} phonemes with prosody", result->count);
+    // Pass 1: Collect raw phonemes with A1/A2/A3
+    struct RawPhoneme {
+        std::string phoneme;
+        int a1, a2, a3;
+    };
+    std::vector<RawPhoneme> rawPhonemes;
 
-    // Parse phoneme string - phonemes are space-separated, sil marks sentence boundaries
-    std::vector<Phoneme> sentencePhonemes;
-    std::vector<ProsodyFeature> sentenceProsody;
-    std::stringstream phonemeStream(phoneme_string);
+    std::stringstream phonemeStream(std::string(result->phonemes));
     std::string phoneme;
     int phonemeIdx = 0;
 
     while (phonemeStream >> phoneme && phonemeIdx < result->count) {
-        // Get prosody values for current phoneme
-        ProsodyFeature pf;
-        pf.a1 = result->prosody_a1[phonemeIdx];
-        pf.a2 = result->prosody_a2[phonemeIdx];
-        pf.a3 = result->prosody_a3[phonemeIdx];
-
-        if (phoneme == "sil") {
-            // Sentence boundary
-            if (!sentencePhonemes.empty()) {
-                phonemes.push_back(sentencePhonemes);
-                prosodyFeatures.push_back(sentenceProsody);
-                sentencePhonemes.clear();
-                sentenceProsody.clear();
-            }
-        } else if (phoneme == "pau") {
-            // Short pause within sentence - add a special pause marker with zero prosody
-            sentencePhonemes.push_back(static_cast<Phoneme>('_'));
-            sentenceProsody.push_back({0, 0, 0});
-        } else {
-            // Regular phoneme
-            auto it = phonemeToPua.find(phoneme);
-            if (it != phonemeToPua.end()) {
-                sentencePhonemes.push_back(it->second);
-                sentenceProsody.push_back(pf);
-            } else if (phoneme.length() == 1) {
-                sentencePhonemes.push_back(static_cast<Phoneme>(phoneme[0]));
-                sentenceProsody.push_back(pf);
-            } else {
-                spdlog::warn("Unknown multi-character phoneme: '{}' (length: {})", phoneme, phoneme.length());
-            }
-        }
+        RawPhoneme rp;
+        rp.phoneme = phoneme;
+        rp.a1 = result->prosody_a1[phonemeIdx];
+        rp.a2 = result->prosody_a2[phonemeIdx];
+        rp.a3 = result->prosody_a3[phonemeIdx];
+        rawPhonemes.push_back(rp);
         phonemeIdx++;
     }
 
-    // Add any remaining phonemes as final sentence
-    if (!sentencePhonemes.empty()) {
-        phonemes.push_back(sentencePhonemes);
-        prosodyFeatures.push_back(sentenceProsody);
-    }
-
-    // Clean up
     openjtalk_free_prosody_result(result);
 
+    spdlog::debug("Collected {} raw phonemes", rawPhonemes.size());
+
+    // Pass 2: Build sentence with BOS/EOS/prosody marks/N variants
+    // Note: The C wrapper strips initial/final 'sil' from the label output,
+    // so we unconditionally add BOS at the start and EOS at the end.
+    std::vector<std::string> sentenceTokens;
+    std::vector<ProsodyFeature> sentenceProsody;
+
+    // Get question type from text
+    std::string eosType = getQuestionType(text);
+    spdlog::debug("getQuestionType('{}') = '{}'", text, eosType);
+
+    // Add BOS unconditionally
+    sentenceTokens.push_back("^");
+    sentenceProsody.push_back({0, 0, 0});
+
+    for (size_t i = 0; i < rawPhonemes.size(); i++) {
+        const auto& rp = rawPhonemes[i];
+
+        if (rp.phoneme == "sil") {
+            // Sentence boundary within multi-sentence text
+            // Finalize current sentence and start a new one
+            if (sentenceTokens.size() > 1) { // More than just BOS
+                sentenceTokens.push_back(eosType);
+                sentenceProsody.push_back({0, 0, 0});
+
+                // Apply N variant rules
+                applyNPhonemeRules(sentenceTokens);
+
+                // Convert to PUA and output
+                std::vector<Phoneme> sentPhonemes;
+                for (const auto& tok : sentenceTokens) {
+                    sentPhonemes.push_back(toPuaPhoneme(tok));
+                }
+                phonemes.push_back(std::move(sentPhonemes));
+                prosodyFeatures.push_back(std::move(sentenceProsody));
+
+                // Start new sentence with BOS
+                sentenceTokens.clear();
+                sentenceProsody.clear();
+                sentenceTokens.push_back("^");
+                sentenceProsody.push_back({0, 0, 0});
+            }
+            continue;
+        }
+
+        if (rp.phoneme == "pau") {
+            sentenceTokens.push_back("_");
+            sentenceProsody.push_back({0, 0, 0});
+            continue;
+        }
+
+        // Regular phoneme: insert prosody marks based on A2 lookahead
+        int a1 = rp.a1;
+        int a2 = rp.a2;
+        int a3 = rp.a3;
+
+        // Get A2 of the next phoneme (same as Python's labels[idx+1])
+        int a2_next = -1;
+        if (i + 1 < rawPhonemes.size()) {
+            a2_next = rawPhonemes[i + 1].a2;
+        }
+
+        // Add the phoneme
+        sentenceTokens.push_back(rp.phoneme);
+        sentenceProsody.push_back({a1, a2, a3});
+
+        // ]: Accent nucleus (falling pitch)
+        if (a1 == 0 && a2_next == a2 + 1) {
+            sentenceTokens.push_back("]");
+            sentenceProsody.push_back({0, 0, 0});
+        }
+
+        // #: Accent phrase boundary
+        if (a2 == a3 && a2_next == 1) {
+            sentenceTokens.push_back("#");
+            sentenceProsody.push_back({0, 0, 0});
+        }
+
+        // [: Pitch rise
+        if (a2 == 1 && a2_next == 2) {
+            sentenceTokens.push_back("[");
+            sentenceProsody.push_back({0, 0, 0});
+        }
+    }
+
+    // Finalize the last sentence (add EOS)
+    if (sentenceTokens.size() > 1) { // More than just BOS
+        sentenceTokens.push_back(eosType);
+        sentenceProsody.push_back({0, 0, 0});
+
+        applyNPhonemeRules(sentenceTokens);
+
+        // Debug: dump final sentence tokens
+        {
+            std::string tokenDump;
+            for (const auto& tok : sentenceTokens) {
+                if (!tokenDump.empty()) tokenDump += " ";
+                tokenDump += tok;
+            }
+            spdlog::debug("Final sentenceTokens: {}", tokenDump);
+        }
+
+        std::vector<Phoneme> sentPhonemes;
+        for (const auto& tok : sentenceTokens) {
+            sentPhonemes.push_back(toPuaPhoneme(tok));
+        }
+        phonemes.push_back(std::move(sentPhonemes));
+        prosodyFeatures.push_back(std::move(sentenceProsody));
+    }
+
     spdlog::debug("OpenJTalk phonemization with prosody complete: {} sentences", phonemes.size());
+}
+
+void phonemize_openjtalk(const std::string &text, std::vector<std::vector<Phoneme>> &phonemes) {
+    spdlog::debug("OpenJTalk phonemizer called with text: {}", text);
+    phonemes.clear();
+
+    // Use prosody version and discard prosody data
+    std::vector<std::vector<ProsodyFeature>> unusedProsody;
+    phonemize_openjtalk_with_prosody(text, phonemes, unusedProsody);
 }
 
 } // namespace piper

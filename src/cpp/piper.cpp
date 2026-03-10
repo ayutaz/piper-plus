@@ -63,7 +63,11 @@ static const std::unordered_map<char32_t, std::string> puaToPhoneme = {
     {0xE005, "cl"}, {0xE006, "ky"}, {0xE007, "kw"}, {0xE008, "gy"}, {0xE009, "gw"},
     {0xE00A, "ty"}, {0xE00B, "dy"}, {0xE00C, "py"}, {0xE00D, "by"}, {0xE00E, "ch"},
     {0xE00F, "ts"}, {0xE010, "sh"}, {0xE011, "zy"}, {0xE012, "hy"}, {0xE013, "ny"},
-    {0xE014, "my"}, {0xE015, "ry"}
+    {0xE014, "my"}, {0xE015, "ry"},
+    // Question type markers (Issue #204)
+    {0xE016, "?!"}, {0xE017, "?."}, {0xE018, "?~"},
+    // N phoneme variants (Issue #207)
+    {0xE019, "N_m"}, {0xE01A, "N_n"}, {0xE01B, "N_ng"}, {0xE01C, "N_uvular"}
 };
 
 // Convert phoneme to readable string for logging
@@ -891,7 +895,8 @@ void synthesize(std::vector<PhonemeId> &phonemeIds,
 // Phonemize text and synthesize audio
 void textToAudio(PiperConfig &config, Voice &voice, std::string text,
                  std::vector<int16_t> &audioBuffer, SynthesisResult &result,
-                 const std::function<void()> &audioCallback) {
+                 const std::function<void()> &audioCallback,
+                 const std::vector<ProsodyFeature> *externalProsody) {
 
   std::size_t sentenceSilenceSamples = 0;
   if (voice.synthesisConfig.sentenceSilenceSeconds > 0) {
@@ -983,6 +988,13 @@ void textToAudio(PiperConfig &config, Voice &voice, std::string text,
     }
   }
 
+  // Override prosody features with external data if provided
+  if (externalProsody && !externalProsody->empty() && useProsody) {
+    allProsodyFeatures.clear();
+    allProsodyFeatures.push_back(*externalProsody);
+    spdlog::debug("Using {} external prosody features", externalProsody->size());
+  }
+
   // Synthesize each sentence independently.
   std::vector<PhonemeId> phonemeIds;
   std::map<Phoneme, std::size_t> missingPhonemes;
@@ -1016,6 +1028,12 @@ void textToAudio(PiperConfig &config, Voice &voice, std::string text,
     idConfig.phonemeIdMap =
         std::make_shared<PhonemeIdMap>(voice.phonemizeConfig.phonemeIdMap);
     idConfig.interspersePad = voice.phonemizeConfig.interspersePad;
+
+    // OpenJTalk: BOS/EOS are already in the phoneme list from phonemizer
+    if (voice.phonemizeConfig.phonemeType == OpenJTalkPhonemes) {
+        idConfig.addBos = false;
+        idConfig.addEos = false;
+    }
 
     if (voice.synthesisConfig.phonemeSilenceSeconds) {
       // Split into phrases
@@ -1095,26 +1113,9 @@ void textToAudio(PiperConfig &config, Voice &voice, std::string text,
         size_t numPhonemeIds = phonemeIds.size();
         prosodyFlat.resize(numPhonemeIds * 3, 0);  // Initialize with zeros
 
-        // Debug: Log prosody mapping details (PHASE 2)
-        spdlog::debug("Prosody mapping debug (BEFORE fix):");
-        spdlog::debug("  phonemeIds.size() = {}", phonemeIds.size());
-        spdlog::debug("  sentenceProsody.size() = {}", sentenceProsody.size());
-        spdlog::debug("  interspersePad = {}", voice.phonemizeConfig.interspersePad);
-
-        // Log first 10 phonemeIds
-        spdlog::debug("  First 10 phonemeIds:");
-        for (size_t i = 0; i < std::min(size_t(10), phonemeIds.size()); i++) {
-          spdlog::debug("    phonemeIds[{}] = {}", i, phonemeIds[i]);
-        }
-
-        // Log sentenceProsody contents
-        spdlog::debug("  sentenceProsody contents:");
-        for (size_t i = 0; i < std::min(size_t(10), sentenceProsody.size()); i++) {
-          spdlog::debug("    prosody[{}] = [{}, {}, {}]", i,
-                        sentenceProsody[i].a1,
-                        sentenceProsody[i].a2,
-                        sentenceProsody[i].a3);
-        }
+        spdlog::debug("Prosody mapping: {} phonemeIds, {} prosody features, interspersePad={}",
+                      phonemeIds.size(), sentenceProsody.size(),
+                      voice.phonemizeConfig.interspersePad);
 
         if (voice.phonemizeConfig.interspersePad) {
           // Map prosody to odd positions (1, 3, 5, ...) which are real phonemes
@@ -1126,59 +1127,13 @@ void textToAudio(PiperConfig &config, Voice &voice, std::string text,
             prosodyIdx++;
           }
         } else {
-          // Direct mapping - detect special tokens by ID (Option B)
-          // Special tokens (^=1, $=2, ?=3, #=4, [=5, ]=6) get zero prosody
-          // Real phonemes get prosody from sentenceProsody in order
-          prosodyFlat.clear();
-          prosodyFlat.reserve(numPhonemeIds * 3);
-
-          size_t prosodyIdx = 0;
-
-          for (size_t i = 0; i < phonemeIds.size(); i++) {
-            PhonemeId id = phonemeIds[i];
-
-            // Special tokens: ^=1, $=2, ?=3, #=4, [=5, ]=6
-            if (id >= 1 && id <= 6) {
-              // Special token → zero prosody
-              prosodyFlat.push_back(0.0f);
-              prosodyFlat.push_back(0.0f);
-              prosodyFlat.push_back(0.0f);
-
-              spdlog::debug("  phonemeIds[{}] = {} (special token) → prosody [0, 0, 0]", i, id);
-            } else {
-              // Real phoneme → use prosody data
-              if (prosodyIdx < sentenceProsody.size()) {
-                int64_t a1 = sentenceProsody[prosodyIdx].a1;
-                int64_t a2 = sentenceProsody[prosodyIdx].a2;
-                int64_t a3 = sentenceProsody[prosodyIdx].a3;
-
-                prosodyFlat.push_back(a1);
-                prosodyFlat.push_back(a2);
-                prosodyFlat.push_back(a3);
-
-                spdlog::debug("  phonemeIds[{}] = {} (real phoneme) → prosody [{:.1f}, {:.1f}, {:.1f}]",
-                              i, id, a1, a2, a3);
-
-                prosodyIdx++;
-              } else {
-                // Safety fallback: zero prosody
-                prosodyFlat.push_back(0.0f);
-                prosodyFlat.push_back(0.0f);
-                prosodyFlat.push_back(0.0f);
-
-                spdlog::warn("  phonemeIds[{}] = {} (out of range) → prosody [0, 0, 0]", i, id);
-              }
-            }
+          // Direct 1:1 mapping (OpenJTalk)
+          // prosodyFeatures are already aligned with phonemes (BOS/EOS/marks have {0,0,0})
+          for (size_t i = 0; i < numPhonemeIds && i < sentenceProsody.size(); i++) {
+            prosodyFlat[i * 3 + 0] = sentenceProsody[i].a1;
+            prosodyFlat[i * 3 + 1] = sentenceProsody[i].a2;
+            prosodyFlat[i * 3 + 2] = sentenceProsody[i].a3;
           }
-
-          // Verification
-          if (prosodyFlat.size() != phonemeIds.size() * 3) {
-            spdlog::error("Prosody flat size mismatch: {} != {} * 3",
-                          prosodyFlat.size(), phonemeIds.size());
-          }
-
-          spdlog::debug("Final prosodyFlat size: {} (phonemeIds: {})",
-                        prosodyFlat.size(), phonemeIds.size());
         }
 
         prosodyPtr = &prosodyFlat;
@@ -1236,10 +1191,11 @@ void textToAudio(PiperConfig &config, Voice &voice, std::string text,
 
 // Phonemize text and synthesize audio to WAV file
 void textToWavFile(PiperConfig &config, Voice &voice, std::string text,
-                   std::ostream &audioFile, SynthesisResult &result) {
+                   std::ostream &audioFile, SynthesisResult &result,
+                   const std::vector<ProsodyFeature> *externalProsody) {
 
   std::vector<int16_t> audioBuffer;
-  textToAudio(config, voice, text, audioBuffer, result, NULL);
+  textToAudio(config, voice, text, audioBuffer, result, NULL, externalProsody);
 
   // Write WAV
   auto synthesisConfig = voice.synthesisConfig;
@@ -1268,9 +1224,14 @@ void phonemesToAudio(PiperConfig &config, Voice &voice,
       std::make_shared<PhonemeIdMap>(voice.phonemizeConfig.phonemeIdMap);
   idConfig.interspersePad = voice.phonemizeConfig.interspersePad;
   
-  // The phonemes_to_ids function handles BOS/EOS automatically based on addBos/addEos flags
-  idConfig.addBos = true;
-  idConfig.addEos = true;
+  // OpenJTalk: BOS/EOS are already in the phoneme list from phonemizer
+  if (voice.phonemizeConfig.phonemeType == OpenJTalkPhonemes) {
+    idConfig.addBos = false;
+    idConfig.addEos = false;
+  } else {
+    idConfig.addBos = true;
+    idConfig.addEos = true;
+  }
   
   // Convert phonemes to IDs
   phonemes_to_ids(phonemes, idConfig, phonemeIds, missingPhonemes);
@@ -1493,8 +1454,14 @@ void textToAudioStreaming(PiperConfig &config, Voice &voice, std::string text,
       idConfig.phonemeIdMap =
           std::make_shared<PhonemeIdMap>(voice.phonemizeConfig.phonemeIdMap);
       idConfig.interspersePad = voice.phonemizeConfig.interspersePad;
-      idConfig.addBos = true;
-      idConfig.addEos = true;
+      // OpenJTalk: BOS/EOS are already in the phoneme list from phonemizer
+      if (voice.phonemizeConfig.phonemeType == OpenJTalkPhonemes) {
+        idConfig.addBos = false;
+        idConfig.addEos = false;
+      } else {
+        idConfig.addBos = true;
+        idConfig.addEos = true;
+      }
 
       phonemes_to_ids(sentencePhonemes, idConfig, phonemeIds,
                       missingPhonemes);
@@ -1602,13 +1569,19 @@ void phonemesToAudioStreaming(PiperConfig &config, Voice &voice,
   idConfig.phonemeIdMap = 
       std::make_shared<PhonemeIdMap>(voice.phonemizeConfig.phonemeIdMap);
   idConfig.interspersePad = voice.phonemizeConfig.interspersePad;
-  idConfig.addBos = true;
-  idConfig.addEos = false;  // We'll add EOS only to the last chunk
-  
+  // OpenJTalk: BOS/EOS are already in the phoneme list from phonemizer
+  if (voice.phonemizeConfig.phonemeType == OpenJTalkPhonemes) {
+    idConfig.addBos = false;
+    idConfig.addEos = false;
+  } else {
+    idConfig.addBos = true;
+    idConfig.addEos = false;  // We'll add EOS only to the last chunk
+  }
+
   std::vector<PhonemeId> phonemeIds;
   std::map<Phoneme, std::size_t> missingPhonemes;
   std::vector<int16_t> chunkAudioBuffer;
-  
+
   // Process phonemes in chunks
   size_t processedPhonemes = 0;
   while (processedPhonemes < phonemes.size()) {
@@ -1616,13 +1589,15 @@ void phonemesToAudioStreaming(PiperConfig &config, Voice &voice,
     size_t chunkStart = processedPhonemes;
     size_t chunkEnd = std::min(processedPhonemes + phonemesPerChunk, phonemes.size());
     bool isLastChunk = (chunkEnd == phonemes.size());
-    
+
     // Extract chunk phonemes
     std::vector<Phoneme> chunkPhonemes(phonemes.begin() + chunkStart,
                                         phonemes.begin() + chunkEnd);
-    
-    // Add EOS only to the last chunk
-    idConfig.addEos = isLastChunk;
+
+    // Add EOS only to the last chunk (non-OpenJTalk only)
+    if (voice.phonemizeConfig.phonemeType != OpenJTalkPhonemes) {
+      idConfig.addEos = isLastChunk;
+    }
     
     // Convert chunk phonemes to IDs
     phonemeIds.clear();

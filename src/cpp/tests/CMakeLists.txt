@@ -4,6 +4,26 @@
 add_compile_definitions(SPDLOG_FMT_EXTERNAL=1)
 add_compile_definitions(FMT_HEADER_ONLY=1)
 
+# Macro: Link OpenJTalk static library and dependencies to a test target
+macro(link_openjtalk_to_test target_name)
+    target_include_directories(${target_name} PRIVATE
+        ${CMAKE_BINARY_DIR}/oj/include
+        ${CMAKE_BINARY_DIR}/oj/include/openjtalk
+        ${CMAKE_BINARY_DIR}/hts_stub/include
+    )
+    if(WIN32)
+        target_link_libraries(${target_name} ${CMAKE_BINARY_DIR}/oj/lib/openjtalk.lib)
+    else()
+        target_link_libraries(${target_name} ${CMAKE_BINARY_DIR}/oj/lib/libopenjtalk.a)
+    endif()
+    if(TARGET hts_engine_stub)
+        target_link_libraries(${target_name} hts_engine_stub)
+    endif()
+    if(TARGET openjtalk_external)
+        add_dependencies(${target_name} openjtalk_external)
+    endif()
+endmacro()
+
 # Test sources
 set(TEST_SOURCES
     test_phonemize.cpp
@@ -16,6 +36,8 @@ set(TEST_SOURCES
     test_streaming_simple.cpp
     test_streaming_raw_phonemes.cpp
     test_prosody_inference.cpp
+    test_n_variants.cpp
+    test_question_markers.cpp
     test_model_speaker_detection.cpp
     test_custom_dictionary.cpp
 )
@@ -88,7 +110,7 @@ foreach(test_source ${TEST_SOURCES})
             ../openjtalk_dictionary_manager.c
             ../openjtalk_error.c
             ../openjtalk_security.c
-            # ../openjtalk_api.c  # Temporarily disabled - requires OpenJTalk static libs
+            ../openjtalk_api.c
         )
         target_include_directories(${test_name} PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/..
@@ -97,8 +119,9 @@ foreach(test_source ${TEST_SOURCES})
         target_link_libraries(${test_name}
             Threads::Threads
         )
+        link_openjtalk_to_test(${test_name})
     endif()
-    
+
     # Link additional dependencies for error handling test
     if(${test_name} STREQUAL "test_openjtalk_error_handling")
         target_sources(${test_name} PRIVATE
@@ -106,7 +129,7 @@ foreach(test_source ${TEST_SOURCES})
             ../openjtalk_dictionary_manager.c
             ../openjtalk_error.c
             ../openjtalk_security.c
-            # ../openjtalk_api.c  # Temporarily disabled - requires OpenJTalk static libs
+            ../openjtalk_api.c
         )
         target_include_directories(${test_name} PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/..
@@ -115,8 +138,9 @@ foreach(test_source ${TEST_SOURCES})
         target_link_libraries(${test_name}
             Threads::Threads
         )
+        link_openjtalk_to_test(${test_name})
     endif()
-    
+
     # Link additional dependencies for optimized test
     if(${test_name} STREQUAL "test_openjtalk_optimized")
         target_sources(${test_name} PRIVATE
@@ -125,7 +149,7 @@ foreach(test_source ${TEST_SOURCES})
             ../openjtalk_error.c
             ../openjtalk_security.c
             ../openjtalk_optimized.c
-            # ../openjtalk_api.c  # Temporarily disabled - requires OpenJTalk static libs
+            ../openjtalk_api.c
         )
         target_include_directories(${test_name} PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/..
@@ -134,6 +158,7 @@ foreach(test_source ${TEST_SOURCES})
         target_link_libraries(${test_name}
             Threads::Threads
         )
+        link_openjtalk_to_test(${test_name})
     endif()
 
     # Link additional dependencies for streaming test - using same approach as test_piper
@@ -142,19 +167,24 @@ foreach(test_source ${TEST_SOURCES})
             ../piper.cpp
             ../phoneme_parser.cpp
             ../openjtalk_phonemize.cpp
+            ../openjtalk_phonemize_utils.cpp
             ../openjtalk_wrapper.c
             ../openjtalk_dictionary_manager.c
             ../openjtalk_error.c
             ../openjtalk_security.c
             ../openjtalk_optimized.c
+            ../openjtalk_api.c
         )
-        
+
         # Include directories
         target_include_directories(${test_name} PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/..
             ${CMAKE_BINARY_DIR}/fi/include
             ${CMAKE_BINARY_DIR}/si/include
             ${CMAKE_BINARY_DIR}/pi/include
+            ${CMAKE_BINARY_DIR}/oj/include
+            ${CMAKE_BINARY_DIR}/oj/include/openjtalk
+            ${CMAKE_BINARY_DIR}/hts_stub/include
         )
         
         # Add library directories
@@ -193,6 +223,9 @@ foreach(test_source ${TEST_SOURCES})
             target_link_libraries(${test_name} Threads::Threads)
         endif()
         
+        # Link OpenJTalk static library
+        link_openjtalk_to_test(${test_name})
+
         # Add dependencies to ensure build order
         add_dependencies(${test_name}
             piper_phonemize_external
@@ -245,19 +278,24 @@ foreach(test_source ${TEST_SOURCES})
             ../piper.cpp
             ../phoneme_parser.cpp
             ../openjtalk_phonemize.cpp
+            ../openjtalk_phonemize_utils.cpp
             ../openjtalk_wrapper.c
             ../openjtalk_dictionary_manager.c
             ../openjtalk_error.c
             ../openjtalk_security.c
             ../openjtalk_optimized.c
+            ../openjtalk_api.c
         )
-        
+
         # Include directories
         target_include_directories(${test_name} PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/..
             ${CMAKE_BINARY_DIR}/fi/include
             ${CMAKE_BINARY_DIR}/si/include
             ${CMAKE_BINARY_DIR}/pi/include
+            ${CMAKE_BINARY_DIR}/oj/include
+            ${CMAKE_BINARY_DIR}/oj/include/openjtalk
+            ${CMAKE_BINARY_DIR}/hts_stub/include
         )
         
         # Add library directories
@@ -296,14 +334,17 @@ foreach(test_source ${TEST_SOURCES})
             target_link_libraries(${test_name} Threads::Threads)
         endif()
         
+        # Link OpenJTalk static library
+        link_openjtalk_to_test(${test_name})
+
         # Add dependencies to ensure build order
-        add_dependencies(${test_name} 
-            piper_phonemize_external 
-            fmt_external 
+        add_dependencies(${test_name}
+            piper_phonemize_external
+            fmt_external
             spdlog_external
         )
     endif()
-    
+
     # Link additional dependencies for phoneme parser test
     if(${test_name} STREQUAL "test_phoneme_parser")
         target_sources(${test_name} PRIVATE
@@ -334,6 +375,16 @@ foreach(test_source ${TEST_SOURCES})
         endif()
         # Ensure dependencies are built first
         add_dependencies(${test_name} spdlog_external fmt_external)
+    endif()
+
+    # Link utils source for N variants and question markers tests
+    if(${test_name} STREQUAL "test_n_variants" OR ${test_name} STREQUAL "test_question_markers")
+        target_sources(${test_name} PRIVATE
+            ../openjtalk_phonemize_utils.cpp
+        )
+        target_include_directories(${test_name} PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/..
+        )
     endif()
 
     add_test(NAME ${test_name} COMMAND ${test_name})

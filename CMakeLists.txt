@@ -108,30 +108,30 @@ if(BUILD_TESTS)
   set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
   FetchContent_MakeAvailable(googletest)
   
-  # Only add tests directory if it exists
-  if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/cpp/tests")
-    add_subdirectory(src/cpp/tests)
-  endif()
+  # Note: add_subdirectory(src/cpp/tests) is deferred to after all ExternalProject
+  # targets are defined, so that if(TARGET openjtalk_external) etc. work correctly.
 endif()
 
 # Add OpenJTalk support on all platforms
 target_sources(piper PRIVATE
   src/cpp/openjtalk_phonemize.cpp
+  src/cpp/openjtalk_phonemize_utils.cpp
   src/cpp/openjtalk_wrapper.c
   src/cpp/openjtalk_dictionary_manager.c
   src/cpp/openjtalk_error.c
   src/cpp/openjtalk_security.c
   src/cpp/openjtalk_optimized.c
-  # src/cpp/openjtalk_api.c  # Temporarily disabled - requires OpenJTalk static libs
+  src/cpp/openjtalk_api.c
 )
 target_sources(test_piper PRIVATE
   src/cpp/openjtalk_phonemize.cpp
+  src/cpp/openjtalk_phonemize_utils.cpp
   src/cpp/openjtalk_wrapper.c
   src/cpp/openjtalk_dictionary_manager.c
   src/cpp/openjtalk_error.c
   src/cpp/openjtalk_security.c
   src/cpp/openjtalk_optimized.c
-  # src/cpp/openjtalk_api.c  # Temporarily disabled - requires OpenJTalk static libs
+  src/cpp/openjtalk_api.c
 )
 
 # Link pthread library on Unix systems
@@ -376,32 +376,33 @@ elseif(NOT DEFINED HTS_ENGINE_DIR)
 endif()
 
 # ---- OpenJTalk ---
+# Using pyopenjtalk-plus's open_jtalk fork for Python/C++ consistency.
+# This fork has improved NJD accent phrase rules (Rules 19-22) and accent type fixes
+# that produce identical fullcontext labels to the Python training pipeline.
+# Both the library and dictionary come from the same pyopenjtalk-plus source.
+set(PYOPENJTALK_PLUS_URL "https://files.pythonhosted.org/packages/82/4e/1e2c165b04dd250dbcb1c270df8517681eed5c20b755c72bec2b42853851/pyopenjtalk_plus-0.4.1.post7.tar.gz")
 
 if(NOT DEFINED OPENJTALK_DIR)
     set(OPENJTALK_DIR "${CMAKE_CURRENT_BINARY_DIR}/oj")
-    set(OPENJTALK_VERSION "1.11")
 
-    # Use CMake build for Windows and Linux ARM64
-    if(WIN32 OR (CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64" AND CMAKE_SYSTEM_NAME STREQUAL "Linux"))
-      # Use CMake build for Windows and Linux ARM64
-      set(OPENJTALK_CMAKE_ARGS
-        -DCMAKE_INSTALL_PREFIX:PATH=${OPENJTALK_DIR}
-        -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}
-        -DBUILD_SHARED_LIBS:BOOL=OFF
-        -DHTS_ENGINE_INCLUDE_DIR:PATH=${HTS_ENGINE_DIR}/include
-        ${EXTERNAL_CMAKE_ARGS}
+    # pyopenjtalk-plus fork: single "openjtalk" library (MeCab + NJD + JPCommon)
+    # No HTS_Engine dependency (NJD/MeCab pipeline only)
+    set(OPENJTALK_CMAKE_ARGS
+      -DCMAKE_INSTALL_PREFIX:PATH=${OPENJTALK_DIR}
+      -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}
+      -DBUILD_SHARED_LIBS:BOOL=OFF
+      -DCHARSET:STRING=utf8
+      ${EXTERNAL_CMAKE_ARGS}
+    )
+
+    if(WIN32)
+      list(APPEND OPENJTALK_CMAKE_ARGS
+        -DCMAKE_MSVC_RUNTIME_LIBRARY:STRING=${CMAKE_MSVC_RUNTIME_LIBRARY}
       )
-      
-      # Platform-specific settings
-      if(WIN32)
+    else()
+      # Linux ARM64 cross-compilation settings
+      if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64" AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
         list(APPEND OPENJTALK_CMAKE_ARGS
-          -DHTS_ENGINE_LIB:FILEPATH=${HTS_ENGINE_DIR}/lib/HTSEngine.lib
-          -DCMAKE_MSVC_RUNTIME_LIBRARY:STRING=${CMAKE_MSVC_RUNTIME_LIBRARY}
-        )
-      else()
-        # Linux ARM64
-        list(APPEND OPENJTALK_CMAKE_ARGS
-          -DHTS_ENGINE_LIB:FILEPATH=${HTS_ENGINE_DIR}/lib/libHTSEngine.a
           -DCMAKE_TOOLCHAIN_FILE:FILEPATH=${CMAKE_TOOLCHAIN_FILE}
           -DCMAKE_C_COMPILER:FILEPATH=aarch64-linux-gnu-gcc
           -DCMAKE_CXX_COMPILER:FILEPATH=aarch64-linux-gnu-g++
@@ -409,89 +410,49 @@ if(NOT DEFINED OPENJTALK_DIR)
           -DCMAKE_RANLIB:FILEPATH=aarch64-linux-gnu-ranlib
         )
       endif()
-      
-      if(WIN32)
-        ExternalProject_Add(
-          openjtalk_external
-          PREFIX "${CMAKE_CURRENT_BINARY_DIR}/o"
-          URL "https://downloads.sourceforge.net/project/open-jtalk/Open%20JTalk/open_jtalk-${OPENJTALK_VERSION}/open_jtalk-${OPENJTALK_VERSION}.tar.gz"
-          CMAKE_ARGS ${OPENJTALK_CMAKE_ARGS}
-          PATCH_COMMAND 
-            ${CMAKE_COMMAND} -E copy 
-              ${CMAKE_CURRENT_SOURCE_DIR}/cmake/OpenJTalk_CMakeLists.txt 
-              <SOURCE_DIR>/CMakeLists.txt
-            COMMAND ${CMAKE_COMMAND} -E copy
-              ${CMAKE_CURRENT_SOURCE_DIR}/cmake/open_jtalk_phonemizer.c
-              <SOURCE_DIR>/bin/open_jtalk_phonemizer.c
-            COMMAND ${CMAKE_COMMAND} -E copy
-              ${CMAKE_CURRENT_SOURCE_DIR}/cmake/apply_openjtalk_patch.ps1
-              <SOURCE_DIR>/apply_patch.ps1
-            COMMAND powershell -ExecutionPolicy Bypass -File "<SOURCE_DIR>/apply_patch.ps1" -SourceDir "<SOURCE_DIR>"
-          BUILD_BYPRODUCTS
-            ${OPENJTALK_DIR}/bin/open_jtalk.exe
-            ${OPENJTALK_DIR}/bin/open_jtalk_phonemizer.exe
-        )
-      else()
-        # Linux ARM64
-        ExternalProject_Add(
-          openjtalk_external
-          PREFIX "${CMAKE_CURRENT_BINARY_DIR}/o"
-          URL "https://downloads.sourceforge.net/project/open-jtalk/Open%20JTalk/open_jtalk-${OPENJTALK_VERSION}/open_jtalk-${OPENJTALK_VERSION}.tar.gz"
-          CMAKE_ARGS ${OPENJTALK_CMAKE_ARGS}
-          PATCH_COMMAND 
-            ${CMAKE_COMMAND} -E copy 
-              ${CMAKE_CURRENT_SOURCE_DIR}/cmake/OpenJTalk_CMakeLists.txt 
-              <SOURCE_DIR>/CMakeLists.txt
-            COMMAND ${CMAKE_COMMAND} -E copy
-              ${CMAKE_CURRENT_SOURCE_DIR}/cmake/open_jtalk_phonemizer.c
-              <SOURCE_DIR>/bin/open_jtalk_phonemizer.c
-            COMMAND ${CMAKE_COMMAND} -E copy
-              ${CMAKE_CURRENT_SOURCE_DIR}/cmake/open_jtalk_patch.sh
-              <SOURCE_DIR>/apply_patch.sh
-            COMMAND ${CMAKE_COMMAND} -E chdir <SOURCE_DIR> chmod +x apply_patch.sh
-            COMMAND ${CMAKE_COMMAND} -E chdir <SOURCE_DIR> ./apply_patch.sh
-          BUILD_BYPRODUCTS
-            ${OPENJTALK_DIR}/bin/open_jtalk
-            ${OPENJTALK_DIR}/bin/open_jtalk_phonemizer
-        )
-      endif()
-      
-      add_dependencies(openjtalk_external hts_engine_external)
-    else()
-      # Use autotools for Unix platforms
-      set(OPENJTALK_CONFIGURE_CMD ${CMAKE_COMMAND} -E env ${CONFIGURE_ENV} ${CMAKE_COMMAND} -E chdir <SOURCE_DIR> ./configure
-        --prefix=${OPENJTALK_DIR}
-        --with-hts-engine-header-path=${HTS_ENGINE_DIR}/include
-        --with-hts-engine-library-path=${HTS_ENGINE_DIR}/lib
-        --with-charset=UTF-8
-        ${CONFIGURE_HOST})
-      
-      ExternalProject_Add(
-        openjtalk_external
-        PREFIX "${CMAKE_CURRENT_BINARY_DIR}/o"
-        URL "https://downloads.sourceforge.net/project/open-jtalk/Open%20JTalk/open_jtalk-${OPENJTALK_VERSION}/open_jtalk-${OPENJTALK_VERSION}.tar.gz"
-        PATCH_COMMAND 
-          ${CMAKE_COMMAND} -E copy 
-            ${CMAKE_CURRENT_SOURCE_DIR}/cmake/open_jtalk_phonemizer.c
-            <SOURCE_DIR>/bin/open_jtalk_phonemizer.c
-        CONFIGURE_COMMAND ${OPENJTALK_CONFIGURE_CMD}
-        BUILD_COMMAND ${CMAKE_COMMAND} -E chdir <SOURCE_DIR> make
-        INSTALL_COMMAND 
-          ${CMAKE_COMMAND} -E chdir <SOURCE_DIR> make install
-          COMMAND ${CMAKE_COMMAND} -E copy
-            ${CMAKE_CURRENT_SOURCE_DIR}/cmake/build_openjtalk_phonemizer.sh
-            <SOURCE_DIR>/build_phonemizer.sh
-          COMMAND ${CMAKE_COMMAND} -E chdir <SOURCE_DIR> chmod +x build_phonemizer.sh
-          COMMAND ${CMAKE_COMMAND} -E chdir <SOURCE_DIR> ./build_phonemizer.sh
-            ${CMAKE_CXX_COMPILER} ${OPENJTALK_DIR} ${HTS_ENGINE_DIR}
-        BUILD_IN_SOURCE 1
-        BUILD_BYPRODUCTS
-          ${OPENJTALK_DIR}/bin/open_jtalk
-          ${OPENJTALK_DIR}/bin/open_jtalk_phonemizer
-      )
-      
-      add_dependencies(openjtalk_external hts_engine_external)
     endif()
+
+    ExternalProject_Add(
+      openjtalk_external
+      PREFIX "${CMAKE_CURRENT_BINARY_DIR}/o"
+      URL ${PYOPENJTALK_PLUS_URL}
+      URL_HASH SHA256=555fdf86310d6d72f4a37e92beb251cdc2114aafc133d4c77b136a07a4b17119
+      DOWNLOAD_NO_PROGRESS TRUE
+      TIMEOUT 600
+      TLS_VERIFY ON
+      DOWNLOAD_TRIES 3
+      SOURCE_SUBDIR lib/open_jtalk/src
+      CMAKE_ARGS ${OPENJTALK_CMAKE_ARGS}
+      PATCH_COMMAND
+        ${CMAKE_COMMAND} -D SOURCE_DIR=<SOURCE_DIR> -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/patch_r9y9_openjtalk.cmake
+      BUILD_BYPRODUCTS
+        ${OPENJTALK_DIR}/lib/libopenjtalk.a      # Unix
+        ${OPENJTALK_DIR}/lib/openjtalk.lib        # Windows
+    )
+
+    # Note: pyopenjtalk-plus fork doesn't require HTS_Engine for NJD pipeline
+    # (no add_dependencies on hts_engine_external needed)
+
+    # Dictionary from pyopenjtalk-plus (same source, same archive)
+    # Custom dictionary with improved accent predictions from jpreprocess project.
+    # DEPENDS openjtalk_external to avoid parallel download race condition.
+    set(OPENJTALK_DIC_DIR "${CMAKE_CURRENT_BINARY_DIR}/share/open_jtalk/dic")
+    ExternalProject_Add(
+      openjtalk_dic_download
+      PREFIX "${CMAKE_CURRENT_BINARY_DIR}/od"
+      DEPENDS openjtalk_external
+      URL ${PYOPENJTALK_PLUS_URL}
+      URL_HASH SHA256=555fdf86310d6d72f4a37e92beb251cdc2114aafc133d4c77b136a07a4b17119
+      DOWNLOAD_NO_PROGRESS TRUE
+      TIMEOUT 600
+      TLS_VERIFY ON
+      DOWNLOAD_TRIES 3
+      CONFIGURE_COMMAND ""
+      BUILD_COMMAND ""
+      INSTALL_COMMAND
+        ${CMAKE_COMMAND} -E make_directory ${OPENJTALK_DIC_DIR}
+        COMMAND ${CMAKE_COMMAND} -E copy_directory <SOURCE_DIR>/pyopenjtalk/dictionary ${OPENJTALK_DIC_DIR}
+    )
 endif()
 
 # ---- Declare executable ----
@@ -590,12 +551,14 @@ if(WIN32 AND ONNXRUNTIME_INCLUDE_DIR)
   target_include_directories(test_piper PUBLIC ${ONNXRUNTIME_INCLUDE_DIR})
 endif()
 
-# Include OpenJTalk headers
+# Include OpenJTalk headers (r9y9 fork installs to include/openjtalk/)
 target_include_directories(piper PUBLIC
   ${OPENJTALK_DIR}/include
+  ${OPENJTALK_DIR}/include/openjtalk
 )
 target_include_directories(test_piper PUBLIC
   ${OPENJTALK_DIR}/include
+  ${OPENJTALK_DIR}/include/openjtalk
 )
 
 # Include HTSEngine headers (required for OpenJTalk)
@@ -606,7 +569,14 @@ target_include_directories(test_piper PUBLIC
   ${HTS_ENGINE_DIR}/include
 )
 
-# OpenJTalk is used via binary execution, includes not needed
+# Link OpenJTalk static library (r9y9 fork: single "openjtalk" lib with MeCab included)
+if(WIN32)
+  target_link_libraries(piper PRIVATE ${OPENJTALK_DIR}/lib/openjtalk.lib)
+  target_link_libraries(test_piper PRIVATE ${OPENJTALK_DIR}/lib/openjtalk.lib)
+else()
+  target_link_libraries(piper PRIVATE ${OPENJTALK_DIR}/lib/libopenjtalk.a)
+  target_link_libraries(test_piper PRIVATE ${OPENJTALK_DIR}/lib/libopenjtalk.a)
+endif()
 
 target_compile_definitions(piper PUBLIC _PIPER_VERSION=${piper_version})
 target_compile_definitions(piper PUBLIC SPDLOG_FMT_EXTERNAL=1)
@@ -626,6 +596,14 @@ if(TRUE)  # HTSEngine and OpenJTalk are built
     target_compile_definitions(test_piper PUBLIC OPENJTALK_DIC_PATH="${CMAKE_CURRENT_BINARY_DIR}/naist-jdic")
     target_compile_definitions(test_piper PUBLIC SPDLOG_FMT_EXTERNAL=1)
     target_compile_definitions(test_piper PUBLIC FMT_HEADER_ONLY=1)
+  endif()
+endif()
+
+# Add test subdirectory AFTER all ExternalProject targets are defined
+# (tests depend on openjtalk_external, hts_engine_external, piper_phonemize_external, etc.)
+if(BUILD_TESTS)
+  if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/cpp/tests")
+    add_subdirectory(src/cpp/tests)
   endif()
 endif()
 
@@ -677,7 +655,7 @@ else()
   )
 endif()
 
-# OpenJTalk is used via binary execution for test_piper, not linked
+# OpenJTalk is linked as a static library (r9y9 fork) for direct API access
 
 # ---- Declare install targets ----
 
@@ -716,47 +694,15 @@ install(
 )
 
 # Install OpenJTalk for Japanese TTS support
-if(TRUE)  # HTSEngine and OpenJTalk are built
-  # Install OpenJTalk binaries
-  if(WIN32)
-    install(
-      PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/oj/bin/open_jtalk.exe
-      DESTINATION bin
-      OPTIONAL  # Don't fail if not built
-    )
-    install(
-      PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/oj/bin/open_jtalk_phonemizer.exe
-      DESTINATION bin
-      OPTIONAL  # Don't fail if not built
-    )
-  else()
-    install(
-      PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/oj/bin/open_jtalk
-      DESTINATION bin
-      OPTIONAL  # Don't fail if not built
-    )
-    install(
-      PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/oj/bin/open_jtalk_phonemizer
-      DESTINATION bin
-      OPTIONAL  # Don't fail if not built
-    )
-  endif()
-
-  # Install OpenJTalk dictionary
-  # The autotools build installs the dictionary under OPENJTALK_DIR (oj/)
-  # while the CMake build may place it under the build root's share/
-  install(
-    DIRECTORY ${OPENJTALK_DIR}/share/open_jtalk
-    DESTINATION share
-    OPTIONAL  # Don't fail if not present
-  )
-  # Fallback: also check the build root's share/ (CMake-based builds)
-  install(
-    DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/share/open_jtalk
-    DESTINATION share
-    OPTIONAL  # Don't fail if not present
-  )
-endif()
+# r9y9 fork: static library linked directly, no separate binaries needed.
+# OpenJTalk binaries (open_jtalk, open_jtalk_phonemizer) are no longer installed
+# since C++ now uses the API directly instead of system() calls.
+# Install OpenJTalk dictionary
+install(
+  DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/share/open_jtalk
+  DESTINATION share
+  OPTIONAL  # Don't fail if not present
+)
 
 # Note: We don't need to copy espeak-ng library on macOS separately
 # because piper_phonemize builds and installs its own custom fork

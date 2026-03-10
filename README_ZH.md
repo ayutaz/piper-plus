@@ -412,7 +412,7 @@ Piper 的 Unity 插件：[github.com/ayutaz/uPiper](https://github.com/ayutaz/uP
 | 训练 | [训练指南](docs/guides/training/training-guide.md) · [多 GPU](docs/guides/training/multi-gpu-training.md) |
 | API | [音素映射](docs/api-reference/phoneme-mapping.md) · [环境变量](docs/getting-started/environment-variables.md) |
 | 功能 | [WebUI](docs/features/webui.md) · [CLI 增强](docs/features/cli-enhancements.md) · [流式处理](docs/features/streaming-mode.md) |
-| 设置 | [快速入门（日语）](docs/getting-started/quick_start_japanese.md) · [Windows](docs/getting-started/windows-setup.md) · [故障排除](docs/getting-started/troubleshooting.md) |
+| 设置 | [快速入门（日语）](docs/guides/japanese/japanese-usage.md) · [Windows](docs/getting-started/windows-setup.md) · [故障排除](docs/getting-started/troubleshooting.md) |
 | Docker | [Docker 环境](docker/README.md) |
 | WebAssembly | [技术详情](src/wasm/openjtalk-web/README.md) |
 
