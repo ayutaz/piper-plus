@@ -4,6 +4,26 @@
 add_compile_definitions(SPDLOG_FMT_EXTERNAL=1)
 add_compile_definitions(FMT_HEADER_ONLY=1)
 
+# Macro: Link OpenJTalk static library and dependencies to a test target
+macro(link_openjtalk_to_test target_name)
+    target_include_directories(${target_name} PRIVATE
+        ${CMAKE_BINARY_DIR}/oj/include
+        ${CMAKE_BINARY_DIR}/oj/include/openjtalk
+        ${CMAKE_BINARY_DIR}/hts_stub/include
+    )
+    if(WIN32)
+        target_link_libraries(${target_name} ${CMAKE_BINARY_DIR}/oj/lib/openjtalk.lib)
+    else()
+        target_link_libraries(${target_name} ${CMAKE_BINARY_DIR}/oj/lib/libopenjtalk.a)
+    endif()
+    if(TARGET hts_engine_stub)
+        target_link_libraries(${target_name} hts_engine_stub)
+    endif()
+    if(TARGET openjtalk_external)
+        add_dependencies(${target_name} openjtalk_external)
+    endif()
+endmacro()
+
 # Test sources
 set(TEST_SOURCES
     test_phonemize.cpp
@@ -94,27 +114,14 @@ foreach(test_source ${TEST_SOURCES})
         )
         target_include_directories(${test_name} PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/..
-            ${CMAKE_BINARY_DIR}/oj/include
-            ${CMAKE_BINARY_DIR}/oj/include/openjtalk
-            ${CMAKE_BINARY_DIR}/hts_stub/include
         )
         find_package(Threads REQUIRED)
         target_link_libraries(${test_name}
             Threads::Threads
         )
-        if(WIN32)
-            target_link_libraries(${test_name} ${CMAKE_BINARY_DIR}/oj/lib/openjtalk.lib)
-        else()
-            target_link_libraries(${test_name} ${CMAKE_BINARY_DIR}/oj/lib/libopenjtalk.a)
-        endif()
-        if(TARGET hts_engine_stub)
-            target_link_libraries(${test_name} hts_engine_stub)
-        endif()
-        if(TARGET openjtalk_external)
-            add_dependencies(${test_name} openjtalk_external)
-        endif()
+        link_openjtalk_to_test(${test_name})
     endif()
-    
+
     # Link additional dependencies for error handling test
     if(${test_name} STREQUAL "test_openjtalk_error_handling")
         target_sources(${test_name} PRIVATE
@@ -126,27 +133,14 @@ foreach(test_source ${TEST_SOURCES})
         )
         target_include_directories(${test_name} PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/..
-            ${CMAKE_BINARY_DIR}/oj/include
-            ${CMAKE_BINARY_DIR}/oj/include/openjtalk
-            ${CMAKE_BINARY_DIR}/hts_stub/include
         )
         find_package(Threads REQUIRED)
         target_link_libraries(${test_name}
             Threads::Threads
         )
-        if(WIN32)
-            target_link_libraries(${test_name} ${CMAKE_BINARY_DIR}/oj/lib/openjtalk.lib)
-        else()
-            target_link_libraries(${test_name} ${CMAKE_BINARY_DIR}/oj/lib/libopenjtalk.a)
-        endif()
-        if(TARGET hts_engine_stub)
-            target_link_libraries(${test_name} hts_engine_stub)
-        endif()
-        if(TARGET openjtalk_external)
-            add_dependencies(${test_name} openjtalk_external)
-        endif()
+        link_openjtalk_to_test(${test_name})
     endif()
-    
+
     # Link additional dependencies for optimized test
     if(${test_name} STREQUAL "test_openjtalk_optimized")
         target_sources(${test_name} PRIVATE
@@ -159,25 +153,12 @@ foreach(test_source ${TEST_SOURCES})
         )
         target_include_directories(${test_name} PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/..
-            ${CMAKE_BINARY_DIR}/oj/include
-            ${CMAKE_BINARY_DIR}/oj/include/openjtalk
-            ${CMAKE_BINARY_DIR}/hts_stub/include
         )
         find_package(Threads REQUIRED)
         target_link_libraries(${test_name}
             Threads::Threads
         )
-        if(WIN32)
-            target_link_libraries(${test_name} ${CMAKE_BINARY_DIR}/oj/lib/openjtalk.lib)
-        else()
-            target_link_libraries(${test_name} ${CMAKE_BINARY_DIR}/oj/lib/libopenjtalk.a)
-        endif()
-        if(TARGET hts_engine_stub)
-            target_link_libraries(${test_name} hts_engine_stub)
-        endif()
-        if(TARGET openjtalk_external)
-            add_dependencies(${test_name} openjtalk_external)
-        endif()
+        link_openjtalk_to_test(${test_name})
     endif()
 
     # Link additional dependencies for streaming test - using same approach as test_piper
@@ -243,14 +224,7 @@ foreach(test_source ${TEST_SOURCES})
         endif()
         
         # Link OpenJTalk static library
-        if(WIN32)
-            target_link_libraries(${test_name} ${CMAKE_BINARY_DIR}/oj/lib/openjtalk.lib)
-        else()
-            target_link_libraries(${test_name} ${CMAKE_BINARY_DIR}/oj/lib/libopenjtalk.a)
-        endif()
-        if(TARGET hts_engine_stub)
-            target_link_libraries(${test_name} hts_engine_stub)
-        endif()
+        link_openjtalk_to_test(${test_name})
 
         # Add dependencies to ensure build order
         add_dependencies(${test_name}
@@ -258,9 +232,6 @@ foreach(test_source ${TEST_SOURCES})
             fmt_external
             spdlog_external
         )
-        if(TARGET openjtalk_external)
-            add_dependencies(${test_name} openjtalk_external)
-        endif()
     endif()
 
     # Link additional dependencies for prosody inference test
@@ -364,14 +335,7 @@ foreach(test_source ${TEST_SOURCES})
         endif()
         
         # Link OpenJTalk static library
-        if(WIN32)
-            target_link_libraries(${test_name} ${CMAKE_BINARY_DIR}/oj/lib/openjtalk.lib)
-        else()
-            target_link_libraries(${test_name} ${CMAKE_BINARY_DIR}/oj/lib/libopenjtalk.a)
-        endif()
-        if(TARGET hts_engine_stub)
-            target_link_libraries(${test_name} hts_engine_stub)
-        endif()
+        link_openjtalk_to_test(${test_name})
 
         # Add dependencies to ensure build order
         add_dependencies(${test_name}
@@ -379,9 +343,6 @@ foreach(test_source ${TEST_SOURCES})
             fmt_external
             spdlog_external
         )
-        if(TARGET openjtalk_external)
-            add_dependencies(${test_name} openjtalk_external)
-        endif()
     endif()
 
     # Link additional dependencies for phoneme parser test

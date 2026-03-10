@@ -326,8 +326,8 @@ char* openjtalk_text_to_phonemes(const char* text) {
                     openjtalk_finalize(oj);
                 }
             }
+            fprintf(stderr, "WARNING: OpenJTalk API failed for text_to_phonemes, falling back to binary path\n");
         }
-        fprintf(stderr, "WARNING: OpenJTalk API failed for text_to_phonemes, falling back to binary path\n");
     }
 
     // Binary fallback path

@@ -415,6 +415,7 @@ if(NOT DEFINED OPENJTALK_DIR)
     ExternalProject_Add(
       openjtalk_external
       PREFIX "${CMAKE_CURRENT_BINARY_DIR}/o"
+      DOWNLOAD_DIR "${CMAKE_CURRENT_BINARY_DIR}/pyopenjtalk_download"
       URL ${PYOPENJTALK_PLUS_URL}
       DOWNLOAD_NO_PROGRESS TRUE
       TIMEOUT 600
@@ -438,6 +439,7 @@ if(NOT DEFINED OPENJTALK_DIR)
     ExternalProject_Add(
       openjtalk_dic_download
       PREFIX "${CMAKE_CURRENT_BINARY_DIR}/od"
+      DOWNLOAD_DIR "${CMAKE_CURRENT_BINARY_DIR}/pyopenjtalk_download"
       URL ${PYOPENJTALK_PLUS_URL}
       DOWNLOAD_NO_PROGRESS TRUE
       TIMEOUT 600
