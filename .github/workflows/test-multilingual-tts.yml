@@ -274,7 +274,9 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-    
+    env:
+      OPENJTALK_DICTIONARY_PATH: ${{ github.workspace }}/piper/share/open_jtalk/dic
+
     steps:
       - uses: actions/checkout@v4.2.2
       

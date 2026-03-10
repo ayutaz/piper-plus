@@ -14,6 +14,9 @@
 #define F_OK 0
 #define popen _popen
 #define pclose _pclose
+#elif defined(__APPLE__)
+#include <unistd.h>
+#include <mach-o/dyld.h>
 #else
 #include <unistd.h>
 #endif
@@ -185,6 +188,63 @@ static const char* get_data_dir() {
     return data_dir;
 }
 
+// Get dictionary path relative to the running executable
+// Looks for <exe_dir>/../share/open_jtalk/dic
+static const char* get_exe_relative_dict_path() {
+    static char exe_dict_path[1024] = {0};
+    char exe_path[1024] = {0};
+
+#ifdef _WIN32
+    DWORD len = GetModuleFileNameA(NULL, exe_path, sizeof(exe_path));
+    if (len == 0 || len >= sizeof(exe_path)) {
+        return NULL;
+    }
+    // Find last backslash to get directory
+    char* last_sep = strrchr(exe_path, '\\');
+    if (!last_sep) {
+        last_sep = strrchr(exe_path, '/');
+    }
+    if (!last_sep) {
+        return NULL;
+    }
+    *last_sep = '\0';
+    snprintf(exe_dict_path, sizeof(exe_dict_path),
+             "%s\\..\\share\\open_jtalk\\dic", exe_path);
+#elif defined(__APPLE__)
+    uint32_t buf_size = sizeof(exe_path);
+    if (_NSGetExecutablePath(exe_path, &buf_size) != 0) {
+        return NULL;
+    }
+    // Find last slash to get directory
+    char* last_sep = strrchr(exe_path, '/');
+    if (!last_sep) {
+        return NULL;
+    }
+    *last_sep = '\0';
+    snprintf(exe_dict_path, sizeof(exe_dict_path),
+             "%s/../share/open_jtalk/dic", exe_path);
+#else
+    ssize_t len = readlink("/proc/self/exe", exe_path, sizeof(exe_path) - 1);
+    if (len <= 0) {
+        return NULL;
+    }
+    exe_path[len] = '\0';
+    // Find last slash to get directory
+    char* last_sep = strrchr(exe_path, '/');
+    if (!last_sep) {
+        return NULL;
+    }
+    *last_sep = '\0';
+    snprintf(exe_dict_path, sizeof(exe_dict_path),
+             "%s/../share/open_jtalk/dic", exe_path);
+#endif
+
+    if (access(exe_dict_path, F_OK) == 0) {
+        return exe_dict_path;
+    }
+    return NULL;
+}
+
 // Get the path to the OpenJTalk dictionary
 const char* get_openjtalk_dictionary_path() {
     static char dict_path[1024] = {0};
@@ -199,7 +259,14 @@ const char* get_openjtalk_dictionary_path() {
         strncpy(dict_path, env_dict, sizeof(dict_path) - 1);
         return dict_path;
     }
-    
+
+    // Check relative to executable binary
+    const char* exe_rel = get_exe_relative_dict_path();
+    if (exe_rel) {
+        strncpy(dict_path, exe_rel, sizeof(dict_path) - 1);
+        return dict_path;
+    }
+
     // Check common system locations
     const char* system_paths[] = {
 #ifdef _WIN32
