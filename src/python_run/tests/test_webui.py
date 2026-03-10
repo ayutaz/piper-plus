@@ -10,7 +10,7 @@ import pytest
 
 
 # Add parent directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src", "python_run"))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 try:
     import gradio as gr

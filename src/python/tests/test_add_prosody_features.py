@@ -1,5 +1,5 @@
 """
-Tests for add_prosody_features.py preprocessing script.
+Tests for piper_train.tools.add_prosody_features preprocessing script.
 
 This module tests the preprocessing script that adds prosody_features and
 updates phoneme_ids with new token system (Issue #204, #207).
@@ -25,15 +25,10 @@ except ImportError:
     HAS_JAPANESE = False
 
 
-# Import the function under test
-try:
-    import sys
-    sys.path.insert(0, "/data/piper")
-    from add_prosody_features import process_utterance
+# Import the function under test (internal module - ImportError should fail the test)
+from piper_train.tools.add_prosody_features import process_utterance
 
-    HAS_SCRIPT = True
-except ImportError:
-    HAS_SCRIPT = False
+HAS_SCRIPT = True
 
 
 class TestProcessUtterance:

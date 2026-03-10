@@ -39,6 +39,7 @@ settings.local.json
 test_piper/
 test_build/
 test_windows_build/
+test_results/
 build_log.zip
 # Root test files (should be in src/cpp/tests or src/python/tests)
 /test_*.cpp

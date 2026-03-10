@@ -148,7 +148,7 @@ cat test.jsonl | CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.infer_onnx
 - `src/python/piper_train/phonemize/registry.py` — 言語レジストリ
 - `src/python/piper_train/phonemize/japanese.py` — `JapanesePhonemizer`
 - `src/python/piper_train/phonemize/english.py` — `EnglishPhonemizer`
-- `test/test_phonemizer_registry.py` — レジストリ・ABCテスト
+- `src/python/tests/test_phonemizer_registry.py` — レジストリ・ABCテスト
 
 **変更点:**
 - `ProsodyInfo` を `base.py` に統一 (日本語/英語共通)
@@ -170,7 +170,7 @@ g2p-en (Apache-2.0) を使用したespeak-ng互換の英語音素化。espeak-ng
 **実装ファイル:**
 - `src/python/piper_train/phonemize/english.py` — G2P変換
 - `src/python/piper_train/infer_onnx.py` — BOS/EOS・パディング挿入
-- `test/test_english_phonemizer.py` — 42テスト
+- `src/python/tests/test_english_phonemizer.py` — 42テスト
 
 **推論コマンド:**
 ```bash
@@ -287,7 +287,7 @@ OpenJTalkから抽出されるA1/A2/A3値をDuration Predictorの入力として
 uv run python -m piper_train --prosody-dim 16 ...
 
 # 前処理時（prosody_features 付きデータセット作成）
-uv run python /data/piper/add_prosody_features.py --input-dataset ... --output-dir ...
+uv run python -m piper_train.tools.add_prosody_features --input-dataset ... --output-dir ...
 ```
 
 **デフォルト有効:** prosodyはデフォルトで有効（`--prosody-dim 16`）
@@ -376,13 +376,14 @@ NCCL_IB_DISABLE=1
 
 ### 便利ツール
 
-| ツール | パス | 用途 |
-|--------|------|------|
-| `add_prosody_features.py` | `/data/piper/add_prosody_features.py` | 既存データセットにprosody_features追加＋phoneme_ids再生成 |
+| ツール | 実行コマンド | 用途 |
+|--------|-------------|------|
+| `piper_train.tools.add_prosody_features` | `uv run python -m piper_train.tools.add_prosody_features` | 既存データセットにprosody_features追加＋phoneme_ids再生成 |
+| `convert_multi_to_single_speaker` | `python scripts/convert_multi_to_single_speaker.py` | マルチスピーカーモデルから単一話者用ckpt作成 |
 
 **使用例**:
 ```bash
-uv run python /data/piper/add_prosody_features.py \
+uv run python -m piper_train.tools.add_prosody_features \
   --input-dataset /data/piper/dataset-moe-speech-20speakers/dataset.jsonl \
   --output-dir /data/piper/dataset-moe-speech-20speakers-v2 \
   --workers 8
