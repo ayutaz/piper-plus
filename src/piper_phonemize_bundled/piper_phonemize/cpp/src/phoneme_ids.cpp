@@ -53,6 +53,15 @@ phonemes_to_ids(const std::vector<Phoneme> &phonemes, PhonemeIdConfig &config,
   } else {
     // Add ids for each phoneme *without* padding
     for (auto const phoneme : phonemes) {
+      if (phonemeIdMap->count(phoneme) < 1) {
+        // Phoneme is missing from id map
+        if (missingPhonemes.count(phoneme) < 1) {
+          missingPhonemes[phoneme] = 1;
+        } else {
+          missingPhonemes[phoneme] += 1;
+        }
+        continue;
+      }
       auto const mappedIds = &(phonemeIdMap->at(phoneme));
       phonemeIds.insert(phonemeIds.end(), mappedIds->begin(), mappedIds->end());
     }
