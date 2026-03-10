@@ -2,7 +2,7 @@ name: Docker Tests
 
 on:
   pull_request:
-    branches: [main, dev]
+    branches: [dev]
     paths:
       - 'docker/**'
       - 'Dockerfile'
@@ -45,16 +45,71 @@ jobs:
           print('All smoke tests passed')
           "
 
+      - name: WebUI smoke test
+        run: |
+          docker run --rm piper-python-inference:test python -c "
+          import gradio; print(f'gradio {gradio.__version__} OK')
+          print('WebUI smoke test passed')
+          "
+
       - name: Test --device cpu providers
         run: |
           docker run --rm piper-python-inference:test python -c "
           import onnxruntime as ort
-          # Verify CPUExecutionProvider is available (CUDA not expected on CI)
           providers = ort.get_available_providers()
           assert 'CPUExecutionProvider' in providers, f'CPUExecutionProvider not found in {providers}'
           print(f'CPU provider available: OK')
           print('--device cpu test passed')
           "
+
+      - name: Inference test - Japanese
+        run: |
+          mkdir -p /tmp/output
+          docker run --rm \
+            -v ${{ github.workspace }}/test/models:/models \
+            -v /tmp/output:/output \
+            -e CUDA_VISIBLE_DEVICES="" \
+            piper-python-inference:test \
+            python inference.py \
+              --model /models/ja_JP-test-medium.onnx \
+              --config /models/ja_JP-test-medium.onnx.json \
+              --output /output/test_ja.wav \
+              --text "こんにちは、今日は良い天気ですね。" \
+              --language ja \
+              --speaker-id 0 \
+              --device cpu
+
+          FILE_SIZE=$(stat --format=%s /tmp/output/test_ja.wav)
+          echo "Output: test_ja.wav ($FILE_SIZE bytes)"
+          if [ "$FILE_SIZE" -lt 1000 ]; then
+            echo "ERROR: Output file too small ($FILE_SIZE bytes)"
+            exit 1
+          fi
+          echo "Japanese inference test passed"
+
+      - name: Inference test - English
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}/test/models:/models \
+            -v /tmp/output:/output \
+            -e CUDA_VISIBLE_DEVICES="" \
+            piper-python-inference:test \
+            python inference.py \
+              --model /models/test_voice.onnx \
+              --config /models/test_voice.onnx.json \
+              --output /output/test_en.wav \
+              --text "Hello, how are you today?" \
+              --language en \
+              --speaker-id 0 \
+              --device cpu
+
+          FILE_SIZE=$(stat --format=%s /tmp/output/test_en.wav)
+          echo "Output: $OUTPUT_FILE ($FILE_SIZE bytes)"
+          if [ "$FILE_SIZE" -lt 1000 ]; then
+            echo "ERROR: Output file too small ($FILE_SIZE bytes)"
+            exit 1
+          fi
+          echo "English inference test passed"
 
   test-cpp-inference:
     runs-on: ubuntu-latest
@@ -83,7 +138,44 @@ jobs:
         run: |
           docker run --rm --entrypoint piper piper-cpp-inference:test --version
 
-  test-webui:
+      - name: Inference test - English
+        run: |
+          mkdir -p /tmp/output
+          echo "Hello, how are you today?" | docker run --rm -i \
+            -v ${{ github.workspace }}/test/models:/models \
+            -v /tmp/output:/output \
+            --entrypoint piper \
+            piper-cpp-inference:test \
+              --model /models/test_voice.onnx \
+              --output_file /output/test_en.wav
+
+          FILE_SIZE=$(stat --format=%s /tmp/output/test_en.wav)
+          echo "Output: test_en.wav ($FILE_SIZE bytes)"
+          if [ "$FILE_SIZE" -lt 1000 ]; then
+            echo "ERROR: Output file too small ($FILE_SIZE bytes)"
+            exit 1
+          fi
+          echo "C++ English inference test passed"
+
+      - name: Inference test - Japanese
+        run: |
+          echo "こんにちは、今日は良い天気ですね。" | docker run --rm -i \
+            -v ${{ github.workspace }}/test/models:/models \
+            -v /tmp/output:/output \
+            --entrypoint piper \
+            piper-cpp-inference:test \
+              --model /models/ja_JP-test-medium.onnx \
+              --output_file /output/test_ja.wav
+
+          FILE_SIZE=$(stat --format=%s /tmp/output/test_ja.wav)
+          echo "Output: test_ja.wav ($FILE_SIZE bytes)"
+          if [ "$FILE_SIZE" -lt 1000 ]; then
+            echo "ERROR: Output file too small ($FILE_SIZE bytes)"
+            exit 1
+          fi
+          echo "C++ Japanese inference test passed"
+
+  test-python-train:
     runs-on: ubuntu-latest
     steps:
       - name: Free disk space
@@ -95,21 +187,112 @@ jobs:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
 
-      - name: Build WebUI image
+      - name: Build Python train image
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./docker/webui/Dockerfile
+          file: ./docker/python-train/Dockerfile
           push: false
-          tags: piper-webui:test
+          tags: piper-python-train:test
           load: true
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
       - name: Smoke test
         run: |
-          docker run --rm piper-webui:test python -c "
+          docker run --rm piper-python-train:test python -c "
+          import torch; print(f'PyTorch {torch.__version__} OK')
+          import pytorch_lightning; print(f'PyTorch Lightning {pytorch_lightning.__version__} OK')
           import piper_train; print('piper_train OK')
-          import gradio; print(f'gradio {gradio.__version__} OK')
+          import onnxruntime as ort; print(f'onnxruntime {ort.__version__} OK')
           print('All smoke tests passed')
           "
+
+      - name: Inference test - Japanese (CPU)
+        run: |
+          mkdir -p /tmp/output
+          docker run --rm \
+            -v ${{ github.workspace }}/test/models:/models \
+            -v /tmp/output:/output \
+            -e CUDA_VISIBLE_DEVICES="" \
+            piper-python-train:test \
+            python -m piper_train.infer_onnx \
+              --model /models/ja_JP-test-medium.onnx \
+              --config /models/ja_JP-test-medium.onnx.json \
+              --output-dir /output \
+              --text "こんにちは、今日は良い天気ですね。" \
+              --language ja \
+              --speaker-id 0
+
+          OUTPUT_FILE=$(ls /tmp/output/*.wav | head -1)
+          FILE_SIZE=$(stat --format=%s "$OUTPUT_FILE")
+          echo "Output: $OUTPUT_FILE ($FILE_SIZE bytes)"
+          if [ "$FILE_SIZE" -lt 1000 ]; then
+            echo "ERROR: Output file too small ($FILE_SIZE bytes)"
+            exit 1
+          fi
+          echo "Python train - Japanese inference test passed"
+
+  test-cpp-dev:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost "$AGENT_TOOLSDIRECTORY" /usr/local/lib/android /opt/hostedtoolcache/CodeQL
+          sudo docker image prune --all --force
+          sudo apt-get clean
+
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build C++ dev image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./docker/cpp-dev/Dockerfile
+          push: false
+          tags: piper-cpp-dev:test
+          load: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Smoke test
+        run: |
+          docker run --rm piper-cpp-dev:test bash -c "
+          which gcc && which g++ && which cmake && which ninja
+          echo 'Build tools OK'
+          ldconfig -p | grep espeak || echo 'espeak-ng in /usr/local/lib'
+          echo 'All smoke tests passed'
+          "
+
+      - name: Build and inference test (English + Japanese)
+        run: |
+          mkdir -p /tmp/output
+          docker run --rm \
+            -v ${{ github.workspace }}:/src \
+            -v /tmp/output:/output \
+            -e ESPEAK_DATA_PATH=/usr/local/share/espeak-ng-data \
+            piper-cpp-dev:test \
+            bash -c "
+              cd /src && mkdir -p build-test && cd build-test && \
+              cmake .. -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=OFF && \
+              ninja -j\$(nproc) && \
+              echo 'Piper build from source: OK' && \
+              echo 'Hello, how are you today?' | ./piper \
+                --model /src/test/models/test_voice.onnx \
+                --output_file /output/test_en.wav && \
+              echo 'こんにちは、今日は良い天気ですね。' | ./piper \
+                --model /src/test/models/ja_JP-test-medium.onnx \
+                --output_file /output/test_ja.wav
+            "
+
+          for f in test_en.wav test_ja.wav; do
+            FILE_SIZE=$(stat --format=%s /tmp/output/$f)
+            echo "Output: $f ($FILE_SIZE bytes)"
+            if [ "$FILE_SIZE" -lt 1000 ]; then
+              echo "ERROR: $f too small ($FILE_SIZE bytes)"
+              exit 1
+            fi
+          done
+          echo "C++ dev - Build and inference tests passed"
+

@@ -1,5 +1,6 @@
 # Python Inference Environment for Piper TTS (GPU/CPU)
 # GPU support via onnxruntime-gpu; also works without --gpus (CPU fallback)
+# Includes Gradio WebUI (--webui mode)
 FROM nvidia/cuda:12.4.1-cudnn-runtime-ubuntu22.04
 
 ENV PYTHONUNBUFFERED=1
@@ -29,14 +30,27 @@ COPY src/python/ /app/src/python/
 # Install piper_train with inference-gpu extras (includes onnxruntime-gpu)
 RUN uv pip install --system "/app/src/python[inference-gpu]"
 
+# Install Gradio WebUI requirements
+COPY src/python_run/requirements_webui.txt /app/requirements_webui.txt
+RUN uv pip install --system -r /app/requirements_webui.txt
+
+# Pre-download NLTK data for g2p-en (both old and new resource names for NLTK compatibility)
+RUN python -c "import nltk; nltk.download('averaged_perceptron_tagger'); nltk.download('averaged_perceptron_tagger_eng'); nltk.download('cmudict')"
+
 # Create directories for models and output
 RUN mkdir -p /app/models /app/output
 
-# Copy inference script and test script
+# Copy inference script, test script, and WebUI app
 COPY docker/python-inference/inference.py /app/
 COPY docker/python-inference/test.py /app/
+COPY docker/webui/app.py /app/webui.py
 
-EXPOSE 8000
+# Expose FastAPI (8000) and Gradio (7860) ports
+EXPOSE 8000 7860
+
+# Gradio environment defaults
+ENV GRADIO_SERVER_NAME=0.0.0.0
+ENV GRADIO_SERVER_PORT=7860
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD python -c "import piper_train; import onnxruntime" || exit 1
@@ -44,6 +58,7 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
 # Build-time smoke test
 RUN python --version && \
     python -c "import onnxruntime as ort; print(f'ONNX Runtime: {ort.__version__}'); print(f'Providers: {ort.get_available_providers()}')" && \
-    python -c "import piper_train; print('piper_train installed')"
+    python -c "import piper_train; print('piper_train installed')" && \
+    python -c "import gradio; print(f'Gradio: {gradio.__version__}')"
 
 CMD ["echo", "Container started successfully"]

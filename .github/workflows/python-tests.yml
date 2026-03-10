@@ -3,7 +3,7 @@ name: python-tests
 on:
   workflow_call:
   pull_request:
-    branches: [ main, dev ]
+    branches: [ dev ]
     paths:
       - 'src/python/**'
       - 'src/python_run/**'

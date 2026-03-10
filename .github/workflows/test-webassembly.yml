@@ -2,12 +2,12 @@ name: Test WebAssembly
 
 on:
   push:
-    branches: [ main, master, develop, 'feature/**' ]
+    branches: [ dev ]
     paths:
       - 'src/wasm/**'
       - '.github/workflows/test-webassembly.yml'
   pull_request:
-    branches: [ main, master, develop ]
+    branches: [ dev ]
     paths:
       - 'src/wasm/**'
       - '.github/workflows/test-webassembly.yml'

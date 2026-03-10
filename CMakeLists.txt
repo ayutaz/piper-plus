@@ -743,6 +743,14 @@ if(TRUE)  # HTSEngine and OpenJTalk are built
   endif()
 
   # Install OpenJTalk dictionary
+  # The autotools build installs the dictionary under OPENJTALK_DIR (oj/)
+  # while the CMake build may place it under the build root's share/
+  install(
+    DIRECTORY ${OPENJTALK_DIR}/share/open_jtalk
+    DESTINATION share
+    OPTIONAL  # Don't fail if not present
+  )
+  # Fallback: also check the build root's share/ (CMake-based builds)
   install(
     DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/share/open_jtalk
     DESTINATION share
