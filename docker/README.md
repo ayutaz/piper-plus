@@ -1,6 +1,6 @@
-# Piper TTS Docker Environments
+# piper-plus Docker Environments
 
-Piper TTS の Docker 環境一式です。Python 推論・学習、WebUI、C++ 推論・開発の 5 つのイメージを提供します。
+piper-plus の Docker 環境一式です。Python 推論・学習、WebUI、C++ 推論・開発の 5 つのイメージを提供します。
 
 Python 推論イメージは **GPL-free** です。espeak-ng / piper-phonemize に依存せず、g2p-en (Apache-2.0) と pyopenjtalk-plus を使用します。
 

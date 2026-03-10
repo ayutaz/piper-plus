@@ -1,4 +1,4 @@
-# Japanese Piper TTS Model Training Guide
+# Japanese piper-plus Model Training Guide
 
 This guide explains how to train a Japanese TTS model for Piper using CSS10 dataset with support for unvoiced vowels.
 
@@ -15,7 +15,7 @@ This guide explains how to train a Japanese TTS model for Piper using CSS10 data
 1. Python 3.11 or higher
 2. PyTorch with CUDA support (for GPU training)
 3. OpenJTalk with dictionary installed
-4. Piper TTS training environment
+4. piper-plus training environment
 
 ## Step 1: Install Dependencies
 

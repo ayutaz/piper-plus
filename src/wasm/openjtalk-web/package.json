@@ -22,7 +22,7 @@
     "wasm",
     "speech-synthesis"
   ],
-  "author": "Piper TTS Project",
+  "author": "piper-plus Project",
   "license": "MIT",
   "devDependencies": {},
   "engines": {

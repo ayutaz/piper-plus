@@ -1,6 +1,6 @@
 # GPU Configuration Guide
 
-This guide explains how to configure and use GPU acceleration in Piper TTS, including multi-GPU support.
+This guide explains how to configure and use GPU acceleration in piper-plus, including multi-GPU support.
 
 ## GPU Device Selection (v1.5.0+)
 

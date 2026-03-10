@@ -1,4 +1,4 @@
-# Python Training Environment for Piper TTS
+# Python Training Environment for piper-plus
 # Multi-stage build to reduce final image size
 
 # Build stage

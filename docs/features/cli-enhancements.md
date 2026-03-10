@@ -1,6 +1,6 @@
 # Piper CLI Enhancements
 
-This document describes the enhanced CLI features added to Piper TTS, inspired by OHF-Voice Piper but implemented independently.
+This document describes the enhanced CLI features added to piper-plus, inspired by OHF-Voice Piper but implemented independently.
 
 ## New Features
 
@@ -93,7 +93,7 @@ voice.synthesize(text, wav_file, **config.to_synthesize_args())
 
 ```bash
 # Simple text-to-speech with auto-play
-piper "Welcome to the enhanced Piper TTS" --model en_US-lessac-medium.onnx --auto-play
+piper "Welcome to the enhanced piper-plus" --model en_US-lessac-medium.onnx --auto-play
 
 # Quiet narration from file
 piper --model en_GB-southern_english-medium.onnx --input-file story.txt --volume 0.7 -f quiet_story.wav

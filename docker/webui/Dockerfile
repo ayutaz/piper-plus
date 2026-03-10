@@ -1,4 +1,4 @@
-# WebUI Docker image for Piper TTS
+# WebUI Docker image for piper-plus
 FROM python:3.11-slim
 
 # Install system dependencies

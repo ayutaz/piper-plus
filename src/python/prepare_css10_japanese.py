@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Prepare CSS10 Japanese dataset for Piper TTS training with unvoiced vowel support.
+Prepare CSS10 Japanese dataset for piper-plus training with unvoiced vowel support.
 """
 
 import argparse

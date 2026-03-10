@@ -1,4 +1,4 @@
-# Python Inference Environment for Piper TTS (GPU/CPU)
+# Python Inference Environment for piper-plus (GPU/CPU)
 # GPU support via onnxruntime-gpu; also works without --gpus (CPU fallback)
 # Includes Gradio WebUI (--webui mode)
 FROM nvidia/cuda:12.4.1-cudnn-runtime-ubuntu22.04

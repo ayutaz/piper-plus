@@ -10,7 +10,7 @@ __version__ = "1.2.0"
 setup(
     name="piper-phonemize",
     version=__version__,
-    description="Phonemization library for Piper TTS (dummy for CI testing)",
+    description="Phonemization library for piper-plus (dummy for CI testing)",
     packages=find_packages(),
     package_data={
         "piper_phonemize": ["*.py"],

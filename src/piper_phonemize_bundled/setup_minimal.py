@@ -47,7 +47,7 @@ else:
 setup(
     name="piper-phonemize",
     version=__version__,
-    description="Phonemization library for Piper TTS",
+    description="Phonemization library for piper-plus",
     packages=find_packages(),
     ext_modules=ext_modules,
     cmdclass={"build_ext": build_ext} if ext_modules else {},

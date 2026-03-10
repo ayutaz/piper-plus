@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Piper TTS WebUI - Gradio-based interface for text-to-speech synthesis."""
+"""piper-plus WebUI - Gradio-based interface for text-to-speech synthesis."""
 
 import argparse
 import json
@@ -162,7 +162,7 @@ def create_ui(model_dir: str, output_dir: str):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Piper TTS WebUI")
+    parser = argparse.ArgumentParser(description="piper-plus WebUI")
     parser.add_argument(
         "--model-dir", default="/models", help="Directory containing ONNX models"
     )

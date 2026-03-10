@@ -1,5 +1,5 @@
 ---
-title: Piper TTS Demo
+title: piper-plus Demo
 emoji: 🎙️
 colorFrom: blue
 colorTo: purple
@@ -10,9 +10,9 @@ pinned: false
 license: mit
 ---
 
-# Piper TTS Demo
+# piper-plus Demo
 
-A web-based demo for [Piper TTS](https://github.com/ayutaz/piper-plus), featuring high-quality text-to-speech synthesis for Japanese and English.
+A web-based demo for [piper-plus](https://github.com/ayutaz/piper-plus), featuring high-quality text-to-speech synthesis for Japanese and English.
 
 ## Features
 

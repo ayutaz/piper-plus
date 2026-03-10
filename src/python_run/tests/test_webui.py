@@ -134,7 +134,7 @@ class TestWebUI:
         if test_models_dir.exists():
             interface = create_interface(test_models_dir)
             assert isinstance(interface, gr.Blocks)
-            assert interface.title == "Piper TTS WebUI"
+            assert interface.title == "piper-plus"
 
             # Check that interface has components
             assert len(interface.blocks) > 0

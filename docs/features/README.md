@@ -1,6 +1,6 @@
 # Features
 
-This section documents all the features available in Piper TTS.
+This section documents all the features available in piper-plus.
 
 ## Core Features
 
