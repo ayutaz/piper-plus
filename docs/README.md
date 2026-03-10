@@ -3,7 +3,6 @@
 Piper TTS documentation. Guides and references for using and developing with Piper Plus.
 
 ## Getting Started
-- [Quick Start (Japanese)](getting-started/quick_start_japanese.md) - 日本語クイックスタート
 - [Windows Setup](getting-started/windows-setup.md) - Windows platform setup guide
 - [Environment Variables](getting-started/environment-variables.md) - Configuration options
 - [Troubleshooting](getting-started/troubleshooting.md) - Common issues and solutions
