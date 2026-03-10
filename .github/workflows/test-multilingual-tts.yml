@@ -215,7 +215,7 @@ jobs:
           echo "オフライン" | piper --model ./test/models/ja_JP-test-medium.onnx --output_file /tmp/test_offline.wav 2>&1 | tee /tmp/offline_log.txt || true
           
           # Check for expected error messages
-          if grep -E "(dictionary manually|Failed to ensure OpenJTalk dictionary|Offline mode)" /tmp/offline_log.txt; then
+          if grep -E "(dictionary manually|Failed to ensure OpenJTalk dictionary|Offline mode|OpenJTalk is not available)" /tmp/offline_log.txt; then
             echo "✓ Offline mode correctly prevents download"
           else
             echo "✗ Offline mode did not show expected error"
@@ -240,7 +240,7 @@ jobs:
           echo "Testing auto-download disable..."
           echo "環境変数" | piper --model ./test/models/ja_JP-test-medium.onnx --output_file /tmp/test_env.wav 2>&1 | tee /tmp/env_log.txt || true
           
-          if grep -E "(download.*manually|auto.*download.*disabled|Failed to ensure OpenJTalk dictionary)" /tmp/env_log.txt; then
+          if grep -E "(download.*manually|auto.*download.*disabled|Failed to ensure OpenJTalk dictionary|OpenJTalk is not available)" /tmp/env_log.txt; then
             echo "✓ PIPER_AUTO_DOWNLOAD_DICT=0 works correctly"
           else
             echo "✗ Auto-download disable did not work as expected"

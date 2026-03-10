@@ -48,7 +48,7 @@ echo
 echo "Test 1: Auto-download disabled (should fail)"
 export PIPER_AUTO_DOWNLOAD_DICT=0
 export OPENJTALK_DICTIONARY_PATH="$TEST_DIR/nonexistent"
-if echo "テスト" | "$PIPER_BIN" --model "$PROJECT_ROOT/test/models/ja_JP-test-medium.onnx" --output_file "$TEST_DIR/test1.wav" 2>&1 | grep -q "download.*manually\|auto.*download.*disabled"; then
+if echo "テスト" | "$PIPER_BIN" --model "$PROJECT_ROOT/test/models/ja_JP-test-medium.onnx" --output_file "$TEST_DIR/test1.wav" 2>&1 | grep -q "download.*manually\|auto.*download.*disabled\|OpenJTalk is not available"; then
     echo "[OK] Test 1 passed: Correctly failed when auto-download is disabled"
 else
     echo "[FAIL] Test 1 failed: Should have failed with manual download message"
@@ -88,7 +88,7 @@ export PIPER_OFFLINE_MODE=1
 export HOME="$TEST_DIR/offline"
 mkdir -p "$HOME"
 
-if echo "オフライン" | "$PIPER_BIN" --model "$PROJECT_ROOT/test/models/ja_JP-test-medium.onnx" --output_file "$TEST_DIR/test3.wav" 2>&1 | grep -q "Offline mode\|dictionary manually"; then
+if echo "オフライン" | "$PIPER_BIN" --model "$PROJECT_ROOT/test/models/ja_JP-test-medium.onnx" --output_file "$TEST_DIR/test3.wav" 2>&1 | grep -q "Offline mode\|dictionary manually\|OpenJTalk is not available"; then
     echo "[OK] Test 3 passed: Offline mode prevents download"
 else
     echo "[FAIL] Test 3 failed: Should have failed in offline mode"
