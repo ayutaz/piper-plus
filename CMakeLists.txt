@@ -415,8 +415,8 @@ if(NOT DEFINED OPENJTALK_DIR)
     ExternalProject_Add(
       openjtalk_external
       PREFIX "${CMAKE_CURRENT_BINARY_DIR}/o"
-      DOWNLOAD_DIR "${CMAKE_CURRENT_BINARY_DIR}/pyopenjtalk_download"
       URL ${PYOPENJTALK_PLUS_URL}
+      URL_HASH SHA256=555fdf86310d6d72f4a37e92beb251cdc2114aafc133d4c77b136a07a4b17119
       DOWNLOAD_NO_PROGRESS TRUE
       TIMEOUT 600
       TLS_VERIFY ON
@@ -435,12 +435,14 @@ if(NOT DEFINED OPENJTALK_DIR)
 
     # Dictionary from pyopenjtalk-plus (same source, same archive)
     # Custom dictionary with improved accent predictions from jpreprocess project.
+    # DEPENDS openjtalk_external to avoid parallel download race condition.
     set(OPENJTALK_DIC_DIR "${CMAKE_CURRENT_BINARY_DIR}/share/open_jtalk/dic")
     ExternalProject_Add(
       openjtalk_dic_download
       PREFIX "${CMAKE_CURRENT_BINARY_DIR}/od"
-      DOWNLOAD_DIR "${CMAKE_CURRENT_BINARY_DIR}/pyopenjtalk_download"
+      DEPENDS openjtalk_external
       URL ${PYOPENJTALK_PLUS_URL}
+      URL_HASH SHA256=555fdf86310d6d72f4a37e92beb251cdc2114aafc133d4c77b136a07a4b17119
       DOWNLOAD_NO_PROGRESS TRUE
       TIMEOUT 600
       TLS_VERIFY ON
