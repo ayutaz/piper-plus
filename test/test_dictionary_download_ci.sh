@@ -47,7 +47,7 @@ echo
 # Test 1: Auto-download disabled
 echo "Test 1: Auto-download disabled (should fail)"
 export PIPER_AUTO_DOWNLOAD_DICT=0
-export OPENJTALK_DICTIONARY_DIR="$TEST_DIR/nonexistent"
+export OPENJTALK_DICTIONARY_PATH="$TEST_DIR/nonexistent"
 if echo "テスト" | "$PIPER_BIN" --model "$PROJECT_ROOT/test/models/ja_JP-test-medium.onnx" --output_file "$TEST_DIR/test1.wav" 2>&1 | grep -q "download.*manually\|auto.*download.*disabled"; then
     echo "[OK] Test 1 passed: Correctly failed when auto-download is disabled"
 else
@@ -61,7 +61,7 @@ echo
 echo "Test 2: Auto-download enabled (should download)"
 unset PIPER_AUTO_DOWNLOAD_DICT
 export HOME="$TEST_DIR"
-unset OPENJTALK_DICTIONARY_DIR
+unset OPENJTALK_DICTIONARY_PATH
 
 echo "Running piper with auto-download..."
 if echo "こんにちは" | "$PIPER_BIN" --model "$PROJECT_ROOT/test/models/ja_JP-test-medium.onnx" --output_file "$TEST_DIR/test2.wav" 2>&1 | tee "$TEST_DIR/download.log"; then
