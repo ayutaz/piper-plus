@@ -101,6 +101,8 @@ To enable FP16 (half-precision) training for better performance:
 sed -i 's/"piper_version": "1.3.0"/"piper_version": "1.3.0",\n    "fp16_run": true/g' /path/to/dataset-css10-ja/config.json
 ```
 
+**Note**: ONNX export now outputs FP16 models by default (model size ~50% smaller). Use `--no-fp16` to export in FP32 if needed.
+
 ### Multi-GPU Training (L4 × 4 GPUs)
 
 ```bash
@@ -175,13 +177,20 @@ tensorboard --logdir ./logs/ja_JP_css10_openjtalk
 
 ## Step 6: Export Model
 
-After training, export the model to ONNX format:
+After training, export the model to ONNX format (FP16 by default, ~50% smaller):
 
 ```bash
 python export_onnx.py \
     --checkpoint ./checkpoints/ja_JP_css10_openjtalk/checkpoint_best.pth \
     --config ./css10_prepared/config.json \
     --output ./ja_JP_css10_openjtalk.onnx
+
+# To export in FP32 instead:
+python export_onnx.py \
+    --checkpoint ./checkpoints/ja_JP_css10_openjtalk/checkpoint_best.pth \
+    --config ./css10_prepared/config.json \
+    --output ./ja_JP_css10_openjtalk.onnx \
+    --no-fp16
 ```
 
 ## Step 7: Test the Model

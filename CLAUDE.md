@@ -1204,6 +1204,7 @@ CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
 |-----------|----------|------|
 | `--no-stochastic` | - | deterministic エクスポート（デバッグ用） |
 | EMA | 常時有効 | チェックポイントに EMA state があれば自動適用 |
+| `--no-fp16` | - | FP16変換を無効化（デフォルト: FP16有効、モデルサイズ~50%削減） |
 
 ### 推論テスト
 
