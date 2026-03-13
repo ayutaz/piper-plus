@@ -79,8 +79,7 @@ if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|ARM64")
     set(CMAKE_EXE_LINKER_FLAGS_RELEASE "-s")
   endif()
   
-  # Temporarily disable NEON for debugging
-  # add_compile_definitions(USE_ARM64_NEON)
+  add_compile_definitions(USE_ARM64_NEON)
 endif()
 
 add_executable(piper src/cpp/main.cpp src/cpp/piper.cpp src/cpp/phoneme_parser.cpp src/cpp/custom_dictionary.cpp)

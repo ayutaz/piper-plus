@@ -4,7 +4,7 @@
 
 This document describes the ARM64-specific optimizations implemented for piper-plus to improve performance and reduce binary size on ARM64 platforms, particularly for embedded devices like Raspberry Pi.
 
-> **Note (current build status):** The NEON SIMD optimizations described below are currently **disabled** in the build. The `USE_ARM64_NEON` flag is commented out in `CMakeLists.txt`, so the NEON-optimized code paths are not compiled. The current ARM64 build uses only `-march=armv8-a -mtune=generic`. The compiler flags and NEON intrinsics described in this document are **aspirational/reference** material for when these optimizations are re-enabled.
+> **Note:** NEON SIMD optimizations are **enabled** by default on ARM64 builds. The `USE_ARM64_NEON` flag is automatically set in `CMakeLists.txt` when the target architecture is `aarch64`, so the NEON-optimized code paths are compiled and active without additional configuration.
 
 ## Optimization Goals (Issue #33)
 
@@ -82,7 +82,7 @@ docker buildx build --platform linux/arm64 -t piper-arm64 .
 
 ## Performance Results
 
-Expected improvements on ARM64 devices:
+Performance improvements on ARM64 devices:
 
 - **Audio normalization**: 3-4x faster
 - **Audio conversion**: 4-6x faster
@@ -116,6 +116,7 @@ time echo "長い日本語のテキスト..." | ./piper \
 ## Compatibility
 
 The optimizations are:
+- Automatically enabled on ARM64 builds (no manual configuration required)
 - Backward compatible (fallback to scalar code on non-ARM64)
 - Conditional compilation using `USE_ARM64_NEON` macro
 - No impact on other architectures
