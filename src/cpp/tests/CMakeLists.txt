@@ -175,6 +175,9 @@ foreach(test_source ${TEST_SOURCES})
             ../openjtalk_optimized.c
             ../openjtalk_api.c
         )
+        if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|ARM64")
+            target_sources(${test_name} PRIVATE ../audio_neon.cpp)
+        endif()
 
         # Include directories
         target_include_directories(${test_name} PRIVATE
@@ -286,6 +289,9 @@ foreach(test_source ${TEST_SOURCES})
             ../openjtalk_optimized.c
             ../openjtalk_api.c
         )
+        if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|ARM64")
+            target_sources(${test_name} PRIVATE ../audio_neon.cpp)
+        endif()
 
         # Include directories
         target_include_directories(${test_name} PRIVATE
