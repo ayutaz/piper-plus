@@ -195,7 +195,12 @@ class TextEncoder(nn.Module):
         nn.init.normal_(self.emb.weight, 0.0, hidden_channels**-0.5)
 
         self.encoder = attentions.Encoder(
-            hidden_channels, filter_channels, n_heads, n_layers, kernel_size, p_dropout,
+            hidden_channels,
+            filter_channels,
+            n_heads,
+            n_layers,
+            kernel_size,
+            p_dropout,
             gin_channels=gin_channels,
         )
         self.proj = nn.Conv1d(hidden_channels, out_channels * 2, 1)
@@ -273,24 +278,34 @@ class DurationDiscriminatorV2(nn.Module):
     Based on p0p4k/vits2_pytorch implementation.
     """
 
-    def __init__(self, in_channels, filter_channels, kernel_size, p_dropout, gin_channels=0):
+    def __init__(
+        self, in_channels, filter_channels, kernel_size, p_dropout, gin_channels=0
+    ):
         super().__init__()
         self.in_channels = in_channels
         self.filter_channels = filter_channels
 
         # Text encoder output processing
-        self.conv_1 = nn.Conv1d(in_channels, filter_channels, kernel_size, padding=kernel_size // 2)
+        self.conv_1 = nn.Conv1d(
+            in_channels, filter_channels, kernel_size, padding=kernel_size // 2
+        )
         self.norm_1 = nn.LayerNorm(filter_channels)
-        self.conv_2 = nn.Conv1d(filter_channels, filter_channels, kernel_size, padding=kernel_size // 2)
+        self.conv_2 = nn.Conv1d(
+            filter_channels, filter_channels, kernel_size, padding=kernel_size // 2
+        )
         self.norm_2 = nn.LayerNorm(filter_channels)
 
         # Duration projection
         self.dur_proj = nn.Conv1d(1, filter_channels, 1)
 
         # Combined processing (text features + duration features)
-        self.pre_out_conv_1 = nn.Conv1d(filter_channels * 2, filter_channels, kernel_size, padding=kernel_size // 2)
+        self.pre_out_conv_1 = nn.Conv1d(
+            filter_channels * 2, filter_channels, kernel_size, padding=kernel_size // 2
+        )
         self.pre_out_norm_1 = nn.LayerNorm(filter_channels)
-        self.pre_out_conv_2 = nn.Conv1d(filter_channels, filter_channels, kernel_size, padding=kernel_size // 2)
+        self.pre_out_conv_2 = nn.Conv1d(
+            filter_channels, filter_channels, kernel_size, padding=kernel_size // 2
+        )
         self.pre_out_norm_2 = nn.LayerNorm(filter_channels)
 
         # Output
@@ -345,7 +360,7 @@ class DurationDiscriminatorV2(nn.Module):
             list: [output_prob_real, output_prob_fake], each [B, T, 1]
         """
         # Apply speaker conditioning
-        if hasattr(self, 'cond') and g is not None:
+        if hasattr(self, "cond") and g is not None:
             x = x + self.cond(g)
 
         # Process text features
@@ -913,7 +928,7 @@ class SynthesizerTrn(nn.Module):
         self.mas_noise_scale_initial = mas_noise_scale_initial
         self.mas_noise_scale_decay = mas_noise_scale_decay
         self.register_buffer(
-            'current_mas_noise_scale',
+            "current_mas_noise_scale",
             torch.tensor(mas_noise_scale_initial, dtype=torch.float32),
         )
 
@@ -1108,7 +1123,9 @@ class SynthesizerTrn(nn.Module):
             # alignment exploration during early training steps.
             # Only inject noise during training to keep validation loss stable.
             if self.training and self.current_mas_noise_scale > 0:
-                neg_cent = neg_cent + torch.randn_like(neg_cent) * self.current_mas_noise_scale
+                neg_cent = (
+                    neg_cent + torch.randn_like(neg_cent) * self.current_mas_noise_scale
+                )
 
             attn_mask = torch.unsqueeze(x_mask, 2) * torch.unsqueeze(y_mask, -1)
             attn = (
@@ -1120,7 +1137,10 @@ class SynthesizerTrn(nn.Module):
         # Decay MAS noise scale after each forward step
         if self.training and self.current_mas_noise_scale > 0:
             self.current_mas_noise_scale.fill_(
-                max(0.0, self.current_mas_noise_scale.item() - self.mas_noise_scale_decay)
+                max(
+                    0.0,
+                    self.current_mas_noise_scale.item() - self.mas_noise_scale_decay,
+                )
             )
 
         # Prepare input for duration predictor with prosody features

@@ -498,7 +498,9 @@ def main():
     dict_args["mas_noise_scale_decay"] = dict_args.pop("mas_noise_decay", 2e-6)
 
     # Map CLI argument name to VitsModel parameter name for Mel Posterior Encoder
-    dict_args["use_mel_posterior_encoder"] = dict_args.pop("mel_posterior_encoder", False)
+    dict_args["use_mel_posterior_encoder"] = dict_args.pop(
+        "mel_posterior_encoder", False
+    )
 
     # --no-sdp -> use_sdp=False
     if dict_args.pop("no_sdp", False):

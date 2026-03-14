@@ -61,7 +61,9 @@ class Encoder(nn.Module):
         # and inject after the middle transformer layer
         if gin_channels > 0:
             self.cond_proj = nn.Conv1d(gin_channels, hidden_channels, 1)
-            self.cond_layer_idx = n_layers // 2 - 1  # For 6 layers: idx=2 (after 3rd layer)
+            self.cond_layer_idx = (
+                n_layers // 2 - 1
+            )  # For 6 layers: idx=2 (after 3rd layer)
 
     def forward(self, x, x_mask, g=None):
         attn_mask = x_mask.unsqueeze(2) * x_mask.unsqueeze(-1)
@@ -84,7 +86,11 @@ class Encoder(nn.Module):
             x = norm_layer_2(x + y)
 
             # Inject speaker conditioning after the middle layer
-            if hasattr(self, 'cond_proj') and g is not None and i == self.cond_layer_idx:
+            if (
+                hasattr(self, "cond_proj")
+                and g is not None
+                and i == self.cond_layer_idx
+            ):
                 x = x + self.cond_proj(g)
         x = x * x_mask
         return x

@@ -467,9 +467,7 @@ class VitsModel(pl.LightningModule):
 
         # Train duration discriminator (VITS2)
         if self.model_dur_disc is not None and dur_info is not None:
-            self._training_step_dur_disc(
-                dur_info, x_mask, g, opt_dur_d, batch
-            )
+            self._training_step_dur_disc(dur_info, x_mask, g, opt_dur_d, batch)
 
         # Clear instance variables to release references
         self._y = None
@@ -652,8 +650,10 @@ class VitsModel(pl.LightningModule):
                 # logw_hat is NOT detached so gradients flow back to DP
                 # x_hidden and logw are detached to not update text encoder / MAS
                 _, output_fake_for_gen = self.model_dur_disc(
-                    x_hidden.detach(), x_mask,
-                    logw.detach(), logw_hat,
+                    x_hidden.detach(),
+                    x_mask,
+                    logw.detach(),
+                    logw_hat,
                     g=g.detach() if g is not None else None,
                 )
                 loss_dur_gen = F.binary_cross_entropy(
@@ -725,16 +725,17 @@ class VitsModel(pl.LightningModule):
         # Forward through duration discriminator
         # Detach all inputs since we're only training the discriminator
         output_real, output_fake = self.model_dur_disc(
-            x_hidden.detach(), x_mask.detach(),
-            logw.detach(), logw_hat.detach(),
+            x_hidden.detach(),
+            x_mask.detach(),
+            logw.detach(),
+            logw_hat.detach(),
             g=g.detach() if g is not None else None,
         )
 
         # BCE loss: real=1, fake=0
-        loss_dur_disc = (
-            F.binary_cross_entropy(output_real, torch.ones_like(output_real))
-            + F.binary_cross_entropy(output_fake, torch.zeros_like(output_fake))
-        )
+        loss_dur_disc = F.binary_cross_entropy(
+            output_real, torch.ones_like(output_real)
+        ) + F.binary_cross_entropy(output_fake, torch.zeros_like(output_fake))
 
         opt_dur_d.zero_grad()
         self.manual_backward(loss_dur_disc)
