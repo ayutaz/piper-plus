@@ -146,6 +146,7 @@ class VitsModel(pl.LightningModule):
             mas_noise_scale_decay=self.hparams.mas_noise_scale_decay,
             use_mel_posterior_encoder=self.hparams.use_mel_posterior_encoder,
             speaker_conditioned_encoder=self.hparams.speaker_conditioned_encoder,
+            sample_rate=self.hparams.sample_rate,
         )
         self.model_d = MultiPeriodDiscriminator(
             use_spectral_norm=self.hparams.use_spectral_norm
@@ -166,9 +167,9 @@ class VitsModel(pl.LightningModule):
         self.model_dur_disc = None
         if self.hparams.use_duration_discriminator:
             if self.hparams.use_sdp:
-                _LOGGER.warning(
-                    "Duration Discriminator is designed for DP mode (--no-sdp). "
-                    "Using it with SDP may not work as expected."
+                raise ValueError(
+                    "Duration Discriminator requires DP mode. "
+                    "Use --no-sdp together with --use-duration-discriminator."
                 )
             from .models import DurationDiscriminatorV2  # noqa: PLC0415
 
@@ -190,10 +191,6 @@ class VitsModel(pl.LightningModule):
         # State kept between training optimizers
         self._y = None
         self._y_hat = None
-        # State for duration discriminator (VITS2)
-        self._dur_info = None
-        self._x_mask = None
-        self._g = None
 
     def _load_test_dataset(self, test_utterances_path: Path):
         """Load fixed test dataset for WandB audio logging.
@@ -458,7 +455,7 @@ class VitsModel(pl.LightningModule):
 
         # Train generator
         opt_g.zero_grad()
-        loss_g = self.training_step_g(batch)
+        loss_g, dur_info, x_mask, g = self.training_step_g(batch)
         self.manual_backward(loss_g)
         opt_g.step()
 
@@ -469,9 +466,9 @@ class VitsModel(pl.LightningModule):
         opt_d.step()
 
         # Train duration discriminator (VITS2)
-        if self.model_dur_disc is not None and self._dur_info is not None:
+        if self.model_dur_disc is not None and dur_info is not None:
             self._training_step_dur_disc(
-                self._dur_info, self._x_mask, self._g, opt_dur_d, batch
+                dur_info, x_mask, g, opt_dur_d, batch
             )
 
         # Clear instance variables to release references
@@ -572,13 +569,11 @@ class VitsModel(pl.LightningModule):
         )
         self._y_hat = y_hat.contiguous()
 
-        # Save dur_info, x_mask, and g for duration discriminator step
-        self._dur_info = dur_info
-        self._x_mask = x_mask
+        # Compute speaker embedding for duration discriminator
         if self.model_g.n_speakers > 1 and speaker_ids is not None:
-            self._g = self.model_g.emb_g(speaker_ids).unsqueeze(-1)
+            g = self.model_g.emb_g(speaker_ids).unsqueeze(-1)
         else:
-            self._g = None
+            g = None
 
         mel = spec_to_mel_torch(
             spec,
@@ -659,7 +654,7 @@ class VitsModel(pl.LightningModule):
                 _, output_fake_for_gen = self.model_dur_disc(
                     x_hidden.detach(), x_mask,
                     logw.detach(), logw_hat,
-                    g=self._g.detach() if self._g is not None else None,
+                    g=g.detach() if g is not None else None,
                 )
                 loss_dur_gen = F.binary_cross_entropy(
                     output_fake_for_gen, torch.ones_like(output_fake_for_gen)
@@ -669,7 +664,7 @@ class VitsModel(pl.LightningModule):
 
             self._log_with_batch_info("loss_gen_all", loss_gen_all, batch)
 
-            return loss_gen_all
+            return loss_gen_all, dur_info, x_mask, g
 
     def training_step_d(self, batch: Batch):
         # From training_step_g
@@ -748,13 +743,14 @@ class VitsModel(pl.LightningModule):
         self._log_with_batch_info("loss/dur_disc", loss_dur_disc, batch)
 
     def validation_step(self, batch: Batch, batch_idx: int):
+<<<<<<< HEAD
         # Temporarily suppress self.log to prevent training_step_g/d from
         # logging training-named metrics (loss_gen_all, loss_disc_all, etc.)
         # during validation.  We restore self.log immediately after.
         _orig_log = self.log
         self.log = lambda *_args, **_kwargs: None  # no-op
         try:
-            loss_g = self.training_step_g(batch)
+            loss_g, _dur_info, _x_mask, _g = self.training_step_g(batch)
             loss_d = self.training_step_d(batch)
         finally:
             self.log = _orig_log
@@ -763,6 +759,7 @@ class VitsModel(pl.LightningModule):
         self._log_with_batch_info("val_loss", val_loss, batch)
         return val_loss
 
+<<<<<<< HEAD
     def on_validation_epoch_end(self):
         """Log audio samples to WandB at the end of validation epoch.
 
@@ -923,6 +920,15 @@ class VitsModel(pl.LightningModule):
         # any rank advances to the next training step.
         if self.trainer.world_size > 1:
             torch.distributed.barrier()
+
+    def on_train_epoch_end(self):
+        """Step all learning rate schedulers at epoch end."""
+        schedulers = self.lr_schedulers()
+        if isinstance(schedulers, list):
+            for sch in schedulers:
+                sch.step()
+        else:
+            schedulers.step()
 
     def configure_optimizers(self):
         # Freeze Duration Predictor if requested

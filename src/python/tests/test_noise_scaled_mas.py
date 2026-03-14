@@ -63,16 +63,16 @@ class TestNoiseScaledMAS:
             mas_noise_scale_decay=2e-6,
         )
 
-        assert model.current_mas_noise_scale == 0.01
+        assert model.current_mas_noise_scale.item() == pytest.approx(0.01)
 
         # Simulate 5000 decay steps
         for _ in range(5000):
-            model.current_mas_noise_scale = max(
-                0.0, model.current_mas_noise_scale - model.mas_noise_scale_decay
+            model.current_mas_noise_scale.fill_(
+                max(0.0, model.current_mas_noise_scale.item() - model.mas_noise_scale_decay)
             )
 
-        assert model.current_mas_noise_scale == 0.0, (
-            f"Expected 0.0 after 5000 steps, got {model.current_mas_noise_scale}"
+        assert model.current_mas_noise_scale.item() == pytest.approx(0.0, abs=1e-8), (
+            f"Expected 0.0 after 5000 steps, got {model.current_mas_noise_scale.item()}"
         )
 
     @pytest.mark.unit
@@ -87,7 +87,7 @@ class TestNoiseScaledMAS:
             mas_noise_scale_decay=2e-6,
         )
 
-        assert model.current_mas_noise_scale == 0.0
+        assert model.current_mas_noise_scale.item() == pytest.approx(0.0, abs=1e-8)
         assert model.mas_noise_scale_initial == 0.0
 
         # Verify that with scale=0, no noise would be added
@@ -142,7 +142,7 @@ class TestNoiseScaledMAS:
 
         assert model.mas_noise_scale_initial == 0.01
         assert model.mas_noise_scale_decay == 2e-6
-        assert model.current_mas_noise_scale == 0.01
+        assert model.current_mas_noise_scale.item() == pytest.approx(0.01)
 
     @pytest.mark.unit
     @pytest.mark.training
@@ -157,13 +157,13 @@ class TestNoiseScaledMAS:
 
         # After 1000 steps, scale should be initial - 1000 * decay
         for _ in range(1000):
-            model.current_mas_noise_scale = max(
-                0.0, model.current_mas_noise_scale - model.mas_noise_scale_decay
+            model.current_mas_noise_scale.fill_(
+                max(0.0, model.current_mas_noise_scale.item() - model.mas_noise_scale_decay)
             )
 
         expected = initial - 1000 * decay
-        assert abs(model.current_mas_noise_scale - expected) < 1e-10, (
-            f"Expected {expected}, got {model.current_mas_noise_scale}"
+        assert model.current_mas_noise_scale.item() == pytest.approx(expected), (
+            f"Expected {expected}, got {model.current_mas_noise_scale.item()}"
         )
 
     @pytest.mark.unit
@@ -177,9 +177,52 @@ class TestNoiseScaledMAS:
 
         # Simulate more steps than needed to reach zero
         for _ in range(10000):
-            model.current_mas_noise_scale = max(
-                0.0, model.current_mas_noise_scale - model.mas_noise_scale_decay
+            model.current_mas_noise_scale.fill_(
+                max(0.0, model.current_mas_noise_scale.item() - model.mas_noise_scale_decay)
             )
 
-        assert model.current_mas_noise_scale == 0.0
-        assert model.current_mas_noise_scale >= 0.0
+        assert model.current_mas_noise_scale.item() == pytest.approx(0.0, abs=1e-8)
+        assert model.current_mas_noise_scale.item() >= 0.0
+
+    @pytest.mark.unit
+    @pytest.mark.training
+    def test_noise_scale_in_state_dict(self):
+        """current_mas_noise_scale should be saved in state_dict as a buffer."""
+        model = _make_synthesizer(mas_noise_scale_initial=0.01)
+        state_dict = model.state_dict()
+        assert 'current_mas_noise_scale' in state_dict, (
+            "current_mas_noise_scale should be in state_dict (registered buffer)"
+        )
+        assert state_dict['current_mas_noise_scale'].item() == pytest.approx(0.01), (
+            f"Expected 0.01, got {state_dict['current_mas_noise_scale'].item()}"
+        )
+
+    @pytest.mark.unit
+    @pytest.mark.training
+    def test_noise_scale_no_decay_in_eval(self):
+        """Noise scale should NOT decay when model is in eval mode."""
+        model = _make_synthesizer(
+            mas_noise_scale_initial=0.01,
+            mas_noise_scale_decay=2e-6,
+            use_sdp=False,
+        )
+        model.eval()
+
+        initial_scale = model.current_mas_noise_scale.item()
+
+        batch_size = 2
+        seq_len = 5
+        spec_len = 32
+
+        x = torch.randint(0, 100, (batch_size, seq_len))
+        x_lengths = torch.tensor([seq_len, seq_len])
+        spec = torch.randn(batch_size, 513, spec_len)
+        spec_lengths = torch.tensor([spec_len, spec_len])
+
+        with torch.no_grad():
+            model(x, x_lengths, spec, spec_lengths)
+
+        assert model.current_mas_noise_scale.item() == pytest.approx(initial_scale), (
+            f"Noise scale should not decay in eval mode. "
+            f"Expected {initial_scale}, got {model.current_mas_noise_scale.item()}"
+        )

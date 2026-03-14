@@ -106,7 +106,7 @@ class ModelConfig:
 
     def __post_init__(self):
         if self.is_multispeaker and (self.gin_channels == 0):
-            self.gin_channels = 512
+            self.gin_channels = 256
 
 
 @dataclass

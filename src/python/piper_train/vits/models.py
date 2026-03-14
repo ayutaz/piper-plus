@@ -321,9 +321,11 @@ class DurationDiscriminatorV2(nn.Module):
         x = torch.cat([x, dur], dim=1)  # [B, filter_channels*2, T]
         x = self.pre_out_conv_1(x * x_mask)
         x = torch.relu(self.pre_out_norm_1(x.transpose(1, 2)).transpose(1, 2))
+        x = x * x_mask
         x = self.drop(x)
         x = self.pre_out_conv_2(x * x_mask)
         x = torch.relu(self.pre_out_norm_2(x.transpose(1, 2)).transpose(1, 2))
+        x = x * x_mask
         x = self.drop(x)
         x = x * x_mask
         output_prob = self.output_layer(x.transpose(1, 2))  # [B, T, 1]
@@ -349,9 +351,11 @@ class DurationDiscriminatorV2(nn.Module):
         # Process text features
         x = self.conv_1(x * x_mask)
         x = torch.relu(self.norm_1(x.transpose(1, 2)).transpose(1, 2))
+        x = x * x_mask
         x = self.drop(x)
         x = self.conv_2(x * x_mask)
         x = torch.relu(self.norm_2(x.transpose(1, 2)).transpose(1, 2))
+        x = x * x_mask
         x = self.drop(x)
 
         # Compute probability for each duration
@@ -869,6 +873,7 @@ class SynthesizerTrn(nn.Module):
         mas_noise_scale_decay: float = 2e-6,
         use_mel_posterior_encoder: bool = False,
         speaker_conditioned_encoder: bool = False,
+        sample_rate: int = 22050,
     ):
         super().__init__()
         self.n_vocab = n_vocab
@@ -898,6 +903,7 @@ class SynthesizerTrn(nn.Module):
         )
         self.use_mel_posterior_encoder = use_mel_posterior_encoder
         self.speaker_conditioned_encoder = speaker_conditioned_encoder
+        self.sample_rate = sample_rate
 
         self.use_sdp = use_sdp
 
@@ -906,7 +912,10 @@ class SynthesizerTrn(nn.Module):
         # Noise decays linearly per step and has no effect on inference.
         self.mas_noise_scale_initial = mas_noise_scale_initial
         self.mas_noise_scale_decay = mas_noise_scale_decay
-        self.current_mas_noise_scale = mas_noise_scale_initial
+        self.register_buffer(
+            'current_mas_noise_scale',
+            torch.tensor(mas_noise_scale_initial, dtype=torch.float32),
+        )
 
         # Speaker-conditioned encoder: inject speaker embedding into TextEncoder
         enc_p_gin = gin_channels if speaker_conditioned_encoder else 0
@@ -1068,7 +1077,7 @@ class SynthesizerTrn(nn.Module):
                 y,
                 n_fft=n_fft,
                 num_mels=80,
-                sampling_rate=22050,
+                sampling_rate=self.sample_rate,
                 fmin=0,
                 fmax=None,
             )
@@ -1108,9 +1117,9 @@ class SynthesizerTrn(nn.Module):
             )
 
         # Decay MAS noise scale after each forward step
-        if self.current_mas_noise_scale > 0:
-            self.current_mas_noise_scale = max(
-                0.0, self.current_mas_noise_scale - self.mas_noise_scale_decay
+        if self.training and self.current_mas_noise_scale > 0:
+            self.current_mas_noise_scale.fill_(
+                max(0.0, self.current_mas_noise_scale.item() - self.mas_noise_scale_decay)
             )
 
         # Prepare input for duration predictor with prosody features
