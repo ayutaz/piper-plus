@@ -35,6 +35,10 @@ Piper Plus documentation. Guides and references for using and developing with Pi
 ### Testing
 - [Multilingual Testing](guides/testing/multilingual-testing.md) - Testing infrastructure
 
+## Research
+調査・リサーチ資料:
+- [VITS2導入計画](research/vits2-implementation-plan.md) - VITS2改良の導入判定・実装計画・TTS最新動向
+
 ## API Reference
 - [Phoneme Mapping](api-reference/phoneme-mapping.md) - Phoneme reference for all languages
 
