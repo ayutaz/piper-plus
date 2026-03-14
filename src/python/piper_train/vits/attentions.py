@@ -18,6 +18,7 @@ class Encoder(nn.Module):
         kernel_size: int = 1,
         p_dropout: float = 0.0,
         window_size: int = 4,
+        gin_channels: int = 0,
         **kwargs,
     ):
         super().__init__()
@@ -56,15 +57,23 @@ class Encoder(nn.Module):
             )
             self.norm_layers_2.append(LayerNorm(hidden_channels))
 
-    def forward(self, x, x_mask):
+        # Speaker conditioning: project gin_channels to hidden_channels
+        # and inject after the middle transformer layer
+        if gin_channels > 0:
+            self.cond_proj = nn.Conv1d(gin_channels, hidden_channels, 1)
+            self.cond_layer_idx = n_layers // 2 - 1  # For 6 layers: idx=2 (after 3rd layer)
+
+    def forward(self, x, x_mask, g=None):
         attn_mask = x_mask.unsqueeze(2) * x_mask.unsqueeze(-1)
         x = x * x_mask
-        for attn_layer, norm_layer_1, ffn_layer, norm_layer_2 in zip(
-            self.attn_layers,
-            self.norm_layers_1,
-            self.ffn_layers,
-            self.norm_layers_2,
-            strict=False,
+        for i, (attn_layer, norm_layer_1, ffn_layer, norm_layer_2) in enumerate(
+            zip(
+                self.attn_layers,
+                self.norm_layers_1,
+                self.ffn_layers,
+                self.norm_layers_2,
+                strict=False,
+            )
         ):
             y = attn_layer(x, x, attn_mask)
             y = self.drop(y)
@@ -73,6 +82,10 @@ class Encoder(nn.Module):
             y = ffn_layer(x, x_mask)
             y = self.drop(y)
             x = norm_layer_2(x + y)
+
+            # Inject speaker conditioning after the middle layer
+            if hasattr(self, 'cond_proj') and g is not None and i == self.cond_layer_idx:
+                x = x + self.cond_proj(g)
         x = x * x_mask
         return x
 

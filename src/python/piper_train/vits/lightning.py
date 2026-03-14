@@ -100,6 +100,8 @@ class VitsModel(pl.LightningModule):
         use_mel_posterior_encoder: bool = False,
         # Duration Discriminator (VITS2)
         use_duration_discriminator: bool = False,
+        # Speaker-Conditioned Text Encoder (VITS2)
+        speaker_conditioned_encoder: bool = False,
         **kwargs,
     ):
         super().__init__()
@@ -110,9 +112,12 @@ class VitsModel(pl.LightningModule):
         # Fix gin_channels BEFORE save_hyperparameters() so the correct value is saved
         # This fixes the bug where gin_channels=0 was saved for multi-speaker models
         if (num_speakers > 1 or num_languages > 1) and (gin_channels <= 0):
-            gin_channels = 512
+            gin_channels = 256
 
         self.save_hyperparameters()
+
+        # Store VITS2 speaker-conditioned encoder flag
+        self.speaker_conditioned_encoder = speaker_conditioned_encoder
 
         # Set up models
         self.model_g = SynthesizerTrn(
@@ -140,6 +145,7 @@ class VitsModel(pl.LightningModule):
             mas_noise_scale_initial=self.hparams.mas_noise_scale_initial,
             mas_noise_scale_decay=self.hparams.mas_noise_scale_decay,
             use_mel_posterior_encoder=self.hparams.use_mel_posterior_encoder,
+            speaker_conditioned_encoder=self.hparams.speaker_conditioned_encoder,
         )
         self.model_d = MultiPeriodDiscriminator(
             use_spectral_norm=self.hparams.use_spectral_norm
@@ -1014,7 +1020,7 @@ class VitsModel(pl.LightningModule):
             "--gin-channels",
             type=int,
             default=0,
-            help="Speaker embedding size for multi-speaker models (default: 0 for single, 768 for multi)",
+            help="Speaker embedding size for multi-speaker models (default: 0 for single, 256 for multi)",
         )
         parser.add_argument(
             "--prosody-dim",

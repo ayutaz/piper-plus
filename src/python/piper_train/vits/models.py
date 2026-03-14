@@ -195,7 +195,8 @@ class TextEncoder(nn.Module):
         nn.init.normal_(self.emb.weight, 0.0, hidden_channels**-0.5)
 
         self.encoder = attentions.Encoder(
-            hidden_channels, filter_channels, n_heads, n_layers, kernel_size, p_dropout
+            hidden_channels, filter_channels, n_heads, n_layers, kernel_size, p_dropout,
+            gin_channels=gin_channels,
         )
         self.proj = nn.Conv1d(hidden_channels, out_channels * 2, 1)
 
@@ -867,6 +868,7 @@ class SynthesizerTrn(nn.Module):
         mas_noise_scale_initial: float = 0.01,
         mas_noise_scale_decay: float = 2e-6,
         use_mel_posterior_encoder: bool = False,
+        speaker_conditioned_encoder: bool = False,
     ):
         super().__init__()
         self.n_vocab = n_vocab
@@ -895,6 +897,7 @@ class SynthesizerTrn(nn.Module):
             prosody_language_ids if prosody_language_ids is not None else {0}
         )
         self.use_mel_posterior_encoder = use_mel_posterior_encoder
+        self.speaker_conditioned_encoder = speaker_conditioned_encoder
 
         self.use_sdp = use_sdp
 
@@ -905,6 +908,8 @@ class SynthesizerTrn(nn.Module):
         self.mas_noise_scale_decay = mas_noise_scale_decay
         self.current_mas_noise_scale = mas_noise_scale_initial
 
+        # Speaker-conditioned encoder: inject speaker embedding into TextEncoder
+        enc_p_gin = gin_channels if speaker_conditioned_encoder else 0
         self.enc_p = TextEncoder(
             n_vocab,
             inter_channels,
@@ -1048,6 +1053,7 @@ class SynthesizerTrn(nn.Module):
         self, x, x_lengths, y, y_lengths, sid=None, lid=None, prosody_features=None
     ):
         g = self._get_global_conditioning(sid, lid)
+
         x, m_p, logs_p, x_mask = self.enc_p(x, x_lengths, g=g)
 
         # VITS2 Mel Posterior Encoder: convert Linear Spec to Mel Spec for enc_q
@@ -1161,6 +1167,8 @@ class SynthesizerTrn(nn.Module):
         if self.n_speakers > 1:
             assert sid is not None, "Missing speaker id"
         g = self._get_global_conditioning(sid, lid)
+        x, m_p, logs_p, x_mask = self.enc_p(x, x_lengths, g=g)
+
         x, m_p, logs_p, x_mask = self.enc_p(x, x_lengths, g=g)
 
         # Prepare input for duration predictor with prosody features

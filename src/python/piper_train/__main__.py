@@ -270,6 +270,13 @@ def create_parser():
         "Discriminates real (MAS) vs predicted (DP) durations. "
         "Best used with --no-sdp. MOS +0.14 improvement.",
     )
+    # Speaker-Conditioned Text Encoder (VITS2)
+    parser.add_argument(
+        "--speaker-conditioned-encoder",
+        action="store_true",
+        help="Enable VITS2 speaker-conditioned text encoder "
+        "(adds speaker vector to encoder 3rd layer)",
+    )
     # Trainer arguments
     parser.add_argument("--accelerator", default="gpu", help="Accelerator to use")
     parser.add_argument("--devices", type=int, default=1, help="Number of devices")
@@ -464,15 +471,12 @@ def main():
         dict_args["upsample_initial_channel"] = 512
         dict_args["upsample_kernel_sizes"] = (16, 16, 4, 4)
 
-    # マルチスピーカーモデルの場合、gin_channelsを512に設定
-    # 768はONNXエクスポート時の数値精度低下を引き起こす（PyTorch↔ONNX相関が0.97→0.70に低下）
-    # 21話者バイリンガルモデル(gin_channels=512)では正常だが、80話者(768)でガビガビ音が発生
-    # VitsModel.__init__のフォールバック(512)と一致させる
-    # argparseは常にdefault値(0)をdict_argsに含めるため、"not in"ではなく値チェック
+    # マルチスピーカーまたは多言語モデルの場合、gin_channelsを256に設定（VITS2最適化）
+    # argparseは常にdefault値(0)をdict_argsに含めるため、値チェック
     if (num_speakers > 1 or num_languages > 1) and dict_args.get(
         "gin_channels", 0
     ) == 0:
-        dict_args["gin_channels"] = 512
+        dict_args["gin_channels"] = 256
 
     # --resume-from-multispeaker-checkpoint 使用時は freeze_dp を自動有効化
     # モデル作成前に設定しないと save_hyperparameters() に反映されず
@@ -503,6 +507,11 @@ def main():
     # --use-duration-discriminator -> use_duration_discriminator=True
     dict_args["use_duration_discriminator"] = dict_args.pop(
         "use_duration_discriminator", False
+    )
+
+    # --speaker-conditioned-encoder -> speaker_conditioned_encoder=True
+    dict_args["speaker_conditioned_encoder"] = dict_args.pop(
+        "speaker_conditioned_encoder", False
     )
 
     model = VitsModel(
