@@ -733,6 +733,12 @@ class SynthesizerTrn(nn.Module):
         Dimension for prosody feature projection. If > 0, enables prosody-aware
         duration prediction using A1/A2/A3 values from OpenJTalk labels.
         Default is 0 (disabled for backward compatibility).
+    use_mel_posterior_encoder : bool, optional
+        If True, use Mel Spectrogram (80ch) instead of Linear Spectrogram
+        (spec_channels) as input to the Posterior Encoder (enc_q).
+        This is the "Improved Encoder E" from VITS2. Since enc_q is not
+        included in the inference graph, this change only affects training.
+        Default is False (backward compatible).
     """
 
     def __init__(
@@ -759,6 +765,9 @@ class SynthesizerTrn(nn.Module):
         use_sdp: bool = True,
         prosody_dim: int = 16,
         prosody_language_ids: "set[int] | None" = None,
+        mas_noise_scale_initial: float = 0.01,
+        mas_noise_scale_decay: float = 2e-6,
+        use_mel_posterior_encoder: bool = False,
     ):
         super().__init__()
         self.n_vocab = n_vocab
@@ -786,8 +795,16 @@ class SynthesizerTrn(nn.Module):
         self.prosody_language_ids: set[int] = (
             prosody_language_ids if prosody_language_ids is not None else {0}
         )
+        self.use_mel_posterior_encoder = use_mel_posterior_encoder
 
         self.use_sdp = use_sdp
+
+        # Noise-Scaled MAS (VITS2): adds Gaussian noise to MAS cost matrix
+        # during early training to diversify alignment exploration.
+        # Noise decays linearly per step and has no effect on inference.
+        self.mas_noise_scale_initial = mas_noise_scale_initial
+        self.mas_noise_scale_decay = mas_noise_scale_decay
+        self.current_mas_noise_scale = mas_noise_scale_initial
 
         self.enc_p = TextEncoder(
             n_vocab,
@@ -810,8 +827,11 @@ class SynthesizerTrn(nn.Module):
             upsample_kernel_sizes,
             gin_channels=gin_channels,
         )
+        # VITS2 Mel Posterior Encoder: use 80-ch Mel Spec instead of
+        # spec_channels (513) Linear Spec as input to enc_q
+        posterior_in_channels = 80 if use_mel_posterior_encoder else spec_channels
         self.enc_q = PosteriorEncoder(
-            spec_channels,
+            posterior_in_channels,
             inter_channels,
             hidden_channels,
             5,
@@ -931,7 +951,26 @@ class SynthesizerTrn(nn.Module):
         g = self._get_global_conditioning(sid, lid)
         x, m_p, logs_p, x_mask = self.enc_p(x, x_lengths, g=g)
 
-        z, m_q, logs_q, y_mask = self.enc_q(y, y_lengths, g=g)
+        # VITS2 Mel Posterior Encoder: convert Linear Spec to Mel Spec for enc_q
+        if self.use_mel_posterior_encoder:
+            from .mel_processing import spec_to_mel_torch  # noqa: PLC0415
+
+            # y is Linear Spectrogram (B, spec_channels, T)
+            # Convert to Mel Spectrogram (B, 80, T) for posterior encoder
+            # n_fft is derived from spec_channels: spec_channels = n_fft // 2 + 1
+            n_fft = (self.spec_channels - 1) * 2
+            enc_q_input = spec_to_mel_torch(
+                y,
+                n_fft=n_fft,
+                num_mels=80,
+                sampling_rate=22050,
+                fmin=0,
+                fmax=None,
+            )
+        else:
+            enc_q_input = y
+
+        z, m_q, logs_q, y_mask = self.enc_q(enc_q_input, y_lengths, g=g)
         z_p = self.flow(z, y_mask, g=g)
 
         with torch.no_grad():
@@ -951,11 +990,22 @@ class SynthesizerTrn(nn.Module):
             )  # [b, 1, t_s]
             neg_cent = neg_cent1 + neg_cent2 + neg_cent3 + neg_cent4
 
+            # Noise-Scaled MAS (VITS2): inject Gaussian noise to diversify
+            # alignment exploration during early training steps.
+            if self.current_mas_noise_scale > 0:
+                neg_cent = neg_cent + torch.randn_like(neg_cent) * self.current_mas_noise_scale
+
             attn_mask = torch.unsqueeze(x_mask, 2) * torch.unsqueeze(y_mask, -1)
             attn = (
                 monotonic_align.maximum_path(neg_cent, attn_mask.squeeze(1))
                 .unsqueeze(1)
                 .detach()
+            )
+
+        # Decay MAS noise scale after each forward step
+        if self.current_mas_noise_scale > 0:
+            self.current_mas_noise_scale = max(
+                0.0, self.current_mas_noise_scale - self.mas_noise_scale_decay
             )
 
         # Prepare input for duration predictor with prosody features

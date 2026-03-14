@@ -93,6 +93,11 @@ class VitsModel(pl.LightningModule):
         wavlm_model_name: str = "microsoft/wavlm-base-plus",
         c_wavlm: float = 0.5,
         wavlm_every_n_steps: int = 1,
+        # Noise-Scaled MAS (VITS2)
+        mas_noise_scale_initial: float = 0.01,
+        mas_noise_scale_decay: float = 2e-6,
+        # VITS2 Mel Posterior Encoder
+        use_mel_posterior_encoder: bool = False,
         **kwargs,
     ):
         super().__init__()
@@ -130,6 +135,9 @@ class VitsModel(pl.LightningModule):
             gin_channels=self.hparams.gin_channels,
             use_sdp=self.hparams.use_sdp,
             prosody_dim=self.hparams.prosody_dim,
+            mas_noise_scale_initial=self.hparams.mas_noise_scale_initial,
+            mas_noise_scale_decay=self.hparams.mas_noise_scale_decay,
+            use_mel_posterior_encoder=self.hparams.use_mel_posterior_encoder,
         )
         self.model_d = MultiPeriodDiscriminator(
             use_spectral_norm=self.hparams.use_spectral_norm

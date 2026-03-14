@@ -228,6 +228,32 @@ def create_parser():
         help="Freeze Duration Predictor parameters during training. "
         "Use for fine-tuning to prevent duration prediction degradation.",
     )
+    # Noise-Scaled MAS (VITS2) arguments
+    parser.add_argument(
+        "--mas-noise-start",
+        type=float,
+        default=0.01,
+        help="Initial noise scale for Noise-Scaled MAS (VITS2). "
+        "Adds Gaussian noise to the MAS cost matrix during early training "
+        "to diversify alignment exploration. Set to 0 to disable (VITS1 compatible). "
+        "(default: 0.01)",
+    )
+    parser.add_argument(
+        "--mas-noise-decay",
+        type=float,
+        default=2e-6,
+        help="Per-step decay for MAS noise scale. "
+        "With default values (start=0.01, decay=2e-6), noise reaches 0 after ~5000 steps. "
+        "(default: 2e-6)",
+    )
+    # VITS2 Mel Posterior Encoder
+    parser.add_argument(
+        "--mel-posterior-encoder",
+        action="store_true",
+        help="Use Mel Spectrogram (80ch) instead of Linear Spectrogram (513ch) "
+        "as input to the Posterior Encoder (VITS2 Improved Encoder E). "
+        "Only affects training; inference graph is unchanged.",
+    )
     # Trainer arguments
     parser.add_argument("--accelerator", default="gpu", help="Accelerator to use")
     parser.add_argument("--devices", type=int, default=1, help="Number of devices")
@@ -446,6 +472,13 @@ def main():
     # ユーザー指定のnum_workersをそのまま使用する
     # 大規模マルチスピーカーモデルでは共有メモリ制約のため、
     # ユーザーが適切な値を設定する必要がある
+
+    # Map CLI argument names to VitsModel parameter names for Noise-Scaled MAS
+    dict_args["mas_noise_scale_initial"] = dict_args.pop("mas_noise_start", 0.01)
+    dict_args["mas_noise_scale_decay"] = dict_args.pop("mas_noise_decay", 2e-6)
+
+    # Map CLI argument name to VitsModel parameter name for Mel Posterior Encoder
+    dict_args["use_mel_posterior_encoder"] = dict_args.pop("mel_posterior_encoder", False)
 
     model = VitsModel(
         num_symbols=num_symbols,
