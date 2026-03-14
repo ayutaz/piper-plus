@@ -90,7 +90,7 @@ class TestDurationDiscriminatorV2:
         batch_size = 2
         in_channels = 192
         filter_channels = 256
-        gin_channels = 512
+        gin_channels = 256
         seq_len = 10
 
         disc = DurationDiscriminatorV2(
@@ -229,7 +229,7 @@ class TestDurationDiscriminatorV2:
             filter_channels=256,
             kernel_size=3,
             p_dropout=0.1,
-            gin_channels=512,
+            gin_channels=256,
         )
 
         assert hasattr(disc, 'cond'), (
