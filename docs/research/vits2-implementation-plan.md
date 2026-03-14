@@ -277,37 +277,291 @@ VITS2ではStochastic Duration Predictor (SDP) を無効化し、通常のDurati
 
 ---
 
-## 6. 導入ロードマップ（一から学習する前提）
+## 6. 実装マイルストーン（一から学習する前提）
 
 一から学習し直すため、全改良を同時に導入可能。5つの改良は相互依存がなく独立に実装できる。
+以下、依存関係・リスク・効果を考慮し4フェーズに分割する。
 
-### 導入する改良と最適化
+---
 
-| # | 改良 | 変更量 | 推論影響 | 期待効果 |
-|---|------|--------|---------|----------|
-| 1 | **Noise-Scaled MAS (C)** | ~20行 | なし | MOS +0.15（最大効果） |
-| 2 | **Mel Posterior Encoder (E)** | ~50行 | なし | 学習効率化 |
-| 3 | **Speaker-Conditioned TextEncoder (D)** | ~30行 | +0.1MB, +1-2% | 話者類似度+0.20 |
-| 4 | **敵対的Duration Predictor (A)** | ~300行 | なし | MOS +0.14（不安定時は無効化） |
-| 5 | **SDP→DP切替** | ~10行 | **速度+10-20%向上** | 推論軽量化 |
-| 6 | **gin_channels: 768→256** | ~5行 | **サイズ-25MB** | 推論軽量化 |
+### Phase 1: 低リスク・高効果の学習改善（推論グラフ変更なし）
 
-### 導入しない改良
+推論グラフに一切影響しない改良から着手し、学習品質の底上げを行う。
 
-| 改良 | 理由 |
+#### M1: Noise-Scaled MAS (改良C)
+
+> **MOS +0.15（5改良中最大効果）、変更 ~20行、推論影響なし**
+
+| 項目 | 内容 |
 |------|------|
-| Transformer Flow (B) | ONNXサイズ+7-8MB、推論速度+8-15%低下。ラズパイでのRTF 80×→33×に悪化。INT8量子化でも50×程度にしか回復せず。MOS貢献も+0.06と最小 |
+| 概要 | MASのコスト行列にガウスノイズを追加し、学習初期のアライメント探索を多様化 |
+| 対象ファイル | `src/python/piper_train/vits/models.py` |
+| 変更内容 | `SynthesizerTrn`に`mas_noise_scale`属性追加、`forward()`のMAS計算（L878-900）にノイズ注入 |
+| CLIフラグ | `--mas-noise-start 0.01` `--mas-noise-decay 2e-6` |
+| テスト | ノイズが5,000ステップで消失することを単体テストで検証 |
+| 依存 | なし（独立して実装可能） |
+| リスク | **極めて低い** — 学習時のMASにのみ影響、推論パスに変更なし |
 
-### 推論モデルサイズの変化予測
+**実装詳細:**
+```python
+# models.py SynthesizerTrn.__init__()
+self.mas_noise_scale = mas_noise_scale_initial  # 0.01
 
-| 項目 | 現在 | VITS2導入後 | 差分 |
-|------|------|-----------|------|
-| gin_channels | 768 | 256 | **-25MB** |
-| SDP→DP切替 | SDP (Flow含む) | DP (Conv1dのみ) | **-0.5MB** |
-| Speaker-Conditioned TextEncoder | なし | Conv1d(256,192,1)追加 | +0.05MB |
-| **合計** | **~74MB** | **~49MB** | **-25MB (-34%)** |
+# models.py SynthesizerTrn.forward() — L897付近
+if self.mas_noise_scale > 0:
+    neg_cent += torch.randn_like(neg_cent) * self.mas_noise_scale
+attn = monotonic_align.maximum_path(neg_cent, attn_mask)
+self.mas_noise_scale = max(0, self.mas_noise_scale - mas_noise_decay)  # 2e-6
+```
 
-### 推奨学習コマンド
+**完了条件:**
+- [ ] `SynthesizerTrn`にmas_noise_scale属性を追加
+- [ ] `forward()`のMAS計算にノイズ注入を実装
+- [ ] ステップごとの減衰ロジックを実装
+- [ ] CLI引数`--mas-noise-start`, `--mas-noise-decay`を追加
+- [ ] 単体テスト: ノイズ減衰が正しく動作すること
+- [ ] 単体テスト: mas_noise_start=0でVITS1と同一動作すること
+
+---
+
+#### M2: Mel Posterior Encoder (改良E)
+
+> **学習効率化、変更 ~50行、推論影響なし**
+
+| 項目 | 内容 |
+|------|------|
+| 概要 | PosteriorEncoder (enc_q) の入力をLinear Spec (513ch) → Mel Spec (80ch) に変更 |
+| 対象ファイル | `models.py`, `lightning.py`, `dataset.py`, `mel_processing.py` |
+| 変更内容 | enc_qの`in_channels`を513→80に変更、学習データのスペクトログラム計算をMel Specに変更 |
+| CLIフラグ | `--mel-posterior-encoder` |
+| テスト | enc_qの入力次元が80であることを検証、forward/inferが正常動作すること |
+| 依存 | なし（独立して実装可能） |
+| リスク | **低い** — enc_qは推論グラフに含まれない（学習時のみ使用） |
+
+**変更箇所の詳細:**
+| ファイル | 箇所 | 変更内容 |
+|----------|------|----------|
+| `models.py` L785 | `PosteriorEncoder(in_channels=spec_channels, ...)` | `spec_channels`→`mel_channels`（80）に変更 |
+| `lightning.py` L340-362 | スペクトログラム計算 | `spectrogram_torch()`→`mel_spectrogram_torch()`に変更 |
+| `dataset.py` L78-143 | データロード | Mel Specの事前計算 or オンザフライ変換 |
+| `__main__.py` | CLI | `--mel-posterior-encoder`フラグ追加 |
+
+**完了条件:**
+- [ ] enc_qの`in_channels`をCLIフラグで切替可能にする
+- [ ] 学習時のスペクトログラム計算をMel Specに変更
+- [ ] データセット互換性の確認（既存データセットで動作すること）
+- [ ] 単体テスト: enc_qの入出力形状が正しいこと
+- [ ] フラグOFF時にVITS1と同一動作すること
+
+---
+
+### Phase 2: Duration系の刷新（推論軽量化）
+
+Duration Predictor周りを一新する。SDP→DP切替とDuration Discriminatorは相互に依存するため同一フェーズで実装する。
+
+#### M3: SDP → DP 切替 + Duration Discriminator (改良A)
+
+> **MOS +0.14 + 推論速度 +10-20%向上、変更 ~310行**
+
+| 項目 | 内容 |
+|------|------|
+| 概要 | StochasticDurationPredictor (SDP) をDurationPredictor (DP) に切替え、Duration Discriminatorで品質を補償 |
+| 対象ファイル | `models.py`, `lightning.py`, `__main__.py`, `export_onnx.py` |
+| CLIフラグ | `--no-sdp` `--use-duration-discriminator` |
+| 依存 | SDP→DP切替とDuration Discriminatorは**セットで導入**（DP単独では多様性低下のリスク） |
+| リスク | **中程度** — Duration Discriminatorの学習不安定化リスクあり（Style-Bert-VITS2の事例） |
+
+**M3-A: SDP → DP 切替（~10行）**
+
+| ファイル | 箇所 | 変更内容 |
+|----------|------|----------|
+| `models.py` L818-825 | DP選択ロジック | `use_sdp`フラグでSDP/DPを切替（既存コードに分岐あり） |
+| `models.py` L955-956 | `infer()`のDP呼び出し | SDPのreverse→DPの直接予測に変更 |
+| `export_onnx.py` L187-241 | ONNX推論グラフ | DPモードではSDPのFlowパラメータを除外 |
+| `__main__.py` | CLI | `--no-sdp`フラグ追加 |
+
+> 現在のコードには`use_sdp`フラグと`DurationPredictor`クラスが既に存在する（models.py L122-167）。
+> 切替自体は既存の分岐ロジックを活用するため変更量は少ない。
+
+**M3-B: Duration Discriminator V2 新規追加（~300行）**
+
+| ファイル | 箇所 | 変更内容 |
+|----------|------|----------|
+| `models.py` | 新規クラス | `DurationDiscriminatorV2`クラス追加（~100行） |
+| `lightning.py` L463-492 | `configure_optimizers()` | 3つ目のオプティマイザ追加（Duration Disc用） |
+| `lightning.py` L270-296 | `training_step()` | Duration Discriminatorの学習ループ追加（~100行） |
+| `lightning.py` L311-405 | `training_step_g()` | Duration Discriminatorの敵対的損失をGenerator損失に追加 |
+| `__main__.py` | CLI | `--use-duration-discriminator`フラグ追加 |
+
+**DurationDiscriminatorV2 構造:**
+```python
+class DurationDiscriminatorV2(nn.Module):
+    # p0p4k/vits2_pytorch 参照
+    conv_1: Conv1d(hidden_channels→hidden_channels, k=3) + LayerNorm + ReLU
+    conv_2: Conv1d(hidden_channels→hidden_channels, k=3) + LayerNorm + ReLU
+    dur_proj: Conv1d(1→hidden_channels, k=1)  # log durationの投影
+    pre_out_conv_1: Conv1d(hidden_channels*2→hidden_channels, k=3) + LayerNorm + ReLU
+    pre_out_conv_2: Conv1d(hidden_channels→hidden_channels, k=3) + LayerNorm + ReLU
+    output_layer: Linear(hidden_channels→1) + Sigmoid
+    # パラメータ数: ~556K（学習時のみ）
+```
+
+**学習ループの変更:**
+```python
+# lightning.py training_step() — 現在: 2オプティマイザ → 3オプティマイザ
+def training_step(self, batch, batch_idx):
+    opt_g, opt_d, opt_dur_d = self.optimizers()  # 3つに変更
+    # 1. Generator更新（duration adversarial loss含む）
+    # 2. MPD/WavLM Discriminator更新
+    # 3. Duration Discriminator更新（新規）
+```
+
+**不安定時の緊急対応:**
+```bash
+# Duration Discriminatorを無効化して学習を続行
+uv run python -m piper_train ... --no-duration-discriminator
+```
+
+**完了条件:**
+- [ ] `DurationDiscriminatorV2`クラスを実装
+- [ ] 3オプティマイザ構成を`configure_optimizers()`に追加
+- [ ] `training_step()`にDuration Discriminator学習ループを追加
+- [ ] `training_step_g()`にduration adversarial lossを追加
+- [ ] `--no-sdp`でDPモードに切替可能にする
+- [ ] `--use-duration-discriminator`でDuration Discの有効/無効を制御
+- [ ] ONNX export: DPモード時にSDP Flowパラメータが含まれないことを検証
+- [ ] 単体テスト: DurationDiscriminatorV2のforward/backward
+- [ ] 単体テスト: 3オプティマイザの学習ステップが正しく動作すること
+- [ ] 統合テスト: DP + Duration Discriminatorでの短時間学習（5-10 epoch）が収束すること
+
+---
+
+### Phase 3: 推論グラフ最適化（モデルサイズ削減）
+
+推論グラフに影響する変更を行い、モデルサイズを大幅に削減する。
+
+#### M4: gin_channels 768 → 256
+
+> **推論モデルサイズ -25MB (-34%)、変更 ~5行**
+
+| 項目 | 内容 |
+|------|------|
+| 概要 | 話者埋め込みの次元数を768→256に削減 |
+| 対象ファイル | `__main__.py`, `lightning.py` |
+| 変更内容 | マルチスピーカー時のデフォルトgin_channelsを768→256に変更 |
+| CLIフラグ | `--gin-channels 256`（既存フラグ、デフォルト値の変更） |
+| 依存 | M6（Speaker-Conditioned TextEncoder）のgin_channels値に影響 |
+| リスク | **低〜中** — 20話者では256で十分だが、話者類似度低下時は512への引き上げが必要 |
+
+**変更箇所:**
+| ファイル | 箇所 | 変更内容 |
+|----------|------|----------|
+| `__main__.py` L330-332 | gin_channels自動設定 | デフォルト768→256に変更 |
+| `lightning.py` L94-95 | gin_channels自動設定 | `gin_channels = 512` → `gin_channels = 256` |
+
+**影響を受けるモジュール（自動的にサイズ削減）:**
+| モジュール | gin=768 → gin=256 | 削減量 |
+|-----------|-------------------|--------|
+| DurationPredictor (cond層) | 147K → 49K | -98K |
+| PosteriorEncoder (WN cond層) | 4,719K → 1,573K | -3,146K |
+| ResidualCouplingBlock (WN cond層) | 4,719K → 1,573K | -3,146K |
+| Generator (cond層) | 393K → 131K | -262K |
+| Speaker Embedding (20話者) | 15K → 5K | -10K |
+| **合計** | **10,140K → 3,380K** | **-6,760K (-25MB)** |
+
+**完了条件:**
+- [ ] デフォルトgin_channelsを256に変更
+- [ ] 既存の`--gin-channels`フラグとの互換性確認
+- [ ] 単体テスト: gin_channels=256でモデル構築・forward/inferが正常動作すること
+- [ ] ONNX exportでモデルサイズが~49MBになることを検証
+
+---
+
+#### M5: Speaker-Conditioned TextEncoder (改良D)
+
+> **話者類似度 +0.20、変更 ~30行、推論影響 +0.05MB**
+
+| 項目 | 内容 |
+|------|------|
+| 概要 | TextEncoderの第3層（6層中）に話者ベクトルを条件付け |
+| 対象ファイル | `models.py`, `attentions.py`, `export_onnx.py` |
+| CLIフラグ | `--speaker-conditioned-encoder` |
+| 依存 | M4（gin_channels値が決定済みであること） |
+| リスク | **低い** — 推論グラフへの追加は Conv1d 1層のみ（+0.05MB） |
+
+**変更箇所:**
+| ファイル | 箇所 | 変更内容 |
+|----------|------|----------|
+| `attentions.py` L37-57 | `Encoder`クラス | `gin_channels`パラメータ追加、第3層の後に`cond_proj(g)`を加算 |
+| `models.py` L170-211 | `TextEncoder`クラス | `gin_channels`パラメータを受け取り`Encoder`に渡す |
+| `models.py` L869 | `forward()` | `enc_p(x, x_lengths)` → `enc_p(x, x_lengths, g=g)` |
+| `models.py` L942 | `infer()` | 同上 |
+| `export_onnx.py` L187-241 | `infer_forward()` | `enc_p`呼び出しに`g`を追加 |
+
+**追加モジュール:**
+```python
+# attentions.py Encoder.__init__()
+if gin_channels > 0:
+    self.cond_proj = nn.Conv1d(gin_channels, hidden_channels, 1)
+    self.cond_layer_idx = 2  # 0-indexed: 第3層の後
+
+# attentions.py Encoder.forward()
+for i, (attn, norm1, ffn, norm2) in enumerate(layers):
+    x = norm1(x + attn(x, x, attn_mask))
+    x = norm2(x + ffn(x, x_mask))
+    if hasattr(self, 'cond_proj') and i == self.cond_layer_idx:
+        x = x + self.cond_proj(g)  # 話者条件付け
+```
+
+**完了条件:**
+- [ ] `Encoder`クラスにgin_channelsパラメータとcond_projを追加
+- [ ] 第3層の後に話者条件付けを挿入
+- [ ] `TextEncoder`経由でgin_channelsを渡す
+- [ ] `SynthesizerTrn`のforward/inferで`g`を`enc_p`に渡す
+- [ ] ONNX export: enc_pに`g`が正しく渡されることを検証
+- [ ] 単体テスト: gin_channels=0（シングルスピーカー）で条件付けが無効になること
+- [ ] 単体テスト: gin_channels=256で条件付けが正常に動作すること
+- [ ] ONNXサイズ増加が+0.05MB以内であることを検証
+
+---
+
+### Phase 4: 統合・学習・評価
+
+全改良を統合し、フル学習を実行する。
+
+#### M6: 統合テスト・ONNX変換・フル学習
+
+> **全改良の統合検証 + 200 epoch学習**
+
+| 項目 | 内容 |
+|------|------|
+| 概要 | Phase 1-3の全改良を統合し、ONNX変換・フル学習を実行 |
+| 依存 | M1〜M5すべて完了 |
+| リスク | **中程度** — Duration Discriminatorの不安定化リスクが主要な懸念 |
+
+**M6-A: 統合テスト**
+
+- [ ] 全フラグ有効でモデル構築が成功すること
+- [ ] 5 epochの短時間学習でlossが正常に減少すること
+- [ ] Duration Discriminatorのlossが発散しないこと
+- [ ] WavLM Discriminatorとの併用で学習が安定すること
+- [ ] GPUメモリがL4 16GB × 4で収まること（batch_size=12）
+
+**M6-B: ONNX変換テスト**
+
+```bash
+# VITS2モデルのONNX変換（DP + EMA）
+CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
+  --no-ema \
+  /data/piper/output-vits2-full/lightning_logs/version_0/checkpoints/epoch=4-step=XXX.ckpt \
+  /tmp/vits2-test.onnx
+```
+
+- [ ] ONNXモデルサイズが~49MB（±5MB）であること
+- [ ] ONNX推論が正常に動作すること（テキスト→音声生成）
+- [ ] 全話者ID (0-19) で推論が成功すること
+
+**M6-C: フル学習 (200 epoch)**
 
 ```bash
 NCCL_DEBUG=WARN NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 \
@@ -329,6 +583,64 @@ uv run python -m piper_train \
   --default_root_dir /data/piper/output-vits2-full
 ```
 
+推定所要時間: **約60-90時間**（L4 × 4, 200 epoch, 60,164発話）
+
+**M6-D: 品質評価**
+
+| 評価項目 | 比較対象 | 合格基準 |
+|----------|----------|----------|
+| 音割れ | v2ベースライン | 音割れなし |
+| 自然性 | v2ベースライン | 同等以上 |
+| 話者類似度 | v2ベースライン | 同等以上 |
+| モデルサイズ | 74MB (v2) | **49MB以下** |
+| 推論速度 (RTF) | v2ベースライン | 同等以上 |
+
+**Duration Discriminator不安定時の代替プラン:**
+```bash
+# Duration Discriminatorを無効化してDP単独で再学習
+uv run python -m piper_train \
+  ... \
+  --no-sdp \
+  --no-duration-discriminator \  # Duration Disc無効化
+  --default_root_dir /data/piper/output-vits2-no-dur-disc
+```
+
+---
+
+### マイルストーン全体像
+
+```
+Phase 1: 低リスク・高効果          Phase 2: Duration刷新        Phase 3: 推論最適化          Phase 4: 統合・学習
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━    ━━━━━━━━━━━━━━━━━━━━━━    ━━━━━━━━━━━━━━━━━━━━━    ━━━━━━━━━━━━━━━━━━━
+M1: Noise-Scaled MAS ──────┐     M3: SDP→DP切替 ─────┐    M4: gin_channels ────┐    M6: 統合テスト
+   ~20行, MOS +0.15        │        + Duration Disc  │       768→256         │       ONNX変換
+                           ├──→     ~310行           ├──→   ~5行, -25MB     ├──→   フル学習
+M2: Mel Posterior Enc ─────┘        MOS +0.14        │                      │       品質評価
+   ~50行, 学習効率化                推論速度+10-20%  │    M5: Speaker-Cond ──┘
+                                                     │       TextEncoder
+                                                     │       ~30行, +0.20
+                                                     └──→   (gin決定後)
+```
+
+| Phase | マイルストーン | 変更量 | リスク | 期待効果 |
+|-------|-------------|--------|--------|----------|
+| **1** | M1: Noise-Scaled MAS | ~20行 | 極めて低い | MOS +0.15 |
+| **1** | M2: Mel Posterior Encoder | ~50行 | 低い | 学習効率化 |
+| **2** | M3: SDP→DP + Duration Disc | ~310行 | **中程度** | MOS +0.14, 推論+10-20% |
+| **3** | M4: gin_channels 768→256 | ~5行 | 低〜中 | **モデルサイズ -25MB** |
+| **3** | M5: Speaker-Cond TextEncoder | ~30行 | 低い | 話者類似度 +0.20 |
+| **4** | M6: 統合・学習・評価 | — | 中程度 | 全改良の検証 |
+
+**合計変更量**: ~415行（テスト除く）
+**推定モデルサイズ**: 74MB → **49MB (-34%)**
+**推定品質向上**: MOS +0.09〜+0.29（全改良が期待通りに動作した場合）
+
+### 導入しない改良
+
+| 改良 | 理由 |
+|------|------|
+| Transformer Flow (B) | ONNXサイズ+7-8MB、推論速度+8-15%低下。ラズパイでのRTF 80×→33×に悪化。INT8量子化でも50×程度にしか回復せず。MOS貢献も+0.06と最小 |
+
 ### 学習時の追加GPUメモリ
 
 | 改良 | 追加メモリ |
@@ -342,7 +654,7 @@ uv run python -m piper_train \
 
 ---
 
-## 6. VITS2以降のTTSアーキテクチャ動向
+## 7. VITS2以降のTTSアーキテクチャ動向
 
 ### VITS3は存在するか？
 
@@ -389,7 +701,7 @@ VITSは「最先端」ではないが、**軽量・高速・エッジ展開**に
 
 ---
 
-## 7. 参考実装
+## 8. 参考実装
 
 | リポジトリ | Stars | ライセンス | 備考 |
 |-----------|-------|-----------|------|
