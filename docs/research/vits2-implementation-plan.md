@@ -225,6 +225,8 @@ piper-plusの現在の`gin_channels=768`は過大。VITS2参考実装 (p0p4k, 10
 
 20話者では256次元で十分な話者表現が可能。
 
+> **精度への影響**: VITS2論文にgin_channelsのablation studyはない。p0p4k実装が109話者で256を使用しており、20話者なら十分と判断。ただし話者類似度が低下した場合は512への引き上げを検討すること。
+
 ### 4.2 SDP → DP への切替
 
 VITS2ではStochastic Duration Predictor (SDP) を無効化し、通常のDuration Predictor (DP) を使用することが推奨されている。
@@ -238,12 +240,23 @@ VITS2ではStochastic Duration Predictor (SDP) を無効化し、通常のDurati
 - SDPのFlowパラメータ（~150-200K）が推論グラフから削除
 - 推論時の計算: SDPのreverse Flow → DPの単純Conv1d（大幅に軽量化）
 
+> **精度への影響**: SDPは確率的に多様なリズムを生成できるが、DPは決定的（同じ入力に同じリズム）。DPへの切替はDuration Discriminatorとのセットで効果を発揮する。Duration Discriminatorなしで単独切替した場合、音声の自然さ（多様性）が低下する可能性がある。
+
+| 項目 | SDP (現在) | DP (VITS2推奨) |
+|------|-----------|---------------|
+| 出力 | 確率的（毎回異なるリズム） | 決定的（同じリズム） |
+| 音声の多様性 | 高い | 低い |
+| 推論速度 | 遅い（Flow計算あり） | 速い |
+| Duration Discriminatorとの相性 | 不明 | 良い |
+
 ### 4.3 Duration Discriminator (A) に関する警告
 
 **Style-Bert-VITS2のJP-Extra版がDuration Discriminatorを意図的に削除した事例:**
 - 理由: 音素間隔が不安定になり学習が安定しない
 - 代替: WavLM Discriminatorを採用
 - piper-plusは既にWavLM Discriminatorを実装済み
+
+> **精度への影響**: Duration Discriminator自体はMOS +0.14の品質向上に貢献する。問題は精度低下ではなく「学習の不安定化」。学習が安定すれば精度は上がるが、不安定な場合は学習が収束しないリスクがある。
 
 **対応方針:**
 - Duration Discriminatorは導入するが、不安定な場合はフラグで無効化できるようにする
