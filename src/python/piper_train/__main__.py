@@ -254,6 +254,22 @@ def create_parser():
         "as input to the Posterior Encoder (VITS2 Improved Encoder E). "
         "Only affects training; inference graph is unchanged.",
     )
+    # SDP -> DP switch (VITS2)
+    parser.add_argument(
+        "--no-sdp",
+        action="store_true",
+        help="Disable Stochastic Duration Predictor and use deterministic Duration Predictor. "
+        "Recommended with --use-duration-discriminator for VITS2 configuration. "
+        "Inference speed improves 10-20%% by removing SDP Flow computation.",
+    )
+    # Duration Discriminator (VITS2)
+    parser.add_argument(
+        "--use-duration-discriminator",
+        action="store_true",
+        help="Enable Duration Discriminator V2 (VITS2). "
+        "Discriminates real (MAS) vs predicted (DP) durations. "
+        "Best used with --no-sdp. MOS +0.14 improvement.",
+    )
     # Trainer arguments
     parser.add_argument("--accelerator", default="gpu", help="Accelerator to use")
     parser.add_argument("--devices", type=int, default=1, help="Number of devices")
@@ -479,6 +495,15 @@ def main():
 
     # Map CLI argument name to VitsModel parameter name for Mel Posterior Encoder
     dict_args["use_mel_posterior_encoder"] = dict_args.pop("mel_posterior_encoder", False)
+
+    # --no-sdp -> use_sdp=False
+    if dict_args.pop("no_sdp", False):
+        dict_args["use_sdp"] = False
+
+    # --use-duration-discriminator -> use_duration_discriminator=True
+    dict_args["use_duration_discriminator"] = dict_args.pop(
+        "use_duration_discriminator", False
+    )
 
     model = VitsModel(
         num_symbols=num_symbols,

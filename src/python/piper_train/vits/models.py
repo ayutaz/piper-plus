@@ -263,6 +263,105 @@ class ResidualCouplingBlock(nn.Module):
         return x
 
 
+class DurationDiscriminatorV2(nn.Module):
+    """Duration Discriminator V2 from VITS2.
+
+    Discriminates between real durations (from MAS) and predicted durations
+    (from Duration Predictor). Used only during training.
+
+    Based on p0p4k/vits2_pytorch implementation.
+    """
+
+    def __init__(self, in_channels, filter_channels, kernel_size, p_dropout, gin_channels=0):
+        super().__init__()
+        self.in_channels = in_channels
+        self.filter_channels = filter_channels
+
+        # Text encoder output processing
+        self.conv_1 = nn.Conv1d(in_channels, filter_channels, kernel_size, padding=kernel_size // 2)
+        self.norm_1 = nn.LayerNorm(filter_channels)
+        self.conv_2 = nn.Conv1d(filter_channels, filter_channels, kernel_size, padding=kernel_size // 2)
+        self.norm_2 = nn.LayerNorm(filter_channels)
+
+        # Duration projection
+        self.dur_proj = nn.Conv1d(1, filter_channels, 1)
+
+        # Combined processing (text features + duration features)
+        self.pre_out_conv_1 = nn.Conv1d(filter_channels * 2, filter_channels, kernel_size, padding=kernel_size // 2)
+        self.pre_out_norm_1 = nn.LayerNorm(filter_channels)
+        self.pre_out_conv_2 = nn.Conv1d(filter_channels, filter_channels, kernel_size, padding=kernel_size // 2)
+        self.pre_out_norm_2 = nn.LayerNorm(filter_channels)
+
+        # Output
+        self.output_layer = nn.Sequential(
+            nn.Linear(filter_channels, 1),
+            nn.Sigmoid(),
+        )
+
+        self.drop = nn.Dropout(p_dropout)
+
+        # Speaker conditioning
+        if gin_channels > 0:
+            self.cond = nn.Conv1d(gin_channels, in_channels, 1)
+
+    def forward_probability(self, x, x_mask, dur, g=None):
+        """Compute probability for a single duration (real or fake).
+
+        Args:
+            x: Processed text features [B, filter_channels, T]
+            x_mask: Text mask [B, 1, T]
+            dur: Log duration [B, 1, T]
+            g: Speaker embedding (unused here, for API consistency)
+
+        Returns:
+            output_prob: Probability [B, T, 1]
+        """
+        dur = self.dur_proj(dur)  # [B, filter_channels, T]
+        x = torch.cat([x, dur], dim=1)  # [B, filter_channels*2, T]
+        x = self.pre_out_conv_1(x * x_mask)
+        x = torch.relu(self.pre_out_norm_1(x.transpose(1, 2)).transpose(1, 2))
+        x = self.drop(x)
+        x = self.pre_out_conv_2(x * x_mask)
+        x = torch.relu(self.pre_out_norm_2(x.transpose(1, 2)).transpose(1, 2))
+        x = self.drop(x)
+        x = x * x_mask
+        output_prob = self.output_layer(x.transpose(1, 2))  # [B, T, 1]
+        return output_prob
+
+    def forward(self, x, x_mask, dur_r, dur_hat, g=None):
+        """Discriminate between real and predicted durations.
+
+        Args:
+            x: Text encoder hidden output [B, in_channels, T]
+            x_mask: Text mask [B, 1, T]
+            dur_r: Real log durations from MAS [B, 1, T]
+            dur_hat: Predicted log durations from DP [B, 1, T]
+            g: Speaker embedding [B, gin_channels, 1] or None
+
+        Returns:
+            list: [output_prob_real, output_prob_fake], each [B, T, 1]
+        """
+        # Apply speaker conditioning
+        if hasattr(self, 'cond') and g is not None:
+            x = x + self.cond(g)
+
+        # Process text features
+        x = self.conv_1(x * x_mask)
+        x = torch.relu(self.norm_1(x.transpose(1, 2)).transpose(1, 2))
+        x = self.drop(x)
+        x = self.conv_2(x * x_mask)
+        x = torch.relu(self.norm_2(x.transpose(1, 2)).transpose(1, 2))
+        x = self.drop(x)
+
+        # Compute probability for each duration
+        output_probs = []
+        for dur in [dur_r, dur_hat]:
+            output_prob = self.forward_probability(x, x_mask, dur, g)
+            output_probs.append(output_prob)
+
+        return output_probs  # [prob_real, prob_fake]
+
+
 class PosteriorEncoder(nn.Module):
     def __init__(
         self,
@@ -1015,12 +1114,18 @@ class SynthesizerTrn(nn.Module):
         if self.use_sdp:
             l_length = self.dp(x_dp, x_mask, w, g=g)
             l_length = l_length / torch.sum(x_mask)
+            dur_info = None
         else:
-            logw_ = torch.log(w + 1e-6) * x_mask
-            logw = self.dp(x_dp, x_mask, g=g)
-            l_length = torch.sum((logw - logw_) ** 2, [1, 2]) / torch.sum(
+            # DP mode: compute and store duration info for Duration Discriminator
+            logw = torch.log(w + 1e-6) * x_mask
+            logw_hat = self.dp(x_dp, x_mask, g=g)
+            l_length = torch.sum((logw_hat - logw) ** 2, [1, 2]) / torch.sum(
                 x_mask
             )  # for averaging
+            # Use x (not x_dp) for Duration Discriminator: x_dp includes prosody
+            # features (hidden_channels + prosody_dim), but DurationDiscriminatorV2
+            # expects in_channels=hidden_channels only.
+            dur_info = (x, logw, logw_hat)
 
         # expand prior
         m_p = torch.matmul(attn.squeeze(1), m_p.transpose(1, 2)).transpose(1, 2)
@@ -1038,6 +1143,7 @@ class SynthesizerTrn(nn.Module):
             x_mask,
             y_mask,
             (z, z_p, m_p, logs_p, m_q, logs_q),
+            dur_info,
         )
 
     def infer(
