@@ -201,41 +201,131 @@ TransformerCouplingLayer (pre_conv型)
 
 ---
 
-## 4. piper-plus独自拡張との互換性
+## 4. 追加最適化（一から学習する場合の推奨変更）
 
-| 既存機能 | Phase 1 (C,A,E) | Phase 2 (D) | 備考 |
-|---------|-----------------|-------------|------|
-| Prosody Features (A1/A2/A3) | 互換 | 互換 | DurationPredictor入力は変更なし |
-| WavLM Discriminator | 互換 | 互換 | 独立Discriminatorとして維持 |
-| SpeakerBalancedBatchSampler | 互換 | 互換 | バッチ構成は変更不要 |
-| EMA (Generator) | 互換 | 互換 | HiFi-GANに変更なし |
-| FP16 Mixed Precision | 互換 | 互換 | VITS2論文でもMixed Precision使用 |
+一から学習し直す前提で、VITS2改良に加えて以下の最適化も同時に行うことを推奨する。
+
+### 4.1 gin_channels の最適化: 768 → 256
+
+piper-plusの現在の`gin_channels=768`は過大。VITS2参考実装 (p0p4k, 109話者) では`gin_channels=256`を採用。
+
+**gin_channelsが使われるモジュールとパラメータ数:**
+
+| モジュール | gin=768 | gin=256 | 削減量 |
+|-----------|---------|---------|--------|
+| StochasticDurationPredictor | 147K | 49K | -98K |
+| DurationPredictor | 147K | 49K | -98K |
+| PosteriorEncoder (WN) | 4,719K | 1,573K | -3,146K |
+| ResidualCouplingBlock (Flow) | 4,719K | 1,573K | -3,146K |
+| Generator (Decoder) | 393K | 131K | -262K |
+| Speaker Embedding (20話者) | 15K | 5K | -10K |
+| **合計** | **10,140K** | **3,380K** | **-6,760K** |
+
+**推論モデルサイズ削減: 約25MB減（話者関連パラメータの61.6%削減）**
+
+20話者では256次元で十分な話者表現が可能。
+
+### 4.2 SDP → DP への切替
+
+VITS2ではStochastic Duration Predictor (SDP) を無効化し、通常のDuration Predictor (DP) を使用することが推奨されている。
+
+**根拠:**
+- p0p4k/vits2_pytorch の `vits2_vctk_base.json`: `use_sdp: false`
+- SDP→DPで推論時のFlowレイヤーが不要になり、**推論速度10-20%向上**
+- Duration Discriminatorとの併用時はDP側が安定
+
+**推論への影響:**
+- SDPのFlowパラメータ（~150-200K）が推論グラフから削除
+- 推論時の計算: SDPのreverse Flow → DPの単純Conv1d（大幅に軽量化）
+
+### 4.3 Duration Discriminator (A) に関する警告
+
+**Style-Bert-VITS2のJP-Extra版がDuration Discriminatorを意図的に削除した事例:**
+- 理由: 音素間隔が不安定になり学習が安定しない
+- 代替: WavLM Discriminatorを採用
+- piper-plusは既にWavLM Discriminatorを実装済み
+
+**対応方針:**
+- Duration Discriminatorは導入するが、不安定な場合はフラグで無効化できるようにする
+- `--use-duration-discriminator`フラグで制御
+- WavLMとの併用で学習が不安定になった場合は、Duration Discriminatorのみ無効化
 
 ---
 
-## 5. 導入ロードマップ
+## 5. piper-plus独自拡張との互換性
 
-### Phase 1: 推論影響ゼロの改良（推奨）
+| 既存機能 | VITS2改良 | 備考 |
+|---------|-----------|------|
+| Prosody Features (A1/A2/A3) | 互換 | DurationPredictor入力は変更なし |
+| WavLM Discriminator | 互換（A注意） | Duration Discriminatorとの併用は要監視 |
+| SpeakerBalancedBatchSampler | 互換 | バッチ構成は変更不要 |
+| EMA (Generator) | 互換 | HiFi-GANに変更なし |
+| FP16 Mixed Precision | 互換 | VITS2論文でもMixed Precision使用 |
 
-| 順序 | 改良 | 変更量 | 期待効果 | リスク |
-|------|------|--------|----------|--------|
-| 1 | Noise-Scaled MAS (C) | ~20行 | アライメント安定化 | なし |
-| 2 | 敵対的Duration Predictor (A) | ~300行 | MOS +0.14、リズム自然性向上 | 学習ループ複雑化 |
-| 3 | Mel Posterior Encoder (E) | ~25行 | 学習メモリ効率化 | 前処理パイプライン変更 |
+---
 
-**合計**: ONNXサイズ ±0MB、推論速度 ±0%
+## 6. 導入ロードマップ（一から学習する前提）
 
-### Phase 2: 軽微な影響の改良（オプション）
+一から学習し直すため、全改良を同時に導入可能。5つの改良は相互依存がなく独立に実装できる。
 
-| 順序 | 改良 | 変更量 | 期待効果 | リスク |
-|------|------|--------|----------|--------|
-| 4 | Speaker-Conditioned TextEncoder (D) | ~30行 | 話者類似度+0.20 | ONNX +0.1MB |
+### 導入する改良と最適化
+
+| # | 改良 | 変更量 | 推論影響 | 期待効果 |
+|---|------|--------|---------|----------|
+| 1 | **Noise-Scaled MAS (C)** | ~20行 | なし | MOS +0.15（最大効果） |
+| 2 | **Mel Posterior Encoder (E)** | ~50行 | なし | 学習効率化 |
+| 3 | **Speaker-Conditioned TextEncoder (D)** | ~30行 | +0.1MB, +1-2% | 話者類似度+0.20 |
+| 4 | **敵対的Duration Predictor (A)** | ~300行 | なし | MOS +0.14（不安定時は無効化） |
+| 5 | **SDP→DP切替** | ~10行 | **速度+10-20%向上** | 推論軽量化 |
+| 6 | **gin_channels: 768→256** | ~5行 | **サイズ-25MB** | 推論軽量化 |
 
 ### 導入しない改良
 
 | 改良 | 理由 |
 |------|------|
-| Transformer Flow (B) | ONNXサイズ+7-8MB、推論速度+8-15%低下。ラズパイでのRTF悪化が許容不可 |
+| Transformer Flow (B) | ONNXサイズ+7-8MB、推論速度+8-15%低下。ラズパイでのRTF 80×→33×に悪化。INT8量子化でも50×程度にしか回復せず。MOS貢献も+0.06と最小 |
+
+### 推論モデルサイズの変化予測
+
+| 項目 | 現在 | VITS2導入後 | 差分 |
+|------|------|-----------|------|
+| gin_channels | 768 | 256 | **-25MB** |
+| SDP→DP切替 | SDP (Flow含む) | DP (Conv1dのみ) | **-0.5MB** |
+| Speaker-Conditioned TextEncoder | なし | Conv1d(256,192,1)追加 | +0.05MB |
+| **合計** | **~74MB** | **~49MB** | **-25MB (-34%)** |
+
+### 推奨学習コマンド
+
+```bash
+NCCL_DEBUG=WARN NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 \
+uv run python -m piper_train \
+  --dataset-dir /data/piper/dataset-moe-speech-20speakers-v2 \
+  --prosody-dim 16 \
+  --accelerator gpu --devices 4 --precision 16-mixed \
+  --max_epochs 200 --batch-size 12 --samples-per-speaker 2 \
+  --checkpoint-epochs 1 --quality medium \
+  --base_lr 2e-4 --disable_auto_lr_scaling \
+  --ema-decay 0.9995 --num-workers 0 --no-pin-memory \
+  --use-duration-discriminator \
+  --mas-noise-start 0.01 \
+  --mas-noise-decay 2e-6 \
+  --mel-posterior-encoder \
+  --speaker-conditioned-encoder \
+  --gin-channels 256 \
+  --no-sdp \
+  --default_root_dir /data/piper/output-vits2-full
+```
+
+### 学習時の追加GPUメモリ
+
+| 改良 | 追加メモリ |
+|------|-----------|
+| Duration Discriminator | +0.5-1 GB |
+| Noise-Scaled MAS | ほぼ0 |
+| Mel Posterior Encoder | ほぼ0 |
+| Speaker-Conditioned TextEncoder | +0.1-0.3 GB |
+| gin_channels削減 | **-1-2 GB（削減）** |
+| **合計** | **±0〜-1 GB（改善方向）** |
 
 ---
 
@@ -301,7 +391,10 @@ VITSは「最先端」ではないが、**軽量・高速・エッジ展開**に
 
 - [VITS2 論文 (arXiv:2307.16430)](https://arxiv.org/abs/2307.16430)
 - [VITS2 デモページ](https://vits-2.github.io/demo/)
-- [p0p4k/vits2_pytorch](https://github.com/p0p4k/vits2_pytorch)
+- [p0p4k/vits2_pytorch](https://github.com/p0p4k/vits2_pytorch) — MIT, 全機能フラグ制御可
+- [daniilrobnikov/vits2](https://github.com/daniilrobnikov/vits2) — MIT
+- [fishaudio/Bert-VITS2](https://github.com/fishaudio/Bert-VITS2) — Duration Discriminatorのバグ修正・WavLM追加の経緯
+- [litagin02/Style-Bert-VITS2](https://github.com/litagin02/Style-Bert-VITS2) — JP-ExtraでDuration Discriminator削除の実例
 - [StyleTTS 2 (NeurIPS 2023)](https://arxiv.org/abs/2306.07691)
 - [Matcha-TTS (ICASSP 2024)](https://arxiv.org/abs/2309.03199)
 - [F5-TTS](https://arxiv.org/abs/2410.06885)
