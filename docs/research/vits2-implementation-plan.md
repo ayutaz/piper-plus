@@ -160,8 +160,8 @@ TextEncoder
 
 **追加モジュール**:
 ```python
-cond_proj = Conv1d(gin_channels=512, hidden_channels=192, kernel_size=1)
-# パラメータ: 512×192 + 192 = 98,688個 (~0.1MB)
+cond_proj = Conv1d(gin_channels=256, hidden_channels=192, kernel_size=1)
+# パラメータ: 256×192 + 192 = 49,344個 (~0.05MB)
 ```
 
 **変更箇所**:

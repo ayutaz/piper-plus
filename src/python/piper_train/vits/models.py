@@ -1106,7 +1106,8 @@ class SynthesizerTrn(nn.Module):
 
             # Noise-Scaled MAS (VITS2): inject Gaussian noise to diversify
             # alignment exploration during early training steps.
-            if self.current_mas_noise_scale > 0:
+            # Only inject noise during training to keep validation loss stable.
+            if self.training and self.current_mas_noise_scale > 0:
                 neg_cent = neg_cent + torch.randn_like(neg_cent) * self.current_mas_noise_scale
 
             attn_mask = torch.unsqueeze(x_mask, 2) * torch.unsqueeze(y_mask, -1)
