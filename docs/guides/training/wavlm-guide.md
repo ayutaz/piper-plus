@@ -98,7 +98,7 @@ uv run python -m piper_train \
 
 ## ONNX変換
 
-WavLM で学習したモデルを ONNX に変換する場合、`--stochastic` フラグが**必須**です。このフラグにより、`noise_scale` によるサンプリングがエクスポートされたグラフ内で有効化されます。
+WavLM で学習したモデルを ONNX に変換する場合、`--stochastic` フラグの使用を**推奨**します。このフラグにより、`noise_scale` によるサンプリングがエクスポートされたグラフ内で有効化され、推論時の音声バリエーション制御が可能になります。
 
 EMA 重みはデフォルトで適用されるため、明示的に指定する必要はありません。
 
@@ -111,12 +111,21 @@ CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
   /path/to/output.onnx
 ```
 
-### ベースラインモデル（WavLMなし）との比較
+### エクスポートオプションの組み合わせ
 
-WavLM なしで学習したモデルでは、`--stochastic` の代わりに `--no-ema` を使用します。
+`--stochastic` と `--no-ema` は独立したオプションで、排他的ではありません。
+
+- `--stochastic`: `noise_scale` によるサンプリングを ONNX グラフ内で有効化
+- `--no-ema`: EMA 重みの適用を無効化（デフォルトでは EMA が適用される）
 
 ```bash
-# ベースラインモデル（deterministic、EMAなし）
+# WavLM モデル推奨: stochastic + EMA（デフォルト）
+CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
+  --stochastic \
+  /path/to/checkpoint.ckpt \
+  /path/to/output.onnx
+
+# ベースラインモデル: deterministic + EMAなし
 CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
   --no-ema \
   /path/to/checkpoint.ckpt \
@@ -127,7 +136,7 @@ CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
 
 | オプション | デフォルト | 説明 |
 |-----------|----------|------|
-| `--stochastic` | off | noise_scale によるサンプリングを有効化 (WavLM モデル必須) |
+| `--stochastic` | off | noise_scale によるサンプリングを有効化（WavLM モデルで推奨） |
 | `--use-ema` | on | チェックポイントの EMA 重みをデコーダに適用 |
 | `--no-ema` | - | EMA 重み適用を無効化 |
 

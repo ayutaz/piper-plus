@@ -232,6 +232,9 @@ Write-Host "音声ファイルを生成しました: $OutputFile"
 # uvのインストール（未インストールの場合）
 powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
 
+# リポジトリのルートディレクトリに移動（build/ 内では実行不可）
+Set-Location $env:USERPROFILE\piper-plus
+
 # 依存関係のインストール（uv が自動的にvenv作成・パッケージインストールを行います）
 uv sync
 
@@ -340,7 +343,8 @@ if "%~1"=="" (
     exit /b 1
 )
 
-powershell -NoProfile -Command "$utf8 = New-Object System.Text.UTF8Encoding($false); [System.IO.File]::WriteAllText('%TMPFILE%', '%~1', $utf8)"
+set "INPUT_TEXT=%~1"
+powershell -NoProfile -Command "param($t,$f); $utf8 = New-Object System.Text.UTF8Encoding($false); [System.IO.File]::WriteAllText($f, $t, $utf8)" -args "%INPUT_TEXT%" "%TMPFILE%"
 
 pushd "%PIPER_DIR%"
 chcp 65001 >nul

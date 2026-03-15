@@ -59,7 +59,7 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 Then install the project dependencies:
 
 ``` sh
-cd piper/src/python
+cd piper-plus
 uv pip install ".[train]"
 ```
 
