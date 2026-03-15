@@ -22,7 +22,14 @@ def _get_session(model_path: str) -> onnxruntime.InferenceSession:
     """Return a cached InferenceSession, creating one if needed."""
     with _cache_lock:
         if model_path not in _session_cache:
-            _session_cache[model_path] = onnxruntime.InferenceSession(model_path)
+            sess_options = onnxruntime.SessionOptions()
+            sess_options.inter_op_num_threads = 1
+            sess_options.intra_op_num_threads = 1
+            _session_cache[model_path] = onnxruntime.InferenceSession(
+                model_path,
+                sess_options=sess_options,
+                providers=["CPUExecutionProvider"],
+            )
         return _session_cache[model_path]
 
 
