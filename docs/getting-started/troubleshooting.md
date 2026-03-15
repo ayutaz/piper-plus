@@ -32,14 +32,21 @@ Error: Model file not found: model.onnx
 Model config doesn't exist
 ```
 
-**原因**: piper は `<モデル名>.onnx.json` を自動検出します（例: `model.onnx` → `model.onnx.json`）。設定ファイルが `config.json` など異なる名前の場合、自動検出に失敗します。
+**設定ファイルの検索順序**: piper は以下の順序で設定ファイルを自動検索します。
+1. `<モデル名>.onnx.json`（例: `model.onnx` → `model.onnx.json`）
+2. モデルと同じディレクトリ内の `config.json`（フォールバック）
+
+このフォールバックにより、多くの場合 `--config` の指定は不要です。
+
+**原因**: 上記のどちらも見つからない場合にこのエラーが発生します。
 
 **解決方法**:
-1. `--config` オプションで明示的に指定:
+1. モデルと同じディレクトリに `config.json` または `<モデル名>.onnx.json` を配置する
+2. `--config` オプションで明示的に指定:
    ```bash
-   piper --model models/model.onnx --config models/config.json --output_file out.wav
+   piper --model models/model.onnx --config /path/to/config.json --output_file out.wav
    ```
-2. または設定ファイルをリネーム:
+3. または設定ファイルをリネーム:
    ```bash
    mv config.json model.onnx.json
    ```

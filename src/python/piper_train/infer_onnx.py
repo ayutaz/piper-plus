@@ -143,9 +143,13 @@ def main():
         if args.config:
             config_path = Path(args.config)
         else:
-            # Look for config.json next to the model
+            # Fallback: {model}.json first (C++ CLI convention), then {model_dir}/config.json
             model_path = Path(args.model)
-            config_path = model_path.parent / "config.json"
+            onnx_json = model_path.with_suffix(model_path.suffix + ".json")
+            if onnx_json.exists():
+                config_path = onnx_json
+            else:
+                config_path = model_path.parent / "config.json"
 
         if not config_path.exists():
             _LOGGER.error(

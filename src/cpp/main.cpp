@@ -634,7 +634,7 @@ void printUsage(char *argv[]) {
   cerr << "   -h        --help              show this message and exit" << endl;
   cerr << "   -m  FILE  --model       FILE  path to onnx model file" << endl;
   cerr << "   -c  FILE  --config      FILE  path to model config file "
-          "(default: model path + .json)"
+          "(default: model path + .json, fallback: config.json in model dir)"
        << endl;
   cerr << "   -f  FILE  --output_file FILE  path to output WAV file ('-' for "
           "stdout)"
@@ -832,6 +832,12 @@ void parseArgs(int argc, char *argv[], RunConfig &runConfig) {
   if (!modelConfigPath) {
     runConfig.modelConfigPath =
         filesystem::path(runConfig.modelPath.string() + ".json");
+    if (!filesystem::exists(runConfig.modelConfigPath)) {
+      auto fallback = runConfig.modelPath.parent_path() / "config.json";
+      if (filesystem::exists(fallback)) {
+        runConfig.modelConfigPath = fallback;
+      }
+    }
   } else {
     runConfig.modelConfigPath = modelConfigPath.value();
   }

@@ -137,15 +137,16 @@ echo 'こんにちは、今日は良い天気ですね。' | \
   ./piper --model models/tsukuyomi.onnx --config models/config.json --output_file output.wav
 ```
 
-> **config.json の命名規則:** piper は `<モデル名>.onnx.json` (例: `tsukuyomi.onnx.json`) を自動検出します。設定ファイルが別名の場合 (例: `config.json`) は `--config` で明示的に指定してください。
+> **config.json の命名規則:** piper は `<モデル名>.onnx.json` を優先的に自動検出します。見つからない場合、モデルと同じディレクトリの `config.json` にフォールバックします。どちらも見つからない場合は `--config` で明示的に指定してください。
 >
 > ```sh
-> # 自動検出される場合 (--config 不要)
+> # 自動検出 (--config 不要)
 > ./piper --model models/tsukuyomi.onnx --output_file output.wav
-> # → models/tsukuyomi.onnx.json を自動読み込み
+> # → 1. models/tsukuyomi.onnx.json を検索
+> # → 2. models/config.json にフォールバック
 >
-> # 別名の場合 (--config 必須)
-> ./piper --model models/tsukuyomi.onnx --config models/config.json --output_file output.wav
+> # 手動指定 (上記どちらも存在しない場合)
+> ./piper --model models/tsukuyomi.onnx --config /path/to/config.json --output_file output.wav
 > ```
 
 ### Python推論
