@@ -12,6 +12,7 @@ import onnxruntime
 
 from piper_train.infer_onnx import text_to_phoneme_ids_and_prosody
 
+
 _session_cache: dict[str, onnxruntime.InferenceSession] = {}
 _config_cache: dict[str, dict] = {}
 _cache_lock = threading.Lock()
