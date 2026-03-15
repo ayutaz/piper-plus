@@ -5,6 +5,7 @@ import argparse
 import json
 import logging
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -25,6 +26,20 @@ from .training_manager import training_manager
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+_voice_cache: dict[str, "PiperVoice"] = {}
+_voice_cache_lock = threading.Lock()
+
+
+def _get_voice(model_path: str) -> "PiperVoice":
+    """Return a cached PiperVoice, loading it on first access."""
+    with _voice_cache_lock:
+        voice = _voice_cache.get(model_path)
+        if voice is None:
+            voice = PiperVoice.load(model_path)
+            _voice_cache[model_path] = voice
+        return voice
+
 
 # Template definitions for different languages
 TEMPLATES = {
@@ -281,8 +296,7 @@ def synthesize_speech(
         import io
         import wave
 
-        # Load voice
-        voice = PiperVoice.load(model_path)
+        voice = _get_voice(model_path)
 
         # Create in-memory WAV file
         wav_buffer = io.BytesIO()

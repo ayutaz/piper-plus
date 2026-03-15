@@ -6,6 +6,7 @@ Supports Japanese and English text-to-speech using ONNX models
 
 import json
 import logging
+import threading
 
 import gradio as gr
 import numpy as np
@@ -129,6 +130,25 @@ PHONEME_TO_PUA = {
 }
 
 
+_session_cache: dict[str, onnxruntime.InferenceSession] = {}
+_session_lock = threading.Lock()
+
+
+def _get_session(model_path: str) -> onnxruntime.InferenceSession:
+    """Return a cached InferenceSession, creating one if needed."""
+    with _session_lock:
+        if model_path not in _session_cache:
+            sess_options = onnxruntime.SessionOptions()
+            sess_options.inter_op_num_threads = 1
+            sess_options.intra_op_num_threads = 1
+            _session_cache[model_path] = onnxruntime.InferenceSession(
+                model_path,
+                sess_options=sess_options,
+                providers=["CPUExecutionProvider"],
+            )
+        return _session_cache[model_path]
+
+
 def load_model_config(config_path: str) -> dict:
     """Load model configuration from JSON file"""
     with open(config_path, encoding="utf-8") as f:
@@ -245,17 +265,9 @@ def synthesize_speech(
     if not phoneme_ids:
         raise gr.Error("Failed to convert text to phonemes")
 
-    # Load ONNX model
-    sess_options = onnxruntime.SessionOptions()
-    sess_options.inter_op_num_threads = 1
-    sess_options.intra_op_num_threads = 1
-
+    # Get cached ONNX session
     try:
-        model = onnxruntime.InferenceSession(
-            model_info["path"],
-            sess_options=sess_options,
-            providers=["CPUExecutionProvider"],
-        )
+        model = _get_session(model_info["path"])
     except Exception as e:
         logger.error(f"Failed to load model: {e}")
         raise gr.Error(f"Failed to load model: {str(e)}") from e

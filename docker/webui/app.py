@@ -3,6 +3,7 @@
 
 import argparse
 import json
+import threading
 from pathlib import Path
 
 import gradio as gr
@@ -10,6 +11,29 @@ import numpy as np
 import onnxruntime
 
 from piper_train.infer_onnx import text_to_phoneme_ids_and_prosody
+
+_session_cache: dict[str, onnxruntime.InferenceSession] = {}
+_config_cache: dict[str, dict] = {}
+_cache_lock = threading.Lock()
+
+
+def _get_session(model_path: str) -> onnxruntime.InferenceSession:
+    """Return a cached InferenceSession, creating one if needed."""
+    with _cache_lock:
+        if model_path not in _session_cache:
+            _session_cache[model_path] = onnxruntime.InferenceSession(model_path)
+        return _session_cache[model_path]
+
+
+def _get_config(model_path: str) -> dict | None:
+    """Return a cached config dict, loading from disk if needed."""
+    with _cache_lock:
+        if model_path not in _config_cache:
+            config = load_config(model_path)
+            if config is None:
+                return None
+            _config_cache[model_path] = config
+        return _config_cache[model_path]
 
 
 def audio_float_to_int16(
@@ -55,7 +79,7 @@ def synthesize(
     if not text.strip() or not model_path:
         return None
 
-    config = load_config(model_path)
+    config = _get_config(model_path)
     if config is None:
         raise gr.Error("config.json not found for selected model")
 
@@ -69,7 +93,7 @@ def synthesize(
         text, phoneme_id_map, language=language
     )
 
-    session = onnxruntime.InferenceSession(model_path)
+    session = _get_session(model_path)
     input_names = [inp.name for inp in session.get_inputs()]
     has_prosody = "prosody_features" in input_names
     has_sid = "sid" in input_names
