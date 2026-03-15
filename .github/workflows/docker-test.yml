@@ -114,6 +114,59 @@ jobs:
           fi
           echo "English inference test passed"
 
+      - name: Config auto-detect test - {model}.onnx.json
+        run: |
+          # Test that --config can be omitted when {model}.onnx.json exists next to the model
+          docker run --rm \
+            -v ${{ github.workspace }}/test/models:/models \
+            -v /tmp/output:/output \
+            -e CUDA_VISIBLE_DEVICES="" \
+            piper-python-inference:test \
+            python inference.py \
+              --model /models/ja_JP-test-medium.onnx \
+              --output /output/test_autodetect.wav \
+              --text "自動検出テストです。" \
+              --language ja \
+              --speaker-id 0 \
+              --device cpu
+
+          FILE_SIZE=$(stat --format=%s /tmp/output/test_autodetect.wav)
+          echo "Output: test_autodetect.wav ($FILE_SIZE bytes)"
+          if [ "$FILE_SIZE" -lt 1000 ]; then
+            echo "ERROR: Output file too small ($FILE_SIZE bytes)"
+            exit 1
+          fi
+          echo "Config auto-detect ({model}.onnx.json) test passed"
+
+      - name: Config fallback test - config.json
+        run: |
+          # Test that --config can be omitted when only config.json exists in model directory
+          # Create a temp directory with model + config.json (no {model}.onnx.json)
+          mkdir -p /tmp/fallback-test
+          cp ${{ github.workspace }}/test/models/test_voice.onnx /tmp/fallback-test/test_voice.onnx
+          cp ${{ github.workspace }}/test/models/test_voice.onnx.json /tmp/fallback-test/config.json
+
+          docker run --rm \
+            -v /tmp/fallback-test:/models/fallback \
+            -v /tmp/output:/output \
+            -e CUDA_VISIBLE_DEVICES="" \
+            piper-python-inference:test \
+            python inference.py \
+              --model /models/fallback/test_voice.onnx \
+              --output /output/test_fallback.wav \
+              --text "Hello, this is a fallback config test." \
+              --language en \
+              --speaker-id 0 \
+              --device cpu
+
+          FILE_SIZE=$(stat --format=%s /tmp/output/test_fallback.wav)
+          echo "Output: test_fallback.wav ($FILE_SIZE bytes)"
+          if [ "$FILE_SIZE" -lt 1000 ]; then
+            echo "ERROR: Output file too small ($FILE_SIZE bytes)"
+            exit 1
+          fi
+          echo "Config fallback (config.json) test passed"
+
   test-cpp-inference:
     runs-on: ubuntu-latest
     steps:
@@ -177,6 +230,49 @@ jobs:
             exit 1
           fi
           echo "C++ Japanese inference test passed"
+
+      - name: Config auto-detect test - {model}.onnx.json
+        run: |
+          # Test that --config can be omitted when {model}.onnx.json exists next to the model
+          echo "Auto-detect config test." | docker run --rm -i \
+            -v ${{ github.workspace }}/test/models:/models \
+            -v /tmp/output:/output \
+            --entrypoint piper \
+            piper-cpp-inference:test \
+              --model /models/test_voice.onnx \
+              --output_file /output/test_cpp_autodetect.wav
+
+          FILE_SIZE=$(stat --format=%s /tmp/output/test_cpp_autodetect.wav)
+          echo "Output: test_cpp_autodetect.wav ($FILE_SIZE bytes)"
+          if [ "$FILE_SIZE" -lt 1000 ]; then
+            echo "ERROR: Output file too small ($FILE_SIZE bytes)"
+            exit 1
+          fi
+          echo "C++ config auto-detect ({model}.onnx.json) test passed"
+
+      - name: Config fallback test - config.json
+        run: |
+          # Test that --config can be omitted when only config.json exists in model directory
+          # Create a temp directory with model + config.json (no {model}.onnx.json)
+          mkdir -p /tmp/fallback-test-cpp
+          cp ${{ github.workspace }}/test/models/test_voice.onnx /tmp/fallback-test-cpp/test_voice.onnx
+          cp ${{ github.workspace }}/test/models/test_voice.onnx.json /tmp/fallback-test-cpp/config.json
+
+          echo "Fallback config test." | docker run --rm -i \
+            -v /tmp/fallback-test-cpp:/models/fallback \
+            -v /tmp/output:/output \
+            --entrypoint piper \
+            piper-cpp-inference:test \
+              --model /models/fallback/test_voice.onnx \
+              --output_file /output/test_cpp_fallback.wav
+
+          FILE_SIZE=$(stat --format=%s /tmp/output/test_cpp_fallback.wav)
+          echo "Output: test_cpp_fallback.wav ($FILE_SIZE bytes)"
+          if [ "$FILE_SIZE" -lt 1000 ]; then
+            echo "ERROR: Output file too small ($FILE_SIZE bytes)"
+            exit 1
+          fi
+          echo "C++ config fallback (config.json) test passed"
 
   test-python-train:
     runs-on: ubuntu-latest
