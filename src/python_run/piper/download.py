@@ -271,16 +271,18 @@ def list_voices(
             if language_filter not in (lang_family, lang_code):
                 continue
 
-        entries.append({
-            "key": voice_info.get("key", voice_key),
-            "language_code": lang_code,
-            "language_family": lang_family,
-            "language_name_english": lang.get("name_english", ""),
-            "language_name_native": lang.get("name_native", ""),
-            "source": voice_info.get("source", "upstream"),
-            "num_speakers": voice_info.get("num_speakers", 1),
-            "quality": voice_info.get("quality", ""),
-        })
+        entries.append(
+            {
+                "key": voice_info.get("key", voice_key),
+                "language_code": lang_code,
+                "language_family": lang_family,
+                "language_name_english": lang.get("name_english", ""),
+                "language_name_native": lang.get("name_native", ""),
+                "source": voice_info.get("source", "upstream"),
+                "num_speakers": voice_info.get("num_speakers", 1),
+                "quality": voice_info.get("quality", ""),
+            }
+        )
 
     if not entries:
         if language_filter:
@@ -360,9 +362,7 @@ def download_model(
     resolved_key = voice_info.get("key", name)
 
     # Download
-    ensure_voice_exists(
-        resolved_key, [download_dir], download_dir, voices
-    )
+    ensure_voice_exists(resolved_key, [download_dir], download_dir, voices)
 
     # Return paths
     return find_voice(resolved_key, [download_dir])
