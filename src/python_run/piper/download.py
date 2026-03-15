@@ -2,6 +2,7 @@
 
 import json
 import logging
+import re
 import shutil
 import sys
 from collections.abc import Iterable
@@ -10,6 +11,10 @@ from typing import Any
 from urllib.request import urlopen
 
 from .file_hash import get_file_hash
+
+
+# Pattern for validating repo values (only safe characters, no ".." traversal)
+_SAFE_REPO_RE = re.compile(r"^[a-zA-Z0-9._\-/]+$")
 
 
 URL_FORMAT = "https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/{file}"
@@ -165,6 +170,9 @@ def ensure_voice_exists(
                 continue
 
             expected_hash = file_info["md5_digest"]
+            if not expected_hash:
+                # No hash to verify; accept the file as-is
+                continue
             actual_hash = get_file_hash(data_file_path)
             if expected_hash != actual_hash:
                 _LOGGER.warning(
@@ -190,11 +198,16 @@ def ensure_voice_exists(
         # piper-plus models use HuggingFace repo URLs
         if voice_info.get("source") == "piper-plus":
             repo = voice_info.get("repo", "")
+            if not _SAFE_REPO_RE.match(repo) or ".." in repo:
+                raise ValueError(f"Invalid repo value: {repo!r}")
             file_url = PIPER_PLUS_URL_FORMAT.format(
                 repo=repo, file=Path(file_path).name
             )
         else:
             file_url = URL_FORMAT.format(file=file_path)
+
+        if not file_url.startswith("https://"):
+            raise ValueError(f"Refusing non-HTTPS URL: {file_url}")
 
         download_file_path = download_dir / file_name
         download_file_path.parent.mkdir(parents=True, exist_ok=True)

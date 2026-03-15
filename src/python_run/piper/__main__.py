@@ -45,7 +45,12 @@ def play_audio_file(file_path: str, sample_rate: int = 22050) -> None:
             subprocess.run(["afplay", file_path], check=True)
 
         elif system == "Windows":
-            # Use Windows Media Player
+            # Reject paths containing single quotes to prevent PowerShell injection
+            if "'" in file_path:
+                raise ValueError(
+                    f"File path contains invalid character (single quote): {file_path}"
+                )
+            # Use Windows Media Player (no shell=True for safety)
             subprocess.run(
                 [
                     "powershell",
@@ -53,7 +58,6 @@ def play_audio_file(file_path: str, sample_rate: int = 22050) -> None:
                     f"(New-Object Media.SoundPlayer '{file_path}').PlaySync()",
                 ],
                 check=True,
-                shell=True,
             )
         else:
             _LOGGER.warning("Unsupported platform for audio playback: %s", system)

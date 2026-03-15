@@ -183,9 +183,21 @@ static std::optional<fs::path> findUpstreamVoicesJson() {
     return std::nullopt;
 }
 
-// Shell-safe: confirm a string contains no dangerous characters.
-// Only allow alphanumerics, hyphens, underscores, dots, slashes, and colons.
+// Shell-safe for URLs: reject backslashes (Unix shell escape character).
+// Only allow alphanumerics, hyphens, underscores, dots, forward slashes, and colons.
 static bool isSafeForShell(const std::string& s) {
+    for (char c : s) {
+        if (!std::isalnum(static_cast<unsigned char>(c)) &&
+            c != '-' && c != '_' && c != '.' && c != '/' &&
+            c != ':') {
+            return false;
+        }
+    }
+    return !s.empty();
+}
+
+// Shell-safe for file paths: allows backslashes for Windows path separators.
+static bool isSafeForShellPath(const std::string& s) {
     for (char c : s) {
         if (!std::isalnum(static_cast<unsigned char>(c)) &&
             c != '-' && c != '_' && c != '.' && c != '/' &&
@@ -194,6 +206,34 @@ static bool isSafeForShell(const std::string& s) {
         }
     }
     return !s.empty();
+}
+
+// Validate that a voice key contains no path traversal characters.
+// Rejects "..", "/", and "\" to prevent directory escape.
+static bool isSafeVoiceKey(const std::string& key) {
+    if (key.empty()) return false;
+    if (key.find("..") != std::string::npos) return false;
+    if (key.find('/') != std::string::npos) return false;
+    if (key.find('\\') != std::string::npos) return false;
+    return true;
+}
+
+// Validate that a repoId contains only safe characters (alphanumerics, hyphens,
+// underscores, dots, and a single forward slash separating owner/repo).
+static bool isSafeRepoId(const std::string& repoId) {
+    if (repoId.empty()) return false;
+    int slashCount = 0;
+    for (char c : repoId) {
+        if (c == '/') {
+            ++slashCount;
+            if (slashCount > 1) return false;  // only one slash allowed
+        } else if (!std::isalnum(static_cast<unsigned char>(c)) &&
+                   c != '-' && c != '_' && c != '.') {
+            return false;
+        }
+    }
+    // Must have exactly one slash (owner/repo format)
+    return slashCount == 1;
 }
 
 // Download a single file using system() with curl/wget/PowerShell
@@ -206,7 +246,8 @@ static bool downloadFile(const std::string& url,
     }
 
     std::string outStr = outputPath.string();
-    // Allow spaces in output path (they are quoted) but reject other specials
+    // Allow spaces in output path (they are quoted) but reject other specials.
+    // Use isSafeForShellPath (allows backslash for Windows paths) plus spaces.
     for (char c : outStr) {
         if (!std::isalnum(static_cast<unsigned char>(c)) &&
             c != '-' && c != '_' && c != '.' && c != '/' &&
@@ -309,6 +350,13 @@ std::vector<VoiceInfo> loadVoiceCatalog() {
             for (auto& [key, entry] : upstreamCatalog.items()) {
                 // Skip if already present (piper-plus overrides upstream)
                 if (existingKeys.count(key) == 0) {
+                    // Validate repoId from external JSON to reject malicious entries
+                    std::string repo = entry.value("repo", "");
+                    if (!repo.empty() && !isSafeRepoId(repo)) {
+                        spdlog::warn("Skipping upstream entry '{}': "
+                                     "unsafe repoId '{}'", key, repo);
+                        continue;
+                    }
                     catalog.push_back(parseVoiceEntry(key, entry, "piper"));
                     existingKeys.insert(key);
                     ++count;
@@ -346,19 +394,12 @@ std::optional<VoiceInfo> findVoice(const std::string& nameOrAlias) {
         }
     }
 
-    // 2. Alias match
+    // 2. Alias match (no partial matching -- aliases provide sufficient coverage)
     for (const auto& voice : catalog) {
         for (const auto& alias : voice.aliases) {
             if (alias == nameOrAlias) {
                 return voice;
             }
-        }
-    }
-
-    // 3. Partial match (key contains the search term)
-    for (const auto& voice : catalog) {
-        if (voice.key.find(nameOrAlias) != std::string::npos) {
-            return voice;
         }
     }
 
@@ -446,8 +487,14 @@ bool downloadModel(const std::string& modelName,
     const VoiceInfo& voice = maybeVoice.value();
     spdlog::info("Downloading model: {} ({})", voice.key, voice.source);
 
-    // Create target directory: modelDir / key  (e.g., models/ja_JP-tsukuyomi-chan-medium/)
-    fs::path targetDir = modelDir / voice.key;
+    // Reject voice.key with path traversal characters (fix: path traversal prevention)
+    if (!isSafeVoiceKey(voice.key)) {
+        spdlog::error("Voice key '{}' contains unsafe path characters", voice.key);
+        return false;
+    }
+
+    // Flat directory layout matching Python: files go directly into modelDir/
+    fs::path targetDir = modelDir;
     std::error_code ec;
     fs::create_directories(targetDir, ec);
     if (ec) {
@@ -471,6 +518,15 @@ bool downloadModel(const std::string& modelName,
     bool allOk = true;
     for (const auto& file : voice.files) {
         std::string url = baseUrl + file.relativePath;
+
+        // Validate that URL starts with expected HuggingFace prefix
+        const std::string expectedPrefix = "https://huggingface.co/";
+        if (url.rfind(expectedPrefix, 0) != 0) {
+            spdlog::error("Rejecting URL with unexpected scheme/domain: {}", url);
+            allOk = false;
+            continue;
+        }
+
         // Use just the filename (last component) as the local name
         fs::path localName = fs::path(file.relativePath).filename();
         fs::path localPath = targetDir / localName;

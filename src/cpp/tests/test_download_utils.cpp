@@ -138,22 +138,22 @@ TEST(DownloadUtilsTest, ModelDownloadPath) {
     namespace fs = std::filesystem;
 
     fs::path modelDir = "/tmp/piper/models";
-    std::string voiceKey = "ja_JP-tsukuyomi-chan-medium";
     std::string filename = "tsukuyomi-wavlm-300epoch.onnx";
 
-    fs::path expectedPath = modelDir / voiceKey / filename;
-    EXPECT_EQ(expectedPath.string(), "/tmp/piper/models/ja_JP-tsukuyomi-chan-medium/tsukuyomi-wavlm-300epoch.onnx");
+    // Flat directory layout: files go directly into modelDir (matches Python behavior)
+    fs::path expectedPath = modelDir / filename;
+    EXPECT_EQ(expectedPath.string(), "/tmp/piper/models/tsukuyomi-wavlm-300epoch.onnx");
 }
 
 TEST(DownloadUtilsTest, ConfigDownloadPath) {
     namespace fs = std::filesystem;
 
     fs::path modelDir = "/tmp/piper/models";
-    std::string voiceKey = "ja_JP-tsukuyomi-chan-medium";
     std::string filename = "config.json";
 
-    fs::path expectedPath = modelDir / voiceKey / filename;
-    EXPECT_EQ(expectedPath.string(), "/tmp/piper/models/ja_JP-tsukuyomi-chan-medium/config.json");
+    // Flat directory layout: files go directly into modelDir (matches Python behavior)
+    fs::path expectedPath = modelDir / filename;
+    EXPECT_EQ(expectedPath.string(), "/tmp/piper/models/config.json");
 }
 
 // ============================================
