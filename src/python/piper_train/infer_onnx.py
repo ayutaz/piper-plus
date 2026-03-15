@@ -92,13 +92,19 @@ def text_to_phoneme_ids_and_prosody(
     """
     from .phonemize.registry import get_phonemizer  # noqa: PLC0415
 
-    # For multilingual models with single-language input, auto-promote to
-    # multilingual phonemizer so that intersperse padding is applied.
+    # For multilingual models with JA input, auto-promote to multilingual
+    # phonemizer so that intersperse padding is applied correctly.
+    # JA is the only language whose post_process_ids() is a no-op (BOS/EOS
+    # are added inline during phonemization), so only JA needs promotion.
+    # Other languages (EN/ZH/ES/FR/PT) already get correct padding from
+    # their base-class post_process_ids().  Promoting them would cause
+    # UnicodeLanguageDetector to misroute Latin-script text to English.
     effective_language = language
     if (
         language_id_map
         and "-" not in language
         and len(language_id_map) > 1
+        and language == "ja"
     ):
         effective_language = "-".join(sorted(language_id_map.keys()))
         _LOGGER.debug(

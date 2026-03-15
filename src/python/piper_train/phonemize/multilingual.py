@@ -305,7 +305,12 @@ class MultilingualPhonemizer(Phonemizer):
         bos_ids = phoneme_id_map.get("^")
         eos_ids = phoneme_id_map.get(self._last_eos, phoneme_id_map.get("$"))
 
-        # Insert pad between every phoneme ID
+        # Insert pad between every phoneme ID, but skip after existing pad/pause
+        # tokens (ID 0).  The training data was created by _add_inter_phoneme_padding
+        # which has the same guard (pid != pad_id).  Without this, JA sentences
+        # containing pauses (88 % of entries) get an extra ID per pause, shifting
+        # every subsequent phoneme and breaking alignment with what the model
+        # learned.
         padded_ids: list[int] = []
         padded_prosody: list[dict | None] = []
         for phoneme_id, prosody_feature in zip(
@@ -313,8 +318,9 @@ class MultilingualPhonemizer(Phonemizer):
         ):
             padded_ids.append(phoneme_id)
             padded_prosody.append(prosody_feature)
-            padded_ids.extend(pad_ids)
-            padded_prosody.extend([None] * len(pad_ids))
+            if phoneme_id not in pad_ids:
+                padded_ids.extend(pad_ids)
+                padded_prosody.extend([None] * len(pad_ids))
 
         phoneme_ids = padded_ids
         prosody_features = padded_prosody

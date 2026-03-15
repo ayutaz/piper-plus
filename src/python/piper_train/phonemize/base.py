@@ -66,7 +66,8 @@ class Phonemizer(ABC):
         bos_ids = phoneme_id_map.get("^")
         eos_ids = phoneme_id_map.get("$")
 
-        # Insert pad between every phoneme ID
+        # Insert pad between every phoneme ID, but skip after existing pad/pause
+        # tokens (ID 0) to match the training data padding scheme.
         padded_ids: list[int] = []
         padded_prosody: list[dict | None] = []
         for phoneme_id, prosody_feature in zip(
@@ -74,8 +75,9 @@ class Phonemizer(ABC):
         ):
             padded_ids.append(phoneme_id)
             padded_prosody.append(prosody_feature)
-            padded_ids.extend(pad_ids)
-            padded_prosody.extend([None] * len(pad_ids))
+            if phoneme_id not in pad_ids:
+                padded_ids.extend(pad_ids)
+                padded_prosody.extend([None] * len(pad_ids))
 
         phoneme_ids = padded_ids
         prosody_features = padded_prosody

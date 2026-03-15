@@ -228,6 +228,157 @@ class TestJaOnlyNoIntersperse:
 # ---------------------------------------------------------------------------
 
 
+class TestNoPaddingAfterPause:
+    """Verify that pause tokens (ID 0) do NOT get extra padding after them.
+
+    The training data was created by _add_inter_phoneme_padding() which skips
+    padding after existing pad/pause tokens (pid != pad_id).  The inference
+    path must match this behaviour, otherwise 88% of JA entries would have
+    shifted phoneme alignment.
+    """
+
+    @pytest.fixture
+    def phoneme_id_map(self):
+        return _get_multilingual_id_map()
+
+    def test_ja_pause_no_triple_zero(self, phoneme_id_map):
+        """JA text with comma (produces pause token) must NOT have triple-0.
+
+        Correct:  ...ph, 0, pause(0), ph, 0, ...
+        Wrong:    ...ph, 0, pause(0), 0, ph, 0, ...  (extra 0 after pause)
+
+        A triple-0 pattern [0, 0, 0] indicates the bug where padding is
+        inserted after an existing pad/pause token.
+        """
+        text = "こんにちは、元気ですか"
+        ids, prosody = text_to_phoneme_ids_and_prosody(
+            text,
+            phoneme_id_map,
+            language="ja",
+            language_id_map=_LANGUAGE_ID_MAP,
+        )
+
+        assert len(ids) >= 3, f"Sequence too short: {ids}"
+        assert len(ids) == len(prosody)
+
+        # Check for triple-0 pattern (indicator of padding-after-pause bug)
+        for i in range(len(ids) - 2):
+            if ids[i] == 0 and ids[i + 1] == 0 and ids[i + 2] == 0:
+                assert False, (
+                    f"Triple-0 at index {i} indicates padding after pause bug. "
+                    f"IDs around: ...{ids[max(0,i-2):i+5]}..."
+                )
+
+    def test_ja_multiple_pauses(self, phoneme_id_map):
+        """JA text with multiple commas should not accumulate extra padding."""
+        text = "今日は、天気が良くて、気持ちいいです。"
+        ids, prosody = text_to_phoneme_ids_and_prosody(
+            text,
+            phoneme_id_map,
+            language="ja",
+            language_id_map=_LANGUAGE_ID_MAP,
+        )
+
+        assert len(ids) >= 3
+        assert len(ids) == len(prosody)
+
+        # Count consecutive zeros - max should be 2 (pad + pause or pause + pad)
+        max_consecutive_zeros = 0
+        current_zeros = 0
+        for pid in ids:
+            if pid == 0:
+                current_zeros += 1
+                max_consecutive_zeros = max(max_consecutive_zeros, current_zeros)
+            else:
+                current_zeros = 0
+
+        assert max_consecutive_zeros <= 2, (
+            f"Max consecutive zeros = {max_consecutive_zeros} (expected <= 2). "
+            f"This indicates padding-after-pause bug. IDs: {ids}"
+        )
+
+
+class TestLatinLanguageNotMisrouted:
+    """Verify that ES/FR/PT text is phonemized by the correct phonemizer,
+    not misrouted to English via UnicodeLanguageDetector."""
+
+    @pytest.fixture
+    def phoneme_id_map(self):
+        return _get_multilingual_id_map()
+
+    def test_es_uses_spanish_phonemizer(self, phoneme_id_map):
+        """ES text should use SpanishPhonemizer, not EnglishPhonemizer.
+
+        Spanish 'ñ' maps to /ɲ/ which has a different phoneme ID than
+        English phonemes. If routed to English, 'ñ' would be unknown.
+        """
+        text = "España"
+        ids, prosody = text_to_phoneme_ids_and_prosody(
+            text,
+            phoneme_id_map,
+            language="es",
+            language_id_map=_LANGUAGE_ID_MAP,
+        )
+
+        assert len(ids) >= 3
+        # Spanish /ɲ/ must be present (from ñ)
+        # Check that it produces valid output with intersperse padding
+        assert has_intersperse_padding(ids), (
+            f"ES output lacks intersperse padding: {ids}"
+        )
+
+    def test_fr_uses_french_phonemizer(self, phoneme_id_map):
+        """FR text should use FrenchPhonemizer, not EnglishPhonemizer."""
+        text = "Bonjour"
+        ids, prosody = text_to_phoneme_ids_and_prosody(
+            text,
+            phoneme_id_map,
+            language="fr",
+            language_id_map=_LANGUAGE_ID_MAP,
+        )
+
+        assert len(ids) >= 3
+        assert has_intersperse_padding(ids)
+
+    def test_pt_uses_portuguese_phonemizer(self, phoneme_id_map):
+        """PT text should use PortuguesePhonemizer, not EnglishPhonemizer."""
+        text = "Obrigado"
+        ids, prosody = text_to_phoneme_ids_and_prosody(
+            text,
+            phoneme_id_map,
+            language="pt",
+            language_id_map=_LANGUAGE_ID_MAP,
+        )
+
+        assert len(ids) >= 3
+        assert has_intersperse_padding(ids)
+
+    def test_es_phonemes_differ_from_english(self, phoneme_id_map):
+        """Same word phonemized as ES vs EN should produce different IDs.
+
+        'Hola' in Spanish = /ola/ (silent h), in English = /hoʊlə/.
+        """
+        text = "Hola"
+        es_ids, _ = text_to_phoneme_ids_and_prosody(
+            text,
+            phoneme_id_map,
+            language="es",
+            language_id_map=_LANGUAGE_ID_MAP,
+        )
+        en_ids, _ = text_to_phoneme_ids_and_prosody(
+            text,
+            phoneme_id_map,
+            language="en",
+            language_id_map=_LANGUAGE_ID_MAP,
+        )
+
+        assert es_ids != en_ids, (
+            f"ES and EN should produce different phoneme IDs for 'Hola'. "
+            f"ES={es_ids}, EN={en_ids}. "
+            f"If identical, ES text is being misrouted to English phonemizer."
+        )
+
+
 class TestPaddingLengthRelation:
     """Verify padded length is roughly 2x unpadded length."""
 
