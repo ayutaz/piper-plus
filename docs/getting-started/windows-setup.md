@@ -3,6 +3,8 @@
 ## 概要
 このガイドでは、Windows環境でPiperとOpenJTalkを使用して日本語音声合成を行うための手順を説明します。
 
+> **ビルド不要で使いたい方へ**: [GitHub Releases](https://github.com/ayutaz/piper-plus/releases) からプリビルドバイナリ (`piper-windows-x64.zip`) をダウンロードすれば、ビルドせずにすぐ使えます。ビルドが必要なのは、ソースコードを変更したい開発者のみです。
+
 ## 前提条件
 
 ### 必須ソフトウェア
@@ -19,7 +21,8 @@
 
 ### 推奨ソフトウェア
 
-- **Python**: 3.11以降（テストやスクリプト実行用）
+- **uv**: Python パッケージマネージャー（[公式サイト](https://docs.astral.sh/uv/)）
+  - インストール: `powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"`
 - **PowerShell**: 7.0以降（Windows PowerShell 5.1でも動作します）
 
 ## ビルド手順
@@ -41,6 +44,7 @@ git --version
 
 ### 2. リポジトリのクローン
 
+**PowerShell:**
 ```powershell
 # 作業ディレクトリを作成
 New-Item -ItemType Directory -Path C:\workspace -Force
@@ -51,8 +55,20 @@ git clone https://github.com/ayutaz/piper-plus.git
 Set-Location piper-plus
 ```
 
+**コマンドプロンプト (cmd):**
+```cmd
+REM 作業ディレクトリを作成
+mkdir C:\workspace
+cd C:\workspace
+
+REM リポジトリをクローン
+git clone https://github.com/ayutaz/piper-plus.git
+cd piper-plus
+```
+
 ### 3. ビルドの実行
 
+**PowerShell:**
 ```powershell
 # ビルドディレクトリを作成
 New-Item -ItemType Directory -Path build -Force
@@ -67,6 +83,24 @@ cmake --build . --config Release --parallel
 # ビルド結果の確認
 Get-ChildItem -Path .\Release -Filter "*.exe"
 ```
+
+**コマンドプロンプト (cmd):**
+```cmd
+REM ビルドディレクトリを作成
+mkdir build
+cd build
+
+REM Visual Studio 2022を使用
+cmake .. -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release
+
+REM ビルド実行
+cmake --build . --config Release --parallel
+
+REM ビルド結果の確認
+dir Release\*.exe
+```
+
+> **ビルド中の警告について**: `warning C4996` (strcpy/fopen 関連) が大量に表示されますが、これは正常です。最終的に `piper.exe` が生成されていれば、ビルドは成功しています。`error` ではなく `warning` であれば無視して問題ありません。
 
 ### 4. ビルド後の確認
 
@@ -124,9 +158,17 @@ New-Item -ItemType Directory -Path $dictPath -Force
 
 ### 基本的な使用方法
 
-```bash
+**PowerShell:**
+```powershell
 # 日本語テキストを音声ファイルに変換
 echo "こんにちは世界" | .\piper.exe --model ja_JP-voice.onnx --output_file hello.wav
+```
+
+**コマンドプロンプト (cmd):**
+```cmd
+REM 日本語テキストを音声ファイルに変換（chcp 65001でUTF-8に切り替え）
+chcp 65001
+echo こんにちは世界 | piper.exe --model ja_JP-voice.onnx --output_file hello.wav
 ```
 
 ### C++から使用する例
@@ -138,19 +180,19 @@ echo "こんにちは世界" | .\piper.exe --model ja_JP-voice.onnx --output_fil
 int main() {
     piper::PiperConfig config;
     piper::Voice voice;
-    
+
     // モデルをロード
     loadVoice(config, "ja_JP-voice.onnx", "ja_JP-voice.onnx.json", voice);
-    
+
     // テキストを音声に変換
     std::string text = "こんにちは世界";
     std::vector<int16_t> audioBuffer;
     piper::SynthesisResult result;
-    
+
     textToAudio(config, voice, text, audioBuffer, result);
-    
+
     // 音声データを処理...
-    
+
     return 0;
 }
 ```
@@ -162,7 +204,7 @@ int main() {
 param(
     [Parameter(Mandatory=$true)]
     [string]$Text,
-    
+
     [Parameter(Mandatory=$true)]
     [string]$OutputFile
 )
@@ -180,6 +222,21 @@ Write-Host "音声ファイルを生成しました: $OutputFile"
 使用方法：
 ```powershell
 .\japanese_tts.ps1 -Text "今日はいい天気ですね" -OutputFile weather.wav
+```
+
+## Python環境のセットアップ
+
+テストやスクリプト実行にはuvを使用します。
+
+```powershell
+# uvのインストール（未インストールの場合）
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+
+# 依存関係のインストール（uv が自動的にvenv作成・パッケージインストールを行います）
+uv sync
+
+# Pythonスクリプトの実行例
+uv run python -m piper_train.infer_onnx --help
 ```
 
 ## トラブルシューティング
@@ -233,30 +290,86 @@ Invoke-WebRequest -Uri "https://jaist.dl.sourceforge.net/project/open-jtalk/Dict
 tar -xzf openjtalk_dic.tar.gz -C "$env:APPDATA\piper"
 ```
 
-### 文字化け
+### 日本語テキストの文字化け・文字化けによる音声生成失敗
 
-症状: 日本語が正しく処理されない
+症状: 日本語テキストをパイプで `piper.exe` に渡すと、文字化けして正しい音声が生成されない
 
-解決方法：
+**原因**: WindowsのコンソールはデフォルトでShift_JIS (コードページ932) を使用するため、UTF-8の日本語テキストがパイプ経由で渡される際に破損します。
+
+#### 解決方法1: `chcp 65001` でUTF-8に切り替え（cmd）
+
+```cmd
+chcp 65001
+echo こんにちは世界 | piper.exe --model ja_JP-voice.onnx --output_file hello.wav
+```
+
+#### 解決方法2: ファイル経由で入力
+
+UTF-8 (BOMなし) のテキストファイルを作成し、`type` コマンドで渡します。
+
+**PowerShell:**
+```powershell
+# UTF-8 BOMなしテキストファイルを作成
+$utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+[System.IO.File]::WriteAllText("input.txt", "こんにちは世界", $utf8NoBom)
+
+# ファイルからパイプで入力
+Get-Content "input.txt" -Encoding UTF8 | .\Release\piper.exe --model ja_JP-voice.onnx --output_file output.wav
+```
+
+**コマンドプロンプト (cmd):**
+```cmd
+chcp 65001
+type input.txt | piper.exe --model ja_JP-voice.onnx --output_file output.wav
+```
+
+#### 解決方法3: `speak.bat` スクリプトを使用（推奨）
+
+エンコーディング処理を自動化するバッチスクリプトを使用します。以下の内容を `speak.bat` として保存してください。
+
+```bat
+@echo off
+setlocal
+set "PIPER_DIR=%~dp0build\Release"
+set "MODEL=%PIPER_DIR%\models\tsukuyomi-wavlm-300epoch.onnx"
+set "CONFIG=%PIPER_DIR%\models\config.json"
+set "TMPFILE=%PIPER_DIR%\input_utf8.txt"
+
+if "%~1"=="" (
+    echo Usage: speak.bat "読み上げたい文章"
+    exit /b 1
+)
+
+powershell -NoProfile -Command "$utf8 = New-Object System.Text.UTF8Encoding($false); [System.IO.File]::WriteAllText('%TMPFILE%', '%~1', $utf8)"
+
+pushd "%PIPER_DIR%"
+chcp 65001 >nul
+type "input_utf8.txt" | piper.exe --model "%MODEL%" --config "%CONFIG%" --output_file output.wav
+popd
+
+if exist "%TMPFILE%" del "%TMPFILE%" >nul 2>&1
+if exist "%PIPER_DIR%\output.wav" start "" "%PIPER_DIR%\output.wav"
+endlocal
+```
+
+使用方法：
+```cmd
+speak.bat "今日はいい天気ですね"
+```
+
+#### 補足: PowerShellでのエンコーディング設定
 
 ```powershell
-# 1. PowerShellのエンコーディング設定
+# PowerShellセッションのエンコーディングをUTF-8に設定
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 [Console]::InputEncoding = [System.Text.Encoding]::UTF8
 $OutputEncoding = [System.Text.Encoding]::UTF8
 
-# 2. システムロケールの確認
+# システムロケールの確認
 Get-WinSystemLocale
 Get-Culture
 
-# 3. UTF-8テキストファイルの作成
-$text = "こんにちは世界"
-$text | Out-File -FilePath "test.txt" -Encoding UTF8NoBOM
-
-# 4. テスト実行
-Get-Content "test.txt" -Encoding UTF8 | .\Release\piper.exe --model ja_JP-voice.onnx --output_file test.wav
-
-# 5. Windows Terminalを使用（推奨）
+# Windows Terminalを使用（推奨）
 # Microsoft StoreからWindows Terminalをインストールし、
 # 設定でプロファイルのエンコーディングをUTF-8に設定
 ```
@@ -274,11 +387,11 @@ function Split-TextForTTS {
         [string]$Text,
         [int]$MaxLength = 1000  # 安全なサイズ
     )
-    
+
     $sentences = $Text -split '。'
     $chunks = @()
     $currentChunk = ""
-    
+
     foreach ($sentence in $sentences) {
         if (($currentChunk.Length + $sentence.Length) -lt $MaxLength) {
             $currentChunk += $sentence + "。"
@@ -288,7 +401,7 @@ function Split-TextForTTS {
         }
     }
     if ($currentChunk) { $chunks += $currentChunk }
-    
+
     return $chunks
 }
 
@@ -339,18 +452,18 @@ foreach ($chunk in $chunks) {
 
 ### 2. パスの文字エンコーディング
 - **問題**: 非ASCII文字を含むパスで問題が発生（#71で対応予定）
-- **回避策**: 
+- **回避策**:
   ```powershell
   # ASCII文字のみのパスを使用
   Set-Location "C:\workspace\piper"
-  
+
   # または一時ファイルを使用
   $tempDir = [System.IO.Path]::GetTempPath()
   ```
 
 ### 3. 同時実行の制限
 - **問題**: スレッドセーフではありません
-- **回避策**: 
+- **回避策**:
   ```powershell
   # ミューテックスを使用した排他制御
   $mutex = New-Object System.Threading.Mutex($false, "PiperTTSMutex")

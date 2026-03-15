@@ -340,6 +340,17 @@ CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.infer_onnx \
   --language ja
 ```
 
+> **WavLM学習モデルの場合**: WavLM Discriminatorで学習したモデルは、高振幅の音声が生成される傾向があります。推論時に `--noise-scale 0.5` を追加することで、音割れを軽減できます：
+> ```bash
+> CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.infer_onnx \
+>   --model /path/to/wavlm_model.onnx \
+>   --config /path/to/config.json \
+>   --output-dir /path/to/output \
+>   --text "テスト文です。" \
+>   --speaker-id 0 --noise-scale 0.5 \
+>   --language ja
+> ```
+
 ### Pythonからの使用例
 
 ```python
