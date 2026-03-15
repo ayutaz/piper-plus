@@ -72,6 +72,7 @@ def text_to_phoneme_ids_and_prosody(
     text: str,
     phoneme_id_map: dict[str, list[int]],
     language: str = "ja",
+    language_id_map: dict[str, int] | None = None,
 ) -> tuple[list[int], list[dict | None]]:
     """Convert text to phoneme IDs and prosody features.
 
@@ -79,6 +80,10 @@ def text_to_phoneme_ids_and_prosody(
         text: Input text
         phoneme_id_map: Mapping from phoneme symbols to IDs
         language: "ja" for Japanese (OpenJTalk), "en" for English (g2p-en)
+        language_id_map: Language-to-ID mapping from config. When provided
+            and the model supports multiple languages, a single language
+            code (e.g. "ja") is auto-promoted to a multilingual phonemizer
+            so that intersperse padding is applied correctly.
 
     Returns:
         tuple of (phoneme_ids, prosody_features)
@@ -87,7 +92,22 @@ def text_to_phoneme_ids_and_prosody(
     """
     from .phonemize.registry import get_phonemizer  # noqa: PLC0415
 
-    phonemizer = get_phonemizer(language)
+    # For multilingual models with single-language input, auto-promote to
+    # multilingual phonemizer so that intersperse padding is applied.
+    effective_language = language
+    if (
+        language_id_map
+        and "-" not in language
+        and len(language_id_map) > 1
+    ):
+        effective_language = "-".join(sorted(language_id_map.keys()))
+        _LOGGER.debug(
+            "Auto-promoting language '%s' to multilingual '%s'",
+            language,
+            effective_language,
+        )
+
+    phonemizer = get_phonemizer(effective_language)
     phonemes, prosody_info_list = phonemizer.phonemize_with_prosody(text)
 
     # Convert phonemes to IDs
@@ -202,9 +222,13 @@ def main():
 
         _LOGGER.info("Loaded phoneme_id_map from %s", config_path)
 
+        # Load language_id_map (needed for multilingual auto-promotion)
+        language_id_map = config.get("language_id_map", {}) if has_lid else {}
+
         # Convert text to phoneme_ids and prosody_features
         phoneme_ids, prosody_features_data = text_to_phoneme_ids_and_prosody(
-            args.text, phoneme_id_map, language=args.language
+            args.text, phoneme_id_map, language=args.language,
+            language_id_map=language_id_map,
         )
         _LOGGER.info(
             "Converted text to %d phoneme IDs: %s",

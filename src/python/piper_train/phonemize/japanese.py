@@ -386,5 +386,10 @@ class JapanesePhonemizer(Phonemizer):
         prosody_features: list[dict | None],
         phoneme_id_map: dict[str, list[int]],
     ) -> tuple[list[int], list[dict | None]]:
-        """No-op: Japanese handles BOS/EOS/padding inline during phonemization."""
+        """No-op: Japanese handles BOS/EOS/padding inline during phonemization.
+
+        For multilingual/bilingual models, the caller should use
+        MultilingualPhonemizer which adds intersperse padding in its
+        own post_process_ids.
+        """
         return phoneme_ids, prosody_features
