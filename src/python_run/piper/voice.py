@@ -97,7 +97,11 @@ class PiperVoice:
     ) -> "PiperVoice":
         """Load an ONNX model and config."""
         if config_path is None:
-            config_path = f"{model_path}.json"
+            candidate = Path(f"{model_path}.json")
+            if candidate.exists():
+                config_path = candidate
+            else:
+                config_path = Path(model_path).parent / "config.json"
 
         with open(config_path, encoding="utf-8") as config_file:
             config_dict = json.load(config_file)

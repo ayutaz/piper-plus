@@ -239,8 +239,15 @@ def main():
     if not args.model:
         parser.error("--model is required for CLI and server modes")
 
-    # Resolve config path
-    config_path = args.config or str(Path(args.model).parent / "config.json")
+    # Resolve config path: {model}.json -> {dir}/config.json
+    if args.config:
+        config_path = args.config
+    else:
+        candidate = Path(f"{args.model}.json")
+        if candidate.exists():
+            config_path = str(candidate)
+        else:
+            config_path = str(Path(args.model).parent / "config.json")
 
     engine = PiperInferenceEngine(
         args.model, config_path, sample_rate=args.sample_rate, device=args.device
