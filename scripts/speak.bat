@@ -1,5 +1,5 @@
 @echo off
-setlocal enabledelayedexpansion
+setlocal
 chcp 65001 >nul 2>&1
 
 REM =============================================
@@ -87,9 +87,9 @@ if not defined TEXT (
 
 REM Build piper command
 set "CMD="%PIPER_EXE%" --text "%TEXT%" --output_file "%OUTPUT%""
-if defined MODEL set "CMD=!CMD! --model "%MODEL%""
-if defined CONFIG set "CMD=!CMD! --config "%CONFIG%""
-if defined SPEAKER set "CMD=!CMD! --speaker %SPEAKER%"
+if defined MODEL call set "CMD=%%CMD%% --model "%MODEL%""
+if defined CONFIG call set "CMD=%%CMD%% --config "%CONFIG%""
+if defined SPEAKER call set "CMD=%%CMD%% --speaker %SPEAKER%"
 
 REM Run piper
 %CMD%

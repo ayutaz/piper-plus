@@ -24,7 +24,7 @@ struct VoiceInfo {
     std::string quality;       // e.g., "medium"
     int numSpeakers;
     std::string source;        // "piper-plus" or "piper"
-    std::string repoUrl;       // HuggingFace URL base
+    std::string repoId;        // HuggingFace repo identifier (e.g., "ayousanz/piper-plus-tsukuyomi-chan")
     std::vector<VoiceFileInfo> files;
     std::vector<std::string> aliases;
 };

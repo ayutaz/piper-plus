@@ -8,6 +8,7 @@
 #include <vector>
 #include <algorithm>
 #include <cctype>
+#include <unordered_set>
 
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
@@ -48,11 +49,11 @@ static const char* PIPER_PLUS_CATALOG_JSON = R"JSON(
         "repo": "ayousanz/piper-plus-tsukuyomi-chan",
         "files": {
             "tsukuyomi-wavlm-300epoch.onnx": {
-                "size_bytes": 0,
+                "size_bytes": 77594624,
                 "md5_digest": ""
             },
             "config.json": {
-                "size_bytes": 0,
+                "size_bytes": 3072,
                 "md5_digest": ""
             }
         },
@@ -71,11 +72,11 @@ static const char* PIPER_PLUS_CATALOG_JSON = R"JSON(
         "repo": "ayousanz/piper-plus-base",
         "files": {
             "moe-speech-20speakers-v2.onnx": {
-                "size_bytes": 0,
+                "size_bytes": 77594624,
                 "md5_digest": ""
             },
             "config.json": {
-                "size_bytes": 0,
+                "size_bytes": 4096,
                 "md5_digest": ""
             }
         },
@@ -124,7 +125,7 @@ static VoiceInfo parseVoiceEntry(const std::string& key,
     vi.source = entry.value("source", defaultSource);
 
     // HuggingFace repo (piper-plus voices)
-    vi.repoUrl = entry.value("repo", "");
+    vi.repoId = entry.value("repo", "");
 
     // Language block
     if (entry.contains("language") && entry["language"].is_object()) {
@@ -172,7 +173,10 @@ static std::optional<fs::path> findUpstreamVoicesJson() {
     for (const auto& p : candidates) {
         std::error_code ec;
         if (fs::exists(p, ec)) {
-            return fs::canonical(p, ec);
+            auto canon = fs::canonical(p, ec);
+            if (!ec && fs::exists(canon)) {
+                return canon;
+            }
         }
     }
 
@@ -241,7 +245,7 @@ static bool downloadFile(const std::string& url,
 std::filesystem::path getDefaultModelDir() {
     // Environment variable takes precedence
     const char* envDir = std::getenv("PIPER_MODEL_DIR");
-    if (envDir) {
+    if (envDir && envDir[0] != '\0') {
         return fs::path(envDir);
     }
 
@@ -294,18 +298,19 @@ std::vector<VoiceInfo> loadVoiceCatalog() {
             std::ifstream ifs(upstreamPath.value());
             json upstreamCatalog = json::parse(ifs);
 
+            // Build a set of existing keys for O(1) duplicate lookup
+            std::unordered_set<std::string> existingKeys;
+            existingKeys.reserve(catalog.size());
+            for (const auto& existing : catalog) {
+                existingKeys.insert(existing.key);
+            }
+
             size_t count = 0;
             for (auto& [key, entry] : upstreamCatalog.items()) {
                 // Skip if already present (piper-plus overrides upstream)
-                bool duplicate = false;
-                for (const auto& existing : catalog) {
-                    if (existing.key == key) {
-                        duplicate = true;
-                        break;
-                    }
-                }
-                if (!duplicate) {
+                if (existingKeys.count(key) == 0) {
                     catalog.push_back(parseVoiceEntry(key, entry, "piper"));
+                    existingKeys.insert(key);
                     ++count;
                 }
             }
@@ -455,7 +460,7 @@ bool downloadModel(const std::string& modelName,
     std::string baseUrl;
     if (voice.source == "piper-plus") {
         // https://huggingface.co/{repo}/resolve/main/{filename}
-        baseUrl = "https://huggingface.co/" + voice.repoUrl + "/resolve/main/";
+        baseUrl = "https://huggingface.co/" + voice.repoId + "/resolve/main/";
     } else {
         // Upstream piper:
         // https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/{file_path}

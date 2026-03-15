@@ -14,6 +14,7 @@
 #include <filesystem>
 #include <algorithm>
 #include <cstdlib>
+#include <cctype>
 #include <sstream>
 #include <iostream>
 
@@ -367,12 +368,12 @@ TEST(ModelManagerTest, VoiceNumSpeakersNonNegative) {
     }
 }
 
-TEST(ModelManagerTest, VoiceRepoUrlNotEmpty) {
+TEST(ModelManagerTest, VoiceRepoIdNotEmpty) {
     auto catalog = piper::loadVoiceCatalog();
     for (const auto& voice : catalog) {
         if (voice.source == "piper-plus") {
-            EXPECT_FALSE(voice.repoUrl.empty())
-                << "Voice " << voice.key << " has empty repoUrl";
+            EXPECT_FALSE(voice.repoId.empty())
+                << "Voice " << voice.key << " has empty repoId";
         }
     }
 }

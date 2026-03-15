@@ -3,6 +3,7 @@
 #include <filesystem>
 #include <fstream>
 #include <cstdlib>
+#include <cctype>
 
 // Test utility functions used by model downloader
 // These tests don't require network access

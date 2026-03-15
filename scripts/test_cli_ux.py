@@ -23,9 +23,10 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
+from typing import Optional
 
 
-def find_piper_exe() -> Path:
+def find_piper_exe() -> Optional[Path]:
     """Find piper executable in common build locations."""
     search_paths = [
         Path("build/Release/piper.exe"),

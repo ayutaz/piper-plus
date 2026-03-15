@@ -4,6 +4,7 @@
 #include <optional>
 #include <filesystem>
 #include <cstdlib>
+#include <stdexcept>
 
 // Test the --text argument parsing logic
 // Note: We test the parsing logic directly without needing the full piper runtime
