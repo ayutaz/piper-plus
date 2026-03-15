@@ -268,7 +268,7 @@ def list_voices(
         lang_family = lang.get("family", "")
 
         if language_filter:
-            if lang_family != language_filter and lang_code != language_filter:
+            if language_filter not in (lang_family, lang_code):
                 continue
 
         entries.append({
@@ -343,7 +343,7 @@ def download_model(
 
     # Build alias lookup
     aliases: dict[str, Any] = {}
-    for voice_key, voice_info in voices.items():
+    for _voice_key, voice_info in voices.items():
         for alias in voice_info.get("aliases", []):
             aliases[alias] = voice_info
 

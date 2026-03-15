@@ -10,8 +10,8 @@
 |--------|------|
 | 外部記事 | A-Uta氏のWindows環境でのビルド＆実行体験記 |
 | コードベース | `src/cpp/main.cpp`, `docs/`, `README.md`, `pyproject.toml` 等 |
-| GitHub Issues | 17件のopen issue, 12件のclosed issue |
-| GitHub PRs | 5件のopen PR |
+| GitHub Issues | 16件のopen issue, 30件のclosed issue |
+| GitHub PRs | 6件のopen PR |
 | GitHub Releases | v1.6.0 (2026-03-04) のリリースアセット |
 
 ### 記事の著者プロフィール
@@ -22,21 +22,22 @@
 - **スキル**: コマンドライン操作可能、C++ビルド環境は専門外
 - **選定理由**: 軽さ、自然な音質、MITライセンス
 
-### 対応状況サマリ (2026-03-15 更新)
+### 対応状況サマリ (2026-03-16 更新)
 
 - [PR #241](https://github.com/ayutaz/piper-plus/pull/241) (マージ済み, commit `1dc64b6`) により、ドキュメント改善を実施。
 - [PR #242](https://github.com/ayutaz/piper-plus/pull/242) (マージ済み, commit `b20b116`) により、WebUI セッションキャッシュを導入。
 - [PR #243](https://github.com/ayutaz/piper-plus/pull/243) (マージ済み, commit `932cceb`) により、config.json フォールバック検索を統一。
+- [PR #244](https://github.com/ayutaz/piper-plus/pull/244) (OPEN) により、C++/Python CLI UX改善を実装。`--text` / `--list-models` / `--download-model` + ヘルパースクリプト。
 
 | # | 優先度 | 課題 | 状態 | 種別 |
 |---|--------|------|------|------|
 | 1 | P0 | プリビルドバイナリの導線 | **解決済み** | ドキュメント |
 | 2 | P0 | config.json 命名規則 | **解決済み** | PR #243 でフォールバック検索実装; HFリネーム不要に |
-| 3 | P0 | Windows 日本語エンコーディング | **解決済み** | C++ `--text` オプション追加、`speak.bat`/`speak.ps1` 同梱 |
+| 3 | P0 | Windows 日本語エンコーディング | **解決済み** | PR #244 で C++ `--text` オプション追加、`speak.bat`/`speak.ps1` 同梱 |
 | 4 | P0 | WebUI パフォーマンス (#235) | **解決済み** | PR #242 でセッションキャッシュ導入 |
 | 5 | P1 | ORT SessionOptions (#233) | **未解決** | コード変更が必要; Issue OPEN |
-| 6 | P1 | コマンドが長い / `--text` | **解決済み** | `--text` オプション追加、環境変数サポート |
-| 7 | P1 | モデルダウンロード手動 | **解決済み** | `--list-models`、`--download-model` 実装 |
+| 6 | P1 | コマンドが長い / `--text` | **解決済み** | PR #244 で `--text` オプション追加、環境変数サポート |
+| 7 | P1 | モデルダウンロード手動 | **解決済み** | PR #244 で C++/Python 両方に `--list-models`、`--download-model` 実装 |
 | 8 | P1 | 学習ガイド陳腐化 | **解決済み** | ドキュメント |
 | 9 | P1 | ドキュメント構造 | **解決済み** | ドキュメント |
 | 10 | P2 | 多言語ドキュメント | **未解決** | 機能PR完了待ち |
@@ -88,7 +89,7 @@ filesystem::path(runConfig.modelPath.string() + ".json");
 
 > **PR #241 で対応済み (ドキュメント)**: windows-setup.md にエンコーディング対策セクション追加
 
-> **feat/cpp-cli-ux で対応済み (コード)**:
+> **PR #244 で対応済み (コード)**:
 > - (A) piper.exe に `--text "テキスト"` オプション追加 — Windows パイプのエンコーディング問題を完全回避
 > - (B) 公式 `speak.bat` / `speak.ps1` を `scripts/` に同梱
 > - (C) 環境変数 `PIPER_DEFAULT_MODEL` / `PIPER_DEFAULT_CONFIG` サポート
@@ -129,9 +130,9 @@ ONNX `InferenceSession` がリクエスト毎に再生成されている。
 
 ### 6. 実行コマンドが長すぎる ✅ 解決済み
 
-> **feat/cpp-cli-ux で対応済み**:
-> - `--text` オプション: パイプ不要で直接テキスト入力
-> - 環境変数: `PIPER_DEFAULT_MODEL`, `PIPER_DEFAULT_CONFIG` サポート
+> **PR #244 で対応済み**:
+> - `--text` オプション: パイプ不要で直接テキスト入力 (C++ / Python 両対応)
+> - 環境変数: `PIPER_DEFAULT_MODEL`, `PIPER_DEFAULT_CONFIG`, `PIPER_MODEL_DIR` サポート
 > - 公式 `speak.bat` / `speak.ps1` ヘルパースクリプト同梱
 >
 > 使用例:
@@ -145,11 +146,12 @@ ONNX `InferenceSession` がリクエスト毎に再生成されている。
 
 > **PR #241 で対応済み (ドキュメント)**: README にモデルカタログ表とダウンロードコマンドを追加
 
-> **feat/cpp-cli-ux で対応済み (コード)**:
-> - `--list-models [LANG]` でモデル一覧表示
-> - `--download-model NAME` でHuggingFaceからモデル自動ダウンロード
-> - `--model-dir DIR` でダウンロード先指定
+> **PR #244 で対応済み (コード)**:
+> - C++ CLI: `--list-models [LANG]` / `--download-model NAME` / `--model-dir DIR`
+> - Python CLI: `--list-models [LANG]` / `--download-model NAME` / `--version`
+> - C++/Python 間でモデルエイリアス（ja-tsukuyomi, ja-base, ja-20speakers）を同期
 > - piper-plus 固有モデル（つくよみちゃん、20話者ベース）と upstream piper-voices を統合カタログで提供
+> - テスト: C++ 67ユニット + 8統合テスト、Python 15テスト
 
 ---
 
@@ -242,12 +244,12 @@ ONNX `InferenceSession` がリクエスト毎に再生成されている。
 
 ## 次のアクション優先順位 (残課題)
 
-| # | アクション | 工数 | 効果 | 関連Issue | 状態 |
-|---|-----------|------|------|-----------|------|
-| 1 | ORT SessionOptions 最適化 | 小 | 中 | #233 | ❌ 未着手 |
-| ~~2~~ | ~~C++ CLI に `--text` オプション追加~~ | ~~中~~ | ~~大~~ | - | ✅ 完了 |
-| ~~3~~ | ~~公式 speak.bat/ps1 同梱~~ | ~~小~~ | ~~中~~ | - | ✅ 完了 |
-| 4 | ビルド時警告の CMake 抑制 | 小 | 小 | - | ❌ 未着手 |
+| # | アクション | 工数 | 効果 | 関連Issue/PR | 状態 |
+|---|-----------|------|------|-------------|------|
+| 1 | **PR #244 マージ** | - | 大 | PR #244 | 🟡 レビュー待ち |
+| 2 | ORT SessionOptions 最適化 | 小 | 中 | #233 | ❌ 未着手 |
+| 3 | ビルド時警告の CMake 抑制 | 小 | 小 | - | ❌ 未着手 |
+| 4 | FP16 変換ツール | 中 | 中 | #236, PR #239 | 🟡 PR 3/4 完了 |
 
 ---
 
@@ -261,3 +263,4 @@ ONNX `InferenceSession` がリクエスト毎に再生成されている。
 - 対応PR: [#241](https://github.com/ayutaz/piper-plus/pull/241) (マージ済み) — ドキュメント改善
 - 対応PR: [#242](https://github.com/ayutaz/piper-plus/pull/242) (マージ済み) — WebUI セッションキャッシュ
 - 対応PR: [#243](https://github.com/ayutaz/piper-plus/pull/243) (マージ済み) — config.json フォールバック検索統一
+- 対応PR: [#244](https://github.com/ayutaz/piper-plus/pull/244) (OPEN) — C++/Python CLI UX改善

@@ -199,7 +199,7 @@ def main() -> None:
                 args.download_model,
                 args.download_dir,
             )
-            print(f"Model downloaded successfully!", file=sys.stderr)
+            print("Model downloaded successfully!", file=sys.stderr)
             print(f"Use with:  --model {onnx_path}", file=sys.stderr)
         except Exception as e:
             print(f"Error: {e}", file=sys.stderr)
