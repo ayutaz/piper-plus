@@ -271,6 +271,23 @@ cmake --build . --config Release
 
 ### C++ CLI
 
+#### テキスト直接入力 (推奨)
+
+`--text` オプションでパイプなしにテキストを直接入力できます:
+
+```sh
+# テキストから音声生成
+./piper --model model.onnx --text "Hello, how are you?" -f output.wav
+
+# 日本語テキスト (Windowsでのエンコーディング問題を回避)
+piper.exe --model models\tsukuyomi.onnx --text "こんにちは、今日は良い天気ですね。" -f output.wav
+
+# 話者指定
+./piper --model model.onnx --text "Hello" --speaker 3 -f output.wav
+```
+
+#### パイプ入力
+
 ```sh
 # 基本
 echo "こんにちは" | ./piper --model ja_model.onnx --output_file output.wav
@@ -302,6 +319,7 @@ echo 'Long text...' | ./piper --model en_model.onnx --output-raw | \
 
 | オプション | 説明 | デフォルト |
 |---|---|---|
+| `--text TEXT` | テキスト直接入力 (パイプ不要) | - |
 | `--streaming` | チャンクベースのストリーミングモード | off |
 | `--use-cuda` | CUDA GPU推論を有効化 | off |
 | `--gpu-device-id NUM` | GPU デバイスID | 0 |
@@ -315,6 +333,9 @@ echo 'Long text...' | ./piper --model en_model.onnx --output-raw | \
 | `--output-timing FILE` | 音素タイミング情報をファイル出力 (JSON/TSV) | - |
 | `--custom-dict FILE` | カスタム辞書 (カンマ区切りで複数指定可) | - |
 | `--json-input` | JSON入力モード | off |
+| `--list-models [LANG]` | 利用可能なモデル一覧を表示 | - |
+| `--download-model NAME` | モデルをダウンロード | - |
+| `--model-dir DIR` | モデルのダウンロード先ディレクトリ | - |
 
 `piper --help` で全オプションを確認できます。
 
@@ -331,6 +352,60 @@ echo 'Long text...' | ./piper --model en_model.onnx --output-raw | \
 ```json
 { "text": "First speaker.", "speaker_id": 0, "output_file": "/tmp/speaker_0.wav" }
 { "text": "Second speaker.", "speaker_id": 1, "output_file": "/tmp/speaker_1.wav" }
+```
+
+### モデル管理
+
+#### モデル一覧の表示
+
+```bash
+# 利用可能なモデル一覧を表示
+./piper --list-models
+
+# 言語でフィルタリング
+./piper --list-models ja
+./piper --list-models en
+```
+
+#### モデルのダウンロード
+
+```bash
+# モデル名を指定してダウンロード
+./piper --download-model tsukuyomi
+./piper --download-model en_US-lessac-medium
+
+# ダウンロード先ディレクトリを指定
+./piper --download-model tsukuyomi --model-dir /path/to/models
+
+# ダウンロード後、モデルを使用
+./piper --model ~/.local/share/piper/models/ja_JP-tsukuyomi-chan-medium/tsukuyomi-wavlm-300epoch.onnx --text "こんにちは"
+```
+
+### 環境変数 (C++ CLI)
+
+| 変数名 | 説明 | 例 |
+|---|---|---|
+| `PIPER_DEFAULT_MODEL` | `--model` 未指定時のデフォルトモデルパス | `/path/to/model.onnx` |
+| `PIPER_DEFAULT_CONFIG` | `--config` 未指定時のデフォルト設定ファイルパス | `/path/to/config.json` |
+| `PIPER_MODEL_DIR` | ダウンロードモデルの保存先ディレクトリ | `~/.local/share/piper/models` |
+| `PIPER_GPU_DEVICE_ID` | CUDA GPUデバイスID | `0` |
+
+### ヘルパースクリプト (Windows)
+
+Windows ユーザー向けに `scripts/` ディレクトリにヘルパースクリプトを提供しています。
+
+**PowerShell:**
+
+```powershell
+.\scripts\speak.ps1 "こんにちは、今日は良い天気ですね。"
+.\scripts\speak.ps1 -Model "models\tsukuyomi.onnx" -Text "テスト"
+```
+
+**コマンドプロンプト:**
+
+```cmd
+scripts\speak.bat "こんにちは、今日は良い天気ですね。"
+scripts\speak.bat --model models\tsukuyomi.onnx "テスト"
 ```
 
 ---

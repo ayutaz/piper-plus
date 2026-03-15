@@ -198,6 +198,23 @@ Prerequisites: C++17 compiler, CMake 3.13+
 
 ### C++ CLI
 
+#### Direct Text Input (Recommended)
+
+The `--text` option allows direct text input without piping:
+
+```sh
+# Simple text-to-speech
+./piper --model model.onnx --text "Hello, how are you?" -f output.wav
+
+# Japanese text (no encoding issues on Windows)
+piper.exe --model models\tsukuyomi.onnx --text "こんにちは、今日は良い天気ですね。" -f output.wav
+
+# With speaker selection
+./piper --model model.onnx --text "Hello" --speaker 3 -f output.wav
+```
+
+#### Pipe Input
+
 ```sh
 # Basic usage
 echo "Hello world" | ./piper --model en_model.onnx --output_file output.wav
@@ -229,6 +246,7 @@ Key options:
 
 | Option | Description | Default |
 |---|---|---|
+| `--text TEXT` | Direct text input (no piping required) | - |
 | `--streaming` | Chunk-based streaming mode | off |
 | `--use-cuda` | Enable CUDA GPU inference | off |
 | `--gpu-device-id NUM` | GPU device ID | 0 |
@@ -242,6 +260,9 @@ Key options:
 | `--output-timing FILE` | Phoneme timing output (JSON/TSV) | - |
 | `--custom-dict FILE` | Custom dictionary (comma-separated for multiple) | - |
 | `--json-input` | JSON input mode | off |
+| `--list-models [LANG]` | List available models | - |
+| `--download-model NAME` | Download a model | - |
+| `--model-dir DIR` | Model download directory | - |
 
 Run `piper --help` for all options.
 
@@ -252,6 +273,60 @@ Use `--json-input` flag for JSON input:
 ```json
 { "text": "First speaker.", "speaker_id": 0, "output_file": "/tmp/speaker_0.wav" }
 { "text": "Second speaker.", "speaker_id": 1, "output_file": "/tmp/speaker_1.wav" }
+```
+
+### Model Management
+
+#### List Available Models
+
+```bash
+# List all available models
+./piper --list-models
+
+# Filter by language
+./piper --list-models ja
+./piper --list-models en
+```
+
+#### Download Models
+
+```bash
+# Download a model by name
+./piper --download-model tsukuyomi
+./piper --download-model en_US-lessac-medium
+
+# Specify download directory
+./piper --download-model tsukuyomi --model-dir /path/to/models
+
+# After download, use the model
+./piper --model ~/.local/share/piper/models/ja_JP-tsukuyomi-chan-medium/tsukuyomi-wavlm-300epoch.onnx --text "こんにちは"
+```
+
+### Environment Variables (C++ CLI)
+
+| Variable | Description | Example |
+|---|---|---|
+| `PIPER_DEFAULT_MODEL` | Default model path when `--model` is not specified | `/path/to/model.onnx` |
+| `PIPER_DEFAULT_CONFIG` | Default config path when `--config` is not specified | `/path/to/config.json` |
+| `PIPER_MODEL_DIR` | Directory for downloaded models | `~/.local/share/piper/models` |
+| `PIPER_GPU_DEVICE_ID` | GPU device ID for CUDA | `0` |
+
+### Helper Scripts (Windows)
+
+For Windows users, helper scripts are provided in the `scripts/` directory:
+
+**PowerShell:**
+
+```powershell
+.\scripts\speak.ps1 "こんにちは、今日は良い天気ですね。"
+.\scripts\speak.ps1 -Model "models\tsukuyomi.onnx" -Text "テスト"
+```
+
+**Command Prompt:**
+
+```cmd
+scripts\speak.bat "こんにちは、今日は良い天気ですね。"
+scripts\speak.bat --model models\tsukuyomi.onnx "テスト"
 ```
 
 ---

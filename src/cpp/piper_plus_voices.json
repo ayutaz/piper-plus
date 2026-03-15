@@ -1,0 +1,90 @@
+{
+    "ja_JP-tsukuyomi-chan-medium": {
+        "key": "ja_JP-tsukuyomi-chan-medium",
+        "name": "tsukuyomi-chan",
+        "language": {
+            "code": "ja_JP",
+            "family": "ja",
+            "region": "JP",
+            "name_native": "日本語",
+            "name_english": "Japanese",
+            "country_english": "Japan"
+        },
+        "quality": "medium",
+        "num_speakers": 1,
+        "speaker_id_map": {},
+        "source": "piper-plus",
+        "repo": "ayousanz/piper-plus-tsukuyomi-chan",
+        "files": {
+            "tsukuyomi-wavlm-300epoch.onnx": {
+                "size_bytes": 77594624,
+                "md5_digest": ""
+            },
+            "config.json": {
+                "size_bytes": 3072,
+                "md5_digest": ""
+            }
+        },
+        "aliases": [
+            "tsukuyomi",
+            "tsukuyomi-chan",
+            "ja-tsukuyomi"
+        ],
+        "description": "Tsukuyomi-chan Japanese TTS model trained with WavLM discriminator (300 epochs)"
+    },
+    "ja_JP-moe-speech-20speakers-medium": {
+        "key": "ja_JP-moe-speech-20speakers-medium",
+        "name": "moe-speech-20speakers",
+        "language": {
+            "code": "ja_JP",
+            "family": "ja",
+            "region": "JP",
+            "name_native": "日本語",
+            "name_english": "Japanese",
+            "country_english": "Japan"
+        },
+        "quality": "medium",
+        "num_speakers": 20,
+        "speaker_id_map": {
+            "speaker_0": 0,
+            "speaker_1": 1,
+            "speaker_2": 2,
+            "speaker_3": 3,
+            "speaker_4": 4,
+            "speaker_5": 5,
+            "speaker_6": 6,
+            "speaker_7": 7,
+            "speaker_8": 8,
+            "speaker_9": 9,
+            "speaker_10": 10,
+            "speaker_11": 11,
+            "speaker_12": 12,
+            "speaker_13": 13,
+            "speaker_14": 14,
+            "speaker_15": 15,
+            "speaker_16": 16,
+            "speaker_17": 17,
+            "speaker_18": 18,
+            "speaker_19": 19
+        },
+        "source": "piper-plus",
+        "repo": "ayousanz/piper-plus-base",
+        "files": {
+            "moe-speech-20speakers-v2.onnx": {
+                "size_bytes": 77594624,
+                "md5_digest": ""
+            },
+            "config.json": {
+                "size_bytes": 4096,
+                "md5_digest": ""
+            }
+        },
+        "aliases": [
+            "moe-speech",
+            "moe-20speakers",
+            "ja-base",
+            "ja-20speakers"
+        ],
+        "description": "Japanese multi-speaker base model (20 speakers) with VITS + Prosody features"
+    }
+}

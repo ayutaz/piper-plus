@@ -17,3 +17,7 @@ CMakeLists.txt text eol=lf
 # Docker files
 Dockerfile* text eol=lf
 .dockerignore text eol=lf
+
+# Windows scripts (keep CRLF)
+*.bat text eol=crlf
+*.ps1 text eol=crlf

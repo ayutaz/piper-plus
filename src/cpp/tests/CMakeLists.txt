@@ -40,6 +40,9 @@ set(TEST_SOURCES
     test_question_markers.cpp
     test_model_speaker_detection.cpp
     test_custom_dictionary.cpp
+    test_text_input.cpp
+    test_model_manager.cpp
+    test_download_utils.cpp
 )
 
 # Add dictionary manager test for Unix platforms
@@ -101,6 +104,31 @@ foreach(test_source ${TEST_SOURCES})
         target_include_directories(${test_name} PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/..
         )
+    endif()
+
+    # Link additional dependencies for model manager test
+    if(${test_name} STREQUAL "test_model_manager")
+        target_sources(${test_name} PRIVATE
+            ../model_manager.cpp
+        )
+        target_include_directories(${test_name} PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/..
+        )
+        # model_manager.cpp uses spdlog for logging
+        target_link_directories(${test_name} PRIVATE
+            ${CMAKE_BINARY_DIR}/si/lib
+            ${CMAKE_BINARY_DIR}/fi/lib
+        )
+        if(WIN32)
+            target_link_libraries(${test_name}
+                optimized spdlog.lib
+                debug spdlogd.lib
+                optimized fmt.lib
+                debug fmtd.lib
+            )
+        else()
+            target_link_libraries(${test_name} spdlog fmt)
+        endif()
     endif()
 
     # Link additional dependencies for security test
