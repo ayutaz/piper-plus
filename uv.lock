@@ -577,6 +577,15 @@ wheels = [
 ]
 
 [[package]]
+name = "fastcore"
+version = "1.12.23"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/82/14/d51dfed2aeecffdc5f06f6f757e7a5b672acd762f048b038f6cd7313c95b/fastcore-1.12.23.tar.gz", hash = "sha256:7eeb0141e9cc0cc3c5d925a534ee1e50040a5d13569b5000690bb6e77330c909", size = 93267, upload-time = "2026-03-05T06:32:21.752Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/9e/f3/25c1bfe7d3825b2290e91be1ac4b467bd166634b65a11c800b7cdbda2ff4/fastcore-1.12.23-py3-none-any.whl", hash = "sha256:0a2b2ac424fde91871ac7ab5564eb478e2ae7b05ce7851636f924f0aa5a55cd7", size = 97463, upload-time = "2026-03-05T06:32:20.166Z" },
+]
+
+[[package]]
 name = "filelock"
 version = "3.18.0"
 source = { registry = "https://pypi.org/simple" }
@@ -751,6 +760,18 @@ dependencies = [
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/53/52/6b77a9c3e4ea32dfb53238422dabf4fa977681d2bf4087bff53c084ab7c5/g2pk2-0.0.3-py3-none-any.whl", hash = "sha256:e708316125248c10432cbead85cf52dd9ed252c423cce531f9df617386978cf2", size = 25716, upload-time = "2023-08-18T17:05:33.705Z" },
+]
+
+[[package]]
+name = "ghapi"
+version = "1.0.13"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "fastcore" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/62/09/1b88f97e8599cda096d42dac830bb2e28ddf202d71843f61bda52bbe99ce/ghapi-1.0.13.tar.gz", hash = "sha256:fb46f5e101efa33bd12a0ae7694de761eec5be1de90f48847699f1e00128f928", size = 72914, upload-time = "2026-02-28T02:21:01.892Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/67/ac/e1960ec21cfd5a0fd9b329822c04d0b5f91abb688c3b1acd7e8ff3390432/ghapi-1.0.13-py3-none-any.whl", hash = "sha256:49d7e336e5664e4d4f92b1d442dfe80f31ecccbee4370bd1d271bd63a1ccf18e", size = 71409, upload-time = "2026-02-28T02:21:00.457Z" },
 ]
 
 [[package]]
@@ -1830,6 +1851,7 @@ source = { editable = "." }
 dependencies = [
     { name = "cython" },
     { name = "g2p-en" },
+    { name = "ghapi" },
     { name = "huggingface-hub" },
     { name = "librosa" },
     { name = "numpy" },
@@ -1898,6 +1920,7 @@ requires-dist = [
     { name = "flake8", marker = "extra == 'dev'", specifier = "==6.1.0" },
     { name = "g2p-en", specifier = ">=2.1.0" },
     { name = "g2pk2", marker = "extra == 'multilingual'", specifier = ">=0.0.3" },
+    { name = "ghapi", specifier = ">=1.0.13" },
     { name = "huggingface-hub", specifier = ">=0.30.0,<1.0" },
     { name = "librosa", specifier = ">=0.10" },
     { name = "mypy", marker = "extra == 'dev'", specifier = "==1.7.1" },

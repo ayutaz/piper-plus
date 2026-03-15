@@ -290,15 +290,20 @@ def main():
     # Setup callbacks
     callbacks = []
     if args.checkpoint_epochs is not None:
+        checkpoint_dir = Path(args.default_root_dir) / "checkpoints"
         callbacks.append(
             ModelCheckpoint(
+                dirpath=str(checkpoint_dir),
                 every_n_epochs=args.checkpoint_epochs,
                 save_top_k=args.save_top_k,
                 save_last=True,
+                save_on_train_epoch_end=True,
             )
         )
         _LOGGER.debug(
-            "Checkpoints will be saved every %s epoch(s)", args.checkpoint_epochs
+            "Checkpoints will be saved every %s epoch(s) to %s",
+            args.checkpoint_epochs,
+            checkpoint_dir,
         )
 
     # EMA is enabled by default
@@ -543,16 +548,20 @@ def main():
             # Setup callbacks
             callbacks = []
             if args.checkpoint_epochs is not None:
+                checkpoint_dir = Path(args.default_root_dir) / "checkpoints"
                 callbacks.append(
                     ModelCheckpoint(
+                        dirpath=str(checkpoint_dir),
                         every_n_epochs=args.checkpoint_epochs,
                         save_top_k=args.save_top_k,
                         save_last=True,
+                        save_on_train_epoch_end=True,
                     )
                 )
                 _LOGGER.debug(
-                    "Checkpoints will be saved every %s epoch(s)",
+                    "Checkpoints will be saved every %s epoch(s) to %s",
                     args.checkpoint_epochs,
+                    checkpoint_dir,
                 )
 
             # EMA is enabled by default
