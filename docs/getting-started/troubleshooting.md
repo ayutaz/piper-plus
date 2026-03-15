@@ -25,6 +25,25 @@ Error: Model file not found: model.onnx
 3. Check file permissions
 4. Download models from official sources
 
+### "Model config doesn't exist" エラー
+
+**症状**:
+```
+Model config doesn't exist
+```
+
+**原因**: piper は `<モデル名>.onnx.json` を自動検出します（例: `model.onnx` → `model.onnx.json`）。設定ファイルが `config.json` など異なる名前の場合、自動検出に失敗します。
+
+**解決方法**:
+1. `--config` オプションで明示的に指定:
+   ```bash
+   piper --model models/model.onnx --config models/config.json --output_file out.wav
+   ```
+2. または設定ファイルをリネーム:
+   ```bash
+   mv config.json model.onnx.json
+   ```
+
 ### "No audio output" Issue
 
 **Symptoms**: Command runs without errors but no audio file is created
@@ -149,6 +168,31 @@ chcp 65001
 REM Use PowerShell instead
 powershell -Command "echo 'こんにちは' | .\piper.exe --model model.onnx --output_file out.wav"
 ```
+
+#### Windows で日本語テキストが文字化けする（No phoneme エラー）
+
+**症状**: PowerShell から日本語テキストをパイプすると、OpenJTalk が `No phoneme` で失敗する。
+
+**原因**: Windows のコンソールエンコーディングが UTF-8 でないため、パイプ経由で文字化けが発生。
+
+**解決方法**:
+
+1. **cmd で `chcp 65001` を実行してから使用**:
+   ```cmd
+   chcp 65001
+   echo こんにちは | piper.exe --model model.onnx --config config.json --output_file out.wav
+   ```
+
+2. **ファイル経由で入力** (最も確実):
+   ```cmd
+   REM UTF-8 BOMなしでテキストファイルを作成
+   powershell -Command "$utf8 = New-Object System.Text.UTF8Encoding($false); [System.IO.File]::WriteAllText('input.txt', 'こんにちは', $utf8)"
+
+   chcp 65001
+   type input.txt | piper.exe --model model.onnx --config config.json --output_file out.wav
+   ```
+
+3. **v1.6.0以降**: piper.exe 内部で `SetConsoleCP(CP_UTF8)` が呼び出されますが、一部の環境ではパイプ入力に効かない場合があります。その場合は方法2を使用してください。
 
 #### "The filename, directory name, or volume label syntax is incorrect"
 

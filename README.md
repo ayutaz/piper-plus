@@ -19,10 +19,10 @@
 
 - [主要機能](#主要機能)
 - [クイックスタート](#クイックスタート)
+- [事前学習済みモデル](#事前学習済みモデル)
 - [インストール](#インストール)
 - [使い方](#使い方)
 - [学習](#学習)
-- [事前学習済みモデル](#事前学習済みモデル)
 - [日本語 TTS](#日本語-tts)
 - [プラットフォーム](#プラットフォーム)
 - [関連リンク](#関連リンク)
@@ -69,6 +69,85 @@
 
 ## クイックスタート
 
+### プリビルドバイナリ (ビルド不要)
+
+[GitHub Releases](https://github.com/ayutaz/piper-plus/releases) からプリビルドバイナリをダウンロードして、すぐに音声合成を開始できます。
+
+**1. バイナリをダウンロード**
+
+お使いのOSに合わせてダウンロード・展開してください。
+
+**Windows (PowerShell):**
+
+```powershell
+Invoke-WebRequest -Uri "https://github.com/ayutaz/piper-plus/releases/latest/download/piper-windows-x64.zip" -OutFile piper.zip
+Expand-Archive piper.zip -DestinationPath piper
+cd piper
+```
+
+**macOS (Apple Silicon):**
+
+```bash
+curl -L -o piper.tar.gz https://github.com/ayutaz/piper-plus/releases/latest/download/piper-macos-arm64.tar.gz
+tar xzf piper.tar.gz
+cd piper
+xattr -cr .
+```
+
+**Linux (x86_64):**
+
+```bash
+curl -L -o piper.tar.gz https://github.com/ayutaz/piper-plus/releases/latest/download/piper-linux-x64.tar.gz
+tar xzf piper.tar.gz
+cd piper
+```
+
+**2. モデルをダウンロード**
+
+つくよみちゃんモデルの例:
+
+**Windows (PowerShell):**
+
+```powershell
+mkdir models
+Invoke-WebRequest -Uri "https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/tsukuyomi-wavlm-300epoch.onnx" -OutFile models/tsukuyomi.onnx
+Invoke-WebRequest -Uri "https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/config.json" -OutFile models/config.json
+```
+
+**macOS / Linux:**
+
+```bash
+mkdir -p models
+curl -L -o models/tsukuyomi.onnx https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/tsukuyomi-wavlm-300epoch.onnx
+curl -L -o models/config.json https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/config.json
+```
+
+**3. 音声を生成**
+
+**Windows (cmd):**
+
+```cmd
+echo こんにちは、今日は良い天気ですね。| piper.exe --model models\tsukuyomi.onnx --config models\config.json --output_file output.wav
+```
+
+**macOS / Linux:**
+
+```bash
+echo 'こんにちは、今日は良い天気ですね。' | \
+  ./piper --model models/tsukuyomi.onnx --config models/config.json --output_file output.wav
+```
+
+> **config.json の命名規則:** piper は `<モデル名>.onnx.json` (例: `tsukuyomi.onnx.json`) を自動検出します。設定ファイルが別名の場合 (例: `config.json`) は `--config` で明示的に指定してください。
+>
+> ```sh
+> # 自動検出される場合 (--config 不要)
+> ./piper --model models/tsukuyomi.onnx --output_file output.wav
+> # → models/tsukuyomi.onnx.json を自動読み込み
+>
+> # 別名の場合 (--config 必須)
+> ./piper --model models/tsukuyomi.onnx --config models/config.json --output_file output.wav
+> ```
+
 ### Python推論
 
 ```bash
@@ -93,6 +172,8 @@ uv run python -m piper_train.infer_onnx \
 
 主なオプション: `--speaker-id`(話者ID)、`--device auto|cpu|gpu`、`--noise-scale`(音声バリエーション)、`--length-scale`(話速)
 
+> **WavLMモデルの推奨設定:** WavLM Discriminatorで学習されたモデル (つくよみちゃん等) は `--noise-scale 0.5` で最適な音質になります (デフォルトは 0.667)。
+
 ### WebUI
 
 ```bash
@@ -100,15 +181,6 @@ uv pip install -r src/python_run/requirements_webui.txt
 cd src/python_run
 python -m piper.webui --data-dir /path/to/models
 # → http://localhost:7860
-```
-
-### C++バイナリ
-
-[GitHub Releases](https://github.com/ayutaz/piper-plus/releases) からダウンロード (amd64 / arm64)。
-
-```sh
-echo 'Welcome to the world of speech synthesis!' | \
-  ./piper --model en_US-lessac-medium.onnx --output_file welcome.wav
 ```
 
 ### Docker
@@ -245,6 +317,12 @@ echo 'Long text...' | ./piper --model en_model.onnx --output-raw | \
 
 `piper --help` で全オプションを確認できます。
 
+> **WavLMモデルの推奨設定:** WavLM Discriminatorで学習されたモデルは `--noise-scale 0.5` を推奨します (デフォルトは 0.667)。
+>
+> ```sh
+> echo "こんにちは" | ./piper --model tsukuyomi.onnx --config config.json --noise-scale 0.5 -f output.wav
+> ```
+
 ### JSON入力
 
 `--json-input` フラグでJSON入力を受け付けます:
@@ -317,18 +395,39 @@ CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
 
 日本語TTSのファインチューニング用ベースモデルを Hugging Face で公開しています。
 
-| モデル | 説明 | ライセンス |
-|---|---|---|
-| [piper-plus-base](https://huggingface.co/ayousanz/piper-plus-base) | 日本語TTS ベースモデル (VITS + WavLM + Prosody) | CC-BY-SA-4.0 |
-| [piper-plus-tsukuyomi-chan](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan) | つくよみちゃんファインチューニング済み | モデルカード参照 |
+| モデル | 言語 | 話者数 | 説明 | ダウンロード |
+|---|---|---|---|---|
+| つくよみちゃん | 日本語 | 1 | ファインチューニング済み、すぐに利用可能 | [HuggingFace](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan) |
+| 20話者ベースモデル | 日本語 | 20 | ファインチューニング用ベースモデル (VITS + WavLM + Prosody) | [HuggingFace](https://huggingface.co/ayousanz/piper-plus-base) |
 
-**piper-plus-base の特徴:**
+### モデルのダウンロード
+
+**つくよみちゃんモデル:**
+
+**Windows (PowerShell):**
+
+```powershell
+mkdir models
+Invoke-WebRequest -Uri "https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/tsukuyomi-wavlm-300epoch.onnx" -OutFile models/tsukuyomi.onnx
+Invoke-WebRequest -Uri "https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/config.json" -OutFile models/config.json
+```
+
+**macOS / Linux:**
+
+```bash
+mkdir -p models
+curl -L -o models/tsukuyomi.onnx https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/tsukuyomi-wavlm-300epoch.onnx
+curl -L -o models/config.json https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/config.json
+```
+
+### piper-plus-base の特徴
 
 - アーキテクチャ: VITS + WavLM Discriminator
 - 学習データ: 60,164発話 (20話者)
 - サンプリングレート: 22,050 Hz
 - Prosody Features: A1/A2/A3 韻律情報
 - 拡張音素: 疑問詞マーカー、文脈依存「ん」バリアント (65音素)
+- ライセンス: CC-BY-SA-4.0
 
 upstream Piper のチェックポイントも利用可能: [piper-checkpoints](https://huggingface.co/datasets/rhasspy/piper-checkpoints/tree/main)
 
