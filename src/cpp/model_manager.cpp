@@ -57,7 +57,7 @@ static const char* PIPER_PLUS_CATALOG_JSON = R"JSON(
                 "md5_digest": ""
             }
         },
-        "aliases": ["tsukuyomi", "tsukuyomi-chan"]
+        "aliases": ["tsukuyomi", "tsukuyomi-chan", "ja-tsukuyomi"]
     },
     "ja_JP-moe-speech-20speakers-medium": {
         "key": "ja_JP-moe-speech-20speakers-medium",
@@ -80,7 +80,7 @@ static const char* PIPER_PLUS_CATALOG_JSON = R"JSON(
                 "md5_digest": ""
             }
         },
-        "aliases": ["moe-speech", "moe-20speakers"]
+        "aliases": ["moe-speech", "moe-20speakers", "ja-base", "ja-20speakers"]
     }
 }
 )JSON";

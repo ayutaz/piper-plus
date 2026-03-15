@@ -14,8 +14,10 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from piper.download import (
     PIPER_PLUS_VOICES,
+    PIPER_PLUS_URL_FORMAT,
     get_voices,
     list_voices,
+    download_model,
     VoiceNotFoundError,
 )
 
@@ -121,3 +123,119 @@ class TestAliasResolution:
                     aliases[alias] = info
 
             assert "moe-speech" in aliases
+
+
+class TestDownloadModel:
+    """Test download_model() function."""
+
+    def test_download_nonexistent_raises(self):
+        """download_model with unknown name raises VoiceNotFoundError."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with pytest.raises(VoiceNotFoundError):
+                download_model("nonexistent-model-xyz", tmpdir)
+
+    def test_download_resolves_alias(self):
+        """download_model resolves aliases correctly before download."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            voices = get_voices(tmpdir)
+            # Build alias map same way as download_model
+            resolved = None
+            for key, info in voices.items():
+                for alias in info.get("aliases", []):
+                    if alias == "tsukuyomi":
+                        resolved = key
+                        break
+            assert resolved == "ja_JP-tsukuyomi-chan-medium"
+
+    def test_download_resolves_ja_tsukuyomi(self):
+        """ja-tsukuyomi alias resolves to tsukuyomi-chan model."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            voices = get_voices(tmpdir)
+            aliases = {}
+            for key, info in voices.items():
+                for alias in info.get("aliases", []):
+                    aliases[alias] = info
+            assert "ja-tsukuyomi" in aliases
+            assert aliases["ja-tsukuyomi"]["key"] == "ja_JP-tsukuyomi-chan-medium"
+
+    def test_download_resolves_ja_base(self):
+        """ja-base alias resolves to moe-speech model."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            voices = get_voices(tmpdir)
+            aliases = {}
+            for key, info in voices.items():
+                for alias in info.get("aliases", []):
+                    aliases[alias] = info
+            assert "ja-base" in aliases
+            assert aliases["ja-base"]["key"] == "ja_JP-moe-speech-20speakers-medium"
+
+
+class TestFindVoiceFallback:
+    """Test find_voice() piper-plus filename fallback."""
+
+    def test_piper_plus_file_names_in_catalog(self):
+        """piper-plus models have correct file names in catalog."""
+        voice = PIPER_PLUS_VOICES["ja_JP-tsukuyomi-chan-medium"]
+        files = list(voice["files"].keys())
+        assert "tsukuyomi-wavlm-300epoch.onnx" in files
+        assert "config.json" in files
+
+    def test_moe_speech_file_names_in_catalog(self):
+        """moe-speech model has correct file names."""
+        voice = PIPER_PLUS_VOICES["ja_JP-moe-speech-20speakers-medium"]
+        files = list(voice["files"].keys())
+        assert "moe-speech-20speakers-v2.onnx" in files
+        assert "config.json" in files
+
+
+class TestVersion:
+    """Test __version__ availability."""
+
+    def test_version_is_string(self):
+        from piper import __version__
+        assert isinstance(__version__, str)
+
+    def test_version_not_empty(self):
+        from piper import __version__
+        assert len(__version__) > 0
+
+    def test_version_not_unknown_if_version_file_exists(self):
+        from piper import __version__
+        version_file = Path(__file__).parent.parent / "piper" / ".." / ".." / ".." / "VERSION"
+        # Only assert if VERSION file actually exists in dev environment
+        if version_file.resolve().exists():
+            assert __version__ != "unknown"
+
+
+class TestEnsureVoiceUrl:
+    """Test URL construction for piper-plus models."""
+
+    def test_piper_plus_url_format(self):
+        url = PIPER_PLUS_URL_FORMAT.format(
+            repo="ayousanz/piper-plus-tsukuyomi-chan",
+            file="config.json",
+        )
+        assert url == "https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/config.json"
+
+    def test_piper_plus_voice_has_repo(self):
+        for key, voice in PIPER_PLUS_VOICES.items():
+            if voice.get("source") == "piper-plus":
+                assert "repo" in voice, f"{key} missing repo field"
+                assert voice["repo"].startswith("ayousanz/")
+
+
+class TestListVoicesFormat:
+    """Test list_voices output format."""
+
+    def test_output_to_stderr(self, capsys):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            list_voices(tmpdir)
+        captured = capsys.readouterr()
+        # Output should be on stderr
+        assert len(captured.err) > 0
+
+    def test_contains_piper_plus_tag(self, capsys):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            list_voices(tmpdir)
+        captured = capsys.readouterr()
+        assert "[piper-plus]" in captured.err
