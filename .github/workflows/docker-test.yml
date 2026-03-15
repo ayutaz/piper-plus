@@ -167,6 +167,33 @@ jobs:
           fi
           echo "Config fallback (config.json) test passed"
 
+      - name: Config not found error test
+        run: |
+          # Test that inference exits with error when no config file exists
+          mkdir -p /tmp/noconfig
+          cp ${{ github.workspace }}/test/models/test_voice.onnx /tmp/noconfig/test_voice.onnx
+
+          docker run --rm \
+            -v /tmp/noconfig:/models/noconfig \
+            -v /tmp/output:/output \
+            -e CUDA_VISIBLE_DEVICES="" \
+            piper-python-inference:test \
+            python inference.py \
+              --model /models/noconfig/test_voice.onnx \
+              --output /output/should_not_exist.wav \
+              --text "This should fail." \
+              --language en \
+              --speaker-id 0 \
+              --device cpu \
+            && { echo "ERROR: Expected non-zero exit code but got 0"; exit 1; } \
+            || echo "Config not found error test passed (non-zero exit as expected)"
+
+          if [ -f /tmp/output/should_not_exist.wav ]; then
+            echo "ERROR: Output file should not exist"
+            exit 1
+          fi
+          echo "Python config not found error test passed"
+
   test-cpp-inference:
     runs-on: ubuntu-latest
     steps:
@@ -273,6 +300,28 @@ jobs:
             exit 1
           fi
           echo "C++ config fallback (config.json) test passed"
+
+      - name: Config not found error test
+        run: |
+          # Test that piper exits with error when no config file exists
+          mkdir -p /tmp/noconfig-cpp
+          cp ${{ github.workspace }}/test/models/test_voice.onnx /tmp/noconfig-cpp/test_voice.onnx
+
+          echo "This should fail." | docker run --rm -i \
+            -v /tmp/noconfig-cpp:/models/noconfig \
+            -v /tmp/output:/output \
+            --entrypoint piper \
+            piper-cpp-inference:test \
+              --model /models/noconfig/test_voice.onnx \
+              --output_file /output/should_not_exist_cpp.wav \
+            && { echo "ERROR: Expected non-zero exit code but got 0"; exit 1; } \
+            || echo "Config not found error test passed (non-zero exit as expected)"
+
+          if [ -f /tmp/output/should_not_exist_cpp.wav ]; then
+            echo "ERROR: Output file should not exist"
+            exit 1
+          fi
+          echo "C++ config not found error test passed"
 
   test-python-train:
     runs-on: ubuntu-latest
