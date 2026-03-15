@@ -175,6 +175,21 @@ uv run python -m piper_train.infer_onnx \
 
 > **WavLMモデルの推奨設定:** WavLM Discriminatorで学習されたモデル (つくよみちゃん等) は `--noise-scale 0.5` で最適な音質になります (デフォルトは 0.667)。
 
+#### Python CLI モデル管理
+
+```bash
+# モデル一覧表示
+python -m piper --list-models
+python -m piper --list-models ja
+
+# モデルダウンロード
+python -m piper --download-model tsukuyomi
+python -m piper --download-model ja_JP-tsukuyomi-chan-medium
+
+# ダウンロード後に使用
+python -m piper --model ja_JP-tsukuyomi-chan-medium --text "こんにちは" -f output.wav
+```
+
 ### WebUI
 
 ```bash

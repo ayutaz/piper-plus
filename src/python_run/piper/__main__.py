@@ -69,7 +69,7 @@ def main() -> None:
         nargs="?",
         help="Text to synthesize (optional, otherwise reads from stdin or file)",
     )
-    parser.add_argument("-m", "--model", required=True, help="Path to Onnx model file")
+    parser.add_argument("-m", "--model", help="Path to Onnx model file")
     parser.add_argument("-c", "--config", help="Path to model config file")
     parser.add_argument(
         "-f",
@@ -143,13 +143,72 @@ def main() -> None:
     parser.add_argument(
         "--debug", action="store_true", help="Print DEBUG messages to console"
     )
+    parser.add_argument(
+        "--list-models",
+        nargs="?",
+        const="",
+        default=None,
+        metavar="LANG",
+        help="List available voice models (optionally filter by language)",
+    )
+    parser.add_argument(
+        "--download-model",
+        metavar="NAME",
+        help="Download a voice model by name",
+    )
+    parser.add_argument(
+        "--version",
+        action="store_true",
+        help="Show version and exit",
+    )
     args = parser.parse_args()
     logging.basicConfig(level=logging.DEBUG if args.debug else logging.INFO)
     _LOGGER.debug(args)
 
+    # Handle --version
+    if args.version:
+        try:
+            from . import __version__
+
+            print(__version__)
+        except (ImportError, AttributeError):
+            version_file = Path(__file__).parent.parent.parent.parent / "VERSION"
+            if version_file.exists():
+                print(version_file.read_text().strip())
+            else:
+                print("unknown")
+        sys.exit(0)
+
     if not args.download_dir:
         # Download to first data directory by default
         args.download_dir = args.data_dir[0]
+
+    # Handle --list-models
+    if args.list_models is not None:
+        from .download import list_voices
+
+        list_voices(args.download_dir, language_filter=args.list_models)
+        sys.exit(0)
+
+    # Handle --download-model
+    if args.download_model:
+        from .download import download_model
+
+        try:
+            onnx_path, config_path = download_model(
+                args.download_model,
+                args.download_dir,
+            )
+            print(f"Model downloaded successfully!", file=sys.stderr)
+            print(f"Use with:  --model {onnx_path}", file=sys.stderr)
+        except Exception as e:
+            print(f"Error: {e}", file=sys.stderr)
+            sys.exit(1)
+        sys.exit(0)
+
+    # --model is required for synthesis
+    if not args.model:
+        parser.error("--model is required (or use --list-models / --download-model)")
 
     # Download voice if file doesn't exist
     model_path = Path(args.model)

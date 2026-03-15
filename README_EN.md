@@ -93,6 +93,21 @@ uv run python -m piper_train.infer_onnx \
 
 Key options: `--speaker-id` (speaker ID), `--device auto|cpu|gpu`, `--noise-scale` (audio variation), `--length-scale` (speech speed)
 
+#### Python CLI Model Management
+
+```bash
+# List available models
+python -m piper --list-models
+python -m piper --list-models ja
+
+# Download a model
+python -m piper --download-model tsukuyomi
+python -m piper --download-model ja_JP-tsukuyomi-chan-medium
+
+# Use after downloading
+python -m piper --model ja_JP-tsukuyomi-chan-medium --text "Hello" -f output.wav
+```
+
 ### WebUI
 
 ```bash
