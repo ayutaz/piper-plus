@@ -46,7 +46,7 @@ Model config doesn't exist
    ```bash
    piper --model models/model.onnx --config /path/to/config.json --output_file out.wav
    ```
-3. または設定ファイルをリネーム:
+3. 同一ディレクトリに複数モデルがあり `config.json` では区別できない場合、モデルごとにリネーム:
    ```bash
    mv config.json model.onnx.json
    ```
