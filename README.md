@@ -97,7 +97,7 @@ xattr -cr .
 **Linux (x86_64):**
 
 ```bash
-curl -L -o piper.tar.gz https://github.com/ayutaz/piper-plus/releases/latest/download/piper-linux-x86_64.tar.gz
+curl -L -o piper.tar.gz https://github.com/ayutaz/piper-plus/releases/latest/download/piper-linux-x64.tar.gz
 tar xzf piper.tar.gz
 cd piper
 ```

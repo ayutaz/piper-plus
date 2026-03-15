@@ -57,7 +57,9 @@ WavLM が有効な場合、GPUメモリが約1-2GB増加するため、`--batch-
 
 ### WavLM を無効化する場合
 
-WavLM を使用せずに学習する場合は、`--c-wavlm 0` を指定します。
+WavLM の損失重みをゼロにする場合は `--c-wavlm 0` を指定します。
+
+> **注意**: `--c-wavlm 0` は損失重みをゼロにするだけで、WavLM モデル自体は GPU メモリに読み込まれます（約1-2GB）。完全に無効化する CLI フラグは現在提供されていません。メモリ節約が目的の場合は、`--batch-size` の調整で対処してください。
 
 ```bash
 uv run python -m piper_train \
@@ -231,22 +233,24 @@ uv run python -m piper_train \
   ...
 ```
 
-**対処法2: WavLM を無効化する**
+**対処法2: WavLM の損失重みをゼロにする**
 
-メモリ制約が厳しい場合は WavLM を無効化して学習できます。
+`--c-wavlm 0` で WavLM の損失への寄与をゼロにできます。
 
 ```bash
 uv run python -m piper_train \
   --c-wavlm 0 \
-  --batch-size 20 \   # WavLM なしなら元のサイズに戻せる
+  --batch-size 12 \
   ...
 ```
 
+> **注意**: `--c-wavlm 0` は損失重みをゼロにするだけで、WavLM モデル自体は GPU メモリに残ります（約1-2GB）。完全にモデルの読み込みを無効化する CLI フラグは現在提供されていないため、メモリ削減効果は限定的です。
+
 **GPU メモリの目安:**
 
-| 構成 | WavLM あり | WavLM なし |
-|------|-----------|-----------|
-| batch-size 12 | 約14-15 GB | 約12-13 GB |
-| batch-size 20 | 約18-20 GB | 約16-17 GB |
+| 構成 | WavLM あり (c_wavlm > 0) | WavLM あり (c_wavlm = 0) | 備考 |
+|------|--------------------------|--------------------------|------|
+| batch-size 12 | 約14-15 GB | 約14-15 GB | c_wavlm=0 でもモデルは読み込まれる |
+| batch-size 20 | 約18-20 GB | 約18-20 GB | batch-size の調整で対処 |
 
 上記は medium quality、FP16 Mixed Precision 有効時の目安です。実際の使用量はデータセットや発話長により変動します。

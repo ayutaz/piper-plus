@@ -264,10 +264,7 @@ uv run python -m piper_train \
   --accelerator 'gpu' \
   --devices 1 \
   --batch-size 32 \
-  --accumulate_grad_batches 2 \         # Gradient accumulation (effective batch = 64)
-  --gradient_clip_val 1.0 \             # Gradient clipping for stability
   --precision 16-mixed \                # Mixed precision training (faster, less memory)
-  --detect_anomaly \                    # Enable anomaly detection (debugging)
   --resume_from_checkpoint /path/to/checkpoint.ckpt  # Resume training
 ```
 
@@ -334,18 +331,25 @@ To test your voice during training, you can use test sentences from `test/fixtur
 
 ```sh
 # For Japanese testing
-cat test/fixtures/test_japanese.txt | \
-    uv run python -m piper_train.infer_onnx \
-        --sample-rate 22050 \
-        --checkpoint /path/to/training_dir/lightning_logs/version_0/checkpoints/*.ckpt \
-        --output-dir /path/to/training_dir/output
+# まず ONNX に変換
+CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
+    /path/to/training_dir/lightning_logs/version_0/checkpoints/last.ckpt \
+    /path/to/training_dir/output/model.onnx
 
-# For English testing  
-cat test/fixtures/test_english.txt | \
-    uv run python -m piper_train.infer_onnx \
-        --sample-rate 22050 \
-        --checkpoint /path/to/training_dir/lightning_logs/version_0/checkpoints/*.ckpt \
-        --output-dir /path/to/training_dir/output
+# 日本語テスト
+uv run python -m piper_train.infer_onnx \
+    --model /path/to/training_dir/output/model.onnx \
+    --config /path/to/training_dir/config.json \
+    --output-dir /path/to/training_dir/output \
+    --text "こんにちは、テスト音声です。"
+
+# 英語テスト
+uv run python -m piper_train.infer_onnx \
+    --model /path/to/training_dir/output/model.onnx \
+    --config /path/to/training_dir/config.json \
+    --output-dir /path/to/training_dir/output \
+    --text "Hello, this is a test." \
+    --language en
 ```
 
 The input format to `piper_train.infer_onnx` is the same as `dataset.jsonl`: one line of JSON per utterance with `phoneme_ids` and `speaker_id` (multi-speaker only). Generate your own test file with [piper-phonemize](https://github.com/rhasspy/piper-phonemize/):
