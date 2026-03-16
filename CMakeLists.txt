@@ -83,8 +83,8 @@ if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|ARM64")
   # add_compile_definitions(USE_ARM64_NEON)
 endif()
 
-add_executable(piper src/cpp/main.cpp src/cpp/piper.cpp src/cpp/phoneme_parser.cpp src/cpp/custom_dictionary.cpp)
-add_executable(test_piper src/cpp/test.cpp src/cpp/piper.cpp src/cpp/phoneme_parser.cpp src/cpp/custom_dictionary.cpp)
+add_executable(piper src/cpp/main.cpp src/cpp/piper.cpp src/cpp/phoneme_parser.cpp src/cpp/custom_dictionary.cpp src/cpp/model_manager.cpp)
+add_executable(test_piper src/cpp/test.cpp src/cpp/piper.cpp src/cpp/phoneme_parser.cpp src/cpp/custom_dictionary.cpp src/cpp/model_manager.cpp)
 
 # Add NEON optimized audio processing for ARM64
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|ARM64")
@@ -614,6 +614,7 @@ add_test(
   NAME test_piper
   COMMAND test_piper "${CMAKE_SOURCE_DIR}/test/models/test_voice.onnx" "$<TARGET_FILE_DIR:test_piper>/espeak-ng-data" "${CMAKE_CURRENT_BINARY_DIR}/test.wav"
 )
+set_tests_properties(test_piper PROPERTIES SKIP_RETURN_CODE 77)
 
 target_compile_features(test_piper PUBLIC cxx_std_17)
 
@@ -702,6 +703,13 @@ install(
   DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/share/open_jtalk
   DESTINATION share
   OPTIONAL  # Don't fail if not present
+)
+
+# Install voices.json catalog for model listing/downloading
+install(
+  FILES ${CMAKE_CURRENT_SOURCE_DIR}/src/python_run/piper/voices.json
+  DESTINATION share
+  OPTIONAL
 )
 
 # Note: We don't need to copy espeak-ng library on macOS separately

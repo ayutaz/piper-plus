@@ -69,6 +69,47 @@ This document lists all environment variables that can be used to configure Pipe
   export PIPER_OFFLINE_MODE=1
   ```
 
+## Model Configuration
+
+### PIPER_DEFAULT_MODEL
+- **Description**: Default ONNX model path, used when `--model` is not specified on the command line
+- **Default**: None (must be specified via CLI or this variable)
+- **Example**:
+  ```bash
+  # Windows
+  set PIPER_DEFAULT_MODEL=C:\models\ja_JP-tsukuyomi-medium.onnx
+
+  # Linux/macOS
+  export PIPER_DEFAULT_MODEL=/opt/piper/models/ja_JP-tsukuyomi-medium.onnx
+  ```
+
+### PIPER_DEFAULT_CONFIG
+- **Description**: Default model configuration file path (JSON), used when `--config` is not specified on the command line
+- **Default**: None (auto-detected from model path if not set)
+- **Example**:
+  ```bash
+  # Windows
+  set PIPER_DEFAULT_CONFIG=C:\models\ja_JP-tsukuyomi-medium.onnx.json
+
+  # Linux/macOS
+  export PIPER_DEFAULT_CONFIG=/opt/piper/models/ja_JP-tsukuyomi-medium.onnx.json
+  ```
+
+### PIPER_MODEL_DIR
+- **Description**: Directory where models are downloaded to, used when `--model-dir` is not specified on the command line
+- **Default**: Platform-specific user data directory
+  - Windows: `%APPDATA%\piper\models`
+  - Linux: `~/.local/share/piper/models`
+  - macOS: `~/.local/share/piper/models`
+- **Example**:
+  ```bash
+  # Windows
+  set PIPER_MODEL_DIR=D:\piper-models
+
+  # Linux/macOS
+  export PIPER_MODEL_DIR=/opt/piper/models
+  ```
+
 ## Runtime Configuration
 
 ### ESPEAK_DATA_PATH
@@ -80,6 +121,15 @@ This document lists all environment variables that can be used to configure Pipe
 - **Example**:
   ```bash
   export ESPEAK_DATA_PATH=/usr/local/share/espeak-ng-data
+  ```
+
+### PIPER_GPU_DEVICE_ID
+- **Description**: GPU device ID to use for CUDA inference
+- **Default**: `0` (first GPU)
+- **Example**:
+  ```bash
+  # Use the second GPU
+  export PIPER_GPU_DEVICE_ID=1
   ```
 
 ### LD_LIBRARY_PATH (Linux)

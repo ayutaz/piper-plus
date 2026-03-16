@@ -33,6 +33,9 @@ docs/
 
 # Test files
 test/
+!test/models/
+!test/models/test_voice.onnx
+!test/models/test_voice.onnx.json
 tests/
 *_test.py
 test_*.py
@@ -89,6 +92,7 @@ nul
 *.wav
 *.mp3
 *.onnx
+!test/models/test_voice.onnx
 *.pt
 *.pth
 *.ckpt

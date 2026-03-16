@@ -74,8 +74,6 @@ private:
     std::string toLowerCase(const std::string& str) const;
     bool isMixedCase(const std::string& str) const;
     std::regex getWordPattern(const std::string& word, bool caseSensitive) const;
-    void loadDictionaryV1(const std::string& dictPath, const void* jsonData);
-    void loadDictionaryV2(const std::string& dictPath, const void* jsonData);
 };
 
 // 便利な関数

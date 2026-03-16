@@ -134,6 +134,27 @@ cat test.jsonl | CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.infer_onnx
 
 ## 実装済み機能
 
+### C++/Python CLI UX改善 ✅ NEW (2026-03-16)
+
+C++/Python CLIにモデル管理・テキスト直接入力機能を追加。Windows UTF-8対応。
+
+**新CLIオプション:**
+| オプション | C++ | Python | 説明 |
+|-----------|-----|--------|------|
+| `--text TEXT` | ✅ | - | テキスト直接入力（パイプ不要） |
+| `--list-models [LANG]` | ✅ | ✅ | モデル一覧表示 |
+| `--download-model NAME` | ✅ | ✅ | モデルダウンロード |
+| `--model-dir DIR` | ✅ | - | ダウンロード先指定 |
+| `--version` | ✅ | ✅ | バージョン表示 |
+
+**環境変数:** `PIPER_DEFAULT_MODEL`, `PIPER_DEFAULT_CONFIG`, `PIPER_MODEL_DIR`
+
+**実装ファイル:**
+- `src/cpp/main.cpp` — C++ CLI新オプション
+- `src/cpp/model_manager.cpp/hpp` — モデルカタログ管理
+- `src/python_run/piper/download.py` — Python モデルダウンロード
+- `scripts/speak.bat`, `scripts/speak.ps1` — Windows ヘルパー
+
 ### Phonemizer ABC + 言語レジストリ ✅ NEW (2026-02-01)
 
 `Phonemizer` 抽象基底クラスと言語レジストリにより、if/elif分岐を解消。新言語追加が容易に。
@@ -468,6 +489,7 @@ cat /path/to/test.jsonl | \
 
 | PR/Issue | 内容 | 状態 |
 |----------|------|------|
+| PR #244 | C++/Python CLI UX改善 (--text, --list-models, --download-model) | Open |
 | PR #230 | Docker テスト強化・ブランチ統一 | Merged |
 | PR #229 | C++/Python音素化パイプライン同期 (M1-M4) | Open |
 | PR #212 | WavLM Discriminator追加 | Open |
