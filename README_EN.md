@@ -278,6 +278,7 @@ Key options:
 | `--list-models [LANG]` | List available models | - |
 | `--download-model NAME` | Download a model | - |
 | `--model-dir DIR` | Model download directory | - |
+| `--version` | Show version | - |
 
 Run `piper --help` for all options.
 

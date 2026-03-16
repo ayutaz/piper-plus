@@ -351,6 +351,7 @@ echo 'Long text...' | ./piper --model en_model.onnx --output-raw | \
 | `--list-models [LANG]` | 利用可能なモデル一覧を表示 | - |
 | `--download-model NAME` | モデルをダウンロード | - |
 | `--model-dir DIR` | モデルのダウンロード先ディレクトリ | - |
+| `--version` | バージョン表示 | - |
 
 `piper --help` で全オプションを確認できます。
 

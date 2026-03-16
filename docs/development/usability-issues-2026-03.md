@@ -27,7 +27,7 @@
 - [PR #241](https://github.com/ayutaz/piper-plus/pull/241) (マージ済み, commit `1dc64b6`) により、ドキュメント改善を実施。
 - [PR #242](https://github.com/ayutaz/piper-plus/pull/242) (マージ済み, commit `b20b116`) により、WebUI セッションキャッシュを導入。
 - [PR #243](https://github.com/ayutaz/piper-plus/pull/243) (マージ済み, commit `932cceb`) により、config.json フォールバック検索を統一。
-- [PR #244](https://github.com/ayutaz/piper-plus/pull/244) (OPEN) により、C++/Python CLI UX改善を実装。`--text` / `--list-models` / `--download-model` + ヘルパースクリプト。
+- [PR #244](https://github.com/ayutaz/piper-plus/pull/244) (OPEN) により、C++/Python CLI UX改善を実装。`--text` / `--list-models` / `--download-model` + ヘルパースクリプト。Windows UTF-8 対応 (GetCommandLineW)、セキュリティ強化 (URL検証, パストラバーサル防止, shell injection 防止)、Docker テスト既存失敗4件修正 (100% pass)。
 
 | # | 優先度 | 課題 | 状態 | 種別 |
 |---|--------|------|------|------|
@@ -264,3 +264,5 @@ ONNX `InferenceSession` がリクエスト毎に再生成されている。
 - 対応PR: [#242](https://github.com/ayutaz/piper-plus/pull/242) (マージ済み) — WebUI セッションキャッシュ
 - 対応PR: [#243](https://github.com/ayutaz/piper-plus/pull/243) (マージ済み) — config.json フォールバック検索統一
 - 対応PR: [#244](https://github.com/ayutaz/piper-plus/pull/244) (OPEN) — C++/Python CLI UX改善
+  - `59164a6` fix: Docker テスト4件の既存失敗を修正 (100% pass)
+  - `681cc31` fix: Windows で --text の日本語が文字化けする問題を修正

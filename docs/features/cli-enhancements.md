@@ -184,6 +184,84 @@ echo "名前は [[ m a i k u r u ]] です" | piper --model ja_JP-test.onnx -f n
 
 For detailed usage, see [Phoneme Input Guide](phoneme-input.md).
 
+## Model Management (モデル管理)
+
+List, download, and manage voice models directly from the CLI.
+
+### `--list-models [LANG]`
+
+Display available voice models. Optionally filter by language code (e.g., `ja`, `en`):
+
+```bash
+# List all available models
+piper --list-models
+
+# List only Japanese models
+piper --list-models ja
+
+# List only English models
+piper --list-models en
+```
+
+### `--download-model NAME`
+
+Download a voice model from HuggingFace. Supports both full model names and short aliases (e.g., `ja-tsukuyomi`):
+
+```bash
+# Download using alias
+piper --download-model ja-tsukuyomi
+
+# Specify a custom download directory
+piper --download-model ja-tsukuyomi --model-dir ./models
+```
+
+### `--model-dir DIR`
+
+Set the directory where models are downloaded. Can also be configured via the `PIPER_MODEL_DIR` environment variable:
+
+```bash
+# Via CLI argument
+piper --download-model ja-tsukuyomi --model-dir /path/to/models
+
+# Via environment variable
+export PIPER_MODEL_DIR=/path/to/models
+piper --download-model ja-tsukuyomi
+```
+
+**Priority**: CLI argument > Environment variable > Default directory
+
+### `--version`
+
+Display the current Piper version:
+
+```bash
+piper --version
+```
+
+### Python CLI Model Management
+
+The same model management features are available in the Python CLI:
+
+```bash
+# List Japanese models
+python -m piper --list-models ja
+
+# Download a model
+python -m piper --download-model ja-tsukuyomi
+
+# Show version
+python -m piper --version
+```
+
+### Security (セキュリティ)
+
+The download functionality includes the following security measures:
+
+- **URL validation**: Only URLs starting with `https://huggingface.co/` are accepted
+- **Voice key sanitization**: Path traversal characters (`..`, `/`, `\`) are rejected to prevent directory escape
+- **Repository ID validation**: Only alphanumerics, hyphens, underscores, dots, and a single `owner/repo` slash are allowed
+- **Shell injection prevention**: URLs and file paths are validated against a strict character allowlist before being passed to download commands
+
 ## Future Enhancements
 
 Planned features for future releases:
