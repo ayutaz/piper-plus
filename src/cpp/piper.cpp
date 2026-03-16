@@ -20,6 +20,9 @@
 #include "openjtalk_phonemize.hpp"
 #include "phoneme_parser.hpp"
 #include "language_detector.hpp"
+#include "spanish_phonemize.hpp"
+#include "french_phonemize.hpp"
+#include "portuguese_phonemize.hpp"
 
 #ifdef USE_ARM64_NEON
 #include "audio_neon.hpp"
@@ -1104,21 +1107,28 @@ void textToAudio(PiperConfig &config, Voice &voice, std::string text,
                 }
               }
             }
+          } else if (langSeg.lang == "es") {
+            // Spanish: native rule-based phonemizer
+            phonemize_spanish(langSeg.text, langPhonemes);
+          } else if (langSeg.lang == "fr") {
+            // French: native rule-based phonemizer
+            phonemize_french(langSeg.text, langPhonemes);
+          } else if (langSeg.lang == "pt") {
+            // Portuguese: native rule-based phonemizer
+            phonemize_portuguese(langSeg.text, langPhonemes);
           } else {
-            // Other languages: use eSpeak
+            // Other languages (EN, ZH, KO): use eSpeak fallback
             eSpeakPhonemeConfig eSpeakConfig;
-            // Map language code to espeak voice
             if (langSeg.lang == "en") eSpeakConfig.voice = "en-us";
             else if (langSeg.lang == "zh") eSpeakConfig.voice = "cmn";
             else if (langSeg.lang == "ko") eSpeakConfig.voice = "ko";
-            else if (langSeg.lang == "es") eSpeakConfig.voice = "es-la";
-            else if (langSeg.lang == "fr") eSpeakConfig.voice = "fr";
-            else if (langSeg.lang == "pt") eSpeakConfig.voice = "pt-br";
             else eSpeakConfig.voice = langSeg.lang;
 
             phonemize_eSpeak(langSeg.text, eSpeakConfig, langPhonemes);
+          }
 
-            // eSpeak phonemes don't have BOS/EOS inline, just add them
+          // Add phonemes from non-JA segment
+          if (langSeg.lang != "ja") {
             for (const auto& sentence : langPhonemes) {
               for (auto ph : sentence) {
                 allPhonemes.push_back(ph);
