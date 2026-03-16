@@ -305,8 +305,14 @@ int main(int argc, char *argv[]) {
     // Try as a numeric ID first
     try {
       piper::LanguageId lid = std::stol(langStr);
-      voice.synthesisConfig.languageId = lid;
-      spdlog::info("Using language ID: {}", lid);
+      if (lid < 0 || lid >= voice.modelConfig.numLanguages) {
+        spdlog::warn("Language ID {} out of range [0, {}), using default (0)",
+                     lid, voice.modelConfig.numLanguages);
+        voice.synthesisConfig.languageId = 0;
+      } else {
+        voice.synthesisConfig.languageId = lid;
+        spdlog::info("Using language ID: {}", lid);
+      }
     } catch (const std::exception&) {
       // Try as a language code (e.g. "ja", "en")
       if (voice.modelConfig.languageIdMap &&
@@ -320,6 +326,15 @@ int main(int argc, char *argv[]) {
         voice.synthesisConfig.languageId = 0;
       }
     }
+  }
+
+  // Warn if languageId is set but model has no lid input
+  if (voice.synthesisConfig.languageId.has_value() &&
+      voice.synthesisConfig.languageId.value() != 0 &&
+      !voice.session.hasLidInput) {
+    spdlog::warn("Model does not support language selection (no lid input), "
+                 "language_id={} will be ignored",
+                 voice.synthesisConfig.languageId.value());
   }
 
   // Get the path to the piper executable so we can locate espeak-ng-data, etc.
@@ -548,8 +563,14 @@ void processLine(string line, RunConfig &runConfig, piper::PiperConfig &piperCon
     }
 
     if (lineRoot.contains("language_id")) {
-      voice.synthesisConfig.languageId =
-          lineRoot["language_id"].get<piper::LanguageId>();
+      auto lid = lineRoot["language_id"].get<piper::LanguageId>();
+      if (lid < 0 || lid >= voice.modelConfig.numLanguages) {
+        spdlog::warn("JSON language_id {} out of range [0, {}), using default (0)",
+                     lid, voice.modelConfig.numLanguages);
+        voice.synthesisConfig.languageId = 0;
+      } else {
+        voice.synthesisConfig.languageId = lid;
+      }
     } else if (lineRoot.contains("language")) {
       auto langCode = lineRoot["language"].get<std::string>();
       if (voice.modelConfig.languageIdMap &&
@@ -557,7 +578,8 @@ void processLine(string line, RunConfig &runConfig, piper::PiperConfig &piperCon
         voice.synthesisConfig.languageId =
             (*voice.modelConfig.languageIdMap)[langCode];
       } else {
-        spdlog::warn("Unknown language code in JSON: {}", langCode);
+        spdlog::warn("Unknown language code in JSON: '{}', using default (0)", langCode);
+        voice.synthesisConfig.languageId = 0;
       }
     }
 

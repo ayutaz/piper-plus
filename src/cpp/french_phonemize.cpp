@@ -162,8 +162,118 @@ static std::u32string utf8ToU32(const std::string &s) {
 }
 
 // ---------------------------------------------------------------------------
-// Normalize: lowercase + NFC (simplified), strip whitespace
+// Normalize: collapse NFD combining sequences, lowercase, strip whitespace
 // ---------------------------------------------------------------------------
+
+// Collapse NFD (decomposed) base+combining-mark pairs into NFC pre-composed
+// codepoints.  This handles input where accented characters arrive as two
+// codepoints (e.g. U+0065 U+0301 for e-acute) instead of the single NFC form
+// (U+00E9).  Both upper- and lowercase base letters are handled; toLowerFr()
+// is applied afterwards.
+//
+// Combining marks handled:
+//   U+0300 combining grave accent
+//   U+0301 combining acute accent
+//   U+0302 combining circumflex accent
+//   U+0303 combining tilde
+//   U+0308 combining diaeresis
+//   U+0327 combining cedilla
+static std::u32string collapseNFD(const std::u32string &input) {
+    std::u32string out;
+    out.reserve(input.size());
+
+    size_t i = 0;
+    size_t n = input.size();
+    while (i < n) {
+        char32_t ch = input[i];
+
+        // Check if next codepoint is a combining mark we handle
+        if (i + 1 < n) {
+            char32_t comb = input[i + 1];
+            char32_t composed = 0;
+
+            switch (comb) {
+            case 0x0300: // combining grave accent
+                switch (ch) {
+                    case U'A': composed = 0x00C0; break; // A-grave
+                    case U'a': composed = 0x00E0; break; // a-grave
+                    case U'E': composed = 0x00C8; break; // E-grave
+                    case U'e': composed = 0x00E8; break; // e-grave
+                    case U'U': composed = 0x00D9; break; // U-grave
+                    case U'u': composed = 0x00F9; break; // u-grave
+                    default: break;
+                }
+                break;
+
+            case 0x0301: // combining acute accent
+                switch (ch) {
+                    case U'E': composed = 0x00C9; break; // E-acute
+                    case U'e': composed = 0x00E9; break; // e-acute
+                    default: break;
+                }
+                break;
+
+            case 0x0302: // combining circumflex accent
+                switch (ch) {
+                    case U'A': composed = 0x00C2; break; // A-circumflex
+                    case U'a': composed = 0x00E2; break; // a-circumflex
+                    case U'E': composed = 0x00CA; break; // E-circumflex
+                    case U'e': composed = 0x00EA; break; // e-circumflex
+                    case U'I': composed = 0x00CE; break; // I-circumflex
+                    case U'i': composed = 0x00EE; break; // i-circumflex
+                    case U'O': composed = 0x00D4; break; // O-circumflex
+                    case U'o': composed = 0x00F4; break; // o-circumflex
+                    case U'U': composed = 0x00DB; break; // U-circumflex
+                    case U'u': composed = 0x00FB; break; // u-circumflex
+                    default: break;
+                }
+                break;
+
+            case 0x0303: // combining tilde (loan words: ñ)
+                switch (ch) {
+                    case U'N': composed = 0x00D1; break; // N-tilde
+                    case U'n': composed = 0x00F1; break; // n-tilde
+                    default: break;
+                }
+                break;
+
+            case 0x0308: // combining diaeresis
+                switch (ch) {
+                    case U'E': composed = 0x00CB; break; // E-diaeresis
+                    case U'e': composed = 0x00EB; break; // e-diaeresis
+                    case U'I': composed = 0x00CF; break; // I-diaeresis
+                    case U'i': composed = 0x00EF; break; // i-diaeresis
+                    case U'U': composed = 0x00DC; break; // U-diaeresis
+                    case U'u': composed = 0x00FC; break; // u-diaeresis
+                    default: break;
+                }
+                break;
+
+            case 0x0327: // combining cedilla
+                switch (ch) {
+                    case U'C': composed = 0x00C7; break; // C-cedilla
+                    case U'c': composed = 0x00E7; break; // c-cedilla
+                    default: break;
+                }
+                break;
+
+            default:
+                break;
+            }
+
+            if (composed != 0) {
+                out.push_back(composed);
+                i += 2; // consumed base + combining mark
+                continue;
+            }
+        }
+
+        out.push_back(ch);
+        ++i;
+    }
+
+    return out;
+}
 
 // Simple ASCII-range + Latin-1 Supplement + Latin Extended-A tolower
 static char32_t toLowerFr(char32_t ch) {
@@ -181,11 +291,16 @@ static char32_t toLowerFr(char32_t ch) {
 }
 
 static std::u32string normalize(const std::u32string &input) {
+    // First collapse NFD combining sequences into NFC pre-composed forms.
+    // This must happen before lowercasing so that e.g. 'E' + U+0301 becomes
+    // U+00C9 (E-acute) which toLowerFr() then maps to U+00E9 (e-acute).
+    std::u32string nfc = collapseNFD(input);
+
     std::u32string result;
-    result.reserve(input.size());
+    result.reserve(nfc.size());
 
     bool lastWasSpace = true; // to collapse leading spaces
-    for (char32_t ch : input) {
+    for (char32_t ch : nfc) {
         // Collapse whitespace
         if (ch == U' ' || ch == U'\t' || ch == U'\n' || ch == U'\r') {
             if (!lastWasSpace) {

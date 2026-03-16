@@ -697,12 +697,26 @@ bool loadPinyinDicts(const std::string& singleCharPath,
         }
 
         // Keys are Chinese character sequences (UTF-8 strings)
-        // Values are space-separated pinyin with tone numbers
+        // Values may be:
+        //   - a string: "yi2 ge4"
+        //   - an array of arrays: [["yi2"], ["ge4"]]  (pypinyin format)
+        //   - an array of strings: ["yi2", "ge4"]
         for (auto& [key, val] : j.items()) {
             if (val.is_string()) {
                 phraseDict[key] = val.get<std::string>();
             } else if (val.is_array() && !val.empty()) {
-                phraseDict[key] = val[0].get<std::string>();
+                std::string pyStr;
+                for (size_t idx = 0; idx < val.size(); ++idx) {
+                    if (idx > 0) pyStr += " ";
+                    if (val[idx].is_array() && !val[idx].empty()) {
+                        pyStr += val[idx][0].get<std::string>();
+                    } else if (val[idx].is_string()) {
+                        pyStr += val[idx].get<std::string>();
+                    }
+                }
+                if (!pyStr.empty()) {
+                    phraseDict[key] = pyStr;
+                }
             }
         }
     }

@@ -155,43 +155,57 @@ static const MedialEntry MEDIAL_TABLE[N_MEDIALS] = {
 // Complex finals (겹받침) are simplified to their representative sound.
 // Index 0 = no final consonant (phoneme value 0).
 // ---------------------------------------------------------------------------
-struct FinalEntry {
-    Phoneme ph;          // 0 = no final
-    int liaisonInitial;  // initial index to use for liaison (-1 = none)
-};
 
 // Liaison mapping: which initial consonant index the final "becomes" when
 // followed by ㅇ (silent initial). -1 means no liaison or index 0 (none).
 // This captures the most common liaison pattern (연음화).
+//
+// For complex finals (겹받침) with liaison, the liaisonInitial carries the
+// second component to the next syllable, while residualFinal holds the first
+// component that remains in the current syllable.  For simple finals,
+// residualFinal is 0 (the entire final moves to the next syllable).
+struct FinalEntry {
+    Phoneme ph;          // 0 = no final
+    int liaisonInitial;  // initial index to use for liaison (-1 = none)
+    int residualFinal;   // final index remaining after liaison (0 = none)
+};
+
 static const FinalEntry FINAL_TABLE[N_FINALS] = {
-    { 0,              -1 },  //  0: (none)
-    { PUA_K_UNREL,     0 },  //  1: ㄱ -> liaison: ㄱ (initial 0)
-    { PUA_K_UNREL,     1 },  //  2: ㄲ -> liaison: ㄲ (initial 1)
-    { PUA_K_UNREL,     9 },  //  3: ㄳ -> liaison: ㅅ (initial 9)
-    { 'n',            -1 },  //  4: ㄴ
-    { 'n',            12 },  //  5: ㄵ -> liaison: ㅈ (initial 12)
-    { 'n',            -1 },  //  6: ㄶ (ㄴ+ㅎ -> n, h dropped)
-    { PUA_T_UNREL,     3 },  //  7: ㄷ -> liaison: ㄷ (initial 3)
-    { 'l',             5 },  //  8: ㄹ -> liaison: ㄹ (initial 5)
-    { PUA_K_UNREL,     0 },  //  9: ㄺ -> liaison: ㄱ (initial 0)
-    { 'm',             5 },  // 10: ㄻ -> liaison: ㄹ (initial 5)?  simplified: m stands
-    { 'l',             7 },  // 11: ㄼ -> liaison: ㅂ (initial 7)
-    { 'l',             9 },  // 12: ㄽ -> liaison: ㅅ (initial 9)
-    { 'l',            16 },  // 13: ㄾ -> liaison: ㅌ (initial 16)
-    { 'l',            17 },  // 14: ㄿ -> liaison: ㅍ (initial 17)
-    { 'l',            -1 },  // 15: ㅀ (ㄹ+ㅎ -> l, h dropped)
-    { 'm',            -1 },  // 16: ㅁ
-    { PUA_P_UNREL,     7 },  // 17: ㅂ -> liaison: ㅂ (initial 7)
-    { PUA_P_UNREL,     9 },  // 18: ㅄ -> liaison: ㅅ (initial 9)
-    { PUA_T_UNREL,     9 },  // 19: ㅅ -> liaison: ㅅ (initial 9)
-    { PUA_T_UNREL,    10 },  // 20: ㅆ -> liaison: ㅆ (initial 10)
-    { IPA_ENG,        -1 },  // 21: ㅇ (velar nasal in coda)
-    { PUA_T_UNREL,    12 },  // 22: ㅈ -> liaison: ㅈ (initial 12)
-    { PUA_T_UNREL,    14 },  // 23: ㅊ -> liaison: ㅊ (initial 14)
-    { PUA_K_UNREL,    15 },  // 24: ㅋ -> liaison: ㅋ (initial 15)
-    { PUA_T_UNREL,    16 },  // 25: ㅌ -> liaison: ㅌ (initial 16)
-    { PUA_P_UNREL,    17 },  // 26: ㅍ -> liaison: ㅍ (initial 17)
-    { PUA_T_UNREL,    -1 },  // 27: ㅎ (h dropped in liaison context)
+    { 0,              -1,  0 },  //  0: (none)
+    { PUA_K_UNREL,     0,  0 },  //  1: ㄱ -> liaison: ㄱ (initial 0)
+    { PUA_K_UNREL,     1,  0 },  //  2: ㄲ -> liaison: ㄲ (initial 1)
+    { PUA_K_UNREL,     9,  1 },  //  3: ㄳ -> liaison: ㅅ (initial 9), residual: ㄱ (final 1)
+    { 'n',            -1,  0 },  //  4: ㄴ
+    { 'n',            12,  4 },  //  5: ㄵ -> liaison: ㅈ (initial 12), residual: ㄴ (final 4)
+    { 'n',            -1,  0 },  //  6: ㄶ (ㄴ+ㅎ -> n, h dropped)
+    { PUA_T_UNREL,     3,  0 },  //  7: ㄷ -> liaison: ㄷ (initial 3)
+    { 'l',             5,  0 },  //  8: ㄹ -> liaison: ㄹ (initial 5)
+    { PUA_K_UNREL,     0,  8 },  //  9: ㄺ -> liaison: ㄱ (initial 0), residual: ㄹ (final 8)
+    // 10: ㄻ (ㄹ+ㅁ) — In standard Korean, ㄻ before ㅇ undergoes liaison
+    // where ㅁ moves to the next syllable's initial. However, ㅁ (bilabial
+    // nasal) has no corresponding initial consonant index in the 19-initial
+    // system (initial index 6 is ㅁ=[m], but the standard pronunciation rule
+    // is that ㄹ is pronounced and ㅁ liaisons: 삶이 → [sal.mi]). We map
+    // liaisonInitial=6 (ㅁ initial) and keep ㄹ (final 8) as residual.
+    // Exception words (e.g., 곬이→[gol.mi]) follow the same pattern.
+    { 'm',             6,  8 },  // 10: ㄻ -> liaison: ㅁ (initial 6), residual: ㄹ (final 8)
+    { 'l',             7,  8 },  // 11: ㄼ -> liaison: ㅂ (initial 7), residual: ㄹ (final 8)
+    { 'l',             9,  8 },  // 12: ㄽ -> liaison: ㅅ (initial 9), residual: ㄹ (final 8)
+    { 'l',            16,  8 },  // 13: ㄾ -> liaison: ㅌ (initial 16), residual: ㄹ (final 8)
+    { 'l',            17,  8 },  // 14: ㄿ -> liaison: ㅍ (initial 17), residual: ㄹ (final 8)
+    { 'l',            -1,  0 },  // 15: ㅀ (ㄹ+ㅎ -> l, h dropped)
+    { 'm',            -1,  0 },  // 16: ㅁ
+    { PUA_P_UNREL,     7,  0 },  // 17: ㅂ -> liaison: ㅂ (initial 7)
+    { PUA_P_UNREL,     9, 17 },  // 18: ㅄ -> liaison: ㅅ (initial 9), residual: ㅂ (final 17)
+    { PUA_T_UNREL,     9,  0 },  // 19: ㅅ -> liaison: ㅅ (initial 9)
+    { PUA_T_UNREL,    10,  0 },  // 20: ㅆ -> liaison: ㅆ (initial 10)
+    { IPA_ENG,        -1,  0 },  // 21: ㅇ (velar nasal in coda)
+    { PUA_T_UNREL,    12,  0 },  // 22: ㅈ -> liaison: ㅈ (initial 12)
+    { PUA_T_UNREL,    14,  0 },  // 23: ㅊ -> liaison: ㅊ (initial 14)
+    { PUA_K_UNREL,    15,  0 },  // 24: ㅋ -> liaison: ㅋ (initial 15)
+    { PUA_T_UNREL,    16,  0 },  // 25: ㅌ -> liaison: ㅌ (initial 16)
+    { PUA_P_UNREL,    17,  0 },  // 26: ㅍ -> liaison: ㅍ (initial 17)
+    { PUA_T_UNREL,    -1,  0 },  // 27: ㅎ (h dropped in liaison context)
 };
 
 // ---------------------------------------------------------------------------
@@ -282,17 +296,25 @@ static void processHangulRun(const std::vector<char32_t> &cps,
     // Apply basic liaison (연음화):
     // If syllable[i] has a final consonant and syllable[i+1] starts with
     // ㅇ (initial==11, silent), move the final to become the next initial.
+    //
+    // The liaison remaps the final consonant from its unreleased coda form
+    // (e.g. k̚, t̚, p̚) to the released initial form (e.g. k, t, p) by
+    // looking up liaisonInitial in INITIAL_TABLE.  For complex finals
+    // (겹받침), the second component liaisons while the first remains as
+    // residualFinal in the current syllable.
     for (size_t i = 0; i + 1 < syls.size(); ++i) {
         int fi = syls[i].final_;
-        if (fi == 0) continue;                    // no final -> skip
-        if (syls[i + 1].initial != 11) continue;  // next initial is not ㅇ
+        if (fi <= 0 || fi >= N_FINALS) continue;  // bounds check + no final
+        if (syls[i + 1].initial != 11) continue;   // next initial is not ㅇ
 
         int liaisonInit = FINAL_TABLE[fi].liaisonInitial;
         if (liaisonInit < 0) continue;  // no liaison defined
 
-        // Move final -> next initial
+        // Move final -> next initial (released form via INITIAL_TABLE)
         syls[i + 1].initial = liaisonInit;
-        syls[i].final_ = 0;  // clear the final
+        // For complex finals, keep the first component; for simple finals,
+        // residualFinal is 0 which clears the final entirely.
+        syls[i].final_ = FINAL_TABLE[fi].residualFinal;
     }
 
     // Emit phonemes for all syllables

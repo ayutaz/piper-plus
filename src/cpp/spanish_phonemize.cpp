@@ -115,12 +115,54 @@ static char32_t toLowerSp(char32_t cp) {
 }
 
 // -----------------------------------------------------------------------
-// Normalize: lowercase + simplified NFC (handles pre-composed accented chars)
+// Collapse NFD combining sequences into NFC pre-composed codepoints.
+//
+// Python's unicodedata.normalize("NFC", text) handles this automatically,
+// but C++ receives raw UTF-8 which may contain decomposed forms
+// (e.g., 'a' + U+0301 combining acute instead of U+00E1 á).
+// We handle the small set of combiners relevant to Spanish:
+//   U+0301 combining acute accent  → á é í ó ú / Á É Í Ó Ú
+//   U+0308 combining diaeresis     → ü / Ü
+//   U+0303 combining tilde         → ñ / Ñ
 // -----------------------------------------------------------------------
-static std::vector<char32_t> normalize(const std::vector<char32_t> &cps) {
+static std::vector<char32_t> collapseCombiners(const std::vector<char32_t> &cps) {
     std::vector<char32_t> out;
     out.reserve(cps.size());
-    for (auto cp : cps) {
+    for (size_t i = 0; i < cps.size(); ++i) {
+        if (i + 1 < cps.size() && cps[i + 1] == 0x0301) { // combining acute
+            switch (cps[i]) {
+            case 'A': out.push_back(0x00C1); ++i; continue; // Á
+            case 'a': out.push_back(0x00E1); ++i; continue; // á
+            case 'E': out.push_back(0x00C9); ++i; continue; // É
+            case 'e': out.push_back(0x00E9); ++i; continue; // é
+            case 'I': out.push_back(0x00CD); ++i; continue; // Í
+            case 'i': out.push_back(0x00ED); ++i; continue; // í
+            case 'O': out.push_back(0x00D3); ++i; continue; // Ó
+            case 'o': out.push_back(0x00F3); ++i; continue; // ó
+            case 'U': out.push_back(0x00DA); ++i; continue; // Ú
+            case 'u': out.push_back(0x00FA); ++i; continue; // ú
+            default: break; // unknown base — fall through, don't skip combiner
+            }
+        } else if (i + 1 < cps.size() && cps[i + 1] == 0x0308) { // combining diaeresis
+            if (cps[i] == 'U') { out.push_back(0x00DC); ++i; continue; } // Ü
+            if (cps[i] == 'u') { out.push_back(0x00FC); ++i; continue; } // ü
+        } else if (i + 1 < cps.size() && cps[i + 1] == 0x0303) { // combining tilde
+            if (cps[i] == 'N') { out.push_back(0x00D1); ++i; continue; } // Ñ
+            if (cps[i] == 'n') { out.push_back(0x00F1); ++i; continue; } // ñ
+        }
+        out.push_back(cps[i]);
+    }
+    return out;
+}
+
+// -----------------------------------------------------------------------
+// Normalize: NFD→NFC collapse + lowercase
+// -----------------------------------------------------------------------
+static std::vector<char32_t> normalize(const std::vector<char32_t> &cps) {
+    auto nfc = collapseCombiners(cps);
+    std::vector<char32_t> out;
+    out.reserve(nfc.size());
+    for (auto cp : nfc) {
         out.push_back(toLowerSp(cp));
     }
     return out;

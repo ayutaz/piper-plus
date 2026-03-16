@@ -1,8 +1,14 @@
 # 新規追加ファイル: 多文字音素→1文字(コードポイント) 変換を共通提供
 # This mapping must match the C++ implementation in openjtalk_phonemize.cpp
+# and all language-specific C++ phonemizers (chinese_phonemize.cpp, etc.)
 
-# Fixed PUA mapping table to ensure consistency between Python and C++
+# Fixed PUA mapping table to ensure consistency between Python and C++.
+# CRITICAL: Every PUA codepoint hardcoded in C++ MUST appear here.
+# Do NOT change assigned codepoints — they are baked into trained models.
 FIXED_PUA_MAPPING = {
+    # =======================================================================
+    # Japanese (JA) — openjtalk_phonemize_utils.cpp
+    # =======================================================================
     # Long vowels
     "a:": 0xE000,
     "i:": 0xE001,
@@ -39,9 +45,96 @@ FIXED_PUA_MAPPING = {
     "N_n": 0xE01A,  # ん before n/t/d/ts/ch (alveolar)
     "N_ng": 0xE01B,  # ん before k/g (velar)
     "N_uvular": 0xE01C,  # ん at end or before vowels
-    # Multilingual extensions
-    "rr": 0xE01D,  # Spanish trill r (orthographic, not IPA)
-    "y_vowel": 0xE01E,  # Close front rounded vowel [y] (ZH pinyin ü, FR lune) - distinct from JA glide "y"
+    # =======================================================================
+    # Multilingual shared
+    # =======================================================================
+    "rr": 0xE01D,  # Spanish trill r (ES spanish_phonemize.cpp PUA_RR)
+    "y_vowel": 0xE01E,  # Close front rounded vowel [y] (ZH pinyin ü, FR lune)
+    # 0xE01F reserved (unused gap)
+    # =======================================================================
+    # Chinese (ZH) — chinese_phonemize.cpp
+    # =======================================================================
+    # --- Initials (aspirated/affricate) ---
+    "p\u02B0": 0xE020,   # pʰ  aspirated bilabial (pinyin p)
+    "t\u02B0": 0xE021,   # tʰ  aspirated alveolar (pinyin t)
+    "k\u02B0": 0xE022,   # kʰ  aspirated velar (pinyin k)
+    "t\u0255": 0xE023,   # tɕ  alveolo-palatal affricate (pinyin j)
+    "t\u0255\u02B0": 0xE024,  # tɕʰ  aspirated alveolo-palatal affricate (pinyin q)
+    # (ɕ U+0255 is a single codepoint — no PUA needed)
+    "t\u0282": 0xE025,   # tʂ  retroflex affricate (pinyin zh)
+    "t\u0282\u02B0": 0xE026,  # tʂʰ  aspirated retroflex affricate (pinyin ch)
+    # (ʂ U+0282, ɻ U+027B are single codepoints — no PUA needed)
+    "ts\u02B0": 0xE027,  # tsʰ  aspirated alveolar affricate (pinyin c)
+    # --- Diphthongs ---
+    "a\u026A": 0xE028,   # aɪ  (pinyin ai)
+    "e\u026A": 0xE029,   # eɪ  (pinyin ei)
+    "a\u028A": 0xE02A,   # aʊ  (pinyin ao)
+    "o\u028A": 0xE02B,   # oʊ  (pinyin ou)
+    # --- Nasal finals ---
+    "an": 0xE02C,         # an  (pinyin an)
+    "\u0259n": 0xE02D,   # ən  (pinyin en)
+    "a\u014B": 0xE02E,   # aŋ  (pinyin ang)
+    "\u0259\u014B": 0xE02F,  # əŋ  (pinyin eng)
+    "u\u014B": 0xE030,   # uŋ  (pinyin ong)
+    # --- i-compound finals (齐齿呼) ---
+    "ia": 0xE031,         # ia  (pinyin ia/ya)
+    "i\u025B": 0xE032,   # iɛ  (pinyin ie/ye)
+    "iou": 0xE033,        # iou (pinyin iu/you)
+    "ia\u028A": 0xE034,  # iaʊ (pinyin iao/yao)
+    "i\u025Bn": 0xE035,  # iɛn (pinyin ian/yan)
+    "in": 0xE036,         # in  (pinyin in/yin)
+    "ia\u014B": 0xE037,  # iaŋ (pinyin iang/yang)
+    "i\u014B": 0xE038,   # iŋ  (pinyin ing/ying)
+    "iu\u014B": 0xE039,  # iuŋ (pinyin iong/yong)
+    # --- u-compound finals (合口呼) ---
+    "ua": 0xE03A,         # ua  (pinyin ua/wa)
+    "uo": 0xE03B,         # uo  (pinyin uo/wo)
+    "ua\u026A": 0xE03C,  # uaɪ (pinyin uai/wai)
+    "ue\u026A": 0xE03D,  # ueɪ (pinyin ui/wei)
+    "uan": 0xE03E,        # uan (pinyin uan/wan)
+    "u\u0259n": 0xE03F,  # uən (pinyin un/wen)
+    "ua\u014B": 0xE040,  # uaŋ (pinyin uang/wang)
+    "u\u0259\u014B": 0xE041,  # uəŋ (pinyin ueng/weng)
+    # --- ü-compound finals (撮口呼) ---
+    "y\u025B": 0xE042,   # yɛ  (pinyin üe/yue)
+    "y\u025Bn": 0xE043,  # yɛn (pinyin üan/yuan)
+    "yn": 0xE044,         # yn  (pinyin ün/yun)
+    # --- Syllabic consonants ---
+    "\u027B\u0329": 0xE045,  # ɻ̩  syllabic retroflex (zhi/chi/shi/ri)
+    # (ɨ U+0268 is a single codepoint — no PUA needed)
+    # --- Tone markers ---
+    "tone1": 0xE046,      # 阴平 (high level)
+    "tone2": 0xE047,      # 阳平 (rising)
+    "tone3": 0xE048,      # 上声 (dipping)
+    "tone4": 0xE049,      # 去声 (falling)
+    "tone5": 0xE04A,      # 轻声 (neutral)
+    # =======================================================================
+    # Korean (KO) — korean_phonemize.cpp
+    # =======================================================================
+    # Note: pʰ/tʰ/kʰ/tɕ/tɕʰ are shared with ZH (same PUA codepoints above)
+    # --- Tense consonants (fortis / 경음) ---
+    "p\u0348": 0xE04B,   # p͈  tense bilabial (ㅃ)
+    "t\u0348": 0xE04C,   # t͈  tense alveolar (ㄸ)
+    "k\u0348": 0xE04D,   # k͈  tense velar (ㄲ)
+    "s\u0348": 0xE04E,   # s͈  tense sibilant (ㅆ)
+    "t\u0348\u0255": 0xE04F,  # t͈ɕ  tense alveolo-palatal affricate (ㅉ)
+    # --- Unreleased finals (내파음) ---
+    "k\u031A": 0xE050,   # k̚  unreleased velar
+    "t\u031A": 0xE051,   # t̚  unreleased alveolar
+    "p\u031A": 0xE052,   # p̚  unreleased bilabial
+    # 0xE053 reserved (unused gap)
+    # =======================================================================
+    # Spanish (ES) / Portuguese (PT) — spanish_phonemize.cpp, portuguese_phonemize.cpp
+    # =======================================================================
+    "t\u0283": 0xE054,   # tʃ  voiceless postalveolar affricate (ES ch, PT palatalized t)
+    "d\u0292": 0xE055,   # dʒ  voiced postalveolar affricate (EN JH, PT palatalized d)
+    # =======================================================================
+    # French (FR) — french_phonemize.cpp
+    # =======================================================================
+    # --- Nasal vowels ---
+    "\u025B\u0303": 0xE056,  # ɛ̃  nasal open-mid front unrounded (vin, pain)
+    "\u0251\u0303": 0xE057,  # ɑ̃  nasal open back unrounded (France, temps)
+    "\u0254\u0303": 0xE058,  # ɔ̃  nasal open-mid back rounded (bon, nom)
 }
 
 # Build bidirectional mappings
@@ -54,8 +147,9 @@ for token, codepoint in FIXED_PUA_MAPPING.items():
     TOKEN2CHAR[token] = ch
     CHAR2TOKEN[ch] = token
 
-# Private Use Area for dynamic allocation (starting after fixed mappings)
-_PUA_START = 0xE020  # Start after the last fixed mapping
+# Private Use Area for dynamic allocation (starting after the last FIXED codepoint)
+# 0xE058 is the last used fixed codepoint (FR ɔ̃), so dynamic starts at 0xE059.
+_PUA_START = 0xE059
 _next = _PUA_START
 
 

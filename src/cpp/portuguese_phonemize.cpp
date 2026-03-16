@@ -200,6 +200,113 @@ static std::vector<char32_t> utf8Decode(const std::string &s) {
 // Encode codepoints back to UTF-8 (only needed for debugging; unused now)
 // static std::string utf8Encode(const std::vector<char32_t> &cps) { ... }
 
+// ---------------------------------------------------------------------------
+// NFD -> NFC combining accent collapse for Portuguese
+//
+// When input arrives in NFD form (e.g. from macOS HFS+ or certain HTTP
+// clients), accented letters are decomposed into a base letter followed by a
+// combining accent codepoint.  The G2P rules expect precomposed NFC forms
+// (e.g. U+00E1 'a acute' rather than U+0061 + U+0301).  This function
+// collapses the most common Portuguese combining sequences in-place.
+//
+// Handled combining marks:
+//   U+0300  COMBINING GRAVE ACCENT        -> a grave
+//   U+0301  COMBINING ACUTE ACCENT        -> a/e/i/o/u acute
+//   U+0302  COMBINING CIRCUMFLEX ACCENT   -> a/e/o circumflex
+//   U+0303  COMBINING TILDE               -> a/o/n tilde
+//   U+0308  COMBINING DIAERESIS           -> u diaeresis
+//   U+0327  COMBINING CEDILLA             -> c cedilla
+// ---------------------------------------------------------------------------
+
+static void collapseNfdCombiningAccents(std::vector<char32_t> &cps) {
+    if (cps.size() < 2) return;
+
+    std::vector<char32_t> out;
+    out.reserve(cps.size());
+
+    size_t i = 0;
+    size_t n = cps.size();
+    while (i < n) {
+        // If this is NOT the last codepoint, check for base + combining pair
+        if (i + 1 < n) {
+            char32_t base = cps[i];
+            char32_t comb = cps[i + 1];
+            char32_t composed = 0;
+
+            switch (comb) {
+            case 0x0300: // COMBINING GRAVE ACCENT
+                if (base == 'a') composed = 0x00E0;
+                else if (base == 'A') composed = 0x00C0;
+                break;
+
+            case 0x0301: // COMBINING ACUTE ACCENT
+                switch (base) {
+                case 'a': composed = 0x00E1; break;
+                case 'e': composed = 0x00E9; break;
+                case 'i': composed = 0x00ED; break;
+                case 'o': composed = 0x00F3; break;
+                case 'u': composed = 0x00FA; break;
+                case 'A': composed = 0x00C1; break;
+                case 'E': composed = 0x00C9; break;
+                case 'I': composed = 0x00CD; break;
+                case 'O': composed = 0x00D3; break;
+                case 'U': composed = 0x00DA; break;
+                default: break;
+                }
+                break;
+
+            case 0x0302: // COMBINING CIRCUMFLEX ACCENT
+                switch (base) {
+                case 'a': composed = 0x00E2; break;
+                case 'e': composed = 0x00EA; break;
+                case 'o': composed = 0x00F4; break;
+                case 'A': composed = 0x00C2; break;
+                case 'E': composed = 0x00CA; break;
+                case 'O': composed = 0x00D4; break;
+                default: break;
+                }
+                break;
+
+            case 0x0303: // COMBINING TILDE
+                switch (base) {
+                case 'a': composed = 0x00E3; break;
+                case 'o': composed = 0x00F5; break;
+                case 'A': composed = 0x00C3; break;
+                case 'O': composed = 0x00D5; break;
+                case 'n': composed = 0x00F1; break;
+                case 'N': composed = 0x00D1; break;
+                default: break;
+                }
+                break;
+
+            case 0x0308: // COMBINING DIAERESIS
+                if (base == 'u') composed = 0x00FC;
+                else if (base == 'U') composed = 0x00DC;
+                break;
+
+            case 0x0327: // COMBINING CEDILLA
+                if (base == 'c') composed = 0x00E7;
+                else if (base == 'C') composed = 0x00C7;
+                break;
+
+            default:
+                break;
+            }
+
+            if (composed != 0) {
+                out.push_back(composed);
+                i += 2; // consumed base + combining mark
+                continue;
+            }
+        }
+
+        out.push_back(cps[i]);
+        ++i;
+    }
+
+    cps = std::move(out);
+}
+
 // Simple lowercase for Latin + common accented letters
 static char32_t toLower(char32_t cp) {
     if (cp >= 'A' && cp <= 'Z') return cp + 32;
@@ -211,10 +318,12 @@ static char32_t toLower(char32_t cp) {
 // Normalize: NFC lowercase, collapse whitespace, trim
 static std::vector<char32_t> normalize(const std::string &text) {
     // The Python version calls unicodedata.normalize("NFC", ...).
-    // For Portuguese text the input is expected to already be NFC (most normal
-    // editing and HTTP transport preserves NFC).  We lowercase and collapse
-    // whitespace here.
+    // We handle the common NFD -> NFC combining accent sequences for
+    // Portuguese, then lowercase and collapse whitespace.
     std::vector<char32_t> cps = utf8Decode(text);
+
+    // NFD -> NFC: collapse combining accents before any other processing
+    collapseNfdCombiningAccents(cps);
 
     // Lowercase
     for (auto &cp : cps) cp = toLower(cp);
@@ -562,8 +671,8 @@ static WordResult convertWord(const std::vector<char32_t> &word) {
         if (ch == 'x') {
             if (i == 0) {
                 ph.push_back(IPA_ESH);
-            } else if (i > 0 && isPlainVowel(word[i - 1])
-                       && i + 1 < n && isPlainVowel(word[i + 1])) {
+            } else if (i > 0 && isVowelChar(word[i - 1])
+                       && i + 1 < n && isVowelChar(word[i + 1])) {
                 ph.push_back('z');
             } else {
                 ph.push_back(IPA_ESH);

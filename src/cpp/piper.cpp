@@ -135,7 +135,9 @@ void parsePhonemizeConfig(json &configRoot, PhonemizeConfig &phonemizeConfig) {
 
   if (configRoot.contains("phoneme_type")) {
     auto phonemeTypeStr = configRoot["phoneme_type"].get<std::string>();
-    if (phonemeTypeStr == "text") {
+    if (phonemeTypeStr == "espeak") {
+      phonemizeConfig.phonemeType = eSpeakPhonemes;
+    } else if (phonemeTypeStr == "text") {
       phonemizeConfig.phonemeType = TextPhonemes;
     } else if (phonemeTypeStr == "openjtalk") {
       phonemizeConfig.phonemeType = OpenJTalkPhonemes;
@@ -145,6 +147,8 @@ void parsePhonemizeConfig(json &configRoot, PhonemizeConfig &phonemizeConfig) {
       phonemizeConfig.phonemeType = MultilingualPhonemes;
       // Multilingual models use OpenJTalk phonemization but WITH intersperse padding
       // (interspersePad defaults to true, so no change needed)
+    } else {
+      spdlog::warn("Unknown phoneme_type '{}', defaulting to eSpeak", phonemeTypeStr);
     }
   }
 
@@ -747,6 +751,13 @@ void loadVoice(PiperConfig &config, std::string modelPath,
     spdlog::debug("Voice contains {} language(s)", voice.modelConfig.numLanguages);
   }
 
+  // Validate language_id_map for multilingual models
+  if (voice.phonemizeConfig.phonemeType == MultilingualPhonemes) {
+    if (!voice.modelConfig.languageIdMap || voice.modelConfig.languageIdMap->empty()) {
+      spdlog::warn("Multilingual model missing language_id_map, defaulting to ja+en");
+    }
+  }
+
   // Load language-specific dictionaries for multilingual models
   // Dictionary files are expected next to the model file
   std::string modelDir = std::filesystem::path(modelPath).parent_path().string();
@@ -828,8 +839,13 @@ void synthesize(std::vector<PhonemeId> &phonemeIds,
   // Add language id for multilingual models
   // ONNX input order: ... -> sid -> lid -> prosody_features
   // NOTE: Must be declared outside "if" to prevent deallocation before Run().
-  std::vector<int64_t> languageId{
-      (int64_t)synthesisConfig.languageId.value_or(0)};
+  auto lid = synthesisConfig.languageId.value_or(0);
+  if (voice && (lid < 0 || lid >= voice->modelConfig.numLanguages)) {
+    spdlog::warn("Language ID {} out of range [0, {}), using 0",
+                 lid, voice->modelConfig.numLanguages);
+    lid = 0;
+  }
+  std::vector<int64_t> languageId{(int64_t)lid};
   std::vector<int64_t> languageIdShape{(int64_t)languageId.size()};
 
   if (session.hasLidInput) {
@@ -978,6 +994,11 @@ void textToAudio(PiperConfig &config, Voice &voice, std::string text,
                  std::vector<int16_t> &audioBuffer, SynthesisResult &result,
                  const std::function<void()> &audioCallback,
                  const std::vector<ProsodyFeature> *externalProsody) {
+
+  // Save the original language ID to detect if the user explicitly set it.
+  // This prevents dominant-language auto-detection from overwriting an
+  // explicit user choice (M3 fix).
+  auto originalLanguageId = voice.synthesisConfig.languageId;
 
   std::size_t sentenceSilenceSamples = 0;
   if (voice.synthesisConfig.sentenceSilenceSeconds > 0) {
@@ -1154,9 +1175,21 @@ void textToAudio(PiperConfig &config, Voice &voice, std::string text,
             phonemize_korean(langSeg.text, langPhonemes);
           } else {
             // Fallback: eSpeak for any language without native G2P
+            // eSpeak produces BOS/EOS markers that must be stripped
             eSpeakPhonemeConfig eSpeakConfig;
             eSpeakConfig.voice = langSeg.lang;
             phonemize_eSpeak(langSeg.text, eSpeakConfig, langPhonemes);
+
+            // Strip BOS/EOS from eSpeak output (same tokens as JA)
+            for (auto& sentence : langPhonemes) {
+              std::vector<Phoneme> filtered;
+              for (auto ph : sentence) {
+                if (!bosEosTokens.count(ph)) {
+                  filtered.push_back(ph);
+                }
+              }
+              sentence = std::move(filtered);
+            }
           }
 
           // Add phonemes from non-JA segment
@@ -1172,14 +1205,18 @@ void textToAudio(PiperConfig &config, Voice &voice, std::string text,
           }
         }
 
-        // Set dominant language for lid
-        if (!langSegments.empty()) {
+        // Set dominant language for lid, but only if the user did not
+        // explicitly set a language ID before this call (M3 fix).
+        // originalLanguageId was captured at the start of textToAudio().
+        // If the current value still matches the original, auto-detect is safe.
+        if (!langSegments.empty() &&
+            voice.synthesisConfig.languageId == originalLanguageId) {
           auto dominantLang = detectDominantLanguage(segment.text, detector);
           if (voice.modelConfig.languageIdMap &&
               voice.modelConfig.languageIdMap->count(dominantLang) > 0) {
             voice.synthesisConfig.languageId =
                 (*voice.modelConfig.languageIdMap)[dominantLang];
-            spdlog::debug("Multilingual: dominant language '{}' (lid={})",
+            spdlog::debug("Multilingual: auto-detected dominant language '{}' (lid={})",
                           dominantLang, voice.synthesisConfig.languageId.value());
           }
         }
