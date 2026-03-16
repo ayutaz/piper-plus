@@ -261,7 +261,7 @@
         
         // Load ONNX model
         async function loadModel(lang) {
-            const modelName = lang === 'ja' ? 'ja_JP-test-medium' : 'en_US-test-medium';
+            const modelName = lang === 'ja' ? 'multilingual-test-medium' : 'en_US-test-medium';
             const modelPath = `../models/${modelName}.onnx`;
             const configPath = `../models/${modelName}.onnx.json`;
             

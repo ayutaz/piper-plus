@@ -219,7 +219,7 @@ class TestPerformance:
 
             from piper.voice import PiperVoice
 
-            model_path = Path("test/models/ja_JP-test-medium.onnx")
+            model_path = Path("test/models/multilingual-test-medium.onnx")
             if not model_path.exists():
                 pytest.skip("Japanese test model not available")
 

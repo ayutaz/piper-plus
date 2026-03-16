@@ -33,10 +33,10 @@ echo "The [[ aɪ diː iː ]] (IDE) is ready" | piper --model en_US-lessac-medium
 #### Japanese (OpenJTalk phonemes)
 ```bash
 # Hiragana with custom reading
-echo "今日は [[ ky o o w a ]] いい天気です" | piper --model ja_JP-test-medium.onnx -f weather.wav
+echo "今日は [[ ky o o w a ]] いい天気です" | piper --model multilingual-test-medium.onnx -f weather.wav
 
 # Foreign name in katakana context
-echo "私は [[ m a i k u r u ]] です" | piper --model ja_JP-test-medium.onnx -f michael.wav
+echo "私は [[ m a i k u r u ]] です" | piper --model multilingual-test-medium.onnx -f michael.wav
 ```
 
 ### Phoneme Systems
@@ -65,7 +65,7 @@ echo "私は [[ m a i k u r u ]] です" | piper --model ja_JP-test-medium.onnx 
 echo "The word 'read' can be [[ r iː d ]] or [[ r ɛ d ]]" | piper --model en_US-lessac-medium.onnx -f read.wav
 
 # Japanese with furigana-like pronunciation
-echo "漢字[[ k a N j i ]]の読み方" | piper --model ja_JP-test-medium.onnx -f kanji.wav
+echo "漢字[[ k a N j i ]]の読み方" | piper --model multilingual-test-medium.onnx -f kanji.wav
 ```
 
 #### Multiple Phoneme Segments

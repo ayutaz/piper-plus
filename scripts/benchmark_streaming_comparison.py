@@ -123,7 +123,7 @@ def main():
     # Models to test
     models = [
         ("Text phonemes", "test/models/text_voice.onnx"),
-        # ("Japanese", "test/models/ja_JP-test-medium.onnx"),  # Skip if espeak issues
+        # ("Japanese", "test/models/multilingual-test-medium.onnx"),  # Skip if espeak issues
     ]
 
     results = []

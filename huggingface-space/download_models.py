@@ -93,8 +93,8 @@ def download_models():
 
     # Model configurations
     models = [
-        ("ja_JP-test-medium.onnx", "ja", "Japanese medium quality model"),
-        ("test_voice.onnx", "en", "English test model"),
+        ("multilingual-test-medium.onnx", "ja", "Japanese medium quality model"),
+        ("multilingual-test-medium.onnx", "en", "English test model"),
     ]
 
     print("Setting up models for demo...")

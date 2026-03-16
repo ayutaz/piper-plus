@@ -104,10 +104,10 @@ GitHub Pages で正しく動作するには、以下の構造が必要：
 │   ├── espeak_phoneme_extractor.js
 │   └── custom_dictionary.js
 └── models/
-    ├── ja_JP-test-medium.onnx
-    ├── ja_JP-test-medium.onnx.json
-    ├── test_voice.onnx
-    └── test_voice.onnx.json
+    ├── multilingual-test-medium.onnx
+    ├── multilingual-test-medium.onnx.json
+    ├── multilingual-test-medium.onnx
+    └── multilingual-test-medium.onnx.json
 ```
 
 ## 注意事項
@@ -123,7 +123,7 @@ GitHub Pages で正しく動作するには、以下の構造が必要：
 
 ```javascript
 // モデルを CDN から読み込む例
-const modelPath = 'https://cdn.jsdelivr.net/gh/username/repo@version/models/ja_JP-test-medium.onnx';
+const modelPath = 'https://cdn.jsdelivr.net/gh/username/repo@version/models/multilingual-test-medium.onnx';
 ```
 
 ## トラブルシューティング

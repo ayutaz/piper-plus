@@ -32,7 +32,7 @@ def get_test_model():
     # Try common test model locations
     test_models = [
         ("en_US-lessac-medium.onnx", "en_US-lessac-medium.onnx.json"),
-        ("ja_JP-test-medium.onnx", "ja_JP-test-medium.onnx.json"),
+        ("multilingual-test-medium.onnx", "multilingual-test-medium.onnx.json"),
     ]
 
     for model, config in test_models:
@@ -111,7 +111,7 @@ def test_raw_phonemes_japanese():
 
     # Look for Japanese model
     model_candidates = [
-        ("ja_JP-test-medium.onnx", "ja_JP-test-medium.onnx.json"),
+        ("multilingual-test-medium.onnx", "multilingual-test-medium.onnx.json"),
         ("ja_JP-fujitou-medium.onnx", "ja_JP-fujitou-medium.onnx.json"),
     ]
 

@@ -173,7 +173,7 @@ jobs:
           mkdir -p $HOME
           
           echo "Testing checksum verification..."
-          if echo "テスト" | piper --model ./test/models/ja_JP-test-medium.onnx --output_file /tmp/test_checksum.wav 2>&1 | tee /tmp/checksum_log.txt; then
+          if echo "テスト" | piper --model ./test/models/multilingual-test-medium.onnx --output_file /tmp/test_checksum.wav 2>&1 | tee /tmp/checksum_log.txt; then
             echo "✓ Piper executed successfully"
             
             # Check if dictionary was downloaded
@@ -212,7 +212,7 @@ jobs:
           
           echo "Testing offline mode..."
           # Should fail without dictionary
-          echo "オフライン" | piper --model ./test/models/ja_JP-test-medium.onnx --output_file /tmp/test_offline.wav 2>&1 | tee /tmp/offline_log.txt || true
+          echo "オフライン" | piper --model ./test/models/multilingual-test-medium.onnx --output_file /tmp/test_offline.wav 2>&1 | tee /tmp/offline_log.txt || true
           
           # Check for expected error messages
           if grep -E "(dictionary manually|Failed to ensure OpenJTalk dictionary|Offline mode|OpenJTalk is not available)" /tmp/offline_log.txt; then
@@ -238,7 +238,7 @@ jobs:
           export PIPER_AUTO_DOWNLOAD_DICT=0
           
           echo "Testing auto-download disable..."
-          echo "環境変数" | piper --model ./test/models/ja_JP-test-medium.onnx --output_file /tmp/test_env.wav 2>&1 | tee /tmp/env_log.txt || true
+          echo "環境変数" | piper --model ./test/models/multilingual-test-medium.onnx --output_file /tmp/test_env.wav 2>&1 | tee /tmp/env_log.txt || true
           
           if grep -E "(download.*manually|auto.*download.*disabled|Failed to ensure OpenJTalk dictionary|OpenJTalk is not available)" /tmp/env_log.txt; then
             echo "✓ PIPER_AUTO_DOWNLOAD_DICT=0 works correctly"

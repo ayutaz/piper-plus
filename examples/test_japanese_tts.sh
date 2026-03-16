@@ -55,7 +55,7 @@ export OPENJTALK_VOICE=$PWD/nitech_jp_atr503_m001.htsvoice
 
 echo "こんにちは、音声合成のテストです。" > test_ja.txt
 
-./piper --model ../test/models/ja_JP-test-medium.onnx --output_file test_output_ja.wav < test_ja.txt
+./piper --model ../test/models/multilingual-test-medium.onnx --output_file test_output_ja.wav < test_ja.txt
 
 if [ -f test_output_ja.wav ]; then
     echo "Success! Generated test_output_ja.wav"

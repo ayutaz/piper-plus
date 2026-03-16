@@ -52,7 +52,7 @@ class TestWebUI:
     def test_language_detection(self):
         """Test language detection from model path"""
         # Test Japanese model
-        ja_lang = get_language_from_model("test/models/ja_JP-test-medium.onnx")
+        ja_lang = get_language_from_model("test/models/multilingual-test-medium.onnx")
         assert ja_lang == "ja_JP"
 
         # Test English model
@@ -82,7 +82,7 @@ class TestWebUI:
     def test_template_updates(self):
         """Test template dropdown updates based on model"""
         # Test with Japanese model
-        ja_dropdown = update_templates("test/models/ja_JP-test-medium.onnx")
+        ja_dropdown = update_templates("test/models/multilingual-test-medium.onnx")
         assert hasattr(ja_dropdown, "choices")
 
         # Test with English model
@@ -93,13 +93,13 @@ class TestWebUI:
         """Test applying templates to text input"""
         # Test custom text
         custom_text = apply_template(
-            "Custom Text", "test/models/ja_JP-test-medium.onnx"
+            "Custom Text", "test/models/multilingual-test-medium.onnx"
         )
         assert custom_text == ""
 
         # Test Japanese greeting
         ja_greeting = apply_template(
-            "Greeting (greeting)", "test/models/ja_JP-test-medium.onnx"
+            "Greeting (greeting)", "test/models/multilingual-test-medium.onnx"
         )
         assert "こんにちは" in ja_greeting
 

@@ -35,13 +35,13 @@ logger = logging.getLogger(__name__)
 # Model configurations
 MODELS = {
     "Japanese (Medium)": {
-        "path": "models/ja_JP-test-medium.onnx",
-        "config": "models/ja_JP-test-medium.onnx.json",
+        "path": "models/multilingual-test-medium.onnx",
+        "config": "models/multilingual-test-medium.onnx.json",
         "language": "ja",
     },
     "English (Test)": {
-        "path": "models/test_voice.onnx",
-        "config": "models/test_voice.onnx.json",
+        "path": "models/multilingual-test-medium.onnx",
+        "config": "models/multilingual-test-medium.onnx.json",
         "language": "en",
     },
 }

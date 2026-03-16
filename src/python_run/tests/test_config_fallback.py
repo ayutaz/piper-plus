@@ -22,8 +22,8 @@ from piper.voice import PiperVoice  # noqa: E402
 
 # Absolute path to the real test model shipped with the repo
 _REPO_ROOT = Path(__file__).resolve().parents[3]  # src/python_run/tests -> repo root
-_TEST_MODEL = _REPO_ROOT / "test" / "models" / "test_voice.onnx"
-_TEST_CONFIG = _REPO_ROOT / "test" / "models" / "test_voice.onnx.json"
+_TEST_MODEL = _REPO_ROOT / "test" / "models" / "multilingual-test-medium.onnx"
+_TEST_CONFIG = _REPO_ROOT / "test" / "models" / "multilingual-test-medium.onnx.json"
 
 
 @pytest.fixture()

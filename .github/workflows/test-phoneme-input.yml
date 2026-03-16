@@ -114,7 +114,7 @@ jobs:
           export ESPEAK_DATA_PATH="${PWD}/build/pi/share/espeak-ng-data"
           
           # Run Python test script
-          python3 scripts/test_phoneme_input.py build/piper test/models/test_voice.onnx
+          python3 scripts/test_phoneme_input.py build/piper test/models/multilingual-test-medium.onnx
       
       - name: Test specific phoneme examples
         run: |
@@ -122,7 +122,7 @@ jobs:
           
           # Test English phoneme input
           echo "Testing English phoneme input..."
-          echo "Hello [[ h ə l oʊ ]] world" | ./build/piper --model test/models/test_voice.onnx --output_file test_en.wav
+          echo "Hello [[ h ə l oʊ ]] world" | ./build/piper --model test/models/multilingual-test-medium.onnx --output_file test_en.wav
           [ -f test_en.wav ] && [ -s test_en.wav ] || (echo "English phoneme test failed!" && exit 1)
           echo "✅ English phoneme input test passed"
           
@@ -135,7 +135,7 @@ jobs:
           
           # Test raw phoneme mode with simple phonemes
           echo "Testing raw phoneme input..."
-          echo "h e l o" | ./build/piper --model test/models/test_voice.onnx --output_file test_raw.wav --raw-phonemes
+          echo "h e l o" | ./build/piper --model test/models/multilingual-test-medium.onnx --output_file test_raw.wav --raw-phonemes
           [ -f test_raw.wav ] && [ -s test_raw.wav ] || (echo "Raw phoneme test failed!" && exit 1)
           echo "✅ Raw phoneme input test passed"
           

@@ -120,7 +120,7 @@ nohup /data/piper/.venv/bin/python -m piper_train \
 23. ✅ **6言語事前学習完了**: 75 epoch / ~282K gradient steps / language-balanced-sampling 自動有効化 (2026-03-16) — epoch=74-step=504712.ckpt
 24. ✅ **6言語 ONNX 変換 + 推論テスト**: 学習完了後に変換・テスト済み (2026-03-16)
 25. ✅ **つくよみちゃん 6言語ベースファインチューニング完了**: 500 epoch / 1GPU / lr=2e-5 / --resume-from-multispeaker-checkpoint (2026-03-16) — v1 は freeze_dp タイミングバグで失敗、v2 で修正済み。`tsukuyomi-6lang-v2-fixed.onnx` (emb_lang後処理済み)、JA 3.05s / EN 2.54s / ZH 1.21s / ES 2.86s / FR 2.11s / PT 2.24s
-26. **CSS10 日本語 6langベースファインチューニング**: CSS10 (6,838発話, 1話者, Apache-2.0) を 6lang ベースモデルから転移学習 → `ja_JP-test-medium.onnx` 置き換え
+26. **CSS10 日本語 6langベースファインチューニング**: CSS10 (6,838発話, 1話者, Apache-2.0) を 6lang ベースモデルから転移学習 → `multilingual-test-medium.onnx` 置き換え
 27. **HuggingFace アップロード**: 6lang ベースモデル + つくよみちゃん 6lang-v2 をアップロード
 
 ### 6lang vs v4 vs v3 vs v2 比較

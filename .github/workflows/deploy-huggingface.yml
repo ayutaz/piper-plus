@@ -54,17 +54,17 @@ jobs:
           echo "Copying model files..."
           
           # Copy Japanese model
-          if [ -f "test/models/ja_JP-test-medium.onnx" ]; then
-            cp test/models/ja_JP-test-medium.onnx hf-space-deploy/models/
-            cp test/models/ja_JP-test-medium.onnx.json hf-space-deploy/models/
-            echo "✓ Copied Japanese model ($(du -h test/models/ja_JP-test-medium.onnx | cut -f1))"
+          if [ -f "test/models/multilingual-test-medium.onnx" ]; then
+            cp test/models/multilingual-test-medium.onnx hf-space-deploy/models/
+            cp test/models/multilingual-test-medium.onnx.json hf-space-deploy/models/
+            echo "✓ Copied Japanese model ($(du -h test/models/multilingual-test-medium.onnx | cut -f1))"
           fi
           
           # Copy English model
-          if [ -f "test/models/test_voice.onnx" ]; then
-            cp test/models/test_voice.onnx hf-space-deploy/models/
-            cp test/models/test_voice.onnx.json hf-space-deploy/models/
-            echo "✓ Copied English model ($(du -h test/models/test_voice.onnx | cut -f1))"
+          if [ -f "test/models/multilingual-test-medium.onnx" ]; then
+            cp test/models/multilingual-test-medium.onnx hf-space-deploy/models/
+            cp test/models/multilingual-test-medium.onnx.json hf-space-deploy/models/
+            echo "✓ Copied English model ($(du -h test/models/multilingual-test-medium.onnx | cut -f1))"
           fi
           
           # Show total size of models
@@ -129,11 +129,11 @@ jobs:
           
           # Show model information
           echo "**Deployed Models**:" >> $GITHUB_STEP_SUMMARY
-          if [ -f "hf-space-deploy/models/ja_JP-test-medium.onnx" ]; then
-            echo "- Japanese Model: $(du -h hf-space-deploy/models/ja_JP-test-medium.onnx | cut -f1)" >> $GITHUB_STEP_SUMMARY
+          if [ -f "hf-space-deploy/models/multilingual-test-medium.onnx" ]; then
+            echo "- Japanese Model: $(du -h hf-space-deploy/models/multilingual-test-medium.onnx | cut -f1)" >> $GITHUB_STEP_SUMMARY
           fi
-          if [ -f "hf-space-deploy/models/test_voice.onnx" ]; then
-            echo "- English Model: $(du -h hf-space-deploy/models/test_voice.onnx | cut -f1)" >> $GITHUB_STEP_SUMMARY
+          if [ -f "hf-space-deploy/models/multilingual-test-medium.onnx" ]; then
+            echo "- English Model: $(du -h hf-space-deploy/models/multilingual-test-medium.onnx | cut -f1)" >> $GITHUB_STEP_SUMMARY
           fi
           echo "" >> $GITHUB_STEP_SUMMARY
           

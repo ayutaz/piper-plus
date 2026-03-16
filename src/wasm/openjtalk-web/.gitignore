@@ -9,9 +9,9 @@ build/Makefile
 # Downloaded models (large files)
 models/*.onnx
 !models/.gitkeep
-!models/test_voice.onnx
+!models/multilingual-test-medium.onnx
 !models/en_US-test-medium.onnx
-!models/ja_JP-test-medium.onnx
+!models/multilingual-test-medium.onnx
 
 # Node modules (if any get added)
 node_modules/
