@@ -207,7 +207,8 @@ class OpenJTalkPiperTTSLazy {
         // Create ONNX session
         this.onnxSession = await ort.InferenceSession.create(absoluteModelPath, {
             executionProviders: ['wasm'],
-            graphOptimizationLevel: 'all'
+            graphOptimizationLevel: 'extended',
+            enableMemPattern: true
         });
         
         const loadTime = performance.now() - startTime;

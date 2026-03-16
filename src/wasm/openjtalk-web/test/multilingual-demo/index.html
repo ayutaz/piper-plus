@@ -385,7 +385,7 @@
                 await espeakExtractor.initialize();
                 
                 // Load ONNX Runtime
-                await loadScript('https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.1/dist/ort.min.js');
+                await loadScript('https://cdn.jsdelivr.net/npm/onnxruntime-web@1.21.0/dist/ort.min.js');
                 
                 // Load default model
                 await loadModel(currentLanguage);
@@ -513,7 +513,8 @@
             // Create ONNX session
             onnxSession = await ort.InferenceSession.create(modelPath, {
                 executionProviders: ['wasm'],
-                graphOptimizationLevel: 'all'
+                graphOptimizationLevel: 'extended',
+                enableMemPattern: true
             });
             
         }

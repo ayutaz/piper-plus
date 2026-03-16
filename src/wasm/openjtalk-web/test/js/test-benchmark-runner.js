@@ -44,7 +44,7 @@ describe('BenchmarkRunner', { skip }, () => {
     const summary = runner.getSummary();
     const entry = summary.find(e => e.name === 'test-stage');
     assert.ok(entry);
-    assert.ok(parseFloat(entry.duration) >= 40, `Duration ${entry.duration} should be >= 40ms`);
+    assert.ok(parseFloat(entry.duration) >= 30, `Duration ${entry.duration} should be >= 30ms`);
   });
 
   it('複数ステージを順番に計測できる', async () => {

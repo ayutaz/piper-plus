@@ -72,6 +72,9 @@ export class RegressionDetector {
       // Only positive delta (slower) counts as regression
       if (delta <= 0) continue;
 
+      // Skip metrics with zero baseline to avoid division by zero
+      if (base === 0) continue;
+
       const percentage = (delta / base) * 100;
       const threshold = THRESHOLDS[metric] ?? DEFAULT_THRESHOLD;
 

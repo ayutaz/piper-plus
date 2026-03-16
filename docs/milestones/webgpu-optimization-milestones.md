@@ -14,13 +14,13 @@
 |----|-------|------|------|-------------|-----------|
 | M1 | 1 | ベンチマーク基盤 | ✅ 完了 | `test-benchmark-runner.js` | 12/12 パス |
 | M2 | 1 | IndexedDBキャッシュ | ✅ 完了 | `test-cache-manager.js` + `test-dictionary-cache.js` | 19/19 パス |
-| M3 | 1 | ONNX Runtime更新 | ⬚ 未着手 | 手動検証 | - |
-| M4 | 2a | リサンプラー | ⬚ 未着手 | `test-resampler.js` | 7テスト (SKIP) |
-| M5 | 2a | AudioWorklet | ⬚ 未着手 | ブラウザE2E | - |
-| M6 | 2b | WebGPUセッション | ⬚ 未着手 | `test-webgpu-session.js` | 11テスト (SKIP) |
-| M7 | 2c | 統合テスト | ⬚ 未着手 | E2E | - |
-| M8 | 3 | ストリーミング | ⬚ 未着手 | `test-streaming-pipeline.js` | 14テスト (SKIP) |
-| M9 | 3 | メモリプール | ⬚ 未着手 | `test-memory-pool.js` | 7テスト (SKIP) |
+| M3 | 1 | ONNX Runtime更新 | 🔶 一部完了 | 手動検証 | ORT 1.21.0更新済 |
+| M4 | 2a | リサンプラー | ✅ 完了 | `test-resampler.js` | 8/8 パス |
+| M5 | 2a | AudioWorklet | ✅ 完了 | `test-audio-backend.js` | 8/8 パス |
+| M6 | 2b | WebGPUセッション | ✅ 完了 | `test-webgpu-session.js` | 11/11 パス |
+| M7 | 2c | 統合テスト | ✅ 完了 | `test-phase2-integration.js` | 10/10 パス |
+| M8 | 3 | ストリーミング | ✅ 完了 | `test-streaming-pipeline.js` | 16/16 パス |
+| M9 | 3 | メモリプール | ✅ 完了 | `test-memory-pool.js` | 7/7 パス |
 | M10 | 4 | モバイルUI | ⬚ 未着手 | 手動検証 | - |
 | M11 | 4 | FP16量子化 | ⬚ 未着手 | Python pytest | - |
 | M12 | 5 | SAB/PWA | ⬚ 未着手 | E2E | - |
@@ -114,16 +114,27 @@ test-dictionary-cache.js (6テスト)
 
 ---
 
-## M3: ONNX Runtime更新
+## M3: ONNX Runtime更新 🔶 一部完了
 
 **Phase**: 1 | **期間**: Week 2 | **依存**: M1
 
 ### 完了条件
-- [ ] `onnxruntime-web` を 1.17.1 → 1.19+ に更新
-- [ ] `executionProviders` を `['wasm-simd', 'wasm']` に変更
-- [ ] `enableMemPattern: true` 追加
+- [x] `onnxruntime-web` を 1.17.1 → 1.21.0 に更新
+- [ ] `executionProviders` を `['wasm-simd', 'wasm']` に変更 ← **未完了**
+- [x] `enableMemPattern: true` 追加
 - [ ] 既存テスト (`npm test`) がパス
 - [ ] BenchmarkRunnerで1.17.1 vs 1.19+のレイテンシ比較結果を記録
+
+### 実施済み
+- ORT CDNを全5デモページで **1.17.1 → 1.21.0** に更新
+  - `demo/index.html`, `demo/multilingual.html`, `demo/simple-multilingual.html`
+  - `demo/piper-espeak-english.html`, `demo/piper-espeak-complete.html`
+- セッションオプション適用: `graphOptimizationLevel: 'extended'`, `enableMemPattern: true`
+
+### 残作業
+- `executionProviders` を `['wasm']` → `['wasm-simd', 'wasm']` に変更
+- ブラウザ手動検証 (MOS比較、メモリリーク、Safari互換性)
+- BenchmarkRunnerでレイテンシ比較記録
 
 ### 検証項目
 | テスト | 対象 |
@@ -135,185 +146,236 @@ test-dictionary-cache.js (6テスト)
 
 ### 実装ファイル
 - `src/wasm/openjtalk-web/demo/index.html` (ORT CDN URL更新)
+- `src/wasm/openjtalk-web/demo/multilingual.html` (ORT CDN URL更新)
+- `src/wasm/openjtalk-web/demo/simple-multilingual.html` (ORT CDN URL更新)
+- `src/wasm/openjtalk-web/demo/piper-espeak-english.html` (ORT CDN URL更新)
+- `src/wasm/openjtalk-web/demo/piper-espeak-complete.html` (ORT CDN URL更新)
 
 ---
 
-## M4: リサンプラー
+## M4: リサンプラー ✅ 完了
 
 **Phase**: 2a | **期間**: Week 3 | **依存**: なし
+**完了日**: 2026-03-16
 
 ### 完了条件
-- [ ] `SimpleResampler` クラス実装 (`src/resampler.js`)
-- [ ] 22050Hz → 48000Hz 変換の正確性
-- [ ] `test-resampler.js` 全テストパス
+- [x] `SimpleResampler` クラス実装 (`src/resampler.js`)
+- [x] 22050Hz → 48000Hz 変換の正確性
+- [x] `test-resampler.js` 全テストパス
 
-### TDDテスト (7テスト)
+### TDDテスト (8テスト — 全パス)
 ```
 test-resampler.js
-├── アップサンプリング (22050→48000)
-│   ├── 出力長が正しい
-│   ├── 無音入力→無音出力
-│   ├── DC信号の保持
-│   └── 出力値が-1.0〜1.0の範囲内
-├── ダウンサンプリング (48000→22050)
-│   └── 出力長が正しい
-├── 同一レート (22050→22050)
-│   └── 入力と同一出力
-└── エッジケース
-    ├── 空入力
-    └── 1サンプル入力
+├── アップサンプリング (22050→48000) (4テスト)
+│   ├── ✅ 出力長が正しい
+│   ├── ✅ 無音入力→無音出力
+│   ├── ✅ DC信号の保持
+│   └── ✅ 出力値が-1.0〜1.0の範囲内
+├── ダウンサンプリング (48000→22050) (1テスト)
+│   └── ✅ 出力長が正しい
+├── 同一レート (22050→22050) (1テスト)
+│   └── ✅ 入力と同一出力
+└── エッジケース (2テスト)
+    ├── ✅ 空入力
+    └── ✅ 1サンプル入力
 ```
+
+**備考**: 当初7テスト予定 → 実装時に8テストに拡張（エッジケース追加）
 
 ### 実装ファイル
 - `src/wasm/openjtalk-web/src/resampler.js` (新規)
 
 ---
 
-## M5: AudioWorklet
+## M5: AudioWorklet ✅ 完了
 
 **Phase**: 2a | **期間**: Week 3-4 | **依存**: M4
+**完了日**: 2026-03-16
 
 ### 完了条件
-- [ ] `PushAudioWorkletProcessor` 実装
-- [ ] ScriptProcessorフォールバック (Factory パターン)
-- [ ] iOS Safari向け `<audio>` タグフォールバック
-- [ ] Chrome / Firefox でリアルタイム再生成功
-- [ ] レイテンシ < 10ms (48kHz環境)
+- [x] `PushAudioWorkletProcessor` 実装
+- [x] ScriptProcessorフォールバック (Factory パターン)
+- [x] iOS Safari向け `<audio>` タグフォールバック (WAVエンコーダ内蔵)
+- [ ] Chrome / Firefox でリアルタイム再生成功 ← **ブラウザE2E未実施**
+- [ ] レイテンシ < 10ms (48kHz環境) ← **ブラウザE2E未実施**
+
+### TDDテスト (8テスト — 全パス)
+```
+test-audio-backend.js
+├── AudioWorkletBackend (1テスト)
+│   └── ✅ AudioWorkletNodeの生成と接続
+├── ScriptProcessorBackend (2テスト)
+│   ├── ✅ ScriptProcessorNodeの生成
+│   └── ✅ pushChunk()でバッファにデータを追加できる
+├── HTMLAudioBackend (3テスト)
+│   ├── ✅ WAVエンコード・再生
+│   ├── ✅ stop()で再生停止
+│   └── ✅ dispose()でリソース解放
+└── Common interface (2テスト)
+    ├── ✅ 全バックエンドがplay/pushChunk/stop/disposeを持つ
+    └── ✅ AudioBackendFactory.create()のフォールバック順序
+```
 
 ### 実装ファイル
 - `src/wasm/openjtalk-web/src/audio-worklet-processor.js` (新規)
 - `src/wasm/openjtalk-web/src/audio-backend-factory.js` (新規)
 - `src/wasm/openjtalk-web/demo/index.html` (改修)
 
-### ブラウザE2Eテスト (手動 → 将来Playwright化)
+### ブラウザE2Eテスト (未実施 — 将来Playwright化)
 | テスト | Chrome | Firefox | Safari | iOS Safari |
 |--------|--------|---------|--------|------------|
-| 日本語テキスト再生 | ✅ | ✅ | ✅ | ✅ (fallback) |
-| 長文ストリーミング | ✅ | ✅ | - | - |
-| レイテンシ計測 | < 10ms | < 10ms | - | - |
+| 日本語テキスト再生 | 未検証 | 未検証 | 未検証 | 未検証 |
+| 長文ストリーミング | 未検証 | 未検証 | - | - |
+| レイテンシ計測 | 未検証 | 未検証 | - | - |
 
 ---
 
-## M6: WebGPUセッション
+## M6: WebGPUセッション ✅ 完了
 
 **Phase**: 2b | **期間**: Week 5-6 | **依存**: M3
+**完了日**: 2026-03-16
 
 ### 完了条件
-- [ ] `WebGPUSessionManager` クラス実装
-- [ ] フォールバック: WebGPU → wasm-simd → wasm
-- [ ] GPU容量チェック (maxBufferSize / maxStorageBufferBindingSize)
-- [ ] `test-webgpu-session.js` 全テストパス
-- [ ] Chrome WebGPU環境で推論速度が WASM比 2倍以上
+- [x] `WebGPUSessionManager` クラス実装
+- [x] フォールバック: WebGPU → wasm-simd → wasm (WebGL含まない)
+- [x] GPU容量チェック (maxBufferSize)
+- [x] `test-webgpu-session.js` 全テストパス
+- [ ] Chrome WebGPU環境で推論速度が WASM比 2倍以上 ← **ブラウザE2E未実施**
 
-### TDDテスト (9テスト)
+### TDDテスト (11テスト — 全パス)
 ```
 test-webgpu-session.js
 ├── フォールバック順序 (5テスト)
-│   ├── WebGPU対応→webgpu選択
-│   ├── WebGPU非対応→wasm-simd
-│   ├── wasm-simd非対応→wasm
-│   ├── 全失敗→エラー
-│   └── WebGL含まない
+│   ├── ✅ WebGPU対応→webgpu選択
+│   ├── ✅ WebGPU非対応→wasm-simd
+│   ├── ✅ wasm-simd非対応→wasm
+│   ├── ✅ 全失敗→エラー
+│   └── ✅ WebGL含まない
 ├── GPU容量チェック (3テスト)
-│   ├── 容量内→true
-│   ├── 容量超過→false
-│   └── GPU非対応→false
+│   ├── ✅ 容量内→true
+│   ├── ✅ 容量超過→false
+│   └── ✅ GPU非対応→false
 └── セッション設定 (3テスト)
-    ├── graphOptimizationLevel=extended
-    ├── enableMemPattern=true
-    └── intraOpNumThreads未設定
+    ├── ✅ graphOptimizationLevel=extended
+    ├── ✅ enableMemPattern=true
+    └── ✅ intraOpNumThreads未設定
 ```
+
+**備考**: 当初9テスト予定 → 実装時に11テストに拡張（セッション設定を3テストに分割）
 
 ### 実装ファイル
 - `src/wasm/openjtalk-web/src/webgpu-session-manager.js` (新規)
 
 ---
 
-## M7: Phase 2 統合テスト
+## M7: Phase 2 統合テスト ✅ 完了
 
 **Phase**: 2c | **期間**: Week 7 | **依存**: M5, M6
+**完了日**: 2026-03-16
 
 ### 完了条件
-- [ ] AudioWorklet + WebGPU統合動作確認
-- [ ] 3ブラウザ (Chrome/Firefox/Edge) で日本語・英語TTS動作
-- [ ] BenchmarkRunnerで各ステージの計測結果を記録
-- [ ] RegressionDetectorでベースラインとの比較
+- [x] AudioWorklet + WebGPU統合動作確認 (ユニットレベルモック)
+- [ ] 3ブラウザ (Chrome/Firefox/Edge) で日本語・英語TTS動作 ← **ブラウザE2E未実施**
+- [x] BenchmarkRunnerで各ステージの計測結果を記録
+- [ ] RegressionDetectorでベースラインとの比較 ← **未記録**
 
-### テストマトリックス
+### TDDテスト (10テスト — 全パス)
+```
+test-phase2-integration.js
+├── ✅ BenchmarkRunner + Resampler計測
+├── ✅ CacheManager getOrFetchサイクル
+├── ✅ Resampler + Streaming (TextChunkerチャンク → リサンプラー)
+├── ✅ WebGPU + Benchmark (セッション作成タイミング)
+├── ✅ TypedArrayPool + Resampler (プール割り当て)
+├── ✅ フルパイプライン (TextChunker → phonemize → infer → resample → onAudioChunk)
+├── ✅ CacheManagerバージョンチェック
+├── ✅ Resampler identity in pipeline (22050→22050)
+├── ✅ Pool stats after pipeline (hits/misses追跡)
+└── ✅ エラー耐性 (synthesize失敗伝播)
+```
+
+### ブラウザE2Eテストマトリックス (未実施)
 | テスト | Chrome 130+ | Firefox 141+ | Edge 130+ |
 |--------|------------|-------------|-----------|
-| WebGPU推論 | ✅ | ⚠️ (flag) | ✅ |
-| WASM-SIMDフォールバック | ✅ | ✅ | ✅ |
-| AudioWorklet再生 | ✅ | ✅ | ✅ |
-| IndexedDBキャッシュ | ✅ | ✅ | ✅ |
+| WebGPU推論 | 未検証 | 未検証 | 未検証 |
+| WASM-SIMDフォールバック | 未検証 | 未検証 | 未検証 |
+| AudioWorklet再生 | 未検証 | 未検証 | 未検証 |
+| IndexedDBキャッシュ | 未検証 | 未検証 | 未検証 |
+
+### 実装ファイル
+- `src/wasm/openjtalk-web/test/js/test-phase2-integration.js` (新規)
 
 ---
 
-## M8: ストリーミング再生
+## M8: ストリーミング再生 ✅ 完了 (前倒し実装)
 
 **Phase**: 3 | **期間**: Week 8-9 | **依存**: M5 (AudioWorklet)
+**完了日**: 2026-03-16
 
 ### 完了条件
-- [ ] `TextChunker` 実装 (日本語/英語文分割)
-- [ ] `StreamingTTSPipeline` 実装 (パイプライン並列化)
-- [ ] `ChunkCrossfader` 実装 (50msクロスフェード)
-- [ ] `RingBuffer` 実装
-- [ ] `test-streaming-pipeline.js` 全テストパス
-- [ ] TTFB < 600ms (WASM, キャッシュ有り)
+- [x] `TextChunker` 実装 (日本語/英語文分割)
+- [x] `StreamingTTSPipeline` 実装 (パイプライン並列化)
+- [x] `ChunkCrossfader` 実装 (50msクロスフェード)
+- [x] `RingBuffer` 実装
+- [x] `test-streaming-pipeline.js` 全テストパス
+- [ ] TTFB < 600ms (WASM, キャッシュ有り) ← **ブラウザE2E未実施**
 
-### TDDテスト (14テスト)
+### TDDテスト (16テスト — 全パス)
 ```
 test-streaming-pipeline.js
 ├── TextChunker (6テスト)
-│   ├── 日本語: 句点分割
-│   ├── 日本語: 感嘆符・疑問符
-│   ├── 日本語: 句読点なし
-│   ├── 日本語: 空文字列
-│   ├── 英語: ピリオド分割
-│   └── 英語: 略語ピリオド
+│   ├── ✅ 日本語: 句点分割
+│   ├── ✅ 日本語: 感嘆符・疑問符
+│   ├── ✅ 日本語: 句読点なし
+│   ├── ✅ 日本語: 空文字列
+│   ├── ✅ 英語: ピリオド分割
+│   └── ✅ 英語: 略語ピリオド
 ├── RingBuffer (4テスト)
-│   ├── enqueue/dequeue基本
-│   ├── 空dequeue
-│   ├── 容量超過
-│   └── size()
+│   ├── ✅ enqueue/dequeue基本
+│   ├── ✅ 空dequeue
+│   ├── ✅ 容量超過
+│   └── ✅ size()
 ├── ChunkCrossfader (3テスト)
-│   ├── 最初のチャンク
-│   ├── クロスフェード処理
-│   └── クロスフェード長0
+│   ├── ✅ 最初のチャンク
+│   ├── ✅ クロスフェード処理
+│   └── ✅ クロスフェード長0
 └── StreamingTTSPipeline (3テスト)
-    ├── 実行順序
-    ├── パイプライン並列化
-    └── 空テキスト
+    ├── ✅ 実行順序
+    ├── ✅ パイプライン並列化
+    └── ✅ 空テキスト
 ```
+
+**備考**: 当初14テスト予定 → 実装時に16テストに拡張
 
 ### 実装ファイル
 - `src/wasm/openjtalk-web/src/streaming-pipeline.js` (新規)
 
 ---
 
-## M9: メモリプール
+## M9: メモリプール ✅ 完了 (前倒し実装)
 
 **Phase**: 3 | **期間**: Week 9-10 | **依存**: なし
+**完了日**: 2026-03-16
 
 ### 完了条件
-- [ ] `TypedArrayPool` クラス実装 (上限/TTL付き)
-- [ ] `test-memory-pool.js` 全テストパス
-- [ ] DevToolsでGCオブジェクト数50%以上削減を確認
+- [x] `TypedArrayPool` クラス実装 (上限/TTL付き)
+- [x] `test-memory-pool.js` 全テストパス
+- [ ] DevToolsでGCオブジェクト数50%以上削減を確認 ← **ブラウザE2E未実施**
 
-### TDDテスト (7テスト)
+### TDDテスト (7テスト — 全パス)
 ```
 test-memory-pool.js
 ├── 基本操作 (3テスト)
-│   ├── Float32Array取得
-│   ├── BigInt64Array取得
-│   └── プール再利用
+│   ├── ✅ Float32Array取得
+│   ├── ✅ BigInt64Array取得
+│   └── ✅ プール再利用
 ├── メモリリーク防止 (2テスト)
-│   ├── MAX_POOL_SIZE超過
-│   └── TTLクリーンアップ
+│   ├── ✅ MAX_POOL_SIZE超過
+│   └── ✅ TTLクリーンアップ
 ├── 統計情報 (1テスト)
-│   └── hits/misses/evictions
+│   └── ✅ hits/misses/evictions
 └── セキュリティ (1テスト)
-    └── ゼロクリア
+    └── ✅ ゼロクリア
 ```
 
 ### 実装ファイル
@@ -430,19 +492,23 @@ test-web-optimization.yml
 
 | Phase | ジョブ名 | 現在のステータス |
 |-------|---------|---------------|
-| 1 | test-phase1 | 🟢 PASS (M1+M2 実装完了、25テスト) |
-| 2 | test-phase2 | 🟡 SKIP (M4+M6 未実装、テストはスキップ) |
-| 3 | test-phase3 | 🟡 SKIP (M8+M9 未実装、テストはスキップ) |
+| 1 | test-phase1 | 🟢 PASS (M1+M2+M3、31テスト) |
+| 2 | test-phase2 | 🟢 PASS (M4+M5+M6、27テスト) |
+| 3 | test-phase3 | 🟢 PASS (M8+M9、23テスト) |
+| Integration | test-integration | 🟢 PASS (M7、10テスト) |
 | 4 | test-python-fp16 | 🟡 SKIP (テストなし) |
-
-→ 実装が進むにつれて 🟡 → 🟢 に変わる
 
 ### テスト統計 (2026-03-16時点)
 
-| カテゴリ | テスト数 | パス | スキップ |
-|---------|---------|------|---------|
-| Phase 1 (M1+M2) | 25 | 25 | 0 |
-| Phase 1 辞書キャッシュ統合 | 6 | 6 | 0 |
-| Phase 2 (M4+M6) | 18 | 0 | 18 |
-| Phase 3 (M8+M9) | 21 | 0 | 21 |
-| **合計** | **70** | **31** | **39** |
+| カテゴリ | テストファイル | テスト数 | パス |
+|---------|--------------|---------|------|
+| M1 ベンチマーク | test-benchmark-runner.js | 12 | 12 |
+| M2 キャッシュ | test-cache-manager.js | 13 | 13 |
+| M2 辞書キャッシュ | test-dictionary-cache.js | 6 | 6 |
+| M4 リサンプラー | test-resampler.js | 8 | 8 |
+| M5 AudioWorklet | test-audio-backend.js | 8 | 8 |
+| M6 WebGPUセッション | test-webgpu-session.js | 11 | 11 |
+| M7 統合テスト | test-phase2-integration.js | 10 | 10 |
+| M8 ストリーミング | test-streaming-pipeline.js | 16 | 16 |
+| M9 メモリプール | test-memory-pool.js | 7 | 7 |
+| **合計** | | **91** | **91** |

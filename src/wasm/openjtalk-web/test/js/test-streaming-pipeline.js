@@ -105,7 +105,7 @@ describe('ChunkCrossfader', { skip }, () => {
     const cf = new ChunkCrossfader(50, 22050);
     const input = new Float32Array([0.1, 0.2, 0.3]);
     const output = cf.addChunk(input);
-    assert.deepEqual([...output], [0.1, 0.2, 0.3]);
+    assert.deepEqual(Array.from(output), Array.from(input));
   });
 
   it('2番目以降のチャンクはクロスフェード処理される', () => {

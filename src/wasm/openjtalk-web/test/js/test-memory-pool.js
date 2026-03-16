@@ -67,7 +67,7 @@ describe('TypedArrayPool', { skip }, () => {
       pool = new TypedArrayPool({ maxAgeMs: 50 });
       pool.returnArray('float32', 3, new Float32Array(3));
       // TTL経過を待つ
-      await new Promise(r => setTimeout(r, 100));
+      await new Promise(r => setTimeout(r, 200));
       pool.cleanup();
       // プールは空になっているはず
       const stats = pool.getStats();

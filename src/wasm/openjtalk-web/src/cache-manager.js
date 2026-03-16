@@ -167,9 +167,8 @@ export class CacheManager {
    * Otherwise call `fetcherFn()`, cache the result, and return it.
    */
   async getOrFetch(key, version, fetcherFn) {
-    const valid = await this.isValid(key, version);
-    if (valid) {
-      const entry = await this.get(key);
+    const entry = await this.get(key);
+    if (entry && entry.version === version) {
       return entry.data;
     }
     const data = await fetcherFn();
