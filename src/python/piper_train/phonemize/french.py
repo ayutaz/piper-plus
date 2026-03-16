@@ -37,9 +37,20 @@ _ILLE_AS_IL = {"ville", "mille", "tranquille"}
 # Polysyllabic words ending in -er that are pronounced /ɛʁ/ (not /e/)
 # These are exceptions to the verb infinitive -er → /e/ rule.
 _ER_AS_EHR = {
-    "hiver", "enfer", "amer", "cancer", "super", "laser",
-    "hamster", "master", "poster", "cluster", "starter",
-    "leader", "transfer", "fer",
+    "hiver",
+    "enfer",
+    "amer",
+    "cancer",
+    "super",
+    "laser",
+    "hamster",
+    "master",
+    "poster",
+    "cluster",
+    "starter",
+    "leader",
+    "transfer",
+    "fer",
 }
 
 
@@ -138,24 +149,14 @@ def _convert_word(word: str) -> list[str]:
             continue
 
         # "euille" -> /œj/ (feuille, écureuil)
-        if (
-            ch == "e"
-            and i + 5 <= n
-            and word[i + 1 : i + 6] == "uille"
-            and i + 6 >= n
-        ):
+        if ch == "e" and i + 5 <= n and word[i + 1 : i + 6] == "uille" and i + 6 >= n:
             phonemes.append("œ")
             phonemes.append("j")
             i += 6
             continue
 
         # "eil" at word end -> /ɛj/ (soleil, réveil)
-        if (
-            ch == "e"
-            and i + 2 < n
-            and word[i + 1 : i + 3] == "il"
-            and i + 3 >= n
-        ):
+        if ch == "e" and i + 2 < n and word[i + 1 : i + 3] == "il" and i + 3 >= n:
             phonemes.append("ɛ")
             phonemes.append("j")
             i += 3
@@ -445,8 +446,10 @@ def _convert_word(word: str) -> list[str]:
                 effective = effective[:-2]
             elif effective.endswith("e"):
                 effective = effective[:-1]
-            if effective and all(c in _CONSONANTS for c in effective) and any(
-                c not in _SILENT_FINAL for c in effective
+            if (
+                effective
+                and all(c in _CONSONANTS for c in effective)
+                and any(c not in _SILENT_FINAL for c in effective)
             ):
                 phonemes.append("ɔ")
             else:
@@ -579,8 +582,11 @@ def _convert_word(word: str) -> list[str]:
                 i += 1
                 continue
             # "ex" + vowel -> /ɛgz/ (handled: x is after e, next is vowel)
-            if i > 0 and word[i - 1] == "e" and i + 1 < n and _is_vowel_char(
-                word[i + 1]
+            if (
+                i > 0
+                and word[i - 1] == "e"
+                and i + 1 < n
+                and _is_vowel_char(word[i + 1])
             ):
                 phonemes.append("ɡ")
                 phonemes.append("z")
@@ -674,9 +680,7 @@ def _split_words(text: str) -> list[str]:
     # (apostrophe is not in the letter character class, so it already acts as a
     # word boundary — this just ensures curly variants behave the same way).
     text = text.replace("\u2019", "'").replace("\u2018", "'")
-    tokens = re.findall(
-        r"[a-zàâæéèêëîïôùûüœçñ]+|[,.;:!?¡¿—–…«»]", text, re.IGNORECASE
-    )
+    tokens = re.findall(r"[a-zàâæéèêëîïôùûüœçñ]+|[,.;:!?¡¿—–…«»]", text, re.IGNORECASE)
     return tokens
 
 
@@ -716,8 +720,20 @@ def phonemize_french_with_prosody(
             # French: stress always on last syllable (last vowel phoneme)
             # Find last vowel-like phoneme for stress marking
             vowel_phonemes = {
-                "a", "e", "ɛ", "i", "o", "ɔ", "u", "y_vowel", "ə", "ø", "œ",
-                "ɛ̃", "ɑ̃", "ɔ̃",
+                "a",
+                "e",
+                "ɛ",
+                "i",
+                "o",
+                "ɔ",
+                "u",
+                "y_vowel",
+                "ə",
+                "ø",
+                "œ",
+                "ɛ̃",
+                "ɑ̃",
+                "ɔ̃",
             }
             last_vowel_idx = -1
             for j in range(len(word_phonemes) - 1, -1, -1):
@@ -728,9 +744,7 @@ def phonemize_french_with_prosody(
             for j, ph in enumerate(word_phonemes):
                 a2 = 2 if j == last_vowel_idx else 0
                 phonemes.append(ph)
-                prosody_list.append(
-                    ProsodyInfo(a1=0, a2=a2, a3=word_phoneme_count)
-                )
+                prosody_list.append(ProsodyInfo(a1=0, a2=a2, a3=word_phoneme_count))
 
         need_space = True
 

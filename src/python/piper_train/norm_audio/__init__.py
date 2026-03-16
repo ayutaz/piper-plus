@@ -172,9 +172,7 @@ def resample_only_no_vad(
     audio_norm_path = cache_dir / f"{audio_cache_id}.pt"
 
     if ignore_cache or not audio_norm_path.exists():
-        audio_data, src_sr = sf.read(
-            str(audio_path), dtype="float32", always_2d=False
-        )
+        audio_data, src_sr = sf.read(str(audio_path), dtype="float32", always_2d=False)
         if audio_data.ndim > 1:
             audio_data = audio_data.mean(axis=1)
 
@@ -218,9 +216,7 @@ def cache_norm_audio_no_vad(
     audio_norm_tensor: torch.Tensor | None = None
 
     if ignore_cache or not audio_norm_path.exists():
-        audio_data, src_sr = sf.read(
-            str(audio_path), dtype="float32", always_2d=False
-        )
+        audio_data, src_sr = sf.read(str(audio_path), dtype="float32", always_2d=False)
         if audio_data.ndim > 1:
             audio_data = audio_data.mean(axis=1)
 

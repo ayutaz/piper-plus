@@ -23,16 +23,16 @@ __all__ = ["get_spanish_id_map", "SPANISH_PHONEMES"]
 #
 # Spanish-ONLY phonemes that need new IDs:
 SPANISH_PHONEMES: list[str] = [
-    "ɲ",   # ñ (palatal nasal)
-    "ɾ",   # tap/flap r (single r between vowels)
+    "ɲ",  # ñ (palatal nasal)
+    "ɾ",  # tap/flap r (single r between vowels)
     "rr",  # trill r (rr, word-initial r) — multi-char, needs PUA
-    "β",   # allophone of /b/ (intervocalic)
-    "ɣ",   # allophone of /ɡ/ (intervocalic)
-    "x",   # jota (/x/ as in "jardín")
-    "ʝ",   # palatal fricative (y, ll — yeísmo)
+    "β",  # allophone of /b/ (intervocalic)
+    "ɣ",  # allophone of /ɡ/ (intervocalic)
+    "x",  # jota (/x/ as in "jardín")
+    "ʝ",  # palatal fricative (y, ll — yeísmo)
     # Inverted punctuation (unique to Spanish orthography)
-    "¡",   # inverted exclamation mark (U+00A1)
-    "¿",   # inverted question mark (U+00BF)
+    "¡",  # inverted exclamation mark (U+00A1)
+    "¿",  # inverted question mark (U+00BF)
 ]
 
 

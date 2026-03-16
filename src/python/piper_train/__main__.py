@@ -414,7 +414,9 @@ def main():
     # 21話者バイリンガルモデル(gin_channels=512)では正常だが、80話者(768)でガビガビ音が発生
     # VitsModel.__init__のフォールバック(512)と一致させる
     # argparseは常にdefault値(0)をdict_argsに含めるため、"not in"ではなく値チェック
-    if (num_speakers > 1 or num_languages > 1) and dict_args.get("gin_channels", 0) == 0:
+    if (num_speakers > 1 or num_languages > 1) and dict_args.get(
+        "gin_channels", 0
+    ) == 0:
         dict_args["gin_channels"] = 512
 
     # --resume-from-multispeaker-checkpoint 使用時は freeze_dp を自動有効化

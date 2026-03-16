@@ -43,6 +43,7 @@ def _get_g2p():
             return None
     return _g2p_instance
 
+
 # ARPAbet to espeak-compatible IPA mapping
 ARPABET_TO_IPA: dict[str, str] = {
     "AA": "ɑ",

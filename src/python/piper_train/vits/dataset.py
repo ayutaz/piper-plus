@@ -35,7 +35,9 @@ class Utterance:
     speaker_id: int | None = None
     language_id: int | None = None
     text: str | None = None
-    prosody_features: np.ndarray | None = None  # dtype=int16, shape=(num_phonemes, 3) for A1/A2/A3
+    prosody_features: np.ndarray | None = (
+        None  # dtype=int16, shape=(num_phonemes, 3) for A1/A2/A3
+    )
 
 
 @dataclass
@@ -127,23 +129,17 @@ class PiperDataset(Dataset):
         # Convert prosody_features to tensor if available
         prosody_tensor = None
         if utt.prosody_features is not None:
-            prosody_tensor = self._prosody_features_to_tensor(
-                utt.prosody_features
-            )
+            prosody_tensor = self._prosody_features_to_tensor(utt.prosody_features)
 
         return UtteranceTensors(
             phoneme_ids=torch.from_numpy(utt.phoneme_ids).long(),
             audio_norm=audio_norm,
             spectrogram=spectrogram,
             speaker_id=(
-                LongTensor([utt.speaker_id])
-                if utt.speaker_id is not None
-                else None
+                LongTensor([utt.speaker_id]) if utt.speaker_id is not None else None
             ),
             language_id=(
-                LongTensor([utt.language_id])
-                if utt.language_id is not None
-                else None
+                LongTensor([utt.language_id]) if utt.language_id is not None else None
             ),
             text=utt.text,
             prosody_features=prosody_tensor,
@@ -548,9 +544,7 @@ class SpeakerBalancedBatchSampler:
                 batch_speakers = []
                 for lang_id in sorted(self.lang_slots.keys()):
                     n_slots = self.lang_slots[lang_id]
-                    batch_speakers.extend(
-                        rng.sample(lang_available[lang_id], n_slots)
-                    )
+                    batch_speakers.extend(rng.sample(lang_available[lang_id], n_slots))
             else:
                 # 従来の全話者均等サンプリング
                 available_speakers = [

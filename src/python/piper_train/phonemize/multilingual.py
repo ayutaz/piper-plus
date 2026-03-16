@@ -46,9 +46,9 @@ class UnicodeLanguageDetector:
     # handled separately as Latin characters.
     _RE_JA_PUNCT = re.compile(
         r"[\u3000-\u303F"
-        r"\uFF00-\uFF20"   # Fullwidth digits and symbols (！＂...＠)
-        r"\uFF3B-\uFF40"   # Fullwidth brackets and symbols (［＼...｀)
-        r"\uFF5B-\uFFEF"   # Fullwidth braces onwards (｛｜...halfwidth/fullwidth forms)
+        r"\uFF00-\uFF20"  # Fullwidth digits and symbols (！＂...＠)
+        r"\uFF3B-\uFF40"  # Fullwidth brackets and symbols (［＼...｀)
+        r"\uFF5B-\uFFEF"  # Fullwidth braces onwards (｛｜...halfwidth/fullwidth forms)
         r"]"
     )
 
@@ -213,9 +213,7 @@ class MultilingualPhonemizer(Phonemizer):
         Language code for Latin-script characters (default: "en").
     """
 
-    def __init__(
-        self, languages: list[str], default_latin_language: str = "en"
-    ):
+    def __init__(self, languages: list[str], default_latin_language: str = "en"):
         self._languages = languages
 
         # Validate that default_latin_language is one of the supported

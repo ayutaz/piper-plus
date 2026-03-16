@@ -261,7 +261,8 @@ class VitsModel(pl.LightningModule):
             train_set_size = len(full_dataset) - valid_set_size
             split_generator = torch.Generator().manual_seed(self.hparams.seed)
             self._train_dataset, self._val_dataset = random_split(
-                full_dataset, [train_set_size, valid_set_size],
+                full_dataset,
+                [train_set_size, valid_set_size],
                 generator=split_generator,
             )
         else:
@@ -279,7 +280,8 @@ class VitsModel(pl.LightningModule):
 
             split_generator = torch.Generator().manual_seed(self.hparams.seed)
             self._train_dataset, self._test_dataset, self._val_dataset = random_split(
-                full_dataset, [train_set_size, num_test_examples, valid_set_size],
+                full_dataset,
+                [train_set_size, num_test_examples, valid_set_size],
                 generator=split_generator,
             )
 

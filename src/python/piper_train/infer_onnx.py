@@ -31,9 +31,7 @@ class _DominantLanguageDetector:
 
         self._language_id_map = language_id_map
         languages = list(language_id_map.keys())
-        self._detector = UnicodeLanguageDetector(
-            languages, default_latin_language="en"
-        )
+        self._detector = UnicodeLanguageDetector(languages, default_latin_language="en")
 
     @classmethod
     def get(cls, language_id_map: dict[str, int]) -> "_DominantLanguageDetector":
@@ -57,9 +55,7 @@ class _DominantLanguageDetector:
         return self._language_id_map.get(dominant, 0)
 
 
-def _detect_dominant_language(
-    text: str, language_id_map: dict[str, int]
-) -> int:
+def _detect_dominant_language(text: str, language_id_map: dict[str, int]) -> int:
     """Detect the dominant language in text using Unicode ranges.
 
     Returns the language_id for the most common script in the text.
@@ -251,7 +247,9 @@ def main():
 
         # Convert text to phoneme_ids and prosody_features
         phoneme_ids, prosody_features_data = text_to_phoneme_ids_and_prosody(
-            args.text, phoneme_id_map, language=args.language,
+            args.text,
+            phoneme_id_map,
+            language=args.language,
             language_id_map=language_id_map,
         )
         _LOGGER.info(
@@ -268,9 +266,7 @@ def main():
                 language_id = language_id_map[args.language]
             elif "-" in args.language:
                 # Multilingual mode: detect dominant language from text
-                language_id = _detect_dominant_language(
-                    args.text, language_id_map
-                )
+                language_id = _detect_dominant_language(args.text, language_id_map)
             _LOGGER.info(
                 "Using language_id=%d for language=%s", language_id, args.language
             )

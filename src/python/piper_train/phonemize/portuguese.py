@@ -528,15 +528,16 @@ def _apply_coda_l_vocalization(phonemes: list[str]) -> list[str]:
             continue
         # l before a consonant -> coda
         # Check first character for multi-char phonemes like tʃ, dʒ
-        if (next_ph in _IPA_CONSONANTS or (len(next_ph) > 1 and next_ph[0] in _IPA_CONSONANTS)) and next_ph not in _IPA_VOWELS:
+        if (
+            next_ph in _IPA_CONSONANTS
+            or (len(next_ph) > 1 and next_ph[0] in _IPA_CONSONANTS)
+        ) and next_ph not in _IPA_VOWELS:
             result[i] = "w"
             continue
     return result
 
 
-def _apply_br_postprocessing(
-    phonemes: list[str], stress_idx: int
-) -> list[str]:
+def _apply_br_postprocessing(phonemes: list[str], stress_idx: int) -> list[str]:
     """Apply Brazilian Portuguese phonological rules as post-processing.
 
     1. t/d palatalization before unstressed final -e:
@@ -612,9 +613,7 @@ def _find_word_ranges(phonemes: list[str]) -> list[tuple[int, int]]:
     return ranges
 
 
-def _reduce_unstressed_vowels(
-    phonemes: list[str], stress_idx: int
-) -> list[str]:
+def _reduce_unstressed_vowels(phonemes: list[str], stress_idx: int) -> list[str]:
     """Reduce unstressed vowels in non-final positions.
 
     In BR Portuguese:
@@ -673,9 +672,7 @@ def phonemize_portuguese_with_prosody(
             for j, ph in enumerate(word_phonemes):
                 a2 = 2 if j == stress_idx else 0
                 phonemes.append(ph)
-                prosody_list.append(
-                    ProsodyInfo(a1=0, a2=a2, a3=word_phoneme_count)
-                )
+                prosody_list.append(ProsodyInfo(a1=0, a2=a2, a3=word_phoneme_count))
 
         need_space = True
 

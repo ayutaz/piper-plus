@@ -902,9 +902,11 @@ class SynthesizerTrn(nn.Module):
                     # Default: {0} (JA only) — same as previous `lid == 1` check
                     prosody_langs = getattr(self, "prosody_language_ids", {0})
                     # Build mask: 1.0 for languages WITH prosody, 0.0 for others
-                    has_prosody = sum(
-                        (lid == lang_id).float() for lang_id in prosody_langs
-                    ).clamp(max=1.0).view(-1, 1, 1)
+                    has_prosody = (
+                        sum((lid == lang_id).float() for lang_id in prosody_langs)
+                        .clamp(max=1.0)
+                        .view(-1, 1, 1)
+                    )
                     prosody_f = prosody_f * has_prosody
                 prosody_proj = self.prosody_proj(prosody_f)
                 prosody_proj = prosody_proj.transpose(1, 2)

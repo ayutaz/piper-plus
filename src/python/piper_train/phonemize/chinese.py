@@ -23,16 +23,18 @@ __all__ = [
 
 # Punctuation mapping (Chinese → Western equivalents)
 _ZH_PUNCT_MAP: dict[str, str] = {
-    "\u3002": ".",   # 。
-    "\uff0c": ",",   # ，
-    "\uff01": "!",   # ！
-    "\uff1f": "?",   # ？
-    "\u3001": ",",   # 、
-    "\uff1b": ";",   # ；
-    "\uff1a": ":",   # ：
+    "\u3002": ".",  # 。
+    "\uff0c": ",",  # ，
+    "\uff01": "!",  # ！
+    "\uff1f": "?",  # ？
+    "\u3001": ",",  # 、
+    "\uff1b": ";",  # ；
+    "\uff1a": ":",  # ：
 }
 
-_PUNCTUATION = set(",.;:!?\u3002\uff0c\uff01\uff1f\u3001\uff1b\uff1a\u201c\u201d\u2018\u2019\u2026\u2014")
+_PUNCTUATION = set(
+    ",.;:!?\u3002\uff0c\uff01\uff1f\u3001\uff1b\uff1a\u201c\u201d\u2018\u2019\u2026\u2014"
+)
 
 # ---------------------------------------------------------------------------
 # Pinyin initial → IPA mapping
@@ -74,7 +76,7 @@ _FINAL_TO_IPA: dict[str, str] = {
     "e": "ɤ",
     "i": "i",
     "u": "u",
-    "\u00fc": "y_vowel",   # ü → y_vowel (avoids collision with JA glide "y")
+    "\u00fc": "y_vowel",  # ü → y_vowel (avoids collision with JA glide "y")
     "v": "y_vowel",
     # Diphthongs
     "ai": "aɪ",
@@ -112,11 +114,11 @@ _FINAL_TO_IPA: dict[str, str] = {
     "uang": "uaŋ",
     "ueng": "uəŋ",
     # ü- compound finals (撮口呼)
-    "\u00fce": "yɛ",   # üe
+    "\u00fce": "yɛ",  # üe
     "ve": "yɛ",
     "\u00fcan": "yɛn",  # üan
     "van": "yɛn",
-    "\u00fcn": "yn",    # ün
+    "\u00fcn": "yn",  # ün
     "vn": "yn",
     # Syllabic consonants (internal keys set by _split_pinyin)
     "-i_retroflex": "ɻ̩",
@@ -125,12 +127,27 @@ _FINAL_TO_IPA: dict[str, str] = {
 
 # Ordered list of consonant initials (two-char first for prefix matching)
 _INITIALS_ORDER = [
-    "zh", "ch", "sh",
-    "b", "p", "m", "f",
-    "d", "t", "n", "l",
-    "g", "k", "h",
-    "j", "q", "x",
-    "r", "z", "c", "s",
+    "zh",
+    "ch",
+    "sh",
+    "b",
+    "p",
+    "m",
+    "f",
+    "d",
+    "t",
+    "n",
+    "l",
+    "g",
+    "k",
+    "h",
+    "j",
+    "q",
+    "x",
+    "r",
+    "z",
+    "c",
+    "s",
 ]
 
 _RETROFLEX_INITIALS = frozenset(("zh", "ch", "sh", "r"))
@@ -200,7 +217,7 @@ def _split_pinyin(pinyin: str) -> tuple[str, str]:
     """Split normalized pinyin syllable into (initial, final)."""
     for init in _INITIALS_ORDER:
         if pinyin.startswith(init):
-            final = pinyin[len(init):]
+            final = pinyin[len(init) :]
 
             # Syllabic consonant: bare "i" after retroflex or alveolar initials
             if final == "i":
@@ -307,9 +324,7 @@ def phonemize_chinese_with_prosody(
         else:
             # Non-Chinese group: pypinyin merges consecutive non-Chinese chars
             # into one entry. Skip past all non-Chinese chars in the text.
-            while text_pos < len(text) and not _RE_CHINESE_CHAR.match(
-                text[text_pos]
-            ):
+            while text_pos < len(text) and not _RE_CHINESE_CHAR.match(text[text_pos]):
                 text_pos += 1
 
     # --- First pass: extract tones for Chinese characters ---
@@ -351,7 +366,6 @@ def phonemize_chinese_with_prosody(
     # results) to avoid index misalignment when non-Chinese characters are
     # grouped by pypinyin.
     for char_idx, ch in enumerate(text):
-
         # Handle punctuation
         if ch in _ZH_PUNCT_MAP:
             phonemes.append(_ZH_PUNCT_MAP[ch])
@@ -397,7 +411,11 @@ def phonemize_chinese_with_prosody(
         ipa_tokens = _pinyin_to_ipa(normalized, tone)
         if erhua_token is not None:
             # Insert ɚ after the vowel tokens but before the tone marker
-            tone_marker = ipa_tokens[-1] if ipa_tokens and ipa_tokens[-1].startswith("tone") else None
+            tone_marker = (
+                ipa_tokens[-1]
+                if ipa_tokens and ipa_tokens[-1].startswith("tone")
+                else None
+            )
             if tone_marker is not None:
                 ipa_tokens = ipa_tokens[:-1] + [erhua_token] + [tone_marker]
             else:
@@ -471,9 +489,11 @@ def phonemize_from_pinyin_syllables(
     word_info = _build_word_info(chinese_text) if chinese_text else {}
 
     # Map Chinese char indices to syllable indices
-    chinese_char_indices = [
-        i for i, ch in enumerate(chinese_text) if _RE_CHINESE_CHAR.match(ch)
-    ] if chinese_text else []
+    chinese_char_indices = (
+        [i for i, ch in enumerate(chinese_text) if _RE_CHINESE_CHAR.match(ch)]
+        if chinese_text
+        else []
+    )
 
     for syl_idx, syllable in enumerate(pinyin_syllables):
         if not syllable:

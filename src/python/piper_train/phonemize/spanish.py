@@ -37,11 +37,38 @@ _RE_TOKEN = re.compile(r"([a-záéíóúüñ]+|[,.;:!?¡¿]+)", re.IGNORECASE)
 
 # Common monosyllabic function words that are phonologically unstressed
 # in connected speech and should not receive the primary stress marker ˈ.
-_UNSTRESSED_FUNCTION_WORDS: frozenset[str] = frozenset({
-    "el", "la", "los", "las", "un", "una", "de", "del", "al",
-    "a", "en", "con", "por", "y", "o", "que", "se", "me", "te",
-    "le", "lo", "nos", "su", "mi", "tu", "es", "no", "si",
-})
+_UNSTRESSED_FUNCTION_WORDS: frozenset[str] = frozenset(
+    {
+        "el",
+        "la",
+        "los",
+        "las",
+        "un",
+        "una",
+        "de",
+        "del",
+        "al",
+        "a",
+        "en",
+        "con",
+        "por",
+        "y",
+        "o",
+        "que",
+        "se",
+        "me",
+        "te",
+        "le",
+        "lo",
+        "nos",
+        "su",
+        "mi",
+        "tu",
+        "es",
+        "no",
+        "si",
+    }
+)
 
 
 def _has_accent_on_char(grapheme: str) -> bool:
@@ -278,8 +305,19 @@ def _find_syllable_boundaries(
                         return _ACCENT_MAP.get(g[-1], g[-1])
 
                     inseparable = {
-                        "bl", "br", "cl", "cr", "dr", "fl",
-                        "fr", "gl", "gr", "pl", "pr", "tr", "tl",
+                        "bl",
+                        "br",
+                        "cl",
+                        "cr",
+                        "dr",
+                        "fl",
+                        "fr",
+                        "gl",
+                        "gr",
+                        "pl",
+                        "pr",
+                        "tr",
+                        "tl",
                     }
                     if cons_count == 2:
                         pair = _base_cons(cons_start) + _base_cons(cons_start + 1)
@@ -476,7 +514,11 @@ def _g2p_word(
         # --- Single character rules ---
 
         if base_ch in ("b", "v"):
-            if _is_word_initial() or _is_after_nasal() or (i > 0 and base_word[i - 1] == "l"):
+            if (
+                _is_word_initial()
+                or _is_after_nasal()
+                or (i > 0 and base_word[i - 1] == "l")
+            ):
                 phonemes.append("b")
             else:
                 phonemes.append("β")  # fricative in all other positions
@@ -492,7 +534,11 @@ def _g2p_word(
             continue
 
         if base_ch == "d":
-            if _is_word_initial() or _is_after_nasal() or (i > 0 and base_word[i - 1] == "l"):
+            if (
+                _is_word_initial()
+                or _is_after_nasal()
+                or (i > 0 and base_word[i - 1] == "l")
+            ):
                 phonemes.append("d")
             else:
                 phonemes.append("ð")  # fricative in all other positions
@@ -507,7 +553,11 @@ def _g2p_word(
         if base_ch == "g":
             if i + 1 < n and base_word[i + 1] in ("e", "i"):
                 phonemes.append("x")
-            elif _is_word_initial() or _is_after_nasal() or (i > 0 and base_word[i - 1] == "l"):
+            elif (
+                _is_word_initial()
+                or _is_after_nasal()
+                or (i > 0 and base_word[i - 1] == "l")
+            ):
                 phonemes.append("ɡ")
             else:
                 phonemes.append("ɣ")  # fricative in all other positions
@@ -624,8 +674,12 @@ def _g2p_word(
 # ---------------------------------------------------------------------------
 
 
-def _phoneme_count_for_unit(grapheme: str, word: str, unit_idx: int,  # noqa: ARG001
-                            units: list[_GraphemeUnit]) -> int:  # noqa: ARG001
+def _phoneme_count_for_unit(
+    grapheme: str,
+    word: str,
+    unit_idx: int,  # noqa: ARG001
+    units: list[_GraphemeUnit],
+) -> int:  # noqa: ARG001
     """Return the number of phonemes produced by a single grapheme unit.
 
     Most units produce exactly 1 phoneme.  Exceptions:
@@ -715,9 +769,7 @@ def _insert_stress_marker(
         if uid == stressed_unit_idx:
             # ph_i now points to the phoneme for this vowel
             return phonemes[:ph_i] + ["ˈ"] + phonemes[ph_i:]
-        count = _phoneme_count_for_unit(
-            units[uid][0], word, uid, units
-        )
+        count = _phoneme_count_for_unit(units[uid][0], word, uid, units)
         ph_i += count
 
     return phonemes
@@ -758,8 +810,11 @@ def phonemize_spanish_with_prosody(
             word_with_stress = word_phonemes
         else:
             word_with_stress = _insert_stress_marker(
-                word_phonemes, token,
-                units=units, boundaries=boundaries, stressed_syl=stressed_syl,
+                word_phonemes,
+                token,
+                units=units,
+                boundaries=boundaries,
+                stressed_syl=stressed_syl,
             )
 
         word_phoneme_count = len(word_phonemes)  # count without stress marker
