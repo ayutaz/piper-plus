@@ -6,6 +6,7 @@
 #include <map>
 #include <optional>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include <onnxruntime_cxx_api.h>
@@ -135,6 +136,11 @@ struct Voice {
   SynthesisConfig synthesisConfig;
   ModelConfig modelConfig;
   ModelSession session;
+
+  // Multilingual dictionary data (loaded on demand)
+  std::unordered_map<std::string, std::string> cmuDict;
+  std::unordered_map<int, std::string> pinyinSingleDict;
+  std::unordered_map<std::string, std::string> pinyinPhraseDict;
 };
 
 // True if the string is a single UTF-8 codepoint

@@ -23,6 +23,9 @@
 #include "spanish_phonemize.hpp"
 #include "french_phonemize.hpp"
 #include "portuguese_phonemize.hpp"
+#include "english_phonemize.hpp"
+#include "chinese_phonemize.hpp"
+#include "korean_phonemize.hpp"
 
 #ifdef USE_ARM64_NEON
 #include "audio_neon.hpp"
@@ -744,6 +747,29 @@ void loadVoice(PiperConfig &config, std::string modelPath,
     spdlog::debug("Voice contains {} language(s)", voice.modelConfig.numLanguages);
   }
 
+  // Load language-specific dictionaries for multilingual models
+  // Dictionary files are expected next to the model file
+  std::string modelDir = std::filesystem::path(modelPath).parent_path().string();
+
+  // English: CMU dictionary
+  std::string cmuPath = modelDir + "/cmudict_data.json";
+  if (std::filesystem::exists(cmuPath)) {
+    if (loadCmuDict(cmuPath, voice.cmuDict)) {
+      spdlog::info("Loaded CMU dictionary ({} entries) from {}", voice.cmuDict.size(), cmuPath);
+    }
+  }
+
+  // Chinese: pypinyin dictionaries
+  std::string pinyinSinglePath = modelDir + "/pinyin_single.json";
+  std::string pinyinPhrasePath = modelDir + "/pinyin_phrases.json";
+  if (std::filesystem::exists(pinyinSinglePath)) {
+    if (loadPinyinDicts(pinyinSinglePath, pinyinPhrasePath,
+                        voice.pinyinSingleDict, voice.pinyinPhraseDict)) {
+      spdlog::info("Loaded pinyin dictionaries (single={}, phrases={}) from {}",
+                   voice.pinyinSingleDict.size(), voice.pinyinPhraseDict.size(), modelDir);
+    }
+  }
+
   spdlog::debug("Voice contains {} speaker(s)", voice.modelConfig.numSpeakers);
 
   loadModel(modelPath, voice.session, useCuda, gpuDeviceId);
@@ -1116,14 +1142,20 @@ void textToAudio(PiperConfig &config, Voice &voice, std::string text,
           } else if (langSeg.lang == "pt") {
             // Portuguese: native rule-based phonemizer
             phonemize_portuguese(langSeg.text, langPhonemes);
+          } else if (langSeg.lang == "en" && !voice.cmuDict.empty()) {
+            // English: CMU dictionary-based G2P
+            phonemize_english(langSeg.text, langPhonemes, voice.cmuDict);
+          } else if (langSeg.lang == "zh" && !voice.pinyinSingleDict.empty()) {
+            // Chinese: pypinyin-based G2P
+            phonemize_chinese(langSeg.text, langPhonemes,
+                              voice.pinyinSingleDict, voice.pinyinPhraseDict);
+          } else if (langSeg.lang == "ko") {
+            // Korean: Hangul decomposition (no external data needed)
+            phonemize_korean(langSeg.text, langPhonemes);
           } else {
-            // Other languages (EN, ZH, KO): use eSpeak fallback
+            // Fallback: eSpeak for any language without native G2P
             eSpeakPhonemeConfig eSpeakConfig;
-            if (langSeg.lang == "en") eSpeakConfig.voice = "en-us";
-            else if (langSeg.lang == "zh") eSpeakConfig.voice = "cmn";
-            else if (langSeg.lang == "ko") eSpeakConfig.voice = "ko";
-            else eSpeakConfig.voice = langSeg.lang;
-
+            eSpeakConfig.voice = langSeg.lang;
             phonemize_eSpeak(langSeg.text, eSpeakConfig, langPhonemes);
           }
 
