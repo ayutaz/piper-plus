@@ -509,7 +509,7 @@ def get_text_casing(casing: str):
 def _cache_audio(
     args: argparse.Namespace,
     utt: "Utterance",
-    silence_detector: "SileroVoiceActivityDetector | None",
+    silence_detector: "SileroVoiceActivityDetector | None",  # noqa: F821
 ) -> tuple[Path, Path]:
     """Dispatch audio caching to energy VAD or Silero VAD based on args."""
     if getattr(args, "energy_vad", True):
@@ -817,14 +817,14 @@ def _phonemize_batch_multilingual_impl(
         language_id_map: dict[str, int] = {}
         _lang_detector = None
         if hasattr(args, "lang_parts") and args.lang_parts:
-            language_id_map = {
-                lang: idx for idx, lang in enumerate(args.lang_parts)
-            }
+            language_id_map = {lang: idx for idx, lang in enumerate(args.lang_parts)}
             from .phonemize.multilingual import UnicodeLanguageDetector  # noqa: PLC0415
 
             _lang_detector = UnicodeLanguageDetector(
                 args.lang_parts,
-                default_latin_language="en" if "en" in args.lang_parts else args.lang_parts[0],
+                default_latin_language="en"
+                if "en" in args.lang_parts
+                else args.lang_parts[0],
             )
         elif getattr(args, "phoneme_type", None) == PhonemeType.BILINGUAL:
             language_id_map = {"ja": 0, "en": 1}
@@ -863,7 +863,9 @@ def _phonemize_batch_multilingual_impl(
                         context_has_kana = _lang_detector.has_kana(utt.text)
                         counts: dict[str, int] = {}
                         for ch in utt.text:
-                            lang = _lang_detector.detect_char(ch, context_has_kana=context_has_kana)
+                            lang = _lang_detector.detect_char(
+                                ch, context_has_kana=context_has_kana
+                            )
                             if lang is not None:
                                 counts[lang] = counts.get(lang, 0) + 1
                         if counts:

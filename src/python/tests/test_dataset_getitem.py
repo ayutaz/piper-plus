@@ -3,16 +3,17 @@
 Ensures that __getitem__ does not mutate self.utterances (required for num_workers>0).
 """
 
-import json
-import tempfile
-from pathlib import Path
-from unittest.mock import patch
-
 import numpy as np
 import pytest
-import torch
 
-from piper_train.vits.dataset import PiperDataset, Utterance, UtteranceTensors
+
+torch = pytest.importorskip("torch")
+
+from piper_train.vits.dataset import (  # noqa: E402
+    PiperDataset,
+    Utterance,
+    UtteranceTensors,
+)
 
 
 def _make_utterance(tmp_path, speaker_id=0, language_id=0, text="test"):
@@ -46,13 +47,16 @@ def _make_utterance_with_prosody(tmp_path, speaker_id=0):
     torch.save(spectrogram, spec_path)
 
     phoneme_ids = np.array([1, 8, 5, 39, 25], dtype=np.int16)
-    prosody_features = np.array([
-        [-2, 1, 5],
-        [-1, 2, 5],
-        [0, 3, 5],
-        [1, 4, 5],
-        [2, 5, 5],
-    ], dtype=np.int16)
+    prosody_features = np.array(
+        [
+            [-2, 1, 5],
+            [-1, 2, 5],
+            [0, 3, 5],
+            [1, 4, 5],
+            [2, 5, 5],
+        ],
+        dtype=np.int16,
+    )
 
     return Utterance(
         phoneme_ids=phoneme_ids,
@@ -101,7 +105,7 @@ def test_getitem_invalid_file_raises(tmp_path):
     )
     dataset = _make_dataset_with_utterances([utt])
 
-    with pytest.raises(Exception):
+    with pytest.raises(FileNotFoundError):
         dataset[0]
 
 
@@ -125,7 +129,7 @@ def test_getitem_does_not_mutate_utterances_list(tmp_path):
     dataset[2]
 
     # Access bad item should raise, NOT shrink the list
-    with pytest.raises(Exception):
+    with pytest.raises(FileNotFoundError):
         dataset[1]
 
     assert len(dataset) == original_len, (
@@ -143,7 +147,10 @@ def test_getitem_with_prosody_features(tmp_path):
     result = dataset[0]
 
     assert result.prosody_features is not None
-    assert result.prosody_features.shape == (5, 3)  # 5 phonemes, 3 features (a1, a2, a3)
+    assert result.prosody_features.shape == (
+        5,
+        3,
+    )  # 5 phonemes, 3 features (a1, a2, a3)
     assert result.prosody_features[0].tolist() == [-2, 1, 5]
     assert result.prosody_features[4].tolist() == [2, 5, 5]
 

@@ -34,6 +34,7 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from hashlib import sha256 as _sha256
 from pathlib import Path
 
+
 _LOGGER = logging.getLogger("prepare_multilingual")
 
 # Language ID mapping (must match model config)
@@ -223,7 +224,7 @@ def parse_cml_tts(
         if not header:
             return [], {}
 
-        for line_no, line in enumerate(f, start=2):
+        for _line_no, line in enumerate(f, start=2):
             line = line.strip()
             if not line:
                 continue
@@ -291,7 +292,11 @@ def _init_phonemize_worker(
 
 
 def _phonemize_single(
-    text: str, wav_path: str, speaker_id_str: str, language: str, language_id: int,
+    text: str,
+    wav_path: str,
+    speaker_id_str: str,
+    language: str,
+    language_id: int,
 ) -> dict:
     """Phonemize a single utterance using cached worker state."""
     ml_phonemizer = _phonemize_worker_state["ml_phonemizer"]
@@ -313,9 +318,7 @@ def _phonemize_single(
                 phoneme_ids.extend(ids)
                 for _ in ids:
                     if pr is not None:
-                        prosody_features.append(
-                            {"a1": pr.a1, "a2": pr.a2, "a3": pr.a3}
-                        )
+                        prosody_features.append({"a1": pr.a1, "a2": pr.a2, "a3": pr.a3})
                     else:
                         prosody_features.append(None)
             else:
@@ -405,9 +408,7 @@ def _phonemize_zh_pinyin_single(
                 phoneme_ids.extend(ids)
                 for _ in ids:
                     if pr is not None:
-                        prosody_features.append(
-                            {"a1": pr.a1, "a2": pr.a2, "a3": pr.a3}
-                        )
+                        prosody_features.append({"a1": pr.a1, "a2": pr.a2, "a3": pr.a3})
                     else:
                         prosody_features.append(None)
             else:
@@ -467,7 +468,9 @@ def _resample_batch_worker_no_vad(args):
     for wav_path in wav_paths:
         try:
             norm_path, cache_id = resample_only_no_vad(
-                wav_path, cache_dir, sample_rate,
+                wav_path,
+                cache_dir,
+                sample_rate,
                 resample_quality=resample_quality,
             )
             spec_path = Path(cache_dir) / f"{cache_id}.spec.pt"
@@ -489,7 +492,9 @@ def _cache_audio_batch_worker_no_vad(args):
     for wav_path in wav_paths:
         try:
             norm_path, spec_path = cache_norm_audio_no_vad(
-                wav_path, cache_dir, sample_rate,
+                wav_path,
+                cache_dir,
+                sample_rate,
                 resample_quality=resample_quality,
             )
             results.append((str(wav_path), str(norm_path), str(spec_path)))
@@ -680,9 +685,7 @@ def phonemize_new_language(
                             phonemized.append(result)
                         done_utts += 1
                     if done_utts % 5000 < _PHONEMIZE_BATCH_SIZE:
-                        _LOGGER.info(
-                            "Phonemized %d/%d %s", done_utts, len(tasks), "ZH"
-                        )
+                        _LOGGER.info("Phonemized %d/%d %s", done_utts, len(tasks), "ZH")
         else:
             _init_zh_pinyin_worker(ALL_LANGUAGES, ml_id_map)
             for batch in batches:
@@ -797,9 +800,7 @@ def cache_audio_parallel(
             if f.name.endswith(".spec.pt"):
                 existing_specs.add(f.name[: -len(".spec.pt")])
 
-    _LOGGER.info(
-        "Found %d existing spec caches in %s", len(existing_specs), cache_dir
-    )
+    _LOGGER.info("Found %d existing spec caches in %s", len(existing_specs), cache_dir)
 
     audio_map: dict[str, tuple[str, str]] = {}
     need_caching: list[str] = []
@@ -846,8 +847,7 @@ def cache_audio_parallel(
             for i in range(0, len(need_caching), _RESAMPLE_BATCH_SIZE)
         ]
         batch_args = [
-            (batch, str(cache_dir), sample_rate, resample_quality)
-            for batch in batches
+            (batch, str(cache_dir), sample_rate, resample_quality) for batch in batches
         ]
 
         resample_results: list[tuple[str, str, str]] = []  # (wav, norm, spec)
@@ -893,7 +893,9 @@ def cache_audio_parallel(
             len(resample_results),
         )
 
-        spec_items = [(norm_str, spec_str) for _, norm_str, spec_str in resample_results]
+        spec_items = [
+            (norm_str, spec_str) for _, norm_str, spec_str in resample_results
+        ]
         computed = _compute_specs_gpu_batch(
             spec_items,
             batch_size=_GPU_SPEC_BATCH_SIZE,
@@ -932,8 +934,7 @@ def cache_audio_parallel(
             for i in range(0, len(need_caching), _RESAMPLE_BATCH_SIZE)
         ]
         batch_args = [
-            (batch, str(cache_dir), sample_rate, resample_quality)
-            for batch in batches
+            (batch, str(cache_dir), sample_rate, resample_quality) for batch in batches
         ]
 
         if workers > 1:
@@ -970,7 +971,9 @@ def cache_audio_parallel(
             for i, wav_path_str in enumerate(need_caching):
                 try:
                     norm_path, spec_path = cache_norm_audio_no_vad(
-                        wav_path_str, cache_dir, sample_rate,
+                        wav_path_str,
+                        cache_dir,
+                        sample_rate,
                         resample_quality=resample_quality,
                     )
                     audio_map[wav_path_str] = (str(norm_path), str(spec_path))
@@ -1072,9 +1075,7 @@ def process_new_language(
         return [], {}
 
     # Assign speaker IDs
-    sorted_speakers = sorted(
-        speaker_counts.items(), key=lambda x: x[1], reverse=True
-    )
+    sorted_speakers = sorted(speaker_counts.items(), key=lambda x: x[1], reverse=True)
     speaker_id_map: dict[str, int] = {}
     for i, (spk, _count) in enumerate(sorted_speakers):
         speaker_id_map[spk] = speaker_id_offset + i
@@ -1089,7 +1090,11 @@ def process_new_language(
 
     # Phase 1: Phonemize
     phonemized, _missing = phonemize_new_language(
-        entries, language, language_id, ml_id_map, workers,
+        entries,
+        language,
+        language_id,
+        ml_id_map,
+        workers,
         use_pinyin_shortcut=use_pinyin_shortcut,
     )
     if not phonemized:
@@ -1098,7 +1103,11 @@ def process_new_language(
 
     # Phase 2: Cache audio (two-phase if GPU available)
     audio_map = cache_audio_parallel(
-        phonemized, cache_dir, sample_rate, workers, language,
+        phonemized,
+        cache_dir,
+        sample_rate,
+        workers,
+        language,
         gpu_spec_device=gpu_spec_device,
         resample_quality=resample_quality,
     )
@@ -1191,9 +1200,7 @@ def main():
     }
     active_new_langs = {k: v for k, v in new_langs.items() if v}
     if not active_new_langs:
-        _LOGGER.warning(
-            "No new language sources provided. Will only copy JA+EN data."
-        )
+        _LOGGER.warning("No new language sources provided. Will only copy JA+EN data.")
 
     # Setup output
     output_dir = Path(args.output_dir)
@@ -1276,9 +1283,7 @@ def main():
             use_pinyin_shortcut=not args.no_pinyin_shortcut,
         )
         all_utterances.extend(zh_utts)
-        all_speaker_map.update(
-            {f"zh_{k}": v for k, v in zh_speakers.items()}
-        )
+        all_speaker_map.update({f"zh_{k}": v for k, v in zh_speakers.items()})
         if zh_speakers:
             next_speaker_id = max(zh_speakers.values()) + 1
         lang_stats["zh"] = len(zh_utts)
@@ -1288,9 +1293,7 @@ def main():
     if args.es_cml_tts:
         _LOGGER.info("=" * 60)
         _LOGGER.info("Processing ES (CML-TTS) from %s", args.es_cml_tts)
-        es_entries, es_speaker_counts = parse_cml_tts(
-            Path(args.es_cml_tts), "es"
-        )
+        es_entries, es_speaker_counts = parse_cml_tts(Path(args.es_cml_tts), "es")
         es_utts, es_speakers = process_new_language(
             es_entries,
             es_speaker_counts,
@@ -1305,9 +1308,7 @@ def main():
             resample_quality=args.resample_quality,
         )
         all_utterances.extend(es_utts)
-        all_speaker_map.update(
-            {f"es_{k}": v for k, v in es_speakers.items()}
-        )
+        all_speaker_map.update({f"es_{k}": v for k, v in es_speakers.items()})
         if es_speakers:
             next_speaker_id = max(es_speakers.values()) + 1
         lang_stats["es"] = len(es_utts)
@@ -1317,9 +1318,7 @@ def main():
     if args.fr_cml_tts:
         _LOGGER.info("=" * 60)
         _LOGGER.info("Processing FR (CML-TTS) from %s", args.fr_cml_tts)
-        fr_entries, fr_speaker_counts = parse_cml_tts(
-            Path(args.fr_cml_tts), "fr"
-        )
+        fr_entries, fr_speaker_counts = parse_cml_tts(Path(args.fr_cml_tts), "fr")
         fr_utts, fr_speakers = process_new_language(
             fr_entries,
             fr_speaker_counts,
@@ -1334,9 +1333,7 @@ def main():
             resample_quality=args.resample_quality,
         )
         all_utterances.extend(fr_utts)
-        all_speaker_map.update(
-            {f"fr_{k}": v for k, v in fr_speakers.items()}
-        )
+        all_speaker_map.update({f"fr_{k}": v for k, v in fr_speakers.items()})
         if fr_speakers:
             next_speaker_id = max(fr_speakers.values()) + 1
         lang_stats["fr"] = len(fr_utts)
@@ -1346,9 +1343,7 @@ def main():
     if args.pt_cml_tts:
         _LOGGER.info("=" * 60)
         _LOGGER.info("Processing PT (CML-TTS) from %s", args.pt_cml_tts)
-        pt_entries, pt_speaker_counts = parse_cml_tts(
-            Path(args.pt_cml_tts), "pt"
-        )
+        pt_entries, pt_speaker_counts = parse_cml_tts(Path(args.pt_cml_tts), "pt")
         pt_utts, pt_speakers = process_new_language(
             pt_entries,
             pt_speaker_counts,
@@ -1363,9 +1358,7 @@ def main():
             resample_quality=args.resample_quality,
         )
         all_utterances.extend(pt_utts)
-        all_speaker_map.update(
-            {f"pt_{k}": v for k, v in pt_speakers.items()}
-        )
+        all_speaker_map.update({f"pt_{k}": v for k, v in pt_speakers.items()})
         if pt_speakers:
             next_speaker_id = max(pt_speakers.values()) + 1
         lang_stats["pt"] = len(pt_utts)
@@ -1393,14 +1386,10 @@ def main():
         config_speaker_map[name] = sid
 
     # Determine active languages
-    active_languages = [
-        lang for lang in ALL_LANGUAGES if lang_stats.get(lang, 0) > 0
-    ]
+    active_languages = [lang for lang in ALL_LANGUAGES if lang_stats.get(lang, 0) > 0]
 
     # Build language_id_map
-    config_language_id_map = {
-        lang: LANGUAGE_ID_MAP[lang] for lang in active_languages
-    }
+    config_language_id_map = {lang: LANGUAGE_ID_MAP[lang] for lang in active_languages}
 
     # Write config.json
     config = {
@@ -1446,9 +1435,7 @@ def main():
         utt_count = lang_stats.get(lang, 0)
         spk_count = lang_speaker_counts.get(lang, 0)
         if utt_count > 0:
-            _LOGGER.info(
-                "  %-4s  %8d  %8d", lang.upper(), utt_count, spk_count
-            )
+            _LOGGER.info("  %-4s  %8d  %8d", lang.upper(), utt_count, spk_count)
     _LOGGER.info("")
     _LOGGER.info(
         "Config: %s (speakers=%d, symbols=%d, languages=%d)",

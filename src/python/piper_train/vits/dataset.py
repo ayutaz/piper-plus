@@ -116,61 +116,38 @@ class PiperDataset(Dataset):
 
     def __getitem__(self, idx) -> UtteranceTensors:
         utt = self.utterances[idx]
-        # 問題のあるファイルでロードが失敗した場合はスキップして次を試す
-        while True:
-            try:
-                audio_norm = _load_tensor(utt.audio_norm_path)
-                if audio_norm.dim() == 1:
-                    audio_norm = audio_norm.unsqueeze(0)
-                spectrogram = _load_tensor(utt.audio_spec_path)
-                # Convert float16 spec to float32 (new caches are saved as float16 to save disk space)
-                if spectrogram.dtype == torch.float16:
-                    spectrogram = spectrogram.float()
+        audio_norm = _load_tensor(utt.audio_norm_path)
+        if audio_norm.dim() == 1:
+            audio_norm = audio_norm.unsqueeze(0)
+        spectrogram = _load_tensor(utt.audio_spec_path)
+        # Convert float16 spec to float32 (new caches are saved as float16 to save disk space)
+        if spectrogram.dtype == torch.float16:
+            spectrogram = spectrogram.float()
 
-                # Convert prosody_features to tensor if available
-                prosody_tensor = None
-                if utt.prosody_features is not None:
-                    prosody_tensor = self._prosody_features_to_tensor(
-                        utt.prosody_features
-                    )
+        # Convert prosody_features to tensor if available
+        prosody_tensor = None
+        if utt.prosody_features is not None:
+            prosody_tensor = self._prosody_features_to_tensor(
+                utt.prosody_features
+            )
 
-                return UtteranceTensors(
-                    phoneme_ids=torch.from_numpy(utt.phoneme_ids).long(),
-                    audio_norm=audio_norm,
-                    spectrogram=spectrogram,
-                    speaker_id=(
-                        LongTensor([utt.speaker_id])
-                        if utt.speaker_id is not None
-                        else None
-                    ),
-                    language_id=(
-                        LongTensor([utt.language_id])
-                        if utt.language_id is not None
-                        else None
-                    ),
-                    text=utt.text,
-                    prosody_features=prosody_tensor,
-                )
-            except Exception as e:
-                _LOGGER.error(
-                    "Failed to load tensors for %s (spec: %s): %s",
-                    utt.audio_norm_path,
-                    utt.audio_spec_path,
-                    e,
-                )
-
-                # 破損ファイルとみなし、データセットから除外
-                self.utterances.pop(idx)
-
-                # データがすべて無効になった場合はエラー
-                if len(self.utterances) == 0:
-                    raise RuntimeError("All utterances failed to load") from e
-
-                # 同じインデックスで次の要素を再試行
-                if idx >= len(self.utterances):
-                    idx = len(self.utterances) - 1
-                utt = self.utterances[idx]
-                # 次のファイルでリトライ（ログは出さない）
+        return UtteranceTensors(
+            phoneme_ids=torch.from_numpy(utt.phoneme_ids).long(),
+            audio_norm=audio_norm,
+            spectrogram=spectrogram,
+            speaker_id=(
+                LongTensor([utt.speaker_id])
+                if utt.speaker_id is not None
+                else None
+            ),
+            language_id=(
+                LongTensor([utt.language_id])
+                if utt.language_id is not None
+                else None
+            ),
+            text=utt.text,
+            prosody_features=prosody_tensor,
+        )
 
     @staticmethod
     def _prosody_features_to_tensor(

@@ -11,12 +11,29 @@ Prevents regression of the Japanese padding bug:
 
 import pytest
 
+
 pyopenjtalk = pytest.importorskip("pyopenjtalk", reason="pyopenjtalk required")
+
+# g2p_en depends on NLTK's averaged_perceptron_tagger_eng data at runtime.
+# If it's not downloaded, skip EN tests gracefully.
+try:
+    import nltk
+
+    nltk.data.find("taggers/averaged_perceptron_tagger_eng")
+    _has_nltk_tagger = True
+except (ImportError, LookupError):
+    _has_nltk_tagger = False
+
+_skip_no_nltk = pytest.mark.skipif(
+    not _has_nltk_tagger,
+    reason="NLTK averaged_perceptron_tagger_eng data not available",
+)
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _get_multilingual_id_map(languages):
     """Build a multilingual phoneme_id_map for the given languages."""
@@ -37,7 +54,10 @@ def _call_text_to_phoneme_ids(text, phoneme_id_map, language, language_id_map=No
     from piper_train.infer_onnx import text_to_phoneme_ids_and_prosody
 
     return text_to_phoneme_ids_and_prosody(
-        text, phoneme_id_map, language=language, language_id_map=language_id_map,
+        text,
+        phoneme_id_map,
+        language=language,
+        language_id_map=language_id_map,
     )
 
 
@@ -60,7 +80,7 @@ def _has_intersperse_padding(phoneme_ids):
         return True  # trivially padded
 
     # Check that every pair of adjacent non-zero IDs has a gap > 1
-    for a, b in zip(non_zero_positions, non_zero_positions[1:]):
+    for a, b in zip(non_zero_positions, non_zero_positions[1:], strict=False):
         if b - a == 1:
             return False
     return True
@@ -84,6 +104,7 @@ SINGLE_LANGUAGE_ID_MAP = {"ja": 0}
 # Tests
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.unit
 class TestJaAutoPromotion:
     """Verify that JA phoneme_ids get intersperse padding when a multilingual
@@ -94,7 +115,9 @@ class TestJaAutoPromotion:
         phoneme_ids must have intersperse padding (0 between adjacent IDs)."""
         id_map = _get_multilingual_id_map(["ja", "en"])
         phoneme_ids, _ = _call_text_to_phoneme_ids(
-            JA_TEST_TEXT, id_map, language="ja",
+            JA_TEST_TEXT,
+            id_map,
+            language="ja",
             language_id_map=MULTILINGUAL_LANGUAGE_ID_MAP,
         )
 
@@ -109,7 +132,9 @@ class TestJaAutoPromotion:
         intersperse padding (JapanesePhonemizer.post_process_ids is no-op)."""
         id_map = _get_ja_only_id_map()
         phoneme_ids, _ = _call_text_to_phoneme_ids(
-            JA_TEST_TEXT, id_map, language="ja",
+            JA_TEST_TEXT,
+            id_map,
+            language="ja",
             language_id_map=None,
         )
 
@@ -124,14 +149,15 @@ class TestJaAutoPromotion:
         """When language_id_map has only 1 language, should NOT auto-promote."""
         id_map = _get_ja_only_id_map()
         phoneme_ids, _ = _call_text_to_phoneme_ids(
-            JA_TEST_TEXT, id_map, language="ja",
+            JA_TEST_TEXT,
+            id_map,
+            language="ja",
             language_id_map=SINGLE_LANGUAGE_ID_MAP,
         )
 
         assert len(phoneme_ids) > 0, "phoneme_ids should not be empty"
         assert not _has_intersperse_padding(phoneme_ids), (
-            f"Single-language map must NOT auto-promote, "
-            f"got: {phoneme_ids}"
+            f"Single-language map must NOT auto-promote, got: {phoneme_ids}"
         )
 
 
@@ -140,6 +166,7 @@ class TestEnPaddingAlways:
     """Verify that EN phonemizer always applies intersperse padding
     regardless of language_id_map."""
 
+    @_skip_no_nltk
     def test_en_always_has_padding(self):
         """EN phonemizer always has padding via base class post_process_ids,
         regardless of language_id_map."""
@@ -148,7 +175,9 @@ class TestEnPaddingAlways:
         # Case 1: with multilingual language_id_map
         id_map_multi = _get_multilingual_id_map(["ja", "en"])
         ids_multi, _ = _call_text_to_phoneme_ids(
-            EN_TEST_TEXT, id_map_multi, language="en",
+            EN_TEST_TEXT,
+            id_map_multi,
+            language="en",
             language_id_map=MULTILINGUAL_LANGUAGE_ID_MAP,
         )
         assert _has_intersperse_padding(ids_multi), (
@@ -161,7 +190,9 @@ class TestEnPaddingAlways:
         # config-provided map), so we build one explicitly.
         en_id_map = _get_multilingual_id_map(["en"])
         ids_standalone, _ = _call_text_to_phoneme_ids(
-            EN_TEST_TEXT, en_id_map, language="en",
+            EN_TEST_TEXT,
+            en_id_map,
+            language="en",
             language_id_map=None,
         )
         assert _has_intersperse_padding(ids_standalone), (
@@ -181,7 +212,9 @@ class TestComboCodeNotPromoted:
         id_map = _get_multilingual_id_map(["ja", "en"])
         # Use language="ja-en" with a multilingual language_id_map
         phoneme_ids, _ = _call_text_to_phoneme_ids(
-            JA_TEST_TEXT, id_map, language="ja-en",
+            JA_TEST_TEXT,
+            id_map,
+            language="ja-en",
             language_id_map=MULTILINGUAL_LANGUAGE_ID_MAP,
         )
 
@@ -190,8 +223,7 @@ class TestComboCodeNotPromoted:
         # (the bilingual/multilingual phonemizer handles padding), but the key
         # point is that the auto-promotion branch is NOT taken.
         assert _has_intersperse_padding(phoneme_ids), (
-            f"Combo code 'ja-en' should still produce padded output, "
-            f"got: {phoneme_ids}"
+            f"Combo code 'ja-en' should still produce padded output, got: {phoneme_ids}"
         )
 
 
@@ -204,7 +236,9 @@ class TestAlignment:
         """phoneme_ids and prosody_features must have same length."""
         id_map = _get_multilingual_id_map(["ja", "en"])
         phoneme_ids, prosody_features = _call_text_to_phoneme_ids(
-            JA_TEST_TEXT, id_map, language="ja",
+            JA_TEST_TEXT,
+            id_map,
+            language="ja",
             language_id_map=MULTILINGUAL_LANGUAGE_ID_MAP,
         )
 
@@ -213,13 +247,16 @@ class TestAlignment:
             f"({len(prosody_features)}) must have same length"
         )
 
+    @_skip_no_nltk
     def test_phoneme_ids_prosody_alignment_en(self):
         """EN: phoneme_ids and prosody_features must also align."""
         g2p_en = pytest.importorskip("g2p_en", reason="g2p_en required")  # noqa: F841
 
         id_map = _get_multilingual_id_map(["ja", "en"])
         phoneme_ids, prosody_features = _call_text_to_phoneme_ids(
-            EN_TEST_TEXT, id_map, language="en",
+            EN_TEST_TEXT,
+            id_map,
+            language="en",
             language_id_map=MULTILINGUAL_LANGUAGE_ID_MAP,
         )
 
@@ -232,7 +269,9 @@ class TestAlignment:
         """JA-only model: alignment must still hold."""
         id_map = _get_ja_only_id_map()
         phoneme_ids, prosody_features = _call_text_to_phoneme_ids(
-            JA_TEST_TEXT, id_map, language="ja",
+            JA_TEST_TEXT,
+            id_map,
+            language="ja",
             language_id_map=None,
         )
 
@@ -253,7 +292,9 @@ class TestPhonemeIdRange:
         num_symbols = len(id_map)
 
         phoneme_ids, _ = _call_text_to_phoneme_ids(
-            JA_TEST_TEXT, id_map, language="ja",
+            JA_TEST_TEXT,
+            id_map,
+            language="ja",
             language_id_map=MULTILINGUAL_LANGUAGE_ID_MAP,
         )
 
@@ -262,6 +303,7 @@ class TestPhonemeIdRange:
                 f"phoneme ID {pid} out of valid range [0, {num_symbols})"
             )
 
+    @_skip_no_nltk
     def test_all_ids_within_valid_range_en(self):
         """EN: all phoneme IDs must also be within range."""
         g2p_en = pytest.importorskip("g2p_en", reason="g2p_en required")  # noqa: F841
@@ -270,7 +312,9 @@ class TestPhonemeIdRange:
         num_symbols = len(id_map)
 
         phoneme_ids, _ = _call_text_to_phoneme_ids(
-            EN_TEST_TEXT, id_map, language="en",
+            EN_TEST_TEXT,
+            id_map,
+            language="en",
             language_id_map=MULTILINGUAL_LANGUAGE_ID_MAP,
         )
 
@@ -285,7 +329,9 @@ class TestPhonemeIdRange:
         num_symbols = len(id_map)
 
         phoneme_ids, _ = _call_text_to_phoneme_ids(
-            JA_TEST_TEXT, id_map, language="ja",
+            JA_TEST_TEXT,
+            id_map,
+            language="ja",
             language_id_map=None,
         )
 
