@@ -117,9 +117,10 @@ nohup /data/piper/.venv/bin/python -m piper_train \
 20. **不要チェックポイント削除**: `output-bilingual-ja-en/lightning_logs/version_28/checkpoints/` に全200エポック分 (~176GB) が残存。`epoch=199` と `last.ckpt` 以外は削除してディスク節約可能
 21. ✅ **多言語 Phonemizer 実装**: ZH/KO/ES/PT/FR の 5言語 Phonemizer + MultilingualPhonemizer (2026-03-07)
 22. ✅ **多言語データセット作成**: `dataset-multilingual-6lang-filtered` — 508,187発話 / 571話者 / 6言語 / 173シンボル (2026-03-07)
-23. **6言語事前学習開始**: ~282K gradient steps / ~157時間 (~6.5日) / language-balanced-sampling 自動有効化
-24. **6言語 ONNX 変換 + 推論テスト**: 学習完了後
-25. **つくよみちゃん 6言語ベースファインチューニング**: 6言語ベースモデルから転移学習
+23. ✅ **6言語事前学習完了**: 75 epoch / ~282K gradient steps / language-balanced-sampling 自動有効化 (2026-03-16) — epoch=74-step=504712.ckpt
+24. ✅ **6言語 ONNX 変換 + 推論テスト**: 学習完了後に変換・テスト済み (2026-03-16)
+25. ✅ **つくよみちゃん 6言語ベースファインチューニング完了**: 500 epoch / 1GPU / lr=2e-5 / --resume-from-multispeaker-checkpoint (2026-03-16) — v1 は freeze_dp タイミングバグで失敗、v2 で修正済み。`tsukuyomi-6lang-v2-fixed.onnx` (emb_lang後処理済み)、JA 3.05s / EN 2.54s / ZH 1.21s / ES 2.86s / FR 2.11s / PT 2.24s
+26. **HuggingFace アップロード**: 6lang ベースモデル + つくよみちゃん 6lang-v2 をアップロード
 
 ### 6lang vs v4 vs v3 vs v2 比較
 
@@ -129,7 +130,7 @@ nohup /data/piper/.venv/bin/python -m piper_train \
 | 総発話数 | 63,325 | 115,795 | 135,060 | **508,187** |
 | 話者数 | 40 | 848 | 330 | **571** |
 | シンボル数 | 97 | 97 | 97 | **173** |
-| 学習期間 | 4h19分 (200ep) | ~3日 (350ep) | ~46時間 (150ep) | **~157時間 (75ep) 予定** |
+| 学習期間 | 4h19分 (200ep) | ~3日 (350ep) | ~46時間 (150ep) | **~157時間 (75ep)** |
 | gradient steps | ~110K | ~202K | ~270K | **~282K** |
 
 **6lang の設計方針**: v4 の JA+EN をベースに ZH (AISHELL-3)、ES/FR/PT (CML-TTS) を追加。話者あたり30発話以上でフィルタし、embedding 学習品質を確保。
@@ -340,6 +341,66 @@ nohup /data/piper/.venv/bin/python -m piper_train \
 
 **emb_lang修正済みチェックポイント:** `output-tsukuyomi-finetune-v4-emb-lang-fix/epoch=499-step=22000-emb_lang_fixed.ckpt`
 
+### つくよみちゃん 6langベースモデルファインチューニング v2 (2026-03-16 完了)
+
+6言語マルチリンガルモデル (571話者, 75 epoch) をベースとして、つくよみちゃんデータ (100発話, ~11分) を転移学習。500 epoch完了。
+
+**v1 (失敗) → v2 (成功) の経緯:**
+- **v1** (`output-tsukuyomi-finetune-6lang`): `--resume-from-multispeaker-checkpoint` で `--freeze-dp` が自動有効化されるはずだったが、**freeze_dp タイミングバグ**により実際には DP が凍結されていなかった。結果として DP catastrophic forgetting が発生し、音声の duration が崩壊。
+- **v2** (`output-tsukuyomi-finetune-6lang-v2`): バグ修正後に再実行。DP 凍結が正しく適用され、全6言語で正常な duration の音声を生成。
+
+**修正されたバグ (2件):**
+
+1. **freeze_dp タイミングバグ** (commit d408856): `args.freeze_dp = True` の設定が `VitsModel` 作成の**後**に実行されていたため、`save_hyperparameters()` が `freeze_dp=False` をキャプチャしていた。`configure_optimizers()` は `self.hparams.freeze_dp` を参照するため、DP 凍結が実際には適用されなかった。修正: `args.freeze_dp = True` をモデル作成の**前**に移動。
+2. **gin_channels 条件バグ**: `models.py` の `SynthesizerTrn.__init__()` で `gin_channels` を有効にする条件が `num_speakers > 1` だったが、シングルスピーカー + 多言語 (`num_languages > 1`) の場合に `gin_channels=0` となり、言語 embedding が機能しなかった。修正: 条件を `(num_speakers > 1 or num_languages > 1)` に変更。なお `lightning.py` 側は 2026-02-02 のバイリンガル実装時に既にこの条件で実装されていたため、`models.py` との不整合を解消。
+
+**2段階方式 (v4 emb-lang-fix と同一アプローチ、6言語拡張):**
+1. **学習時**: `--resume-from-multispeaker-checkpoint` で emb_lang[0:5] を元の embedding + emb_g_mean 補正のまま保持。凍結された DP が正しい各言語 conditioning を受け取れるようにする。`--freeze-dp` は自動有効化。
+2. **後処理 (ONNX エクスポート前)**: 学習完了後に `emb_lang[0]` (JA=つくよみちゃん) → `emb_lang[1:5]` (EN/ZH/ES/FR/PT) にコピーして声質を統一。これにより全言語のテキスト発話時もつくよみちゃんの声質で合成される。
+
+**注意:** ZH の duration (1.21s) が他言語 (2-3s) と比べて著しく短い。凍結された DP が JA conditioning (コピー後) を受け取るが、元の ZH DP パラメータの特性により短い duration が生成される。
+
+**データセット:** `/data/piper/dataset-tsukuyomi-finetune-6lang/` (100発話, 1話者, 173シンボル, 6言語)
+
+**学習開始コマンド:**
+```bash
+export WANDB_API_KEY=$(grep WANDB_API_KEY /data/piper/.env | cut -d= -f2) && \
+NCCL_DEBUG=WARN NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 \
+nohup /data/piper/.venv/bin/python -m piper_train \
+  --dataset-dir /data/piper/dataset-tsukuyomi-finetune-6lang \
+  --prosody-dim 16 \
+  --accelerator gpu --devices 1 --precision 32-true \
+  --max_epochs 500 --batch-size 4 --samples-per-speaker 4 \
+  --checkpoint-epochs 50 --quality medium \
+  --base_lr 2e-5 --disable_auto_lr_scaling \
+  --ema-decay 0.9995 \
+  --max-phoneme-ids 400 \
+  --no-wavlm \
+  --val-every-n-epochs 50 \
+  --audio-log-epochs 50 \
+  --resume-from-multispeaker-checkpoint \
+    /data/piper/output-multilingual-6lang/lightning_logs/version_0/checkpoints/epoch=74-step=504712.ckpt \
+  --default_root_dir /data/piper/output-tsukuyomi-finetune-6lang-v2 \
+  > /data/piper/training_tsukuyomi_6lang_v2.log 2>&1 &
+```
+
+**推論結果:**
+
+| テキスト | 言語 | 音声長 |
+|---------|------|--------|
+| 「こんにちは、つくよみちゃんです。」 | JA | 3.05s |
+| "Hello, how are you today?" | EN | 2.54s |
+| "你好，今天天气很好。" | ZH | 1.21s |
+| "Hola, como estas hoy?" | ES | 2.86s |
+| "Bonjour, comment allez-vous?" | FR | 2.11s |
+| "Ola, como voce esta hoje?" | PT | 2.24s |
+
+**生成モデル:** `/data/piper/output-tsukuyomi-finetune-6lang-v2/tsukuyomi-6lang-v2-fixed.onnx` (emb_lang後処理済み)
+
+**チェックポイント:** `output-tsukuyomi-finetune-6lang-v2/lightning_logs/version_0/checkpoints/epoch=499-step=22000.ckpt`
+
+**emb_lang修正済みチェックポイント:** `output-tsukuyomi-finetune-6lang-v2/epoch=499-step=22000-emb_lang_fixed.ckpt`
+
 ### 学習開始コマンド (v2、参考)
 
 ```bash
@@ -444,6 +505,30 @@ CUDA_VISIBLE_DEVICES="" .venv/bin/python -m piper_train.infer_onnx \
 
 **テストファイル:**
 - `src/python/tests/test_freeze_dp.py` — 5テスト（凍結確認、他パラメータ非凍結確認、optimizer 除外確認）
+
+### freeze_dp タイミングバグ修正 ✅ NEW (2026-03-16)
+
+`--resume-from-multispeaker-checkpoint` 使用時に `--freeze-dp` が自動有効化されるはずだったが、実際にはモデル作成後に `args.freeze_dp = True` が設定されていたため、`save_hyperparameters()` が `freeze_dp=False` をキャプチャし、DP 凍結が適用されていなかった。
+
+**問題:** `__main__.py` で `args.freeze_dp = True` の設定が `VitsModel(args)` の**後**に配置されていた。`VitsModel.__init__()` 内の `save_hyperparameters()` が呼ばれた時点では `freeze_dp=False` のまま。`configure_optimizers()` は `self.hparams.freeze_dp` を参照するため、DP パラメータが凍結されず optimizer に含まれてしまっていた。
+
+**修正 (commit d408856):** `args.freeze_dp = True` をモデル作成の**前**に移動。
+
+**影響:** つくよみちゃん 6lang v1 ファインチューニングが DP 凍結なしで実行されてしまい、DP catastrophic forgetting が発生。v2 で修正後に再実行して解決。
+
+**修正ファイル:**
+- `src/python/piper_train/__main__.py` — `args.freeze_dp = True` の位置をモデル作成前に移動
+
+### gin_channels 多言語対応修正 ✅ NEW (2026-03-16)
+
+`models.py` の `SynthesizerTrn.__init__()` で `gin_channels` を有効にする条件が `num_speakers > 1` のみだったため、シングルスピーカー + 多言語 (`num_languages > 1`) の場合に `gin_channels=0` となり、言語 embedding が機能しなかった。
+
+**問題:** `lightning.py` 側は 2026-02-02 のバイリンガル実装時に `(num_speakers > 1 or num_languages > 1)` の条件で実装済みだったが、`models.py` 側が `num_speakers > 1` のままで不整合があった。2言語バイリンガル FT 時は `num_speakers=1` でもデフォルトの `gin_channels=512` が使われていたため問題が顕在化しなかったが、明示的な条件として整合性を確保するために修正。
+
+**修正:** `models.py` の条件を `(num_speakers > 1 or num_languages > 1)` に変更。
+
+**修正ファイル:**
+- `src/python/piper_train/vits/models.py` — `gin_channels` 有効化条件を多言語対応に修正
 
 ### 学習高速化 ✅ NEW (2026-02-19)
 
@@ -1011,7 +1096,8 @@ NCCL_IB_DISABLE=1
 
 | 用途 | パス | 発話数 | 特徴 |
 |------|------|--------|------|
-| **多言語 6lang** 学習待ち | `/data/piper/dataset-multilingual-6lang-filtered/` | 508,187 | JA+EN+ZH+ES+FR+PT、571話者、173シンボル、>=30発話/話者 |
+| **多言語 6lang** ✅学習完了 | `/data/piper/dataset-multilingual-6lang-filtered/` | 508,187 | JA+EN+ZH+ES+FR+PT、571話者、173シンボル、>=30発話/話者 |
+| **つくよみちゃん 6langベース finetune** ✅完了 | `/data/piper/dataset-tsukuyomi-finetune-6lang/` | 100 | 1話者、173シンボル、multilingual(6言語) |
 | **バイリンガル JA+EN v4** ✅学習完了 | `/data/piper/dataset-bilingual-ja-en-v4/` | 135,060 | JA 60,148 (20話者) + EN 74,912 (LibriTTS-R 310話者)、330話者、97シンボル、~170h |
 | **バイリンガル JA+EN v3** ✅学習完了 | `/data/piper/dataset-bilingual-ja-en-v3/` | 115,795 | JA 60,148 (20話者) + EN 55,647 (LibriTTS-R 828話者)、848話者、97シンボル、174h |
 | **つくよみちゃん v3ベース finetune** ✅完了 | `/data/piper/dataset-tsukuyomi-finetune-v3/` | 100 | 1話者、97シンボル、bilingual(JA+EN) |
@@ -1031,6 +1117,9 @@ NCCL_IB_DISABLE=1
 
 | 用途 | パス | 状態 |
 |------|------|------|
+| **つくよみちゃん 6lang-v2** | `/data/piper/output-tsukuyomi-finetune-6lang-v2/tsukuyomi-6lang-v2-fixed.onnx` | ✅ 500 epoch完了・ONNX変換済み (2026-03-16) — emb_lang[0]→[1:5]後処理修正、JA/EN/ZH/ES/FR/PTテスト成功 |
+| **多言語 6lang ベースモデル** | `/data/piper/output-multilingual-6lang/` | ✅ 75 epoch完了 (2026-03-16) — epoch=74-step=504712.ckpt、571話者、6言語 |
+| つくよみちゃん 6lang-v1 (失敗) | `/data/piper/output-tsukuyomi-finetune-6lang/` | DP凍結未適用 (freeze_dpタイミングバグ) — v2で修正済み |
 | **つくよみちゃん v4 emb-lang-fix** | `/data/piper/output-tsukuyomi-finetune-v4-emb-lang-fix/tsukuyomi-v4-emb-lang-fix.onnx` | ✅ 500 epoch完了・ONNX変換済み (2026-03-05) — emb_lang[1] 後処理修正、JA/EN/混合テスト成功 |
 | **バイリンガル JA+EN v4** | `/data/piper/output-bilingual-ja-en-v4/bilingual-ja-en-v4-150epoch.onnx` | ✅ 150 epoch完了・ONNX変換済み (75MB, 2026-03-04) — EMA適用済み、JA/EN/混合テスト成功 |
 | **つくよみちゃん v4 freeze-dp** | `/data/piper/output-tsukuyomi-finetune-v4-freeze-dp/tsukuyomi-v4-freeze-dp.onnx` | ✅ 500 epoch完了・ONNX変換済み (2026-03-04) — --freeze-dp で DP 凍結、音声長 1.11s→1.76s 改善 |
