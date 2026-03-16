@@ -94,13 +94,9 @@ export class DictionaryLoader {
           data = await this.cacheManager.getOrFetch(
             cacheKey,
             this.dictVersion,
-            fetchFile
+            fetchFile,
+            { priority: 'high' }
           );
-          // Ensure high priority so dictionaries survive eviction
-          await this.cacheManager.set(cacheKey, data, {
-            version: this.dictVersion,
-            priority: 'high',
-          });
         } else {
           data = await fetchFile();
         }

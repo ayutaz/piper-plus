@@ -14,6 +14,9 @@ export class CacheManager {
    * @param {{ dbFactory: () => object }} options
    */
   constructor({ dbFactory } = {}) {
+    if (typeof dbFactory !== 'function') {
+      throw new TypeError('CacheManager requires a dbFactory function');
+    }
     this._db = dbFactory();
   }
 
@@ -23,30 +26,38 @@ export class CacheManager {
 
   _store(mode = 'readonly') {
     const tx = this._db.transaction(STORE_NAME, mode);
-    return tx.objectStore();
+    return tx.objectStore(STORE_NAME);
   }
 
+  /**
+   * Wrap an IDB request (or mock request) into a Promise.
+   *
+   * Mock requests are plain objects with a `_mock` flag set by MockIndexedDB.
+   * Real IDBRequest objects have addEventListener / onsuccess / onerror and
+   * must wait for the success/error event before reading `.result`.
+   */
   _wrap(request) {
-    // MockIndexedDB sets `result` synchronously (if present at all), so we can
-    // resolve immediately.  For real IDB we fall back to onsuccess / onerror.
     return new Promise((resolve, reject) => {
       if (!request) {
         resolve(undefined);
         return;
       }
-      // The mock returns plain objects with `result` (for get/count/getAll) or
-      // without it (for put/delete).  Use `'result' in request` to distinguish
-      // from the case where result is genuinely `undefined` (get miss).
-      if ('result' in request) {
+
+      // Mock requests are tagged with `_mock: true` and can be resolved
+      // synchronously because the underlying Map operations are instant.
+      if (request._mock) {
         resolve(request.result);
         return;
       }
-      // put / delete in the mock have no `result` key — just resolve.
-      if (request.onsuccess === null && request.onerror === null) {
-        resolve(undefined);
+
+      // Real IDBRequest — wait for completion via events.
+      if (typeof request.addEventListener === 'function') {
+        request.addEventListener('success', () => resolve(request.result));
+        request.addEventListener('error', () => reject(request.error));
         return;
       }
-      // Fallback for real IDB (onsuccess / onerror pattern)
+
+      // Legacy fallback: onsuccess / onerror property assignment
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error);
     });
@@ -165,14 +176,19 @@ export class CacheManager {
   /**
    * If the cache contains `key` at the given `version`, return cached data.
    * Otherwise call `fetcherFn()`, cache the result, and return it.
+   *
+   * @param {string} key
+   * @param {string} version
+   * @param {function(): Promise<ArrayBuffer>} fetcherFn
+   * @param {{ priority?: string }} options
    */
-  async getOrFetch(key, version, fetcherFn) {
+  async getOrFetch(key, version, fetcherFn, { priority = 'medium' } = {}) {
     const entry = await this.get(key);
     if (entry && entry.version === version) {
       return entry.data;
     }
     const data = await fetcherFn();
-    await this.set(key, data, { version });
+    await this.set(key, data, { version, priority });
     return data;
   }
 

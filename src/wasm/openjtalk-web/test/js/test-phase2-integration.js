@@ -39,15 +39,13 @@ class MockIndexedDB {
     const store = this.stores.get(name) || new Map();
     this.stores.set(name, store);
     return {
-      objectStore: () => ({
-        get: (key) => ({ result: store.get(key), onsuccess: null, onerror: null }),
-        put: (val) => { store.set(val.key, val); return { onsuccess: null, onerror: null }; },
-        delete: (key) => { store.delete(key); return { onsuccess: null, onerror: null }; },
-        count: () => ({ result: store.size, onsuccess: null, onerror: null }),
-        getAll: () => ({ result: [...store.values()], onsuccess: null, onerror: null }),
+      objectStore: (storeName) => ({
+        get: (key) => ({ _mock: true, result: store.get(key) }),
+        put: (val) => { store.set(val.key, val); return { _mock: true, result: undefined }; },
+        delete: (key) => { store.delete(key); return { _mock: true, result: undefined }; },
+        count: () => ({ _mock: true, result: store.size }),
+        getAll: () => ({ _mock: true, result: [...store.values()] }),
       }),
-      oncomplete: null,
-      onerror: null,
     };
   }
 }

@@ -14,8 +14,9 @@ export class AudioBackendFactory {
    */
   static async create({ workletUrl = './audio-worklet-processor.js', sampleRate = 48000 } = {}) {
     // Try AudioWorklet first
+    let ctx;
     try {
-      const ctx = new AudioContext({ sampleRate });
+      ctx = new AudioContext({ sampleRate });
       if (ctx.audioWorklet) {
         await ctx.audioWorklet.addModule(workletUrl);
         return new AudioWorkletBackend(ctx);
@@ -23,13 +24,20 @@ export class AudioBackendFactory {
     } catch (e) {
       console.warn('AudioWorklet not available, falling back:', e.message);
     }
+    // Close unused AudioContext before trying next fallback
+    if (ctx && ctx.state !== 'closed') {
+      try { await ctx.close(); } catch { /* ignore close errors */ }
+    }
 
     // Try ScriptProcessor (deprecated but widely supported)
     try {
-      const ctx = new AudioContext({ sampleRate });
+      ctx = new AudioContext({ sampleRate });
       return new ScriptProcessorBackend(ctx);
     } catch (e) {
       console.warn('ScriptProcessor not available, falling back:', e.message);
+      if (ctx && ctx.state !== 'closed') {
+        try { await ctx.close(); } catch { /* ignore close errors */ }
+      }
     }
 
     // Fallback: HTMLAudioElement (iOS Safari)
@@ -144,11 +152,9 @@ class HTMLAudioBackend {
   }
 
   async play(audioData) {
+    // Stop any existing playback before starting new one
+    this.stop();
     // Encode as WAV and play via <audio> element
-    if (this._blobUrl) {
-      URL.revokeObjectURL(this._blobUrl);
-      this._blobUrl = null;
-    }
     const wav = this._encodeWav(audioData);
     const blob = new Blob([wav], { type: 'audio/wav' });
     this._blobUrl = URL.createObjectURL(blob);

@@ -154,8 +154,9 @@ export class ChunkCrossfader {
     const actualFadeLen = Math.min(fadeLen, prev.length, chunk.length);
     const output = new Float32Array(chunk.length);
 
+    const fadeDenom = actualFadeLen > 1 ? actualFadeLen - 1 : 1;
     for (let i = 0; i < actualFadeLen; i++) {
-      const t = i / fadeLen;
+      const t = i / fadeDenom;
       output[i] = prev[i] * (1 - t) + chunk[i] * t;
     }
 

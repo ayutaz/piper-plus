@@ -140,7 +140,7 @@ describe('WebGPUSessionManager', { skip }, () => {
           }),
         },
       });
-      // 50MB GPU + 100MB buffer = 150MB required, but maxBufferSize=50MB
+      // maxBufferSize=50MB, modelSize=100MB → false
       const ok = await mgr.checkGPUCapacity(100 * 1024 * 1024);
       assert.equal(ok, false);
     });
