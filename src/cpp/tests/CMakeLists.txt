@@ -35,7 +35,6 @@ set(TEST_SOURCES
     test_phoneme_parser.cpp
     test_streaming_simple.cpp
     test_streaming_raw_phonemes.cpp
-    test_prosody_inference.cpp
     test_n_variants.cpp
     test_question_markers.cpp
     test_model_speaker_detection.cpp
@@ -48,6 +47,11 @@ set(TEST_SOURCES
 # Add dictionary manager test for Unix platforms
 if(NOT WIN32 AND NOT MSVC)
     list(APPEND TEST_SOURCES test_dictionary_manager.cpp)
+endif()
+
+# Add prosody inference test only when ONNX Runtime headers are available
+if(EXISTS "${CMAKE_BINARY_DIR}/pi/include/onnxruntime_cxx_api.h")
+    list(APPEND TEST_SOURCES test_prosody_inference.cpp)
 endif()
 
 # Create test executables

@@ -7,6 +7,18 @@
 extern "C" {
 #include "../openjtalk_optimized.h"
 #include "../openjtalk_wrapper_functions.h"
+#include "../openjtalk_dictionary_manager.h"
+}
+
+// Helper: check that OpenJTalk is actually functional (dictionary + binary)
+// by attempting a real phoneme conversion
+static bool openjtalk_functional() {
+    char* phonemes = openjtalk_text_to_phonemes_optimized("テスト");
+    if (phonemes) {
+        openjtalk_free_phonemes(phonemes);
+        return true;
+    }
+    return false;
 }
 
 class OpenJTalkOptimizedTest : public ::testing::Test {
@@ -19,7 +31,7 @@ protected:
         config.ttl_seconds = 300;  // 5 minutes
         ASSERT_TRUE(openjtalk_optimized_init(&config));
     }
-    
+
     void TearDown() override {
         openjtalk_optimized_cleanup();
     }
@@ -27,8 +39,8 @@ protected:
 
 // Test basic functionality
 TEST_F(OpenJTalkOptimizedTest, BasicConversion) {
-    if (!openjtalk_is_available()) {
-        GTEST_SKIP() << "OpenJTalk not available";
+    if (!openjtalk_functional()) {
+        GTEST_SKIP() << "OpenJTalk not functional (dictionary or binary missing)";
     }
     
     const char* text = "こんにちは";
@@ -47,8 +59,8 @@ TEST_F(OpenJTalkOptimizedTest, BasicConversion) {
 
 // Test cache functionality
 TEST_F(OpenJTalkOptimizedTest, CacheHitPerformance) {
-    if (!openjtalk_is_available()) {
-        GTEST_SKIP() << "OpenJTalk not available";
+    if (!openjtalk_functional()) {
+        GTEST_SKIP() << "OpenJTalk not functional (dictionary or binary missing)";
     }
     
     const char* text = "キャッシュテスト";
@@ -89,8 +101,8 @@ TEST_F(OpenJTalkOptimizedTest, CacheHitPerformance) {
 
 // Test performance comparison with original implementation
 TEST_F(OpenJTalkOptimizedTest, PerformanceComparison) {
-    if (!openjtalk_is_available()) {
-        GTEST_SKIP() << "OpenJTalk not available";
+    if (!openjtalk_functional()) {
+        GTEST_SKIP() << "OpenJTalk not functional (dictionary or binary missing)";
     }
     
     const char* test_texts[] = {
@@ -149,8 +161,8 @@ TEST_F(OpenJTalkOptimizedTest, PerformanceComparison) {
 
 // Test concurrent access
 TEST_F(OpenJTalkOptimizedTest, ConcurrentAccess) {
-    if (!openjtalk_is_available()) {
-        GTEST_SKIP() << "OpenJTalk not available";
+    if (!openjtalk_functional()) {
+        GTEST_SKIP() << "OpenJTalk not functional (dictionary or binary missing)";
     }
     
     const int num_threads = 4;
@@ -197,8 +209,8 @@ TEST_F(OpenJTalkOptimizedTest, CacheEviction) {
     config.ttl_seconds = 300;
     ASSERT_TRUE(openjtalk_optimized_init(&config));
     
-    if (!openjtalk_is_available()) {
-        GTEST_SKIP() << "OpenJTalk not available";
+    if (!openjtalk_functional()) {
+        GTEST_SKIP() << "OpenJTalk not functional (dictionary or binary missing)";
     }
     
     // Add entries to fill cache
@@ -238,8 +250,8 @@ TEST_F(OpenJTalkOptimizedTest, NoCache) {
     openjtalk_optimized_cleanup();
     ASSERT_TRUE(openjtalk_optimized_init(nullptr));
     
-    if (!openjtalk_is_available()) {
-        GTEST_SKIP() << "OpenJTalk not available";
+    if (!openjtalk_functional()) {
+        GTEST_SKIP() << "OpenJTalk not functional (dictionary or binary missing)";
     }
     
     const char* text = "キャッシュなし";
