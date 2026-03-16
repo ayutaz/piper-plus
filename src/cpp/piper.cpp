@@ -970,18 +970,24 @@ void textToAudio(PiperConfig &config, Voice &voice, std::string text,
         eSpeakConfig.voice = voice.phonemizeConfig.eSpeak.voice;
         phonemize_eSpeak(segment.text, eSpeakConfig, segmentPhonemes);
       } else if (usesOpenJTalk(voice.phonemizeConfig.phonemeType)) {
-        // Japanese OpenJTalk phonemizer
+        // Japanese/Multilingual OpenJTalk phonemizer
         if (useProsody) {
-          // Use prosody-aware phonemizer
           phonemize_openjtalk_with_prosody(segment.text, segmentPhonemes, segmentProsody);
         } else {
           phonemize_openjtalk(segment.text, segmentPhonemes);
         }
 
-        // If OpenJTalk failed, we cannot process Japanese text
+        // If OpenJTalk failed, fall back to eSpeak for multilingual models
         if (segmentPhonemes.empty() && !segment.text.empty()) {
-          throw std::runtime_error("OpenJTalk is not available or failed to process Japanese text. "
-                                   "Cannot synthesize Japanese without OpenJTalk.");
+          if (voice.phonemizeConfig.phonemeType == MultilingualPhonemes) {
+            spdlog::warn("OpenJTalk unavailable, falling back to eSpeak for multilingual model");
+            eSpeakPhonemeConfig eSpeakConfig;
+            eSpeakConfig.voice = "en";
+            phonemize_eSpeak(segment.text, eSpeakConfig, segmentPhonemes);
+          } else {
+            throw std::runtime_error("OpenJTalk is not available or failed to process Japanese text. "
+                                     "Cannot synthesize Japanese without OpenJTalk.");
+          }
         }
       } else {
         // Use UTF-8 codepoints as "phonemes"
@@ -1445,11 +1451,19 @@ void textToAudioStreaming(PiperConfig &config, Voice &voice, std::string text,
       eSpeakConfig.voice = voice.phonemizeConfig.eSpeak.voice;
       phonemize_eSpeak(chunk, eSpeakConfig, chunkSentences);
     } else if (usesOpenJTalk(voice.phonemizeConfig.phonemeType)) {
-      // Japanese OpenJTalk phonemizer
+      // Japanese/Multilingual OpenJTalk phonemizer
       if (useProsody) {
         phonemize_openjtalk_with_prosody(chunk, chunkSentences, chunkProsody);
       } else {
         phonemize_openjtalk(chunk, chunkSentences);
+      }
+      // Fall back to eSpeak for multilingual models when OpenJTalk is unavailable
+      if (chunkSentences.empty() && !chunk.empty() &&
+          voice.phonemizeConfig.phonemeType == MultilingualPhonemes) {
+        spdlog::warn("OpenJTalk unavailable, falling back to eSpeak for multilingual model");
+        eSpeakPhonemeConfig eSpeakConfig;
+        eSpeakConfig.voice = "en";
+        phonemize_eSpeak(chunk, eSpeakConfig, chunkSentences);
       }
     } else {
       // Use UTF-8 codepoints as "phonemes"

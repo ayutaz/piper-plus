@@ -163,7 +163,13 @@ class PiperVoice:
                         "Using default phonemization without custom dictionary"
                     )
                     return [phonemize_japanese(text)]
-            except ImportError as e:
+            except (ImportError, RuntimeError) as e:
+                if self.config.phoneme_type == PhonemeType.MULTILINGUAL:
+                    # Fall back to eSpeak for multilingual models
+                    _LOGGER.warning(
+                        f"OpenJTalk unavailable, falling back to eSpeak: {e}"
+                    )
+                    return phonemize_espeak(text, "en")
                 _LOGGER.warning(f"Failed to import phonemizer: {e}")
                 return [self._phonemize_japanese_simple(text)]
 
@@ -209,7 +215,10 @@ class PiperVoice:
             ids.extend(id_map[phoneme])
 
             # eSpeak and multilingual models use intersperse padding (PAD between phonemes).
-            if self.config.phoneme_type in (PhonemeType.ESPEAK, PhonemeType.MULTILINGUAL):
+            if self.config.phoneme_type in (
+                PhonemeType.ESPEAK,
+                PhonemeType.MULTILINGUAL,
+            ):
                 ids.extend(id_map[PAD])
 
         ids.extend(id_map[EOS])
