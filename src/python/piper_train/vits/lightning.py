@@ -676,7 +676,12 @@ class VitsModel(pl.LightningModule):
                     except Exception:
                         pass
                     if not language_map:
-                        language_map = {0: "ja", 1: "en"}
+                        language_map = {
+                            i: f"lang_{i}"
+                            for i in range(
+                                getattr(self.hparams, "num_languages", 1)
+                            )
+                        }
 
                     with torch.no_grad():  # Disable gradient computation
                         for utt_idx, test_utt in enumerate(self._test_dataset):
