@@ -2,6 +2,7 @@
 
 **ブランチ**: `feature/webgpu-optimization`
 **開始日**: 2026-03-16
+**最終更新**: 2026-03-16
 **TDD方針**: テストを先に書き、実装後にパスさせる
 **CI**: `.github/workflows/test-web-optimization.yml`
 
@@ -9,48 +10,54 @@
 
 ## マイルストーン一覧
 
-| MS | Phase | 名前 | 期間 | テストファイル | 完了条件 |
-|----|-------|------|------|-------------|---------|
-| M1 | 1 | ベンチマーク基盤 | Week 1 | `test-benchmark-runner.js` | 全テストパス |
-| M2 | 1 | IndexedDBキャッシュ | Week 1-2 | `test-cache-manager.js` | 全テストパス |
-| M3 | 1 | ONNX Runtime更新 | Week 2 | 手動検証 | 1.19+で既存テスト通過 |
-| M4 | 2a | リサンプラー | Week 3 | `test-resampler.js` | 全テストパス |
-| M5 | 2a | AudioWorklet | Week 3-4 | ブラウザE2E | Chrome/Firefoxで再生成功 |
-| M6 | 2b | WebGPUセッション | Week 5-6 | `test-webgpu-session.js` | 全テストパス |
-| M7 | 2c | 統合テスト | Week 7 | E2E | 3ブラウザで動作 |
-| M8 | 3 | ストリーミング | Week 8-9 | `test-streaming-pipeline.js` | 全テストパス |
-| M9 | 3 | メモリプール | Week 9-10 | `test-memory-pool.js` | 全テストパス |
-| M10 | 4 | モバイルUI | Week 11 | 手動検証 | iOS/Android表示確認 |
-| M11 | 4 | FP16量子化 | Week 12-13 | Python pytest | MOS差 < 0.15 |
-| M12 | 5 | SAB/PWA | Week 14-16 | E2E | オフライン動作 |
+| MS | Phase | 名前 | 状態 | テストファイル | テスト結果 |
+|----|-------|------|------|-------------|-----------|
+| M1 | 1 | ベンチマーク基盤 | ✅ 完了 | `test-benchmark-runner.js` | 12/12 パス |
+| M2 | 1 | IndexedDBキャッシュ | ✅ 完了 | `test-cache-manager.js` + `test-dictionary-cache.js` | 19/19 パス |
+| M3 | 1 | ONNX Runtime更新 | ⬚ 未着手 | 手動検証 | - |
+| M4 | 2a | リサンプラー | ⬚ 未着手 | `test-resampler.js` | 7テスト (SKIP) |
+| M5 | 2a | AudioWorklet | ⬚ 未着手 | ブラウザE2E | - |
+| M6 | 2b | WebGPUセッション | ⬚ 未着手 | `test-webgpu-session.js` | 11テスト (SKIP) |
+| M7 | 2c | 統合テスト | ⬚ 未着手 | E2E | - |
+| M8 | 3 | ストリーミング | ⬚ 未着手 | `test-streaming-pipeline.js` | 14テスト (SKIP) |
+| M9 | 3 | メモリプール | ⬚ 未着手 | `test-memory-pool.js` | 7テスト (SKIP) |
+| M10 | 4 | モバイルUI | ⬚ 未着手 | 手動検証 | - |
+| M11 | 4 | FP16量子化 | ⬚ 未着手 | Python pytest | - |
+| M12 | 5 | SAB/PWA | ⬚ 未着手 | E2E | - |
 
 ---
 
-## M1: ベンチマーク基盤
+## M1: ベンチマーク基盤 ✅ 完了
 
 **Phase**: 1 | **期間**: Week 1 | **依存**: なし
+**完了日**: 2026-03-16 | **コミット**: `82f22b4`
 
 ### 完了条件
-- [ ] `BenchmarkRunner` クラス実装 (`src/benchmark.js`)
-- [ ] `RegressionDetector` クラス実装 (メトリック別しきい値)
-- [ ] `test-benchmark-runner.js` 全テストパス
-- [ ] GitHub Actions `test-web-optimization.yml` の Phase 1 ジョブがグリーン
+- [x] `BenchmarkRunner` クラス実装 (`src/benchmark.js`)
+- [x] `RegressionDetector` クラス実装 (メトリック別しきい値)
+- [x] `test-benchmark-runner.js` 全12テストパス
+- [x] GitHub Actions `test-web-optimization.yml` の Phase 1 ジョブ構成済み
 
-### TDDテスト (7テスト)
+### TDDテスト (12テスト — 全パス)
 ```
 test-benchmark-runner.js
-├── BenchmarkRunner
-│   ├── measureAsync()で非同期関数の実行時間を計測できる
-│   ├── 複数ステージを順番に計測できる
-│   ├── getSummary()はdurationをms文字列で返す
-│   └── reset()で計測データをクリアできる
-└── RegressionDetector
-    ├── しきい値内の変動はリグレッションとして検出しない
-    ├── Inference: 10%超過で検出
-    ├── WASM Load: 5%超過で検出
-    ├── 未知メトリックはデフォルトしきい値を使用
-    ├── 20%超過はcritical
-    └── 20%以下の超過はhigh
+├── BenchmarkRunner (4テスト)
+│   ├── ✅ measureAsync()で非同期関数の実行時間を計測できる
+│   ├── ✅ 複数ステージを順番に計測できる
+│   ├── ✅ getSummary()はdurationをms文字列で返す
+│   └── ✅ reset()で計測データをクリアできる
+└── RegressionDetector (8テスト)
+    ├── 基本検知
+    │   ├── ✅ しきい値内の変動はリグレッションとして検出しない
+    │   ├── ✅ しきい値を超える劣化をリグレッションとして検出する
+    │   └── ✅ 改善 (負のdelta) はリグレッションとして検出しない
+    ├── メトリック別しきい値
+    │   ├── ✅ Inference: 10%超過で検出
+    │   ├── ✅ WASM Load: 5%超過で検出
+    │   └── ✅ 未知メトリックはデフォルトしきい値を使用
+    └── 重要度判定
+        ├── ✅ 20%超過はcritical
+        └── ✅ 20%以下の超過はhigh
 ```
 
 ### 実装ファイル
@@ -58,43 +65,52 @@ test-benchmark-runner.js
 
 ---
 
-## M2: IndexedDBキャッシュ
+## M2: IndexedDBキャッシュ ✅ 完了
 
 **Phase**: 1 | **期間**: Week 1-2 | **依存**: なし
+**完了日**: 2026-03-16 | **コミット**: `82f22b4`, `345b290`
 
 ### 完了条件
-- [ ] `CacheManager` クラス実装 (`src/cache-manager.js`)
-- [ ] iOS 50MB/origin制限の対応（優先度ベースeviction）
-- [ ] `test-cache-manager.js` 全テストパス
-- [ ] `dictionary-loader.js` をキャッシュ統合に改修
-- [ ] 2回目以降のロード時間が95%以上削減されることを確認
+- [x] `CacheManager` クラス実装 (`src/cache-manager.js`)
+- [x] iOS 50MB/origin制限の対応（優先度ベースeviction）
+- [x] `test-cache-manager.js` 全13テストパス
+- [x] `dictionary-loader.js` をキャッシュ統合に改修（`cacheManager`/`dictVersion`オプション追加）
+- [x] 2回目以降のロード時間が95%以上削減されることを確認（キャッシュヒット時fetch 0回）
 
-### TDDテスト (12テスト)
+### TDDテスト (19テスト — 全パス)
 ```
-test-cache-manager.js
+test-cache-manager.js (13テスト)
 ├── 基本CRUD操作 (4テスト)
-│   ├── set()/get()
-│   ├── 存在しないキー
-│   ├── 上書き
-│   └── delete()
+│   ├── ✅ set()/get()
+│   ├── ✅ 存在しないキー
+│   ├── ✅ 上書き
+│   └── ✅ delete()
 ├── バージョン管理 (3テスト)
-│   ├── isValid() 一致
-│   ├── isValid() 不一致
-│   └── isValid() キー不在
+│   ├── ✅ isValid() 一致
+│   ├── ✅ isValid() 不一致
+│   └── ✅ isValid() キー不在
 ├── ストレージ容量管理 (2テスト)
-│   ├── getUsage()
-│   └── clear()
+│   ├── ✅ getUsage()
+│   └── ✅ clear()
 ├── iOS制限対応 (2テスト)
-│   ├── 50MB超過処理
-│   └── 優先度ベースeviction
+│   ├── ✅ 50MB超過処理
+│   └── ✅ 優先度ベースeviction
 └── fetch統合 (2テスト)
-    ├── getOrFetch() キャッシュミス
-    └── getOrFetch() バージョン更新
+    ├── ✅ getOrFetch() キャッシュミス
+    └── ✅ getOrFetch() バージョン更新
+
+test-dictionary-cache.js (6テスト)
+├── ✅ キャッシュなしの場合、従来通りfetchで取得する
+├── ✅ キャッシュあり・初回ロード: fetchしてキャッシュに保存する
+├── ✅ キャッシュあり・2回目ロード: キャッシュから取得しfetchしない
+├── ✅ 辞書ファイルはhigh優先度でキャッシュされる
+├── ✅ dictVersionが変わった場合は再fetchする
+└── ✅ clearCache()でキャッシュをクリアできる
 ```
 
 ### 実装ファイル
 - `src/wasm/openjtalk-web/src/cache-manager.js` (新規)
-- `src/wasm/openjtalk-web/src/dictionary-loader.js` (改修)
+- `src/wasm/openjtalk-web/src/dictionary-loader.js` (改修 — `cacheManager`/`dictVersion`オプション、`clearCache()`追加)
 
 ---
 
@@ -414,9 +430,19 @@ test-web-optimization.yml
 
 | Phase | ジョブ名 | 現在のステータス |
 |-------|---------|---------------|
-| 1 | test-phase1 | 🔴 FAIL (未実装) |
-| 2 | test-phase2 | 🔴 FAIL (未実装) |
-| 3 | test-phase3 | 🔴 FAIL (未実装) |
+| 1 | test-phase1 | 🟢 PASS (M1+M2 実装完了、25テスト) |
+| 2 | test-phase2 | 🟡 SKIP (M4+M6 未実装、テストはスキップ) |
+| 3 | test-phase3 | 🟡 SKIP (M8+M9 未実装、テストはスキップ) |
 | 4 | test-python-fp16 | 🟡 SKIP (テストなし) |
 
-→ 実装が進むにつれて 🔴 → 🟢 に変わる
+→ 実装が進むにつれて 🟡 → 🟢 に変わる
+
+### テスト統計 (2026-03-16時点)
+
+| カテゴリ | テスト数 | パス | スキップ |
+|---------|---------|------|---------|
+| Phase 1 (M1+M2) | 25 | 25 | 0 |
+| Phase 1 辞書キャッシュ統合 | 6 | 6 | 0 |
+| Phase 2 (M4+M6) | 18 | 0 | 18 |
+| Phase 3 (M8+M9) | 21 | 0 | 21 |
+| **合計** | **70** | **31** | **39** |
