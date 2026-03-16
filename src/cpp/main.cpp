@@ -23,7 +23,8 @@
 #ifdef _WIN32
 #include <fcntl.h>
 #include <io.h>
-#include <windows.h>  // SetConsoleOutputCPとCP_UTF8のために追加
+#include <windows.h>
+#include <shellapi.h>  // CommandLineToArgvW
 #endif
 
 #ifdef __APPLE__
@@ -148,6 +149,35 @@ void processLine(string line, RunConfig &runConfig, piper::PiperConfig &piperCon
 // ----------------------------------------------------------------------------
 
 int main(int argc, char *argv[]) {
+
+#ifdef _WIN32
+  // On Windows, argv is in the system ANSI code page (e.g. CP932 for Japanese).
+  // Re-read arguments as UTF-16 via GetCommandLineW() and convert to UTF-8
+  // so that --text "日本語" works correctly.
+  std::vector<std::string> utf8Args;
+  std::vector<char*> utf8Argv;
+  {
+    int wargc = 0;
+    LPWSTR* wargv = CommandLineToArgvW(GetCommandLineW(), &wargc);
+    if (wargv) {
+      utf8Args.reserve(wargc);
+      for (int i = 0; i < wargc; i++) {
+        int len = WideCharToMultiByte(CP_UTF8, 0, wargv[i], -1, nullptr, 0, nullptr, nullptr);
+        std::string s(len - 1, '\0');
+        WideCharToMultiByte(CP_UTF8, 0, wargv[i], -1, &s[0], len, nullptr, nullptr);
+        utf8Args.push_back(std::move(s));
+      }
+      LocalFree(wargv);
+      utf8Argv.reserve(wargc + 1);
+      for (auto& s : utf8Args) {
+        utf8Argv.push_back(&s[0]);
+      }
+      utf8Argv.push_back(nullptr);
+      argc = wargc;
+      argv = utf8Argv.data();
+    }
+  }
+#endif
 
   spdlog::set_default_logger(spdlog::stderr_color_st("piper"));
 
