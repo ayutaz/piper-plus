@@ -20,6 +20,7 @@ using json = nlohmann::json;
 namespace piper {
 
 typedef int64_t SpeakerId;
+typedef int64_t LanguageId;
 
 struct eSpeakConfig {
   std::string voice = "en-us";
@@ -80,6 +81,9 @@ struct SynthesisConfig {
   // Speaker id from 0 to numSpeakers - 1
   std::optional<SpeakerId> speakerId;
 
+  // Language id from 0 to numLanguages - 1
+  std::optional<LanguageId> languageId;
+
   // Extra silence
   float sentenceSilenceSeconds = 0.2f;
   std::optional<std::map<piper::Phoneme, float>> phonemeSilenceSeconds;
@@ -87,9 +91,13 @@ struct SynthesisConfig {
 
 struct ModelConfig {
   int numSpeakers;
+  int numLanguages = 1;
 
   // speaker name -> id
   std::optional<std::map<std::string, SpeakerId>> speakerIdMap;
+
+  // language code -> id (e.g. "ja" -> 0, "en" -> 1)
+  std::optional<std::map<std::string, LanguageId>> languageIdMap;
 };
 
 struct ModelSession {

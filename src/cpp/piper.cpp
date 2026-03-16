@@ -67,7 +67,9 @@ static const std::unordered_map<char32_t, std::string> puaToPhoneme = {
     // Question type markers (Issue #204)
     {0xE016, "?!"}, {0xE017, "?."}, {0xE018, "?~"},
     // N phoneme variants (Issue #207)
-    {0xE019, "N_m"}, {0xE01A, "N_n"}, {0xE01B, "N_ng"}, {0xE01C, "N_uvular"}
+    {0xE019, "N_m"}, {0xE01A, "N_n"}, {0xE01B, "N_ng"}, {0xE01C, "N_uvular"},
+    // Multilingual phoneme tokens
+    {0xE01D, "rr"}, {0xE01E, "y_vowel"}
 };
 
 // Convert phoneme to readable string for logging
@@ -131,7 +133,7 @@ void parsePhonemizeConfig(json &configRoot, PhonemizeConfig &phonemizeConfig) {
       phonemizeConfig.phonemeType = OpenJTalkPhonemes;
       // OpenJTalk models don't use padding between phonemes
       phonemizeConfig.interspersePad = false;
-    } else if (phonemeTypeStr == "multilingual") {
+    } else if (phonemeTypeStr == "multilingual" || phonemeTypeStr == "bilingual") {
       phonemizeConfig.phonemeType = MultilingualPhonemes;
       // Multilingual models use OpenJTalk phonemization but WITH intersperse padding
       // (interspersePad defaults to true, so no change needed)
@@ -274,6 +276,25 @@ void parseModelConfig(json &configRoot, ModelConfig &modelConfig) {
       std::string speakerName = speakerItem.key();
       (*modelConfig.speakerIdMap)[speakerName] =
           speakerItem.value().get<SpeakerId>();
+    }
+  }
+
+  // Parse num_languages (default: 1 for monolingual models)
+  if (configRoot.contains("num_languages")) {
+    modelConfig.numLanguages = configRoot["num_languages"].get<int>();
+  }
+
+  // Parse language_id_map: {"ja": 0, "en": 1, ...}
+  if (configRoot.contains("language_id_map")) {
+    if (!modelConfig.languageIdMap) {
+      modelConfig.languageIdMap.emplace();
+    }
+
+    auto languageIdMapValue = configRoot["language_id_map"];
+    for (auto &langItem : languageIdMapValue.items()) {
+      std::string langCode = langItem.key();
+      (*modelConfig.languageIdMap)[langCode] =
+          langItem.value().get<LanguageId>();
     }
   }
 
@@ -710,6 +731,14 @@ void loadVoice(PiperConfig &config, std::string modelPath,
     }
   }
 
+  // Multi-language model: set default language to 0
+  if (voice.modelConfig.numLanguages > 1) {
+    if (!voice.synthesisConfig.languageId) {
+      voice.synthesisConfig.languageId = 0;
+    }
+    spdlog::debug("Voice contains {} language(s)", voice.modelConfig.numLanguages);
+  }
+
   spdlog::debug("Voice contains {} speaker(s)", voice.modelConfig.numSpeakers);
 
   loadModel(modelPath, voice.session, useCuda, gpuDeviceId);
@@ -765,8 +794,11 @@ void synthesize(std::vector<PhonemeId> &phonemeIds,
     inputNamesVec.push_back("sid");
   }
 
-  // Add language id for multilingual models (default to 0 = first language)
-  std::vector<int64_t> languageId{0};
+  // Add language id for multilingual models
+  // ONNX input order: ... -> sid -> lid -> prosody_features
+  // NOTE: Must be declared outside "if" to prevent deallocation before Run().
+  std::vector<int64_t> languageId{
+      (int64_t)synthesisConfig.languageId.value_or(0)};
   std::vector<int64_t> languageIdShape{(int64_t)languageId.size()};
 
   if (session.hasLidInput) {
