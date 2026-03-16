@@ -4,8 +4,10 @@
  */
 
 export class DictionaryLoader {
-  constructor(module) {
+  constructor(module, { cacheManager = null, dictVersion = 'v1.0' } = {}) {
     this.module = module;
+    this.cacheManager = cacheManager;
+    this.dictVersion = dictVersion;
     this.dictFiles = [
       'char.bin',
       'matrix.bin', 
@@ -25,22 +27,33 @@ export class DictionaryLoader {
    */
   async loadFromArchive(url) {
     console.log('Loading dictionary archive from:', url);
-    
+
     try {
-      const response = await fetch(url);
-      if (!response.ok) {
-        throw new Error(`Failed to fetch dictionary: ${response.statusText}`);
+      const fetchArchive = async () => {
+        const response = await fetch(url);
+        if (!response.ok) {
+          throw new Error(`Failed to fetch dictionary: ${response.statusText}`);
+        }
+        return await response.arrayBuffer();
+      };
+
+      if (this.cacheManager) {
+        await this.cacheManager.getOrFetch(
+          'dict/archive',
+          this.dictVersion,
+          fetchArchive
+        );
+      } else {
+        await fetchArchive();
       }
 
-      const arrayBuffer = await response.arrayBuffer();
-      
       // For MVP, we'll load individual files
       // TODO: Implement tar.gz extraction in browser
       console.warn('Archive extraction not implemented - using individual files');
-      
+
       // Load individual dictionary files instead
       await this.loadIndividualFiles(url.replace('/dict.tar.gz', '/dict'));
-      
+
     } catch (error) {
       console.error('Failed to load dictionary archive:', error);
       throw error;
@@ -66,19 +79,38 @@ export class DictionaryLoader {
     const loadPromises = this.dictFiles.map(async (filename) => {
       try {
         const url = `${baseUrl}/${filename}`;
-        const response = await fetch(url);
-        
-        if (!response.ok) {
-          throw new Error(`Failed to load ${filename}: ${response.statusText}`);
+
+        const fetchFile = async () => {
+          const response = await fetch(url);
+          if (!response.ok) {
+            throw new Error(`Failed to load ${filename}: ${response.statusText}`);
+          }
+          return await response.arrayBuffer();
+        };
+
+        let data;
+        if (this.cacheManager) {
+          const cacheKey = `dict/${filename}`;
+          data = await this.cacheManager.getOrFetch(
+            cacheKey,
+            this.dictVersion,
+            fetchFile
+          );
+          // Ensure high priority so dictionaries survive eviction
+          await this.cacheManager.set(cacheKey, data, {
+            version: this.dictVersion,
+            priority: 'high',
+          });
+        } else {
+          data = await fetchFile();
         }
 
-        const data = await response.arrayBuffer();
         const uint8Array = new Uint8Array(data);
-        
+
         // Write to virtual file system
         this.module.FS.writeFile(`/dict/${filename}`, uint8Array);
         console.log(`Loaded ${filename} (${uint8Array.length} bytes)`);
-        
+
       } catch (error) {
         console.error(`Failed to load ${filename}:`, error);
         throw error;
@@ -154,6 +186,16 @@ export class DictionaryLoader {
     }
     
     return sizes;
+  }
+
+  /**
+   * Clear cached dictionary data (if cacheManager is available)
+   * @returns {Promise<void>}
+   */
+  async clearCache() {
+    if (this.cacheManager) {
+      await this.cacheManager.clear();
+    }
   }
 }
 
