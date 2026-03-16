@@ -989,6 +989,215 @@ void synthesize(std::vector<PhonemeId> &phonemeIds,
 
 // ----------------------------------------------------------------------------
 
+// Compute prosody features (a1, a2, a3) for non-JA languages.
+// Each language family uses a different prosody extraction strategy:
+//   - Chinese (zh):  a1=tone(1-5), a2=syllable position, a3=syllables in word
+//   - English/Spanish/Portuguese (en/es/pt): a1=0, a2=stress level, a3=word phoneme count
+//   - French (fr):   a1=0, a2=2 for final vowel in word, a3=word phoneme count
+//   - Korean (ko) / unknown: all {0,0,0}
+static std::vector<ProsodyFeature> computeNonJaProsody(
+    const std::vector<Phoneme> &phonemes, const std::string &lang) {
+
+  std::vector<ProsodyFeature> result(phonemes.size(), {0, 0, 0});
+
+  if (phonemes.empty()) return result;
+
+  // --- Vowel-like phoneme detection ---
+  auto isVowelLike = [](Phoneme ph) -> bool {
+    // Basic Latin vowels
+    if (ph == 0x61 || ph == 0x65 || ph == 0x69 ||
+        ph == 0x6F || ph == 0x75) return true;
+    // IPA vowels
+    if (ph == 0x0251 || ph == 0x00E6 || ph == 0x028C ||
+        ph == 0x0259 || ph == 0x0254 || ph == 0x025B ||
+        ph == 0x025A || ph == 0x025C || ph == 0x026A ||
+        ph == 0x028A || ph == 0x00F8 || ph == 0x0153) return true;
+    // PUA: y_vowel
+    if (ph == 0xE01E) return true;
+    // PUA: French nasal vowels
+    if (ph >= 0xE056 && ph <= 0xE058) return true;
+    return false;
+  };
+
+  // Length marker
+  constexpr Phoneme LENGTH_MARKER = 0x02D0; // ː
+
+  // --- Word boundary detection ---
+  auto isWordBoundary = [](Phoneme ph) -> bool {
+    if (ph == 0x20) return true;                        // space
+    if (ph == U',' || ph == U'.' || ph == U'!' ||
+        ph == U'?' || ph == U';' || ph == U':') return true;
+    if (ph == 0x3001 || ph == 0x3002 || ph == 0xFF0C) return true; // CJK punct
+    return false;
+  };
+
+  // --- Chinese: tone from PUA markers, syllable position in word ---
+  if (lang == "zh") {
+    constexpr Phoneme PUA_TONE1 = 0xE046;
+    constexpr Phoneme PUA_TONE5 = 0xE04A;
+
+    auto isToneMarker = [](Phoneme ph) -> bool {
+      return ph >= 0xE046 && ph <= 0xE04A;
+    };
+    auto getToneFromMarker = [](Phoneme ph) -> int {
+      return static_cast<int>(ph - 0xE046 + 1);
+    };
+
+    // Two-pass: first identify word boundaries & syllable counts,
+    // then assign a1=tone, a2=syllable pos, a3=total syllables.
+    // A "word" is delimited by word boundaries.
+    // A "syllable" in the Chinese phoneme stream ends at a tone marker.
+
+    size_t wordStart = 0;
+    while (wordStart < phonemes.size()) {
+      // Find word end
+      size_t wordEnd = wordStart;
+      while (wordEnd < phonemes.size() && !isWordBoundary(phonemes[wordEnd])) {
+        wordEnd++;
+      }
+
+      // Count syllables in this word (= number of tone markers)
+      int totalSyllables = 0;
+      for (size_t i = wordStart; i < wordEnd; i++) {
+        if (isToneMarker(phonemes[i])) totalSyllables++;
+      }
+      if (totalSyllables == 0) totalSyllables = 1; // at least 1
+
+      // Assign prosody: track current syllable position
+      int syllablePos = 1;
+      int currentTone = 0;
+      for (size_t i = wordStart; i < wordEnd; i++) {
+        if (isToneMarker(phonemes[i])) {
+          currentTone = getToneFromMarker(phonemes[i]);
+          result[i] = {currentTone, syllablePos, totalSyllables};
+          syllablePos++;
+          currentTone = 0; // reset for next syllable
+        } else {
+          // Non-tone phonemes in the current syllable get a1=0
+          result[i] = {0, syllablePos, totalSyllables};
+        }
+      }
+
+      // Boundary phonemes stay {0,0,0}
+      if (wordEnd < phonemes.size()) {
+        wordEnd++; // skip the boundary
+      }
+      wordStart = wordEnd;
+    }
+
+    return result;
+  }
+
+  // --- English / Spanish / Portuguese: stress-based prosody ---
+  if (lang == "en" || lang == "es" || lang == "pt") {
+    constexpr Phoneme PRIMARY_STRESS   = 0x02C8; // ˈ
+    constexpr Phoneme SECONDARY_STRESS = 0x02CC; // ˌ
+
+    auto isStressMarker = [](Phoneme ph) -> bool {
+      return ph == 0x02C8 || ph == 0x02CC;
+    };
+
+    // Process word by word
+    size_t wordStart = 0;
+    while (wordStart < phonemes.size()) {
+      // Find word end
+      size_t wordEnd = wordStart;
+      while (wordEnd < phonemes.size() && !isWordBoundary(phonemes[wordEnd])) {
+        wordEnd++;
+      }
+
+      // Count phonemes in word excluding stress markers (for a3)
+      int wordPhonemeCount = 0;
+      for (size_t i = wordStart; i < wordEnd; i++) {
+        if (!isStressMarker(phonemes[i])) wordPhonemeCount++;
+      }
+      if (wordPhonemeCount == 0) wordPhonemeCount = 1;
+
+      // Assign stress: ˈ→2, ˌ→1, applied to the marker itself and
+      // following vowel-like phonemes (including ː length marker).
+      // Reset to 0 when a non-vowel, non-length-marker phoneme appears
+      // after at least one vowel was assigned stress.
+      int pendingStress = 0;
+      bool vowelAssigned = false;
+      for (size_t i = wordStart; i < wordEnd; i++) {
+        Phoneme ph = phonemes[i];
+        if (ph == PRIMARY_STRESS) {
+          pendingStress = 2;
+          vowelAssigned = false;
+          result[i] = {0, pendingStress, wordPhonemeCount};
+        } else if (ph == SECONDARY_STRESS) {
+          pendingStress = 1;
+          vowelAssigned = false;
+          result[i] = {0, pendingStress, wordPhonemeCount};
+        } else if (isVowelLike(ph) || (ph == LENGTH_MARKER && vowelAssigned)) {
+          // Vowel or length marker after a vowel: assign current stress
+          result[i] = {0, pendingStress, wordPhonemeCount};
+          if (isVowelLike(ph)) vowelAssigned = true;
+        } else {
+          // Consonant or other: reset stress if a vowel was already assigned
+          if (vowelAssigned) {
+            pendingStress = 0;
+            vowelAssigned = false;
+          }
+          result[i] = {0, pendingStress, wordPhonemeCount};
+        }
+      }
+
+      // Boundary phonemes stay {0,0,0}
+      if (wordEnd < phonemes.size()) {
+        wordEnd++; // skip boundary
+      }
+      wordStart = wordEnd;
+    }
+
+    return result;
+  }
+
+  // --- French: final-syllable stress (a2=2 for last vowel in word) ---
+  if (lang == "fr") {
+    size_t wordStart = 0;
+    while (wordStart < phonemes.size()) {
+      // Find word end
+      size_t wordEnd = wordStart;
+      while (wordEnd < phonemes.size() && !isWordBoundary(phonemes[wordEnd])) {
+        wordEnd++;
+      }
+
+      // Count phonemes in word (for a3)
+      int wordPhonemeCount = static_cast<int>(wordEnd - wordStart);
+      if (wordPhonemeCount == 0) wordPhonemeCount = 1;
+
+      // Find the last vowel-like phoneme in this word
+      int lastVowelIdx = -1;
+      for (size_t i = wordStart; i < wordEnd; i++) {
+        if (isVowelLike(phonemes[i])) {
+          lastVowelIdx = static_cast<int>(i);
+        }
+      }
+
+      // Assign: a1=0, a2=2 for last vowel, a2=0 otherwise, a3=word count
+      for (size_t i = wordStart; i < wordEnd; i++) {
+        int stress = (static_cast<int>(i) == lastVowelIdx) ? 2 : 0;
+        result[i] = {0, stress, wordPhonemeCount};
+      }
+
+      // Boundary phonemes stay {0,0,0}
+      if (wordEnd < phonemes.size()) {
+        wordEnd++; // skip boundary
+      }
+      wordStart = wordEnd;
+    }
+
+    return result;
+  }
+
+  // --- Korean / unknown: all zeros ---
+  // result is already initialized to {0,0,0}
+  return result;
+}
+
+// ----------------------------------------------------------------------------
+
 // Phonemize text and synthesize audio
 void textToAudio(PiperConfig &config, Voice &voice, std::string text,
                  std::vector<int16_t> &audioBuffer, SynthesisResult &result,
@@ -1166,6 +1375,25 @@ void textToAudio(PiperConfig &config, Voice &voice, std::string text,
           } else if (langSeg.lang == "en" && !voice.cmuDict.empty()) {
             // English: CMU dictionary-based G2P
             phonemize_english(langSeg.text, langPhonemes, voice.cmuDict);
+            // EN OOV fallback: if CMU dict produced no phonemes, use eSpeak
+            bool hasAnyPhonemes = false;
+            for (const auto& s : langPhonemes) {
+              if (!s.empty()) { hasAnyPhonemes = true; break; }
+            }
+            if (!hasAnyPhonemes) {
+              langPhonemes.clear();
+              eSpeakPhonemeConfig eSpeakConfig;
+              eSpeakConfig.voice = "en-us";
+              phonemize_eSpeak(langSeg.text, eSpeakConfig, langPhonemes);
+              for (auto& sentence : langPhonemes) {
+                std::vector<Phoneme> filtered;
+                for (auto ph : sentence) {
+                  if (!bosEosTokens.count(ph)) filtered.push_back(ph);
+                }
+                sentence = std::move(filtered);
+              }
+              spdlog::warn("English CMU dict produced no phonemes for segment; falling back to eSpeak");
+            }
           } else if (langSeg.lang == "zh" && !voice.pinyinSingleDict.empty()) {
             // Chinese: pypinyin-based G2P
             phonemize_chinese(langSeg.text, langPhonemes,
@@ -1192,13 +1420,18 @@ void textToAudio(PiperConfig &config, Voice &voice, std::string text,
             }
           }
 
-          // Add phonemes from non-JA segment
+          // Add phonemes from non-JA segment with language-specific prosody
           if (langSeg.lang != "ja") {
             for (const auto& sentence : langPhonemes) {
-              for (auto ph : sentence) {
-                allPhonemes.push_back(ph);
-                if (voice.session.hasProsodyInput) {
-                  allProsody.push_back({0, 0, 0});  // No prosody for non-JA
+              if (voice.session.hasProsodyInput) {
+                auto sentenceProsody = computeNonJaProsody(sentence, langSeg.lang);
+                for (size_t pi = 0; pi < sentence.size(); pi++) {
+                  allPhonemes.push_back(sentence[pi]);
+                  allProsody.push_back(sentenceProsody[pi]);
+                }
+              } else {
+                for (auto ph : sentence) {
+                  allPhonemes.push_back(ph);
                 }
               }
             }
