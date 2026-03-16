@@ -335,6 +335,12 @@ class PiperVoice:
             lid = np.expand_dims(np.array([0], dtype=np.int64), 0)
             args["lid"] = lid
 
+        # Include prosody_features if model requires them (zeros as default)
+        if "prosody_features" in input_names:
+            num_phonemes = phoneme_ids_array.shape[1]
+            prosody = np.zeros((1, num_phonemes, 3), dtype=np.int64)
+            args["prosody_features"] = prosody
+
         # Synthesize through Onnx
         audio = self.session.run(
             None,

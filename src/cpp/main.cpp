@@ -316,7 +316,8 @@ int main(int argc, char *argv[]) {
 #endif
 #endif
 
-  if (voice.phonemizeConfig.phonemeType == piper::eSpeakPhonemes) {
+  if (voice.phonemizeConfig.phonemeType == piper::eSpeakPhonemes ||
+      voice.phonemizeConfig.phonemeType == piper::MultilingualPhonemes) {
     spdlog::debug("Voice uses eSpeak phonemes ({})",
                   voice.phonemizeConfig.eSpeak.voice);
 
