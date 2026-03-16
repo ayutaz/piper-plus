@@ -37,8 +37,14 @@ struct PiperConfig {
 enum PhonemeType {
   eSpeakPhonemes,
   TextPhonemes,
-  OpenJTalkPhonemes
+  OpenJTalkPhonemes,
+  MultilingualPhonemes
 };
+
+// Helper: true for phoneme types that use OpenJTalk-based phonemization
+inline bool usesOpenJTalk(PhonemeType type) {
+  return type == OpenJTalkPhonemes || type == MultilingualPhonemes;
+}
 
 // Prosody info for a phoneme (A1/A2/A3 values from OpenJTalk)
 struct ProsodyFeature {
@@ -94,6 +100,7 @@ struct ModelSession {
   bool hasDurationOutput = false;  // Whether model outputs duration information
   bool hasProsodyInput = false;    // Whether model accepts prosody_features input
   bool hasMultiSpeaker = false;    // Whether model has sid (speaker ID) input
+  bool hasLidInput = false;        // Whether model has lid (language ID) input
 
   ModelSession() : onnx(nullptr){};
 };

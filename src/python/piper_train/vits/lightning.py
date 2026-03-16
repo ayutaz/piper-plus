@@ -678,9 +678,7 @@ class VitsModel(pl.LightningModule):
                     if not language_map:
                         language_map = {
                             i: f"lang_{i}"
-                            for i in range(
-                                getattr(self.hparams, "num_languages", 1)
-                            )
+                            for i in range(getattr(self.hparams, "num_languages", 1))
                         }
 
                     with torch.no_grad():  # Disable gradient computation

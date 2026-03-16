@@ -92,7 +92,11 @@ def download_models():
 
     # Model configurations
     models = [
-        ("multilingual-test-medium.onnx", "multilingual", "Multilingual medium quality model"),
+        (
+            "multilingual-test-medium.onnx",
+            "multilingual",
+            "Multilingual medium quality model",
+        ),
     ]
 
     print("Setting up models for demo...")

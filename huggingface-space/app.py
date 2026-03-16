@@ -398,7 +398,10 @@ def create_interface():
                     "おはようございます。本日の会議は午後3時から始まります。",
                     "Multilingual (Japanese)",
                 ],
-                ["Hello world! This is a text to speech demo.", "Multilingual (English)"],
+                [
+                    "Hello world! This is a text to speech demo.",
+                    "Multilingual (English)",
+                ],
                 [
                     "Welcome to piper-plus. Enjoy high quality speech synthesis.",
                     "Multilingual (English)",

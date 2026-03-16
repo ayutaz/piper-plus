@@ -141,7 +141,10 @@ class PiperVoice:
         if self.config.phoneme_type == PhonemeType.TEXT:
             return phonemize_codepoints(text)
 
-        if self.config.phoneme_type == PhonemeType.OPENJTALK:
+        if self.config.phoneme_type in (
+            PhonemeType.OPENJTALK,
+            PhonemeType.MULTILINGUAL,
+        ):
             # Use the local phonemization module
             try:
                 from .phonemize.japanese import (
@@ -205,8 +208,8 @@ class PiperVoice:
 
             ids.extend(id_map[phoneme])
 
-            # 学習データが PAD("_") を各音素ごとに含んでいるのは eSpeak 方式のみ。
-            if self.config.phoneme_type == PhonemeType.ESPEAK:
+            # eSpeak and multilingual models use intersperse padding (PAD between phonemes).
+            if self.config.phoneme_type in (PhonemeType.ESPEAK, PhonemeType.MULTILINGUAL):
                 ids.extend(id_map[PAD])
 
         ids.extend(id_map[EOS])
@@ -316,6 +319,12 @@ class PiperVoice:
                 speaker_id = 0
             sid = np.expand_dims(np.array([speaker_id], dtype=np.int64), 0)
             args["sid"] = sid
+
+        # Include lid for multilingual models
+        input_names = {inp.name for inp in self.session.get_inputs()}
+        if "lid" in input_names:
+            lid = np.expand_dims(np.array([0], dtype=np.int64), 0)
+            args["lid"] = lid
 
         # Synthesize through Onnx
         audio = self.session.run(

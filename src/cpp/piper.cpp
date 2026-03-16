@@ -131,6 +131,10 @@ void parsePhonemizeConfig(json &configRoot, PhonemizeConfig &phonemizeConfig) {
       phonemizeConfig.phonemeType = OpenJTalkPhonemes;
       // OpenJTalk models don't use padding between phonemes
       phonemizeConfig.interspersePad = false;
+    } else if (phonemeTypeStr == "multilingual") {
+      phonemizeConfig.phonemeType = MultilingualPhonemes;
+      // Multilingual models use OpenJTalk phonemization but WITH intersperse padding
+      // (interspersePad defaults to true, so no change needed)
     }
   }
 
@@ -342,7 +346,7 @@ std::vector<PhonemeInfo> extractTimingsFromDurations(
     }
     
     // Adjust timings for Japanese if needed
-    if (phonemeType == OpenJTalkPhonemes) {
+    if (usesOpenJTalk(phonemeType)) {
         for (size_t i = 0; i < timings.size(); ++i) {
             // Convert PUA mapped phonemes back to original
             if (timings[i].phoneme.size() == 1) {
@@ -672,6 +676,9 @@ void loadModel(std::string modelPath, ModelSession &session, bool useCuda, int g
     } else if (name == "sid") {
       session.hasMultiSpeaker = true;
       spdlog::debug("Model supports multi-speaker (sid input)");
+    } else if (name == "lid") {
+      session.hasLidInput = true;
+      spdlog::debug("Model supports language ID (lid input)");
     }
   }
 }
@@ -756,6 +763,17 @@ void synthesize(std::vector<PhonemeId> &phonemeIds,
         memoryInfo, speakerId.data(), speakerId.size(), speakerIdShape.data(),
         speakerIdShape.size()));
     inputNamesVec.push_back("sid");
+  }
+
+  // Add language id for multilingual models (default to 0 = first language)
+  std::vector<int64_t> languageId{0};
+  std::vector<int64_t> languageIdShape{(int64_t)languageId.size()};
+
+  if (session.hasLidInput) {
+    inputTensors.push_back(Ort::Value::CreateTensor<int64_t>(
+        memoryInfo, languageId.data(), languageId.size(),
+        languageIdShape.data(), languageIdShape.size()));
+    inputNamesVec.push_back("lid");
   }
 
   // Add prosody features if model supports them and they are provided
@@ -924,7 +942,7 @@ void textToAudio(PiperConfig &config, Voice &voice, std::string text,
   // Prosody features for each sentence (only used for OpenJTalk with prosody-enabled models)
   std::vector<std::vector<ProsodyFeature>> allProsodyFeatures;
   bool useProsody = voice.session.hasProsodyInput &&
-                    voice.phonemizeConfig.phonemeType == OpenJTalkPhonemes;
+                    usesOpenJTalk(voice.phonemizeConfig.phonemeType);
 
   // Process each segment
   for (const auto& segment : textSegments) {
@@ -951,7 +969,7 @@ void textToAudio(PiperConfig &config, Voice &voice, std::string text,
         eSpeakPhonemeConfig eSpeakConfig;
         eSpeakConfig.voice = voice.phonemizeConfig.eSpeak.voice;
         phonemize_eSpeak(segment.text, eSpeakConfig, segmentPhonemes);
-      } else if (voice.phonemizeConfig.phonemeType == OpenJTalkPhonemes) {
+      } else if (usesOpenJTalk(voice.phonemizeConfig.phonemeType)) {
         // Japanese OpenJTalk phonemizer
         if (useProsody) {
           // Use prosody-aware phonemizer
@@ -1030,7 +1048,7 @@ void textToAudio(PiperConfig &config, Voice &voice, std::string text,
     idConfig.interspersePad = voice.phonemizeConfig.interspersePad;
 
     // OpenJTalk: BOS/EOS are already in the phoneme list from phonemizer
-    if (voice.phonemizeConfig.phonemeType == OpenJTalkPhonemes) {
+    if (usesOpenJTalk(voice.phonemizeConfig.phonemeType)) {
         idConfig.addBos = false;
         idConfig.addEos = false;
     }
@@ -1225,7 +1243,7 @@ void phonemesToAudio(PiperConfig &config, Voice &voice,
   idConfig.interspersePad = voice.phonemizeConfig.interspersePad;
   
   // OpenJTalk: BOS/EOS are already in the phoneme list from phonemizer
-  if (voice.phonemizeConfig.phonemeType == OpenJTalkPhonemes) {
+  if (usesOpenJTalk(voice.phonemizeConfig.phonemeType)) {
     idConfig.addBos = false;
     idConfig.addEos = false;
   } else {
@@ -1367,7 +1385,7 @@ void textToAudioStreaming(PiperConfig &config, Voice &voice, std::string text,
   
   // Select appropriate regex based on language
   const std::regex& sentenceBoundary = 
-    (voice.phonemizeConfig.phonemeType == OpenJTalkPhonemes) 
+    (usesOpenJTalk(voice.phonemizeConfig.phonemeType)) 
     ? japaneseSentenceBoundary 
     : englishSentenceBoundary;
   
@@ -1419,14 +1437,14 @@ void textToAudioStreaming(PiperConfig &config, Voice &voice, std::string text,
 
     // Check if model supports prosody input
     bool useProsody = voice.session.hasProsodyInput &&
-                      voice.phonemizeConfig.phonemeType == OpenJTalkPhonemes;
+                      usesOpenJTalk(voice.phonemizeConfig.phonemeType);
 
     if (voice.phonemizeConfig.phonemeType == eSpeakPhonemes) {
       // Use espeak-ng for phonemization
       eSpeakPhonemeConfig eSpeakConfig;
       eSpeakConfig.voice = voice.phonemizeConfig.eSpeak.voice;
       phonemize_eSpeak(chunk, eSpeakConfig, chunkSentences);
-    } else if (voice.phonemizeConfig.phonemeType == OpenJTalkPhonemes) {
+    } else if (usesOpenJTalk(voice.phonemizeConfig.phonemeType)) {
       // Japanese OpenJTalk phonemizer
       if (useProsody) {
         phonemize_openjtalk_with_prosody(chunk, chunkSentences, chunkProsody);
@@ -1455,7 +1473,7 @@ void textToAudioStreaming(PiperConfig &config, Voice &voice, std::string text,
           std::make_shared<PhonemeIdMap>(voice.phonemizeConfig.phonemeIdMap);
       idConfig.interspersePad = voice.phonemizeConfig.interspersePad;
       // OpenJTalk: BOS/EOS are already in the phoneme list from phonemizer
-      if (voice.phonemizeConfig.phonemeType == OpenJTalkPhonemes) {
+      if (usesOpenJTalk(voice.phonemizeConfig.phonemeType)) {
         idConfig.addBos = false;
         idConfig.addEos = false;
       } else {
@@ -1570,7 +1588,7 @@ void phonemesToAudioStreaming(PiperConfig &config, Voice &voice,
       std::make_shared<PhonemeIdMap>(voice.phonemizeConfig.phonemeIdMap);
   idConfig.interspersePad = voice.phonemizeConfig.interspersePad;
   // OpenJTalk: BOS/EOS are already in the phoneme list from phonemizer
-  if (voice.phonemizeConfig.phonemeType == OpenJTalkPhonemes) {
+  if (usesOpenJTalk(voice.phonemizeConfig.phonemeType)) {
     idConfig.addBos = false;
     idConfig.addEos = false;
   } else {
@@ -1595,7 +1613,7 @@ void phonemesToAudioStreaming(PiperConfig &config, Voice &voice,
                                         phonemes.begin() + chunkEnd);
 
     // Add EOS only to the last chunk (non-OpenJTalk only)
-    if (voice.phonemizeConfig.phonemeType != OpenJTalkPhonemes) {
+    if (!usesOpenJTalk(voice.phonemizeConfig.phonemeType)) {
       idConfig.addEos = isLastChunk;
     }
     
