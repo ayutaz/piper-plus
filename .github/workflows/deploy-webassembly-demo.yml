@@ -119,7 +119,7 @@ jobs:
             fi
             
             # Additionally verify critical model files are present
-            CRITICAL_MODELS="multilingual-test-medium.onnx multilingual-test-medium.onnx"
+            CRITICAL_MODELS="multilingual-test-medium.onnx"
             for model in $CRITICAL_MODELS; do
               if [ ! -f "deploy/models/$model" ]; then
                 echo "ERROR: Critical model file $model is missing!"

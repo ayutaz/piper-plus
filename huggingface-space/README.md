@@ -24,9 +24,8 @@ A web-based demo for [piper-plus](https://github.com/ayutaz/piper-plus), featuri
 
 ## Models
 
-This demo includes:
-- **Japanese (Medium)**: CSS10-based Japanese model with natural intonation
-- **English (Test)**: English model for demonstration
+This demo uses a single multilingual model that supports both Japanese and English:
+- **Multilingual (Medium)**: Handles Japanese (OpenJTalk) and English phonemization with a unified model
 
 ## Usage
 

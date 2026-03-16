@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 piper-plus Gradio Demo for Hugging Face Spaces
-Supports Japanese and English text-to-speech using ONNX models
+Supports multilingual text-to-speech using a single ONNX model
 """
 
 import json
@@ -33,13 +33,15 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Model configurations
+# A single multilingual model handles all languages; the "language" field
+# controls which phonemizer is used for text input.
 MODELS = {
-    "Japanese (Medium)": {
+    "Multilingual (Japanese)": {
         "path": "models/multilingual-test-medium.onnx",
         "config": "models/multilingual-test-medium.onnx.json",
         "language": "ja",
     },
-    "English (Test)": {
+    "Multilingual (English)": {
         "path": "models/multilingual-test-medium.onnx",
         "config": "models/multilingual-test-medium.onnx.json",
         "language": "en",
@@ -316,9 +318,9 @@ def create_interface():
         gr.Markdown("""
             # piper-plus Demo
 
-            High-quality text-to-speech synthesis supporting Japanese and English.
+            High-quality multilingual text-to-speech synthesis supporting Japanese and English.
 
-            This demo uses ONNX models for fast CPU inference.
+            This demo uses a single multilingual ONNX model for fast CPU inference.
             """)
 
         with gr.Row():
@@ -381,8 +383,9 @@ def create_interface():
 
             gr.Markdown("""
                 ### Tips:
-                - Japanese model expects hiragana/kanji text
-                - English model works with standard text
+                - Select Japanese mode for hiragana/kanji text
+                - Select English mode for standard English text
+                - Both modes use the same multilingual model
                 - Adjust speed for faster/slower speech
                 - Higher expressiveness = more natural variation
                 """)
@@ -390,15 +393,15 @@ def create_interface():
         # Examples
         gr.Examples(
             examples=[
-                ["こんにちは、世界！今日はいい天気ですね。", "Japanese (Medium)"],
+                ["こんにちは、世界！今日はいい天気ですね。", "Multilingual (Japanese)"],
                 [
                     "おはようございます。本日の会議は午後3時から始まります。",
-                    "Japanese (Medium)",
+                    "Multilingual (Japanese)",
                 ],
-                ["Hello world! This is a text to speech demo.", "English (Test)"],
+                ["Hello world! This is a text to speech demo.", "Multilingual (English)"],
                 [
                     "Welcome to piper-plus. Enjoy high quality speech synthesis.",
-                    "English (Test)",
+                    "Multilingual (English)",
                 ],
             ],
             inputs=[text_input, model_dropdown],

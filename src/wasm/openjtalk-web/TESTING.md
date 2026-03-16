@@ -112,10 +112,10 @@ this.dictionary = {
 
 ### Model Configuration
 
-English model expects eSpeak phonemes. Current implementation maps:
-- Simple phonemes → IPA symbols → Model IDs
+The multilingual model accepts phonemes from all supported languages. Current implementation maps:
+- Simple phonemes / IPA symbols → Model IDs
 
-See `models/en_US-test-medium.onnx.json` for phoneme mappings.
+See `models/multilingual-test-medium.onnx.json` for phoneme mappings.
 
 ## Next Steps
 

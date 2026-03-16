@@ -10,8 +10,6 @@ build/Makefile
 models/*.onnx
 !models/.gitkeep
 !models/multilingual-test-medium.onnx
-!models/en_US-test-medium.onnx
-!models/multilingual-test-medium.onnx
 
 # Node modules (if any get added)
 node_modules/
