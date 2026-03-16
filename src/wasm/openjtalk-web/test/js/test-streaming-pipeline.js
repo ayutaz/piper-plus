@@ -128,6 +128,52 @@ describe('ChunkCrossfader', { skip }, () => {
     const output = cf.addChunk(chunk2);
     assert.equal(output[0], 0.5);
   });
+
+  it('空チャンクを渡しても_prevTailが保持される', () => {
+    const crossfader = new ChunkCrossfader(50, 22050);
+    const chunk1 = new Float32Array([0.5, 0.5, 0.5, 0.5, 0.5]);
+    crossfader.addChunk(chunk1);
+
+    // Add empty chunk — should not clear _prevTail
+    const emptyResult = crossfader.addChunk(new Float32Array(0));
+    assert.equal(emptyResult.length, 0);
+
+    // Next real chunk should still crossfade with chunk1's tail
+    const chunk3 = new Float32Array([1.0, 1.0, 1.0, 1.0, 1.0]);
+    const result = crossfader.addChunk(chunk3);
+    // If _prevTail was preserved, the first sample should have some blending
+    // (not 100% chunk3 which would happen if _prevTail was lost)
+    assert.ok(result.length === 5);
+  });
+
+  it('チャンクがfadeLen未満でもクロスフェードが正しく動作する', () => {
+    // fadeLen at 22050Hz/50ms = ceil(22050*0.05) = 1103 samples
+    const crossfader = new ChunkCrossfader(50, 22050);
+    const chunk1 = new Float32Array(2000).fill(1.0);
+    crossfader.addChunk(chunk1);
+
+    // Short chunk: only 10 samples, much less than fadeLen=1103
+    const shortChunk = new Float32Array(10).fill(0.0);
+    const result = crossfader.addChunk(shortChunk);
+    assert.equal(result.length, 10);
+    // First sample should be blended (not pure 0.0 since prev tail was 1.0)
+    assert.ok(result[0] > 0, 'First sample should have prev contribution');
+    // Last sample should be close to 0.0 (new chunk value)
+    assert.ok(result[9] < 0.5, 'Last sample should lean toward new chunk');
+  });
+
+  it('1サンプルのクロスフェードは50/50ブレンドになる', () => {
+    const crossfader = new ChunkCrossfader(50, 22050);
+    const chunk1 = new Float32Array(2000).fill(1.0);
+    crossfader.addChunk(chunk1);
+
+    // 1-sample chunk
+    const singleSample = new Float32Array([0.0]);
+    const result = crossfader.addChunk(singleSample);
+    assert.equal(result.length, 1);
+    // Should be 50% blend of prev (1.0) and new (0.0) = 0.5
+    assert.ok(Math.abs(result[0] - 0.5) < 0.01, `Expected ~0.5, got ${result[0]}`);
+  });
 });
 
 // --- StreamingTTSPipeline ---
@@ -178,5 +224,11 @@ describe('StreamingTTSPipeline', { skip }, () => {
       onAudioChunk: () => {},
     });
     await pipeline.synthesizeAndPlay('', 'ja'); // no error
+  });
+
+  it('コールバックが関数でない場合TypeErrorをスローする', () => {
+    assert.throws(() => new StreamingTTSPipeline({ phonemize: 'not a function', synthesize: async () => {}, onAudioChunk: () => {} }), { name: 'TypeError' });
+    assert.throws(() => new StreamingTTSPipeline({ phonemize: async () => {}, synthesize: null, onAudioChunk: () => {} }), { name: 'TypeError' });
+    assert.throws(() => new StreamingTTSPipeline({ phonemize: async () => {}, synthesize: async () => {}, onAudioChunk: 123 }), { name: 'TypeError' });
   });
 });

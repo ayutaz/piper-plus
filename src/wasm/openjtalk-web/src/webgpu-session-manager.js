@@ -2,7 +2,7 @@
  * WebGPUSessionManager
  * Phase 2b: WebGPU backend with automatic fallback
  *
- * Fallback order: webgpu -> wasm-simd -> wasm (no webgl)
+ * Fallback order: webgpu -> wasm (no webgl)
  */
 
 export class WebGPUSessionManager {
@@ -24,8 +24,8 @@ export class WebGPUSessionManager {
    */
   async createSession(modelPath) {
     const providers = this._gpu
-      ? ['webgpu', 'wasm-simd', 'wasm']
-      : ['wasm-simd', 'wasm'];
+      ? ['webgpu', 'wasm']
+      : ['wasm'];
 
     const errors = [];
     for (const provider of providers) {
@@ -39,7 +39,7 @@ export class WebGPUSessionManager {
         this.currentProvider = provider;
         return session;
       } catch (e) {
-        errors.push(`${typeof provider === 'string' ? provider : provider.name}: ${e.message}`);
+        errors.push(`${typeof provider === 'string' ? provider : provider.name}: ${e?.message ?? String(e)}`);
       }
     }
 
@@ -60,7 +60,8 @@ export class WebGPUSessionManager {
     if (!adapter) return false;
     const device = await adapter.requestDevice();
     try {
-      return device.limits.maxBufferSize >= modelSizeBytes;
+      return device.limits.maxBufferSize >= modelSizeBytes
+          && device.limits.maxStorageBufferBindingSize >= modelSizeBytes;
     } finally {
       device.destroy();
     }

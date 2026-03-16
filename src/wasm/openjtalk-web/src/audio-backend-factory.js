@@ -76,9 +76,9 @@ class AudioWorkletBackend {
     }
   }
 
-  dispose() {
+  async dispose() {
     this.stop();
-    if (this.ctx.state !== 'closed') this.ctx.close();
+    if (this.ctx.state !== 'closed') await this.ctx.close();
   }
 }
 
@@ -129,6 +129,7 @@ class ScriptProcessorBackend {
 
   stop() {
     if (this.processor) {
+      this.processor.onaudioprocess = null;
       this.processor.disconnect();
       this.processor = null;
     }
@@ -136,9 +137,9 @@ class ScriptProcessorBackend {
     this.offset = 0;
   }
 
-  dispose() {
+  async dispose() {
     this.stop();
-    if (this.ctx.state !== 'closed') this.ctx.close();
+    if (this.ctx.state !== 'closed') await this.ctx.close();
   }
 }
 
@@ -159,7 +160,12 @@ class HTMLAudioBackend {
     const blob = new Blob([wav], { type: 'audio/wav' });
     this._blobUrl = URL.createObjectURL(blob);
     this.audio = new Audio(this._blobUrl);
-    await this.audio.play();
+    try {
+      await this.audio.play();
+    } catch (e) {
+      this.stop();
+      throw e;
+    }
   }
 
   pushChunk(chunk) {

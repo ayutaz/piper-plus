@@ -11,6 +11,25 @@ const PRIORITY_ORDER = { high: 0, medium: 1, low: 2 };
 
 export class CacheManager {
   /**
+   * Async factory for real IndexedDB usage.
+   * Handles indexedDB.open() and onupgradeneeded.
+   */
+  static async create({ dbName = 'piper-cache', dbVersion = 1, storeName = 'cache' } = {}) {
+    const db = await new Promise((resolve, reject) => {
+      const req = indexedDB.open(dbName, dbVersion);
+      req.onupgradeneeded = (e) => {
+        const db = e.target.result;
+        if (!db.objectStoreNames.contains(storeName)) {
+          db.createObjectStore(storeName, { keyPath: 'key' });
+        }
+      };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+    return new CacheManager({ dbFactory: () => db });
+  }
+
+  /**
    * @param {{ dbFactory: () => object }} options
    */
   constructor({ dbFactory } = {}) {
@@ -18,6 +37,10 @@ export class CacheManager {
       throw new TypeError('CacheManager requires a dbFactory function');
     }
     this._db = dbFactory();
+    if (!this._db || typeof this._db.transaction !== 'function') {
+      throw new TypeError('dbFactory must return an object with a transaction() method');
+    }
+    this._inflight = new Map();
   }
 
   // ---------------------------------------------------------------------------
@@ -57,7 +80,20 @@ export class CacheManager {
         return;
       }
 
-      // Legacy fallback: onsuccess / onerror property assignment
+      // Legacy fallback: onsuccess / onerror property assignment.
+      // This path is kept for older IDB shims that expose settable onsuccess/onerror
+      // but lack addEventListener.  If neither mechanism is available the promise
+      // would hang forever, so we reject early.
+      if (typeof request.onsuccess === 'undefined'
+          && !('onsuccess' in request)
+          && typeof Object.getOwnPropertyDescriptor(
+               Object.getPrototypeOf(request) || request, 'onsuccess'
+             ) === 'undefined') {
+        reject(new TypeError(
+          'IDB request object has no supported completion mechanism (_mock, addEventListener, or settable onsuccess)'
+        ));
+        return;
+      }
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error);
     });
@@ -187,9 +223,25 @@ export class CacheManager {
     if (entry && entry.version === version) {
       return entry.data;
     }
-    const data = await fetcherFn();
-    await this.set(key, data, { version, priority });
-    return data;
+
+    // Inflight deduplication: if another caller is already fetching the same
+    // key+version, return the existing promise instead of issuing a second fetch.
+    const inflightKey = `${key}@${version}`;
+    if (this._inflight.has(inflightKey)) {
+      return this._inflight.get(inflightKey);
+    }
+
+    const promise = fetcherFn()
+      .then(async (data) => {
+        await this.set(key, data, { version, priority });
+        return data;
+      })
+      .finally(() => {
+        this._inflight.delete(inflightKey);
+      });
+
+    this._inflight.set(inflightKey, promise);
+    return promise;
   }
 
   // ---------------------------------------------------------------------------

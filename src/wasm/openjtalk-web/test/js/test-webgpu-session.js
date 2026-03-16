@@ -61,23 +61,14 @@ describe('WebGPUSessionManager', { skip }, () => {
   describe('フォールバック順序', () => {
     it('WebGPU対応環境ではwebgpuプロバイダーを選択する', async () => {
       const mgr = new WebGPUSessionManager({
-        ort: createMockOrt({ supportedProviders: ['webgpu', 'wasm-simd', 'wasm'] }),
+        ort: createMockOrt({ supportedProviders: ['webgpu', 'wasm'] }),
         gpu: createMockGPU(true),
       });
       const session = await mgr.createSession('model.onnx');
       assert.equal(mgr.currentProvider, 'webgpu');
     });
 
-    it('WebGPU非対応時はwasm-simdにフォールバックする', async () => {
-      const mgr = new WebGPUSessionManager({
-        ort: createMockOrt({ supportedProviders: ['wasm-simd', 'wasm'] }),
-        gpu: createMockGPU(false),
-      });
-      const session = await mgr.createSession('model.onnx');
-      assert.equal(mgr.currentProvider, 'wasm-simd');
-    });
-
-    it('wasm-simd非対応時はwasmにフォールバックする', async () => {
+    it('WebGPU非対応時はwasmにフォールバックする', async () => {
       const mgr = new WebGPUSessionManager({
         ort: createMockOrt({ supportedProviders: ['wasm'] }),
         gpu: createMockGPU(false),
@@ -97,7 +88,7 @@ describe('WebGPUSessionManager', { skip }, () => {
       );
     });
 
-    it('フォールバック順序は webgpu → wasm-simd → wasm (WebGL含まない)', async () => {
+    it('フォールバック順序は webgpu → wasm (WebGL含まない)', async () => {
       const tried = [];
       const mgr = new WebGPUSessionManager({
         ort: {
@@ -114,7 +105,7 @@ describe('WebGPUSessionManager', { skip }, () => {
       });
       try { await mgr.createSession('model.onnx'); } catch {}
       assert.ok(!tried.includes('webgl'), 'WebGL should not be in fallback chain');
-      assert.deepEqual(tried, ['webgpu', 'wasm-simd', 'wasm']);
+      assert.deepEqual(tried, ['webgpu', 'wasm']);
     });
   });
 
@@ -145,10 +136,38 @@ describe('WebGPUSessionManager', { skip }, () => {
       assert.equal(ok, false);
     });
 
+    it('maxStorageBufferBindingSizeが不足するとfalseを返す', async () => {
+      const mgr = new WebGPUSessionManager({
+        ort: createMockOrt(),
+        gpu: {
+          requestAdapter: async () => ({
+            requestDevice: async () => ({
+              limits: {
+                maxBufferSize: 256 * 1024 * 1024,           // 256MB — enough
+                maxStorageBufferBindingSize: 50 * 1024 * 1024, // 50MB — too small
+              },
+              destroy: () => {},
+            }),
+          }),
+        },
+      });
+      const ok = await mgr.checkGPUCapacity(100 * 1024 * 1024); // 100MB
+      assert.equal(ok, false);
+    });
+
     it('GPU非対応時はfalseを返す', async () => {
       const mgr = new WebGPUSessionManager({
         ort: createMockOrt(),
         gpu: undefined,
+      });
+      const ok = await mgr.checkGPUCapacity(26 * 1024 * 1024);
+      assert.equal(ok, false);
+    });
+
+    it('requestAdapterがnullを返した場合はfalseを返す', async () => {
+      const mgr = new WebGPUSessionManager({
+        ort: createMockOrt(),
+        gpu: { requestAdapter: async () => null },
       });
       const ok = await mgr.checkGPUCapacity(26 * 1024 * 1024);
       assert.equal(ok, false);

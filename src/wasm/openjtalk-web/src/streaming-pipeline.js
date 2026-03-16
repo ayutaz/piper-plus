@@ -141,6 +141,10 @@ export class ChunkCrossfader {
    * @returns {Float32Array}
    */
   addChunk(chunk) {
+    if (chunk.length === 0) {
+      return new Float32Array(0);
+    }
+
     const fadeLen = Math.ceil(this._sampleRate * this._crossfadeMs / 1000);
 
     if (this._prevTail === null || fadeLen === 0) {
@@ -156,7 +160,7 @@ export class ChunkCrossfader {
 
     const fadeDenom = actualFadeLen > 1 ? actualFadeLen - 1 : 1;
     for (let i = 0; i < actualFadeLen; i++) {
-      const t = i / fadeDenom;
+      const t = actualFadeLen === 1 ? 0.5 : i / fadeDenom;
       output[i] = prev[i] * (1 - t) + chunk[i] * t;
     }
 

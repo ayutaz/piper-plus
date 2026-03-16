@@ -21,22 +21,7 @@ const runner = new BenchmarkRunner();
 // ============================================================
 // MockIndexedDB for CacheManager
 // ============================================================
-class MockIndexedDB {
-  constructor() { this.stores = new Map(); }
-  transaction(name, mode) {
-    const store = this.stores.get(name) || new Map();
-    this.stores.set(name, store);
-    return {
-      objectStore: (storeName) => ({
-        get: (key) => ({ _mock: true, result: store.get(key) }),
-        put: (val) => { store.set(val.key, val); return { _mock: true, result: undefined }; },
-        delete: (key) => { store.delete(key); return { _mock: true, result: undefined }; },
-        count: () => ({ _mock: true, result: store.size }),
-        getAll: () => ({ _mock: true, result: [...store.values()] }),
-      }),
-    };
-  }
-}
+import { MockIndexedDB } from '../helpers/mock-indexeddb.js';
 
 console.log('='.repeat(60));
 console.log('  WebGPU最適化ベンチマーク');

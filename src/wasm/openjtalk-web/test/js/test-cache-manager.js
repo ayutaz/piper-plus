@@ -7,25 +7,7 @@
 
 import { strict as assert } from 'assert';
 import { describe, it, before, after, beforeEach } from 'node:test';
-
-// Node.js環境ではIndexedDBが存在しないため、軽量モックを使用
-// ブラウザE2Eテストは Playwright で別途実施
-class MockIndexedDB {
-  constructor() { this.stores = new Map(); }
-  transaction(name, mode) {
-    const store = this.stores.get(name) || new Map();
-    this.stores.set(name, store);
-    return {
-      objectStore: (storeName) => ({
-        get: (key) => ({ _mock: true, result: store.get(key) }),
-        put: (val) => { store.set(val.key, val); return { _mock: true, result: undefined }; },
-        delete: (key) => { store.delete(key); return { _mock: true, result: undefined }; },
-        count: () => ({ _mock: true, result: store.size }),
-        getAll: () => ({ _mock: true, result: [...store.values()] }),
-      }),
-    };
-  }
-}
+import { MockIndexedDB } from '../helpers/mock-indexeddb.js';
 
 // CacheManager をインポート (未実装のため、テストはすべてfail前提)
 let CacheManager;
@@ -163,6 +145,86 @@ describe('CacheManager', { skip }, () => {
       await cache.getOrFetch('asset', 'v1', fetcher);
       await cache.getOrFetch('asset', 'v2', fetcher);
       assert.equal(fetchCount, 2);
+    });
+
+    it('getOrFetch()のpriorityオプションがsetに伝播する', async () => {
+      await cache.getOrFetch('test-key', 'v1', async () => new ArrayBuffer(100), { priority: 'high' });
+      const entry = await cache.get('test-key');
+      assert.equal(entry.priority, 'high');
+    });
+
+    it('getOrFetch()のpriorityデフォルトはmedium', async () => {
+      await cache.getOrFetch('test-key', 'v1', async () => new ArrayBuffer(100));
+      const entry = await cache.get('test-key');
+      assert.equal(entry.priority, 'medium');
+    });
+
+    it('getOrFetch()の同一キー同時呼び出しでfetcherが1回だけ呼ばれる', async () => {
+      let fetchCount = 0;
+      const fetcher = async () => {
+        fetchCount++;
+        await new Promise(r => setTimeout(r, 50));
+        return new ArrayBuffer(100);
+      };
+      // Launch two concurrent getOrFetch for the same key
+      const [data1, data2] = await Promise.all([
+        cache.getOrFetch('same-key', 'v1', fetcher),
+        cache.getOrFetch('same-key', 'v1', fetcher),
+      ]);
+      assert.equal(fetchCount, 1, 'fetcher should be called only once');
+      assert.ok(data1);
+      assert.ok(data2);
+    });
+  });
+
+  describe('コンストラクタ検証', () => {
+    it('dbFactory未指定でTypeErrorをスローする', () => {
+      assert.throws(() => new CacheManager(), { name: 'TypeError' });
+    });
+    it('dbFactory:nullでTypeErrorをスローする', () => {
+      assert.throws(() => new CacheManager({ dbFactory: null }), { name: 'TypeError' });
+    });
+    it('dbFactory()がtransactionメソッドを持たないオブジェクトを返すとTypeErrorをスローする', () => {
+      assert.throws(() => new CacheManager({ dbFactory: () => ({}) }), { name: 'TypeError' });
+    });
+  });
+
+  describe('eviction動作', () => {
+    it('容量超過時にlow優先度のエントリが先に退避される', async () => {
+      const localCache = new CacheManager({ dbFactory: () => new MockIndexedDB() });
+      // Fill with low-priority items near quota
+      await localCache.set('low1', new ArrayBuffer(20 * 1024 * 1024), { version: 'v1', priority: 'low' });
+      await localCache.set('low2', new ArrayBuffer(20 * 1024 * 1024), { version: 'v1', priority: 'low' });
+      // Add a high-priority item that pushes over quota
+      await localCache.set('high1', new ArrayBuffer(15 * 1024 * 1024), { version: 'v1', priority: 'high' });
+      // high1 should survive, at least one low should be evicted
+      const high = await localCache.get('high1');
+      assert.ok(high, 'high priority item should survive eviction');
+      const usage = await localCache.getUsage();
+      assert.ok(usage.used <= 50 * 1024 * 1024, 'usage should be within quota');
+    });
+
+    it('high優先度のエントリはevictionの対象にならない', async () => {
+      const localCache = new CacheManager({ dbFactory: () => new MockIndexedDB() });
+      await localCache.set('high1', new ArrayBuffer(25 * 1024 * 1024), { version: 'v1', priority: 'high' });
+      await localCache.set('high2', new ArrayBuffer(25 * 1024 * 1024), { version: 'v1', priority: 'high' });
+      // This should throw because high-priority items can't be evicted
+      await assert.rejects(
+        () => localCache.set('extra', new ArrayBuffer(5 * 1024 * 1024), { version: 'v1', priority: 'medium' }),
+        /quota/i
+      );
+    });
+
+    it('同一優先度内では古いエントリが先に退避される', async () => {
+      const localCache = new CacheManager({ dbFactory: () => new MockIndexedDB() });
+      await localCache.set('old', new ArrayBuffer(20 * 1024 * 1024), { version: 'v1', priority: 'low' });
+      // Slight delay to ensure different storedAt
+      await localCache.set('new', new ArrayBuffer(20 * 1024 * 1024), { version: 'v1', priority: 'low' });
+      // Trigger eviction
+      await localCache.set('trigger', new ArrayBuffer(15 * 1024 * 1024), { version: 'v1', priority: 'medium' });
+      // 'old' should be evicted first
+      const oldEntry = await localCache.get('old');
+      assert.equal(oldEntry, null, 'oldest low-priority entry should be evicted first');
     });
   });
 });

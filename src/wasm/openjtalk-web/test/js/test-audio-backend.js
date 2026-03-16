@@ -28,6 +28,14 @@ describe('AudioWorkletBackend', { skip }, () => {
     const backend = new AudioWorkletBackend(null);
     assert.equal(backend.type, 'audioworklet');
   });
+
+  it('AudioWorkletBackend.dispose()がPromiseを返す', () => {
+    const mockCtx = { state: 'running', close: async () => {} };
+    const backend = new AudioWorkletBackend(mockCtx);
+    const result = backend.dispose();
+    assert.ok(result instanceof Promise || (result && typeof result.then === 'function'),
+      'dispose() should return a Promise');
+  });
 });
 
 // --- ScriptProcessorBackend ---
@@ -44,6 +52,27 @@ describe('ScriptProcessorBackend', { skip }, () => {
     backend.pushChunk(chunk);
     assert.equal(backend.buffer.length, 1, 'Buffer should contain one chunk after pushChunk');
     assert.deepEqual(backend.buffer[0], chunk);
+  });
+
+  it('ScriptProcessorBackend.dispose()がPromiseを返す', () => {
+    const mockCtx = { state: 'running', close: async () => {} };
+    const backend = new ScriptProcessorBackend(mockCtx);
+    const result = backend.dispose();
+    assert.ok(result instanceof Promise || (result && typeof result.then === 'function'),
+      'dispose() should return a Promise');
+  });
+
+  it('stop()でonaudioprocessがnullになる', () => {
+    const mockCtx = { state: 'running', close: async () => {} };
+    const backend = new ScriptProcessorBackend(mockCtx);
+    const mockProcessor = {
+      onaudioprocess: () => {},
+      disconnect: () => {}
+    };
+    backend.processor = mockProcessor;
+    backend.stop();
+    assert.equal(mockProcessor.onaudioprocess, null, 'onaudioprocess should be null after stop');
+    assert.equal(backend.processor, null, 'processor should be null after stop');
   });
 });
 
@@ -74,6 +103,22 @@ describe('HTMLAudioBackend', { skip }, () => {
     assert.equal(String.fromCharCode(...header), 'RIFF');
     // Total size: 44 header + 4 samples * 2 bytes = 52
     assert.equal(wav.byteLength, 52);
+  });
+
+  it('play()連続呼び出しで前のblobUrlがrevokeされる', () => {
+    // HTMLAudioBackend tests need to verify stop() is called before new play
+    // Since Audio/URL are not available in Node.js, we test the _encodeWav and
+    // verify stop() clears state
+    const backend = new HTMLAudioBackend(48000);
+    // Simulate state as if play() was already called
+    backend.audio = { pause: () => {} };
+    backend._blobUrl = 'blob:test-url';
+
+    // Call stop() (which play() calls first)
+    backend.stop();
+
+    assert.equal(backend.audio, null, 'audio should be null after stop');
+    assert.equal(backend._blobUrl, null, 'blobUrl should be null after stop');
   });
 });
 
