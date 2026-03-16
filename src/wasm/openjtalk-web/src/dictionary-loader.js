@@ -4,8 +4,10 @@
  */
 
 export class DictionaryLoader {
-  constructor(module) {
+  constructor(module, { cacheManager = null, dictVersion = 'v1.0' } = {}) {
     this.module = module;
+    this.cacheManager = cacheManager;
+    this.dictVersion = dictVersion;
     this.dictFiles = [
       'char.bin',
       'matrix.bin', 
@@ -25,22 +27,12 @@ export class DictionaryLoader {
    */
   async loadFromArchive(url) {
     console.log('Loading dictionary archive from:', url);
-    
-    try {
-      const response = await fetch(url);
-      if (!response.ok) {
-        throw new Error(`Failed to fetch dictionary: ${response.statusText}`);
-      }
 
-      const arrayBuffer = await response.arrayBuffer();
-      
-      // For MVP, we'll load individual files
-      // TODO: Implement tar.gz extraction in browser
+    try {
+      // Archive extraction not yet implemented — load individual files
       console.warn('Archive extraction not implemented - using individual files');
-      
-      // Load individual dictionary files instead
       await this.loadIndividualFiles(url.replace('/dict.tar.gz', '/dict'));
-      
+
     } catch (error) {
       console.error('Failed to load dictionary archive:', error);
       throw error;
@@ -54,7 +46,7 @@ export class DictionaryLoader {
    */
   async loadIndividualFiles(baseUrl) {
     console.log('Loading individual dictionary files from:', baseUrl);
-    
+
     // Ensure directory exists
     try {
       this.module.FS.mkdir('/dict');
@@ -62,31 +54,64 @@ export class DictionaryLoader {
       // Directory might already exist
     }
 
-    // Load each dictionary file
-    const loadPromises = this.dictFiles.map(async (filename) => {
-      try {
-        const url = `${baseUrl}/${filename}`;
+    if (this.cacheManager) {
+      // Sequential loading to ensure accurate quota calculations
+      for (const filename of this.dictFiles) {
+        await this._loadSingleFile(baseUrl, filename);
+      }
+    } else {
+      // Parallel loading (no cache quota concern)
+      const loadPromises = this.dictFiles.map(async (filename) => {
+        await this._loadSingleFile(baseUrl, filename);
+      });
+      await Promise.all(loadPromises);
+    }
+
+    console.log('All dictionary files loaded successfully');
+  }
+
+  /**
+   * Load a single dictionary file, using cache if available
+   * @param {string} baseUrl - Base URL for dictionary files
+   * @param {string} filename - Dictionary filename to load
+   * @returns {Promise<void>}
+   * @private
+   */
+  async _loadSingleFile(baseUrl, filename) {
+    try {
+      const url = `${baseUrl}/${filename}`;
+
+      const fetchFile = async () => {
         const response = await fetch(url);
-        
         if (!response.ok) {
           throw new Error(`Failed to load ${filename}: ${response.statusText}`);
         }
+        return await response.arrayBuffer();
+      };
 
-        const data = await response.arrayBuffer();
-        const uint8Array = new Uint8Array(data);
-        
-        // Write to virtual file system
-        this.module.FS.writeFile(`/dict/${filename}`, uint8Array);
-        console.log(`Loaded ${filename} (${uint8Array.length} bytes)`);
-        
-      } catch (error) {
-        console.error(`Failed to load ${filename}:`, error);
-        throw error;
+      let data;
+      if (this.cacheManager) {
+        const cacheKey = `dict/${filename}`;
+        data = await this.cacheManager.getOrFetch(
+          cacheKey,
+          this.dictVersion,
+          fetchFile,
+          { priority: 'high' }
+        );
+      } else {
+        data = await fetchFile();
       }
-    });
 
-    await Promise.all(loadPromises);
-    console.log('All dictionary files loaded successfully');
+      const uint8Array = new Uint8Array(data);
+
+      // Write to virtual file system
+      this.module.FS.writeFile(`/dict/${filename}`, uint8Array);
+      console.log(`Loaded ${filename} (${uint8Array.length} bytes)`);
+
+    } catch (error) {
+      console.error(`Failed to load ${filename}:`, error);
+      throw error;
+    }
   }
 
   /**
@@ -154,6 +179,16 @@ export class DictionaryLoader {
     }
     
     return sizes;
+  }
+
+  /**
+   * Clear cached dictionary data (if cacheManager is available)
+   * @returns {Promise<void>}
+   */
+  async clearCache() {
+    if (this.cacheManager) {
+      await this.cacheManager.clear();
+    }
   }
 }
 

@@ -97,7 +97,7 @@
             });
             
             // Load ONNX Runtime
-            await loadScript('https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.1/dist/ort.min.js');
+            await loadScript('https://cdn.jsdelivr.net/npm/onnxruntime-web@1.21.0/dist/ort.min.js');
             
             // Load model
             const configResponse = await fetch('../models/ja_JP-test-medium.onnx.json');
@@ -105,7 +105,8 @@
             
             onnxSession = await ort.InferenceSession.create('../models/ja_JP-test-medium.onnx', {
                 executionProviders: ['wasm'],
-                graphOptimizationLevel: 'all'
+                graphOptimizationLevel: 'extended',
+                enableMemPattern: true
             });
             
             console.log('Initialized');
