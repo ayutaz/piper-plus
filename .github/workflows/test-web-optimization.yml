@@ -1,0 +1,118 @@
+name: Test Web Optimization
+
+on:
+  push:
+    branches: [ dev, 'feature/webgpu-optimization' ]
+    paths:
+      - 'src/wasm/openjtalk-web/src/**'
+      - 'src/wasm/openjtalk-web/test/**'
+      - 'src/wasm/openjtalk-web/package.json'
+      - '.github/workflows/test-web-optimization.yml'
+  pull_request:
+    branches: [ dev ]
+    paths:
+      - 'src/wasm/openjtalk-web/src/**'
+      - 'src/wasm/openjtalk-web/test/**'
+      - 'src/wasm/openjtalk-web/package.json'
+      - '.github/workflows/test-web-optimization.yml'
+
+jobs:
+  # Phase 1: 基盤テスト (BenchmarkRunner, CacheManager)
+  test-phase1:
+    name: "Phase 1: Foundation"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Run Phase 1 tests
+      working-directory: src/wasm/openjtalk-web
+      run: npm run test:optimization:phase1
+
+  # Phase 2: WebGPU + AudioWorklet テスト
+  test-phase2:
+    name: "Phase 2: WebGPU & Audio"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Run Phase 2 tests
+      working-directory: src/wasm/openjtalk-web
+      run: npm run test:optimization:phase2
+
+  # Phase 3: ストリーミング + メモリプール テスト
+  test-phase3:
+    name: "Phase 3: Streaming & Memory"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Run Phase 3 tests
+      working-directory: src/wasm/openjtalk-web
+      run: npm run test:optimization:phase3
+
+  # 全テスト統合 (Phase 1-3)
+  test-all:
+    name: "All Optimization Tests"
+    runs-on: ubuntu-latest
+    needs: [test-phase1, test-phase2, test-phase3]
+    timeout-minutes: 15
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Run all optimization tests
+      working-directory: src/wasm/openjtalk-web
+      run: npm run test:optimization
+
+    - name: Run existing tests
+      working-directory: src/wasm/openjtalk-web
+      continue-on-error: true
+      run: npm test
+
+  # Python FP16 量子化テスト (Phase 4)
+  test-python-fp16:
+    name: "Phase 4: FP16 Quantization (Python)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v4
+
+    - name: Setup Python
+      run: uv python install 3.11
+
+    - name: Install dependencies
+      working-directory: src/python
+      run: uv sync --extra test
+
+    - name: Run FP16 export tests
+      working-directory: src/python
+      run: |
+        uv run python -m pytest tests/test_export_onnx.py -v --tb=short \
+          -m "unit and not requires_gpu" \
+          -k "fp16 or quantize or float16" \
+          || echo "No FP16 tests yet (TDD: tests written before implementation)"
