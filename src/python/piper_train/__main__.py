@@ -216,6 +216,12 @@ def main():
         "50 batches (~1000 samples) is statistically sufficient for trend monitoring.",
     )
     parser.add_argument(
+        "--limit-train-batches",
+        type=int,
+        default=None,
+        help="Limit training to N batches per epoch (for testing). Default: None (no limit).",
+    )
+    parser.add_argument(
         "--max_epochs", type=int, default=1000, help="Maximum number of epochs"
     )
     parser.add_argument(
@@ -356,6 +362,10 @@ def main():
         "check_val_every_n_epoch": args.val_every_n_epochs,
         "limit_val_batches": args.limit_val_batches,
     }
+
+    # --limit-train-batches: テスト用に学習バッチ数を制限
+    if getattr(args, "limit_train_batches", None) is not None:
+        trainer_kwargs["limit_train_batches"] = args.limit_train_batches
 
     # Multi-GPU DDP optimization
     # Use DDPStrategy with gradient_as_bucket_view=True for memory efficiency

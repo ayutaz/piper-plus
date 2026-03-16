@@ -82,6 +82,7 @@ class PiperDataset(Dataset):
         self,
         dataset_paths: list[str | Path],
         max_phoneme_ids: int | None = None,
+        validate_cache: bool = False,
     ):
         self.utterances: list[Utterance] = []
 
