@@ -396,8 +396,18 @@ def main():
     # 21話者バイリンガルモデル(gin_channels=512)では正常だが、80話者(768)でガビガビ音が発生
     # VitsModel.__init__のフォールバック(512)と一致させる
     # argparseは常にdefault値(0)をdict_argsに含めるため、"not in"ではなく値チェック
-    if num_speakers > 1 and dict_args.get("gin_channels", 0) == 0:
+    if (num_speakers > 1 or num_languages > 1) and dict_args.get("gin_channels", 0) == 0:
         dict_args["gin_channels"] = 512
+
+    # --resume-from-multispeaker-checkpoint 使用時は freeze_dp を自動有効化
+    # モデル作成前に設定しないと save_hyperparameters() に反映されず
+    # configure_optimizers() で freeze_dp=False のまま DP が凍結されない
+    if args.resume_from_multispeaker_checkpoint and not args.freeze_dp:
+        args.freeze_dp = True
+        dict_args["freeze_dp"] = True
+        _LOGGER.info(
+            "Auto-enabled --freeze-dp for multispeaker→single-speaker transfer"
+        )
 
     # num_workers自動調整機能を削除
     # ユーザー指定のnum_workersをそのまま使用する
@@ -448,11 +458,6 @@ def main():
         )
 
     if args.resume_from_multispeaker_checkpoint:
-        if not args.freeze_dp:
-            args.freeze_dp = True
-            _LOGGER.info(
-                "Auto-enabled --freeze-dp for multispeaker→single-speaker transfer"
-            )
         assert num_speakers == 1, (
             "--resume-from-multispeaker-checkpoint はシングルスピーカーモデル専用です。"
             "マルチスピーカーへの転移には --resume_from_single_speaker_checkpoint を使用してください。"
