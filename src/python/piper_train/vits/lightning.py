@@ -223,8 +223,8 @@ class VitsModel(pl.LightningModule):
                     phoneme_ids=torch.LongTensor(data["phoneme_ids"]),
                     audio_norm_path=None,  # Not needed for test set
                     audio_spec_path=None,
-                    speaker_id=torch.LongTensor([data.get("speaker_id", 0)]),
-                    language_id=torch.LongTensor([data.get("language_id", 0)]),
+                    speaker_id=data.get("speaker_id", 0),
+                    language_id=data.get("language_id", 0),
                     prosody_features=data.get("prosody_features"),
                     text=data["text"],  # Store original text for logging
                 )
@@ -657,8 +657,24 @@ class VitsModel(pl.LightningModule):
             wandb_logger = self._get_wandb_logger() if should_log else None
 
             if should_log and wandb_logger is not None and WANDB_AVAILABLE:
+                import json
+
                 try:
                     wandb_audio_data = []
+
+                    # Build language map from config once (outside loop)
+                    language_map = {}
+                    try:
+                        config_path = self.hparams.dataset_dir / "config.json"
+                        with open(config_path, encoding="utf-8") as cfg:
+                            cfg_data = json.load(cfg)
+                        lid_map = cfg_data.get("language_id_map", {})
+                        for lang_name, lang_id in lid_map.items():
+                            language_map[lang_id] = lang_name
+                    except Exception:
+                        pass
+                    if not language_map:
+                        language_map = {0: "ja", 1: "en"}
 
                     with torch.no_grad():  # Disable gradient computation
                         for utt_idx, test_utt in enumerate(self._test_dataset):
@@ -668,13 +684,14 @@ class VitsModel(pl.LightningModule):
                                 [len(test_utt.phoneme_ids)]
                             ).to(self.device)
                             scales = [0.667, 1.0, 0.8]
+                            # speaker_id/language_id are int; wrap in LongTensor for model
                             sid = (
-                                test_utt.speaker_id.to(self.device)
+                                torch.LongTensor([test_utt.speaker_id]).to(self.device)
                                 if test_utt.speaker_id is not None
                                 else None
                             )
                             lid = (
-                                test_utt.language_id.to(self.device)
+                                torch.LongTensor([test_utt.language_id]).to(self.device)
                                 if test_utt.language_id is not None
                                 else None
                             )
@@ -696,19 +713,6 @@ class VitsModel(pl.LightningModule):
                             speaker_str = (
                                 f"spk={sid.item()}" if sid is not None else "single"
                             )
-                            # Build language map from config (supports N languages)
-                            language_map = {}
-                            try:
-                                config_path = self.hparams.dataset_dir / "config.json"
-                                with open(config_path, encoding="utf-8") as cfg:
-                                    cfg_data = json.load(cfg)
-                                lid_map = cfg_data.get("language_id_map", {})
-                                for lang_name, lang_id in lid_map.items():
-                                    language_map[lang_id] = lang_name
-                            except Exception:
-                                pass
-                            if not language_map:
-                                language_map = {0: "ja", 1: "en"}
                             lang_str = language_map.get(
                                 lid.item() if lid is not None else 0, "unknown"
                             )

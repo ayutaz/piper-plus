@@ -195,12 +195,13 @@ def main() -> None:
         length_scale = scales[1]
         noise_scale_w = scales[2]
 
-        # 1. Encoder
-        x, m_p, logs_p, x_mask = model_g.enc_p(text, text_lengths)
-
+        # 1. Global conditioning (must be computed before enc_p)
         g = model_g._get_global_conditioning(sid, lid)
 
-        # 2. Duration Predictor (called only once)
+        # 2. Encoder (with global conditioning for cond_layer)
+        x, m_p, logs_p, x_mask = model_g.enc_p(text, text_lengths, g=g)
+
+        # 3. Duration Predictor (called only once)
         x_dp = model_g._prepare_prosody_input(x, x_mask, prosody_features, lid=lid)
         if model_g.use_sdp:
             logw = model_g.dp(
@@ -212,7 +213,7 @@ def main() -> None:
         w = torch.exp(logw) * x_mask * length_scale
         durations = w.squeeze(1)  # [batch, phoneme_length]
 
-        # 3. Attention/Alignment
+        # 4. Attention/Alignment
         w_ceil = torch.ceil(w)
         y_lengths = torch.clamp_min(torch.sum(w_ceil, [1, 2]), 1).long()
         y_mask = torch.unsqueeze(
@@ -221,18 +222,18 @@ def main() -> None:
         attn_mask = torch.unsqueeze(x_mask, 2) * torch.unsqueeze(y_mask, -1)
         attn = commons.generate_path(w_ceil, attn_mask)
 
-        # 4. Expand prior
+        # 5. Expand prior
         m_p = torch.matmul(attn.squeeze(1), m_p.transpose(1, 2)).transpose(1, 2)
         logs_p = torch.matmul(attn.squeeze(1), logs_p.transpose(1, 2)).transpose(1, 2)
 
-        # 5. Sample z_p
+        # 6. Sample z_p
         if stochastic:
             noise_scale = scales[0]
             z_p = m_p + torch.randn_like(m_p) * torch.exp(logs_p) * noise_scale
         else:
             z_p = m_p
 
-        # 6. Flow + Decoder
+        # 7. Flow + Decoder
         z = model_g.flow(z_p, y_mask, g=g, reverse=True)
         o = model_g.dec((z * y_mask), g=g)
         audio = o.unsqueeze(1)
@@ -247,17 +248,20 @@ def main() -> None:
     )
     sequence_lengths = torch.LongTensor([sequences.size(1)])
 
+    # Determine which optional inputs to include.
+    # These flags control BOTH dummy_input and input_names so they stay in sync.
+    include_sid = num_speakers > 1 or num_languages > 1
+    include_lid = num_languages > 1
+
     sid: torch.LongTensor | None = None
-    if num_speakers > 1:
-        sid = torch.LongTensor([0])
-    elif num_languages > 1:
-        # Single-speaker multilingual: include sid=0 to maintain correct
+    if include_sid:
+        # Multi-speaker: real speaker ID needed.
+        # Single-speaker multilingual: sid=0 placeholder to maintain correct
         # positional argument order in infer_forward (sid before lid).
-        # The model ignores sid since n_speakers <= 1.
         sid = torch.LongTensor([0])
 
     lid: torch.LongTensor | None = None
-    if num_languages > 1:
+    if include_lid:
         lid = torch.LongTensor([0])
 
     # noise, noise_w, length
@@ -269,18 +273,9 @@ def main() -> None:
     if has_prosody:
         prosody_features = torch.zeros(1, dummy_input_length, 3, dtype=torch.long)
 
-    # Build dummy input tuple dynamically
+    # Build dummy input tuple and input_names using the same flags
     dummy_input_list: list = [sequences, sequence_lengths, scales]
-    if sid is not None:
-        dummy_input_list.append(sid)
-    if num_languages > 1:
-        dummy_input_list.append(lid)
-    if has_prosody:
-        dummy_input_list.append(prosody_features)
-    dummy_input = tuple(dummy_input_list)
-
-    # Export - always include durations output
-    output_names = ["output", "durations"]
+    input_names = ["input", "input_lengths", "scales"]
     dynamic_axes = {
         "input": {0: "batch_size", 1: "phonemes"},
         "input_lengths": {0: "batch_size"},
@@ -288,23 +283,27 @@ def main() -> None:
         "durations": {0: "batch_size", 1: "phonemes"},
     }
 
-    # Configure input names based on model type
-    input_names = ["input", "input_lengths", "scales"]
-    if sid is not None:
+    if include_sid:
+        dummy_input_list.append(sid)
         input_names.append("sid")
         dynamic_axes["sid"] = {0: "batch_size"}
-    if num_languages > 1:
+    if include_lid:
+        dummy_input_list.append(lid)
         input_names.append("lid")
         dynamic_axes["lid"] = {0: "batch_size"}
-
-    # Add prosody_features if model uses prosody
     if has_prosody:
+        dummy_input_list.append(prosody_features)
         input_names.append("prosody_features")
         dynamic_axes["prosody_features"] = {0: "batch_size", 1: "phonemes"}
         _LOGGER.info(
             "Exporting model with prosody features support (prosody_dim=%d)",
             model_g.prosody_dim,
         )
+
+    dummy_input = tuple(dummy_input_list)
+
+    # Export - always include durations output
+    output_names = ["output", "durations"]
 
     torch.onnx.export(
         model=model_g,

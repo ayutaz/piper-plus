@@ -70,7 +70,6 @@ ENGLISH_PHONEMES: list[str] = [
     ";",
     ":",
     "!",
-    "?",  # already in SPECIAL_TOKENS but also used standalone by EN
     # Rare characters that may appear in text
     "-",
     "'",

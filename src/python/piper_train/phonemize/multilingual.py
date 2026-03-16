@@ -217,6 +217,22 @@ class MultilingualPhonemizer(Phonemizer):
         self, languages: list[str], default_latin_language: str = "en"
     ):
         self._languages = languages
+
+        # Validate that default_latin_language is one of the supported
+        # languages.  If not (e.g. the caller passed "en" but languages is
+        # ["ja", "zh"]), fall back to the first language so that
+        # _segment_text_multilingual never produces segments with an
+        # unsupported language code.
+        if default_latin_language not in languages:
+            _LOGGER.warning(
+                "default_latin_language '%s' is not in supported languages %s; "
+                "falling back to '%s'.",
+                default_latin_language,
+                languages,
+                languages[0],
+            )
+            default_latin_language = languages[0]
+
         self._default_latin_language = default_latin_language
         self._detector = UnicodeLanguageDetector(
             languages, default_latin_language=default_latin_language

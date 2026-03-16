@@ -443,9 +443,16 @@ def main():
 
     if args.compile:
         _LOGGER.info(
-            "Compiling model with torch.compile(mode='reduce-overhead', dynamic=True)"
+            "Compiling model sub-modules with torch.compile(mode='reduce-overhead', dynamic=True)"
         )
-        model = torch.compile(model, mode="reduce-overhead", dynamic=True)
+        if hasattr(model, "model_g"):
+            model.model_g = torch.compile(
+                model.model_g, mode="reduce-overhead", dynamic=True
+            )
+        if hasattr(model, "model_d"):
+            model.model_d = torch.compile(
+                model.model_d, mode="reduce-overhead", dynamic=True
+            )
 
     if args.resume_from_single_speaker_checkpoint:
         assert num_speakers > 1, (

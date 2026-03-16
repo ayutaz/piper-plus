@@ -73,13 +73,19 @@ def get_phonemizer(language: str) -> Phonemizer:
 
 
 def _detect_default_latin(languages: list[str]) -> str:
-    """Determine the default Latin-script language for a language combination."""
-    # Prefer English if present, otherwise first Latin-script language
+    """Determine the default Latin-script language for a language combination.
+
+    Returns the best Latin-script language from *languages*.  Prefers English,
+    then falls back to other Latin-script languages in the list.  If none are
+    present (e.g. "ja-zh"), returns ``languages[0]`` so the caller always gets
+    a language that is actually in the combo.
+    """
     latin_langs = ["en", "es", "pt", "fr"]
     for lang in latin_langs:
         if lang in languages:
             return lang
-    return "en"
+    # No Latin-script language in the combo -- fall back to first language
+    return languages[0]
 
 
 def available_languages() -> list[str]:

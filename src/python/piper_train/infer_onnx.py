@@ -24,7 +24,7 @@ class _DominantLanguageDetector:
     across calls to avoid repeated object construction overhead.
     """
 
-    _cache: "dict[tuple[str, ...], _DominantLanguageDetector]" = {}
+    _cache: "dict[tuple[tuple[str, int], ...], _DominantLanguageDetector]" = {}
 
     def __init__(self, language_id_map: dict[str, int]):
         from .phonemize.multilingual import UnicodeLanguageDetector  # noqa: PLC0415
