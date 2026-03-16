@@ -61,7 +61,7 @@ nohup /data/piper/.venv/bin/python -m piper_train \
 | `--batch-size 20` | v4と同一。173 symbols でも V100 16GB に収まる |
 | `--samples-per-speaker 2` | 6言語 x スロット配分: ja=2, en=2, zh=2, es=2, fr=1, pt=1 |
 | `--checkpoint-epochs 5` | 75ep / 5 = 15 チェックポイント |
-| 推定学習時間 | ~157時間 (~6.5日) | |
+| 実際の学習時間 | ~92時間 (~3.8日) — 7回リスタート含む |
 | language-balanced-sampling | 自動有効化 (話者比 >= 3:1) |
 
 ### 前バージョン: `dataset-bilingual-ja-en-v4` (v4 バイリンガル、学習完了)
@@ -120,7 +120,8 @@ nohup /data/piper/.venv/bin/python -m piper_train \
 23. ✅ **6言語事前学習完了**: 75 epoch / ~282K gradient steps / language-balanced-sampling 自動有効化 (2026-03-16) — epoch=74-step=504712.ckpt
 24. ✅ **6言語 ONNX 変換 + 推論テスト**: 学習完了後に変換・テスト済み (2026-03-16)
 25. ✅ **つくよみちゃん 6言語ベースファインチューニング完了**: 500 epoch / 1GPU / lr=2e-5 / --resume-from-multispeaker-checkpoint (2026-03-16) — v1 は freeze_dp タイミングバグで失敗、v2 で修正済み。`tsukuyomi-6lang-v2-fixed.onnx` (emb_lang後処理済み)、JA 3.05s / EN 2.54s / ZH 1.21s / ES 2.86s / FR 2.11s / PT 2.24s
-26. **HuggingFace アップロード**: 6lang ベースモデル + つくよみちゃん 6lang-v2 をアップロード
+26. **CSS10 日本語 6langベースファインチューニング**: CSS10 (6,838発話, 1話者, Apache-2.0) を 6lang ベースモデルから転移学習 → `ja_JP-test-medium.onnx` 置き換え
+27. **HuggingFace アップロード**: 6lang ベースモデル + つくよみちゃん 6lang-v2 をアップロード
 
 ### 6lang vs v4 vs v3 vs v2 比較
 
@@ -130,7 +131,7 @@ nohup /data/piper/.venv/bin/python -m piper_train \
 | 総発話数 | 63,325 | 115,795 | 135,060 | **508,187** |
 | 話者数 | 40 | 848 | 330 | **571** |
 | シンボル数 | 97 | 97 | 97 | **173** |
-| 学習期間 | 4h19分 (200ep) | ~3日 (350ep) | ~46時間 (150ep) | **~157時間 (75ep)** |
+| 学習期間 | 4h19分 (200ep) | ~3日 (350ep) | ~46時間 (150ep) | **~92時間 (75ep)** |
 | gradient steps | ~110K | ~202K | ~270K | **~282K** |
 
 **6lang の設計方針**: v4 の JA+EN をベースに ZH (AISHELL-3)、ES/FR/PT (CML-TTS) を追加。話者あたり30発話以上でフィルタし、embedding 学習品質を確保。
