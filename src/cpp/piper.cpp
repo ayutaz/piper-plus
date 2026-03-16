@@ -2,6 +2,7 @@
 #include <chrono>
 #include <fstream>
 #include <limits>
+#include <set>
 #include <sstream>
 #include <stdexcept>
 #include <filesystem>
@@ -18,6 +19,7 @@
 #include "wavfile.hpp"
 #include "openjtalk_phonemize.hpp"
 #include "phoneme_parser.hpp"
+#include "language_detector.hpp"
 
 #ifdef USE_ARM64_NEON
 #include "audio_neon.hpp"
@@ -1021,6 +1023,132 @@ void textToAudio(PiperConfig &config, Voice &voice, std::string text,
                                      "Cannot synthesize Japanese without OpenJTalk.");
           }
         }
+      } else if (voice.phonemizeConfig.phonemeType == MultilingualPhonemes) {
+        // Multilingual: segment text by language, phonemize each segment
+        // with the appropriate engine, strip BOS/EOS from JA segments.
+        std::vector<std::string> multiLangs;
+        if (voice.modelConfig.languageIdMap) {
+          for (const auto& [code, id] : *voice.modelConfig.languageIdMap) {
+            multiLangs.push_back(code);
+          }
+        } else {
+          multiLangs = {"ja", "en"};  // Default bilingual
+        }
+
+        // Determine default Latin language
+        std::string defaultLatin = "en";
+        for (const auto& lang : {"en", "es", "pt", "fr"}) {
+          if (std::find(multiLangs.begin(), multiLangs.end(), lang) != multiLangs.end()) {
+            defaultLatin = lang;
+            break;
+          }
+        }
+
+        UnicodeLanguageDetector detector(multiLangs, defaultLatin);
+        auto langSegments = detector.segmentText(segment.text);
+
+        // BOS/EOS codepoints to strip from JA segments
+        std::set<Phoneme> bosEosTokens = {
+          0x5E,    // ^ (BOS)
+          0x24,    // $ (EOS)
+          0x3F,    // ? (question EOS)
+          0xE016,  // ?! (emphatic question)
+          0xE017,  // ?. (neutral question)
+          0xE018   // ?~ (tag question)
+        };
+
+        // Track last EOS for dynamic EOS selection
+        Phoneme lastEos = 0x24;  // Default: $
+
+        std::vector<Phoneme> allPhonemes;
+        std::vector<ProsodyFeature> allProsody;
+
+        for (const auto& langSeg : langSegments) {
+          std::vector<std::vector<Phoneme>> langPhonemes;
+          std::vector<std::vector<ProsodyFeature>> langProsody;
+
+          if (langSeg.lang == "ja") {
+            // Japanese: use OpenJTalk
+            if (voice.session.hasProsodyInput) {
+              phonemize_openjtalk_with_prosody(langSeg.text, langPhonemes, langProsody);
+            } else {
+              phonemize_openjtalk(langSeg.text, langPhonemes);
+            }
+
+            // Strip BOS/EOS from JA phonemes
+            for (size_t s = 0; s < langPhonemes.size(); s++) {
+              for (auto ph : langPhonemes[s]) {
+                if (bosEosTokens.count(ph)) {
+                  if (ph != 0x5E) {  // Not BOS
+                    lastEos = ph;    // Track EOS
+                  }
+                  continue;  // Skip BOS/EOS
+                }
+                allPhonemes.push_back(ph);
+                if (voice.session.hasProsodyInput && s < langProsody.size()) {
+                  // Find matching prosody index (approximate)
+                  // JA phonemizer produces 1:1 phoneme:prosody
+                }
+              }
+              // Add prosody for JA phonemes (after stripping)
+              if (voice.session.hasProsodyInput && s < langProsody.size()) {
+                // We need to rebuild prosody without BOS/EOS entries
+                for (size_t pi = 0; pi < langPhonemes[s].size(); pi++) {
+                  if (!bosEosTokens.count(langPhonemes[s][pi])) {
+                    if (pi < langProsody[s].size()) {
+                      allProsody.push_back(langProsody[s][pi]);
+                    } else {
+                      allProsody.push_back({0, 0, 0});
+                    }
+                  }
+                }
+              }
+            }
+          } else {
+            // Other languages: use eSpeak
+            eSpeakPhonemeConfig eSpeakConfig;
+            // Map language code to espeak voice
+            if (langSeg.lang == "en") eSpeakConfig.voice = "en-us";
+            else if (langSeg.lang == "zh") eSpeakConfig.voice = "cmn";
+            else if (langSeg.lang == "ko") eSpeakConfig.voice = "ko";
+            else if (langSeg.lang == "es") eSpeakConfig.voice = "es-la";
+            else if (langSeg.lang == "fr") eSpeakConfig.voice = "fr";
+            else if (langSeg.lang == "pt") eSpeakConfig.voice = "pt-br";
+            else eSpeakConfig.voice = langSeg.lang;
+
+            phonemize_eSpeak(langSeg.text, eSpeakConfig, langPhonemes);
+
+            // eSpeak phonemes don't have BOS/EOS inline, just add them
+            for (const auto& sentence : langPhonemes) {
+              for (auto ph : sentence) {
+                allPhonemes.push_back(ph);
+                if (voice.session.hasProsodyInput) {
+                  allProsody.push_back({0, 0, 0});  // No prosody for non-JA
+                }
+              }
+            }
+          }
+        }
+
+        // Set dominant language for lid
+        if (!langSegments.empty()) {
+          auto dominantLang = detectDominantLanguage(segment.text, detector);
+          if (voice.modelConfig.languageIdMap &&
+              voice.modelConfig.languageIdMap->count(dominantLang) > 0) {
+            voice.synthesisConfig.languageId =
+                (*voice.modelConfig.languageIdMap)[dominantLang];
+            spdlog::debug("Multilingual: dominant language '{}' (lid={})",
+                          dominantLang, voice.synthesisConfig.languageId.value());
+          }
+        }
+
+        // Add as a single sentence
+        if (!allPhonemes.empty()) {
+          segmentPhonemes.push_back(std::move(allPhonemes));
+          if (voice.session.hasProsodyInput) {
+            segmentProsody.push_back(std::move(allProsody));
+          }
+        }
       } else {
         // Use UTF-8 codepoints as "phonemes"
         CodepointsPhonemeConfig codepointsConfig;
@@ -1090,6 +1218,10 @@ void textToAudio(PiperConfig &config, Voice &voice, std::string text,
         idConfig.addBos = false;
         idConfig.addEos = false;
     }
+
+    // Multilingual: use eSpeak-style BOS/EOS + padding (added by phonemes_to_ids)
+    // BOS/EOS from individual segments are already stripped
+    // Note: MultilingualPhonemes uses interspersePad=true (set in parsePhonemizeConfig)
 
     if (voice.synthesisConfig.phonemeSilenceSeconds) {
       // Split into phrases
@@ -1422,9 +1554,9 @@ void textToAudioStreaming(PiperConfig &config, Voice &voice, std::string text,
   static const std::regex englishSentenceBoundary("([.!?,;:]+|\\s+(?:and|or|but|because|while|when|if|that|which)\\s+)");
   
   // Select appropriate regex based on language
-  const std::regex& sentenceBoundary = 
-    (usesOpenJTalk(voice.phonemizeConfig.phonemeType)) 
-    ? japaneseSentenceBoundary 
+  const std::regex& sentenceBoundary =
+    (usesOpenJTalk(voice.phonemizeConfig.phonemeType))
+    ? japaneseSentenceBoundary
     : englishSentenceBoundary;
   
   // Split text into chunks at natural boundaries
