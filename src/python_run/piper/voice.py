@@ -332,7 +332,7 @@ class PiperVoice:
         # Include lid for multilingual models
         input_names = {inp.name for inp in self.session.get_inputs()}
         if "lid" in input_names:
-            lid = np.expand_dims(np.array([0], dtype=np.int64), 0)
+            lid = np.array([0], dtype=np.int64)
             args["lid"] = lid
 
         # Include prosody_features if model requires them (zeros as default)
