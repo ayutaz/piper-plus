@@ -745,7 +745,7 @@ void printUsage(char *argv[]) {
 void ensureArg(int argc, char *argv[], int argi) {
   if ((argi + 1) >= argc) {
     printUsage(argv);
-    exit(0);
+    exit(EXIT_FAILURE);
   }
 }
 

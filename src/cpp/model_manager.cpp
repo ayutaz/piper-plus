@@ -45,6 +45,7 @@ static const char* PIPER_PLUS_CATALOG_JSON = R"JSON(
         },
         "quality": "medium",
         "num_speakers": 1,
+        "speaker_id_map": {},
         "source": "piper-plus",
         "repo": "ayousanz/piper-plus-tsukuyomi-chan",
         "files": {
@@ -57,7 +58,8 @@ static const char* PIPER_PLUS_CATALOG_JSON = R"JSON(
                 "md5_digest": ""
             }
         },
-        "aliases": ["tsukuyomi", "tsukuyomi-chan", "ja-tsukuyomi"]
+        "aliases": ["tsukuyomi", "tsukuyomi-chan", "ja-tsukuyomi"],
+        "description": "Tsukuyomi-chan Japanese TTS model trained with WavLM discriminator (300 epochs)"
     },
     "ja_JP-moe-speech-20speakers-medium": {
         "key": "ja_JP-moe-speech-20speakers-medium",
@@ -68,6 +70,13 @@ static const char* PIPER_PLUS_CATALOG_JSON = R"JSON(
         },
         "quality": "medium",
         "num_speakers": 20,
+        "speaker_id_map": {
+            "speaker_0": 0, "speaker_1": 1, "speaker_2": 2, "speaker_3": 3,
+            "speaker_4": 4, "speaker_5": 5, "speaker_6": 6, "speaker_7": 7,
+            "speaker_8": 8, "speaker_9": 9, "speaker_10": 10, "speaker_11": 11,
+            "speaker_12": 12, "speaker_13": 13, "speaker_14": 14, "speaker_15": 15,
+            "speaker_16": 16, "speaker_17": 17, "speaker_18": 18, "speaker_19": 19
+        },
         "source": "piper-plus",
         "repo": "ayousanz/piper-plus-base",
         "files": {
@@ -80,7 +89,8 @@ static const char* PIPER_PLUS_CATALOG_JSON = R"JSON(
                 "md5_digest": ""
             }
         },
-        "aliases": ["moe-speech", "moe-20speakers", "ja-base", "ja-20speakers"]
+        "aliases": ["moe-speech", "moe-20speakers", "ja-base", "ja-20speakers"],
+        "description": "Japanese multi-speaker base model (20 speakers) with VITS + Prosody features"
     }
 }
 )JSON";
@@ -246,12 +256,19 @@ static bool downloadFile(const std::string& url,
     }
 
     std::string outStr = outputPath.string();
-    // Allow spaces in output path (they are quoted) but reject other specials.
-    // Use isSafeForShellPath (allows backslash for Windows paths) plus spaces.
-    for (char c : outStr) {
-        if (!std::isalnum(static_cast<unsigned char>(c)) &&
-            c != '-' && c != '_' && c != '.' && c != '/' &&
-            c != '\\' && c != ':' && c != ' ') {
+    // Allow isSafeForShellPath characters plus spaces (paths are quoted in commands).
+    if (!isSafeForShellPath(outStr)) {
+        // isSafeForShellPath rejects spaces; check if spaces are the only extras
+        bool safeWithSpaces = !outStr.empty();
+        for (char c : outStr) {
+            if (c != ' ' && !std::isalnum(static_cast<unsigned char>(c)) &&
+                c != '-' && c != '_' && c != '.' && c != '/' &&
+                c != '\\' && c != ':') {
+                safeWithSpaces = false;
+                break;
+            }
+        }
+        if (!safeWithSpaces) {
             spdlog::error("Output path contains unsafe characters: {}", outStr);
             return false;
         }

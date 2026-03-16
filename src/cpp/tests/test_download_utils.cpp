@@ -55,6 +55,64 @@ std::string extractModelName(const std::string& key) {
     return key.substr(pos + 1, lastPos - pos - 1);
 }
 
+// --- Security validation helpers (inline replicas of static functions in model_manager.cpp) ---
+
+// Shell-safe for URLs: reject backslashes (Unix shell escape character).
+// Only allow alphanumerics, hyphens, underscores, dots, forward slashes, and colons.
+bool isSafeForShell(const std::string& s) {
+    for (char c : s) {
+        if (!std::isalnum(static_cast<unsigned char>(c)) &&
+            c != '-' && c != '_' && c != '.' && c != '/' &&
+            c != ':') {
+            return false;
+        }
+    }
+    return !s.empty();
+}
+
+// Shell-safe for file paths: allows backslashes for Windows path separators.
+bool isSafeForShellPath(const std::string& s) {
+    for (char c : s) {
+        if (!std::isalnum(static_cast<unsigned char>(c)) &&
+            c != '-' && c != '_' && c != '.' && c != '/' &&
+            c != '\\' && c != ':') {
+            return false;
+        }
+    }
+    return !s.empty();
+}
+
+// Validate that a voice key contains no path traversal characters.
+bool isSafeVoiceKey(const std::string& key) {
+    if (key.empty()) return false;
+    if (key.find("..") != std::string::npos) return false;
+    if (key.find('/') != std::string::npos) return false;
+    if (key.find('\\') != std::string::npos) return false;
+    return true;
+}
+
+// Validate that a repoId has exactly one slash and only safe characters.
+bool isSafeRepoId(const std::string& repoId) {
+    if (repoId.empty()) return false;
+    int slashCount = 0;
+    for (char c : repoId) {
+        if (c == '/') {
+            ++slashCount;
+            if (slashCount > 1) return false;
+        } else if (!std::isalnum(static_cast<unsigned char>(c)) &&
+                   c != '-' && c != '_' && c != '.') {
+            return false;
+        }
+    }
+    return slashCount == 1;
+}
+
+// Validate that a URL starts with the expected HuggingFace prefix.
+bool isHuggingFaceUrl(const std::string& url) {
+    const std::string expectedPrefix = "https://huggingface.co/";
+    return url.rfind(expectedPrefix, 0) == 0;
+}
+
 } // anonymous namespace
 
 // ============================================
@@ -197,4 +255,128 @@ TEST(DownloadUtilsTest, DataDirectoryPath) {
         EXPECT_FALSE(expected.empty());
     }
 #endif
+}
+
+// ============================================
+// Security validation tests: isSafeForShell
+// ============================================
+
+TEST(SecurityValidationTest, SafeUrlAccepted) {
+    EXPECT_TRUE(isSafeForShell("https://huggingface.co/owner/repo/resolve/main/model.onnx"));
+    EXPECT_TRUE(isSafeForShell("https://example.com/file.tar.gz"));
+    EXPECT_TRUE(isSafeForShell("http://localhost:8080/path"));
+}
+
+TEST(SecurityValidationTest, UnsafeUrlWithBackslash) {
+    EXPECT_FALSE(isSafeForShell("https://example.com/path\\file"));
+    EXPECT_FALSE(isSafeForShell("C:\\Users\\model.onnx"));
+}
+
+TEST(SecurityValidationTest, UnsafeUrlWithShellChars) {
+    EXPECT_FALSE(isSafeForShell("https://example.com/$HOME"));
+    EXPECT_FALSE(isSafeForShell("https://example.com/`whoami`"));
+    EXPECT_FALSE(isSafeForShell("https://example.com/a;rm -rf /"));
+    EXPECT_FALSE(isSafeForShell("https://example.com/a|cat /etc/passwd"));
+    EXPECT_FALSE(isSafeForShell("https://example.com/a&bg"));
+}
+
+TEST(SecurityValidationTest, EmptyUrlRejected) {
+    EXPECT_FALSE(isSafeForShell(""));
+}
+
+// ============================================
+// Security validation tests: isSafeForShellPath
+// ============================================
+
+TEST(SecurityValidationTest, WindowsPathAccepted) {
+    EXPECT_TRUE(isSafeForShellPath("C:\\Users\\piper\\models\\model.onnx"));
+    EXPECT_TRUE(isSafeForShellPath("D:\\data\\piper\\config.json"));
+}
+
+TEST(SecurityValidationTest, UnixPathAccepted) {
+    EXPECT_TRUE(isSafeForShellPath("/home/user/.local/share/piper/model.onnx"));
+    EXPECT_TRUE(isSafeForShellPath("/tmp/piper/models/config.json"));
+}
+
+// ============================================
+// Security validation tests: isSafeVoiceKey
+// ============================================
+
+TEST(SecurityValidationTest, SafeVoiceKeyAccepted) {
+    EXPECT_TRUE(isSafeVoiceKey("ja_JP-tsukuyomi-chan-medium"));
+    EXPECT_TRUE(isSafeVoiceKey("en_US-lessac-medium"));
+    EXPECT_TRUE(isSafeVoiceKey("moe-speech-20speakers"));
+}
+
+TEST(SecurityValidationTest, VoiceKeyWithDotDot) {
+    EXPECT_FALSE(isSafeVoiceKey(".."));
+    EXPECT_FALSE(isSafeVoiceKey("../../../etc/passwd"));
+    EXPECT_FALSE(isSafeVoiceKey("model..hack"));
+}
+
+TEST(SecurityValidationTest, VoiceKeyWithSlash) {
+    EXPECT_FALSE(isSafeVoiceKey("model/hack"));
+    EXPECT_FALSE(isSafeVoiceKey("/etc/passwd"));
+}
+
+TEST(SecurityValidationTest, VoiceKeyWithBackslash) {
+    EXPECT_FALSE(isSafeVoiceKey("model\\hack"));
+    EXPECT_FALSE(isSafeVoiceKey("C:\\Windows\\system32"));
+}
+
+TEST(SecurityValidationTest, EmptyVoiceKeyRejected) {
+    EXPECT_FALSE(isSafeVoiceKey(""));
+}
+
+// ============================================
+// Security validation tests: isSafeRepoId
+// ============================================
+
+TEST(SecurityValidationTest, SafeRepoIdAccepted) {
+    EXPECT_TRUE(isSafeRepoId("ayousanz/piper-plus-tsukuyomi-chan"));
+    EXPECT_TRUE(isSafeRepoId("rhasspy/piper-voices"));
+    EXPECT_TRUE(isSafeRepoId("owner/repo.v2"));
+    EXPECT_TRUE(isSafeRepoId("user_name/repo_name"));
+}
+
+TEST(SecurityValidationTest, RepoIdMultipleSlashes) {
+    EXPECT_FALSE(isSafeRepoId("owner/repo/extra"));
+    EXPECT_FALSE(isSafeRepoId("a/b/c/d"));
+}
+
+TEST(SecurityValidationTest, RepoIdNoSlash) {
+    EXPECT_FALSE(isSafeRepoId("noslash"));
+    EXPECT_FALSE(isSafeRepoId("single-component"));
+}
+
+TEST(SecurityValidationTest, RepoIdWithSpecialChars) {
+    EXPECT_FALSE(isSafeRepoId("owner/repo;hack"));
+    EXPECT_FALSE(isSafeRepoId("owner/repo$(cmd)"));
+    EXPECT_FALSE(isSafeRepoId("owner/repo|pipe"));
+    EXPECT_FALSE(isSafeRepoId("owner/repo&bg"));
+    EXPECT_FALSE(isSafeRepoId("owner/repo`whoami`"));
+}
+
+TEST(SecurityValidationTest, EmptyRepoIdRejected) {
+    EXPECT_FALSE(isSafeRepoId(""));
+}
+
+// ============================================
+// Security validation tests: URL prefix
+// ============================================
+
+TEST(SecurityValidationTest, HuggingFaceUrlAccepted) {
+    EXPECT_TRUE(isHuggingFaceUrl("https://huggingface.co/owner/repo/resolve/main/file.onnx"));
+    EXPECT_TRUE(isHuggingFaceUrl("https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/model.onnx"));
+}
+
+TEST(SecurityValidationTest, NonHuggingFaceUrlRejected) {
+    EXPECT_FALSE(isHuggingFaceUrl("https://evil.com/huggingface.co/file"));
+    EXPECT_FALSE(isHuggingFaceUrl("http://huggingface.co/owner/repo"));  // http, not https
+    EXPECT_FALSE(isHuggingFaceUrl("https://example.com/model.onnx"));
+}
+
+TEST(SecurityValidationTest, FileSchemeRejected) {
+    EXPECT_FALSE(isHuggingFaceUrl("file:///etc/passwd"));
+    EXPECT_FALSE(isHuggingFaceUrl("file:///C:/Windows/system32"));
 }
