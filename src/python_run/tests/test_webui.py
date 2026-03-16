@@ -55,8 +55,8 @@ class TestWebUI:
         ja_lang = get_language_from_model("test/models/multilingual-test-medium.onnx")
         assert ja_lang == "ja_JP"
 
-        # Test English model
-        en_lang = get_language_from_model("test/models/en_US-test.onnx")
+        # Test multilingual model (falls back to en_US)
+        en_lang = get_language_from_model("test/models/multilingual-test-medium.onnx")
         assert en_lang == "en_US"
 
         # Test fallback
@@ -85,8 +85,8 @@ class TestWebUI:
         ja_dropdown = update_templates("test/models/multilingual-test-medium.onnx")
         assert hasattr(ja_dropdown, "choices")
 
-        # Test with English model
-        en_dropdown = update_templates("test/models/en_US-test.onnx")
+        # Test with multilingual model
+        en_dropdown = update_templates("test/models/multilingual-test-medium.onnx")
         assert hasattr(en_dropdown, "choices")
 
     def test_template_application(self):
@@ -103,9 +103,9 @@ class TestWebUI:
         )
         assert "こんにちは" in ja_greeting
 
-        # Test English greeting
+        # Test English greeting (multilingual model falls back to en_US)
         en_greeting = apply_template(
-            "Greeting (greeting)", "test/models/en_US-test.onnx"
+            "Greeting (greeting)", "test/models/multilingual-test-medium.onnx"
         )
         assert "Hello" in en_greeting
 

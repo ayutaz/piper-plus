@@ -1,0 +1,3 @@
+# Downloaded/generated models (large files)
+models/*.onnx
+!models/multilingual-test-medium.onnx
