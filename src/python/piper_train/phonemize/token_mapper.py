@@ -39,6 +39,9 @@ FIXED_PUA_MAPPING = {
     "N_n": 0xE01A,  # ん before n/t/d/ts/ch (alveolar)
     "N_ng": 0xE01B,  # ん before k/g (velar)
     "N_uvular": 0xE01C,  # ん at end or before vowels
+    # Multilingual extensions
+    "rr": 0xE01D,  # Spanish trill r (orthographic, not IPA)
+    "y_vowel": 0xE01E,  # Close front rounded vowel [y] (ZH pinyin ü, FR lune) - distinct from JA glide "y"
 }
 
 # Build bidirectional mappings

@@ -57,7 +57,7 @@ except ImportError:
     tashkeel_run = None
 
 from .f0_extraction import cache_f0
-from .norm_audio import cache_norm_audio, make_silence_detector
+from .norm_audio import cache_norm_audio, cache_norm_audio_fast, make_silence_detector
 
 
 # Custom Japanese phonemizer
@@ -94,6 +94,9 @@ class PhonemeType(str, Enum):
 
     BILINGUAL = "bilingual"
     """Phonemes come from bilingual phonemizer (JA+EN)"""
+
+    MULTILINGUAL = "multilingual"
+    """Phonemes come from multilingual phonemizer (N languages)"""
 
 
 def main() -> None:
@@ -178,6 +181,14 @@ def main() -> None:
         default=880.0,
         help="Maximum F0 value in Hz (default: 880.0)",
     )
+    parser.add_argument(
+        "--energy-vad",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Use fast energy-based VAD instead of Silero ONNX VAD "
+        "(~50x faster, default: enabled). Use --no-energy-vad to "
+        "fall back to Silero VAD.",
+    )
     args = parser.parse_args()
 
     if args.single_speaker and (args.speaker_id is not None):
@@ -196,13 +207,36 @@ def main() -> None:
 
     warnings.filterwarnings("ignore", category=UserWarning)
 
+    # Log VAD mode
+    if args.energy_vad:
+        _LOGGER.info("Using energy-based VAD (fast mode, ~50x faster than Silero)")
+    else:
+        _LOGGER.info("Using Silero ONNX VAD (--no-energy-vad)")
+
     # Ensure enum
     args.phoneme_type = PhonemeType(args.phoneme_type)
 
     # 日本語の場合は自動的に OPENJTALK を使用し、ID マップを設定
     japanese_id_map = None
     bilingual_id_map = None
-    if args.language == "ja-en":
+    multilingual_id_map = None
+    lang_parts = args.language.split("-")
+    if len(lang_parts) >= 3:
+        # Multilingual mode: 3+ languages (e.g., ja-en-zh-ko)
+        args.phoneme_type = PhonemeType.MULTILINGUAL
+        from .phonemize.multilingual_id_map import (
+            get_multilingual_id_map,  # noqa: PLC0415
+        )
+
+        multilingual_id_map = get_multilingual_id_map(lang_parts)
+        args.phoneme_id_map = multilingual_id_map
+        args.lang_parts = lang_parts
+        _LOGGER.info(
+            "Using multilingual (%s) phonemization (%s symbols)",
+            args.language,
+            len(multilingual_id_map),
+        )
+    elif args.language == "ja-en":
         args.phoneme_type = PhonemeType.BILINGUAL
         from .phonemize.bilingual_id_map import get_bilingual_id_map  # noqa: PLC0415
 
@@ -285,25 +319,33 @@ def main() -> None:
                 "phoneme_type": args.phoneme_type.value,
                 "phoneme_map": {},
                 "phoneme_id_map": (
-                    bilingual_id_map
-                    if bilingual_id_map is not None
+                    multilingual_id_map
+                    if multilingual_id_map is not None
                     else (
-                        get_codepoints_map()[args.language]
-                        if args.phoneme_type == PhonemeType.TEXT
+                        bilingual_id_map
+                        if bilingual_id_map is not None
                         else (
-                            japanese_id_map
-                            if japanese_id_map is not None
-                            else get_espeak_map()
+                            get_codepoints_map()[args.language]
+                            if args.phoneme_type == PhonemeType.TEXT
+                            else (
+                                japanese_id_map
+                                if japanese_id_map is not None
+                                else get_espeak_map()
+                            )
                         )
                     )
                 ),
                 "num_symbols": (
-                    len(bilingual_id_map)
-                    if bilingual_id_map is not None
+                    len(multilingual_id_map)
+                    if multilingual_id_map is not None
                     else (
-                        len(japanese_id_map)
-                        if japanese_id_map is not None
-                        else get_max_phonemes()
+                        len(bilingual_id_map)
+                        if bilingual_id_map is not None
+                        else (
+                            len(japanese_id_map)
+                            if japanese_id_map is not None
+                            else get_max_phonemes()
+                        )
                     )
                 ),
                 "num_speakers": len(speaker_counts),
@@ -312,19 +354,29 @@ def main() -> None:
                 # Multi-language support
                 **(
                     {
-                        "num_languages": 2,
-                        "language_id_map": {"ja": 0, "en": 1},
+                        "num_languages": len(lang_parts),
+                        "language_id_map": {
+                            lang: idx for idx, lang in enumerate(lang_parts)
+                        },
                     }
-                    if bilingual_id_map is not None
-                    else {}
+                    if multilingual_id_map is not None
+                    else (
+                        {
+                            "num_languages": 2,
+                            "language_id_map": {"ja": 0, "en": 1},
+                        }
+                        if bilingual_id_map is not None
+                        else {}
+                    )
                 ),
-                # Add prosody information for Japanese or bilingual
+                # Add prosody information for Japanese, bilingual, or multilingual
                 **(
                     {
                         "prosody_num_symbols": 11,
                         "prosody_id_map": {str(i): [i] for i in range(11)},
                     }
                     if args.language in ("ja", "ja-en")
+                    or (multilingual_id_map is not None and "ja" in lang_parts)
                     else {}
                 ),
             },
@@ -344,7 +396,9 @@ def main() -> None:
     queue_out: Queue[Utterance | None] = Queue()
 
     # Start workers
-    if args.phoneme_type == PhonemeType.BILINGUAL:
+    if args.phoneme_type == PhonemeType.MULTILINGUAL:
+        target = phonemize_batch_multilingual
+    elif args.phoneme_type == PhonemeType.BILINGUAL:
         target = phonemize_batch_bilingual
     elif args.phoneme_type == PhonemeType.TEXT:
         target = phonemize_batch_text
@@ -452,6 +506,30 @@ def get_text_casing(casing: str):
     return lambda s: s
 
 
+def _cache_audio(
+    args: argparse.Namespace,
+    utt: "Utterance",
+    silence_detector: "SileroVoiceActivityDetector | None",
+) -> tuple[Path, Path]:
+    """Dispatch audio caching to energy VAD or Silero VAD based on args."""
+    if getattr(args, "energy_vad", True):
+        return cache_norm_audio_fast(
+            utt.audio_path,
+            args.cache_dir,
+            args.sample_rate,
+        )
+    else:
+        assert silence_detector is not None, (
+            "silence_detector must be provided when --no-energy-vad is used"
+        )
+        return cache_norm_audio(
+            utt.audio_path,
+            args.cache_dir,
+            silence_detector,
+            args.sample_rate,
+        )
+
+
 def phonemize_batch_espeak(
     args: argparse.Namespace, queue_in: JoinableQueue, queue_out: Queue
 ):
@@ -462,7 +540,9 @@ def phonemize_batch_espeak(
             os.dup2(devnull_fd, 2)
 
         casing = get_text_casing(args.text_casing)
-        silence_detector = make_silence_detector()
+        silence_detector = (
+            make_silence_detector() if not getattr(args, "energy_vad", True) else None
+        )
 
         # Timeout
         timeout_sec = getattr(args, "timeout_seconds", 0)
@@ -499,11 +579,8 @@ def phonemize_batch_espeak(
                         missing_phonemes=utt.missing_phonemes,
                     )
                     if not args.skip_audio:
-                        utt.audio_norm_path, utt.audio_spec_path = cache_norm_audio(
-                            utt.audio_path,
-                            args.cache_dir,
-                            silence_detector,
-                            args.sample_rate,
+                        utt.audio_norm_path, utt.audio_spec_path = _cache_audio(
+                            args, utt, silence_detector
                         )
                     queue_out.put(utt)
                     if timeout_sec > 0:
@@ -529,7 +606,9 @@ def phonemize_batch_text(
             os.dup2(devnull_fd, 2)
 
         casing = get_text_casing(args.text_casing)
-        silence_detector = make_silence_detector()
+        silence_detector = (
+            make_silence_detector() if not getattr(args, "energy_vad", True) else None
+        )
 
         timeout_sec = getattr(args, "timeout_seconds", 0)
 
@@ -565,11 +644,8 @@ def phonemize_batch_text(
                         missing_phonemes=utt.missing_phonemes,
                     )
                     if not args.skip_audio:
-                        utt.audio_norm_path, utt.audio_spec_path = cache_norm_audio(
-                            utt.audio_path,
-                            args.cache_dir,
-                            silence_detector,
-                            args.sample_rate,
+                        utt.audio_norm_path, utt.audio_spec_path = _cache_audio(
+                            args, utt, silence_detector
                         )
                     queue_out.put(utt)
                     if timeout_sec > 0:
@@ -595,7 +671,9 @@ def phonemize_batch_openjtalk(
             os.dup2(devnull_fd, 2)
 
         casing = get_text_casing(args.text_casing)
-        silence_detector = make_silence_detector()
+        silence_detector = (
+            make_silence_detector() if not getattr(args, "energy_vad", True) else None
+        )
 
         # カスタム辞書を読み込む（存在する場合）
         custom_dict = None
@@ -672,11 +750,8 @@ def phonemize_batch_openjtalk(
                         )
 
                     if not args.skip_audio:
-                        utt.audio_norm_path, utt.audio_spec_path = cache_norm_audio(
-                            utt.audio_path,
-                            args.cache_dir,
-                            silence_detector,
-                            args.sample_rate,
+                        utt.audio_norm_path, utt.audio_spec_path = _cache_audio(
+                            args, utt, silence_detector
                         )
 
                         # Extract F0 if enabled
@@ -704,17 +779,31 @@ def phonemize_batch_openjtalk(
         _LOGGER.exception("phonemize_batch_openjtalk")
 
 
-def phonemize_batch_bilingual(
-    args: argparse.Namespace, queue_in: JoinableQueue, queue_out: Queue
+def _phonemize_batch_multilingual_impl(
+    args: argparse.Namespace,
+    queue_in: JoinableQueue,
+    queue_out: Queue,
+    phonemizer,
+    label: str,
 ):
-    """Bilingual (JA+EN) phonemization using BilingualPhonemizer."""
+    """Shared implementation for multilingual/bilingual batch phonemization.
+
+    Parameters
+    ----------
+    phonemizer : MultilingualPhonemizer or BilingualPhonemizer
+        The phonemizer instance to use for text conversion.
+    label : str
+        Label for error logging (e.g. "multilingual" or "bilingual").
+    """
     try:
         if not getattr(args, "debug", False):
             devnull_fd = os.open(os.devnull, os.O_RDWR)
             os.dup2(devnull_fd, 2)
 
         casing = get_text_casing(args.text_casing)
-        silence_detector = make_silence_detector()
+        silence_detector = (
+            make_silence_detector() if not getattr(args, "energy_vad", True) else None
+        )
 
         timeout_sec = getattr(args, "timeout_seconds", 0)
 
@@ -724,10 +813,27 @@ def phonemize_batch_bilingual(
         if timeout_sec > 0:
             signal.signal(signal.SIGALRM, _timeout_handler)
 
-        # Detect language from text using bilingual segmenter
-        from .phonemize.bilingual import BilingualPhonemizer  # noqa: PLC0415
+        # Build language_id_map and detector once per worker for multilingual mode
+        language_id_map: dict[str, int] = {}
+        _lang_detector = None
+        if hasattr(args, "lang_parts") and args.lang_parts:
+            language_id_map = {
+                lang: idx for idx, lang in enumerate(args.lang_parts)
+            }
+            from .phonemize.multilingual import UnicodeLanguageDetector  # noqa: PLC0415
 
-        phonemizer = BilingualPhonemizer(["ja", "en"])
+            _lang_detector = UnicodeLanguageDetector(
+                args.lang_parts,
+                default_latin_language="en" if "en" in args.lang_parts else args.lang_parts[0],
+            )
+        elif getattr(args, "phoneme_type", None) == PhonemeType.BILINGUAL:
+            language_id_map = {"ja": 0, "en": 1}
+            from .phonemize.multilingual import UnicodeLanguageDetector  # noqa: PLC0415
+
+            _lang_detector = UnicodeLanguageDetector(
+                ["ja", "en"],
+                default_latin_language="en",
+            )
 
         while True:
             utt_batch = queue_in.get()
@@ -752,6 +858,20 @@ def phonemize_batch_bilingual(
                             utt.missing_phonemes[phoneme] += 1
                             _LOGGER.warning(f"Missing phoneme: {phoneme}")
 
+                    # Detect and set language_id for multilingual/bilingual utterances
+                    if _lang_detector is not None and language_id_map:
+                        context_has_kana = _lang_detector.has_kana(utt.text)
+                        counts: dict[str, int] = {}
+                        for ch in utt.text:
+                            lang = _lang_detector.detect_char(ch, context_has_kana=context_has_kana)
+                            if lang is not None:
+                                counts[lang] = counts.get(lang, 0) + 1
+                        if counts:
+                            dominant = max(counts, key=lambda k: counts[k])
+                            utt.language_id = language_id_map.get(dominant, 0)
+                        else:
+                            utt.language_id = 0
+
                     # Post-process (BOS/EOS/padding)
                     prosody_features_raw = [
                         {"a1": p.a1, "a2": p.a2, "a3": p.a3} if p is not None else None
@@ -775,11 +895,8 @@ def phonemize_batch_bilingual(
                         utt.prosody_features = utt.prosody_features[:min_len]
 
                     if not args.skip_audio:
-                        utt.audio_norm_path, utt.audio_spec_path = cache_norm_audio(
-                            utt.audio_path,
-                            args.cache_dir,
-                            silence_detector,
-                            args.sample_rate,
+                        utt.audio_norm_path, utt.audio_spec_path = _cache_audio(
+                            args, utt, silence_detector
                         )
 
                         if getattr(args, "extract_f0", False):
@@ -803,7 +920,36 @@ def phonemize_batch_bilingual(
 
             queue_in.task_done()
     except Exception:
-        _LOGGER.exception("phonemize_batch_bilingual")
+        _LOGGER.exception("phonemize_batch_%s", label)
+
+
+def phonemize_batch_multilingual(
+    args: argparse.Namespace, queue_in: JoinableQueue, queue_out: Queue
+):
+    """Multilingual (N languages) phonemization using MultilingualPhonemizer."""
+    from .phonemize.multilingual import MultilingualPhonemizer  # noqa: PLC0415
+
+    lang_parts = getattr(args, "lang_parts", args.language.split("-"))
+    phonemizer = MultilingualPhonemizer(lang_parts)
+    _phonemize_batch_multilingual_impl(
+        args, queue_in, queue_out, phonemizer, "multilingual"
+    )
+
+
+def phonemize_batch_bilingual(
+    args: argparse.Namespace, queue_in: JoinableQueue, queue_out: Queue
+):
+    """Bilingual (JA+EN) phonemization using BilingualPhonemizer.
+
+    Delegates to the shared multilingual implementation since
+    BilingualPhonemizer is a subclass of MultilingualPhonemizer.
+    """
+    from .phonemize.bilingual import BilingualPhonemizer  # noqa: PLC0415
+
+    phonemizer = BilingualPhonemizer(["ja", "en"])
+    _phonemize_batch_multilingual_impl(
+        args, queue_in, queue_out, phonemizer, "bilingual"
+    )
 
 
 # -----------------------------------------------------------------------------

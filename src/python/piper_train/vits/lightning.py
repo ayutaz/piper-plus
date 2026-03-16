@@ -259,8 +259,10 @@ class VitsModel(pl.LightningModule):
             )
             valid_set_size = int(len(full_dataset) * validation_split)
             train_set_size = len(full_dataset) - valid_set_size
+            split_generator = torch.Generator().manual_seed(self.hparams.seed)
             self._train_dataset, self._val_dataset = random_split(
-                full_dataset, [train_set_size, valid_set_size]
+                full_dataset, [train_set_size, valid_set_size],
+                generator=split_generator,
             )
         else:
             # Fallback: use random split (old behavior)
@@ -275,8 +277,10 @@ class VitsModel(pl.LightningModule):
             valid_set_size = int(len(full_dataset) * validation_split)
             train_set_size = len(full_dataset) - valid_set_size - num_test_examples
 
+            split_generator = torch.Generator().manual_seed(self.hparams.seed)
             self._train_dataset, self._test_dataset, self._val_dataset = random_split(
-                full_dataset, [train_set_size, num_test_examples, valid_set_size]
+                full_dataset, [train_set_size, num_test_examples, valid_set_size],
+                generator=split_generator,
             )
 
     def forward(
@@ -692,7 +696,19 @@ class VitsModel(pl.LightningModule):
                             speaker_str = (
                                 f"spk={sid.item()}" if sid is not None else "single"
                             )
-                            language_map = {0: "ja", 1: "en"}
+                            # Build language map from config (supports N languages)
+                            language_map = {}
+                            try:
+                                config_path = self.hparams.dataset_dir / "config.json"
+                                with open(config_path, encoding="utf-8") as cfg:
+                                    cfg_data = json.load(cfg)
+                                lid_map = cfg_data.get("language_id_map", {})
+                                for lang_name, lang_id in lid_map.items():
+                                    language_map[lang_id] = lang_name
+                            except Exception:
+                                pass
+                            if not language_map:
+                                language_map = {0: "ja", 1: "en"}
                             lang_str = language_map.get(
                                 lid.item() if lid is not None else 0, "unknown"
                             )

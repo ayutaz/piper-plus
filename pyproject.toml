@@ -23,6 +23,7 @@ dependencies = [
     "piper-train[train]",
     "onnxscript>=0.6.2",
     "onnxruntime>=1.24.1",
+    "ghapi>=1.0.13",
 ]
 
 [project.optional-dependencies]
@@ -46,6 +47,11 @@ inference-gpu = [
     "g2p-en>=2.1.0",
     "fastapi>=0.110",
     "uvicorn>=0.27",
+]
+
+multilingual = [
+    "pypinyin>=0.50",
+    "g2pk2>=0.0.3",
 ]
 
 train = [
@@ -194,13 +200,17 @@ inline-quotes = "double"
 "scripts/*" = ["ARG", "PLC0415"]  # Allow conditional imports in scripts  
 # token_mapper.py: グローバル変数を使用した音素マッピングシステム
 "src/python/piper_train/phonemize/token_mapper.py" = ["PLW0603"]
+# korean.py: G2p()インスタンスのモジュールレベルキャッシュ
+"src/python/piper_train/phonemize/korean.py" = ["PLW0603"]
+# bilingual.py: 条件付きインポート（後方互換のため動的切り替え）
+"src/python/piper_train/phonemize/bilingual.py" = ["PLC0415"]
 # mel_processing.py: パフォーマンス最適化のためのグローバルキャッシュ
 "src/python/piper_train/vits/mel_processing.py" = ["PLW0602"]
 # test_phonemize.py: オプショナルな依存関係の条件付きインポート
 "src/python/tests/test_phonemize.py" = ["E402"]
 # preprocess.py: 条件付きインポートで警告を抑制
 "src/python/piper_train/preprocess.py" = ["PLC0415"]
-"src/python/piper_train/phonemize/english.py" = ["PLC0415"]
+"src/python/piper_train/phonemize/english.py" = ["PLC0415", "PLW0603"]
 # prepare scripts: 条件付きインポートを許可
 "src/python/prepare_*.py" = ["PLC0415"]
 # runtime files: 条件付きインポートを許可

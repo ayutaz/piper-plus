@@ -29,13 +29,13 @@ def _load_tensor(path: Path) -> torch.Tensor:
 
 @dataclass
 class Utterance:
-    phoneme_ids: list[int]
+    phoneme_ids: np.ndarray  # dtype=int16, shape=(num_phonemes,)
     audio_norm_path: Path
     audio_spec_path: Path
     speaker_id: int | None = None
     language_id: int | None = None
     text: str | None = None
-    prosody_features: list[dict | None] | None = None  # A1/A2/A3 per phoneme
+    prosody_features: np.ndarray | None = None  # dtype=int16, shape=(num_phonemes, 3) for A1/A2/A3
 
 
 @dataclass
@@ -134,7 +134,7 @@ class PiperDataset(Dataset):
                     )
 
                 return UtteranceTensors(
-                    phoneme_ids=LongTensor(utt.phoneme_ids),
+                    phoneme_ids=torch.from_numpy(utt.phoneme_ids).long(),
                     audio_norm=audio_norm,
                     spectrogram=spectrogram,
                     speaker_id=(
@@ -173,12 +173,14 @@ class PiperDataset(Dataset):
 
     @staticmethod
     def _prosody_features_to_tensor(
-        prosody_features: list[dict | None],
+        prosody_features: np.ndarray,
     ) -> LongTensor:
-        """Convert prosody features (list of dicts) to tensor.
+        """Convert prosody features (numpy array) to tensor.
 
         Args:
-            prosody_features: List of {"a1": int, "a2": int, "a3": int} or None
+            prosody_features: numpy int16 array of shape (num_phonemes, 3)
+                where columns are A1, A2, A3 values.
+                Special tokens are encoded as (0, 0, 0).
 
         Returns:
             LongTensor of shape (num_phonemes, 3) where:
@@ -187,14 +189,7 @@ class PiperDataset(Dataset):
             - [:, 2] = A3 values (total morae in phrase)
             - Special tokens (None) are encoded as (0, 0, 0)
         """
-        result = []
-        for feat in prosody_features:
-            if feat is not None:
-                result.append([feat["a1"], feat["a2"], feat["a3"]])
-            else:
-                # Special tokens (^, $, ?, _, #, [, ]) have no prosody info
-                result.append([0, 0, 0])
-        return LongTensor(result)
+        return torch.from_numpy(prosody_features).long()
 
     @staticmethod
     def load_dataset(
@@ -233,6 +228,18 @@ class PiperDataset(Dataset):
     @staticmethod
     def load_utterance(line: str, dataset_dir: Path | None = None) -> Utterance:
         utt_dict = json.loads(line)
+
+        phoneme_ids = np.array(utt_dict["phoneme_ids"], dtype=np.int16)
+
+        prosody_raw = utt_dict.get("prosody_features")
+        prosody_features: np.ndarray | None = None
+        if prosody_raw is not None:
+            prosody_arr = [
+                [f["a1"], f["a2"], f["a3"]] if f is not None else [0, 0, 0]
+                for f in prosody_raw
+            ]
+            prosody_features = np.array(prosody_arr, dtype=np.int16)
+
         audio_norm_path = Path(utt_dict["audio_norm_path"])
         audio_spec_path = Path(utt_dict["audio_spec_path"])
 
@@ -244,13 +251,13 @@ class PiperDataset(Dataset):
                 audio_spec_path = dataset_dir / audio_spec_path
 
         return Utterance(
-            phoneme_ids=utt_dict["phoneme_ids"],
+            phoneme_ids=phoneme_ids,
             audio_norm_path=audio_norm_path,
             audio_spec_path=audio_spec_path,
             speaker_id=utt_dict.get("speaker_id"),
             language_id=utt_dict.get("language_id"),
             text=utt_dict.get("text"),
-            prosody_features=utt_dict.get("prosody_features"),
+            prosody_features=prosody_features,
         )
 
 
@@ -481,15 +488,20 @@ class SpeakerBalancedBatchSampler:
             for spk_id in self.speakers:
                 lang = speaker_to_language.get(spk_id, 0)
                 self.lang_groups[lang].append(spk_id)
-            # JA/EN スロット数を計算 (50:50)
-            self.ja_slots = self.speakers_per_batch // 2
-            self.en_slots = self.speakers_per_batch - self.ja_slots
+            # N言語均等スロット配分
+            n_lang_groups = len(self.lang_groups)
+            base_slots = self.speakers_per_batch // n_lang_groups
+            remainder = self.speakers_per_batch % n_lang_groups
+            # lang_slots: {lang_id: num_slots}
+            # 余りは先頭言語に配分
+            self.lang_slots: dict[int, int] = {}
+            for i, lang_id in enumerate(sorted(self.lang_groups.keys())):
+                self.lang_slots[lang_id] = base_slots + (1 if i < remainder else 0)
             lang_counts = {lang: len(spks) for lang, spks in self.lang_groups.items()}
             _LOGGER.info(
-                "Language group balance enabled: %s, ja_slots=%d, en_slots=%d",
+                "Language group balance enabled: %s, lang_slots=%s",
                 lang_counts,
-                self.ja_slots,
-                self.en_slots,
+                self.lang_slots,
             )
 
         # DDP対応: rank と world_size を取得
@@ -534,30 +546,33 @@ class SpeakerBalancedBatchSampler:
         }
         speaker_pointers = dict.fromkeys(self.speakers, 0)
 
-        batch_idx = 0
+        # 全バッチを先に生成してから world_size の倍数に切り詰める
+        # これにより全 DDP rank が同じバッチ数を受け取ることを保証する
+        all_batches = []
         while True:
             if self.language_group_balance:
-                # 言語グループ均等サンプリング: JA 50% + EN 50%
-                ja_available = [
-                    spk
-                    for spk in self.lang_groups.get(0, [])
-                    if speaker_pointers[spk] + self.samples_per_speaker
-                    <= len(speaker_indices[spk])
-                ]
-                en_available = [
-                    spk
-                    for spk in self.lang_groups.get(1, [])
-                    if speaker_pointers[spk] + self.samples_per_speaker
-                    <= len(speaker_indices[spk])
-                ]
-                if (
-                    len(ja_available) < self.ja_slots
-                    or len(en_available) < self.en_slots
+                # N言語グループ均等サンプリング
+                lang_available: dict[int, list[int]] = {}
+                for lang_id, speakers_in_lang in self.lang_groups.items():
+                    lang_available[lang_id] = [
+                        spk
+                        for spk in speakers_in_lang
+                        if speaker_pointers[spk] + self.samples_per_speaker
+                        <= len(speaker_indices[spk])
+                    ]
+                # 全言語グループがスロット数を満たせるか確認
+                if any(
+                    len(lang_available.get(lang_id, []))
+                    < self.lang_slots.get(lang_id, 0)
+                    for lang_id in self.lang_slots
                 ):
                     break
-                batch_speakers = rng.sample(ja_available, self.ja_slots) + rng.sample(
-                    en_available, self.en_slots
-                )
+                batch_speakers = []
+                for lang_id in sorted(self.lang_slots.keys()):
+                    n_slots = self.lang_slots[lang_id]
+                    batch_speakers.extend(
+                        rng.sample(lang_available[lang_id], n_slots)
+                    )
             else:
                 # 従来の全話者均等サンプリング
                 available_speakers = [
@@ -577,31 +592,32 @@ class SpeakerBalancedBatchSampler:
                 batch.extend(speaker_indices[spk][start:end])
                 speaker_pointers[spk] = end
 
-            # DDP: このGPUが担当するバッチのみを返す
+            all_batches.append(batch)
+
+        # DDP: world_size の倍数に切り詰めて全 rank が同じバッチ数を受け取る
+        usable = (len(all_batches) // self.world_size) * self.world_size
+        for batch_idx in range(usable):
             if batch_idx % self.world_size == self.rank:
-                yield batch
-            batch_idx += 1
+                yield all_batches[batch_idx]
 
     def __len__(self) -> int:
         if self.language_group_balance:
-            # 言語グループ均等サンプリング: JA グループと EN グループ それぞれの制約で計算
-            ja_speakers = self.lang_groups.get(0, [])
-            en_speakers = self.lang_groups.get(1, [])
-            if not ja_speakers or not en_speakers:
-                # フォールバック: 通常計算
-                pass
-            else:
-                ja_min = min(len(self.speaker_to_indices[s]) for s in ja_speakers)
-                en_min = min(len(self.speaker_to_indices[s]) for s in en_speakers)
-                # JA グループが 1 epoch で提供できるバッチ数
-                ja_batches = (
-                    len(ja_speakers) * (ja_min // self.samples_per_speaker)
-                ) // self.ja_slots
-                # EN グループが 1 epoch で提供できるバッチ数
-                en_batches = (
-                    len(en_speakers) * (en_min // self.samples_per_speaker)
-                ) // self.en_slots
-                total_batches = min(ja_batches, en_batches)
+            # N言語グループ均等サンプリング: 各言語の総利用可能バッチ数で推定
+            # __iter__ は話者が使い切られても他の話者が残っていれば継続するため、
+            # 各言語の「全話者の合計利用可能サンプル数 / slots」で推定する
+            lang_batches_list = []
+            for lang_id, slots in self.lang_slots.items():
+                speakers_in_lang = self.lang_groups.get(lang_id, [])
+                if not speakers_in_lang or slots == 0:
+                    continue
+                total_usable = sum(
+                    (len(self.speaker_to_indices[s]) // self.samples_per_speaker)
+                    for s in speakers_in_lang
+                )
+                batches = total_usable // slots
+                lang_batches_list.append(batches)
+            if lang_batches_list:
+                total_batches = min(lang_batches_list)
                 return max(1, total_batches // self.world_size)
 
         # より正確な計算: 各話者から取れるバッチ数を計算

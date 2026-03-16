@@ -97,10 +97,11 @@ def main():
     )
     parser.add_argument(
         "--resume-from-multispeaker-checkpoint",
-        help="For single-speaker models only. Loads a multi-speaker checkpoint with strict=False "
-        "(emb_g is skipped), adds emb_g mean to emb_lang for conditioning correction, "
-        "and initializes emb_lang[1] (EN) from emb_lang[0] (JA). "
-        "Optimizer state is reset (training starts from epoch 0).",
+        help="For single-speaker fine-tuning. Loads a multi-speaker checkpoint with strict=False "
+        "(emb_g is skipped), adds emb_g mean to all emb_lang rows for conditioning correction, "
+        "and preserves original language embeddings. "
+        "Optimizer state is reset (training starts from epoch 0). "
+        "Automatically enables --freeze-dp.",
     )
     parser.add_argument(
         "--save-top-k",
@@ -297,15 +298,20 @@ def main():
     # Setup callbacks
     callbacks = []
     if args.checkpoint_epochs is not None:
+        checkpoint_dir = Path(args.default_root_dir) / "checkpoints"
         callbacks.append(
             ModelCheckpoint(
+                dirpath=str(checkpoint_dir),
                 every_n_epochs=args.checkpoint_epochs,
                 save_top_k=args.save_top_k,
                 save_last=True,
+                save_on_train_epoch_end=True,
             )
         )
         _LOGGER.debug(
-            "Checkpoints will be saved every %s epoch(s)", args.checkpoint_epochs
+            "Checkpoints will be saved every %s epoch(s) to %s",
+            args.checkpoint_epochs,
+            checkpoint_dir,
         )
 
     # EMA is enabled by default
@@ -398,8 +404,18 @@ def main():
     # 21話者バイリンガルモデル(gin_channels=512)では正常だが、80話者(768)でガビガビ音が発生
     # VitsModel.__init__のフォールバック(512)と一致させる
     # argparseは常にdefault値(0)をdict_argsに含めるため、"not in"ではなく値チェック
-    if num_speakers > 1 and dict_args.get("gin_channels", 0) == 0:
+    if (num_speakers > 1 or num_languages > 1) and dict_args.get("gin_channels", 0) == 0:
         dict_args["gin_channels"] = 512
+
+    # --resume-from-multispeaker-checkpoint 使用時は freeze_dp を自動有効化
+    # モデル作成前に設定しないと save_hyperparameters() に反映されず
+    # configure_optimizers() で freeze_dp=False のまま DP が凍結されない
+    if args.resume_from_multispeaker_checkpoint and not args.freeze_dp:
+        args.freeze_dp = True
+        dict_args["freeze_dp"] = True
+        _LOGGER.info(
+            "Auto-enabled --freeze-dp for multispeaker→single-speaker transfer"
+        )
 
     # num_workers自動調整機能を削除
     # ユーザー指定のnum_workersをそのまま使用する
@@ -450,11 +466,6 @@ def main():
         )
 
     if args.resume_from_multispeaker_checkpoint:
-        if not args.freeze_dp:
-            args.freeze_dp = True
-            _LOGGER.info(
-                "Auto-enabled --freeze-dp for multispeaker→single-speaker transfer"
-            )
         assert num_speakers == 1, (
             "--resume-from-multispeaker-checkpoint はシングルスピーカーモデル専用です。"
             "マルチスピーカーへの転移には --resume_from_single_speaker_checkpoint を使用してください。"
@@ -500,16 +511,15 @@ def main():
                 "emb_g not found in checkpoint or model has no emb_lang; skipping conditioning correction."
             )
 
-        # 3. emb_lang[1] (EN) は元の値 + emb_g_mean をそのまま保持する。
-        #    以前は emb_lang[0] (JA) でコピー上書きしていたが、これにより
-        #    凍結された Duration Predictor が EN conditioning を認識できず
-        #    英語の duration が崩壊する問題があった。
-        #    emb_g_mean 補正済みの元の EN embedding を保持することで、
-        #    DP が正しい EN duration パターンを予測できる。
+        # 3. All emb_lang rows are preserved with emb_g_mean correction.
+        #    Previously emb_lang[0] (JA) was copied to emb_lang[1] (EN), but this
+        #    caused the frozen Duration Predictor to lose EN conditioning, breaking
+        #    English duration prediction. Keeping original embeddings + correction
+        #    lets the DP predict correct duration patterns for all languages.
         if hasattr(model.model_g, "emb_lang") and model.model_g.n_languages > 1:
             _LOGGER.info(
-                "emb_lang[1] (EN) preserved with emb_g_mean correction "
-                "(not overwritten by JA) for correct EN duration prediction."
+                "All emb_lang rows preserved with emb_g_mean correction "
+                "for correct duration prediction across languages."
             )
 
         _LOGGER.info(
@@ -551,16 +561,20 @@ def main():
             # Setup callbacks
             callbacks = []
             if args.checkpoint_epochs is not None:
+                checkpoint_dir = Path(args.default_root_dir) / "checkpoints"
                 callbacks.append(
                     ModelCheckpoint(
+                        dirpath=str(checkpoint_dir),
                         every_n_epochs=args.checkpoint_epochs,
                         save_top_k=args.save_top_k,
                         save_last=True,
+                        save_on_train_epoch_end=True,
                     )
                 )
                 _LOGGER.debug(
-                    "Checkpoints will be saved every %s epoch(s)",
+                    "Checkpoints will be saved every %s epoch(s) to %s",
                     args.checkpoint_epochs,
+                    checkpoint_dir,
                 )
 
             # EMA is enabled by default

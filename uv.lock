@@ -577,6 +577,15 @@ wheels = [
 ]
 
 [[package]]
+name = "fastcore"
+version = "1.12.23"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/82/14/d51dfed2aeecffdc5f06f6f757e7a5b672acd762f048b038f6cd7313c95b/fastcore-1.12.23.tar.gz", hash = "sha256:7eeb0141e9cc0cc3c5d925a534ee1e50040a5d13569b5000690bb6e77330c909", size = 93267, upload-time = "2026-03-05T06:32:21.752Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/9e/f3/25c1bfe7d3825b2290e91be1ac4b467bd166634b65a11c800b7cdbda2ff4/fastcore-1.12.23-py3-none-any.whl", hash = "sha256:0a2b2ac424fde91871ac7ab5564eb478e2ae7b05ce7851636f924f0aa5a55cd7", size = 97463, upload-time = "2026-03-05T06:32:20.166Z" },
+]
+
+[[package]]
 name = "filelock"
 version = "3.18.0"
 source = { registry = "https://pypi.org/simple" }
@@ -739,6 +748,30 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/5f/22/2c7acbe6164ed6cfd4301e9ad2dbde69c68d22268a0f9b5b0ee6052ed3ab/g2p_en-2.1.0.tar.gz", hash = "sha256:32ecb119827a3b10ea8c1197276f4ea4f44070ae56cbbd01f0f261875f556a58", size = 3116166, upload-time = "2019-12-31T01:16:12.753Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/d7/d9/b77dc634a7a0c0c97716ba97dd0a28cbfa6267c96f359c4f27ed71cbd284/g2p_en-2.1.0-py3-none-any.whl", hash = "sha256:2a7aabf1fc7f270fcc3349881407988c9245173c2413debbe5432f4a4f31319f", size = 3117464, upload-time = "2019-12-31T01:16:03.286Z" },
+]
+
+[[package]]
+name = "g2pk2"
+version = "0.0.3"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "jamo" },
+    { name = "nltk" },
+]
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/53/52/6b77a9c3e4ea32dfb53238422dabf4fa977681d2bf4087bff53c084ab7c5/g2pk2-0.0.3-py3-none-any.whl", hash = "sha256:e708316125248c10432cbead85cf52dd9ed252c423cce531f9df617386978cf2", size = 25716, upload-time = "2023-08-18T17:05:33.705Z" },
+]
+
+[[package]]
+name = "ghapi"
+version = "1.0.13"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "fastcore" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/62/09/1b88f97e8599cda096d42dac830bb2e28ddf202d71843f61bda52bbe99ce/ghapi-1.0.13.tar.gz", hash = "sha256:fb46f5e101efa33bd12a0ae7694de761eec5be1de90f48847699f1e00128f928", size = 72914, upload-time = "2026-02-28T02:21:01.892Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/67/ac/e1960ec21cfd5a0fd9b329822c04d0b5f91abb688c3b1acd7e8ff3390432/ghapi-1.0.13-py3-none-any.whl", hash = "sha256:49d7e336e5664e4d4f92b1d442dfe80f31ecccbee4370bd1d271bd63a1ccf18e", size = 71409, upload-time = "2026-02-28T02:21:00.457Z" },
 ]
 
 [[package]]
@@ -920,6 +953,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/87/f9/c1eb8635a24e87ade2efce21e3ce8cd6b8630bb685ddc9cdaca1349b2eb5/isort-5.13.2.tar.gz", hash = "sha256:48fdfcb9face5d58a4f6dde2e72a1fb8dcaf8ab26f95ab49fab84c2ddefb0109", size = 175303, upload-time = "2023-12-13T20:37:26.124Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/d1/b3/8def84f539e7d2289a02f0524b944b15d7c75dab7628bedf1c4f0992029c/isort-5.13.2-py3-none-any.whl", hash = "sha256:8ca5e72a8d85860d5a3fa69b8745237f2939afe12dbf656afbcb47fe72d947a6", size = 92310, upload-time = "2023-12-13T20:37:23.244Z" },
+]
+
+[[package]]
+name = "jamo"
+version = "0.4.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/b1/a2/bda770579809726e929ca6356743f9f50f64a2cbaee578fa9d4824afb00e/jamo-0.4.1.tar.gz", hash = "sha256:ea65cf9d35338d0e0af48d75ff426d8a369b0ebde6f07051c3ac37256f56d025", size = 7386, upload-time = "2017-11-06T19:28:51.729Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/ac/cc/49812faae67f9a24be6ddaf58a2cf7e8c3cbfcf5b762d9414f7103d2ea2c/jamo-0.4.1-py3-none-any.whl", hash = "sha256:d4b94fd23324c606ed2fbc4037c603e2c3a7ae9390c05d3473aea1ccb6b1c3fb", size = 9543, upload-time = "2017-11-06T19:28:49.624Z" },
 ]
 
 [[package]]
@@ -1809,6 +1851,7 @@ source = { editable = "." }
 dependencies = [
     { name = "cython" },
     { name = "g2p-en" },
+    { name = "ghapi" },
     { name = "huggingface-hub" },
     { name = "librosa" },
     { name = "numpy" },
@@ -1842,6 +1885,10 @@ dev = [
     { name = "types-pyyaml" },
     { name = "types-requests" },
 ]
+multilingual = [
+    { name = "g2pk2" },
+    { name = "pypinyin" },
+]
 preprocess = [
     { name = "piper-phonemize" },
 ]
@@ -1872,6 +1919,8 @@ requires-dist = [
     { name = "cython", specifier = ">=3.0" },
     { name = "flake8", marker = "extra == 'dev'", specifier = "==6.1.0" },
     { name = "g2p-en", specifier = ">=2.1.0" },
+    { name = "g2pk2", marker = "extra == 'multilingual'", specifier = ">=0.0.3" },
+    { name = "ghapi", specifier = ">=1.0.13" },
     { name = "huggingface-hub", specifier = ">=0.30.0,<1.0" },
     { name = "librosa", specifier = ">=0.10" },
     { name = "mypy", marker = "extra == 'dev'", specifier = "==1.7.1" },
@@ -1883,6 +1932,7 @@ requires-dist = [
     { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=3.0.0" },
     { name = "pylint", marker = "extra == 'dev'", specifier = "==3.0.2" },
     { name = "pyopenjtalk-plus", specifier = ">=0.4" },
+    { name = "pypinyin", marker = "extra == 'multilingual'", specifier = ">=0.50" },
     { name = "pytest", marker = "extra == 'dev'", specifier = "==7.4.3" },
     { name = "pytest", marker = "extra == 'test'", specifier = "==7.4.3" },
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = "==4.1.0" },
@@ -1908,7 +1958,7 @@ requires-dist = [
     { name = "types-requests", marker = "extra == 'test'", specifier = "==2.31.0" },
     { name = "wandb", specifier = ">=0.19" },
 ]
-provides-extras = ["preprocess", "dev", "test"]
+provides-extras = ["preprocess", "multilingual", "dev", "test"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -2271,6 +2321,15 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/28/da/6b2a36f3eb486cb67e285078a239ad07934d7c3dda855bec6e4bdfb46cf4/pyopenjtalk_plus-0.4.1.post7-cp314-cp314-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:b2f1ed0a103c5888231ac93d81f8ecdb9f911c1e95b25e426ce532f1e9dcb093", size = 30732644, upload-time = "2025-11-18T20:06:22.561Z" },
     { url = "https://files.pythonhosted.org/packages/02/a4/4f55520f62cc781a4ac01b887f18e51969c59ac3aad2982d7658b752f818/pyopenjtalk_plus-0.4.1.post7-cp314-cp314-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:1136e6515a1ceea0be4919642053c63cf0bae48c3521fc6a6ca0c120474faed0", size = 30806892, upload-time = "2025-11-18T20:06:24.99Z" },
     { url = "https://files.pythonhosted.org/packages/9e/b4/606d1340435f91c9f79a4e1124fec7da78857e87a25d0fda8e47385c15b8/pyopenjtalk_plus-0.4.1.post7-cp314-cp314-win_amd64.whl", hash = "sha256:5789aa2aee8da2f9a0786c2950b131e45be2ab3c99994071a481cce14e5ddab6", size = 25456622, upload-time = "2025-11-18T20:06:27.377Z" },
+]
+
+[[package]]
+name = "pypinyin"
+version = "0.55.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/b4/a4/784cf98c09e0dc22776b0d7d8a4a5b761218bcae4608c2416ce1e167c8af/pypinyin-0.55.0.tar.gz", hash = "sha256:b5711b3a0c6f76e67408ec6b2e3c4987a3a806b7c528076e7c7b86fcf0eaa66b", size = 839836, upload-time = "2025-07-20T12:01:50.657Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b9/7b/4cabc76fcc21c3c7d5c671d8783984d30ac9d3bb387c4ba784fca3cdfa3a/pypinyin-0.55.0-py2.py3-none-any.whl", hash = "sha256:d53b1e8ad2cdb815fb2cb604ed3123372f5a28c6f447571244aca36fc62a286f", size = 840203, upload-time = "2025-07-20T12:01:48.535Z" },
 ]
 
 [[package]]
