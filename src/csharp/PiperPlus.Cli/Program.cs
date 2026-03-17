@@ -216,20 +216,21 @@ internal static class Program
             name: "--test-mode",
             description: "Skip ONNX inference (CI testing)");
 
-        // --list-models (Phase 4 placeholder)
+        // --list-models [LANG]
         var listModelsOption = new Option<string?>(
             name: "--list-models",
-            description: "List available models (not yet implemented)");
+            description: "List available models (optionally filter by language code)")
+        { Arity = ArgumentArity.ZeroOrOne };
 
-        // --download-model (Phase 4 placeholder)
+        // --download-model NAME
         var downloadModelOption = new Option<string?>(
             name: "--download-model",
-            description: "Download a model (not yet implemented)");
+            description: "Download a model by name");
 
-        // --model-dir (Phase 4 placeholder)
+        // --model-dir DIR
         var modelDirOption = new Option<DirectoryInfo?>(
             name: "--model-dir",
-            description: "Model directory");
+            description: "Model download directory");
 
         var rootCommand = new RootCommand("Piper Plus TTS — C# CLI")
         {
@@ -288,21 +289,30 @@ internal static class Program
                 bool quiet = result.GetValueForOption(quietOption);
 
                 // ============================================================
-                // Phase 4 placeholders: --list-models / --download-model
+                // --list-models / --download-model (early return, no model needed)
                 // ============================================================
-                string? listModels = result.GetValueForOption(listModelsOption);
-                if (listModels is not null)
+                if (result.FindResultFor(listModelsOption) is not null)
                 {
-                    LogError("--list-models is not yet implemented. Coming in Phase 4.");
-                    ctx.ExitCode = 1;
+                    string? listModelsLang = result.GetValueForOption(listModelsOption);
+                    ModelManager.ListModels(string.IsNullOrEmpty(listModelsLang) ? null : listModelsLang);
+                    ctx.ExitCode = 0;
                     return;
                 }
 
-                string? downloadModel = result.GetValueForOption(downloadModelOption);
-                if (downloadModel is not null)
+                string? downloadModelName = result.GetValueForOption(downloadModelOption);
+                if (!string.IsNullOrEmpty(downloadModelName))
                 {
-                    LogError("--download-model is not yet implemented. Coming in Phase 4.");
-                    ctx.ExitCode = 1;
+                    var dlModelDir = result.GetValueForOption(modelDirOption);
+                    string targetDir = dlModelDir?.FullName
+                        ?? Environment.GetEnvironmentVariable("PIPER_MODEL_DIR")
+                        ?? ModelManager.GetDefaultModelDir();
+
+                    LogInfo(quiet, $"Downloading model '{downloadModelName}' to {targetDir}...");
+
+                    bool success = ModelManager.DownloadModelAsync(
+                        downloadModelName, targetDir, CancellationToken.None).GetAwaiter().GetResult();
+
+                    ctx.ExitCode = success ? 0 : 1;
                     return;
                 }
 

@@ -1,0 +1,156 @@
+using System.Text.Json;
+
+namespace PiperPlus.Core.Config;
+
+/// <summary>
+/// Provides access to the piper-plus voice catalog.
+/// Mirrors the C++ <c>loadVoiceCatalog()</c> function in <c>model_manager.cpp</c>.
+/// </summary>
+public static class VoiceCatalog
+{
+    // -------------------------------------------------------------------
+    // Built-in catalog (object initializers — no JSON parsing at runtime)
+    // -------------------------------------------------------------------
+
+    private static readonly VoiceInfo[] BuiltInVoices =
+    [
+        new VoiceInfo(
+            Key: "ja_JP-tsukuyomi-chan-medium",
+            Name: "tsukuyomi-chan",
+            LanguageCode: "ja_JP",
+            LanguageFamily: "ja",
+            LanguageNameNative: "日本語",
+            LanguageNameEnglish: "Japanese",
+            Quality: "medium",
+            NumSpeakers: 1,
+            Source: "piper-plus",
+            RepoId: "ayousanz/piper-plus-tsukuyomi-chan",
+            Files:
+            [
+                new VoiceFileInfo("tsukuyomi-wavlm-300epoch.onnx", 77594624, ""),
+                new VoiceFileInfo("config.json", 3072, ""),
+            ],
+            Aliases: ["tsukuyomi", "tsukuyomi-chan", "ja-tsukuyomi"],
+            Description: "Tsukuyomi-chan Japanese TTS model trained with WavLM discriminator (300 epochs)"),
+
+        new VoiceInfo(
+            Key: "ja_JP-moe-speech-20speakers-medium",
+            Name: "moe-speech-20speakers",
+            LanguageCode: "ja_JP",
+            LanguageFamily: "ja",
+            LanguageNameNative: "日本語",
+            LanguageNameEnglish: "Japanese",
+            Quality: "medium",
+            NumSpeakers: 20,
+            Source: "piper-plus",
+            RepoId: "ayousanz/piper-plus-base",
+            Files:
+            [
+                new VoiceFileInfo("moe-speech-20speakers-v2.onnx", 77594624, ""),
+                new VoiceFileInfo("config.json", 4096, ""),
+            ],
+            Aliases: ["moe-speech", "moe-20speakers", "ja-base", "ja-20speakers"],
+            Description: "Japanese multi-speaker base model (20 speakers) with VITS + Prosody features"),
+    ];
+
+    /// <summary>
+    /// Returns the embedded piper-plus catalog (no I/O).
+    /// </summary>
+    public static IReadOnlyList<VoiceInfo> LoadBuiltInCatalog()
+        => BuiltInVoices;
+
+    /// <summary>
+    /// Loads a voice catalog from an external <c>voices.json</c> file.
+    /// The JSON format matches the C++ upstream catalog: a dictionary keyed by voice key.
+    /// </summary>
+    /// <exception cref="FileNotFoundException">Thrown when <paramref name="path"/> does not exist.</exception>
+    /// <exception cref="InvalidOperationException">Thrown when deserialization fails.</exception>
+    public static IReadOnlyList<VoiceInfo> LoadFromFile(string path)
+    {
+        if (!File.Exists(path))
+        {
+            throw new FileNotFoundException(
+                $"Voices catalog file not found: {path}", path);
+        }
+
+        using var stream = File.OpenRead(path);
+        var dict = JsonSerializer.Deserialize(
+            stream,
+            VoiceCatalogJsonContext.Default.DictionaryStringVoiceJsonEntry);
+
+        if (dict is null)
+        {
+            throw new InvalidOperationException(
+                $"Failed to deserialize voice catalog from: {path}");
+        }
+
+        var result = new List<VoiceInfo>(dict.Count);
+        foreach (var (key, entry) in dict)
+        {
+            result.Add(VoiceJsonConverter.ToVoiceInfo(key, entry));
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Returns the built-in catalog merged with an optional external <c>voices.json</c>.
+    /// Built-in entries take precedence when keys collide (same semantics as the C++ implementation).
+    /// The result is sorted by language code, then by key.
+    /// </summary>
+    public static IReadOnlyList<VoiceInfo> LoadMergedCatalog(string? externalVoicesJsonPath = null)
+    {
+        var builtIn = LoadBuiltInCatalog();
+
+        if (string.IsNullOrEmpty(externalVoicesJsonPath) || !File.Exists(externalVoicesJsonPath))
+        {
+            // Nothing to merge — return built-in sorted
+            return SortCatalog(builtIn);
+        }
+
+        IReadOnlyList<VoiceInfo> external;
+        try
+        {
+            external = LoadFromFile(externalVoicesJsonPath);
+        }
+        catch
+        {
+            // If external file is unreadable, fall back to built-in only
+            return SortCatalog(builtIn);
+        }
+
+        // Merge: built-in keys win
+        var merged = new Dictionary<string, VoiceInfo>(
+            builtIn.Count + external.Count, StringComparer.Ordinal);
+
+        foreach (var voice in builtIn)
+        {
+            merged[voice.Key] = voice;
+        }
+
+        foreach (var voice in external)
+        {
+            merged.TryAdd(voice.Key, voice);
+        }
+
+        return SortCatalog(merged.Values);
+    }
+
+    // -------------------------------------------------------------------
+    // Helpers
+    // -------------------------------------------------------------------
+
+    /// <summary>
+    /// Sorts voices by language code, then by key (same order as C++ loadVoiceCatalog).
+    /// </summary>
+    private static IReadOnlyList<VoiceInfo> SortCatalog(IEnumerable<VoiceInfo> voices)
+    {
+        var list = voices.ToList();
+        list.Sort((a, b) =>
+        {
+            int cmp = string.Compare(a.LanguageCode, b.LanguageCode, StringComparison.Ordinal);
+            return cmp != 0 ? cmp : string.Compare(a.Key, b.Key, StringComparison.Ordinal);
+        });
+        return list;
+    }
+}
