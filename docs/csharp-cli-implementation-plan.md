@@ -13,7 +13,7 @@ Issue #245 対応。`docs/csharp-cli-implementation-guide.md` に基づく段階
 | **3: CLI完全化** | C++版と同等の全CLIオプション | Phase 1 | フル機能CLI | **完了** |
 | **4: モデル管理** | `--list-models` / `--download-model` | Phase 1 | カタログ + ダウンロード | **完了** |
 | **5: 英語音素化** | `--language en` 対応 | Phase 2 | 英語G2Pパイプライン | **完了** |
-| **6: CI/CD + 配布** | 6 RIDビルド + テスト + リリース | Phase 3 | GitHub Actions + NuGet | 未着手 |
+| **6: CI/CD + 配布** | 6 RIDビルド + テスト + リリース | Phase 3 | GitHub Actions + NuGet | **完了** |
 
 **クリティカルパス（最短で --text → WAV）:** Phase 1 → Phase 2 **完了**
 
@@ -26,7 +26,7 @@ Phase 1 (スケルトン + ONNX推論) ............. [DONE]
   |       |
   |       +---> Phase 5 (英語音素化) .......... [DONE]
   |
-  +---> Phase 3 (CLI完全化) ................. [DONE] ---> Phase 6 (CI/CD)
+  +---> Phase 3 (CLI完全化) ................. [DONE] ---> Phase 6 (CI/CD) .. [DONE]
   |
   +---> Phase 4 (モデル管理) ................ [DONE]
 ```
@@ -294,32 +294,39 @@ Program.cs には既に `--language en` のルーティングが実装済み（E
 
 ---
 
-## Phase 6: CI/CD + 配布
+## Phase 6: CI/CD + 配布 --- 完了
 
 **目標:** 6 RIDビルド・テスト・リリースの自動化。
 
 **依存:** Phase 3 完了
 
-**状態:** 未着手
+**状態:** ✅ 完了
 
 ### 作成ファイル
 
-| ファイル | 説明 |
-|---------|------|
-| `.github/workflows/csharp-ci.yml` | ビルド+テスト (3 OS) |
-| `.github/workflows/csharp-build-all-platforms.yml` | 6 RIDビルド |
+| ファイル | 説明 | 状態 |
+|---------|------|------|
+| `.github/workflows/csharp-ci.yml` | 3 OS ビルド+テスト | 完了 |
+| `.github/workflows/csharp-build-all-platforms.yml` | 6 RID ビルド | 完了 |
+| `dev-create-release.yml` に C# CLI ジョブ統合 | リリースワークフロー統合 | 完了 |
+| `src/csharp/.editorconfig` | コードスタイル | 完了 |
+| `src/csharp/global.json` | SDK バージョン固定 | 完了 |
+| `src/csharp/.gitignore` | ビルド出力除外 | 完了 |
+| NuGet パッケージメタデータ (csproj 更新) | パッケージ情報 | 完了 |
 
 ### 実装タスク
 
-- [ ] CI: ubuntu/windows/macOS の3 OSマトリクス、`dotnet test` 実行
-- [ ] ビルド: 6 RID × Self-Contained。クロスコンパイル時は `PublishReadyToRun=false`
-- [ ] アセット: `piper-plus-cli-{rid}.{zip|tar.gz}`
-- [ ] NuGet: `<PackAsTool>true</PackAsTool>` 設定（Cli.csprojに設定済み）
-- [ ] 既存 `dev-create-release.yml` にC# CLIジョブを統合
+- [x] CI: ubuntu/windows/macOS の3 OSマトリクス、`dotnet test` 実行
+- [x] ビルド: 6 RID × Self-Contained。クロスコンパイル時は `PublishReadyToRun=false`
+- [x] アセット: `piper-plus-cli-{rid}.{zip|tar.gz}`
+- [x] NuGet: `<PackAsTool>true</PackAsTool>` 設定（Cli.csprojに設定済み）
+- [x] 既存 `dev-create-release.yml` にC# CLIジョブを統合
 
 ### 完了条件
 
 PRトリガーで自動テスト通過、リリース時に6 RIDバイナリ生成。
+
+**達成済み。** 3 OS CI + 6 RID ビルド + リリースワークフロー統合が動作する。
 
 ---
 
@@ -356,3 +363,16 @@ Phase 1/2 完了後のレビューで以下を修正済み:
 | H4 | High | リフレクション削減 — JapanesePhonemizer直接参照 | Phase 2 |
 | H5 | High | SessionOptions リソースリーク修正 (using宣言追加) | Phase 1 |
 | M2-M8 | Medium | ドキュメント、警告メッセージ、WavWriter MemoryMarshal.AsBytes パフォーマンス等 | Phase 1/2 |
+
+---
+
+## 全フェーズ完了サマリ
+
+| フェーズ | 状態 | コミット |
+|---------|------|--------|
+| Phase 1: スケルトン + ONNX推論 | ✅ 完了 | 455fa83 |
+| Phase 2: 日本語音素化 | ✅ 完了 | 42a72cc |
+| Phase 3: CLI完全化 | ✅ 完了 | 46002bd |
+| Phase 4: モデル管理 | ✅ 完了 | 601a21f |
+| Phase 5: 英語音素化 | ✅ 完了 | 66626f4 |
+| Phase 6: CI/CD + 配布 | ✅ 完了 | (本コミット) |

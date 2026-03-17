@@ -1,0 +1,46 @@
+name: "C# CI"
+
+on:
+  pull_request:
+    branches: [dev]
+    paths:
+      - 'src/csharp/**'
+      - '.github/workflows/csharp-ci.yml'
+  push:
+    branches: [dev]
+    paths:
+      - 'src/csharp/**'
+      - '.github/workflows/csharp-ci.yml'
+
+jobs:
+  build-and-test:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, windows-latest, macos-14]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore src/csharp/PiperPlus.sln
+
+      - name: Build
+        run: dotnet build src/csharp/PiperPlus.sln -c Release --no-restore
+
+      - name: Test
+        run: dotnet test src/csharp/PiperPlus.sln -c Release --no-build --logger "trx;LogFileName=test-results.xml"
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results-${{ matrix.os }}
+          path: '**/TestResults/test-results.xml'

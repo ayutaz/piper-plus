@@ -239,11 +239,89 @@ jobs:
             echo "⚠️ PyPI token not found or no wheels to upload, skipping"
           fi
 
+  # C# CLI builds
+  csharp-cli:
+    name: Build C# CLI (${{ matrix.rid }})
+    needs: create_release
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - rid: win-x64
+            os: windows-2022
+            archive_ext: zip
+            cross: false
+          - rid: win-arm64
+            os: windows-2022
+            archive_ext: zip
+            cross: true
+          - rid: linux-x64
+            os: ubuntu-22.04
+            archive_ext: tar.gz
+            cross: false
+          - rid: linux-arm64
+            os: ubuntu-22.04
+            archive_ext: tar.gz
+            cross: true
+          - rid: osx-x64
+            os: macos-14
+            archive_ext: tar.gz
+            cross: true
+          - rid: osx-arm64
+            os: macos-14
+            archive_ext: tar.gz
+            cross: false
+    steps:
+      - uses: actions/checkout@v4.2.2
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Publish C# CLI
+        shell: bash
+        run: |
+          PUBLISH_ARGS="-c Release -r ${{ matrix.rid }} --self-contained true"
+          PUBLISH_ARGS="$PUBLISH_ARGS -p:PublishSingleFile=true -p:PublishTrimmed=true"
+          PUBLISH_ARGS="$PUBLISH_ARGS -p:Version=${{ github.event.inputs.version }}"
+
+          if [ "${{ matrix.cross }}" = "true" ]; then
+            PUBLISH_ARGS="$PUBLISH_ARGS -p:PublishReadyToRun=false"
+          else
+            PUBLISH_ARGS="$PUBLISH_ARGS -p:PublishReadyToRun=true"
+          fi
+
+          dotnet publish src/csharp/PiperPlus.Cli/PiperPlus.Cli.csproj $PUBLISH_ARGS -o publish/
+
+      - name: Create archive (tar.gz)
+        if: matrix.archive_ext == 'tar.gz'
+        run: |
+          cd publish
+          tar -czf ../piper-plus-cli-${{ matrix.rid }}.tar.gz *
+
+      - name: Create archive (zip)
+        if: matrix.archive_ext == 'zip'
+        shell: pwsh
+        run: |
+          Compress-Archive -Path publish/* -DestinationPath piper-plus-cli-${{ matrix.rid }}.zip
+
+      - name: Upload Release Asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create_release.outputs.upload_url }}
+          asset_path: piper-plus-cli-${{ matrix.rid }}.${{ matrix.archive_ext }}
+          asset_name: piper-plus-cli-${{ matrix.rid }}.${{ matrix.archive_ext }}
+          asset_content_type: ${{ matrix.archive_ext == 'zip' && 'application/zip' || 'application/gzip' }}
+
   # Final summary
   release_summary:
     name: Release Summary
     runs-on: ubuntu-latest
-    needs: [create_release, build_all, publish_pypi]
+    needs: [create_release, build_all, publish_pypi, csharp-cli]
     if: always()
     steps:
       - name: Summary
@@ -257,8 +335,9 @@ jobs:
           echo "- Create Release: ${{ needs.create_release.result }}"
           echo "- Build All: ${{ needs.build_all.result }}"
           echo "- Publish PyPI: ${{ needs.publish_pypi.result }}"
+          echo "- C# CLI: ${{ needs.csharp-cli.result }}"
           echo ""
-          
+
           if [ "${{ needs.build_all.result }}" = "success" ]; then
             echo "✅ All platforms built successfully"
           else
