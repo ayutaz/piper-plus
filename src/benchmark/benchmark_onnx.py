@@ -39,7 +39,7 @@ def main() -> None:
 
     session_options = onnxruntime.SessionOptions()
     session_options.graph_optimization_level = (
-        onnxruntime.GraphOptimizationLevel.ORT_DISABLE_ALL
+        onnxruntime.GraphOptimizationLevel.ORT_ENABLE_ALL
     )
     # session_options.enable_cpu_mem_arena = False
     # session_options.enable_mem_pattern = False

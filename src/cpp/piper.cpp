@@ -425,13 +425,10 @@ void loadModel(std::string modelPath, ModelSession &session, bool useCuda, int g
   //     GraphOptimizationLevel::ORT_ENABLE_EXTENDED);
 
   session.options.SetGraphOptimizationLevel(
-      GraphOptimizationLevel::ORT_DISABLE_ALL);
+      GraphOptimizationLevel::ORT_ENABLE_ALL);
 
   // Slows down performance very slightly
   // session.options.SetExecutionMode(ExecutionMode::ORT_PARALLEL);
-
-  session.options.DisableCpuMemArena();
-  session.options.DisableMemPattern();
   session.options.DisableProfiling();
 
   auto startTime = std::chrono::steady_clock::now();
