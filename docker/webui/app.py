@@ -97,14 +97,17 @@ def synthesize(
 
     sample_rate = config.get("audio", {}).get("sample_rate", 22050)
 
+    language_id_map = config.get("language_id_map", {})
+
     phoneme_ids, prosody_features_data = text_to_phoneme_ids_and_prosody(
-        text, phoneme_id_map, language=language
+        text, phoneme_id_map, language=language, language_id_map=language_id_map
     )
 
     session = _get_session(model_path)
     input_names = [inp.name for inp in session.get_inputs()]
     has_prosody = "prosody_features" in input_names
     has_sid = "sid" in input_names
+    has_lid = "lid" in input_names
 
     text_array = np.expand_dims(np.array(phoneme_ids, dtype=np.int64), 0)
     text_lengths = np.array([text_array.shape[1]], dtype=np.int64)
@@ -118,6 +121,10 @@ def synthesize(
 
     if has_sid:
         inputs["sid"] = np.array([int(speaker_id)], dtype=np.int64)
+
+    if has_lid:
+        language_id = language_id_map.get(language, 0)
+        inputs["lid"] = np.array([language_id], dtype=np.int64)
 
     if has_prosody and prosody_features_data:
         prosody_array = []
@@ -158,7 +165,7 @@ def create_ui(model_dir: str, output_dir: str):
                     value=model_choices[0] if models else None,
                 )
                 language = gr.Radio(
-                    choices=["ja", "en"],
+                    choices=["ja", "en", "zh", "es", "fr", "pt"],
                     label="Language",
                     value="ja",
                 )

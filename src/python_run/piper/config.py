@@ -40,6 +40,12 @@ class PiperConfig:
     phoneme_type: PhonemeType
     """espeak or text"""
 
+    num_languages: int = 1
+    """Number of languages"""
+
+    language_id_map: Mapping[str, int] | None = None
+    """Language code -> language id (e.g. {"ja": 0, "en": 1})"""
+
     @staticmethod
     def from_dict(config: dict[str, Any]) -> "PiperConfig":
         inference = config.get("inference", {})
@@ -54,4 +60,6 @@ class PiperConfig:
             espeak_voice=config.get("espeak", {}).get("voice", ""),
             phoneme_id_map=config["phoneme_id_map"],
             phoneme_type=PhonemeType(config.get("phoneme_type", PhonemeType.ESPEAK)),
+            num_languages=config.get("num_languages", 1),
+            language_id_map=config.get("language_id_map"),
         )

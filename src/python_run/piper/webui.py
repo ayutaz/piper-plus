@@ -272,6 +272,7 @@ def synthesize_speech(
     length_scale: float,
     noise_scale: float,
     noise_w: float,
+    language_code: str = "auto",
 ) -> tuple[int, np.ndarray]:
     """Generate speech from text"""
     if not text.strip():
@@ -298,6 +299,18 @@ def synthesize_speech(
 
         voice = _get_voice(model_path)
 
+        # Resolve language_code -> numeric language_id
+        language_id: int | None = None
+        if language_code and language_code != "auto":
+            if voice.config.language_id_map:
+                language_id = voice.config.language_id_map.get(language_code)
+                if language_id is None:
+                    logger.warning(
+                        "Language '%s' not found in model's language_id_map; "
+                        "falling back to model default",
+                        language_code,
+                    )
+
         # Create in-memory WAV file
         wav_buffer = io.BytesIO()
 
@@ -314,6 +327,7 @@ def synthesize_speech(
                 length_scale=length_scale,
                 noise_scale=noise_scale,
                 noise_w=noise_w,
+                language_id=language_id,
             )
 
         # Read audio data from buffer
@@ -550,6 +564,21 @@ def create_interface(data_dir: Path) -> gr.Blocks:
                                 maximum=99,
                             )
 
+                            language_selector = gr.Dropdown(
+                                choices=[
+                                    ("Auto (model default)", "auto"),
+                                    ("Japanese (ja)", "ja"),
+                                    ("English (en)", "en"),
+                                    ("Chinese (zh)", "zh"),
+                                    ("Spanish (es)", "es"),
+                                    ("French (fr)", "fr"),
+                                    ("Portuguese (pt)", "pt"),
+                                ],
+                                label="Language",
+                                value="auto",
+                                info="Select output language for multilingual models",
+                            )
+
                             length_scale = gr.Slider(
                                 label="Speed (Length Scale)",
                                 minimum=0.5,
@@ -618,6 +647,7 @@ def create_interface(data_dir: Path) -> gr.Blocks:
                             1.0,
                             0.667,
                             0.8,
+                            "en",
                         ],
                         [
                             "The quick brown fox jumps over the lazy dog.",
@@ -626,6 +656,7 @@ def create_interface(data_dir: Path) -> gr.Blocks:
                             0.8,
                             0.5,
                             0.8,
+                            "en",
                         ],
                         [
                             "Good morning! Today's weather is perfect for a walk in the park.",
@@ -634,6 +665,7 @@ def create_interface(data_dir: Path) -> gr.Blocks:
                             1.0,
                             0.667,
                             0.8,
+                            "en",
                         ],
                         [
                             "Artificial intelligence is transforming how we interact with technology.",
@@ -642,6 +674,7 @@ def create_interface(data_dir: Path) -> gr.Blocks:
                             0.9,
                             0.7,
                             0.8,
+                            "en",
                         ],
                         [
                             "Testing speech synthesis with numbers: 1, 2, 3, 4, 5.",
@@ -650,6 +683,7 @@ def create_interface(data_dir: Path) -> gr.Blocks:
                             1.0,
                             0.667,
                             0.8,
+                            "en",
                         ],
                         # Japanese examples with Japanese model
                         [
@@ -659,6 +693,7 @@ def create_interface(data_dir: Path) -> gr.Blocks:
                             1.0,
                             0.667,
                             0.8,
+                            "ja",
                         ],
                         [
                             "人工知能による音声合成のデモンストレーションです。",
@@ -667,6 +702,7 @@ def create_interface(data_dir: Path) -> gr.Blocks:
                             1.0,
                             0.667,
                             0.8,
+                            "ja",
                         ],
                         [
                             "明日の会議は午後3時から始まります。よろしくお願いします。",
@@ -675,6 +711,7 @@ def create_interface(data_dir: Path) -> gr.Blocks:
                             0.9,
                             0.667,
                             0.8,
+                            "ja",
                         ],
                         [
                             "春の桜は本当に美しいです。日本の四季は素晴らしいですね。",
@@ -683,6 +720,7 @@ def create_interface(data_dir: Path) -> gr.Blocks:
                             1.1,
                             0.7,
                             0.8,
+                            "ja",
                         ],
                         [
                             "2024年の技術トレンドについて説明します。",
@@ -691,6 +729,7 @@ def create_interface(data_dir: Path) -> gr.Blocks:
                             1.0,
                             0.667,
                             0.8,
+                            "ja",
                         ],
                     ],
                     inputs=[
@@ -700,6 +739,7 @@ def create_interface(data_dir: Path) -> gr.Blocks:
                         length_scale,
                         noise_scale,
                         noise_w,
+                        language_selector,
                     ],
                     label="Example Texts (English & Japanese)",
                 )
@@ -868,6 +908,7 @@ def create_interface(data_dir: Path) -> gr.Blocks:
                 length_scale,
                 noise_scale,
                 noise_w,
+                language_selector,
             ],
             outputs=audio_output,
         )

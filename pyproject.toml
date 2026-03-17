@@ -217,6 +217,8 @@ inline-quotes = "double"
 "src/python_run/*" = ["PLC0415"]
 # Docker test scripts: テスト関数内での条件付きインポートを許可
 "docker/**/test.py" = ["PLC0415"]
+# HuggingFace Spaces app: オプショナルな多言語依存の条件付きインポート
+"huggingface-space/*.py" = ["PLC0415"]
 # __main__.py: torch.serialization.add_safe_globals() がimport前に必要
 "src/python/piper_train/__main__.py" = ["E402"]
 # export_onnx.py: 同上

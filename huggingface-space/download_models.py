@@ -78,6 +78,15 @@ def create_dummy_config(output_path: Path, language: str = "multilingual"):
         "num_symbols": 10,
         "num_speakers": 1,
         "speaker_id_map": {},
+        "language_id_map": {
+            "ja": 0,
+            "en": 1,
+            "zh": 2,
+            "es": 3,
+            "fr": 4,
+            "pt": 5,
+        },
+        "num_languages": 6,
     }
 
     with open(output_path, "w", encoding="utf-8") as f:

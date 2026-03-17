@@ -46,6 +46,26 @@ MODELS = {
         "config": "models/multilingual-test-medium.onnx.json",
         "language": "en",
     },
+    "Multilingual (Chinese)": {
+        "path": "models/multilingual-test-medium.onnx",
+        "config": "models/multilingual-test-medium.onnx.json",
+        "language": "zh",
+    },
+    "Multilingual (Spanish)": {
+        "path": "models/multilingual-test-medium.onnx",
+        "config": "models/multilingual-test-medium.onnx.json",
+        "language": "es",
+    },
+    "Multilingual (French)": {
+        "path": "models/multilingual-test-medium.onnx",
+        "config": "models/multilingual-test-medium.onnx.json",
+        "language": "fr",
+    },
+    "Multilingual (Portuguese)": {
+        "path": "models/multilingual-test-medium.onnx",
+        "config": "models/multilingual-test-medium.onnx.json",
+        "language": "pt",
+    },
 }
 
 # Basic English word to IPA mapping for common words
@@ -194,34 +214,109 @@ def text_to_phonemes(text: str, language: str) -> list[str]:
             # Simple fallback - just use dummy phonemes
             phonemes = ["^"] + list("aiueo") * 5 + ["$"]
 
-    elif ESPEAK_AVAILABLE:  # English
-        phonemizer = Phonemizer("en-us")
-        phoneme_str = phonemizer.phonemize(text)
-        # Convert phoneme string to list
-        phonemes = ["^"] + list(phoneme_str.replace(" ", "")) + ["$"]
+    elif language == "en":
+        if ESPEAK_AVAILABLE:
+            phonemizer = Phonemizer("en-us")
+            phoneme_str = phonemizer.phonemize(text)
+            # Convert phoneme string to list
+            phonemes = ["^"] + list(phoneme_str.replace(" ", "")) + ["$"]
+        else:
+            logger.warning("espeak_phonemizer not available, using IPA fallback")
+            # IPA-based fallback for better English pronunciation
+            words = text.lower().split()
+            phonemes = ["^"]
+
+            for i, word in enumerate(words):
+                # Add space between words
+                if i > 0:
+                    phonemes.append(" ")
+
+                # Remove punctuation from word
+                clean_word = "".join(c for c in word if c.isalpha())
+
+                if clean_word in ENGLISH_IPA_MAP:
+                    # Use IPA mapping if available
+                    ipa = ENGLISH_IPA_MAP[clean_word]
+                    phonemes.extend(list(ipa))
+                else:
+                    # Fall back to character-by-character for unknown words
+                    phonemes.extend(list(clean_word))
+
+            phonemes.append("$")
+
     else:
-        logger.warning("espeak_phonemizer not available, using IPA fallback")
-        # IPA-based fallback for better English pronunciation
-        words = text.lower().split()
-        phonemes = ["^"]
+        # zh / es / fr / pt: try MultilingualPhonemizer first
+        try:
+            from piper_train.phonemize.multilingual import (
+                MultilingualPhonemizer,  # noqa: PLC0415
+            )
 
-        for i, word in enumerate(words):
-            # Add space between words
-            if i > 0:
-                phonemes.append(" ")
+            mp = MultilingualPhonemizer(languages=["ja", "en", "zh", "es", "fr", "pt"])
+            phonemes = mp.phonemize(text)
+        except Exception:
+            logger.warning(
+                "MultilingualPhonemizer unavailable for language '%s', "
+                "trying individual phonemizer",
+                language,
+            )
+            phonemes = None
+            try:
+                if language == "zh":
+                    from piper_train.phonemize.chinese import (
+                        ChinesePhonemizer,  # noqa: PLC0415
+                    )
 
-            # Remove punctuation from word
-            clean_word = "".join(c for c in word if c.isalpha())
+                    phonemes = ChinesePhonemizer().phonemize(text)
+                elif language == "es":
+                    from piper_train.phonemize.spanish import (
+                        SpanishPhonemizer,  # noqa: PLC0415
+                    )
 
-            if clean_word in ENGLISH_IPA_MAP:
-                # Use IPA mapping if available
-                ipa = ENGLISH_IPA_MAP[clean_word]
-                phonemes.extend(list(ipa))
-            else:
-                # Fall back to character-by-character for unknown words
-                phonemes.extend(list(clean_word))
+                    phonemes = SpanishPhonemizer().phonemize(text)
+                elif language == "fr":
+                    from piper_train.phonemize.french import (
+                        FrenchPhonemizer,  # noqa: PLC0415
+                    )
 
-        phonemes.append("$")
+                    phonemes = FrenchPhonemizer().phonemize(text)
+                elif language == "pt":
+                    from piper_train.phonemize.portuguese import (
+                        PortuguesePhonemizer,  # noqa: PLC0415
+                    )
+
+                    phonemes = PortuguesePhonemizer().phonemize(text)
+            except Exception:
+                logger.warning(
+                    "Individual phonemizer unavailable for language '%s'",
+                    language,
+                )
+
+            if phonemes is None:
+                if ESPEAK_AVAILABLE:
+                    # Map language code to espeak locale
+                    espeak_lang_map = {
+                        "zh": "zh",
+                        "es": "es",
+                        "fr": "fr",
+                        "pt": "pt",
+                    }
+                    espeak_lang = espeak_lang_map.get(language, language)
+                    try:
+                        phonemizer = Phonemizer(espeak_lang)
+                        phoneme_str = phonemizer.phonemize(text)
+                        phonemes = ["^"] + list(phoneme_str.replace(" ", "")) + ["$"]
+                    except Exception:
+                        logger.warning(
+                            "espeak fallback failed for language '%s', using characters",
+                            language,
+                        )
+                        phonemes = list(text)
+                else:
+                    logger.warning(
+                        "No phonemizer available for language '%s', using characters",
+                        language,
+                    )
+                    phonemes = list(text)
 
     return phonemes
 
@@ -258,10 +353,11 @@ def synthesize_speech(
         raise gr.Error("Invalid model selected")
 
     model_info = MODELS[model_name]
+    language = model_info["language"]
     config = load_model_config(model_info["config"])
 
     # Convert text to phoneme IDs
-    phonemes = text_to_phonemes(text, model_info["language"])
+    phonemes = text_to_phonemes(text, language)
     phoneme_ids = phonemes_to_ids(phonemes, config)
 
     if not phoneme_ids:
@@ -295,6 +391,16 @@ def synthesize_speech(
         if sid is not None:
             inputs["sid"] = sid
 
+        # Add language ID (lid) if the model supports multilingual conditioning
+        input_names_set = {inp.name for inp in model.get_inputs()}
+        if "lid" in input_names_set:
+            language_id_map = config.get(
+                "language_id_map",
+                {"ja": 0, "en": 1, "zh": 2, "es": 3, "fr": 4, "pt": 5},
+            )
+            lid_value = language_id_map.get(language, 0)
+            inputs["lid"] = np.array([lid_value], dtype=np.int64)
+
         audio = model.run(None, inputs)[0]
 
         # Remove batch and channel dimensions
@@ -318,7 +424,8 @@ def create_interface():
         gr.Markdown("""
             # piper-plus Demo
 
-            High-quality multilingual text-to-speech synthesis supporting Japanese and English.
+            High-quality multilingual text-to-speech synthesis supporting Japanese, English,
+            Chinese, Spanish, French, and Portuguese.
 
             This demo uses a single multilingual ONNX model for fast CPU inference.
             """)
@@ -383,11 +490,11 @@ def create_interface():
 
             gr.Markdown("""
                 ### Tips:
-                - Select Japanese mode for hiragana/kanji text
-                - Select English mode for standard English text
-                - Both modes use the same multilingual model
+                - Select the language matching your input text
+                - All modes use the same multilingual ONNX model
                 - Adjust speed for faster/slower speech
                 - Higher expressiveness = more natural variation
+                - Chinese, Spanish, French, Portuguese require piper_train installed
                 """)
 
         # Examples
@@ -406,6 +513,10 @@ def create_interface():
                     "Welcome to piper-plus. Enjoy high quality speech synthesis.",
                     "Multilingual (English)",
                 ],
+                ["你好，世界！今天天气很好。", "Multilingual (Chinese)"],
+                ["¡Hola, mundo! Bienvenido a piper-plus.", "Multilingual (Spanish)"],
+                ["Bonjour le monde! Bienvenue sur piper-plus.", "Multilingual (French)"],
+                ["Olá, mundo! Bem-vindo ao piper-plus.", "Multilingual (Portuguese)"],
             ],
             inputs=[text_input, model_dropdown],
         )
