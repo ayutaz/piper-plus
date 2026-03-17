@@ -4,7 +4,7 @@ Issue #245 対応のための技術調査結果と実装仕様をまとめたド
 
 ---
 
-## 1. プロジェクト構成
+## 1. プロジェクト構成 ✅
 
 ```
 src/csharp/
@@ -13,26 +13,31 @@ src/csharp/
 ├── PiperPlus.Core/
 │   ├── PiperPlus.Core.csproj
 │   ├── Inference/
-│   │   ├── PiperSession.cs          # ONNX Runtime 推論ラッパー
-│   │   ├── PiperModel.cs            # モデル能力検出 (sid, prosody等)
-│   │   └── WavWriter.cs             # WAV書き出し (44バイトヘッダー + PCM)
+│   │   ├── PiperSession.cs          # ✅ ONNX Runtime 推論ラッパー
+│   │   ├── PiperModel.cs            # ✅ モデル能力検出 (sid, prosody等)
+│   │   └── WavWriter.cs             # ✅ WAV書き出し (44バイトヘッダー + PCM)
 │   ├── Phonemize/
-│   │   ├── IPhonemizer.cs           # 音素化インターフェース
-│   │   ├── JapanesePhonemizer.cs    # DotNetG2P統合
-│   │   ├── EnglishPhonemizer.cs     # DotNetG2P.English統合
-│   │   ├── PiperPhonemeConverter.cs  # PUA変換 + N変異 + 疑問詞判定
-│   │   └── PhonemeEncoder.cs        # BOS/EOS/PAD挿入 + phoneme_id変換
+│   │   ├── IPhonemizer.cs           # ✅ 音素化インターフェース + ProsodyInfo + IJapaneseG2PEngine
+│   │   ├── JapanesePhonemizer.cs    # ✅ IJapaneseG2PEngine 経由の日本語音素化
+│   │   ├── EnglishPhonemizer.cs     # 未実装 (Phase 3)
+│   │   ├── PiperPhonemeConverter.cs  # ✅ PUA変換 + N変異 + 疑問詞判定
+│   │   └── PhonemeEncoder.cs        # ✅ phoneme_id変換 + PostProcessIds呼び出し
 │   ├── Config/
-│   │   ├── PiperConfig.cs           # config.json デシリアライズ
-│   │   └── ModelManager.cs          # --list-models / --download-model
+│   │   ├── PiperConfig.cs           # ✅ config.json デシリアライズ (source-gen)
+│   │   └── ModelManager.cs          # 未実装 (Phase 3: --list-models / --download-model)
 │   └── Mapping/
-│       └── OpenJTalkToPiperMapping.cs  # PUAマッピングテーブル (uPiperから移植)
+│       └── OpenJTalkToPiperMapping.cs  # ✅ PUAマッピングテーブル (uPiperから移植)
 ├── PiperPlus.Cli/
 │   ├── PiperPlus.Cli.csproj
-│   └── Program.cs                   # System.CommandLine エントリーポイント
+│   └── Program.cs                   # ✅ System.CommandLine エントリーポイント
 └── PiperPlus.Core.Tests/
     ├── PiperPlus.Core.Tests.csproj
-    └── ...
+    ├── PiperConfigTests.cs           # ✅
+    ├── InferenceTests.cs             # ✅
+    ├── WavWriterTests.cs             # ✅
+    ├── PhonemeConverterTests.cs      # ✅
+    ├── PhonemeEncoderTests.cs        # ✅
+    └── JapanesePhonemizerTests.cs    # ✅
 ```
 
 ### NuGet依存関係
@@ -41,11 +46,9 @@ src/csharp/
 | パッケージ | バージョン | 用途 |
 |-----------|----------|------|
 | `Microsoft.ML.OnnxRuntime.Managed` | 1.24.3 | ONNX推論 (マネージドAPIのみ) |
-| `DotNetG2P` | 最新 | 日本語G2Pエンジン ([GitHub](https://github.com/ayutaz/dot-net-g2p)) |
-| `DotNetG2P.MeCab` | 最新 | 純C# MeCab |
-| `DotNetG2P.English` | 最新 | 英語G2P |
+| `Microsoft.Extensions.Logging.Abstractions` | 8.0.3 | PhonemeEncoder のロギング抽象化 |
 
-> **注意:** DotNetG2Pパッケージは [ayutaz/dot-net-g2p](https://github.com/ayutaz/dot-net-g2p) で開発中。NuGet公開状況は要確認。
+> **注意 (Phase 3):** DotNetG2Pパッケージ (`DotNetG2P`, `DotNetG2P.MeCab`, `DotNetG2P.English`) は [ayutaz/dot-net-g2p](https://github.com/ayutaz/dot-net-g2p) で開発中。NuGet公開後に Core の依存に追加予定。現在 `JapanesePhonemizer` は `IJapaneseG2PEngine` 抽象インターフェース経由で G2P エンジンを受け取るため、DotNetG2P への直接依存はない。CLI (`Program.cs`) ではリフレクションで解決を試みる。
 
 **PiperPlus.Cli:**
 | パッケージ | バージョン | 用途 |
@@ -66,8 +69,8 @@ src/csharp/
 | プロジェクト | TFM | 理由 |
 |---|---|---|
 | PiperPlus.Core | `net8.0` | uPiper (.NET Standard 2.1 / Unity) との互換性確保 |
-| PiperPlus.Cli | `net10.0` | 最新LTS (2028-11 EOL)、Self-Contained配布に最適 |
-| PiperPlus.Core.Tests | `net10.0` | テストは最新で実行 |
+| PiperPlus.Cli | `net9.0` | 現行STS、Self-Contained配布に最適 |
+| PiperPlus.Core.Tests | `net9.0` | テストは最新で実行 |
 
 ### Directory.Build.props
 ```xml
@@ -86,22 +89,25 @@ src/csharp/
 ```
 
 > **注意:** `TargetFramework` は Directory.Build.props ではなく各 `.csproj` で指定する。
-> Core は `<TargetFramework>net8.0</TargetFramework>`、Cli は `<TargetFramework>net10.0</TargetFramework>`。
+> Core は `<TargetFramework>net8.0</TargetFramework>`、Cli/Tests は `<TargetFramework>net9.0</TargetFramework>`。
 
 ---
 
-## 2. CLI インターフェース仕様
+## 2. CLI インターフェース仕様 ✅ (一部未実装)
 
 C++版 (`src/cpp/main.cpp`) と同等のCLIを提供する。
 
 ### 2.1 コマンドラインオプション
 
+#### 実装済み ✅
+
 | オプション | 短形式 | 型 | デフォルト | 説明 |
 |-----------|--------|-----|---------|------|
 | `--model` | `-m` | FileInfo | 必須 | .onnxモデルファイル |
 | `--config` | `-c` | FileInfo | 自動検出 | config.jsonパス |
-| `--text` | `-t` | string | - | テキスト直接入力 |
-| `--output_file` | `-f` | FileInfo | - | 出力WAVパス (`-`=stdout) |
+| `--text` | `-t` | string | - | テキスト直接入力 (JSONL不要) |
+| `--language` | - | string | `ja` | `--text` モード用言語: `ja` / `en` |
+| `--output_file` | `-f` | string | - | 出力WAVパス (`-`=stdout) |
 | `--output_dir` | `-d` | DirectoryInfo | `.` | 出力ディレクトリ |
 | `--output_raw` | - | flag | - | Raw PCM (int16) をstdoutに出力 |
 | `--speaker` | `-s` | int | 0 | 話者ID |
@@ -110,6 +116,16 @@ C++版 (`src/cpp/main.cpp`) と同等のCLIを提供する。
 | `--noise_w` | - | float | 0.8 | Duration Predictorノイズ |
 | `--sentence_silence` | - | float | 0.2 | 文末無音(秒) |
 | `--json-input` | - | flag | - | stdin をJSONLとして解釈 |
+| `--version` | - | flag | - | バージョン表示 |
+| `--debug` | - | flag | - | DEBUGログ (stderr) |
+| `--quiet` | `-q` | flag | - | ログ無効 |
+
+> **注意:** `--text` と `--json-input` は排他。両方指定するとエラーになる。
+
+#### 未実装 (Phase 3以降)
+
+| オプション | 短形式 | 型 | デフォルト | 説明 |
+|-----------|--------|-----|---------|------|
 | `--list-models` | - | string? | - | モデル一覧表示 |
 | `--download-model` | - | string | - | モデルダウンロード |
 | `--model-dir` | - | DirectoryInfo | OS依存 | モデル保存先 |
@@ -123,9 +139,6 @@ C++版 (`src/cpp/main.cpp`) と同等のCLIを提供する。
 | `--custom-dict` | - | string | - | カスタム辞書ファイル (カンマ区切り) |
 | `--espeak_data` | - | DirectoryInfo | 自動検出 | espeak-ngデータパス |
 | `--tashkeel_model` | - | FileInfo | - | libtashkeel ORTモデル (アラビア語) |
-| `--version` | - | flag | - | バージョン表示 |
-| `--debug` | - | flag | - | DEBUGログ |
-| `--quiet` | `-q` | flag | - | ログ無効 |
 | `--test-mode` | - | flag | - | ONNX実行スキップ (CI用) |
 
 ### 2.2 環境変数
@@ -137,20 +150,36 @@ C++版 (`src/cpp/main.cpp`) と同等のCLIを提供する。
 | `PIPER_MODEL_DIR` | モデル保存先ディレクトリ |
 | `PIPER_GPU_DEVICE_ID` | CUDA GPUデバイスID |
 
-### 2.3 stdin/stdout プロトコル
+### 2.3 入出力モード ✅
 
-- **テキスト入力:** 1行1文、改行区切り
-- **JSONL入力** (`--json-input`):
-  ```json
-  {"text":"...", "speaker_id":0, "speaker":"name", "output_file":"...", "prosody_features":[[a1,a2,a3],...]}
-  ```
-- **出力:** WAVファイルパス (stdout) / WAVバイナリ (`-f -`) / Raw PCM (`--output_raw`)
+**入力モード (排他):**
+
+| モード | 条件 | 説明 |
+|--------|------|------|
+| テキスト直接入力 | `--text` 指定 | `--language` で言語指定 (デフォルト `ja`)。PhonemeEncoder で自動音素化。 |
+| JSONL stdin | `--json-input` または stdin パイプ | 1行1発話。pre-encoded phoneme_ids を含む JSON。 |
+
+**JSONL フォーマット:**
+```json
+{"phoneme_ids":[1,8,5,39], "speaker_id":0, "output_file":"out.wav", "prosody_features":[[a1,a2,a3],...]}
+```
+
+> **注意:** JSONL の `prosody_features` はネストした配列形式 `[[a1,a2,a3],...]`。Python 版の dict 形式 `[{"a1":1,"a2":2,"a3":3},...]` とは異なる。
+
+**出力モード:**
+
+| モード | 条件 | 説明 |
+|--------|------|------|
+| ディレクトリ | デフォルト | `{output_dir}/{index}.wav` |
+| 単一ファイル | `--output_file path` | 指定パスに WAV 出力 |
+| WAV stdout | `--output_file -` | WAV バイナリを stdout に出力 |
+| Raw PCM stdout | `--output_raw` | ヘッダーなし int16 PCM を stdout に出力 |
 
 ---
 
-## 3. ONNX モデル テンソル仕様
+## 3. ONNX モデル テンソル仕様 ✅
 
-### 3.1 入力テンソル
+### 3.1 入力テンソル ✅
 
 | テンソル名 | 型 | Shape | 必須 |
 |-----------|------|--------|------|
@@ -162,30 +191,42 @@ C++版 (`src/cpp/main.cpp`) と同等のCLIを提供する。
 
 **scales配列:** `[noise_scale, length_scale, noise_scale_w]` — デフォルト値: `[0.667, 1.0, 0.8]`
 
-### 3.2 出力テンソル
+### 3.2 出力テンソル ✅
 
 | テンソル名 | 型 | Shape |
 |-----------|------|--------|
 | `output` | float32 | `[1, 1, audio_samples]` |
 
-### 3.3 float32→int16変換
+### 3.3 float32→int16変換 ✅
+
+ピークノーマライズ後、**対称クリッピング `[-32767, 32767]`** でint16に変換する。
+`short.MinValue` (-32768) ではなく `-32767` を使用し、正負対称を保つ。
 
 ```csharp
-float maxVal = audioFloat.Max(f => Math.Abs(f));
+// PiperSession.ConvertToInt16() の実装:
+float maxVal = 0f;
+for (int i = 0; i < audio.Length; i++)
+{
+    float abs = Math.Abs(audio[i]);
+    if (abs > maxVal) maxVal = abs;
+}
 float scale = 32767.0f / Math.Max(0.01f, maxVal);
-short sample = (short)Math.Clamp(audioFloat[i] * scale, short.MinValue, short.MaxValue);
+result[i] = (short)Math.Clamp(audio[i] * scale, -32767f, 32767f);
 ```
 
-### 3.4 モデル能力検出
+### 3.4 モデル能力検出 ✅
+
+`PiperModel` コンストラクタで `InferenceSession.InputMetadata` のキーを検査して能力を判定する。
 
 ```csharp
-bool hasSid = session.InputNames.Contains("sid");
-bool hasProsody = session.InputNames.Contains("prosody_features");
+// PiperModel コンストラクタ内:
+HasSpeakerId = _session.InputMetadata.ContainsKey("sid");
+HasProsody   = _session.InputMetadata.ContainsKey("prosody_features");
 ```
 
 ---
 
-## 4. config.json スキーマ
+## 4. config.json スキーマ ✅
 
 ### 必須フィールド
 
@@ -215,29 +256,37 @@ bool hasProsody = session.InputNames.Contains("prosody_features");
 - **必ず1文字 (1 codepoint)** — 多文字音素はPUA (U+E000–U+E01C) に変換済み
 - `_`=PAD, `^`=BOS, `$`=EOS
 
-### config.json 検索順序
+### config.json 検索順序 ✅
+
+`PiperConfig.FindConfigPath()` で実装済み:
 
 1. `--config` 明示指定
 2. `PIPER_DEFAULT_CONFIG` 環境変数
 3. `{model_path}.json`
 4. `{model_dir}/config.json`
 
+### デシリアライズ ✅
+
+`PiperConfig.LoadFromFile()` は `System.Text.Json` source generator (`PiperConfigJsonContext`) を使用。
+トリム安全・AOT安全。`phoneme_id_map`、`audio`、`inference` の必須フィールドバリデーション付き。
+
 ---
 
-## 5. 日本語音素化パイプライン
+## 5. 日本語音素化パイプライン ✅
 
 ### 処理フロー
 
 ```
 テキスト
-  → [1] DotNetG2P.G2PEngine.ToProsodyFeatures(text)
-    → ProsodyFeatures { Phonemes[], A1[], A2[], A3[] }
-  → [2] sil/pau → 韻律トークン変換 (^, $, ?, _)
-  → [3] 疑問詞マーカー判定 (_get_question_type)
-  → [4] N変異適用 (N → N_m / N_n / N_ng / N_uvular)
-  → [5] PUA変換 (多文字音素 → 単一コードポイント)
-  → [6] phoneme_id_map ルックアップ → phoneme_ids
-  → [7] prosody_features 対応付け
+  → [1] IJapaneseG2PEngine.Convert(text)
+    → G2PResult { Phonemes[], A1[], A2[], A3[] }
+  → [2] sil/pau → 韻律トークン変換 (^, $, ?, _)            [JapanesePhonemizer]
+  → [3] 韻律マーカー挿入 (], #, [) — A1/A2/A3基づく         [JapanesePhonemizer]
+  → [4] 疑問詞マーカー判定 (GetQuestionType)                [PiperPhonemeConverter]
+  → [5] N変異適用 (N → N_m / N_n / N_ng / N_uvular)        [PiperPhonemeConverter]
+  → [6] PUA変換 (多文字音素 → 単一コードポイント)            [PiperPhonemeConverter → OpenJTalkToPiperMapping]
+  → [7] phoneme_id_map ルックアップ → phoneme_ids           [PhonemeEncoder]
+  → [8] prosody_features 対応付け                           [PhonemeEncoder]
 ```
 
 ### 疑問詞マーカー
@@ -281,7 +330,7 @@ bool hasProsody = session.InputNames.Contains("prosody_features");
 
 ---
 
-## 6. 英語音素化パイプライン
+## 6. 英語音素化パイプライン (未実装 — Phase 3)
 
 ### 処理フロー
 
@@ -309,9 +358,37 @@ BOS/EOS: [1, 0, 10, 0, 59, 0, 24, 0, 120, 0, 27, 0, 100, 0, 2]
 
 ---
 
-## 7. DotNetG2P 統合API
+## 7. G2P 抽象レイヤーと DotNetG2P 統合
 
-### 日本語
+### 7.1 IJapaneseG2PEngine 抽象インターフェース ✅
+
+`JapanesePhonemizer` は G2P エンジンへの直接依存を持たず、`IJapaneseG2PEngine` インターフェースを通じてエンジンを注入する。これにより DotNetG2P 未公開時もテスト可能。
+
+```csharp
+// IPhonemizer.cs 内で定義:
+public record G2PResult(string[] Phonemes, int[] A1, int[] A2, int[] A3);
+
+public interface IJapaneseG2PEngine
+{
+    G2PResult Convert(string text);
+}
+```
+
+**テストでのモック使用例:**
+```csharp
+// テストで IJapaneseG2PEngine をモック実装して JapanesePhonemizer を検証可能
+var mockEngine = new MockG2PEngine(/* 固定値を返す */);
+var phonemizer = new JapanesePhonemizer(mockEngine);
+var tokens = phonemizer.Phonemize("こんにちは");
+```
+
+**CLI での解決 (`Program.cs`):** DotNetG2P がインストールされている場合、リフレクションで `DotNetG2PEngine` を検出して `IJapaneseG2PEngine` として注入する。未インストール時は `NotSupportedException` をスローし、JSONL stdin モードの使用を案内する。
+
+### 7.2 DotNetG2P API (Phase 3 — NuGet公開待ち)
+
+DotNetG2P パッケージは [ayutaz/dot-net-g2p](https://github.com/ayutaz/dot-net-g2p) で開発中。
+
+#### 日本語
 
 ```csharp
 using var engine = new G2PEngine(new MeCabTokenizer());
@@ -322,7 +399,7 @@ ProsodyFeatures features = engine.ToProsodyFeatures("こんにちは");
 // features.A3: [0, 5, 5, 4, 4, 3, 3, 2, 1, 1, 0]
 ```
 
-### 英語
+#### 英語
 
 ```csharp
 using var engine = new EnglishG2PEngine();
@@ -330,7 +407,7 @@ string phonemes = engine.ToPhonemes("hello world");
 // "HH AH0 L OW1 W ER1 L D"
 ```
 
-### スレッドセーフティ
+#### スレッドセーフティ
 
 | クラス | スレッドセーフ |
 |---|---|
@@ -338,13 +415,62 @@ string phonemes = engine.ToPhonemes("hello world");
 | `MeCabTokenizer` | 非安全 |
 | `EnglishG2PEngine` | 安全 |
 
-### MeCab辞書パス (検索順)
+#### MeCab辞書パス (検索順)
 
 1. 環境変数 `DOTNETG2P_NAIST_JDIC_PATH`
 2. 環境変数 `NAIST_JDIC_PATH`
 3. `~/naist-jdic`
 4. `./naist-jdic`
 5. `./open_jtalk_dic_utf_8-1.11`
+
+---
+
+## 7a. PhonemeEncoder ✅
+
+テキストから ONNX 推論用の phoneme ID 配列 + prosody 配列を生成する静的クラス。
+Python `infer_onnx.py` の `text_to_phoneme_ids_and_prosody()` に相当する。
+
+### 処理フロー
+
+```
+text → IPhonemizer.PhonemizeWithProsody()
+  → tokens + prosody
+  → phoneme_id_map ルックアップ (1トークン → 複数ID展開)
+  → IPhonemizer.PostProcessIds() (言語固有の BOS/EOS/PAD 挿入)
+  → (List<int> PhonemeIds, List<ProsodyInfo?> ProsodyFeatures)
+```
+
+### API
+
+| メソッド | 戻り値 | 説明 |
+|---------|--------|------|
+| `Encode(phonemizer, text, phonemeIdMap)` | `(List<int>, List<ProsodyInfo?>)` | phoneme ID + prosody リスト |
+| `EncodeDirect(phonemizer, text, phonemeIdMap)` | `(long[], long?)` | ONNX テンソル用 long 配列 (prosody は flat `[a1,a2,a3,...]`) |
+| `SetLogger(ILogger)` | void | 未知音素の警告用ロガー設定 |
+
+**`EncodeDirect` の prosody 配列レイアウト:**
+- `[a1_0, a2_0, a3_0, a1_1, a2_1, a3_1, ...]` (長さ = phonemeIds.Length * 3)
+- 全エントリが null の場合は `null` を返す (prosody なしモデル用)
+- null エントリは `[0, 0, 0]` で埋められる
+
+---
+
+## 7b. PiperPhonemeConverter ✅
+
+日本語音素パイプラインの3つの静的ヘルパーメソッドを提供する。
+Python `japanese.py` の `_get_question_type`、`_apply_n_phoneme_rules` と `token_mapper.py` の `map_sequence` に相当する。
+
+### API
+
+| メソッド | 説明 |
+|---------|------|
+| `GetQuestionType(text)` | テキスト末尾の句読点から疑問詞マーカーを判定 → `"?!"` / `"?."` / `"?~"` / `"?"` / `"$"` |
+| `ApplyNPhonemeRules(tokens)` | `"N"` トークンを後続音素に基づき `N_m` / `N_n` / `N_ng` / `N_uvular` に置換 |
+| `MapSequence(tokens)` | 多文字トークンを PUA 単一コードポイントに変換 (`OpenJTalkToPiperMapping` 経由) |
+
+### スキップトークン (N 変異のルックアヘッドで無視)
+
+`_`, `#`, `[`, `]`, `^`, `$`, `?`, `?!`, `?.`, `?~`
 
 ---
 
@@ -370,7 +496,7 @@ string phonemes = engine.ToPhonemes("hello world");
 
 ---
 
-## 9. モデル管理
+## 9. モデル管理 (未実装 — Phase 3)
 
 ### カタログソース
 
@@ -400,7 +526,7 @@ string phonemes = engine.ToPhonemes("hello world");
 
 ---
 
-## 10. WAV書き出し
+## 10. WAV書き出し ✅
 
 44バイト PCM WAVヘッダー + int16サンプルデータ。NAudio不要。
 
