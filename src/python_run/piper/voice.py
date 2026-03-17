@@ -182,15 +182,17 @@ class PiperVoice:
 
                 # Try to load default custom dictionary
                 custom_dict = get_default_dictionary()
-
-                if custom_dict:
-                    _LOGGER.debug("Using custom dictionary for phonemization")
-                    return [phonemize_japanese(text, custom_dict=custom_dict)]
-                else:
-                    _LOGGER.debug(
-                        "Using default phonemization without custom dictionary"
-                    )
-                    return [phonemize_japanese(text)]
+                _LOGGER.debug(
+                    "Using custom dictionary for phonemization"
+                    if custom_dict
+                    else "Using default phonemization without custom dictionary"
+                )
+                result = (
+                    phonemize_japanese(text, custom_dict=custom_dict)
+                    if custom_dict
+                    else phonemize_japanese(text)
+                )
+                return [result]
             except (ImportError, RuntimeError) as e:
                 if self.config.phoneme_type in (
                     PhonemeType.MULTILINGUAL,

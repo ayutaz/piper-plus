@@ -174,7 +174,6 @@ select = [
 # 除外するルール
 ignore = [
     "E501",  # line too long (blackが処理)
-    "PLR0911",  # Too many return statements
     "PLR0913",  # Too many arguments to function call
     "PLR2004",  # Magic value used in comparison
     "PLR0912",  # Too many branches
