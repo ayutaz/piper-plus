@@ -52,10 +52,13 @@ jobs:
           chmod +x piper/bin/piper
           chmod +x piper/bin/open_jtalk || true
           
-          # Set library path for Linux
+          # Set library path for Linux and macOS
           if [ "${{ runner.os }}" = "Linux" ]; then
             export LD_LIBRARY_PATH="${PWD}/piper/lib:${LD_LIBRARY_PATH}"
             echo "LD_LIBRARY_PATH=${PWD}/piper/lib:${LD_LIBRARY_PATH}" >> $GITHUB_ENV
+          elif [ "${{ runner.os }}" = "macOS" ]; then
+            export DYLD_LIBRARY_PATH="${PWD}/piper/lib:${DYLD_LIBRARY_PATH}"
+            echo "DYLD_LIBRARY_PATH=${PWD}/piper/lib:${DYLD_LIBRARY_PATH}" >> $GITHUB_ENV
           fi
           
           # Verify OpenJTalk is available (check phonemizer version first)

@@ -20,7 +20,7 @@ protected:
     modelPath = "test/models/text_voice.onnx";
 
     // Initialize minimal voice configuration
-    voice.phonemizeConfig.phonemeType = eSpeakPhonemes;
+    voice.phonemizeConfig.phonemeType = MultilingualPhonemes;
     voice.phonemizeConfig.interspersePad = true;
 
     // Set pad/bos/eos IDs (these are already default values, but explicit for clarity)

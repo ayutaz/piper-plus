@@ -319,9 +319,9 @@ def _convert_word(word: str) -> tuple[list[str], int]:
                 phonemes.append("ʃ")
             elif (
                 i > 0
-                and word[i - 1] in "aeiou"
+                and _is_vowel_char(word[i - 1])
                 and i + 1 < n
-                and word[i + 1] in "aeiou"
+                and _is_vowel_char(word[i + 1])
             ):
                 phonemes.append("z")
             else:

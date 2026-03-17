@@ -83,8 +83,8 @@ if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|ARM64")
   # add_compile_definitions(USE_ARM64_NEON)
 endif()
 
-add_executable(piper src/cpp/main.cpp src/cpp/piper.cpp src/cpp/phoneme_parser.cpp src/cpp/custom_dictionary.cpp src/cpp/model_manager.cpp)
-add_executable(test_piper src/cpp/test.cpp src/cpp/piper.cpp src/cpp/phoneme_parser.cpp src/cpp/custom_dictionary.cpp src/cpp/model_manager.cpp)
+add_executable(piper src/cpp/main.cpp src/cpp/piper.cpp src/cpp/phoneme_parser.cpp src/cpp/custom_dictionary.cpp src/cpp/model_manager.cpp src/cpp/language_detector.cpp src/cpp/english_phonemize.cpp src/cpp/chinese_phonemize.cpp src/cpp/korean_phonemize.cpp src/cpp/spanish_phonemize.cpp src/cpp/french_phonemize.cpp src/cpp/portuguese_phonemize.cpp)
+add_executable(test_piper src/cpp/test.cpp src/cpp/piper.cpp src/cpp/phoneme_parser.cpp src/cpp/custom_dictionary.cpp src/cpp/model_manager.cpp src/cpp/language_detector.cpp src/cpp/english_phonemize.cpp src/cpp/chinese_phonemize.cpp src/cpp/korean_phonemize.cpp src/cpp/spanish_phonemize.cpp src/cpp/french_phonemize.cpp src/cpp/portuguese_phonemize.cpp)
 
 # Add NEON optimized audio processing for ARM64
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|ARM64")
@@ -145,20 +145,19 @@ endif()
 if(APPLE)
   set_target_properties(piper PROPERTIES
     MACOSX_RPATH TRUE
-    INSTALL_RPATH "@executable_path/../lib;@loader_path/../lib;${PIPER_PHONEMIZE_DIR}/lib"
+    INSTALL_RPATH "@executable_path;@executable_path/../lib;@loader_path/../lib"
+    BUILD_RPATH "${CMAKE_CURRENT_BINARY_DIR}/ort/lib"
     BUILD_WITH_INSTALL_RPATH FALSE
-    BUILD_RPATH "${PIPER_PHONEMIZE_DIR}/lib"
   )
   set_target_properties(test_piper PROPERTIES
     MACOSX_RPATH TRUE
-    INSTALL_RPATH "@executable_path/../lib;@loader_path/../lib;${PIPER_PHONEMIZE_DIR}/lib"
+    INSTALL_RPATH "@executable_path;@executable_path/../lib;@loader_path/../lib"
+    BUILD_RPATH "${CMAKE_CURRENT_BINARY_DIR}/ort/lib"
     BUILD_WITH_INSTALL_RPATH FALSE
-    BUILD_RPATH "${PIPER_PHONEMIZE_DIR}/lib"
   )
 endif()
 
 # NOTE: external project prefix are shortened because of path length restrictions on Windows
-# NOTE: onnxruntime is pulled from piper-phonemize
 
 # ---- fmt ---
 
@@ -230,50 +229,45 @@ if(NOT DEFINED SPDLOG_DIR)
   add_dependencies(test_piper spdlog_external)
 endif()
 
-# ---- piper-phonemize ---
-
-if(NOT DEFINED PIPER_PHONEMIZE_DIR)
-  set(PIPER_PHONEMIZE_DIR "${CMAKE_CURRENT_BINARY_DIR}/pi")
-  # On Windows, we need espeak-ng as a shared library for proper functioning
-  if(WIN32)
-    set(PIPER_PHONEMIZE_SHARED_LIBS ON)
-  else()
-    # Use static linking for ARM64 to avoid QEMU issues
-    set(PIPER_PHONEMIZE_SHARED_LIBS OFF)
-  endif()
-  
-  # NOTE: Using master branch HEAD. For reproducible builds, pin to a specific commit:
-  # URL "https://github.com/rhasspy/piper-phonemize/archive/<commit-hash>.zip"
-  ExternalProject_Add(
-    piper_phonemize_external
-    PREFIX "${CMAKE_CURRENT_BINARY_DIR}/p"
-    URL "https://github.com/rhasspy/piper-phonemize/archive/refs/heads/master.zip"
-    DOWNLOAD_NO_PROGRESS TRUE
-    TIMEOUT 600  # 10 minutes timeout
-    TLS_VERIFY ON
-    DOWNLOAD_TRIES 3  # Retry download 3 times
-    CMAKE_ARGS -DCMAKE_INSTALL_PREFIX:PATH=${PIPER_PHONEMIZE_DIR}
-    CMAKE_ARGS -DBUILD_SHARED_LIBS:BOOL=${PIPER_PHONEMIZE_SHARED_LIBS}
-    CMAKE_ARGS -DESPEAK_NG_BUILD_SHARED:BOOL=${PIPER_PHONEMIZE_SHARED_LIBS}
-    CMAKE_ARGS -DCMAKE_MSVC_RUNTIME_LIBRARY:STRING=${CMAKE_MSVC_RUNTIME_LIBRARY}
-    CMAKE_ARGS ${EXTERNAL_CMAKE_ARGS}
-    # Patch piper-phonemize sources to force UTF-8 on MSVC for all subprojects
-    PATCH_COMMAND
-      ${CMAKE_COMMAND} -D SOURCE_DIR=<SOURCE_DIR> -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/apply_piper_phonemize_patch.cmake
-    # Ensure nested builds (e.g., espeak-ng) receive MSVC UTF-8 option even if flags are overridden
-    BUILD_COMMAND ${CMAKE_COMMAND} -E env CL=/utf-8 ${CMAKE_COMMAND} --build <BINARY_DIR> --config $<CONFIG>
-    INSTALL_COMMAND ${CMAKE_COMMAND} -E env CL=/utf-8 ${CMAKE_COMMAND} --build <BINARY_DIR> --target install --config $<CONFIG>
-  )
-  add_dependencies(piper piper_phonemize_external)
-  add_dependencies(test_piper piper_phonemize_external)
-endif()
-
-# Runtime library is already set globally via CMAKE_MSVC_RUNTIME_LIBRARY
-# No need to set per-target properties
-
-# ---- ONNX Runtime for Windows ---
+# ---- ONNX Runtime ---
 if(WIN32)
   include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/find_onnxruntime_windows.cmake)
+elseif(NOT DEFINED ONNXRUNTIME_DIR)
+  # Linux/macOS: Download pre-built ONNX Runtime if not already available
+  set(ONNXRUNTIME_VERSION "1.14.1")
+  if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|ARM64")
+    if(APPLE)
+      set(ONNXRUNTIME_ARCH "arm64")
+    else()
+      set(ONNXRUNTIME_ARCH "aarch64")
+    endif()
+  else()
+    set(ONNXRUNTIME_ARCH "x64")
+  endif()
+  if(APPLE)
+    set(ONNXRUNTIME_URL "https://github.com/microsoft/onnxruntime/releases/download/v${ONNXRUNTIME_VERSION}/onnxruntime-osx-${ONNXRUNTIME_ARCH}-${ONNXRUNTIME_VERSION}.tgz")
+  else()
+    set(ONNXRUNTIME_URL "https://github.com/microsoft/onnxruntime/releases/download/v${ONNXRUNTIME_VERSION}/onnxruntime-linux-${ONNXRUNTIME_ARCH}-${ONNXRUNTIME_VERSION}.tgz")
+  endif()
+  set(ONNXRUNTIME_DIR "${CMAKE_CURRENT_BINARY_DIR}/ort")
+
+  include(ExternalProject)
+  ExternalProject_Add(
+    onnxruntime_external
+    PREFIX "${CMAKE_CURRENT_BINARY_DIR}/ort_dl"
+    URL "${ONNXRUNTIME_URL}"
+    CONFIGURE_COMMAND ""
+    BUILD_COMMAND ""
+    INSTALL_COMMAND ${CMAKE_COMMAND} -E copy_directory <SOURCE_DIR>/lib ${ONNXRUNTIME_DIR}/lib
+    COMMAND ${CMAKE_COMMAND} -E copy_directory <SOURCE_DIR>/include ${ONNXRUNTIME_DIR}/include
+  )
+  add_dependencies(piper onnxruntime_external)
+  add_dependencies(test_piper onnxruntime_external)
+
+  target_include_directories(piper PUBLIC ${ONNXRUNTIME_DIR}/include)
+  target_include_directories(test_piper PUBLIC ${ONNXRUNTIME_DIR}/include)
+  target_link_directories(piper PUBLIC ${ONNXRUNTIME_DIR}/lib)
+  target_link_directories(test_piper PUBLIC ${ONNXRUNTIME_DIR}/lib)
 endif()
 
 # ---- HTSEngine ---
@@ -460,12 +454,6 @@ endif()
 if(APPLE)
   # macOS-specific settings
   set(PIPER_EXTRA_LIBRARIES "pthread")
-  # Find Homebrew-installed espeak-ng
-  if(CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
-    set(HOMEBREW_PREFIX "/usr/local")
-  else()
-    set(HOMEBREW_PREFIX "/opt/homebrew")
-  endif()
 elseif(NOT MSVC)
   # Linux flags
   string(APPEND CMAKE_CXX_FLAGS " -Wall -Wextra -Wl,-rpath,'$ORIGIN'")
@@ -483,8 +471,6 @@ if(WIN32)
     debug ${FMT_DIR}/lib/fmtd.lib
     optimized ${SPDLOG_DIR}/lib/spdlog.lib
     debug ${SPDLOG_DIR}/lib/spdlogd.lib
-    ${PIPER_PHONEMIZE_DIR}/lib/piper_phonemize.lib
-    ${PIPER_PHONEMIZE_DIR}/lib/espeak-ng.lib
     ${ONNXRUNTIME_LIB}
     ${PIPER_EXTRA_LIBRARIES}
   )
@@ -493,8 +479,6 @@ else()
   target_link_libraries(piper PRIVATE
     fmt
     spdlog
-    piper_phonemize
-    espeak-ng
     onnxruntime
     ${PIPER_EXTRA_LIBRARIES}
   )
@@ -533,22 +517,27 @@ endif()
 target_link_directories(piper PUBLIC
   ${FMT_DIR}/lib
   ${SPDLOG_DIR}/lib
-  ${PIPER_PHONEMIZE_DIR}/lib
 )
-
-# Note: We don't need Homebrew paths for espeak-ng on macOS
-# because we're using the custom build from piper_phonemize
 
 target_include_directories(piper PUBLIC
   ${FMT_DIR}/include
   ${SPDLOG_DIR}/include
-  ${PIPER_PHONEMIZE_DIR}/include
 )
 
 # Add ONNX Runtime include directory for Windows
 if(WIN32 AND ONNXRUNTIME_INCLUDE_DIR)
   target_include_directories(piper PUBLIC ${ONNXRUNTIME_INCLUDE_DIR})
   target_include_directories(test_piper PUBLIC ${ONNXRUNTIME_INCLUDE_DIR})
+endif()
+
+# Add ONNX Runtime install path for Linux/macOS
+if(NOT WIN32 AND DEFINED ONNXRUNTIME_DIR)
+  # Also install ONNX Runtime shared libs
+  install(
+    DIRECTORY ${ONNXRUNTIME_DIR}/lib/
+    DESTINATION lib
+    FILES_MATCHING PATTERN "libonnxruntime*"
+  )
 endif()
 
 # Include OpenJTalk headers (r9y9 fork installs to include/openjtalk/)
@@ -600,7 +589,7 @@ if(TRUE)  # HTSEngine and OpenJTalk are built
 endif()
 
 # Add test subdirectory AFTER all ExternalProject targets are defined
-# (tests depend on openjtalk_external, hts_engine_external, piper_phonemize_external, etc.)
+# (tests depend on openjtalk_external, hts_engine_external, etc.)
 if(BUILD_TESTS)
   if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/cpp/tests")
     add_subdirectory(src/cpp/tests)
@@ -612,7 +601,7 @@ include(CTest)
 enable_testing()
 add_test(
   NAME test_piper
-  COMMAND test_piper "${CMAKE_SOURCE_DIR}/test/models/multilingual-test-medium.onnx" "$<TARGET_FILE_DIR:test_piper>/espeak-ng-data" "${CMAKE_CURRENT_BINARY_DIR}/test.wav"
+  COMMAND test_piper "${CMAKE_SOURCE_DIR}/test/models/multilingual-test-medium.onnx" "${CMAKE_CURRENT_BINARY_DIR}/test.wav"
 )
 set_tests_properties(test_piper PROPERTIES SKIP_RETURN_CODE 77)
 
@@ -622,14 +611,12 @@ target_include_directories(
   test_piper PUBLIC
   ${FMT_DIR}/include
   ${SPDLOG_DIR}/include
-  ${PIPER_PHONEMIZE_DIR}/include
 )
 
 target_link_directories(
   test_piper PUBLIC
   ${FMT_DIR}/lib
   ${SPDLOG_DIR}/lib
-  ${PIPER_PHONEMIZE_DIR}/lib
 )
 
 # Platform-specific library linking for test_piper
@@ -640,8 +627,6 @@ if(WIN32)
     debug ${FMT_DIR}/lib/fmtd.lib
     optimized ${SPDLOG_DIR}/lib/spdlog.lib
     debug ${SPDLOG_DIR}/lib/spdlogd.lib
-    ${PIPER_PHONEMIZE_DIR}/lib/piper_phonemize.lib
-    ${PIPER_PHONEMIZE_DIR}/lib/espeak-ng.lib
     ${ONNXRUNTIME_LIB}
     ${PIPER_EXTRA_LIBRARIES}
   )
@@ -649,8 +634,6 @@ else()
   target_link_libraries(test_piper PRIVATE
     fmt
     spdlog
-    espeak-ng
-    piper_phonemize
     onnxruntime
     ${PIPER_EXTRA_LIBRARIES}
   )
@@ -663,36 +646,6 @@ endif()
 install(
   TARGETS piper
   DESTINATION bin)
-
-# Dependencies
-install(
-  DIRECTORY ${PIPER_PHONEMIZE_DIR}/bin/
-  DESTINATION bin
-  USE_SOURCE_PERMISSIONS  # keep +x
-  FILES_MATCHING
-  PATTERN "piper_phonemize"
-  PATTERN "espeak-ng"
-  PATTERN "*.dll"
-)
-
-install(
-  DIRECTORY ${PIPER_PHONEMIZE_DIR}/lib/
-  DESTINATION lib
-  FILES_MATCHING
-  PATTERN "*.dll"
-  PATTERN "*.so*"
-  PATTERN "*.dylib"
-)
-
-install(
-  DIRECTORY ${PIPER_PHONEMIZE_DIR}/share/espeak-ng-data
-  DESTINATION share
-)
-
-install(
-  FILES ${PIPER_PHONEMIZE_DIR}/share/libtashkeel_model.ort
-  DESTINATION share
-)
 
 # Install OpenJTalk for Japanese TTS support
 # r9y9 fork: static library linked directly, no separate binaries needed.
@@ -712,11 +665,6 @@ install(
   OPTIONAL
 )
 
-# Note: We don't need to copy espeak-ng library on macOS separately
-# because piper_phonemize builds and installs its own custom fork
-# of espeak-ng that includes the required espeak_TextToPhonemesWithTerminator
-# function. The library is already installed by the piper_phonemize
-# external project.
 
 # ---- Windows-specific DLL handling ----
 if(WIN32)
@@ -765,32 +713,6 @@ if(WIN32)
     endif()
   endif()
   
-  # Copy piper-phonemize DLLs
-  # First, copy specific DLLs we know we need
-  set(PIPER_PHONEMIZE_BUILD_DIR "${CMAKE_CURRENT_BINARY_DIR}/p/src/piper_phonemize_external-build")
-  
-  # Copy DLLs from installed locations
-  # Both espeak-ng.dll and piper_phonemize.dll should be installed to ${PIPER_PHONEMIZE_DIR}/bin
-  
-  add_custom_command(TARGET piper POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E echo "Copying DLLs for piper..."
-    # Copy from installed location
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-      "${PIPER_PHONEMIZE_DIR}/bin"
-      "$<TARGET_FILE_DIR:piper>/"
-    COMMENT "Copying piper-phonemize DLLs..."
-  )
-  
-  add_custom_command(TARGET test_piper POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E echo "Copying DLLs for test_piper..."
-    # Copy from installed location
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-      "${PIPER_PHONEMIZE_DIR}/bin"
-      "$<TARGET_FILE_DIR:test_piper>/"
-    COMMENT "Copying piper-phonemize DLLs for tests..."
-  )
-  
-  
   # Copy Microsoft C++ runtime redistributables if needed
   # Required for dynamic runtime linking (/MD)
   set(CMAKE_INSTALL_UCRT_LIBRARIES TRUE)
@@ -810,12 +732,4 @@ if(WIN32)
       )
     endforeach()
   endif()
-  
-  # Also copy espeak-ng data for test
-  add_custom_command(TARGET test_piper POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-      "${PIPER_PHONEMIZE_DIR}/share/espeak-ng-data"
-      "$<TARGET_FILE_DIR:test_piper>/espeak-ng-data"
-    COMMENT "Copying espeak-ng data for tests..."
-  )
 endif()

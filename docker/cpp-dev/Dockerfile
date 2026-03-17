@@ -33,31 +33,16 @@ RUN apt-get update && apt-get install -y \
     python3-pip \
     && rm -rf /var/lib/apt/lists/*
 
-# Install espeak-ng dependencies and build from source
-RUN apt-get update && apt-get install -y \
-    autoconf \
-    automake \
-    gettext \
-    libtool \
-    make \
-    libpcaudio-dev \
-    && rm -rf /var/lib/apt/lists/* && \
-    git clone --branch 1.51.1 --depth 1 https://github.com/espeak-ng/espeak-ng.git && \
-    cd espeak-ng && \
-    ./autogen.sh && \
-    ./configure --prefix=/usr/local && \
-    make -j$(nproc) && \
-    make install && \
-    cd .. && rm -rf espeak-ng
+# Note: eSpeak-ng and piper-phonemize are NO LONGER needed.
+# piper-plus uses self-contained G2P for all 6 languages (JA/EN/ZH/ES/FR/PT).
 
-# Install piper-phonemize
-RUN git clone https://github.com/rhasspy/piper-phonemize.git && \
-    cd piper-phonemize && \
-    mkdir build && cd build && \
-    cmake .. -DCMAKE_BUILD_TYPE=Release && \
-    make -j$(nproc) && \
-    make install && \
-    cd ../.. && rm -rf piper-phonemize
+# Install ONNX Runtime (CPU, Linux x64)
+RUN wget -q https://github.com/microsoft/onnxruntime/releases/download/v1.14.1/onnxruntime-linux-x64-1.14.1.tgz && \
+    tar -xzf onnxruntime-linux-x64-1.14.1.tgz && \
+    cp onnxruntime-linux-x64-1.14.1/lib/* /usr/local/lib/ && \
+    cp -r onnxruntime-linux-x64-1.14.1/include/* /usr/local/include/ && \
+    ldconfig && \
+    rm -rf onnxruntime-linux-x64-1.14.1*
 
 # Install OpenJTalk and dependencies
 RUN apt-get update && apt-get install -y \
@@ -116,7 +101,7 @@ RUN echo "=== Running build-time tests ===" && \
     echo "Testing build tools..." && \
     which gcc && which g++ && which cmake && \
     echo "Testing libraries..." && \
-    ldconfig -p | grep -E "(espeak|HTSEngine)" || echo "Some libraries in /usr/local/lib" && \
+    ldconfig -p | grep -E "HTSEngine" || echo "Some libraries in /usr/local/lib" && \
     echo "=== Build-time tests passed ==="
 
 # Ensure we're in a valid directory

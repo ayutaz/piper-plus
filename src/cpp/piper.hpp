@@ -6,12 +6,14 @@
 #include <map>
 #include <optional>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include <onnxruntime_cxx_api.h>
-#include <piper-phonemize/phoneme_ids.hpp>
-#include <piper-phonemize/phonemize.hpp>
-#include <piper-phonemize/tashkeel.hpp>
+
+// Self-contained phoneme types.
+// Provides: Phoneme (char32_t), PhonemeId (int64_t), PhonemeIdMap, PhonemeIdConfig
+#include "phoneme_ids.hpp"
 
 #include "json.hpp"
 
@@ -20,23 +22,13 @@ using json = nlohmann::json;
 namespace piper {
 
 typedef int64_t SpeakerId;
-
-struct eSpeakConfig {
-  std::string voice = "en-us";
-};
+typedef int64_t LanguageId;
 
 struct PiperConfig {
-  std::string eSpeakDataPath;
-  bool useESpeak = true;
-
-  bool useTashkeel = false;
-  std::optional<std::string> tashkeelModelPath;
-  std::unique_ptr<tashkeel::State> tashkeelState;
+  // No external dependencies needed for MultilingualPhonemes
 };
 
 enum PhonemeType {
-  eSpeakPhonemes,
-  TextPhonemes,
   OpenJTalkPhonemes,
   MultilingualPhonemes
 };
@@ -54,7 +46,7 @@ struct ProsodyFeature {
 };
 
 struct PhonemizeConfig {
-  PhonemeType phonemeType = eSpeakPhonemes;
+  PhonemeType phonemeType = MultilingualPhonemes;
   std::optional<std::map<Phoneme, std::vector<Phoneme>>> phonemeMap;
   std::map<Phoneme, std::vector<PhonemeId>> phonemeIdMap;
 
@@ -62,8 +54,6 @@ struct PhonemizeConfig {
   PhonemeId idBos = 1; // beginning of sentence
   PhonemeId idEos = 2; // end of sentence
   bool interspersePad = true;
-
-  eSpeakConfig eSpeak;
 };
 
 struct SynthesisConfig {
@@ -80,6 +70,9 @@ struct SynthesisConfig {
   // Speaker id from 0 to numSpeakers - 1
   std::optional<SpeakerId> speakerId;
 
+  // Language id from 0 to numLanguages - 1
+  std::optional<LanguageId> languageId;
+
   // Extra silence
   float sentenceSilenceSeconds = 0.2f;
   std::optional<std::map<piper::Phoneme, float>> phonemeSilenceSeconds;
@@ -87,9 +80,13 @@ struct SynthesisConfig {
 
 struct ModelConfig {
   int numSpeakers;
+  int numLanguages = 1;
 
   // speaker name -> id
   std::optional<std::map<std::string, SpeakerId>> speakerIdMap;
+
+  // language code -> id (e.g. "ja" -> 0, "en" -> 1)
+  std::optional<std::map<std::string, LanguageId>> languageIdMap;
 };
 
 struct ModelSession {
@@ -127,6 +124,11 @@ struct Voice {
   SynthesisConfig synthesisConfig;
   ModelConfig modelConfig;
   ModelSession session;
+
+  // Multilingual dictionary data (loaded on demand)
+  std::unordered_map<std::string, std::string> cmuDict;
+  std::unordered_map<int, std::string> pinyinSingleDict;
+  std::unordered_map<std::string, std::string> pinyinPhraseDict;
 };
 
 // True if the string is a single UTF-8 codepoint

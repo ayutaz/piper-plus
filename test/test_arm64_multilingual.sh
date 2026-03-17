@@ -1,5 +1,6 @@
 #!/bin/bash
 # ARM64 multilingual build verification script for CI/CD
+# Note: eSpeak-ng is no longer required (removed in favor of self-contained G2P)
 
 set -e
 
@@ -13,33 +14,17 @@ else
     exit 1
 fi
 
-# Check espeak-ng integration
-echo "=== Checking espeak-ng integration ==="
-if ldd /build/install/bin/piper | grep -q "espeak"; then
-    echo "✅ espeak-ng is linked"
+# Check ONNX Runtime is linked
+echo "=== Checking ONNX Runtime integration ==="
+if ldd /build/install/bin/piper 2>/dev/null | grep -q "onnxruntime"; then
+    echo "✅ ONNX Runtime is linked"
 else
-    echo "❌ espeak-ng is not linked"
-    exit 1
+    echo "⚠️ ONNX Runtime linkage not detected (may be statically linked)"
 fi
 
-# Check espeak-ng data
-if [ -d /build/install/share/espeak-ng-data ]; then
-    echo "✅ espeak-ng data found"
-    # Check for language files
-    if ls /build/install/share/espeak-ng-data/lang/* >/dev/null 2>&1; then
-        echo "✅ Language files present"
-    else
-        echo "⚠️ Language files may be incomplete"
-    fi
-else
-    echo "❌ espeak-ng data not found"
-    exit 1
-fi
-
-# Test phonemization without full TTS
-echo "=== Testing phonemization capabilities ==="
+# Test binary execution
+echo "=== Testing binary execution ==="
 export LD_LIBRARY_PATH=/build/install/lib:$LD_LIBRARY_PATH
-export ESPEAK_DATA_PATH=/build/install/share/espeak-ng-data
 
 # Just check if piper can load with timeout
 if timeout 5 /build/install/bin/piper --help >/dev/null 2>&1; then

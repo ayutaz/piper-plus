@@ -35,7 +35,9 @@ KOREAN_PHONEMES: list[str] = [
     "p̚",
     # Vowels unique to Korean
     "ɯ",  # close back unrounded vowel (ㅡ)
-    "ø",  # close-mid front rounded vowel (ㅚ)
+    # NOTE: ㅚ is [we] (diphthong) in modern Seoul Korean, not [ø] (monophthong).
+    # The phonemizer decomposes ㅚ into ["w", "e"], both already in the JA/EN
+    # inventory. The monophthong "ø" is not produced and therefore not listed.
     # Consonants / glides
     "ɾ",  # alveolar flap (ㄹ initial)
     "ɰ",  # velar approximant (ㅢ first element)
