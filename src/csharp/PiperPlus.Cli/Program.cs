@@ -1185,20 +1185,21 @@ internal static class Program
 
             case "en":
             {
-                var phonemizerType = Type.GetType(
-                    "PiperPlus.Core.Phonemize.EnglishPhonemizer, PiperPlus.Core");
-                if (phonemizerType is null)
+                // DotNetG2P.English のラッパーをリフレクションで解決
+                var g2pType = Type.GetType(
+                    "PiperPlus.Core.Phonemize.DotNetEnglishG2PEngine, PiperPlus.Core");
+                if (g2pType is null)
                 {
                     throw new NotSupportedException(
-                        "--text mode for English requires EnglishPhonemizer, " +
-                        "which is not yet available.");
+                        "--text mode for English requires DotNetG2P.English, which is not yet available. " +
+                        "Use JSONL stdin input instead.");
                 }
 
-                var phonemizer = Activator.CreateInstance(phonemizerType) as IPhonemizer
+                var g2pEngine = Activator.CreateInstance(g2pType) as IEnglishG2PEngine
                     ?? throw new NotSupportedException(
-                        "Failed to create EnglishPhonemizer instance.");
+                        "Failed to create DotNetEnglishG2PEngine instance.");
 
-                return phonemizer;
+                return new EnglishPhonemizer(g2pEngine);
             }
 
             default:
