@@ -43,7 +43,7 @@ def main() -> None:
     )
     # session_options.enable_cpu_mem_arena = False
     # session_options.enable_mem_pattern = False
-    session_options.enable_mem_reuse = False
+    # session_options.enable_mem_reuse = False
     # session_options.enable_profiling = False
     # session_options.execution_mode = onnxruntime.ExecutionMode.ORT_PARALLEL
     # session_options.execution_order = onnxruntime.ExecutionOrder.PRIORITY_BASED
