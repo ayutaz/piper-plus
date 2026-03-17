@@ -2,6 +2,7 @@
 #include "utf8.h"
 
 #include <algorithm>
+#include <cstdint>
 #include <map>
 
 namespace piper {
