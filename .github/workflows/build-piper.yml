@@ -300,12 +300,16 @@ jobs:
             # Check specific paths
             [ -d "build/pi/lib" ] && cp build/pi/lib/*.so* dist/piper/lib/ 2>/dev/null || true
             [ -d "build/p/src/piper_phonemize_external-build/install/lib" ] && cp build/p/src/piper_phonemize_external-build/install/lib/*.so* dist/piper/lib/ 2>/dev/null || true
+            # Copy ONNX Runtime from system install location (installed by build step)
+            cp /usr/local/lib/libonnxruntime*.so* dist/piper/lib/ 2>/dev/null || true
           elif [ "${{ runner.os }}" = "macOS" ]; then
             # Copy main libraries
             find build -name "*.dylib" -type f -exec cp {} dist/piper/lib/ \; 2>/dev/null || true
             # Check specific paths
             [ -d "build/pi/lib" ] && cp build/pi/lib/*.dylib dist/piper/lib/ 2>/dev/null || true
             [ -d "build/p/src/piper_phonemize_external-build/install/lib" ] && cp build/p/src/piper_phonemize_external-build/install/lib/*.dylib dist/piper/lib/ 2>/dev/null || true
+            # Copy ONNX Runtime from system install location (installed by build step)
+            cp /usr/local/lib/libonnxruntime*.dylib dist/piper/lib/ 2>/dev/null || true
           fi
           
           # Copy OpenJTalk binary and data

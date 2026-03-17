@@ -145,12 +145,14 @@ endif()
 if(APPLE)
   set_target_properties(piper PROPERTIES
     MACOSX_RPATH TRUE
-    INSTALL_RPATH "@executable_path/../lib;@loader_path/../lib"
+    INSTALL_RPATH "@executable_path;@executable_path/../lib;@loader_path/../lib"
+    BUILD_RPATH "${CMAKE_CURRENT_BINARY_DIR}/ort/lib"
     BUILD_WITH_INSTALL_RPATH FALSE
   )
   set_target_properties(test_piper PROPERTIES
     MACOSX_RPATH TRUE
-    INSTALL_RPATH "@executable_path/../lib;@loader_path/../lib"
+    INSTALL_RPATH "@executable_path;@executable_path/../lib;@loader_path/../lib"
+    BUILD_RPATH "${CMAKE_CURRENT_BINARY_DIR}/ort/lib"
     BUILD_WITH_INSTALL_RPATH FALSE
   )
 endif()
