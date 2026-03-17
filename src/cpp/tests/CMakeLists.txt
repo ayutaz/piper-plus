@@ -198,6 +198,15 @@ foreach(test_source ${TEST_SOURCES})
         target_sources(${test_name} PRIVATE
             ../piper.cpp
             ../phoneme_parser.cpp
+            ../custom_dictionary.cpp
+            ../model_manager.cpp
+            ../language_detector.cpp
+            ../english_phonemize.cpp
+            ../chinese_phonemize.cpp
+            ../korean_phonemize.cpp
+            ../spanish_phonemize.cpp
+            ../french_phonemize.cpp
+            ../portuguese_phonemize.cpp
             ../openjtalk_phonemize.cpp
             ../openjtalk_phonemize_utils.cpp
             ../openjtalk_wrapper.c
@@ -213,7 +222,7 @@ foreach(test_source ${TEST_SOURCES})
             ${CMAKE_CURRENT_SOURCE_DIR}/..
             ${CMAKE_BINARY_DIR}/fi/include
             ${CMAKE_BINARY_DIR}/si/include
-            ${CMAKE_BINARY_DIR}/pi/include
+            ${CMAKE_BINARY_DIR}/ort/include
             ${CMAKE_BINARY_DIR}/oj/include
             ${CMAKE_BINARY_DIR}/oj/include/openjtalk
             ${CMAKE_BINARY_DIR}/hts_stub/include
@@ -223,7 +232,7 @@ foreach(test_source ${TEST_SOURCES})
         target_link_directories(${test_name} PRIVATE
             ${CMAKE_BINARY_DIR}/fi/lib
             ${CMAKE_BINARY_DIR}/si/lib
-            ${CMAKE_BINARY_DIR}/pi/lib
+            ${CMAKE_BINARY_DIR}/ort/lib
         )
         
         # Platform-specific library linking (same as main piper)
@@ -234,7 +243,7 @@ foreach(test_source ${TEST_SOURCES})
                 debug ${CMAKE_BINARY_DIR}/fi/lib/fmtd.lib
                 optimized ${CMAKE_BINARY_DIR}/si/lib/spdlog.lib
                 debug ${CMAKE_BINARY_DIR}/si/lib/spdlogd.lib
-                ${CMAKE_BINARY_DIR}/pi/lib/onnxruntime.lib
+                ${CMAKE_BINARY_DIR}/ort/lib/onnxruntime.lib
             )
         else()
             # Unix: Use library names and let CMake find them in link directories
@@ -271,20 +280,20 @@ foreach(test_source ${TEST_SOURCES})
             ${CMAKE_CURRENT_SOURCE_DIR}/..
             ${CMAKE_BINARY_DIR}/fi/include
             ${CMAKE_BINARY_DIR}/si/include
-            ${CMAKE_BINARY_DIR}/pi/include
+            ${CMAKE_BINARY_DIR}/ort/include
         )
 
         # Add library directories
         target_link_directories(${test_name} PRIVATE
             ${CMAKE_BINARY_DIR}/fi/lib
             ${CMAKE_BINARY_DIR}/si/lib
-            ${CMAKE_BINARY_DIR}/pi/lib
+            ${CMAKE_BINARY_DIR}/ort/lib
         )
 
         # Platform-specific library linking
         if(WIN32)
             target_link_libraries(${test_name}
-                ${CMAKE_BINARY_DIR}/pi/lib/onnxruntime.lib
+                ${CMAKE_BINARY_DIR}/ort/lib/onnxruntime.lib
             )
         else()
             target_link_libraries(${test_name}
@@ -304,6 +313,15 @@ foreach(test_source ${TEST_SOURCES})
         target_sources(${test_name} PRIVATE
             ../piper.cpp
             ../phoneme_parser.cpp
+            ../custom_dictionary.cpp
+            ../model_manager.cpp
+            ../language_detector.cpp
+            ../english_phonemize.cpp
+            ../chinese_phonemize.cpp
+            ../korean_phonemize.cpp
+            ../spanish_phonemize.cpp
+            ../french_phonemize.cpp
+            ../portuguese_phonemize.cpp
             ../openjtalk_phonemize.cpp
             ../openjtalk_phonemize_utils.cpp
             ../openjtalk_wrapper.c
@@ -319,7 +337,7 @@ foreach(test_source ${TEST_SOURCES})
             ${CMAKE_CURRENT_SOURCE_DIR}/..
             ${CMAKE_BINARY_DIR}/fi/include
             ${CMAKE_BINARY_DIR}/si/include
-            ${CMAKE_BINARY_DIR}/pi/include
+            ${CMAKE_BINARY_DIR}/ort/include
             ${CMAKE_BINARY_DIR}/oj/include
             ${CMAKE_BINARY_DIR}/oj/include/openjtalk
             ${CMAKE_BINARY_DIR}/hts_stub/include
@@ -329,7 +347,7 @@ foreach(test_source ${TEST_SOURCES})
         target_link_directories(${test_name} PRIVATE
             ${CMAKE_BINARY_DIR}/fi/lib
             ${CMAKE_BINARY_DIR}/si/lib
-            ${CMAKE_BINARY_DIR}/pi/lib
+            ${CMAKE_BINARY_DIR}/ort/lib
         )
         
         # Platform-specific library linking (same as main piper)
@@ -340,7 +358,7 @@ foreach(test_source ${TEST_SOURCES})
                 debug ${CMAKE_BINARY_DIR}/fi/lib/fmtd.lib
                 optimized ${CMAKE_BINARY_DIR}/si/lib/spdlog.lib
                 debug ${CMAKE_BINARY_DIR}/si/lib/spdlogd.lib
-                ${CMAKE_BINARY_DIR}/pi/lib/onnxruntime.lib
+                ${CMAKE_BINARY_DIR}/ort/lib/onnxruntime.lib
             )
         else()
             # Unix: Use library names and let CMake find them in link directories
