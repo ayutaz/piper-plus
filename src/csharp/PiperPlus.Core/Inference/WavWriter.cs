@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Text;
 
 namespace PiperPlus.Core.Inference;
@@ -54,11 +55,9 @@ public static class WavWriter
         writer.Write("data"u8);                           // Subchunk2ID    (4)
         writer.Write(dataSize);                           // Subchunk2Size  (4)
 
-        // --- PCM samples ---
-        for (int i = 0; i < samples.Length; i++)
-        {
-            writer.Write(samples[i]);
-        }
+        // --- PCM samples (bulk write) ---
+        var bytes = MemoryMarshal.AsBytes(samples);
+        writer.Write(bytes);
     }
 
     /// <summary>

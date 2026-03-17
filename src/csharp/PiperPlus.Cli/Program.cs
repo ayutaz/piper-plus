@@ -26,6 +26,10 @@ internal sealed class JsonlUtterance
     [JsonPropertyName("output_file")]
     public string? OutputFile { get; set; }
 
+    /// <summary>
+    /// Prosody features as array-of-arrays: [[a1, a2, a3], [a1, a2, a3], ...].
+    /// Note: Python uses dict format [{"a1":1,"a2":2,"a3":3},...] which differs.
+    /// </summary>
     [JsonPropertyName("prosody_features")]
     public int[][]? ProsodyFeatures { get; set; }
 }
@@ -243,7 +247,7 @@ internal static class Program
                 InferenceSession session;
                 try
                 {
-                    var sessionOptions = new SessionOptions();
+                    using var sessionOptions = new SessionOptions();
                     session = new InferenceSession(modelPath, sessionOptions);
                 }
                 catch (Exception ex)
@@ -388,6 +392,13 @@ internal static class Program
                 // JSONL stdin mode (existing behavior)
                 // ================================================================
 
+                // Hint when stdin appears to be a terminal
+                if (!jsonInput && Console.IsInputRedirected == false)
+                {
+                    LogInfo(quiet, "Reading from stdin. Use --text for direct text input, " +
+                                   "or pipe JSONL input. Press Ctrl+D (Unix) / Ctrl+Z (Windows) to end.");
+                }
+
                 // Open stdout stream once for raw/wav stdout modes (avoid re-opening per utterance)
                 Stream? stdoutStream = (outputMode is OutputMode.RawStdout or OutputMode.WavStdout)
                     ? Console.OpenStandardOutput()
@@ -492,6 +503,10 @@ internal static class Program
 
                             case OutputMode.SingleFile:
                             {
+                                if (utteranceIndex > 0)
+                                {
+                                    LogInfo(quiet, $"Warning: --output_file overwrites previous utterance ({outputFile})");
+                                }
                                 var path = outputFile!;
                                 WavWriter.Write(path, audio, sampleRate);
                                 LogInfo(quiet, path);
@@ -573,9 +588,7 @@ internal static class Program
         {
             case "ja":
             {
-                // JapanesePhonemizer requires an IJapaneseG2PEngine (DotNetG2P wrapper).
-                // The DotNetG2P NuGet package may not yet be available; try to resolve
-                // via reflection so the CLI compiles even before the concrete type exists.
+                // DotNetG2PEngine は NuGet 未公開の可能性があるためリフレクションで解決
                 var g2pType = Type.GetType(
                     "PiperPlus.Core.Phonemize.DotNetG2PEngine, PiperPlus.Core");
                 if (g2pType is null)
@@ -585,24 +598,12 @@ internal static class Program
                         "Use JSONL stdin input instead.");
                 }
 
-                var g2pEngine = Activator.CreateInstance(g2pType)
+                var g2pEngine = Activator.CreateInstance(g2pType) as IJapaneseG2PEngine
                     ?? throw new NotSupportedException(
                         "Failed to create DotNetG2PEngine instance.");
 
-                var phonemizerType = Type.GetType(
-                    "PiperPlus.Core.Phonemize.JapanesePhonemizer, PiperPlus.Core");
-                if (phonemizerType is null)
-                {
-                    throw new NotSupportedException(
-                        "--text mode for Japanese requires JapanesePhonemizer, " +
-                        "which is not yet available.");
-                }
-
-                var phonemizer = Activator.CreateInstance(phonemizerType, g2pEngine) as IPhonemizer
-                    ?? throw new NotSupportedException(
-                        "Failed to create JapanesePhonemizer instance.");
-
-                return phonemizer;
+                // JapanesePhonemizer は直接参照可能
+                return new JapanesePhonemizer(g2pEngine);
             }
 
             case "en":

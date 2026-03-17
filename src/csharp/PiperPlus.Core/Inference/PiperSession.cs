@@ -172,8 +172,9 @@ public sealed class PiperSession
             // ----- Run inference -----
             string[] outputNames = new string[] { "output" };
 
+            using var runOptions = new RunOptions();
             using var results = _model.Session.Run(
-                new RunOptions(),
+                runOptions,
                 inputNames,
                 inputValues,
                 outputNames);
@@ -240,7 +241,7 @@ public sealed class PiperSession
         var result = new short[audio.Length];
         for (int i = 0; i < audio.Length; i++)
         {
-            result[i] = (short)Math.Clamp(audio[i] * scale, short.MinValue, short.MaxValue);
+            result[i] = (short)Math.Clamp(audio[i] * scale, -32767f, 32767f);
         }
 
         return result;
