@@ -1150,43 +1150,43 @@ internal static class Program
         switch (language)
         {
             case "ja":
-            {
-                // DotNetG2PEngine は NuGet 未公開の可能性があるためリフレクションで解決
-                var g2pType = Type.GetType(
-                    "PiperPlus.Core.Phonemize.DotNetG2PEngine, PiperPlus.Core");
-                if (g2pType is null)
                 {
-                    throw new NotSupportedException(
-                        "--text mode for Japanese requires DotNetG2P, which is not yet available. " +
-                        "Use JSONL stdin input instead.");
+                    // DotNetG2PEngine は NuGet 未公開の可能性があるためリフレクションで解決
+                    var g2pType = Type.GetType(
+                        "PiperPlus.Core.Phonemize.DotNetG2PEngine, PiperPlus.Core");
+                    if (g2pType is null)
+                    {
+                        throw new NotSupportedException(
+                            "--text mode for Japanese requires DotNetG2P, which is not yet available. " +
+                            "Use JSONL stdin input instead.");
+                    }
+
+                    var g2pEngine = Activator.CreateInstance(g2pType) as IJapaneseG2PEngine
+                        ?? throw new NotSupportedException(
+                            "Failed to create DotNetG2PEngine instance.");
+
+                    // JapanesePhonemizer は直接参照可能
+                    return new JapanesePhonemizer(g2pEngine);
                 }
-
-                var g2pEngine = Activator.CreateInstance(g2pType) as IJapaneseG2PEngine
-                    ?? throw new NotSupportedException(
-                        "Failed to create DotNetG2PEngine instance.");
-
-                // JapanesePhonemizer は直接参照可能
-                return new JapanesePhonemizer(g2pEngine);
-            }
 
             case "en":
-            {
-                // DotNetG2P.English のラッパーをリフレクションで解決
-                var g2pType = Type.GetType(
-                    "PiperPlus.Core.Phonemize.DotNetEnglishG2PEngine, PiperPlus.Core");
-                if (g2pType is null)
                 {
-                    throw new NotSupportedException(
-                        "--text mode for English requires DotNetG2P.English, which is not yet available. " +
-                        "Use JSONL stdin input instead.");
+                    // DotNetG2P.English のラッパーをリフレクションで解決
+                    var g2pType = Type.GetType(
+                        "PiperPlus.Core.Phonemize.DotNetEnglishG2PEngine, PiperPlus.Core");
+                    if (g2pType is null)
+                    {
+                        throw new NotSupportedException(
+                            "--text mode for English requires DotNetG2P.English, which is not yet available. " +
+                            "Use JSONL stdin input instead.");
+                    }
+
+                    var g2pEngine = Activator.CreateInstance(g2pType) as IEnglishG2PEngine
+                        ?? throw new NotSupportedException(
+                            "Failed to create DotNetEnglishG2PEngine instance.");
+
+                    return new EnglishPhonemizer(g2pEngine);
                 }
-
-                var g2pEngine = Activator.CreateInstance(g2pType) as IEnglishG2PEngine
-                    ?? throw new NotSupportedException(
-                        "Failed to create DotNetEnglishG2PEngine instance.");
-
-                return new EnglishPhonemizer(g2pEngine);
-            }
 
             default:
                 throw new NotSupportedException(
@@ -1211,40 +1211,40 @@ internal static class Program
         switch (outputMode)
         {
             case OutputMode.RawStdout:
-            {
-                using var stdout = Console.OpenStandardOutput();
-                WriteRawPcm(stdout, audio);
-                break;
-            }
-
-            case OutputMode.WavStdout:
-            {
-                using var stdout = Console.OpenStandardOutput();
-                WavWriter.Write(stdout, audio, sampleRate);
-                break;
-            }
-
-            case OutputMode.SingleFile:
-            {
-                WavWriter.Write(outputFile!, audio, sampleRate);
-                LogInfo(quiet, outputFile!);
-                break;
-            }
-
-            case OutputMode.Directory:
-            {
-                var wavPath = Path.Combine(outputDir.FullName, "0.wav");
-
-                var parentDir = Path.GetDirectoryName(wavPath);
-                if (!string.IsNullOrEmpty(parentDir) && !Directory.Exists(parentDir))
                 {
-                    Directory.CreateDirectory(parentDir);
+                    using var stdout = Console.OpenStandardOutput();
+                    WriteRawPcm(stdout, audio);
+                    break;
                 }
 
-                WavWriter.Write(wavPath, audio, sampleRate);
-                LogInfo(quiet, wavPath);
-                break;
-            }
+            case OutputMode.WavStdout:
+                {
+                    using var stdout = Console.OpenStandardOutput();
+                    WavWriter.Write(stdout, audio, sampleRate);
+                    break;
+                }
+
+            case OutputMode.SingleFile:
+                {
+                    WavWriter.Write(outputFile!, audio, sampleRate);
+                    LogInfo(quiet, outputFile!);
+                    break;
+                }
+
+            case OutputMode.Directory:
+                {
+                    var wavPath = Path.Combine(outputDir.FullName, "0.wav");
+
+                    var parentDir = Path.GetDirectoryName(wavPath);
+                    if (!string.IsNullOrEmpty(parentDir) && !Directory.Exists(parentDir))
+                    {
+                        Directory.CreateDirectory(parentDir);
+                    }
+
+                    WavWriter.Write(wavPath, audio, sampleRate);
+                    LogInfo(quiet, wavPath);
+                    break;
+                }
         }
     }
 
@@ -1282,55 +1282,55 @@ internal static class Program
                 break;
 
             case OutputMode.SingleFile:
-            {
-                if (utteranceIndex > 0)
                 {
-                    LogInfo(quiet, $"Warning: --output_file overwrites previous utterance ({outputFile})");
+                    if (utteranceIndex > 0)
+                    {
+                        LogInfo(quiet, $"Warning: --output_file overwrites previous utterance ({outputFile})");
+                    }
+                    var path = outputFile!;
+                    WavWriter.Write(path, audio, sampleRate);
+                    LogInfo(quiet, path);
+                    break;
                 }
-                var path = outputFile!;
-                WavWriter.Write(path, audio, sampleRate);
-                LogInfo(quiet, path);
-                break;
-            }
 
             case OutputMode.Directory:
-            {
-                string wavPath;
-                if (!string.IsNullOrEmpty(uttOutputFile))
                 {
-                    // Security: prevent path traversal from JSONL output_file
-                    if (uttOutputFile.Contains("..") || Path.IsPathRooted(uttOutputFile))
+                    string wavPath;
+                    if (!string.IsNullOrEmpty(uttOutputFile))
                     {
-                        LogError($"Rejected output_file with path traversal or absolute path: {uttOutputFile}");
-                        Environment.ExitCode = 1;
-                        return;
+                        // Security: prevent path traversal from JSONL output_file
+                        if (uttOutputFile.Contains("..") || Path.IsPathRooted(uttOutputFile))
+                        {
+                            LogError($"Rejected output_file with path traversal or absolute path: {uttOutputFile}");
+                            Environment.ExitCode = 1;
+                            return;
+                        }
+                        wavPath = Path.GetFullPath(Path.Combine(outputDir.FullName, uttOutputFile));
+                        if (!wavPath.StartsWith(outputDir.FullName))
+                        {
+                            LogError($"Rejected output_file outside output directory: {uttOutputFile}");
+                            Environment.ExitCode = 1;
+                            return;
+                        }
                     }
-                    wavPath = Path.GetFullPath(Path.Combine(outputDir.FullName, uttOutputFile));
-                    if (!wavPath.StartsWith(outputDir.FullName))
+                    else
                     {
-                        LogError($"Rejected output_file outside output directory: {uttOutputFile}");
-                        Environment.ExitCode = 1;
-                        return;
+                        wavPath = Path.Combine(
+                            outputDir.FullName, $"{utteranceIndex}.wav");
                     }
-                }
-                else
-                {
-                    wavPath = Path.Combine(
-                        outputDir.FullName, $"{utteranceIndex}.wav");
-                }
 
-                // Ensure parent directory exists
-                var parentDir = Path.GetDirectoryName(wavPath);
-                if (!string.IsNullOrEmpty(parentDir)
-                    && !Directory.Exists(parentDir))
-                {
-                    Directory.CreateDirectory(parentDir);
-                }
+                    // Ensure parent directory exists
+                    var parentDir = Path.GetDirectoryName(wavPath);
+                    if (!string.IsNullOrEmpty(parentDir)
+                        && !Directory.Exists(parentDir))
+                    {
+                        Directory.CreateDirectory(parentDir);
+                    }
 
-                WavWriter.Write(wavPath, audio, sampleRate);
-                LogInfo(quiet, wavPath);
-                break;
-            }
+                    WavWriter.Write(wavPath, audio, sampleRate);
+                    LogInfo(quiet, wavPath);
+                    break;
+                }
         }
     }
 

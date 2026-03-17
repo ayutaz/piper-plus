@@ -54,9 +54,9 @@ public sealed class PhonemeConverterTests
             ["?."] = '\uE017',
             ["?~"] = '\uE018',
             // N phoneme variants (Issue #207)
-            ["N_m"]      = '\uE019',
-            ["N_n"]      = '\uE01A',
-            ["N_ng"]     = '\uE01B',
+            ["N_m"] = '\uE019',
+            ["N_n"] = '\uE01A',
+            ["N_ng"] = '\uE01B',
             ["N_uvular"] = '\uE01C',
         };
 
