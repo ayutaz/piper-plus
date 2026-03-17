@@ -339,7 +339,7 @@ std::vector<PhonemeInfo> extractTimingsFromDurations(
             phonemeStr = it->second;
         } else {
             // Try to decode single character
-            if (id > 2 && id < 256) {
+            if (id > 2 && id < 128) {
                 phonemeStr = std::string(1, static_cast<char>(id));
             }
         }
