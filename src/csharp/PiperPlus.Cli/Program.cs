@@ -8,6 +8,7 @@ using Microsoft.ML.OnnxRuntime;
 
 using PiperPlus.Core.Config;
 using PiperPlus.Core.Inference;
+using PiperPlus.Core.Phonemize;
 
 namespace PiperPlus.Cli;
 
@@ -105,6 +106,17 @@ internal static class Program
             getDefaultValue: () => 0.2f,
             description: "Seconds of silence after each sentence (default: 0.2)");
 
+        // --text / -t
+        var textOption = new Option<string?>(
+            aliases: ["--text", "-t"],
+            description: "Text to synthesize (alternative to JSONL stdin input)");
+
+        // --language
+        var languageOption = new Option<string>(
+            name: "--language",
+            getDefaultValue: () => "ja",
+            description: "Language for --text mode: ja or en (default: ja)");
+
         // --json-input
         var jsonInputOption = new Option<bool>(
             name: "--json-input",
@@ -137,6 +149,8 @@ internal static class Program
             lengthScaleOption,
             noiseWOption,
             sentenceSilenceOption,
+            textOption,
+            languageOption,
             jsonInputOption,
             debugOption,
             quietOption,
@@ -255,9 +269,19 @@ internal static class Program
                 float sentenceSilence = result.GetValueForOption(sentenceSilenceOption);
                 bool outputRaw = result.GetValueForOption(outputRawOption);
                 bool jsonInput = result.GetValueForOption(jsonInputOption);
+                string? textInput = result.GetValueForOption(textOption);
+                string language = result.GetValueForOption(languageOption)!;
 
                 string? outputFile = result.GetValueForOption(outputFileOption);
                 var outputDir = result.GetValueForOption(outputDirOption)!;
+
+                // Validate --text and --json-input are mutually exclusive
+                if (!string.IsNullOrEmpty(textInput) && jsonInput)
+                {
+                    LogError("--text and --json-input are mutually exclusive.");
+                    ctx.ExitCode = 1;
+                    return;
+                }
 
                 int sampleRate = model.SampleRate;
                 piperSession.SentenceSilenceSeconds = sentenceSilence;
@@ -292,6 +316,77 @@ internal static class Program
                 LogDebug(debug, quiet,
                     $"Params: noise_scale={noiseScale}, length_scale={lengthScale}, " +
                     $"noise_w={noiseW}, speaker={speaker}");
+
+                // ================================================================
+                // --text mode: phonemize text directly
+                // ================================================================
+                if (!string.IsNullOrEmpty(textInput))
+                {
+                    LogDebug(debug, quiet, $"Text mode: language={language}, text=\"{textInput}\"");
+
+                    // Resolve phonemizer for the requested language
+                    IPhonemizer phonemizer;
+                    try
+                    {
+                        phonemizer = ResolveTextModePhonemizer(language);
+                    }
+                    catch (NotSupportedException ex)
+                    {
+                        LogError(ex.Message);
+                        ctx.ExitCode = 1;
+                        return;
+                    }
+
+                    // Use the phonemizer's own ID map if available, else fall back to config
+                    var phonemeIdMap = phonemizer.GetPhonemeIdMap() ?? config.PhonemeIdMap;
+
+                    // Phonemize + encode in one step via PhonemeEncoder
+                    var (phonemeIdsLong, prosodyFlat) = PhonemeEncoder.EncodeDirect(
+                        phonemizer, textInput, phonemeIdMap);
+
+                    LogDebug(debug, quiet,
+                        $"Encoded: {phonemeIdsLong.Length} phoneme IDs" +
+                        (prosodyFlat is not null ? $", prosody={prosodyFlat.Length / 3} entries" : ""));
+
+                    // If model doesn't support prosody, discard the prosody data
+                    if (!model.HasProsody)
+                    {
+                        prosodyFlat = null;
+                    }
+
+                    // Synthesize
+                    short[] audio;
+                    try
+                    {
+                        var synthesisInput = new SynthesisInput(
+                            PhonemeIds: phonemeIdsLong,
+                            SpeakerId: speaker,
+                            ProsodyFeatures: prosodyFlat,
+                            NoiseScale: noiseScale,
+                            LengthScale: lengthScale,
+                            NoiseW: noiseW);
+                        audio = piperSession.Synthesize(synthesisInput);
+                    }
+                    catch (Exception ex)
+                    {
+                        LogError($"Synthesis failed: {ex.Message}");
+                        ctx.ExitCode = 1;
+                        return;
+                    }
+
+                    // Write output
+                    WriteTextModeOutput(
+                        outputMode, outputRaw, outputFile, outputDir,
+                        audio, sampleRate, quiet);
+
+                    LogInfo(quiet, "Synthesized 1 utterance(s).");
+                    ctx.ExitCode = 0;
+                    return;
+                }
+
+                // ================================================================
+                // JSONL stdin mode (existing behavior)
+                // ================================================================
 
                 // Open stdout stream once for raw/wav stdout modes (avoid re-opening per utterance)
                 Stream? stdoutStream = (outputMode is OutputMode.RawStdout or OutputMode.WavStdout)
@@ -453,6 +548,139 @@ internal static class Program
             });
 
         return rootCommand;
+    }
+
+    // ----------------------------------------------------------------
+    // Text mode helpers
+    // ----------------------------------------------------------------
+
+    /// <summary>
+    /// Resolve an <see cref="IPhonemizer"/> for the given language in --text mode.
+    /// <para>
+    /// Currently supported languages:
+    /// <list type="bullet">
+    ///   <item><c>ja</c> — Japanese (requires <c>JapanesePhonemizer</c> + <c>IJapaneseG2PEngine</c>)</item>
+    ///   <item><c>en</c> — English (requires <c>EnglishPhonemizer</c>)</item>
+    /// </list>
+    /// </para>
+    /// </summary>
+    /// <param name="language">Language code.</param>
+    /// <returns>An <see cref="IPhonemizer"/> instance.</returns>
+    /// <exception cref="NotSupportedException">When the language or its dependencies are unavailable.</exception>
+    private static IPhonemizer ResolveTextModePhonemizer(string language)
+    {
+        switch (language)
+        {
+            case "ja":
+            {
+                // JapanesePhonemizer requires an IJapaneseG2PEngine (DotNetG2P wrapper).
+                // The DotNetG2P NuGet package may not yet be available; try to resolve
+                // via reflection so the CLI compiles even before the concrete type exists.
+                var g2pType = Type.GetType(
+                    "PiperPlus.Core.Phonemize.DotNetG2PEngine, PiperPlus.Core");
+                if (g2pType is null)
+                {
+                    throw new NotSupportedException(
+                        "--text mode for Japanese requires DotNetG2P, which is not yet available. " +
+                        "Use JSONL stdin input instead.");
+                }
+
+                var g2pEngine = Activator.CreateInstance(g2pType)
+                    ?? throw new NotSupportedException(
+                        "Failed to create DotNetG2PEngine instance.");
+
+                var phonemizerType = Type.GetType(
+                    "PiperPlus.Core.Phonemize.JapanesePhonemizer, PiperPlus.Core");
+                if (phonemizerType is null)
+                {
+                    throw new NotSupportedException(
+                        "--text mode for Japanese requires JapanesePhonemizer, " +
+                        "which is not yet available.");
+                }
+
+                var phonemizer = Activator.CreateInstance(phonemizerType, g2pEngine) as IPhonemizer
+                    ?? throw new NotSupportedException(
+                        "Failed to create JapanesePhonemizer instance.");
+
+                return phonemizer;
+            }
+
+            case "en":
+            {
+                var phonemizerType = Type.GetType(
+                    "PiperPlus.Core.Phonemize.EnglishPhonemizer, PiperPlus.Core");
+                if (phonemizerType is null)
+                {
+                    throw new NotSupportedException(
+                        "--text mode for English requires EnglishPhonemizer, " +
+                        "which is not yet available.");
+                }
+
+                var phonemizer = Activator.CreateInstance(phonemizerType) as IPhonemizer
+                    ?? throw new NotSupportedException(
+                        "Failed to create EnglishPhonemizer instance.");
+
+                return phonemizer;
+            }
+
+            default:
+                throw new NotSupportedException(
+                    $"Unsupported language for --text mode: {language}. " +
+                    "Supported languages: ja, en.");
+        }
+    }
+
+    /// <summary>
+    /// Write synthesized audio to the appropriate output target for --text mode.
+    /// Produces a single file named <c>0.wav</c> in directory mode.
+    /// </summary>
+    private static void WriteTextModeOutput(
+        OutputMode outputMode,
+        bool outputRaw,
+        string? outputFile,
+        DirectoryInfo outputDir,
+        short[] audio,
+        int sampleRate,
+        bool quiet)
+    {
+        switch (outputMode)
+        {
+            case OutputMode.RawStdout:
+            {
+                using var stdout = Console.OpenStandardOutput();
+                WriteRawPcm(stdout, audio);
+                break;
+            }
+
+            case OutputMode.WavStdout:
+            {
+                using var stdout = Console.OpenStandardOutput();
+                WavWriter.Write(stdout, audio, sampleRate);
+                break;
+            }
+
+            case OutputMode.SingleFile:
+            {
+                WavWriter.Write(outputFile!, audio, sampleRate);
+                LogInfo(quiet, outputFile!);
+                break;
+            }
+
+            case OutputMode.Directory:
+            {
+                var wavPath = Path.Combine(outputDir.FullName, "0.wav");
+
+                var parentDir = Path.GetDirectoryName(wavPath);
+                if (!string.IsNullOrEmpty(parentDir) && !Directory.Exists(parentDir))
+                {
+                    Directory.CreateDirectory(parentDir);
+                }
+
+                WavWriter.Write(wavPath, audio, sampleRate);
+                LogInfo(quiet, wavPath);
+                break;
+            }
+        }
     }
 
     // ----------------------------------------------------------------
