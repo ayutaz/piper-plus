@@ -43,6 +43,9 @@ public sealed class PiperModel : IDisposable
         HasSpeakerId = _session.InputMetadata.ContainsKey("sid");
         HasProsody = _session.InputMetadata.ContainsKey("prosody_features");
 
+        // Detect duration output capability (mirrors C++ piper.cpp:loadModel).
+        HasDurationOutput = _session.OutputMetadata.ContainsKey("durations");
+
         SampleRate = config.Audio.SampleRate;
     }
 
@@ -61,6 +64,13 @@ public sealed class PiperModel : IDisposable
     /// (A1/A2/A3 accent information from OpenJTalk).
     /// </summary>
     public bool HasProsody { get; }
+
+    /// <summary>
+    /// <c>true</c> when the model produces a <c>durations</c> output tensor,
+    /// providing per-phoneme duration information.
+    /// Mirrors <c>hasDurationOutput</c> in the C++ implementation (<c>piper.cpp</c>).
+    /// </summary>
+    public bool HasDurationOutput { get; }
 
     /// <summary>
     /// Audio sample rate in Hz, sourced from the accompanying config.json.

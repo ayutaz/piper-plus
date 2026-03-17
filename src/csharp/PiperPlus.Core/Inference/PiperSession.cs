@@ -4,6 +4,16 @@ using Microsoft.ML.OnnxRuntime;
 namespace PiperPlus.Core.Inference;
 
 /// <summary>
+/// Inference result containing synthesized audio and optional per-phoneme durations.
+/// </summary>
+/// <param name="Audio">Peak-normalized 16-bit PCM audio samples.</param>
+/// <param name="Durations">
+/// Per-phoneme durations (in frames) with shape <c>[phoneme_length]</c>, or
+/// <c>null</c> when the model does not produce a <c>durations</c> output tensor.
+/// </param>
+public record SynthesisResult(short[] Audio, float[]? Durations);
+
+/// <summary>
 /// Input parameters for a single TTS synthesis call.
 /// Mirrors the VITS inference signature used by the C++ and Python runtimes.
 /// </summary>
@@ -186,6 +196,120 @@ public sealed class PiperSession
         finally
         {
             // Dispose optional tensors that were created outside the using declarations.
+            sidTensor?.Dispose();
+            prosodyTensor?.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// Synthesize audio from phoneme IDs and return peak-normalized 16-bit PCM samples
+    /// together with optional per-phoneme duration information.
+    /// </summary>
+    /// <remarks>
+    /// When the model exposes a <c>durations</c> output tensor (shape <c>[1, phoneme_length]</c>),
+    /// the durations are extracted and returned. Otherwise <see cref="SynthesisResult.Durations"/>
+    /// is <c>null</c>. This mirrors the C++ implementation in <c>piper.cpp:synthesize</c>.
+    /// </remarks>
+    /// <param name="input">Synthesis parameters including phoneme IDs and optional speaker/prosody data.</param>
+    /// <returns>A <see cref="SynthesisResult"/> containing PCM audio and optional durations.</returns>
+    public SynthesisResult SynthesizeWithDurations(SynthesisInput input)
+    {
+        ArgumentNullException.ThrowIfNull(input);
+
+        long[] phonemeIds = input.PhonemeIds;
+        int phonemeLength = phonemeIds.Length;
+
+        // ----- Build input tensors -----
+
+        // input: [1, phoneme_length]
+        using var inputTensor = OrtValue.CreateTensorValueFromMemory(
+            phonemeIds, new long[] { 1, phonemeLength });
+
+        // input_lengths: [1]
+        long[] lengths = new long[] { phonemeLength };
+        using var inputLengths = OrtValue.CreateTensorValueFromMemory(
+            lengths, new long[] { 1 });
+
+        // scales: [3] -- noise_scale, length_scale, noise_w
+        float[] scales = new float[] { input.NoiseScale, input.LengthScale, input.NoiseW };
+        using var scalesTensor = OrtValue.CreateTensorValueFromMemory(
+            scales, new long[] { 3 });
+
+        // Collect names and values in order.
+        var inputNames = new List<string>(5) { "input", "input_lengths", "scales" };
+        var inputValues = new List<OrtValue>(5) { inputTensor, inputLengths, scalesTensor };
+
+        // sid (optional): [1]
+        OrtValue? sidTensor = null;
+        if (_model.HasSpeakerId)
+        {
+            long[] sidArray = new long[] { input.SpeakerId };
+            sidTensor = OrtValue.CreateTensorValueFromMemory(sidArray, new long[] { 1 });
+            inputNames.Add("sid");
+            inputValues.Add(sidTensor);
+        }
+
+        // prosody_features (optional): [1, phoneme_length, 3]
+        OrtValue? prosodyTensor = null;
+        if (_model.HasProsody)
+        {
+            long[] prosodyArray;
+            if (input.ProsodyFeatures is not null
+                && input.ProsodyFeatures.Length == phonemeLength * 3)
+            {
+                prosodyArray = input.ProsodyFeatures;
+            }
+            else
+            {
+                prosodyArray = new long[phonemeLength * 3];
+            }
+
+            prosodyTensor = OrtValue.CreateTensorValueFromMemory(
+                prosodyArray, new long[] { 1, phonemeLength, 3 });
+            inputNames.Add("prosody_features");
+            inputValues.Add(prosodyTensor);
+        }
+
+        try
+        {
+            // ----- Build output names -----
+            var outputNames = _model.HasDurationOutput
+                ? new string[] { "output", "durations" }
+                : new string[] { "output" };
+
+            // ----- Run inference -----
+            using var runOptions = new RunOptions();
+            using var results = _model.Session.Run(
+                runOptions,
+                inputNames,
+                inputValues,
+                outputNames);
+
+            // Output shape: [1, 1, audio_samples] -- squeeze to 1-D.
+            ReadOnlySpan<float> outputSpan = results[0].GetTensorDataAsSpan<float>();
+            short[] pcm = ConvertToInt16(outputSpan);
+
+            // Append sentence silence if configured.
+            if (SentenceSilenceSeconds > 0)
+            {
+                int silenceSamples = (int)(_model.SampleRate * SentenceSilenceSeconds);
+                var padded = new short[pcm.Length + silenceSamples];
+                pcm.CopyTo(padded.AsSpan());
+                pcm = padded;
+            }
+
+            // Extract durations if available: shape [1, phoneme_length] (float32).
+            float[]? durations = null;
+            if (_model.HasDurationOutput && results.Count >= 2)
+            {
+                ReadOnlySpan<float> durSpan = results[1].GetTensorDataAsSpan<float>();
+                durations = durSpan.ToArray();
+            }
+
+            return new SynthesisResult(pcm, durations);
+        }
+        finally
+        {
             sidTensor?.Dispose();
             prosodyTensor?.Dispose();
         }

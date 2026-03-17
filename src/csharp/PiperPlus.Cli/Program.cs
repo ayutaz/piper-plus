@@ -32,6 +32,20 @@ internal sealed class JsonlUtterance
     /// </summary>
     [JsonPropertyName("prosody_features")]
     public int[][]? ProsodyFeatures { get; set; }
+
+    /// <summary>
+    /// Text field for JSONL lines — when present, the CLI phonemizes this text
+    /// instead of requiring pre-computed <see cref="PhonemeIds"/>.
+    /// </summary>
+    [JsonPropertyName("text")]
+    public string? Text { get; set; }
+
+    /// <summary>
+    /// Speaker name resolved via <see cref="PiperConfig.SpeakerIdMap"/>.
+    /// Takes precedence over <see cref="SpeakerId"/> when both are present.
+    /// </summary>
+    [JsonPropertyName("speaker")]
+    public string? Speaker { get; set; }
 }
 
 /// <summary>
@@ -141,6 +155,82 @@ internal static class Program
             name: "--version",
             description: "Show version and exit");
 
+        // ================================================================
+        // Phase 3 — new CLI options (14)
+        // ================================================================
+
+        // --use-cuda
+        var useCudaOption = new Option<bool>(
+            name: "--use-cuda",
+            description: "Use CUDA execution provider");
+
+        // --gpu-device-id
+        var gpuDeviceIdOption = new Option<int>(
+            name: "--gpu-device-id",
+            getDefaultValue: () => 0,
+            description: "CUDA GPU device ID");
+
+        // --phoneme_silence
+        var phonemeSilenceOption = new Option<string?>(
+            name: "--phoneme_silence",
+            description: "Phoneme silence: '<phoneme> <seconds>'");
+
+        // --raw-phonemes
+        var rawPhonemesOption = new Option<bool>(
+            name: "--raw-phonemes",
+            description: "Treat input as phonemes (not text)");
+
+        // --streaming
+        var streamingOption = new Option<bool>(
+            name: "--streaming",
+            description: "Stream raw PCM int16 to stdout");
+
+        // --output-timing
+        var outputTimingOption = new Option<string?>(
+            name: "--output-timing",
+            description: "Output phoneme timing to file");
+
+        // --timing-format
+        var timingFormatOption = new Option<string>(
+            name: "--timing-format",
+            getDefaultValue: () => "json",
+            description: "Timing format: json or tsv");
+
+        // --custom-dict
+        var customDictOption = new Option<string?>(
+            name: "--custom-dict",
+            description: "Custom dictionary files (comma-separated)");
+
+        // --espeak_data (no-op, for C++ CLI compatibility)
+        var espeakDataOption = new Option<string?>(
+            name: "--espeak_data",
+            description: "espeak-ng data path (ignored in C# CLI)");
+
+        // --tashkeel_model (no-op, for C++ CLI compatibility)
+        var tashkeelModelOption = new Option<string?>(
+            name: "--tashkeel_model",
+            description: "libtashkeel model (ignored in C# CLI)");
+
+        // --test-mode
+        var testModeOption = new Option<bool>(
+            name: "--test-mode",
+            description: "Skip ONNX inference (CI testing)");
+
+        // --list-models (Phase 4 placeholder)
+        var listModelsOption = new Option<string?>(
+            name: "--list-models",
+            description: "List available models (not yet implemented)");
+
+        // --download-model (Phase 4 placeholder)
+        var downloadModelOption = new Option<string?>(
+            name: "--download-model",
+            description: "Download a model (not yet implemented)");
+
+        // --model-dir (Phase 4 placeholder)
+        var modelDirOption = new Option<DirectoryInfo?>(
+            name: "--model-dir",
+            description: "Model directory");
+
         var rootCommand = new RootCommand("Piper Plus TTS — C# CLI")
         {
             modelOption,
@@ -159,6 +249,21 @@ internal static class Program
             debugOption,
             quietOption,
             versionOption,
+            // Phase 3 options
+            useCudaOption,
+            gpuDeviceIdOption,
+            phonemeSilenceOption,
+            rawPhonemesOption,
+            streamingOption,
+            outputTimingOption,
+            timingFormatOption,
+            customDictOption,
+            espeakDataOption,
+            tashkeelModelOption,
+            testModeOption,
+            listModelsOption,
+            downloadModelOption,
+            modelDirOption,
         };
 
         rootCommand.SetHandler(
@@ -182,6 +287,77 @@ internal static class Program
                 bool debug = result.GetValueForOption(debugOption);
                 bool quiet = result.GetValueForOption(quietOption);
 
+                // ============================================================
+                // Phase 4 placeholders: --list-models / --download-model
+                // ============================================================
+                string? listModels = result.GetValueForOption(listModelsOption);
+                if (listModels is not null)
+                {
+                    LogError("--list-models is not yet implemented. Coming in Phase 4.");
+                    ctx.ExitCode = 1;
+                    return;
+                }
+
+                string? downloadModel = result.GetValueForOption(downloadModelOption);
+                if (downloadModel is not null)
+                {
+                    LogError("--download-model is not yet implemented. Coming in Phase 4.");
+                    ctx.ExitCode = 1;
+                    return;
+                }
+
+                // ============================================================
+                // No-op options (C++ CLI compatibility)
+                // ============================================================
+                string? espeakData = result.GetValueForOption(espeakDataOption);
+                if (!string.IsNullOrEmpty(espeakData))
+                {
+                    LogDebug(debug, quiet, $"--espeak_data ignored in C# CLI: {espeakData}");
+                }
+
+                string? tashkeelModel = result.GetValueForOption(tashkeelModelOption);
+                if (!string.IsNullOrEmpty(tashkeelModel))
+                {
+                    LogDebug(debug, quiet, $"--tashkeel_model ignored in C# CLI: {tashkeelModel}");
+                }
+
+                // ============================================================
+                // Phase 3 option values
+                // ============================================================
+                bool useCuda = result.GetValueForOption(useCudaOption);
+                int gpuDeviceId = result.GetValueForOption(gpuDeviceIdOption);
+                string? phonemeSilenceSpec = result.GetValueForOption(phonemeSilenceOption);
+                bool rawPhonemes = result.GetValueForOption(rawPhonemesOption);
+                bool streaming = result.GetValueForOption(streamingOption);
+                string? outputTimingPath = result.GetValueForOption(outputTimingOption);
+                string timingFormat = result.GetValueForOption(timingFormatOption)!;
+                string? customDictPaths = result.GetValueForOption(customDictOption);
+                bool testMode = result.GetValueForOption(testModeOption);
+
+                // --model-dir: resolve from CLI > PIPER_MODEL_DIR env
+                var modelDirInfo = result.GetValueForOption(modelDirOption);
+                if (modelDirInfo is null)
+                {
+                    var envModelDir = Environment.GetEnvironmentVariable("PIPER_MODEL_DIR");
+                    if (!string.IsNullOrEmpty(envModelDir))
+                    {
+                        modelDirInfo = new DirectoryInfo(envModelDir);
+                        LogDebug(debug, quiet, $"PIPER_MODEL_DIR: {envModelDir}");
+                    }
+                }
+
+                // --gpu-device-id: resolve from CLI > PIPER_GPU_DEVICE_ID env
+                // (SessionFactory also handles this, but we resolve here for logging)
+                if (gpuDeviceId == 0)
+                {
+                    var envGpu = Environment.GetEnvironmentVariable("PIPER_GPU_DEVICE_ID");
+                    if (!string.IsNullOrEmpty(envGpu) && int.TryParse(envGpu, out int envGpuId))
+                    {
+                        gpuDeviceId = envGpuId;
+                        LogDebug(debug, quiet, $"PIPER_GPU_DEVICE_ID: {envGpuId}");
+                    }
+                }
+
                 // Resolve model path: CLI > env > error
                 var modelFileInfo = result.GetValueForOption(modelOption);
                 string? modelPath = modelFileInfo?.FullName;
@@ -195,14 +371,15 @@ internal static class Program
                     }
                 }
 
-                if (string.IsNullOrEmpty(modelPath))
+                // --test-mode does not require a real model when --text is used
+                if (string.IsNullOrEmpty(modelPath) && !testMode)
                 {
                     LogError("--model is required (or set PIPER_DEFAULT_MODEL).");
                     ctx.ExitCode = 1;
                     return;
                 }
 
-                if (!File.Exists(modelPath))
+                if (!testMode && !string.IsNullOrEmpty(modelPath) && !File.Exists(modelPath))
                 {
                     LogError($"Model file not found: {modelPath}");
                     ctx.ExitCode = 1;
@@ -215,7 +392,7 @@ internal static class Program
                 string? configPath = PiperConfig.FindConfigPath(
                     explicitConfig, modelPath);
 
-                if (string.IsNullOrEmpty(configPath))
+                if (string.IsNullOrEmpty(configPath) && !testMode)
                 {
                     LogError(
                         $"config.json not found. Searched: {modelPath}.json, " +
@@ -227,43 +404,54 @@ internal static class Program
 
                 LogDebug(debug, quiet, $"Config path: {configPath}");
 
-                PiperConfig config;
-                try
+                PiperConfig? config = null;
+                if (!string.IsNullOrEmpty(configPath))
                 {
-                    config = PiperConfig.LoadFromFile(configPath);
-                }
-                catch (Exception ex)
-                {
-                    LogError($"Failed to load config: {ex.Message}");
-                    ctx.ExitCode = 1;
-                    return;
-                }
-
-                LogDebug(debug, quiet, $"Model path: {modelPath}");
-                LogDebug(debug, quiet, $"Sample rate: {config.Audio.SampleRate}");
-                LogInfo(quiet, $"Loading model: {modelPath}");
-
-                // Create ONNX InferenceSession
-                InferenceSession session;
-                try
-                {
-                    using var sessionOptions = new SessionOptions();
-                    session = new InferenceSession(modelPath, sessionOptions);
-                }
-                catch (Exception ex)
-                {
-                    LogError($"Failed to load ONNX model: {ex.Message}");
-                    ctx.ExitCode = 1;
-                    return;
+                    try
+                    {
+                        config = PiperConfig.LoadFromFile(configPath);
+                    }
+                    catch (Exception ex)
+                    {
+                        LogError($"Failed to load config: {ex.Message}");
+                        ctx.ExitCode = 1;
+                        return;
+                    }
                 }
 
-                using var model = new PiperModel(session, config);
-                LogInfo(quiet, $"Model loaded (speakers={config.NumSpeakers}, " +
-                               $"hasSid={model.HasSpeakerId}, " +
-                               $"hasProsody={model.HasProsody})");
+                // ============================================================
+                // Parse --phoneme_silence
+                // ============================================================
+                Dictionary<string, float>? phonemeSilenceMap = null;
+                if (!string.IsNullOrEmpty(phonemeSilenceSpec))
+                {
+                    try
+                    {
+                        phonemeSilenceMap = PhonemeSilenceProcessor.Parse(phonemeSilenceSpec);
+                        LogDebug(debug, quiet,
+                            $"Phoneme silence: {phonemeSilenceMap.Count} entries");
+                    }
+                    catch (ArgumentException ex)
+                    {
+                        LogError($"Invalid --phoneme_silence: {ex.Message}");
+                        ctx.ExitCode = 1;
+                        return;
+                    }
+                }
 
-                // Create PiperSession for inference
-                var piperSession = new PiperSession(model);
+                // ============================================================
+                // Load --custom-dict
+                // ============================================================
+                CustomDictionary? customDict = null;
+                if (!string.IsNullOrEmpty(customDictPaths))
+                {
+                    customDict = new CustomDictionary();
+                    var paths = customDictPaths.Split(',',
+                        StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                    customDict.LoadDictionaries(paths);
+                    LogDebug(debug, quiet,
+                        $"Custom dictionary: {customDict.Count} entries from {paths.Length} file(s)");
+                }
 
                 // Gather synthesis parameters
                 float noiseScale = result.GetValueForOption(noiseScaleOption);
@@ -287,12 +475,164 @@ internal static class Program
                     return;
                 }
 
+                // ============================================================
+                // --test-mode + --text: output phoneme IDs and exit
+                // ============================================================
+                if (testMode && !string.IsNullOrEmpty(textInput))
+                {
+                    LogDebug(debug, quiet, "[test-mode] Phonemizing text without inference.");
+
+                    IPhonemizer phonemizer;
+                    try
+                    {
+                        phonemizer = ResolveTextModePhonemizer(language);
+                    }
+                    catch (NotSupportedException ex)
+                    {
+                        LogError(ex.Message);
+                        ctx.ExitCode = 1;
+                        return;
+                    }
+
+                    // Apply custom dict before phonemization
+                    if (customDict is not null)
+                    {
+                        textInput = customDict.ApplyToText(textInput);
+                    }
+
+                    var phonemeIdMap = phonemizer.GetPhonemeIdMap()
+                                      ?? config?.PhonemeIdMap
+                                      ?? new Dictionary<string, int[]>();
+                    var (phonemeIdsLong, _) = PhonemeEncoder.EncodeDirect(
+                        phonemizer, textInput, phonemeIdMap);
+
+                    Console.Error.WriteLine(
+                        $"[test-mode] phoneme_ids({phonemeIdsLong.Length}): " +
+                        $"[{string.Join(", ", phonemeIdsLong)}]");
+
+                    ctx.ExitCode = 0;
+                    return;
+                }
+
+                // ============================================================
+                // --test-mode + JSONL/raw-phonemes: parse and output IDs
+                // ============================================================
+                if (testMode)
+                {
+                    LogDebug(debug, quiet, "[test-mode] Processing stdin without inference.");
+
+                    using var stdinReader = new StreamReader(
+                        Console.OpenStandardInput(), Console.InputEncoding);
+
+                    int lineNum = 0;
+                    string? line;
+                    while ((line = stdinReader.ReadLine()) is not null)
+                    {
+                        if (string.IsNullOrWhiteSpace(line))
+                            continue;
+
+                        lineNum++;
+
+                        if (rawPhonemes)
+                        {
+                            Console.Error.WriteLine(
+                                $"[test-mode] raw-phonemes line {lineNum}: {line.Trim()}");
+                            continue;
+                        }
+
+                        // JSONL mode
+                        try
+                        {
+                            var utterance = JsonSerializer.Deserialize(
+                                line, CliJsonContext.Default.JsonlUtterance);
+
+                            if (utterance?.PhonemeIds is not null)
+                            {
+                                Console.Error.WriteLine(
+                                    $"[test-mode] line {lineNum}: phoneme_ids({utterance.PhonemeIds.Length}): " +
+                                    $"[{string.Join(", ", utterance.PhonemeIds)}]");
+                            }
+                            else if (utterance?.Text is not null)
+                            {
+                                Console.Error.WriteLine(
+                                    $"[test-mode] line {lineNum}: text=\"{utterance.Text}\"");
+                            }
+                        }
+                        catch (JsonException ex)
+                        {
+                            LogError($"Invalid JSON on line {lineNum}: {ex.Message}");
+                        }
+                    }
+
+                    ctx.ExitCode = 0;
+                    return;
+                }
+
+                // ============================================================
+                // Model/config must be available for inference modes
+                // ============================================================
+                if (string.IsNullOrEmpty(modelPath))
+                {
+                    LogError("--model is required (or set PIPER_DEFAULT_MODEL).");
+                    ctx.ExitCode = 1;
+                    return;
+                }
+
+                if (config is null)
+                {
+                    LogError(
+                        $"config.json not found. Searched: {modelPath}.json, " +
+                        $"{Path.GetDirectoryName(modelPath)}/config.json. " +
+                        "Use --config to specify.");
+                    ctx.ExitCode = 1;
+                    return;
+                }
+
+                LogDebug(debug, quiet, $"Model path: {modelPath}");
+                LogDebug(debug, quiet, $"Sample rate: {config.Audio.SampleRate}");
+                LogInfo(quiet, $"Loading model: {modelPath}");
+
+                // Create ONNX InferenceSession via SessionFactory (CUDA-aware)
+                InferenceSession session;
+                try
+                {
+                    session = SessionFactory.Create(
+                        modelPath,
+                        useCuda: useCuda,
+                        gpuDeviceId: gpuDeviceId);
+                }
+                catch (Exception ex)
+                {
+                    LogError($"Failed to load ONNX model: {ex.Message}");
+                    ctx.ExitCode = 1;
+                    return;
+                }
+
+                using var model = new PiperModel(session, config);
+                LogInfo(quiet, $"Model loaded (speakers={config.NumSpeakers}, " +
+                               $"hasSid={model.HasSpeakerId}, " +
+                               $"hasProsody={model.HasProsody})");
+
+                if (useCuda)
+                {
+                    LogDebug(debug, quiet, $"CUDA enabled (device_id={gpuDeviceId})");
+                }
+
+                // Create PiperSession for inference
+                var piperSession = new PiperSession(model);
+
                 int sampleRate = model.SampleRate;
                 piperSession.SentenceSilenceSeconds = sentenceSilence;
 
                 // Determine output mode
                 OutputMode outputMode;
-                if (outputRaw)
+                if (streaming)
+                {
+                    // --streaming forces raw stdout mode
+                    outputMode = OutputMode.RawStdout;
+                    LogDebug(debug, quiet, "Streaming mode: forcing raw PCM stdout output");
+                }
+                else if (outputRaw)
                 {
                     outputMode = OutputMode.RawStdout;
                 }
@@ -326,6 +666,18 @@ internal static class Program
                 // ================================================================
                 if (!string.IsNullOrEmpty(textInput))
                 {
+                    // Apply custom dictionary before phonemization
+                    if (customDict is not null)
+                    {
+                        string original = textInput;
+                        textInput = customDict.ApplyToText(textInput);
+                        if (textInput != original)
+                        {
+                            LogDebug(debug, quiet,
+                                $"Custom dict: \"{original}\" -> \"{textInput}\"");
+                        }
+                    }
+
                     LogDebug(debug, quiet, $"Text mode: language={language}, text=\"{textInput}\"");
 
                     // Resolve phonemizer for the requested language
@@ -358,18 +710,14 @@ internal static class Program
                         prosodyFlat = null;
                     }
 
-                    // Synthesize
+                    // Synthesize (with optional --phoneme_silence splitting)
                     short[] audio;
                     try
                     {
-                        var synthesisInput = new SynthesisInput(
-                            PhonemeIds: phonemeIdsLong,
-                            SpeakerId: speaker,
-                            ProsodyFeatures: prosodyFlat,
-                            NoiseScale: noiseScale,
-                            LengthScale: lengthScale,
-                            NoiseW: noiseW);
-                        audio = piperSession.Synthesize(synthesisInput);
+                        audio = SynthesizeWithPhonemeSilence(
+                            piperSession, phonemeIdsLong, prosodyFlat,
+                            speaker, noiseScale, lengthScale, noiseW,
+                            phonemeSilenceMap, config.PhonemeIdMap, sampleRate);
                     }
                     catch (Exception ex)
                     {
@@ -378,10 +726,27 @@ internal static class Program
                         return;
                     }
 
-                    // Write output
-                    WriteTextModeOutput(
-                        outputMode, outputRaw, outputFile, outputDir,
-                        audio, sampleRate, quiet);
+                    // --output-timing: warn that timing data is not available
+                    // (VITS model does not expose per-phoneme durations in standard output)
+                    if (!string.IsNullOrEmpty(outputTimingPath))
+                    {
+                        LogInfo(quiet,
+                            $"Warning: --output-timing specified but phoneme timing data " +
+                            $"is not available from this model. Skipping timing output.");
+                    }
+
+                    // Write output (streaming vs normal)
+                    if (streaming)
+                    {
+                        using var stdout = Console.OpenStandardOutput();
+                        StreamingWriter.WriteImmediate(stdout, audio);
+                    }
+                    else
+                    {
+                        WriteTextModeOutput(
+                            outputMode, outputRaw, outputFile, outputDir,
+                            audio, sampleRate, quiet);
+                    }
 
                     LogInfo(quiet, "Synthesized 1 utterance(s).");
                     ctx.ExitCode = 0;
@@ -389,7 +754,100 @@ internal static class Program
                 }
 
                 // ================================================================
-                // JSONL stdin mode (existing behavior)
+                // --raw-phonemes mode: stdin lines are space-separated phonemes
+                // ================================================================
+                if (rawPhonemes)
+                {
+                    LogDebug(debug, quiet, "Raw phonemes mode: interpreting stdin as phoneme strings");
+
+                    using var stdinReader = new StreamReader(
+                        Console.OpenStandardInput(), Console.InputEncoding);
+
+                    Stream? stdoutStream = (outputMode is OutputMode.RawStdout or OutputMode.WavStdout)
+                        ? Console.OpenStandardOutput()
+                        : null;
+
+                    try
+                    {
+                        int utteranceIndex = 0;
+                        string? line;
+
+                        while ((line = stdinReader.ReadLine()) is not null)
+                        {
+                            if (string.IsNullOrWhiteSpace(line))
+                                continue;
+
+                            // Parse space-separated phonemes and look up IDs
+                            string[] phonemeTokens = line.Trim().Split(' ',
+                                StringSplitOptions.RemoveEmptyEntries);
+
+                            var idList = new List<long>();
+                            foreach (string token in phonemeTokens)
+                            {
+                                if (config.PhonemeIdMap.TryGetValue(token, out int[]? ids))
+                                {
+                                    foreach (int id in ids)
+                                    {
+                                        idList.Add(id);
+                                    }
+                                }
+                                else
+                                {
+                                    LogDebug(debug, quiet,
+                                        $"Unknown phoneme '{token}' — skipped");
+                                }
+                            }
+
+                            if (idList.Count == 0)
+                            {
+                                LogDebug(debug, quiet,
+                                    $"Line {utteranceIndex + 1}: no valid phoneme IDs; skipping.");
+                                utteranceIndex++;
+                                continue;
+                            }
+
+                            long[] phonemeIdsLong = idList.ToArray();
+
+                            LogDebug(debug, quiet,
+                                $"Raw phonemes line {utteranceIndex}: {phonemeTokens.Length} tokens -> " +
+                                $"{phonemeIdsLong.Length} IDs, speaker={speaker}");
+
+                            short[] audio;
+                            try
+                            {
+                                audio = SynthesizeWithPhonemeSilence(
+                                    piperSession, phonemeIdsLong, null,
+                                    speaker, noiseScale, lengthScale, noiseW,
+                                    phonemeSilenceMap, config.PhonemeIdMap, sampleRate);
+                            }
+                            catch (Exception ex)
+                            {
+                                LogError($"Synthesis failed on line {utteranceIndex + 1}: {ex.Message}");
+                                ctx.ExitCode = 1;
+                                return;
+                            }
+
+                            WriteUtteranceOutput(
+                                outputMode, stdoutStream, streaming,
+                                outputFile, outputDir, null,
+                                audio, sampleRate, utteranceIndex, quiet);
+
+                            utteranceIndex++;
+                        }
+
+                        LogInfo(quiet, $"Synthesized {utteranceIndex} utterance(s).");
+                        ctx.ExitCode = 0;
+                    }
+                    finally
+                    {
+                        stdoutStream?.Dispose();
+                    }
+
+                    return;
+                }
+
+                // ================================================================
+                // JSONL stdin mode (existing behavior, extended)
                 // ================================================================
 
                 // Hint when stdin appears to be a terminal
@@ -399,170 +857,279 @@ internal static class Program
                                    "or pipe JSONL input. Press Ctrl+D (Unix) / Ctrl+Z (Windows) to end.");
                 }
 
+                // Lazily resolved phonemizer for JSONL "text" field processing
+                IPhonemizer? jsonlPhonemizer = null;
+
                 // Open stdout stream once for raw/wav stdout modes (avoid re-opening per utterance)
-                Stream? stdoutStream = (outputMode is OutputMode.RawStdout or OutputMode.WavStdout)
-                    ? Console.OpenStandardOutput()
-                    : null;
-                try
                 {
-                    // Read stdin line by line
-                    int utteranceIndex = 0;
-                    string? line;
-
-                    using var stdinReader = new StreamReader(
-                        Console.OpenStandardInput(), Console.InputEncoding);
-
-                    while ((line = stdinReader.ReadLine()) is not null)
+                    Stream? stdoutStream = (outputMode is OutputMode.RawStdout or OutputMode.WavStdout)
+                        ? Console.OpenStandardOutput()
+                        : null;
+                    try
                     {
-                        if (string.IsNullOrWhiteSpace(line))
-                        {
-                            continue;
-                        }
+                        // Read stdin line by line
+                        int utteranceIndex = 0;
+                        string? line;
 
-                        // Parse JSONL input
-                        JsonlUtterance? utterance;
-                        try
-                        {
-                            utterance = JsonSerializer.Deserialize(
-                                line, CliJsonContext.Default.JsonlUtterance);
-                        }
-                        catch (JsonException ex)
-                        {
-                            LogError($"Invalid JSON on line {utteranceIndex + 1}: {ex.Message}");
-                            ctx.ExitCode = 1;
-                            return;
-                        }
+                        using var stdinReader = new StreamReader(
+                            Console.OpenStandardInput(), Console.InputEncoding);
 
-                        if (utterance?.PhonemeIds is null || utterance.PhonemeIds.Length == 0)
+                        while ((line = stdinReader.ReadLine()) is not null)
                         {
-                            LogError($"Missing or empty phoneme_ids on line {utteranceIndex + 1}.");
-                            ctx.ExitCode = 1;
-                            return;
-                        }
-
-                        // Resolve per-utterance parameters
-                        int uttSpeaker = utterance.SpeakerId ?? speaker;
-
-                        // Convert int[] → long[] for ONNX tensor (int64)
-                        long[] phonemeIdsLong = Array.ConvertAll(
-                            utterance.PhonemeIds, id => (long)id);
-
-                        // Convert int[][] → flat long[] for prosody features
-                        long[]? prosodyFlat = null;
-                        if (utterance.ProsodyFeatures is { Length: > 0 })
-                        {
-                            prosodyFlat = new long[utterance.ProsodyFeatures.Length * 3];
-                            for (int pi = 0; pi < utterance.ProsodyFeatures.Length; pi++)
+                            if (string.IsNullOrWhiteSpace(line))
                             {
-                                var pf = utterance.ProsodyFeatures[pi];
-                                if (pf is { Length: >= 3 })
-                                {
-                                    prosodyFlat[pi * 3] = pf[0];
-                                    prosodyFlat[pi * 3 + 1] = pf[1];
-                                    prosodyFlat[pi * 3 + 2] = pf[2];
-                                }
-                            }
-                        }
-
-                        LogDebug(debug, quiet,
-                            $"Utterance {utteranceIndex}: phonemes={utterance.PhonemeIds.Length}, " +
-                            $"speaker={uttSpeaker}");
-
-                        // Run inference (sentence silence is handled by PiperSession)
-                        short[] audio;
-                        try
-                        {
-                            var synthesisInput = new SynthesisInput(
-                                PhonemeIds: phonemeIdsLong,
-                                SpeakerId: uttSpeaker,
-                                ProsodyFeatures: prosodyFlat,
-                                NoiseScale: noiseScale,
-                                LengthScale: lengthScale,
-                                NoiseW: noiseW);
-                            audio = piperSession.Synthesize(synthesisInput);
-                        }
-                        catch (Exception ex)
-                        {
-                            LogError($"Synthesis failed on line {utteranceIndex + 1}: {ex.Message}");
-                            ctx.ExitCode = 1;
-                            return;
-                        }
-
-                        // Determine output target for this utterance
-                        string? uttOutputFile = utterance.OutputFile;
-
-                        switch (outputMode)
-                        {
-                            case OutputMode.RawStdout:
-                                WriteRawPcm(stdoutStream!, audio);
-                                break;
-
-                            case OutputMode.WavStdout:
-                                WavWriter.Write(stdoutStream!, audio, sampleRate);
-                                break;
-
-                            case OutputMode.SingleFile:
-                            {
-                                if (utteranceIndex > 0)
-                                {
-                                    LogInfo(quiet, $"Warning: --output_file overwrites previous utterance ({outputFile})");
-                                }
-                                var path = outputFile!;
-                                WavWriter.Write(path, audio, sampleRate);
-                                LogInfo(quiet, path);
-                                break;
+                                continue;
                             }
 
-                            case OutputMode.Directory:
+                            // Parse JSONL input
+                            JsonlUtterance? utterance;
+                            try
                             {
-                                string wavPath;
-                                if (!string.IsNullOrEmpty(uttOutputFile))
+                                utterance = JsonSerializer.Deserialize(
+                                    line, CliJsonContext.Default.JsonlUtterance);
+                            }
+                            catch (JsonException ex)
+                            {
+                                LogError($"Invalid JSON on line {utteranceIndex + 1}: {ex.Message}");
+                                ctx.ExitCode = 1;
+                                return;
+                            }
+
+                            // ---------------------------------------------------
+                            // Resolve speaker: "speaker" name > speaker_id > CLI default
+                            // ---------------------------------------------------
+                            int uttSpeaker = utterance?.SpeakerId ?? speaker;
+
+                            if (!string.IsNullOrEmpty(utterance?.Speaker)
+                                && config.SpeakerIdMap is not null)
+                            {
+                                if (config.SpeakerIdMap.TryGetValue(
+                                        utterance.Speaker, out int resolvedId))
                                 {
-                                    // Per-utterance output_file from JSONL
-                                    wavPath = Path.IsPathRooted(uttOutputFile)
-                                        ? uttOutputFile
-                                        : Path.Combine(outputDir.FullName, uttOutputFile);
+                                    uttSpeaker = resolvedId;
+                                    LogDebug(debug, quiet,
+                                        $"Speaker name '{utterance.Speaker}' -> ID {resolvedId}");
                                 }
                                 else
                                 {
-                                    wavPath = Path.Combine(
-                                        outputDir.FullName, $"{utteranceIndex}.wav");
+                                    LogError(
+                                        $"Unknown speaker name '{utterance.Speaker}' " +
+                                        $"on line {utteranceIndex + 1}. " +
+                                        "Available: " +
+                                        string.Join(", ", config.SpeakerIdMap.Keys));
+                                    ctx.ExitCode = 1;
+                                    return;
                                 }
-
-                                // Ensure parent directory exists
-                                var parentDir = Path.GetDirectoryName(wavPath);
-                                if (!string.IsNullOrEmpty(parentDir)
-                                    && !Directory.Exists(parentDir))
-                                {
-                                    Directory.CreateDirectory(parentDir);
-                                }
-
-                                WavWriter.Write(wavPath, audio, sampleRate);
-                                LogInfo(quiet, wavPath);
-                                break;
                             }
+
+                            // ---------------------------------------------------
+                            // JSONL "text" field: phonemize inline
+                            // ---------------------------------------------------
+                            long[] phonemeIdsLong;
+                            long[]? prosodyFlat = null;
+
+                            if (!string.IsNullOrEmpty(utterance?.Text))
+                            {
+                                // Lazily create phonemizer
+                                if (jsonlPhonemizer is null)
+                                {
+                                    try
+                                    {
+                                        jsonlPhonemizer = ResolveTextModePhonemizer(language);
+                                    }
+                                    catch (NotSupportedException ex)
+                                    {
+                                        LogError(ex.Message);
+                                        ctx.ExitCode = 1;
+                                        return;
+                                    }
+                                }
+
+                                string textToPhon = utterance!.Text;
+
+                                // Apply custom dict
+                                if (customDict is not null)
+                                {
+                                    textToPhon = customDict.ApplyToText(textToPhon);
+                                }
+
+                                var phonemeIdMap = jsonlPhonemizer.GetPhonemeIdMap()
+                                                  ?? config.PhonemeIdMap;
+                                var encoded = PhonemeEncoder.EncodeDirect(
+                                    jsonlPhonemizer, textToPhon, phonemeIdMap);
+                                phonemeIdsLong = encoded.PhonemeIds;
+                                prosodyFlat = model.HasProsody ? encoded.ProsodyFlat : null;
+
+                                LogDebug(debug, quiet,
+                                    $"JSONL text line {utteranceIndex}: \"{textToPhon}\" -> " +
+                                    $"{phonemeIdsLong.Length} IDs");
+                            }
+                            else
+                            {
+                                // Standard phoneme_ids mode
+                                if (utterance?.PhonemeIds is null || utterance.PhonemeIds.Length == 0)
+                                {
+                                    LogError($"Missing or empty phoneme_ids (and no text) on line {utteranceIndex + 1}.");
+                                    ctx.ExitCode = 1;
+                                    return;
+                                }
+
+                                // Convert int[] -> long[] for ONNX tensor (int64)
+                                phonemeIdsLong = Array.ConvertAll(
+                                    utterance.PhonemeIds, id => (long)id);
+
+                                // Convert int[][] -> flat long[] for prosody features
+                                if (utterance.ProsodyFeatures is { Length: > 0 })
+                                {
+                                    prosodyFlat = new long[utterance.ProsodyFeatures.Length * 3];
+                                    for (int pi = 0; pi < utterance.ProsodyFeatures.Length; pi++)
+                                    {
+                                        var pf = utterance.ProsodyFeatures[pi];
+                                        if (pf is { Length: >= 3 })
+                                        {
+                                            prosodyFlat[pi * 3] = pf[0];
+                                            prosodyFlat[pi * 3 + 1] = pf[1];
+                                            prosodyFlat[pi * 3 + 2] = pf[2];
+                                        }
+                                    }
+                                }
+                            }
+
+                            LogDebug(debug, quiet,
+                                $"Utterance {utteranceIndex}: phonemes={phonemeIdsLong.Length}, " +
+                                $"speaker={uttSpeaker}");
+
+                            // Run inference (with optional --phoneme_silence splitting)
+                            short[] audio;
+                            try
+                            {
+                                audio = SynthesizeWithPhonemeSilence(
+                                    piperSession, phonemeIdsLong, prosodyFlat,
+                                    uttSpeaker, noiseScale, lengthScale, noiseW,
+                                    phonemeSilenceMap, config.PhonemeIdMap, sampleRate);
+                            }
+                            catch (Exception ex)
+                            {
+                                LogError($"Synthesis failed on line {utteranceIndex + 1}: {ex.Message}");
+                                ctx.ExitCode = 1;
+                                return;
+                            }
+
+                            // Determine output target for this utterance
+                            string? uttOutputFile = utterance?.OutputFile;
+
+                            WriteUtteranceOutput(
+                                outputMode, stdoutStream, streaming,
+                                outputFile, outputDir, uttOutputFile,
+                                audio, sampleRate, utteranceIndex, quiet);
+
+                            utteranceIndex++;
                         }
 
-                        utteranceIndex++;
-                    }
+                        if (utteranceIndex == 0 && jsonInput)
+                        {
+                            LogError("No input received on stdin.");
+                            ctx.ExitCode = 1;
+                            return;
+                        }
 
-                    if (utteranceIndex == 0 && jsonInput)
+                        // --output-timing: warn once at end if no timing data
+                        if (!string.IsNullOrEmpty(outputTimingPath))
+                        {
+                            LogInfo(quiet,
+                                $"Warning: --output-timing specified but phoneme timing data " +
+                                $"is not available from this model. Skipping timing output.");
+                        }
+
+                        LogInfo(quiet, $"Synthesized {utteranceIndex} utterance(s).");
+                        ctx.ExitCode = 0;
+                    }
+                    finally
                     {
-                        LogError("No input received on stdin.");
-                        ctx.ExitCode = 1;
-                        return;
+                        stdoutStream?.Dispose();
                     }
-
-                    LogInfo(quiet, $"Synthesized {utteranceIndex} utterance(s).");
-                    ctx.ExitCode = 0;
-                }
-                finally
-                {
-                    stdoutStream?.Dispose();
                 }
             });
 
         return rootCommand;
+    }
+
+    // ----------------------------------------------------------------
+    // Synthesis helpers
+    // ----------------------------------------------------------------
+
+    /// <summary>
+    /// Synthesize audio, optionally splitting at phoneme silence boundaries.
+    /// When <paramref name="phonemeSilenceMap"/> is <c>null</c>, performs a
+    /// single inference call (normal path). Otherwise, splits the phoneme
+    /// sequence via <see cref="PhonemeSilenceProcessor"/> and concatenates
+    /// per-phrase audio with inserted silence gaps.
+    /// </summary>
+    private static short[] SynthesizeWithPhonemeSilence(
+        PiperSession piperSession,
+        long[] phonemeIdsLong,
+        long[]? prosodyFlat,
+        int speaker,
+        float noiseScale,
+        float lengthScale,
+        float noiseW,
+        Dictionary<string, float>? phonemeSilenceMap,
+        Dictionary<string, int[]> phonemeIdMap,
+        int sampleRate)
+    {
+        // Normal (non-split) path
+        if (phonemeSilenceMap is null || phonemeSilenceMap.Count == 0)
+        {
+            var input = new SynthesisInput(
+                PhonemeIds: phonemeIdsLong,
+                SpeakerId: speaker,
+                ProsodyFeatures: prosodyFlat,
+                NoiseScale: noiseScale,
+                LengthScale: lengthScale,
+                NoiseW: noiseW);
+            return piperSession.Synthesize(input);
+        }
+
+        // Split at phoneme silence boundaries
+        var phrases = PhonemeSilenceProcessor.SplitAtPhonemeSilence(
+            phonemeIdsLong, prosodyFlat,
+            phonemeSilenceMap, phonemeIdMap, sampleRate);
+
+        var segments = new List<(short[] Audio, int SilenceSamples)>();
+        int totalLength = 0;
+
+        foreach (var phrase in phrases)
+        {
+            if (phrase.PhonemeIds.Count == 0)
+                continue;
+
+            long[] phraseIds = phrase.PhonemeIds.ToArray();
+            long[]? phraseProsody = phrase.ProsodyFlat?.ToArray();
+
+            var input = new SynthesisInput(
+                PhonemeIds: phraseIds,
+                SpeakerId: speaker,
+                ProsodyFeatures: phraseProsody,
+                NoiseScale: noiseScale,
+                LengthScale: lengthScale,
+                NoiseW: noiseW);
+
+            short[] phraseAudio = piperSession.Synthesize(input);
+            segments.Add((phraseAudio, phrase.SilenceSamples));
+            totalLength += phraseAudio.Length + phrase.SilenceSamples;
+        }
+
+        // Concatenate segments with silence gaps
+        var result = new short[totalLength];
+        int offset = 0;
+        foreach (var (audio, silenceSamples) in segments)
+        {
+            audio.CopyTo(result.AsSpan(offset));
+            offset += audio.Length;
+            offset += silenceSamples; // zeros already initialized
+        }
+
+        return result;
     }
 
     // ----------------------------------------------------------------
@@ -673,6 +1240,82 @@ internal static class Program
 
                 var parentDir = Path.GetDirectoryName(wavPath);
                 if (!string.IsNullOrEmpty(parentDir) && !Directory.Exists(parentDir))
+                {
+                    Directory.CreateDirectory(parentDir);
+                }
+
+                WavWriter.Write(wavPath, audio, sampleRate);
+                LogInfo(quiet, wavPath);
+                break;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Write a single utterance's audio to the appropriate output target
+    /// in JSONL/raw-phonemes mode. Handles streaming vs non-streaming output.
+    /// </summary>
+    private static void WriteUtteranceOutput(
+        OutputMode outputMode,
+        Stream? stdoutStream,
+        bool streaming,
+        string? outputFile,
+        DirectoryInfo outputDir,
+        string? uttOutputFile,
+        short[] audio,
+        int sampleRate,
+        int utteranceIndex,
+        bool quiet)
+    {
+        // --streaming: always use StreamingWriter
+        if (streaming && stdoutStream is not null)
+        {
+            StreamingWriter.WriteImmediate(stdoutStream, audio);
+            return;
+        }
+
+        switch (outputMode)
+        {
+            case OutputMode.RawStdout:
+                WriteRawPcm(stdoutStream!, audio);
+                break;
+
+            case OutputMode.WavStdout:
+                WavWriter.Write(stdoutStream!, audio, sampleRate);
+                break;
+
+            case OutputMode.SingleFile:
+            {
+                if (utteranceIndex > 0)
+                {
+                    LogInfo(quiet, $"Warning: --output_file overwrites previous utterance ({outputFile})");
+                }
+                var path = outputFile!;
+                WavWriter.Write(path, audio, sampleRate);
+                LogInfo(quiet, path);
+                break;
+            }
+
+            case OutputMode.Directory:
+            {
+                string wavPath;
+                if (!string.IsNullOrEmpty(uttOutputFile))
+                {
+                    // Per-utterance output_file from JSONL
+                    wavPath = Path.IsPathRooted(uttOutputFile)
+                        ? uttOutputFile
+                        : Path.Combine(outputDir.FullName, uttOutputFile);
+                }
+                else
+                {
+                    wavPath = Path.Combine(
+                        outputDir.FullName, $"{utteranceIndex}.wav");
+                }
+
+                // Ensure parent directory exists
+                var parentDir = Path.GetDirectoryName(wavPath);
+                if (!string.IsNullOrEmpty(parentDir)
+                    && !Directory.Exists(parentDir))
                 {
                     Directory.CreateDirectory(parentDir);
                 }
