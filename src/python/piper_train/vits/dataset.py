@@ -98,9 +98,7 @@ class PiperDataset(Dataset):
         if validate_cache:
             before = len(self.utterances)
             self.utterances = [
-                utt
-                for utt in self.utterances
-                if self._validate_cache_files(utt)
+                utt for utt in self.utterances if self._validate_cache_files(utt)
             ]
             removed = before - len(self.utterances)
             if removed:

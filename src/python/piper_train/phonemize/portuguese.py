@@ -607,7 +607,6 @@ def _find_word_ranges(phonemes: list[str]) -> list[tuple[int, int]]:
     return ranges
 
 
-
 def _split_words(text: str) -> list[str]:
     """Split text into words and punctuation tokens."""
     tokens = re.findall(

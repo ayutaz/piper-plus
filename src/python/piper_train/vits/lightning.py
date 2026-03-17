@@ -707,7 +707,9 @@ class VitsModel(pl.LightningModule):
                             if raw_sid is not None:
                                 if isinstance(raw_sid, torch.Tensor):
                                     sid = (
-                                        raw_sid.unsqueeze(0) if raw_sid.dim() == 0 else raw_sid
+                                        raw_sid.unsqueeze(0)
+                                        if raw_sid.dim() == 0
+                                        else raw_sid
                                     ).to(self.device)
                                 else:
                                     sid = torch.LongTensor([raw_sid]).to(self.device)
@@ -718,7 +720,9 @@ class VitsModel(pl.LightningModule):
                             if raw_lid is not None:
                                 if isinstance(raw_lid, torch.Tensor):
                                     lid = (
-                                        raw_lid.unsqueeze(0) if raw_lid.dim() == 0 else raw_lid
+                                        raw_lid.unsqueeze(0)
+                                        if raw_lid.dim() == 0
+                                        else raw_lid
                                     ).to(self.device)
                                 else:
                                     lid = torch.LongTensor([raw_lid]).to(self.device)

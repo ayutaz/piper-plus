@@ -163,9 +163,7 @@ class PiperVoice:
                     )
                     mp = MultilingualPhonemizer(languages=languages)
                     phonemes = mp.phonemize(text)
-                    _LOGGER.debug(
-                        "MultilingualPhonemizer: '%s' -> %s", text, phonemes
-                    )
+                    _LOGGER.debug("MultilingualPhonemizer: '%s' -> %s", text, phonemes)
                     return [phonemes]
                 except ImportError:
                     _LOGGER.debug(

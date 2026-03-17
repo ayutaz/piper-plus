@@ -19,15 +19,23 @@
 #include "../french_phonemize.hpp"
 #include "../portuguese_phonemize.hpp"
 #include "../korean_phonemize.hpp"
-#include "../piper.hpp"
+// NOTE: piper.hpp is intentionally NOT included here — it pulls in
+// <onnxruntime_cxx_api.h> which introduces a static initializer referencing
+// OrtGetApiBase.  This test does not link against onnxruntime, so we define
+// only the minimal types/helpers needed without that dependency.
+#include "../phoneme_parser.hpp"  // piper::Phoneme = char32_t
 #include "../utf8.h"
 
-// Provide definitions for isSingleCodepoint / getCodepoint declared in
-// piper.hpp.  The implementations mirror piper.cpp but are compiled here
-// so the test does not need to link the full piper.cpp (which requires
-// ONNX Runtime libraries).
 namespace piper {
 
+// Minimal ModelConfig used by TestModelConfigTest (no ORT fields).
+struct ModelConfig {
+    int numSpeakers = 0;
+    int numLanguages = 1;
+};
+
+// Implementations of helpers declared in piper.hpp but defined here so
+// this test links without the full piper.cpp / onnxruntime.
 bool isSingleCodepoint(std::string s) {
     return utf8::distance(s.begin(), s.end()) == 1;
 }
@@ -37,8 +45,6 @@ Phoneme getCodepoint(std::string s) {
                                                          s.end());
     return *character_iter;
 }
-
-std::string getVersion() { return "test"; }
 
 } // namespace piper
 
