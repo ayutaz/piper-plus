@@ -1,5 +1,6 @@
 using System.CommandLine;
 using System.CommandLine.Invocation;
+using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -42,7 +43,7 @@ internal sealed class JsonlUtterance
 
     /// <summary>
     /// Speaker name resolved via <see cref="PiperConfig.SpeakerIdMap"/>.
-    /// Takes precedence over <see cref="SpeakerId"/> when both are present.
+    /// Used only when <see cref="SpeakerId"/> is absent (speaker_id takes precedence).
     /// </summary>
     [JsonPropertyName("speaker")]
     public string? Speaker { get; set; }
@@ -62,8 +63,16 @@ internal static class Program
 {
     private static int Main(string[] args)
     {
-        var rootCommand = BuildRootCommand();
-        return rootCommand.Invoke(args);
+        try
+        {
+            var rootCommand = BuildRootCommand();
+            return rootCommand.Invoke(args);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[ERR] Fatal error: {ex.Message}");
+            return 1;
+        }
     }
 
     private static RootCommand BuildRootCommand()
@@ -78,20 +87,20 @@ internal static class Program
             aliases: ["--config", "-c"],
             description: "Path to config.json (auto-detected if omitted)");
 
-        // --output_file / -f
+        // --output_file / --output-file / -f
         var outputFileOption = new Option<string?>(
-            aliases: ["--output_file", "-f"],
+            aliases: ["--output_file", "--output-file", "-f"],
             description: "Output WAV file path ('-' for stdout)");
 
-        // --output_dir / -d
+        // --output_dir / --output-dir / -d
         var outputDirOption = new Option<DirectoryInfo>(
-            aliases: ["--output_dir", "-d"],
+            aliases: ["--output_dir", "--output-dir", "-d"],
             getDefaultValue: () => new DirectoryInfo(Directory.GetCurrentDirectory()),
             description: "Output directory (default: current directory)");
 
-        // --output_raw
+        // --output_raw / --output-raw
         var outputRawOption = new Option<bool>(
-            name: "--output_raw",
+            aliases: ["--output_raw", "--output-raw"],
             description: "Output raw PCM int16 to stdout (no WAV header)");
 
         // --speaker / -s
@@ -100,27 +109,27 @@ internal static class Program
             getDefaultValue: () => 0,
             description: "Speaker ID (default: 0)");
 
-        // --noise_scale
+        // --noise_scale / --noise-scale
         var noiseScaleOption = new Option<float>(
-            name: "--noise_scale",
+            aliases: ["--noise_scale", "--noise-scale"],
             getDefaultValue: () => 0.667f,
             description: "Generator noise scale (default: 0.667)");
 
-        // --length_scale
+        // --length_scale / --length-scale
         var lengthScaleOption = new Option<float>(
-            name: "--length_scale",
+            aliases: ["--length_scale", "--length-scale"],
             getDefaultValue: () => 1.0f,
             description: "Phoneme length scale (default: 1.0)");
 
-        // --noise_w
+        // --noise_w / --noise-w
         var noiseWOption = new Option<float>(
-            name: "--noise_w",
+            aliases: ["--noise_w", "--noise-w"],
             getDefaultValue: () => 0.8f,
             description: "Duration predictor noise (default: 0.8)");
 
-        // --sentence_silence
+        // --sentence_silence / --sentence-silence
         var sentenceSilenceOption = new Option<float>(
-            name: "--sentence_silence",
+            aliases: ["--sentence_silence", "--sentence-silence"],
             getDefaultValue: () => 0.2f,
             description: "Seconds of silence after each sentence (default: 0.2)");
 
@@ -787,28 +796,11 @@ internal static class Program
                             if (string.IsNullOrWhiteSpace(line))
                                 continue;
 
-                            // Parse space-separated phonemes and look up IDs
-                            string[] phonemeTokens = line.Trim().Split(' ',
-                                StringSplitOptions.RemoveEmptyEntries);
+                            // Parse space-separated phonemes via RawPhonemeParser
+                            // (handles PUA resolution for multi-char tokens like "a:", "N_m")
+                            long[] phonemeIdsLong = RawPhonemeParser.Parse(line.Trim(), config.PhonemeIdMap);
 
-                            var idList = new List<long>();
-                            foreach (string token in phonemeTokens)
-                            {
-                                if (config.PhonemeIdMap.TryGetValue(token, out int[]? ids))
-                                {
-                                    foreach (int id in ids)
-                                    {
-                                        idList.Add(id);
-                                    }
-                                }
-                                else
-                                {
-                                    LogDebug(debug, quiet,
-                                        $"Unknown phoneme '{token}' — skipped");
-                                }
-                            }
-
-                            if (idList.Count == 0)
+                            if (phonemeIdsLong.Length == 0)
                             {
                                 LogDebug(debug, quiet,
                                     $"Line {utteranceIndex + 1}: no valid phoneme IDs; skipping.");
@@ -816,10 +808,8 @@ internal static class Program
                                 continue;
                             }
 
-                            long[] phonemeIdsLong = idList.ToArray();
-
                             LogDebug(debug, quiet,
-                                $"Raw phonemes line {utteranceIndex}: {phonemeTokens.Length} tokens -> " +
+                                $"Raw phonemes line {utteranceIndex}: " +
                                 $"{phonemeIdsLong.Length} IDs, speaker={speaker}");
 
                             short[] audio;
@@ -906,11 +896,15 @@ internal static class Program
                             }
 
                             // ---------------------------------------------------
-                            // Resolve speaker: "speaker" name > speaker_id > CLI default
+                            // Resolve speaker: speaker_id > "speaker" name > CLI default
+                            // (C++ compatible: speaker_id takes precedence)
                             // ---------------------------------------------------
-                            int uttSpeaker = utterance?.SpeakerId ?? speaker;
-
-                            if (!string.IsNullOrEmpty(utterance?.Speaker)
+                            int uttSpeaker;
+                            if (utterance?.SpeakerId.HasValue == true)
+                            {
+                                uttSpeaker = utterance.SpeakerId.Value;
+                            }
+                            else if (!string.IsNullOrEmpty(utterance?.Speaker)
                                 && config.SpeakerIdMap is not null)
                             {
                                 if (config.SpeakerIdMap.TryGetValue(
@@ -922,14 +916,15 @@ internal static class Program
                                 }
                                 else
                                 {
-                                    LogError(
-                                        $"Unknown speaker name '{utterance.Speaker}' " +
-                                        $"on line {utteranceIndex + 1}. " +
-                                        "Available: " +
-                                        string.Join(", ", config.SpeakerIdMap.Keys));
-                                    ctx.ExitCode = 1;
-                                    return;
+                                    // C++ compatible: warn and continue (don't exit)
+                                    LogInfo(quiet,
+                                        $"Warning: Unknown speaker name '{utterance.Speaker}', using default speaker {speaker}");
+                                    uttSpeaker = speaker;
                                 }
+                            }
+                            else
+                            {
+                                uttSpeaker = speaker;
                             }
 
                             // ---------------------------------------------------
@@ -1159,6 +1154,9 @@ internal static class Program
     /// <param name="language">Language code.</param>
     /// <returns>An <see cref="IPhonemizer"/> instance.</returns>
     /// <exception cref="NotSupportedException">When the language or its dependencies are unavailable.</exception>
+    [RequiresUnreferencedCode(
+        "G2P engine types are resolved via reflection. When publishing trimmed, " +
+        "ensure DotNetG2PEngine/DotNetEnglishG2PEngine are preserved.")]
     private static IPhonemizer ResolveTextModePhonemizer(string language)
     {
         switch (language)
@@ -1312,10 +1310,20 @@ internal static class Program
                 string wavPath;
                 if (!string.IsNullOrEmpty(uttOutputFile))
                 {
-                    // Per-utterance output_file from JSONL
-                    wavPath = Path.IsPathRooted(uttOutputFile)
-                        ? uttOutputFile
-                        : Path.Combine(outputDir.FullName, uttOutputFile);
+                    // Security: prevent path traversal from JSONL output_file
+                    if (uttOutputFile.Contains("..") || Path.IsPathRooted(uttOutputFile))
+                    {
+                        LogError($"Rejected output_file with path traversal or absolute path: {uttOutputFile}");
+                        ctx.ExitCode = 1;
+                        return;
+                    }
+                    wavPath = Path.GetFullPath(Path.Combine(outputDir.FullName, uttOutputFile));
+                    if (!wavPath.StartsWith(outputDir.FullName))
+                    {
+                        LogError($"Rejected output_file outside output directory: {uttOutputFile}");
+                        ctx.ExitCode = 1;
+                        return;
+                    }
                 }
                 else
                 {

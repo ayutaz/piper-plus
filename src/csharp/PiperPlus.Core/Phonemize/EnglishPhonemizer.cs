@@ -30,14 +30,6 @@ public interface IEnglishG2PEngine
     List<List<string>> ConvertToArpabet(string text);
 }
 
-/// <summary>
-/// G2P result together with the original source words extracted from
-/// the input text (used for function-word detection).
-/// </summary>
-/// <param name="ArpabetWords">Per-word ARPAbet token sequences.</param>
-/// <param name="SourceWords">Lowered alphabetic words from the original text.</param>
-public record EnglishG2PContext(List<List<string>> ArpabetWords, List<string> SourceWords);
-
 // -----------------------------------------------------------------
 // EnglishPhonemizer
 // -----------------------------------------------------------------

@@ -93,12 +93,26 @@ public static class VoiceCatalog
         return result;
     }
 
+    private static readonly Lazy<IReadOnlyList<VoiceInfo>> s_cachedCatalog =
+        new(() => LoadMergedCatalogInternal(null));
+
     /// <summary>
     /// Returns the built-in catalog merged with an optional external <c>voices.json</c>.
     /// Built-in entries take precedence when keys collide (same semantics as the C++ implementation).
     /// The result is sorted by language code, then by key.
+    /// When <paramref name="externalVoicesJsonPath"/> is <c>null</c>, the result is cached
+    /// (thread-safe via <see cref="Lazy{T}"/>).
     /// </summary>
     public static IReadOnlyList<VoiceInfo> LoadMergedCatalog(string? externalVoicesJsonPath = null)
+    {
+        if (externalVoicesJsonPath is null)
+            return s_cachedCatalog.Value;
+
+        // External file specified — bypass cache
+        return LoadMergedCatalogInternal(externalVoicesJsonPath);
+    }
+
+    private static IReadOnlyList<VoiceInfo> LoadMergedCatalogInternal(string? externalVoicesJsonPath)
     {
         var builtIn = LoadBuiltInCatalog();
 
@@ -113,9 +127,11 @@ public static class VoiceCatalog
         {
             external = LoadFromFile(externalVoicesJsonPath);
         }
-        catch
+        catch (Exception ex)
         {
             // If external file is unreadable, fall back to built-in only
+            System.Diagnostics.Debug.WriteLine(
+                $"Failed to load external voices catalog: {ex.Message}");
             return SortCatalog(builtIn);
         }
 

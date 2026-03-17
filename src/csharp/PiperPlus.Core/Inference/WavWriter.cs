@@ -32,7 +32,11 @@ public static class WavWriter
 
         using var writer = new BinaryWriter(stream, Encoding.ASCII, leaveOpen: true);
 
-        int dataSize = samples.Length * BytesPerSample;
+        long dataSize64 = (long)samples.Length * BytesPerSample;
+        if (dataSize64 > int.MaxValue)
+            throw new ArgumentException(
+                $"Audio data ({samples.Length} samples) exceeds WAV format limit.");
+        int dataSize = (int)dataSize64;
         int byteRate = sampleRate * NumChannels * BytesPerSample;
         short blockAlign = (short)(NumChannels * BytesPerSample);
 

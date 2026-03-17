@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace PiperPlus.Core.Phonemize;
 
@@ -33,6 +35,17 @@ namespace PiperPlus.Core.Phonemize;
 /// </remarks>
 public sealed class CustomDictionary
 {
+    private static ILogger s_logger = NullLogger.Instance;
+
+    /// <summary>
+    /// Replace the default (no-op) logger used for dictionary load warnings.
+    /// Call once at application startup; not required for correct operation.
+    /// </summary>
+    public static void SetLogger(ILogger logger)
+    {
+        s_logger = logger ?? NullLogger.Instance;
+    }
+
     // Entries stored as (original, replacement) pairs.
     // Kept in a list so we can sort by key length for longest-match-first application.
     private readonly List<KeyValuePair<string, string>> _entries = new();
@@ -100,8 +113,8 @@ public sealed class CustomDictionary
     }
 
     /// <summary>
-    /// Load multiple dictionary files. If loading one file fails, the error
-    /// is written to stderr and the remaining files are still processed.
+    /// Load multiple dictionary files. If loading one file fails, a warning
+    /// is logged via <see cref="SetLogger"/> and the remaining files are still processed.
     /// </summary>
     /// <param name="filePaths">Paths to dictionary files.</param>
     /// <exception cref="ArgumentNullException">
@@ -119,8 +132,9 @@ public sealed class CustomDictionary
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine(
-                    $"Warning: Failed to load dictionary {filePath}: {ex.Message}");
+                s_logger.LogWarning(
+                    "Failed to load dictionary {FilePath}: {Message}",
+                    filePath, ex.Message);
             }
         }
     }

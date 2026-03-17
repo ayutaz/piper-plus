@@ -9,11 +9,18 @@ namespace PiperPlus.Core.Config;
 /// </summary>
 public static class ModelManager
 {
-    private static readonly HttpClient s_httpClient = new()
+    private static readonly HttpClient s_httpClient = CreateHttpClient();
+
+    private static HttpClient CreateHttpClient()
     {
-        // HuggingFace redirects to CDN; follow automatically
-        Timeout = TimeSpan.FromMinutes(10),
-    };
+        var client = new HttpClient
+        {
+            // HuggingFace redirects to CDN; follow automatically
+            Timeout = TimeSpan.FromMinutes(10),
+        };
+        client.DefaultRequestHeaders.UserAgent.ParseAdd("PiperPlus/1.0");
+        return client;
+    }
 
     private const string HuggingFacePrefix = "https://huggingface.co/";
 
@@ -259,6 +266,16 @@ public static class ModelManager
 
         foreach (var file in voice.Files)
         {
+            // Security: validate file path safety (no path traversal)
+            var localName = Path.GetFileName(file.RelativePath);
+            if (string.IsNullOrEmpty(localName) || file.RelativePath.Contains(".."))
+            {
+                Console.Error.WriteLine(
+                    $"  Skipping file with unsafe path: {file.RelativePath}");
+                allOk = false;
+                continue;
+            }
+
             var url = baseUrl + file.RelativePath;
 
             // Security: enforce HTTPS HuggingFace prefix
@@ -271,7 +288,6 @@ public static class ModelManager
             }
 
             // Use just the filename as the local name (flat directory layout)
-            var localName = Path.GetFileName(file.RelativePath);
             var localPath = Path.Combine(modelDir, localName);
 
             // Skip if file already exists with correct size
@@ -294,6 +310,22 @@ public static class ModelManager
             else
             {
                 Console.Error.WriteLine($"  Downloaded {localName}");
+
+                // Verify MD5 digest if available
+                if (!string.IsNullOrEmpty(file.Md5Digest))
+                {
+                    using var md5 = System.Security.Cryptography.MD5.Create();
+                    using var fileStream = File.OpenRead(localPath);
+                    var hashBytes = md5.ComputeHash(fileStream);
+                    var actualHash = BitConverter.ToString(hashBytes)
+                        .Replace("-", "").ToLowerInvariant();
+                    if (actualHash != file.Md5Digest.ToLowerInvariant())
+                    {
+                        Console.Error.WriteLine(
+                            $"  MD5 mismatch for {localName}: " +
+                            $"expected {file.Md5Digest}, got {actualHash}");
+                    }
+                }
             }
         }
 
@@ -331,6 +363,7 @@ public static class ModelManager
     private static async Task<bool> DownloadFileAsync(
         string url, string outputPath, CancellationToken ct)
     {
+        var tempPath = outputPath + ".tmp";
         try
         {
             using var response = await s_httpClient
@@ -349,12 +382,15 @@ public static class ModelManager
                 .ReadAsStreamAsync(ct)
                 .ConfigureAwait(false);
             await using var fileStream = new FileStream(
-                outputPath, FileMode.Create, FileAccess.Write,
+                tempPath, FileMode.Create, FileAccess.Write,
                 FileShare.None, bufferSize: 81920, useAsync: true);
 
             await contentStream
                 .CopyToAsync(fileStream, ct)
                 .ConfigureAwait(false);
+
+            // Atomically replace the target file
+            File.Move(tempPath, outputPath, true);
 
             return true;
         }
@@ -362,6 +398,10 @@ public static class ModelManager
             ex is HttpRequestException or TaskCanceledException or IOException)
         {
             Console.Error.WriteLine($"  Download error: {ex.Message}");
+
+            // Clean up partial temp file
+            try { File.Delete(tempPath); } catch { /* best-effort */ }
+
             return false;
         }
     }

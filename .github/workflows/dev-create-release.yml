@@ -244,6 +244,7 @@ jobs:
     name: Build C# CLI (${{ matrix.rid }})
     needs: create_release
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -278,7 +279,9 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '9.0.x'
+          dotnet-version: |
+            8.0.x
+            9.0.x
 
       - name: Publish C# CLI
         shell: bash
@@ -308,14 +311,12 @@ jobs:
           Compress-Archive -Path publish/* -DestinationPath piper-plus-cli-${{ matrix.rid }}.zip
 
       - name: Upload Release Asset
-        uses: actions/upload-release-asset@v1
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ needs.create_release.outputs.upload_url }}
-          asset_path: piper-plus-cli-${{ matrix.rid }}.${{ matrix.archive_ext }}
-          asset_name: piper-plus-cli-${{ matrix.rid }}.${{ matrix.archive_ext }}
-          asset_content_type: ${{ matrix.archive_ext == 'zip' && 'application/zip' || 'application/gzip' }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload "${{ needs.create_release.outputs.tag_name }}" \
+            "piper-plus-cli-${{ matrix.rid }}.${{ matrix.archive_ext }}" \
+            --clobber
 
   # Final summary
   release_summary:

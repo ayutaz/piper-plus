@@ -116,6 +116,10 @@ public sealed class JapanesePhonemizer : IPhonemizer
         var prosody = new List<ProsodyInfo?>();
         int count = phonemes.Length;
 
+        if (a1Arr.Length != count || a2Arr.Length != count || a3Arr.Length != count)
+            throw new System.InvalidOperationException(
+                $"G2P result arrays have inconsistent lengths: phonemes={count}, A1={a1Arr.Length}, A2={a2Arr.Length}, A3={a3Arr.Length}");
+
         for (int idx = 0; idx < count; idx++)
         {
             var phoneme = phonemes[idx];
