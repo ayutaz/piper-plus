@@ -116,12 +116,15 @@ class PiperInferenceEngine:
         input_names = [inp.name for inp in self.model.get_inputs()]
         self.has_prosody = "prosody_features" in input_names
         self.has_sid = "sid" in input_names
+        self.has_lid = "lid" in input_names
+        self.language_id_map = config.get("language_id_map", {})
 
         _LOGGER.info(
-            "Model loaded: %s (prosody=%s, sid=%s)",
+            "Model loaded: %s (prosody=%s, sid=%s, lid=%s)",
             model_path,
             self.has_prosody,
             self.has_sid,
+            self.has_lid,
         )
 
     def synthesize(
@@ -166,6 +169,10 @@ class PiperInferenceEngine:
                 prosody_np = np.zeros((1, text_input.shape[1], 3), dtype=np.int64)
             inputs["prosody_features"] = prosody_np
 
+        if self.has_lid:
+            language_id = self.language_id_map.get(language, 0)
+            inputs["lid"] = np.array([language_id], dtype=np.int64)
+
         start = time.perf_counter()
         outputs = self.model.run(None, inputs)
         audio = outputs[0].squeeze((0, 1))
@@ -192,7 +199,10 @@ def main():
     parser.add_argument("--output", default="output.wav", help="Output WAV path")
     parser.add_argument("--speaker-id", type=int, default=0, help="Speaker ID")
     parser.add_argument(
-        "--language", default="ja", choices=["ja", "en"], help="Language"
+        "--language",
+        default="ja",
+        choices=["ja", "en", "zh", "es", "fr", "pt"],
+        help="Language",
     )
     parser.add_argument("--noise-scale", type=float, default=0.667)
     parser.add_argument("--length-scale", type=float, default=1.0)
