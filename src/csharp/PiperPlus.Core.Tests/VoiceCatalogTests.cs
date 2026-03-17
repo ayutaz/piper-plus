@@ -269,4 +269,102 @@ public sealed class VoiceCatalogTests : IDisposable
         var same = new VoiceFileInfo("model.onnx", 77594624, "d41d8cd98f00b204e9800998ecf8427e");
         Assert.Equal(file, same);
     }
+
+    // ================================================================
+    // Caching, sorting, and catalog-wide invariant tests
+    // ================================================================
+
+    [Fact]
+    public void LoadMergedCatalog_CachingVerification_ReturnsSameReference()
+    {
+        // When called without an external path, the result is cached via Lazy<T>.
+        // Two consecutive calls should return the exact same object reference.
+        var first = VoiceCatalog.LoadMergedCatalog();
+        var second = VoiceCatalog.LoadMergedCatalog();
+
+        Assert.Same(first, second);
+    }
+
+    [Fact]
+    public void LoadBuiltInCatalog_SortedByLanguageAndKey()
+    {
+        // LoadMergedCatalog sorts by LanguageCode then Key.
+        // Verify the merged catalog (which wraps built-in) maintains this order.
+        var catalog = VoiceCatalog.LoadMergedCatalog();
+
+        for (int i = 1; i < catalog.Count; i++)
+        {
+            var prev = catalog[i - 1];
+            var curr = catalog[i];
+
+            int langCmp = string.Compare(
+                prev.LanguageCode, curr.LanguageCode, StringComparison.Ordinal);
+
+            if (langCmp == 0)
+            {
+                int keyCmp = string.Compare(
+                    prev.Key, curr.Key, StringComparison.Ordinal);
+                Assert.True(keyCmp <= 0,
+                    $"Catalog not sorted by key within same language: " +
+                    $"'{prev.Key}' should come before '{curr.Key}'");
+            }
+            else
+            {
+                Assert.True(langCmp < 0,
+                    $"Catalog not sorted by language code: " +
+                    $"'{prev.LanguageCode}' should come before '{curr.LanguageCode}'");
+            }
+        }
+    }
+
+    [Fact]
+    public void VoiceInfo_AllCatalogEntries_HaveNonEmptyKey()
+    {
+        var catalog = VoiceCatalog.LoadMergedCatalog();
+
+        foreach (var voice in catalog)
+        {
+            Assert.False(string.IsNullOrWhiteSpace(voice.Key),
+                "Every catalog entry must have a non-empty Key");
+        }
+    }
+
+    [Fact]
+    public void VoiceInfo_AllCatalogEntries_HaveFiles()
+    {
+        var catalog = VoiceCatalog.LoadMergedCatalog();
+
+        foreach (var voice in catalog)
+        {
+            Assert.True(voice.Files.Count >= 1,
+                $"Voice '{voice.Key}' must have at least 1 file");
+        }
+    }
+
+    [Fact]
+    public void VoiceInfo_AllCatalogEntries_HaveValidRepoId()
+    {
+        var catalog = VoiceCatalog.LoadMergedCatalog();
+
+        foreach (var voice in catalog)
+        {
+            int slashCount = voice.RepoId.Count(c => c == '/');
+            Assert.Equal(1, slashCount);
+        }
+    }
+
+    [Fact]
+    public void VoiceFileInfo_AllFiles_HaveNonEmptyRelativePath()
+    {
+        var catalog = VoiceCatalog.LoadMergedCatalog();
+
+        foreach (var voice in catalog)
+        {
+            foreach (var file in voice.Files)
+            {
+                Assert.False(string.IsNullOrWhiteSpace(file.RelativePath),
+                    $"File in voice '{voice.Key}' must have a non-empty RelativePath");
+            }
+        }
+    }
 }

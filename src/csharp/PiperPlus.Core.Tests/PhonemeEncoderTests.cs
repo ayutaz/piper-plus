@@ -269,4 +269,38 @@ public class PhonemeEncoderTests
         // Expected: [BOS=1, a=10, pad=0, i=11, pad=0, EOS=2]
         Assert.Equal([1L, 10L, 0L, 11L, 0L, 2L], phonemeIds);
     }
+
+    // ----------------------------------------------------------------
+    // 10. NullPhonemizer_ThrowsArgumentNullException
+    // ----------------------------------------------------------------
+
+    [Fact]
+    public void Encode_NullPhonemizer_ThrowsArgumentNullException()
+    {
+        Assert.Throws<ArgumentNullException>(
+            () => PhonemeEncoder.Encode(null!, "text", MakeMap()));
+    }
+
+    // ----------------------------------------------------------------
+    // 11. LargeProsodyValues_EncodedCorrectly
+    // ----------------------------------------------------------------
+
+    [Fact]
+    public void EncodeDirect_LargeProsodyValues_EncodedCorrectly()
+    {
+        var pMax = new ProsodyInfo(int.MaxValue, int.MaxValue, int.MaxValue);
+
+        var phonemizer = new StubPhonemizer(
+            ["a"],
+            [pMax]);
+
+        var (phonemeIds, prosodyFlat) = PhonemeEncoder.EncodeDirect(phonemizer, "dummy", MakeMap());
+
+        Assert.Equal([10L], phonemeIds);
+        Assert.NotNull(prosodyFlat);
+        Assert.Equal(3, prosodyFlat!.Length);
+        Assert.Equal((long)int.MaxValue, prosodyFlat[0]);
+        Assert.Equal((long)int.MaxValue, prosodyFlat[1]);
+        Assert.Equal((long)int.MaxValue, prosodyFlat[2]);
+    }
 }

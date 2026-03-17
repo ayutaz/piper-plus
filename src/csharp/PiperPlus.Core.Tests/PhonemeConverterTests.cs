@@ -261,4 +261,135 @@ public sealed class PhonemeConverterTests
 
         Assert.Equal(["k", "a", "k", "i"], result);
     }
+
+    // ================================================================
+    // Exhaustive N phoneme variant tests
+    // ================================================================
+
+    [Theory]
+    [InlineData("m")]
+    [InlineData("my")]
+    [InlineData("b")]
+    [InlineData("by")]
+    [InlineData("p")]
+    [InlineData("py")]
+    public void ApplyNPhonemeRules_AllBilabialPhonemes(string following)
+    {
+        // N before any bilabial phoneme -> N_m
+        var input = new List<string> { "a", "N", following, "a" };
+
+        var result = PiperPhonemeConverter.ApplyNPhonemeRules(input);
+
+        Assert.Equal("N_m", result[1]);
+    }
+
+    [Theory]
+    [InlineData("n")]
+    [InlineData("ny")]
+    [InlineData("t")]
+    [InlineData("ty")]
+    [InlineData("d")]
+    [InlineData("dy")]
+    [InlineData("ts")]
+    [InlineData("ch")]
+    public void ApplyNPhonemeRules_AllAlveolarPhonemes(string following)
+    {
+        // N before any alveolar phoneme -> N_n
+        var input = new List<string> { "a", "N", following, "a" };
+
+        var result = PiperPhonemeConverter.ApplyNPhonemeRules(input);
+
+        Assert.Equal("N_n", result[1]);
+    }
+
+    [Theory]
+    [InlineData("k")]
+    [InlineData("ky")]
+    [InlineData("kw")]
+    [InlineData("g")]
+    [InlineData("gy")]
+    [InlineData("gw")]
+    public void ApplyNPhonemeRules_AllVelarPhonemes(string following)
+    {
+        // N before any velar phoneme -> N_ng
+        var input = new List<string> { "a", "N", following, "a" };
+
+        var result = PiperPhonemeConverter.ApplyNPhonemeRules(input);
+
+        Assert.Equal("N_ng", result[1]);
+    }
+
+    [Theory]
+    [InlineData("a")]
+    [InlineData("i")]
+    [InlineData("u")]
+    [InlineData("e")]
+    [InlineData("o")]
+    public void ApplyNPhonemeRules_N_BeforeVowel_Uvular(string vowel)
+    {
+        // N before any vowel -> N_uvular
+        var input = new List<string> { "N", vowel };
+
+        var result = PiperPhonemeConverter.ApplyNPhonemeRules(input);
+
+        Assert.Equal("N_uvular", result[0]);
+    }
+
+    [Fact]
+    public void ApplyNPhonemeRules_SkipMultipleTokens()
+    {
+        // N followed by "_", "#", then "p" -> N_m (skips both "_" and "#", sees "p")
+        var input = new List<string> { "N", "_", "#", "p", "a" };
+
+        var result = PiperPhonemeConverter.ApplyNPhonemeRules(input);
+
+        Assert.Equal("N_m", result[0]);
+        // The remaining tokens are unchanged
+        Assert.Equal(["N_m", "_", "#", "p", "a"], result);
+    }
+
+    [Fact]
+    public void ApplyNPhonemeRules_OnlySkipTokensAfterN_Uvular()
+    {
+        // N followed by only skip tokens (no real phoneme) -> N_uvular
+        var input = new List<string> { "a", "N", "_", "#", "$" };
+
+        var result = PiperPhonemeConverter.ApplyNPhonemeRules(input);
+
+        Assert.Equal("N_uvular", result[1]);
+        Assert.Equal(["a", "N_uvular", "_", "#", "$"], result);
+    }
+
+    [Fact]
+    public void ApplyNPhonemeRules_UnknownPhoneme_Uvular()
+    {
+        // N before an unknown phoneme "x" -> N_uvular (fallback)
+        var input = new List<string> { "N", "x" };
+
+        var result = PiperPhonemeConverter.ApplyNPhonemeRules(input);
+
+        Assert.Equal("N_uvular", result[0]);
+        Assert.Equal(["N_uvular", "x"], result);
+    }
+
+    // ================================================================
+    // Additional GetQuestionType tests
+    // ================================================================
+
+    [Fact]
+    public void GetQuestionType_NullInput_ReturnsDefault()
+    {
+        // null.AsSpan() returns ReadOnlySpan<char>.Empty in .NET,
+        // so GetQuestionType treats null the same as empty string -> "$"
+        Assert.Equal("$", PiperPhonemeConverter.GetQuestionType(null!));
+    }
+
+    [Fact]
+    public void GetQuestionType_MixedFullWidthAscii()
+    {
+        // Full-width question ？ followed by ASCII half-width !
+        // "？!" does not match any multi-char pattern (expected: "！？" or "？！")
+        // The last char is '!' (not '?' or '？'), so -> "$"
+        Assert.Equal("$", PiperPhonemeConverter.GetQuestionType("なぜ\uFF1F!"));
+    }
 }

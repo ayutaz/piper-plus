@@ -240,4 +240,133 @@ public sealed class ArpabetToIPAConverterTests
     {
         Assert.False(ArpabetToIPAConverter.IsPunctuation("a"));
     }
+
+    // ================================================================
+    // Additional ConvertToken tests
+    // ================================================================
+
+    [Fact]
+    public void ConvertToken_ER_SecondaryStress()
+    {
+        // ER2 -> ɚ with stress=2 (secondary stress does NOT trigger the ɜː rule)
+        var (ipa, stress) = ArpabetToIPAConverter.ConvertToken("ER2");
+
+        Assert.Equal("\u025a", ipa); // ɚ
+        Assert.Equal(2, stress);
+    }
+
+    // ================================================================
+    // Additional ConvertWord tests
+    // ================================================================
+
+    [Fact]
+    public void ConvertWord_AA0_R_MergesToLongVowel()
+    {
+        // AA0 + R -> single ɑːɹ token with stress=0
+        var result = ArpabetToIPAConverter.ConvertWord(["AA0", "R"]);
+
+        Assert.Single(result);
+        Assert.Equal("\u0251\u02d0\u0279", result[0].Ipa); // ɑːɹ
+        Assert.Equal(0, result[0].Stress);
+    }
+
+    [Fact]
+    public void ConvertWord_AA2_R_MergesToLongVowel()
+    {
+        // AA2 + R -> single ɑːɹ token with stress=2
+        var result = ArpabetToIPAConverter.ConvertWord(["AA2", "R"]);
+
+        Assert.Single(result);
+        Assert.Equal("\u0251\u02d0\u0279", result[0].Ipa); // ɑːɹ
+        Assert.Equal(2, result[0].Stress);
+    }
+
+    [Fact]
+    public void ConvertWord_EmptyList_ReturnsEmpty()
+    {
+        var result = ArpabetToIPAConverter.ConvertWord([]);
+
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public void ConvertWord_SingleConsonant()
+    {
+        // ["B"] -> single entry "b" with stress=-1
+        var result = ArpabetToIPAConverter.ConvertWord(["B"]);
+
+        Assert.Single(result);
+        Assert.Equal("b", result[0].Ipa);
+        Assert.Equal(-1, result[0].Stress);
+    }
+
+    [Fact]
+    public void ConvertWord_R_AfterConsonant_NoMerge()
+    {
+        // ["T", "R"] -> separate entries; merge only applies to AA+R
+        var result = ArpabetToIPAConverter.ConvertWord(["T", "R"]);
+
+        Assert.Equal(2, result.Count);
+        Assert.Equal("t", result[0].Ipa);
+        Assert.Equal(-1, result[0].Stress);
+        Assert.Equal("\u0279", result[1].Ipa); // ɹ
+        Assert.Equal(-1, result[1].Stress);
+    }
+
+    [Fact]
+    public void ConvertWord_ER_NoStressDigit()
+    {
+        // ["ER"] without stress digit -> ɚ with stress=-1
+        var result = ArpabetToIPAConverter.ConvertWord(["ER"]);
+
+        Assert.Single(result);
+        Assert.Equal("\u025a", result[0].Ipa); // ɚ
+        Assert.Equal(-1, result[0].Stress);
+    }
+
+    // ================================================================
+    // Additional IsPunctuation tests
+    // ================================================================
+
+    [Theory]
+    [InlineData(",")]
+    [InlineData(".")]
+    [InlineData("!")]
+    [InlineData("?")]
+    [InlineData(";")]
+    [InlineData(":")]
+    public void IsPunctuation_AllSupported(string token)
+    {
+        Assert.True(ArpabetToIPAConverter.IsPunctuation(token));
+    }
+
+    [Fact]
+    public void IsPunctuation_EmptyString_ReturnsFalse()
+    {
+        Assert.False(ArpabetToIPAConverter.IsPunctuation(""));
+    }
+
+    // ================================================================
+    // Additional IsFunctionWord tests
+    // ================================================================
+
+    [Theory]
+    [InlineData("am")]
+    [InlineData("was")]
+    [InlineData("you")]
+    [InlineData("have")]
+    [InlineData("at")]
+    [InlineData("for")]
+    [InlineData("and")]
+    [InlineData("but")]
+    public void IsFunctionWord_RepresentativeSample(string word)
+    {
+        Assert.True(ArpabetToIPAConverter.IsFunctionWord(word));
+    }
+
+    [Fact]
+    public void IsFunctionWord_EmptyString_ReturnsFalse()
+    {
+        Assert.False(ArpabetToIPAConverter.IsFunctionWord(""));
+    }
 }

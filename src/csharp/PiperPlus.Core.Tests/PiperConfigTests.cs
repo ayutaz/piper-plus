@@ -1,3 +1,4 @@
+using System.Text.Json;
 using PiperPlus.Core.Config;
 
 namespace PiperPlus.Core.Tests;
@@ -353,8 +354,190 @@ public sealed class PiperConfigTests : IDisposable
     }
 
     // ================================================================
+    // Environment variable tests
+    // ================================================================
+
+    [Fact]
+    public void FindConfigPath_EnvironmentVariable_ReturnsIt()
+    {
+        var configPath = WriteTempConfig("{}", "env_config.json");
+        var originalValue = Environment.GetEnvironmentVariable("PIPER_DEFAULT_CONFIG");
+        try
+        {
+            Environment.SetEnvironmentVariable("PIPER_DEFAULT_CONFIG", configPath);
+
+            var result = PiperConfig.FindConfigPath(explicitPath: null, modelPath: null);
+
+            Assert.Equal(configPath, result);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("PIPER_DEFAULT_CONFIG", originalValue);
+        }
+    }
+
+    [Fact]
+    public void FindConfigPath_EnvironmentVariable_NonExistent_SkipsToNext()
+    {
+        var nonExistent = Path.Combine(_tempDir, "does_not_exist_env.json");
+        var modelPath = Path.Combine(_tempDir, "model.onnx");
+        var modelJsonPath = modelPath + ".json";
+        File.WriteAllText(modelJsonPath, "{}");
+
+        var originalValue = Environment.GetEnvironmentVariable("PIPER_DEFAULT_CONFIG");
+        try
+        {
+            Environment.SetEnvironmentVariable("PIPER_DEFAULT_CONFIG", nonExistent);
+
+            var result = PiperConfig.FindConfigPath(explicitPath: null, modelPath);
+
+            // Env var file doesn't exist, so it should fall through to model.onnx.json
+            Assert.Equal(modelJsonPath, result);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("PIPER_DEFAULT_CONFIG", originalValue);
+        }
+    }
+
+    [Fact]
+    public void FindConfigPath_EnvironmentVariable_Priority()
+    {
+        // Both env var file and model.onnx.json exist — env var should win
+        var envConfigPath = WriteTempConfig("{}", "env_priority.json");
+        var modelPath = Path.Combine(_tempDir, "model.onnx");
+        var modelJsonPath = modelPath + ".json";
+        File.WriteAllText(modelJsonPath, "{}");
+
+        var originalValue = Environment.GetEnvironmentVariable("PIPER_DEFAULT_CONFIG");
+        try
+        {
+            Environment.SetEnvironmentVariable("PIPER_DEFAULT_CONFIG", envConfigPath);
+
+            var result = PiperConfig.FindConfigPath(explicitPath: null, modelPath);
+
+            Assert.Equal(envConfigPath, result);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("PIPER_DEFAULT_CONFIG", originalValue);
+        }
+    }
+
+    // ================================================================
+    // Malformed JSON tests
+    // ================================================================
+
+    [Fact]
+    public void LoadFromFile_MalformedJson_ThrowsException()
+    {
+        var path = WriteTempConfig("{invalid json}", "malformed.json");
+
+        Assert.ThrowsAny<JsonException>(() => PiperConfig.LoadFromFile(path));
+    }
+
+    [Fact]
+    public void LoadFromFile_EmptyFile_ThrowsException()
+    {
+        var path = WriteTempConfig("", "empty.json");
+
+        Assert.ThrowsAny<JsonException>(() => PiperConfig.LoadFromFile(path));
+    }
+
+    [Fact]
+    public void LoadFromFile_JsonNull_ThrowsException()
+    {
+        var path = WriteTempConfig("null", "json_null.json");
+
+        Assert.Throws<InvalidOperationException>(() => PiperConfig.LoadFromFile(path));
+    }
+
+    // ================================================================
+    // Default value tests
+    // ================================================================
+
+    [Fact]
+    public void Audio_SampleRate_DefaultValue_22050()
+    {
+        // audio section present but sample_rate omitted — should default to 22050
+        const string json = """
+        {
+          "num_speakers": 1,
+          "phoneme_id_map": { "_": [0] },
+          "audio": {},
+          "inference": { "noise_scale": 0.667, "length_scale": 1.0, "noise_w": 0.8 }
+        }
+        """;
+
+        var path = WriteTempConfig(json, "default_sample_rate.json");
+        var config = PiperConfig.LoadFromFile(path);
+
+        Assert.Equal(22050, config.Audio.SampleRate);
+    }
+
+    [Fact]
+    public void Inference_DefaultValues_WhenFieldsOmitted()
+    {
+        // inference section present but all fields omitted — should use defaults
+        const string json = """
+        {
+          "num_speakers": 1,
+          "phoneme_id_map": { "_": [0] },
+          "audio": { "sample_rate": 22050 },
+          "inference": {}
+        }
+        """;
+
+        var path = WriteTempConfig(json, "default_inference.json");
+        var config = PiperConfig.LoadFromFile(path);
+
+        Assert.Equal(0.667f, config.Inference.NoiseScale);
+        Assert.Equal(1.0f, config.Inference.LengthScale);
+        Assert.Equal(0.8f, config.Inference.NoiseW);
+    }
+
+    // ================================================================
     // Edge cases
     // ================================================================
+
+    [Fact]
+    public void LoadFromFile_EmptyPhonemeIdMap_ThrowsException()
+    {
+        const string json = """
+        {
+          "num_speakers": 1,
+          "phoneme_id_map": {},
+          "audio": { "sample_rate": 22050 },
+          "inference": { "noise_scale": 0.667, "length_scale": 1.0, "noise_w": 0.8 }
+        }
+        """;
+
+        var path = WriteTempConfig(json, "empty_phoneme_map.json");
+        var ex = Assert.Throws<InvalidOperationException>(() => PiperConfig.LoadFromFile(path));
+        Assert.Contains("phoneme_id_map", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void PhonemeIdMap_MultipleIds_DeserializedCorrectly()
+    {
+        const string json = """
+        {
+          "num_speakers": 1,
+          "phoneme_id_map": {
+            "_": [0],
+            "a": [10, 11, 12]
+          },
+          "audio": { "sample_rate": 22050 },
+          "inference": { "noise_scale": 0.667, "length_scale": 1.0, "noise_w": 0.8 }
+        }
+        """;
+
+        var path = WriteTempConfig(json, "multi_ids.json");
+        var config = PiperConfig.LoadFromFile(path);
+
+        Assert.Equal(3, config.PhonemeIdMap["a"].Length);
+        Assert.Equal([10, 11, 12], config.PhonemeIdMap["a"]);
+    }
 
     [Fact]
     public void LoadFromFile_NonExistentFile_ThrowsFileNotFound()

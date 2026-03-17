@@ -205,4 +205,128 @@ public sealed class ModelManagerTests : IDisposable
 
         Assert.False(result);
     }
+
+    // ================================================================
+    // GetDefaultModelDir — environment variable overrides
+    // ================================================================
+
+    [Fact]
+    public void GetDefaultModelDir_EnvVarOverride()
+    {
+        string? original = Environment.GetEnvironmentVariable("PIPER_MODEL_DIR");
+        try
+        {
+            const string customDir = "/tmp/test-piper-models";
+            Environment.SetEnvironmentVariable("PIPER_MODEL_DIR", customDir);
+
+            string dir = ModelManager.GetDefaultModelDir();
+
+            Assert.Equal(customDir, dir);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("PIPER_MODEL_DIR", original);
+        }
+    }
+
+    [Fact]
+    public void GetDefaultModelDir_EnvVarEmpty_UsesOSDefault()
+    {
+        string? original = Environment.GetEnvironmentVariable("PIPER_MODEL_DIR");
+        try
+        {
+            Environment.SetEnvironmentVariable("PIPER_MODEL_DIR", "");
+
+            string dir = ModelManager.GetDefaultModelDir();
+
+            // With empty env var, should fall back to OS-specific path containing "piper" and "models"
+            Assert.False(string.IsNullOrEmpty(dir));
+            string lower = dir.ToLowerInvariant();
+            Assert.Contains("piper", lower);
+            Assert.Contains("models", lower);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("PIPER_MODEL_DIR", original);
+        }
+    }
+
+    // ================================================================
+    // FindVoice — null input
+    // ================================================================
+
+    [Fact]
+    public void FindVoice_NullInput_ReturnsNull()
+    {
+        // Passing null (via null-forgiving operator) should not throw.
+        var voice = ModelManager.FindVoice(null!);
+
+        Assert.Null(voice);
+    }
+
+    // ================================================================
+    // ListModels — additional filter scenarios
+    // ================================================================
+
+    [Fact]
+    public void ListModels_LanguageCodeFilter_ja_JP()
+    {
+        using var sw = CaptureStdErr();
+
+        // Filter by full language code "ja_JP" (not just the family "ja")
+        ModelManager.ListModels("ja_JP");
+
+        string output = sw.ToString();
+
+        Assert.Contains("ja_JP-tsukuyomi-chan-medium", output);
+        Assert.Contains("ja_JP-moe-speech-20speakers-medium", output);
+        Assert.Contains("Available voice models:", output);
+    }
+
+    [Fact]
+    public void ListModels_EmptyFilter_SameAsNull()
+    {
+        // An empty string filter should behave the same as null (show all models).
+        using var swEmpty = CaptureStdErr();
+        ModelManager.ListModels("");
+        string outputEmpty = swEmpty.ToString();
+
+        // Restore stderr for the second call
+        if (_originalStdErr is not null)
+        {
+            Console.SetError(_originalStdErr);
+            _originalStdErr = null;
+        }
+
+        using var swNull = CaptureStdErr();
+        ModelManager.ListModels(null);
+        string outputNull = swNull.ToString();
+
+        // Both should list the same models
+        Assert.Contains("ja_JP-tsukuyomi-chan-medium", outputEmpty);
+        Assert.Contains("ja_JP-moe-speech-20speakers-medium", outputEmpty);
+        Assert.Contains("ja_JP-tsukuyomi-chan-medium", outputNull);
+        Assert.Contains("ja_JP-moe-speech-20speakers-medium", outputNull);
+    }
+
+    // ================================================================
+    // FindVoice — all aliases resolve correctly
+    // ================================================================
+
+    [Fact]
+    public void FindVoice_AllAliases_ResolveCorrectly()
+    {
+        var catalog = VoiceCatalog.LoadMergedCatalog();
+
+        foreach (var voice in catalog)
+        {
+            foreach (var alias in voice.Aliases)
+            {
+                var found = ModelManager.FindVoice(alias);
+
+                Assert.NotNull(found);
+                Assert.Equal(voice.Key, found!.Key);
+            }
+        }
+    }
 }

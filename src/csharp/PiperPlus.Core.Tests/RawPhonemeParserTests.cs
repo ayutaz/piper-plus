@@ -141,4 +141,80 @@ public sealed class RawPhonemeParserTests
         // "zzz" and "qqq" are unknown and skipped.
         Assert.Equal([1L, 10L, 30L, 2L, 11L], result);
     }
+
+    // ================================================================
+    // 9. Parse_WhitespaceOnlyString_ReturnsEmpty
+    // ================================================================
+
+    [Fact]
+    public void Parse_WhitespaceOnlyString_ReturnsEmpty()
+    {
+        var map = MakeMap();
+
+        var result = RawPhonemeParser.Parse("   \t  ", map);
+
+        Assert.Empty(result);
+    }
+
+    // ================================================================
+    // 10. Parse_MultipleSpacesBetweenTokens_Handled
+    // ================================================================
+
+    [Fact]
+    public void Parse_MultipleSpacesBetweenTokens_Handled()
+    {
+        // Multiple spaces between tokens should be treated like single spaces.
+        var map = MakeMap();
+
+        var result = RawPhonemeParser.Parse("^   a    $", map);
+
+        Assert.Equal([1L, 10L, 2L], result);
+    }
+
+    // ================================================================
+    // 11. Parse_MultiIdPhoneme_AllIdsFlattened
+    // ================================================================
+
+    [Fact]
+    public void Parse_MultiIdPhoneme_AllIdsFlattened()
+    {
+        // A phoneme mapped to multiple IDs should produce all IDs in order.
+        var map = MakeMap();
+        map["x"] = [10, 11];
+
+        var result = RawPhonemeParser.Parse("^ x $", map);
+
+        Assert.Equal([1L, 10L, 11L, 2L], result);
+    }
+
+    // ================================================================
+    // 12. Parse_TokenCase_MustBeExact
+    // ================================================================
+
+    [Fact]
+    public void Parse_TokenCase_MustBeExact()
+    {
+        // "a" is in the map but "A" is not — case-sensitive lookup must skip "A".
+        var map = MakeMap();
+
+        var result = RawPhonemeParser.Parse("a A i", map);
+
+        // "A" is skipped because the map only has lowercase "a".
+        Assert.Equal([10L, 11L], result);
+    }
+
+    // ================================================================
+    // 13. Parse_OrderPreserved
+    // ================================================================
+
+    [Fact]
+    public void Parse_OrderPreserved()
+    {
+        // Verify the exact output order matches the input token order.
+        var map = MakeMap();
+
+        var result = RawPhonemeParser.Parse("$ a ^ a $", map);
+
+        Assert.Equal([2L, 10L, 1L, 10L, 2L], result);
+    }
 }

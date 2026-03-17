@@ -423,4 +423,84 @@ public sealed class EnglishPhonemizerTests
 
         Assert.Equal(tokens.Count, prosody.Count);
     }
+
+    // ================================================================
+    // 18. ProsodyA3_IsWordPhonemeCount
+    // ================================================================
+
+    [Fact]
+    public void ProsodyA3_IsWordPhonemeCount()
+    {
+        // "cat" -> K AE1 T => IPA: k(1) æ(1) t(1) = 3 IPA chars
+        // A3 should be 3 for all phoneme tokens in the word.
+        var words = new List<List<string>>
+        {
+            new() { "K", "AE1", "T" },
+        };
+
+        var phonemizer = new EnglishPhonemizer(new StubEnglishG2PEngine(words));
+        var (tokens, prosody) = phonemizer.PhonemizeWithProsody("cat");
+
+        // Count actual IPA characters (excluding stress markers)
+        // K->k(1), AE1->æ(1), T->t(1), total=3
+        // The stress marker ˈ also gets A3=3 in its prosody entry.
+        var a3Values = prosody
+            .Where(p => p is not null)
+            .Select(p => p!.A3)
+            .Distinct()
+            .ToList();
+
+        Assert.Single(a3Values); // all tokens share the same A3
+        Assert.Equal(3, a3Values[0]);
+    }
+
+    // ================================================================
+    // 19. SecondaryStress_MapsTo_A2_1
+    // ================================================================
+
+    [Fact]
+    public void SecondaryStress_MapsTo_A2_1()
+    {
+        // Secondary stress (2) -> A2=1.
+        // Use a content word (not a function word) with secondary stress.
+        // "replay" -> R IH0 P L EY2
+        var words = new List<List<string>>
+        {
+            new() { "R", "IH0", "P", "L", "EY2" },
+        };
+
+        var phonemizer = new EnglishPhonemizer(new StubEnglishG2PEngine(words));
+        var (_, prosody) = phonemizer.PhonemizeWithProsody("replay");
+
+        var a2Values = prosody.Where(p => p is not null).Select(p => p!.A2).ToList();
+        Assert.Contains(1, a2Values);
+    }
+
+    // ================================================================
+    // 20. MultipleStressMarkers_InSingleWord
+    // ================================================================
+
+    [Fact]
+    public void MultipleStressMarkers_InSingleWord()
+    {
+        // A word with both primary and secondary stress:
+        // "information" -> IH2 N F ER0 M EY1 SH AH0 N
+        // Should produce both ˌ (before IH2) and ˈ (before EY1).
+        var words = new List<List<string>>
+        {
+            new() { "IH2", "N", "F", "ER0", "M", "EY1", "SH", "AH0", "N" },
+        };
+
+        var phonemizer = new EnglishPhonemizer(new StubEnglishG2PEngine(words));
+        var (tokens, _) = phonemizer.PhonemizeWithProsody("information");
+
+        Assert.Contains("\u02cc", tokens); // ˌ (secondary)
+        Assert.Contains("\u02c8", tokens); // ˈ (primary)
+
+        // ˌ should appear before ˈ in the token sequence.
+        int secondaryIdx = tokens.IndexOf("\u02cc");
+        int primaryIdx = tokens.IndexOf("\u02c8");
+        Assert.True(secondaryIdx < primaryIdx,
+            "Secondary stress marker should appear before primary stress marker");
+    }
 }

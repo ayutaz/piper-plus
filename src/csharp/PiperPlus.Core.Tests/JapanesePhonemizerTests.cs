@@ -238,4 +238,27 @@ public sealed class JapanesePhonemizerTests
         Assert.Empty(tokens);
         Assert.Empty(prosody);
     }
+
+    // ================================================================
+    // 9. PhonemizeCore_InvalidG2PResult_MismatchedArrayLengths
+    // ================================================================
+
+    [Fact]
+    public void PhonemizeCore_InvalidG2PResult_MismatchedArrayLengths()
+    {
+        // A1 array is shorter than Phonemes -> should throw InvalidOperationException
+        var g2p = new G2PResult(
+            Phonemes: ["sil", "k", "a", "sil"],
+            A1: [0, -1],            // length 2, mismatched with phonemes length 4
+            A2: [0, 1, 2, 0],
+            A3: [0, 2, 2, 0]
+        );
+
+        var phonemizer = new JapanesePhonemizer(new StubG2PEngine(g2p));
+
+        var ex = Assert.Throws<System.InvalidOperationException>(
+            () => phonemizer.PhonemizeWithProsody("テスト"));
+
+        Assert.Contains("inconsistent lengths", ex.Message);
+    }
 }

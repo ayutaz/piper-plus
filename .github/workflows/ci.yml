@@ -280,18 +280,35 @@ jobs:
             8.0.x
             9.0.x
 
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('src/csharp/**/*.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
       - name: Build C# solution
         run: dotnet build src/csharp/PiperPlus.sln -c Release
 
+      - name: Check formatting
+        run: dotnet format src/csharp/PiperPlus.sln --verify-no-changes --no-restore
+
       - name: Run C# tests
-        run: dotnet test src/csharp/PiperPlus.sln -c Release --no-build --logger "trx;LogFileName=test-results.xml"
+        run: |
+          dotnet test src/csharp/PiperPlus.sln -c Release --no-build \
+            --logger "trx;LogFileName=test-results.xml" \
+            --collect:"XPlat Code Coverage" \
+            --settings src/csharp/PiperPlus.runsettings
 
       - name: Upload test results
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: csharp-test-results-${{ matrix.os }}
-          path: '**/TestResults/test-results.xml'
+          path: |
+            **/TestResults/test-results.xml
+            **/coverage.cobertura.xml
           retention-days: 30
 
   python-tests:
