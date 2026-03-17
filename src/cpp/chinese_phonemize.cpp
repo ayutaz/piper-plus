@@ -10,6 +10,7 @@
 #include "chinese_phonemize.hpp"
 #include "json.hpp"
 #include "utf8.h"
+#include "utf8_utils.hpp"
 
 #include <algorithm>
 #include <cstdint>
@@ -103,13 +104,19 @@ constexpr Phoneme PUA_Y_VOWEL     = 0xE01E; // close front rounded [y] (pinyin u
 
 static Phoneme mapZhPunct(char32_t cp) {
     switch (cp) {
-        case 0x3002: return '.';  // fullwidth period
-        case 0xFF0C: return ',';  // fullwidth comma
-        case 0xFF01: return '!';  // fullwidth exclamation
-        case 0xFF1F: return '?';  // fullwidth question
-        case 0x3001: return ',';  // ideographic comma
-        case 0xFF1B: return ';';  // fullwidth semicolon
-        case 0xFF1A: return ':';  // fullwidth colon
+        case 0x3002: return '.';   // fullwidth period
+        case 0xFF0C: return ',';   // fullwidth comma
+        case 0xFF01: return '!';   // fullwidth exclamation
+        case 0xFF1F: return '?';   // fullwidth question
+        case 0x3001: return ',';   // ideographic comma
+        case 0xFF1B: return ';';   // fullwidth semicolon
+        case 0xFF1A: return ':';   // fullwidth colon
+        case 0x2026: return '.';   // ellipsis (…)
+        case 0x2014: return ',';   // em-dash (—) -> pause
+        case 0x201C: return '"';   // left double curly quote (")
+        case 0x201D: return '"';   // right double curly quote (")
+        case 0x2018: return '\'';  // left single curly quote (')
+        case 0x2019: return '\'';  // right single curly quote (')
         default:     return 0;
     }
 }
@@ -133,34 +140,12 @@ static bool isCJK(char32_t cp) {
 }
 
 // =========================================================================
-// UTF-8 helpers
+// UTF-8 helpers — delegated to utf8_utils.hpp
 // =========================================================================
 
-static std::vector<char32_t> toCodepoints(const std::string& s) {
-    std::vector<char32_t> cps;
-    auto it = s.begin();
-    while (it != s.end()) {
-        cps.push_back(utf8::unchecked::next(it));
-    }
-    return cps;
-}
-
-// Encode a single codepoint to UTF-8 string
-static std::string cpToUtf8(char32_t cp) {
-    std::string s;
-    utf8::unchecked::append(cp, std::back_inserter(s));
-    return s;
-}
-
-// Encode a range of codepoints to UTF-8
-static std::string cpsToUtf8(const std::vector<char32_t>& cps,
-                              size_t start, size_t count) {
-    std::string s;
-    for (size_t i = start; i < start + count && i < cps.size(); ++i) {
-        utf8::unchecked::append(cps[i], std::back_inserter(s));
-    }
-    return s;
-}
+using utf8_util::toCodepoints;
+using utf8_util::cpToUtf8;
+using utf8_util::cpsToUtf8;
 
 // =========================================================================
 // Pinyin initial consonants (ordered: two-char first for prefix matching)
@@ -733,6 +718,10 @@ void phonemize_chinese(const std::string& text,
                        const std::unordered_map<int, std::string>& singleCharDict,
                        const std::unordered_map<std::string, std::string>& phraseDict) {
     phonemes.clear();
+
+    if (!utf8::is_valid(text.begin(), text.end())) {
+        return;
+    }
 
     // Decode UTF-8 to codepoints
     auto cps = toCodepoints(text);

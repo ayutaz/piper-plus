@@ -51,6 +51,7 @@ class Phonemizer(ABC):
         phoneme_ids: list[int],
         prosody_features: list[dict | None],
         phoneme_id_map: dict[str, list[int]],
+        eos_token: str = "$",
     ) -> tuple[list[int], list[dict | None]]:
         """Add BOS/EOS and inter-phoneme padding (espeak-ng compatible).
 
@@ -61,10 +62,17 @@ class Phonemizer(ABC):
         Subclasses may override for language-specific behavior (e.g.,
         MultilingualPhonemizer uses a dynamic EOS token, JapanesePhonemizer
         delegates post-processing to the caller).
+
+        Parameters
+        ----------
+        eos_token : str
+            The EOS token to look up in ``phoneme_id_map``.  Defaults to
+            ``"$"``.  Falls back to ``"$"`` when the requested token is not
+            present in the map.
         """
         pad_ids = phoneme_id_map.get("_", [0])
         bos_ids = phoneme_id_map.get("^")
-        eos_ids = phoneme_id_map.get("$")
+        eos_ids = phoneme_id_map.get(eos_token, phoneme_id_map.get("$"))
 
         # Insert pad between every phoneme ID, but skip after existing pad/pause
         # tokens (ID 0) to match the training data padding scheme.

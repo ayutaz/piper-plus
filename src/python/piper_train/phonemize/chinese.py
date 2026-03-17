@@ -30,6 +30,12 @@ _ZH_PUNCT_MAP: dict[str, str] = {
     "\u3001": ",",  # 、
     "\uff1b": ";",  # ；
     "\uff1a": ":",  # ：
+    "\u2026": ".",  # … (ellipsis)
+    "\u2014": ",",  # — (em-dash → pause)
+    "\u201c": '"',  # " (left curly double quote)
+    "\u201d": '"',  # " (right curly double quote)
+    "\u2018": "'",  # ' (left curly single quote)
+    "\u2019": "'",  # ' (right curly single quote)
 }
 
 _PUNCTUATION = set(
@@ -294,11 +300,10 @@ def phonemize_chinese_with_prosody(
     try:
         from pypinyin import Style, pinyin  # noqa: PLC0415
     except ImportError:
-        _LOGGER.warning(
-            "pypinyin not installed; Chinese phonemization unavailable. "
+        raise ImportError(
+            "pypinyin is required for Chinese phonemization. "
             "Install with: pip install pypinyin"
-        )
-        return [], []
+        ) from None
 
     phonemes: list[str] = []
     prosody_list: list[ProsodyInfo | None] = []

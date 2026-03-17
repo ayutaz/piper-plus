@@ -17,8 +17,6 @@
 
 #include "json.hpp"
 
-using json = nlohmann::json;
-
 namespace piper {
 
 typedef int64_t SpeakerId;
@@ -79,7 +77,7 @@ struct SynthesisConfig {
 };
 
 struct ModelConfig {
-  int numSpeakers;
+  int numSpeakers = 0;
   int numLanguages = 1;
 
   // speaker name -> id
@@ -119,7 +117,7 @@ struct SynthesisResult {
 };
 
 struct Voice {
-  json configRoot;
+  nlohmann::json configRoot;
   PhonemizeConfig phonemizeConfig;
   SynthesisConfig synthesisConfig;
   ModelConfig modelConfig;

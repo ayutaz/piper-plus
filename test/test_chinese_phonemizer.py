@@ -248,3 +248,52 @@ class TestChinesePhonemizer:
         phonemes, prosody = phonemize_chinese_with_prosody("你好，世界！")
         assert len(phonemes) == len(prosody)
         assert len(phonemes) > 0
+
+    def test_chinese_punctuation_mapped(self):
+        """All Chinese punctuation must be mapped — no raw high codepoints remain.
+
+        Regression test #21: curly quotes (\u201c \u201d), ellipsis (\u2026),
+        and em-dash (\u2014) are listed in _PUNCTUATION and should either be
+        mapped to ASCII equivalents via _ZH_PUNCT_MAP or passed through as
+        single-char tokens from _PUNCTUATION.  No codepoint >= U+2000 should
+        survive in the phoneme output.
+        """
+        from piper_train.phonemize.chinese import phonemize_chinese
+
+        # Text with curly quotes, ellipsis, and em-dash around Chinese chars
+        text = "\u201c\u4f60\u597d\u201d\u2026\u2014\u4e16\u754c"
+        #       "你好"…—世界
+        phonemes = phonemize_chinese(text)
+
+        high_codepoints = [
+            ph for ph in phonemes
+            if len(ph) == 1 and ord(ph) >= 0x2000 and ord(ph) < 0xE000
+        ]
+        assert high_codepoints == [], (
+            f"Raw high-Unicode codepoints should not remain in output. "
+            f"Found: {[hex(ord(c)) for c in high_codepoints]} in {phonemes}"
+        )
+
+
+class TestChinesePhonemzerMissingDependency:
+    """#22: pypinyin missing should raise ImportError, not produce empty output."""
+
+    def test_missing_pypinyin_raises_import_error(self):
+        """pypinyin unavailable -> ImportError with install instructions."""
+        import importlib
+        import sys
+
+        # Temporarily hide pypinyin from the import system
+        saved = sys.modules.get("pypinyin")
+        sys.modules["pypinyin"] = None  # type: ignore[assignment]
+        try:
+            # Re-import to pick up the patched sys.modules
+            mod = importlib.import_module("piper_train.phonemize.chinese")
+            with pytest.raises(ImportError, match="pypinyin"):
+                mod.phonemize_chinese("你好")
+        finally:
+            # Restore original state
+            if saved is None:
+                sys.modules.pop("pypinyin", None)
+            else:
+                sys.modules["pypinyin"] = saved

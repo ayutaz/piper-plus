@@ -12,8 +12,8 @@ dependencies = [
     "numpy<2.3",
     "tensorboard>=2.20.0",
     "g2p-en>=2.1.0",
-    "torch>=2.10",
-    "torchaudio>=2.10",
+    "torch>=2.1.0",
+    "torchaudio>=2.1.0",
     "pytorch-lightning>=2.0",
     "librosa>=0.10",
     "cython>=3.2.4",
@@ -22,7 +22,7 @@ dependencies = [
     "transformers>=4.30",
     "piper-train[train]",
     "onnxscript>=0.6.2",
-    "onnxruntime>=1.24.1",
+    "onnxruntime>=1.17",
     "ghapi>=1.0.13",
 ]
 

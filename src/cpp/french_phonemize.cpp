@@ -6,6 +6,7 @@
 
 #include "french_phonemize.hpp"
 #include "utf8.h"
+#include "utf8_utils.hpp"
 
 #include <cstdint>
 #include <string>
@@ -148,18 +149,10 @@ static const std::unordered_set<std::u32string> ER_AS_EHR = {
 };
 
 // ---------------------------------------------------------------------------
-// UTF-8 <-> UTF-32 helpers
+// UTF-8 <-> UTF-32 helpers — delegated to utf8_utils.hpp
 // ---------------------------------------------------------------------------
 
-static std::u32string utf8ToU32(const std::string &s) {
-    std::u32string result;
-    auto it = s.begin();
-    while (it != s.end()) {
-        char32_t cp = utf8::unchecked::next(it);
-        result.push_back(cp);
-    }
-    return result;
-}
+using utf8_util::utf8ToU32;
 
 // ---------------------------------------------------------------------------
 // Normalize: collapse NFD combining sequences, lowercase, strip whitespace
@@ -1158,6 +1151,10 @@ void phonemize_french(const std::string &text,
                       std::vector<std::vector<Phoneme>> &phonemes)
 {
     phonemes.clear();
+
+    if (!utf8::is_valid(text.begin(), text.end())) {
+        return;
+    }
 
     // Decode UTF-8 input to UTF-32
     std::u32string u32text = utf8ToU32(text);

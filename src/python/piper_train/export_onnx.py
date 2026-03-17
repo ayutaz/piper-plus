@@ -7,9 +7,6 @@ from pathlib import Path
 
 import torch
 
-
-torch.serialization.add_safe_globals([pathlib.PosixPath])
-
 from .vits import commons
 from .vits.lightning import VitsModel
 
@@ -236,9 +233,8 @@ def main() -> None:
         # 7. Flow + Decoder
         z = model_g.flow(z_p, y_mask, g=g, reverse=True)
         o = model_g.dec((z * y_mask), g=g)
-        audio = o.unsqueeze(1)
 
-        return audio, durations
+        return o, durations
 
     model_g.forward = infer_forward
 
@@ -279,7 +275,7 @@ def main() -> None:
     dynamic_axes = {
         "input": {0: "batch_size", 1: "phonemes"},
         "input_lengths": {0: "batch_size"},
-        "output": {0: "batch_size", 1: "time"},
+        "output": {0: "batch_size", 2: "time"},
         "durations": {0: "batch_size", 1: "phonemes"},
     }
 

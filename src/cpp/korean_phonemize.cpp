@@ -9,6 +9,7 @@
 
 #include "korean_phonemize.hpp"
 #include "utf8.h"
+#include "utf8_utils.hpp"
 
 #include <string>
 #include <vector>
@@ -226,15 +227,62 @@ static bool isPunctuation(char32_t ch) {
 }
 
 // ---------------------------------------------------------------------------
-// UTF-8 -> codepoint vector
+// UTF-8 -> codepoint vector — delegated to utf8_utils.hpp
 // ---------------------------------------------------------------------------
-static std::vector<char32_t> toCodepoints(const std::string &s) {
-    std::vector<char32_t> cps;
-    auto it = s.begin();
-    while (it != s.end()) {
-        cps.push_back(utf8::unchecked::next(it));
+using utf8_util::toCodepoints;
+
+// ---------------------------------------------------------------------------
+// NFD Hangul jamo -> NFC composed syllable conversion
+//
+// macOS decomposes Hangul into NFD jamo sequences (U+1100-U+11FF).
+// This function recomposes them into precomposed syllables (U+AC00-U+D7A3)
+// so that isHangulSyllable() and decompose() work correctly.
+//
+// Algorithm: leading (U+1100-U+1112) + vowel (U+1161-U+1175)
+//            + optional trailing (U+11A8-U+11C2)
+//   -> ((leading - 0x1100) * 21 + (vowel - 0x1161)) * 28 + trailing_offset + 0xAC00
+// ---------------------------------------------------------------------------
+static bool isLeadingJamo(char32_t ch) {
+    return ch >= 0x1100 && ch <= 0x1112;
+}
+
+static bool isVowelJamo(char32_t ch) {
+    return ch >= 0x1161 && ch <= 0x1175;
+}
+
+static bool isTrailingJamo(char32_t ch) {
+    return ch >= 0x11A8 && ch <= 0x11C2;
+}
+
+static void composeHangulJamo(std::vector<char32_t> &cps) {
+    std::vector<char32_t> out;
+    out.reserve(cps.size());
+    size_t n = cps.size();
+    size_t i = 0;
+
+    while (i < n) {
+        if (isLeadingJamo(cps[i]) && i + 1 < n && isVowelJamo(cps[i + 1])) {
+            int leading = static_cast<int>(cps[i] - 0x1100);
+            int vowel   = static_cast<int>(cps[i + 1] - 0x1161);
+            int trailing = 0;
+
+            if (i + 2 < n && isTrailingJamo(cps[i + 2])) {
+                trailing = static_cast<int>(cps[i + 2] - 0x11A8) + 1;
+                i += 3;
+            } else {
+                i += 2;
+            }
+
+            char32_t composed = static_cast<char32_t>(
+                (leading * 21 + vowel) * 28 + trailing + 0xAC00);
+            out.push_back(composed);
+        } else {
+            out.push_back(cps[i]);
+            ++i;
+        }
     }
-    return cps;
+
+    cps = std::move(out);
 }
 
 // ---------------------------------------------------------------------------
@@ -333,8 +381,15 @@ void phonemize_korean(const std::string &text,
                       std::vector<std::vector<Phoneme>> &phonemes) {
     phonemes.clear();
 
+    if (!utf8::is_valid(text.begin(), text.end())) {
+        return;
+    }
+
     auto cps = toCodepoints(text);
     if (cps.empty()) return;
+
+    // Recompose NFD Hangul jamo sequences (macOS) into NFC precomposed syllables
+    composeHangulJamo(cps);
 
     std::vector<Phoneme> sentence;
     bool needSpace = false;

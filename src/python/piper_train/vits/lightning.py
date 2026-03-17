@@ -375,6 +375,7 @@ class VitsModel(pl.LightningModule):
                 collate_fn=collate_fn,
                 num_workers=self.hparams.num_workers,
                 batch_size=self.hparams.batch_size,
+                shuffle=True,
                 pin_memory=pin_memory,
                 persistent_workers=(self.hparams.num_workers > 0),
                 prefetch_factor=(2 if self.hparams.num_workers > 0 else None),
@@ -634,7 +635,18 @@ class VitsModel(pl.LightningModule):
             return loss_disc_all
 
     def validation_step(self, batch: Batch, batch_idx: int):
-        val_loss = self.training_step_g(batch) + self.training_step_d(batch)
+        # Temporarily suppress self.log to prevent training_step_g/d from
+        # logging training-named metrics (loss_gen_all, loss_disc_all, etc.)
+        # during validation.  We restore self.log immediately after.
+        _orig_log = self.log
+        self.log = lambda *_args, **_kwargs: None  # no-op
+        try:
+            loss_g = self.training_step_g(batch)
+            loss_d = self.training_step_d(batch)
+        finally:
+            self.log = _orig_log
+
+        val_loss = loss_g + loss_d
         self._log_with_batch_info("val_loss", val_loss, batch)
         return val_loss
 
@@ -689,17 +701,29 @@ class VitsModel(pl.LightningModule):
                                 [len(test_utt.phoneme_ids)]
                             ).to(self.device)
                             scales = [0.667, 1.0, 0.8]
-                            # speaker_id/language_id are int; wrap in LongTensor for model
-                            sid = (
-                                torch.LongTensor([test_utt.speaker_id]).to(self.device)
-                                if test_utt.speaker_id is not None
-                                else None
-                            )
-                            lid = (
-                                torch.LongTensor([test_utt.language_id]).to(self.device)
-                                if test_utt.language_id is not None
-                                else None
-                            )
+                            # speaker_id / language_id may be int or Tensor
+                            # (Subset from random_split wraps them as LongTensor)
+                            raw_sid = test_utt.speaker_id
+                            if raw_sid is not None:
+                                if isinstance(raw_sid, torch.Tensor):
+                                    sid = (
+                                        raw_sid.unsqueeze(0) if raw_sid.dim() == 0 else raw_sid
+                                    ).to(self.device)
+                                else:
+                                    sid = torch.LongTensor([raw_sid]).to(self.device)
+                            else:
+                                sid = None
+
+                            raw_lid = test_utt.language_id
+                            if raw_lid is not None:
+                                if isinstance(raw_lid, torch.Tensor):
+                                    lid = (
+                                        raw_lid.unsqueeze(0) if raw_lid.dim() == 0 else raw_lid
+                                    ).to(self.device)
+                                else:
+                                    lid = torch.LongTensor([raw_lid]).to(self.device)
+                            else:
+                                lid = None
 
                             test_audio = self(
                                 text, text_lengths, scales, sid=sid, lid=lid

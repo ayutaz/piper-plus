@@ -12,6 +12,7 @@ torch = pytest.importorskip("torch")
 from piper_train.vits.dataset import (  # noqa: E402
     PiperDataset,
     Utterance,
+    UtteranceCollate,
     UtteranceTensors,
 )
 
@@ -186,3 +187,44 @@ def test_getitem_without_speaker_id(tmp_path):
 
     result = dataset[0]
     assert result.speaker_id is None
+
+
+@pytest.mark.unit
+def test_collate_non_multilanguage_with_language_id(tmp_path):
+    """language_id付きデータをis_multilanguage=Falseで処理してもassertで落ちない.
+
+    Regression test: UtteranceCollate(is_multilanguage=False) must not crash
+    when utterances carry a non-None language_id.  The collate should simply
+    ignore the language_id field rather than raising an AssertionError.
+    """
+    utt1 = _make_utterance(tmp_path, speaker_id=0, language_id=1, text="a")
+    utt2 = _make_utterance(tmp_path, speaker_id=1, language_id=0, text="b")
+    dataset = _make_dataset_with_utterances([utt1, utt2])
+
+    tensors = [dataset[0], dataset[1]]
+
+    collate = UtteranceCollate(
+        is_multispeaker=True,
+        segment_size=8192,
+        is_multilanguage=False,
+    )
+
+    # Must not raise AssertionError
+    batch = collate(tensors)
+
+    # language_ids should be None when is_multilanguage=False
+    assert batch.language_ids is None
+    # Other fields should still be populated
+    assert batch.phoneme_ids.shape[0] == 2
+    assert batch.speaker_ids is not None
+
+
+@pytest.mark.unit
+def test_validate_cache_files_method_exists():
+    """_validate_cache_files メソッドが定義されていることを確認.
+
+    Regression test: PiperDataset must expose _validate_cache_files so that
+    the validate_cache=True code path in __init__ can filter corrupted entries.
+    """
+    assert hasattr(PiperDataset, "_validate_cache_files")
+    assert callable(PiperDataset._validate_cache_files)

@@ -543,11 +543,9 @@ def _apply_br_postprocessing(phonemes: list[str], stress_idx: int) -> list[str]:
     1. t/d palatalization before unstressed final -e:
        - te# (unstressed) -> tʃi
        - de# (unstressed) -> dʒi
-    2. Unstressed vowel reduction:
+    2. Unstressed final vowel reduction:
        - Unstressed final e -> i
        - Unstressed final o -> u
-       - Unstressed non-final e -> i (in common positions)
-       - Unstressed non-final o -> u (in common positions)
     """
     result = list(phonemes)
 
@@ -589,10 +587,6 @@ def _apply_br_postprocessing(phonemes: list[str], stress_idx: int) -> list[str]:
             # Unstressed final o -> u
             result[last_phoneme_idx] = "u"
 
-    # --- Pass 2: Non-final unstressed vowel reduction ---
-    # Recalculate word ranges since pass 1 may have inserted phonemes
-    result = _reduce_unstressed_vowels(result, stress_idx)
-
     return result
 
 
@@ -612,20 +606,6 @@ def _find_word_ranges(phonemes: list[str]) -> list[tuple[int, int]]:
         ranges.append((start, len(phonemes)))
     return ranges
 
-
-def _reduce_unstressed_vowels(phonemes: list[str], stress_idx: int) -> list[str]:
-    """Reduce unstressed vowels in non-final positions.
-
-    In BR Portuguese:
-    - Pretonic 'e' often reduces to [i] (but not always; simplified here)
-    - Pretonic 'o' often reduces to [u] (but not always; simplified here)
-
-    We apply conservative reduction: only reduce clearly unstressed positions.
-    """
-    # For now, the final-position reduction is handled in _apply_br_postprocessing.
-    # Non-final reduction is complex and context-dependent in BP. We keep it
-    # minimal to avoid over-reduction.
-    return phonemes
 
 
 def _split_words(text: str) -> list[str]:

@@ -356,3 +356,26 @@ class TestHangulDecomposition:
             f"NFC and NFD inputs should produce identical phonemes.\n"
             f"NFC: {phonemes_nfc}\nNFD: {phonemes_nfd}"
         )
+
+    def test_nfd_hangul_input_matches_nfc(self):
+        """NFD Hangul input (decomposed jamo) must produce the same phonemes as NFC.
+
+        Regression test #19: a single composed syllable U+AC00 (가) vs its
+        NFD decomposition U+1100 U+1161 (ㄱ + ㅏ) must yield identical output.
+        """
+        from piper_train.phonemize.korean import phonemize_korean
+
+        nfc = "\uac00"  # 가 (composed)
+        nfd = "\u1100\u1161"  # ㄱ + ㅏ (decomposed jamo)
+        # Verify the two representations are byte-different
+        assert nfc != nfd, "NFC and NFD forms should differ at string level"
+
+        phonemes_nfc = phonemize_korean(nfc)
+        phonemes_nfd = phonemize_korean(nfd)
+        assert phonemes_nfc == phonemes_nfd, (
+            f"NFD single syllable should match NFC.\n"
+            f"NFC ({nfc!r}): {phonemes_nfc}\n"
+            f"NFD ({nfd!r}): {phonemes_nfd}"
+        )
+        # Sanity: output should be non-empty
+        assert len(phonemes_nfc) > 0, "phonemize_korean should produce output for 가"

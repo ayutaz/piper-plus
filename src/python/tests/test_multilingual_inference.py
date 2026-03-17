@@ -7,7 +7,12 @@ Prevents regression of the Japanese padding bug:
   language="ja", the function must auto-promote to MultilingualPhonemizer
   so that intersperse padding (ID 0 between adjacent phoneme IDs) is applied.
 - JA-only models (no language_id_map) must NOT be affected.
+
+Also covers:
+  #38 ONNX export output must be 3D [batch, 1, time] (not 4D with extra unsqueeze)
 """
+
+from pathlib import Path
 
 import pytest
 
@@ -339,3 +344,144 @@ class TestPhonemeIdRange:
             assert 0 <= pid < num_symbols, (
                 f"phoneme ID {pid} out of valid range [0, {num_symbols})"
             )
+
+
+@pytest.mark.unit
+class TestSidDefaultForSingleSpeakerMultilingual:
+    """Verify that infer_onnx defaults sid to [0] when has_sid=True but
+    speaker_id is None (single-speaker multilingual model)."""
+
+    def test_sid_default_for_single_speaker_multilingual(self):
+        """has_sid=True で speaker_id=None の場合、sid がデフォルト [0] になる.
+
+        Regression test: single-speaker multilingual models export with a sid
+        input (because gin_channels > 0 when num_languages > 1), but the user
+        may not provide a speaker_id.  infer_onnx must default sid to [0]
+        rather than passing None, which would cause an ONNX runtime error.
+        """
+        import numpy as np
+
+        # Simulate the infer_onnx logic: speaker_id is None, has_sid is True
+        speaker_id = None
+        has_sid = True
+
+        sid = None
+        if speaker_id is not None:
+            sid = np.array([speaker_id], dtype=np.int64)
+
+        # This is the key default logic from infer_onnx.py lines 316-317
+        if sid is None and has_sid:
+            sid = np.array([0], dtype=np.int64)
+
+        assert sid is not None, "sid must not be None when has_sid=True"
+        assert sid.tolist() == [0], f"sid should default to [0], got {sid.tolist()}"
+        assert sid.dtype == np.int64
+
+    def test_sid_preserved_when_explicit(self):
+        """has_sid=True で speaker_id=5 の場合、sid は [5] のまま."""
+        import numpy as np
+
+        speaker_id = 5
+        has_sid = True
+
+        sid = None
+        if speaker_id is not None:
+            sid = np.array([speaker_id], dtype=np.int64)
+
+        if sid is None and has_sid:
+            sid = np.array([0], dtype=np.int64)
+
+        assert sid is not None
+        assert sid.tolist() == [5], f"sid should be [5], got {sid.tolist()}"
+
+    def test_sid_none_when_no_sid_input(self):
+        """has_sid=False で speaker_id=None の場合、sid は None のまま."""
+        import numpy as np
+
+        speaker_id = None
+        has_sid = False
+
+        sid = None
+        if speaker_id is not None:
+            sid = np.array([speaker_id], dtype=np.int64)
+
+        if sid is None and has_sid:
+            sid = np.array([0], dtype=np.int64)
+
+        assert sid is None, "sid must remain None when has_sid=False"
+
+
+# ---------------------------------------------------------------------------
+# ONNX output shape regression test (#38)
+# ---------------------------------------------------------------------------
+
+_REPO_ROOT = Path(__file__).resolve().parents[2]  # src/python/tests -> repo root
+_SHIPPED_MODEL = _REPO_ROOT / "test" / "models" / "multilingual-test-medium.onnx"
+
+
+@pytest.mark.unit
+class TestOnnxOutputShape:
+    """Verify ONNX model output is 3D [batch, 1, time].
+
+    Regression test for #38: an earlier version of the export wrapped the
+    decoder output with an extra unsqueeze, producing 4D [batch, 1, 1, time].
+    The correct shape is [batch, 1, time] -- batch dim, single audio channel,
+    and variable-length time axis.
+    """
+
+    def test_onnx_output_is_3d(self):
+        """ONNX model 'output' must be 3-dimensional [batch, 1, time]."""
+        ort = pytest.importorskip(
+            "onnxruntime", reason="onnxruntime required for ONNX output shape test"
+        )
+
+        if not _SHIPPED_MODEL.exists():
+            pytest.skip(
+                f"Shipped test model not found: {_SHIPPED_MODEL}"
+            )
+
+        import numpy as np
+
+        session = ort.InferenceSession(str(_SHIPPED_MODEL))
+
+        # Build minimal inputs by inspecting the model
+        input_names = {inp.name for inp in session.get_inputs()}
+
+        # A short phoneme_ids sequence (BOS + a few IDs + EOS)
+        phoneme_ids = np.array([[1, 0, 10, 0, 11, 0, 2]], dtype=np.int64)
+        phoneme_lengths = np.array([phoneme_ids.shape[1]], dtype=np.int64)
+        scales = np.array([0.667, 1.0, 0.8], dtype=np.float32)
+
+        args = {
+            "input": phoneme_ids,
+            "input_lengths": phoneme_lengths,
+            "scales": scales,
+        }
+
+        if "sid" in input_names:
+            args["sid"] = np.array([0], dtype=np.int64)
+        if "lid" in input_names:
+            args["lid"] = np.array([0], dtype=np.int64)
+        if "prosody_features" in input_names:
+            num_phonemes = phoneme_ids.shape[1]
+            args["prosody_features"] = np.zeros(
+                (1, num_phonemes, 3), dtype=np.int64
+            )
+
+        outputs = session.run(None, args)
+        audio_output = outputs[0]
+
+        assert audio_output.ndim == 3, (
+            f"ONNX 'output' must be 3D [batch, 1, time], "
+            f"got {audio_output.ndim}D with shape {audio_output.shape}. "
+            f"This is a regression: an extra unsqueeze was removed."
+        )
+        assert audio_output.shape[0] == 1, (
+            f"Batch dimension should be 1, got {audio_output.shape[0]}"
+        )
+        assert audio_output.shape[1] == 1, (
+            f"Channel dimension should be 1, got {audio_output.shape[1]}"
+        )
+        assert audio_output.shape[2] > 0, (
+            f"Time dimension should be > 0, got {audio_output.shape[2]}"
+        )

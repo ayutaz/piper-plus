@@ -326,3 +326,31 @@ class TestSpanishPhonemizer:
         assert len(phonemes) == len(prosody), (
             f"Prosody alignment broken: {len(phonemes)} phonemes vs {len(prosody)} prosody"
         )
+
+    # ---------------------------------------------------------------
+    # Regression #20: xc + vowel produces exactly 2 phonemes (k + s)
+    # ---------------------------------------------------------------
+
+    def test_xc_before_vowel_produces_two_phonemes(self):
+        """'xc' + vowel must produce 'k' and 's' (2 phonemes) in sequence.
+
+        The xc digraph before e/i is handled as a single grapheme unit by
+        _segment_graphemes, and _g2p_word emits k + s.  This regression test
+        verifies both phonemes are present and adjacent.
+        """
+        phonemes = phonemize_spanish("exceso")
+        # Find k and s in the phoneme sequence (stress marker may appear between them)
+        assert "k" in phonemes and "s" in phonemes, (
+            f"Expected 'k' and 's' for xc+vowel in 'exceso', got: {phonemes}"
+        )
+        k_idx = phonemes.index("k")
+        s_idx = phonemes.index("s")
+        assert s_idx > k_idx, (
+            f"Expected 's' after 'k' for xc+vowel in 'exceso', got: {phonemes}"
+        )
+
+        # Also verify with another xc word
+        phonemes2 = phonemize_spanish("excitar")
+        assert "k" in phonemes2 and "s" in phonemes2, (
+            f"Expected 'k' and 's' for xc+vowel in 'excitar', got: {phonemes2}"
+        )

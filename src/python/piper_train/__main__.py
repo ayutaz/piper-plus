@@ -7,8 +7,6 @@ from pathlib import Path
 
 import torch
 
-
-torch.serialization.add_safe_globals([pathlib.PosixPath])
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import TensorBoardLogger
@@ -73,9 +71,73 @@ def configure_ddp_strategy(num_gpus, user_strategy=None, no_wavlm=False):
     return None
 
 
-def main():
-    logging.basicConfig(level=logging.DEBUG)
+def _build_trainer(args, loggers, num_gpus, num_speakers):
+    """Build a Trainer instance with callbacks and strategy from args.
 
+    This is called both on the normal path and when falling back from a
+    failed checkpoint resume (where a fresh Trainer is needed to clear
+    the stale ckpt_path).
+    """
+    callbacks = []
+    if args.checkpoint_epochs is not None:
+        checkpoint_dir = Path(args.default_root_dir) / "checkpoints"
+        callbacks.append(
+            ModelCheckpoint(
+                dirpath=str(checkpoint_dir),
+                every_n_epochs=args.checkpoint_epochs,
+                save_top_k=args.save_top_k,
+                save_last=True,
+                save_on_train_epoch_end=True,
+            )
+        )
+        _LOGGER.debug(
+            "Checkpoints will be saved every %s epoch(s) to %s",
+            args.checkpoint_epochs,
+            checkpoint_dir,
+        )
+
+    # EMA is enabled by default
+    if not args.no_ema:
+        callbacks.append(EMACallback(decay=args.ema_decay))
+        _LOGGER.info("Using EMA with decay rate %s", args.ema_decay)
+    else:
+        _LOGGER.info("EMA disabled by user request")
+
+    trainer_kwargs = {
+        "accelerator": args.accelerator,
+        "devices": args.devices,
+        "precision": args.precision,
+        "max_epochs": args.max_epochs,
+        "callbacks": callbacks,
+        "default_root_dir": args.default_root_dir,
+        "logger": loggers,
+        "check_val_every_n_epoch": args.val_every_n_epochs,
+        "limit_val_batches": args.limit_val_batches,
+    }
+
+    # --limit-train-batches: テスト用に学習バッチ数を制限
+    if getattr(args, "limit_train_batches", None) is not None:
+        trainer_kwargs["limit_train_batches"] = args.limit_train_batches
+
+    # Multi-GPU DDP optimization
+    strategy = configure_ddp_strategy(num_gpus, args.strategy, no_wavlm=args.no_wavlm)
+    if strategy:
+        trainer_kwargs["strategy"] = strategy
+
+    # When using SpeakerBalancedBatchSampler, disable Lightning's automatic distributed sampler
+    if args.samples_per_speaker > 0 and num_speakers > 1:
+        trainer_kwargs["use_distributed_sampler"] = False
+        _LOGGER.info("Disabled distributed sampler for SpeakerBalancedBatchSampler")
+
+    return Trainer(**trainer_kwargs)
+
+
+def create_parser():
+    """Create the argument parser for piper_train.
+
+    Extracted so that tests can import and reuse the canonical parser
+    instead of duplicating argparse definitions.
+    """
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--dataset-dir", required=True, help="Path to pre-processed dataset directory"
@@ -239,6 +301,13 @@ def main():
         help="Enable torch.compile() for potential training speedup (requires PyTorch 2.0+)",
     )
     parser.add_argument("--seed", type=int, default=1234)
+    return parser
+
+
+def main():
+    logging.basicConfig(level=logging.DEBUG)
+
+    parser = create_parser()
     args = parser.parse_args()
     _LOGGER.debug(args)
 
@@ -301,33 +370,7 @@ def main():
         num_languages = int(config.get("num_languages", 1))
         sample_rate = int(config["audio"]["sample_rate"])
 
-    # Setup callbacks
-    callbacks = []
-    if args.checkpoint_epochs is not None:
-        checkpoint_dir = Path(args.default_root_dir) / "checkpoints"
-        callbacks.append(
-            ModelCheckpoint(
-                dirpath=str(checkpoint_dir),
-                every_n_epochs=args.checkpoint_epochs,
-                save_top_k=args.save_top_k,
-                save_last=True,
-                save_on_train_epoch_end=True,
-            )
-        )
-        _LOGGER.debug(
-            "Checkpoints will be saved every %s epoch(s) to %s",
-            args.checkpoint_epochs,
-            checkpoint_dir,
-        )
-
-    # EMA is enabled by default
-    if not args.no_ema:
-        callbacks.append(EMACallback(decay=args.ema_decay))
-        _LOGGER.info("Using EMA with decay rate %s", args.ema_decay)
-    else:
-        _LOGGER.info("EMA disabled by user request")
-
-    # Setup loggers
+    # Setup loggers (created once and reused across Trainer instances)
     loggers = []
 
     # TensorBoard logger (always enabled)
@@ -351,36 +394,7 @@ def main():
     else:
         _LOGGER.info("Wandb not available, using TensorBoard only")
 
-    trainer_kwargs = {
-        "accelerator": args.accelerator,
-        "devices": args.devices,
-        "precision": args.precision,
-        "max_epochs": args.max_epochs,
-        "callbacks": callbacks,
-        "default_root_dir": args.default_root_dir,
-        "logger": loggers,
-        "check_val_every_n_epoch": args.val_every_n_epochs,
-        "limit_val_batches": args.limit_val_batches,
-    }
-
-    # --limit-train-batches: テスト用に学習バッチ数を制限
-    if getattr(args, "limit_train_batches", None) is not None:
-        trainer_kwargs["limit_train_batches"] = args.limit_train_batches
-
-    # Multi-GPU DDP optimization
-    # Use DDPStrategy with gradient_as_bucket_view=True for memory efficiency
-    # find_unused_parameters=True is required for GAN training (Generator/Discriminator alternate)
-    strategy = configure_ddp_strategy(num_gpus, args.strategy, no_wavlm=args.no_wavlm)
-    if strategy:
-        trainer_kwargs["strategy"] = strategy
-
-    # When using SpeakerBalancedBatchSampler, disable Lightning's automatic distributed sampler
-    # The batch sampler handles DDP-awareness internally
-    if args.samples_per_speaker > 0 and num_speakers > 1:
-        trainer_kwargs["use_distributed_sampler"] = False
-        _LOGGER.info("Disabled distributed sampler for SpeakerBalancedBatchSampler")
-
-    trainer = Trainer(**trainer_kwargs)
+    trainer = _build_trainer(args, loggers, num_gpus, num_speakers)
 
     dict_args = vars(args)
 
@@ -577,56 +591,7 @@ def main():
                 del args_dict["resume_from_checkpoint"]
 
             # 新しいTrainerインスタンスを作成（ckpt_pathをクリアするため）
-            # Setup callbacks
-            callbacks = []
-            if args.checkpoint_epochs is not None:
-                checkpoint_dir = Path(args.default_root_dir) / "checkpoints"
-                callbacks.append(
-                    ModelCheckpoint(
-                        dirpath=str(checkpoint_dir),
-                        every_n_epochs=args.checkpoint_epochs,
-                        save_top_k=args.save_top_k,
-                        save_last=True,
-                        save_on_train_epoch_end=True,
-                    )
-                )
-                _LOGGER.debug(
-                    "Checkpoints will be saved every %s epoch(s) to %s",
-                    args.checkpoint_epochs,
-                    checkpoint_dir,
-                )
-
-            # EMA is enabled by default
-            if not args.no_ema:
-                callbacks.append(EMACallback(decay=args.ema_decay))
-                _LOGGER.info("Using EMA with decay rate %s", args.ema_decay)
-            else:
-                _LOGGER.info("EMA disabled by user request")
-
-            trainer_kwargs = {
-                "accelerator": args.accelerator,
-                "devices": args.devices,
-                "precision": args.precision,
-                "max_epochs": args.max_epochs,
-                "callbacks": callbacks,
-                "default_root_dir": args.default_root_dir,
-                "logger": loggers,
-                "check_val_every_n_epoch": args.val_every_n_epochs,
-                "limit_val_batches": args.limit_val_batches,
-            }
-
-            # Multi-GPU DDP optimization
-            strategy = configure_ddp_strategy(
-                num_gpus, args.strategy, no_wavlm=args.no_wavlm
-            )
-            if strategy:
-                trainer_kwargs["strategy"] = strategy
-
-            # When using SpeakerBalancedBatchSampler, disable Lightning's automatic distributed sampler
-            if args.samples_per_speaker > 0 and num_speakers > 1:
-                trainer_kwargs["use_distributed_sampler"] = False
-
-            trainer = Trainer(**trainer_kwargs)
+            trainer = _build_trainer(args, loggers, num_gpus, num_speakers)
 
             # 新しいTrainerで学習を開始
             trainer.fit(model)

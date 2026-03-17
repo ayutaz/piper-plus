@@ -314,37 +314,11 @@ class MultilingualPhonemizer(Phonemizer):
         prosody_features: list[dict | None],
         phoneme_id_map: dict[str, list[int]],
     ) -> tuple[list[int], list[dict | None]]:
-        """Add BOS/EOS and inter-phoneme padding (espeak-ng compatible)."""
-        pad_ids = phoneme_id_map.get("_", [0])
-        bos_ids = phoneme_id_map.get("^")
-        eos_ids = phoneme_id_map.get(self._last_eos, phoneme_id_map.get("$"))
+        """Add BOS/EOS and inter-phoneme padding (espeak-ng compatible).
 
-        # Insert pad between every phoneme ID, but skip after existing pad/pause
-        # tokens (ID 0).  The training data was created by _add_inter_phoneme_padding
-        # which has the same guard (pid != pad_id).  Without this, JA sentences
-        # containing pauses (88 % of entries) get an extra ID per pause, shifting
-        # every subsequent phoneme and breaking alignment with what the model
-        # learned.
-        padded_ids: list[int] = []
-        padded_prosody: list[dict | None] = []
-        for phoneme_id, prosody_feature in zip(
-            phoneme_ids, prosody_features, strict=True
-        ):
-            padded_ids.append(phoneme_id)
-            padded_prosody.append(prosody_feature)
-            if phoneme_id not in pad_ids:
-                padded_ids.extend(pad_ids)
-                padded_prosody.extend([None] * len(pad_ids))
-
-        phoneme_ids = padded_ids
-        prosody_features = padded_prosody
-
-        # Wrap with BOS/EOS
-        if bos_ids:
-            phoneme_ids = bos_ids + [pad_ids[0]] + phoneme_ids
-            prosody_features = [None] * (len(bos_ids) + 1) + prosody_features
-        if eos_ids:
-            phoneme_ids = phoneme_ids + eos_ids
-            prosody_features = prosody_features + [None] * len(eos_ids)
-
-        return phoneme_ids, prosody_features
+        Delegates to the base class implementation, passing the dynamic EOS
+        token captured during the most recent ``phonemize_with_prosody`` call.
+        """
+        return super().post_process_ids(
+            phoneme_ids, prosody_features, phoneme_id_map, eos_token=self._last_eos
+        )

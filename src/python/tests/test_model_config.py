@@ -19,7 +19,7 @@ def test_models_no_super_monotonic_align_import():
     models_path = (
         Path(__file__).resolve().parent.parent / "piper_train" / "vits" / "models.py"
     )
-    source = models_path.read_text()
+    source = models_path.read_text(encoding="utf-8")
     tree = ast.parse(source)
 
     for node in ast.walk(tree):
@@ -43,7 +43,7 @@ def test_models_imports_local_monotonic_align():
     models_path = (
         Path(__file__).resolve().parent.parent / "piper_train" / "vits" / "models.py"
     )
-    source = models_path.read_text()
+    source = models_path.read_text(encoding="utf-8")
 
     assert "monotonic_align" in source, (
         "models.py must import monotonic_align (local Cython module)"
@@ -121,54 +121,13 @@ def test_gin_channels_not_set_for_single_speaker():
 
 
 def _parse_main_args(cli_args):
-    """Parse CLI args using __main__.py's argparser (without running main())."""
-    import argparse
-
+    """Parse CLI args using the canonical parser from __main__.py."""
     try:
-        from piper_train.vits.lightning import VitsModel
+        from piper_train.__main__ import create_parser
     except ImportError as e:
         pytest.skip(f"Training dependencies not available: {e}")
 
-    parser = argparse.ArgumentParser()
-    # Replicate the parser setup from __main__.py
-    parser.add_argument("--dataset-dir", required=True)
-    parser.add_argument("--checkpoint-epochs", type=int)
-    parser.add_argument(
-        "--quality", default="medium", choices=("x-low", "medium", "high")
-    )
-    parser.add_argument("--save-top-k", type=int, default=-1)
-    parser.add_argument("--no-ema", action="store_true")
-    parser.add_argument("--ema-decay", type=float, default=0.9995)
-    parser.add_argument("--auto_lr_scaling", action="store_true", default=True)
-    parser.add_argument("--disable_auto_lr_scaling", action="store_true")
-    parser.add_argument("--base_lr", type=float, default=2e-4)
-    parser.add_argument("--wavlm-model-name", default="microsoft/wavlm-base-plus")
-    parser.add_argument("--c-wavlm", type=float, default=0.5)
-    parser.add_argument("--wavlm-every-n-steps", type=int, default=1)
-    parser.add_argument("--no-wavlm", action="store_true")
-    parser.add_argument("--accelerator", default="gpu")
-    parser.add_argument("--devices", type=int, default=1)
-    parser.add_argument("--strategy", default=None)
-    parser.add_argument("--no-pin-memory", action="store_true")
-    parser.add_argument("--samples-per-speaker", type=int, default=0)
-    parser.add_argument("--precision", default="16-mixed")
-    parser.add_argument("--max_epochs", type=int, default=1000)
-    parser.add_argument("--default_root_dir", default=None)
-    parser.add_argument("--resume_from_checkpoint", default=None)
-    parser.add_argument(
-        "--val-every-n-epochs",
-        type=int,
-        default=5,
-    )
-    parser.add_argument(
-        "--limit-val-batches",
-        type=int,
-        default=50,
-    )
-    VitsModel.add_model_specific_args(parser)
-    parser.add_argument("--compile", action="store_true")
-    parser.add_argument("--seed", type=int, default=1234)
-
+    parser = create_parser()
     return parser.parse_args(cli_args)
 
 

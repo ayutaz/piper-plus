@@ -175,7 +175,7 @@ class PiperInferenceEngine:
 
         start = time.perf_counter()
         outputs = self.model.run(None, inputs)
-        audio = outputs[0].squeeze((0, 1))
+        audio = outputs[0].squeeze(0)
         audio = audio_float_to_int16(audio.squeeze())
         elapsed = time.perf_counter() - start
 

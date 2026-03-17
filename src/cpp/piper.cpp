@@ -1,5 +1,6 @@
 #include <array>
 #include <chrono>
+#include <cmath>
 #include <fstream>
 #include <limits>
 #include <set>
@@ -38,6 +39,8 @@
 #define NOMINMAX
 #endif
 #endif
+
+using json = nlohmann::json;
 
 
 namespace piper {
@@ -359,9 +362,9 @@ std::vector<PhonemeInfo> extractTimingsFromDurations(
     if (usesOpenJTalk(phonemeType)) {
         for (size_t i = 0; i < timings.size(); ++i) {
             // Convert PUA mapped phonemes back to original
-            if (timings[i].phoneme.size() == 1) {
-                // Get the first character as a codepoint
-                Phoneme ph = static_cast<Phoneme>(timings[i].phoneme[0]);
+            if (isSingleCodepoint(timings[i].phoneme)) {
+                // Get the first codepoint (handles multi-byte UTF-8, e.g. PUA U+E000+)
+                Phoneme ph = getCodepoint(timings[i].phoneme);
                 auto it = puaToPhoneme.find(ph);
                 if (it != puaToPhoneme.end()) {
                     timings[i].phoneme = it->second;
@@ -430,7 +433,7 @@ void loadModel(std::string modelPath, ModelSession &session, bool useCuda, int g
   auto startTime = std::chrono::steady_clock::now();
 
 #ifdef _WIN32
-  auto modelPathW = std::wstring(modelPath.begin(), modelPath.end());
+  auto modelPathW = std::filesystem::path(modelPath).wstring();
   auto modelPathStr = modelPathW.c_str();
 #else
   auto modelPathStr = modelPath.c_str();
@@ -669,7 +672,7 @@ void synthesize(std::vector<PhonemeId> &phonemeIds,
   maxAudioValue = findMaxAudioValueNEON(audio, audioCount);
 #else
   for (int64_t i = 0; i < audioCount; i++) {
-    float audioValue = abs(audio[i]);
+    float audioValue = std::abs(audio[i]);
     if (audioValue > maxAudioValue) {
       maxAudioValue = audioValue;
     }
@@ -1733,7 +1736,7 @@ void textToAudioStreaming(PiperConfig &config, Voice &voice, std::string text,
   
   // Calculate final real-time factor
   if (result.audioSeconds > 0) {
-    result.realTimeFactor = result.audioSeconds / result.inferSeconds;
+    result.realTimeFactor = result.inferSeconds / result.audioSeconds;
   }
   
   spdlog::debug("Streaming synthesis complete: {} chunks, {:.2f}s audio, RTF={:.2f}",

@@ -61,3 +61,50 @@ def test_ddp_strategy_always_has_find_unused_and_bucket_view():
         assert isinstance(strategy, DDPStrategy)
         assert strategy._ddp_kwargs.get("find_unused_parameters") is True
         assert strategy._ddp_kwargs.get("gradient_as_bucket_view") is True
+
+
+@pytest.mark.unit
+def test_train_dataloader_has_shuffle():
+    """非balanced パスの DataLoader に shuffle=True が設定されている.
+
+    Regression test: VitsModel.train_dataloader() の non-balanced (single-speaker
+    or samples_per_speaker=0) コードパスで DataLoader に shuffle=True が渡されて
+    いること。shuffle=False だとエポックごとに同一順序で学習してしまい、
+    過学習や学習品質劣化の原因になる。
+    """
+    torch = pytest.importorskip("torch")
+    pytest.importorskip("pytorch_lightning")
+
+    try:
+        from piper_train.vits.lightning import VitsModel
+    except ImportError as e:
+        pytest.skip(f"Training dependencies not available: {e}")
+
+    # single-speaker, samples_per_speaker=0 -> non-balanced path
+    model = VitsModel(
+        num_symbols=97,
+        num_speakers=1,
+        num_languages=1,
+        dataset=None,
+        batch_size=4,
+        learning_rate=2e-4,
+        use_wavlm_discriminator=False,
+    )
+
+    # Inject a minimal fake train dataset so train_dataloader() can run
+    from torch.utils.data import TensorDataset
+
+    fake_dataset = TensorDataset(torch.zeros(10))
+    model._train_dataset = fake_dataset
+    model.hparams["samples_per_speaker"] = 0
+
+    loader = model.train_dataloader()
+
+    # DataLoader stores the shuffle sampler internally. When shuffle=True and
+    # no custom sampler is given, PyTorch wraps it in a RandomSampler.
+    from torch.utils.data import RandomSampler
+
+    assert isinstance(loader.sampler, RandomSampler), (
+        f"Non-balanced DataLoader must use RandomSampler (shuffle=True), "
+        f"got {type(loader.sampler).__name__}"
+    )

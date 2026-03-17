@@ -220,6 +220,46 @@ class TestMultilingualPhonemizer:
         assert result_ids[-1] == eos_id
         assert len(result_ids) == len(result_prosody)
 
+    def test_post_process_ids_delegation(self):
+        """MultilingualPhonemizer.post_process_ids must delegate to Phonemizer base and produce the same result.
+
+        Regression test #33: given the same phoneme_ids and phoneme_id_map,
+        calling post_process_ids on a MultilingualPhonemizer instance and
+        calling the base Phonemizer.post_process_ids directly should yield
+        identical output (BOS/EOS wrapping and inter-phoneme padding).
+        """
+        from piper_train.phonemize.base import Phonemizer
+        from piper_train.phonemize.multilingual import MultilingualPhonemizer
+        from piper_train.phonemize.token_mapper import register
+
+        mp = MultilingualPhonemizer(["ja", "en"])
+        id_map = mp.get_phoneme_id_map()
+
+        # Build a short phoneme_ids sequence: [a, e, i]
+        syms = [register(s) for s in ("a", "e", "i")]
+        phoneme_ids = [id_map[s][0] for s in syms]
+        prosody_features = [None] * len(phoneme_ids)
+
+        # MultilingualPhonemizer result (uses default _last_eos="$")
+        mp._last_eos = "$"
+        ml_ids, ml_prosody = mp.post_process_ids(
+            list(phoneme_ids), list(prosody_features), id_map
+        )
+
+        # Base class result (call unbound method directly)
+        base_ids, base_prosody = Phonemizer.post_process_ids(
+            mp, list(phoneme_ids), list(prosody_features), id_map, eos_token="$"
+        )
+
+        assert ml_ids == base_ids, (
+            f"MultilingualPhonemizer post_process_ids differs from base.\n"
+            f"Multilingual: {ml_ids}\nBase: {base_ids}"
+        )
+        assert ml_prosody == base_prosody, (
+            f"Multilingual prosody differs from base.\n"
+            f"Multilingual: {ml_prosody}\nBase: {base_prosody}"
+        )
+
 
 # ---------------------------------------------------------------------------
 # Backward compatibility with BilingualPhonemizer

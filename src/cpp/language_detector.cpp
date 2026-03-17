@@ -129,6 +129,10 @@ std::string UnicodeLanguageDetector::detectChar(char32_t ch,
 // ---------------------------------------------------------------------------
 
 bool UnicodeLanguageDetector::hasKana(const std::string& utf8Text) const {
+    if (!utf8::is_valid(utf8Text.begin(), utf8Text.end())) {
+        return false;
+    }
+
     auto it = utf8Text.begin();
     auto end = utf8Text.end();
     while (it != end) {
@@ -146,6 +150,10 @@ bool UnicodeLanguageDetector::hasKana(const std::string& utf8Text) const {
 
 std::vector<LangSegment> UnicodeLanguageDetector::segmentText(
     const std::string& utf8Text) const {
+
+    if (!utf8::is_valid(utf8Text.begin(), utf8Text.end())) {
+        return {};
+    }
 
     // Check if the text is empty or whitespace-only
     bool hasNonWhitespace = false;
@@ -215,6 +223,10 @@ std::vector<LangSegment> UnicodeLanguageDetector::segmentText(
 std::string detectDominantLanguage(
     const std::string& utf8Text,
     const UnicodeLanguageDetector& detector) {
+
+    if (!utf8::is_valid(utf8Text.begin(), utf8Text.end())) {
+        return detector.defaultLatinLanguage();
+    }
 
     bool contextHasKana = detector.hasKana(utf8Text);
 

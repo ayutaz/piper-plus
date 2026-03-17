@@ -10,6 +10,7 @@ class PhonemeType(str, Enum):
     ESPEAK = "espeak"
     TEXT = "text"
     OPENJTALK = "openjtalk"
+    BILINGUAL = "bilingual"
     MULTILINGUAL = "multilingual"
 
 

@@ -100,7 +100,7 @@ class PiperDataset(Dataset):
             self.utterances = [
                 utt
                 for utt in self.utterances
-                if PiperDataset._validate_cache_files(utt)
+                if self._validate_cache_files(utt)
             ]
             removed = before - len(self.utterances)
             if removed:
@@ -144,6 +144,17 @@ class PiperDataset(Dataset):
             text=utt.text,
             prosody_features=prosody_tensor,
         )
+
+    @staticmethod
+    def _validate_cache_files(utt: Utterance) -> bool:
+        """Check that both cached audio files exist on disk."""
+        if not utt.audio_norm_path.exists():
+            _LOGGER.debug("Missing audio_norm: %s", utt.audio_norm_path)
+            return False
+        if not utt.audio_spec_path.exists():
+            _LOGGER.debug("Missing audio_spec: %s", utt.audio_spec_path)
+            return False
+        return True
 
     @staticmethod
     def _prosody_features_to_tensor(
@@ -326,8 +337,7 @@ class UtteranceCollate:
                 assert speaker_ids is not None
                 speaker_ids[utt_idx] = utt.speaker_id
 
-            if utt.language_id is not None:
-                assert language_ids is not None
+            if utt.language_id is not None and language_ids is not None:
                 language_ids[utt_idx] = utt.language_id
 
             if prosody_padded is not None and utt.prosody_features is not None:

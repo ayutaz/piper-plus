@@ -505,3 +505,42 @@ class TestPortuguesePhonemizer:
             f"Prosody alignment broken: "
             f"{len(phonemes)} phonemes vs {len(prosody)} prosody"
         )
+
+    # --- Stress index after nasal coda removal (#18) ---
+
+    def test_stress_idx_after_nasal_coda_removal(self):
+        """Stress index must still point at the correct vowel after nasal coda removal.
+
+        Words like 'noite' (oral vowel) and 'monte' (nasal coda absorbed) must
+        have stress_idx pointing at a vowel phoneme, not shifted by the removal
+        of the nasal consonant.
+        """
+        from piper_train.phonemize.portuguese import _convert_word
+
+        # 'monte': m + õ (nasal, n absorbed) + t + i (final e reduced)
+        # Stress should land on the nasal vowel õ
+        phonemes_monte, stress_idx_monte = _convert_word("monte")
+        assert 0 <= stress_idx_monte < len(phonemes_monte), (
+            f"stress_idx {stress_idx_monte} out of range for monte "
+            f"(len={len(phonemes_monte)}): {phonemes_monte}"
+        )
+        stressed_ph = phonemes_monte[stress_idx_monte]
+        # The stressed phoneme must be a vowel (oral or nasal)
+        _IPA_ALL_VOWELS = set("aeioɛɔuãẽĩõũ")
+        assert stressed_ph in _IPA_ALL_VOWELS, (
+            f"Stress on non-vowel '{stressed_ph}' at idx {stress_idx_monte} "
+            f"in monte: {phonemes_monte}"
+        )
+
+        # 'noite': n + o + i + tʃ + i  (palatalization of final -te)
+        # Stress should land on 'o' (paroxytone)
+        phonemes_noite, stress_idx_noite = _convert_word("noite")
+        assert 0 <= stress_idx_noite < len(phonemes_noite), (
+            f"stress_idx {stress_idx_noite} out of range for noite "
+            f"(len={len(phonemes_noite)}): {phonemes_noite}"
+        )
+        stressed_ph_noite = phonemes_noite[stress_idx_noite]
+        assert stressed_ph_noite in _IPA_ALL_VOWELS, (
+            f"Stress on non-vowel '{stressed_ph_noite}' at idx {stress_idx_noite} "
+            f"in noite: {phonemes_noite}"
+        )

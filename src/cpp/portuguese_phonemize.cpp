@@ -6,6 +6,7 @@
 
 #include "portuguese_phonemize.hpp"
 #include "utf8.h"
+#include "utf8_utils.hpp"
 
 #include <algorithm>
 #include <cctype>
@@ -184,21 +185,10 @@ static bool isPlainVowel(char32_t ch) {
 // UTF-8 to codepoint vector conversion + NFC lowercase normalization
 // ---------------------------------------------------------------------------
 
-// Decode a UTF-8 string to a vector of char32_t codepoints
+// Delegated to utf8_utils.hpp; local alias for compatibility.
 static std::vector<char32_t> utf8Decode(const std::string &s) {
-    std::vector<char32_t> out;
-    out.reserve(s.size());
-    auto it = s.begin();
-    auto end = s.end();
-    while (it != end) {
-        char32_t cp = utf8::unchecked::next(it);
-        out.push_back(cp);
-    }
-    return out;
+    return utf8_util::toCodepoints(s);
 }
-
-// Encode codepoints back to UTF-8 (only needed for debugging; unused now)
-// static std::string utf8Encode(const std::vector<char32_t> &cps) { ... }
 
 // ---------------------------------------------------------------------------
 // NFD -> NFC combining accent collapse for Portuguese
@@ -822,7 +812,9 @@ static WordResult convertWord(const std::vector<char32_t> &word) {
 // Mirrors Python _remove_duplicate_nasal_coda
 // ---------------------------------------------------------------------------
 
-static void removeDuplicateNasalCoda(std::vector<char32_t> &ph) {
+// Returns the number of elements removed *and* adjusts stressIdx accordingly.
+static int removeDuplicateNasalCoda(std::vector<char32_t> &ph, int &stressIdx) {
+    int removed = 0;
     int i = static_cast<int>(ph.size()) - 1;
     while (i >= 1) {
         if ((ph[i] == 'n' || ph[i] == 'm') && isIpaNasalVowel(ph[i - 1])) {
@@ -830,11 +822,17 @@ static void removeDuplicateNasalCoda(std::vector<char32_t> &ph) {
             bool atBoundary = (static_cast<size_t>(i) == ph.size() - 1)
                               || (ph[i + 1] == ' ') || isPunctuation(ph[i + 1]);
             if (atBoundary) {
+                // If the removed element is before stressIdx, shift it back
+                if (stressIdx >= 0 && i < stressIdx) {
+                    --stressIdx;
+                }
                 ph.erase(ph.begin() + i);
+                ++removed;
             }
         }
         --i;
     }
+    return removed;
 }
 
 // ---------------------------------------------------------------------------
@@ -937,7 +935,7 @@ static void applyBrPostprocessing(std::vector<char32_t> &ph, int stressIdx) {
 
 static WordResult processWord(const std::vector<char32_t> &word) {
     WordResult wr = convertWord(word);
-    removeDuplicateNasalCoda(wr.phonemes);
+    removeDuplicateNasalCoda(wr.phonemes, wr.stressIdx);
     applyCodaLVocalization(wr.phonemes);
     applyBrPostprocessing(wr.phonemes, wr.stressIdx);
     return wr;
@@ -992,6 +990,10 @@ void phonemize_portuguese(const std::string &text,
                           std::vector<std::vector<Phoneme>> &phonemes) {
     phonemes.clear();
     if (text.empty()) return;
+
+    if (!utf8::is_valid(text.begin(), text.end())) {
+        return;
+    }
 
     std::vector<Phoneme> sentence = phonemizeSentence(text);
     if (!sentence.empty()) {

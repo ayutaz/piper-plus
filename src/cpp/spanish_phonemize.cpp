@@ -6,6 +6,7 @@
 
 #include "spanish_phonemize.hpp"
 #include "utf8.h"
+#include "utf8_utils.hpp"
 
 #include <algorithm>
 #include <string>
@@ -79,25 +80,10 @@ static bool isVowelOrAccented(char32_t cp) {
 }
 
 // -----------------------------------------------------------------------
-// UTF-8 helpers
+// UTF-8 helpers — delegated to utf8_utils.hpp
 // -----------------------------------------------------------------------
 
-// Decode a UTF-8 string into a vector of codepoints.
-static std::vector<char32_t> toCodepoints(const std::string &s) {
-    std::vector<char32_t> cps;
-    auto it = s.begin();
-    while (it != s.end()) {
-        cps.push_back(utf8::unchecked::next(it));
-    }
-    return cps;
-}
-
-// Encode a vector of codepoints back to UTF-8 (unused but handy for debug).
-// static std::string toUtf8(const std::vector<char32_t> &cps) {
-//     std::string out;
-//     for (auto cp : cps) utf8::unchecked::append(cp, std::back_inserter(out));
-//     return out;
-// }
+using utf8_util::toCodepoints;
 
 // -----------------------------------------------------------------------
 // Lowercasing (ASCII + Spanish accented letters)
@@ -228,10 +214,8 @@ static const std::unordered_set<std::string> UNSTRESSED_FUNCTION_WORDS = {
 };
 
 // Helper: convert codepoint vector to UTF-8 string (for lookup).
-static std::string cpToUtf8(const std::vector<char32_t> &cps) {
-    std::string s;
-    for (auto cp : cps) utf8::unchecked::append(cp, std::back_inserter(s));
-    return s;
+static std::string cpVecToUtf8(const std::vector<char32_t> &cps) {
+    return utf8_util::cpsToUtf8(cps);
 }
 
 // -----------------------------------------------------------------------
@@ -720,6 +704,9 @@ static int phonemeCountForUnit(const GUnit &unit) {
     // "gu-diaeresis" digraph -> 2 (g + w)
     if (base.size() == 2 && base[0] == 'g' && unit.chars[1] == 0x00FC) return 2;
 
+    // "xc" digraph before e/i -> k s (2 phonemes)
+    if (base.size() == 2 && base[0] == 'x' && base[1] == 'c') return 2;
+
     // x -> ks (2)
     if (base.size() == 1 && base[0] == 'x') return 2;
 
@@ -774,6 +761,10 @@ void phonemize_spanish(const std::string &text,
                        std::vector<std::vector<Phoneme>> &phonemes) {
     phonemes.clear();
 
+    if (!utf8::is_valid(text.begin(), text.end())) {
+        return;
+    }
+
     // Decode and normalize
     auto cps = toCodepoints(text);
     cps = normalize(cps);
@@ -802,7 +793,7 @@ void phonemize_spanish(const std::string &text,
         auto res = g2pWord(tok.chars);
 
         // Check if unstressed function word
-        std::string wordUtf8 = cpToUtf8(tok.chars);
+        std::string wordUtf8 = cpVecToUtf8(tok.chars);
         bool isFunction = UNSTRESSED_FUNCTION_WORDS.count(wordUtf8) > 0;
 
         if (!isFunction) {

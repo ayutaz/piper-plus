@@ -7,18 +7,83 @@
 #include <regex>
 #include <iostream>
 
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#include <windows.h>
+#elif defined(__APPLE__)
+#include <mach-o/dyld.h>
+#include <climits>
+#else
+#include <climits>
+#endif
+
 #include "json.hpp"
 
 using json = nlohmann::json;
+namespace fs = std::filesystem;
 
 namespace piper {
 
+// Get the directory containing the running executable (same logic as model_manager.cpp)
+static fs::path getDictExeDir() {
+#ifdef _WIN32
+    wchar_t wbuf[MAX_PATH] = {0};
+    DWORD len = GetModuleFileNameW(nullptr, wbuf, MAX_PATH);
+    if (len > 0 && len < MAX_PATH) {
+        return fs::path(wbuf).parent_path();
+    }
+#elif defined(__APPLE__)
+    char buf[PATH_MAX] = {0};
+    uint32_t size = sizeof(buf);
+    if (_NSGetExecutablePath(buf, &size) == 0) {
+        return fs::path(buf).parent_path();
+    }
+#else
+    try {
+        return fs::canonical("/proc/self/exe").parent_path();
+    } catch (...) {
+        // fall through
+    }
+#endif
+    return fs::current_path();
+}
+
+// Find the dictionaries directory: try exe-relative paths first, then
+// fall back to the compile-time __FILE__-based path for development builds.
+static fs::path findDictDir() {
+    fs::path exeDir = getDictExeDir();
+    std::error_code ec;
+
+    // Exe-relative candidates (installed / packaged layout)
+    std::vector<fs::path> candidates = {
+        exeDir / "data" / "dictionaries",
+        exeDir / ".." / "data" / "dictionaries",
+        exeDir / ".." / "share" / "piper" / "dictionaries",
+    };
+
+    for (const auto& p : candidates) {
+        if (fs::is_directory(p, ec)) {
+            return fs::canonical(p, ec);
+        }
+    }
+
+    // Compile-time fallback (development builds only)
+    fs::path compilePath = fs::path(__FILE__).parent_path().parent_path().parent_path()
+                           / "data" / "dictionaries";
+    if (fs::is_directory(compilePath, ec)) {
+        return compilePath;
+    }
+
+    // Last resort: return the first candidate (will simply fail to find files)
+    return candidates.front();
+}
+
 CustomDictionary::CustomDictionary() {
     // デフォルト辞書ディレクトリを設定
-    // 実行ファイルからの相対パスで設定
-    defaultDictDir_ = std::filesystem::path(__FILE__).parent_path().parent_path().parent_path() 
-                      / "data" / "dictionaries";
-    
+    // 実行ファイルからの相対パスを優先、フォールバックで __FILE__ ベース
+    defaultDictDir_ = findDictDir();
+
     loadDefaultDictionaries();
 }
 
@@ -202,38 +267,37 @@ void CustomDictionary::saveDictionary(const std::string& outputPath) const {
     if (!file.is_open()) {
         throw std::runtime_error("Failed to open output file: " + outputPath);
     }
-    
-    file << "{\n";
-    file << "  \"version\": \"2.0\",\n";
-    file << "  \"description\": \"Custom dictionary exported from Piper\",\n";
-    file << "  \"metadata\": {\n";
-    file << "    \"created\": \"auto-generated\",\n";
-    file << "    \"author\": \"Piper\",\n";
-    file << "    \"license\": \"MIT\"\n";
-    file << "  },\n";
-    file << "  \"entries\": {\n";
-    
-    bool first = true;
-    
-    // すべてのエントリを出力
+
+    // Use nlohmann::json to build the output so that keys and values
+    // (which may contain " or \) are properly escaped.
+    json root;
+    root["version"] = "2.0";
+    root["description"] = "Custom dictionary exported from Piper";
+    root["metadata"] = {
+        {"created", "auto-generated"},
+        {"author", "Piper"},
+        {"license", "MIT"}
+    };
+
+    json entries = json::object();
+
     for (const auto& [word, entry] : entries_) {
-        if (!first) file << ",\n";
-        file << "    \"" << word << "\": {";
-        file << "\"pronunciation\": \"" << entry.pronunciation << "\", ";
-        file << "\"priority\": " << entry.priority << "}";
-        first = false;
+        entries[word] = {
+            {"pronunciation", entry.pronunciation},
+            {"priority", entry.priority}
+        };
     }
-    
+
     for (const auto& [word, entry] : caseSensitiveEntries_) {
-        if (!first) file << ",\n";
-        file << "    \"" << word << "\": {";
-        file << "\"pronunciation\": \"" << entry.pronunciation << "\", ";
-        file << "\"priority\": " << entry.priority << "}";
-        first = false;
+        entries[word] = {
+            {"pronunciation", entry.pronunciation},
+            {"priority", entry.priority}
+        };
     }
-    
-    file << "\n  }\n";
-    file << "}\n";
+
+    root["entries"] = entries;
+
+    file << root.dump(2) << "\n";
 }
 
 CustomDictionary::Stats CustomDictionary::getStats() const {

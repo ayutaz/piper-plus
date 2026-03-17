@@ -131,7 +131,7 @@ def synthesize(
         )
 
     outputs = session.run(None, inputs)
-    audio = outputs[0].squeeze((0, 1))
+    audio = outputs[0].squeeze(0)
     audio = audio_float_to_int16(audio.squeeze())
 
     return (sample_rate, audio)

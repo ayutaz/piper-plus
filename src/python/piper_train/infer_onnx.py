@@ -312,6 +312,10 @@ def main():
             "scales": scales,
         }
 
+        # Default sid to 0 for models that require it (e.g. single-speaker multilingual)
+        if sid is None and has_sid:
+            sid = np.array([0], dtype=np.int64)
+
         if sid is not None:
             inputs["sid"] = sid
 
@@ -342,7 +346,7 @@ def main():
 
         start_time = time.perf_counter()
         outputs = model.run(None, inputs)
-        audio = outputs[0].squeeze((0, 1))
+        audio = outputs[0].squeeze(0)
         # durations output is available for phoneme timing (e.g., lip-sync, karaoke)
         durations = outputs[1] if len(outputs) > 1 else None
         # audio = denoise(audio, bias_spec, 10)

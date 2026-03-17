@@ -16,6 +16,7 @@
 #include "english_phonemize.hpp"
 #include "json.hpp"
 #include "utf8.h"
+#include "utf8_utils.hpp"
 
 #include <algorithm>
 #include <cctype>
@@ -169,18 +170,10 @@ static const std::unordered_set<std::string> &functionWords() {
 }
 
 // -----------------------------------------------------------------------
-// UTF-8 helpers
+// UTF-8 helpers — delegated to utf8_utils.hpp
 // -----------------------------------------------------------------------
 
-// Decode UTF-8 string to codepoint vector.
-static std::vector<char32_t> toCodepoints(const std::string &s) {
-    std::vector<char32_t> cps;
-    auto it = s.begin();
-    while (it != s.end()) {
-        cps.push_back(utf8::unchecked::next(it));
-    }
-    return cps;
-}
+using utf8_util::toCodepoints;
 
 // -----------------------------------------------------------------------
 // Tokenizer
@@ -558,6 +551,10 @@ void phonemize_english(const std::string &text,
                        std::vector<std::vector<Phoneme>> &phonemes,
                        const std::unordered_map<std::string, std::string> &cmuDict) {
     phonemes.clear();
+
+    if (!utf8::is_valid(text.begin(), text.end())) {
+        return;
+    }
 
     // Tokenize
     auto tokens = tokenize(text);
