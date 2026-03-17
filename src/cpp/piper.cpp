@@ -1011,17 +1011,9 @@ void textToAudio(PiperConfig &config, Voice &voice, std::string text,
           phonemize_openjtalk(segment.text, segmentPhonemes);
         }
 
-        // If OpenJTalk failed, fall back to eSpeak for multilingual models
+        // If OpenJTalk failed, report error (eSpeak is no longer available)
         if (segmentPhonemes.empty() && !segment.text.empty()) {
-          if (voice.phonemizeConfig.phonemeType == MultilingualPhonemes) {
-            spdlog::warn("OpenJTalk unavailable, falling back to eSpeak for multilingual model");
-            eSpeakPhonemeConfig eSpeakConfig;
-            eSpeakConfig.voice = "en";
-            phonemize_eSpeak(segment.text, eSpeakConfig, segmentPhonemes);
-          } else {
-            throw std::runtime_error("OpenJTalk is not available or failed to process Japanese text. "
-                                     "Cannot synthesize Japanese without OpenJTalk.");
-          }
+          spdlog::error("OpenJTalk failed to process text; skipping segment");
         }
       } else if (voice.phonemizeConfig.phonemeType == MultilingualPhonemes) {
         // Multilingual: segment text by language, phonemize each segment
