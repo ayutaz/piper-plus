@@ -290,6 +290,10 @@ jobs:
           mkdir -p /tmp/fallback-test-cpp
           cp ${{ github.workspace }}/test/models/multilingual-test-medium.onnx /tmp/fallback-test-cpp/multilingual-test-medium.onnx
           cp ${{ github.workspace }}/test/models/multilingual-test-medium.onnx.json /tmp/fallback-test-cpp/config.json
+          # Copy G2P dictionary files for multilingual inference
+          cp ${{ github.workspace }}/src/cpp/cmudict_data.json /tmp/fallback-test-cpp/ 2>/dev/null || true
+          cp ${{ github.workspace }}/src/cpp/pinyin_single.json /tmp/fallback-test-cpp/ 2>/dev/null || true
+          cp ${{ github.workspace }}/src/cpp/pinyin_phrases.json /tmp/fallback-test-cpp/ 2>/dev/null || true
 
           echo "Fallback config test." | docker run --rm -i \
             -v /tmp/fallback-test-cpp:/models/fallback \
