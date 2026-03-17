@@ -12,6 +12,9 @@ on:
       - 'src/csharp/**'
       - '.github/workflows/csharp-ci.yml'
 
+permissions:
+  contents: read
+
 jobs:
   build-and-test:
     runs-on: ${{ matrix.os }}
@@ -37,6 +40,10 @@ jobs:
       - name: Build
         run: dotnet build src/csharp/PiperPlus.sln -c Release --no-restore
 
+      - name: Check formatting
+        run: dotnet format src/csharp/PiperPlus.sln --verify-no-changes --no-restore
+        continue-on-error: true
+
       - name: Test
         run: dotnet test src/csharp/PiperPlus.sln -c Release --no-build --logger "trx;LogFileName=test-results.xml"
 
@@ -46,3 +53,4 @@ jobs:
         with:
           name: test-results-${{ matrix.os }}
           path: '**/TestResults/test-results.xml'
+          retention-days: 30

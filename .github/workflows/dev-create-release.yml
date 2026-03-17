@@ -266,9 +266,9 @@ jobs:
             archive_ext: tar.gz
             cross: true
           - rid: osx-x64
-            os: macos-14
+            os: macos-13
             archive_ext: tar.gz
-            cross: true
+            cross: false
           - rid: osx-arm64
             os: macos-14
             archive_ext: tar.gz
@@ -300,15 +300,16 @@ jobs:
 
       - name: Create archive (tar.gz)
         if: matrix.archive_ext == 'tar.gz'
-        run: |
-          cd publish
-          tar -czf ../piper-plus-cli-${{ matrix.rid }}.tar.gz *
+        run: tar -czf piper-plus-cli-${{ matrix.rid }}.tar.gz -C publish .
 
       - name: Create archive (zip)
         if: matrix.archive_ext == 'zip'
         shell: pwsh
         run: |
           Compress-Archive -Path publish/* -DestinationPath piper-plus-cli-${{ matrix.rid }}.zip
+
+      - name: Show archive size
+        run: ls -lh piper-plus-cli-${{ matrix.rid }}.${{ matrix.archive_ext }}
 
       - name: Upload Release Asset
         env:
@@ -339,8 +340,15 @@ jobs:
           echo "- C# CLI: ${{ needs.csharp-cli.result }}"
           echo ""
 
-          if [ "${{ needs.build_all.result }}" = "success" ]; then
-            echo "✅ All platforms built successfully"
+          BUILD_ALL="${{ needs.build_all.result }}"
+          CSHARP_CLI="${{ needs.csharp-cli.result }}"
+
+          echo "## Release Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- C++/Python Build: $BUILD_ALL" >> $GITHUB_STEP_SUMMARY
+          echo "- C# CLI: $CSHARP_CLI" >> $GITHUB_STEP_SUMMARY
+
+          if [[ "$BUILD_ALL" == "success" ]] && [[ "$CSHARP_CLI" == "success" ]]; then
+            echo "✅ All builds successful" >> $GITHUB_STEP_SUMMARY
           else
-            echo "❌ Some builds failed"
+            echo "❌ Build failures detected" >> $GITHUB_STEP_SUMMARY
           fi

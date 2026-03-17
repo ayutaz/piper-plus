@@ -41,9 +41,9 @@ jobs:
             archive: tar.gz
             cross: true
           - rid: osx-x64
-            os: macos-14
+            os: macos-13    # Intel x64 runner
             archive: tar.gz
-            cross: true
+            cross: false    # ネイティブビルド
           - rid: osx-arm64
             os: macos-14
             archive: tar.gz
@@ -93,6 +93,9 @@ jobs:
         if: matrix.archive == 'zip'
         shell: pwsh
         run: Compress-Archive -Path publish/* -DestinationPath piper-plus-cli-${{ matrix.rid }}.zip
+
+      - name: Show archive size
+        run: ls -lh piper-plus-cli-${{ matrix.rid }}.${{ matrix.archive }}
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4

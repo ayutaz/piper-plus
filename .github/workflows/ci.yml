@@ -263,6 +263,37 @@ jobs:
           fi
         shell: bash
 
+  csharp-tests:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            9.0.x
+
+      - name: Build C# solution
+        run: dotnet build src/csharp/PiperPlus.sln -c Release
+
+      - name: Run C# tests
+        run: dotnet test src/csharp/PiperPlus.sln -c Release --no-build --logger "trx;LogFileName=test-results.xml"
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: csharp-test-results-${{ matrix.os }}
+          path: '**/TestResults/test-results.xml'
+          retention-days: 30
+
   python-tests:
     runs-on: ${{ matrix.os }}
     strategy:
