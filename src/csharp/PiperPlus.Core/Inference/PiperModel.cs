@@ -1,0 +1,107 @@
+using Microsoft.ML.OnnxRuntime;
+using PiperPlus.Core.Config;
+
+namespace PiperPlus.Core.Inference;
+
+/// <summary>
+/// Wraps an ONNX Runtime <see cref="InferenceSession"/> for a Piper TTS model,
+/// exposing model capabilities detected from input tensor metadata.
+/// </summary>
+/// <remarks>
+/// Capability detection mirrors the C++ implementation in <c>piper.cpp:loadModel</c>
+/// and the Python implementation in <c>infer_onnx.py</c>, which inspect input names
+/// for optional tensors such as <c>sid</c> (multi-speaker) and
+/// <c>prosody_features</c> (A1/A2/A3 prosody).
+/// </remarks>
+public sealed class PiperModel : IDisposable
+{
+    private readonly InferenceSession _session;
+    private bool _disposed;
+
+    /// <summary>
+    /// Initializes a new <see cref="PiperModel"/> by inspecting the session's
+    /// input metadata for optional capabilities.
+    /// </summary>
+    /// <param name="session">
+    /// A pre-created <see cref="InferenceSession"/>. Ownership is transferred;
+    /// the session will be disposed when this instance is disposed.
+    /// </param>
+    /// <param name="config">
+    /// The parsed <c>config.json</c> that accompanies the ONNX model.
+    /// </param>
+    public PiperModel(InferenceSession session, PiperConfig config)
+    {
+        ArgumentNullException.ThrowIfNull(session);
+        ArgumentNullException.ThrowIfNull(config);
+
+        _session = session;
+
+        // Materialise input names once for capability detection and public access.
+        InputNames = _session.InputMetadata.Keys.ToList().AsReadOnly();
+
+        // Detect optional capabilities from tensor names.
+        HasSpeakerId = _session.InputMetadata.ContainsKey("sid");
+        HasProsody = _session.InputMetadata.ContainsKey("prosody_features");
+
+        SampleRate = config.Audio.SampleRate;
+    }
+
+    // ----------------------------------------------------------------
+    // Model capabilities
+    // ----------------------------------------------------------------
+
+    /// <summary>
+    /// <c>true</c> when the model accepts a <c>sid</c> (speaker-id) tensor,
+    /// indicating a multi-speaker model.
+    /// </summary>
+    public bool HasSpeakerId { get; }
+
+    /// <summary>
+    /// <c>true</c> when the model accepts a <c>prosody_features</c> tensor
+    /// (A1/A2/A3 accent information from OpenJTalk).
+    /// </summary>
+    public bool HasProsody { get; }
+
+    /// <summary>
+    /// Audio sample rate in Hz, sourced from the accompanying config.json.
+    /// </summary>
+    public int SampleRate { get; }
+
+    /// <summary>
+    /// Ordered list of input tensor names exposed by the ONNX model.
+    /// </summary>
+    public IReadOnlyList<string> InputNames { get; }
+
+    // ----------------------------------------------------------------
+    // Internal access for the inference pipeline
+    // ----------------------------------------------------------------
+
+    /// <summary>
+    /// The underlying ONNX Runtime session. Intended for use by the
+    /// inference pipeline within this assembly.
+    /// </summary>
+    internal InferenceSession Session
+    {
+        get
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            return _session;
+        }
+    }
+
+    // ----------------------------------------------------------------
+    // IDisposable
+    // ----------------------------------------------------------------
+
+    /// <inheritdoc/>
+    public void Dispose()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _session.Dispose();
+        _disposed = true;
+    }
+}
