@@ -30,7 +30,6 @@ echo ""
 # Test 2: Check libraries
 echo "--- Library Test ---"
 libs=(
-    "espeak-ng"
     "HTSEngine"
     "OpenJTalk"
     "sndfile"
@@ -52,25 +51,14 @@ done
 
 echo ""
 
-# Test 3: Check phonemizers
+# Test 3: Check phonemizers (eSpeak-ng and piper-phonemize no longer needed)
 echo "--- Phonemizer Test ---"
-if command -v piper_phonemize &> /dev/null; then
-    echo "✓ piper_phonemize available"
-else
-    echo "ℹ piper_phonemize not in PATH"
-fi
-
-if command -v espeak-ng &> /dev/null; then
-    echo "✓ espeak-ng: $(espeak-ng --version 2>&1 | head -n1)"
-else
-    echo "✗ espeak-ng not found"
-fi
-
 if command -v open_jtalk &> /dev/null; then
     echo "✓ open_jtalk available"
 else
     echo "ℹ open_jtalk not in PATH"
 fi
+echo "ℹ eSpeak-ng/piper-phonemize removed (GPL-free, self-contained G2P)"
 
 echo ""
 

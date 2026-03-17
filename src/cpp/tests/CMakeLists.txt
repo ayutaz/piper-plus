@@ -234,8 +234,6 @@ foreach(test_source ${TEST_SOURCES})
                 debug ${CMAKE_BINARY_DIR}/fi/lib/fmtd.lib
                 optimized ${CMAKE_BINARY_DIR}/si/lib/spdlog.lib
                 debug ${CMAKE_BINARY_DIR}/si/lib/spdlogd.lib
-                ${CMAKE_BINARY_DIR}/pi/lib/piper_phonemize.lib
-                ${CMAKE_BINARY_DIR}/pi/lib/espeak-ng.lib
                 ${CMAKE_BINARY_DIR}/pi/lib/onnxruntime.lib
             )
         else()
@@ -243,8 +241,6 @@ foreach(test_source ${TEST_SOURCES})
             target_link_libraries(${test_name}
                 fmt
                 spdlog
-                piper_phonemize
-                espeak-ng
                 onnxruntime
             )
         endif()
@@ -260,7 +256,6 @@ foreach(test_source ${TEST_SOURCES})
 
         # Add dependencies to ensure build order
         add_dependencies(${test_name}
-            piper_phonemize_external
             fmt_external
             spdlog_external
         )
@@ -345,8 +340,6 @@ foreach(test_source ${TEST_SOURCES})
                 debug ${CMAKE_BINARY_DIR}/fi/lib/fmtd.lib
                 optimized ${CMAKE_BINARY_DIR}/si/lib/spdlog.lib
                 debug ${CMAKE_BINARY_DIR}/si/lib/spdlogd.lib
-                ${CMAKE_BINARY_DIR}/pi/lib/piper_phonemize.lib
-                ${CMAKE_BINARY_DIR}/pi/lib/espeak-ng.lib
                 ${CMAKE_BINARY_DIR}/pi/lib/onnxruntime.lib
             )
         else()
@@ -354,8 +347,6 @@ foreach(test_source ${TEST_SOURCES})
             target_link_libraries(${test_name}
                 fmt
                 spdlog
-                piper_phonemize
-                espeak-ng
                 onnxruntime
             )
         endif()
@@ -371,7 +362,6 @@ foreach(test_source ${TEST_SOURCES})
 
         # Add dependencies to ensure build order
         add_dependencies(${test_name}
-            piper_phonemize_external
             fmt_external
             spdlog_external
         )
