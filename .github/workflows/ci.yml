@@ -295,6 +295,7 @@ jobs:
         run: dotnet format src/csharp/PiperPlus.sln --verify-no-changes --no-restore
 
       - name: Run C# tests
+        shell: bash
         run: |
           dotnet test src/csharp/PiperPlus.sln -c Release --no-build \
             --filter "Category!=CLI" \
