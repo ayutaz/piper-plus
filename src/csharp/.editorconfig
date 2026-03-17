@@ -32,6 +32,7 @@ csharp_style_expression_bodied_methods = when_on_single_line:suggestion
 [*.{csproj,props,targets}]
 indent_style = space
 indent_size = 2
+end_of_line = lf
 
 # YAML files
 [*.yml]

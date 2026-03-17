@@ -10,6 +10,14 @@
 *.h text eol=lf
 *.hpp text eol=lf
 
+# C# files
+*.cs text eol=lf
+*.csproj text eol=lf
+*.sln text eol=lf
+*.props text eol=lf
+*.targets text eol=lf
+*.runsettings text eol=lf
+
 # CMake files
 CMakeLists.txt text eol=lf
 *.cmake text eol=lf
