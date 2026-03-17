@@ -308,12 +308,16 @@ std::vector<PhonemeInfo> extractTimingsFromDurations(
 ) {
     std::vector<PhonemeInfo> timings;
     
-    // Build reverse map from phoneme ID to string
+    // Build reverse map from phoneme ID to UTF-8 string.
+    // idMap key is Phoneme (char32_t); encode it properly so isSingleCodepoint()
+    // and the utf8-checked functions never see invalid byte sequences.
     std::unordered_map<PhonemeId, std::string> phonemeIdToStringMap;
-    for (const auto& [phonemeStr, ids] : idMap) {
+    for (const auto& [phonemeChar, ids] : idMap) {
         if (!ids.empty()) {
-            // Map phoneme ID to its string representation
-            phonemeIdToStringMap[ids[0]] = phonemeStr;
+            std::string phonemeUtf8;
+            utf8::append(static_cast<uint32_t>(phonemeChar),
+                         std::back_inserter(phonemeUtf8));
+            phonemeIdToStringMap[ids[0]] = std::move(phonemeUtf8);
         }
     }
     
