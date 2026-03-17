@@ -13,8 +13,10 @@
 #include <onnxruntime_cxx_api.h>
 #include <spdlog/spdlog.h>
 
-// piper-phonemize library functions (used at runtime, not exposed in public API)
-#include <piper-phonemize/phoneme_ids.hpp>
+// Self-contained phoneme ID conversion (replaces piper-phonemize/phoneme_ids.hpp)
+#include "phoneme_ids.hpp"
+
+// piper-phonemize library: eSpeak/codepoints phonemization (runtime only)
 #include <piper-phonemize/phonemize.hpp>
 
 #include "json.hpp"

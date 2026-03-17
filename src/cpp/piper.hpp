@@ -11,18 +11,15 @@
 
 #include <onnxruntime_cxx_api.h>
 
-// Self-contained type definitions (formerly from piper-phonemize headers).
-// These types are binary-compatible with piper-phonemize for linking.
-#include "phoneme_parser.hpp"  // piper::Phoneme = char32_t
+// Self-contained phoneme types (no piper-phonemize header dependency).
+// Provides: Phoneme (char32_t), PhonemeId (int64_t), PhonemeIdMap, PhonemeIdConfig
+#include "phoneme_ids.hpp"
 
 #include "json.hpp"
 
 using json = nlohmann::json;
 
 namespace piper {
-
-typedef int64_t PhonemeId;
-typedef std::map<Phoneme, std::vector<PhonemeId>> PhonemeIdMap;
 
 typedef int64_t SpeakerId;
 typedef int64_t LanguageId;
