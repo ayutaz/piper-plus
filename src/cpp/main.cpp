@@ -27,10 +27,6 @@
 #include <shellapi.h>  // CommandLineToArgvW
 #endif
 
-#ifdef __APPLE__
-#include <mach-o/dyld.h>
-#endif
-
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/spdlog.h>
 
@@ -81,9 +77,6 @@ struct RunConfig {
 
   // Seconds of silence to add after each sentence
   optional<float> sentenceSilenceSeconds;
-
-  // Path to espeak-ng data directory (default is next to piper executable)
-  optional<filesystem::path> eSpeakDataPath;
 
   // stdin input is lines of JSON instead of text with format:
   // {
@@ -244,9 +237,7 @@ int main(int argc, char *argv[]) {
   // Pre-load critical DLLs to ensure proper loading order
   std::vector<std::wstring> criticalDlls = {
     L"onnxruntime.dll",
-    L"onnxruntime_providers_shared.dll",
-    L"espeak-ng.dll",
-    L"piper_phonemize.dll"
+    L"onnxruntime_providers_shared.dll"
   };
   
   for (const auto& dllName : criticalDlls) {
@@ -331,55 +322,6 @@ int main(int argc, char *argv[]) {
     spdlog::warn("Model does not support language selection (no lid input), "
                  "language_id={} will be ignored",
                  voice.synthesisConfig.languageId.value());
-  }
-
-  // Get the path to the piper executable so we can locate espeak-ng-data, etc.
-  // next to it.
-#ifdef _MSC_VER
-  auto exePath = []() {
-    wchar_t moduleFileName[MAX_PATH] = {0};
-    GetModuleFileNameW(nullptr, moduleFileName, std::size(moduleFileName));
-    return filesystem::path(moduleFileName);
-  }();
-#else
-#ifdef __APPLE__
-  auto exePath = []() {
-    char moduleFileName[PATH_MAX] = {0};
-    uint32_t moduleFileNameSize = std::size(moduleFileName);
-    _NSGetExecutablePath(moduleFileName, &moduleFileNameSize);
-    return filesystem::path(moduleFileName);
-  }();
-#else
-  auto exePath = filesystem::canonical("/proc/self/exe");
-#endif
-#endif
-
-  if (voice.phonemizeConfig.phonemeType == piper::eSpeakPhonemes ||
-      voice.phonemizeConfig.phonemeType == piper::MultilingualPhonemes) {
-    spdlog::debug("Voice uses eSpeak phonemes ({})",
-                  voice.phonemizeConfig.eSpeak.voice);
-
-    if (runConfig.eSpeakDataPath) {
-      // User provided path
-      piperConfig.eSpeakDataPath = runConfig.eSpeakDataPath.value().string();
-      spdlog::debug("Using user-provided espeak-ng-data directory: {}",
-                    piperConfig.eSpeakDataPath);
-    } else {
-      // Let piper::initialize() find the data path automatically
-      piperConfig.eSpeakDataPath = "";
-      spdlog::debug("Will auto-detect espeak-ng-data directory");
-    }
-  } else if (voice.phonemizeConfig.phonemeType == piper::MultilingualPhonemes) {
-    // Multilingual models may use eSpeak for some languages
-    spdlog::debug("Voice uses multilingual phonemes");
-    if (runConfig.eSpeakDataPath) {
-      piperConfig.eSpeakDataPath = runConfig.eSpeakDataPath.value().string();
-    } else {
-      piperConfig.eSpeakDataPath = "";
-    }
-  } else {
-    // Not using eSpeak
-    piperConfig.useESpeak = false;
   }
 
   try {
@@ -788,8 +730,6 @@ void printUsage(char *argv[]) {
   cerr << "   Phoneme input: Use [[ phonemes ]] notation to specify exact pronunciation" << endl;
   cerr << "                  Example: echo \"Hello [[ h ə l oʊ ]] world\" | piper ..." << endl;
   cerr << endl;
-  cerr << "   --espeak_data           DIR   path to espeak-ng data directory"
-       << endl;
   cerr << "   --json-input                  stdin input is lines of JSON "
           "instead of plain text"
        << endl;
@@ -925,9 +865,6 @@ void parseArgs(int argc, char *argv[], RunConfig &runConfig) {
 
       auto phoneme = piper::getCodepoint(phonemeStr);
       (*runConfig.phonemeSilenceSeconds)[phoneme] = stof(argv[++i]);
-    } else if (arg == "--espeak_data" || arg == "--espeak-data") {
-      ensureArg(argc, argv, i);
-      runConfig.eSpeakDataPath = filesystem::path(argv[++i]);
     } else if (arg == "--json_input" || arg == "--json-input") {
       runConfig.jsonInput = true;
     } else if (arg == "--use_cuda" || arg == "--use-cuda") {

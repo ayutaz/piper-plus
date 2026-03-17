@@ -11,7 +11,7 @@
 
 #include <onnxruntime_cxx_api.h>
 
-// Self-contained phoneme types (no piper-phonemize header dependency).
+// Self-contained phoneme types.
 // Provides: Phoneme (char32_t), PhonemeId (int64_t), PhonemeIdMap, PhonemeIdConfig
 #include "phoneme_ids.hpp"
 
@@ -24,18 +24,11 @@ namespace piper {
 typedef int64_t SpeakerId;
 typedef int64_t LanguageId;
 
-struct eSpeakConfig {
-  std::string voice = "en-us";
-};
-
 struct PiperConfig {
-  std::string eSpeakDataPath;
-  bool useESpeak = true;
+  // No external dependencies needed for MultilingualPhonemes
 };
 
 enum PhonemeType {
-  eSpeakPhonemes,
-  TextPhonemes,
   OpenJTalkPhonemes,
   MultilingualPhonemes
 };
@@ -53,7 +46,7 @@ struct ProsodyFeature {
 };
 
 struct PhonemizeConfig {
-  PhonemeType phonemeType = eSpeakPhonemes;
+  PhonemeType phonemeType = MultilingualPhonemes;
   std::optional<std::map<Phoneme, std::vector<Phoneme>>> phonemeMap;
   std::map<Phoneme, std::vector<PhonemeId>> phonemeIdMap;
 
@@ -61,8 +54,6 @@ struct PhonemizeConfig {
   PhonemeId idBos = 1; // beginning of sentence
   PhonemeId idEos = 2; // end of sentence
   bool interspersePad = true;
-
-  eSpeakConfig eSpeak;
 };
 
 struct SynthesisConfig {

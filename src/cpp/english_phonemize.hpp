@@ -27,8 +27,9 @@ bool loadCmuDict(const std::string &jsonPath,
 //   5. Insert stress markers before stressed vowels
 //   6. Each IPA character is a separate Phoneme (char32_t)
 //
-// Words not found in the dictionary produce no phonemes for that word
-// (the caller should fall back to eSpeak for OOV words).
+// Words not found in the dictionary are handled by morphological fallback
+// (stripping common suffixes and retrying the lookup).  Truly OOV words
+// produce no phonemes for that word.
 //
 // Output is a vector of sentences (typically one), each sentence a vector
 // of Phoneme codepoints.

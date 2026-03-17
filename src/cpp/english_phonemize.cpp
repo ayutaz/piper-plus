@@ -8,8 +8,10 @@
 //   - Stress markers (primary/secondary) before vowels
 //   - Each IPA character is a separate phoneme codepoint
 //
-// Words not found in the CMU dictionary produce no output; the caller
-// should fall back to eSpeak for those.
+// Words not found in the CMU dictionary are handled by morphological
+// fallback: common English suffixes (-ing, -ed, -s/-es, -er, -ly, -est)
+// are stripped and the base form is looked up.  Truly OOV words (no dict
+// entry and no morphological match) produce no output.
 
 #include "english_phonemize.hpp"
 #include "json.hpp"
@@ -391,6 +393,127 @@ static std::vector<std::string> getSourceWords(const std::vector<Token> &tokens)
     return words;
 }
 
+// -----------------------------------------------------------------------
+// Morphological fallback for OOV words.
+//
+// Strips common English suffixes and looks up the base form in the CMU
+// dictionary.  If found, returns the base ARPAbet string with the
+// suffix phonemes appended.  Returns "" if no match is found.
+//
+// Supported suffix patterns:
+//   -ing  (running->run, making->make, sitting->sit)
+//   -ed   (walked->walk, stopped->stop, loved->love)
+//   -s/-es/-ies  (cats->cat, boxes->box, countries->country)
+//   -er   (faster->fast, runner->run)
+//   -ly/-ily  (quickly->quick, happily->happy)
+//   -est  (fastest->fast)
+// -----------------------------------------------------------------------
+
+static std::string tryMorphologicalFallback(
+        const std::string &word,
+        const std::unordered_map<std::string, std::string> &cmuDict) {
+
+    // Helper: check if base is in dict and return combined ARPAbet.
+    auto tryBase = [&](const std::string &base,
+                       const char *suffixArpa) -> std::string {
+        auto it = cmuDict.find(base);
+        if (it != cmuDict.end()) {
+            return it->second + " " + suffixArpa;
+        }
+        return {};
+    };
+
+    const size_t len = word.size();
+
+    // ----- -ing (running->run, making->make, sitting->sit) -----
+    if (len > 4 && word.compare(len - 3, 3, "ing") == 0) {
+        std::string base = word.substr(0, len - 3);
+        // Direct: running->runn? no, run+ning. Try base directly.
+        auto r = tryBase(base, "IH0 NG");
+        if (!r.empty()) return r;
+
+        // Doubled consonant: sitting->sit (base="sitt", dedup->"sit")
+        if (base.size() >= 2 && base.back() == base[base.size() - 2]) {
+            r = tryBase(base.substr(0, base.size() - 1), "IH0 NG");
+            if (!r.empty()) return r;
+        }
+
+        // Restored 'e': making->make
+        r = tryBase(base + "e", "IH0 NG");
+        if (!r.empty()) return r;
+    }
+
+    // ----- -ed (walked->walk, stopped->stop, loved->love) -----
+    if (len > 3 && word.compare(len - 2, 2, "ed") == 0) {
+        std::string base = word.substr(0, len - 2);
+        auto r = tryBase(base, "D");
+        if (!r.empty()) return r;
+
+        // Doubled consonant: stopped->stop
+        if (base.size() >= 2 && base.back() == base[base.size() - 2]) {
+            r = tryBase(base.substr(0, base.size() - 1), "D");
+            if (!r.empty()) return r;
+        }
+
+        // Strip only 'd': loved->love (base = word minus 'd')
+        r = tryBase(word.substr(0, len - 1), "D");
+        if (!r.empty()) return r;
+    }
+
+    // ----- -s / -es / -ies (cats->cat, boxes->box, countries->country) -----
+    if (len > 2 && word.back() == 's') {
+        // -ies -> -y: countries->country (check before -es/-s)
+        if (len > 4 && word.compare(len - 3, 3, "ies") == 0) {
+            auto r = tryBase(word.substr(0, len - 3) + "y", "Z");
+            if (!r.empty()) return r;
+        }
+
+        // -es: boxes->box
+        if (len > 3 && word.compare(len - 2, 2, "es") == 0) {
+            auto r = tryBase(word.substr(0, len - 2), "IH0 Z");
+            if (!r.empty()) return r;
+        }
+
+        // -s: cats->cat
+        auto r = tryBase(word.substr(0, len - 1), "Z");
+        if (!r.empty()) return r;
+    }
+
+    // ----- -er (faster->fast, runner->run) -----
+    if (len > 3 && word.compare(len - 2, 2, "er") == 0) {
+        std::string base = word.substr(0, len - 2);
+        auto r = tryBase(base, "ER0");
+        if (!r.empty()) return r;
+
+        // Doubled consonant: runner->run
+        if (base.size() >= 2 && base.back() == base[base.size() - 2]) {
+            r = tryBase(base.substr(0, base.size() - 1), "ER0");
+            if (!r.empty()) return r;
+        }
+    }
+
+    // ----- -ly / -ily (quickly->quick, happily->happy) -----
+    if (len > 3 && word.compare(len - 2, 2, "ly") == 0) {
+        std::string base = word.substr(0, len - 2);
+        auto r = tryBase(base, "L IY0");
+        if (!r.empty()) return r;
+
+        // -ily -> -y: happily->happy
+        if (len > 4 && word[len - 3] == 'i') {
+            r = tryBase(word.substr(0, len - 3) + "y", "L IY0");
+            if (!r.empty()) return r;
+        }
+    }
+
+    // ----- -est (fastest->fast) -----
+    if (len > 4 && word.compare(len - 3, 3, "est") == 0) {
+        auto r = tryBase(word.substr(0, len - 3), "AH0 S T");
+        if (!r.empty()) return r;
+    }
+
+    return {};  // Truly OOV — no morphological match
+}
+
 } // anonymous namespace
 
 // -----------------------------------------------------------------------
@@ -477,11 +600,15 @@ void phonemize_english(const std::string &text,
 
         // Word token: look up in CMU dictionary
         auto dictIt = cmuDict.find(tok.text);
+        std::string morphArpa;  // holds result from morphological fallback
         if (dictIt == cmuDict.end()) {
-            // OOV: produce no phonemes (caller falls back to eSpeak)
-            // Still set needSpace so subsequent words get spacing
-            needSpace = true;
-            continue;
+            // OOV: try morphological fallback (strip suffix, retry lookup)
+            morphArpa = tryMorphologicalFallback(tok.text, cmuDict);
+            if (morphArpa.empty()) {
+                // Truly OOV: no dict entry, no morphological match
+                needSpace = true;
+                continue;
+            }
         }
 
         // Insert word-boundary space (except before first word)
@@ -490,7 +617,10 @@ void phonemize_english(const std::string &text,
         }
 
         // Parse ARPAbet and convert to IPA
-        auto arpaTokens = parseArpabet(dictIt->second);
+        // Use morphological result if dict lookup missed, otherwise use dict entry
+        const std::string &arpaStr =
+            (dictIt != cmuDict.end()) ? dictIt->second : morphArpa;
+        auto arpaTokens = parseArpabet(arpaStr);
         auto wordIpas = convertWordToIpa(arpaTokens);
 
         // Apply function-word destressing

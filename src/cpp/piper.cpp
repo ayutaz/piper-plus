@@ -9,15 +9,11 @@
 #include <unordered_map>
 #include <regex>
 
-#include <espeak-ng/speak_lib.h>
 #include <onnxruntime_cxx_api.h>
 #include <spdlog/spdlog.h>
 
-// Self-contained phoneme ID conversion (replaces piper-phonemize/phoneme_ids.hpp)
+// Self-contained phoneme ID conversion
 #include "phoneme_ids.hpp"
-
-// piper-phonemize library: eSpeak/codepoints phonemization (runtime only)
-#include <piper-phonemize/phonemize.hpp>
 
 #include "json.hpp"
 #include "piper.hpp"
@@ -38,22 +34,9 @@
 #endif
 
 #ifdef _WIN32
-#ifndef WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN
-#endif
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
-#include <windows.h>
-#include <io.h>
-#define access _access
-#define F_OK 0
-#else
-#include <unistd.h>
-#endif
-
-#ifdef __APPLE__
-#include <mach-o/dyld.h>
 #endif
 
 
@@ -120,10 +103,7 @@ Phoneme getCodepoint(std::string s) {
 // Load JSON config information for phonemization
 void parsePhonemizeConfig(json &configRoot, PhonemizeConfig &phonemizeConfig) {
   // {
-  //     "espeak": {
-  //         "voice": "<language code>"
-  //     },
-  //     "phoneme_type": "<espeak or text>",
+  //     "phoneme_type": "<openjtalk or multilingual>",
   //     "phoneme_map": {
   //         "<from phoneme>": ["<to phoneme 1>", "<to phoneme 2>", ...]
   //     },
@@ -132,29 +112,20 @@ void parsePhonemizeConfig(json &configRoot, PhonemizeConfig &phonemizeConfig) {
   //     }
   // }
 
-  if (configRoot.contains("espeak")) {
-    auto espeakValue = configRoot["espeak"];
-    if (espeakValue.contains("voice")) {
-      phonemizeConfig.eSpeak.voice = espeakValue["voice"].get<std::string>();
-    }
-  }
-
   if (configRoot.contains("phoneme_type")) {
     auto phonemeTypeStr = configRoot["phoneme_type"].get<std::string>();
-    if (phonemeTypeStr == "espeak") {
-      phonemizeConfig.phonemeType = eSpeakPhonemes;
-    } else if (phonemeTypeStr == "text") {
-      phonemizeConfig.phonemeType = TextPhonemes;
-    } else if (phonemeTypeStr == "openjtalk") {
+    if (phonemeTypeStr == "openjtalk") {
       phonemizeConfig.phonemeType = OpenJTalkPhonemes;
       // OpenJTalk models don't use padding between phonemes
       phonemizeConfig.interspersePad = false;
     } else if (phonemeTypeStr == "multilingual" || phonemeTypeStr == "bilingual") {
       phonemizeConfig.phonemeType = MultilingualPhonemes;
-      // Multilingual models use OpenJTalk phonemization but WITH intersperse padding
-      // (interspersePad defaults to true, so no change needed)
+      // Multilingual models use padding between phonemes
+      phonemizeConfig.interspersePad = true;
     } else {
-      spdlog::warn("Unknown phoneme_type '{}', defaulting to eSpeak", phonemeTypeStr);
+      spdlog::warn("Unknown phoneme_type '{}', defaulting to MultilingualPhonemes", phonemeTypeStr);
+      phonemizeConfig.phonemeType = MultilingualPhonemes;
+      phonemizeConfig.interspersePad = true;
     }
   }
 
@@ -410,217 +381,11 @@ std::vector<PhonemeInfo> extractTimingsFromDurations(
     return timings;
 }
 
-// Helper function to find espeak-ng data directory
-std::string findEspeakDataPath() {
-    // First, check environment variable
-    const char* env_path = getenv("ESPEAK_DATA_PATH");
-    if (env_path && access(env_path, F_OK) == 0) {
-        spdlog::debug("Using ESPEAK_DATA_PATH from environment: {}", env_path);
-        return env_path;
-    }
-    
-    // Try to find data relative to executable
-    char exe_path[4096] = {0};
-    
-#ifdef _WIN32
-    // Use wide char API for better Unicode support on Windows
-    wchar_t exe_path_w[4096] = {0};
-    DWORD size = ::GetModuleFileNameW(NULL, exe_path_w, sizeof(exe_path_w) / sizeof(wchar_t));
-    if (size > 0 && size <= (sizeof(exe_path_w) / sizeof(wchar_t) - 1)) {
-        // Convert to UTF-8
-        int utf8_size = WideCharToMultiByte(CP_UTF8, 0, exe_path_w, -1, nullptr, 0, nullptr, nullptr);
-        if (utf8_size > 0 && utf8_size <= sizeof(exe_path)) {
-            WideCharToMultiByte(CP_UTF8, 0, exe_path_w, -1, exe_path, utf8_size, nullptr, nullptr);
-        }
-    }
-#elif defined(__APPLE__)
-    uint32_t size = sizeof(exe_path);
-    if (_NSGetExecutablePath(exe_path, &size) != 0) {
-        exe_path[0] = '\0';
-    }
-#elif defined(__linux__)
-    ssize_t len = readlink("/proc/self/exe", exe_path, sizeof(exe_path) - 1);
-    if (len > 0) {
-        exe_path[len] = '\0';
-    } else {
-        exe_path[0] = '\0';
-    }
-#endif
-    
-    if (exe_path[0] != '\0') {
-        std::filesystem::path exePath(exe_path);
-        std::filesystem::path exeDir = exePath.parent_path();
-        
-        // Try different relative locations
-        std::vector<std::filesystem::path> candidates = {
-#ifdef _WIN32
-            // Windows-specific search paths - prioritize exe directory
-            exeDir / "espeak-ng-data",                    // Same directory as exe (highest priority)
-            exeDir / ".." / "share" / "espeak-ng-data",   // Standard distribution location
-            exeDir / "share" / "espeak-ng-data",          // Alternative share location
-            exeDir / ".." / "espeak-ng-data",             // Parent directory
-            exeDir / ".." / "lib" / "espeak-ng-data",     // lib directory
-            // Try to find in build directories (for development)
-            exeDir / ".." / ".." / "share" / "espeak-ng-data",
-            // Common installation paths
-            "C:\\Program Files\\eSpeak NG\\espeak-ng-data",
-            "C:\\Program Files (x86)\\eSpeak NG\\espeak-ng-data",
-            "C:\\espeak-ng-data"
-#else
-            exeDir / "espeak-ng-data",                    // Same directory as exe
-            exeDir / ".." / "share" / "espeak-ng-data",   // Installed location
-            exeDir / ".." / "espeak-ng-data",             // Alternative location
-            exeDir / ".." / "lib" / "espeak-ng-data"      // Another alternative for Unix
-#endif
-        };
-        
-        for (const auto& candidate : candidates) {
-            try {
-                auto absPath = std::filesystem::absolute(candidate);
-                // Normalize the path to avoid issues with mixed separators
-                auto normalizedPath = absPath.lexically_normal();
-                
-                if (std::filesystem::exists(normalizedPath)) {
-                    // Verify it's actually a directory with expected content
-                    auto phontabPath = normalizedPath / "phontab";
-                    if (std::filesystem::exists(phontabPath)) {
-                        spdlog::info("Found valid espeak-ng-data at: {}", normalizedPath.string());
-                        
-#ifdef _WIN32
-                        // On Windows, convert to native path separators
-                        auto nativePath = normalizedPath.make_preferred();
-                        return nativePath.string();
-#else
-                        return normalizedPath.string();
-#endif
-                    } else {
-                        spdlog::debug("Directory {} exists but missing phontab file", normalizedPath.string());
-                    }
-                }
-            } catch (const std::exception& e) {
-                spdlog::debug("Error checking path {}: {}", candidate.string(), e.what());
-            }
-        }
-        
-        // Log all paths we tried for debugging
-        spdlog::warn("Could not find espeak-ng-data directory. Searched in:");
-        // Store normalized paths to avoid duplicate operations
-        std::vector<std::pair<std::filesystem::path, std::string>> searchedPaths;
-        for (const auto& candidate : candidates) {
-            try {
-                auto absPath = std::filesystem::absolute(candidate).lexically_normal();
-                searchedPaths.push_back({candidate, absPath.string()});
-                spdlog::warn("  - {}", absPath.string());
-            } catch (...) {
-                searchedPaths.push_back({candidate, candidate.string() + " (invalid path)"});
-                spdlog::warn("  - {} (invalid path)", candidate.string());
-            }
-        }
-    }
-    
-    // If nothing found, return empty string (espeak will use its default)
-    spdlog::warn("espeak-ng will attempt to use its built-in default data");
-    return "";
-}
-
 void initialize(PiperConfig &config) {
-  if (config.useESpeak) {
-    // Set up espeak-ng for calling espeak_TextToPhonemesWithTerminator
-    // See: https://github.com/rhasspy/espeak-ng
-    spdlog::debug("Initializing eSpeak");
-    
-    // If no path was provided, try to find it automatically
-    if (config.eSpeakDataPath.empty()) {
-        config.eSpeakDataPath = findEspeakDataPath();
-    }
-    
-#ifdef _WIN32
-    // On Windows, normalize the path to use native separators
-    if (!config.eSpeakDataPath.empty()) {
-        try {
-            std::filesystem::path dataPath(config.eSpeakDataPath);
-            dataPath = dataPath.lexically_normal().make_preferred();
-            config.eSpeakDataPath = dataPath.string();
-            spdlog::debug("Normalized espeak-ng-data path: {}", config.eSpeakDataPath);
-        } catch (const std::exception& e) {
-            spdlog::warn("Failed to normalize espeak-ng-data path: {}", e.what());
-        }
-    }
-#endif
-    
-    const char* espeak_path = config.eSpeakDataPath.empty() ? nullptr : config.eSpeakDataPath.c_str();
-    
-    spdlog::info("Calling espeak_Initialize with path: {}", 
-                 espeak_path ? espeak_path : "(using built-in default)");
-    
-#ifdef _WIN32
-    // On Windows, add extra debugging for DLL loading issues
-    spdlog::debug("Current DLL directory: {}", 
-                  []() -> std::string {
-                      wchar_t buffer[MAX_PATH] = {0};
-                      DWORD result = ::GetDllDirectoryW(MAX_PATH, buffer);
-                      if (result > 0 && result < MAX_PATH) {
-                          return std::filesystem::path(buffer).string();
-                      }
-                      return "(not set)";
-                  }());
-                  
-    // Verify espeak-ng.dll is loaded
-    HMODULE espeakModule = ::GetModuleHandleA("espeak-ng.dll");
-    if (espeakModule) {
-        wchar_t dllPath[MAX_PATH] = {0};
-        if (::GetModuleFileNameW(espeakModule, dllPath, MAX_PATH) > 0) {
-            // Convert once and store the result
-            std::string dllPathStr = std::filesystem::path(dllPath).string();
-            spdlog::debug("espeak-ng.dll loaded from: {}", dllPathStr);
-        }
-    } else {
-        spdlog::warn("espeak-ng.dll not yet loaded");
-    }
-#endif
-    
-    int result = espeak_Initialize(AUDIO_OUTPUT_SYNCHRONOUS,
-                                   /*buflength*/ 0,
-                                   /*path*/ espeak_path,
-                                   /*options*/ 0);
-    if (result < 0) {
-      spdlog::error("espeak_Initialize failed with code: {}", result);
-      
-#ifdef _WIN32
-      DWORD lastError = ::GetLastError();
-      if (lastError != 0) {
-          spdlog::error("Windows last error code: {} (0x{:X})", lastError, lastError);
-      }
-      
-      // Provide helpful error messages based on the error code
-      if (result == -1) {
-          spdlog::error("eSpeak initialization failed: Unable to access espeak-ng-data directory");
-          spdlog::error("Please ensure espeak-ng-data directory is present in one of these locations:");
-          spdlog::error("  1. Same directory as piper.exe");
-          spdlog::error("  2. ../share/espeak-ng-data relative to piper.exe");
-          spdlog::error("  3. Set ESPEAK_DATA_PATH environment variable");
-          spdlog::error("  4. Use --espeak_data command line option");
-      }
-#endif
-      
-      throw std::runtime_error("Failed to initialize eSpeak-ng. Check logs for details.");
-    }
-
-    spdlog::info("Successfully initialized eSpeak with data path: {}", 
-                 espeak_path ? espeak_path : "(built-in default)");
-  }
-
   spdlog::info("Initialized piper");
 }
 
 void terminate(PiperConfig &config) {
-  if (config.useESpeak) {
-    // Clean up espeak-ng
-    spdlog::debug("Terminating eSpeak");
-    espeak_Terminate();
-    spdlog::debug("Terminated eSpeak");
-  }
-
   spdlog::info("Terminated piper");
 }
 
@@ -1238,13 +1003,8 @@ void textToAudio(PiperConfig &config, Voice &voice, std::string text,
       std::vector<std::vector<Phoneme>> segmentPhonemes;
       std::vector<std::vector<ProsodyFeature>> segmentProsody;
 
-      if (voice.phonemizeConfig.phonemeType == eSpeakPhonemes) {
-        // Use espeak-ng for phonemization
-        eSpeakPhonemeConfig eSpeakConfig;
-        eSpeakConfig.voice = voice.phonemizeConfig.eSpeak.voice;
-        phonemize_eSpeak(segment.text, eSpeakConfig, segmentPhonemes);
-      } else if (usesOpenJTalk(voice.phonemizeConfig.phonemeType)) {
-        // Japanese/Multilingual OpenJTalk phonemizer
+      if (voice.phonemizeConfig.phonemeType == OpenJTalkPhonemes) {
+        // Japanese OpenJTalk phonemizer
         if (useProsody) {
           phonemize_openjtalk_with_prosody(segment.text, segmentPhonemes, segmentProsody);
         } else {
@@ -1356,24 +1116,13 @@ void textToAudio(PiperConfig &config, Voice &voice, std::string text,
           } else if (langSeg.lang == "en" && !voice.cmuDict.empty()) {
             // English: CMU dictionary-based G2P
             phonemize_english(langSeg.text, langPhonemes, voice.cmuDict);
-            // EN OOV fallback: if CMU dict produced no phonemes, use eSpeak
+            // Check if CMU dict produced any phonemes
             bool hasAnyPhonemes = false;
             for (const auto& s : langPhonemes) {
               if (!s.empty()) { hasAnyPhonemes = true; break; }
             }
             if (!hasAnyPhonemes) {
-              langPhonemes.clear();
-              eSpeakPhonemeConfig eSpeakConfig;
-              eSpeakConfig.voice = "en-us";
-              phonemize_eSpeak(langSeg.text, eSpeakConfig, langPhonemes);
-              for (auto& sentence : langPhonemes) {
-                std::vector<Phoneme> filtered;
-                for (auto ph : sentence) {
-                  if (!bosEosTokens.count(ph)) filtered.push_back(ph);
-                }
-                sentence = std::move(filtered);
-              }
-              spdlog::warn("English CMU dict produced no phonemes for segment; falling back to eSpeak");
+              spdlog::debug("English segment '{}' has no CMU dict matches; skipping", langSeg.text);
             }
           } else if (langSeg.lang == "zh" && !voice.pinyinSingleDict.empty()) {
             // Chinese: pypinyin-based G2P
@@ -1383,22 +1132,7 @@ void textToAudio(PiperConfig &config, Voice &voice, std::string text,
             // Korean: Hangul decomposition (no external data needed)
             phonemize_korean(langSeg.text, langPhonemes);
           } else {
-            // Fallback: eSpeak for any language without native G2P
-            // eSpeak produces BOS/EOS markers that must be stripped
-            eSpeakPhonemeConfig eSpeakConfig;
-            eSpeakConfig.voice = langSeg.lang;
-            phonemize_eSpeak(langSeg.text, eSpeakConfig, langPhonemes);
-
-            // Strip BOS/EOS from eSpeak output (same tokens as JA)
-            for (auto& sentence : langPhonemes) {
-              std::vector<Phoneme> filtered;
-              for (auto ph : sentence) {
-                if (!bosEosTokens.count(ph)) {
-                  filtered.push_back(ph);
-                }
-              }
-              sentence = std::move(filtered);
-            }
+            spdlog::warn("No native phonemizer for language '{}'; skipping segment", langSeg.lang);
           }
 
           // Add phonemes from non-JA segment with language-specific prosody
@@ -1442,10 +1176,6 @@ void textToAudio(PiperConfig &config, Voice &voice, std::string text,
             segmentProsody.push_back(std::move(allProsody));
           }
         }
-      } else {
-        // Use UTF-8 codepoints as "phonemes"
-        CodepointsPhonemeConfig codepointsConfig;
-        phonemize_codepoints(segment.text, codepointsConfig, segmentPhonemes);
       }
 
       // Add all sentences from this segment
@@ -1512,7 +1242,7 @@ void textToAudio(PiperConfig &config, Voice &voice, std::string text,
         idConfig.addEos = false;
     }
 
-    // Multilingual: use eSpeak-style BOS/EOS + padding (added by phonemes_to_ids)
+    // Multilingual: BOS/EOS + padding (added by phonemes_to_ids)
     // BOS/EOS from individual segments are already stripped
     // Note: MultilingualPhonemes uses interspersePad=true (set in parsePhonemizeConfig)
 
@@ -1902,30 +1632,18 @@ void textToAudioStreaming(PiperConfig &config, Voice &voice, std::string text,
     bool useProsody = voice.session.hasProsodyInput &&
                       usesOpenJTalk(voice.phonemizeConfig.phonemeType);
 
-    if (voice.phonemizeConfig.phonemeType == eSpeakPhonemes) {
-      // Use espeak-ng for phonemization
-      eSpeakPhonemeConfig eSpeakConfig;
-      eSpeakConfig.voice = voice.phonemizeConfig.eSpeak.voice;
-      phonemize_eSpeak(chunk, eSpeakConfig, chunkSentences);
-    } else if (usesOpenJTalk(voice.phonemizeConfig.phonemeType)) {
+    if (usesOpenJTalk(voice.phonemizeConfig.phonemeType)) {
       // Japanese/Multilingual OpenJTalk phonemizer
       if (useProsody) {
         phonemize_openjtalk_with_prosody(chunk, chunkSentences, chunkProsody);
       } else {
         phonemize_openjtalk(chunk, chunkSentences);
       }
-      // Fall back to eSpeak for multilingual models when OpenJTalk is unavailable
-      if (chunkSentences.empty() && !chunk.empty() &&
-          voice.phonemizeConfig.phonemeType == MultilingualPhonemes) {
-        spdlog::warn("OpenJTalk unavailable, falling back to eSpeak for multilingual model");
-        eSpeakPhonemeConfig eSpeakConfig;
-        eSpeakConfig.voice = "en";
-        phonemize_eSpeak(chunk, eSpeakConfig, chunkSentences);
-      }
-    } else {
-      // Use UTF-8 codepoints as "phonemes"
-      CodepointsPhonemeConfig codepointsConfig;
-      phonemize_codepoints(chunk, codepointsConfig, chunkSentences);
+    } else if (voice.phonemizeConfig.phonemeType == MultilingualPhonemes) {
+      // TODO: Implement proper multilingual streaming dispatch
+      // For now, fall back to OpenJTalk for multilingual streaming
+      spdlog::warn("Multilingual streaming not yet implemented; falling back to OpenJTalk for chunk");
+      phonemize_openjtalk(chunk, chunkSentences);
     }
 
     // Process each sentence in the chunk
