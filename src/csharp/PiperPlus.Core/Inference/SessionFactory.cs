@@ -150,15 +150,9 @@ public static class SessionFactory
     {
         try
         {
-            // OrtCUDAProviderOptions equivalent in managed API.
-            // "cudnn_conv_algo_search" = 1 corresponds to OrtCudnnConvAlgoSearchHeuristic
-            // in the C++ enum, matching the C++ piper.cpp configuration.
-            var cudaOptions = new Dictionary<string, string>
-            {
-                ["device_id"] = deviceId.ToString(),
-                ["cudnn_conv_algo_search"] = "1", // HEURISTIC
-            };
-
+            // The C++ implementation sets OrtCUDAProviderOptions with
+            // cudnn_conv_algo_search = OrtCudnnConvAlgoSearchHeuristic.
+            // The managed API's int overload uses default CUDA options.
             options.AppendExecutionProvider_CUDA(deviceId);
 
             logger.LogInformation(

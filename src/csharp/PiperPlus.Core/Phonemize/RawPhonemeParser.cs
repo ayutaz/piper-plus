@@ -53,7 +53,7 @@ public static class RawPhonemeParser
     /// <c>config.json</c>.
     /// </param>
     /// <returns>Flat array of phoneme IDs suitable for ONNX inference input.</returns>
-    public static long[] Parse(string phonemeString, Dictionary<string, int[]> phonemeIdMap)
+    public static long[] Parse(string? phonemeString, Dictionary<string, int[]> phonemeIdMap)
     {
         ArgumentNullException.ThrowIfNull(phonemeIdMap);
 

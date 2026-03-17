@@ -310,6 +310,7 @@ jobs:
 
       - name: Show archive size
         run: ls -lh piper-plus-cli-${{ matrix.rid }}.${{ matrix.archive_ext }}
+        shell: bash
 
       - name: Upload Release Asset
         env:

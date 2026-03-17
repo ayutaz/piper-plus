@@ -58,12 +58,21 @@ public sealed class CliIntegrationTests
         var psi = new ProcessStartInfo
         {
             FileName = "dotnet",
-            Arguments = $"run --project {cliProjectPath} -- {string.Join(' ', args)}",
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
             CreateNoWindow = true,
         };
+
+        // Use ArgumentList to avoid quoting/escaping issues with spaces in paths
+        psi.ArgumentList.Add("run");
+        psi.ArgumentList.Add("--project");
+        psi.ArgumentList.Add(cliProjectPath);
+        psi.ArgumentList.Add("--");
+        foreach (var arg in args)
+        {
+            psi.ArgumentList.Add(arg);
+        }
 
         using var process = new Process { StartInfo = psi };
         process.Start();

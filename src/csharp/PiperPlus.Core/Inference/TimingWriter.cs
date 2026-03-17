@@ -275,11 +275,11 @@ public static class TimingWriter
 
         foreach (var e in entries)
         {
-            writer.Write(e.StartSeconds.ToString("F3"));
+            writer.Write(e.StartSeconds.ToString("F3", System.Globalization.CultureInfo.InvariantCulture));
             writer.Write('\t');
-            writer.Write(e.EndSeconds.ToString("F3"));
+            writer.Write(e.EndSeconds.ToString("F3", System.Globalization.CultureInfo.InvariantCulture));
             writer.Write('\t');
-            writer.Write(e.DurationSeconds.ToString("F3"));
+            writer.Write(e.DurationSeconds.ToString("F3", System.Globalization.CultureInfo.InvariantCulture));
             writer.Write('\t');
             writer.WriteLine(e.Phoneme);
         }
