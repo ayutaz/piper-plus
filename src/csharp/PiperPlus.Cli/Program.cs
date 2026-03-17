@@ -1,5 +1,4 @@
 using System.CommandLine;
-using System.CommandLine.Invocation;
 using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using System.Text.Json;
@@ -66,7 +65,7 @@ internal static class Program
         try
         {
             var rootCommand = BuildRootCommand();
-            return rootCommand.Invoke(args);
+            return rootCommand.Parse(args).Invoke();
         }
         catch (Exception ex)
         {
@@ -78,168 +77,158 @@ internal static class Program
     private static RootCommand BuildRootCommand()
     {
         // --model / -m
-        var modelOption = new Option<FileInfo?>(
-            aliases: ["--model", "-m"],
-            description: "Path to .onnx model file");
+        var modelOption = new Option<FileInfo?>("--model", "-m")
+        { Description = "Path to .onnx model file" };
 
         // --config / -c
-        var configOption = new Option<FileInfo?>(
-            aliases: ["--config", "-c"],
-            description: "Path to config.json (auto-detected if omitted)");
+        var configOption = new Option<FileInfo?>("--config", "-c")
+        { Description = "Path to config.json (auto-detected if omitted)" };
 
         // --output_file / --output-file / -f
-        var outputFileOption = new Option<string?>(
-            aliases: ["--output_file", "--output-file", "-f"],
-            description: "Output WAV file path ('-' for stdout)");
+        var outputFileOption = new Option<string?>("--output_file", "--output-file", "-f")
+        { Description = "Output WAV file path ('-' for stdout)" };
 
         // --output_dir / --output-dir / -d
-        var outputDirOption = new Option<DirectoryInfo>(
-            aliases: ["--output_dir", "--output-dir", "-d"],
-            getDefaultValue: () => new DirectoryInfo(Directory.GetCurrentDirectory()),
-            description: "Output directory (default: current directory)");
+        var outputDirOption = new Option<DirectoryInfo>("--output_dir", "--output-dir", "-d")
+        {
+            Description = "Output directory (default: current directory)",
+            DefaultValueFactory = _ => new DirectoryInfo(Directory.GetCurrentDirectory()),
+        };
 
         // --output_raw / --output-raw
-        var outputRawOption = new Option<bool>(
-            aliases: ["--output_raw", "--output-raw"],
-            description: "Output raw PCM int16 to stdout (no WAV header)");
+        var outputRawOption = new Option<bool>("--output_raw", "--output-raw")
+        { Description = "Output raw PCM int16 to stdout (no WAV header)" };
 
         // --speaker / -s
-        var speakerOption = new Option<int>(
-            aliases: ["--speaker", "-s"],
-            getDefaultValue: () => 0,
-            description: "Speaker ID (default: 0)");
+        var speakerOption = new Option<int>("--speaker", "-s")
+        {
+            Description = "Speaker ID (default: 0)",
+            DefaultValueFactory = _ => 0,
+        };
 
         // --noise_scale / --noise-scale
-        var noiseScaleOption = new Option<float>(
-            aliases: ["--noise_scale", "--noise-scale"],
-            getDefaultValue: () => 0.667f,
-            description: "Generator noise scale (default: 0.667)");
+        var noiseScaleOption = new Option<float>("--noise_scale", "--noise-scale")
+        {
+            Description = "Generator noise scale (default: 0.667)",
+            DefaultValueFactory = _ => 0.667f,
+        };
 
         // --length_scale / --length-scale
-        var lengthScaleOption = new Option<float>(
-            aliases: ["--length_scale", "--length-scale"],
-            getDefaultValue: () => 1.0f,
-            description: "Phoneme length scale (default: 1.0)");
+        var lengthScaleOption = new Option<float>("--length_scale", "--length-scale")
+        {
+            Description = "Phoneme length scale (default: 1.0)",
+            DefaultValueFactory = _ => 1.0f,
+        };
 
         // --noise_w / --noise-w
-        var noiseWOption = new Option<float>(
-            aliases: ["--noise_w", "--noise-w"],
-            getDefaultValue: () => 0.8f,
-            description: "Duration predictor noise (default: 0.8)");
+        var noiseWOption = new Option<float>("--noise_w", "--noise-w")
+        {
+            Description = "Duration predictor noise (default: 0.8)",
+            DefaultValueFactory = _ => 0.8f,
+        };
 
         // --sentence_silence / --sentence-silence
-        var sentenceSilenceOption = new Option<float>(
-            aliases: ["--sentence_silence", "--sentence-silence"],
-            getDefaultValue: () => 0.2f,
-            description: "Seconds of silence after each sentence (default: 0.2)");
+        var sentenceSilenceOption = new Option<float>("--sentence_silence", "--sentence-silence")
+        {
+            Description = "Seconds of silence after each sentence (default: 0.2)",
+            DefaultValueFactory = _ => 0.2f,
+        };
 
         // --text / -t
-        var textOption = new Option<string?>(
-            aliases: ["--text", "-t"],
-            description: "Text to synthesize (alternative to JSONL stdin input)");
+        var textOption = new Option<string?>("--text", "-t")
+        { Description = "Text to synthesize (alternative to JSONL stdin input)" };
 
         // --language
-        var languageOption = new Option<string>(
-            name: "--language",
-            getDefaultValue: () => "ja",
-            description: "Language for --text mode: ja or en (default: ja)");
+        var languageOption = new Option<string>("--language")
+        {
+            Description = "Language for --text mode: ja or en (default: ja)",
+            DefaultValueFactory = _ => "ja",
+        };
 
         // --json-input
-        var jsonInputOption = new Option<bool>(
-            name: "--json-input",
-            description: "Interpret stdin as JSONL");
+        var jsonInputOption = new Option<bool>("--json-input")
+        { Description = "Interpret stdin as JSONL" };
 
         // --debug
-        var debugOption = new Option<bool>(
-            name: "--debug",
-            description: "Enable DEBUG logging to stderr");
+        var debugOption = new Option<bool>("--debug")
+        { Description = "Enable DEBUG logging to stderr" };
 
         // --quiet / -q
-        var quietOption = new Option<bool>(
-            aliases: ["--quiet", "-q"],
-            description: "Disable all logging");
+        var quietOption = new Option<bool>("--quiet", "-q")
+        { Description = "Disable all logging" };
 
         // --version
-        var versionOption = new Option<bool>(
-            name: "--version",
-            description: "Show version and exit");
+        var versionOption = new Option<bool>("--version")
+        { Description = "Show version and exit" };
 
         // ================================================================
         // Phase 3 — new CLI options (14)
         // ================================================================
 
         // --use-cuda
-        var useCudaOption = new Option<bool>(
-            name: "--use-cuda",
-            description: "Use CUDA execution provider");
+        var useCudaOption = new Option<bool>("--use-cuda")
+        { Description = "Use CUDA execution provider" };
 
         // --gpu-device-id
-        var gpuDeviceIdOption = new Option<int>(
-            name: "--gpu-device-id",
-            getDefaultValue: () => 0,
-            description: "CUDA GPU device ID");
+        var gpuDeviceIdOption = new Option<int>("--gpu-device-id")
+        {
+            Description = "CUDA GPU device ID",
+            DefaultValueFactory = _ => 0,
+        };
 
         // --phoneme_silence
-        var phonemeSilenceOption = new Option<string?>(
-            name: "--phoneme_silence",
-            description: "Phoneme silence: '<phoneme> <seconds>'");
+        var phonemeSilenceOption = new Option<string?>("--phoneme_silence")
+        { Description = "Phoneme silence: '<phoneme> <seconds>'" };
 
         // --raw-phonemes
-        var rawPhonemesOption = new Option<bool>(
-            name: "--raw-phonemes",
-            description: "Treat input as phonemes (not text)");
+        var rawPhonemesOption = new Option<bool>("--raw-phonemes")
+        { Description = "Treat input as phonemes (not text)" };
 
         // --streaming
-        var streamingOption = new Option<bool>(
-            name: "--streaming",
-            description: "Stream raw PCM int16 to stdout");
+        var streamingOption = new Option<bool>("--streaming")
+        { Description = "Stream raw PCM int16 to stdout" };
 
         // --output-timing
-        var outputTimingOption = new Option<string?>(
-            name: "--output-timing",
-            description: "Output phoneme timing to file");
+        var outputTimingOption = new Option<string?>("--output-timing")
+        { Description = "Output phoneme timing to file" };
 
         // --timing-format
-        var timingFormatOption = new Option<string>(
-            name: "--timing-format",
-            getDefaultValue: () => "json",
-            description: "Timing format: json or tsv");
+        var timingFormatOption = new Option<string>("--timing-format")
+        {
+            Description = "Timing format: json or tsv",
+            DefaultValueFactory = _ => "json",
+        };
 
         // --custom-dict
-        var customDictOption = new Option<string?>(
-            name: "--custom-dict",
-            description: "Custom dictionary files (comma-separated)");
+        var customDictOption = new Option<string?>("--custom-dict")
+        { Description = "Custom dictionary files (comma-separated)" };
 
         // --espeak_data (no-op, for C++ CLI compatibility)
-        var espeakDataOption = new Option<string?>(
-            name: "--espeak_data",
-            description: "espeak-ng data path (ignored in C# CLI)");
+        var espeakDataOption = new Option<string?>("--espeak_data")
+        { Description = "espeak-ng data path (ignored in C# CLI)" };
 
         // --tashkeel_model (no-op, for C++ CLI compatibility)
-        var tashkeelModelOption = new Option<string?>(
-            name: "--tashkeel_model",
-            description: "libtashkeel model (ignored in C# CLI)");
+        var tashkeelModelOption = new Option<string?>("--tashkeel_model")
+        { Description = "libtashkeel model (ignored in C# CLI)" };
 
         // --test-mode
-        var testModeOption = new Option<bool>(
-            name: "--test-mode",
-            description: "Skip ONNX inference (CI testing)");
+        var testModeOption = new Option<bool>("--test-mode")
+        { Description = "Skip ONNX inference (CI testing)" };
 
         // --list-models [LANG]
-        var listModelsOption = new Option<string?>(
-            name: "--list-models",
-            description: "List available models (optionally filter by language code)")
-        { Arity = ArgumentArity.ZeroOrOne };
+        var listModelsOption = new Option<string?>("--list-models")
+        {
+            Description = "List available models (optionally filter by language code)",
+            Arity = ArgumentArity.ZeroOrOne,
+        };
 
         // --download-model NAME
-        var downloadModelOption = new Option<string?>(
-            name: "--download-model",
-            description: "Download a model by name");
+        var downloadModelOption = new Option<string?>("--download-model")
+        { Description = "Download a model by name" };
 
         // --model-dir DIR
-        var modelDirOption = new Option<DirectoryInfo?>(
-            name: "--model-dir",
-            description: "Model download directory");
+        var modelDirOption = new Option<DirectoryInfo?>("--model-dir")
+        { Description = "Model download directory" };
 
         var rootCommand = new RootCommand("Piper Plus TTS — C# CLI")
         {
@@ -276,13 +265,10 @@ internal static class Program
             modelDirOption,
         };
 
-        rootCommand.SetHandler(
-            (InvocationContext ctx) =>
+        rootCommand.SetAction((parseResult) =>
             {
-                var result = ctx.ParseResult;
-
                 // --version: early exit
-                if (result.GetValueForOption(versionOption))
+                if (parseResult.GetValue(versionOption))
                 {
                     var version = Assembly.GetExecutingAssembly()
                         .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
@@ -290,28 +276,26 @@ internal static class Program
                         ?? Assembly.GetExecutingAssembly().GetName().Version?.ToString()
                         ?? "unknown";
                     Console.WriteLine(version);
-                    ctx.ExitCode = 0;
                     return;
                 }
 
-                bool debug = result.GetValueForOption(debugOption);
-                bool quiet = result.GetValueForOption(quietOption);
+                bool debug = parseResult.GetValue(debugOption);
+                bool quiet = parseResult.GetValue(quietOption);
 
                 // ============================================================
                 // --list-models / --download-model (early return, no model needed)
                 // ============================================================
-                if (result.FindResultFor(listModelsOption) is not null)
+                if (parseResult.GetResult(listModelsOption) is not null)
                 {
-                    string? listModelsLang = result.GetValueForOption(listModelsOption);
+                    string? listModelsLang = parseResult.GetValue(listModelsOption);
                     ModelManager.ListModels(string.IsNullOrEmpty(listModelsLang) ? null : listModelsLang);
-                    ctx.ExitCode = 0;
                     return;
                 }
 
-                string? downloadModelName = result.GetValueForOption(downloadModelOption);
+                string? downloadModelName = parseResult.GetValue(downloadModelOption);
                 if (!string.IsNullOrEmpty(downloadModelName))
                 {
-                    var dlModelDir = result.GetValueForOption(modelDirOption);
+                    var dlModelDir = parseResult.GetValue(modelDirOption);
                     string targetDir = dlModelDir?.FullName
                         ?? Environment.GetEnvironmentVariable("PIPER_MODEL_DIR")
                         ?? ModelManager.GetDefaultModelDir();
@@ -321,20 +305,23 @@ internal static class Program
                     bool success = ModelManager.DownloadModelAsync(
                         downloadModelName, targetDir, CancellationToken.None).GetAwaiter().GetResult();
 
-                    ctx.ExitCode = success ? 0 : 1;
+                    if (!success)
+                    {
+                        Environment.ExitCode = 1;
+                    }
                     return;
                 }
 
                 // ============================================================
                 // No-op options (C++ CLI compatibility)
                 // ============================================================
-                string? espeakData = result.GetValueForOption(espeakDataOption);
+                string? espeakData = parseResult.GetValue(espeakDataOption);
                 if (!string.IsNullOrEmpty(espeakData))
                 {
                     LogDebug(debug, quiet, $"--espeak_data ignored in C# CLI: {espeakData}");
                 }
 
-                string? tashkeelModel = result.GetValueForOption(tashkeelModelOption);
+                string? tashkeelModel = parseResult.GetValue(tashkeelModelOption);
                 if (!string.IsNullOrEmpty(tashkeelModel))
                 {
                     LogDebug(debug, quiet, $"--tashkeel_model ignored in C# CLI: {tashkeelModel}");
@@ -343,18 +330,18 @@ internal static class Program
                 // ============================================================
                 // Phase 3 option values
                 // ============================================================
-                bool useCuda = result.GetValueForOption(useCudaOption);
-                int gpuDeviceId = result.GetValueForOption(gpuDeviceIdOption);
-                string? phonemeSilenceSpec = result.GetValueForOption(phonemeSilenceOption);
-                bool rawPhonemes = result.GetValueForOption(rawPhonemesOption);
-                bool streaming = result.GetValueForOption(streamingOption);
-                string? outputTimingPath = result.GetValueForOption(outputTimingOption);
-                string timingFormat = result.GetValueForOption(timingFormatOption)!;
-                string? customDictPaths = result.GetValueForOption(customDictOption);
-                bool testMode = result.GetValueForOption(testModeOption);
+                bool useCuda = parseResult.GetValue(useCudaOption);
+                int gpuDeviceId = parseResult.GetValue(gpuDeviceIdOption);
+                string? phonemeSilenceSpec = parseResult.GetValue(phonemeSilenceOption);
+                bool rawPhonemes = parseResult.GetValue(rawPhonemesOption);
+                bool streaming = parseResult.GetValue(streamingOption);
+                string? outputTimingPath = parseResult.GetValue(outputTimingOption);
+                string timingFormat = parseResult.GetValue(timingFormatOption)!;
+                string? customDictPaths = parseResult.GetValue(customDictOption);
+                bool testMode = parseResult.GetValue(testModeOption);
 
                 // --model-dir: resolve from CLI > PIPER_MODEL_DIR env
-                var modelDirInfo = result.GetValueForOption(modelDirOption);
+                var modelDirInfo = parseResult.GetValue(modelDirOption);
                 if (modelDirInfo is null)
                 {
                     var envModelDir = Environment.GetEnvironmentVariable("PIPER_MODEL_DIR");
@@ -378,7 +365,7 @@ internal static class Program
                 }
 
                 // Resolve model path: CLI > env > error
-                var modelFileInfo = result.GetValueForOption(modelOption);
+                var modelFileInfo = parseResult.GetValue(modelOption);
                 string? modelPath = modelFileInfo?.FullName;
 
                 if (string.IsNullOrEmpty(modelPath))
@@ -394,19 +381,19 @@ internal static class Program
                 if (string.IsNullOrEmpty(modelPath) && !testMode)
                 {
                     LogError("--model is required (or set PIPER_DEFAULT_MODEL).");
-                    ctx.ExitCode = 1;
+                    Environment.ExitCode = 1;
                     return;
                 }
 
                 if (!testMode && !string.IsNullOrEmpty(modelPath) && !File.Exists(modelPath))
                 {
                     LogError($"Model file not found: {modelPath}");
-                    ctx.ExitCode = 1;
+                    Environment.ExitCode = 1;
                     return;
                 }
 
                 // Resolve config path
-                var configFileInfo = result.GetValueForOption(configOption);
+                var configFileInfo = parseResult.GetValue(configOption);
                 string? explicitConfig = configFileInfo?.FullName;
                 string? configPath = PiperConfig.FindConfigPath(
                     explicitConfig, modelPath);
@@ -417,7 +404,7 @@ internal static class Program
                         $"config.json not found. Searched: {modelPath}.json, " +
                         $"{Path.GetDirectoryName(modelPath)}/config.json. " +
                         "Use --config to specify.");
-                    ctx.ExitCode = 1;
+                    Environment.ExitCode = 1;
                     return;
                 }
 
@@ -433,7 +420,7 @@ internal static class Program
                     catch (Exception ex)
                     {
                         LogError($"Failed to load config: {ex.Message}");
-                        ctx.ExitCode = 1;
+                        Environment.ExitCode = 1;
                         return;
                     }
                 }
@@ -453,7 +440,7 @@ internal static class Program
                     catch (ArgumentException ex)
                     {
                         LogError($"Invalid --phoneme_silence: {ex.Message}");
-                        ctx.ExitCode = 1;
+                        Environment.ExitCode = 1;
                         return;
                     }
                 }
@@ -473,24 +460,24 @@ internal static class Program
                 }
 
                 // Gather synthesis parameters
-                float noiseScale = result.GetValueForOption(noiseScaleOption);
-                float lengthScale = result.GetValueForOption(lengthScaleOption);
-                float noiseW = result.GetValueForOption(noiseWOption);
-                int speaker = result.GetValueForOption(speakerOption);
-                float sentenceSilence = result.GetValueForOption(sentenceSilenceOption);
-                bool outputRaw = result.GetValueForOption(outputRawOption);
-                bool jsonInput = result.GetValueForOption(jsonInputOption);
-                string? textInput = result.GetValueForOption(textOption);
-                string language = result.GetValueForOption(languageOption)!;
+                float noiseScale = parseResult.GetValue(noiseScaleOption);
+                float lengthScale = parseResult.GetValue(lengthScaleOption);
+                float noiseW = parseResult.GetValue(noiseWOption);
+                int speaker = parseResult.GetValue(speakerOption);
+                float sentenceSilence = parseResult.GetValue(sentenceSilenceOption);
+                bool outputRaw = parseResult.GetValue(outputRawOption);
+                bool jsonInput = parseResult.GetValue(jsonInputOption);
+                string? textInput = parseResult.GetValue(textOption);
+                string language = parseResult.GetValue(languageOption)!;
 
-                string? outputFile = result.GetValueForOption(outputFileOption);
-                var outputDir = result.GetValueForOption(outputDirOption)!;
+                string? outputFile = parseResult.GetValue(outputFileOption);
+                var outputDir = parseResult.GetValue(outputDirOption)!;
 
                 // Validate --text and --json-input are mutually exclusive
                 if (!string.IsNullOrEmpty(textInput) && jsonInput)
                 {
                     LogError("--text and --json-input are mutually exclusive.");
-                    ctx.ExitCode = 1;
+                    Environment.ExitCode = 1;
                     return;
                 }
 
@@ -504,12 +491,14 @@ internal static class Program
                     IPhonemizer phonemizer;
                     try
                     {
+#pragma warning disable IL2026 // RequiresUnreferencedCode -- G2P engines resolved via reflection
                         phonemizer = ResolveTextModePhonemizer(language);
+#pragma warning restore IL2026
                     }
                     catch (NotSupportedException ex)
                     {
                         LogError(ex.Message);
-                        ctx.ExitCode = 1;
+                        Environment.ExitCode = 1;
                         return;
                     }
 
@@ -529,7 +518,6 @@ internal static class Program
                         $"[test-mode] phoneme_ids({phonemeIdsLong.Length}): " +
                         $"[{string.Join(", ", phonemeIdsLong)}]");
 
-                    ctx.ExitCode = 0;
                     return;
                 }
 
@@ -583,7 +571,6 @@ internal static class Program
                         }
                     }
 
-                    ctx.ExitCode = 0;
                     return;
                 }
 
@@ -593,7 +580,7 @@ internal static class Program
                 if (string.IsNullOrEmpty(modelPath))
                 {
                     LogError("--model is required (or set PIPER_DEFAULT_MODEL).");
-                    ctx.ExitCode = 1;
+                    Environment.ExitCode = 1;
                     return;
                 }
 
@@ -603,7 +590,7 @@ internal static class Program
                         $"config.json not found. Searched: {modelPath}.json, " +
                         $"{Path.GetDirectoryName(modelPath)}/config.json. " +
                         "Use --config to specify.");
-                    ctx.ExitCode = 1;
+                    Environment.ExitCode = 1;
                     return;
                 }
 
@@ -623,7 +610,7 @@ internal static class Program
                 catch (Exception ex)
                 {
                     LogError($"Failed to load ONNX model: {ex.Message}");
-                    ctx.ExitCode = 1;
+                    Environment.ExitCode = 1;
                     return;
                 }
 
@@ -703,12 +690,14 @@ internal static class Program
                     IPhonemizer phonemizer;
                     try
                     {
+#pragma warning disable IL2026 // RequiresUnreferencedCode -- G2P engines resolved via reflection
                         phonemizer = ResolveTextModePhonemizer(language);
+#pragma warning restore IL2026
                     }
                     catch (NotSupportedException ex)
                     {
                         LogError(ex.Message);
-                        ctx.ExitCode = 1;
+                        Environment.ExitCode = 1;
                         return;
                     }
 
@@ -741,7 +730,7 @@ internal static class Program
                     catch (Exception ex)
                     {
                         LogError($"Synthesis failed: {ex.Message}");
-                        ctx.ExitCode = 1;
+                        Environment.ExitCode = 1;
                         return;
                     }
 
@@ -768,7 +757,6 @@ internal static class Program
                     }
 
                     LogInfo(quiet, "Synthesized 1 utterance(s).");
-                    ctx.ExitCode = 0;
                     return;
                 }
 
@@ -823,7 +811,7 @@ internal static class Program
                             catch (Exception ex)
                             {
                                 LogError($"Synthesis failed on line {utteranceIndex + 1}: {ex.Message}");
-                                ctx.ExitCode = 1;
+                                Environment.ExitCode = 1;
                                 return;
                             }
 
@@ -836,7 +824,6 @@ internal static class Program
                         }
 
                         LogInfo(quiet, $"Synthesized {utteranceIndex} utterance(s).");
-                        ctx.ExitCode = 0;
                     }
                     finally
                     {
@@ -891,7 +878,7 @@ internal static class Program
                             catch (JsonException ex)
                             {
                                 LogError($"Invalid JSON on line {utteranceIndex + 1}: {ex.Message}");
-                                ctx.ExitCode = 1;
+                                Environment.ExitCode = 1;
                                 return;
                             }
 
@@ -940,12 +927,14 @@ internal static class Program
                                 {
                                     try
                                     {
+#pragma warning disable IL2026 // RequiresUnreferencedCode -- G2P engines resolved via reflection
                                         jsonlPhonemizer = ResolveTextModePhonemizer(language);
+#pragma warning restore IL2026
                                     }
                                     catch (NotSupportedException ex)
                                     {
                                         LogError(ex.Message);
-                                        ctx.ExitCode = 1;
+                                        Environment.ExitCode = 1;
                                         return;
                                     }
                                 }
@@ -975,7 +964,7 @@ internal static class Program
                                 if (utterance?.PhonemeIds is null || utterance.PhonemeIds.Length == 0)
                                 {
                                     LogError($"Missing or empty phoneme_ids (and no text) on line {utteranceIndex + 1}.");
-                                    ctx.ExitCode = 1;
+                                    Environment.ExitCode = 1;
                                     return;
                                 }
 
@@ -1016,7 +1005,7 @@ internal static class Program
                             catch (Exception ex)
                             {
                                 LogError($"Synthesis failed on line {utteranceIndex + 1}: {ex.Message}");
-                                ctx.ExitCode = 1;
+                                Environment.ExitCode = 1;
                                 return;
                             }
 
@@ -1034,7 +1023,7 @@ internal static class Program
                         if (utteranceIndex == 0 && jsonInput)
                         {
                             LogError("No input received on stdin.");
-                            ctx.ExitCode = 1;
+                            Environment.ExitCode = 1;
                             return;
                         }
 
@@ -1047,7 +1036,6 @@ internal static class Program
                         }
 
                         LogInfo(quiet, $"Synthesized {utteranceIndex} utterance(s).");
-                        ctx.ExitCode = 0;
                     }
                     finally
                     {
@@ -1314,14 +1302,14 @@ internal static class Program
                     if (uttOutputFile.Contains("..") || Path.IsPathRooted(uttOutputFile))
                     {
                         LogError($"Rejected output_file with path traversal or absolute path: {uttOutputFile}");
-                        ctx.ExitCode = 1;
+                        Environment.ExitCode = 1;
                         return;
                     }
                     wavPath = Path.GetFullPath(Path.Combine(outputDir.FullName, uttOutputFile));
                     if (!wavPath.StartsWith(outputDir.FullName))
                     {
                         LogError($"Rejected output_file outside output directory: {uttOutputFile}");
-                        ctx.ExitCode = 1;
+                        Environment.ExitCode = 1;
                         return;
                     }
                 }

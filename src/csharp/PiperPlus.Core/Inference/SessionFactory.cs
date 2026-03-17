@@ -87,8 +87,8 @@ public static class SessionFactory
 
         var options = new SessionOptions();
 
-        // Match C++ piper.cpp: disable graph optimisation, memory arena, etc.
-        options.SetGraphOptimizationLevel(GraphOptimizationLevel.ORT_DISABLE_ALL);
+        // Match C++ piper.cpp: disable graph optimisation.
+        options.GraphOptimizationLevel = GraphOptimizationLevel.ORT_DISABLE_ALL;
 
         if (useCuda)
         {
@@ -159,7 +159,7 @@ public static class SessionFactory
                 ["cudnn_conv_algo_search"] = "1", // HEURISTIC
             };
 
-            options.AppendExecutionProvider_CUDA(cudaOptions);
+            options.AppendExecutionProvider_CUDA(deviceId);
 
             logger.LogInformation(
                 "CUDA execution provider enabled (device_id={DeviceId})", deviceId);

@@ -88,7 +88,7 @@ public sealed class Phase4IntegrationTests : IDisposable
         bool result = await ModelManager.DownloadModelAsync(
             "nonexistent-model-that-does-not-exist",
             Path.GetTempPath(),
-            CancellationToken.None);
+            TestContext.Current.CancellationToken);
 
         Assert.False(result);
     }

@@ -57,7 +57,7 @@ public sealed class EnglishPhonemizerTests
         // Primary stress on OW1 should insert "ˈ" before the vowel.
         var words = new List<List<string>>
         {
-            ["HH", "AH0", "L", "OW1"],
+            new() { "HH", "AH0", "L", "OW1" },
         };
 
         var phonemizer = new EnglishPhonemizer(new StubEnglishG2PEngine(words));
@@ -80,7 +80,7 @@ public sealed class EnglishPhonemizerTests
         // "information" has secondary stress on the first syllable.
         var words = new List<List<string>>
         {
-            ["IH2", "N", "F", "ER0", "M", "EY1", "SH", "AH0", "N"],
+            new() { "IH2", "N", "F", "ER0", "M", "EY1", "SH", "AH0", "N" },
         };
 
         var phonemizer = new EnglishPhonemizer(new StubEnglishG2PEngine(words));
@@ -100,7 +100,7 @@ public sealed class EnglishPhonemizerTests
         // "hello" -> HH AH0 L OW1: check the "ə" (AH0) has no marker before it.
         var words = new List<List<string>>
         {
-            ["HH", "AH0", "L", "OW1"],
+            new() { "HH", "AH0", "L", "OW1" },
         };
 
         var phonemizer = new EnglishPhonemizer(new StubEnglishG2PEngine(words));
@@ -127,7 +127,7 @@ public sealed class EnglishPhonemizerTests
         // Here we supply DH IY1 to verify stress removal.
         var words = new List<List<string>>
         {
-            ["DH", "IY1"],
+            new() { "DH", "IY1" },
         };
 
         var phonemizer = new EnglishPhonemizer(new StubEnglishG2PEngine(words));
@@ -148,7 +148,7 @@ public sealed class EnglishPhonemizerTests
         // "cat" is a content word. K AE1 T -> k ˈ æ t
         var words = new List<List<string>>
         {
-            ["K", "AE1", "T"],
+            new() { "K", "AE1", "T" },
         };
 
         var phonemizer = new EnglishPhonemizer(new StubEnglishG2PEngine(words));
@@ -167,8 +167,8 @@ public sealed class EnglishPhonemizerTests
         // Two words: "hello world" should have a space between them.
         var words = new List<List<string>>
         {
-            ["HH", "AH0", "L", "OW1"],
-            ["W", "ER1", "L", "D"],
+            new() { "HH", "AH0", "L", "OW1" },
+            new() { "W", "ER1", "L", "D" },
         };
 
         var phonemizer = new EnglishPhonemizer(new StubEnglishG2PEngine(words));
@@ -186,8 +186,8 @@ public sealed class EnglishPhonemizerTests
     {
         var words = new List<List<string>>
         {
-            ["HH", "AH0", "L", "OW1"],
-            ["W", "ER1", "L", "D"],
+            new() { "HH", "AH0", "L", "OW1" },
+            new() { "W", "ER1", "L", "D" },
         };
 
         var phonemizer = new EnglishPhonemizer(new StubEnglishG2PEngine(words));
@@ -207,9 +207,9 @@ public sealed class EnglishPhonemizerTests
         // Comma should attach to "hello" (no space before comma).
         var words = new List<List<string>>
         {
-            ["HH", "AH0", "L", "OW1"],
-            [","],
-            ["W", "ER1", "L", "D"],
+            new() { "HH", "AH0", "L", "OW1" },
+            new() { "," },
+            new() { "W", "ER1", "L", "D" },
         };
 
         var phonemizer = new EnglishPhonemizer(new StubEnglishG2PEngine(words));
@@ -232,7 +232,7 @@ public sealed class EnglishPhonemizerTests
         // "go" -> G OW1
         var words = new List<List<string>>
         {
-            ["G", "OW1"],
+            new() { "G", "OW1" },
         };
 
         var phonemizer = new EnglishPhonemizer(new StubEnglishG2PEngine(words));
@@ -252,7 +252,7 @@ public sealed class EnglishPhonemizerTests
         // "the" is a function word. DH AH0 -> unstressed -> A2=0 for all.
         var words = new List<List<string>>
         {
-            ["DH", "AH0"],
+            new() { "DH", "AH0" },
         };
 
         var phonemizer = new EnglishPhonemizer(new StubEnglishG2PEngine(words));
@@ -272,8 +272,8 @@ public sealed class EnglishPhonemizerTests
         // English always has A1=0.
         var words = new List<List<string>>
         {
-            ["HH", "AH0", "L", "OW1"],
-            ["W", "ER1", "L", "D"],
+            new() { "HH", "AH0", "L", "OW1" },
+            new() { "W", "ER1", "L", "D" },
         };
 
         var phonemizer = new EnglishPhonemizer(new StubEnglishG2PEngine(words));
@@ -413,9 +413,9 @@ public sealed class EnglishPhonemizerTests
         // Multi-word input: tokens.Count must equal prosody.Count.
         var words = new List<List<string>>
         {
-            ["HH", "AH0", "L", "OW1"],
-            [","],
-            ["W", "ER1", "L", "D"],
+            new() { "HH", "AH0", "L", "OW1" },
+            new() { "," },
+            new() { "W", "ER1", "L", "D" },
         };
 
         var phonemizer = new EnglishPhonemizer(new StubEnglishG2PEngine(words));

@@ -201,7 +201,7 @@ public sealed class ModelManagerTests : IDisposable
         using var sw = CaptureStdErr();
 
         bool result = await ModelManager.DownloadModelAsync(
-            "nonexistent-model-xyz", Path.GetTempPath());
+            "nonexistent-model-xyz", Path.GetTempPath(), TestContext.Current.CancellationToken);
 
         Assert.False(result);
     }

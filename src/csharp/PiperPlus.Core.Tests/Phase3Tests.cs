@@ -235,7 +235,12 @@ public sealed class Phase3Tests : IDisposable
             frame_shift_ms = 256.0 / 22050 * 1000,
         };
 
-        string json = JsonSerializer.Serialize(timingJson, new JsonSerializerOptions { WriteIndented = true });
+        var jsonOptions = new JsonSerializerOptions
+        {
+            WriteIndented = true,
+            TypeInfoResolver = new System.Text.Json.Serialization.Metadata.DefaultJsonTypeInfoResolver()
+        };
+        string json = JsonSerializer.Serialize(timingJson, jsonOptions);
         writer.Write(json);
         writer.Flush();
 
