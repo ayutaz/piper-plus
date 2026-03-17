@@ -10,15 +10,19 @@
 #include <vector>
 
 #include <onnxruntime_cxx_api.h>
-#include <piper-phonemize/phoneme_ids.hpp>
-#include <piper-phonemize/phonemize.hpp>
-#include <piper-phonemize/tashkeel.hpp>
+
+// Self-contained type definitions (formerly from piper-phonemize headers).
+// These types are binary-compatible with piper-phonemize for linking.
+#include "phoneme_parser.hpp"  // piper::Phoneme = char32_t
 
 #include "json.hpp"
 
 using json = nlohmann::json;
 
 namespace piper {
+
+typedef int64_t PhonemeId;
+typedef std::map<Phoneme, std::vector<PhonemeId>> PhonemeIdMap;
 
 typedef int64_t SpeakerId;
 typedef int64_t LanguageId;
@@ -30,10 +34,6 @@ struct eSpeakConfig {
 struct PiperConfig {
   std::string eSpeakDataPath;
   bool useESpeak = true;
-
-  bool useTashkeel = false;
-  std::optional<std::string> tashkeelModelPath;
-  std::unique_ptr<tashkeel::State> tashkeelState;
 };
 
 enum PhonemeType {

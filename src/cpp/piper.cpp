@@ -13,6 +13,10 @@
 #include <onnxruntime_cxx_api.h>
 #include <spdlog/spdlog.h>
 
+// piper-phonemize library functions (used at runtime, not exposed in public API)
+#include <piper-phonemize/phoneme_ids.hpp>
+#include <piper-phonemize/phonemize.hpp>
+
 #include "json.hpp"
 #include "piper.hpp"
 #include "utf8.h"
@@ -602,22 +606,6 @@ void initialize(PiperConfig &config) {
 
     spdlog::info("Successfully initialized eSpeak with data path: {}", 
                  espeak_path ? espeak_path : "(built-in default)");
-  }
-
-  // Load onnx model for libtashkeel
-  // https://github.com/mush42/libtashkeel/
-  if (config.useTashkeel) {
-    spdlog::debug("Using libtashkeel for diacritization");
-    if (!config.tashkeelModelPath) {
-      throw std::runtime_error("No path to libtashkeel model");
-    }
-
-    spdlog::debug("Loading libtashkeel model from {}",
-                  config.tashkeelModelPath.value());
-    config.tashkeelState = std::make_unique<tashkeel::State>();
-    tashkeel::tashkeel_load(config.tashkeelModelPath.value(),
-                            *config.tashkeelState);
-    spdlog::debug("Initialized libtashkeel");
   }
 
   spdlog::info("Initialized piper");
@@ -1214,15 +1202,6 @@ void textToAudio(PiperConfig &config, Voice &voice, std::string text,
     sentenceSilenceSamples = (std::size_t)(
         voice.synthesisConfig.sentenceSilenceSeconds *
         voice.synthesisConfig.sampleRate * voice.synthesisConfig.channels);
-  }
-
-  if (config.useTashkeel) {
-    if (!config.tashkeelState) {
-      throw std::runtime_error("Tashkeel model is not loaded");
-    }
-
-    spdlog::debug("Diacritizing text with libtashkeel: {}", text);
-    text = tashkeel::tashkeel_run(text, *config.tashkeelState);
   }
 
   // Parse text for [[ phonemes ]] notation

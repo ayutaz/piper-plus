@@ -85,10 +85,6 @@ struct RunConfig {
   // Path to espeak-ng data directory (default is next to piper executable)
   optional<filesystem::path> eSpeakDataPath;
 
-  // Path to libtashkeel ort model
-  // https://github.com/mush42/libtashkeel/
-  optional<filesystem::path> tashkeelModelPath;
-
   // stdin input is lines of JSON instead of text with format:
   // {
   //   "text": str,               (required)
@@ -384,25 +380,6 @@ int main(int argc, char *argv[]) {
   } else {
     // Not using eSpeak
     piperConfig.useESpeak = false;
-  }
-
-  // Enable libtashkeel for Arabic
-  if (voice.phonemizeConfig.eSpeak.voice == "ar") {
-    piperConfig.useTashkeel = true;
-    if (runConfig.tashkeelModelPath) {
-      // User provided path
-      piperConfig.tashkeelModelPath =
-          runConfig.tashkeelModelPath.value().string();
-    } else {
-      // Assume next to piper executable
-      piperConfig.tashkeelModelPath =
-          std::filesystem::absolute(
-              exePath.parent_path().append("libtashkeel_model.ort"))
-              .string();
-
-      spdlog::debug("libtashkeel model is expected at {}",
-                    piperConfig.tashkeelModelPath.value());
-    }
   }
 
   try {
@@ -813,9 +790,6 @@ void printUsage(char *argv[]) {
   cerr << endl;
   cerr << "   --espeak_data           DIR   path to espeak-ng data directory"
        << endl;
-  cerr << "   --tashkeel_model        FILE  path to libtashkeel onnx model "
-          "(arabic)"
-       << endl;
   cerr << "   --json-input                  stdin input is lines of JSON "
           "instead of plain text"
        << endl;
@@ -954,9 +928,6 @@ void parseArgs(int argc, char *argv[], RunConfig &runConfig) {
     } else if (arg == "--espeak_data" || arg == "--espeak-data") {
       ensureArg(argc, argv, i);
       runConfig.eSpeakDataPath = filesystem::path(argv[++i]);
-    } else if (arg == "--tashkeel_model" || arg == "--tashkeel-model") {
-      ensureArg(argc, argv, i);
-      runConfig.tashkeelModelPath = filesystem::path(argv[++i]);
     } else if (arg == "--json_input" || arg == "--json-input") {
       runConfig.jsonInput = true;
     } else if (arg == "--use_cuda" || arg == "--use-cuda") {
