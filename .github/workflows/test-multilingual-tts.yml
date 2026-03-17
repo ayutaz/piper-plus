@@ -327,6 +327,16 @@ jobs:
       
       # Note: Voice download is handled by test_multilingual_tts.py itself
       
+      - name: Copy G2P dictionary files next to models
+        shell: bash
+        run: |
+          # Copy CMU dict and pypinyin dicts alongside test models
+          for model_dir in $(find . -name "*.onnx" -exec dirname {} \; | sort -u); do
+            cp -f src/cpp/cmudict_data.json "$model_dir/" 2>/dev/null || true
+            cp -f src/cpp/pinyin_single.json "$model_dir/" 2>/dev/null || true
+            cp -f src/cpp/pinyin_phrases.json "$model_dir/" 2>/dev/null || true
+          done
+
       - name: Run multilingual tests
         shell: bash
         run: |

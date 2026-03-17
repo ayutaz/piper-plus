@@ -1,5 +1,18 @@
 # C++ Tests CMake configuration
 
+# Resolve ONNX Runtime paths (Windows uses ONNXRUNTIME_INCLUDE_DIR/ONNXRUNTIME_LIB, Linux/macOS uses ort/ prefix)
+if(ONNXRUNTIME_INCLUDE_DIR)
+    set(ORT_INCLUDE_DIR ${ONNXRUNTIME_INCLUDE_DIR})
+else()
+    set(ORT_INCLUDE_DIR ${CMAKE_BINARY_DIR}/ort/include)
+endif()
+
+if(ONNXRUNTIME_LIB)
+    get_filename_component(ORT_LIB_DIR ${ONNXRUNTIME_LIB} DIRECTORY)
+else()
+    set(ORT_LIB_DIR ${CMAKE_BINARY_DIR}/ort/lib)
+endif()
+
 # Add global compile definitions for all tests
 add_compile_definitions(SPDLOG_FMT_EXTERNAL=1)
 add_compile_definitions(FMT_HEADER_ONLY=1)
@@ -50,7 +63,7 @@ if(NOT WIN32 AND NOT MSVC)
 endif()
 
 # Add prosody inference test only when ONNX Runtime headers are available
-if(EXISTS "${CMAKE_BINARY_DIR}/pi/include/onnxruntime_cxx_api.h")
+if(EXISTS "${ORT_INCLUDE_DIR}/onnxruntime_cxx_api.h" OR EXISTS "${CMAKE_BINARY_DIR}/pi/include/onnxruntime_cxx_api.h")
     list(APPEND TEST_SOURCES test_prosody_inference.cpp)
 endif()
 
@@ -222,7 +235,7 @@ foreach(test_source ${TEST_SOURCES})
             ${CMAKE_CURRENT_SOURCE_DIR}/..
             ${CMAKE_BINARY_DIR}/fi/include
             ${CMAKE_BINARY_DIR}/si/include
-            ${CMAKE_BINARY_DIR}/ort/include
+            ${ORT_INCLUDE_DIR}
             ${CMAKE_BINARY_DIR}/oj/include
             ${CMAKE_BINARY_DIR}/oj/include/openjtalk
             ${CMAKE_BINARY_DIR}/hts_stub/include
@@ -232,7 +245,7 @@ foreach(test_source ${TEST_SOURCES})
         target_link_directories(${test_name} PRIVATE
             ${CMAKE_BINARY_DIR}/fi/lib
             ${CMAKE_BINARY_DIR}/si/lib
-            ${CMAKE_BINARY_DIR}/ort/lib
+            ${ORT_LIB_DIR}
         )
         
         # Platform-specific library linking (same as main piper)
@@ -243,7 +256,7 @@ foreach(test_source ${TEST_SOURCES})
                 debug ${CMAKE_BINARY_DIR}/fi/lib/fmtd.lib
                 optimized ${CMAKE_BINARY_DIR}/si/lib/spdlog.lib
                 debug ${CMAKE_BINARY_DIR}/si/lib/spdlogd.lib
-                ${CMAKE_BINARY_DIR}/ort/lib/onnxruntime.lib
+                ${ORT_LIB_DIR}/onnxruntime.lib
             )
         else()
             # Unix: Use library names and let CMake find them in link directories
@@ -280,20 +293,20 @@ foreach(test_source ${TEST_SOURCES})
             ${CMAKE_CURRENT_SOURCE_DIR}/..
             ${CMAKE_BINARY_DIR}/fi/include
             ${CMAKE_BINARY_DIR}/si/include
-            ${CMAKE_BINARY_DIR}/ort/include
+            ${ORT_INCLUDE_DIR}
         )
 
         # Add library directories
         target_link_directories(${test_name} PRIVATE
             ${CMAKE_BINARY_DIR}/fi/lib
             ${CMAKE_BINARY_DIR}/si/lib
-            ${CMAKE_BINARY_DIR}/ort/lib
+            ${ORT_LIB_DIR}
         )
 
         # Platform-specific library linking
         if(WIN32)
             target_link_libraries(${test_name}
-                ${CMAKE_BINARY_DIR}/ort/lib/onnxruntime.lib
+                ${ORT_LIB_DIR}/onnxruntime.lib
             )
         else()
             target_link_libraries(${test_name}
@@ -337,7 +350,7 @@ foreach(test_source ${TEST_SOURCES})
             ${CMAKE_CURRENT_SOURCE_DIR}/..
             ${CMAKE_BINARY_DIR}/fi/include
             ${CMAKE_BINARY_DIR}/si/include
-            ${CMAKE_BINARY_DIR}/ort/include
+            ${ORT_INCLUDE_DIR}
             ${CMAKE_BINARY_DIR}/oj/include
             ${CMAKE_BINARY_DIR}/oj/include/openjtalk
             ${CMAKE_BINARY_DIR}/hts_stub/include
@@ -347,7 +360,7 @@ foreach(test_source ${TEST_SOURCES})
         target_link_directories(${test_name} PRIVATE
             ${CMAKE_BINARY_DIR}/fi/lib
             ${CMAKE_BINARY_DIR}/si/lib
-            ${CMAKE_BINARY_DIR}/ort/lib
+            ${ORT_LIB_DIR}
         )
         
         # Platform-specific library linking (same as main piper)
@@ -358,7 +371,7 @@ foreach(test_source ${TEST_SOURCES})
                 debug ${CMAKE_BINARY_DIR}/fi/lib/fmtd.lib
                 optimized ${CMAKE_BINARY_DIR}/si/lib/spdlog.lib
                 debug ${CMAKE_BINARY_DIR}/si/lib/spdlogd.lib
-                ${CMAKE_BINARY_DIR}/ort/lib/onnxruntime.lib
+                ${ORT_LIB_DIR}/onnxruntime.lib
             )
         else()
             # Unix: Use library names and let CMake find them in link directories

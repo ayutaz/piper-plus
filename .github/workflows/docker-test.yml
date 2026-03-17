@@ -221,6 +221,12 @@ jobs:
         run: |
           docker run --rm --entrypoint piper piper-cpp-inference:test --version
 
+      - name: Copy G2P dictionary files next to models
+        run: |
+          cp -f ${{ github.workspace }}/src/cpp/cmudict_data.json ${{ github.workspace }}/test/models/ 2>/dev/null || true
+          cp -f ${{ github.workspace }}/src/cpp/pinyin_single.json ${{ github.workspace }}/test/models/ 2>/dev/null || true
+          cp -f ${{ github.workspace }}/src/cpp/pinyin_phrases.json ${{ github.workspace }}/test/models/ 2>/dev/null || true
+
       - name: Inference test - English
         run: |
           mkdir -p /tmp/output
