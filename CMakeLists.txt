@@ -227,9 +227,41 @@ if(NOT DEFINED SPDLOG_DIR)
   add_dependencies(test_piper spdlog_external)
 endif()
 
-# ---- ONNX Runtime for Windows ---
+# ---- ONNX Runtime ---
 if(WIN32)
   include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/find_onnxruntime_windows.cmake)
+elseif(NOT DEFINED ONNXRUNTIME_DIR)
+  # Linux/macOS: Download pre-built ONNX Runtime if not already available
+  set(ONNXRUNTIME_VERSION "1.14.1")
+  if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|ARM64")
+    set(ONNXRUNTIME_ARCH "aarch64")
+  else()
+    set(ONNXRUNTIME_ARCH "x64")
+  endif()
+  if(APPLE)
+    set(ONNXRUNTIME_URL "https://github.com/microsoft/onnxruntime/releases/download/v${ONNXRUNTIME_VERSION}/onnxruntime-osx-${ONNXRUNTIME_ARCH}-${ONNXRUNTIME_VERSION}.tgz")
+  else()
+    set(ONNXRUNTIME_URL "https://github.com/microsoft/onnxruntime/releases/download/v${ONNXRUNTIME_VERSION}/onnxruntime-linux-${ONNXRUNTIME_ARCH}-${ONNXRUNTIME_VERSION}.tgz")
+  endif()
+  set(ONNXRUNTIME_DIR "${CMAKE_CURRENT_BINARY_DIR}/ort")
+
+  include(ExternalProject)
+  ExternalProject_Add(
+    onnxruntime_external
+    PREFIX "${CMAKE_CURRENT_BINARY_DIR}/ort_dl"
+    URL "${ONNXRUNTIME_URL}"
+    CONFIGURE_COMMAND ""
+    BUILD_COMMAND ""
+    INSTALL_COMMAND ${CMAKE_COMMAND} -E copy_directory <SOURCE_DIR>/lib ${ONNXRUNTIME_DIR}/lib
+    COMMAND ${CMAKE_COMMAND} -E copy_directory <SOURCE_DIR>/include ${ONNXRUNTIME_DIR}/include
+  )
+  add_dependencies(piper onnxruntime_external)
+  add_dependencies(test_piper onnxruntime_external)
+
+  target_include_directories(piper PUBLIC ${ONNXRUNTIME_DIR}/include)
+  target_include_directories(test_piper PUBLIC ${ONNXRUNTIME_DIR}/include)
+  target_link_directories(piper PUBLIC ${ONNXRUNTIME_DIR}/lib)
+  target_link_directories(test_piper PUBLIC ${ONNXRUNTIME_DIR}/lib)
 endif()
 
 # ---- HTSEngine ---
@@ -490,6 +522,16 @@ target_include_directories(piper PUBLIC
 if(WIN32 AND ONNXRUNTIME_INCLUDE_DIR)
   target_include_directories(piper PUBLIC ${ONNXRUNTIME_INCLUDE_DIR})
   target_include_directories(test_piper PUBLIC ${ONNXRUNTIME_INCLUDE_DIR})
+endif()
+
+# Add ONNX Runtime install path for Linux/macOS
+if(NOT WIN32 AND DEFINED ONNXRUNTIME_DIR)
+  # Also install ONNX Runtime shared libs
+  install(
+    DIRECTORY ${ONNXRUNTIME_DIR}/lib/
+    DESTINATION lib
+    FILES_MATCHING PATTERN "libonnxruntime*"
+  )
 endif()
 
 # Include OpenJTalk headers (r9y9 fork installs to include/openjtalk/)

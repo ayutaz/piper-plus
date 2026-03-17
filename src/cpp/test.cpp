@@ -21,15 +21,15 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
-  if (argc < 4) {
+  if (argc < 3) {
     std::cerr << "Need output WAV path" << std::endl;
     return 1;
   }
 
   auto modelPath = std::string(argv[1]);
-  auto outputPath = std::string(argv[3]);
+  auto outputPath = std::string(argv[2]);
 
-  // Skip test if model file is not available (e.g. Docker builds without test models)
+  // Skip test if model file is not available
   {
     std::ifstream modelCheck(modelPath);
     if (!modelCheck.good()) {
@@ -39,41 +39,7 @@ int main(int argc, char *argv[]) {
     std::ifstream configCheck(modelPath + ".json");
     if (!configCheck.good()) {
       std::cout << "SKIPPED: Config file not found: " << modelPath + ".json" << std::endl;
-      return 77; // CTest SKIP_RETURN_CODE
-    }
-  }
-
-  // Use provided espeak-ng-data path if available, otherwise auto-detect
-  if (argc >= 3 && std::string(argv[2]) != "auto") {
-    piperConfig.eSpeakDataPath = std::string(argv[2]);
-  } else {
-    piperConfig.eSpeakDataPath = ""; // Will auto-detect in initialize()
-  }
-
-  // Check espeak-ng data before calling initialize (espeak calls exit() on failure)
-  {
-    auto espeakPath = piperConfig.eSpeakDataPath;
-    if (espeakPath.empty()) {
-      // Auto-detect: check common paths
-      std::vector<std::string> candidates = {
-        "/usr/share/espeak-ng-data/phontab",
-        "/usr/local/share/espeak-ng-data/phontab"
-      };
-      bool found = false;
-      for (const auto& p : candidates) {
-        std::ifstream f(p);
-        if (f.good()) { found = true; break; }
-      }
-      if (!found) {
-        std::cout << "SKIPPED: espeak-ng-data not found" << std::endl;
-        return 77;
-      }
-    } else {
-      std::ifstream f(espeakPath + "/phontab");
-      if (!f.good()) {
-        std::cout << "SKIPPED: espeak-ng-data not found at " << espeakPath << std::endl;
-        return 77;
-      }
+      return 77;
     }
   }
 
@@ -85,7 +51,7 @@ int main(int argc, char *argv[]) {
     piper::initialize(piperConfig);
   } catch (const std::exception &e) {
     std::cout << "SKIPPED: Failed to initialize: " << e.what() << std::endl;
-    return 77; // CTest SKIP_RETURN_CODE
+    return 77;
   }
 
   // Output audio to WAV file
