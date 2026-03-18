@@ -334,7 +334,7 @@ type input.txt | piper.exe --model ja_JP-voice.onnx --output_file output.wav
 @echo off
 setlocal
 set "PIPER_DIR=%~dp0build\Release"
-set "MODEL=%PIPER_DIR%\models\tsukuyomi-wavlm-300epoch.onnx"
+set "MODEL=%PIPER_DIR%\models\tsukuyomi-chan-6lang-fp16.onnx"
 set "CONFIG=%PIPER_DIR%\models\config.json"
 set "TMPFILE=%PIPER_DIR%\input_utf8.txt"
 

@@ -180,7 +180,7 @@ class TestFindVoiceFallback:
         """piper-plus models have correct file names in catalog."""
         voice = PIPER_PLUS_VOICES["ja_JP-tsukuyomi-chan-medium"]
         files = list(voice["files"].keys())
-        assert "tsukuyomi-wavlm-300epoch.onnx" in files
+        assert "tsukuyomi-chan-6lang-fp16.onnx" in files
         assert "config.json" in files
 
     def test_moe_speech_file_names_in_catalog(self):

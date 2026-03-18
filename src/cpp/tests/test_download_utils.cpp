@@ -120,8 +120,8 @@ bool isHuggingFaceUrl(const std::string& url) {
 // ============================================
 
 TEST(DownloadUtilsTest, PiperPlusUrlConstruction) {
-    auto url = buildPiperPlusUrl("ayousanz/piper-plus-tsukuyomi-chan", "tsukuyomi-wavlm-300epoch.onnx");
-    EXPECT_EQ(url, "https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/tsukuyomi-wavlm-300epoch.onnx");
+    auto url = buildPiperPlusUrl("ayousanz/piper-plus-tsukuyomi-chan", "tsukuyomi-chan-6lang-fp16.onnx");
+    EXPECT_EQ(url, "https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/tsukuyomi-chan-6lang-fp16.onnx");
 }
 
 TEST(DownloadUtilsTest, PiperPlusUrlConfig) {
@@ -171,7 +171,7 @@ TEST(DownloadUtilsTest, SanitizeDirtyFilename) {
 }
 
 TEST(DownloadUtilsTest, SanitizePreservesHyphensUnderscores) {
-    EXPECT_EQ(sanitizeFilename("tsukuyomi-wavlm-300epoch.onnx"), "tsukuyomi-wavlm-300epoch.onnx");
+    EXPECT_EQ(sanitizeFilename("tsukuyomi-chan-6lang-fp16.onnx"), "tsukuyomi-chan-6lang-fp16.onnx");
     EXPECT_EQ(sanitizeFilename("ja_JP-model_v2.onnx"), "ja_JP-model_v2.onnx");
 }
 
@@ -196,11 +196,11 @@ TEST(DownloadUtilsTest, ModelDownloadPath) {
     namespace fs = std::filesystem;
 
     fs::path modelDir = "/tmp/piper/models";
-    std::string filename = "tsukuyomi-wavlm-300epoch.onnx";
+    std::string filename = "tsukuyomi-chan-6lang-fp16.onnx";
 
     // Flat directory layout: files go directly into modelDir (matches Python behavior)
     fs::path expectedPath = modelDir / filename;
-    EXPECT_EQ(expectedPath.string(), "/tmp/piper/models/tsukuyomi-wavlm-300epoch.onnx");
+    EXPECT_EQ(expectedPath.string(), "/tmp/piper/models/tsukuyomi-chan-6lang-fp16.onnx");
 }
 
 TEST(DownloadUtilsTest, ConfigDownloadPath) {

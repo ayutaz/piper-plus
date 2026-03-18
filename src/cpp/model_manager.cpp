@@ -49,7 +49,7 @@ static const char* PIPER_PLUS_CATALOG_JSON = R"JSON(
         "source": "piper-plus",
         "repo": "ayousanz/piper-plus-tsukuyomi-chan",
         "files": {
-            "tsukuyomi-wavlm-300epoch.onnx": {
+            "tsukuyomi-chan-6lang-fp16.onnx": {
                 "size_bytes": 77594624,
                 "md5_digest": ""
             },
@@ -59,7 +59,7 @@ static const char* PIPER_PLUS_CATALOG_JSON = R"JSON(
             }
         },
         "aliases": ["tsukuyomi", "tsukuyomi-chan", "ja-tsukuyomi"],
-        "description": "Tsukuyomi-chan Japanese TTS model trained with WavLM discriminator (300 epochs)"
+        "description": "Tsukuyomi-chan 6-language TTS model fine-tuned from multilingual base (FP16)"
     },
     "ja_JP-moe-speech-20speakers-medium": {
         "key": "ja_JP-moe-speech-20speakers-medium",
