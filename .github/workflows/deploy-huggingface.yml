@@ -115,6 +115,47 @@ jobs:
           echo "Directory structure:"
           tree -h hf-space-deploy 2>/dev/null || ls -lah hf-space-deploy/ 2>/dev/null || echo "Directory not found"
 
+      - name: Validate Python imports before deployment
+        working-directory: hf-space-deploy
+        run: |
+          echo "=== Pre-deployment import validation ==="
+          python3 -c "
+import sys, importlib
+
+modules = [
+    ('piper_train.infer_onnx', 'text_to_phoneme_ids_and_prosody'),
+    ('piper_train.phonemize.registry', 'get_phonemizer'),
+    ('piper_train.phonemize.base', 'Phonemizer'),
+    ('piper_train.phonemize.multilingual', 'UnicodeLanguageDetector'),
+    ('piper_train.phonemize.token_mapper', None),
+    ('piper_train.phonemize.jp_id_map', None),
+    ('piper_train.phonemize.multilingual_id_map', None),
+    ('piper_train.vits.utils', 'audio_float_to_int16'),
+    ('piper_train.vits.wavfile', 'write'),
+]
+
+failed = []
+for mod_name, attr_name in modules:
+    try:
+        mod = importlib.import_module(mod_name)
+        if attr_name and not hasattr(mod, attr_name):
+            failed.append(f'{mod_name}.{attr_name} not found')
+            print(f'  ✗ {mod_name}.{attr_name} — attribute missing')
+        else:
+            print(f'  ✓ {mod_name}' + (f'.{attr_name}' if attr_name else ''))
+    except ImportError as e:
+        failed.append(f'{mod_name}: {e}')
+        print(f'  ✗ {mod_name} — {e}')
+
+if failed:
+    print(f'\n✗ {len(failed)} import(s) failed. Aborting deployment.')
+    for f in failed:
+        print(f'  - {f}')
+    sys.exit(1)
+else:
+    print(f'\n✓ All {len(modules)} imports validated. Safe to deploy.')
+"
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
