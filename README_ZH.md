@@ -309,6 +309,7 @@ CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
 
 - `--resume_from_checkpoint` — 从检查点恢复训练
 - `--resume_from_single_speaker_checkpoint` — 将单说话人模型转换为多说话人模型
+- `--resume-from-multispeaker-checkpoint` — 多说话人到单说话人的迁移学习（自动启用 `--freeze-dp`）
 
 ### 语音评估
 
@@ -327,7 +328,7 @@ CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
 
 **piper-plus-base 特征：**
 
-- 架构：VITS + WavLM Discriminator + 韵律特征
+- 架构：VITS + 韵律特征 (Prosody Features)
 - 语言：6种 — 日语 (ja)、英语 (en)、普通话 (zh)、西班牙语 (es)、法语 (fr)、葡萄牙语 (pt)
 - 训练数据：508,187 条语音（571 位说话人）
 - 采样率：22,050 Hz

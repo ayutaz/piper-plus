@@ -325,11 +325,10 @@ Des modeles de base pour le fine-tuning TTS japonais sont disponibles sur Huggin
 |---|---|---|
 | [piper-plus-base](https://huggingface.co/ayousanz/piper-plus-base) | Modele de base 6 langues (571 locuteurs, 508 187 enonces, 173 symboles) | CC-BY-SA-4.0 |
 | [piper-plus-tsukuyomi-chan](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan) | Modele fine-tune Tsukuyomi-chan 6 langues (FP16) | Voir la fiche modele |
-| [piper-plus-base](https://huggingface.co/ayousanz/piper-plus-base) | Modele de base TTS japonais (VITS + WavLM + Prosody, 20 locuteurs) | CC-BY-SA-4.0 |
 
 **Caracteristiques du modele de base 6 langues :**
 
-- Architecture : VITS + WavLM Discriminator + Prosody
+- Architecture : VITS + Prosody Features
 - Donnees d'entrainement : 508 187 enonces (571 locuteurs, 6 langues)
 - Langues : ja (20 locuteurs), en (310 locuteurs), zh (142 locuteurs), es (63 locuteurs), fr (28 locuteurs), pt (8 locuteurs)
 - Codes de langue : ja=0, en=1, zh=2, es=3, fr=4, pt=5

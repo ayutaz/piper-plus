@@ -316,7 +316,7 @@ Use `--json-input` flag for JSON input:
 ./piper --download-model tsukuyomi --model-dir /path/to/models
 
 # After download, use the model
-./piper --model ~/.local/share/piper/models/ja_JP-tsukuyomi-chan-medium/tsukuyomi-wavlm-300epoch.onnx --text "こんにちは"
+./piper --model ~/.local/share/piper/models/ja_JP-tsukuyomi-chan-medium/tsukuyomi-chan-6lang-fp16.onnx --text "こんにちは"
 ```
 
 ### Environment Variables (C++ CLI)

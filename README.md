@@ -111,7 +111,7 @@ cd piper
 
 ```powershell
 mkdir models
-Invoke-WebRequest -Uri "https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/tsukuyomi-wavlm-300epoch.onnx" -OutFile models/tsukuyomi.onnx
+Invoke-WebRequest -Uri "https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/tsukuyomi-chan-6lang-fp16.onnx" -OutFile models/tsukuyomi.onnx
 Invoke-WebRequest -Uri "https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/config.json" -OutFile models/config.json
 ```
 
@@ -119,7 +119,7 @@ Invoke-WebRequest -Uri "https://huggingface.co/ayousanz/piper-plus-tsukuyomi-cha
 
 ```bash
 mkdir -p models
-curl -L -o models/tsukuyomi.onnx https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/tsukuyomi-wavlm-300epoch.onnx
+curl -L -o models/tsukuyomi.onnx https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/tsukuyomi-chan-6lang-fp16.onnx
 curl -L -o models/config.json https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/config.json
 ```
 
@@ -395,7 +395,7 @@ echo 'Long text...' | ./piper --model en_model.onnx --output-raw | \
 ./piper --download-model tsukuyomi --model-dir /path/to/models
 
 # ダウンロード後、モデルを使用
-./piper --model ~/.local/share/piper/models/ja_JP-tsukuyomi-chan-medium/tsukuyomi-wavlm-300epoch.onnx --text "こんにちは"
+./piper --model ~/.local/share/piper/models/ja_JP-tsukuyomi-chan-medium/tsukuyomi-chan-6lang-fp16.onnx --text "こんにちは"
 ```
 
 ### 環境変数 (C++ CLI)
@@ -498,8 +498,6 @@ CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
 |---|---|---|---|---|
 | 6言語ベースモデル | JA/EN/ZH/ES/FR/PT | 571 | 6言語マルチリンガルベースモデル (508,187発話, VITS + Prosody) | [HuggingFace](https://huggingface.co/ayousanz/piper-plus-base) |
 | つくよみちゃん 6lang | JA/EN/ZH/ES/FR/PT | 1 | 6言語ベースからファインチューニング、6言語対応、FP16 | [HuggingFace](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan) |
-| つくよみちゃん (JA-only) | 日本語 | 1 | 日本語専用、WavLM学習済み | [HuggingFace](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan) |
-| 20話者ベースモデル | 日本語 | 20 | 日本語ファインチューニング用ベースモデル (VITS + WavLM + Prosody) | [HuggingFace](https://huggingface.co/ayousanz/piper-plus-base) |
 
 ### モデルのダウンロード
 
@@ -509,7 +507,7 @@ CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
 
 ```powershell
 mkdir models
-Invoke-WebRequest -Uri "https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/tsukuyomi-wavlm-300epoch.onnx" -OutFile models/tsukuyomi.onnx
+Invoke-WebRequest -Uri "https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/tsukuyomi-chan-6lang-fp16.onnx" -OutFile models/tsukuyomi.onnx
 Invoke-WebRequest -Uri "https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/config.json" -OutFile models/config.json
 ```
 
@@ -517,7 +515,7 @@ Invoke-WebRequest -Uri "https://huggingface.co/ayousanz/piper-plus-tsukuyomi-cha
 
 ```bash
 mkdir -p models
-curl -L -o models/tsukuyomi.onnx https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/tsukuyomi-wavlm-300epoch.onnx
+curl -L -o models/tsukuyomi.onnx https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/tsukuyomi-chan-6lang-fp16.onnx
 curl -L -o models/config.json https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/config.json
 ```
 
@@ -540,15 +538,6 @@ curl -L -o models/config.json https://huggingface.co/ayousanz/piper-plus-tsukuyo
 | スペイン語 | es | 3 | 63 | 168,374 | CML-TTS |
 | フランス語 | fr | 4 | 28 | 107,464 | CML-TTS |
 | ポルトガル語 | pt | 5 | 8 | 34,066 | CML-TTS |
-
-### piper-plus-base (JA-only) の特徴
-
-- アーキテクチャ: VITS + WavLM Discriminator
-- 学習データ: 60,164発話 (20話者)
-- サンプリングレート: 22,050 Hz
-- Prosody Features: A1/A2/A3 韻律情報
-- 拡張音素: 疑問詞マーカー、文脈依存「ん」バリアント (65音素)
-- ライセンス: CC-BY-SA-4.0
 
 upstream Piper のチェックポイントも利用可能: [piper-checkpoints](https://huggingface.co/datasets/rhasspy/piper-checkpoints/tree/main)
 
