@@ -39,14 +39,12 @@ def main() -> None:
 
     session_options = onnxruntime.SessionOptions()
     session_options.graph_optimization_level = (
-        onnxruntime.GraphOptimizationLevel.ORT_DISABLE_ALL
+        onnxruntime.GraphOptimizationLevel.ORT_ENABLE_ALL
     )
-    # session_options.enable_cpu_mem_arena = False
-    # session_options.enable_mem_pattern = False
-    session_options.enable_mem_reuse = False
-    # session_options.enable_profiling = False
-    # session_options.execution_mode = onnxruntime.ExecutionMode.ORT_PARALLEL
-    # session_options.execution_order = onnxruntime.ExecutionOrder.PRIORITY_BASED
+    # Speed-optimized: enable memory reuse/arena/pattern (trades memory for speed)
+    session_options.enable_mem_reuse = True
+    session_options.enable_cpu_mem_arena = True
+    session_options.enable_mem_pattern = True
 
     session = onnxruntime.InferenceSession(
         args.model,
