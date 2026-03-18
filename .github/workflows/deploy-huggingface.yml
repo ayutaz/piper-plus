@@ -123,7 +123,7 @@ jobs:
       - name: Validate Python imports before deployment
         working-directory: hf-space-deploy
         run: |
-          pip install numpy
+          pip install numpy onnxruntime
           echo "=== Pre-deployment import validation ==="
           python3 << 'PYEOF'
           import sys, importlib
