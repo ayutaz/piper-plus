@@ -2,9 +2,10 @@
 gradio==6.9.0
 numpy>=1.24.0,<2.3
 onnxruntime>=1.16.0
-pyopenjtalk>=0.3.0
+pyopenjtalk-plus>=0.4  # Japanese Phonemizer (JapanesePhonemizer), Apache-2.0
 onnx>=1.14.0
 # Note: espeak-phonemizer requires system espeak-ng library
 # For simplified deployment, using IPA-based fallback for English
 pypinyin>=0.50
+g2p-en>=2.1.0  # English Phonemizer (EnglishPhonemizer)
 # g2pk2>=0.0.3  # Optional: Korean phonemization (KoreanPhonemizer)
