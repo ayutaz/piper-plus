@@ -1,7 +1,14 @@
-//! Compute device enumeration and selection.
+//! High-level compute device enumeration and selection.
 //!
-//! Provides a unified interface for discovering and selecting compute devices
-//! (CPU, CUDA, CoreML, DirectML) for ONNX Runtime inference.
+//! Provides a user-facing interface for discovering and selecting compute
+//! devices (CPU, CUDA, CoreML, DirectML) for ONNX Runtime inference.
+//!
+//! This module operates at the **application layer** -- it handles user input
+//! parsing, device discovery, and display formatting.  The actual ONNX Runtime
+//! `ExecutionProvider` configuration lives in [`crate::gpu`], which is the
+//! **low-level ort integration layer**.  Use [`From<DeviceSelection>`] to
+//! convert a high-level selection into a [`crate::gpu::DeviceType`] suitable
+//! for passing to [`crate::gpu::configure_session_builder`].
 
 use crate::error::PiperError;
 
@@ -339,9 +346,73 @@ pub fn recommended_device() -> DeviceSelection {
     DeviceSelection::auto()
 }
 
+// ---------------------------------------------------------------------------
+// Bridge to gpu::DeviceType
+// ---------------------------------------------------------------------------
+
+/// Convert a high-level [`DeviceSelection`] into the low-level
+/// [`crate::gpu::DeviceType`] used by the ONNX Runtime session builder.
+impl From<DeviceSelection> for crate::gpu::DeviceType {
+    fn from(sel: DeviceSelection) -> Self {
+        match sel.kind {
+            DeviceKind::Cpu => crate::gpu::DeviceType::Cpu,
+            DeviceKind::Cuda => crate::gpu::DeviceType::Cuda {
+                device_id: sel.device_id,
+            },
+            DeviceKind::CoreML => crate::gpu::DeviceType::CoreML,
+            DeviceKind::DirectML => crate::gpu::DeviceType::DirectML {
+                device_id: sel.device_id,
+            },
+            DeviceKind::TensorRT => crate::gpu::DeviceType::TensorRT {
+                device_id: sel.device_id,
+            },
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // --- DeviceSelection -> gpu::DeviceType conversion ---
+
+    #[test]
+    fn test_from_device_selection_cpu() {
+        let sel = DeviceSelection::cpu();
+        let dt: crate::gpu::DeviceType = sel.into();
+        assert_eq!(dt, crate::gpu::DeviceType::Cpu);
+    }
+
+    #[test]
+    fn test_from_device_selection_cuda() {
+        let sel = DeviceSelection::cuda(2);
+        let dt: crate::gpu::DeviceType = sel.into();
+        assert_eq!(dt, crate::gpu::DeviceType::Cuda { device_id: 2 });
+    }
+
+    #[test]
+    fn test_from_device_selection_coreml() {
+        let sel = DeviceSelection::coreml();
+        let dt: crate::gpu::DeviceType = sel.into();
+        assert_eq!(dt, crate::gpu::DeviceType::CoreML);
+    }
+
+    #[test]
+    fn test_from_device_selection_directml() {
+        let sel = DeviceSelection::directml(1);
+        let dt: crate::gpu::DeviceType = sel.into();
+        assert_eq!(dt, crate::gpu::DeviceType::DirectML { device_id: 1 });
+    }
+
+    #[test]
+    fn test_from_device_selection_tensorrt() {
+        let sel = DeviceSelection {
+            kind: DeviceKind::TensorRT,
+            device_id: 0,
+        };
+        let dt: crate::gpu::DeviceType = sel.into();
+        assert_eq!(dt, crate::gpu::DeviceType::TensorRT { device_id: 0 });
+    }
 
     // --- DeviceSelection::from_str ---
 

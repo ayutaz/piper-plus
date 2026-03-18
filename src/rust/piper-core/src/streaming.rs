@@ -169,6 +169,14 @@ impl WavFileSink {
     }
 }
 
+impl Drop for WavFileSink {
+    fn drop(&mut self) {
+        // Ensure the WAV header is updated even if the caller forgets to
+        // call finalize(). Errors are intentionally ignored during drop.
+        let _ = self.finalize();
+    }
+}
+
 impl AudioSink for WavFileSink {
     fn write_chunk(&mut self, samples: &[i16], sample_rate: u32) -> Result<(), PiperError> {
         if !self.header_written {

@@ -1,7 +1,16 @@
-//! GPU inference support via ONNX Runtime ExecutionProviders.
+//! Low-level GPU inference support via ONNX Runtime ExecutionProviders.
 //!
-//! Feature-gated: `cuda`, `coreml`, `directml`, `tensorrt` features enable respective providers.
-//! Auto-detection tries available providers and falls back to CPU.
+//! This module handles the **ort integration layer** -- it configures ONNX
+//! Runtime `SessionBuilder` instances with the appropriate `ExecutionProvider`
+//! (CUDA, CoreML, DirectML, TensorRT) and manages device string parsing for
+//! the engine.
+//!
+//! Feature-gated: `cuda`, `coreml`, `directml`, `tensorrt` features enable
+//! respective providers.  Auto-detection tries available providers and falls
+//! back to CPU.
+//!
+//! For the high-level, user-facing device enumeration and selection API, see
+//! [`crate::device`].
 
 use crate::error::PiperError;
 

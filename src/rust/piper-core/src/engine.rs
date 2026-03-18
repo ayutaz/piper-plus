@@ -87,8 +87,10 @@ impl OnnxEngine {
     /// `"gpu"` / `"auto"` 指定時は CUDA を試行し、失敗すれば CPU にフォールバックする。
     pub fn load(model_path: &Path, config: &VoiceConfig, device: &str) -> Result<Self, PiperError> {
         // デバイス文字列をパースして GPU プロバイダを設定
+        // "auto" は parse_device_string 内でフォールバックするが、
+        // 明示的なデバイス指定 (e.g. "cuda:0") が不正な場合はエラーを返す。
         let device_type = crate::gpu::parse_device_string(device)
-            .unwrap_or(crate::gpu::DeviceType::Cpu);
+            .map_err(|e| PiperError::ModelLoad(format!("invalid device '{}': {}", device, e)))?;
 
         let builder = Session::builder()
             .map_err(|e| PiperError::ModelLoad(e.to_string()))?;
@@ -280,9 +282,29 @@ impl OnnxEngine {
 
         // --- duration テンソル抽出 (オプション) ---
         let durations = if self.capabilities.has_duration_output {
-            outputs.get("durations")
-                .and_then(|d| d.try_extract_tensor::<f32>().ok())
-                .map(|(_shape, data)| data.to_vec())
+            match outputs.get("durations") {
+                Some(d) => match d.try_extract_tensor::<f32>() {
+                    Ok((_shape, data)) => {
+                        let vec = data.to_vec();
+                        tracing::debug!("Duration tensor extracted: {} values", vec.len());
+                        Some(vec)
+                    }
+                    Err(e) => {
+                        tracing::warn!(
+                            "Duration tensor extraction failed (shape/type mismatch): {}. \
+                             Expected f32 tensor with shape [1, phoneme_length].",
+                            e
+                        );
+                        None
+                    }
+                },
+                None => {
+                    tracing::warn!(
+                        "Model declares 'durations' output but tensor was not found in results"
+                    );
+                    None
+                }
+            }
         } else {
             None
         };

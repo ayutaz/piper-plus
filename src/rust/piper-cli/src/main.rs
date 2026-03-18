@@ -15,9 +15,9 @@ const SUPPORTED_LANGUAGES: &[&str] = &["ja", "en", "zh", "ko", "es", "fr", "pt"]
 #[derive(Parser, Debug)]
 #[command(name = "piper", version, about = "Piper-Plus TTS inference")]
 struct Cli {
-    /// ONNX モデルファイルパス
+    /// ONNX モデルファイルパス (--list-devices/--list-models 以外では必須)
     #[arg(short, long)]
-    model: PathBuf,
+    model: Option<PathBuf>,
 
     /// config.json パス (省略時は自動検出)
     #[arg(short, long)]
@@ -121,9 +121,19 @@ fn main() -> Result<()> {
         return Ok(());
     }
 
+    // --text と --batch の排他チェック
+    if cli.text.is_some() && cli.batch.is_some() {
+        anyhow::bail!("--text and --batch are mutually exclusive");
+    }
+
+    // --model は standalone コマンド以外では必須
+    let model_path = cli.model.as_ref().ok_or_else(|| {
+        anyhow::anyhow!("--model is required for synthesis (only --list-devices and --list-models work without it)")
+    })?;
+
     // config.json 検出
     let config_path = config::VoiceConfig::resolve_config_path(
-        &cli.model,
+        model_path,
         cli.config.as_deref(),
     ).context("config.json not found")?;
 
@@ -160,9 +170,49 @@ fn main() -> Result<()> {
         }
     }
 
-    if let Some(text) = &cli.text {
+    if let Some(ref batch_path) = cli.batch {
+        // --batch モード: テキストファイルから1行ずつ読み込み合成
+        let mut voice = PiperVoice::load(model_path, cli.config.as_deref(), &cli.device)
+            .context("Failed to initialize PiperVoice")?;
+
+        let content = std::fs::read_to_string(batch_path)
+            .with_context(|| format!("Failed to read batch file: {}", batch_path.display()))?;
+
+        let lines: Vec<&str> = content.lines().filter(|l| !l.trim().is_empty()).collect();
+        if lines.is_empty() {
+            anyhow::bail!("Batch file is empty: {}", batch_path.display());
+        }
+
+        let output_dir = cli.output_dir.as_ref().ok_or_else(|| {
+            anyhow::anyhow!("--output-dir is required for --batch mode")
+        })?;
+
+        tracing::info!("Batch mode: {} lines from {}", lines.len(), batch_path.display());
+
+        for (i, line) in lines.iter().enumerate() {
+            let idx = i + 1;
+            let result = voice.synthesize_text(
+                line, cli.speaker, cli.language.as_deref(),
+                cli.noise_scale, cli.length_scale, cli.noise_w,
+            ).with_context(|| format!("Synthesis failed for line {}", idx))?;
+
+            let filename = format!("{:04}.wav", idx);
+            let path = output_dir.join(&filename);
+            audio::write_wav(&path, result.sample_rate, &result.audio)
+                .with_context(|| format!("Failed to write {}", path.display()))?;
+
+            tracing::info!(
+                "Batch [{}/{}]: {:.3}s audio, {:.3}s infer, RTF={:.3} -> {}",
+                idx, lines.len(),
+                result.audio_seconds, result.infer_seconds, result.real_time_factor(),
+                path.display(),
+            );
+        }
+
+        tracing::info!("Batch complete: {} files written", lines.len());
+    } else if let Some(text) = &cli.text {
         // --text モード: PiperVoice でテキストから直接音声合成
-        let mut voice = PiperVoice::load(&cli.model, cli.config.as_deref(), &cli.device)
+        let mut voice = PiperVoice::load(model_path, cli.config.as_deref(), &cli.device)
             .context("Failed to initialize PiperVoice")?;
 
         // カスタム辞書の読み込み (将来対応予定)
@@ -191,66 +241,102 @@ fn main() -> Result<()> {
             tracing::info!("Language: auto-detect (from phonemizer)");
         }
 
-        let result = voice.synthesize_text(
-            text, cli.speaker, cli.language.as_deref(),
-            cli.noise_scale, cli.length_scale, cli.noise_w,
-        ).context("Failed to synthesize text")?;
-
-        tracing::info!(
-            "Synthesized: {:.3}s audio, {:.3}s infer, RTF={:.3}",
-            result.audio_seconds, result.infer_seconds, result.real_time_factor(),
-        );
-
-        // --timing: 音素タイミング出力
-        if let Some(ref format) = cli.timing {
-            if let Some(ref durations) = result.durations {
-                // phoneme_ids からトークン名を推定 (簡易版: ID をそのまま使用)
-                let tokens: Vec<String> = (0..durations.len())
-                    .map(|i| format!("ph_{}", i))
-                    .collect();
-                match piper_core::timing::durations_to_timing(
-                    durations, &tokens, result.sample_rate, piper_core::timing::DEFAULT_HOP_LENGTH,
-                ) {
-                    Ok(timing) => {
-                        let output = match format.as_str() {
-                            "json" => timing.to_json().unwrap_or_default(),
-                            "tsv" => timing.to_tsv(),
-                            "srt" => timing.to_srt(),
-                            _ => {
-                                anyhow::bail!("Unknown timing format: '{}'. Use json, tsv, or srt.", format);
-                            }
-                        };
-                        eprintln!("{}", output);
-                    }
-                    Err(e) => tracing::warn!("Timing extraction failed: {}", e),
-                }
-            } else {
-                tracing::warn!("Model does not output duration tensor; --timing ignored.");
+        if cli.stream {
+            // --stream --text: センテンス単位で分割して逐次合成
+            let sentences = piper_core::streaming::split_sentences(text);
+            if sentences.is_empty() {
+                anyhow::bail!("No sentences found in input text");
             }
-        }
 
-        // 出力
-        if output_to_stdout {
-            audio::write_wav_to_stdout(result.sample_rate, &result.audio)
-                .context("Failed to write WAV to stdout")?;
-        } else if let Some(ref dir) = cli.output_dir {
-            let path = dir.join("output.wav");
-            audio::write_wav(&path, result.sample_rate, &result.audio)
-                .with_context(|| format!("Failed to write {}", path.display()))?;
-            tracing::info!("Wrote: {}", path.display());
-        } else if let Some(ref file) = cli.output_file {
-            let path = PathBuf::from(file);
-            audio::write_wav(&path, result.sample_rate, &result.audio)
-                .with_context(|| format!("Failed to write {}", path.display()))?;
-            tracing::info!("Wrote: {}", path.display());
+            tracing::info!("Streaming mode: {} sentence(s)", sentences.len());
+
+            let output_dir = cli.output_dir.as_ref().ok_or_else(|| {
+                anyhow::anyhow!("--output-dir is required for --stream mode")
+            })?;
+
+            for (i, sentence) in sentences.iter().enumerate() {
+                let idx = i + 1;
+                let result = voice.synthesize_text(
+                    sentence, cli.speaker, cli.language.as_deref(),
+                    cli.noise_scale, cli.length_scale, cli.noise_w,
+                ).with_context(|| format!("Synthesis failed for sentence {}", idx))?;
+
+                let filename = format!("chunk_{:04}.wav", idx);
+                let path = output_dir.join(&filename);
+                audio::write_wav(&path, result.sample_rate, &result.audio)
+                    .with_context(|| format!("Failed to write {}", path.display()))?;
+
+                tracing::info!(
+                    "Stream chunk [{}/{}]: \"{}\", {:.3}s audio -> {}",
+                    idx, sentences.len(), sentence,
+                    result.audio_seconds, path.display(),
+                );
+            }
+
+            tracing::info!("Streaming complete: {} chunks written", sentences.len());
         } else {
-            // デフォルト: stdout に出力
-            audio::write_wav_to_stdout(result.sample_rate, &result.audio)
-                .context("Failed to write WAV to stdout")?;
+            // 通常の --text モード (一括合成)
+            let result = voice.synthesize_text(
+                text, cli.speaker, cli.language.as_deref(),
+                cli.noise_scale, cli.length_scale, cli.noise_w,
+            ).context("Failed to synthesize text")?;
+
+            tracing::info!(
+                "Synthesized: {:.3}s audio, {:.3}s infer, RTF={:.3}",
+                result.audio_seconds, result.infer_seconds, result.real_time_factor(),
+            );
+
+            // --timing: 音素タイミング出力
+            if let Some(ref format) = cli.timing {
+                if let Some(ref durations) = result.durations {
+                    // phoneme_ids からトークン名を推定 (簡易版: ID をそのまま使用)
+                    let tokens: Vec<String> = (0..durations.len())
+                        .map(|i| format!("ph_{}", i))
+                        .collect();
+                    match piper_core::timing::durations_to_timing(
+                        durations, &tokens, result.sample_rate, piper_core::timing::DEFAULT_HOP_LENGTH,
+                    ) {
+                        Ok(timing) => {
+                            let output = match format.as_str() {
+                                "json" => timing.to_json().unwrap_or_default(),
+                                "tsv" => timing.to_tsv(),
+                                "srt" => timing.to_srt(),
+                                _ => {
+                                    anyhow::bail!("Unknown timing format: '{}'. Use json, tsv, or srt.", format);
+                                }
+                            };
+                            eprintln!("{}", output);
+                        }
+                        Err(e) => tracing::warn!("Timing extraction failed: {}", e),
+                    }
+                } else {
+                    tracing::warn!("Model does not output duration tensor; --timing ignored.");
+                }
+            }
+
+            // 出力
+            if output_to_stdout {
+                audio::write_wav_to_stdout(result.sample_rate, &result.audio)
+                    .context("Failed to write WAV to stdout")?;
+            } else if let Some(ref dir) = cli.output_dir {
+                let path = dir.join("output.wav");
+                audio::write_wav(&path, result.sample_rate, &result.audio)
+                    .with_context(|| format!("Failed to write {}", path.display()))?;
+                tracing::info!("Wrote: {}", path.display());
+            } else if let Some(ref file) = cli.output_file {
+                let path = PathBuf::from(file);
+                audio::write_wav(&path, result.sample_rate, &result.audio)
+                    .with_context(|| format!("Failed to write {}", path.display()))?;
+                tracing::info!("Wrote: {}", path.display());
+            } else {
+                // デフォルト: stdout に出力
+                audio::write_wav_to_stdout(result.sample_rate, &result.audio)
+                    .context("Failed to write WAV to stdout")?;
+            }
         }
     } else {
         // JSONL stdin パイプライン (既存)
-        let mut engine = OnnxEngine::load(&cli.model, &voice_config, &cli.device)
+        let mut engine = OnnxEngine::load(model_path, &voice_config, &cli.device)
             .context("Failed to load ONNX model")?;
 
         let stdin = std::io::stdin();

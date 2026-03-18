@@ -8,25 +8,7 @@
 //! are available.
 
 use crate::error::PiperError;
-
-// ---------------------------------------------------------------------------
-// AudioSink trait (mirrors streaming.rs -- will be replaced by a re-export
-// once streaming.rs lands)
-// ---------------------------------------------------------------------------
-
-/// Trait for consuming synthesised audio in a streaming fashion.
-///
-/// This is a local copy of the canonical `AudioSink` that lives in
-/// `streaming.rs`.  During integration the implementations below should
-/// switch to `use crate::streaming::AudioSink` and this definition
-/// should be removed.
-pub trait AudioSink: Send {
-    /// Feed a chunk of signed 16-bit PCM samples at the given sample rate.
-    fn write_chunk(&mut self, samples: &[i16], sample_rate: u32) -> Result<(), PiperError>;
-
-    /// Signal that no more chunks will be written.
-    fn finalize(&mut self) -> Result<(), PiperError>;
-}
+use crate::streaming::AudioSink;
 
 // ---------------------------------------------------------------------------
 // DummyPlayer -- always available, useful for testing / benchmarking
