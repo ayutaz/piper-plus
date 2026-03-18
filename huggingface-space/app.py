@@ -68,6 +68,16 @@ MODELS = {
     },
 }
 
+# Sample texts shown when the user switches language/model
+SAMPLE_TEXTS = {
+    "ja": "こんにちは、今日はとても良い天気ですね。散歩に出かけましょう。",
+    "en": "Hello, how are you today? The weather is beautiful, let's go for a walk.",
+    "zh": "你好，今天天气非常好。我们一起去散步吧。",
+    "es": "Hola, ¿cómo estás hoy? El clima es hermoso, vamos a dar un paseo.",
+    "fr": "Bonjour, comment allez-vous aujourd'hui? Il fait beau, allons nous promener.",
+    "pt": "Olá, como você está hoje? O tempo está lindo, vamos dar um passeio.",
+}
+
 # Basic English word to IPA mapping for common words
 # This is a simplified fallback when espeak-ng is not available
 ENGLISH_IPA_MAP = {
@@ -418,6 +428,13 @@ def synthesize_speech(
         raise gr.Error(f"Failed to generate speech: {str(e)}") from e
 
 
+def on_model_change(model_name: str) -> str:
+    """Return sample text for the selected model's language."""
+    model_info = MODELS.get(model_name, {})
+    language = model_info.get("language", "ja")
+    return SAMPLE_TEXTS.get(language, "")
+
+
 def create_interface():
     """Create Gradio interface"""
     with gr.Blocks(title="piper-plus Demo") as interface:
@@ -441,6 +458,7 @@ def create_interface():
                 text_input = gr.Textbox(
                     label="Text to synthesize",
                     placeholder="Enter text here...",
+                    value=SAMPLE_TEXTS["ja"],
                     lines=3,
                 )
 
@@ -522,6 +540,12 @@ def create_interface():
         )
 
         # Event handlers
+        model_dropdown.change(
+            fn=on_model_change,
+            inputs=[model_dropdown],
+            outputs=[text_input],
+        )
+
         synthesize_btn.click(
             fn=synthesize_speech,
             inputs=[

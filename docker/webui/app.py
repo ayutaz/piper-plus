@@ -13,6 +13,21 @@ import onnxruntime
 from piper_train.infer_onnx import text_to_phoneme_ids_and_prosody
 
 
+SAMPLE_TEXTS = {
+    "ja": "こんにちは、今日はとても良い天気ですね。散歩に出かけましょう。",
+    "en": "Hello, how are you today? The weather is beautiful, let's go for a walk.",
+    "zh": "你好，今天天气非常好。我们一起去散步吧。",
+    "es": "Hola, ¿cómo estás hoy? El clima es hermoso, vamos a dar un paseo.",
+    "fr": "Bonjour, comment allez-vous aujourd'hui? Il fait beau, allons nous promener.",
+    "pt": "Olá, como você está hoje? O tempo está lindo, vamos dar um passeio.",
+}
+
+
+def on_language_change(language: str) -> str:
+    """Return sample text for the selected language."""
+    return SAMPLE_TEXTS.get(language, "")
+
+
 _session_cache: dict[str, onnxruntime.InferenceSession] = {}
 _config_cache: dict[str, dict] = {}
 _cache_lock = threading.Lock()
@@ -158,6 +173,7 @@ def create_ui(model_dir: str, output_dir: str):
                     label="Text",
                     placeholder="Enter text to synthesize...",
                     lines=3,
+                    value=SAMPLE_TEXTS["ja"],
                 )
                 model_dropdown = gr.Dropdown(
                     choices=model_choices,
@@ -182,6 +198,12 @@ def create_ui(model_dir: str, output_dir: str):
 
             with gr.Column():
                 audio_output = gr.Audio(label="Output", type="numpy")
+
+        language.change(
+            fn=on_language_change,
+            inputs=[language],
+            outputs=[text_input],
+        )
 
         btn.click(
             fn=synthesize,
