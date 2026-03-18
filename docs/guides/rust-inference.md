@@ -11,8 +11,8 @@
 3. [技術スタック](#技術スタック)
 4. [先行事例](#先行事例)
 5. [アーキテクチャ設計](#アーキテクチャ設計)
-6. [日本語音素化の実装方針](#日本語音素化の実装方針)
-7. [英語音素化の実装方針](#英語音素化の実装方針)
+6. [多言語対応](#多言語対応)
+7. [言語別音素化の実装方針](#言語別音素化の実装方針)
 8. [音声出力](#音声出力)
 9. [パフォーマンス評価](#パフォーマンス評価)
 10. [WASM/ブラウザ対応](#wasmブラウザ対応)
@@ -71,10 +71,19 @@ float32 audio → int16 PCM → WAV 出力
 | `input` | int64 | `[1, phoneme_length]` | Yes | 音素 ID 列 |
 | `input_lengths` | int64 | `[1]` | Yes | 音素列の長さ |
 | `scales` | float32 | `[3]` | Yes | `[noise_scale, length_scale, noise_scale_w]` |
-| `sid` | int64 | `[1]` | No | マルチスピーカー時の話者 ID |
+| `sid` | int64 | `[1]` | No | マルチスピーカー or 多言語モデル時の話者 ID |
+| `lid` | int64 | `[1]` | No | 多言語モデル時の言語 ID (`num_languages > 1`) |
 | `prosody_features` | int64 | `[1, phoneme_length, 3]` | No | A1/A2/A3 プロソディ値 |
 
 デフォルトスケール値: `noise_scale=0.667`, `length_scale=1.0`, `noise_scale_w=0.8`
+
+**テンソル順序** (ONNX グラフの入力順):
+1. `input` → 2. `input_lengths` → 3. `scales` → 4. `sid` (条件付き) → 5. `lid` (条件付き) → 6. `prosody_features` (条件付き)
+
+**条件判定**:
+- `sid`: `num_speakers > 1` OR `num_languages > 1` のとき必須
+- `lid`: `num_languages > 1` のとき必須
+- `prosody_features`: `prosody_dim > 0` のとき必須
 
 #### 出力テンソル
 
@@ -87,11 +96,35 @@ float32 audio → int16 PCM → WAV 出力
 
 - **ONNX モデル** (`.onnx`) — 約 74MB (medium quality, 20 speakers)
 - **config.json** — `phoneme_id_map`, `num_speakers`, `sample_rate` 等を含む
+- **辞書データ** (言語別) — CMU 辞書 (EN, 3.7MB), pypinyin 辞書 (ZH, 2.6MB)
 
 config.json 検出順序:
 1. `--config` で明示指定
 2. `{model}.onnx.json` (C++ CLI convention)
 3. `{model_dir}/config.json`
+
+### config.json のスキーマ (多言語対応)
+
+```json
+{
+  "audio": { "sample_rate": 22050 },
+  "num_speakers": 571,
+  "num_symbols": 173,
+  "phoneme_type": "multilingual",
+  "phoneme_id_map": { "^": [1], "_": [0], "a": [15], ... },
+  "num_languages": 6,
+  "language_id_map": {
+    "ja": 0, "en": 1, "zh": 2, "es": 3, "fr": 4, "pt": 5
+  },
+  "prosody_num_symbols": 11,
+  "prosody_id_map": { "0": [0], "1": [1], ... }
+}
+```
+
+`phoneme_type` の値:
+- `"openjtalk"` — 日本語単言語 (BOS/EOS inline, パディングなし)
+- `"bilingual"` — JA+EN バイリンガル (97 シンボル)
+- `"multilingual"` — N 言語 (173 シンボル, インタースパースパディングあり)
 
 ### C++ 版と Python 版の機能差分
 
@@ -99,7 +132,14 @@ config.json 検出順序:
 |------|-----|--------|
 | ONNX 推論 | Yes | Yes |
 | 日本語音素化 (OpenJTalk) | Yes | Yes |
-| 英語音素化 (espeak-ng) | Yes | No (g2p-en) |
+| 英語音素化 (CMU 辞書) | Yes | Yes (g2p-en) |
+| 中国語音素化 (pypinyin 辞書) | Yes | Yes |
+| 韓国語音素化 (Hangul 分解) | Yes | Yes |
+| スペイン語音素化 (ルールベース) | Yes | Yes |
+| フランス語音素化 (ルールベース) | Yes | Yes |
+| ポルトガル語音素化 (ルールベース) | Yes | Yes |
+| Unicode 言語自動検出 | Yes | Yes |
+| 多言語コードスイッチング | Yes | Yes |
 | プロソディ (A1/A2/A3) | Yes | Yes |
 | カスタム辞書 | Yes | No |
 | ストリーミング推論 | Yes | No |
@@ -118,10 +158,14 @@ config.json 検出順序:
 | ONNX 推論 | `ort` | >=2.0 | MIT/Apache-2.0 | piper-rs 等で VITS 推論実績。全 ONNX op 対応。GPU 対応 |
 | 日本語音素化 | `jpreprocess` | latest | MIT | Pure Rust OpenJTalk 互換。A1/A2/A3 取得可能 |
 | ラベルパース | `jlabel` | latest | MIT | HTS fullcontext label の型付きパース |
+| 中国語ピンイン | `pinyin` | latest | MIT | 漢字→ピンイン変換 (385K+ DL) |
+| 韓国語 Hangul | `hangul` | latest | MIT | Hangul 音節→jamo 分解 |
+| 英語辞書 | `cmudict-fast` | latest | MIT | CMU 発音辞書ルックアップ |
 | WAV 出力 | `hound` | 3.5.1 | Apache-2.0 | 事実上の標準 |
 | 音声再生 | `rodio` | 0.22.2 | MIT/Apache-2.0 | cpal 上位 API。ストリーミング対応 |
 | CLI | `clap` | latest | MIT/Apache-2.0 | derive マクロで簡潔 |
 | JSON | `serde` + `serde_json` | latest | MIT/Apache-2.0 | config.json / phoneme_id_map |
+| 正規表現 | `regex` | latest | MIT/Apache-2.0 | fullcontext label パース、G2P ルール |
 | エラー (lib) | `thiserror` | latest | MIT/Apache-2.0 | ライブラリ層のエラー型定義 |
 | エラー (bin) | `anyhow` | latest | MIT/Apache-2.0 | CLI 層のエラーハンドリング |
 | ログ | `tracing` | latest | MIT | spdlog 相当 |
@@ -179,8 +223,14 @@ src/rust/
 │       └── phonemize/
 │           ├── mod.rs           # Phonemizer trait + レジストリ
 │           ├── japanese.rs      # jpreprocess ベース
-│           ├── english.rs       # CMU 辞書 + ルール
-│           └── token_map.rs     # PUA マッピング (正準定義)
+│           ├── english.rs       # CMU 辞書 + ARPAbet→IPA
+│           ├── chinese.rs       # pypinyin 辞書 + ピンイン→IPA + 声調サンドヒ
+│           ├── korean.rs        # Hangul 分解 + jamo→IPA
+│           ├── spanish.rs       # ルールベース G2P
+│           ├── french.rs        # ルールベース G2P
+│           ├── portuguese.rs    # ルールベース G2P
+│           ├── multilingual.rs  # 多言語コードスイッチング + Unicode 言語検出
+│           └── token_map.rs     # PUA マッピング (89 固定エントリ, 正準定義)
 ├── piper-cli/                 # CLI バイナリ
 │   ├── Cargo.toml
 │   └── src/
@@ -205,6 +255,10 @@ pub trait Phonemizer: Send + Sync {
         &self, text: &str,
     ) -> Result<(Vec<String>, Vec<Option<ProsodyInfo>>), PiperError>;
 
+    /// 言語固有の phoneme_id_map を返す (None なら config.json のものを使用)
+    fn get_phoneme_id_map(&self) -> Option<&PhonemeIdMap>;
+
+    /// BOS/EOS/パディング挿入。JA は no-op、他言語はデフォルト実装を使用
     fn post_process_ids(
         &self,
         ids: Vec<i64>,
@@ -239,6 +293,7 @@ pub struct PiperVoice {
 
 impl PiperVoice {
     pub fn load(model_path: &Path, config_path: &Path) -> Result<Self, PiperError>;
+    /// 多言語モデルでは language_id を自動検出 (Unicode 範囲ベース)
     pub fn synthesize_text(&self, text: &str, speaker_id: Option<i64>) -> Result<SynthesisResult, PiperError>;
     pub fn text_to_wav_file(&self, text: &str, output: &Path, speaker_id: Option<i64>) -> Result<SynthesisResult, PiperError>;
     pub fn synthesize_streaming(&self, text: &str, speaker_id: Option<i64>, chunk_callback: impl FnMut(&[i16])) -> Result<SynthesisResult, PiperError>;
@@ -269,115 +324,176 @@ pub enum PiperError {
 
 ---
 
-## 日本語音素化の実装方針
+## 多言語対応
 
-### 処理フロー
+PR #218 で 7 言語 (JA/EN/ZH/KO/ES/FR/PT) の GPL-free G2P が実装された。Rust 推論でも全言語をサポートする必要がある。
 
-```
-日本語テキスト
-    |  jpreprocess (Pure Rust OpenJTalk)
-    v
-HTS fullcontext labels
-    |  正規表現で音素 + A1/A2/A3 抽出
-    v
-生の音素列 + プロソディ情報
-    |  栗原法: ^, $, ?, _, #, [, ] マーク挿入
-    v
-プロソディ付き音素列
-    |  疑問詞マーカー: ?!, ?., ?~ (Issue #204)
-    |  N 変異規則: N_m, N_n, N_ng, N_uvular (Issue #207)
-    v
-最終音素列
-    |  PUA マッピング: 多文字 → U+E000-E01C
-    v
-phoneme_id_map で ID 変換
-    |
-    v
-phoneme_ids: Vec<i64> + prosody_features: Vec<[i32;3]>
-```
+### 対応言語一覧
 
-### 選択肢比較
+| 言語 | コード | G2P 方式 | Python 依存 | 外部データ | 推定 Rust 行数 |
+|------|--------|---------|------------|-----------|---------------|
+| 日本語 | `ja` | OpenJTalk | pyopenjtalk | NAIST-JDIC 辞書 | ~500 |
+| 英語 | `en` | CMU 辞書 + ARPAbet→IPA | g2p-en | `cmudict_data.json` (3.7MB) | ~500-700 |
+| 中国語 | `zh` | pypinyin 辞書 + ピンイン→IPA | pypinyin | `pinyin_single.json` + `pinyin_phrases.json` (2.6MB) | ~700-900 |
+| 韓国語 | `ko` | Hangul 分解 + jamo→IPA | g2pk2 | なし | ~300-500 |
+| スペイン語 | `es` | ルールベース | なし | なし | ~700-900 |
+| フランス語 | `fr` | ルールベース | なし | なし | ~1000-1300 |
+| ポルトガル語 | `pt` | ルールベース | なし | なし | ~800-1000 |
 
-| アプローチ | 利点 | 欠点 |
-|-----------|------|------|
-| **jpreprocess (推奨)** | Pure Rust。NAIST-JDIC 内蔵。jlabel で A1/A2/A3 型付きパース | pyopenjtalk-plus カスタムルールとの互換性要検証 |
-| OpenJTalk C FFI | C++ 版と完全互換 | unsafe コード。ビルド複雑 |
-| lindera/vibrato | Pure Rust | fullcontext label 非対応。A1/A2/A3 取得不可 |
+### Unicode 言語検出 (UnicodeLanguageDetector)
 
-### jpreprocess の使い方
+多言語モデルではテキストを言語セグメントに分割し、言語別 Phonemizer に委譲する。
+
+**検出優先順位:**
+1. ひらがな/カタカナ (U+3040-30FF, U+31F0-31FF) → `ja`
+2. ハングル (U+AC00-D7AF) → `ko`
+3. CJK 漢字 (U+4E00-9FFF) → かな文脈あり: `ja` / なし: `zh`
+4. Latin 文字 → `default_latin_language` (en/es/fr/pt から選択)
+5. 中立文字 (数字/句読点) → 前セグメントを継承
 
 ```rust
-use jpreprocess::*;
+pub struct UnicodeLanguageDetector {
+    languages: HashSet<String>,
+    default_latin_lang: String,
+}
 
-let config = SystemDictionaryConfig::Bundled(jpreprocess_naist_jdic::BUNDLED);
-let jpreprocess = JPreprocess::with_dictionaries(config.load()?, None);
-let labels = jpreprocess.extract_fullcontext("こんにちは")?;
-// labels: Vec<String> in HTS format
-// → 正規表現または jlabel で A1/A2/A3 パース
+impl UnicodeLanguageDetector {
+    pub fn detect_char(&self, ch: char, context_has_kana: bool) -> Option<&str>;
+    pub fn segment_text(&self, text: &str) -> Vec<LangSegment>;
+}
+
+pub struct LangSegment {
+    pub lang: String,
+    pub text: String,
+}
 ```
 
-### 互換性の注意点
+### 言語 ID と自動プロモーション
 
-pyopenjtalk-plus には以下の独自 NJD ルールがある (`src/cpp/openjtalk_api.c`):
-- `apply_original_rule_before_chaining()` — 動詞連用形・敬語等のアクセント調整
-- `modify_acc_after_chaining()` — 後処理
+多言語モデル (`num_languages > 1`) で単一言語 (`--language ja`) を指定した場合、自動的に `MultilingualPhonemizer` に昇格してインタースパースパディングを適用する:
 
-jpreprocess がこれらを含むか要検証。差異がある場合は:
-1. jpreprocess にパッチを当てる (MIT ライセンスで可能)
-2. OpenJTalk C FFI にフォールバック
-
-### PUA マッピングテーブル
-
-Python (`token_mapper.py`)、C++ (`piper.cpp`) と同一テーブルを `token_map.rs` に正準定義:
-
-```
-a: → U+E000, i: → U+E001, u: → U+E002, e: → U+E003, o: → U+E004
-cl → U+E005, ky → U+E006, kw → U+E007, ...
-?! → U+E016, ?. → U+E017, ?~ → U+E018
-N_m → U+E019, N_n → U+E01A, N_ng → U+E01B, N_uvular → U+E01C
+```rust
+fn auto_promote_language(language: &str, language_id_map: &HashMap<String, i64>) -> String {
+    if language == "ja" && language_id_map.len() > 1 && !language.contains('-') {
+        // ja → "en-es-fr-ja-pt-zh" のような正規化コンボに昇格
+        let mut langs: Vec<&str> = language_id_map.keys().map(|s| s.as_str()).collect();
+        langs.sort();
+        langs.join("-")
+    } else {
+        language.to_string()
+    }
+}
 ```
 
-将来的には共通 JSON テーブルに外出しし、3 言語から参照する形が望ましい。
+### プロソディ情報 (A1/A2/A3) の言語別セマンティクス
 
-### N 変異規則
+全言語で `ProsodyInfo { a1, a2, a3 }` を共有するが、値の意味が異なる:
 
-| バリアント | 条件 | 例 |
-|-----------|------|-----|
-| `N_m` | m/b/p の前 (両唇音) | さんぽ |
-| `N_n` | n/t/d/ts/ch の前 (歯茎音) | あんない |
-| `N_ng` | k/g の前 (軟口蓋音) | ぎんこう |
-| `N_uvular` | 語末/母音の前 (口蓋垂音) | ほん |
+| 言語 | a1 | a2 | a3 |
+|------|-----|-----|-----|
+| **JA** | アクセント核相対位置 (-4~+N) | モーラ位置 (1-based) | アクセント句内総モーラ数 |
+| **ZH** | 声調 (1-5, PUA tone markers から抽出) | 単語内の音節位置 | 単語の音節数 |
+| **EN** | 0 (固定) | ストレスレベル (0/1/2) | 単語内の音素数 |
+| **ES/PT** | 0 (固定) | ストレスレベル (0/2) | 単語内の音素数 |
+| **FR** | 0 (固定) | 語末母音=2, 他=0 | 単語内の音素数 |
+| **KO** | 0 (固定) | 0 (固定) | 0 (固定) |
+
+**注意**: 多言語モデルの学習時、プロソディは日本語のみ有効 (`prosody_language_ids={0}`)。他言語のプロソディはゼロマスクされる。
+
+### post_process_ids の言語別動作
+
+| phoneme_type | BOS/EOS | インタースパースパディング |
+|--------------|---------|--------------------------|
+| `openjtalk` (JA 単言語) | inline (phonemize 内で挿入) | なし |
+| `bilingual` / `multilingual` | base class が追加 | あり (音素間に `_`=ID 0 を挿入) |
+
+JA 単言語モデルの `post_process_ids()` は no-op。多言語モデルでは JA も昇格されパディングが適用される。
+
+### PUA マッピングテーブル (全 89 エントリ)
+
+Python (`token_mapper.py`)、C++ (各 `*_phonemize.cpp`) と同一テーブルを `token_map.rs` に正準定義。**学習済みモデルの重みに依存するため、変更不可。**
+
+| 範囲 | 数 | 言語 | 内容 |
+|------|-----|------|------|
+| U+E000-E004 | 5 | JA | 長母音 (a:, i:, u:, e:, o:) |
+| U+E005 | 1 | JA | cl (促音) |
+| U+E006-E015 | 16 | JA | パラタル子音 (ky, kw, gy, ..., ry) |
+| U+E016-E018 | 3 | JA | 疑問詞マーカー (?!, ?., ?~) |
+| U+E019-E01C | 4 | JA | N 変異 (N_m, N_n, N_ng, N_uvular) |
+| U+E01D | 1 | ES | rr (トリル) |
+| U+E01E | 1 | ZH/FR | y_vowel (前舌丸め母音) |
+| U+E020-E04A | 43 | ZH | 送気/反舌/複合韻母、声調マーカー (tone1-5) |
+| U+E04B-E052 | 8 | KO | 濃音 (p͈,t͈,k͈,s͈,t͈ɕ)、未放出終声 (k̚,t̚,p̚) |
+| U+E054-E055 | 2 | ES/PT | 破擦音 (tʃ, dʒ) |
+| U+E056-E058 | 3 | FR | 鼻母音 (ɛ̃, ɑ̃, ɔ̃) |
+
+動的割り当ては `U+E059` 以降。
 
 ---
 
-## 英語音素化の実装方針
+## 言語別音素化の実装方針
 
-### 処理フロー
+### 推奨戦略: C++ 実装の直接移植
+
+C++ G2P コード (PR #218) は Python との出力パリティが検証済みのため、最もリスクが低い。
+
+### 日本語 (JA)
 
 ```
-英語テキスト
-    |  CMU 辞書照合 + ルールベース OOV 処理
-    v
-ARPAbet 音素列
-    |  ARPAbet → IPA 変換 + ストレスマーカー (ˈ/ˌ)
-    v
-IPA 音素列
-    |  機能語ストレス除去
-    |  単語間スペース / 句読点処理
-    v
-音素列 + プロソディ (a1=0, a2=stress, a3=word_phonemes)
-    |  BOS/EOS/パディング挿入 (post_process_ids)
-    v
-phoneme_ids + prosody_features
+テキスト → jpreprocess (fullcontext labels) → A1/A2/A3 抽出
+→ 栗原法 prosody マーク → N 変異規則 → PUA マッピング → phoneme_ids
 ```
-
-### 選択肢
 
 | アプローチ | 利点 | 欠点 |
 |-----------|------|------|
-| **CMU 辞書 + ルールベース (推奨)** | Pure Rust。GPL-free | OOV 語の精度がやや劣る |
-| grapheme_to_phoneme + arpabet crate | OOV 対応あり | 2 クレート組み合わせ |
-| espeak-ng FFI | 高精度・多言語 | **GPL-3.0 汚染リスク** |
+| **jpreprocess (推奨)** | Pure Rust。NAIST-JDIC 内蔵 | pyopenjtalk-plus カスタムルールとの互換性要検証 |
+| OpenJTalk C FFI | C++ 版と完全互換 | unsafe コード。ビルド複雑 |
+
+N 変異規則: `N_m` (m/b/p前), `N_n` (n/t/d前), `N_ng` (k/g前), `N_uvular` (語末/母音前)
+
+### 英語 (EN)
+
+```
+テキスト → CMU 辞書照合 + OOV フォールバック → ARPAbet → IPA
+→ 機能語ストレス除去 → BOS/EOS/パディング → phoneme_ids
+```
+
+- CMU 辞書 (123K 語, Public Domain) を JSON で読み込み
+- ARPAbet→IPA 変換 + 文脈依存ルール (`AA+R→ɑːɹ`, `ER1→ɜː`)
+- 機能語ストレス除去 (97 語: a, the, are, you 等)
+- **espeak-ng は使用禁止 (GPL-3.0)**
+
+### 中国語 (ZH)
+
+```
+テキスト → pypinyin 辞書照合 (多音字フレーズマッチング) → ピンイン正規化
+→ 声調サンドヒ (T3+T3, 一, 不) → ピンイン→IPA → 儿化処理 → phoneme_ids
+```
+
+- 単文字辞書 (8.1K 文字) + フレーズ辞書 (8.5K フレーズ) を JSON で読み込み
+- 声調サンドヒ 4 規則: T3+T3→T2, 一+T4→T2, 一+T1/T2/T3→T4, 不+T4→T2
+- 声調マーカーは PUA (U+E046-E04A)
+
+### 韓国語 (KO)
+
+```
+テキスト → Hangul 音節分解 (数学的: code - 0xAC00) → 初声/中声/終声
+→ jamo→IPA テーブル → liaison 規則 → phoneme_ids
+```
+
+- Hangul 分解は純粋な算術演算 (外部データ不要)
+- 初声 19 + 中声 21 + 終声 28 の IPA テーブル
+- C++ 版では g2pk2 の音韻規則は未実装 (liaison のみ)
+
+### スペイン語 (ES) / フランス語 (FR) / ポルトガル語 (PT)
+
+全てルールベース G2P (外部依存なし、Pure Rust で直接実装):
+
+| 言語 | 主要ルール | C++ 行数 |
+|------|----------|---------|
+| ES | seseo (c/z→s), 文脈依存 b/d/g→β/ð/ɣ, ストレス規則 | 815 |
+| FR | 鼻母音, 無音末尾子音, -tion/-ille パターン, リエゾン | 1196 |
+| PT | 鼻母音, coda-l→w, t/d 口蓋化, r の多型 (ɾ/ʁ) | 1004 |
 
 ---
 
@@ -483,9 +599,9 @@ fn audio_float_to_int16(audio: &[f32]) -> Vec<i16> {
 **目標**: phoneme_ids 直接入力 → ONNX 推論 → WAV 出力
 
 - `ort` による ONNX セッション管理
-- `config.json` パース (`phoneme_id_map`, `sample_rate`)
+- `config.json` パース (`phoneme_id_map`, `sample_rate`, `language_id_map`)
 - phoneme_ids + input_lengths + scales テンソル構築
-- sid / prosody_features オプション対応
+- sid / lid / prosody_features オプション対応 (多言語モデル含む)
 - 16-bit PCM WAV 書き出し
 - JSONL stdin 入力 (Python 互換)
 
@@ -498,17 +614,22 @@ fn audio_float_to_int16(audio: &[f32]) -> Vec<i16> {
 - jpreprocess による fullcontext label 生成
 - A1/A2/A3 抽出 + 栗原法 prosody マーク
 - 疑問詞マーカー / N 変異規則
-- PUA トークンマッピング
+- PUA トークンマッピング (89 固定エントリ)
 - カスタム辞書
 
-### Phase 3: CLI 完成 — 3-4 週間
+### Phase 3: 多言語 G2P + CLI — 4-6 週間
 
-**目標**: テキスト → 音声の完全パイプライン + モデル管理
+**目標**: 7 言語対応 + テキスト → 音声の完全パイプライン
 
-- `--text "テキスト"` 直接入力
+- `--text "テキスト"` 直接入力 + `--language ja-en-zh` 多言語指定
 - `--list-models` / `--download-model`
-- 英語音素化 (CMU 辞書ベース)
-- 言語レジストリ (trait + 動的ディスパッチ)
+- 英語 G2P (CMU 辞書 + ARPAbet→IPA)
+- 中国語 G2P (pypinyin 辞書 + ピンイン→IPA + 声調サンドヒ)
+- 韓国語 G2P (Hangul 分解 + jamo→IPA)
+- スペイン語/フランス語/ポルトガル語 G2P (ルールベース)
+- Unicode 言語検出 + 多言語コードスイッチング
+- 言語レジストリ (trait + 動的ディスパッチ + 正規化キャッシング)
+- 言語自動プロモーション (JA → 多言語モデル時)
 
 ### Phase 4: 高度な機能
 
@@ -523,12 +644,12 @@ fn audio_float_to_int16(audio: &[f32]) -> Vec<i16> {
 
 | フェーズ | 工数 | 累計 |
 |---------|------|------|
-| Phase 1: MVP | 2-3 週 | 2-3 週 |
+| Phase 1: MVP (ONNX 推論) | 2-3 週 | 2-3 週 |
 | Phase 2: 日本語音素化 | 3-4 週 | 5-7 週 |
-| Phase 3: CLI 完成 | 3-4 週 | 8-11 週 |
-| Phase 4: 高度な機能 | 8-11 週 | 16-22 週 |
+| Phase 3: 多言語 G2P + CLI | 4-6 週 | 9-13 週 |
+| Phase 4: 高度な機能 | 8-11 週 | 17-24 週 |
 
-**Phase 1-3 で実用 CLI が完成 (約 2-3 ヶ月)**
+**Phase 1-3 で 7 言語対応の実用 CLI が完成 (約 2-3 ヶ月)**
 
 ---
 
@@ -539,8 +660,10 @@ fn audio_float_to_int16(audio: &[f32]) -> Vec<i16> {
 | リスク | 重大度 | 対策 |
 |--------|-------|------|
 | jpreprocess と pyopenjtalk-plus の出力差異 | 高 | ゴールデンテストで検証。差異時は OpenJTalk C FFI にフォールバック |
-| 英語 G2P の精度 (g2p-en 比) | 中 | CMU 辞書で主要語カバー。後段で ML ベース G2P 検討 |
-| PUA マッピングの 3 言語同期 | 中 | 共通 JSON テーブルに外出しし全言語から参照 |
+| 7 言語 G2P の Python/C++ との出力パリティ | 高 | C++ 実装を直接移植 (出力パリティ検証済み)。言語別ゴールデンテスト |
+| PUA マッピングの Python/C++/Rust 同期 | 高 | 89 固定エントリを `token_map.rs` に正準定義。CI でクロス言語検証 |
+| フランス語 G2P の複雑さ (1200 行) | 中 | C++ 版を忠実に移植。例外辞書を JSON で管理 |
+| 英語 OOV 語の精度 | 中 | CMU 辞書で 95-98% カバー。形態論的接尾辞剥離でフォールバック |
 | `ort` crate の API 安定性 | 低 | バージョンピン。v2 は production-ready |
 
 ### ライセンス互換性
@@ -552,7 +675,10 @@ fn audio_float_to_int16(audio: &[f32]) -> Vec<i16> {
 | ort | MIT/Apache-2.0 | OK |
 | ONNX Runtime | MIT | OK |
 | jpreprocess | MIT | OK |
+| CMU Pronouncing Dictionary | Public Domain | OK |
+| pypinyin 辞書データ | MIT | OK |
 | hound, clap, serde | MIT/Apache-2.0 | OK |
+| pinyin, hangul crate | MIT | OK |
 | OpenJTalk (C) | Modified BSD | OK |
 | **espeak-ng** | **GPL-3.0** | **非互換 — 使用しないこと** |
 
@@ -578,6 +704,14 @@ fn audio_float_to_int16(audio: &[f32]) -> Vec<i16> {
 
 - [jpreprocess/jpreprocess](https://github.com/jpreprocess/jpreprocess) — Pure Rust OpenJTalk 互換
 - [jpreprocess/jlabel](https://github.com/jpreprocess/jlabel) — HTS label パーサ
+
+### 多言語 G2P
+
+- [pinyin crate](https://crates.io/crates/pinyin) — 漢字→ピンイン変換 (385K+ DL)
+- [hangul crate](https://crates.io/crates/hangul) — Hangul 音節分解
+- [cmudict-fast](https://github.com/BenjaminHinchliff/cmudict-fast) — CMU 発音辞書ルックアップ
+- [voirs-g2p](https://crates.io/crates/voirs-g2p) — 多言語 G2P (Beta, MIT)
+- [lngcnv](https://crates.io/crates/lngcnv) — 英語/スペイン語 IPA 変換
 
 ### Rust オーディオ
 
