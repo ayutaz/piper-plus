@@ -102,6 +102,9 @@ class VitsModel(pl.LightningModule):
         use_duration_discriminator: bool = False,
         # Speaker-Conditioned Text Encoder (VITS2)
         speaker_conditioned_encoder: bool = False,
+        # LR scheduler options
+        cosine_scheduler: bool = False,
+        max_epochs: int = 75,
         **kwargs,
     ):
         super().__init__()
@@ -744,7 +747,6 @@ class VitsModel(pl.LightningModule):
         self._log_with_batch_info("loss/dur_disc", loss_dur_disc, batch)
 
     def validation_step(self, batch: Batch, batch_idx: int):
-<<<<<<< HEAD
         # Temporarily suppress self.log to prevent training_step_g/d from
         # logging training-named metrics (loss_gen_all, loss_disc_all, etc.)
         # during validation.  We restore self.log immediately after.
@@ -760,7 +762,6 @@ class VitsModel(pl.LightningModule):
         self._log_with_batch_info("val_loss", val_loss, batch)
         return val_loss
 
-<<<<<<< HEAD
     def on_validation_epoch_end(self):
         """Log audio samples to WandB at the end of validation epoch.
 
@@ -953,46 +954,88 @@ class VitsModel(pl.LightningModule):
         if self.model_d_wavlm is not None:
             d_params = d_params + list(self.model_d_wavlm.parameters())
 
+        use_fused = torch.cuda.is_available()
         optimizers = [
             torch.optim.AdamW(
                 gen_params,
                 lr=self.hparams.learning_rate,
                 betas=self.hparams.betas,
                 eps=self.hparams.eps,
-                fused=torch.cuda.is_available(),
+                fused=use_fused,
             ),
             torch.optim.AdamW(
                 d_params,
                 lr=self.hparams.learning_rate,
                 betas=self.hparams.betas,
                 eps=self.hparams.eps,
-                fused=torch.cuda.is_available(),
-            ),
-        ]
-        schedulers = [
-            torch.optim.lr_scheduler.ExponentialLR(
-                optimizers[0], gamma=self.hparams.lr_decay
-            ),
-            torch.optim.lr_scheduler.ExponentialLR(
-                optimizers[1], gamma=self.hparams.lr_decay
+                fused=use_fused,
             ),
         ]
 
-        # Duration Discriminator optimizer (VITS2)
+        # Duration Discriminator optimizer (VITS2) — with fused=True
         if self.model_dur_disc is not None:
             optim_dur_d = torch.optim.AdamW(
                 self.model_dur_disc.parameters(),
                 lr=self.hparams.learning_rate,
                 betas=self.hparams.betas,
                 eps=self.hparams.eps,
-            )
-            sched_dur_d = torch.optim.lr_scheduler.ExponentialLR(
-                optim_dur_d, gamma=self.hparams.lr_decay
+                fused=use_fused,
             )
             optimizers.append(optim_dur_d)
-            schedulers.append(sched_dur_d)
+
+        # Build LR schedulers
+        schedulers = self._build_lr_schedulers(optimizers)
 
         return optimizers, schedulers
+
+    def _build_lr_schedulers(self, optimizers):
+        """Build LR schedulers with optional warmup and cosine annealing."""
+        use_cosine = getattr(self.hparams, "cosine_scheduler", False)
+        warmup_epochs = getattr(self.hparams, "warmup_epochs", 0)
+        max_epochs = getattr(self.hparams, "max_epochs", 75)
+
+        schedulers = []
+        for opt in optimizers:
+            # Build main scheduler
+            if use_cosine:
+                main_epochs = max(1, max_epochs - warmup_epochs)
+                main_sched = torch.optim.lr_scheduler.CosineAnnealingLR(
+                    opt, T_max=main_epochs, eta_min=1e-6
+                )
+            else:
+                main_sched = torch.optim.lr_scheduler.ExponentialLR(
+                    opt, gamma=self.hparams.lr_decay
+                )
+
+            # Wrap with warmup if requested
+            if warmup_epochs > 0:
+                warmup_sched = torch.optim.lr_scheduler.LinearLR(
+                    opt, start_factor=0.1, total_iters=warmup_epochs
+                )
+                sched = torch.optim.lr_scheduler.SequentialLR(
+                    opt,
+                    schedulers=[warmup_sched, main_sched],
+                    milestones=[warmup_epochs],
+                )
+            else:
+                sched = main_sched
+
+            schedulers.append(sched)
+
+        if use_cosine:
+            _LOGGER.info(
+                "Using CosineAnnealingLR (T_max=%d, eta_min=1e-6) with %d warmup epochs",
+                max(1, max_epochs - warmup_epochs),
+                warmup_epochs,
+            )
+        elif warmup_epochs > 0:
+            _LOGGER.info(
+                "Using ExponentialLR (gamma=%.6f) with %d warmup epochs",
+                self.hparams.lr_decay,
+                warmup_epochs,
+            )
+
+        return schedulers
 
     @staticmethod
     def add_model_specific_args(parent_parser):

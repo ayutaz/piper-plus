@@ -943,7 +943,7 @@ class SynthesizerTrn(nn.Module):
             n_layers,
             kernel_size,
             p_dropout,
-            gin_channels=gin_channels,
+            gin_channels=enc_p_gin,
         )
         self.dec = Generator(
             inter_channels,
@@ -1197,8 +1197,6 @@ class SynthesizerTrn(nn.Module):
         if self.n_speakers > 1:
             assert sid is not None, "Missing speaker id"
         g = self._get_global_conditioning(sid, lid)
-        x, m_p, logs_p, x_mask = self.enc_p(x, x_lengths, g=g)
-
         x, m_p, logs_p, x_mask = self.enc_p(x, x_lengths, g=g)
 
         # Prepare input for duration predictor with prosody features

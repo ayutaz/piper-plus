@@ -62,9 +62,10 @@ def configure_ddp_strategy(num_gpus, user_strategy=None, no_wavlm=False):
         ddp_kwargs = {
             "find_unused_parameters": True,
             "gradient_as_bucket_view": True,
+            "bucket_cap_mb": 50,
         }
         _LOGGER.info(
-            "Using DDPStrategy with find_unused_parameters=True, gradient_as_bucket_view=True"
+            "Using DDPStrategy with find_unused_parameters=True, gradient_as_bucket_view=True, bucket_cap_mb=50"
         )
         return DDPStrategy(**ddp_kwargs)
     return None
@@ -227,6 +228,21 @@ def create_parser():
         default=False,
         help="Freeze Duration Predictor parameters during training. "
         "Use for fine-tuning to prevent duration prediction degradation.",
+    )
+    # LR scheduler options
+    parser.add_argument(
+        "--warmup-epochs",
+        type=int,
+        default=0,
+        help="Number of warmup epochs with linear LR ramp from 0.1x to 1x base_lr. "
+        "Recommended: 3 for VITS2 (stabilizes 3-optimizer dynamics). (default: 0)",
+    )
+    parser.add_argument(
+        "--cosine-scheduler",
+        action="store_true",
+        help="Use CosineAnnealingLR instead of ExponentialLR. "
+        "Provides meaningful decay over the training schedule. "
+        "Recommended for VITS2 where epoch count is known.",
     )
     # Noise-Scaled MAS (VITS2) arguments
     parser.add_argument(
@@ -515,6 +531,9 @@ def main():
     dict_args["speaker_conditioned_encoder"] = dict_args.pop(
         "speaker_conditioned_encoder", False
     )
+
+    # Pass max_epochs to VitsModel for CosineAnnealingLR T_max
+    dict_args["max_epochs"] = args.max_epochs
 
     model = VitsModel(
         num_symbols=num_symbols,

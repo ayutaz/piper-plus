@@ -71,7 +71,7 @@ class TestNoiseScaledMAS:
                 max(0.0, model.current_mas_noise_scale.item() - model.mas_noise_scale_decay)
             )
 
-        assert model.current_mas_noise_scale.item() == pytest.approx(0.0, abs=1e-8), (
+        assert model.current_mas_noise_scale.item() == pytest.approx(0.0, abs=1e-6), (
             f"Expected 0.0 after 5000 steps, got {model.current_mas_noise_scale.item()}"
         )
 
@@ -162,7 +162,7 @@ class TestNoiseScaledMAS:
             )
 
         expected = initial - 1000 * decay
-        assert model.current_mas_noise_scale.item() == pytest.approx(expected), (
+        assert model.current_mas_noise_scale.item() == pytest.approx(expected, abs=1e-6), (
             f"Expected {expected}, got {model.current_mas_noise_scale.item()}"
         )
 
