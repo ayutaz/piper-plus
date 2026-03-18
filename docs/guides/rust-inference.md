@@ -153,24 +153,20 @@ config.json 検出順序:
 
 ### 推奨クレート
 
-| 用途 | クレート | バージョン | ライセンス | 選定理由 |
-|------|---------|-----------|-----------|---------|
-| ONNX 推論 | `ort` | >=2.0 | MIT/Apache-2.0 | piper-rs 等で VITS 推論実績。全 ONNX op 対応。GPU 対応 |
-| 日本語音素化 | `jpreprocess` | latest | MIT | Pure Rust OpenJTalk 互換。A1/A2/A3 取得可能 |
-| ラベルパース | `jlabel` | latest | MIT | HTS fullcontext label の型付きパース |
-| 中国語ピンイン | `pinyin` | latest | MIT | 漢字→ピンイン変換 (385K+ DL) |
-| 韓国語 Hangul | `hangul` | latest | MIT | Hangul 音節→jamo 分解 |
-| 英語辞書 | `cmudict-fast` | latest | MIT | CMU 発音辞書ルックアップ |
-| WAV 出力 | `hound` | 3.5.1 | Apache-2.0 | 事実上の標準 |
-| 音声再生 | `rodio` | 0.22.2 | MIT/Apache-2.0 | cpal 上位 API。ストリーミング対応 |
-| CLI | `clap` | latest | MIT/Apache-2.0 | derive マクロで簡潔 |
-| JSON | `serde` + `serde_json` | latest | MIT/Apache-2.0 | config.json / phoneme_id_map |
-| 正規表現 | `regex` | latest | MIT/Apache-2.0 | fullcontext label パース、G2P ルール |
-| エラー (lib) | `thiserror` | latest | MIT/Apache-2.0 | ライブラリ層のエラー型定義 |
-| エラー (bin) | `anyhow` | latest | MIT/Apache-2.0 | CLI 層のエラーハンドリング |
-| ログ | `tracing` | latest | MIT | spdlog 相当 |
-| HTTP | `reqwest` | latest | MIT/Apache-2.0 | モデルダウンロード |
-| リサンプリング | `rubato` | 0.11.0 | MIT | 22050Hz → デバイス SR 変換 (任意) |
+| 用途 | クレート | 状態 | ライセンス | 選定理由 |
+|------|---------|------|-----------|---------|
+| ONNX 推論 | `ort` | ✅ 使用中 | MIT/Apache-2.0 | piper-rs 等で VITS 推論実績。全 ONNX op 対応。GPU 対応 |
+| 日本語音素化 | `jpreprocess` | ✅ 使用中 (feature-gated) | MIT | Pure Rust OpenJTalk 互換。A1/A2/A3 取得可能 |
+| WAV 出力 | `hound` | ✅ 使用中 | Apache-2.0 | 事実上の標準 |
+| CLI | `clap` | ✅ 使用中 | MIT/Apache-2.0 | derive マクロで簡潔 |
+| JSON | `serde` + `serde_json` | ✅ 使用中 | MIT/Apache-2.0 | config.json / phoneme_id_map |
+| 正規表現 | `regex` | ✅ 使用中 | MIT/Apache-2.0 | fullcontext label パース、G2P ルール |
+| エラー (lib) | `thiserror` | ✅ 使用中 | MIT/Apache-2.0 | ライブラリ層のエラー型定義 |
+| エラー (bin) | `anyhow` | ✅ 使用中 | MIT/Apache-2.0 | CLI 層のエラーハンドリング |
+| ログ | `tracing` | ✅ 使用中 | MIT | spdlog 相当 |
+| 音声再生 | `rodio` | 未実装 (Phase 4) | MIT/Apache-2.0 | cpal 上位 API。ストリーミング対応 |
+| HTTP | `reqwest` | 未実装 (Phase 4) | MIT/Apache-2.0 | モデルダウンロード |
+| リサンプリング | `rubato` | 未実装 (Phase 4) | MIT | 22050Hz → デバイス SR 変換 (任意) |
 
 ### ONNX Runtime ライブラリ比較
 
@@ -215,35 +211,29 @@ src/rust/
 │   ├── Cargo.toml
 │   └── src/
 │       ├── lib.rs
-│       ├── error.rs            # thiserror 定義
+│       ├── error.rs            # thiserror 定義 (10 バリアント)
 │       ├── config.rs           # config.json / phoneme_id_map
 │       ├── engine.rs           # ort ONNX 推論
 │       ├── audio.rs            # WAV 出力 / PCM 変換
-│       ├── model_catalog.rs    # voices.json カタログ + DL
+│       ├── input.rs            # JSONL stdin 入力パーサ
+│       ├── voice.rs            # PiperVoice 高レベル API
 │       └── phonemize/
 │           ├── mod.rs           # Phonemizer trait + レジストリ
-│           ├── japanese.rs      # jpreprocess ベース
+│           ├── japanese.rs      # jpreprocess ベース (feature-gated)
 │           ├── english.rs       # CMU 辞書 + ARPAbet→IPA
-│           ├── chinese.rs       # pypinyin 辞書 + ピンイン→IPA + 声調サンドヒ
+│           ├── chinese.rs       # pypinyin 辞書 + ピンイン→IPA
 │           ├── korean.rs        # Hangul 分解 + jamo→IPA
 │           ├── spanish.rs       # ルールベース G2P
 │           ├── french.rs        # ルールベース G2P
 │           ├── portuguese.rs    # ルールベース G2P
-│           ├── multilingual.rs  # 多言語コードスイッチング + Unicode 言語検出
-│           └── token_map.rs     # PUA マッピング (89 固定エントリ, 正準定義)
+│           ├── multilingual.rs  # Unicode 言語検出 + MultilingualPhonemizer
+│           ├── token_map.rs     # PUA マッピング (87 固定エントリ)
+│           ├── custom_dict.rs   # カスタム辞書 (JSON v1.0/v2.0)
+│           └── phoneme_converter.rs # トークン→phoneme_id 変換
 ├── piper-cli/                 # CLI バイナリ
 │   ├── Cargo.toml
 │   └── src/
 │       └── main.rs
-├── piper-ffi/                 # C FFI 層 (Python/Swift/Kotlin 等)
-│   ├── Cargo.toml
-│   ├── src/
-│   │   └── lib.rs
-│   └── piper.h                # cbindgen 生成
-└── piper-server/              # HTTP/gRPC サーバ (将来)
-    ├── Cargo.toml
-    └── src/
-        └── main.rs
 ```
 
 ### 主要トレイト
@@ -267,6 +257,11 @@ pub trait Phonemizer: Send + Sync {
     ) -> (Vec<i64>, Vec<Option<ProsodyFeature>>);
 
     fn language_code(&self) -> &str;
+
+    /// 入力テキストから主要言語を検出 (MultilingualPhonemizer がオーバーライド)
+    fn detect_primary_language(&self, _text: &str) -> &str {
+        self.language_code()  // デフォルト: language_code() を返す
+    }
 }
 
 /// ONNX 推論エンジン
@@ -292,11 +287,13 @@ pub struct PiperVoice {
 }
 
 impl PiperVoice {
-    pub fn load(model_path: &Path, config_path: &Path) -> Result<Self, PiperError>;
-    /// 多言語モデルでは language_id を自動検出 (Unicode 範囲ベース)
-    pub fn synthesize_text(&self, text: &str, speaker_id: Option<i64>) -> Result<SynthesisResult, PiperError>;
+    pub fn load(model_path: &Path, config_path: Option<&Path>, device: &str) -> Result<Self, PiperError>;
+    pub fn synthesize_text(
+        &mut self, text: &str, speaker_id: Option<i64>,
+        language_override: Option<&str>,
+        noise_scale: f32, length_scale: f32, noise_w: f32,
+    ) -> Result<SynthesisResult, PiperError>;
     pub fn text_to_wav_file(&self, text: &str, output: &Path, speaker_id: Option<i64>) -> Result<SynthesisResult, PiperError>;
-    pub fn synthesize_streaming(&self, text: &str, speaker_id: Option<i64>, chunk_callback: impl FnMut(&[i16])) -> Result<SynthesisResult, PiperError>;
 }
 ```
 
@@ -309,18 +306,43 @@ impl PiperVoice {
 pub enum PiperError {
     #[error("config file not found: {path}")]
     ConfigNotFound { path: String },
+    #[error("invalid config: {reason}")]
+    InvalidConfig { reason: String },
     #[error("model load failed: {0}")]
-    ModelLoad(#[from] ort::Error),
+    ModelLoad(String),
     #[error("unsupported language: {code}")]
     UnsupportedLanguage { code: String },
     #[error("unknown phoneme: {phoneme}")]
     UnknownPhoneme { phoneme: String },
     #[error("inference failed: {0}")]
-    Inference(#[from] ort::Error),
+    Inference(String),
     #[error("audio output error: {0}")]
     AudioOutput(#[from] std::io::Error),
+    #[error("JSON parse error: {0}")]
+    JsonParse(#[from] serde_json::Error),
+    #[error("WAV write error: {0}")]
+    WavWrite(String),
+    #[error("phonemization error: {0}")]
+    Phonemize(String),
+    #[error("dictionary load error: {path}")]
+    DictionaryLoad { path: String },
+    #[error("jpreprocess initialization error: {0}")]
+    JPreprocessInit(String),
+    #[error("label parse error: {0}")]
+    LabelParse(String),
+    #[error("phoneme ID not found: {phoneme}")]
+    PhonemeIdNotFound { phoneme: String },
 }
 ```
+
+### Feature Flags
+
+| Feature | デフォルト | 説明 |
+|---------|----------|------|
+| `japanese` | 有効 | jpreprocess による日本語音素化 |
+| `naist-jdic` | 無効 | バンドル NAIST-JDIC 辞書 (ビルド時間増加) |
+
+`japanese` 無効時は `JapanesePhonemizer` が利用不可。多言語モデルでは `PassthroughPhonemizer` にフォールバック。
 
 ---
 
@@ -409,7 +431,7 @@ fn auto_promote_language(language: &str, language_id_map: &HashMap<String, i64>)
 
 JA 単言語モデルの `post_process_ids()` は no-op。多言語モデルでは JA も昇格されパディングが適用される。
 
-### PUA マッピングテーブル (全 89 エントリ)
+### PUA マッピングテーブル (全 87 エントリ)
 
 Python (`token_mapper.py`)、C++ (各 `*_phonemize.cpp`) と同一テーブルを `token_map.rs` に正準定義。**学習済みモデルの重みに依存するため、変更不可。**
 
@@ -594,7 +616,7 @@ fn audio_float_to_int16(audio: &[f32]) -> Vec<i16> {
 
 ## ロードマップ
 
-### Phase 1: 最小推論 (MVP) — 2-3 週間
+### Phase 1: 最小推論 (MVP) — 2-3 週間 ✅
 
 **目標**: phoneme_ids 直接入力 → ONNX 推論 → WAV 出力
 
@@ -618,7 +640,7 @@ fn audio_float_to_int16(audio: &[f32]) -> Vec<i16> {
 - 栗原法 prosody マーク (`^`, `$`, `?`, `_`, `#`, `[`, `]`)
 - 疑問詞マーカー (`?!`, `?.`, `?~` — Issue #204)
 - N 変異規則 (`N_m`, `N_n`, `N_ng`, `N_uvular` — Issue #207)
-- PUA トークンマッピング (89 固定エントリ)
+- PUA トークンマッピング (87 固定エントリ)
 - カスタム辞書 (JSON 形式、正規表現マッチ)
 - **`post_process_ids` は no-op** (BOS/EOS/パディングは phonemize 内で inline 処理)
 
@@ -629,7 +651,7 @@ fn audio_float_to_int16(audio: &[f32]) -> Vec<i16> {
   - 疑問詞マーカー (?!, ?., ?~)
   - N 変異規則 (N_m, N_n, N_ng, N_uvular)
   - PUA トークンマッピング
-- `phonemize/custom_dict.rs` — カスタム辞書 (JSON v1.0/v2.0)
+- `phonemize/custom_dict.rs` — カスタム辞書 (JSON v1.0/v2.0, CLI 統合は未完了)
 - `phonemize/phoneme_converter.rs` — トークン→ID変換
 - `voice.rs` — PiperVoice 高レベル API (テキスト→音声)
 - CLI: `--text`, `--language`, `--custom-dict` オプション追加
@@ -639,11 +661,21 @@ fn audio_float_to_int16(audio: &[f32]) -> Vec<i16> {
 
 **目標**: 7 言語対応 + テキスト → 音声の完全パイプライン
 
-**CLI 機能:**
-- `--text "テキスト"` 直接入力
-- `--language ja-en-zh` 多言語指定 (単一言語/コンボ両対応)
+**実装済み CLI オプション:**
+- `--model` ONNX モデルファイルパス (必須)
+- `--config` config.json パス (省略時は自動検出)
+- `--text "テキスト"` 直接入力 (JSONL stdin をバイパス)
+- `--language ja` 音素化の言語 (ja/en/zh/ko/es/fr/pt, デフォルト: 自動検出)
+- `--speaker` 話者 ID
+- `--output-dir` WAV 出力ディレクトリ
+- `--output-file` WAV 出力ファイル (- で stdout)
+- `--noise-scale` / `--length-scale` / `--noise-w` 合成パラメータ
+- `--device auto|cpu|gpu` デバイス選択
+- `--custom-dict` カスタム辞書パス (複数指定可、未統合)
+- `--debug` デバッグログ出力
+
+**未実装 (Phase 4):**
 - `--list-models` / `--download-model`
-- config.json フォールバック検出 (`--config` > `.onnx.json` > `config.json`)
 
 **英語 G2P** (~700 行):
 - CMU 辞書 (123K 語) JSON ロード + ルックアップ
@@ -712,12 +744,20 @@ fn audio_float_to_int16(audio: &[f32]) -> Vec<i16> {
 
 | フェーズ | 工数 | 累計 |
 |---------|------|------|
-| Phase 1: MVP (ONNX 推論) | 2-3 週 | 2-3 週 |
+| Phase 1: MVP (ONNX 推論) ✅ | 2-3 週 | 2-3 週 |
 | Phase 2: 日本語音素化 ✅ | 3-4 週 | 5-7 週 |
 | Phase 3: 多言語 G2P + CLI ✅ | 5-7 週 | 10-14 週 |
 | Phase 4: 高度な機能 | 9-12 週 | 19-26 週 |
 
 **Phase 1-3 で 7 言語対応の実用 CLI が完成 (約 2.5-3.5 ヶ月)**
+
+### テストカバレッジ
+
+| テストスイート | テスト数 |
+|---|---|
+| ユニットテスト (piper-core) | 366 |
+| 統合テスト (12 ファイル) | 282 |
+| **合計** | **648** |
 
 ---
 
@@ -729,7 +769,7 @@ fn audio_float_to_int16(audio: &[f32]) -> Vec<i16> {
 |--------|-------|------|
 | jpreprocess と pyopenjtalk-plus の出力差異 | 高 | ゴールデンテストで検証。差異時は OpenJTalk C FFI にフォールバック |
 | 7 言語 G2P の Python/C++ との出力パリティ | 高 | C++ 実装を直接移植 (出力パリティ検証済み)。言語別ゴールデンテスト |
-| PUA マッピングの Python/C++/Rust 同期 | 高 | 89 固定エントリを `token_map.rs` に正準定義。CI でクロス言語検証 |
+| PUA マッピングの Python/C++/Rust 同期 | 高 | 87 固定エントリを `token_map.rs` に正準定義。CI でクロス言語検証 |
 | フランス語 G2P の複雑さ (1200 行) | 中 | C++ 版を忠実に移植。例外辞書を JSON で管理 |
 | 英語 OOV 語の精度 | 中 | CMU 辞書で 95-98% カバー。形態論的接尾辞剥離でフォールバック |
 | `ort` crate の API 安定性 | 低 | バージョンピン。v2 は production-ready |
