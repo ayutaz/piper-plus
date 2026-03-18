@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **ONNXエクスポートFP16デフォルト化** — `export_onnx`でFP16変換をデフォルト適用し、モデルサイズを約50%削減。`--no-fp16`フラグで無効化可能。LayerNormalization/Sigmoid/SoftmaxはFP32を維持し数値安定性を確保
 - **M1: C++/Python音素化パイプライン同期** — プロソディマーク挿入(`[`/`]`/`#`)、文脈依存Nバリアント(`N_m`/`N_n`/`N_ng`/`N_uvular`)、疑問詞タイプEOSマーカー(`?!`/`?.`/`?~`)、BOS/EOS制御をC++に実装
 - **M1.5: OpenJTalkフロントエンド統一** — SourceForge版OpenJTalkバイナリ(`system()`呼び出し)からpyopenjtalk-plusのr9y9/open_jtalk Cライブラリ(API直接呼び出し)に移行。NJD後処理ルールをCにポート
 - **M2: ログ・テスト整合性** — Nバリアント/疑問詞マーカーの58ユニットテスト追加

@@ -7,6 +7,7 @@ from pathlib import Path
 
 import torch
 
+from .tools.convert_fp16 import convert_fp16
 from .vits import commons
 from .vits.lightning import VitsModel
 
@@ -104,6 +105,11 @@ def main() -> None:
         default=True,
         help="Enable stochastic sampling (z_p = m_p + noise * noise_scale). "
         "Default: enabled. Use --no-stochastic for deterministic (debugging用).",
+    )
+    parser.add_argument(
+        "--no-fp16",
+        action="store_true",
+        help="Disable FP16 conversion (default: FP16 enabled)",
     )
     args = parser.parse_args()
 
@@ -326,6 +332,28 @@ def main() -> None:
             )
         else:
             simplify_onnx_model(args.output)
+
+    # Apply FP16 conversion (default: enabled)
+    # Uses a temporary file for atomic replacement to avoid data corruption
+    if not args.no_fp16:
+        fp32_size = args.output.stat().st_size
+        tmp_fp16 = args.output.with_suffix(".onnx.fp16_tmp")
+        try:
+            convert_fp16(args.output, tmp_fp16)
+            tmp_fp16.replace(args.output)
+        except Exception:
+            tmp_fp16.unlink(missing_ok=True)
+            raise
+        fp16_size = args.output.stat().st_size
+        reduction_pct = (
+            ((fp32_size - fp16_size) / fp32_size) * 100 if fp32_size > 0 else 0
+        )
+        _LOGGER.info(
+            "FP16 conversion: %.1f MB -> %.1f MB (%.1f%% reduction)",
+            fp32_size / (1024 * 1024),
+            fp16_size / (1024 * 1024),
+            reduction_pct,
+        )
 
 
 # -----------------------------------------------------------------------------

@@ -462,10 +462,16 @@ uv run python -m piper_train \
 
 ### ONNX変換
 
+出力モデルはデフォルトで FP16 に変換されます（モデルサイズ約50%削減）。数値安定性のため LayerNormalization, Sigmoid, Softmax は FP32 のまま保持されます。FP32 出力が必要な場合は `--no-fp16` を指定してください。
+
 ```bash
-# 標準モデル
+# 標準モデル (FP16出力)
 CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
   /path/to/checkpoint.ckpt /path/to/output.onnx
+
+# FP32出力
+CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
+  --no-fp16 /path/to/checkpoint.ckpt /path/to/output.onnx
 
 # WavLMモデル (--stochastic 必須)
 CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
