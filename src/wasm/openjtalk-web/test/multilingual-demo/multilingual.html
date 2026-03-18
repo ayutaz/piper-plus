@@ -581,6 +581,10 @@
             const lidValue = langIdMap[currentLanguage] || 0;
             feeds['lid'] = new ort.Tensor('int64', new BigInt64Array([BigInt(lidValue)]), [1]);
 
+            // Add zero-filled prosody_features (required input)
+            const zeroProsody = new BigInt64Array(phonemeIds.length * 3);
+            feeds['prosody_features'] = new ort.Tensor('int64', zeroProsody, [1, phonemeIds.length, 3]);
+
             const results = await onnxSession.run(feeds);
             const audioTensor = results['output'] || results[Object.keys(results)[0]];
             

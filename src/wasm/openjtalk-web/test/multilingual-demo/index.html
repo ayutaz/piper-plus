@@ -777,7 +777,7 @@
             const langId = langIdMap[currentLanguage] || 0;
             feeds['lid'] = new ort.Tensor('int64', new BigInt64Array([BigInt(langId)]), [1]);
 
-            // Add prosody features if model supports it
+            // Add prosody features (required input for this model)
             if (prosodyFeatures && currentModelConfig.prosody_id_map) {
                 const flatProsody = [];
                 for (const [a1, a2, a3] of prosodyFeatures) {
@@ -785,6 +785,13 @@
                 }
                 feeds['prosody_features'] = new ort.Tensor('int64',
                     new BigInt64Array(flatProsody),
+                    [1, phonemeIds.length, 3]
+                );
+            } else {
+                // Zero-filled prosody for non-JA languages or when prosody data unavailable
+                const zeroProsody = new BigInt64Array(phonemeIds.length * 3);
+                feeds['prosody_features'] = new ort.Tensor('int64',
+                    zeroProsody,
                     [1, phonemeIds.length, 3]
                 );
             }

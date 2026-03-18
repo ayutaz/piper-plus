@@ -453,13 +453,18 @@
                 [1]
             );
 
+            // Add zero-filled prosody_features (required input)
+            const zeroProsody = new BigInt64Array(phonemeIds.length * 3);
+            const prosodyTensor = new ort.Tensor('int64', zeroProsody, [1, phonemeIds.length, 3]);
+
             const feeds = {
                 'input': inputTensor,
                 'input_lengths': lengthTensor,
                 'scales': scalesTensor,
-                'lid': lidTensor
+                'lid': lidTensor,
+                'prosody_features': prosodyTensor
             };
-            
+
             console.log('Running ONNX inference...');
             const results = await onnxSession.run(feeds);
             const audioTensor = results['output'] || results[Object.keys(results)[0]];
