@@ -75,8 +75,14 @@ class AudioPlayer @JvmOverloads constructor(
         }
         try {
             track.write(audio.samples, 0, audio.samples.size)
-            // Wait for playback to finish
+            // Wait for playback to actually complete — write() only buffers
+            // data; playbackHeadPosition tracks how many frames have been output.
+            val totalFrames = audio.samples.size
+            while (track.playbackHeadPosition < totalFrames && isPlaying) {
+                Thread.sleep(10)
+            }
             track.stop()
+            track.flush()
         } finally {
             synchronized(lock) {
                 isPlaying = false
@@ -95,12 +101,20 @@ class AudioPlayer @JvmOverloads constructor(
             isPlaying = true
         }
         try {
+            var totalFrames = 0
             audioFlow.collect { chunk ->
                 if (chunk.isNotEmpty()) {
                     track.write(chunk, 0, chunk.size)
+                    totalFrames += chunk.size
                 }
             }
+            // Wait for playback to actually complete — write() only buffers
+            // data; playbackHeadPosition tracks how many frames have been output.
+            while (track.playbackHeadPosition < totalFrames && isPlaying) {
+                Thread.sleep(10)
+            }
             track.stop()
+            track.flush()
         } catch (e: Exception) {
             synchronized(lock) {
                 isPlaying = false

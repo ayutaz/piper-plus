@@ -2,6 +2,7 @@
 #include "piper_jni_utils.h"
 #include "piper.hpp"
 
+#include <optional>
 #include <stdexcept>
 
 PiperEngine::PiperEngine(const std::string &modelPath, const std::string &configPath) {

@@ -130,22 +130,19 @@ class PiperTtsService : TextToSpeechService() {
             val sampleRate = audio.sampleRate
             callback.start(sampleRate, AudioFormat.ENCODING_PCM_16BIT, 1)
 
-            // Convert ShortArray to ByteArray (little-endian)
-            val byteBuffer = ByteBuffer.allocate(audio.samples.size * 2)
-                .order(ByteOrder.LITTLE_ENDIAN)
-            for (sample in audio.samples) {
-                byteBuffer.putShort(sample)
-            }
-            val bytes = byteBuffer.array()
-
-            // Send in chunks respecting maxBufferSize
+            // Convert and send samples in chunks to avoid doubling peak memory
             val maxBytes = callback.maxBufferSize
-            var sourceOffset = 0
-            while (sourceOffset < bytes.size) {
-                val size = minOf(maxBytes, bytes.size - sourceOffset)
-                val chunk = bytes.copyOfRange(sourceOffset, sourceOffset + size)
-                callback.audioAvailable(chunk, 0, size)
-                sourceOffset += size
+            val chunkSamples = maxBytes / 2 // 2 bytes per short
+            var sampleOffset = 0
+            while (sampleOffset < audio.samples.size) {
+                val remaining = audio.samples.size - sampleOffset
+                val count = minOf(chunkSamples, remaining)
+                val chunk = ByteBuffer.allocate(count * 2).order(ByteOrder.LITTLE_ENDIAN)
+                for (i in 0 until count) {
+                    chunk.putShort(audio.samples[sampleOffset + i])
+                }
+                callback.audioAvailable(chunk.array(), 0, count * 2)
+                sampleOffset += count
             }
 
             callback.done()

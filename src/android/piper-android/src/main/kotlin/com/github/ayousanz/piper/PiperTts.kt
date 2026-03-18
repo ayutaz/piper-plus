@@ -188,18 +188,19 @@ class PiperTts private constructor(
 
         synchronized(lock) {
             check(nativeHandle != 0L) { "PiperTts has been closed" }
-            try {
-                NativeBridge.nativeSynthesizeStreaming(
-                    nativeHandle, text, language, speakerId
-                ) { chunk ->
-                    trySend(chunk)
-                }
-                close()
-            } catch (e: Exception) {
-                close(e)
-            }
         }
 
+        try {
+            NativeBridge.nativeSynthesizeStreaming(
+                nativeHandle, text, language, speakerId
+            ) { chunk ->
+                trySend(chunk)
+            }
+        } catch (e: Exception) {
+            close(e)
+        }
+
+        channel.close()
         awaitClose()
     }.flowOn(Dispatchers.Default)
 
