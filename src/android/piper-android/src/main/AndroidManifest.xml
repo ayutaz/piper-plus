@@ -1,4 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Library manifest - namespace is defined in build.gradle.kts -->
+
+    <!-- TTS Service registration -->
+    <application>
+        <service
+            android:name=".PiperTtsService"
+            android:exported="true"
+            android:label="Piper TTS">
+            <intent-filter>
+                <action android:name="android.intent.action.TTS_SERVICE" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+            <meta-data
+                android:name="android.speech.tts"
+                android:resource="@xml/tts_engine" />
+        </service>
+    </application>
+
 </manifest>
