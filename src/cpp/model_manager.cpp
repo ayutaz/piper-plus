@@ -50,11 +50,11 @@ static const char* PIPER_PLUS_CATALOG_JSON = R"JSON(
         "repo": "ayousanz/piper-plus-tsukuyomi-chan",
         "files": {
             "tsukuyomi-chan-6lang-fp16.onnx": {
-                "size_bytes": 77594624,
+                "size_bytes": 39216913,
                 "md5_digest": ""
             },
             "config.json": {
-                "size_bytes": 3072,
+                "size_bytes": 8568,
                 "md5_digest": ""
             }
         },
