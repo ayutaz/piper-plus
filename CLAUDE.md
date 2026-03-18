@@ -105,9 +105,9 @@ nohup /data/piper/.venv/bin/python -m piper_train \
 | 「こんにちは、つくよみちゃんです。」 | JA | 3.05s |
 | "Hello, how are you today?" | EN | 2.54s |
 | "你好，今天天气很好。" | ZH | 1.21s |
-| "Hola, como estas hoy?" | ES | 2.86s |
+| "¿Hola, cómo estás hoy?" | ES | 2.86s |
 | "Bonjour, comment allez-vous?" | FR | 2.11s |
-| "Ola, como voce esta hoje?" | PT | 2.24s |
+| "Olá, como você está hoje?" | PT | 2.24s |
 
 **注意:** ZH の duration (1.21s) が他言語 (2-3s) と比べて短い。凍結された DP の ZH パラメータ特性による。
 
@@ -373,6 +373,8 @@ CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.infer_onnx \
   --language ja-en-zh-es-fr-pt --speaker-id 0 --noise-scale 0.667
 ```
 
+**注意:** `--language` の言語コード順は任意（内部で canonical key に正規化される）。
+
 **英語 (speaker_id=20, EN話者の先頭):**
 ```bash
 CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.infer_onnx \
@@ -390,6 +392,12 @@ cat /path/to/test.jsonl | \
     --model /path/to/model.onnx \
     --output-dir /path/to/output
 ```
+
+**JSONLフォーマット (1行1発話):**
+```json
+{"phoneme_ids": [1, 8, 5, 39, ...], "speaker_id": 0, "prosody_features": [{"a1": -2, "a2": 1, "a3": 5}, ...]}
+```
+`phoneme_ids` は必須。`speaker_id` (デフォルト: 0)、`prosody_features` (省略時はゼロ) は任意。
 
 ---
 
