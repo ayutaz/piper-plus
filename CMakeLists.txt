@@ -665,7 +665,6 @@ install(
     ${CMAKE_CURRENT_SOURCE_DIR}/src/cpp/pinyin_single.json
     ${CMAKE_CURRENT_SOURCE_DIR}/src/cpp/pinyin_phrases.json
   DESTINATION share/piper/dicts
-  OPTIONAL
 )
 
 # Install voices.json catalog for model listing/downloading

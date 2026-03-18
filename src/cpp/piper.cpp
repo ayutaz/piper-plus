@@ -490,21 +490,28 @@ void loadModel(std::string modelPath, ModelSession &session, bool useCuda, int g
 // Returns empty path on failure.
 static std::filesystem::path getExeDir() {
 #ifdef _WIN32
-  char buf[MAX_PATH];
-  DWORD len = GetModuleFileNameA(NULL, buf, sizeof(buf));
-  if (len == 0 || len >= sizeof(buf)) return {};
-  return std::filesystem::path(buf).parent_path();
+  wchar_t wpath[MAX_PATH];
+  DWORD len = GetModuleFileNameW(NULL, wpath, MAX_PATH);
+  if (len == 0 || len >= MAX_PATH) return {};
+  return std::filesystem::path(wpath).parent_path();
 #elif defined(__APPLE__)
-  char buf[1024];
-  uint32_t size = sizeof(buf);
-  if (_NSGetExecutablePath(buf, &size) != 0) return {};
-  return std::filesystem::path(buf).parent_path();
+  uint32_t size = 0;
+  _NSGetExecutablePath(nullptr, &size); // query required size
+  std::vector<char> buf(size);
+  if (_NSGetExecutablePath(buf.data(), &size) != 0) return {};
+  return std::filesystem::path(buf.data()).parent_path();
 #else
-  char buf[1024];
-  ssize_t len = readlink("/proc/self/exe", buf, sizeof(buf) - 1);
-  if (len <= 0) return {};
-  buf[len] = '\0';
-  return std::filesystem::path(buf).parent_path();
+  // Try with a reasonable initial buffer, then grow if needed
+  std::vector<char> buf(1024);
+  while (true) {
+    ssize_t len = readlink("/proc/self/exe", buf.data(), buf.size());
+    if (len <= 0) return {};
+    if (static_cast<size_t>(len) < buf.size()) {
+      buf[len] = '\0';
+      return std::filesystem::path(buf.data()).parent_path();
+    }
+    buf.resize(buf.size() * 2);
+  }
 #endif
 }
 
@@ -529,8 +536,11 @@ static std::string findDictionaryFile(const std::string &filename,
   if (!exeDir.empty()) {
     fs::path p2 = exeDir / ".." / "share" / "piper" / "dicts" / filename;
     if (fs::exists(p2)) {
-      spdlog::debug("Dictionary '{}' found in exe-relative dir: {}", filename, p2.string());
-      return fs::canonical(p2).string();
+      std::error_code ec;
+      auto resolved = fs::weakly_canonical(p2, ec);
+      std::string checkPath = ec ? p2.string() : resolved.string();
+      spdlog::debug("Dictionary '{}' found in exe-relative dir: {}", filename, checkPath);
+      return checkPath;
     }
   }
 
@@ -606,6 +616,10 @@ void loadVoice(PiperConfig &config, std::string modelPath,
   std::string pinyinSinglePath = findDictionaryFile("pinyin_single.json", modelDir);
   std::string pinyinPhrasePath = findDictionaryFile("pinyin_phrases.json", modelDir);
   if (!pinyinSinglePath.empty()) {
+    if (pinyinPhrasePath.empty()) {
+      spdlog::warn("pinyin_single.json found but pinyin_phrases.json is missing; "
+                   "Chinese phrase-level G2P will be degraded");
+    }
     if (loadPinyinDicts(pinyinSinglePath, pinyinPhrasePath,
                         voice.pinyinSingleDict, voice.pinyinPhraseDict)) {
       spdlog::info("Loaded pinyin dictionaries (single={}, phrases={}) from {}",
@@ -1201,8 +1215,10 @@ void textToAudio(PiperConfig &config, Voice &voice, std::string text,
             phonemize_portuguese(langSeg.text, langPhonemes);
           } else if (langSeg.lang == "en") {
             // English: CMU dictionary-based G2P
-            if (voice.cmuDict.empty()) {
+            static bool warnedNoCmuDict = false;
+            if (voice.cmuDict.empty() && !warnedNoCmuDict) {
               spdlog::warn("English CMU dictionary not loaded; English text may not be phonemized correctly");
+              warnedNoCmuDict = true;
             }
             phonemize_english(langSeg.text, langPhonemes, voice.cmuDict);
             // Check if CMU dict produced any phonemes
@@ -1215,8 +1231,10 @@ void textToAudio(PiperConfig &config, Voice &voice, std::string text,
             }
           } else if (langSeg.lang == "zh") {
             // Chinese: pypinyin-based G2P
-            if (voice.pinyinSingleDict.empty()) {
+            static bool warnedNoPinyinDict = false;
+            if (voice.pinyinSingleDict.empty() && !warnedNoPinyinDict) {
               spdlog::warn("Chinese pinyin dictionary not loaded; Chinese text may not be phonemized correctly");
+              warnedNoPinyinDict = true;
             }
             phonemize_chinese(langSeg.text, langPhonemes,
                               voice.pinyinSingleDict, voice.pinyinPhraseDict);
