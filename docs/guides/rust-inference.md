@@ -599,11 +599,13 @@ fn audio_float_to_int16(audio: &[f32]) -> Vec<i16> {
 **目標**: phoneme_ids 直接入力 → ONNX 推論 → WAV 出力
 
 - `ort` による ONNX セッション管理
-- `config.json` パース (`phoneme_id_map`, `sample_rate`, `language_id_map`)
+- `config.json` パース (`phoneme_id_map`, `sample_rate`, `language_id_map`, `phoneme_type`)
 - phoneme_ids + input_lengths + scales テンソル構築
 - sid / lid / prosody_features オプション対応 (多言語モデル含む)
-- 16-bit PCM WAV 書き出し
+- `phoneme_type` による動作分岐判定 (`openjtalk` / `bilingual` / `multilingual`)
+- 16-bit PCM WAV 書き出し (ピーク正規化)
 - JSONL stdin 入力 (Python 互換)
+- `--device auto|cpu|gpu` デバイス選択
 
 **検証基準**: Python `infer_onnx.py` と同一 phoneme_ids で同一 WAV 出力
 
@@ -612,33 +614,75 @@ fn audio_float_to_int16(audio: &[f32]) -> Vec<i16> {
 **目標**: テキスト → phoneme_ids + prosody_features の日本語パイプライン
 
 - jpreprocess による fullcontext label 生成
-- A1/A2/A3 抽出 + 栗原法 prosody マーク
-- 疑問詞マーカー / N 変異規則
+- A1/A2/A3 抽出 (正規表現: `/A:([\d-]+)\+`, `\+([0-9]+)\+`, `\+([0-9]+)/`)
+- 栗原法 prosody マーク (`^`, `$`, `?`, `_`, `#`, `[`, `]`)
+- 疑問詞マーカー (`?!`, `?.`, `?~` — Issue #204)
+- N 変異規則 (`N_m`, `N_n`, `N_ng`, `N_uvular` — Issue #207)
 - PUA トークンマッピング (89 固定エントリ)
-- カスタム辞書
+- カスタム辞書 (JSON 形式、正規表現マッチ)
+- **`post_process_ids` は no-op** (BOS/EOS/パディングは phonemize 内で inline 処理)
 
-### Phase 3: 多言語 G2P + CLI — 4-6 週間
+### Phase 3: 多言語 G2P + CLI — 5-7 週間
 
 **目標**: 7 言語対応 + テキスト → 音声の完全パイプライン
 
-- `--text "テキスト"` 直接入力 + `--language ja-en-zh` 多言語指定
+**CLI 機能:**
+- `--text "テキスト"` 直接入力
+- `--language ja-en-zh` 多言語指定 (単一言語/コンボ両対応)
 - `--list-models` / `--download-model`
-- 英語 G2P (CMU 辞書 + ARPAbet→IPA)
-- 中国語 G2P (pypinyin 辞書 + ピンイン→IPA + 声調サンドヒ)
-- 韓国語 G2P (Hangul 分解 + jamo→IPA)
-- スペイン語/フランス語/ポルトガル語 G2P (ルールベース)
-- Unicode 言語検出 + 多言語コードスイッチング
+- config.json フォールバック検出 (`--config` > `.onnx.json` > `config.json`)
+
+**英語 G2P** (~700 行):
+- CMU 辞書 (123K 語) JSON ロード + ルックアップ
+- ARPAbet→IPA 変換 + 文脈依存ルール (`AA+R→ɑːɹ`, `ER1→ɜː`, `ER0→ɚ`)
+- 機能語ストレス除去 (97 語)
+- OOV フォールバック: 形態論的接尾辞剥離 (-ing, -ed, -s, -er, -ly, -est)
+- `post_process_ids`: BOS + インタースパースパディング + EOS
+
+**中国語 G2P** (~900 行):
+- pypinyin 辞書 (単文字 8.1K + フレーズ 8.5K) JSON ロード
+- 多音字フレーズマッチング (最長一致)
+- ピンイン正規化 (y/w プレフィクス除去、v→ü)
+- 声調サンドヒ 4 規則 (T3+T3, 一, 不)
+- ピンイン→IPA 変換 (声母 21 + 韻母 45+)
+- 儿化 (erhua) 処理
+- プロソディ: a1=声調(1-5), a2=音節位置, a3=単語内音節数
+
+**韓国語 G2P** (~500 行):
+- Hangul 音節分解 (算術: `(code - 0xAC00) / (21*28)`, etc.)
+- 初声 19 + 中声 21 + 終声 28 の IPA テーブル
+- 基本 liaison (連音化) 規則
+
+**スペイン語 G2P** (~900 行):
+- ルールベース (seseo: c/z→s, 文脈依存 b/d/g→β/ð/ɣ)
+- ストレス規則 (アクセント記号 + 語末判定)
+- 機能語ストレス除去 (30+ 語)
+
+**フランス語 G2P** (~1300 行, 最も複雑):
+- 鼻母音 (ɛ̃, ɑ̃, ɔ̃), 無音末尾子音, -tion/-ille パターン
+- 前舌丸め母音 (ø, œ, y_vowel), 半母音 (ɥ)
+- リエゾン, 例外辞書 (ville, mille 等)
+
+**ポルトガル語 G2P** (~1000 行):
+- 鼻母音 (ã, ẽ, ĩ, õ, ũ), coda-l→w, t/d 口蓋化
+- r の多型 (語頭/coda: ʁ, 母音間: ɾ)
+
+**多言語基盤:**
+- Unicode 言語検出 (`UnicodeLanguageDetector`)
+- テキストセグメンテーション (言語別に分割して各 Phonemizer に委譲)
 - 言語レジストリ (trait + 動的ディスパッチ + 正規化キャッシング)
-- 言語自動プロモーション (JA → 多言語モデル時)
+- 言語自動プロモーション (JA → 多言語モデル時にパディング適用)
+- 非 JA 言語のプロソディ計算 (`computeNonJaProsody` 相当)
 
 ### Phase 4: 高度な機能
 
 | サブフェーズ | 内容 | 工数 |
 |------------|------|------|
-| 4a | ストリーミング再生 (rodio + ringbuf) | 2 週間 |
-| 4b | WASM 対応 (ort tract backend) | 3-4 週間 |
-| 4c | GPU 推論 (CUDA/CoreML feature flag) | 1-2 週間 |
-| 4d | PyO3 Python バインディング | 2-3 週間 |
+| 4a | ストリーミング再生 (rodio + ringbuf + クロスフェード) | 2 週間 |
+| 4b | phoneme timing 出力 (JSON/TSV, duration テンソルから抽出) | 1 週間 |
+| 4c | WASM 対応 (ort tract backend) | 3-4 週間 |
+| 4d | GPU 推論 (CUDA/CoreML feature flag) | 1-2 週間 |
+| 4e | PyO3 Python バインディング | 2-3 週間 |
 
 ### 工数サマリ
 
@@ -646,10 +690,10 @@ fn audio_float_to_int16(audio: &[f32]) -> Vec<i16> {
 |---------|------|------|
 | Phase 1: MVP (ONNX 推論) | 2-3 週 | 2-3 週 |
 | Phase 2: 日本語音素化 | 3-4 週 | 5-7 週 |
-| Phase 3: 多言語 G2P + CLI | 4-6 週 | 9-13 週 |
-| Phase 4: 高度な機能 | 8-11 週 | 17-24 週 |
+| Phase 3: 多言語 G2P + CLI | 5-7 週 | 10-14 週 |
+| Phase 4: 高度な機能 | 9-12 週 | 19-26 週 |
 
-**Phase 1-3 で 7 言語対応の実用 CLI が完成 (約 2-3 ヶ月)**
+**Phase 1-3 で 7 言語対応の実用 CLI が完成 (約 2.5-3.5 ヶ月)**
 
 ---
 
