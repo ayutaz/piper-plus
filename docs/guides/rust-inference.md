@@ -164,9 +164,11 @@ config.json 検出順序:
 | エラー (lib) | `thiserror` | ✅ 使用中 | MIT/Apache-2.0 | ライブラリ層のエラー型定義 |
 | エラー (bin) | `anyhow` | ✅ 使用中 | MIT/Apache-2.0 | CLI 層のエラーハンドリング |
 | ログ | `tracing` | ✅ 使用中 | MIT | spdlog 相当 |
-| 音声再生 | `rodio` | 未実装 (Phase 4) | MIT/Apache-2.0 | cpal 上位 API。ストリーミング対応 |
-| HTTP | `reqwest` | 未実装 (Phase 4) | MIT/Apache-2.0 | モデルダウンロード |
-| リサンプリング | `rubato` | 未実装 (Phase 4) | MIT | 22050Hz → デバイス SR 変換 (任意) |
+| 音声再生 | `rodio` 0.19 | ✅ 使用中 (feature-gated) | MIT/Apache-2.0 | cpal 上位 API。ストリーミング対応 |
+| HTTP | `reqwest` 0.12 | ✅ 使用中 (feature-gated) | MIT/Apache-2.0 | モデルダウンロード |
+| リサンプリング | `rubato` 0.16 | ✅ 使用中 (feature-gated) | MIT | 22050Hz → デバイス SR 変換 (任意) |
+| Python バインディング | `pyo3` | ✅ 使用中 | MIT/Apache-2.0 | PyO3 Python バインディング |
+| NumPy 連携 | `numpy` (pyo3) | ✅ 使用中 | MIT/Apache-2.0 | numpy 配列出力 |
 
 ### ONNX Runtime ライブラリ比較
 
@@ -206,17 +208,27 @@ config.json 検出順序:
 
 ```
 src/rust/
-├── Cargo.toml                 (workspace root)
+├── Cargo.toml                 (workspace root: piper-core, piper-cli, piper-python)
 ├── piper-core/                # 推論エンジン + 音素化 (ライブラリ)
 │   ├── Cargo.toml
 │   └── src/
 │       ├── lib.rs
-│       ├── error.rs            # thiserror 定義 (10 バリアント)
+│       ├── error.rs            # thiserror 定義 (22 バリアント)
 │       ├── config.rs           # config.json / phoneme_id_map
-│       ├── engine.rs           # ort ONNX 推論
+│       ├── engine.rs           # ort ONNX 推論 + GPU EP統合
 │       ├── audio.rs            # WAV 出力 / PCM 変換
 │       ├── input.rs            # JSONL stdin 入力パーサ
 │       ├── voice.rs            # PiperVoice 高レベル API
+│       ├── streaming.rs        # AudioSink trait + ストリーミング合成
+│       ├── playback.rs         # rodio リアルタイム再生 (feature-gated)
+│       ├── timing.rs           # 音素タイミング (JSON/TSV/SRT)
+│       ├── gpu.rs              # GPU ExecutionProvider (CUDA/CoreML/DirectML/TensorRT)
+│       ├── wasm.rs             # WASM 互換 API (in-memory)
+│       ├── model_download.rs   # HuggingFace モデルダウンロード (feature-gated)
+│       ├── audio_format.rs     # リサンプリング + フォーマット変換
+│       ├── text_splitter.rs    # センテンス分割 (略語対応)
+│       ├── device.rs           # デバイス列挙 + 自動選択
+│       ├── batch.rs            # バッチ合成
 │       └── phonemize/
 │           ├── mod.rs           # Phonemizer trait + レジストリ
 │           ├── japanese.rs      # jpreprocess ベース (feature-gated)
@@ -234,6 +246,11 @@ src/rust/
 │   ├── Cargo.toml
 │   └── src/
 │       └── main.rs
+├── piper-python/              # PyO3 Python バインディング
+│   ├── Cargo.toml
+│   ├── pyproject.toml          # maturin ビルド設定
+│   └── src/
+│       └── lib.rs              # PiperVoice + SynthesisResult Python クラス
 ```
 
 ### 主要トレイト
@@ -264,15 +281,13 @@ pub trait Phonemizer: Send + Sync {
     }
 }
 
-/// ONNX 推論エンジン
-pub trait TTSEngine: Send + Sync {
-    fn synthesize(&self, request: &SynthesisRequest) -> Result<SynthesisResult, PiperError>;
-    fn capabilities(&self) -> &ModelCapabilities;
-}
+/// ONNX 推論エンジン (具象構造体、トレイトではない)
+/// OnnxEngine は ort セッションを保持し、GPU EP 統合 + duration テンソル抽出を行う
+pub struct OnnxEngine { /* ... */ }
 
-/// オーディオ出力先
-pub trait AudioOutput: Send {
-    fn write_samples(&mut self, samples: &[i16], sample_rate: u32) -> Result<(), PiperError>;
+/// オーディオ出力先 (ストリーミング合成用)
+pub trait AudioSink: Send {
+    fn write_chunk(&mut self, samples: &[i16], sample_rate: u32) -> Result<(), PiperError>;
     fn finalize(&mut self) -> Result<(), PiperError>;
 }
 ```
@@ -293,7 +308,15 @@ impl PiperVoice {
         language_override: Option<&str>,
         noise_scale: f32, length_scale: f32, noise_w: f32,
     ) -> Result<SynthesisResult, PiperError>;
-    pub fn text_to_wav_file(&self, text: &str, output: &Path, speaker_id: Option<i64>) -> Result<SynthesisResult, PiperError>;
+    pub fn text_to_wav_file(&mut self, text: &str, output: &Path, speaker_id: Option<i64>) -> Result<SynthesisResult, PiperError>;
+}
+
+pub struct SynthesisResult {
+    pub audio: Vec<i16>,
+    pub sample_rate: u32,
+    pub infer_seconds: f64,
+    pub audio_seconds: f64,
+    pub durations: Option<Vec<f32>>,  // Phase 4: 音素デュレーション
 }
 ```
 
@@ -332,6 +355,22 @@ pub enum PiperError {
     LabelParse(String),
     #[error("phoneme ID not found: {phoneme}")]
     PhonemeIdNotFound { phoneme: String },
+    #[error("streaming error: {0}")]
+    Streaming(String),
+    #[error("playback error: {0}")]
+    Playback(String),
+    #[error("timing error: {0}")]
+    Timing(String),
+    #[error("download error: {0}")]
+    Download(String),
+    #[error("resampling error: {0}")]
+    Resample(String),
+    #[error("device error: {0}")]
+    Device(String),
+    #[error("batch processing error: {0}")]
+    Batch(String),
+    #[error("WASM error: {0}")]
+    Wasm(String),
 }
 ```
 
@@ -341,6 +380,13 @@ pub enum PiperError {
 |---------|----------|------|
 | `japanese` | 有効 | jpreprocess による日本語音素化 |
 | `naist-jdic` | 無効 | バンドル NAIST-JDIC 辞書 (ビルド時間増加) |
+| `playback` | 無効 | rodio によるリアルタイム音声再生 |
+| `download` | 無効 | reqwest による HTTP モデルダウンロード |
+| `resample` | 無効 | rubato による高品質リサンプリング |
+| `cuda` | 無効 | CUDA ExecutionProvider (NVIDIA GPU) |
+| `coreml` | 無効 | CoreML ExecutionProvider (macOS) |
+| `directml` | 無効 | DirectML ExecutionProvider (Windows) |
+| `tensorrt` | 無効 | TensorRT ExecutionProvider (NVIDIA 最適化) |
 
 `japanese` 無効時は `JapanesePhonemizer` が利用不可。多言語モデルでは `PassthroughPhonemizer` にフォールバック。
 
@@ -673,9 +719,11 @@ fn audio_float_to_int16(audio: &[f32]) -> Vec<i16> {
 - `--device auto|cpu|gpu` デバイス選択
 - `--custom-dict` カスタム辞書パス (複数指定可、未統合)
 - `--debug` デバッグログ出力
-
-**未実装 (Phase 4):**
-- `--list-models` / `--download-model`
+- `--stream` ストリーミング合成 (センテンス単位)
+- `--timing json|tsv|srt` 音素タイミング出力
+- `--list-devices` 利用可能デバイス一覧
+- `--list-models` 利用可能モデル一覧
+- `--batch FILE` バッチ処理 (テキストファイルから)
 
 **英語 G2P** (~700 行):
 - CMU 辞書 (123K 語) JSON ロード + ルックアップ
@@ -730,15 +778,30 @@ fn audio_float_to_int16(audio: &[f32]) -> Vec<i16> {
   - Unicode言語検出、テキストセグメンテーション、BOS/EOS/インタースパースパディング
 - `voice.rs` — Bilingual/Multilingual phoneme type 対応
 
-### Phase 4: 高度な機能
+### Phase 4: 高度な機能 ✅
 
-| サブフェーズ | 内容 | 工数 |
-|------------|------|------|
-| 4a | ストリーミング再生 (rodio + ringbuf + クロスフェード) | 2 週間 |
-| 4b | phoneme timing 出力 (JSON/TSV, duration テンソルから抽出) | 1 週間 |
-| 4c | WASM 対応 (ort tract backend) | 3-4 週間 |
-| 4d | GPU 推論 (CUDA/CoreML feature flag) | 1-2 週間 |
-| 4e | PyO3 Python バインディング | 2-3 週間 |
+| サブフェーズ | 内容 | 工数 | 状態 |
+|------------|------|------|------|
+| 4a | ストリーミング再生 (rodio + ringbuf + クロスフェード) | 2 週間 | ✅ |
+| 4b | phoneme timing 出力 (JSON/TSV/SRT, duration テンソルから抽出) | 1 週間 | ✅ |
+| 4c | WASM 対応 (in-memory model loading) | 3-4 週間 | ✅ |
+| 4d | GPU 推論 (CUDA/CoreML/DirectML/TensorRT feature flag) | 1-2 週間 | ✅ |
+| 4e | PyO3 Python バインディング | 2-3 週間 | ✅ |
+
+**実装済み (Phase 4):**
+- `streaming.rs` — AudioSink trait, BufferSink, WavFileSink, crossfade, split_sentences
+- `playback.rs` — RodioPlayer (feature-gated), DummyPlayer, CollectorSink
+- `timing.rs` — PhonemeTimingInfo, duration→timestamp変換, JSON/TSV/SRT出力
+- `gpu.rs` — DeviceType, parse_device_string, configure_session_builder (CUDA/CoreML/DirectML/TensorRT)
+- `device.rs` — DeviceKind, DeviceSelection, enumerate_devices, auto()
+- `wasm.rs` — WasmVoice (in-memory model loading), samples_to_wav_bytes
+- `model_download.rs` — ModelInfo, HuggingFace URL, builtin_registry (feature-gated)
+- `audio_format.rs` — resample_linear, resample_sinc (feature-gated), mono/stereo, normalize, fade, concat
+- `text_splitter.rs` — split_sentences (略語対応), split_chunks, SplitConfig
+- `batch.rs` — BatchJob, BatchResult, BatchSummary, jobs_from_text_file, jobs_from_jsonl
+- `piper-python/` — PyO3 PiperVoice + SynthesisResult (numpy出力, GIL解放)
+- engine.rs: GPU EP統合 + duration テンソル抽出
+- CLI: --stream, --timing, --list-devices, --list-models, --batch
 
 ### 工数サマリ
 
@@ -747,7 +810,7 @@ fn audio_float_to_int16(audio: &[f32]) -> Vec<i16> {
 | Phase 1: MVP (ONNX 推論) ✅ | 2-3 週 | 2-3 週 |
 | Phase 2: 日本語音素化 ✅ | 3-4 週 | 5-7 週 |
 | Phase 3: 多言語 G2P + CLI ✅ | 5-7 週 | 10-14 週 |
-| Phase 4: 高度な機能 | 9-12 週 | 19-26 週 |
+| Phase 4: 高度な機能 ✅ | 9-12 週 | 19-26 週 |
 
 **Phase 1-3 で 7 言語対応の実用 CLI が完成 (約 2.5-3.5 ヶ月)**
 
@@ -755,9 +818,9 @@ fn audio_float_to_int16(audio: &[f32]) -> Vec<i16> {
 
 | テストスイート | テスト数 |
 |---|---|
-| ユニットテスト (piper-core) | 366 |
-| 統合テスト (12 ファイル) | 282 |
-| **合計** | **648** |
+| ユニットテスト (piper-core) | 633 |
+| 統合テスト (20 ファイル) | 594 |
+| **合計** | **1,227** |
 
 ---
 
