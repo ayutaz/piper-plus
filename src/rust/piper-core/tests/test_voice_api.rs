@@ -1,13 +1,9 @@
-use std::path::PathBuf;
 use piper_core::PiperVoice;
+use std::path::PathBuf;
 
 #[test]
 fn test_load_missing_model_fails() {
-    let result = PiperVoice::load(
-        &PathBuf::from("/nonexistent/model.onnx"),
-        None,
-        "cpu",
-    );
+    let result = PiperVoice::load(&PathBuf::from("/nonexistent/model.onnx"), None, "cpu");
     assert!(result.is_err());
 }
 
@@ -30,9 +26,17 @@ use std::collections::HashMap;
 #[test]
 fn test_prosody_to_features_preserves_values() {
     let prosody = vec![
-        Some(ProsodyInfo { a1: -3, a2: 2, a3: 7 }),
+        Some(ProsodyInfo {
+            a1: -3,
+            a2: 2,
+            a3: 7,
+        }),
         None,
-        Some(ProsodyInfo { a1: 0, a2: 1, a3: 3 }),
+        Some(ProsodyInfo {
+            a1: 0,
+            a2: 1,
+            a3: 3,
+        }),
     ];
     let features = phoneme_converter::prosody_to_features(&prosody);
     assert_eq!(features.len(), 3);

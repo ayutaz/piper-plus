@@ -3,7 +3,9 @@
 //! Verifies duration-to-timestamp conversion, serialization formats
 //! (JSON / TSV / SRT), edge cases, and timing invariants.
 
-use piper_core::timing::{durations_to_timing, PhonemeTimingInfo, TimingResult, DEFAULT_HOP_LENGTH};
+use piper_core::timing::{
+    durations_to_timing, PhonemeTimingInfo, TimingResult, DEFAULT_HOP_LENGTH,
+};
 
 // =========================================================================
 // Helper
@@ -93,9 +95,7 @@ fn test_equal_durations() {
             i
         );
     }
-    assert!(
-        (result.total_duration_ms - n as f64 * dur_val as f64 * ms).abs() < 1e-6
-    );
+    assert!((result.total_duration_ms - n as f64 * dur_val as f64 * ms).abs() < 1e-6);
 }
 
 // =========================================================================
@@ -418,11 +418,7 @@ fn test_srt_timestamp_format() {
         let hms: Vec<&str> = segments[0].split(':').collect();
         assert_eq!(hms.len(), 3, "should have HH:MM:SS");
         // Milliseconds part
-        assert_eq!(
-            segments[1].len(),
-            3,
-            "milliseconds should be 3 digits"
-        );
+        assert_eq!(segments[1].len(), 3, "milliseconds should be 3 digits");
     }
 }
 

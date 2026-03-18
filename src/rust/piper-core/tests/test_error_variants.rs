@@ -24,7 +24,10 @@ fn test_invalid_config() {
         reason: "missing field".to_string(),
     };
     let msg = format!("{}", err);
-    assert!(msg.contains("missing field"), "Display should contain reason");
+    assert!(
+        msg.contains("missing field"),
+        "Display should contain reason"
+    );
     assert!(
         msg.contains("invalid config"),
         "Display should mention invalid config"
@@ -321,10 +324,7 @@ fn test_playback() {
         msg.contains("no audio device"),
         "Display should contain inner message"
     );
-    assert!(
-        msg.contains("playback"),
-        "Display should mention playback"
-    );
+    assert!(msg.contains("playback"), "Display should mention playback");
     let dbg = format!("{:?}", err);
     assert!(!dbg.is_empty());
     match err {
@@ -360,10 +360,7 @@ fn test_download() {
         msg.contains("404 not found"),
         "Display should contain inner message"
     );
-    assert!(
-        msg.contains("download"),
-        "Display should mention download"
-    );
+    assert!(msg.contains("download"), "Display should mention download");
     let dbg = format!("{:?}", err);
     assert!(!dbg.is_empty());
     match err {

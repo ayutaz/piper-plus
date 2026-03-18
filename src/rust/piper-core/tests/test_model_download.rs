@@ -34,7 +34,10 @@ fn test_huggingface_url_empty_filename() {
 
 #[test]
 fn test_huggingface_url_real_repo() {
-    let url = huggingface_url("ayousanz/piper-plus-tsukuyomi-chan", "tsukuyomi-6lang-v2-fixed.onnx");
+    let url = huggingface_url(
+        "ayousanz/piper-plus-tsukuyomi-chan",
+        "tsukuyomi-6lang-v2-fixed.onnx",
+    );
     assert_eq!(
         url,
         "https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/tsukuyomi-6lang-v2-fixed.onnx"
@@ -180,7 +183,10 @@ fn test_parse_model_registry_missing_name_field() {
 
 #[test]
 fn test_is_model_cached_nonexistent_directory() {
-    assert!(!is_model_cached("model", Path::new("/nonexistent/path/that/does/not/exist")));
+    assert!(!is_model_cached(
+        "model",
+        Path::new("/nonexistent/path/that/does/not/exist")
+    ));
 }
 
 #[test]

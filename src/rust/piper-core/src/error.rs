@@ -45,7 +45,6 @@ pub enum PiperError {
     PhonemeIdNotFound { phoneme: String },
 
     // --- Phase 4 error variants ---
-
     #[error("streaming error: {0}")]
     Streaming(String),
 

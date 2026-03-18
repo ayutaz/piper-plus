@@ -56,56 +56,56 @@ static FINAL_TO_IPA: LazyLock<HashMap<&'static str, &'static str>> = LazyLock::n
         // Simple vowels
         ("a", "a"),
         ("o", "o"),
-        ("e", "\u{0264}"),        // ɤ close-mid back unrounded
+        ("e", "\u{0264}"), // ɤ close-mid back unrounded
         ("i", "i"),
         ("u", "u"),
-        ("\u{00fc}", "y_vowel"),  // ü -> y_vowel
+        ("\u{00fc}", "y_vowel"), // ü -> y_vowel
         ("v", "y_vowel"),
         // Diphthongs
-        ("ai", "a\u{026a}"),      // aɪ
-        ("ei", "e\u{026a}"),      // eɪ
-        ("ao", "a\u{028a}"),      // aʊ
-        ("ou", "o\u{028a}"),      // oʊ
+        ("ai", "a\u{026a}"), // aɪ
+        ("ei", "e\u{026a}"), // eɪ
+        ("ao", "a\u{028a}"), // aʊ
+        ("ou", "o\u{028a}"), // oʊ
         // Nasal finals
         ("an", "an"),
-        ("en", "\u{0259}n"),      // ən
-        ("ang", "a\u{014b}"),     // aŋ
+        ("en", "\u{0259}n"),         // ən
+        ("ang", "a\u{014b}"),        // aŋ
         ("eng", "\u{0259}\u{014b}"), // əŋ
-        ("ong", "u\u{014b}"),     // uŋ
+        ("ong", "u\u{014b}"),        // uŋ
         // Retroflex final
-        ("er", "\u{025a}"),       // ɚ
+        ("er", "\u{025a}"), // ɚ
         // i-compound finals (齐齿呼)
         ("ia", "ia"),
-        ("ie", "i\u{025b}"),     // iɛ
-        ("iao", "ia\u{028a}"),   // iaʊ
+        ("ie", "i\u{025b}"),   // iɛ
+        ("iao", "ia\u{028a}"), // iaʊ
         ("iu", "iou"),
         ("iou", "iou"),
-        ("ian", "i\u{025b}n"),   // iɛn
+        ("ian", "i\u{025b}n"), // iɛn
         ("in", "in"),
-        ("iang", "ia\u{014b}"),  // iaŋ
-        ("ing", "i\u{014b}"),    // iŋ
-        ("iong", "iu\u{014b}"),  // iuŋ
+        ("iang", "ia\u{014b}"), // iaŋ
+        ("ing", "i\u{014b}"),   // iŋ
+        ("iong", "iu\u{014b}"), // iuŋ
         // u-compound finals (合口呼)
         ("ua", "ua"),
         ("uo", "uo"),
-        ("uai", "ua\u{026a}"),   // uaɪ
-        ("ui", "ue\u{026a}"),    // ueɪ
-        ("uei", "ue\u{026a}"),   // ueɪ
+        ("uai", "ua\u{026a}"), // uaɪ
+        ("ui", "ue\u{026a}"),  // ueɪ
+        ("uei", "ue\u{026a}"), // ueɪ
         ("uan", "uan"),
-        ("un", "u\u{0259}n"),    // uən
-        ("uen", "u\u{0259}n"),   // uən
-        ("uang", "ua\u{014b}"),  // uaŋ
+        ("un", "u\u{0259}n"),          // uən
+        ("uen", "u\u{0259}n"),         // uən
+        ("uang", "ua\u{014b}"),        // uaŋ
         ("ueng", "u\u{0259}\u{014b}"), // uəŋ
         // ü-compound finals (撮口呼) — using actual ü char
-        ("\u{00fc}e", "y\u{025b}"),    // yɛ
+        ("\u{00fc}e", "y\u{025b}"), // yɛ
         ("ve", "y\u{025b}"),
-        ("\u{00fc}an", "y\u{025b}n"),  // yɛn
+        ("\u{00fc}an", "y\u{025b}n"), // yɛn
         ("van", "y\u{025b}n"),
-        ("\u{00fc}n", "yn"),           // yn
+        ("\u{00fc}n", "yn"), // yn
         ("vn", "yn"),
         // Syllabic consonants (internal keys from split_pinyin)
-        ("-i_retroflex", "\u{027b}\u{0329}"),  // ɻ̩
-        ("-i_alveolar", "\u{0268}"),           // ɨ
+        ("-i_retroflex", "\u{027b}\u{0329}"), // ɻ̩
+        ("-i_alveolar", "\u{0268}"),          // ɨ
     ]
     .into_iter()
     .collect()
@@ -113,12 +113,8 @@ static FINAL_TO_IPA: LazyLock<HashMap<&'static str, &'static str>> = LazyLock::n
 
 /// Ordered list of consonant initials (two-char first for prefix matching).
 const INITIALS_ORDER: &[&str] = &[
-    "zh", "ch", "sh",
-    "b", "p", "m", "f",
-    "d", "t", "n", "l",
-    "g", "k", "h",
-    "j", "q", "x",
-    "r", "z", "c", "s",
+    "zh", "ch", "sh", "b", "p", "m", "f", "d", "t", "n", "l", "g", "k", "h", "j", "q", "x", "r",
+    "z", "c", "s",
 ];
 
 static RETROFLEX_INITIALS: LazyLock<HashSet<&'static str>> =
@@ -133,19 +129,19 @@ static ALVEOLAR_INITIALS: LazyLock<HashSet<&'static str>> =
 
 fn map_zh_punct(cp: char) -> Option<char> {
     match cp {
-        '\u{3002}' => Some('.'),   // 。
-        '\u{ff0c}' => Some(','),   // ，
-        '\u{ff01}' => Some('!'),   // ！
-        '\u{ff1f}' => Some('?'),   // ？
-        '\u{3001}' => Some(','),   // 、
-        '\u{ff1b}' => Some(';'),   // ；
-        '\u{ff1a}' => Some(':'),   // ：
-        '\u{2026}' => Some('.'),   // …
-        '\u{2014}' => Some(','),   // —
-        '\u{201c}' => Some('"'),   // "
-        '\u{201d}' => Some('"'),   // "
-        '\u{2018}' => Some('\''),  // '
-        '\u{2019}' => Some('\''),  // '
+        '\u{3002}' => Some('.'),  // 。
+        '\u{ff0c}' => Some(','),  // ，
+        '\u{ff01}' => Some('!'),  // ！
+        '\u{ff1f}' => Some('?'),  // ？
+        '\u{3001}' => Some(','),  // 、
+        '\u{ff1b}' => Some(';'),  // ；
+        '\u{ff1a}' => Some(':'),  // ：
+        '\u{2026}' => Some('.'),  // …
+        '\u{2014}' => Some(','),  // —
+        '\u{201c}' => Some('"'),  // "
+        '\u{201d}' => Some('"'),  // "
+        '\u{2018}' => Some('\''), // '
+        '\u{2019}' => Some('\''), // '
         _ => None,
     }
 }
@@ -153,11 +149,24 @@ fn map_zh_punct(cp: char) -> Option<char> {
 fn is_zh_punctuation(cp: char) -> bool {
     matches!(
         cp,
-        ',' | '.' | ';' | ':' | '!' | '?'
-            | '\u{3002}' | '\u{ff0c}' | '\u{ff01}' | '\u{ff1f}'
-            | '\u{3001}' | '\u{ff1b}' | '\u{ff1a}'
-            | '\u{201c}' | '\u{201d}' | '\u{2018}' | '\u{2019}'
-            | '\u{2026}' | '\u{2014}'
+        ',' | '.'
+            | ';'
+            | ':'
+            | '!'
+            | '?'
+            | '\u{3002}'
+            | '\u{ff0c}'
+            | '\u{ff01}'
+            | '\u{ff1f}'
+            | '\u{3001}'
+            | '\u{ff1b}'
+            | '\u{ff1a}'
+            | '\u{201c}'
+            | '\u{201d}'
+            | '\u{2018}'
+            | '\u{2019}'
+            | '\u{2026}'
+            | '\u{2014}'
     )
 }
 
@@ -582,13 +591,25 @@ fn phonemize_chinese_internal(
                 prosody_list.push(None);
             } else if ch.is_whitespace() {
                 phonemes.push(" ".to_string());
-                prosody_list.push(Some(ProsodyInfo { a1: 0, a2: 0, a3: 0 }));
+                prosody_list.push(Some(ProsodyInfo {
+                    a1: 0,
+                    a2: 0,
+                    a3: 0,
+                }));
             } else if ch.is_ascii_digit() {
                 phonemes.push(ch.to_string());
-                prosody_list.push(Some(ProsodyInfo { a1: 0, a2: 0, a3: 1 }));
+                prosody_list.push(Some(ProsodyInfo {
+                    a1: 0,
+                    a2: 0,
+                    a3: 1,
+                }));
             } else if ch.is_alphabetic() {
                 phonemes.push(ch.to_string());
-                prosody_list.push(Some(ProsodyInfo { a1: 0, a2: 0, a3: 1 }));
+                prosody_list.push(Some(ProsodyInfo {
+                    a1: 0,
+                    a2: 0,
+                    a3: 1,
+                }));
             }
             // Other characters: skip
             continue;
@@ -599,9 +620,7 @@ fn phonemize_chinese_internal(
         let tone = cpdata.tone;
 
         // Erhua handling: trailing 'r' that is not standalone "er"
-        let has_erhua = normalized.len() > 1
-            && normalized != "er"
-            && normalized.ends_with('r');
+        let has_erhua = normalized.len() > 1 && normalized != "er" && normalized.ends_with('r');
         if has_erhua {
             normalized.pop(); // remove trailing 'r'
         }
@@ -816,16 +835,12 @@ impl ChinesePhonemizer {
         let (single, phrase) = ZH_DICT_CACHE.get_or_init(|| {
             let s = load_single_char_dict(single_char_path)
                 .expect("pinyin single-char dictionary load failed");
-            let p = load_phrase_dict(phrase_path)
-                .expect("pinyin phrase dictionary load failed");
+            let p = load_phrase_dict(phrase_path).expect("pinyin phrase dictionary load failed");
             (s, p)
         });
 
         Ok(Self {
-            dict: ZhDictRef::Static {
-                single,
-                phrase,
-            },
+            dict: ZhDictRef::Static { single, phrase },
         })
     }
 
@@ -869,9 +884,18 @@ impl Phonemizer for ChinesePhonemizer {
         id_map: &PhonemeIdMap,
     ) -> (Vec<i64>, Vec<Option<ProsodyFeature>>) {
         // BOS + intersperse padding + EOS (same as English default)
-        let bos = id_map.get("^").and_then(|v| v.first().copied()).unwrap_or(1);
-        let eos = id_map.get("$").and_then(|v| v.first().copied()).unwrap_or(2);
-        let pad = id_map.get("_").and_then(|v| v.first().copied()).unwrap_or(0);
+        let bos = id_map
+            .get("^")
+            .and_then(|v| v.first().copied())
+            .unwrap_or(1);
+        let eos = id_map
+            .get("$")
+            .and_then(|v| v.first().copied())
+            .unwrap_or(2);
+        let pad = id_map
+            .get("_")
+            .and_then(|v| v.first().copied())
+            .unwrap_or(0);
 
         let mut out_ids = Vec::with_capacity(ids.len() * 2 + 2);
         let mut out_prosody = Vec::with_capacity(ids.len() * 2 + 2);
@@ -911,10 +935,7 @@ mod tests {
     use super::*;
 
     // --- Helper: create a minimal phonemizer with inline dicts ---
-    fn make_phonemizer(
-        singles: &[(char, &str)],
-        phrases: &[(&str, &[&str])],
-    ) -> ChinesePhonemizer {
+    fn make_phonemizer(singles: &[(char, &str)], phrases: &[(&str, &[&str])]) -> ChinesePhonemizer {
         let single_dict: HashMap<char, String> = singles
             .iter()
             .map(|(ch, py)| (*ch, py.to_string()))
@@ -1005,10 +1026,7 @@ mod tests {
 
     #[test]
     fn test_tone_sandhi_t3_t3() {
-        let mut st = vec![
-            ("ni".to_string(), 3_u8),
-            ("hao".to_string(), 3),
-        ];
+        let mut st = vec![("ni".to_string(), 3_u8), ("hao".to_string(), 3)];
         apply_tone_sandhi(&mut st);
         assert_eq!(st[0].1, 2); // T3 -> T2
         assert_eq!(st[1].1, 3); // unchanged
@@ -1018,7 +1036,7 @@ mod tests {
     fn test_tone_sandhi_yi_before_t4() {
         // 一定 yi1 ding4 -> yi2 ding4
         let mut st = vec![
-            ("i".to_string(), 1_u8),   // "yi" normalized to "i"
+            ("i".to_string(), 1_u8), // "yi" normalized to "i"
             ("ting".to_string(), 4),
         ];
         apply_tone_sandhi(&mut st);
@@ -1028,10 +1046,7 @@ mod tests {
     #[test]
     fn test_tone_sandhi_yi_before_t1() {
         // 一般 yi1 ban1 -> yi4 ban1
-        let mut st = vec![
-            ("i".to_string(), 1_u8),
-            ("ban".to_string(), 1),
-        ];
+        let mut st = vec![("i".to_string(), 1_u8), ("ban".to_string(), 1)];
         apply_tone_sandhi(&mut st);
         assert_eq!(st[0].1, 4);
     }
@@ -1039,10 +1054,7 @@ mod tests {
     #[test]
     fn test_tone_sandhi_bu_before_t4() {
         // 不对 bu4 dui4 -> bu2 dui4
-        let mut st = vec![
-            ("bu".to_string(), 4_u8),
-            ("tuei".to_string(), 4),
-        ];
+        let mut st = vec![("bu".to_string(), 4_u8), ("tuei".to_string(), 4)];
         apply_tone_sandhi(&mut st);
         assert_eq!(st[0].1, 2);
     }
@@ -1064,7 +1076,7 @@ mod tests {
         // zhi -> initial "zh" + final "-i_retroflex"
         let tokens = pinyin_to_ipa("zhi", 1);
         assert_eq!(tokens.len(), 3);
-        assert_eq!(tokens[0], "t\u{0282}");  // tʂ
+        assert_eq!(tokens[0], "t\u{0282}"); // tʂ
         assert_eq!(tokens[1], "\u{027b}\u{0329}"); // ɻ̩
         assert_eq!(tokens[2], "tone1");
     }
@@ -1074,8 +1086,8 @@ mod tests {
         // guang -> initial "g" + final "uang"
         let tokens = pinyin_to_ipa("guang", 3);
         assert_eq!(tokens.len(), 3);
-        assert_eq!(tokens[0], "k");           // g -> k in IPA
-        assert_eq!(tokens[1], "ua\u{014b}");  // uaŋ
+        assert_eq!(tokens[0], "k"); // g -> k in IPA
+        assert_eq!(tokens[1], "ua\u{014b}"); // uaŋ
         assert_eq!(tokens[2], "tone3");
     }
 
@@ -1094,8 +1106,8 @@ mod tests {
     fn test_single_char_phonemize() {
         let phon = make_phonemizer(
             &[
-                ('\u{4f60}', "ni3"),   // 你
-                ('\u{597d}', "hao3"),  // 好
+                ('\u{4f60}', "ni3"),  // 你
+                ('\u{597d}', "hao3"), // 好
             ],
             &[],
         );
@@ -1121,8 +1133,8 @@ mod tests {
     fn test_phrase_dict_overrides_single() {
         let phon = make_phonemizer(
             &[
-                ('\u{4e00}', "yi1"),   // 一 (default T1)
-                ('\u{4e2a}', "ge4"),   // 个
+                ('\u{4e00}', "yi1"), // 一 (default T1)
+                ('\u{4e2a}', "ge4"), // 个
             ],
             &[("\u{4e00}\u{4e2a}", &["yi2", "ge4"])], // phrase dict overrides to T2
         );
@@ -1140,10 +1152,7 @@ mod tests {
 
     #[test]
     fn test_punctuation_passthrough() {
-        let phon = make_phonemizer(
-            &[('\u{4f60}', "ni3")],
-            &[],
-        );
+        let phon = make_phonemizer(&[('\u{4f60}', "ni3")], &[]);
         let (tokens, _) = phon.phonemize_with_prosody("\u{4f60}\u{3002}").unwrap();
 
         // Should contain the period (mapped from 。)
@@ -1195,10 +1204,10 @@ mod tests {
     #[test]
     fn test_pua_mapping_initials() {
         let tokens = vec![
-            "p\u{02b0}".to_string(),     // pʰ
-            "t\u{0255}".to_string(),      // tɕ
-            "t\u{0282}".to_string(),      // tʂ
-            "ts\u{02b0}".to_string(),     // tsʰ
+            "p\u{02b0}".to_string(),  // pʰ
+            "t\u{0255}".to_string(),  // tɕ
+            "t\u{0282}".to_string(),  // tʂ
+            "ts\u{02b0}".to_string(), // tsʰ
         ];
         let mapped = map_sequence(tokens);
         assert_eq!(mapped[0], "\u{E020}"); // pʰ
@@ -1213,11 +1222,7 @@ mod tests {
     fn test_post_process_ids_bos_eos_pad() {
         let phon = make_phonemizer(&[], &[]);
         let ids = vec![10_i64, 20, 30];
-        let prosody: Vec<Option<ProsodyFeature>> = vec![
-            Some([1, 1, 2]),
-            Some([1, 2, 2]),
-            None,
-        ];
+        let prosody: Vec<Option<ProsodyFeature>> = vec![Some([1, 1, 2]), Some([1, 2, 2]), None];
         let mut id_map: PhonemeIdMap = HashMap::new();
         id_map.insert("^".to_string(), vec![1]);
         id_map.insert("$".to_string(), vec![2]);

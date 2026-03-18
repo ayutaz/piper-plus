@@ -18,7 +18,7 @@ env:
 jobs:
   check:
     name: cargo check
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: src/rust
@@ -36,7 +36,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-22.04, macos-latest, windows-latest]
+        os: [ubuntu-24.04, macos-latest, windows-latest]
     defaults:
       run:
         working-directory: src/rust
@@ -58,7 +58,7 @@ jobs:
 
   fmt:
     name: rustfmt
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: src/rust
@@ -71,7 +71,7 @@ jobs:
 
   clippy:
     name: clippy
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: src/rust
@@ -87,7 +87,7 @@ jobs:
 
   python-bindings:
     name: piper-python build
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: src/rust/piper-python

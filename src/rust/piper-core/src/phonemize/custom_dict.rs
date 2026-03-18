@@ -149,7 +149,9 @@ impl CustomDictionary {
 
         for (word, entry) in &cs_entries {
             let pattern = self.get_word_pattern(word, true);
-            result = pattern.replace_all(&result, entry.pronunciation.as_str()).to_string();
+            result = pattern
+                .replace_all(&result, entry.pronunciation.as_str())
+                .to_string();
         }
 
         // Case-insensitive エントリ (長い順)
@@ -158,7 +160,9 @@ impl CustomDictionary {
 
         for (word, entry) in &ci_entries {
             let pattern = self.get_word_pattern(word, false);
-            result = pattern.replace_all(&result, entry.pronunciation.as_str()).to_string();
+            result = pattern
+                .replace_all(&result, entry.pronunciation.as_str())
+                .to_string();
         }
 
         result
@@ -188,7 +192,9 @@ impl CustomDictionary {
 
         // Case-insensitive (lowercase 正規化)
         let normalized = word.to_lowercase();
-        self.entries.get(&normalized).map(|e| e.pronunciation.as_str())
+        self.entries
+            .get(&normalized)
+            .map(|e| e.pronunciation.as_str())
     }
 
     // -----------------------------------------------------------------------
@@ -202,8 +208,7 @@ impl CustomDictionary {
 
         if word != lower && word != upper {
             // 大文字小文字混在 → case-sensitive マップ
-            self.case_sensitive_entries
-                .insert(word.to_string(), entry);
+            self.case_sensitive_entries.insert(word.to_string(), entry);
         } else {
             // 全大文字 or 全小文字 → lowercase 正規化して case-insensitive マップ
             let normalized = lower;
@@ -422,22 +427,13 @@ mod tests {
         dict.add_word("API", "エーピーアイ", 5);
 
         // 単語境界あり → マッチ
-        assert_eq!(
-            dict.apply_to_text("Use API here"),
-            "Use エーピーアイ here"
-        );
+        assert_eq!(dict.apply_to_text("Use API here"), "Use エーピーアイ here");
 
         // 英数字に隣接 → マッチしない
-        assert_eq!(
-            dict.apply_to_text("UseAPIhere"),
-            "UseAPIhere"
-        );
+        assert_eq!(dict.apply_to_text("UseAPIhere"), "UseAPIhere");
 
         // 記号に隣接 → マッチ
-        assert_eq!(
-            dict.apply_to_text("(API)"),
-            "(エーピーアイ)"
-        );
+        assert_eq!(dict.apply_to_text("(API)"), "(エーピーアイ)");
     }
 
     #[test]

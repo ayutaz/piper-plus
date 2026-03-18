@@ -62,25 +62,25 @@ const IPA_VELAR_APPROX: char = '\u{0270}'; // ɰ velar approximant (ㅢ)
 // None = silent (ㅇ in initial position)
 // ---------------------------------------------------------------------------
 const INITIAL_TABLE: [Option<char>; N_INITIALS] = [
-    Some('k'),       //  0: ㄱ
-    Some(PUA_KK),    //  1: ㄲ (tense)
-    Some('n'),       //  2: ㄴ
-    Some('t'),       //  3: ㄷ
-    Some(PUA_TT),    //  4: ㄸ (tense)
-    Some(IPA_FLAP),  //  5: ㄹ
-    Some('m'),       //  6: ㅁ
-    Some('p'),       //  7: ㅂ
-    Some(PUA_PP),    //  8: ㅃ (tense)
-    Some('s'),       //  9: ㅅ
-    Some(PUA_SS),    // 10: ㅆ (tense)
-    None,            // 11: ㅇ (silent in initial)
-    Some(PUA_TC),    // 12: ㅈ
-    Some(PUA_TTCH),  // 13: ㅉ (tense)
-    Some(PUA_TCH),   // 14: ㅊ (aspirated)
-    Some(PUA_KH),    // 15: ㅋ (aspirated)
-    Some(PUA_TH),    // 16: ㅌ (aspirated)
-    Some(PUA_PH),    // 17: ㅍ (aspirated)
-    Some('h'),       // 18: ㅎ
+    Some('k'),      //  0: ㄱ
+    Some(PUA_KK),   //  1: ㄲ (tense)
+    Some('n'),      //  2: ㄴ
+    Some('t'),      //  3: ㄷ
+    Some(PUA_TT),   //  4: ㄸ (tense)
+    Some(IPA_FLAP), //  5: ㄹ
+    Some('m'),      //  6: ㅁ
+    Some('p'),      //  7: ㅂ
+    Some(PUA_PP),   //  8: ㅃ (tense)
+    Some('s'),      //  9: ㅅ
+    Some(PUA_SS),   // 10: ㅆ (tense)
+    None,           // 11: ㅇ (silent in initial)
+    Some(PUA_TC),   // 12: ㅈ
+    Some(PUA_TTCH), // 13: ㅉ (tense)
+    Some(PUA_TCH),  // 14: ㅊ (aspirated)
+    Some(PUA_KH),   // 15: ㅋ (aspirated)
+    Some(PUA_TH),   // 16: ㅌ (aspirated)
+    Some(PUA_PH),   // 17: ㅍ (aspirated)
+    Some('h'),      // 18: ㅎ
 ];
 
 // ---------------------------------------------------------------------------
@@ -88,27 +88,27 @@ const INITIAL_TABLE: [Option<char>; N_INITIALS] = [
 // Diphthongs produce glide + vowel (2 phonemes).
 // ---------------------------------------------------------------------------
 const MEDIAL_TABLE: [(char, Option<char>); N_MEDIALS] = [
-    ('a', None),                          //  0: ㅏ
-    (IPA_OPEN_E, None),                   //  1: ㅐ
-    ('j', Some('a')),                     //  2: ㅑ
-    ('j', Some(IPA_OPEN_E)),              //  3: ㅒ
-    (IPA_OPEN_MID_BACK, None),            //  4: ㅓ
-    ('e', None),                          //  5: ㅔ
-    ('j', Some(IPA_OPEN_MID_BACK)),       //  6: ㅕ
-    ('j', Some('e')),                     //  7: ㅖ
-    ('o', None),                          //  8: ㅗ
-    ('w', Some('a')),                     //  9: ㅘ
-    ('w', Some(IPA_OPEN_E)),              // 10: ㅙ
-    ('w', Some('e')),                     // 11: ㅚ (modern Seoul: [we])
-    ('j', Some('o')),                     // 12: ㅛ
-    ('u', None),                          // 13: ㅜ
-    ('w', Some(IPA_OPEN_MID_BACK)),       // 14: ㅝ
-    ('w', Some('e')),                     // 15: ㅞ
-    ('w', Some('i')),                     // 16: ㅟ
-    ('j', Some('u')),                     // 17: ㅠ
-    (IPA_CLOSE_BACK_UNR, None),           // 18: ㅡ
-    (IPA_VELAR_APPROX, Some('i')),        // 19: ㅢ
-    ('i', None),                          // 20: ㅣ
+    ('a', None),                    //  0: ㅏ
+    (IPA_OPEN_E, None),             //  1: ㅐ
+    ('j', Some('a')),               //  2: ㅑ
+    ('j', Some(IPA_OPEN_E)),        //  3: ㅒ
+    (IPA_OPEN_MID_BACK, None),      //  4: ㅓ
+    ('e', None),                    //  5: ㅔ
+    ('j', Some(IPA_OPEN_MID_BACK)), //  6: ㅕ
+    ('j', Some('e')),               //  7: ㅖ
+    ('o', None),                    //  8: ㅗ
+    ('w', Some('a')),               //  9: ㅘ
+    ('w', Some(IPA_OPEN_E)),        // 10: ㅙ
+    ('w', Some('e')),               // 11: ㅚ (modern Seoul: [we])
+    ('j', Some('o')),               // 12: ㅛ
+    ('u', None),                    // 13: ㅜ
+    ('w', Some(IPA_OPEN_MID_BACK)), // 14: ㅝ
+    ('w', Some('e')),               // 15: ㅞ
+    ('w', Some('i')),               // 16: ㅟ
+    ('j', Some('u')),               // 17: ㅠ
+    (IPA_CLOSE_BACK_UNR, None),     // 18: ㅡ
+    (IPA_VELAR_APPROX, Some('i')),  // 19: ㅢ
+    ('i', None),                    // 20: ㅣ
 ];
 
 // ---------------------------------------------------------------------------
@@ -130,34 +130,146 @@ struct FinalEntry {
 }
 
 const FINAL_TABLE: [FinalEntry; N_FINALS] = [
-    FinalEntry { ph: None,              liaison_initial: -1, residual_final: 0  }, //  0: (none)
-    FinalEntry { ph: Some(PUA_K_UNREL), liaison_initial:  0, residual_final: 0  }, //  1: ㄱ
-    FinalEntry { ph: Some(PUA_K_UNREL), liaison_initial:  1, residual_final: 0  }, //  2: ㄲ
-    FinalEntry { ph: Some(PUA_K_UNREL), liaison_initial:  9, residual_final: 1  }, //  3: ㄳ -> ㅅ, residual ㄱ
-    FinalEntry { ph: Some('n'),         liaison_initial: -1, residual_final: 0  }, //  4: ㄴ
-    FinalEntry { ph: Some('n'),         liaison_initial: 12, residual_final: 4  }, //  5: ㄵ -> ㅈ, residual ㄴ
-    FinalEntry { ph: Some('n'),         liaison_initial: -1, residual_final: 0  }, //  6: ㄶ (ㄴ+ㅎ -> n)
-    FinalEntry { ph: Some(PUA_T_UNREL), liaison_initial:  3, residual_final: 0  }, //  7: ㄷ
-    FinalEntry { ph: Some('l'),         liaison_initial:  5, residual_final: 0  }, //  8: ㄹ
-    FinalEntry { ph: Some(PUA_K_UNREL), liaison_initial:  0, residual_final: 8  }, //  9: ㄺ -> ㄱ, residual ㄹ
-    FinalEntry { ph: Some('m'),         liaison_initial:  6, residual_final: 8  }, // 10: ㄻ -> ㅁ, residual ㄹ
-    FinalEntry { ph: Some('l'),         liaison_initial:  7, residual_final: 8  }, // 11: ㄼ -> ㅂ, residual ㄹ
-    FinalEntry { ph: Some('l'),         liaison_initial:  9, residual_final: 8  }, // 12: ㄽ -> ㅅ, residual ㄹ
-    FinalEntry { ph: Some('l'),         liaison_initial: 16, residual_final: 8  }, // 13: ㄾ -> ㅌ, residual ㄹ
-    FinalEntry { ph: Some('l'),         liaison_initial: 17, residual_final: 8  }, // 14: ㄿ -> ㅍ, residual ㄹ
-    FinalEntry { ph: Some('l'),         liaison_initial: -1, residual_final: 0  }, // 15: ㅀ (ㄹ+ㅎ -> l)
-    FinalEntry { ph: Some('m'),         liaison_initial: -1, residual_final: 0  }, // 16: ㅁ
-    FinalEntry { ph: Some(PUA_P_UNREL), liaison_initial:  7, residual_final: 0  }, // 17: ㅂ
-    FinalEntry { ph: Some(PUA_P_UNREL), liaison_initial:  9, residual_final: 17 }, // 18: ㅄ -> ㅅ, residual ㅂ
-    FinalEntry { ph: Some(PUA_T_UNREL), liaison_initial:  9, residual_final: 0  }, // 19: ㅅ
-    FinalEntry { ph: Some(PUA_T_UNREL), liaison_initial: 10, residual_final: 0  }, // 20: ㅆ
-    FinalEntry { ph: Some(IPA_ENG),     liaison_initial: -1, residual_final: 0  }, // 21: ㅇ (velar nasal)
-    FinalEntry { ph: Some(PUA_T_UNREL), liaison_initial: 12, residual_final: 0  }, // 22: ㅈ
-    FinalEntry { ph: Some(PUA_T_UNREL), liaison_initial: 14, residual_final: 0  }, // 23: ㅊ
-    FinalEntry { ph: Some(PUA_K_UNREL), liaison_initial: 15, residual_final: 0  }, // 24: ㅋ
-    FinalEntry { ph: Some(PUA_T_UNREL), liaison_initial: 16, residual_final: 0  }, // 25: ㅌ
-    FinalEntry { ph: Some(PUA_P_UNREL), liaison_initial: 17, residual_final: 0  }, // 26: ㅍ
-    FinalEntry { ph: Some(PUA_T_UNREL), liaison_initial: -1, residual_final: 0  }, // 27: ㅎ (h dropped)
+    FinalEntry {
+        ph: None,
+        liaison_initial: -1,
+        residual_final: 0,
+    }, //  0: (none)
+    FinalEntry {
+        ph: Some(PUA_K_UNREL),
+        liaison_initial: 0,
+        residual_final: 0,
+    }, //  1: ㄱ
+    FinalEntry {
+        ph: Some(PUA_K_UNREL),
+        liaison_initial: 1,
+        residual_final: 0,
+    }, //  2: ㄲ
+    FinalEntry {
+        ph: Some(PUA_K_UNREL),
+        liaison_initial: 9,
+        residual_final: 1,
+    }, //  3: ㄳ -> ㅅ, residual ㄱ
+    FinalEntry {
+        ph: Some('n'),
+        liaison_initial: -1,
+        residual_final: 0,
+    }, //  4: ㄴ
+    FinalEntry {
+        ph: Some('n'),
+        liaison_initial: 12,
+        residual_final: 4,
+    }, //  5: ㄵ -> ㅈ, residual ㄴ
+    FinalEntry {
+        ph: Some('n'),
+        liaison_initial: -1,
+        residual_final: 0,
+    }, //  6: ㄶ (ㄴ+ㅎ -> n)
+    FinalEntry {
+        ph: Some(PUA_T_UNREL),
+        liaison_initial: 3,
+        residual_final: 0,
+    }, //  7: ㄷ
+    FinalEntry {
+        ph: Some('l'),
+        liaison_initial: 5,
+        residual_final: 0,
+    }, //  8: ㄹ
+    FinalEntry {
+        ph: Some(PUA_K_UNREL),
+        liaison_initial: 0,
+        residual_final: 8,
+    }, //  9: ㄺ -> ㄱ, residual ㄹ
+    FinalEntry {
+        ph: Some('m'),
+        liaison_initial: 6,
+        residual_final: 8,
+    }, // 10: ㄻ -> ㅁ, residual ㄹ
+    FinalEntry {
+        ph: Some('l'),
+        liaison_initial: 7,
+        residual_final: 8,
+    }, // 11: ㄼ -> ㅂ, residual ㄹ
+    FinalEntry {
+        ph: Some('l'),
+        liaison_initial: 9,
+        residual_final: 8,
+    }, // 12: ㄽ -> ㅅ, residual ㄹ
+    FinalEntry {
+        ph: Some('l'),
+        liaison_initial: 16,
+        residual_final: 8,
+    }, // 13: ㄾ -> ㅌ, residual ㄹ
+    FinalEntry {
+        ph: Some('l'),
+        liaison_initial: 17,
+        residual_final: 8,
+    }, // 14: ㄿ -> ㅍ, residual ㄹ
+    FinalEntry {
+        ph: Some('l'),
+        liaison_initial: -1,
+        residual_final: 0,
+    }, // 15: ㅀ (ㄹ+ㅎ -> l)
+    FinalEntry {
+        ph: Some('m'),
+        liaison_initial: -1,
+        residual_final: 0,
+    }, // 16: ㅁ
+    FinalEntry {
+        ph: Some(PUA_P_UNREL),
+        liaison_initial: 7,
+        residual_final: 0,
+    }, // 17: ㅂ
+    FinalEntry {
+        ph: Some(PUA_P_UNREL),
+        liaison_initial: 9,
+        residual_final: 17,
+    }, // 18: ㅄ -> ㅅ, residual ㅂ
+    FinalEntry {
+        ph: Some(PUA_T_UNREL),
+        liaison_initial: 9,
+        residual_final: 0,
+    }, // 19: ㅅ
+    FinalEntry {
+        ph: Some(PUA_T_UNREL),
+        liaison_initial: 10,
+        residual_final: 0,
+    }, // 20: ㅆ
+    FinalEntry {
+        ph: Some(IPA_ENG),
+        liaison_initial: -1,
+        residual_final: 0,
+    }, // 21: ㅇ (velar nasal)
+    FinalEntry {
+        ph: Some(PUA_T_UNREL),
+        liaison_initial: 12,
+        residual_final: 0,
+    }, // 22: ㅈ
+    FinalEntry {
+        ph: Some(PUA_T_UNREL),
+        liaison_initial: 14,
+        residual_final: 0,
+    }, // 23: ㅊ
+    FinalEntry {
+        ph: Some(PUA_K_UNREL),
+        liaison_initial: 15,
+        residual_final: 0,
+    }, // 24: ㅋ
+    FinalEntry {
+        ph: Some(PUA_T_UNREL),
+        liaison_initial: 16,
+        residual_final: 0,
+    }, // 25: ㅌ
+    FinalEntry {
+        ph: Some(PUA_P_UNREL),
+        liaison_initial: 17,
+        residual_final: 0,
+    }, // 26: ㅍ
+    FinalEntry {
+        ph: Some(PUA_T_UNREL),
+        liaison_initial: -1,
+        residual_final: 0,
+    }, // 27: ㅎ (h dropped)
 ];
 
 // ---------------------------------------------------------------------------
@@ -451,7 +563,13 @@ impl Phonemizer for KoreanPhonemizer {
         // Prosody: all fixed at (0, 0, 0) for Korean
         let prosody: Vec<Option<ProsodyInfo>> = tokens
             .iter()
-            .map(|_| Some(ProsodyInfo { a1: 0, a2: 0, a3: 0 }))
+            .map(|_| {
+                Some(ProsodyInfo {
+                    a1: 0,
+                    a2: 0,
+                    a3: 0,
+                })
+            })
             .collect();
 
         Ok((tokens, prosody))
@@ -564,10 +682,7 @@ mod tests {
     fn test_word_hangul() {
         // 한글 -> h a n + k ɯ l
         let chars = text_to_phoneme_chars("한글");
-        assert_eq!(
-            chars,
-            vec!['h', 'a', 'n', 'k', IPA_CLOSE_BACK_UNR, 'l']
-        );
+        assert_eq!(chars, vec!['h', 'a', 'n', 'k', IPA_CLOSE_BACK_UNR, 'l']);
     }
 
     // ===== Liaison (연음화) =====
@@ -715,11 +830,7 @@ mod tests {
         id_map.insert("_".to_string(), vec![0]);
 
         let ids = vec![10, 20, 30];
-        let prosody = vec![
-            Some([0, 0, 0]),
-            Some([0, 0, 0]),
-            Some([0, 0, 0]),
-        ];
+        let prosody = vec![Some([0, 0, 0]), Some([0, 0, 0]), Some([0, 0, 0])];
 
         let (out_ids, out_prosody) = p.post_process_ids(ids, prosody, &id_map);
 
@@ -784,10 +895,7 @@ mod tests {
         // No liaison: next initial is ㅁ(6), not ㅇ(11)
         // -> k u k̚ + m i n
         let chars = text_to_phoneme_chars("국민");
-        assert_eq!(
-            chars,
-            vec!['k', 'u', PUA_K_UNREL, 'm', 'i', 'n']
-        );
+        assert_eq!(chars, vec!['k', 'u', PUA_K_UNREL, 'm', 'i', 'n']);
     }
 
     // ===== Tense affricate =====

@@ -1,7 +1,7 @@
+use piper_core::error::PiperError;
 use piper_core::streaming::{
     crossfade, split_sentences, AudioSink, BufferSink, StreamingResult, WavFileSink,
 };
-use piper_core::error::PiperError;
 
 // ===================================================================
 // 1. AudioSink trait -- BufferSink

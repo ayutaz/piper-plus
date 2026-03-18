@@ -38,12 +38,7 @@ impl JsonlUtterance {
     }
 
     /// SynthesisRequest に変換 (move semantics — self を消費して clone を回避)
-    pub fn to_request(
-        self,
-        noise_scale: f32,
-        length_scale: f32,
-        noise_w: f32,
-    ) -> SynthesisRequest {
+    pub fn to_request(self, noise_scale: f32, length_scale: f32, noise_w: f32) -> SynthesisRequest {
         let prosody_features = self.prosody_features.map(|features| {
             features
                 .iter()

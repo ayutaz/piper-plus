@@ -192,10 +192,7 @@ pub fn segment_text<'a>(
 
     // Fallback: if no language-specific chars were detected, use default
     if segments.is_empty() && !text.trim().is_empty() {
-        segments.push((
-            detector.default_latin_language.clone(),
-            text.to_string(),
-        ));
+        segments.push((detector.default_latin_language.clone(), text.to_string()));
     }
 
     segments
@@ -220,14 +217,9 @@ pub fn default_post_process_ids(
     id_map: &PhonemeIdMap,
     eos_token: &str,
 ) -> (Vec<i64>, Vec<Option<ProsodyFeature>>) {
-    let pad_ids = id_map
-        .get("_")
-        .cloned()
-        .unwrap_or_else(|| vec![0]);
+    let pad_ids = id_map.get("_").cloned().unwrap_or_else(|| vec![0]);
     let bos_ids = id_map.get("^");
-    let eos_ids = id_map
-        .get(eos_token)
-        .or_else(|| id_map.get("$"));
+    let eos_ids = id_map.get(eos_token).or_else(|| id_map.get("$"));
 
     // Intersperse: pad after every phoneme, but skip after existing pad
     // tokens to match the training data padding scheme.
@@ -249,8 +241,7 @@ pub fn default_post_process_ids(
         with_bos_ids.extend_from_slice(bos);
         with_bos_ids.push(pad_ids[0]);
         with_bos_ids.extend_from_slice(&padded_ids);
-        let mut with_bos_prosody =
-            Vec::with_capacity(bos.len() + 1 + padded_prosody.len());
+        let mut with_bos_prosody = Vec::with_capacity(bos.len() + 1 + padded_prosody.len());
         with_bos_prosody.extend(std::iter::repeat(None).take(bos.len() + 1));
         with_bos_prosody.extend_from_slice(&padded_prosody);
         padded_ids = with_bos_ids;
@@ -361,8 +352,7 @@ impl MultilingualPhonemizer {
                 .unwrap_or_else(|| "en".to_string());
         }
 
-        let detector =
-            UnicodeLanguageDetector::new(&languages, &default_latin_language);
+        let detector = UnicodeLanguageDetector::new(&languages, &default_latin_language);
 
         Self {
             languages,
@@ -452,14 +442,12 @@ impl Phonemizer for MultilingualPhonemizer {
         let mut last_eos = "$".to_string();
 
         for (lang, segment_text) in &segments {
-            let phonemizer = self.phonemizers.get(lang).ok_or_else(|| {
-                PiperError::UnsupportedLanguage {
-                    code: lang.clone(),
-                }
-            })?;
+            let phonemizer = self
+                .phonemizers
+                .get(lang)
+                .ok_or_else(|| PiperError::UnsupportedLanguage { code: lang.clone() })?;
 
-            let (phonemes, prosody_list) =
-                phonemizer.phonemize_with_prosody(segment_text)?;
+            let (phonemes, prosody_list) = phonemizer.phonemize_with_prosody(segment_text)?;
 
             // Strip BOS/EOS from individual segments.
             // This includes PUA-encoded question markers from Japanese.
@@ -771,8 +759,7 @@ mod tests {
         let id_map = make_id_map();
         let ids = vec![10, 11, 12];
         let prosody = vec![None, None, None];
-        let (out_ids, out_prosody) =
-            default_post_process_ids(ids, prosody, &id_map, "$");
+        let (out_ids, out_prosody) = default_post_process_ids(ids, prosody, &id_map, "$");
         // Expected: ^(1) + pad(0) + 10 + pad(0) + 11 + pad(0) + 12 + pad(0) + $(2)
         assert_eq!(out_ids, vec![1, 0, 10, 0, 11, 0, 12, 0, 2]);
         assert_eq!(out_prosody.len(), out_ids.len());
@@ -784,8 +771,7 @@ mod tests {
         // ID 0 is a pad token — should NOT get another pad after it
         let ids = vec![10, 0, 12];
         let prosody = vec![None, None, None];
-        let (out_ids, _) =
-            default_post_process_ids(ids, prosody, &id_map, "$");
+        let (out_ids, _) = default_post_process_ids(ids, prosody, &id_map, "$");
         // Expected: ^(1) + pad(0) + 10 + pad(0) + 0 (no pad after) + 12 + pad(0) + $(2)
         assert_eq!(out_ids, vec![1, 0, 10, 0, 0, 12, 0, 2]);
     }
@@ -795,8 +781,7 @@ mod tests {
         let id_map = make_id_map();
         let ids = vec![10];
         let prosody = vec![None];
-        let (out_ids, _) =
-            default_post_process_ids(ids, prosody, &id_map, "?");
+        let (out_ids, _) = default_post_process_ids(ids, prosody, &id_map, "?");
         // Expected: ^(1) + pad(0) + 10 + pad(0) + ?(3)
         assert_eq!(out_ids, vec![1, 0, 10, 0, 3]);
     }
@@ -807,8 +792,7 @@ mod tests {
         let ids = vec![10];
         let prosody = vec![None];
         // Request EOS token "nonexistent" — should fall back to "$"
-        let (out_ids, _) =
-            default_post_process_ids(ids, prosody, &id_map, "nonexistent");
+        let (out_ids, _) = default_post_process_ids(ids, prosody, &id_map, "nonexistent");
         // Expected: ^(1) + pad(0) + 10 + pad(0) + $(2)
         assert_eq!(out_ids, vec![1, 0, 10, 0, 2]);
     }
@@ -818,8 +802,7 @@ mod tests {
         let id_map = make_id_map();
         let ids: Vec<i64> = Vec::new();
         let prosody: Vec<Option<ProsodyFeature>> = Vec::new();
-        let (out_ids, out_prosody) =
-            default_post_process_ids(ids, prosody, &id_map, "$");
+        let (out_ids, out_prosody) = default_post_process_ids(ids, prosody, &id_map, "$");
         // Expected: ^(1) + pad(0) + $(2)
         assert_eq!(out_ids, vec![1, 0, 2]);
         assert_eq!(out_prosody.len(), out_ids.len());
@@ -830,8 +813,7 @@ mod tests {
         let id_map = make_id_map();
         let ids = vec![10, 11];
         let prosody = vec![Some([1, 2, 3]), None];
-        let (out_ids, out_prosody) =
-            default_post_process_ids(ids, prosody, &id_map, "$");
+        let (out_ids, out_prosody) = default_post_process_ids(ids, prosody, &id_map, "$");
         // ^=None pad=None 10=Some([1,2,3]) pad=None 11=None pad=None $=None
         assert_eq!(out_ids, vec![1, 0, 10, 0, 11, 0, 2]);
         assert!(out_prosody[0].is_none()); // ^
@@ -881,8 +863,7 @@ mod tests {
         let ids = vec![5, 6, 7, 8, 9];
         let prosody: Vec<Option<ProsodyFeature>> =
             vec![Some([1, 0, 3]), None, Some([0, 2, 4]), None, None];
-        let (out_ids, out_prosody) =
-            default_post_process_ids(ids, prosody, &id_map, "$");
+        let (out_ids, out_prosody) = default_post_process_ids(ids, prosody, &id_map, "$");
         assert_eq!(
             out_ids.len(),
             out_prosody.len(),

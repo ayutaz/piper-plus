@@ -78,8 +78,9 @@ pub fn parse_device_string(device: &str) -> Result<DeviceType, PiperError> {
         };
 
         if let Some(kind_name) = canonical {
-            let device_id =
-                id_str.parse::<i32>().map_err(|_| PiperError::InvalidConfig {
+            let device_id = id_str
+                .parse::<i32>()
+                .map_err(|_| PiperError::InvalidConfig {
                     reason: format!("invalid {kind_name} device id: '{id_str}'"),
                 })?;
 
@@ -293,7 +294,7 @@ fn configure_cuda(
 
 #[cfg(feature = "coreml")]
 fn is_coreml_available() -> bool {
-    use ort::ep::{ExecutionProvider, CoreML};
+    use ort::ep::{CoreML, ExecutionProvider};
     CoreML::default().is_available().unwrap_or(false)
 }
 
@@ -317,7 +318,7 @@ fn configure_coreml(
 
 #[cfg(feature = "directml")]
 fn is_directml_available() -> bool {
-    use ort::ep::{ExecutionProvider, DirectML};
+    use ort::ep::{DirectML, ExecutionProvider};
     DirectML::default().is_available().unwrap_or(false)
 }
 
@@ -326,7 +327,9 @@ fn configure_directml(
     builder: ort::session::builder::SessionBuilder,
     device_id: i32,
 ) -> Result<(ort::session::builder::SessionBuilder, DeviceType), PiperError> {
-    let ep = ort::ep::DirectML::default().with_device_id(device_id).build();
+    let ep = ort::ep::DirectML::default()
+        .with_device_id(device_id)
+        .build();
     match builder.with_execution_providers([ep]) {
         Ok(b) => {
             tracing::info!("DirectML execution provider registered (device_id={device_id})");
@@ -351,7 +354,9 @@ fn configure_tensorrt(
     builder: ort::session::builder::SessionBuilder,
     device_id: i32,
 ) -> Result<(ort::session::builder::SessionBuilder, DeviceType), PiperError> {
-    let ep = ort::ep::TensorRT::default().with_device_id(device_id).build();
+    let ep = ort::ep::TensorRT::default()
+        .with_device_id(device_id)
+        .build();
     match builder.with_execution_providers([ep]) {
         Ok(b) => {
             tracing::info!("TensorRT execution provider registered (device_id={device_id})");
@@ -513,7 +518,10 @@ mod tests {
     #[test]
     fn test_list_devices_cpu_always_available() {
         let devices = list_devices();
-        let cpu = devices.iter().find(|d| d.device_type == DeviceType::Cpu).unwrap();
+        let cpu = devices
+            .iter()
+            .find(|d| d.device_type == DeviceType::Cpu)
+            .unwrap();
         assert!(cpu.available);
         assert_eq!(cpu.name, "CPU");
     }
@@ -535,14 +543,8 @@ mod tests {
 
     #[test]
     fn test_display_cuda() {
-        assert_eq!(
-            format!("{}", DeviceType::Cuda { device_id: 0 }),
-            "cuda:0"
-        );
-        assert_eq!(
-            format!("{}", DeviceType::Cuda { device_id: 3 }),
-            "cuda:3"
-        );
+        assert_eq!(format!("{}", DeviceType::Cuda { device_id: 0 }), "cuda:0");
+        assert_eq!(format!("{}", DeviceType::Cuda { device_id: 3 }), "cuda:3");
     }
 
     #[test]
@@ -640,7 +642,9 @@ mod tests {
     #[test]
     fn test_cuda_listed_when_feature_enabled() {
         let devices = list_devices();
-        assert!(devices.iter().any(|d| matches!(d.device_type, DeviceType::Cuda { .. })));
+        assert!(devices
+            .iter()
+            .any(|d| matches!(d.device_type, DeviceType::Cuda { .. })));
     }
 
     #[cfg(feature = "coreml")]
@@ -697,8 +701,7 @@ mod tests {
     #[test]
     fn test_coreml_fallback_without_feature() {
         let builder = ort::session::Session::builder().expect("session builder");
-        let (_, actual_device) =
-            configure_session_builder(builder, &DeviceType::CoreML).unwrap();
+        let (_, actual_device) = configure_session_builder(builder, &DeviceType::CoreML).unwrap();
         assert_eq!(actual_device, DeviceType::Cpu);
     }
 

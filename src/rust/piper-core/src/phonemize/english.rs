@@ -54,45 +54,45 @@ use crate::error::PiperError;
 
 static ARPABET_TO_IPA: LazyLock<HashMap<&'static str, &'static str>> = LazyLock::new(|| {
     [
-        ("AA", "\u{0251}"),                // ɑ
-        ("AE", "\u{00E6}"),                // æ
-        ("AH", "\u{028C}"),                // ʌ (stressed default)
-        ("AO", "\u{0254}\u{02D0}"),        // ɔː
-        ("AW", "a\u{028A}"),               // aʊ
-        ("AY", "a\u{026A}"),               // aɪ
-        ("B",  "b"),
-        ("CH", "t\u{0283}"),               // tʃ
-        ("D",  "d"),
-        ("DH", "\u{00F0}"),                // ð
-        ("EH", "\u{025B}"),                // ɛ
-        ("ER", "\u{025A}"),                // ɚ (unstressed default)
-        ("EY", "e\u{026A}"),               // eɪ
-        ("F",  "f"),
-        ("G",  "\u{0261}"),                // ɡ
+        ("AA", "\u{0251}"),         // ɑ
+        ("AE", "\u{00E6}"),         // æ
+        ("AH", "\u{028C}"),         // ʌ (stressed default)
+        ("AO", "\u{0254}\u{02D0}"), // ɔː
+        ("AW", "a\u{028A}"),        // aʊ
+        ("AY", "a\u{026A}"),        // aɪ
+        ("B", "b"),
+        ("CH", "t\u{0283}"), // tʃ
+        ("D", "d"),
+        ("DH", "\u{00F0}"),  // ð
+        ("EH", "\u{025B}"),  // ɛ
+        ("ER", "\u{025A}"),  // ɚ (unstressed default)
+        ("EY", "e\u{026A}"), // eɪ
+        ("F", "f"),
+        ("G", "\u{0261}"), // ɡ
         ("HH", "h"),
-        ("IH", "\u{026A}"),                // ɪ
-        ("IY", "i\u{02D0}"),              // iː
-        ("JH", "d\u{0292}"),               // dʒ
-        ("K",  "k"),
-        ("L",  "l"),
-        ("M",  "m"),
-        ("N",  "n"),
-        ("NG", "\u{014B}"),                // ŋ
-        ("OW", "o\u{028A}"),               // oʊ
-        ("OY", "\u{0254}\u{026A}"),        // ɔɪ
-        ("P",  "p"),
-        ("R",  "\u{0279}"),                // ɹ
-        ("S",  "s"),
-        ("SH", "\u{0283}"),                // ʃ
-        ("T",  "t"),
-        ("TH", "\u{03B8}"),                // θ
-        ("UH", "\u{028A}"),                // ʊ
-        ("UW", "u\u{02D0}"),              // uː
-        ("V",  "v"),
-        ("W",  "w"),
-        ("Y",  "j"),
-        ("Z",  "z"),
-        ("ZH", "\u{0292}"),                // ʒ
+        ("IH", "\u{026A}"),  // ɪ
+        ("IY", "i\u{02D0}"), // iː
+        ("JH", "d\u{0292}"), // dʒ
+        ("K", "k"),
+        ("L", "l"),
+        ("M", "m"),
+        ("N", "n"),
+        ("NG", "\u{014B}"),         // ŋ
+        ("OW", "o\u{028A}"),        // oʊ
+        ("OY", "\u{0254}\u{026A}"), // ɔɪ
+        ("P", "p"),
+        ("R", "\u{0279}"), // ɹ
+        ("S", "s"),
+        ("SH", "\u{0283}"), // ʃ
+        ("T", "t"),
+        ("TH", "\u{03B8}"),  // θ
+        ("UH", "\u{028A}"),  // ʊ
+        ("UW", "u\u{02D0}"), // uː
+        ("V", "v"),
+        ("W", "w"),
+        ("Y", "j"),
+        ("Z", "z"),
+        ("ZH", "\u{0292}"), // ʒ
     ]
     .into_iter()
     .collect()
@@ -129,30 +129,101 @@ fn is_punctuation(ch: char) -> bool {
 static FUNCTION_WORDS: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
     [
         // articles / determiners
-        "a", "an", "the",
+        "a",
+        "an",
+        "the",
         // pronouns
-        "i", "me", "my", "mine", "myself",
-        "you", "your", "yours", "yourself",
-        "he", "him", "his", "himself",
-        "she", "her", "hers", "herself",
-        "it", "its", "itself",
-        "we", "us", "our", "ours", "ourselves",
-        "they", "them", "their", "theirs", "themselves",
+        "i",
+        "me",
+        "my",
+        "mine",
+        "myself",
+        "you",
+        "your",
+        "yours",
+        "yourself",
+        "he",
+        "him",
+        "his",
+        "himself",
+        "she",
+        "her",
+        "hers",
+        "herself",
+        "it",
+        "its",
+        "itself",
+        "we",
+        "us",
+        "our",
+        "ours",
+        "ourselves",
+        "they",
+        "them",
+        "their",
+        "theirs",
+        "themselves",
         // be-verbs
-        "am", "is", "are", "was", "were", "be", "been", "being",
+        "am",
+        "is",
+        "are",
+        "was",
+        "were",
+        "be",
+        "been",
+        "being",
         // auxiliaries
-        "have", "has", "had", "having",
-        "do", "does", "did",
-        "will", "would", "shall", "should",
-        "can", "could", "may", "might", "must",
+        "have",
+        "has",
+        "had",
+        "having",
+        "do",
+        "does",
+        "did",
+        "will",
+        "would",
+        "shall",
+        "should",
+        "can",
+        "could",
+        "may",
+        "might",
+        "must",
         // prepositions
-        "at", "by", "for", "from", "in", "of", "on", "to", "with",
-        "about", "after", "before", "between", "into", "through", "under",
+        "at",
+        "by",
+        "for",
+        "from",
+        "in",
+        "of",
+        "on",
+        "to",
+        "with",
+        "about",
+        "after",
+        "before",
+        "between",
+        "into",
+        "through",
+        "under",
         // conjunctions
-        "and", "but", "or", "nor", "so", "yet",
-        "if", "that", "than", "when", "while", "as", "because", "since",
+        "and",
+        "but",
+        "or",
+        "nor",
+        "so",
+        "yet",
+        "if",
+        "that",
+        "than",
+        "when",
+        "while",
+        "as",
+        "because",
+        "since",
         // others
-        "not", "no",
+        "not",
+        "no",
     ]
     .into_iter()
     .collect()
@@ -227,8 +298,8 @@ fn tokenize(text: &str) -> Vec<Token> {
 /// A parsed ARPAbet token with its base symbol and stress level.
 #[derive(Debug)]
 struct ArpaToken {
-    base: String,  // e.g. "HH", "AH", "OW"
-    stress: i32,   // 0, 1, 2, or -1 for consonants
+    base: String, // e.g. "HH", "AH", "OW"
+    stress: i32,  // 0, 1, 2, or -1 for consonants
 }
 
 /// Parse an ARPAbet pronunciation string into tokens.
@@ -282,10 +353,7 @@ fn convert_word_to_ipa(tokens: &[ArpaToken]) -> Vec<IpaPhoneme> {
         let tok = &tokens[i];
 
         // Context-dependent rule: AA + R -> ɑːɹ
-        if tok.base == "AA"
-            && i + 1 < n
-            && tokens[i + 1].base == "R"
-            && tokens[i + 1].stress == -1
+        if tok.base == "AA" && i + 1 < n && tokens[i + 1].base == "R" && tokens[i + 1].stress == -1
         {
             result.push(IpaPhoneme {
                 ipa: AA_R_MERGED_IPA.to_string(),
@@ -485,10 +553,9 @@ static CMU_DICT_CACHE: OnceLock<HashMap<String, String>> = OnceLock::new();
 ///
 /// Standalone function used by the `OnceLock` cache initializer.
 fn load_cmu_dict(dict_path: &Path) -> Result<HashMap<String, String>, PiperError> {
-    let content =
-        std::fs::read_to_string(dict_path).map_err(|_| PiperError::DictionaryLoad {
-            path: dict_path.display().to_string(),
-        })?;
+    let content = std::fs::read_to_string(dict_path).map_err(|_| PiperError::DictionaryLoad {
+        path: dict_path.display().to_string(),
+    })?;
 
     let raw: serde_json::Value =
         serde_json::from_str(&content).map_err(|e| PiperError::DictionaryLoad {
@@ -570,9 +637,8 @@ impl EnglishPhonemizer {
         // get_or_init ensures the dictionary is loaded exactly once.
         // If a different path is passed on a later call, the first-loaded
         // dictionary is still used (consistent with single-dict semantics).
-        let dict = CMU_DICT_CACHE.get_or_init(|| {
-            load_cmu_dict(dict_path).expect("CMU dictionary load failed")
-        });
+        let dict = CMU_DICT_CACHE
+            .get_or_init(|| load_cmu_dict(dict_path).expect("CMU dictionary load failed"));
 
         Ok(Self {
             cmu_dict: DictRef::Static(dict),
@@ -623,10 +689,7 @@ impl EnglishPhonemizer {
     /// Tokenizes the input text, looks up words in the CMU dictionary,
     /// converts ARPAbet to IPA, applies function-word destressing,
     /// inserts stress markers, and computes prosody features.
-    fn phonemize_impl(
-        &self,
-        text: &str,
-    ) -> (Vec<String>, Vec<Option<ProsodyInfo>>) {
+    fn phonemize_impl(&self, text: &str) -> (Vec<String>, Vec<Option<ProsodyInfo>>) {
         let tokens = tokenize(text);
         if tokens.is_empty() {
             return (Vec::new(), Vec::new());
@@ -666,7 +729,11 @@ impl EnglishPhonemizer {
                 // Punctuation: attach to preceding word (no space before)
                 for ch in tok.text.chars() {
                     phonemes.push(ch.to_string());
-                    prosody_list.push(Some(ProsodyInfo { a1: 0, a2: 0, a3: 0 }));
+                    prosody_list.push(Some(ProsodyInfo {
+                        a1: 0,
+                        a2: 0,
+                        a3: 0,
+                    }));
                 }
                 need_space = true;
                 continue;
@@ -691,7 +758,11 @@ impl EnglishPhonemizer {
             // Insert word-boundary space (except before first word)
             if need_space {
                 phonemes.push(" ".to_string());
-                prosody_list.push(Some(ProsodyInfo { a1: 0, a2: 0, a3: 0 }));
+                prosody_list.push(Some(ProsodyInfo {
+                    a1: 0,
+                    a2: 0,
+                    a3: 0,
+                }));
             }
 
             // Parse ARPAbet and convert to IPA
@@ -930,7 +1001,11 @@ mod tests {
         let (phonemes, prosody) = p.phonemize_impl("hello");
         let joined: String = phonemes.join("");
         assert!(joined.contains('h'), "expected 'h' in: {}", joined);
-        assert!(joined.contains('\u{0259}'), "expected schwa ə in: {}", joined);
+        assert!(
+            joined.contains('\u{0259}'),
+            "expected schwa ə in: {}",
+            joined
+        );
         assert!(joined.contains('l'), "expected 'l' in: {}", joined);
         assert!(joined.contains('\u{02C8}'), "expected ˈ in: {}", joined);
         assert!(joined.contains('o'), "expected 'o' in: {}", joined);
@@ -944,8 +1019,15 @@ mod tests {
         let p = make_phonemizer(&[("the", "DH AH0"), ("cat", "K AE1 T")]);
         let (phonemes, prosody) = p.phonemize_impl("the cat");
         let joined: String = phonemes.join("");
-        assert!(joined.contains('\u{02C8}'), "expected ˈ for 'cat': {}", joined);
-        assert!(phonemes.contains(&" ".to_string()), "expected word boundary space");
+        assert!(
+            joined.contains('\u{02C8}'),
+            "expected ˈ for 'cat': {}",
+            joined
+        );
+        assert!(
+            phonemes.contains(&" ".to_string()),
+            "expected word boundary space"
+        );
         assert_eq!(phonemes.len(), prosody.len());
     }
 
@@ -1105,10 +1187,7 @@ mod tests {
 
     #[test]
     fn test_word_boundary_space() {
-        let p = make_phonemizer(&[
-            ("hello", "HH AH0 L OW1"),
-            ("world", "W ER1 L D"),
-        ]);
+        let p = make_phonemizer(&[("hello", "HH AH0 L OW1"), ("world", "W ER1 L D")]);
         let (phonemes, prosody) = p.phonemize_impl("hello world");
         let space_count = phonemes.iter().filter(|p| p.as_str() == " ").count();
         assert_eq!(space_count, 1, "expected 1 space between words");
@@ -1131,16 +1210,28 @@ mod tests {
     #[test]
     fn test_destress_removes_all_stress() {
         let mut ipas = vec![
-            IpaPhoneme { ipa: "a".to_string(), stress: 1 },
-            IpaPhoneme { ipa: "b".to_string(), stress: 2 },
-            IpaPhoneme { ipa: "c".to_string(), stress: -1 },
-            IpaPhoneme { ipa: "d".to_string(), stress: 0 },
+            IpaPhoneme {
+                ipa: "a".to_string(),
+                stress: 1,
+            },
+            IpaPhoneme {
+                ipa: "b".to_string(),
+                stress: 2,
+            },
+            IpaPhoneme {
+                ipa: "c".to_string(),
+                stress: -1,
+            },
+            IpaPhoneme {
+                ipa: "d".to_string(),
+                stress: 0,
+            },
         ];
         destress(&mut ipas);
-        assert_eq!(ipas[0].stress, 0);  // primary -> 0
-        assert_eq!(ipas[1].stress, 0);  // secondary -> 0
+        assert_eq!(ipas[0].stress, 0); // primary -> 0
+        assert_eq!(ipas[1].stress, 0); // secondary -> 0
         assert_eq!(ipas[2].stress, -1); // consonant unchanged
-        assert_eq!(ipas[3].stress, 0);  // already 0
+        assert_eq!(ipas[3].stress, 0); // already 0
     }
 
     // ===== 16. ARPABET_TO_IPA table completeness =====
@@ -1195,7 +1286,11 @@ mod tests {
         assert!(result.is_some());
         let arpa = result.unwrap();
         assert!(arpa.starts_with("R AH1 N"), "got: {}", arpa);
-        assert!(arpa.ends_with("ER0"), "should append ER0 suffix, got: {}", arpa);
+        assert!(
+            arpa.ends_with("ER0"),
+            "should append ER0 suffix, got: {}",
+            arpa
+        );
     }
 
     // ===== 19. Morphological: -ly suffix =====
@@ -1207,7 +1302,11 @@ mod tests {
         assert!(result.is_some());
         let arpa = result.unwrap();
         assert!(arpa.starts_with("K W IH1 K"), "got: {}", arpa);
-        assert!(arpa.ends_with("L IY0"), "should append L IY0, got: {}", arpa);
+        assert!(
+            arpa.ends_with("L IY0"),
+            "should append L IY0, got: {}",
+            arpa
+        );
     }
 
     // ===== 20. Morphological: -est suffix =====
@@ -1219,6 +1318,10 @@ mod tests {
         assert!(result.is_some());
         let arpa = result.unwrap();
         assert!(arpa.starts_with("F AE1 S T"), "got: {}", arpa);
-        assert!(arpa.ends_with("AH0 S T"), "should append AH0 S T, got: {}", arpa);
+        assert!(
+            arpa.ends_with("AH0 S T"),
+            "should append AH0 S T, got: {}",
+            arpa
+        );
     }
 }

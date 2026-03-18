@@ -104,16 +104,8 @@ fn test_post_process_ids_passthrough() {
     let (result_ids, result_prosody) = p.post_process_ids(ids, prosody, &id_map);
 
     // Korean uses default_post_process_ids: BOS + intersperse padding + EOS
-    assert_eq!(
-        *result_ids.first().unwrap(),
-        1,
-        "should start with BOS"
-    );
-    assert_eq!(
-        *result_ids.last().unwrap(),
-        2,
-        "should end with EOS"
-    );
+    assert_eq!(*result_ids.first().unwrap(), 1, "should start with BOS");
+    assert_eq!(*result_ids.last().unwrap(), 2, "should end with EOS");
     assert!(
         result_ids.contains(&10) && result_ids.contains(&20) && result_ids.contains(&30),
         "should contain all original phoneme IDs"

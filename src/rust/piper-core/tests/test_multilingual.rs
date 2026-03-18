@@ -278,7 +278,11 @@ fn test_segment_mixed_ja_en() {
     let detector = make_detector(&["ja", "en"], "en");
     let segments = segment_text("今日はgoodですね", &detector);
     // Expect at least JA and EN segments
-    assert!(segments.len() >= 2, "expected >= 2 segments, got {}", segments.len());
+    assert!(
+        segments.len() >= 2,
+        "expected >= 2 segments, got {}",
+        segments.len()
+    );
     // First segment should be Japanese
     assert_eq!(segments[0].0, "ja");
     // There should be an English segment somewhere
@@ -409,8 +413,8 @@ fn test_post_process_adds_bos_eos_padding() {
 
     // Expected: BOS(1) + pad(0) + 10 + pad(0) + 11 + pad(0) + EOS(2)
     assert_eq!(result_ids, vec![1, 0, 10, 0, 11, 0, 2]);
-    assert_eq!(result_ids[0], 1);  // BOS
-    assert_eq!(result_ids[1], 0);  // pad after BOS
+    assert_eq!(result_ids[0], 1); // BOS
+    assert_eq!(result_ids[1], 0); // pad after BOS
     assert_eq!(*result_ids.last().unwrap(), 2); // EOS
     assert_eq!(result_ids.len(), result_prosody.len());
 }
@@ -536,7 +540,7 @@ fn test_segment_six_language_detector() {
     assert_eq!(detector.detect_char('\u{3042}', false), Some("ja"));
     // Chinese ideograph (no kana context)
     assert_eq!(detector.detect_char('\u{4F60}', false), Some("zh")); // 你
-    // Latin -> default (en)
+                                                                     // Latin -> default (en)
     assert_eq!(detector.detect_char('A', false), Some("en"));
     // Neutral
     assert_eq!(detector.detect_char('5', false), None);

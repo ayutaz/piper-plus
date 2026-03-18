@@ -101,15 +101,11 @@ pub fn durations_to_timing(
     }
 
     if sample_rate == 0 {
-        return Err(PiperError::Inference(
-            "sample_rate must be > 0".to_string(),
-        ));
+        return Err(PiperError::Inference("sample_rate must be > 0".to_string()));
     }
 
     if hop_length == 0 {
-        return Err(PiperError::Inference(
-            "hop_length must be > 0".to_string(),
-        ));
+        return Err(PiperError::Inference("hop_length must be > 0".to_string()));
     }
 
     // Time in seconds for one frame
@@ -687,12 +683,11 @@ mod tests {
     fn test_unicode_phoneme_names() {
         let ipa_tokens = vec![
             "\u{0251}\u{02D0}".to_string(), // ɑː
-            "\u{0283}".to_string(),          // ʃ
-            "\u{014B}".to_string(),          // ŋ
+            "\u{0283}".to_string(),         // ʃ
+            "\u{014B}".to_string(),         // ŋ
         ];
         let durations = vec![5.0, 3.0, 7.0];
-        let result =
-            durations_to_timing(&durations, &ipa_tokens, 1000, 1).unwrap();
+        let result = durations_to_timing(&durations, &ipa_tokens, 1000, 1).unwrap();
 
         // Verify phoneme names are preserved
         assert_eq!(result.phonemes[0].phoneme, "\u{0251}\u{02D0}");
@@ -845,7 +840,10 @@ mod tests {
 
         // Compact format also succeeds
         let compact = timing.to_json_compact().expect("compact should succeed");
-        assert!(compact.contains("null"), "compact JSON contains null for Infinity");
+        assert!(
+            compact.contains("null"),
+            "compact JSON contains null for Infinity"
+        );
 
         // PiperError::from(serde_json::Error) conversion is exercised
         // by to_json / to_json_compact internally via map_err.

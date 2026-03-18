@@ -3,7 +3,7 @@
 //! Validates device string parsing, device enumeration,
 //! and trait implementations on DeviceType / DeviceInfo.
 
-use piper_core::gpu::{parse_device_string, list_devices, DeviceType, DeviceInfo};
+use piper_core::gpu::{list_devices, parse_device_string, DeviceInfo, DeviceType};
 
 // =========================================================================
 // parse_device_string — valid inputs
@@ -70,7 +70,10 @@ fn test_parse_auto_returns_valid_device() {
     // We cannot know which device is selected, but it must be one of the
     // known variants. A simple way to verify: it should display without panic.
     let display = format!("{}", dt);
-    assert!(!display.is_empty(), "auto device should have a non-empty display string");
+    assert!(
+        !display.is_empty(),
+        "auto device should have a non-empty display string"
+    );
 }
 
 // =========================================================================
@@ -138,7 +141,10 @@ fn test_parse_cuda_negative_device_accepted_or_rejected() {
 #[test]
 fn test_parse_cuda_non_numeric_suffix_errors() {
     let result = parse_device_string("cuda:abc");
-    assert!(result.is_err(), "non-numeric device id should return an error");
+    assert!(
+        result.is_err(),
+        "non-numeric device id should return an error"
+    );
 }
 
 // =========================================================================
@@ -178,11 +184,7 @@ fn test_list_devices_no_duplicate_types() {
     let mut seen: Vec<String> = Vec::new();
     for d in &devices {
         let key = format!("{}", d.device_type);
-        assert!(
-            !seen.contains(&key),
-            "duplicate device type found: {}",
-            key
-        );
+        assert!(!seen.contains(&key), "duplicate device type found: {}", key);
         seen.push(key);
     }
 }
@@ -283,10 +285,7 @@ fn test_eq_same_variant() {
 #[test]
 fn test_ne_different_variant() {
     assert_ne!(DeviceType::Cpu, DeviceType::CoreML);
-    assert_ne!(
-        DeviceType::Cpu,
-        DeviceType::Cuda { device_id: 0 }
-    );
+    assert_ne!(DeviceType::Cpu, DeviceType::Cuda { device_id: 0 });
 }
 
 #[test]

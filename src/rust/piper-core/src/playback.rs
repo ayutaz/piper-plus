@@ -75,9 +75,7 @@ impl AudioSink for DummyPlayer {
             ));
         }
         if sample_rate == 0 {
-            return Err(PiperError::Inference(
-                "sample rate must be > 0".to_string(),
-            ));
+            return Err(PiperError::Inference("sample rate must be > 0".to_string()));
         }
         self.total_samples += samples.len();
         self.chunk_count += 1;
@@ -150,9 +148,7 @@ impl AudioSink for CollectorSink {
             ));
         }
         if sample_rate == 0 {
-            return Err(PiperError::Inference(
-                "sample rate must be > 0".to_string(),
-            ));
+            return Err(PiperError::Inference("sample rate must be > 0".to_string()));
         }
         // Detect sample rate mismatch across chunks
         if let Some(prev) = self.sample_rate {
@@ -299,9 +295,7 @@ impl AudioSink for RodioPlayer {
             ));
         }
         if sample_rate == 0 {
-            return Err(PiperError::Inference(
-                "sample rate must be > 0".to_string(),
-            ));
+            return Err(PiperError::Inference("sample rate must be > 0".to_string()));
         }
         if samples.is_empty() {
             return Ok(());
@@ -340,9 +334,7 @@ impl AudioSink for RodioPlayer {
 /// if the audio device cannot be opened.
 pub fn play_audio(samples: &[i16], sample_rate: u32) -> Result<(), PiperError> {
     if sample_rate == 0 {
-        return Err(PiperError::Inference(
-            "sample rate must be > 0".to_string(),
-        ));
+        return Err(PiperError::Inference("sample rate must be > 0".to_string()));
     }
 
     #[cfg(feature = "playback")]
@@ -712,8 +704,7 @@ mod tests {
             let input: Vec<i16> = (0..input_len as i16).collect();
             let output = RodioPlayer::linear_resample(&input, 22050, 48000);
 
-            let expected_len =
-                ((input_len as f64) * (48000.0 / 22050.0)).ceil() as usize;
+            let expected_len = ((input_len as f64) * (48000.0 / 22050.0)).ceil() as usize;
             // Allow +/- 1 sample tolerance for rounding
             assert!(
                 (output.len() as isize - expected_len as isize).unsigned_abs() <= 1,
@@ -737,10 +728,7 @@ mod tests {
             let input = vec![i16::MIN, i16::MAX, i16::MIN, i16::MAX, 0];
             let output = RodioPlayer::linear_resample(&input, 22050, 48000);
 
-            assert!(
-                !output.is_empty(),
-                "resampled output should not be empty"
-            );
+            assert!(!output.is_empty(), "resampled output should not be empty");
 
             // Every output sample must stay within valid i16 range
             for (i, &sample) in output.iter().enumerate() {
@@ -753,7 +741,8 @@ mod tests {
             // Verify the extreme values appear in the output (first and
             // last input samples map directly to output positions)
             assert_eq!(
-                output[0], i16::MIN,
+                output[0],
+                i16::MIN,
                 "first output sample should be i16::MIN"
             );
         }

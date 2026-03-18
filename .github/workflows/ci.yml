@@ -359,7 +359,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-22.04, macos-latest]
+        os: [ubuntu-24.04, macos-latest]
     defaults:
       run:
         working-directory: src/rust

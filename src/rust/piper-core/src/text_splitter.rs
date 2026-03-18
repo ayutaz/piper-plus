@@ -35,12 +35,9 @@ impl Default for SplitConfig {
 
 /// Common English abbreviations that should not trigger sentence splitting.
 const ABBREVIATIONS: &[&str] = &[
-    "Mr.", "Mrs.", "Ms.", "Dr.", "Prof.", "Jr.", "Sr.",
-    "Inc.", "Ltd.", "Corp.", "Co.", "vs.", "etc.", "approx.",
-    "dept.", "est.", "vol.", "no.", "tel.", "fax.",
-    "Jan.", "Feb.", "Mar.", "Apr.", "Jun.", "Jul.", "Aug.",
-    "Sep.", "Oct.", "Nov.", "Dec.",
-    "St.", "Ave.", "Blvd.", "Rd.",
+    "Mr.", "Mrs.", "Ms.", "Dr.", "Prof.", "Jr.", "Sr.", "Inc.", "Ltd.", "Corp.", "Co.", "vs.",
+    "etc.", "approx.", "dept.", "est.", "vol.", "no.", "tel.", "fax.", "Jan.", "Feb.", "Mar.",
+    "Apr.", "Jun.", "Jul.", "Aug.", "Sep.", "Oct.", "Nov.", "Dec.", "St.", "Ave.", "Blvd.", "Rd.",
     "a.m.", "p.m.", "e.g.", "i.e.",
 ];
 
@@ -141,11 +138,13 @@ pub fn split_sentences(text: &str) -> Vec<String> {
         if is_cjk_sentence_end(c) {
             current.push(c);
             // Consume any trailing CJK punctuation or closing quotes/brackets
-            while i + 1 < len && (indexed[i + 1].1 == '\u{300D}' // 」
+            while i + 1 < len
+                && (indexed[i + 1].1 == '\u{300D}' // 」
                 || indexed[i + 1].1 == '\u{300F}'                 // 』
                 || indexed[i + 1].1 == '\u{FF09}'                 // ）
                 || indexed[i + 1].1 == '"'
-                || indexed[i + 1].1 == '\u{201D}')                // "
+                || indexed[i + 1].1 == '\u{201D}')
+            // "
             {
                 i += 1;
                 current.push(indexed[i].1);
@@ -168,17 +167,18 @@ pub fn split_sentences(text: &str) -> Vec<String> {
             current.push(c);
 
             // Handle multiple consecutive punctuation: !? ?! !! ...
-            while i + 1 < len && (is_western_sentence_end(indexed[i + 1].1)
-                || indexed[i + 1].1 == '.')
+            while i + 1 < len
+                && (is_western_sentence_end(indexed[i + 1].1) || indexed[i + 1].1 == '.')
             {
                 i += 1;
                 current.push(indexed[i].1);
             }
 
             // Consume closing quotes after punctuation
-            while i + 1 < len && (indexed[i + 1].1 == '"'
-                || indexed[i + 1].1 == '\u{201D}'
-                || indexed[i + 1].1 == '\'')
+            while i + 1 < len
+                && (indexed[i + 1].1 == '"'
+                    || indexed[i + 1].1 == '\u{201D}'
+                    || indexed[i + 1].1 == '\'')
             {
                 i += 1;
                 current.push(indexed[i].1);
@@ -259,8 +259,7 @@ pub fn split_sentences(text: &str) -> Vec<String> {
 /// Split a single long sentence at clause boundaries (commas, semicolons, colons).
 fn split_at_clauses(text: &str) -> Vec<String> {
     let clause_delimiters: &[char] = &[
-        ',', ';', ':',
-        '\u{3001}', // 、(Japanese comma)
+        ',', ';', ':', '\u{3001}', // 、(Japanese comma)
         '\u{FF0C}', // ，(fullwidth comma)
         '\u{FF1B}', // ；(fullwidth semicolon)
     ];
@@ -399,7 +398,10 @@ mod tests {
     #[test]
     fn test_english_multiple_sentences() {
         let result = split_sentences("First sentence. Second sentence. Third one.");
-        assert_eq!(result, vec!["First sentence.", "Second sentence.", "Third one."]);
+        assert_eq!(
+            result,
+            vec!["First sentence.", "Second sentence.", "Third one."]
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -414,7 +416,10 @@ mod tests {
     #[test]
     fn test_japanese_mixed_punctuation() {
         let result = split_sentences("元気ですか？はい、元気です。よかった！");
-        assert_eq!(result, vec!["元気ですか？", "はい、元気です。", "よかった！"]);
+        assert_eq!(
+            result,
+            vec!["元気ですか？", "はい、元気です。", "よかった！"]
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -432,7 +437,11 @@ mod tests {
         // At minimum, CJK sentence ender splits correctly
         assert!(!result.is_empty());
         assert!(result[0].contains("これはテストです。"));
-        assert!(result.len() >= 2, "expected at least 2 chunks, got {:?}", result);
+        assert!(
+            result.len() >= 2,
+            "expected at least 2 chunks, got {:?}",
+            result
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -441,7 +450,10 @@ mod tests {
     #[test]
     fn test_abbreviation_mr() {
         let result = split_sentences("Mr. Smith went to the store. He bought milk.");
-        assert_eq!(result, vec!["Mr. Smith went to the store.", "He bought milk."]);
+        assert_eq!(
+            result,
+            vec!["Mr. Smith went to the store.", "He bought milk."]
+        );
     }
 
     #[test]
@@ -453,7 +465,10 @@ mod tests {
     #[test]
     fn test_abbreviation_etc() {
         let result = split_sentences("Apples, oranges, etc. are fruits. Eat them.");
-        assert_eq!(result, vec!["Apples, oranges, etc. are fruits.", "Eat them."]);
+        assert_eq!(
+            result,
+            vec!["Apples, oranges, etc. are fruits.", "Eat them."]
+        );
     }
 
     #[test]
@@ -484,15 +499,11 @@ mod tests {
     // -----------------------------------------------------------------------
     #[test]
     fn test_clause_splitting() {
-        let clauses = split_at_clauses(
-            "first part, second part; third part: fourth part"
+        let clauses = split_at_clauses("first part, second part; third part: fourth part");
+        assert_eq!(
+            clauses,
+            vec!["first part,", "second part;", "third part:", "fourth part",]
         );
-        assert_eq!(clauses, vec![
-            "first part,",
-            "second part;",
-            "third part:",
-            "fourth part",
-        ]);
     }
 
     #[test]
@@ -512,7 +523,11 @@ mod tests {
         };
         let chunks = split_chunks(long, &config);
         // Should have been clause-split since the whole thing > 30 chars
-        assert!(chunks.len() > 1, "expected multiple chunks, got {}", chunks.len());
+        assert!(
+            chunks.len() > 1,
+            "expected multiple chunks, got {}",
+            chunks.len()
+        );
         // Each clause should be within limits (or at least attempted)
         for chunk in &chunks {
             assert!(!chunk.text.is_empty());
@@ -545,7 +560,11 @@ mod tests {
         let chunks = split_chunks(text, &config);
         // max_chars=0 means no limit, sentences split normally
         assert!(!chunks.is_empty(), "should produce at least one chunk");
-        assert!(chunks.len() >= 2, "expected at least 2 chunks, got {:?}", chunks.iter().map(|c| &c.text).collect::<Vec<_>>());
+        assert!(
+            chunks.len() >= 2,
+            "expected at least 2 chunks, got {:?}",
+            chunks.iter().map(|c| &c.text).collect::<Vec<_>>()
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -645,8 +664,16 @@ mod tests {
         // The key is that it doesn't panic and produces non-empty results
         assert!(!result.is_empty());
         let joined: String = result.join(" ");
-        assert!(joined.contains("Wait"), "should contain 'Wait': {:?}", result);
-        assert!(joined.contains("what?"), "should contain 'what?': {:?}", result);
+        assert!(
+            joined.contains("Wait"),
+            "should contain 'Wait': {:?}",
+            result
+        );
+        assert!(
+            joined.contains("what?"),
+            "should contain 'what?': {:?}",
+            result
+        );
     }
 
     #[test]
@@ -693,13 +720,20 @@ mod tests {
             min_chars: 0,
         };
         let chunks = split_chunks(text, &config);
-        assert!(chunks.len() >= 2, "expected at least 2 chunks, got {:?}", chunks.iter().map(|c| &c.text).collect::<Vec<_>>());
+        assert!(
+            chunks.len() >= 2,
+            "expected at least 2 chunks, got {:?}",
+            chunks.iter().map(|c| &c.text).collect::<Vec<_>>()
+        );
         // Verify indices are sequential
         for (i, chunk) in chunks.iter().enumerate() {
             assert_eq!(chunk.index, i, "chunk {} index mismatch", i);
         }
         // Last chunk must have is_last=true
-        assert!(chunks.last().unwrap().is_last, "last chunk should have is_last=true");
+        assert!(
+            chunks.last().unwrap().is_last,
+            "last chunk should have is_last=true"
+        );
         // Non-last chunks must have is_last=false
         for chunk in &chunks[..chunks.len() - 1] {
             assert!(!chunk.is_last, "non-last chunk should have is_last=false");
@@ -821,7 +855,8 @@ mod tests {
 
     #[test]
     fn test_chunks_with_merging_and_splitting() {
-        let text = "A. B. This is a long sentence with many words, and some clauses; and more text here.";
+        let text =
+            "A. B. This is a long sentence with many words, and some clauses; and more text here.";
         let config = SplitConfig {
             max_chars: 40,
             split_on_clause: true,
@@ -844,7 +879,12 @@ mod tests {
     fn test_split_sentences_nested_quotes() {
         let text = "He said \"she said 'hello'\" then left.";
         let result = split_sentences(text);
-        assert_eq!(result.len(), 1, "nested quotes should not cause extra splits: {:?}", result);
+        assert_eq!(
+            result.len(),
+            1,
+            "nested quotes should not cause extra splits: {:?}",
+            result
+        );
         assert_eq!(result[0], text);
     }
 
@@ -856,7 +896,10 @@ mod tests {
         // Input is three CJK sentence-ending marks with no surrounding text
         let result = split_sentences("\u{3002}\u{FF01}\u{FF1F}");
         // Each mark should be treated as its own sentence (non-empty)
-        assert!(!result.is_empty(), "CJK-only punctuation should produce output");
+        assert!(
+            !result.is_empty(),
+            "CJK-only punctuation should produce output"
+        );
         for s in &result {
             assert!(!s.is_empty(), "no empty sentences should be emitted");
         }
@@ -876,11 +919,24 @@ mod tests {
         };
         let chunks = split_chunks(text, &config);
         // Must not panic; should still produce at least one chunk
-        assert!(!chunks.is_empty(), "should produce chunks even with invalid config");
+        assert!(
+            !chunks.is_empty(),
+            "should produce chunks even with invalid config"
+        );
         // All text should survive the round-trip
-        let rejoined: String = chunks.iter().map(|c| c.text.as_str()).collect::<Vec<_>>().join(" ");
-        assert!(rejoined.contains("Hello"), "text should survive: {rejoined}");
-        assert!(rejoined.contains("Goodbye"), "text should survive: {rejoined}");
+        let rejoined: String = chunks
+            .iter()
+            .map(|c| c.text.as_str())
+            .collect::<Vec<_>>()
+            .join(" ");
+        assert!(
+            rejoined.contains("Hello"),
+            "text should survive: {rejoined}"
+        );
+        assert!(
+            rejoined.contains("Goodbye"),
+            "text should survive: {rejoined}"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -900,8 +956,10 @@ mod tests {
         let result = split_sentences("Dr. Smith is here.");
         // "Dr." is an abbreviation and must not split
         assert_eq!(
-            result.len(), 1,
-            "abbreviation at start should not split: {:?}", result
+            result.len(),
+            1,
+            "abbreviation at start should not split: {:?}",
+            result
         );
         assert_eq!(result[0], "Dr. Smith is here.");
     }
@@ -922,13 +980,19 @@ mod tests {
         let result_double = split_sentences("Hello.\r\n\r\nWorld.");
         assert!(
             result_double.len() >= 2,
-            "double CRLF should cause paragraph split: {:?}", result_double
+            "double CRLF should cause paragraph split: {:?}",
+            result_double
         );
         // First chunk should contain "Hello." and last should contain "World."
-        assert!(result_double[0].contains("Hello."), "first chunk: {:?}", result_double);
+        assert!(
+            result_double[0].contains("Hello."),
+            "first chunk: {:?}",
+            result_double
+        );
         assert!(
             result_double.last().unwrap().contains("World."),
-            "last chunk: {:?}", result_double
+            "last chunk: {:?}",
+            result_double
         );
     }
 }

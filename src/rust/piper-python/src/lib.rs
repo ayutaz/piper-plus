@@ -131,11 +131,7 @@ impl SynthesisResult {
     /// Useful for downstream audio processing libraries that expect
     /// floating-point samples.
     fn audio_float32<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray1<f32>> {
-        let floats: Vec<f32> = self
-            .samples
-            .iter()
-            .map(|&s| s as f32 / 32768.0)
-            .collect();
+        let floats: Vec<f32> = self.samples.iter().map(|&s| s as f32 / 32768.0).collect();
         floats.into_pyarray_bound(py)
     }
 
@@ -376,11 +372,7 @@ impl PiperVoice {
 
         let result = py.allow_threads(move || {
             let inner = unsafe { inner_ptr.as_mut() };
-            inner.text_to_wav_file(
-                &text_owned,
-                Path::new(&output_owned),
-                speaker_id,
-            )
+            inner.text_to_wav_file(&text_owned, Path::new(&output_owned), speaker_id)
         });
 
         to_pyresult(result).map(SynthesisResult::from)

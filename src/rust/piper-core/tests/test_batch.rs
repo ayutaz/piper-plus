@@ -247,9 +247,18 @@ fn test_batch_summary_to_summary_string_contains_counts() {
     };
     let s = summary.to_summary_string();
     // The summary string should mention key metrics
-    assert!(s.contains("5") || s.contains("total"), "should contain total job count");
-    assert!(s.contains("4") || s.contains("success"), "should contain success count");
-    assert!(s.contains("1") || s.contains("fail"), "should contain failure count");
+    assert!(
+        s.contains("5") || s.contains("total"),
+        "should contain total job count"
+    );
+    assert!(
+        s.contains("4") || s.contains("success"),
+        "should contain success count"
+    );
+    assert!(
+        s.contains("1") || s.contains("fail"),
+        "should contain failure count"
+    );
 }
 
 #[test]
@@ -263,7 +272,10 @@ fn test_batch_summary_to_summary_string_not_empty() {
         results: vec![],
     };
     let s = summary.to_summary_string();
-    assert!(!s.is_empty(), "summary string should not be empty even with zero jobs");
+    assert!(
+        !s.is_empty(),
+        "summary string should not be empty even with zero jobs"
+    );
 }
 
 // ===================================================================
@@ -296,8 +308,7 @@ fn test_jobs_from_text_file_with_speaker_and_language() {
     let output_dir = dir.path().join("output");
     std::fs::create_dir_all(&output_dir).unwrap();
 
-    let jobs =
-        jobs_from_text_file(&text_path, &output_dir, Some(2), Some("en")).unwrap();
+    let jobs = jobs_from_text_file(&text_path, &output_dir, Some(2), Some("en")).unwrap();
     assert_eq!(jobs.len(), 2);
     assert_eq!(jobs[0].speaker_id, Some(2));
     assert_eq!(jobs[0].language.as_deref(), Some("en"));

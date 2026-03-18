@@ -493,10 +493,7 @@ fn find_stress_position(word: &[char]) -> i32 {
     if !paroxytone && sn >= 2 {
         let sl = stripped[sn - 2];
         let el = stripped[sn - 1];
-        if (sl == 'a' && el == 'm')
-            || (sl == 'e' && el == 'm')
-            || (sl == 'e' && el == 'n')
-        {
+        if (sl == 'a' && el == 'm') || (sl == 'e' && el == 'm') || (sl == 'e' && el == 'n') {
             paroxytone = true;
         }
     }
@@ -672,10 +669,7 @@ fn convert_word(word: &[char]) -> WordResult {
         if ch == 'x' {
             if i == 0 {
                 ph.push(IPA_ESH);
-            } else if i > 0
-                && is_vowel_char(word[i - 1])
-                && i + 1 < n
-                && is_vowel_char(word[i + 1])
+            } else if i > 0 && is_vowel_char(word[i - 1]) && i + 1 < n && is_vowel_char(word[i + 1])
             {
                 ph.push('z');
             } else {
@@ -835,9 +829,8 @@ fn remove_duplicate_nasal_coda(ph: &mut Vec<char>, stress_idx: &mut i32) {
         let idx = i as usize;
         if (ph[idx] == 'n' || ph[idx] == 'm') && is_ipa_nasal_vowel(ph[idx - 1]) {
             // Check boundary: at end, or next is space / punctuation
-            let at_boundary = idx == ph.len() - 1
-                || ph[idx + 1] == ' '
-                || is_punctuation(ph[idx + 1]);
+            let at_boundary =
+                idx == ph.len() - 1 || ph[idx + 1] == ' ' || is_punctuation(ph[idx + 1]);
             if at_boundary {
                 if *stress_idx >= 0 && i < *stress_idx {
                     *stress_idx -= 1;
@@ -987,13 +980,21 @@ fn phonemize_sentence_with_prosody(text: &str) -> (Vec<String>, Vec<Option<Proso
             // Punctuation: no space before
             for &ch in &tok.chars {
                 phonemes.push(phoneme_char_to_token(ch));
-                prosody_list.push(Some(ProsodyInfo { a1: 0, a2: 0, a3: 0 }));
+                prosody_list.push(Some(ProsodyInfo {
+                    a1: 0,
+                    a2: 0,
+                    a3: 0,
+                }));
             }
             need_space = true;
         } else {
             if need_space {
                 phonemes.push(" ".to_string());
-                prosody_list.push(Some(ProsodyInfo { a1: 0, a2: 0, a3: 0 }));
+                prosody_list.push(Some(ProsodyInfo {
+                    a1: 0,
+                    a2: 0,
+                    a3: 0,
+                }));
             }
             let wr = process_word(&tok.chars);
             let word_phoneme_count = wr.phonemes.len() as i32;
@@ -1059,8 +1060,7 @@ impl Phonemizer for PortuguesePhonemizer {
 
         // Insert pad between every phoneme ID (skip after existing pad tokens)
         let mut padded_ids: Vec<i64> = Vec::with_capacity(ids.len() * 2);
-        let mut padded_prosody: Vec<Option<ProsodyFeature>> =
-            Vec::with_capacity(prosody.len() * 2);
+        let mut padded_prosody: Vec<Option<ProsodyFeature>> = Vec::with_capacity(prosody.len() * 2);
 
         for (phoneme_id, prosody_feature) in ids.iter().zip(prosody.iter()) {
             padded_ids.push(*phoneme_id);
@@ -1145,13 +1145,14 @@ mod tests {
     fn test_nasal_vowel_bom() {
         // "bom" -> b + nasal o (o tilde)
         let ph = phonemize_chars("bom");
-        assert!(
-            ph.contains(&NASAL_O),
-            "expected nasal o in {:?}",
+        assert!(ph.contains(&NASAL_O), "expected nasal o in {:?}", ph);
+        // Should NOT have trailing 'm' after nasal vowel (duplicate removed)
+        assert_eq!(
+            ph.last(),
+            Some(&NASAL_O),
+            "no trailing m after nasal: {:?}",
             ph
         );
-        // Should NOT have trailing 'm' after nasal vowel (duplicate removed)
-        assert_eq!(ph.last(), Some(&NASAL_O), "no trailing m after nasal: {:?}", ph);
     }
 
     // ------------------------------------------------------------------
@@ -1161,11 +1162,7 @@ mod tests {
     fn test_coda_l_vocalization_brasil() {
         // "Brasil" -> b ʁ a z i w (final l -> w)
         let ph = phonemize_chars("Brasil");
-        assert!(
-            ph.contains(&'w'),
-            "expected coda-l -> w in {:?}",
-            ph
-        );
+        assert!(ph.contains(&'w'), "expected coda-l -> w in {:?}", ph);
         assert!(
             !ph.contains(&'l'),
             "should not contain 'l' in coda: {:?}",
@@ -1344,9 +1341,7 @@ mod tests {
             "tokens and prosody must match length"
         );
         // At least one phoneme should have a2=2 (stressed)
-        let has_stress = prosody.iter().any(|p| {
-            p.map_or(false, |info| info.a2 == 2)
-        });
+        let has_stress = prosody.iter().any(|p| p.map_or(false, |info| info.a2 == 2));
         assert!(has_stress, "should have at least one stressed phoneme");
     }
 

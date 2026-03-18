@@ -52,7 +52,10 @@ const PUA_TCH: char = '\u{E054}';
 // ---------------------------------------------------------------------------
 
 fn is_punctuation(c: char) -> bool {
-    matches!(c, ',' | '.' | ';' | ':' | '!' | '?' | '\u{00A1}' | '\u{00BF}')
+    matches!(
+        c,
+        ',' | '.' | ';' | ':' | '!' | '?' | '\u{00A1}' | '\u{00BF}'
+    )
 }
 
 // ---------------------------------------------------------------------------
@@ -820,10 +823,7 @@ fn g2p_word(word: &[char]) -> G2PResult {
         // x
         if bc == 'x' {
             // xc+e/i: c is absorbed, x provides /ks/
-            if i + 1 < n
-                && bw[i + 1] == 'c'
-                && i + 2 < n
-                && (bw[i + 2] == 'e' || bw[i + 2] == 'i')
+            if i + 1 < n && bw[i + 1] == 'c' && i + 2 < n && (bw[i + 2] == 'e' || bw[i + 2] == 'i')
             {
                 ph.push('k');
                 ph.push('s');
@@ -977,9 +977,7 @@ fn map_sequence(tokens: Vec<String>) -> Vec<String> {
 ///
 /// Returns (phonemes, prosody_info_list) where each phoneme has corresponding
 /// prosody info with a1=0, a2=stress-based (0 or 2), a3=word phoneme count.
-pub fn phonemize_spanish_with_prosody(
-    text: &str,
-) -> (Vec<String>, Vec<Option<ProsodyInfo>>) {
+pub fn phonemize_spanish_with_prosody(text: &str) -> (Vec<String>, Vec<Option<ProsodyInfo>>) {
     let cps = normalize(text);
     let tokens = tokenize(&cps);
     if tokens.is_empty() {
@@ -995,13 +993,21 @@ pub fn phonemize_spanish_with_prosody(
             Token::Punct(chars) => {
                 for &c in chars {
                     phonemes.push(c.to_string());
-                    prosody_list.push(Some(ProsodyInfo { a1: 0, a2: 0, a3: 0 }));
+                    prosody_list.push(Some(ProsodyInfo {
+                        a1: 0,
+                        a2: 0,
+                        a3: 0,
+                    }));
                 }
             }
             Token::Word(chars) => {
                 if need_space {
                     phonemes.push(" ".to_string());
-                    prosody_list.push(Some(ProsodyInfo { a1: 0, a2: 0, a3: 0 }));
+                    prosody_list.push(Some(ProsodyInfo {
+                        a1: 0,
+                        a2: 0,
+                        a3: 0,
+                    }));
                 }
 
                 let mut res = g2p_word(chars);
@@ -1116,8 +1122,7 @@ impl Phonemizer for SpanishPhonemizer {
             .unwrap_or(2);
 
         let mut out_ids: Vec<i64> = Vec::with_capacity(ids.len() * 2 + 2);
-        let mut out_prosody: Vec<Option<ProsodyFeature>> =
-            Vec::with_capacity(ids.len() * 2 + 2);
+        let mut out_prosody: Vec<Option<ProsodyFeature>> = Vec::with_capacity(ids.len() * 2 + 2);
 
         // BOS
         out_ids.push(bos_id);
@@ -1169,24 +1174,44 @@ mod tests {
         // "hola" -> h is silent, o l a with stress on penultimate (o)
         let result = ph("hola");
         let stress = IPA_STRESS.to_string();
-        assert!(result.contains(&stress), "should have stress marker: {:?}", result);
+        assert!(
+            result.contains(&stress),
+            "should have stress marker: {:?}",
+            result
+        );
         assert!(result.contains(&"o".to_string()));
         assert!(result.contains(&"l".to_string()));
         assert!(result.contains(&"a".to_string()));
         // h should NOT appear (silent)
-        assert!(!result.iter().any(|s| s == "h"), "h should be silent: {:?}", result);
+        assert!(
+            !result.iter().any(|s| s == "h"),
+            "h should be silent: {:?}",
+            result
+        );
     }
 
     #[test]
     fn test_seseo_c_before_e_and_z() {
         // "ce" -> s e (seseo: c before e -> s)
         let result_ce = ph("ce");
-        assert!(result_ce.contains(&"s".to_string()), "c before e -> s: {:?}", result_ce);
+        assert!(
+            result_ce.contains(&"s".to_string()),
+            "c before e -> s: {:?}",
+            result_ce
+        );
 
         // "zapato" -> s a p a t o (z -> s)
         let result_z = ph("zapato");
-        assert!(result_z.contains(&"s".to_string()), "z -> s: {:?}", result_z);
-        assert!(!result_z.iter().any(|s| s == "z"), "z should not appear: {:?}", result_z);
+        assert!(
+            result_z.contains(&"s".to_string()),
+            "z -> s: {:?}",
+            result_z
+        );
+        assert!(
+            !result_z.iter().any(|s| s == "z"),
+            "z should not appear: {:?}",
+            result_z
+        );
     }
 
     #[test]
@@ -1214,7 +1239,11 @@ mod tests {
 
         // "rosa" -> word-initial r -> trill
         let result_r = ph("rosa");
-        assert!(result_r.contains(&rr_str), "word-initial r -> PUA_RR: {:?}", result_r);
+        assert!(
+            result_r.contains(&rr_str),
+            "word-initial r -> PUA_RR: {:?}",
+            result_r
+        );
     }
 
     #[test]
@@ -1228,11 +1257,20 @@ mod tests {
     #[test]
     fn test_intervocalic_allophony_b_d_g() {
         // "lobo" -> l o β o
-        assert!(ph("lobo").contains(&IPA_BETA.to_string()), "intervocalic b -> β");
+        assert!(
+            ph("lobo").contains(&IPA_BETA.to_string()),
+            "intervocalic b -> β"
+        );
         // "todo" -> t o ð o
-        assert!(ph("todo").contains(&IPA_ETH.to_string()), "intervocalic d -> ð");
+        assert!(
+            ph("todo").contains(&IPA_ETH.to_string()),
+            "intervocalic d -> ð"
+        );
         // "lago" -> l a ɣ o
-        assert!(ph("lago").contains(&IPA_GAMMA.to_string()), "intervocalic g -> ɣ");
+        assert!(
+            ph("lago").contains(&IPA_GAMMA.to_string()),
+            "intervocalic g -> ɣ"
+        );
     }
 
     // ===== Stress rules =====
@@ -1245,7 +1283,10 @@ mod tests {
         // "ciudad" ends in 'd' (not n/s) -> final syllable stress
         assert!(ph("ciudad").contains(&stress), "final stress for ciudad");
         // "teléfono" has accent on é -> stress on that syllable
-        assert!(ph("teléfono").contains(&stress), "accent mark stress for teléfono");
+        assert!(
+            ph("teléfono").contains(&stress),
+            "accent mark stress for teléfono"
+        );
     }
 
     // ===== Function word stress removal =====
@@ -1357,7 +1398,11 @@ mod tests {
     fn test_word_final_y_vowel() {
         let result = ph("hoy");
         // h is silent, o is a vowel, y at end -> i
-        assert!(result.contains(&"i".to_string()), "word-final y -> i: {:?}", result);
+        assert!(
+            result.contains(&"i".to_string()),
+            "word-final y -> i: {:?}",
+            result
+        );
     }
 
     #[test]
@@ -1379,20 +1424,30 @@ mod tests {
 
     #[test]
     fn test_space_between_words() {
-        assert!(ph("el sol").contains(&" ".to_string()), "space between words");
+        assert!(
+            ph("el sol").contains(&" ".to_string()),
+            "space between words"
+        );
     }
 
     #[test]
     fn test_b_after_nasal_is_stop() {
         let result = ph("amba");
         assert!(result.contains(&"b".to_string()), "b after nasal -> stop");
-        assert!(!result.contains(&IPA_BETA.to_string()), "b after nasal NOT β");
+        assert!(
+            !result.contains(&IPA_BETA.to_string()),
+            "b after nasal NOT β"
+        );
     }
 
     #[test]
     fn test_r_after_n_is_trill() {
         let result = ph("enrique");
-        assert!(result.contains(&PUA_RR.to_string()), "r after n -> trill: {:?}", result);
+        assert!(
+            result.contains(&PUA_RR.to_string()),
+            "r after n -> trill: {:?}",
+            result
+        );
     }
 
     #[test]
@@ -1401,13 +1456,21 @@ mod tests {
         assert_eq!(phonemes.len(), prosody.len());
         let stress = IPA_STRESS.to_string();
         let stress_count = phonemes.iter().filter(|s| **s == stress).count();
-        assert!(stress_count >= 2, "multiple content words have stress: {:?}", phonemes);
+        assert!(
+            stress_count >= 2,
+            "multiple content words have stress: {:?}",
+            phonemes
+        );
     }
 
     #[test]
     fn test_sc_before_e_produces_single_s() {
         // "escena" -> sc before e -> single s, no geminate
         let result = ph("escena");
-        assert!(result.iter().any(|s| s == "s"), "sc before e -> s: {:?}", result);
+        assert!(
+            result.iter().any(|s| s == "s"),
+            "sc before e -> s: {:?}",
+            result
+        );
     }
 }

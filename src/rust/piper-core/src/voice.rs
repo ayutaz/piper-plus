@@ -46,16 +46,12 @@ impl PiperVoice {
     fn create_phonemizer(config: &VoiceConfig) -> Result<Box<dyn Phonemizer>, PiperError> {
         match config.phoneme_type {
             #[cfg(feature = "japanese")]
-            crate::config::PhonemeType::OpenJTalk => {
-                Ok(Box::new(
-                    crate::phonemize::japanese::JapanesePhonemizer::new()?,
-                ))
-            }
-            crate::config::PhonemeType::Bilingual
-            | crate::config::PhonemeType::Multilingual => {
+            crate::config::PhonemeType::OpenJTalk => Ok(Box::new(
+                crate::phonemize::japanese::JapanesePhonemizer::new()?,
+            )),
+            crate::config::PhonemeType::Bilingual | crate::config::PhonemeType::Multilingual => {
                 // Extract language codes from language_id_map
-                let mut languages: Vec<String> =
-                    config.language_id_map.keys().cloned().collect();
+                let mut languages: Vec<String> = config.language_id_map.keys().cloned().collect();
                 languages.sort(); // canonical order
 
                 if languages.is_empty() {
@@ -76,22 +72,16 @@ impl PiperVoice {
                 };
 
                 // Build per-language phonemizers
-                let mut phonemizers: std::collections::HashMap<
-                    String,
-                    Box<dyn Phonemizer>,
-                > = std::collections::HashMap::new();
+                let mut phonemizers: std::collections::HashMap<String, Box<dyn Phonemizer>> =
+                    std::collections::HashMap::new();
 
                 for lang in &languages {
                     let phonemizer: Box<dyn Phonemizer> = match lang.as_str() {
                         #[cfg(feature = "japanese")]
-                        "ja" => Box::new(
-                            crate::phonemize::japanese::JapanesePhonemizer::new()?,
-                        ),
-                        _ => Box::new(
-                            crate::phonemize::multilingual::PassthroughPhonemizer::new(
-                                lang,
-                            ),
-                        ),
+                        "ja" => Box::new(crate::phonemize::japanese::JapanesePhonemizer::new()?),
+                        _ => Box::new(crate::phonemize::multilingual::PassthroughPhonemizer::new(
+                            lang,
+                        )),
                     };
                     phonemizers.insert(lang.clone(), phonemizer);
                 }
@@ -235,12 +225,7 @@ fn build_prosody_tensor(
     features: &[Option<crate::phonemize::ProsodyFeature>],
 ) -> Option<Vec<crate::phonemize::ProsodyFeature>> {
     if features.iter().any(|p| p.is_some()) {
-        Some(
-            features
-                .iter()
-                .map(|p| p.unwrap_or([0, 0, 0]))
-                .collect(),
-        )
+        Some(features.iter().map(|p| p.unwrap_or([0, 0, 0])).collect())
     } else {
         None
     }
@@ -294,11 +279,7 @@ mod tests {
     // -----------------------------------------------------------------------
     #[test]
     fn test_load_fails_with_missing_model() {
-        let result = PiperVoice::load(
-            Path::new("/nonexistent/model.onnx"),
-            None,
-            "cpu",
-        );
+        let result = PiperVoice::load(Path::new("/nonexistent/model.onnx"), None, "cpu");
         let err = expect_err(result);
         // config が見つからないためエラーになる
         let msg = format!("{err}");
@@ -444,12 +425,9 @@ mod tests {
             phoneme_type: PhonemeType::Multilingual,
             phoneme_id_map: HashMap::new(),
             num_languages: 2,
-            language_id_map: [
-                ("zh".into(), 0i64),
-                ("es".into(), 1),
-            ]
-            .into_iter()
-            .collect(),
+            language_id_map: [("zh".into(), 0i64), ("es".into(), 1)]
+                .into_iter()
+                .collect(),
             speaker_id_map: HashMap::new(),
         };
         let result = PiperVoice::create_phonemizer(&config);
@@ -551,10 +529,7 @@ mod tests {
         assert_eq!(config.language_id_map.get("en"), Some(&1));
         assert_eq!(config.language_id_map.get("zh"), Some(&2));
         // Unknown language falls back to 0
-        assert_eq!(
-            config.language_id_map.get("ko").copied().unwrap_or(0),
-            0
-        );
+        assert_eq!(config.language_id_map.get("ko").copied().unwrap_or(0), 0);
     }
 
     #[test]
@@ -636,9 +611,17 @@ mod tests {
     #[test]
     fn test_prosody_to_optional_features_with_values() {
         let prosody = vec![
-            Some(ProsodyInfo { a1: -2, a2: 1, a3: 5 }),
+            Some(ProsodyInfo {
+                a1: -2,
+                a2: 1,
+                a3: 5,
+            }),
             None,
-            Some(ProsodyInfo { a1: 0, a2: 3, a3: 5 }),
+            Some(ProsodyInfo {
+                a1: 0,
+                a2: 3,
+                a3: 5,
+            }),
         ];
         let result = prosody_to_optional_features(&prosody);
         assert_eq!(result.len(), 3);
@@ -663,11 +646,7 @@ mod tests {
 
     #[test]
     fn test_build_prosody_tensor_with_some() {
-        let features = vec![
-            Some([-2, 1, 5]),
-            None,
-            Some([0, 3, 5]),
-        ];
+        let features = vec![Some([-2, 1, 5]), None, Some([0, 3, 5])];
         let tensor = build_prosody_tensor(&features);
         assert!(tensor.is_some());
         let t = tensor.unwrap();
@@ -697,9 +676,17 @@ mod tests {
     #[test]
     fn test_build_prosody_direct_with_some() {
         let prosody = vec![
-            Some(ProsodyInfo { a1: -2, a2: 1, a3: 5 }),
+            Some(ProsodyInfo {
+                a1: -2,
+                a2: 1,
+                a3: 5,
+            }),
             None,
-            Some(ProsodyInfo { a1: 0, a2: 3, a3: 5 }),
+            Some(ProsodyInfo {
+                a1: 0,
+                a2: 3,
+                a3: 5,
+            }),
         ];
         let tensor = build_prosody_direct(&prosody);
         assert!(tensor.is_some());
@@ -729,9 +716,17 @@ mod tests {
         // Verify build_prosody_direct produces the same result as
         // prosody_to_optional_features + build_prosody_tensor
         let prosody = vec![
-            Some(ProsodyInfo { a1: 1, a2: 2, a3: 3 }),
+            Some(ProsodyInfo {
+                a1: 1,
+                a2: 2,
+                a3: 3,
+            }),
             None,
-            Some(ProsodyInfo { a1: -1, a2: 0, a3: 7 }),
+            Some(ProsodyInfo {
+                a1: -1,
+                a2: 0,
+                a3: 7,
+            }),
             None,
         ];
         let two_step = build_prosody_tensor(&prosody_to_optional_features(&prosody));

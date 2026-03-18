@@ -1,6 +1,6 @@
-use std::collections::HashMap;
 use piper_core::phonemize::phoneme_converter;
 use piper_core::phonemize::ProsodyInfo;
+use std::collections::HashMap;
 
 fn make_test_id_map() -> HashMap<String, Vec<i64>> {
     let mut map = HashMap::new();
@@ -25,7 +25,10 @@ fn make_test_id_map() -> HashMap<String, Vec<i64>> {
 #[test]
 fn test_basic_token_conversion() {
     let map = make_test_id_map();
-    let tokens: Vec<String> = vec!["^", "k", "o", "$"].iter().map(|s| s.to_string()).collect();
+    let tokens: Vec<String> = vec!["^", "k", "o", "$"]
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
     let ids = phoneme_converter::tokens_to_ids(&tokens, &map).unwrap();
     assert_eq!(ids, vec![1, 12, 13, 2]);
 }
@@ -49,9 +52,17 @@ fn test_unknown_phoneme_error() {
 #[test]
 fn test_prosody_conversion() {
     let prosody = vec![
-        Some(ProsodyInfo { a1: -2, a2: 1, a3: 5 }),
+        Some(ProsodyInfo {
+            a1: -2,
+            a2: 1,
+            a3: 5,
+        }),
         None,
-        Some(ProsodyInfo { a1: 0, a2: 2, a3: 5 }),
+        Some(ProsodyInfo {
+            a1: 0,
+            a2: 2,
+            a3: 5,
+        }),
     ];
     let features = phoneme_converter::prosody_to_features(&prosody);
     assert_eq!(features[0], [-2, 1, 5]);

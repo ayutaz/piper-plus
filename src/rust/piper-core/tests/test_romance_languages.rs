@@ -194,8 +194,7 @@ mod spanish {
         let ids = vec![10i64, 20];
         let prosody = vec![Some([0i32, 2, 2]), Some([0, 0, 2])];
 
-        let (result_ids, result_prosody) =
-            p.post_process_ids(ids, prosody, &id_map);
+        let (result_ids, result_prosody) = p.post_process_ids(ids, prosody, &id_map);
         // Expected: BOS(1) + 10 + pad(0) + 20 + EOS(2)
         assert_eq!(result_ids, vec![1, 10, 0, 20, 2]);
         assert_eq!(result_ids.len(), result_prosody.len());
@@ -246,7 +245,9 @@ mod french {
         let p = FrenchPhonemizer::new();
         let (tokens, _) = p.phonemize_with_prosody("bon").unwrap();
         assert!(
-            tokens.iter().any(|t| t == "\u{E058}" || t == "\u{0254}\u{0303}"),
+            tokens
+                .iter()
+                .any(|t| t == "\u{E058}" || t == "\u{0254}\u{0303}"),
             "bon should contain nasal \u{0254}\u{0303} in {:?}",
             tokens
         );
@@ -258,7 +259,9 @@ mod french {
         let p = FrenchPhonemizer::new();
         let (tokens, _) = p.phonemize_with_prosody("enfant").unwrap();
         assert!(
-            tokens.iter().any(|t| t == "\u{E057}" || t == "\u{0251}\u{0303}"),
+            tokens
+                .iter()
+                .any(|t| t == "\u{E057}" || t == "\u{0251}\u{0303}"),
             "enfant should contain nasal \u{0251}\u{0303} in {:?}",
             tokens
         );
@@ -270,7 +273,9 @@ mod french {
         let p = FrenchPhonemizer::new();
         let (tokens, _) = p.phonemize_with_prosody("fin").unwrap();
         assert!(
-            tokens.iter().any(|t| t == "\u{E056}" || t == "\u{025B}\u{0303}"),
+            tokens
+                .iter()
+                .any(|t| t == "\u{E056}" || t == "\u{025B}\u{0303}"),
             "fin should contain nasal \u{025B}\u{0303} in {:?}",
             tokens
         );
@@ -396,28 +401,13 @@ mod french {
         let ids = vec![10i64, 20];
         let prosody = vec![Some([0i32, 2, 2]), Some([0, 0, 2])];
 
-        let (result_ids, result_prosody) =
-            p.post_process_ids(ids, prosody, &id_map);
+        let (result_ids, result_prosody) = p.post_process_ids(ids, prosody, &id_map);
         // Verify BOS and EOS are present
-        assert_eq!(
-            *result_ids.first().unwrap(),
-            1,
-            "should start with BOS"
-        );
-        assert_eq!(
-            *result_ids.last().unwrap(),
-            2,
-            "should end with EOS"
-        );
+        assert_eq!(*result_ids.first().unwrap(), 1, "should start with BOS");
+        assert_eq!(*result_ids.last().unwrap(), 2, "should end with EOS");
         // Verify original phoneme IDs are included
-        assert!(
-            result_ids.contains(&10),
-            "should contain phoneme ID 10"
-        );
-        assert!(
-            result_ids.contains(&20),
-            "should contain phoneme ID 20"
-        );
+        assert!(result_ids.contains(&10), "should contain phoneme ID 10");
+        assert!(result_ids.contains(&20), "should contain phoneme ID 20");
         assert_eq!(
             result_ids.len(),
             result_prosody.len(),
@@ -432,9 +422,10 @@ mod french {
         let (tokens, _) = p.phonemize_with_prosody("parler").unwrap();
         // Should end with /e/ not /ɛʁ/
         // Find last vowel-like token
-        let last_vowel = tokens.iter().rev().find(|t| {
-            matches!(t.as_str(), "e" | "\u{025B}" | "a" | "i" | "o" | "u")
-        });
+        let last_vowel = tokens
+            .iter()
+            .rev()
+            .find(|t| matches!(t.as_str(), "e" | "\u{025B}" | "a" | "i" | "o" | "u"));
         assert_eq!(
             last_vowel.map(|s| s.as_str()),
             Some("e"),
@@ -665,8 +656,7 @@ mod portuguese {
         let ids = vec![10i64, 20];
         let prosody = vec![Some([0i32, 2, 2]), Some([0, 0, 2])];
 
-        let (result_ids, result_prosody) =
-            p.post_process_ids(ids, prosody, &id_map);
+        let (result_ids, result_prosody) = p.post_process_ids(ids, prosody, &id_map);
         // Expected: BOS(1) + pad(0) + 10 + pad(0) + 20 + pad(0) + EOS(2)
         assert_eq!(result_ids, vec![1, 0, 10, 0, 20, 0, 2]);
         assert_eq!(result_ids.len(), result_prosody.len());
@@ -689,9 +679,7 @@ mod portuguese {
         // At least one phoneme should be marked as stressed (a2=2)
         let p = PortuguesePhonemizer::new();
         let (_, prosody) = p.phonemize_with_prosody("casa").unwrap();
-        let has_stress = prosody
-            .iter()
-            .any(|p| p.map_or(false, |info| info.a2 == 2));
+        let has_stress = prosody.iter().any(|p| p.map_or(false, |info| info.a2 == 2));
         assert!(has_stress, "should have at least one stressed phoneme");
     }
 }
@@ -702,9 +690,9 @@ mod portuguese {
 
 mod detect_primary_language {
     use super::*;
-    use piper_core::phonemize::spanish::SpanishPhonemizer;
     use piper_core::phonemize::french::FrenchPhonemizer;
     use piper_core::phonemize::portuguese::PortuguesePhonemizer;
+    use piper_core::phonemize::spanish::SpanishPhonemizer;
 
     // --- Spanish ---
 

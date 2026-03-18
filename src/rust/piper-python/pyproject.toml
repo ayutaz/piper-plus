@@ -12,5 +12,4 @@ keywords = ["tts", "speech-synthesis", "piper", "onnx"]
 
 [tool.maturin]
 features = ["pyo3/extension-module"]
-python-source = "python"
 module-name = "piper_plus"

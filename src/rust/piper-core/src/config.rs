@@ -58,9 +58,15 @@ pub enum PhonemeType {
     Text,
 }
 
-fn default_num_speakers() -> usize { 1 }
-fn default_num_languages() -> usize { 1 }
-fn default_sample_rate() -> u32 { 22050 }
+fn default_num_speakers() -> usize {
+    1
+}
+fn default_num_languages() -> usize {
+    1
+}
+fn default_sample_rate() -> u32 {
+    22050
+}
 
 impl VoiceConfig {
     /// config.json を読み込む

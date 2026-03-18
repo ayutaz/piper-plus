@@ -41,7 +41,10 @@ fn test_get_phoneme_id_map_returns_none() {
 fn test_basic_phonemize() {
     let p = require_phonemizer!();
     let (tokens, prosody) = p.phonemize_with_prosody("hello").unwrap();
-    assert!(!tokens.is_empty(), "phonemize('hello') should produce tokens");
+    assert!(
+        !tokens.is_empty(),
+        "phonemize('hello') should produce tokens"
+    );
     assert_eq!(
         tokens.len(),
         prosody.len(),
@@ -182,7 +185,8 @@ fn test_punctuation_attached_to_word() {
     if let Some(comma_pos) = tokens.iter().position(|t| t == ",") {
         if comma_pos > 0 {
             assert_ne!(
-                tokens[comma_pos - 1], " ",
+                tokens[comma_pos - 1],
+                " ",
                 "comma should not be preceded by a space (attached to previous word)"
             );
         }
@@ -318,10 +322,7 @@ fn test_post_process_ids_bos_eos_prosody_is_none() {
     let (_result_ids, result_prosody) = p.post_process_ids(ids, prosody, &id_map);
 
     // BOS prosody should be None
-    assert!(
-        result_prosody[0].is_none(),
-        "BOS prosody should be None"
-    );
+    assert!(result_prosody[0].is_none(), "BOS prosody should be None");
     // EOS prosody should be None
     assert!(
         result_prosody.last().unwrap().is_none(),

@@ -107,11 +107,7 @@ mod tests {
     #[test]
     fn test_pua_character_conversion() {
         // PUA char U+E000 represents "a:" (long vowel)
-        let map = make_map(&[
-            ("^", &[1]),
-            ("\u{E000}", &[45]),
-            ("$", &[2]),
-        ]);
+        let map = make_map(&[("^", &[1]), ("\u{E000}", &[45]), ("$", &[2])]);
         let tokens: Vec<String> = vec!["^", "\u{E000}", "$"]
             .into_iter()
             .map(String::from)
@@ -124,10 +120,7 @@ mod tests {
     #[test]
     fn test_unknown_phoneme_error() {
         let map = make_map(&[("a", &[15])]);
-        let tokens: Vec<String> = vec!["a", "Z"]
-            .into_iter()
-            .map(String::from)
-            .collect();
+        let tokens: Vec<String> = vec!["a", "Z"].into_iter().map(String::from).collect();
 
         let result = tokens_to_ids(&tokens, &map);
         assert!(result.is_err());
@@ -164,15 +157,8 @@ mod tests {
 
     #[test]
     fn test_build_synthesis_request() {
-        let map = make_map(&[
-            ("^", &[1]),
-            ("a", &[15]),
-            ("$", &[2]),
-        ]);
-        let tokens: Vec<String> = vec!["^", "a", "$"]
-            .into_iter()
-            .map(String::from)
-            .collect();
+        let map = make_map(&[("^", &[1]), ("a", &[15]), ("$", &[2])]);
+        let tokens: Vec<String> = vec!["^", "a", "$"].into_iter().map(String::from).collect();
         let prosody = vec![
             None,
             Some(ProsodyInfo {
@@ -183,17 +169,9 @@ mod tests {
             None,
         ];
 
-        let req = build_synthesis_request(
-            &tokens,
-            &prosody,
-            &map,
-            Some(5),
-            Some(1),
-            0.667,
-            1.0,
-            0.8,
-        )
-        .unwrap();
+        let req =
+            build_synthesis_request(&tokens, &prosody, &map, Some(5), Some(1), 0.667, 1.0, 0.8)
+                .unwrap();
 
         assert_eq!(req.phoneme_ids, vec![1, 15, 2]);
         assert_eq!(req.speaker_id, Some(5));
@@ -213,10 +191,7 @@ mod tests {
     fn test_multi_id_mapping() {
         // Some phoneme_id_map entries map to multiple IDs
         let map = make_map(&[("a", &[10, 11]), ("b", &[20])]);
-        let tokens: Vec<String> = vec!["a", "b"]
-            .into_iter()
-            .map(String::from)
-            .collect();
+        let tokens: Vec<String> = vec!["a", "b"].into_iter().map(String::from).collect();
 
         let ids = tokens_to_ids(&tokens, &map).unwrap();
         assert_eq!(ids, vec![10, 11, 20]);

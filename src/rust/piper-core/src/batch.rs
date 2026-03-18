@@ -146,10 +146,7 @@ struct BatchJsonlLine {
 /// Each line is a JSON object with a required "text" field and optional
 /// "speaker_id", "language", and "output_file" fields. When "output_file"
 /// is absent, output paths are auto-generated as `output_dir/utt_001.wav`.
-pub fn jobs_from_jsonl(
-    jsonl_path: &Path,
-    output_dir: &Path,
-) -> Result<Vec<BatchJob>, PiperError> {
+pub fn jobs_from_jsonl(jsonl_path: &Path, output_dir: &Path) -> Result<Vec<BatchJob>, PiperError> {
     let file = fs::File::open(jsonl_path)?;
     let reader = std::io::BufReader::new(file);
     let mut jobs = Vec::new();
@@ -162,11 +159,10 @@ pub fn jobs_from_jsonl(
             continue;
         }
 
-        let parsed: BatchJsonlLine = serde_json::from_str(trimmed).map_err(|e| {
-            PiperError::InvalidConfig {
+        let parsed: BatchJsonlLine =
+            serde_json::from_str(trimmed).map_err(|e| PiperError::InvalidConfig {
                 reason: format!("JSONL line {}: {}", line_no + 1, e),
-            }
-        })?;
+            })?;
 
         let output_path = if let Some(ref filename) = parsed.output_file {
             output_dir.join(filename)
@@ -410,8 +406,7 @@ mod tests {
         let text_path = dir.path().join("input.txt");
         fs::write(&text_path, "Hello world\nGoodbye world\n").unwrap();
 
-        let jobs =
-            jobs_from_text_file(&text_path, dir.path(), Some(0), Some("en")).unwrap();
+        let jobs = jobs_from_text_file(&text_path, dir.path(), Some(0), Some("en")).unwrap();
         assert_eq!(jobs.len(), 2);
         assert_eq!(jobs[0].text, "Hello world");
         assert_eq!(jobs[0].output_path, dir.path().join("utt_001.wav"));
@@ -450,8 +445,12 @@ mod tests {
 
     #[test]
     fn test_jobs_from_text_file_nonexistent() {
-        let result =
-            jobs_from_text_file(Path::new("/nonexistent/file.txt"), Path::new("/tmp"), None, None);
+        let result = jobs_from_text_file(
+            Path::new("/nonexistent/file.txt"),
+            Path::new("/tmp"),
+            None,
+            None,
+        );
         assert!(result.is_err());
     }
 
@@ -480,8 +479,7 @@ mod tests {
     fn test_jobs_from_jsonl_with_output_file() {
         let dir = tempfile::tempdir().unwrap();
         let jsonl_path = dir.path().join("batch.jsonl");
-        let content =
-            r#"{"text": "Custom", "output_file": "custom_output.wav"}"#;
+        let content = r#"{"text": "Custom", "output_file": "custom_output.wav"}"#;
         fs::write(&jsonl_path, content).unwrap();
 
         let jobs = jobs_from_jsonl(&jsonl_path, dir.path()).unwrap();
@@ -493,8 +491,7 @@ mod tests {
     fn test_jobs_from_jsonl_with_language() {
         let dir = tempfile::tempdir().unwrap();
         let jsonl_path = dir.path().join("batch.jsonl");
-        let content =
-            r#"{"text": "Bonjour", "language": "fr", "speaker_id": 2}"#;
+        let content = r#"{"text": "Bonjour", "language": "fr", "speaker_id": 2}"#;
         fs::write(&jsonl_path, content).unwrap();
 
         let jobs = jobs_from_jsonl(&jsonl_path, dir.path()).unwrap();
@@ -693,7 +690,10 @@ mod tests {
         fs::write(&jsonl_path, r#"{"speaker_id": 1, "language": "en"}"#).unwrap();
 
         let result = jobs_from_jsonl(&jsonl_path, dir.path());
-        assert!(result.is_err(), "missing 'text' field should cause an error");
+        assert!(
+            result.is_err(),
+            "missing 'text' field should cause an error"
+        );
         let err_msg = format!("{}", result.unwrap_err());
         assert!(
             err_msg.contains("text") || err_msg.contains("missing field"),

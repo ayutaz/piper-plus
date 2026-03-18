@@ -133,15 +133,13 @@ impl WavFileSink {
         self.file.write_all(&1u16.to_le_bytes())?; // PCM format
         self.file.write_all(&1u16.to_le_bytes())?; // mono
         self.file.write_all(&sample_rate.to_le_bytes())?;
-        self.file
-            .write_all(&(sample_rate * 2).to_le_bytes())?; // byte rate
+        self.file.write_all(&(sample_rate * 2).to_le_bytes())?; // byte rate
         self.file.write_all(&2u16.to_le_bytes())?; // block align
         self.file.write_all(&16u16.to_le_bytes())?; // bits per sample
 
         // data chunk header
         self.file.write_all(b"data")?;
-        self.file
-            .write_all(&placeholder_data_size.to_le_bytes())?;
+        self.file.write_all(&placeholder_data_size.to_le_bytes())?;
 
         self.sample_rate = sample_rate;
         self.header_written = true;
@@ -160,13 +158,11 @@ impl WavFileSink {
         let file_size = data_size + 36;
 
         // Update RIFF chunk size at offset 4
-        self.file
-            .seek(std::io::SeekFrom::Start(4))?;
+        self.file.seek(std::io::SeekFrom::Start(4))?;
         self.file.write_all(&file_size.to_le_bytes())?;
 
         // Update data chunk size at offset 40
-        self.file
-            .seek(std::io::SeekFrom::Start(40))?;
+        self.file.seek(std::io::SeekFrom::Start(40))?;
         self.file.write_all(&data_size.to_le_bytes())?;
 
         // Flush

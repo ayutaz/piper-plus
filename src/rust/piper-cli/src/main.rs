@@ -3,11 +3,7 @@ use std::path::PathBuf;
 use anyhow::{Context, Result};
 use clap::Parser;
 
-use piper_core::{
-    OnnxEngine, PiperVoice, VoiceConfig,
-    audio, config,
-    input::JsonlReader,
-};
+use piper_core::{audio, config, input::JsonlReader, OnnxEngine, PiperVoice, VoiceConfig};
 
 /// サポートされている言語コード
 const SUPPORTED_LANGUAGES: &[&str] = &["ja", "en", "zh", "ko", "es", "fr", "pt"];
@@ -116,7 +112,10 @@ fn main() -> Result<()> {
         let models = piper_core::model_download::builtin_registry();
         println!("Available models:");
         for model in models {
-            println!("  {} ({}) - {}", model.name, model.language, model.description);
+            println!(
+                "  {} ({}) - {}",
+                model.name, model.language, model.description
+            );
         }
         return Ok(());
     }
@@ -132,16 +131,13 @@ fn main() -> Result<()> {
     })?;
 
     // config.json 検出
-    let config_path = config::VoiceConfig::resolve_config_path(
-        model_path,
-        cli.config.as_deref(),
-    ).context("config.json not found")?;
+    let config_path = config::VoiceConfig::resolve_config_path(model_path, cli.config.as_deref())
+        .context("config.json not found")?;
 
     tracing::info!("Config: {}", config_path.display());
 
     // 設定読み込み
-    let voice_config = VoiceConfig::load(&config_path)
-        .context("Failed to load config.json")?;
+    let voice_config = VoiceConfig::load(&config_path).context("Failed to load config.json")?;
 
     tracing::info!(
         "Model: speakers={}, languages={}, type={:?}",
@@ -183,18 +179,29 @@ fn main() -> Result<()> {
             anyhow::bail!("Batch file is empty: {}", batch_path.display());
         }
 
-        let output_dir = cli.output_dir.as_ref().ok_or_else(|| {
-            anyhow::anyhow!("--output-dir is required for --batch mode")
-        })?;
+        let output_dir = cli
+            .output_dir
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("--output-dir is required for --batch mode"))?;
 
-        tracing::info!("Batch mode: {} lines from {}", lines.len(), batch_path.display());
+        tracing::info!(
+            "Batch mode: {} lines from {}",
+            lines.len(),
+            batch_path.display()
+        );
 
         for (i, line) in lines.iter().enumerate() {
             let idx = i + 1;
-            let result = voice.synthesize_text(
-                line, cli.speaker, cli.language.as_deref(),
-                cli.noise_scale, cli.length_scale, cli.noise_w,
-            ).with_context(|| format!("Synthesis failed for line {}", idx))?;
+            let result = voice
+                .synthesize_text(
+                    line,
+                    cli.speaker,
+                    cli.language.as_deref(),
+                    cli.noise_scale,
+                    cli.length_scale,
+                    cli.noise_w,
+                )
+                .with_context(|| format!("Synthesis failed for line {}", idx))?;
 
             let filename = format!("{:04}.wav", idx);
             let path = output_dir.join(&filename);
@@ -203,8 +210,11 @@ fn main() -> Result<()> {
 
             tracing::info!(
                 "Batch [{}/{}]: {:.3}s audio, {:.3}s infer, RTF={:.3} -> {}",
-                idx, lines.len(),
-                result.audio_seconds, result.infer_seconds, result.real_time_factor(),
+                idx,
+                lines.len(),
+                result.audio_seconds,
+                result.infer_seconds,
+                result.real_time_factor(),
                 path.display(),
             );
         }
@@ -217,7 +227,10 @@ fn main() -> Result<()> {
 
         // カスタム辞書の読み込み (将来対応予定)
         if !cli.custom_dicts.is_empty() {
-            tracing::warn!("Custom dictionaries are not yet supported in text mode, ignoring {} dict(s)", cli.custom_dicts.len());
+            tracing::warn!(
+                "Custom dictionaries are not yet supported in text mode, ignoring {} dict(s)",
+                cli.custom_dicts.len()
+            );
         }
 
         // 言語ログ出力
@@ -227,7 +240,11 @@ fn main() -> Result<()> {
                 if let Some(&lid) = voice_config.language_id_map.get(lang.as_str()) {
                     tracing::info!("Language override: {} (lid={})", lang, lid);
                 } else {
-                    let available: Vec<&str> = voice_config.language_id_map.keys().map(|s| s.as_str()).collect();
+                    let available: Vec<&str> = voice_config
+                        .language_id_map
+                        .keys()
+                        .map(|s| s.as_str())
+                        .collect();
                     anyhow::bail!(
                         "Language '{}' is not available in this model. Available: {}",
                         lang,
@@ -250,16 +267,23 @@ fn main() -> Result<()> {
 
             tracing::info!("Streaming mode: {} sentence(s)", sentences.len());
 
-            let output_dir = cli.output_dir.as_ref().ok_or_else(|| {
-                anyhow::anyhow!("--output-dir is required for --stream mode")
-            })?;
+            let output_dir = cli
+                .output_dir
+                .as_ref()
+                .ok_or_else(|| anyhow::anyhow!("--output-dir is required for --stream mode"))?;
 
             for (i, sentence) in sentences.iter().enumerate() {
                 let idx = i + 1;
-                let result = voice.synthesize_text(
-                    sentence, cli.speaker, cli.language.as_deref(),
-                    cli.noise_scale, cli.length_scale, cli.noise_w,
-                ).with_context(|| format!("Synthesis failed for sentence {}", idx))?;
+                let result = voice
+                    .synthesize_text(
+                        sentence,
+                        cli.speaker,
+                        cli.language.as_deref(),
+                        cli.noise_scale,
+                        cli.length_scale,
+                        cli.noise_w,
+                    )
+                    .with_context(|| format!("Synthesis failed for sentence {}", idx))?;
 
                 let filename = format!("chunk_{:04}.wav", idx);
                 let path = output_dir.join(&filename);
@@ -268,33 +292,46 @@ fn main() -> Result<()> {
 
                 tracing::info!(
                     "Stream chunk [{}/{}]: \"{}\", {:.3}s audio -> {}",
-                    idx, sentences.len(), sentence,
-                    result.audio_seconds, path.display(),
+                    idx,
+                    sentences.len(),
+                    sentence,
+                    result.audio_seconds,
+                    path.display(),
                 );
             }
 
             tracing::info!("Streaming complete: {} chunks written", sentences.len());
         } else {
             // 通常の --text モード (一括合成)
-            let result = voice.synthesize_text(
-                text, cli.speaker, cli.language.as_deref(),
-                cli.noise_scale, cli.length_scale, cli.noise_w,
-            ).context("Failed to synthesize text")?;
+            let result = voice
+                .synthesize_text(
+                    text,
+                    cli.speaker,
+                    cli.language.as_deref(),
+                    cli.noise_scale,
+                    cli.length_scale,
+                    cli.noise_w,
+                )
+                .context("Failed to synthesize text")?;
 
             tracing::info!(
                 "Synthesized: {:.3}s audio, {:.3}s infer, RTF={:.3}",
-                result.audio_seconds, result.infer_seconds, result.real_time_factor(),
+                result.audio_seconds,
+                result.infer_seconds,
+                result.real_time_factor(),
             );
 
             // --timing: 音素タイミング出力
             if let Some(ref format) = cli.timing {
                 if let Some(ref durations) = result.durations {
                     // phoneme_ids からトークン名を推定 (簡易版: ID をそのまま使用)
-                    let tokens: Vec<String> = (0..durations.len())
-                        .map(|i| format!("ph_{}", i))
-                        .collect();
+                    let tokens: Vec<String> =
+                        (0..durations.len()).map(|i| format!("ph_{}", i)).collect();
                     match piper_core::timing::durations_to_timing(
-                        durations, &tokens, result.sample_rate, piper_core::timing::DEFAULT_HOP_LENGTH,
+                        durations,
+                        &tokens,
+                        result.sample_rate,
+                        piper_core::timing::DEFAULT_HOP_LENGTH,
                     ) {
                         Ok(timing) => {
                             let output = match format.as_str() {
@@ -302,7 +339,10 @@ fn main() -> Result<()> {
                                 "tsv" => timing.to_tsv(),
                                 "srt" => timing.to_srt(),
                                 _ => {
-                                    anyhow::bail!("Unknown timing format: '{}'. Use json, tsv, or srt.", format);
+                                    anyhow::bail!(
+                                        "Unknown timing format: '{}'. Use json, tsv, or srt.",
+                                        format
+                                    );
                                 }
                             };
                             eprintln!("{}", output);
@@ -351,11 +391,7 @@ fn main() -> Result<()> {
             let output_file = utterance.output_file.clone();
 
             // SynthesisRequest 構築 (move semantics — clone を回避)
-            let mut request = utterance.to_request(
-                cli.noise_scale,
-                cli.length_scale,
-                cli.noise_w,
-            );
+            let mut request = utterance.to_request(cli.noise_scale, cli.length_scale, cli.noise_w);
 
             // CLI の speaker_id でオーバーライド
             if let Some(sid) = cli.speaker {
@@ -363,7 +399,8 @@ fn main() -> Result<()> {
             }
 
             // 推論実行
-            let synthesis = engine.synthesize(&request)
+            let synthesis = engine
+                .synthesize(&request)
                 .with_context(|| format!("Inference failed for utterance {}", utt_count))?;
 
             tracing::info!(
@@ -379,8 +416,7 @@ fn main() -> Result<()> {
                 audio::write_wav_to_stdout(synthesis.sample_rate, &synthesis.audio)
                     .context("Failed to write WAV to stdout")?;
             } else if let Some(ref dir) = cli.output_dir {
-                let filename = output_file
-                    .unwrap_or_else(|| format!("{}.wav", utt_count));
+                let filename = output_file.unwrap_or_else(|| format!("{}.wav", utt_count));
                 let output_path = dir.join(&filename);
                 audio::write_wav(&output_path, synthesis.sample_rate, &synthesis.audio)
                     .with_context(|| format!("Failed to write {}", output_path.display()))?;

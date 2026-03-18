@@ -92,11 +92,11 @@ impl OnnxEngine {
         let device_type = crate::gpu::parse_device_string(device)
             .map_err(|e| PiperError::ModelLoad(format!("invalid device '{}': {}", device, e)))?;
 
-        let builder = Session::builder()
-            .map_err(|e| PiperError::ModelLoad(e.to_string()))?;
+        let builder = Session::builder().map_err(|e| PiperError::ModelLoad(e.to_string()))?;
 
-        let (mut builder, actual_device) = crate::gpu::configure_session_builder(builder, &device_type)
-            .map_err(|e| PiperError::ModelLoad(format!("device config: {e}")))?;
+        let (mut builder, actual_device) =
+            crate::gpu::configure_session_builder(builder, &device_type)
+                .map_err(|e| PiperError::ModelLoad(format!("device config: {e}")))?;
 
         tracing::info!("Using device: {}", actual_device);
 
@@ -105,8 +105,16 @@ impl OnnxEngine {
             .map_err(|e| PiperError::ModelLoad(e.to_string()))?;
 
         // モデルの入出力ノード名から能力を自動検出
-        let input_names: Vec<String> = session.inputs().iter().map(|i| i.name().to_string()).collect();
-        let output_names: Vec<String> = session.outputs().iter().map(|o| o.name().to_string()).collect();
+        let input_names: Vec<String> = session
+            .inputs()
+            .iter()
+            .map(|i| i.name().to_string())
+            .collect();
+        let output_names: Vec<String> = session
+            .outputs()
+            .iter()
+            .map(|o| o.name().to_string())
+            .collect();
 
         let has_input = |name: &str| input_names.iter().any(|n| n == name);
         let has_output = |name: &str| output_names.iter().any(|n| n == name);
@@ -161,7 +169,10 @@ impl OnnxEngine {
     /// ONNX 出力:
     /// - `output`: float32 \[1, 1, audio_samples\]
     /// - `durations` (オプション): float32 \[1, phoneme_length\]
-    pub fn synthesize(&mut self, request: &SynthesisRequest) -> Result<SynthesisResult, PiperError> {
+    pub fn synthesize(
+        &mut self,
+        request: &SynthesisRequest,
+    ) -> Result<SynthesisResult, PiperError> {
         let phoneme_len = request.phoneme_ids.len();
         if phoneme_len == 0 {
             return Err(PiperError::Inference("empty phoneme_ids".to_string()));
@@ -179,11 +190,9 @@ impl OnnxEngine {
         .map_err(|e| PiperError::Inference(format!("input tensor: {e}")))?;
 
         // 2. input_lengths: int64 [1]
-        let lengths_tensor = Tensor::from_array((
-            [1_usize],
-            vec![phoneme_len as i64].into_boxed_slice(),
-        ))
-        .map_err(|e| PiperError::Inference(format!("input_lengths tensor: {e}")))?;
+        let lengths_tensor =
+            Tensor::from_array(([1_usize], vec![phoneme_len as i64].into_boxed_slice()))
+                .map_err(|e| PiperError::Inference(format!("input_lengths tensor: {e}")))?;
 
         // 3. scales: float32 [3]
         let scales_tensor = Tensor::from_array((
@@ -230,11 +239,8 @@ impl OnnxEngine {
             };
             let pf_len = flat.len() / 3;
             prosody_tensor = Some(
-                Tensor::from_array((
-                    [1_usize, pf_len, 3],
-                    flat.into_boxed_slice(),
-                ))
-                .map_err(|e| PiperError::Inference(format!("prosody tensor: {e}")))?,
+                Tensor::from_array(([1_usize, pf_len, 3], flat.into_boxed_slice()))
+                    .map_err(|e| PiperError::Inference(format!("prosody tensor: {e}")))?,
             );
         } else {
             prosody_tensor = None;
@@ -409,7 +415,13 @@ mod tests {
     fn test_synthesis_request_custom_values() {
         let req = SynthesisRequest {
             phoneme_ids: vec![1, 2, 3, 4, 5],
-            prosody_features: Some(vec![[1, 2, 3], [4, 5, 6], [7, 8, 9], [10, 11, 12], [13, 14, 15]]),
+            prosody_features: Some(vec![
+                [1, 2, 3],
+                [4, 5, 6],
+                [7, 8, 9],
+                [10, 11, 12],
+                [13, 14, 15],
+            ]),
             speaker_id: Some(42),
             language_id: Some(3),
             noise_scale: 0.333,

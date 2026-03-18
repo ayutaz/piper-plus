@@ -134,7 +134,11 @@ fn test_newline_between_sentences() {
     assert_eq!(result.len(), 2);
     assert_eq!(result[0], "Hello.");
     // Newline may leave leading space on second chunk
-    assert!(result[1].trim() == "World.", "expected 'World.', got '{}'", result[1]);
+    assert!(
+        result[1].trim() == "World.",
+        "expected 'World.', got '{}'",
+        result[1]
+    );
 }
 
 #[test]
@@ -289,7 +293,11 @@ fn test_max_chars_zero_no_limit() {
     };
     let chunks = split_chunks(text, &config);
     // With no max limit, sentences should be split but may merge
-    assert!(chunks.len() >= 2, "expected at least 2 chunks, got {:?}", chunks.iter().map(|c| &c.text).collect::<Vec<_>>());
+    assert!(
+        chunks.len() >= 2,
+        "expected at least 2 chunks, got {:?}",
+        chunks.iter().map(|c| &c.text).collect::<Vec<_>>()
+    );
 }
 
 // ===========================================================================

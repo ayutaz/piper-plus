@@ -191,7 +191,10 @@ fn test_from_str_empty_string_errors() {
 #[test]
 fn test_from_str_whitespace_only_errors() {
     let result = DeviceSelection::from_str("   ");
-    assert!(result.is_err(), "whitespace-only string should return an error");
+    assert!(
+        result.is_err(),
+        "whitespace-only string should return an error"
+    );
 }
 
 #[test]
@@ -209,7 +212,10 @@ fn test_from_str_garbage_errors() {
 #[test]
 fn test_from_str_invalid_device_id_non_numeric() {
     let result = DeviceSelection::from_str("cuda:abc");
-    assert!(result.is_err(), "non-numeric device id should return an error");
+    assert!(
+        result.is_err(),
+        "non-numeric device id should return an error"
+    );
 }
 
 #[test]
@@ -221,7 +227,10 @@ fn test_from_str_invalid_device_id_float() {
 #[test]
 fn test_from_str_completely_unknown() {
     let result = DeviceSelection::from_str("vulkan");
-    assert!(result.is_err(), "unknown device kind should return an error");
+    assert!(
+        result.is_err(),
+        "unknown device kind should return an error"
+    );
 }
 
 // =========================================================================
@@ -354,7 +363,10 @@ fn test_enumerate_devices_non_empty() {
 fn test_enumerate_devices_includes_cpu() {
     let devices = enumerate_devices();
     let has_cpu = devices.iter().any(|d| d.kind == DeviceKind::Cpu);
-    assert!(has_cpu, "enumerate_devices() must always include a CPU entry");
+    assert!(
+        has_cpu,
+        "enumerate_devices() must always include a CPU entry"
+    );
 }
 
 #[test]
@@ -364,7 +376,10 @@ fn test_enumerate_devices_cpu_is_available() {
         .iter()
         .find(|d| d.kind == DeviceKind::Cpu)
         .expect("CPU device must be present");
-    assert!(cpu.available, "CPU device must always be marked as available");
+    assert!(
+        cpu.available,
+        "CPU device must always be marked as available"
+    );
     assert_eq!(cpu.device_id, 0, "CPU device_id should be 0");
 }
 

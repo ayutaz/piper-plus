@@ -329,27 +329,43 @@ pub fn is_device_available(kind: &DeviceKind) -> bool {
     let avail = AVAIL.get_or_init(|| Availability {
         cuda: {
             #[cfg(feature = "cuda")]
-            { true }
+            {
+                true
+            }
             #[cfg(not(feature = "cuda"))]
-            { false }
+            {
+                false
+            }
         },
         coreml: {
             #[cfg(all(feature = "coreml", target_os = "macos"))]
-            { true }
+            {
+                true
+            }
             #[cfg(not(all(feature = "coreml", target_os = "macos")))]
-            { false }
+            {
+                false
+            }
         },
         directml: {
             #[cfg(all(feature = "directml", target_os = "windows"))]
-            { true }
+            {
+                true
+            }
             #[cfg(not(all(feature = "directml", target_os = "windows")))]
-            { false }
+            {
+                false
+            }
         },
         tensorrt: {
             #[cfg(feature = "tensorrt")]
-            { true }
+            {
+                true
+            }
             #[cfg(not(feature = "tensorrt"))]
-            { false }
+            {
+                false
+            }
         },
     });
 
@@ -617,10 +633,7 @@ mod tests {
             memory_bytes: Some(24 * 1024 * 1024 * 1024), // 24 GB
         };
         let s = info.to_string();
-        assert_eq!(
-            s,
-            "cuda:0 (NVIDIA GeForce RTX 3090, 24GB) [available]"
-        );
+        assert_eq!(s, "cuda:0 (NVIDIA GeForce RTX 3090, 24GB) [available]");
     }
 
     #[test]
@@ -781,8 +794,14 @@ mod tests {
         for sel in cases {
             let displayed = sel.to_string();
             let parsed = DeviceSelection::from_str(&displayed).unwrap();
-            assert_eq!(parsed.kind, sel.kind, "roundtrip kind failed for '{displayed}'");
-            assert_eq!(parsed.device_id, sel.device_id, "roundtrip id failed for '{displayed}'");
+            assert_eq!(
+                parsed.kind, sel.kind,
+                "roundtrip kind failed for '{displayed}'"
+            );
+            assert_eq!(
+                parsed.device_id, sel.device_id,
+                "roundtrip id failed for '{displayed}'"
+            );
         }
     }
 

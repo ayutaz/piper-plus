@@ -39,25 +39,21 @@ static RE_PHONEME: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"-([^+]+)\+").expect("RE_PHONEME"));
 
 /// Extract A1 (relative accent position) from label: `/A:([\d-]+)+`
-static RE_A1: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"/A:([\d-]+)\+").expect("RE_A1"));
+static RE_A1: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"/A:([\d-]+)\+").expect("RE_A1"));
 
 /// Extract A2 (forward position in accent phrase): `+([0-9]+)+`
-static RE_A2: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"\+([0-9]+)\+").expect("RE_A2"));
+static RE_A2: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\+([0-9]+)\+").expect("RE_A2"));
 
 /// Extract A3 (backward position / phrase length): `+([0-9]+)/`
-static RE_A3: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"\+([0-9]+)/").expect("RE_A3"));
+static RE_A3: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\+([0-9]+)/").expect("RE_A3"));
 
 // ---------------------------------------------------------------------------
 // Consonant sets for N variant classification
 // ---------------------------------------------------------------------------
 
 /// Bilabial consonants: N before these becomes N_m.
-static BILABIAL: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
-    ["m", "my", "b", "by", "p", "py"].into_iter().collect()
-});
+static BILABIAL: LazyLock<HashSet<&'static str>> =
+    LazyLock::new(|| ["m", "my", "b", "by", "p", "py"].into_iter().collect());
 
 /// Alveolar consonants: N before these becomes N_n.
 static ALVEOLAR: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
@@ -67,9 +63,8 @@ static ALVEOLAR: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
 });
 
 /// Velar consonants: N before these becomes N_ng.
-static VELAR: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
-    ["k", "ky", "kw", "g", "gy", "gw"].into_iter().collect()
-});
+static VELAR: LazyLock<HashSet<&'static str>> =
+    LazyLock::new(|| ["k", "ky", "kw", "g", "gy", "gw"].into_iter().collect());
 
 /// Tokens that should be skipped when looking for the next phoneme
 /// (prosody markers, pause markers, sentence boundaries).
@@ -754,8 +749,7 @@ mod tests {
 
     #[test]
     fn test_non_n_tokens_unchanged() {
-        let mut tokens =
-            vec_s(&["^", "k", "o", "N", "n", "i", "ch", "i", "w", "a", "$"]);
+        let mut tokens = vec_s(&["^", "k", "o", "N", "n", "i", "ch", "i", "w", "a", "$"]);
         apply_n_phoneme_rules(&mut tokens);
         assert_eq!(tokens[1], "k"); // unchanged
         assert_eq!(tokens[6], "ch"); // unchanged

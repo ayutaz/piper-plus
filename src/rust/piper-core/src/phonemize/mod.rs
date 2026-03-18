@@ -8,18 +8,18 @@ use std::collections::HashMap;
 use crate::config::PhonemeIdMap;
 use crate::error::PiperError;
 
-pub mod token_map;
+pub mod chinese;
+pub mod custom_dict;
+pub mod english;
+pub mod french;
 #[cfg(feature = "japanese")]
 pub mod japanese;
-pub mod custom_dict;
-pub mod phoneme_converter;
-pub mod english;
-pub mod chinese;
 pub mod korean;
-pub mod spanish;
-pub mod french;
-pub mod portuguese;
 pub mod multilingual;
+pub mod phoneme_converter;
+pub mod portuguese;
+pub mod spanish;
+pub mod token_map;
 
 /// プロソディ情報 (言語間で共有)
 #[derive(Debug, Clone, Copy)]

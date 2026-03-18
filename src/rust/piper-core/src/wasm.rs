@@ -66,10 +66,7 @@ impl WasmVoice {
     /// # Arguments
     /// * `model_bytes` - ONNX model file contents
     /// * `config_json` - config.json file contents as string
-    pub fn load_from_bytes(
-        model_bytes: &[u8],
-        config_json: &str,
-    ) -> Result<Self, PiperError> {
+    pub fn load_from_bytes(model_bytes: &[u8], config_json: &str) -> Result<Self, PiperError> {
         let config: VoiceConfig = parse_config(config_json)?;
 
         let session = Session::builder()
@@ -145,11 +142,9 @@ impl WasmVoice {
         .map_err(|e| PiperError::Inference(format!("input tensor: {e}")))?;
 
         // 2. input_lengths: int64 [1]
-        let lengths_tensor = Tensor::from_array((
-            [1_usize],
-            vec![phoneme_len as i64].into_boxed_slice(),
-        ))
-        .map_err(|e| PiperError::Inference(format!("input_lengths tensor: {e}")))?;
+        let lengths_tensor =
+            Tensor::from_array(([1_usize], vec![phoneme_len as i64].into_boxed_slice()))
+                .map_err(|e| PiperError::Inference(format!("input_lengths tensor: {e}")))?;
 
         // 3. scales: float32 [3]
         let scales_tensor = Tensor::from_array((
@@ -187,11 +182,8 @@ impl WasmVoice {
         if self.capabilities.has_prosody {
             let flat = vec![0i64; phoneme_len * 3];
             prosody_tensor = Some(
-                Tensor::from_array((
-                    [1_usize, phoneme_len, 3],
-                    flat.into_boxed_slice(),
-                ))
-                .map_err(|e| PiperError::Inference(format!("prosody tensor: {e}")))?,
+                Tensor::from_array(([1_usize, phoneme_len, 3], flat.into_boxed_slice()))
+                    .map_err(|e| PiperError::Inference(format!("prosody tensor: {e}")))?,
             );
         } else {
             prosody_tensor = None;
@@ -274,10 +266,7 @@ impl WasmVoice {
 
 /// Convert i16 PCM samples to f32 normalized audio (-1.0 to 1.0)
 pub fn samples_i16_to_f32(samples: &[i16]) -> Vec<f32> {
-    samples
-        .iter()
-        .map(|&s| s as f32 / 32768.0)
-        .collect()
+    samples.iter().map(|&s| s as f32 / 32768.0).collect()
 }
 
 /// Convert f32 audio to WAV bytes (in-memory, no filesystem)
@@ -312,7 +301,10 @@ pub fn samples_to_wav_bytes(samples: &[i16], sample_rate: u32) -> Vec<u8> {
     buf.extend_from_slice(b"data");
     buf.extend_from_slice(&data_size.to_le_bytes());
     buf.extend_from_slice(
-        &samples.iter().flat_map(|s| s.to_le_bytes()).collect::<Vec<u8>>(),
+        &samples
+            .iter()
+            .flat_map(|s| s.to_le_bytes())
+            .collect::<Vec<u8>>(),
     );
 
     buf
@@ -625,13 +617,7 @@ mod tests {
     // -----------------------------------------------------------------------
     #[test]
     fn test_wav_roundtrip_samples() {
-        let original: Vec<i16> = vec![
-            i16::MIN,
-            -1000,
-            0,
-            1000,
-            i16::MAX,
-        ];
+        let original: Vec<i16> = vec![i16::MIN, -1000, 0, 1000, i16::MAX];
         let wav = samples_to_wav_bytes(&original, 16000);
 
         // Extract samples back from WAV bytes (data starts at offset 44)

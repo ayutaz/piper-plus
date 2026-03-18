@@ -10,10 +10,7 @@ pub fn audio_float_to_int16(audio: &[f32]) -> Vec<i16> {
     }
 
     // ピーク値を検出 (最小値 0.01 でゼロ除算防止)
-    let max_val = audio
-        .iter()
-        .map(|x| x.abs())
-        .fold(0.01f32, f32::max);
+    let max_val = audio.iter().map(|x| x.abs()).fold(0.01f32, f32::max);
 
     let scale = 32767.0 / max_val;
 
@@ -33,8 +30,8 @@ pub fn write_wav(path: &Path, sample_rate: u32, audio: &[i16]) -> Result<(), Pip
         sample_format: hound::SampleFormat::Int,
     };
 
-    let mut writer = hound::WavWriter::create(path, spec)
-        .map_err(|e| PiperError::WavWrite(e.to_string()))?;
+    let mut writer =
+        hound::WavWriter::create(path, spec).map_err(|e| PiperError::WavWrite(e.to_string()))?;
 
     for &sample in audio {
         writer
@@ -66,13 +63,13 @@ pub fn write_wav_to_stdout(sample_rate: u32, audio: &[i16]) -> Result<(), PiperE
 
     // fmt chunk
     stdout.write_all(b"fmt ")?;
-    stdout.write_all(&16u32.to_le_bytes())?;  // chunk size
-    stdout.write_all(&1u16.to_le_bytes())?;   // PCM format
-    stdout.write_all(&1u16.to_le_bytes())?;   // mono
+    stdout.write_all(&16u32.to_le_bytes())?; // chunk size
+    stdout.write_all(&1u16.to_le_bytes())?; // PCM format
+    stdout.write_all(&1u16.to_le_bytes())?; // mono
     stdout.write_all(&sample_rate.to_le_bytes())?;
-    stdout.write_all(&(sample_rate * 2).to_le_bytes())?;  // byte rate
-    stdout.write_all(&2u16.to_le_bytes())?;   // block align
-    stdout.write_all(&16u16.to_le_bytes())?;  // bits per sample
+    stdout.write_all(&(sample_rate * 2).to_le_bytes())?; // byte rate
+    stdout.write_all(&2u16.to_le_bytes())?; // block align
+    stdout.write_all(&16u16.to_le_bytes())?; // bits per sample
 
     // data chunk
     stdout.write_all(b"data")?;

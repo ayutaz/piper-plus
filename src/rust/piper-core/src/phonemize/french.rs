@@ -101,7 +101,10 @@ fn is_consonant_char(ch: char) -> bool {
 }
 
 fn is_silent_final(ch: char) -> bool {
-    matches!(ch, 'd' | 'g' | 'h' | 'm' | 'n' | 'p' | 's' | 't' | 'x' | 'z')
+    matches!(
+        ch,
+        'd' | 'g' | 'h' | 'm' | 'n' | 'p' | 's' | 't' | 'x' | 'z'
+    )
 }
 
 fn is_punctuation(ch: char) -> bool {
@@ -626,10 +629,7 @@ fn convert_word(word: &[char]) -> Vec<char> {
         // ---------------------------------------------------------------
 
         // "an", "am", "en", "em" -> nasal-alpha-tilde
-        if (ch == 'a' || ch == 'e')
-            && i + 1 < n
-            && (word[i + 1] == 'n' || word[i + 1] == 'm')
-        {
+        if (ch == 'a' || ch == 'e') && i + 1 < n && (word[i + 1] == 'n' || word[i + 1] == 'm') {
             if i + 2 >= n {
                 phonemes.push(PUA_NASAL_AN);
                 i += 2;
@@ -817,9 +817,7 @@ fn convert_word(word: &[char]) -> Vec<char> {
             let eff_start = i + 1;
             let mut eff_end = n;
             if eff_end > eff_start {
-                if eff_end - eff_start >= 2
-                    && word[eff_end - 2] == 'e'
-                    && word[eff_end - 1] == 's'
+                if eff_end - eff_start >= 2 && word[eff_end - 2] == 'e' && word[eff_end - 1] == 's'
                 {
                     eff_end -= 2;
                 } else if word[eff_end - 1] == 'e' {
@@ -922,8 +920,7 @@ fn convert_word(word: &[char]) -> Vec<char> {
             }
 
             let remaining = &word[(i + 1)..];
-            let all_cons =
-                !remaining.is_empty() && remaining.iter().all(|&c| is_consonant_char(c));
+            let all_cons = !remaining.is_empty() && remaining.iter().all(|&c| is_consonant_char(c));
             let has_pronounced = remaining.iter().any(|&c| !is_silent_final(c));
 
             if !remaining.is_empty() && all_cons && has_pronounced {
@@ -1128,9 +1125,7 @@ fn map_sequence(tokens: Vec<String>) -> Vec<String> {
 /// - a1 = 0 (French has no pitch accent like Japanese)
 /// - a2 = 2 for the last vowel phoneme in each word (word-final stress), 0 otherwise
 /// - a3 = number of phonemes in the word
-pub fn phonemize_french_with_prosody(
-    text: &str,
-) -> (Vec<String>, Vec<Option<ProsodyInfo>>) {
+pub fn phonemize_french_with_prosody(text: &str) -> (Vec<String>, Vec<Option<ProsodyInfo>>) {
     let normalized = normalize(text);
     let tokens = split_words(&normalized);
 
@@ -1141,13 +1136,21 @@ pub fn phonemize_french_with_prosody(
     for tok in &tokens {
         if !tok.is_punct && need_space {
             phonemes.push(" ".to_string());
-            prosody_list.push(Some(ProsodyInfo { a1: 0, a2: 0, a3: 0 }));
+            prosody_list.push(Some(ProsodyInfo {
+                a1: 0,
+                a2: 0,
+                a3: 0,
+            }));
         }
 
         if tok.is_punct {
             for &ch in &tok.text {
                 phonemes.push(ch.to_string());
-                prosody_list.push(Some(ProsodyInfo { a1: 0, a2: 0, a3: 0 }));
+                prosody_list.push(Some(ProsodyInfo {
+                    a1: 0,
+                    a2: 0,
+                    a3: 0,
+                }));
             }
         } else {
             let word_phonemes = convert_word(&tok.text);
@@ -1290,7 +1293,10 @@ mod tests {
     #[test]
     fn test_nasal_an() {
         let result = word_ph("france");
-        assert!(result.contains(PUA_NASAL_AN), "expected nasal-an in france: {result}");
+        assert!(
+            result.contains(PUA_NASAL_AN),
+            "expected nasal-an in france: {result}"
+        );
     }
 
     #[test]
@@ -1309,7 +1315,10 @@ mod tests {
     fn test_silent_final_t() {
         let result = word_ph("chat");
         assert!(result.contains(IPA_ESH), "expected esh in chat: {result}");
-        assert!(!result.ends_with('t'), "final t should be silent in chat: {result}");
+        assert!(
+            !result.ends_with('t'),
+            "final t should be silent in chat: {result}"
+        );
     }
 
     // ===== 3. -tion =====
@@ -1354,13 +1363,19 @@ mod tests {
     #[test]
     fn test_er_verb_ending() {
         let result = word_ph("parler");
-        assert!(result.ends_with('e'), "polysyllabic -er should end /e/: {result}");
+        assert!(
+            result.ends_with('e'),
+            "polysyllabic -er should end /e/: {result}"
+        );
     }
 
     #[test]
     fn test_er_exception() {
         let result = word_ph("hiver");
-        assert!(result.contains(IPA_UVULAR_R), "hiver should have uvular-R: {result}");
+        assert!(
+            result.contains(IPA_UVULAR_R),
+            "hiver should have uvular-R: {result}"
+        );
     }
 
     // ===== 7. ch/gn digraphs =====
@@ -1374,7 +1389,10 @@ mod tests {
     #[test]
     fn test_gn_digraph() {
         let result = word_ph("ligne");
-        assert!(result.contains(IPA_PALATAL_N), "expected palatal-N in ligne: {result}");
+        assert!(
+            result.contains(IPA_PALATAL_N),
+            "expected palatal-N in ligne: {result}"
+        );
     }
 
     // ===== 8. Intervocalic s =====
@@ -1382,7 +1400,10 @@ mod tests {
     #[test]
     fn test_intervocalic_s() {
         let result = word_ph("maison");
-        assert!(result.contains('z'), "intervocalic s should be z in maison: {result}");
+        assert!(
+            result.contains('z'),
+            "intervocalic s should be z in maison: {result}"
+        );
     }
 
     // ===== 9. Semi-vowel =====
@@ -1390,7 +1411,10 @@ mod tests {
     #[test]
     fn test_u_before_i() {
         let result = word_ph("lui");
-        assert!(result.contains(IPA_TURNED_H), "u before i -> turned-h in lui: {result}");
+        assert!(
+            result.contains(IPA_TURNED_H),
+            "u before i -> turned-h in lui: {result}"
+        );
     }
 
     // ===== 10. Normalization =====
@@ -1463,7 +1487,10 @@ mod tests {
     #[test]
     fn test_g_before_front_vowel() {
         let result = word_ph("gel");
-        assert!(result.starts_with(IPA_EZH), "g before e -> ezh in gel: {result}");
+        assert!(
+            result.starts_with(IPA_EZH),
+            "g before e -> ezh in gel: {result}"
+        );
     }
 
     // ===== 15. PUA mapping =====
@@ -1472,7 +1499,11 @@ mod tests {
     fn test_pua_nasal_in_output() {
         let (tokens, _) = phonemize_french_with_prosody("bon");
         let nasal_on_pua = PUA_NASAL_ON.to_string();
-        assert!(tokens.contains(&nasal_on_pua), "bon -> PUA nasal-on: {:?}", tokens);
+        assert!(
+            tokens.contains(&nasal_on_pua),
+            "bon -> PUA nasal-on: {:?}",
+            tokens
+        );
     }
 
     // ===== 16. Language code =====
@@ -1524,13 +1555,19 @@ mod tests {
     #[test]
     fn test_eu_open() {
         let result = word_ph("fleur");
-        assert!(result.contains(IPA_OE_LIG), "eu before r -> open in fleur: {result}");
+        assert!(
+            result.contains(IPA_OE_LIG),
+            "eu before r -> open in fleur: {result}"
+        );
     }
 
     #[test]
     fn test_eu_closed() {
         let result = word_ph("jeu");
-        assert!(result.contains(IPA_SLASHED_O), "eu at end -> closed in jeu: {result}");
+        assert!(
+            result.contains(IPA_SLASHED_O),
+            "eu at end -> closed in jeu: {result}"
+        );
     }
 
     // ===== 22. Phonemizer trait =====
@@ -1550,7 +1587,10 @@ mod tests {
     #[test]
     fn test_gu_before_front_vowel() {
         let result = word_ph("guerre");
-        assert!(result.contains(IPA_VOICED_G), "gu+e -> voiced-g in guerre: {result}");
+        assert!(
+            result.contains(IPA_VOICED_G),
+            "gu+e -> voiced-g in guerre: {result}"
+        );
     }
 
     // ===== 24. Cedilla =====

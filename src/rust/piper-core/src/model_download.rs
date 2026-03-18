@@ -65,7 +65,9 @@ fn platform_data_dir() -> Option<PathBuf> {
         if let Ok(xdg) = std::env::var("XDG_DATA_HOME") {
             return Some(PathBuf::from(xdg));
         }
-        std::env::var("HOME").ok().map(|h| PathBuf::from(h).join(".local").join("share"))
+        std::env::var("HOME")
+            .ok()
+            .map(|h| PathBuf::from(h).join(".local").join("share"))
     }
 
     #[cfg(target_os = "macos")]
@@ -100,9 +102,12 @@ pub fn download_file(
 
     // Ensure the parent directory exists.
     if let Some(parent) = dest.parent() {
-        std::fs::create_dir_all(parent).map_err(|e| PiperError::ModelLoad(format!(
-            "failed to create directory {}: {e}", parent.display()
-        )))?;
+        std::fs::create_dir_all(parent).map_err(|e| {
+            PiperError::ModelLoad(format!(
+                "failed to create directory {}: {e}",
+                parent.display()
+            ))
+        })?;
     }
 
     let client = reqwest::blocking::Client::builder()
@@ -111,9 +116,10 @@ pub fn download_file(
         .build()
         .map_err(|e| PiperError::Download(format!("HTTP client error: {e}")))?;
 
-    let mut response = client.get(url).send().map_err(|e| {
-        PiperError::Download(format!("download failed: {e}"))
-    })?;
+    let mut response = client
+        .get(url)
+        .send()
+        .map_err(|e| PiperError::Download(format!("download failed: {e}")))?;
 
     if !response.status().is_success() {
         return Err(PiperError::ModelLoad(format!(
@@ -151,7 +157,11 @@ pub fn download_file(
         if let Some(ref cb) = progress {
             if bytes_downloaded >= next_report || (total_bytes == Some(bytes_downloaded)) {
                 let percentage = total_bytes.map(|t| {
-                    if t == 0 { 100.0 } else { (bytes_downloaded as f64 / t as f64) * 100.0 }
+                    if t == 0 {
+                        100.0
+                    } else {
+                        (bytes_downloaded as f64 / t as f64) * 100.0
+                    }
                 });
                 cb(DownloadProgress {
                     bytes_downloaded,
@@ -163,9 +173,8 @@ pub fn download_file(
         }
     }
 
-    file.flush().map_err(|e| {
-        PiperError::ModelLoad(format!("failed to flush {}: {e}", dest.display()))
-    })?;
+    file.flush()
+        .map_err(|e| PiperError::ModelLoad(format!("failed to flush {}: {e}", dest.display())))?;
 
     Ok(())
 }
@@ -202,10 +211,10 @@ pub fn download_model(
         ))
     })?;
 
-    let model_filename = url_filename(&model_info.model_url)
-        .unwrap_or_else(|| format!("{}.onnx", model_info.name));
-    let config_filename = url_filename(&model_info.config_url)
-        .unwrap_or_else(|| "config.json".to_string());
+    let model_filename =
+        url_filename(&model_info.model_url).unwrap_or_else(|| format!("{}.onnx", model_info.name));
+    let config_filename =
+        url_filename(&model_info.config_url).unwrap_or_else(|| "config.json".to_string());
 
     let model_path = dest_dir.join(&model_filename);
     let config_path = dest_dir.join(&config_filename);
@@ -286,10 +295,7 @@ pub fn builtin_registry() -> &'static [ModelInfo] {
                     "ayousanz/piper-plus-tsukuyomi-chan",
                     "tsukuyomi-6lang-v2-fixed.onnx",
                 ),
-                config_url: huggingface_url(
-                    "ayousanz/piper-plus-tsukuyomi-chan",
-                    "config.json",
-                ),
+                config_url: huggingface_url("ayousanz/piper-plus-tsukuyomi-chan", "config.json"),
                 size_bytes: None,
             },
             ModelInfo {
@@ -301,10 +307,7 @@ pub fn builtin_registry() -> &'static [ModelInfo] {
                     "ayousanz/piper-plus-base",
                     "multilingual-6lang-75epoch.onnx",
                 ),
-                config_url: huggingface_url(
-                    "ayousanz/piper-plus-base",
-                    "config.json",
-                ),
+                config_url: huggingface_url("ayousanz/piper-plus-base", "config.json"),
                 size_bytes: None,
             },
         ]
@@ -317,7 +320,8 @@ pub fn builtin_registry() -> &'static [ModelInfo] {
 fn url_filename(url: &str) -> Option<String> {
     let path = url.split('?').next().unwrap_or(url);
     let path = path.split('#').next().unwrap_or(path);
-    path.rsplit('/').next()
+    path.rsplit('/')
+        .next()
         .filter(|s| !s.is_empty())
         .map(|s| s.to_string())
 }
@@ -433,7 +437,10 @@ mod tests {
     #[test]
     fn test_default_model_dir_is_non_empty() {
         let dir = default_model_dir();
-        assert!(!dir.as_os_str().is_empty(), "default_model_dir must not be empty");
+        assert!(
+            !dir.as_os_str().is_empty(),
+            "default_model_dir must not be empty"
+        );
         // Should always end with "models".
         assert_eq!(
             dir.file_name().and_then(|s| s.to_str()),
@@ -493,8 +500,16 @@ mod tests {
         );
         // Every entry should have valid-looking URLs.
         for m in models {
-            assert!(m.model_url.starts_with("https://"), "bad model_url: {}", m.model_url);
-            assert!(m.config_url.starts_with("https://"), "bad config_url: {}", m.config_url);
+            assert!(
+                m.model_url.starts_with("https://"),
+                "bad model_url: {}",
+                m.model_url
+            );
+            assert!(
+                m.config_url.starts_with("https://"),
+                "bad config_url: {}",
+                m.config_url
+            );
             assert!(!m.name.is_empty());
         }
     }
@@ -528,7 +543,10 @@ mod tests {
 
     #[test]
     fn test_url_filename_extraction() {
-        assert_eq!(url_filename("https://example.com/path/to/model.onnx"), Some("model.onnx".to_string()));
+        assert_eq!(
+            url_filename("https://example.com/path/to/model.onnx"),
+            Some("model.onnx".to_string())
+        );
         assert_eq!(url_filename("https://example.com/"), None);
         assert_eq!(url_filename("model.onnx"), Some("model.onnx".to_string()));
     }
@@ -567,7 +585,10 @@ mod tests {
         let result = download_file("https://example.com/model.onnx", &dest, None);
         assert!(result.is_err());
         let msg = format!("{}", result.unwrap_err());
-        assert!(msg.contains("download"), "error should mention the download feature: {msg}");
+        assert!(
+            msg.contains("download"),
+            "error should mention the download feature: {msg}"
+        );
     }
 
     #[cfg(not(feature = "download"))]
@@ -597,7 +618,11 @@ mod tests {
         // (i.e. no division-by-zero panic).
         let total: Option<u64> = Some(0);
         let percentage = total.map(|t| {
-            if t == 0 { 100.0 } else { (50_f64 / t as f64) * 100.0 }
+            if t == 0 {
+                100.0
+            } else {
+                (50_f64 / t as f64) * 100.0
+            }
         });
         let progress = DownloadProgress {
             bytes_downloaded: 50,
