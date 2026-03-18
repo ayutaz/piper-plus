@@ -345,7 +345,9 @@ def main() -> None:
             tmp_fp16.unlink(missing_ok=True)
             raise
         fp16_size = args.output.stat().st_size
-        reduction_pct = ((fp32_size - fp16_size) / fp32_size) * 100 if fp32_size > 0 else 0
+        reduction_pct = (
+            ((fp32_size - fp16_size) / fp32_size) * 100 if fp32_size > 0 else 0
+        )
         _LOGGER.info(
             "FP16 conversion: %.1f MB -> %.1f MB (%.1f%% reduction)",
             fp32_size / (1024 * 1024),
