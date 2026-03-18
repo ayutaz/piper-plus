@@ -1,5 +1,7 @@
 # Multilingual Dataset Plan (6 Languages)
 
+> **ステータス: 完了 (2026-03-16)** — このプランは実装済みです。dataset-multilingual-6lang-filtered として508,187発話 / 571話者 / 6言語のデータセットが作成されました。
+
 ## Overview
 
 Piper TTS の多言語対応に向けたデータセット計画。既存の JA+EN バイリンガルモデル (v4) を拡張し、ZH/ES/FR/PT の4言語を追加して6言語モデルを構築する。
