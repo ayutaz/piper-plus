@@ -9,6 +9,9 @@ use piper_core::{
     input::JsonlReader,
 };
 
+/// サポートされている言語コード
+const SUPPORTED_LANGUAGES: &[&str] = &["ja", "en", "zh", "ko", "es", "fr", "pt"];
+
 #[derive(Parser, Debug)]
 #[command(name = "piper", version, about = "Piper-Plus TTS inference")]
 struct Cli {
@@ -56,7 +59,7 @@ struct Cli {
     #[arg(short, long)]
     text: Option<String>,
 
-    /// 音素化の言語 (デフォルト: config から自動検出)
+    /// 音素化の言語を指定 [ja, en, zh, ko, es, fr, pt] (デフォルト: 自動検出)
     #[arg(short, long)]
     language: Option<String>,
 
@@ -106,6 +109,17 @@ fn main() -> Result<()> {
     // stdout 出力モード判定
     let output_to_stdout = cli.output_file.as_deref() == Some("-");
 
+    // --language バリデーション
+    if let Some(ref lang) = cli.language {
+        if !SUPPORTED_LANGUAGES.contains(&lang.as_str()) {
+            anyhow::bail!(
+                "Unsupported language: '{}'. Supported languages: {}",
+                lang,
+                SUPPORTED_LANGUAGES.join(", "),
+            );
+        }
+    }
+
     if let Some(text) = &cli.text {
         // --text モード: PiperVoice でテキストから直接音声合成
         let mut voice = PiperVoice::load(&cli.model, cli.config.as_deref(), &cli.device)
@@ -116,8 +130,30 @@ fn main() -> Result<()> {
             tracing::warn!("Custom dictionaries are not yet supported in text mode, ignoring {} dict(s)", cli.custom_dicts.len());
         }
 
+        // 言語ログ出力
+        if let Some(ref lang) = cli.language {
+            // 多言語モデルの場合: 指定言語が language_id_map に存在するか確認
+            if voice_config.is_multilingual() {
+                if let Some(&lid) = voice_config.language_id_map.get(lang.as_str()) {
+                    tracing::info!("Language override: {} (lid={})", lang, lid);
+                } else {
+                    let available: Vec<&str> = voice_config.language_id_map.keys().map(|s| s.as_str()).collect();
+                    anyhow::bail!(
+                        "Language '{}' is not available in this model. Available: {}",
+                        lang,
+                        available.join(", "),
+                    );
+                }
+            } else {
+                tracing::info!("Language specified: {} (model is monolingual, language detection handled by phonemizer)", lang);
+            }
+        } else {
+            tracing::info!("Language: auto-detect (from phonemizer)");
+        }
+
         let result = voice.synthesize_text(
-            text, cli.speaker, cli.noise_scale, cli.length_scale, cli.noise_w,
+            text, cli.speaker, cli.language.as_deref(),
+            cli.noise_scale, cli.length_scale, cli.noise_w,
         ).context("Failed to synthesize text")?;
 
         tracing::info!(

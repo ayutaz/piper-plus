@@ -635,7 +635,7 @@ fn audio_float_to_int16(audio: &[f32]) -> Vec<i16> {
 - CLI: `--text`, `--language`, `--custom-dict` オプション追加
 - `token_map.rs` — PUA マッピングを Python token_mapper.py と完全一致に修正
 
-### Phase 3: 多言語 G2P + CLI — 5-7 週間
+### Phase 3: 多言語 G2P + CLI — 5-7 週間 ✅
 
 **目標**: 7 言語対応 + テキスト → 音声の完全パイプライン
 
@@ -687,6 +687,17 @@ fn audio_float_to_int16(audio: &[f32]) -> Vec<i16> {
 - 言語自動プロモーション (JA → 多言語モデル時にパディング適用)
 - 非 JA 言語のプロソディ計算 (`computeNonJaProsody` 相当)
 
+**実装済み (Phase 3):**
+- `phonemize/english.rs` — EnglishPhonemizer (CMU辞書 + ARPAbet→IPA)
+- `phonemize/chinese.rs` — ChinesePhonemizer (pypinyin辞書 + ピンイン→IPA + 声調サンドヒ)
+- `phonemize/korean.rs` — KoreanPhonemizer (Hangul分解 + jamo→IPA)
+- `phonemize/spanish.rs` — SpanishPhonemizer (ルールベース G2P)
+- `phonemize/french.rs` — FrenchPhonemizer (ルールベース G2P)
+- `phonemize/portuguese.rs` — PortuguesePhonemizer (ルールベース G2P)
+- `phonemize/multilingual.rs` — UnicodeLanguageDetector + MultilingualPhonemizer
+  - Unicode言語検出、テキストセグメンテーション、BOS/EOS/インタースパースパディング
+- `voice.rs` — Bilingual/Multilingual phoneme type 対応
+
 ### Phase 4: 高度な機能
 
 | サブフェーズ | 内容 | 工数 |
@@ -703,7 +714,7 @@ fn audio_float_to_int16(audio: &[f32]) -> Vec<i16> {
 |---------|------|------|
 | Phase 1: MVP (ONNX 推論) | 2-3 週 | 2-3 週 |
 | Phase 2: 日本語音素化 ✅ | 3-4 週 | 5-7 週 |
-| Phase 3: 多言語 G2P + CLI | 5-7 週 | 10-14 週 |
+| Phase 3: 多言語 G2P + CLI ✅ | 5-7 週 | 10-14 週 |
 | Phase 4: 高度な機能 | 9-12 週 | 19-26 週 |
 
 **Phase 1-3 で 7 言語対応の実用 CLI が完成 (約 2.5-3.5 ヶ月)**

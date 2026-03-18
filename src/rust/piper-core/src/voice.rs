@@ -22,7 +22,7 @@ impl PiperVoice {
     ///
     /// phoneme_type に基づいて適切な Phonemizer を自動選択:
     /// - OpenJTalk → JapanesePhonemizer (feature = "japanese")
-    /// - Bilingual/Multilingual → 将来の Phase 3 で対応
+    /// - Bilingual/Multilingual → MultilingualPhonemizer (Unicode言語検出)
     pub fn load(
         model_path: &Path,
         config_path: Option<&Path>,
@@ -44,23 +44,81 @@ impl PiperVoice {
     ///
     /// テスト容易性のため独立関数として切り出し。
     fn create_phonemizer(config: &VoiceConfig) -> Result<Box<dyn Phonemizer>, PiperError> {
-        #[cfg(feature = "japanese")]
-        if config.phoneme_type == crate::config::PhonemeType::OpenJTalk {
-            return Ok(
-                Box::new(crate::phonemize::japanese::JapanesePhonemizer::new()?)
-            );
-        }
+        match config.phoneme_type {
+            #[cfg(feature = "japanese")]
+            crate::config::PhonemeType::OpenJTalk => {
+                Ok(Box::new(
+                    crate::phonemize::japanese::JapanesePhonemizer::new()?,
+                ))
+            }
+            crate::config::PhonemeType::Bilingual
+            | crate::config::PhonemeType::Multilingual => {
+                // Extract language codes from language_id_map
+                let mut languages: Vec<String> =
+                    config.language_id_map.keys().cloned().collect();
+                languages.sort(); // canonical order
 
-        Err(PiperError::UnsupportedLanguage {
-            code: format!("{:?}", config.phoneme_type),
-        })
+                if languages.is_empty() {
+                    return Err(PiperError::InvalidConfig {
+                        reason: "multilingual model requires language_id_map".to_string(),
+                    });
+                }
+
+                // Determine default Latin language
+                let default_latin = if languages.contains(&"en".to_string()) {
+                    "en".to_string()
+                } else {
+                    languages
+                        .iter()
+                        .find(|l| matches!(l.as_str(), "es" | "fr" | "pt"))
+                        .cloned()
+                        .unwrap_or_else(|| languages[0].clone())
+                };
+
+                // Build per-language phonemizers
+                let mut phonemizers: std::collections::HashMap<
+                    String,
+                    Box<dyn Phonemizer>,
+                > = std::collections::HashMap::new();
+
+                for lang in &languages {
+                    let phonemizer: Box<dyn Phonemizer> = match lang.as_str() {
+                        #[cfg(feature = "japanese")]
+                        "ja" => Box::new(
+                            crate::phonemize::japanese::JapanesePhonemizer::new()?,
+                        ),
+                        _ => Box::new(
+                            crate::phonemize::multilingual::PassthroughPhonemizer::new(
+                                lang,
+                            ),
+                        ),
+                    };
+                    phonemizers.insert(lang.clone(), phonemizer);
+                }
+
+                Ok(Box::new(
+                    crate::phonemize::multilingual::MultilingualPhonemizer::new(
+                        languages,
+                        default_latin,
+                        phonemizers,
+                    ),
+                ))
+            }
+            _ => Err(PiperError::UnsupportedLanguage {
+                code: format!("{:?}", config.phoneme_type),
+            }),
+        }
     }
 
     /// テキストを音声に変換
+    ///
+    /// `language_override` を指定すると、phonemizer の自動検出を上書きして
+    /// 指定言語の language_id を使用する。多言語モデルで特定言語を強制する場合に使用。
     pub fn synthesize_text(
         &mut self,
         text: &str,
         speaker_id: Option<i64>,
+        language_override: Option<&str>,
         noise_scale: f32,
         length_scale: f32,
         noise_w: f32,
@@ -83,8 +141,15 @@ impl PiperVoice {
                 .post_process_ids(ids, prosody_feats, phoneme_id_map);
 
         // 4. Determine language_id from config
+        //    language_override が指定されていればそちらを優先。
+        //    多言語モデルの場合、テキストの最初の言語セグメントを自動検出して language_id を決定。
+        //    単言語モデルの場合は phonemizer の言語コードを使用。
         let language_id = if self.config.needs_lid() {
-            let lang_code = self.phonemizer.language_code();
+            let lang_code = if let Some(ovr) = language_override {
+                ovr
+            } else {
+                self.detect_language(text)
+            };
             Some(
                 self.config
                     .language_id_map
@@ -117,9 +182,18 @@ impl PiperVoice {
         output: &Path,
         speaker_id: Option<i64>,
     ) -> Result<SynthesisResult, PiperError> {
-        let result = self.synthesize_text(text, speaker_id, 0.667, 1.0, 0.8)?;
+        let result = self.synthesize_text(text, speaker_id, None, 0.667, 1.0, 0.8)?;
         crate::audio::write_wav(output, result.sample_rate, &result.audio)?;
         Ok(result)
+    }
+
+    /// テキストの主要言語を検出する。
+    ///
+    /// 多言語/バイリンガルモデルの場合、`MultilingualPhonemizer` の
+    /// `detect_primary_language` を使用して最初の言語セグメントを検出。
+    /// 単言語モデルの場合は phonemizer の `language_code()` にフォールバック。
+    fn detect_language(&self, text: &str) -> &str {
+        self.phonemizer.detect_primary_language(text)
     }
 
     /// config への参照を返す
@@ -234,7 +308,8 @@ mod tests {
     }
 
     #[test]
-    fn test_create_phonemizer_unsupported_bilingual() {
+    fn test_create_phonemizer_bilingual_empty_language_id_map() {
+        // Bilingual with empty language_id_map should return InvalidConfig
         let config = VoiceConfig {
             audio: Default::default(),
             num_speakers: 1,
@@ -246,18 +321,70 @@ mod tests {
             speaker_id_map: HashMap::new(),
         };
         match expect_err(PiperVoice::create_phonemizer(&config)) {
-            PiperError::UnsupportedLanguage { code } => {
+            PiperError::InvalidConfig { reason } => {
                 assert!(
-                    code.contains("Bilingual"),
-                    "expected 'Bilingual' in code, got: {code}"
+                    reason.contains("language_id_map"),
+                    "expected 'language_id_map' in reason, got: {reason}"
                 );
             }
-            other => panic!("expected UnsupportedLanguage, got: {other:?}"),
+            other => panic!("expected InvalidConfig, got: {other:?}"),
         }
     }
 
     #[test]
-    fn test_create_phonemizer_unsupported_multilingual() {
+    fn test_create_phonemizer_bilingual_success() {
+        // Bilingual with populated language_id_map should succeed
+        // Uses en+es (no "ja") to avoid NAIST-JDIC dependency in tests
+        let config = VoiceConfig {
+            audio: Default::default(),
+            num_speakers: 330,
+            num_symbols: 97,
+            phoneme_type: PhonemeType::Bilingual,
+            phoneme_id_map: HashMap::new(),
+            num_languages: 2,
+            language_id_map: [("en".into(), 0i64), ("es".into(), 1)]
+                .into_iter()
+                .collect(),
+            speaker_id_map: HashMap::new(),
+        };
+        let result = PiperVoice::create_phonemizer(&config);
+        assert!(result.is_ok(), "expected Ok, got: {:?}", result.err());
+        let phonemizer = result.unwrap();
+        // MultilingualPhonemizer returns default_latin_language as language_code
+        assert_eq!(phonemizer.language_code(), "en");
+    }
+
+    #[test]
+    fn test_create_phonemizer_multilingual_success() {
+        // Multilingual with populated language_id_map should succeed
+        // Uses en+zh+es+fr+pt (no "ja") to avoid NAIST-JDIC dependency in tests
+        let config = VoiceConfig {
+            audio: Default::default(),
+            num_speakers: 571,
+            num_symbols: 173,
+            phoneme_type: PhonemeType::Multilingual,
+            phoneme_id_map: HashMap::new(),
+            num_languages: 5,
+            language_id_map: [
+                ("en".into(), 0i64),
+                ("zh".into(), 1),
+                ("es".into(), 2),
+                ("fr".into(), 3),
+                ("pt".into(), 4),
+            ]
+            .into_iter()
+            .collect(),
+            speaker_id_map: HashMap::new(),
+        };
+        let result = PiperVoice::create_phonemizer(&config);
+        assert!(result.is_ok(), "expected Ok, got: {:?}", result.err());
+        let phonemizer = result.unwrap();
+        assert_eq!(phonemizer.language_code(), "en");
+    }
+
+    #[test]
+    fn test_create_phonemizer_multilingual_empty_language_id_map() {
+        // Multilingual with empty language_id_map should return InvalidConfig
         let config = VoiceConfig {
             audio: Default::default(),
             num_speakers: 571,
@@ -265,24 +392,67 @@ mod tests {
             phoneme_type: PhonemeType::Multilingual,
             phoneme_id_map: HashMap::new(),
             num_languages: 6,
+            language_id_map: HashMap::new(),
+            speaker_id_map: HashMap::new(),
+        };
+        match expect_err(PiperVoice::create_phonemizer(&config)) {
+            PiperError::InvalidConfig { reason } => {
+                assert!(
+                    reason.contains("language_id_map"),
+                    "expected 'language_id_map' in reason, got: {reason}"
+                );
+            }
+            other => panic!("expected InvalidConfig, got: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_create_phonemizer_multilingual_default_latin_fallback() {
+        // When 'en' is not in language_id_map, should fall back to es/fr/pt
+        // Uses zh+es (no "ja" or "en") to test fallback
+        let config = VoiceConfig {
+            audio: Default::default(),
+            num_speakers: 100,
+            num_symbols: 100,
+            phoneme_type: PhonemeType::Multilingual,
+            phoneme_id_map: HashMap::new(),
+            num_languages: 2,
             language_id_map: [
-                ("ja".into(), 0),
-                ("en".into(), 1),
-                ("zh".into(), 2),
+                ("zh".into(), 0i64),
+                ("es".into(), 1),
             ]
             .into_iter()
             .collect(),
             speaker_id_map: HashMap::new(),
         };
-        match expect_err(PiperVoice::create_phonemizer(&config)) {
-            PiperError::UnsupportedLanguage { code } => {
-                assert!(
-                    code.contains("Multilingual"),
-                    "expected 'Multilingual' in code, got: {code}"
-                );
-            }
-            other => panic!("expected UnsupportedLanguage, got: {other:?}"),
-        }
+        let result = PiperVoice::create_phonemizer(&config);
+        assert!(result.is_ok(), "expected Ok, got: {:?}", result.err());
+        let phonemizer = result.unwrap();
+        // Should fall back to "es" as the default Latin language
+        assert_eq!(phonemizer.language_code(), "es");
+    }
+
+    #[test]
+    fn test_create_phonemizer_multilingual_detect_language() {
+        // Test that detect_primary_language works through the trait
+        // Uses en+zh (no "ja") to avoid NAIST-JDIC dependency
+        let config = VoiceConfig {
+            audio: Default::default(),
+            num_speakers: 330,
+            num_symbols: 97,
+            phoneme_type: PhonemeType::Bilingual,
+            phoneme_id_map: HashMap::new(),
+            num_languages: 2,
+            language_id_map: [("en".into(), 0i64), ("zh".into(), 1)]
+                .into_iter()
+                .collect(),
+            speaker_id_map: HashMap::new(),
+        };
+        let phonemizer = PiperVoice::create_phonemizer(&config).unwrap();
+        // English text should be detected as "en"
+        assert_eq!(phonemizer.detect_primary_language("Hello world"), "en");
+        // Chinese text should be detected as "zh"
+        assert_eq!(phonemizer.detect_primary_language("你好世界"), "zh");
     }
 
     #[test]
