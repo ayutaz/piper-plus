@@ -712,36 +712,31 @@
 
         // Convert phonemes to IDs
         function phonemesToIds(phonemes) {
-            // Apply padding for short Japanese text to improve synthesis quality
-            let processedPhonemes = phonemes;
-            if (currentLanguage === 'ja' && phonemes.length < 20) {
-                // Add silence tokens for short text
-                processedPhonemes = [
-                    phonemes[0],  // Keep BOS (^)
-                    '_', '_',     // Add silence padding
-                    ...phonemes.slice(1, -1),  // Original phonemes without BOS/EOS
-                    '_', '_',     // Add silence padding
-                    phonemes[phonemes.length - 1]  // Keep EOS ($)
-                ];
-            }
-            
-            const ids = [];
             const phonemeIdMap = currentModelConfig.phoneme_id_map;
-            
-            for (const phoneme of processedPhonemes) {
+            const padIds = phonemeIdMap['_'] || [0];
+            const bosIds = phonemeIdMap['^'] || [1];
+            const eosIds = phonemeIdMap['$'] || [2];
+
+            // Build IDs with BOS/EOS and PAD intersperse between every phoneme
+            // Format: [BOS, PAD, phoneme1, PAD, phoneme2, PAD, ..., EOS]
+            const ids = [];
+            ids.push(...bosIds);
+            ids.push(...padIds);
+
+            for (const phoneme of phonemes) {
+                // Skip BOS/EOS markers from phoneme list (we add them ourselves)
+                if (phoneme === '^' || phoneme === '$') continue;
+
                 if (phonemeIdMap[phoneme]) {
                     ids.push(...phonemeIdMap[phoneme]);
                 } else {
-                    // Use padding token as fallback for Japanese
-                    if (currentLanguage === 'ja') {
-                        ids.push(...(phonemeIdMap['_'] || [0]));
-                    } else {
-                        // Use space as fallback for non-Japanese languages
-                        ids.push(...(phonemeIdMap[' '] || [3]));
-                    }
+                    // Unknown phoneme: skip
+                    continue;
                 }
+                ids.push(...padIds);  // PAD after each phoneme
             }
-            
+
+            ids.push(...eosIds);
             return ids;
         }
         

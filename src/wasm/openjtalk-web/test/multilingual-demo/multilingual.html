@@ -535,18 +535,28 @@
         
         // Convert phonemes to IDs
         function phonemesToIds(phonemes) {
-            const ids = [];
             const phonemeIdMap = modelConfig.phoneme_id_map;
-            
+            const padIds = phonemeIdMap['_'] || [0];
+            const bosIds = phonemeIdMap['^'] || [1];
+            const eosIds = phonemeIdMap['$'] || [2];
+
+            // BOS/EOS + PAD intersperse: [BOS, PAD, ph1, PAD, ph2, PAD, ..., EOS]
+            const ids = [];
+            ids.push(...bosIds);
+            ids.push(...padIds);
+
             for (const phoneme of phonemes) {
+                if (phoneme === '^' || phoneme === '$') continue;
                 if (phonemeIdMap[phoneme]) {
                     ids.push(...phonemeIdMap[phoneme]);
                 } else {
                     console.warn(`Unknown phoneme: ${phoneme}`);
-                    ids.push(0); // Use padding ID
+                    continue;
                 }
+                ids.push(...padIds);
             }
-            
+
+            ids.push(...eosIds);
             return ids;
         }
         
