@@ -47,12 +47,9 @@ android {
         jvmTarget = "11"
     }
 
-    publishing {
-        singleVariant("release") {
-            withSourcesJar()
-            withJavadocJar()
-        }
-    }
+    // Note: publishing { singleVariant("release") } is handled automatically
+    // by the vanniktech maven-publish plugin. Do NOT add it manually here
+    // as it causes "singleVariant publishing DSL multiple times" error.
 }
 
 dependencies {
