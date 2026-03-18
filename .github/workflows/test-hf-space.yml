@@ -98,7 +98,9 @@ jobs:
           "
 
       - name: "Layer 2: Install HF Space requirements"
-        run: pip install -r hf-space-deploy/requirements.txt
+        run: |
+          pip install -r hf-space-deploy/requirements.txt
+          python3 -c "import nltk; nltk.download('averaged_perceptron_tagger_eng', quiet=True); nltk.download('cmudict', quiet=True)"
 
       - name: "Layer 2.5: Import validation (with external deps)"
         working-directory: hf-space-deploy
