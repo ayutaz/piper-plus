@@ -347,3 +347,27 @@ fn test_no_raw_pinyin_in_output() {
         );
     }
 }
+
+// =========================================================================
+// detect_primary_language
+// =========================================================================
+
+#[test]
+fn test_detect_primary_language_returns_zh() {
+    let p = require_phonemizer!();
+    assert_eq!(
+        p.detect_primary_language("你好世界"),
+        "zh",
+        "detect_primary_language should return 'zh' for Chinese phonemizer"
+    );
+}
+
+#[test]
+fn test_detect_primary_language_empty_string() {
+    let p = require_phonemizer!();
+    assert_eq!(
+        p.detect_primary_language(""),
+        "zh",
+        "detect_primary_language should return 'zh' even for empty input"
+    );
+}

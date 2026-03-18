@@ -686,4 +686,48 @@ mod tests {
         assert!(set.contains(&DeviceKind::Cuda));
         assert!(!set.contains(&DeviceKind::CoreML));
     }
+
+    // -----------------------------------------------------------------------
+    // Additional TDD tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_device_selection_from_str_negative_id() {
+        // "cuda:-1" should parse successfully because i32 allows negative values.
+        // The from_str implementation parses as i32 without validation.
+        let sel = DeviceSelection::from_str("cuda:-1").unwrap();
+        assert_eq!(sel.kind, DeviceKind::Cuda);
+        assert_eq!(sel.device_id, -1);
+    }
+
+    #[test]
+    fn test_enumerate_devices_no_duplicates() {
+        let devices = enumerate_devices();
+        let mut seen_kinds: Vec<DeviceKind> = Vec::new();
+        for d in &devices {
+            assert!(
+                !seen_kinds.contains(&d.kind),
+                "duplicate device kind: {:?}",
+                d.kind
+            );
+            seen_kinds.push(d.kind.clone());
+        }
+    }
+
+    #[test]
+    fn test_device_info_memory_display_large() {
+        // 80 GB VRAM (A100-class) -- verify no overflow in display formatting
+        let memory: u64 = 80 * 1024 * 1024 * 1024;
+        let info = DeviceInfo {
+            kind: DeviceKind::Cuda,
+            device_id: 0,
+            name: "NVIDIA A100".to_string(),
+            available: true,
+            memory_bytes: Some(memory),
+        };
+        let s = info.to_string();
+        assert!(s.contains("80GB"), "expected '80GB' in: {s}");
+        assert!(s.contains("[available]"));
+        assert!(s.contains("cuda:0"));
+    }
 }

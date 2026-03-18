@@ -685,4 +685,119 @@ mod tests {
         let result = concat_audio(&[&a, &b, &c], 0);
         assert_eq!(result, vec![1, 2, 3, 4, 5, 6, 7, 8, 9]);
     }
+
+    // --- Edge case tests ---
+
+    #[test]
+    fn test_f32_to_i16_nan() {
+        // NaN should not panic; clamping NaN is implementation-defined but
+        // Rust's f32::clamp returns NaN, which `as i16` casts to 0.
+        let result = f32_to_i16(&[f32::NAN]);
+        assert_eq!(result.len(), 1);
+        // The important thing is no panic. Rust `as` cast of NaN to i16 yields 0.
+        assert_eq!(result[0], 0);
+    }
+
+    #[test]
+    fn test_f32_to_i16_positive_infinity() {
+        let result = f32_to_i16(&[f32::INFINITY]);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0], i16::MAX);
+    }
+
+    #[test]
+    fn test_f32_to_i16_negative_infinity() {
+        let result = f32_to_i16(&[f32::NEG_INFINITY]);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0], i16::MIN);
+    }
+
+    #[test]
+    fn test_resample_linear_single_sample() {
+        // A single sample should not panic and should produce output
+        let input = vec![12345i16];
+        let output = resample_linear(&input, 22050, 44100);
+        assert!(!output.is_empty());
+        // The output should contain the original value (possibly repeated)
+        assert_eq!(output[0], 12345);
+    }
+
+    #[test]
+    fn test_resample_linear_zero_from_rate() {
+        let input = vec![100i16; 10];
+        let output = resample_linear(&input, 0, 44100);
+        assert!(output.is_empty());
+    }
+
+    #[test]
+    fn test_resample_linear_zero_to_rate() {
+        let input = vec![100i16; 10];
+        let output = resample_linear(&input, 44100, 0);
+        assert!(output.is_empty());
+    }
+
+    #[test]
+    fn test_fade_in_zero_fade_samples() {
+        // Zero fade_samples should be a no-op
+        let mut samples = vec![1000i16, 2000, 3000];
+        let original = samples.clone();
+        fade_in(&mut samples, 0);
+        assert_eq!(samples, original);
+    }
+
+    #[test]
+    fn test_fade_out_zero_fade_samples() {
+        // Zero fade_samples should be a no-op
+        let mut samples = vec![1000i16, 2000, 3000];
+        let original = samples.clone();
+        fade_out(&mut samples, 0);
+        assert_eq!(samples, original);
+    }
+
+    #[test]
+    fn test_stereo_to_mono_odd_length() {
+        // Odd-length input: chunks_exact(2) should drop the last sample
+        let stereo = vec![100i16, 200, 300, 400, 500];
+        let mono = stereo_to_mono(&stereo);
+        // Only two complete pairs: (100,200) and (300,400); 500 is dropped
+        assert_eq!(mono.len(), 2);
+        assert_eq!(mono[0], 150);
+        assert_eq!(mono[1], 350);
+    }
+
+    #[test]
+    fn test_normalize_peak_single_sample() {
+        let mut samples = vec![1000i16];
+        normalize_peak(&mut samples, 0.0);
+        // Single-sample peak should be scaled to 32767
+        assert!((samples[0] as i32 - 32767).abs() <= 1);
+    }
+
+    #[test]
+    fn test_trim_silence_very_low_threshold() {
+        // At -90 dB, threshold_linear ~ 32768 * 10^(-90/20) ~ 1.036,
+        // which truncates to 1 as i32, so any sample with abs >= 1 is kept.
+        let samples = vec![0i16, 1, 2, 3, 0];
+        let trimmed = trim_silence(&samples, -90.0);
+        assert_eq!(trimmed, &[1, 2, 3]);
+    }
+
+    #[test]
+    fn test_concat_audio_crossfade_exceeds_chunk_length() {
+        // crossfade_samples > chunk lengths; should clamp and not panic
+        let a: Vec<i16> = vec![5000; 3];
+        let b: Vec<i16> = vec![5000; 2];
+        let result = concat_audio(&[&a, &b], 100);
+        // crossfade is clamped to min(100, 3, 2) = 2
+        // output = 3 + 2 - 2 = 3 samples
+        assert_eq!(result.len(), 3);
+        // Since both chunks have the same constant value, all samples should
+        // be approximately 5000
+        for &s in &result {
+            assert!(
+                (s - 5000).abs() <= 1,
+                "expected ~5000, got {s}"
+            );
+        }
+    }
 }

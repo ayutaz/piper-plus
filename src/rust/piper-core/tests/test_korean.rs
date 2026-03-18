@@ -48,3 +48,79 @@ fn test_non_hangul_passthrough() {
     // Digits should either be skipped or passed through
     assert!(tokens.is_empty() || tokens.iter().all(|t| t.len() <= 1));
 }
+
+// ---------------------------------------------------------------------------
+// detect_primary_language
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_detect_primary_language_returns_ko() {
+    let p = KoreanPhonemizer::new();
+    assert_eq!(
+        p.detect_primary_language("안녕하세요"),
+        "ko",
+        "detect_primary_language should return 'ko' for Korean phonemizer"
+    );
+}
+
+#[test]
+fn test_detect_primary_language_empty_string() {
+    let p = KoreanPhonemizer::new();
+    assert_eq!(
+        p.detect_primary_language(""),
+        "ko",
+        "detect_primary_language should return 'ko' even for empty input"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// get_phoneme_id_map
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_get_phoneme_id_map() {
+    let p = KoreanPhonemizer::new();
+    assert!(
+        p.get_phoneme_id_map().is_none(),
+        "Korean phonemizer should return None for phoneme_id_map (uses config.json)"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// post_process_ids
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_post_process_ids_passthrough() {
+    let p = KoreanPhonemizer::new();
+    let mut id_map = std::collections::HashMap::new();
+    id_map.insert("^".to_string(), vec![1i64]);
+    id_map.insert("$".to_string(), vec![2i64]);
+    id_map.insert("_".to_string(), vec![0i64]);
+
+    let ids = vec![10i64, 20, 30];
+    let prosody = vec![Some([0i32, 0, 0]), Some([0, 0, 0]), Some([0, 0, 0])];
+
+    let (result_ids, result_prosody) = p.post_process_ids(ids, prosody, &id_map);
+
+    // Korean uses default_post_process_ids: BOS + intersperse padding + EOS
+    assert_eq!(
+        *result_ids.first().unwrap(),
+        1,
+        "should start with BOS"
+    );
+    assert_eq!(
+        *result_ids.last().unwrap(),
+        2,
+        "should end with EOS"
+    );
+    assert!(
+        result_ids.contains(&10) && result_ids.contains(&20) && result_ids.contains(&30),
+        "should contain all original phoneme IDs"
+    );
+    assert_eq!(
+        result_ids.len(),
+        result_prosody.len(),
+        "IDs and prosody must have same length"
+    );
+}

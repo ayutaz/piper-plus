@@ -129,3 +129,27 @@ fn test_phonemize_n_variant_velar() {
     let has_n_ng = tokens.iter().any(|t| t == "\u{E01B}" || t == "N_ng");
     assert!(has_n_ng, "ぎんこう should have N_ng before k, got: {:?}", tokens);
 }
+
+// ---------------------------------------------------------------------------
+// detect_primary_language
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_detect_primary_language_returns_ja() {
+    let phonemizer = create_phonemizer();
+    assert_eq!(
+        phonemizer.detect_primary_language("こんにちは"),
+        "ja",
+        "detect_primary_language should return 'ja' for Japanese phonemizer"
+    );
+}
+
+#[test]
+fn test_detect_primary_language_empty_string() {
+    let phonemizer = create_phonemizer();
+    assert_eq!(
+        phonemizer.detect_primary_language(""),
+        "ja",
+        "detect_primary_language should return 'ja' even for empty input"
+    );
+}

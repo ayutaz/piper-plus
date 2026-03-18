@@ -35,7 +35,6 @@ pub mod text_splitter;
 pub mod timing;
 pub mod wasm;
 
-#[cfg(feature = "playback")]
 pub mod playback;
 
 // Re-exports

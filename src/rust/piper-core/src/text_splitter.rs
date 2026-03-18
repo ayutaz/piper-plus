@@ -834,4 +834,99 @@ mod tests {
         // Last chunk must have is_last = true
         assert!(chunks.last().unwrap().is_last);
     }
+
+    // -----------------------------------------------------------------------
+    // 21. Nested quotes — inner quotes should not break the outer sentence
+    // -----------------------------------------------------------------------
+    #[test]
+    fn test_split_sentences_nested_quotes() {
+        let text = "He said \"she said 'hello'\" then left.";
+        let result = split_sentences(text);
+        assert_eq!(result.len(), 1, "nested quotes should not cause extra splits: {:?}", result);
+        assert_eq!(result[0], text);
+    }
+
+    // -----------------------------------------------------------------------
+    // 22. Only CJK punctuation (no actual text content)
+    // -----------------------------------------------------------------------
+    #[test]
+    fn test_split_sentences_only_cjk_punctuation() {
+        // Input is three CJK sentence-ending marks with no surrounding text
+        let result = split_sentences("\u{3002}\u{FF01}\u{FF1F}");
+        // Each mark should be treated as its own sentence (non-empty)
+        assert!(!result.is_empty(), "CJK-only punctuation should produce output");
+        for s in &result {
+            assert!(!s.is_empty(), "no empty sentences should be emitted");
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // 23. split_chunks where max_chars < min_chars — should still not panic
+    // -----------------------------------------------------------------------
+    #[test]
+    fn test_split_chunks_max_less_than_min() {
+        let text = "Hello world. Goodbye world.";
+        // Intentionally contradictory: max < min
+        let config = SplitConfig {
+            max_chars: 5,
+            split_on_clause: true,
+            min_chars: 50,
+        };
+        let chunks = split_chunks(text, &config);
+        // Must not panic; should still produce at least one chunk
+        assert!(!chunks.is_empty(), "should produce chunks even with invalid config");
+        // All text should survive the round-trip
+        let rejoined: String = chunks.iter().map(|c| c.text.as_str()).collect::<Vec<_>>().join(" ");
+        assert!(rejoined.contains("Hello"), "text should survive: {rejoined}");
+        assert!(rejoined.contains("Goodbye"), "text should survive: {rejoined}");
+    }
+
+    // -----------------------------------------------------------------------
+    // 24. Consecutive terminators — "Really?! Yes." should give 2 chunks
+    // -----------------------------------------------------------------------
+    #[test]
+    fn test_split_sentences_consecutive_terminators() {
+        let result = split_sentences("Really?! Yes.");
+        assert_eq!(result, vec!["Really?!", "Yes."]);
+    }
+
+    // -----------------------------------------------------------------------
+    // 25. Abbreviation at start of sentence — "Dr. Smith is here."
+    // -----------------------------------------------------------------------
+    #[test]
+    fn test_split_sentences_abbreviation_at_start() {
+        let result = split_sentences("Dr. Smith is here.");
+        // "Dr." is an abbreviation and must not split
+        assert_eq!(
+            result.len(), 1,
+            "abbreviation at start should not split: {:?}", result
+        );
+        assert_eq!(result[0], "Dr. Smith is here.");
+    }
+
+    // -----------------------------------------------------------------------
+    // 26. CRLF line endings — "\r\n" should be treated like "\n"
+    // -----------------------------------------------------------------------
+    #[test]
+    fn test_split_sentences_crlf_line_endings() {
+        // Single CRLF: treated as single newline (space), no split
+        let result_single = split_sentences("Hello.\r\nWorld.");
+        assert!(
+            !result_single.is_empty(),
+            "CRLF input should produce output"
+        );
+
+        // Double CRLF: treated as paragraph break, should split
+        let result_double = split_sentences("Hello.\r\n\r\nWorld.");
+        assert!(
+            result_double.len() >= 2,
+            "double CRLF should cause paragraph split: {:?}", result_double
+        );
+        // First chunk should contain "Hello." and last should contain "World."
+        assert!(result_double[0].contains("Hello."), "first chunk: {:?}", result_double);
+        assert!(
+            result_double.last().unwrap().contains("World."),
+            "last chunk: {:?}", result_double
+        );
+    }
 }

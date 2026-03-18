@@ -415,3 +415,27 @@ fn test_mixed_known_unknown_words() {
     assert!(!tokens.is_empty());
     assert_eq!(tokens.len(), prosody.len());
 }
+
+// ---------------------------------------------------------------------------
+// detect_primary_language
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_detect_primary_language_returns_en() {
+    let p = require_phonemizer!();
+    assert_eq!(
+        p.detect_primary_language("hello world"),
+        "en",
+        "detect_primary_language should return 'en' for English phonemizer"
+    );
+}
+
+#[test]
+fn test_detect_primary_language_empty_string() {
+    let p = require_phonemizer!();
+    assert_eq!(
+        p.detect_primary_language(""),
+        "en",
+        "detect_primary_language should return 'en' even for empty input"
+    );
+}

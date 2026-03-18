@@ -707,4 +707,57 @@ mod tests {
             configure_session_builder(builder, &DeviceType::TensorRT { device_id: 0 }).unwrap();
         assert_eq!(actual_device, DeviceType::Cpu);
     }
+
+    // -----------------------------------------------------------------------
+    // Additional TDD tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_auto_detect_device_returns_valid() {
+        let dt = parse_device_string("auto").unwrap();
+        // Regardless of features, the result must be a valid DeviceType variant
+        match dt {
+            DeviceType::Cpu
+            | DeviceType::Cuda { .. }
+            | DeviceType::CoreML
+            | DeviceType::DirectML { .. }
+            | DeviceType::TensorRT { .. } => {} // all valid
+        }
+    }
+
+    #[test]
+    fn test_parse_device_string_whitespace() {
+        // parse_device_string does to_lowercase() but NOT trim(), so
+        // leading/trailing whitespace causes "unknown device" error.
+        let result = parse_device_string(" cuda ");
+        assert!(result.is_err());
+        let err_msg = format!("{}", result.unwrap_err());
+        assert!(err_msg.contains("unknown device"));
+    }
+
+    #[test]
+    fn test_parse_device_string_large_device_id() {
+        let dt = parse_device_string("cuda:999").unwrap();
+        assert_eq!(dt, DeviceType::Cuda { device_id: 999 });
+    }
+
+    #[test]
+    fn test_device_type_default_display_roundtrip() {
+        // For each variant, Display then parse back should produce the same value
+        let variants = vec![
+            DeviceType::Cpu,
+            DeviceType::Cuda { device_id: 0 },
+            DeviceType::Cuda { device_id: 7 },
+            DeviceType::CoreML,
+            DeviceType::DirectML { device_id: 0 },
+            DeviceType::DirectML { device_id: 3 },
+            DeviceType::TensorRT { device_id: 0 },
+            DeviceType::TensorRT { device_id: 5 },
+        ];
+        for variant in variants {
+            let displayed = format!("{variant}");
+            let parsed = parse_device_string(&displayed).unwrap();
+            assert_eq!(parsed, variant, "roundtrip failed for '{displayed}'");
+        }
+    }
 }

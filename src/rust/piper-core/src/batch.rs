@@ -681,4 +681,92 @@ mod tests {
         assert_eq!(jobs[1].output_path, dir.path().join("my.wav"));
         assert_eq!(jobs[2].output_path, dir.path().join("utt_003.wav"));
     }
+
+    // -----------------------------------------------------------------------
+    // 13. JSONL malformed input: missing "text" field
+    // -----------------------------------------------------------------------
+    #[test]
+    fn test_jobs_from_jsonl_missing_text_field() {
+        let dir = tempfile::tempdir().unwrap();
+        let jsonl_path = dir.path().join("no_text.jsonl");
+        // "text" key is absent — serde should fail because it is required
+        fs::write(&jsonl_path, r#"{"speaker_id": 1, "language": "en"}"#).unwrap();
+
+        let result = jobs_from_jsonl(&jsonl_path, dir.path());
+        assert!(result.is_err(), "missing 'text' field should cause an error");
+        let err_msg = format!("{}", result.unwrap_err());
+        assert!(
+            err_msg.contains("text") || err_msg.contains("missing field"),
+            "error should mention the missing field, got: {err_msg}"
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // 14. JSONL malformed input: speaker_id as string should error
+    // -----------------------------------------------------------------------
+    #[test]
+    fn test_jobs_from_jsonl_invalid_speaker_id_type() {
+        let dir = tempfile::tempdir().unwrap();
+        let jsonl_path = dir.path().join("bad_sid.jsonl");
+        // speaker_id should be an integer, not a string
+        fs::write(
+            &jsonl_path,
+            r#"{"text": "hello", "speaker_id": "not_a_number"}"#,
+        )
+        .unwrap();
+
+        let result = jobs_from_jsonl(&jsonl_path, dir.path());
+        assert!(
+            result.is_err(),
+            "speaker_id as string should cause a deserialization error"
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // 15. BatchSummary from empty results produces zeros
+    // -----------------------------------------------------------------------
+    #[test]
+    fn test_batch_summary_from_empty_results() {
+        let summary = BatchSummary::from_results(Vec::new());
+        assert_eq!(summary.total_jobs, 0);
+        assert_eq!(summary.successful, 0);
+        assert_eq!(summary.failed, 0);
+        assert!((summary.total_audio_seconds - 0.0).abs() < 1e-9);
+        assert!((summary.total_infer_seconds - 0.0).abs() < 1e-9);
+        assert!((summary.real_time_factor() - 0.0).abs() < 1e-9);
+        assert!(summary.results.is_empty());
+    }
+
+    // -----------------------------------------------------------------------
+    // 16. real_time_factor returns exactly 0.0 when audio_seconds is zero
+    // -----------------------------------------------------------------------
+    #[test]
+    fn test_real_time_factor_zero_audio_returns_zero() {
+        // Even with nonzero infer_seconds, RTF must be 0.0 when audio is 0
+        let summary = BatchSummary {
+            total_jobs: 5,
+            successful: 0,
+            failed: 5,
+            total_audio_seconds: 0.0,
+            total_infer_seconds: 42.0,
+            results: Vec::new(),
+        };
+        assert_eq!(summary.real_time_factor(), 0.0);
+    }
+
+    // -----------------------------------------------------------------------
+    // 17. auto_output_path with Unicode prefix
+    // -----------------------------------------------------------------------
+    #[test]
+    fn test_auto_output_path_unicode_prefix() {
+        let p = auto_output_path(Path::new("/tmp/out"), 0, "発話");
+        assert_eq!(p, PathBuf::from("/tmp/out/発話_001.wav"));
+
+        let p2 = auto_output_path(Path::new("/tmp/out"), 9, "テスト");
+        assert_eq!(p2, PathBuf::from("/tmp/out/テスト_010.wav"));
+
+        // Emoji prefix
+        let p3 = auto_output_path(Path::new("/data"), 2, "🔊audio");
+        assert_eq!(p3, PathBuf::from("/data/🔊audio_003.wav"));
+    }
 }

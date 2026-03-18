@@ -575,4 +575,289 @@ mod tests {
             assert_eq!(tsv_phoneme, json_phoneme);
         }
     }
+
+    // ---------------------------------------------------------------
+    // 22. Phoneme name containing tab in TSV output
+    // ---------------------------------------------------------------
+
+    #[test]
+    fn test_tsv_phoneme_with_tab() {
+        // A phoneme token that contains a literal tab character.
+        // The current TSV writer does not escape it, so the tab will
+        // appear as an extra column, producing 5 fields instead of 4.
+        let durations = vec![5.0];
+        let toks = vec!["a\tb".to_string()];
+        let result = durations_to_timing(&durations, &toks, 1000, 1).unwrap();
+
+        let tsv = result.to_tsv();
+        let data_line = tsv.lines().nth(1).expect("expected a data line");
+        let fields: Vec<&str> = data_line.split('\t').collect();
+
+        // Tab inside the phoneme name splits the field, yielding 5 columns.
+        assert_eq!(
+            fields.len(),
+            5,
+            "tab inside phoneme name produces an extra TSV column"
+        );
+    }
+
+    // ---------------------------------------------------------------
+    // 23. Phoneme name containing newline in SRT output
+    // ---------------------------------------------------------------
+
+    #[test]
+    fn test_srt_phoneme_with_newline() {
+        // A phoneme token with an embedded newline will split the
+        // subtitle text across two visual lines inside the SRT entry.
+        // The entry count should still be 1 since entries are delimited
+        // by blank lines ("\n\n").
+        let durations = vec![10.0];
+        let toks = vec!["line1\nline2".to_string()];
+        let result = durations_to_timing(&durations, &toks, 1000, 1).unwrap();
+
+        let srt = result.to_srt();
+
+        // The block delimiter is "\n\n".  Because the phoneme itself
+        // contains "\n", we verify that the index "1" and the arrow
+        // marker are still present and structurally correct.
+        assert!(srt.contains("1\n"));
+        assert!(srt.contains(" --> "));
+        assert!(srt.contains("line1\nline2"));
+    }
+
+    // ---------------------------------------------------------------
+    // 24. Duration with NaN — clamped to 0 by f32::max(0.0)
+    // ---------------------------------------------------------------
+
+    #[test]
+    fn test_nan_duration() {
+        let durations = vec![f32::NAN, 10.0];
+        let toks = tokens(&["nan_ph", "ok"]);
+        let result = durations_to_timing(&durations, &toks, 1000, 1).unwrap();
+
+        // Rust's f32::max returns the non-NaN argument when one operand
+        // is NaN, so NAN.max(0.0) == 0.0. The NaN is effectively clamped.
+        assert!(
+            (result.phonemes[0].duration_ms - 0.0).abs() < 1e-9,
+            "NaN duration is clamped to 0 by f32::max"
+        );
+        assert!(
+            (result.phonemes[0].start_ms - result.phonemes[0].end_ms).abs() < 1e-9,
+            "start == end for zero-duration phoneme"
+        );
+
+        // The second phoneme should still have a valid duration.
+        assert!(
+            (result.phonemes[1].duration_ms - 10.0).abs() < 1e-6,
+            "non-NaN phoneme keeps its value"
+        );
+
+        // Total should only reflect the valid phoneme
+        assert!(
+            (result.total_duration_ms - 10.0).abs() < 1e-6,
+            "total reflects only the non-NaN phoneme"
+        );
+    }
+
+    // ---------------------------------------------------------------
+    // 25. Duration with Infinity — propagates as infinite ms
+    // ---------------------------------------------------------------
+
+    #[test]
+    fn test_infinity_duration() {
+        let durations = vec![f32::INFINITY];
+        let toks = tokens(&["inf_ph"]);
+        let result = durations_to_timing(&durations, &toks, 1000, 1).unwrap();
+
+        assert!(
+            result.phonemes[0].duration_ms.is_infinite(),
+            "Infinity duration propagates"
+        );
+        assert!(
+            result.total_duration_ms.is_infinite(),
+            "total also becomes infinite"
+        );
+    }
+
+    // ---------------------------------------------------------------
+    // 26. Unicode / IPA phoneme names in all formats
+    // ---------------------------------------------------------------
+
+    #[test]
+    fn test_unicode_phoneme_names() {
+        let ipa_tokens = vec![
+            "\u{0251}\u{02D0}".to_string(), // ɑː
+            "\u{0283}".to_string(),          // ʃ
+            "\u{014B}".to_string(),          // ŋ
+        ];
+        let durations = vec![5.0, 3.0, 7.0];
+        let result =
+            durations_to_timing(&durations, &ipa_tokens, 1000, 1).unwrap();
+
+        // Verify phoneme names are preserved
+        assert_eq!(result.phonemes[0].phoneme, "\u{0251}\u{02D0}");
+        assert_eq!(result.phonemes[1].phoneme, "\u{0283}");
+        assert_eq!(result.phonemes[2].phoneme, "\u{014B}");
+
+        // JSON roundtrip preserves Unicode
+        let json = result.to_json().unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
+        assert_eq!(
+            parsed["phonemes"][0]["phoneme"].as_str().unwrap(),
+            "\u{0251}\u{02D0}"
+        );
+
+        // TSV contains the Unicode characters
+        let tsv = result.to_tsv();
+        assert!(tsv.contains("\u{0251}\u{02D0}"));
+        assert!(tsv.contains("\u{0283}"));
+        assert!(tsv.contains("\u{014B}"));
+
+        // SRT contains the Unicode characters
+        let srt = result.to_srt();
+        assert!(srt.contains("\u{0251}\u{02D0}"));
+        assert!(srt.contains("\u{0283}"));
+        assert!(srt.contains("\u{014B}"));
+    }
+
+    // ---------------------------------------------------------------
+    // 27. Very small durations preserve precision
+    // ---------------------------------------------------------------
+
+    #[test]
+    fn test_very_small_durations_precision() {
+        // 0.001 frames at sample_rate=1000, hop=1 => 0.001 ms per frame
+        let durations = vec![0.001_f32];
+        let toks = tokens(&["tiny"]);
+        let result = durations_to_timing(&durations, &toks, 1000, 1).unwrap();
+
+        // frame_time_ms = 1.0 ms; duration = 0.001 * 1.0 = 0.001 ms
+        let expected = 0.001_f64;
+        assert!(
+            (result.phonemes[0].duration_ms - expected).abs() < 1e-9,
+            "very small duration: got {} expected {}",
+            result.phonemes[0].duration_ms,
+            expected
+        );
+
+        // TSV should render with sub-millisecond precision via {:.3}
+        let tsv = result.to_tsv();
+        let data_line = tsv.lines().nth(1).unwrap();
+        // The duration field (3rd column) should be "0.001"
+        let fields: Vec<&str> = data_line.split('\t').collect();
+        assert_eq!(fields[2], "0.001");
+    }
+
+    // ---------------------------------------------------------------
+    // 28. TimingResult direct construction and field access
+    // ---------------------------------------------------------------
+
+    #[test]
+    fn test_timing_result_direct_construction() {
+        let timing = TimingResult {
+            phonemes: vec![
+                PhonemeTimingInfo {
+                    phoneme: "hello".to_string(),
+                    start_ms: 0.0,
+                    end_ms: 100.5,
+                    duration_ms: 100.5,
+                },
+                PhonemeTimingInfo {
+                    phoneme: "world".to_string(),
+                    start_ms: 100.5,
+                    end_ms: 250.0,
+                    duration_ms: 149.5,
+                },
+            ],
+            total_duration_ms: 250.0,
+            sample_rate: 48000,
+        };
+
+        // Field access
+        assert_eq!(timing.phonemes.len(), 2);
+        assert_eq!(timing.phonemes[0].phoneme, "hello");
+        assert_eq!(timing.phonemes[1].phoneme, "world");
+        assert!((timing.phonemes[0].start_ms - 0.0).abs() < 1e-9);
+        assert!((timing.phonemes[0].end_ms - 100.5).abs() < 1e-9);
+        assert!((timing.phonemes[0].duration_ms - 100.5).abs() < 1e-9);
+        assert!((timing.phonemes[1].start_ms - 100.5).abs() < 1e-9);
+        assert!((timing.phonemes[1].end_ms - 250.0).abs() < 1e-9);
+        assert!((timing.phonemes[1].duration_ms - 149.5).abs() < 1e-9);
+        assert!((timing.total_duration_ms - 250.0).abs() < 1e-9);
+        assert_eq!(timing.sample_rate, 48000);
+
+        // Clone trait works
+        let cloned = timing.clone();
+        assert_eq!(cloned.phonemes.len(), timing.phonemes.len());
+        assert_eq!(cloned.sample_rate, timing.sample_rate);
+
+        // Serialization works on directly constructed structs
+        let json = timing.to_json().unwrap();
+        assert!(json.contains("\"hello\""));
+        assert!(json.contains("\"world\""));
+        assert!(json.contains("48000"));
+    }
+
+    // ---------------------------------------------------------------
+    // 29. JSON serializes non-finite f64 as null (serde_json >=1.0.128)
+    // ---------------------------------------------------------------
+
+    #[test]
+    fn test_json_nonfinite_serialized_as_null() {
+        // serde_json >= 1.0.128 serializes NaN / Infinity as JSON null
+        // rather than returning an error.  Verify this behaviour so that
+        // callers know what to expect when a TimingResult contains
+        // non-finite values (e.g. from an Infinity input duration).
+        let timing = TimingResult {
+            phonemes: vec![PhonemeTimingInfo {
+                phoneme: "inf".to_string(),
+                start_ms: 0.0,
+                end_ms: f64::INFINITY,
+                duration_ms: f64::INFINITY,
+            }],
+            total_duration_ms: f64::INFINITY,
+            sample_rate: 22050,
+        };
+
+        // to_json should succeed (not error)
+        let json = timing.to_json().expect("to_json should succeed");
+        let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
+
+        // Non-finite values become null in JSON
+        assert!(
+            parsed["total_duration_ms"].is_null(),
+            "Infinity total_duration_ms serialized as null"
+        );
+        assert!(
+            parsed["phonemes"][0]["end_ms"].is_null(),
+            "Infinity end_ms serialized as null"
+        );
+        assert!(
+            parsed["phonemes"][0]["duration_ms"].is_null(),
+            "Infinity duration_ms serialized as null"
+        );
+
+        // Finite values remain as numbers
+        assert!(
+            parsed["phonemes"][0]["start_ms"].is_number(),
+            "finite start_ms remains a number"
+        );
+
+        // Compact format also succeeds
+        let compact = timing.to_json_compact().expect("compact should succeed");
+        assert!(compact.contains("null"), "compact JSON contains null for Infinity");
+
+        // PiperError::from(serde_json::Error) conversion is exercised
+        // by to_json / to_json_compact internally via map_err.
+        // Verify the error path is reachable with truly invalid JSON input.
+        let bad_json = "{ not valid json }";
+        let serde_err: Result<serde_json::Value, _> = serde_json::from_str(bad_json);
+        let piper_err: PiperError = serde_err.unwrap_err().into();
+        let msg = piper_err.to_string();
+        assert!(
+            msg.contains("JSON"),
+            "PiperError from serde_json mentions JSON: {}",
+            msg
+        );
+    }
 }

@@ -545,6 +545,111 @@ mod tests {
         assert!(result.is_ok());
     }
 
+    // -- DummyPlayer additional tests ----------------------------------------
+
+    #[test]
+    fn dummy_player_double_finalize_is_idempotent() {
+        let mut player = DummyPlayer::new();
+        player.write_chunk(&[1, 2, 3], 22050).unwrap();
+        player.finalize().unwrap();
+        assert!(player.is_finalized());
+
+        // Second finalize should also succeed (idempotent)
+        player.finalize().unwrap();
+        assert!(player.is_finalized());
+    }
+
+    #[test]
+    fn dummy_player_large_sample_count() {
+        let mut player = DummyPlayer::new();
+        let samples: Vec<i16> = vec![42; 1_000_000];
+        player.write_chunk(&samples, 22050).unwrap();
+
+        assert_eq!(player.total_samples(), 1_000_000);
+        assert_eq!(player.chunk_count(), 1);
+        assert_eq!(player.last_sample_rate(), 22050);
+    }
+
+    // -- CollectorSink additional tests --------------------------------------
+
+    #[test]
+    fn collector_sink_double_finalize_is_idempotent() {
+        let mut sink = CollectorSink::new();
+        sink.write_chunk(&[10, 20], 44100).unwrap();
+        sink.finalize().unwrap();
+        assert!(sink.is_finalized());
+
+        // Second finalize should also succeed (idempotent)
+        sink.finalize().unwrap();
+        assert!(sink.is_finalized());
+    }
+
+    #[test]
+    fn collector_sink_multiple_different_sample_rates_errors() {
+        let mut sink = CollectorSink::new();
+
+        // First chunk at 22050 sets the rate
+        sink.write_chunk(&[1, 2, 3], 22050).unwrap();
+        assert_eq!(sink.sample_rate(), Some(22050));
+
+        // Second chunk at 44100 must fail with mismatch error
+        let result = sink.write_chunk(&[4, 5], 44100);
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(
+            err_msg.contains("mismatch"),
+            "error should mention mismatch, got: {err_msg}"
+        );
+        assert!(
+            err_msg.contains("22050"),
+            "error should mention expected rate 22050, got: {err_msg}"
+        );
+        assert!(
+            err_msg.contains("44100"),
+            "error should mention actual rate 44100, got: {err_msg}"
+        );
+
+        // Third chunk at 16000 must also fail (first rate still locked at 22050)
+        let result2 = sink.write_chunk(&[6], 16000);
+        assert!(result2.is_err());
+
+        // Verify only the first chunk's samples were collected
+        assert_eq!(sink.samples(), &[1, 2, 3]);
+    }
+
+    #[test]
+    fn collector_sink_into_samples_ownership() {
+        let mut sink = CollectorSink::new();
+        sink.write_chunk(&[100, 200, 300], 16000).unwrap();
+        sink.write_chunk(&[400, 500], 16000).unwrap();
+        sink.finalize().unwrap();
+
+        // into_samples consumes self and returns owned Vec
+        let owned: Vec<i16> = sink.into_samples();
+        assert_eq!(owned, vec![100, 200, 300, 400, 500]);
+        assert_eq!(owned.len(), 5);
+
+        // After into_samples, `sink` is moved -- cannot be used.
+        // (This is enforced at compile time, no runtime assertion needed.)
+    }
+
+    // -- play_audio with various sample rates --------------------------------
+
+    #[test]
+    fn play_audio_various_sample_rates() {
+        // Without the `playback` feature, play_audio uses DummyPlayer.
+        // All valid sample rates should succeed.
+        let samples: Vec<i16> = (0..64).collect();
+
+        for &rate in &[8000u32, 16000, 22050, 44100] {
+            let result = play_audio(&samples, rate);
+            assert!(
+                result.is_ok(),
+                "play_audio should succeed at sample rate {rate}"
+            );
+        }
+    }
+
     // -- RodioPlayer compile-time checks (feature-gated) --------------------
     // These tests verify that the RodioPlayer API compiles correctly
     // under the `playback` feature.  Actual audio output is not tested
@@ -595,6 +700,60 @@ mod tests {
             assert!(
                 output.len() < input.len(),
                 "downsampled output should have fewer samples"
+            );
+        }
+
+        #[test]
+        fn rodio_linear_resample_preserves_length_ratio() {
+            // Upsample 22050 -> 48000: output length should be
+            // ceil(input_len * 48000/22050)
+            let input_len = 22050; // 1 second of audio at 22050 Hz
+            let input: Vec<i16> = (0..input_len as i16).collect();
+            let output = RodioPlayer::linear_resample(&input, 22050, 48000);
+
+            let expected_len =
+                ((input_len as f64) * (48000.0 / 22050.0)).ceil() as usize;
+            // Allow +/- 1 sample tolerance for rounding
+            assert!(
+                (output.len() as isize - expected_len as isize).unsigned_abs() <= 1,
+                "expected ~{expected_len} samples, got {}",
+                output.len()
+            );
+
+            // Verify ratio is approximately correct
+            let ratio = output.len() as f64 / input_len as f64;
+            let expected_ratio = 48000.0 / 22050.0;
+            assert!(
+                (ratio - expected_ratio).abs() < 0.01,
+                "sample count ratio {ratio:.4} should be close to {expected_ratio:.4}"
+            );
+        }
+
+        #[test]
+        fn rodio_linear_resample_boundary_values() {
+            // Test with extreme i16 values (MIN and MAX) to verify
+            // clamping and interpolation do not overflow or wrap
+            let input = vec![i16::MIN, i16::MAX, i16::MIN, i16::MAX, 0];
+            let output = RodioPlayer::linear_resample(&input, 22050, 48000);
+
+            assert!(
+                !output.is_empty(),
+                "resampled output should not be empty"
+            );
+
+            // Every output sample must stay within valid i16 range
+            for (i, &sample) in output.iter().enumerate() {
+                assert!(
+                    sample >= i16::MIN && sample <= i16::MAX,
+                    "sample[{i}] = {sample} is out of i16 range"
+                );
+            }
+
+            // Verify the extreme values appear in the output (first and
+            // last input samples map directly to output positions)
+            assert_eq!(
+                output[0], i16::MIN,
+                "first output sample should be i16::MIN"
             );
         }
     }

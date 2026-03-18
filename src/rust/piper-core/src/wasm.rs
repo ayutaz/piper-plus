@@ -53,6 +53,7 @@ pub struct WasmModelCapabilities {
 
 /// WASM-compatible voice synthesizer.
 /// Loads model from bytes rather than file paths.
+#[derive(Debug)]
 pub struct WasmVoice {
     config: VoiceConfig,
     session: Session,
@@ -671,5 +672,220 @@ mod tests {
             let br = u32::from_le_bytes([wav[28], wav[29], wav[30], wav[31]]);
             assert_eq!(br, rate * 2, "byte rate mismatch for {rate}");
         }
+    }
+
+    // -----------------------------------------------------------------------
+    // 10. WasmVoice::load_from_bytes with invalid model bytes
+    // -----------------------------------------------------------------------
+    #[test]
+    fn test_load_from_bytes_invalid_model() {
+        let config = r#"{
+            "audio": {"sample_rate": 22050},
+            "num_speakers": 1,
+            "num_symbols": 10,
+            "phoneme_type": "openjtalk",
+            "phoneme_id_map": {},
+            "num_languages": 1,
+            "language_id_map": {},
+            "speaker_id_map": {}
+        }"#;
+        let result = WasmVoice::load_from_bytes(b"not a model", config);
+        assert!(result.is_err());
+        match result.err().unwrap() {
+            PiperError::ModelLoad(msg) => {
+                assert!(!msg.is_empty(), "error message should be non-empty");
+            }
+            other => panic!("expected ModelLoad, got: {other:?}"),
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // 11. WasmVoice::load_from_bytes with invalid config JSON
+    // -----------------------------------------------------------------------
+    #[test]
+    fn test_load_from_bytes_invalid_config() {
+        let result = WasmVoice::load_from_bytes(b"fake", "not json");
+        assert!(result.is_err());
+        match result.err().unwrap() {
+            PiperError::JsonParse(_) => {} // config parse fails before model load
+            other => panic!("expected JsonParse, got: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_load_from_bytes_empty_config() {
+        // Empty string is not valid JSON
+        let result = WasmVoice::load_from_bytes(b"fake model data", "");
+        assert!(result.is_err());
+        match result.err().unwrap() {
+            PiperError::JsonParse(_) => {}
+            other => panic!("expected JsonParse, got: {other:?}"),
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // 12. WasmSynthesisResult edge cases
+    // -----------------------------------------------------------------------
+    #[test]
+    fn test_wasm_synthesis_result_large_audio() {
+        // Simulate a large audio output (~60 seconds at 22050 Hz)
+        let num_samples = 22050 * 60;
+        let result = WasmSynthesisResult {
+            audio_samples: vec![0i16; num_samples],
+            sample_rate: 22050,
+            infer_seconds: 2.5,
+            audio_seconds: num_samples as f64 / 22050.0,
+        };
+        assert_eq!(result.audio_samples.len(), num_samples);
+        assert!((result.audio_seconds - 60.0).abs() < 1e-6);
+        // RTF < 1 means faster than real-time
+        assert!(result.real_time_factor() < 1.0);
+    }
+
+    #[test]
+    fn test_wasm_synthesis_result_negative_infer_seconds() {
+        // Negative infer_seconds is unusual but should not panic
+        let result = WasmSynthesisResult {
+            audio_samples: vec![1, 2, 3],
+            sample_rate: 22050,
+            infer_seconds: -0.5,
+            audio_seconds: 1.0,
+        };
+        // RTF will be negative, which is meaningless but should not crash
+        let rtf = result.real_time_factor();
+        assert!(rtf < 0.0);
+    }
+
+    // -----------------------------------------------------------------------
+    // 13. samples_i16_to_f32 boundary values
+    // -----------------------------------------------------------------------
+    #[test]
+    fn test_samples_i16_to_f32_boundaries() {
+        let samples = vec![i16::MIN, i16::MAX, 0];
+        let f32s = samples_i16_to_f32(&samples);
+        // i16::MIN (-32768) / 32768.0 = exactly -1.0
+        assert!(f32s[0] <= -1.0 + 0.001);
+        // i16::MAX (32767) / 32768.0 ~ 0.99997
+        assert!(f32s[1] >= 1.0 - 0.001);
+        // 0 / 32768.0 = 0.0
+        assert!((f32s[2]).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_samples_i16_to_f32_all_within_range() {
+        // Every possible i16 value should produce f32 in [-1.0, 1.0)
+        let samples: Vec<i16> = vec![i16::MIN, i16::MIN + 1, -1, 0, 1, i16::MAX - 1, i16::MAX];
+        let f32s = samples_i16_to_f32(&samples);
+        for &v in &f32s {
+            assert!(v >= -1.0, "value {v} below -1.0");
+            assert!(v < 1.0, "value {v} >= 1.0 (i16::MAX / 32768 should be < 1)");
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // 14. samples_to_wav_bytes with large data (no overflow)
+    // -----------------------------------------------------------------------
+    #[test]
+    fn test_wav_bytes_large_sample_count() {
+        // 10 seconds of audio at 22050 Hz = 220,500 samples
+        let num_samples = 220_500;
+        let samples = vec![0i16; num_samples];
+        let wav = samples_to_wav_bytes(&samples, 22050);
+
+        // Total should be 44 header + num_samples * 2 bytes
+        let expected_len = 44 + num_samples * 2;
+        assert_eq!(wav.len(), expected_len);
+
+        // RIFF file size = total - 8
+        let file_size = u32::from_le_bytes([wav[4], wav[5], wav[6], wav[7]]);
+        assert_eq!(file_size, (expected_len - 8) as u32);
+
+        // data chunk size = num_samples * 2
+        let data_size = u32::from_le_bytes([wav[40], wav[41], wav[42], wav[43]]);
+        assert_eq!(data_size, (num_samples * 2) as u32);
+    }
+
+    // -----------------------------------------------------------------------
+    // 15. parse_config with extra/unknown fields (should be ignored)
+    // -----------------------------------------------------------------------
+    #[test]
+    fn test_parse_config_extra_fields_ignored() {
+        let json = r#"{
+            "audio": {"sample_rate": 44100},
+            "num_speakers": 5,
+            "some_unknown_field": "should be ignored",
+            "another_unknown": 42,
+            "nested_unknown": {"a": 1, "b": [2, 3]}
+        }"#;
+        let config = parse_config(json).unwrap();
+        assert_eq!(config.audio.sample_rate, 44100);
+        assert_eq!(config.num_speakers, 5);
+        // The parse succeeded despite unknown fields
+    }
+
+    // -----------------------------------------------------------------------
+    // 16. parse_config with speaker_id_map
+    // -----------------------------------------------------------------------
+    #[test]
+    fn test_parse_config_speaker_id_map() {
+        let json = r#"{
+            "num_speakers": 3,
+            "speaker_id_map": {"alice": 0, "bob": 1, "charlie": 2},
+            "phoneme_id_map": {"a": [1], "b": [2]}
+        }"#;
+        let config = parse_config(json).unwrap();
+        assert_eq!(config.num_speakers, 3);
+        assert_eq!(config.speaker_id_map.len(), 3);
+        assert_eq!(config.speaker_id_map.get("alice"), Some(&0));
+        assert_eq!(config.speaker_id_map.get("charlie"), Some(&2));
+    }
+
+    // -----------------------------------------------------------------------
+    // 17. WasmVoice::load_from_bytes with empty model bytes
+    // -----------------------------------------------------------------------
+    #[test]
+    fn test_load_from_bytes_empty_model() {
+        let config = r#"{"audio": {"sample_rate": 22050}}"#;
+        let result = WasmVoice::load_from_bytes(b"", config);
+        assert!(result.is_err());
+        match result.err().unwrap() {
+            PiperError::ModelLoad(_) => {} // ONNX runtime cannot load empty bytes
+            other => panic!("expected ModelLoad, got: {other:?}"),
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // 18. samples_to_wav_bytes roundtrip with extreme values
+    // -----------------------------------------------------------------------
+    #[test]
+    fn test_wav_bytes_extreme_sample_values() {
+        let samples: Vec<i16> = vec![i16::MIN, i16::MAX, i16::MIN, i16::MAX];
+        let wav = samples_to_wav_bytes(&samples, 22050);
+
+        // Verify each extreme value survives the WAV encoding
+        for i in 0..samples.len() {
+            let offset = 44 + i * 2;
+            let recovered = i16::from_le_bytes([wav[offset], wav[offset + 1]]);
+            assert_eq!(
+                recovered, samples[i],
+                "sample {i}: expected {}, got {recovered}",
+                samples[i]
+            );
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // 19. WasmSynthesisResult real_time_factor edge: both zero
+    // -----------------------------------------------------------------------
+    #[test]
+    fn test_wasm_synthesis_result_rtf_both_zero() {
+        let result = WasmSynthesisResult {
+            audio_samples: Vec::new(),
+            sample_rate: 22050,
+            infer_seconds: 0.0,
+            audio_seconds: 0.0,
+        };
+        // audio_seconds == 0 -> returns 0.0 (guarded division)
+        assert!((result.real_time_factor()).abs() < 1e-6);
     }
 }

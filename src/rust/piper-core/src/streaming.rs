@@ -629,4 +629,138 @@ mod tests {
         accept_sink(&mut buffer).unwrap();
         assert_eq!(buffer.get_samples(), &[1, 2, 3]);
     }
+
+    // ===================================================================
+    // TDD追加テスト: WavFileSink error paths
+    // ===================================================================
+
+    #[test]
+    fn test_wav_file_sink_drop_finalizes() {
+        // Drop without calling finalize() should still produce a valid WAV.
+        let dir = tempfile::tempdir().unwrap();
+        let wav_path = dir.path().join("drop_test.wav");
+
+        {
+            let mut sink = WavFileSink::new(&wav_path).unwrap();
+            let samples: Vec<i16> = vec![100, 200, 300, -100, -200];
+            sink.write_chunk(&samples, 22050).unwrap();
+            // Intentionally NOT calling finalize(); drop should handle it.
+        }
+
+        // Read back with hound and verify the WAV is valid
+        let reader = hound::WavReader::open(&wav_path).unwrap();
+        let spec = reader.spec();
+        assert_eq!(spec.channels, 1);
+        assert_eq!(spec.sample_rate, 22050);
+        assert_eq!(spec.bits_per_sample, 16);
+        let read_samples: Vec<i16> = reader.into_samples::<i16>().map(|s| s.unwrap()).collect();
+        assert_eq!(read_samples, vec![100, 200, 300, -100, -200]);
+    }
+
+    #[test]
+    fn test_wav_file_sink_sample_rate_update() {
+        // Writing chunks with different sample rates: header uses the first
+        // chunk's rate, but sample_rate field tracks the latest write_chunk call.
+        // The WAV header is written once on the first chunk, so the file will
+        // report the first sample rate. Verify that the file is still readable.
+        let dir = tempfile::tempdir().unwrap();
+        let wav_path = dir.path().join("rate_update.wav");
+
+        {
+            let mut sink = WavFileSink::new(&wav_path).unwrap();
+            sink.write_chunk(&[10, 20], 16000).unwrap();
+            sink.write_chunk(&[30, 40], 44100).unwrap();
+            sink.finalize().unwrap();
+        }
+
+        let reader = hound::WavReader::open(&wav_path).unwrap();
+        // Header is written with the first chunk's rate
+        assert_eq!(reader.spec().sample_rate, 16000);
+        let read_samples: Vec<i16> = reader.into_samples::<i16>().map(|s| s.unwrap()).collect();
+        assert_eq!(read_samples, vec![10, 20, 30, 40]);
+    }
+
+    // ===================================================================
+    // TDD追加テスト: crossfade edge cases
+    // ===================================================================
+
+    #[test]
+    fn test_crossfade_negative_samples() {
+        // Realistic negative audio values: linear blend between two negative/positive regions
+        let prev = vec![-10000i16, -5000];
+        let next = vec![5000i16, 10000];
+        let result = crossfade(&prev, &next, 2);
+        assert_eq!(result.len(), 2);
+        // i=0: alpha=0.0 -> -10000*(1.0) + 5000*(0.0) = -10000
+        assert_eq!(result[0], -10000);
+        // i=1: alpha=0.5 -> -5000*(0.5) + 10000*(0.5) = 2500
+        assert_eq!(result[1], 2500);
+    }
+
+    #[test]
+    fn test_crossfade_max_i16_values() {
+        // Verify no overflow when blending i16::MAX and i16::MIN.
+        // The computation is done in f64 and clamped to [-32768, 32767].
+        let prev = vec![i16::MAX, i16::MAX];
+        let next = vec![i16::MIN, i16::MIN];
+        let result = crossfade(&prev, &next, 2);
+        assert_eq!(result.len(), 2);
+        // i=0: alpha=0.0 -> 32767*(1.0) + (-32768)*(0.0) = 32767
+        assert_eq!(result[0], i16::MAX);
+        // i=1: alpha=0.5 -> 32767*0.5 + (-32768)*0.5 = -0.5 -> 0 (truncated)
+        // Exact: 16383.5 + (-16384.0) = -0.5 -> -0.5 as i16 = 0
+        assert_eq!(result[1], 0);
+    }
+
+    // ===================================================================
+    // TDD追加テスト: split_sentences edge cases
+    // ===================================================================
+
+    #[test]
+    fn test_split_sentences_consecutive_terminators() {
+        // "Really?! Yes." — '?' and '!' are each sentence terminators.
+        // '?' triggers the first split -> "Really?"
+        // '!' is consumed as a new char, immediately triggers a split -> "!"
+        // " Yes." is the third chunk -> "Yes."
+        let result = split_sentences("Really?! Yes.");
+        assert_eq!(result.len(), 3);
+        assert_eq!(result[0], "Really?");
+        assert_eq!(result[1], "!");
+        assert_eq!(result[2], "Yes.");
+    }
+
+    #[test]
+    fn test_split_sentences_single_char_sentence() {
+        // "A. B." should produce 2 chunks: "A." and "B."
+        let result = split_sentences("A. B.");
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0], "A.");
+        assert_eq!(result[1], "B.");
+    }
+
+    #[test]
+    fn test_split_sentences_newline_separator() {
+        // Newlines between sentences should be treated as whitespace and trimmed.
+        let result = split_sentences("Hello.\nWorld.");
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0], "Hello.");
+        assert_eq!(result[1], "World.");
+    }
+
+    // ===================================================================
+    // TDD追加テスト: BufferSink large data
+    // ===================================================================
+
+    #[test]
+    fn test_buffer_sink_large_chunks() {
+        // Write 1M samples and verify total count.
+        let mut sink = BufferSink::new();
+        let chunk: Vec<i16> = (0..10_000).map(|i| (i % 1000) as i16).collect();
+        for _ in 0..100 {
+            sink.write_chunk(&chunk, 22050).unwrap();
+        }
+        sink.finalize().unwrap();
+        assert_eq!(sink.get_samples().len(), 1_000_000);
+        assert_eq!(sink.sample_rate(), Some(22050));
+    }
 }

@@ -695,3 +695,80 @@ mod portuguese {
         assert!(has_stress, "should have at least one stressed phoneme");
     }
 }
+
+// =========================================================================
+// detect_primary_language tests (all romance languages)
+// =========================================================================
+
+mod detect_primary_language {
+    use super::*;
+    use piper_core::phonemize::spanish::SpanishPhonemizer;
+    use piper_core::phonemize::french::FrenchPhonemizer;
+    use piper_core::phonemize::portuguese::PortuguesePhonemizer;
+
+    // --- Spanish ---
+
+    #[test]
+    fn test_detect_primary_language_returns_es() {
+        let p = SpanishPhonemizer::new();
+        assert_eq!(
+            p.detect_primary_language("hola mundo"),
+            "es",
+            "detect_primary_language should return 'es' for Spanish phonemizer"
+        );
+    }
+
+    #[test]
+    fn test_detect_primary_language_es_empty_string() {
+        let p = SpanishPhonemizer::new();
+        assert_eq!(
+            p.detect_primary_language(""),
+            "es",
+            "detect_primary_language should return 'es' even for empty input"
+        );
+    }
+
+    // --- French ---
+
+    #[test]
+    fn test_detect_primary_language_returns_fr() {
+        let p = FrenchPhonemizer::new();
+        assert_eq!(
+            p.detect_primary_language("bonjour le monde"),
+            "fr",
+            "detect_primary_language should return 'fr' for French phonemizer"
+        );
+    }
+
+    #[test]
+    fn test_detect_primary_language_fr_empty_string() {
+        let p = FrenchPhonemizer::new();
+        assert_eq!(
+            p.detect_primary_language(""),
+            "fr",
+            "detect_primary_language should return 'fr' even for empty input"
+        );
+    }
+
+    // --- Portuguese ---
+
+    #[test]
+    fn test_detect_primary_language_returns_pt() {
+        let p = PortuguesePhonemizer::new();
+        assert_eq!(
+            p.detect_primary_language("bom dia"),
+            "pt",
+            "detect_primary_language should return 'pt' for Portuguese phonemizer"
+        );
+    }
+
+    #[test]
+    fn test_detect_primary_language_pt_empty_string() {
+        let p = PortuguesePhonemizer::new();
+        assert_eq!(
+            p.detect_primary_language(""),
+            "pt",
+            "detect_primary_language should return 'pt' even for empty input"
+        );
+    }
+}

@@ -373,4 +373,87 @@ mod tests {
         assert!(debug.contains("has_prosody: true"));
         assert!(debug.contains("has_duration_output: false"));
     }
+
+    // -----------------------------------------------------------------------
+    // Additional TDD tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_synthesis_result_with_durations() {
+        let result = SynthesisResult {
+            audio: vec![0i16; 22050],
+            sample_rate: 22050,
+            infer_seconds: 0.3,
+            audio_seconds: 1.0,
+            durations: Some(vec![1.0, 2.0, 3.0]),
+        };
+        let durations = result.durations.as_ref().unwrap();
+        assert_eq!(durations.len(), 3);
+        assert!((durations[0] - 1.0).abs() < 1e-6);
+        assert!((durations[1] - 2.0).abs() < 1e-6);
+        assert!((durations[2] - 3.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_synthesis_result_rtf_infinity() {
+        // infer_seconds > 0 but audio_seconds = 0 => RTF should be 0.0 (guard)
+        let result = SynthesisResult {
+            audio: Vec::new(),
+            sample_rate: 22050,
+            infer_seconds: 1.5,
+            audio_seconds: 0.0,
+            durations: None,
+        };
+        assert!((result.real_time_factor() - 0.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_synthesis_request_custom_values() {
+        let req = SynthesisRequest {
+            phoneme_ids: vec![1, 2, 3, 4, 5],
+            prosody_features: Some(vec![[1, 2, 3], [4, 5, 6], [7, 8, 9], [10, 11, 12], [13, 14, 15]]),
+            speaker_id: Some(42),
+            language_id: Some(3),
+            noise_scale: 0.333,
+            length_scale: 1.5,
+            noise_w: 0.5,
+        };
+        assert_eq!(req.phoneme_ids.len(), 5);
+        assert_eq!(req.speaker_id, Some(42));
+        assert_eq!(req.language_id, Some(3));
+        assert!((req.noise_scale - 0.333).abs() < 1e-6);
+        assert!((req.length_scale - 1.5).abs() < 1e-6);
+        assert!((req.noise_w - 0.5).abs() < 1e-6);
+        let pf = req.prosody_features.as_ref().unwrap();
+        assert_eq!(pf.len(), 5);
+        assert_eq!(pf[0], [1, 2, 3]);
+    }
+
+    #[test]
+    fn test_model_capabilities_all_true() {
+        let caps = ModelCapabilities {
+            has_sid: true,
+            has_lid: true,
+            has_prosody: true,
+            has_duration_output: true,
+        };
+        assert!(caps.has_sid);
+        assert!(caps.has_lid);
+        assert!(caps.has_prosody);
+        assert!(caps.has_duration_output);
+    }
+
+    #[test]
+    fn test_model_capabilities_all_false() {
+        let caps = ModelCapabilities {
+            has_sid: false,
+            has_lid: false,
+            has_prosody: false,
+            has_duration_output: false,
+        };
+        assert!(!caps.has_sid);
+        assert!(!caps.has_lid);
+        assert!(!caps.has_prosody);
+        assert!(!caps.has_duration_output);
+    }
 }

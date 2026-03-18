@@ -543,4 +543,151 @@ mod tests {
         let result = download_model(&info, dir.path(), None);
         assert!(result.is_err());
     }
+
+    // -- TDD additions: feature-gated paths & error handling ------------------
+
+    #[test]
+    fn test_download_progress_percentage_zero_total() {
+        // When total_bytes is Some(0) the percentage calculation in
+        // download_file uses `if t == 0 { 100.0 }`.  Verify the same
+        // convention works when constructing DownloadProgress manually
+        // (i.e. no division-by-zero panic).
+        let total: Option<u64> = Some(0);
+        let percentage = total.map(|t| {
+            if t == 0 { 100.0 } else { (50_f64 / t as f64) * 100.0 }
+        });
+        let progress = DownloadProgress {
+            bytes_downloaded: 50,
+            total_bytes: total,
+            percentage,
+        };
+        assert_eq!(progress.percentage, Some(100.0));
+        assert_eq!(progress.total_bytes, Some(0));
+    }
+
+    #[test]
+    fn test_model_info_empty_fields() {
+        // All-empty strings are structurally valid — no runtime panic.
+        let info = ModelInfo {
+            name: String::new(),
+            language: String::new(),
+            quality: String::new(),
+            description: String::new(),
+            model_url: String::new(),
+            config_url: String::new(),
+            size_bytes: None,
+        };
+        assert!(info.name.is_empty());
+        assert!(info.size_bytes.is_none());
+
+        // Roundtrip through JSON should also succeed.
+        let json = serde_json::to_string(&info).unwrap();
+        let back: ModelInfo = serde_json::from_str(&json).unwrap();
+        assert!(back.name.is_empty());
+    }
+
+    #[test]
+    fn test_huggingface_url_special_chars() {
+        // Repo names with spaces or special characters — the function does
+        // plain string interpolation so they must appear verbatim in the URL.
+        let url = huggingface_url("owner/repo with spaces", "model (v2).onnx");
+        assert!(url.starts_with("https://huggingface.co/"));
+        assert!(url.contains("repo with spaces"));
+        assert!(url.contains("model (v2).onnx"));
+
+        // Unicode characters in repo name.
+        let url2 = huggingface_url("user/日本語モデル", "model.onnx");
+        assert!(url2.contains("日本語モデル"));
+    }
+
+    #[test]
+    fn test_is_model_cached_empty_model_name() {
+        let dir = tempfile::tempdir().unwrap();
+        let dir_path = dir.path();
+
+        // Empty model name produces ".onnx" and ".onnx.json" lookups.
+        // Nothing exists so it must return false without panicking.
+        assert!(!is_model_cached("", dir_path));
+
+        // Even if we create the degenerate files, the logic should work.
+        std::fs::write(dir_path.join(".onnx"), b"fake").unwrap();
+        std::fs::write(dir_path.join(".onnx.json"), b"{}").unwrap();
+        assert!(is_model_cached("", dir_path));
+    }
+
+    #[test]
+    fn test_is_model_cached_with_subdirectory() {
+        // A model_dir that does not exist on disk should return false,
+        // never panic.
+        let nonexistent = PathBuf::from("/tmp/piper_test_nonexistent_dir_12345");
+        assert!(!is_model_cached("some-model", &nonexistent));
+    }
+
+    #[test]
+    fn test_parse_model_registry_extra_fields() {
+        // serde by default ignores unknown fields (no deny_unknown_fields).
+        let json = r#"[
+            {
+                "name": "test",
+                "language": "en",
+                "quality": "medium",
+                "description": "desc",
+                "model_url": "https://example.com/m.onnx",
+                "config_url": "https://example.com/c.json",
+                "size_bytes": null,
+                "author": "someone",
+                "license": "MIT",
+                "extra_nested": {"a": 1}
+            }
+        ]"#;
+        let models = parse_model_registry(json).unwrap();
+        assert_eq!(models.len(), 1);
+        assert_eq!(models[0].name, "test");
+    }
+
+    #[test]
+    fn test_parse_model_registry_unicode() {
+        // Japanese/Chinese characters in name and description.
+        let json = r#"[
+            {
+                "name": "つくよみちゃん",
+                "language": "ja",
+                "quality": "medium",
+                "description": "高品質な日本語音声合成 — 中文描述也可以",
+                "model_url": "https://example.com/model.onnx",
+                "config_url": "https://example.com/config.json",
+                "size_bytes": 999
+            }
+        ]"#;
+        let models = parse_model_registry(json).unwrap();
+        assert_eq!(models[0].name, "つくよみちゃん");
+        assert!(models[0].description.contains("中文"));
+    }
+
+    #[test]
+    fn test_builtin_registry_urls_format() {
+        // Every URL in the builtin registry must start with https://
+        // and reference huggingface.co.
+        for m in builtin_registry() {
+            assert!(
+                m.model_url.starts_with("https://") && m.model_url.contains("huggingface"),
+                "model_url must be an HTTPS HuggingFace URL, got: {}",
+                m.model_url,
+            );
+            assert!(
+                m.config_url.starts_with("https://") && m.config_url.contains("huggingface"),
+                "config_url must be an HTTPS HuggingFace URL, got: {}",
+                m.config_url,
+            );
+        }
+    }
+
+    #[test]
+    fn test_default_model_dir_consistent() {
+        // Calling twice must return the exact same path — no randomness
+        // or time-dependent components.
+        let a = default_model_dir();
+        let b = default_model_dir();
+        assert_eq!(a, b, "default_model_dir should be deterministic");
+    }
 }
