@@ -5,8 +5,10 @@ import sys
 from pathlib import Path
 
 import numpy as np
-import onnx
 import pytest
+
+
+onnx = pytest.importorskip("onnx")
 
 
 def _onnx_inference(onnx_path, phoneme_ids, prosody_features, noise_scale=0.667):
@@ -150,13 +152,20 @@ class TestKeepFP32Ops:
         from piper_train.tools.convert_fp16 import main
 
         fp16_path = tmp_path / "model_fp16_custom.onnx"
-        main([
-            "--model", str(temp_onnx_model),
-            "--output", str(fp16_path),
-            "--keep-fp32-ops", "Conv,MatMul",
-        ])
+        main(
+            [
+                "--model",
+                str(temp_onnx_model),
+                "--output",
+                str(fp16_path),
+                "--keep-fp32-ops",
+                "Conv,MatMul",
+            ]
+        )
 
-        assert fp16_path.exists(), "FP16 model with custom keep-fp32-ops was not created"
+        assert fp16_path.exists(), (
+            "FP16 model with custom keep-fp32-ops was not created"
+        )
 
         model = onnx.load(str(fp16_path))
         onnx.checker.check_model(model, full_check=False)
@@ -173,7 +182,9 @@ class TestValidation:
         from piper_train.tools.convert_fp16 import main
 
         fp16_path = tmp_path / "model_fp16.onnx"
-        main(["--model", str(temp_onnx_model), "--output", str(fp16_path), "--validate"])
+        main(
+            ["--model", str(temp_onnx_model), "--output", str(fp16_path), "--validate"]
+        )
 
         assert fp16_path.exists(), "FP16 model was not created with --validate"
 
@@ -190,10 +201,15 @@ class TestCLI:
         fp16_path = tmp_path / "model_fp16_cli.onnx"
         result = subprocess.run(
             [
-                sys.executable, "-m", "piper_train.tools.convert_fp16",
-                "--model", str(temp_onnx_model),
-                "--output", str(fp16_path),
+                sys.executable,
+                "-m",
+                "piper_train.tools.convert_fp16",
+                "--model",
+                str(temp_onnx_model),
+                "--output",
+                str(fp16_path),
             ],
+            check=False,
             capture_output=True,
             text=True,
             timeout=120,
@@ -211,11 +227,16 @@ class TestCLI:
         fp16_path = tmp_path / "model_fp16_cli_validate.onnx"
         result = subprocess.run(
             [
-                sys.executable, "-m", "piper_train.tools.convert_fp16",
-                "--model", str(temp_onnx_model),
-                "--output", str(fp16_path),
+                sys.executable,
+                "-m",
+                "piper_train.tools.convert_fp16",
+                "--model",
+                str(temp_onnx_model),
+                "--output",
+                str(fp16_path),
                 "--validate",
             ],
+            check=False,
             capture_output=True,
             text=True,
             timeout=120,

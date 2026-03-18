@@ -32,6 +32,7 @@ import numpy as np
 import onnx
 from onnx import TensorProto, helper, numpy_helper
 
+
 _LOGGER = logging.getLogger("piper_train.tools.convert_fp16")
 
 # VITS固有のデフォルトFP32保持オペレータ
@@ -178,7 +179,8 @@ def convert_fp16(
 
     _LOGGER.info(
         "Initializers: %d converted to FP16, %d kept as FP32",
-        converted_count, kept_count,
+        converted_count,
+        kept_count,
     )
 
     # Castノードをグラフの先頭に挿入（initializerの直後、他ノードの前）
@@ -261,9 +263,15 @@ def validate_model(
         fp16_outputs = fp16_sess.run(None, inputs)
 
         all_passed = True
-        for i, (orig, fp16_out) in enumerate(zip(original_outputs, fp16_outputs)):
+        for i, (orig, fp16_out) in enumerate(
+            zip(original_outputs, fp16_outputs, strict=False)
+        ):
             orig_f32 = orig.astype(np.float32) if orig.dtype == np.float16 else orig
-            fp16_f32 = fp16_out.astype(np.float32) if fp16_out.dtype == np.float16 else fp16_out
+            fp16_f32 = (
+                fp16_out.astype(np.float32)
+                if fp16_out.dtype == np.float16
+                else fp16_out
+            )
 
             if orig_f32.shape != fp16_f32.shape:
                 # TTSモデルではDuration Predictorの精度差により
@@ -271,7 +279,9 @@ def validate_model(
                 _LOGGER.info(
                     "Output %d: shape differs (original=%s, fp16=%s) "
                     "- expected for TTS duration prediction",
-                    i, orig_f32.shape, fp16_f32.shape,
+                    i,
+                    orig_f32.shape,
+                    fp16_f32.shape,
                 )
                 continue
 
@@ -281,14 +291,18 @@ def validate_model(
             if np.allclose(orig_f32, fp16_f32, rtol=rtol, atol=atol):
                 _LOGGER.info(
                     "Output %d: PASSED (mean_abs=%.6f, max_abs=%.6f)",
-                    i, mean_abs_err, max_abs_err,
+                    i,
+                    mean_abs_err,
+                    max_abs_err,
                 )
             else:
                 all_passed = False
                 _LOGGER.warning(
                     "Output %d: MARGINAL (mean_abs=%.6f, max_abs=%.6f) "
                     "- small differences are typically inaudible for TTS",
-                    i, mean_abs_err, max_abs_err,
+                    i,
+                    mean_abs_err,
+                    max_abs_err,
                 )
 
         if all_passed:
@@ -313,7 +327,9 @@ def _create_dummy_inputs(session) -> dict[str, np.ndarray] | None:
     for inp in session.get_inputs():
         name = inp.name
         if name == "input":
-            inputs[name] = np.random.randint(0, 50, size=[1, phoneme_length], dtype=np.int64)
+            inputs[name] = np.random.randint(
+                0, 50, size=[1, phoneme_length], dtype=np.int64
+            )
         elif name == "input_lengths":
             inputs[name] = np.array([phoneme_length], dtype=np.int64)
         elif name == "scales":
@@ -338,32 +354,42 @@ def main(argv=None):
         "VITS TTSモデルに最適化されたデフォルト設定を使用。",
     )
     parser.add_argument(
-        "--model", required=True,
+        "--model",
+        required=True,
         help="入力FP32 ONNXモデルのパス",
     )
     parser.add_argument(
-        "--output", required=True,
+        "--output",
+        required=True,
         help="出力FP16 ONNXモデルのパス",
     )
     parser.add_argument(
-        "--validate", action="store_true",
+        "--validate",
+        action="store_true",
         help="変換後にグラフ構造チェックと出力比較を実行",
     )
     parser.add_argument(
-        "--keep-fp32-ops", type=str, default=None,
+        "--keep-fp32-ops",
+        type=str,
+        default=None,
         help="FP32保持するオペレータ（カンマ区切り）。"
         "デフォルト: LayerNormalization,Sigmoid,Softmax",
     )
     parser.add_argument(
-        "--rtol", type=float, default=0.01,
+        "--rtol",
+        type=float,
+        default=0.01,
         help="検証時の相対誤差閾値（デフォルト: 0.01 = 1%%）",
     )
     parser.add_argument(
-        "--atol", type=float, default=0.01,
+        "--atol",
+        type=float,
+        default=0.01,
         help="検証時の絶対誤差閾値（デフォルト: 0.01）",
     )
     parser.add_argument(
-        "--debug", action="store_true",
+        "--debug",
+        action="store_true",
         help="DEBUGレベルのログを表示",
     )
     args = parser.parse_args(argv)
@@ -385,7 +411,9 @@ def main(argv=None):
         sys.exit(1)
 
     if args.keep_fp32_ops is not None:
-        keep_fp32_ops = [op.strip() for op in args.keep_fp32_ops.split(",") if op.strip()]
+        keep_fp32_ops = [
+            op.strip() for op in args.keep_fp32_ops.split(",") if op.strip()
+        ]
     else:
         keep_fp32_ops = None
 
