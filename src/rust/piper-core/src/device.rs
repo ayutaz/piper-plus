@@ -135,24 +135,43 @@ impl DeviceSelection {
             let id: i32 = id_part.parse().map_err(|_| PiperError::InvalidConfig {
                 reason: format!("invalid device id: '{id_part}'"),
             })?;
+            if id < 0 {
+                return Err(PiperError::InvalidConfig {
+                    reason: format!("negative device ID not allowed: {id}"),
+                });
+            }
             (kind_part, id)
         } else {
             (s.as_str(), 0)
         };
 
         match kind_str {
-            "cpu" => Ok(Self {
-                kind: DeviceKind::Cpu,
-                device_id,
-            }),
+            "cpu" => {
+                if device_id != 0 {
+                    return Err(PiperError::InvalidConfig {
+                        reason: "cpu does not accept a device ID".to_string(),
+                    });
+                }
+                Ok(Self {
+                    kind: DeviceKind::Cpu,
+                    device_id: 0,
+                })
+            }
             "cuda" => Ok(Self {
                 kind: DeviceKind::Cuda,
                 device_id,
             }),
-            "coreml" => Ok(Self {
-                kind: DeviceKind::CoreML,
-                device_id,
-            }),
+            "coreml" => {
+                if device_id != 0 {
+                    return Err(PiperError::InvalidConfig {
+                        reason: "coreml does not accept a device ID".to_string(),
+                    });
+                }
+                Ok(Self {
+                    kind: DeviceKind::CoreML,
+                    device_id: 0,
+                })
+            }
             "directml" => Ok(Self {
                 kind: DeviceKind::DirectML,
                 device_id,
@@ -698,11 +717,73 @@ mod tests {
 
     #[test]
     fn test_device_selection_from_str_negative_id() {
-        // "cuda:-1" should parse successfully because i32 allows negative values.
-        // The from_str implementation parses as i32 without validation.
-        let sel = DeviceSelection::from_str("cuda:-1").unwrap();
-        assert_eq!(sel.kind, DeviceKind::Cuda);
-        assert_eq!(sel.device_id, -1);
+        // "cuda:-1" must be rejected -- negative device IDs are not allowed.
+        let result = DeviceSelection::from_str("cuda:-1");
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(
+            err_msg.contains("negative device ID"),
+            "error should mention negative device ID, got: {err_msg}"
+        );
+    }
+
+    #[test]
+    fn test_device_selection_from_str_cpu_with_id_rejected() {
+        // "cpu:1" must be rejected -- cpu does not accept a device ID.
+        let result = DeviceSelection::from_str("cpu:1");
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(
+            err_msg.contains("cpu does not accept a device ID"),
+            "error should mention cpu device ID, got: {err_msg}"
+        );
+    }
+
+    #[test]
+    fn test_device_selection_from_str_cpu_zero_ok() {
+        // "cpu:0" is accepted (equivalent to bare "cpu").
+        let sel = DeviceSelection::from_str("cpu:0").unwrap();
+        assert_eq!(sel.kind, DeviceKind::Cpu);
+        assert_eq!(sel.device_id, 0);
+    }
+
+    #[test]
+    fn test_device_selection_from_str_coreml_with_id_rejected() {
+        // "coreml:1" must be rejected -- coreml does not accept a device ID.
+        let result = DeviceSelection::from_str("coreml:1");
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(
+            err_msg.contains("coreml does not accept a device ID"),
+            "error should mention coreml device ID, got: {err_msg}"
+        );
+    }
+
+    #[test]
+    fn test_device_selection_from_str_coreml_zero_ok() {
+        // "coreml:0" is accepted (equivalent to bare "coreml").
+        let sel = DeviceSelection::from_str("coreml:0").unwrap();
+        assert_eq!(sel.kind, DeviceKind::CoreML);
+        assert_eq!(sel.device_id, 0);
+    }
+
+    #[test]
+    fn test_device_selection_display_roundtrip() {
+        // Display then parse back should produce the same value.
+        let cases = vec![
+            DeviceSelection::cpu(),
+            DeviceSelection::cuda(0),
+            DeviceSelection::cuda(3),
+            DeviceSelection::coreml(),
+            DeviceSelection::directml(0),
+            DeviceSelection::directml(2),
+        ];
+        for sel in cases {
+            let displayed = sel.to_string();
+            let parsed = DeviceSelection::from_str(&displayed).unwrap();
+            assert_eq!(parsed.kind, sel.kind, "roundtrip kind failed for '{displayed}'");
+            assert_eq!(parsed.device_id, sel.device_id, "roundtrip id failed for '{displayed}'");
+        }
     }
 
     #[test]

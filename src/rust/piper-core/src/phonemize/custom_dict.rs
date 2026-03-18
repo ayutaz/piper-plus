@@ -17,6 +17,7 @@
 
 use std::collections::HashMap;
 use std::path::Path;
+use std::sync::Mutex;
 
 use regex::Regex;
 use serde::Deserialize;
@@ -87,8 +88,8 @@ pub struct CustomDictionary {
     entries: HashMap<String, DictEntry>,
     /// Case-sensitive エントリ (混在ケースの単語)
     case_sensitive_entries: HashMap<String, DictEntry>,
-    /// コンパイル済み正規表現キャッシュ
-    pattern_cache: HashMap<String, Regex>,
+    /// コンパイル済み正規表現キャッシュ (interior mutability で &self から挿入可能)
+    pattern_cache: Mutex<HashMap<String, Regex>>,
 }
 
 impl CustomDictionary {
@@ -97,7 +98,7 @@ impl CustomDictionary {
         Self {
             entries: HashMap::new(),
             case_sensitive_entries: HashMap::new(),
-            pattern_cache: HashMap::new(),
+            pattern_cache: Mutex::new(HashMap::new()),
         }
     }
 
@@ -173,7 +174,7 @@ impl CustomDictionary {
             priority,
         };
         self.add_entry(word, entry);
-        self.pattern_cache.clear();
+        self.pattern_cache.lock().unwrap().clear();
     }
 
     /// 単語の読みを取得
@@ -221,7 +222,8 @@ impl CustomDictionary {
     fn get_word_pattern(&self, word: &str, case_sensitive: bool) -> Regex {
         let cache_key = format!("{}_{}", word, case_sensitive);
 
-        if let Some(cached) = self.pattern_cache.get(&cache_key) {
+        let mut cache = self.pattern_cache.lock().unwrap();
+        if let Some(cached) = cache.get(&cache_key) {
             return cached.clone();
         }
 
@@ -245,7 +247,9 @@ impl CustomDictionary {
             Regex::new(&format!("(?i){}", pattern_str))
         };
 
-        pattern.expect("failed to compile regex pattern")
+        let pat = pattern.expect("failed to compile regex pattern");
+        cache.insert(cache_key, pat.clone());
+        pat
     }
 }
 

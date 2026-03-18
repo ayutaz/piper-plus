@@ -150,7 +150,13 @@ impl WavFileSink {
 
     /// Update the RIFF and data chunk sizes in the WAV header.
     fn update_sizes(&mut self) -> Result<(), PiperError> {
-        let data_size = (self.total_samples * 2) as u32;
+        let data_size_u64 = (self.total_samples as u64) * 2;
+        if data_size_u64 > u32::MAX as u64 {
+            return Err(PiperError::Streaming(
+                "WAV file exceeds 4GB limit".to_string(),
+            ));
+        }
+        let data_size = data_size_u64 as u32;
         let file_size = data_size + 36;
 
         // Update RIFF chunk size at offset 4
@@ -181,6 +187,14 @@ impl AudioSink for WavFileSink {
     fn write_chunk(&mut self, samples: &[i16], sample_rate: u32) -> Result<(), PiperError> {
         if !self.header_written {
             self.write_header(sample_rate)?;
+        }
+
+        // Reject mismatched sample rates after the header has been written
+        if self.sample_rate != sample_rate {
+            return Err(PiperError::Streaming(format!(
+                "sample rate mismatch: expected {}, got {}",
+                self.sample_rate, sample_rate
+            )));
         }
 
         // Write raw PCM sample data (batched to avoid per-sample syscalls)
@@ -224,7 +238,11 @@ pub fn crossfade(prev_tail: &[i16], next_head: &[i16], overlap_samples: usize) -
     let mut blended = Vec::with_capacity(actual_overlap);
     for i in 0..actual_overlap {
         // Linear fade: prev fades out, next fades in
-        let alpha = (i as f64) / (actual_overlap as f64);
+        let alpha = if actual_overlap <= 1 {
+            1.0
+        } else {
+            (i as f64) / ((actual_overlap - 1) as f64)
+        };
         let prev_sample = prev_tail[prev_tail.len() - actual_overlap + i] as f64;
         let next_sample = next_head[i] as f64;
         let mixed = prev_sample * (1.0 - alpha) + next_sample * alpha;
@@ -437,8 +455,8 @@ mod tests {
         assert_eq!(result.len(), 4);
         // At i=0: alpha=0.0 -> 1000*(1.0) + 0*0.0 = 1000
         assert_eq!(result[0], 1000);
-        // At i=3: alpha=0.75 -> 1000*0.25 + 0*0.75 = 250
-        assert_eq!(result[3], 250);
+        // At i=3: alpha=1.0 -> 1000*0.0 + 0*1.0 = 0
+        assert_eq!(result[3], 0);
     }
 
     #[test]
@@ -449,8 +467,8 @@ mod tests {
         assert_eq!(result.len(), 4);
         // i=0: alpha=0.0 -> 100
         assert_eq!(result[0], 100);
-        // i=2: alpha=0.5 -> 100*0.5 + 200*0.5 = 150
-        assert_eq!(result[2], 150);
+        // i=2: alpha=2/3 -> 100*(1/3) + 200*(2/3) = 166.67 -> 166
+        assert_eq!(result[2], 166);
     }
 
     #[test]
@@ -491,8 +509,8 @@ mod tests {
         let next = vec![0i16];
         let result = crossfade(&prev, &next, 1);
         assert_eq!(result.len(), 1);
-        // alpha=0.0 -> 1000*(1.0) + 0*(0.0) = 1000
-        assert_eq!(result[0], 1000);
+        // overlap=1: alpha=1.0 -> 1000*(0.0) + 0*(1.0) = 0
+        assert_eq!(result[0], 0);
     }
 
     // ===================================================================
@@ -660,26 +678,60 @@ mod tests {
     }
 
     #[test]
-    fn test_wav_file_sink_sample_rate_update() {
-        // Writing chunks with different sample rates: header uses the first
-        // chunk's rate, but sample_rate field tracks the latest write_chunk call.
-        // The WAV header is written once on the first chunk, so the file will
-        // report the first sample rate. Verify that the file is still readable.
+    fn test_wav_file_sink_sample_rate_mismatch_rejected() {
+        // Writing chunks with different sample rates must return an error.
         let dir = tempfile::tempdir().unwrap();
-        let wav_path = dir.path().join("rate_update.wav");
+        let wav_path = dir.path().join("rate_mismatch.wav");
+
+        let mut sink = WavFileSink::new(&wav_path).unwrap();
+        sink.write_chunk(&[10, 20], 16000).unwrap();
+        let err = sink.write_chunk(&[30, 40], 44100).unwrap_err();
+        let msg = err.to_string();
+        assert!(
+            msg.contains("sample rate mismatch"),
+            "expected sample rate mismatch error, got: {}",
+            msg
+        );
+    }
+
+    #[test]
+    fn test_wav_file_sink_same_sample_rate_ok() {
+        // Multiple chunks with the same sample rate should succeed.
+        let dir = tempfile::tempdir().unwrap();
+        let wav_path = dir.path().join("same_rate.wav");
 
         {
             let mut sink = WavFileSink::new(&wav_path).unwrap();
             sink.write_chunk(&[10, 20], 16000).unwrap();
-            sink.write_chunk(&[30, 40], 44100).unwrap();
+            sink.write_chunk(&[30, 40], 16000).unwrap();
             sink.finalize().unwrap();
         }
 
         let reader = hound::WavReader::open(&wav_path).unwrap();
-        // Header is written with the first chunk's rate
         assert_eq!(reader.spec().sample_rate, 16000);
         let read_samples: Vec<i16> = reader.into_samples::<i16>().map(|s| s.unwrap()).collect();
         assert_eq!(read_samples, vec![10, 20, 30, 40]);
+    }
+
+    #[test]
+    fn test_wav_file_sink_overflow_rejected() {
+        // Simulate a total_samples count that would overflow u32 when
+        // converted to byte size. We cannot actually write 2B+ samples in a
+        // test, so we poke the internal state via a helper.
+        let dir = tempfile::tempdir().unwrap();
+        let wav_path = dir.path().join("overflow.wav");
+
+        let mut sink = WavFileSink::new(&wav_path).unwrap();
+        sink.write_chunk(&[1], 22050).unwrap();
+        // Manually set total_samples to a value that overflows u32 * 2
+        sink.total_samples = (u32::MAX as usize) / 2 + 2;
+        let err = sink.finalize().unwrap_err();
+        let msg = err.to_string();
+        assert!(
+            msg.contains("4GB"),
+            "expected 4GB limit error, got: {}",
+            msg
+        );
     }
 
     // ===================================================================
@@ -695,8 +747,8 @@ mod tests {
         assert_eq!(result.len(), 2);
         // i=0: alpha=0.0 -> -10000*(1.0) + 5000*(0.0) = -10000
         assert_eq!(result[0], -10000);
-        // i=1: alpha=0.5 -> -5000*(0.5) + 10000*(0.5) = 2500
-        assert_eq!(result[1], 2500);
+        // i=1: alpha=1.0 -> -5000*(0.0) + 10000*(1.0) = 10000
+        assert_eq!(result[1], 10000);
     }
 
     #[test]
@@ -709,9 +761,8 @@ mod tests {
         assert_eq!(result.len(), 2);
         // i=0: alpha=0.0 -> 32767*(1.0) + (-32768)*(0.0) = 32767
         assert_eq!(result[0], i16::MAX);
-        // i=1: alpha=0.5 -> 32767*0.5 + (-32768)*0.5 = -0.5 -> 0 (truncated)
-        // Exact: 16383.5 + (-16384.0) = -0.5 -> -0.5 as i16 = 0
-        assert_eq!(result[1], 0);
+        // i=1: alpha=1.0 -> 32767*0.0 + (-32768)*1.0 = -32768 = i16::MIN
+        assert_eq!(result[1], i16::MIN);
     }
 
     // ===================================================================

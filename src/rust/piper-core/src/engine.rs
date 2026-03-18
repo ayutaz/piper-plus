@@ -83,8 +83,8 @@ pub struct OnnxEngine {
 impl OnnxEngine {
     /// ONNX モデルを読み込んでエンジンを初期化する。
     ///
-    /// `device` は `"cpu"`, `"gpu"`, `"auto"` のいずれか。
-    /// `"gpu"` / `"auto"` 指定時は CUDA を試行し、失敗すれば CPU にフォールバックする。
+    /// `device` は `"cpu"`, `"auto"`, `"cuda"`, `"cuda:0"`, `"coreml"`, `"directml"`, `"tensorrt"` のいずれか。
+    /// `"auto"` 指定時は CUDA を試行し、失敗すれば CPU にフォールバックする。
     pub fn load(model_path: &Path, config: &VoiceConfig, device: &str) -> Result<Self, PiperError> {
         // デバイス文字列をパースして GPU プロバイダを設定
         // "auto" は parse_device_string 内でフォールバックするが、

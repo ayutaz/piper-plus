@@ -85,18 +85,19 @@ impl<R: std::io::BufRead> Iterator for JsonlReader<R> {
     type Item = Result<JsonlUtterance, PiperError>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.line_buf.clear();
-        match self.reader.read_line(&mut self.line_buf) {
-            Ok(0) => None, // EOF
-            Ok(_) => {
-                let trimmed = self.line_buf.trim();
-                if trimmed.is_empty() {
-                    self.next() // 空行をスキップ
-                } else {
-                    Some(JsonlUtterance::parse(trimmed))
+        loop {
+            self.line_buf.clear();
+            match self.reader.read_line(&mut self.line_buf) {
+                Ok(0) => return None, // EOF
+                Ok(_) => {
+                    let trimmed = self.line_buf.trim();
+                    if trimmed.is_empty() {
+                        continue; // skip empty lines without recursion
+                    }
+                    return Some(JsonlUtterance::parse(trimmed));
                 }
+                Err(e) => return Some(Err(PiperError::AudioOutput(e))),
             }
-            Err(e) => Some(Err(PiperError::AudioOutput(e))),
         }
     }
 }

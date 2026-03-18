@@ -181,14 +181,15 @@ fn test_crossfade_equal_length_slices() {
     let next = vec![0i16; 8];
     let result = crossfade(&prev, &next, 4);
     assert_eq!(result.len(), 4);
-    // i=0: alpha=0/4=0.0 -> 1000*1.0 + 0*0.0 = 1000
+    // New formula: alpha = i / (overlap - 1) = i / 3
+    // i=0: alpha=0/3=0.0   -> 1000*1.0 + 0*0.0 = 1000
     assert_eq!(result[0], 1000);
-    // i=1: alpha=1/4=0.25 -> 1000*0.75 + 0*0.25 = 750
-    assert_eq!(result[1], 750);
-    // i=2: alpha=2/4=0.50 -> 1000*0.5 + 0*0.5 = 500
-    assert_eq!(result[2], 500);
-    // i=3: alpha=3/4=0.75 -> 1000*0.25 + 0*0.75 = 250
-    assert_eq!(result[3], 250);
+    // i=1: alpha=1/3=0.333 -> 1000*0.667 + 0*0.333 = 666
+    assert_eq!(result[1], 666);
+    // i=2: alpha=2/3=0.667 -> 1000*0.333 + 0*0.667 = 333
+    assert_eq!(result[2], 333);
+    // i=3: alpha=3/3=1.0   -> 1000*0.0 + 0*1.0 = 0
+    assert_eq!(result[3], 0);
 }
 
 #[test]
@@ -231,14 +232,15 @@ fn test_crossfade_values_linearly_interpolated() {
     let next = vec![200i16; 4];
     let result = crossfade(&prev, &next, 4);
     assert_eq!(result.len(), 4);
-    // i=0: alpha=0/4=0.00 -> 100*1.0 + 200*0.0 = 100
+    // New formula: alpha = i / (overlap - 1) = i / 3
+    // i=0: alpha=0/3=0.0   -> 100*1.0   + 200*0.0   = 100
     assert_eq!(result[0], 100);
-    // i=1: alpha=1/4=0.25 -> 100*0.75 + 200*0.25 = 75 + 50 = 125
-    assert_eq!(result[1], 125);
-    // i=2: alpha=2/4=0.50 -> 100*0.5  + 200*0.5  = 50 + 100 = 150
-    assert_eq!(result[2], 150);
-    // i=3: alpha=3/4=0.75 -> 100*0.25 + 200*0.75 = 25 + 150 = 175
-    assert_eq!(result[3], 175);
+    // i=1: alpha=1/3=0.333 -> 100*0.667 + 200*0.333 = 66.7 + 66.6 = 133
+    assert_eq!(result[1], 133);
+    // i=2: alpha=2/3=0.667 -> 100*0.333 + 200*0.667 = 33.3 + 133.4 = 166
+    assert_eq!(result[2], 166);
+    // i=3: alpha=3/3=1.0   -> 100*0.0   + 200*1.0   = 200
+    assert_eq!(result[3], 200);
 }
 
 #[test]
@@ -247,8 +249,8 @@ fn test_crossfade_single_sample() {
     let next = vec![0i16];
     let result = crossfade(&prev, &next, 1);
     assert_eq!(result.len(), 1);
-    // alpha = 0/1 = 0.0 -> 1000*1.0 + 0*0.0 = 1000
-    assert_eq!(result[0], 1000);
+    // Single sample: alpha = 1.0 (full transition to next)
+    assert_eq!(result[0], 0);
 }
 
 #[test]
@@ -258,12 +260,13 @@ fn test_crossfade_uses_tail_of_prev() {
     let next = vec![600i16; 6];
     let result = crossfade(&prev, &next, 3);
     assert_eq!(result.len(), 3);
-    // i=0: alpha=0/3 -> prev[3]=300*1.0 + next[0]=600*0.0 = 300
+    // New formula: alpha = i / (overlap - 1) = i / 2
+    // i=0: alpha=0/2=0.0 -> 300*1.0 + 600*0.0 = 300
     assert_eq!(result[0], 300);
-    // i=1: alpha=1/3 -> 300*(2/3) + 600*(1/3) = 200 + 200 = 400
-    assert_eq!(result[1], 400);
-    // i=2: alpha=2/3 -> 300*(1/3) + 600*(2/3) = 100 + 400 = 500
-    assert_eq!(result[2], 500);
+    // i=1: alpha=1/2=0.5 -> 300*0.5 + 600*0.5 = 150 + 300 = 450
+    assert_eq!(result[1], 450);
+    // i=2: alpha=2/2=1.0 -> 300*0.0 + 600*1.0 = 600
+    assert_eq!(result[2], 600);
 }
 
 #[test]

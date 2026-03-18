@@ -83,6 +83,12 @@ pub fn parse_device_string(device: &str) -> Result<DeviceType, PiperError> {
                     reason: format!("invalid {kind_name} device id: '{id_str}'"),
                 })?;
 
+            if device_id < 0 {
+                return Err(PiperError::InvalidConfig {
+                    reason: format!("negative device ID not allowed: {device_id}"),
+                });
+            }
+
             return match kind_name {
                 "CUDA" => Ok(DeviceType::Cuda { device_id }),
                 "DirectML" => Ok(DeviceType::DirectML { device_id }),

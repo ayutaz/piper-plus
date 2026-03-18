@@ -105,8 +105,14 @@ pub fn download_file(
         )))?;
     }
 
-    let mut response = reqwest::blocking::get(url).map_err(|e| {
-        PiperError::ModelLoad(format!("HTTP request failed for {url}: {e}"))
+    let client = reqwest::blocking::Client::builder()
+        .connect_timeout(std::time::Duration::from_secs(30))
+        .timeout(std::time::Duration::from_secs(600)) // 10 min for large models
+        .build()
+        .map_err(|e| PiperError::Download(format!("HTTP client error: {e}")))?;
+
+    let mut response = client.get(url).send().map_err(|e| {
+        PiperError::Download(format!("download failed: {e}"))
     })?;
 
     if !response.status().is_success() {
@@ -309,10 +315,11 @@ pub fn builtin_registry() -> &'static [ModelInfo] {
 ///
 /// Returns `None` if the URL has no path segments or the last segment is empty.
 fn url_filename(url: &str) -> Option<String> {
-    url.rsplit('/').next().and_then(|s| {
-        let s = s.trim();
-        if s.is_empty() { None } else { Some(s.to_string()) }
-    })
+    let path = url.split('?').next().unwrap_or(url);
+    let path = path.split('#').next().unwrap_or(path);
+    path.rsplit('/').next()
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string())
 }
 
 // ---------------------------------------------------------------------------
@@ -524,6 +531,30 @@ mod tests {
         assert_eq!(url_filename("https://example.com/path/to/model.onnx"), Some("model.onnx".to_string()));
         assert_eq!(url_filename("https://example.com/"), None);
         assert_eq!(url_filename("model.onnx"), Some("model.onnx".to_string()));
+    }
+
+    #[test]
+    fn test_url_filename_strips_query_string() {
+        assert_eq!(
+            url_filename("https://example.com/model.onnx?token=abc123"),
+            Some("model.onnx".to_string()),
+        );
+    }
+
+    #[test]
+    fn test_url_filename_strips_fragment() {
+        assert_eq!(
+            url_filename("https://example.com/model.onnx#section"),
+            Some("model.onnx".to_string()),
+        );
+    }
+
+    #[test]
+    fn test_url_filename_strips_query_and_fragment() {
+        assert_eq!(
+            url_filename("https://example.com/model.onnx?v=2#top"),
+            Some("model.onnx".to_string()),
+        );
     }
 
     // -- download_file stub (non-download feature) ----------------------------
