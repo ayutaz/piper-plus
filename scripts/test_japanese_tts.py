@@ -72,7 +72,7 @@ class JapaneseTTSTester:
         # Performance metrics
         self.performance_metrics = {
             "language": "ja_JP",
-            "model": "ja_JP-test-medium",
+            "model": "multilingual-test-medium",
             "platform": sys.platform,
             "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
             "test_results": [],
@@ -102,7 +102,7 @@ class JapaneseTTSTester:
         print("Downloading Japanese TTS model...")
         # Use the test model that's already in the repository
         test_model_path = (
-            Path(__file__).parent.parent / "test" / "models" / "ja_JP-test-medium.onnx"
+            Path(__file__).parent.parent / "test" / "models" / "multilingual-test-medium.onnx"
         )
 
         if test_model_path.exists():

@@ -17,10 +17,58 @@ from .vits.wavfile import write as write_wav
 _LOGGER = logging.getLogger("piper_train.infer_onnx")
 
 
+class _DominantLanguageDetector:
+    """Cached wrapper around UnicodeLanguageDetector for dominant-language detection.
+
+    The detector is instantiated once per unique set of languages and reused
+    across calls to avoid repeated object construction overhead.
+    """
+
+    _cache: "dict[tuple[tuple[str, int], ...], _DominantLanguageDetector]" = {}
+
+    def __init__(self, language_id_map: dict[str, int]):
+        from .phonemize.multilingual import UnicodeLanguageDetector  # noqa: PLC0415
+
+        self._language_id_map = language_id_map
+        languages = list(language_id_map.keys())
+        self._detector = UnicodeLanguageDetector(languages, default_latin_language="en")
+
+    @classmethod
+    def get(cls, language_id_map: dict[str, int]) -> "_DominantLanguageDetector":
+        """Return a cached instance for this language_id_map."""
+        key = tuple(sorted(language_id_map.items()))
+        if key not in cls._cache:
+            cls._cache[key] = cls(language_id_map)
+        return cls._cache[key]
+
+    def detect(self, text: str) -> int:
+        """Return the language_id for the dominant language in text."""
+        context_has_kana = self._detector.has_kana(text)
+        counts: dict[str, int] = {}
+        for ch in text:
+            lang = self._detector.detect_char(ch, context_has_kana=context_has_kana)
+            if lang is not None:
+                counts[lang] = counts.get(lang, 0) + 1
+        if not counts:
+            return self._language_id_map.get("en", 0)
+        dominant = max(counts, key=lambda k: counts[k])
+        return self._language_id_map.get(dominant, 0)
+
+
+def _detect_dominant_language(text: str, language_id_map: dict[str, int]) -> int:
+    """Detect the dominant language in text using Unicode ranges.
+
+    Returns the language_id for the most common script in the text.
+    Uses a cached UnicodeLanguageDetector instance for efficiency.
+    """
+    return _DominantLanguageDetector.get(language_id_map).detect(text)
+
+
 def text_to_phoneme_ids_and_prosody(
     text: str,
     phoneme_id_map: dict[str, list[int]],
     language: str = "ja",
+    language_id_map: dict[str, int] | None = None,
 ) -> tuple[list[int], list[dict | None]]:
     """Convert text to phoneme IDs and prosody features.
 
@@ -28,6 +76,10 @@ def text_to_phoneme_ids_and_prosody(
         text: Input text
         phoneme_id_map: Mapping from phoneme symbols to IDs
         language: "ja" for Japanese (OpenJTalk), "en" for English (g2p-en)
+        language_id_map: Language-to-ID mapping from config. When provided
+            and the model supports multiple languages, a single language
+            code (e.g. "ja") is auto-promoted to a multilingual phonemizer
+            so that intersperse padding is applied correctly.
 
     Returns:
         tuple of (phoneme_ids, prosody_features)
@@ -36,7 +88,28 @@ def text_to_phoneme_ids_and_prosody(
     """
     from .phonemize.registry import get_phonemizer  # noqa: PLC0415
 
-    phonemizer = get_phonemizer(language)
+    # For multilingual models with JA input, auto-promote to multilingual
+    # phonemizer so that intersperse padding is applied correctly.
+    # JA is the only language whose post_process_ids() is a no-op (BOS/EOS
+    # are added inline during phonemization), so only JA needs promotion.
+    # Other languages (EN/ZH/ES/FR/PT) already get correct padding from
+    # their base-class post_process_ids().  Promoting them would cause
+    # UnicodeLanguageDetector to misroute Latin-script text to English.
+    effective_language = language
+    if (
+        language_id_map
+        and "-" not in language
+        and len(language_id_map) > 1
+        and language == "ja"
+    ):
+        effective_language = "-".join(sorted(language_id_map.keys()))
+        _LOGGER.debug(
+            "Auto-promoting language '%s' to multilingual '%s'",
+            language,
+            effective_language,
+        )
+
+    phonemizer = get_phonemizer(effective_language)
     phonemes, prosody_info_list = phonemizer.phonemize_with_prosody(text)
 
     # Convert phonemes to IDs
@@ -82,20 +155,18 @@ def main():
     # Text input options
     parser.add_argument(
         "--text",
-        help="Japanese text to synthesize (alternative to JSONL stdin input)",
+        help="Text to synthesize (alternative to JSONL stdin input)",
     )
     parser.add_argument(
         "--config",
         help="Path to config.json with phoneme_id_map (required with --text). "
         "If not specified, looks for config.json next to the model.",
     )
-    from .phonemize.registry import available_languages  # noqa: PLC0415
-
     parser.add_argument(
         "--language",
-        choices=available_languages(),
         default="ja",
-        help="Language for --text mode (default: ja)",
+        help="Language for --text mode. Single (ja, en, zh, ko, es, pt, fr) "
+        "or multilingual combo (ja-en, ja-en-zh-ko, etc.) (default: ja)",
     )
     parser.add_argument(
         "--speaker-id",
@@ -131,10 +202,13 @@ def main():
     input_names = [inp.name for inp in model.get_inputs()]
     has_prosody = "prosody_features" in input_names
     has_sid = "sid" in input_names
+    has_lid = "lid" in input_names
     if has_prosody:
         _LOGGER.info("Model supports prosody features (A1/A2/A3)")
     if has_sid:
         _LOGGER.info("Model supports multi-speaker (sid input)")
+    if has_lid:
+        _LOGGER.info("Model supports multi-language (lid input)")
 
     # Handle --text mode: convert text to phoneme_ids and prosody_features
     phoneme_id_map = None
@@ -168,9 +242,15 @@ def main():
 
         _LOGGER.info("Loaded phoneme_id_map from %s", config_path)
 
+        # Load language_id_map (needed for multilingual auto-promotion)
+        language_id_map = config.get("language_id_map", {}) if has_lid else {}
+
         # Convert text to phoneme_ids and prosody_features
         phoneme_ids, prosody_features_data = text_to_phoneme_ids_and_prosody(
-            args.text, phoneme_id_map, language=args.language
+            args.text,
+            phoneme_id_map,
+            language=args.language,
+            language_id_map=language_id_map,
         )
         _LOGGER.info(
             "Converted text to %d phoneme IDs: %s",
@@ -178,11 +258,25 @@ def main():
             args.text[:50] + "..." if len(args.text) > 50 else args.text,
         )
 
+        # Determine language_id from config
+        language_id = 0  # default
+        if has_lid:
+            language_id_map = config.get("language_id_map", {})
+            if args.language in language_id_map:
+                language_id = language_id_map[args.language]
+            elif "-" in args.language:
+                # Multilingual mode: detect dominant language from text
+                language_id = _detect_dominant_language(args.text, language_id_map)
+            _LOGGER.info(
+                "Using language_id=%d for language=%s", language_id, args.language
+            )
+
         # Create single utterance
         utterances = [
             {
                 "phoneme_ids": phoneme_ids,
                 "speaker_id": args.speaker_id if has_sid else None,
+                "language_id": language_id if has_lid else None,
                 "prosody_features": prosody_features_data,
             }
         ]
@@ -218,8 +312,17 @@ def main():
             "scales": scales,
         }
 
+        # Default sid to 0 for models that require it (e.g. single-speaker multilingual)
+        if sid is None and has_sid:
+            sid = np.array([0], dtype=np.int64)
+
         if sid is not None:
             inputs["sid"] = sid
+
+        # Handle language ID if model supports it
+        if has_lid:
+            language_id = utt.get("language_id", 0)
+            inputs["lid"] = np.array([language_id], dtype=np.int64)
 
         # Handle prosody features if model supports them
         if has_prosody:
@@ -243,7 +346,7 @@ def main():
 
         start_time = time.perf_counter()
         outputs = model.run(None, inputs)
-        audio = outputs[0].squeeze((0, 1))
+        audio = outputs[0].squeeze(0)
         # durations output is available for phoneme timing (e.g., lip-sync, karaoke)
         durations = outputs[1] if len(outputs) > 1 else None
         # audio = denoise(audio, bias_spec, 10)

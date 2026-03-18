@@ -5,8 +5,8 @@
 ## ディレクトリ構成
 
 - `models/` - テスト用の音声合成モデル
-  - `ja_JP-test-medium.onnx` - 日本語テストモデル（カスタム辞書対応）
-  - `ja_JP-test-medium.onnx.json` - モデルの設定ファイル
+  - `multilingual-test-medium.onnx` - 日本語テストモデル（カスタム辞書対応）
+  - `multilingual-test-medium.onnx.json` - モデルの設定ファイル
   
 - `fixtures/` - テスト用の入力ファイル  
   - `test_japanese.txt` - 日本語のテスト用テキスト
@@ -23,7 +23,7 @@ GitHub Actionsのビルドパイプラインで、各プラットフォーム（
 
 ## モデルについて
 
-### ja_JP-test-medium.onnx
+### multilingual-test-medium.onnx
 - 学習データ: CSS10日本語コーパス（6,841音声ファイル）
 - モデルサイズ: 約60MB
 - エポック数: 2500

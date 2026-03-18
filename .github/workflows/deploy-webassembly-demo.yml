@@ -92,14 +92,14 @@ jobs:
             ls -la deploy/models/
             
             # Ensure Japanese model is present, fallback to test/models if needed
-            if [ ! -f "deploy/models/ja_JP-test-medium.onnx" ]; then
-              echo "WARNING: ja_JP-test-medium.onnx not found in src/wasm/openjtalk-web/models"
-              if [ -f "test/models/ja_JP-test-medium.onnx" ]; then
-                echo "Copying ja_JP-test-medium.onnx from test/models..."
-                cp test/models/ja_JP-test-medium.onnx deploy/models/
+            if [ ! -f "deploy/models/multilingual-test-medium.onnx" ]; then
+              echo "WARNING: multilingual-test-medium.onnx not found in src/wasm/openjtalk-web/models"
+              if [ -f "test/models/multilingual-test-medium.onnx" ]; then
+                echo "Copying multilingual-test-medium.onnx from test/models..."
+                cp test/models/multilingual-test-medium.onnx deploy/models/
                 echo "Japanese model copied from test/models"
               else
-                echo "ERROR: ja_JP-test-medium.onnx not found in either location!"
+                echo "ERROR: multilingual-test-medium.onnx not found in either location!"
                 exit 1
               fi
             fi
@@ -119,7 +119,7 @@ jobs:
             fi
             
             # Additionally verify critical model files are present
-            CRITICAL_MODELS="ja_JP-test-medium.onnx test_voice.onnx"
+            CRITICAL_MODELS="multilingual-test-medium.onnx"
             for model in $CRITICAL_MODELS; do
               if [ ! -f "deploy/models/$model" ]; then
                 echo "ERROR: Critical model file $model is missing!"

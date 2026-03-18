@@ -184,7 +184,7 @@ class TestCLIIntegration:
             Path(__file__).parent.parent.parent.parent
             / "test"
             / "models"
-            / "test_voice.onnx"
+            / "multilingual-test-medium.onnx"
         ).exists(),
         reason="Test model not available",
     )
@@ -197,7 +197,7 @@ class TestCLIIntegration:
             Path(__file__).parent.parent.parent.parent
             / "test"
             / "models"
-            / "test_voice.onnx"
+            / "multilingual-test-medium.onnx"
         )
 
         # Run piper CLI

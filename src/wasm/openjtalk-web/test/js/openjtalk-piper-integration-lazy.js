@@ -154,11 +154,11 @@ class OpenJTalkPiperTTSLazy {
     async loadModelConfig(config) {
         let modelConfigPath = config.modelConfigPath;
         if (window.location.hostname.includes('github.io')) {
-            if (modelConfigPath === 'models/ja_JP-test-medium.onnx.json' || 
-                modelConfigPath === './models/ja_JP-test-medium.onnx.json' || 
-                modelConfigPath === '../models/ja_JP-test-medium.onnx.json' ||
-                modelConfigPath.endsWith('/models/ja_JP-test-medium.onnx.json')) {
-                modelConfigPath = '../../models/ja_JP-test-medium.onnx.json';
+            if (modelConfigPath === 'models/multilingual-test-medium.onnx.json' || 
+                modelConfigPath === './models/multilingual-test-medium.onnx.json' || 
+                modelConfigPath === '../models/multilingual-test-medium.onnx.json' ||
+                modelConfigPath.endsWith('/models/multilingual-test-medium.onnx.json')) {
+                modelConfigPath = '../../models/multilingual-test-medium.onnx.json';
             }
         }
         
@@ -193,11 +193,11 @@ class OpenJTalkPiperTTSLazy {
         
         let modelPath = this.config.onnx.modelPath;
         if (window.location.hostname.includes('github.io')) {
-            if (modelPath === 'models/ja_JP-test-medium.onnx' || 
-                modelPath === './models/ja_JP-test-medium.onnx' || 
-                modelPath === '../models/ja_JP-test-medium.onnx' ||
-                modelPath.endsWith('/models/ja_JP-test-medium.onnx')) {
-                modelPath = '../../models/ja_JP-test-medium.onnx';
+            if (modelPath === 'models/multilingual-test-medium.onnx' || 
+                modelPath === './models/multilingual-test-medium.onnx' || 
+                modelPath === '../models/multilingual-test-medium.onnx' ||
+                modelPath.endsWith('/models/multilingual-test-medium.onnx')) {
+                modelPath = '../../models/multilingual-test-medium.onnx';
             }
         }
         

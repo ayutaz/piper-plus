@@ -12,10 +12,8 @@ protected:
     
     void SetUp() override {
         // Initialize with minimal config
-        config.useESpeak = false;
-        
-        // Set up text phoneme voice config
-        voice.phonemizeConfig.phonemeType = piper::TextPhonemes;
+        // Set up multilingual voice config
+        voice.phonemizeConfig.phonemeType = piper::MultilingualPhonemes;
         
         // Minimal phoneme map for testing
         voice.phonemizeConfig.phonemeIdMap = {

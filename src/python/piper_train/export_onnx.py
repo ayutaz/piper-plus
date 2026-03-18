@@ -100,25 +100,12 @@ def main() -> None:
     )
     parser.add_argument(
         "--stochastic",
-        action="store_true",
-        help="Enable stochastic sampling (z_p = m_p + noise * noise_scale). "
-        "Recommended for WavLM-trained models to avoid mechanical artifacts.",
-    )
-    parser.add_argument(
-        "--use-ema",
-        action="store_true",
+        action=argparse.BooleanOptionalAction,
         default=True,
-        help="Apply EMA weights to decoder if available in checkpoint (default: enabled)",
-    )
-    parser.add_argument(
-        "--no-ema",
-        action="store_true",
-        help="Disable EMA weight application",
+        help="Enable stochastic sampling (z_p = m_p + noise * noise_scale). "
+        "Default: enabled. Use --no-stochastic for deterministic (debugging用).",
     )
     args = parser.parse_args()
-
-    if args.no_ema:
-        args.use_ema = False
 
     if args.debug:
         logging.basicConfig(level=logging.DEBUG)
@@ -147,6 +134,7 @@ def main() -> None:
 
     num_symbols = model_g.n_vocab
     num_speakers = model_g.n_speakers
+    num_languages = getattr(model_g, "n_languages", 1)
 
     # Enable ONNX export mode for deterministic output
     model_g.onnx_export_mode = True
@@ -157,34 +145,45 @@ def main() -> None:
     # Inference only
     model_g.eval()
 
+    # Apply EMA weights to decoder if available (always applied when present)
+    # IMPORTANT: EMA must be applied BEFORE remove_weight_norm(), because EMA shadow
+    # params use weight_g/weight_v keys. remove_weight_norm() fuses them into a single
+    # "weight" tensor, making EMA keys unmatchable.
+    ckpt = torch.load(args.checkpoint, map_location="cpu")
+    ema_state = ckpt.get("ema_generator_state")
+    if ema_state and "shadow_params" in ema_state:
+        applied = 0
+        skipped = 0
+        dec_params = dict(model_g.dec.named_parameters())
+        for name, shadow_param in ema_state["shadow_params"].items():
+            if name in dec_params:
+                dec_params[name].data.copy_(shadow_param)
+                applied += 1
+            else:
+                skipped += 1
+        if applied > 0:
+            _LOGGER.info(
+                "Applied EMA weights to decoder: %d parameters (skipped %d)",
+                applied,
+                skipped,
+            )
+        else:
+            _LOGGER.warning("EMA state found but no matching decoder parameters")
+    else:
+        _LOGGER.info("No EMA state found in checkpoint, skipping EMA")
+    del ckpt
+
     with torch.no_grad():
         model_g.dec.remove_weight_norm()
-
-    # Apply EMA weights to decoder if available
-    if args.use_ema:
-        ckpt = torch.load(args.checkpoint, map_location="cpu")
-        ema_state = ckpt.get("ema_generator_state")
-        if ema_state and "shadow_params" in ema_state:
-            applied = 0
-            dec_params = dict(model_g.dec.named_parameters())
-            for name, shadow_param in ema_state["shadow_params"].items():
-                if name in dec_params:
-                    dec_params[name].data.copy_(shadow_param)
-                    applied += 1
-            if applied > 0:
-                _LOGGER.info("Applied EMA weights to decoder: %d parameters", applied)
-            else:
-                _LOGGER.warning("EMA state found but no matching decoder parameters")
-        else:
-            _LOGGER.info("No EMA state found in checkpoint, skipping EMA")
-        del ckpt
 
     # Check if model uses prosody features
     has_prosody = getattr(model_g, "prosody_dim", 0) > 0
 
     stochastic = args.stochastic
 
-    def infer_forward(text, text_lengths, scales, sid=None, prosody_features=None):
+    def infer_forward(
+        text, text_lengths, scales, sid=None, lid=None, prosody_features=None
+    ):
         """
         Efficient forward function that returns both audio and duration information.
         The duration predictor is called once to compute both durations and audio output.
@@ -193,16 +192,14 @@ def main() -> None:
         length_scale = scales[1]
         noise_scale_w = scales[2]
 
-        # 1. Encoder
-        x, m_p, logs_p, x_mask = model_g.enc_p(text, text_lengths)
+        # 1. Global conditioning (must be computed before enc_p)
+        g = model_g._get_global_conditioning(sid, lid)
 
-        if model_g.n_speakers > 1 and sid is not None:
-            g = model_g.emb_g(sid).unsqueeze(-1)
-        else:
-            g = None
+        # 2. Encoder (with global conditioning for cond_layer)
+        x, m_p, logs_p, x_mask = model_g.enc_p(text, text_lengths, g=g)
 
-        # 2. Duration Predictor (called only once)
-        x_dp = model_g._prepare_prosody_input(x, x_mask, prosody_features)
+        # 3. Duration Predictor (called only once)
+        x_dp = model_g._prepare_prosody_input(x, x_mask, prosody_features, lid=lid)
         if model_g.use_sdp:
             logw = model_g.dp(
                 x_dp, x_mask, g=g, reverse=True, noise_scale=noise_scale_w
@@ -213,7 +210,7 @@ def main() -> None:
         w = torch.exp(logw) * x_mask * length_scale
         durations = w.squeeze(1)  # [batch, phoneme_length]
 
-        # 3. Attention/Alignment
+        # 4. Attention/Alignment
         w_ceil = torch.ceil(w)
         y_lengths = torch.clamp_min(torch.sum(w_ceil, [1, 2]), 1).long()
         y_mask = torch.unsqueeze(
@@ -222,23 +219,22 @@ def main() -> None:
         attn_mask = torch.unsqueeze(x_mask, 2) * torch.unsqueeze(y_mask, -1)
         attn = commons.generate_path(w_ceil, attn_mask)
 
-        # 4. Expand prior
+        # 5. Expand prior
         m_p = torch.matmul(attn.squeeze(1), m_p.transpose(1, 2)).transpose(1, 2)
         logs_p = torch.matmul(attn.squeeze(1), logs_p.transpose(1, 2)).transpose(1, 2)
 
-        # 5. Sample z_p
+        # 6. Sample z_p
         if stochastic:
             noise_scale = scales[0]
             z_p = m_p + torch.randn_like(m_p) * torch.exp(logs_p) * noise_scale
         else:
             z_p = m_p
 
-        # 6. Flow + Decoder
+        # 7. Flow + Decoder
         z = model_g.flow(z_p, y_mask, g=g, reverse=True)
         o = model_g.dec((z * y_mask), g=g)
-        audio = o.unsqueeze(1)
 
-        return audio, durations
+        return o, durations
 
     model_g.forward = infer_forward
 
@@ -248,9 +244,21 @@ def main() -> None:
     )
     sequence_lengths = torch.LongTensor([sequences.size(1)])
 
+    # Determine which optional inputs to include.
+    # These flags control BOTH dummy_input and input_names so they stay in sync.
+    include_sid = num_speakers > 1 or num_languages > 1
+    include_lid = num_languages > 1
+
     sid: torch.LongTensor | None = None
-    if num_speakers > 1:
+    if include_sid:
+        # Multi-speaker: real speaker ID needed.
+        # Single-speaker multilingual: sid=0 placeholder to maintain correct
+        # positional argument order in infer_forward (sid before lid).
         sid = torch.LongTensor([0])
+
+    lid: torch.LongTensor | None = None
+    if include_lid:
+        lid = torch.LongTensor([0])
 
     # noise, noise_w, length
     scales = torch.FloatTensor([0.667, 1.0, 0.8])
@@ -261,40 +269,37 @@ def main() -> None:
     if has_prosody:
         prosody_features = torch.zeros(1, dummy_input_length, 3, dtype=torch.long)
 
-    # Include all inputs for compatibility
-    if num_speakers > 1 and has_prosody:
-        dummy_input = (sequences, sequence_lengths, scales, sid, prosody_features)
-    elif num_speakers > 1:
-        dummy_input = (sequences, sequence_lengths, scales, sid)
-    elif has_prosody:
-        dummy_input = (sequences, sequence_lengths, scales, None, prosody_features)
-    else:
-        dummy_input = (sequences, sequence_lengths, scales)
-
-    # Export - always include durations output
-    output_names = ["output", "durations"]
+    # Build dummy input tuple and input_names using the same flags
+    dummy_input_list: list = [sequences, sequence_lengths, scales]
+    input_names = ["input", "input_lengths", "scales"]
     dynamic_axes = {
         "input": {0: "batch_size", 1: "phonemes"},
         "input_lengths": {0: "batch_size"},
-        "output": {0: "batch_size", 1: "time"},
+        "output": {0: "batch_size", 2: "time"},
         "durations": {0: "batch_size", 1: "phonemes"},
     }
 
-    # Configure input names based on model type
-    if num_speakers > 1:
-        input_names = ["input", "input_lengths", "scales", "sid"]
+    if include_sid:
+        dummy_input_list.append(sid)
+        input_names.append("sid")
         dynamic_axes["sid"] = {0: "batch_size"}
-    else:
-        input_names = ["input", "input_lengths", "scales"]
-
-    # Add prosody_features if model uses prosody
+    if include_lid:
+        dummy_input_list.append(lid)
+        input_names.append("lid")
+        dynamic_axes["lid"] = {0: "batch_size"}
     if has_prosody:
+        dummy_input_list.append(prosody_features)
         input_names.append("prosody_features")
         dynamic_axes["prosody_features"] = {0: "batch_size", 1: "phonemes"}
         _LOGGER.info(
             "Exporting model with prosody features support (prosody_dim=%d)",
             model_g.prosody_dim,
         )
+
+    dummy_input = tuple(dummy_input_list)
+
+    # Export - always include durations output
+    output_names = ["output", "durations"]
 
     torch.onnx.export(
         model=model_g,
@@ -309,9 +314,7 @@ def main() -> None:
     )
 
     mode = "stochastic" if args.stochastic else "deterministic"
-    _LOGGER.info(
-        "Exported model to %s (mode: %s, ema: %s)", args.output, mode, args.use_ema
-    )
+    _LOGGER.info("Exported model to %s (mode: %s)", args.output, mode)
 
     # Apply ONNX simplification if requested
     # Skip simplification for prosody models to avoid numerical precision issues

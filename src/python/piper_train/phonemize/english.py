@@ -19,6 +19,31 @@ __all__ = [
     "EnglishPhonemizer",
 ]
 
+# ---------------------------------------------------------------------------
+# G2p instance cache — instantiating G2p() takes 100–500 ms; cache it at
+# module level so repeated calls to phonemize_english() are fast.
+# ---------------------------------------------------------------------------
+_g2p_instance = None
+_g2p_unavailable = False
+
+
+def _get_g2p():
+    """Return a cached G2p instance (or None if g2p_en is unavailable)."""
+    global _g2p_instance, _g2p_unavailable
+    if _g2p_unavailable:
+        return None
+    if _g2p_instance is None:
+        try:
+            from g2p_en import G2p  # noqa: PLC0415
+
+            _g2p_instance = G2p()
+        except (ImportError, Exception) as exc:
+            _LOGGER.warning("g2p_en unavailable: %s", exc)
+            _g2p_unavailable = True
+            return None
+    return _g2p_instance
+
+
 # ARPAbet to espeak-compatible IPA mapping
 ARPABET_TO_IPA: dict[str, str] = {
     "AA": "ɑ",
@@ -186,9 +211,12 @@ def _g2p_en_to_arpabet_tokens(text: str) -> list[list[str]]:
     (e.g. ["HH", "AH0", "L", "OW1"]).
     Punctuation-only groups are kept as separate "words".
     """
-    from g2p_en import G2p  # noqa: PLC0415
-
-    g2p = G2p()
+    g2p = _get_g2p()
+    if g2p is None:
+        raise ImportError(
+            "g2p_en is required for English phonemization. "
+            "Install it with: pip install g2p-en"
+        )
     raw = g2p(text)
 
     # g2p-en returns a flat list of phonemes with spaces as word boundaries
@@ -395,38 +423,3 @@ class EnglishPhonemizer(Phonemizer):
 
     def get_phoneme_id_map(self) -> dict[str, list[int]] | None:
         return None
-
-    def post_process_ids(
-        self,
-        phoneme_ids: list[int],
-        prosody_features: list[dict | None],
-        phoneme_id_map: dict[str, list[int]],
-    ) -> tuple[list[int], list[dict | None]]:
-        """Add BOS/EOS and inter-phoneme padding for English (espeak-ng compat)."""
-        pad_ids = phoneme_id_map.get("_", [0])
-        bos_ids = phoneme_id_map.get("^")
-        eos_ids = phoneme_id_map.get("$")
-
-        # Insert pad between every phoneme ID
-        padded_ids: list[int] = []
-        padded_prosody: list[dict | None] = []
-        for phoneme_id, prosody_feature in zip(
-            phoneme_ids, prosody_features, strict=True
-        ):
-            padded_ids.append(phoneme_id)
-            padded_prosody.append(prosody_feature)
-            padded_ids.extend(pad_ids)
-            padded_prosody.extend([None] * len(pad_ids))
-
-        phoneme_ids = padded_ids
-        prosody_features = padded_prosody
-
-        # Wrap with BOS/EOS
-        if bos_ids:
-            phoneme_ids = bos_ids + [pad_ids[0]] + phoneme_ids
-            prosody_features = [None] * (len(bos_ids) + 1) + prosody_features
-        if eos_ids:
-            phoneme_ids = phoneme_ids + eos_ids
-            prosody_features = prosody_features + [None] * len(eos_ids)
-
-        return phoneme_ids, prosody_features

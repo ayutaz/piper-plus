@@ -218,15 +218,15 @@
         <div class="language-selector">
             <label>言語選択 / Language Selection</label>
             <div class="language-buttons">
-                <button class="lang-button active" data-lang="ja" data-model="ja_JP-test-medium">
+                <button class="lang-button active" data-lang="ja" data-model="multilingual-test-medium">
                     🇯🇵 日本語
                 </button>
-                <button class="lang-button" data-lang="en" data-model="en_US-test-medium">
+                <button class="lang-button" data-lang="en" data-model="multilingual-test-medium">
                     🇺🇸 English
                 </button>
             </div>
             <div class="model-info" id="modelInfo">
-                モデル: ja_JP-test-medium.onnx (OpenJTalk)
+                モデル: multilingual-test-medium.onnx (OpenJTalk)
             </div>
         </div>
 
@@ -331,7 +331,7 @@
                 await loadScript('https://cdn.jsdelivr.net/npm/onnxruntime-web@1.21.0/dist/ort.min.js');
                 
                 // Load initial model
-                await loadModel('ja_JP-test-medium');
+                await loadModel('multilingual-test-medium');
                 
                 updateStatus('準備完了！', 'success');
                 generateBtn.disabled = false;

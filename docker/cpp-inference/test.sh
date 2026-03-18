@@ -16,12 +16,10 @@ fi
 
 echo ""
 
-# Test 2: Check libraries
+# Test 2: Check libraries (ONNX Runtime only — espeak-ng/piper-phonemize removed, GPL-free)
 echo "--- Library Test ---"
 libs=(
     "libonnxruntime.so"
-    "libespeak-ng.so"
-    "libpiper_phonemize.so"
 )
 
 all_libs_found=true
@@ -37,18 +35,17 @@ done
 if [ "$all_libs_found" = false ]; then
     echo "Warning: Some libraries missing from ldconfig cache"
     echo "Checking /usr/local/lib..."
-    ls -la /usr/local/lib/ | grep -E "(onnx|espeak|piper)" || true
+    ls -la /usr/local/lib/ | grep -E "onnx" || true
 fi
 
 echo ""
 
-# Test 3: Check espeak-ng data
-echo "--- eSpeak-ng Data Test ---"
-if [ -d "/usr/local/share/espeak-ng-data" ]; then
-    echo "✓ eSpeak-ng data directory found"
-    echo "  Languages: $(ls /usr/local/share/espeak-ng-data/lang | wc -l)"
+# Test 3: Check native G2P (self-contained, no espeak-ng dependency)
+echo "--- Native G2P Test ---"
+if piper --help 2>&1 | grep -qi "model\|help\|usage"; then
+    echo "✓ piper binary responds to --help (native G2P built-in)"
 else
-    echo "✗ eSpeak-ng data directory not found"
+    echo "✗ piper --help did not produce expected output"
 fi
 
 echo ""

@@ -44,12 +44,13 @@ def calculate_learning_rate(base_lr, effective_batch_size, base_batch_size=16):
     return base_lr * (effective_batch_size / base_batch_size)
 
 
-def configure_ddp_strategy(num_gpus, user_strategy=None):
+def configure_ddp_strategy(num_gpus, user_strategy=None, no_wavlm=False):
     """Configure DDP strategy for multi-GPU training.
 
     Args:
         num_gpus: Number of GPUs to use
         user_strategy: User-specified strategy (optional)
+        no_wavlm: Whether WavLM is disabled (unused, kept for API compatibility).
 
     Returns:
         Strategy configuration or None
@@ -58,19 +59,84 @@ def configure_ddp_strategy(num_gpus, user_strategy=None):
         _LOGGER.info(f"Using user-specified strategy: {user_strategy}")
         return user_strategy
     elif num_gpus >= 2:
+        ddp_kwargs = {
+            "find_unused_parameters": True,
+            "gradient_as_bucket_view": True,
+        }
         _LOGGER.info(
-            "Using optimized DDPStrategy with gradient_as_bucket_view=True for memory efficiency"
+            "Using DDPStrategy with find_unused_parameters=True, gradient_as_bucket_view=True"
         )
-        return DDPStrategy(
-            find_unused_parameters=True,
-            gradient_as_bucket_view=True,
-        )
+        return DDPStrategy(**ddp_kwargs)
     return None
 
 
-def main():
-    logging.basicConfig(level=logging.DEBUG)
+def _build_trainer(args, loggers, num_gpus, num_speakers):
+    """Build a Trainer instance with callbacks and strategy from args.
 
+    This is called both on the normal path and when falling back from a
+    failed checkpoint resume (where a fresh Trainer is needed to clear
+    the stale ckpt_path).
+    """
+    callbacks = []
+    if args.checkpoint_epochs is not None:
+        checkpoint_dir = Path(args.default_root_dir) / "checkpoints"
+        callbacks.append(
+            ModelCheckpoint(
+                dirpath=str(checkpoint_dir),
+                every_n_epochs=args.checkpoint_epochs,
+                save_top_k=args.save_top_k,
+                save_last=True,
+                save_on_train_epoch_end=True,
+            )
+        )
+        _LOGGER.debug(
+            "Checkpoints will be saved every %s epoch(s) to %s",
+            args.checkpoint_epochs,
+            checkpoint_dir,
+        )
+
+    # EMA is enabled by default
+    if not args.no_ema:
+        callbacks.append(EMACallback(decay=args.ema_decay))
+        _LOGGER.info("Using EMA with decay rate %s", args.ema_decay)
+    else:
+        _LOGGER.info("EMA disabled by user request")
+
+    trainer_kwargs = {
+        "accelerator": args.accelerator,
+        "devices": args.devices,
+        "precision": args.precision,
+        "max_epochs": args.max_epochs,
+        "callbacks": callbacks,
+        "default_root_dir": args.default_root_dir,
+        "logger": loggers,
+        "check_val_every_n_epoch": args.val_every_n_epochs,
+        "limit_val_batches": args.limit_val_batches,
+    }
+
+    # --limit-train-batches: テスト用に学習バッチ数を制限
+    if getattr(args, "limit_train_batches", None) is not None:
+        trainer_kwargs["limit_train_batches"] = args.limit_train_batches
+
+    # Multi-GPU DDP optimization
+    strategy = configure_ddp_strategy(num_gpus, args.strategy, no_wavlm=args.no_wavlm)
+    if strategy:
+        trainer_kwargs["strategy"] = strategy
+
+    # When using SpeakerBalancedBatchSampler, disable Lightning's automatic distributed sampler
+    if args.samples_per_speaker > 0 and num_speakers > 1:
+        trainer_kwargs["use_distributed_sampler"] = False
+        _LOGGER.info("Disabled distributed sampler for SpeakerBalancedBatchSampler")
+
+    return Trainer(**trainer_kwargs)
+
+
+def create_parser():
+    """Create the argument parser for piper_train.
+
+    Extracted so that tests can import and reuse the canonical parser
+    instead of duplicating argparse definitions.
+    """
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--dataset-dir", required=True, help="Path to pre-processed dataset directory"
@@ -89,6 +155,14 @@ def main():
     parser.add_argument(
         "--resume_from_single_speaker_checkpoint",
         help="For multi-speaker models only. Converts a single-speaker checkpoint to multi-speaker and resumes training",  # noqa: E501
+    )
+    parser.add_argument(
+        "--resume-from-multispeaker-checkpoint",
+        help="For single-speaker fine-tuning. Loads a multi-speaker checkpoint with strict=False "
+        "(emb_g is skipped), adds emb_g mean to all emb_lang rows for conditioning correction, "
+        "and preserves original language embeddings. "
+        "Optimizer state is reset (training starts from epoch 0). "
+        "Automatically enables --freeze-dp.",
     )
     parser.add_argument(
         "--save-top-k",
@@ -136,6 +210,24 @@ def main():
         default=0.5,
         help="WavLM discriminator loss weight (default: 0.5)",
     )
+    parser.add_argument(
+        "--wavlm-every-n-steps",
+        type=int,
+        default=1,
+        help="Compute WavLM loss every N steps (default: 1, higher = faster training)",
+    )
+    parser.add_argument(
+        "--no-wavlm",
+        action="store_true",
+        help="Disable WavLM discriminator (faster training, slightly lower quality)",
+    )
+    parser.add_argument(
+        "--freeze-dp",
+        action="store_true",
+        default=False,
+        help="Freeze Duration Predictor parameters during training. "
+        "Use for fine-tuning to prevent duration prediction degradation.",
+    )
     # Trainer arguments
     parser.add_argument("--accelerator", default="gpu", help="Accelerator to use")
     parser.add_argument("--devices", type=int, default=1, help="Number of devices")
@@ -157,10 +249,38 @@ def main():
         "Set to 0 to disable (default: 0).",
     )
     parser.add_argument(
+        "--language-balanced-sampling",
+        action="store_true",
+        default=False,
+        help="Force language-balanced sampling (JA 50%% / EN 50%%). "
+        "If not specified, auto-enabled when speaker count ratio between languages >= 3:1. "
+        "Requires --samples-per-speaker > 0 and num_languages > 1.",
+    )
+    parser.add_argument(
         "--precision",
         default="16-mixed",
         choices=("32-true", "16-mixed", "bf16-mixed"),
         help="Floating point precision (default: 16-mixed for faster training with minimal quality impact)",
+    )
+    parser.add_argument(
+        "--val-every-n-epochs",
+        type=int,
+        default=5,
+        help="Run validation every N epochs (default: 5). Training loss is monitored via WandB every step, "
+        "so validation is only needed for quality trend checks.",
+    )
+    parser.add_argument(
+        "--limit-val-batches",
+        type=int,
+        default=50,
+        help="Limit validation to N batches per validation run (default: 50). "
+        "50 batches (~1000 samples) is statistically sufficient for trend monitoring.",
+    )
+    parser.add_argument(
+        "--limit-train-batches",
+        type=int,
+        default=None,
+        help="Limit training to N batches per epoch (for testing). Default: None (no limit).",
     )
     parser.add_argument(
         "--max_epochs", type=int, default=1000, help="Maximum number of epochs"
@@ -174,7 +294,19 @@ def main():
         help="Path to checkpoint to resume from",
     )
     VitsModel.add_model_specific_args(parser)
+    parser.add_argument(
+        "--compile",
+        action="store_true",
+        help="Enable torch.compile() for potential training speedup (requires PyTorch 2.0+)",
+    )
     parser.add_argument("--seed", type=int, default=1234)
+    return parser
+
+
+def main():
+    logging.basicConfig(level=logging.DEBUG)
+
+    parser = create_parser()
     args = parser.parse_args()
     _LOGGER.debug(args)
 
@@ -198,10 +330,13 @@ def main():
     _LOGGER.info(f"Training with {num_gpus} GPU(s)")
     _LOGGER.info(f"Using precision: {args.precision}")
 
-    # Log WavLM Discriminator status (always enabled)
-    _LOGGER.info(
-        f"WavLM Discriminator enabled: model={args.wavlm_model_name}, weight={args.c_wavlm}"
-    )
+    # Log WavLM Discriminator status
+    if args.no_wavlm:
+        _LOGGER.info("WavLM Discriminator disabled by --no-wavlm flag")
+    else:
+        _LOGGER.info(
+            f"WavLM Discriminator enabled: model={args.wavlm_model_name}, weight={args.c_wavlm}"
+        )
 
     # Initialize scaled_lr
     scaled_lr = args.base_lr
@@ -231,30 +366,10 @@ def main():
         config = json.load(config_file)
         num_symbols = int(config["num_symbols"])
         num_speakers = int(config["num_speakers"])
+        num_languages = int(config.get("num_languages", 1))
         sample_rate = int(config["audio"]["sample_rate"])
 
-    # Setup callbacks
-    callbacks = []
-    if args.checkpoint_epochs is not None:
-        callbacks.append(
-            ModelCheckpoint(
-                every_n_epochs=args.checkpoint_epochs,
-                save_top_k=args.save_top_k,
-                save_last=True,
-            )
-        )
-        _LOGGER.debug(
-            "Checkpoints will be saved every %s epoch(s)", args.checkpoint_epochs
-        )
-
-    # EMA is enabled by default
-    if not args.no_ema:
-        callbacks.append(EMACallback(decay=args.ema_decay))
-        _LOGGER.info("Using EMA with decay rate %s", args.ema_decay)
-    else:
-        _LOGGER.info("EMA disabled by user request")
-
-    # Setup loggers
+    # Setup loggers (created once and reused across Trainer instances)
     loggers = []
 
     # TensorBoard logger (always enabled)
@@ -278,32 +393,12 @@ def main():
     else:
         _LOGGER.info("Wandb not available, using TensorBoard only")
 
-    trainer_kwargs = {
-        "accelerator": args.accelerator,
-        "devices": args.devices,
-        "precision": args.precision,
-        "max_epochs": args.max_epochs,
-        "callbacks": callbacks,
-        "default_root_dir": args.default_root_dir,
-        "logger": loggers,
-    }
-
-    # Multi-GPU DDP optimization
-    # Use DDPStrategy with gradient_as_bucket_view=True for memory efficiency
-    # find_unused_parameters=True is required for GAN training (Generator/Discriminator alternate)
-    strategy = configure_ddp_strategy(num_gpus, args.strategy)
-    if strategy:
-        trainer_kwargs["strategy"] = strategy
-
-    # When using SpeakerBalancedBatchSampler, disable Lightning's automatic distributed sampler
-    # The batch sampler handles DDP-awareness internally
-    if args.samples_per_speaker > 0 and num_speakers > 1:
-        trainer_kwargs["use_distributed_sampler"] = False
-        _LOGGER.info("Disabled distributed sampler for SpeakerBalancedBatchSampler")
-
-    trainer = Trainer(**trainer_kwargs)
+    trainer = _build_trainer(args, loggers, num_gpus, num_speakers)
 
     dict_args = vars(args)
+
+    if args.no_wavlm:
+        dict_args["use_wavlm_discriminator"] = False
 
     # Set learning rate (either scaled or base)
     if hasattr(args, "auto_lr_scaling") and args.auto_lr_scaling and num_gpus > 1:
@@ -327,9 +422,25 @@ def main():
         dict_args["upsample_initial_channel"] = 512
         dict_args["upsample_kernel_sizes"] = (16, 16, 4, 4)
 
-    # マルチスピーカーモデルの場合、gin_channelsを768に設定（品質向上のため）
-    if num_speakers > 1 and "gin_channels" not in dict_args:
-        dict_args["gin_channels"] = 768
+    # マルチスピーカーモデルの場合、gin_channelsを512に設定
+    # 768はONNXエクスポート時の数値精度低下を引き起こす（PyTorch↔ONNX相関が0.97→0.70に低下）
+    # 21話者バイリンガルモデル(gin_channels=512)では正常だが、80話者(768)でガビガビ音が発生
+    # VitsModel.__init__のフォールバック(512)と一致させる
+    # argparseは常にdefault値(0)をdict_argsに含めるため、"not in"ではなく値チェック
+    if (num_speakers > 1 or num_languages > 1) and dict_args.get(
+        "gin_channels", 0
+    ) == 0:
+        dict_args["gin_channels"] = 512
+
+    # --resume-from-multispeaker-checkpoint 使用時は freeze_dp を自動有効化
+    # モデル作成前に設定しないと save_hyperparameters() に反映されず
+    # configure_optimizers() で freeze_dp=False のまま DP が凍結されない
+    if args.resume_from_multispeaker_checkpoint and not args.freeze_dp:
+        args.freeze_dp = True
+        dict_args["freeze_dp"] = True
+        _LOGGER.info(
+            "Auto-enabled --freeze-dp for multispeaker→single-speaker transfer"
+        )
 
     # num_workers自動調整機能を削除
     # ユーザー指定のnum_workersをそのまま使用する
@@ -339,10 +450,24 @@ def main():
     model = VitsModel(
         num_symbols=num_symbols,
         num_speakers=num_speakers,
+        num_languages=num_languages,
         sample_rate=sample_rate,
         dataset=[dataset_path],
         **dict_args,
     )
+
+    if args.compile:
+        _LOGGER.info(
+            "Compiling model sub-modules with torch.compile(mode='reduce-overhead', dynamic=True)"
+        )
+        if hasattr(model, "model_g"):
+            model.model_g = torch.compile(
+                model.model_g, mode="reduce-overhead", dynamic=True
+            )
+        if hasattr(model, "model_d"):
+            model.model_d = torch.compile(
+                model.model_d, mode="reduce-overhead", dynamic=True
+            )
 
     if args.resume_from_single_speaker_checkpoint:
         assert num_speakers > 1, (
@@ -359,21 +484,79 @@ def main():
             dataset=None,
         )
         g_dict = model_single.model_g.state_dict()
-        for key in list(g_dict.keys()):
-            # Remove keys that can't be copied over due to missing speaker embedding
-            if (
-                key.startswith("dec.cond")
-                or key.startswith("dp.cond")
-                or ("enc.cond_layer" in key)
-            ):
-                g_dict.pop(key, None)
+        # NOTE: cond 層 (dec.cond, dp.cond, enc.cond_layer 等) は
+        # single/multi-speaker どちらも gin_channels=512 で形状が同一のため
+        # 除外不要。全重みを転移してよい。
 
-        # Copy over the multi-speaker model, excluding keys related to the
-        # speaker embedding (which is missing from the single-speaker model).
+        # Copy over the single-speaker weights; keys missing in g_dict
+        # (e.g. emb_g of the multi-speaker target) will keep their
+        # randomly-initialized values.
         load_state_dict(model.model_g, g_dict)
         load_state_dict(model.model_d, model_single.model_d.state_dict())
         _LOGGER.info(
             "Successfully converted single-speaker checkpoint to multi-speaker"
+        )
+
+    if args.resume_from_multispeaker_checkpoint:
+        assert num_speakers == 1, (
+            "--resume-from-multispeaker-checkpoint はシングルスピーカーモデル専用です。"
+            "マルチスピーカーへの転移には --resume_from_single_speaker_checkpoint を使用してください。"
+        )
+        _LOGGER.info(
+            "Resuming from multispeaker checkpoint: %s",
+            args.resume_from_multispeaker_checkpoint,
+        )
+
+        # 1. strict=False でロード（emb_g は自動スキップ）
+        # NOTE: weights_only=False is required to handle PosixPath objects in checkpoints
+        # This poses a security risk - only load trusted checkpoints
+        checkpoint = torch.load(
+            args.resume_from_multispeaker_checkpoint,
+            map_location="cpu",
+            weights_only=False,
+        )
+        missing, unexpected = model.load_state_dict(
+            checkpoint["state_dict"], strict=False
+        )
+        _LOGGER.info(
+            "Weights loaded (strict=False). Missing keys: %s. Unexpected keys: %s.",
+            missing,
+            unexpected,
+        )
+
+        # 2. emb_g 平均を emb_lang に加算（conditioning 分布補正）
+        #    emb_g は平均ノルム ~0.68 でほぼゼロ中心のため影響は軽微だが、
+        #    conceptual correctness のため実施する。
+        saved_sd = checkpoint["state_dict"]
+        emb_g_weight = saved_sd.get("model_g.emb_g.weight")
+        if emb_g_weight is not None and hasattr(model.model_g, "emb_lang"):
+            emb_g_mean = emb_g_weight.mean(dim=0)  # [gin_channels]
+            _LOGGER.info(
+                "emb_g mean norm: %.4f → adding to all emb_lang rows for conditioning correction",
+                emb_g_mean.norm().item(),
+            )
+            with torch.no_grad():
+                model.model_g.emb_lang.weight.add_(emb_g_mean.unsqueeze(0))
+            _LOGGER.info("emb_g_mean added to emb_lang.")
+        else:
+            _LOGGER.info(
+                "emb_g not found in checkpoint or model has no emb_lang; skipping conditioning correction."
+            )
+
+        # 3. All emb_lang rows are preserved with emb_g_mean correction.
+        #    Previously emb_lang[0] (JA) was copied to emb_lang[1] (EN), but this
+        #    caused the frozen Duration Predictor to lose EN conditioning, breaking
+        #    English duration prediction. Keeping original embeddings + correction
+        #    lets the DP predict correct duration patterns for all languages.
+        if hasattr(model.model_g, "emb_lang") and model.model_g.n_languages > 1:
+            _LOGGER.info(
+                "All emb_lang rows preserved with emb_g_mean correction "
+                "for correct duration prediction across languages."
+            )
+
+        _LOGGER.info(
+            "Multispeaker → single-speaker transfer complete. "
+            "Starting training from epoch 0 (optimizer state reset)."
         )
 
     # チェックポイントからの再開処理を修正
@@ -407,48 +590,7 @@ def main():
                 del args_dict["resume_from_checkpoint"]
 
             # 新しいTrainerインスタンスを作成（ckpt_pathをクリアするため）
-            # Setup callbacks
-            callbacks = []
-            if args.checkpoint_epochs is not None:
-                callbacks.append(
-                    ModelCheckpoint(
-                        every_n_epochs=args.checkpoint_epochs,
-                        save_top_k=args.save_top_k,
-                        save_last=True,
-                    )
-                )
-                _LOGGER.debug(
-                    "Checkpoints will be saved every %s epoch(s)",
-                    args.checkpoint_epochs,
-                )
-
-            # EMA is enabled by default
-            if not args.no_ema:
-                callbacks.append(EMACallback(decay=args.ema_decay))
-                _LOGGER.info("Using EMA with decay rate %s", args.ema_decay)
-            else:
-                _LOGGER.info("EMA disabled by user request")
-
-            trainer_kwargs = {
-                "accelerator": args.accelerator,
-                "devices": args.devices,
-                "precision": args.precision,
-                "max_epochs": args.max_epochs,
-                "callbacks": callbacks,
-                "default_root_dir": args.default_root_dir,
-                "logger": loggers,
-            }
-
-            # Multi-GPU DDP optimization
-            strategy = configure_ddp_strategy(num_gpus, args.strategy)
-            if strategy:
-                trainer_kwargs["strategy"] = strategy
-
-            # When using SpeakerBalancedBatchSampler, disable Lightning's automatic distributed sampler
-            if args.samples_per_speaker > 0 and num_speakers > 1:
-                trainer_kwargs["use_distributed_sampler"] = False
-
-            trainer = Trainer(**trainer_kwargs)
+            trainer = _build_trainer(args, loggers, num_gpus, num_speakers)
 
             # 新しいTrainerで学習を開始
             trainer.fit(model)

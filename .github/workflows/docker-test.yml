@@ -74,8 +74,8 @@ jobs:
             -e CUDA_VISIBLE_DEVICES="" \
             piper-python-inference:test \
             python inference.py \
-              --model /models/ja_JP-test-medium.onnx \
-              --config /models/ja_JP-test-medium.onnx.json \
+              --model /models/multilingual-test-medium.onnx \
+              --config /models/multilingual-test-medium.onnx.json \
               --output /output/test_ja.wav \
               --text "こんにちは、今日は良い天気ですね。" \
               --language ja \
@@ -98,8 +98,8 @@ jobs:
             -e CUDA_VISIBLE_DEVICES="" \
             piper-python-inference:test \
             python inference.py \
-              --model /models/test_voice.onnx \
-              --config /models/test_voice.onnx.json \
+              --model /models/multilingual-test-medium.onnx \
+              --config /models/multilingual-test-medium.onnx.json \
               --output /output/test_en.wav \
               --text "Hello, how are you today?" \
               --language en \
@@ -123,7 +123,7 @@ jobs:
             -e CUDA_VISIBLE_DEVICES="" \
             piper-python-inference:test \
             python inference.py \
-              --model /models/ja_JP-test-medium.onnx \
+              --model /models/multilingual-test-medium.onnx \
               --output /output/test_autodetect.wav \
               --text "自動検出テストです。" \
               --language ja \
@@ -143,8 +143,8 @@ jobs:
           # Test that --config can be omitted when only config.json exists in model directory
           # Create a temp directory with model + config.json (no {model}.onnx.json)
           mkdir -p /tmp/fallback-test
-          cp ${{ github.workspace }}/test/models/test_voice.onnx /tmp/fallback-test/test_voice.onnx
-          cp ${{ github.workspace }}/test/models/test_voice.onnx.json /tmp/fallback-test/config.json
+          cp ${{ github.workspace }}/test/models/multilingual-test-medium.onnx /tmp/fallback-test/multilingual-test-medium.onnx
+          cp ${{ github.workspace }}/test/models/multilingual-test-medium.onnx.json /tmp/fallback-test/config.json
 
           docker run --rm \
             -v /tmp/fallback-test:/models/fallback \
@@ -152,7 +152,7 @@ jobs:
             -e CUDA_VISIBLE_DEVICES="" \
             piper-python-inference:test \
             python inference.py \
-              --model /models/fallback/test_voice.onnx \
+              --model /models/fallback/multilingual-test-medium.onnx \
               --output /output/test_fallback.wav \
               --text "Hello, this is a fallback config test." \
               --language en \
@@ -171,7 +171,7 @@ jobs:
         run: |
           # Test that inference exits with error when no config file exists
           mkdir -p /tmp/noconfig
-          cp ${{ github.workspace }}/test/models/test_voice.onnx /tmp/noconfig/test_voice.onnx
+          cp ${{ github.workspace }}/test/models/multilingual-test-medium.onnx /tmp/noconfig/multilingual-test-medium.onnx
 
           docker run --rm \
             -v /tmp/noconfig:/models/noconfig \
@@ -179,7 +179,7 @@ jobs:
             -e CUDA_VISIBLE_DEVICES="" \
             piper-python-inference:test \
             python inference.py \
-              --model /models/noconfig/test_voice.onnx \
+              --model /models/noconfig/multilingual-test-medium.onnx \
               --output /output/should_not_exist.wav \
               --text "This should fail." \
               --language en \
@@ -221,6 +221,12 @@ jobs:
         run: |
           docker run --rm --entrypoint piper piper-cpp-inference:test --version
 
+      - name: Copy G2P dictionary files next to models
+        run: |
+          cp -f ${{ github.workspace }}/src/cpp/cmudict_data.json ${{ github.workspace }}/test/models/ 2>/dev/null || true
+          cp -f ${{ github.workspace }}/src/cpp/pinyin_single.json ${{ github.workspace }}/test/models/ 2>/dev/null || true
+          cp -f ${{ github.workspace }}/src/cpp/pinyin_phrases.json ${{ github.workspace }}/test/models/ 2>/dev/null || true
+
       - name: Inference test - English
         run: |
           mkdir -p /tmp/output
@@ -229,7 +235,7 @@ jobs:
             -v /tmp/output:/output \
             --entrypoint piper \
             piper-cpp-inference:test \
-              --model /models/test_voice.onnx \
+              --model /models/multilingual-test-medium.onnx \
               --output_file /output/test_en.wav
 
           FILE_SIZE=$(stat --format=%s /tmp/output/test_en.wav)
@@ -247,7 +253,7 @@ jobs:
             -v /tmp/output:/output \
             --entrypoint piper \
             piper-cpp-inference:test \
-              --model /models/ja_JP-test-medium.onnx \
+              --model /models/multilingual-test-medium.onnx \
               --output_file /output/test_ja.wav
 
           FILE_SIZE=$(stat --format=%s /tmp/output/test_ja.wav)
@@ -266,7 +272,7 @@ jobs:
             -v /tmp/output:/output \
             --entrypoint piper \
             piper-cpp-inference:test \
-              --model /models/test_voice.onnx \
+              --model /models/multilingual-test-medium.onnx \
               --output_file /output/test_cpp_autodetect.wav
 
           FILE_SIZE=$(stat --format=%s /tmp/output/test_cpp_autodetect.wav)
@@ -282,15 +288,19 @@ jobs:
           # Test that --config can be omitted when only config.json exists in model directory
           # Create a temp directory with model + config.json (no {model}.onnx.json)
           mkdir -p /tmp/fallback-test-cpp
-          cp ${{ github.workspace }}/test/models/test_voice.onnx /tmp/fallback-test-cpp/test_voice.onnx
-          cp ${{ github.workspace }}/test/models/test_voice.onnx.json /tmp/fallback-test-cpp/config.json
+          cp ${{ github.workspace }}/test/models/multilingual-test-medium.onnx /tmp/fallback-test-cpp/multilingual-test-medium.onnx
+          cp ${{ github.workspace }}/test/models/multilingual-test-medium.onnx.json /tmp/fallback-test-cpp/config.json
+          # Copy G2P dictionary files for multilingual inference
+          cp ${{ github.workspace }}/src/cpp/cmudict_data.json /tmp/fallback-test-cpp/ 2>/dev/null || true
+          cp ${{ github.workspace }}/src/cpp/pinyin_single.json /tmp/fallback-test-cpp/ 2>/dev/null || true
+          cp ${{ github.workspace }}/src/cpp/pinyin_phrases.json /tmp/fallback-test-cpp/ 2>/dev/null || true
 
           echo "Fallback config test." | docker run --rm -i \
             -v /tmp/fallback-test-cpp:/models/fallback \
             -v /tmp/output:/output \
             --entrypoint piper \
             piper-cpp-inference:test \
-              --model /models/fallback/test_voice.onnx \
+              --model /models/fallback/multilingual-test-medium.onnx \
               --output_file /output/test_cpp_fallback.wav
 
           FILE_SIZE=$(stat --format=%s /tmp/output/test_cpp_fallback.wav)
@@ -305,14 +315,14 @@ jobs:
         run: |
           # Test that piper exits with error when no config file exists
           mkdir -p /tmp/noconfig-cpp
-          cp ${{ github.workspace }}/test/models/test_voice.onnx /tmp/noconfig-cpp/test_voice.onnx
+          cp ${{ github.workspace }}/test/models/multilingual-test-medium.onnx /tmp/noconfig-cpp/multilingual-test-medium.onnx
 
           echo "This should fail." | docker run --rm -i \
             -v /tmp/noconfig-cpp:/models/noconfig \
             -v /tmp/output:/output \
             --entrypoint piper \
             piper-cpp-inference:test \
-              --model /models/noconfig/test_voice.onnx \
+              --model /models/noconfig/multilingual-test-medium.onnx \
               --output_file /output/should_not_exist_cpp.wav \
             && { echo "ERROR: Expected non-zero exit code but got 0"; exit 1; } \
             || echo "Config not found error test passed (non-zero exit as expected)"

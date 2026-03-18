@@ -107,10 +107,27 @@ def main() -> None:
         if not text:
             raise ValueError("No text provided")
 
-        _LOGGER.debug("Synthesizing text: %s", text)
+        # Resolve language_id from query parameters
+        language_id: int | None = None
+        language_id_raw = request.args.get("language_id", None)
+        language = request.args.get("language", None)
+
+        if language_id_raw is not None:
+            try:
+                language_id = int(language_id_raw)
+            except (ValueError, TypeError):
+                language_id = None
+        elif language is not None:
+            language_id_map = voice.config.language_id_map
+            if language_id_map:
+                language_id = language_id_map.get(language)
+
+        _LOGGER.debug("Synthesizing text: %s (language_id=%s)", text, language_id)
         with io.BytesIO() as wav_io:
             with wave.open(wav_io, "wb") as wav_file:
-                voice.synthesize(text, wav_file, **synthesize_args)
+                voice.synthesize(
+                    text, wav_file, **synthesize_args, language_id=language_id
+                )
 
             return wav_io.getvalue()
 

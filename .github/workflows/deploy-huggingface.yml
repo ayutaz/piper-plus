@@ -53,23 +53,61 @@ jobs:
           mkdir -p hf-space-deploy/models
           echo "Copying model files..."
           
-          # Copy Japanese model
-          if [ -f "test/models/ja_JP-test-medium.onnx" ]; then
-            cp test/models/ja_JP-test-medium.onnx hf-space-deploy/models/
-            cp test/models/ja_JP-test-medium.onnx.json hf-space-deploy/models/
-            echo "✓ Copied Japanese model ($(du -h test/models/ja_JP-test-medium.onnx | cut -f1))"
-          fi
-          
-          # Copy English model
-          if [ -f "test/models/test_voice.onnx" ]; then
-            cp test/models/test_voice.onnx hf-space-deploy/models/
-            cp test/models/test_voice.onnx.json hf-space-deploy/models/
-            echo "✓ Copied English model ($(du -h test/models/test_voice.onnx | cut -f1))"
+          # Copy multilingual model
+          if [ -f "test/models/multilingual-test-medium.onnx" ]; then
+            cp test/models/multilingual-test-medium.onnx hf-space-deploy/models/
+            cp test/models/multilingual-test-medium.onnx.json hf-space-deploy/models/
+            echo "✓ Copied multilingual model ($(du -h test/models/multilingual-test-medium.onnx | cut -f1))"
           fi
           
           # Show total size of models
           echo "Total model size: $(du -sh hf-space-deploy/models | cut -f1)"
-          
+
+          # Copy piper_train phonemize module (inference-only, no torch dependency)
+          echo "Copying piper_train phonemize module..."
+          mkdir -p hf-space-deploy/piper_train/phonemize
+          mkdir -p hf-space-deploy/piper_train/vits
+
+          # piper_train package init (empty - avoids importing heavy dependencies)
+          touch hf-space-deploy/piper_train/__init__.py
+
+          # Phonemize module
+          cp src/python/piper_train/phonemize/__init__.py hf-space-deploy/piper_train/phonemize/
+          cp src/python/piper_train/phonemize/base.py hf-space-deploy/piper_train/phonemize/
+          cp src/python/piper_train/phonemize/registry.py hf-space-deploy/piper_train/phonemize/
+          cp src/python/piper_train/phonemize/multilingual.py hf-space-deploy/piper_train/phonemize/
+          cp src/python/piper_train/phonemize/bilingual.py hf-space-deploy/piper_train/phonemize/
+          cp src/python/piper_train/phonemize/japanese.py hf-space-deploy/piper_train/phonemize/
+          cp src/python/piper_train/phonemize/english.py hf-space-deploy/piper_train/phonemize/
+          cp src/python/piper_train/phonemize/chinese.py hf-space-deploy/piper_train/phonemize/
+          cp src/python/piper_train/phonemize/korean.py hf-space-deploy/piper_train/phonemize/
+          cp src/python/piper_train/phonemize/spanish.py hf-space-deploy/piper_train/phonemize/
+          cp src/python/piper_train/phonemize/portuguese.py hf-space-deploy/piper_train/phonemize/
+          cp src/python/piper_train/phonemize/french.py hf-space-deploy/piper_train/phonemize/
+          cp src/python/piper_train/phonemize/token_mapper.py hf-space-deploy/piper_train/phonemize/
+          cp src/python/piper_train/phonemize/custom_dict.py hf-space-deploy/piper_train/phonemize/
+          cp src/python/piper_train/phonemize/jp_id_map.py hf-space-deploy/piper_train/phonemize/
+          cp src/python/piper_train/phonemize/multilingual_id_map.py hf-space-deploy/piper_train/phonemize/
+          cp src/python/piper_train/phonemize/bilingual_id_map.py hf-space-deploy/piper_train/phonemize/
+          cp src/python/piper_train/phonemize/zh_id_map.py hf-space-deploy/piper_train/phonemize/
+          cp src/python/piper_train/phonemize/ko_id_map.py hf-space-deploy/piper_train/phonemize/
+          cp src/python/piper_train/phonemize/es_id_map.py hf-space-deploy/piper_train/phonemize/
+          cp src/python/piper_train/phonemize/pt_id_map.py hf-space-deploy/piper_train/phonemize/
+          cp src/python/piper_train/phonemize/fr_id_map.py hf-space-deploy/piper_train/phonemize/
+          echo "✓ Copied phonemize module ($(find hf-space-deploy/piper_train/phonemize -name '*.py' | wc -l) files)"
+
+          # Inference script (text_to_phoneme_ids_and_prosody)
+          cp src/python/piper_train/infer_onnx.py hf-space-deploy/piper_train/
+          echo "✓ Copied infer_onnx.py"
+
+          # vits utilities (audio processing, no torch)
+          touch hf-space-deploy/piper_train/vits/__init__.py
+          cp src/python/piper_train/vits/utils.py hf-space-deploy/piper_train/vits/
+          cp src/python/piper_train/vits/wavfile.py hf-space-deploy/piper_train/vits/
+          echo "✓ Copied piper_train/vits/ (utils.py, wavfile.py)"
+
+          echo "piper_train module ready: $(find hf-space-deploy/piper_train -name '*.py' | wc -l) total Python files"
+
           # List files to be deployed
           echo "Files to deploy:"
           find hf-space-deploy -type f \( -name "*.py" -o -name "*.txt" -o -name "*.md" -o -name "*.onnx" -o -name "*.json" \) | sort
@@ -81,6 +119,49 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+
+      - name: Validate Python imports before deployment
+        working-directory: hf-space-deploy
+        run: |
+          pip install numpy onnxruntime
+          echo "=== Pre-deployment import validation ==="
+          python3 << 'PYEOF'
+          import sys, importlib
+
+          modules = [
+              ("piper_train.infer_onnx", "text_to_phoneme_ids_and_prosody"),
+              ("piper_train.phonemize.registry", "get_phonemizer"),
+              ("piper_train.phonemize.base", "Phonemizer"),
+              ("piper_train.phonemize.multilingual", "UnicodeLanguageDetector"),
+              ("piper_train.phonemize.token_mapper", None),
+              ("piper_train.phonemize.jp_id_map", None),
+              ("piper_train.phonemize.multilingual_id_map", None),
+              ("piper_train.vits.utils", "audio_float_to_int16"),
+              ("piper_train.vits.wavfile", "write"),
+          ]
+
+          failed = []
+          for mod_name, attr_name in modules:
+              try:
+                  mod = importlib.import_module(mod_name)
+                  if attr_name and not hasattr(mod, attr_name):
+                      failed.append(f"{mod_name}.{attr_name} not found")
+                      print(f"  FAIL {mod_name}.{attr_name} -- attribute missing")
+                  else:
+                      label = f"{mod_name}.{attr_name}" if attr_name else mod_name
+                      print(f"  OK {label}")
+              except ImportError as e:
+                  failed.append(f"{mod_name} -- {e}")
+                  print(f"  FAIL {mod_name} -- {e}")
+
+          if failed:
+              print(f"\nFAILED: {len(failed)} import(s) failed. Aborting deployment.")
+              for f in failed:
+                  print(f"  - {f}")
+              sys.exit(1)
+          else:
+              print(f"\nPASSED: All {len(modules)} imports validated. Safe to deploy.")
+          PYEOF
 
       - name: Install and deploy to Hugging Face
         env:
@@ -129,11 +210,8 @@ jobs:
           
           # Show model information
           echo "**Deployed Models**:" >> $GITHUB_STEP_SUMMARY
-          if [ -f "hf-space-deploy/models/ja_JP-test-medium.onnx" ]; then
-            echo "- Japanese Model: $(du -h hf-space-deploy/models/ja_JP-test-medium.onnx | cut -f1)" >> $GITHUB_STEP_SUMMARY
-          fi
-          if [ -f "hf-space-deploy/models/test_voice.onnx" ]; then
-            echo "- English Model: $(du -h hf-space-deploy/models/test_voice.onnx | cut -f1)" >> $GITHUB_STEP_SUMMARY
+          if [ -f "hf-space-deploy/models/multilingual-test-medium.onnx" ]; then
+            echo "- Multilingual Model: $(du -h hf-space-deploy/models/multilingual-test-medium.onnx | cut -f1)" >> $GITHUB_STEP_SUMMARY
           fi
           echo "" >> $GITHUB_STEP_SUMMARY
           

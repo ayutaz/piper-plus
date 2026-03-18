@@ -38,7 +38,7 @@ npm run build
 # Build with eSpeak-ng support (Multilingual)
 ./build/build-unified.sh
 
-# Prepare English model
+# Verify multilingual model is in place
 ./scripts/prepare-english-model.sh
 
 # Build for development (with debug symbols)
@@ -82,8 +82,7 @@ openjtalk-web/
 │   ├── unified_phonemizer.js (multilingual)
 │   └── unified_phonemizer.wasm
 ├── models/          # ONNX models
-│   ├── ja_JP-test-medium.onnx
-│   └── en_US-test-medium.onnx
+│   └── multilingual-test-medium.onnx
 ├── src/             # Source files
 │   ├── openjtalk_wrapper.cpp
 │   ├── phonemizer_wrapper.cpp (multilingual)
@@ -109,8 +108,8 @@ await tts.initialize({
         voicePath: 'assets/voice/mei_normal.htsvoice'
     },
     onnx: {
-        modelPath: 'models/ja_JP-test-medium.onnx',
-        modelConfigPath: 'models/ja_JP-test-medium.onnx.json'
+        modelPath: 'models/multilingual-test-medium.onnx',
+        modelConfigPath: 'models/multilingual-test-medium.onnx.json'
     }
 });
 

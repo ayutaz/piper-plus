@@ -5,38 +5,24 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 MODELS_DIR="$PROJECT_DIR/models"
 
-echo "=== Preparing English Model for WebAssembly Demo ==="
+echo "=== Checking Multilingual Model for WebAssembly Demo ==="
 
-# For demo purposes, we'll use a lightweight approach
-# In production, you would download or convert an actual English model
+# Both Japanese and English now use the same multilingual model.
+# There is no separate en_US-test-medium model.
 
-# Check if we have a sample English model in the main Piper project
-PIPER_ROOT="$(cd "$PROJECT_DIR/../../../.." && pwd)"
-SAMPLE_MODEL=""
+MODEL_FILE="$MODELS_DIR/multilingual-test-medium.onnx"
 
-# Search for English models
-echo "Searching for English models in Piper project..."
-for model in "$PIPER_ROOT"/test*.onnx "$PIPER_ROOT"/models/en*.onnx; do
-    if [ -f "$model" ]; then
-        echo "Found model: $model"
-        SAMPLE_MODEL="$model"
-        break
-    fi
-done
-
-if [ -n "$SAMPLE_MODEL" ]; then
-    echo "Copying English model to WebAssembly demo..."
-    cp "$SAMPLE_MODEL" "$MODELS_DIR/en_US-test-medium.onnx"
-    echo "Model copied successfully"
+if [ -f "$MODEL_FILE" ]; then
+    echo "Multilingual model found: $MODEL_FILE"
+    echo "Size: $(du -h "$MODEL_FILE" | cut -f1)"
+    echo ""
+    echo "This single model handles both Japanese and English synthesis."
 else
-    echo "No existing English model found."
+    echo "Multilingual model not found at: $MODEL_FILE"
     echo ""
-    echo "To add an English model:"
-    echo "1. Download a Piper English model (e.g., en_US-lessac-medium.onnx)"
-    echo "2. Copy it to: $MODELS_DIR/en_US-test-medium.onnx"
+    echo "To add the multilingual model:"
+    echo "1. Train or download the multilingual-test-medium model"
+    echo "2. Copy it to: $MODEL_FILE"
     echo ""
-    echo "Or for testing, you can create a dummy model:"
-    echo "  touch $MODELS_DIR/en_US-test-medium.onnx"
-    echo ""
-    echo "Note: The model config (en_US-test-medium.onnx.json) is already created."
+    echo "Note: Both Japanese and English share this single model file."
 fi

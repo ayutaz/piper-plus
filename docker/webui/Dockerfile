@@ -18,8 +18,8 @@ COPY pyproject.toml /app/pyproject.toml
 COPY src/python /app/src/python
 COPY src/python_run/requirements_webui.txt /app/requirements_webui.txt
 
-# Install piper_train with inference extras + gradio
-RUN uv pip install --system "/app/src/python[inference]" && \
+# Install piper_train with inference extras + gradio + multilingual
+RUN uv pip install --system "/app/src/python[inference,multilingual]" && \
     uv pip install --system -r /app/requirements_webui.txt
 
 # Copy WebUI application

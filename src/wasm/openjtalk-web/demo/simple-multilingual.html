@@ -260,22 +260,29 @@
         }
         
         // Load ONNX model
+        // Both languages use the same multilingual model
         async function loadModel(lang) {
-            const modelName = lang === 'ja' ? 'ja_JP-test-medium' : 'en_US-test-medium';
+            const modelName = 'multilingual-test-medium';
             const modelPath = `../models/${modelName}.onnx`;
             const configPath = `../models/${modelName}.onnx.json`;
-            
+
             // Load model config
             const configResponse = await fetch(configPath);
             modelConfig = await configResponse.json();
-            
+
+            // Reuse existing session if model is already loaded
+            if (onnxSession) {
+                console.log(`Reusing model for ${lang}: ${modelName}`);
+                return;
+            }
+
             // Create ONNX session
             onnxSession = await ort.InferenceSession.create(modelPath, {
                 executionProviders: ['wasm'],
                 graphOptimizationLevel: 'extended',
                 enableMemPattern: true
             });
-            
+
             console.log(`Loaded model: ${modelName}`);
         }
         

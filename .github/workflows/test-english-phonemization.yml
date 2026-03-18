@@ -73,10 +73,10 @@ jobs:
       run: |
         cd src/python_run
         # Download a small test model if needed
-        if [ ! -f "../../test/models/test_voice.onnx" ]; then
+        if [ ! -f "../../test/models/multilingual-test-medium.onnx" ]; then
           echo "Test model not found, skipping CLI test"
         else
-          echo "Hello world" | python -m piper --model ../../test/models/test_voice.onnx --output_file test_output.wav
+          echo "Hello world" | python -m piper --model ../../test/models/multilingual-test-medium.onnx --output_file test_output.wav
           # Verify output file was created
           test -f test_output.wav && echo "CLI test passed"
         fi

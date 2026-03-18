@@ -141,8 +141,37 @@ class PiperVoice:
         if self.config.phoneme_type == PhonemeType.TEXT:
             return phonemize_codepoints(text)
 
-        if self.config.phoneme_type == PhonemeType.OPENJTALK:
-            # Use the local phonemization module
+        if self.config.phoneme_type in (
+            PhonemeType.OPENJTALK,
+            PhonemeType.BILINGUAL,
+            PhonemeType.MULTILINGUAL,
+        ):
+            # For MULTILINGUAL/BILINGUAL, try MultilingualPhonemizer first
+            if self.config.phoneme_type in (
+                PhonemeType.MULTILINGUAL,
+                PhonemeType.BILINGUAL,
+            ):
+                try:
+                    from piper_train.phonemize.multilingual import (
+                        MultilingualPhonemizer,
+                    )
+
+                    languages = (
+                        ["ja", "en"]
+                        if self.config.phoneme_type == PhonemeType.BILINGUAL
+                        else ["ja", "en", "zh", "es", "fr", "pt"]
+                    )
+                    mp = MultilingualPhonemizer(languages=languages)
+                    phonemes = mp.phonemize(text)
+                    _LOGGER.debug("MultilingualPhonemizer: '%s' -> %s", text, phonemes)
+                    return [phonemes]
+                except ImportError:
+                    _LOGGER.debug(
+                        "MultilingualPhonemizer not available, "
+                        "falling back to JA phonemizer + eSpeak"
+                    )
+
+            # Use the local phonemization module (JA phonemizer)
             try:
                 from .phonemize.japanese import (
                     get_default_dictionary,
@@ -151,16 +180,27 @@ class PiperVoice:
 
                 # Try to load default custom dictionary
                 custom_dict = get_default_dictionary()
-
-                if custom_dict:
-                    _LOGGER.debug("Using custom dictionary for phonemization")
-                    return [phonemize_japanese(text, custom_dict=custom_dict)]
-                else:
-                    _LOGGER.debug(
-                        "Using default phonemization without custom dictionary"
+                _LOGGER.debug(
+                    "Using custom dictionary for phonemization"
+                    if custom_dict
+                    else "Using default phonemization without custom dictionary"
+                )
+                result = (
+                    phonemize_japanese(text, custom_dict=custom_dict)
+                    if custom_dict
+                    else phonemize_japanese(text)
+                )
+                return [result]
+            except (ImportError, RuntimeError) as e:
+                if self.config.phoneme_type in (
+                    PhonemeType.MULTILINGUAL,
+                    PhonemeType.BILINGUAL,
+                ):
+                    # Fall back to eSpeak for multilingual/bilingual models
+                    _LOGGER.warning(
+                        f"OpenJTalk unavailable, falling back to eSpeak: {e}"
                     )
-                    return [phonemize_japanese(text)]
-            except ImportError as e:
+                    return phonemize_espeak(text, "en")
                 _LOGGER.warning(f"Failed to import phonemizer: {e}")
                 return [self._phonemize_japanese_simple(text)]
 
@@ -205,8 +245,12 @@ class PiperVoice:
 
             ids.extend(id_map[phoneme])
 
-            # 学習データが PAD("_") を各音素ごとに含んでいるのは eSpeak 方式のみ。
-            if self.config.phoneme_type == PhonemeType.ESPEAK:
+            # eSpeak, bilingual, and multilingual models use intersperse padding (PAD between phonemes).
+            if self.config.phoneme_type in (
+                PhonemeType.ESPEAK,
+                PhonemeType.BILINGUAL,
+                PhonemeType.MULTILINGUAL,
+            ):
                 ids.extend(id_map[PAD])
 
         ids.extend(id_map[EOS])
@@ -223,6 +267,7 @@ class PiperVoice:
         noise_w: float | None = None,
         sentence_silence: float = 0.0,
         volume: float = 1.0,
+        language_id: int | None = None,
     ):
         """Synthesize WAV audio from text."""
         wav_file.setframerate(self.config.sample_rate)
@@ -237,6 +282,7 @@ class PiperVoice:
             noise_w=noise_w,
             sentence_silence=sentence_silence,
             volume=volume,
+            language_id=language_id,
         ):
             wav_file.writeframes(audio_bytes)
 
@@ -249,6 +295,7 @@ class PiperVoice:
         noise_w: float | None = None,
         sentence_silence: float = 0.0,
         volume: float = 1.0,
+        language_id: int | None = None,
     ) -> Iterable[bytes]:
         """Synthesize raw audio per sentence from text."""
         sentence_phonemes = self.phonemize(text)
@@ -267,6 +314,7 @@ class PiperVoice:
                     noise_scale=noise_scale,
                     noise_w=noise_w,
                     volume=volume,
+                    language_id=language_id,
                 )
                 + silence_bytes
             )
@@ -279,6 +327,7 @@ class PiperVoice:
         noise_scale: float | None = None,
         noise_w: float | None = None,
         volume: float = 1.0,
+        language_id: int | None = None,
     ) -> bytes:
         """Synthesize raw audio from phoneme ids."""
         if length_scale is None:
@@ -317,10 +366,23 @@ class PiperVoice:
             sid = np.expand_dims(np.array([speaker_id], dtype=np.int64), 0)
             args["sid"] = sid
 
+        # Include lid for multilingual models
+        input_names = {inp.name for inp in self.session.get_inputs()}
+        if "lid" in input_names:
+            lid_value = language_id if language_id is not None else 0
+            lid = np.array([lid_value], dtype=np.int64)
+            args["lid"] = lid
+
+        # Include prosody_features if model requires them (zeros as default)
+        if "prosody_features" in input_names:
+            num_phonemes = phoneme_ids_array.shape[1]
+            prosody = np.zeros((1, num_phonemes, 3), dtype=np.int64)
+            args["prosody_features"] = prosody
+
         # Synthesize through Onnx
         audio = self.session.run(
             None,
             args,
-        )[0].squeeze((0, 1))
+        )[0].squeeze(0)
         audio = audio_float_to_int16(audio.squeeze(), volume=volume)
         return audio.tobytes()

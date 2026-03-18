@@ -21,3 +21,17 @@ try:
         ESPEAK_AVAILABLE = False
 except ImportError:
     ESPEAK_AVAILABLE = False
+
+try:
+    import pypinyin  # noqa: F401
+
+    HAS_PYPINYIN = True
+except ImportError:
+    HAS_PYPINYIN = False
+
+try:
+    import g2pk2  # noqa: F401
+
+    HAS_G2PK2 = True
+except ImportError:
+    HAS_G2PK2 = False

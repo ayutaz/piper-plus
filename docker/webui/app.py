@@ -13,6 +13,21 @@ import onnxruntime
 from piper_train.infer_onnx import text_to_phoneme_ids_and_prosody
 
 
+SAMPLE_TEXTS = {
+    "ja": "こんにちは、今日はとても良い天気ですね。散歩に出かけましょう。",
+    "en": "Hello, how are you today? The weather is beautiful, let's go for a walk.",
+    "zh": "你好，今天天气非常好。我们一起去散步吧。",
+    "es": "Hola, ¿cómo estás hoy? El clima es hermoso, vamos a dar un paseo.",
+    "fr": "Bonjour, comment allez-vous aujourd'hui? Il fait beau, allons nous promener.",
+    "pt": "Olá, como você está hoje? O tempo está lindo, vamos dar um passeio.",
+}
+
+
+def on_language_change(language: str) -> str:
+    """Return sample text for the selected language."""
+    return SAMPLE_TEXTS.get(language, "")
+
+
 _session_cache: dict[str, onnxruntime.InferenceSession] = {}
 _config_cache: dict[str, dict] = {}
 _cache_lock = threading.Lock()
@@ -97,14 +112,17 @@ def synthesize(
 
     sample_rate = config.get("audio", {}).get("sample_rate", 22050)
 
+    language_id_map = config.get("language_id_map", {})
+
     phoneme_ids, prosody_features_data = text_to_phoneme_ids_and_prosody(
-        text, phoneme_id_map, language=language
+        text, phoneme_id_map, language=language, language_id_map=language_id_map
     )
 
     session = _get_session(model_path)
     input_names = [inp.name for inp in session.get_inputs()]
     has_prosody = "prosody_features" in input_names
     has_sid = "sid" in input_names
+    has_lid = "lid" in input_names
 
     text_array = np.expand_dims(np.array(phoneme_ids, dtype=np.int64), 0)
     text_lengths = np.array([text_array.shape[1]], dtype=np.int64)
@@ -119,6 +137,10 @@ def synthesize(
     if has_sid:
         inputs["sid"] = np.array([int(speaker_id)], dtype=np.int64)
 
+    if has_lid:
+        language_id = language_id_map.get(language, 0)
+        inputs["lid"] = np.array([language_id], dtype=np.int64)
+
     if has_prosody and prosody_features_data:
         prosody_array = []
         for pf in prosody_features_data:
@@ -131,7 +153,7 @@ def synthesize(
         )
 
     outputs = session.run(None, inputs)
-    audio = outputs[0].squeeze((0, 1))
+    audio = outputs[0].squeeze(0)
     audio = audio_float_to_int16(audio.squeeze())
 
     return (sample_rate, audio)
@@ -151,6 +173,7 @@ def create_ui(model_dir: str, output_dir: str):
                     label="Text",
                     placeholder="Enter text to synthesize...",
                     lines=3,
+                    value=SAMPLE_TEXTS["ja"],
                 )
                 model_dropdown = gr.Dropdown(
                     choices=model_choices,
@@ -158,7 +181,7 @@ def create_ui(model_dir: str, output_dir: str):
                     value=model_choices[0] if models else None,
                 )
                 language = gr.Radio(
-                    choices=["ja", "en"],
+                    choices=["ja", "en", "zh", "es", "fr", "pt"],
                     label="Language",
                     value="ja",
                 )
@@ -175,6 +198,12 @@ def create_ui(model_dir: str, output_dir: str):
 
             with gr.Column():
                 audio_output = gr.Audio(label="Output", type="numpy")
+
+        language.change(
+            fn=on_language_change,
+            inputs=[language],
+            outputs=[text_input],
+        )
 
         btn.click(
             fn=synthesize,

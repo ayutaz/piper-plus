@@ -69,7 +69,7 @@ def main():
             Path(__file__).parent.parent.parent
             / "test"
             / "models"
-            / "ja_JP-test-medium.onnx.json"
+            / "multilingual-test-medium.onnx.json"
         )
         if test_model_path.exists():
             print(f"Updating test model: {test_model_path}")

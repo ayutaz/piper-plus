@@ -1,5 +1,4 @@
 import logging
-import os
 from pathlib import Path
 
 import pytorch_lightning as pl
@@ -15,10 +14,18 @@ from .mel_processing import mel_spectrogram_torch, spec_to_mel_torch
 from .models import MultiPeriodDiscriminator, SynthesizerTrn, WavLMDiscriminator
 
 
+# Optional wandb import with graceful fallback
+try:
+    import wandb
+
+    WANDB_AVAILABLE = True
+except ImportError:
+    WANDB_AVAILABLE = False
+
 _LOGGER = logging.getLogger("vits.lightning")
 
 # Memory cleanup frequency (iterations)
-MEMORY_CLEANUP_FREQUENCY = 100
+MEMORY_CLEANUP_FREQUENCY = 500
 
 
 class VitsModel(pl.LightningModule):
@@ -26,6 +33,8 @@ class VitsModel(pl.LightningModule):
         self,
         num_symbols: int,
         num_speakers: int,
+        num_languages: int = 1,
+        audio_log_epochs: int = 1,  # Log audio samples to WandB every N epochs
         # audio
         resblock="2",
         resblock_kernel_sizes=(3, 5, 7),
@@ -73,15 +82,17 @@ class VitsModel(pl.LightningModule):
         c_mel: int = 45,
         c_kl: float = 1.0,
         grad_clip: float | None = None,
-        num_workers: int = 1,
+        num_workers: int = 2,
         seed: int = 1234,
-        num_test_examples: int = 5,
+        num_test_examples: int = 2,
         validation_split: float = 0.1,
         max_phoneme_ids: int | None = None,
+        validate_cache: bool = False,
         # WavLM Discriminator (enabled by default for improved audio quality)
         use_wavlm_discriminator: bool = True,
         wavlm_model_name: str = "microsoft/wavlm-base-plus",
         c_wavlm: float = 0.5,
+        wavlm_every_n_steps: int = 1,
         **kwargs,
     ):
         super().__init__()
@@ -91,7 +102,7 @@ class VitsModel(pl.LightningModule):
 
         # Fix gin_channels BEFORE save_hyperparameters() so the correct value is saved
         # This fixes the bug where gin_channels=0 was saved for multi-speaker models
-        if (num_speakers > 1) and (gin_channels <= 0):
+        if (num_speakers > 1 or num_languages > 1) and (gin_channels <= 0):
             gin_channels = 512
 
         self.save_hyperparameters()
@@ -115,6 +126,7 @@ class VitsModel(pl.LightningModule):
             upsample_initial_channel=self.hparams.upsample_initial_channel,
             upsample_kernel_sizes=self.hparams.upsample_kernel_sizes,
             n_speakers=self.hparams.num_speakers,
+            n_languages=self.hparams.num_languages,
             gin_channels=self.hparams.gin_channels,
             use_sdp=self.hparams.use_sdp,
             prosody_dim=self.hparams.prosody_dim,
@@ -144,6 +156,85 @@ class VitsModel(pl.LightningModule):
         self._y = None
         self._y_hat = None
 
+    def _load_test_dataset(self, test_utterances_path: Path):
+        """Load fixed test dataset for WandB audio logging.
+
+        Ensures Japanese, English, and mixed sentences are all covered.
+        Mixed sentences (language_id == -1) are automatically phonemized with ja-en.
+        """
+        import json
+
+        from .dataset import Utterance
+
+        utterances = []
+
+        with open(test_utterances_path, encoding="utf-8") as f:
+            for line in f:
+                data = json.loads(line.strip())
+
+                # Mixed sentences (language_id == -1) need phonemization
+                if data.get("language_id", 0) == -1:
+                    from ..phonemize.registry import get_phonemizer
+
+                    phonemizer = get_phonemizer("ja-en")
+                    phonemes, prosody_info_list = phonemizer.phonemize_with_prosody(
+                        data["text"]
+                    )
+
+                    # Load phoneme_id_map from config.json
+                    config_path = self.hparams.dataset_dir / "config.json"
+                    with open(config_path, encoding="utf-8") as cfg:
+                        config = json.load(cfg)
+                        pid_map = config["phoneme_id_map"]
+
+                    # Convert phonemes to IDs
+                    phoneme_ids = []
+                    prosody_features = []
+                    for phoneme, prosody_info in zip(
+                        phonemes, prosody_info_list, strict=True
+                    ):
+                        if phoneme in pid_map:
+                            ids = pid_map[phoneme]
+                            phoneme_ids.extend(ids)
+                            for _ in ids:
+                                if prosody_info is not None:
+                                    prosody_features.append(
+                                        {
+                                            "a1": prosody_info.a1,
+                                            "a2": prosody_info.a2,
+                                            "a3": prosody_info.a3,
+                                        }
+                                    )
+                                else:
+                                    prosody_features.append(None)
+
+                    # Apply post-processing (BOS/EOS/padding)
+                    phoneme_ids, prosody_features = phonemizer.post_process_ids(
+                        phoneme_ids, prosody_features, pid_map
+                    )
+
+                    data["phoneme_ids"] = phoneme_ids
+                    data["prosody_features"] = prosody_features
+                    # Set language_id to ja (0) for mixed sentences (or detect from text)
+                    data["language_id"] = config.get("language_id_map", {}).get("ja", 0)
+
+                # Create Utterance object
+                utt = Utterance(
+                    phoneme_ids=torch.LongTensor(data["phoneme_ids"]),
+                    audio_norm_path=None,  # Not needed for test set
+                    audio_spec_path=None,
+                    speaker_id=data.get("speaker_id", 0),
+                    language_id=data.get("language_id", 0),
+                    prosody_features=data.get("prosody_features"),
+                    text=data["text"],  # Store original text for logging
+                )
+                utterances.append(utt)
+
+        _LOGGER.info(
+            f"Loaded {len(utterances)} fixed test utterances from {test_utterances_path}"
+        )
+        return utterances
+
     def _load_datasets(
         self,
         validation_split: float,
@@ -154,17 +245,49 @@ class VitsModel(pl.LightningModule):
             _LOGGER.debug("No dataset to load")
             return
 
-        full_dataset = PiperDataset(
-            self.hparams.dataset, max_phoneme_ids=max_phoneme_ids
-        )
-        valid_set_size = int(len(full_dataset) * validation_split)
-        train_set_size = len(full_dataset) - valid_set_size - num_test_examples
+        validate_cache = self.hparams.get("validate_cache", False)
 
-        self._train_dataset, self._test_dataset, self._val_dataset = random_split(
-            full_dataset, [train_set_size, num_test_examples, valid_set_size]
-        )
+        # Try to load fixed test dataset first
+        test_utterances_path = self.hparams.dataset_dir / "test_utterances.jsonl"
+        if test_utterances_path.exists():
+            self._test_dataset = self._load_test_dataset(test_utterances_path)
+            # Load train/val datasets without test examples
+            full_dataset = PiperDataset(
+                self.hparams.dataset,
+                max_phoneme_ids=max_phoneme_ids,
+                validate_cache=validate_cache,
+            )
+            valid_set_size = int(len(full_dataset) * validation_split)
+            train_set_size = len(full_dataset) - valid_set_size
+            split_generator = torch.Generator().manual_seed(self.hparams.seed)
+            self._train_dataset, self._val_dataset = random_split(
+                full_dataset,
+                [train_set_size, valid_set_size],
+                generator=split_generator,
+            )
+        else:
+            # Fallback: use random split (old behavior)
+            _LOGGER.warning(
+                f"Fixed test dataset not found at {test_utterances_path}, using random split"
+            )
+            full_dataset = PiperDataset(
+                self.hparams.dataset,
+                max_phoneme_ids=max_phoneme_ids,
+                validate_cache=validate_cache,
+            )
+            valid_set_size = int(len(full_dataset) * validation_split)
+            train_set_size = len(full_dataset) - valid_set_size - num_test_examples
 
-    def forward(self, text, text_lengths, scales, sid=None, prosody_features=None):
+            split_generator = torch.Generator().manual_seed(self.hparams.seed)
+            self._train_dataset, self._test_dataset, self._val_dataset = random_split(
+                full_dataset,
+                [train_set_size, num_test_examples, valid_set_size],
+                generator=split_generator,
+            )
+
+    def forward(
+        self, text, text_lengths, scales, sid=None, lid=None, prosody_features=None
+    ):
         noise_scale = scales[0]
         length_scale = scales[1]
         noise_scale_w = scales[2]
@@ -175,10 +298,20 @@ class VitsModel(pl.LightningModule):
             length_scale=length_scale,
             noise_scale_w=noise_scale_w,
             sid=sid,
+            lid=lid,
             prosody_features=prosody_features,
         )
 
         return audio
+
+    def on_train_epoch_end(self):
+        """Step LR schedulers at the end of each epoch.
+
+        With automatic_optimization=False, Lightning does not step schedulers
+        automatically. We must do it manually.
+        """
+        for sch in self.lr_schedulers():
+            sch.step()
 
     def on_train_epoch_start(self):
         """エポック開始時にSpeakerBalancedBatchSamplerのepochを更新"""
@@ -198,17 +331,25 @@ class VitsModel(pl.LightningModule):
         collate_fn = UtteranceCollate(
             is_multispeaker=self.hparams.num_speakers > 1,
             segment_size=self.hparams.segment_size,
+            is_multilanguage=self.hparams.num_languages > 1,
         )
 
         # マルチスピーカーでsamples_per_speakerが設定されている場合は
         # SpeakerBalancedBatchSamplerを使用
         samples_per_speaker = getattr(self.hparams, "samples_per_speaker", 0)
         if self.hparams.num_speakers > 1 and samples_per_speaker > 0:
+            language_group_balance = getattr(
+                self.hparams, "language_balanced_sampling", None
+            )
+            # CLI default is False (store_true); convert to None for auto-detection
+            if language_group_balance is False:
+                language_group_balance = None
             self._train_batch_sampler = SpeakerBalancedBatchSampler(
                 self._train_dataset,
                 batch_size=self.hparams.batch_size,
                 samples_per_speaker=samples_per_speaker,
                 drop_last=True,
+                language_group_balance=language_group_balance,
             )
             _LOGGER.info(
                 "Using SpeakerBalancedBatchSampler: batch_size=%d, samples_per_speaker=%d, "
@@ -223,7 +364,8 @@ class VitsModel(pl.LightningModule):
                 batch_sampler=self._train_batch_sampler,
                 num_workers=self.hparams.num_workers,
                 pin_memory=pin_memory,
-                persistent_workers=(True if self.hparams.num_workers > 0 else False),
+                persistent_workers=(self.hparams.num_workers > 0),
+                prefetch_factor=(2 if self.hparams.num_workers > 0 else None),
             )
         else:
             # 従来の動作（ランダムサンプリング）
@@ -233,10 +375,10 @@ class VitsModel(pl.LightningModule):
                 collate_fn=collate_fn,
                 num_workers=self.hparams.num_workers,
                 batch_size=self.hparams.batch_size,
+                shuffle=True,
                 pin_memory=pin_memory,
-                persistent_workers=(
-                    True if self.hparams.num_workers > 0 else False
-                ),  # Multi-GPU optimization
+                persistent_workers=(self.hparams.num_workers > 0),
+                prefetch_factor=(2 if self.hparams.num_workers > 0 else None),
             )
 
     def val_dataloader(self):
@@ -247,13 +389,13 @@ class VitsModel(pl.LightningModule):
             collate_fn=UtteranceCollate(
                 is_multispeaker=self.hparams.num_speakers > 1,
                 segment_size=self.hparams.segment_size,
+                is_multilanguage=self.hparams.num_languages > 1,
             ),
             num_workers=self.hparams.num_workers,
             batch_size=self.hparams.batch_size,
             pin_memory=pin_memory,
-            persistent_workers=(
-                True if self.hparams.num_workers > 0 else False
-            ),  # Multi-GPU optimization
+            persistent_workers=(self.hparams.num_workers > 0),
+            prefetch_factor=(2 if self.hparams.num_workers > 0 else None),
         )
 
     def test_dataloader(self):
@@ -262,6 +404,7 @@ class VitsModel(pl.LightningModule):
             collate_fn=UtteranceCollate(
                 is_multispeaker=self.hparams.num_speakers > 1,
                 segment_size=self.hparams.segment_size,
+                is_multilanguage=self.hparams.num_languages > 1,
             ),
             num_workers=self.hparams.num_workers,
             batch_size=self.hparams.batch_size,
@@ -283,9 +426,14 @@ class VitsModel(pl.LightningModule):
         self.manual_backward(loss_d)
         opt_d.step()
 
+        # Clear instance variables to release references
+        self._y = None
+        self._y_hat = None
+
         # Periodic memory cleanup to prevent fragmentation
         if batch_idx % MEMORY_CLEANUP_FREQUENCY == 0:
             if torch.cuda.is_available():
+                torch.cuda.synchronize()  # Wait for GPU operations to complete
                 torch.cuda.empty_cache()
                 # Use info level only for first cleanup, then debug
                 if batch_idx == 0:
@@ -308,8 +456,44 @@ class VitsModel(pl.LightningModule):
         sync_dist = self.trainer.world_size > 1
         self.log(key, value, batch_size=batch_size, sync_dist=sync_dist)
 
+    def _get_wandb_logger(self):
+        """Get WandB logger from trainer's logger list, if available.
+
+        Returns:
+            WandbLogger instance or None if not found/unavailable
+        """
+        if not WANDB_AVAILABLE:
+            return None
+
+        # PyTorch Lightning 2.x uses trainer.loggers (plural) for multiple loggers
+        if hasattr(self.trainer, "loggers") and self.trainer.loggers:
+            loggers = self.trainer.loggers
+        else:
+            # Fallback to trainer.logger (singular)
+            trainer_logger = self.trainer.logger
+            loggers = (
+                trainer_logger if isinstance(trainer_logger, list) else [trainer_logger]
+            )
+
+        for logger in loggers:
+            # Check by class name to avoid import dependency
+            if logger.__class__.__name__ == "WandbLogger":
+                return logger
+
+        return None
+
     def training_step_g(self, batch: Batch):
-        x, x_lengths, y, _, spec, spec_lengths, speaker_ids, prosody_features = (
+        (
+            x,
+            x_lengths,
+            y,
+            _,
+            spec,
+            spec_lengths,
+            speaker_ids,
+            language_ids,
+            prosody_features,
+        ) = (
             batch.phoneme_ids,
             batch.phoneme_lengths,
             batch.audios,
@@ -317,6 +501,7 @@ class VitsModel(pl.LightningModule):
             batch.spectrograms,
             batch.spectrogram_lengths,
             batch.speaker_ids if batch.speaker_ids is not None else None,
+            batch.language_ids if batch.language_ids is not None else None,
             batch.prosody_features if batch.prosody_features is not None else None,
         )
         (
@@ -333,6 +518,7 @@ class VitsModel(pl.LightningModule):
             spec,
             spec_lengths,
             speaker_ids,
+            lid=language_ids,
             prosody_features=prosody_features,
         )
         self._y_hat = y_hat.contiguous()
@@ -386,14 +572,21 @@ class VitsModel(pl.LightningModule):
 
             loss_gen_all = loss_gen + loss_fm + loss_mel + loss_dur + loss_kl
 
-            # WavLM Discriminator loss (optional)
-            if self.model_d_wavlm is not None:
+            # WavLM Discriminator loss (optional, computed every N steps)
+            if self.model_d_wavlm is not None and (
+                self.global_step % self.hparams.wavlm_every_n_steps == 0
+            ):
                 _y_d_hat_r_wlm, y_d_hat_g_wlm, fmap_r_wlm, fmap_g_wlm = (
                     self.model_d_wavlm(y, y_hat)
                 )
                 loss_fm_wavlm = feature_loss(fmap_r_wlm, fmap_g_wlm)
                 loss_gen_wavlm, _ = generator_loss(y_d_hat_g_wlm)
-                loss_wavlm = (loss_gen_wavlm + loss_fm_wavlm) * self.hparams.c_wavlm
+                # Scale up loss to compensate for reduced frequency
+                loss_wavlm = (
+                    (loss_gen_wavlm + loss_fm_wavlm)
+                    * self.hparams.c_wavlm
+                    * self.hparams.wavlm_every_n_steps
+                )
                 loss_gen_all = loss_gen_all + loss_wavlm
 
                 # Log WavLM losses
@@ -419,13 +612,20 @@ class VitsModel(pl.LightningModule):
             )
             loss_disc_all = loss_disc
 
-            # WavLM Discriminator loss (optional)
-            if self.model_d_wavlm is not None:
+            # WavLM Discriminator loss (optional, computed every N steps)
+            if self.model_d_wavlm is not None and (
+                self.global_step % self.hparams.wavlm_every_n_steps == 0
+            ):
                 y_d_hat_r_wlm, y_d_hat_g_wlm, _, _ = self.model_d_wavlm(
                     y, y_hat_detached
                 )
                 loss_disc_wavlm, _, _ = discriminator_loss(y_d_hat_r_wlm, y_d_hat_g_wlm)
-                loss_disc_all = loss_disc_all + loss_disc_wavlm * self.hparams.c_wavlm
+                loss_disc_all = (
+                    loss_disc_all
+                    + loss_disc_wavlm
+                    * self.hparams.c_wavlm
+                    * self.hparams.wavlm_every_n_steps
+                )
 
                 # Log WavLM discriminator loss
                 self._log_with_batch_info("loss_disc_wavlm", loss_disc_wavlm, batch)
@@ -435,32 +635,199 @@ class VitsModel(pl.LightningModule):
             return loss_disc_all
 
     def validation_step(self, batch: Batch, batch_idx: int):
-        val_loss = self.training_step_g(batch) + self.training_step_d(batch)
+        # Temporarily suppress self.log to prevent training_step_g/d from
+        # logging training-named metrics (loss_gen_all, loss_disc_all, etc.)
+        # during validation.  We restore self.log immediately after.
+        _orig_log = self.log
+        self.log = lambda *_args, **_kwargs: None  # no-op
+        try:
+            loss_g = self.training_step_g(batch)
+            loss_d = self.training_step_d(batch)
+        finally:
+            self.log = _orig_log
+
+        val_loss = loss_g + loss_d
         self._log_with_batch_info("val_loss", val_loss, batch)
-
-        # Generate audio examples
-        for utt_idx, test_utt in enumerate(self._test_dataset):
-            text = test_utt.phoneme_ids.unsqueeze(0).to(self.device)
-            text_lengths = torch.LongTensor([len(test_utt.phoneme_ids)]).to(self.device)
-            scales = [0.667, 1.0, 0.8]
-            sid = (
-                test_utt.speaker_id.to(self.device)
-                if test_utt.speaker_id is not None
-                else None
-            )
-            test_audio = self(text, text_lengths, scales, sid=sid).detach()
-
-            # Scale to make louder in [-1, 1]
-            test_audio = test_audio * (1.0 / max(0.01, abs(test_audio.max())))
-
-            tag = test_utt.text or str(utt_idx)
-            self.logger.experiment.add_audio(
-                tag, test_audio, sample_rate=self.hparams.sample_rate
-            )
-
         return val_loss
 
+    def on_validation_epoch_end(self):
+        """Log audio samples to WandB at the end of validation epoch.
+
+        This is called after all validation batches are processed,
+        avoiding blocking the validation loop with audio generation.
+
+        DDP safety: rank 0 performs audio generation and WandB upload inside
+        the is_global_zero block, then ALL ranks sync at a barrier. Without
+        the barrier, Lightning may advance ranks 1-3 to the next training step
+        while rank 0 is still uploading to WandB, causing NCCL ALLREDUCE timeout.
+        """
+        # Only rank 0 does audio generation and WandB logging.
+        # Wrapped in a block (not early return) so the barrier below runs on all ranks.
+        if self.trainer.is_global_zero:
+            should_log = (
+                self.hparams.audio_log_epochs > 0
+                and self.current_epoch % self.hparams.audio_log_epochs == 0
+            )
+            wandb_logger = self._get_wandb_logger() if should_log else None
+
+            if should_log and wandb_logger is not None and WANDB_AVAILABLE:
+                import json
+
+                try:
+                    wandb_audio_data = []
+
+                    # Build language map from config once (outside loop)
+                    language_map = {}
+                    try:
+                        config_path = self.hparams.dataset_dir / "config.json"
+                        with open(config_path, encoding="utf-8") as cfg:
+                            cfg_data = json.load(cfg)
+                        lid_map = cfg_data.get("language_id_map", {})
+                        for lang_name, lang_id in lid_map.items():
+                            language_map[lang_id] = lang_name
+                    except Exception:
+                        pass
+                    if not language_map:
+                        language_map = {
+                            i: f"lang_{i}"
+                            for i in range(getattr(self.hparams, "num_languages", 1))
+                        }
+
+                    with torch.no_grad():  # Disable gradient computation
+                        for utt_idx, test_utt in enumerate(self._test_dataset):
+                            # Generate audio
+                            text = test_utt.phoneme_ids.unsqueeze(0).to(self.device)
+                            text_lengths = torch.LongTensor(
+                                [len(test_utt.phoneme_ids)]
+                            ).to(self.device)
+                            scales = [0.667, 1.0, 0.8]
+                            # speaker_id / language_id may be int or Tensor
+                            # (Subset from random_split wraps them as LongTensor)
+                            raw_sid = test_utt.speaker_id
+                            if raw_sid is not None:
+                                if isinstance(raw_sid, torch.Tensor):
+                                    sid = (
+                                        raw_sid.unsqueeze(0)
+                                        if raw_sid.dim() == 0
+                                        else raw_sid
+                                    ).to(self.device)
+                                else:
+                                    sid = torch.LongTensor([raw_sid]).to(self.device)
+                            else:
+                                sid = None
+
+                            raw_lid = test_utt.language_id
+                            if raw_lid is not None:
+                                if isinstance(raw_lid, torch.Tensor):
+                                    lid = (
+                                        raw_lid.unsqueeze(0)
+                                        if raw_lid.dim() == 0
+                                        else raw_lid
+                                    ).to(self.device)
+                                else:
+                                    lid = torch.LongTensor([raw_lid]).to(self.device)
+                            else:
+                                lid = None
+
+                            test_audio = self(
+                                text, text_lengths, scales, sid=sid, lid=lid
+                            ).detach()
+                            test_audio = test_audio * (
+                                1.0 / max(0.01, abs(test_audio.max()))
+                            )
+
+                            # Convert to numpy (CPU)
+                            audio_np = test_audio.squeeze().cpu().numpy()
+
+                            # Build metadata
+                            text_str = (
+                                test_utt.text if test_utt.text else f"sample_{utt_idx}"
+                            )
+                            speaker_str = (
+                                f"spk={sid.item()}" if sid is not None else "single"
+                            )
+                            lang_str = language_map.get(
+                                lid.item() if lid is not None else 0, "unknown"
+                            )
+                            noise_scale, length_scale, noise_scale_w = scales
+
+                            # Create WandB audio
+                            caption = f"{text_str} | {speaker_str} | {lang_str} | noise={noise_scale:.3f},len={length_scale:.2f},noisew={noise_scale_w:.2f}"
+                            wandb_audio = wandb.Audio(
+                                audio_np,
+                                sample_rate=self.hparams.sample_rate,
+                                caption=caption,
+                            )
+
+                            wandb_audio_data.append(
+                                [
+                                    text_str,
+                                    speaker_str,
+                                    lang_str,
+                                    self.current_epoch,
+                                    self.global_step,
+                                    wandb_audio,
+                                ]
+                            )
+
+                            # Aggressive per-sample GPU memory cleanup
+                            del test_audio, text, text_lengths, sid, lid
+                            if torch.cuda.is_available():
+                                torch.cuda.synchronize()
+                                torch.cuda.empty_cache()
+
+                    # Log all samples as table
+                    if wandb_audio_data:
+                        columns = [
+                            "text",
+                            "speaker",
+                            "language",
+                            "epoch",
+                            "step",
+                            "audio",
+                        ]
+                        table = wandb.Table(columns=columns, data=wandb_audio_data)
+                        wandb_logger.experiment.log(
+                            {
+                                f"validation_audio_samples/epoch_{self.current_epoch}": table
+                            },
+                            step=self.global_step,
+                        )
+                        _LOGGER.info(
+                            f"Logged {len(wandb_audio_data)} audio samples to WandB at epoch {self.current_epoch}"
+                        )
+
+                    # Final cleanup
+                    del wandb_audio_data
+                    if torch.cuda.is_available():
+                        torch.cuda.synchronize()
+                        torch.cuda.empty_cache()
+
+                except Exception as e:
+                    _LOGGER.warning(f"Failed to log audio to WandB: {e}")
+
+        # DDP barrier: all ranks wait here so rank 0's WandB I/O completes before
+        # any rank advances to the next training step.
+        if self.trainer.world_size > 1:
+            torch.distributed.barrier()
+
     def configure_optimizers(self):
+        # Freeze Duration Predictor if requested
+        freeze_dp = getattr(self.hparams, "freeze_dp", False)
+        if freeze_dp:
+            dp_frozen_count = 0
+            for name, param in self.model_g.named_parameters():
+                if name.startswith("dp."):
+                    param.requires_grad = False
+                    dp_frozen_count += 1
+            _LOGGER.info(
+                "Frozen %d Duration Predictor parameters (--freeze-dp)",
+                dp_frozen_count,
+            )
+
+        # Generator optimizer: only trainable parameters
+        gen_params = [p for p in self.model_g.parameters() if p.requires_grad]
+
         # Collect discriminator parameters (including WavLM if enabled)
         d_params = list(self.model_d.parameters())
         if self.model_d_wavlm is not None:
@@ -468,16 +835,18 @@ class VitsModel(pl.LightningModule):
 
         optimizers = [
             torch.optim.AdamW(
-                self.model_g.parameters(),
+                gen_params,
                 lr=self.hparams.learning_rate,
                 betas=self.hparams.betas,
                 eps=self.hparams.eps,
+                fused=torch.cuda.is_available(),
             ),
             torch.optim.AdamW(
                 d_params,
                 lr=self.hparams.learning_rate,
                 betas=self.hparams.betas,
                 eps=self.hparams.eps,
+                fused=torch.cuda.is_available(),
             ),
         ]
         schedulers = [
@@ -496,11 +865,24 @@ class VitsModel(pl.LightningModule):
         parser = parent_parser.add_argument_group("VitsModel")
         parser.add_argument("--batch-size", type=int, required=True)
         parser.add_argument("--validation-split", type=float, default=0.1)
-        parser.add_argument("--num-test-examples", type=int, default=5)
+        parser.add_argument("--num-test-examples", type=int, default=2)
+        parser.add_argument(
+            "--audio-log-epochs",
+            type=int,
+            default=1,
+            help="Log audio samples to WandB every N epochs (default: 1, 0=disable)",
+        )
         parser.add_argument(
             "--max-phoneme-ids",
             type=int,
             help="Exclude utterances with phoneme id lists longer than this",
+        )
+        parser.add_argument(
+            "--validate-cache",
+            action="store_true",
+            default=False,
+            help="At startup, load-test every cached .pt file and skip corrupted ones "
+            "(slow for large datasets; use once after suspected corruption).",
         )
         parser.add_argument("--hidden-channels", type=int, default=192)
         parser.add_argument("--inter-channels", type=int, default=192)
@@ -522,7 +904,8 @@ class VitsModel(pl.LightningModule):
         parser.add_argument(
             "--num-workers",
             type=int,
-            default=min(16, os.cpu_count()),
-            help="Number of workers for DataLoader",
+            default=2,
+            help="Number of workers for DataLoader (default: 2 for parallel data loading). "
+            "Set to 0 for single-threaded loading if shared memory is limited.",
         )
         return parent_parser

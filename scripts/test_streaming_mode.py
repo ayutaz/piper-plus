@@ -125,10 +125,10 @@ def main():
 
     # Test with different models and texts
     test_cases = [
-        ("test/models/test_voice.onnx", "Hello world."),
-        ("test/models/test_voice.onnx", "The quick brown fox jumps over the lazy dog."),
-        ("test/models/ja_JP-test-medium.onnx", "こんにちは世界。"),
-        ("test/models/ja_JP-test-medium.onnx", "今日はとてもいい天気ですね。"),
+        ("test/models/multilingual-test-medium.onnx", "Hello world."),
+        ("test/models/multilingual-test-medium.onnx", "The quick brown fox jumps over the lazy dog."),
+        ("test/models/multilingual-test-medium.onnx", "こんにちは世界。"),
+        ("test/models/multilingual-test-medium.onnx", "今日はとてもいい天気ですね。"),
     ]
 
     for model_path, text in test_cases:

@@ -84,6 +84,74 @@ SAMPLE_TEXTS = {
             "健康的な生活習慣を身につけることが大切です。",
         ],
     },
+    "zh": {
+        "greeting": [
+            "你好，很高兴认识你。",
+        ],
+        "news": [
+            "今天天气非常好，适合外出活动。",
+        ],
+        "story": [
+            "从前有一个小女孩，她住在美丽的森林里。",
+        ],
+        "question": [
+            "你今天感觉怎么样？",
+        ],
+        "farewell": [
+            "再见，下次见。",
+        ],
+    },
+    "es": {
+        "greeting": [
+            "Hola, mucho gusto en conocerte.",
+        ],
+        "news": [
+            "Hoy hace muy buen tiempo, ideal para salir.",
+        ],
+        "story": [
+            "Érase una vez una niña que vivía en un hermoso bosque.",
+        ],
+        "question": [
+            "¿Cómo te sientes hoy?",
+        ],
+        "farewell": [
+            "Adiós, hasta la próxima.",
+        ],
+    },
+    "fr": {
+        "greeting": [
+            "Bonjour, enchanté de vous rencontrer.",
+        ],
+        "news": [
+            "Il fait très beau aujourd'hui, parfait pour sortir.",
+        ],
+        "story": [
+            "Il était une fois une petite fille qui vivait dans une belle forêt.",
+        ],
+        "question": [
+            "Comment vous sentez-vous aujourd'hui?",
+        ],
+        "farewell": [
+            "Au revoir, à bientôt.",
+        ],
+    },
+    "pt": {
+        "greeting": [
+            "Olá, prazer em conhecê-lo.",
+        ],
+        "news": [
+            "Hoje está muito bom tempo, ideal para sair.",
+        ],
+        "story": [
+            "Era uma vez uma menina que vivia numa bela floresta.",
+        ],
+        "question": [
+            "Como você está se sentindo hoje?",
+        ],
+        "farewell": [
+            "Tchau, até a próxima.",
+        ],
+    },
 }
 
 # Voice-over and narration samples

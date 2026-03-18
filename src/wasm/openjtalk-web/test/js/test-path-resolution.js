@@ -68,7 +68,7 @@ describe('Workflow Path Transformations', () => {
         const htmlPaths = [
             { from: '../../dist/openjtalk.js', to: './dist/openjtalk.js' },
             { from: '../../assets/dict', to: './assets/dict' },
-            { from: '../../models/ja_JP-test-medium.onnx', to: './models/ja_JP-test-medium.onnx' }
+            { from: '../../models/multilingual-test-medium.onnx', to: './models/multilingual-test-medium.onnx' }
         ];
         
         htmlPaths.forEach(({ from, to }) => {

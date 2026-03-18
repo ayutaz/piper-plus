@@ -56,14 +56,13 @@ def create_dummy_onnx_model(output_path: Path, num_symbols: int = 130):
     print(f"Created dummy model: {output_path}")
 
 
-def create_dummy_config(output_path: Path, language: str = "en"):
+def create_dummy_config(output_path: Path, language: str = "multilingual"):
     """Create a dummy model configuration"""
     config = {
         "audio": {"sample_rate": 22050},
-        "espeak": {"voice": "en-us" if language == "en" else "ja"},
         "language": {"code": language},
         "inference": {"noise_scale": 0.667, "length_scale": 1, "noise_w": 0.8},
-        "phoneme_type": "espeak" if language == "en" else "openjtalk",
+        "phoneme_type": "multilingual",
         "phoneme_map": {},
         "phoneme_id_map": {
             "_": [0],
@@ -79,6 +78,15 @@ def create_dummy_config(output_path: Path, language: str = "en"):
         "num_symbols": 10,
         "num_speakers": 1,
         "speaker_id_map": {},
+        "language_id_map": {
+            "ja": 0,
+            "en": 1,
+            "zh": 2,
+            "es": 3,
+            "fr": 4,
+            "pt": 5,
+        },
+        "num_languages": 6,
     }
 
     with open(output_path, "w", encoding="utf-8") as f:
@@ -93,8 +101,11 @@ def download_models():
 
     # Model configurations
     models = [
-        ("ja_JP-test-medium.onnx", "ja", "Japanese medium quality model"),
-        ("test_voice.onnx", "en", "English test model"),
+        (
+            "multilingual-test-medium.onnx",
+            "multilingual",
+            "Multilingual medium quality model",
+        ),
     ]
 
     print("Setting up models for demo...")

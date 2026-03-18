@@ -25,7 +25,7 @@ COPY cmake/ cmake/
 COPY src/cpp/ src/cpp/
 
 # Copy test models for test_piper (may be empty if .dockerignore excludes them)
-COPY test/models/test_voice.onnx* test/models/
+COPY test/models/multilingual-test-medium.onnx* test/models/
 
 # Build piper with tests enabled
 # Use -k0 to continue building even if some targets fail (e.g. test_prosody_inference needs onnxruntime headers)

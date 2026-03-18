@@ -102,10 +102,10 @@ static const char* PIPER_PLUS_CATALOG_JSON = R"JSON(
 // Get the directory containing the running executable
 static fs::path getExeDir() {
 #ifdef _WIN32
-    char buf[MAX_PATH] = {0};
-    DWORD len = GetModuleFileNameA(nullptr, buf, sizeof(buf));
-    if (len > 0 && len < sizeof(buf)) {
-        return fs::path(buf).parent_path();
+    wchar_t wbuf[MAX_PATH] = {0};
+    DWORD len = GetModuleFileNameW(nullptr, wbuf, MAX_PATH);
+    if (len > 0 && len < MAX_PATH) {
+        return fs::path(wbuf).parent_path();
     }
 #elif defined(__APPLE__)
     char buf[PATH_MAX] = {0};
@@ -193,13 +193,15 @@ static std::optional<fs::path> findUpstreamVoicesJson() {
     return std::nullopt;
 }
 
-// Shell-safe for URLs: reject backslashes (Unix shell escape character).
-// Only allow alphanumerics, hyphens, underscores, dots, forward slashes, and colons.
+// Shell-safe for URLs: allowlist approach.
+// Only allow alphanumerics, hyphens, underscores, dots, forward slashes,
+// colons, and percent (for URL-encoded characters).
+// Explicitly rejects shell metacharacters: ' $ ` ( ) ; | & < > ~ # ! { } etc.
 static bool isSafeForShell(const std::string& s) {
     for (char c : s) {
         if (!std::isalnum(static_cast<unsigned char>(c)) &&
             c != '-' && c != '_' && c != '.' && c != '/' &&
-            c != ':') {
+            c != ':' && c != '%') {
             return false;
         }
     }
@@ -207,6 +209,7 @@ static bool isSafeForShell(const std::string& s) {
 }
 
 // Shell-safe for file paths: allows backslashes for Windows path separators.
+// Explicitly rejects shell metacharacters: ' $ ` ( ) ; | & < > ~ # ! { } etc.
 static bool isSafeForShellPath(const std::string& s) {
     for (char c : s) {
         if (!std::isalnum(static_cast<unsigned char>(c)) &&

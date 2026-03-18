@@ -379,3 +379,17 @@ class JapanesePhonemizer(Phonemizer):
 
     def get_phoneme_id_map(self) -> dict[str, list[int]] | None:
         return None
+
+    def post_process_ids(
+        self,
+        phoneme_ids: list[int],
+        prosody_features: list[dict | None],
+        phoneme_id_map: dict[str, list[int]],
+    ) -> tuple[list[int], list[dict | None]]:
+        """No-op: Japanese handles BOS/EOS/padding inline during phonemization.
+
+        For multilingual/bilingual models, the caller should use
+        MultilingualPhonemizer which adds intersperse padding in its
+        own post_process_ids.
+        """
+        return phoneme_ids, prosody_features

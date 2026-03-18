@@ -27,10 +27,6 @@
 #include <shellapi.h>  // CommandLineToArgvW
 #endif
 
-#ifdef __APPLE__
-#include <mach-o/dyld.h>
-#endif
-
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/spdlog.h>
 
@@ -67,6 +63,9 @@ struct RunConfig {
   // Numerical id of the default speaker (multi-speaker voices)
   optional<piper::SpeakerId> speakerId;
 
+  // Language code or numerical id (multi-language voices)
+  optional<string> language;
+
   // Amount of noise to add during audio generation
   optional<float> noiseScale;
 
@@ -78,13 +77,6 @@ struct RunConfig {
 
   // Seconds of silence to add after each sentence
   optional<float> sentenceSilenceSeconds;
-
-  // Path to espeak-ng data directory (default is next to piper executable)
-  optional<filesystem::path> eSpeakDataPath;
-
-  // Path to libtashkeel ort model
-  // https://github.com/mush42/libtashkeel/
-  optional<filesystem::path> tashkeelModelPath;
 
   // stdin input is lines of JSON instead of text with format:
   // {
@@ -245,9 +237,7 @@ int main(int argc, char *argv[]) {
   // Pre-load critical DLLs to ensure proper loading order
   std::vector<std::wstring> criticalDlls = {
     L"onnxruntime.dll",
-    L"onnxruntime_providers_shared.dll",
-    L"espeak-ng.dll",
-    L"piper_phonemize.dll"
+    L"onnxruntime_providers_shared.dll"
   };
   
   for (const auto& dllName : criticalDlls) {
@@ -295,63 +285,43 @@ int main(int argc, char *argv[]) {
   spdlog::info("Loaded voice in {} second(s)",
                chrono::duration<double>(endTime - startTime).count());
 
-  // Get the path to the piper executable so we can locate espeak-ng-data, etc.
-  // next to it.
-#ifdef _MSC_VER
-  auto exePath = []() {
-    wchar_t moduleFileName[MAX_PATH] = {0};
-    GetModuleFileNameW(nullptr, moduleFileName, std::size(moduleFileName));
-    return filesystem::path(moduleFileName);
-  }();
-#else
-#ifdef __APPLE__
-  auto exePath = []() {
-    char moduleFileName[PATH_MAX] = {0};
-    uint32_t moduleFileNameSize = std::size(moduleFileName);
-    _NSGetExecutablePath(moduleFileName, &moduleFileNameSize);
-    return filesystem::path(moduleFileName);
-  }();
-#else
-  auto exePath = filesystem::canonical("/proc/self/exe");
-#endif
-#endif
+  // Resolve --language to a numeric language ID
+  if (runConfig.language) {
+    std::string langStr = runConfig.language.value();
 
-  if (voice.phonemizeConfig.phonemeType == piper::eSpeakPhonemes) {
-    spdlog::debug("Voice uses eSpeak phonemes ({})",
-                  voice.phonemizeConfig.eSpeak.voice);
-
-    if (runConfig.eSpeakDataPath) {
-      // User provided path
-      piperConfig.eSpeakDataPath = runConfig.eSpeakDataPath.value().string();
-      spdlog::debug("Using user-provided espeak-ng-data directory: {}",
-                    piperConfig.eSpeakDataPath);
-    } else {
-      // Let piper::initialize() find the data path automatically
-      piperConfig.eSpeakDataPath = "";
-      spdlog::debug("Will auto-detect espeak-ng-data directory");
+    // Try as a numeric ID first
+    try {
+      piper::LanguageId lid = std::stol(langStr);
+      if (lid < 0 || lid >= voice.modelConfig.numLanguages) {
+        spdlog::warn("Language ID {} out of range [0, {}), using default (0)",
+                     lid, voice.modelConfig.numLanguages);
+        voice.synthesisConfig.languageId = 0;
+      } else {
+        voice.synthesisConfig.languageId = lid;
+        spdlog::info("Using language ID: {}", lid);
+      }
+    } catch (const std::exception&) {
+      // Try as a language code (e.g. "ja", "en")
+      if (voice.modelConfig.languageIdMap &&
+          voice.modelConfig.languageIdMap->count(langStr) > 0) {
+        voice.synthesisConfig.languageId =
+            (*voice.modelConfig.languageIdMap)[langStr];
+        spdlog::info("Resolved language '{}' to ID {}",
+                     langStr, voice.synthesisConfig.languageId.value());
+      } else {
+        spdlog::warn("Unknown language '{}', using default (0)", langStr);
+        voice.synthesisConfig.languageId = 0;
+      }
     }
-  } else {
-    // Not using eSpeak
-    piperConfig.useESpeak = false;
   }
 
-  // Enable libtashkeel for Arabic
-  if (voice.phonemizeConfig.eSpeak.voice == "ar") {
-    piperConfig.useTashkeel = true;
-    if (runConfig.tashkeelModelPath) {
-      // User provided path
-      piperConfig.tashkeelModelPath =
-          runConfig.tashkeelModelPath.value().string();
-    } else {
-      // Assume next to piper executable
-      piperConfig.tashkeelModelPath =
-          std::filesystem::absolute(
-              exePath.parent_path().append("libtashkeel_model.ort"))
-              .string();
-
-      spdlog::debug("libtashkeel model is expected at {}",
-                    piperConfig.tashkeelModelPath.value());
-    }
+  // Warn if languageId is set but model has no lid input
+  if (voice.synthesisConfig.languageId.has_value() &&
+      voice.synthesisConfig.languageId.value() != 0 &&
+      !voice.session.hasLidInput) {
+    spdlog::warn("Model does not support language selection (no lid input), "
+                 "language_id={} will be ignored",
+                 voice.synthesisConfig.languageId.value());
   }
 
   try {
@@ -474,6 +444,7 @@ void processLine(string line, RunConfig &runConfig, piper::PiperConfig &piperCon
                  bool jsonInput, std::unique_ptr<piper::CustomDictionary> &customDict) {
   auto outputType = runConfig.outputType;
   auto speakerId = voice.synthesisConfig.speakerId;
+  auto languageId = voice.synthesisConfig.languageId;
   std::optional<filesystem::path> maybeOutputPath = runConfig.outputPath;
 
   // External prosody features (from JSON input)
@@ -507,6 +478,27 @@ void processLine(string line, RunConfig &runConfig, piper::PiperConfig &piperCon
             (*voice.modelConfig.speakerIdMap)[speakerName];
       } else {
         spdlog::warn("No speaker named: {}", speakerName);
+      }
+    }
+
+    if (lineRoot.contains("language_id")) {
+      auto lid = lineRoot["language_id"].get<piper::LanguageId>();
+      if (lid < 0 || lid >= voice.modelConfig.numLanguages) {
+        spdlog::warn("JSON language_id {} out of range [0, {}), using default (0)",
+                     lid, voice.modelConfig.numLanguages);
+        voice.synthesisConfig.languageId = 0;
+      } else {
+        voice.synthesisConfig.languageId = lid;
+      }
+    } else if (lineRoot.contains("language")) {
+      auto langCode = lineRoot["language"].get<std::string>();
+      if (voice.modelConfig.languageIdMap &&
+          voice.modelConfig.languageIdMap->count(langCode) > 0) {
+        voice.synthesisConfig.languageId =
+            (*voice.modelConfig.languageIdMap)[langCode];
+      } else {
+        spdlog::warn("Unknown language code in JSON: '{}', using default (0)", langCode);
+        voice.synthesisConfig.languageId = 0;
       }
     }
 
@@ -693,6 +685,7 @@ void processLine(string line, RunConfig &runConfig, piper::PiperConfig &piperCon
 
   // Restore config (--json-input)
   voice.synthesisConfig.speakerId = speakerId;
+  voice.synthesisConfig.languageId = languageId;
 
 } // processLine
 
@@ -719,6 +712,7 @@ void printUsage(char *argv[]) {
           "becomes available"
        << endl;
   cerr << "   -s  NUM   --speaker     NUM   id of speaker (default: 0)" << endl;
+  cerr << "   -l  CODE  --language    CODE  language code or id (default: auto)" << endl;
   cerr << "   --noise_scale           NUM   generator noise (default: 0.667)"
        << endl;
   cerr << "   --length_scale          NUM   phoneme length (default: 1.0)"
@@ -736,11 +730,6 @@ void printUsage(char *argv[]) {
   cerr << "   Phoneme input: Use [[ phonemes ]] notation to specify exact pronunciation" << endl;
   cerr << "                  Example: echo \"Hello [[ h ə l oʊ ]] world\" | piper ..." << endl;
   cerr << endl;
-  cerr << "   --espeak_data           DIR   path to espeak-ng data directory"
-       << endl;
-  cerr << "   --tashkeel_model        FILE  path to libtashkeel onnx model "
-          "(arabic)"
-       << endl;
   cerr << "   --json-input                  stdin input is lines of JSON "
           "instead of plain text"
        << endl;
@@ -844,6 +833,9 @@ void parseArgs(int argc, char *argv[], RunConfig &runConfig) {
     } else if (arg == "-s" || arg == "--speaker") {
       ensureArg(argc, argv, i);
       runConfig.speakerId = (piper::SpeakerId)stol(argv[++i]);
+    } else if (arg == "-l" || arg == "--language") {
+      ensureArg(argc, argv, i);
+      runConfig.language = argv[++i];
     } else if (arg == "--noise_scale" || arg == "--noise-scale") {
       ensureArg(argc, argv, i);
       runConfig.noiseScale = stof(argv[++i]);
@@ -873,12 +865,6 @@ void parseArgs(int argc, char *argv[], RunConfig &runConfig) {
 
       auto phoneme = piper::getCodepoint(phonemeStr);
       (*runConfig.phonemeSilenceSeconds)[phoneme] = stof(argv[++i]);
-    } else if (arg == "--espeak_data" || arg == "--espeak-data") {
-      ensureArg(argc, argv, i);
-      runConfig.eSpeakDataPath = filesystem::path(argv[++i]);
-    } else if (arg == "--tashkeel_model" || arg == "--tashkeel-model") {
-      ensureArg(argc, argv, i);
-      runConfig.tashkeelModelPath = filesystem::path(argv[++i]);
     } else if (arg == "--json_input" || arg == "--json-input") {
       runConfig.jsonInput = true;
     } else if (arg == "--use_cuda" || arg == "--use-cuda") {

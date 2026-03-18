@@ -12,11 +12,18 @@ dependencies = [
     "numpy<2.3",
     "tensorboard>=2.20.0",
     "g2p-en>=2.1.0",
-    "torch>=2.10",
-    "torchaudio>=2.10",
-    "piper-train[train]",
+    "torch>=2.1.0",
+    "torchaudio>=2.1.0",
+    "pytorch-lightning>=2.0",
+    "librosa>=0.10",
     "cython>=3.2.4",
+    "pyopenjtalk-plus>=0.4",
+    "wandb>=0.19",
+    "transformers>=4.30",
+    "piper-train[train]",
     "onnxscript>=0.6.2",
+    "onnxruntime>=1.17",
+    "ghapi>=1.0.13",
 ]
 
 [project.optional-dependencies]
@@ -40,6 +47,11 @@ inference-gpu = [
     "g2p-en>=2.1.0",
     "fastapi>=0.110",
     "uvicorn>=0.27",
+]
+
+multilingual = [
+    "pypinyin>=0.50",
+    "g2pk2>=0.0.3",
 ]
 
 train = [
@@ -188,19 +200,34 @@ inline-quotes = "double"
 "scripts/*" = ["ARG", "PLC0415"]  # Allow conditional imports in scripts  
 # token_mapper.py: グローバル変数を使用した音素マッピングシステム
 "src/python/piper_train/phonemize/token_mapper.py" = ["PLW0603"]
+# korean.py: G2p()インスタンスのモジュールレベルキャッシュ
+"src/python/piper_train/phonemize/korean.py" = ["PLW0603"]
+# bilingual.py: 条件付きインポート（後方互換のため動的切り替え）
+"src/python/piper_train/phonemize/bilingual.py" = ["PLC0415"]
 # mel_processing.py: パフォーマンス最適化のためのグローバルキャッシュ
 "src/python/piper_train/vits/mel_processing.py" = ["PLW0602"]
 # test_phonemize.py: オプショナルな依存関係の条件付きインポート
 "src/python/tests/test_phonemize.py" = ["E402"]
 # preprocess.py: 条件付きインポートで警告を抑制
 "src/python/piper_train/preprocess.py" = ["PLC0415"]
-"src/python/piper_train/phonemize/english.py" = ["PLC0415"]
+"src/python/piper_train/phonemize/english.py" = ["PLC0415", "PLW0603"]
 # prepare scripts: 条件付きインポートを許可
 "src/python/prepare_*.py" = ["PLC0415"]
 # runtime files: 条件付きインポートを許可
 "src/python_run/*" = ["PLC0415"]
 # Docker test scripts: テスト関数内での条件付きインポートを許可
 "docker/**/test.py" = ["PLC0415"]
+# HuggingFace Spaces app: オプショナルな多言語依存の条件付きインポート
+"huggingface-space/*.py" = ["PLC0415"]
+# __main__.py: torch.serialization.add_safe_globals() がimport前に必要
+"src/python/piper_train/__main__.py" = ["E402"]
+# export_onnx.py: 同上
+"src/python/piper_train/export_onnx.py" = ["E402"]
+# lightning.py: メソッド内の遅延import（循環import回避、オプショナル依存）
+"src/python/piper_train/vits/lightning.py" = ["PLC0415"]
+
+[tool.setuptools.packages.find]
+where = ["src/python"]
 
 [tool.setuptools.dynamic]
 version = {file = "VERSION"}

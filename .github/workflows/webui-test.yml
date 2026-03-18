@@ -74,7 +74,7 @@ jobs:
       - name: Test template system
         run: |
           cd src/python_run
-          python -c "from piper.webui import TEMPLATES, get_language_from_model; print(f'Available languages: {list(TEMPLATES.keys())}'); lang = get_language_from_model('test/models/ja_JP-test-medium.onnx'); print(f'Japanese model detected as: {lang}')"
+          python -c "from piper.webui import TEMPLATES, get_language_from_model; print(f'Available languages: {list(TEMPLATES.keys())}'); lang = get_language_from_model('test/models/multilingual-test-medium.onnx'); print(f'Japanese model detected as: {lang}')"
       
       - name: Test sample texts
         run: |
