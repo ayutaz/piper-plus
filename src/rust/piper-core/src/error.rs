@@ -43,4 +43,30 @@ pub enum PiperError {
 
     #[error("phoneme ID not found: {phoneme}")]
     PhonemeIdNotFound { phoneme: String },
+
+    // --- Phase 4 error variants ---
+
+    #[error("streaming error: {0}")]
+    Streaming(String),
+
+    #[error("playback error: {0}")]
+    Playback(String),
+
+    #[error("timing error: {0}")]
+    Timing(String),
+
+    #[error("download error: {0}")]
+    Download(String),
+
+    #[error("resampling error: {0}")]
+    Resample(String),
+
+    #[error("device error: {0}")]
+    Device(String),
+
+    #[error("batch processing error: {0}")]
+    Batch(String),
+
+    #[error("WASM error: {0}")]
+    Wasm(String),
 }

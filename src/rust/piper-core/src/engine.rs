@@ -47,6 +47,9 @@ pub struct SynthesisResult {
     pub sample_rate: u32,
     pub infer_seconds: f64,
     pub audio_seconds: f64,
+    /// Phoneme durations from the model (if available).
+    /// Shape: [phoneme_length], each value = number of frames.
+    pub durations: Option<Vec<f32>>,
 }
 
 impl SynthesisResult {
@@ -83,13 +86,17 @@ impl OnnxEngine {
     /// `device` は `"cpu"`, `"gpu"`, `"auto"` のいずれか。
     /// `"gpu"` / `"auto"` 指定時は CUDA を試行し、失敗すれば CPU にフォールバックする。
     pub fn load(model_path: &Path, config: &VoiceConfig, device: &str) -> Result<Self, PiperError> {
-        let mut builder = Session::builder()
+        // デバイス文字列をパースして GPU プロバイダを設定
+        let device_type = crate::gpu::parse_device_string(device)
+            .unwrap_or(crate::gpu::DeviceType::Cpu);
+
+        let builder = Session::builder()
             .map_err(|e| PiperError::ModelLoad(e.to_string()))?;
 
-        // GPU support is not yet implemented; always use CPU.
-        if device == "gpu" {
-            tracing::warn!("GPU requested but not yet supported, using CPU");
-        }
+        let (mut builder, actual_device) = crate::gpu::configure_session_builder(builder, &device_type)
+            .map_err(|e| PiperError::ModelLoad(format!("device config: {e}")))?;
+
+        tracing::info!("Using device: {}", actual_device);
 
         let session = builder
             .commit_from_file(model_path)
@@ -271,11 +278,21 @@ impl OnnxEngine {
         let audio_i16 = audio_float_to_int16(&audio_f32);
         let audio_seconds = audio_i16.len() as f64 / self.sample_rate as f64;
 
+        // --- duration テンソル抽出 (オプション) ---
+        let durations = if self.capabilities.has_duration_output {
+            outputs.get("durations")
+                .and_then(|d| d.try_extract_tensor::<f32>().ok())
+                .map(|(_shape, data)| data.to_vec())
+        } else {
+            None
+        };
+
         Ok(SynthesisResult {
             audio: audio_i16,
             sample_rate: self.sample_rate,
             infer_seconds,
             audio_seconds,
+            durations,
         })
     }
 }
@@ -303,6 +320,7 @@ mod tests {
             sample_rate: 22050,
             infer_seconds: 0.5,
             audio_seconds: 1.0,
+            durations: None,
         };
         assert!((result.real_time_factor() - 0.5).abs() < 1e-6);
     }
@@ -314,6 +332,7 @@ mod tests {
             sample_rate: 22050,
             infer_seconds: 0.1,
             audio_seconds: 0.0,
+            durations: None,
         };
         assert!((result.real_time_factor()).abs() < 1e-6);
     }

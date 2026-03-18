@@ -8,6 +8,13 @@ license.workspace = true
 default = ["japanese"]
 japanese = ["dep:jpreprocess"]
 naist-jdic = ["japanese", "jpreprocess/naist-jdic"]
+playback = ["dep:rodio"]
+download = ["dep:reqwest"]
+resample = ["dep:rubato"]
+cuda = []
+coreml = []
+directml = []
+tensorrt = []
 
 [dependencies]
 ort = "2.0.0-rc.12"
@@ -19,6 +26,9 @@ hound = "3.5"
 ndarray = "0.17"
 regex = "1"
 jpreprocess = { version = "0.9", optional = true }
+rodio = { version = "0.19", optional = true }
+reqwest = { version = "0.12", features = ["blocking"], optional = true }
+rubato = { version = "0.16", optional = true }
 
 [dev-dependencies]
 tempfile = "3"

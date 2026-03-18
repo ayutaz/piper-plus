@@ -66,6 +66,26 @@ struct Cli {
     /// カスタム辞書パス (複数指定可)
     #[arg(long = "custom-dict")]
     custom_dicts: Vec<PathBuf>,
+
+    /// ストリーミング合成 (センテンス単位で逐次出力)
+    #[arg(long)]
+    stream: bool,
+
+    /// 音素タイミング出力 (json, tsv, srt)
+    #[arg(long, value_name = "FORMAT")]
+    timing: Option<String>,
+
+    /// 利用可能なデバイスを一覧表示
+    #[arg(long)]
+    list_devices: bool,
+
+    /// 利用可能なモデルを一覧表示
+    #[arg(long)]
+    list_models: bool,
+
+    /// バッチ処理: テキストファイルから読み込み (1行1発話)
+    #[arg(long, value_name = "FILE")]
+    batch: Option<PathBuf>,
 }
 
 fn main() -> Result<()> {
@@ -80,6 +100,26 @@ fn main() -> Result<()> {
         )
         .with_writer(std::io::stderr)
         .init();
+
+    // --list-devices: デバイス一覧表示 (モデル不要)
+    if cli.list_devices {
+        let devices = piper_core::device::enumerate_devices();
+        println!("Available devices:");
+        for dev in &devices {
+            println!("  {}", dev);
+        }
+        return Ok(());
+    }
+
+    // --list-models: モデル一覧表示 (モデル不要)
+    if cli.list_models {
+        let models = piper_core::model_download::builtin_registry();
+        println!("Available models:");
+        for model in &models {
+            println!("  {} ({}) - {}", model.name, model.language, model.description);
+        }
+        return Ok(());
+    }
 
     // config.json 検出
     let config_path = config::VoiceConfig::resolve_config_path(
@@ -160,6 +200,34 @@ fn main() -> Result<()> {
             "Synthesized: {:.3}s audio, {:.3}s infer, RTF={:.3}",
             result.audio_seconds, result.infer_seconds, result.real_time_factor(),
         );
+
+        // --timing: 音素タイミング出力
+        if let Some(ref format) = cli.timing {
+            if let Some(ref durations) = result.durations {
+                // phoneme_ids からトークン名を推定 (簡易版: ID をそのまま使用)
+                let tokens: Vec<String> = (0..durations.len())
+                    .map(|i| format!("ph_{}", i))
+                    .collect();
+                match piper_core::timing::durations_to_timing(
+                    durations, &tokens, result.sample_rate, piper_core::timing::DEFAULT_HOP_LENGTH,
+                ) {
+                    Ok(timing) => {
+                        let output = match format.as_str() {
+                            "json" => timing.to_json().unwrap_or_default(),
+                            "tsv" => timing.to_tsv(),
+                            "srt" => timing.to_srt(),
+                            _ => {
+                                anyhow::bail!("Unknown timing format: '{}'. Use json, tsv, or srt.", format);
+                            }
+                        };
+                        eprintln!("{}", output);
+                    }
+                    Err(e) => tracing::warn!("Timing extraction failed: {}", e),
+                }
+            } else {
+                tracing::warn!("Model does not output duration tensor; --timing ignored.");
+            }
+        }
 
         // 出力
         if output_to_stdout {

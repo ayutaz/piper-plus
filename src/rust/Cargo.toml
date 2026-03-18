@@ -1,5 +1,5 @@
 [workspace]
-members = ["piper-core", "piper-cli"]
+members = ["piper-core", "piper-cli", "piper-python"]
 resolver = "2"
 
 [workspace.package]

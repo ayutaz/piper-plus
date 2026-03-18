@@ -1,0 +1,22 @@
+[package]
+name = "piper-python"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "Python bindings for Piper-Plus TTS inference"
+
+[lib]
+name = "piper_plus"
+crate-type = ["cdylib"]
+
+[dependencies]
+piper-core = { path = "../piper-core" }
+pyo3 = { version = "0.22", features = ["extension-module"] }
+numpy = "0.22"
+
+[features]
+default = []
+japanese = ["piper-core/japanese"]
+naist-jdic = ["piper-core/naist-jdic"]
+
+# Part of the piper-plus workspace (../Cargo.toml)
