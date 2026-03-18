@@ -102,7 +102,9 @@ jobs:
 
           # vits utilities (audio processing, no torch)
           touch hf-space-deploy/piper_train/vits/__init__.py
-          echo "✓ Created piper_train/vits/__init__.py"
+          cp src/python/piper_train/vits/utils.py hf-space-deploy/piper_train/vits/
+          cp src/python/piper_train/vits/wavfile.py hf-space-deploy/piper_train/vits/
+          echo "✓ Copied piper_train/vits/ (utils.py, wavfile.py)"
 
           echo "piper_train module ready: $(find hf-space-deploy/piper_train -name '*.py' | wc -l) total Python files"
 
