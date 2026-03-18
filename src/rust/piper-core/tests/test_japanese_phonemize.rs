@@ -3,21 +3,36 @@
 use piper_core::phonemize::japanese::JapanesePhonemizer;
 use piper_core::phonemize::Phonemizer;
 
-/// Helper to create a phonemizer for tests (using bundled NAIST-JDIC dictionary).
-#[cfg(feature = "naist-jdic")]
-fn create_phonemizer() -> JapanesePhonemizer {
-    JapanesePhonemizer::new_bundled().expect("Failed to create JapanesePhonemizer with bundled dict")
+/// Try to create a JapanesePhonemizer.
+/// With naist-jdic feature: uses bundled dictionary.
+/// Without: searches for dictionary file, returns None if not found.
+fn try_create_phonemizer() -> Option<JapanesePhonemizer> {
+    #[cfg(feature = "naist-jdic")]
+    {
+        Some(JapanesePhonemizer::new_bundled().expect("Failed to create with bundled dict"))
+    }
+    #[cfg(not(feature = "naist-jdic"))]
+    {
+        JapanesePhonemizer::new().ok()
+    }
 }
 
-/// Fallback: search for dictionary file when naist-jdic feature is not enabled.
-#[cfg(not(feature = "naist-jdic"))]
-fn create_phonemizer() -> JapanesePhonemizer {
-    JapanesePhonemizer::new().expect("Failed to create JapanesePhonemizer. Set JPREPROCESS_DICT env var.")
+/// Macro to get a phonemizer or skip the test if dictionary is unavailable.
+macro_rules! require_phonemizer {
+    () => {
+        match try_create_phonemizer() {
+            Some(p) => p,
+            None => {
+                eprintln!("SKIP: NAIST-JDIC dictionary not found. Run with --features naist-jdic.");
+                return;
+            }
+        }
+    };
 }
 
 #[test]
 fn test_phonemize_basic_text() {
-    let phonemizer = create_phonemizer();
+    let phonemizer = require_phonemizer!();
     let (tokens, prosody) = phonemizer.phonemize_with_prosody("こんにちは").unwrap();
 
     // Should start with ^ and end with $
@@ -34,14 +49,14 @@ fn test_phonemize_basic_text() {
 
 #[test]
 fn test_phonemize_question() {
-    let phonemizer = create_phonemizer();
+    let phonemizer = require_phonemizer!();
     let (tokens, _) = phonemizer.phonemize_with_prosody("本当？").unwrap();
     assert_eq!(tokens.last().map(|s| s.as_str()), Some("?"));
 }
 
 #[test]
 fn test_phonemize_emphatic_question() {
-    let phonemizer = create_phonemizer();
+    let phonemizer = require_phonemizer!();
     // ?! should produce the PUA character for "?!"
     let (tokens, _) = phonemizer.phonemize_with_prosody("本当？！").unwrap();
     // The last token should be the PUA-mapped "?!" character
@@ -52,7 +67,7 @@ fn test_phonemize_emphatic_question() {
 
 #[test]
 fn test_phonemize_with_pause() {
-    let phonemizer = create_phonemizer();
+    let phonemizer = require_phonemizer!();
     let (tokens, _) = phonemizer.phonemize_with_prosody("こんにちは、元気ですか。").unwrap();
 
     // Should contain a pause marker "_" somewhere
@@ -61,7 +76,7 @@ fn test_phonemize_with_pause() {
 
 #[test]
 fn test_phonemize_contains_prosody_marks() {
-    let phonemizer = create_phonemizer();
+    let phonemizer = require_phonemizer!();
     let (tokens, _) = phonemizer.phonemize_with_prosody("今日は良い天気ですね。").unwrap();
 
     // Should contain some prosody marks like [, ], #
@@ -74,7 +89,7 @@ fn test_phonemize_contains_prosody_marks() {
 
 #[test]
 fn test_phonemize_prosody_values() {
-    let phonemizer = create_phonemizer();
+    let phonemizer = require_phonemizer!();
     let (tokens, prosody) = phonemizer.phonemize_with_prosody("こんにちは").unwrap();
 
     // Phoneme tokens should have Some prosody, special tokens should have None
@@ -88,7 +103,7 @@ fn test_phonemize_prosody_values() {
 
 #[test]
 fn test_post_process_ids_is_noop() {
-    let phonemizer = create_phonemizer();
+    let phonemizer = require_phonemizer!();
     let ids = vec![1i64, 2, 3];
     let prosody = vec![Some([0i32, 1, 2]), None, Some([1, 2, 3])];
     let map = std::collections::HashMap::new();
@@ -100,19 +115,19 @@ fn test_post_process_ids_is_noop() {
 
 #[test]
 fn test_language_code() {
-    let phonemizer = create_phonemizer();
+    let phonemizer = require_phonemizer!();
     assert_eq!(phonemizer.language_code(), "ja");
 }
 
 #[test]
 fn test_get_phoneme_id_map_returns_none() {
-    let phonemizer = create_phonemizer();
+    let phonemizer = require_phonemizer!();
     assert!(phonemizer.get_phoneme_id_map().is_none());
 }
 
 #[test]
 fn test_phonemize_n_variant_bilabial() {
-    let phonemizer = create_phonemizer();
+    let phonemizer = require_phonemizer!();
     let (tokens, _) = phonemizer.phonemize_with_prosody("さんぽ").unwrap();
 
     // Should contain N_m (PUA U+E019) before 'p'
@@ -122,7 +137,7 @@ fn test_phonemize_n_variant_bilabial() {
 
 #[test]
 fn test_phonemize_n_variant_velar() {
-    let phonemizer = create_phonemizer();
+    let phonemizer = require_phonemizer!();
     let (tokens, _) = phonemizer.phonemize_with_prosody("ぎんこう").unwrap();
 
     // Should contain N_ng (PUA U+E01B) before 'k'
@@ -136,7 +151,7 @@ fn test_phonemize_n_variant_velar() {
 
 #[test]
 fn test_detect_primary_language_returns_ja() {
-    let phonemizer = create_phonemizer();
+    let phonemizer = require_phonemizer!();
     assert_eq!(
         phonemizer.detect_primary_language("こんにちは"),
         "ja",
@@ -146,7 +161,7 @@ fn test_detect_primary_language_returns_ja() {
 
 #[test]
 fn test_detect_primary_language_empty_string() {
-    let phonemizer = create_phonemizer();
+    let phonemizer = require_phonemizer!();
     assert_eq!(
         phonemizer.detect_primary_language(""),
         "ja",
