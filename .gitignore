@@ -63,6 +63,8 @@ CLAUDE.md
 
 # Rust build artifacts
 src/rust/target/
+src/rust/piper-python/target/
+src/rust/piper-python/Cargo.lock
 
 # WebAssembly temp directories
 src/wasm/openjtalk-web/temp/
