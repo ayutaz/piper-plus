@@ -9,7 +9,7 @@ English | [日本語](README.md) | [中文](README_ZH.md) | [Français](README_F
 [![Hugging Face Demo](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Demo-blue)](https://huggingface.co/spaces/ayousanz/piper-plus-demo)
 [![Hugging Face Model](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Model-orange)](https://huggingface.co/ayousanz/piper-plus-base)
 
-A fast, high-quality neural text-to-speech (TTS) system. Built on the [VITS](https://github.com/jaywalnut310/vits/) architecture with multi-speaker support for Japanese and English. A fork of [Piper](https://github.com/rhasspy/piper) with significantly enhanced Japanese support, improved voice quality, and advanced training features.
+A fast, high-quality neural text-to-speech (TTS) system. Built on the [VITS](https://github.com/jaywalnut310/vits/) architecture with multi-speaker support for 6 languages (Japanese, English, Mandarin Chinese, Spanish, French, Portuguese). A fork of [Piper](https://github.com/rhasspy/piper) with significantly enhanced Japanese support, improved voice quality, and advanced training features.
 
 **[Hugging Face Demo](https://huggingface.co/spaces/ayousanz/piper-plus-demo)** | **[WebAssembly Demo](https://ayutaz.github.io/piper-plus/)** (runs in browser, no server needed)
 
@@ -33,9 +33,10 @@ A fast, high-quality neural text-to-speech (TTS) system. Built on the [VITS](htt
 
 ### Speech Synthesis
 
+- **6-Language Support** — Japanese, English, Mandarin Chinese, Spanish, French, Portuguese (language codes: ja=0, en=1, zh=2, es=3, fr=4, pt=5)
 - **Japanese TTS** — OpenJTalk integration, prosody features (A1/A2/A3), question markers (#204), context-dependent "N" variants (#207)
 - **English TTS** — GPL-free G2P ([g2p-en](https://github.com/Kyubyong/g2p), Apache-2.0), no espeak-ng dependency
-- **Multi-speaker** — 20+ speakers, SpeakerBalancedBatchSampler
+- **Multi-speaker** — 571 speakers in 6-language base model, SpeakerBalancedBatchSampler with language-balanced sampling
 - **Custom Dictionary** — 200+ built-in technical term pronunciations — [Guide](docs/features/custom_dictionary.md)
 - **Phoneme Input** — Direct phoneme specification with `[[ phonemes ]]` notation — [Guide](docs/features/phoneme-input.md)
 
@@ -383,10 +384,16 @@ Multi-GPU automatically configures DDP (Distributed Data Parallel). NCCL environ
 
 ### ONNX Export
 
+FP16 conversion is applied by default, reducing model size by ~50%. Use `--no-fp16` to disable.
+
 ```bash
-# Standard model
+# Standard model (FP16 by default)
 CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
   /path/to/checkpoint.ckpt /path/to/output.onnx
+
+# Full precision (FP32)
+CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
+  --no-fp16 /path/to/checkpoint.ckpt /path/to/output.onnx
 
 # WavLM model (--stochastic required)
 CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
@@ -397,6 +404,7 @@ CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
 
 - `--resume_from_checkpoint` — Resume training from checkpoint
 - `--resume_from_single_speaker_checkpoint` — Convert single-speaker to multi-speaker model
+- `--resume-from-multispeaker-checkpoint` — Convert multi-speaker to single-speaker for fine-tuning (auto-enables `--freeze-dp`)
 
 ### Voice Evaluation
 
@@ -406,20 +414,23 @@ MCD, PESQ, and UTMOS evaluation tools are available in `scripts/evaluation/`.
 
 ## Pre-trained Models
 
-Pre-trained base models for Japanese TTS fine-tuning are available on Hugging Face.
+Pre-trained base models for multilingual TTS and fine-tuning are available on Hugging Face.
 
 | Model | Description | License |
 |---|---|---|
-| [piper-plus-base](https://huggingface.co/ayousanz/piper-plus-base) | Japanese TTS base model (VITS + WavLM + Prosody) | CC-BY-SA-4.0 |
-| [piper-plus-tsukuyomi-chan](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan) | Tsukuyomi-chan fine-tuned model | See model card |
+| [piper-plus-base](https://huggingface.co/ayousanz/piper-plus-base) | 6-Language base model (571 speakers, 508,187 utterances, JA/EN/ZH/ES/FR/PT) | CC-BY-SA-4.0 |
+| [piper-plus-tsukuyomi-chan](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan) | Tsukuyomi-chan fine-tuned model (6-language, FP16) | See model card |
 
-**piper-plus-base features:**
+**6-Language Base Model features:**
 
-- Architecture: VITS + WavLM Discriminator
-- Training data: 60,164 utterances (20 speakers)
+- Architecture: VITS + Prosody Features
+- Training data: 508,187 utterances (571 speakers across 6 languages)
+- Languages: Japanese (20 speakers), English (310 speakers), Mandarin Chinese (142 speakers), Spanish (63 speakers), French (28 speakers), Portuguese (8 speakers)
+- Language codes: ja=0, en=1, zh=2, es=3, fr=4, pt=5
 - Sample rate: 22,050 Hz
-- Prosody Features: A1/A2/A3 prosody information
-- Extended phonemes: Question markers, context-dependent "N" variants (65 phonemes)
+- Phonemes: 173 symbols (unified multilingual phoneme inventory)
+- Prosody Features: A1/A2/A3 prosody information (Japanese)
+- Extended phonemes: Question markers, context-dependent "N" variants
 
 Upstream Piper checkpoints also available: [piper-checkpoints](https://huggingface.co/datasets/rhasspy/piper-checkpoints/tree/main)
 

@@ -9,7 +9,7 @@
 [![Hugging Face Demo](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Demo-blue)](https://huggingface.co/spaces/ayousanz/piper-plus-demo)
 [![Hugging Face Model](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Model-orange)](https://huggingface.co/ayousanz/piper-plus-base)
 
-快速、高质量的神经网络文本转语音 (TTS) 系统。基于 [VITS](https://github.com/jaywalnut310/vits/) 架构，支持日语和英语的多说话人语音合成。本项目是 [Piper](https://github.com/rhasspy/piper) 的分支，大幅增强了日语支持、音质和训练功能。
+快速、高质量的神经网络文本转语音 (TTS) 系统。基于 [VITS](https://github.com/jaywalnut310/vits/) 架构，支持6种语言（日语、英语、普通话、西班牙语、法语、葡萄牙语）的多说话人语音合成。本项目是 [Piper](https://github.com/rhasspy/piper) 的分支，大幅增强了日语支持、音质和训练功能。
 
 **[Hugging Face 演示](https://huggingface.co/spaces/ayousanz/piper-plus-demo)** | **[WebAssembly 演示](https://ayutaz.github.io/piper-plus/)** (浏览器运行，无需服务器)
 
@@ -35,7 +35,8 @@
 
 - **日语 TTS** — OpenJTalk 集成、韵律特征 (A1/A2/A3)、疑问标记 (#204)、上下文相关「ん」变体 (#207)
 - **英语 TTS** — 无 GPL 依赖的 G2P ([g2p-en](https://github.com/Kyubyong/g2p), Apache-2.0)，无需 espeak-ng
-- **多说话人** — 支持 20+ 说话人，SpeakerBalancedBatchSampler
+- **多语言支持** — 6种语言 (ja/en/zh/es/fr/pt)，571说话人的6语言基础模型
+- **多说话人** — SpeakerBalancedBatchSampler，语言均衡采样自动启用
 - **自定义词典** — 内置 200+ 技术术语发音词典 — [指南](docs/features/custom_dictionary.md)
 - **音素输入** — 使用 `[[ phonemes ]]` 标记直接指定音素 — [指南](docs/features/phoneme-input.md)
 
@@ -288,10 +289,16 @@ uv run python -m piper_train \
 
 ### ONNX 导出
 
+默认启用FP16转换，模型大小减少约50%。使用 `--no-fp16` 可以禁用。
+
 ```bash
-# 标准模型
+# 标准模型（默认FP16，模型大小约50%）
 CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
   /path/to/checkpoint.ckpt /path/to/output.onnx
+
+# 禁用FP16（完整精度）
+CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
+  --no-fp16 /path/to/checkpoint.ckpt /path/to/output.onnx
 
 # WavLM 模型（必须使用 --stochastic）
 CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
@@ -315,16 +322,29 @@ CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
 
 | 模型 | 说明 | 许可证 |
 |---|---|---|
-| [piper-plus-base](https://huggingface.co/ayousanz/piper-plus-base) | 日语 TTS 基础模型 (VITS + WavLM + Prosody) | CC-BY-SA-4.0 |
-| [piper-plus-tsukuyomi-chan](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan) | Tsukuyomi-chan 微调模型 | 参阅模型卡 |
+| [piper-plus-base](https://huggingface.co/ayousanz/piper-plus-base) | 6语言基础模型 (571说话人, 508,187条语音, VITS + Prosody) | CC-BY-SA-4.0 |
+| [piper-plus-tsukuyomi-chan](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan) | Tsukuyomi-chan 6语言版微调模型 (FP16) | 参阅模型卡 |
 
 **piper-plus-base 特征：**
 
-- 架构：VITS + WavLM Discriminator
-- 训练数据：60,164 条语音（20 位说话人）
+- 架构：VITS + WavLM Discriminator + 韵律特征
+- 语言：6种 — 日语 (ja)、英语 (en)、普通话 (zh)、西班牙语 (es)、法语 (fr)、葡萄牙语 (pt)
+- 训练数据：508,187 条语音（571 位说话人）
 - 采样率：22,050 Hz
+- 音素数：173
 - 韵律特征：A1/A2/A3 韵律信息
-- 扩展音素：疑问标记、上下文相关「ん」变体（65 个音素）
+- 扩展音素：疑问标记、上下文相关「ん」变体
+
+**语言ID映射：**
+
+| 语言 | ID | 说话人数 | 语音数 | 来源 |
+|---|---|---|---|---|
+| 日语 (ja) | 0 | 20 | 60,148 | MOE-Speech |
+| 英语 (en) | 1 | 310 | 74,912 | LibriTTS-R |
+| 普通话 (zh) | 2 | 142 | 63,223 | AISHELL-3 |
+| 西班牙语 (es) | 3 | 63 | 168,374 | CML-TTS |
+| 法语 (fr) | 4 | 28 | 107,464 | CML-TTS |
+| 葡萄牙语 (pt) | 5 | 8 | 34,066 | CML-TTS |
 
 上游 Piper 检查点也可使用：[piper-checkpoints](https://huggingface.co/datasets/rhasspy/piper-checkpoints/tree/main)
 
