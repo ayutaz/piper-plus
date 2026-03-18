@@ -3,6 +3,7 @@
 //! Provides sample rate conversion, format conversion, and audio processing.
 //! Resampling uses the `rubato` crate (feature-gated behind "resample").
 
+#[cfg(feature = "resample")]
 use crate::error::PiperError;
 
 /// Audio format specification

@@ -236,6 +236,7 @@ fn build_prosody_tensor(
 /// `prosody_to_optional_features` + `build_prosody_tensor` を 1 パスに統合。
 /// 中間の `Vec<Option<[i32; 3]>>` を生成せず、いずれかが Some なら
 /// Some(Vec<[i32; 3]>) を返す。全て None なら None を返す。
+#[cfg(test)]
 fn build_prosody_direct(
     prosody: &[Option<crate::phonemize::ProsodyInfo>],
 ) -> Option<Vec<crate::phonemize::ProsodyFeature>> {

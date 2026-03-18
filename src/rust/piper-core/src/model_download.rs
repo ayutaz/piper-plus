@@ -317,6 +317,7 @@ pub fn builtin_registry() -> &'static [ModelInfo] {
 /// Extract the filename component from a URL path.
 ///
 /// Returns `None` if the URL has no path segments or the last segment is empty.
+#[cfg(any(feature = "download", test))]
 fn url_filename(url: &str) -> Option<String> {
     let path = url.split('?').next().unwrap_or(url);
     let path = path.split('#').next().unwrap_or(path);
