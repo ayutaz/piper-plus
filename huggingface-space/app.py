@@ -12,6 +12,12 @@ import gradio as gr
 import numpy as np
 import onnxruntime
 
+# Download NLTK data required by g2p-en (English phonemizer)
+import nltk
+
+nltk.download("averaged_perceptron_tagger_eng", quiet=True)
+nltk.download("cmudict", quiet=True)
+
 # Download models if not present
 from download_models import download_models
 
