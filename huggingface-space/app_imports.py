@@ -30,8 +30,8 @@ except ImportError:
     HAS_PYPINYIN = False
 
 try:
-    import g2pk  # noqa: F401
+    import g2pk2  # noqa: F401
 
-    HAS_G2PK = True
+    HAS_G2PK2 = True
 except ImportError:
-    HAS_G2PK = False
+    HAS_G2PK2 = False

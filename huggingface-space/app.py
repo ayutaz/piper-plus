@@ -9,19 +9,20 @@ import logging
 import threading
 
 import gradio as gr
+import nltk
 import numpy as np
 import onnxruntime
 
-# Download NLTK data required by g2p-en (English phonemizer)
-import nltk
 
+# Download NLTK data required by g2p-en (English phonemizer).
+# This must run before importing modules that transitively load g2p-en.
 nltk.download("averaged_perceptron_tagger_eng", quiet=True)
 nltk.download("cmudict", quiet=True)
 
 # Download models if not present
-from download_models import download_models
+from download_models import download_models  # noqa: E402
 
-from piper_train.infer_onnx import text_to_phoneme_ids_and_prosody
+from piper_train.infer_onnx import text_to_phoneme_ids_and_prosody  # noqa: E402
 
 
 # Ensure models are downloaded

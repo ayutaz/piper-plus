@@ -125,7 +125,9 @@ def main() -> None:
         _LOGGER.debug("Synthesizing text: %s (language_id=%s)", text, language_id)
         with io.BytesIO() as wav_io:
             with wave.open(wav_io, "wb") as wav_file:
-                voice.synthesize(text, wav_file, **synthesize_args, language_id=language_id)
+                voice.synthesize(
+                    text, wav_file, **synthesize_args, language_id=language_id
+                )
 
             return wav_io.getvalue()
 

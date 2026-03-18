@@ -63,12 +63,11 @@ jobs:
           python3 -c "
           import sys, importlib
 
+          # Only modules that have NO external dependencies (no numpy, no pyopenjtalk, etc.)
           modules = [
-              ('piper_train.infer_onnx', 'text_to_phoneme_ids_and_prosody'),
               ('piper_train.phonemize.registry', 'get_phonemizer'),
               ('piper_train.phonemize.base', 'Phonemizer'),
               ('piper_train.phonemize.multilingual', 'UnicodeLanguageDetector'),
-              ('piper_train.phonemize.japanese', None),
               ('piper_train.phonemize.english', None),
               ('piper_train.phonemize.chinese', None),
               ('piper_train.phonemize.spanish', None),
@@ -77,8 +76,6 @@ jobs:
               ('piper_train.phonemize.token_mapper', None),
               ('piper_train.phonemize.jp_id_map', None),
               ('piper_train.phonemize.multilingual_id_map', None),
-              ('piper_train.vits.utils', 'audio_float_to_int16'),
-              ('piper_train.vits.wavfile', 'write'),
           ]
 
           failed = []
@@ -102,6 +99,39 @@ jobs:
 
       - name: "Layer 2: Install HF Space requirements"
         run: pip install -r hf-space-deploy/requirements.txt
+
+      - name: "Layer 2.5: Import validation (with external deps)"
+        working-directory: hf-space-deploy
+        run: |
+          python3 -c "
+          import sys, importlib
+
+          # Modules that require external deps (numpy, pyopenjtalk, etc.)
+          modules = [
+              ('piper_train.infer_onnx', 'text_to_phoneme_ids_and_prosody'),
+              ('piper_train.phonemize.japanese', None),
+              ('piper_train.vits.utils', 'audio_float_to_int16'),
+              ('piper_train.vits.wavfile', 'write'),
+          ]
+
+          failed = []
+          for mod_name, attr_name in modules:
+              try:
+                  mod = importlib.import_module(mod_name)
+                  if attr_name and not hasattr(mod, attr_name):
+                      failed.append(f'{mod_name}.{attr_name} not found')
+                  else:
+                      label = f'{mod_name}.{attr_name}' if attr_name else mod_name
+                      print(f'  OK {label}')
+              except ImportError as e:
+                  failed.append(f'{mod_name}: {e}')
+                  print(f'  FAIL {mod_name} -- {e}')
+
+          if failed:
+              print(f'\nFAIL: {len(failed)} import(s) failed')
+              sys.exit(1)
+          print(f'\nOK: All {len(modules)} imports with deps passed')
+          "
 
       - name: "Layer 3: Japanese phonemization test"
         working-directory: hf-space-deploy
