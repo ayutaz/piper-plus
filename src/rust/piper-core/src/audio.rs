@@ -17,10 +17,11 @@ pub fn audio_float_to_int16(audio: &[f32]) -> Vec<i16> {
 
     let scale = 32767.0 / max_val;
 
-    audio
-        .iter()
-        .map(|x| (x * scale).clamp(-32768.0, 32767.0) as i16)
-        .collect()
+    let mut result = Vec::with_capacity(audio.len());
+    for &x in audio {
+        result.push((x * scale).clamp(-32768.0, 32767.0) as i16);
+    }
+    result
 }
 
 /// WAV ファイルを書き出す
@@ -76,9 +77,11 @@ pub fn write_wav_to_stdout(sample_rate: u32, audio: &[i16]) -> Result<(), PiperE
     // data chunk
     stdout.write_all(b"data")?;
     stdout.write_all(&data_size.to_le_bytes())?;
+    let mut buf = Vec::with_capacity(audio.len() * 2);
     for &sample in audio {
-        stdout.write_all(&sample.to_le_bytes())?;
+        buf.extend_from_slice(&sample.to_le_bytes());
     }
+    stdout.write_all(&buf)?;
 
     stdout.flush()?;
     Ok(())

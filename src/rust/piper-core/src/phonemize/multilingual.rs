@@ -7,7 +7,7 @@
 //! Port of the Python `multilingual.py`.
 
 use std::collections::{HashMap, HashSet};
-use std::sync::Mutex;
+use std::sync::{Mutex, OnceLock};
 
 use super::token_map::token_to_pua;
 use super::{Phonemizer, ProsodyFeature, ProsodyInfo};
@@ -172,8 +172,8 @@ pub fn segment_text<'a>(
             if let Some(prev) = current_lang {
                 if detected != prev {
                     // Language changed — flush the current segment
-                    segments.push((prev.to_string(), current_chars.clone()));
-                    current_chars.clear();
+                    segments.push((prev.to_string(), std::mem::take(&mut current_chars)));
+                    // current_chars is now empty String (no allocation needed for clear)
                 }
             }
             current_lang = Some(detected);
@@ -397,32 +397,40 @@ impl MultilingualPhonemizer {
 
     /// Build the set of BOS/EOS-like tokens to strip from individual
     /// segment outputs. Includes PUA-encoded Japanese question markers.
-    fn bos_eos_tokens() -> HashSet<String> {
-        let mut set = HashSet::new();
-        set.insert("^".to_string());
-        set.insert("$".to_string());
-        set.insert("?".to_string());
-        // PUA-encoded question markers (?!, ?., ?~)
-        for marker in &["?!", "?.", "?~"] {
-            if let Some(pua) = token_to_pua(marker) {
-                set.insert(pua.to_string());
+    /// Cached via `OnceLock` to avoid re-constructing the `HashSet` on every call.
+    fn bos_eos_tokens() -> &'static HashSet<String> {
+        static TOKENS: OnceLock<HashSet<String>> = OnceLock::new();
+        TOKENS.get_or_init(|| {
+            let mut set = HashSet::new();
+            set.insert("^".to_string());
+            set.insert("$".to_string());
+            set.insert("?".to_string());
+            // PUA-encoded question markers (?!, ?., ?~)
+            for marker in &["?!", "?.", "?~"] {
+                if let Some(pua) = token_to_pua(marker) {
+                    set.insert(pua.to_string());
+                }
             }
-        }
-        set
+            set
+        })
     }
 
     /// Build the set of EOS-like tokens (subset of BOS/EOS used to track
     /// the last EOS for dynamic post-processing).
-    fn eos_tokens() -> HashSet<String> {
-        let mut set = HashSet::new();
-        set.insert("$".to_string());
-        set.insert("?".to_string());
-        for marker in &["?!", "?.", "?~"] {
-            if let Some(pua) = token_to_pua(marker) {
-                set.insert(pua.to_string());
+    /// Cached via `OnceLock` to avoid re-constructing the `HashSet` on every call.
+    fn eos_tokens() -> &'static HashSet<String> {
+        static TOKENS: OnceLock<HashSet<String>> = OnceLock::new();
+        TOKENS.get_or_init(|| {
+            let mut set = HashSet::new();
+            set.insert("$".to_string());
+            set.insert("?".to_string());
+            for marker in &["?!", "?.", "?~"] {
+                if let Some(pua) = token_to_pua(marker) {
+                    set.insert(pua.to_string());
+                }
             }
-        }
-        set
+            set
+        })
     }
 }
 
@@ -854,7 +862,7 @@ mod tests {
         let eos_set = MultilingualPhonemizer::eos_tokens();
         let bos_eos_set = MultilingualPhonemizer::bos_eos_tokens();
         // EOS set should be a subset of BOS/EOS set
-        for token in &eos_set {
+        for token in eos_set {
             assert!(
                 bos_eos_set.contains(token),
                 "EOS token {:?} not in BOS/EOS set",

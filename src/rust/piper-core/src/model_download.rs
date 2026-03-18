@@ -96,7 +96,7 @@ pub fn download_file(
     dest: &Path,
     progress: Option<ProgressCallback>,
 ) -> Result<(), PiperError> {
-    use std::io::Write;
+    use std::io::{BufWriter, Read as _, Write};
 
     // Ensure the parent directory exists.
     if let Some(parent) = dest.parent() {
@@ -105,7 +105,7 @@ pub fn download_file(
         )))?;
     }
 
-    let response = reqwest::blocking::get(url).map_err(|e| {
+    let mut response = reqwest::blocking::get(url).map_err(|e| {
         PiperError::ModelLoad(format!("HTTP request failed for {url}: {e}"))
     })?;
 
@@ -122,23 +122,28 @@ pub fn download_file(
     const PROGRESS_INTERVAL: u64 = 100 * 1024;
     let mut next_report = PROGRESS_INTERVAL;
 
-    let bytes = response.bytes().map_err(|e| {
-        PiperError::ModelLoad(format!("failed to read response body from {url}: {e}"))
-    })?;
-
-    let mut file = std::fs::File::create(dest).map_err(|e| {
+    let file = std::fs::File::create(dest).map_err(|e| {
         PiperError::ModelLoad(format!("failed to create file {}: {e}", dest.display()))
     })?;
+    let mut file = BufWriter::with_capacity(256 * 1024, file); // 256KB buffer
 
-    // Write in chunks to support progress reporting.
-    for chunk in bytes.chunks(64 * 1024) {
-        file.write_all(chunk).map_err(|e| {
+    // Stream directly from the response to disk to avoid loading
+    // the entire body into memory.
+    let mut buf = [0u8; 64 * 1024];
+    loop {
+        let n = response.read(&mut buf).map_err(|e| {
+            PiperError::ModelLoad(format!("failed to read response body from {url}: {e}"))
+        })?;
+        if n == 0 {
+            break;
+        }
+        file.write_all(&buf[..n]).map_err(|e| {
             PiperError::ModelLoad(format!("failed to write to {}: {e}", dest.display()))
         })?;
-        bytes_downloaded += chunk.len() as u64;
+        bytes_downloaded += n as u64;
 
         if let Some(ref cb) = progress {
-            if bytes_downloaded >= next_report || bytes_downloaded == bytes.len() as u64 {
+            if bytes_downloaded >= next_report || (total_bytes == Some(bytes_downloaded)) {
                 let percentage = total_bytes.map(|t| {
                     if t == 0 { 100.0 } else { (bytes_downloaded as f64 / t as f64) * 100.0 }
                 });
@@ -258,39 +263,46 @@ pub fn is_model_cached(model_name: &str, model_dir: &Path) -> bool {
 }
 
 /// Built-in model registry with known Piper-Plus models.
-pub fn builtin_registry() -> Vec<ModelInfo> {
-    vec![
-        ModelInfo {
-            name: "tsukuyomi-6lang-v2".to_string(),
-            language: "ja-en-zh-es-fr-pt".to_string(),
-            quality: "medium".to_string(),
-            description: "Tsukuyomi-chan 6-language model (JA/EN/ZH/ES/FR/PT)".to_string(),
-            model_url: huggingface_url(
-                "ayousanz/piper-plus-tsukuyomi-chan",
-                "tsukuyomi-6lang-v2-fixed.onnx",
-            ),
-            config_url: huggingface_url(
-                "ayousanz/piper-plus-tsukuyomi-chan",
-                "config.json",
-            ),
-            size_bytes: None,
-        },
-        ModelInfo {
-            name: "piper-plus-base".to_string(),
-            language: "ja-en-zh-es-fr-pt".to_string(),
-            quality: "medium".to_string(),
-            description: "Piper-Plus 6-language base model (571 speakers)".to_string(),
-            model_url: huggingface_url(
-                "ayousanz/piper-plus-base",
-                "multilingual-6lang-75epoch.onnx",
-            ),
-            config_url: huggingface_url(
-                "ayousanz/piper-plus-base",
-                "config.json",
-            ),
-            size_bytes: None,
-        },
-    ]
+///
+/// The registry is lazily initialised once and then shared for the lifetime
+/// of the process, avoiding repeated heap allocations on every call.
+pub fn builtin_registry() -> &'static [ModelInfo] {
+    use std::sync::OnceLock;
+    static REGISTRY: OnceLock<Vec<ModelInfo>> = OnceLock::new();
+    REGISTRY.get_or_init(|| {
+        vec![
+            ModelInfo {
+                name: "tsukuyomi-6lang-v2".to_string(),
+                language: "ja-en-zh-es-fr-pt".to_string(),
+                quality: "medium".to_string(),
+                description: "Tsukuyomi-chan 6-language model (JA/EN/ZH/ES/FR/PT)".to_string(),
+                model_url: huggingface_url(
+                    "ayousanz/piper-plus-tsukuyomi-chan",
+                    "tsukuyomi-6lang-v2-fixed.onnx",
+                ),
+                config_url: huggingface_url(
+                    "ayousanz/piper-plus-tsukuyomi-chan",
+                    "config.json",
+                ),
+                size_bytes: None,
+            },
+            ModelInfo {
+                name: "piper-plus-base".to_string(),
+                language: "ja-en-zh-es-fr-pt".to_string(),
+                quality: "medium".to_string(),
+                description: "Piper-Plus 6-language base model (571 speakers)".to_string(),
+                model_url: huggingface_url(
+                    "ayousanz/piper-plus-base",
+                    "multilingual-6lang-75epoch.onnx",
+                ),
+                config_url: huggingface_url(
+                    "ayousanz/piper-plus-base",
+                    "config.json",
+                ),
+                size_bytes: None,
+            },
+        ]
+    })
 }
 
 /// Extract the filename component from a URL path.
@@ -473,7 +485,7 @@ mod tests {
             "builtin registry should contain at least 2 models"
         );
         // Every entry should have valid-looking URLs.
-        for m in &models {
+        for m in models {
             assert!(m.model_url.starts_with("https://"), "bad model_url: {}", m.model_url);
             assert!(m.config_url.starts_with("https://"), "bad config_url: {}", m.config_url);
             assert!(!m.name.is_empty());

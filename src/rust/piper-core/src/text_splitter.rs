@@ -91,12 +91,14 @@ pub fn split_sentences(text: &str) -> Vec<String> {
     let mut current = String::new();
     let mut in_quotes = false;
 
-    let chars: Vec<char> = text.chars().collect();
-    let len = chars.len();
+    // Build a (byte_offset, char) index from char_indices() so we can track
+    // byte positions incrementally instead of collecting into Vec<char>.
+    let indexed: Vec<(usize, char)> = text.char_indices().collect();
+    let len = indexed.len();
     let mut i = 0;
 
     while i < len {
-        let c = chars[i];
+        let (_byte_off, c) = indexed[i];
 
         // Track quote state
         if c == '"' || c == '\u{201C}' || c == '\u{201D}' {
@@ -111,8 +113,8 @@ pub fn split_sentences(text: &str) -> Vec<String> {
             // Count consecutive newlines
             let mut newline_count = 0;
             let mut j = i;
-            while j < len && (chars[j] == '\n' || chars[j] == '\r') {
-                if chars[j] == '\n' {
+            while j < len && (indexed[j].1 == '\n' || indexed[j].1 == '\r') {
+                if indexed[j].1 == '\n' {
                     newline_count += 1;
                 }
                 j += 1;
@@ -139,14 +141,14 @@ pub fn split_sentences(text: &str) -> Vec<String> {
         if is_cjk_sentence_end(c) {
             current.push(c);
             // Consume any trailing CJK punctuation or closing quotes/brackets
-            while i + 1 < len && (chars[i + 1] == '\u{300D}' // 」
-                || chars[i + 1] == '\u{300F}'                 // 』
-                || chars[i + 1] == '\u{FF09}'                 // ）
-                || chars[i + 1] == '"'
-                || chars[i + 1] == '\u{201D}')                // "
+            while i + 1 < len && (indexed[i + 1].1 == '\u{300D}' // 」
+                || indexed[i + 1].1 == '\u{300F}'                 // 』
+                || indexed[i + 1].1 == '\u{FF09}'                 // ）
+                || indexed[i + 1].1 == '"'
+                || indexed[i + 1].1 == '\u{201D}')                // "
             {
                 i += 1;
-                current.push(chars[i]);
+                current.push(indexed[i].1);
             }
             let trimmed = current.trim_end().to_string();
             if !trimmed.is_empty() {
@@ -155,7 +157,7 @@ pub fn split_sentences(text: &str) -> Vec<String> {
             current.clear();
             i += 1;
             // Skip whitespace after CJK sentence end
-            while i < len && chars[i].is_whitespace() && chars[i] != '\n' {
+            while i < len && indexed[i].1.is_whitespace() && indexed[i].1 != '\n' {
                 i += 1;
             }
             continue;
@@ -166,26 +168,26 @@ pub fn split_sentences(text: &str) -> Vec<String> {
             current.push(c);
 
             // Handle multiple consecutive punctuation: !? ?! !! ...
-            while i + 1 < len && (is_western_sentence_end(chars[i + 1])
-                || chars[i + 1] == '.')
+            while i + 1 < len && (is_western_sentence_end(indexed[i + 1].1)
+                || indexed[i + 1].1 == '.')
             {
                 i += 1;
-                current.push(chars[i]);
+                current.push(indexed[i].1);
             }
 
             // Consume closing quotes after punctuation
-            while i + 1 < len && (chars[i + 1] == '"'
-                || chars[i + 1] == '\u{201D}'
-                || chars[i + 1] == '\'')
+            while i + 1 < len && (indexed[i + 1].1 == '"'
+                || indexed[i + 1].1 == '\u{201D}'
+                || indexed[i + 1].1 == '\'')
             {
                 i += 1;
-                current.push(chars[i]);
+                current.push(indexed[i].1);
             }
 
             // Check if this is an abbreviation (only for periods)
             if c == '.' {
-                // Calculate the byte position of this period
-                let byte_pos: usize = chars[..=i].iter().map(|ch| ch.len_utf8()).sum::<usize>() - 1;
+                // Use byte offset directly from char_indices
+                let byte_pos = indexed[i].0;
                 if ends_with_abbreviation(&text[..=byte_pos], byte_pos) {
                     // Don't split at abbreviations
                     i += 1;
@@ -197,7 +199,7 @@ pub fn split_sentences(text: &str) -> Vec<String> {
                 if dot_count >= 3 {
                     // Ellipsis: don't split here, continue to see if next
                     // char is whitespace + capital or more punctuation
-                    if i + 1 < len && !chars[i + 1].is_whitespace() {
+                    if i + 1 < len && !indexed[i + 1].1.is_whitespace() {
                         i += 1;
                         continue;
                     }
@@ -217,7 +219,7 @@ pub fn split_sentences(text: &str) -> Vec<String> {
                 continue;
             }
 
-            if chars[next_i].is_whitespace() || chars[next_i] == '\n' {
+            if indexed[next_i].1.is_whitespace() || indexed[next_i].1 == '\n' {
                 // Don't split if we're inside quotes
                 if in_quotes {
                     i += 1;
@@ -231,7 +233,7 @@ pub fn split_sentences(text: &str) -> Vec<String> {
                 current.clear();
                 i = next_i;
                 // Skip whitespace between sentences
-                while i < len && chars[i] == ' ' {
+                while i < len && indexed[i].1 == ' ' {
                     i += 1;
                 }
                 continue;
@@ -266,19 +268,19 @@ fn split_at_clauses(text: &str) -> Vec<String> {
     let mut clauses: Vec<String> = Vec::new();
     let mut current = String::new();
 
-    let chars: Vec<char> = text.chars().collect();
-    let len = chars.len();
+    let indexed: Vec<(usize, char)> = text.char_indices().collect();
+    let len = indexed.len();
     let mut i = 0;
 
     while i < len {
-        let c = chars[i];
+        let (_byte_off, c) = indexed[i];
         current.push(c);
 
         if clause_delimiters.contains(&c) {
             // Include trailing space if present
-            if i + 1 < len && chars[i + 1] == ' ' {
+            if i + 1 < len && indexed[i + 1].1 == ' ' {
                 i += 1;
-                current.push(chars[i]);
+                current.push(indexed[i].1);
             }
             let trimmed = current.trim_end().to_string();
             if !trimmed.is_empty() {
@@ -322,16 +324,16 @@ pub fn split_chunks(text: &str, config: &SplitConfig) -> Vec<TextChunk> {
 
     // Phase 1: Expand sentences that exceed max_chars via clause splitting
     let mut expanded: Vec<String> = Vec::new();
-    for sentence in &sentences {
+    for sentence in sentences {
         if max > 0 && sentence.len() > max && config.split_on_clause {
-            let clauses = split_at_clauses(sentence);
+            let clauses = split_at_clauses(&sentence);
             // Merge clauses that are still too long -- just keep them as-is
             // (we cannot split further without breaking words)
             for clause in clauses {
                 expanded.push(clause);
             }
         } else {
-            expanded.push(sentence.clone());
+            expanded.push(sentence);
         }
     }
 
@@ -339,24 +341,24 @@ pub fn split_chunks(text: &str, config: &SplitConfig) -> Vec<TextChunk> {
     let mut merged: Vec<String> = Vec::new();
     let mut buffer = String::new();
 
-    for piece in &expanded {
+    for piece in expanded {
         if buffer.is_empty() {
-            buffer = piece.clone();
+            buffer = piece;
         } else {
             // Try merging
             let combined_len = buffer.len() + 1 + piece.len(); // +1 for space
             if buffer.len() < min {
                 // Current buffer is too short, merge
                 buffer.push(' ');
-                buffer.push_str(piece);
+                buffer.push_str(&piece);
             } else if max > 0 && combined_len <= max && piece.len() < min {
                 // Next piece is too short, merge it into current
                 buffer.push(' ');
-                buffer.push_str(piece);
+                buffer.push_str(&piece);
             } else {
                 // Flush buffer
                 merged.push(buffer);
-                buffer = piece.clone();
+                buffer = piece;
             }
         }
     }

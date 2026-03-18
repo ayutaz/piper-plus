@@ -10,6 +10,8 @@
 //! convert a high-level selection into a [`crate::gpu::DeviceType`] suitable
 //! for passing to [`crate::gpu::configure_session_builder`].
 
+use std::sync::OnceLock;
+
 use crate::error::PiperError;
 
 /// Compute device type.
@@ -215,70 +217,75 @@ impl std::fmt::Display for DeviceSelection {
 ///
 /// CPU is always included. Accelerators are included only when the
 /// corresponding feature flag is compiled in.
-pub fn enumerate_devices() -> Vec<DeviceInfo> {
-    let mut devices = Vec::new();
+///
+/// Results are computed once and cached for the lifetime of the process.
+pub fn enumerate_devices() -> &'static [DeviceInfo] {
+    static DEVICES: OnceLock<Vec<DeviceInfo>> = OnceLock::new();
+    DEVICES.get_or_init(|| {
+        let mut devices = Vec::new();
 
-    // CPU is always available
-    devices.push(DeviceInfo {
-        kind: DeviceKind::Cpu,
-        device_id: 0,
-        name: "CPU".to_string(),
-        available: true,
-        memory_bytes: None,
-    });
-
-    // CUDA devices
-    #[cfg(feature = "cuda")]
-    {
-        // When the cuda feature is compiled, report at least device 0.
-        // Actual GPU enumeration would require the CUDA runtime; for now
-        // we advertise a single device whose availability is best-effort.
+        // CPU is always available
         devices.push(DeviceInfo {
-            kind: DeviceKind::Cuda,
+            kind: DeviceKind::Cpu,
             device_id: 0,
-            name: "CUDA Device 0".to_string(),
+            name: "CPU".to_string(),
             available: true,
             memory_bytes: None,
         });
-    }
 
-    // CoreML (macOS only)
-    #[cfg(all(feature = "coreml", target_os = "macos"))]
-    {
-        devices.push(DeviceInfo {
-            kind: DeviceKind::CoreML,
-            device_id: 0,
-            name: "Apple Neural Engine / GPU".to_string(),
-            available: true,
-            memory_bytes: None,
-        });
-    }
+        // CUDA devices
+        #[cfg(feature = "cuda")]
+        {
+            // When the cuda feature is compiled, report at least device 0.
+            // Actual GPU enumeration would require the CUDA runtime; for now
+            // we advertise a single device whose availability is best-effort.
+            devices.push(DeviceInfo {
+                kind: DeviceKind::Cuda,
+                device_id: 0,
+                name: "CUDA Device 0".to_string(),
+                available: true,
+                memory_bytes: None,
+            });
+        }
 
-    // DirectML (Windows only)
-    #[cfg(all(feature = "directml", target_os = "windows"))]
-    {
-        devices.push(DeviceInfo {
-            kind: DeviceKind::DirectML,
-            device_id: 0,
-            name: "DirectML Device 0".to_string(),
-            available: true,
-            memory_bytes: None,
-        });
-    }
+        // CoreML (macOS only)
+        #[cfg(all(feature = "coreml", target_os = "macos"))]
+        {
+            devices.push(DeviceInfo {
+                kind: DeviceKind::CoreML,
+                device_id: 0,
+                name: "Apple Neural Engine / GPU".to_string(),
+                available: true,
+                memory_bytes: None,
+            });
+        }
 
-    // TensorRT (Linux typically)
-    #[cfg(feature = "tensorrt")]
-    {
-        devices.push(DeviceInfo {
-            kind: DeviceKind::TensorRT,
-            device_id: 0,
-            name: "TensorRT Device 0".to_string(),
-            available: true,
-            memory_bytes: None,
-        });
-    }
+        // DirectML (Windows only)
+        #[cfg(all(feature = "directml", target_os = "windows"))]
+        {
+            devices.push(DeviceInfo {
+                kind: DeviceKind::DirectML,
+                device_id: 0,
+                name: "DirectML Device 0".to_string(),
+                available: true,
+                memory_bytes: None,
+            });
+        }
 
-    devices
+        // TensorRT (Linux typically)
+        #[cfg(feature = "tensorrt")]
+        {
+            devices.push(DeviceInfo {
+                kind: DeviceKind::TensorRT,
+                device_id: 0,
+                name: "TensorRT Device 0".to_string(),
+                available: true,
+                memory_bytes: None,
+            });
+        }
+
+        devices
+    })
 }
 
 /// Check if a specific device kind is available.
@@ -288,53 +295,51 @@ pub fn enumerate_devices() -> Vec<DeviceInfo> {
 /// 2. The runtime can plausibly support it (e.g., correct OS).
 ///
 /// CPU is always available.
+///
+/// Results are computed once and cached for the lifetime of the process.
 pub fn is_device_available(kind: &DeviceKind) -> bool {
+    /// Cached availability results for all device kinds.
+    struct Availability {
+        cuda: bool,
+        coreml: bool,
+        directml: bool,
+        tensorrt: bool,
+    }
+
+    static AVAIL: OnceLock<Availability> = OnceLock::new();
+    let avail = AVAIL.get_or_init(|| Availability {
+        cuda: {
+            #[cfg(feature = "cuda")]
+            { true }
+            #[cfg(not(feature = "cuda"))]
+            { false }
+        },
+        coreml: {
+            #[cfg(all(feature = "coreml", target_os = "macos"))]
+            { true }
+            #[cfg(not(all(feature = "coreml", target_os = "macos")))]
+            { false }
+        },
+        directml: {
+            #[cfg(all(feature = "directml", target_os = "windows"))]
+            { true }
+            #[cfg(not(all(feature = "directml", target_os = "windows")))]
+            { false }
+        },
+        tensorrt: {
+            #[cfg(feature = "tensorrt")]
+            { true }
+            #[cfg(not(feature = "tensorrt"))]
+            { false }
+        },
+    });
+
     match kind {
         DeviceKind::Cpu => true,
-
-        DeviceKind::Cuda => {
-            #[cfg(feature = "cuda")]
-            {
-                true
-            }
-            #[cfg(not(feature = "cuda"))]
-            {
-                false
-            }
-        }
-
-        DeviceKind::CoreML => {
-            #[cfg(all(feature = "coreml", target_os = "macos"))]
-            {
-                true
-            }
-            #[cfg(not(all(feature = "coreml", target_os = "macos")))]
-            {
-                false
-            }
-        }
-
-        DeviceKind::DirectML => {
-            #[cfg(all(feature = "directml", target_os = "windows"))]
-            {
-                true
-            }
-            #[cfg(not(all(feature = "directml", target_os = "windows")))]
-            {
-                false
-            }
-        }
-
-        DeviceKind::TensorRT => {
-            #[cfg(feature = "tensorrt")]
-            {
-                true
-            }
-            #[cfg(not(feature = "tensorrt"))]
-            {
-                false
-            }
-        }
+        DeviceKind::Cuda => avail.cuda,
+        DeviceKind::CoreML => avail.coreml,
+        DeviceKind::DirectML => avail.directml,
+        DeviceKind::TensorRT => avail.tensorrt,
     }
 }
 
@@ -704,7 +709,7 @@ mod tests {
     fn test_enumerate_devices_no_duplicates() {
         let devices = enumerate_devices();
         let mut seen_kinds: Vec<DeviceKind> = Vec::new();
-        for d in &devices {
+        for d in devices {
             assert!(
                 !seen_kinds.contains(&d.kind),
                 "duplicate device kind: {:?}",

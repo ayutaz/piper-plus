@@ -311,9 +311,9 @@ pub fn samples_to_wav_bytes(samples: &[i16], sample_rate: u32) -> Vec<u8> {
     // data chunk (8 bytes header + sample data)
     buf.extend_from_slice(b"data");
     buf.extend_from_slice(&data_size.to_le_bytes());
-    for &sample in samples {
-        buf.extend_from_slice(&sample.to_le_bytes());
-    }
+    buf.extend_from_slice(
+        &samples.iter().flat_map(|s| s.to_le_bytes()).collect::<Vec<u8>>(),
+    );
 
     buf
 }

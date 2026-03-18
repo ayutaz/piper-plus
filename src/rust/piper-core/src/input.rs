@@ -37,14 +37,14 @@ impl JsonlUtterance {
         serde_json::from_str(line).map_err(PiperError::from)
     }
 
-    /// SynthesisRequest に変換
+    /// SynthesisRequest に変換 (move semantics — self を消費して clone を回避)
     pub fn to_request(
-        &self,
+        self,
         noise_scale: f32,
         length_scale: f32,
         noise_w: f32,
     ) -> SynthesisRequest {
-        let prosody_features = self.prosody_features.as_ref().map(|features| {
+        let prosody_features = self.prosody_features.map(|features| {
             features
                 .iter()
                 .map(|f| match f {
@@ -55,7 +55,7 @@ impl JsonlUtterance {
         });
 
         SynthesisRequest {
-            phoneme_ids: self.phoneme_ids.clone(),
+            phoneme_ids: self.phoneme_ids,
             prosody_features,
             speaker_id: self.speaker_id,
             language_id: self.language_id,

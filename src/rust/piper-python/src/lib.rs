@@ -104,12 +104,26 @@ struct SynthesisResult {
 
 #[pymethods]
 impl SynthesisResult {
-    /// Return audio as a numpy int16 array.
+    /// Return audio as a numpy int16 array (cloning the internal buffer).
     ///
     /// The array contains raw PCM samples suitable for direct playback
-    /// or WAV encoding.
+    /// or WAV encoding.  The internal buffer is preserved so that
+    /// :meth:`audio_float32`, :meth:`save_wav`, or a second call to this
+    /// method remain valid.  For a zero-copy alternative, see
+    /// :meth:`take_audio_int16`.
     fn audio_int16<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray1<i16>> {
         self.samples.clone().into_pyarray_bound(py)
+    }
+
+    /// Move the internal int16 buffer into a numpy array without copying.
+    ///
+    /// This is more efficient than :meth:`audio_int16` because it avoids
+    /// cloning the samples vector.  After calling this method the internal
+    /// buffer is empty -- subsequent calls to :meth:`audio_int16`,
+    /// :meth:`audio_float32`, or :meth:`save_wav` will return/use an
+    /// empty array.
+    fn take_audio_int16<'py>(&mut self, py: Python<'py>) -> Bound<'py, PyArray1<i16>> {
+        std::mem::take(&mut self.samples).into_pyarray_bound(py)
     }
 
     /// Return audio as a numpy float32 array, normalized to [-1.0, 1.0].
@@ -269,6 +283,63 @@ impl PiperVoice {
         });
 
         to_pyresult(result).map(SynthesisResult::from)
+    }
+
+    /// Synthesize multiple texts in a single call.
+    ///
+    /// This is more efficient than calling :meth:`synthesize` in a loop
+    /// because the GIL is released once for the entire batch rather than
+    /// once per text.
+    ///
+    /// The GIL is released during ONNX inference so other Python threads
+    /// can run concurrently.
+    ///
+    /// Args:
+    ///     texts: List of input texts to synthesize.
+    ///     speaker_id: Speaker index for multi-speaker models (default: None).
+    ///     language: Language code override (e.g. ``"ja"``, ``"en"``).
+    ///         If omitted, the phonemizer auto-detects each text's language.
+    ///     noise_scale: Noise scale for VITS stochastic synthesis (default: 0.667).
+    ///     length_scale: Duration scale -- values > 1.0 produce slower speech (default: 1.0).
+    ///     noise_w: Noise weight for duration predictor (default: 0.8).
+    ///
+    /// Returns:
+    ///     List of SynthesisResult, one per input text, in the same order.
+    ///
+    /// Raises:
+    ///     ValueError: If any text produces unknown phonemes.
+    ///     RuntimeError: If ONNX inference fails.
+    #[pyo3(signature = (texts, speaker_id=None, language=None, noise_scale=0.667, length_scale=1.0, noise_w=0.8))]
+    fn synthesize_batch(
+        &mut self,
+        py: Python<'_>,
+        texts: Vec<String>,
+        speaker_id: Option<i64>,
+        language: Option<String>,
+        noise_scale: f32,
+        length_scale: f32,
+        noise_w: f32,
+    ) -> PyResult<Vec<SynthesisResult>> {
+        let inner_ptr = SendPtr(&mut self.inner as *mut piper_core::PiperVoice);
+
+        let results = py.allow_threads(move || {
+            let inner = unsafe { inner_ptr.as_mut() };
+            let mut out = Vec::with_capacity(texts.len());
+            for text in &texts {
+                let r = inner.synthesize_text(
+                    text,
+                    speaker_id,
+                    language.as_deref(),
+                    noise_scale,
+                    length_scale,
+                    noise_w,
+                )?;
+                out.push(r);
+            }
+            Ok::<_, piper_core::PiperError>(out)
+        });
+
+        to_pyresult(results).map(|v| v.into_iter().map(SynthesisResult::from).collect())
     }
 
     /// Synthesize text and save directly to a WAV file.

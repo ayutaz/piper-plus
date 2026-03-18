@@ -9,7 +9,7 @@
 
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
-use std::sync::LazyLock;
+use std::sync::{LazyLock, OnceLock};
 
 use super::token_map::token_to_pua;
 use super::{Phonemizer, ProsodyFeature, ProsodyInfo};
@@ -747,41 +747,100 @@ fn load_phrase_dict(path: &Path) -> Result<HashMap<String, Vec<String>>, PiperEr
 }
 
 // =========================================================================
+// Global Chinese dictionary cache
+//
+// The pinyin dictionaries (single-char ~20K entries, phrase ~100K entries)
+// are loaded and parsed once, then shared across all `ChinesePhonemizer`
+// instances via `&'static` references.
+// =========================================================================
+
+/// Cached pair of (single_char_dict, phrase_dict).
+static ZH_DICT_CACHE: OnceLock<(HashMap<char, String>, HashMap<String, Vec<String>>)> =
+    OnceLock::new();
+
+// =========================================================================
 // ChinesePhonemizer
 // =========================================================================
 
 /// Chinese (Mandarin) phonemizer.
 ///
 /// Loads pypinyin-format JSON dictionaries for character-to-pinyin conversion
-/// and converts to IPA phonemes with PUA codepoint mapping.
+/// and converts to IPA phonemes with PUA codepoint mapping. Dictionaries
+/// are loaded once and cached globally via `OnceLock`, so creating multiple
+/// instances is cheap.
 pub struct ChinesePhonemizer {
-    single_dict: HashMap<char, String>,
-    phrase_dict: HashMap<String, Vec<String>>,
+    dict: ZhDictRef,
+}
+
+/// Internal enum to hold either static references to the globally cached
+/// dictionaries or owned dictionaries (for tests).
+enum ZhDictRef {
+    /// References to the `OnceLock`-cached dictionaries.
+    Static {
+        single: &'static HashMap<char, String>,
+        phrase: &'static HashMap<String, Vec<String>>,
+    },
+    /// Owned dictionaries, used by `from_dicts` for testing.
+    Owned {
+        single: HashMap<char, String>,
+        phrase: HashMap<String, Vec<String>>,
+    },
+}
+
+impl ZhDictRef {
+    fn single(&self) -> &HashMap<char, String> {
+        match self {
+            ZhDictRef::Static { single, .. } => single,
+            ZhDictRef::Owned { single, .. } => single,
+        }
+    }
+
+    fn phrase(&self) -> &HashMap<String, Vec<String>> {
+        match self {
+            ZhDictRef::Static { phrase, .. } => phrase,
+            ZhDictRef::Owned { phrase, .. } => phrase,
+        }
+    }
 }
 
 impl ChinesePhonemizer {
     /// Create a new `ChinesePhonemizer` by loading dictionaries from JSON files.
     ///
+    /// The dictionaries are loaded and parsed only on the first call;
+    /// subsequent calls reuse the cached data.
+    ///
     /// # Arguments
     /// * `single_char_path` - Path to `pinyin_single.json`
     /// * `phrase_path` - Path to `pinyin_phrases.json`
     pub fn new(single_char_path: &Path, phrase_path: &Path) -> Result<Self, PiperError> {
-        let single_dict = load_single_char_dict(single_char_path)?;
-        let phrase_dict = load_phrase_dict(phrase_path)?;
+        let (single, phrase) = ZH_DICT_CACHE.get_or_init(|| {
+            let s = load_single_char_dict(single_char_path)
+                .expect("pinyin single-char dictionary load failed");
+            let p = load_phrase_dict(phrase_path)
+                .expect("pinyin phrase dictionary load failed");
+            (s, p)
+        });
+
         Ok(Self {
-            single_dict,
-            phrase_dict,
+            dict: ZhDictRef::Static {
+                single,
+                phrase,
+            },
         })
     }
 
     /// Create a `ChinesePhonemizer` from pre-loaded dictionaries.
+    ///
+    /// Does not affect or use the global cache.
     pub fn from_dicts(
         single_dict: HashMap<char, String>,
         phrase_dict: HashMap<String, Vec<String>>,
     ) -> Self {
         Self {
-            single_dict,
-            phrase_dict,
+            dict: ZhDictRef::Owned {
+                single: single_dict,
+                phrase: phrase_dict,
+            },
         }
     }
 }
@@ -793,8 +852,8 @@ impl Phonemizer for ChinesePhonemizer {
     ) -> Result<(Vec<String>, Vec<Option<ProsodyInfo>>), PiperError> {
         Ok(phonemize_chinese_internal(
             text,
-            &self.single_dict,
-            &self.phrase_dict,
+            self.dict.single(),
+            self.dict.phrase(),
         ))
     }
 

@@ -43,8 +43,9 @@ pub fn resample_linear(samples: &[i16], from_rate: u32, to_rate: u32) -> Vec<i16
     let out_len = (samples.len() as f64 * ratio).ceil() as usize;
     let mut output = Vec::with_capacity(out_len);
 
-    for i in 0..out_len {
-        let src_pos = i as f64 / ratio;
+    let step = from_rate as f64 / to_rate as f64; // pre-computed inverse ratio
+    let mut src_pos = 0.0_f64;
+    for _i in 0..out_len {
         let src_idx = src_pos as usize;
         let frac = src_pos - src_idx as f64;
 
@@ -58,6 +59,7 @@ pub fn resample_linear(samples: &[i16], from_rate: u32, to_rate: u32) -> Vec<i16
         };
 
         output.push(sample);
+        src_pos += step; // addition instead of division per sample
     }
 
     output
@@ -253,9 +255,14 @@ pub fn trim_silence(samples: &[i16], threshold_db: f32) -> &[i16] {
 /// Apply a simple fade-in effect (linear amplitude ramp).
 pub fn fade_in(samples: &mut [i16], fade_samples: usize) {
     let fade_len = fade_samples.min(samples.len());
-    for (i, s) in samples[..fade_len].iter_mut().enumerate() {
-        let gain = i as f64 / fade_len as f64;
+    if fade_len == 0 {
+        return;
+    }
+    let inv_len = 1.0_f64 / fade_len as f64; // compute once
+    let mut gain = 0.0_f64;
+    for s in samples[..fade_len].iter_mut() {
         *s = (*s as f64 * gain) as i16;
+        gain += inv_len; // addition per sample instead of division
     }
 }
 
@@ -263,10 +270,15 @@ pub fn fade_in(samples: &mut [i16], fade_samples: usize) {
 pub fn fade_out(samples: &mut [i16], fade_samples: usize) {
     let len = samples.len();
     let fade_len = fade_samples.min(len);
+    if fade_len == 0 {
+        return;
+    }
     let fade_start = len - fade_len;
-    for (i, s) in samples[fade_start..].iter_mut().enumerate() {
-        let gain = 1.0 - (i as f64 / fade_len as f64);
+    let inv_len = 1.0_f64 / fade_len as f64; // compute once
+    let mut gain = 1.0_f64;
+    for s in samples[fade_start..].iter_mut() {
         *s = (*s as f64 * gain) as i16;
+        gain -= inv_len; // addition per sample instead of division
     }
 }
 
@@ -306,11 +318,13 @@ pub fn concat_audio(chunks: &[&[i16]], crossfade_samples: usize) -> Vec<i16> {
 
         // Apply crossfade to the overlap region
         let out_start = output.len() - xfade;
+        let slope = 1.0_f64 / (xfade + 1) as f64; // pre-computed step
+        let mut t = slope;
         for i in 0..xfade {
-            let t = (i + 1) as f64 / (xfade + 1) as f64;
             let a = output[out_start + i] as f64 * (1.0 - t);
             let b = chunk[i] as f64 * t;
             output[out_start + i] = (a + b).clamp(-32768.0, 32767.0) as i16;
+            t += slope; // addition instead of division per sample
         }
 
         // Append the rest of the chunk after the crossfade region

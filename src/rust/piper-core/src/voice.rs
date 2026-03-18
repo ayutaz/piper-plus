@@ -140,7 +140,11 @@ impl PiperVoice {
             self.phonemizer
                 .post_process_ids(ids, prosody_feats, phoneme_id_map);
 
-        // 4. Determine language_id from config
+        // 4. Build prosody tensor directly from post-processed features
+        //    (single pass: Option<ProsodyFeature>[] → Option<Vec<ProsodyFeature>>)
+        let prosody_tensor = build_prosody_tensor(&prosody_feats);
+
+        // 5. Determine language_id from config
         //    language_override が指定されていればそちらを優先。
         //    多言語モデルの場合、テキストの最初の言語セグメントを自動検出して language_id を決定。
         //    単言語モデルの場合は phonemizer の言語コードを使用。
@@ -161,10 +165,10 @@ impl PiperVoice {
             None
         };
 
-        // 5. Build request and run inference
+        // 6. Build request and run inference
         let request = SynthesisRequest {
             phoneme_ids: ids,
-            prosody_features: build_prosody_tensor(&prosody_feats),
+            prosody_features: prosody_tensor,
             speaker_id,
             language_id,
             noise_scale,
@@ -235,6 +239,29 @@ fn build_prosody_tensor(
             features
                 .iter()
                 .map(|p| p.unwrap_or([0, 0, 0]))
+                .collect(),
+        )
+    } else {
+        None
+    }
+}
+
+/// ProsodyInfo 列から ONNX 入力用の Option<Vec<[i32; 3]>> に直接変換する。
+///
+/// `prosody_to_optional_features` + `build_prosody_tensor` を 1 パスに統合。
+/// 中間の `Vec<Option<[i32; 3]>>` を生成せず、いずれかが Some なら
+/// Some(Vec<[i32; 3]>) を返す。全て None なら None を返す。
+fn build_prosody_direct(
+    prosody: &[Option<crate::phonemize::ProsodyInfo>],
+) -> Option<Vec<crate::phonemize::ProsodyFeature>> {
+    if prosody.iter().any(|p| p.is_some()) {
+        Some(
+            prosody
+                .iter()
+                .map(|p| match p {
+                    Some(info) => [info.a1, info.a2, info.a3],
+                    None => [0, 0, 0],
+                })
                 .collect(),
         )
     } else {
@@ -662,6 +689,54 @@ mod tests {
         let features: Vec<Option<[i32; 3]>> = vec![];
         let tensor = build_prosody_tensor(&features);
         assert!(tensor.is_none());
+    }
+
+    // -----------------------------------------------------------------------
+    // 6. build_prosody_direct (consolidated single-pass conversion)
+    // -----------------------------------------------------------------------
+    #[test]
+    fn test_build_prosody_direct_with_some() {
+        let prosody = vec![
+            Some(ProsodyInfo { a1: -2, a2: 1, a3: 5 }),
+            None,
+            Some(ProsodyInfo { a1: 0, a2: 3, a3: 5 }),
+        ];
+        let tensor = build_prosody_direct(&prosody);
+        assert!(tensor.is_some());
+        let t = tensor.unwrap();
+        assert_eq!(t.len(), 3);
+        assert_eq!(t[0], [-2, 1, 5]);
+        assert_eq!(t[1], [0, 0, 0]); // None -> zero-filled
+        assert_eq!(t[2], [0, 3, 5]);
+    }
+
+    #[test]
+    fn test_build_prosody_direct_all_none() {
+        let prosody: Vec<Option<ProsodyInfo>> = vec![None, None];
+        let tensor = build_prosody_direct(&prosody);
+        assert!(tensor.is_none());
+    }
+
+    #[test]
+    fn test_build_prosody_direct_empty() {
+        let prosody: Vec<Option<ProsodyInfo>> = vec![];
+        let tensor = build_prosody_direct(&prosody);
+        assert!(tensor.is_none());
+    }
+
+    #[test]
+    fn test_build_prosody_direct_matches_two_step() {
+        // Verify build_prosody_direct produces the same result as
+        // prosody_to_optional_features + build_prosody_tensor
+        let prosody = vec![
+            Some(ProsodyInfo { a1: 1, a2: 2, a3: 3 }),
+            None,
+            Some(ProsodyInfo { a1: -1, a2: 0, a3: 7 }),
+            None,
+        ];
+        let two_step = build_prosody_tensor(&prosody_to_optional_features(&prosody));
+        let direct = build_prosody_direct(&prosody);
+        assert_eq!(two_step, direct);
     }
 
     // -----------------------------------------------------------------------

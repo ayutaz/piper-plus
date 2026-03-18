@@ -258,7 +258,7 @@ fn test_builtin_registry_non_empty() {
 #[test]
 fn test_builtin_registry_all_have_non_empty_name() {
     let models = builtin_registry();
-    for m in &models {
+    for m in models {
         assert!(
             !m.name.is_empty(),
             "every model in builtin registry must have a non-empty name"
@@ -269,7 +269,7 @@ fn test_builtin_registry_all_have_non_empty_name() {
 #[test]
 fn test_builtin_registry_all_have_valid_urls() {
     let models = builtin_registry();
-    for m in &models {
+    for m in models {
         assert!(
             m.model_url.starts_with("https://"),
             "model_url should start with https://, got: {}",
@@ -286,7 +286,7 @@ fn test_builtin_registry_all_have_valid_urls() {
 #[test]
 fn test_builtin_registry_urls_contain_huggingface() {
     let models = builtin_registry();
-    for m in &models {
+    for m in models {
         assert!(
             m.model_url.contains("huggingface.co"),
             "model_url should reference huggingface.co, got: {}",
@@ -303,7 +303,7 @@ fn test_builtin_registry_urls_contain_huggingface() {
 #[test]
 fn test_builtin_registry_all_have_non_empty_language() {
     let models = builtin_registry();
-    for m in &models {
+    for m in models {
         assert!(
             !m.language.is_empty(),
             "every model in builtin registry must have a non-empty language, model: {}",

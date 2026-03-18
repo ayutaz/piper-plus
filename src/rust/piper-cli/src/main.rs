@@ -105,7 +105,7 @@ fn main() -> Result<()> {
     if cli.list_devices {
         let devices = piper_core::device::enumerate_devices();
         println!("Available devices:");
-        for dev in &devices {
+        for dev in devices {
             println!("  {}", dev);
         }
         return Ok(());
@@ -115,7 +115,7 @@ fn main() -> Result<()> {
     if cli.list_models {
         let models = piper_core::model_download::builtin_registry();
         println!("Available models:");
-        for model in &models {
+        for model in models {
             println!("  {} ({}) - {}", model.name, model.language, model.description);
         }
         return Ok(());
@@ -347,7 +347,10 @@ fn main() -> Result<()> {
             let utterance = result.context("Failed to parse JSONL line")?;
             utt_count += 1;
 
-            // SynthesisRequest 構築
+            // output_file を先に取り出す (to_request が self を消費するため)
+            let output_file = utterance.output_file.clone();
+
+            // SynthesisRequest 構築 (move semantics — clone を回避)
             let mut request = utterance.to_request(
                 cli.noise_scale,
                 cli.length_scale,
@@ -376,8 +379,7 @@ fn main() -> Result<()> {
                 audio::write_wav_to_stdout(synthesis.sample_rate, &synthesis.audio)
                     .context("Failed to write WAV to stdout")?;
             } else if let Some(ref dir) = cli.output_dir {
-                let filename = utterance
-                    .output_file
+                let filename = output_file
                     .unwrap_or_else(|| format!("{}.wav", utt_count));
                 let output_path = dir.join(&filename);
                 audio::write_wav(&output_path, synthesis.sample_rate, &synthesis.audio)

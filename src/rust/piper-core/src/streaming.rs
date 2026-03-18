@@ -183,10 +183,12 @@ impl AudioSink for WavFileSink {
             self.write_header(sample_rate)?;
         }
 
-        // Write raw PCM sample data
+        // Write raw PCM sample data (batched to avoid per-sample syscalls)
+        let mut buf = Vec::with_capacity(samples.len() * 2);
         for &sample in samples {
-            self.file.write_all(&sample.to_le_bytes())?;
+            buf.extend_from_slice(&sample.to_le_bytes());
         }
+        self.file.write_all(&buf)?;
         self.total_samples += samples.len();
         Ok(())
     }

@@ -371,7 +371,7 @@ fn test_enumerate_devices_cpu_is_available() {
 #[test]
 fn test_enumerate_devices_all_have_names() {
     let devices = enumerate_devices();
-    for d in &devices {
+    for d in devices {
         assert!(
             !d.name.is_empty(),
             "device {:?} should have a non-empty name",
@@ -407,7 +407,7 @@ fn test_is_device_available_consistency_with_enumerate() {
     // Every device reported by enumerate_devices as available should also
     // return true from is_device_available.
     let devices = enumerate_devices();
-    for d in &devices {
+    for d in devices {
         if d.available {
             assert!(
                 is_device_available(&d.kind),

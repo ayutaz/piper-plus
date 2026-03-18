@@ -50,51 +50,57 @@ pub struct DeviceInfo {
 ///
 /// The string is matched case-insensitively.
 pub fn parse_device_string(device: &str) -> Result<DeviceType, PiperError> {
-    let device_lower = device.to_lowercase();
+    let device = device.trim();
 
-    if device_lower == "cpu" {
+    if device.eq_ignore_ascii_case("cpu") {
         return Ok(DeviceType::Cpu);
     }
 
-    if device_lower == "auto" {
+    if device.eq_ignore_ascii_case("auto") {
         return Ok(auto_detect_device());
     }
 
-    if device_lower == "coreml" {
+    if device.eq_ignore_ascii_case("coreml") {
         return Ok(DeviceType::CoreML);
     }
 
-    // Handle "cuda" and "cuda:N"
-    if device_lower == "cuda" {
-        return Ok(DeviceType::Cuda { device_id: 0 });
-    }
-    if let Some(id_str) = device_lower.strip_prefix("cuda:") {
-        let device_id = id_str.parse::<i32>().map_err(|_| PiperError::InvalidConfig {
-            reason: format!("invalid CUDA device id: '{id_str}'"),
-        })?;
-        return Ok(DeviceType::Cuda { device_id });
-    }
+    // Handle devices with optional ":N" suffix by splitting on ':'
+    if let Some((prefix, id_str)) = device.split_once(':') {
+        // Map prefix to canonical display name for error messages
+        let canonical = if prefix.eq_ignore_ascii_case("cuda") {
+            Some("CUDA")
+        } else if prefix.eq_ignore_ascii_case("directml") {
+            Some("DirectML")
+        } else if prefix.eq_ignore_ascii_case("tensorrt") {
+            Some("TensorRT")
+        } else {
+            None
+        };
 
-    // Handle "directml" and "directml:N"
-    if device_lower == "directml" {
-        return Ok(DeviceType::DirectML { device_id: 0 });
-    }
-    if let Some(id_str) = device_lower.strip_prefix("directml:") {
-        let device_id = id_str.parse::<i32>().map_err(|_| PiperError::InvalidConfig {
-            reason: format!("invalid DirectML device id: '{id_str}'"),
-        })?;
-        return Ok(DeviceType::DirectML { device_id });
-    }
+        if let Some(kind_name) = canonical {
+            let device_id =
+                id_str.parse::<i32>().map_err(|_| PiperError::InvalidConfig {
+                    reason: format!("invalid {kind_name} device id: '{id_str}'"),
+                })?;
 
-    // Handle "tensorrt" and "tensorrt:N"
-    if device_lower == "tensorrt" {
-        return Ok(DeviceType::TensorRT { device_id: 0 });
-    }
-    if let Some(id_str) = device_lower.strip_prefix("tensorrt:") {
-        let device_id = id_str.parse::<i32>().map_err(|_| PiperError::InvalidConfig {
-            reason: format!("invalid TensorRT device id: '{id_str}'"),
-        })?;
-        return Ok(DeviceType::TensorRT { device_id });
+            return match kind_name {
+                "CUDA" => Ok(DeviceType::Cuda { device_id }),
+                "DirectML" => Ok(DeviceType::DirectML { device_id }),
+                "TensorRT" => Ok(DeviceType::TensorRT { device_id }),
+                _ => unreachable!(),
+            };
+        }
+    } else {
+        // No colon -- bare name defaults to device_id 0
+        if device.eq_ignore_ascii_case("cuda") {
+            return Ok(DeviceType::Cuda { device_id: 0 });
+        }
+        if device.eq_ignore_ascii_case("directml") {
+            return Ok(DeviceType::DirectML { device_id: 0 });
+        }
+        if device.eq_ignore_ascii_case("tensorrt") {
+            return Ok(DeviceType::TensorRT { device_id: 0 });
+        }
     }
 
     Err(PiperError::InvalidConfig {
@@ -727,12 +733,9 @@ mod tests {
 
     #[test]
     fn test_parse_device_string_whitespace() {
-        // parse_device_string does to_lowercase() but NOT trim(), so
-        // leading/trailing whitespace causes "unknown device" error.
-        let result = parse_device_string(" cuda ");
-        assert!(result.is_err());
-        let err_msg = format!("{}", result.unwrap_err());
-        assert!(err_msg.contains("unknown device"));
+        // parse_device_string trims whitespace before matching.
+        let dt = parse_device_string(" cuda ").unwrap();
+        assert_eq!(dt, DeviceType::Cuda { device_id: 0 });
     }
 
     #[test]

@@ -38,7 +38,7 @@
 
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
-use std::sync::LazyLock;
+use std::sync::{LazyLock, OnceLock};
 
 use super::multilingual::default_post_process_ids;
 use super::{Phonemizer, ProsodyFeature, ProsodyInfo};
@@ -472,10 +472,48 @@ fn try_morphological_fallback(word: &str, cmu_dict: &HashMap<String, String>) ->
 // EnglishPhonemizer
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Global CMU dictionary cache
+//
+// The CMU dictionary JSON (~6 MB parsed) is loaded and parsed once, then
+// shared across all `EnglishPhonemizer` instances via `&'static` reference.
+// ---------------------------------------------------------------------------
+
+static CMU_DICT_CACHE: OnceLock<HashMap<String, String>> = OnceLock::new();
+
+/// Load and parse a CMU dictionary JSON file into a HashMap.
+///
+/// Standalone function used by the `OnceLock` cache initializer.
+fn load_cmu_dict(dict_path: &Path) -> Result<HashMap<String, String>, PiperError> {
+    let content =
+        std::fs::read_to_string(dict_path).map_err(|_| PiperError::DictionaryLoad {
+            path: dict_path.display().to_string(),
+        })?;
+
+    let raw: serde_json::Value =
+        serde_json::from_str(&content).map_err(|e| PiperError::DictionaryLoad {
+            path: format!("{}: {}", dict_path.display(), e),
+        })?;
+
+    let obj = raw.as_object().ok_or_else(|| PiperError::DictionaryLoad {
+        path: format!("{}: expected JSON object", dict_path.display()),
+    })?;
+
+    let mut cmu_dict = HashMap::with_capacity(obj.len());
+    for (key, value) in obj {
+        if let Some(arpa) = value.as_str() {
+            cmu_dict.insert(key.clone(), arpa.to_string());
+        }
+    }
+
+    Ok(cmu_dict)
+}
+
 /// English phonemizer using CMU dictionary + ARPAbet-to-IPA conversion.
 ///
 /// Loads the CMU dictionary from a JSON file mapping lowercase words to
-/// ARPAbet pronunciation strings. Uses lazy loading.
+/// ARPAbet pronunciation strings. The dictionary is loaded once and cached
+/// globally via `OnceLock`, so creating multiple instances is cheap.
 ///
 /// ## JSON format
 ///
@@ -483,13 +521,35 @@ fn try_morphological_fallback(word: &str, cmu_dict: &HashMap<String, String>) ->
 /// {"hello": "HH AH0 L OW1", "world": "W ER1 L D"}
 /// ```
 pub struct EnglishPhonemizer {
-    /// word -> ARPAbet pronunciation string (e.g. "HH AH0 L OW1")
-    cmu_dict: HashMap<String, String>,
+    /// Reference to the cached CMU dictionary, or an owned dictionary for
+    /// test instances created via `new_with_hashmap`.
+    cmu_dict: DictRef,
+}
+
+/// Internal enum to hold either a static reference to the globally cached
+/// dictionary or an owned dictionary (for tests).
+enum DictRef {
+    /// Reference to the `OnceLock`-cached dictionary (zero-copy after first load).
+    Static(&'static HashMap<String, String>),
+    /// Owned dictionary, used by `new_with_hashmap` for testing.
+    Owned(HashMap<String, String>),
+}
+
+impl DictRef {
+    fn as_map(&self) -> &HashMap<String, String> {
+        match self {
+            DictRef::Static(r) => r,
+            DictRef::Owned(m) => m,
+        }
+    }
 }
 
 impl EnglishPhonemizer {
     /// Create a new `EnglishPhonemizer` by searching well-known locations
     /// for the CMU dictionary JSON file.
+    ///
+    /// The dictionary is loaded and parsed only once; subsequent calls
+    /// return immediately with a reference to the cached data.
     ///
     /// Search order:
     /// 1. `CMUDICT_PATH` environment variable
@@ -502,37 +562,31 @@ impl EnglishPhonemizer {
 
     /// Create a new `EnglishPhonemizer` with a dictionary loaded from a JSON file.
     ///
-    /// The JSON file must be an object mapping lowercase words to ARPAbet strings.
+    /// The dictionary is loaded and parsed only on the first call; subsequent
+    /// calls (even with different paths) reuse the cached dictionary. This
+    /// matches the intended usage where a single CMU dictionary is used
+    /// throughout the application lifetime.
     pub fn new_with_dict(dict_path: &Path) -> Result<Self, PiperError> {
-        let content =
-            std::fs::read_to_string(dict_path).map_err(|_| PiperError::DictionaryLoad {
-                path: dict_path.display().to_string(),
-            })?;
+        // get_or_init ensures the dictionary is loaded exactly once.
+        // If a different path is passed on a later call, the first-loaded
+        // dictionary is still used (consistent with single-dict semantics).
+        let dict = CMU_DICT_CACHE.get_or_init(|| {
+            load_cmu_dict(dict_path).expect("CMU dictionary load failed")
+        });
 
-        let raw: serde_json::Value =
-            serde_json::from_str(&content).map_err(|e| PiperError::DictionaryLoad {
-                path: format!("{}: {}", dict_path.display(), e),
-            })?;
-
-        let obj = raw.as_object().ok_or_else(|| PiperError::DictionaryLoad {
-            path: format!("{}: expected JSON object", dict_path.display()),
-        })?;
-
-        let mut cmu_dict = HashMap::with_capacity(obj.len());
-        for (key, value) in obj {
-            if let Some(arpa) = value.as_str() {
-                cmu_dict.insert(key.clone(), arpa.to_string());
-            }
-        }
-
-        Ok(Self { cmu_dict })
+        Ok(Self {
+            cmu_dict: DictRef::Static(dict),
+        })
     }
 
     /// Create a new `EnglishPhonemizer` from an in-memory dictionary.
     ///
-    /// Useful for testing without a JSON file on disk.
+    /// Useful for testing without a JSON file on disk. Does not affect
+    /// or use the global cache.
     pub fn new_with_hashmap(dict: HashMap<String, String>) -> Self {
-        Self { cmu_dict: dict }
+        Self {
+            cmu_dict: DictRef::Owned(dict),
+        }
     }
 
     /// Search well-known locations for the CMU dictionary JSON file.
@@ -619,11 +673,12 @@ impl EnglishPhonemizer {
             }
 
             // Word token: look up in CMU dictionary
-            let arpa_str = if let Some(arpa) = self.cmu_dict.get(&tok.text) {
+            let dict = self.cmu_dict.as_map();
+            let arpa_str = if let Some(arpa) = dict.get(&tok.text) {
                 arpa.clone()
             } else {
                 // OOV: try morphological fallback
-                match try_morphological_fallback(&tok.text, &self.cmu_dict) {
+                match try_morphological_fallback(&tok.text, dict) {
                     Some(arpa) => arpa,
                     None => {
                         // Truly OOV: skip this word

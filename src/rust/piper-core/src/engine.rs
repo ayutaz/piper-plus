@@ -174,7 +174,7 @@ impl OnnxEngine {
         // 1. input: int64 [1, phoneme_len]
         let input_tensor = Tensor::from_array((
             [1_usize, phoneme_len],
-            request.phoneme_ids.clone().into_boxed_slice(),
+            request.phoneme_ids.to_vec().into_boxed_slice(),
         ))
         .map_err(|e| PiperError::Inference(format!("input tensor: {e}")))?;
 
@@ -274,10 +274,8 @@ impl OnnxEngine {
             .try_extract_tensor::<f32>()
             .map_err(|e| PiperError::Inference(format!("extract output: {e}")))?;
 
-        let audio_f32: Vec<f32> = audio_slice.to_vec();
-
         // float32 -> int16 ピーク正規化
-        let audio_i16 = audio_float_to_int16(&audio_f32);
+        let audio_i16 = audio_float_to_int16(&audio_slice);
         let audio_seconds = audio_i16.len() as f64 / self.sample_rate as f64;
 
         // --- duration テンソル抽出 (オプション) ---
