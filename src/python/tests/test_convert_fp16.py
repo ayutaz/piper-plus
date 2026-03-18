@@ -13,7 +13,9 @@ def _onnx_inference(onnx_path, phoneme_ids, prosody_features, noise_scale=0.667)
     """Run ONNX inference and return audio output."""
     import onnxruntime
 
-    session = onnxruntime.InferenceSession(str(onnx_path))
+    session = onnxruntime.InferenceSession(
+        str(onnx_path), providers=["CPUExecutionProvider"]
+    )
     text = np.expand_dims(np.array(phoneme_ids, dtype=np.int64), 0)
     text_lengths = np.array([text.shape[1]], dtype=np.int64)
     scales = np.array([noise_scale, 1.0, 0.8], dtype=np.float32)

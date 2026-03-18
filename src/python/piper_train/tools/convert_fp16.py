@@ -117,8 +117,27 @@ def convert_fp16(
     converted_count = 0
     kept_count = 0
     cast_nodes: list[onnx.NodeProto] = []
-    # 1つのinitializerが複数ノードで使用される場合、Castは1つだけ挿入
-    cast_output_map: dict[str, str] = {}
+
+    # 既存グラフの全テンソル名を収集（名前衝突を回避）
+    existing_names: set[str] = set()
+    for init in graph.initializer:
+        existing_names.add(init.name)
+    for node in graph.node:
+        existing_names.update(node.output)
+        if node.name:
+            existing_names.add(node.name)
+
+    def _unique_name(base: str) -> str:
+        """既存名と衝突しないユニーク名を生成する。"""
+        if base not in existing_names:
+            existing_names.add(base)
+            return base
+        idx = 0
+        while f"{base}_{idx}" in existing_names:
+            idx += 1
+        name = f"{base}_{idx}"
+        existing_names.add(name)
+        return name
 
     for init in graph.initializer:
         if init.data_type != TensorProto.FLOAT:
@@ -138,17 +157,17 @@ def convert_fp16(
         del init.float_data[:]
         init.raw_data = fp16_data.tobytes()
 
-        # Castノードを作成（FP16→FP32）
-        cast_output_name = f"{init.name}_fp32"
+        # Castノードを作成（FP16→FP32）— 名前衝突を回避
+        cast_output_name = _unique_name(f"{init.name}_fp32")
+        cast_node_name = _unique_name(f"Cast_fp16to32_{init.name}")
         cast_node = helper.make_node(
             "Cast",
             inputs=[init.name],
             outputs=[cast_output_name],
             to=TensorProto.FLOAT,
-            name=f"Cast_fp16to32_{init.name}",
+            name=cast_node_name,
         )
         cast_nodes.append(cast_node)
-        cast_output_map[init.name] = cast_output_name
 
         # 消費ノードの入力をCast出力に差し替え
         if init.name in init_consumers:
@@ -265,6 +284,7 @@ def validate_model(
                     i, mean_abs_err, max_abs_err,
                 )
             else:
+                all_passed = False
                 _LOGGER.warning(
                     "Output %d: MARGINAL (mean_abs=%.6f, max_abs=%.6f) "
                     "- small differences are typically inaudible for TTS",
@@ -273,6 +293,11 @@ def validate_model(
 
         if all_passed:
             _LOGGER.info("Validation: PASSED")
+        else:
+            _LOGGER.warning(
+                "Validation: MARGINAL - some outputs exceed tolerance "
+                "(small differences are typically inaudible for TTS)"
+            )
         return all_passed
 
     except Exception as e:
@@ -294,6 +319,8 @@ def _create_dummy_inputs(session) -> dict[str, np.ndarray] | None:
         elif name == "scales":
             inputs[name] = np.array([0.667, 1.0, 0.8], dtype=np.float32)
         elif name == "sid":
+            inputs[name] = np.array([0], dtype=np.int64)
+        elif name == "lid":
             inputs[name] = np.array([0], dtype=np.int64)
         elif name == "prosody_features":
             inputs[name] = np.zeros([1, phoneme_length, 3], dtype=np.int64)

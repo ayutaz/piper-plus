@@ -334,9 +334,16 @@ def main() -> None:
             simplify_onnx_model(args.output)
 
     # Apply FP16 conversion (default: enabled)
+    # Uses a temporary file for atomic replacement to avoid data corruption
     if not args.no_fp16:
         fp32_size = args.output.stat().st_size
-        convert_fp16(args.output, args.output)
+        tmp_fp16 = args.output.with_suffix(".onnx.fp16_tmp")
+        try:
+            convert_fp16(args.output, tmp_fp16)
+            tmp_fp16.replace(args.output)
+        except Exception:
+            tmp_fp16.unlink(missing_ok=True)
+            raise
         fp16_size = args.output.stat().st_size
         reduction_pct = ((fp32_size - fp16_size) / fp32_size) * 100 if fp32_size > 0 else 0
         _LOGGER.info(
