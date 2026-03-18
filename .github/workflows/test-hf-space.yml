@@ -1,0 +1,202 @@
+name: Test HF Space Build
+
+on:
+  push:
+    branches: [dev, feat/multilingual-ui-hf-demo]
+    paths:
+      - 'huggingface-space/**'
+      - 'src/python/piper_train/phonemize/**'
+      - 'src/python/piper_train/infer_onnx.py'
+      - 'src/python/piper_train/vits/utils.py'
+      - 'src/python/piper_train/vits/wavfile.py'
+      - '.github/workflows/test-hf-space.yml'
+      - '.github/workflows/deploy-huggingface.yml'
+  pull_request:
+    paths:
+      - 'huggingface-space/**'
+      - 'src/python/piper_train/phonemize/**'
+      - 'src/python/piper_train/infer_onnx.py'
+  workflow_dispatch:
+
+jobs:
+  test-hf-space:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Prepare HF Space deployment directory
+        run: |
+          mkdir -p hf-space-deploy/models
+
+          # Copy app files (same as deploy-huggingface.yml)
+          cp huggingface-space/app.py hf-space-deploy/
+          cp huggingface-space/app_imports.py hf-space-deploy/
+          cp huggingface-space/download_models.py hf-space-deploy/
+          cp huggingface-space/requirements.txt hf-space-deploy/
+
+          # Copy piper_train module (same as deploy-huggingface.yml)
+          mkdir -p hf-space-deploy/piper_train/phonemize
+          mkdir -p hf-space-deploy/piper_train/vits
+          touch hf-space-deploy/piper_train/__init__.py
+          cp src/python/piper_train/phonemize/*.py hf-space-deploy/piper_train/phonemize/
+          cp src/python/piper_train/infer_onnx.py hf-space-deploy/piper_train/
+          touch hf-space-deploy/piper_train/vits/__init__.py
+          cp src/python/piper_train/vits/utils.py hf-space-deploy/piper_train/vits/
+          cp src/python/piper_train/vits/wavfile.py hf-space-deploy/piper_train/vits/
+
+          # Copy model config for integration test (skip .onnx — 75MB)
+          if [ -f "test/models/multilingual-test-medium.onnx.json" ]; then
+            cp test/models/multilingual-test-medium.onnx.json hf-space-deploy/models/
+          fi
+
+          echo "Files prepared:"
+          find hf-space-deploy -name '*.py' | wc -l
+          echo "Python files"
+
+      - name: "Layer 1: Core import validation (no external deps)"
+        working-directory: hf-space-deploy
+        run: |
+          python3 -c "
+          import sys, importlib
+
+          # Only modules that have NO external dependencies (no numpy, no pyopenjtalk, etc.)
+          modules = [
+              ('piper_train.phonemize.registry', 'get_phonemizer'),
+              ('piper_train.phonemize.base', 'Phonemizer'),
+              ('piper_train.phonemize.multilingual', 'UnicodeLanguageDetector'),
+              ('piper_train.phonemize.english', None),
+              ('piper_train.phonemize.chinese', None),
+              ('piper_train.phonemize.spanish', None),
+              ('piper_train.phonemize.french', None),
+              ('piper_train.phonemize.portuguese', None),
+              ('piper_train.phonemize.token_mapper', None),
+              ('piper_train.phonemize.jp_id_map', None),
+              ('piper_train.phonemize.multilingual_id_map', None),
+          ]
+
+          failed = []
+          for mod_name, attr_name in modules:
+              try:
+                  mod = importlib.import_module(mod_name)
+                  if attr_name and not hasattr(mod, attr_name):
+                      failed.append(f'{mod_name}.{attr_name} not found')
+                  else:
+                      label = f'{mod_name}.{attr_name}' if attr_name else mod_name
+                      print(f'  OK {label}')
+              except ImportError as e:
+                  failed.append(f'{mod_name}: {e}')
+                  print(f'  FAIL {mod_name} -- {e}')
+
+          if failed:
+              print(f'\nFAIL: {len(failed)} import(s) failed')
+              sys.exit(1)
+          print(f'\nOK: All {len(modules)} core imports passed')
+          "
+
+      - name: "Layer 2: Install HF Space requirements"
+        run: |
+          pip install -r hf-space-deploy/requirements.txt
+          python3 -c "import nltk; nltk.download('averaged_perceptron_tagger_eng', quiet=True); nltk.download('cmudict', quiet=True)"
+
+      - name: "Layer 2.5: Import validation (with external deps)"
+        working-directory: hf-space-deploy
+        run: |
+          python3 -c "
+          import sys, importlib
+
+          # Modules that require external deps (numpy, pyopenjtalk, etc.)
+          modules = [
+              ('piper_train.infer_onnx', 'text_to_phoneme_ids_and_prosody'),
+              ('piper_train.phonemize.japanese', None),
+              ('piper_train.vits.utils', 'audio_float_to_int16'),
+              ('piper_train.vits.wavfile', 'write'),
+          ]
+
+          failed = []
+          for mod_name, attr_name in modules:
+              try:
+                  mod = importlib.import_module(mod_name)
+                  if attr_name and not hasattr(mod, attr_name):
+                      failed.append(f'{mod_name}.{attr_name} not found')
+                  else:
+                      label = f'{mod_name}.{attr_name}' if attr_name else mod_name
+                      print(f'  OK {label}')
+              except ImportError as e:
+                  failed.append(f'{mod_name}: {e}')
+                  print(f'  FAIL {mod_name} -- {e}')
+
+          if failed:
+              print(f'\nFAIL: {len(failed)} import(s) failed')
+              sys.exit(1)
+          print(f'\nOK: All {len(modules)} imports with deps passed')
+          "
+
+      - name: "Layer 3: Japanese phonemization test"
+        working-directory: hf-space-deploy
+        run: |
+          python3 -c "
+          from piper_train.infer_onnx import text_to_phoneme_ids_and_prosody
+          import json
+
+          with open('models/multilingual-test-medium.onnx.json') as f:
+              config = json.load(f)
+
+          phoneme_id_map = config['phoneme_id_map']
+          language_id_map = config.get('language_id_map', {})
+
+          phoneme_ids, prosody = text_to_phoneme_ids_and_prosody(
+              'こんにちは、世界！', phoneme_id_map, language='ja', language_id_map=language_id_map
+          )
+          assert len(phoneme_ids) > 0, 'JA phonemization failed'
+          assert prosody is not None, 'JA prosody is None'
+          # JA should have real prosody data (not all zeros)
+          has_nonzero = any(p is not None and (p.get('a1', 0) != 0 or p.get('a2', 0) != 0 or p.get('a3', 0) != 0) for p in prosody if p is not None)
+          print(f'OK JA: {len(phoneme_ids)} phoneme IDs, prosody has_nonzero={has_nonzero}')
+          "
+
+      - name: "Layer 4: English phonemization test"
+        working-directory: hf-space-deploy
+        run: |
+          python3 -c "
+          from piper_train.infer_onnx import text_to_phoneme_ids_and_prosody
+          import json
+
+          with open('models/multilingual-test-medium.onnx.json') as f:
+              config = json.load(f)
+
+          phoneme_ids, prosody = text_to_phoneme_ids_and_prosody(
+              'Hello, how are you today?', config['phoneme_id_map'],
+              language='en', language_id_map=config.get('language_id_map', {})
+          )
+          assert len(phoneme_ids) > 0, 'EN phonemization failed'
+          print(f'OK EN: {len(phoneme_ids)} phoneme IDs')
+          "
+
+      - name: "Layer 5: App module import test"
+        working-directory: hf-space-deploy
+        run: |
+          python3 -c "
+          # Verify app.py can be imported without errors
+          # (download_models will run but models already exist or will be skipped)
+          import app
+          assert hasattr(app, 'create_interface'), 'Missing create_interface'
+          assert hasattr(app, 'synthesize_speech'), 'Missing synthesize_speech'
+          assert hasattr(app, 'MODELS'), 'Missing MODELS'
+          assert len(app.MODELS) == 6, f'Expected 6 models, got {len(app.MODELS)}'
+          print('OK app.py imports passed, 6 language models configured')
+          "
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "## HF Space Build Test" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ job.status }}" = "success" ]; then
+            echo "All layers passed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "Test failed -- do NOT deploy to HF Spaces" >> $GITHUB_STEP_SUMMARY
+          fi

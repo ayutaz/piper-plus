@@ -1,6 +1,7 @@
 /**
  * Simple Unified Phonemizer API
- * Uses OpenJTalk for Japanese and a simple phonemizer for English
+ * Uses OpenJTalk for Japanese, a simple phonemizer for English,
+ * and character-based fallbacks for zh/es/fr/pt.
  */
 
 import { SimpleEnglishPhonemizer, createEnglishPhonemeMap } from './simple_english_phonemizer.js';
@@ -12,6 +13,8 @@ export class SimpleUnifiedPhonemizer {
         this.englishPhonemizer = new SimpleEnglishPhonemizer();
         this.englishPhonemeMap = createEnglishPhonemeMap();
         this.initialized = false;
+        // phoneme_id_map from model config (set via setPhonemeIdMap or initialize)
+        this.phonemeIdMap = options.phonemeIdMap || null;
         // GitHub Pages deployment configuration
         this.deploymentConfig = options.deploymentConfig || {
             isGitHubPages: false,
@@ -179,9 +182,15 @@ export class SimpleUnifiedPhonemizer {
         if (language === 'ja') {
             // Use OpenJTalk for Japanese
             return this.textToPhonemesJapanese(text);
-        } else {
+        } else if (language === 'en') {
             // Use simple phonemizer for English
             return this.textToPhonemesEnglish(text);
+        } else if (language === 'zh') {
+            // Chinese: character-based phoneme_id_map fallback
+            return this.phonemizeChinese(text);
+        } else {
+            // es/fr/pt: Latin-script character-based fallback
+            return this.phonemizeLatinFallback(text);
         }
     }
 
@@ -213,13 +222,77 @@ export class SimpleUnifiedPhonemizer {
     }
 
     /**
+     * Chinese text to phoneme IDs using character-based phoneme_id_map fallback.
+     * Since proper pinyin conversion requires a large dictionary, this maps
+     * each character directly through the model's phoneme_id_map.
+     * Returns an array of phoneme IDs (integers).
+     */
+    phonemizeChinese(text) {
+        const phonemeIdMap = this.phonemeIdMap;
+        if (!phonemeIdMap) {
+            throw new Error('phonemeIdMap is required for Chinese phonemization. Call setPhonemeIdMap() first.');
+        }
+        const phonemeIds = [1]; // BOS
+        for (const char of text) {
+            if (phonemeIdMap[char]) {
+                phonemeIds.push(...phonemeIdMap[char]);
+                phonemeIds.push(0); // PAD
+            }
+        }
+        phonemeIds.push(2); // EOS
+        return phonemeIds;
+    }
+
+    /**
+     * Latin-script language (es/fr/pt) text to phoneme IDs using character-based
+     * phoneme_id_map fallback. Lowercases the text and maps each character
+     * through the model's phoneme_id_map.
+     * Returns an array of phoneme IDs (integers).
+     */
+    phonemizeLatinFallback(text) {
+        const phonemeIdMap = this.phonemeIdMap;
+        if (!phonemeIdMap) {
+            throw new Error('phonemeIdMap is required for Latin fallback phonemization. Call setPhonemeIdMap() first.');
+        }
+        const phonemeIds = [1]; // BOS
+        for (const char of text.toLowerCase()) {
+            if (phonemeIdMap[char]) {
+                phonemeIds.push(...phonemeIdMap[char]);
+                phonemeIds.push(0); // PAD
+            } else if (char === ' ') {
+                // Use space mapping if available
+                if (phonemeIdMap[' ']) {
+                    phonemeIds.push(...phonemeIdMap[' ']);
+                    phonemeIds.push(0); // PAD
+                }
+            }
+            // Unknown characters are skipped
+        }
+        phonemeIds.push(2); // EOS
+        return phonemeIds;
+    }
+
+    /**
+     * Set the phoneme_id_map from model config.
+     * Required for zh/es/fr/pt fallback phonemization.
+     * @param {Object} phonemeIdMap - mapping from character/phoneme string to array of IDs
+     */
+    setPhonemeIdMap(phonemeIdMap) {
+        this.phonemeIdMap = phonemeIdMap;
+    }
+
+    /**
      * Extract phonemes from OpenJTalk labels
      */
     extractPhonemes(labels, language = 'ja') {
         if (language === 'ja') {
             return this.extractPhonemesFromLabels(labels);
-        } else {
+        } else if (language === 'en') {
             return this.extractPhonemesFromIPA(labels);
+        } else {
+            // zh/es/fr/pt: textToPhonemes already returns phoneme ID arrays,
+            // so pass through directly
+            return labels;
         }
     }
 
@@ -283,23 +356,43 @@ export class SimpleUnifiedPhonemizer {
         if (language === 'en') {
             return this.englishPhonemeMap;
         }
+        if (language === 'zh' || language === 'es' || language === 'fr' || language === 'pt') {
+            // zh/es/fr/pt use the model's phoneme_id_map directly
+            return this.phonemeIdMap;
+        }
         // For Japanese, the map should come from the model config
         return null;
     }
 
     /**
-     * Detect language from text
+     * Detect language from text.
+     * Priority: JA (Hiragana/Katakana) > ZH (CJK without Kana) > EN (default).
+     * Note: es/fr/pt cannot be reliably distinguished from EN by characters alone,
+     * so they must be specified explicitly via the language parameter.
      */
     detectLanguage(text) {
         // Simple detection based on character ranges
+        let hasKana = false;
+        let hasCJK = false;
         for (const char of text) {
             const code = char.charCodeAt(0);
-            // Check for Japanese characters
+            // Check for Japanese Kana (definitive JA indicator)
             if ((code >= 0x3040 && code <= 0x309F) || // Hiragana
-                (code >= 0x30A0 && code <= 0x30FF) || // Katakana
-                (code >= 0x4E00 && code <= 0x9FAF)) { // Kanji
-                return 'ja';
+                (code >= 0x30A0 && code <= 0x30FF)) { // Katakana
+                hasKana = true;
+                break; // Kana is definitive for JA
             }
+            // Check for CJK Unified Ideographs (shared by JA and ZH)
+            if (code >= 0x4E00 && code <= 0x9FFF) {
+                hasCJK = true;
+            }
+        }
+        if (hasKana) {
+            return 'ja';
+        }
+        if (hasCJK) {
+            // CJK characters without Kana → Chinese
+            return 'zh';
         }
         return 'en';
     }

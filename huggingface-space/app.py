@@ -9,23 +9,24 @@ import logging
 import threading
 
 import gradio as gr
+import nltk
 import numpy as np
 import onnxruntime
-from app_imports import ESPEAK_AVAILABLE, PYOPENJTALK_AVAILABLE
+
+
+# Download NLTK data required by g2p-en (English phonemizer).
+# This must run before importing modules that transitively load g2p-en.
+nltk.download("averaged_perceptron_tagger_eng", quiet=True)
+nltk.download("cmudict", quiet=True)
 
 # Download models if not present
-from download_models import download_models
+from download_models import download_models  # noqa: E402
+
+from piper_train.infer_onnx import text_to_phoneme_ids_and_prosody  # noqa: E402
 
 
 # Ensure models are downloaded
 download_models()
-
-
-# Import optional dependencies
-if PYOPENJTALK_AVAILABLE:
-    import pyopenjtalk
-if ESPEAK_AVAILABLE:
-    from espeak_phonemizer import Phonemizer
 
 
 # Configure logging
@@ -46,91 +47,37 @@ MODELS = {
         "config": "models/multilingual-test-medium.onnx.json",
         "language": "en",
     },
+    "Multilingual (Chinese)": {
+        "path": "models/multilingual-test-medium.onnx",
+        "config": "models/multilingual-test-medium.onnx.json",
+        "language": "zh",
+    },
+    "Multilingual (Spanish)": {
+        "path": "models/multilingual-test-medium.onnx",
+        "config": "models/multilingual-test-medium.onnx.json",
+        "language": "es",
+    },
+    "Multilingual (French)": {
+        "path": "models/multilingual-test-medium.onnx",
+        "config": "models/multilingual-test-medium.onnx.json",
+        "language": "fr",
+    },
+    "Multilingual (Portuguese)": {
+        "path": "models/multilingual-test-medium.onnx",
+        "config": "models/multilingual-test-medium.onnx.json",
+        "language": "pt",
+    },
 }
 
-# Basic English word to IPA mapping for common words
-# This is a simplified fallback when espeak-ng is not available
-ENGLISH_IPA_MAP = {
-    "hello": "hɛloʊ",
-    "world": "wɜrld",
-    "this": "ðɪs",
-    "is": "ɪz",
-    "a": "ə",
-    "test": "tɛst",
-    "text": "tɛkst",
-    "to": "tu",
-    "speech": "spitʃ",
-    "demo": "dɛmoʊ",
-    "welcome": "wɛlkəm",
-    "piper": "paɪpər",
-    "tts": "titiɛs",
-    "enjoy": "ɛndʒɔɪ",
-    "high": "haɪ",
-    "quality": "kwɑləti",
-    "synthesis": "sɪnθəsɪs",
-    "the": "ðə",
-    "and": "ænd",
-    "for": "fɔr",
-    "with": "wɪð",
-    "you": "ju",
-    "can": "kæn",
-    "it": "ɪt",
-    "that": "ðæt",
-    "have": "hæv",
-    "from": "frʌm",
-    "or": "ɔr",
-    "which": "wɪtʃ",
-    "one": "wʌn",
-    "would": "wʊd",
-    "all": "ɔl",
-    "will": "wɪl",
-    "there": "ðɛr",
-    "say": "seɪ",
-    "who": "hu",
-    "make": "meɪk",
-    "when": "wɛn",
-    "time": "taɪm",
-    "if": "ɪf",
-    "no": "noʊ",
-    "way": "weɪ",
-    "has": "hæz",
-    "yes": "jɛs",
-    "good": "gʊd",
-    "very": "vɛri",
+# Sample texts shown when the user switches language/model
+SAMPLE_TEXTS = {
+    "ja": "こんにちは、今日はとても良い天気ですね。散歩に出かけましょう。",
+    "en": "Hello, how are you today? The weather is beautiful, let's go for a walk.",
+    "zh": "你好，今天天气非常好。我们一起去散步吧。",
+    "es": "Hola, ¿cómo estás hoy? El clima es hermoso, vamos a dar un paseo.",
+    "fr": "Bonjour, comment allez-vous aujourd'hui? Il fait beau, allons nous promener.",
+    "pt": "Olá, como você está hoje? O tempo está lindo, vamos dar um passeio.",
 }
-
-# Japanese multi-character phoneme to Unicode PUA mapping
-# This mapping must match the C++ implementation and training data
-PHONEME_TO_PUA = {
-    # Long vowels
-    "a:": "\ue000",
-    "i:": "\ue001",
-    "u:": "\ue002",
-    "e:": "\ue003",
-    "o:": "\ue004",
-    # Special consonants
-    "cl": "\ue005",  # Geminate/glottal stop
-    # Palatalized consonants
-    "ky": "\ue006",
-    "kw": "\ue007",
-    "gy": "\ue008",
-    "gw": "\ue009",
-    "ty": "\ue00a",
-    "dy": "\ue00b",
-    "py": "\ue00c",
-    "by": "\ue00d",
-    # Affricates and special sounds
-    "ch": "\ue00e",
-    "ts": "\ue00f",
-    "sh": "\ue010",
-    "zy": "\ue011",
-    "hy": "\ue012",
-    # Palatalized nasals/liquids
-    "ny": "\ue013",
-    "my": "\ue014",
-    "ry": "\ue015",
-}
-
 
 _session_cache: dict[str, onnxruntime.InferenceSession] = {}
 _session_lock = threading.Lock()
@@ -157,90 +104,6 @@ def load_model_config(config_path: str) -> dict:
         return json.load(f)
 
 
-def map_phonemes(phonemes: list[str]) -> list[str]:
-    """Map multi-character phonemes to Unicode PUA characters"""
-    result = []
-    for phoneme in phonemes:
-        if phoneme in PHONEME_TO_PUA:
-            result.append(PHONEME_TO_PUA[phoneme])
-        else:
-            result.append(phoneme)
-    return result
-
-
-def text_to_phonemes(text: str, language: str) -> list[str]:
-    """Convert text to phoneme strings based on language"""
-
-    if language == "ja":
-        if PYOPENJTALK_AVAILABLE:
-            # Get phonemes from OpenJTalk
-            labels = pyopenjtalk.extract_fullcontext(text)
-            phonemes = []
-
-            for label in labels:
-                # Extract phoneme from label
-                if "-" in label and "+" in label:
-                    phoneme = label.split("-")[1].split("+")[0]
-                    if phoneme not in ["sil", "pau"]:
-                        phonemes.append(phoneme)
-
-            # Add sentence markers
-            phonemes = ["^"] + phonemes + ["$"]
-
-            # Convert multi-character phonemes to Unicode PUA
-            phonemes = map_phonemes(phonemes)
-        else:
-            logger.warning("pyopenjtalk not available, using fallback")
-            # Simple fallback - just use dummy phonemes
-            phonemes = ["^"] + list("aiueo") * 5 + ["$"]
-
-    elif ESPEAK_AVAILABLE:  # English
-        phonemizer = Phonemizer("en-us")
-        phoneme_str = phonemizer.phonemize(text)
-        # Convert phoneme string to list
-        phonemes = ["^"] + list(phoneme_str.replace(" ", "")) + ["$"]
-    else:
-        logger.warning("espeak_phonemizer not available, using IPA fallback")
-        # IPA-based fallback for better English pronunciation
-        words = text.lower().split()
-        phonemes = ["^"]
-
-        for i, word in enumerate(words):
-            # Add space between words
-            if i > 0:
-                phonemes.append(" ")
-
-            # Remove punctuation from word
-            clean_word = "".join(c for c in word if c.isalpha())
-
-            if clean_word in ENGLISH_IPA_MAP:
-                # Use IPA mapping if available
-                ipa = ENGLISH_IPA_MAP[clean_word]
-                phonemes.extend(list(ipa))
-            else:
-                # Fall back to character-by-character for unknown words
-                phonemes.extend(list(clean_word))
-
-        phonemes.append("$")
-
-    return phonemes
-
-
-def phonemes_to_ids(phonemes: list[str], config: dict) -> list[int]:
-    """Convert phonemes to model input IDs"""
-    phoneme_id_map = config.get("phoneme_id_map", {})
-
-    ids = []
-    for phoneme in phonemes:
-        if phoneme in phoneme_id_map:
-            ids.extend(phoneme_id_map[phoneme])
-        else:
-            # Use pad token for unknown phonemes
-            ids.append(0)
-
-    return ids
-
-
 def synthesize_speech(
     text: str,
     model_name: str,
@@ -258,11 +121,15 @@ def synthesize_speech(
         raise gr.Error("Invalid model selected")
 
     model_info = MODELS[model_name]
+    language = model_info["language"]
     config = load_model_config(model_info["config"])
 
-    # Convert text to phoneme IDs
-    phonemes = text_to_phonemes(text, model_info["language"])
-    phoneme_ids = phonemes_to_ids(phonemes, config)
+    # Convert text to phoneme IDs and prosody features
+    phoneme_id_map = config.get("phoneme_id_map", {})
+    language_id_map = config.get("language_id_map", {})
+    phoneme_ids, prosody_features_data = text_to_phoneme_ids_and_prosody(
+        text, phoneme_id_map, language=language, language_id_map=language_id_map
+    )
 
     if not phoneme_ids:
         raise gr.Error("Failed to convert text to phonemes")
@@ -295,6 +162,31 @@ def synthesize_speech(
         if sid is not None:
             inputs["sid"] = sid
 
+        # Add language ID (lid) if the model supports multilingual conditioning
+        input_names_set = {inp.name for inp in model.get_inputs()}
+        if "lid" in input_names_set:
+            lid_value = language_id_map.get(language, 0)
+            inputs["lid"] = np.array([lid_value], dtype=np.int64)
+
+        # Add prosody_features if the model requires them
+        if "prosody_features" in input_names_set:
+            if prosody_features_data:
+                prosody_array = []
+                for pf in prosody_features_data:
+                    if pf is None:
+                        prosody_array.append([0, 0, 0])
+                    else:
+                        prosody_array.append([pf["a1"], pf["a2"], pf["a3"]])
+                inputs["prosody_features"] = np.expand_dims(
+                    np.array(prosody_array, dtype=np.int64), 0
+                )
+            else:
+                # Fallback: zero-filled prosody
+                num_phonemes = text_array.shape[1]
+                inputs["prosody_features"] = np.zeros(
+                    (1, num_phonemes, 3), dtype=np.int64
+                )
+
         audio = model.run(None, inputs)[0]
 
         # Remove batch and channel dimensions
@@ -312,13 +204,21 @@ def synthesize_speech(
         raise gr.Error(f"Failed to generate speech: {str(e)}") from e
 
 
+def on_model_change(model_name: str) -> str:
+    """Return sample text for the selected model's language."""
+    model_info = MODELS.get(model_name, {})
+    language = model_info.get("language", "ja")
+    return SAMPLE_TEXTS.get(language, "")
+
+
 def create_interface():
     """Create Gradio interface"""
     with gr.Blocks(title="piper-plus Demo") as interface:
         gr.Markdown("""
             # piper-plus Demo
 
-            High-quality multilingual text-to-speech synthesis supporting Japanese and English.
+            High-quality multilingual text-to-speech synthesis supporting Japanese, English,
+            Chinese, Spanish, French, and Portuguese.
 
             This demo uses a single multilingual ONNX model for fast CPU inference.
             """)
@@ -334,6 +234,7 @@ def create_interface():
                 text_input = gr.Textbox(
                     label="Text to synthesize",
                     placeholder="Enter text here...",
+                    value=SAMPLE_TEXTS["ja"],
                     lines=3,
                 )
 
@@ -383,11 +284,11 @@ def create_interface():
 
             gr.Markdown("""
                 ### Tips:
-                - Select Japanese mode for hiragana/kanji text
-                - Select English mode for standard English text
-                - Both modes use the same multilingual model
+                - Select the language matching your input text
+                - All modes use the same multilingual ONNX model
                 - Adjust speed for faster/slower speech
                 - Higher expressiveness = more natural variation
+                - Chinese, Spanish, French, Portuguese require piper_train installed
                 """)
 
         # Examples
@@ -406,11 +307,24 @@ def create_interface():
                     "Welcome to piper-plus. Enjoy high quality speech synthesis.",
                     "Multilingual (English)",
                 ],
+                ["你好，世界！今天天气很好。", "Multilingual (Chinese)"],
+                ["¡Hola, mundo! Bienvenido a piper-plus.", "Multilingual (Spanish)"],
+                [
+                    "Bonjour le monde! Bienvenue sur piper-plus.",
+                    "Multilingual (French)",
+                ],
+                ["Olá, mundo! Bem-vindo ao piper-plus.", "Multilingual (Portuguese)"],
             ],
             inputs=[text_input, model_dropdown],
         )
 
         # Event handlers
+        model_dropdown.change(
+            fn=on_model_change,
+            inputs=[model_dropdown],
+            outputs=[text_input],
+        )
+
         synthesize_btn.click(
             fn=synthesize_speech,
             inputs=[
