@@ -34,6 +34,7 @@
         }
         .language-buttons {
             display: flex;
+            flex-wrap: wrap;
             gap: 10px;
             margin-top: 10px;
         }
@@ -235,7 +236,7 @@
 <body>
     <div class="container">
         <h1>🎤 piper-plus</h1>
-        <p class="subtitle">WebAssemblyとONNX Runtimeを使用した日本語・英語のニューラル音声合成</p>
+        <p class="subtitle">WebAssemblyとONNX Runtimeを使用した6言語マルチリンガルニューラル音声合成</p>
         
         <div id="status" class="status info">
             初期化中...
@@ -246,6 +247,10 @@
             <ul>
                 <li>🇯🇵 日本語音声合成（OpenJTalk + Piperニューラルモデル）</li>
                 <li>🇺🇸 英語音声合成（eSpeak-ng + Piperニューラルモデル）</li>
+                <li>🇨🇳 中国語音声合成（eSpeak-ng + Piperニューラルモデル）</li>
+                <li>🇪🇸 スペイン語音声合成（eSpeak-ng + Piperニューラルモデル）</li>
+                <li>🇫🇷 フランス語音声合成（eSpeak-ng + Piperニューラルモデル）</li>
+                <li>🇧🇷 ポルトガル語音声合成（eSpeak-ng + Piperニューラルモデル）</li>
                 <li>🎯 完全ブラウザ実装（サーバー不要）</li>
                 <li>⚡ WebAssembly + ONNX Runtime Webによる高速処理</li>
             </ul>
@@ -254,12 +259,12 @@
         <div class="language-selector">
             <label>言語選択 / Language Selection</label>
             <div class="language-buttons">
-                <button class="lang-button active" data-lang="ja">
-                    🇯🇵 日本語
-                </button>
-                <button class="lang-button" data-lang="en">
-                    🇺🇸 English
-                </button>
+                <button class="lang-button active" data-lang="ja">🇯🇵 日本語</button>
+                <button class="lang-button" data-lang="en">🇺🇸 English</button>
+                <button class="lang-button" data-lang="zh">🇨🇳 中文</button>
+                <button class="lang-button" data-lang="es">🇪🇸 Español</button>
+                <button class="lang-button" data-lang="fr">🇫🇷 Français</button>
+                <button class="lang-button" data-lang="pt">🇧🇷 Português</button>
             </div>
         </div>
 
@@ -326,6 +331,7 @@
                 name: '英語 (eSpeak-ng)',
                 model: 'multilingual-test-medium.onnx',
                 phonemizer: 'espeak-ng',
+                espeakLang: 'en-us',
                 testText: 'Hello world! This is a test of the Piper text to speech system.',
                 templates: [
                     'Hello world!',
@@ -333,6 +339,62 @@
                     'How are you today?',
                     'Welcome to the Piper speech synthesis demo.',
                     'The quick brown fox jumps over the lazy dog.'
+                ]
+            },
+            'zh': {
+                name: '中国語',
+                model: 'multilingual-test-medium.onnx',
+                phonemizer: 'espeak-ng',
+                espeakLang: 'cmn',
+                testText: '你好，今天天气非常好。我们一起去散步吧。',
+                templates: [
+                    '你好，今天天气非常好。',
+                    '我们一起去散步吧。',
+                    '欢迎来到语音合成演示。',
+                    '中文语音合成听起来很自然。',
+                    '春天的花开得很美丽。'
+                ]
+            },
+            'es': {
+                name: 'スペイン語',
+                model: 'multilingual-test-medium.onnx',
+                phonemizer: 'espeak-ng',
+                espeakLang: 'es',
+                testText: 'Hola, ¿cómo estás hoy? El clima es hermoso, vamos a dar un paseo.',
+                templates: [
+                    '¡Hola, mundo!',
+                    'Hola, ¿cómo estás hoy? El clima es hermoso, vamos a dar un paseo.',
+                    'Bienvenido a la demostración de síntesis de voz.',
+                    'La síntesis de voz en español suena muy natural.',
+                    'Las flores de primavera son muy hermosas.'
+                ]
+            },
+            'fr': {
+                name: 'フランス語',
+                model: 'multilingual-test-medium.onnx',
+                phonemizer: 'espeak-ng',
+                espeakLang: 'fr',
+                testText: 'Bonjour, comment allez-vous aujourd\'hui? Il fait beau, allons nous promener.',
+                templates: [
+                    'Bonjour, le monde!',
+                    'Bonjour, comment allez-vous aujourd\'hui?',
+                    'Bienvenue à la démonstration de synthèse vocale.',
+                    'La synthèse vocale en français sonne très naturelle.',
+                    'Les fleurs du printemps sont très belles.'
+                ]
+            },
+            'pt': {
+                name: 'ポルトガル語',
+                model: 'multilingual-test-medium.onnx',
+                phonemizer: 'espeak-ng',
+                espeakLang: 'pt-br',
+                testText: 'Olá, como você está hoje? O tempo está lindo, vamos dar um passeio.',
+                templates: [
+                    'Olá, mundo!',
+                    'Olá, como você está hoje? O tempo está lindo, vamos dar um passeio.',
+                    'Bem-vindo à demonstração de síntese de voz.',
+                    'A síntese de voz em português soa muito natural.',
+                    'As flores da primavera são muito bonitas.'
                 ]
             }
         };
@@ -379,7 +441,7 @@
                     }
                 });
                 
-                // Initialize eSpeak-ng for English
+                // Initialize eSpeak-ng for non-Japanese languages (en/zh/es/fr/pt)
                 updateStatus('eSpeak-ngを初期化しています...');
                 espeakExtractor = new ESpeakPhonemeExtractor();
                 await espeakExtractor.initialize();
@@ -487,17 +549,37 @@
         
         // Update language info
         function updateLanguageInfo(lang) {
-            if (lang === 'ja') {
-                languageInfo.innerHTML = `
-                    <h3>日本語：OpenJTalkによる音素化</h3>
-                    <p>MeCab形態素解析とHTS音声合成エンジンを使用した高精度な日本語音素化</p>
-                `;
-            } else if (lang === 'en') {
-                languageInfo.innerHTML = `
-                    <h3>英語：eSpeak-ng + Piperによる音声合成</h3>
-                    <p>Python版と同等のeSpeak-ng音素化とPiperニューラル音声合成</p>
-                `;
-            }
+            const langInfoMap = {
+                'ja': {
+                    title: '日本語：OpenJTalkによる音素化',
+                    desc: 'MeCab形態素解析とHTS音声合成エンジンを使用した高精度な日本語音素化'
+                },
+                'en': {
+                    title: '英語：eSpeak-ng + Piperによる音声合成',
+                    desc: 'Python版と同等のeSpeak-ng音素化とPiperニューラル音声合成'
+                },
+                'zh': {
+                    title: '中国語：eSpeak-ng + Piperによる音声合成',
+                    desc: 'eSpeak-ng (cmn) による中国語音素化とPiperニューラル音声合成'
+                },
+                'es': {
+                    title: 'スペイン語：eSpeak-ng + Piperによる音声合成',
+                    desc: 'eSpeak-ng (es) によるスペイン語音素化とPiperニューラル音声合成'
+                },
+                'fr': {
+                    title: 'フランス語：eSpeak-ng + Piperによる音声合成',
+                    desc: 'eSpeak-ng (fr) によるフランス語音素化とPiperニューラル音声合成'
+                },
+                'pt': {
+                    title: 'ポルトガル語：eSpeak-ng + Piperによる音声合成',
+                    desc: 'eSpeak-ng (pt-br) によるポルトガル語音素化とPiperニューラル音声合成'
+                }
+            };
+            const info = langInfoMap[lang] || langInfoMap['ja'];
+            languageInfo.innerHTML = `
+                <h3>${info.title}</h3>
+                <p>${info.desc}</p>
+            `;
         }
         
         // Load ONNX model
@@ -528,15 +610,17 @@
                     if (customDict && customDict.initialized) {
                         processedText = customDict.processText(text);
                     }
-                    
+
                     // Use OpenJTalk for Japanese
                     unifiedPhonemizer.textToPhonemes(processedText, 'ja').then(labels => {
                         const phonemes = unifiedPhonemizer.extractPhonemes(labels, 'ja');
                         resolve({ phonemes, labels });
                     }).catch(reject);
-                } else if (lang === 'en') {
-                    // Use eSpeak-ng phoneme extractor for Python-compatible phonemization
-                    espeakExtractor.phonemize(text, 'en-us').then(phonemes => {
+                } else {
+                    // Use eSpeak-ng for all non-Japanese languages
+                    const config = languageConfigs[lang];
+                    const espeakLang = config.espeakLang || 'en-us';
+                    espeakExtractor.phonemize(text, espeakLang).then(phonemes => {
                         resolve({ phonemes, labels: null });
                     }).catch(reject);
                 }
@@ -652,7 +736,7 @@
                     if (currentLanguage === 'ja') {
                         ids.push(...(phonemeIdMap['_'] || [0]));
                     } else {
-                        // Use space as fallback for English
+                        // Use space as fallback for non-Japanese languages
                         ids.push(...(phonemeIdMap[' '] || [3]));
                     }
                 }
@@ -687,6 +771,11 @@
                 'input_lengths': lengthTensor,
                 'scales': scalesTensor
             };
+
+            // Add language ID (lid) tensor for multilingual models
+            const langIdMap = { 'ja': 0, 'en': 1, 'zh': 2, 'es': 3, 'fr': 4, 'pt': 5 };
+            const langId = langIdMap[currentLanguage] || 0;
+            feeds['lid'] = new ort.Tensor('int64', new BigInt64Array([BigInt(langId)]), [1]);
 
             // Add prosody features if model supports it
             if (prosodyFeatures && currentModelConfig.prosody_id_map) {

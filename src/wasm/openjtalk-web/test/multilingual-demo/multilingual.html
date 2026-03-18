@@ -34,6 +34,7 @@
         }
         .language-buttons {
             display: flex;
+            flex-wrap: wrap;
             gap: 10px;
             margin-top: 10px;
         }
@@ -209,7 +210,7 @@
 <body>
     <div class="container">
         <h1>Multilingual TTS WebAssembly Demo</h1>
-        <p class="subtitle">多言語対応音声合成エンジン - 日本語（OpenJTalk）・英語（eSpeak-ng）</p>
+        <p class="subtitle">多言語対応音声合成エンジン - 6言語対応（JA/EN/ZH/ES/FR/PT）</p>
         
         <div id="status" class="status info">
             初期化中... <span class="loading-spinner"></span>
@@ -224,9 +225,21 @@
                 <button class="lang-button" data-lang="en" data-model="multilingual-test-medium">
                     🇺🇸 English
                 </button>
+                <button class="lang-button" data-lang="zh" data-model="multilingual-test-medium">
+                    🇨🇳 中文
+                </button>
+                <button class="lang-button" data-lang="es" data-model="multilingual-test-medium">
+                    🇪🇸 Español
+                </button>
+                <button class="lang-button" data-lang="fr" data-model="multilingual-test-medium">
+                    🇫🇷 Français
+                </button>
+                <button class="lang-button" data-lang="pt" data-model="multilingual-test-medium">
+                    🇧🇷 Português
+                </button>
             </div>
             <div class="model-info" id="modelInfo">
-                モデル: multilingual-test-medium.onnx (OpenJTalk)
+                モデル: multilingual-test-medium.onnx (JA - OpenJTalk)
             </div>
         </div>
 
@@ -283,9 +296,46 @@
                 { text: 'Artificial intelligence text-to-speech technology', label: 'Technical' },
                 { text: 'The quick brown fox jumps over the lazy dog.', label: 'Pangram' },
                 { text: 'To be or not to be, that is the question.', label: 'Literature' }
+            ],
+            'zh': [
+                { text: '你好，世界！', label: '问候' },
+                { text: '人工智能语音合成技术', label: '技术' },
+                { text: '今天天气很好，适合出去散步。', label: '日常' },
+                { text: '千里之行，始于足下。', label: '成语' }
+            ],
+            'es': [
+                { text: '¡Hola, mundo!', label: 'Saludo' },
+                { text: 'La inteligencia artificial y la sintesis de voz', label: 'Tecnico' },
+                { text: 'El cielo esta muy azul hoy.', label: 'Cotidiano' },
+                { text: 'En un lugar de la Mancha, de cuyo nombre no quiero acordarme.', label: 'Literatura' }
+            ],
+            'fr': [
+                { text: 'Bonjour, le monde!', label: 'Salutation' },
+                { text: "L'intelligence artificielle et la synthese vocale", label: 'Technique' },
+                { text: 'Il fait tres beau temps aujourd\'hui.', label: 'Quotidien' },
+                { text: 'Etre ou ne pas etre, telle est la question.', label: 'Litterature' }
+            ],
+            'pt': [
+                { text: 'Ola, mundo!', label: 'Saudacao' },
+                { text: 'Inteligencia artificial e sintese de voz', label: 'Tecnico' },
+                { text: 'Hoje o tempo esta muito bom para passear.', label: 'Cotidiano' },
+                { text: 'A vida e a arte do encontro, embora haja tanto desencontro pela vida.', label: 'Literatura' }
             ]
         };
         
+        // Language configurations
+        const languageConfigs = {
+            'ja': { name: '日本語', phonemizer: 'OpenJTalk', flag: '🇯🇵' },
+            'en': { name: 'English', phonemizer: 'eSpeak-ng', flag: '🇺🇸' },
+            'zh': { name: '中文', phonemizer: 'eSpeak-ng', flag: '🇨🇳' },
+            'es': { name: 'Espanol', phonemizer: 'eSpeak-ng', flag: '🇪🇸' },
+            'fr': { name: 'Francais', phonemizer: 'eSpeak-ng', flag: '🇫🇷' },
+            'pt': { name: 'Portugues', phonemizer: 'eSpeak-ng', flag: '🇧🇷' }
+        };
+
+        // Language ID map for ONNX lid tensor
+        const langIdMap = { 'ja': 0, 'en': 1, 'zh': 2, 'es': 3, 'fr': 4, 'pt': 5 };
+
         let phonemizer = null;
         let currentLanguage = 'ja';
         let onnxSession = null;
@@ -374,8 +424,8 @@
             });
             
             // Update model info
-            const phonemizerType = lang === 'ja' ? 'OpenJTalk' : 'eSpeak-ng';
-            modelInfo.textContent = `モデル: ${model}.onnx (${phonemizerType})`;
+            const config = languageConfigs[lang] || languageConfigs['ja'];
+            modelInfo.textContent = `モデル: ${model}.onnx (${lang.toUpperCase()} - ${config.phonemizer})`;
             
             // Load new model
             updateStatus('モデルを切り替えています...', 'loading');
@@ -422,9 +472,19 @@
                 updateStatus('音素変換中...', 'loading');
                 generateBtn.disabled = true;
                 
+                // Map language code to eSpeak voice name for non-JA languages
+                const espeakLangMap = {
+                    'en': 'en',
+                    'zh': 'cmn',
+                    'es': 'es',
+                    'fr': 'fr',
+                    'pt': 'pt'
+                };
+
                 // Get phonemes
-                const phonemeData = await phonemizer.textToPhonemes(text, currentLanguage);
-                
+                const phonemeLang = espeakLangMap[currentLanguage] || currentLanguage;
+                const phonemeData = await phonemizer.textToPhonemes(text, phonemeLang);
+
                 let phonemes;
                 if (currentLanguage === 'ja') {
                     // Extract phonemes from OpenJTalk labels
@@ -451,9 +511,12 @@
                 audioPlayer.src = audioUrl;
                 
                 // Show details
+                const langConfig = languageConfigs[currentLanguage] || languageConfigs['ja'];
                 detailsOutput.textContent = JSON.stringify({
                     language: currentLanguage,
-                    phonemizer: currentLanguage === 'ja' ? 'OpenJTalk' : 'eSpeak-ng',
+                    languageName: langConfig.name,
+                    phonemizer: langConfig.phonemizer,
+                    languageId: langIdMap[currentLanguage] || 0,
                     phonemes: phonemes.join(' '),
                     phonemeCount: phonemes.length,
                     sampleRate: modelConfig.audio.sample_rate
@@ -513,7 +576,11 @@
                 'input_lengths': lengthTensor,
                 'scales': scalesTensor
             };
-            
+
+            // Add language ID tensor for multilingual models
+            const lidValue = langIdMap[currentLanguage] || 0;
+            feeds['lid'] = new ort.Tensor('int64', new BigInt64Array([BigInt(lidValue)]), [1]);
+
             const results = await onnxSession.run(feeds);
             const audioTensor = results['output'] || results[Object.keys(results)[0]];
             
