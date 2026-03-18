@@ -658,6 +658,16 @@ install(
   OPTIONAL  # Don't fail if not present
 )
 
+# Install phonemizer dictionaries (English CMU, Chinese Pinyin)
+install(
+  FILES
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/cpp/cmudict_data.json
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/cpp/pinyin_single.json
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/cpp/pinyin_phrases.json
+  DESTINATION share/piper/dicts
+  OPTIONAL
+)
+
 # Install voices.json catalog for model listing/downloading
 install(
   FILES ${CMAKE_CURRENT_SOURCE_DIR}/src/python_run/piper/voices.json

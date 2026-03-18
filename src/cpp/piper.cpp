@@ -38,6 +38,11 @@
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
+#include <windows.h>
+#elif defined(__APPLE__)
+#include <mach-o/dyld.h>
+#else
+#include <unistd.h>
 #endif
 
 using json = nlohmann::json;
@@ -481,6 +486,68 @@ void loadModel(std::string modelPath, ModelSession &session, bool useCuda, int g
   }
 }
 
+// Get the directory containing the running executable.
+// Returns empty path on failure.
+static std::filesystem::path getExeDir() {
+#ifdef _WIN32
+  char buf[MAX_PATH];
+  DWORD len = GetModuleFileNameA(NULL, buf, sizeof(buf));
+  if (len == 0 || len >= sizeof(buf)) return {};
+  return std::filesystem::path(buf).parent_path();
+#elif defined(__APPLE__)
+  char buf[1024];
+  uint32_t size = sizeof(buf);
+  if (_NSGetExecutablePath(buf, &size) != 0) return {};
+  return std::filesystem::path(buf).parent_path();
+#else
+  char buf[1024];
+  ssize_t len = readlink("/proc/self/exe", buf, sizeof(buf) - 1);
+  if (len <= 0) return {};
+  buf[len] = '\0';
+  return std::filesystem::path(buf).parent_path();
+#endif
+}
+
+// Search for a dictionary file in multiple locations:
+//   1. modelDir/<filename>              (model-local)
+//   2. <exe_dir>/../share/piper/dicts/<filename>  (installed)
+//   3. PIPER_DICTIONARIES_PATH/<filename>          (env override)
+// Returns the first path that exists, or empty string if not found.
+static std::string findDictionaryFile(const std::string &filename,
+                                      const std::string &modelDir) {
+  namespace fs = std::filesystem;
+
+  // 1. Model directory
+  fs::path p1 = fs::path(modelDir) / filename;
+  if (fs::exists(p1)) {
+    spdlog::debug("Dictionary '{}' found in model dir: {}", filename, p1.string());
+    return p1.string();
+  }
+
+  // 2. Exe-relative path: <exe_dir>/../share/piper/dicts/<filename>
+  auto exeDir = getExeDir();
+  if (!exeDir.empty()) {
+    fs::path p2 = exeDir / ".." / "share" / "piper" / "dicts" / filename;
+    if (fs::exists(p2)) {
+      spdlog::debug("Dictionary '{}' found in exe-relative dir: {}", filename, p2.string());
+      return fs::canonical(p2).string();
+    }
+  }
+
+  // 3. Environment variable PIPER_DICTIONARIES_PATH
+  const char *envPath = std::getenv("PIPER_DICTIONARIES_PATH");
+  if (envPath && envPath[0] != '\0') {
+    fs::path p3 = fs::path(envPath) / filename;
+    if (fs::exists(p3)) {
+      spdlog::debug("Dictionary '{}' found via PIPER_DICTIONARIES_PATH: {}", filename, p3.string());
+      return p3.string();
+    }
+  }
+
+  spdlog::debug("Dictionary '{}' not found in any search path", filename);
+  return {};
+}
+
 // Load Onnx model and JSON config file
 void loadVoice(PiperConfig &config, std::string modelPath,
                std::string modelConfigPath, Voice &voice,
@@ -524,25 +591,26 @@ void loadVoice(PiperConfig &config, std::string modelPath,
   }
 
   // Load language-specific dictionaries for multilingual models
-  // Dictionary files are expected next to the model file
+  // Search order: model dir -> exe-relative -> PIPER_DICTIONARIES_PATH
   std::string modelDir = std::filesystem::path(modelPath).parent_path().string();
 
   // English: CMU dictionary
-  std::string cmuPath = modelDir + "/cmudict_data.json";
-  if (std::filesystem::exists(cmuPath)) {
+  std::string cmuPath = findDictionaryFile("cmudict_data.json", modelDir);
+  if (!cmuPath.empty()) {
     if (loadCmuDict(cmuPath, voice.cmuDict)) {
       spdlog::info("Loaded CMU dictionary ({} entries) from {}", voice.cmuDict.size(), cmuPath);
     }
   }
 
   // Chinese: pypinyin dictionaries
-  std::string pinyinSinglePath = modelDir + "/pinyin_single.json";
-  std::string pinyinPhrasePath = modelDir + "/pinyin_phrases.json";
-  if (std::filesystem::exists(pinyinSinglePath)) {
+  std::string pinyinSinglePath = findDictionaryFile("pinyin_single.json", modelDir);
+  std::string pinyinPhrasePath = findDictionaryFile("pinyin_phrases.json", modelDir);
+  if (!pinyinSinglePath.empty()) {
     if (loadPinyinDicts(pinyinSinglePath, pinyinPhrasePath,
                         voice.pinyinSingleDict, voice.pinyinPhraseDict)) {
       spdlog::info("Loaded pinyin dictionaries (single={}, phrases={}) from {}",
-                   voice.pinyinSingleDict.size(), voice.pinyinPhraseDict.size(), modelDir);
+                   voice.pinyinSingleDict.size(), voice.pinyinPhraseDict.size(),
+                   std::filesystem::path(pinyinSinglePath).parent_path().string());
     }
   }
 
@@ -1037,12 +1105,28 @@ void textToAudio(PiperConfig &config, Voice &voice, std::string text,
           multiLangs = {"ja", "en"};  // Default bilingual
         }
 
-        // Determine default Latin language
+        // Determine default Latin language.
+        // If the user set --language, reverse-lookup the code and prefer it
+        // when it is a Latin-script language.
         std::string defaultLatin = "en";
-        for (const auto& lang : {"en", "es", "pt", "fr"}) {
-          if (std::find(multiLangs.begin(), multiLangs.end(), lang) != multiLangs.end()) {
-            defaultLatin = lang;
-            break;
+        static const std::set<std::string> latinLangs = {"en", "es", "pt", "fr"};
+        bool defaultLatinSet = false;
+        if (voice.synthesisConfig.languageId && voice.modelConfig.languageIdMap) {
+          for (const auto& [code, id] : *voice.modelConfig.languageIdMap) {
+            if (id == *voice.synthesisConfig.languageId && latinLangs.count(code)) {
+              defaultLatin = code;
+              defaultLatinSet = true;
+              break;
+            }
+          }
+        }
+        // Fallback: pick the first available Latin language by priority
+        if (!defaultLatinSet) {
+          for (const auto& lang : {"en", "es", "pt", "fr"}) {
+            if (std::find(multiLangs.begin(), multiLangs.end(), lang) != multiLangs.end()) {
+              defaultLatin = lang;
+              break;
+            }
           }
         }
 
@@ -1115,8 +1199,11 @@ void textToAudio(PiperConfig &config, Voice &voice, std::string text,
           } else if (langSeg.lang == "pt") {
             // Portuguese: native rule-based phonemizer
             phonemize_portuguese(langSeg.text, langPhonemes);
-          } else if (langSeg.lang == "en" && !voice.cmuDict.empty()) {
+          } else if (langSeg.lang == "en") {
             // English: CMU dictionary-based G2P
+            if (voice.cmuDict.empty()) {
+              spdlog::warn("English CMU dictionary not loaded; English text may not be phonemized correctly");
+            }
             phonemize_english(langSeg.text, langPhonemes, voice.cmuDict);
             // Check if CMU dict produced any phonemes
             bool hasAnyPhonemes = false;
@@ -1126,8 +1213,11 @@ void textToAudio(PiperConfig &config, Voice &voice, std::string text,
             if (!hasAnyPhonemes) {
               spdlog::debug("English segment '{}' has no CMU dict matches; skipping", langSeg.text);
             }
-          } else if (langSeg.lang == "zh" && !voice.pinyinSingleDict.empty()) {
+          } else if (langSeg.lang == "zh") {
             // Chinese: pypinyin-based G2P
+            if (voice.pinyinSingleDict.empty()) {
+              spdlog::warn("Chinese pinyin dictionary not loaded; Chinese text may not be phonemized correctly");
+            }
             phonemize_chinese(langSeg.text, langPhonemes,
                               voice.pinyinSingleDict, voice.pinyinPhraseDict);
           } else if (langSeg.lang == "ko") {
