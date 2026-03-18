@@ -411,6 +411,13 @@ def synthesize_speech(
             lid_value = language_id_map.get(language, 0)
             inputs["lid"] = np.array([lid_value], dtype=np.int64)
 
+        # Add prosody_features if the model requires them (zeros as default)
+        if "prosody_features" in input_names_set:
+            num_phonemes = text_array.shape[1]
+            inputs["prosody_features"] = np.zeros(
+                (1, num_phonemes, 3), dtype=np.int64
+            )
+
         audio = model.run(None, inputs)[0]
 
         # Remove batch and channel dimensions
