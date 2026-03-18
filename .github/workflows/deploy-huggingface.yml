@@ -115,9 +115,15 @@ jobs:
           echo "Directory structure:"
           tree -h hf-space-deploy 2>/dev/null || ls -lah hf-space-deploy/ 2>/dev/null || echo "Directory not found"
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
       - name: Validate Python imports before deployment
         working-directory: hf-space-deploy
         run: |
+          pip install numpy
           echo "=== Pre-deployment import validation ==="
           python3 << 'PYEOF'
           import sys, importlib
@@ -156,11 +162,6 @@ jobs:
           else:
               print(f"\nPASSED: All {len(modules)} imports validated. Safe to deploy.")
           PYEOF
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
 
       - name: Install and deploy to Hugging Face
         env:
