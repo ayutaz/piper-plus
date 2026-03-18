@@ -15,7 +15,7 @@ use crate::error::PiperError;
 ///
 /// Implementations include WAV file, in-memory buffer, rodio playback, etc.
 /// Object-safe: no generics in methods.
-pub trait AudioSink: Send {
+pub trait AudioSink {
     /// Called for each audio chunk produced by the synthesizer.
     fn write_chunk(&mut self, samples: &[i16], sample_rate: u32) -> Result<(), PiperError>;
 
