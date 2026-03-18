@@ -91,3 +91,20 @@ generate_upiper_samples.py
 nul
 test/models/tsukuyomi-chan/
 docs/development/usability-issues-2026-03.md
+
+# Rust build artifacts
+src/rust/
+
+# Android
+src/android/.gradle/
+src/android/build/
+src/android/piper-android/build/
+src/android/sample-app/build/
+src/android/piper-android/src/main/jniLibs/
+src/android/local.properties
+*.aar
+*.apk
+
+# Android cross-compile build artifacts
+build-android-*/
+install-android-*/
