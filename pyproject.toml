@@ -24,6 +24,7 @@ dependencies = [
     "onnxscript>=0.6.2",
     "onnxruntime>=1.17",
     "ghapi>=1.0.13",
+    "onnx>=1.20.1",
 ]
 
 [project.optional-dependencies]
