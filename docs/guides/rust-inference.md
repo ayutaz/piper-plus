@@ -609,7 +609,7 @@ fn audio_float_to_int16(audio: &[f32]) -> Vec<i16> {
 
 **検証基準**: Python `infer_onnx.py` と同一 phoneme_ids で同一 WAV 出力
 
-### Phase 2: 日本語音素化 — 3-4 週間
+### Phase 2: 日本語音素化 — 3-4 週間 ✅
 
 **目標**: テキスト → phoneme_ids + prosody_features の日本語パイプライン
 
@@ -621,6 +621,19 @@ fn audio_float_to_int16(audio: &[f32]) -> Vec<i16> {
 - PUA トークンマッピング (89 固定エントリ)
 - カスタム辞書 (JSON 形式、正規表現マッチ)
 - **`post_process_ids` は no-op** (BOS/EOS/パディングは phonemize 内で inline 処理)
+
+**実装済み (Phase 2):**
+- `phonemize/japanese.rs` — JapanesePhonemizer (jpreprocess ベース)
+  - fullcontext label → 音素抽出 + 栗原法 prosody マーク
+  - A1/A2/A3 プロソディ値抽出
+  - 疑問詞マーカー (?!, ?., ?~)
+  - N 変異規則 (N_m, N_n, N_ng, N_uvular)
+  - PUA トークンマッピング
+- `phonemize/custom_dict.rs` — カスタム辞書 (JSON v1.0/v2.0)
+- `phonemize/phoneme_converter.rs` — トークン→ID変換
+- `voice.rs` — PiperVoice 高レベル API (テキスト→音声)
+- CLI: `--text`, `--language`, `--custom-dict` オプション追加
+- `token_map.rs` — PUA マッピングを Python token_mapper.py と完全一致に修正
 
 ### Phase 3: 多言語 G2P + CLI — 5-7 週間
 
@@ -689,7 +702,7 @@ fn audio_float_to_int16(audio: &[f32]) -> Vec<i16> {
 | フェーズ | 工数 | 累計 |
 |---------|------|------|
 | Phase 1: MVP (ONNX 推論) | 2-3 週 | 2-3 週 |
-| Phase 2: 日本語音素化 | 3-4 週 | 5-7 週 |
+| Phase 2: 日本語音素化 ✅ | 3-4 週 | 5-7 週 |
 | Phase 3: 多言語 G2P + CLI | 5-7 週 | 10-14 週 |
 | Phase 4: 高度な機能 | 9-12 週 | 19-26 週 |
 

@@ -4,6 +4,11 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 
+[features]
+default = ["japanese"]
+japanese = ["dep:jpreprocess"]
+naist-jdic = ["japanese", "jpreprocess/naist-jdic"]
+
 [dependencies]
 ort = "2.0.0-rc.12"
 serde = { version = "1", features = ["derive"] }
@@ -12,3 +17,8 @@ thiserror = "2"
 tracing = "0.1"
 hound = "3.5"
 ndarray = "0.17"
+regex = "1"
+jpreprocess = { version = "0.9", optional = true }
+
+[dev-dependencies]
+tempfile = "3"

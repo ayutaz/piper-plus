@@ -28,4 +28,19 @@ pub enum PiperError {
 
     #[error("WAV write error: {0}")]
     WavWrite(String),
+
+    #[error("phonemization error: {0}")]
+    Phonemize(String),
+
+    #[error("dictionary load error: {path}")]
+    DictionaryLoad { path: String },
+
+    #[error("jpreprocess initialization error: {0}")]
+    JPreprocessInit(String),
+
+    #[error("label parse error: {0}")]
+    LabelParse(String),
+
+    #[error("phoneme ID not found: {phoneme}")]
+    PhonemeIdNotFound { phoneme: String },
 }

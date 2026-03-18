@@ -9,9 +9,11 @@ pub mod engine;
 pub mod error;
 pub mod input;
 pub mod phonemize;
+pub mod voice;
 
 // Re-exports
 pub use config::{PhonemeIdMap, PhonemeType, VoiceConfig};
 pub use engine::{ModelCapabilities, OnnxEngine, SynthesisRequest, SynthesisResult};
 pub use error::PiperError;
 pub use phonemize::{ProsodyFeature, ProsodyInfo};
+pub use voice::PiperVoice;

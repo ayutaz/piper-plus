@@ -6,63 +6,105 @@
 use std::collections::HashMap;
 use std::sync::LazyLock;
 
-/// 固定 PUA マッピング (89 エントリ)
+/// 固定 PUA マッピング (87 エントリ)
 /// 多文字音素トークン → Unicode Private Use Area コードポイント
 pub static FIXED_PUA_MAP: LazyLock<Vec<(&'static str, u32)>> = LazyLock::new(|| {
     vec![
         // === Japanese (U+E000-E01C) ===
         // Long vowels
         ("a:", 0xE000), ("i:", 0xE001), ("u:", 0xE002), ("e:", 0xE003), ("o:", 0xE004),
-        // Special
+        // Special consonants
         ("cl", 0xE005),
         // Palatalized consonants
         ("ky", 0xE006), ("kw", 0xE007), ("gy", 0xE008), ("gw", 0xE009),
-        ("ny", 0xE00A), ("by", 0xE00B), ("py", 0xE00C), ("my", 0xE00D),
-        // Affricates / Fricatives
-        ("ch", 0xE00E), ("ts", 0xE00F), ("sh", 0xE010), ("dy", 0xE011),
-        ("ty", 0xE012), ("hy", 0xE013),
-        // Other
-        ("ry", 0xE014), ("fw", 0xE015),
-        // Question markers (Issue #204)
+        ("ty", 0xE00A), ("dy", 0xE00B), ("py", 0xE00C), ("by", 0xE00D),
+        // Affricates and special sounds
+        ("ch", 0xE00E), ("ts", 0xE00F), ("sh", 0xE010), ("zy", 0xE011),
+        ("hy", 0xE012),
+        // Palatalized nasals/liquids
+        ("ny", 0xE013), ("my", 0xE014), ("ry", 0xE015),
+        // Question type markers (Issue #204)
         ("?!", 0xE016), ("?.", 0xE017), ("?~", 0xE018),
-        // N variants (Issue #207)
+        // N phoneme variants (Issue #207)
         ("N_m", 0xE019), ("N_n", 0xE01A), ("N_ng", 0xE01B), ("N_uvular", 0xE01C),
 
         // === Multilingual shared (U+E01D-E01E) ===
-        ("rr", 0xE01D),         // Spanish trill
-        ("y_vowel", 0xE01E),    // Front rounded vowel (ZH/FR)
+        ("rr", 0xE01D),         // Spanish trill r
+        ("y_vowel", 0xE01E),    // Close front rounded vowel [y] (ZH pinyin ü, FR lune)
+        // 0xE01F reserved (unused gap)
 
         // === Chinese (U+E020-E04A) ===
-        // Aspirated consonants
-        ("pʰ", 0xE020), ("tʰ", 0xE021), ("kʰ", 0xE022),
-        ("tɕ", 0xE023), ("tɕʰ", 0xE024),
-        ("tʂ", 0xE025), ("tʂʰ", 0xE026), ("tsʰ", 0xE027),
-        // Diphthongs
-        ("aɪ", 0xE028), ("eɪ", 0xE029), ("aʊ", 0xE02A), ("oʊ", 0xE02B),
-        // Nasal finals
-        ("an", 0xE02C), ("ən", 0xE02D), ("aŋ", 0xE02E), ("əŋ", 0xE02F), ("uŋ", 0xE030),
-        // Compound finals
-        ("ia", 0xE031), ("iɛ", 0xE032), ("iɛn", 0xE033), ("iaŋ", 0xE034), ("iŋ", 0xE035),
-        ("ua", 0xE036), ("uo", 0xE037), ("uaɪ", 0xE038), ("ueɪ", 0xE039),
-        ("uan", 0xE03A), ("uən", 0xE03B), ("uaŋ", 0xE03C),
-        ("yɛ", 0xE03D), ("yan", 0xE03E), ("yn", 0xE03F),
-        // Special
-        ("iaʊ", 0xE040), ("ioʊ", 0xE041), ("yŋ", 0xE042),
-        ("ɥ", 0xE043), ("ɻ", 0xE044),
-        ("syl", 0xE045), // Syllabic consonant (zhi/chi/shi/ri)
-        // Tone markers
+        // --- Initials (aspirated/affricate) ---
+        ("p\u{02b0}", 0xE020), // pʰ  aspirated bilabial (pinyin p)
+        ("t\u{02b0}", 0xE021), // tʰ  aspirated alveolar (pinyin t)
+        ("k\u{02b0}", 0xE022), // kʰ  aspirated velar (pinyin k)
+        ("t\u{0255}", 0xE023), // tɕ  alveolo-palatal affricate (pinyin j)
+        ("t\u{0255}\u{02b0}", 0xE024), // tɕʰ  aspirated alveolo-palatal (pinyin q)
+        ("t\u{0282}", 0xE025), // tʂ  retroflex affricate (pinyin zh)
+        ("t\u{0282}\u{02b0}", 0xE026), // tʂʰ  aspirated retroflex (pinyin ch)
+        ("ts\u{02b0}", 0xE027), // tsʰ  aspirated alveolar affricate (pinyin c)
+        // --- Diphthongs ---
+        ("a\u{026a}", 0xE028), // aɪ  (pinyin ai)
+        ("e\u{026a}", 0xE029), // eɪ  (pinyin ei)
+        ("a\u{028a}", 0xE02A), // aʊ  (pinyin ao)
+        ("o\u{028a}", 0xE02B), // oʊ  (pinyin ou)
+        // --- Nasal finals ---
+        ("an", 0xE02C),        // an  (pinyin an)
+        ("\u{0259}n", 0xE02D), // ən  (pinyin en)
+        ("a\u{014b}", 0xE02E), // aŋ  (pinyin ang)
+        ("\u{0259}\u{014b}", 0xE02F), // əŋ  (pinyin eng)
+        ("u\u{014b}", 0xE030), // uŋ  (pinyin ong)
+        // --- i-compound finals (齐齿呼) ---
+        ("ia", 0xE031),        // ia  (pinyin ia/ya)
+        ("i\u{025b}", 0xE032), // iɛ  (pinyin ie/ye)
+        ("iou", 0xE033),       // iou (pinyin iu/you)
+        ("ia\u{028a}", 0xE034), // iaʊ (pinyin iao/yao)
+        ("i\u{025b}n", 0xE035), // iɛn (pinyin ian/yan)
+        ("in", 0xE036),        // in  (pinyin in/yin)
+        ("ia\u{014b}", 0xE037), // iaŋ (pinyin iang/yang)
+        ("i\u{014b}", 0xE038), // iŋ  (pinyin ing/ying)
+        ("iu\u{014b}", 0xE039), // iuŋ (pinyin iong/yong)
+        // --- u-compound finals (合口呼) ---
+        ("ua", 0xE03A),        // ua  (pinyin ua/wa)
+        ("uo", 0xE03B),        // uo  (pinyin uo/wo)
+        ("ua\u{026a}", 0xE03C), // uaɪ (pinyin uai/wai)
+        ("ue\u{026a}", 0xE03D), // ueɪ (pinyin ui/wei)
+        ("uan", 0xE03E),       // uan (pinyin uan/wan)
+        ("u\u{0259}n", 0xE03F), // uən (pinyin un/wen)
+        ("ua\u{014b}", 0xE040), // uaŋ (pinyin uang/wang)
+        ("u\u{0259}\u{014b}", 0xE041), // uəŋ (pinyin ueng/weng)
+        // --- ü-compound finals (撮口呼) ---
+        ("y\u{025b}", 0xE042), // yɛ  (pinyin üe/yue)
+        ("y\u{025b}n", 0xE043), // yɛn (pinyin üan/yuan)
+        ("yn", 0xE044),        // yn  (pinyin ün/yun)
+        // --- Syllabic consonants ---
+        ("\u{027b}\u{0329}", 0xE045), // ɻ̩  syllabic retroflex (zhi/chi/shi/ri)
+        // --- Tone markers ---
         ("tone1", 0xE046), ("tone2", 0xE047), ("tone3", 0xE048),
         ("tone4", 0xE049), ("tone5", 0xE04A),
 
         // === Korean (U+E04B-E052) ===
-        ("p͈", 0xE04B), ("t͈", 0xE04C), ("k͈", 0xE04D), ("s͈", 0xE04E), ("t͈ɕ", 0xE04F),
-        ("k̚", 0xE050), ("t̚", 0xE051), ("p̚", 0xE052),
+        // --- Tense consonants (fortis / 경음) ---
+        ("p\u{0348}", 0xE04B), // p͈  tense bilabial (ㅃ)
+        ("t\u{0348}", 0xE04C), // t͈  tense alveolar (ㄸ)
+        ("k\u{0348}", 0xE04D), // k͈  tense velar (ㄲ)
+        ("s\u{0348}", 0xE04E), // s͈  tense sibilant (ㅆ)
+        ("t\u{0348}\u{0255}", 0xE04F), // t͈ɕ  tense alveolo-palatal affricate (ㅉ)
+        // --- Unreleased finals (내파음) ---
+        ("k\u{031a}", 0xE050), // k̚  unreleased velar
+        ("t\u{031a}", 0xE051), // t̚  unreleased alveolar
+        ("p\u{031a}", 0xE052), // p̚  unreleased bilabial
+        // 0xE053 reserved (unused gap)
 
         // === Spanish/Portuguese (U+E054-E055) ===
-        ("tʃ", 0xE054), ("dʒ", 0xE055),
+        ("t\u{0283}", 0xE054), // tʃ  voiceless postalveolar affricate
+        ("d\u{0292}", 0xE055), // dʒ  voiced postalveolar affricate
 
         // === French (U+E056-E058) ===
-        ("ɛ̃", 0xE056), ("ɑ̃", 0xE057), ("ɔ̃", 0xE058),
+        // --- Nasal vowels ---
+        ("\u{025b}\u{0303}", 0xE056), // ɛ̃  nasal open-mid front unrounded
+        ("\u{0251}\u{0303}", 0xE057), // ɑ̃  nasal open back unrounded
+        ("\u{0254}\u{0303}", 0xE058), // ɔ̃  nasal open-mid back rounded
     ]
 });
 
@@ -102,7 +144,40 @@ mod tests {
 
     #[test]
     fn test_fixed_pua_count() {
+        // Must match Python token_mapper.py FIXED_PUA_MAPPING count exactly
         assert_eq!(FIXED_PUA_MAP.len(), 87);
+    }
+
+    #[test]
+    fn test_japanese_palatalized_order() {
+        // Verify E00A-E015 match Python canonical order exactly
+        assert_eq!(token_to_pua("ty"), Some('\u{E00A}'));
+        assert_eq!(token_to_pua("dy"), Some('\u{E00B}'));
+        assert_eq!(token_to_pua("py"), Some('\u{E00C}'));
+        assert_eq!(token_to_pua("by"), Some('\u{E00D}'));
+        assert_eq!(token_to_pua("zy"), Some('\u{E011}'));
+        assert_eq!(token_to_pua("hy"), Some('\u{E012}'));
+        assert_eq!(token_to_pua("ny"), Some('\u{E013}'));
+        assert_eq!(token_to_pua("my"), Some('\u{E014}'));
+        assert_eq!(token_to_pua("ry"), Some('\u{E015}'));
+        // "fw" must NOT exist in the mapping
+        assert_eq!(token_to_pua("fw"), None);
+    }
+
+    #[test]
+    fn test_chinese_compound_finals() {
+        // i-compound finals
+        assert_eq!(token_to_pua("iou"), Some('\u{E033}'));
+        assert_eq!(token_to_pua("in"), Some('\u{E036}'));
+        // u-compound finals
+        assert_eq!(token_to_pua("uan"), Some('\u{E03E}'));
+        // ü-compound finals
+        assert_eq!(token_to_pua("yn"), Some('\u{E044}'));
+        // Syllabic consonant: ɻ̩ (U+027B + U+0329)
+        assert_eq!(token_to_pua("\u{027b}\u{0329}"), Some('\u{E045}'));
+        // "syl", "ɥ", "ɻ" (single), "ioʊ", "yŋ", "yan" must NOT exist
+        assert_eq!(token_to_pua("syl"), None);
+        assert_eq!(token_to_pua("\u{0265}"), None); // ɥ
     }
 
     #[test]

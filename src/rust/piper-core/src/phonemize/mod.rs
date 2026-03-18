@@ -1,7 +1,7 @@
-//! Phonemizer trait and language registry.
+//! Phonemizer trait, language registry, and language-specific implementations.
 //!
-//! Phase 1 (MVP) ではテキスト音素化は未実装。
-//! JSONL 入力で phoneme_ids を直接受け取る。
+//! Phase 2: Japanese phonemization via jpreprocess.
+//! JSONL 入力 (Phase 1) に加え、テキスト直接入力をサポート。
 
 use std::collections::HashMap;
 
@@ -9,6 +9,10 @@ use crate::config::PhonemeIdMap;
 use crate::error::PiperError;
 
 pub mod token_map;
+#[cfg(feature = "japanese")]
+pub mod japanese;
+pub mod custom_dict;
+pub mod phoneme_converter;
 
 /// プロソディ情報 (言語間で共有)
 #[derive(Debug, Clone, Copy)]
