@@ -206,28 +206,45 @@
 
 ---
 
-## Phase 5: 配布・ドキュメント
+## Phase 5: 配布・ドキュメント (進行中)
 
 **目標:** Maven Centralに公開し、他の開発者がGradle依存で利用できる状態にする。
 
 ### 5.1 Maven Central公開設定
 
-| タスク | 成果物 | 依存 |
-|--------|--------|------|
-| Sonatype Central Portal アカウント作成 | namespace検証済み | - |
-| GPG鍵ペア生成 + キーサーバー登録 | 公開鍵登録 | 上記 |
-| vanniktech maven-publish plugin設定 | `build.gradle.kts` | Phase 1 |
-| POMメタデータ設定 (license, scm, developers) | Maven要件充足 | 上記 |
-| GitHub Secrets設定 (MAVEN_CENTRAL_*, GPG_*) | CI用シークレット | 上記 |
+| タスク | 成果物 | 依存 | 状態 |
+|--------|--------|------|------|
+| Sonatype Central Portal アカウント作成 | namespace検証済み | - | 未着手 |
+| GPG鍵ペア生成 + キーサーバー登録 | 公開鍵登録 | 上記 | 未着手 |
+| vanniktech maven-publish plugin設定 | `build.gradle.kts` | Phase 1 | ✅ |
+| POMメタデータ設定 (license, scm, developers) | Maven要件充足 | 上記 | ✅ |
+| GitHub Secrets設定 (MAVEN_CENTRAL_*, GPG_*) | CI用シークレット | 上記 | 未着手 |
 
 ### 5.2 CI/CD自動リリース
 
-| タスク | 成果物 | 依存 |
-|--------|--------|------|
-| `.github/workflows/android-publish.yml` 作成 | 公開ワークフロー | 5.1 |
-| GitHub Release → Maven Central 自動公開 | `publishAndReleaseToMavenCentral` | 上記 |
-| テスト公開 (beta版) | `1.0.0-beta01` on Maven Central | 上記 |
-| 正式リリース | `1.0.0` on Maven Central | 上記 |
+| タスク | 成果物 | 依存 | 状態 |
+|--------|--------|------|------|
+| `.github/workflows/android-build.yml` 作成 | ビルドワークフロー | Phase 1 | ✅ |
+| Debug + Release AARビルド | CIでAAR生成 | 上記 | ✅ |
+| Android Lint | コード品質チェック | 上記 | ✅ |
+| ユニットテスト (testDebugUnitTest) | テスト結果 | 上記 | ✅ |
+| サンプルアプリビルド + Lint | sample-app CI検証 | 上記 | ✅ |
+| AARアーティファクトアップロード (debug + release) | GitHub Artifacts | 上記 | ✅ |
+| `.github/workflows/android-publish.yml` 作成 | 公開ワークフロー | 5.1 | ✅ |
+| Secrets バリデーション (MAVEN_CENTRAL_*, GPG_*) | 公開前チェック | 上記 | ✅ |
+| Version バリデーション (gradle.properties vs tag) | バージョン整合性チェック | 上記 | ✅ |
+| Build + Lint + Test before publish | 公開前品質ゲート | 上記 | ✅ |
+| `publishAndReleaseToMavenCentral` タスク | Maven Central公開 | 上記 | ✅ |
+| ビルドスクリプト修正 (CMake source dir, 依存変数) | ビルド安定化 | Phase 1 | ✅ |
+| NDK CI環境セットアップ | ネイティブビルドCI対応 | 上記 | 未着手 |
+| Instrumented tests (androidTest) | デバイステスト | 上記 | 未着手 |
+| テスト公開 (beta版) | `1.0.0-beta01` on Maven Central | 5.1 | 未着手 |
+| 正式リリース | `1.0.0` on Maven Central | 上記 | 未着手 |
+
+**CI/CD 実装メモ:**
+- ビルドワークフロー (`android-build.yml`): push/PR時に `src/android/**`, `src/cpp/**`, `CMakeLists.txt` 変更で自動トリガー。Debug/Release AAR, Lint, Unit Tests, Sample Appビルドを実行。
+- 公開ワークフロー (`android-publish.yml`): `android-v*` タグの GitHub Release 作成時にトリガー。Secrets検証 → Version整合性チェック → Build+Lint+Test → Maven Central公開 の安全なパイプライン。
+- 残作業: Sonatype Central Portalアカウント作成、GPG鍵生成、GitHub Secrets登録、NDK CI環境構築、Instrumented tests追加。
 
 ### 5.3 ドキュメント
 
@@ -272,9 +289,9 @@ Phase 4: サンプルアプリ
   ├── 4.2 UIスクリーン
   └── 4.3 ViewModel統合
 
-Phase 5: 配布・ドキュメント
-  ├── 5.1 Maven Central設定
-  ├── 5.2 CI/CD自動リリース
+Phase 5: 配布・ドキュメント (進行中)
+  ├── 5.1 Maven Central設定 (一部完了: plugin設定済み、アカウント未作成)
+  ├── 5.2 CI/CD自動リリース (ワークフロー完了 ✅、実公開は未着手)
   └── 5.3 ドキュメント
 ```
 

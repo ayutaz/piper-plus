@@ -16,6 +16,15 @@ android {
         ndk {
             abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64")
         }
+
+        // TODO: No externalNativeBuild (CMake/ndk-build) configuration is defined here.
+        // Native .so files must be pre-built using the scripts in `scripts/` and placed
+        // in `src/main/jniLibs/<abi>/` manually.
+        // For Gradle-integrated native builds, an `externalNativeBuild` block would be
+        // needed in this `defaultConfig` section (or at the `android` level).
+        // This is intentionally omitted because the native build requires external
+        // dependencies (ONNX Runtime, OpenJTalk, spdlog, fmt) that must be
+        // cross-compiled for Android first.
     }
 
     buildTypes {

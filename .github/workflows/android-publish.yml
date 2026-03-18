@@ -8,6 +8,8 @@ jobs:
   publish:
     name: Publish to Maven Central
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     if: startsWith(github.ref, 'refs/tags/android-v')
     steps:
       - uses: actions/checkout@v4
@@ -25,12 +27,14 @@ jobs:
         run: |
           if [ -z "${{ secrets.MAVEN_CENTRAL_USERNAME }}" ]; then echo "MAVEN_CENTRAL_USERNAME not set"; exit 1; fi
           if [ -z "${{ secrets.MAVEN_CENTRAL_PASSWORD }}" ]; then echo "MAVEN_CENTRAL_PASSWORD not set"; exit 1; fi
+          if [ -z "${{ secrets.GPG_SIGNING_KEY }}" ]; then echo "GPG_SIGNING_KEY not set"; exit 1; fi
+          if [ -z "${{ secrets.GPG_SIGNING_PASSWORD }}" ]; then echo "GPG_SIGNING_PASSWORD not set"; exit 1; fi
 
       - name: Validate version
         working-directory: src/android
         run: |
-          VERSION=$(grep "VERSION_NAME=" gradle.properties | cut -d= -f2)
-          TAG_VERSION=${GITHUB_REF#refs/tags/android-v}
+          VERSION=$(grep "VERSION_NAME=" gradle.properties | cut -d= -f2 | tr -d '[:space:]')
+          TAG_VERSION=$(echo "${GITHUB_REF#refs/tags/android-v}" | tr -d '[:space:]')
           if [ "$VERSION" != "$TAG_VERSION" ]; then
             echo "Version mismatch: gradle.properties=$VERSION, tag=$TAG_VERSION"
             exit 1
@@ -39,6 +43,10 @@ jobs:
       - name: Build AAR (release)
         working-directory: src/android
         run: ./gradlew :piper-android:assembleRelease
+
+      - name: Run Android Lint
+        working-directory: src/android
+        run: ./gradlew :piper-android:lint
 
       - name: Run tests
         working-directory: src/android

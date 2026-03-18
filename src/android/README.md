@@ -161,6 +161,36 @@ The TTS Service expects model files (`.onnx` and `config.json`) in the `<app>/fi
 | `lengthScale` | 1.0 | Speech speed (< 1.0 = faster) |
 | `noiseW` | 0.8 | Phoneme width variability |
 
+## Building from Source
+
+### Native Library Build
+
+The native JNI library must be cross-compiled for Android before building the AAR:
+
+```bash
+# Set dependency paths
+export ONNXRUNTIME_DIR=/path/to/onnxruntime-android
+export OPENJTALK_DIR=/path/to/openjtalk-android
+export SPDLOG_DIR=/path/to/spdlog
+export FMT_DIR=/path/to/fmt
+
+# Build for each ABI
+./scripts/build-android-arm64-v8a.sh
+./scripts/build-android-armeabi-v7a.sh
+./scripts/build-android-x86_64.sh
+```
+
+Place the built `.so` files in `piper-android/src/main/jniLibs/<abi>/`.
+
+### AAR Build
+
+```bash
+cd src/android
+./gradlew :piper-android:assembleRelease
+```
+
+The AAR will be at `piper-android/build/outputs/aar/piper-android-release.aar`.
+
 ### Supported Languages
 
 Language codes use ISO 639-1 format.
