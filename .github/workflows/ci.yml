@@ -354,6 +354,40 @@ jobs:
           flags: python
           name: Python ${{ matrix.python-version }} - ${{ runner.os }}
 
+  rust-tests:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, macos-latest]
+    defaults:
+      run:
+        working-directory: src/rust
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src/rust -> target
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Clippy
+        run: cargo clippy --workspace -- -D warnings
+        continue-on-error: true
+
+      - name: Run tests
+        run: cargo test -p piper-core --no-fail-fast
+
+      - name: Run tests (naist-jdic)
+        run: cargo test -p piper-core --features naist-jdic --no-fail-fast
+
+      - name: Check piper-python
+        run: cargo check -p piper-python
+
   lint:
     runs-on: ubuntu-latest
     
