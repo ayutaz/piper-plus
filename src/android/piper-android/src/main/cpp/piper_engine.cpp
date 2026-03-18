@@ -10,7 +10,7 @@ PiperEngine::PiperEngine(const std::string &modelPath, const std::string &config
 
     piper::initialize(*config_);
 
-    std::optional<piper::SpeakerId> speakerId;
+    std::optional<piper::SpeakerId> speakerId = std::nullopt;
     piper::loadVoice(*config_, modelPath, configPath, *voice_, speakerId,
                      /*useCuda=*/false, /*gpuDeviceId=*/0);
 
@@ -72,19 +72,26 @@ void PiperEngine::synthesizeStreaming(
 }
 
 int PiperEngine::getSampleRate() const {
+    std::lock_guard<std::mutex> lock(synthMutex_);
     return voice_ ? voice_->synthesisConfig.sampleRate : 22050;
 }
 
 int PiperEngine::getNumSpeakers() const {
+    std::lock_guard<std::mutex> lock(synthMutex_);
     return voice_ ? voice_->modelConfig.numSpeakers : 0;
 }
 
 int PiperEngine::getNumLanguages() const {
+    std::lock_guard<std::mutex> lock(synthMutex_);
     return voice_ ? voice_->modelConfig.numLanguages : 1;
 }
 
 void PiperEngine::setLanguage(const std::string &language) {
     if (language.empty()) return;
+
+    if (!voice_) {
+        throw std::runtime_error("setLanguage called but voice is not loaded");
+    }
 
     auto &langMap = voice_->modelConfig.languageIdMap;
     if (langMap.has_value()) {
@@ -92,7 +99,8 @@ void PiperEngine::setLanguage(const std::string &language) {
         if (it != langMap->end()) {
             voice_->synthesisConfig.languageId = it->second;
         } else {
-            PIPER_LOGW("Language '%s' not found in model, using default", language.c_str());
+            throw std::invalid_argument(
+                "Language '" + language + "' not found in model's languageIdMap");
         }
     }
 }

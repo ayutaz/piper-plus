@@ -28,32 +28,36 @@ class PiperTts private constructor(
     val config: PiperConfig,
 ) : AutoCloseable {
 
+    private val lock = Any()
+
     /** Sample rate of the loaded model (typically 22050). */
     val sampleRate: Int
-        get() {
+        get() = synchronized(lock) {
             check(nativeHandle != 0L) { "PiperTts has been closed" }
-            return NativeBridge.nativeGetSampleRate(nativeHandle)
+            NativeBridge.nativeGetSampleRate(nativeHandle)
         }
 
     /** Number of speakers in the loaded model. */
     val numSpeakers: Int
-        get() {
+        get() = synchronized(lock) {
             check(nativeHandle != 0L) { "PiperTts has been closed" }
-            return NativeBridge.nativeGetNumSpeakers(nativeHandle)
+            NativeBridge.nativeGetNumSpeakers(nativeHandle)
         }
 
     /** Number of languages in the loaded model. */
     val numLanguages: Int
-        get() {
+        get() = synchronized(lock) {
             check(nativeHandle != 0L) { "PiperTts has been closed" }
-            return NativeBridge.nativeGetNumLanguages(nativeHandle)
+            NativeBridge.nativeGetNumLanguages(nativeHandle)
         }
 
     /** Whether this engine instance is still valid. */
     val isOpen: Boolean
-        get() = nativeHandle != 0L
+        get() = synchronized(lock) { nativeHandle != 0L }
 
     companion object {
+        const val MAX_TEXT_LENGTH = 10_000
+
         init {
             System.loadLibrary("piper_jni")
         }
@@ -103,13 +107,34 @@ class PiperTts private constructor(
         }
 
         private fun Context.copyAssetToInternal(assetPath: String): java.io.File {
-            val outFile = java.io.File(filesDir, "piper/$assetPath")
+            require(!assetPath.contains("..")) { "assetPath must not contain '..'" }
+            require(!assetPath.startsWith("/")) { "assetPath must not be absolute" }
+
+            val parentDir = java.io.File(filesDir, "piper")
+            val outFile = java.io.File(parentDir, assetPath)
+            val canonicalParent = parentDir.canonicalPath
+            require(outFile.canonicalPath.startsWith(canonicalParent)) {
+                "assetPath escapes the intended directory"
+            }
+
             if (!outFile.exists()) {
                 outFile.parentFile?.mkdirs()
-                assets.open(assetPath).use { input ->
-                    outFile.outputStream().use { output ->
-                        input.copyTo(output)
+                val tmpFile = java.io.File.createTempFile("piper_", ".tmp", outFile.parentFile)
+                try {
+                    assets.open(assetPath).use { input ->
+                        tmpFile.outputStream().use { output ->
+                            input.copyTo(output)
+                        }
                     }
+                    if (!tmpFile.renameTo(outFile)) {
+                        tmpFile.inputStream().use { input ->
+                            outFile.outputStream().use { output ->
+                                input.copyTo(output)
+                            }
+                        }
+                    }
+                } finally {
+                    tmpFile.delete()
                 }
             }
             return outFile
@@ -132,11 +157,16 @@ class PiperTts private constructor(
         language: String = "ja",
         speakerId: Int = config.speakerId,
     ): PiperAudio = withContext(Dispatchers.Default) {
-        check(nativeHandle != 0L) { "PiperTts has been closed" }
+        require(text.length <= MAX_TEXT_LENGTH) { "Text exceeds maximum length of $MAX_TEXT_LENGTH characters" }
+        require(speakerId >= 0) { "speakerId must be non-negative" }
+        require(language.isNotEmpty()) { "language must not be empty" }
         if (text.isEmpty()) return@withContext PiperAudio(ShortArray(0))
 
-        val samples = NativeBridge.nativeSynthesize(nativeHandle, text, language, speakerId)
-        PiperAudio(samples, sampleRate)
+        synchronized(lock) {
+            check(nativeHandle != 0L) { "PiperTts has been closed" }
+            val samples = NativeBridge.nativeSynthesize(nativeHandle, text, language, speakerId)
+            PiperAudio(samples, sampleRate)
+        }
     }
 
     /**
@@ -152,15 +182,24 @@ class PiperTts private constructor(
         language: String = "ja",
         speakerId: Int = config.speakerId,
     ): Flow<ShortArray> = callbackFlow {
-        check(nativeHandle != 0L) { "PiperTts has been closed" }
+        require(text.length <= MAX_TEXT_LENGTH) { "Text exceeds maximum length of $MAX_TEXT_LENGTH characters" }
+        require(speakerId >= 0) { "speakerId must be non-negative" }
+        require(language.isNotEmpty()) { "language must not be empty" }
 
-        NativeBridge.nativeSynthesizeStreaming(
-            nativeHandle, text, language, speakerId
-        ) { chunk ->
-            trySend(chunk)
+        synchronized(lock) {
+            check(nativeHandle != 0L) { "PiperTts has been closed" }
+            try {
+                NativeBridge.nativeSynthesizeStreaming(
+                    nativeHandle, text, language, speakerId
+                ) { chunk ->
+                    trySend(chunk)
+                }
+                close()
+            } catch (e: Exception) {
+                close(e)
+            }
         }
 
-        close()
         awaitClose()
     }.flowOn(Dispatchers.Default)
 
@@ -169,14 +208,11 @@ class PiperTts private constructor(
      * Safe to call multiple times.
      */
     override fun close() {
-        if (nativeHandle != 0L) {
-            NativeBridge.nativeDestroy(nativeHandle)
-            nativeHandle = 0L
+        synchronized(lock) {
+            if (nativeHandle != 0L) {
+                NativeBridge.nativeDestroy(nativeHandle)
+                nativeHandle = 0L
+            }
         }
-    }
-
-    @Suppress("removal")
-    protected fun finalize() {
-        close()
     }
 }

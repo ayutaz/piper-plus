@@ -18,6 +18,15 @@ data class PiperConfig @JvmOverloads constructor(
     @JvmField val lengthScale: Float = DEFAULT_LENGTH_SCALE,
     @JvmField val noiseW: Float = DEFAULT_NOISE_W,
 ) {
+    init {
+        require(noiseScale >= 0f) { "noiseScale must be non-negative" }
+        require(lengthScale > 0f) { "lengthScale must be positive" }
+        require(noiseW in 0f..1f) { "noiseW must be in range [0, 1]" }
+        require(speakerId >= 0) { "speakerId must be non-negative" }
+        require(modelPath.isNotEmpty()) { "modelPath must not be empty" }
+        require(configPath.isNotEmpty()) { "configPath must not be empty" }
+    }
+
     companion object {
         const val DEFAULT_SPEAKER_ID = 0
         const val DEFAULT_NOISE_SCALE = 0.667f

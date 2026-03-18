@@ -12,6 +12,8 @@
 
 // Exception-safe JNI wrapper macro.
 // Catches C++ exceptions and converts them to Java RuntimeException.
+// NOTE: ThrowNew messages are intentionally generic to avoid leaking native
+//       details to the Java layer. Full details are logged via PIPER_LOGE.
 #define PIPER_JNI_TRY_CATCH_RETURN(env, returnOnError, block) \
     try { \
         block \
@@ -19,21 +21,30 @@
         PIPER_LOGE("ONNX Runtime error: %s", e.what()); \
         jclass cls = env->FindClass("java/lang/RuntimeException"); \
         if (cls != nullptr) { \
-            env->ThrowNew(cls, e.what()); \
+            env->ThrowNew(cls, "ONNX Runtime error during synthesis"); \
+        } else { \
+            env->ExceptionClear(); \
+            PIPER_LOGE("Failed to find RuntimeException class"); \
         } \
         return returnOnError; \
     } catch (const std::exception& e) { \
         PIPER_LOGE("Native error: %s", e.what()); \
         jclass cls = env->FindClass("java/lang/RuntimeException"); \
         if (cls != nullptr) { \
-            env->ThrowNew(cls, e.what()); \
+            env->ThrowNew(cls, "Native error during synthesis"); \
+        } else { \
+            env->ExceptionClear(); \
+            PIPER_LOGE("Failed to find RuntimeException class"); \
         } \
         return returnOnError; \
     } catch (...) { \
         PIPER_LOGE("Unknown native error"); \
         jclass cls = env->FindClass("java/lang/RuntimeException"); \
         if (cls != nullptr) { \
-            env->ThrowNew(cls, "Unknown native error in Piper JNI"); \
+            env->ThrowNew(cls, "Unknown native error"); \
+        } else { \
+            env->ExceptionClear(); \
+            PIPER_LOGE("Failed to find RuntimeException class"); \
         } \
         return returnOnError; \
     }
@@ -46,21 +57,30 @@
         PIPER_LOGE("ONNX Runtime error: %s", e.what()); \
         jclass cls = env->FindClass("java/lang/RuntimeException"); \
         if (cls != nullptr) { \
-            env->ThrowNew(cls, e.what()); \
+            env->ThrowNew(cls, "ONNX Runtime error during synthesis"); \
+        } else { \
+            env->ExceptionClear(); \
+            PIPER_LOGE("Failed to find RuntimeException class"); \
         } \
         return; \
     } catch (const std::exception& e) { \
         PIPER_LOGE("Native error: %s", e.what()); \
         jclass cls = env->FindClass("java/lang/RuntimeException"); \
         if (cls != nullptr) { \
-            env->ThrowNew(cls, e.what()); \
+            env->ThrowNew(cls, "Native error during synthesis"); \
+        } else { \
+            env->ExceptionClear(); \
+            PIPER_LOGE("Failed to find RuntimeException class"); \
         } \
         return; \
     } catch (...) { \
         PIPER_LOGE("Unknown native error"); \
         jclass cls = env->FindClass("java/lang/RuntimeException"); \
         if (cls != nullptr) { \
-            env->ThrowNew(cls, "Unknown native error in Piper JNI"); \
+            env->ThrowNew(cls, "Unknown native error"); \
+        } else { \
+            env->ExceptionClear(); \
+            PIPER_LOGE("Failed to find RuntimeException class"); \
         } \
         return; \
     }

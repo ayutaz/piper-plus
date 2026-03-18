@@ -21,8 +21,9 @@ class ModelManager(private val context: Context) {
         return modelsDir.listFiles()
             ?.filter { it.isDirectory }
             ?.mapNotNull { dir ->
-                val onnx = dir.listFiles()?.firstOrNull { it.name.endsWith(".onnx") }
-                val json = dir.listFiles()?.firstOrNull { it.name.endsWith(".json") }
+                val files = dir.listFiles()
+                val onnx = files?.firstOrNull { it.name.endsWith(".onnx") }
+                val json = files?.firstOrNull { it.name.endsWith(".json") }
                 if (onnx != null && json != null) {
                     ModelInfo(
                         name = dir.name,
@@ -43,9 +44,21 @@ class ModelManager(private val context: Context) {
      */
     fun installFromAssets(assetDir: String): ModelInfo {
         val targetDir = File(modelsDir, assetDir).apply { mkdirs() }
+        val targetDirCanonical = targetDir.canonicalPath
 
-        context.assets.list(assetDir)?.forEach { fileName ->
+        val fileNames = context.assets.list(assetDir)
+            ?: throw IllegalArgumentException(
+                "Asset directory not found or not listable: $assetDir"
+            )
+
+        fileNames.forEach { fileName ->
+            require(!fileName.contains("..") && !fileName.contains("/") && !fileName.contains("\\")) {
+                "Invalid file name in assets: $fileName"
+            }
             val targetFile = File(targetDir, fileName)
+            require(targetFile.canonicalPath.startsWith(targetDirCanonical)) {
+                "Path traversal detected: $fileName"
+            }
             if (!targetFile.exists()) {
                 context.assets.open("$assetDir/$fileName").use { input ->
                     targetFile.outputStream().use { output ->
@@ -89,12 +102,14 @@ class ModelManager(private val context: Context) {
             speakerId: Int = PiperConfig.DEFAULT_SPEAKER_ID,
             noiseScale: Float = PiperConfig.DEFAULT_NOISE_SCALE,
             lengthScale: Float = PiperConfig.DEFAULT_LENGTH_SCALE,
+            noiseW: Float = PiperConfig.DEFAULT_NOISE_W,
         ): PiperConfig = PiperConfig(
             modelPath = modelPath,
             configPath = configPath,
             speakerId = speakerId,
             noiseScale = noiseScale,
             lengthScale = lengthScale,
+            noiseW = noiseW,
         )
 
         /** Human-readable model size. */

@@ -80,7 +80,7 @@ private:
 
     std::unique_ptr<piper::PiperConfig> config_;
     std::unique_ptr<piper::Voice> voice_;
-    std::mutex synthMutex_; // Serialize synthesis calls
+    mutable std::mutex synthMutex_; // Serialize synthesis calls
 };
 
 #endif // PIPER_ENGINE_HPP_

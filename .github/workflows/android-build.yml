@@ -2,7 +2,7 @@ name: Android Build & Test
 
 on:
   push:
-    branches: [dev]
+    branches: [dev, main]
     paths:
       - 'src/android/**'
       - 'src/cpp/**'
@@ -17,6 +17,9 @@ jobs:
   build-aar:
     name: Build AAR
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: src/android
     steps:
       - uses: actions/checkout@v4
 
@@ -30,19 +33,31 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
 
       - name: Build AAR (debug)
-        working-directory: src/android
         run: ./gradlew :piper-android:assembleDebug
 
+      - name: Build AAR (release)
+        run: ./gradlew :piper-android:assembleRelease
+
+      - name: Run Android Lint
+        run: ./gradlew :piper-android:lint
+
       - name: Run unit tests
-        working-directory: src/android
         run: ./gradlew :piper-android:testDebugUnitTest
 
-      - name: Upload AAR artifact
+      - name: Upload AAR artifact (debug)
         if: success()
         uses: actions/upload-artifact@v4
         with:
           name: piper-android-debug-aar
-          path: src/android/piper-android/build/outputs/aar/*.aar
+          path: src/android/piper-android/build/outputs/aar/*-debug.aar
+          retention-days: 14
+
+      - name: Upload AAR artifact (release)
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: piper-android-release-aar
+          path: src/android/piper-android/build/outputs/aar/*-release.aar
           retention-days: 14
 
       - name: Upload test results

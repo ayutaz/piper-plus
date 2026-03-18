@@ -34,8 +34,8 @@ class MainActivity : ComponentActivity() {
                             if (modelFile != null) {
                                 viewModel.initialize(modelFile)
                             }
-                        } catch (_: Exception) {
-                            // No model in assets - user can load manually
+                        } catch (e: Exception) {
+                            viewModel.setError("Failed to load model from assets: ${e.message}")
                         }
                     }
                 }

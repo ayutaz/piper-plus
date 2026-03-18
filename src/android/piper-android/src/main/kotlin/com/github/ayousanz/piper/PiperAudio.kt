@@ -1,5 +1,6 @@
 package com.github.ayousanz.piper
 
+import java.io.File
 import java.io.FileOutputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -20,31 +21,50 @@ data class PiperAudio(
 
     /** Save audio as a WAV file. */
     fun save(path: String) {
-        FileOutputStream(path).use { fos ->
-            val dataSize = samples.size * 2
-            val header = ByteBuffer.allocate(44).order(ByteOrder.LITTLE_ENDIAN).apply {
-                // RIFF header
-                put("RIFF".toByteArray())
-                putInt(dataSize + 36)
-                put("WAVE".toByteArray())
-                // fmt chunk
-                put("fmt ".toByteArray())
-                putInt(16) // PCM
-                putShort(1) // PCM format
-                putShort(1) // mono
-                putInt(sampleRate)
-                putInt(sampleRate * 2) // bytes per sec
-                putShort(2) // block align
-                putShort(16) // bits per sample
-                // data chunk
-                put("data".toByteArray())
-                putInt(dataSize)
-            }
-            fos.write(header.array())
+        require(path.isNotBlank()) { "Path must not be empty or blank" }
 
-            val pcm = ByteBuffer.allocate(dataSize).order(ByteOrder.LITTLE_ENDIAN)
-            samples.forEach { pcm.putShort(it) }
-            fos.write(pcm.array())
+        val targetFile = File(path).canonicalFile
+        val parentDir = targetFile.parentFile
+        if (parentDir != null && !parentDir.exists()) {
+            if (!parentDir.mkdirs()) {
+                throw IllegalArgumentException("Cannot create parent directory: $parentDir")
+            }
+        }
+
+        val tempFile = File(targetFile.parent, targetFile.name + ".tmp")
+        try {
+            FileOutputStream(tempFile).use { fos ->
+                val dataSize = samples.size * 2
+                val header = ByteBuffer.allocate(44).order(ByteOrder.LITTLE_ENDIAN).apply {
+                    // RIFF header
+                    put("RIFF".toByteArray())
+                    putInt(dataSize + 36)
+                    put("WAVE".toByteArray())
+                    // fmt chunk
+                    put("fmt ".toByteArray())
+                    putInt(16) // PCM
+                    putShort(1) // PCM format
+                    putShort(1) // mono
+                    putInt(sampleRate)
+                    putInt(sampleRate * 2) // bytes per sec
+                    putShort(2) // block align
+                    putShort(16) // bits per sample
+                    // data chunk
+                    put("data".toByteArray())
+                    putInt(dataSize)
+                }
+                fos.write(header.array())
+
+                val pcm = ByteBuffer.allocate(dataSize).order(ByteOrder.LITTLE_ENDIAN)
+                samples.forEach { pcm.putShort(it) }
+                fos.write(pcm.array())
+            }
+            if (!tempFile.renameTo(targetFile)) {
+                throw IllegalArgumentException("Failed to rename temp file to: $targetFile")
+            }
+        } catch (e: Exception) {
+            tempFile.delete()
+            throw e
         }
     }
 

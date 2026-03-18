@@ -37,6 +37,10 @@
 
 cmake_minimum_required(VERSION 3.22)
 
+if(NOT ANDROID)
+    message(FATAL_ERROR "This CMakeLists.txt is for Android builds only. Use the root CMakeLists.txt for desktop builds.")
+endif()
+
 project(piper_jni C CXX)
 
 # ---------------------------------------------------------------------------
@@ -63,6 +67,10 @@ get_filename_component(PIPER_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../../.." ABSOLUT
 add_library(piper_jni SHARED
     src/main/cpp/piper_jni.cpp
     src/main/cpp/piper_engine.cpp
+)
+
+set_target_properties(piper_jni PROPERTIES
+    LINKER_LANGUAGE CXX
 )
 
 # ---------------------------------------------------------------------------
@@ -125,6 +133,7 @@ target_compile_definitions(piper_jni PRIVATE
     SPDLOG_FMT_EXTERNAL=1
     FMT_HEADER_ONLY=1
     BUILD_ANDROID_JNI=1
+    OPENJTALK_DIC_PATH="piper/openjtalk"
 )
 
 # ---------------------------------------------------------------------------
@@ -146,7 +155,8 @@ if(DEFINED ONNXRUNTIME_DIR)
     )
     target_link_libraries(piper_jni PRIVATE onnxruntime)
 else()
-    message(STATUS "ONNXRUNTIME_DIR not set -- assuming Gradle AAR provides ONNX Runtime")
+    message(FATAL_ERROR "ONNXRUNTIME_DIR is required for Android JNI build. "
+            "Set -DONNXRUNTIME_DIR=/path/to/onnxruntime-android")
 endif()
 
 # ---------------------------------------------------------------------------
@@ -215,4 +225,11 @@ target_compile_options(piper_jni PRIVATE
 set_target_properties(piper_jni PROPERTIES
     # Let AGP / NDK handle stripping via CMAKE_BUILD_TYPE
     LINK_FLAGS_RELEASE "-s"
+)
+
+# ---------------------------------------------------------------------------
+# Install rule — place the JNI .so under lib/<ABI>/ for packaging
+# ---------------------------------------------------------------------------
+install(TARGETS piper_jni
+    LIBRARY DESTINATION lib/${ANDROID_ABI}
 )

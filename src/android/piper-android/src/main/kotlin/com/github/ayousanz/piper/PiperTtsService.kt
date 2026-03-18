@@ -28,6 +28,7 @@ class PiperTtsService : TextToSpeechService() {
 
     companion object {
         private const val TAG = "PiperTtsService"
+        private const val DEFAULT_SAMPLE_RATE = 22050
 
         // Supported languages (ISO 639-1)
         private val SUPPORTED_LANGUAGES = setOf("ja", "en", "zh", "es", "fr", "pt")
@@ -39,6 +40,7 @@ class PiperTtsService : TextToSpeechService() {
         )
     }
 
+    @Volatile
     private var engine: PiperTts? = null
     private var currentLanguage: String = "ja"
 
@@ -52,26 +54,30 @@ class PiperTtsService : TextToSpeechService() {
     private fun ensureEngine(): PiperTts {
         engine?.let { return it }
 
-        // Look for model in internal storage
-        val modelDir = filesDir.resolve("piper")
-        val modelFile = modelDir.listFiles()?.firstOrNull { it.name.endsWith(".onnx") }
-        val configFile = modelDir.listFiles()?.firstOrNull { it.name.endsWith(".json") }
+        synchronized(this) {
+            engine?.let { return it }
 
-        if (modelFile == null || configFile == null) {
-            throw IllegalStateException(
-                "No Piper model found in ${modelDir.absolutePath}. " +
-                "Copy a .onnx model and .json config to this directory."
+            // Look for model in internal storage
+            val modelDir = filesDir.resolve("piper")
+            val modelFile = modelDir.listFiles()?.firstOrNull { it.name.endsWith(".onnx") }
+            val configFile = modelDir.listFiles()?.firstOrNull { it.name.endsWith(".json") }
+
+            if (modelFile == null || configFile == null) {
+                throw IllegalStateException(
+                    "No Piper model found in ${modelDir.absolutePath}. " +
+                    "Copy a .onnx model and .json config to this directory."
+                )
+            }
+
+            val config = PiperConfig(
+                modelPath = modelFile.absolutePath,
+                configPath = configFile.absolutePath,
             )
-        }
 
-        val config = PiperConfig(
-            modelPath = modelFile.absolutePath,
-            configPath = configFile.absolutePath,
-        )
-
-        return PiperTts.load(config).also {
-            engine = it
-            Log.i(TAG, "Engine loaded: ${modelFile.name}")
+            return PiperTts.load(config).also {
+                engine = it
+                Log.i(TAG, "Engine loaded: ${modelFile.name}")
+            }
         }
     }
 
@@ -101,13 +107,21 @@ class PiperTtsService : TextToSpeechService() {
     override fun onSynthesizeText(request: SynthesisRequest, callback: SynthesisCallback) {
         val text = request.charSequenceText?.toString()
         if (text.isNullOrBlank()) {
+            callback.start(DEFAULT_SAMPLE_RATE, AudioFormat.ENCODING_PCM_16BIT, 1)
             callback.done()
             return
         }
 
         try {
             val tts = ensureEngine()
-            val lang = request.language?.lowercase()?.take(2) ?: currentLanguage
+
+            // Validate language; fall back to currentLanguage if unsupported
+            val requestedLang = request.language?.lowercase()?.take(2)
+            val lang = if (requestedLang != null && requestedLang in SUPPORTED_LANGUAGES) {
+                requestedLang
+            } else {
+                currentLanguage
+            }
 
             val audio = runBlocking {
                 tts.synthesize(text, language = lang)
@@ -126,18 +140,23 @@ class PiperTtsService : TextToSpeechService() {
 
             // Send in chunks respecting maxBufferSize
             val maxBytes = callback.maxBufferSize
-            var offset = 0
-            while (offset < bytes.size) {
-                val size = minOf(maxBytes, bytes.size - offset)
-                callback.audioAvailable(bytes, offset, size)
-                offset += size
+            var sourceOffset = 0
+            while (sourceOffset < bytes.size) {
+                val size = minOf(maxBytes, bytes.size - sourceOffset)
+                val chunk = bytes.copyOfRange(sourceOffset, sourceOffset + size)
+                callback.audioAvailable(chunk, 0, size)
+                sourceOffset += size
             }
 
             callback.done()
 
         } catch (e: Exception) {
             Log.e(TAG, "Synthesis failed", e)
-            callback.error()
+            try {
+                callback.error()
+            } catch (callbackError: Exception) {
+                Log.e(TAG, "Failed to report error to callback", callbackError)
+            }
         }
     }
 
@@ -146,8 +165,17 @@ class PiperTtsService : TextToSpeechService() {
         // Current synthesis is synchronous, so nothing to cancel
     }
 
+    override fun onCancel() {
+        Log.i(TAG, "onCancel called")
+        onStop()
+    }
+
     override fun onDestroy() {
-        engine?.close()
+        try {
+            engine?.close()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error closing engine", e)
+        }
         engine = null
         Log.i(TAG, "PiperTtsService destroyed")
         super.onDestroy()

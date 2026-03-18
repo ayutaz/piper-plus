@@ -6,7 +6,6 @@ import android.media.AudioTrack
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
-import java.io.Closeable
 
 /**
  * AudioTrack-based audio player for Piper TTS output.
@@ -24,11 +23,13 @@ import java.io.Closeable
  * }
  * ```
  */
-class AudioPlayer(
+class AudioPlayer @JvmOverloads constructor(
     private val sampleRate: Int = 22050,
-) : Closeable {
+) : AutoCloseable {
 
+    private val lock = Any()
     private var audioTrack: AudioTrack? = null
+    @Volatile
     private var isPlaying = false
 
     private fun ensureAudioTrack(): AudioTrack {
@@ -68,14 +69,18 @@ class AudioPlayer(
         if (audio.samples.isEmpty()) return@withContext
 
         val track = ensureAudioTrack()
-        try {
-            isPlaying = true
+        synchronized(lock) {
             track.play()
+            isPlaying = true
+        }
+        try {
             track.write(audio.samples, 0, audio.samples.size)
             // Wait for playback to finish
             track.stop()
         } finally {
-            isPlaying = false
+            synchronized(lock) {
+                isPlaying = false
+            }
         }
     }
 
@@ -85,17 +90,26 @@ class AudioPlayer(
      */
     suspend fun playStream(audioFlow: Flow<ShortArray>) = withContext(Dispatchers.IO) {
         val track = ensureAudioTrack()
-        try {
-            isPlaying = true
+        synchronized(lock) {
             track.play()
+            isPlaying = true
+        }
+        try {
             audioFlow.collect { chunk ->
                 if (chunk.isNotEmpty()) {
                     track.write(chunk, 0, chunk.size)
                 }
             }
             track.stop()
+        } catch (e: Exception) {
+            synchronized(lock) {
+                isPlaying = false
+            }
+            throw e
         } finally {
-            isPlaying = false
+            synchronized(lock) {
+                isPlaying = false
+            }
         }
     }
 
@@ -103,18 +117,23 @@ class AudioPlayer(
      * Stop current playback immediately.
      */
     fun stop() {
-        if (isPlaying) {
-            audioTrack?.apply {
-                pause()
-                flush()
+        synchronized(lock) {
+            if (isPlaying) {
+                audioTrack?.apply {
+                    pause()
+                    flush()
+                }
+                isPlaying = false
             }
-            isPlaying = false
         }
     }
 
     override fun close() {
-        stop()
-        audioTrack?.release()
-        audioTrack = null
+        try {
+            stop()
+        } finally {
+            audioTrack?.release()
+            audioTrack = null
+        }
     }
 }

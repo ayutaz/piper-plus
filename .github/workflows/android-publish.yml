@@ -21,6 +21,29 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      - name: Validate secrets
+        run: |
+          if [ -z "${{ secrets.MAVEN_CENTRAL_USERNAME }}" ]; then echo "MAVEN_CENTRAL_USERNAME not set"; exit 1; fi
+          if [ -z "${{ secrets.MAVEN_CENTRAL_PASSWORD }}" ]; then echo "MAVEN_CENTRAL_PASSWORD not set"; exit 1; fi
+
+      - name: Validate version
+        working-directory: src/android
+        run: |
+          VERSION=$(grep "VERSION_NAME=" gradle.properties | cut -d= -f2)
+          TAG_VERSION=${GITHUB_REF#refs/tags/android-v}
+          if [ "$VERSION" != "$TAG_VERSION" ]; then
+            echo "Version mismatch: gradle.properties=$VERSION, tag=$TAG_VERSION"
+            exit 1
+          fi
+
+      - name: Build AAR (release)
+        working-directory: src/android
+        run: ./gradlew :piper-android:assembleRelease
+
+      - name: Run tests
+        working-directory: src/android
+        run: ./gradlew :piper-android:testReleaseUnitTest
+
       - name: Publish to Maven Central
         working-directory: src/android
         run: ./gradlew publishAndReleaseToMavenCentral --no-configuration-cache

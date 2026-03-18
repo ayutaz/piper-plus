@@ -25,6 +25,9 @@ echo "NDK: $ANDROID_NDK"
 echo "Build dir: $BUILD_DIR"
 echo "Install dir: $INSTALL_DIR"
 
+# NOTE: ANDROID_STL=c++_shared requires libc++_shared.so to be packaged in the
+# APK (typically in jniLibs/<ABI>/). Use c++_static instead if you prefer a
+# self-contained binary with no shared C++ runtime dependency.
 cmake -S "$PROJECT_ROOT" -B "$BUILD_DIR" \
     -DCMAKE_TOOLCHAIN_FILE="$ANDROID_NDK/build/cmake/android.toolchain.cmake" \
     -DANDROID_ABI="$ABI" \
@@ -38,4 +41,9 @@ cmake --build "$BUILD_DIR" --parallel "$(nproc 2>/dev/null || sysctl -n hw.ncpu 
 cmake --install "$BUILD_DIR" --strip
 
 echo "=== Build complete: $INSTALL_DIR ==="
-ls -la "$INSTALL_DIR/lib/"*.so 2>/dev/null || echo "No .so files found in install dir"
+if ! ls "$INSTALL_DIR/lib/"*.so 1>/dev/null 2>&1; then
+    echo "Error: No .so files found in $INSTALL_DIR/lib/"
+    exit 1
+fi
+echo "Build successful:"
+ls -la "$INSTALL_DIR/lib/"*.so

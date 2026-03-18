@@ -18,7 +18,7 @@ Android向けの高品質ニューラルTTS (Text-to-Speech) ライブラリ。V
 
 ```groovy
 dependencies {
-    implementation("io.github.ayousanz:piper-android:1.0.0")
+    implementation("io.github.ayousanz:piper-android:0.1.0")
 }
 ```
 
@@ -79,6 +79,8 @@ PiperTts tts = PiperTts.load(config);
 // or use the TextToSpeechService integration instead.
 ```
 
+> **Java interop note:** `PiperTts.load()` can be called synchronously from Java, but `synthesize()` and `synthesizeStream()` are Kotlin suspend functions and cannot be called directly from Java. Use a thread pool or `ExecutorService` to run synthesis on a background thread, or use the `TextToSpeechService` integration which handles threading internally.
+
 ## Model Management
 
 ```kotlin
@@ -99,8 +101,14 @@ val tts = PiperTts.load(model.toConfig())
 ## System TTS Engine
 
 Piper TTS can be registered as an Android system TTS engine.
-Copy model files to `<app>/files/piper/`, then select "Piper TTS"
-in Android Settings > Text-to-Speech > Preferred engine.
+Select "Piper TTS" in Android Settings > Text-to-Speech > Preferred engine.
+
+### Model File Location
+
+The TTS Service expects model files (`.onnx` and `config.json`) in the `<app>/files/piper/` directory. There are two ways to place them there:
+
+- **Via `ModelManager`**: Call `manager.installFromAssets("model-name")` to copy bundled assets to the correct location automatically.
+- **Manually**: Copy `model.onnx` and `config.json` into `context.filesDir/piper/` (e.g., `/data/data/com.example.app/files/piper/`).
 
 ## API Reference
 
@@ -116,6 +124,31 @@ in Android Settings > Text-to-Speech > Preferred engine.
 | `sampleRate` | Model sample rate (typically 22050) |
 | `numSpeakers` | Number of speakers in model |
 | `numLanguages` | Number of languages in model |
+| `isOpen` | Whether the native session is still open |
+
+### PiperAudio
+
+| Property | Description |
+|----------|-------------|
+| `durationSeconds` | Duration of the synthesized audio in seconds |
+
+### AudioPlayer
+
+| Method | Description |
+|--------|-------------|
+| `play(audio)` | Play a `PiperAudio` instance to completion |
+| `playStream(flow)` | Play streaming chunks as they arrive |
+| `stop()` | Stop playback immediately |
+| `close()` | Release the underlying `AudioTrack` |
+
+### ModelManager
+
+| Method | Description |
+|--------|-------------|
+| `listModels()` | List all installed models |
+| `installFromAssets(name)` | Install a model from bundled assets |
+| `deleteModel(name)` | Delete an installed model |
+| `hasModel(name)` | Check whether a model is installed |
 
 ### PiperConfig
 
@@ -129,6 +162,8 @@ in Android Settings > Text-to-Speech > Preferred engine.
 | `noiseW` | 0.8 | Phoneme width variability |
 
 ### Supported Languages
+
+Language codes use ISO 639-1 format.
 
 | Code | Language |
 |------|----------|

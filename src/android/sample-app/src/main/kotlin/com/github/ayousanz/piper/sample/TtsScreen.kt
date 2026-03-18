@@ -52,7 +52,7 @@ fun TtsScreen(
             // Text input
             OutlinedTextField(
                 value = text,
-                onValueChange = { text = it },
+                onValueChange = { if (it.length <= 1000) text = it },
                 label = { Text("Text to synthesize") },
                 modifier = Modifier.fillMaxWidth(),
                 minLines = 3,
@@ -96,7 +96,7 @@ fun TtsScreen(
                 Text("Speaker ID:", style = MaterialTheme.typography.bodyMedium)
                 OutlinedTextField(
                     value = speakerId.toString(),
-                    onValueChange = { it.toIntOrNull()?.let(onSpeakerIdChanged) },
+                    onValueChange = { it.toIntOrNull()?.takeIf { id -> id >= 0 }?.let(onSpeakerIdChanged) },
                     modifier = Modifier.width(80.dp),
                     singleLine = true,
                 )

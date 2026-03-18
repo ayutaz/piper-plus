@@ -20,6 +20,7 @@ android {
 
     buildTypes {
         release {
+            // Library modules should not minify; the consuming app is responsible for minification
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),

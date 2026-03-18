@@ -63,7 +63,8 @@ class TtsViewModel(application: Application) : AndroidViewModel(application) {
      * Initialize from file paths (for models stored on device).
      */
     fun initializeFromPath(modelPath: String, configPath: String) {
-        if (_playbackState.value != PlaybackState.Uninitialized) return
+        tts?.close()
+        audioPlayer?.close()
 
         viewModelScope.launch {
             _playbackState.value = PlaybackState.Loading
@@ -103,6 +104,7 @@ class TtsViewModel(application: Application) : AndroidViewModel(application) {
                 _playbackState.value = PlaybackState.Idle
 
             } catch (e: CancellationException) {
+                _playbackState.value = PlaybackState.Idle
                 throw e
             } catch (e: Exception) {
                 _playbackState.value = PlaybackState.Error("Synthesis failed: ${e.message}")
@@ -133,6 +135,7 @@ class TtsViewModel(application: Application) : AndroidViewModel(application) {
                 _playbackState.value = PlaybackState.Idle
 
             } catch (e: CancellationException) {
+                _playbackState.value = PlaybackState.Idle
                 throw e
             } catch (e: Exception) {
                 _playbackState.value = PlaybackState.Error("Streaming failed: ${e.message}")
@@ -144,9 +147,12 @@ class TtsViewModel(application: Application) : AndroidViewModel(application) {
      * Stop current synthesis/playback.
      */
     fun stop() {
-        currentJob?.cancel()
-        currentJob = null
-        audioPlayer?.stop()
+        try {
+            currentJob?.cancel()
+            currentJob = null
+        } finally {
+            audioPlayer?.stop()
+        }
         if (_playbackState.value !is PlaybackState.Uninitialized &&
             _playbackState.value !is PlaybackState.Loading) {
             _playbackState.value = PlaybackState.Idle
@@ -177,6 +183,7 @@ class TtsViewModel(application: Application) : AndroidViewModel(application) {
     fun setSpeakerId(id: Int) { _speakerId.value = id }
     fun setNoiseScale(value: Float) { _noiseScale.value = value }
     fun setLengthScale(value: Float) { _lengthScale.value = value }
+    fun setError(message: String) { _playbackState.value = PlaybackState.Error(message) }
 
     override fun onCleared() {
         super.onCleared()

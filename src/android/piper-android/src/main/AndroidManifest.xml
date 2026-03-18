@@ -6,7 +6,8 @@
         <service
             android:name=".PiperTtsService"
             android:exported="true"
-            android:label="Piper TTS">
+            android:label="Piper TTS"
+            android:permission="android.permission.BIND_TEXT_TO_SPEECH">
             <intent-filter>
                 <action android:name="android.intent.action.TTS_SERVICE" />
                 <category android:name="android.intent.category.DEFAULT" />
