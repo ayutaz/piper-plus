@@ -154,40 +154,37 @@ impl WasmVoice {
         .map_err(|e| PiperError::Inference(format!("scales tensor: {e}")))?;
 
         // 4. sid: int64 [1] (conditional)
-        let sid_tensor;
         let sid_val = speaker_id.unwrap_or(0);
-        if self.capabilities.has_sid {
-            sid_tensor = Some(
+        let sid_tensor = if self.capabilities.has_sid {
+            Some(
                 Tensor::from_array(([1_usize], vec![sid_val].into_boxed_slice()))
                     .map_err(|e| PiperError::Inference(format!("sid tensor: {e}")))?,
-            );
+            )
         } else {
-            sid_tensor = None;
-        }
+            None
+        };
 
         // 5. lid: int64 [1] (conditional)
-        let lid_tensor;
         let lid_val = language_id.unwrap_or(0);
-        if self.capabilities.has_lid {
-            lid_tensor = Some(
+        let lid_tensor = if self.capabilities.has_lid {
+            Some(
                 Tensor::from_array(([1_usize], vec![lid_val].into_boxed_slice()))
                     .map_err(|e| PiperError::Inference(format!("lid tensor: {e}")))?,
-            );
+            )
         } else {
-            lid_tensor = None;
-        }
+            None
+        };
 
         // 6. prosody_features: int64 [1, phoneme_len, 3] (conditional, zero-filled)
-        let prosody_tensor;
-        if self.capabilities.has_prosody {
+        let prosody_tensor = if self.capabilities.has_prosody {
             let flat = vec![0i64; phoneme_len * 3];
-            prosody_tensor = Some(
+            Some(
                 Tensor::from_array(([1_usize, phoneme_len, 3], flat.into_boxed_slice()))
                     .map_err(|e| PiperError::Inference(format!("prosody tensor: {e}")))?,
-            );
+            )
         } else {
-            prosody_tensor = None;
-        }
+            None
+        };
 
         // Build input map
         let mut inputs: Vec<(Cow<str>, ort::session::SessionInputValue<'_>)> =

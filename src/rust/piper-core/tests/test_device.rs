@@ -5,6 +5,8 @@
 //! enumerate_devices, is_device_available, auto(), recommended_device(),
 //! and trait implementations (Clone, PartialEq, Hash).
 
+use std::str::FromStr;
+
 use piper_core::device::*;
 
 // =========================================================================

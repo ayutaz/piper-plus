@@ -48,6 +48,7 @@ pub fn prosody_to_features(prosody: &[Option<ProsodyInfo>]) -> Vec<ProsodyFeatur
 ///
 /// This is the final step before ONNX inference: it resolves token strings
 /// to integer IDs and packs everything into the request struct.
+#[allow(clippy::too_many_arguments)]
 pub fn build_synthesis_request(
     tokens: &[String],
     prosody: &[Option<ProsodyInfo>],

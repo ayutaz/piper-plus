@@ -343,7 +343,7 @@ pub fn play_audio(samples: &[i16], sample_rate: u32) -> Result<(), PiperError> {
         player.write_chunk(samples, sample_rate)?;
         player.finalize()?;
         player.wait_until_done();
-        return Ok(());
+        Ok(())
     }
 
     #[cfg(not(feature = "playback"))]

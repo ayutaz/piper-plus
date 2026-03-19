@@ -476,9 +476,9 @@ fn find_syllable_boundaries(units: &[GUnit]) -> Vec<usize> {
                     ns_bounds.push(i); // hiatus
                 } else {
                     // Accented weak vowel forces hiatus
-                    if is_weak_vowel(curr_b) && has_stress_accent(curr_g) {
-                        ns_bounds.push(i);
-                    } else if is_weak_vowel(prev_b) && has_stress_accent(prev_g) {
+                    if (is_weak_vowel(curr_b) && has_stress_accent(curr_g))
+                        || (is_weak_vowel(prev_b) && has_stress_accent(prev_g))
+                    {
                         ns_bounds.push(i);
                     }
                 }
@@ -928,13 +928,11 @@ fn insert_stress_marker(
     };
 
     // Find first vowel unit in stressed syllable
-    let mut stressed_unit_idx: Option<usize> = None;
-    for uid in syl_start..syl_end.min(num_units) {
-        if units[uid].is_vowel {
-            stressed_unit_idx = Some(uid);
-            break;
-        }
-    }
+    let stressed_unit_idx = units[syl_start..syl_end.min(num_units)]
+        .iter()
+        .enumerate()
+        .find(|(_, u)| u.is_vowel)
+        .map(|(offset, _)| syl_start + offset);
 
     let stressed_unit_idx = match stressed_unit_idx {
         Some(idx) => idx,
@@ -943,12 +941,12 @@ fn insert_stress_marker(
 
     // Walk units -> accumulate phoneme count to find insertion point
     let mut ph_i = 0usize;
-    for uid in 0..num_units {
+    for (uid, unit) in units.iter().enumerate() {
         if uid == stressed_unit_idx {
             phonemes.insert(ph_i, IPA_STRESS);
             return;
         }
-        ph_i += phoneme_count_for_unit(&units[uid]);
+        ph_i += phoneme_count_for_unit(unit);
     }
 }
 

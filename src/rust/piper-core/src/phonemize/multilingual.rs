@@ -231,7 +231,7 @@ pub fn default_post_process_ids(
         padded_prosody.push(*p);
         if !pad_ids.contains(id) {
             padded_ids.extend_from_slice(&pad_ids);
-            padded_prosody.extend(std::iter::repeat(None).take(pad_ids.len()));
+            padded_prosody.extend(std::iter::repeat_n(None, pad_ids.len()));
         }
     }
 
@@ -242,7 +242,7 @@ pub fn default_post_process_ids(
         with_bos_ids.push(pad_ids[0]);
         with_bos_ids.extend_from_slice(&padded_ids);
         let mut with_bos_prosody = Vec::with_capacity(bos.len() + 1 + padded_prosody.len());
-        with_bos_prosody.extend(std::iter::repeat(None).take(bos.len() + 1));
+        with_bos_prosody.extend(std::iter::repeat_n(None, bos.len() + 1));
         with_bos_prosody.extend_from_slice(&padded_prosody);
         padded_ids = with_bos_ids;
         padded_prosody = with_bos_prosody;
@@ -251,7 +251,7 @@ pub fn default_post_process_ids(
     // Append EOS
     if let Some(eos) = eos_ids {
         padded_ids.extend_from_slice(eos);
-        padded_prosody.extend(std::iter::repeat(None).take(eos.len()));
+        padded_prosody.extend(std::iter::repeat_n(None, eos.len()));
     }
 
     (padded_ids, padded_prosody)

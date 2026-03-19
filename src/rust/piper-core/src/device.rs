@@ -10,6 +10,7 @@
 //! convert a high-level selection into a [`crate::gpu::DeviceType`] suitable
 //! for passing to [`crate::gpu::configure_session_builder`].
 
+use std::str::FromStr;
 use std::sync::OnceLock;
 
 use crate::error::PiperError;
@@ -113,11 +114,50 @@ impl DeviceSelection {
         }
     }
 
-    /// Parse from string: `"cpu"`, `"cuda"`, `"cuda:0"`, `"cuda:1"`, `"coreml"`,
-    /// `"directml"`, `"directml:0"`, `"tensorrt"`, `"tensorrt:0"`, `"auto"`.
+    /// Auto-select the best available device.
     ///
-    /// Parsing is case-insensitive.
-    pub fn from_str(s: &str) -> Result<Self, PiperError> {
+    /// Priority by platform:
+    /// - macOS: CoreML > CPU
+    /// - Linux: CUDA > CPU
+    /// - Windows: DirectML > CPU
+    /// - Other: CPU
+    ///
+    /// Feature flags are checked at compile time; if the preferred accelerator
+    /// was not compiled in, falls back to CPU.
+    pub fn auto() -> Self {
+        #[cfg(target_os = "macos")]
+        {
+            if is_device_available(&DeviceKind::CoreML) {
+                return Self::coreml();
+            }
+        }
+
+        #[cfg(target_os = "linux")]
+        {
+            if is_device_available(&DeviceKind::Cuda) {
+                return Self::cuda(0);
+            }
+        }
+
+        #[cfg(target_os = "windows")]
+        {
+            if is_device_available(&DeviceKind::DirectML) {
+                return Self::directml(0);
+            }
+        }
+
+        Self::cpu()
+    }
+}
+
+/// Parse from string: `"cpu"`, `"cuda"`, `"cuda:0"`, `"cuda:1"`, `"coreml"`,
+/// `"directml"`, `"directml:0"`, `"tensorrt"`, `"tensorrt:0"`, `"auto"`.
+///
+/// Parsing is case-insensitive.
+impl FromStr for DeviceSelection {
+    type Err = PiperError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         let s = s.trim().to_ascii_lowercase();
 
         if s.is_empty() {
@@ -184,41 +224,6 @@ impl DeviceSelection {
                 reason: format!("unknown device kind: '{kind_str}'"),
             }),
         }
-    }
-
-    /// Auto-select the best available device.
-    ///
-    /// Priority by platform:
-    /// - macOS: CoreML > CPU
-    /// - Linux: CUDA > CPU
-    /// - Windows: DirectML > CPU
-    /// - Other: CPU
-    ///
-    /// Feature flags are checked at compile time; if the preferred accelerator
-    /// was not compiled in, falls back to CPU.
-    pub fn auto() -> Self {
-        #[cfg(target_os = "macos")]
-        {
-            if is_device_available(&DeviceKind::CoreML) {
-                return Self::coreml();
-            }
-        }
-
-        #[cfg(target_os = "linux")]
-        {
-            if is_device_available(&DeviceKind::Cuda) {
-                return Self::cuda(0);
-            }
-        }
-
-        #[cfg(target_os = "windows")]
-        {
-            if is_device_available(&DeviceKind::DirectML) {
-                return Self::directml(0);
-            }
-        }
-
-        Self::cpu()
     }
 }
 

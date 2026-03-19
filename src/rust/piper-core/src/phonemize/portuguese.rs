@@ -396,11 +396,10 @@ fn count_vowel_groups(word: &[char]) -> i32 {
             continue;
         }
         // gu before e/i: u silent
-        if ch == 'g' && i + 1 < n && word[i + 1] == 'u' {
-            if i + 2 < n && is_soft_vowel(word[i + 2]) {
-                i += 2;
-                continue;
-            }
+        if ch == 'g' && i + 1 < n && word[i + 1] == 'u' && i + 2 < n && is_soft_vowel(word[i + 2])
+        {
+            i += 2;
+            continue;
         }
         // ou diphthong: one vowel group
         if ch == 'o' && i + 1 < n && word[i + 1] == 'u' {
@@ -443,11 +442,10 @@ fn find_stress_position(word: &[char]) -> i32 {
             i += 2;
             continue;
         }
-        if ch == 'g' && i + 1 < n && word[i + 1] == 'u' {
-            if i + 2 < n && is_soft_vowel(word[i + 2]) {
-                i += 2;
-                continue;
-            }
+        if ch == 'g' && i + 1 < n && word[i + 1] == 'u' && i + 2 < n && is_soft_vowel(word[i + 2])
+        {
+            i += 2;
+            continue;
         }
         if ch == 'o' && i + 1 < n && word[i + 1] == 'u' {
             if is_stress_accent(ch) || is_circumflex(ch) || is_tilde(ch) {
@@ -493,7 +491,7 @@ fn find_stress_position(word: &[char]) -> i32 {
     if !paroxytone && sn >= 2 {
         let sl = stripped[sn - 2];
         let el = stripped[sn - 1];
-        if (sl == 'a' && el == 'm') || (sl == 'e' && el == 'm') || (sl == 'e' && el == 'n') {
+        if matches!((sl, el), ('a', 'm') | ('e', 'm') | ('e', 'n')) {
             paroxytone = true;
         }
     }
@@ -605,12 +603,15 @@ fn convert_word(word: &[char]) -> WordResult {
             continue;
         }
         // "sc" before e/i -> s
-        if ch == 's' && i + 1 < n && word[i + 1] == 'c' {
-            if i + 2 < n && is_soft_vowel(word[i + 2]) {
-                ph.push('s');
-                i += 2; // skip "sc", vowel handled next iteration
-                continue;
-            }
+        if ch == 's'
+            && i + 1 < n
+            && word[i + 1] == 'c'
+            && i + 2 < n
+            && is_soft_vowel(word[i + 2])
+        {
+            ph.push('s');
+            i += 2; // skip "sc", vowel handled next iteration
+            continue;
         }
         // "qu" digraph
         if ch == 'q' && i + 1 < n && word[i + 1] == 'u' {
@@ -626,12 +627,15 @@ fn convert_word(word: &[char]) -> WordResult {
             continue;
         }
         // "gu" before e/i -> voiced velar plosive (u silent)
-        if ch == 'g' && i + 1 < n && word[i + 1] == 'u' {
-            if i + 2 < n && is_soft_vowel(word[i + 2]) {
-                ph.push(IPA_VOICED_G);
-                i += 2;
-                continue;
-            }
+        if ch == 'g'
+            && i + 1 < n
+            && word[i + 1] == 'u'
+            && i + 2 < n
+            && is_soft_vowel(word[i + 2])
+        {
+            ph.push(IPA_VOICED_G);
+            i += 2;
+            continue;
         }
         // "ou" -> o (common BR reduction, single vowel group)
         if ch == 'o' && i + 1 < n && word[i + 1] == 'u' {
@@ -846,7 +850,7 @@ fn remove_duplicate_nasal_coda(ph: &mut Vec<char>, stress_idx: &mut i32) {
 // Post-processing step 2: coda-l vocalization (l -> w in coda)
 // ---------------------------------------------------------------------------
 
-fn apply_coda_l_vocalization(ph: &mut Vec<char>) {
+fn apply_coda_l_vocalization(ph: &mut [char]) {
     for i in 0..ph.len() {
         if ph[i] != 'l' {
             continue;
@@ -881,8 +885,8 @@ fn apply_coda_l_vocalization(ph: &mut Vec<char>) {
 fn find_word_ranges(ph: &[char]) -> Vec<(usize, usize)> {
     let mut ranges = Vec::new();
     let mut start = 0;
-    for i in 0..ph.len() {
-        if ph[i] == ' ' {
+    for (i, &ch) in ph.iter().enumerate() {
+        if ch == ' ' {
             if i > start {
                 ranges.push((start, i));
             }
@@ -895,7 +899,7 @@ fn find_word_ranges(ph: &[char]) -> Vec<(usize, usize)> {
     ranges
 }
 
-fn apply_br_postprocessing(ph: &mut Vec<char>, stress_idx: i32) {
+fn apply_br_postprocessing(ph: &mut [char], stress_idx: i32) {
     // --- Pass 1: t/d palatalization + unstressed final e/o reduction ---
     let ranges = find_word_ranges(ph);
 
