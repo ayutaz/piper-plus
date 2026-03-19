@@ -396,8 +396,7 @@ fn count_vowel_groups(word: &[char]) -> i32 {
             continue;
         }
         // gu before e/i: u silent
-        if ch == 'g' && i + 1 < n && word[i + 1] == 'u' && i + 2 < n && is_soft_vowel(word[i + 2])
-        {
+        if ch == 'g' && i + 1 < n && word[i + 1] == 'u' && i + 2 < n && is_soft_vowel(word[i + 2]) {
             i += 2;
             continue;
         }
@@ -442,8 +441,7 @@ fn find_stress_position(word: &[char]) -> i32 {
             i += 2;
             continue;
         }
-        if ch == 'g' && i + 1 < n && word[i + 1] == 'u' && i + 2 < n && is_soft_vowel(word[i + 2])
-        {
+        if ch == 'g' && i + 1 < n && word[i + 1] == 'u' && i + 2 < n && is_soft_vowel(word[i + 2]) {
             i += 2;
             continue;
         }
@@ -603,12 +601,7 @@ fn convert_word(word: &[char]) -> WordResult {
             continue;
         }
         // "sc" before e/i -> s
-        if ch == 's'
-            && i + 1 < n
-            && word[i + 1] == 'c'
-            && i + 2 < n
-            && is_soft_vowel(word[i + 2])
-        {
+        if ch == 's' && i + 1 < n && word[i + 1] == 'c' && i + 2 < n && is_soft_vowel(word[i + 2]) {
             ph.push('s');
             i += 2; // skip "sc", vowel handled next iteration
             continue;
@@ -627,12 +620,7 @@ fn convert_word(word: &[char]) -> WordResult {
             continue;
         }
         // "gu" before e/i -> voiced velar plosive (u silent)
-        if ch == 'g'
-            && i + 1 < n
-            && word[i + 1] == 'u'
-            && i + 2 < n
-            && is_soft_vowel(word[i + 2])
-        {
+        if ch == 'g' && i + 1 < n && word[i + 1] == 'u' && i + 2 < n && is_soft_vowel(word[i + 2]) {
             ph.push(IPA_VOICED_G);
             i += 2;
             continue;
@@ -921,13 +909,13 @@ fn apply_br_postprocessing(ph: &mut [char], stress_idx: i32) {
         // Unstressed final 'e'
         if ph[last_idx] == 'e' && last_idx as i32 != stress_idx {
             // Preceded by 't' -> t + e -> affricate + i
-            if last_idx >= start + 1 && ph[last_idx - 1] == 't' {
+            if last_idx > start && ph[last_idx - 1] == 't' {
                 ph[last_idx - 1] = PUA_AFFRICATE_TCH;
                 ph[last_idx] = 'i';
                 continue;
             }
             // Preceded by 'd' -> d + e -> affricate + i
-            if last_idx >= start + 1 && ph[last_idx - 1] == 'd' {
+            if last_idx > start && ph[last_idx - 1] == 'd' {
                 ph[last_idx - 1] = PUA_AFFRICATE_DZH;
                 ph[last_idx] = 'i';
                 continue;

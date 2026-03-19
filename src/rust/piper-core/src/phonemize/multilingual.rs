@@ -151,10 +151,7 @@ impl UnicodeLanguageDetector {
 /// Neutral characters (whitespace, digits, punctuation) are absorbed into
 /// the preceding language segment. If no language-specific characters are
 /// found (e.g., text is only digits), falls back to `default_latin_language`.
-pub fn segment_text<'a>(
-    text: &str,
-    detector: &'a UnicodeLanguageDetector,
-) -> Vec<(String, String)> {
+pub fn segment_text(text: &str, detector: &UnicodeLanguageDetector) -> Vec<(String, String)> {
     if text.trim().is_empty() {
         return Vec::new();
     }

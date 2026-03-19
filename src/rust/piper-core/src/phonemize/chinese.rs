@@ -596,14 +596,7 @@ fn phonemize_chinese_internal(
                     a2: 0,
                     a3: 0,
                 }));
-            } else if ch.is_ascii_digit() {
-                phonemes.push(ch.to_string());
-                prosody_list.push(Some(ProsodyInfo {
-                    a1: 0,
-                    a2: 0,
-                    a3: 1,
-                }));
-            } else if ch.is_alphabetic() {
+            } else if ch.is_ascii_digit() || ch.is_alphabetic() {
                 phonemes.push(ch.to_string());
                 prosody_list.push(Some(ProsodyInfo {
                     a1: 0,
@@ -773,9 +766,11 @@ fn load_phrase_dict(path: &Path) -> Result<HashMap<String, Vec<String>>, PiperEr
 // instances via `&'static` references.
 // =========================================================================
 
+/// Pair of (single_char_dict, phrase_dict).
+type ZhDictPair = (HashMap<char, String>, HashMap<String, Vec<String>>);
+
 /// Cached pair of (single_char_dict, phrase_dict).
-static ZH_DICT_CACHE: OnceLock<(HashMap<char, String>, HashMap<String, Vec<String>>)> =
-    OnceLock::new();
+static ZH_DICT_CACHE: OnceLock<ZhDictPair> = OnceLock::new();
 
 // =========================================================================
 // ChinesePhonemizer

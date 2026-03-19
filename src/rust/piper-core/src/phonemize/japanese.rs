@@ -138,7 +138,7 @@ pub fn get_question_type(text: &str) -> &'static str {
 ///
 /// Prosody markers (`_`, `#`, `[`, `]`, `^`, `$`, `?`, etc.) are skipped
 /// when looking ahead for the next phoneme.
-pub fn apply_n_phoneme_rules(tokens: &mut Vec<String>) {
+pub fn apply_n_phoneme_rules(tokens: &mut [String]) {
     // Collect (index, variant) pairs first to avoid borrow issues.
     let replacements: Vec<(usize, &str)> = tokens
         .iter()

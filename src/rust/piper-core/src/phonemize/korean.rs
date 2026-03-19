@@ -278,7 +278,7 @@ const FINAL_TABLE: [FinalEntry; N_FINALS] = [
 
 fn is_hangul_syllable(ch: char) -> bool {
     let code = ch as u32;
-    code >= HANGUL_START && code <= HANGUL_END
+    (HANGUL_START..=HANGUL_END).contains(&code)
 }
 
 /// Decompose a Hangul syllable into (initial, medial, final) indices.

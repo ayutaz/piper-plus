@@ -202,32 +202,29 @@ impl OnnxEngine {
         .map_err(|e| PiperError::Inference(format!("scales tensor: {e}")))?;
 
         // 4. sid: int64 [1] (条件付き)
-        let sid_tensor;
         let sid_val = request.speaker_id.unwrap_or(0);
-        if self.capabilities.has_sid {
-            sid_tensor = Some(
+        let sid_tensor = if self.capabilities.has_sid {
+            Some(
                 Tensor::from_array(([1_usize], vec![sid_val].into_boxed_slice()))
                     .map_err(|e| PiperError::Inference(format!("sid tensor: {e}")))?,
-            );
+            )
         } else {
-            sid_tensor = None;
-        }
+            None
+        };
 
         // 5. lid: int64 [1] (条件付き)
-        let lid_tensor;
         let lid_val = request.language_id.unwrap_or(0);
-        if self.capabilities.has_lid {
-            lid_tensor = Some(
+        let lid_tensor = if self.capabilities.has_lid {
+            Some(
                 Tensor::from_array(([1_usize], vec![lid_val].into_boxed_slice()))
                     .map_err(|e| PiperError::Inference(format!("lid tensor: {e}")))?,
-            );
+            )
         } else {
-            lid_tensor = None;
-        }
+            None
+        };
 
         // 6. prosody_features: int64 [1, phoneme_len, 3] (条件付き)
-        let prosody_tensor;
-        if self.capabilities.has_prosody {
+        let prosody_tensor = if self.capabilities.has_prosody {
             let flat: Vec<i64> = if let Some(ref features) = request.prosody_features {
                 features
                     .iter()
@@ -238,13 +235,13 @@ impl OnnxEngine {
                 vec![0i64; phoneme_len * 3]
             };
             let pf_len = flat.len() / 3;
-            prosody_tensor = Some(
+            Some(
                 Tensor::from_array(([1_usize, pf_len, 3], flat.into_boxed_slice()))
                     .map_err(|e| PiperError::Inference(format!("prosody tensor: {e}")))?,
-            );
+            )
         } else {
-            prosody_tensor = None;
-        }
+            None
+        };
 
         // ValueMap を構築
         let mut inputs: Vec<(Cow<str>, ort::session::SessionInputValue<'_>)> =
@@ -281,7 +278,7 @@ impl OnnxEngine {
             .map_err(|e| PiperError::Inference(format!("extract output: {e}")))?;
 
         // float32 -> int16 ピーク正規化
-        let audio_i16 = audio_float_to_int16(&audio_slice);
+        let audio_i16 = audio_float_to_int16(audio_slice);
         let audio_seconds = audio_i16.len() as f64 / self.sample_rate as f64;
 
         // --- duration テンソル抽出 (オプション) ---

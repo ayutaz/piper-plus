@@ -616,12 +616,15 @@ fn convert_word(word: &[char]) -> Vec<char> {
         }
 
         // "gu" + front vowel -> voiced velar (silent u)
-        if ch == 'g' && i + 1 < n && word[i + 1] == 'u' {
-            if i + 2 < n && is_front_vowel_for_cg(word[i + 2]) {
-                phonemes.push(IPA_VOICED_G);
-                i += 2;
-                continue;
-            }
+        if ch == 'g'
+            && i + 1 < n
+            && word[i + 1] == 'u'
+            && i + 2 < n
+            && is_front_vowel_for_cg(word[i + 2])
+        {
+            phonemes.push(IPA_VOICED_G);
+            i += 2;
+            continue;
         }
 
         // ---------------------------------------------------------------
@@ -739,9 +742,7 @@ fn convert_word(word: &[char]) -> Vec<char> {
         }
 
         // "eu", "oeu" -> slashed-o (closed) or oe-ligature (open before pronounced consonant)
-        if (ch == 'e' && i + 1 < n && word[i + 1] == 'u')
-            || (ch == '\u{0153}' && i + 1 < n && word[i + 1] == 'u')
-        {
+        if (ch == 'e' || ch == '\u{0153}') && i + 1 < n && word[i + 1] == 'u' {
             if i + 2 < n && is_consonant_char(word[i + 2]) && !is_silent_final(word[i + 2]) {
                 phonemes.push(IPA_OE_LIG);
             } else {
@@ -829,13 +830,13 @@ fn convert_word(word: &[char]) -> Vec<char> {
             let mut all_consonants = true;
             let mut has_pronounced = false;
 
-            for k in eff_start..eff_end {
+            for &c in &word[eff_start..eff_end] {
                 has_effective = true;
-                if !is_consonant_char(word[k]) {
+                if !is_consonant_char(c) {
                     all_consonants = false;
                     break;
                 }
-                if !is_silent_final(word[k]) {
+                if !is_silent_final(c) {
                     has_pronounced = true;
                 }
             }
@@ -905,8 +906,8 @@ fn convert_word(word: &[char]) -> Vec<char> {
             }
 
             let mut cons_count = 0;
-            for k in (i + 1)..n {
-                if is_consonant_char(word[k]) {
+            for &c in &word[(i + 1)..n] {
+                if is_consonant_char(c) {
                     cons_count += 1;
                 } else {
                     break;
