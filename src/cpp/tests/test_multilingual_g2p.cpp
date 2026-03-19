@@ -1,11 +1,11 @@
 /**
  * Unit tests for multilingual G2P: LanguageDetector + per-language phonemizers.
  *
- * Covers: LanguageDetector segmentation (4 tests), English G2P (3),
+ * Covers: LanguageDetector segmentation (7 tests), English G2P (3),
  * Chinese G2P (2), Spanish G2P (2), French G2P (2), Portuguese G2P (2),
  * Korean G2P (2), PUA codepoint handling (1), ModelConfig defaults (1),
  * RTF calculation (1), UTF-8 validation (1), findDictionaryFile logic (3),
- * defaultLatinLang detection (4).  Total: 28 tests.
+ * defaultLatinLang detection (4).  Total: 31 tests.
  */
 
 #include <gtest/gtest.h>
@@ -97,7 +97,7 @@ static std::unordered_map<std::string, std::string> makeTestPhraseDict() {
 }
 
 // =========================================================================
-// 1. LanguageDetector tests (4)
+// 1. LanguageDetector tests (7)
 // =========================================================================
 
 class LanguageDetectorTest : public ::testing::Test {
@@ -139,6 +139,38 @@ TEST_F(LanguageDetectorTest, CJKText) {
     // "你好" — CJK ideographs without kana context -> "zh"
     auto segments = detector.segmentText("\xe4\xbd\xa0\xe5\xa5\xbd");
     ASSERT_FALSE(segments.empty());
+    EXPECT_EQ(segments[0].lang, "zh");
+}
+
+TEST_F(LanguageDetectorTest, ChineseTextWithPunctuation) {
+    // "你好，今天天气很好。" — CJK punctuation should stay with Chinese segment
+    auto segments = detector.segmentText(
+        "\xe4\xbd\xa0\xe5\xa5\xbd\xef\xbc\x8c"           // 你好，
+        "\xe4\xbb\x8a\xe5\xa4\xa9\xe5\xa4\xa9\xe6\xb0\x94"  // 今天天气
+        "\xe5\xbe\x88\xe5\xa5\xbd\xe3\x80\x82");          // 很好。
+    ASSERT_FALSE(segments.empty());
+    // Should be a single "zh" segment, not split by punctuation
+    EXPECT_EQ(segments.size(), 1u);
+    EXPECT_EQ(segments[0].lang, "zh");
+}
+
+TEST_F(LanguageDetectorTest, JapaneseTextWithPunctuation) {
+    // "こんにちは。" — kana + CJK period should be a single "ja" segment
+    auto segments = detector.segmentText(
+        "\xe3\x81\x93\xe3\x82\x93\xe3\x81\xab\xe3\x81\xa1\xe3\x81\xaf"  // こんにちは
+        "\xe3\x80\x82");                                                     // 。
+    ASSERT_FALSE(segments.empty());
+    EXPECT_EQ(segments.size(), 1u);
+    EXPECT_EQ(segments[0].lang, "ja");
+}
+
+TEST_F(LanguageDetectorTest, ChineseMultipleSentences) {
+    // "你好！谢谢。" — multiple sentences with CJK punctuation
+    auto segments = detector.segmentText(
+        "\xe4\xbd\xa0\xe5\xa5\xbd\xef\xbc\x81"  // 你好！
+        "\xe8\xb0\xa2\xe8\xb0\xa2\xe3\x80\x82"); // 谢谢。
+    ASSERT_FALSE(segments.empty());
+    EXPECT_EQ(segments.size(), 1u);
     EXPECT_EQ(segments[0].lang, "zh");
 }
 

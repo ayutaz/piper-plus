@@ -39,9 +39,9 @@ bool UnicodeLanguageDetector::isFullwidthLatin(char32_t cp) {
            (cp >= 0xFF41 && cp <= 0xFF5A);
 }
 
-// Japanese-specific punctuation: CJK punctuation (U+3000-303F) + fullwidth
+// CJK shared punctuation: CJK punctuation (U+3000-303F) + fullwidth
 // forms, EXCLUDING fullwidth Latin letters (handled by isFullwidthLatin).
-bool UnicodeLanguageDetector::isJaPunct(char32_t cp) {
+bool UnicodeLanguageDetector::isCJKPunct(char32_t cp) {
     return (cp >= 0x3000 && cp <= 0x303F) ||
            (cp >= 0xFF00 && cp <= 0xFF20) ||  // Fullwidth digits & symbols
            (cp >= 0xFF3B && cp <= 0xFF40) ||  // Fullwidth brackets & symbols
@@ -107,9 +107,10 @@ std::string UnicodeLanguageDetector::detectChar(char32_t ch,
         return "";
     }
 
-    // 5. Japanese-specific punctuation
-    if (isJaPunct(ch)) {
-        return hasJa_ ? "ja" : "";
+    // 5. CJK punctuation — treat as neutral so it joins the surrounding segment
+    //    (same behavior as ASCII punctuation in step 7)
+    if (isCJKPunct(ch)) {
+        return "";
     }
 
     // 6. Latin characters

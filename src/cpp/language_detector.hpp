@@ -34,7 +34,7 @@ private:
     static bool isHangul(char32_t cp);
     static bool isCJK(char32_t cp);
     static bool isFullwidthLatin(char32_t cp);
-    static bool isJaPunct(char32_t cp);
+    static bool isCJKPunct(char32_t cp);
     static bool isLatin(char32_t cp);
 
     std::set<std::string> languages_;
