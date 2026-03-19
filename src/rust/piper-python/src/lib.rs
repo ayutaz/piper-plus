@@ -99,6 +99,7 @@ struct SynthesisResult {
 }
 
 #[pymethods]
+#[allow(clippy::useless_conversion, clippy::needless_question_mark)]
 impl SynthesisResult {
     /// Return audio as a numpy int16 array (cloning the internal buffer).
     ///
@@ -136,10 +137,8 @@ impl SynthesisResult {
     /// Args:
     ///     path: Output file path (e.g. "output.wav").
     fn save_wav(&self, path: &str) -> PyResult<()> {
-        Ok(
-            piper_core::audio::write_wav(Path::new(path), self.sample_rate, &self.samples)
-                .map_err(piper_err_to_pyerr)?,
-        )
+        piper_core::audio::write_wav(Path::new(path), self.sample_rate, &self.samples)
+            .map_err(piper_err_to_pyerr)
     }
 
     fn __repr__(&self) -> String {
@@ -186,6 +185,7 @@ struct PiperVoice {
 }
 
 #[pymethods]
+#[allow(clippy::useless_conversion, clippy::needless_question_mark)]
 impl PiperVoice {
     /// Load a voice model from files.
     ///
