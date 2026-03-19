@@ -311,7 +311,37 @@ jobs:
             # Copy ONNX Runtime from system install location (installed by build step)
             cp /usr/local/lib/libonnxruntime*.dylib dist/piper/lib/ 2>/dev/null || true
           fi
-          
+
+          # Fix macOS rpath for relocatable distribution
+          if [ "${{ runner.os }}" = "macOS" ]; then
+            echo "Fixing macOS rpath for relocatable distribution..."
+
+            # Fix piper binary rpath
+            if [ -f "dist/piper/bin/piper" ]; then
+              # Remove all existing rpath entries
+              for rpath in $(otool -l dist/piper/bin/piper | grep -A2 'LC_RPATH' | grep 'path ' | awk '{print $2}'); do
+                install_name_tool -delete_rpath "$rpath" dist/piper/bin/piper 2>/dev/null || true
+              done
+              # Add relative rpath
+              install_name_tool -add_rpath @executable_path/../lib dist/piper/bin/piper
+              echo "Fixed piper binary rpath"
+            fi
+
+            # Fix dylib install names to use @rpath
+            for dylib in dist/piper/lib/*.dylib; do
+              if [ -f "$dylib" ]; then
+                basename=$(basename "$dylib")
+                install_name_tool -id "@rpath/$basename" "$dylib" 2>/dev/null || true
+              fi
+            done
+
+            # Verify
+            echo "Verification - piper rpath entries:"
+            otool -l dist/piper/bin/piper | grep -A2 'LC_RPATH' || echo "No LC_RPATH found"
+            echo "Verification - piper linked libraries:"
+            otool -L dist/piper/bin/piper
+          fi
+
           # Copy OpenJTalk binary and data
           for oj_path in "build/oj/bin/open_jtalk" "build/open_jtalk" "build/bin/open_jtalk"; do
             if [ -f "$oj_path" ]; then

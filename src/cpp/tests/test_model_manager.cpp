@@ -140,18 +140,22 @@ TEST(ModelManagerTest, CatalogContainsTsukuyomi) {
     EXPECT_TRUE(found) << "ja_JP-tsukuyomi-chan-medium not found in catalog";
 }
 
-TEST(ModelManagerTest, CatalogContainsMoeSpeech) {
+TEST(ModelManagerTest, CatalogContainsCss10) {
     auto catalog = piper::loadVoiceCatalog();
     bool found = false;
     for (const auto& voice : catalog) {
-        if (voice.key == "ja_JP-moe-speech-20speakers-medium") {
+        if (voice.key == "ja_JP-css10-6lang-medium") {
             found = true;
-            EXPECT_EQ(voice.numSpeakers, 20);
+            EXPECT_EQ(voice.name, "css10-6lang");
+            EXPECT_EQ(voice.languageCode, "ja_JP");
+            EXPECT_EQ(voice.languageFamily, "ja");
             EXPECT_EQ(voice.source, "piper-plus");
+            EXPECT_EQ(voice.numSpeakers, 1);
+            EXPECT_EQ(voice.quality, "medium");
             break;
         }
     }
-    EXPECT_TRUE(found) << "ja_JP-moe-speech-20speakers-medium not found in catalog";
+    EXPECT_TRUE(found) << "ja_JP-css10-6lang-medium not found in catalog";
 }
 
 TEST(ModelManagerTest, CatalogVoicesHaveFiles) {
@@ -262,18 +266,18 @@ TEST(ModelManagerTest, FindByAlias) {
     EXPECT_EQ(result->key, "ja_JP-tsukuyomi-chan-medium");
 }
 
+TEST(ModelManagerTest, FindByAliasCss10) {
+    auto result = piper::findVoice("css10");
+    ASSERT_TRUE(result.has_value())
+        << "findVoice failed for alias 'css10'";
+    EXPECT_EQ(result->key, "ja_JP-css10-6lang-medium");
+}
+
 TEST(ModelManagerTest, FindByAliasFullName) {
     auto result = piper::findVoice("tsukuyomi-chan");
     ASSERT_TRUE(result.has_value())
         << "findVoice failed for alias 'tsukuyomi-chan'";
     EXPECT_EQ(result->key, "ja_JP-tsukuyomi-chan-medium");
-}
-
-TEST(ModelManagerTest, FindByAliasMoeSpeech) {
-    auto result = piper::findVoice("moe-speech");
-    ASSERT_TRUE(result.has_value())
-        << "findVoice failed for alias 'moe-speech'";
-    EXPECT_EQ(result->key, "ja_JP-moe-speech-20speakers-medium");
 }
 
 TEST(ModelManagerTest, FindNonExistent) {
@@ -329,7 +333,7 @@ TEST(ModelManagerTest, PiperPlusSource) {
     auto catalog = piper::loadVoiceCatalog();
     for (const auto& voice : catalog) {
         if (voice.key.find("tsukuyomi") != std::string::npos ||
-            voice.key.find("moe-speech") != std::string::npos) {
+            voice.key.find("css10") != std::string::npos) {
             EXPECT_EQ(voice.source, "piper-plus")
                 << "Voice " << voice.key << " should have source 'piper-plus'";
         }
