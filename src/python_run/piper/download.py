@@ -53,6 +53,35 @@ PIPER_PLUS_VOICES: dict[str, Any] = {
         "aliases": ["tsukuyomi", "tsukuyomi-chan", "ja-tsukuyomi"],
         "description": "Tsukuyomi-chan 6-language TTS model fine-tuned from multilingual base (FP16)",
     },
+    "ja_JP-css10-6lang-medium": {
+        "key": "ja_JP-css10-6lang-medium",
+        "name": "css10-6lang",
+        "language": {
+            "code": "ja_JP",
+            "family": "ja",
+            "region": "JP",
+            "name_native": "\u65e5\u672c\u8a9e",
+            "name_english": "Japanese",
+            "country_english": "Japan",
+        },
+        "quality": "medium",
+        "num_speakers": 1,
+        "speaker_id_map": {},
+        "source": "piper-plus",
+        "repo": "ayousanz/piper-plus-css10-ja-6lang",
+        "files": {
+            "css10-ja-6lang-fp16.onnx": {
+                "size_bytes": 39414515,
+                "md5_digest": "",
+            },
+            "config.json": {
+                "size_bytes": 8966,
+                "md5_digest": "",
+            },
+        },
+        "aliases": ["css10", "css10-6lang", "css10-ja", "ja-css10"],
+        "description": "CSS10 Japanese 6-language TTS model fine-tuned from multilingual base (FP16, 6841 utterances)",
+    },
 }
 
 _DIR = Path(__file__).parent
