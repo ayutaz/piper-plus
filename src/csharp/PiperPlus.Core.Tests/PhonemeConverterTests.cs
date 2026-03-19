@@ -18,8 +18,9 @@ public sealed class PhonemeConverterTests
     [Fact]
     public void All29Entries_MatchPythonMapping()
     {
-        // The 29 fixed PUA entries must exactly match Python's FIXED_PUA_MAPPING
-        // in token_mapper.py and C++ openjtalk_phonemize.cpp.
+        // The fixed PUA entries must exactly match Python's FIXED_PUA_MAPPING
+        // in token_mapper.py and C++ language-specific phonemize files.
+        // Originally 29 JA entries; expanded to 87 for 6-language multilingual.
         var expected = new Dictionary<string, char>(29)
         {
             // Long vowels
@@ -62,7 +63,8 @@ public sealed class PhonemeConverterTests
 
         var actual = OpenJTalkToPiperMapping.TokenToChar;
 
-        Assert.Equal(29, actual.Count);
+        // 87 total entries: 29 JA + 2 shared + 43 ZH + 8 KO + 2 ES/PT + 3 FR
+        Assert.Equal(87, actual.Count);
 
         foreach (var (token, expectedChar) in expected)
         {

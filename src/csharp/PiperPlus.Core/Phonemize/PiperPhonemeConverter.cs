@@ -145,6 +145,84 @@ public static class PiperPhonemeConverter
     }
 
     // -----------------------------------------------------------------
+    // EspeakPostProcessIds
+    // -----------------------------------------------------------------
+
+    /// <summary>
+    /// Shared espeak-ng compatible PostProcessIds used by English, Chinese,
+    /// Spanish, French, and Portuguese phonemizers.
+    /// Inserts inter-phoneme padding and wraps with BOS/EOS.
+    /// <para>
+    /// Transformation:
+    /// <code>
+    /// Input:  [10, 59, 24]
+    /// PAD:    [10, 0, 59, 0, 24, 0]
+    /// BOS/EOS: [BOS, 0, 10, 0, 59, 0, 24, 0, EOS]
+    /// </code>
+    /// </para>
+    /// </summary>
+    /// <param name="phonemeIds">Raw phoneme IDs before padding.</param>
+    /// <param name="prosodyFeatures">Prosody info aligned 1:1 with <paramref name="phonemeIds"/>.</param>
+    /// <param name="phonemeIdMap">ID map from config.json (must contain <c>"_"</c> for PAD).</param>
+    /// <returns>Padded IDs and prosody with BOS/EOS wrapper.</returns>
+    public static (List<int> Ids, List<ProsodyInfo?> Prosody) EspeakPostProcessIds(
+        List<int> phonemeIds,
+        List<ProsodyInfo?> prosodyFeatures,
+        Dictionary<string, int[]> phonemeIdMap)
+    {
+        // Resolve special token IDs from the phoneme-ID map.
+        int[] padIds = phonemeIdMap.TryGetValue("_", out int[]? padArr) ? padArr : [0];
+        phonemeIdMap.TryGetValue("^", out int[]? bosIds);
+        phonemeIdMap.TryGetValue("$", out int[]? eosIds);
+
+        // Step 1: Insert PAD after every phoneme ID.
+        var paddedIds = new List<int>(phonemeIds.Count * 2);
+        var paddedProsody = new List<ProsodyInfo?>(phonemeIds.Count * 2);
+
+        for (int i = 0; i < phonemeIds.Count; i++)
+        {
+            paddedIds.Add(phonemeIds[i]);
+            paddedProsody.Add(prosodyFeatures[i]);
+
+            paddedIds.AddRange(padIds);
+            for (int j = 0; j < padIds.Length; j++)
+            {
+                paddedProsody.Add(null);
+            }
+        }
+
+        // Step 2: Wrap with BOS + PAD ... EOS.
+        if (bosIds is not null)
+        {
+            var withBos = new List<int>(bosIds.Length + 1 + paddedIds.Count);
+            withBos.AddRange(bosIds);
+            withBos.Add(padIds[0]);
+            withBos.AddRange(paddedIds);
+
+            var withBosProsody = new List<ProsodyInfo?>(bosIds.Length + 1 + paddedProsody.Count);
+            for (int i = 0; i < bosIds.Length + 1; i++)
+            {
+                withBosProsody.Add(null);
+            }
+            withBosProsody.AddRange(paddedProsody);
+
+            paddedIds = withBos;
+            paddedProsody = withBosProsody;
+        }
+
+        if (eosIds is not null)
+        {
+            paddedIds.AddRange(eosIds);
+            for (int i = 0; i < eosIds.Length; i++)
+            {
+                paddedProsody.Add(null);
+            }
+        }
+
+        return (paddedIds, paddedProsody);
+    }
+
+    // -----------------------------------------------------------------
     // Private helpers
     // -----------------------------------------------------------------
 
