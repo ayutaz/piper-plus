@@ -27,6 +27,8 @@ jobs:
     - uses: actions/setup-python@v5
       with:
         python-version: '3.12'
+    - name: Install ALSA dev (for rodio/playback feature)
+      run: sudo apt-get update && sudo apt-get install -y libasound2-dev
     - uses: dtolnay/rust-toolchain@stable
     - uses: Swatinem/rust-cache@v2
       with:
@@ -83,6 +85,8 @@ jobs:
     - uses: actions/setup-python@v5
       with:
         python-version: '3.12'
+    - name: Install ALSA dev (for rodio/playback feature)
+      run: sudo apt-get update && sudo apt-get install -y libasound2-dev
     - uses: dtolnay/rust-toolchain@stable
       with:
         components: clippy
