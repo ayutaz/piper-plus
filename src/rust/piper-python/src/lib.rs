@@ -98,8 +98,8 @@ struct SynthesisResult {
     samples: Vec<i16>,
 }
 
-#[pymethods]
 #[allow(clippy::useless_conversion, clippy::needless_question_mark)]
+#[pymethods]
 impl SynthesisResult {
     /// Return audio as a numpy int16 array (cloning the internal buffer).
     ///
@@ -184,8 +184,8 @@ struct PiperVoice {
     inner: piper_core::PiperVoice,
 }
 
-#[pymethods]
 #[allow(clippy::useless_conversion, clippy::needless_question_mark)]
+#[pymethods]
 impl PiperVoice {
     /// Load a voice model from files.
     ///
