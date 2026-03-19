@@ -136,8 +136,10 @@ impl SynthesisResult {
     /// Args:
     ///     path: Output file path (e.g. "output.wav").
     fn save_wav(&self, path: &str) -> PyResult<()> {
-        piper_core::audio::write_wav(Path::new(path), self.sample_rate, &self.samples)
-            .map_err(piper_err_to_pyerr)
+        Ok(
+            piper_core::audio::write_wav(Path::new(path), self.sample_rate, &self.samples)
+                .map_err(piper_err_to_pyerr)?,
+        )
     }
 
     fn __repr__(&self) -> String {
@@ -269,7 +271,7 @@ impl PiperVoice {
             )
         });
 
-        result.map_err(piper_err_to_pyerr).map(SynthesisResult::from)
+        Ok(result.map_err(piper_err_to_pyerr)?.into())
     }
 
     /// Synthesize multiple texts in a single call.
@@ -327,9 +329,11 @@ impl PiperVoice {
             Ok::<_, piper_core::PiperError>(out)
         });
 
-        results
-            .map_err(piper_err_to_pyerr)
-            .map(|v| v.into_iter().map(SynthesisResult::from).collect())
+        Ok(results
+            .map_err(piper_err_to_pyerr)?
+            .into_iter()
+            .map(SynthesisResult::from)
+            .collect())
     }
 
     /// Synthesize text and save directly to a WAV file.
@@ -369,7 +373,7 @@ impl PiperVoice {
             inner.text_to_wav_file(&text_owned, Path::new(&output_owned), speaker_id)
         });
 
-        result.map_err(piper_err_to_pyerr).map(SynthesisResult::from)
+        Ok(result.map_err(piper_err_to_pyerr)?.into())
     }
 
     /// The sample rate of the loaded model (e.g. 22050).
