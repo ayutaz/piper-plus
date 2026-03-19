@@ -37,12 +37,6 @@ class TestPiperPlusVoiceCatalog:
         assert voice["source"] == "piper-plus"
         assert voice["num_speakers"] == 1
 
-    def test_moe_speech_in_catalog(self):
-        assert "ja_JP-moe-speech-20speakers-medium" in PIPER_PLUS_VOICES
-        voice = PIPER_PLUS_VOICES["ja_JP-moe-speech-20speakers-medium"]
-        assert voice["num_speakers"] == 20
-        assert voice["source"] == "piper-plus"
-
     def test_piper_plus_voices_have_files(self):
         for key, voice in PIPER_PLUS_VOICES.items():
             assert "files" in voice, f"{key} missing files"
@@ -67,7 +61,6 @@ class TestGetVoices:
         with tempfile.TemporaryDirectory() as tmpdir:
             voices = get_voices(tmpdir)
             assert "ja_JP-tsukuyomi-chan-medium" in voices
-            assert "ja_JP-moe-speech-20speakers-medium" in voices
 
     def test_includes_upstream(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -117,16 +110,6 @@ class TestAliasResolution:
             assert "tsukuyomi" in aliases
             assert aliases["tsukuyomi"]["key"] == "ja_JP-tsukuyomi-chan-medium"
 
-    def test_alias_moe_speech(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            voices = get_voices(tmpdir)
-            aliases = {}
-            for _key, info in voices.items():
-                for alias in info.get("aliases", []):
-                    aliases[alias] = info
-
-            assert "moe-speech" in aliases
-
 
 class TestDownloadModel:
     """Test download_model() function."""
@@ -161,18 +144,6 @@ class TestDownloadModel:
             assert "ja-tsukuyomi" in aliases
             assert aliases["ja-tsukuyomi"]["key"] == "ja_JP-tsukuyomi-chan-medium"
 
-    def test_download_resolves_ja_base(self):
-        """ja-base alias resolves to moe-speech model."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            voices = get_voices(tmpdir)
-            aliases = {}
-            for _key, info in voices.items():
-                for alias in info.get("aliases", []):
-                    aliases[alias] = info
-            assert "ja-base" in aliases
-            assert aliases["ja-base"]["key"] == "ja_JP-moe-speech-20speakers-medium"
-
-
 class TestFindVoiceFallback:
     """Test find_voice() piper-plus filename fallback."""
 
@@ -181,13 +152,6 @@ class TestFindVoiceFallback:
         voice = PIPER_PLUS_VOICES["ja_JP-tsukuyomi-chan-medium"]
         files = list(voice["files"].keys())
         assert "tsukuyomi-chan-6lang-fp16.onnx" in files
-        assert "config.json" in files
-
-    def test_moe_speech_file_names_in_catalog(self):
-        """moe-speech model has correct file names."""
-        voice = PIPER_PLUS_VOICES["ja_JP-moe-speech-20speakers-medium"]
-        files = list(voice["files"].keys())
-        assert "moe-speech-20speakers-v2.onnx" in files
         assert "config.json" in files
 
 

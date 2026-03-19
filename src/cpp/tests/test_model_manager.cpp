@@ -140,20 +140,6 @@ TEST(ModelManagerTest, CatalogContainsTsukuyomi) {
     EXPECT_TRUE(found) << "ja_JP-tsukuyomi-chan-medium not found in catalog";
 }
 
-TEST(ModelManagerTest, CatalogContainsMoeSpeech) {
-    auto catalog = piper::loadVoiceCatalog();
-    bool found = false;
-    for (const auto& voice : catalog) {
-        if (voice.key == "ja_JP-moe-speech-20speakers-medium") {
-            found = true;
-            EXPECT_EQ(voice.numSpeakers, 20);
-            EXPECT_EQ(voice.source, "piper-plus");
-            break;
-        }
-    }
-    EXPECT_TRUE(found) << "ja_JP-moe-speech-20speakers-medium not found in catalog";
-}
-
 TEST(ModelManagerTest, CatalogVoicesHaveFiles) {
     auto catalog = piper::loadVoiceCatalog();
     for (const auto& voice : catalog) {
@@ -269,13 +255,6 @@ TEST(ModelManagerTest, FindByAliasFullName) {
     EXPECT_EQ(result->key, "ja_JP-tsukuyomi-chan-medium");
 }
 
-TEST(ModelManagerTest, FindByAliasMoeSpeech) {
-    auto result = piper::findVoice("moe-speech");
-    ASSERT_TRUE(result.has_value())
-        << "findVoice failed for alias 'moe-speech'";
-    EXPECT_EQ(result->key, "ja_JP-moe-speech-20speakers-medium");
-}
-
 TEST(ModelManagerTest, FindNonExistent) {
     auto result = piper::findVoice("non-existent-model-xyz-12345");
     EXPECT_FALSE(result.has_value())
@@ -328,8 +307,7 @@ TEST(ModelManagerTest, ListEnglishModels) {
 TEST(ModelManagerTest, PiperPlusSource) {
     auto catalog = piper::loadVoiceCatalog();
     for (const auto& voice : catalog) {
-        if (voice.key.find("tsukuyomi") != std::string::npos ||
-            voice.key.find("moe-speech") != std::string::npos) {
+        if (voice.key.find("tsukuyomi") != std::string::npos) {
             EXPECT_EQ(voice.source, "piper-plus")
                 << "Voice " << voice.key << " should have source 'piper-plus'";
         }
