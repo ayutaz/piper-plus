@@ -11,11 +11,13 @@ namespace piper {
 // Static Unicode range helpers
 // ---------------------------------------------------------------------------
 
-// Hiragana: U+3040-309F, Katakana: U+30A0-30FF, Katakana Phonetic Ext: U+31F0-31FF
+// Hiragana: U+3040-309F, Katakana: U+30A0-30FF, Katakana Phonetic Ext: U+31F0-31FF,
+// Halfwidth Katakana: U+FF65-FF9F
 bool UnicodeLanguageDetector::isKana(char32_t cp) {
     return (cp >= 0x3040 && cp <= 0x309F) ||
            (cp >= 0x30A0 && cp <= 0x30FF) ||
-           (cp >= 0x31F0 && cp <= 0x31FF);
+           (cp >= 0x31F0 && cp <= 0x31FF) ||
+           (cp >= 0xFF65 && cp <= 0xFF9F);
 }
 
 // CJK Unified Ideographs: U+4E00-9FFF, Extension A: U+3400-4DBF,
@@ -26,11 +28,13 @@ bool UnicodeLanguageDetector::isCJK(char32_t cp) {
            (cp >= 0xF900 && cp <= 0xFAFF);
 }
 
-// Hangul Syllables: U+AC00-D7AF, Jamo: U+1100-11FF, Compat Jamo: U+3130-318F
+// Hangul Syllables: U+AC00-D7AF, Jamo: U+1100-11FF, Compat Jamo: U+3130-318F,
+// Halfwidth Hangul: U+FFA0-FFDC
 bool UnicodeLanguageDetector::isHangul(char32_t cp) {
     return (cp >= 0xAC00 && cp <= 0xD7AF) ||
            (cp >= 0x1100 && cp <= 0x11FF) ||
-           (cp >= 0x3130 && cp <= 0x318F);
+           (cp >= 0x3130 && cp <= 0x318F) ||
+           (cp >= 0xFFA0 && cp <= 0xFFDC);
 }
 
 // Fullwidth Latin letters: U+FF21-FF3A (A-Z), U+FF41-FF5A (a-z)
@@ -40,12 +44,15 @@ bool UnicodeLanguageDetector::isFullwidthLatin(char32_t cp) {
 }
 
 // CJK shared punctuation: CJK punctuation (U+3000-303F) + fullwidth
-// forms, EXCLUDING fullwidth Latin letters (handled by isFullwidthLatin).
+// forms, EXCLUDING fullwidth Latin letters (handled by isFullwidthLatin),
+// halfwidth Katakana (FF65-FF9F, handled by isKana), and
+// halfwidth Hangul (FFA0-FFDC, handled by isHangul).
 bool UnicodeLanguageDetector::isCJKPunct(char32_t cp) {
     return (cp >= 0x3000 && cp <= 0x303F) ||
            (cp >= 0xFF00 && cp <= 0xFF20) ||  // Fullwidth digits & symbols
            (cp >= 0xFF3B && cp <= 0xFF40) ||  // Fullwidth brackets & symbols
-           (cp >= 0xFF5B && cp <= 0xFFEF);    // Fullwidth braces onwards
+           (cp >= 0xFF5B && cp <= 0xFF64) ||  // Fullwidth braces & misc symbols
+           (cp >= 0xFFE0 && cp <= 0xFFEF);    // Fullwidth currency & misc
 }
 
 // Basic Latin + Latin Extended-A diacritics.
