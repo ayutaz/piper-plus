@@ -4,10 +4,14 @@
  * Covers: LanguageDetector segmentation (4 tests), English G2P (3),
  * Chinese G2P (2), Spanish G2P (2), French G2P (2), Portuguese G2P (2),
  * Korean G2P (2), PUA codepoint handling (1), ModelConfig defaults (1),
- * RTF calculation (1), UTF-8 validation (1).  Total: 21 tests.
+ * RTF calculation (1), UTF-8 validation (1), findDictionaryFile logic (3),
+ * defaultLatinLang detection (4).  Total: 28 tests.
  */
 
 #include <gtest/gtest.h>
+#include <cstdlib>
+#include <filesystem>
+#include <fstream>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -399,4 +403,186 @@ TEST(Utf8ValidationTest, InvalidUtf8ReturnsEmpty) {
         std::vector<std::vector<Phoneme>> phonemes;
         EXPECT_NO_THROW(phonemize_korean(invalid, phonemes));
     }
+}
+
+// =========================================================================
+// 12. findDictionaryFile logic tests (3)
+//
+// findDictionaryFile and getExeDir are static in piper.cpp and cannot be
+// linked from this test binary (it does not link onnxruntime).  We
+// replicate the same 3-tier search algorithm here so the logic is
+// validated without pulling in the full piper.cpp dependency.
+// =========================================================================
+
+namespace {
+
+// Replicates piper.cpp findDictionaryFile() search logic:
+//   1. modelDir/<filename>
+//   2. <exeDir>/../share/piper/dicts/<filename>  (skipped here — no exe context)
+//   3. PIPER_DICTIONARIES_PATH/<filename>
+// Returns first existing path, or empty string.
+std::string findDictionaryFileTestImpl(const std::string &filename,
+                                       const std::string &modelDir) {
+    namespace fs = std::filesystem;
+
+    // 1. Model directory
+    fs::path p1 = fs::path(modelDir) / filename;
+    if (fs::exists(p1)) {
+        return p1.string();
+    }
+
+    // 2. (exe-relative path skipped in test context)
+
+    // 3. Environment variable
+    const char *envPath = std::getenv("PIPER_DICTIONARIES_PATH");
+    if (envPath && envPath[0] != '\0') {
+        fs::path p3 = fs::path(envPath) / filename;
+        if (fs::exists(p3)) {
+            return p3.string();
+        }
+    }
+
+    return {};
+}
+
+// RAII helper to set/unset an environment variable for the scope of a test.
+class ScopedEnvVar {
+public:
+    ScopedEnvVar(const std::string &name, const std::string &value)
+        : name_(name) {
+#ifdef _WIN32
+        _putenv_s(name_.c_str(), value.c_str());
+#else
+        setenv(name_.c_str(), value.c_str(), 1);
+#endif
+    }
+    ~ScopedEnvVar() {
+#ifdef _WIN32
+        _putenv_s(name_.c_str(), "");
+#else
+        unsetenv(name_.c_str());
+#endif
+    }
+private:
+    std::string name_;
+};
+
+// Create a temporary directory that is cleaned up on destruction.
+class TempDir {
+public:
+    TempDir() {
+        namespace fs = std::filesystem;
+        path_ = fs::temp_directory_path() / "piper_test_dict_XXXXXX";
+        // Ensure unique name by appending a counter
+        int counter = 0;
+        while (fs::exists(path_)) {
+            path_ = fs::temp_directory_path() /
+                     ("piper_test_dict_" + std::to_string(counter++));
+        }
+        fs::create_directories(path_);
+    }
+    ~TempDir() {
+        std::filesystem::remove_all(path_);
+    }
+    const std::filesystem::path &path() const { return path_; }
+private:
+    std::filesystem::path path_;
+};
+
+} // anonymous namespace
+
+TEST(FindDictionaryFileTest, EnvVarOverride) {
+    // Create a temp directory with a dummy dictionary file
+    TempDir tmpDir;
+    std::string filename = "cmudict_data.json";
+    std::ofstream(tmpDir.path() / filename) << "{}";
+
+    // Set environment variable to point to the temp directory
+    ScopedEnvVar env("PIPER_DICTIONARIES_PATH", tmpDir.path().string());
+
+    // Model dir does NOT contain the file -> should fall through to env var
+    TempDir emptyModelDir;
+    std::string result = findDictionaryFileTestImpl(filename, emptyModelDir.path().string());
+
+    EXPECT_FALSE(result.empty()) << "Dictionary should be found via PIPER_DICTIONARIES_PATH";
+    EXPECT_NE(result.find(filename), std::string::npos);
+}
+
+TEST(FindDictionaryFileTest, NonexistentPathReturnsEmpty) {
+    // Neither model dir nor env var points to a valid file
+    std::string bogusDir = "/no/such/directory/piper_test_bogus_12345";
+
+    // Make sure env var is not set or points to a nonexistent path
+    ScopedEnvVar env("PIPER_DICTIONARIES_PATH", bogusDir);
+
+    std::string result = findDictionaryFileTestImpl("cmudict_data.json", bogusDir);
+    EXPECT_TRUE(result.empty()) << "Should return empty string for nonexistent paths";
+}
+
+TEST(FindDictionaryFileTest, ModelDirHasPriority) {
+    // Create two temp dirs: one for model dir, one for env var
+    TempDir modelDir;
+    TempDir envDir;
+    std::string filename = "cmudict_data.json";
+
+    // Place the file in both directories
+    std::ofstream(modelDir.path() / filename) << "{\"source\": \"model\"}";
+    std::ofstream(envDir.path() / filename) << "{\"source\": \"env\"}";
+
+    ScopedEnvVar env("PIPER_DICTIONARIES_PATH", envDir.path().string());
+
+    std::string result = findDictionaryFileTestImpl(filename, modelDir.path().string());
+
+    EXPECT_FALSE(result.empty());
+    // Model dir path should win (priority 1 over priority 3)
+    EXPECT_NE(result.find(modelDir.path().string()), std::string::npos)
+        << "Model directory should have priority over PIPER_DICTIONARIES_PATH";
+}
+
+// =========================================================================
+// 13. defaultLatinLang detection tests (4)
+//
+// Verify that UnicodeLanguageDetector classifies Latin text according to
+// the defaultLatinLang constructor parameter.
+// =========================================================================
+
+TEST(DefaultLatinLangTest, SpanishDefault) {
+    UnicodeLanguageDetector detector{
+        {"ja", "en", "zh", "es", "fr", "pt"}, "es"};
+
+    auto segments = detector.segmentText("Hola");
+    ASSERT_FALSE(segments.empty());
+    EXPECT_EQ(segments[0].lang, "es")
+        << "Latin text should be classified as 'es' when defaultLatinLang=\"es\"";
+}
+
+TEST(DefaultLatinLangTest, FrenchDefault) {
+    UnicodeLanguageDetector detector{
+        {"ja", "en", "zh", "es", "fr", "pt"}, "fr"};
+
+    auto segments = detector.segmentText("Bonjour");
+    ASSERT_FALSE(segments.empty());
+    EXPECT_EQ(segments[0].lang, "fr")
+        << "Latin text should be classified as 'fr' when defaultLatinLang=\"fr\"";
+}
+
+TEST(DefaultLatinLangTest, PortugueseDefault) {
+    UnicodeLanguageDetector detector{
+        {"ja", "en", "zh", "es", "fr", "pt"}, "pt"};
+
+    // "Olá" contains Latin characters (including accented a)
+    auto segments = detector.segmentText("Ol\xc3\xa1");  // Olá in UTF-8
+    ASSERT_FALSE(segments.empty());
+    EXPECT_EQ(segments[0].lang, "pt")
+        << "Latin text should be classified as 'pt' when defaultLatinLang=\"pt\"";
+}
+
+TEST(DefaultLatinLangTest, EnglishDefault) {
+    UnicodeLanguageDetector detector{
+        {"ja", "en", "zh", "es", "fr", "pt"}, "en"};
+
+    auto segments = detector.segmentText("Hello");
+    ASSERT_FALSE(segments.empty());
+    EXPECT_EQ(segments[0].lang, "en")
+        << "Latin text should be classified as 'en' when defaultLatinLang=\"en\"";
 }

@@ -344,6 +344,12 @@ jobs:
             rm -rf open_jtalk_dic_utf_8-1.11
           fi
 
+          # Copy phonemizer dictionaries
+          mkdir -p dist/piper/share/piper/dicts
+          cp src/cpp/cmudict_data.json dist/piper/share/piper/dicts/ 2>/dev/null || true
+          cp src/cpp/pinyin_single.json dist/piper/share/piper/dicts/ 2>/dev/null || true
+          cp src/cpp/pinyin_phrases.json dist/piper/share/piper/dicts/ 2>/dev/null || true
+
           # Create archive
           tar -czf piper-${{ runner.os }}.tar.gz -C dist piper
           
@@ -434,6 +440,12 @@ jobs:
           # Clean up
           Remove-Item -Force naist-jdic.tar.gz -ErrorAction SilentlyContinue
           Remove-Item -Recurse -Force open_jtalk_dic_utf_8-1.11 -ErrorAction SilentlyContinue
+
+          # Copy phonemizer dictionaries
+          New-Item -ItemType Directory -Force -Path dist/piper/share/piper/dicts
+          Copy-Item src/cpp/cmudict_data.json -Destination dist/piper/share/piper/dicts/ -ErrorAction SilentlyContinue
+          Copy-Item src/cpp/pinyin_single.json -Destination dist/piper/share/piper/dicts/ -ErrorAction SilentlyContinue
+          Copy-Item src/cpp/pinyin_phrases.json -Destination dist/piper/share/piper/dicts/ -ErrorAction SilentlyContinue
 
           # Create archive
           Compress-Archive -Path dist/piper -DestinationPath piper-${{ runner.os }}.zip
