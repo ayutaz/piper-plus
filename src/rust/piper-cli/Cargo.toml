@@ -1,0 +1,12 @@
+[package]
+name = "piper-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+piper-core = { path = "../piper-core" }
+clap = { version = "4", features = ["derive"] }
+anyhow = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }

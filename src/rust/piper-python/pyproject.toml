@@ -1,0 +1,15 @@
+[build-system]
+requires = ["maturin>=1.0,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "piper-plus"
+version = "0.1.0"
+description = "High-quality neural text-to-speech with 7-language support"
+requires-python = ">=3.8"
+license = "MIT"
+keywords = ["tts", "speech-synthesis", "piper", "onnx"]
+
+[tool.maturin]
+features = ["pyo3/extension-module"]
+module-name = "piper_plus"

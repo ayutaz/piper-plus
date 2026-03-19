@@ -1,0 +1,114 @@
+name: rust-tests
+
+on:
+  workflow_call:
+  pull_request:
+    branches: [ dev ]
+    paths:
+      - 'src/rust/**'
+      - '.github/workflows/rust-tests.yml'
+  push:
+    branches: [ dev ]
+    paths:
+      - 'src/rust/**'
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  check:
+    name: cargo check
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: src/rust
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+    - name: Install ALSA dev (for rodio/playback feature)
+      run: sudo apt-get update && sudo apt-get install -y libasound2-dev
+    - uses: dtolnay/rust-toolchain@stable
+    - uses: Swatinem/rust-cache@v2
+      with:
+        workspaces: src/rust -> target
+    - run: cargo check --workspace --all-features
+
+  test:
+    name: tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-latest, windows-latest]
+    defaults:
+      run:
+        working-directory: src/rust
+    steps:
+    - uses: actions/checkout@v4
+    - uses: dtolnay/rust-toolchain@stable
+    - uses: Swatinem/rust-cache@v2
+      with:
+        workspaces: src/rust -> target
+
+    - name: Run tests (default features)
+      run: cargo test -p piper-core --no-fail-fast
+
+    - name: Run tests (naist-jdic)
+      run: cargo test -p piper-core --features naist-jdic --no-fail-fast
+
+    - name: Run CLI check
+      run: cargo check -p piper-cli
+
+  fmt:
+    name: rustfmt
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: src/rust
+    steps:
+    - uses: actions/checkout@v4
+    - uses: dtolnay/rust-toolchain@stable
+      with:
+        components: rustfmt
+    - run: cargo fmt --all -- --check
+
+  clippy:
+    name: clippy
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: src/rust
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+    - name: Install ALSA dev (for rodio/playback feature)
+      run: sudo apt-get update && sudo apt-get install -y libasound2-dev
+    - uses: dtolnay/rust-toolchain@stable
+      with:
+        components: clippy
+    - uses: Swatinem/rust-cache@v2
+      with:
+        workspaces: src/rust -> target
+    - run: cargo clippy --workspace --all-features -- -D warnings
+
+  python-bindings:
+    name: piper-python build
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: src/rust/piper-python
+    steps:
+    - uses: actions/checkout@v4
+    - uses: dtolnay/rust-toolchain@stable
+    - uses: Swatinem/rust-cache@v2
+      with:
+        workspaces: src/rust -> target
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+    - run: pip install maturin
+    - run: maturin build --release
