@@ -4,8 +4,20 @@
 
 C# CLI (`PiperPlus.Cli`) に中国語 (zh)、スペイン語 (es)、フランス語 (fr)、ポルトガル語 (pt) の4言語を追加し、Python/Rust と同等の6言語マルチリンガル対応を実現する。
 
-**現状:** JA + EN の2言語のみ対応
+**現状:** JA + EN の2言語のみ対応 (CLI統合未完了)
 **目標:** JA + EN + ZH + ES + FR + PT の6言語対応
+
+### 進捗状況
+
+| Phase | 内容 | 状態 |
+|-------|------|------|
+| Phase 1 | G2P Engine Interfaces (4ファイル) | **完了** |
+| Phase 2 | Phonemizer Classes (4ファイル) | **完了** |
+| Phase 3 | PUA Mapping 拡張 (29→87エントリ) | **完了** |
+| Phase 4 | CLI 統合 (`Program.cs` + `--language`) | 未着手 |
+| Phase 5 | MultilingualPhonemizer (オプション) | 未着手 |
+| Phase 6 | テスト (4ファイル, 40テストケース) | **完了** |
+| Phase 7 | NuGet 依存関係 | 未着手 |
 
 ---
 
@@ -36,7 +48,6 @@ var engine = new ChineseG2PEngine();
 
 // piper-plus 互換 IPA (トーン付き)
 string ipa = engine.ToPiperIPA("你好世界");
-// → IPA tokens with tone markers
 
 // PUA マッピング済みフォネーム
 string[] pua = engine.ToPuaPhonemes("你好世界");
@@ -93,12 +104,16 @@ public interface IPhonemizer
 public record ProsodyInfo(int A1, int A2, int A3);
 ```
 
-### 既存実装パターン
+### 実装パターン一覧
 
-| 実装 | G2P Engine Interface | PostProcessIds | GetPhonemeIdMap |
-|------|---------------------|----------------|-----------------|
-| `JapanesePhonemizer` | `IJapaneseG2PEngine` | デフォルト (no-op) | `null` (config.json) |
-| `EnglishPhonemizer` | `IEnglishG2PEngine` | BOS/EOS/PAD挿入 | `null` (config.json) |
+| 実装 | G2P Engine Interface | PostProcessIds | GetPhonemeIdMap | 状態 |
+|------|---------------------|----------------|-----------------|------|
+| `JapanesePhonemizer` | `IJapaneseG2PEngine` | デフォルト (no-op) | `null` (config.json) | 既存 |
+| `EnglishPhonemizer` | `IEnglishG2PEngine` | BOS/EOS/PAD挿入 | `null` (config.json) | 既存 |
+| `ChinesePhonemizer` | `IChineseG2PEngine` | BOS/EOS/PAD挿入 (EN同一) | `null` (config.json) | **実装済** |
+| `SpanishPhonemizer` | `ISpanishG2PEngine` | BOS/EOS/PAD挿入 (EN同一) | `null` (config.json) | **実装済** |
+| `FrenchPhonemizer` | `IFrenchG2PEngine` | BOS/EOS/PAD挿入 (EN同一) | `null` (config.json) | **実装済** |
+| `PortuguesePhonemizer` | `IPortugueseG2PEngine` | BOS/EOS/PAD挿入 (EN同一) | `null` (config.json) | **実装済** |
 
 ### パイプライン全体像
 
@@ -132,7 +147,6 @@ text
 | 句読点 | 全角→半角マッピング (。→. ，→, 等) |
 | PUA範囲 | U+E020–U+E04A (固定43エントリ) |
 | Prosody | A1=tone(1-5), A2=syllable_pos, A3=word_length |
-| PostProcessIds | BOS + pad-between + EOS (末尾padなし) |
 
 **主要 PUA マッピング (中国語固有):**
 
@@ -164,7 +178,7 @@ text
 | 機能語 | 27語でストレス抑制 (el, la, de, que 等) |
 | PUA | `rr`→U+E01D, `tʃ`→U+E054 |
 | Prosody | A1=0, A2=2(stressed)/0, A3=word_phoneme_count |
-| PostProcessIds | BOS + pad-between + EOS (末尾padなし) |
+| ˈ マーカー | **出力に含む** (Python と同一) |
 
 **スペイン語固有フォネーム (9個):**
 `ɲ`, `ɾ`, `rr`, `β`, `ɣ`, `x`, `ʝ`, `¡`, `¿`
@@ -182,7 +196,7 @@ text
 | y_vowel | `y` (close front rounded /y/) — 日本語の /j/ との衝突回避 |
 | PUA | ɛ̃→U+E056, ɑ̃→U+E057, ɔ̃→U+E058, y_vowel→U+E01E |
 | Prosody | A1=0, A2=2(last vowel=stressed)/0, A3=word_phoneme_count |
-| PostProcessIds | BOS + pad + id + pad + ... + pad + EOS (末尾padあり) |
+| ˈ マーカー | **出力に含まない** (Phonemizer が最終母音を検出して A2 設定) |
 
 **フランス語固有フォネーム (16個):**
 `ɛ̃`, `ɑ̃`, `ɔ̃`, `ø`, `œ`, `y_vowel`, `ɔ`, `ə`, `ɥ`, `ɲ`, `ʁ`, `—`, `–`, `…`, `«`, `»`
@@ -198,29 +212,66 @@ text
 | ストレス | アクセント記号 > paroxytone (a/e/o/am/em/en末尾) > oxytone |
 | PUA | `tʃ`→U+E054, `dʒ`→U+E055, `ʁ`→共有 |
 | Prosody | A1=0, A2=2(stressed)/0, A3=word_phoneme_count |
-| PostProcessIds | BOS + pad + id + pad + ... + pad + EOS (末尾padあり) |
+| ˈ マーカー | **G2P から受信し除去** (Python と同様、出力には含まない) |
 
 **ポルトガル語固有フォネーム (12個):**
 `ã`, `ẽ`, `ĩ`, `õ`, `ũ`, `tʃ`, `dʒ`, `ʎ`, `ʁ`, `—`, `–`, `…`
 
 ---
 
-## PostProcessIds パターンの差異
+## PostProcessIds — 全非JA言語で共通
 
-| 言語 | パターン | 図式 |
-|------|---------|------|
-| JA | no-op (BOS/EOSはフォネームトークンとして処理) | `^ ... $ or ?` |
-| EN | BOS + inter-pad + EOS | `^ _ id0 _ id1 _ ... _ idN _ $` |
-| ZH, ES | BOS + inter-pad + EOS (末尾padなし) | `^ id0 _ id1 _ ... _ idN $` |
-| FR, PT | BOS + pad + inter-pad + EOS (末尾padあり) | `^ _ id0 _ id1 _ ... _ idN _ $` |
+Python `base.py` の `post_process_ids()` を検証した結果、**全非JA言語が同一アルゴリズム**を使用することが判明。
 
-**重要:** FR/PT は EN と同じレイアウト。ZH/ES は末尾の pad がない点が異なる。
+### アルゴリズム (Python base.py)
+
+```python
+# 1. 各 phoneme_id の後に PAD を挿入 (既に PAD の場合はスキップ)
+for phoneme_id in phoneme_ids:
+    padded.append(phoneme_id)
+    if phoneme_id not in pad_ids:
+        padded.extend(pad_ids)
+
+# 2. BOS + PAD を先頭に追加
+phoneme_ids = bos_ids + [pad_ids[0]] + padded
+
+# 3. EOS を末尾に追加
+phoneme_ids = phoneme_ids + eos_ids
+```
+
+### 結果パターン (全非JA言語で共通)
+
+```
+[BOS, PAD, id0, PAD, id1, PAD, ..., idN, PAD, EOS]
+ ^    _    id0  _    id1  _         idN  _    $
+```
+
+| 言語 | PostProcessIds |
+|------|---------------|
+| JA | no-op (BOS/EOSはフォネームトークンとして処理) |
+| EN, ZH, ES, FR, PT | BOS + PAD + inter-pad + EOS (全て同一) |
+
+**C# 実装**: `PiperPhonemeConverter.EspeakPostProcessIds()` として共通ヘルパーメソッドを追加。各 Phonemizer の `PostProcessIds()` からこのヘルパーを呼び出す。
+
+> **注意:** 当初の調査では ZH/ES が「末尾 pad なし」、FR/PT が「末尾 pad あり」と記述していたが、Python ソースコードの検証により全言語同一であることを確認済み。
 
 ---
 
 ## PUA トークンマッピング全体像
 
-Python の `token_mapper.py` に定義された固定 PUA マッピング (89エントリ) のうち、C# 側で新規に必要なもの:
+Python の `token_mapper.py` に定義された固定 PUA マッピング (89エントリ) を C# `OpenJTalkToPiperMapping.cs` に移植済み (87エントリ、KO含む)。
+
+### C# マッピングテーブル: 29→87エントリ
+
+| 言語グループ | 範囲 | エントリ数 |
+|-------------|------|-----------|
+| JA (既存) | U+E000–U+E01C | 29 |
+| 共有 (rr, y_vowel) | U+E01D–U+E01E | 2 |
+| ZH | U+E020–U+E04A | 43 |
+| KO | U+E04B–U+E052 | 8 |
+| ES/PT | U+E054–U+E055 | 2 |
+| FR | U+E056–U+E058 | 3 |
+| **合計** | | **87** |
 
 ### 中国語用 (U+E020–U+E04A, 43エントリ)
 子音: `pʰ`, `tʰ`, `kʰ`, `tɕ`, `tɕʰ`, `tʂ`, `tʂʰ`, `tsʰ`
@@ -234,93 +285,103 @@ Python の `token_mapper.py` に定義された固定 PUA マッピング (89エ
 ### フランス語用
 `ɛ̃` → U+E056, `ɑ̃` → U+E057, `ɔ̃` → U+E058
 
-### 共有 (既に JA/EN に存在する可能性あり)
-`y_vowel` → U+E01E, `ts` → U+E00F
+### 共有
+`y_vowel` → U+E01E, `ts` → U+E00F (JA既存)
 
 ---
 
 ## 実装チェックリスト
 
-### Phase 1: G2P Engine Interfaces
-
-新規作成するインターフェース:
+### Phase 1: G2P Engine Interfaces — **完了**
 
 ```
 src/csharp/PiperPlus.Core/Phonemize/
-├── IChineseG2PEngine.cs      ← NEW
-├── ISpanishG2PEngine.cs      ← NEW
-├── IFrenchG2PEngine.cs       ← NEW
-└── IPortugueseG2PEngine.cs   ← NEW
+├── IChineseG2PEngine.cs      ← 実装済
+├── ISpanishG2PEngine.cs      ← 実装済
+├── IFrenchG2PEngine.cs       ← 実装済
+└── IPortugueseG2PEngine.cs   ← 実装済
 ```
-
-各インターフェースは dot-net-g2p の対応エンジンをラップする最小限のメソッドを定義。
 
 #### IChineseG2PEngine
 ```csharp
-public interface IChineseG2PEngine
-{
-    /// <summary>piper-plus互換IPA + ProsodyInfo を返す</summary>
-    ChineseG2PResult Convert(string text);
-}
-
 public record ChineseG2PResult(
     IReadOnlyList<string> Phonemes,  // PUA-mapped tokens
     IReadOnlyList<int> A1,           // tone (1-5)
     IReadOnlyList<int> A2,           // syllable position
     IReadOnlyList<int> A3            // word length
 );
+
+public interface IChineseG2PEngine
+{
+    ChineseG2PResult Convert(string text);
+}
 ```
 
 #### ISpanishG2PEngine / IFrenchG2PEngine / IPortugueseG2PEngine
 ```csharp
 public interface ISpanishG2PEngine
 {
-    /// <summary>IPA phoneme list を返す</summary>
     List<string> ToPhonemeList(string text);
 }
 // French, Portuguese も同様の最小インターフェース
 ```
 
-### Phase 2: Phonemizer Classes
+**設計判断:**
+- 中国語は `ChineseG2PResult` record で Prosody を一括返却 (engine が PUA + prosody を一括処理)
+- ES/FR/PT はフラット `List<string>` で IPA トークンを返す (ストレス/prosody は Phonemizer 層で処理)
 
-新規作成する Phonemizer:
+### Phase 2: Phonemizer Classes — **完了**
 
 ```
 src/csharp/PiperPlus.Core/Phonemize/
-├── ChinesePhonemizer.cs       ← NEW
-├── SpanishPhonemizer.cs       ← NEW
-├── FrenchPhonemizer.cs        ← NEW
-└── PortuguesePhonemizer.cs    ← NEW
+├── ChinesePhonemizer.cs       ← 実装済
+├── SpanishPhonemizer.cs       ← 実装済
+├── FrenchPhonemizer.cs        ← 実装済
+└── PortuguesePhonemizer.cs    ← 実装済
 ```
 
-各クラスは `IPhonemizer` を実装:
+| クラス | GetPhonemeIdMap | PostProcessIds | ストレス処理 |
+|-------|----------------|----------------|-------------|
+| `ChinesePhonemizer` | `null` | EspeakPostProcessIds (EN同一) | Engine が prosody を返す |
+| `SpanishPhonemizer` | `null` | EspeakPostProcessIds (EN同一) | ˈ マーカーを読取、出力に維持 |
+| `FrenchPhonemizer` | `null` | EspeakPostProcessIds (EN同一) | 最終母音を検出、ˈ なし |
+| `PortuguesePhonemizer` | `null` | EspeakPostProcessIds (EN同一) | ˈ マーカーを読取後除去 |
 
-| クラス | GetPhonemeIdMap | PostProcessIds |
-|-------|----------------|----------------|
-| `ChinesePhonemizer` | `null` (config.json) | override: BOS + inter-pad + EOS (末尾padなし) |
-| `SpanishPhonemizer` | `null` (config.json) | override: BOS + inter-pad + EOS (末尾padなし) |
-| `FrenchPhonemizer` | `null` (config.json) | override: BOS + pad + inter-pad + EOS (末尾padあり) |
-| `PortuguesePhonemizer` | `null` (config.json) | override: BOS + pad + inter-pad + EOS (末尾padあり) |
+**各言語の Phonemizer 実装詳細:**
 
-**中国語の特殊処理:**
-- dot-net-g2p `ToPuaPhonemes()` が PUA マッピング済みトークンを返すため、C# 側での PUA 変換は不要
-- `ToIpaWithProsody()` で Prosody 情報も取得可能
-- 全角句読点→半角変換はエンジン側で処理
+#### ChinesePhonemizer (薄いラッパー)
+- `IChineseG2PEngine.Convert()` が PUA マッピング済み + prosody を返す
+- Phonemizer は結果をそのまま `(tokens, prosody)` に変換
+- PUA 変換不要、ストレス検出不要
 
-**ES/FR/PT の共通処理:**
-- dot-net-g2p `ToIPA()` が IPA 文字列を返す
-- C# 側でストレスマーカー挿入 + Prosody 生成が必要
-- multi-char トークン (`tʃ`, `dʒ`, `rr`, `ɛ̃` 等) → PUA マッピングが必要
+#### SpanishPhonemizer
+- G2P engine が返すフラットリストに ˈ マーカーとスペース区切りを含む
+- Phonemizer がワード分割 → ˈ 読取 → prosody 生成 → PUA mapping
+- ˈ と直後の母音に A2=2、他は A2=0
+- A3 = ˈ を除くワード内フォネーム数
+- 母音: a, e, i, o, u
 
-### Phase 3: PUA Token Mapping 拡張
+#### FrenchPhonemizer
+- G2P engine が返すフラットリストに ˈ を含まない
+- Phonemizer がワード分割 → 最終母音検出 → prosody 生成 → PUA mapping
+- 最終母音に A2=2、他は A2=0
+- 母音: a, e, ɛ, i, o, ɔ, u, y_vowel, ə, ø, œ, ɛ̃, ɑ̃, ɔ̃
 
-`OpenJTalkToPiperMapping.cs` を拡張して新言語の PUA エントリを追加。
+#### PortuguesePhonemizer
+- G2P engine が返すフラットリストに ˈ マーカーを含む
+- Phonemizer がワード分割 → ˈ 読取 → ˈ 除去 → prosody 生成 → PUA mapping
+- ˈ 直後のフォネームに A2=2、他は A2=0
+- A3 = ˈ を除くワード内フォネーム数
 
-現在 29 エントリ (JA のみ) → 中国語43 + ES/PT/FR共通数エントリ追加で約80エントリに拡大。
+### Phase 3: PUA Token Mapping 拡張 — **完了**
 
-**注意:** `OpenJTalkToPiperMapping` という名前は JA 固有なので、リネームまたは新クラス `MultilingualPuaMapping` の作成を検討。
+`OpenJTalkToPiperMapping.cs` を拡張: 29→87エントリ。
 
-### Phase 4: CLI 統合
+Python `token_mapper.py` の FIXED_PUA_MAPPING 全89エントリのうち87を C# に移植 (KO 8エントリ含む)。
+
+**追加:** `PiperPhonemeConverter.EspeakPostProcessIds()` 共通ヘルパーメソッド。
+
+### Phase 4: CLI 統合 — **未着手**
 
 `Program.cs` の `ResolveTextModePhonemizer()` に4言語を追加:
 
@@ -341,7 +402,7 @@ case "pt":
 
 `--language` オプションの Description を更新: `"ja, en, zh, es, fr, or pt"`
 
-### Phase 5: MultilingualPhonemizer (オプション)
+### Phase 5: MultilingualPhonemizer (オプション) — **未着手**
 
 Python/Rust と同等の多言語自動ルーティング:
 
@@ -356,26 +417,25 @@ src/csharp/PiperPlus.Core/Phonemize/
 - BOS/EOS はセグメント単位で strip → 全体で1つだけ付与
 - `_last_eos` で日本語疑問文の EOS トークンを保持
 
-### Phase 6: テスト
+### Phase 6: テスト — **完了**
 
 ```
 src/csharp/PiperPlus.Core.Tests/
-├── ChinesePhonemizerTests.cs      ← NEW
-├── SpanishPhonemizerTests.cs      ← NEW
-├── FrenchPhonemizerTests.cs       ← NEW
-├── PortuguesePhonemizerTests.cs   ← NEW
-└── MultilingualPhonemizerTests.cs ← NEW (Phase 5)
+├── ChinesePhonemizerTests.cs      ← 実装済 (9テスト)
+├── SpanishPhonemizerTests.cs      ← 実装済 (10テスト)
+├── FrenchPhonemizerTests.cs       ← 実装済 (11テスト)
+├── PortuguesePhonemizerTests.cs   ← 実装済 (10テスト)
+└── MultilingualPhonemizerTests.cs ← Phase 5 で作成予定
 ```
 
 テストパターン (既存 JA/EN テストに準拠):
-- xUnit v3 (`[Fact]`, `[Theory]` + `[InlineData]`)
+- xUnit v3 (`[Fact]`)
 - Hand-written stubs (モッキングフレームワークなし)
 - `Assert.Equal` でシーケンス比較
 - `tokens.Count == prosody.Count` 不変条件チェック
 - PostProcessIds の BOS/EOS/PAD レイアウト検証
-- PUA マッピング検証
 
-### Phase 7: NuGet 依存関係
+### Phase 7: NuGet 依存関係 — **未着手**
 
 `PiperPlus.Core.csproj` には G2P パッケージを追加**しない** (現行パターンに従い reflection で解決)。
 
@@ -409,33 +469,41 @@ IDs 169–173: フランス語固有フォネーム (~5個, 共有除く)
 
 ## ファイル変更サマリー
 
-### 新規作成ファイル (14ファイル)
+### 実装済ファイル
 
-| ファイル | 内容 |
-|---------|------|
-| `PiperPlus.Core/Phonemize/IChineseG2PEngine.cs` | 中国語G2Pインターフェース |
-| `PiperPlus.Core/Phonemize/ISpanishG2PEngine.cs` | スペイン語G2Pインターフェース |
-| `PiperPlus.Core/Phonemize/IFrenchG2PEngine.cs` | フランス語G2Pインターフェース |
-| `PiperPlus.Core/Phonemize/IPortugueseG2PEngine.cs` | ポルトガル語G2Pインターフェース |
-| `PiperPlus.Core/Phonemize/ChinesePhonemizer.cs` | 中国語Phonemizer |
-| `PiperPlus.Core/Phonemize/SpanishPhonemizer.cs` | スペイン語Phonemizer |
-| `PiperPlus.Core/Phonemize/FrenchPhonemizer.cs` | フランス語Phonemizer |
-| `PiperPlus.Core/Phonemize/PortuguesePhonemizer.cs` | ポルトガル語Phonemizer |
-| `PiperPlus.Core.Tests/ChinesePhonemizerTests.cs` | 中国語テスト |
-| `PiperPlus.Core.Tests/SpanishPhonemizerTests.cs` | スペイン語テスト |
-| `PiperPlus.Core.Tests/FrenchPhonemizerTests.cs` | フランス語テスト |
-| `PiperPlus.Core.Tests/PortuguesePhonemizerTests.cs` | ポルトガル語テスト |
-| `PiperPlus.Core/Phonemize/MultilingualPhonemizer.cs` | 多言語ルーター (Phase 5) |
-| `PiperPlus.Core/Phonemize/UnicodeLanguageDetector.cs` | 言語判別 (Phase 5) |
+#### 新規作成 (12ファイル)
 
-### 変更ファイル (4ファイル)
+| ファイル | 内容 | Phase |
+|---------|------|-------|
+| `PiperPlus.Core/Phonemize/IChineseG2PEngine.cs` | 中国語G2Pインターフェース + ChineseG2PResult | 1 |
+| `PiperPlus.Core/Phonemize/ISpanishG2PEngine.cs` | スペイン語G2Pインターフェース | 1 |
+| `PiperPlus.Core/Phonemize/IFrenchG2PEngine.cs` | フランス語G2Pインターフェース | 1 |
+| `PiperPlus.Core/Phonemize/IPortugueseG2PEngine.cs` | ポルトガル語G2Pインターフェース | 1 |
+| `PiperPlus.Core/Phonemize/ChinesePhonemizer.cs` | 中国語Phonemizer (薄いラッパー) | 2 |
+| `PiperPlus.Core/Phonemize/SpanishPhonemizer.cs` | スペイン語Phonemizer (ˈ維持) | 2 |
+| `PiperPlus.Core/Phonemize/FrenchPhonemizer.cs` | フランス語Phonemizer (最終母音ストレス) | 2 |
+| `PiperPlus.Core/Phonemize/PortuguesePhonemizer.cs` | ポルトガル語Phonemizer (ˈ除去) | 2 |
+| `PiperPlus.Core.Tests/ChinesePhonemizerTests.cs` | 中国語テスト (9件) | 6 |
+| `PiperPlus.Core.Tests/SpanishPhonemizerTests.cs` | スペイン語テスト (10件) | 6 |
+| `PiperPlus.Core.Tests/FrenchPhonemizerTests.cs` | フランス語テスト (11件) | 6 |
+| `PiperPlus.Core.Tests/PortuguesePhonemizerTests.cs` | ポルトガル語テスト (10件) | 6 |
 
-| ファイル | 変更内容 |
-|---------|---------|
-| `PiperPlus.Core/Mapping/OpenJTalkToPiperMapping.cs` | PUA エントリ追加 (ZH/ES/FR/PT) |
-| `PiperPlus.Cli/Program.cs` | `ResolveTextModePhonemizer()` に4言語追加 + `--language` Description 更新 |
-| `PiperPlus.Cli/PiperPlus.Cli.csproj` | NuGet PackageReference 追加 |
-| `.github/workflows/ci.yml` | C# テストに新言語テスト追加 (必要に応じて) |
+#### 変更済 (3ファイル)
+
+| ファイル | 変更内容 | Phase |
+|---------|---------|-------|
+| `PiperPlus.Core/Mapping/OpenJTalkToPiperMapping.cs` | PUA 29→87エントリ (ZH/KO/ES/PT/FR) | 3 |
+| `PiperPlus.Core/Phonemize/PiperPhonemeConverter.cs` | `EspeakPostProcessIds()` 共通ヘルパー追加 | 3 |
+| `PiperPlus.Core.Tests/PhonemeConverterTests.cs` | エントリ数チェック 29→87 に更新 | 3 |
+
+### 未着手ファイル
+
+| ファイル | 変更内容 | Phase |
+|---------|---------|-------|
+| `PiperPlus.Cli/Program.cs` | `ResolveTextModePhonemizer()` に4言語追加 + `--language` Description 更新 | 4 |
+| `PiperPlus.Cli/PiperPlus.Cli.csproj` | NuGet PackageReference 追加 | 7 |
+| `PiperPlus.Core/Phonemize/MultilingualPhonemizer.cs` | 多言語ルーター (オプション) | 5 |
+| `PiperPlus.Core/Phonemize/UnicodeLanguageDetector.cs` | 言語判別 (オプション) | 5 |
 
 ### 変更不要ファイル
 
@@ -449,39 +517,40 @@ IDs 169–173: フランス語固有フォネーム (~5個, 共有除く)
 
 ## dot-net-g2p 出力 → piper-plus フォネーム 変換戦略
 
-### 中国語: 最小変換
+### 中国語: 最小変換 (実装済)
 
 dot-net-g2p の `ToPuaPhonemes()` / `ToIpaWithProsody()` が piper-plus 互換出力を直接提供するため、C# Phonemizer は薄いラッパーで済む。
 
 ```
-dot-net-g2p.ToPuaPhonemes() → PUA-mapped tokens (直接利用可能)
-dot-net-g2p.ToIpaWithProsody() → IPA + A1/A2/A3 (直接利用可能)
+IChineseG2PEngine.Convert(text) → ChineseG2PResult
+  → Phonemes: PUA-mapped tokens (直接利用可能)
+  → A1/A2/A3: prosody 値 (直接利用可能)
 ```
 
-### ES/FR/PT: IPA → PUA 変換必要
+### ES/FR/PT: IPA → PUA 変換 (実装済)
 
-dot-net-g2p は IPA 文字列を返すが、multi-char IPA トークン (`tʃ`, `dʒ`, `rr`, `ɛ̃` 等) を PUA single-codepoint に変換する処理が C# 側で必要。
+dot-net-g2p は IPA フラットリストを返し、Phonemizer が以下を処理:
 
 ```
-dot-net-g2p.ToIPA() → IPA string
-  → tokenize (multi-char IPA 分割)
-  → PUA mapping (OpenJTalkToPiperMapping 拡張)
-  → stress marker insertion (ˈ before stressed vowel)
+I*G2PEngine.ToPhonemeList(text) → flat IPA tokens
+  → word split (スペース / 句読点で分割)
+  → stress handling (言語別: ES=ˈ維持, FR=最終母音検出, PT=ˈ除去)
   → prosody generation (A1=0, A2=stress, A3=count)
+  → PUA mapping (PiperPhonemeConverter.MapSequence)
 ```
 
 ---
 
 ## 実装優先順
 
-| 優先度 | Phase | 内容 | 見積り |
-|--------|-------|------|--------|
-| 1 | Phase 1 | G2P Engine Interfaces (4ファイル) | 小 |
-| 2 | Phase 2 | Phonemizer Classes (4ファイル) | 中〜大 |
-| 3 | Phase 3 | PUA Mapping 拡張 | 小 |
-| 4 | Phase 4 | CLI 統合 | 小 |
-| 5 | Phase 6 | テスト (4ファイル) | 中 |
-| 6 | Phase 7 | NuGet 依存関係 | 小 |
-| 7 | Phase 5 | Multilingual Phonemizer (オプション) | 大 |
+| 優先度 | Phase | 内容 | 状態 |
+|--------|-------|------|------|
+| 1 | Phase 1 | G2P Engine Interfaces (4ファイル) | **完了** |
+| 2 | Phase 2 | Phonemizer Classes (4ファイル) | **完了** |
+| 3 | Phase 3 | PUA Mapping 拡張 (29→87) | **完了** |
+| 4 | Phase 6 | テスト (4ファイル, 40ケース) | **完了** |
+| 5 | Phase 4 | CLI 統合 | 未着手 |
+| 6 | Phase 7 | NuGet 依存関係 | 未着手 |
+| 7 | Phase 5 | Multilingual Phonemizer (オプション) | 未着手 |
 
-Phase 1–4, 6–7 で単一言語モード (`--language zh` 等) が動作。Phase 5 は言語自動検出が必要な場合のみ。
+Phase 4 + 7 で単一言語モード (`--language zh` 等) が動作。Phase 5 は言語自動検出が必要な場合のみ。

@@ -141,7 +141,7 @@ internal static class Program
         // --language
         var languageOption = new Option<string>("--language")
         {
-            Description = "Language for --text mode: ja or en (default: ja)",
+            Description = "Language for --text mode: ja, en, zh, es, fr, or pt (default: ja)",
             DefaultValueFactory = _ => "ja",
         };
 
@@ -1135,7 +1135,11 @@ internal static class Program
     /// Currently supported languages:
     /// <list type="bullet">
     ///   <item><c>ja</c> — Japanese (requires <c>JapanesePhonemizer</c> + <c>IJapaneseG2PEngine</c>)</item>
-    ///   <item><c>en</c> — English (requires <c>EnglishPhonemizer</c>)</item>
+    ///   <item><c>en</c> — English (requires <c>EnglishPhonemizer</c> + <c>IEnglishG2PEngine</c>)</item>
+    ///   <item><c>zh</c> — Chinese (requires <c>ChinesePhonemizer</c> + <c>DotNetChineseG2PEngine</c>)</item>
+    ///   <item><c>es</c> — Spanish (requires <c>SpanishPhonemizer</c> + <c>DotNetSpanishG2PEngine</c>)</item>
+    ///   <item><c>fr</c> — French (requires <c>FrenchPhonemizer</c> + <c>DotNetFrenchG2PEngine</c>)</item>
+    ///   <item><c>pt</c> — Portuguese (requires <c>PortuguesePhonemizer</c> + <c>DotNetPortugueseG2PEngine</c>)</item>
     /// </list>
     /// </para>
     /// </summary>
@@ -1188,10 +1192,22 @@ internal static class Program
                     return new EnglishPhonemizer(g2pEngine);
                 }
 
+            case "zh":
+                return new ChinesePhonemizer(new DotNetChineseG2PEngine());
+
+            case "es":
+                return new SpanishPhonemizer(new DotNetSpanishG2PEngine());
+
+            case "fr":
+                return new FrenchPhonemizer(new DotNetFrenchG2PEngine());
+
+            case "pt":
+                return new PortuguesePhonemizer(new DotNetPortugueseG2PEngine());
+
             default:
                 throw new NotSupportedException(
                     $"Unsupported language for --text mode: {language}. " +
-                    "Supported languages: ja, en.");
+                    "Supported languages: ja, en, zh, es, fr, pt.");
         }
     }
 

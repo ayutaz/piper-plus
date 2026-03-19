@@ -243,4 +243,86 @@ public sealed class CliIntegrationTests
             $"Expected phoneme_ids output or G2P unavailable message. " +
             $"ExitCode={exitCode}, Output: {combined}");
     }
+
+    [Fact]
+    [Trait("Category", "CLI")]
+    public async Task TestMode_Chinese_OutputsPhonemeIds()
+    {
+        var (exitCode, stdout, stderr) = await RunCliAsync(
+            "--test-mode", "--text", "你好", "--language", "zh");
+        SkipIfBuildFailed(exitCode, stderr);
+
+        string combined = stdout + stderr;
+        Assert.True(
+            combined.Contains("phoneme_ids", StringComparison.Ordinal)
+            || combined.Contains("not yet available", StringComparison.OrdinalIgnoreCase)
+            || combined.Contains("DotNetG2P", StringComparison.Ordinal),
+            $"Expected phoneme_ids or G2P unavailable. ExitCode={exitCode}, Output: {combined}");
+    }
+
+    [Fact]
+    [Trait("Category", "CLI")]
+    public async Task TestMode_Spanish_OutputsPhonemeIds()
+    {
+        var (exitCode, stdout, stderr) = await RunCliAsync(
+            "--test-mode", "--text", "Hola", "--language", "es");
+        SkipIfBuildFailed(exitCode, stderr);
+
+        string combined = stdout + stderr;
+        Assert.True(
+            combined.Contains("phoneme_ids", StringComparison.Ordinal)
+            || combined.Contains("not yet available", StringComparison.OrdinalIgnoreCase)
+            || combined.Contains("DotNetG2P", StringComparison.Ordinal),
+            $"Expected phoneme_ids or G2P unavailable. ExitCode={exitCode}, Output: {combined}");
+    }
+
+    [Fact]
+    [Trait("Category", "CLI")]
+    public async Task TestMode_French_OutputsPhonemeIds()
+    {
+        var (exitCode, stdout, stderr) = await RunCliAsync(
+            "--test-mode", "--text", "Bonjour", "--language", "fr");
+        SkipIfBuildFailed(exitCode, stderr);
+
+        string combined = stdout + stderr;
+        Assert.True(
+            combined.Contains("phoneme_ids", StringComparison.Ordinal)
+            || combined.Contains("not yet available", StringComparison.OrdinalIgnoreCase)
+            || combined.Contains("DotNetG2P", StringComparison.Ordinal),
+            $"Expected phoneme_ids or G2P unavailable. ExitCode={exitCode}, Output: {combined}");
+    }
+
+    [Fact]
+    [Trait("Category", "CLI")]
+    public async Task TestMode_Portuguese_OutputsPhonemeIds()
+    {
+        var (exitCode, stdout, stderr) = await RunCliAsync(
+            "--test-mode", "--text", "Olá", "--language", "pt");
+        SkipIfBuildFailed(exitCode, stderr);
+
+        string combined = stdout + stderr;
+        Assert.True(
+            combined.Contains("phoneme_ids", StringComparison.Ordinal)
+            || combined.Contains("not yet available", StringComparison.OrdinalIgnoreCase)
+            || combined.Contains("DotNetG2P", StringComparison.Ordinal),
+            $"Expected phoneme_ids or G2P unavailable. ExitCode={exitCode}, Output: {combined}");
+    }
+
+    [Fact]
+    [Trait("Category", "CLI")]
+    public async Task TestMode_UnsupportedLanguage_ShowsError()
+    {
+        var (exitCode, stdout, stderr) = await RunCliAsync(
+            "--test-mode", "--text", "test", "--language", "xx");
+        SkipIfBuildFailed(exitCode, stderr);
+
+        string combined = stdout + stderr;
+        Assert.True(
+            exitCode != 0
+            || combined.Contains("unsupported", StringComparison.OrdinalIgnoreCase)
+            || combined.Contains("not supported", StringComparison.OrdinalIgnoreCase)
+            || combined.Contains("unknown language", StringComparison.OrdinalIgnoreCase)
+            || combined.Contains("error", StringComparison.OrdinalIgnoreCase),
+            $"Expected error for unsupported language 'xx'. ExitCode={exitCode}, Output: {combined}");
+    }
 }

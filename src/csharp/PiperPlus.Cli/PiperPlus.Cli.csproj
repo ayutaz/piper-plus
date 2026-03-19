@@ -26,6 +26,10 @@
   <ItemGroup>
     <PackageReference Include="System.CommandLine" Version="2.0.5" />
     <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.24.3" />
+    <PackageReference Include="DotNetG2P.Chinese" Version="1.7.0" />
+    <PackageReference Include="DotNetG2P.Spanish" Version="1.7.0" />
+    <PackageReference Include="DotNetG2P.French" Version="1.7.0" />
+    <PackageReference Include="DotNetG2P.Portuguese" Version="1.7.0" />
   </ItemGroup>
 
   <ItemGroup>
