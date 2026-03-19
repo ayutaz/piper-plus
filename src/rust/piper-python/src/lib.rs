@@ -37,11 +37,6 @@ fn piper_err_to_pyerr(err: piper_core::PiperError) -> PyErr {
     }
 }
 
-/// Internal helper: convert PiperError Result to PyResult.
-fn to_pyresult<T>(r: Result<T, piper_core::PiperError>) -> PyResult<T> {
-    r.map_err(piper_err_to_pyerr)
-}
-
 // ---------------------------------------------------------------------------
 // Send wrapper for raw pointer (GIL release support)
 // ---------------------------------------------------------------------------
@@ -65,6 +60,7 @@ impl<T> SendPtr<T> {
     ///
     /// SAFETY: Caller must guarantee the pointer is valid and that no
     /// other references to the same data exist.
+    #[allow(clippy::mut_from_ref)]
     unsafe fn as_mut(&self) -> &mut T {
         &mut *self.0
     }
@@ -140,11 +136,8 @@ impl SynthesisResult {
     /// Args:
     ///     path: Output file path (e.g. "output.wav").
     fn save_wav(&self, path: &str) -> PyResult<()> {
-        to_pyresult(piper_core::audio::write_wav(
-            Path::new(path),
-            self.sample_rate,
-            &self.samples,
-        ))
+        piper_core::audio::write_wav(Path::new(path), self.sample_rate, &self.samples)
+            .map_err(piper_err_to_pyerr)
     }
 
     fn __repr__(&self) -> String {
@@ -210,11 +203,8 @@ impl PiperVoice {
     #[pyo3(signature = (model_path, config_path=None, device="cpu"))]
     fn new(model_path: &str, config_path: Option<&str>, device: &str) -> PyResult<Self> {
         let cfg = config_path.map(Path::new);
-        let inner = to_pyresult(piper_core::PiperVoice::load(
-            Path::new(model_path),
-            cfg,
-            device,
-        ))?;
+        let inner = piper_core::PiperVoice::load(Path::new(model_path), cfg, device)
+            .map_err(piper_err_to_pyerr)?;
         Ok(Self { inner })
     }
 
@@ -243,6 +233,7 @@ impl PiperVoice {
     /// Raises:
     ///     ValueError: If the text produces unknown phonemes.
     ///     RuntimeError: If ONNX inference fails.
+    #[allow(clippy::too_many_arguments)]
     #[pyo3(signature = (text, speaker_id=None, language=None, noise_scale=0.667, length_scale=1.0, noise_w=0.8))]
     fn synthesize(
         &mut self,
@@ -278,7 +269,7 @@ impl PiperVoice {
             )
         });
 
-        to_pyresult(result).map(SynthesisResult::from)
+        result.map_err(piper_err_to_pyerr).map(SynthesisResult::from)
     }
 
     /// Synthesize multiple texts in a single call.
@@ -305,6 +296,7 @@ impl PiperVoice {
     /// Raises:
     ///     ValueError: If any text produces unknown phonemes.
     ///     RuntimeError: If ONNX inference fails.
+    #[allow(clippy::too_many_arguments)]
     #[pyo3(signature = (texts, speaker_id=None, language=None, noise_scale=0.667, length_scale=1.0, noise_w=0.8))]
     fn synthesize_batch(
         &mut self,
@@ -335,7 +327,9 @@ impl PiperVoice {
             Ok::<_, piper_core::PiperError>(out)
         });
 
-        to_pyresult(results).map(|v| v.into_iter().map(SynthesisResult::from).collect())
+        results
+            .map_err(piper_err_to_pyerr)
+            .map(|v| v.into_iter().map(SynthesisResult::from).collect())
     }
 
     /// Synthesize text and save directly to a WAV file.
@@ -375,7 +369,7 @@ impl PiperVoice {
             inner.text_to_wav_file(&text_owned, Path::new(&output_owned), speaker_id)
         });
 
-        to_pyresult(result).map(SynthesisResult::from)
+        result.map_err(piper_err_to_pyerr).map(SynthesisResult::from)
     }
 
     /// The sample rate of the loaded model (e.g. 22050).
