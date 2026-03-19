@@ -162,11 +162,6 @@ class PiperTtsService : TextToSpeechService() {
         // Current synthesis is synchronous, so nothing to cancel
     }
 
-    override fun onCancel() {
-        Log.i(TAG, "onCancel called")
-        onStop()
-    }
-
     override fun onDestroy() {
         try {
             engine?.close()
