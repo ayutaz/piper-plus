@@ -121,10 +121,14 @@ public sealed class EnglishPhonemizer : IPhonemizer
             paddedIds.Add(phonemeIds[i]);
             paddedProsody.Add(prosodyFeatures[i]);
 
-            paddedIds.AddRange(padIds);
-            for (int j = 0; j < padIds.Length; j++)
+            // Only insert PAD if current phoneme is not already a pad token (matches Python base.py)
+            if (Array.IndexOf(padIds, phonemeIds[i]) < 0)
             {
-                paddedProsody.Add(null);
+                paddedIds.AddRange(padIds);
+                for (int j = 0; j < padIds.Length; j++)
+                {
+                    paddedProsody.Add(null);
+                }
             }
         }
 

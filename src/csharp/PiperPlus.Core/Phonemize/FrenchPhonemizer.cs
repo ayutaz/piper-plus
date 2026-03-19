@@ -42,6 +42,8 @@ public sealed class FrenchPhonemizer : IPhonemizer
     private static readonly HashSet<string> s_punctuation = new()
     {
         ".", ",", ";", ":", "!", "?",
+        "\u00a1", // ¡
+        "\u00bf", // ¿
         "\u00ab", // «
         "\u00bb", // »
         "\u2014", // —
@@ -111,10 +113,14 @@ public sealed class FrenchPhonemizer : IPhonemizer
             paddedIds.Add(phonemeIds[i]);
             paddedProsody.Add(prosodyFeatures[i]);
 
-            paddedIds.AddRange(padIds);
-            for (int j = 0; j < padIds.Length; j++)
+            // Only insert PAD if current phoneme is not already a pad token (matches Python base.py)
+            if (Array.IndexOf(padIds, phonemeIds[i]) < 0)
             {
-                paddedProsody.Add(null);
+                paddedIds.AddRange(padIds);
+                for (int j = 0; j < padIds.Length; j++)
+                {
+                    paddedProsody.Add(null);
+                }
             }
         }
 

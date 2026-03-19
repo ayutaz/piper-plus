@@ -31,7 +31,7 @@ public sealed class PortuguesePhonemizer : IPhonemizer
     // Portuguese punctuation characters that appear as standalone tokens.
     // Mirrors Python _PUNCTUATION = set(",.;:!?¡¿—–…")
     private static readonly HashSet<string> Punctuation =
-        [".", ",", ";", ":", "!", "?", "\u2014", "\u2013", "\u2026"]; // — = U+2014, – = U+2013, … = U+2026
+        [".", ",", ";", ":", "!", "?", "\u00a1", "\u00bf", "\u2014", "\u2013", "\u2026"]; // ¡ = U+00A1, ¿ = U+00BF, — = U+2014, – = U+2013, … = U+2026
 
     /// <summary>
     /// Create a new <see cref="PortuguesePhonemizer"/> backed by the given G2P engine.
@@ -95,10 +95,14 @@ public sealed class PortuguesePhonemizer : IPhonemizer
             paddedIds.Add(phonemeIds[i]);
             paddedProsody.Add(prosodyFeatures[i]);
 
-            paddedIds.AddRange(padIds);
-            for (int j = 0; j < padIds.Length; j++)
+            // Only insert PAD if current phoneme is not already a pad token (matches Python base.py)
+            if (Array.IndexOf(padIds, phonemeIds[i]) < 0)
             {
-                paddedProsody.Add(null);
+                paddedIds.AddRange(padIds);
+                for (int j = 0; j < padIds.Length; j++)
+                {
+                    paddedProsody.Add(null);
+                }
             }
         }
 
