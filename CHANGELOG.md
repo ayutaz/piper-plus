@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **ONNXエクスポートFP16デフォルト化** — `export_onnx`でFP16変換をデフォルト適用し、モデルサイズを約50%削減。`--no-fp16`フラグで無効化可能。LayerNormalization/Sigmoid/SoftmaxはFP32を維持し数値安定性を確保 (#239)
 
 #### Changed
+- **全ONNXモデルをFP16に統一 + モデル参照を6lang版に更新** — テストモデル・HuggingFace Spacesモデルを6lang FP16版に統一し、モデルカタログ(piper_plus_voices.json)を6lang版に更新。モデルサイズ約50%削減（77MB→39MB） (#256)
 - CMake ExternalProjectをpyopenjtalk-plus PyPI sdistベースに統一（全プラットフォーム共通）
 - OpenJTalkをスタンドアロンバイナリから静的ライブラリリンクに変更
 - `openjtalk_dictionary_manager.c`にバイナリ相対パスでの辞書検索を追加
@@ -33,6 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### 🔧 Improvements
 
 #### Fixed
+- **C++マルチリンガルphonemizerの全6言語動作修正** — JA以外の5言語(EN/ZH/ES/FR/PT)が動作しない問題を修正。辞書ファイル(CMU/pypinyin)をビルド成果物に同梱し、辞書検索パスを3段階探索(モデルDir→exe相対→環境変数)に拡充。`--language`指定でラテン文字言語の検出精度向上、辞書未ロード時のgraceful degradation対応 (#254)
 - **config.jsonフォールバック検索の統一** — 全コンポーネントで一貫したconfig検索ロジック (#243)
 - **Windows学習互換性** — Windows環境での学習パイプライン修正 + prosodyモデル置換 (#232)
 - **Dockerビルドトリガー修正** — トリガーブランチをdevに修正 (#228)
