@@ -15,7 +15,7 @@ C# CLI (`PiperPlus.Cli`) に中国語 (zh)、スペイン語 (es)、フランス
 | Phase 2 | Phonemizer Classes (4ファイル) | **完了** |
 | Phase 3 | PUA Mapping 拡張 (29→87エントリ) | **完了** |
 | Phase 4 | CLI 統合 (`Program.cs` + `--language`) | 未着手 |
-| Phase 5 | MultilingualPhonemizer (オプション) | 未着手 |
+| Phase 5 | MultilingualPhonemizer (オプション) | **完了** |
 | Phase 6 | テスト (4ファイル, 40テストケース) | **完了** |
 | Phase 7 | NuGet 依存関係 | 未着手 |
 
@@ -402,14 +402,14 @@ case "pt":
 
 `--language` オプションの Description を更新: `"ja, en, zh, es, fr, or pt"`
 
-### Phase 5: MultilingualPhonemizer (オプション) — **未着手**
+### Phase 5: MultilingualPhonemizer (オプション) — **完了**
 
 Python/Rust と同等の多言語自動ルーティング:
 
 ```
 src/csharp/PiperPlus.Core/Phonemize/
-├── MultilingualPhonemizer.cs      ← NEW
-└── UnicodeLanguageDetector.cs     ← NEW
+├── MultilingualPhonemizer.cs      ← 実装済
+└── UnicodeLanguageDetector.cs     ← 実装済
 ```
 
 - Unicode 範囲で言語を自動判別
@@ -496,14 +496,19 @@ IDs 169–173: フランス語固有フォネーム (~5個, 共有除く)
 | `PiperPlus.Core/Phonemize/PiperPhonemeConverter.cs` | `EspeakPostProcessIds()` 共通ヘルパー追加 | 3 |
 | `PiperPlus.Core.Tests/PhonemeConverterTests.cs` | エントリ数チェック 29→87 に更新 | 3 |
 
+#### 新規作成 (2ファイル, Phase 5)
+
+| ファイル | 内容 | Phase |
+|---------|------|-------|
+| `PiperPlus.Core/Phonemize/MultilingualPhonemizer.cs` | 多言語ルーター | 5 |
+| `PiperPlus.Core/Phonemize/UnicodeLanguageDetector.cs` | 言語判別 | 5 |
+
 ### 未着手ファイル
 
 | ファイル | 変更内容 | Phase |
 |---------|---------|-------|
 | `PiperPlus.Cli/Program.cs` | `ResolveTextModePhonemizer()` に4言語追加 + `--language` Description 更新 | 4 |
 | `PiperPlus.Cli/PiperPlus.Cli.csproj` | NuGet PackageReference 追加 | 7 |
-| `PiperPlus.Core/Phonemize/MultilingualPhonemizer.cs` | 多言語ルーター (オプション) | 5 |
-| `PiperPlus.Core/Phonemize/UnicodeLanguageDetector.cs` | 言語判別 (オプション) | 5 |
 
 ### 変更不要ファイル
 
@@ -551,6 +556,6 @@ I*G2PEngine.ToPhonemeList(text) → flat IPA tokens
 | 4 | Phase 6 | テスト (4ファイル, 40ケース) | **完了** |
 | 5 | Phase 4 | CLI 統合 | 未着手 |
 | 6 | Phase 7 | NuGet 依存関係 | 未着手 |
-| 7 | Phase 5 | Multilingual Phonemizer (オプション) | 未着手 |
+| 7 | Phase 5 | Multilingual Phonemizer (オプション) | **完了** |
 
 Phase 4 + 7 で単一言語モード (`--language zh` 等) が動作。Phase 5 は言語自動検出が必要な場合のみ。

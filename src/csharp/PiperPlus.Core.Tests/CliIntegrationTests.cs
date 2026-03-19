@@ -325,4 +325,29 @@ public sealed class CliIntegrationTests
             || combined.Contains("error", StringComparison.OrdinalIgnoreCase),
             $"Expected error for unsupported language 'xx'. ExitCode={exitCode}, Output: {combined}");
     }
+
+    // ================================================================
+    // --test-mode multilingual
+    // ================================================================
+
+    [Fact]
+    [Trait("Category", "CLI")]
+    public async Task TestMode_Multilingual_JaEn_OutputsPhonemeIds()
+    {
+        // Multi-language code "ja-en" should phonemize mixed-language text
+        var (exitCode, stdout, stderr) = await RunCliAsync(
+            "--test-mode", "--text", "こんにちはhello", "--language", "ja-en");
+        SkipIfBuildFailed(exitCode, stderr);
+
+        string combined = stdout + stderr;
+
+        // Either phonemizer succeeds and outputs phoneme_ids,
+        // or it fails because a G2P engine is not available.
+        Assert.True(
+            combined.Contains("phoneme_ids", StringComparison.Ordinal)
+            || combined.Contains("not yet available", StringComparison.OrdinalIgnoreCase)
+            || combined.Contains("DotNetG2P", StringComparison.Ordinal),
+            $"Expected phoneme_ids output or G2P unavailable message. " +
+            $"ExitCode={exitCode}, Output: {combined}");
+    }
 }

@@ -141,7 +141,7 @@ internal static class Program
         // --language
         var languageOption = new Option<string>("--language")
         {
-            Description = "Language for --text mode: ja, en, zh, es, fr, or pt (default: ja)",
+            Description = "Language for --text mode: ja, en, zh, es, fr, pt, or combined (e.g. ja-en-zh-es-fr-pt) (default: ja)",
             DefaultValueFactory = _ => "ja",
         };
 
@@ -1140,6 +1140,8 @@ internal static class Program
     ///   <item><c>es</c> — Spanish (requires <c>SpanishPhonemizer</c> + <c>DotNetSpanishG2PEngine</c>)</item>
     ///   <item><c>fr</c> — French (requires <c>FrenchPhonemizer</c> + <c>DotNetFrenchG2PEngine</c>)</item>
     ///   <item><c>pt</c> — Portuguese (requires <c>PortuguesePhonemizer</c> + <c>DotNetPortugueseG2PEngine</c>)</item>
+    ///   <item>Combined codes (e.g. <c>ja-en-zh-es-fr-pt</c>) — returns a
+    ///         <see cref="MultilingualPhonemizer"/> that auto-detects language per segment.</item>
     /// </list>
     /// </para>
     /// </summary>
@@ -1151,6 +1153,31 @@ internal static class Program
         "ensure DotNetG2PEngine/DotNetEnglishG2PEngine are preserved.")]
     private static IPhonemizer ResolveTextModePhonemizer(string language)
     {
+        // Multi-language code: "ja-en", "ja-en-zh-es-fr-pt", etc.
+        if (language.Contains('-'))
+        {
+            var parts = language.Split('-');
+            var phonemizers = new Dictionary<string, IPhonemizer>();
+            foreach (var part in parts)
+            {
+                // Recursively resolve each language (reuse existing switch cases)
+                phonemizers[part] = ResolveTextModePhonemizer(part);
+            }
+
+            // Determine default Latin language (prefer en, then es, pt, fr)
+            string defaultLatin = "en";
+            foreach (var lat in new[] { "en", "es", "pt", "fr" })
+            {
+                if (phonemizers.ContainsKey(lat))
+                {
+                    defaultLatin = lat;
+                    break;
+                }
+            }
+
+            return new MultilingualPhonemizer(phonemizers, defaultLatin);
+        }
+
         switch (language)
         {
             case "ja":
@@ -1207,7 +1234,7 @@ internal static class Program
             default:
                 throw new NotSupportedException(
                     $"Unsupported language for --text mode: {language}. " +
-                    "Supported languages: ja, en, zh, es, fr, pt.");
+                    "Supported languages: ja, en, zh, es, fr, pt, or combined (e.g. ja-en-zh-es-fr-pt).");
         }
     }
 
