@@ -289,14 +289,18 @@ Validation頻度削減、DataLoader最適化 (num_workers=2, pin_memory)、LRス
 |------|------|
 | TFM | PiperPlus.Core: net8.0, PiperPlus.Cli: net9.0 |
 | 対応言語 | JA, EN, ZH, ES, FR, PT (6言語) |
-| G2P依存 | DotNetG2P.Chinese/Spanish/French/Portuguese v1.7.0 |
-| テスト | 721テスト (xUnit v3) |
+| G2P依存 | DotNetG2P v1.8.0 (JA), DotNetG2P.MeCab v1.8.0 (JA), DotNetG2P.English v1.8.0 (EN), DotNetG2P.Chinese/Spanish/French/Portuguese v1.7.0 |
+| テスト | 735テスト (xUnit v3) |
 | CI | 3 OS × 2 .NET バージョン (csharp-ci.yml) |
 | ビルド | `dotnet build src/csharp/PiperPlus.sln` |
 
 **実装:** `src/csharp/PiperPlus.Core/`, `src/csharp/PiperPlus.Cli/`
 
-### Rust 推論エンジン (piper-rs)
+**追加機能:**
+- `lid` (言語ID) テンソル対応: マルチリンガルモデルで `language_id_map` から自動解決
+- OpenJTalk 辞書自動ダウンロード: C++ `openjtalk_dictionary_manager.c` と同等の辞書検索・自動DL機能
+
+### Rust 推論エンジン (piper-plus)
 
 Rust によるONNX推論エンジン。ストリーミング、CUDA/CoreML/DirectML対応。PyO3 による Python バインディング提供。
 
@@ -307,6 +311,8 @@ Rust によるONNX推論エンジン。ストリーミング、CUDA/CoreML/Direc
 | 特徴 | ストリーミング、GPU推論、WASM対応 |
 | CI | 3 OS (rust-tests.yml) |
 | ビルド | `cargo build --release -p piper-plus-cli` |
+
+**辞書自動ダウンロード:** `dict-download` feature (デフォルト有効) で OpenJTalk 辞書を自動検索・ダウンロード。`PIPER_OFFLINE_MODE=1` で無効化可能。
 
 **実装:** `src/rust/piper-core/`, `src/rust/piper-cli/`, `src/rust/piper-python/`
 
@@ -357,6 +363,7 @@ Rust によるONNX推論エンジン。ストリーミング、CUDA/CoreML/Direc
 | マルチリンガルPhonemizer | `src/csharp/PiperPlus.Core/Phonemize/MultilingualPhonemizer.cs` |
 | PUAマッピング | `src/csharp/PiperPlus.Core/Mapping/OpenJTalkToPiperMapping.cs` |
 | 設定管理 | `src/csharp/PiperPlus.Core/Config/` |
+| 辞書マネージャ | `src/csharp/PiperPlus.Core/Config/DictionaryManager.cs` |
 
 ### Rust ソースコード
 
@@ -368,6 +375,7 @@ Rust によるONNX推論エンジン。ストリーミング、CUDA/CoreML/Direc
 | Python バインディング | `src/rust/piper-python/` |
 | 音素化 | `src/rust/piper-core/src/phonemize/` |
 | 推論エンジン | `src/rust/piper-core/src/engine.rs` |
+| 辞書マネージャ | `src/rust/piper-core/src/dictionary_manager.rs` |
 
 ### データセット
 

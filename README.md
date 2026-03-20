@@ -57,7 +57,7 @@
 - **[Docker](docker/README.md)** — 推論・学習・WebUI・C++の5イメージ提供
 - **PyPI** — `pip install piper-tts-plus` で簡単インストール
 - **C# CLI** — .NET 8/9 クロスプラットフォーム、6言語マルチリンガル、ONNX推論
-- **Rust CLI** — piper-plus/piper-plus-cli、ストリーミング、CUDA/CoreML/DirectML対応
+- **Rust CLI** — piper-plus/piper-plus-cli、ストリーミング、CUDA/CoreML/DirectML対応、辞書自動ダウンロード
 
 ### プラットフォーム
 
@@ -236,6 +236,34 @@ PyPI パッケージからもインストール可能:
 pip install piper-tts-plus
 ```
 
+### パッケージからインストール
+
+**Python (PyPI):**
+```bash
+pip install piper-tts-plus
+```
+
+**C# CLI (.NET Global Tool):**
+```bash
+dotnet tool install -g PiperPlus.Cli
+```
+
+**Rust CLI (crates.io):**
+```bash
+cargo install piper-plus-cli
+```
+
+**C# ライブラリ (NuGet):**
+```bash
+dotnet add package PiperPlus.Core
+```
+
+**Rust ライブラリ (crates.io):**
+```toml
+[dependencies]
+piper-plus = "0.1.0"
+```
+
 ### ソースからビルド (C++)
 
 ```bash
@@ -262,6 +290,19 @@ dotnet test src/csharp/PiperPlus.Core.Tests/
 ```
 
 前提条件: .NET 8 SDK 以上
+
+#### C# CLI 使用例
+
+```bash
+# 日本語
+piper-plus --model model.onnx --text "こんにちは" --language ja --output-file output.wav
+
+# 英語
+piper-plus --model model.onnx --text "Hello world" --language en --output-file output.wav
+
+# マルチリンガル (自動言語検出)
+piper-plus --model model.onnx --text "こんにちはHello你好" --language ja-en-zh --output-file output.wav
+```
 
 ### ソースからビルド (Rust)
 
