@@ -465,7 +465,7 @@ mod tests {
         let ints = f32_to_i16(&samples);
         assert_eq!(ints[0], 32767); // clamped
         assert_eq!(ints[1], -32768); // clamped
-                                     // 0.5 * 32768 = 16384
+        // 0.5 * 32768 = 16384
         assert_eq!(ints[2], 16384);
     }
 
@@ -641,8 +641,8 @@ mod tests {
     fn test_fade_out_larger_than_length() {
         let mut samples = vec![10000i16; 3];
         fade_out(&mut samples, 100); // fade_samples > len
-                                     // Should not panic, fade is clamped to length
-                                     // First sample: i=0, gain = 1.0 - 0/3 = 1.0 (unchanged)
+        // Should not panic, fade is clamped to length
+        // First sample: i=0, gain = 1.0 - 0/3 = 1.0 (unchanged)
         assert_eq!(samples[0], 10000);
         // Last sample: i=2, gain = 1.0 - 2/3 ≈ 0.333
         assert!(samples[2] < samples[0], "last should be smaller than first");

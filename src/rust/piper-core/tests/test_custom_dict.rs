@@ -1,4 +1,4 @@
-use piper_core::phonemize::custom_dict::CustomDictionary;
+use piper_plus::phonemize::custom_dict::CustomDictionary;
 use std::io::Write;
 use std::sync::atomic::{AtomicU32, Ordering};
 

@@ -255,10 +255,10 @@ fn pinyin_to_ipa(syllable: &str, tone: u8) -> Vec<String> {
     let mut tokens: Vec<String> = Vec::new();
 
     // Initial consonant
-    if !initial.is_empty() {
-        if let Some(&ipa) = INITIAL_TO_IPA.get(initial) {
-            tokens.push(ipa.to_string());
-        }
+    if !initial.is_empty()
+        && let Some(&ipa) = INITIAL_TO_IPA.get(initial)
+    {
+        tokens.push(ipa.to_string());
     }
 
     // Final vowel(s) as a single compound token
@@ -335,10 +335,10 @@ fn apply_tone_sandhi(syllable_tones: &mut [(String, u8)]) {
 /// Extract tone number (1-5) from the end of a pinyin syllable.
 /// Returns (base_syllable, tone). Default tone is 5 (neutral).
 fn extract_tone(syllable: &str) -> (&str, u8) {
-    if let Some(last) = syllable.bytes().last() {
-        if (b'1'..=b'5').contains(&last) {
-            return (&syllable[..syllable.len() - 1], last - b'0');
-        }
+    if let Some(last) = syllable.bytes().last()
+        && (b'1'..=b'5').contains(&last)
+    {
+        return (&syllable[..syllable.len() - 1], last - b'0');
     }
     (syllable, 5)
 }
@@ -739,10 +739,10 @@ fn load_phrase_dict(path: &Path) -> Result<HashMap<String, Vec<String>>, PiperEr
             for item in arr {
                 if let Some(s) = item.as_str() {
                     py_list.push(s.to_string());
-                } else if let Some(inner_arr) = item.as_array() {
-                    if let Some(first) = inner_arr.first().and_then(|v| v.as_str()) {
-                        py_list.push(first.to_string());
-                    }
+                } else if let Some(inner_arr) = item.as_array()
+                    && let Some(first) = inner_arr.first().and_then(|v| v.as_str())
+                {
+                    py_list.push(first.to_string());
                 }
             }
             py_list

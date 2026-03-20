@@ -302,11 +302,11 @@ Rust によるONNX推論エンジン。ストリーミング、CUDA/CoreML/Direc
 
 | 項目 | 詳細 |
 |------|------|
-| クレート | piper-core, piper-cli, piper-python |
+| クレート | piper-plus, piper-plus-cli, piper-plus-python |
 | 対応言語 | JA, EN, ZH, KO, ES, FR, PT (7言語) |
 | 特徴 | ストリーミング、GPU推論、WASM対応 |
 | CI | 3 OS (rust-tests.yml) |
-| ビルド | `cargo build --release -p piper-cli` |
+| ビルド | `cargo build --release -p piper-plus-cli` |
 
 **実装:** `src/rust/piper-core/`, `src/rust/piper-cli/`, `src/rust/piper-python/`
 

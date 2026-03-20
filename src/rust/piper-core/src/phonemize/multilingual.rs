@@ -166,12 +166,12 @@ pub fn segment_text(text: &str, detector: &UnicodeLanguageDetector) -> Vec<(Stri
         let lang = detector.detect_char(ch, context_has_kana);
 
         if let Some(detected) = lang {
-            if let Some(prev) = current_lang {
-                if detected != prev {
-                    // Language changed — flush the current segment
-                    segments.push((prev.to_string(), std::mem::take(&mut current_chars)));
-                    // current_chars is now empty String (no allocation needed for clear)
-                }
+            if let Some(prev) = current_lang
+                && detected != prev
+            {
+                // Language changed — flush the current segment
+                segments.push((prev.to_string(), std::mem::take(&mut current_chars)));
+                // current_chars is now empty String (no allocation needed for clear)
             }
             current_lang = Some(detected);
         }
@@ -181,10 +181,10 @@ pub fn segment_text(text: &str, detector: &UnicodeLanguageDetector) -> Vec<(Stri
     }
 
     // Flush remaining characters
-    if let Some(lang) = current_lang {
-        if !current_chars.is_empty() {
-            segments.push((lang.to_string(), current_chars));
-        }
+    if let Some(lang) = current_lang
+        && !current_chars.is_empty()
+    {
+        segments.push((lang.to_string(), current_chars));
     }
 
     // Fallback: if no language-specific chars were detected, use default

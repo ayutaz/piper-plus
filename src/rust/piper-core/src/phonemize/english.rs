@@ -440,10 +440,9 @@ fn try_morphological_fallback(word: &str, cmu_dict: &HashMap<String, String>) ->
         let base_bytes = base.as_bytes();
         if base_bytes.len() >= 2
             && base_bytes[base_bytes.len() - 1] == base_bytes[base_bytes.len() - 2]
+            && let Some(r) = try_base(&base[..base.len() - 1], "IH0 NG")
         {
-            if let Some(r) = try_base(&base[..base.len() - 1], "IH0 NG") {
-                return Some(r);
-            }
+            return Some(r);
         }
         // Restored 'e': making->make
         let base_e = format!("{}e", base);
@@ -462,10 +461,9 @@ fn try_morphological_fallback(word: &str, cmu_dict: &HashMap<String, String>) ->
         let base_bytes = base.as_bytes();
         if base_bytes.len() >= 2
             && base_bytes[base_bytes.len() - 1] == base_bytes[base_bytes.len() - 2]
+            && let Some(r) = try_base(&base[..base.len() - 1], "D")
         {
-            if let Some(r) = try_base(&base[..base.len() - 1], "D") {
-                return Some(r);
-            }
+            return Some(r);
         }
         // Strip only 'd': loved->love
         if let Some(r) = try_base(&word[..len - 1], "D") {
@@ -483,10 +481,11 @@ fn try_morphological_fallback(word: &str, cmu_dict: &HashMap<String, String>) ->
             }
         }
         // -es: boxes->box
-        if len > 3 && word.ends_with("es") {
-            if let Some(r) = try_base(&word[..len - 2], "IH0 Z") {
-                return Some(r);
-            }
+        if len > 3
+            && word.ends_with("es")
+            && let Some(r) = try_base(&word[..len - 2], "IH0 Z")
+        {
+            return Some(r);
         }
         // -s: cats->cat
         if let Some(r) = try_base(&word[..len - 1], "Z") {
@@ -504,10 +503,9 @@ fn try_morphological_fallback(word: &str, cmu_dict: &HashMap<String, String>) ->
         let base_bytes = base.as_bytes();
         if base_bytes.len() >= 2
             && base_bytes[base_bytes.len() - 1] == base_bytes[base_bytes.len() - 2]
+            && let Some(r) = try_base(&base[..base.len() - 1], "ER0")
         {
-            if let Some(r) = try_base(&base[..base.len() - 1], "ER0") {
-                return Some(r);
-            }
+            return Some(r);
         }
     }
 
@@ -527,10 +525,11 @@ fn try_morphological_fallback(word: &str, cmu_dict: &HashMap<String, String>) ->
     }
 
     // ----- -est (fastest->fast) -----
-    if len > 4 && word.ends_with("est") {
-        if let Some(r) = try_base(&word[..len - 3], "AH0 S T") {
-            return Some(r);
-        }
+    if len > 4
+        && word.ends_with("est")
+        && let Some(r) = try_base(&word[..len - 3], "AH0 S T")
+    {
+        return Some(r);
     }
 
     None // Truly OOV

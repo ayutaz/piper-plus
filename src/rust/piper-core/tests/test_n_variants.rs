@@ -1,6 +1,6 @@
 //! Integration tests for Japanese N phoneme context-dependent variant rules.
 //!
-//! Tests `piper_core::phonemize::japanese::apply_n_phoneme_rules` which
+//! Tests `piper_plus::phonemize::japanese::apply_n_phoneme_rules` which
 //! replaces bare "N" tokens with context-appropriate variants:
 //!
 //! - N_m      : before m/b/p/my/by/py (bilabial assimilation)
@@ -10,7 +10,7 @@
 
 #[cfg(feature = "japanese")]
 mod tests {
-    use piper_core::phonemize::japanese::apply_n_phoneme_rules;
+    use piper_plus::phonemize::japanese::apply_n_phoneme_rules;
 
     // -----------------------------------------------------------------------
     // Bilabial assimilation (N_m)

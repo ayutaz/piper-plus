@@ -3,7 +3,7 @@
 //! Validates device string parsing, device enumeration,
 //! and trait implementations on DeviceType / DeviceInfo.
 
-use piper_core::gpu::{list_devices, parse_device_string, DeviceInfo, DeviceType};
+use piper_plus::gpu::{DeviceInfo, DeviceType, list_devices, parse_device_string};
 
 // =========================================================================
 // parse_device_string — valid inputs

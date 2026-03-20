@@ -8,6 +8,10 @@ on:
     branches:
       - dev
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   cpp-tests:
     runs-on: ${{ matrix.os }}
@@ -298,7 +302,6 @@ jobs:
         shell: bash
         run: |
           dotnet test src/csharp/PiperPlus.sln -c Release --no-build \
-            --filter "Category!=CLI" \
             --logger "trx;LogFileName=test-results.xml" \
             --collect:"XPlat Code Coverage" \
             --settings src/csharp/PiperPlus.runsettings
@@ -484,17 +487,17 @@ jobs:
         continue-on-error: true
 
       - name: Run tests
-        run: cargo test -p piper-core --no-fail-fast
+        run: cargo test -p piper-plus --no-fail-fast
 
       - name: Run tests (naist-jdic)
-        run: cargo test -p piper-core --features naist-jdic --no-fail-fast
+        run: cargo test -p piper-plus --features naist-jdic --no-fail-fast
 
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
-      - name: Check piper-python
-        run: cargo check -p piper-python
+      - name: Check piper-plus-python
+        run: cargo check -p piper-plus-python
 
   lint:
     runs-on: ubuntu-latest

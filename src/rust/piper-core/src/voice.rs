@@ -7,8 +7,8 @@ use std::path::Path;
 use crate::config::VoiceConfig;
 use crate::engine::{OnnxEngine, SynthesisRequest, SynthesisResult};
 use crate::error::PiperError;
-use crate::phonemize::phoneme_converter;
 use crate::phonemize::Phonemizer;
+use crate::phonemize::phoneme_converter;
 
 /// テキストから音声を合成する高レベル API
 pub struct PiperVoice {
@@ -30,7 +30,8 @@ impl PiperVoice {
     ) -> Result<Self, PiperError> {
         let resolved_config = VoiceConfig::resolve_config_path(model_path, config_path)?;
         let config = VoiceConfig::load(&resolved_config)?;
-        let phonemizer = Self::create_phonemizer(&config)?;
+        let model_dir = model_path.parent().map(|p| p.to_path_buf());
+        let phonemizer = Self::create_phonemizer(&config, model_dir.as_deref())?;
         let engine = OnnxEngine::load(model_path, &config, device)?;
 
         Ok(Self {
@@ -42,13 +43,17 @@ impl PiperVoice {
 
     /// phoneme_type に基づいて Phonemizer を生成する。
     ///
+    /// `model_dir` はモデルファイルの親ディレクトリ。辞書ファイルの検索に使用。
     /// テスト容易性のため独立関数として切り出し。
-    fn create_phonemizer(config: &VoiceConfig) -> Result<Box<dyn Phonemizer>, PiperError> {
+    fn create_phonemizer(
+        config: &VoiceConfig,
+        model_dir: Option<&Path>,
+    ) -> Result<Box<dyn Phonemizer>, PiperError> {
         match config.phoneme_type {
             #[cfg(feature = "japanese")]
-            crate::config::PhonemeType::OpenJTalk => Ok(Box::new(
-                crate::phonemize::japanese::JapanesePhonemizer::new()?,
-            )),
+            crate::config::PhonemeType::OpenJTalk => {
+                Ok(Box::new(Self::create_japanese_phonemizer()?))
+            }
             crate::config::PhonemeType::Bilingual | crate::config::PhonemeType::Multilingual => {
                 // Extract language codes from language_id_map
                 let mut languages: Vec<String> = config.language_id_map.keys().cloned().collect();
@@ -76,13 +81,8 @@ impl PiperVoice {
                     std::collections::HashMap::new();
 
                 for lang in &languages {
-                    let phonemizer: Box<dyn Phonemizer> = match lang.as_str() {
-                        #[cfg(feature = "japanese")]
-                        "ja" => Box::new(crate::phonemize::japanese::JapanesePhonemizer::new()?),
-                        _ => Box::new(crate::phonemize::multilingual::PassthroughPhonemizer::new(
-                            lang,
-                        )),
-                    };
+                    let phonemizer: Box<dyn Phonemizer> =
+                        Self::create_language_phonemizer(lang, model_dir)?;
                     phonemizers.insert(lang.clone(), phonemizer);
                 }
 
@@ -98,6 +98,113 @@ impl PiperVoice {
                 code: format!("{:?}", config.phoneme_type),
             }),
         }
+    }
+
+    /// 言語コードに基づいて適切な Phonemizer を生成する。
+    ///
+    /// 各言語の専用 Phonemizer を使用し、辞書が必要な言語 (en, zh) は
+    /// `model_dir` 配下またはデフォルトパスから辞書を検索する。
+    /// 辞書が見つからない場合は PassthroughPhonemizer にフォールバックする。
+    fn create_language_phonemizer(
+        lang: &str,
+        model_dir: Option<&Path>,
+    ) -> Result<Box<dyn Phonemizer>, PiperError> {
+        match lang {
+            #[cfg(feature = "japanese")]
+            "ja" => Ok(Box::new(Self::create_japanese_phonemizer()?)),
+            "en" => match Self::create_english_phonemizer(model_dir) {
+                Ok(p) => Ok(Box::new(p)),
+                Err(e) => {
+                    tracing::warn!("English phonemizer unavailable ({}), using passthrough", e);
+                    Ok(Box::new(
+                        crate::phonemize::multilingual::PassthroughPhonemizer::new(lang),
+                    ))
+                }
+            },
+            "zh" => match Self::create_chinese_phonemizer(model_dir) {
+                Ok(p) => Ok(Box::new(p)),
+                Err(e) => {
+                    tracing::warn!("Chinese phonemizer unavailable ({}), using passthrough", e);
+                    Ok(Box::new(
+                        crate::phonemize::multilingual::PassthroughPhonemizer::new(lang),
+                    ))
+                }
+            },
+            "es" => Ok(Box::new(crate::phonemize::spanish::SpanishPhonemizer::new())),
+            "fr" => Ok(Box::new(crate::phonemize::french::FrenchPhonemizer::new())),
+            "pt" => Ok(Box::new(
+                crate::phonemize::portuguese::PortuguesePhonemizer::new(),
+            )),
+            "ko" => Ok(Box::new(crate::phonemize::korean::KoreanPhonemizer::new())),
+            _ => Ok(Box::new(
+                crate::phonemize::multilingual::PassthroughPhonemizer::new(lang),
+            )),
+        }
+    }
+
+    /// EnglishPhonemizer を生成する。
+    ///
+    /// CMU辞書を以下の順で検索:
+    /// 1. `CMUDICT_PATH` 環境変数
+    /// 2. `{model_dir}/cmudict_data.json`
+    /// 3. `./cmudict_data.json`
+    /// 4. `/usr/share/piper/cmudict_data.json`
+    fn create_english_phonemizer(
+        model_dir: Option<&Path>,
+    ) -> Result<crate::phonemize::english::EnglishPhonemizer, PiperError> {
+        // Try model_dir first if available
+        if let Some(dir) = model_dir {
+            let model_dict = dir.join("cmudict_data.json");
+            if model_dict.exists() {
+                return crate::phonemize::english::EnglishPhonemizer::new_with_dict(&model_dict);
+            }
+        }
+        // Fall back to default search (env var, local, system)
+        crate::phonemize::english::EnglishPhonemizer::new()
+    }
+
+    /// ChinesePhonemizer を生成する。
+    ///
+    /// Pinyin辞書を以下の順で検索:
+    /// 1. `PINYIN_SINGLE_PATH` / `PINYIN_PHRASES_PATH` 環境変数
+    /// 2. `{model_dir}/pinyin_single.json` + `{model_dir}/pinyin_phrases.json`
+    /// 3. `./pinyin_single.json` + `./pinyin_phrases.json`
+    fn create_chinese_phonemizer(
+        model_dir: Option<&Path>,
+    ) -> Result<crate::phonemize::chinese::ChinesePhonemizer, PiperError> {
+        // 1. Environment variable override
+        if let (Ok(single), Ok(phrases)) = (
+            std::env::var("PINYIN_SINGLE_PATH"),
+            std::env::var("PINYIN_PHRASES_PATH"),
+        ) {
+            let sp = std::path::PathBuf::from(&single);
+            let pp = std::path::PathBuf::from(&phrases);
+            if sp.exists() && pp.exists() {
+                return crate::phonemize::chinese::ChinesePhonemizer::new(&sp, &pp);
+            }
+        }
+
+        // 2. model_dir
+        if let Some(dir) = model_dir {
+            let single = dir.join("pinyin_single.json");
+            let phrases = dir.join("pinyin_phrases.json");
+            if single.exists() && phrases.exists() {
+                return crate::phonemize::chinese::ChinesePhonemizer::new(&single, &phrases);
+            }
+        }
+
+        // 3. Local development path
+        let single = std::path::PathBuf::from("pinyin_single.json");
+        let phrases = std::path::PathBuf::from("pinyin_phrases.json");
+        if single.exists() && phrases.exists() {
+            return crate::phonemize::chinese::ChinesePhonemizer::new(&single, &phrases);
+        }
+
+        Err(PiperError::DictionaryLoad {
+            path: "pinyin_single.json / pinyin_phrases.json not found. \
+                   Place dictionaries next to the model or set PINYIN_SINGLE_PATH / PINYIN_PHRASES_PATH env vars"
+                .to_string(),
+        })
     }
 
     /// テキストを音声に変換
@@ -188,6 +295,23 @@ impl PiperVoice {
     /// 単言語モデルの場合は phonemizer の `language_code()` にフォールバック。
     fn detect_language(&self, text: &str) -> &str {
         self.phonemizer.detect_primary_language(text)
+    }
+
+    /// JapanesePhonemizer を生成する。
+    ///
+    /// `naist-jdic` feature が有効なら bundled 辞書を使用し、
+    /// 無効なら外部辞書を自動検索する。
+    #[cfg(feature = "japanese")]
+    fn create_japanese_phonemizer()
+    -> Result<crate::phonemize::japanese::JapanesePhonemizer, PiperError> {
+        #[cfg(feature = "naist-jdic")]
+        {
+            crate::phonemize::japanese::JapanesePhonemizer::new_bundled()
+        }
+        #[cfg(not(feature = "naist-jdic"))]
+        {
+            crate::phonemize::japanese::JapanesePhonemizer::new()
+        }
     }
 
     /// config への参照を返す
@@ -305,7 +429,7 @@ mod tests {
             language_id_map: HashMap::new(),
             speaker_id_map: HashMap::new(),
         };
-        match expect_err(PiperVoice::create_phonemizer(&config)) {
+        match expect_err(PiperVoice::create_phonemizer(&config, None)) {
             PiperError::UnsupportedLanguage { code } => {
                 assert!(
                     code.contains("Espeak"),
@@ -329,7 +453,7 @@ mod tests {
             language_id_map: HashMap::new(),
             speaker_id_map: HashMap::new(),
         };
-        match expect_err(PiperVoice::create_phonemizer(&config)) {
+        match expect_err(PiperVoice::create_phonemizer(&config, None)) {
             PiperError::InvalidConfig { reason } => {
                 assert!(
                     reason.contains("language_id_map"),
@@ -356,7 +480,7 @@ mod tests {
                 .collect(),
             speaker_id_map: HashMap::new(),
         };
-        let result = PiperVoice::create_phonemizer(&config);
+        let result = PiperVoice::create_phonemizer(&config, None);
         assert!(result.is_ok(), "expected Ok, got: {:?}", result.err());
         let phonemizer = result.unwrap();
         // MultilingualPhonemizer returns default_latin_language as language_code
@@ -385,7 +509,7 @@ mod tests {
             .collect(),
             speaker_id_map: HashMap::new(),
         };
-        let result = PiperVoice::create_phonemizer(&config);
+        let result = PiperVoice::create_phonemizer(&config, None);
         assert!(result.is_ok(), "expected Ok, got: {:?}", result.err());
         let phonemizer = result.unwrap();
         assert_eq!(phonemizer.language_code(), "en");
@@ -404,7 +528,7 @@ mod tests {
             language_id_map: HashMap::new(),
             speaker_id_map: HashMap::new(),
         };
-        match expect_err(PiperVoice::create_phonemizer(&config)) {
+        match expect_err(PiperVoice::create_phonemizer(&config, None)) {
             PiperError::InvalidConfig { reason } => {
                 assert!(
                     reason.contains("language_id_map"),
@@ -431,7 +555,7 @@ mod tests {
                 .collect(),
             speaker_id_map: HashMap::new(),
         };
-        let result = PiperVoice::create_phonemizer(&config);
+        let result = PiperVoice::create_phonemizer(&config, None);
         assert!(result.is_ok(), "expected Ok, got: {:?}", result.err());
         let phonemizer = result.unwrap();
         // Should fall back to "es" as the default Latin language
@@ -454,7 +578,7 @@ mod tests {
                 .collect(),
             speaker_id_map: HashMap::new(),
         };
-        let phonemizer = PiperVoice::create_phonemizer(&config).unwrap();
+        let phonemizer = PiperVoice::create_phonemizer(&config, None).unwrap();
         // English text should be detected as "en"
         assert_eq!(phonemizer.detect_primary_language("Hello world"), "en");
         // Chinese text should be detected as "zh"
@@ -473,7 +597,7 @@ mod tests {
             language_id_map: HashMap::new(),
             speaker_id_map: HashMap::new(),
         };
-        match expect_err(PiperVoice::create_phonemizer(&config)) {
+        match expect_err(PiperVoice::create_phonemizer(&config, None)) {
             PiperError::UnsupportedLanguage { code } => {
                 assert!(
                     code.contains("Text"),

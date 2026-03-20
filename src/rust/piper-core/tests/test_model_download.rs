@@ -1,6 +1,6 @@
-use piper_core::model_download::{
-    builtin_registry, default_model_dir, huggingface_url, is_model_cached, parse_model_registry,
-    DownloadProgress, ModelInfo,
+use piper_plus::model_download::{
+    DownloadProgress, ModelInfo, builtin_registry, default_model_dir, huggingface_url,
+    is_model_cached, parse_model_registry,
 };
 use std::path::Path;
 

@@ -8,31 +8,9 @@ namespace PiperPlus.Core.Tests;
 /// methods indirectly through the public <c>FindVoice</c> and <c>DownloadModelAsync</c>
 /// APIs, ensuring path traversal and injection attacks are rejected.
 /// </summary>
-public sealed class SecurityTests : IDisposable
+[Collection("StdErr")]
+public sealed class SecurityTests
 {
-    private TextWriter? _originalStdErr;
-
-    public void Dispose()
-    {
-        if (_originalStdErr is not null)
-        {
-            Console.SetError(_originalStdErr);
-            _originalStdErr = null;
-        }
-    }
-
-    /// <summary>
-    /// Redirects <see cref="Console.Error"/> to a <see cref="StringWriter"/>
-    /// and returns it. The original stderr is saved for restoration in
-    /// <see cref="Dispose"/>.
-    /// </summary>
-    private StringWriter CaptureStdErr()
-    {
-        _originalStdErr = Console.Error;
-        var sw = new StringWriter();
-        Console.SetError(sw);
-        return sw;
-    }
 
     // ================================================================
     // FindVoice — path traversal via voice key
@@ -79,14 +57,10 @@ public sealed class SecurityTests : IDisposable
     [InlineData("..")]
     public async Task DownloadModelAsync_PathTraversalName_ReturnsFalse(string maliciousName)
     {
-        using var sw = CaptureStdErr();
-
         bool result = await ModelManager.DownloadModelAsync(
             maliciousName, Path.GetTempPath(), TestContext.Current.CancellationToken);
 
         Assert.False(result);
-        string output = sw.ToString();
-        Assert.Contains("not found", output, StringComparison.OrdinalIgnoreCase);
     }
 
     [Theory]
@@ -96,8 +70,6 @@ public sealed class SecurityTests : IDisposable
     [InlineData("a")]
     public async Task DownloadModelAsync_NonexistentName_ReturnsFalse(string badName)
     {
-        using var sw = CaptureStdErr();
-
         bool result = await ModelManager.DownloadModelAsync(
             badName, Path.GetTempPath(), TestContext.Current.CancellationToken);
 

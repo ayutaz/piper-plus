@@ -151,12 +151,12 @@ impl AudioSink for CollectorSink {
             return Err(PiperError::Inference("sample rate must be > 0".to_string()));
         }
         // Detect sample rate mismatch across chunks
-        if let Some(prev) = self.sample_rate {
-            if prev != sample_rate {
-                return Err(PiperError::Inference(format!(
-                    "sample rate mismatch: expected {prev}, got {sample_rate}"
-                )));
-            }
+        if let Some(prev) = self.sample_rate
+            && prev != sample_rate
+        {
+            return Err(PiperError::Inference(format!(
+                "sample rate mismatch: expected {prev}, got {sample_rate}"
+            )));
         }
         self.sample_rate = Some(sample_rate);
         self.samples.extend_from_slice(samples);
@@ -181,8 +181,8 @@ impl AudioSink for CollectorSink {
 /// # Example (requires `--features playback`)
 ///
 /// ```ignore
-/// use piper_core::playback::RodioPlayer;
-/// use piper_core::streaming::AudioSink;
+/// use piper_plus::playback::RodioPlayer;
+/// use piper_plus::streaming::AudioSink;
 ///
 /// let mut player = RodioPlayer::new()?;
 /// player.write_chunk(&samples, 22050)?;

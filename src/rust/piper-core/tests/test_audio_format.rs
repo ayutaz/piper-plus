@@ -4,7 +4,7 @@
 //! sample format conversion, normalization, RMS measurement, silence
 //! trimming, fade effects, and audio concatenation with crossfade.
 
-use piper_core::audio_format::*;
+use piper_plus::audio_format::*;
 
 // =========================================================================
 // AudioFormat struct

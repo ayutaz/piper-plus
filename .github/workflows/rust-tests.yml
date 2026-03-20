@@ -53,13 +53,13 @@ jobs:
         workspaces: src/rust -> target
 
     - name: Run tests (default features)
-      run: cargo test -p piper-core --no-fail-fast
+      run: cargo test -p piper-plus --no-fail-fast
 
     - name: Run tests (naist-jdic)
-      run: cargo test -p piper-core --features naist-jdic --no-fail-fast
+      run: cargo test -p piper-plus --features naist-jdic --no-fail-fast
 
     - name: Run CLI check
-      run: cargo check -p piper-cli
+      run: cargo check -p piper-plus-cli
 
   fmt:
     name: rustfmt
@@ -96,7 +96,7 @@ jobs:
     - run: cargo clippy --workspace --all-features -- -D warnings
 
   python-bindings:
-    name: piper-python build
+    name: piper-plus-python build
     runs-on: ubuntu-24.04
     defaults:
       run:

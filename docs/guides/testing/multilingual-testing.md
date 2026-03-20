@@ -134,9 +134,9 @@ CI is defined in `.github/workflows/csharp-ci.yml` and runs on:
 
 This gives a 3 OS x 2 .NET versions matrix (6 combinations).
 
-## Rust Tests (piper-core)
+## Rust Tests (piper-plus)
 
-The Rust `piper-core` crate has 21 integration test files covering:
+The Rust `piper-plus` crate has 21 integration test files covering:
 
 - Multilingual phonemization (`test_multilingual.rs`, `test_romance_languages.rs`)
 - Per-language phonemizers (`test_japanese_phonemize.rs`, `test_english.rs`, `test_chinese.rs`, `test_korean.rs`)
@@ -149,13 +149,13 @@ The Rust `piper-core` crate has 21 integration test files covering:
 ### Running Rust Tests Locally
 
 ```bash
-cargo test -p piper-core
+cargo test -p piper-plus
 ```
 
 To run with verbose output and no failure short-circuit:
 
 ```bash
-cargo test -p piper-core --no-fail-fast -- --nocapture
+cargo test -p piper-plus --no-fail-fast -- --nocapture
 ```
 
 ### Rust CI Configuration

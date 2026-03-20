@@ -31,6 +31,7 @@ public record SynthesisResult(short[] Audio, float[]? Durations);
 public record SynthesisInput(
     long[] PhonemeIds,
     int SpeakerId = 0,
+    int LanguageId = 0,
     long[]? ProsodyFeatures = null,
     float NoiseScale = 0.667f,
     float LengthScale = 1.0f,
@@ -214,6 +215,16 @@ public sealed class PiperSession
             inputValues.Add(sidTensor);
         }
 
+        // lid (optional): [1] -- language ID for multilingual models
+        OrtValue? lidTensor = null;
+        if (_model.HasLanguageId)
+        {
+            long[] lidArray = new long[] { input.LanguageId };
+            lidTensor = OrtValue.CreateTensorValueFromMemory(lidArray, new long[] { 1 });
+            inputNames.Add("lid");
+            inputValues.Add(lidTensor);
+        }
+
         // prosody_features (optional): [1, phoneme_length, 3]
         // Use ArrayPool for the zero-filled fallback array to avoid per-call allocations
         // when no prosody data is provided. The rented buffer must stay alive through
@@ -282,6 +293,7 @@ public sealed class PiperSession
         {
             // Dispose optional tensors that were created outside the using declarations.
             sidTensor?.Dispose();
+            lidTensor?.Dispose();
             prosodyTensor?.Dispose();
 
             // Return the pooled prosody buffer after the tensor is disposed.
