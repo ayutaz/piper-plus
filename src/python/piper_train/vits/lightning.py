@@ -343,15 +343,6 @@ class VitsModel(pl.LightningModule):
 
         return audio
 
-    def on_train_epoch_end(self):
-        """Step LR schedulers at the end of each epoch.
-
-        With automatic_optimization=False, Lightning does not step schedulers
-        automatically. We must do it manually.
-        """
-        for sch in self.lr_schedulers():
-            sch.step()
-
     def on_train_epoch_start(self):
         """エポック開始時にSpeakerBalancedBatchSamplerのepochを更新"""
         if (
