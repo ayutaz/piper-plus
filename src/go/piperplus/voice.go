@@ -5,15 +5,18 @@ import (
 	"log/slog"
 	"sync"
 	"sync/atomic"
+
+	"github.com/ayutaz/piper-plus/src/go/phonemize"
 )
 
 // Voice represents a loaded TTS model ready for synthesis.
 type Voice struct {
-	engine *OnnxEngine
-	config *VoiceConfig
-	logger *slog.Logger
-	closed atomic.Bool
-	mu     sync.Mutex // protects Close
+	engine     *OnnxEngine
+	config     *VoiceConfig
+	phonemizer phonemize.Phonemizer
+	logger     *slog.Logger
+	closed     atomic.Bool
+	mu         sync.Mutex // protects Close
 }
 
 // LoadVoice loads a TTS model from modelPath and returns a Voice ready for synthesis.
@@ -62,12 +65,22 @@ func LoadVoice(ctx context.Context, modelPath string, opts ...LoadOption) (*Voic
 		return nil, err
 	}
 
+	// Try to create a phonemizer. Failure is non-fatal: the user can still
+	// use SynthesizeFromIDs with pre-computed phoneme IDs.
+	var ph phonemize.Phonemizer
+	ph, err = createPhonemizer(config, "")
+	if err != nil {
+		logger.Warn("phonemizer not available; use SynthesizeFromIDs for direct phoneme input",
+			"reason", err.Error())
+	}
+
 	logger.Info("voice loaded", "model", modelPath, "device", loadOpts.Device)
 
 	return &Voice{
-		engine: engine,
-		config: config,
-		logger: logger,
+		engine:     engine,
+		config:     config,
+		phonemizer: ph,
+		logger:     logger,
 	}, nil
 }
 

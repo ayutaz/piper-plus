@@ -1,0 +1,140 @@
+package phonemize
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+	"strings"
+)
+
+// CustomDictionary maps words to their phoneme sequences.
+type CustomDictionary struct {
+	entries map[string][]string // normalized word -> phoneme tokens
+}
+
+// NewCustomDictionary creates an empty dictionary.
+func NewCustomDictionary() *CustomDictionary {
+	return &CustomDictionary{entries: make(map[string][]string)}
+}
+
+// LoadDictFile loads a dictionary from a text file.
+// Format: one entry per line, "word phoneme1 phoneme2 ..."
+// Lines starting with # are comments. Empty lines are skipped.
+func LoadDictFile(path string) (*CustomDictionary, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, fmt.Errorf("open dict file: %w", err)
+	}
+	defer f.Close()
+
+	d := NewCustomDictionary()
+	scanner := bufio.NewScanner(f)
+	lineNo := 0
+	for scanner.Scan() {
+		lineNo++
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		fields := strings.Fields(line)
+		if len(fields) < 2 {
+			return nil, fmt.Errorf("dict line %d: need word + at least one phoneme, got %q", lineNo, line)
+		}
+		word := normalizeWord(fields[0])
+		d.entries[word] = fields[1:]
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("read dict file: %w", err)
+	}
+	return d, nil
+}
+
+// LoadDictFiles loads and merges multiple dictionary files.
+// Later files override earlier ones for the same word.
+func LoadDictFiles(paths []string) (*CustomDictionary, error) {
+	merged := NewCustomDictionary()
+	for _, p := range paths {
+		d, err := LoadDictFile(p)
+		if err != nil {
+			return nil, err
+		}
+		for word, phonemes := range d.entries {
+			merged.entries[word] = phonemes
+		}
+	}
+	return merged, nil
+}
+
+// Lookup returns the phoneme sequence for a word, or nil if not found.
+// Word is normalized (lowercased, trimmed).
+func (d *CustomDictionary) Lookup(word string) []string {
+	if ph, ok := d.entries[normalizeWord(word)]; ok {
+		cp := make([]string, len(ph))
+		copy(cp, ph)
+		return cp
+	}
+	return nil
+}
+
+// Add adds or overwrites a dictionary entry.
+func (d *CustomDictionary) Add(word string, phonemes []string) {
+	d.entries[normalizeWord(word)] = phonemes
+}
+
+// Len returns the number of entries.
+func (d *CustomDictionary) Len() int {
+	return len(d.entries)
+}
+
+// WrapPhonemizer wraps an existing Phonemizer, checking the dictionary first.
+// Words found in the dictionary use the dictionary phonemes;
+// other words fall through to the wrapped phonemizer.
+func (d *CustomDictionary) WrapPhonemizer(p Phonemizer) Phonemizer {
+	return &dictPhonemizer{dict: d, wrapped: p}
+}
+
+// normalizeWord lowercases and trims a word for dictionary lookup.
+func normalizeWord(w string) string {
+	return strings.ToLower(strings.TrimSpace(w))
+}
+
+// dictPhonemizer wraps a Phonemizer with dictionary lookup.
+type dictPhonemizer struct {
+	dict    *CustomDictionary
+	wrapped Phonemizer
+}
+
+// PhonemizeWithProsody tokenizes text into words and checks the dictionary
+// for each word before falling through to the wrapped phonemizer.
+func (dp *dictPhonemizer) PhonemizeWithProsody(text string) (*PhonemizeResult, error) {
+	words := strings.Fields(text)
+	var allTokens []string
+	var allProsody []*ProsodyInfo
+
+	for _, w := range words {
+		if ph := dp.dict.Lookup(w); ph != nil {
+			allTokens = append(allTokens, ph...)
+			for range ph {
+				allProsody = append(allProsody, nil)
+			}
+		} else {
+			res, err := dp.wrapped.PhonemizeWithProsody(w)
+			if err != nil {
+				return nil, fmt.Errorf("phonemize %q: %w", w, err)
+			}
+			allTokens = append(allTokens, res.Tokens...)
+			allProsody = append(allProsody, res.Prosody...)
+		}
+	}
+
+	return &PhonemizeResult{
+		Tokens:   allTokens,
+		Prosody:  allProsody,
+		EOSToken: "$",
+	}, nil
+}
+
+// LanguageCode delegates to the wrapped phonemizer.
+func (dp *dictPhonemizer) LanguageCode() string {
+	return dp.wrapped.LanguageCode()
+}

@@ -26,11 +26,12 @@ type SynthesisRequest struct {
 
 // SynthesisOptions holds resolved parameters for text-level synthesis.
 type SynthesisOptions struct {
-	Language    string
-	SpeakerID   int64
-	NoiseScale  float32
-	LengthScale float32
-	NoiseW      float32
+	Language        string
+	SpeakerID       int64
+	NoiseScale      float32
+	LengthScale     float32
+	NoiseW          float32
+	SentenceSilence float64 // seconds of silence between sentences (default 0.2)
 }
 
 // SynthesisOption is a functional option applied to SynthesisOptions.
@@ -59,6 +60,12 @@ func WithLengthScale(v float32) SynthesisOption {
 // WithNoiseW sets the duration predictor noise scale.
 func WithNoiseW(v float32) SynthesisOption {
 	return func(o *SynthesisOptions) { o.NoiseW = v }
+}
+
+// WithSentenceSilence sets the silence duration (in seconds) inserted between
+// sentences during streaming synthesis.
+func WithSentenceSilence(seconds float64) SynthesisOption {
+	return func(o *SynthesisOptions) { o.SentenceSilence = seconds }
 }
 
 // ---------------------------------------------------------------------------
@@ -97,9 +104,10 @@ func WithLogger(logger *slog.Logger) LoadOption {
 // defaultSynthesisOptions returns SynthesisOptions with sensible defaults.
 func defaultSynthesisOptions() SynthesisOptions {
 	return SynthesisOptions{
-		NoiseScale:  0.667,
-		LengthScale: 1.0,
-		NoiseW:      0.8,
+		NoiseScale:      0.667,
+		LengthScale:     1.0,
+		NoiseW:          0.8,
+		SentenceSilence: 0.2,
 	}
 }
 

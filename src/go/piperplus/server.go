@@ -1,0 +1,194 @@
+package piperplus
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"log/slog"
+	"net/http"
+	"strconv"
+	"time"
+)
+
+// Server is an HTTP TTS server.
+type Server struct {
+	voice  *Voice
+	logger *slog.Logger
+	mux    *http.ServeMux
+}
+
+type synthesizeRequest struct {
+	Text        string  `json:"text"`
+	Language    string  `json:"language,omitempty"`
+	SpeakerID   int64   `json:"speaker_id,omitempty"`
+	NoiseScale  float32 `json:"noise_scale,omitempty"`
+	LengthScale float32 `json:"length_scale,omitempty"`
+	NoiseW      float32 `json:"noise_w,omitempty"`
+}
+
+type healthResponse struct {
+	Status string `json:"status"`
+}
+
+type infoResponse struct {
+	NumSpeakers  int              `json:"num_speakers"`
+	NumLanguages int              `json:"num_languages"`
+	Languages    map[string]int64 `json:"languages,omitempty"`
+	Capabilities ModelCapabilities `json:"capabilities"`
+	SampleRate   int              `json:"sample_rate"`
+}
+
+// NewServer creates a new TTS HTTP server.
+func NewServer(voice *Voice, logger *slog.Logger) *Server {
+	if logger == nil {
+		logger = slog.Default()
+	}
+	s := &Server{
+		voice:  voice,
+		logger: logger,
+		mux:    http.NewServeMux(),
+	}
+	s.mux.HandleFunc("/synthesize", s.handleSynthesize)
+	s.mux.HandleFunc("/health", s.handleHealth)
+	s.mux.HandleFunc("/info", s.handleInfo)
+	return s
+}
+
+// Handler returns the http.Handler for this server.
+func (s *Server) Handler() http.Handler {
+	return s.mux
+}
+
+// ListenAndServe starts the server on the given address.
+func (s *Server) ListenAndServe(addr string) error {
+	s.logger.Info("starting TTS server", "addr", addr)
+	srv := &http.Server{
+		Addr:              addr,
+		Handler:           s.mux,
+		ReadHeaderTimeout: 10 * time.Second,
+	}
+	return srv.ListenAndServe()
+}
+
+func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(healthResponse{Status: "ok"})
+}
+
+func (s *Server) handleInfo(w http.ResponseWriter, r *http.Request) {
+	cfg := s.voice.Config()
+	resp := infoResponse{
+		NumSpeakers:  cfg.NumSpeakers,
+		NumLanguages: cfg.NumLanguages,
+		Languages:    cfg.LanguageIDMap,
+		Capabilities: s.voice.Capabilities(),
+		SampleRate:   cfg.Audio.SampleRate,
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(resp)
+}
+
+func (s *Server) handleSynthesize(w http.ResponseWriter, r *http.Request) {
+	var req synthesizeRequest
+	var err error
+
+	switch r.Method {
+	case http.MethodGet:
+		req, err = parseSynthesizeQuery(r)
+	case http.MethodPost:
+		err = json.NewDecoder(r.Body).Decode(&req)
+	default:
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if err != nil {
+		writeError(w, http.StatusBadRequest, fmt.Sprintf("invalid request: %v", err))
+		return
+	}
+
+	if req.Text == "" {
+		writeError(w, http.StatusBadRequest, "text is required")
+		return
+	}
+
+	// Build synthesis options.
+	var opts []SynthesisOption
+	if req.Language != "" {
+		opts = append(opts, WithLanguage(req.Language))
+	}
+	if req.SpeakerID != 0 {
+		opts = append(opts, WithSpeakerID(req.SpeakerID))
+	}
+	if req.NoiseScale != 0 {
+		opts = append(opts, WithNoiseScale(req.NoiseScale))
+	}
+	if req.LengthScale != 0 {
+		opts = append(opts, WithLengthScale(req.LengthScale))
+	}
+	if req.NoiseW != 0 {
+		opts = append(opts, WithNoiseW(req.NoiseW))
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 60*time.Second)
+	defer cancel()
+
+	result, err := s.voice.Synthesize(ctx, req.Text, opts...)
+	if err != nil {
+		s.logger.Error("synthesis failed", "error", err, "text", req.Text)
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("synthesis failed: %v", err))
+		return
+	}
+
+	s.logger.Info("synthesized",
+		"text_len", len(req.Text),
+		"duration", result.Duration,
+		"rtf", fmt.Sprintf("%.2f", result.RTF()),
+	)
+
+	w.Header().Set("Content-Type", "audio/wav")
+	result.WriteTo(w)
+}
+
+func parseSynthesizeQuery(r *http.Request) (synthesizeRequest, error) {
+	q := r.URL.Query()
+	req := synthesizeRequest{
+		Text:     q.Get("text"),
+		Language: q.Get("lang"),
+	}
+
+	if v := q.Get("speaker"); v != "" {
+		id, err := strconv.ParseInt(v, 10, 64)
+		if err != nil {
+			return req, fmt.Errorf("invalid speaker: %w", err)
+		}
+		req.SpeakerID = id
+	}
+	if v := q.Get("noise_scale"); v != "" {
+		f, err := strconv.ParseFloat(v, 32)
+		if err != nil {
+			return req, fmt.Errorf("invalid noise_scale: %w", err)
+		}
+		req.NoiseScale = float32(f)
+	}
+	if v := q.Get("length_scale"); v != "" {
+		f, err := strconv.ParseFloat(v, 32)
+		if err != nil {
+			return req, fmt.Errorf("invalid length_scale: %w", err)
+		}
+		req.LengthScale = float32(f)
+	}
+	if v := q.Get("noise_w"); v != "" {
+		f, err := strconv.ParseFloat(v, 32)
+		if err != nil {
+			return req, fmt.Errorf("invalid noise_w: %w", err)
+		}
+		req.NoiseW = float32(f)
+	}
+	return req, nil
+}
+
+func writeError(w http.ResponseWriter, code int, msg string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(code)
+	json.NewEncoder(w).Encode(map[string]string{"error": msg})
+}
