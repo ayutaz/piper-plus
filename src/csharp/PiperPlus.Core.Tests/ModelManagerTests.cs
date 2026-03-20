@@ -8,6 +8,7 @@ namespace PiperPlus.Core.Tests;
 /// These tests validate the embedded piper-plus voice catalog behavior
 /// that mirrors the C++ model_manager.cpp and Python download.py implementations.
 /// </summary>
+[Collection("StdErr")]
 public sealed class ModelManagerTests : IDisposable
 {
     private TextWriter? _originalStdErr;
