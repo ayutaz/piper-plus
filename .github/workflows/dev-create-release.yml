@@ -368,6 +368,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4.2.2
 
+      - name: Validate crate version
+        working-directory: src/rust
+        run: |
+          CRATE_VERSION=$(grep '^version' Cargo.toml | head -1 | sed 's/.*"\(.*\)".*/\1/')
+          RELEASE_VERSION="${{ github.event.inputs.version }}"
+          echo "Crate version: $CRATE_VERSION"
+          echo "Release version: $RELEASE_VERSION"
+          if [ "$CRATE_VERSION" != "$RELEASE_VERSION" ]; then
+            echo "::notice::Rust crate version ($CRATE_VERSION) differs from release version ($RELEASE_VERSION). Rust packages use independent versioning."
+          fi
+
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
