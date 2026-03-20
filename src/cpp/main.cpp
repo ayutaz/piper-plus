@@ -938,10 +938,19 @@ void parseArgs(int argc, char *argv[], RunConfig &runConfig) {
     return;
   }
 
-  // Verify model file exists
+  // Verify model file exists; if not, try resolving as a model name/alias
   ifstream modelFile(runConfig.modelPath.c_str(), ios::binary);
   if (!modelFile.good()) {
-    throw runtime_error("Model file doesn't exist");
+    auto modelDir = runConfig.modelDir.value_or(piper::getDefaultModelDir());
+    auto resolved = piper::resolveModelPath(runConfig.modelPath.string(), modelDir);
+    if (resolved) {
+      spdlog::info("Resolved model name '{}' to {}", runConfig.modelPath.string(), resolved->string());
+      runConfig.modelPath = resolved.value();
+      modelFile.open(runConfig.modelPath.c_str(), ios::binary);
+    }
+    if (!modelFile.good()) {
+      throw runtime_error("Model file doesn't exist: " + runConfig.modelPath.string());
+    }
   }
 
   if (!modelConfigPath) {

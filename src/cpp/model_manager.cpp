@@ -585,4 +585,28 @@ bool downloadModel(const std::string& modelName,
     return allOk;
 }
 
+std::optional<fs::path> resolveModelPath(
+    const std::string& nameOrAlias,
+    const fs::path& modelDir) {
+    auto maybeVoice = findVoice(nameOrAlias);
+    if (!maybeVoice) {
+        return std::nullopt;
+    }
+
+    const VoiceInfo& voice = maybeVoice.value();
+
+    // Find the .onnx file in the voice's file list
+    for (const auto& file : voice.files) {
+        fs::path fn = fs::path(file.relativePath).filename();
+        if (fn.extension() == ".onnx") {
+            fs::path candidate = modelDir / fn;
+            if (fs::exists(candidate)) {
+                return candidate;
+            }
+        }
+    }
+
+    return std::nullopt;
+}
+
 } // namespace piper

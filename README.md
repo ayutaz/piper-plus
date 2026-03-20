@@ -113,19 +113,10 @@ cd piper
 # つくよみちゃんモデルをダウンロード
 ./bin/piper --download-model tsukuyomi
 
-# 音声を生成 (ダウンロード完了時に表示されるパスを --model に指定)
-./bin/piper --text "こんにちは、今日は良い天気ですね。" \
-  --model ~/.local/share/piper/models/tsukuyomi-chan-6lang-fp16.onnx \
-  --output_file output.wav
+# 音声を生成 (モデル名だけで OK — ダウンロード済みモデルを自動解決)
+./bin/piper --model tsukuyomi --text "こんにちは、今日は良い天気ですね。" --output_file output.wav
 ```
 
-> **Windows (PowerShell) での実行例:**
->
-> ```powershell
-> .\bin\piper.exe --download-model tsukuyomi
-> .\bin\piper.exe --text "こんにちは、今日は良い天気ですね。" --model $env:APPDATA\piper\models\tsukuyomi-chan-6lang-fp16.onnx --output_file output.wav
-> ```
->
 > **Windows cmd を使う場合:** cmd はデフォルトで Shift-JIS (CP932) のため、先に `chcp 65001` で UTF-8 に切り替えてください。
 >
 > **output.wav の出力先:** カレントディレクトリ（`cd piper` した場所）に生成されます。
