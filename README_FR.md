@@ -109,7 +109,7 @@ Telecharger depuis [GitHub Releases](https://github.com/ayutaz/piper-plus/releas
 
 ```sh
 echo 'Welcome to the world of speech synthesis!' | \
-  ./piper --model en_US-lessac-medium.onnx --output_file welcome.wav
+  ./bin/piper --model en_US-lessac-medium.onnx --output_file welcome.wav
 ```
 
 ### Docker
@@ -201,25 +201,25 @@ Prerequis : compilateur C++17, CMake 3.13+
 
 ```sh
 # Utilisation de base
-echo "こんにちは" | ./piper --model ja_model.onnx --output_file output.wav
+echo "こんにちは" | ./bin/piper --model ja_model.onnx --output_file output.wav
 
 # Streaming (faible latence)
-echo "Texte long..." | ./piper --model ja_model.onnx --output_file output.wav --streaming
+echo "Texte long..." | ./bin/piper --model ja_model.onnx --output_file output.wav --streaming
 
 # Inference GPU
-echo "Hello" | ./piper --model en_model.onnx --use-cuda --output_file output.wav
+echo "Hello" | ./bin/piper --model en_model.onnx --use-cuda --output_file output.wav
 
 # Sortie de timing phonemique (pour lip-sync, sous-titres)
-echo "Hello world" | ./piper --model en_model.onnx -f speech.wav --output-timing timing.json
+echo "Hello world" | ./bin/piper --model en_model.onnx -f speech.wav --output-timing timing.json
 
 # Dictionnaire personnalise
-echo "DockerとGitHubを使います" | ./piper --model ja_model.onnx --custom-dict my_dict.json -f output.wav
+echo "DockerとGitHubを使います" | ./bin/piper --model ja_model.onnx --custom-dict my_dict.json -f output.wav
 
 # Saisie phonemique en ligne
-echo 'Hello [[ h ə l oʊ ]] world' | ./piper --model en_model.onnx -f output.wav
+echo 'Hello [[ h ə l oʊ ]] world' | ./bin/piper --model en_model.onnx -f output.wav
 
 # Saisie de phonemes bruts
-echo 'h ə l oʊ _ w ɜː l d' | ./piper --model en_model.onnx --raw-phonemes -f output.wav
+echo 'h ə l oʊ _ w ɜː l d' | ./bin/piper --model en_model.onnx --raw-phonemes -f output.wav
 ```
 
 Options principales :

@@ -86,7 +86,7 @@
 
 ```powershell
 Invoke-WebRequest -Uri "https://github.com/ayutaz/piper-plus/releases/latest/download/piper-windows-x64.zip" -OutFile piper.zip
-Expand-Archive piper.zip -DestinationPath piper
+Expand-Archive piper.zip -DestinationPath .
 cd piper
 ```
 
@@ -129,29 +129,38 @@ curl -L -o models/config.json https://huggingface.co/ayousanz/piper-plus-tsukuyo
 
 **3. 音声を生成**
 
-**Windows (cmd):**
+**Windows (PowerShell):**
 
-```cmd
-echo こんにちは、今日は良い天気ですね。| piper.exe --model models\tsukuyomi.onnx --config models\config.json --output_file output.wav
+```powershell
+.\bin\piper.exe --text "こんにちは、今日は良い天気ですね。" --model models\tsukuyomi.onnx --config models\config.json --output_file output.wav
 ```
 
 **macOS / Linux:**
 
 ```bash
-echo 'こんにちは、今日は良い天気ですね。' | \
-  ./piper --model models/tsukuyomi.onnx --config models/config.json --output_file output.wav
+./bin/piper --text 'こんにちは、今日は良い天気ですね。' \
+  --model models/tsukuyomi.onnx --config models/config.json --output_file output.wav
 ```
+
+> **output.wav の出力先:** カレントディレクトリ（`cd piper` した場所）に生成されます。
+>
+> **Windows cmd を使う場合:** cmd はデフォルトで Shift-JIS (CP932) のため、UTF-8 に切り替えてから実行してください:
+>
+> ```cmd
+> chcp 65001
+> bin\piper.exe --text "こんにちは、今日は良い天気ですね。" --model models\tsukuyomi.onnx --config models\config.json --output_file output.wav
+> ```
 
 > **config.json の命名規則:** piper は `<モデル名>.onnx.json` を優先的に自動検出します。見つからない場合、モデルと同じディレクトリの `config.json` にフォールバックします。どちらも見つからない場合は `--config` で明示的に指定してください。
 >
 > ```sh
 > # 自動検出 (--config 不要)
-> ./piper --model models/tsukuyomi.onnx --output_file output.wav
+> ./bin/piper --model models/tsukuyomi.onnx --output_file output.wav
 > # → 1. models/tsukuyomi.onnx.json を検索
 > # → 2. models/config.json にフォールバック
 >
 > # 手動指定 (上記どちらも存在しない場合)
-> ./piper --model models/tsukuyomi.onnx --config /path/to/config.json --output_file output.wav
+> ./bin/piper --model models/tsukuyomi.onnx --config /path/to/config.json --output_file output.wav
 > ```
 
 ### Python推論
@@ -319,41 +328,41 @@ cargo test -p piper-core
 
 ```sh
 # テキストから音声生成
-./piper --model model.onnx --text "Hello, how are you?" -f output.wav
+./bin/piper --model model.onnx --text "Hello, how are you?" -f output.wav
 
 # 日本語テキスト (Windowsでのエンコーディング問題を回避)
-piper.exe --model models\tsukuyomi.onnx --text "こんにちは、今日は良い天気ですね。" -f output.wav
+bin\piper.exe --model models\tsukuyomi.onnx --text "こんにちは、今日は良い天気ですね。" -f output.wav
 
 # 話者指定
-./piper --model model.onnx --text "Hello" --speaker 3 -f output.wav
+./bin/piper --model model.onnx --text "Hello" --speaker 3 -f output.wav
 ```
 
 #### パイプ入力
 
 ```sh
 # 基本
-echo "こんにちは" | ./piper --model ja_model.onnx --output_file output.wav
+echo "こんにちは" | ./bin/piper --model ja_model.onnx --output_file output.wav
 
 # ストリーミング (低レイテンシ)
-echo "長いテキスト..." | ./piper --model ja_model.onnx --output_file output.wav --streaming
+echo "長いテキスト..." | ./bin/piper --model ja_model.onnx --output_file output.wav --streaming
 
 # GPU推論
-echo "Hello" | ./piper --model en_model.onnx --use-cuda --output_file output.wav
+echo "Hello" | ./bin/piper --model en_model.onnx --use-cuda --output_file output.wav
 
 # 音素タイミング出力 (リップシンク・字幕同期用)
-echo "Hello world" | ./piper --model en_model.onnx -f speech.wav --output-timing timing.json
+echo "Hello world" | ./bin/piper --model en_model.onnx -f speech.wav --output-timing timing.json
 
 # カスタム辞書
-echo "DockerとGitHubを使います" | ./piper --model ja_model.onnx --custom-dict my_dict.json -f output.wav
+echo "DockerとGitHubを使います" | ./bin/piper --model ja_model.onnx --custom-dict my_dict.json -f output.wav
 
 # インライン音素入力
-echo 'Hello [[ h ə l oʊ ]] world' | ./piper --model en_model.onnx -f output.wav
+echo 'Hello [[ h ə l oʊ ]] world' | ./bin/piper --model en_model.onnx -f output.wav
 
 # 生の音素入力
-echo 'h ə l oʊ _ w ɜː l d' | ./piper --model en_model.onnx --raw-phonemes -f output.wav
+echo 'h ə l oʊ _ w ɜː l d' | ./bin/piper --model en_model.onnx --raw-phonemes -f output.wav
 
 # ストリーミング (raw audio 出力)
-echo 'Long text...' | ./piper --model en_model.onnx --output-raw | \
+echo 'Long text...' | ./bin/piper --model en_model.onnx --output-raw | \
   aplay -r 22050 -f S16_LE -t raw -
 ```
 
@@ -385,7 +394,7 @@ echo 'Long text...' | ./piper --model en_model.onnx --output-raw | \
 > **WavLMモデルの推奨設定:** WavLM Discriminatorで学習されたモデルは `--noise-scale 0.5` を推奨します (デフォルトは 0.667)。
 >
 > ```sh
-> echo "こんにちは" | ./piper --model tsukuyomi.onnx --config config.json --noise-scale 0.5 -f output.wav
+> echo "こんにちは" | ./bin/piper --model tsukuyomi.onnx --config config.json --noise-scale 0.5 -f output.wav
 > ```
 
 ### JSON入力
@@ -403,25 +412,25 @@ echo 'Long text...' | ./piper --model en_model.onnx --output-raw | \
 
 ```bash
 # 利用可能なモデル一覧を表示
-./piper --list-models
+./bin/piper --list-models
 
 # 言語でフィルタリング
-./piper --list-models ja
-./piper --list-models en
+./bin/piper --list-models ja
+./bin/piper --list-models en
 ```
 
 #### モデルのダウンロード
 
 ```bash
 # モデル名を指定してダウンロード
-./piper --download-model tsukuyomi
-./piper --download-model en_US-lessac-medium
+./bin/piper --download-model tsukuyomi
+./bin/piper --download-model en_US-lessac-medium
 
 # ダウンロード先ディレクトリを指定
-./piper --download-model tsukuyomi --model-dir /path/to/models
+./bin/piper --download-model tsukuyomi --model-dir /path/to/models
 
 # ダウンロード後、モデルを使用
-./piper --model ~/.local/share/piper/models/ja_JP-tsukuyomi-chan-medium/tsukuyomi-chan-6lang-fp16.onnx --text "こんにちは"
+./bin/piper --model ~/.local/share/piper/models/ja_JP-tsukuyomi-chan-medium/tsukuyomi-chan-6lang-fp16.onnx --text "こんにちは"
 ```
 
 ### 環境変数 (C++ CLI)
