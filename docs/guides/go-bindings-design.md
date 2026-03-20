@@ -2,21 +2,26 @@
 
 Issue: [#260 feat: Go 推論バインディング](https://github.com/ayutaz/piper-plus/issues/260)
 
+**ステータス: 実装完了 (Phase 1-5)** — 2026-03-21
+
 ## 概要
 
-Go向けのTTS推論バインディングを実装する。サーバーサイド/マイクロサービス/CLIツール用途に最適化し、ONNX Runtime を直接利用して推論を行う。
+Go向けのTTS推論バインディング。サーバーサイド/マイクロサービス/CLIツール用途に最適化し、ONNX Runtime を直接利用して推論を行う。
 
 ### 技術仕様
 
 | 項目 | 値 |
 |---|---|
 | 言語 | Go 1.26+ |
-| ONNX Runtime | `yalue/onnxruntime_go` (v1.24.1+) 経由 C API |
-| ビルドシステム | Go modules |
-| 配布 | Go module, Docker image, シングルバイナリ |
+| ONNX Runtime | `yalue/onnxruntime_go` v1.27.0 経由 C API |
+| CLI フレームワーク | `spf13/cobra` v1.10.2 |
+| ビルドシステム | Go modules + Makefile |
+| 配布 | Go module, Docker image (Alpine), シングルバイナリ |
 | 対応プラットフォーム | Linux (x86_64, arm64), macOS (arm64), Windows (x86_64) |
 | Execution Provider | CPU, CUDA, TensorRT, CoreML, DirectML |
 | 対応言語 | 6言語 (ja, en, zh, es, fr, pt) |
+| 総コード量 | 73ファイル, ~11,600行 (テスト含む) |
+| テスト | 148 unit + 6 integration |
 
 ## 背景・モチベーション
 
@@ -109,40 +114,58 @@ func Shutdown() error {
 
 ```
 src/go/
-├── go.mod                     # module github.com/ayutaz/piper-plus/src/go
+├── go.mod                         # module github.com/ayutaz/piper-plus/src/go
 ├── go.sum
-├── piperplus/                 # package piperplus — コアライブラリ
-│   ├── engine.go              # ONNX 推論エンジン (DynamicAdvancedSession)
-│   ├── engine_test.go
-│   ├── voice.go               # 高レベル API (Voice ロード + 合成)
-│   ├── voice_test.go
-│   ├── config.go              # config.json パーサー
-│   ├── config_test.go
-│   ├── wav.go                 # WAV ファイル出力 (io.WriterTo)
-│   ├── wav_test.go
-│   ├── timing.go              # phoneme タイミング (durations → 時刻変換)
-│   ├── timing_test.go
-│   ├── errors.go              # 構造化エラー型
-│   └── device.go              # GPU デバイス選択
-├── phonemize/                 # package phonemize — Phonemizer (sibling)
-│   ├── phonemizer.go          # Phonemizer インターフェース
-│   ├── registry.go            # 言語レジストリ
-│   ├── multilingual.go        # マルチリンガル Phonemizer
-│   ├── multilingual_test.go
-│   ├── unicode_detect.go      # Unicode 言語検出
-│   ├── unicode_detect_test.go
-│   ├── japanese.go            # 日本語 (G2P Engine インターフェース)
-│   ├── japanese_test.go
-│   ├── english.go             # 英語 (CMU辞書 + G2P)
-│   ├── english_test.go
-│   ├── chinese.go             # 中国語 (Pinyin)
-│   ├── spanish.go             # スペイン語 (規則ベース)
-│   ├── french.go              # フランス語 (規則ベース)
-│   └── portuguese.go          # ポルトガル語 (規則ベース)
+├── Makefile                       # build/test/lint/docker/coverage
+├── .golangci.yml                  # golangci-lint 設定
+├── README.md                      # 包括的ドキュメント
+├── piperplus/                     # package piperplus — コアライブラリ
+│   ├── doc.go                     # godoc パッケージドキュメント
+│   ├── init.go                    # ONNX Runtime Init()/Shutdown() ライフサイクル
+│   ├── errors.go                  # 構造化エラー型 (5種 + sentinel 4種)
+│   ├── config.go                  # VoiceConfig + config.json パーサー
+│   ├── options.go                 # SynthesisRequest/Option, LoadOption (functional options)
+│   ├── engine.go                  # OnnxEngine (DynamicAdvancedSession + 能力検出)
+│   ├── voice.go                   # Voice API (LoadVoice, Close)
+│   ├── synthesize.go              # Voice.Synthesize (phonemizer↔engine統合)
+│   ├── wav.go                     # SynthesisResult + WAV 出力 (io.WriterTo)
+│   ├── timing.go                  # phoneme タイミング (durations → 時刻変換)
+│   ├── device.go                  # GPU デバイス選択 + EP 設定
+│   ├── streaming.go               # AudioSink + ストリーミング合成 + クロスフェード
+│   ├── text_splitter.go           # 文分割 (JA/ZH/EN 対応)
+│   ├── pool.go                    # VoicePool (セッションプーリング)
+│   ├── server.go                  # HTTP API サーバー (/synthesize, /health, /info)
+│   ├── jsonl.go                   # JSONL 入力パーサー
+│   ├── model_manager.go           # モデルダウンロード + キャッシュ管理
+│   ├── testdata/                  # テストフィクスチャ (config.json 等)
+│   └── *_test.go                  # ユニット + インテグレーションテスト
+├── phonemize/                     # package phonemize — 6言語 Phonemizer
+│   ├── doc.go                     # godoc パッケージドキュメント
+│   ├── phonemizer.go              # Phonemizer インターフェース + PostProcessIDs
+│   ├── pua.go                     # PUA 双方向マッピング (87 固定エントリ)
+│   ├── unicode_detect.go          # Unicode 言語検出 (7段階優先度)
+│   ├── multilingual.go            # マルチリンガル Phonemizer + EOSToken 追跡
+│   ├── japanese.go                # 日本語 (G2P Engine + Kurihara + N変異)
+│   ├── english.go                 # 英語 (CMU辞書 + ARPAbet→IPA)
+│   ├── chinese.go                 # 中国語 (Pinyin→IPA + 声調変調)
+│   ├── spanish.go                 # スペイン語 (規則ベース G2P, seseo)
+│   ├── french.go                  # フランス語 (規則ベース G2P, 鼻母音)
+│   ├── portuguese.go              # ポルトガル語 (規則ベース G2P, 鼻母音化)
+│   ├── dict.go                    # カスタム辞書サポート
+│   └── *_test.go                  # ユニットテスト
 ├── cmd/
-│   └── piper-plus/            # CLI アプリケーション (cobra)
+│   └── piper-plus/                # CLI アプリケーション (cobra, 17フラグ)
 │       └── main.go
-└── README.md
+├── docker/
+│   ├── Dockerfile                 # Alpine multi-stage (ONNX Runtime 同梱)
+│   └── .dockerignore
+└── examples/
+    ├── README.md
+    ├── basic/main.go              # 基本テキスト→WAV 合成
+    ├── server/main.go             # HTTP TTS サーバー
+    ├── streaming/main.go          # ストリーミング合成
+    ├── batch/main.go              # バッチ処理
+    └── pool/main.go               # VoicePool 並行合成
 ```
 
 **インポートパス:**
@@ -907,52 +930,69 @@ voice, err := piperplus.LoadVoice(ctx, "model.onnx",
 
 ## 実装フェーズ
 
-### Phase 1: プロジェクト構造・ビルドシステム
+### Phase 1: プロジェクト構造・ビルドシステム ✅ 完了
 
-- `src/go/` ディレクトリ作成、`go.mod` 設定
-- ONNX Runtime ライブラリロード + `Init()`/`Shutdown()` ライフサイクル
-- `VoiceConfig` 構造体 + config.json パーサー
-- CI/CD: `go-ci.yml` (unit test + lint)
+**コミット:** `1ea4091` — 17ファイル, +2,231行, 30テスト
 
-### Phase 2: コア推論エンジン
+- `src/go/go.mod` (Go 1.26, onnxruntime_go v1.27.0)
+- `piperplus/init.go` — ONNX Runtime `Init()`/`Shutdown()` + `sync.Once` + 環境変数フォールバック
+- `piperplus/errors.go` — 構造化エラー型 5種 + sentinel 4種
+- `piperplus/config.go` — `VoiceConfig` + JSON パーサー + 4段階パス解決 + バリデーション + ヘルパーメソッド
+- `piperplus/doc.go` — godoc ドキュメント
+- `.github/workflows/go-ci.yml` — CI (unit-test 3OS + integration-test + lint)
+- `piperplus/testdata/` — テストフィクスチャ 5ファイル
 
-- `OnnxEngine` — `DynamicAdvancedSession` ラッパー + 能力検出
-- テンソル動的構築・推論実行
-- `SynthesisResult` — `io.WriterTo` 実装、ピーク正規化、WAV 出力
-- Phoneme タイミング (`durations` → 時刻変換)
-- GPU デバイス選択 + フォールバック
-- `context.Context` キャンセル (`RunOptions.SetTerminate()`)
-- 構造化エラー型
-- CI: integration test (ONNX Runtime + テストモデル)
+### Phase 2: コア推論エンジン ✅ 完了
 
-### Phase 3: Phonemizer
+**コミット:** `883254b` — 10ファイル, +1,859行, 35テスト (29 unit + 6 integration)
 
-- `Phonemizer` インターフェース定義 + `PhonemizeResult` (EOSToken 含む)
-- 日本語: `JapaneseG2PEngine` インターフェース + Kurihara method + サブプロセスバックエンド
-- 英語: CMU辞書 + G2P (ARPAbet → IPA変換)
-- 中国語: Pinyin ベース
-- スペイン語/フランス語/ポルトガル語: 規則ベース
-- `MultilingualPhonemizer`: Unicode セグメント分割 + 言語別委譲
-- `PostProcessIDs`: BOS/EOS/PAD 挿入 (共通ヘルパー)
-- PUA エンコード/デコード
+- `piperplus/engine.go` — `OnnxEngine` + `DynamicAdvancedSession` + `ModelCapabilities` 自動検出 + テンソル動的構築
+- `piperplus/voice.go` — `LoadVoice` + `SynthesizeFromIDs` + `Close` (`sync.Once` + `atomic.Bool`)
+- `piperplus/wav.go` — `SynthesisResult` + `io.WriterTo` + ピーク正規化 + PCM変換
+- `piperplus/timing.go` — `DurationsToTiming` + JSON/TSV 出力
+- `piperplus/device.go` — `ParseDevice` + EP 設定 (CUDA/CoreML/DirectML/TensorRT) + CPU 自動フォールバック
+- `piperplus/options.go` — `SynthesisRequest` + `SynthesisOption` + `LoadOption` (functional options)
+- `context.Context` キャンセル (`RunOptions.Terminate()`)
 
-### Phase 4: サーバー・ツール統合
+### Phase 3: Phonemizer ✅ 完了
 
-- CLI (cobra): 全オプション実装
-- JSONL 入力パーサー
-- バッチ処理
-- ストリーミング合成 (`TextSplitter` + `AudioSink` + クロスフェード)
-- `VoicePool` (セッションプール)
-- HTTP API サーバー / gRPC サーバー (オプション)
-- モデルダウンロード・キャッシュ管理
-- カスタム辞書サポート
+**コミット:** `024976a` — 13ファイル, +3,251行, 28テスト
 
-### Phase 5: 配布・ドキュメント
+- `phonemize/phonemizer.go` — `Phonemizer` インターフェース + `PhonemizeResult` (EOSToken) + `PostProcessIDs`
+- `phonemize/pua.go` — PUA 双方向マッピング 87固定エントリ (JA 29 + shared 2 + ZH 43 + KO 8 + ES/PT 2 + FR 3)
+- `phonemize/unicode_detect.go` — Unicode 言語検出 7段階優先度 + `SegmentText`
+- `phonemize/japanese.go` — `JapaneseG2PEngine` インターフェース + Kurihara method + N変異4種 + 疑問詞マーカー
+- `phonemize/english.go` — CMU辞書 + ARPAbet→IPA 変換 + 機能語デストレス
+- `phonemize/chinese.go` — Pinyin→IPA + 声調変調 (T3+T3, 一, 不) + 児化音 + 音節子音
+- `phonemize/spanish.go` — 規則ベース G2P (seseo) + b/d/g 異音 + ストレス
+- `phonemize/french.go` — 規則ベース G2P + 鼻母音 (ɛ̃/ɑ̃/ɔ̃) + 無音子音
+- `phonemize/portuguese.go` — 規則ベース G2P + 鼻母音化 + t/d口蓋化 + coda l声化
+- `phonemize/multilingual.go` — Unicode セグメント分割 + 言語別委譲 + EOSToken 追跡 (mutable state なし)
 
-- Go module 公開
-- Docker イメージ (Alpine ベース、ONNX Runtime 同梱)
-- godoc ドキュメント
-- サンプルコード (HTTP server, CLI, batch)
+### Phase 4: サーバー・ツール統合 ✅ 完了
+
+**コミット:** `6f809a6` — 20ファイル, +2,937行, 55テスト
+
+- `piperplus/synthesize.go` — `Voice.Synthesize(text)` phonemizer↔engine 統合
+- `cmd/piper-plus/main.go` — cobra CLI (17フラグ, 3入力モード: --text/--batch/JSONL stdin)
+- `piperplus/streaming.go` — `AudioSink` + `SynthesizeStream` + クロスフェード
+- `piperplus/text_splitter.go` — 文分割 (JA `。` / ZH `。` / EN `.!?` 対応)
+- `piperplus/pool.go` — `VoicePool` セマフォベースセッションプーリング
+- `piperplus/server.go` — HTTP API (`/synthesize` GET/POST + `/health` + `/info`)
+- `piperplus/jsonl.go` — JSONL 入力パーサー (phoneme_ids + text 両対応)
+- `piperplus/model_manager.go` — プラットフォーム別キャッシュ + ダウンロード + 検索
+- `phonemize/dict.go` — カスタム辞書 (ファイルロード + Phonemizer ラッパー)
+
+### Phase 5: 配布・ドキュメント ✅ 完了
+
+**コミット:** `5697ee2` — 13ファイル, +1,303行
+
+- `src/go/README.md` — 包括的ドキュメント (API Reference, CLI Usage, GPU, Docker, HTTP API)
+- `docker/Dockerfile` — Alpine multi-stage (builder + runtime, ONNX Runtime 同梱)
+- `Makefile` — build/test/lint/docker/coverage/install ターゲット
+- `.golangci.yml` — golangci-lint 設定
+- godoc 更新: `piperplus/doc.go` + `phonemize/doc.go`
+- サンプルコード 5種: `examples/{basic,server,streaming,batch,pool}/main.go`
 
 ## CI/CD 設計
 
@@ -984,7 +1024,7 @@ on:
   workflow_call:  # ci.yml から呼び出し可能
 
 env:
-  ORT_VERSION: '1.24.1'
+  ORT_VERSION: '1.21.0'
 
 jobs:
   unit-test:
@@ -1125,3 +1165,34 @@ jobs:
 |---|---|
 | `src/python/piper_train/infer_onnx.py` | ONNX 推論スクリプト |
 | `src/python/piper_train/export_onnx.py` | ONNX エクスポート (入出力仕様の参照) |
+
+## 実装サマリー
+
+### 統計
+
+| 指標 | 値 |
+|---|---|
+| 総ファイル数 | 73 |
+| 総コード行数 | ~11,600 |
+| ユニットテスト | 148 |
+| インテグレーションテスト | 6 |
+| パッケージ数 | 3 (`piperplus`, `phonemize`, `cmd/piper-plus`) |
+| サンプルコード | 5 (basic, server, streaming, batch, pool) |
+| 外部依存 | 2 (`yalue/onnxruntime_go`, `spf13/cobra`) |
+
+### Go 実装 vs 他言語比較
+
+| 機能 | Go | Rust | C# | C++ |
+|---|---|---|---|---|
+| ONNX 推論 | ✅ | ✅ | ✅ | ✅ |
+| 6言語 Phonemizer | ✅ | ✅ (7言語) | ✅ | ✅ |
+| ストリーミング | ✅ | ✅ | ✅ | ✅ |
+| GPU (CUDA/CoreML/DirectML/TensorRT) | ✅ | ✅ | ✅ | ✅ |
+| HTTP API サーバー | ✅ | — | — | — |
+| セッションプーリング (VoicePool) | ✅ | — | — | — |
+| CLI | ✅ (cobra) | ✅ (clap) | ✅ | ✅ |
+| Docker イメージ | ✅ | — | — | — |
+| カスタム辞書 | ✅ | ✅ | ✅ | — |
+| モデルダウンロード/キャッシュ | ✅ | ✅ | ✅ | — |
+| Phoneme タイミング | ✅ | ✅ | ✅ | — |
+| context.Context キャンセル | ✅ | — | CancellationToken | — |
