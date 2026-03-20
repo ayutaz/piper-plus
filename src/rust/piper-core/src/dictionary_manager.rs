@@ -676,4 +676,169 @@ mod tests {
         // We just verify it doesn't panic.
         let _ = result;
     }
+
+    // -----------------------------------------------------------------------
+    // Environment-variable tests (serialized via ENV_MUTEX)
+    //
+    // `std::env::set_var` / `remove_var` mutate process-wide state and are
+    // `unsafe` in Rust 2024 edition.  A shared mutex prevents concurrent
+    // env mutations across test threads from racing.
+    // -----------------------------------------------------------------------
+
+    use std::sync::Mutex;
+
+    /// Mutex that serializes all env-var-mutating tests so they don't race.
+    static ENV_MUTEX: Mutex<()> = Mutex::new(());
+
+    #[test]
+    fn test_find_dictionary_env_var_valid() {
+        let _lock = ENV_MUTEX.lock().unwrap();
+
+        // Create a temp dir with a .dic file to make it "valid"
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("sys.dic"), b"test").unwrap();
+
+        // SAFETY: serialized by ENV_MUTEX; restored immediately.
+        unsafe {
+            std::env::set_var("OPENJTALK_DICTIONARY_PATH", dir.path());
+        }
+        let result = find_dictionary();
+        unsafe {
+            std::env::remove_var("OPENJTALK_DICTIONARY_PATH");
+        }
+
+        assert_eq!(result, Some(dir.path().to_path_buf()));
+    }
+
+    #[test]
+    fn test_find_dictionary_env_var_invalid_skipped() {
+        let _lock = ENV_MUTEX.lock().unwrap();
+
+        // Set env var to nonexistent path - should be skipped
+        // SAFETY: serialized by ENV_MUTEX; restored immediately.
+        unsafe {
+            std::env::set_var("OPENJTALK_DICTIONARY_PATH", "/nonexistent/path/dict");
+        }
+        let result = find_dictionary();
+        unsafe {
+            std::env::remove_var("OPENJTALK_DICTIONARY_PATH");
+        }
+
+        // Should NOT return the invalid path (returns None or another valid path)
+        assert_ne!(
+            result,
+            Some(std::path::PathBuf::from("/nonexistent/path/dict"))
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // Control flag tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_offline_mode_enabled() {
+        let _lock = ENV_MUTEX.lock().unwrap();
+
+        // SAFETY: serialized by ENV_MUTEX; restored immediately.
+        unsafe {
+            std::env::set_var("PIPER_OFFLINE_MODE", "1");
+        }
+        assert!(is_offline_mode());
+        unsafe {
+            std::env::remove_var("PIPER_OFFLINE_MODE");
+        }
+    }
+
+    #[test]
+    fn test_offline_mode_disabled_by_default() {
+        let _lock = ENV_MUTEX.lock().unwrap();
+
+        // SAFETY: serialized by ENV_MUTEX; restored immediately.
+        unsafe {
+            std::env::remove_var("PIPER_OFFLINE_MODE");
+        }
+        assert!(!is_offline_mode());
+    }
+
+    #[test]
+    fn test_offline_mode_other_values_not_offline() {
+        let _lock = ENV_MUTEX.lock().unwrap();
+
+        // SAFETY: serialized by ENV_MUTEX; restored immediately.
+        unsafe {
+            std::env::set_var("PIPER_OFFLINE_MODE", "0");
+        }
+        assert!(!is_offline_mode());
+        unsafe {
+            std::env::set_var("PIPER_OFFLINE_MODE", "true");
+        }
+        assert!(!is_offline_mode());
+        unsafe {
+            std::env::remove_var("PIPER_OFFLINE_MODE");
+        }
+    }
+
+    #[test]
+    fn test_auto_download_enabled_by_default() {
+        let _lock = ENV_MUTEX.lock().unwrap();
+
+        // SAFETY: serialized by ENV_MUTEX; restored immediately.
+        unsafe {
+            std::env::remove_var("PIPER_AUTO_DOWNLOAD_DICT");
+        }
+        assert!(is_auto_download_enabled());
+    }
+
+    #[test]
+    fn test_auto_download_disabled() {
+        let _lock = ENV_MUTEX.lock().unwrap();
+
+        // SAFETY: serialized by ENV_MUTEX; restored immediately.
+        unsafe {
+            std::env::set_var("PIPER_AUTO_DOWNLOAD_DICT", "0");
+        }
+        assert!(!is_auto_download_enabled());
+        unsafe {
+            std::env::remove_var("PIPER_AUTO_DOWNLOAD_DICT");
+        }
+    }
+
+    #[test]
+    fn test_auto_download_other_values_enabled() {
+        let _lock = ENV_MUTEX.lock().unwrap();
+
+        // SAFETY: serialized by ENV_MUTEX; restored immediately.
+        unsafe {
+            std::env::set_var("PIPER_AUTO_DOWNLOAD_DICT", "1");
+        }
+        assert!(is_auto_download_enabled());
+        unsafe {
+            std::env::set_var("PIPER_AUTO_DOWNLOAD_DICT", "false");
+        }
+        assert!(is_auto_download_enabled());
+        unsafe {
+            std::env::remove_var("PIPER_AUTO_DOWNLOAD_DICT");
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // Data directory resolution tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_get_data_dir_env_override() {
+        let _lock = ENV_MUTEX.lock().unwrap();
+
+        let dir = tempfile::tempdir().unwrap();
+        // SAFETY: serialized by ENV_MUTEX; restored immediately.
+        unsafe {
+            std::env::set_var("OPENJTALK_DATA_DIR", dir.path());
+        }
+        let result = get_data_dir();
+        unsafe {
+            std::env::remove_var("OPENJTALK_DATA_DIR");
+        }
+
+        assert_eq!(result, dir.path().to_path_buf());
+    }
 }
