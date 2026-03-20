@@ -327,7 +327,7 @@ uv run python -m piper_train \
 
 **Language-balanced sampling:** When the speaker count ratio between languages exceeds 3:1, `--language-balanced-sampling` is **automatically enabled** to ensure balanced representation across language groups. You can also force it on with `--language-balanced-sampling`.
 
-**Dataset preparation:** Use `prepare_multilingual_dataset.py` to create a 6-language dataset from individual language sources. The resulting dataset uses 173 symbols in the `phoneme_id_map`.
+**Dataset preparation:** Use `uv run python -m piper_train.tools.prepare_multilingual_dataset` to create a 6-language dataset from individual language sources. The resulting dataset uses 173 symbols in the `phoneme_id_map`.
 
 
 ### Transfer Learning (転移学習)
