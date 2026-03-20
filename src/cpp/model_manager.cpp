@@ -464,7 +464,7 @@ void listModels(const std::string& languageFilter) {
             std::cerr << " [" << voice.languageCode << "]:" << std::endl;
         }
 
-        // Format: key  [source]  N speaker(s)  quality
+        // Format: key  [source]  N speaker(s)  quality  (aliases)
         std::cerr << "    " << voice.key;
 
         // Pad to 40 chars for alignment
@@ -478,7 +478,17 @@ void listModels(const std::string& languageFilter) {
         std::cerr << "[" << voice.source << "]  ";
         std::cerr << voice.numSpeakers << " speaker"
                   << (voice.numSpeakers != 1 ? "s" : "") << "   ";
-        std::cerr << voice.quality << std::endl;
+        std::cerr << voice.quality;
+
+        if (!voice.aliases.empty()) {
+            std::cerr << "   (";
+            for (size_t i = 0; i < voice.aliases.size(); ++i) {
+                if (i > 0) std::cerr << ", ";
+                std::cerr << voice.aliases[i];
+            }
+            std::cerr << ")";
+        }
+        std::cerr << std::endl;
     }
 
     std::cerr << std::endl;
