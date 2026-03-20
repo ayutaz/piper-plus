@@ -123,8 +123,8 @@ python -m piper.webui --data-dir /path/to/models
 Download from [GitHub Releases](https://github.com/ayutaz/piper-plus/releases) (amd64 / arm64).
 
 ```sh
-echo 'Welcome to the world of speech synthesis!' | \
-  ./piper --model en_US-lessac-medium.onnx --output_file welcome.wav
+./bin/piper --text 'Welcome to the world of speech synthesis!' \
+  --model en_US-lessac-medium.onnx --output_file welcome.wav
 ```
 
 ### Docker
@@ -220,41 +220,41 @@ The `--text` option allows direct text input without piping:
 
 ```sh
 # Simple text-to-speech
-./piper --model model.onnx --text "Hello, how are you?" -f output.wav
+./bin/piper --model model.onnx --text "Hello, how are you?" -f output.wav
 
 # Japanese text (no encoding issues on Windows)
-piper.exe --model models\tsukuyomi.onnx --text "こんにちは、今日は良い天気ですね。" -f output.wav
+bin\piper.exe --model models\tsukuyomi.onnx --text "こんにちは、今日は良い天気ですね。" -f output.wav
 
 # With speaker selection
-./piper --model model.onnx --text "Hello" --speaker 3 -f output.wav
+./bin/piper --model model.onnx --text "Hello" --speaker 3 -f output.wav
 ```
 
 #### Pipe Input
 
 ```sh
 # Basic usage
-echo "Hello world" | ./piper --model en_model.onnx --output_file output.wav
+echo "Hello world" | ./bin/piper --model en_model.onnx --output_file output.wav
 
 # Streaming (low latency)
-echo "Long text..." | ./piper --model en_model.onnx --output_file output.wav --streaming
+echo "Long text..." | ./bin/piper --model en_model.onnx --output_file output.wav --streaming
 
 # GPU inference
-echo "Hello" | ./piper --model en_model.onnx --use-cuda --output_file output.wav
+echo "Hello" | ./bin/piper --model en_model.onnx --use-cuda --output_file output.wav
 
 # Phoneme timing output (for lip-sync, subtitles)
-echo "Hello world" | ./piper --model en_model.onnx -f speech.wav --output-timing timing.json
+echo "Hello world" | ./bin/piper --model en_model.onnx -f speech.wav --output-timing timing.json
 
 # Custom dictionary
-echo "DockerとGitHubを使います" | ./piper --model ja_model.onnx --custom-dict my_dict.json -f output.wav
+echo "DockerとGitHubを使います" | ./bin/piper --model ja_model.onnx --custom-dict my_dict.json -f output.wav
 
 # Inline phoneme input
-echo 'Hello [[ h ə l oʊ ]] world' | ./piper --model en_model.onnx -f output.wav
+echo 'Hello [[ h ə l oʊ ]] world' | ./bin/piper --model en_model.onnx -f output.wav
 
 # Raw phoneme input
-echo 'h ə l oʊ _ w ɜː l d' | ./piper --model en_model.onnx --raw-phonemes -f output.wav
+echo 'h ə l oʊ _ w ɜː l d' | ./bin/piper --model en_model.onnx --raw-phonemes -f output.wav
 
 # Streaming raw audio output
-echo 'Long text...' | ./piper --model en_model.onnx --output-raw | \
+echo 'Long text...' | ./bin/piper --model en_model.onnx --output-raw | \
   aplay -r 22050 -f S16_LE -t raw -
 ```
 
@@ -262,6 +262,7 @@ Key options:
 
 | Option | Description | Default |
 |---|---|---|
+| `--model PATH\|NAME` | Model file path, or model name (auto-resolves downloaded models) | - |
 | `--text TEXT` | Direct text input (no piping required) | - |
 | `--streaming` | Chunk-based streaming mode | off |
 | `--use-cuda` | Enable CUDA GPU inference | off |
@@ -298,25 +299,25 @@ Use `--json-input` flag for JSON input:
 
 ```bash
 # List all available models
-./piper --list-models
+./bin/piper --list-models
 
 # Filter by language
-./piper --list-models ja
-./piper --list-models en
+./bin/piper --list-models ja
+./bin/piper --list-models en
 ```
 
 #### Download Models
 
 ```bash
-# Download a model by name
-./piper --download-model tsukuyomi
-./piper --download-model en_US-lessac-medium
+# Download a model by name (aliases also work)
+./bin/piper --download-model tsukuyomi
+./bin/piper --download-model en_US-lessac-medium
 
 # Specify download directory
-./piper --download-model tsukuyomi --model-dir /path/to/models
+./bin/piper --download-model tsukuyomi --model-dir /path/to/models
 
-# After download, use the model
-./piper --model ~/.local/share/piper/models/ja_JP-tsukuyomi-chan-medium/tsukuyomi-chan-6lang-fp16.onnx --text "こんにちは"
+# After download, use by model name (no full path needed)
+./bin/piper --model tsukuyomi --text "こんにちは"
 ```
 
 ### Environment Variables (C++ CLI)

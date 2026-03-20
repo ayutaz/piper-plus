@@ -925,6 +925,47 @@ void parseArgs(int argc, char *argv[], RunConfig &runConfig) {
     } else if (arg == "-h" || arg == "--help") {
       printUsage(argv);
       exit(0);
+    } else if (arg.rfind("--", 0) == 0) {
+      // Unknown flag starting with "--": suggest closest match
+      static const vector<string> knownFlags = {
+        "--model", "--config", "--output_file", "--output-file",
+        "--output_dir", "--output-dir", "--output_raw", "--output-raw",
+        "--speaker", "--language", "--noise-scale", "--noise_scale",
+        "--length-scale", "--length_scale", "--noise-w", "--noise_w",
+        "--sentence-silence", "--sentence_silence",
+        "--phoneme-silence", "--phoneme_silence",
+        "--json-input", "--json_input", "--use-cuda", "--use_cuda",
+        "--gpu-device-id", "--gpu_device_id",
+        "--raw-phonemes", "--raw_phonemes", "--streaming",
+        "--output-timing", "--output_timing",
+        "--timing-format", "--timing_format",
+        "--custom-dict", "--custom_dict", "--text",
+        "--list-models", "--download-model", "--model-dir", "--model_dir",
+        "--version", "--test-mode", "--debug", "--quiet", "--help",
+        "--no-stochastic",
+      };
+      // Find best match by edit distance (simple Levenshtein)
+      string bestMatch;
+      size_t bestDist = string::npos;
+      for (const auto& flag : knownFlags) {
+        // Simple distance: count differing chars after common prefix
+        size_t maxLen = max(arg.size(), flag.size());
+        size_t minLen = min(arg.size(), flag.size());
+        size_t dist = maxLen - minLen;
+        for (size_t j = 0; j < minLen; ++j) {
+          if (arg[j] != flag[j]) ++dist;
+        }
+        if (dist < bestDist) {
+          bestDist = dist;
+          bestMatch = flag;
+        }
+      }
+      cerr << "Unknown option: " << arg << endl;
+      if (bestDist <= 3 && !bestMatch.empty()) {
+        cerr << "Did you mean: " << bestMatch << " ?" << endl;
+      }
+      cerr << "Use --help for usage information." << endl;
+      exit(1);
     }
   }
 
@@ -938,10 +979,37 @@ void parseArgs(int argc, char *argv[], RunConfig &runConfig) {
     return;
   }
 
-  // Verify model file exists
+  // Verify model file exists; if not, try resolving as a model name/alias
   ifstream modelFile(runConfig.modelPath.c_str(), ios::binary);
   if (!modelFile.good()) {
-    throw runtime_error("Model file doesn't exist");
+    auto modelDir = runConfig.modelDir.value_or(piper::getDefaultModelDir());
+    auto resolved = piper::resolveModelPath(runConfig.modelPath.string(), modelDir);
+    if (resolved) {
+      spdlog::info("Resolved model name '{}' to {}", runConfig.modelPath.string(), resolved->string());
+      runConfig.modelPath = resolved.value();
+      modelFile.open(runConfig.modelPath.c_str(), ios::binary);
+    }
+    if (!modelFile.good()) {
+      // Check if it looks like a model name (no path separators or extension)
+      auto pathStr = runConfig.modelPath.string();
+      bool looksLikeName = pathStr.find('/') == string::npos &&
+                           pathStr.find('\\') == string::npos &&
+                           pathStr.find('.') == string::npos;
+      if (looksLikeName) {
+        auto voice = piper::findVoice(pathStr);
+        if (voice) {
+          cerr << "Model '" << pathStr << "' was found in the catalog but is not downloaded yet." << endl;
+          cerr << "Run:  --download-model " << pathStr << endl;
+        } else {
+          cerr << "Model '" << pathStr << "' not found." << endl;
+          cerr << "Use --list-models to see available models, "
+               << "or specify a file path with --model /path/to/model.onnx" << endl;
+        }
+      } else {
+        cerr << "Model file not found: " << pathStr << endl;
+      }
+      exit(1);
+    }
   }
 
   if (!modelConfigPath) {

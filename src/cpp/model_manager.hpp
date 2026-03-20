@@ -52,6 +52,12 @@ bool downloadModel(const std::string& modelName,
 // Find a voice by key or alias
 std::optional<VoiceInfo> findVoice(const std::string& nameOrAlias);
 
+// Resolve a model name or alias to the downloaded .onnx file path.
+// Returns nullopt if the voice is not found in the catalog or not downloaded.
+std::optional<std::filesystem::path> resolveModelPath(
+    const std::string& nameOrAlias,
+    const std::filesystem::path& modelDir);
+
 } // namespace piper
 
 #endif // MODEL_MANAGER_H_

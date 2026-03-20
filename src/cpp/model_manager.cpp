@@ -464,7 +464,7 @@ void listModels(const std::string& languageFilter) {
             std::cerr << " [" << voice.languageCode << "]:" << std::endl;
         }
 
-        // Format: key  [source]  N speaker(s)  quality
+        // Format: key  [source]  N speaker(s)  quality  (aliases)
         std::cerr << "    " << voice.key;
 
         // Pad to 40 chars for alignment
@@ -478,7 +478,17 @@ void listModels(const std::string& languageFilter) {
         std::cerr << "[" << voice.source << "]  ";
         std::cerr << voice.numSpeakers << " speaker"
                   << (voice.numSpeakers != 1 ? "s" : "") << "   ";
-        std::cerr << voice.quality << std::endl;
+        std::cerr << voice.quality;
+
+        if (!voice.aliases.empty()) {
+            std::cerr << "   (";
+            for (size_t i = 0; i < voice.aliases.size(); ++i) {
+                if (i > 0) std::cerr << ", ";
+                std::cerr << voice.aliases[i];
+            }
+            std::cerr << ")";
+        }
+        std::cerr << std::endl;
     }
 
     std::cerr << std::endl;
@@ -583,6 +593,30 @@ bool downloadModel(const std::string& modelName,
     }
 
     return allOk;
+}
+
+std::optional<fs::path> resolveModelPath(
+    const std::string& nameOrAlias,
+    const fs::path& modelDir) {
+    auto maybeVoice = findVoice(nameOrAlias);
+    if (!maybeVoice) {
+        return std::nullopt;
+    }
+
+    const VoiceInfo& voice = maybeVoice.value();
+
+    // Find the .onnx file in the voice's file list
+    for (const auto& file : voice.files) {
+        fs::path fn = fs::path(file.relativePath).filename();
+        if (fn.extension() == ".onnx") {
+            fs::path candidate = modelDir / fn;
+            if (fs::exists(candidate)) {
+                return candidate;
+            }
+        }
+    }
+
+    return std::nullopt;
 }
 
 } // namespace piper
