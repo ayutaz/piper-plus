@@ -17,18 +17,13 @@ crate-type = ["cdylib"]
 
 [dependencies]
 piper_core = { package = "piper-plus", path = "../piper-core", version = "0.1.0" }
-pyo3 = { version = "0.22", features = ["extension-module"] }
-numpy = "0.22"
+pyo3 = { version = "0.23", features = ["extension-module"] }
+numpy = "0.23"
 
 [features]
 default = []
 japanese = ["piper_core/japanese"]
 naist-jdic = ["piper_core/naist-jdic"]
-
-[lints.rust]
-# PyO3 v0.22 #[pymethods] macro generates unsafe calls without explicit
-# unsafe blocks, which is an error in Rust 2024 edition. Allow until PyO3 0.23+.
-unsafe_op_in_unsafe_fn = "allow"
 
 [lints.clippy]
 # PyO3 #[pymethods] macro generates code that triggers useless_conversion

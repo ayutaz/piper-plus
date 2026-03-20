@@ -62,7 +62,7 @@ impl<T> SendPtr<T> {
     /// other references to the same data exist.
     #[allow(clippy::mut_from_ref)]
     unsafe fn as_mut(&self) -> &mut T {
-        &mut *self.0
+        unsafe { &mut *self.0 }
     }
 }
 
@@ -109,7 +109,7 @@ impl SynthesisResult {
     /// method remain valid.  For a zero-copy alternative, see
     /// :meth:`take_audio_int16`.
     fn audio_int16<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray1<i16>> {
-        self.samples.clone().into_pyarray_bound(py)
+        self.samples.clone().into_pyarray(py)
     }
 
     /// Move the internal int16 buffer into a numpy array without copying.
@@ -120,7 +120,7 @@ impl SynthesisResult {
     /// :meth:`audio_float32`, or :meth:`save_wav` will return/use an
     /// empty array.
     fn take_audio_int16<'py>(&mut self, py: Python<'py>) -> Bound<'py, PyArray1<i16>> {
-        std::mem::take(&mut self.samples).into_pyarray_bound(py)
+        std::mem::take(&mut self.samples).into_pyarray(py)
     }
 
     /// Return audio as a numpy float32 array, normalized to [-1.0, 1.0].
@@ -129,7 +129,7 @@ impl SynthesisResult {
     /// floating-point samples.
     fn audio_float32<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray1<f32>> {
         let floats: Vec<f32> = self.samples.iter().map(|&s| s as f32 / 32768.0).collect();
-        floats.into_pyarray_bound(py)
+        floats.into_pyarray(py)
     }
 
     /// Save audio to a WAV file.
