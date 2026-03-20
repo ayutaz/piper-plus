@@ -28,6 +28,9 @@ Piper Plus documentation. Guides and references for using and developing with Pi
 
 ## Guides
 
+### Development
+- [Go Bindings Design](guides/go-bindings-design.md) - Go 推論バインディング設計ドキュメント
+
 ### Training
 - [Training Guide](guides/training/training-guide.md) - General training instructions
 - [WavLM Discriminator Guide](guides/training/wavlm-guide.md) - WavLM による音質向上ガイド
@@ -47,4 +50,5 @@ Piper Plus documentation. Guides and references for using and developing with Pi
 - **C++ (libpiper)**: メインの推論ライブラリ — [src/cpp/](../src/cpp/)
 - **C# CLI (PiperPlus)**: .NET 8/9 クロスプラットフォーム CLI — [src/csharp/](../src/csharp/)
 - **Rust 推論エンジン**: piper-plus / piper-plus-cli — [src/rust/](../src/rust/)
+- **Go バインディング**: サーバーサイド推論 — [src/go/piper-plus/](../src/go/piper-plus/) ([設計ドキュメント](guides/go-bindings-design.md))
 - **WebAssembly**: Browser-based TTS — [src/wasm/openjtalk-web/](../src/wasm/openjtalk-web/)
