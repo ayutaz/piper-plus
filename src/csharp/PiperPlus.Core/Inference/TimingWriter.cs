@@ -198,6 +198,20 @@ public static class TimingWriter
     }
 
     // ------------------------------------------------------------------
+    // Static caches
+    // ------------------------------------------------------------------
+
+    private static readonly string[] s_asciiStrings = InitAsciiStrings();
+
+    private static string[] InitAsciiStrings()
+    {
+        var arr = new string[128];
+        for (int i = 0; i < 128; i++)
+            arr[i] = ((char)i).ToString();
+        return arr;
+    }
+
+    // ------------------------------------------------------------------
     // Private helpers
     // ------------------------------------------------------------------
 
@@ -243,13 +257,8 @@ public static class TimingWriter
             return str;
         }
 
-        // Fallback: printable ASCII characters.
-        if (id is > 2 and < 128)
-        {
-            return ((char)id).ToString();
-        }
-
-        return "?";
+        // Fallback: printable ASCII characters (cached to avoid per-call allocation).
+        return id is > 2 and < 128 ? s_asciiStrings[id] : "?";
     }
 
     private static List<TimingDto> ConvertToDtos(List<PhonemeTimingEntry> entries)

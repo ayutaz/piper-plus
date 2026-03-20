@@ -173,9 +173,11 @@ public static class PhonemeSilenceProcessor
         bool hasProsody = prosodyFlat is not null
                           && prosodyFlat.Length == phonemeIds.Length * 3;
 
-        var phrases = new List<Phrase>();
-        var currentIds = new List<long>();
-        List<long>? currentProsody = hasProsody ? new List<long>() : null;
+        var phrases = new List<Phrase>(8);
+        var currentIds = new List<long>(Math.Max(10, phonemeIds.Length / 4));
+        List<long>? currentProsody = hasProsody
+            ? new List<long>(Math.Max(10, phonemeIds.Length * 3 / 4))
+            : null;
 
         for (int i = 0; i < phonemeIds.Length; i++)
         {
@@ -201,8 +203,10 @@ public static class PhonemeSilenceProcessor
                     silenceSamples));
 
                 // Start a new phrase.
-                currentIds = new List<long>();
-                currentProsody = hasProsody ? new List<long>() : null;
+                currentIds = new List<long>(Math.Max(10, phonemeIds.Length / 4));
+                currentProsody = hasProsody
+                    ? new List<long>(Math.Max(10, phonemeIds.Length * 3 / 4))
+                    : null;
             }
         }
 

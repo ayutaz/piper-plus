@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Text.RegularExpressions;
 
 namespace PiperPlus.Core.Phonemize;
 
@@ -19,44 +18,53 @@ namespace PiperPlus.Core.Phonemize;
 public sealed class UnicodeLanguageDetector
 {
     // Hiragana: U+3040-309F, Katakana: U+30A0-30FF, Katakana Phonetic: U+31F0-31FF
-    private static readonly Regex s_kanaRegex = new(
-        @"[\u3040-\u309F\u30A0-\u30FF\u31F0-\u31FF]",
-        RegexOptions.Compiled);
+    private static bool IsKana(char ch) =>
+        (ch >= '\u3040' && ch <= '\u309F') ||
+        (ch >= '\u30A0' && ch <= '\u30FF') ||
+        (ch >= '\u31F0' && ch <= '\u31FF');
 
     // CJK Unified Ideographs: U+4E00-9FFF, Extension A: U+3400-4DBF
     // CJK Compatibility: U+F900-FAFF
-    private static readonly Regex s_cjkRegex = new(
-        @"[\u4E00-\u9FFF\u3400-\u4DBF\uF900-\uFAFF]",
-        RegexOptions.Compiled);
+    private static bool IsCjk(char ch) =>
+        (ch >= '\u4E00' && ch <= '\u9FFF') ||
+        (ch >= '\u3400' && ch <= '\u4DBF') ||
+        (ch >= '\uF900' && ch <= '\uFAFF');
 
     // Japanese-specific: CJK punctuation + fullwidth forms.
     // Excludes fullwidth Latin letters (U+FF21-FF3A, U+FF41-FF5A) which are
     // handled separately as Latin characters.
-    private static readonly Regex s_jaPunctRegex = new(
-        @"[\u3000-\u303F\uFF00-\uFF20\uFF3B-\uFF40\uFF5B-\uFFEF]",
-        RegexOptions.Compiled);
+    private static bool IsJaPunct(char ch) =>
+        (ch >= '\u3000' && ch <= '\u303F') ||
+        (ch >= '\uFF00' && ch <= '\uFF20') ||
+        (ch >= '\uFF3B' && ch <= '\uFF40') ||
+        (ch >= '\uFF5B' && ch <= '\uFFEF');
 
     // Fullwidth Latin letters: U+FF21-FF3A (A-Z), U+FF41-FF5A (a-z)
-    private static readonly Regex s_fullwidthLatinRegex = new(
-        @"[\uFF21-\uFF3A\uFF41-\uFF5A]",
-        RegexOptions.Compiled);
+    private static bool IsFullwidthLatin(char ch) =>
+        (ch >= '\uFF21' && ch <= '\uFF3A') ||
+        (ch >= '\uFF41' && ch <= '\uFF5A');
 
     // Hangul Syllables: U+AC00-D7AF, Jamo: U+1100-11FF, Compat Jamo: U+3130-318F
-    private static readonly Regex s_hangulRegex = new(
-        @"[\uAC00-\uD7AF\u1100-\u11FF\u3130-\u318F]",
-        RegexOptions.Compiled);
+    private static bool IsHangul(char ch) =>
+        (ch >= '\uAC00' && ch <= '\uD7AF') ||
+        (ch >= '\u1100' && ch <= '\u11FF') ||
+        (ch >= '\u3130' && ch <= '\u318F');
 
     // Basic Latin letters (including extended Latin with diacritics).
     // Excludes multiplication sign (U+00D7) and division sign (U+00F7) which
     // fall within the A-o range.
-    private static readonly Regex s_latinRegex = new(
-        @"[A-Za-z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u00FF]",
-        RegexOptions.Compiled);
+    private static bool IsLatin(char ch) =>
+        (ch >= 'A' && ch <= 'Z') ||
+        (ch >= 'a' && ch <= 'z') ||
+        (ch >= '\u00C0' && ch <= '\u00D6') ||
+        (ch >= '\u00D8' && ch <= '\u00F6') ||
+        (ch >= '\u00F8' && ch <= '\u00FF');
 
     private readonly HashSet<string> _languages;
     private readonly bool _hasJa;
     private readonly bool _hasZh;
     private readonly bool _hasKo;
+    private readonly string? _defaultLatinResult;
 
     /// <summary>
     /// Gets the default language code used for Latin-script characters.
@@ -85,6 +93,7 @@ public sealed class UnicodeLanguageDetector
         _hasJa = _languages.Contains("ja");
         _hasZh = _languages.Contains("zh");
         _hasKo = _languages.Contains("ko");
+        _defaultLatinResult = _languages.Contains(defaultLatinLanguage) ? defaultLatinLanguage : null;
     }
 
     /// <summary>
@@ -101,22 +110,20 @@ public sealed class UnicodeLanguageDetector
     /// </returns>
     public string? DetectChar(char ch, bool contextHasKana = false)
     {
-        string s = ch.ToString();
-
         // Kana -> always Japanese
-        if (s_kanaRegex.IsMatch(s))
+        if (IsKana(ch))
         {
             return _hasJa ? "ja" : null;
         }
 
         // Hangul -> Korean
-        if (s_hangulRegex.IsMatch(s))
+        if (IsHangul(ch))
         {
             return _hasKo ? "ko" : null;
         }
 
         // CJK ideographs -> JA or ZH depending on context
-        if (s_cjkRegex.IsMatch(s))
+        if (IsCjk(ch))
         {
             if (_hasJa && _hasZh)
             {
@@ -129,26 +136,22 @@ public sealed class UnicodeLanguageDetector
         }
 
         // Fullwidth Latin letters (A-Z, a-z) -> treat as Latin, not Japanese
-        if (s_fullwidthLatinRegex.IsMatch(s))
+        if (IsFullwidthLatin(ch))
         {
-            return _languages.Contains(DefaultLatinLanguage)
-                ? DefaultLatinLanguage
-                : null;
+            return _defaultLatinResult;
         }
 
         // Japanese-specific punctuation (CJK punct + fullwidth forms,
         // excluding fullwidth Latin already handled above)
-        if (s_jaPunctRegex.IsMatch(s))
+        if (IsJaPunct(ch))
         {
             return _hasJa ? "ja" : null;
         }
 
         // Latin characters
-        if (s_latinRegex.IsMatch(s))
+        if (IsLatin(ch))
         {
-            return _languages.Contains(DefaultLatinLanguage)
-                ? DefaultLatinLanguage
-                : null;
+            return _defaultLatinResult;
         }
 
         // Neutral: whitespace, digits, basic punctuation
@@ -163,7 +166,16 @@ public sealed class UnicodeLanguageDetector
     public bool HasKana(string text)
     {
         ArgumentNullException.ThrowIfNull(text);
-        return s_kanaRegex.IsMatch(text);
+
+        for (int i = 0; i < text.Length; i++)
+        {
+            if (IsKana(text[i]))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /// <summary>
@@ -199,7 +211,7 @@ public sealed class UnicodeLanguageDetector
 
         var segments = new List<(string Lang, string Text)>();
         string? currentLang = null;
-        var currentChars = new List<char>();
+        int segmentStart = 0;
 
         for (int i = 0; i < text.Length; i++)
         {
@@ -208,21 +220,19 @@ public sealed class UnicodeLanguageDetector
 
             if (lang is not null && lang != currentLang && currentLang is not null)
             {
-                segments.Add((currentLang, new string(currentChars.ToArray())));
-                currentChars.Clear();
+                segments.Add((currentLang, text[segmentStart..i]));
+                segmentStart = i;
             }
 
             if (lang is not null)
             {
                 currentLang = lang;
             }
-
-            currentChars.Add(ch);
         }
 
-        if (currentChars.Count > 0 && currentLang is not null)
+        if (segmentStart < text.Length && currentLang is not null)
         {
-            segments.Add((currentLang, new string(currentChars.ToArray())));
+            segments.Add((currentLang, text[segmentStart..]));
         }
 
         // If no language-specific characters were detected (e.g., text is only

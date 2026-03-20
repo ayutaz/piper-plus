@@ -18,7 +18,7 @@ namespace PiperPlus.Core.Phonemize;
 /// </list>
 /// </para>
 /// </summary>
-public static class ArpabetToIPAConverter
+public static partial class ArpabetToIPAConverter
 {
     // ---------------------------------------------------------------
     // ARPAbet-to-IPA mapping (33 entries + AH-unstressed special case)
@@ -78,7 +78,8 @@ public static class ArpabetToIPAConverter
     private const string AhUnstressedIpa = "\u0259"; // ə
 
     // Regex: base letters + optional stress digit (0/1/2).
-    private static readonly Regex s_reArpabet = new(@"^([A-Z]+)(\d)?$", RegexOptions.Compiled);
+    [GeneratedRegex(@"^([A-Z]+)(\d)?$")]
+    private static partial Regex ArpabetPattern();
 
     // ---------------------------------------------------------------
     // Punctuation
@@ -155,7 +156,7 @@ public static class ArpabetToIPAConverter
     /// </returns>
     public static (string Ipa, int Stress) ConvertToken(string arpabetToken)
     {
-        var m = s_reArpabet.Match(arpabetToken);
+        var m = ArpabetPattern().Match(arpabetToken);
         if (!m.Success)
         {
             // Punctuation or unknown token — return as-is.
@@ -206,7 +207,7 @@ public static class ArpabetToIPAConverter
         while (i < tokens.Count)
         {
             string token = tokens[i];
-            var m = s_reArpabet.Match(token);
+            var m = ArpabetPattern().Match(token);
 
             if (m.Success)
             {

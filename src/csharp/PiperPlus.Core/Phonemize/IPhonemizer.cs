@@ -36,7 +36,7 @@ namespace PiperPlus.Core.Phonemize;
 /// <param name="A1">Language-dependent prosody dimension 1.</param>
 /// <param name="A2">Language-dependent prosody dimension 2.</param>
 /// <param name="A3">Language-dependent prosody dimension 3.</param>
-public record ProsodyInfo(int A1, int A2, int A3);
+public record struct ProsodyInfo(int A1, int A2, int A3);
 
 /// <summary>
 /// Language-agnostic phonemizer contract.

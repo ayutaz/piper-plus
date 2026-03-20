@@ -62,8 +62,9 @@ public static class RawPhonemeParser
             return [];
         }
 
-        var result = new List<long>();
         var tokens = phonemeString.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        // Estimate: each space-separated token maps to ~1-2 IDs
+        var result = new List<long>(tokens.Length * 2);
 
         foreach (var token in tokens)
         {
@@ -79,17 +80,15 @@ public static class RawPhonemeParser
             }
 
             // 2. Multi-char token -> PUA mapping (e.g. "a:" -> '\uE000', "N_m" -> '\uE019')
-            if (OpenJTalkToPiperMapping.TokenToChar.TryGetValue(token, out var puaChar))
+            //    MapToken returns a cached string (no allocation) when the token is known.
+            var mapped = OpenJTalkToPiperMapping.MapToken(token);
+            if (!ReferenceEquals(mapped, token) && phonemeIdMap.TryGetValue(mapped, out var puaIds))
             {
-                var puaKey = puaChar.ToString();
-                if (phonemeIdMap.TryGetValue(puaKey, out var puaIds))
+                foreach (var id in puaIds)
                 {
-                    foreach (var id in puaIds)
-                    {
-                        result.Add(id);
-                    }
-                    continue;
+                    result.Add(id);
                 }
+                continue;
             }
 
             // 3. Unknown token -- warn and skip.

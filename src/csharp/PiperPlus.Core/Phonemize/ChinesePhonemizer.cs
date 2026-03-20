@@ -72,60 +72,7 @@ public sealed class ChinesePhonemizer : IPhonemizer
         List<ProsodyInfo?> prosodyFeatures,
         Dictionary<string, int[]> phonemeIdMap)
     {
-        // Resolve special token IDs from the phoneme-ID map.
-        int[] padIds = phonemeIdMap.TryGetValue("_", out int[]? padArr) ? padArr : [0];
-        phonemeIdMap.TryGetValue("^", out int[]? bosIds);
-        phonemeIdMap.TryGetValue("$", out int[]? eosIds);
-
-        // Step 1: Insert PAD after every phoneme ID.
-        var paddedIds = new List<int>(phonemeIds.Count * 2);
-        var paddedProsody = new List<ProsodyInfo?>(phonemeIds.Count * 2);
-
-        for (int i = 0; i < phonemeIds.Count; i++)
-        {
-            paddedIds.Add(phonemeIds[i]);
-            paddedProsody.Add(prosodyFeatures[i]);
-
-            // Only insert PAD if current phoneme is not already a pad token (matches Python base.py)
-            if (Array.IndexOf(padIds, phonemeIds[i]) < 0)
-            {
-                paddedIds.AddRange(padIds);
-                for (int j = 0; j < padIds.Length; j++)
-                {
-                    paddedProsody.Add(null);
-                }
-            }
-        }
-
-        // Step 2: Wrap with BOS + PAD ... EOS.
-        if (bosIds is not null)
-        {
-            var withBos = new List<int>(bosIds.Length + 1 + paddedIds.Count);
-            withBos.AddRange(bosIds);
-            withBos.Add(padIds[0]);
-            withBos.AddRange(paddedIds);
-
-            var withBosProsody = new List<ProsodyInfo?>(bosIds.Length + 1 + paddedProsody.Count);
-            for (int i = 0; i < bosIds.Length + 1; i++)
-            {
-                withBosProsody.Add(null);
-            }
-            withBosProsody.AddRange(paddedProsody);
-
-            paddedIds = withBos;
-            paddedProsody = withBosProsody;
-        }
-
-        if (eosIds is not null)
-        {
-            paddedIds.AddRange(eosIds);
-            for (int i = 0; i < eosIds.Length; i++)
-            {
-                paddedProsody.Add(null);
-            }
-        }
-
-        return (paddedIds, paddedProsody);
+        return PiperPhonemeConverter.EspeakPostProcessIds(phonemeIds, prosodyFeatures, phonemeIdMap);
     }
 
     // -----------------------------------------------------------------

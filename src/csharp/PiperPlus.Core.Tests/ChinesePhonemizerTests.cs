@@ -98,7 +98,7 @@ public sealed class ChinesePhonemizerTests
         foreach (var p in prosody)
         {
             Assert.NotNull(p);
-            Assert.Equal(3, p!.A1);
+            Assert.Equal(3, p!.Value.A1);
         }
     }
 

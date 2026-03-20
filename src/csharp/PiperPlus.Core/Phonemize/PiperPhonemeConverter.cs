@@ -175,55 +175,60 @@ public static class PiperPhonemeConverter
         phonemeIdMap.TryGetValue("^", out int[]? bosIds);
         phonemeIdMap.TryGetValue("$", out int[]? eosIds);
 
-        // Step 1: Insert PAD after every phoneme ID.
-        var paddedIds = new List<int>(phonemeIds.Count * 2);
-        var paddedProsody = new List<ProsodyInfo?>(phonemeIds.Count * 2);
+        // Calculate capacity upfront for a single allocation.
+        int bosLen = bosIds?.Length ?? 0;
+        int eosLen = eosIds?.Length ?? 0;
+        // BOS ids + PAD(0) + (phoneme + PAD) per phoneme + EOS ids
+        int capacity = bosLen + 1 + phonemeIds.Count * (1 + padIds.Length) + eosLen;
 
+        var ids = new List<int>(capacity);
+        var prosody = new List<ProsodyInfo?>(capacity);
+
+        // Single-pass PAD check: use simple != for single-element padIds.
+        bool singlePad = padIds.Length == 1;
+        int singlePadVal = singlePad ? padIds[0] : 0;
+
+        // Add BOS ids + PAD(0).
+        if (bosIds is not null)
+        {
+            ids.AddRange(bosIds);
+            ids.Add(padIds[0]);
+            for (int i = 0; i < bosIds.Length + 1; i++)
+            {
+                prosody.Add(null);
+            }
+        }
+
+        // Add each phoneme + inter-phoneme PAD.
         for (int i = 0; i < phonemeIds.Count; i++)
         {
-            paddedIds.Add(phonemeIds[i]);
-            paddedProsody.Add(prosodyFeatures[i]);
+            int phoneme = phonemeIds[i];
+            ids.Add(phoneme);
+            prosody.Add(prosodyFeatures[i]);
 
             // Only insert PAD if current phoneme is not already a pad token (matches Python base.py)
-            if (Array.IndexOf(padIds, phonemeIds[i]) < 0)
+            bool isPad = singlePad ? phoneme == singlePadVal : Array.IndexOf(padIds, phoneme) >= 0;
+            if (!isPad)
             {
-                paddedIds.AddRange(padIds);
+                ids.AddRange(padIds);
                 for (int j = 0; j < padIds.Length; j++)
                 {
-                    paddedProsody.Add(null);
+                    prosody.Add(null);
                 }
             }
         }
 
-        // Step 2: Wrap with BOS + PAD ... EOS.
-        if (bosIds is not null)
-        {
-            var withBos = new List<int>(bosIds.Length + 1 + paddedIds.Count);
-            withBos.AddRange(bosIds);
-            withBos.Add(padIds[0]);
-            withBos.AddRange(paddedIds);
-
-            var withBosProsody = new List<ProsodyInfo?>(bosIds.Length + 1 + paddedProsody.Count);
-            for (int i = 0; i < bosIds.Length + 1; i++)
-            {
-                withBosProsody.Add(null);
-            }
-            withBosProsody.AddRange(paddedProsody);
-
-            paddedIds = withBos;
-            paddedProsody = withBosProsody;
-        }
-
+        // Add EOS ids.
         if (eosIds is not null)
         {
-            paddedIds.AddRange(eosIds);
+            ids.AddRange(eosIds);
             for (int i = 0; i < eosIds.Length; i++)
             {
-                paddedProsody.Add(null);
+                prosody.Add(null);
             }
         }
 
-        return (paddedIds, paddedProsody);
+        return (ids, prosody);
     }
 
     // -----------------------------------------------------------------

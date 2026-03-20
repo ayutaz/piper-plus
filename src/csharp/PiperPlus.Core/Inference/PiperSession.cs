@@ -1,4 +1,5 @@
 using System;
+using System.Buffers;
 using Microsoft.ML.OnnxRuntime;
 
 namespace PiperPlus.Core.Inference;
@@ -214,19 +215,31 @@ public sealed class PiperSession
         }
 
         // prosody_features (optional): [1, phoneme_length, 3]
+        // Use ArrayPool for the zero-filled fallback array to avoid per-call allocations
+        // when no prosody data is provided. The rented buffer must stay alive through
+        // Session.Run() because OrtValue pins the managed array.
         OrtValue? prosodyTensor = null;
+        long[]? rentedProsody = null;
         if (_model.HasProsody)
         {
             long[] prosodyArray;
+            int prosodySize = phonemeLength * 3;
             if (input.ProsodyFeatures is not null
-                && input.ProsodyFeatures.Length == phonemeLength * 3)
+                && input.ProsodyFeatures.Length == prosodySize)
             {
                 prosodyArray = input.ProsodyFeatures;
             }
+            else if (prosodySize > 64)
+            {
+                // Pool the zero-fill buffer for non-trivial sizes.
+                rentedProsody = ArrayPool<long>.Shared.Rent(prosodySize);
+                Array.Clear(rentedProsody, 0, prosodySize);
+                prosodyArray = rentedProsody;
+            }
             else
             {
-                // Use zeros when no prosody data is provided (matches C++ behaviour).
-                prosodyArray = new long[phonemeLength * 3];
+                // Small arrays: plain allocation is cheaper than pool overhead.
+                prosodyArray = new long[prosodySize];
             }
 
             prosodyTensor = OrtValue.CreateTensorValueFromMemory(
@@ -270,6 +283,10 @@ public sealed class PiperSession
             // Dispose optional tensors that were created outside the using declarations.
             sidTensor?.Dispose();
             prosodyTensor?.Dispose();
+
+            // Return the pooled prosody buffer after the tensor is disposed.
+            if (rentedProsody is not null)
+                ArrayPool<long>.Shared.Return(rentedProsody);
         }
     }
 

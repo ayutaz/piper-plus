@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 
 namespace PiperPlus.Core.Phonemize;
 
@@ -16,11 +17,11 @@ namespace PiperPlus.Core.Phonemize;
 /// <c>piper_train/phonemize/multilingual.py</c>.
 /// </para>
 /// <para>
-/// <b>Thread safety:</b> This class is <b>NOT</b> thread-safe. The
-/// <see cref="PhonemizeWithProsody"/> method sets <c>_lastEos</c> which is
-/// subsequently read by <see cref="PostProcessIds"/>. For concurrent use,
-/// callers must use a separate <see cref="MultilingualPhonemizer"/> instance
-/// per thread.
+/// <b>Thread safety:</b> A single instance may be used from multiple
+/// threads concurrently.  The EOS token captured during
+/// <see cref="PhonemizeWithProsody"/> is stored in thread-local storage
+/// so that each thread's subsequent <see cref="PostProcessIds"/> call
+/// sees the correct value.
 /// </para>
 /// </summary>
 public sealed class MultilingualPhonemizer : IPhonemizer
@@ -29,13 +30,11 @@ public sealed class MultilingualPhonemizer : IPhonemizer
     private readonly UnicodeLanguageDetector _detector;
 
     /// <summary>
-    /// The last EOS token captured during <see cref="PhonemizeWithProsody"/>.
-    /// Read by <see cref="PostProcessIds"/> to determine the correct EOS ID.
-    /// <para>
-    /// This makes the instance <b>NOT thread-safe</b>.
-    /// </para>
+    /// Per-thread EOS token captured during <see cref="PhonemizeWithProsody"/>
+    /// and read by <see cref="PostProcessIds"/> to determine the correct EOS ID.
+    /// Thread-local storage ensures concurrent callers do not interfere.
     /// </summary>
-    private string _lastEos = "$";
+    private readonly ThreadLocal<string> _lastEos = new(() => "$");
 
     // -----------------------------------------------------------------
     // BOS / EOS token sets
@@ -127,9 +126,10 @@ public sealed class MultilingualPhonemizer : IPhonemizer
 
     /// <inheritdoc />
     /// <remarks>
-    /// Uses the dynamic EOS token (<see cref="_lastEos"/>) captured during
-    /// the most recent <see cref="PhonemizeWithProsody"/> call. Falls back
-    /// to <c>"$"</c> if the captured token is not in the phoneme-ID map.
+    /// Uses the dynamic EOS token (<see cref="_lastEos"/>) captured on the
+    /// current thread during the most recent <see cref="PhonemizeWithProsody"/>
+    /// call. Falls back to <c>"$"</c> if the captured token is not in the
+    /// phoneme-ID map.
     /// <para>
     /// The underlying algorithm is the standard espeak-ng BOS + PAD +
     /// inter-pad + EOS scheme (same as
@@ -146,8 +146,8 @@ public sealed class MultilingualPhonemizer : IPhonemizer
         int[] padIds = phonemeIdMap.TryGetValue("_", out int[]? padArr) ? padArr : [0];
         phonemeIdMap.TryGetValue("^", out int[]? bosIds);
 
-        // Try _lastEos first, fall back to "$"
-        if (!phonemeIdMap.TryGetValue(_lastEos, out int[]? eosIds))
+        // Try _lastEos (thread-local) first, fall back to "$"
+        if (!phonemeIdMap.TryGetValue(_lastEos.Value!, out int[]? eosIds))
             phonemeIdMap.TryGetValue("$", out eosIds);
 
         // Step 1: Insert PAD after every phoneme ID.
@@ -213,8 +213,8 @@ public sealed class MultilingualPhonemizer : IPhonemizer
         if (segments.Count == 0)
             return (new List<string>(), new List<ProsodyInfo?>());
 
-        var allPhonemes = new List<string>();
-        var allProsody = new List<ProsodyInfo?>();
+        var allPhonemes = new List<string>(segments.Count * 50);
+        var allProsody = new List<ProsodyInfo?>(segments.Count * 50);
         string lastEos = "$";
 
         foreach (var (lang, segmentText) in segments)
@@ -240,7 +240,7 @@ public sealed class MultilingualPhonemizer : IPhonemizer
             }
         }
 
-        _lastEos = lastEos;
+        _lastEos.Value = lastEos;
         return (allPhonemes, allProsody);
     }
 }

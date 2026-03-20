@@ -56,6 +56,8 @@ public sealed class CustomDictionary
     // Sorted snapshot used by ApplyToText (rebuilt lazily when _dirty is true).
     private List<KeyValuePair<string, string>>? _sorted;
 
+    private readonly object _sortLock = new();
+
     /// <summary>
     /// Number of entries currently loaded.
     /// </summary>
@@ -156,11 +158,17 @@ public sealed class CustomDictionary
         // Rebuild sorted snapshot when entries have changed.
         if (_dirty || _sorted is null)
         {
-            _sorted = _entries
-                .OrderByDescending(kv => kv.Key.Length)
-                .ThenBy(kv => kv.Key, StringComparer.Ordinal)
-                .ToList();
-            _dirty = false;
+            lock (_sortLock)
+            {
+                if (_dirty || _sorted is null)
+                {
+                    _sorted = _entries
+                        .OrderByDescending(kv => kv.Key.Length)
+                        .ThenBy(kv => kv.Key, StringComparer.Ordinal)
+                        .ToList();
+                    _dirty = false;
+                }
+            }
         }
 
         foreach (var kv in _sorted)

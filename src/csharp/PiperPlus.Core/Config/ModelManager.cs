@@ -82,36 +82,36 @@ public static class ModelManager
     // FindVoice
     // ------------------------------------------------------------------
 
+    private static Dictionary<string, VoiceInfo>? s_voiceLookup;
+
+    private static Dictionary<string, VoiceInfo> GetVoiceLookup(IReadOnlyList<VoiceInfo> catalog)
+    {
+        if (s_voiceLookup is not null) return s_voiceLookup;
+
+        var lookup = new Dictionary<string, VoiceInfo>(catalog.Count * 4, StringComparer.Ordinal);
+        foreach (var voice in catalog)
+        {
+            lookup.TryAdd(voice.Key, voice);
+            foreach (var alias in voice.Aliases)
+            {
+                lookup.TryAdd(alias, voice);
+            }
+        }
+        s_voiceLookup = lookup;
+        return lookup;
+    }
+
     /// <summary>
     /// Searches the merged catalog for a voice by exact key or alias.
+    /// Uses a cached dictionary for O(1) lookup.
     /// Returns <c>null</c> when no match is found.
     /// </summary>
     public static VoiceInfo? FindVoice(string nameOrAlias)
     {
+        if (nameOrAlias is null) return null;
         var catalog = VoiceCatalog.LoadMergedCatalog();
-
-        // 1. Exact key match
-        foreach (var voice in catalog)
-        {
-            if (string.Equals(voice.Key, nameOrAlias, StringComparison.Ordinal))
-            {
-                return voice;
-            }
-        }
-
-        // 2. Alias match
-        foreach (var voice in catalog)
-        {
-            foreach (var alias in voice.Aliases)
-            {
-                if (string.Equals(alias, nameOrAlias, StringComparison.Ordinal))
-                {
-                    return voice;
-                }
-            }
-        }
-
-        return null;
+        var lookup = GetVoiceLookup(catalog);
+        return lookup.TryGetValue(nameOrAlias, out var voice) ? voice : null;
     }
 
     // ------------------------------------------------------------------

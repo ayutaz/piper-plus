@@ -59,8 +59,8 @@ public static class PhonemeEncoder
         var (tokens, prosodyList) = phonemizer.PhonemizeWithProsody(text);
 
         // Step 2: Map tokens to IDs, duplicating prosody for multi-ID tokens.
-        var phonemeIds = new List<int>();
-        var prosodyFeatures = new List<ProsodyInfo?>();
+        var phonemeIds = new List<int>(tokens.Count * 2);
+        var prosodyFeatures = new List<ProsodyInfo?>(tokens.Count * 2);
 
         for (int i = 0; i < tokens.Count; i++)
         {

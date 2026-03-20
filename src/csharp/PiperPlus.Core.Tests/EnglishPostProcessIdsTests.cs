@@ -675,19 +675,19 @@ public sealed class EnglishPostProcessIdsTests
 
         // Phoneme positions carry the exact original prosody values.
         Assert.Equal(p1, prosody[2]);  // phoneme 10 -> p1
-        Assert.Equal(-1, prosody[2]!.A1);
-        Assert.Equal(2, prosody[2]!.A2);
-        Assert.Equal(5, prosody[2]!.A3);
+        Assert.Equal(-1, prosody[2]!.Value.A1);
+        Assert.Equal(2, prosody[2]!.Value.A2);
+        Assert.Equal(5, prosody[2]!.Value.A3);
 
         Assert.Equal(p2, prosody[4]);  // phoneme 11 -> p2
-        Assert.Equal(0, prosody[4]!.A1);
-        Assert.Equal(1, prosody[4]!.A2);
-        Assert.Equal(5, prosody[4]!.A3);
+        Assert.Equal(0, prosody[4]!.Value.A1);
+        Assert.Equal(1, prosody[4]!.Value.A2);
+        Assert.Equal(5, prosody[4]!.Value.A3);
 
         Assert.Equal(p3, prosody[6]);  // phoneme 12 -> p3
-        Assert.Equal(1, prosody[6]!.A1);
-        Assert.Equal(0, prosody[6]!.A2);
-        Assert.Equal(5, prosody[6]!.A3);
+        Assert.Equal(1, prosody[6]!.Value.A1);
+        Assert.Equal(0, prosody[6]!.Value.A2);
+        Assert.Equal(5, prosody[6]!.Value.A3);
 
         // All structural positions (BOS, PADs, EOS) must be null.
         Assert.Null(prosody[0]);  // BOS

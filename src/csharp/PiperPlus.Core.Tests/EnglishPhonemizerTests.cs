@@ -238,7 +238,7 @@ public sealed class EnglishPhonemizerTests
         var phonemizer = new EnglishPhonemizer(new StubEnglishG2PEngine(words));
         var (_, prosody) = phonemizer.PhonemizeWithProsody("go");
 
-        var a2Values = prosody.Where(p => p is not null).Select(p => p!.A2).ToList();
+        var a2Values = prosody.Where(p => p is not null).Select(p => p!.Value.A2).ToList();
         Assert.Contains(2, a2Values);
     }
 
@@ -258,7 +258,7 @@ public sealed class EnglishPhonemizerTests
         var phonemizer = new EnglishPhonemizer(new StubEnglishG2PEngine(words));
         var (_, prosody) = phonemizer.PhonemizeWithProsody("the");
 
-        var a2Values = prosody.Where(p => p is not null).Select(p => p!.A2).ToList();
+        var a2Values = prosody.Where(p => p is not null).Select(p => p!.Value.A2).ToList();
         Assert.Contains(0, a2Values);
     }
 
@@ -283,7 +283,7 @@ public sealed class EnglishPhonemizerTests
         {
             if (p is not null)
             {
-                Assert.Equal(0, p.A1);
+                Assert.Equal(0, p!.Value.A1);
             }
         }
     }
@@ -486,7 +486,7 @@ public sealed class EnglishPhonemizerTests
         // The stress marker ˈ also gets A3=3 in its prosody entry.
         var a3Values = prosody
             .Where(p => p is not null)
-            .Select(p => p!.A3)
+            .Select(p => p!.Value.A3)
             .Distinct()
             .ToList();
 
@@ -512,7 +512,7 @@ public sealed class EnglishPhonemizerTests
         var phonemizer = new EnglishPhonemizer(new StubEnglishG2PEngine(words));
         var (_, prosody) = phonemizer.PhonemizeWithProsody("replay");
 
-        var a2Values = prosody.Where(p => p is not null).Select(p => p!.A2).ToList();
+        var a2Values = prosody.Where(p => p is not null).Select(p => p!.Value.A2).ToList();
         Assert.Contains(1, a2Values);
     }
 

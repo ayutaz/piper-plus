@@ -76,7 +76,7 @@ public sealed class PortuguesePhonemizerTests
         int iIdx = result.IndexOf("i");
         Assert.True(iIdx >= 0, "'i' should be present");
         Assert.NotNull(prosody[iIdx]);
-        Assert.Equal(2, prosody[iIdx]!.A2);
+        Assert.Equal(2, prosody[iIdx]!.Value.A2);
     }
 
     // ================================================================
@@ -97,19 +97,19 @@ public sealed class PortuguesePhonemizerTests
         int bIdx = result.IndexOf("b");
         Assert.True(bIdx >= 0, "'b' should be present");
         Assert.NotNull(prosody[bIdx]);
-        Assert.Equal(0, prosody[bIdx]!.A2);
+        Assert.Equal(0, prosody[bIdx]!.Value.A2);
 
         // "a" should also be unstressed.
         int aIdx = result.IndexOf("a");
         Assert.True(aIdx >= 0, "'a' should be present");
         Assert.NotNull(prosody[aIdx]);
-        Assert.Equal(0, prosody[aIdx]!.A2);
+        Assert.Equal(0, prosody[aIdx]!.Value.A2);
 
         // "w" (final) should also be unstressed.
         int wIdx = result.IndexOf("w");
         Assert.True(wIdx >= 0, "'w' should be present");
         Assert.NotNull(prosody[wIdx]);
-        Assert.Equal(0, prosody[wIdx]!.A2);
+        Assert.Equal(0, prosody[wIdx]!.Value.A2);
     }
 
     // ================================================================
@@ -128,7 +128,7 @@ public sealed class PortuguesePhonemizerTests
 
         var a3Values = prosody
             .Where(p => p is not null)
-            .Select(p => p!.A3)
+            .Select(p => p!.Value.A3)
             .Distinct()
             .ToList();
 
@@ -177,9 +177,9 @@ public sealed class PortuguesePhonemizerTests
         int commaIdx = result.IndexOf(",");
         Assert.True(commaIdx >= 0, "Comma should be present");
         Assert.NotNull(prosody[commaIdx]);
-        Assert.Equal(0, prosody[commaIdx]!.A1);
-        Assert.Equal(0, prosody[commaIdx]!.A2);
-        Assert.Equal(0, prosody[commaIdx]!.A3);
+        Assert.Equal(0, prosody[commaIdx]!.Value.A1);
+        Assert.Equal(0, prosody[commaIdx]!.Value.A2);
+        Assert.Equal(0, prosody[commaIdx]!.Value.A3);
     }
 
     // ================================================================
@@ -267,7 +267,7 @@ public sealed class PortuguesePhonemizerTests
         foreach (var p in prosody)
         {
             Assert.NotNull(p);
-            Assert.Equal(0, p!.A2);
+            Assert.Equal(0, p!.Value.A2);
         }
     }
 
@@ -384,17 +384,17 @@ public sealed class PortuguesePhonemizerTests
         int qIdx = result.IndexOf("\u00bf");
         Assert.True(qIdx >= 0, "\u00bf should be present");
         Assert.NotNull(prosody[qIdx]);
-        Assert.Equal(0, prosody[qIdx]!.A1);
-        Assert.Equal(0, prosody[qIdx]!.A2);
-        Assert.Equal(0, prosody[qIdx]!.A3);
+        Assert.Equal(0, prosody[qIdx]!.Value.A1);
+        Assert.Equal(0, prosody[qIdx]!.Value.A2);
+        Assert.Equal(0, prosody[qIdx]!.Value.A3);
 
         // ¡ should be present with zero prosody.
         int eIdx = result.IndexOf("\u00a1");
         Assert.True(eIdx >= 0, "\u00a1 should be present");
         Assert.NotNull(prosody[eIdx]);
-        Assert.Equal(0, prosody[eIdx]!.A1);
-        Assert.Equal(0, prosody[eIdx]!.A2);
-        Assert.Equal(0, prosody[eIdx]!.A3);
+        Assert.Equal(0, prosody[eIdx]!.Value.A1);
+        Assert.Equal(0, prosody[eIdx]!.Value.A2);
+        Assert.Equal(0, prosody[eIdx]!.Value.A3);
     }
 
     // ================================================================
@@ -424,9 +424,9 @@ public sealed class PortuguesePhonemizerTests
             int idx = result.IndexOf(punct);
             Assert.True(idx >= 0, $"{punct} should be present");
             Assert.NotNull(prosody[idx]);
-            Assert.Equal(0, prosody[idx]!.A1);
-            Assert.Equal(0, prosody[idx]!.A2);
-            Assert.Equal(0, prosody[idx]!.A3);
+            Assert.Equal(0, prosody[idx]!.Value.A1);
+            Assert.Equal(0, prosody[idx]!.Value.A2);
+            Assert.Equal(0, prosody[idx]!.Value.A3);
         }
     }
 
@@ -450,7 +450,7 @@ public sealed class PortuguesePhonemizerTests
         foreach (var p in prosody)
         {
             Assert.NotNull(p);
-            Assert.Equal(0, p!.A2);
+            Assert.Equal(0, p!.Value.A2);
         }
         // The 3 phonemes should still be present.
         Assert.Equal(3, result.Count);
@@ -482,6 +482,6 @@ public sealed class PortuguesePhonemizerTests
         // õ follows the stress marker, so it should have A2=2.
         int oIdx = result.IndexOf("\u00f5");
         Assert.NotNull(prosody[oIdx]);
-        Assert.Equal(2, prosody[oIdx]!.A2);
+        Assert.Equal(2, prosody[oIdx]!.Value.A2);
     }
 }

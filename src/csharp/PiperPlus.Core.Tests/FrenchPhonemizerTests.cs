@@ -56,7 +56,7 @@ public sealed class FrenchPhonemizerTests
         // u is the last vowel, so it should get A2=2.
         var nonNull = prosody.Where(p => p is not null).ToList();
         var uProsody = nonNull[3]; // b(0), ɔ̃(1), ʒ(2), u(3)
-        Assert.Equal(2, uProsody!.A2);
+        Assert.Equal(2, uProsody!.Value.A2);
     }
 
     // ================================================================
@@ -75,7 +75,7 @@ public sealed class FrenchPhonemizerTests
 
         // ɔ̃ at index 1 is a vowel but not the last -> A2=0.
         var nonNull = prosody.Where(p => p is not null).ToList();
-        Assert.Equal(0, nonNull[1]!.A2); // ɔ̃
+        Assert.Equal(0, nonNull[1]!.Value.A2); // ɔ̃
     }
 
     // ================================================================
@@ -93,9 +93,9 @@ public sealed class FrenchPhonemizerTests
         var (_, prosody) = phonemizer.PhonemizeWithProsody("bonjour");
 
         var nonNull = prosody.Where(p => p is not null).ToList();
-        Assert.Equal(0, nonNull[0]!.A2); // b
-        Assert.Equal(0, nonNull[2]!.A2); // ʒ
-        Assert.Equal(0, nonNull[4]!.A2); // ʁ
+        Assert.Equal(0, nonNull[0]!.Value.A2); // b
+        Assert.Equal(0, nonNull[2]!.Value.A2); // ʒ
+        Assert.Equal(0, nonNull[4]!.Value.A2); // ʁ
     }
 
     // ================================================================
@@ -114,7 +114,7 @@ public sealed class FrenchPhonemizerTests
 
         var a3Values = prosody
             .Where(p => p is not null)
-            .Select(p => p!.A3)
+            .Select(p => p!.Value.A3)
             .Distinct()
             .ToList();
 
@@ -171,9 +171,9 @@ public sealed class FrenchPhonemizerTests
         // The comma should have A1=0, A2=0, A3=0.
         var commaProsody = prosody[^1];
         Assert.NotNull(commaProsody);
-        Assert.Equal(0, commaProsody!.A1);
-        Assert.Equal(0, commaProsody.A2);
-        Assert.Equal(0, commaProsody.A3);
+        Assert.Equal(0, commaProsody!.Value.A1);
+        Assert.Equal(0, commaProsody!.Value.A2);
+        Assert.Equal(0, commaProsody!.Value.A3);
     }
 
     // ================================================================
@@ -191,7 +191,7 @@ public sealed class FrenchPhonemizerTests
         var (_, prosody) = phonemizer.PhonemizeWithProsody("bon");
 
         var nonNull = prosody.Where(p => p is not null).ToList();
-        Assert.Equal(2, nonNull[1]!.A2); // ɔ̃ is last vowel -> stressed
+        Assert.Equal(2, nonNull[1]!.Value.A2); // ɔ̃ is last vowel -> stressed
 
         // Also test ɛ̃ and ɑ̃.
         var tokens2 = new List<string> { "v", "\u025b\u0303" }; // v ɛ̃
@@ -199,14 +199,14 @@ public sealed class FrenchPhonemizerTests
         var (_, prosody2) = phonemizer2.PhonemizeWithProsody("vin");
 
         var nonNull2 = prosody2.Where(p => p is not null).ToList();
-        Assert.Equal(2, nonNull2[1]!.A2); // ɛ̃ is last vowel -> stressed
+        Assert.Equal(2, nonNull2[1]!.Value.A2); // ɛ̃ is last vowel -> stressed
 
         var tokens3 = new List<string> { "l", "\u0251\u0303" }; // l ɑ̃
         var phonemizer3 = new FrenchPhonemizer(new StubFrenchG2PEngine(tokens3));
         var (_, prosody3) = phonemizer3.PhonemizeWithProsody("lent");
 
         var nonNull3 = prosody3.Where(p => p is not null).ToList();
-        Assert.Equal(2, nonNull3[1]!.A2); // ɑ̃ is last vowel -> stressed
+        Assert.Equal(2, nonNull3[1]!.Value.A2); // ɑ̃ is last vowel -> stressed
     }
 
     // ================================================================
@@ -379,15 +379,15 @@ public sealed class FrenchPhonemizerTests
 
         // ¿ at index 0 should be punctuation with zero prosody.
         Assert.NotNull(prosody[0]);
-        Assert.Equal(0, prosody[0]!.A1);
-        Assert.Equal(0, prosody[0]!.A2);
-        Assert.Equal(0, prosody[0]!.A3);
+        Assert.Equal(0, prosody[0]!.Value.A1);
+        Assert.Equal(0, prosody[0]!.Value.A2);
+        Assert.Equal(0, prosody[0]!.Value.A3);
 
         // ¡ at the end should also be punctuation with zero prosody.
         Assert.NotNull(prosody[^1]);
-        Assert.Equal(0, prosody[^1]!.A1);
-        Assert.Equal(0, prosody[^1]!.A2);
-        Assert.Equal(0, prosody[^1]!.A3);
+        Assert.Equal(0, prosody[^1]!.Value.A1);
+        Assert.Equal(0, prosody[^1]!.Value.A2);
+        Assert.Equal(0, prosody[^1]!.Value.A3);
     }
 
     // ================================================================
@@ -405,15 +405,15 @@ public sealed class FrenchPhonemizerTests
 
         // « at index 0 should be punctuation with zero prosody.
         Assert.NotNull(prosody[0]);
-        Assert.Equal(0, prosody[0]!.A1);
-        Assert.Equal(0, prosody[0]!.A2);
-        Assert.Equal(0, prosody[0]!.A3);
+        Assert.Equal(0, prosody[0]!.Value.A1);
+        Assert.Equal(0, prosody[0]!.Value.A2);
+        Assert.Equal(0, prosody[0]!.Value.A3);
 
         // » at the end should also be punctuation with zero prosody.
         Assert.NotNull(prosody[^1]);
-        Assert.Equal(0, prosody[^1]!.A1);
-        Assert.Equal(0, prosody[^1]!.A2);
-        Assert.Equal(0, prosody[^1]!.A3);
+        Assert.Equal(0, prosody[^1]!.Value.A1);
+        Assert.Equal(0, prosody[^1]!.Value.A2);
+        Assert.Equal(0, prosody[^1]!.Value.A3);
     }
 
     // ================================================================
@@ -431,8 +431,8 @@ public sealed class FrenchPhonemizerTests
         var (_, prosody) = phonemizer.PhonemizeWithProsody("test");
 
         var nonNull = prosody.Where(p => p is not null).ToList();
-        Assert.Equal(0, nonNull[0]!.A2);  // k = consonant -> no stress
-        Assert.Equal(2, nonNull[1]!.A2);  // y_vowel = last vowel -> stressed
+        Assert.Equal(0, nonNull[0]!.Value.A2);  // k = consonant -> no stress
+        Assert.Equal(2, nonNull[1]!.Value.A2);  // y_vowel = last vowel -> stressed
     }
 
     // ================================================================
@@ -450,7 +450,7 @@ public sealed class FrenchPhonemizerTests
         var (_, prosody) = phonemizer.PhonemizeWithProsody("le");
 
         var nonNull = prosody.Where(p => p is not null).ToList();
-        Assert.Equal(0, nonNull[0]!.A2);  // l = consonant -> no stress
-        Assert.Equal(2, nonNull[1]!.A2);  // ə = last vowel -> stressed
+        Assert.Equal(0, nonNull[0]!.Value.A2);  // l = consonant -> no stress
+        Assert.Equal(2, nonNull[1]!.Value.A2);  // ə = last vowel -> stressed
     }
 }

@@ -176,6 +176,9 @@ public static class OpenJTalkToPiperMapping
     public static IReadOnlyDictionary<char, string> CharToToken { get; } =
         BuildReverse(TokenToChar);
 
+    /// <summary>Pre-computed char→string cache to avoid per-call ToString() allocations.</summary>
+    private static readonly Dictionary<char, string> s_charToString = BuildCharToString();
+
     // ----------------------------------------------------------------
     // Public helpers
     // ----------------------------------------------------------------
@@ -198,7 +201,7 @@ public static class OpenJTalkToPiperMapping
         }
 
         return TokenToChar.TryGetValue(token, out var pua)
-            ? pua.ToString()
+            ? s_charToString[pua]
             : token;
     }
 
@@ -230,5 +233,15 @@ public static class OpenJTalkToPiperMapping
         }
 
         return new ReadOnlyDictionary<char, string>(reverse);
+    }
+
+    private static Dictionary<char, string> BuildCharToString()
+    {
+        var dict = new Dictionary<char, string>(TokenToChar.Count);
+        foreach (var (_, ch) in TokenToChar)
+        {
+            dict[ch] = ch.ToString();
+        }
+        return dict;
     }
 }

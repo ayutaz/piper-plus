@@ -72,7 +72,7 @@ public sealed class SpanishPhonemizerTests
         int idx = result.IndexOf("\u02c8");
         Assert.True(idx >= 0, "Stress marker should be present");
         Assert.NotNull(prosody[idx]);
-        Assert.Equal(2, prosody[idx]!.A2);
+        Assert.Equal(2, prosody[idx]!.Value.A2);
     }
 
     // ================================================================
@@ -92,7 +92,7 @@ public sealed class SpanishPhonemizerTests
         int vowelIdx = stressIdx + 1;
         Assert.True(vowelIdx < result.Count, "Vowel should follow stress marker");
         Assert.NotNull(prosody[vowelIdx]);
-        Assert.Equal(2, prosody[vowelIdx]!.A2);
+        Assert.Equal(2, prosody[vowelIdx]!.Value.A2);
     }
 
     // ================================================================
@@ -113,13 +113,13 @@ public sealed class SpanishPhonemizerTests
         int lIdx = result.IndexOf("l");
         Assert.True(lIdx >= 0, "'l' should be present");
         Assert.NotNull(prosody[lIdx]);
-        Assert.Equal(0, prosody[lIdx]!.A2);
+        Assert.Equal(0, prosody[lIdx]!.Value.A2);
 
         // Find final "a" -- it should be unstressed.
         int aIdx = result.LastIndexOf("a");
         Assert.True(aIdx >= 0, "'a' should be present");
         Assert.NotNull(prosody[aIdx]);
-        Assert.Equal(0, prosody[aIdx]!.A2);
+        Assert.Equal(0, prosody[aIdx]!.Value.A2);
     }
 
     // ================================================================
@@ -138,7 +138,7 @@ public sealed class SpanishPhonemizerTests
 
         var a3Values = prosody
             .Where(p => p is not null)
-            .Select(p => p!.A3)
+            .Select(p => p!.Value.A3)
             .Distinct()
             .ToList();
 
@@ -187,9 +187,9 @@ public sealed class SpanishPhonemizerTests
         int commaIdx = result.IndexOf(",");
         Assert.True(commaIdx >= 0, "Comma should be present");
         Assert.NotNull(prosody[commaIdx]);
-        Assert.Equal(0, prosody[commaIdx]!.A1);
-        Assert.Equal(0, prosody[commaIdx]!.A2);
-        Assert.Equal(0, prosody[commaIdx]!.A3);
+        Assert.Equal(0, prosody[commaIdx]!.Value.A1);
+        Assert.Equal(0, prosody[commaIdx]!.Value.A2);
+        Assert.Equal(0, prosody[commaIdx]!.Value.A3);
     }
 
     // ================================================================
@@ -366,17 +366,17 @@ public sealed class SpanishPhonemizerTests
         int invertedIdx = result.IndexOf("\u00bf");
         Assert.True(invertedIdx >= 0, "\u00bf should be present");
         Assert.NotNull(prosody[invertedIdx]);
-        Assert.Equal(0, prosody[invertedIdx]!.A1);
-        Assert.Equal(0, prosody[invertedIdx]!.A2);
-        Assert.Equal(0, prosody[invertedIdx]!.A3);
+        Assert.Equal(0, prosody[invertedIdx]!.Value.A1);
+        Assert.Equal(0, prosody[invertedIdx]!.Value.A2);
+        Assert.Equal(0, prosody[invertedIdx]!.Value.A3);
 
         // Regular ? should also be present with zero prosody.
         int questionIdx = result.IndexOf("?");
         Assert.True(questionIdx >= 0, "? should be present");
         Assert.NotNull(prosody[questionIdx]);
-        Assert.Equal(0, prosody[questionIdx]!.A1);
-        Assert.Equal(0, prosody[questionIdx]!.A2);
-        Assert.Equal(0, prosody[questionIdx]!.A3);
+        Assert.Equal(0, prosody[questionIdx]!.Value.A1);
+        Assert.Equal(0, prosody[questionIdx]!.Value.A2);
+        Assert.Equal(0, prosody[questionIdx]!.Value.A3);
     }
 
     // ================================================================
@@ -396,17 +396,17 @@ public sealed class SpanishPhonemizerTests
         int stressIdx = result.IndexOf("\u02c8");
         Assert.True(stressIdx >= 0, "Stress marker should be present");
         Assert.NotNull(prosody[stressIdx]);
-        Assert.Equal(2, prosody[stressIdx]!.A2);
+        Assert.Equal(2, prosody[stressIdx]!.Value.A2);
 
         // A3 = phoneme count excluding ˈ = 2 (k, a).
-        Assert.Equal(2, prosody[stressIdx]!.A3);
+        Assert.Equal(2, prosody[stressIdx]!.Value.A3);
 
         // ˈ is the last token, so no vowel follows → no other token has A2=2.
         for (int i = 0; i < result.Count; i++)
         {
             if (i != stressIdx && result[i] != "\u02c8")
             {
-                Assert.Equal(0, prosody[i]!.A2);
+                Assert.Equal(0, prosody[i]!.Value.A2);
             }
         }
     }

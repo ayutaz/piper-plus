@@ -50,13 +50,24 @@ public interface IEnglishG2PEngine
 /// </list>
 /// </para>
 /// </summary>
-public sealed class EnglishPhonemizer : IPhonemizer
+public sealed partial class EnglishPhonemizer : IPhonemizer
 {
     private readonly IEnglishG2PEngine _engine;
 
     // Regex to extract alphabetic words (including apostrophes) from text.
     // Mirrors Python: re.findall(r"[a-zA-Z']+", text.lower())
-    private static readonly Regex s_sourceWordRegex = new(@"[a-zA-Z']+", RegexOptions.Compiled);
+    [GeneratedRegex(@"[a-zA-Z']+")]
+    private static partial Regex SourceWordRegex();
+
+    // Cache single-char strings for IPA characters (covers ASCII + IPA Extensions)
+    private static readonly string[] s_charStrings = InitCharStrings();
+    private static string[] InitCharStrings()
+    {
+        var arr = new string[0x0300];
+        for (int i = 0; i < arr.Length; i++)
+            arr[i] = ((char)i).ToString();
+        return arr;
+    }
 
     /// <summary>
     /// Create a new <see cref="EnglishPhonemizer"/> backed by the given G2P engine.
@@ -107,60 +118,7 @@ public sealed class EnglishPhonemizer : IPhonemizer
         List<ProsodyInfo?> prosodyFeatures,
         Dictionary<string, int[]> phonemeIdMap)
     {
-        // Resolve special token IDs from the phoneme-ID map.
-        int[] padIds = phonemeIdMap.TryGetValue("_", out int[]? padArr) ? padArr : [0];
-        phonemeIdMap.TryGetValue("^", out int[]? bosIds);
-        phonemeIdMap.TryGetValue("$", out int[]? eosIds);
-
-        // Step 1: Insert PAD after every phoneme ID.
-        var paddedIds = new List<int>(phonemeIds.Count * 2);
-        var paddedProsody = new List<ProsodyInfo?>(phonemeIds.Count * 2);
-
-        for (int i = 0; i < phonemeIds.Count; i++)
-        {
-            paddedIds.Add(phonemeIds[i]);
-            paddedProsody.Add(prosodyFeatures[i]);
-
-            // Only insert PAD if current phoneme is not already a pad token (matches Python base.py)
-            if (Array.IndexOf(padIds, phonemeIds[i]) < 0)
-            {
-                paddedIds.AddRange(padIds);
-                for (int j = 0; j < padIds.Length; j++)
-                {
-                    paddedProsody.Add(null);
-                }
-            }
-        }
-
-        // Step 2: Wrap with BOS + PAD ... EOS.
-        if (bosIds is not null)
-        {
-            var withBos = new List<int>(bosIds.Length + 1 + paddedIds.Count);
-            withBos.AddRange(bosIds);
-            withBos.Add(padIds[0]);
-            withBos.AddRange(paddedIds);
-
-            var withBosProsody = new List<ProsodyInfo?>(bosIds.Length + 1 + paddedProsody.Count);
-            for (int i = 0; i < bosIds.Length + 1; i++)
-            {
-                withBosProsody.Add(null);
-            }
-            withBosProsody.AddRange(paddedProsody);
-
-            paddedIds = withBos;
-            paddedProsody = withBosProsody;
-        }
-
-        if (eosIds is not null)
-        {
-            paddedIds.AddRange(eosIds);
-            for (int i = 0; i < eosIds.Length; i++)
-            {
-                paddedProsody.Add(null);
-            }
-        }
-
-        return (paddedIds, paddedProsody);
+        return PiperPhonemeConverter.EspeakPostProcessIds(phonemeIds, prosodyFeatures, phonemeIdMap);
     }
 
     // -----------------------------------------------------------------
@@ -181,8 +139,8 @@ public sealed class EnglishPhonemizer : IPhonemizer
         // Mirrors Python: re.findall(r"[a-zA-Z']+", text.lower())
         List<string> sourceWords = GetSourceWords(text);
 
-        var phonemes = new List<string>();
-        var prosodyList = new List<ProsodyInfo?>();
+        var phonemes = new List<string>(sourceWords.Count * 3);
+        var prosodyList = new List<ProsodyInfo?>(sourceWords.Count * 3);
 
         // Step 3: Build function-word flags for each word group.
         // Non-punctuation words are matched to source words in order.
@@ -276,7 +234,7 @@ public sealed class EnglishPhonemizer : IPhonemizer
                 // Each IPA character becomes a separate phoneme token.
                 foreach (char ch in ipa)
                 {
-                    phonemes.Add(ch.ToString());
+                    phonemes.Add(ch < s_charStrings.Length ? s_charStrings[ch] : ch.ToString());
                     prosodyList.Add(new ProsodyInfo(A1: 0, A2: a2, A3: wordPhonemeCount));
                 }
             }
@@ -316,7 +274,7 @@ public sealed class EnglishPhonemizer : IPhonemizer
     /// </summary>
     private static List<string> GetSourceWords(string text)
     {
-        var matches = s_sourceWordRegex.Matches(text.ToLowerInvariant());
+        var matches = SourceWordRegex().Matches(text.ToLowerInvariant());
         var result = new List<string>(matches.Count);
         foreach (Match m in matches)
         {

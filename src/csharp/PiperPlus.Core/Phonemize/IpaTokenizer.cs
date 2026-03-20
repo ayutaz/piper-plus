@@ -22,7 +22,7 @@ public static class IpaTokenizer
     /// </param>
     public static List<string> Tokenize(string ipa, IReadOnlySet<string>? knownDigraphs = null)
     {
-        var tokens = new List<string>();
+        var tokens = new List<string>(Math.Max(4, ipa.Length / 2));
         int i = 0;
         while (i < ipa.Length)
         {

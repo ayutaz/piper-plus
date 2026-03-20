@@ -112,9 +112,10 @@ public sealed class JapanesePhonemizer : IPhonemizer
         var a2Arr = g2p.A2;
         var a3Arr = g2p.A3;
 
-        var tokens = new List<string>();
-        var prosody = new List<ProsodyInfo?>();
         int count = phonemes.Length;
+        // Each phoneme may emit itself + one prosody mark (], #, or [), so ~2x capacity.
+        var tokens = new List<string>(count * 2);
+        var prosody = new List<ProsodyInfo?>(count * 2);
 
         if (a1Arr.Length != count || a2Arr.Length != count || a3Arr.Length != count)
             throw new System.InvalidOperationException(
