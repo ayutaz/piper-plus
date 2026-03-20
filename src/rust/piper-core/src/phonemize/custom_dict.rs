@@ -213,10 +213,10 @@ impl CustomDictionary {
             // 全大文字 or 全小文字 → lowercase 正規化して case-insensitive マップ
             let normalized = lower;
 
-            if let Some(existing) = self.entries.get(&normalized) {
-                if entry.priority <= existing.priority {
-                    return; // 既存の方が優先度が高い (または同じ)
-                }
+            if let Some(existing) = self.entries.get(&normalized)
+                && entry.priority <= existing.priority
+            {
+                return; // 既存の方が優先度が高い (または同じ)
             }
 
             self.entries.insert(normalized, entry);

@@ -16,14 +16,14 @@ name = "piper_plus"
 crate-type = ["cdylib"]
 
 [dependencies]
-piper-plus = { path = "../piper-core", version = "0.1.0" }
+piper_core = { package = "piper-plus", path = "../piper-core", version = "0.1.0" }
 pyo3 = { version = "0.22", features = ["extension-module"] }
 numpy = "0.22"
 
 [features]
 default = []
-japanese = ["piper-plus/japanese"]
-naist-jdic = ["piper-plus/naist-jdic"]
+japanese = ["piper_core/japanese"]
+naist-jdic = ["piper_core/naist-jdic"]
 
 [lints.clippy]
 # PyO3 #[pymethods] macro generates code that triggers useless_conversion

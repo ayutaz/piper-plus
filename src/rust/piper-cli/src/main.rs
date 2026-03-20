@@ -156,14 +156,14 @@ fn main() -> Result<()> {
     let output_to_stdout = cli.output_file.as_deref() == Some("-");
 
     // --language バリデーション
-    if let Some(ref lang) = cli.language {
-        if !SUPPORTED_LANGUAGES.contains(&lang.as_str()) {
-            anyhow::bail!(
-                "Unsupported language: '{}'. Supported languages: {}",
-                lang,
-                SUPPORTED_LANGUAGES.join(", "),
-            );
-        }
+    if let Some(ref lang) = cli.language
+        && !SUPPORTED_LANGUAGES.contains(&lang.as_str())
+    {
+        anyhow::bail!(
+            "Unsupported language: '{}'. Supported languages: {}",
+            lang,
+            SUPPORTED_LANGUAGES.join(", "),
+        );
     }
 
     if let Some(ref batch_path) = cli.batch {

@@ -374,10 +374,10 @@ struct KoSyllable {
 
 fn emit_syllable(syl: &KoSyllable, out: &mut Vec<char>) {
     // Initial consonant
-    if syl.initial < N_INITIALS {
-        if let Some(ph) = INITIAL_TABLE[syl.initial] {
-            out.push(ph);
-        }
+    if syl.initial < N_INITIALS
+        && let Some(ph) = INITIAL_TABLE[syl.initial]
+    {
+        out.push(ph);
     }
 
     // Medial vowel (1-2 phonemes)
@@ -390,10 +390,11 @@ fn emit_syllable(syl: &KoSyllable, out: &mut Vec<char>) {
     }
 
     // Final consonant
-    if syl.final_ > 0 && syl.final_ < N_FINALS {
-        if let Some(ph) = FINAL_TABLE[syl.final_].ph {
-            out.push(ph);
-        }
+    if syl.final_ > 0
+        && syl.final_ < N_FINALS
+        && let Some(ph) = FINAL_TABLE[syl.final_].ph
+    {
+        out.push(ph);
     }
 }
 

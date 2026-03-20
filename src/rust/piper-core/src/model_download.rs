@@ -154,22 +154,22 @@ pub fn download_file(
         })?;
         bytes_downloaded += n as u64;
 
-        if let Some(ref cb) = progress {
-            if bytes_downloaded >= next_report || (total_bytes == Some(bytes_downloaded)) {
-                let percentage = total_bytes.map(|t| {
-                    if t == 0 {
-                        100.0
-                    } else {
-                        (bytes_downloaded as f64 / t as f64) * 100.0
-                    }
-                });
-                cb(DownloadProgress {
-                    bytes_downloaded,
-                    total_bytes,
-                    percentage,
-                });
-                next_report = bytes_downloaded + PROGRESS_INTERVAL;
-            }
+        if let Some(ref cb) = progress
+            && (bytes_downloaded >= next_report || (total_bytes == Some(bytes_downloaded)))
+        {
+            let percentage = total_bytes.map(|t| {
+                if t == 0 {
+                    100.0
+                } else {
+                    (bytes_downloaded as f64 / t as f64) * 100.0
+                }
+            });
+            cb(DownloadProgress {
+                bytes_downloaded,
+                total_bytes,
+                percentage,
+            });
+            next_report = bytes_downloaded + PROGRESS_INTERVAL;
         }
     }
 
