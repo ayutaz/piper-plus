@@ -25,6 +25,11 @@ default = []
 japanese = ["piper_core/japanese"]
 naist-jdic = ["piper_core/naist-jdic"]
 
+[lints.rust]
+# PyO3 v0.22 #[pymethods] macro generates unsafe calls without explicit
+# unsafe blocks, which is an error in Rust 2024 edition. Allow until PyO3 0.23+.
+unsafe_op_in_unsafe_fn = "allow"
+
 [lints.clippy]
 # PyO3 #[pymethods] macro generates code that triggers useless_conversion
 # when map_err(piper_err_to_pyerr) is used for custom exception mapping.
