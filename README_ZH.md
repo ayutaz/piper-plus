@@ -37,7 +37,7 @@
 - **英语 TTS** — 无 GPL 依赖的 G2P ([g2p-en](https://github.com/Kyubyong/g2p), Apache-2.0)，无需 espeak-ng
 - **多语言支持** — 6种语言 (ja/en/zh/es/fr/pt)，571说话人的6语言基础模型
 - **多说话人** — SpeakerBalancedBatchSampler，语言均衡采样自动启用
-- **自定义词典** — 内置 200+ 技术术语发音词典 — [指南](docs/features/custom_dictionary.md)
+- **自定义词典** — 内置 200+ 技术术语发音词典
 - **音素输入** — 使用 `[[ phonemes ]]` 标记直接指定音素 — [指南](docs/features/phoneme-input.md)
 
 ### 训练
@@ -285,7 +285,7 @@ uv run python -m piper_train \
   --ema-decay 0.9995
 ```
 
-多 GPU 自动配置 DDP（分布式数据并行）。需要设置 NCCL 环境变量。详情请参阅[多 GPU 训练指南](docs/guides/training/multi-gpu-training.md)。
+多 GPU 自动配置 DDP（分布式数据并行）。需要设置 NCCL 环境变量。详情请参阅多 GPU 训练指南。
 
 ### ONNX 导出
 
@@ -363,7 +363,7 @@ CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
 | `PIPER_AUTO_DOWNLOAD_DICT` | 设为 `0` 禁用自动下载 |
 | `PIPER_OFFLINE_MODE` | 设为 `1` 启用离线模式 |
 
-详情请参阅[日语使用指南](docs/guides/japanese/japanese-usage.md)和[音素映射参考](docs/api-reference/phoneme-mapping.md)。
+详情请参阅日语使用指南和[音素映射参考](docs/api-reference/phoneme-mapping.md)。
 
 ---
 
@@ -429,11 +429,11 @@ Piper 的 Unity 插件：[github.com/ayutaz/uPiper](https://github.com/ayutaz/uP
 
 | 类别 | 链接 |
 |---|---|
-| 日语 TTS | [日语使用指南](docs/guides/japanese/japanese-usage.md) |
-| 训练 | [训练指南](docs/guides/training/training-guide.md) · [多 GPU](docs/guides/training/multi-gpu-training.md) |
+| 日语 TTS | 日语使用指南 |
+| 训练 | [训练指南](docs/guides/training/training-guide.md) · 多 GPU |
 | API | [音素映射](docs/api-reference/phoneme-mapping.md) · [环境变量](docs/getting-started/environment-variables.md) |
-| 功能 | [WebUI](docs/features/webui.md) · [CLI 增强](docs/features/cli-enhancements.md) · [流式处理](docs/features/streaming-mode.md) |
-| 设置 | [快速入门（日语）](docs/guides/japanese/japanese-usage.md) · [Windows](docs/getting-started/windows-setup.md) · [故障排除](docs/getting-started/troubleshooting.md) |
+| 功能 | [WebUI](docs/features/webui.md) · CLI 增强 · 流式处理 |
+| 设置 | 快速入门（日语） · [Windows](docs/getting-started/windows-setup.md) · [故障排除](docs/getting-started/troubleshooting.md) |
 | Docker | [Docker 环境](docker/README.md) |
 | WebAssembly | [技术详情](src/wasm/openjtalk-web/README.md) |
 

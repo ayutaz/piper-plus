@@ -10,10 +10,14 @@ For Windows, see [ssamjh's guide using WSL](https://ssamjh.nz/create-custom-pipe
 - [Preparing a Dataset](#preparing-a-dataset)
 - [Training a Model](#training-a-model)
 - [Multi-Speaker Fine-Tuning](#multi-speaker-fine-tuning)
+- [Multilingual Training (6言語)](#multilingual-training-6言語)
+- [Transfer Learning (転移学習)](#transfer-learning-転移学習)
 - [WavLM Discriminator](#wavlm-discriminator)
 - [Testing](#testing)
+- [Multilingual Inference (6言語推論)](#multilingual-inference-6言語推論)
 - [Tensorboard](#tensorboard)
 - [Exporting a Model](#exporting-a-model)
+- [CLI Options Reference](#cli-options-reference)
 - [DataLoader ワーカー数 (`--num-workers`)](#dataloader-ワーカー数---num-workers)
 - [チェックポイント保存個数 (`--save-top-k`)](#チェックポイント保存個数---save-top-k)
 
@@ -254,6 +258,8 @@ You can adjust the validation split (5% = 0.05) and number of test examples for 
 
 Batch size can be tricky to get right. It depends on the size of your GPU's vRAM, the model's quality/size, and the length of the longest sentence in your dataset. The `--max-phoneme-ids <N>` argument to `piper_train` will drop sentences that have more than `N` phoneme ids. In practice, using `--batch-size 32` and `--max-phoneme-ids 400` will work for 24 GB of vRAM (RTX 3090/4090).
 
+**Note on 6-language multilingual models:** The 6-language model uses 173 symbols (vs 97 for bilingual JA+EN), which increases embedding table size and GPU memory usage. On V100 16GB, `--batch-size 20` with `--max-phoneme-ids 400` is recommended. For fine-tuning a single speaker from a multilingual base, `--batch-size 4` works well.
+
 ### Advanced Training Options
 
 Additional options for fine-tuning your training:
@@ -276,6 +282,99 @@ If you're training a multi-speaker model, use `--resume_from_single_speaker_chec
 For multi-speaker models, use `--samples-per-speaker <N>` to activate the `SpeakerBalancedBatchSampler`, which ensures each batch contains balanced speaker representation and prevents Duration Predictor collapse. For example, `--batch-size 20 --samples-per-speaker 2` with 10 speakers gives an effective batch of 20.
 
 
+### Multilingual Training (6言語)
+
+Piper supports multilingual pretraining with up to 6 languages: Japanese (ja), English (en), Chinese (zh), Spanish (es), French (fr), and Portuguese (pt).
+
+**Supported languages and Phonemizers:**
+
+| Language | Code | Phonemizer | Dependency |
+|----------|------|------------|------------|
+| Japanese | ja | JapanesePhonemizer | pyopenjtalk |
+| English | en | EnglishPhonemizer | g2p-en (Apache-2.0) |
+| Chinese | zh | ChinesePhonemizer | pypinyin (MIT) |
+| Spanish | es | SpanishPhonemizer | Rule-based (no dependency) |
+| French | fr | FrenchPhonemizer | Rule-based (no dependency) |
+| Portuguese | pt | PortuguesePhonemizer | Rule-based (no dependency) |
+
+**Multilingual pretraining command template:**
+
+```sh
+NCCL_DEBUG=WARN NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 \
+uv run python -m piper_train \
+  --dataset-dir /path/to/multilingual-dataset \
+  --prosody-dim 16 \
+  --accelerator gpu --devices 4 --precision 32-true \
+  --max_epochs 75 --batch-size 20 --samples-per-speaker 2 \
+  --checkpoint-epochs 5 --quality medium \
+  --base_lr 2e-4 --disable_auto_lr_scaling \
+  --ema-decay 0.9995 \
+  --max-phoneme-ids 400 \
+  --no-wavlm \
+  --audio-log-epochs 5 \
+  --default_root_dir /path/to/output-dir
+```
+
+**Key parameters:**
+
+| Parameter | Value | Rationale |
+|-----------|-------|-----------|
+| `--max_epochs 75` | 75 epochs with large dataset yields ~282K gradient steps |
+| `--batch-size 20` | Fits on V100 16GB with 173 symbols |
+| `--samples-per-speaker 2` | Balances speaker representation across 6 languages |
+| `--precision 32-true` | V100 requires FP32 (FP16-mixed causes slow backward pass) |
+| `--no-wavlm` | Recommended on V100 for training speed |
+
+**Language-balanced sampling:** When the speaker count ratio between languages exceeds 3:1, `--language-balanced-sampling` is **automatically enabled** to ensure balanced representation across language groups. You can also force it on with `--language-balanced-sampling`.
+
+**Dataset preparation:** Use `prepare_multilingual_dataset.py` to create a 6-language dataset from individual language sources. The resulting dataset uses 173 symbols in the `phoneme_id_map`.
+
+
+### Transfer Learning (転移学習)
+
+Transfer a multilingual multi-speaker model to a single-speaker voice using `--resume-from-multispeaker-checkpoint`. This automatically handles:
+
+1. Removal of `emb_g` (speaker embedding)
+2. Correction of `emb_lang` (language embedding)
+3. Enabling `--freeze-dp` (Duration Predictor freezing)
+
+**Single-speaker fine-tuning command template:**
+
+```sh
+uv run python -m piper_train \
+  --dataset-dir /path/to/finetune-dataset \
+  --prosody-dim 16 \
+  --accelerator gpu --devices 1 --precision 32-true \
+  --max_epochs 500 --batch-size 4 --samples-per-speaker 4 \
+  --checkpoint-epochs 50 --quality medium \
+  --base_lr 2e-5 --disable_auto_lr_scaling \
+  --ema-decay 0.9995 \
+  --max-phoneme-ids 400 \
+  --no-wavlm \
+  --val-every-n-epochs 50 \
+  --audio-log-epochs 50 \
+  --resume-from-multispeaker-checkpoint /path/to/base-model.ckpt \
+  --default_root_dir /path/to/output-dir
+```
+
+**Parameter differences from pretraining:**
+
+| Parameter | Pretraining | Fine-tuning | Reason |
+|-----------|-------------|-------------|--------|
+| `--devices` | 4 | 1 | Small data makes DDP overhead excessive |
+| `--base_lr` | 2e-4 | 2e-5 | 1/10 to prevent catastrophic forgetting |
+| `--batch-size` | 20 | 4 | e.g. 100 utterances / 4 = 25 batches/epoch |
+| `--freeze-dp` | not set | auto-enabled | Prevents DP catastrophic forgetting |
+| `--audio-log-epochs` | 5 | 50 | Match validation frequency |
+
+**Post-processing for multilingual voice unification:**
+
+After fine-tuning, before ONNX export, copy `emb_lang[0]` (target language) to `emb_lang[1:N]` (other languages) to unify the voice timbre across all languages. This is a two-step workflow:
+
+1. **Training**: `--resume-from-multispeaker-checkpoint` preserves all `emb_lang` embeddings so the frozen DP receives correct conditioning
+2. **Post-processing**: Copy the target language embedding to all other language slots before ONNX export
+
+
 ### WavLM Discriminator
 
 WavLM Discriminator is a Microsoft WavLM-based perceptual quality discriminator. It is **enabled by default** and improves MOS (Mean Opinion Score) by approximately +0.15-0.25.
@@ -285,15 +384,24 @@ WavLM Discriminator is a Microsoft WavLM-based perceptual quality discriminator.
 - WavLM is used **during training only** -- it is not included in the exported ONNX inference graph, so there is no impact on inference speed
 - Adds approximately **1-2 GB GPU memory per GPU**; reduce `--batch-size` if you encounter OOM errors
 - Control the discriminator loss weight with `--c-wavlm` (default: 0.5)
-- To disable WavLM, set `--c-wavlm 0`
+- To disable WavLM, use `--no-wavlm` (recommended on V100 for training speed)
+- Alternatively, set `--c-wavlm 0` to zero out the WavLM loss while keeping the module loaded
 
 **ONNX export for WavLM-trained models:**
 
-WavLM-trained models should be exported with `--stochastic` to enable noise_scale sampling:
+Stochastic export (noise_scale sampling) is **enabled by default**, which is the recommended setting for WavLM-trained models. Simply run:
 
 ```sh
 CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
-    --stochastic \
+    /path/to/model.ckpt \
+    /path/to/model.onnx
+```
+
+Use `--no-stochastic` only for deterministic debugging:
+
+```sh
+CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
+    --no-stochastic \
     /path/to/model.ckpt \
     /path/to/model.onnx
 ```
@@ -356,6 +464,81 @@ The input format to `piper_train.infer_onnx` is the same as `dataset.jsonl`: one
 
 ```sh
 lib/piper_phonemize -l en-us --espeak-data lib/espeak-ng-data/ < my_test_sentences.txt > my_test_phonemes.jsonl
+```
+
+
+### Multilingual Inference (6言語推論)
+
+For multilingual models, use `--language` to specify the language combination and `--speaker-id` to select a speaker. The `--language` value uses a hyphen-separated list of language codes (order does not matter; it is normalized internally).
+
+**Japanese (speaker_id=0):**
+```sh
+CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.infer_onnx \
+    --model /path/to/multilingual-model.onnx \
+    --config /path/to/config.json \
+    --output-dir /path/to/output \
+    --text "こんにちは、今日は良い天気ですね。" \
+    --language ja-en-zh-es-fr-pt --speaker-id 0 --noise-scale 0.667
+```
+
+**English (speaker_id=20):**
+```sh
+CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.infer_onnx \
+    --model /path/to/multilingual-model.onnx \
+    --config /path/to/config.json \
+    --output-dir /path/to/output \
+    --text "Hello, how are you today?" \
+    --language ja-en-zh-es-fr-pt --speaker-id 20 --noise-scale 0.667
+```
+
+**Chinese:**
+```sh
+CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.infer_onnx \
+    --model /path/to/multilingual-model.onnx \
+    --config /path/to/config.json \
+    --output-dir /path/to/output \
+    --text "你好，今天天气很好。" \
+    --language ja-en-zh-es-fr-pt --speaker-id 162 --noise-scale 0.667
+```
+
+**Spanish:**
+```sh
+CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.infer_onnx \
+    --model /path/to/multilingual-model.onnx \
+    --config /path/to/config.json \
+    --output-dir /path/to/output \
+    --text "Hola, ¿cómo estás hoy?" \
+    --language ja-en-zh-es-fr-pt --speaker-id 472 --noise-scale 0.667
+```
+
+**French:**
+```sh
+CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.infer_onnx \
+    --model /path/to/multilingual-model.onnx \
+    --config /path/to/config.json \
+    --output-dir /path/to/output \
+    --text "Bonjour, comment allez-vous aujourd'hui?" \
+    --language ja-en-zh-es-fr-pt --speaker-id 535 --noise-scale 0.667
+```
+
+**Portuguese:**
+```sh
+CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.infer_onnx \
+    --model /path/to/multilingual-model.onnx \
+    --config /path/to/config.json \
+    --output-dir /path/to/output \
+    --text "Olá, como você está hoje?" \
+    --language ja-en-zh-es-fr-pt --speaker-id 563 --noise-scale 0.667
+```
+
+**Single-speaker fine-tuned model (all languages use speaker_id=0):**
+```sh
+CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.infer_onnx \
+    --model /path/to/finetuned-model.onnx \
+    --config /path/to/config.json \
+    --output-dir /path/to/output \
+    --text "こんにちは、つくよみちゃんです。" \
+    --language ja-en-zh-es-fr-pt --speaker-id 0 --noise-scale 0.667
 ```
 
 
@@ -472,15 +655,24 @@ cp /path/to/training_dir/config.json \
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--stochastic` | off | Enable noise_scale sampling in the exported graph. **Recommended for WavLM-trained models.** |
+| `--no-stochastic` | stochastic ON | Disable noise_scale sampling (deterministic export, for debugging). Default is stochastic export (recommended). |
 | `--use-ema` | on | Apply EMA weights to the decoder in the exported model. |
 | `--no-ema` | - | Disable EMA weight application. |
+| `--no-fp16` | FP16 ON | Disable FP16 conversion. Default: FP16 enabled, reducing model size by ~50%. |
 
-Example for a WavLM-trained model:
+Example (default stochastic + FP16 export, recommended):
 
 ```sh
-uv run python -m piper_train.export_onnx \
-    --stochastic \
+CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
+    /path/to/model.ckpt \
+    /path/to/model.onnx
+```
+
+Example (deterministic, no FP16, for debugging):
+
+```sh
+CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
+    --no-stochastic --no-fp16 \
     /path/to/model.ckpt \
     /path/to/model.onnx
 ```
@@ -521,6 +713,25 @@ If the export is successful, you can now use your voice with Piper:
 echo 'This is a test.' | \
   piper -m /path/to/model.onnx --output_file test.wav
 ```
+
+### CLI Options Reference
+
+Summary of key CLI options for `piper_train`:
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--freeze-dp` | off (auto-enabled with `--resume-from-multispeaker-checkpoint`) | Freeze Duration Predictor parameters to prevent catastrophic forgetting during fine-tuning. Automatically enabled when using `--resume-from-multispeaker-checkpoint`. |
+| `--resume-from-multispeaker-checkpoint <path>` | - | Transfer learning from a multi-speaker model to single-speaker. Automatically removes `emb_g`, corrects `emb_lang`, and enables `--freeze-dp`. |
+| `--language-balanced-sampling` | auto (enabled when speaker ratio >= 3:1) | Force language-balanced batch sampling. Ensures equal representation across language groups. Automatically enabled when speaker count ratio between languages exceeds 3:1. |
+| `--no-wavlm` | WavLM ON | Disable WavLM discriminator. Recommended on V100 for training speed (~0.03 it/s with WavLM vs faster without). |
+| `--audio-log-epochs N` | 1 | Interval (in epochs) for logging audio samples to WandB. Set to 0 to disable. For DDP, `5` is recommended. For fine-tuning, match `--val-every-n-epochs`. |
+| `--no-fp16` | FP16 ON (export only) | Disable FP16 conversion during ONNX export. Default exports FP16 models (~50% size reduction). |
+| `--prosody-dim N` | 16 | Dimension for A1/A2/A3 prosody features fed to Duration Predictor. Set to 0 to disable. |
+| `--ema-decay` | 0.9995 | EMA decay rate for decoder weights. |
+| `--max-phoneme-ids N` | no limit | Drop utterances with more than N phoneme IDs. Recommended: 400. |
+| `--samples-per-speaker N` | - | Activate `SpeakerBalancedBatchSampler` with N samples per speaker per batch. |
+| `--c-wavlm` | 0.5 | WavLM discriminator loss weight. Reduce if audio clipping occurs. |
+| `--num-test-examples N` | 2 | Number of test audio examples to generate during validation. |
 
 ### DataLoader ワーカー数 (`--num-workers`)
 

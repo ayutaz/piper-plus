@@ -281,6 +281,35 @@ Validation頻度削減、DataLoader最適化 (num_workers=2, pin_memory)、LRス
 **CLIオプション:** `--val-every-n-epochs N` (デフォルト: 5), `--limit-val-batches N` (デフォルト: 50), `--num-workers N` (デフォルト: 2), `--no-pin-memory`
 **実装:** `__main__.py`, `vits/lightning.py`, `vits/dataset.py`
 
+### C# CLI (PiperPlus)
+
+6言語マルチリンガル対応のクロスプラットフォーム .NET CLI。Python実装と同等の音素化パイプラインを C# で再実装。
+
+| 項目 | 詳細 |
+|------|------|
+| TFM | PiperPlus.Core: net8.0, PiperPlus.Cli: net9.0 |
+| 対応言語 | JA, EN, ZH, ES, FR, PT (6言語) |
+| G2P依存 | DotNetG2P.Chinese/Spanish/French/Portuguese v1.7.0 |
+| テスト | 721テスト (xUnit v3) |
+| CI | 3 OS × 2 .NET バージョン (csharp-ci.yml) |
+| ビルド | `dotnet build src/csharp/PiperPlus.sln` |
+
+**実装:** `src/csharp/PiperPlus.Core/`, `src/csharp/PiperPlus.Cli/`
+
+### Rust 推論エンジン (piper-rs)
+
+Rust によるONNX推論エンジン。ストリーミング、CUDA/CoreML/DirectML対応。PyO3 による Python バインディング提供。
+
+| 項目 | 詳細 |
+|------|------|
+| クレート | piper-core, piper-cli, piper-python |
+| 対応言語 | JA, EN, ZH, KO, ES, FR, PT (7言語) |
+| 特徴 | ストリーミング、GPU推論、WASM対応 |
+| CI | 3 OS (rust-tests.yml) |
+| ビルド | `cargo build --release -p piper-cli` |
+
+**実装:** `src/rust/piper-core/`, `src/rust/piper-cli/`, `src/rust/piper-python/`
+
 ---
 
 ## 重要なファイルパス
@@ -309,6 +338,36 @@ Validation頻度削減、DataLoader最適化 (num_workers=2, pin_memory)、LRス
 | マルチリンガルIDマップ | `src/python/piper_train/phonemize/multilingual_id_map.py` |
 | バイリンガルPhonemizer | `src/python/piper_train/phonemize/bilingual.py` |
 | バイリンガルIDマップ | `src/python/piper_train/phonemize/bilingual_id_map.py` |
+
+### C# ソースコード
+
+| 用途 | パス |
+|------|------|
+| ソリューション | `src/csharp/PiperPlus.sln` |
+| コアライブラリ | `src/csharp/PiperPlus.Core/` |
+| CLI アプリケーション | `src/csharp/PiperPlus.Cli/` |
+| テスト | `src/csharp/PiperPlus.Core.Tests/` |
+| ONNX推論 | `src/csharp/PiperPlus.Core/Inference/` |
+| 日本語音素化 | `src/csharp/PiperPlus.Core/Phonemize/JapanesePhonemizer.cs` |
+| 英語音素化 | `src/csharp/PiperPlus.Core/Phonemize/EnglishPhonemizer.cs` |
+| 中国語音素化 | `src/csharp/PiperPlus.Core/Phonemize/ChinesePhonemizer.cs` |
+| スペイン語音素化 | `src/csharp/PiperPlus.Core/Phonemize/SpanishPhonemizer.cs` |
+| ポルトガル語音素化 | `src/csharp/PiperPlus.Core/Phonemize/PortuguesePhonemizer.cs` |
+| フランス語音素化 | `src/csharp/PiperPlus.Core/Phonemize/FrenchPhonemizer.cs` |
+| マルチリンガルPhonemizer | `src/csharp/PiperPlus.Core/Phonemize/MultilingualPhonemizer.cs` |
+| PUAマッピング | `src/csharp/PiperPlus.Core/Mapping/OpenJTalkToPiperMapping.cs` |
+| 設定管理 | `src/csharp/PiperPlus.Core/Config/` |
+
+### Rust ソースコード
+
+| 用途 | パス |
+|------|------|
+| ワークスペース | `src/rust/Cargo.toml` |
+| コアライブラリ | `src/rust/piper-core/` |
+| CLI アプリケーション | `src/rust/piper-cli/` |
+| Python バインディング | `src/rust/piper-python/` |
+| 音素化 | `src/rust/piper-core/src/phonemize/` |
+| 推論エンジン | `src/rust/piper-core/src/engine.rs` |
 
 ### データセット
 

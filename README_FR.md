@@ -37,7 +37,7 @@ Systeme de synthese vocale neuronale (TTS) rapide et de haute qualite. Base sur 
 - **TTS anglais** — G2P sans GPL ([g2p-en](https://github.com/Kyubyong/g2p), Apache-2.0), pas de dependance a espeak-ng
 - **Multilingue 6 langues** — Japonais, anglais, chinois mandarin, espagnol, francais, portugais (ja=0, en=1, zh=2, es=3, fr=4, pt=5)
 - **Multi-locuteurs** — 571 locuteurs dans le modele de base 6 langues, SpeakerBalancedBatchSampler
-- **Dictionnaire personnalise** — 200+ termes techniques integres — [Guide](docs/features/custom_dictionary.md)
+- **Dictionnaire personnalise** — 200+ termes techniques integres
 - **Saisie phonemique** — Specification directe avec la notation `[[ phonemes ]]` — [Guide](docs/features/phoneme-input.md)
 
 ### Entrainement
@@ -285,7 +285,7 @@ uv run python -m piper_train \
   --ema-decay 0.9995
 ```
 
-Le multi-GPU configure automatiquement le DDP (Distributed Data Parallel). Les variables d'environnement NCCL sont requises. Voir le [Guide multi-GPU](docs/guides/training/multi-gpu-training.md).
+Le multi-GPU configure automatiquement le DDP (Distributed Data Parallel). Les variables d'environnement NCCL sont requises. Voir le Guide multi-GPU pour plus de details.
 
 ### Export ONNX
 
@@ -354,7 +354,7 @@ Synthese vocale japonaise de haute qualite avec integration OpenJTalk. Le dictio
 | `PIPER_AUTO_DOWNLOAD_DICT` | `0` pour desactiver le telechargement automatique |
 | `PIPER_OFFLINE_MODE` | `1` pour le mode hors ligne |
 
-Voir le [Guide d'utilisation japonais](docs/guides/japanese/japanese-usage.md) et la [Reference de mappage phonemique](docs/api-reference/phoneme-mapping.md).
+Voir le Guide d'utilisation japonais et la [Reference de mappage phonemique](docs/api-reference/phoneme-mapping.md).
 
 ---
 
@@ -420,11 +420,11 @@ Chaque voix necessite un fichier `.onnx` et un fichier de configuration `.onnx.j
 
 | Categorie | Liens |
 |---|---|
-| TTS japonais | [Guide d'utilisation japonais](docs/guides/japanese/japanese-usage.md) |
-| Entrainement | [Guide d'entrainement](docs/guides/training/training-guide.md) · [Multi-GPU](docs/guides/training/multi-gpu-training.md) |
+| TTS japonais | Guide d'utilisation japonais |
+| Entrainement | [Guide d'entrainement](docs/guides/training/training-guide.md) · Multi-GPU |
 | API | [Mappage phonemique](docs/api-reference/phoneme-mapping.md) · [Variables d'environnement](docs/getting-started/environment-variables.md) |
-| Fonctionnalites | [WebUI](docs/features/webui.md) · [CLI ameliore](docs/features/cli-enhancements.md) · [Streaming](docs/features/streaming-mode.md) |
-| Configuration | [Demarrage rapide (japonais)](docs/guides/japanese/japanese-usage.md) · [Windows](docs/getting-started/windows-setup.md) · [Depannage](docs/getting-started/troubleshooting.md) |
+| Fonctionnalites | [WebUI](docs/features/webui.md) · CLI ameliore · Streaming |
+| Configuration | Demarrage rapide (japonais) · [Windows](docs/getting-started/windows-setup.md) · [Depannage](docs/getting-started/troubleshooting.md) |
 | Docker | [Environnements Docker](docker/README.md) |
 | WebAssembly | [Details techniques](src/wasm/openjtalk-web/README.md) |
 

@@ -43,5 +43,8 @@ Piper Plus documentation. Guides and references for using and developing with Pi
 - [Changelog](/CHANGELOG.md) - Version history
 - [License](/LICENSE.md) - Project license (MIT)
 
-## WebAssembly
-Browser-based TTS implementation is in [src/wasm/openjtalk-web/](../src/wasm/openjtalk-web/).
+## Implementations
+- **C++ (libpiper)**: メインの推論ライブラリ — [src/cpp/](../src/cpp/)
+- **C# CLI (PiperPlus)**: .NET 8/9 クロスプラットフォーム CLI — [src/csharp/](../src/csharp/)
+- **Rust 推論エンジン**: piper-core / piper-cli — [src/rust/](../src/rust/)
+- **WebAssembly**: Browser-based TTS — [src/wasm/openjtalk-web/](../src/wasm/openjtalk-web/)

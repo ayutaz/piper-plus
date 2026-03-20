@@ -49,8 +49,10 @@ python -m piper.webui \
 ### Inference Tab
 
 - **Model Selection**: Auto-detects all .onnx models in the data directory
-- **Template System**: Language-specific templates (English, Japanese, German, French)
-- **Speaker ID**: For multi-speaker models
+- **6言語マルチリンガルモデル対応** (ja, en, zh, es, fr, pt)
+- **言語自動検出**: テキスト入力から言語を自動判定
+- **話者選択**: マルチスピーカーモデルでの話者切り替え
+- **Template System**: Language-specific templates (English, Japanese, Chinese, Spanish, French, Portuguese)
 - **Speed Control**: 0.5-2.0x
 - **Noise Parameters**: Expressiveness and phoneme width variation
 - **Audio Output**: Play and download generated speech
