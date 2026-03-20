@@ -154,6 +154,20 @@ New-Item -ItemType Directory -Path $dictPath -Force
 [Environment]::SetEnvironmentVariable("PIPER_OFFLINE_MODE", "1", [EnvironmentVariableTarget]::User)
 ```
 
+### C# CLI のセットアップ (オプション)
+
+C++ ビルドの代わりに C# CLI を使用する場合:
+
+1. **.NET 9 SDK** のインストール: https://dotnet.microsoft.com/download/dotnet/9.0
+2. ビルド:
+```powershell
+dotnet build src\csharp\PiperPlus.sln -c Release
+```
+3. 実行:
+```powershell
+dotnet run --project src\csharp\PiperPlus.Cli -- --model path\to\model.onnx --text "テスト"
+```
+
 ## 使用例
 
 ### 基本的な使用方法

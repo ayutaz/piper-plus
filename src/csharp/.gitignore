@@ -1,0 +1,28 @@
+## .NET build outputs
+bin/
+obj/
+publish/
+
+## NuGet
+*.nupkg
+*.snupkg
+
+## User-specific files
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+## IDE
+.vs/
+.vscode/
+.idea/
+*.DotSettings.user
+
+## Test results
+TestResults/
+*.trx
+
+## OS files
+.DS_Store
+Thumbs.db

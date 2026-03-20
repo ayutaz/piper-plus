@@ -96,3 +96,4 @@ generate_upiper_samples.py
 nul
 test/models/tsukuyomi-chan/
 docs/development/usability-issues-2026-03.md
+src/rust/target/*

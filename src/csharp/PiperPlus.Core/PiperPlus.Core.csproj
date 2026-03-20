@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace>PiperPlus.Core</RootNamespace>
+
+    <!-- NuGet Package Metadata -->
+    <PackageId>PiperPlus.Core</PackageId>
+    <Authors>ayousanz</Authors>
+    <Description>Piper Plus TTS Core library — ONNX inference, phonemization, config</Description>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/ayutaz/piper-plus</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/ayutaz/piper-plus</RepositoryUrl>
+    <PackageTags>tts;text-to-speech;piper;onnx;vits</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.ML.OnnxRuntime.Managed" Version="1.24.3" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.3" />
+  </ItemGroup>
+
+</Project>

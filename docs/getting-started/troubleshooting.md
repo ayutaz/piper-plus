@@ -9,6 +9,7 @@ This guide helps resolve common issues when using Piper, especially with Japanes
 - [Build Issues](#build-issues)
 - [Performance Issues](#performance-issues)
 - [Training Troubleshooting](#training-troubleshooting)
+- [C# CLI (PiperPlus) のトラブルシューティング](#c-cli-piperplus-のトラブルシューティング)
 
 ## General Issues
 
@@ -89,7 +90,7 @@ Model config doesn't exist
    export PIPER_AUTO_DOWNLOAD_DICT=1
    
    # Or specify manually
-   export OPENJTALK_DICTIONARY_DIR=/path/to/dictionary
+   export OPENJTALK_DICTIONARY_PATH=/path/to/dictionary
    ```
 
 3. **Using wrong model type**
@@ -415,3 +416,29 @@ If issues persist:
    CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
      --no-ema /path/to/checkpoint.ckpt /path/to/output.onnx
    ```
+
+## C# CLI (PiperPlus) のトラブルシューティング
+
+### .NET ランタイムが見つからない
+
+**問題**: `dotnet` コマンドが認識されない
+
+**解決策**: .NET 8 SDK 以上をインストールしてください:
+- https://dotnet.microsoft.com/download
+
+### DotNetG2P パッケージエラー
+
+**問題**: 中国語/スペイン語/フランス語/ポルトガル語の G2P でエラーが発生
+
+**解決策**: NuGet パッケージの復元を実行:
+```bash
+dotnet restore src/csharp/PiperPlus.sln
+```
+
+### ONNX Runtime エラー
+
+**問題**: モデル読み込み時に ONNX Runtime エラー
+
+**解決策**:
+- Microsoft.ML.OnnxRuntime.Managed v1.24.3 が必要
+- GPU版を使用する場合は Microsoft.ML.OnnxRuntime.Gpu に変更

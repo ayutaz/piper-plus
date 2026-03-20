@@ -1,0 +1,124 @@
+name: "C# Build All Platforms"
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: 'Version string (e.g., 1.0.0)'
+        required: false
+        type: string
+        default: '0.0.0-dev'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version string'
+        required: false
+        default: '0.0.0-dev'
+
+jobs:
+  build:
+    name: Build ${{ matrix.rid }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - rid: win-x64
+            os: windows-2022
+            archive: zip
+            cross: false
+          - rid: win-arm64
+            os: windows-2022
+            archive: zip
+            cross: true
+          - rid: linux-x64
+            os: ubuntu-22.04
+            archive: tar.gz
+            cross: false
+          - rid: linux-arm64
+            os: ubuntu-22.04
+            archive: tar.gz
+            cross: true
+          - rid: osx-x64
+            os: macos-13    # Intel x64 runner
+            archive: tar.gz
+            cross: false    # ネイティブビルド
+          - rid: osx-arm64
+            os: macos-14
+            archive: tar.gz
+            cross: false
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            9.0.x
+
+      - name: Publish (native)
+        if: ${{ matrix.cross == false }}
+        run: >
+          dotnet publish src/csharp/PiperPlus.Cli/PiperPlus.Cli.csproj
+          -c Release
+          -r ${{ matrix.rid }}
+          --self-contained true
+          -p:PublishSingleFile=true
+          -p:PublishTrimmed=true
+          -p:PublishReadyToRun=true
+          -p:Version=${{ inputs.version }}
+          -o publish/
+
+      - name: Publish (cross-compile)
+        if: ${{ matrix.cross == true }}
+        run: >
+          dotnet publish src/csharp/PiperPlus.Cli/PiperPlus.Cli.csproj
+          -c Release
+          -r ${{ matrix.rid }}
+          --self-contained true
+          -p:PublishSingleFile=true
+          -p:PublishTrimmed=true
+          -p:PublishReadyToRun=false
+          -p:Version=${{ inputs.version }}
+          -o publish/
+
+      - name: Create archive (tar.gz)
+        if: matrix.archive == 'tar.gz'
+        run: tar -czf piper-plus-cli-${{ matrix.rid }}.tar.gz -C publish .
+
+      - name: Create archive (zip)
+        if: matrix.archive == 'zip'
+        shell: pwsh
+        run: Compress-Archive -Path publish/* -DestinationPath piper-plus-cli-${{ matrix.rid }}.zip
+
+      - name: Show archive size
+        run: ls -lh piper-plus-cli-${{ matrix.rid }}.${{ matrix.archive }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: piper-plus-cli-${{ matrix.rid }}-${{ inputs.version }}
+          path: piper-plus-cli-${{ matrix.rid }}.${{ matrix.archive }}
+          retention-days: 30
+
+  summary:
+    name: Build Summary
+    needs: build
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Check build results
+        run: |
+          echo "## C# CLI Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** ${{ inputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ needs.build.result }}" == "success" ]; then
+            echo "All 6 RID builds completed successfully." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "One or more builds failed." >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi

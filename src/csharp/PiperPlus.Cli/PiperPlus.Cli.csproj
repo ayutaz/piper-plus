@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <RootNamespace>PiperPlus.Cli</RootNamespace>
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>piper-plus</ToolCommandName>
+
+    <!-- Suppress ILLink trim warnings for reflection-based G2P engine resolution.
+         The ResolveTextModePhonemizer method uses Type.GetType/Activator.CreateInstance
+         which cannot be statically analyzed. This is intentional and documented. -->
+    <SuppressTrimAnalysisWarnings>true</SuppressTrimAnalysisWarnings>
+
+    <!-- NuGet Package Metadata -->
+    <PackageId>PiperPlus.Cli</PackageId>
+    <PackageVersion>0.0.0</PackageVersion>
+    <Authors>ayousanz</Authors>
+    <Description>Piper Plus TTS — C# CLI for neural text-to-speech synthesis</Description>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/ayutaz/piper-plus</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/ayutaz/piper-plus</RepositoryUrl>
+    <PackageTags>tts;text-to-speech;piper;onnx;vits</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.CommandLine" Version="2.0.5" />
+    <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.24.3" />
+    <PackageReference Include="DotNetG2P.Chinese" Version="1.7.0" />
+    <PackageReference Include="DotNetG2P.Spanish" Version="1.7.0" />
+    <PackageReference Include="DotNetG2P.French" Version="1.7.0" />
+    <PackageReference Include="DotNetG2P.Portuguese" Version="1.7.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\PiperPlus.Core\PiperPlus.Core.csproj" />
+  </ItemGroup>
+
+</Project>
