@@ -493,7 +493,7 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Check piper-python
+      - name: Check piper-plus-python
         run: cargo check -p piper-plus-python
 
   lint:

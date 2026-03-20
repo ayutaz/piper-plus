@@ -96,7 +96,7 @@ jobs:
     - run: cargo clippy --workspace --all-features -- -D warnings
 
   python-bindings:
-    name: piper-python build
+    name: piper-plus-python build
     runs-on: ubuntu-24.04
     defaults:
       run:

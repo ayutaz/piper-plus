@@ -57,7 +57,7 @@
 - **[Docker](docker/README.md)** — 推論・学習・WebUI・C++の5イメージ提供
 - **PyPI** — `pip install piper-tts-plus` で簡単インストール
 - **C# CLI** — .NET 8/9 クロスプラットフォーム、6言語マルチリンガル、ONNX推論
-- **Rust CLI** — piper-core/piper-cli、ストリーミング、CUDA/CoreML/DirectML対応
+- **Rust CLI** — piper-plus/piper-plus-cli、ストリーミング、CUDA/CoreML/DirectML対応
 
 ### プラットフォーム
 
@@ -267,9 +267,9 @@ dotnet test src/csharp/PiperPlus.Core.Tests/
 
 ```bash
 # Rust CLI ビルド
-cargo build --release -p piper-cli
+cargo build --release -p piper-plus-cli
 # テスト
-cargo test -p piper-core
+cargo test -p piper-plus
 ```
 
 前提条件: Rust 1.70+、cargo
