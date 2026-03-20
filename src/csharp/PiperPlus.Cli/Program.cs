@@ -23,6 +23,9 @@ internal sealed class JsonlUtterance
     [JsonPropertyName("speaker_id")]
     public int? SpeakerId { get; set; }
 
+    [JsonPropertyName("language_id")]
+    public int? LanguageId { get; set; }
+
     [JsonPropertyName("output_file")]
     public string? OutputFile { get; set; }
 
@@ -617,7 +620,11 @@ internal static class Program
                 using var model = new PiperModel(session, config);
                 LogInfo(quiet, $"Model loaded (speakers={config.NumSpeakers}, " +
                                $"hasSid={model.HasSpeakerId}, " +
+                               $"hasLid={model.HasLanguageId}, " +
                                $"hasProsody={model.HasProsody})");
+
+                // Resolve language ID from config's language_id_map
+                int languageId = ResolveLanguageId(config, language);
 
                 if (useCuda)
                 {
@@ -724,7 +731,7 @@ internal static class Program
                     {
                         audio = SynthesizeWithPhonemeSilence(
                             piperSession, phonemeIdsLong, prosodyFlat,
-                            speaker, noiseScale, lengthScale, noiseW,
+                            speaker, languageId, noiseScale, lengthScale, noiseW,
                             phonemeSilenceMap, config.PhonemeIdMap, sampleRate);
                     }
                     catch (Exception ex)
@@ -805,7 +812,7 @@ internal static class Program
                             {
                                 audio = SynthesizeWithPhonemeSilence(
                                     piperSession, phonemeIdsLong, null,
-                                    speaker, noiseScale, lengthScale, noiseW,
+                                    speaker, languageId, noiseScale, lengthScale, noiseW,
                                     phonemeSilenceMap, config.PhonemeIdMap, sampleRate);
                             }
                             catch (Exception ex)
@@ -914,6 +921,9 @@ internal static class Program
                                 uttSpeaker = speaker;
                             }
 
+                            // Resolve language_id from JSONL (overrides CLI default)
+                            int uttLanguageId = utterance?.LanguageId ?? languageId;
+
                             // ---------------------------------------------------
                             // JSONL "text" field: phonemize inline
                             // ---------------------------------------------------
@@ -999,7 +1009,7 @@ internal static class Program
                             {
                                 audio = SynthesizeWithPhonemeSilence(
                                     piperSession, phonemeIdsLong, prosodyFlat,
-                                    uttSpeaker, noiseScale, lengthScale, noiseW,
+                                    uttSpeaker, uttLanguageId, noiseScale, lengthScale, noiseW,
                                     phonemeSilenceMap, config.PhonemeIdMap, sampleRate);
                             }
                             catch (Exception ex)
@@ -1063,6 +1073,7 @@ internal static class Program
         long[] phonemeIdsLong,
         long[]? prosodyFlat,
         int speaker,
+        int languageId,
         float noiseScale,
         float lengthScale,
         float noiseW,
@@ -1076,6 +1087,7 @@ internal static class Program
             var input = new SynthesisInput(
                 PhonemeIds: phonemeIdsLong,
                 SpeakerId: speaker,
+                LanguageId: languageId,
                 ProsodyFeatures: prosodyFlat,
                 NoiseScale: noiseScale,
                 LengthScale: lengthScale,
@@ -1102,6 +1114,7 @@ internal static class Program
             var input = new SynthesisInput(
                 PhonemeIds: phraseIds,
                 SpeakerId: speaker,
+                LanguageId: languageId,
                 ProsodyFeatures: phraseProsody,
                 NoiseScale: noiseScale,
                 LengthScale: lengthScale,
@@ -1123,6 +1136,33 @@ internal static class Program
         }
 
         return result;
+    }
+
+    // ----------------------------------------------------------------
+    // Language ID resolution
+    // ----------------------------------------------------------------
+
+    /// <summary>
+    /// Resolve the language ID from the config's <c>language_id_map</c>.
+    /// For single-language codes (e.g. "ja"), looks up directly.
+    /// For combined codes (e.g. "ja-en"), returns 0 (multilingual phonemizer
+    /// handles per-segment language selection via JSONL <c>language_id</c>).
+    /// </summary>
+    private static int ResolveLanguageId(PiperConfig config, string? language)
+    {
+        if (config.LanguageIdMap is null || string.IsNullOrEmpty(language))
+            return 0;
+
+        // Single language code: direct lookup
+        if (config.LanguageIdMap.TryGetValue(language, out int id))
+            return id;
+
+        // Combined code (e.g. "ja-en-zh"): default to first language
+        string first = language.Split('-')[0];
+        if (config.LanguageIdMap.TryGetValue(first, out int firstId))
+            return firstId;
+
+        return 0;
     }
 
     // ----------------------------------------------------------------

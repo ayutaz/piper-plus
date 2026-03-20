@@ -41,6 +41,7 @@ public sealed class PiperModel : IDisposable
 
         // Detect optional capabilities from tensor names.
         HasSpeakerId = _session.InputMetadata.ContainsKey("sid");
+        HasLanguageId = _session.InputMetadata.ContainsKey("lid");
         HasProsody = _session.InputMetadata.ContainsKey("prosody_features");
 
         // Detect duration output capability (mirrors C++ piper.cpp:loadModel).
@@ -58,6 +59,12 @@ public sealed class PiperModel : IDisposable
     /// indicating a multi-speaker model.
     /// </summary>
     public bool HasSpeakerId { get; }
+
+    /// <summary>
+    /// <c>true</c> when the model accepts a <c>lid</c> (language-id) tensor,
+    /// indicating a multilingual model.
+    /// </summary>
+    public bool HasLanguageId { get; }
 
     /// <summary>
     /// <c>true</c> when the model accepts a <c>prosody_features</c> tensor

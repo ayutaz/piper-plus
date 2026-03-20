@@ -55,6 +55,18 @@ public sealed class PiperConfig
     public Dictionary<string, string[]>? PhonemeMap { get; set; }
 
     /// <summary>
+    /// Number of languages for multilingual models.
+    /// </summary>
+    [JsonPropertyName("num_languages")]
+    public int? NumLanguages { get; set; }
+
+    /// <summary>
+    /// Maps language codes (e.g. "ja", "en") to integer IDs for the <c>lid</c> ONNX input.
+    /// </summary>
+    [JsonPropertyName("language_id_map")]
+    public Dictionary<string, int>? LanguageIdMap { get; set; }
+
+    /// <summary>
     /// Number of prosody symbols (prosody models only).
     /// </summary>
     [JsonPropertyName("prosody_num_symbols")]
