@@ -1161,7 +1161,7 @@ pub fn phonemize_french_with_prosody(text: &str) -> (Vec<String>, Vec<Option<Pro
                 .iter()
                 .enumerate()
                 .rev()
-                .find(|(_, &ph)| is_vowel_phoneme(ph))
+                .find(|&(_, &ph)| is_vowel_phoneme(ph))
                 .map(|(idx, _)| idx);
 
             for (j, &ph) in word_phonemes.iter().enumerate() {
