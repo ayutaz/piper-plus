@@ -1,8 +1,10 @@
 package phonemize
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -158,6 +160,256 @@ func TestCustomDictionary_Len(t *testing.T) {
 	if d.Len() != 2 {
 		t.Errorf("after overwrite, Len() = %d, want 2", d.Len())
 	}
+}
+
+// ---------------------------------------------------------------------------
+// dictPhonemizer: BOS/EOS stripping — mock that always returns BOS/EOS
+// ---------------------------------------------------------------------------
+
+// dictMockPhonemizer returns predictable tokens with BOS/EOS for testing.
+type dictMockPhonemizer struct {
+	lang string
+	// phonemes maps a lowercased word to its phoneme tokens (without BOS/EOS).
+	phonemes map[string][]string
+	eosToken string // EOS token this mock produces (default "$")
+}
+
+func (m *dictMockPhonemizer) PhonemizeWithProsody(text string) (*PhonemizeResult, error) {
+	word := strings.ToLower(strings.TrimSpace(text))
+	ph, ok := m.phonemes[word]
+	if !ok {
+		return nil, fmt.Errorf("dictMockPhonemizer: unknown word %q", word)
+	}
+	eos := m.eosToken
+	if eos == "" {
+		eos = "$"
+	}
+	// Build tokens: ^ + phonemes + eos
+	tokens := make([]string, 0, len(ph)+2)
+	tokens = append(tokens, "^")
+	tokens = append(tokens, ph...)
+	tokens = append(tokens, eos)
+
+	prosody := make([]*ProsodyInfo, len(tokens))
+	for i, tok := range tokens {
+		if tok == "^" || bosEosTokens[tok] {
+			prosody[i] = nil
+		} else {
+			prosody[i] = &ProsodyInfo{A1: 0, A2: 0, A3: 1}
+		}
+	}
+
+	return &PhonemizeResult{
+		Tokens:   tokens,
+		Prosody:  prosody,
+		EOSToken: eos,
+	}, nil
+}
+
+func (m *dictMockPhonemizer) LanguageCode() string {
+	return m.lang
+}
+
+// assertTokensEqual is a test helper that compares token slices.
+func assertTokensEqual(t *testing.T, label string, got, want []string) {
+	t.Helper()
+	if len(got) != len(want) {
+		t.Fatalf("%s: len = %d, want %d\n  got:  %v\n  want: %v", label, len(got), len(want), got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("%s[%d] = %q, want %q", label, i, got[i], want[i])
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// dictPhonemizer: mixed dict + non-dict words — BOS/EOS once only
+// ---------------------------------------------------------------------------
+
+func TestDictPhonemizer_MixedWords_BosEosOnce(t *testing.T) {
+	// "hello" is in the dictionary; "world" falls through to the mock.
+	dict := NewCustomDictionary()
+	dict.Add("hello", []string{"h", "ɛ", "l", "oʊ"})
+
+	mock := &dictMockPhonemizer{
+		lang:     "en",
+		phonemes: map[string][]string{"world": {"w", "ɜː", "l", "d"}},
+		eosToken: "$",
+	}
+	dp := dict.WrapPhonemizer(mock)
+
+	res, err := dp.PhonemizeWithProsody("hello world")
+	if err != nil {
+		t.Fatalf("PhonemizeWithProsody error: %v", err)
+	}
+
+	// Expect dict phonemes + wrapped phonemes, no BOS/EOS in the middle.
+	wantTokens := []string{"h", "ɛ", "l", "oʊ", "w", "ɜː", "l", "d"}
+	assertTokensEqual(t, "tokens", res.Tokens, wantTokens)
+
+	// No BOS or EOS should appear anywhere in the token list.
+	for i, tok := range res.Tokens {
+		if bosEosTokens[tok] {
+			t.Errorf("unexpected BOS/EOS token at index %d: %q", i, tok)
+		}
+	}
+
+	if res.EOSToken != "$" {
+		t.Errorf("EOSToken = %q, want \"$\"", res.EOSToken)
+	}
+
+	// Prosody length must match tokens length.
+	if len(res.Prosody) != len(res.Tokens) {
+		t.Errorf("prosody len = %d, want %d", len(res.Prosody), len(res.Tokens))
+	}
+}
+
+// ---------------------------------------------------------------------------
+// dictPhonemizer: all dict words — no wrapped phonemizer called
+// ---------------------------------------------------------------------------
+
+func TestDictPhonemizer_AllDictWords(t *testing.T) {
+	dict := NewCustomDictionary()
+	dict.Add("hello", []string{"h", "ɛ", "l", "oʊ"})
+	dict.Add("world", []string{"w", "ɜː", "l", "d"})
+
+	mock := &dictMockPhonemizer{
+		lang:     "en",
+		phonemes: map[string][]string{},
+	}
+	dp := dict.WrapPhonemizer(mock)
+
+	res, err := dp.PhonemizeWithProsody("hello world")
+	if err != nil {
+		t.Fatalf("PhonemizeWithProsody error: %v", err)
+	}
+
+	wantTokens := []string{"h", "ɛ", "l", "oʊ", "w", "ɜː", "l", "d"}
+	assertTokensEqual(t, "tokens", res.Tokens, wantTokens)
+
+	for i, tok := range res.Tokens {
+		if bosEosTokens[tok] {
+			t.Errorf("unexpected BOS/EOS token at index %d: %q", i, tok)
+		}
+	}
+
+	// Default EOS when no wrapped phonemizer was called.
+	if res.EOSToken != "$" {
+		t.Errorf("EOSToken = %q, want \"$\"", res.EOSToken)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// dictPhonemizer: all non-dict words — fully delegated
+// ---------------------------------------------------------------------------
+
+func TestDictPhonemizer_AllNonDictWords(t *testing.T) {
+	dict := NewCustomDictionary() // empty dictionary
+
+	mock := &dictMockPhonemizer{
+		lang: "en",
+		phonemes: map[string][]string{
+			"good":    {"ɡ", "ʊ", "d"},
+			"morning": {"m", "ɔː", "n", "ɪ", "ŋ"},
+		},
+		eosToken: "$",
+	}
+	dp := dict.WrapPhonemizer(mock)
+
+	res, err := dp.PhonemizeWithProsody("good morning")
+	if err != nil {
+		t.Fatalf("PhonemizeWithProsody error: %v", err)
+	}
+
+	// Both words delegated; BOS/EOS stripped from each.
+	wantTokens := []string{"ɡ", "ʊ", "d", "m", "ɔː", "n", "ɪ", "ŋ"}
+	assertTokensEqual(t, "tokens", res.Tokens, wantTokens)
+
+	for i, tok := range res.Tokens {
+		if bosEosTokens[tok] {
+			t.Errorf("unexpected BOS/EOS token at index %d: %q", i, tok)
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// dictPhonemizer: single word (dict hit)
+// ---------------------------------------------------------------------------
+
+func TestDictPhonemizer_SingleDictWord(t *testing.T) {
+	dict := NewCustomDictionary()
+	dict.Add("hello", []string{"h", "ɛ", "l", "oʊ"})
+
+	mock := &dictMockPhonemizer{lang: "en", phonemes: map[string][]string{}}
+	dp := dict.WrapPhonemizer(mock)
+
+	res, err := dp.PhonemizeWithProsody("hello")
+	if err != nil {
+		t.Fatalf("PhonemizeWithProsody error: %v", err)
+	}
+
+	wantTokens := []string{"h", "ɛ", "l", "oʊ"}
+	assertTokensEqual(t, "tokens", res.Tokens, wantTokens)
+}
+
+// ---------------------------------------------------------------------------
+// dictPhonemizer: single word (non-dict, delegated)
+// ---------------------------------------------------------------------------
+
+func TestDictPhonemizer_SingleNonDictWord(t *testing.T) {
+	dict := NewCustomDictionary()
+
+	mock := &dictMockPhonemizer{
+		lang:     "en",
+		phonemes: map[string][]string{"world": {"w", "ɜː", "l", "d"}},
+		eosToken: "$",
+	}
+	dp := dict.WrapPhonemizer(mock)
+
+	res, err := dp.PhonemizeWithProsody("world")
+	if err != nil {
+		t.Fatalf("PhonemizeWithProsody error: %v", err)
+	}
+
+	// BOS/EOS stripped even for a single delegated word.
+	wantTokens := []string{"w", "ɜː", "l", "d"}
+	assertTokensEqual(t, "tokens", res.Tokens, wantTokens)
+
+	for i, tok := range res.Tokens {
+		if bosEosTokens[tok] {
+			t.Errorf("unexpected BOS/EOS token at index %d: %q", i, tok)
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// dictPhonemizer: question EOS token propagated from wrapped phonemizer
+// ---------------------------------------------------------------------------
+
+func TestDictPhonemizer_QuestionEOSToken(t *testing.T) {
+	dict := NewCustomDictionary()
+	dict.Add("are", []string{"ɑː"})
+
+	mock := &dictMockPhonemizer{
+		lang:     "en",
+		phonemes: map[string][]string{"you": {"j", "uː"}},
+		eosToken: "?",
+	}
+	dp := dict.WrapPhonemizer(mock)
+
+	res, err := dp.PhonemizeWithProsody("are you")
+	if err != nil {
+		t.Fatalf("PhonemizeWithProsody error: %v", err)
+	}
+
+	// "?" should be propagated as EOSToken, not "$".
+	if res.EOSToken != "?" {
+		t.Errorf("EOSToken = %q, want \"?\"", res.EOSToken)
+	}
+
+	wantTokens := []string{"ɑː", "j", "uː"}
+	assertTokensEqual(t, "tokens", res.Tokens, wantTokens)
 }
 
 // ---------------------------------------------------------------------------

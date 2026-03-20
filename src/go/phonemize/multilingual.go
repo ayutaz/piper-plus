@@ -3,6 +3,8 @@ package phonemize
 import (
 	"log/slog"
 	"strings"
+
+	"golang.org/x/text/unicode/norm"
 )
 
 // bosEosTokens is the set of BOS/EOS tokens to strip from segment output.
@@ -62,6 +64,11 @@ func (m *MultilingualPhonemizer) LanguageCode() string {
 // phonemizers, strips BOS/EOS from each segment, and concatenates the results.
 // The dynamically determined EOS token is stored in result.EOSToken.
 func (m *MultilingualPhonemizer) PhonemizeWithProsody(text string) (*PhonemizeResult, error) {
+	// Normalize to NFC so that decomposed sequences (e.g. e + combining acute
+	// from macOS HFS+ or Web APIs) are folded into their composed equivalents
+	// before language detection and phonemization.
+	text = norm.NFC.String(text)
+
 	segments := SegmentText(text, m.detector)
 	if len(segments) == 0 {
 		return &PhonemizeResult{

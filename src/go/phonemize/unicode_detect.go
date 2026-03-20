@@ -1,6 +1,7 @@
 package phonemize
 
 import (
+	"strings"
 	"unicode/utf8"
 )
 
@@ -46,18 +47,24 @@ func NewUnicodeLanguageDetector(languages []string, defaultLatinLang string) *Un
 // contextHasKana indicates whether the surrounding text contains hiragana/katakana,
 // which disambiguates CJK ideographs between Japanese and Chinese.
 func (d *UnicodeLanguageDetector) DetectChar(ch rune, contextHasKana bool) string {
-	// 1. Hiragana / Katakana / Katakana Extensions -> "ja"
+	// 1. Hiragana / Katakana / Katakana Extensions -> "ja" (only if JA registered)
 	if (ch >= 0x3040 && ch <= 0x309F) ||
 		(ch >= 0x30A0 && ch <= 0x30FF) ||
 		(ch >= 0x31F0 && ch <= 0x31FF) {
-		return "ja"
+		if d.hasJA {
+			return "ja"
+		}
+		return ""
 	}
 
-	// 2. Hangul Syllables / Jamo / Compat Jamo -> "ko"
+	// 2. Hangul Syllables / Jamo / Compat Jamo -> "ko" (only if KO registered)
 	if (ch >= 0xAC00 && ch <= 0xD7AF) ||
 		(ch >= 0x1100 && ch <= 0x11FF) ||
 		(ch >= 0x3130 && ch <= 0x318F) {
-		return "ko"
+		if d.hasKO {
+			return "ko"
+		}
+		return ""
 	}
 
 	// 3. CJK Unified Ideographs / Extension A / Compat Ideographs
@@ -90,7 +97,13 @@ func (d *UnicodeLanguageDetector) DetectChar(ch rune, contextHasKana bool) strin
 		(ch >= 0xFF00 && ch <= 0xFF20) ||
 		(ch >= 0xFF3B && ch <= 0xFF40) ||
 		(ch >= 0xFF5B && ch <= 0xFFEF) {
-		return "ja"
+		if d.hasJA {
+			return "ja"
+		}
+		if d.hasZH {
+			return "zh"
+		}
+		return ""
 	}
 
 	// 6. Latin (basic + supplement)
@@ -126,7 +139,7 @@ func (d *UnicodeLanguageDetector) HasKana(text string) bool {
 // If no language is detected and text has content, the entire text is
 // returned as a single segment with defaultLatinLanguage.
 func SegmentText(text string, detector *UnicodeLanguageDetector) []LangSegment {
-	if len(text) == 0 {
+	if len(text) == 0 || strings.TrimSpace(text) == "" {
 		return nil
 	}
 

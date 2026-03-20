@@ -289,12 +289,25 @@ func esG2P(word []rune) (phonemes []string, stressPhIdx int) {
 				phonemes = append(phonemes, "ɾ")
 			}
 		case 's':
+			// sc + e/i -> single /s/ (Latin American seseo: avoid geminate ss)
+			if i+1 < n && base[i+1] == 'c' && i+2 < n && (base[i+2] == 'e' || base[i+2] == 'i') {
+				phonemes = append(phonemes, "s")
+				i += 2 // skip 's' and 'c'; vowel handled next iteration
+				continue
+			}
 			phonemes = append(phonemes, "s")
 		case 't':
 			phonemes = append(phonemes, "t")
 		case 'w':
 			phonemes = append(phonemes, "w")
 		case 'x':
+			// xc + e/i -> /k,s/ with c absorbed (x already provides /ks/)
+			if i+1 < n && base[i+1] == 'c' && i+2 < n && (base[i+2] == 'e' || base[i+2] == 'i') {
+				phonemes = append(phonemes, "k")
+				phonemes = append(phonemes, "s")
+				i += 2 // skip 'x' and 'c'; vowel handled next iteration
+				continue
+			}
 			phonemes = append(phonemes, "k")
 			phonemes = append(phonemes, "s")
 		case 'y':

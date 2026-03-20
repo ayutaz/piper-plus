@@ -2,6 +2,7 @@ package phonemize
 
 import (
 	"fmt"
+	"log/slog"
 	"strings"
 	"unicode"
 )
@@ -17,7 +18,17 @@ type ChinesePhonemizer struct {
 }
 
 // NewChinesePhonemizer creates a phonemizer with pinyin dictionaries.
+// If both dictionaries are nil, CJK characters will not be phonemized (skipped).
 func NewChinesePhonemizer(singleChar map[rune]string, phrases map[string]string) *ChinesePhonemizer {
+	if singleChar == nil && phrases == nil {
+		slog.Warn("Chinese phonemizer created without pinyin dictionaries; CJK characters will not be phonemized")
+	}
+	if singleChar == nil {
+		singleChar = make(map[rune]string)
+	}
+	if phrases == nil {
+		phrases = make(map[string]string)
+	}
 	return &ChinesePhonemizer{
 		singleCharPinyin: singleChar,
 		phrasesPinyin:    phrases,

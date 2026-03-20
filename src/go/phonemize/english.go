@@ -1,6 +1,7 @@
 package phonemize
 
 import (
+	"log/slog"
 	"strings"
 	"unicode"
 )
@@ -12,7 +13,13 @@ type EnglishPhonemizer struct {
 
 // NewEnglishPhonemizer creates a phonemizer with the given CMU dictionary.
 // cmuDict maps lowercase words to ARPAbet phoneme lists (e.g., "hello" -> ["HH","AH0","L","OW1"]).
+// If cmuDict is nil, the phonemizer will still function but every word will
+// fall back to letter-by-letter decomposition, producing significantly lower
+// quality output.
 func NewEnglishPhonemizer(cmuDict map[string][]string) *EnglishPhonemizer {
+	if cmuDict == nil {
+		slog.Warn("English phonemizer created without CMU dictionary; all words will use letter-by-letter fallback")
+	}
 	return &EnglishPhonemizer{cmuDict: cmuDict}
 }
 
@@ -272,6 +279,9 @@ func (p *EnglishPhonemizer) PhonemizeWithProsody(text string) (*PhonemizeResult,
 		lower := strings.ToLower(tok.text)
 		isFunctionWord := functionWords[lower]
 
+		// Look up the word in the CMU dictionary. When cmuDict is nil (no
+		// dictionary loaded), the map lookup returns the zero value (nil, false)
+		// so every word falls through to the letter-by-letter fallback below.
 		arpTokens, found := p.cmuDict[lower]
 		if found {
 			ipas := convertWordToIPA(arpTokens)

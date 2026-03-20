@@ -48,11 +48,6 @@ var ptConsStr = map[string]bool{
 	"t\u0283": true, "d\u0292": true,
 }
 var ptNasV = map[string]bool{"\u00e3": true, "\u1ebd": true, "\u0129": true, "\u00f5": true, "\u0169": true}
-var ptFunc = map[string]bool{"o": true, "a": true, "os": true, "as": true, "um": true, "uma": true,
-	"de": true, "do": true, "da": true, "dos": true, "das": true, "em": true,
-	"no": true, "na": true, "nos": true, "nas": true, "por": true, "com": true,
-	"para": true, "que": true, "se": true, "me": true, "te": true, "lhe": true,
-	"e": true, "ou": true, "mas": true, "nem": true}
 
 func ptV(c rune) bool           { return ptVowels[c] }
 func ptB(c rune) rune           { if b, ok := ptAccBase[c]; ok { return b }; return c }
@@ -240,21 +235,25 @@ func (p *PortuguesePhonemizer) PhonemizeWithProsody(text string) (*PhonemizeResu
 	var phons []string
 	var pros []*ProsodyInfo
 	sp := false
+	eos := "$"
 	for _, tk := range toks {
 		if tk.kind == tokenPunct {
-			phons = append(phons, tk.text); pros = append(pros, &ProsodyInfo{0, 0, 0}); continue
+			phons = append(phons, tk.text); pros = append(pros, &ProsodyInfo{0, 0, 0})
+			if tk.text == "?" || tk.text == "!" {
+				eos = tk.text
+			}
+			continue
 		}
 		if sp { phons = append(phons, " "); pros = append(pros, &ProsodyInfo{0, 0, 0}) }
 		wr := []rune(tk.text)
-		fw := ptFunc[tk.text]
 		wp, si := ptConvert(wr)
 		wl := len(wp)
 		for j, ph := range wp {
-			a2 := 0; if j == si && !fw { a2 = 2 }
+			a2 := 0; if j == si { a2 = 2 }
 			phons = append(phons, ph); pros = append(pros, &ProsodyInfo{0, a2, wl})
 		}
 		sp = true
 	}
 	phons = MapSequence(phons)
-	return &PhonemizeResult{Tokens: phons, Prosody: pros, EOSToken: "$"}, nil
+	return &PhonemizeResult{Tokens: phons, Prosody: pros, EOSToken: eos}, nil
 }

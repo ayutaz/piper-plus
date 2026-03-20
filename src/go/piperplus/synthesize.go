@@ -3,6 +3,8 @@ package piperplus
 import (
 	"context"
 	"fmt"
+	"log/slog"
+	"sort"
 
 	"github.com/ayutaz/piper-plus/src/go/phonemize"
 )
@@ -24,7 +26,12 @@ func createMultilingualPhonemizer(config *VoiceConfig) (phonemize.Phonemizer, er
 	for lang := range config.LanguageIDMap {
 		p, err := phonemizerForLanguage(lang)
 		if err != nil {
-			// Japanese requires a G2P engine; skip gracefully.
+			if lang == "ja" {
+				// Japanese requires a native G2P engine; skip gracefully.
+				continue
+			}
+			slog.Warn("phonemizer creation failed; skipping language",
+				"language", lang, "error", err)
 			continue
 		}
 		phonemizers[lang] = p
@@ -39,10 +46,12 @@ func createMultilingualPhonemizer(config *VoiceConfig) (phonemize.Phonemizer, er
 	}
 
 	// Build the languages list from successfully created phonemizers only.
+	// Sort for deterministic order since Go map iteration is non-deterministic.
 	languages := make([]string, 0, len(phonemizers))
 	for lang := range phonemizers {
 		languages = append(languages, lang)
 	}
+	sort.Strings(languages)
 
 	defaultLatinLang := phonemize.DefaultLatinLanguage(languages)
 
@@ -76,12 +85,16 @@ func phonemizerForLanguage(lang string) (phonemize.Phonemizer, error) {
 	case "ja":
 		return nil, fmt.Errorf("Japanese requires G2P engine")
 	case "en":
+		// TODO: load CMU dict from dataDir when data directory support is added.
+		slog.Warn("English phonemizer created without CMU dictionary; all words will use letter-by-letter fallback")
 		p := phonemize.NewEnglishPhonemizer(nil)
 		if p == nil {
 			return nil, fmt.Errorf("failed to create English phonemizer")
 		}
 		return p, nil
 	case "zh":
+		// TODO: load pinyin dicts from dataDir when data directory support is added.
+		slog.Warn("Chinese phonemizer created without pinyin dictionaries; hanzi phonemization may be degraded")
 		p := phonemize.NewChinesePhonemizer(nil, nil)
 		if p == nil {
 			return nil, fmt.Errorf("failed to create Chinese phonemizer")
@@ -155,6 +168,9 @@ func (v *Voice) Synthesize(ctx context.Context, text string, opts ...SynthesisOp
 	}
 
 	// Resolve language ID from options + config.
+	// When language is not specified but the model is multilingual, default to the
+	// phonemizer's primary language so the language ID matches the phonemized output.
+	// TODO: support per-segment language detection for mixed-language text.
 	var languageID int64
 	if so.Language != "" {
 		lid, ok := v.config.LanguageIDMap[so.Language]
@@ -162,6 +178,13 @@ func (v *Voice) Synthesize(ctx context.Context, text string, opts ...SynthesisOp
 			return nil, fmt.Errorf("piperplus: unknown language %q; available: %v", so.Language, v.config.LanguageIDMap)
 		}
 		languageID = lid
+	} else if v.config.IsMultilingual() {
+		defaultLang := v.phonemizer.LanguageCode()
+		if lid, ok := v.config.LanguageIDMap[defaultLang]; ok {
+			languageID = lid
+		}
+		slog.Warn("multilingual model but no language specified; using phonemizer default",
+			"default_language", defaultLang, "language_id", languageID)
 	}
 
 	// Build request and delegate to engine.

@@ -103,7 +103,7 @@ func frWord(word string) []string {
 			ph = append(ph, "\u0251\u0303"); i += 2; continue // am/an → ɑ̃
 		}
 		if c == 'e' && (at(1) == 'n' || at(1) == 'm') && (i+2 >= n || (!frV[rs[i+2]] && rs[i+2] != rs[i+1])) {
-			ph = append(ph, "\u025b\u0303"); i += 2; continue // em/en → ɛ̃
+			ph = append(ph, "\u0251\u0303"); i += 2; continue // em/en → ɑ̃ (merged with an/am in standard French)
 		}
 		if c == 'i' && (at(1) == 'n' || at(1) == 'm') && (i+2 >= n || (!frV[rs[i+2]] && rs[i+2] != rs[i+1])) {
 			ph = append(ph, "\u025b\u0303"); i += 2; continue
@@ -200,12 +200,18 @@ func frSplit(text string) []string {
 func (p *FrenchPhonemizer) PhonemizeWithProsody(text string) (*PhonemizeResult, error) {
 	text = strings.Join(strings.Fields(strings.ToLower(strings.TrimSpace(text))), " ")
 	toks := frSplit(text)
-	var phs []string; var pro []*ProsodyInfo; sp := false
+	var phs []string; var pro []*ProsodyInfo; sp := false; eos := "$"
 	for _, tk := range toks {
 		pu := true; for _, c := range tk { if !frPu[c] { pu = false; break } }
 		if !pu && sp { phs = append(phs, " "); pro = append(pro, &ProsodyInfo{}) }
 		if pu {
-			for _, c := range tk { phs = append(phs, string(c)); pro = append(pro, &ProsodyInfo{}) }
+			for _, c := range tk {
+				ch := string(c)
+				phs = append(phs, ch); pro = append(pro, &ProsodyInfo{})
+				if c == '?' || c == '!' {
+					eos = ch
+				}
+			}
 		} else {
 			wp := frWord(tk); cnt := len(wp); lv := -1
 			for j := cnt - 1; j >= 0; j-- { if frVP[wp[j]] { lv = j; break } }
@@ -217,7 +223,7 @@ func (p *FrenchPhonemizer) PhonemizeWithProsody(text string) (*PhonemizeResult, 
 		sp = true
 	}
 	phs = MapSequence(phs)
-	return &PhonemizeResult{Tokens: phs, Prosody: pro, EOSToken: "$"}, nil
+	return &PhonemizeResult{Tokens: phs, Prosody: pro, EOSToken: eos}, nil
 }
 
 var _ Phonemizer = (*FrenchPhonemizer)(nil)

@@ -206,3 +206,277 @@ func TestLatinExtendedChars(t *testing.T) {
 		t.Errorf("expected language fr, got %q", segs[0].Language)
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Additional: CJK Extension A and Compatibility ranges
+// ---------------------------------------------------------------------------
+
+func TestDetectChar_CJKExtensionA(t *testing.T) {
+	// CJK Unified Ideographs Extension A: U+3400-U+4DBF
+	d := NewUnicodeLanguageDetector([]string{"ja", "zh", "en"}, "en")
+	got := d.DetectChar('\u3400', false) // first char of Extension A
+	if got != "zh" {
+		t.Errorf("CJK Extension A (U+3400, no kana): expected zh, got %q", got)
+	}
+	got = d.DetectChar('\u4DBF', true) // last char of Extension A
+	if got != "ja" {
+		t.Errorf("CJK Extension A (U+4DBF, with kana): expected ja, got %q", got)
+	}
+}
+
+func TestDetectChar_CJKCompatibility(t *testing.T) {
+	// CJK Compatibility Ideographs: U+F900-U+FAFF
+	d := NewUnicodeLanguageDetector([]string{"ja", "zh", "en"}, "en")
+	got := d.DetectChar('\uF900', false)
+	if got != "zh" {
+		t.Errorf("CJK Compat (U+F900, no kana): expected zh, got %q", got)
+	}
+	got = d.DetectChar('\uFAFF', true)
+	if got != "ja" {
+		t.Errorf("CJK Compat (U+FAFF, with kana): expected ja, got %q", got)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Additional: CJK with neither JA nor ZH registered
+// ---------------------------------------------------------------------------
+
+func TestDetectChar_CJKNeitherJANorZH(t *testing.T) {
+	d := NewUnicodeLanguageDetector([]string{"en", "ko"}, "en")
+	got := d.DetectChar('漢', false)
+	if got != "" {
+		t.Errorf("CJK with neither JA nor ZH: expected empty, got %q", got)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Additional: Hangul boundary values
+// ---------------------------------------------------------------------------
+
+func TestDetectChar_HangulBoundaries(t *testing.T) {
+	d := NewUnicodeLanguageDetector([]string{"ko", "en"}, "en")
+	tests := []struct {
+		ch   rune
+		want string
+		desc string
+	}{
+		{0xAC00, "ko", "Hangul Syllables start (가)"},
+		{0xD7AF, "ko", "Hangul Syllables end"},
+		{0x1100, "ko", "Hangul Jamo start (ᄀ)"},
+		{0x11FF, "ko", "Hangul Jamo end"},
+		{0x3130, "ko", "Hangul Compat Jamo start"},
+		{0x318F, "ko", "Hangul Compat Jamo end"},
+	}
+	for _, tc := range tests {
+		got := d.DetectChar(tc.ch, false)
+		if got != tc.want {
+			t.Errorf("DetectChar(U+%04X) = %q, want %q [%s]", tc.ch, got, tc.want, tc.desc)
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Additional: Hangul without KO registered
+// ---------------------------------------------------------------------------
+
+func TestDetectChar_HangulNoKO(t *testing.T) {
+	// Python returns None when ko not in languages; Go should return ""
+	d := NewUnicodeLanguageDetector([]string{"ja", "en"}, "en")
+	got := d.DetectChar('한', false)
+	if got != "" {
+		t.Errorf("Hangul without KO registered: expected empty, got %q", got)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Additional: Kana without JA registered
+// ---------------------------------------------------------------------------
+
+func TestDetectChar_KanaNoJA(t *testing.T) {
+	// Python returns None when ja not in languages; Go should return ""
+	d := NewUnicodeLanguageDetector([]string{"zh", "en"}, "en")
+	got := d.DetectChar('あ', false)
+	if got != "" {
+		t.Errorf("Kana without JA registered: expected empty, got %q", got)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Additional: fullwidth punctuation boundary coverage
+// ---------------------------------------------------------------------------
+
+func TestDetectChar_FullwidthPunctBoundaries(t *testing.T) {
+	d := NewUnicodeLanguageDetector([]string{"ja", "en"}, "en")
+	tests := []struct {
+		ch   rune
+		want string
+		desc string
+	}{
+		{0x3000, "ja", "ideographic space (CJK punct start)"},
+		{0x303F, "ja", "CJK punct end"},
+		{0xFF00, "ja", "fullwidth forms start (＀)"},
+		{0xFF20, "ja", "fullwidth @ (＠)"},
+		// 0xFF21 (Ａ) is fullwidth Latin -> en
+		{0xFF21, "en", "fullwidth A -> Latin"},
+		{0xFF3A, "en", "fullwidth Z -> Latin"},
+		// 0xFF3B (［) back to JA punct
+		{0xFF3B, "ja", "fullwidth [ -> JA punct"},
+		{0xFF40, "ja", "fullwidth ` -> JA punct"},
+		// 0xFF41 (ａ) is fullwidth Latin -> en
+		{0xFF41, "en", "fullwidth a -> Latin"},
+		{0xFF5A, "en", "fullwidth z -> Latin"},
+		// 0xFF5B (｛) -> JA punct
+		{0xFF5B, "ja", "fullwidth { -> JA punct"},
+		{0xFFEF, "ja", "halfwidth/fullwidth forms end"},
+	}
+	for _, tc := range tests {
+		got := d.DetectChar(tc.ch, false)
+		if got != tc.want {
+			t.Errorf("DetectChar(U+%04X) = %q, want %q [%s]", tc.ch, got, tc.want, tc.desc)
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Additional: Latin extended range boundary tests
+// ---------------------------------------------------------------------------
+
+func TestDetectChar_LatinBoundaries(t *testing.T) {
+	d := NewUnicodeLanguageDetector([]string{"en"}, "en")
+	tests := []struct {
+		ch   rune
+		want string
+		desc string
+	}{
+		{0x00C0, "en", "Latin A-grave (start of extended range)"},
+		{0x00D6, "en", "Latin O-diaeresis (end of first block)"},
+		{0x00D7, "", "multiplication sign (excluded from Latin)"},
+		{0x00D8, "en", "Latin O-stroke"},
+		{0x00F6, "en", "Latin o-diaeresis"},
+		{0x00F7, "", "division sign (excluded from Latin)"},
+		{0x00F8, "en", "Latin o-stroke"},
+		{0x00FF, "en", "Latin y-diaeresis (end of range)"},
+	}
+	for _, tc := range tests {
+		got := d.DetectChar(tc.ch, false)
+		if got != tc.want {
+			t.Errorf("DetectChar(U+%04X) = %q, want %q [%s]", tc.ch, got, tc.want, tc.desc)
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Additional: multi-segment boundary with neutral chars between languages
+// ---------------------------------------------------------------------------
+
+func TestSegmentText_NeutralBetweenLanguages(t *testing.T) {
+	d := NewUnicodeLanguageDetector([]string{"ja", "en"}, "en")
+	// "hello 123 こんにちは" -> neutral "123" between en and ja.
+	// "123" is after "hello " (en), so it's absorbed into en.
+	segs := SegmentText("hello 123 こんにちは", d)
+	if len(segs) != 2 {
+		t.Fatalf("expected 2 segments, got %d: %+v", len(segs), segs)
+	}
+	if segs[0].Language != "en" {
+		t.Errorf("segment 0: expected en, got %q", segs[0].Language)
+	}
+	// "hello 123 " should all be in en segment
+	if segs[0].Text != "hello 123 " {
+		t.Errorf("segment 0: expected 'hello 123 ', got %q", segs[0].Text)
+	}
+	if segs[1].Language != "ja" {
+		t.Errorf("segment 1: expected ja, got %q", segs[1].Language)
+	}
+}
+
+func TestSegmentText_MultipleLanguageSwitches(t *testing.T) {
+	d := NewUnicodeLanguageDetector([]string{"ja", "en", "zh"}, "en")
+	// "abc漢字def" -> no kana, CJK=zh: [en:"abc", zh:"漢字", en:"def"]
+	segs := SegmentText("abc漢字def", d)
+	if len(segs) != 3 {
+		t.Fatalf("expected 3 segments, got %d: %+v", len(segs), segs)
+	}
+	if segs[0].Language != "en" || segs[1].Language != "zh" || segs[2].Language != "en" {
+		t.Errorf("expected [en, zh, en], got [%q, %q, %q]",
+			segs[0].Language, segs[1].Language, segs[2].Language)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Additional: HasKana edge cases
+// ---------------------------------------------------------------------------
+
+func TestHasKana_KatakanaExtension(t *testing.T) {
+	d := NewUnicodeLanguageDetector([]string{"ja", "en"}, "en")
+	// U+31F0-U+31FF are Katakana Phonetic Extensions.
+	// HasKana only checks U+3040-309F (hiragana) and U+30A0-30FF (katakana),
+	// so katakana extension is NOT detected by HasKana.
+	if d.HasKana(string(rune(0x31F0))) {
+		t.Error("HasKana should return false for Katakana Phonetic Extension (only checks 3040-30FF)")
+	}
+}
+
+func TestHasKana_MixedWithCJK(t *testing.T) {
+	d := NewUnicodeLanguageDetector([]string{"ja", "en"}, "en")
+	if !d.HasKana("漢字あ") {
+		t.Error("HasKana should return true for CJK + hiragana")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// CJK punctuation routing: JA not registered, ZH registered -> "zh"
+// ---------------------------------------------------------------------------
+
+func TestDetectChar_CJKPunctNoJAWithZH(t *testing.T) {
+	d := NewUnicodeLanguageDetector([]string{"zh", "en"}, "en")
+	tests := []struct {
+		ch   rune
+		want string
+		desc string
+	}{
+		{'。', "zh", "CJK period -> zh when JA absent, ZH present"},
+		{'、', "zh", "CJK comma -> zh when JA absent, ZH present"},
+		{'「', "zh", "CJK left bracket -> zh when JA absent, ZH present"},
+		{0xFF01, "zh", "fullwidth ! -> zh when JA absent, ZH present"},
+		{0xFF5B, "zh", "fullwidth { -> zh when JA absent, ZH present"},
+	}
+	for _, tc := range tests {
+		got := d.DetectChar(tc.ch, false)
+		if got != tc.want {
+			t.Errorf("DetectChar(U+%04X) = %q, want %q [%s]", tc.ch, got, tc.want, tc.desc)
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// CJK punctuation: neither JA nor ZH registered -> ""
+// ---------------------------------------------------------------------------
+
+func TestDetectChar_CJKPunctNeitherJANorZH(t *testing.T) {
+	d := NewUnicodeLanguageDetector([]string{"en", "ko"}, "en")
+	got := d.DetectChar('。', false)
+	if got != "" {
+		t.Errorf("CJK punct with neither JA nor ZH: expected empty, got %q", got)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Whitespace-only text -> empty slice (Python parity)
+// ---------------------------------------------------------------------------
+
+func TestSegmentText_WhitespaceOnly(t *testing.T) {
+	d := NewUnicodeLanguageDetector([]string{"ja", "en"}, "en")
+	tests := []string{
+		" ",
+		"   ",
+		"\t",
+		"\n",
+		" \t\n ",
+	}
+	for _, text := range tests {
+		segs := SegmentText(text, d)
+		if len(segs) != 0 {
+			t.Errorf("SegmentText(%q): expected 0 segments, got %d: %+v", text, len(segs), segs)
+		}
+	}
+}

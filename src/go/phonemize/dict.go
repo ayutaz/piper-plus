@@ -106,10 +106,18 @@ type dictPhonemizer struct {
 
 // PhonemizeWithProsody tokenizes text into words and checks the dictionary
 // for each word before falling through to the wrapped phonemizer.
+//
+// BOS/EOS tokens are stripped from each per-word result to prevent
+// accumulation in multi-word output. A single BOS/EOS pair is NOT added
+// here; the caller (PostProcessIDs / PostProcessMultilingualIDs) handles
+// that. The last EOS token seen from the wrapped phonemizer is propagated
+// in result.EOSToken so the caller can select the correct variant
+// ("$", "?", "?!", etc.).
 func (dp *dictPhonemizer) PhonemizeWithProsody(text string) (*PhonemizeResult, error) {
 	words := strings.Fields(text)
 	var allTokens []string
 	var allProsody []*ProsodyInfo
+	lastEOS := "$"
 
 	for _, w := range words {
 		if ph := dp.dict.Lookup(w); ph != nil {
@@ -122,15 +130,29 @@ func (dp *dictPhonemizer) PhonemizeWithProsody(text string) (*PhonemizeResult, e
 			if err != nil {
 				return nil, fmt.Errorf("phonemize %q: %w", w, err)
 			}
-			allTokens = append(allTokens, res.Tokens...)
-			allProsody = append(allProsody, res.Prosody...)
+			// Strip BOS/EOS from this word's output and track the last EOS,
+			// matching the approach used by MultilingualPhonemizer.
+			for i, tok := range res.Tokens {
+				if bosEosTokens[tok] {
+					if eosOnlyTokens[tok] {
+						lastEOS = tok
+					}
+					continue
+				}
+				allTokens = append(allTokens, tok)
+				var p *ProsodyInfo
+				if i < len(res.Prosody) {
+					p = res.Prosody[i]
+				}
+				allProsody = append(allProsody, p)
+			}
 		}
 	}
 
 	return &PhonemizeResult{
 		Tokens:   allTokens,
 		Prosody:  allProsody,
-		EOSToken: "$",
+		EOSToken: lastEOS,
 	}, nil
 }
 

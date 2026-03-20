@@ -110,7 +110,12 @@ var fixedPUA = map[string]rune{
 }
 
 // reversePUA maps PUA codepoints back to multi-character tokens.
-var reversePUA map[rune]string
+// Protected by reverseMu (RWMutex) for concurrent safety: RegisterToken writes
+// under a Write lock; PUAToToken reads under a Read lock.
+var (
+	reversePUA map[rune]string
+	reverseMu  sync.RWMutex
+)
 
 // dynamicPUA maps unknown multi-char tokens to dynamically allocated PUA codepoints.
 // This mirrors Python's token_mapper.py behavior of allocating PUA codepoints on the fly.
@@ -160,12 +165,17 @@ func RegisterToken(token string) string {
 	nextDynamic++
 	mapped := string(r)
 	dynamicPUA[token] = mapped
+	reverseMu.Lock()
 	reversePUA[r] = token
+	reverseMu.Unlock()
 	return mapped
 }
 
 // PUAToToken reverses a PUA codepoint back to the multi-character token.
+// Safe for concurrent use with RegisterToken via reverseMu (RWMutex).
 func PUAToToken(ch rune) (string, bool) {
+	reverseMu.RLock()
+	defer reverseMu.RUnlock()
 	token, ok := reversePUA[ch]
 	return token, ok
 }
@@ -182,6 +192,8 @@ func DynamicPUACount() int {
 func ResetDynamicPUA() {
 	dynamicMu.Lock()
 	defer dynamicMu.Unlock()
+	reverseMu.Lock()
+	defer reverseMu.Unlock()
 	for token := range dynamicPUA {
 		r, _ := utf8.DecodeRuneInString(dynamicPUA[token])
 		delete(reversePUA, r)
