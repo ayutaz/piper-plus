@@ -117,7 +117,7 @@ cd piper
 ./bin/piper --model tsukuyomi --text "こんにちは、今日は良い天気ですね。" --output_file output.wav
 ```
 
-> **Windows cmd を使う場合:** cmd はデフォルトで Shift-JIS (CP932) のため、先に `chcp 65001` で UTF-8 に切り替えてください。
+> **Windows cmd のコードページについて:** `--text` オプションは内部で `GetCommandLineW()` (UTF-16) を使用するため、コードページに依存せずそのまま動作します。パイプ入力（`echo ... | piper`）を使う場合のみ、事前に `chcp 65001` で UTF-8 に切り替えてください。
 >
 > **output.wav の出力先:** カレントディレクトリ（`cd piper` した場所）に生成されます。
 
