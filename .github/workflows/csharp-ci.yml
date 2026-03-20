@@ -56,7 +56,6 @@ jobs:
         shell: bash
         run: |
           dotnet test src/csharp/PiperPlus.sln -c Release --no-build \
-            --filter "Category!=CLI" \
             --logger "trx;LogFileName=test-results.xml" \
             --collect:"XPlat Code Coverage" \
             --settings src/csharp/PiperPlus.runsettings
