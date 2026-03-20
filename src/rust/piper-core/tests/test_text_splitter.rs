@@ -1,4 +1,4 @@
-use piper_core::text_splitter::{split_chunks, split_sentences, SplitConfig, TextChunk};
+use piper_plus::text_splitter::{split_chunks, split_sentences, SplitConfig, TextChunk};
 
 // ===========================================================================
 // 1. split_sentences — English

@@ -484,17 +484,17 @@ jobs:
         continue-on-error: true
 
       - name: Run tests
-        run: cargo test -p piper-core --no-fail-fast
+        run: cargo test -p piper-plus --no-fail-fast
 
       - name: Run tests (naist-jdic)
-        run: cargo test -p piper-core --features naist-jdic --no-fail-fast
+        run: cargo test -p piper-plus --features naist-jdic --no-fail-fast
 
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
       - name: Check piper-python
-        run: cargo check -p piper-python
+        run: cargo check -p piper-plus-python
 
   lint:
     runs-on: ubuntu-latest

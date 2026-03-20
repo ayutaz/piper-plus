@@ -1,4 +1,4 @@
-use piper_core::PiperError;
+use piper_plus::PiperError;
 
 // --- 1. ConfigNotFound ---
 #[test]

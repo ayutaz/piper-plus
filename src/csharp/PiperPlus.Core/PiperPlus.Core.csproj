@@ -6,13 +6,19 @@
 
     <!-- NuGet Package Metadata -->
     <PackageId>PiperPlus.Core</PackageId>
+    <Version>0.1.0</Version>
     <Authors>ayousanz</Authors>
     <Description>Piper Plus TTS Core library — ONNX inference, phonemization, config</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/ayutaz/piper-plus</PackageProjectUrl>
     <RepositoryUrl>https://github.com/ayutaz/piper-plus</RepositoryUrl>
     <PackageTags>tts;text-to-speech;piper;onnx;vits</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="../../../README.md" Pack="true" PackagePath="/" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.ML.OnnxRuntime.Managed" Version="1.24.3" />

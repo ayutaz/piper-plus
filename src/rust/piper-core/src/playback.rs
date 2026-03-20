@@ -181,8 +181,8 @@ impl AudioSink for CollectorSink {
 /// # Example (requires `--features playback`)
 ///
 /// ```ignore
-/// use piper_core::playback::RodioPlayer;
-/// use piper_core::streaming::AudioSink;
+/// use piper_plus::playback::RodioPlayer;
+/// use piper_plus::streaming::AudioSink;
 ///
 /// let mut player = RodioPlayer::new()?;
 /// player.write_chunk(&samples, 22050)?;

@@ -1,23 +1,29 @@
 [package]
-name = "piper-python"
-version = "0.1.0"
-edition = "2021"
-license = "MIT"
-description = "Python bindings for Piper-Plus TTS inference"
+name = "piper-plus-python"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+categories.workspace = true
+description = "Python bindings for Piper Plus TTS inference"
+publish = false
 
 [lib]
 name = "piper_plus"
 crate-type = ["cdylib"]
 
 [dependencies]
-piper-core = { path = "../piper-core" }
+piper-plus = { path = "../piper-core", version = "0.1.0" }
 pyo3 = { version = "0.22", features = ["extension-module"] }
 numpy = "0.22"
 
 [features]
 default = []
-japanese = ["piper-core/japanese"]
-naist-jdic = ["piper-core/naist-jdic"]
+japanese = ["piper-plus/japanese"]
+naist-jdic = ["piper-plus/naist-jdic"]
 
 [lints.clippy]
 # PyO3 #[pymethods] macro generates code that triggers useless_conversion

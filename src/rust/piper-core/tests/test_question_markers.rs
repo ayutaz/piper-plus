@@ -1,6 +1,6 @@
 //! Integration tests for Japanese question marker detection (Issue #204).
 //!
-//! Tests `piper_core::phonemize::japanese::get_question_type` which determines
+//! Tests `piper_plus::phonemize::japanese::get_question_type` which determines
 //! the appropriate end-of-sentence marker based on trailing punctuation.
 //!
 //! Marker reference:
@@ -11,7 +11,7 @@
 //! - "$"  : Declarative (non-question)
 
 #[cfg(feature = "japanese")]
-use piper_core::phonemize::japanese::get_question_type;
+use piper_plus::phonemize::japanese::get_question_type;
 
 // ---------------------------------------------------------------------------
 // Standard question mark

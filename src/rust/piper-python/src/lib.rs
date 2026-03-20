@@ -21,16 +21,16 @@ use pyo3::prelude::*;
 /// - Config / validation 系 -> ValueError
 /// - IO / WAV 系 -> IOError
 /// - その他 (推論・モデルロード) -> RuntimeError
-fn piper_err_to_pyerr(err: piper_core::PiperError) -> PyErr {
+fn piper_err_to_pyerr(err: piper_plus::PiperError) -> PyErr {
     match &err {
-        piper_core::PiperError::ConfigNotFound { .. }
-        | piper_core::PiperError::InvalidConfig { .. }
-        | piper_core::PiperError::UnsupportedLanguage { .. }
-        | piper_core::PiperError::UnknownPhoneme { .. }
-        | piper_core::PiperError::PhonemeIdNotFound { .. } => {
+        piper_plus::PiperError::ConfigNotFound { .. }
+        | piper_plus::PiperError::InvalidConfig { .. }
+        | piper_plus::PiperError::UnsupportedLanguage { .. }
+        | piper_plus::PiperError::UnknownPhoneme { .. }
+        | piper_plus::PiperError::PhonemeIdNotFound { .. } => {
             PyValueError::new_err(err.to_string())
         }
-        piper_core::PiperError::AudioOutput(_) | piper_core::PiperError::WavWrite(_) => {
+        piper_plus::PiperError::AudioOutput(_) | piper_plus::PiperError::WavWrite(_) => {
             PyIOError::new_err(err.to_string())
         }
         _ => PyRuntimeError::new_err(err.to_string()),
@@ -137,7 +137,7 @@ impl SynthesisResult {
     /// Args:
     ///     path: Output file path (e.g. "output.wav").
     fn save_wav(&self, path: &str) -> PyResult<()> {
-        piper_core::audio::write_wav(Path::new(path), self.sample_rate, &self.samples)
+        piper_plus::audio::write_wav(Path::new(path), self.sample_rate, &self.samples)
             .map_err(piper_err_to_pyerr)
     }
 
@@ -154,8 +154,8 @@ impl SynthesisResult {
 }
 
 /// Build a Python SynthesisResult from the core SynthesisResult.
-impl From<piper_core::SynthesisResult> for SynthesisResult {
-    fn from(r: piper_core::SynthesisResult) -> Self {
+impl From<piper_plus::SynthesisResult> for SynthesisResult {
+    fn from(r: piper_plus::SynthesisResult) -> Self {
         Self {
             audio_seconds: r.audio_seconds,
             infer_seconds: r.infer_seconds,
@@ -181,7 +181,7 @@ impl From<piper_core::SynthesisResult> for SynthesisResult {
 ///     >>> audio = result.audio_float32()   # numpy array
 #[pyclass]
 struct PiperVoice {
-    inner: piper_core::PiperVoice,
+    inner: piper_plus::PiperVoice,
 }
 
 #[allow(clippy::useless_conversion, clippy::needless_question_mark)]
@@ -205,7 +205,7 @@ impl PiperVoice {
     #[pyo3(signature = (model_path, config_path=None, device="cpu"))]
     fn new(model_path: &str, config_path: Option<&str>, device: &str) -> PyResult<Self> {
         let cfg = config_path.map(Path::new);
-        let inner = piper_core::PiperVoice::load(Path::new(model_path), cfg, device)
+        let inner = piper_plus::PiperVoice::load(Path::new(model_path), cfg, device)
             .map_err(piper_err_to_pyerr)?;
         Ok(Self { inner })
     }
@@ -257,7 +257,7 @@ impl PiperVoice {
         // bound required by allow_threads.  This is safe because
         // allow_threads only releases the GIL -- the closure still runs on
         // the same OS thread that holds &mut self, so no data race occurs.
-        let inner_ptr = SendPtr(&mut self.inner as *mut piper_core::PiperVoice);
+        let inner_ptr = SendPtr(&mut self.inner as *mut piper_plus::PiperVoice);
 
         let result = py.allow_threads(move || {
             let inner = unsafe { inner_ptr.as_mut() };
@@ -310,7 +310,7 @@ impl PiperVoice {
         length_scale: f32,
         noise_w: f32,
     ) -> PyResult<Vec<SynthesisResult>> {
-        let inner_ptr = SendPtr(&mut self.inner as *mut piper_core::PiperVoice);
+        let inner_ptr = SendPtr(&mut self.inner as *mut piper_plus::PiperVoice);
 
         let results = py.allow_threads(move || {
             let inner = unsafe { inner_ptr.as_mut() };
@@ -326,7 +326,7 @@ impl PiperVoice {
                 )?;
                 out.push(r);
             }
-            Ok::<_, piper_core::PiperError>(out)
+            Ok::<_, piper_plus::PiperError>(out)
         });
 
         Ok(results
@@ -366,7 +366,7 @@ impl PiperVoice {
         let text_owned = text.to_string();
         let output_owned = output_path.to_string();
 
-        let inner_ptr = SendPtr(&mut self.inner as *mut piper_core::PiperVoice);
+        let inner_ptr = SendPtr(&mut self.inner as *mut piper_plus::PiperVoice);
 
         let result = py.allow_threads(move || {
             let inner = unsafe { inner_ptr.as_mut() };

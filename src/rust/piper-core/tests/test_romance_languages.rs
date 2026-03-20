@@ -2,14 +2,14 @@
 //!
 //! These are all rule-based phonemizers with no external data dependencies.
 
-use piper_core::phonemize::Phonemizer;
+use piper_plus::phonemize::Phonemizer;
 
 // =========================================================================
 // Spanish Tests
 // =========================================================================
 mod spanish {
     use super::*;
-    use piper_core::phonemize::spanish::SpanishPhonemizer;
+    use piper_plus::phonemize::spanish::SpanishPhonemizer;
 
     #[test]
     fn test_language_code() {
@@ -219,7 +219,7 @@ mod spanish {
 // =========================================================================
 mod french {
     use super::*;
-    use piper_core::phonemize::french::FrenchPhonemizer;
+    use piper_plus::phonemize::french::FrenchPhonemizer;
 
     #[test]
     fn test_language_code() {
@@ -452,7 +452,7 @@ mod french {
 // =========================================================================
 mod portuguese {
     use super::*;
-    use piper_core::phonemize::portuguese::PortuguesePhonemizer;
+    use piper_plus::phonemize::portuguese::PortuguesePhonemizer;
 
     #[test]
     fn test_language_code() {
@@ -690,9 +690,9 @@ mod portuguese {
 
 mod detect_primary_language {
     use super::*;
-    use piper_core::phonemize::french::FrenchPhonemizer;
-    use piper_core::phonemize::portuguese::PortuguesePhonemizer;
-    use piper_core::phonemize::spanish::SpanishPhonemizer;
+    use piper_plus::phonemize::french::FrenchPhonemizer;
+    use piper_plus::phonemize::portuguese::PortuguesePhonemizer;
+    use piper_plus::phonemize::spanish::SpanishPhonemizer;
 
     // --- Spanish ---
 

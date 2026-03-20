@@ -1,4 +1,4 @@
-use piper_core::batch::*;
+use piper_plus::batch::*;
 use std::path::{Path, PathBuf};
 
 // ===================================================================

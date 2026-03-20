@@ -6,8 +6,8 @@
 //! If the phonemizer cannot be created for any reason (e.g., future external
 //! dependency not available), tests gracefully skip.
 
-use piper_core::phonemize::chinese::ChinesePhonemizer;
-use piper_core::phonemize::Phonemizer;
+use piper_plus::phonemize::chinese::ChinesePhonemizer;
+use piper_plus::phonemize::Phonemizer;
 
 fn try_create() -> Option<ChinesePhonemizer> {
     // ChinesePhonemizer requires pinyin dictionary JSON files.

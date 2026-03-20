@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use anyhow::{Context, Result};
 use clap::Parser;
 
-use piper_core::{audio, config, input::JsonlReader, OnnxEngine, PiperVoice, VoiceConfig};
+use piper_plus::{audio, config, input::JsonlReader, OnnxEngine, PiperVoice, VoiceConfig};
 
 /// サポートされている言語コード
 const SUPPORTED_LANGUAGES: &[&str] = &["ja", "en", "zh", "ko", "es", "fr", "pt"];
@@ -99,7 +99,7 @@ fn main() -> Result<()> {
 
     // --list-devices: デバイス一覧表示 (モデル不要)
     if cli.list_devices {
-        let devices = piper_core::device::enumerate_devices();
+        let devices = piper_plus::device::enumerate_devices();
         println!("Available devices:");
         for dev in devices {
             println!("  {}", dev);
@@ -109,7 +109,7 @@ fn main() -> Result<()> {
 
     // --list-models: モデル一覧表示 (モデル不要)
     if cli.list_models {
-        let models = piper_core::model_download::builtin_registry();
+        let models = piper_plus::model_download::builtin_registry();
         println!("Available models:");
         for model in models {
             println!(
@@ -260,7 +260,7 @@ fn main() -> Result<()> {
 
         if cli.stream {
             // --stream --text: センテンス単位で分割して逐次合成
-            let sentences = piper_core::streaming::split_sentences(text);
+            let sentences = piper_plus::streaming::split_sentences(text);
             if sentences.is_empty() {
                 anyhow::bail!("No sentences found in input text");
             }
@@ -327,11 +327,11 @@ fn main() -> Result<()> {
                     // phoneme_ids からトークン名を推定 (簡易版: ID をそのまま使用)
                     let tokens: Vec<String> =
                         (0..durations.len()).map(|i| format!("ph_{}", i)).collect();
-                    match piper_core::timing::durations_to_timing(
+                    match piper_plus::timing::durations_to_timing(
                         durations,
                         &tokens,
                         result.sample_rate,
-                        piper_core::timing::DEFAULT_HOP_LENGTH,
+                        piper_plus::timing::DEFAULT_HOP_LENGTH,
                     ) {
                         Ok(timing) => {
                             let output = match format.as_str() {

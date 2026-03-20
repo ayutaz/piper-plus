@@ -320,16 +320,91 @@ jobs:
             "piper-plus-cli-${{ matrix.rid }}.${{ matrix.archive_ext }}" \
             --clobber
 
+  # Publish to NuGet
+  publish_nuget:
+    name: Publish to NuGet
+    needs: create_release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4.2.2
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            9.0.x
+
+      - name: Pack NuGet packages
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          dotnet pack src/csharp/PiperPlus.Core/PiperPlus.Core.csproj \
+            -c Release -p:Version="$VERSION" -o nupkgs/
+          dotnet pack src/csharp/PiperPlus.Cli/PiperPlus.Cli.csproj \
+            -c Release -p:Version="$VERSION" -o nupkgs/
+          echo "Packages created:"
+          ls -lh nupkgs/
+
+      - name: Publish to NuGet
+        env:
+          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+        run: |
+          if [ -n "$NUGET_API_KEY" ]; then
+            for pkg in nupkgs/*.nupkg; do
+              dotnet nuget push "$pkg" \
+                --api-key "$NUGET_API_KEY" \
+                --source https://api.nuget.org/v3/index.json \
+                --skip-duplicate
+            done
+          else
+            echo "⚠️ NUGET_API_KEY not found, skipping NuGet publish"
+          fi
+
+  # Publish to crates.io
+  publish_crates:
+    name: Publish to crates.io
+    needs: create_release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4.2.2
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Publish piper-plus (core)
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        working-directory: src/rust
+        run: |
+          if [ -n "$CARGO_REGISTRY_TOKEN" ]; then
+            cargo publish -p piper-plus --allow-dirty
+          else
+            echo "⚠️ CARGO_REGISTRY_TOKEN not found, skipping crates.io publish"
+          fi
+
+      - name: Publish piper-plus-cli
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        working-directory: src/rust
+        run: |
+          if [ -n "$CARGO_REGISTRY_TOKEN" ]; then
+            # Wait for crates.io index to update
+            sleep 30
+            cargo publish -p piper-plus-cli --allow-dirty
+          else
+            echo "⚠️ CARGO_REGISTRY_TOKEN not found, skipping crates.io publish"
+          fi
+
   # Final summary
   release_summary:
     name: Release Summary
     runs-on: ubuntu-latest
-    needs: [create_release, build_all, publish_pypi, csharp-cli]
+    needs: [create_release, build_all, publish_pypi, publish_nuget, publish_crates, csharp-cli]
     if: always()
     steps:
       - name: Summary
         run: |
-          echo "## 📊 Release Summary"
+          echo "## Release Summary"
           echo ""
           echo "**Release Name:** ${{ needs.create_release.outputs.release_name }}"
           echo "**Tag:** ${{ needs.create_release.outputs.tag_name }}"
@@ -338,18 +413,14 @@ jobs:
           echo "- Create Release: ${{ needs.create_release.result }}"
           echo "- Build All: ${{ needs.build_all.result }}"
           echo "- Publish PyPI: ${{ needs.publish_pypi.result }}"
+          echo "- Publish NuGet: ${{ needs.publish_nuget.result }}"
+          echo "- Publish crates.io: ${{ needs.publish_crates.result }}"
           echo "- C# CLI: ${{ needs.csharp-cli.result }}"
           echo ""
 
-          BUILD_ALL="${{ needs.build_all.result }}"
-          CSHARP_CLI="${{ needs.csharp-cli.result }}"
-
           echo "## Release Summary" >> $GITHUB_STEP_SUMMARY
-          echo "- C++/Python Build: $BUILD_ALL" >> $GITHUB_STEP_SUMMARY
-          echo "- C# CLI: $CSHARP_CLI" >> $GITHUB_STEP_SUMMARY
-
-          if [[ "$BUILD_ALL" == "success" ]] && [[ "$CSHARP_CLI" == "success" ]]; then
-            echo "✅ All builds successful" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "❌ Build failures detected" >> $GITHUB_STEP_SUMMARY
-          fi
+          echo "- C++/Python Build: ${{ needs.build_all.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- PyPI: ${{ needs.publish_pypi.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- NuGet: ${{ needs.publish_nuget.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- crates.io: ${{ needs.publish_crates.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- C# CLI: ${{ needs.csharp-cli.result }}" >> $GITHUB_STEP_SUMMARY

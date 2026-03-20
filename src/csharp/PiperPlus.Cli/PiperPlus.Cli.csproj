@@ -14,14 +14,19 @@
 
     <!-- NuGet Package Metadata -->
     <PackageId>PiperPlus.Cli</PackageId>
-    <PackageVersion>0.0.0</PackageVersion>
+    <Version>0.1.0</Version>
     <Authors>ayousanz</Authors>
     <Description>Piper Plus TTS — C# CLI for neural text-to-speech synthesis</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/ayutaz/piper-plus</PackageProjectUrl>
     <RepositoryUrl>https://github.com/ayutaz/piper-plus</RepositoryUrl>
     <PackageTags>tts;text-to-speech;piper;onnx;vits</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="../../../README.md" Pack="true" PackagePath="/" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="System.CommandLine" Version="2.0.5" />

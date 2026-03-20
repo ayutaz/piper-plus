@@ -1949,18 +1949,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8b870d8c151b6f2fb93e84a13146138f05d02ed11c7e7c54f8826aaaf7c9f184"
 
 [[package]]
-name = "piper-cli"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "clap",
- "piper-core",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
-name = "piper-core"
+name = "piper-plus"
 version = "0.1.0"
 dependencies = [
  "hound",
@@ -1979,11 +1968,22 @@ dependencies = [
 ]
 
 [[package]]
-name = "piper-python"
+name = "piper-plus-cli"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "piper-plus",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "piper-plus-python"
 version = "0.1.0"
 dependencies = [
  "numpy",
- "piper-core",
+ "piper-plus",
  "pyo3",
 ]
 

@@ -1,11 +1,11 @@
 //! Integration tests for multilingual phonemizer and Unicode language detection.
 //!
 //! Validates `UnicodeLanguageDetector`, `segment_text`, and
-//! `default_post_process_ids` from `piper_core::phonemize::multilingual`.
+//! `default_post_process_ids` from `piper_plus::phonemize::multilingual`.
 
 use std::collections::HashMap;
 
-use piper_core::phonemize::multilingual::{
+use piper_plus::phonemize::multilingual::{
     default_post_process_ids, segment_text, UnicodeLanguageDetector,
 };
 

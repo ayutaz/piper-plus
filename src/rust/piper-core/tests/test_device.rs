@@ -7,7 +7,7 @@
 
 use std::str::FromStr;
 
-use piper_core::device::*;
+use piper_plus::device::*;
 
 // =========================================================================
 // DeviceSelection constructors

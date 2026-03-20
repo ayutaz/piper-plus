@@ -249,7 +249,7 @@ pub fn download_model(
 /// # Examples
 ///
 /// ```
-/// # use piper_core::model_download::huggingface_url;
+/// # use piper_plus::model_download::huggingface_url;
 /// let url = huggingface_url("ayousanz/piper-plus-tsukuyomi-chan", "model.onnx");
 /// assert_eq!(url, "https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/model.onnx");
 /// ```
