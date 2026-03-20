@@ -99,8 +99,11 @@ func frWord(word string) []string {
 		if c == 'q' && at(1) == 'u' { ph = append(ph, "k"); i += 2; continue }
 		if c == 'g' && at(1) == 'u' && i+2 < n && frSo[rs[i+2]] { ph = append(ph, "\u0261"); i += 2; continue }
 		// Nasal vowels: V + n/m
-		if (c == 'a' || c == 'e') && (at(1) == 'n' || at(1) == 'm') && (i+2 >= n || (!frV[rs[i+2]] && rs[i+2] != rs[i+1])) {
-			ph = append(ph, "\u0251\u0303"); i += 2; continue
+		if c == 'a' && (at(1) == 'n' || at(1) == 'm') && (i+2 >= n || (!frV[rs[i+2]] && rs[i+2] != rs[i+1])) {
+			ph = append(ph, "\u0251\u0303"); i += 2; continue // am/an → ɑ̃
+		}
+		if c == 'e' && (at(1) == 'n' || at(1) == 'm') && (i+2 >= n || (!frV[rs[i+2]] && rs[i+2] != rs[i+1])) {
+			ph = append(ph, "\u025b\u0303"); i += 2; continue // em/en → ɛ̃
 		}
 		if c == 'i' && (at(1) == 'n' || at(1) == 'm') && (i+2 >= n || (!frV[rs[i+2]] && rs[i+2] != rs[i+1])) {
 			ph = append(ph, "\u025b\u0303"); i += 2; continue

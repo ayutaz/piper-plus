@@ -1,6 +1,10 @@
 package phonemize
 
-import "unicode/utf8"
+import (
+	"fmt"
+	"sync"
+	"unicode/utf8"
+)
 
 // fixedPUA maps multi-character phoneme tokens to single PUA codepoints.
 // 87 entries total, covering JA, ZH, KO, ES/PT, FR, and shared tokens.
@@ -108,6 +112,17 @@ var fixedPUA = map[string]rune{
 // reversePUA maps PUA codepoints back to multi-character tokens.
 var reversePUA map[rune]string
 
+// dynamicPUA maps unknown multi-char tokens to dynamically allocated PUA codepoints.
+// This mirrors Python's token_mapper.py behavior of allocating PUA codepoints on the fly.
+var (
+	dynamicPUA  = make(map[string]string)
+	dynamicMu   sync.Mutex
+	nextDynamic = rune(0xE059) // Start after last fixed PUA (0xE058 = ɔ̃)
+)
+
+// maxPUA is the upper bound of the Unicode Private Use Area (BMP).
+const maxPUA = rune(0xF8FF)
+
 func init() {
 	reversePUA = make(map[rune]string, len(fixedPUA))
 	for token, r := range fixedPUA {
@@ -117,6 +132,8 @@ func init() {
 
 // RegisterToken maps a multi-character phoneme token to a single PUA codepoint.
 // Single-character tokens are returned as-is.
+// Unknown multi-char tokens are dynamically allocated a PUA codepoint (thread-safe),
+// mirroring Python's token_mapper.py behavior.
 func RegisterToken(token string) string {
 	if r, ok := fixedPUA[token]; ok {
 		return string(r)
@@ -125,8 +142,26 @@ func RegisterToken(token string) string {
 	if utf8.RuneCountInString(token) == 1 {
 		return token
 	}
-	// Multi-char token not in PUA map — return as-is (caller handles unknown).
-	return token
+
+	// Multi-char token not in fixed PUA map — dynamically allocate a PUA codepoint.
+	dynamicMu.Lock()
+	defer dynamicMu.Unlock()
+
+	if mapped, ok := dynamicPUA[token]; ok {
+		return mapped
+	}
+
+	if nextDynamic > maxPUA {
+		// PUA space exhausted; return token unchanged as a fallback.
+		return token
+	}
+
+	r := nextDynamic
+	nextDynamic++
+	mapped := string(r)
+	dynamicPUA[token] = mapped
+	reversePUA[r] = token
+	return mapped
 }
 
 // PUAToToken reverses a PUA codepoint back to the multi-character token.
@@ -134,6 +169,29 @@ func PUAToToken(ch rune) (string, bool) {
 	token, ok := reversePUA[ch]
 	return token, ok
 }
+
+// DynamicPUACount returns the number of dynamically allocated PUA codepoints.
+func DynamicPUACount() int {
+	dynamicMu.Lock()
+	defer dynamicMu.Unlock()
+	return len(dynamicPUA)
+}
+
+// ResetDynamicPUA clears all dynamically allocated PUA mappings.
+// Intended for testing only.
+func ResetDynamicPUA() {
+	dynamicMu.Lock()
+	defer dynamicMu.Unlock()
+	for token := range dynamicPUA {
+		r, _ := utf8.DecodeRuneInString(dynamicPUA[token])
+		delete(reversePUA, r)
+	}
+	dynamicPUA = make(map[string]string)
+	nextDynamic = 0xE059
+}
+
+// ErrPUAExhausted is returned when the PUA codepoint space is exhausted.
+var ErrPUAExhausted = fmt.Errorf("PUA codepoint space exhausted (max U+%04X)", maxPUA)
 
 // MapSequence applies RegisterToken to each token in a slice.
 func MapSequence(tokens []string) []string {

@@ -29,10 +29,12 @@ RUN apk add --no-cache ca-certificates libstdc++
 # Override TARGETARCH for cross-compilation (e.g. aarch64).
 ARG ORT_VERSION=1.21.0
 ARG TARGETARCH=x86_64
-RUN wget -q https://github.com/microsoft/onnxruntime/releases/download/v${ORT_VERSION}/onnxruntime-linux-${TARGETARCH}-${ORT_VERSION}.tgz \
+RUN set -eux \
+    && wget -q https://github.com/microsoft/onnxruntime/releases/download/v${ORT_VERSION}/onnxruntime-linux-${TARGETARCH}-${ORT_VERSION}.tgz \
     && tar xzf onnxruntime-linux-${TARGETARCH}-${ORT_VERSION}.tgz \
     && cp onnxruntime-linux-${TARGETARCH}-${ORT_VERSION}/lib/libonnxruntime.so /usr/lib/ \
-    && rm -rf onnxruntime-*
+    && rm -rf onnxruntime-* \
+    && ldconfig /usr/lib || true
 
 # Copy the statically-linked Go binary from the build stage
 COPY --from=builder /piper-plus /usr/local/bin/piper-plus
@@ -43,6 +45,10 @@ ENV ONNX_RUNTIME_SHARED_LIBRARY_PATH=/usr/lib/libonnxruntime.so
 # Default directory for mounting ONNX voice models
 ENV PIPER_MODEL_DIR=/models
 RUN mkdir -p /models
+
+# Run as non-root user for security
+RUN adduser -D -h /app piper
+USER piper
 
 WORKDIR /app
 ENTRYPOINT ["piper-plus"]

@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -66,6 +67,9 @@ func (s *Server) ListenAndServe(addr string) error {
 		Addr:              addr,
 		Handler:           s.mux,
 		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      120 * time.Second,
+		IdleTimeout:       120 * time.Second,
 	}
 	return srv.ListenAndServe()
 }
@@ -96,6 +100,12 @@ func (s *Server) handleSynthesize(w http.ResponseWriter, r *http.Request) {
 	case http.MethodGet:
 		req, err = parseSynthesizeQuery(r)
 	case http.MethodPost:
+		ct := r.Header.Get("Content-Type")
+		if !strings.Contains(ct, "application/json") {
+			writeError(w, http.StatusUnsupportedMediaType, "Content-Type must be application/json")
+			return
+		}
+		r.Body = http.MaxBytesReader(w, r.Body, 1*1024*1024) // 1 MB limit
 		err = json.NewDecoder(r.Body).Decode(&req)
 	default:
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
@@ -135,7 +145,7 @@ func (s *Server) handleSynthesize(w http.ResponseWriter, r *http.Request) {
 	result, err := s.voice.Synthesize(ctx, req.Text, opts...)
 	if err != nil {
 		s.logger.Error("synthesis failed", "error", err, "text", req.Text)
-		writeError(w, http.StatusInternalServerError, fmt.Sprintf("synthesis failed: %v", err))
+		writeError(w, http.StatusInternalServerError, "synthesis failed")
 		return
 	}
 
@@ -146,7 +156,9 @@ func (s *Server) handleSynthesize(w http.ResponseWriter, r *http.Request) {
 	)
 
 	w.Header().Set("Content-Type", "audio/wav")
-	result.WriteTo(w)
+	if _, err := result.WriteTo(w); err != nil {
+		s.logger.Error("failed to write response", "error", err)
+	}
 }
 
 func parseSynthesizeQuery(r *http.Request) (synthesizeRequest, error) {

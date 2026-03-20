@@ -1,7 +1,9 @@
 package phonemize
 
 import (
+	"sync"
 	"testing"
+	"unicode/utf8"
 )
 
 func TestRegisterToken_FixedPUA(t *testing.T) {
@@ -75,6 +77,99 @@ func TestMapSequence(t *testing.T) {
 			t.Errorf("MapSequence[%d] = %q, want %q", i, got[i], expected[i])
 		}
 	}
+}
+
+func TestRegisterToken_DynamicPUA(t *testing.T) {
+	ResetDynamicPUA()
+	defer ResetDynamicPUA()
+
+	// Unknown multi-char token should get dynamically allocated.
+	token := "xx_unknown"
+	mapped := RegisterToken(token)
+
+	// Should be a single rune (PUA codepoint), not the original multi-char token.
+	if utf8.RuneCountInString(mapped) != 1 {
+		t.Fatalf("RegisterToken(%q) returned %q (len=%d runes), want single rune",
+			token, mapped, utf8.RuneCountInString(mapped))
+	}
+
+	r, _ := utf8.DecodeRuneInString(mapped)
+	if r != 0xE059 {
+		t.Errorf("RegisterToken(%q) allocated U+%04X, want U+E059", token, r)
+	}
+
+	// Calling again with the same token should return the same mapping.
+	mapped2 := RegisterToken(token)
+	if mapped2 != mapped {
+		t.Errorf("RegisterToken(%q) second call = %q, want %q (same as first)", token, mapped2, mapped)
+	}
+
+	// Reverse mapping should work.
+	got, ok := PUAToToken(r)
+	if !ok {
+		t.Errorf("PUAToToken(U+%04X) returned ok=false after dynamic allocation", r)
+	}
+	if got != token {
+		t.Errorf("PUAToToken(U+%04X) = %q, want %q", r, got, token)
+	}
+
+	if DynamicPUACount() != 1 {
+		t.Errorf("DynamicPUACount() = %d, want 1", DynamicPUACount())
+	}
+}
+
+func TestRegisterToken_DynamicPUA_ThreadSafety(t *testing.T) {
+	ResetDynamicPUA()
+	defer ResetDynamicPUA()
+
+	const goroutines = 50
+	var wg sync.WaitGroup
+	wg.Add(goroutines)
+
+	results := make([]string, goroutines)
+	for i := range goroutines {
+		go func(idx int) {
+			defer wg.Done()
+			// Each goroutine registers the same token; all should get the same mapping.
+			results[idx] = RegisterToken("concurrent_test_token")
+		}(i)
+	}
+	wg.Wait()
+
+	// All results should be identical.
+	for i := 1; i < goroutines; i++ {
+		if results[i] != results[0] {
+			t.Errorf("goroutine %d got %q, goroutine 0 got %q", i, results[i], results[0])
+		}
+	}
+
+	// Should have allocated exactly 1 dynamic PUA codepoint.
+	if DynamicPUACount() != 1 {
+		t.Errorf("DynamicPUACount() = %d, want 1 (concurrent registration of same token)", DynamicPUACount())
+	}
+}
+
+func TestResetDynamicPUA(t *testing.T) {
+	ResetDynamicPUA()
+
+	RegisterToken("reset_test_token")
+	if DynamicPUACount() != 1 {
+		t.Fatalf("DynamicPUACount() = %d before reset, want 1", DynamicPUACount())
+	}
+
+	ResetDynamicPUA()
+	if DynamicPUACount() != 0 {
+		t.Errorf("DynamicPUACount() = %d after reset, want 0", DynamicPUACount())
+	}
+
+	// After reset, the same starting PUA codepoint should be reused.
+	mapped := RegisterToken("reset_test_token_2")
+	r, _ := utf8.DecodeRuneInString(mapped)
+	if r != 0xE059 {
+		t.Errorf("after reset, first dynamic allocation = U+%04X, want U+E059", r)
+	}
+
+	ResetDynamicPUA()
 }
 
 func TestPostProcessIDs_BasicPadding(t *testing.T) {

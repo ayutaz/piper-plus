@@ -37,6 +37,16 @@ var ptPunct = map[rune]bool{'.': true, ',': true, ';': true, ':': true, '!': tru
 var ptCons = map[rune]bool{'b': true, 'd': true, 'f': true, '\u0261': true, 'k': true, 'l': true,
 	'm': true, 'n': true, 'p': true, '\u0272': true, '\u027E': true, '\u0281': true,
 	's': true, '\u0283': true, 't': true, '\u028E': true, 'v': true, 'w': true, 'z': true, '\u0292': true}
+// ptConsStr is a string-based consonant phoneme set that includes multi-char
+// phonemes (e.g. "tʃ", "dʒ") which ptCons (rune-based) cannot represent.
+var ptConsStr = map[string]bool{
+	"b": true, "d": true, "f": true, "\u0261": true, "k": true, "l": true,
+	"m": true, "n": true, "p": true, "\u0272": true, "\u027E": true, "\u0281": true,
+	"s": true, "\u0283": true, "t": true, "\u028E": true, "v": true, "w": true,
+	"z": true, "\u0292": true,
+	// multi-char consonant phonemes produced by ptConvert
+	"t\u0283": true, "d\u0292": true,
+}
 var ptNasV = map[string]bool{"\u00e3": true, "\u1ebd": true, "\u0129": true, "\u00f5": true, "\u0169": true}
 var ptFunc = map[string]bool{"o": true, "a": true, "os": true, "as": true, "um": true, "uma": true,
 	"de": true, "do": true, "da": true, "dos": true, "das": true, "em": true,
@@ -178,7 +188,7 @@ func ptCodaL(p []string) []string {
 		if s != "l" { continue }
 		if i == len(r)-1 { r[i] = "w"; continue }
 		nx := r[i+1]
-		if nx == " " || ptPunct[[]rune(nx)[0]] || ptCons[[]rune(nx)[0]] { r[i] = "w" }
+		if nx == " " || ptPunct[[]rune(nx)[0]] || ptConsStr[nx] { r[i] = "w" }
 	}
 	return r
 }

@@ -30,6 +30,9 @@ func (r *SynthesisResult) WriteTo(w io.Writer) (int64, error) {
 	buf.Write(pcm)
 
 	n, err := w.Write(buf.Bytes())
+	if err == nil && n < buf.Len() {
+		return int64(n), io.ErrShortWrite
+	}
 	return int64(n), err
 }
 
@@ -70,10 +73,14 @@ func (r *SynthesisResult) AudioFloat32() []float32 {
 // normalization. The peak amplitude is mapped to 32767; samples are clamped
 // to [-32767, 32767].
 func peakNormalize(audioFloat []float32) []int16 {
-	// Find peak amplitude.
+	// Find peak amplitude, skipping NaN/Inf values.
 	var peak float64
 	for _, s := range audioFloat {
-		if a := math.Abs(float64(s)); a > peak {
+		v := float64(s)
+		if math.IsNaN(v) || math.IsInf(v, 0) {
+			continue
+		}
+		if a := math.Abs(v); a > peak {
 			peak = a
 		}
 	}
@@ -83,11 +90,11 @@ func peakNormalize(audioFloat []float32) []int16 {
 	out := make([]int16, len(audioFloat))
 	for i, s := range audioFloat {
 		v := float64(s) * scale
-		// Clamp to int16 range.
+		// Clamp to int16 range [MinInt16, MaxInt16].
 		if v > math.MaxInt16 {
 			v = math.MaxInt16
-		} else if v < -math.MaxInt16 {
-			v = -math.MaxInt16
+		} else if v < math.MinInt16 {
+			v = math.MinInt16
 		}
 		out[i] = int16(v)
 	}
@@ -96,9 +103,14 @@ func peakNormalize(audioFloat []float32) []int16 {
 
 // writeWAVHeader writes a 44-byte RIFF WAV header for PCM 16-bit mono audio.
 func writeWAVHeader(w io.Writer, sampleRate, numSamples int) error {
-	dataSize := uint32(numSamples * 2)
-	fileSize := uint32(36 + numSamples*2)
-	byteRate := uint32(sampleRate * 2)
+	const (
+		channels       = 1
+		bytesPerSample = 2 // 16-bit
+	)
+	dataSize := uint32(numSamples * bytesPerSample)
+	fileSize := uint32(36 + numSamples*bytesPerSample) // 36 = header size (44) minus RIFF chunk prefix (8)
+	// byteRate = sampleRate * channels * bytesPerSample
+	byteRate := uint32(sampleRate * channels * bytesPerSample)
 
 	// RIFF chunk descriptor.
 	if _, err := w.Write([]byte("RIFF")); err != nil {
@@ -121,19 +133,19 @@ func writeWAVHeader(w io.Writer, sampleRate, numSamples int) error {
 	if err := binary.Write(w, binary.LittleEndian, uint16(1)); err != nil { // PCM format
 		return err
 	}
-	if err := binary.Write(w, binary.LittleEndian, uint16(1)); err != nil { // mono
+	if err := binary.Write(w, binary.LittleEndian, uint16(channels)); err != nil { // mono
 		return err
 	}
 	if err := binary.Write(w, binary.LittleEndian, uint32(sampleRate)); err != nil {
 		return err
 	}
-	if err := binary.Write(w, binary.LittleEndian, byteRate); err != nil {
+	if err := binary.Write(w, binary.LittleEndian, byteRate); err != nil { // sampleRate * channels * bytesPerSample
 		return err
 	}
-	if err := binary.Write(w, binary.LittleEndian, uint16(2)); err != nil { // block align
+	if err := binary.Write(w, binary.LittleEndian, uint16(channels*bytesPerSample)); err != nil { // block align = channels * bytesPerSample
 		return err
 	}
-	if err := binary.Write(w, binary.LittleEndian, uint16(16)); err != nil { // bits per sample
+	if err := binary.Write(w, binary.LittleEndian, uint16(bytesPerSample*8)); err != nil { // bits per sample = bytesPerSample * 8
 		return err
 	}
 
@@ -151,9 +163,9 @@ func writeWAVHeader(w io.Writer, sampleRate, numSamples int) error {
 // pcmToBytes converts a slice of int16 PCM samples to a little-endian byte
 // slice.
 func pcmToBytes(samples []int16) []byte {
-	buf := make([]byte, 0, len(samples)*2)
-	for _, s := range samples {
-		buf = binary.LittleEndian.AppendUint16(buf, uint16(s))
+	buf := make([]byte, len(samples)*2)
+	for i, s := range samples {
+		binary.LittleEndian.PutUint16(buf[i*2:], uint16(s))
 	}
 	return buf
 }

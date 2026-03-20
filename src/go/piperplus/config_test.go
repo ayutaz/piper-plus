@@ -123,6 +123,54 @@ func TestLoadConfig_InvalidMissingAudio(t *testing.T) {
 	}
 }
 
+func TestLoadConfig_InvalidZeroSpeakers(t *testing.T) {
+	_, err := LoadConfig(filepath.Join("testdata", "invalid_zero_speakers.json"))
+	if err == nil {
+		t.Fatal("LoadConfig should return an error when num_speakers == 0")
+	}
+
+	var cfgErr *ConfigError
+	if !errors.As(err, &cfgErr) {
+		t.Errorf("error type = %T, want *ConfigError", err)
+	}
+}
+
+func TestLoadConfig_InvalidZeroLanguages(t *testing.T) {
+	_, err := LoadConfig(filepath.Join("testdata", "invalid_zero_languages.json"))
+	if err == nil {
+		t.Fatal("LoadConfig should return an error when num_languages == 0")
+	}
+
+	var cfgErr *ConfigError
+	if !errors.As(err, &cfgErr) {
+		t.Errorf("error type = %T, want *ConfigError", err)
+	}
+}
+
+func TestLoadConfig_InvalidMultilingualNoLangMap(t *testing.T) {
+	_, err := LoadConfig(filepath.Join("testdata", "invalid_multilingual_no_lang_map.json"))
+	if err == nil {
+		t.Fatal("LoadConfig should return an error for multilingual model with empty language_id_map")
+	}
+
+	var cfgErr *ConfigError
+	if !errors.As(err, &cfgErr) {
+		t.Errorf("error type = %T, want *ConfigError", err)
+	}
+}
+
+func TestLoadConfig_InvalidMultiSpeakerNoSpeakerMap(t *testing.T) {
+	_, err := LoadConfig(filepath.Join("testdata", "invalid_multispeaker_no_speaker_map.json"))
+	if err == nil {
+		t.Fatal("LoadConfig should return an error for multi-speaker model with empty speaker_id_map")
+	}
+
+	var cfgErr *ConfigError
+	if !errors.As(err, &cfgErr) {
+		t.Errorf("error type = %T, want *ConfigError", err)
+	}
+}
+
 // ---------------------------------------------------------------------------
 // FindConfigPath tests
 // ---------------------------------------------------------------------------
@@ -188,6 +236,24 @@ func TestFindConfigPath_NotFound(t *testing.T) {
 	_, err := FindConfigPath("", modelPath)
 	if err == nil {
 		t.Fatal("FindConfigPath should return an error when no config is found")
+	}
+
+	var cfgErr *ConfigError
+	if !errors.As(err, &cfgErr) {
+		t.Errorf("error type = %T, want *ConfigError", err)
+	}
+}
+
+func TestFindConfigPath_EnvVarFileNotFound(t *testing.T) {
+	// When PIPER_DEFAULT_CONFIG is explicitly set but the file doesn't exist,
+	// FindConfigPath should return an error instead of silently falling through.
+	t.Setenv("PIPER_DEFAULT_CONFIG", "/nonexistent/path/config.json")
+
+	dir := t.TempDir()
+	modelPath := filepath.Join(dir, "model.onnx")
+	_, err := FindConfigPath("", modelPath)
+	if err == nil {
+		t.Fatal("FindConfigPath should return an error when PIPER_DEFAULT_CONFIG points to a non-existent file")
 	}
 
 	var cfgErr *ConfigError

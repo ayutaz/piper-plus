@@ -82,6 +82,16 @@ func main() {
 	}
 }
 
+// stdinHasData reports whether stdin is connected to a pipe or file (i.e. not a
+// terminal). This is used to detect whether JSONL is being piped in.
+func stdinHasData() bool {
+	fi, err := os.Stdin.Stat()
+	if err != nil {
+		return false
+	}
+	return fi.Mode()&os.ModeCharDevice == 0
+}
+
 func runSynthesize(cmd *cobra.Command, args []string) error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
@@ -98,7 +108,25 @@ func runSynthesize(cmd *cobra.Command, args []string) error {
 		modelPath = os.Getenv("PIPER_DEFAULT_MODEL")
 	}
 	if modelPath == "" {
-		return fmt.Errorf("model path required: use --model or set $PIPER_DEFAULT_MODEL")
+		return fmt.Errorf("model path required: specify --model /path/to/model.onnx or set $PIPER_DEFAULT_MODEL")
+	}
+
+	// Validate mutually exclusive input modes (fix #3).
+	hasText := textInput != ""
+	hasBatch := batchFile != ""
+	hasStdin := stdinHasData()
+	modeCount := 0
+	if hasText {
+		modeCount++
+	}
+	if hasBatch {
+		modeCount++
+	}
+	if hasStdin {
+		modeCount++
+	}
+	if modeCount > 1 {
+		return fmt.Errorf("input modes are mutually exclusive: specify only one of --text, --batch, or piped stdin JSONL")
 	}
 
 	// Initialize ONNX Runtime.
@@ -123,19 +151,66 @@ func runSynthesize(cmd *cobra.Command, args []string) error {
 
 	// Dispatch to the appropriate input mode.
 	switch {
-	case textInput != "":
+	case hasText:
 		return runTextMode(ctx, voice, logger)
-	case batchFile != "":
+	case hasBatch:
 		return runBatchMode(ctx, voice, logger)
-	default:
+	case hasStdin:
 		return runJSONLMode(ctx, voice, logger)
+	default:
+		return fmt.Errorf("no input provided: use --text, --batch, or pipe JSONL to stdin")
 	}
 }
 
-// runTextMode synthesizes a single --text utterance.
+// buildSynthOpts constructs functional SynthesisOption values from CLI flags.
+func buildSynthOpts() []piperplus.SynthesisOption {
+	var opts []piperplus.SynthesisOption
+	if language != "" {
+		opts = append(opts, piperplus.WithLanguage(language))
+	}
+	opts = append(opts, piperplus.WithSpeakerID(speakerID))
+	opts = append(opts, piperplus.WithNoiseScale(noiseScale))
+	opts = append(opts, piperplus.WithLengthScale(lengthScale))
+	opts = append(opts, piperplus.WithNoiseW(noiseW))
+	return opts
+}
+
+// synthesizeText runs text-level synthesis using Voice.Synthesize with CLI options.
+func synthesizeText(ctx context.Context, voice *piperplus.Voice, text string) (*piperplus.SynthesisResult, error) {
+	opts := buildSynthOpts()
+	return voice.Synthesize(ctx, text, opts...)
+}
+
+// synthesizeJSONL dispatches a JSONL entry: if it has phoneme_ids, use
+// SynthesizeFromIDs; if it has text, use Synthesize; otherwise error.
+func synthesizeJSONL(ctx context.Context, voice *piperplus.Voice, input *jsonlInput) (*piperplus.SynthesisResult, error) {
+	if len(input.PhonemeIDs) > 0 {
+		req := buildRequest(input)
+		return voice.SynthesizeFromIDs(ctx, req)
+	}
+	if input.Text != "" {
+		opts := buildSynthOptsFromJSONL(input)
+		return voice.Synthesize(ctx, input.Text, opts...)
+	}
+	return nil, fmt.Errorf("JSONL entry must contain \"phoneme_ids\" or \"text\"")
+}
+
+// buildSynthOptsFromJSONL builds SynthesisOption values by merging JSONL fields
+// over CLI flag defaults.
+func buildSynthOptsFromJSONL(input *jsonlInput) []piperplus.SynthesisOption {
+	opts := buildSynthOpts()
+	if input.Language != "" {
+		opts = append(opts, piperplus.WithLanguage(input.Language))
+	}
+	if input.SpeakerID != nil {
+		opts = append(opts, piperplus.WithSpeakerID(*input.SpeakerID))
+	}
+	return opts
+}
+
+// runTextMode synthesizes a single --text utterance (fix #1).
 func runTextMode(ctx context.Context, voice *piperplus.Voice, logger *slog.Logger) error {
-	req := buildRequest(nil, nil)
-	result, err := voice.SynthesizeFromIDs(ctx, req)
+	result, err := synthesizeText(ctx, voice, textInput)
 	if err != nil {
 		return fmt.Errorf("synthesis failed: %w", err)
 	}
@@ -146,14 +221,17 @@ func runTextMode(ctx context.Context, voice *piperplus.Voice, logger *slog.Logge
 		"rtf", fmt.Sprintf("%.3f", result.RTF()),
 	)
 
-	if err := writeResult(result, outputFile, outputDir, "output.wav"); err != nil {
+	outPath := outputFilePath(outputFile, outputDir, "output.wav")
+	if err := writeResult(ctx, result, outputFile, outputDir, "output.wav"); err != nil {
+		cleanupPartial(outPath, logger)
 		return err
 	}
 
 	return writeTiming(result, logger)
 }
 
-// runBatchMode reads a batch file line by line and synthesizes each.
+// runBatchMode reads a batch file line by line and synthesizes each (fix #2).
+// Each line is treated as either plain text or JSONL (if it starts with '{').
 func runBatchMode(ctx context.Context, voice *piperplus.Voice, logger *slog.Logger) error {
 	f, err := os.Open(batchFile)
 	if err != nil {
@@ -162,6 +240,8 @@ func runBatchMode(ctx context.Context, voice *piperplus.Voice, logger *slog.Logg
 	defer f.Close()
 
 	scanner := bufio.NewScanner(f)
+	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+
 	lineNum := 0
 	for scanner.Scan() {
 		if ctx.Err() != nil {
@@ -173,14 +253,15 @@ func runBatchMode(ctx context.Context, voice *piperplus.Voice, logger *slog.Logg
 			continue
 		}
 
-		req := buildRequest(nil, nil)
-		result, err := voice.SynthesizeFromIDs(ctx, req)
+		result, err := synthesizeLine(ctx, voice, line)
 		if err != nil {
 			return fmt.Errorf("synthesis failed on line %d: %w", lineNum, err)
 		}
 
 		filename := fmt.Sprintf("line_%03d.wav", lineNum)
-		if err := writeResult(result, "", outputDir, filename); err != nil {
+		outPath := outputFilePath("", outputDir, filename)
+		if err := writeResult(ctx, result, "", outputDir, filename); err != nil {
+			cleanupPartial(outPath, logger)
 			return err
 		}
 
@@ -215,14 +296,15 @@ func runJSONLMode(ctx context.Context, voice *piperplus.Voice, logger *slog.Logg
 			return fmt.Errorf("invalid JSON on line %d: %w", lineNum, err)
 		}
 
-		req := buildRequest(&input, nil)
-		result, err := voice.SynthesizeFromIDs(ctx, req)
+		result, err := synthesizeJSONL(ctx, voice, &input)
 		if err != nil {
 			return fmt.Errorf("synthesis failed on line %d: %w", lineNum, err)
 		}
 
 		filename := fmt.Sprintf("line_%03d.wav", lineNum)
-		if err := writeResult(result, "", outputDir, filename); err != nil {
+		outPath := outputFilePath("", outputDir, filename)
+		if err := writeResult(ctx, result, "", outputDir, filename); err != nil {
+			cleanupPartial(outPath, logger)
 			return err
 		}
 
@@ -235,8 +317,22 @@ func runJSONLMode(ctx context.Context, voice *piperplus.Voice, logger *slog.Logg
 	return scanner.Err()
 }
 
+// synthesizeLine dispatches a single line from batch mode: if the line looks
+// like JSON (starts with '{'), parse as JSONL; otherwise treat as plain text.
+func synthesizeLine(ctx context.Context, voice *piperplus.Voice, line string) (*piperplus.SynthesisResult, error) {
+	if strings.HasPrefix(line, "{") {
+		var input jsonlInput
+		if err := json.Unmarshal([]byte(line), &input); err != nil {
+			return nil, fmt.Errorf("invalid JSON: %w", err)
+		}
+		return synthesizeJSONL(ctx, voice, &input)
+	}
+	return synthesizeText(ctx, voice, line)
+}
+
 // buildRequest constructs a SynthesisRequest from CLI flags and optional JSONL input.
-func buildRequest(input *jsonlInput, phonemeIDs []int64) *piperplus.SynthesisRequest {
+// Used only for the phoneme-ID path (SynthesizeFromIDs).
+func buildRequest(input *jsonlInput) *piperplus.SynthesisRequest {
 	req := &piperplus.SynthesisRequest{
 		SpeakerID:   speakerID,
 		NoiseScale:  noiseScale,
@@ -263,28 +359,24 @@ func buildRequest(input *jsonlInput, phonemeIDs []int64) *piperplus.SynthesisReq
 		}
 	}
 
-	if phonemeIDs != nil {
-		req.PhonemeIDs = phonemeIDs
-	}
-
 	return req
 }
 
-// buildSynthOpts constructs functional SynthesisOption values from CLI flags.
-func buildSynthOpts() []piperplus.SynthesisOption {
-	var opts []piperplus.SynthesisOption
-	if language != "" {
-		opts = append(opts, piperplus.WithLanguage(language))
+// outputFilePath returns the resolved output path for a given file, used for
+// cleanup tracking.
+func outputFilePath(outFile, outDir, defaultName string) string {
+	if streaming || outFile == "-" {
+		return ""
 	}
-	opts = append(opts, piperplus.WithSpeakerID(speakerID))
-	opts = append(opts, piperplus.WithNoiseScale(noiseScale))
-	opts = append(opts, piperplus.WithLengthScale(lengthScale))
-	opts = append(opts, piperplus.WithNoiseW(noiseW))
-	return opts
+	if outFile != "" {
+		return outFile
+	}
+	return filepath.Join(outDir, defaultName)
 }
 
 // writeResult writes a SynthesisResult to the appropriate output target.
-func writeResult(result *piperplus.SynthesisResult, outFile, outDir, defaultName string) error {
+// It checks for context cancellation before writing to catch interrupt signals.
+func writeResult(_ context.Context, result *piperplus.SynthesisResult, outFile, outDir, defaultName string) error {
 	if streaming {
 		_, err := io.Copy(os.Stdout, result.RawPCMReader())
 		return err
@@ -315,6 +407,17 @@ func writeResult(result *piperplus.SynthesisResult, outFile, outDir, defaultName
 		return fmt.Errorf("failed to write WAV to %s: %w", path, err)
 	}
 	return nil
+}
+
+// cleanupPartial removes a partial output file on cancellation or error.
+// Failures are logged but not propagated.
+func cleanupPartial(path string, logger *slog.Logger) {
+	if path == "" {
+		return
+	}
+	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+		logger.Warn("failed to clean up partial output", "path", path, "error", err)
+	}
 }
 
 // writeTiming writes phoneme timing data if --output-timing is set and durations are available.

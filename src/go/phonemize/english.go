@@ -73,15 +73,18 @@ var functionWords = map[string]bool{
 	// articles / determiners
 	"a": true, "an": true, "the": true,
 	// pronouns
-	"i": true, "me": true, "my": true, "you": true, "your": true,
-	"he": true, "him": true, "his": true, "she": true, "her": true,
-	"it": true, "its": true, "we": true, "us": true, "our": true,
-	"they": true, "them": true, "their": true,
+	"i": true, "me": true, "my": true, "mine": true, "myself": true,
+	"you": true, "your": true, "yours": true, "yourself": true,
+	"he": true, "him": true, "his": true, "himself": true,
+	"she": true, "her": true, "hers": true, "herself": true,
+	"it": true, "its": true, "itself": true,
+	"we": true, "us": true, "our": true, "ours": true, "ourselves": true,
+	"they": true, "them": true, "their": true, "theirs": true, "themselves": true,
 	// be-verbs
 	"am": true, "is": true, "are": true, "was": true, "were": true,
 	"be": true, "been": true, "being": true,
 	// auxiliaries
-	"have": true, "has": true, "had": true,
+	"have": true, "has": true, "had": true, "having": true,
 	"do": true, "does": true, "did": true,
 	"will": true, "would": true, "can": true, "could": true,
 	"shall": true, "should": true, "may": true, "might": true, "must": true,
@@ -89,15 +92,15 @@ var functionWords = map[string]bool{
 	"at": true, "by": true, "for": true, "from": true, "in": true,
 	"of": true, "on": true, "to": true, "with": true,
 	"about": true, "after": true, "before": true, "between": true,
-	"into": true, "through": true,
+	"into": true, "through": true, "under": true,
 	// conjunctions
-	"and": true, "but": true, "or": true, "if": true, "that": true,
-	"than": true, "as": true, "when": true, "while": true,
-	"because": true, "since": true, "so": true, "yet": true, "nor": true,
+	"and": true, "but": true, "or": true, "nor": true,
+	"so": true, "yet": true,
+	"if": true, "that": true, "than": true,
+	"when": true, "while": true, "as": true,
+	"because": true, "since": true,
 	// others
 	"not": true, "no": true,
-	"what": true, "who": true, "which": true, "where": true, "how": true,
-	"all": true, "some": true, "any": true, "each": true, "every": true,
 }
 
 // ---------------------------------------------------------------------------
@@ -242,6 +245,10 @@ func tokenizeText(text string) []textToken {
 
 // PhonemizeWithProsody converts English text to IPA phoneme tokens with prosody.
 func (p *EnglishPhonemizer) PhonemizeWithProsody(text string) (*PhonemizeResult, error) {
+	if strings.TrimSpace(text) == "" {
+		return &PhonemizeResult{EOSToken: "$"}, nil
+	}
+
 	tokens := tokenizeText(text)
 
 	var phonemes []string

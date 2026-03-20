@@ -11,7 +11,7 @@ import (
 // For multilingual models, creates MultilingualPhonemizer.
 // For single-language models, creates the language-specific phonemizer.
 func createPhonemizer(config *VoiceConfig, dataDir string) (phonemize.Phonemizer, error) {
-	if config.IsMultilingual() && len(config.LanguageIDMap) > 1 {
+	if config.IsMultilingual() {
 		return createMultilingualPhonemizer(config)
 	}
 	return createSingleLanguagePhonemizer(config)
@@ -20,15 +20,8 @@ func createPhonemizer(config *VoiceConfig, dataDir string) (phonemize.Phonemizer
 // createMultilingualPhonemizer builds a MultilingualPhonemizer from the config's
 // LanguageIDMap. Japanese is skipped if no G2P engine is available.
 func createMultilingualPhonemizer(config *VoiceConfig) (phonemize.Phonemizer, error) {
-	languages := make([]string, 0, len(config.LanguageIDMap))
+	phonemizers := make(map[string]phonemize.Phonemizer, len(config.LanguageIDMap))
 	for lang := range config.LanguageIDMap {
-		languages = append(languages, lang)
-	}
-
-	defaultLatinLang := phonemize.DefaultLatinLanguage(languages)
-
-	phonemizers := make(map[string]phonemize.Phonemizer, len(languages))
-	for _, lang := range languages {
 		p, err := phonemizerForLanguage(lang)
 		if err != nil {
 			// Japanese requires a G2P engine; skip gracefully.
@@ -38,8 +31,20 @@ func createMultilingualPhonemizer(config *VoiceConfig) (phonemize.Phonemizer, er
 	}
 
 	if len(phonemizers) == 0 {
-		return nil, fmt.Errorf("no phonemizers could be created for languages %v", languages)
+		allLangs := make([]string, 0, len(config.LanguageIDMap))
+		for lang := range config.LanguageIDMap {
+			allLangs = append(allLangs, lang)
+		}
+		return nil, fmt.Errorf("no phonemizers could be created for languages %v", allLangs)
 	}
+
+	// Build the languages list from successfully created phonemizers only.
+	languages := make([]string, 0, len(phonemizers))
+	for lang := range phonemizers {
+		languages = append(languages, lang)
+	}
+
+	defaultLatinLang := phonemize.DefaultLatinLanguage(languages)
 
 	return phonemize.NewMultilingualPhonemizer(languages, defaultLatinLang, phonemizers), nil
 }
@@ -71,9 +76,17 @@ func phonemizerForLanguage(lang string) (phonemize.Phonemizer, error) {
 	case "ja":
 		return nil, fmt.Errorf("Japanese requires G2P engine")
 	case "en":
-		return phonemize.NewEnglishPhonemizer(nil), nil
+		p := phonemize.NewEnglishPhonemizer(nil)
+		if p == nil {
+			return nil, fmt.Errorf("failed to create English phonemizer")
+		}
+		return p, nil
 	case "zh":
-		return phonemize.NewChinesePhonemizer(nil, nil), nil
+		p := phonemize.NewChinesePhonemizer(nil, nil)
+		if p == nil {
+			return nil, fmt.Errorf("failed to create Chinese phonemizer")
+		}
+		return p, nil
 	case "es":
 		return phonemize.NewSpanishPhonemizer(), nil
 	case "fr":
@@ -119,7 +132,7 @@ func (v *Voice) Synthesize(ctx context.Context, text string, opts ...SynthesisOp
 	var phonemeIDs []int64
 	var prosody []*phonemize.ProsodyInfo
 
-	if v.config.IsMultilingual() && len(v.config.LanguageIDMap) > 1 {
+	if v.config.IsMultilingual() {
 		phonemeIDs, prosody = phonemize.PostProcessMultilingualIDs(result, v.config.PhonemeIDMap)
 	} else {
 		ids := phonemize.TokensToIDs(result.Tokens, v.config.PhonemeIDMap)
@@ -144,9 +157,11 @@ func (v *Voice) Synthesize(ctx context.Context, text string, opts ...SynthesisOp
 	// Resolve language ID from options + config.
 	var languageID int64
 	if so.Language != "" {
-		if lid, ok := v.config.LanguageIDMap[so.Language]; ok {
-			languageID = lid
+		lid, ok := v.config.LanguageIDMap[so.Language]
+		if !ok {
+			return nil, fmt.Errorf("piperplus: unknown language %q; available: %v", so.Language, v.config.LanguageIDMap)
 		}
+		languageID = lid
 	}
 
 	// Build request and delegate to engine.

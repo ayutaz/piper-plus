@@ -49,6 +49,8 @@ func ParseDevice(device string) (DeviceType, error) {
 	parts := strings.SplitN(lower, ":", 2)
 	provider := parts[0]
 
+	const maxDeviceID = 255
+
 	var deviceID int
 	if len(parts) == 2 {
 		id, err := strconv.Atoi(parts[1])
@@ -57,6 +59,9 @@ func ParseDevice(device string) (DeviceType, error) {
 		}
 		if id < 0 {
 			return DeviceType{}, fmt.Errorf("piperplus: negative device ID %d in %q", id, device)
+		}
+		if id > maxDeviceID {
+			return DeviceType{}, fmt.Errorf("piperplus: device ID %d exceeds maximum (%d) in %q", id, maxDeviceID, device)
 		}
 		deviceID = id
 	}
@@ -180,6 +185,12 @@ func appendTensorRT(sessOpts *ort.SessionOptions, deviceID int) error {
 
 // autoSelectEP tries execution providers in priority order: CUDA → CoreML →
 // DirectML → CPU. The first provider that succeeds is used.
+//
+// NOTE: A failed AppendExecutionProvider* call may leave partial state inside
+// the ONNX Runtime SessionOptions. ONNX Runtime's EP list is append-only, so
+// failed attempts may remain registered but inactive. In practice the runtime
+// ignores EPs it cannot initialise, and the final successful EP (or the
+// default CPU EP) is the one actually used for inference.
 func autoSelectEP(sessOpts *ort.SessionOptions, logger *slog.Logger) DeviceType {
 	// Try CUDA first.
 	if err := appendCUDA(sessOpts, 0); err == nil {

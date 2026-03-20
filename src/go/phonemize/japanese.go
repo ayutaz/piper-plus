@@ -52,7 +52,7 @@ func (p *JapanesePhonemizer) LanguageCode() string {
 
 var (
 	rePhoneme = regexp.MustCompile(`-([^+]+)\+`)
-	reA1      = regexp.MustCompile(`/A:([-\d]+)\+`)
+	reA1      = regexp.MustCompile(`/A:([0-9\-]+)\+`)
 	reA2      = regexp.MustCompile(`\+(\d+)\+`)
 	reA3      = regexp.MustCompile(`\+(\d+)/`)
 )
@@ -246,6 +246,9 @@ var velars = map[string]bool{
 //   - N_n      : before alveolar (n, ny, t, ty, d, dy, ts, ch)
 //   - N_ng     : before velar (k, ky, kw, g, gy, gw)
 //   - N_uvular : at phrase end or before vowels/other consonants
+//
+// This is a 1-to-1 replacement (each "N" maps to exactly one variant token),
+// so the token count is unchanged and the prosody array stays aligned.
 func applyNPhonemeRules(tokens []string) []string {
 	result := make([]string, 0, len(tokens))
 

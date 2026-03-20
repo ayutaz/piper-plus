@@ -10,6 +10,15 @@ import (
 // It handles multiple languages: Japanese (。！？), Chinese (。！？), and
 // Western (.!?). Punctuation is kept attached to the preceding sentence.
 // Splits inside quotes or parentheses are suppressed.
+//
+// Limitations:
+//   - Unmatched brackets: If the input contains unclosed brackets or
+//     parentheses, the nesting depth never returns to zero and the
+//     remaining text is emitted as a single unsplit sentence.
+//   - ASCII double-quote ('"'): Handled via a simple toggle, so nested or
+//     unbalanced ASCII double-quotes will desynchronise the in-quote state.
+//     Use Unicode quotes (\u201c/\u201d) for reliable nesting via the
+//     bracket depth mechanism.
 func SplitSentences(text string) []string {
 	if len(text) == 0 {
 		return nil

@@ -2,8 +2,8 @@ package piperplus
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
-	"sync"
 	"sync/atomic"
 
 	"github.com/ayutaz/piper-plus/src/go/phonemize"
@@ -16,7 +16,6 @@ type Voice struct {
 	phonemizer phonemize.Phonemizer
 	logger     *slog.Logger
 	closed     atomic.Bool
-	mu         sync.Mutex // protects Close
 }
 
 // LoadVoice loads a TTS model from modelPath and returns a Voice ready for synthesis.
@@ -65,11 +64,15 @@ func LoadVoice(ctx context.Context, modelPath string, opts ...LoadOption) (*Voic
 		return nil, err
 	}
 
-	// Try to create a phonemizer. Failure is non-fatal: the user can still
-	// use SynthesizeFromIDs with pre-computed phoneme IDs.
+	// Try to create a phonemizer. For "text" phoneme type, failure is non-fatal
+	// since the user provides pre-computed phoneme IDs. For all other types,
+	// a working phonemizer is required.
 	var ph phonemize.Phonemizer
 	ph, err = createPhonemizer(config, "")
 	if err != nil {
+		if config.PhonemeType != PhonemeTypeText {
+			return nil, fmt.Errorf("piperplus: phonemizer required for phoneme_type %q: %w", config.PhonemeType, err)
+		}
 		logger.Warn("phonemizer not available; use SynthesizeFromIDs for direct phoneme input",
 			"reason", err.Error())
 	}
@@ -89,6 +92,9 @@ func (v *Voice) SynthesizeFromIDs(ctx context.Context, req *SynthesisRequest) (*
 	if v.closed.Load() {
 		return nil, ErrModelClosed
 	}
+	if req == nil {
+		return nil, fmt.Errorf("piperplus: nil synthesis request")
+	}
 	return v.engine.Synthesize(ctx, req)
 }
 
@@ -98,12 +104,11 @@ func (v *Voice) Close() error {
 	if !v.closed.CompareAndSwap(false, true) {
 		return nil
 	}
-	v.mu.Lock()
-	defer v.mu.Unlock()
 	return v.engine.Close()
 }
 
-// Config returns the voice configuration (read-only).
+// Config returns the voice configuration. The returned pointer is shared
+// with the Voice; callers must NOT modify the returned VoiceConfig.
 func (v *Voice) Config() *VoiceConfig {
 	return v.config
 }

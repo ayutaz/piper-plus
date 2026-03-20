@@ -31,6 +31,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          # NOTE: sparse-checkout only fetches src/go/. Integration tests that
+          # reference test models outside this path (e.g. test/models/) will not
+          # find them here. Those tests run in the integration-test job which
+          # does a full checkout.
           sparse-checkout: src/go
       - uses: actions/setup-go@v5
         with:
@@ -80,6 +84,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          # NOTE: sparse-checkout only fetches src/go/. This is sufficient for
+          # linting since golangci-lint only needs the Go source files.
           sparse-checkout: src/go
       - uses: actions/setup-go@v5
         with:

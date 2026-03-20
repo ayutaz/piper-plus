@@ -4,10 +4,15 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"math"
 	"time"
 
 	ort "github.com/yalue/onnxruntime_go"
 )
+
+// maxPhonemeLen is the upper bound for phoneme input length to prevent
+// excessively large tensor allocations.
+const maxPhonemeLen = 10000
 
 // ModelCapabilities detected from ONNX graph.
 type ModelCapabilities struct {
@@ -109,6 +114,10 @@ func newOnnxEngine(modelPath string, config *VoiceConfig, sessOpts *ort.SessionO
 
 // Synthesize runs ONNX inference for the given synthesis request.
 func (e *OnnxEngine) Synthesize(ctx context.Context, req *SynthesisRequest) (*SynthesisResult, error) {
+	if e.session == nil {
+		return nil, ErrModelClosed
+	}
+
 	if len(req.PhonemeIDs) == 0 {
 		return nil, ErrEmptyPhonemeIDs
 	}
@@ -119,6 +128,11 @@ func (e *OnnxEngine) Synthesize(ctx context.Context, req *SynthesisRequest) (*Sy
 	}
 
 	phonemeLen := len(req.PhonemeIDs)
+	if phonemeLen > maxPhonemeLen {
+		return nil, &InferenceError{
+			Msg: fmt.Sprintf("phoneme length %d exceeds maximum %d", phonemeLen, maxPhonemeLen),
+		}
+	}
 
 	// Collect all input tensors for cleanup.
 	var tensors []ort.Value
@@ -209,12 +223,15 @@ func (e *OnnxEngine) Synthesize(ctx context.Context, req *SynthesisRequest) (*Sy
 	defer runOpts.Destroy()
 
 	// Spawn goroutine to watch for context cancellation.
+	cancelled := make(chan struct{})
 	done := make(chan struct{})
 	defer close(done)
 	go func() {
 		select {
 		case <-ctx.Done():
+			e.logger.Debug("context cancelled, terminating inference", "reason", ctx.Err())
 			runOpts.Terminate()
+			close(cancelled)
 		case <-done:
 		}
 	}()
@@ -222,13 +239,42 @@ func (e *OnnxEngine) Synthesize(ctx context.Context, req *SynthesisRequest) (*Sy
 	// Run inference.
 	start := time.Now()
 	if err := e.session.RunWithOptions(inputs, outputs, runOpts); err != nil {
-		// Check if it was a context cancellation.
+		// Destroy any auto-allocated output tensors on error.
+		for i, o := range outputs {
+			if o != nil {
+				o.Destroy()
+				outputs[i] = nil
+			}
+		}
+		// Determine whether the error is from context cancellation or an
+		// inference failure. Check the cancelled channel (non-blocking) to
+		// avoid racing on ctx.Err() alone.
+		select {
+		case <-cancelled:
+			e.logger.Info("inference terminated due to context cancellation",
+				"elapsed", time.Since(start))
+			return nil, ctx.Err()
+		default:
+		}
 		if ctx.Err() != nil {
+			e.logger.Info("inference failed with concurrent context cancellation",
+				"elapsed", time.Since(start), "err", err)
 			return nil, ctx.Err()
 		}
 		return nil, &InferenceError{Msg: "ONNX inference failed", Err: err}
 	}
 	inferTime := time.Since(start)
+
+	// Destroy all auto-allocated output tensors when we are done.
+	// This prevents memory leaks when type assertions fail or errors occur.
+	defer func() {
+		for i, o := range outputs {
+			if o != nil {
+				o.Destroy()
+				outputs[i] = nil
+			}
+		}
+	}()
 
 	// Extract audio from the first output tensor.
 	audioOutputTensor, ok := outputs[0].(*ort.Tensor[float32])
@@ -236,18 +282,26 @@ func (e *OnnxEngine) Synthesize(ctx context.Context, req *SynthesisRequest) (*Sy
 		return nil, &InferenceError{Msg: "unexpected output tensor type for audio", Err: nil}
 	}
 	rawAudio := audioOutputTensor.GetData()
-	// Copy data before destroying the tensor.
+	// Copy data before the deferred Destroy runs.
 	audioCopy := make([]float32, len(rawAudio))
 	copy(audioCopy, rawAudio)
-	audioOutputTensor.Destroy()
+
+	// Check for NaN/Inf in audio output which indicates inference failure.
+	for i, s := range audioCopy {
+		if math.IsNaN(float64(s)) || math.IsInf(float64(s), 0) {
+			return nil, &InferenceError{
+				Msg: fmt.Sprintf("audio output contains NaN/Inf at sample %d", i),
+			}
+		}
+	}
 
 	// Peak-normalize and convert to int16.
 	audio := peakNormalize(audioCopy)
 
-	// Calculate audio duration.
+	// Calculate audio duration using integer arithmetic for precision.
 	var audioDuration time.Duration
 	if len(audio) > 0 && e.sampleRate > 0 {
-		audioDuration = time.Duration(float64(len(audio)) / float64(e.sampleRate) * float64(time.Second))
+		audioDuration = time.Duration(int64(len(audio)) * int64(time.Second) / int64(e.sampleRate))
 	}
 
 	// Extract durations if available.
@@ -258,9 +312,21 @@ func (e *OnnxEngine) Synthesize(ctx context.Context, req *SynthesisRequest) (*Sy
 			rawDur := durTensor.GetData()
 			durations = make([]float32, len(rawDur))
 			copy(durations, rawDur)
-			durTensor.Destroy()
+			if len(durations) != phonemeLen {
+				e.logger.Warn("duration count does not match phoneme length",
+					"durations", len(durations), "phoneme_len", phonemeLen)
+			}
+		} else {
+			e.logger.Warn("unexpected tensor type for duration output; durations unavailable")
 		}
 	}
+
+	e.logger.Debug("inference complete",
+		"phoneme_len", phonemeLen,
+		"audio_samples", len(audio),
+		"audio_duration", audioDuration,
+		"infer_time", inferTime,
+	)
 
 	return &SynthesisResult{
 		Audio:      audio,

@@ -1,6 +1,6 @@
 package phonemize
 
-import "log"
+import "log/slog"
 
 // ProsodyInfo holds A1/A2/A3 prosody values per phoneme.
 type ProsodyInfo struct {
@@ -32,7 +32,10 @@ func TokensToIDs(tokens []string, phonemeIDMap map[string][]int64) []int64 {
 		if idList, ok := phonemeIDMap[mapped]; ok {
 			ids = append(ids, idList...)
 		} else {
-			log.Printf("WARNING: unknown phoneme token %q (mapped %q), skipping", tok, mapped)
+			slog.Warn("unknown phoneme token, skipping",
+				"token", tok,
+				"mapped", mapped,
+			)
 		}
 	}
 	return ids
@@ -43,8 +46,10 @@ func TokensToIDs(tokens []string, phonemeIDMap map[string][]int64) []int64 {
 // Japanese handles BOS/EOS inline (no-op).
 //
 // Algorithm:
-//  1. Intersperse padding: after each phoneme ID, insert pad token
-//     EXCEPT if the current ID is already a pad token (skip to avoid double-pad)
+//  1. Intersperse padding: after each phoneme ID, insert pad token (ID 0 by default).
+//     EXCEPT if the current ID is already a pad token (skip to avoid double-pad).
+//     This produces the pattern: [ph1, pad, ph2, pad, ...] which VITS expects
+//     for monotonic alignment search (MAS) to work correctly.
 //  2. Prepend BOS + pad
 //  3. Append EOS
 func PostProcessIDs(

@@ -25,6 +25,11 @@ var eosOnlyTokens = map[string]bool{
 }
 
 // MultilingualPhonemizer routes text segments to language-specific phonemizers.
+//
+// Thread safety: MultilingualPhonemizer is safe for concurrent use.
+// All mutable state (EOSToken tracking) is passed through return values,
+// not shared fields. The underlying per-language phonemizers must also be
+// safe for concurrent use.
 type MultilingualPhonemizer struct {
 	languages            []string
 	defaultLatinLanguage string
@@ -66,6 +71,8 @@ func (m *MultilingualPhonemizer) PhonemizeWithProsody(text string) (*PhonemizeRe
 
 	var allTokens []string
 	var allProsody []*ProsodyInfo
+	// Default EOS is "$" if no segment produces an explicit EOS token
+	// (e.g., "?", "?!", "?.", "?~"). This matches Python's behavior.
 	lastEOS := "$"
 
 	for _, seg := range segments {
@@ -81,6 +88,17 @@ func (m *MultilingualPhonemizer) PhonemizeWithProsody(text string) (*PhonemizeRe
 		result, err := phonemizer.PhonemizeWithProsody(seg.Text)
 		if err != nil {
 			return nil, err
+		}
+
+		// Invariant: len(result.Tokens) == len(result.Prosody) after each
+		// phonemizer call. BOS/EOS tokens always have nil prosody at matching
+		// indices, so filtering them out keeps tokens and prosody aligned.
+		if len(result.Tokens) != len(result.Prosody) {
+			slog.Warn("tokens/prosody length mismatch from phonemizer",
+				"language", seg.Language,
+				"tokens_len", len(result.Tokens),
+				"prosody_len", len(result.Prosody),
+			)
 		}
 
 		// Strip BOS/EOS tokens from this segment's output and track the last EOS.

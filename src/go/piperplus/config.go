@@ -108,11 +108,15 @@ func FindConfigPath(explicitPath, modelPath string) (string, error) {
 		return explicitPath, nil
 	}
 
-	// 2. Environment variable.
+	// 2. Environment variable — if explicitly set, file must exist.
 	if envPath := os.Getenv("PIPER_DEFAULT_CONFIG"); envPath != "" {
-		if _, err := os.Stat(envPath); err == nil {
-			return envPath, nil
+		if _, err := os.Stat(envPath); err != nil {
+			return "", &ConfigError{
+				Path: envPath,
+				Err:  fmt.Errorf("PIPER_DEFAULT_CONFIG set but file not found: %w", err),
+			}
 		}
+		return envPath, nil
 	}
 
 	if modelPath != "" {
@@ -142,6 +146,18 @@ func (c *VoiceConfig) Validate() error {
 	}
 	if c.Audio.SampleRate <= 0 {
 		return fmt.Errorf("audio.sample_rate must be > 0, got %d", c.Audio.SampleRate)
+	}
+	if c.NumSpeakers <= 0 {
+		return fmt.Errorf("num_speakers must be > 0, got %d", c.NumSpeakers)
+	}
+	if c.NumLanguages <= 0 {
+		return fmt.Errorf("num_languages must be > 0, got %d", c.NumLanguages)
+	}
+	if c.NumLanguages > 1 && len(c.LanguageIDMap) == 0 {
+		return fmt.Errorf("language_id_map is required for multilingual models (num_languages=%d)", c.NumLanguages)
+	}
+	if c.NumSpeakers > 1 && len(c.SpeakerIDMap) == 0 {
+		return fmt.Errorf("speaker_id_map is required for multi-speaker models (num_speakers=%d)", c.NumSpeakers)
 	}
 	return nil
 }

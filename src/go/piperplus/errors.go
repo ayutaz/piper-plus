@@ -5,6 +5,15 @@ import (
 	"fmt"
 )
 
+// Compile-time interface checks — ensure all error types satisfy the error interface.
+var (
+	_ error = (*ModelLoadError)(nil)
+	_ error = (*ConfigError)(nil)
+	_ error = (*InferenceError)(nil)
+	_ error = (*PhonemeError)(nil)
+	_ error = (*PhonemeIDNotFoundError)(nil)
+)
+
 // Sentinel errors.
 var (
 	ErrModelClosed     = errors.New("piperplus: voice is closed")
@@ -59,6 +68,8 @@ func (e *InferenceError) Unwrap() error {
 }
 
 // PhonemeError indicates a phonemization error.
+// It intentionally does not implement Unwrap because it carries descriptive
+// fields (Phoneme, Language, Msg) rather than wrapping an underlying error.
 type PhonemeError struct {
 	Phoneme  string
 	Language string

@@ -1,6 +1,9 @@
 package piperplus
 
-import "log/slog"
+import (
+	"log/slog"
+	"math"
+)
 
 // ---------------------------------------------------------------------------
 // SynthesisRequest — low-level request used by OnnxEngine.Synthesize and
@@ -43,23 +46,48 @@ func WithLanguage(lang string) SynthesisOption {
 }
 
 // WithSpeakerID sets the speaker ID for multi-speaker models.
+// Negative values are silently ignored.
 func WithSpeakerID(id int64) SynthesisOption {
-	return func(o *SynthesisOptions) { o.SpeakerID = id }
+	return func(o *SynthesisOptions) {
+		if id >= 0 {
+			o.SpeakerID = id
+		}
+	}
 }
 
 // WithNoiseScale sets the generation noise scale.
+// NaN and Inf values are silently ignored.
 func WithNoiseScale(v float32) SynthesisOption {
-	return func(o *SynthesisOptions) { o.NoiseScale = v }
+	return func(o *SynthesisOptions) {
+		if !isInvalidFloat32(v) {
+			o.NoiseScale = v
+		}
+	}
 }
 
 // WithLengthScale sets the speech rate (length scale).
+// NaN and Inf values are silently ignored.
 func WithLengthScale(v float32) SynthesisOption {
-	return func(o *SynthesisOptions) { o.LengthScale = v }
+	return func(o *SynthesisOptions) {
+		if !isInvalidFloat32(v) {
+			o.LengthScale = v
+		}
+	}
 }
 
 // WithNoiseW sets the duration predictor noise scale.
+// NaN and Inf values are silently ignored.
 func WithNoiseW(v float32) SynthesisOption {
-	return func(o *SynthesisOptions) { o.NoiseW = v }
+	return func(o *SynthesisOptions) {
+		if !isInvalidFloat32(v) {
+			o.NoiseW = v
+		}
+	}
+}
+
+// isInvalidFloat32 returns true if v is NaN or +/-Inf.
+func isInvalidFloat32(v float32) bool {
+	return math.IsNaN(float64(v)) || math.IsInf(float64(v), 0)
 }
 
 // WithSentenceSilence sets the silence duration (in seconds) inserted between

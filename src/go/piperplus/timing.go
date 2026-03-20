@@ -3,6 +3,7 @@ package piperplus
 import (
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"math"
 	"strings"
 )
@@ -46,6 +47,12 @@ func DurationsToTiming(durations []float32, phonemeTokens []string, sampleRate, 
 	var totalDurationMs float64
 
 	for i := range durations {
+		if durations[i] < 0 {
+			slog.Warn("negative phoneme duration clamped to 0",
+				"index", i,
+				"phoneme", phonemeTokens[i],
+				"value", durations[i])
+		}
 		durationMs := math.Max(0, float64(durations[i])) * msPerFrame
 		startMs := cumMs
 		endMs := startMs + durationMs
@@ -83,7 +90,9 @@ func (r *TimingResult) ToTSV() string {
 	var b strings.Builder
 	b.WriteString("start_ms\tend_ms\tduration_ms\tphoneme\n")
 	for _, p := range r.Phonemes {
-		b.WriteString(fmt.Sprintf("%.3f\t%.3f\t%.3f\t%s\n", p.StartMs, p.EndMs, p.DurationMs, p.Phoneme))
+		// Escape tab and newline characters in phoneme strings to preserve TSV format.
+		escaped := strings.NewReplacer("\t", `\t`, "\n", `\n`).Replace(p.Phoneme)
+		b.WriteString(fmt.Sprintf("%.3f\t%.3f\t%.3f\t%s\n", p.StartMs, p.EndMs, p.DurationMs, escaped))
 	}
 	return b.String()
 }

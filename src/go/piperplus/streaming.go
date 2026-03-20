@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"math"
 )
 
 // AudioSink receives audio chunks during streaming synthesis.
@@ -57,33 +58,46 @@ func (v *Voice) SynthesizeStream(
 		return sink.Close()
 	}
 
+	// Ensure sink is always closed, even on error paths.
+	var synthErr error
+	defer func() {
+		closeErr := sink.Close()
+		if synthErr == nil {
+			synthErr = closeErr
+		}
+	}()
+
 	so := applySynthesisOptions(opts)
 	sentenceSilence := so.SentenceSilence
 
 	for i, sentence := range sentences {
 		if err := ctx.Err(); err != nil {
-			return err
+			synthErr = err
+			return synthErr
 		}
 
 		result, err := v.Synthesize(ctx, sentence, opts...)
 		if err != nil {
-			return fmt.Errorf("piperplus: streaming synthesis failed on sentence %d: %w", i, err)
+			synthErr = fmt.Errorf("piperplus: streaming synthesis failed on sentence %d: %w", i, err)
+			return synthErr
 		}
 
 		if err := sink.WriteAudio(result.Audio, result.SampleRate); err != nil {
-			return fmt.Errorf("piperplus: sink write failed: %w", err)
+			synthErr = fmt.Errorf("piperplus: sink write failed: %w", err)
+			return synthErr
 		}
 
 		// Insert silence between sentences (not after the last one).
 		if i < len(sentences)-1 && sentenceSilence > 0 && result.SampleRate > 0 {
 			silenceSamples := int(sentenceSilence * float64(result.SampleRate))
 			if err := sink.WriteAudio(make([]int16, silenceSamples), result.SampleRate); err != nil {
-				return fmt.Errorf("piperplus: sink write failed: %w", err)
+				synthErr = fmt.Errorf("piperplus: sink write failed: %w", err)
+				return synthErr
 			}
 		}
 	}
 
-	return sink.Close()
+	return synthErr
 }
 
 // crossfade blends the end of prev with the start of next over overlapSamples
@@ -110,7 +124,14 @@ func crossfade(prev, next []int16, overlapSamples int) []int16 {
 		ratio := float64(i) / float64(overlapSamples)
 		p := float64(prev[len(prev)-overlapSamples+i]) * (1 - ratio)
 		n := float64(next[i]) * ratio
-		out[offset+i] = int16(p + n)
+		// Clamp to [MinInt16, MaxInt16] to prevent integer overflow.
+		sum := p + n
+		if sum > math.MaxInt16 {
+			sum = math.MaxInt16
+		} else if sum < math.MinInt16 {
+			sum = math.MinInt16
+		}
+		out[offset+i] = int16(sum)
 	}
 
 	// Copy the non-overlapping tail of next.

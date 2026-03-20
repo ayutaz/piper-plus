@@ -6,6 +6,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -45,7 +46,10 @@ func DefaultCacheDir() string {
 		return env
 	}
 
-	home, _ := os.UserHomeDir()
+	home, err := os.UserHomeDir()
+	if err != nil {
+		home = os.TempDir()
+	}
 	switch runtime.GOOS {
 	case "darwin":
 		return filepath.Join(home, "Library", "Application Support", "piper-plus", "models")
@@ -69,7 +73,7 @@ func (m *ModelManager) CacheDir() string {
 
 // EnsureDir creates the cache directory if it does not exist.
 func (m *ModelManager) EnsureDir() error {
-	return os.MkdirAll(m.cacheDir, 0755)
+	return os.MkdirAll(m.cacheDir, 0700)
 }
 
 // ListModels returns all downloaded models found in the cache directory.
@@ -126,12 +130,20 @@ func (m *ModelManager) FindModel(name string) (string, error) {
 
 // DownloadModel downloads a model from url into the cache directory.
 // It writes to a temp file then renames for atomicity.
-func (m *ModelManager) DownloadModel(ctx context.Context, url string) (string, error) {
+func (m *ModelManager) DownloadModel(ctx context.Context, rawURL string) (string, error) {
+	// Enforce HTTPS (or file:// for local, http://127.0.0.1 / http://localhost for testing).
+	if !strings.HasPrefix(rawURL, "https://") &&
+		!strings.HasPrefix(rawURL, "file://") &&
+		!strings.HasPrefix(rawURL, "http://127.0.0.1") &&
+		!strings.HasPrefix(rawURL, "http://localhost") {
+		return "", fmt.Errorf("piperplus: download model: URL must use https:// (got %s)", rawURL)
+	}
+
 	if err := m.EnsureDir(); err != nil {
 		return "", fmt.Errorf("piperplus: download model: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
 	if err != nil {
 		return "", fmt.Errorf("piperplus: download model: %w", err)
 	}
@@ -146,10 +158,17 @@ func (m *ModelManager) DownloadModel(ctx context.Context, url string) (string, e
 		return "", fmt.Errorf("piperplus: download model: HTTP %d", resp.StatusCode)
 	}
 
-	// Derive filename from URL path.
-	fileName := filepath.Base(url)
+	// Derive filename from parsed URL path to prevent path traversal.
+	parsedURL, err := url.Parse(rawURL)
+	if err != nil {
+		return "", fmt.Errorf("piperplus: download model: invalid URL: %w", err)
+	}
+	fileName := filepath.Base(parsedURL.Path)
 	if fileName == "" || fileName == "." || fileName == "/" {
 		fileName = "model.onnx"
+	}
+	if strings.Contains(fileName, "..") {
+		return "", fmt.Errorf("piperplus: download model: invalid filename %q", fileName)
 	}
 	destPath := filepath.Join(m.cacheDir, fileName)
 	tmpFile, err := os.CreateTemp(m.cacheDir, "download-*.tmp")
@@ -159,12 +178,19 @@ func (m *ModelManager) DownloadModel(ctx context.Context, url string) (string, e
 	tmpPath := tmpFile.Name()
 
 	written, err := io.Copy(tmpFile, resp.Body)
+	resp.Body.Close() // close explicitly after copy, defer is a safety net
 	if closeErr := tmpFile.Close(); closeErr != nil && err == nil {
 		err = closeErr
 	}
 	if err != nil {
 		os.Remove(tmpPath)
 		return "", fmt.Errorf("piperplus: download model: %w", err)
+	}
+
+	// Restrict file permissions to owner-only.
+	if chmodErr := os.Chmod(tmpPath, 0600); chmodErr != nil {
+		os.Remove(tmpPath)
+		return "", fmt.Errorf("piperplus: download model: chmod: %w", chmodErr)
 	}
 
 	m.logger.Info("model downloaded", "path", destPath, "bytes", written)
