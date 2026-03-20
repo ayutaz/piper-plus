@@ -7,8 +7,8 @@ use std::path::Path;
 use crate::config::VoiceConfig;
 use crate::engine::{OnnxEngine, SynthesisRequest, SynthesisResult};
 use crate::error::PiperError;
-use crate::phonemize::phoneme_converter;
 use crate::phonemize::Phonemizer;
+use crate::phonemize::phoneme_converter;
 
 /// テキストから音声を合成する高レベル API
 pub struct PiperVoice {

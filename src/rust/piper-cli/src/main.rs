@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use anyhow::{Context, Result};
 use clap::Parser;
 
-use piper_plus::{audio, config, input::JsonlReader, OnnxEngine, PiperVoice, VoiceConfig};
+use piper_plus::{OnnxEngine, PiperVoice, VoiceConfig, audio, config, input::JsonlReader};
 
 /// サポートされている言語コード
 const SUPPORTED_LANGUAGES: &[&str] = &["ja", "en", "zh", "ko", "es", "fr", "pt"];
@@ -252,7 +252,10 @@ fn main() -> Result<()> {
                     );
                 }
             } else {
-                tracing::info!("Language specified: {} (model is monolingual, language detection handled by phonemizer)", lang);
+                tracing::info!(
+                    "Language specified: {} (model is monolingual, language detection handled by phonemizer)",
+                    lang
+                );
             }
         } else {
             tracing::info!("Language: auto-detect (from phonemizer)");

@@ -19,8 +19,8 @@ fn test_load_missing_config_fails() {
 }
 
 // Additional tests for phoneme_converter integration
-use piper_plus::phonemize::phoneme_converter;
 use piper_plus::phonemize::ProsodyInfo;
+use piper_plus::phonemize::phoneme_converter;
 use std::collections::HashMap;
 
 #[test]

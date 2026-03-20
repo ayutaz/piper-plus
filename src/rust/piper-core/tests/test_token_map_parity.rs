@@ -4,7 +4,7 @@
 //! If any of these tests fail, the Rust and Python token maps are out of sync,
 //! which will cause model inference to produce wrong phoneme IDs.
 
-use piper_plus::phonemize::token_map::{token_to_pua, FIXED_PUA_MAP};
+use piper_plus::phonemize::token_map::{FIXED_PUA_MAP, token_to_pua};
 
 // =========================================================================
 // Japanese (JA) — U+E000..U+E01C

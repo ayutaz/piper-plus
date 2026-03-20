@@ -1,5 +1,5 @@
-use piper_plus::phonemize::english::EnglishPhonemizer;
 use piper_plus::phonemize::Phonemizer;
+use piper_plus::phonemize::english::EnglishPhonemizer;
 
 fn try_create_phonemizer() -> Option<EnglishPhonemizer> {
     EnglishPhonemizer::new().ok()

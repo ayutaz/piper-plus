@@ -1,6 +1,6 @@
 use piper_plus::error::PiperError;
 use piper_plus::streaming::{
-    crossfade, split_sentences, AudioSink, BufferSink, StreamingResult, WavFileSink,
+    AudioSink, BufferSink, StreamingResult, WavFileSink, crossfade, split_sentences,
 };
 
 // ===================================================================

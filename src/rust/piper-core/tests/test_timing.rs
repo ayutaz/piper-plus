@@ -4,7 +4,7 @@
 //! (JSON / TSV / SRT), edge cases, and timing invariants.
 
 use piper_plus::timing::{
-    durations_to_timing, PhonemeTimingInfo, TimingResult, DEFAULT_HOP_LENGTH,
+    DEFAULT_HOP_LENGTH, PhonemeTimingInfo, TimingResult, durations_to_timing,
 };
 
 // =========================================================================

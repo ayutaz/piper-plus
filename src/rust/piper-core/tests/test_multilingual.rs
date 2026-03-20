@@ -6,7 +6,7 @@
 use std::collections::HashMap;
 
 use piper_plus::phonemize::multilingual::{
-    default_post_process_ids, segment_text, UnicodeLanguageDetector,
+    UnicodeLanguageDetector, default_post_process_ids, segment_text,
 };
 
 // ===========================================================================
@@ -540,7 +540,7 @@ fn test_segment_six_language_detector() {
     assert_eq!(detector.detect_char('\u{3042}', false), Some("ja"));
     // Chinese ideograph (no kana context)
     assert_eq!(detector.detect_char('\u{4F60}', false), Some("zh")); // 你
-                                                                     // Latin -> default (en)
+    // Latin -> default (en)
     assert_eq!(detector.detect_char('A', false), Some("en"));
     // Neutral
     assert_eq!(detector.detect_char('5', false), None);

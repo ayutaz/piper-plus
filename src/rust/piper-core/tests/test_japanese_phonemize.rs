@@ -1,7 +1,7 @@
 #![cfg(feature = "japanese")]
 
-use piper_plus::phonemize::japanese::JapanesePhonemizer;
 use piper_plus::phonemize::Phonemizer;
+use piper_plus::phonemize::japanese::JapanesePhonemizer;
 
 /// Try to create a JapanesePhonemizer.
 /// With naist-jdic feature: uses bundled dictionary.

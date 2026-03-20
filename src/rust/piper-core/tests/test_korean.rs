@@ -1,5 +1,5 @@
-use piper_plus::phonemize::korean::KoreanPhonemizer;
 use piper_plus::phonemize::Phonemizer;
+use piper_plus::phonemize::korean::KoreanPhonemizer;
 
 #[test]
 fn test_language_code() {

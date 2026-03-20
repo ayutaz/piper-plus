@@ -269,7 +269,7 @@ pub fn configure_session_builder(
 
 #[cfg(feature = "cuda")]
 fn is_cuda_available() -> bool {
-    use ort::ep::{ExecutionProvider, CUDA};
+    use ort::ep::{CUDA, ExecutionProvider};
     CUDA::default().is_available().unwrap_or(false)
 }
 
@@ -642,9 +642,11 @@ mod tests {
     #[test]
     fn test_cuda_listed_when_feature_enabled() {
         let devices = list_devices();
-        assert!(devices
-            .iter()
-            .any(|d| matches!(d.device_type, DeviceType::Cuda { .. })));
+        assert!(
+            devices
+                .iter()
+                .any(|d| matches!(d.device_type, DeviceType::Cuda { .. }))
+        );
     }
 
     #[cfg(feature = "coreml")]
@@ -658,18 +660,22 @@ mod tests {
     #[test]
     fn test_directml_listed_when_feature_enabled() {
         let devices = list_devices();
-        assert!(devices
-            .iter()
-            .any(|d| matches!(d.device_type, DeviceType::DirectML { .. })));
+        assert!(
+            devices
+                .iter()
+                .any(|d| matches!(d.device_type, DeviceType::DirectML { .. }))
+        );
     }
 
     #[cfg(feature = "tensorrt")]
     #[test]
     fn test_tensorrt_listed_when_feature_enabled() {
         let devices = list_devices();
-        assert!(devices
-            .iter()
-            .any(|d| matches!(d.device_type, DeviceType::TensorRT { .. })));
+        assert!(
+            devices
+                .iter()
+                .any(|d| matches!(d.device_type, DeviceType::TensorRT { .. }))
+        );
     }
 
     // -----------------------------------------------------------------------
