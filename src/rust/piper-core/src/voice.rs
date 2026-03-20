@@ -111,7 +111,15 @@ impl PiperVoice {
     ) -> Result<Box<dyn Phonemizer>, PiperError> {
         match lang {
             #[cfg(feature = "japanese")]
-            "ja" => Ok(Box::new(Self::create_japanese_phonemizer()?)),
+            "ja" => match Self::create_japanese_phonemizer() {
+                Ok(p) => Ok(Box::new(p)),
+                Err(e) => {
+                    tracing::warn!("Japanese phonemizer unavailable ({}), using passthrough", e);
+                    Ok(Box::new(
+                        crate::phonemize::multilingual::PassthroughPhonemizer::new(lang),
+                    ))
+                }
+            },
             "en" => match Self::create_english_phonemizer(model_dir) {
                 Ok(p) => Ok(Box::new(p)),
                 Err(e) => {
