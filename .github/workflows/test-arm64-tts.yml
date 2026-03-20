@@ -35,8 +35,13 @@ jobs:
           docker run --rm --platform linux/arm64 alpine:latest uname -m
           
           # Test basic compilation in ARM64 environment
-          docker run --rm --platform linux/arm64 ubuntu:22.04 bash -c "
-            apt-get update && apt-get install -y build-essential cmake
+          docker run --rm --platform linux/arm64 --network=host ubuntu:22.04 bash -c "
+            set -e
+            for i in 1 2 3; do
+              apt-get update && apt-get install -y build-essential cmake && break
+              echo \"Retry \$i failed, waiting 5s...\"
+              sleep 5
+            done
             echo 'int main() { return 0; }' > test.c
             gcc test.c -o test
             ./test && echo 'ARM64 compilation works'
@@ -54,8 +59,13 @@ jobs:
           EOF
           
           # Try to compile for ARM64 using Docker
-          docker run --rm --platform linux/arm64 -v $(pwd):/work ubuntu:22.04 bash -c "
-            apt-get update && apt-get install -y gcc
+          docker run --rm --platform linux/arm64 --network=host -v $(pwd):/work ubuntu:22.04 bash -c "
+            set -e
+            for i in 1 2 3; do
+              apt-get update && apt-get install -y gcc && break
+              echo \"Retry \$i failed, waiting 5s...\"
+              sleep 5
+            done
             cd /work
             gcc test-arm64.c -o test-arm64
             file test-arm64
