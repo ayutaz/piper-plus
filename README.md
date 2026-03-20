@@ -328,6 +328,7 @@ echo 'Long text...' | ./bin/piper --model en_model.onnx --output-raw | \
 
 | オプション | 説明 | デフォルト |
 |---|---|---|
+| `--model PATH\|NAME` | モデルファイルのパス、またはモデル名 (ダウンロード済みモデルを自動解決) | - |
 | `--text TEXT` | テキスト直接入力 (パイプ不要) | - |
 | `--streaming` | チャンクベースのストリーミングモード | off |
 | `--use-cuda` | CUDA GPU推論を有効化 | off |
@@ -380,15 +381,15 @@ echo 'Long text...' | ./bin/piper --model en_model.onnx --output-raw | \
 #### モデルのダウンロード
 
 ```bash
-# モデル名を指定してダウンロード
+# モデル名を指定してダウンロード (エイリアスも使用可能)
 ./bin/piper --download-model tsukuyomi
 ./bin/piper --download-model en_US-lessac-medium
 
 # ダウンロード先ディレクトリを指定
 ./bin/piper --download-model tsukuyomi --model-dir /path/to/models
 
-# ダウンロード後、モデルを使用
-./bin/piper --model ~/.local/share/piper/models/ja_JP-tsukuyomi-chan-medium/tsukuyomi-chan-6lang-fp16.onnx --text "こんにちは"
+# ダウンロード後、モデル名で推論 (フルパス不要)
+./bin/piper --model tsukuyomi --text "こんにちは"
 ```
 
 ### 環境変数 (C++ CLI)

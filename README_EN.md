@@ -262,6 +262,7 @@ Key options:
 
 | Option | Description | Default |
 |---|---|---|
+| `--model PATH\|NAME` | Model file path, or model name (auto-resolves downloaded models) | - |
 | `--text TEXT` | Direct text input (no piping required) | - |
 | `--streaming` | Chunk-based streaming mode | off |
 | `--use-cuda` | Enable CUDA GPU inference | off |
@@ -308,15 +309,15 @@ Use `--json-input` flag for JSON input:
 #### Download Models
 
 ```bash
-# Download a model by name
+# Download a model by name (aliases also work)
 ./bin/piper --download-model tsukuyomi
 ./bin/piper --download-model en_US-lessac-medium
 
 # Specify download directory
 ./bin/piper --download-model tsukuyomi --model-dir /path/to/models
 
-# After download, use the model
-./bin/piper --model ~/.local/share/piper/models/ja_JP-tsukuyomi-chan-medium/tsukuyomi-chan-6lang-fp16.onnx --text "こんにちは"
+# After download, use by model name (no full path needed)
+./bin/piper --model tsukuyomi --text "こんにちは"
 ```
 
 ### Environment Variables (C++ CLI)
