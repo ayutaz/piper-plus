@@ -376,7 +376,71 @@ public sealed class EnglishPostProcessIdsTests
     }
 
     // ================================================================
-    // 12. Integration — PostProcessIds via PhonemeEncoder
+    // 12. PostProcessIds_SkipsPadAfterPadToken
+    // ================================================================
+
+    /// <summary>
+    /// When input contains a PAD token (0), no additional PAD should be
+    /// inserted after it. Mirrors the Python conditional:
+    /// <c>if phoneme_id not in pad_ids → skip PAD insertion</c>.
+    /// </summary>
+    [Fact]
+    public void PostProcessIds_SkipsPadAfterPadToken()
+    {
+        var phonemizer = MakePhonemizer();
+        var map = new Dictionary<string, int[]>
+        {
+            ["_"] = [0],
+            ["^"] = [1],
+            ["$"] = [2],
+        };
+
+        var phonemeIds = new List<int> { 10, 0, 11 };
+        var prosody = new List<ProsodyInfo?>
+        {
+            new ProsodyInfo(0, 1, 3),
+            null,
+            new ProsodyInfo(0, 2, 3),
+        };
+
+        var (ids, pros) = phonemizer.PostProcessIds(phonemeIds, prosody, map);
+
+        // Expected: [BOS=1, PAD=0, 10, PAD=0, 0(no extra PAD), 11, PAD=0, EOS=2]
+        Assert.Equal([1, 0, 10, 0, 0, 11, 0, 2], ids);
+        Assert.Equal(ids.Count, pros.Count);
+    }
+
+    // ================================================================
+    // 13. PostProcessIds_AllPadTokens_NoPadInserted
+    // ================================================================
+
+    /// <summary>
+    /// When all input IDs are PAD tokens, no inter-phoneme PAD is inserted
+    /// after any of them. The output is just BOS + PAD + 0 + 0 + EOS.
+    /// </summary>
+    [Fact]
+    public void PostProcessIds_AllPadTokens_NoPadInserted()
+    {
+        var phonemizer = MakePhonemizer();
+        var map = new Dictionary<string, int[]>
+        {
+            ["_"] = [0],
+            ["^"] = [1],
+            ["$"] = [2],
+        };
+
+        var phonemeIds = new List<int> { 0, 0 };
+        var prosody = new List<ProsodyInfo?> { null, null };
+
+        var (ids, pros) = phonemizer.PostProcessIds(phonemeIds, prosody, map);
+
+        // Expected: [BOS=1, PAD=0, 0, 0, EOS=2] (no extra PADs after the 0s)
+        Assert.Equal([1, 0, 0, 0, 2], ids);
+        Assert.Equal(ids.Count, pros.Count);
+    }
+
+    // ================================================================
+    // 14. Integration — PostProcessIds via PhonemeEncoder
     // ================================================================
 
     /// <summary>
@@ -416,6 +480,222 @@ public sealed class EnglishPostProcessIdsTests
 
         // Ids and Prosody must be the same length.
         Assert.Equal(ids.Count, prosody.Count);
+    }
+
+    // ================================================================
+    // 15. PostProcessIds_NoBosInMap — multi-phoneme, no BOS
+    // ================================================================
+
+    /// <summary>
+    /// When "^" is absent from the map and multiple phonemes are given,
+    /// output has no BOS prefix: [PAD, id1, PAD, id2, PAD, EOS].
+    /// Verifies the pattern with more than one phoneme (complements
+    /// <see cref="NoBOS_BosSkipped"/> which tests a single phoneme).
+    /// </summary>
+    [Fact]
+    public void PostProcessIds_NoBosInMap()
+    {
+        var phonemizer = MakePhonemizer();
+        var map = MakeMap();
+        map.Remove("^");
+
+        var inputIds = new List<int> { 10, 11, 12 };
+        var inputProsody = new List<ProsodyInfo?>
+        {
+            new ProsodyInfo(0, 2, 3),
+            new ProsodyInfo(0, 1, 3),
+            new ProsodyInfo(0, 0, 3),
+        };
+
+        var (ids, prosody) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
+
+        // No BOS: 10 + PAD(0) + 11 + PAD(0) + 12 + PAD(0) + EOS(2)
+        Assert.Equal([10, 0, 11, 0, 12, 0, 2], ids);
+        Assert.Equal(ids.Count, prosody.Count);
+
+        // First element is phoneme, not BOS null.
+        Assert.NotNull(prosody[0]);
+        // EOS at the end is null.
+        Assert.Null(prosody[^1]);
+    }
+
+    // ================================================================
+    // 16. PostProcessIds_NoEosInMap — multi-phoneme, no EOS
+    // ================================================================
+
+    /// <summary>
+    /// When "$" is absent from the map and multiple phonemes are given,
+    /// output has no EOS suffix: [BOS, PAD, id1, PAD, id2, PAD, id3, PAD].
+    /// Verifies the pattern with more than one phoneme (complements
+    /// <see cref="NoEOS_EosSkipped"/> which tests a single phoneme).
+    /// </summary>
+    [Fact]
+    public void PostProcessIds_NoEosInMap()
+    {
+        var phonemizer = MakePhonemizer();
+        var map = MakeMap();
+        map.Remove("$");
+
+        var inputIds = new List<int> { 10, 11, 12 };
+        var inputProsody = new List<ProsodyInfo?>
+        {
+            new ProsodyInfo(0, 2, 3),
+            new ProsodyInfo(0, 1, 3),
+            new ProsodyInfo(0, 0, 3),
+        };
+
+        var (ids, prosody) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
+
+        // BOS(1) + PAD(0) + 10 + PAD(0) + 11 + PAD(0) + 12 + PAD(0), no EOS.
+        Assert.Equal([1, 0, 10, 0, 11, 0, 12, 0], ids);
+        Assert.Equal(ids.Count, prosody.Count);
+
+        // BOS and its PAD are null.
+        Assert.Null(prosody[0]);
+        Assert.Null(prosody[1]);
+        // Last element is a trailing PAD (null), not EOS.
+        Assert.Null(prosody[^1]);
+        // Phoneme at index 6 is the last real phoneme.
+        Assert.NotNull(prosody[6]);
+    }
+
+    // ================================================================
+    // 17. PostProcessIds_NoPadInMap — multi-phoneme, default PAD
+    // ================================================================
+
+    /// <summary>
+    /// When "_" is absent from the map with multiple phonemes,
+    /// PAD defaults to [0]. Extends <see cref="NoPadInMap_DefaultsToZero"/>
+    /// (single phoneme) to confirm the default PAD is inserted between
+    /// every phoneme pair.
+    /// </summary>
+    [Fact]
+    public void PostProcessIds_NoPadInMap()
+    {
+        var phonemizer = MakePhonemizer();
+        var map = new Dictionary<string, int[]>
+        {
+            ["^"] = [1],
+            ["$"] = [2],
+            ["h"] = [10],
+            ["\u0259"] = [11],  // ə
+            ["l"] = [12],
+        };
+        // "_" is absent — PAD should fall back to [0].
+
+        var inputIds = new List<int> { 10, 11, 12 };
+        var inputProsody = new List<ProsodyInfo?>
+        {
+            new ProsodyInfo(0, 2, 3),
+            new ProsodyInfo(0, 1, 3),
+            new ProsodyInfo(0, 0, 3),
+        };
+
+        var (ids, prosody) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
+
+        // BOS(1) + PAD(0) + 10 + PAD(0) + 11 + PAD(0) + 12 + PAD(0) + EOS(2)
+        Assert.Equal([1, 0, 10, 0, 11, 0, 12, 0, 2], ids);
+        Assert.Equal(ids.Count, prosody.Count);
+
+        // All PAD positions (indices 1, 3, 5, 7) use fallback value 0.
+        Assert.Equal(0, ids[1]);
+        Assert.Equal(0, ids[3]);
+        Assert.Equal(0, ids[5]);
+        Assert.Equal(0, ids[7]);
+    }
+
+    // ================================================================
+    // 18. PostProcessIds_SinglePhoneme — detailed assertions
+    // ================================================================
+
+    /// <summary>
+    /// A single phoneme [10] produces exactly [BOS(1), PAD(0), 10, PAD(0), EOS(2)].
+    /// Extends <see cref="SinglePhoneme_PadAndBosEosInserted"/> with explicit
+    /// per-index checks for both IDs and prosody.
+    /// </summary>
+    [Fact]
+    public void PostProcessIds_SinglePhoneme()
+    {
+        var phonemizer = MakePhonemizer();
+        var map = MakeMap();
+
+        var inputIds = new List<int> { 10 };
+        var inputProsody = new List<ProsodyInfo?> { new ProsodyInfo(0, 2, 1) };
+
+        var (ids, prosody) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
+
+        // Exact output: [BOS, PAD, 10, PAD, EOS]
+        Assert.Equal(5, ids.Count);
+        Assert.Equal(1, ids[0]);   // BOS
+        Assert.Equal(0, ids[1]);   // PAD
+        Assert.Equal(10, ids[2]);  // phoneme
+        Assert.Equal(0, ids[3]);   // PAD
+        Assert.Equal(2, ids[4]);   // EOS
+
+        // Prosody: only index 2 carries the original prosody.
+        Assert.Equal(5, prosody.Count);
+        Assert.Null(prosody[0]);   // BOS
+        Assert.Null(prosody[1]);   // PAD
+        Assert.NotNull(prosody[2]);
+        Assert.Equal(new ProsodyInfo(0, 2, 1), prosody[2]);
+        Assert.Null(prosody[3]);   // PAD
+        Assert.Null(prosody[4]);   // EOS
+    }
+
+    // ================================================================
+    // 19. PostProcessIds_ProsodyPreservedThroughPadding
+    // ================================================================
+
+    /// <summary>
+    /// Verifies that distinct prosody values survive padding and appear
+    /// at the correct indices in the output. Each phoneme carries a
+    /// unique <see cref="ProsodyInfo"/> so we can confirm positional
+    /// integrity after BOS/PAD insertion.
+    /// </summary>
+    [Fact]
+    public void PostProcessIds_ProsodyPreservedThroughPadding()
+    {
+        var phonemizer = MakePhonemizer();
+        var map = MakeMap();
+
+        var p1 = new ProsodyInfo(A1: -1, A2: 2, A3: 5);
+        var p2 = new ProsodyInfo(A1: 0, A2: 1, A3: 5);
+        var p3 = new ProsodyInfo(A1: 1, A2: 0, A3: 5);
+
+        var inputIds = new List<int> { 10, 11, 12 };
+        var inputProsody = new List<ProsodyInfo?> { p1, p2, p3 };
+
+        var (ids, prosody) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
+
+        // Output layout:
+        // idx: 0     1     2    3     4    5     6    7     8
+        //      BOS   PAD   10   PAD   11   PAD   12   PAD   EOS
+        Assert.Equal(9, ids.Count);
+        Assert.Equal(9, prosody.Count);
+
+        // Phoneme positions carry the exact original prosody values.
+        Assert.Equal(p1, prosody[2]);  // phoneme 10 -> p1
+        Assert.Equal(-1, prosody[2]!.A1);
+        Assert.Equal(2, prosody[2]!.A2);
+        Assert.Equal(5, prosody[2]!.A3);
+
+        Assert.Equal(p2, prosody[4]);  // phoneme 11 -> p2
+        Assert.Equal(0, prosody[4]!.A1);
+        Assert.Equal(1, prosody[4]!.A2);
+        Assert.Equal(5, prosody[4]!.A3);
+
+        Assert.Equal(p3, prosody[6]);  // phoneme 12 -> p3
+        Assert.Equal(1, prosody[6]!.A1);
+        Assert.Equal(0, prosody[6]!.A2);
+        Assert.Equal(5, prosody[6]!.A3);
+
+        // All structural positions (BOS, PADs, EOS) must be null.
+        Assert.Null(prosody[0]);  // BOS
+        Assert.Null(prosody[1]);  // PAD after BOS
+        Assert.Null(prosody[3]);  // PAD after phoneme 10
+        Assert.Null(prosody[5]);  // PAD after phoneme 11
+        Assert.Null(prosody[7]);  // PAD after phoneme 12
+        Assert.Null(prosody[8]);  // EOS
     }
 
     // ================================================================

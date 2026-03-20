@@ -270,4 +270,218 @@ public sealed class PortuguesePhonemizerTests
             Assert.Equal(0, p!.A2);
         }
     }
+
+    // ================================================================
+    // 11. PostProcessIds_SkipsPadAfterPadToken
+    // ================================================================
+
+    [Fact]
+    public void PostProcessIds_SkipsPadAfterPadToken()
+    {
+        // When the input already contains a PAD token (0), no extra PAD
+        // should be inserted after it (avoids double-PAD).
+        var phonemizer = new PortuguesePhonemizer(
+            new StubPortugueseG2PEngine([]));
+
+        // Input: [10, 0, 11] where 0 is PAD.
+        var inputIds = new List<int> { 10, 0, 11 };
+        var inputProsody = new List<ProsodyInfo?>
+        {
+            new(0, 0, 3), null, new(0, 0, 3),
+        };
+        var map = MakeMap();
+
+        var (ids, prosody) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
+
+        // Expected:
+        // BOS(1), PAD(0), 10, PAD(0), 0, 11, PAD(0), EOS(2)
+        // = [1, 0, 10, 0, 0, 11, 0, 2]
+        Assert.Equal([1, 0, 10, 0, 0, 11, 0, 2], ids);
+        Assert.Equal(ids.Count, prosody.Count);
+    }
+
+    // ================================================================
+    // 12. PostProcessIds_EmptyInput
+    // ================================================================
+
+    [Fact]
+    public void PostProcessIds_EmptyInput()
+    {
+        // Empty phoneme list should still produce BOS + PAD + EOS.
+        var phonemizer = new PortuguesePhonemizer(
+            new StubPortugueseG2PEngine([]));
+
+        var inputIds = new List<int>();
+        var inputProsody = new List<ProsodyInfo?>();
+        var map = MakeMap();
+
+        var (ids, prosody) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
+
+        // Expected: [BOS(1), PAD(0), EOS(2)]
+        Assert.Equal([1, 0, 2], ids);
+        Assert.Equal(ids.Count, prosody.Count);
+    }
+
+    // ================================================================
+    // 13. Phonemize_ReturnsTokensOnly
+    // ================================================================
+
+    [Fact]
+    public void Phonemize_ReturnsTokensOnly()
+    {
+        // Phonemize() should return tokens without prosody.
+        var tokens = new List<string> { "b", "\u027e", "a", "z", "\u02c8", "i", "w" };
+
+        var phonemizer = new PortuguesePhonemizer(new StubPortugueseG2PEngine(tokens));
+        var result = phonemizer.Phonemize("Brasil");
+
+        Assert.NotEmpty(result);
+        // Stress marker should be stripped (same behavior as PhonemizeWithProsody).
+        Assert.DoesNotContain("\u02c8", result);
+        // Phonemes should be present.
+        Assert.Contains("b", result);
+        Assert.Contains("i", result);
+    }
+
+    // ================================================================
+    // 14. PhonemizeWithProsody_EmptyInput
+    // ================================================================
+
+    [Fact]
+    public void PhonemizeWithProsody_EmptyInput()
+    {
+        // When the G2P engine returns an empty list, both tokens and
+        // prosody should be empty.
+        var phonemizer = new PortuguesePhonemizer(
+            new StubPortugueseG2PEngine([]));
+
+        var (result, prosody) = phonemizer.PhonemizeWithProsody("");
+
+        Assert.Empty(result);
+        Assert.Empty(prosody);
+    }
+
+    // ================================================================
+    // 15. Punctuation_InvertedMarks
+    // ================================================================
+
+    [Fact]
+    public void Punctuation_InvertedMarks()
+    {
+        // ¡ (U+00A1) and ¿ (U+00BF) should be recognized as punctuation
+        // and receive zero prosody.
+        var tokens = new List<string>
+        {
+            "\u00bf",  // ¿
+            "\u02c8", "b", "o", "m",
+            "\u00a1",  // ¡
+        };
+
+        var phonemizer = new PortuguesePhonemizer(new StubPortugueseG2PEngine(tokens));
+        var (result, prosody) = phonemizer.PhonemizeWithProsody("\u00bfbom\u00a1");
+
+        // ¿ should be present with zero prosody.
+        int qIdx = result.IndexOf("\u00bf");
+        Assert.True(qIdx >= 0, "\u00bf should be present");
+        Assert.NotNull(prosody[qIdx]);
+        Assert.Equal(0, prosody[qIdx]!.A1);
+        Assert.Equal(0, prosody[qIdx]!.A2);
+        Assert.Equal(0, prosody[qIdx]!.A3);
+
+        // ¡ should be present with zero prosody.
+        int eIdx = result.IndexOf("\u00a1");
+        Assert.True(eIdx >= 0, "\u00a1 should be present");
+        Assert.NotNull(prosody[eIdx]);
+        Assert.Equal(0, prosody[eIdx]!.A1);
+        Assert.Equal(0, prosody[eIdx]!.A2);
+        Assert.Equal(0, prosody[eIdx]!.A3);
+    }
+
+    // ================================================================
+    // 16. Punctuation_Dashes
+    // ================================================================
+
+    [Fact]
+    public void Punctuation_Dashes()
+    {
+        // — (U+2014 em dash), – (U+2013 en dash), and … (U+2026 ellipsis)
+        // should all be recognized as punctuation with zero prosody.
+        var tokens = new List<string>
+        {
+            "b", "o", "m",
+            "\u2014",  // —
+            "b", "o", "m",
+            "\u2013",  // –
+            "b", "o", "m",
+            "\u2026",  // …
+        };
+
+        var phonemizer = new PortuguesePhonemizer(new StubPortugueseG2PEngine(tokens));
+        var (result, prosody) = phonemizer.PhonemizeWithProsody("bom\u2014bom\u2013bom\u2026");
+
+        foreach (var punct in new[] { "\u2014", "\u2013", "\u2026" })
+        {
+            int idx = result.IndexOf(punct);
+            Assert.True(idx >= 0, $"{punct} should be present");
+            Assert.NotNull(prosody[idx]);
+            Assert.Equal(0, prosody[idx]!.A1);
+            Assert.Equal(0, prosody[idx]!.A2);
+            Assert.Equal(0, prosody[idx]!.A3);
+        }
+    }
+
+    // ================================================================
+    // 17. StressMarker_AtEndOfWord
+    // ================================================================
+
+    [Fact]
+    public void StressMarker_AtEndOfWord()
+    {
+        // When ˈ appears at the end of a word with no following phoneme,
+        // it should be stripped and no phoneme receives A2=2.
+        var tokens = new List<string> { "b", "o", "m", "\u02c8" };
+
+        var phonemizer = new PortuguesePhonemizer(new StubPortugueseG2PEngine(tokens));
+        var (result, prosody) = phonemizer.PhonemizeWithProsody("bom");
+
+        // ˈ should be stripped from output.
+        Assert.DoesNotContain("\u02c8", result);
+        // All phonemes should be unstressed (A2=0).
+        foreach (var p in prosody)
+        {
+            Assert.NotNull(p);
+            Assert.Equal(0, p!.A2);
+        }
+        // The 3 phonemes should still be present.
+        Assert.Equal(3, result.Count);
+    }
+
+    // ================================================================
+    // 18. NasalVowel_PreservedInOutput
+    // ================================================================
+
+    [Fact]
+    public void NasalVowel_PreservedInOutput()
+    {
+        // NFC nasal vowels (ã, õ, etc.) should pass through the
+        // phonemizer without being altered or stripped.
+        var tokens = new List<string> { "m", "\u00e3", "\u02c8", "\u00f5", "s" };
+        //                                     ã                     õ
+
+        var phonemizer = new PortuguesePhonemizer(new StubPortugueseG2PEngine(tokens));
+        var (result, prosody) = phonemizer.PhonemizeWithProsody("m\u00e3os");
+
+        // ã should be present.
+        Assert.Contains("\u00e3", result);
+        // õ should be present.
+        Assert.Contains("\u00f5", result);
+        // ˈ should be stripped.
+        Assert.DoesNotContain("\u02c8", result);
+        // Alignment check.
+        Assert.Equal(result.Count, prosody.Count);
+        // õ follows the stress marker, so it should have A2=2.
+        int oIdx = result.IndexOf("\u00f5");
+        Assert.NotNull(prosody[oIdx]);
+        Assert.Equal(2, prosody[oIdx]!.A2);
+    }
 }

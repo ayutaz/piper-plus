@@ -394,4 +394,63 @@ public sealed class PhonemeConverterTests
         // The last char is '!' (not '?' or '？'), so -> "$"
         Assert.Equal("$", PiperPhonemeConverter.GetQuestionType("なぜ\uFF1F!"));
     }
+
+    // ================================================================
+    // EspeakPostProcessIds tests
+    // ================================================================
+
+    [Fact]
+    public void EspeakPostProcessIds_BasicSequence()
+    {
+        var ids = new List<int> { 10, 11 };
+        var prosody = new List<ProsodyInfo?> { new(0, 1, 2), new(0, 2, 2) };
+        var map = new Dictionary<string, int[]>
+        {
+            ["_"] = [0],
+            ["^"] = [1],
+            ["$"] = [2],
+        };
+
+        var (resultIds, resultPros) = PiperPhonemeConverter.EspeakPostProcessIds(ids, prosody, map);
+
+        Assert.Equal([1, 0, 10, 0, 11, 0, 2], resultIds);
+        Assert.Equal(resultIds.Count, resultPros.Count);
+    }
+
+    [Fact]
+    public void EspeakPostProcessIds_SkipsPadAfterPadToken()
+    {
+        var ids = new List<int> { 10, 0, 11 };
+        var prosody = new List<ProsodyInfo?> { new(0, 1, 3), null, new(0, 2, 3) };
+        var map = new Dictionary<string, int[]>
+        {
+            ["_"] = [0],
+            ["^"] = [1],
+            ["$"] = [2],
+        };
+
+        var (resultIds, resultPros) = PiperPhonemeConverter.EspeakPostProcessIds(ids, prosody, map);
+
+        // 0 is a PAD token -> no extra PAD after it
+        Assert.Equal([1, 0, 10, 0, 0, 11, 0, 2], resultIds);
+        Assert.Equal(resultIds.Count, resultPros.Count);
+    }
+
+    [Fact]
+    public void EspeakPostProcessIds_EmptyInput()
+    {
+        var ids = new List<int>();
+        var prosody = new List<ProsodyInfo?>();
+        var map = new Dictionary<string, int[]>
+        {
+            ["_"] = [0],
+            ["^"] = [1],
+            ["$"] = [2],
+        };
+
+        var (resultIds, resultPros) = PiperPhonemeConverter.EspeakPostProcessIds(ids, prosody, map);
+
+        Assert.Equal([1, 0, 2], resultIds);
+        Assert.Equal(resultIds.Count, resultPros.Count);
+    }
 }

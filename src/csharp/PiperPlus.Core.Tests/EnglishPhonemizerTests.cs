@@ -390,7 +390,47 @@ public sealed class EnglishPhonemizerTests
     }
 
     // ================================================================
-    // 16. GetPhonemeIdMap_ReturnsNull
+    // 16. Phonemize_ReturnsTokensOnly
+    // ================================================================
+
+    [Fact]
+    public void Phonemize_ReturnsTokensOnly()
+    {
+        // Phonemize() should return the same token list as PhonemizeWithProsody().Tokens.
+        var words = new List<List<string>>
+        {
+            new() { "K", "AE1", "T" },
+        };
+
+        var phonemizer = new EnglishPhonemizer(new StubEnglishG2PEngine(words));
+        var tokens = phonemizer.Phonemize("cat");
+
+        Assert.IsType<List<string>>(tokens);
+        Assert.NotEmpty(tokens);
+        // Should contain the IPA phonemes for "cat": k, æ, t (plus stress marker).
+        Assert.Contains("k", tokens);
+        Assert.Contains("t", tokens);
+    }
+
+    // ================================================================
+    // 17. PhonemizeWithProsody_EmptyInput
+    // ================================================================
+
+    [Fact]
+    public void PhonemizeWithProsody_EmptyInput()
+    {
+        // Engine returns empty word groups -> empty result.
+        var words = new List<List<string>>();
+
+        var phonemizer = new EnglishPhonemizer(new StubEnglishG2PEngine(words));
+        var (tokens, prosody) = phonemizer.PhonemizeWithProsody("");
+
+        Assert.Empty(tokens);
+        Assert.Empty(prosody);
+    }
+
+    // ================================================================
+    // 18. GetPhonemeIdMap_ReturnsNull
     // ================================================================
 
     [Fact]
@@ -404,7 +444,7 @@ public sealed class EnglishPhonemizerTests
     }
 
     // ================================================================
-    // 17. ProsodyAlignment_Maintained
+    // 19. ProsodyAlignment_Maintained
     // ================================================================
 
     [Fact]
@@ -425,7 +465,7 @@ public sealed class EnglishPhonemizerTests
     }
 
     // ================================================================
-    // 18. ProsodyA3_IsWordPhonemeCount
+    // 20. ProsodyA3_IsWordPhonemeCount
     // ================================================================
 
     [Fact]
@@ -455,7 +495,7 @@ public sealed class EnglishPhonemizerTests
     }
 
     // ================================================================
-    // 19. SecondaryStress_MapsTo_A2_1
+    // 21. SecondaryStress_MapsTo_A2_1
     // ================================================================
 
     [Fact]
@@ -477,7 +517,7 @@ public sealed class EnglishPhonemizerTests
     }
 
     // ================================================================
-    // 20. MultipleStressMarkers_InSingleWord
+    // 22. MultipleStressMarkers_InSingleWord
     // ================================================================
 
     [Fact]

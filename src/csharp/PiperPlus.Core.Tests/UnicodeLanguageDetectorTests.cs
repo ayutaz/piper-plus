@@ -219,4 +219,136 @@ public sealed class UnicodeLanguageDetectorTests
         // Pure CJK ideographs only: "漢字" (U+6F22 U+5B57) -- no kana present
         Assert.False(detector.HasKana("\u6F22\u5B57"));
     }
+
+    // ================================================================
+    // 16. CjkExtensionA_Detected
+    // ================================================================
+
+    /// <summary>
+    /// CJK Extension A character (U+3400) should be detected as CJK.
+    /// Without kana context and with both ja+zh, it should map to "zh".
+    /// </summary>
+    [Fact]
+    public void CjkExtensionA_Detected()
+    {
+        var detector = MakeDetector("ja", "en", "zh");
+
+        // U+3400 is the first code point in CJK Unified Ideographs Extension A
+        Assert.Equal("zh", detector.DetectChar('\u3400', contextHasKana: false));
+        // With kana context -> Japanese
+        Assert.Equal("ja", detector.DetectChar('\u3400', contextHasKana: true));
+    }
+
+    // ================================================================
+    // 17. CjkCompatibility_Detected
+    // ================================================================
+
+    /// <summary>
+    /// CJK Compatibility Ideograph (U+F900) should be detected as CJK.
+    /// Without kana context and with both ja+zh, it should map to "zh".
+    /// </summary>
+    [Fact]
+    public void CjkCompatibility_Detected()
+    {
+        var detector = MakeDetector("ja", "en", "zh");
+
+        // U+F900 is the first code point in CJK Compatibility Ideographs
+        Assert.Equal("zh", detector.DetectChar('\uF900', contextHasKana: false));
+        // With kana context -> Japanese
+        Assert.Equal("ja", detector.DetectChar('\uF900', contextHasKana: true));
+    }
+
+    // ================================================================
+    // 18. MultiplicationSign_NotLatin
+    // ================================================================
+
+    /// <summary>
+    /// U+00D7 (×) multiplication sign falls between Latin ranges and must
+    /// be excluded from Latin detection -- should return null (neutral).
+    /// </summary>
+    [Fact]
+    public void MultiplicationSign_NotLatin()
+    {
+        var detector = MakeDetector("ja", "en");
+
+        Assert.Null(detector.DetectChar('\u00D7', contextHasKana: false));
+    }
+
+    // ================================================================
+    // 19. DivisionSign_NotLatin
+    // ================================================================
+
+    /// <summary>
+    /// U+00F7 (÷) division sign falls between Latin ranges and must
+    /// be excluded from Latin detection -- should return null (neutral).
+    /// </summary>
+    [Fact]
+    public void DivisionSign_NotLatin()
+    {
+        var detector = MakeDetector("ja", "en");
+
+        Assert.Null(detector.DetectChar('\u00F7', contextHasKana: false));
+    }
+
+    // ================================================================
+    // 20. HangulJamo_Detected
+    // ================================================================
+
+    /// <summary>
+    /// Hangul Jamo character (U+1100, ᄀ) should be detected as Korean.
+    /// This tests the Jamo range (U+1100-11FF) as opposed to the Hangul
+    /// Syllables range tested by <see cref="Hangul_DetectsKorean"/>.
+    /// </summary>
+    [Fact]
+    public void HangulJamo_Detected()
+    {
+        var detector = MakeDetector("ja", "en", "ko");
+
+        // U+1100 is Hangul Choseong Kiyeok (ᄀ)
+        Assert.Equal("ko", detector.DetectChar('\u1100', contextHasKana: false));
+    }
+
+    // ================================================================
+    // 21. LatinWithDiacritics_Detected
+    // ================================================================
+
+    /// <summary>
+    /// Latin Extended character U+00C0 (À) should be detected as Latin,
+    /// mapping to the default Latin language ("en").
+    /// </summary>
+    [Fact]
+    public void LatinWithDiacritics_Detected()
+    {
+        var detector = MakeDetector("ja", "en");
+
+        // U+00C0 is Latin Capital Letter A With Grave (À)
+        Assert.Equal("en", detector.DetectChar('\u00C0', contextHasKana: false));
+    }
+
+    // ================================================================
+    // 22. ThreeLanguageSegmentation
+    // ================================================================
+
+    /// <summary>
+    /// "hello こんにちは world" should produce 3 segments:
+    /// EN("hello "), JA("こんにちは "), EN("world").
+    /// The trailing spaces are absorbed into the preceding segment.
+    /// </summary>
+    [Fact]
+    public void ThreeLanguageSegmentation()
+    {
+        var detector = MakeDetector("ja", "en");
+
+        var segments = detector.SegmentText("hello \u3053\u3093\u306B\u3061\u306F world");
+
+        Assert.Equal(3, segments.Count);
+        Assert.Equal("en", segments[0].Lang);
+        Assert.Equal("ja", segments[1].Lang);
+        Assert.Equal("en", segments[2].Lang);
+
+        // Verify text content: neutral chars absorbed into preceding segment
+        Assert.Equal("hello ", segments[0].Text);
+        Assert.Equal("\u3053\u3093\u306B\u3061\u306F ", segments[1].Text); // こんにちは + space
+        Assert.Equal("world", segments[2].Text);
+    }
 }

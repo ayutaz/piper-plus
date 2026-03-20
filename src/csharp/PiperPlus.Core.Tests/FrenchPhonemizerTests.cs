@@ -272,4 +272,185 @@ public sealed class FrenchPhonemizerTests
         Assert.Null(prosody[0]);   // BOS
         Assert.Null(prosody[^1]);  // EOS
     }
+
+    // ================================================================
+    // 12. PostProcessIds_SkipsPadAfterPadToken
+    // ================================================================
+
+    [Fact]
+    public void PostProcessIds_SkipsPadAfterPadToken()
+    {
+        var phonemizer = new FrenchPhonemizer(
+            new StubFrenchG2PEngine([]));
+
+        // Input: [b(10), PAD(0), o(11)] — PAD token already present.
+        // PAD-after-PAD should be skipped (matching Python base.py).
+        var inputIds = new List<int> { 10, 0, 11 };
+        var inputProsody = new List<ProsodyInfo?>
+        {
+            new(0, 0, 3), null, new(0, 2, 3),
+        };
+        var map = MakeMap();
+
+        var (ids, prosody) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
+
+        // Expected:
+        // BOS(1), PAD(0), 10, PAD(0), 0, 11, PAD(0), EOS(2)
+        // = [1, 0, 10, 0, 0, 11, 0, 2]
+        // Note: no double-PAD after the PAD(0) token itself.
+        Assert.Equal([1, 0, 10, 0, 0, 11, 0, 2], ids);
+
+        // IDs and prosody must have the same length.
+        Assert.Equal(ids.Count, prosody.Count);
+    }
+
+    // ================================================================
+    // 13. PostProcessIds_EmptyInput
+    // ================================================================
+
+    [Fact]
+    public void PostProcessIds_EmptyInput()
+    {
+        var phonemizer = new FrenchPhonemizer(
+            new StubFrenchG2PEngine([]));
+
+        // Empty input: no phoneme IDs at all.
+        var inputIds = new List<int>();
+        var inputProsody = new List<ProsodyInfo?>();
+        var map = MakeMap();
+
+        var (ids, prosody) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
+
+        // Expected: BOS(1), PAD(0), EOS(2) = [1, 0, 2]
+        Assert.Equal([1, 0, 2], ids);
+
+        // IDs and prosody must have the same length.
+        Assert.Equal(ids.Count, prosody.Count);
+    }
+
+    // ================================================================
+    // 14. Phonemize_ReturnsTokensOnly
+    // ================================================================
+
+    [Fact]
+    public void Phonemize_ReturnsTokensOnly()
+    {
+        // "bonjour" -> b ɔ̃ ʒ u ʁ
+        var tokens = new List<string> { "b", "\u0254\u0303", "\u0292", "u", "\u0281" };
+
+        var phonemizer = new FrenchPhonemizer(new StubFrenchG2PEngine(tokens));
+        var result = phonemizer.Phonemize("bonjour");
+
+        // Phonemize() should return tokens (possibly PUA-mapped).
+        Assert.NotNull(result);
+        Assert.NotEmpty(result);
+        Assert.Equal(tokens.Count, result.Count);
+    }
+
+    // ================================================================
+    // 15. PhonemizeWithProsody_EmptyInput
+    // ================================================================
+
+    [Fact]
+    public void PhonemizeWithProsody_EmptyInput()
+    {
+        // Engine returns empty list -> empty result.
+        var phonemizer = new FrenchPhonemizer(
+            new StubFrenchG2PEngine([]));
+
+        var (outputTokens, prosody) = phonemizer.PhonemizeWithProsody("");
+
+        Assert.Empty(outputTokens);
+        Assert.Empty(prosody);
+    }
+
+    // ================================================================
+    // 16. Punctuation_InvertedMarks
+    // ================================================================
+
+    [Fact]
+    public void Punctuation_InvertedMarks()
+    {
+        // ¡ and ¿ are recognized as punctuation with zero prosody.
+        var tokens = new List<string> { "\u00bf", "u", "i", "\u00a1" }; // ¿ u i ¡
+
+        var phonemizer = new FrenchPhonemizer(new StubFrenchG2PEngine(tokens));
+        var (_, prosody) = phonemizer.PhonemizeWithProsody("\u00bfoui\u00a1");
+
+        // ¿ at index 0 should be punctuation with zero prosody.
+        Assert.NotNull(prosody[0]);
+        Assert.Equal(0, prosody[0]!.A1);
+        Assert.Equal(0, prosody[0]!.A2);
+        Assert.Equal(0, prosody[0]!.A3);
+
+        // ¡ at the end should also be punctuation with zero prosody.
+        Assert.NotNull(prosody[^1]);
+        Assert.Equal(0, prosody[^1]!.A1);
+        Assert.Equal(0, prosody[^1]!.A2);
+        Assert.Equal(0, prosody[^1]!.A3);
+    }
+
+    // ================================================================
+    // 17. Punctuation_Guillemets
+    // ================================================================
+
+    [Fact]
+    public void Punctuation_Guillemets()
+    {
+        // « and » are recognized as punctuation.
+        var tokens = new List<string> { "\u00ab", "u", "i", "\u00bb" }; // « u i »
+
+        var phonemizer = new FrenchPhonemizer(new StubFrenchG2PEngine(tokens));
+        var (_, prosody) = phonemizer.PhonemizeWithProsody("\u00aboui\u00bb");
+
+        // « at index 0 should be punctuation with zero prosody.
+        Assert.NotNull(prosody[0]);
+        Assert.Equal(0, prosody[0]!.A1);
+        Assert.Equal(0, prosody[0]!.A2);
+        Assert.Equal(0, prosody[0]!.A3);
+
+        // » at the end should also be punctuation with zero prosody.
+        Assert.NotNull(prosody[^1]);
+        Assert.Equal(0, prosody[^1]!.A1);
+        Assert.Equal(0, prosody[^1]!.A2);
+        Assert.Equal(0, prosody[^1]!.A3);
+    }
+
+    // ================================================================
+    // 18. YVowel_TreatedAsVowel
+    // ================================================================
+
+    [Fact]
+    public void YVowel_TreatedAsVowel()
+    {
+        // "y_vowel" token is treated as a vowel for stress detection.
+        // Word: "k y_vowel" — y_vowel is the last vowel -> A2=2.
+        var tokens = new List<string> { "k", "y_vowel" };
+
+        var phonemizer = new FrenchPhonemizer(new StubFrenchG2PEngine(tokens));
+        var (_, prosody) = phonemizer.PhonemizeWithProsody("test");
+
+        var nonNull = prosody.Where(p => p is not null).ToList();
+        Assert.Equal(0, nonNull[0]!.A2);  // k = consonant -> no stress
+        Assert.Equal(2, nonNull[1]!.A2);  // y_vowel = last vowel -> stressed
+    }
+
+    // ================================================================
+    // 19. Schwa_TreatedAsVowel
+    // ================================================================
+
+    [Fact]
+    public void Schwa_TreatedAsVowel()
+    {
+        // ə (schwa) token is treated as a vowel for stress detection.
+        // Word: "l ə" — ə is the last vowel -> A2=2.
+        var tokens = new List<string> { "l", "\u0259" }; // l ə
+
+        var phonemizer = new FrenchPhonemizer(new StubFrenchG2PEngine(tokens));
+        var (_, prosody) = phonemizer.PhonemizeWithProsody("le");
+
+        var nonNull = prosody.Where(p => p is not null).ToList();
+        Assert.Equal(0, nonNull[0]!.A2);  // l = consonant -> no stress
+        Assert.Equal(2, nonNull[1]!.A2);  // ə = last vowel -> stressed
+    }
 }

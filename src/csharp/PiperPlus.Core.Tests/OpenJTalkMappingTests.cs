@@ -77,4 +77,87 @@ public sealed class OpenJTalkMappingTests
 
         Assert.Equal(expectedChar.ToString(), result);
     }
+
+    // ================================================================
+    // 5. MapToken_SingleChar_PassThrough
+    // ================================================================
+
+    [Theory]
+    [InlineData("a")]
+    [InlineData("k")]
+    [InlineData("o")]
+    public void MapToken_SingleChar_PassThrough(string token)
+    {
+        var result = OpenJTalkToPiperMapping.MapToken(token);
+
+        Assert.Equal(token, result);
+    }
+
+    // ================================================================
+    // 6. MapSequence_AllSingleChars_AllPassThrough
+    // ================================================================
+
+    [Fact]
+    public void MapSequence_AllSingleChars_AllPassThrough()
+    {
+        var input = new[] { "a", "k", "o" };
+
+        var result = OpenJTalkToPiperMapping.MapSequence(input);
+
+        Assert.Equal(input, result);
+    }
+
+    // ================================================================
+    // 7. MapSequence_MixedTokens_CorrectMapping
+    // ================================================================
+
+    [Fact]
+    public void MapSequence_MixedTokens_CorrectMapping()
+    {
+        // Mix of single chars (pass-through) and PUA tokens (mapped)
+        var input = new[] { "a", "ch", "o", "N_m" };
+
+        var result = OpenJTalkToPiperMapping.MapSequence(input);
+
+        Assert.Equal(new[] { "a", "\uE00E", "o", "\uE019" }, result);
+    }
+
+    // ================================================================
+    // 8. ChineseAffricates_MappedCorrectly
+    // ================================================================
+
+    [Fact]
+    public void ChineseAffricates_MappedCorrectly()
+    {
+        // tɕ (t\u0255) → U+E023
+        var result = OpenJTalkToPiperMapping.MapToken("t\u0255");
+
+        Assert.Equal("\uE023", result);
+    }
+
+    // ================================================================
+    // 9. FrenchNasalVowels_MappedCorrectly
+    // ================================================================
+
+    [Fact]
+    public void FrenchNasalVowels_MappedCorrectly()
+    {
+        // ɛ̃ (\u025B\u0303) → U+E056
+        var result = OpenJTalkToPiperMapping.MapToken("\u025B\u0303");
+
+        Assert.Equal("\uE056", result);
+    }
+
+    // ================================================================
+    // 10. KoreanTensed_MappedCorrectly
+    // ================================================================
+
+    [Fact]
+    public void KoreanTensed_MappedCorrectly()
+    {
+        // p͈ (p\u0348) → U+E04B
+        var result = OpenJTalkToPiperMapping.MapToken("p\u0348");
+
+        Assert.Equal("\uE04B", result);
+    }
 }

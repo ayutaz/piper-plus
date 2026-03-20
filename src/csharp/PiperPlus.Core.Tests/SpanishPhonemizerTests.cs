@@ -260,4 +260,154 @@ public sealed class SpanishPhonemizerTests
         Assert.Null(prosody[0]);   // BOS
         Assert.Null(prosody[^1]);  // EOS
     }
+
+    // ================================================================
+    // 11. PostProcessIds_SkipsPadAfterPadToken
+    // ================================================================
+
+    [Fact]
+    public void PostProcessIds_SkipsPadAfterPadToken()
+    {
+        var phonemizer = new SpanishPhonemizer(
+            new StubSpanishG2PEngine([]));
+
+        // Input: [10, 0, 11] where 0 is PAD. No double-PAD should be inserted.
+        var inputIds = new List<int> { 10, 0, 11 };
+        var inputProsody = new List<ProsodyInfo?>
+        {
+            new(0, 2, 3), null, new(0, 0, 3),
+        };
+        var map = MakeMap();
+
+        var (ids, prosody) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
+
+        // Expected:
+        // BOS(1), PAD(0), 10, PAD(0), 0, 11, PAD(0), EOS(2)
+        // = [1, 0, 10, 0, 0, 11, 0, 2]
+        Assert.Equal([1, 0, 10, 0, 0, 11, 0, 2], ids);
+        Assert.Equal(ids.Count, prosody.Count);
+    }
+
+    // ================================================================
+    // 12. PostProcessIds_EmptyInput
+    // ================================================================
+
+    [Fact]
+    public void PostProcessIds_EmptyInput()
+    {
+        var phonemizer = new SpanishPhonemizer(
+            new StubSpanishG2PEngine([]));
+
+        var inputIds = new List<int>();
+        var inputProsody = new List<ProsodyInfo?>();
+        var map = MakeMap();
+
+        var (ids, prosody) = phonemizer.PostProcessIds(inputIds, inputProsody, map);
+
+        // Empty input → BOS(1), PAD(0), EOS(2) only.
+        Assert.Equal([1, 0, 2], ids);
+        Assert.Equal(ids.Count, prosody.Count);
+    }
+
+    // ================================================================
+    // 13. Phonemize_ReturnsTokensOnly
+    // ================================================================
+
+    [Fact]
+    public void Phonemize_ReturnsTokensOnly()
+    {
+        // Phonemize() should return the same tokens as PhonemizeWithProsody().
+        var tokens = new List<string> { "\u02c8", "o", "l", "a" };
+
+        var phonemizer = new SpanishPhonemizer(new StubSpanishG2PEngine(tokens));
+        var plain = phonemizer.Phonemize("hola");
+        var (withProsody, _) = phonemizer.PhonemizeWithProsody("hola");
+
+        Assert.Equal(withProsody, plain);
+    }
+
+    // ================================================================
+    // 14. PhonemizeWithProsody_EmptyInput
+    // ================================================================
+
+    [Fact]
+    public void PhonemizeWithProsody_EmptyInput()
+    {
+        // Engine returns empty list → empty phonemes and prosody.
+        var phonemizer = new SpanishPhonemizer(
+            new StubSpanishG2PEngine([]));
+
+        var (result, prosody) = phonemizer.PhonemizeWithProsody("");
+
+        Assert.Empty(result);
+        Assert.Empty(prosody);
+    }
+
+    // ================================================================
+    // 15. Punctuation_InvertedMarks
+    // ================================================================
+
+    [Fact]
+    public void Punctuation_InvertedMarks()
+    {
+        // ¡ (U+00A1) and ¿ (U+00BF) should be recognized as punctuation
+        // with zero prosody.
+        var tokens = new List<string>
+        {
+            "\u00bf",                           // ¿
+            "\u02c8", "o", "l", "a",
+            "?",
+        };
+
+        var phonemizer = new SpanishPhonemizer(new StubSpanishG2PEngine(tokens));
+        var (result, prosody) = phonemizer.PhonemizeWithProsody("¿hola?");
+
+        // ¿ should be present with zero prosody.
+        int invertedIdx = result.IndexOf("\u00bf");
+        Assert.True(invertedIdx >= 0, "\u00bf should be present");
+        Assert.NotNull(prosody[invertedIdx]);
+        Assert.Equal(0, prosody[invertedIdx]!.A1);
+        Assert.Equal(0, prosody[invertedIdx]!.A2);
+        Assert.Equal(0, prosody[invertedIdx]!.A3);
+
+        // Regular ? should also be present with zero prosody.
+        int questionIdx = result.IndexOf("?");
+        Assert.True(questionIdx >= 0, "? should be present");
+        Assert.NotNull(prosody[questionIdx]);
+        Assert.Equal(0, prosody[questionIdx]!.A1);
+        Assert.Equal(0, prosody[questionIdx]!.A2);
+        Assert.Equal(0, prosody[questionIdx]!.A3);
+    }
+
+    // ================================================================
+    // 16. StressMarker_AtEndOfWord
+    // ================================================================
+
+    [Fact]
+    public void StressMarker_AtEndOfWord()
+    {
+        // ˈ at the end of a word with no following vowel.
+        // It still receives A2=2 and A3 = phoneme count excluding ˈ.
+        var tokens = new List<string> { "k", "a", "\u02c8" };
+
+        var phonemizer = new SpanishPhonemizer(new StubSpanishG2PEngine(tokens));
+        var (result, prosody) = phonemizer.PhonemizeWithProsody("ka");
+
+        int stressIdx = result.IndexOf("\u02c8");
+        Assert.True(stressIdx >= 0, "Stress marker should be present");
+        Assert.NotNull(prosody[stressIdx]);
+        Assert.Equal(2, prosody[stressIdx]!.A2);
+
+        // A3 = phoneme count excluding ˈ = 2 (k, a).
+        Assert.Equal(2, prosody[stressIdx]!.A3);
+
+        // ˈ is the last token, so no vowel follows → no other token has A2=2.
+        for (int i = 0; i < result.Count; i++)
+        {
+            if (i != stressIdx && result[i] != "\u02c8")
+            {
+                Assert.Equal(0, prosody[i]!.A2);
+            }
+        }
+    }
 }
