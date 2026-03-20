@@ -1221,43 +1221,10 @@ internal static class Program
         switch (language)
         {
             case "ja":
-                {
-                    // DotNetG2PEngine は NuGet 未公開の可能性があるためリフレクションで解決
-                    var g2pType = Type.GetType(
-                        "PiperPlus.Core.Phonemize.DotNetG2PEngine, PiperPlus.Core");
-                    if (g2pType is null)
-                    {
-                        throw new NotSupportedException(
-                            "--text mode for Japanese requires DotNetG2P, which is not yet available. " +
-                            "Use JSONL stdin input instead.");
-                    }
-
-                    var g2pEngine = Activator.CreateInstance(g2pType) as IJapaneseG2PEngine
-                        ?? throw new NotSupportedException(
-                            "Failed to create DotNetG2PEngine instance.");
-
-                    // JapanesePhonemizer は直接参照可能
-                    return new JapanesePhonemizer(g2pEngine);
-                }
+                return new JapanesePhonemizer(new DotNetG2PEngine());
 
             case "en":
-                {
-                    // DotNetG2P.English のラッパーをリフレクションで解決
-                    var g2pType = Type.GetType(
-                        "PiperPlus.Core.Phonemize.DotNetEnglishG2PEngine, PiperPlus.Core");
-                    if (g2pType is null)
-                    {
-                        throw new NotSupportedException(
-                            "--text mode for English requires DotNetG2P.English, which is not yet available. " +
-                            "Use JSONL stdin input instead.");
-                    }
-
-                    var g2pEngine = Activator.CreateInstance(g2pType) as IEnglishG2PEngine
-                        ?? throw new NotSupportedException(
-                            "Failed to create DotNetEnglishG2PEngine instance.");
-
-                    return new EnglishPhonemizer(g2pEngine);
-                }
+                return new EnglishPhonemizer(new DotNetEnglishG2PEngine());
 
             case "zh":
                 return new ChinesePhonemizer(new DotNetChineseG2PEngine());
