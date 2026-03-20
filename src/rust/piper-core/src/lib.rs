@@ -18,6 +18,7 @@
 // --- Core modules ---
 pub mod audio;
 pub mod config;
+pub mod dictionary_manager;
 pub mod engine;
 pub mod error;
 pub mod input;

@@ -11,11 +11,12 @@ categories.workspace = true
 description = "High-quality neural text-to-speech engine with 7-language support"
 
 [features]
-default = ["japanese"]
+default = ["japanese", "dict-download"]
 japanese = ["dep:jpreprocess"]
 naist-jdic = ["japanese", "jpreprocess/naist-jdic"]
 playback = ["dep:rodio"]
 download = ["dep:reqwest"]
+dict-download = ["download", "dep:sha2", "dep:flate2", "dep:tar"]
 resample = ["dep:rubato"]
 cuda = []
 coreml = []
@@ -34,6 +35,9 @@ regex = "1"
 jpreprocess = { version = "0.9", optional = true }
 rodio = { version = "0.19", optional = true }
 reqwest = { version = "0.12", features = ["blocking"], optional = true }
+sha2 = { version = "0.10", optional = true }
+flate2 = { version = "1", optional = true }
+tar = { version = "0.4", optional = true }
 rubato = { version = "0.16", optional = true }
 
 [dev-dependencies]

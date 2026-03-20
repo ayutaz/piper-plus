@@ -308,7 +308,8 @@ impl PiperVoice {
     /// JapanesePhonemizer を生成する。
     ///
     /// `naist-jdic` feature が有効なら bundled 辞書を使用し、
-    /// 無効なら外部辞書を自動検索する。
+    /// 無効なら `dictionary_manager::ensure_dictionary()` で外部辞書を
+    /// 自動検索・ダウンロードする。
     #[cfg(feature = "japanese")]
     fn create_japanese_phonemizer()
     -> Result<crate::phonemize::japanese::JapanesePhonemizer, PiperError> {
@@ -318,7 +319,21 @@ impl PiperVoice {
         }
         #[cfg(not(feature = "naist-jdic"))]
         {
-            crate::phonemize::japanese::JapanesePhonemizer::new()
+            // Try dictionary_manager first (searches standard paths + auto-download)
+            match crate::dictionary_manager::ensure_dictionary() {
+                Ok(dict_path) => {
+                    tracing::info!("Using OpenJTalk dictionary from {}", dict_path.display());
+                    crate::phonemize::japanese::JapanesePhonemizer::new_with_dict(&dict_path)
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        "dictionary_manager failed ({}), falling back to JapanesePhonemizer::new()",
+                        e
+                    );
+                    // Fall back to jpreprocess's own dictionary search
+                    crate::phonemize::japanese::JapanesePhonemizer::new()
+                }
+            }
         }
     }
 
