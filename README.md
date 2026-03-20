@@ -107,61 +107,28 @@ tar xzf piper.tar.gz
 cd piper
 ```
 
-**2. モデルをダウンロード**
+**2. モデルをダウンロード & 音声を生成**
 
-つくよみちゃんモデルの例:
+```sh
+# つくよみちゃんモデルをダウンロード
+./bin/piper --download-model tsukuyomi
 
-**Windows (PowerShell):**
-
-```powershell
-mkdir models
-Invoke-WebRequest -Uri "https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/tsukuyomi-chan-6lang-fp16.onnx" -OutFile models/tsukuyomi.onnx
-Invoke-WebRequest -Uri "https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/config.json" -OutFile models/config.json
+# 音声を生成 (ダウンロード完了時に表示されるパスを --model に指定)
+./bin/piper --text "こんにちは、今日は良い天気ですね。" \
+  --model ~/.local/share/piper/models/tsukuyomi-chan-6lang-fp16.onnx \
+  --output_file output.wav
 ```
 
-**macOS / Linux:**
-
-```bash
-mkdir -p models
-curl -L -o models/tsukuyomi.onnx https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/tsukuyomi-chan-6lang-fp16.onnx
-curl -L -o models/config.json https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/config.json
-```
-
-**3. 音声を生成**
-
-**Windows (PowerShell):**
-
-```powershell
-.\bin\piper.exe --text "こんにちは、今日は良い天気ですね。" --model models\tsukuyomi.onnx --config models\config.json --output_file output.wav
-```
-
-**macOS / Linux:**
-
-```bash
-./bin/piper --text 'こんにちは、今日は良い天気ですね。' \
-  --model models/tsukuyomi.onnx --config models/config.json --output_file output.wav
-```
-
+> **Windows (PowerShell) での実行例:**
+>
+> ```powershell
+> .\bin\piper.exe --download-model tsukuyomi
+> .\bin\piper.exe --text "こんにちは、今日は良い天気ですね。" --model $env:APPDATA\piper\models\tsukuyomi-chan-6lang-fp16.onnx --output_file output.wav
+> ```
+>
+> **Windows cmd を使う場合:** cmd はデフォルトで Shift-JIS (CP932) のため、先に `chcp 65001` で UTF-8 に切り替えてください。
+>
 > **output.wav の出力先:** カレントディレクトリ（`cd piper` した場所）に生成されます。
->
-> **Windows cmd を使う場合:** cmd はデフォルトで Shift-JIS (CP932) のため、UTF-8 に切り替えてから実行してください:
->
-> ```cmd
-> chcp 65001
-> bin\piper.exe --text "こんにちは、今日は良い天気ですね。" --model models\tsukuyomi.onnx --config models\config.json --output_file output.wav
-> ```
-
-> **config.json の命名規則:** piper は `<モデル名>.onnx.json` を優先的に自動検出します。見つからない場合、モデルと同じディレクトリの `config.json` にフォールバックします。どちらも見つからない場合は `--config` で明示的に指定してください。
->
-> ```sh
-> # 自動検出 (--config 不要)
-> ./bin/piper --model models/tsukuyomi.onnx --output_file output.wav
-> # → 1. models/tsukuyomi.onnx.json を検索
-> # → 2. models/config.json にフォールバック
->
-> # 手動指定 (上記どちらも存在しない場合)
-> ./bin/piper --model models/tsukuyomi.onnx --config /path/to/config.json --output_file output.wav
-> ```
 
 ### Python推論
 
