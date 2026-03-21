@@ -542,6 +542,10 @@ mod tests {
 
     #[test]
     fn test_find_dictionary_returns_valid_or_none() {
+        // Acquire ENV_MUTEX: concurrent env var tests may set
+        // OPENJTALK_DICTIONARY_PATH to a temp dir that gets cleaned up
+        // before we validate it, causing a spurious failure.
+        let _lock = ENV_MUTEX.lock().unwrap_or_else(|e| e.into_inner());
         // find_dictionary() should return either None or a valid dictionary
         if let Some(p) = find_dictionary() {
             assert!(
