@@ -302,7 +302,34 @@ piper-plus --model model.onnx --text "Hello world" --language en --output-file o
 
 # マルチリンガル (自動言語検出)
 piper-plus --model model.onnx --text "こんにちはHello你好" --language ja-en-zh --output-file output.wav
+
+# ストリーミング (文ごとに逐次PCM出力)
+piper-plus --model model.onnx --text "最初の文。次の文。" --language ja --streaming | aplay -r 22050 -f S16_LE
+
+# カスタム辞書 (JSON v1/v2 または TSV)
+piper-plus --model model.onnx --text "AI技術" --language ja --custom-dict my_dict.json --output-file output.wav
 ```
+
+#### Rust CLI 使用例
+
+```bash
+# 日本語 (naist-jdic辞書バンドル済み)
+piper-plus-cli --model model.onnx --text "こんにちは" --language ja --output-file output.wav
+
+# 英語
+piper-plus-cli --model model.onnx --text "Hello world" --language en --output-file output.wav
+
+# ストリーミング (文ごとに逐次合成)
+piper-plus-cli --model model.onnx --text "First sentence. Second sentence." --stream --output-dir chunks/
+
+# カスタム辞書
+piper-plus-cli --model model.onnx --text "AI技術" --custom-dict my_dict.json --output-file output.wav
+
+# GPU推論
+piper-plus-cli --model model.onnx --text "Hello" --device cuda --output-file output.wav
+```
+
+> **Note:** C# CLI は `dotnet tool install -g PiperPlus.Cli` で、Rust CLI は `cargo install piper-plus-cli` でインストールできます。両方とも6言語対応・カスタム辞書・ストリーミングをサポートしています。
 
 ### ソースからビルド (Rust)
 
