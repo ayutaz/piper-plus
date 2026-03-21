@@ -38,7 +38,7 @@ func main() {
 
 	// Init ONNX Runtime
 	if err := piperplus.Init(""); err != nil {
-		log.Fatal(err)
+		log.Fatal(err) //nolint:gocritic // Fatal is acceptable in example programs
 	}
 	defer piperplus.Shutdown()
 
@@ -51,7 +51,7 @@ func main() {
 		piperplus.WithLogger(logger),
 	)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(err) //nolint:gocritic // Fatal is acceptable in example programs
 	}
 	defer voice.Close()
 

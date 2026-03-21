@@ -58,7 +58,7 @@ func LoadVoice(ctx context.Context, modelPath string, opts ...LoadOption) (*Voic
 	if err != nil {
 		return nil, &ModelLoadError{Path: modelPath, Err: err}
 	}
-	defer sessOpts.Destroy()
+	defer func() { _ = sessOpts.Destroy() }()
 
 	// Create the ONNX inference engine.
 	engine, err := newOnnxEngine(modelPath, config, sessOpts, logger)

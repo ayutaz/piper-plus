@@ -67,9 +67,11 @@ func TestPeakNormalize_SmallValues(t *testing.T) {
 		t.Fatalf("expected 2 samples, got %d", len(out))
 	}
 	// Should not panic or produce extreme values.
+	// Note: out is []int16, so values are inherently within [-32768, 32767].
+	// Verify no clipping to extremes occurred.
 	for i, s := range out {
-		if s < -32767 || s > 32767 {
-			t.Errorf("sample[%d] out of int16 range: %d", i, s)
+		if int(s) < -32767 || int(s) > 32767 {
+			t.Errorf("sample[%d] out of expected range: %d", i, s)
 		}
 	}
 	// Verify nonzero output (scale was clamped, not zero-divided).

@@ -242,7 +242,7 @@ func runBatchMode(ctx context.Context, voice *piperplus.Voice, logger *slog.Logg
 	if err != nil {
 		return fmt.Errorf("failed to open batch file: %w", err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	scanner := bufio.NewScanner(f)
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
@@ -406,7 +406,7 @@ func writeResult(_ context.Context, result *piperplus.SynthesisResult, outFile, 
 	if err != nil {
 		return fmt.Errorf("failed to create output file %s: %w", path, err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	if err := result.WriteWAV(f); err != nil {
 		return fmt.Errorf("failed to write WAV to %s: %w", path, err)

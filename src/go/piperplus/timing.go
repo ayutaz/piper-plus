@@ -92,7 +92,7 @@ func (r *TimingResult) ToTSV() string {
 	for _, p := range r.Phonemes {
 		// Escape tab and newline characters in phoneme strings to preserve TSV format.
 		escaped := strings.NewReplacer("\t", `\t`, "\n", `\n`).Replace(p.Phoneme)
-		b.WriteString(fmt.Sprintf("%.3f\t%.3f\t%.3f\t%s\n", p.StartMs, p.EndMs, p.DurationMs, escaped))
+		fmt.Fprintf(&b, "%.3f\t%.3f\t%.3f\t%s\n", p.StartMs, p.EndMs, p.DurationMs, escaped)
 	}
 	return b.String()
 }

@@ -84,7 +84,7 @@ func phonemizerForLanguage(lang string, dicts *dictData) (phonemize.Phonemizer, 
 	switch lang {
 	case "ja":
 		if phonemize.NewOpenJTalkEngine == nil {
-			return nil, fmt.Errorf("Japanese G2P requires build tag 'openjtalk' (CGO + libopenjtalk)")
+			return nil, fmt.Errorf("japanese G2P requires build tag 'openjtalk' (CGO + libopenjtalk)")
 		}
 		var dictPath string
 		if dicts != nil {

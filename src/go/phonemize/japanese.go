@@ -86,10 +86,11 @@ func labelsToTokensWithProsody(labels []string, text string) (*PhonemizeResult, 
 
 		// Beginning / end silence
 		if phoneme == "sil" {
-			if idx == 0 {
+			switch idx {
+			case 0:
 				tokens = append(tokens, "^")
 				prosody = append(prosody, nil)
-			} else if idx == numLabels-1 {
+			case numLabels - 1:
 				qt := getQuestionType(text)
 				tokens = append(tokens, qt)
 				prosody = append(prosody, nil)
@@ -290,4 +291,3 @@ func applyNPhonemeRules(tokens []string) []string {
 
 // Verify that *JapanesePhonemizer satisfies the Phonemizer interface.
 var _ Phonemizer = (*JapanesePhonemizer)(nil)
-

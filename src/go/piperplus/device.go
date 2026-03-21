@@ -149,7 +149,7 @@ func appendCUDA(sessOpts *ort.SessionOptions, deviceID int) error {
 	if err != nil {
 		return fmt.Errorf("failed to create CUDA provider options: %w", err)
 	}
-	defer cudaOpts.Destroy()
+	defer func() { _ = cudaOpts.Destroy() }()
 
 	if err := cudaOpts.Update(map[string]string{
 		"device_id": strconv.Itoa(deviceID),
@@ -169,7 +169,7 @@ func appendTensorRT(sessOpts *ort.SessionOptions, deviceID int) error {
 	if err != nil {
 		return fmt.Errorf("failed to create TensorRT provider options: %w", err)
 	}
-	defer trtOpts.Destroy()
+	defer func() { _ = trtOpts.Destroy() }()
 
 	if err := trtOpts.Update(map[string]string{
 		"device_id": strconv.Itoa(deviceID),
@@ -189,7 +189,7 @@ func appendTensorRT(sessOpts *ort.SessionOptions, deviceID int) error {
 // NOTE: A failed AppendExecutionProvider* call may leave partial state inside
 // the ONNX Runtime SessionOptions. ONNX Runtime's EP list is append-only, so
 // failed attempts may remain registered but inactive. In practice the runtime
-// ignores EPs it cannot initialise, and the final successful EP (or the
+// ignores EPs it cannot initialize, and the final successful EP (or the
 // default CPU EP) is the one actually used for inference.
 func autoSelectEP(sessOpts *ort.SessionOptions, logger *slog.Logger) DeviceType {
 	// Try CUDA first.

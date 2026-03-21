@@ -149,7 +149,7 @@ func (p *VoicePool) release(v *Voice) {
 	p.mu.Lock()
 	if p.closed {
 		p.mu.Unlock()
-		v.Close()
+		_ = v.Close()
 		return
 	}
 	p.mu.Unlock()
@@ -157,6 +157,6 @@ func (p *VoicePool) release(v *Voice) {
 	select {
 	case p.voices <- v:
 	default:
-		v.Close()
+		_ = v.Close()
 	}
 }

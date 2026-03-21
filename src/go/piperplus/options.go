@@ -154,26 +154,9 @@ func defaultSynthesisOptions() SynthesisOptions {
 	}
 }
 
-// defaultLoadOptions returns LoadOptions with sensible defaults.
-func defaultLoadOptions() LoadOptions {
-	return LoadOptions{
-		Device: "cpu",
-		Logger: slog.Default(),
-	}
-}
-
 // applySynthesisOptions starts from defaults and applies each option.
 func applySynthesisOptions(opts []SynthesisOption) SynthesisOptions {
 	o := defaultSynthesisOptions()
-	for _, fn := range opts {
-		fn(&o)
-	}
-	return o
-}
-
-// applyLoadOptions starts from defaults and applies each option.
-func applyLoadOptions(opts []LoadOption) LoadOptions {
-	o := defaultLoadOptions()
 	for _, fn := range opts {
 		fn(&o)
 	}

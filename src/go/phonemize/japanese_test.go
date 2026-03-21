@@ -390,22 +390,23 @@ func TestLabelsToTokensWithProsody_ProsodyValues(t *testing.T) {
 
 	// Find the phoneme token "k" and check its prosody
 	for i, tok := range result.Tokens {
-		if tok == "k" {
-			p := result.Prosody[i]
-			if p == nil {
-				t.Fatal("prosody for 'k' is nil, expected non-nil")
-			}
-			if p.A1 != -2 {
-				t.Errorf("A1 for 'k' = %d, want -2", p.A1)
-			}
-			if p.A2 != 1 {
-				t.Errorf("A2 for 'k' = %d, want 1", p.A2)
-			}
-			if p.A3 != 5 {
-				t.Errorf("A3 for 'k' = %d, want 5", p.A3)
-			}
-			return
+		if tok != "k" {
+			continue
 		}
+		p := result.Prosody[i]
+		if p == nil {
+			t.Fatal("prosody for 'k' is nil, expected non-nil")
+		}
+		if p.A1 != -2 {
+			t.Errorf("A1 for 'k' = %d, want -2", p.A1)
+		}
+		if p.A2 != 1 {
+			t.Errorf("A2 for 'k' = %d, want 1", p.A2)
+		}
+		if p.A3 != 5 {
+			t.Errorf("A3 for 'k' = %d, want 5", p.A3)
+		}
+		return
 	}
 	t.Error("phoneme 'k' not found in tokens")
 }

@@ -25,7 +25,7 @@ func LoadDictFile(path string) (*CustomDictionary, error) {
 	if err != nil {
 		return nil, fmt.Errorf("open dict file: %w", err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	d := NewCustomDictionary()
 	scanner := bufio.NewScanner(f)

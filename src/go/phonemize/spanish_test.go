@@ -20,13 +20,6 @@ func esPhonemeStr(word string) string {
 	return strings.Join(esPhonemes(word), "|")
 }
 
-// esStress returns the stressed phoneme index for a normalized word.
-func esStress(word string) int {
-	runes := esNormalize(word)
-	_, idx := esG2P(runes)
-	return idx
-}
-
 // ============================================================================
 // 1. Basic G2P: single consonant and vowel mappings
 // ============================================================================

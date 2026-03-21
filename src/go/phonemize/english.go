@@ -303,18 +303,20 @@ func (p *EnglishPhonemizer) PhonemizeWithProsody(text string) (*PhonemizeResult,
 
 			for _, ph := range ipas {
 				// stress -> A2: primary(1)->2, secondary(2)->1, else 0
-				a2 := 0
-				if ph.stress == 1 {
+				var a2 int
+				switch ph.stress {
+				case 1:
 					a2 = 2
-				} else if ph.stress == 2 {
+				case 2:
 					a2 = 1
 				}
 
 				// Insert stress marker before stressed vowels
-				if ph.stress == 1 {
+				switch ph.stress {
+				case 1:
 					phonemes = append(phonemes, "ˈ")
 					prosody = append(prosody, &ProsodyInfo{A1: 0, A2: a2, A3: wordPhonemeCount})
-				} else if ph.stress == 2 {
+				case 2:
 					phonemes = append(phonemes, "ˌ")
 					prosody = append(prosody, &ProsodyInfo{A1: 0, A2: a2, A3: wordPhonemeCount})
 				}

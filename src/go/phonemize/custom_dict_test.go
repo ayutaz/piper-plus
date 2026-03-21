@@ -85,10 +85,8 @@ func TestLoadTextDictJSON_V1Format(t *testing.T) {
 
 	if e, ok := td.entries["world"]; !ok {
 		t.Error("entries[\"world\"] not found")
-	} else {
-		if e.pronunciation != "ワールド" {
-			t.Errorf("world pronunciation = %q, want ワールド", e.pronunciation)
-		}
+	} else if e.pronunciation != "ワールド" {
+		t.Errorf("world pronunciation = %q, want ワールド", e.pronunciation)
 	}
 }
 

@@ -203,16 +203,6 @@ func TestSynthesizeRequest_JSON_OmittedFields(t *testing.T) {
 // HTTP handler tests — endpoints that don't require ONNX
 // ---------------------------------------------------------------------------
 
-// newTestServer creates a Server with a nil voice for handler tests that
-// don't reach synthesis. Health endpoint works with nil voice.
-func newTestServer() *Server {
-	return &Server{
-		voice:  nil,
-		logger: nil,
-		mux:    http.NewServeMux(),
-	}
-}
-
 // newTestServerWithMux creates a Server and registers routes, using a nil
 // voice. Only use for endpoints that don't call voice methods.
 func newTestServerWithMux() *Server {

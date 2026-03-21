@@ -13,7 +13,7 @@ import (
 
 // ChinesePhonemizer converts Chinese text to IPA via pinyin.
 type ChinesePhonemizer struct {
-	singleCharPinyin map[rune]string  // char -> pinyin (e.g., '你'->"ni3")
+	singleCharPinyin map[rune]string   // char -> pinyin (e.g., '你'->"ni3")
 	phrasesPinyin    map[string]string // phrase -> pinyin (e.g., "你好"->"ni3hao3")
 }
 
@@ -85,13 +85,13 @@ var zhInitialToIPA = map[string]string{
 
 var zhFinalToIPA = map[string]string{
 	// Simple vowels
-	"a":  "a",
-	"o":  "o",
-	"e":  "ɤ",
-	"i":  "i",
-	"u":  "u",
-	"ü":  "y_vowel",
-	"v":  "y_vowel",
+	"a": "a",
+	"o": "o",
+	"e": "ɤ",
+	"i": "i",
+	"u": "u",
+	"ü": "y_vowel",
+	"v": "y_vowel",
 	// Diphthongs
 	"ai": "aɪ",
 	"ei": "eɪ",
@@ -156,17 +156,17 @@ var zhAlveolarInitials = map[string]bool{
 // ---------------------------------------------------------------------------
 
 var zhPunctMap = map[rune]rune{
-	'\u3002': '.', // 。
-	'\uff0c': ',', // ，
-	'\uff01': '!', // ！
-	'\uff1f': '?', // ？
-	'\u3001': ',', // 、
-	'\uff1b': ';', // ；
-	'\uff1a': ':', // ：
-	'\u2026': '.', // …
-	'\u2014': ',', // —
-	'\u201c': '"', // "
-	'\u201d': '"', // "
+	'\u3002': '.',  // 。
+	'\uff0c': ',',  // ，
+	'\uff01': '!',  // ！
+	'\uff1f': '?',  // ？
+	'\u3001': ',',  // 、
+	'\uff1b': ';',  // ；
+	'\uff1a': ':',  // ：
+	'\u2026': '.',  // …
+	'\u2014': ',',  // —
+	'\u201c': '"',  // "
+	'\u201d': '"',  // "
 	'\u2018': '\'', // '
 	'\u2019': '\'', // '
 }
@@ -660,4 +660,3 @@ func (p *ChinesePhonemizer) PhonemizeWithProsody(text string) (*PhonemizeResult,
 // ---------------------------------------------------------------------------
 
 var _ Phonemizer = (*ChinesePhonemizer)(nil)
-

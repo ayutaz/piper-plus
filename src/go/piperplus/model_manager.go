@@ -152,7 +152,7 @@ func (m *ModelManager) DownloadModel(ctx context.Context, rawURL string) (string
 	if err != nil {
 		return "", fmt.Errorf("piperplus: download model: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("piperplus: download model: HTTP %d", resp.StatusCode)
@@ -178,25 +178,25 @@ func (m *ModelManager) DownloadModel(ctx context.Context, rawURL string) (string
 	tmpPath := tmpFile.Name()
 
 	written, err := io.Copy(tmpFile, resp.Body)
-	resp.Body.Close() // close explicitly after copy, defer is a safety net
+	_ = resp.Body.Close() // close explicitly after copy, defer is a safety net
 	if closeErr := tmpFile.Close(); closeErr != nil && err == nil {
 		err = closeErr
 	}
 	if err != nil {
-		os.Remove(tmpPath)
+		_ = os.Remove(tmpPath)
 		return "", fmt.Errorf("piperplus: download model: %w", err)
 	}
 
 	// Restrict file permissions to owner-only.
 	if chmodErr := os.Chmod(tmpPath, 0600); chmodErr != nil {
-		os.Remove(tmpPath)
+		_ = os.Remove(tmpPath)
 		return "", fmt.Errorf("piperplus: download model: chmod: %w", chmodErr)
 	}
 
 	m.logger.Info("model downloaded", "path", destPath, "bytes", written)
 
 	if err := os.Rename(tmpPath, destPath); err != nil {
-		os.Remove(tmpPath)
+		_ = os.Remove(tmpPath)
 		return "", fmt.Errorf("piperplus: download model: rename: %w", err)
 	}
 

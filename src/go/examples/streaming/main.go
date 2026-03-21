@@ -32,14 +32,14 @@ func main() {
 	}
 
 	if err := piperplus.Init(""); err != nil {
-		log.Fatal(err)
+		log.Fatal(err) //nolint:gocritic // Fatal is acceptable in example programs
 	}
 	defer piperplus.Shutdown()
 
 	ctx := context.Background()
 	voice, err := piperplus.LoadVoice(ctx, *modelPath)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(err) //nolint:gocritic // Fatal is acceptable in example programs
 	}
 	defer voice.Close()
 

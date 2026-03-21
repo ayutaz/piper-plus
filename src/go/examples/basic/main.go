@@ -31,7 +31,7 @@ func main() {
 
 	// Initialize ONNX Runtime
 	if err := piperplus.Init(""); err != nil {
-		log.Fatalf("Failed to init ONNX Runtime: %v", err)
+		log.Fatalf("Failed to init ONNX Runtime: %v", err) //nolint:gocritic // Fatal is acceptable in example programs
 	}
 	defer piperplus.Shutdown()
 
@@ -41,7 +41,7 @@ func main() {
 		piperplus.WithDevice(*device),
 	)
 	if err != nil {
-		log.Fatalf("Failed to load voice: %v", err)
+		log.Fatalf("Failed to load voice: %v", err) //nolint:gocritic // Fatal is acceptable in example programs
 	}
 	defer voice.Close()
 

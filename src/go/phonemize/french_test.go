@@ -23,12 +23,12 @@ func TestFrenchNasalVowels_AN_AM(t *testing.T) {
 		word string
 		want string // expected nasal vowel phoneme
 	}{
-		{"france", "\u0251\u0303"},     // an -> ɑ̃
-		{"sang", "\u0251\u0303"},       // an word-final -> ɑ̃
-		{"camp", "\u0251\u0303"},       // am -> ɑ̃
-		{"lampe", "\u0251\u0303"},      // am before consonant -> ɑ̃
-		{"chambre", "\u0251\u0303"},    // am before b (consonant) -> ɑ̃
-		{"champ", "\u0251\u0303"},      // am word-final -> ɑ̃
+		{"france", "\u0251\u0303"},  // an -> ɑ̃
+		{"sang", "\u0251\u0303"},    // an word-final -> ɑ̃
+		{"camp", "\u0251\u0303"},    // am -> ɑ̃
+		{"lampe", "\u0251\u0303"},   // am before consonant -> ɑ̃
+		{"chambre", "\u0251\u0303"}, //nolint:misspell // French word — am before b (consonant) -> ɑ̃
+		{"champ", "\u0251\u0303"},   // am word-final -> ɑ̃
 	}
 	for _, tc := range tests {
 		ph := frWordPhonemes(tc.word)
@@ -51,12 +51,12 @@ func TestFrenchNasalVowels_EN_EM(t *testing.T) {
 		word string
 		want string
 	}{
-		{"temps", "\u0251\u0303"},      // em -> ɑ̃
-		{"entrer", "\u0251\u0303"},     // en -> ɑ̃
-		{"ensemble", "\u0251\u0303"},   // en -> ɑ̃
-		{"novembre", "\u0251\u0303"},   // em -> ɑ̃
-		{"enfant", "\u0251\u0303"},     // en -> ɑ̃
-		{"comment", "\u0251\u0303"},    // en word-final -> ɑ̃
+		{"temps", "\u0251\u0303"},    // em -> ɑ̃
+		{"entrer", "\u0251\u0303"},   // en -> ɑ̃
+		{"ensemble", "\u0251\u0303"}, // en -> ɑ̃
+		{"novembre", "\u0251\u0303"}, // em -> ɑ̃
+		{"enfant", "\u0251\u0303"},   // en -> ɑ̃
+		{"comment", "\u0251\u0303"},  // en word-final -> ɑ̃
 	}
 	for _, tc := range tests {
 		ph := frWordPhonemes(tc.word)
@@ -79,10 +79,10 @@ func TestFrenchNasalVowels_IN_IM(t *testing.T) {
 		word string
 		want string
 	}{
-		{"vin", "\u025b\u0303"},       // in -> ɛ̃
-		{"simple", "\u025b\u0303"},    // im -> ɛ̃
-		{"fin", "\u025b\u0303"},       // in -> ɛ̃
-		{"jardin", "\u025b\u0303"},    // in -> ɛ̃
+		{"vin", "\u025b\u0303"},    // in -> ɛ̃
+		{"simple", "\u025b\u0303"}, // im -> ɛ̃
+		{"fin", "\u025b\u0303"},    // in -> ɛ̃
+		{"jardin", "\u025b\u0303"}, // in -> ɛ̃
 	}
 	for _, tc := range tests {
 		ph := frWordPhonemes(tc.word)
@@ -105,10 +105,10 @@ func TestFrenchNasalVowels_ON_OM(t *testing.T) {
 		word string
 		want string
 	}{
-		{"bon", "\u0254\u0303"},       // on -> ɔ̃
-		{"nom", "\u0254\u0303"},       // om -> ɔ̃
-		{"monde", "\u0254\u0303"},     // on before consonant -> ɔ̃
-		{"ombre", "\u0254\u0303"},     // om before consonant -> ɔ̃
+		{"bon", "\u0254\u0303"},   // on -> ɔ̃
+		{"nom", "\u0254\u0303"},   // om -> ɔ̃
+		{"monde", "\u0254\u0303"}, // on before consonant -> ɔ̃
+		{"ombre", "\u0254\u0303"}, // om before consonant -> ɔ̃
 	}
 	for _, tc := range tests {
 		ph := frWordPhonemes(tc.word)
@@ -131,10 +131,10 @@ func TestFrenchNasalVowels_UN_UM(t *testing.T) {
 		word string
 		want string
 	}{
-		{"brun", "\u025b\u0303"},     // un -> ɛ̃
-		{"lundi", "\u025b\u0303"},    // un -> ɛ̃
-		{"humble", "\u025b\u0303"},   // um -> ɛ̃
-		{"parfum", "\u025b\u0303"},   // um -> ɛ̃
+		{"brun", "\u025b\u0303"},   // un -> ɛ̃
+		{"lundi", "\u025b\u0303"},  // un -> ɛ̃
+		{"humble", "\u025b\u0303"}, // um -> ɛ̃
+		{"parfum", "\u025b\u0303"}, // um -> ɛ̃
 	}
 	for _, tc := range tests {
 		ph := frWordPhonemes(tc.word)
@@ -157,8 +157,8 @@ func TestFrenchNasalVowels_YN_YM(t *testing.T) {
 		word string
 		want string
 	}{
-		{"syndicat", "\u025b\u0303"},  // yn -> ɛ̃
-		{"symbole", "\u025b\u0303"},   // ym -> ɛ̃
+		{"syndicat", "\u025b\u0303"}, // yn -> ɛ̃
+		{"symbole", "\u025b\u0303"},  // ym -> ɛ̃
 	}
 	for _, tc := range tests {
 		ph := frWordPhonemes(tc.word)
@@ -178,9 +178,9 @@ func TestFrenchNasalVowels_YN_YM(t *testing.T) {
 // Nasal vowel non-nasalization: doubled n/m and vowel-following should NOT nasalize.
 func TestFrenchNasal_NonNasalCases(t *testing.T) {
 	tests := []struct {
-		word    string
-		nasals  []string // these should NOT appear in output
-		desc    string
+		word   string
+		nasals []string // these should NOT appear in output
+		desc   string
 	}{
 		// "anne" — doubled 'n' should NOT nasalize
 		{"anne", []string{"\u0251\u0303", "\u025b\u0303"}, "doubled n blocks nasal"},
@@ -218,9 +218,9 @@ func TestFrenchNasal_AIN_EIN(t *testing.T) {
 		word string
 		want string
 	}{
-		{"pain", "\u025b\u0303"},    // ain -> ɛ̃
-		{"main", "\u025b\u0303"},    // ain -> ɛ̃
-		{"plein", "\u025b\u0303"},   // ein -> ɛ̃
+		{"pain", "\u025b\u0303"},  // ain -> ɛ̃
+		{"main", "\u025b\u0303"},  // ain -> ɛ̃
+		{"plein", "\u025b\u0303"}, // ein -> ɛ̃
 	}
 	for _, tc := range tests {
 		ph := frWordPhonemes(tc.word)
@@ -319,9 +319,9 @@ func TestFrenchNasal_STION(t *testing.T) {
 
 func TestFrenchSilentFinalConsonants(t *testing.T) {
 	tests := []struct {
-		word           string
-		shouldNotEnd   string // this phoneme should NOT be the last one
-		desc           string
+		word         string
+		shouldNotEnd string // this phoneme should NOT be the last one
+		desc         string
 	}{
 		// Final 't' is silent in "petit"
 		{"petit", "t", "final t should be silent"},
@@ -426,18 +426,18 @@ func TestFrenchAccentedVowels(t *testing.T) {
 		char rune
 		want string
 	}{
-		{'\u00e9', "e"},           // é -> e
-		{'\u00e8', "\u025b"},      // è -> ɛ
-		{'\u00ea', "\u025b"},      // ê -> ɛ
-		{'\u00eb', "\u025b"},      // ë -> ɛ
-		{'\u00e0', "a"},           // à -> a
-		{'\u00e2', "a"},           // â -> a
-		{'\u00ee', "i"},           // î -> i
-		{'\u00ef', "i"},           // ï -> i
-		{'\u00f4', "o"},           // ô -> o
-		{'\u00f9', "y_vowel"},     // ù -> y_vowel
-		{'\u00fb', "y_vowel"},     // û -> y_vowel
-		{'\u00fc', "y_vowel"},     // ü -> y_vowel
+		{'\u00e9', "e"},       // é -> e
+		{'\u00e8', "\u025b"},  // è -> ɛ
+		{'\u00ea', "\u025b"},  // ê -> ɛ
+		{'\u00eb', "\u025b"},  // ë -> ɛ
+		{'\u00e0', "a"},       // à -> a
+		{'\u00e2', "a"},       // â -> a
+		{'\u00ee', "i"},       // î -> i
+		{'\u00ef', "i"},       // ï -> i
+		{'\u00f4', "o"},       // ô -> o
+		{'\u00f9', "y_vowel"}, // ù -> y_vowel
+		{'\u00fb', "y_vowel"}, // û -> y_vowel
+		{'\u00fc', "y_vowel"}, // ü -> y_vowel
 	}
 	for _, tc := range tests {
 		// Test as single-character word
@@ -549,10 +549,10 @@ func TestFrenchEU(t *testing.T) {
 		want string
 		desc string
 	}{
-		{"peu", "\u00f8", "eu closed -> ø"},  // peu: no following consonant
-		{"jeu", "\u00f8", "eu closed -> ø"},  // jeu: no following consonant
-		{"peur", "\u0153", "eu open -> œ"},   // peur: before pronounced 'r'
-		{"fleur", "\u0153", "eu open -> œ"},  // fleur: before pronounced 'r'
+		{"peu", "\u00f8", "eu closed -> ø"}, // peu: no following consonant
+		{"jeu", "\u00f8", "eu closed -> ø"}, // jeu: no following consonant
+		{"peur", "\u0153", "eu open -> œ"},  // peur: before pronounced 'r'
+		{"fleur", "\u0153", "eu open -> œ"}, // fleur: before pronounced 'r'
 	}
 	for _, tc := range tests {
 		ph := frWordPhonemes(tc.word)
@@ -692,8 +692,8 @@ func TestFrenchR(t *testing.T) {
 		word  string
 		count int
 	}{
-		{"rare", 2},   // two separate r's
-		{"terre", 1},  // doubled rr -> single
+		{"rare", 2},  // two separate r's
+		{"terre", 1}, // doubled rr -> single
 	}
 	for _, tc := range tests {
 		ph := frWordPhonemes(tc.word)
@@ -719,9 +719,9 @@ func TestFrenchER_VerbInfinitive(t *testing.T) {
 		word string
 		want string
 	}{
-		{"parler", "e"},   // verb infinitive
-		{"manger", "e"},   // verb infinitive
-		{"chanter", "e"},  // verb infinitive
+		{"parler", "e"},  // verb infinitive
+		{"manger", "e"},  // verb infinitive
+		{"chanter", "e"}, // verb infinitive
 	}
 	for _, tc := range tests {
 		ph := frWordPhonemes(tc.word)
@@ -825,10 +825,9 @@ func TestFrenchAILLE(t *testing.T) {
 
 func TestFrenchOUILLE(t *testing.T) {
 	// ouille -> u + j
-	ph := frWordPhonemes("bouteille")
 	// "bouteille" actually has "eille" pattern, not "ouille"
 	// Use "grenouille" for ouille test
-	ph = frWordPhonemes("grenouille")
+	ph := frWordPhonemes("grenouille")
 	foundU := false
 	foundJ := false
 	for _, p := range ph {
@@ -1127,11 +1126,11 @@ func TestFrenchPhonemizer_EOSToken(t *testing.T) {
 		text string
 		want string
 	}{
-		{"Bonjour.", "$"},           // period -> default $
-		{"Comment allez-vous?", "?"},  // question mark -> ?
-		{"Très bien!", "!"},         // exclamation -> !
-		{"Bonjour le monde", "$"},   // no punctuation -> default $
-		{"Vraiment?!", "!"},         // last punctuation wins
+		{"Bonjour.", "$"},            // period -> default $
+		{"Comment allez-vous?", "?"}, // question mark -> ?
+		{"Très bien!", "!"},          // exclamation -> !
+		{"Bonjour le monde", "$"},    // no punctuation -> default $
+		{"Vraiment?!", "!"},          // last punctuation wins
 	}
 	for _, tc := range tests {
 		result, err := p.PhonemizeWithProsody(tc.text)

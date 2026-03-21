@@ -122,7 +122,7 @@ func (e *OnnxEngine) Synthesize(ctx context.Context, req *SynthesisRequest) (*Sy
 		return nil, ErrEmptyPhonemeIDs
 	}
 
-	// Check for pre-cancelled context.
+	// Check for pre-canceled context.
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -139,7 +139,7 @@ func (e *OnnxEngine) Synthesize(ctx context.Context, req *SynthesisRequest) (*Sy
 
 	cleanup := func() {
 		for _, t := range tensors {
-			t.Destroy()
+			_ = t.Destroy()
 		}
 	}
 	defer cleanup()
@@ -220,18 +220,18 @@ func (e *OnnxEngine) Synthesize(ctx context.Context, req *SynthesisRequest) (*Sy
 	if err != nil {
 		return nil, &InferenceError{Msg: "failed to create run options", Err: err}
 	}
-	defer runOpts.Destroy()
+	defer func() { _ = runOpts.Destroy() }()
 
 	// Spawn goroutine to watch for context cancellation.
-	cancelled := make(chan struct{})
+	canceled := make(chan struct{})
 	done := make(chan struct{})
 	defer close(done)
 	go func() {
 		select {
 		case <-ctx.Done():
-			e.logger.Debug("context cancelled, terminating inference", "reason", ctx.Err())
-			runOpts.Terminate()
-			close(cancelled)
+			e.logger.Debug("context canceled, terminating inference", "reason", ctx.Err())
+			_ = runOpts.Terminate()
+			close(canceled)
 		case <-done:
 		}
 	}()
@@ -242,15 +242,15 @@ func (e *OnnxEngine) Synthesize(ctx context.Context, req *SynthesisRequest) (*Sy
 		// Destroy any auto-allocated output tensors on error.
 		for i, o := range outputs {
 			if o != nil {
-				o.Destroy()
+				_ = o.Destroy()
 				outputs[i] = nil
 			}
 		}
 		// Determine whether the error is from context cancellation or an
-		// inference failure. Check the cancelled channel (non-blocking) to
+		// inference failure. Check the canceled channel (non-blocking) to
 		// avoid racing on ctx.Err() alone.
 		select {
-		case <-cancelled:
+		case <-canceled:
 			e.logger.Info("inference terminated due to context cancellation",
 				"elapsed", time.Since(start))
 			return nil, ctx.Err()
@@ -270,7 +270,7 @@ func (e *OnnxEngine) Synthesize(ctx context.Context, req *SynthesisRequest) (*Sy
 	defer func() {
 		for i, o := range outputs {
 			if o != nil {
-				o.Destroy()
+				_ = o.Destroy()
 				outputs[i] = nil
 			}
 		}

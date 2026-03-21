@@ -76,7 +76,7 @@ func (s *Server) ListenAndServe(addr string) error {
 
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(healthResponse{Status: "ok"})
+	_ = json.NewEncoder(w).Encode(healthResponse{Status: "ok"})
 }
 
 func (s *Server) handleInfo(w http.ResponseWriter, r *http.Request) {
@@ -89,7 +89,7 @@ func (s *Server) handleInfo(w http.ResponseWriter, r *http.Request) {
 		SampleRate:   cfg.Audio.SampleRate,
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
+	_ = json.NewEncoder(w).Encode(resp)
 }
 
 func (s *Server) handleSynthesize(w http.ResponseWriter, r *http.Request) {
@@ -205,5 +205,5 @@ func parseSynthesizeQuery(r *http.Request) (synthesizeRequest, error) {
 func writeError(w http.ResponseWriter, code int, msg string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
-	json.NewEncoder(w).Encode(map[string]string{"error": msg})
+	_ = json.NewEncoder(w).Encode(map[string]string{"error": msg})
 }
