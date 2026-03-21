@@ -71,14 +71,14 @@ public sealed class Phase4IntegrationTests : IDisposable
     }
 
     [Fact]
-    public void ListModelsContainsMoeSpeech()
+    public void ListModelsContainsCss10()
     {
         using var sw = CaptureStdErr();
 
         ModelManager.ListModels();
 
         string output = sw.ToString();
-        Assert.Contains("moe-speech", output);
+        Assert.Contains("css10-6lang", output);
     }
 
     [Fact]
@@ -250,7 +250,6 @@ public sealed class Phase4IntegrationTests : IDisposable
         Assert.Contains("ja_JP-tsukuyomi-chan-medium", output);
         Assert.Contains("[piper-plus]", output);
         Assert.Contains("1 speaker", output);
-        Assert.Contains("20 speakers", output);
         Assert.Contains("medium", output);
 
         // Footer

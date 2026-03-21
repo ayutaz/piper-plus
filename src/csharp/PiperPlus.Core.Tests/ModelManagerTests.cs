@@ -92,14 +92,14 @@ public sealed class ModelManagerTests : IDisposable
     }
 
     [Fact]
-    public void FindVoice_ByAlias_MoeSpeech()
+    public void FindVoice_ByAlias_Css10()
     {
-        var voice = ModelManager.FindVoice("moe-speech");
+        var voice = ModelManager.FindVoice("css10");
 
         Assert.NotNull(voice);
-        Assert.Equal("ja_JP-moe-speech-20speakers-medium", voice!.Key);
-        Assert.Equal("moe-speech-20speakers", voice.Name);
-        Assert.Equal(20, voice.NumSpeakers);
+        Assert.Equal("ja_JP-css10-6lang-medium", voice!.Key);
+        Assert.Equal("css10-6lang", voice.Name);
+        Assert.Equal(1, voice.NumSpeakers);
     }
 
     // ================================================================
@@ -146,7 +146,7 @@ public sealed class ModelManagerTests : IDisposable
 
         // The catalog contains both piper-plus voices
         Assert.Contains("ja_JP-tsukuyomi-chan-medium", output);
-        Assert.Contains("ja_JP-moe-speech-20speakers-medium", output);
+        Assert.Contains("ja_JP-css10-6lang-medium", output);
         Assert.Contains("Available voice models:", output);
     }
 
@@ -161,7 +161,7 @@ public sealed class ModelManagerTests : IDisposable
 
         // Japanese models should appear
         Assert.Contains("ja_JP-tsukuyomi-chan-medium", output);
-        Assert.Contains("ja_JP-moe-speech-20speakers-medium", output);
+        Assert.Contains("ja_JP-css10-6lang-medium", output);
         Assert.Contains("Japanese", output);
     }
 
@@ -280,7 +280,7 @@ public sealed class ModelManagerTests : IDisposable
         string output = sw.ToString();
 
         Assert.Contains("ja_JP-tsukuyomi-chan-medium", output);
-        Assert.Contains("ja_JP-moe-speech-20speakers-medium", output);
+        Assert.Contains("ja_JP-css10-6lang-medium", output);
         Assert.Contains("Available voice models:", output);
     }
 
@@ -305,9 +305,9 @@ public sealed class ModelManagerTests : IDisposable
 
         // Both should list the same models
         Assert.Contains("ja_JP-tsukuyomi-chan-medium", outputEmpty);
-        Assert.Contains("ja_JP-moe-speech-20speakers-medium", outputEmpty);
+        Assert.Contains("ja_JP-css10-6lang-medium", outputEmpty);
         Assert.Contains("ja_JP-tsukuyomi-chan-medium", outputNull);
-        Assert.Contains("ja_JP-moe-speech-20speakers-medium", outputNull);
+        Assert.Contains("ja_JP-css10-6lang-medium", outputNull);
     }
 
     // ================================================================
