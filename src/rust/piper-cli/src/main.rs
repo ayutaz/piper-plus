@@ -119,8 +119,8 @@ struct Cli {
 fn parse_phoneme_silence(values: &[String]) -> Result<HashMap<String, f32>> {
     let mut map = HashMap::new();
     for entry in values {
-        let parts: Vec<&str> = entry.splitn(2, ' ').collect();
-        if parts.len() != 2 {
+        let parts: Vec<&str> = entry.split_whitespace().collect();
+        if parts.len() < 2 {
             anyhow::bail!(
                 "Invalid --phoneme-silence format: '{}'. Expected 'PHONEME SECONDS' (e.g. '_ 0.5').",
                 entry
@@ -167,7 +167,13 @@ fn main() -> Result<()> {
         .or_else(|| std::env::var("PIPER_MODEL_DIR").ok().map(PathBuf::from));
 
     // ログ初期化
-    let env_filter = if cli.debug { "debug" } else { "info" };
+    let env_filter = if cli.quiet {
+        "off"
+    } else if cli.debug {
+        "debug"
+    } else {
+        "info"
+    };
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env()
@@ -375,21 +381,25 @@ fn main() -> Result<()> {
                 .with_context(|| format!("Synthesis failed for line {}", idx))?;
 
             // --sentence-silence: 文末に無音を追加
-            let mut audio_data = result.audio.clone();
-            append_silence(&mut audio_data, result.sample_rate, cli.sentence_silence);
+            let sample_rate = result.sample_rate;
+            let audio_seconds = result.audio_seconds;
+            let infer_seconds = result.infer_seconds;
+            let rtf = result.real_time_factor();
+            let mut audio_data = result.audio;
+            append_silence(&mut audio_data, sample_rate, cli.sentence_silence);
 
             let filename = format!("{:04}.wav", idx);
             let path = output_dir.join(&filename);
-            audio::write_wav(&path, result.sample_rate, &audio_data)
+            audio::write_wav(&path, sample_rate, &audio_data)
                 .with_context(|| format!("Failed to write {}", path.display()))?;
 
             tracing::info!(
                 "Batch [{}/{}]: {:.3}s audio, {:.3}s infer, RTF={:.3} -> {}",
                 idx,
                 lines.len(),
-                result.audio_seconds,
-                result.infer_seconds,
-                result.real_time_factor(),
+                audio_seconds,
+                infer_seconds,
+                rtf,
                 path.display(),
             );
         }
@@ -485,12 +495,14 @@ fn main() -> Result<()> {
                     .with_context(|| format!("Synthesis failed for sentence {}", idx))?;
 
                 // --sentence-silence: 文末に無音を追加
-                let mut audio_data = result.audio.clone();
-                append_silence(&mut audio_data, result.sample_rate, cli.sentence_silence);
+                let sample_rate = result.sample_rate;
+                let audio_seconds = result.audio_seconds;
+                let mut audio_data = result.audio;
+                append_silence(&mut audio_data, sample_rate, cli.sentence_silence);
 
                 let filename = format!("chunk_{:04}.wav", idx);
                 let path = output_dir.join(&filename);
-                audio::write_wav(&path, result.sample_rate, &audio_data)
+                audio::write_wav(&path, sample_rate, &audio_data)
                     .with_context(|| format!("Failed to write {}", path.display()))?;
 
                 tracing::info!(
@@ -498,7 +510,7 @@ fn main() -> Result<()> {
                     idx,
                     sentences.len(),
                     sentence,
-                    result.audio_seconds,
+                    audio_seconds,
                     path.display(),
                 );
             }
@@ -515,6 +527,18 @@ fn main() -> Result<()> {
             } else {
                 text.to_string()
             };
+
+            // --test-mode: phoneme IDs のみ出力して終了 (ONNX 推論スキップ)
+            if cli.test_mode {
+                let ids = voice
+                    .phonemize_to_ids(&text_to_synth)
+                    .context("Failed to phonemize text")?;
+                let json =
+                    serde_json::to_string(&ids).context("Failed to serialize phoneme IDs")?;
+                println!("{}", json);
+                return Ok(());
+            }
+
             let result = voice
                 .synthesize_text(
                     &text_to_synth,
@@ -567,27 +591,31 @@ fn main() -> Result<()> {
             }
 
             // --sentence-silence: 文末に無音を追加
-            let mut audio_data = result.audio.clone();
-            append_silence(&mut audio_data, result.sample_rate, cli.sentence_silence);
+            let sample_rate = result.sample_rate;
+            let mut audio_data = result.audio;
+            append_silence(&mut audio_data, sample_rate, cli.sentence_silence);
 
             // 出力
-            if output_to_stdout {
-                audio::write_wav_to_stdout(result.sample_rate, &audio_data)
+            if cli.output_raw {
+                audio::write_raw_to_stdout(&audio_data)
+                    .context("Failed to write raw PCM to stdout")?;
+            } else if output_to_stdout {
+                audio::write_wav_to_stdout(sample_rate, &audio_data)
                     .context("Failed to write WAV to stdout")?;
             } else if let Some(ref dir) = cli.output_dir {
                 let path = dir.join("output.wav");
-                audio::write_wav(&path, result.sample_rate, &audio_data)
+                audio::write_wav(&path, sample_rate, &audio_data)
                     .with_context(|| format!("Failed to write {}", path.display()))?;
                 tracing::info!("Wrote: {}", path.display());
             } else if let Some(ref file) = cli.output_file {
                 let path = PathBuf::from(file);
-                audio::write_wav(&path, result.sample_rate, &audio_data)
+                audio::write_wav(&path, sample_rate, &audio_data)
                     .with_context(|| format!("Failed to write {}", path.display()))?;
                 tracing::info!("Wrote: {}", path.display());
             } else {
                 // デフォルト: output.wav に出力
                 let path = PathBuf::from("output.wav");
-                audio::write_wav(&path, result.sample_rate, &audio_data)
+                audio::write_wav(&path, sample_rate, &audio_data)
                     .with_context(|| format!("Failed to write {}", path.display()))?;
                 tracing::info!("Wrote: {}", path.display());
             }
@@ -630,22 +658,23 @@ fn main() -> Result<()> {
             );
 
             // --sentence-silence: 文末に無音を追加
-            let mut audio_data = synthesis.audio.clone();
-            append_silence(&mut audio_data, synthesis.sample_rate, cli.sentence_silence);
+            let sample_rate = synthesis.sample_rate;
+            let mut audio_data = synthesis.audio;
+            append_silence(&mut audio_data, sample_rate, cli.sentence_silence);
 
             // 出力
             if output_to_stdout {
-                audio::write_wav_to_stdout(synthesis.sample_rate, &audio_data)
+                audio::write_wav_to_stdout(sample_rate, &audio_data)
                     .context("Failed to write WAV to stdout")?;
             } else if let Some(ref dir) = cli.output_dir {
                 let filename = output_file.unwrap_or_else(|| format!("{}.wav", utt_count));
                 let output_path = dir.join(&filename);
-                audio::write_wav(&output_path, synthesis.sample_rate, &audio_data)
+                audio::write_wav(&output_path, sample_rate, &audio_data)
                     .with_context(|| format!("Failed to write {}", output_path.display()))?;
                 tracing::info!("Wrote: {}", output_path.display());
             } else if let Some(ref file) = cli.output_file {
                 let output_path = PathBuf::from(file);
-                audio::write_wav(&output_path, synthesis.sample_rate, &audio_data)
+                audio::write_wav(&output_path, sample_rate, &audio_data)
                     .with_context(|| format!("Failed to write {}", output_path.display()))?;
                 tracing::info!("Wrote: {}", output_path.display());
             }

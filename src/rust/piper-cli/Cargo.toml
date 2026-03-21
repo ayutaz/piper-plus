@@ -14,5 +14,6 @@ description = "CLI tool for Piper Plus neural text-to-speech synthesis"
 piper-plus = { path = "../piper-core", version = "0.1.0" }
 clap = { version = "4", features = ["derive"] }
 anyhow = "1"
+serde_json = "1"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }

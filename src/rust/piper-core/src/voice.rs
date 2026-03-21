@@ -933,4 +933,16 @@ mod tests {
             other => panic!("expected PhonemeIdNotFound, got: {other:?}"),
         }
     }
+
+    // -----------------------------------------------------------------------
+    // phonemize_to_ids — cannot be unit-tested without an ONNX model
+    // -----------------------------------------------------------------------
+    // `PiperVoice::phonemize_to_ids` requires a fully initialized `PiperVoice`
+    // (ONNX engine + config), so it cannot be unit-tested without a real model
+    // file. Its internals are covered by the component tests above:
+    //   - phonemize_with_prosody: tested via language-specific phonemizer tests
+    //   - tokens_to_ids: tested in phoneme_converter::tests and above
+    //   - post_process_ids: tested in phonemizer trait tests
+    // End-to-end testing of phonemize_to_ids is done via integration tests
+    // (test_custom_dict_integration.rs) and CLI --test-mode.
 }
