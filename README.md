@@ -36,7 +36,7 @@
 - **6言語対応** — 日本語・英語・中国語・スペイン語・フランス語・ポルトガル語 (ja=0, en=1, zh=2, es=3, fr=4, pt=5)
 - **日本語 TTS** — OpenJTalk統合、韻律情報 (A1/A2/A3)、疑問詞マーカー (#204)、文脈依存「ん」バリアント (#207)
 - **英語 TTS** — GPL-free G2P ([g2p-en](https://github.com/Kyubyong/g2p), Apache-2.0)、espeak-ng 不要
-- **マルチスピーカー** — 571話者対応 (6言語ベースモデル)、SpeakerBalancedBatchSampler、言語グループ均等サンプリング
+- **マルチスピーカー** — 571話者対応 (学習用ベースモデル)、SpeakerBalancedBatchSampler、言語グループ均等サンプリング
 - **カスタム辞書** — 200+技術用語の発音辞書内蔵
 - **音素入力** — `[[ phonemes ]]` 記法による直接指定 — [ガイド](docs/features/phoneme-input.md)
 
@@ -575,12 +575,20 @@ CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
 
 ## 事前学習済みモデル
 
-日本語TTSのファインチューニング用ベースモデルを Hugging Face で公開しています。
+推論用の音声合成モデルを Hugging Face で公開しています。
+
+**推論用モデル (すぐに使えます):**
 
 | モデル | 言語 | 話者数 | 説明 | ダウンロード |
 |---|---|---|---|---|
-| 6言語ベースモデル | JA/EN/ZH/ES/FR/PT | 571 | 6言語マルチリンガルベースモデル (508,187発話, VITS + Prosody) | [HuggingFace](https://huggingface.co/ayousanz/piper-plus-base) |
-| つくよみちゃん 6lang | JA/EN/ZH/ES/FR/PT | 1 | 6言語ベースからファインチューニング、6言語対応、FP16 | [HuggingFace](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan) |
+| つくよみちゃん 6lang | JA/EN/ZH/ES/FR/PT | 1 | つくよみちゃん音声、6言語対応、FP16 | [HuggingFace](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan) |
+| CSS10 日本語 6lang | JA/EN/ZH/ES/FR/PT | 1 | CSS10日本語音声、6言語対応、FP16 (6,841発話) | [HuggingFace](https://huggingface.co/ayousanz/piper-plus-css10-ja-6lang) |
+
+**学習用ベースモデル (ファインチューニング用):**
+
+| モデル | 言語 | 話者数 | 説明 | ダウンロード |
+|---|---|---|---|---|
+| 6言語ベースモデル | JA/EN/ZH/ES/FR/PT | 571 | マルチリンガル事前学習済み (508,187発話, VITS + Prosody) | [HuggingFace](https://huggingface.co/ayousanz/piper-plus-base) |
 
 ### モデルのダウンロード
 
@@ -602,7 +610,7 @@ curl -L -o models/tsukuyomi.onnx https://huggingface.co/ayousanz/piper-plus-tsuk
 curl -L -o models/config.json https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/config.json
 ```
 
-### 6言語ベースモデルの特徴
+### 6言語ベースモデルの特徴 (学習用)
 
 - アーキテクチャ: VITS + Prosody Features
 - 学習データ: 508,187発話 (571話者, 6言語)
