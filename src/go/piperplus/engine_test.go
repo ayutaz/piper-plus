@@ -29,8 +29,10 @@ func TestDetectCapabilities(t *testing.T) {
 		t.Fatalf("detectCapabilities failed: %v", err)
 	}
 
-	if !caps.HasSpeakerID {
-		t.Error("expected HasSpeakerID to be true for multilingual model")
+	// The test model (multilingual-test-medium.onnx) is a single-speaker
+	// finetuned model, so it does NOT have a speaker_id input.
+	if caps.HasSpeakerID {
+		t.Error("expected HasSpeakerID to be false for single-speaker finetuned model")
 	}
 	if !caps.HasLanguageID {
 		t.Error("expected HasLanguageID to be true for multilingual model")
