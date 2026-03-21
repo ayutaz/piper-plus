@@ -57,7 +57,7 @@
 - **[Docker](docker/README.md)** — 推論・学習・WebUI・C++の5イメージ提供
 - **PyPI** — `pip install piper-tts-plus` で簡単インストール
 - **C# CLI** — .NET 8/9 クロスプラットフォーム、6言語マルチリンガル、ONNX推論
-- **Rust CLI** — piper-plus/piper-plus-cli、ストリーミング、CUDA/CoreML/DirectML対応
+- **Rust CLI** — piper-plus/piper-plus-cli、ストリーミング、CUDA/CoreML/DirectML対応、辞書自動ダウンロード
 
 ### プラットフォーム
 
@@ -236,6 +236,34 @@ PyPI パッケージからもインストール可能:
 pip install piper-tts-plus
 ```
 
+### パッケージからインストール
+
+**Python (PyPI):**
+```bash
+pip install piper-tts-plus
+```
+
+**C# CLI (.NET Global Tool):**
+```bash
+dotnet tool install -g PiperPlus.Cli
+```
+
+**Rust CLI (crates.io):**
+```bash
+cargo install piper-plus-cli
+```
+
+**C# ライブラリ (NuGet):**
+```bash
+dotnet add package PiperPlus.Core
+```
+
+**Rust ライブラリ (crates.io):**
+```toml
+[dependencies]
+piper-plus = "0.1.0"
+```
+
 ### ソースからビルド (C++)
 
 ```bash
@@ -262,6 +290,46 @@ dotnet test src/csharp/PiperPlus.Core.Tests/
 ```
 
 前提条件: .NET 8 SDK 以上
+
+#### C# CLI 使用例
+
+```bash
+# 日本語
+piper-plus --model model.onnx --text "こんにちは" --language ja --output-file output.wav
+
+# 英語
+piper-plus --model model.onnx --text "Hello world" --language en --output-file output.wav
+
+# マルチリンガル (自動言語検出)
+piper-plus --model model.onnx --text "こんにちはHello你好" --language ja-en-zh --output-file output.wav
+
+# ストリーミング (文ごとに逐次PCM出力)
+piper-plus --model model.onnx --text "最初の文。次の文。" --language ja --streaming | aplay -r 22050 -f S16_LE
+
+# カスタム辞書 (JSON v1/v2 または TSV)
+piper-plus --model model.onnx --text "AI技術" --language ja --custom-dict my_dict.json --output-file output.wav
+```
+
+#### Rust CLI 使用例
+
+```bash
+# 日本語 (naist-jdic辞書バンドル済み)
+piper-plus-cli --model model.onnx --text "こんにちは" --language ja --output-file output.wav
+
+# 英語
+piper-plus-cli --model model.onnx --text "Hello world" --language en --output-file output.wav
+
+# ストリーミング (文ごとに逐次合成)
+piper-plus-cli --model model.onnx --text "First sentence. Second sentence." --stream --output-dir chunks/
+
+# カスタム辞書
+piper-plus-cli --model model.onnx --text "AI技術" --custom-dict my_dict.json --output-file output.wav
+
+# GPU推論
+piper-plus-cli --model model.onnx --text "Hello" --device cuda --output-file output.wav
+```
+
+> **Note:** C# CLI は `dotnet tool install -g PiperPlus.Cli` で、Rust CLI は `cargo install piper-plus-cli` でインストールできます。両方とも6言語対応・カスタム辞書・ストリーミングをサポートしています。
 
 ### ソースからビルド (Rust)
 

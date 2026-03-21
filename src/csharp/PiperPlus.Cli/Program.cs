@@ -753,17 +753,69 @@ internal static class Program
                     // Write output (streaming vs normal)
                     if (streaming)
                     {
-                        using var stdout = Console.OpenStandardOutput();
-                        StreamingWriter.WriteImmediate(stdout, audio);
+                        // Sentence-level streaming: split text, synthesize each sentence,
+                        // and write progressive raw PCM to stdout.
+                        var sentences = TextSplitter.SplitSentences(textInput);
+                        int streamedCount;
+
+                        if (sentences.Count <= 1)
+                        {
+                            // Single sentence or no split: write the already-synthesized audio
+                            using var stdout = Console.OpenStandardOutput();
+                            StreamingWriter.WriteChunked(stdout, audio);
+                            LogDebug(debug, quiet,
+                                $"Streamed sentence: \"{textInput}\" ({audio.Length} samples)");
+                            streamedCount = 1;
+                        }
+                        else
+                        {
+                            // Multiple sentences: synthesize each independently for
+                            // lower time-to-first-audio
+                            using var stdout = Console.OpenStandardOutput();
+                            foreach (var sentence in sentences)
+                            {
+                                string sentenceText = sentence;
+                                if (customDict is not null)
+                                    sentenceText = customDict.ApplyToText(sentenceText);
+
+                                var (sentencePhonemeIds, sentenceProsody) =
+                                    PhonemeEncoder.EncodeDirect(
+                                        phonemizer, sentenceText, phonemeIdMap);
+
+                                if (!model.HasProsody) sentenceProsody = null;
+
+                                short[] chunkAudio;
+                                try
+                                {
+                                    chunkAudio = SynthesizeWithPhonemeSilence(
+                                        piperSession, sentencePhonemeIds, sentenceProsody,
+                                        speaker, languageId, noiseScale, lengthScale, noiseW,
+                                        phonemeSilenceMap, config.PhonemeIdMap, sampleRate);
+                                }
+                                catch (Exception ex)
+                                {
+                                    LogError($"Synthesis failed for sentence: {ex.Message}");
+                                    Environment.ExitCode = 1;
+                                    return;
+                                }
+
+                                StreamingWriter.WriteChunked(stdout, chunkAudio);
+                                LogDebug(debug, quiet,
+                                    $"Streamed sentence: \"{sentence}\" ({chunkAudio.Length} samples)");
+                            }
+                            streamedCount = sentences.Count;
+                        }
+
+                        LogInfo(quiet, $"Streamed {streamedCount} sentence(s).");
                     }
                     else
                     {
                         WriteTextModeOutput(
                             outputMode, outputRaw, outputFile, outputDir,
                             audio, sampleRate, quiet);
+                        LogInfo(quiet, "Synthesized 1 utterance(s).");
                     }
 
-                    LogInfo(quiet, "Synthesized 1 utterance(s).");
                     return;
                 }
 

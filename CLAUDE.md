@@ -289,14 +289,20 @@ Validation頻度削減、DataLoader最適化 (num_workers=2, pin_memory)、LRス
 |------|------|
 | TFM | PiperPlus.Core: net8.0, PiperPlus.Cli: net9.0 |
 | 対応言語 | JA, EN, ZH, ES, FR, PT (6言語) |
-| G2P依存 | DotNetG2P.Chinese/Spanish/French/Portuguese v1.7.0 |
-| テスト | 721テスト (xUnit v3) |
+| G2P依存 | DotNetG2P v1.8.0 (JA), DotNetG2P.MeCab v1.8.0 (JA), DotNetG2P.English v1.8.0 (EN), DotNetG2P.Chinese/Spanish/French/Portuguese v1.7.0 |
+| テスト | 775テスト (xUnit v3) |
 | CI | 3 OS × 2 .NET バージョン (csharp-ci.yml) |
 | ビルド | `dotnet build src/csharp/PiperPlus.sln` |
 
 **実装:** `src/csharp/PiperPlus.Core/`, `src/csharp/PiperPlus.Cli/`
 
-### Rust 推論エンジン (piper-rs)
+**追加機能:**
+- `lid` (言語ID) テンソル対応: マルチリンガルモデルで `language_id_map` から自動解決
+- OpenJTalk 辞書自動ダウンロード: C++ `openjtalk_dictionary_manager.c` と同等の辞書検索・自動DL機能
+- ストリーミング文分割: `TextSplitter.SplitSentences()` で文ごとに逐次合成 (`--streaming`)
+- カスタム辞書: JSON v1.0/v2.0 (C++/Rust互換) + TSV 形式対応 (`--custom-dict`)
+
+### Rust 推論エンジン (piper-plus)
 
 Rust によるONNX推論エンジン。ストリーミング、CUDA/CoreML/DirectML対応。PyO3 による Python バインディング提供。
 
@@ -307,6 +313,12 @@ Rust によるONNX推論エンジン。ストリーミング、CUDA/CoreML/Direc
 | 特徴 | ストリーミング、GPU推論、WASM対応 |
 | CI | 3 OS (rust-tests.yml) |
 | ビルド | `cargo build --release -p piper-plus-cli` |
+
+**デフォルトfeature:** `naist-jdic` (JA辞書バンドル) + `dict-download` (OpenJTalk辞書自動DL、C#/C++用)。jpreprocess は lindera 形式辞書を使用するため、OpenJTalk MeCab 形式とは非互換。`PIPER_OFFLINE_MODE=1` で自動DL無効化可能。
+
+**追加機能:**
+- カスタム辞書: JSON v1.0/v2.0 対応、`--custom-dict` でCLI統合済み (テキスト/バッチ/ストリーミング全パス)
+- バイナリビルドCI: PR時3プラットフォーム、リリース時5ターゲット (Linux ARM64クロスコンパイル含む)
 
 **実装:** `src/rust/piper-core/`, `src/rust/piper-cli/`, `src/rust/piper-python/`
 
@@ -357,6 +369,8 @@ Rust によるONNX推論エンジン。ストリーミング、CUDA/CoreML/Direc
 | マルチリンガルPhonemizer | `src/csharp/PiperPlus.Core/Phonemize/MultilingualPhonemizer.cs` |
 | PUAマッピング | `src/csharp/PiperPlus.Core/Mapping/OpenJTalkToPiperMapping.cs` |
 | 設定管理 | `src/csharp/PiperPlus.Core/Config/` |
+| 辞書マネージャ | `src/csharp/PiperPlus.Core/Config/DictionaryManager.cs` |
+| テキスト分割 | `src/csharp/PiperPlus.Core/Phonemize/TextSplitter.cs` |
 
 ### Rust ソースコード
 
@@ -368,6 +382,8 @@ Rust によるONNX推論エンジン。ストリーミング、CUDA/CoreML/Direc
 | Python バインディング | `src/rust/piper-python/` |
 | 音素化 | `src/rust/piper-core/src/phonemize/` |
 | 推論エンジン | `src/rust/piper-core/src/engine.rs` |
+| 辞書マネージャ | `src/rust/piper-core/src/dictionary_manager.rs` |
+| カスタム辞書テスト | `src/rust/piper-core/tests/test_custom_dict_integration.rs` |
 
 ### データセット
 

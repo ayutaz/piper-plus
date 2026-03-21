@@ -1,5 +1,6 @@
 using DotNetG2P;
 using DotNetG2P.MeCab;
+using PiperPlus.Core.Config;
 using PiperPlus.Core.Phonemize;
 
 namespace PiperPlus.Cli;
@@ -8,13 +9,27 @@ namespace PiperPlus.Cli;
 /// Adapter that wraps <see cref="G2PEngine"/> (DotNetG2P.Core + DotNetG2P.MeCab)
 /// to implement <see cref="IJapaneseG2PEngine"/> for piper-plus Japanese phonemization.
 /// </summary>
+/// <remarks>
+/// Before creating the <see cref="MeCabTokenizer"/>, this class uses
+/// <see cref="DictionaryManager"/> to ensure the naist-jdic dictionary is available.
+/// If the dictionary is not found locally, it will be downloaded automatically
+/// (unless offline mode or auto-download is disabled).
+/// </remarks>
 internal sealed class DotNetG2PEngine : IJapaneseG2PEngine
 {
     private readonly G2PEngine _engine;
 
     public DotNetG2PEngine()
     {
-        var tokenizer = new MeCabTokenizer();
+        // Ensure dictionary is available (download if necessary).
+        // Block on async since the G2PEngine constructor is synchronous.
+        var dictPath = DictionaryManager.EnsureDictionaryAsync().GetAwaiter().GetResult();
+
+        // Set NAIST_JDIC_PATH so DotNetG2P.MeCab NaistJdicLocator can find it,
+        // and also pass the path directly to the MeCabTokenizer constructor.
+        Environment.SetEnvironmentVariable("NAIST_JDIC_PATH", dictPath);
+
+        var tokenizer = new MeCabTokenizer(dictPath);
         _engine = new G2PEngine(tokenizer);
     }
 

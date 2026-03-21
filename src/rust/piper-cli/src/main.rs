@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use anyhow::{Context, Result};
 use clap::Parser;
 
+use piper_plus::phonemize::custom_dict::CustomDictionary;
 use piper_plus::{OnnxEngine, PiperVoice, VoiceConfig, audio, config, input::JsonlReader};
 
 /// サポートされている言語コード
@@ -171,6 +172,26 @@ fn main() -> Result<()> {
         let mut voice = PiperVoice::load(model_path, cli.config.as_deref(), &cli.device)
             .context("Failed to initialize PiperVoice")?;
 
+        // Load custom dictionaries
+        let custom_dict = if !cli.custom_dicts.is_empty() {
+            let mut dict = CustomDictionary::new();
+            for path in &cli.custom_dicts {
+                match dict.load_dictionary(path) {
+                    Ok(()) => tracing::info!("Loaded custom dictionary: {}", path.display()),
+                    Err(e) => {
+                        tracing::error!(
+                            "Failed to load custom dictionary {}: {}",
+                            path.display(),
+                            e
+                        )
+                    }
+                }
+            }
+            Some(dict)
+        } else {
+            None
+        };
+
         let content = std::fs::read_to_string(batch_path)
             .with_context(|| format!("Failed to read batch file: {}", batch_path.display()))?;
 
@@ -192,9 +213,18 @@ fn main() -> Result<()> {
 
         for (i, line) in lines.iter().enumerate() {
             let idx = i + 1;
+            let text_to_synth = if let Some(ref dict) = custom_dict {
+                let modified = dict.apply_to_text(line);
+                if modified != *line {
+                    tracing::debug!("Custom dict: \"{}\" -> \"{}\"", line, modified);
+                }
+                modified
+            } else {
+                line.to_string()
+            };
             let result = voice
                 .synthesize_text(
-                    line,
+                    &text_to_synth,
                     cli.speaker,
                     cli.language.as_deref(),
                     cli.noise_scale,
@@ -225,13 +255,25 @@ fn main() -> Result<()> {
         let mut voice = PiperVoice::load(model_path, cli.config.as_deref(), &cli.device)
             .context("Failed to initialize PiperVoice")?;
 
-        // カスタム辞書の読み込み (将来対応予定)
-        if !cli.custom_dicts.is_empty() {
-            tracing::warn!(
-                "Custom dictionaries are not yet supported in text mode, ignoring {} dict(s)",
-                cli.custom_dicts.len()
-            );
-        }
+        // Load custom dictionaries
+        let custom_dict = if !cli.custom_dicts.is_empty() {
+            let mut dict = CustomDictionary::new();
+            for path in &cli.custom_dicts {
+                match dict.load_dictionary(path) {
+                    Ok(()) => tracing::info!("Loaded custom dictionary: {}", path.display()),
+                    Err(e) => {
+                        tracing::error!(
+                            "Failed to load custom dictionary {}: {}",
+                            path.display(),
+                            e
+                        )
+                    }
+                }
+            }
+            Some(dict)
+        } else {
+            None
+        };
 
         // 言語ログ出力
         if let Some(ref lang) = cli.language {
@@ -277,9 +319,18 @@ fn main() -> Result<()> {
 
             for (i, sentence) in sentences.iter().enumerate() {
                 let idx = i + 1;
+                let text_to_synth = if let Some(ref dict) = custom_dict {
+                    let modified = dict.apply_to_text(sentence);
+                    if modified != *sentence {
+                        tracing::debug!("Custom dict: \"{}\" -> \"{}\"", sentence, modified);
+                    }
+                    modified
+                } else {
+                    sentence.to_string()
+                };
                 let result = voice
                     .synthesize_text(
-                        sentence,
+                        &text_to_synth,
                         cli.speaker,
                         cli.language.as_deref(),
                         cli.noise_scale,
@@ -306,9 +357,18 @@ fn main() -> Result<()> {
             tracing::info!("Streaming complete: {} chunks written", sentences.len());
         } else {
             // 通常の --text モード (一括合成)
+            let text_to_synth = if let Some(ref dict) = custom_dict {
+                let modified = dict.apply_to_text(text);
+                if modified != *text {
+                    tracing::debug!("Custom dict: \"{}\" -> \"{}\"", text, modified);
+                }
+                modified
+            } else {
+                text.to_string()
+            };
             let result = voice
                 .synthesize_text(
-                    text,
+                    &text_to_synth,
                     cli.speaker,
                     cli.language.as_deref(),
                     cli.noise_scale,

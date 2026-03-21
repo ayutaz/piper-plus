@@ -102,8 +102,9 @@ impl PiperVoice {
 
     /// 言語コードに基づいて適切な Phonemizer を生成する。
     ///
-    /// 各言語の専用 Phonemizer を使用し、辞書が必要な言語 (en, zh) は
+    /// 各言語の専用 Phonemizer を使用し、辞書が必要な言語 (ja, en, zh) は
     /// `model_dir` 配下またはデフォルトパスから辞書を検索する。
+    /// JA は dictionary_manager による自動ダウンロードも対応。
     /// 辞書が見つからない場合は PassthroughPhonemizer にフォールバックする。
     fn create_language_phonemizer(
         lang: &str,
@@ -111,7 +112,15 @@ impl PiperVoice {
     ) -> Result<Box<dyn Phonemizer>, PiperError> {
         match lang {
             #[cfg(feature = "japanese")]
-            "ja" => Ok(Box::new(Self::create_japanese_phonemizer()?)),
+            "ja" => match Self::create_japanese_phonemizer() {
+                Ok(p) => Ok(Box::new(p)),
+                Err(e) => {
+                    tracing::warn!("Japanese phonemizer unavailable ({}), using passthrough", e);
+                    Ok(Box::new(
+                        crate::phonemize::multilingual::PassthroughPhonemizer::new(lang),
+                    ))
+                }
+            },
             "en" => match Self::create_english_phonemizer(model_dir) {
                 Ok(p) => Ok(Box::new(p)),
                 Err(e) => {
@@ -300,7 +309,8 @@ impl PiperVoice {
     /// JapanesePhonemizer を生成する。
     ///
     /// `naist-jdic` feature が有効なら bundled 辞書を使用し、
-    /// 無効なら外部辞書を自動検索する。
+    /// 無効なら `dictionary_manager::ensure_dictionary()` で外部辞書を
+    /// 自動検索・ダウンロードする。
     #[cfg(feature = "japanese")]
     fn create_japanese_phonemizer()
     -> Result<crate::phonemize::japanese::JapanesePhonemizer, PiperError> {
@@ -310,7 +320,21 @@ impl PiperVoice {
         }
         #[cfg(not(feature = "naist-jdic"))]
         {
-            crate::phonemize::japanese::JapanesePhonemizer::new()
+            // Try dictionary_manager first (searches standard paths + auto-download)
+            match crate::dictionary_manager::ensure_dictionary() {
+                Ok(dict_path) => {
+                    tracing::info!("Using OpenJTalk dictionary from {}", dict_path.display());
+                    crate::phonemize::japanese::JapanesePhonemizer::new_with_dict(&dict_path)
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        "dictionary_manager failed ({}), falling back to JapanesePhonemizer::new()",
+                        e
+                    );
+                    // Fall back to jpreprocess's own dictionary search
+                    crate::phonemize::japanese::JapanesePhonemizer::new()
+                }
+            }
         }
     }
 
