@@ -457,7 +457,7 @@ jobs:
         uses: codecov/codecov-action@v5
         if: matrix.python-version == '3.11' && runner.os == 'Linux'
         with:
-          file: ./coverage.xml
+          files: ./coverage.xml
           flags: python
           name: Python ${{ matrix.python-version }} - ${{ runner.os }}
 
