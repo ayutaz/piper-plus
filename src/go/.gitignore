@@ -1,0 +1,5 @@
+# Go test binaries
+*.test
+
+# Built binaries
+piper-plus
