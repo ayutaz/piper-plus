@@ -58,6 +58,7 @@
 - **PyPI** — `pip install piper-plus` で簡単インストール
 - **C# CLI** — .NET 8/9 クロスプラットフォーム、7言語マルチリンガル、ONNX推論
 - **Rust CLI** — piper-plus/piper-plus-cli、ストリーミング、CUDA/CoreML/DirectML対応、辞書自動ダウンロード
+- **[Go CLI](src/go/README.md)** — HTTP APIサーバー、セッションプーリング、Docker対応、シングルバイナリ
 
 ### プラットフォーム
 
@@ -69,6 +70,7 @@
 | Web | WebAssembly | Chrome/Edge/Firefox/Safari |
 | C# (.NET) | x64 / ARM64 | .NET 8/9、Linux/macOS/Windows |
 | Rust | x64 / ARM64 | Linux/macOS/Windows、CUDA/CoreML/DirectML |
+| Go | x64 / ARM64 | Linux/macOS/Windows、HTTP API、Docker |
 
 ---
 
