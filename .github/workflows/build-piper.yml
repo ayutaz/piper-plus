@@ -44,7 +44,7 @@ jobs:
       build-path: ${{ steps.set-build-path.outputs.path }}
     
     steps:
-      - uses: actions/checkout@v6.2.2
+      - uses: actions/checkout@v6
       
       - name: Set artifact name
         id: set-artifact-name
@@ -489,7 +489,7 @@ jobs:
       
       # Upload artifacts
       - name: Upload build artifact
-        uses: actions/upload-artifact@v7.6.0
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ steps.set-artifact-name.outputs.name }}
           path: |
@@ -501,7 +501,7 @@ jobs:
       # Upload build logs on failure
       - name: Upload build logs on failure
         if: failure()
-        uses: actions/upload-artifact@v7.6.0
+        uses: actions/upload-artifact@v7
         with:
           name: build-logs-${{ runner.os }}-${{ github.sha }}
           path: |

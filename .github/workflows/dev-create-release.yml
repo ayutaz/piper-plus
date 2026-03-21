@@ -26,7 +26,7 @@ jobs:
       release_name: ${{ steps.get_release_name.outputs.name }}
       tag_name: ${{ steps.get_release_name.outputs.tag_name }}
     steps:
-      - uses: actions/checkout@v6.2.2
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -201,7 +201,7 @@ jobs:
       needs.build_all.result == 'success'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6.2.2
+      - uses: actions/checkout@v6
 
       - name: Download all wheels
         uses: actions/download-artifact@v8
@@ -274,7 +274,7 @@ jobs:
             archive_ext: tar.gz
             cross: false
     steps:
-      - uses: actions/checkout@v6.2.2
+      - uses: actions/checkout@v6
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v5
@@ -326,7 +326,7 @@ jobs:
     needs: create_release
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6.2.2
+      - uses: actions/checkout@v6
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v5
@@ -366,7 +366,7 @@ jobs:
     needs: create_release
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6.2.2
+      - uses: actions/checkout@v6
 
       - name: Validate crate version
         working-directory: src/rust

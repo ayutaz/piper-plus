@@ -23,7 +23,7 @@ jobs:
         build-type: [Release]
     
     steps:
-      - uses: actions/checkout@v6.2.2
+      - uses: actions/checkout@v6
         with:
           submodules: true
       

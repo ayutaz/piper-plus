@@ -71,10 +71,10 @@ jobs:
         os: [ubuntu-latest, macos-latest]
     
     steps:
-      - uses: actions/checkout@v6.2.2
+      - uses: actions/checkout@v6
       
       - name: Download piper artifact
-        uses: actions/download-artifact@v8.1.8
+        uses: actions/download-artifact@v8
         with:
           name: piper-dict-test-${{ matrix.os }}-${{ github.sha }}
       
@@ -273,7 +273,7 @@ jobs:
       
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v7.6.0
+        uses: actions/upload-artifact@v7
         with:
           name: dictionary-download-test-results-${{ matrix.os }}-run${{ github.run_number }}
           path: |
@@ -308,10 +308,10 @@ jobs:
       OPENJTALK_DICTIONARY_PATH: ${{ github.workspace }}/piper/share/open_jtalk/dic
 
     steps:
-      - uses: actions/checkout@v6.2.2
+      - uses: actions/checkout@v6
       
       - name: Download piper artifact
-        uses: actions/download-artifact@v8.1.8
+        uses: actions/download-artifact@v8
         with:
           name: piper-multilingual-${{ matrix.os }}-${{ github.sha }}
       
@@ -381,7 +381,7 @@ jobs:
       
       - name: Upload test audio
         if: always()
-        uses: actions/upload-artifact@v7.6.0
+        uses: actions/upload-artifact@v7
         with:
           name: multilingual-tts-audio-${{ matrix.os }}-run${{ github.run_number }}
           path: |

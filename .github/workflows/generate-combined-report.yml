@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-      - uses: actions/checkout@v6.2.2
+      - uses: actions/checkout@v6
       
       - name: Setup Python
         uses: actions/setup-python@v6
@@ -74,7 +74,7 @@ jobs:
       
       - name: Upload final combined report
         if: always()
-        uses: actions/upload-artifact@v7.6.0
+        uses: actions/upload-artifact@v7
         with:
           name: combined-performance-report-${{ github.run_id }}
           path: |

@@ -29,7 +29,7 @@ jobs:
         python: ["3.11", "3.12"]  # Start with 3.11 and 3.12
 
     steps:
-      - uses: actions/checkout@v6.2.2
+      - uses: actions/checkout@v6
         with:
           submodules: recursive
           fetch-depth: 0
@@ -93,7 +93,7 @@ jobs:
           Get-ChildItem wheelhouse/*.whl
 
       # Upload artifacts
-      - uses: actions/upload-artifact@v7.6.0
+      - uses: actions/upload-artifact@v7
         with:
           name: wheels-windows-${{ matrix.python }}
           path: src/piper_phonemize_bundled/wheelhouse/*.whl
@@ -109,7 +109,7 @@ jobs:
         python-version: ['3.11', '3.12']
 
     steps:
-      - uses: actions/checkout@v6.2.2
+      - uses: actions/checkout@v6
 
       - name: Set up Python
         uses: actions/setup-python@v6
@@ -178,7 +178,7 @@ jobs:
         python-version: ['3.11']  # Use Python 3.11 which has better wheel support
 
     steps:
-      - uses: actions/checkout@v6.2.2
+      - uses: actions/checkout@v6
 
       - name: Set up Python
         uses: actions/setup-python@v6
