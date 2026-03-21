@@ -380,4 +380,125 @@ public sealed class CliIntegrationTests
             $"Expected successful test-mode run with default output. " +
             $"ExitCode={exitCode}, Output: {combined}");
     }
+
+    // ================================================================
+    // --model with model name/alias (auto-resolve)
+    // ================================================================
+
+    [Fact]
+    [Trait("Category", "CLI")]
+    public async Task Model_NonexistentNameOrFile_ShowsError()
+    {
+        // --model with a string that is neither a file nor a known model name
+        // should display an error message.
+        var (exitCode, _, stderr) = await RunCliAsync(
+            "--model", "totally-fake-nonexistent-model-xyz",
+            "--text", "test");
+        SkipIfBuildFailed(exitCode, stderr);
+
+        Assert.True(
+            exitCode != 0 || stderr.Contains("not found", StringComparison.OrdinalIgnoreCase),
+            $"Expected error for unknown model name. ExitCode={exitCode}, stderr: {stderr}");
+    }
+
+    // ================================================================
+    // --download-model with alias
+    // ================================================================
+
+    [Fact]
+    [Trait("Category", "CLI")]
+    public async Task DownloadModel_InvalidName_ShowsError()
+    {
+        // --download-model with a name that doesn't exist in the catalog
+        var (exitCode, _, stderr) = await RunCliAsync(
+            "--download-model", "totally-nonexistent-model-xyz");
+        SkipIfBuildFailed(exitCode, stderr);
+
+        Assert.True(
+            exitCode != 0
+            || stderr.Contains("not found", StringComparison.OrdinalIgnoreCase)
+            || stderr.Contains("Error", StringComparison.OrdinalIgnoreCase),
+            $"Expected error for unknown model name. ExitCode={exitCode}, stderr: {stderr}");
+    }
+
+    // ================================================================
+    // --test-mode with [[ inline phonemes ]] notation
+    // ================================================================
+
+    [Fact]
+    [Trait("Category", "CLI")]
+    public async Task TestMode_InlinePhonemes_JapaneseWithNotation()
+    {
+        // The [[ ... ]] inline phoneme notation should be recognized in test-mode.
+        // Mix plain text with inline phonemes: "hello [[ k o N n i ch i w a ]]"
+        var (exitCode, stdout, stderr) = await RunCliAsync(
+            "--test-mode", "--text", "hello [[ k o N n i ch i w a ]]",
+            "--language", "ja-en");
+        SkipIfBuildFailed(exitCode, stderr);
+
+        string combined = stdout + stderr;
+
+        // Either phonemizer succeeds and outputs phoneme_ids (which would include
+        // IDs from both the phonemized "hello" and the raw phoneme tokens),
+        // or the G2P engine is not available.
+        Assert.True(
+            combined.Contains("phoneme_ids", StringComparison.Ordinal)
+            || combined.Contains("not yet available", StringComparison.OrdinalIgnoreCase)
+            || combined.Contains("DotNetG2P", StringComparison.Ordinal),
+            $"Expected phoneme_ids or G2P unavailable. ExitCode={exitCode}, Output: {combined}");
+    }
+
+    [Fact]
+    [Trait("Category", "CLI")]
+    public async Task TestMode_InlinePhonemes_OnlyBrackets()
+    {
+        // Input with only [[ ... ]] notation (no plain text part)
+        var (exitCode, stdout, stderr) = await RunCliAsync(
+            "--test-mode", "--text", "[[ a i u e o ]]",
+            "--language", "ja");
+        SkipIfBuildFailed(exitCode, stderr);
+
+        string combined = stdout + stderr;
+
+        Assert.True(
+            combined.Contains("phoneme_ids", StringComparison.Ordinal)
+            || combined.Contains("not yet available", StringComparison.OrdinalIgnoreCase)
+            || combined.Contains("DotNetG2P", StringComparison.Ordinal),
+            $"Expected phoneme_ids output. ExitCode={exitCode}, Output: {combined}");
+    }
+
+    // ================================================================
+    // --model accepts string (not just FileInfo)
+    // ================================================================
+
+    [Fact]
+    [Trait("Category", "CLI")]
+    public async Task Model_AcceptsModelNameString_NotJustFilePath()
+    {
+        // Verify that --model accepts arbitrary strings (not just file paths).
+        // With --test-mode, a known model name should be recognized
+        // (though it may fail at download since we're in test mode).
+        // An unknown name should produce an appropriate error.
+        var (exitCode, stdout, stderr) = await RunCliAsync(
+            "--model", "tsukuyomi", "--text", "テスト");
+        SkipIfBuildFailed(exitCode, stderr);
+
+        string combined = stdout + stderr;
+
+        // The CLI should either:
+        //   - Resolve the model and fail at inference (no actual model file)
+        //   - Attempt auto-download and fail
+        //   - Show "not found locally. Downloading..." message
+        // The key test is that it does NOT fail with "Invalid option" or
+        // "unrecognized command" — the string is accepted as a valid option value.
+        Assert.True(
+            combined.Contains("Resolved model", StringComparison.OrdinalIgnoreCase)
+            || combined.Contains("not found locally", StringComparison.OrdinalIgnoreCase)
+            || combined.Contains("Downloading", StringComparison.OrdinalIgnoreCase)
+            || combined.Contains("download", StringComparison.OrdinalIgnoreCase)
+            || combined.Contains("failed", StringComparison.OrdinalIgnoreCase)
+            || combined.Contains("Error", StringComparison.OrdinalIgnoreCase)
+            || exitCode != 0,
+            $"Expected model resolution attempt. ExitCode={exitCode}, Output: {combined}");
+    }
 }

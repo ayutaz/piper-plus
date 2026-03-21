@@ -80,8 +80,8 @@ internal static class Program
     private static RootCommand BuildRootCommand()
     {
         // --model / -m
-        var modelOption = new Option<FileInfo?>("--model", "-m")
-        { Description = "Path to .onnx model file" };
+        var modelOption = new Option<string?>("--model", "-m")
+        { Description = "Path to .onnx model file, or model name/alias for auto-download" };
 
         // --config / -c
         var configOption = new Option<FileInfo?>("--config", "-c")
@@ -298,15 +298,23 @@ internal static class Program
                 string? downloadModelName = parseResult.GetValue(downloadModelOption);
                 if (!string.IsNullOrEmpty(downloadModelName))
                 {
+                    // Resolve alias to canonical key for better UX
+                    var resolvedVoice = ModelManager.FindVoice(downloadModelName);
+                    string resolvedName = resolvedVoice?.Key ?? downloadModelName;
+                    if (resolvedVoice is not null && resolvedName != downloadModelName)
+                    {
+                        LogInfo(quiet, $"Resolved '{downloadModelName}' -> '{resolvedName}'");
+                    }
+
                     var dlModelDir = parseResult.GetValue(modelDirOption);
                     string targetDir = dlModelDir?.FullName
                         ?? Environment.GetEnvironmentVariable("PIPER_MODEL_DIR")
                         ?? ModelManager.GetDefaultModelDir();
 
-                    LogInfo(quiet, $"Downloading model '{downloadModelName}' to {targetDir}...");
+                    LogInfo(quiet, $"Downloading model '{resolvedName}' to {targetDir}...");
 
                     bool success = ModelManager.DownloadModelAsync(
-                        downloadModelName, targetDir, CancellationToken.None).GetAwaiter().GetResult();
+                        resolvedName, targetDir, CancellationToken.None).GetAwaiter().GetResult();
 
                     if (!success)
                     {
@@ -368,8 +376,8 @@ internal static class Program
                 }
 
                 // Resolve model path: CLI > env > error
-                var modelFileInfo = parseResult.GetValue(modelOption);
-                string? modelPath = modelFileInfo?.FullName;
+                // --model now accepts file paths, model names, or aliases
+                string? modelPath = parseResult.GetValue(modelOption);
 
                 if (string.IsNullOrEmpty(modelPath))
                 {
@@ -388,11 +396,32 @@ internal static class Program
                     return;
                 }
 
-                if (!testMode && !string.IsNullOrEmpty(modelPath) && !File.Exists(modelPath))
+                // Resolve model name/alias to a file path (with auto-download)
+                string? modelDirStr = modelDirInfo?.FullName;
+                if (!testMode && !string.IsNullOrEmpty(modelPath))
                 {
-                    LogError($"Model file not found: {modelPath}");
-                    Environment.ExitCode = 1;
-                    return;
+                    try
+                    {
+                        string resolvedModelPath = ModelManager.ResolveModelPathAsync(
+                            modelPath, modelDirStr, CancellationToken.None).GetAwaiter().GetResult();
+                        if (resolvedModelPath != modelPath)
+                        {
+                            LogInfo(quiet, $"Resolved model: {resolvedModelPath}");
+                        }
+                        modelPath = resolvedModelPath;
+                    }
+                    catch (FileNotFoundException ex)
+                    {
+                        LogError(ex.Message);
+                        Environment.ExitCode = 1;
+                        return;
+                    }
+                    catch (InvalidOperationException ex)
+                    {
+                        LogError(ex.Message);
+                        Environment.ExitCode = 1;
+                        return;
+                    }
                 }
 
                 // Resolve config path
@@ -449,17 +478,32 @@ internal static class Program
                 }
 
                 // ============================================================
-                // Load --custom-dict
+                // Load --custom-dict + default dictionaries
                 // ============================================================
                 CustomDictionary? customDict = null;
                 if (!string.IsNullOrEmpty(customDictPaths))
                 {
+                    // Explicit --custom-dict: load defaults first (lower priority),
+                    // then user-specified files (higher priority wins via priority system).
                     customDict = new CustomDictionary();
+                    customDict.LoadDefaults();
                     var paths = customDictPaths.Split(',',
                         StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
                     customDict.LoadDictionaries(paths);
                     LogDebug(debug, quiet,
-                        $"Custom dictionary: {customDict.Count} entries from {paths.Length} file(s)");
+                        $"Custom dictionary: {customDict.Count} entries from defaults + {paths.Length} file(s)");
+                }
+                else
+                {
+                    // No explicit --custom-dict: try loading default dictionaries
+                    var defaultDict = new CustomDictionary();
+                    defaultDict.LoadDefaults();
+                    if (defaultDict.Count > 0)
+                    {
+                        customDict = defaultDict;
+                        LogDebug(debug, quiet,
+                            $"Loaded {defaultDict.Count} default dictionary entries");
+                    }
                 }
 
                 // Gather synthesis parameters
@@ -514,8 +558,49 @@ internal static class Program
                     var phonemeIdMap = phonemizer.GetPhonemeIdMap()
                                       ?? config?.PhonemeIdMap
                                       ?? new Dictionary<string, int[]>();
-                    var (phonemeIdsLong, _) = PhonemeEncoder.EncodeDirect(
-                        phonemizer, textInput, phonemeIdMap);
+
+                    long[] phonemeIdsLong;
+
+                    // Check for [[ phoneme ]] inline notation
+                    var testSegments = InlinePhonemeParser.Parse(textInput);
+                    if (testSegments.Any(s => s.IsPhonemes))
+                    {
+                        var allIds = new List<long>();
+                        for (int segIndex = 0; segIndex < testSegments.Count; segIndex++)
+                        {
+                            var seg = testSegments[segIndex];
+                            bool isFirst = segIndex == 0;
+                            bool isLast = segIndex == testSegments.Count - 1;
+
+                            long[] segIds;
+                            if (seg.IsPhonemes)
+                            {
+                                segIds = RawPhonemeParser.Parse(seg.Text, phonemeIdMap);
+                            }
+                            else
+                            {
+                                var (ids, _) = PhonemeEncoder.EncodeDirect(
+                                    phonemizer, seg.Text, phonemeIdMap);
+                                segIds = ids;
+                            }
+
+                            // Trim BOS from non-first segments, EOS from non-last segments
+                            // to avoid duplicated BOS/EOS at concatenation boundaries.
+                            int start = (!isFirst && segIds.Length > 0) ? 1 : 0;
+                            int end = (!isLast && segIds.Length > 0) ? segIds.Length - 1 : segIds.Length;
+
+                            for (int i = start; i < end; i++)
+                            {
+                                allIds.Add(segIds[i]);
+                            }
+                        }
+                        phonemeIdsLong = allIds.ToArray();
+                    }
+                    else
+                    {
+                        (phonemeIdsLong, _) = PhonemeEncoder.EncodeDirect(
+                            phonemizer, textInput, phonemeIdMap);
+                    }
 
                     Console.Error.WriteLine(
                         $"[test-mode] phoneme_ids({phonemeIdsLong.Length}): " +
@@ -721,9 +806,78 @@ internal static class Program
                     // Use the phonemizer's own ID map if available, else fall back to config
                     var phonemeIdMap = phonemizer.GetPhonemeIdMap() ?? config.PhonemeIdMap;
 
-                    // Phonemize + encode in one step via PhonemeEncoder
-                    var (phonemeIdsLong, prosodyFlat) = PhonemeEncoder.EncodeDirect(
-                        phonemizer, textInput, phonemeIdMap);
+                    long[] phonemeIdsLong;
+                    long[]? prosodyFlat;
+
+                    // Check for [[ phoneme ]] inline notation
+                    var inlineSegments = InlinePhonemeParser.Parse(textInput);
+                    if (inlineSegments.Any(s => s.IsPhonemes))
+                    {
+                        // Mixed mode: process each segment separately
+                        var allIds = new List<long>();
+                        var allProsody = new List<long>();
+                        bool hasAnyProsody = false;
+
+                        for (int segIndex = 0; segIndex < inlineSegments.Count; segIndex++)
+                        {
+                            var seg = inlineSegments[segIndex];
+                            bool isFirst = segIndex == 0;
+                            bool isLast = segIndex == inlineSegments.Count - 1;
+
+                            long[] segIds;
+                            long[]? segProsody = null;
+
+                            if (seg.IsPhonemes)
+                            {
+                                // Direct phoneme input — parse like --raw-phonemes
+                                segIds = RawPhonemeParser.Parse(seg.Text, phonemeIdMap);
+                            }
+                            else
+                            {
+                                // Normal text — phonemize
+                                var (ids, prosody) = PhonemeEncoder.EncodeDirect(
+                                    phonemizer, seg.Text, phonemeIdMap);
+                                segIds = ids;
+                                segProsody = prosody;
+                                if (prosody != null)
+                                    hasAnyProsody = true;
+                            }
+
+                            // Trim BOS from non-first segments, EOS from non-last segments
+                            // to avoid duplicated BOS/EOS at concatenation boundaries.
+                            int start = (!isFirst && segIds.Length > 0) ? 1 : 0;
+                            int end = (!isLast && segIds.Length > 0) ? segIds.Length - 1 : segIds.Length;
+
+                            for (int i = start; i < end; i++)
+                            {
+                                allIds.Add(segIds[i]);
+                                if (segProsody != null && i * 3 + 2 < segProsody.Length)
+                                {
+                                    allProsody.Add(segProsody[i * 3]);
+                                    allProsody.Add(segProsody[i * 3 + 1]);
+                                    allProsody.Add(segProsody[i * 3 + 2]);
+                                }
+                                else
+                                {
+                                    allProsody.Add(0);
+                                    allProsody.Add(0);
+                                    allProsody.Add(0);
+                                }
+                            }
+                        }
+
+                        phonemeIdsLong = allIds.ToArray();
+                        prosodyFlat = hasAnyProsody ? allProsody.ToArray() : null;
+
+                        LogDebug(debug, quiet,
+                            $"Inline phoneme mode: {inlineSegments.Count} segments");
+                    }
+                    else
+                    {
+                        // Normal mode — no inline notation
+                        (phonemeIdsLong, prosodyFlat) = PhonemeEncoder.EncodeDirect(
+                            phonemizer, textInput, phonemeIdMap);
+                    }
 
                     LogDebug(debug, quiet,
                         $"Encoded: {phonemeIdsLong.Length} phoneme IDs" +
