@@ -126,7 +126,7 @@ func TestVoicePool_AcquireRespectsContext(t *testing.T) {
 
 	_, err := pool.acquire(ctx)
 	if err != context.Canceled {
-		t.Errorf("acquire with cancelled ctx: err = %v, want context.Canceled", err)
+		t.Errorf("acquire with canceled ctx: err = %v, want context.Canceled", err)
 	}
 
 	// Drain the semaphore for clean teardown.

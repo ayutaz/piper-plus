@@ -9,21 +9,21 @@ import (
 
 // bosEosTokens is the set of BOS/EOS tokens to strip from segment output.
 var bosEosTokens = map[string]bool{
-	"^":                   true,
-	"$":                   true,
-	"?":                   true,
-	string(rune(0xE016)):  true, // ?!
-	string(rune(0xE017)):  true, // ?.
-	string(rune(0xE018)):  true, // ?~
+	"^":                  true,
+	"$":                  true,
+	"?":                  true,
+	string(rune(0xE016)): true, // ?!
+	string(rune(0xE017)): true, // ?.
+	string(rune(0xE018)): true, // ?~
 }
 
 // eosOnlyTokens is the subset of bosEosTokens that are EOS-like (excludes "^").
 var eosOnlyTokens = map[string]bool{
-	"$":                   true,
-	"?":                   true,
-	string(rune(0xE016)):  true, // ?!
-	string(rune(0xE017)):  true, // ?.
-	string(rune(0xE018)):  true, // ?~
+	"$":                  true,
+	"?":                  true,
+	string(rune(0xE016)): true, // ?!
+	string(rune(0xE017)): true, // ?.
+	string(rune(0xE018)): true, // ?~
 }
 
 // MultilingualPhonemizer routes text segments to language-specific phonemizers.

@@ -358,17 +358,17 @@ func TestZhApplyToneSandhi(t *testing.T) {
 func TestZhPunctMap(t *testing.T) {
 	// Verify Chinese punctuation maps match Python _ZH_PUNCT_MAP exactly
 	expectedMappings := map[rune]rune{
-		'\u3002': '.', // 。
-		'\uff0c': ',', // ，
-		'\uff01': '!', // ！
-		'\uff1f': '?', // ？
-		'\u3001': ',', // 、
-		'\uff1b': ';', // ；
-		'\uff1a': ':', // ：
-		'\u2026': '.', // …
-		'\u2014': ',', // —
-		'\u201c': '"', // "
-		'\u201d': '"', // "
+		'\u3002': '.',  // 。
+		'\uff0c': ',',  // ，
+		'\uff01': '!',  // ！
+		'\uff1f': '?',  // ？
+		'\u3001': ',',  // 、
+		'\uff1b': ';',  // ；
+		'\uff1a': ':',  // ：
+		'\u2026': '.',  // …
+		'\u2014': ',',  // —
+		'\u201c': '"',  // "
+		'\u201d': '"',  // "
 		'\u2018': '\'', // '
 		'\u2019': '\'', // '
 	}
@@ -399,14 +399,14 @@ func TestIsCJK(t *testing.T) {
 		{'你', true},
 		{'好', true},
 		{'中', true},
-		{'\u4E00', true},  // CJK first
-		{'\u9FFF', true},  // CJK last (basic)
-		{'\u3400', true},  // CJK Extension A first
-		{'\u4DBF', true},  // CJK Extension A last
+		{'\u4E00', true}, // CJK first
+		{'\u9FFF', true}, // CJK last (basic)
+		{'\u3400', true}, // CJK Extension A first
+		{'\u4DBF', true}, // CJK Extension A last
 		{'a', false},
 		{'1', false},
-		{'。', false},       // punctuation, not CJK
-		{'\u3000', false},  // ideographic space
+		{'。', false},      // punctuation, not CJK
+		{'\u3000', false}, // ideographic space
 	}
 	for _, tc := range tests {
 		got := isCJK(tc.r)
@@ -803,7 +803,7 @@ func TestChinesePhonemizer_Prosody(t *testing.T) {
 
 func TestZhPhraseMatch(t *testing.T) {
 	phrases := map[string]string{
-		"你好": "ni3 hao3",
+		"你好":   "ni3 hao3",
 		"中华人民": "zhong1 hua2 ren2 min2",
 	}
 	runes := []rune("你好世界")
@@ -1215,19 +1215,19 @@ func TestFullPinyinPipeline(t *testing.T) {
 		wantTokens []string
 	}{
 		{"ma1", "ma1", []string{"m", "a", "tone1"}},
-		{"wo3", "wo3", []string{"uo", "tone3"}},           // w normalization
-		{"yi1", "yi1", []string{"i", "tone1"}},             // y normalization
-		{"wu3", "wu3", []string{"u", "tone3"}},             // w normalization
-		{"yu4", "yu4", []string{"y_vowel", "tone4"}},       // y normalization -> ü
-		{"zhi1", "zhi1", []string{"tʂ", "ɻ̩", "tone1"}},   // retroflex syllabic
-		{"ci2", "ci2", []string{"tsʰ", "ɨ", "tone2"}},     // alveolar syllabic
-		{"er2", "er2", []string{"ɚ", "tone2"}},             // standalone er
-		{"yue4", "yue4", []string{"yɛ", "tone4"}},          // yu -> ü, üe -> yɛ
-		{"yuan2", "yuan2", []string{"yɛn", "tone2"}},       // yuan -> üan -> yɛn
-		{"yun2", "yun2", []string{"yn", "tone2"}},          // yun -> ün -> yn
-		{"jun1", "jun1", []string{"tɕ", "yn", "tone1"}},    // j + un -> j + ün -> tɕ + yn
-		{"gui4", "gui4", []string{"k", "ueɪ", "tone4"}},    // g + ui -> k + ueɪ
-		{"dui4", "dui4", []string{"t", "ueɪ", "tone4"}},    // d + ui -> t + ueɪ
+		{"wo3", "wo3", []string{"uo", "tone3"}},         // w normalization
+		{"yi1", "yi1", []string{"i", "tone1"}},          // y normalization
+		{"wu3", "wu3", []string{"u", "tone3"}},          // w normalization
+		{"yu4", "yu4", []string{"y_vowel", "tone4"}},    // y normalization -> ü
+		{"zhi1", "zhi1", []string{"tʂ", "ɻ̩", "tone1"}}, // retroflex syllabic
+		{"ci2", "ci2", []string{"tsʰ", "ɨ", "tone2"}},   // alveolar syllabic
+		{"er2", "er2", []string{"ɚ", "tone2"}},          // standalone er
+		{"yue4", "yue4", []string{"yɛ", "tone4"}},       // yu -> ü, üe -> yɛ
+		{"yuan2", "yuan2", []string{"yɛn", "tone2"}},    // yuan -> üan -> yɛn
+		{"yun2", "yun2", []string{"yn", "tone2"}},       // yun -> ün -> yn
+		{"jun1", "jun1", []string{"tɕ", "yn", "tone1"}}, // j + un -> j + ün -> tɕ + yn
+		{"gui4", "gui4", []string{"k", "ueɪ", "tone4"}}, // g + ui -> k + ueɪ
+		{"dui4", "dui4", []string{"t", "ueɪ", "tone4"}}, // d + ui -> t + ueɪ
 		{"liang2", "liang2", []string{"l", "iaŋ", "tone2"}},
 		{"xiong2", "xiong2", []string{"ɕ", "iuŋ", "tone2"}},
 		{"guang1", "guang1", []string{"k", "uaŋ", "tone1"}},

@@ -217,7 +217,7 @@ func ptConvert(r []rune) ([]string, int) {
 		}
 		if c == 'q' && i+1 < n && r[i+1] == 'u' {
 			ph = append(ph, "k")
-			if !(i+2 < n && ptEI(r[i+2])) {
+			if i+2 >= n || !ptEI(r[i+2]) {
 				ph = append(ph, "w")
 			}
 			i += 2
@@ -256,11 +256,12 @@ func ptConvert(r []rune) ([]string, int) {
 			i++
 			continue
 		case 'x':
-			if i == 0 {
+			switch {
+			case i == 0:
 				ph = append(ph, "\u0283")
-			} else if i > 0 && ptV(r[i-1]) && i+1 < n && ptV(r[i+1]) {
+			case i > 0 && ptV(r[i-1]) && i+1 < n && ptV(r[i+1]):
 				ph = append(ph, "z")
-			} else {
+			default:
 				ph = append(ph, "\u0283")
 			}
 			i++
@@ -329,11 +330,12 @@ func ptConvert(r []rune) ([]string, int) {
 			if ptTild[c] {
 				isNas = true
 			} else if i+1 < n && (r[i+1] == 'n' || r[i+1] == 'm') {
-				if r[i+1] == 'n' && i+2 < n && r[i+2] == 'h' { /* nh: not nasal */
-				} else if i+2 >= n {
+				switch {
+				case r[i+1] == 'n' && i+2 < n && r[i+2] == 'h': /* nh: not nasal */
+				case i+2 >= n:
 					isNas = true
 					absN = true
-				} else if !ptV(r[i+2]) {
+				case !ptV(r[i+2]):
 					isNas = true
 					absN = true
 				}

@@ -259,11 +259,12 @@ func esG2P(word []rune) (phonemes []string, stressPhIdx int) {
 		case 'f':
 			phonemes = append(phonemes, "f")
 		case 'g':
-			if i+1 < n && (base[i+1] == 'e' || base[i+1] == 'i') {
+			switch {
+			case i+1 < n && (base[i+1] == 'e' || base[i+1] == 'i'):
 				phonemes = append(phonemes, "x")
-			} else if isWordInitOrNasalL(i) {
+			case isWordInitOrNasalL(i):
 				phonemes = append(phonemes, "ɡ")
-			} else {
+			default:
 				phonemes = append(phonemes, "ɣ")
 			}
 		case 'h':

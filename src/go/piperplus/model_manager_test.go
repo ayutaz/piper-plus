@@ -305,7 +305,7 @@ func TestModelManager_DownloadModel_CancelledContext(t *testing.T) {
 
 	_, err := mgr.DownloadModel(ctx, srv.URL+"/model.onnx")
 	if err == nil {
-		t.Fatal("DownloadModel should return an error for cancelled context")
+		t.Fatal("DownloadModel should return an error for canceled context")
 	}
 }
 

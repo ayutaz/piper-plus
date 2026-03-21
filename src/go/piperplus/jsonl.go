@@ -45,7 +45,7 @@ func ParseJSONLLine(line []byte) (*JSONLInput, error) {
 
 // ReadJSONL reads JSONL from an io.Reader, returning channels for parsed inputs
 // and errors. Both channels are closed when the reader is exhausted or ctx is
-// cancelled. Empty lines and lines starting with "//" are skipped.
+// canceled. Empty lines and lines starting with "//" are skipped.
 //
 // By default, the first parse error stops processing. Use ContinueOnError to
 // send errors on errCh and keep reading subsequent lines instead.

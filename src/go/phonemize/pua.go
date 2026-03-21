@@ -82,7 +82,7 @@ var fixedPUA = map[string]rune{
 	"yɛ":    0xE042,
 	"yɛn":   0xE043,
 	"yn":    0xE044,
-	"ɻ̩":     0xE045,
+	"ɻ̩":    0xE045,
 	"tone1": 0xE046,
 	"tone2": 0xE047,
 	"tone3": 0xE048,
