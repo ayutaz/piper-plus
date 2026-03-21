@@ -290,7 +290,7 @@ Validation頻度削減、DataLoader最適化 (num_workers=2, pin_memory)、LRス
 | TFM | PiperPlus.Core: net8.0, PiperPlus.Cli: net9.0 |
 | 対応言語 | JA, EN, ZH, ES, FR, PT (6言語) |
 | G2P依存 | DotNetG2P v1.8.0 (JA), DotNetG2P.MeCab v1.8.0 (JA), DotNetG2P.English v1.8.0 (EN), DotNetG2P.Chinese/Spanish/French/Portuguese v1.7.0 |
-| テスト | 735テスト (xUnit v3) |
+| テスト | 749テスト (xUnit v3) |
 | CI | 3 OS × 2 .NET バージョン (csharp-ci.yml) |
 | ビルド | `dotnet build src/csharp/PiperPlus.sln` |
 
@@ -312,7 +312,7 @@ Rust によるONNX推論エンジン。ストリーミング、CUDA/CoreML/Direc
 | CI | 3 OS (rust-tests.yml) |
 | ビルド | `cargo build --release -p piper-plus-cli` |
 
-**辞書自動ダウンロード:** `dict-download` feature (デフォルト有効) で OpenJTalk 辞書を自動検索・ダウンロード。`PIPER_OFFLINE_MODE=1` で無効化可能。
+**デフォルトfeature:** `naist-jdic` (JA辞書バンドル) + `dict-download` (OpenJTalk辞書自動DL、C#/C++用)。jpreprocess は lindera 形式辞書を使用するため、OpenJTalk MeCab 形式とは非互換。`PIPER_OFFLINE_MODE=1` で自動DL無効化可能。
 
 **実装:** `src/rust/piper-core/`, `src/rust/piper-cli/`, `src/rust/piper-python/`
 

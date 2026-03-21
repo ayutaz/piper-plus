@@ -123,15 +123,15 @@ jobs:
         include:
           - os: ubuntu-24.04
             target: x86_64-unknown-linux-gnu
-            artifact: piper-plus-cli-linux-x64
+            artifact: piper-plus-rs-cli-linux-x64
             archive_ext: tar.gz
           - os: macos-latest
             target: aarch64-apple-darwin
-            artifact: piper-plus-cli-osx-arm64
+            artifact: piper-plus-rs-cli-osx-arm64
             archive_ext: tar.gz
           - os: windows-latest
             target: x86_64-pc-windows-msvc
-            artifact: piper-plus-cli-win-x64
+            artifact: piper-plus-rs-cli-win-x64
             archive_ext: zip
     defaults:
       run:
