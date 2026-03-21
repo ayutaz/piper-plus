@@ -72,7 +72,9 @@ def get_default_model_dir() -> str:
         xdg = os.environ.get("XDG_DATA_HOME")
         if xdg:
             return os.path.join(xdg, "piper", "models")
-        return os.path.join(os.path.expanduser("~"), ".local", "share", "piper", "models")
+        return os.path.join(
+            os.path.expanduser("~"), ".local", "share", "piper", "models"
+        )
 
 
 def find_voice(name: str) -> dict | None:
@@ -109,12 +111,16 @@ def list_models(language_filter: str | None = None) -> None:
         voices = [
             v
             for v in voices
-            if v["language_family"] == language_filter or v["language_code"] == language_filter
+            if v["language_family"] == language_filter
+            or v["language_code"] == language_filter
         ]
 
     if not voices:
         if language_filter:
-            print(f"No voice models found for language: {language_filter}", file=sys.stderr)
+            print(
+                f"No voice models found for language: {language_filter}",
+                file=sys.stderr,
+            )
         else:
             print("No voice models found.", file=sys.stderr)
         return
@@ -126,12 +132,19 @@ def list_models(language_filter: str | None = None) -> None:
         if voice["language_code"] != current_lang:
             current_lang = voice["language_code"]
             header = f"  {voice['language_name_english']}"
-            if voice.get("language_name_native") and voice["language_name_native"] != voice["language_name_english"]:
+            if (
+                voice.get("language_name_native")
+                and voice["language_name_native"] != voice["language_name_english"]
+            ):
                 header += f" ({voice['language_name_native']})"
             header += f" [{current_lang}]:"
             print(f"\n{header}", file=sys.stderr)
 
-        speakers = "1 speaker" if voice["num_speakers"] == 1 else f"{voice['num_speakers']} speakers"
+        speakers = (
+            "1 speaker"
+            if voice["num_speakers"] == 1
+            else f"{voice['num_speakers']} speakers"
+        )
         print(
             f"    {voice['key']:<44} [{voice['source']}]  {speakers}   {voice['quality']}",
             file=sys.stderr,
@@ -181,7 +194,10 @@ def download_model(model_name: str, model_dir: str | None = None) -> bool:
             existing_size = os.path.getsize(dest_path)
             expected_size = file_info.get("size_bytes", 0)
             if expected_size > 0 and existing_size == expected_size:
-                print(f"  Skipping {filename} (already exists, size matches)", file=sys.stderr)
+                print(
+                    f"  Skipping {filename} (already exists, size matches)",
+                    file=sys.stderr,
+                )
                 continue
 
         try:

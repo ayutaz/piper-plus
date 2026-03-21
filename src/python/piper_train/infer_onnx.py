@@ -244,7 +244,9 @@ def main():
         sys.exit(1)
 
     # Resolve model name/alias to file path
-    resolved = resolve_model_path(args.model, args.model_dir) if resolve_model_path else None
+    resolved = (
+        resolve_model_path(args.model, args.model_dir) if resolve_model_path else None
+    )
     if resolved:
         args.model = resolved
     elif not os.path.exists(args.model):
