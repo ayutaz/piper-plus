@@ -4,11 +4,9 @@ Provides model listing, downloading, and resolution functionality
 matching the C++ model_manager.cpp and C# ModelManager.cs implementations.
 """
 
-import json
 import os
 import sys
-from pathlib import Path
-from typing import Optional
+
 
 # Embedded voice catalog (matches src/cpp/piper_plus_voices.json)
 _BUILTIN_CATALOG = {
@@ -77,7 +75,7 @@ def get_default_model_dir() -> str:
         return os.path.join(os.path.expanduser("~"), ".local", "share", "piper", "models")
 
 
-def find_voice(name: str) -> Optional[dict]:
+def find_voice(name: str) -> dict | None:
     """Find a voice by key, name, or alias.
 
     Returns the voice dict or None if not found.
@@ -99,7 +97,7 @@ def find_voice(name: str) -> Optional[dict]:
     return None
 
 
-def list_models(language_filter: Optional[str] = None) -> None:
+def list_models(language_filter: str | None = None) -> None:
     """Print available voice models to stderr.
 
     Args:
@@ -142,7 +140,7 @@ def list_models(language_filter: Optional[str] = None) -> None:
     print("\nUse --download-model <name> to download a model.", file=sys.stderr)
 
 
-def download_model(model_name: str, model_dir: Optional[str] = None) -> bool:
+def download_model(model_name: str, model_dir: str | None = None) -> bool:
     """Download a model by name/alias to the model directory.
 
     Returns True on success, False on failure.
@@ -216,7 +214,7 @@ def download_model(model_name: str, model_dir: Optional[str] = None) -> bool:
     return success
 
 
-def resolve_model_path(model_arg: str, model_dir: Optional[str] = None) -> Optional[str]:
+def resolve_model_path(model_arg: str, model_dir: str | None = None) -> str | None:
     """Resolve a model argument to an actual .onnx file path.
 
     If model_arg is a file path that exists, return it directly.

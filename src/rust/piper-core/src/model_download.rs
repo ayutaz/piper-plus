@@ -302,7 +302,9 @@ pub fn builtin_registry() -> &'static [ModelInfo] {
                 name: "css10-6lang".to_string(),
                 language: "ja-en-zh-es-fr-pt".to_string(),
                 quality: "medium".to_string(),
-                description: "CSS10 Japanese 6-language model fine-tuned from multilingual base (FP16)".to_string(),
+                description:
+                    "CSS10 Japanese 6-language model fine-tuned from multilingual base (FP16)"
+                        .to_string(),
                 model_url: huggingface_url(
                     "ayousanz/piper-plus-css10-ja-6lang",
                     "css10-ja-6lang-fp16.onnx",

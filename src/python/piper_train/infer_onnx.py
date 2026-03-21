@@ -11,7 +11,6 @@ from pathlib import Path
 import numpy as np
 import onnxruntime
 
-from .model_manager import download_model, list_models, resolve_model_path
 from .vits.utils import audio_float_to_int16
 from .vits.wavfile import write as write_wav
 
@@ -203,13 +202,31 @@ def main():
     )
     args = parser.parse_args()
 
+    # Lazy import: model_manager is optional (not available in HF Space environment)
+    try:
+        from .model_manager import (  # noqa: PLC0415
+            download_model,
+            list_models,
+            resolve_model_path,
+        )
+    except ImportError:
+        list_models = None  # type: ignore[assignment]
+        download_model = None  # type: ignore[assignment]
+        resolve_model_path = None  # type: ignore[assignment]
+
     # Handle --list-models (early exit)
     if args.list_models is not None:
+        if list_models is None:
+            print("Error: model_manager is not available.", file=sys.stderr)
+            sys.exit(1)
         list_models(args.list_models if args.list_models else None)
         return
 
     # Handle --download-model (early exit)
     if args.download_model is not None:
+        if download_model is None:
+            print("Error: model_manager is not available.", file=sys.stderr)
+            sys.exit(1)
         success = download_model(args.download_model, args.model_dir)
         sys.exit(0 if success else 1)
 
@@ -227,7 +244,7 @@ def main():
         sys.exit(1)
 
     # Resolve model name/alias to file path
-    resolved = resolve_model_path(args.model, args.model_dir)
+    resolved = resolve_model_path(args.model, args.model_dir) if resolve_model_path else None
     if resolved:
         args.model = resolved
     elif not os.path.exists(args.model):
