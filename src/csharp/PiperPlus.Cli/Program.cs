@@ -566,17 +566,32 @@ internal static class Program
                     if (testSegments.Any(s => s.IsPhonemes))
                     {
                         var allIds = new List<long>();
-                        foreach (var seg in testSegments)
+                        for (int segIndex = 0; segIndex < testSegments.Count; segIndex++)
                         {
+                            var seg = testSegments[segIndex];
+                            bool isFirst = segIndex == 0;
+                            bool isLast = segIndex == testSegments.Count - 1;
+
+                            long[] segIds;
                             if (seg.IsPhonemes)
                             {
-                                allIds.AddRange(RawPhonemeParser.Parse(seg.Text, phonemeIdMap));
+                                segIds = RawPhonemeParser.Parse(seg.Text, phonemeIdMap);
                             }
                             else
                             {
                                 var (ids, _) = PhonemeEncoder.EncodeDirect(
                                     phonemizer, seg.Text, phonemeIdMap);
-                                allIds.AddRange(ids);
+                                segIds = ids;
+                            }
+
+                            // Trim BOS from non-first segments, EOS from non-last segments
+                            // to avoid duplicated BOS/EOS at concatenation boundaries.
+                            int start = (!isFirst && segIds.Length > 0) ? 1 : 0;
+                            int end = (!isLast && segIds.Length > 0) ? segIds.Length - 1 : segIds.Length;
+
+                            for (int i = start; i < end; i++)
+                            {
+                                allIds.Add(segIds[i]);
                             }
                         }
                         phonemeIdsLong = allIds.ToArray();
@@ -803,40 +818,50 @@ internal static class Program
                         var allProsody = new List<long>();
                         bool hasAnyProsody = false;
 
-                        foreach (var seg in inlineSegments)
+                        for (int segIndex = 0; segIndex < inlineSegments.Count; segIndex++)
                         {
+                            var seg = inlineSegments[segIndex];
+                            bool isFirst = segIndex == 0;
+                            bool isLast = segIndex == inlineSegments.Count - 1;
+
+                            long[] segIds;
+                            long[]? segProsody = null;
+
                             if (seg.IsPhonemes)
                             {
                                 // Direct phoneme input — parse like --raw-phonemes
-                                var ids = RawPhonemeParser.Parse(seg.Text, phonemeIdMap);
-                                allIds.AddRange(ids);
-                                // No prosody for inline phonemes — fill with zeros
-                                for (int pi = 0; pi < ids.Length; pi++)
-                                {
-                                    allProsody.Add(0);
-                                    allProsody.Add(0);
-                                    allProsody.Add(0);
-                                }
+                                segIds = RawPhonemeParser.Parse(seg.Text, phonemeIdMap);
                             }
                             else
                             {
                                 // Normal text — phonemize
                                 var (ids, prosody) = PhonemeEncoder.EncodeDirect(
                                     phonemizer, seg.Text, phonemeIdMap);
-                                allIds.AddRange(ids);
+                                segIds = ids;
+                                segProsody = prosody;
                                 if (prosody != null)
-                                {
                                     hasAnyProsody = true;
-                                    allProsody.AddRange(prosody);
+                            }
+
+                            // Trim BOS from non-first segments, EOS from non-last segments
+                            // to avoid duplicated BOS/EOS at concatenation boundaries.
+                            int start = (!isFirst && segIds.Length > 0) ? 1 : 0;
+                            int end = (!isLast && segIds.Length > 0) ? segIds.Length - 1 : segIds.Length;
+
+                            for (int i = start; i < end; i++)
+                            {
+                                allIds.Add(segIds[i]);
+                                if (segProsody != null && i * 3 + 2 < segProsody.Length)
+                                {
+                                    allProsody.Add(segProsody[i * 3]);
+                                    allProsody.Add(segProsody[i * 3 + 1]);
+                                    allProsody.Add(segProsody[i * 3 + 2]);
                                 }
                                 else
                                 {
-                                    for (int pi = 0; pi < ids.Length; pi++)
-                                    {
-                                        allProsody.Add(0);
-                                        allProsody.Add(0);
-                                        allProsody.Add(0);
-                                    }
+                                    allProsody.Add(0);
+                                    allProsody.Add(0);
+                                    allProsody.Add(0);
                                 }
                             }
                         }

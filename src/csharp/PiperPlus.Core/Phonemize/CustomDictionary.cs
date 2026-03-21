@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -51,6 +52,8 @@ public sealed class CustomDictionary
 {
     private static ILogger s_logger = NullLogger.Instance;
 
+    private static readonly ConcurrentDictionary<string, Regex> _regexCache = new();
+
     /// <summary>
     /// Replace the default (no-op) logger used for dictionary load warnings.
     /// Call once at application startup; not required for correct operation.
@@ -58,6 +61,18 @@ public sealed class CustomDictionary
     public static void SetLogger(ILogger logger)
     {
         s_logger = logger ?? NullLogger.Instance;
+    }
+
+    private static Regex GetOrCreateRegex(string key, bool caseSensitive)
+    {
+        string cacheKey = key + (caseSensitive ? "_cs" : "_ci");
+        return _regexCache.GetOrAdd(cacheKey, _ =>
+        {
+            var pattern = @"\b" + Regex.Escape(key) + @"\b";
+            var options = RegexOptions.Compiled | RegexOptions.CultureInvariant;
+            if (!caseSensitive) options |= RegexOptions.IgnoreCase;
+            return new Regex(pattern, options);
+        });
     }
 
     /// <summary>
@@ -365,14 +380,15 @@ public sealed class CustomDictionary
 
         foreach (var entry in _sorted)
         {
-            if (IsAsciiOnly(entry.Key))
+            if (StartsWithAscii(entry.Key))
             {
+                // Fast pre-check: skip regex if the key doesn't appear at all.
+                if (text.IndexOf(entry.Key, entry.IsCaseSensitive ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase) < 0)
+                    continue;
+
                 // ASCII words: use \b word boundary to prevent partial matches.
-                var pattern = @"\b" + Regex.Escape(entry.Key) + @"\b";
-                var options = entry.IsCaseSensitive
-                    ? RegexOptions.None
-                    : RegexOptions.IgnoreCase;
-                text = Regex.Replace(text, pattern, entry.Value, options);
+                var regex = GetOrCreateRegex(entry.Key, entry.IsCaseSensitive);
+                text = regex.Replace(text, entry.Value);
             }
             else
             {
@@ -410,15 +426,14 @@ public sealed class CustomDictionary
     }
 
     /// <summary>
-    /// Returns <c>true</c> when every character in <paramref name="word"/>
-    /// is in the ASCII range (0-127). Non-ASCII words (Japanese, Chinese,
-    /// etc.) skip <c>\b</c> word-boundary matching because regex word
-    /// boundaries do not work reliably with multi-byte characters.
+    /// Returns <c>true</c> when the first character of <paramref name="word"/>
+    /// is in the ASCII range (0-127), matching the C++ implementation.
+    /// Words starting with non-ASCII characters (Japanese, Chinese, etc.)
+    /// skip <c>\b</c> word-boundary matching because regex word boundaries
+    /// do not work reliably with multi-byte characters.
     /// </summary>
-    private static bool IsAsciiOnly(string word)
+    private static bool StartsWithAscii(string word)
     {
-        foreach (char c in word)
-            if (c > 127) return false;
-        return true;
+        return word.Length > 0 && word[0] <= 127;
     }
 }

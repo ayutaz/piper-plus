@@ -56,14 +56,12 @@ public static partial class InlinePhonemeParser
             if (match.Index > lastPos)
             {
                 var text = input[lastPos..match.Index];
-                if (!string.IsNullOrWhiteSpace(text))
-                    result.Add(new TextOrPhonemes(false, text));
+                result.Add(new TextOrPhonemes(false, text));
             }
 
-            // Add phoneme segment
+            // Add phoneme segment (even if empty — matches C++ behavior)
             var phonemes = match.Groups[1].Value.Trim();
-            if (phonemes.Length > 0)
-                result.Add(new TextOrPhonemes(true, phonemes));
+            result.Add(new TextOrPhonemes(true, phonemes));
 
             lastPos = match.Index + match.Length;
         }
@@ -72,8 +70,7 @@ public static partial class InlinePhonemeParser
         if (lastPos < input.Length)
         {
             var text = input[lastPos..];
-            if (!string.IsNullOrWhiteSpace(text))
-                result.Add(new TextOrPhonemes(false, text));
+            result.Add(new TextOrPhonemes(false, text));
         }
 
         return result;

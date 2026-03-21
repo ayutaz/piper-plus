@@ -382,32 +382,30 @@ public sealed class ModelManagerTests : IDisposable
     [Fact]
     public async Task ResolveModelPathAsync_KnownVoiceName_ChecksCacheDir()
     {
-        // Resolve with a known voice name but no cached file.
-        // Outcome depends on network availability:
-        //   (a) Download succeeds → returns path to downloaded .onnx file
-        //   (b) Download fails → throws InvalidOperationException or FileNotFoundException
-        // Both outcomes are valid in CI.
+        // Use a known voice and simulate cache hit
+        var voice = ModelManager.FindVoice("tsukuyomi");
+        Assert.NotNull(voice);
+
+        var onnxFile = voice!.Files
+            .FirstOrDefault(f => f.RelativePath.EndsWith(".onnx", StringComparison.OrdinalIgnoreCase));
+        Assert.NotNull(onnxFile);
+
         var tempDir = Path.Combine(Path.GetTempPath(), $"resolve_test_{Guid.NewGuid():N}");
         Directory.CreateDirectory(tempDir);
         try
         {
-            try
-            {
-                string result = await ModelManager.ResolveModelPathAsync(
-                    "tsukuyomi", tempDir, TestContext.Current.CancellationToken);
+            var cachedPath = Path.Combine(tempDir, Path.GetFileName(onnxFile!.RelativePath));
+            await File.WriteAllBytesAsync(cachedPath, new byte[] { 0 },
+                TestContext.Current.CancellationToken);
 
-                // Download succeeded: result should be a valid .onnx path
-                Assert.True(result.EndsWith(".onnx", StringComparison.OrdinalIgnoreCase),
-                    $"Expected .onnx path, got: {result}");
-            }
-            catch (Exception ex) when (ex is InvalidOperationException or FileNotFoundException)
-            {
-                // Download failed: expected in offline/restricted environments
-            }
+            string result = await ModelManager.ResolveModelPathAsync(
+                "tsukuyomi", tempDir, TestContext.Current.CancellationToken);
+
+            Assert.Equal(cachedPath, result);
         }
         finally
         {
-            try { Directory.Delete(tempDir, true); } catch { /* best-effort */ }
+            try { Directory.Delete(tempDir, true); } catch { }
         }
     }
 
@@ -475,15 +473,34 @@ public sealed class ModelManagerTests : IDisposable
     [Fact]
     public async Task ResolveModelPathAsync_NullModelDir_UsesDefault()
     {
-        // When modelDir is null, ResolveModelPathAsync should fall back to
-        // GetDefaultModelDir(). We can't easily test the download path,
-        // but we can verify it doesn't throw NullReferenceException.
-        // Use a nonexistent model name to trigger FileNotFoundException.
-        await Assert.ThrowsAsync<FileNotFoundException>(
-            () => ModelManager.ResolveModelPathAsync(
-                "nonexistent-model-xyz",
-                null,
-                TestContext.Current.CancellationToken));
+        var voice = ModelManager.FindVoice("css10");
+        Assert.NotNull(voice);
+
+        var onnxFile = voice!.Files
+            .FirstOrDefault(f => f.RelativePath.EndsWith(".onnx", StringComparison.OrdinalIgnoreCase));
+        Assert.NotNull(onnxFile);
+
+        var tempDir = Path.Combine(Path.GetTempPath(), $"resolve_default_{Guid.NewGuid():N}");
+        Directory.CreateDirectory(tempDir);
+
+        var originalEnv = Environment.GetEnvironmentVariable("PIPER_MODEL_DIR");
+        Environment.SetEnvironmentVariable("PIPER_MODEL_DIR", tempDir);
+        try
+        {
+            var cachedPath = Path.Combine(tempDir, Path.GetFileName(onnxFile!.RelativePath));
+            await File.WriteAllBytesAsync(cachedPath, new byte[] { 0 },
+                TestContext.Current.CancellationToken);
+
+            string result = await ModelManager.ResolveModelPathAsync(
+                "css10", null, TestContext.Current.CancellationToken);
+
+            Assert.Equal(cachedPath, result);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("PIPER_MODEL_DIR", originalEnv);
+            try { Directory.Delete(tempDir, true); } catch { }
+        }
     }
 
     [Fact]

@@ -133,29 +133,45 @@ public sealed class InlinePhonemeParserTests
     }
 
     // ================================================================
-    // 9. Empty brackets — no phoneme segment added
+    // 9. Empty brackets — empty phoneme segment kept (matches C++)
     // ================================================================
 
     [Fact]
-    public void Parse_EmptyBrackets_NoPhonemeSegment()
+    public void Parse_EmptyBrackets_EmptyPhonemeSegmentKept()
     {
         var result = InlinePhonemeParser.Parse("hello [[]] world");
 
-        // Empty brackets produce no phoneme segment, but the surrounding text
-        // may be split into segments.
-        Assert.DoesNotContain(result, s => s.IsPhonemes);
+        Assert.Equal(3, result.Count);
+
+        Assert.False(result[0].IsPhonemes);
+        Assert.Equal("hello ", result[0].Text);
+
+        Assert.True(result[1].IsPhonemes);
+        Assert.Equal("", result[1].Text);
+
+        Assert.False(result[2].IsPhonemes);
+        Assert.Equal(" world", result[2].Text);
     }
 
     // ================================================================
-    // 10. Whitespace-only brackets — no phoneme segment added
+    // 10. Whitespace-only brackets — empty phoneme segment kept (matches C++)
     // ================================================================
 
     [Fact]
-    public void Parse_WhitespaceOnlyBrackets_NoPhonemeSegment()
+    public void Parse_WhitespaceOnlyBrackets_EmptyPhonemeSegmentKept()
     {
         var result = InlinePhonemeParser.Parse("hello [[   ]] world");
 
-        Assert.DoesNotContain(result, s => s.IsPhonemes);
+        Assert.Equal(3, result.Count);
+
+        Assert.False(result[0].IsPhonemes);
+        Assert.Equal("hello ", result[0].Text);
+
+        Assert.True(result[1].IsPhonemes);
+        Assert.Equal("", result[1].Text);
+
+        Assert.False(result[2].IsPhonemes);
+        Assert.Equal(" world", result[2].Text);
     }
 
     // ================================================================
@@ -227,17 +243,24 @@ public sealed class InlinePhonemeParserTests
     }
 
     // ================================================================
-    // 15. Whitespace-only text between blocks is skipped
+    // 15. Whitespace-only text between blocks is kept (matches C++)
     // ================================================================
 
     [Fact]
-    public void Parse_WhitespaceOnlyTextBetweenBlocks_Skipped()
+    public void Parse_WhitespaceOnlyTextBetweenBlocks_Kept()
     {
-        // Whitespace-only text segments between phoneme blocks are omitted
+        // Whitespace-only text segments between phoneme blocks are preserved
         var result = InlinePhonemeParser.Parse("[[ a ]]   [[ b ]]");
 
-        Assert.Equal(2, result.Count);
+        Assert.Equal(3, result.Count);
+
         Assert.True(result[0].IsPhonemes);
-        Assert.True(result[1].IsPhonemes);
+        Assert.Equal("a", result[0].Text);
+
+        Assert.False(result[1].IsPhonemes);
+        Assert.Equal("   ", result[1].Text);
+
+        Assert.True(result[2].IsPhonemes);
+        Assert.Equal("b", result[2].Text);
     }
 }
