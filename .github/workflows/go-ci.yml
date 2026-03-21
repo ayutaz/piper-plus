@@ -76,6 +76,50 @@ jobs:
           ONNX_RUNTIME_SHARED_LIBRARY_PATH: ${{ github.workspace }}/onnxruntime/lib/libonnxruntime.so
           PIPER_TEST_MODEL: ${{ github.workspace }}/test/models/multilingual-test-medium.onnx
 
+  build:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            goos: linux
+            goarch: amd64
+            artifact: piper-plus-linux-amd64
+          - os: macos-latest
+            goos: darwin
+            goarch: arm64
+            artifact: piper-plus-darwin-arm64
+          - os: windows-latest
+            goos: windows
+            goarch: amd64
+            artifact: piper-plus-windows-amd64
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: src/go
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: src/go
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26'
+          cache-dependency-path: src/go/go.sum
+      - name: Build CLI binary
+        run: go build -trimpath -ldflags="-s -w" -o ${{ matrix.artifact }}${{ matrix.goos == 'windows' && '.exe' || '' }} ./cmd/piper-plus
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+      - name: Upload binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: src/go/${{ matrix.artifact }}${{ matrix.goos == 'windows' && '.exe' || '' }}
+          retention-days: 14
+
   lint:
     runs-on: ubuntu-22.04
     timeout-minutes: 10

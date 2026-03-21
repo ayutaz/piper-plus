@@ -26,8 +26,8 @@ func createMultilingualPhonemizer(config *VoiceConfig, dicts *dictData) (phonemi
 	for lang := range config.LanguageIDMap {
 		p, err := phonemizerForLanguage(lang, dicts)
 		if err != nil {
-			if lang == "ja" {
-				// Japanese requires a native G2P engine; skip gracefully.
+			if lang == "ja" && phonemize.NewOpenJTalkEngine == nil {
+				// Japanese requires CGO OpenJTalk engine; skip gracefully.
 				continue
 			}
 			slog.Warn("phonemizer creation failed; skipping language",
@@ -69,7 +69,7 @@ func createSingleLanguagePhonemizer(config *VoiceConfig, dicts *dictData) (phone
 	// Try PhonemeType first, then fall back to language code.
 	switch config.PhonemeType {
 	case PhonemeTypeOpenJTalk:
-		return nil, fmt.Errorf("Japanese requires G2P engine")
+		return phonemizerForLanguage("ja", dicts)
 	case PhonemeTypeEspeak:
 		if lang == "" {
 			lang = "en"
@@ -83,7 +83,21 @@ func createSingleLanguagePhonemizer(config *VoiceConfig, dicts *dictData) (phone
 func phonemizerForLanguage(lang string, dicts *dictData) (phonemize.Phonemizer, error) {
 	switch lang {
 	case "ja":
-		return nil, fmt.Errorf("Japanese requires G2P engine")
+		if phonemize.NewOpenJTalkEngine == nil {
+			return nil, fmt.Errorf("Japanese G2P requires build tag 'openjtalk' (CGO + libopenjtalk)")
+		}
+		var dictPath string
+		if dicts != nil {
+			dictPath = dicts.openjtalkDictDir
+		}
+		if dictPath == "" {
+			return nil, fmt.Errorf("OpenJTalk dictionary not found; set OPENJTALK_DICTIONARY_PATH or place dictionary next to model")
+		}
+		engine, err := phonemize.NewOpenJTalkEngine(dictPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create OpenJTalk engine: %w", err)
+		}
+		return phonemize.NewJapanesePhonemizer(engine), nil
 	case "en":
 		var cmuDict map[string][]string
 		if dicts != nil {

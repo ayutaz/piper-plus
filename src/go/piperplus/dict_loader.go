@@ -12,9 +12,10 @@ import (
 
 // dictData holds all loaded dictionaries for phonemizer initialisation.
 type dictData struct {
-	cmuDict      map[string][]string
-	pinyinSingle map[rune]string
-	pinyinPhrase map[string]string
+	cmuDict          map[string][]string
+	pinyinSingle     map[rune]string
+	pinyinPhrase     map[string]string
+	openjtalkDictDir string // path to OpenJTalk dictionary directory
 }
 
 // findDictionaryFile searches for a dictionary file using a 3-tier strategy:
@@ -52,6 +53,43 @@ func findDictionaryFile(filename, modelDir string) string {
 	}
 
 	slog.Debug("dictionary file not found", "file", filename)
+	return ""
+}
+
+// findOpenJTalkDict searches for the OpenJTalk dictionary directory using a
+// 3-tier strategy similar to findDictionaryFile:
+//  1. modelDir/open_jtalk_dic_utf_8-1.11/ — next to model
+//  2. <exe_dir>/../share/open_jtalk/dic/ — exe-relative (same as C++)
+//  3. OPENJTALK_DICTIONARY_PATH environment variable — explicit override
+//
+// Each candidate is validated by checking for the presence of sys.dic (the main
+// MeCab dictionary file). Returns the first valid path, or empty string.
+func findOpenJTalkDict(modelDir string) string {
+	candidates := make([]string, 0, 3)
+
+	// Tier 1: model directory.
+	if modelDir != "" {
+		candidates = append(candidates, filepath.Join(modelDir, "open_jtalk_dic_utf_8-1.11"))
+	}
+
+	// Tier 2: executable-relative path.
+	if exePath, err := os.Executable(); err == nil {
+		candidates = append(candidates, filepath.Join(filepath.Dir(exePath), "..", "share", "open_jtalk", "dic"))
+	}
+
+	// Tier 3: OPENJTALK_DICTIONARY_PATH environment variable.
+	if envDir := os.Getenv("OPENJTALK_DICTIONARY_PATH"); envDir != "" {
+		candidates = append(candidates, envDir)
+	}
+
+	for _, candidate := range candidates {
+		if _, err := os.Stat(filepath.Join(candidate, "sys.dic")); err == nil {
+			slog.Debug("OpenJTalk dictionary found", "path", candidate)
+			return candidate
+		}
+	}
+
+	slog.Debug("OpenJTalk dictionary not found")
 	return ""
 }
 
@@ -221,6 +259,17 @@ func loadDictionaries(modelDir string, languages map[string]int64, logger *slog.
 					"phrase_entries", len(phrases),
 				)
 			}
+		}
+	}
+
+	// Japanese: OpenJTalk dictionary.
+	if _, ok := languages["ja"]; ok {
+		dictDir := findOpenJTalkDict(modelDir)
+		if dictDir == "" {
+			logger.Warn("OpenJTalk dictionary not found; Japanese phonemization will not be available")
+		} else {
+			dd.openjtalkDictDir = dictDir
+			logger.Info("found OpenJTalk dictionary", "path", dictDir)
 		}
 	}
 
