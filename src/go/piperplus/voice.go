@@ -15,6 +15,7 @@ type Voice struct {
 	engine     *OnnxEngine
 	config     *VoiceConfig
 	phonemizer phonemize.Phonemizer
+	textDict   *phonemize.TextDictionary // custom dictionary for text substitution
 	logger     *slog.Logger
 	closed     atomic.Bool
 }
@@ -86,12 +87,26 @@ func LoadVoice(ctx context.Context, modelPath string, opts ...LoadOption) (*Voic
 			"reason", err.Error())
 	}
 
+	// Load custom dictionary for text substitution if paths provided.
+	var textDict *phonemize.TextDictionary
+	if len(loadOpts.CustomDictPaths) > 0 {
+		td, tdErr := phonemize.LoadTextDictJSONFiles(loadOpts.CustomDictPaths)
+		if tdErr != nil {
+			logger.Warn("failed to load custom dictionary", "error", tdErr)
+		} else if td.Len() > 0 {
+			logger.Info("loaded custom dictionary", "entries", td.Len(), "files", len(loadOpts.CustomDictPaths))
+		}
+		// Store even if empty (nil-safe in Synthesize)
+		textDict = td
+	}
+
 	logger.Info("voice loaded", "model", modelPath, "device", loadOpts.Device)
 
 	return &Voice{
 		engine:     engine,
 		config:     config,
 		phonemizer: ph,
+		textDict:   textDict,
 		logger:     logger,
 	}, nil
 }

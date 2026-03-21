@@ -36,6 +36,7 @@ var (
 	timingOutput    string
 	timingFormat    string
 	debug           bool
+	customDictPaths []string // --custom-dict (repeatable)
 )
 
 // jsonlInput represents a single line of JSONL input from stdin or batch file.
@@ -74,6 +75,7 @@ func init() {
 	f.StringVar(&timingOutput, "output-timing", "", "write phoneme timing to file")
 	f.StringVar(&timingFormat, "timing-format", "json", "timing output format (json or tsv)")
 	f.BoolVar(&debug, "debug", false, "enable debug logging")
+	f.StringArrayVar(&customDictPaths, "custom-dict", nil, "custom dictionary JSON file paths (repeatable)")
 }
 
 func main() {
@@ -142,6 +144,9 @@ func runSynthesize(cmd *cobra.Command, args []string) error {
 	}
 	loadOpts = append(loadOpts, piperplus.WithDevice(device))
 	loadOpts = append(loadOpts, piperplus.WithLogger(logger))
+	if len(customDictPaths) > 0 {
+		loadOpts = append(loadOpts, piperplus.WithCustomDict(customDictPaths...))
+	}
 
 	voice, err := piperplus.LoadVoice(ctx, modelPath, loadOpts...)
 	if err != nil {

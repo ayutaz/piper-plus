@@ -153,6 +153,11 @@ func (v *Voice) Synthesize(ctx context.Context, text string, opts ...SynthesisOp
 		fn(&so)
 	}
 
+	// Apply custom dictionary text substitution before phonemization.
+	if v.textDict != nil {
+		text = v.textDict.ApplyToText(text)
+	}
+
 	// Phonemize text.
 	result, err := v.phonemizer.PhonemizeWithProsody(text)
 	if err != nil {

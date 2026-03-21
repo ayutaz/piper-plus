@@ -1,5 +1,5 @@
 # Go test binaries
 *.test
 
-# Built binaries
-piper-plus
+# Built binaries (root level only, not cmd/piper-plus/ directory)
+/piper-plus

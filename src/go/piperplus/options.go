@@ -102,10 +102,11 @@ func WithSentenceSilence(seconds float64) SynthesisOption {
 
 // LoadOptions holds resolved parameters for model loading.
 type LoadOptions struct {
-	ConfigPath string       // explicit path to config.json
-	DictDir    string       // explicit dictionary directory (overrides search)
-	Device     string       // default "cpu"
-	Logger     *slog.Logger // default slog.Default()
+	ConfigPath      string       // explicit path to config.json
+	DictDir         string       // explicit dictionary directory (overrides search)
+	CustomDictPaths []string     // paths to custom dictionary JSON files
+	Device          string       // default "cpu"
+	Logger          *slog.Logger // default slog.Default()
 }
 
 // LoadOption is a functional option applied to LoadOptions.
@@ -121,6 +122,12 @@ func WithConfig(path string) LoadOption {
 // This takes priority over the model directory and PIPER_DICTIONARIES_PATH.
 func WithDictDir(dir string) LoadOption {
 	return func(o *LoadOptions) { o.DictDir = dir }
+}
+
+// WithCustomDict sets custom dictionary JSON file paths.
+// These are loaded and applied as text substitution before phonemization.
+func WithCustomDict(paths ...string) LoadOption {
+	return func(o *LoadOptions) { o.CustomDictPaths = append(o.CustomDictPaths, paths...) }
 }
 
 // WithDevice sets the inference device (e.g. "cpu", "cuda").
