@@ -330,4 +330,182 @@ public sealed class ModelManagerTests : IDisposable
             }
         }
     }
+
+    // ================================================================
+    // ResolveModelPathAsync — file path resolution
+    // ================================================================
+
+    [Fact]
+    public async Task ResolveModelPathAsync_ExistingFile_ReturnsFullPath()
+    {
+        // Create a temporary .onnx file to simulate a local model.
+        var tempFile = Path.Combine(Path.GetTempPath(), $"test_model_{Guid.NewGuid():N}.onnx");
+        try
+        {
+            await File.WriteAllBytesAsync(tempFile, new byte[] { 0 },
+                TestContext.Current.CancellationToken);
+
+            string result = await ModelManager.ResolveModelPathAsync(
+                tempFile, null, TestContext.Current.CancellationToken);
+
+            Assert.Equal(Path.GetFullPath(tempFile), result);
+        }
+        finally
+        {
+            try { File.Delete(tempFile); } catch { /* best-effort */ }
+        }
+    }
+
+    [Fact]
+    public async Task ResolveModelPathAsync_NonexistentFileNorModelName_ThrowsFileNotFound()
+    {
+        // A string that is neither an existing file nor a known model name
+        // should throw FileNotFoundException.
+        await Assert.ThrowsAsync<FileNotFoundException>(
+            () => ModelManager.ResolveModelPathAsync(
+                "totally-nonexistent-model-xyz-12345",
+                null,
+                TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task ResolveModelPathAsync_EmptyString_ThrowsFileNotFound()
+    {
+        // Empty string is not a file and not a model name.
+        await Assert.ThrowsAsync<FileNotFoundException>(
+            () => ModelManager.ResolveModelPathAsync(
+                "",
+                null,
+                TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task ResolveModelPathAsync_KnownVoiceName_ChecksCacheDir()
+    {
+        // Resolve with a known voice name but no cached file.
+        // This should either:
+        //   (a) find a cached file and return it, or
+        //   (b) attempt download (which may fail in CI),
+        //       throwing InvalidOperationException.
+        // We use a temp directory as modelDir so there's definitely no cache.
+        var tempDir = Path.Combine(Path.GetTempPath(), $"resolve_test_{Guid.NewGuid():N}");
+        Directory.CreateDirectory(tempDir);
+        try
+        {
+            // Use a known voice name from the catalog
+            var ex = await Assert.ThrowsAnyAsync<Exception>(
+                () => ModelManager.ResolveModelPathAsync(
+                    "tsukuyomi", tempDir, TestContext.Current.CancellationToken));
+
+            // Should be InvalidOperationException (download failed) or
+            // FileNotFoundException (ONNX file not found after download)
+            Assert.True(
+                ex is InvalidOperationException || ex is FileNotFoundException,
+                $"Expected InvalidOperationException or FileNotFoundException, got {ex.GetType().Name}: {ex.Message}");
+        }
+        finally
+        {
+            try { Directory.Delete(tempDir, true); } catch { /* best-effort */ }
+        }
+    }
+
+    [Fact]
+    public async Task ResolveModelPathAsync_KnownVoiceWithCachedOnnx_ReturnsCachedPath()
+    {
+        // Simulate a cached ONNX file for a known voice.
+        var voice = ModelManager.FindVoice("tsukuyomi");
+        Assert.NotNull(voice);
+
+        var onnxFile = voice!.Files
+            .FirstOrDefault(f => f.RelativePath.EndsWith(".onnx", StringComparison.OrdinalIgnoreCase));
+        Assert.NotNull(onnxFile);
+
+        var tempDir = Path.Combine(Path.GetTempPath(), $"resolve_cache_{Guid.NewGuid():N}");
+        Directory.CreateDirectory(tempDir);
+        try
+        {
+            // Create a fake cached ONNX file with the expected name
+            var cachedPath = Path.Combine(tempDir, Path.GetFileName(onnxFile!.RelativePath));
+            await File.WriteAllBytesAsync(cachedPath, new byte[] { 0 },
+                TestContext.Current.CancellationToken);
+
+            string result = await ModelManager.ResolveModelPathAsync(
+                "tsukuyomi", tempDir, TestContext.Current.CancellationToken);
+
+            Assert.Equal(cachedPath, result);
+        }
+        finally
+        {
+            try { Directory.Delete(tempDir, true); } catch { /* best-effort */ }
+        }
+    }
+
+    [Fact]
+    public async Task ResolveModelPathAsync_AliasResolvesToCachedFile()
+    {
+        // Resolve using an alias (e.g., "css10") with a cached ONNX file.
+        var voice = ModelManager.FindVoice("css10");
+        Assert.NotNull(voice);
+
+        var onnxFile = voice!.Files
+            .FirstOrDefault(f => f.RelativePath.EndsWith(".onnx", StringComparison.OrdinalIgnoreCase));
+        Assert.NotNull(onnxFile);
+
+        var tempDir = Path.Combine(Path.GetTempPath(), $"resolve_alias_{Guid.NewGuid():N}");
+        Directory.CreateDirectory(tempDir);
+        try
+        {
+            var cachedPath = Path.Combine(tempDir, Path.GetFileName(onnxFile!.RelativePath));
+            await File.WriteAllBytesAsync(cachedPath, new byte[] { 0 },
+                TestContext.Current.CancellationToken);
+
+            string result = await ModelManager.ResolveModelPathAsync(
+                "css10", tempDir, TestContext.Current.CancellationToken);
+
+            Assert.Equal(cachedPath, result);
+        }
+        finally
+        {
+            try { Directory.Delete(tempDir, true); } catch { /* best-effort */ }
+        }
+    }
+
+    [Fact]
+    public async Task ResolveModelPathAsync_NullModelDir_UsesDefault()
+    {
+        // When modelDir is null, ResolveModelPathAsync should fall back to
+        // GetDefaultModelDir(). We can't easily test the download path,
+        // but we can verify it doesn't throw NullReferenceException.
+        // Use a nonexistent model name to trigger FileNotFoundException.
+        await Assert.ThrowsAsync<FileNotFoundException>(
+            () => ModelManager.ResolveModelPathAsync(
+                "nonexistent-model-xyz",
+                null,
+                TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task ResolveModelPathAsync_FilePathPrioritizedOverModelName()
+    {
+        // If a file exists on disk AND matches a model name, the file path
+        // should be returned (file check happens first).
+        var tempDir = Path.Combine(Path.GetTempPath(), $"resolve_priority_{Guid.NewGuid():N}");
+        Directory.CreateDirectory(tempDir);
+        var tempFile = Path.Combine(tempDir, "tsukuyomi");  // matches alias name
+        try
+        {
+            await File.WriteAllBytesAsync(tempFile, new byte[] { 0 },
+                TestContext.Current.CancellationToken);
+
+            string result = await ModelManager.ResolveModelPathAsync(
+                tempFile, null, TestContext.Current.CancellationToken);
+
+            // Should return the file path, not resolve as a model name
+            Assert.Equal(Path.GetFullPath(tempFile), result);
+        }
+        finally
+        {
+            try { Directory.Delete(tempDir, true); } catch { /* best-effort */ }
+        }
+    }
 }

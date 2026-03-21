@@ -357,6 +357,81 @@ public static class ModelManager
     }
 
     // ------------------------------------------------------------------
+    // ResolveModelPathAsync
+    // ------------------------------------------------------------------
+
+    /// <summary>
+    /// Resolves a model path from a file path, model name, or alias.
+    /// <list type="number">
+    ///   <item><description>If <paramref name="modelStr"/> exists as a file, returns it directly.</description></item>
+    ///   <item><description>If it matches a model name/alias, checks for a locally cached ONNX file.</description></item>
+    ///   <item><description>If not cached, auto-downloads the model and returns the ONNX path.</description></item>
+    /// </list>
+    /// </summary>
+    /// <param name="modelStr">File path, model name, or alias.</param>
+    /// <param name="modelDir">
+    /// Directory for cached models. Falls back to <see cref="GetDefaultModelDir"/>.
+    /// </param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Absolute path to the resolved <c>.onnx</c> model file.</returns>
+    /// <exception cref="FileNotFoundException">
+    /// Thrown when <paramref name="modelStr"/> is not a file and not a known model name,
+    /// or when the downloaded model does not contain an ONNX file.
+    /// </exception>
+    /// <exception cref="InvalidOperationException">
+    /// Thrown when the download fails.
+    /// </exception>
+    public static async Task<string> ResolveModelPathAsync(
+        string modelStr, string? modelDir = null, CancellationToken ct = default)
+    {
+        // 1. Direct file path
+        if (File.Exists(modelStr))
+            return Path.GetFullPath(modelStr);
+
+        // 2. Try as model name/alias
+        var voice = FindVoice(modelStr);
+        if (voice is null)
+        {
+            throw new FileNotFoundException(
+                $"Model '{modelStr}' not found as file or model name. " +
+                "Use --list-models to see available models.");
+        }
+
+        var dir = modelDir ?? GetDefaultModelDir();
+
+        // Find the .onnx file entry in the voice catalog
+        var onnxFile = voice.Files
+            .FirstOrDefault(f => f.RelativePath.EndsWith(".onnx", StringComparison.OrdinalIgnoreCase));
+
+        // Check if already cached locally
+        if (onnxFile is not null)
+        {
+            var cachedPath = Path.Combine(dir, Path.GetFileName(onnxFile.RelativePath));
+            if (File.Exists(cachedPath))
+                return cachedPath;
+        }
+
+        // 3. Auto-download
+        Console.Error.WriteLine($"Model '{voice.Key}' not found locally. Downloading...");
+        bool success = await DownloadModelAsync(voice.Key, dir, ct).ConfigureAwait(false);
+        if (!success)
+        {
+            throw new InvalidOperationException(
+                $"Failed to download model '{voice.Key}'.");
+        }
+
+        if (onnxFile is not null)
+        {
+            var downloadedPath = Path.Combine(dir, Path.GetFileName(onnxFile.RelativePath));
+            if (File.Exists(downloadedPath))
+                return downloadedPath;
+        }
+
+        throw new FileNotFoundException(
+            $"Model '{voice.Key}' downloaded but ONNX file not found in {dir}.");
+    }
+
+    // ------------------------------------------------------------------
     // Private: file download via HttpClient
     // ------------------------------------------------------------------
 

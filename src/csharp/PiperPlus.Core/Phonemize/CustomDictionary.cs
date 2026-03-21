@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -60,10 +61,18 @@ public sealed class CustomDictionary
     }
 
     /// <summary>
-    /// A single dictionary entry with key, value (replacement text) and priority.
+    /// A single dictionary entry with key, value (replacement text), priority,
+    /// and case-sensitivity flag.
     /// Higher priority wins when the same key is loaded from multiple files.
     /// </summary>
-    private record DictionaryEntry(string Key, string Value, int Priority = 5);
+    /// <param name="Key">The original dictionary key (before any normalization).</param>
+    /// <param name="Value">The replacement text (pronunciation).</param>
+    /// <param name="Priority">Priority for conflict resolution (higher wins).</param>
+    /// <param name="IsCaseSensitive">
+    /// <c>true</c> for mixed-case keys (e.g. "PyTorch") that must match exactly;
+    /// <c>false</c> for all-upper or all-lower keys that match case-insensitively.
+    /// </param>
+    private record DictionaryEntry(string Key, string Value, int Priority = 5, bool IsCaseSensitive = false);
 
     // Entries stored with priority support.
     // Kept in a list so we can sort by key length for longest-match-first application.
@@ -215,20 +224,82 @@ public sealed class CustomDictionary
 
     private void AddEntry(string key, string value, int priority)
     {
-        var existing = _entries.FindIndex(e => e.Key == key);
+        bool caseSensitive = IsMixedCase(key);
+
+        // For case-insensitive entries, match by lowered key to deduplicate
+        // (e.g. "API" and "api" should be treated as the same entry).
+        var existing = _entries.FindIndex(e =>
+            caseSensitive
+                ? (e.IsCaseSensitive && e.Key == key)
+                : (!e.IsCaseSensitive && string.Equals(e.Key, key, StringComparison.OrdinalIgnoreCase)));
+
         if (existing >= 0)
         {
             if (priority <= _entries[existing].Priority)
                 return; // Existing has higher or equal priority — keep it.
 
-            _entries[existing] = new DictionaryEntry(key, value, priority);
+            _entries[existing] = new DictionaryEntry(key, value, priority, caseSensitive);
         }
         else
         {
-            _entries.Add(new DictionaryEntry(key, value, priority));
+            _entries.Add(new DictionaryEntry(key, value, priority, caseSensitive));
         }
 
         _dirty = true;
+    }
+
+    /// <summary>
+    /// Load default dictionaries from standard locations.
+    /// <para>
+    /// Searches for a <c>data/dictionaries/</c> directory relative to the
+    /// application base directory, its parent directories, and the current
+    /// working directory.  All <c>*.json</c> files in the first directory
+    /// found are loaded in ordinal-sorted order (matching C++ behaviour).
+    /// Files that fail to parse are silently skipped with a log warning.
+    /// </para>
+    /// </summary>
+    public void LoadDefaults()
+    {
+        var searchPaths = new List<string>();
+
+        // Exe-relative paths (matches C++ findDictDir candidates)
+        var exeDir = AppContext.BaseDirectory.TrimEnd(
+            Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        searchPaths.Add(Path.Combine(exeDir, "data", "dictionaries"));
+        searchPaths.Add(Path.Combine(exeDir, "..", "data", "dictionaries"));
+        searchPaths.Add(Path.Combine(exeDir, "..", "..", "data", "dictionaries"));
+
+        // Working directory
+        searchPaths.Add(Path.Combine(
+            Directory.GetCurrentDirectory(), "data", "dictionaries"));
+
+        foreach (var searchPath in searchPaths)
+        {
+            if (!Directory.Exists(searchPath))
+                continue;
+
+            // Load in sorted order (matching C++ behaviour)
+            var files = Directory.GetFiles(searchPath, "*.json")
+                .OrderBy(f => f, StringComparer.Ordinal)
+                .ToArray();
+
+            foreach (var file in files)
+            {
+                try
+                {
+                    LoadDictionary(file);
+                }
+                catch (Exception ex)
+                {
+                    s_logger.LogWarning(
+                        "Failed to load default dictionary {File}: {Message}",
+                        file, ex.Message);
+                }
+            }
+
+            // Only load from first found directory
+            return;
+        }
     }
 
     /// <summary>
@@ -262,7 +333,11 @@ public sealed class CustomDictionary
     /// Apply all dictionary entries to <paramref name="text"/>.
     /// <para>
     /// Entries are applied in longest-key-first order (longest match wins).
-    /// Replacement is case-sensitive.
+    /// Mixed-case keys (e.g. "PyTorch") match case-sensitively; all-upper
+    /// or all-lower keys (e.g. "AI", "python") match case-insensitively.
+    /// ASCII-only keys use word-boundary matching (<c>\b</c>) to prevent
+    /// partial matches (e.g. "AI" does not match inside "AIDS").
+    /// Non-ASCII keys (Japanese, Chinese, etc.) use simple substring replacement.
     /// </para>
     /// </summary>
     /// <param name="text">Input text.</param>
@@ -290,12 +365,60 @@ public sealed class CustomDictionary
 
         foreach (var entry in _sorted)
         {
-            if (text.Contains(entry.Key, StringComparison.Ordinal))
+            if (IsAsciiOnly(entry.Key))
             {
-                text = text.Replace(entry.Key, entry.Value, StringComparison.Ordinal);
+                // ASCII words: use \b word boundary to prevent partial matches.
+                var pattern = @"\b" + Regex.Escape(entry.Key) + @"\b";
+                var options = entry.IsCaseSensitive
+                    ? RegexOptions.None
+                    : RegexOptions.IgnoreCase;
+                text = Regex.Replace(text, pattern, entry.Value, options);
+            }
+            else
+            {
+                // Non-ASCII (Japanese, Chinese, etc.): simple substring replacement.
+                var comparison = entry.IsCaseSensitive
+                    ? StringComparison.Ordinal
+                    : StringComparison.OrdinalIgnoreCase;
+                text = text.Replace(entry.Key, entry.Value, comparison);
             }
         }
 
         return text;
+    }
+
+    // ----------------------------------------------------------------
+    // Helper methods for case sensitivity and word boundary detection
+    // ----------------------------------------------------------------
+
+    /// <summary>
+    /// Returns <c>true</c> when <paramref name="word"/> contains both
+    /// upper-case and lower-case characters (e.g. "PyTorch", "iPhone").
+    /// Such words are stored in the case-sensitive bucket and require
+    /// exact-case matching.
+    /// </summary>
+    private static bool IsMixedCase(string word)
+    {
+        bool hasUpper = false, hasLower = false;
+        foreach (char c in word)
+        {
+            if (char.IsUpper(c)) hasUpper = true;
+            if (char.IsLower(c)) hasLower = true;
+            if (hasUpper && hasLower) return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Returns <c>true</c> when every character in <paramref name="word"/>
+    /// is in the ASCII range (0-127). Non-ASCII words (Japanese, Chinese,
+    /// etc.) skip <c>\b</c> word-boundary matching because regex word
+    /// boundaries do not work reliably with multi-byte characters.
+    /// </summary>
+    private static bool IsAsciiOnly(string word)
+    {
+        foreach (char c in word)
+            if (c > 127) return false;
+        return true;
     }
 }
