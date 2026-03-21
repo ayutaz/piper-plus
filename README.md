@@ -294,39 +294,60 @@ dotnet test src/csharp/PiperPlus.Core.Tests/
 #### C# CLI 使用例
 
 ```bash
-# 日本語
-piper-plus --model model.onnx --text "こんにちは" --language ja --output-file output.wav
+# モデル名で推論 (自動ダウンロード対応、--output-file 省略で output.wav に出力)
+piper-plus --model tsukuyomi --text "こんにちは" --language ja
 
 # 英語
-piper-plus --model model.onnx --text "Hello world" --language en --output-file output.wav
+piper-plus --model model.onnx --text "Hello world" --language en
 
 # マルチリンガル (自動言語検出)
-piper-plus --model model.onnx --text "こんにちはHello你好" --language ja-en-zh --output-file output.wav
+piper-plus --model model.onnx --text "こんにちはHello你好" --language ja-en-zh
+
+# インライン音素記法 (テキスト中に直接音素を指定)
+piper-plus --model model.onnx --text "Hello [[ h ə l oʊ ]] world" --language en
 
 # ストリーミング (文ごとに逐次PCM出力)
 piper-plus --model model.onnx --text "最初の文。次の文。" --language ja --streaming | aplay -r 22050 -f S16_LE
 
 # カスタム辞書 (JSON v1/v2 または TSV)
-piper-plus --model model.onnx --text "AI技術" --language ja --custom-dict my_dict.json --output-file output.wav
+piper-plus --model model.onnx --text "AI技術" --language ja --custom-dict my_dict.json
+
+# モデルダウンロード
+piper-plus --download-model tsukuyomi
+piper-plus --list-models ja
+
+# テストモード (ONNX推論なしで phoneme IDs を確認)
+piper-plus --model model.onnx --test-mode --text "こんにちは" --language ja
 ```
 
 #### Rust CLI 使用例
 
 ```bash
-# 日本語 (naist-jdic辞書バンドル済み)
-piper-plus-cli --model model.onnx --text "こんにちは" --language ja --output-file output.wav
+# モデル名で推論 (自動ダウンロード対応)
+piper-plus-cli --model tsukuyomi --text "こんにちは" --language ja
 
 # 英語
-piper-plus-cli --model model.onnx --text "Hello world" --language en --output-file output.wav
+piper-plus-cli --model model.onnx --text "Hello world" --language en
+
+# モデルダウンロード・管理
+piper-plus-cli --download-model tsukuyomi
+piper-plus-cli --list-models ja
 
 # ストリーミング (文ごとに逐次合成)
 piper-plus-cli --model model.onnx --text "First sentence. Second sentence." --stream --output-dir chunks/
 
 # カスタム辞書
-piper-plus-cli --model model.onnx --text "AI技術" --custom-dict my_dict.json --output-file output.wav
+piper-plus-cli --model model.onnx --text "AI技術" --custom-dict my_dict.json
 
 # GPU推論
-piper-plus-cli --model model.onnx --text "Hello" --device cuda --output-file output.wav
+piper-plus-cli --model model.onnx --text "Hello" --device cuda
+
+# テストモード・静音モード
+piper-plus-cli --model model.onnx --test-mode --text "hello" --language en
+piper-plus-cli --model model.onnx --text "hello" --language en --quiet
+
+# raw PCM出力 (WAVヘッダなし)
+piper-plus-cli --model model.onnx --text "hello" --language en --output-raw | aplay -r 22050 -f S16_LE
 ```
 
 > **Note:** C# CLI は `dotnet tool install -g PiperPlus.Cli` で、Rust CLI は `cargo install piper-plus-cli` でインストールできます。両方とも6言語対応・カスタム辞書・ストリーミングをサポートしています。
