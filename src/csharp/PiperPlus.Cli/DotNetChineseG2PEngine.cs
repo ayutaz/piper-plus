@@ -58,6 +58,37 @@ internal sealed class DotNetChineseG2PEngine : IChineseG2PEngine
         int phonemesPerSyllable = puaPhonemes.Length / totalSyllables;
         int remainder = puaPhonemes.Length % totalSyllables;
 
+        // Guard: if there are fewer phoneme tokens than syllables, the
+        // distribution loop cannot assign at least one token per syllable.
+        // This shouldn't happen with well-formed DotNetG2P output, but
+        // fall back to returning the raw PUA phonemes with tone markers
+        // only (no per-syllable distribution) to avoid silent corruption.
+        if (phonemesPerSyllable == 0 && remainder == 0)
+        {
+            var fallback = new List<string>(totalSyllables);
+            var fbA1 = new List<int>(totalSyllables);
+            var fbA2 = new List<int>(totalSyllables);
+            var fbA3 = new List<int>(totalSyllables);
+
+            for (int syl = 0; syl < totalSyllables; syl++)
+            {
+                var p = prosodyResult.Prosody[syl];
+                if (p.A1 >= 1 && p.A1 <= 5)
+                {
+                    fallback.Add(TonePuaStrings[p.A1]);
+                    fbA1.Add(p.A1);
+                    fbA2.Add(p.A2);
+                    fbA3.Add(p.A3);
+                }
+            }
+
+            return new ChineseG2PResult(
+                Phonemes: fallback,
+                A1: fbA1,
+                A2: fbA2,
+                A3: fbA3);
+        }
+
         // Pre-allocate: each syllable contributes its phonemes + 1 tone marker
         var phonemes = new List<string>(puaPhonemes.Length + totalSyllables);
         var a1 = new List<int>(puaPhonemes.Length + totalSyllables);
@@ -87,15 +118,6 @@ internal sealed class DotNetChineseG2PEngine : IChineseG2PEngine
                 a2.Add(p.A2);
                 a3.Add(p.A3);
             }
-        }
-
-        // Add any remaining non-Chinese tokens (punctuation etc.)
-        for (; puaIdx < puaPhonemes.Length; puaIdx++)
-        {
-            phonemes.Add(puaPhonemes[puaIdx]);
-            a1.Add(0);
-            a2.Add(0);
-            a3.Add(0);
         }
 
         return new ChineseG2PResult(

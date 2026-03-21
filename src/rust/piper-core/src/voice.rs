@@ -102,8 +102,9 @@ impl PiperVoice {
 
     /// 言語コードに基づいて適切な Phonemizer を生成する。
     ///
-    /// 各言語の専用 Phonemizer を使用し、辞書が必要な言語 (en, zh) は
+    /// 各言語の専用 Phonemizer を使用し、辞書が必要な言語 (ja, en, zh) は
     /// `model_dir` 配下またはデフォルトパスから辞書を検索する。
+    /// JA は dictionary_manager による自動ダウンロードも対応。
     /// 辞書が見つからない場合は PassthroughPhonemizer にフォールバックする。
     fn create_language_phonemizer(
         lang: &str,
