@@ -44,7 +44,8 @@ fn test_write_wav_default_output_name() {
     let expected_size: u64 = 44 + (22050 * 2);
     let actual_size = std::fs::metadata(&path).unwrap().len();
     assert_eq!(
-        actual_size, expected_size,
+        actual_size,
+        expected_size,
         "WAV file size should be header (44) + data ({} samples * 2 bytes)",
         samples.len()
     );
@@ -60,7 +61,10 @@ fn test_write_wav_empty_audio() {
     assert!(path.exists());
     // Empty audio: just the WAV header (44 bytes)
     let size = std::fs::metadata(&path).unwrap().len();
-    assert_eq!(size, 44, "empty audio WAV should be exactly 44 bytes (header only)");
+    assert_eq!(
+        size, 44,
+        "empty audio WAV should be exactly 44 bytes (header only)"
+    );
 }
 
 #[test]
