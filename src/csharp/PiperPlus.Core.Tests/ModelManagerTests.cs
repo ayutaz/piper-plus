@@ -383,25 +383,27 @@ public sealed class ModelManagerTests : IDisposable
     public async Task ResolveModelPathAsync_KnownVoiceName_ChecksCacheDir()
     {
         // Resolve with a known voice name but no cached file.
-        // This should either:
-        //   (a) find a cached file and return it, or
-        //   (b) attempt download (which may fail in CI),
-        //       throwing InvalidOperationException.
-        // We use a temp directory as modelDir so there's definitely no cache.
+        // Outcome depends on network availability:
+        //   (a) Download succeeds → returns path to downloaded .onnx file
+        //   (b) Download fails → throws InvalidOperationException or FileNotFoundException
+        // Both outcomes are valid in CI.
         var tempDir = Path.Combine(Path.GetTempPath(), $"resolve_test_{Guid.NewGuid():N}");
         Directory.CreateDirectory(tempDir);
         try
         {
-            // Use a known voice name from the catalog
-            var ex = await Assert.ThrowsAnyAsync<Exception>(
-                () => ModelManager.ResolveModelPathAsync(
-                    "tsukuyomi", tempDir, TestContext.Current.CancellationToken));
+            try
+            {
+                string result = await ModelManager.ResolveModelPathAsync(
+                    "tsukuyomi", tempDir, TestContext.Current.CancellationToken);
 
-            // Should be InvalidOperationException (download failed) or
-            // FileNotFoundException (ONNX file not found after download)
-            Assert.True(
-                ex is InvalidOperationException || ex is FileNotFoundException,
-                $"Expected InvalidOperationException or FileNotFoundException, got {ex.GetType().Name}: {ex.Message}");
+                // Download succeeded: result should be a valid .onnx path
+                Assert.True(result.EndsWith(".onnx", StringComparison.OrdinalIgnoreCase),
+                    $"Expected .onnx path, got: {result}");
+            }
+            catch (Exception ex) when (ex is InvalidOperationException or FileNotFoundException)
+            {
+                // Download failed: expected in offline/restricted environments
+            }
         }
         finally
         {
