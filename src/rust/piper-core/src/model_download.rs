@@ -316,6 +316,107 @@ pub fn builtin_registry() -> &'static [ModelInfo] {
     })
 }
 
+/// Find a model by name or alias in the built-in registry.
+///
+/// Supports exact name match, unique partial match (contains), and unique
+/// description match (case-insensitive).
+pub fn find_model(query: &str) -> Option<&'static ModelInfo> {
+    let registry = builtin_registry();
+
+    // 1. Exact name match
+    if let Some(m) = registry.iter().find(|m| m.name == query) {
+        return Some(m);
+    }
+
+    // 2. Partial name match (contains)
+    let matches: Vec<_> = registry.iter().filter(|m| m.name.contains(query)).collect();
+    if matches.len() == 1 {
+        return Some(matches[0]);
+    }
+
+    // 3. Check if query matches any part of the description
+    let query_lower = query.to_lowercase();
+    let desc_matches: Vec<_> = registry
+        .iter()
+        .filter(|m| m.description.to_lowercase().contains(&query_lower))
+        .collect();
+    if desc_matches.len() == 1 {
+        return Some(desc_matches[0]);
+    }
+
+    None
+}
+
+/// Resolve a model path from a name, alias, or file path.
+///
+/// 1. If the string is a path to an existing file, return it directly.
+/// 2. If it matches a model name in the registry, look in `model_dir` for a
+///    cached copy.
+/// 3. If not cached, auto-download when the `download` feature is enabled.
+pub fn resolve_model_path(
+    model_str: &str,
+    model_dir: Option<&Path>,
+) -> Result<PathBuf, PiperError> {
+    let path = PathBuf::from(model_str);
+
+    // 1. Direct file path
+    if path.is_file() {
+        return Ok(path);
+    } else if path.is_dir() {
+        return Err(PiperError::ModelLoad(format!(
+            "Path '{}' is a directory. Please provide a model file path or a model name.",
+            path.display()
+        )));
+    }
+
+    // 2. Try as model name
+    let model_info = find_model(model_str).ok_or_else(|| {
+        PiperError::ModelLoad(format!(
+            "Model '{}' not found. Use --list-models to see available models, or specify a file path.",
+            model_str
+        ))
+    })?;
+
+    let dir = model_dir
+        .map(PathBuf::from)
+        .unwrap_or_else(default_model_dir);
+
+    // Check if already cached
+    if is_model_cached(&model_info.name, &dir) {
+        let model_path = dir.join(format!("{}.onnx", model_info.name));
+        return Ok(model_path);
+    }
+
+    // 3. Auto-download
+    #[cfg(feature = "download")]
+    {
+        eprintln!(
+            "Model '{}' not found locally. Downloading...",
+            model_info.name
+        );
+        let (model_path, _config_path) = download_model(
+            model_info,
+            &dir,
+            Some(Box::new(|progress| {
+                if let Some(pct) = progress.percentage {
+                    eprint!("\r  Downloading... {:.1}%", pct);
+                }
+            })),
+        )?;
+        eprintln!();
+        eprintln!("Model downloaded to: {}", model_path.display());
+        Ok(model_path)
+    }
+
+    #[cfg(not(feature = "download"))]
+    {
+        Err(PiperError::ModelLoad(format!(
+            "Model '{}' not cached. Download it with: --download-model {}",
+            model_str, model_info.name
+        )))
+    }
+}
+
 /// Extract the filename component from a URL path.
 ///
 /// Returns `None` if the URL has no path segments or the last segment is empty.
@@ -760,5 +861,105 @@ mod tests {
         let a = default_model_dir();
         let b = default_model_dir();
         assert_eq!(a, b, "default_model_dir should be deterministic");
+    }
+
+    // -- find_model -----------------------------------------------------------
+
+    #[test]
+    fn test_find_model_exact_name() {
+        let m = find_model("tsukuyomi-6lang-v2");
+        assert!(m.is_some());
+        assert_eq!(m.unwrap().name, "tsukuyomi-6lang-v2");
+    }
+
+    #[test]
+    fn test_find_model_partial_name() {
+        // "css10" is a unique substring across all model names.
+        let m = find_model("css10");
+        assert!(m.is_some());
+        assert!(
+            m.unwrap().name.contains("css10"),
+            "partial name match should return a model containing the query string"
+        );
+    }
+
+    #[test]
+    fn test_find_model_description_match() {
+        // "Tsukuyomi" appears only in one model's description.
+        let m = find_model("Tsukuyomi");
+        assert!(m.is_some());
+        assert!(
+            m.unwrap().description.to_lowercase().contains("tsukuyomi"),
+            "description match should return a model whose description contains the query"
+        );
+    }
+
+    #[test]
+    fn test_find_model_case_insensitive_description() {
+        let m = find_model("tsukuyomi");
+        assert!(m.is_some());
+        assert!(
+            m.unwrap().description.to_lowercase().contains("tsukuyomi"),
+            "case-insensitive description match should find a model"
+        );
+    }
+
+    #[test]
+    fn test_find_model_no_match() {
+        let m = find_model("nonexistent-model-xyz");
+        assert!(m.is_none());
+    }
+
+    #[test]
+    fn test_find_model_ambiguous_returns_none() {
+        // "6lang" appears in both model names, so partial match is ambiguous.
+        let m = find_model("6lang");
+        assert!(m.is_none(), "ambiguous partial match should return None");
+    }
+
+    // -- resolve_model_path ---------------------------------------------------
+
+    #[test]
+    fn test_resolve_model_path_existing_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("my-model.onnx");
+        std::fs::write(&file, b"fake onnx").unwrap();
+
+        let resolved = resolve_model_path(file.to_str().unwrap(), None).unwrap();
+        assert_eq!(resolved, file);
+    }
+
+    #[test]
+    fn test_resolve_model_path_cached_model() {
+        let dir = tempfile::tempdir().unwrap();
+        let dir_path = dir.path();
+
+        // Create cached files for tsukuyomi-6lang-v2
+        std::fs::write(dir_path.join("tsukuyomi-6lang-v2.onnx"), b"fake").unwrap();
+        std::fs::write(dir_path.join("tsukuyomi-6lang-v2.onnx.json"), b"{}").unwrap();
+
+        let resolved = resolve_model_path("tsukuyomi-6lang-v2", Some(dir_path)).unwrap();
+        assert_eq!(resolved, dir_path.join("tsukuyomi-6lang-v2.onnx"));
+    }
+
+    #[test]
+    fn test_resolve_model_path_cached_via_alias() {
+        let dir = tempfile::tempdir().unwrap();
+        let dir_path = dir.path();
+
+        // "css10" partial match resolves to "css10-6lang"
+        std::fs::write(dir_path.join("css10-6lang.onnx"), b"fake").unwrap();
+        std::fs::write(dir_path.join("css10-6lang.onnx.json"), b"{}").unwrap();
+
+        let resolved = resolve_model_path("css10", Some(dir_path)).unwrap();
+        assert_eq!(resolved, dir_path.join("css10-6lang.onnx"));
+    }
+
+    #[test]
+    fn test_resolve_model_path_unknown_model_error() {
+        let result = resolve_model_path("nonexistent-model-xyz", None);
+        assert!(result.is_err());
+        let msg = format!("{}", result.unwrap_err());
+        assert!(msg.contains("not found"), "error message: {msg}");
     }
 }

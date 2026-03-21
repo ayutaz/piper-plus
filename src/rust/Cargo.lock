@@ -2025,6 +2025,7 @@ dependencies = [
  "anyhow",
  "clap",
  "piper-plus",
+ "serde_json",
  "tracing",
  "tracing-subscriber",
 ]

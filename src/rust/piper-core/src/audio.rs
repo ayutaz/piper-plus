@@ -84,6 +84,25 @@ pub fn write_wav_to_stdout(sample_rate: u32, audio: &[i16]) -> Result<(), PiperE
     Ok(())
 }
 
+/// Write raw PCM int16 samples to any writer (little-endian).
+///
+/// This is the testable core of `write_raw_to_stdout`.
+pub fn write_raw_pcm(writer: &mut impl std::io::Write, samples: &[i16]) -> Result<(), PiperError> {
+    let mut buf = Vec::with_capacity(samples.len() * 2);
+    for &sample in samples {
+        buf.extend_from_slice(&sample.to_le_bytes());
+    }
+    writer.write_all(&buf)?;
+    writer.flush()?;
+    Ok(())
+}
+
+/// raw PCM int16 データを stdout にバイナリで書き出す (WAV ヘッダなし)
+pub fn write_raw_to_stdout(audio: &[i16]) -> Result<(), PiperError> {
+    let mut stdout = std::io::stdout().lock();
+    write_raw_pcm(&mut stdout, audio)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -119,5 +138,23 @@ mod tests {
         // ピーク正規化で 2.0 → 32767, -2.0 → -32767
         assert_eq!(result[0], 32767);
         assert_eq!(result[1], -32767);
+    }
+
+    #[test]
+    fn test_write_raw_pcm_little_endian() {
+        let samples = vec![0x0100i16, -1i16, 0i16];
+        let mut buf = Vec::new();
+        write_raw_pcm(&mut buf, &samples).unwrap();
+        // 0x0100 in LE = [0x00, 0x01]
+        // -1 in LE = [0xFF, 0xFF]
+        // 0 in LE = [0x00, 0x00]
+        assert_eq!(buf, vec![0x00, 0x01, 0xFF, 0xFF, 0x00, 0x00]);
+    }
+
+    #[test]
+    fn test_write_raw_pcm_empty() {
+        let mut buf = Vec::new();
+        write_raw_pcm(&mut buf, &[]).unwrap();
+        assert!(buf.is_empty());
     }
 }
