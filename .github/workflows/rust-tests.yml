@@ -112,3 +112,60 @@ jobs:
         python-version: '3.12'
     - run: pip install maturin
     - run: maturin build --release
+
+  build:
+    name: build (${{ matrix.target }})
+    needs: [check, test]
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+            artifact: piper-plus-cli-linux-x64
+            archive_ext: tar.gz
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            artifact: piper-plus-cli-osx-arm64
+            archive_ext: tar.gz
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            artifact: piper-plus-cli-win-x64
+            archive_ext: zip
+    defaults:
+      run:
+        working-directory: src/rust
+    steps:
+    - uses: actions/checkout@v4
+    - uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: ${{ matrix.target }}
+    - uses: Swatinem/rust-cache@v2
+      with:
+        workspaces: src/rust -> target
+
+    - name: Build release binary
+      run: cargo build --release -p piper-plus-cli --target ${{ matrix.target }}
+
+    - name: Create archive (tar.gz)
+      if: matrix.archive_ext == 'tar.gz'
+      run: |
+        mkdir -p staging
+        cp target/${{ matrix.target }}/release/piper-plus-cli staging/
+        tar -czf ${{ matrix.artifact }}.tar.gz -C staging .
+
+    - name: Create archive (zip)
+      if: matrix.archive_ext == 'zip'
+      shell: pwsh
+      run: |
+        New-Item -ItemType Directory -Force staging
+        Copy-Item target/${{ matrix.target }}/release/piper-plus-cli.exe staging/
+        Compress-Archive -Path staging/* -DestinationPath ${{ matrix.artifact }}.zip
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ matrix.artifact }}
+        path: src/rust/${{ matrix.artifact }}.${{ matrix.archive_ext }}
+        retention-days: 7
