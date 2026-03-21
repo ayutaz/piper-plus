@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.Json;
 using PiperPlus.Core.Phonemize;
 
 namespace PiperPlus.Core.Tests;
@@ -26,6 +27,17 @@ public sealed class CustomDictionaryTests : IDisposable
     private string CreateTempFile(string content)
     {
         var path = Path.GetTempFileName();
+        File.WriteAllText(path, content, Encoding.UTF8);
+        _tempFiles.Add(path);
+        return path;
+    }
+
+    /// <summary>
+    /// Creates a temporary <c>.json</c> file with the given content and registers it for cleanup.
+    /// </summary>
+    private string CreateTempJsonFile(string content)
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"piper_test_{Guid.NewGuid():N}.json");
         File.WriteAllText(path, content, Encoding.UTF8);
         _tempFiles.Add(path);
         return path;
@@ -265,5 +277,259 @@ public sealed class CustomDictionaryTests : IDisposable
         Assert.Equal("bar", dict.ApplyToText("foo"));
         // Original entries should still work
         Assert.Equal("world", dict.ApplyToText("hello"));
+    }
+
+    // ================================================================
+    // JSON dictionary tests
+    // ================================================================
+
+    [Fact]
+    public void LoadJsonV1_SimpleFormat()
+    {
+        string json = """
+            {
+                "version": "1.0",
+                "entries": {
+                    "API": "エーピーアイ",
+                    "CPU": "シーピーユー"
+                }
+            }
+            """;
+        string path = CreateTempJsonFile(json);
+
+        var dict = new CustomDictionary();
+        dict.LoadDictionary(path);
+
+        Assert.Equal(2, dict.Count);
+        Assert.Equal("エーピーアイ test", dict.ApplyToText("API test"));
+        Assert.Equal("シーピーユー test", dict.ApplyToText("CPU test"));
+    }
+
+    [Fact]
+    public void LoadJsonV2_WithPriority()
+    {
+        string json = """
+            {
+                "version": "2.0",
+                "entries": {
+                    "API": { "pronunciation": "エーピーアイ", "priority": 8 },
+                    "GPU": { "pronunciation": "ジーピーユー", "priority": 3 }
+                }
+            }
+            """;
+        string path = CreateTempJsonFile(json);
+
+        var dict = new CustomDictionary();
+        dict.LoadDictionary(path);
+
+        Assert.Equal(2, dict.Count);
+        Assert.Equal("エーピーアイ", dict.ApplyToText("API"));
+        Assert.Equal("ジーピーユー", dict.ApplyToText("GPU"));
+    }
+
+    [Fact]
+    public void LoadJsonV2_CommentSkipped()
+    {
+        string json = """
+            {
+                "version": "2.0",
+                "entries": {
+                    "// this is a comment": { "pronunciation": "ignored", "priority": 1 },
+                    "API": { "pronunciation": "エーピーアイ", "priority": 5 }
+                }
+            }
+            """;
+        string path = CreateTempJsonFile(json);
+
+        var dict = new CustomDictionary();
+        dict.LoadDictionary(path);
+
+        // Comment key should not become an entry
+        Assert.Equal(1, dict.Count);
+        Assert.Equal("エーピーアイ", dict.ApplyToText("API"));
+    }
+
+    [Fact]
+    public void LoadJsonV2_MissingPriority_DefaultsFive()
+    {
+        // V2.0 object without "priority" key — should default to 5
+        string json = """
+            {
+                "version": "2.0",
+                "entries": {
+                    "API": { "pronunciation": "エーピーアイ" }
+                }
+            }
+            """;
+        string path = CreateTempJsonFile(json);
+
+        var dict = new CustomDictionary();
+        dict.LoadDictionary(path);
+
+        Assert.Equal(1, dict.Count);
+
+        // Load a second file with priority 5 — same priority, should NOT override
+        string json2 = """
+            {
+                "version": "2.0",
+                "entries": {
+                    "API": { "pronunciation": "CHANGED", "priority": 5 }
+                }
+            }
+            """;
+        string path2 = CreateTempJsonFile(json2);
+        dict.LoadDictionary(path2);
+
+        // Original entry (default priority 5) should be kept
+        Assert.Equal("エーピーアイ", dict.ApplyToText("API"));
+    }
+
+    [Fact]
+    public void LoadJson_PriorityOverride()
+    {
+        // First file: priority 3
+        string json1 = """
+            {
+                "version": "2.0",
+                "entries": {
+                    "API": { "pronunciation": "low-priority", "priority": 3 }
+                }
+            }
+            """;
+        // Second file: priority 8 — should win
+        string json2 = """
+            {
+                "version": "2.0",
+                "entries": {
+                    "API": { "pronunciation": "high-priority", "priority": 8 }
+                }
+            }
+            """;
+        string path1 = CreateTempJsonFile(json1);
+        string path2 = CreateTempJsonFile(json2);
+
+        var dict = new CustomDictionary();
+        dict.LoadDictionary(path1);
+        dict.LoadDictionary(path2);
+
+        Assert.Equal(1, dict.Count);
+        Assert.Equal("high-priority", dict.ApplyToText("API"));
+    }
+
+    [Fact]
+    public void LoadJson_LowerPriority_Rejected()
+    {
+        // First file: priority 8
+        string json1 = """
+            {
+                "version": "2.0",
+                "entries": {
+                    "API": { "pronunciation": "high-priority", "priority": 8 }
+                }
+            }
+            """;
+        // Second file: priority 3 — should be rejected
+        string json2 = """
+            {
+                "version": "2.0",
+                "entries": {
+                    "API": { "pronunciation": "low-priority", "priority": 3 }
+                }
+            }
+            """;
+        string path1 = CreateTempJsonFile(json1);
+        string path2 = CreateTempJsonFile(json2);
+
+        var dict = new CustomDictionary();
+        dict.LoadDictionary(path1);
+        dict.LoadDictionary(path2);
+
+        Assert.Equal(1, dict.Count);
+        Assert.Equal("high-priority", dict.ApplyToText("API"));
+    }
+
+    [Fact]
+    public void LoadJson_InvalidJson_Throws()
+    {
+        string badJson = "{ this is not valid JSON }}}";
+        string path = CreateTempJsonFile(badJson);
+
+        var dict = new CustomDictionary();
+
+        Assert.ThrowsAny<JsonException>(() => dict.LoadDictionary(path));
+    }
+
+    [Fact]
+    public void LoadMixed_TsvAndJson()
+    {
+        // TSV file
+        string tsvContent = "hello\tworld\n";
+        string tsvPath = CreateTempFile(tsvContent);
+
+        // JSON file
+        string jsonContent = """
+            {
+                "version": "1.0",
+                "entries": {
+                    "foo": "bar"
+                }
+            }
+            """;
+        string jsonPath = CreateTempJsonFile(jsonContent);
+
+        var dict = new CustomDictionary();
+        dict.LoadDictionary(tsvPath);
+        dict.LoadDictionary(jsonPath);
+
+        Assert.Equal(2, dict.Count);
+        Assert.Equal("world", dict.ApplyToText("hello"));
+        Assert.Equal("bar", dict.ApplyToText("foo"));
+    }
+
+    [Fact]
+    public void ApplyToText_JsonEntries_Work()
+    {
+        string json = """
+            {
+                "version": "1.0",
+                "entries": {
+                    "cat": "dog",
+                    "sat": "lay"
+                }
+            }
+            """;
+        string path = CreateTempJsonFile(json);
+
+        var dict = new CustomDictionary();
+        dict.LoadDictionary(path);
+
+        Assert.Equal("the dog lay", dict.ApplyToText("the cat sat"));
+    }
+
+    [Fact]
+    public void LoadJson_MetadataSkipped()
+    {
+        // All metadata keys at the entries level should be ignored
+        string json = """
+            {
+                "version": "2.0",
+                "description": "Test dictionary",
+                "metadata": { "author": "test" },
+                "entries": {
+                    "version": "should-be-skipped",
+                    "description": "should-be-skipped",
+                    "metadata": "should-be-skipped",
+                    "API": "エーピーアイ"
+                }
+            }
+            """;
+        string path = CreateTempJsonFile(json);
+
+        var dict = new CustomDictionary();
+        dict.LoadDictionary(path);
+
+        // Only "API" should be loaded; version/description/metadata are skipped
+        Assert.Equal(1, dict.Count);
+        Assert.Equal("エーピーアイ", dict.ApplyToText("API"));
     }
 }
