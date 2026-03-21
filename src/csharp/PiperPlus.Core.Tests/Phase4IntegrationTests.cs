@@ -7,6 +7,7 @@ namespace PiperPlus.Core.Tests;
 /// <see cref="VoiceCatalog"/>, <see cref="ModelManager"/>, and
 /// <see cref="VoiceInfo"/>.
 /// </summary>
+[Collection("StdErr")]
 public sealed class Phase4IntegrationTests : IDisposable
 {
     private TextWriter? _originalStdErr;
