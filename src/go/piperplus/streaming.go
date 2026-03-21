@@ -146,11 +146,12 @@ func int16ToFloat32(s []int16) []float32 {
 func float32ToInt16(s []float32) []int16 {
 	out := make([]int16, len(s))
 	for i, v := range s {
-		if v > math.MaxInt16 {
+		switch {
+		case v > math.MaxInt16:
 			out[i] = math.MaxInt16
-		} else if v < math.MinInt16 {
+		case v < math.MinInt16:
 			out[i] = math.MinInt16
-		} else {
+		default:
 			out[i] = int16(v)
 		}
 	}
