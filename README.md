@@ -727,5 +727,3 @@ upstream Piper の音声モデル (30+言語) も利用可能: [piper-voices](ht
 ## Changelog
 
 [CHANGELOG.md](CHANGELOG.md) を参照。
-
-[![A library from the Open Home Foundation](https://www.openhomefoundation.org/badges/ohf-library.png)](https://www.openhomefoundation.org/)

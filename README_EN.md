@@ -530,5 +530,3 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 ## Changelog
 
 See [CHANGELOG.md](CHANGELOG.md) for version history and release notes.
-
-[![A library from the Open Home Foundation](https://www.openhomefoundation.org/badges/ohf-library.png)](https://www.openhomefoundation.org/)
