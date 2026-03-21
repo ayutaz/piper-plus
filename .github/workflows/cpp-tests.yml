@@ -23,12 +23,12 @@ jobs:
         build-type: [Release]
     
     steps:
-      - uses: actions/checkout@v4.2.2
+      - uses: actions/checkout@v6.2.2
         with:
           submodules: true
       
       - name: Setup build cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.cache/ccache
@@ -181,7 +181,7 @@ jobs:
       
       - name: Upload test results on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: test-results-${{ matrix.os }}-${{ matrix.build-type }}
           path: |

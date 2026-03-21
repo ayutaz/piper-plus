@@ -26,12 +26,12 @@ jobs:
         os: [ubuntu-latest, macos-latest]
     
     steps:
-      - uses: actions/checkout@v4.2.2
+      - uses: actions/checkout@v6.2.2
         with:
           submodules: true
       
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.11'
       
@@ -147,7 +147,7 @@ jobs:
       
       - name: Upload test outputs on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: phoneme-test-outputs-${{ matrix.os }}
           path: |

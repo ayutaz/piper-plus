@@ -50,10 +50,10 @@ jobs:
             cross: false
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: |
             8.0.x
@@ -98,7 +98,7 @@ jobs:
         run: ls -lh piper-plus-cli-${{ matrix.rid }}.${{ matrix.archive }}
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: piper-plus-cli-${{ matrix.rid }}-${{ inputs.version }}
           path: piper-plus-cli-${{ matrix.rid }}.${{ matrix.archive }}
