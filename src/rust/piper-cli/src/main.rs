@@ -80,6 +80,14 @@ struct Cli {
     #[arg(long)]
     list_models: bool,
 
+    /// モデルをダウンロード (名前指定)
+    #[arg(long, value_name = "NAME")]
+    download_model: Option<String>,
+
+    /// モデルディレクトリ (ダウンロード先)
+    #[arg(long, value_name = "DIR")]
+    model_dir: Option<PathBuf>,
+
     /// バッチ処理: テキストファイルから読み込み (1行1発話)
     #[arg(long, value_name = "FILE")]
     batch: Option<PathBuf>,
@@ -121,6 +129,49 @@ fn main() -> Result<()> {
         return Ok(());
     }
 
+    // --download-model: モデルダウンロード (モデル不要)
+    if let Some(ref model_name) = cli.download_model {
+        let registry = piper_plus::model_download::builtin_registry();
+        let model_info = registry
+            .iter()
+            .find(|m| m.name == *model_name)
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "Model '{}' not found. Use --list-models to see available models.",
+                    model_name
+                )
+            })?;
+
+        let dest_dir = cli
+            .model_dir
+            .clone()
+            .unwrap_or_else(piper_plus::model_download::default_model_dir);
+
+        eprintln!(
+            "Downloading model: {} to {}",
+            model_name,
+            dest_dir.display()
+        );
+
+        let (model_path, config_path) = piper_plus::model_download::download_model(
+            model_info,
+            &dest_dir,
+            Some(Box::new(|progress| {
+                if let Some(pct) = progress.percentage {
+                    eprint!("\r  Downloading... {:.1}%", pct);
+                } else {
+                    eprint!("\r  Downloading... {} KB", progress.bytes_downloaded / 1024);
+                }
+            })),
+        )
+        .context("Failed to download model")?;
+
+        eprintln!();
+        eprintln!("Model saved to: {}", model_path.display());
+        eprintln!("Config saved to: {}", config_path.display());
+        return Ok(());
+    }
+
     // --text と --batch の排他チェック
     if cli.text.is_some() && cli.batch.is_some() {
         anyhow::bail!("--text and --batch are mutually exclusive");
@@ -128,7 +179,7 @@ fn main() -> Result<()> {
 
     // --model は standalone コマンド以外では必須
     let model_path = cli.model.as_ref().ok_or_else(|| {
-        anyhow::anyhow!("--model is required for synthesis (only --list-devices and --list-models work without it)")
+        anyhow::anyhow!("--model is required for synthesis (only --list-devices, --list-models, and --download-model work without it)")
     })?;
 
     // config.json 検出
