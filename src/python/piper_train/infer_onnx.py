@@ -3,6 +3,7 @@ import argparse
 import json
 import logging
 import math
+import os
 import sys
 import time
 from pathlib import Path
@@ -10,6 +11,7 @@ from pathlib import Path
 import numpy as np
 import onnxruntime
 
+from .model_manager import download_model, list_models, resolve_model_path
 from .vits.utils import audio_float_to_int16
 from .vits.wavfile import write as write_wav
 
@@ -146,8 +148,27 @@ def main():
     """Main entry point"""
     logging.basicConfig(level=logging.DEBUG)
     parser = argparse.ArgumentParser(prog="piper_train.infer_onnx")
-    parser.add_argument("--model", required=True, help="Path to model (.onnx)")
-    parser.add_argument("--output-dir", required=True, help="Path to write WAV files")
+    parser.add_argument("--model", help="Path to model (.onnx) or model name/alias")
+    parser.add_argument("--output-dir", help="Path to write WAV files")
+    parser.add_argument(
+        "--list-models",
+        nargs="?",
+        const="",
+        default=None,
+        metavar="LANG",
+        help="List available voice models (optionally filter by language code)",
+    )
+    parser.add_argument(
+        "--download-model",
+        default=None,
+        metavar="NAME",
+        help="Download a model by name or alias",
+    )
+    parser.add_argument(
+        "--model-dir",
+        default=None,
+        help="Model download/search directory",
+    )
     parser.add_argument("--sample-rate", type=int, default=22050)
     parser.add_argument("--noise-scale", type=float, default=0.667)
     parser.add_argument("--noise-scale-w", type=float, default=0.8)
@@ -181,6 +202,42 @@ def main():
         help="Device to run inference on (default: auto)",
     )
     args = parser.parse_args()
+
+    # Handle --list-models (early exit)
+    if args.list_models is not None:
+        list_models(args.list_models if args.list_models else None)
+        return
+
+    # Handle --download-model (early exit)
+    if args.download_model is not None:
+        success = download_model(args.download_model, args.model_dir)
+        sys.exit(0 if success else 1)
+
+    # Validate required args for inference mode
+    if args.model is None:
+        print(
+            "Error: --model is required for inference. "
+            "Use --list-models to see available models.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    if args.output_dir is None:
+        print("Error: --output-dir is required for inference.", file=sys.stderr)
+        sys.exit(1)
+
+    # Resolve model name/alias to file path
+    resolved = resolve_model_path(args.model, args.model_dir)
+    if resolved:
+        args.model = resolved
+    elif not os.path.exists(args.model):
+        print(f"Error: Model not found: {args.model}", file=sys.stderr)
+        print(
+            "Use --list-models to see available models, "
+            "or --download-model to download one.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
 
     args.output_dir = Path(args.output_dir)
     args.output_dir.mkdir(parents=True, exist_ok=True)
