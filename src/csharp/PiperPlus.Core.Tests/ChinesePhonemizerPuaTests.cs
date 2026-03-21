@@ -65,9 +65,9 @@ public sealed class ChinesePhonemizerPuaTests
         // Engine output: ni3 -> [n, i, tone3], hao3 -> [x, a, o, tone3]
         var g2p = new ChineseG2PResult(
             Phonemes: [PuaN, PuaI, Tone3, PuaX, PuaA, PuaO, Tone3],
-            A1:       [3,    3,    3,     3,    3,    3,    3],
-            A2:       [1,    1,    1,     2,    2,    2,    2],
-            A3:       [2,    2,    2,     2,    2,    2,    2]
+            A1: [3, 3, 3, 3, 3, 3, 3],
+            A2: [1, 1, 1, 2, 2, 2, 2],
+            A3: [2, 2, 2, 2, 2, 2, 2]
         );
 
         var phonemizer = new ChinesePhonemizer(new ToneStubEngine(g2p));
@@ -93,9 +93,9 @@ public sealed class ChinesePhonemizerPuaTests
         // "你好" with tone markers included in engine output
         var g2p = new ChineseG2PResult(
             Phonemes: [PuaN, PuaI, Tone3, PuaX, PuaA, PuaO, Tone3],
-            A1:       [3,    3,    3,     3,    3,    3,    3],
-            A2:       [1,    1,    1,     2,    2,    2,    2],
-            A3:       [2,    2,    2,     2,    2,    2,    2]
+            A1: [3, 3, 3, 3, 3, 3, 3],
+            A2: [1, 1, 1, 2, 2, 2, 2],
+            A3: [2, 2, 2, 2, 2, 2, 2]
         );
 
         var phonemizer = new ChinesePhonemizer(new ToneStubEngine(g2p));
@@ -129,9 +129,9 @@ public sealed class ChinesePhonemizerPuaTests
         // Simulate 5 single-phoneme syllables, one for each tone
         var g2p = new ChineseG2PResult(
             Phonemes: [PuaA, Tone1, PuaA, Tone2, PuaA, Tone3, PuaA, Tone4, PuaA, Tone5],
-            A1:       [1,    1,     2,    2,     3,    3,     4,    4,     5,    5],
-            A2:       [1,    1,     2,    2,     3,    3,     4,    4,     5,    5],
-            A3:       [5,    5,     5,    5,     5,    5,     5,    5,     5,    5]
+            A1: [1, 1, 2, 2, 3, 3, 4, 4, 5, 5],
+            A2: [1, 1, 2, 2, 3, 3, 4, 4, 5, 5],
+            A3: [5, 5, 5, 5, 5, 5, 5, 5, 5, 5]
         );
 
         var phonemizer = new ChinesePhonemizer(new ToneStubEngine(g2p));
@@ -169,9 +169,9 @@ public sealed class ChinesePhonemizerPuaTests
         // "你好吗" (3-syllable word): A2 = 1, 2, 3
         var g2p = new ChineseG2PResult(
             Phonemes: [PuaN, PuaI, Tone3, PuaX, PuaA, PuaO, Tone3, PuaN, PuaA, Tone5],
-            A1:       [3,    3,    3,     3,    3,    3,    3,     5,    5,    5],
-            A2:       [1,    1,    1,     2,    2,    2,    2,     3,    3,    3],
-            A3:       [3,    3,    3,     3,    3,    3,    3,     3,    3,    3]
+            A1: [3, 3, 3, 3, 3, 3, 3, 5, 5, 5],
+            A2: [1, 1, 1, 2, 2, 2, 2, 3, 3, 3],
+            A3: [3, 3, 3, 3, 3, 3, 3, 3, 3, 3]
         );
 
         var phonemizer = new ChinesePhonemizer(new ToneStubEngine(g2p));
@@ -205,9 +205,9 @@ public sealed class ChinesePhonemizerPuaTests
         // Two words: "你" (1 syllable, A3=1) + "好吗" (2 syllables, A3=2)
         var g2p = new ChineseG2PResult(
             Phonemes: [PuaN, PuaI, Tone3, PuaX, PuaA, PuaO, Tone3, PuaN, PuaA, Tone5],
-            A1:       [3,    3,    3,     3,    3,    3,    3,     5,    5,    5],
-            A2:       [1,    1,    1,     1,    1,    1,    1,     2,    2,    2],
-            A3:       [1,    1,    1,     2,    2,    2,    2,     2,    2,    2]
+            A1: [3, 3, 3, 3, 3, 3, 3, 5, 5, 5],
+            A2: [1, 1, 1, 1, 1, 1, 1, 2, 2, 2],
+            A3: [1, 1, 1, 2, 2, 2, 2, 2, 2, 2]
         );
 
         var phonemizer = new ChinesePhonemizer(new ToneStubEngine(g2p));
@@ -237,9 +237,9 @@ public sealed class ChinesePhonemizerPuaTests
         // Simple: one phoneme + one tone marker
         var g2p = new ChineseG2PResult(
             Phonemes: [PuaA, Tone1],
-            A1:       [1, 1],
-            A2:       [1, 1],
-            A3:       [1, 1]
+            A1: [1, 1],
+            A2: [1, 1],
+            A3: [1, 1]
         );
 
         var phonemizer = new ChinesePhonemizer(new ToneStubEngine(g2p));
@@ -277,9 +277,9 @@ public sealed class ChinesePhonemizerPuaTests
     {
         var g2p = new ChineseG2PResult(
             Phonemes: [Tone3],
-            A1:       [3],
-            A2:       [1],
-            A3:       [1]
+            A1: [3],
+            A2: [1],
+            A3: [1]
         );
 
         var phonemizer = new ChinesePhonemizer(new ToneStubEngine(g2p));
@@ -306,9 +306,9 @@ public sealed class ChinesePhonemizerPuaTests
         // "中" (tone1, A2=1, A3=2), "国" (tone2, A2=2, A3=2)
         var g2p = new ChineseG2PResult(
             Phonemes: [PuaO, Tone3, PuaA, PuaI, Tone4, PuaN, PuaO, Tone1, PuaN, PuaO, Tone2],
-            A1:       [3,    3,     4,    4,    4,     1,    1,    1,     2,    2,    2],
-            A2:       [1,    1,     1,    1,    1,     1,    1,    1,     2,    2,    2],
-            A3:       [1,    1,     1,    1,    1,     2,    2,    2,     2,    2,    2]
+            A1: [3, 3, 4, 4, 4, 1, 1, 1, 2, 2, 2],
+            A2: [1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2],
+            A3: [1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2]
         );
 
         var phonemizer = new ChinesePhonemizer(new ToneStubEngine(g2p));
