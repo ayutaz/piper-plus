@@ -12,19 +12,19 @@ import (
 // createPhonemizer builds the appropriate Phonemizer based on VoiceConfig.
 // For multilingual models, creates MultilingualPhonemizer.
 // For single-language models, creates the language-specific phonemizer.
-func createPhonemizer(config *VoiceConfig, dataDir string) (phonemize.Phonemizer, error) {
+func createPhonemizer(config *VoiceConfig, dicts *dictData) (phonemize.Phonemizer, error) {
 	if config.IsMultilingual() {
-		return createMultilingualPhonemizer(config)
+		return createMultilingualPhonemizer(config, dicts)
 	}
-	return createSingleLanguagePhonemizer(config)
+	return createSingleLanguagePhonemizer(config, dicts)
 }
 
 // createMultilingualPhonemizer builds a MultilingualPhonemizer from the config's
 // LanguageIDMap. Japanese is skipped if no G2P engine is available.
-func createMultilingualPhonemizer(config *VoiceConfig) (phonemize.Phonemizer, error) {
+func createMultilingualPhonemizer(config *VoiceConfig, dicts *dictData) (phonemize.Phonemizer, error) {
 	phonemizers := make(map[string]phonemize.Phonemizer, len(config.LanguageIDMap))
 	for lang := range config.LanguageIDMap {
-		p, err := phonemizerForLanguage(lang)
+		p, err := phonemizerForLanguage(lang, dicts)
 		if err != nil {
 			if lang == "ja" {
 				// Japanese requires a native G2P engine; skip gracefully.
@@ -60,7 +60,7 @@ func createMultilingualPhonemizer(config *VoiceConfig) (phonemize.Phonemizer, er
 
 // createSingleLanguagePhonemizer builds a language-specific phonemizer based on
 // the config's PhonemeType or Language.Code.
-func createSingleLanguagePhonemizer(config *VoiceConfig) (phonemize.Phonemizer, error) {
+func createSingleLanguagePhonemizer(config *VoiceConfig, dicts *dictData) (phonemize.Phonemizer, error) {
 	lang := ""
 	if config.Language != nil {
 		lang = config.Language.Code
@@ -76,30 +76,34 @@ func createSingleLanguagePhonemizer(config *VoiceConfig) (phonemize.Phonemizer, 
 		}
 	}
 
-	return phonemizerForLanguage(lang)
+	return phonemizerForLanguage(lang, dicts)
 }
 
 // phonemizerForLanguage creates a single-language phonemizer for the given code.
-func phonemizerForLanguage(lang string) (phonemize.Phonemizer, error) {
+func phonemizerForLanguage(lang string, dicts *dictData) (phonemize.Phonemizer, error) {
 	switch lang {
 	case "ja":
 		return nil, fmt.Errorf("Japanese requires G2P engine")
 	case "en":
-		// TODO: load CMU dict from dataDir when data directory support is added.
-		slog.Warn("English phonemizer created without CMU dictionary; all words will use letter-by-letter fallback")
-		p := phonemize.NewEnglishPhonemizer(nil)
-		if p == nil {
-			return nil, fmt.Errorf("failed to create English phonemizer")
+		var cmuDict map[string][]string
+		if dicts != nil {
+			cmuDict = dicts.cmuDict
 		}
-		return p, nil
+		if cmuDict == nil {
+			slog.Warn("English phonemizer created without CMU dictionary; all words will use letter-by-letter fallback")
+		}
+		return phonemize.NewEnglishPhonemizer(cmuDict), nil
 	case "zh":
-		// TODO: load pinyin dicts from dataDir when data directory support is added.
-		slog.Warn("Chinese phonemizer created without pinyin dictionaries; hanzi phonemization may be degraded")
-		p := phonemize.NewChinesePhonemizer(nil, nil)
-		if p == nil {
-			return nil, fmt.Errorf("failed to create Chinese phonemizer")
+		var single map[rune]string
+		var phrase map[string]string
+		if dicts != nil {
+			single = dicts.pinyinSingle
+			phrase = dicts.pinyinPhrase
 		}
-		return p, nil
+		if single == nil && phrase == nil {
+			slog.Warn("Chinese phonemizer created without pinyin dictionaries; hanzi phonemization may be degraded")
+		}
+		return phonemize.NewChinesePhonemizer(single, phrase), nil
 	case "es":
 		return phonemize.NewSpanishPhonemizer(), nil
 	case "fr":

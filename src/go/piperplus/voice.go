@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"path/filepath"
 	"sync/atomic"
 
 	"github.com/ayutaz/piper-plus/src/go/phonemize"
@@ -64,11 +65,19 @@ func LoadVoice(ctx context.Context, modelPath string, opts ...LoadOption) (*Voic
 		return nil, err
 	}
 
+	// Load dictionaries for languages that need them.
+	// WithDictDir overrides the default model-directory search.
+	dictSearchDir := loadOpts.DictDir
+	if dictSearchDir == "" {
+		dictSearchDir = filepath.Dir(modelPath)
+	}
+	dicts := loadDictionaries(dictSearchDir, config.LanguageIDMap, logger)
+
 	// Try to create a phonemizer. For "text" phoneme type, failure is non-fatal
 	// since the user provides pre-computed phoneme IDs. For all other types,
 	// a working phonemizer is required.
 	var ph phonemize.Phonemizer
-	ph, err = createPhonemizer(config, "")
+	ph, err = createPhonemizer(config, dicts)
 	if err != nil {
 		if config.PhonemeType != PhonemeTypeText {
 			return nil, fmt.Errorf("piperplus: phonemizer required for phoneme_type %q: %w", config.PhonemeType, err)
