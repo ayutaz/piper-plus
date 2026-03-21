@@ -84,6 +84,20 @@ pub fn write_wav_to_stdout(sample_rate: u32, audio: &[i16]) -> Result<(), PiperE
     Ok(())
 }
 
+/// raw PCM int16 データを stdout にバイナリで書き出す (WAV ヘッダなし)
+pub fn write_raw_to_stdout(audio: &[i16]) -> Result<(), PiperError> {
+    use std::io::Write;
+
+    let mut stdout = std::io::stdout().lock();
+    let mut buf = Vec::with_capacity(audio.len() * 2);
+    for &sample in audio {
+        buf.extend_from_slice(&sample.to_le_bytes());
+    }
+    stdout.write_all(&buf)?;
+    stdout.flush()?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

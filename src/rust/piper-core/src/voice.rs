@@ -45,7 +45,8 @@ impl PiperVoice {
     ///
     /// `model_dir` はモデルファイルの親ディレクトリ。辞書ファイルの検索に使用。
     /// テスト容易性のため独立関数として切り出し。
-    fn create_phonemizer(
+    /// `--test-mode` (CLI) で ONNX エンジンなしに phonemizer のみ使用する場合にも利用。
+    pub fn create_phonemizer(
         config: &VoiceConfig,
         model_dir: Option<&Path>,
     ) -> Result<Box<dyn Phonemizer>, PiperError> {
@@ -283,6 +284,27 @@ impl PiperVoice {
         };
 
         self.engine.synthesize(&request)
+    }
+
+    /// テキストを音素化して phoneme IDs を返す (ONNX 推論なし)
+    ///
+    /// `--test-mode` (CI用) で phonemization パイプラインのみ検証する場合に使用。
+    pub fn phonemize_to_ids(&self, text: &str) -> Result<Vec<i64>, PiperError> {
+        let (tokens, prosody) = self.phonemizer.phonemize_with_prosody(text)?;
+
+        let phoneme_id_map = self
+            .phonemizer
+            .get_phoneme_id_map()
+            .unwrap_or(&self.config.phoneme_id_map);
+
+        let ids = phoneme_converter::tokens_to_ids(&tokens, phoneme_id_map)?;
+        let prosody_feats = prosody_to_optional_features(&prosody);
+
+        let (ids, _prosody_feats) =
+            self.phonemizer
+                .post_process_ids(ids, prosody_feats, phoneme_id_map);
+
+        Ok(ids)
     }
 
     /// テキストを WAV ファイルに出力 (デフォルトパラメータ使用)

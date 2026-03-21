@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::path::PathBuf;
 
 use anyhow::{Context, Result};
@@ -12,7 +13,7 @@ const SUPPORTED_LANGUAGES: &[&str] = &["ja", "en", "zh", "ko", "es", "fr", "pt"]
 #[derive(Parser, Debug)]
 #[command(name = "piper", version, about = "Piper-Plus TTS inference")]
 struct Cli {
-    /// ONNX モデルファイルパス (--list-devices/--list-models 以外では必須)
+    /// ONNX モデル (ファイルパス、モデル名、またはエイリアス)
     #[arg(short, long)]
     model: Option<PathBuf>,
 
@@ -76,9 +77,9 @@ struct Cli {
     #[arg(long)]
     list_devices: bool,
 
-    /// 利用可能なモデルを一覧表示
-    #[arg(long)]
-    list_models: bool,
+    /// 利用可能なモデルを一覧表示 (言語フィルタ: --list-models ja)
+    #[arg(long, value_name = "LANG", num_args = 0..=1, default_missing_value = "")]
+    list_models: Option<String>,
 
     /// モデルをダウンロード (名前指定)
     #[arg(long, value_name = "NAME")]
@@ -91,10 +92,79 @@ struct Cli {
     /// バッチ処理: テキストファイルから読み込み (1行1発話)
     #[arg(long, value_name = "FILE")]
     batch: Option<PathBuf>,
+
+    /// 文間の無音時間 (秒、デフォルト: 0.2)
+    #[arg(long, default_value_t = 0.2)]
+    sentence_silence: f32,
+
+    /// 特定音素の後に追加する無音 (例: "_ 0.5")
+    #[arg(long, value_name = "PHONEME SECONDS")]
+    phoneme_silence: Vec<String>,
+
+    /// ログ出力を無効化
+    #[arg(short, long)]
+    quiet: bool,
+
+    /// テストモード: ONNX推論をスキップし phoneme IDs のみ出力 (CI用)
+    #[arg(long)]
+    test_mode: bool,
+
+    /// raw PCM int16 を stdout に出力 (WAVヘッダなし)
+    #[arg(long)]
+    output_raw: bool,
+}
+
+/// --phoneme-silence の値をパースして HashMap に変換する。
+/// 各エントリは "PHONEME SECONDS" 形式 (例: "_ 0.5")。
+fn parse_phoneme_silence(values: &[String]) -> Result<HashMap<String, f32>> {
+    let mut map = HashMap::new();
+    for entry in values {
+        let parts: Vec<&str> = entry.splitn(2, ' ').collect();
+        if parts.len() != 2 {
+            anyhow::bail!(
+                "Invalid --phoneme-silence format: '{}'. Expected 'PHONEME SECONDS' (e.g. '_ 0.5').",
+                entry
+            );
+        }
+        let phoneme = parts[0].to_string();
+        let seconds: f32 = parts[1].parse().with_context(|| {
+            format!(
+                "Invalid seconds value '{}' in --phoneme-silence '{}'",
+                parts[1], entry
+            )
+        })?;
+        map.insert(phoneme, seconds);
+    }
+    Ok(map)
+}
+
+/// 音声データの末尾に無音サンプルを追加する。
+fn append_silence(audio: &mut Vec<i16>, sample_rate: u32, silence_seconds: f32) {
+    if silence_seconds > 0.0 {
+        let num_samples = (sample_rate as f32 * silence_seconds) as usize;
+        audio.extend(std::iter::repeat_n(0i16, num_samples));
+    }
 }
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
+
+    // Apply environment variable defaults
+    let model_arg = cli
+        .model
+        .clone()
+        .or_else(|| std::env::var("PIPER_DEFAULT_MODEL").ok().map(PathBuf::from));
+
+    let config_arg = cli.config.clone().or_else(|| {
+        std::env::var("PIPER_DEFAULT_CONFIG")
+            .ok()
+            .map(PathBuf::from)
+    });
+
+    let model_dir_arg = cli
+        .model_dir
+        .clone()
+        .or_else(|| std::env::var("PIPER_MODEL_DIR").ok().map(PathBuf::from));
 
     // ログ初期化
     let env_filter = if cli.debug { "debug" } else { "info" };
@@ -117,10 +187,13 @@ fn main() -> Result<()> {
     }
 
     // --list-models: モデル一覧表示 (モデル不要)
-    if cli.list_models {
+    if let Some(ref lang_filter) = cli.list_models {
         let models = piper_plus::model_download::builtin_registry();
         println!("Available models:");
         for model in models {
+            if !lang_filter.is_empty() && !model.language.contains(lang_filter.as_str()) {
+                continue;
+            }
             println!(
                 "  {} ({}) - {}",
                 model.name, model.language, model.description
@@ -131,19 +204,14 @@ fn main() -> Result<()> {
 
     // --download-model: モデルダウンロード (モデル不要)
     if let Some(ref model_name) = cli.download_model {
-        let registry = piper_plus::model_download::builtin_registry();
-        let model_info = registry
-            .iter()
-            .find(|m| m.name == *model_name)
-            .ok_or_else(|| {
-                anyhow::anyhow!(
-                    "Model '{}' not found. Use --list-models to see available models.",
-                    model_name
-                )
-            })?;
+        let model_info = piper_plus::model_download::find_model(model_name).ok_or_else(|| {
+            anyhow::anyhow!(
+                "Model '{}' not found. Use --list-models to see available models.",
+                model_name
+            )
+        })?;
 
-        let dest_dir = cli
-            .model_dir
+        let dest_dir = model_dir_arg
             .clone()
             .unwrap_or_else(piper_plus::model_download::default_model_dir);
 
@@ -177,13 +245,21 @@ fn main() -> Result<()> {
         anyhow::bail!("--text and --batch are mutually exclusive");
     }
 
-    // --model は standalone コマンド以外では必須
-    let model_path = cli.model.as_ref().ok_or_else(|| {
-        anyhow::anyhow!("--model is required for synthesis (only --list-devices, --list-models, and --download-model work without it)")
-    })?;
+    // --model は standalone コマンド以外では必須 (env: PIPER_DEFAULT_MODEL)
+    // ファイルパス、モデル名、エイリアスのいずれかで指定可能
+    let model_path = {
+        let model_str = model_arg.as_ref().ok_or_else(|| {
+            anyhow::anyhow!("--model is required for synthesis (or set PIPER_DEFAULT_MODEL env var). Only --list-devices, --list-models, and --download-model work without it.")
+        })?;
+        piper_plus::model_download::resolve_model_path(
+            &model_str.to_string_lossy(),
+            model_dir_arg.as_deref(),
+        )
+        .context("Failed to resolve model")?
+    };
 
-    // config.json 検出
-    let config_path = config::VoiceConfig::resolve_config_path(model_path, cli.config.as_deref())
+    // config.json 検出 (env: PIPER_DEFAULT_CONFIG)
+    let config_path = config::VoiceConfig::resolve_config_path(&model_path, config_arg.as_deref())
         .context("config.json not found")?;
 
     tracing::info!("Config: {}", config_path.display());
@@ -218,9 +294,23 @@ fn main() -> Result<()> {
         );
     }
 
+    // --phoneme-silence パース
+    let _phoneme_silence_map = parse_phoneme_silence(&cli.phoneme_silence)?;
+    // TODO: phoneme_silence_map を音素境界で適用する (現在はパース・保持のみ)
+    if !_phoneme_silence_map.is_empty() {
+        tracing::info!(
+            "Phoneme silence: {:?} (parsed but not yet applied to audio)",
+            _phoneme_silence_map
+        );
+    }
+
+    if cli.sentence_silence != 0.2 {
+        tracing::info!("Sentence silence: {:.3}s", cli.sentence_silence);
+    }
+
     if let Some(ref batch_path) = cli.batch {
         // --batch モード: テキストファイルから1行ずつ読み込み合成
-        let mut voice = PiperVoice::load(model_path, cli.config.as_deref(), &cli.device)
+        let mut voice = PiperVoice::load(&model_path, config_arg.as_deref(), &cli.device)
             .context("Failed to initialize PiperVoice")?;
 
         // Load custom dictionaries
@@ -284,9 +374,13 @@ fn main() -> Result<()> {
                 )
                 .with_context(|| format!("Synthesis failed for line {}", idx))?;
 
+            // --sentence-silence: 文末に無音を追加
+            let mut audio_data = result.audio.clone();
+            append_silence(&mut audio_data, result.sample_rate, cli.sentence_silence);
+
             let filename = format!("{:04}.wav", idx);
             let path = output_dir.join(&filename);
-            audio::write_wav(&path, result.sample_rate, &result.audio)
+            audio::write_wav(&path, result.sample_rate, &audio_data)
                 .with_context(|| format!("Failed to write {}", path.display()))?;
 
             tracing::info!(
@@ -303,7 +397,7 @@ fn main() -> Result<()> {
         tracing::info!("Batch complete: {} files written", lines.len());
     } else if let Some(text) = &cli.text {
         // --text モード: PiperVoice でテキストから直接音声合成
-        let mut voice = PiperVoice::load(model_path, cli.config.as_deref(), &cli.device)
+        let mut voice = PiperVoice::load(&model_path, config_arg.as_deref(), &cli.device)
             .context("Failed to initialize PiperVoice")?;
 
         // Load custom dictionaries
@@ -390,9 +484,13 @@ fn main() -> Result<()> {
                     )
                     .with_context(|| format!("Synthesis failed for sentence {}", idx))?;
 
+                // --sentence-silence: 文末に無音を追加
+                let mut audio_data = result.audio.clone();
+                append_silence(&mut audio_data, result.sample_rate, cli.sentence_silence);
+
                 let filename = format!("chunk_{:04}.wav", idx);
                 let path = output_dir.join(&filename);
-                audio::write_wav(&path, result.sample_rate, &result.audio)
+                audio::write_wav(&path, result.sample_rate, &audio_data)
                     .with_context(|| format!("Failed to write {}", path.display()))?;
 
                 tracing::info!(
@@ -468,31 +566,35 @@ fn main() -> Result<()> {
                 }
             }
 
+            // --sentence-silence: 文末に無音を追加
+            let mut audio_data = result.audio.clone();
+            append_silence(&mut audio_data, result.sample_rate, cli.sentence_silence);
+
             // 出力
             if output_to_stdout {
-                audio::write_wav_to_stdout(result.sample_rate, &result.audio)
+                audio::write_wav_to_stdout(result.sample_rate, &audio_data)
                     .context("Failed to write WAV to stdout")?;
             } else if let Some(ref dir) = cli.output_dir {
                 let path = dir.join("output.wav");
-                audio::write_wav(&path, result.sample_rate, &result.audio)
+                audio::write_wav(&path, result.sample_rate, &audio_data)
                     .with_context(|| format!("Failed to write {}", path.display()))?;
                 tracing::info!("Wrote: {}", path.display());
             } else if let Some(ref file) = cli.output_file {
                 let path = PathBuf::from(file);
-                audio::write_wav(&path, result.sample_rate, &result.audio)
+                audio::write_wav(&path, result.sample_rate, &audio_data)
                     .with_context(|| format!("Failed to write {}", path.display()))?;
                 tracing::info!("Wrote: {}", path.display());
             } else {
                 // デフォルト: output.wav に出力
                 let path = PathBuf::from("output.wav");
-                audio::write_wav(&path, result.sample_rate, &result.audio)
+                audio::write_wav(&path, result.sample_rate, &audio_data)
                     .with_context(|| format!("Failed to write {}", path.display()))?;
                 tracing::info!("Wrote: {}", path.display());
             }
         }
     } else {
         // JSONL stdin パイプライン (既存)
-        let mut engine = OnnxEngine::load(model_path, &voice_config, &cli.device)
+        let mut engine = OnnxEngine::load(&model_path, &voice_config, &cli.device)
             .context("Failed to load ONNX model")?;
 
         let stdin = std::io::stdin();
@@ -527,19 +629,23 @@ fn main() -> Result<()> {
                 synthesis.real_time_factor(),
             );
 
+            // --sentence-silence: 文末に無音を追加
+            let mut audio_data = synthesis.audio.clone();
+            append_silence(&mut audio_data, synthesis.sample_rate, cli.sentence_silence);
+
             // 出力
             if output_to_stdout {
-                audio::write_wav_to_stdout(synthesis.sample_rate, &synthesis.audio)
+                audio::write_wav_to_stdout(synthesis.sample_rate, &audio_data)
                     .context("Failed to write WAV to stdout")?;
             } else if let Some(ref dir) = cli.output_dir {
                 let filename = output_file.unwrap_or_else(|| format!("{}.wav", utt_count));
                 let output_path = dir.join(&filename);
-                audio::write_wav(&output_path, synthesis.sample_rate, &synthesis.audio)
+                audio::write_wav(&output_path, synthesis.sample_rate, &audio_data)
                     .with_context(|| format!("Failed to write {}", output_path.display()))?;
                 tracing::info!("Wrote: {}", output_path.display());
             } else if let Some(ref file) = cli.output_file {
                 let output_path = PathBuf::from(file);
-                audio::write_wav(&output_path, synthesis.sample_rate, &synthesis.audio)
+                audio::write_wav(&output_path, synthesis.sample_rate, &audio_data)
                     .with_context(|| format!("Failed to write {}", output_path.display()))?;
                 tracing::info!("Wrote: {}", output_path.display());
             }
