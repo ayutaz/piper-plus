@@ -1,7 +1,14 @@
 //! OpenJTalk dictionary download manager.
 //!
-//! Automatically searches for or downloads the OpenJTalk UTF-8 dictionary,
-//! mirroring the C++ `openjtalk_dictionary_manager.c` behavior.
+//! Automatically searches for or downloads the OpenJTalk UTF-8 dictionary
+//! (MeCab binary format), mirroring the C++ `openjtalk_dictionary_manager.c` behavior.
+//!
+//! **Note:** This module downloads the OpenJTalk MeCab-format dictionary which is
+//! used by C++ and C# implementations. The Rust `jpreprocess` library uses a
+//! different binary format (lindera). When the `naist-jdic` feature is enabled
+//! (default), jpreprocess bundles its own dictionary and this module is not used
+//! for Japanese phonemization. This module is primarily used by the C# CLI's
+//! `DictionaryManager` equivalent.
 //!
 //! ## Dictionary search order
 //!

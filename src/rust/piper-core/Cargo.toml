@@ -11,7 +11,7 @@ categories.workspace = true
 description = "High-quality neural text-to-speech engine with 7-language support"
 
 [features]
-default = ["japanese", "dict-download"]
+default = ["naist-jdic", "dict-download"]
 japanese = ["dep:jpreprocess"]
 naist-jdic = ["japanese", "jpreprocess/naist-jdic"]
 playback = ["dep:rodio"]
