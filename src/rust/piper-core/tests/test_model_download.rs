@@ -36,11 +36,11 @@ fn test_huggingface_url_empty_filename() {
 fn test_huggingface_url_real_repo() {
     let url = huggingface_url(
         "ayousanz/piper-plus-tsukuyomi-chan",
-        "tsukuyomi-6lang-v2-fixed.onnx",
+        "tsukuyomi-chan-6lang-fp16.onnx",
     );
     assert_eq!(
         url,
-        "https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/tsukuyomi-6lang-v2-fixed.onnx"
+        "https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/tsukuyomi-chan-6lang-fp16.onnx"
     );
 }
 

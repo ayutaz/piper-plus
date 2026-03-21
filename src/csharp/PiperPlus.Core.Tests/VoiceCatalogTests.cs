@@ -90,25 +90,25 @@ public sealed class VoiceCatalogTests : IDisposable
     }
 
     [Fact]
-    public void MoeSpeech_Has20Speakers()
+    public void Css10_Has1Speaker()
     {
         var catalog = VoiceCatalog.LoadBuiltInCatalog();
-        var moe = catalog.Single(v => v.Key == "ja_JP-moe-speech-20speakers-medium");
+        var css10 = catalog.Single(v => v.Key == "ja_JP-css10-6lang-medium");
 
-        Assert.Equal(20, moe.NumSpeakers);
+        Assert.Equal(1, css10.NumSpeakers);
     }
 
     [Fact]
-    public void MoeSpeech_HasCorrectAliases()
+    public void Css10_HasCorrectAliases()
     {
         var catalog = VoiceCatalog.LoadBuiltInCatalog();
-        var moe = catalog.Single(v => v.Key == "ja_JP-moe-speech-20speakers-medium");
+        var css10 = catalog.Single(v => v.Key == "ja_JP-css10-6lang-medium");
 
-        Assert.Equal(4, moe.Aliases.Count);
-        Assert.Contains("moe-speech", moe.Aliases);
-        Assert.Contains("moe-20speakers", moe.Aliases);
-        Assert.Contains("ja-base", moe.Aliases);
-        Assert.Contains("ja-20speakers", moe.Aliases);
+        Assert.Equal(4, css10.Aliases.Count);
+        Assert.Contains("css10", css10.Aliases);
+        Assert.Contains("css10-6lang", css10.Aliases);
+        Assert.Contains("css10-ja", css10.Aliases);
+        Assert.Contains("ja-css10", css10.Aliases);
     }
 
     // ================================================================
@@ -123,7 +123,7 @@ public sealed class VoiceCatalogTests : IDisposable
         // Should contain the 2 built-in models
         Assert.Equal(2, catalog.Count);
         Assert.Contains(catalog, v => v.Key == "ja_JP-tsukuyomi-chan-medium");
-        Assert.Contains(catalog, v => v.Key == "ja_JP-moe-speech-20speakers-medium");
+        Assert.Contains(catalog, v => v.Key == "ja_JP-css10-6lang-medium");
     }
 
     [Fact]
@@ -155,7 +155,7 @@ public sealed class VoiceCatalogTests : IDisposable
         // 2 built-in + 1 external = 3
         Assert.Equal(3, catalog.Count);
         Assert.Contains(catalog, v => v.Key == "ja_JP-tsukuyomi-chan-medium");
-        Assert.Contains(catalog, v => v.Key == "ja_JP-moe-speech-20speakers-medium");
+        Assert.Contains(catalog, v => v.Key == "ja_JP-css10-6lang-medium");
         Assert.Contains(catalog, v => v.Key == "en_US-amy-medium");
 
         // Verify external entry properties

@@ -23,8 +23,8 @@ jobs:
       run:
         working-directory: src/rust
     steps:
-    - uses: actions/checkout@v4
-    - uses: actions/setup-python@v5
+    - uses: actions/checkout@v6
+    - uses: actions/setup-python@v6
       with:
         python-version: '3.12'
     - name: Install ALSA dev (for rodio/playback feature)
@@ -46,7 +46,7 @@ jobs:
       run:
         working-directory: src/rust
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - uses: dtolnay/rust-toolchain@stable
     - uses: Swatinem/rust-cache@v2
       with:
@@ -68,7 +68,7 @@ jobs:
       run:
         working-directory: src/rust
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - uses: dtolnay/rust-toolchain@stable
       with:
         components: rustfmt
@@ -81,8 +81,8 @@ jobs:
       run:
         working-directory: src/rust
     steps:
-    - uses: actions/checkout@v4
-    - uses: actions/setup-python@v5
+    - uses: actions/checkout@v6
+    - uses: actions/setup-python@v6
       with:
         python-version: '3.12'
     - name: Install ALSA dev (for rodio/playback feature)
@@ -102,12 +102,12 @@ jobs:
       run:
         working-directory: src/rust/piper-python
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - uses: dtolnay/rust-toolchain@stable
     - uses: Swatinem/rust-cache@v2
       with:
         workspaces: src/rust -> target
-    - uses: actions/setup-python@v5
+    - uses: actions/setup-python@v6
       with:
         python-version: '3.12'
     - run: pip install maturin
@@ -137,7 +137,7 @@ jobs:
       run:
         working-directory: src/rust
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - uses: dtolnay/rust-toolchain@stable
       with:
         targets: ${{ matrix.target }}
@@ -164,7 +164,7 @@ jobs:
         Compress-Archive -Path staging/* -DestinationPath ${{ matrix.artifact }}.zip
 
     - name: Upload artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: ${{ matrix.artifact }}
         path: src/rust/${{ matrix.artifact }}.${{ matrix.archive_ext }}

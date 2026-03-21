@@ -293,22 +293,24 @@ pub fn builtin_registry() -> &'static [ModelInfo] {
                 description: "Tsukuyomi-chan 6-language model (JA/EN/ZH/ES/FR/PT)".to_string(),
                 model_url: huggingface_url(
                     "ayousanz/piper-plus-tsukuyomi-chan",
-                    "tsukuyomi-6lang-v2-fixed.onnx",
+                    "tsukuyomi-chan-6lang-fp16.onnx",
                 ),
                 config_url: huggingface_url("ayousanz/piper-plus-tsukuyomi-chan", "config.json"),
                 size_bytes: None,
             },
             ModelInfo {
-                name: "piper-plus-base".to_string(),
+                name: "css10-6lang".to_string(),
                 language: "ja-en-zh-es-fr-pt".to_string(),
                 quality: "medium".to_string(),
-                description: "Piper-Plus 6-language base model (571 speakers)".to_string(),
+                description:
+                    "CSS10 Japanese 6-language model fine-tuned from multilingual base (FP16)"
+                        .to_string(),
                 model_url: huggingface_url(
-                    "ayousanz/piper-plus-base",
-                    "multilingual-6lang-75epoch.onnx",
+                    "ayousanz/piper-plus-css10-ja-6lang",
+                    "css10-ja-6lang-fp16.onnx",
                 ),
-                config_url: huggingface_url("ayousanz/piper-plus-base", "config.json"),
-                size_bytes: None,
+                config_url: huggingface_url("ayousanz/piper-plus-css10-ja-6lang", "config.json"),
+                size_bytes: Some(39_414_515),
             },
         ]
     })

@@ -638,6 +638,16 @@ internal static class Program
                 piperSession.SentenceSilenceSeconds = sentenceSilence;
 
                 // Determine output mode
+                // In --text mode, default to "output.wav" when no output option is specified
+                bool outputDirExplicit = parseResult.Tokens.Any(
+                    t => t.Value is "--output-dir" or "--output_dir" or "-d");
+                if (!string.IsNullOrEmpty(textInput)
+                    && string.IsNullOrEmpty(outputFile)
+                    && !outputDirExplicit)
+                {
+                    outputFile = "output.wav";
+                }
+
                 OutputMode outputMode;
                 if (streaming)
                 {

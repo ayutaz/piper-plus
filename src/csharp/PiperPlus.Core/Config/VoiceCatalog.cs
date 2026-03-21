@@ -27,30 +27,30 @@ public static class VoiceCatalog
             RepoId: "ayousanz/piper-plus-tsukuyomi-chan",
             Files:
             [
-                new VoiceFileInfo("tsukuyomi-wavlm-300epoch.onnx", 77594624, ""),
+                new VoiceFileInfo("tsukuyomi-chan-6lang-fp16.onnx", 77594624, ""),
                 new VoiceFileInfo("config.json", 3072, ""),
             ],
             Aliases: ["tsukuyomi", "tsukuyomi-chan", "ja-tsukuyomi"],
             Description: "Tsukuyomi-chan Japanese TTS model trained with WavLM discriminator (300 epochs)"),
 
         new VoiceInfo(
-            Key: "ja_JP-moe-speech-20speakers-medium",
-            Name: "moe-speech-20speakers",
+            Key: "ja_JP-css10-6lang-medium",
+            Name: "css10-6lang",
             LanguageCode: "ja_JP",
             LanguageFamily: "ja",
             LanguageNameNative: "日本語",
             LanguageNameEnglish: "Japanese",
             Quality: "medium",
-            NumSpeakers: 20,
+            NumSpeakers: 1,
             Source: "piper-plus",
-            RepoId: "ayousanz/piper-plus-base",
+            RepoId: "ayousanz/piper-plus-css10-ja-6lang",
             Files:
             [
-                new VoiceFileInfo("moe-speech-20speakers-v2.onnx", 77594624, ""),
-                new VoiceFileInfo("config.json", 4096, ""),
+                new VoiceFileInfo("css10-ja-6lang-fp16.onnx", 39414515, ""),
+                new VoiceFileInfo("config.json", 8966, ""),
             ],
-            Aliases: ["moe-speech", "moe-20speakers", "ja-base", "ja-20speakers"],
-            Description: "Japanese multi-speaker base model (20 speakers) with VITS + Prosody features"),
+            Aliases: ["css10", "css10-6lang", "css10-ja", "ja-css10"],
+            Description: "CSS10 Japanese 6-language TTS model fine-tuned from multilingual base (FP16, 6841 utterances)"),
     ];
 
     /// <summary>
