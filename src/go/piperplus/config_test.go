@@ -288,13 +288,13 @@ func TestFindConfigPath_EnvVar(t *testing.T) {
 
 func TestVoiceConfig_HelperMethods(t *testing.T) {
 	tests := []struct {
-		name          string
-		cfg           VoiceConfig
-		multiSpeaker  bool
-		multilingual  bool
-		needsSID      bool
-		needsLID      bool
-		needsProsody  bool
+		name         string
+		cfg          VoiceConfig
+		multiSpeaker bool
+		multilingual bool
+		needsSID     bool
+		needsLID     bool
+		needsProsody bool
 	}{
 		{
 			name:         "single speaker, single language, espeak",

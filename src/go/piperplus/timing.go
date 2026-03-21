@@ -22,8 +22,8 @@ type PhonemeTimingInfo struct {
 // TimingResult holds timing information for an entire utterance.
 type TimingResult struct {
 	Phonemes        []PhonemeTimingInfo `json:"phonemes"`
-	TotalDurationMs float64            `json:"total_duration_ms"`
-	SampleRate      int                `json:"sample_rate"`
+	TotalDurationMs float64             `json:"total_duration_ms"`
+	SampleRate      int                 `json:"sample_rate"`
 }
 
 // DurationsToTiming converts per-phoneme duration frames from the ONNX model's

@@ -26,7 +26,7 @@ func SplitSentences(text string) []string {
 
 	var sentences []string
 	var current strings.Builder
-	depth := 0    // nesting depth for brackets/parentheses
+	depth := 0       // nesting depth for brackets/parentheses
 	inQuote := false // toggle for ambiguous ASCII double-quote
 
 	runes := []rune(text)

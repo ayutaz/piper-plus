@@ -58,47 +58,47 @@ var allFixedPUA = []struct {
 
 	// Chinese (0xE020-0xE04A) — 43 entries
 	// Initials
-	{"p\u02b0", 0xE020, "ZH"},   // pʰ
-	{"t\u02b0", 0xE021, "ZH"},   // tʰ
-	{"k\u02b0", 0xE022, "ZH"},   // kʰ
-	{"t\u0255", 0xE023, "ZH"},   // tɕ
+	{"p\u02b0", 0xE020, "ZH"},       // pʰ
+	{"t\u02b0", 0xE021, "ZH"},       // tʰ
+	{"k\u02b0", 0xE022, "ZH"},       // kʰ
+	{"t\u0255", 0xE023, "ZH"},       // tɕ
 	{"t\u0255\u02b0", 0xE024, "ZH"}, // tɕʰ
-	{"t\u0282", 0xE025, "ZH"},   // tʂ
+	{"t\u0282", 0xE025, "ZH"},       // tʂ
 	{"t\u0282\u02b0", 0xE026, "ZH"}, // tʂʰ
-	{"ts\u02b0", 0xE027, "ZH"},  // tsʰ
+	{"ts\u02b0", 0xE027, "ZH"},      // tsʰ
 	// Diphthongs
-	{"a\u026a", 0xE028, "ZH"},   // aɪ
-	{"e\u026a", 0xE029, "ZH"},   // eɪ
-	{"a\u028a", 0xE02A, "ZH"},   // aʊ
-	{"o\u028a", 0xE02B, "ZH"},   // oʊ
+	{"a\u026a", 0xE028, "ZH"}, // aɪ
+	{"e\u026a", 0xE029, "ZH"}, // eɪ
+	{"a\u028a", 0xE02A, "ZH"}, // aʊ
+	{"o\u028a", 0xE02B, "ZH"}, // oʊ
 	// Nasal finals
 	{"an", 0xE02C, "ZH"},
-	{"\u0259n", 0xE02D, "ZH"},   // ən
-	{"a\u014b", 0xE02E, "ZH"},   // aŋ
+	{"\u0259n", 0xE02D, "ZH"},      // ən
+	{"a\u014b", 0xE02E, "ZH"},      // aŋ
 	{"\u0259\u014b", 0xE02F, "ZH"}, // əŋ
-	{"u\u014b", 0xE030, "ZH"},   // uŋ
+	{"u\u014b", 0xE030, "ZH"},      // uŋ
 	// i-compound finals
 	{"ia", 0xE031, "ZH"},
-	{"i\u025b", 0xE032, "ZH"},   // iɛ
+	{"i\u025b", 0xE032, "ZH"}, // iɛ
 	{"iou", 0xE033, "ZH"},
-	{"ia\u028a", 0xE034, "ZH"},  // iaʊ
-	{"i\u025bn", 0xE035, "ZH"},  // iɛn
+	{"ia\u028a", 0xE034, "ZH"}, // iaʊ
+	{"i\u025bn", 0xE035, "ZH"}, // iɛn
 	{"in", 0xE036, "ZH"},
-	{"ia\u014b", 0xE037, "ZH"},  // iaŋ
-	{"i\u014b", 0xE038, "ZH"},   // iŋ
-	{"iu\u014b", 0xE039, "ZH"},  // iuŋ
+	{"ia\u014b", 0xE037, "ZH"}, // iaŋ
+	{"i\u014b", 0xE038, "ZH"},  // iŋ
+	{"iu\u014b", 0xE039, "ZH"}, // iuŋ
 	// u-compound finals
 	{"ua", 0xE03A, "ZH"},
 	{"uo", 0xE03B, "ZH"},
-	{"ua\u026a", 0xE03C, "ZH"},  // uaɪ
-	{"ue\u026a", 0xE03D, "ZH"},  // ueɪ
+	{"ua\u026a", 0xE03C, "ZH"}, // uaɪ
+	{"ue\u026a", 0xE03D, "ZH"}, // ueɪ
 	{"uan", 0xE03E, "ZH"},
-	{"u\u0259n", 0xE03F, "ZH"},  // uən
-	{"ua\u014b", 0xE040, "ZH"},  // uaŋ
+	{"u\u0259n", 0xE03F, "ZH"},      // uən
+	{"ua\u014b", 0xE040, "ZH"},      // uaŋ
 	{"u\u0259\u014b", 0xE041, "ZH"}, // uəŋ
 	// u-umlaut compound finals
-	{"y\u025b", 0xE042, "ZH"},   // yɛ
-	{"y\u025bn", 0xE043, "ZH"},  // yɛn
+	{"y\u025b", 0xE042, "ZH"},  // yɛ
+	{"y\u025bn", 0xE043, "ZH"}, // yɛn
 	{"yn", 0xE044, "ZH"},
 	// Syllabic consonants
 	{"\u027b\u0329", 0xE045, "ZH"}, // ɻ̩
@@ -110,14 +110,14 @@ var allFixedPUA = []struct {
 	{"tone5", 0xE04A, "ZH"},
 
 	// Korean (0xE04B-0xE052) — 8 entries
-	{"p\u0348", 0xE04B, "KO"},   // p͈
-	{"t\u0348", 0xE04C, "KO"},   // t͈
-	{"k\u0348", 0xE04D, "KO"},   // k͈
-	{"s\u0348", 0xE04E, "KO"},   // s͈
+	{"p\u0348", 0xE04B, "KO"},       // p͈
+	{"t\u0348", 0xE04C, "KO"},       // t͈
+	{"k\u0348", 0xE04D, "KO"},       // k͈
+	{"s\u0348", 0xE04E, "KO"},       // s͈
 	{"t\u0348\u0255", 0xE04F, "KO"}, // t͈ɕ
-	{"k\u031a", 0xE050, "KO"},   // k̚
-	{"t\u031a", 0xE051, "KO"},   // t̚
-	{"p\u031a", 0xE052, "KO"},   // p̚
+	{"k\u031a", 0xE050, "KO"},       // k̚
+	{"t\u031a", 0xE051, "KO"},       // t̚
+	{"p\u031a", 0xE052, "KO"},       // p̚
 
 	// Spanish/Portuguese (0xE054-0xE055) — 2 entries
 	{"t\u0283", 0xE054, "ES/PT"}, // tʃ
@@ -186,12 +186,12 @@ func TestFixedPUA_NoDuplicateTokens(t *testing.T) {
 // TestFixedPUA_CodepointRanges verifies that each language group uses its documented range.
 func TestFixedPUA_CodepointRanges(t *testing.T) {
 	ranges := map[string][2]rune{
-		"JA":    {0xE000, 0xE01C},
+		"JA":     {0xE000, 0xE01C},
 		"shared": {0xE01D, 0xE01E},
-		"ZH":    {0xE020, 0xE04A},
-		"KO":    {0xE04B, 0xE052},
-		"ES/PT": {0xE054, 0xE055},
-		"FR":    {0xE056, 0xE058},
+		"ZH":     {0xE020, 0xE04A},
+		"KO":     {0xE04B, 0xE052},
+		"ES/PT":  {0xE054, 0xE055},
+		"FR":     {0xE056, 0xE058},
 	}
 	for _, tc := range allFixedPUA {
 		r := ranges[tc.group]
@@ -235,7 +235,7 @@ func TestRegisterToken_FixedPUA(t *testing.T) {
 		{"a:", 0xE000},
 		{"N_m", 0xE019},
 		{"tone1", 0xE046},
-		{"t\u0283", 0xE054}, // tʃ
+		{"t\u0283", 0xE054},      // tʃ
 		{"\u025b\u0303", 0xE056}, // ɛ̃
 	}
 	for _, tc := range tests {
@@ -266,10 +266,10 @@ func TestRegisterToken_SingleChar(t *testing.T) {
 	}{
 		{"a", "a"},
 		{"k", "k"},
-		{"ə", "ə"},       // single IPA character (U+0259)
-		{"ɕ", "ɕ"},       // single IPA character (U+0255)
-		{" ", " "},        // space
-		{",", ","},        // punctuation
+		{"ə", "ə"}, // single IPA character (U+0259)
+		{"ɕ", "ɕ"}, // single IPA character (U+0255)
+		{" ", " "}, // space
+		{",", ","}, // punctuation
 	}
 	for _, tc := range tests {
 		got := RegisterToken(tc.token)
@@ -302,7 +302,7 @@ func TestPUAToToken_ReverseMapping(t *testing.T) {
 		{0xE000, "a:"},
 		{0xE019, "N_m"},
 		{0xE046, "tone1"},
-		{0xE054, "t\u0283"}, // tʃ
+		{0xE054, "t\u0283"},      // tʃ
 		{0xE056, "\u025b\u0303"}, // ɛ̃
 	}
 	for _, tc := range tests {
@@ -791,16 +791,16 @@ func TestTokensToIDs_ChineseTokens(t *testing.T) {
 // TestTokensToIDs_SpecialTokens verifies BOS, EOS, pad, and question markers.
 func TestTokensToIDs_SpecialTokens(t *testing.T) {
 	idMap := map[string][]int64{
-		"_":                   {0},
-		"^":                   {1},
-		"$":                   {2},
-		"?":                   {3},
-		string(rune(0xE016)):  {4}, // ?!
-		string(rune(0xE017)):  {5}, // ?.
-		string(rune(0xE018)):  {6}, // ?~
-		"#":                   {7},
-		"[":                   {8},
-		"]":                   {9},
+		"_":                  {0},
+		"^":                  {1},
+		"$":                  {2},
+		"?":                  {3},
+		string(rune(0xE016)): {4}, // ?!
+		string(rune(0xE017)): {5}, // ?.
+		string(rune(0xE018)): {6}, // ?~
+		"#":                  {7},
+		"[":                  {8},
+		"]":                  {9},
 	}
 	tokens := []string{"^", "_", "#", "[", "]", "?!", "?.", "?~", "$", "?"}
 	got := TokensToIDs(tokens, idMap)
@@ -880,13 +880,13 @@ func TestPostProcessIDs_CustomEOS(t *testing.T) {
 // TestPostProcessIDs_QuestionMarkerEOS verifies EOS tokens for question types.
 func TestPostProcessIDs_QuestionMarkerEOS(t *testing.T) {
 	idMap := map[string][]int64{
-		"_":                   {0},
-		"^":                   {1},
-		"$":                   {2},
-		"?":                   {3},
-		string(rune(0xE016)):  {4}, // ?!
-		string(rune(0xE017)):  {5}, // ?.
-		string(rune(0xE018)):  {6}, // ?~
+		"_":                  {0},
+		"^":                  {1},
+		"$":                  {2},
+		"?":                  {3},
+		string(rune(0xE016)): {4}, // ?!
+		string(rune(0xE017)): {5}, // ?.
+		string(rune(0xE018)): {6}, // ?~
 	}
 
 	tests := []struct {
@@ -1047,9 +1047,9 @@ func TestPostProcessIDs_ProsodyAlignment(t *testing.T) {
 func TestFixedPUA_CombiningCharacters(t *testing.T) {
 	// Entries that use combining characters (diacritics after base char).
 	combiningEntries := []struct {
-		token    string
-		wantPUA  rune
-		desc     string
+		token   string
+		wantPUA rune
+		desc    string
 	}{
 		// Korean tense: base + U+0348 (combining double acute accent above)
 		{"p\u0348", 0xE04B, "KO p͈ (p + combining double acute accent)"},

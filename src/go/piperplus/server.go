@@ -32,11 +32,11 @@ type healthResponse struct {
 }
 
 type infoResponse struct {
-	NumSpeakers  int              `json:"num_speakers"`
-	NumLanguages int              `json:"num_languages"`
-	Languages    map[string]int64 `json:"languages,omitempty"`
+	NumSpeakers  int               `json:"num_speakers"`
+	NumLanguages int               `json:"num_languages"`
+	Languages    map[string]int64  `json:"languages,omitempty"`
 	Capabilities ModelCapabilities `json:"capabilities"`
-	SampleRate   int              `json:"sample_rate"`
+	SampleRate   int               `json:"sample_rate"`
 }
 
 // NewServer creates a new TTS HTTP server.
