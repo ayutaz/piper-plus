@@ -290,7 +290,7 @@ Validation頻度削減、DataLoader最適化 (num_workers=2, pin_memory)、LRス
 | TFM | PiperPlus.Core: net8.0, PiperPlus.Cli: net9.0 |
 | 対応言語 | JA, EN, ZH, ES, FR, PT (6言語) |
 | G2P依存 | DotNetG2P v1.8.0 (JA), DotNetG2P.MeCab v1.8.0 (JA), DotNetG2P.English v1.8.0 (EN), DotNetG2P.Chinese/Spanish/French/Portuguese v1.7.0 |
-| テスト | 775テスト (xUnit v3) |
+| テスト | 829テスト (xUnit v3) |
 | CI | 3 OS × 2 .NET バージョン (csharp-ci.yml) |
 | ビルド | `dotnet build src/csharp/PiperPlus.sln` |
 
@@ -301,6 +301,8 @@ Validation頻度削減、DataLoader最適化 (num_workers=2, pin_memory)、LRス
 - OpenJTalk 辞書自動ダウンロード: C++ `openjtalk_dictionary_manager.c` と同等の辞書検索・自動DL機能
 - ストリーミング文分割: `TextSplitter.SplitSentences()` で文ごとに逐次合成 (`--streaming`)
 - カスタム辞書: JSON v1.0/v2.0 (C++/Rust互換) + TSV 形式対応 (`--custom-dict`)
+- `[[ phoneme ]]` インライン音素記法: テキスト中に直接音素を指定可能
+- モデル名自動解決: `--model tsukuyomi` でエイリアス検索 + 自動DL
 
 ### Rust 推論エンジン (piper-plus)
 
@@ -317,8 +319,14 @@ Rust によるONNX推論エンジン。ストリーミング、CUDA/CoreML/Direc
 **デフォルトfeature:** `naist-jdic` (JA辞書バンドル) + `dict-download` (OpenJTalk辞書自動DL、C#/C++用)。jpreprocess は lindera 形式辞書を使用するため、OpenJTalk MeCab 形式とは非互換。`PIPER_OFFLINE_MODE=1` で自動DL無効化可能。
 
 **追加機能:**
-- カスタム辞書: JSON v1.0/v2.0 対応、`--custom-dict` でCLI統合済み (テキスト/バッチ/ストリーミング全パス)
-- バイナリビルドCI: PR時3プラットフォーム、リリース時5ターゲット (Linux ARM64クロスコンパイル含む)
+- カスタム辞書: JSON v1.0/v2.0 対応、`--custom-dict` でCLI統合済み
+- バイナリビルドCI: PR時3プラットフォーム、リリース時5ターゲット
+- モデル名自動解決: `--model tsukuyomi` でエイリアス検索 + 自動DL
+- `--download-model` / `--model-dir`: モデルダウンロード管理
+- `--quiet` / `--test-mode` / `--output-raw`: デバッグ・CI対応
+- `--sentence-silence` / `--phoneme-silence`: 無音制御
+- `--list-models` 言語フィルタ: `--list-models ja`
+- 環境変数: PIPER_DEFAULT_MODEL, PIPER_DEFAULT_CONFIG, PIPER_MODEL_DIR
 
 **実装:** `src/rust/piper-core/`, `src/rust/piper-cli/`, `src/rust/piper-python/`
 
@@ -371,6 +379,9 @@ Rust によるONNX推論エンジン。ストリーミング、CUDA/CoreML/Direc
 | 設定管理 | `src/csharp/PiperPlus.Core/Config/` |
 | 辞書マネージャ | `src/csharp/PiperPlus.Core/Config/DictionaryManager.cs` |
 | テキスト分割 | `src/csharp/PiperPlus.Core/Phonemize/TextSplitter.cs` |
+| インライン音素パーサー | `src/csharp/PiperPlus.Core/Phonemize/InlinePhonemeParser.cs` |
+| Raw音素パーサー | `src/csharp/PiperPlus.Core/Phonemize/RawPhonemeParser.cs` |
+| モデルマネージャ | `src/csharp/PiperPlus.Core/Config/ModelManager.cs` |
 
 ### Rust ソースコード
 
@@ -384,6 +395,7 @@ Rust によるONNX推論エンジン。ストリーミング、CUDA/CoreML/Direc
 | 推論エンジン | `src/rust/piper-core/src/engine.rs` |
 | 辞書マネージャ | `src/rust/piper-core/src/dictionary_manager.rs` |
 | カスタム辞書テスト | `src/rust/piper-core/tests/test_custom_dict_integration.rs` |
+| デフォルト出力テスト | `src/rust/piper-core/tests/test_default_output.rs` |
 
 ### データセット
 

@@ -50,7 +50,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - C# ONNX推論の `lid` テンソル未送信バグ修正
-- C# 中国語音素マッピング修正 (3 IDs → 51 IDs)
+- C# 中国語音素マッピング修正 (「你好」3 IDs → 15 IDs、「你好，今天天气很好。」3 IDs → 51 IDs)
 - Rust 多言語推論で各言語に正しいPhonemizerを使用するよう修正
 - Rust JA辞書未発見時のPassthroughPhonemizerフォールバック追加
 - C# CLI統合テストの global.json rollForward修正
