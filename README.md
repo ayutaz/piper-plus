@@ -582,7 +582,7 @@ CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
 | モデル | 言語 | 話者数 | 説明 | ダウンロード |
 |---|---|---|---|---|
 | つくよみちゃん 6lang | JA/EN/ZH/ES/FR/PT | 1 | つくよみちゃん音声、6言語対応、FP16 | [HuggingFace](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan) |
-| CSS10 日本語 6lang | JA/EN/ZH/ES/FR/PT | 1 | CSS10日本語音声、6言語対応、FP16 (6,841発話) | [HuggingFace](https://huggingface.co/ayousanz/piper-plus-css10-ja-6lang) |
+| CSS10 日本語 6lang | JA/EN/ZH/ES/FR/PT | 1 | CSS10日本語音声、6言語対応、FP16 | [HuggingFace](https://huggingface.co/ayousanz/piper-plus-css10-ja-6lang) |
 
 **学習用ベースモデル (ファインチューニング用):**
 
@@ -630,7 +630,7 @@ curl -L -o models/config.json https://huggingface.co/ayousanz/piper-plus-tsukuyo
 | フランス語 | fr | 4 | 28 | 107,464 | CML-TTS |
 | ポルトガル語 | pt | 5 | 8 | 34,066 | CML-TTS |
 
-upstream Piper のチェックポイントも利用可能: [piper-checkpoints](https://huggingface.co/datasets/rhasspy/piper-checkpoints/tree/main)
+> **Note:** piper-plus は独自のアーキテクチャ拡張 (多言語埋め込み、Prosody A1/A2/A3、173シンボル) を行っているため、upstream Piper のチェックポイント/ONNXモデルとの互換性はありません。piper-plus 専用のモデルをご利用ください。
 
 ---
 
