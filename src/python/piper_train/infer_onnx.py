@@ -240,8 +240,12 @@ def main():
         sys.exit(1)
 
     if args.output_dir is None:
-        print("Error: --output-dir is required for inference.", file=sys.stderr)
-        sys.exit(1)
+        if args.text:
+            # --text mode: default to "output.wav" in current directory
+            args.output_dir = "."
+        else:
+            print("Error: --output-dir is required for inference.", file=sys.stderr)
+            sys.exit(1)
 
     # Resolve model name/alias to file path
     resolved = (
@@ -447,8 +451,12 @@ def main():
         if durations is not None:
             _LOGGER.debug("Phoneme durations shape: %s", durations.shape)
 
-        output_path = args.output_dir / f"{utt_id}.wav"
+        if args.text:
+            output_path = args.output_dir / "output.wav"
+        else:
+            output_path = args.output_dir / f"{utt_id}.wav"
         write_wav(str(output_path), args.sample_rate, audio)
+        _LOGGER.info("Wrote: %s", output_path)
 
 
 def denoise(

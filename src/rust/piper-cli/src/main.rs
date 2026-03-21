@@ -483,9 +483,11 @@ fn main() -> Result<()> {
                     .with_context(|| format!("Failed to write {}", path.display()))?;
                 tracing::info!("Wrote: {}", path.display());
             } else {
-                // デフォルト: stdout に出力
-                audio::write_wav_to_stdout(result.sample_rate, &result.audio)
-                    .context("Failed to write WAV to stdout")?;
+                // デフォルト: output.wav に出力
+                let path = PathBuf::from("output.wav");
+                audio::write_wav(&path, result.sample_rate, &result.audio)
+                    .with_context(|| format!("Failed to write {}", path.display()))?;
+                tracing::info!("Wrote: {}", path.display());
             }
         }
     } else {

@@ -526,9 +526,13 @@ void processLine(string line, RunConfig &runConfig, piper::PiperConfig &piperCon
           .count();
 
   if (outputType == OUTPUT_DIRECTORY) {
-    // Generate path using timestamp
+    // In --text mode, use "output.wav" instead of timestamp
     stringstream outputName;
-    outputName << timestamp << ".wav";
+    if (runConfig.textInput) {
+      outputName << "output.wav";
+    } else {
+      outputName << timestamp << ".wav";
+    }
     filesystem::path outputPath = runConfig.outputPath.value();
     outputPath.append(outputName.str());
 
