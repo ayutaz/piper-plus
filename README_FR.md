@@ -53,6 +53,8 @@ Systeme de synthese vocale neuronale (TTS) rapide et de haute qualite. Base sur 
 
 - **[WebUI (Gradio)](docs/features/webui.md)** — Inference et entrainement, compatible Docker
 - **CLI C++** — Streaming, inference CUDA, sortie de timing phonemique, dictionnaire personnalise
+- **CLI C#** — .NET 8/9 multiplateforme, 6 langues multilingue, inference ONNX
+- **CLI Rust** — piper-plus/piper-plus-cli, streaming, CUDA/CoreML/DirectML, telechargement automatique des dictionnaires
 - **[WebAssembly](src/wasm/openjtalk-web/README.md)** — Fonctionne entierement dans le navigateur, sans serveur
 - **[Docker](docker/README.md)** — 5 images pour l'inference, l'entrainement, WebUI et C++
 - **PyPI** — `pip install piper-tts-plus`
@@ -65,6 +67,8 @@ Systeme de synthese vocale neuronale (TTS) rapide et de haute qualite. Base sur 
 | macOS | ARM64 (Apple Silicon) uniquement | M1/M2/M3+ |
 | Windows | x64 | Support complet |
 | Web | WebAssembly | Chrome/Edge/Firefox/Safari |
+| C# (.NET) | x64 / ARM64 | .NET 8/9, Linux/macOS/Windows |
+| Rust | x64 / ARM64 | Linux/macOS/Windows, CUDA/CoreML/DirectML |
 
 ---
 
@@ -177,6 +181,34 @@ Egalement disponible sur PyPI :
 pip install piper-tts-plus
 ```
 
+### Installation depuis les gestionnaires de paquets
+
+**Python (PyPI) :**
+```bash
+pip install piper-tts-plus
+```
+
+**C# CLI (Outil global .NET) :**
+```bash
+dotnet tool install -g PiperPlus.Cli
+```
+
+**Rust CLI (crates.io) :**
+```bash
+cargo install piper-plus-cli
+```
+
+**Bibliotheque C# (NuGet) :**
+```bash
+dotnet add package PiperPlus.Core
+```
+
+**Bibliotheque Rust (crates.io) :**
+```toml
+[dependencies]
+piper-plus = "0.1.0"
+```
+
 ### Construction depuis les sources (C++)
 
 ```bash
@@ -192,6 +224,89 @@ Prerequis : compilateur C++17, CMake 3.13+
 - **Linux** : placer [piper-phonemize](https://github.com/rhasspy/piper-phonemize) dans `lib/Linux-$(uname -m)/piper_phonemize` avant la construction
 - **Windows** : voir le [Guide d'installation Windows](docs/getting-started/windows-setup.md)
 - **macOS** : les dependances sont telechargees automatiquement
+
+### Construction depuis les sources (C#)
+
+```bash
+# Construction du CLI C#
+dotnet build src/csharp/PiperPlus.sln -c Release
+# Tests
+dotnet test src/csharp/PiperPlus.Core.Tests/
+```
+
+Prerequis : .NET 8 SDK ou superieur
+
+#### Exemples d'utilisation du CLI C#
+
+```bash
+# Inference par nom de modele (telechargement automatique, sortie par defaut : output.wav)
+piper-plus --model tsukuyomi --text "こんにちは" --language ja
+
+# Anglais
+piper-plus --model model.onnx --text "Hello world" --language en
+
+# Multilingue (detection automatique de la langue)
+piper-plus --model model.onnx --text "こんにちはHello你好" --language ja-en-zh
+
+# Notation phonemique en ligne (specification directe des phonemes dans le texte)
+piper-plus --model model.onnx --text "Hello [[ h ə l oʊ ]] world" --language en
+
+# Streaming (sortie PCM sequentielle par phrase)
+piper-plus --model model.onnx --text "Premiere phrase. Deuxieme phrase." --language fr --streaming | aplay -r 22050 -f S16_LE
+
+# Dictionnaire personnalise (JSON v1/v2 ou TSV)
+piper-plus --model model.onnx --text "AI技術" --language ja --custom-dict my_dict.json
+
+# Telechargement de modeles
+piper-plus --download-model tsukuyomi
+piper-plus --list-models ja
+
+# Mode test (verification des phoneme IDs sans inference ONNX)
+piper-plus --model model.onnx --test-mode --text "こんにちは" --language ja
+```
+
+### Construction depuis les sources (Rust)
+
+```bash
+# Construction du CLI Rust
+cargo build --release -p piper-plus-cli
+# Tests
+cargo test -p piper-plus
+```
+
+Prerequis : Rust 1.70+, cargo
+
+#### Exemples d'utilisation du CLI Rust
+
+```bash
+# Inference par nom de modele (telechargement automatique)
+piper-plus-cli --model tsukuyomi --text "こんにちは" --language ja
+
+# Anglais
+piper-plus-cli --model model.onnx --text "Hello world" --language en
+
+# Telechargement et gestion de modeles
+piper-plus-cli --download-model tsukuyomi
+piper-plus-cli --list-models ja
+
+# Streaming (synthese sequentielle par phrase)
+piper-plus-cli --model model.onnx --text "Premiere phrase. Deuxieme phrase." --stream --output-dir chunks/
+
+# Dictionnaire personnalise
+piper-plus-cli --model model.onnx --text "AI技術" --custom-dict my_dict.json
+
+# Inference GPU
+piper-plus-cli --model model.onnx --text "Hello" --device cuda
+
+# Mode test et mode silencieux
+piper-plus-cli --model model.onnx --test-mode --text "hello" --language en
+piper-plus-cli --model model.onnx --text "hello" --language en --quiet
+
+# Sortie PCM brute (sans en-tete WAV)
+piper-plus-cli --model model.onnx --text "hello" --language en --output-raw | aplay -r 22050 -f S16_LE
+```
+
+> **Note :** Le CLI C# s'installe via `dotnet tool install -g PiperPlus.Cli` et le CLI Rust via `cargo install piper-plus-cli`. Les deux prennent en charge 6 langues, les dictionnaires personnalises et le streaming.
 
 ---
 
@@ -319,12 +434,20 @@ Des outils d'evaluation MCD, PESQ et UTMOS sont disponibles dans `scripts/evalua
 
 ## Modeles pre-entraines
 
-Des modeles de base pour le fine-tuning TTS japonais sont disponibles sur Hugging Face.
+Des modeles de synthese vocale pour l'inference et le fine-tuning sont disponibles sur Hugging Face.
 
-| Modele | Description | Licence |
-|---|---|---|
-| [piper-plus-base](https://huggingface.co/ayousanz/piper-plus-base) | Modele de base 6 langues (571 locuteurs, 508 187 enonces, 173 symboles) | CC-BY-SA-4.0 |
-| [piper-plus-tsukuyomi-chan](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan) | Modele fine-tune Tsukuyomi-chan 6 langues (FP16) | Voir la fiche modele |
+**Modeles pour l'inference (prets a l'emploi) :**
+
+| Modele | Langues | Locuteurs | Description | Telechargement |
+|---|---|---|---|---|
+| Tsukuyomi-chan 6lang | JA/EN/ZH/ES/FR/PT | 1 | Voix Tsukuyomi-chan, 6 langues, FP16 | [HuggingFace](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan) |
+| CSS10 Japonais 6lang | JA/EN/ZH/ES/FR/PT | 1 | Voix CSS10 japonaise, 6 langues, FP16 | [HuggingFace](https://huggingface.co/ayousanz/piper-plus-css10-ja-6lang) |
+
+**Modeles de base pour l'entrainement (fine-tuning) :**
+
+| Modele | Langues | Locuteurs | Description | Telechargement |
+|---|---|---|---|---|
+| Modele de base 6 langues | JA/EN/ZH/ES/FR/PT | 571 | Pre-entraine multilingue (508 187 enonces, VITS + Prosody) | [HuggingFace](https://huggingface.co/ayousanz/piper-plus-base) |
 
 **Caracteristiques du modele de base 6 langues :**
 
@@ -337,6 +460,8 @@ Des modeles de base pour le fine-tuning TTS japonais sont disponibles sur Huggin
 - Entrainement : 75 epochs, ~282K gradient steps, ~92 heures (4x V100)
 - Caracteristiques prosodiques : informations prosodiques A1/A2/A3
 - Phonemes etendus : marqueurs interrogatifs, variantes contextuelles du "N"
+
+> **Note :** piper-plus integre des extensions architecturales proprietaires (embeddings multilingues, Prosodie A1/A2/A3, 173 symboles) qui le rendent incompatible avec les checkpoints/modeles ONNX de Piper upstream. Veuillez utiliser les modeles specifiques a piper-plus.
 
 Les checkpoints Piper upstream sont egalement disponibles : [piper-checkpoints](https://huggingface.co/datasets/rhasspy/piper-checkpoints/tree/main)
 
@@ -435,5 +560,3 @@ Voir [CONTRIBUTING.md](CONTRIBUTING.md) pour les directives.
 ## Journal des modifications
 
 Voir [CHANGELOG.md](CHANGELOG.md) pour l'historique des versions.
-
-[![A library from the Open Home Foundation](https://www.openhomefoundation.org/badges/ohf-library.png)](https://www.openhomefoundation.org/)

@@ -56,6 +56,8 @@ A fast, high-quality neural text-to-speech (TTS) system. Built on the [VITS](htt
 - **[WebAssembly](src/wasm/openjtalk-web/README.md)** — Fully runs in browser, no server
 - **[Docker](docker/README.md)** — 5 images for inference, training, WebUI, and C++
 - **PyPI** — `pip install piper-tts-plus`
+- **C# CLI** — .NET 8/9 cross-platform, 6-language multilingual, ONNX inference
+- **Rust CLI** — piper-plus/piper-plus-cli, streaming, CUDA/CoreML/DirectML support, auto dictionary download
 
 ### Platforms
 
@@ -65,6 +67,8 @@ A fast, high-quality neural text-to-speech (TTS) system. Built on the [VITS](htt
 | macOS | ARM64 (Apple Silicon) only | M1/M2/M3+ |
 | Windows | x64 | Full support |
 | Web | WebAssembly | Chrome/Edge/Firefox/Safari |
+| C# (.NET) | x64 / ARM64 | .NET 8/9, Linux/macOS/Windows |
+| Rust | x64 / ARM64 | Linux/macOS/Windows, CUDA/CoreML/DirectML |
 
 ---
 
@@ -192,6 +196,34 @@ Also available from PyPI:
 pip install piper-tts-plus
 ```
 
+### Install from Package Managers
+
+**Python (PyPI):**
+```bash
+pip install piper-tts-plus
+```
+
+**C# CLI (.NET Global Tool):**
+```bash
+dotnet tool install -g PiperPlus.Cli
+```
+
+**Rust CLI (crates.io):**
+```bash
+cargo install piper-plus-cli
+```
+
+**C# Library (NuGet):**
+```bash
+dotnet add package PiperPlus.Core
+```
+
+**Rust Library (crates.io):**
+```toml
+[dependencies]
+piper-plus = "0.1.0"
+```
+
 ### Building from Source (C++)
 
 ```bash
@@ -207,6 +239,89 @@ Prerequisites: C++17 compiler, CMake 3.13+
 - **Linux**: Place [piper-phonemize](https://github.com/rhasspy/piper-phonemize) at `lib/Linux-$(uname -m)/piper_phonemize` before building
 - **Windows**: See [Windows Setup Guide](docs/getting-started/windows-setup.md)
 - **macOS**: Dependencies are downloaded automatically
+
+### Building from Source (C#)
+
+```bash
+# C# CLI build
+dotnet build src/csharp/PiperPlus.sln -c Release
+# Test
+dotnet test src/csharp/PiperPlus.Core.Tests/
+```
+
+Prerequisites: .NET 8 SDK or later
+
+#### C# CLI Usage Examples
+
+```bash
+# Inference with model name (auto-download supported, defaults to output.wav)
+piper-plus --model tsukuyomi --text "こんにちは" --language ja
+
+# English
+piper-plus --model model.onnx --text "Hello world" --language en
+
+# Multilingual (automatic language detection)
+piper-plus --model model.onnx --text "こんにちはHello你好" --language ja-en-zh
+
+# Inline phoneme notation
+piper-plus --model model.onnx --text "Hello [[ h ə l oʊ ]] world" --language en
+
+# Streaming (progressive PCM output per sentence)
+piper-plus --model model.onnx --text "First sentence. Second sentence." --language en --streaming | aplay -r 22050 -f S16_LE
+
+# Custom dictionary (JSON v1/v2 or TSV)
+piper-plus --model model.onnx --text "AI technology" --language en --custom-dict my_dict.json
+
+# Model management
+piper-plus --download-model tsukuyomi
+piper-plus --list-models ja
+
+# Test mode (verify phoneme IDs without ONNX inference)
+piper-plus --model model.onnx --test-mode --text "hello" --language en
+```
+
+#### Rust CLI Usage Examples
+
+```bash
+# Inference with model name (auto-download supported)
+piper-plus-cli --model tsukuyomi --text "こんにちは" --language ja
+
+# English
+piper-plus-cli --model model.onnx --text "Hello world" --language en
+
+# Model management
+piper-plus-cli --download-model tsukuyomi
+piper-plus-cli --list-models ja
+
+# Streaming (sentence-by-sentence synthesis)
+piper-plus-cli --model model.onnx --text "First sentence. Second sentence." --stream --output-dir chunks/
+
+# Custom dictionary
+piper-plus-cli --model model.onnx --text "AI technology" --custom-dict my_dict.json
+
+# GPU inference
+piper-plus-cli --model model.onnx --text "Hello" --device cuda
+
+# Test mode / quiet mode
+piper-plus-cli --model model.onnx --test-mode --text "hello" --language en
+piper-plus-cli --model model.onnx --text "hello" --language en --quiet
+
+# Raw PCM output (no WAV header)
+piper-plus-cli --model model.onnx --text "hello" --language en --output-raw | aplay -r 22050 -f S16_LE
+```
+
+> **Note:** Install C# CLI with `dotnet tool install -g PiperPlus.Cli` and Rust CLI with `cargo install piper-plus-cli`. Both support 6 languages, custom dictionaries, and streaming.
+
+### Building from Source (Rust)
+
+```bash
+# Rust CLI build
+cargo build --release -p piper-plus-cli
+# Test
+cargo test -p piper-plus
+```
+
+Prerequisites: Rust 1.70+, cargo
 
 ---
 
@@ -415,12 +530,20 @@ MCD, PESQ, and UTMOS evaluation tools are available in `scripts/evaluation/`.
 
 ## Pre-trained Models
 
-Pre-trained base models for multilingual TTS and fine-tuning are available on Hugging Face.
+Pre-trained models for multilingual TTS and fine-tuning are available on Hugging Face.
 
-| Model | Description | License |
-|---|---|---|
-| [piper-plus-base](https://huggingface.co/ayousanz/piper-plus-base) | 6-Language base model (571 speakers, 508,187 utterances, JA/EN/ZH/ES/FR/PT) | CC-BY-SA-4.0 |
-| [piper-plus-tsukuyomi-chan](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan) | Tsukuyomi-chan fine-tuned model (6-language, FP16) | See model card |
+**Inference Models (ready to use):**
+
+| Model | Languages | Speakers | Description | Download |
+|---|---|---|---|---|
+| Tsukuyomi-chan 6lang | JA/EN/ZH/ES/FR/PT | 1 | Tsukuyomi-chan voice, 6-language, FP16 | [HuggingFace](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan) |
+| CSS10 Japanese 6lang | JA/EN/ZH/ES/FR/PT | 1 | CSS10 Japanese voice, 6-language, FP16 | [HuggingFace](https://huggingface.co/ayousanz/piper-plus-css10-ja-6lang) |
+
+**Base Models (for fine-tuning):**
+
+| Model | Languages | Speakers | Description | Download |
+|---|---|---|---|---|
+| 6-Language Base | JA/EN/ZH/ES/FR/PT | 571 | Multilingual pre-trained (508,187 utterances, VITS + Prosody) | [HuggingFace](https://huggingface.co/ayousanz/piper-plus-base) |
 
 **6-Language Base Model features:**
 
@@ -433,7 +556,7 @@ Pre-trained base models for multilingual TTS and fine-tuning are available on Hu
 - Prosody Features: A1/A2/A3 prosody information (Japanese)
 - Extended phonemes: Question markers, context-dependent "N" variants
 
-Upstream Piper checkpoints also available: [piper-checkpoints](https://huggingface.co/datasets/rhasspy/piper-checkpoints/tree/main)
+> **Note:** piper-plus has custom architecture extensions (multilingual embeddings, Prosody A1/A2/A3, 173 symbols) that make it incompatible with upstream Piper checkpoints/ONNX models. Please use piper-plus specific models.
 
 ---
 
