@@ -7,6 +7,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.8.0] - 2026-03-22
+
+### Added
+
+#### C# (.NET) CLI
+- モデル名/エイリアス自動解決 + 未ダウンロード時自動ダウンロード (`--model tsukuyomi`)
+- `[[ phoneme ]]` インライン音素記法サポート
+- カスタム辞書の大小文字分離・単語境界マッチング (C++パリティ)
+- デフォルト辞書自動読み込み (`data/dictionaries/`)
+- DotNetG2P + DotNetG2P.MeCab による日本語G2P
+- DotNetG2P.English による英語G2P
+- 中国語PUAマッピング + トーンマーカー修正
+- `lid` (言語ID) テンソル対応
+- OpenJTalk辞書自動ダウンロード (`DictionaryManager`)
+- ストリーミング文分割 (`TextSplitter`)
+- カスタム辞書 JSON v1/v2 形式対応
+- NuGet パッケージ公開準備 (PiperPlus.Core, PiperPlus.Cli v0.1.0)
+
+#### Rust CLI
+- モデル名/エイリアス自動解決 + 自動ダウンロード (`find_model`, `resolve_model_path`)
+- `--download-model` / `--model-dir` オプション追加
+- `--quiet`, `--test-mode`, `--output-raw` オプション追加
+- `--sentence-silence`, `--phoneme-silence` オプション追加
+- `--list-models` 言語フィルタ (`--list-models ja`)
+- カスタム辞書CLI統合 (テキスト/バッチ/ストリーミング全パス)
+- 環境変数サポート (PIPER_DEFAULT_MODEL, PIPER_DEFAULT_CONFIG, PIPER_MODEL_DIR)
+- naist-jdic をデフォルトfeatureに変更 (辞書バンドル)
+- PyO3 0.22→0.23 アップグレード
+- crates.io パッケージ公開準備 (piper-plus, piper-plus-cli v0.1.0)
+
+#### CI/CD
+- Rust CLIバイナリビルド (PR時3OS、リリース時5ターゲット)
+- NuGet/crates.io 自動publishジョブ
+- GitHub Actions を Node.js 24 対応バージョンに全面更新
+- CI concurrencyグループ追加
+- ARM64 QEMU DNS修正
+
+#### 全言語共通
+- `--output-file` 省略時に `output.wav` デフォルト出力
+- Python モデルカタログ・ダウンロード機能追加
+
+### Fixed
+- C# ONNX推論の `lid` テンソル未送信バグ修正
+- C# 中国語音素マッピング修正 (3 IDs → 51 IDs)
+- Rust 多言語推論で各言語に正しいPhonemizerを使用するよう修正
+- Rust JA辞書未発見時のPassthroughPhonemizerフォールバック追加
+- C# CLI統合テストの global.json rollForward修正
+- C# テストのstderrレースコンディション修正
+- リリースアーティファクト名衝突解消 (C#/Rust)
+
+### Changed
+- Rustクレート名: piper-core→piper-plus, piper-cli→piper-plus-cli
+- C#/Rust バージョンはPyPIと独立管理 (v0.1.0)
+
 ## [1.7.0] - 2026-03-18
 
 ### 🚀 Major Features
