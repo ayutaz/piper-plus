@@ -244,8 +244,8 @@ func TestDictPhonemizer_MixedWords_BosEosOnce(t *testing.T) {
 		t.Fatalf("PhonemizeWithProsody error: %v", err)
 	}
 
-	// Expect dict phonemes + wrapped phonemes, no BOS/EOS in the middle.
-	wantTokens := []string{"h", "ɛ", "l", "oʊ", "w", "ɜː", "l", "d"}
+	// Expect dict phonemes + space + wrapped phonemes, no BOS/EOS in the middle.
+	wantTokens := []string{"h", "ɛ", "l", "oʊ", " ", "w", "ɜː", "l", "d"}
 	assertTokensEqual(t, "tokens", res.Tokens, wantTokens)
 
 	// No BOS or EOS should appear anywhere in the token list.
@@ -285,7 +285,7 @@ func TestDictPhonemizer_AllDictWords(t *testing.T) {
 		t.Fatalf("PhonemizeWithProsody error: %v", err)
 	}
 
-	wantTokens := []string{"h", "ɛ", "l", "oʊ", "w", "ɜː", "l", "d"}
+	wantTokens := []string{"h", "ɛ", "l", "oʊ", " ", "w", "ɜː", "l", "d"}
 	assertTokensEqual(t, "tokens", res.Tokens, wantTokens)
 
 	for i, tok := range res.Tokens {
@@ -322,8 +322,8 @@ func TestDictPhonemizer_AllNonDictWords(t *testing.T) {
 		t.Fatalf("PhonemizeWithProsody error: %v", err)
 	}
 
-	// Both words delegated; BOS/EOS stripped from each.
-	wantTokens := []string{"ɡ", "ʊ", "d", "m", "ɔː", "n", "ɪ", "ŋ"}
+	// Both words delegated; BOS/EOS stripped from each; space inserted between.
+	wantTokens := []string{"ɡ", "ʊ", "d", " ", "m", "ɔː", "n", "ɪ", "ŋ"}
 	assertTokensEqual(t, "tokens", res.Tokens, wantTokens)
 
 	for i, tok := range res.Tokens {
@@ -408,7 +408,7 @@ func TestDictPhonemizer_QuestionEOSToken(t *testing.T) {
 		t.Errorf("EOSToken = %q, want \"?\"", res.EOSToken)
 	}
 
-	wantTokens := []string{"ɑː", "j", "uː"}
+	wantTokens := []string{"ɑː", " ", "j", "uː"}
 	assertTokensEqual(t, "tokens", res.Tokens, wantTokens)
 }
 

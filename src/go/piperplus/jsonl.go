@@ -56,7 +56,7 @@ func ReadJSONL(ctx context.Context, r io.Reader, opts ...JSONLOption) (<-chan *J
 	}
 
 	inputCh := make(chan *JSONLInput)
-	errCh := make(chan error, 1)
+	errCh := make(chan error, 64)
 
 	go func() {
 		defer close(inputCh)

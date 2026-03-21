@@ -19,12 +19,12 @@ type Server struct {
 }
 
 type synthesizeRequest struct {
-	Text        string  `json:"text"`
-	Language    string  `json:"language,omitempty"`
-	SpeakerID   int64   `json:"speaker_id,omitempty"`
-	NoiseScale  float32 `json:"noise_scale,omitempty"`
-	LengthScale float32 `json:"length_scale,omitempty"`
-	NoiseW      float32 `json:"noise_w,omitempty"`
+	Text        string   `json:"text"`
+	Language    string   `json:"language,omitempty"`
+	SpeakerID   *int64   `json:"speaker_id,omitempty"`
+	NoiseScale  *float32 `json:"noise_scale,omitempty"`
+	LengthScale *float32 `json:"length_scale,omitempty"`
+	NoiseW      *float32 `json:"noise_w,omitempty"`
 }
 
 type healthResponse struct {
@@ -126,17 +126,17 @@ func (s *Server) handleSynthesize(w http.ResponseWriter, r *http.Request) {
 	if req.Language != "" {
 		opts = append(opts, WithLanguage(req.Language))
 	}
-	if req.SpeakerID != 0 {
-		opts = append(opts, WithSpeakerID(req.SpeakerID))
+	if req.SpeakerID != nil {
+		opts = append(opts, WithSpeakerID(*req.SpeakerID))
 	}
-	if req.NoiseScale != 0 {
-		opts = append(opts, WithNoiseScale(req.NoiseScale))
+	if req.NoiseScale != nil {
+		opts = append(opts, WithNoiseScale(*req.NoiseScale))
 	}
-	if req.LengthScale != 0 {
-		opts = append(opts, WithLengthScale(req.LengthScale))
+	if req.LengthScale != nil {
+		opts = append(opts, WithLengthScale(*req.LengthScale))
 	}
-	if req.NoiseW != 0 {
-		opts = append(opts, WithNoiseW(req.NoiseW))
+	if req.NoiseW != nil {
+		opts = append(opts, WithNoiseW(*req.NoiseW))
 	}
 
 	ctx, cancel := context.WithTimeout(r.Context(), 60*time.Second)
@@ -144,7 +144,7 @@ func (s *Server) handleSynthesize(w http.ResponseWriter, r *http.Request) {
 
 	result, err := s.voice.Synthesize(ctx, req.Text, opts...)
 	if err != nil {
-		s.logger.Error("synthesis failed", "error", err, "text", req.Text)
+		s.logger.Error("synthesis failed", "error", err, "text_len", len(req.Text))
 		writeError(w, http.StatusInternalServerError, "synthesis failed")
 		return
 	}
@@ -168,33 +168,36 @@ func parseSynthesizeQuery(r *http.Request) (synthesizeRequest, error) {
 		Language: q.Get("lang"),
 	}
 
-	if v := q.Get("speaker"); v != "" {
-		id, err := strconv.ParseInt(v, 10, 64)
+	if q.Has("speaker") {
+		id, err := strconv.ParseInt(q.Get("speaker"), 10, 64)
 		if err != nil {
 			return req, fmt.Errorf("invalid speaker: %w", err)
 		}
-		req.SpeakerID = id
+		req.SpeakerID = &id
 	}
-	if v := q.Get("noise_scale"); v != "" {
-		f, err := strconv.ParseFloat(v, 32)
+	if q.Has("noise_scale") {
+		f, err := strconv.ParseFloat(q.Get("noise_scale"), 32)
 		if err != nil {
 			return req, fmt.Errorf("invalid noise_scale: %w", err)
 		}
-		req.NoiseScale = float32(f)
+		v := float32(f)
+		req.NoiseScale = &v
 	}
-	if v := q.Get("length_scale"); v != "" {
-		f, err := strconv.ParseFloat(v, 32)
+	if q.Has("length_scale") {
+		f, err := strconv.ParseFloat(q.Get("length_scale"), 32)
 		if err != nil {
 			return req, fmt.Errorf("invalid length_scale: %w", err)
 		}
-		req.LengthScale = float32(f)
+		v := float32(f)
+		req.LengthScale = &v
 	}
-	if v := q.Get("noise_w"); v != "" {
-		f, err := strconv.ParseFloat(v, 32)
+	if q.Has("noise_w") {
+		f, err := strconv.ParseFloat(q.Get("noise_w"), 32)
 		if err != nil {
 			return req, fmt.Errorf("invalid noise_w: %w", err)
 		}
-		req.NoiseW = float32(f)
+		v := float32(f)
+		req.NoiseW = &v
 	}
 	return req, nil
 }

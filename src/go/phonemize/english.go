@@ -337,13 +337,28 @@ func (p *EnglishPhonemizer) PhonemizeWithProsody(text string) (*PhonemizeResult,
 		needSpace = true
 	}
 
+	// Determine EOS token from last sentence-final punctuation.
+	eosToken := "$"
+	for i := len(tokens) - 1; i >= 0; i-- {
+		if tokens[i].kind != tokenPunct {
+			continue
+		}
+		switch tokens[i].text {
+		case "?":
+			eosToken = "?"
+		case "!":
+			eosToken = "!"
+		}
+		break
+	}
+
 	// Apply PUA mapping
 	phonemes = MapSequence(phonemes)
 
 	return &PhonemizeResult{
 		Tokens:   phonemes,
 		Prosody:  prosody,
-		EOSToken: "$",
+		EOSToken: eosToken,
 	}, nil
 }
 

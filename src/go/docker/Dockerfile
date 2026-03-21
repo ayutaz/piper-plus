@@ -48,6 +48,7 @@ RUN mkdir -p /models
 
 # Run as non-root user for security
 RUN adduser -D -h /app piper
+RUN chown piper:piper /models
 USER piper
 
 WORKDIR /app

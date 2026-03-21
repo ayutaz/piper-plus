@@ -66,8 +66,8 @@ func TestSynthesizeRequest_JSON(t *testing.T) {
 	if req.Language != "en" {
 		t.Errorf("Language = %q, want %q", req.Language, "en")
 	}
-	if req.SpeakerID != 5 {
-		t.Errorf("SpeakerID = %d, want 5", req.SpeakerID)
+	if req.SpeakerID == nil || *req.SpeakerID != 5 {
+		t.Errorf("SpeakerID = %v, want 5", req.SpeakerID)
 	}
 }
 
@@ -98,10 +98,10 @@ func TestParseSynthesizeQuery(t *testing.T) {
 	if req.Language != "en" {
 		t.Errorf("Language = %q, want %q", req.Language, "en")
 	}
-	if req.SpeakerID != 3 {
-		t.Errorf("SpeakerID = %d, want 3", req.SpeakerID)
+	if req.SpeakerID == nil || *req.SpeakerID != 3 {
+		t.Errorf("SpeakerID = %v, want 3", req.SpeakerID)
 	}
-	if req.NoiseScale != 0.5 {
-		t.Errorf("NoiseScale = %f, want 0.5", req.NoiseScale)
+	if req.NoiseScale == nil || *req.NoiseScale != 0.5 {
+		t.Errorf("NoiseScale = %v, want 0.5", req.NoiseScale)
 	}
 }

@@ -1110,12 +1110,27 @@ func TestEOSToken(t *testing.T) {
 		{"hello world", "$"},
 		{"", "$"},
 		{"  ", "$"},
+		// Sentence-final punctuation determines EOS token
+		{"hello?", "?"},
+		{"how are you?", "?"},
+		{"hello!", "!"},
+		{"go!", "!"},
+		// Period maps to default "$"
+		{"hello.", "$"},
+		{"hello world.", "$"},
+		// Last punctuation wins
+		{"hello! world?", "?"},
+		{"hello? world!", "!"},
+		// Only punctuation
+		{"?", "?"},
+		{"!", "!"},
+		{".", "$"},
 	}
 
 	for _, tc := range tests {
 		result, err := p.PhonemizeWithProsody(tc.input)
 		if err != nil {
-			t.Fatalf("error: %v", err)
+			t.Fatalf("PhonemizeWithProsody(%q) error: %v", tc.input, err)
 		}
 		if result.EOSToken != tc.wantEOS {
 			t.Errorf("PhonemizeWithProsody(%q).EOSToken = %q, want %q",

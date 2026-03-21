@@ -114,12 +114,19 @@ type dictPhonemizer struct {
 // in result.EOSToken so the caller can select the correct variant
 // ("$", "?", "?!", etc.).
 func (dp *dictPhonemizer) PhonemizeWithProsody(text string) (*PhonemizeResult, error) {
+	// Note: We split on whitespace and phonemize per-word, but re-insert " "
+	// tokens between words to preserve word boundaries in the phoneme sequence.
+	// This matches the behavior of the wrapped phonemizer's full-text output.
 	words := strings.Fields(text)
 	var allTokens []string
 	var allProsody []*ProsodyInfo
 	lastEOS := "$"
 
-	for _, w := range words {
+	for wi, w := range words {
+		if wi > 0 {
+			allTokens = append(allTokens, " ")
+			allProsody = append(allProsody, &ProsodyInfo{A1: 0, A2: 0, A3: 0})
+		}
 		if ph := dp.dict.Lookup(w); ph != nil {
 			allTokens = append(allTokens, ph...)
 			for range ph {

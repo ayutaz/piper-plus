@@ -92,16 +92,16 @@ func configureSessionOptions(device string, logger *slog.Logger) (*ort.SessionOp
 		return nil, fmt.Errorf("piperplus: failed to create session options: %w", err)
 	}
 
-	selected := configurEP(sessOpts, dev, logger)
+	selected := configureEP(sessOpts, dev, logger)
 	logger.Info("ONNX Runtime execution provider configured", "device", selected.String())
 
 	return sessOpts, nil
 }
 
-// configurEP attempts to attach the requested execution provider to the session
+// configureEP attempts to attach the requested execution provider to the session
 // options. It returns the DeviceType that was actually selected (may be CPU if
 // the requested EP failed).
-func configurEP(sessOpts *ort.SessionOptions, dev DeviceType, logger *slog.Logger) DeviceType {
+func configureEP(sessOpts *ort.SessionOptions, dev DeviceType, logger *slog.Logger) DeviceType {
 	switch dev.Provider {
 	case "cpu":
 		return DeviceType{Provider: "cpu", DeviceID: 0}
