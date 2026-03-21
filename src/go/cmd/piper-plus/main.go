@@ -37,6 +37,16 @@ var (
 	timingFormat    string
 	debug           bool
 	customDictPaths []string // --custom-dict (repeatable)
+
+	// Additional CLI flags matching C++ implementation.
+	version        bool     // --version
+	quiet          bool     // -q, --quiet
+	outputRaw      bool     // --output-raw
+	jsonInput      bool     // --json-input
+	listModels     bool     // --list-models
+	downloadModel  string   // --download-model NAME
+	modelDir       string   // --model-dir DIR
+	phonemeSilence []string // --phoneme-silence (repeatable, "phoneme:seconds" format)
 )
 
 // jsonlInput represents a single line of JSONL input from stdin or batch file.
@@ -76,6 +86,16 @@ func init() {
 	f.StringVar(&timingFormat, "timing-format", "json", "timing output format (json or tsv)")
 	f.BoolVar(&debug, "debug", false, "enable debug logging")
 	f.StringArrayVar(&customDictPaths, "custom-dict", nil, "custom dictionary JSON file paths (repeatable)")
+
+	// Additional flags matching C++ implementation.
+	f.BoolVar(&version, "version", false, "print version and exit")
+	f.BoolVarP(&quiet, "quiet", "q", false, "disable all logging")
+	f.BoolVar(&outputRaw, "output-raw", false, "output raw PCM audio to stdout (no WAV header)")
+	f.BoolVar(&jsonInput, "json-input", false, "read stdin as JSON lines")
+	f.BoolVar(&listModels, "list-models", false, "list downloaded models in cache directory")
+	f.StringVar(&downloadModel, "download-model", "", "download model by URL into cache directory")
+	f.StringVar(&modelDir, "model-dir", "", "model cache directory override")
+	f.StringArrayVar(&phonemeSilence, "phoneme-silence", nil, "per-phoneme silence (format: phoneme:seconds, repeatable)")
 }
 
 func main() {
@@ -95,6 +115,12 @@ func stdinHasData() bool {
 }
 
 func runSynthesize(cmd *cobra.Command, args []string) error {
+	// --version: print version and exit immediately.
+	if version {
+		fmt.Println("piper-plus (Go) v0.1.0")
+		return nil
+	}
+
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
 
@@ -103,7 +129,38 @@ func runSynthesize(cmd *cobra.Command, args []string) error {
 	if debug {
 		level = slog.LevelDebug
 	}
+	if quiet {
+		level = slog.LevelError + 1 // suppress all output
+	}
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: level}))
+
+	// --list-models: list downloaded models and exit.
+	if listModels {
+		mgr := piperplus.NewModelManager(modelDir, logger)
+		models, err := mgr.ListModels()
+		if err != nil {
+			return fmt.Errorf("failed to list models: %w", err)
+		}
+		if len(models) == 0 {
+			fmt.Fprintf(os.Stderr, "no models found in %s\n", mgr.CacheDir())
+			return nil
+		}
+		for _, m := range models {
+			fmt.Printf("%-40s %6.1f MB  %s\n", m.Name, m.SizeMB, m.Path)
+		}
+		return nil
+	}
+
+	// --download-model: download a model by URL and exit.
+	if downloadModel != "" {
+		mgr := piperplus.NewModelManager(modelDir, logger)
+		path, err := mgr.DownloadModel(ctx, downloadModel)
+		if err != nil {
+			return fmt.Errorf("download failed: %w", err)
+		}
+		fmt.Println(path)
+		return nil
+	}
 
 	// Resolve model path: flag > env.
 	if modelPath == "" {
@@ -113,10 +170,37 @@ func runSynthesize(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("model path required: specify --model /path/to/model.onnx or set $PIPER_DEFAULT_MODEL")
 	}
 
+	// Try resolving model name/alias if file doesn't exist.
+	if _, err := os.Stat(modelPath); os.IsNotExist(err) {
+		mgr := piperplus.NewModelManager(modelDir, logger)
+		resolved, resolveErr := mgr.FindModel(modelPath)
+		if resolveErr != nil {
+			return fmt.Errorf("model not found: %s (try --list-models or --download-model)", modelPath)
+		}
+		modelPath = resolved
+	}
+
+	// Parse --phoneme-silence flags ("phoneme:seconds" format).
+	var phonemeSilenceMap map[string]float64
+	if len(phonemeSilence) > 0 {
+		phonemeSilenceMap = make(map[string]float64, len(phonemeSilence))
+		for _, ps := range phonemeSilence {
+			parts := strings.SplitN(ps, ":", 2)
+			if len(parts) != 2 {
+				return fmt.Errorf("invalid --phoneme-silence format %q (expected phoneme:seconds)", ps)
+			}
+			var secs float64
+			if _, err := fmt.Sscanf(parts[1], "%f", &secs); err != nil {
+				return fmt.Errorf("invalid silence duration in %q: %w", ps, err)
+			}
+			phonemeSilenceMap[parts[0]] = secs
+		}
+	}
+
 	// Validate mutually exclusive input modes (fix #3).
 	hasText := textInput != ""
 	hasBatch := batchFile != ""
-	hasStdin := stdinHasData()
+	hasStdin := stdinHasData() || jsonInput
 	modeCount := 0
 	if hasText {
 		modeCount++
@@ -146,6 +230,9 @@ func runSynthesize(cmd *cobra.Command, args []string) error {
 	loadOpts = append(loadOpts, piperplus.WithLogger(logger))
 	if len(customDictPaths) > 0 {
 		loadOpts = append(loadOpts, piperplus.WithCustomDict(customDictPaths...))
+	}
+	if phonemeSilenceMap != nil {
+		loadOpts = append(loadOpts, piperplus.WithPhonemeSilenceLoad(phonemeSilenceMap))
 	}
 
 	voice, err := piperplus.LoadVoice(ctx, modelPath, loadOpts...)
@@ -177,6 +264,7 @@ func buildSynthOpts() []piperplus.SynthesisOption {
 	opts = append(opts, piperplus.WithNoiseScale(noiseScale))
 	opts = append(opts, piperplus.WithLengthScale(lengthScale))
 	opts = append(opts, piperplus.WithNoiseW(noiseW))
+	opts = append(opts, piperplus.WithSentenceSilence(sentenceSilence))
 	return opts
 }
 
@@ -370,7 +458,7 @@ func buildRequest(input *jsonlInput) *piperplus.SynthesisRequest {
 // outputFilePath returns the resolved output path for a given file, used for
 // cleanup tracking.
 func outputFilePath(outFile, outDir, defaultName string) string {
-	if streaming || outFile == "-" {
+	if streaming || outputRaw || outFile == "-" {
 		return ""
 	}
 	if outFile != "" {
@@ -382,7 +470,7 @@ func outputFilePath(outFile, outDir, defaultName string) string {
 // writeResult writes a SynthesisResult to the appropriate output target.
 // It checks for context cancellation before writing to catch interrupt signals.
 func writeResult(_ context.Context, result *piperplus.SynthesisResult, outFile, outDir, defaultName string) error {
-	if streaming {
+	if streaming || outputRaw {
 		_, err := io.Copy(os.Stdout, result.RawPCMReader())
 		return err
 	}

@@ -43,6 +43,8 @@ func (s *WriterAudioSink) Close() error {
 // SynthesizeStream synthesizes long text by splitting into sentences,
 // synthesizing each, and writing audio chunks to the sink. Silence of
 // SentenceSilence seconds (default 0.2) is inserted between sentences.
+// Adjacent sentence chunks are crossfaded using CrossfadeChunks to reduce
+// click/pop artifacts at boundaries.
 func (v *Voice) SynthesizeStream(
 	ctx context.Context,
 	text string,
@@ -70,6 +72,8 @@ func (v *Voice) SynthesizeStream(
 	so := applySynthesisOptions(opts)
 	sentenceSilence := so.SentenceSilence
 
+	var prevChunkF32 []float32
+
 	for i, sentence := range sentences {
 		if err := ctx.Err(); err != nil {
 			synthErr = err
@@ -82,9 +86,29 @@ func (v *Voice) SynthesizeStream(
 			return synthErr
 		}
 
-		if err := sink.WriteAudio(result.Audio, result.SampleRate); err != nil {
-			synthErr = fmt.Errorf("piperplus: sink write failed: %w", err)
-			return synthErr
+		curChunkF32 := int16ToFloat32(result.Audio)
+
+		if len(prevChunkF32) > 0 && len(curChunkF32) > 0 {
+			// Crossfade with previous chunk to reduce boundary artifacts.
+			blended := CrossfadeChunks(prevChunkF32, curChunkF32, DefaultOverlapSamples)
+			if err := sink.WriteAudio(float32ToInt16(blended), result.SampleRate); err != nil {
+				synthErr = fmt.Errorf("piperplus: sink write failed: %w", err)
+				return synthErr
+			}
+			// After writing the blended result, there is no separate
+			// "previous chunk" to carry forward (the blend already consumed
+			// both). Reset so the next iteration starts fresh.
+			prevChunkF32 = nil
+		} else {
+			// First chunk or empty current chunk -- write prev if pending,
+			// then hold current for next iteration's crossfade.
+			if len(prevChunkF32) > 0 {
+				if err := sink.WriteAudio(float32ToInt16(prevChunkF32), result.SampleRate); err != nil {
+					synthErr = fmt.Errorf("piperplus: sink write failed: %w", err)
+					return synthErr
+				}
+			}
+			prevChunkF32 = curChunkF32
 		}
 
 		// Insert silence between sentences (not after the last one).
@@ -97,7 +121,40 @@ func (v *Voice) SynthesizeStream(
 		}
 	}
 
+	// Flush any remaining buffered chunk.
+	if len(prevChunkF32) > 0 {
+		if err := sink.WriteAudio(float32ToInt16(prevChunkF32), 22050); err != nil {
+			synthErr = fmt.Errorf("piperplus: sink write failed: %w", err)
+			return synthErr
+		}
+	}
+
 	return synthErr
+}
+
+// int16ToFloat32 converts PCM int16 samples to float32.
+func int16ToFloat32(s []int16) []float32 {
+	out := make([]float32, len(s))
+	for i, v := range s {
+		out[i] = float32(v)
+	}
+	return out
+}
+
+// float32ToInt16 converts float32 samples back to PCM int16, clamping values
+// that exceed the int16 range.
+func float32ToInt16(s []float32) []int16 {
+	out := make([]int16, len(s))
+	for i, v := range s {
+		if v > math.MaxInt16 {
+			out[i] = math.MaxInt16
+		} else if v < math.MinInt16 {
+			out[i] = math.MinInt16
+		} else {
+			out[i] = int16(v)
+		}
+	}
+	return out
 }
 
 // crossfade blends the end of prev with the start of next over overlapSamples
@@ -136,6 +193,72 @@ func crossfade(prev, next []int16, overlapSamples int) []int16 {
 
 	// Copy the non-overlapping tail of next.
 	copy(out[offset+overlapSamples:], next[overlapSamples:])
+
+	return out
+}
+
+// DefaultOverlapSamples is the default number of samples used for crossfade
+// between audio chunks (10 ms at 22050 Hz).
+const DefaultOverlapSamples = 220
+
+// MinCrossfadeSamples is the minimum overlap required to apply crossfade.
+// Below this threshold (~2 ms at 22050 Hz) crossfade is skipped and chunks
+// are simply concatenated.
+const MinCrossfadeSamples = 44
+
+// CrossfadeChunks blends the end of prev with the start of next using a
+// linear crossfade over overlapSamples. The algorithm matches the C++
+// crossfadeAudioChunks() in piper.cpp:
+//
+//  1. actualOverlap = min(overlapSamples, len(prev)/4, len(next)/4)
+//  2. If actualOverlap < 44 (< ~2 ms): skip crossfade, concatenate.
+//  3. Fade-out prev tail by (1 - t), fade-in next head by t, blend.
+//  4. Return prev[:end-overlap] ++ blended ++ next[overlap:].
+//
+// The returned slice has length len(prev) + len(next) - actualOverlap when
+// crossfade is applied, or len(prev) + len(next) when skipped.
+func CrossfadeChunks(prev, next []float32, overlapSamples int) []float32 {
+	if len(prev) == 0 || len(next) == 0 || overlapSamples <= 0 {
+		out := make([]float32, len(prev)+len(next))
+		copy(out, prev)
+		copy(out[len(prev):], next)
+		return out
+	}
+
+	// Cap overlap to at most 1/4 of each chunk.
+	actualOverlap := overlapSamples
+	if q := len(prev) / 4; q < actualOverlap {
+		actualOverlap = q
+	}
+	if q := len(next) / 4; q < actualOverlap {
+		actualOverlap = q
+	}
+
+	// If the overlap is too small to be audible, just concatenate.
+	if actualOverlap < MinCrossfadeSamples {
+		out := make([]float32, len(prev)+len(next))
+		copy(out, prev)
+		copy(out[len(prev):], next)
+		return out
+	}
+
+	outLen := len(prev) + len(next) - actualOverlap
+	out := make([]float32, outLen)
+
+	// Non-overlapping head of prev.
+	headEnd := len(prev) - actualOverlap
+	copy(out, prev[:headEnd])
+
+	// Blended region.
+	for i := 0; i < actualOverlap; i++ {
+		t := float32(i) / float32(actualOverlap)
+		fadeOut := prev[headEnd+i] * (1 - t)
+		fadeIn := next[i] * t
+		out[headEnd+i] = fadeOut + fadeIn
+	}
+
+	// Non-overlapping tail of next.
+	copy(out[headEnd+actualOverlap:], next[actualOverlap:])
 
 	return out
 }

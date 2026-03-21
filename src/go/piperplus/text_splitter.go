@@ -196,3 +196,68 @@ func isCloseBracket(r rune) bool {
 	}
 	return false
 }
+
+// isPunctuation reports whether a rune is a sentence-ending or clause-ending punctuation.
+func isPunctuation(r rune) bool {
+	switch r {
+	case '.', '!', '?', ',', ';', ':',
+		'。', '！', '？', '．', '、', '，':
+		return true
+	}
+	return false
+}
+
+// CalculateDynamicChunkSize returns an appropriate chunk size based on punctuation density.
+// This mirrors the C++ calculateDynamicChunkSize() logic.
+func CalculateDynamicChunkSize(text string, baseChunkSize int) int {
+	if baseChunkSize <= 0 {
+		baseChunkSize = 50
+	}
+	runes := []rune(text)
+	n := len(runes)
+	if n < baseChunkSize*2 {
+		return n // short text, no chunking
+	}
+	punctCount := 0
+	for _, r := range runes {
+		if isPunctuation(r) {
+			punctCount++
+		}
+	}
+	density := float64(punctCount) / float64(n)
+	switch {
+	case density > 0.05:
+		return baseChunkSize
+	case density >= 0.02:
+		return baseChunkSize * 2
+	default:
+		return baseChunkSize * 3
+	}
+}
+
+// SplitTextForStreaming splits text into chunks optimized for streaming synthesis.
+// It uses dynamic chunk sizing based on punctuation density and groups small sentences.
+func SplitTextForStreaming(text string, baseChunkSize int) []string {
+	sentences := SplitSentences(text)
+	if len(sentences) <= 1 {
+		return sentences
+	}
+	chunkSize := CalculateDynamicChunkSize(text, baseChunkSize)
+	var chunks []string
+	var current strings.Builder
+	currentLen := 0
+	for _, s := range sentences {
+		sLen := len([]rune(s))
+		if currentLen > 0 && currentLen+sLen > chunkSize {
+			chunks = append(chunks, current.String())
+			current.Reset()
+			currentLen = 0
+		}
+		current.WriteString(s)
+		currentLen += sLen
+	}
+	if current.Len() > 0 {
+		chunks = append(chunks, current.String())
+	}
+	return chunks
+}

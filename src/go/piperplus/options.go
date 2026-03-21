@@ -13,13 +13,14 @@ import (
 // SynthesisRequest holds parameters for a single synthesis operation.
 // Used with OnnxEngine.Synthesize and Voice.SynthesizeFromIDs.
 type SynthesisRequest struct {
-	PhonemeIDs      []int64    // phoneme ID sequence (required)
-	SpeakerID       int64      // speaker ID (default 0)
-	LanguageID      int64      // language ID (default 0)
-	NoiseScale      float32    // generation noise (default 0.667)
-	LengthScale     float32    // speech rate (default 1.0)
-	NoiseW          float32    // duration predictor noise (default 0.8)
-	ProsodyFeatures [][3]int64 // A1/A2/A3 per phoneme (nil = zero-fill)
+	PhonemeIDs      []int64            // phoneme ID sequence (required)
+	SpeakerID       int64              // speaker ID (default 0)
+	LanguageID      int64              // language ID (default 0)
+	NoiseScale      float32            // generation noise (default 0.667)
+	LengthScale     float32            // speech rate (default 1.0)
+	NoiseW          float32            // duration predictor noise (default 0.8)
+	ProsodyFeatures [][3]int64         // A1/A2/A3 per phoneme (nil = zero-fill)
+	PhonemeSilence  map[string]float64 // phoneme -> seconds of silence to insert after it (nil = disabled)
 }
 
 // ---------------------------------------------------------------------------
@@ -34,7 +35,8 @@ type SynthesisOptions struct {
 	NoiseScale      float32
 	LengthScale     float32
 	NoiseW          float32
-	SentenceSilence float64 // seconds of silence between sentences (default 0.2)
+	SentenceSilence float64            // seconds of silence between sentences (default 0.2)
+	PhonemeSilence  map[string]float64 // phoneme -> seconds of silence to insert after it (nil = disabled)
 }
 
 // SynthesisOption is a functional option applied to SynthesisOptions.
@@ -96,17 +98,26 @@ func WithSentenceSilence(seconds float64) SynthesisOption {
 	return func(o *SynthesisOptions) { o.SentenceSilence = seconds }
 }
 
+// WithPhonemeSilence sets a map of phoneme -> seconds of silence to insert
+// after that phoneme in the synthesized audio. This matches the C++
+// --phoneme_silence feature. For example, {"_": 0.1} inserts 100ms of silence
+// after every underscore phoneme.
+func WithPhonemeSilence(m map[string]float64) SynthesisOption {
+	return func(o *SynthesisOptions) { o.PhonemeSilence = m }
+}
+
 // ---------------------------------------------------------------------------
 // LoadOption — functional options for LoadVoice.
 // ---------------------------------------------------------------------------
 
 // LoadOptions holds resolved parameters for model loading.
 type LoadOptions struct {
-	ConfigPath      string       // explicit path to config.json
-	DictDir         string       // explicit dictionary directory (overrides search)
-	CustomDictPaths []string     // paths to custom dictionary JSON files
-	Device          string       // default "cpu"
-	Logger          *slog.Logger // default slog.Default()
+	ConfigPath      string             // explicit path to config.json
+	DictDir         string             // explicit dictionary directory (overrides search)
+	CustomDictPaths []string           // paths to custom dictionary JSON files
+	Device          string             // default "cpu"
+	Logger          *slog.Logger       // default slog.Default()
+	PhonemeSilence  map[string]float64 // phoneme -> seconds of silence after it (applied at load time as default)
 }
 
 // LoadOption is a functional option applied to LoadOptions.
@@ -140,6 +151,13 @@ func WithLogger(logger *slog.Logger) LoadOption {
 	return func(o *LoadOptions) { o.Logger = logger }
 }
 
+// WithPhonemeSilenceLoad sets a default phoneme silence map at model-load time.
+// The map specifies phoneme -> seconds of silence to insert after that phoneme.
+// This can be overridden per-request via [WithPhonemeSilence].
+func WithPhonemeSilenceLoad(m map[string]float64) LoadOption {
+	return func(o *LoadOptions) { o.PhonemeSilence = m }
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -169,10 +187,11 @@ func applySynthesisOptions(opts []SynthesisOption) SynthesisOptions {
 func NewSynthesisRequest(phonemeIDs []int64, opts ...SynthesisOption) *SynthesisRequest {
 	so := applySynthesisOptions(opts)
 	return &SynthesisRequest{
-		PhonemeIDs:  phonemeIDs,
-		SpeakerID:   so.SpeakerID,
-		NoiseScale:  so.NoiseScale,
-		LengthScale: so.LengthScale,
-		NoiseW:      so.NoiseW,
+		PhonemeIDs:     phonemeIDs,
+		SpeakerID:      so.SpeakerID,
+		NoiseScale:     so.NoiseScale,
+		LengthScale:    so.LengthScale,
+		NoiseW:         so.NoiseW,
+		PhonemeSilence: so.PhonemeSilence,
 	}
 }

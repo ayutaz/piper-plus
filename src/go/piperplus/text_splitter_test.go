@@ -225,3 +225,42 @@ func TestSplitTextChunks_AllFitInOne(t *testing.T) {
 		t.Errorf("expected %q, got %q", "Hello. World.", chunks[0])
 	}
 }
+
+// ---------------------------------------------------------------------------
+// CalculateDynamicChunkSize
+// ---------------------------------------------------------------------------
+
+func TestCalculateDynamicChunkSize_Short(t *testing.T) {
+	size := CalculateDynamicChunkSize("Hello.", 50)
+	if size != 6 {
+		t.Errorf("expected 6, got %d", size)
+	}
+}
+
+func TestCalculateDynamicChunkSize_HighPunct(t *testing.T) {
+	// Need >= 100 runes (baseChunkSize*2) with density > 0.05.
+	// 34 repetitions of "Ab. " = 136 runes, 34 periods -> density ~0.25.
+	text := strings.Repeat("Ab. ", 34)
+	size := CalculateDynamicChunkSize(text, 50)
+	if size != 50 {
+		t.Errorf("expected 50, got %d", size)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// SplitTextForStreaming
+// ---------------------------------------------------------------------------
+
+func TestSplitTextForStreaming_Empty(t *testing.T) {
+	chunks := SplitTextForStreaming("", 50)
+	if len(chunks) != 0 {
+		t.Errorf("expected 0 chunks, got %d", len(chunks))
+	}
+}
+
+func TestSplitTextForStreaming_Short(t *testing.T) {
+	chunks := SplitTextForStreaming("Hello.", 50)
+	if len(chunks) != 1 || chunks[0] != "Hello." {
+		t.Errorf("unexpected: %v", chunks)
+	}
+}
