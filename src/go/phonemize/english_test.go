@@ -170,8 +170,8 @@ func TestParseArpabet(t *testing.T) {
 
 func TestArpabetTokenToIPA(t *testing.T) {
 	tests := []struct {
-		token     string
-		wantIPA   string
+		token      string
+		wantIPA    string
 		wantStress int
 	}{
 		// Consonant — no stress
@@ -295,9 +295,9 @@ func TestConvertWordToIPA(t *testing.T) {
 
 func TestTokenizeText(t *testing.T) {
 	tests := []struct {
-		name   string
-		input  string
-		want   []textToken
+		name  string
+		input string
+		want  []textToken
 	}{
 		{
 			name:  "simple words",

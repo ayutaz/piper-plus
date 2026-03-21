@@ -35,15 +35,16 @@ func SplitSentences(text string) []string {
 
 		// Track nesting depth.
 		justClosed := false
-		if r == '"' {
+		switch {
+		case r == '"':
 			// ASCII double-quote is ambiguous; use toggle.
 			if inQuote {
 				justClosed = true
 			}
 			inQuote = !inQuote
-		} else if isOpenBracket(r) {
+		case isOpenBracket(r):
 			depth++
-		} else if isCloseBracket(r) && depth > 0 {
+		case isCloseBracket(r) && depth > 0:
 			depth--
 			justClosed = true
 		}

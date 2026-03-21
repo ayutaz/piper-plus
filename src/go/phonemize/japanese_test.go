@@ -72,15 +72,15 @@ func TestGetQuestionType_Basic(t *testing.T) {
 func TestGetQuestionType_PythonParity(t *testing.T) {
 	// These pairs are taken from Python test expectations.
 	pairs := map[string]string{
-		"こんにちは？":   "?",
-		"本当？！":     "?!",
-		"いいね？。":    "?.",
-		"そうだね？～":   "?~",
-		"こんにちは":    "$",
-		"Hello?":    "?",
-		"Really?!":  "?!",
-		"Right?~":   "?~",
-		"Hmm?.":     "?.",
+		"こんにちは？":     "?",
+		"本当？！":       "?!",
+		"いいね？。":      "?.",
+		"そうだね？～":     "?~",
+		"こんにちは":      "$",
+		"Hello?":     "?",
+		"Really?!":   "?!",
+		"Right?~":    "?~",
+		"Hmm?.":      "?.",
 		"Statement.": "$",
 	}
 	for text, want := range pairs {
@@ -284,10 +284,10 @@ func TestLabelsToTokensWithProsody_BasicDeclarative(t *testing.T) {
 	// Minimal label set: sil -> k -> o -> sil
 	// This tests BOS (^), phoneme extraction, and EOS ($).
 	labels := []string{
-		"xx^xx-sil+xx=xx/A:xx+xx+xx/B:xx-xx_xx/C:xx_xx+xx",       // sil at start
-		"xx^xx-k+o=xx/A:0+2+3/B:xx-xx_xx/C:xx_xx+xx",             // k phoneme
-		"xx^xx-o+N=xx/A:0+3+3/B:xx-xx_xx/C:xx_xx+xx",             // o phoneme
-		"xx^xx-sil+xx=xx/A:xx+xx+xx/B:xx-xx_xx/C:xx_xx+xx",       // sil at end
+		"xx^xx-sil+xx=xx/A:xx+xx+xx/B:xx-xx_xx/C:xx_xx+xx", // sil at start
+		"xx^xx-k+o=xx/A:0+2+3/B:xx-xx_xx/C:xx_xx+xx",       // k phoneme
+		"xx^xx-o+N=xx/A:0+3+3/B:xx-xx_xx/C:xx_xx+xx",       // o phoneme
+		"xx^xx-sil+xx=xx/A:xx+xx+xx/B:xx-xx_xx/C:xx_xx+xx", // sil at end
 	}
 	result, err := labelsToTokensWithProsody(labels, "こんにちは")
 	if err != nil {
@@ -337,7 +337,7 @@ func TestLabelsToTokensWithProsody_PauInsertion(t *testing.T) {
 	labels := []string{
 		"xx^xx-sil+xx=xx/A:xx+xx+xx/B:xx-xx_xx/C:xx_xx+xx",
 		"xx^xx-k+o=xx/A:0+1+2/B:xx-xx_xx/C:xx_xx+xx",
-		"xx^xx-pau+xx=xx/A:xx+xx+xx/B:xx-xx_xx/C:xx_xx+xx",   // pau
+		"xx^xx-pau+xx=xx/A:xx+xx+xx/B:xx-xx_xx/C:xx_xx+xx", // pau
 		"xx^xx-o+sil=xx/A:0+1+1/B:xx-xx_xx/C:xx_xx+xx",
 		"xx^xx-sil+xx=xx/A:xx+xx+xx/B:xx-xx_xx/C:xx_xx+xx",
 	}
@@ -420,8 +420,8 @@ func TestLabelsToTokensWithProsody_AccentNucleus(t *testing.T) {
 	// This simulates: phoneme at position a2=2 with a1=0, next phoneme at a2=3
 	labels := []string{
 		"xx^xx-sil+xx=xx/A:xx+xx+xx/B:xx-xx_xx/C:xx_xx+xx",
-		"xx^xx-k+o=xx/A:0+2+4/B:xx-xx_xx/C:xx_xx+xx",  // a1=0, a2=2
-		"xx^xx-o+n=xx/A:1+3+4/B:xx-xx_xx/C:xx_xx+xx",   // a2_next=3 == 2+1 -> insert "]"
+		"xx^xx-k+o=xx/A:0+2+4/B:xx-xx_xx/C:xx_xx+xx", // a1=0, a2=2
+		"xx^xx-o+n=xx/A:1+3+4/B:xx-xx_xx/C:xx_xx+xx", // a2_next=3 == 2+1 -> insert "]"
 		"xx^xx-sil+xx=xx/A:xx+xx+xx/B:xx-xx_xx/C:xx_xx+xx",
 	}
 	result, err := labelsToTokensWithProsody(labels, "テスト")
@@ -444,8 +444,8 @@ func TestLabelsToTokensWithProsody_PhraseBoundary(t *testing.T) {
 	// "#" is inserted when a2==a3 and a2_next==1
 	labels := []string{
 		"xx^xx-sil+xx=xx/A:xx+xx+xx/B:xx-xx_xx/C:xx_xx+xx",
-		"xx^xx-k+o=xx/A:1+3+3/B:xx-xx_xx/C:xx_xx+xx",  // a2=3, a3=3
-		"xx^xx-o+n=xx/A:0+1+2/B:xx-xx_xx/C:xx_xx+xx",   // a2_next=1 -> insert "#"
+		"xx^xx-k+o=xx/A:1+3+3/B:xx-xx_xx/C:xx_xx+xx", // a2=3, a3=3
+		"xx^xx-o+n=xx/A:0+1+2/B:xx-xx_xx/C:xx_xx+xx", // a2_next=1 -> insert "#"
 		"xx^xx-sil+xx=xx/A:xx+xx+xx/B:xx-xx_xx/C:xx_xx+xx",
 	}
 	result, err := labelsToTokensWithProsody(labels, "テスト")
@@ -468,8 +468,8 @@ func TestLabelsToTokensWithProsody_RisingPitch(t *testing.T) {
 	// "[" is inserted when a2==1 and a2_next==2
 	labels := []string{
 		"xx^xx-sil+xx=xx/A:xx+xx+xx/B:xx-xx_xx/C:xx_xx+xx",
-		"xx^xx-k+o=xx/A:1+1+3/B:xx-xx_xx/C:xx_xx+xx",  // a2=1
-		"xx^xx-o+n=xx/A:0+2+3/B:xx-xx_xx/C:xx_xx+xx",   // a2_next=2 -> insert "["
+		"xx^xx-k+o=xx/A:1+1+3/B:xx-xx_xx/C:xx_xx+xx", // a2=1
+		"xx^xx-o+n=xx/A:0+2+3/B:xx-xx_xx/C:xx_xx+xx", // a2_next=2 -> insert "["
 		"xx^xx-sil+xx=xx/A:xx+xx+xx/B:xx-xx_xx/C:xx_xx+xx",
 	}
 	result, err := labelsToTokensWithProsody(labels, "テスト")
@@ -499,7 +499,7 @@ func TestLabelsToTokensWithProsody_NPhonemeIntegration(t *testing.T) {
 		"xx^xx-sil+xx=xx/A:xx+xx+xx/B:xx-xx_xx/C:xx_xx+xx",
 		"xx^xx-k+o=xx/A:0+1+2/B:xx-xx_xx/C:xx_xx+xx",
 		"xx^xx-o+N=xx/A:0+2+2/B:xx-xx_xx/C:xx_xx+xx",
-		"xx^xx-N+b=xx/A:0+1+2/B:xx-xx_xx/C:xx_xx+xx",   // N followed by b -> N_m
+		"xx^xx-N+b=xx/A:0+1+2/B:xx-xx_xx/C:xx_xx+xx", // N followed by b -> N_m
 		"xx^xx-b+a=xx/A:0+2+2/B:xx-xx_xx/C:xx_xx+xx",
 		"xx^xx-sil+xx=xx/A:xx+xx+xx/B:xx-xx_xx/C:xx_xx+xx",
 	}
@@ -583,7 +583,7 @@ func TestLabelsToTokensWithProsody_MissingA1A2A3(t *testing.T) {
 	// Phoneme label without A1/A2/A3 — should still extract phoneme, prosody=nil
 	labels := []string{
 		"xx^xx-sil+xx=xx/A:xx+xx+xx/B:xx-xx_xx/C:xx_xx+xx",
-		"xx^xx-k+o=xx/B:xx-xx_xx/C:xx_xx+xx",  // missing /A: field
+		"xx^xx-k+o=xx/B:xx-xx_xx/C:xx_xx+xx", // missing /A: field
 		"xx^xx-sil+xx=xx/A:xx+xx+xx/B:xx-xx_xx/C:xx_xx+xx",
 	}
 	result, err := labelsToTokensWithProsody(labels, "テスト")
@@ -952,8 +952,8 @@ func TestLabelsToTokensWithProsody_CombinedProsodyMarks(t *testing.T) {
 	//   - a2==1, a2_next==2 -> YES: insert "["
 	labels := []string{
 		"xx^xx-sil+xx=xx/A:xx+xx+xx/B:xx-xx_xx/C:xx_xx+xx",
-		"xx^xx-a+k=xx/A:0+3+3/B:xx-xx_xx/C:xx_xx+xx",     // end of phrase
-		"xx^xx-k+a=xx/A:1+1+2/B:xx-xx_xx/C:xx_xx+xx",     // start of new phrase
+		"xx^xx-a+k=xx/A:0+3+3/B:xx-xx_xx/C:xx_xx+xx", // end of phrase
+		"xx^xx-k+a=xx/A:1+1+2/B:xx-xx_xx/C:xx_xx+xx", // start of new phrase
 		"xx^xx-a+sil=xx/A:0+2+2/B:xx-xx_xx/C:xx_xx+xx",
 		"xx^xx-sil+xx=xx/A:xx+xx+xx/B:xx-xx_xx/C:xx_xx+xx",
 	}

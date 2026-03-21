@@ -161,14 +161,15 @@ func SegmentText(text string, detector *UnicodeLanguageDetector) []LangSegment {
 
 		lang := detector.DetectChar(ch, contextHasKana)
 
-		if lang == "" {
+		switch {
+		case lang == "":
 			// Neutral: absorb into current segment.
 			currentBuf = append(currentBuf, text[i:i+size]...)
-		} else if currentLang == "" || lang == currentLang {
+		case currentLang == "" || lang == currentLang:
 			// Same language or first language encountered.
 			currentLang = lang
 			currentBuf = append(currentBuf, text[i:i+size]...)
-		} else {
+		default:
 			// Language changed: flush previous segment.
 			if len(currentBuf) > 0 {
 				segments = append(segments, LangSegment{

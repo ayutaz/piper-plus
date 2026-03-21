@@ -1007,8 +1007,8 @@ func TestMultilingualPhonemizer_NFC_AlreadyNFC(t *testing.T) {
 
 func TestMultilingualPhonemizer_NFC_NFDAndNFCSameResult(t *testing.T) {
 	// Both NFD and NFC inputs should produce identical phonemizer input.
-	nfdInput := "e\u0301"         // NFD
-	nfcInput := "\u00e9"          // NFC
+	nfdInput := "e\u0301" // NFD
+	nfcInput := "\u00e9"  // NFC
 
 	mockNFD := &nfcNormMockPhonemizer{lang: "fr"}
 	mockNFC := &nfcNormMockPhonemizer{lang: "fr"}
