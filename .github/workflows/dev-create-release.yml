@@ -261,11 +261,11 @@ jobs:
       matrix:
         include:
           - rid: win-x64
-            os: windows-2022
+            os: windows-latest
             archive_ext: zip
             cross: false
           - rid: win-arm64
-            os: windows-2022
+            os: windows-latest
             archive_ext: zip
             cross: true
           - rid: linux-x64
@@ -326,6 +326,7 @@ jobs:
       - name: Upload Release Asset
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
         run: |
           gh release upload "${{ needs.create_release.outputs.tag_name }}" \
             "piper-plus-cli-${{ matrix.rid }}.${{ matrix.archive_ext }}" \
@@ -427,12 +428,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-22.04
+          - os: ubuntu-24.04
             target: x86_64-unknown-linux-gnu
             artifact: piper-plus-rs-cli-linux-x64
             archive_ext: tar.gz
             cross: false
-          - os: ubuntu-22.04
+          - os: ubuntu-24.04
             target: aarch64-unknown-linux-gnu
             artifact: piper-plus-rs-cli-linux-arm64
             archive_ext: tar.gz
@@ -447,7 +448,7 @@ jobs:
             artifact: piper-plus-rs-cli-osx-arm64
             archive_ext: tar.gz
             cross: false
-          - os: windows-2022
+          - os: windows-latest
             target: x86_64-pc-windows-msvc
             artifact: piper-plus-rs-cli-win-x64
             archive_ext: zip
@@ -494,6 +495,7 @@ jobs:
         run: ls -lh ${{ matrix.artifact }}.${{ matrix.archive_ext }}
 
       - name: Upload Release Asset
+        shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
