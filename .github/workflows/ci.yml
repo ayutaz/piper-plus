@@ -326,10 +326,22 @@ jobs:
         include:
           - os: ubuntu-22.04
             rid: linux-x64
+            cross: false
+          - os: ubuntu-22.04
+            rid: linux-arm64
+            cross: true
           - os: macos-14
             rid: osx-arm64
+            cross: false
+          - os: macos-14
+            rid: osx-x64
+            cross: true
           - os: windows-latest
             rid: win-x64
+            cross: false
+          - os: windows-latest
+            rid: win-arm64
+            cross: true
     steps:
       - uses: actions/checkout@v6
 
@@ -349,15 +361,16 @@ jobs:
             ${{ runner.os }}-nuget-
 
       - name: Publish self-contained binary
-        run: >
-          dotnet publish src/csharp/PiperPlus.Cli/PiperPlus.Cli.csproj
-          -c Release
-          -r ${{ matrix.rid }}
-          --self-contained true
-          -p:PublishSingleFile=true
-          -p:PublishTrimmed=true
-          -p:PublishReadyToRun=true
-          -o publish/
+        shell: bash
+        run: |
+          PUBLISH_ARGS="-c Release -r ${{ matrix.rid }} --self-contained true"
+          PUBLISH_ARGS="$PUBLISH_ARGS -p:PublishSingleFile=true -p:PublishTrimmed=true"
+          if [ "${{ matrix.cross }}" = "true" ]; then
+            PUBLISH_ARGS="$PUBLISH_ARGS -p:PublishReadyToRun=false"
+          else
+            PUBLISH_ARGS="$PUBLISH_ARGS -p:PublishReadyToRun=true"
+          fi
+          dotnet publish src/csharp/PiperPlus.Cli/PiperPlus.Cli.csproj $PUBLISH_ARGS -o publish/
 
       - name: Verify binary exists
         run: ls -lh publish/

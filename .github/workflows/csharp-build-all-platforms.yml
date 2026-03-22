@@ -41,9 +41,9 @@ jobs:
             archive: tar.gz
             cross: true
           - rid: osx-x64
-            os: macos-13    # Intel x64 runner
+            os: macos-14    # ARM64 runner, cross-compile for x64
             archive: tar.gz
-            cross: false    # ネイティブビルド
+            cross: true     # PublishReadyToRun disabled for cross-compile
           - rid: osx-arm64
             os: macos-14
             archive: tar.gz
