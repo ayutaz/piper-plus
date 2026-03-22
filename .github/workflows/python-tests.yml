@@ -87,6 +87,22 @@ jobs:
         cd src/python
         pytest tests/ -v --tb=short -m "inference and unit"
 
+    # ---------------------------------------------------------------
+    # Runtime package tests (src/python_run — PyPI piper-tts-plus)
+    # ---------------------------------------------------------------
+    - name: Install runtime package dependencies
+      run: |
+        pip install pyopenjtalk-plus g2p-en pypinyin
+      env:
+        PYTHONUTF8: '1'
+
+    - name: Run runtime phonemization tests
+      run: |
+        cd src/python_run
+        pytest tests/test_japanese_phonemization.py tests/test_multilingual_integration.py -v --tb=short --override-ini="addopts="
+      env:
+        PYTHONUTF8: '1'
+
     - name: Upload test results
       if: always()
       uses: actions/upload-artifact@v7
