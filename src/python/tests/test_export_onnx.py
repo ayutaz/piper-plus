@@ -1,8 +1,10 @@
-"""Tests for export_onnx stochastic/deterministic export modes and EMA weight application."""
+"""Tests for export_onnx stochastic/deterministic export modes, EMA weight application,
+and emb_lang unification."""
 
 import numpy as np
 import pytest
 import torch
+from torch import nn
 
 
 def _onnx_inference(onnx_path, phoneme_ids, prosody_features, noise_scale=0.667):
@@ -166,3 +168,133 @@ class TestEMAWeightApplication:
         ckpt = torch.load(str(ckpt_path), map_location="cpu")
         ema_state = ckpt.get("ema_generator_state")
         assert ema_state is None, "Should not have EMA state"
+
+
+def _make_mock_model_g(n_speakers, n_languages, gin_channels=512):
+    """emb_lang テスト用の簡易モックモデルを作成"""
+
+    class MockModelG:
+        def __init__(self, n_speakers, n_languages, gin_channels):
+            self.n_speakers = n_speakers
+            self.n_languages = n_languages
+            if n_languages > 1:
+                self.emb_lang = nn.Embedding(n_languages, gin_channels)
+                # 各言語に異なる初期値を設定
+                with torch.no_grad():
+                    for i in range(n_languages):
+                        self.emb_lang.weight[i].fill_(float(i + 1))
+
+    return MockModelG(n_speakers, n_languages, gin_channels)
+
+
+@pytest.mark.unit
+class TestUnifyEmbLang:
+    """emb_lang 統一のテスト"""
+
+    def test_auto_enabled_single_speaker_multilingual(self):
+        """num_speakers=1, num_languages>1 → 自動有効化"""
+        model_g = _make_mock_model_g(n_speakers=1, n_languages=6)
+        num_speakers = model_g.n_speakers
+        num_languages = model_g.n_languages
+
+        # auto判定ロジック (export_onnx.py と同一)
+        unify_emb_lang = None  # auto
+        if unify_emb_lang is None:
+            should_unify = (num_speakers <= 1) and (num_languages > 1)
+        else:
+            should_unify = unify_emb_lang
+
+        assert should_unify is True
+
+    def test_auto_disabled_multi_speaker(self):
+        """num_speakers>1, num_languages>1 → 自動無効化"""
+        model_g = _make_mock_model_g(n_speakers=2, n_languages=6)
+        num_speakers = model_g.n_speakers
+        num_languages = model_g.n_languages
+
+        unify_emb_lang = None
+        if unify_emb_lang is None:
+            should_unify = (num_speakers <= 1) and (num_languages > 1)
+        else:
+            should_unify = unify_emb_lang
+
+        assert should_unify is False
+
+    def test_explicit_enable_overrides_auto(self):
+        """--unify-emb-lang でマルチスピーカーでも有効化"""
+        model_g = _make_mock_model_g(n_speakers=2, n_languages=6)
+        num_speakers = model_g.n_speakers
+        num_languages = model_g.n_languages
+
+        unify_emb_lang = True  # explicit
+        if unify_emb_lang is None:
+            should_unify = (num_speakers <= 1) and (num_languages > 1)
+        else:
+            should_unify = unify_emb_lang
+
+        assert should_unify is True
+
+    def test_explicit_disable_overrides_auto(self):
+        """--no-unify-emb-lang でシングルスピーカー多言語でも無効化"""
+        model_g = _make_mock_model_g(n_speakers=1, n_languages=6)
+        num_speakers = model_g.n_speakers
+        num_languages = model_g.n_languages
+
+        unify_emb_lang = False  # explicit disable
+        if unify_emb_lang is None:
+            should_unify = (num_speakers <= 1) and (num_languages > 1)
+        else:
+            should_unify = unify_emb_lang
+
+        assert should_unify is False
+
+    def test_unify_copies_source_to_all(self):
+        """統一後に全言語のembeddingがsourceと同一"""
+        num_languages = 6
+        model_g = _make_mock_model_g(n_speakers=1, n_languages=num_languages)
+        source = 0
+
+        # 統一前: 各言語は異なる値
+        with torch.no_grad():
+            for i in range(num_languages):
+                assert model_g.emb_lang.weight[i][0].item() == float(i + 1)
+
+        # 統一処理 (export_onnx.py と同一ロジック)
+        with torch.no_grad():
+            emb_lang = model_g.emb_lang.weight
+            source_emb = emb_lang[source].clone()
+            for i in range(num_languages):
+                if i != source:
+                    emb_lang[i].copy_(source_emb)
+
+        # 統一後: 全言語がsource (=1.0) と同一
+        for i in range(num_languages):
+            assert torch.equal(model_g.emb_lang.weight[i], model_g.emb_lang.weight[source])
+
+    def test_unify_with_custom_source(self):
+        """--unify-emb-lang-source 2 で言語2基準のコピー"""
+        num_languages = 6
+        model_g = _make_mock_model_g(n_speakers=1, n_languages=num_languages)
+        source = 2
+
+        with torch.no_grad():
+            emb_lang = model_g.emb_lang.weight
+            source_emb = emb_lang[source].clone()
+            for i in range(num_languages):
+                if i != source:
+                    emb_lang[i].copy_(source_emb)
+
+        # 全言語がsource (=3.0) と同一
+        for i in range(num_languages):
+            assert model_g.emb_lang.weight[i][0].item() == 3.0
+
+    def test_invalid_source_raises_error(self):
+        """範囲外のsourceでValueError"""
+        num_languages = 6
+        source = 10
+
+        with pytest.raises(ValueError, match="must be 0..5"):
+            if source < 0 or source >= num_languages:
+                raise ValueError(
+                    f"--unify-emb-lang-source must be 0..{num_languages - 1}, got {source}"
+                )

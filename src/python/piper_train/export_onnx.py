@@ -111,6 +111,20 @@ def main() -> None:
         action="store_true",
         help="Disable FP16 conversion (default: FP16 enabled)",
     )
+    parser.add_argument(
+        "--unify-emb-lang",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="Unify emb_lang embeddings for single-speaker multilingual models. "
+        "Default: auto (enabled when num_speakers <= 1 and num_languages > 1). "
+        "Use --no-unify-emb-lang to disable.",
+    )
+    parser.add_argument(
+        "--unify-emb-lang-source",
+        type=int,
+        default=0,
+        help="Source language index for emb_lang unification (default: 0).",
+    )
     args = parser.parse_args()
 
     if args.debug:
@@ -150,6 +164,33 @@ def main() -> None:
 
     # Inference only
     model_g.eval()
+
+    # Unify emb_lang embeddings for single-speaker multilingual models
+    # Must be done BEFORE torch.onnx.export(); EMA does not affect emb_lang
+    if args.unify_emb_lang is None:
+        should_unify = (num_speakers <= 1) and (num_languages > 1)
+    else:
+        should_unify = args.unify_emb_lang
+
+    if should_unify and num_languages > 1:
+        source = args.unify_emb_lang_source
+        if source < 0 or source >= num_languages:
+            raise ValueError(
+                f"--unify-emb-lang-source must be 0..{num_languages - 1}, got {source}"
+            )
+        with torch.no_grad():
+            emb_lang = model_g.emb_lang.weight  # [num_languages, gin_channels]
+            source_emb = emb_lang[source].clone()
+            for i in range(num_languages):
+                if i != source:
+                    emb_lang[i].copy_(source_emb)
+        _LOGGER.info(
+            "Unified emb_lang: copied lang[%d] to all %d languages",
+            source,
+            num_languages,
+        )
+    elif should_unify and num_languages <= 1:
+        _LOGGER.info("Skipping emb_lang unification: model has only %d language(s)", num_languages)
 
     # Apply EMA weights to decoder if available (always applied when present)
     # IMPORTANT: EMA must be applied BEFORE remove_weight_norm(), because EMA shadow
