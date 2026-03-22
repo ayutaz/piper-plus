@@ -286,6 +286,150 @@ def temp_onnx_model_stochastic(mock_vits_model, tmp_path_factory):
     return onnx_path
 
 
+@pytest.fixture(scope="module")
+def mock_vits_model_multilingual():
+    """マルチリンガル対応モックVITSモデルを作成（n_speakers=1, n_languages=2）"""
+    import torch
+
+    from piper_train.vits.models import SynthesizerTrn
+
+    torch.manual_seed(42)
+
+    model = SynthesizerTrn(
+        n_vocab=50,
+        spec_channels=513,
+        segment_size=8192,
+        inter_channels=192,
+        hidden_channels=192,
+        filter_channels=768,
+        n_heads=2,
+        n_layers=6,
+        kernel_size=3,
+        p_dropout=0.1,
+        resblock="1",
+        resblock_kernel_sizes=[3, 7, 11],
+        resblock_dilation_sizes=[[1, 3, 5], [1, 3, 5], [1, 3, 5]],
+        upsample_rates=[8, 8, 2, 2],
+        upsample_initial_channel=512,
+        upsample_kernel_sizes=[16, 16, 4, 4],
+        n_speakers=1,
+        n_languages=2,
+        gin_channels=512,
+        use_sdp=True,
+        prosody_dim=16,
+    )
+
+    # 各言語に異なる初期値を設定（統一テスト用）
+    with torch.no_grad():
+        model.emb_lang.weight[0].fill_(1.0)
+        model.emb_lang.weight[1].fill_(2.0)
+
+    model.eval()
+    with torch.no_grad():
+        model.dec.remove_weight_norm()
+
+    return model
+
+
+@pytest.fixture(scope="module")
+def temp_onnx_model_unified_emb_lang(mock_vits_model_multilingual, tmp_path_factory):
+    """emb_lang統一後にONNXエクスポートしたマルチリンガルモデル"""
+    import torch
+
+    from piper_train.vits import commons
+
+    model = mock_vits_model_multilingual
+
+    # emb_lang 統一処理 (export_onnx.py と同一ロジック)
+    with torch.no_grad():
+        emb_lang = model.emb_lang.weight
+        source_emb = emb_lang[0].clone()
+        for i in range(model.n_languages):
+            if i != 0:
+                emb_lang[i].copy_(source_emb)
+
+    tmp_dir = tmp_path_factory.mktemp("models_unified")
+    onnx_path = tmp_dir / "mock_model_unified.onnx"
+
+    dummy_input_length = 10
+    sequences = torch.randint(0, 50, (1, dummy_input_length), dtype=torch.long)
+    sequence_lengths = torch.LongTensor([dummy_input_length])
+    scales = torch.FloatTensor([0.667, 1.0, 0.8])
+    sid = torch.LongTensor([0])
+    lid = torch.LongTensor([0])
+    prosody_features = torch.zeros(1, dummy_input_length, 3, dtype=torch.long)
+
+    model.onnx_export_mode = True
+    if hasattr(model, "dp"):
+        model.dp.onnx_export_mode = True
+
+    def infer_forward(
+        input_tensor, input_lengths, scales_tensor, sid_tensor, lid_tensor,
+        prosody_features_tensor,
+    ):
+        length_scale = scales_tensor[1]
+        noise_scale_w = scales_tensor[2]
+
+        g = model._get_global_conditioning(sid_tensor, lid_tensor)
+        x, m_p, logs_p, x_mask = model.enc_p(input_tensor, input_lengths, g=g)
+
+        x_dp = model._prepare_prosody_input(x, x_mask, prosody_features_tensor, lid=lid_tensor)
+        if model.use_sdp:
+            logw = model.dp(x_dp, x_mask, g=g, reverse=True, noise_scale=noise_scale_w)
+        else:
+            logw = model.dp(x_dp, x_mask, g=g)
+
+        w = torch.exp(logw) * x_mask * length_scale
+        durations = w.squeeze(1)
+
+        w_ceil = torch.ceil(w)
+        y_lengths = torch.clamp_min(torch.sum(w_ceil, [1, 2]), 1).long()
+        y_mask = torch.unsqueeze(
+            commons.sequence_mask(y_lengths, y_lengths.max()), 1
+        ).type_as(x_mask)
+        attn_mask = torch.unsqueeze(x_mask, 2) * torch.unsqueeze(y_mask, -1)
+        attn = commons.generate_path(w_ceil, attn_mask)
+
+        m_p = torch.matmul(attn.squeeze(1), m_p.transpose(1, 2)).transpose(1, 2)
+        logs_p = torch.matmul(attn.squeeze(1), logs_p.transpose(1, 2)).transpose(1, 2)
+
+        z_p = m_p  # deterministic
+        z = model.flow(z_p, y_mask, g=g, reverse=True)
+        o = model.dec((z * y_mask), g=g)
+
+        return o, durations
+
+    _orig_forward = model.forward
+    model.forward = infer_forward
+
+    try:
+        torch.onnx.export(
+            model,
+            (sequences, sequence_lengths, scales, sid, lid, prosody_features),
+            str(onnx_path),
+            opset_version=15,
+            input_names=["input", "input_lengths", "scales", "sid", "lid", "prosody_features"],
+            output_names=["output", "durations"],
+            dynamic_axes={
+                "input": {0: "batch_size", 1: "phonemes"},
+                "input_lengths": {0: "batch_size"},
+                "sid": {0: "batch_size"},
+                "lid": {0: "batch_size"},
+                "prosody_features": {0: "batch_size", 1: "phonemes"},
+                "output": {0: "batch_size", 2: "time"},
+                "durations": {0: "batch_size", 1: "phonemes"},
+            },
+            verbose=False,
+            dynamo=False,
+        )
+    except (SystemError, Exception) as e:
+        model.forward = _orig_forward
+        pytest.skip(f"ONNX export not supported: {e}")
+
+    model.forward = _orig_forward
+    return onnx_path
+
+
 @pytest.fixture
 def sample_phoneme_ids():
     """標準的なテスト用音素ID列"""

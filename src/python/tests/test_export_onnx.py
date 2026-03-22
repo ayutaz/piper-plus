@@ -298,3 +298,55 @@ class TestUnifyEmbLang:
                 raise ValueError(
                     f"--unify-emb-lang-source must be 0..{num_languages - 1}, got {source}"
                 )
+
+
+@pytest.mark.inference
+class TestUnifyEmbLangOnnxExport:
+    """emb_lang 統一後の ONNX エクスポート統合テスト"""
+
+    def test_onnx_export_succeeds(self, temp_onnx_model_unified_emb_lang):
+        """emb_lang統一後のモデルが正常にONNXエクスポートできる"""
+        import os
+
+        assert temp_onnx_model_unified_emb_lang.exists()
+        assert os.path.getsize(temp_onnx_model_unified_emb_lang) > 0
+
+    def test_onnx_inference_with_different_lid(
+        self, temp_onnx_model_unified_emb_lang, sample_phoneme_ids, sample_prosody_features
+    ):
+        """emb_lang統一後は異なるlidでも同一の音声出力"""
+        import onnxruntime
+
+        session = onnxruntime.InferenceSession(str(temp_onnx_model_unified_emb_lang))
+        input_names = {inp.name for inp in session.get_inputs()}
+
+        text = np.expand_dims(np.array(sample_phoneme_ids, dtype=np.int64), 0)
+        text_lengths = np.array([text.shape[1]], dtype=np.int64)
+        scales = np.array([0.0, 1.0, 0.8], dtype=np.float32)  # noise_scale=0 for determinism
+
+        pf = []
+        for feat in sample_prosody_features:
+            if feat is None:
+                pf.append([0, 0, 0])
+            else:
+                pf.append([feat["a1"], feat["a2"], feat["a3"]])
+        prosody = np.expand_dims(np.array(pf, dtype=np.int64), 0)
+
+        def _build_inputs(lid_val):
+            inputs = {"input": text, "input_lengths": text_lengths, "scales": scales}
+            if "sid" in input_names:
+                inputs["sid"] = np.array([0], dtype=np.int64)
+            if "lid" in input_names:
+                inputs["lid"] = np.array([lid_val], dtype=np.int64)
+            if "prosody_features" in input_names:
+                inputs["prosody_features"] = prosody
+            return inputs
+
+        audio_lid0 = session.run(None, _build_inputs(0))[0].squeeze()
+        audio_lid1 = session.run(None, _build_inputs(1))[0].squeeze()
+
+        # emb_lang統一後は出力が同一であるべき
+        np.testing.assert_array_equal(
+            audio_lid0, audio_lid1,
+            err_msg="After emb_lang unification, different lid values should produce identical output",
+        )
