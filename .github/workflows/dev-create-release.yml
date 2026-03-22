@@ -400,7 +400,19 @@ jobs:
         working-directory: src/rust
         run: |
           if [ -n "$CARGO_REGISTRY_TOKEN" ]; then
-            cargo publish -p piper-plus --allow-dirty || echo "⚠️ piper-plus already published or publish failed (continuing)"
+            set +e
+            OUTPUT=$(cargo publish -p piper-plus --allow-dirty 2>&1)
+            STATUS=$?
+            set -e
+            echo "$OUTPUT"
+            if [ "$STATUS" -ne 0 ]; then
+              if echo "$OUTPUT" | grep -q "already uploaded\|already exists"; then
+                echo "⚠️ piper-plus version already published on crates.io (continuing)"
+              else
+                echo "::error::Failed to publish piper-plus to crates.io"
+                exit "$STATUS"
+              fi
+            fi
           else
             echo "⚠️ CARGO_REGISTRY_TOKEN not found, skipping crates.io publish"
           fi
@@ -413,7 +425,19 @@ jobs:
           if [ -n "$CARGO_REGISTRY_TOKEN" ]; then
             # Wait for crates.io index to update
             sleep 30
-            cargo publish -p piper-plus-cli --allow-dirty || echo "⚠️ piper-plus-cli already published or publish failed (continuing)"
+            set +e
+            OUTPUT=$(cargo publish -p piper-plus-cli --allow-dirty 2>&1)
+            STATUS=$?
+            set -e
+            echo "$OUTPUT"
+            if [ "$STATUS" -ne 0 ]; then
+              if echo "$OUTPUT" | grep -q "already uploaded\|already exists"; then
+                echo "⚠️ piper-plus-cli version already published on crates.io (continuing)"
+              else
+                echo "::error::Failed to publish piper-plus-cli to crates.io"
+                exit "$STATUS"
+              fi
+            fi
           else
             echo "⚠️ CARGO_REGISTRY_TOKEN not found, skipping crates.io publish"
           fi
