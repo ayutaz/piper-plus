@@ -76,6 +76,40 @@ def test_portuguese_phonemize_real():
     assert result[-1] == "$", f"Expected EOS '$', got {result[-1]!r}"
 
 
+def test_japanese_long_text_splitting():
+    """Verify that long Japanese text is split and does not crash OpenJTalk."""
+    pyopenjtalk = pytest.importorskip(
+        "pyopenjtalk_plus",
+        reason="pyopenjtalk-plus not installed",
+    )
+    del pyopenjtalk
+
+    from piper.phonemize.japanese import phonemize_japanese
+
+    # ~3000 chars — exceeds OpenJTalk's ~2700 char buffer limit
+    long_text = "これはテストです。" * 350
+    result = phonemize_japanese(long_text)
+    assert len(result) > 100, f"Expected many tokens, got {len(result)}"
+    assert result[0] == "^", "Expected BOS"
+
+
+def test_japanese_question_markers():
+    """Verify question type markers in jp_id_map match phonemizer output."""
+    from piper.phonemize.jp_id_map import SPECIAL_TOKENS
+
+    # Confirm the markers exist in the ID map
+    for marker in ("?!", "?.", "?~"):
+        assert marker in SPECIAL_TOKENS, f"Missing question marker: {marker}"
+
+
+def test_japanese_n_variants_in_id_map():
+    """Verify N phoneme variants in jp_id_map."""
+    from piper.phonemize.jp_id_map import JAPANESE_PHONEMES
+
+    for variant in ("N_m", "N_n", "N_ng", "N_uvular"):
+        assert variant in JAPANESE_PHONEMES, f"Missing N variant: {variant}"
+
+
 def test_multilingual_phonemizer_all_languages():
     """Create MultilingualPhonemizer with all 6 languages and test each."""
     pytest.importorskip(

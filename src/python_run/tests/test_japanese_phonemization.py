@@ -110,6 +110,12 @@ class TestJpIdMap:
         assert "N" in JAPANESE_PHONEMES  # Moraic nasal
         assert "cl" in JAPANESE_PHONEMES  # Geminate
 
+        # Check N phoneme variants (Issue #207)
+        assert "N_m" in JAPANESE_PHONEMES
+        assert "N_n" in JAPANESE_PHONEMES
+        assert "N_ng" in JAPANESE_PHONEMES
+        assert "N_uvular" in JAPANESE_PHONEMES
+
         # Check palatalized consonants
         assert "ky" in JAPANESE_PHONEMES
         assert "sh" in JAPANESE_PHONEMES
@@ -120,6 +126,11 @@ class TestJpIdMap:
         assert "^" in SPECIAL_TOKENS  # BOS
         assert "$" in SPECIAL_TOKENS  # EOS
         assert "#" in SPECIAL_TOKENS  # Phrase boundary
+
+        # Check question type markers (Issue #204)
+        assert "?!" in SPECIAL_TOKENS
+        assert "?." in SPECIAL_TOKENS
+        assert "?~" in SPECIAL_TOKENS
 
     def test_get_japanese_id_map(self):
         """Test ID map generation"""
