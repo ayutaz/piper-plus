@@ -20,6 +20,15 @@ class TestTokenMapper:
         assert "ts" in FIXED_PUA_MAPPING
         assert "ky" in FIXED_PUA_MAPPING
 
+        # Check question-type markers and N-variant tokens
+        assert "?!" in FIXED_PUA_MAPPING
+        assert "?." in FIXED_PUA_MAPPING
+        assert "?~" in FIXED_PUA_MAPPING
+        assert "N_m" in FIXED_PUA_MAPPING
+        assert "N_n" in FIXED_PUA_MAPPING
+        assert "N_ng" in FIXED_PUA_MAPPING
+        assert "N_uvular" in FIXED_PUA_MAPPING
+
         # Check PUA range
         for token, codepoint in FIXED_PUA_MAPPING.items():
             assert 0xE000 <= codepoint <= 0xF8FF, f"{token} maps to invalid PUA: {hex(codepoint)}"
@@ -300,7 +309,7 @@ class TestVoiceIntegration:
                 result = PiperVoice.phonemize(voice, "こんにちは")
 
                 # Should have called our mocked function
-                assert mock_phonemize.called or True  # Allow either path
+                assert mock_phonemize.called
 
         except ImportError as e:
             # If imports fail, we want to know why
