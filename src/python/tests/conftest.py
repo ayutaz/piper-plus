@@ -336,17 +336,16 @@ def temp_onnx_model_unified_emb_lang(mock_vits_model_multilingual, tmp_path_fact
     """emb_lang統一後にONNXエクスポートしたマルチリンガルモデル"""
     import torch
 
+    from piper_train.export_onnx import unify_emb_lang_weights
     from piper_train.vits import commons
 
     model = mock_vits_model_multilingual
 
-    # emb_lang 統一処理 (export_onnx.py と同一ロジック)
-    with torch.no_grad():
-        emb_lang = model.emb_lang.weight
-        source_emb = emb_lang[0].clone()
-        for i in range(model.n_languages):
-            if i != 0:
-                emb_lang[i].copy_(source_emb)
+    # Save original weights to restore after export (avoid leaking into other tests)
+    original_emb_lang = model.emb_lang.weight.data.clone()
+
+    # emb_lang 統一処理 (export_onnx.py のヘルパー関数を使用)
+    unify_emb_lang_weights(model, source=0)
 
     tmp_dir = tmp_path_factory.mktemp("models_unified")
     onnx_path = tmp_dir / "mock_model_unified.onnx"
@@ -437,9 +436,12 @@ def temp_onnx_model_unified_emb_lang(mock_vits_model_multilingual, tmp_path_fact
         )
     except (SystemError, Exception) as e:
         model.forward = _orig_forward
+        model.emb_lang.weight.data.copy_(original_emb_lang)
         pytest.skip(f"ONNX export not supported: {e}")
 
     model.forward = _orig_forward
+    # Restore original weights so mock_vits_model_multilingual is not polluted
+    model.emb_lang.weight.data.copy_(original_emb_lang)
     return onnx_path
 
 

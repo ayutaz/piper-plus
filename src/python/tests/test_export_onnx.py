@@ -189,100 +189,57 @@ def _make_mock_model_g(n_speakers, n_languages, gin_channels=512):
 
 @pytest.mark.unit
 class TestUnifyEmbLang:
-    """emb_lang 統一のテスト"""
+    """emb_lang 統一のテスト（export_onnx のヘルパー関数を直接テスト）"""
 
     def test_auto_enabled_single_speaker_multilingual(self):
         """num_speakers=1, num_languages>1 → 自動有効化"""
-        model_g = _make_mock_model_g(n_speakers=1, n_languages=6)
-        num_speakers = model_g.n_speakers
-        num_languages = model_g.n_languages
+        from piper_train.export_onnx import should_unify_emb_lang
 
-        # auto判定ロジック (export_onnx.py と同一)
-        unify_emb_lang = None  # auto
-        if unify_emb_lang is None:
-            should_unify = (num_speakers <= 1) and (num_languages > 1)
-        else:
-            should_unify = unify_emb_lang
-
-        assert should_unify is True
+        assert should_unify_emb_lang(None, num_speakers=1, num_languages=6) is True
 
     def test_auto_disabled_multi_speaker(self):
         """num_speakers>1, num_languages>1 → 自動無効化"""
-        model_g = _make_mock_model_g(n_speakers=2, n_languages=6)
-        num_speakers = model_g.n_speakers
-        num_languages = model_g.n_languages
+        from piper_train.export_onnx import should_unify_emb_lang
 
-        unify_emb_lang = None
-        if unify_emb_lang is None:
-            should_unify = (num_speakers <= 1) and (num_languages > 1)
-        else:
-            should_unify = unify_emb_lang
-
-        assert should_unify is False
+        assert should_unify_emb_lang(None, num_speakers=2, num_languages=6) is False
 
     def test_explicit_enable_overrides_auto(self):
         """--unify-emb-lang でマルチスピーカーでも有効化"""
-        model_g = _make_mock_model_g(n_speakers=2, n_languages=6)
-        num_speakers = model_g.n_speakers
-        num_languages = model_g.n_languages
+        from piper_train.export_onnx import should_unify_emb_lang
 
-        unify_emb_lang = True  # explicit
-        if unify_emb_lang is None:
-            should_unify = (num_speakers <= 1) and (num_languages > 1)
-        else:
-            should_unify = unify_emb_lang
-
-        assert should_unify is True
+        assert should_unify_emb_lang(True, num_speakers=2, num_languages=6) is True
 
     def test_explicit_disable_overrides_auto(self):
         """--no-unify-emb-lang でシングルスピーカー多言語でも無効化"""
-        model_g = _make_mock_model_g(n_speakers=1, n_languages=6)
-        num_speakers = model_g.n_speakers
-        num_languages = model_g.n_languages
+        from piper_train.export_onnx import should_unify_emb_lang
 
-        unify_emb_lang = False  # explicit disable
-        if unify_emb_lang is None:
-            should_unify = (num_speakers <= 1) and (num_languages > 1)
-        else:
-            should_unify = unify_emb_lang
-
-        assert should_unify is False
+        assert should_unify_emb_lang(False, num_speakers=1, num_languages=6) is False
 
     def test_unify_copies_source_to_all(self):
         """統一後に全言語のembeddingがsourceと同一"""
+        from piper_train.export_onnx import unify_emb_lang_weights
+
         num_languages = 6
         model_g = _make_mock_model_g(n_speakers=1, n_languages=num_languages)
-        source = 0
 
         # 統一前: 各言語は異なる値
-        with torch.no_grad():
-            for i in range(num_languages):
-                assert model_g.emb_lang.weight[i][0].item() == float(i + 1)
+        for i in range(num_languages):
+            assert model_g.emb_lang.weight[i][0].item() == float(i + 1)
 
-        # 統一処理 (export_onnx.py と同一ロジック)
-        with torch.no_grad():
-            emb_lang = model_g.emb_lang.weight
-            source_emb = emb_lang[source].clone()
-            for i in range(num_languages):
-                if i != source:
-                    emb_lang[i].copy_(source_emb)
+        unify_emb_lang_weights(model_g, source=0)
 
         # 統一後: 全言語がsource (=1.0) と同一
         for i in range(num_languages):
-            assert torch.equal(model_g.emb_lang.weight[i], model_g.emb_lang.weight[source])
+            assert torch.equal(model_g.emb_lang.weight[i], model_g.emb_lang.weight[0])
 
     def test_unify_with_custom_source(self):
         """--unify-emb-lang-source 2 で言語2基準のコピー"""
+        from piper_train.export_onnx import unify_emb_lang_weights
+
         num_languages = 6
         model_g = _make_mock_model_g(n_speakers=1, n_languages=num_languages)
-        source = 2
 
-        with torch.no_grad():
-            emb_lang = model_g.emb_lang.weight
-            source_emb = emb_lang[source].clone()
-            for i in range(num_languages):
-                if i != source:
-                    emb_lang[i].copy_(source_emb)
+        unify_emb_lang_weights(model_g, source=2)
 
         # 全言語がsource (=3.0) と同一
         for i in range(num_languages):
@@ -290,14 +247,12 @@ class TestUnifyEmbLang:
 
     def test_invalid_source_raises_error(self):
         """範囲外のsourceでValueError"""
-        num_languages = 6
-        source = 10
+        from piper_train.export_onnx import unify_emb_lang_weights
+
+        model_g = _make_mock_model_g(n_speakers=1, n_languages=6)
 
         with pytest.raises(ValueError, match="must be 0..5"):
-            if source < 0 or source >= num_languages:
-                raise ValueError(
-                    f"--unify-emb-lang-source must be 0..{num_languages - 1}, got {source}"
-                )
+            unify_emb_lang_weights(model_g, source=10)
 
 
 @pytest.mark.inference
@@ -312,7 +267,10 @@ class TestUnifyEmbLangOnnxExport:
         assert os.path.getsize(temp_onnx_model_unified_emb_lang) > 0
 
     def test_onnx_inference_with_different_lid(
-        self, temp_onnx_model_unified_emb_lang, sample_phoneme_ids, sample_prosody_features
+        self,
+        temp_onnx_model_unified_emb_lang,
+        sample_phoneme_ids,
+        sample_prosody_features,
     ):
         """emb_lang統一後は異なるlidでも同一の音声出力"""
         import onnxruntime
@@ -322,7 +280,9 @@ class TestUnifyEmbLangOnnxExport:
 
         text = np.expand_dims(np.array(sample_phoneme_ids, dtype=np.int64), 0)
         text_lengths = np.array([text.shape[1]], dtype=np.int64)
-        scales = np.array([0.0, 1.0, 0.8], dtype=np.float32)  # noise_scale=0 for determinism
+        scales = np.array(
+            [0.0, 1.0, 0.8], dtype=np.float32
+        )  # noise_scale=0 for determinism
 
         pf = []
         for feat in sample_prosody_features:
@@ -347,6 +307,7 @@ class TestUnifyEmbLangOnnxExport:
 
         # emb_lang統一後は出力が同一であるべき
         np.testing.assert_array_equal(
-            audio_lid0, audio_lid1,
+            audio_lid0,
+            audio_lid1,
             err_msg="After emb_lang unification, different lid values should produce identical output",
         )

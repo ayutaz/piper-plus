@@ -25,6 +25,65 @@ _LOGGER = logging.getLogger("piper_train.export_onnx")
 OPSET_VERSION = 15
 
 
+def should_unify_emb_lang(
+    unify_flag: "bool | None",
+    num_speakers: int,
+    num_languages: int,
+) -> bool:
+    """Determine whether emb_lang unification should be performed.
+
+    Parameters
+    ----------
+    unify_flag : bool or None
+        CLI flag value. None means auto-detect.
+    num_speakers : int
+        Number of speakers in the model.
+    num_languages : int
+        Number of languages in the model.
+
+    Returns
+    -------
+    bool
+        True if emb_lang should be unified.
+    """
+    if unify_flag is None:
+        return (num_speakers <= 1) and (num_languages > 1)
+    return unify_flag
+
+
+def unify_emb_lang_weights(model_g, source: int = 0) -> None:
+    """Copy emb_lang[source] to all other language embeddings.
+
+    Parameters
+    ----------
+    model_g : SynthesizerTrn
+        The generator model with emb_lang attribute.
+    source : int
+        Source language index to copy from.
+
+    Raises
+    ------
+    ValueError
+        If source is out of range.
+    """
+    num_languages = model_g.n_languages
+    if source < 0 or source >= num_languages:
+        raise ValueError(
+            f"--unify-emb-lang-source must be 0..{num_languages - 1}, got {source}"
+        )
+    with torch.no_grad():
+        emb_lang = model_g.emb_lang.weight  # [num_languages, gin_channels]
+        source_emb = emb_lang[source].clone()
+        for i in range(num_languages):
+            if i != source:
+                emb_lang[i].copy_(source_emb)
+    _LOGGER.info(
+        "Unified emb_lang: copied lang[%d] to all %d languages",
+        source,
+        num_languages,
+    )
+
+
 def simplify_onnx_model(onnx_path: Path, check_n: int = 3) -> bool:
     """
     Simplify ONNX model using onnxsim-prebuilt with validation.
@@ -167,29 +226,14 @@ def main() -> None:
 
     # Unify emb_lang embeddings for single-speaker multilingual models
     # Must be done BEFORE torch.onnx.export(); EMA does not affect emb_lang
-    if args.unify_emb_lang is None:
-        should_unify = (num_speakers <= 1) and (num_languages > 1)
-    else:
-        should_unify = args.unify_emb_lang
+    do_unify = should_unify_emb_lang(args.unify_emb_lang, num_speakers, num_languages)
 
-    if should_unify and num_languages > 1:
-        source = args.unify_emb_lang_source
-        if source < 0 or source >= num_languages:
-            raise ValueError(
-                f"--unify-emb-lang-source must be 0..{num_languages - 1}, got {source}"
-            )
-        with torch.no_grad():
-            emb_lang = model_g.emb_lang.weight  # [num_languages, gin_channels]
-            source_emb = emb_lang[source].clone()
-            for i in range(num_languages):
-                if i != source:
-                    emb_lang[i].copy_(source_emb)
-        _LOGGER.info(
-            "Unified emb_lang: copied lang[%d] to all %d languages",
-            source,
-            num_languages,
-        )
-    elif should_unify and num_languages <= 1:
+    if do_unify and num_languages > 1:
+        try:
+            unify_emb_lang_weights(model_g, source=args.unify_emb_lang_source)
+        except ValueError as e:
+            parser.error(str(e))
+    elif do_unify and num_languages <= 1:
         _LOGGER.info(
             "Skipping emb_lang unification: model has only %d language(s)",
             num_languages,
