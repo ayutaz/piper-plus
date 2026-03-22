@@ -25,9 +25,6 @@ class PiperConfig:
     sample_rate: int
     """Sample rate of output audio"""
 
-    espeak_voice: str
-    """Name of espeak-ng voice or alphabet"""
-
     length_scale: float
     noise_scale: float
     noise_w: float
@@ -36,7 +33,6 @@ class PiperConfig:
     """Phoneme -> [id,]"""
 
     phoneme_type: PhonemeType
-    """espeak or text"""
 
     num_languages: int = 1
     """Number of languages"""
@@ -55,7 +51,6 @@ class PiperConfig:
             noise_scale=inference.get("noise_scale", 0.667),
             length_scale=inference.get("length_scale", 1.0),
             noise_w=inference.get("noise_w", 0.8),
-            espeak_voice=config.get("espeak", {}).get("voice", ""),
             phoneme_id_map=config["phoneme_id_map"],
             phoneme_type=PhonemeType(config.get("phoneme_type", "multilingual")),
             num_languages=config.get("num_languages", 1),
