@@ -49,7 +49,7 @@ setup(
     license="MIT",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    packages=setuptools.find_packages(),
+    packages=setuptools.find_packages(exclude=["tests", "tests.*", "build", "build.*"]),
     package_data={"piper": [str(p.relative_to(module_dir)) for p in data_files]},
     entry_points={
         "console_scripts": [

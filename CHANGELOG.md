@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.8.1] - 2026-03-22
+
+### Fixed
+- PyPI パッケージ (`piper-tts-plus`) の日本語音素化が空結果を返す致命的バグを修正
+  - HTS ラベルパーシングを学習側と同じ正規表現ベースに書き換え (Kurihara method)
+- `piper.__version__` が wheel インストール時に `"unknown"` を返す問題を修正
+- wheel に `tests/` パッケージが含まれていた問題を修正
+
+### Added
+- EN/ZH/ES/FR/PT の phonemizer を runtime パッケージに追加 (6言語マルチリンガル対応)
+- `MultilingualPhonemizer` (Unicode ベース言語自動検出 + ルーティング) を追加
+- N バリアント規則・疑問詞マーカーを runtime 側に追加 (学習側と一致)
+- 6言語統合テスト (`test_multilingual_integration.py`)
+- CI: `python-tests.yml` に runtime テストステップ追加 (3 OS)
+- CI: `dev-build-all.yml` に wheel ビルド後の6言語スモークテスト追加
+
+### Changed
+- `token_mapper.py` を全87エントリの多言語 PUA マッピングに更新
+- `voice.py` を `piper_train` 不要のローカル `MultilingualPhonemizer` に切り替え
+- `pyopenjtalk-plus>=0.4`, `g2p-en>=2.1.0`, `pypinyin>=0.50` を依存関係に追加
+
 ## [1.8.0] - 2026-03-22
 
 ### Added
