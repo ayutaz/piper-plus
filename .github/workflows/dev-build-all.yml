@@ -196,6 +196,47 @@ jobs:
           name: wheels-3.11
           path: dist/*.whl
 
+  # Test Python wheels on multiple platforms
+  test_python_wheels:
+    name: Test Python Wheels (${{ matrix.os }})
+    needs: [build_python_wheels]
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, windows-latest]
+    steps:
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+
+      - name: Download wheel artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: wheels-3.11
+          path: dist/
+
+      - name: Install wheel and dependencies
+        shell: bash
+        run: |
+          python -m pip install --upgrade pip
+          pip install dist/*.whl
+          pip install pyopenjtalk-plus g2p-en pypinyin
+
+      - name: Smoke test all 6 languages
+        shell: bash
+        env:
+          PYTHONUTF8: '1'
+        run: |
+          python -c "
+          from piper.phonemize.multilingual import MultilingualPhonemizer
+          mp = MultilingualPhonemizer(languages=['ja', 'en', 'zh', 'es', 'fr', 'pt'])
+          for lang, text in [('ja', 'こんにちは'), ('en', 'Hello'), ('zh', '你好'), ('es', 'Hola'), ('fr', 'Bonjour'), ('pt', 'Ola')]:
+              result = mp.phonemize(text)
+              assert len(result) > 3, f'{lang} failed: {len(result)} tokens'
+          print('All 6 languages OK')
+          "
+
   # Upload built artifacts to release if URL is provided
   upload_to_release:
     name: Upload to Release
@@ -251,7 +292,7 @@ jobs:
   # Summary job
   summary:
     name: Build Summary
-    needs: [build_linux_x64, build_macos_arm64, build_windows_x64, build_linux_armv7, build_linux_arm64, build_python_wheels]
+    needs: [build_linux_x64, build_macos_arm64, build_windows_x64, build_linux_armv7, build_linux_arm64, build_python_wheels, test_python_wheels]
     if: always()
     runs-on: ubuntu-22.04
     outputs:
@@ -265,17 +306,19 @@ jobs:
              [[ "${{ needs.build_windows_x64.result }}" == "success" ]] && \
              [[ "${{ needs.build_linux_armv7.result }}" == "success" ]] && \
              [[ "${{ needs.build_linux_arm64.result }}" == "success" ]] && \
-             [[ "${{ needs.build_python_wheels.result }}" == "success" ]]; then
+             [[ "${{ needs.build_python_wheels.result }}" == "success" ]] && \
+             [[ "${{ needs.test_python_wheels.result }}" == "success" ]]; then
             echo "success=true" >> $GITHUB_OUTPUT
-            echo "✅ All builds succeeded!"
+            echo "✅ All builds and tests succeeded!"
           else
             echo "success=false" >> $GITHUB_OUTPUT
-            echo "❌ Some builds failed:"
+            echo "❌ Some builds/tests failed:"
             echo "  Linux x64: ${{ needs.build_linux_x64.result }}"
             echo "  macOS ARM64: ${{ needs.build_macos_arm64.result }}"
             echo "  Windows x64: ${{ needs.build_windows_x64.result }}"
             echo "  Linux ARMv7: ${{ needs.build_linux_armv7.result }}"
             echo "  Linux ARM64: ${{ needs.build_linux_arm64.result }}"
             echo "  Python Wheels: ${{ needs.build_python_wheels.result }}"
+            echo "  Wheel Tests: ${{ needs.test_python_wheels.result }}"
             exit 1
           fi

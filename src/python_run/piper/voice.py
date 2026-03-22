@@ -56,46 +56,15 @@ except ImportError:
 
 from .config import PhonemeType, PiperConfig
 from .const import BOS, EOS, PAD
+from .phonemize.token_mapper import FIXED_PUA_MAPPING
 from .util import audio_float_to_int16
 
 
 _LOGGER = logging.getLogger(__name__)
 
-# Multi-character phoneme to PUA character mapping for Japanese
-# This must match the C++ side and Python training side
-MULTI_CHAR_TO_PUA = {
-    "a:": "\ue000",
-    "i:": "\ue001",
-    "u:": "\ue002",
-    "e:": "\ue003",
-    "o:": "\ue004",
-    "cl": "\ue005",
-    "ky": "\ue006",
-    "kw": "\ue007",
-    "gy": "\ue008",
-    "gw": "\ue009",
-    "ty": "\ue00a",
-    "dy": "\ue00b",
-    "py": "\ue00c",
-    "by": "\ue00d",
-    "ch": "\ue00e",
-    "ts": "\ue00f",
-    "sh": "\ue010",
-    "zy": "\ue011",
-    "hy": "\ue012",
-    "ny": "\ue013",
-    "my": "\ue014",
-    "ry": "\ue015",
-    # Question type markers (Issue #204)
-    "?!": "\ue016",
-    "?.": "\ue017",
-    "?~": "\ue018",
-    # N phoneme variants (Issue #207)
-    "N_m": "\ue019",
-    "N_n": "\ue01a",
-    "N_ng": "\ue01b",
-    "N_uvular": "\ue01c",
-}
+# Multi-character phoneme to PUA character mapping — derived from token_mapper
+# to guarantee consistency across the codebase.
+MULTI_CHAR_TO_PUA = {k: chr(v) for k, v in FIXED_PUA_MAPPING.items()}
 
 
 @dataclass
@@ -160,15 +129,13 @@ class PiperVoice:
             PhonemeType.BILINGUAL,
             PhonemeType.MULTILINGUAL,
         ):
-            # For MULTILINGUAL/BILINGUAL, try MultilingualPhonemizer first
+            # For MULTILINGUAL/BILINGUAL, use MultilingualPhonemizer
             if self.config.phoneme_type in (
                 PhonemeType.MULTILINGUAL,
                 PhonemeType.BILINGUAL,
             ):
                 try:
-                    from piper_train.phonemize.multilingual import (
-                        MultilingualPhonemizer,
-                    )
+                    from .phonemize.multilingual import MultilingualPhonemizer
 
                     languages = (
                         ["ja", "en"]
