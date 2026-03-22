@@ -9,51 +9,6 @@ from typing import Any
 import numpy as np
 import onnxruntime
 
-
-# Try to import piper_phonemize, but make it optional
-try:
-    from piper_phonemize import phonemize_codepoints, phonemize_espeak, tashkeel_run
-
-    HAS_PIPER_PHONEMIZE = True
-except ImportError:
-    HAS_PIPER_PHONEMIZE = False
-
-    # Provide fallback implementations
-    def phonemize_codepoints(text, lang=None):
-        # Simple fallback: return text as list of characters
-        return [list(text)]
-
-    def phonemize_espeak(text, voice=None):
-        # Try to use espeak-ng command if available
-        try:
-            from .espeak_phonemizer import phonemize_espeak_ng
-
-            return phonemize_espeak_ng(text, voice or "en-us")
-        except ImportError:
-            # Simple fallback: return text as list of characters
-            import logging
-
-            logging.warning("espeak_phonemizer not available, using character fallback")
-            return [list(text)]
-
-    def tashkeel_run(text):
-        # Simple fallback: return original text
-        return text
-
-
-# Try to import pyopenjtalk-plus first (Windows compatible), fall back to pyopenjtalk
-try:
-    import pyopenjtalk_plus as pyopenjtalk
-
-    HAS_PYOPENJTALK = True
-except ImportError:
-    try:
-        import pyopenjtalk
-
-        HAS_PYOPENJTALK = True
-    except ImportError:
-        HAS_PYOPENJTALK = False
-
 from .config import PhonemeType, PiperConfig
 from .const import BOS, EOS, PAD
 from .phonemize.token_mapper import FIXED_PUA_MAPPING
@@ -111,108 +66,37 @@ class PiperVoice:
 
     def phonemize(self, text: str) -> list[list[str]]:
         """Text to phonemes grouped by sentence."""
-        if self.config.phoneme_type == PhonemeType.ESPEAK:
-            if self.config.espeak_voice == "ar":
-                # Arabic diacritization
-                # https://github.com/mush42/libtashkeel/
-                text = tashkeel_run(text)
-
-            phonemes = phonemize_espeak(text, self.config.espeak_voice)
-            _LOGGER.debug(f"Phonemized '{text}' to: {phonemes}")
-            return phonemes
-
-        if self.config.phoneme_type == PhonemeType.TEXT:
-            return phonemize_codepoints(text)
-
         if self.config.phoneme_type in (
-            PhonemeType.OPENJTALK,
-            PhonemeType.BILINGUAL,
             PhonemeType.MULTILINGUAL,
+            PhonemeType.BILINGUAL,
         ):
-            # For MULTILINGUAL/BILINGUAL, use MultilingualPhonemizer
-            if self.config.phoneme_type in (
-                PhonemeType.MULTILINGUAL,
-                PhonemeType.BILINGUAL,
-            ):
-                try:
-                    from .phonemize.multilingual import MultilingualPhonemizer
+            from .phonemize.multilingual import MultilingualPhonemizer
 
-                    languages = (
-                        ["ja", "en"]
-                        if self.config.phoneme_type == PhonemeType.BILINGUAL
-                        else ["ja", "en", "zh", "es", "fr", "pt"]
-                    )
-                    mp = MultilingualPhonemizer(languages=languages)
-                    phonemes = mp.phonemize(text)
-                    _LOGGER.debug("MultilingualPhonemizer: '%s' -> %s", text, phonemes)
-                    return [phonemes]
-                except ImportError:
-                    _LOGGER.debug(
-                        "MultilingualPhonemizer not available, "
-                        "falling back to JA phonemizer + eSpeak"
-                    )
+            languages = (
+                ["ja", "en"]
+                if self.config.phoneme_type == PhonemeType.BILINGUAL
+                else ["ja", "en", "zh", "es", "fr", "pt"]
+            )
+            mp = MultilingualPhonemizer(languages=languages)
+            phonemes = mp.phonemize(text)
+            _LOGGER.debug("MultilingualPhonemizer: '%s' -> %s", text, phonemes)
+            return [phonemes]
 
-            # Use the local phonemization module (JA phonemizer)
-            try:
-                from .phonemize.japanese import (
-                    get_default_dictionary,
-                    phonemize_japanese,
-                )
+        if self.config.phoneme_type == PhonemeType.OPENJTALK:
+            from .phonemize.japanese import (
+                get_default_dictionary,
+                phonemize_japanese,
+            )
 
-                # Try to load default custom dictionary
-                custom_dict = get_default_dictionary()
-                _LOGGER.debug(
-                    "Using custom dictionary for phonemization"
-                    if custom_dict
-                    else "Using default phonemization without custom dictionary"
-                )
-                result = (
-                    phonemize_japanese(text, custom_dict=custom_dict)
-                    if custom_dict
-                    else phonemize_japanese(text)
-                )
-                return [result]
-            except (ImportError, RuntimeError) as e:
-                if self.config.phoneme_type in (
-                    PhonemeType.MULTILINGUAL,
-                    PhonemeType.BILINGUAL,
-                ):
-                    # Fall back to eSpeak for multilingual/bilingual models
-                    _LOGGER.warning(
-                        f"OpenJTalk unavailable, falling back to eSpeak: {e}"
-                    )
-                    return phonemize_espeak(text, "en")
-                _LOGGER.warning(f"Failed to import phonemizer: {e}")
-                return [self._phonemize_japanese_simple(text)]
+            custom_dict = get_default_dictionary()
+            result = (
+                phonemize_japanese(text, custom_dict=custom_dict)
+                if custom_dict
+                else phonemize_japanese(text)
+            )
+            return [result]
 
-        raise ValueError(f"Unexpected phoneme type: {self.config.phoneme_type}")
-
-    def _phonemize_japanese_simple(self, text: str) -> list[str]:
-        """Phonemize Japanese text without prosody marks."""
-        if not HAS_PYOPENJTALK:
-            raise RuntimeError("pyopenjtalk is required for Japanese phonemization")
-
-        # Simple phonemization without prosody marks
-        phonemes = pyopenjtalk.g2p(text)
-        tokens = phonemes.split()
-
-        # Use the local token mapper
-        try:
-            from .phonemize.token_mapper import map_sequence
-
-            return map_sequence(tokens)
-        except ImportError:
-            # Fallback to local PUA mapping
-            converted = []
-            for token in tokens:
-                if token in MULTI_CHAR_TO_PUA:
-                    converted.append(MULTI_CHAR_TO_PUA[token])
-                elif len(token) > 1:
-                    _LOGGER.warning("Multi-char token not in PUA map: %s", token)
-                    converted.append(token)
-                else:
-                    converted.append(token)
-            return converted
+        raise ValueError(f"Unsupported phoneme type: {self.config.phoneme_type}")
 
     def phonemes_to_ids(self, phonemes: list[str]) -> list[int]:
         """Phonemes to ids."""
@@ -226,9 +110,8 @@ class PiperVoice:
 
             ids.extend(id_map[phoneme])
 
-            # eSpeak, bilingual, and multilingual models use intersperse padding (PAD between phonemes).
+            # Bilingual and multilingual models use intersperse padding (PAD between phonemes).
             if self.config.phoneme_type in (
-                PhonemeType.ESPEAK,
                 PhonemeType.BILINGUAL,
                 PhonemeType.MULTILINGUAL,
             ):

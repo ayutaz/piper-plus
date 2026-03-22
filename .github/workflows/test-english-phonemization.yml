@@ -50,11 +50,13 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         cd src/python_run
-        # Install minimal dependencies for testing
         pip install onnxruntime>=1.11.0
         pip install pytest pytest-cov
-        # Install package without piper_phonemize to test fallback
+        pip install pyopenjtalk-plus g2p-en pypinyin
+        python -c "import nltk; nltk.download('averaged_perceptron_tagger_eng', quiet=True); nltk.download('cmudict', quiet=True)"
         pip install --no-deps -e .
+      env:
+        PYTHONUTF8: '1'
     
     - name: Verify espeak-ng installation
       run: |

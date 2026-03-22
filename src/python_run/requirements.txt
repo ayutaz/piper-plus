@@ -10,10 +10,3 @@ g2p-en>=2.1.0
 
 # Chinese phonemization
 pypinyin>=0.50
-
-# Phonemization library (espeak-ng based, for non-Japanese languages)
-# For Windows: use our custom build (will be provided as wheel)
-# For macOS/Linux: use the official PyPI package
-piper-phonemize>=1.0.0; sys_platform != 'win32'
-# Note: Windows users need to install piper-phonemize wheel separately
-# or it will be bundled with the Windows release

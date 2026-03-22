@@ -129,6 +129,29 @@ class CustomDictionary:
         return text
 
 
+# OpenJTalk has a buffer limit (~2700 chars). Split on sentence boundaries.
+_MAX_OPENJTALK_CHARS = 2000
+_RE_JA_SENTENCE_SPLIT = re.compile(r"(?<=[。！？\n])")
+
+
+def _split_long_text(text: str, max_chars: int = _MAX_OPENJTALK_CHARS) -> list[str]:
+    """Split text into chunks safe for OpenJTalk processing."""
+    if len(text) <= max_chars:
+        return [text]
+
+    sentences = _RE_JA_SENTENCE_SPLIT.split(text)
+    chunks: list[str] = []
+    current = ""
+    for sent in sentences:
+        if len(current) + len(sent) > max_chars and current:
+            chunks.append(current)
+            current = ""
+        current += sent
+    if current:
+        chunks.append(current)
+    return chunks
+
+
 def phonemize_japanese(
     text: str, custom_dict: CustomDictionary | None = None, prosody: bool = True
 ) -> list[str]:
@@ -150,6 +173,18 @@ def phonemize_japanese(
 
     if custom_dict:
         text = custom_dict.apply(text)
+
+    # Split long text to avoid OpenJTalk buffer overflow (~2700 char limit)
+    chunks = _split_long_text(text)
+    if len(chunks) > 1:
+        all_tokens: list[str] = []
+        for chunk in chunks:
+            chunk_tokens = phonemize_japanese(chunk, prosody=prosody)
+            # Strip BOS/EOS from intermediate chunks
+            inner = [t for t in chunk_tokens if t not in ("^", "$", "?")]
+            all_tokens.extend(inner)
+        eos = _get_question_type(text) if prosody else "$"
+        return map_sequence(["^"] + all_tokens + [eos])
 
     if not prosody:
         phoneme_str = pyopenjtalk.g2p(text)

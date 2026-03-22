@@ -91,8 +91,7 @@ class TestVoicePhonemizerIntegration:
     def mock_config(self):
         """Create a mock PiperConfig for testing"""
         config = MagicMock(spec=PiperConfig)
-        config.phoneme_type = PhonemeType.ESPEAK
-        config.espeak_voice = "en-us"
+        config.phoneme_type = PhonemeType.MULTILINGUAL
         config.sample_rate = 16000
         config.phoneme_id_map = {
             "^": [1],
@@ -112,41 +111,6 @@ class TestVoicePhonemizerIntegration:
             "ɹ": [88],
         }
         return config
-
-    def test_voice_phonemize_with_espeak_fallback(self, mock_config):
-        """Test that voice.py correctly uses espeak fallback"""
-        if PiperVoice is None:
-            pytest.skip("PiperVoice not available")
-
-        # Patch the import to simulate piper_phonemize not available
-        with patch.dict(sys.modules, {"piper_phonemize": None}):
-            # Need to reload voice module to pick up the import change
-            import importlib
-
-            import piper.voice
-
-            importlib.reload(piper.voice)
-
-            # Create a mock voice
-            voice = MagicMock()
-            voice.config = mock_config
-
-            # Manually call phonemize method
-            phonemes = piper.voice.PiperVoice.phonemize(voice, "Hello")
-
-            # Should get phonemes, not just characters
-            assert isinstance(phonemes, list)
-            assert len(phonemes) > 0
-
-            # If espeak-ng is available, should get IPA phonemes
-            if (
-                subprocess.run(
-                    ["which", "espeak-ng"], check=False, capture_output=True
-                ).returncode
-                == 0
-            ):
-                phoneme_str = "".join(phonemes[0])
-                assert any(char in phoneme_str for char in ["ə", "ˈ", "ʊ", "ɜ"])
 
     def test_phonemes_to_ids_with_ipa(self, mock_config):
         """Test conversion of IPA phonemes to IDs"""

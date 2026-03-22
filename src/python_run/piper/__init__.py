@@ -1,14 +1,18 @@
-from pathlib import Path
+from importlib.metadata import PackageNotFoundError, version
 
 from .voice import PiperVoice
 
 
-# Read version from VERSION file
-_VERSION_FILE = Path(__file__).parent.parent.parent.parent / "VERSION"
-if _VERSION_FILE.exists():
-    __version__ = _VERSION_FILE.read_text().strip()
-else:
-    __version__ = "unknown"
+try:
+    __version__ = version("piper-tts-plus")
+except PackageNotFoundError:
+    # Fallback for development (running from source tree)
+    from pathlib import Path
+
+    _VERSION_FILE = Path(__file__).parent.parent.parent.parent / "VERSION"
+    __version__ = (
+        _VERSION_FILE.read_text().strip() if _VERSION_FILE.exists() else "unknown"
+    )
 
 __all__ = [
     "PiperVoice",
