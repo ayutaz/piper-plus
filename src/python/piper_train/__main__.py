@@ -3,6 +3,7 @@ import json
 import logging
 import pathlib
 import platform
+import sys
 from pathlib import Path
 
 import torch
@@ -10,6 +11,7 @@ from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import TensorBoardLogger
 from pytorch_lightning.strategies import DDPStrategy
+from torch import nn
 
 from .vits.ema import EMACallback
 from .vits.lightning import VitsModel
@@ -224,10 +226,25 @@ def create_parser():
     )
     parser.add_argument(
         "--freeze-dp",
-        action="store_true",
+        action=argparse.BooleanOptionalAction,
         default=False,
         help="Freeze Duration Predictor parameters during training. "
-        "Use for fine-tuning to prevent duration prediction degradation.",
+        "Use for fine-tuning to prevent duration prediction degradation. "
+        "Use --no-freeze-dp to override auto-enable with --resume-from-multispeaker-checkpoint.",
+    )
+    parser.add_argument(
+        "--keep-emb-g",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Keep a frozen single-speaker emb_g (mean-initialized) during multispeaker transfer. "
+        "Preserves conditioning distribution for Duration Predictor. Default: enabled.",
+    )
+    parser.add_argument(
+        "--dp-lr",
+        type=float,
+        default=None,
+        help="Separate learning rate for Duration Predictor. "
+        "Default: None (uses base_lr). Recommended for VITS2 FT: base_lr * 5.",
     )
     # LR scheduler options
     parser.add_argument(
@@ -487,22 +504,30 @@ def main():
         dict_args["upsample_initial_channel"] = 512
         dict_args["upsample_kernel_sizes"] = (16, 16, 4, 4)
 
-    # マルチスピーカーまたは多言語モデルの場合、gin_channelsを256に設定（VITS2最適化）
+    # マルチスピーカーまたは多言語モデルの場合、gin_channelsを512に設定
+    # gin_channels=256ではFT時に滑舌・ノイズ劣化が発生するため512を採用
     # argparseは常にdefault値(0)をdict_argsに含めるため、値チェック
     if (num_speakers > 1 or num_languages > 1) and dict_args.get(
         "gin_channels", 0
     ) == 0:
-        dict_args["gin_channels"] = 256
+        dict_args["gin_channels"] = 512
 
     # --resume-from-multispeaker-checkpoint 使用時は freeze_dp を自動有効化
     # モデル作成前に設定しないと save_hyperparameters() に反映されず
     # configure_optimizers() で freeze_dp=False のまま DP が凍結されない
+    # --no-freeze-dp が明示指定された場合はスキップ
+    no_freeze_dp_explicit = "--no-freeze-dp" in sys.argv
     if args.resume_from_multispeaker_checkpoint and not args.freeze_dp:
-        args.freeze_dp = True
-        dict_args["freeze_dp"] = True
-        _LOGGER.info(
-            "Auto-enabled --freeze-dp for multispeaker→single-speaker transfer"
-        )
+        if no_freeze_dp_explicit:
+            _LOGGER.info(
+                "Skipping auto --freeze-dp: --no-freeze-dp explicitly specified"
+            )
+        else:
+            args.freeze_dp = True
+            dict_args["freeze_dp"] = True
+            _LOGGER.info(
+                "Auto-enabled --freeze-dp for multispeaker→single-speaker transfer"
+            )
 
     # num_workers自動調整機能を削除
     # ユーザー指定のnum_workersをそのまま使用する
@@ -534,6 +559,9 @@ def main():
 
     # Pass max_epochs to VitsModel for CosineAnnealingLR T_max
     dict_args["max_epochs"] = args.max_epochs
+
+    # Pass dp_lr to VitsModel for differential Duration Predictor learning rate
+    dict_args["dp_lr"] = args.dp_lr
 
     model = VitsModel(
         num_symbols=num_symbols,
@@ -603,6 +631,74 @@ def main():
             map_location="cpu",
             weights_only=False,
         )
+
+        # Pre-compute emb_g_mean from checkpoint before loading.
+        # Use language-specific speaker mean when possible (e.g., JA speakers
+        # for JA fine-tuning) to preserve target language characteristics.
+        # Falls back to all-speaker mean if language info unavailable.
+        saved_sd = checkpoint["state_dict"]
+        emb_g_weight = saved_sd.get("model_g.emb_g.weight")
+        emb_g_mean = None
+        if emb_g_weight is not None:
+            # Try to find target language speakers from the base dataset.
+            # The base dataset path is stored in the checkpoint's hyper_parameters.
+            target_speaker_ids = None
+            base_hp = checkpoint.get("hyper_parameters", {})
+            base_dataset_dir = base_hp.get("dataset_dir")
+            base_dataset_jsonl = (
+                Path(base_dataset_dir) / "dataset.jsonl"
+                if base_dataset_dir
+                else None
+            )
+            if base_dataset_jsonl and not base_dataset_jsonl.exists():
+                base_dataset_jsonl = None
+
+            ft_dataset_jsonl = Path(args.dataset_dir) / "dataset.jsonl"
+            if ft_dataset_jsonl.exists() and base_dataset_jsonl and base_dataset_jsonl.exists():
+                try:
+                    # Get the primary language_id from FT dataset (first utterance)
+                    target_lid = 0  # default
+                    with open(ft_dataset_jsonl) as f:
+                        first_line = json.loads(f.readline())
+                        target_lid = first_line.get("language_id", 0)
+
+                    # Scan base dataset for speakers of target language
+                    speaker_ids_for_lang = set()
+                    with open(base_dataset_jsonl) as f:
+                        for line in f:
+                            d = json.loads(line)
+                            if d.get("language_id") == target_lid:
+                                sid = d.get("speaker_id")
+                                if sid is not None:
+                                    speaker_ids_for_lang.add(sid)
+
+                    if speaker_ids_for_lang:
+                        target_speaker_ids = sorted(speaker_ids_for_lang)
+                        _LOGGER.info(
+                            "Found %d speakers for language_id=%d in base dataset",
+                            len(target_speaker_ids),
+                            target_lid,
+                        )
+                except Exception as e:
+                    _LOGGER.debug("Could not determine language-specific speakers: %s", e)
+
+            if target_speaker_ids and len(target_speaker_ids) < emb_g_weight.size(0):
+                idx = torch.tensor(target_speaker_ids, dtype=torch.long)
+                emb_g_mean = emb_g_weight[idx].mean(dim=0)
+                _LOGGER.info(
+                    "emb_g mean norm: %.4f (from %d language-matched speakers out of %d total)",
+                    emb_g_mean.norm().item(),
+                    len(target_speaker_ids),
+                    emb_g_weight.size(0),
+                )
+            else:
+                emb_g_mean = emb_g_weight.mean(dim=0)
+                _LOGGER.info(
+                    "emb_g mean norm: %.4f (from all %d speakers)",
+                    emb_g_mean.norm().item(),
+                    emb_g_weight.size(0),
+                )
+
         missing, unexpected = model.load_state_dict(
             checkpoint["state_dict"], strict=False
         )
@@ -612,13 +708,52 @@ def main():
             unexpected,
         )
 
-        # 2. emb_g 平均を emb_lang に加算（conditioning 分布補正）
-        #    emb_g は平均ノルム ~0.68 でほぼゼロ中心のため影響は軽微だが、
-        #    conceptual correctness のため実施する。
-        saved_sd = checkpoint["state_dict"]
-        emb_g_weight = saved_sd.get("model_g.emb_g.weight")
-        if emb_g_weight is not None and hasattr(model.model_g, "emb_lang"):
-            emb_g_mean = emb_g_weight.mean(dim=0)  # [gin_channels]
+        keep_emb_g = getattr(args, "keep_emb_g", True)
+        if keep_emb_g and emb_g_mean is not None:
+            # --keep-emb-g: Keep a frozen single-speaker emb_g (mean-initialized)
+            # This preserves the conditioning distribution that the Duration Predictor
+            # and other gin_channels-conditioned layers expect.
+            gin_channels = model.model_g.gin_channels
+
+            # Add emb_g to the model (it was not created since num_speakers=1)
+            model.model_g.emb_g = nn.Embedding(1, gin_channels)
+            with torch.no_grad():
+                model.model_g.emb_g.weight.copy_(emb_g_mean.unsqueeze(0))
+
+            # Freeze emb_g so it acts as a fixed conditioning bias
+            model.model_g.emb_g.weight.requires_grad = False
+
+            # Set n_speakers=2 so _get_global_conditioning uses emb_g
+            # (the condition is `self.n_speakers > 1 and sid is not None`)
+            model.model_g.n_speakers = 2
+
+            # Monkey-patch _get_global_conditioning to inject sid=0 when sid is None.
+            # The collate produces speaker_ids=None for single-speaker datasets,
+            # but we need emb_g(0) to be included in the conditioning vector.
+            _original_get_g = model.model_g._get_global_conditioning
+
+            def _patched_get_global_conditioning(sid=None, lid=None):
+                if sid is None and hasattr(model.model_g, "emb_g"):
+                    # Create sid=0 tensor matching the batch size from lid
+                    if lid is not None:
+                        batch_size = lid.size(0)
+                        device = lid.device
+                    else:
+                        batch_size = 1
+                        device = model.model_g.emb_g.weight.device
+                    sid = torch.zeros(batch_size, dtype=torch.long, device=device)
+                return _original_get_g(sid=sid, lid=lid)
+
+            model.model_g._get_global_conditioning = _patched_get_global_conditioning
+
+            # Skip emb_g_mean -> emb_lang correction (no longer needed since emb_g exists)
+            _LOGGER.info(
+                "Keeping frozen emb_g (1 speaker, mean-initialized) for conditioning preservation"
+            )
+        elif emb_g_mean is not None and hasattr(model.model_g, "emb_lang"):
+            # --no-keep-emb-g: Legacy behavior - add emb_g_mean to emb_lang
+            # emb_g は平均ノルム ~0.68 でほぼゼロ中心のため影響は軽微だが、
+            # conceptual correctness のため実施する。
             _LOGGER.info(
                 "emb_g mean norm: %.4f → adding to all emb_lang rows for conditioning correction",
                 emb_g_mean.norm().item(),
@@ -631,15 +766,14 @@ def main():
                 "emb_g not found in checkpoint or model has no emb_lang; skipping conditioning correction."
             )
 
-        # 3. All emb_lang rows are preserved with emb_g_mean correction.
-        #    Previously emb_lang[0] (JA) was copied to emb_lang[1] (EN), but this
-        #    caused the frozen Duration Predictor to lose EN conditioning, breaking
-        #    English duration prediction. Keeping original embeddings + correction
-        #    lets the DP predict correct duration patterns for all languages.
+        # All emb_lang rows are preserved (with either frozen emb_g or emb_g_mean correction).
+        # Previously emb_lang[0] (JA) was copied to emb_lang[1] (EN), but this
+        # caused the frozen Duration Predictor to lose EN conditioning, breaking
+        # English duration prediction. Keeping original embeddings lets the DP
+        # predict correct duration patterns for all languages.
         if hasattr(model.model_g, "emb_lang") and model.model_g.n_languages > 1:
             _LOGGER.info(
-                "All emb_lang rows preserved with emb_g_mean correction "
-                "for correct duration prediction across languages."
+                "All emb_lang rows preserved for correct duration prediction across languages."
             )
 
         _LOGGER.info(

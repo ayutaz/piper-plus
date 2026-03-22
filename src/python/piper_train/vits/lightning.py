@@ -938,22 +938,59 @@ class VitsModel(pl.LightningModule):
             )
 
         # Generator optimizer: only trainable parameters
-        gen_params = [p for p in self.model_g.parameters() if p.requires_grad]
+        # Support differential LR for Duration Predictor (--dp-lr)
+        dp_lr = getattr(self.hparams, "dp_lr", None)
+
+        use_fused = torch.cuda.is_available()
+
+        if dp_lr is not None:
+            # Split generator params into DP and non-DP groups
+            dp_params = []
+            other_params = []
+            for name, param in self.model_g.named_parameters():
+                if not param.requires_grad:
+                    continue
+                if name.startswith("dp."):
+                    dp_params.append(param)
+                else:
+                    other_params.append(param)
+
+            _LOGGER.info(
+                "Using differential LR: DP=%g (%d params), others=%g (%d params)",
+                dp_lr,
+                len(dp_params),
+                self.hparams.learning_rate,
+                len(other_params),
+            )
+
+            opt_g = torch.optim.AdamW(
+                [
+                    {"params": other_params, "lr": self.hparams.learning_rate},
+                    {"params": dp_params, "lr": dp_lr},
+                ],
+                betas=self.hparams.betas,
+                eps=self.hparams.eps,
+                fused=use_fused,
+            )
+        else:
+            gen_params = [
+                p for p in self.model_g.parameters() if p.requires_grad
+            ]
+            opt_g = torch.optim.AdamW(
+                gen_params,
+                lr=self.hparams.learning_rate,
+                betas=self.hparams.betas,
+                eps=self.hparams.eps,
+                fused=use_fused,
+            )
 
         # Collect discriminator parameters (including WavLM if enabled)
         d_params = list(self.model_d.parameters())
         if self.model_d_wavlm is not None:
             d_params = d_params + list(self.model_d_wavlm.parameters())
 
-        use_fused = torch.cuda.is_available()
         optimizers = [
-            torch.optim.AdamW(
-                gen_params,
-                lr=self.hparams.learning_rate,
-                betas=self.hparams.betas,
-                eps=self.hparams.eps,
-                fused=use_fused,
-            ),
+            opt_g,
             torch.optim.AdamW(
                 d_params,
                 lr=self.hparams.learning_rate,
