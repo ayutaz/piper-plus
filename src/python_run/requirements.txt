@@ -10,7 +10,3 @@ g2p-en>=2.1.0
 
 # Chinese phonemization
 pypinyin>=0.50
-
-# Note: piper-phonemize (espeak-ng based) is optional.
-# Install with: pip install piper-tts-plus[espeak]
-# Required only for PhonemeType.ESPEAK models (not needed for multilingual/JA models).
