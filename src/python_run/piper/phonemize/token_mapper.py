@@ -30,6 +30,15 @@ FIXED_PUA_MAPPING = {
     "ny": 0xE013,
     "my": 0xE014,
     "ry": 0xE015,
+    # Question type markers (Issue #204)
+    "?!": 0xE016,  # Emphatic question
+    "?.": 0xE017,  # Neutral/rhetorical question
+    "?~": 0xE018,  # Tag question
+    # N phoneme variants (Issue #207)
+    "N_m": 0xE019,  # before m/b/p (bilabial)
+    "N_n": 0xE01A,  # before n/t/d/ts/ch (alveolar)
+    "N_ng": 0xE01B,  # before k/g (velar)
+    "N_uvular": 0xE01C,  # at end or before vowels
 }
 
 # Build bidirectional mappings

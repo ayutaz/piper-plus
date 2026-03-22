@@ -41,13 +41,18 @@ except ImportError:
         return text
 
 
-# Try to import pyopenjtalk, but make it optional
+# Try to import pyopenjtalk-plus first (Windows compatible), fall back to pyopenjtalk
 try:
-    import pyopenjtalk
+    import pyopenjtalk_plus as pyopenjtalk
 
     HAS_PYOPENJTALK = True
 except ImportError:
-    HAS_PYOPENJTALK = False
+    try:
+        import pyopenjtalk
+
+        HAS_PYOPENJTALK = True
+    except ImportError:
+        HAS_PYOPENJTALK = False
 
 from .config import PhonemeType, PiperConfig
 from .const import BOS, EOS, PAD
@@ -81,6 +86,15 @@ MULTI_CHAR_TO_PUA = {
     "ny": "\ue013",
     "my": "\ue014",
     "ry": "\ue015",
+    # Question type markers (Issue #204)
+    "?!": "\ue016",
+    "?.": "\ue017",
+    "?~": "\ue018",
+    # N phoneme variants (Issue #207)
+    "N_m": "\ue019",
+    "N_n": "\ue01a",
+    "N_ng": "\ue01b",
+    "N_uvular": "\ue01c",
 }
 
 

@@ -2,7 +2,10 @@
 onnxruntime>=1.11.0
 numpy>=1.24.0,<3.0
 
-# Phonemization library
+# Japanese phonemization (cross-platform, no espeak-ng dependency)
+pyopenjtalk-plus>=0.4
+
+# Phonemization library (espeak-ng based, for non-Japanese languages)
 # For Windows: use our custom build (will be provided as wheel)
 # For macOS/Linux: use the official PyPI package
 piper-phonemize>=1.0.0; sys_platform != 'win32'
