@@ -458,11 +458,6 @@ jobs:
             archive_ext: tar.gz
             cross: false
           - os: macos-14
-            target: x86_64-apple-darwin
-            artifact: piper-plus-rs-cli-osx-x64
-            archive_ext: tar.gz
-            cross: false
-          - os: macos-14
             target: aarch64-apple-darwin
             artifact: piper-plus-rs-cli-osx-arm64
             archive_ext: tar.gz

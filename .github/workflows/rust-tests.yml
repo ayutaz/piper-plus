@@ -129,10 +129,6 @@ jobs:
             target: aarch64-apple-darwin
             artifact: piper-plus-rs-cli-osx-arm64
             archive_ext: tar.gz
-          - os: macos-latest
-            target: x86_64-apple-darwin
-            artifact: piper-plus-rs-cli-osx-x64
-            archive_ext: tar.gz
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             artifact: piper-plus-rs-cli-win-x64
