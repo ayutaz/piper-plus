@@ -17,6 +17,9 @@ SPECIAL_TOKENS: list[str] = [
     "^",  # BOS
     "$",  # EOS (declarative)
     "?",  # EOS (interrogative)
+    "?!",  # EOS (emphatic question)
+    "?.",  # EOS (neutral/rhetorical question)
+    "?~",  # EOS (tag question)
     "#",  # accent phrase boundary
     "[",  # rising pitch mark (accent phrase head)
     "]",  # falling pitch mark (accent nucleus)
@@ -45,7 +48,11 @@ JAPANESE_PHONEMES: list[str] = [
     "e:",
     "o:",
     # special consonant-centric phonemes
-    "N",  # 撥音 (ん)
+    "N",  # 撥音 (ん) — generic, used when N-variant rules are disabled
+    "N_m",  # ん before m/b/p (bilabial)
+    "N_n",  # ん before n/t/d/ts/ch (alveolar)
+    "N_ng",  # ん before k/g (velar)
+    "N_uvular",  # ん at end or before vowels
     "cl",  # 促音 / 終止閉鎖
     "q",  # 促音 (alternate label)
     # plosives + voiced counterparts

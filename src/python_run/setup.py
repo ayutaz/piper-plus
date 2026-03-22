@@ -24,7 +24,11 @@ requirements = []
 requirements_path = this_dir / "requirements.txt"
 if requirements_path.is_file():
     with open(requirements_path, encoding="utf-8") as requirements_file:
-        requirements = requirements_file.read().splitlines()
+        requirements = [
+            line.strip()
+            for line in requirements_file
+            if line.strip() and not line.strip().startswith("#")
+        ]
 
 # README.md を PyPI 用の長い説明として読み込む
 long_description = ""
@@ -58,7 +62,11 @@ setup(
     },
     install_requires=requirements,
     python_requires=">=3.11",
-    extras_require={"gpu": ["onnxruntime-gpu>=1.11.0,<2"], "http": ["flask>=3,<4"]},
+    extras_require={
+        "gpu": ["onnxruntime-gpu>=1.11.0,<2"],
+        "http": ["flask>=3,<4"],
+        "espeak": ["piper-phonemize>=1.0.0"],
+    },
     classifiers=[
         "Development Status :: 3 - Alpha",
         "Intended Audience :: Developers",
