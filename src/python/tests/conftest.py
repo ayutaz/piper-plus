@@ -364,7 +364,11 @@ def temp_onnx_model_unified_emb_lang(mock_vits_model_multilingual, tmp_path_fact
         model.dp.onnx_export_mode = True
 
     def infer_forward(
-        input_tensor, input_lengths, scales_tensor, sid_tensor, lid_tensor,
+        input_tensor,
+        input_lengths,
+        scales_tensor,
+        sid_tensor,
+        lid_tensor,
         prosody_features_tensor,
     ):
         length_scale = scales_tensor[1]
@@ -373,7 +377,9 @@ def temp_onnx_model_unified_emb_lang(mock_vits_model_multilingual, tmp_path_fact
         g = model._get_global_conditioning(sid_tensor, lid_tensor)
         x, m_p, logs_p, x_mask = model.enc_p(input_tensor, input_lengths, g=g)
 
-        x_dp = model._prepare_prosody_input(x, x_mask, prosody_features_tensor, lid=lid_tensor)
+        x_dp = model._prepare_prosody_input(
+            x, x_mask, prosody_features_tensor, lid=lid_tensor
+        )
         if model.use_sdp:
             logw = model.dp(x_dp, x_mask, g=g, reverse=True, noise_scale=noise_scale_w)
         else:
@@ -408,7 +414,14 @@ def temp_onnx_model_unified_emb_lang(mock_vits_model_multilingual, tmp_path_fact
             (sequences, sequence_lengths, scales, sid, lid, prosody_features),
             str(onnx_path),
             opset_version=15,
-            input_names=["input", "input_lengths", "scales", "sid", "lid", "prosody_features"],
+            input_names=[
+                "input",
+                "input_lengths",
+                "scales",
+                "sid",
+                "lid",
+                "prosody_features",
+            ],
             output_names=["output", "durations"],
             dynamic_axes={
                 "input": {0: "batch_size", 1: "phonemes"},

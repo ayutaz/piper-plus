@@ -190,7 +190,10 @@ def main() -> None:
             num_languages,
         )
     elif should_unify and num_languages <= 1:
-        _LOGGER.info("Skipping emb_lang unification: model has only %d language(s)", num_languages)
+        _LOGGER.info(
+            "Skipping emb_lang unification: model has only %d language(s)",
+            num_languages,
+        )
 
     # Apply EMA weights to decoder if available (always applied when present)
     # IMPORTANT: EMA must be applied BEFORE remove_weight_norm(), because EMA shadow
