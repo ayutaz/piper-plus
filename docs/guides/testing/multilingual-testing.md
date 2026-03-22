@@ -99,7 +99,7 @@ Note: Chinese (zh_CN) tests are skipped on Windows due to phonemizer limitations
 
 ## C# Tests (PiperPlus.Core.Tests)
 
-The C# implementation has 721 tests using xUnit v3 in the `PiperPlus.Core.Tests` project. These tests cover:
+The C# implementation has 829 tests using xUnit v3 in the `PiperPlus.Core.Tests` project. These tests cover:
 
 - All 6 language phonemizers (Japanese, English, Chinese, Spanish, Portuguese, French)
 - `PostProcessIds` logic

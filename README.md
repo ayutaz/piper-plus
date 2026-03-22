@@ -36,7 +36,7 @@
 - **6言語対応** — 日本語・英語・中国語・スペイン語・フランス語・ポルトガル語 (ja=0, en=1, zh=2, es=3, fr=4, pt=5)
 - **日本語 TTS** — OpenJTalk統合、韻律情報 (A1/A2/A3)、疑問詞マーカー (#204)、文脈依存「ん」バリアント (#207)
 - **英語 TTS** — GPL-free G2P ([g2p-en](https://github.com/Kyubyong/g2p), Apache-2.0)、espeak-ng 不要
-- **マルチスピーカー** — 571話者対応 (6言語ベースモデル)、SpeakerBalancedBatchSampler、言語グループ均等サンプリング
+- **マルチスピーカー** — 571話者対応 (学習用ベースモデル)、SpeakerBalancedBatchSampler、言語グループ均等サンプリング
 - **カスタム辞書** — 200+技術用語の発音辞書内蔵
 - **音素入力** — `[[ phonemes ]]` 記法による直接指定 — [ガイド](docs/features/phoneme-input.md)
 
@@ -294,39 +294,60 @@ dotnet test src/csharp/PiperPlus.Core.Tests/
 #### C# CLI 使用例
 
 ```bash
-# 日本語
-piper-plus --model model.onnx --text "こんにちは" --language ja --output-file output.wav
+# モデル名で推論 (自動ダウンロード対応、--output-file 省略で output.wav に出力)
+piper-plus --model tsukuyomi --text "こんにちは" --language ja
 
 # 英語
-piper-plus --model model.onnx --text "Hello world" --language en --output-file output.wav
+piper-plus --model model.onnx --text "Hello world" --language en
 
 # マルチリンガル (自動言語検出)
-piper-plus --model model.onnx --text "こんにちはHello你好" --language ja-en-zh --output-file output.wav
+piper-plus --model model.onnx --text "こんにちはHello你好" --language ja-en-zh
+
+# インライン音素記法 (テキスト中に直接音素を指定)
+piper-plus --model model.onnx --text "Hello [[ h ə l oʊ ]] world" --language en
 
 # ストリーミング (文ごとに逐次PCM出力)
 piper-plus --model model.onnx --text "最初の文。次の文。" --language ja --streaming | aplay -r 22050 -f S16_LE
 
 # カスタム辞書 (JSON v1/v2 または TSV)
-piper-plus --model model.onnx --text "AI技術" --language ja --custom-dict my_dict.json --output-file output.wav
+piper-plus --model model.onnx --text "AI技術" --language ja --custom-dict my_dict.json
+
+# モデルダウンロード
+piper-plus --download-model tsukuyomi
+piper-plus --list-models ja
+
+# テストモード (ONNX推論なしで phoneme IDs を確認)
+piper-plus --model model.onnx --test-mode --text "こんにちは" --language ja
 ```
 
 #### Rust CLI 使用例
 
 ```bash
-# 日本語 (naist-jdic辞書バンドル済み)
-piper-plus-cli --model model.onnx --text "こんにちは" --language ja --output-file output.wav
+# モデル名で推論 (自動ダウンロード対応)
+piper-plus-cli --model tsukuyomi --text "こんにちは" --language ja
 
 # 英語
-piper-plus-cli --model model.onnx --text "Hello world" --language en --output-file output.wav
+piper-plus-cli --model model.onnx --text "Hello world" --language en
+
+# モデルダウンロード・管理
+piper-plus-cli --download-model tsukuyomi
+piper-plus-cli --list-models ja
 
 # ストリーミング (文ごとに逐次合成)
 piper-plus-cli --model model.onnx --text "First sentence. Second sentence." --stream --output-dir chunks/
 
 # カスタム辞書
-piper-plus-cli --model model.onnx --text "AI技術" --custom-dict my_dict.json --output-file output.wav
+piper-plus-cli --model model.onnx --text "AI技術" --custom-dict my_dict.json
 
 # GPU推論
-piper-plus-cli --model model.onnx --text "Hello" --device cuda --output-file output.wav
+piper-plus-cli --model model.onnx --text "Hello" --device cuda
+
+# テストモード・静音モード
+piper-plus-cli --model model.onnx --test-mode --text "hello" --language en
+piper-plus-cli --model model.onnx --text "hello" --language en --quiet
+
+# raw PCM出力 (WAVヘッダなし)
+piper-plus-cli --model model.onnx --text "hello" --language en --output-raw | aplay -r 22050 -f S16_LE
 ```
 
 > **Note:** C# CLI は `dotnet tool install -g PiperPlus.Cli` で、Rust CLI は `cargo install piper-plus-cli` でインストールできます。両方とも6言語対応・カスタム辞書・ストリーミングをサポートしています。
@@ -554,12 +575,20 @@ CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
 
 ## 事前学習済みモデル
 
-日本語TTSのファインチューニング用ベースモデルを Hugging Face で公開しています。
+推論用の音声合成モデルを Hugging Face で公開しています。
+
+**推論用モデル (すぐに使えます):**
 
 | モデル | 言語 | 話者数 | 説明 | ダウンロード |
 |---|---|---|---|---|
-| 6言語ベースモデル | JA/EN/ZH/ES/FR/PT | 571 | 6言語マルチリンガルベースモデル (508,187発話, VITS + Prosody) | [HuggingFace](https://huggingface.co/ayousanz/piper-plus-base) |
-| つくよみちゃん 6lang | JA/EN/ZH/ES/FR/PT | 1 | 6言語ベースからファインチューニング、6言語対応、FP16 | [HuggingFace](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan) |
+| つくよみちゃん 6lang | JA/EN/ZH/ES/FR/PT | 1 | つくよみちゃん音声、6言語対応、FP16 | [HuggingFace](https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan) |
+| CSS10 日本語 6lang | JA/EN/ZH/ES/FR/PT | 1 | CSS10日本語音声、6言語対応、FP16 | [HuggingFace](https://huggingface.co/ayousanz/piper-plus-css10-ja-6lang) |
+
+**学習用ベースモデル (ファインチューニング用):**
+
+| モデル | 言語 | 話者数 | 説明 | ダウンロード |
+|---|---|---|---|---|
+| 6言語ベースモデル | JA/EN/ZH/ES/FR/PT | 571 | マルチリンガル事前学習済み (508,187発話, VITS + Prosody) | [HuggingFace](https://huggingface.co/ayousanz/piper-plus-base) |
 
 ### モデルのダウンロード
 
@@ -581,7 +610,7 @@ curl -L -o models/tsukuyomi.onnx https://huggingface.co/ayousanz/piper-plus-tsuk
 curl -L -o models/config.json https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/config.json
 ```
 
-### 6言語ベースモデルの特徴
+### 6言語ベースモデルの特徴 (学習用)
 
 - アーキテクチャ: VITS + Prosody Features
 - 学習データ: 508,187発話 (571話者, 6言語)
@@ -601,7 +630,7 @@ curl -L -o models/config.json https://huggingface.co/ayousanz/piper-plus-tsukuyo
 | フランス語 | fr | 4 | 28 | 107,464 | CML-TTS |
 | ポルトガル語 | pt | 5 | 8 | 34,066 | CML-TTS |
 
-upstream Piper のチェックポイントも利用可能: [piper-checkpoints](https://huggingface.co/datasets/rhasspy/piper-checkpoints/tree/main)
+> **Note:** piper-plus は独自のアーキテクチャ拡張 (多言語埋め込み、Prosody A1/A2/A3、173シンボル) を行っているため、upstream Piper のチェックポイント/ONNXモデルとの互換性はありません。piper-plus 専用のモデルをご利用ください。
 
 ---
 
@@ -698,5 +727,3 @@ upstream Piper の音声モデル (30+言語) も利用可能: [piper-voices](ht
 ## Changelog
 
 [CHANGELOG.md](CHANGELOG.md) を参照。
-
-[![A library from the Open Home Foundation](https://www.openhomefoundation.org/badges/ohf-library.png)](https://www.openhomefoundation.org/)

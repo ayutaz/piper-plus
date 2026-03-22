@@ -35,11 +35,16 @@ lightning_logs/
 *.claude/
 settings.local.json
 
+# Generated audio files
+*.wav
+!test/**/*.wav
+
 # Test artifacts
 test_piper/
 test_build/
 test_windows_build/
 test_results/
+test_ci_binaries/
 build_log.zip
 # Root test files (should be in src/cpp/tests or src/python/tests)
 /test_*.cpp
@@ -48,6 +53,10 @@ build_log.zip
 /test_*.sh
 /test_*
 !test/
+
+# Package build artifacts
+nupkgs/
+publish_test/
 # Test logs
 *.log
 

@@ -125,12 +125,23 @@ jobs:
           
           echo "### 📦 Installation" >> $GITHUB_OUTPUT
           echo "\`\`\`bash" >> $GITHUB_OUTPUT
+          echo "# Python" >> $GITHUB_OUTPUT
           echo "pip install piper-tts-plus==${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          echo "" >> $GITHUB_OUTPUT
+          echo "# C# (.NET Global Tool) — v0.1.0" >> $GITHUB_OUTPUT
+          echo "dotnet tool install -g PiperPlus.Cli --version 0.1.0" >> $GITHUB_OUTPUT
+          echo "" >> $GITHUB_OUTPUT
+          echo "# Rust — v0.1.0" >> $GITHUB_OUTPUT
+          echo "cargo install piper-plus-cli --version 0.1.0" >> $GITHUB_OUTPUT
           echo "\`\`\`" >> $GITHUB_OUTPUT
           echo "" >> $GITHUB_OUTPUT
-          
+
           echo "### 🔗 Links" >> $GITHUB_OUTPUT
           echo "- [PyPI Package](https://pypi.org/project/piper-tts-plus/${{ github.event.inputs.version }}/)" >> $GITHUB_OUTPUT
+          echo "- [NuGet Package (CLI)](https://www.nuget.org/packages/PiperPlus.Cli)" >> $GITHUB_OUTPUT
+          echo "- [NuGet Package (Core)](https://www.nuget.org/packages/PiperPlus.Core)" >> $GITHUB_OUTPUT
+          echo "- [crates.io Package (CLI)](https://crates.io/crates/piper-plus-cli)" >> $GITHUB_OUTPUT
+          echo "- [crates.io Package (Core)](https://crates.io/crates/piper-plus)" >> $GITHUB_OUTPUT
           echo "- [Documentation](https://github.com/ayutaz/piper-plus#readme)" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
@@ -288,7 +299,7 @@ jobs:
         run: |
           PUBLISH_ARGS="-c Release -r ${{ matrix.rid }} --self-contained true"
           PUBLISH_ARGS="$PUBLISH_ARGS -p:PublishSingleFile=true -p:PublishTrimmed=true"
-          PUBLISH_ARGS="$PUBLISH_ARGS -p:Version=${{ github.event.inputs.version }}"
+          # C# CLI uses its own version from csproj (independent from PyPI version)
 
           if [ "${{ matrix.cross }}" = "true" ]; then
             PUBLISH_ARGS="$PUBLISH_ARGS -p:PublishReadyToRun=false"
@@ -337,11 +348,11 @@ jobs:
 
       - name: Pack NuGet packages
         run: |
-          VERSION="${{ github.event.inputs.version }}"
+          # NuGet packages use their own version from csproj (independent from PyPI version)
           dotnet pack src/csharp/PiperPlus.Core/PiperPlus.Core.csproj \
-            -c Release -p:Version="$VERSION" -o nupkgs/
+            -c Release -o nupkgs/
           dotnet pack src/csharp/PiperPlus.Cli/PiperPlus.Cli.csproj \
-            -c Release -p:Version="$VERSION" -o nupkgs/
+            -c Release -o nupkgs/
           echo "Packages created:"
           ls -lh nupkgs/
 
