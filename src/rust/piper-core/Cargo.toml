@@ -24,7 +24,7 @@ directml = []
 tensorrt = []
 
 [dependencies]
-ort = { version = "2.0.0-rc.12", default-features = false, features = ["std", "ndarray", "tracing", "download-binaries", "tls-rustls", "copy-dylibs"] }
+ort = { version = "2.0.0-rc.12", default-features = false, features = ["std", "ndarray", "tracing", "download-binaries", "tls-rustls", "copy-dylibs", "api-24"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "2"
