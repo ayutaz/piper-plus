@@ -7,8 +7,6 @@ from typing import Any
 
 
 class PhonemeType(str, Enum):
-    ESPEAK = "espeak"
-    TEXT = "text"
     OPENJTALK = "openjtalk"
     BILINGUAL = "bilingual"
     MULTILINGUAL = "multilingual"
@@ -59,7 +57,7 @@ class PiperConfig:
             noise_w=inference.get("noise_w", 0.8),
             espeak_voice=config.get("espeak", {}).get("voice", ""),
             phoneme_id_map=config["phoneme_id_map"],
-            phoneme_type=PhonemeType(config.get("phoneme_type", PhonemeType.ESPEAK)),
+            phoneme_type=PhonemeType(config.get("phoneme_type", "multilingual")),
             num_languages=config.get("num_languages", 1),
             language_id_map=config.get("language_id_map"),
         )

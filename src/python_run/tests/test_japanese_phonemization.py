@@ -296,35 +296,25 @@ class TestJapanesePhonemizerModule:
 class TestVoiceIntegration:
     """Test integration with voice.py"""
 
-    @patch('piper.voice.HAS_PYOPENJTALK', False)
     def test_voice_imports_phonemize_module(self):
         """Test that voice.py can import the phonemize module"""
-        # This tests the actual import path
-        try:
-            from piper.config import PhonemeType
-            from piper.voice import PiperVoice
+        from piper.config import PhonemeType
+        from piper.voice import PiperVoice
 
-            # Create mock config for Japanese
-            mock_config = MagicMock()
-            mock_config.phoneme_type = PhonemeType.OPENJTALK
+        # Create mock config for Japanese
+        mock_config = MagicMock()
+        mock_config.phoneme_type = PhonemeType.OPENJTALK
 
-            # Create mock voice
-            voice = MagicMock()
-            voice.config = mock_config
+        # Create mock voice
+        voice = MagicMock()
+        voice.config = mock_config
 
-            # Test that phonemize method can access the module
-            with patch('piper.phonemize.japanese.phonemize_japanese') as mock_phonemize:
-                mock_phonemize.return_value = ["k", "o", "n", "n", "i", "ch", "i", "w", "a"]
-
-                # This should use the internal phonemize module
-                result = PiperVoice.phonemize(voice, "こんにちは")
-
-                # Should have called our mocked function
+        # Test that phonemize method uses the JA phonemizer
+        with patch('piper.phonemize.japanese.phonemize_japanese') as mock_phonemize:
+            mock_phonemize.return_value = ["k", "o", "n", "n", "i", "ch", "i", "w", "a"]
+            with patch('piper.phonemize.japanese.get_default_dictionary', return_value=None):
+                PiperVoice.phonemize(voice, "こんにちは")
                 assert mock_phonemize.called
-
-        except ImportError as e:
-            # If imports fail, we want to know why
-            pytest.fail(f"Failed to import required modules: {e}")
 
     def test_multi_char_to_pua_consistency(self):
         """Test that MULTI_CHAR_TO_PUA in voice.py matches token_mapper"""
