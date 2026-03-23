@@ -70,9 +70,9 @@ nohup /data/piper/.venv/bin/python -m piper_train \
 
 6言語マルチリンガルモデル (571話者, 75 epoch) をベースとして、つくよみちゃんデータ (100発話, ~11分) を転移学習。500 epoch完了。v1はfreeze_dpタイミングバグで失敗、v2で修正済み。
 
-**2段階方式:**
+**ワークフロー:**
 1. **学習時**: `--resume-from-multispeaker-checkpoint` で emb_lang[0:5] を元の embedding + emb_g_mean 補正のまま保持。`--freeze-dp` は自動有効化。
-2. **後処理 (ONNX エクスポート前)**: `emb_lang[0]` (JA=つくよみちゃん) -> `emb_lang[1:5]` (EN/ZH/ES/FR/PT) にコピーして声質を統一。
+2. **ONNXエクスポート時**: `export_onnx` が自動で `emb_lang[0]` → `emb_lang[1:5]` にコピーして声質を統一 (`--unify-emb-lang` がシングルスピーカー多言語モデルで自動有効化)。
 
 **データセット:** `/data/piper/dataset-tsukuyomi-finetune-6lang/` (100発話, 1話者, 173シンボル, 6言語)
 
@@ -216,6 +216,14 @@ ONNX エクスポート時にデフォルトで FP16 変換を適用。モデル
 **CLIオプション:** `--no-fp16` (FP16変換を無効化)
 **実装:** `export_onnx.py`
 
+### emb_lang 自動統一 (--unify-emb-lang)
+
+シングルスピーカー多言語モデルのONNXエクスポート時に、`emb_lang` を自動統一。ソース言語 (デフォルト: lang[0]) の embedding を全言語にコピーして声質を統一する。`num_speakers <= 1 && num_languages > 1` で自動有効化。
+
+**CLIオプション:** `--unify-emb-lang` / `--no-unify-emb-lang` (デフォルト: auto), `--unify-emb-lang-source N` (デフォルト: 0)
+**実装:** `export_onnx.py` (`should_unify_emb_lang()`, `unify_emb_lang_weights()`)
+**テスト:** `tests/test_export_onnx.py` (`TestUnifyEmbLang`, `TestUnifyEmbLangOnnxExport`)
+
 ### WavLM Discriminator (--no-wavlm)
 
 Microsoft WavLMベースの知覚品質判別器。デフォルト有効。学習時のみ使用 (推論グラフには含まれない)。GPUメモリ追加 ~1-2GB/GPU。V100では `--no-wavlm` 推奨 (学習速度優先)。
@@ -249,9 +257,9 @@ OpenJTalkから抽出されるA1/A2/A3値をDuration Predictorの入力として
 
 マルチスピーカー -> シングルスピーカー転移の専用フラグ。自動で emb_g 除去 + emb_lang 補正 + freeze-dp 有効化を実行。
 
-**推奨ワークフロー (2段階方式):**
+**推奨ワークフロー:**
 1. **学習時**: `--resume-from-multispeaker-checkpoint` で全言語の emb_lang を保持 (凍結 DP が正しい conditioning を受け取る)
-2. **後処理**: ONNX エクスポート前に `emb_lang[0]` -> `emb_lang[1:N]` にコピーして声質を統一
+2. **ONNXエクスポート時**: `export_onnx` が `--unify-emb-lang` (自動有効化) で `emb_lang[0]` → `emb_lang[1:N]` にコピーして声質を統一
 
 **CLIオプション:** `--resume-from-multispeaker-checkpoint <path>`
 **実装:** `__main__.py`
@@ -445,8 +453,12 @@ CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.export_onnx \
 | オプション | デフォルト | 説明 |
 |-----------|----------|------|
 | `--no-stochastic` | - | deterministic エクスポート（デバッグ用） |
-| EMA | 常時有効 | チェックポイントに EMA state があれば自動適用 |
 | `--no-fp16` | - | FP16変換を無効化（デフォルト: FP16有効、モデルサイズ~50%削減） |
+| `--unify-emb-lang` / `--no-unify-emb-lang` | auto | emb_lang 自動統一（シングルスピーカー多言語モデルで自動有効化） |
+| `--unify-emb-lang-source N` | 0 | emb_lang 統一のソース言語インデックス |
+| `--simplify` | - | ONNX モデル simplification を適用 |
+| `--debug` | - | デバッグログ出力 |
+| EMA | 常時有効 | チェックポイントに EMA state があれば自動適用（CLIオプションではない） |
 
 ### 推論テスト (6lang マルチリンガルモデル)
 

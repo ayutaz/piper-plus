@@ -15,6 +15,9 @@ from enum import Enum
 from multiprocessing import JoinableQueue, Process, Queue
 from pathlib import Path
 
+# signal.SIGALRM / signal.alarm() are Unix-only; guard all uses.
+_HAS_SIGALRM = hasattr(signal, "SIGALRM")
+
 
 try:
     from piper_phonemize import (
@@ -550,7 +553,7 @@ def phonemize_batch_espeak(
         def _timeout_handler(signum, frame):
             raise TimeoutError()
 
-        if timeout_sec > 0:
+        if timeout_sec > 0 and _HAS_SIGALRM:
             signal.signal(signal.SIGALRM, _timeout_handler)
 
         while True:
@@ -563,7 +566,7 @@ def phonemize_batch_espeak(
                     if args.tashkeel:
                         utt.text = tashkeel_run(utt.text)
 
-                    if timeout_sec > 0:
+                    if timeout_sec > 0 and _HAS_SIGALRM:
                         signal.alarm(timeout_sec)
                     _LOGGER.debug(utt)
                     all_phonemes = phonemize_espeak(casing(utt.text), args.language)
@@ -583,7 +586,7 @@ def phonemize_batch_espeak(
                             args, utt, silence_detector
                         )
                     queue_out.put(utt)
-                    if timeout_sec > 0:
+                    if timeout_sec > 0 and _HAS_SIGALRM:
                         signal.alarm(0)
                 except TimeoutError:
                     _LOGGER.error("Skipping utterance due to timeout: %s", utt)
@@ -615,7 +618,7 @@ def phonemize_batch_text(
         def _timeout_handler(signum, frame):
             raise TimeoutError()
 
-        if timeout_sec > 0:
+        if timeout_sec > 0 and _HAS_SIGALRM:
             signal.signal(signal.SIGALRM, _timeout_handler)
 
         while True:
@@ -628,7 +631,7 @@ def phonemize_batch_text(
                     if args.tashkeel:
                         utt.text = tashkeel_run(utt.text)
 
-                    if timeout_sec > 0:
+                    if timeout_sec > 0 and _HAS_SIGALRM:
                         signal.alarm(timeout_sec)
                     _LOGGER.debug(utt)
                     all_phonemes = phonemize_codepoints(casing(utt.text))
@@ -648,7 +651,7 @@ def phonemize_batch_text(
                             args, utt, silence_detector
                         )
                     queue_out.put(utt)
-                    if timeout_sec > 0:
+                    if timeout_sec > 0 and _HAS_SIGALRM:
                         signal.alarm(0)
                 except TimeoutError:
                     _LOGGER.error("Skipping utterance due to timeout: %s", utt)
@@ -694,7 +697,7 @@ def phonemize_batch_openjtalk(
         def _timeout_handler(signum, frame):
             raise TimeoutError()
 
-        if timeout_sec > 0:
+        if timeout_sec > 0 and _HAS_SIGALRM:
             signal.signal(signal.SIGALRM, _timeout_handler)
 
         while True:
@@ -704,7 +707,7 @@ def phonemize_batch_openjtalk(
 
             for utt in utt_batch:
                 try:
-                    if timeout_sec > 0:
+                    if timeout_sec > 0 and _HAS_SIGALRM:
                         signal.alarm(timeout_sec)
                     _LOGGER.debug(utt)
                     # 高低アクセントを含む日本語 phonemizer（カスタム辞書適用）
@@ -765,7 +768,7 @@ def phonemize_batch_openjtalk(
                                 f0_max=getattr(args, "f0_max", 880.0),
                             )
                     queue_out.put(utt)
-                    if timeout_sec > 0:
+                    if timeout_sec > 0 and _HAS_SIGALRM:
                         signal.alarm(0)
                 except TimeoutError:
                     _LOGGER.error("Skipping utterance due to timeout: %s", utt)
@@ -810,7 +813,7 @@ def _phonemize_batch_multilingual_impl(
         def _timeout_handler(signum, frame):
             raise TimeoutError()
 
-        if timeout_sec > 0:
+        if timeout_sec > 0 and _HAS_SIGALRM:
             signal.signal(signal.SIGALRM, _timeout_handler)
 
         # Build language_id_map and detector once per worker for multilingual mode
@@ -842,7 +845,7 @@ def _phonemize_batch_multilingual_impl(
 
             for utt in utt_batch:
                 try:
-                    if timeout_sec > 0:
+                    if timeout_sec > 0 and _HAS_SIGALRM:
                         signal.alarm(timeout_sec)
                     _LOGGER.debug(utt)
                     text = casing(utt.text)
@@ -911,7 +914,7 @@ def _phonemize_batch_multilingual_impl(
                                 f0_max=getattr(args, "f0_max", 880.0),
                             )
                     queue_out.put(utt)
-                    if timeout_sec > 0:
+                    if timeout_sec > 0 and _HAS_SIGALRM:
                         signal.alarm(0)
                 except TimeoutError:
                     _LOGGER.error("Skipping utterance due to timeout: %s", utt)
