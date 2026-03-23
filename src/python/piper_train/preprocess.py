@@ -15,9 +15,6 @@ from enum import Enum
 from multiprocessing import JoinableQueue, Process, Queue
 from pathlib import Path
 
-# signal.SIGALRM / signal.alarm() are Unix-only; guard all uses.
-_HAS_SIGALRM = hasattr(signal, "SIGALRM")
-
 
 try:
     from piper_phonemize import (
@@ -83,6 +80,9 @@ except ImportError:
 _DIR = Path(__file__).parent
 _VERSION = (_DIR / "VERSION").read_text(encoding="utf-8").strip()
 _LOGGER = logging.getLogger("preprocess")
+
+# signal.SIGALRM / signal.alarm() are Unix-only; guard all uses.
+_HAS_SIGALRM = hasattr(signal, "SIGALRM")
 
 
 class PhonemeType(str, Enum):
