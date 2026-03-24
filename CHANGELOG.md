@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `export_onnx` で `emb_lang` 自動統一 (`--unify-emb-lang` / `--no-unify-emb-lang`) — シングルスピーカー多言語モデルで自動有効化 (#266, #279)
 - `export_onnx` に `--unify-emb-lang-source N` オプション追加 (ソース言語インデックス指定)
 - `docs/design/issue-266-auto-unify-emb-lang.md` 設計ドキュメント追加
+- `emb_lang` 自動統一のユニットテスト7件 + ONNX統合テスト2件 (`test_export_onnx.py`)
+- テスト用マルチリンガルモデルフィクスチャ追加 (`conftest.py`)
 
 ### Fixed
 - `preprocess.py` の Windows 互換性修正 — `_HAS_SIGALRM` ガードで `signal.SIGALRM` 未対応プラットフォームでのクラッシュを回避 (#282)

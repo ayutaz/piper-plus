@@ -65,21 +65,24 @@ class TestRealIntegration:
         audio_data = np.zeros(samples, dtype=np.int16)
 
         with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
+            tmp_path = Path(tmp.name)
+
+        try:
             # Write WAV
-            with wave.open(tmp.name, "wb") as wav_file:
+            with wave.open(str(tmp_path), "wb") as wav_file:
                 wav_file.setnchannels(1)
                 wav_file.setsampwidth(2)
                 wav_file.setframerate(sample_rate)
                 wav_file.writeframes(audio_data.tobytes())
 
             # Verify WAV
-            with wave.open(tmp.name, "rb") as wav_file:
+            with wave.open(str(tmp_path), "rb") as wav_file:
                 assert wav_file.getnchannels() == 1
                 assert wav_file.getsampwidth() == 2
                 assert wav_file.getframerate() == sample_rate
                 assert wav_file.getnframes() == samples
-
-            Path(tmp.name).unlink()
+        finally:
+            tmp_path.unlink()
 
     @pytest.mark.integration
     @pytest.mark.slow
