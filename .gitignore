@@ -6,6 +6,7 @@ tmp/
 requirements.txt.backup
 
 *.py[cod]
+__pycache__/
 *.egg
 *.egg-info/
 build
@@ -90,6 +91,10 @@ create_comprehensive_*.py
 add_missing_*.py
 retrain_*.py
 comprehensive_*.py
+
+# Training datasets and downloaded models
+datasets/
+models/
 
 # Local working files
 checkpoints/

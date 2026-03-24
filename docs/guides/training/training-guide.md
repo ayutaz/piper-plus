@@ -367,12 +367,12 @@ uv run python -m piper_train \
 | `--freeze-dp` | not set | auto-enabled | Prevents DP catastrophic forgetting |
 | `--audio-log-epochs` | 5 | 50 | Match validation frequency |
 
-**Post-processing for multilingual voice unification:**
+**Multilingual voice unification:**
 
-After fine-tuning, before ONNX export, copy `emb_lang[0]` (target language) to `emb_lang[1:N]` (other languages) to unify the voice timbre across all languages. This is a two-step workflow:
+For single-speaker multilingual models, `emb_lang` embeddings are automatically unified during ONNX export (`--unify-emb-lang`, auto-enabled when `num_speakers <= 1 and num_languages > 1`). The source language embedding (default: lang[0]) is copied to all other languages to ensure consistent voice timbre.
 
 1. **Training**: `--resume-from-multispeaker-checkpoint` preserves all `emb_lang` embeddings so the frozen DP receives correct conditioning
-2. **Post-processing**: Copy the target language embedding to all other language slots before ONNX export
+2. **ONNX export**: `export_onnx` automatically copies `emb_lang[0]` → `emb_lang[1:N]` (use `--no-unify-emb-lang` to disable, `--unify-emb-lang-source N` to change source)
 
 
 ### WavLM Discriminator
@@ -656,9 +656,12 @@ cp /path/to/training_dir/config.json \
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--no-stochastic` | stochastic ON | Disable noise_scale sampling (deterministic export, for debugging). Default is stochastic export (recommended). |
-| `--use-ema` | on | Apply EMA weights to the decoder in the exported model. |
-| `--no-ema` | - | Disable EMA weight application. |
 | `--no-fp16` | FP16 ON | Disable FP16 conversion. Default: FP16 enabled, reducing model size by ~50%. |
+| `--unify-emb-lang` / `--no-unify-emb-lang` | auto | Unify emb_lang embeddings. Auto-enabled for single-speaker multilingual models (num_speakers <= 1 && num_languages > 1). |
+| `--unify-emb-lang-source N` | 0 | Source language index for emb_lang unification. |
+| `--simplify` | off | Apply ONNX model simplification after export. |
+| `--debug` | off | Print DEBUG messages to the console. |
+| EMA | always on | EMA weights are automatically applied when available (not a CLI flag). |
 
 Example (default stochastic + FP16 export, recommended):
 
