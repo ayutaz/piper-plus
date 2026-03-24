@@ -222,6 +222,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install dist/*.whl
           pip install pyopenjtalk-plus g2p-en pypinyin
+          python -c "import nltk; nltk.download('averaged_perceptron_tagger_eng', quiet=True); nltk.download('cmudict', quiet=True)"
 
       - name: Smoke test all 6 languages
         shell: bash
