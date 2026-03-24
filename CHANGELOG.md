@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.8.2] - 2026-03-24
+
+### Added
+- `export_onnx` で `emb_lang` 自動統一 (`--unify-emb-lang` / `--no-unify-emb-lang`) — シングルスピーカー多言語モデルで自動有効化 (#266, #279)
+- `export_onnx` に `--unify-emb-lang-source N` オプション追加 (ソース言語インデックス指定)
+- `docs/design/issue-266-auto-unify-emb-lang.md` 設計ドキュメント追加
+
+### Fixed
+- `preprocess.py` の Windows 互換性修正 — `_HAS_SIGALRM` ガードで `signal.SIGALRM` 未対応プラットフォームでのクラッシュを回避 (#282)
+- `preprocess.py` で `--timeout-seconds` が SIGALRM 未対応時にサイレント no-op になる問題に警告ログ追加
+
+### Changed
+- CLAUDE.md, training-guide.md を Issue #266 の自動 emb_lang 統一に合わせて更新
+- `export_onnx` のドキュメントに `--simplify`, `--debug` オプションを追加
+- `.gitignore` に `datasets/`, `models/`, `__pycache__/` 追加
+- `pyproject.toml` に `VERSION` ファイルの package-data 設定追加
+
 ## [1.8.1] - 2026-03-22
 
 ### Fixed
