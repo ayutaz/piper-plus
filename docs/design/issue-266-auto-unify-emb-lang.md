@@ -35,7 +35,7 @@ torch.save(ckpt, "checkpoint-fixed.ckpt")
 
 ## 調査結果
 
-### 1. `export_onnx.py` の現状
+### 1. `export_onnx.py` の変更前の状態
 
 | 項目 | 詳細 |
 |------|------|

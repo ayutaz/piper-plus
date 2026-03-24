@@ -555,6 +555,12 @@ def phonemize_batch_espeak(
 
         if timeout_sec > 0 and _HAS_SIGALRM:
             signal.signal(signal.SIGALRM, _timeout_handler)
+        elif timeout_sec > 0 and not _HAS_SIGALRM:
+            _LOGGER.warning(
+                "Timeouts requested (timeout_seconds=%d) but SIGALRM is not available "
+                "on this platform; timeouts will not be enforced in this worker.",
+                timeout_sec,
+            )
 
         while True:
             utt_batch = queue_in.get()
@@ -620,6 +626,12 @@ def phonemize_batch_text(
 
         if timeout_sec > 0 and _HAS_SIGALRM:
             signal.signal(signal.SIGALRM, _timeout_handler)
+        elif timeout_sec > 0 and not _HAS_SIGALRM:
+            _LOGGER.warning(
+                "Timeouts requested (timeout_seconds=%d) but SIGALRM is not available "
+                "on this platform; timeouts will not be enforced in this worker.",
+                timeout_sec,
+            )
 
         while True:
             utt_batch = queue_in.get()
@@ -699,6 +711,12 @@ def phonemize_batch_openjtalk(
 
         if timeout_sec > 0 and _HAS_SIGALRM:
             signal.signal(signal.SIGALRM, _timeout_handler)
+        elif timeout_sec > 0 and not _HAS_SIGALRM:
+            _LOGGER.warning(
+                "Timeouts requested (timeout_seconds=%d) but SIGALRM is not available "
+                "on this platform; timeouts will not be enforced in this worker.",
+                timeout_sec,
+            )
 
         while True:
             utt_batch = queue_in.get()
@@ -815,6 +833,12 @@ def _phonemize_batch_multilingual_impl(
 
         if timeout_sec > 0 and _HAS_SIGALRM:
             signal.signal(signal.SIGALRM, _timeout_handler)
+        elif timeout_sec > 0 and not _HAS_SIGALRM:
+            _LOGGER.warning(
+                "Timeouts requested (timeout_seconds=%d) but SIGALRM is not available "
+                "on this platform; timeouts will not be enforced in this worker.",
+                timeout_sec,
+            )
 
         # Build language_id_map and detector once per worker for multilingual mode
         language_id_map: dict[str, int] = {}

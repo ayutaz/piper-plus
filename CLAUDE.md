@@ -218,7 +218,7 @@ ONNX エクスポート時にデフォルトで FP16 変換を適用。モデル
 
 ### emb_lang 自動統一 (--unify-emb-lang)
 
-シングルスピーカー多言語モデルのONNXエクスポート時に、`emb_lang` を自動統一。ソース言語 (デフォルト: lang[0]) の embedding を全言語にコピーして声質を統一する。`num_speakers <= 1 && num_languages > 1` で自動有効化。
+シングルスピーカー多言語モデルのONNXエクスポート時に、`emb_lang` を自動統一。ソース言語 (デフォルト: lang[0]) の embedding を全言語にコピーして声質を統一する。`num_speakers <= 1 and num_languages > 1` で自動有効化。
 
 **CLIオプション:** `--unify-emb-lang` / `--no-unify-emb-lang` (デフォルト: auto), `--unify-emb-lang-source N` (デフォルト: 0)
 **実装:** `export_onnx.py` (`should_unify_emb_lang()`, `unify_emb_lang_weights()`)

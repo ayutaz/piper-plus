@@ -369,7 +369,7 @@ uv run python -m piper_train \
 
 **Multilingual voice unification:**
 
-For single-speaker multilingual models, `emb_lang` embeddings are automatically unified during ONNX export (`--unify-emb-lang`, auto-enabled when `num_speakers <= 1 && num_languages > 1`). The source language embedding (default: lang[0]) is copied to all other languages to ensure consistent voice timbre.
+For single-speaker multilingual models, `emb_lang` embeddings are automatically unified during ONNX export (`--unify-emb-lang`, auto-enabled when `num_speakers <= 1 and num_languages > 1`). The source language embedding (default: lang[0]) is copied to all other languages to ensure consistent voice timbre.
 
 1. **Training**: `--resume-from-multispeaker-checkpoint` preserves all `emb_lang` embeddings so the frozen DP receives correct conditioning
 2. **ONNX export**: `export_onnx` automatically copies `emb_lang[0]` → `emb_lang[1:N]` (use `--no-unify-emb-lang` to disable, `--unify-emb-lang-source N` to change source)

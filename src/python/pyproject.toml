@@ -72,6 +72,9 @@ test = [
 [project.scripts]
 piper-train = "piper_train.__main__:main"
 
+[tool.setuptools.package-data]
+piper_train = ["VERSION"]
+
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["piper_train*"]
