@@ -1,8 +1,33 @@
 {
-  "name": "openjtalk-web",
-  "version": "1.0.0",
-  "description": "OpenJTalk WebAssembly implementation for browser-based Japanese TTS",
+  "name": "piper-plus",
+  "version": "0.1.0",
+  "description": "Browser-based multilingual neural TTS with VITS. Supports Japanese, English, Chinese, Spanish, French, and Portuguese.",
   "type": "module",
+  "main": "src/index.js",
+  "module": "src/index.js",
+  "types": "types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./types/index.d.ts",
+      "import": "./src/index.js"
+    },
+    "./phonemizer": {
+      "import": "./src/simple_unified_api.js"
+    },
+    "./streaming": {
+      "import": "./src/streaming-pipeline.js"
+    }
+  },
+  "files": [
+    "src/**/*.js",
+    "dist/openjtalk.wasm",
+    "dist/openjtalk.js",
+    "dist/load-dictionary.js",
+    "types/",
+    "THIRD-PARTY-LICENSES.md",
+    "LICENSE.md",
+    "README.npm.md"
+  ],
   "scripts": {
     "test": "node --test test/js/test-openjtalk-integration.js test/js/test-github-pages-paths.js",
     "test:integration": "node --test test/js/test-openjtalk-integration.js",
@@ -12,24 +37,39 @@
     "test:optimization:phase2": "node --test test/js/test-resampler.js test/js/test-webgpu-session.js test/js/test-audio-backend.js",
     "test:optimization:phase3": "node --test test/js/test-streaming-pipeline.js test/js/test-memory-pool.js",
     "test:optimization:integration": "node --test test/js/test-phase2-integration.js",
+    "test:npm-package": "node --test test/js/test-npm-package.js",
     "test:watch": "node --test --watch test/js/test-openjtalk-integration.js",
     "build:debug": "cd build && ./build-safe.sh",
     "build:production": "cd build && ./build-production.sh",
     "build": "npm run build:production",
     "serve": "python3 -m http.server 8081",
-    "clean": "rm -rf dist build/build-*"
+    "clean": "rm -rf dist build/build-*",
+    "prepublishOnly": "echo 'Ready to publish'"
+  },
+  "peerDependencies": {
+    "onnxruntime-web": ">=1.21.0"
   },
   "keywords": [
-    "openjtalk",
     "tts",
+    "text-to-speech",
+    "speech-synthesis",
     "japanese",
+    "multilingual",
+    "vits",
+    "onnx",
     "webassembly",
     "wasm",
-    "speech-synthesis"
+    "piper",
+    "openjtalk",
+    "neural-tts"
   ],
-  "author": "piper-plus Project",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ayutaz/piper-plus"
+  },
+  "homepage": "https://ayutaz.github.io/piper-plus/",
+  "author": "ayutaz",
   "license": "MIT",
-  "devDependencies": {},
   "engines": {
     "node": ">=18.0.0"
   }
