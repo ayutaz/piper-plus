@@ -49,10 +49,12 @@ piper --model tsukuyomi --text "こんにちは、今日は良い天気ですね
 ### Python API
 
 ```python
+import wave
 from piper import PiperVoice
 
 voice = PiperVoice.load("path/to/model.onnx", config_path="path/to/config.json")
-wav_bytes = voice.synthesize("こんにちは、今日は良い天気ですね。")
+with wave.open("output.wav", "wb") as wav_file:
+    voice.synthesize("こんにちは、今日は良い天気ですね。", wav_file)
 ```
 
 ## 事前学習済みモデル
