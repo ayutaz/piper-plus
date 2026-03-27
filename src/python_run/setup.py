@@ -44,8 +44,8 @@ setup(
     name="piper-tts-plus",
     version=version,
     description=(
-        "A fast, local neural text to speech system that sounds great and is "
-        "optimized for the Raspberry Pi 4."
+        "A fast, high-quality neural text-to-speech system supporting "
+        "6 languages (ja/en/zh/es/fr/pt) with VITS architecture"
     ),
     url="https://github.com/ayutaz/piper-plus",
     author="yousan",
