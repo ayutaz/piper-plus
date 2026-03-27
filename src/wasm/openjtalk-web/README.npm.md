@@ -172,6 +172,21 @@ Returned by `synthesize()`. Wraps raw PCM audio samples.
 | `sampleRate` | `number` | Sample rate in Hz (typically 22050). |
 | `duration` | `number` | Audio duration in seconds. |
 
+### `modelManager.resolveUrls(modelNameOrUrl)`
+
+Resolves a model identifier to concrete URLs without downloading.
+
+- `modelNameOrUrl` -- Registry shortcut (`"tsukuyomi"`), HuggingFace repo (`"ayousanz/piper-plus-tsukuyomi-chan"`), or direct URL
+- Returns: `Promise<{ modelUrl: string, configUrl: string, cacheKey: string }>`
+
+### `dictManager.resolveUrls(options?)`
+
+Returns resolved dictionary and voice URLs without downloading.
+
+- `options.dictUrl` -- Custom base URL for dictionary files (default: HuggingFace)
+- `options.voiceUrl` -- Custom URL for HTS voice file (default: HuggingFace)
+- Returns: `{ dictBaseUrl: string, voiceUrl: string }`
+
 ## Available Models
 
 | Model | HuggingFace Repo | Description |
@@ -274,6 +289,26 @@ await modelManager.clearCache();
 
 // Clear dictionary cache
 await dictManager.clearCache();
+```
+
+### URL Resolution
+
+Resolve model or dictionary URLs without downloading:
+
+```javascript
+import { ModelManager, DictManager } from "piper-plus";
+
+// Resolve model URL from a shortcut or repo name
+const modelMgr = new ModelManager();
+const { modelUrl, configUrl, cacheKey } = await modelMgr.resolveUrls("tsukuyomi");
+console.log(modelUrl);  // https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/...
+
+// Resolve dictionary URLs
+const dictMgr = new DictManager();
+const { dictBaseUrl, voiceUrl } = dictMgr.resolveUrls({
+  dictUrl: "https://custom-cdn.example.com/dict",
+});
+console.log(dictBaseUrl);  // https://custom-cdn.example.com/dict (trailing slash removed)
 ```
 
 ### Sub-path Imports

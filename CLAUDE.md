@@ -338,6 +338,33 @@ Rust によるONNX推論エンジン。ストリーミング、CUDA/CoreML/Direc
 
 **実装:** `src/rust/piper-core/`, `src/rust/piper-cli/`, `src/rust/piper-python/`
 
+### JavaScript/WASM npm パッケージ (piper-plus)
+
+ブラウザ内で完全オフラインの多言語 TTS を `npm install piper-plus` で利用可能にする npm パッケージ。eSpeak-ng 不使用 (GPL リスク回避)。
+
+| 項目 | 詳細 |
+|------|------|
+| パッケージ名 | piper-plus |
+| バージョン | 0.1.0 |
+| 対応言語 | JA, EN, ZH, ES, FR, PT (6言語) |
+| 音素化 | OpenJTalk WASM (JA), SimpleEnglishPhonemizer (EN), キャラクタベース (ZH/ES/FR/PT) |
+| 推論 | onnxruntime-web (peerDependency) |
+| テスト | 282テスト (Node.js test runner) |
+| CI | ci.yml (PR/push), npm-publish.yml (タグトリガー) |
+| ビルド | ブラウザ専用 (Node.js 非対応) |
+
+**コアクラス:**
+- `PiperPlus` — 高レベル API (initialize → synthesize → AudioResult)
+- `ModelManager` — HuggingFace モデル DL + IndexedDB キャッシュ
+- `DictManager` — OpenJTalk 辞書 DL + IndexedDB キャッシュ
+- `AudioResult` — WAV エンコード + 再生 + ダウンロード
+- `SimpleUnifiedPhonemizer` — 6言語音素化 (eSpeak-ng 不使用)
+
+**実装:** `src/wasm/openjtalk-web/src/`, `src/wasm/openjtalk-web/types/index.d.ts`
+**テスト:** `src/wasm/openjtalk-web/test/js/test-*.js` (282テスト)
+**npm README:** `src/wasm/openjtalk-web/README.npm.md`
+**設計ドキュメント:** `docs/design/npm-package-plan.md`
+
 ---
 
 ## 重要なファイルパス
@@ -404,6 +431,18 @@ Rust によるONNX推論エンジン。ストリーミング、CUDA/CoreML/Direc
 | 辞書マネージャ | `src/rust/piper-core/src/dictionary_manager.rs` |
 | カスタム辞書テスト | `src/rust/piper-core/tests/test_custom_dict_integration.rs` |
 | デフォルト出力テスト | `src/rust/piper-core/tests/test_default_output.rs` |
+
+### npm パッケージ ソースコード
+
+| 用途 | パス |
+|------|------|
+| エントリーポイント | `src/wasm/openjtalk-web/src/index.js` |
+| モデルマネージャ | `src/wasm/openjtalk-web/src/model-manager.js` |
+| 辞書マネージャ | `src/wasm/openjtalk-web/src/dict-manager.js` |
+| 音声結果 | `src/wasm/openjtalk-web/src/audio-result.js` |
+| TypeScript型定義 | `src/wasm/openjtalk-web/types/index.d.ts` |
+| npm パッケージ設定 | `src/wasm/openjtalk-web/package.json` |
+| npm publish CI | `.github/workflows/npm-publish.yml` |
 
 ### データセット
 
