@@ -26,7 +26,11 @@ function getAudioContext() {
   }
   // Resume if the context was suspended (auto-play policy).
   if (sharedAudioContext.state === 'suspended') {
-    sharedAudioContext.resume();
+    void sharedAudioContext.resume().catch((err) => {
+      if (typeof console !== 'undefined' && console.warn) {
+        console.warn('AudioContext.resume() failed:', err);
+      }
+    });
   }
   return sharedAudioContext;
 }

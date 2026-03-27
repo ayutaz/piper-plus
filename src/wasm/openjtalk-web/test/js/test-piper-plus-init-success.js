@@ -359,6 +359,9 @@ function restoreGlobals() {
 // Tests
 // ===========================================================================
 
+// NOTE: _init() は WebGPUSessionManager, SimpleUnifiedPhonemizer (WASM),
+// IndexedDB 等のブラウザ専用 API に依存するため、Node.js 環境では
+// prototype stub で代替している。ブラウザ統合テストは別途 E2E で実施する。
 describe('PiperPlus.initialize() 正常系', { skip }, () => {
   beforeEach(() => {
     installGlobalMocks();

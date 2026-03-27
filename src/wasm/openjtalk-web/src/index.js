@@ -214,7 +214,7 @@ export class PiperPlus {
     progress({ stage: 'model', progress: 0, message: 'Resolving model...' });
 
     const modelManager = new ModelManager();
-    const { modelUrl, configUrl } = modelManager.resolveUrls(options.model);
+    const { modelUrl, configUrl } = await modelManager.resolveUrls(options.model);
 
     progress({ stage: 'model', progress: 0.1, message: 'Downloading config...' });
     const configResponse = await fetch(configUrl);
@@ -240,7 +240,7 @@ export class PiperPlus {
     progress({ stage: 'phonemizer', progress: 0, message: 'Initializing phonemizer...' });
 
     const dictManager = new DictManager();
-    const { dictUrl, voiceUrl } = dictManager.resolveUrls({
+    const { dictBaseUrl, voiceUrl } = await dictManager.resolveUrls({
       dictUrl: options.dictUrl,
       voiceUrl: options.voiceUrl,
     });
@@ -248,9 +248,7 @@ export class PiperPlus {
     this._phonemizer = new SimpleUnifiedPhonemizer();
     await this._phonemizer.initialize({
       openjtalk: {
-        jsPath: dictUrl.jsPath,
-        wasmPath: dictUrl.wasmPath,
-        dictPath: dictUrl.dictPath,
+        dictPath: dictBaseUrl,
         voicePath: voiceUrl,
       },
     });

@@ -136,6 +136,27 @@ export class DictManager {
   // ---- Public API -------------------------------------------------------------
 
   /**
+   * Resolve dictionary and voice URLs without downloading anything.
+   *
+   * Applies the same default-fallback logic used by {@link loadDictionary} so
+   * that callers (e.g. `PiperPlus._init()`) can inspect the final URLs before
+   * any network request is made.
+   *
+   * @param {Object} [options]
+   * @param {string} [options.dictUrl]  - Base URL for dictionary files.
+   * @param {string} [options.voiceUrl] - URL for the HTS voice file.
+   * @returns {{ dictBaseUrl: string, voiceUrl: string }}
+   */
+  resolveUrls(options = {}) {
+    const dictBaseUrl = (options.dictUrl || DEFAULT_DICT_BASE_URL).replace(
+      /\/+$/,
+      ''
+    );
+    const voiceUrl = options.voiceUrl || DEFAULT_VOICE_URL;
+    return { dictBaseUrl, voiceUrl };
+  }
+
+  /**
    * Download (or retrieve from cache) dictionary files and the HTS voice file.
    *
    * @param {Object} [options]
@@ -150,8 +171,7 @@ export class DictManager {
    * @returns {Promise<{dictFiles: Object<string,ArrayBuffer>, voiceData: ArrayBuffer}>}
    */
   async loadDictionary(options = {}) {
-    const dictBaseUrl = options.dictUrl || DEFAULT_DICT_BASE_URL;
-    const voiceUrl = options.voiceUrl || DEFAULT_VOICE_URL;
+    const { dictBaseUrl, voiceUrl } = this.resolveUrls(options);
     const onProgress = options.onProgress || null;
 
     const db = await this._openDB();

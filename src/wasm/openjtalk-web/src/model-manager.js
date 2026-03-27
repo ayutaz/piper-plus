@@ -188,6 +188,18 @@ export class ModelManager {
   }
 
   /**
+   * Resolve a model identifier to concrete URLs.
+   *
+   * This is the public entry point that delegates to {@link _resolveUrls}.
+   *
+   * @param {string} modelNameOrUrl - Registry shortcut, HuggingFace repo, or direct URL
+   * @returns {Promise<{modelUrl: string, configUrl: string, cacheKey: string}>}
+   */
+  async resolveUrls(modelNameOrUrl) {
+    return this._resolveUrls(modelNameOrUrl);
+  }
+
+  /**
    * Load a model and its config, using the IndexedDB cache when available.
    *
    * @param {string} modelNameOrUrl - Registry shortcut, HuggingFace repo name, or direct URL
