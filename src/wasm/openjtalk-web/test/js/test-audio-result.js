@@ -69,6 +69,60 @@ describe('AudioResult', { skip }, () => {
   });
 
   // -------------------------------------------------------
+  // 1b. sampleRate バリデーション個別テスト
+  // -------------------------------------------------------
+  describe('sampleRate バリデーション (個別)', () => {
+    it('sampleRate = 0 で TypeError', () => {
+      const samples = new Float32Array(1);
+      assert.throws(() => new AudioResult(samples, 0), TypeError);
+    });
+
+    it('sampleRate = -1 で TypeError', () => {
+      const samples = new Float32Array(1);
+      assert.throws(() => new AudioResult(samples, -1), TypeError);
+    });
+
+    it('sampleRate = "abc" (文字列) で TypeError', () => {
+      const samples = new Float32Array(1);
+      assert.throws(() => new AudioResult(samples, 'abc'), TypeError);
+    });
+  });
+
+  // -------------------------------------------------------
+  // 1c. sampleRate 境界値テスト
+  // -------------------------------------------------------
+  describe('sampleRate 境界値', () => {
+    it('sampleRate = NaN はバリデーションをすり抜ける (実装バグ)', () => {
+      // typeof NaN === 'number' => true
+      // NaN <= 0 => false (NaN との比較は常に false)
+      // したがって現在の実装ではガード条件を通過してしまう。
+      // 本来は TypeError を投げるべきだが、実装が NaN を拒否しないことを文書化する。
+      const samples = new Float32Array([0.5]);
+      const result = new AudioResult(samples, NaN);
+      assert.equal(result.sampleRate, NaN);
+      // duration が NaN になることも確認
+      assert.ok(Number.isNaN(result.duration));
+    });
+
+    it('sampleRate = Infinity は受け入れられる', () => {
+      // typeof Infinity === 'number' => true
+      // Infinity <= 0 => false
+      // 実装上は正の数として扱われるため、構築は成功する。
+      const samples = new Float32Array([0.5]);
+      const result = new AudioResult(samples, Infinity);
+      assert.equal(result.sampleRate, Infinity);
+      // duration = 1 / Infinity = 0
+      assert.equal(result.duration, 0);
+    });
+
+    it('sampleRate = -Infinity で TypeError', () => {
+      const samples = new Float32Array(1);
+      // -Infinity <= 0 => true なので、ガード条件で弾かれる
+      assert.throws(() => new AudioResult(samples, -Infinity), TypeError);
+    });
+  });
+
+  // -------------------------------------------------------
   // 2. duration 計算
   // -------------------------------------------------------
   describe('duration 計算', () => {
@@ -188,6 +242,98 @@ describe('AudioResult', { skip }, () => {
   });
 
   // -------------------------------------------------------
+  // 3b. 0サンプル toWav() テスト
+  // -------------------------------------------------------
+  describe('toWav() 0サンプル境界', () => {
+    it('0サンプルで有効な 44 バイト WAV ヘッダーのみ生成される', () => {
+      const result = new AudioResult(new Float32Array(0), 22050);
+      const wav = result.toWav();
+      assert.equal(wav.byteLength, 44);
+    });
+
+    it('0サンプル WAV の RIFF ヘッダーが正しい', () => {
+      const result = new AudioResult(new Float32Array(0), 22050);
+      const wav = result.toWav();
+      const view = new DataView(wav);
+      assert.equal(readString(view, 0, 4), 'RIFF');
+      assert.equal(readString(view, 8, 4), 'WAVE');
+    });
+
+    it('0サンプル WAV の RIFF チャンクサイズが 36', () => {
+      // fileSize(44) - 8 = 36
+      const result = new AudioResult(new Float32Array(0), 22050);
+      const wav = result.toWav();
+      const view = new DataView(wav);
+      assert.equal(view.getUint32(4, true), 36);
+    });
+
+    it('0サンプル WAV の data チャンクサイズが 0', () => {
+      const result = new AudioResult(new Float32Array(0), 22050);
+      const wav = result.toWav();
+      const view = new DataView(wav);
+      assert.equal(view.getUint32(40, true), 0);
+    });
+
+    it('0サンプル WAV の fmt チャンクが正しい', () => {
+      const result = new AudioResult(new Float32Array(0), 22050);
+      const wav = result.toWav();
+      const view = new DataView(wav);
+      assert.equal(readString(view, 12, 4), 'fmt ');
+      assert.equal(view.getUint16(20, true), 1);       // PCM
+      assert.equal(view.getUint16(22, true), 1);       // mono
+      assert.equal(view.getUint32(24, true), 22050);   // sampleRate
+      assert.equal(view.getUint16(34, true), 16);      // bitsPerSample
+    });
+  });
+
+  // -------------------------------------------------------
+  // 3c. 各種 sampleRate での toWav() テスト
+  // -------------------------------------------------------
+  describe('toWav() 各種 sampleRate', () => {
+    it('sampleRate = 8000 が正しくエンコードされる', () => {
+      const result = new AudioResult(new Float32Array(10), 8000);
+      const wav = result.toWav();
+      const view = new DataView(wav);
+      assert.equal(view.getUint32(24, true), 8000);
+      // byteRate = sampleRate * numChannels * bytesPerSample = 8000 * 1 * 2
+      assert.equal(view.getUint32(28, true), 16000);
+    });
+
+    it('sampleRate = 16000 が正しくエンコードされる', () => {
+      const result = new AudioResult(new Float32Array(10), 16000);
+      const wav = result.toWav();
+      const view = new DataView(wav);
+      assert.equal(view.getUint32(24, true), 16000);
+      assert.equal(view.getUint32(28, true), 32000);
+    });
+
+    it('sampleRate = 44100 が正しくエンコードされる', () => {
+      const result = new AudioResult(new Float32Array(10), 44100);
+      const wav = result.toWav();
+      const view = new DataView(wav);
+      assert.equal(view.getUint32(24, true), 44100);
+      assert.equal(view.getUint32(28, true), 88200);
+    });
+
+    it('sampleRate = 48000 が正しくエンコードされる', () => {
+      const result = new AudioResult(new Float32Array(10), 48000);
+      const wav = result.toWav();
+      const view = new DataView(wav);
+      assert.equal(view.getUint32(24, true), 48000);
+      assert.equal(view.getUint32(28, true), 96000);
+    });
+
+    it('blockAlign は全 sampleRate で 2 (mono 16-bit)', () => {
+      for (const sr of [8000, 16000, 22050, 44100, 48000]) {
+        const result = new AudioResult(new Float32Array(10), sr);
+        const wav = result.toWav();
+        const view = new DataView(wav);
+        assert.equal(view.getUint16(32, true), 2, `blockAlign mismatch for sampleRate ${sr}`);
+      }
+    });
+  });
+
+  // -------------------------------------------------------
   // 4. toBlob() テスト
   // -------------------------------------------------------
   describe('toBlob()', () => {
@@ -283,6 +429,64 @@ describe('AudioResult', { skip }, () => {
       assert.equal(readSampleInt16(wav, 1), 32767);
       assert.equal(readSampleInt16(wav, 2), -32768);
       assert.equal(readSampleInt16(wav, 3), Math.floor(0.5 * 0x7FFF));
+    });
+  });
+
+  // -------------------------------------------------------
+  // 5b. 特殊な浮動小数点サンプル値の変換テスト
+  // -------------------------------------------------------
+  describe('特殊浮動小数点サンプル値の変換', () => {
+    /**
+     * toWav() の PCM データ領域から指定インデックスの Int16 値を読み取る。
+     * @param {ArrayBuffer} wav
+     * @param {number}      index  サンプルインデックス (0-based)
+     * @returns {number}     Int16 値 (-32768 ~ 32767)
+     */
+    function readSampleInt16(wav, index) {
+      const view = new DataView(wav);
+      return view.getInt16(44 + index * 2, true);
+    }
+
+    it('NaN サンプル値は Int16 の 0 に変換される', () => {
+      // Math.max(-1, Math.min(1, NaN)) => NaN
+      // NaN < 0 => false なので NaN * 0x7FFF => NaN
+      // DataView.setInt16(offset, NaN) は 0 を書き込む
+      const result = new AudioResult(new Float32Array([NaN]), 22050);
+      const wav = result.toWav();
+      assert.equal(readSampleInt16(wav, 0), 0);
+    });
+
+    it('Infinity サンプル値は Int16 最大値 (32767) にクリッピングされる', () => {
+      // Math.max(-1, Math.min(1, Infinity)) => 1.0
+      // 1.0 * 0x7FFF => 32767
+      const result = new AudioResult(new Float32Array([Infinity]), 22050);
+      const wav = result.toWav();
+      assert.equal(readSampleInt16(wav, 0), 32767);
+    });
+
+    it('-Infinity サンプル値は Int16 最小値 (-32768) にクリッピングされる', () => {
+      // Math.max(-1, Math.min(1, -Infinity)) => -1.0
+      // -1.0 * 0x8000 => -32768
+      const result = new AudioResult(new Float32Array([-Infinity]), 22050);
+      const wav = result.toWav();
+      assert.equal(readSampleInt16(wav, 0), -32768);
+    });
+
+    it('NaN と通常サンプルが混在する場合', () => {
+      const input = new Float32Array([0.5, NaN, -0.5]);
+      const result = new AudioResult(input, 22050);
+      const wav = result.toWav();
+      assert.equal(readSampleInt16(wav, 0), Math.floor(0.5 * 0x7FFF));
+      assert.equal(readSampleInt16(wav, 1), 0);  // NaN -> 0
+      assert.equal(readSampleInt16(wav, 2), Math.floor(-0.5 * 0x8000));
+    });
+
+    it('Infinity と -Infinity が混在する場合', () => {
+      const input = new Float32Array([Infinity, -Infinity]);
+      const result = new AudioResult(input, 22050);
+      const wav = result.toWav();
+      assert.equal(readSampleInt16(wav, 0), 32767);   // +Inf -> max
+      assert.equal(readSampleInt16(wav, 1), -32768);  // -Inf -> min
     });
   });
 });

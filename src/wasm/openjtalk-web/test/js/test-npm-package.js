@@ -80,10 +80,10 @@ function walkDir(dir) {
 }
 
 // ---------------------------------------------------------------------------
-// 1. Exports validation
+// 1. exports バリデーション
 // ---------------------------------------------------------------------------
 
-describe('exports validation', () => {
+describe('exports バリデーション', () => {
   /** Expected named exports from the main entry point. */
   const EXPECTED_EXPORTS = [
     'PiperPlus',
@@ -97,7 +97,7 @@ describe('exports validation', () => {
     'CacheManager',
   ];
 
-  it('main entry point (src/index.js) can be imported', async () => {
+  it('メインエントリポイント (src/index.js) がインポートできる', async () => {
     const entryPath = resolve(PROJECT_ROOT, 'src', 'index.js');
     assert.ok(existsSync(entryPath), `Entry point does not exist: ${entryPath}`);
 
@@ -105,7 +105,7 @@ describe('exports validation', () => {
     assert.ok(mod, 'Module should be importable');
   });
 
-  it('all expected names are exported', async () => {
+  it('すべての期待されるシンボルがエクスポートされている', async () => {
     const entryPath = resolve(PROJECT_ROOT, 'src', 'index.js');
     const mod = await import(entryPath);
     const exportedNames = Object.keys(mod);
@@ -118,7 +118,7 @@ describe('exports validation', () => {
     }
   });
 
-  it('exported names match between index.js and type definitions', async () => {
+  it('エクスポート名が index.js と型定義で一致する', async () => {
     const dtsPath = resolve(PROJECT_ROOT, 'types', 'index.d.ts');
     if (!existsSync(dtsPath)) {
       // Type definitions not yet created -- skip gracefully.
@@ -140,15 +140,15 @@ describe('exports validation', () => {
 });
 
 // ---------------------------------------------------------------------------
-// 2. package.json validation
+// 2. package.json バリデーション
 // ---------------------------------------------------------------------------
 
-describe('package.json validation', () => {
-  it('name is "piper-plus"', () => {
+describe('package.json バリデーション', () => {
+  it('パッケージ名が "piper-plus" である', () => {
     assert.equal(pkg.name, 'piper-plus');
   });
 
-  it('version follows semver (X.Y.Z)', () => {
+  it('バージョンが semver 形式 (X.Y.Z) に従っている', () => {
     const semverRe = /^\d+\.\d+\.\d+(?:-[\w.]+)?(?:\+[\w.]+)?$/;
     assert.match(
       pkg.version,
@@ -157,11 +157,11 @@ describe('package.json validation', () => {
     );
   });
 
-  it('license is "MIT"', () => {
+  it('ライセンスが "MIT" である', () => {
     assert.equal(pkg.license, 'MIT');
   });
 
-  it('peerDependencies includes "onnxruntime-web"', () => {
+  it('peerDependencies に "onnxruntime-web" が含まれている', () => {
     assert.ok(pkg.peerDependencies, 'peerDependencies is missing');
     assert.ok(
       'onnxruntime-web' in pkg.peerDependencies,
@@ -169,31 +169,99 @@ describe('package.json validation', () => {
     );
   });
 
-  it('type is "module"', () => {
+  it('type が "module" である', () => {
     assert.equal(pkg.type, 'module');
   });
 
-  it('exports field is defined', () => {
+  it('exports フィールドが存在する', () => {
     assert.ok(pkg.exports, 'exports field is missing');
+  });
+
+  it('exports がオブジェクトである', () => {
     assert.ok(
       typeof pkg.exports === 'object',
       'exports should be an object',
     );
+  });
+
+  it('exports に "." エントリが存在する', () => {
     assert.ok(pkg.exports['.'], 'exports should contain a "." entry');
   });
 
-  it('files field is defined and is an array', () => {
+  it('files フィールドが定義されており配列である', () => {
     assert.ok(Array.isArray(pkg.files), 'files should be an array');
     assert.ok(pkg.files.length > 0, 'files should not be empty');
   });
 });
 
 // ---------------------------------------------------------------------------
-// 3. files field validation
+// 2.1 subpath exports バリデーション
 // ---------------------------------------------------------------------------
 
-describe('files field validation', () => {
-  it('files entries resolve to existing paths', () => {
+describe('subpath exports バリデーション', () => {
+  it('./phonemizer サブパスエクスポートが定義されている', () => {
+    assert.ok(
+      pkg.exports['./phonemizer'],
+      'exports should contain a "./phonemizer" entry',
+    );
+  });
+
+  it('./phonemizer の参照先ファイルが存在する', () => {
+    const importPath = pkg.exports['./phonemizer'].import;
+    assert.ok(importPath, './phonemizer export should have an "import" field');
+    const absPath = resolve(PROJECT_ROOT, importPath);
+    assert.ok(
+      existsSync(absPath),
+      `./phonemizer import target does not exist: ${importPath}`,
+    );
+  });
+
+  it('./streaming サブパスエクスポートが定義されている', () => {
+    assert.ok(
+      pkg.exports['./streaming'],
+      'exports should contain a "./streaming" entry',
+    );
+  });
+
+  it('./streaming の参照先ファイルが存在する', () => {
+    const importPath = pkg.exports['./streaming'].import;
+    assert.ok(importPath, './streaming export should have an "import" field');
+    const absPath = resolve(PROJECT_ROOT, importPath);
+    assert.ok(
+      existsSync(absPath),
+      `./streaming import target does not exist: ${importPath}`,
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 2.2 keywords バリデーション
+// ---------------------------------------------------------------------------
+
+describe('keywords バリデーション', () => {
+  const ESSENTIAL_KEYWORDS = ['tts', 'wasm', 'japanese', 'multilingual'];
+
+  it('keywords フィールドが定義されており配列である', () => {
+    assert.ok(Array.isArray(pkg.keywords), 'keywords should be an array');
+    assert.ok(pkg.keywords.length > 0, 'keywords should not be empty');
+  });
+
+  for (const keyword of ESSENTIAL_KEYWORDS) {
+    it(`必須キーワード "${keyword}" が含まれている`, () => {
+      assert.ok(
+        pkg.keywords.includes(keyword),
+        `keywords should include "${keyword}". Actual: [${pkg.keywords.join(', ')}]`,
+      );
+    });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// 3. files フィールドバリデーション
+// ---------------------------------------------------------------------------
+
+describe('files フィールドバリデーション', () => {
+  it('files エントリが既存のパスに解決される', () => {
     const missing = [];
 
     for (const entry of pkg.files) {
@@ -210,22 +278,22 @@ describe('files field validation', () => {
     );
   });
 
-  it('dist/openjtalk.wasm exists', () => {
+  it('dist/openjtalk.wasm が存在する', () => {
     const wasmPath = join(PROJECT_ROOT, 'dist', 'openjtalk.wasm');
     assert.ok(existsSync(wasmPath), 'dist/openjtalk.wasm is missing');
   });
 
-  it('dist/openjtalk.js exists', () => {
+  it('dist/openjtalk.js が存在する', () => {
     const jsPath = join(PROJECT_ROOT, 'dist', 'openjtalk.js');
     assert.ok(existsSync(jsPath), 'dist/openjtalk.js is missing');
   });
 
-  it('types/index.d.ts exists', () => {
+  it('types/index.d.ts が存在する', () => {
     const dtsPath = join(PROJECT_ROOT, 'types', 'index.d.ts');
     assert.ok(existsSync(dtsPath), 'types/index.d.ts is missing');
   });
 
-  it('dist/espeak-ng/ is NOT included in files', () => {
+  it('dist/espeak-ng/ が files に含まれていない', () => {
     const hasEspeakNg = pkg.files.some((entry) => {
       // Check for any pattern that would match dist/espeak-ng/
       return (
@@ -244,13 +312,13 @@ describe('files field validation', () => {
 });
 
 // ---------------------------------------------------------------------------
-// 4. Package size estimate
+// 4. パッケージサイズ見積もり
 // ---------------------------------------------------------------------------
 
-describe('package size estimate', () => {
+describe('パッケージサイズ見積もり', () => {
   const MAX_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
 
-  it('total size of files entries is under 10 MB', () => {
+  it('files エントリの合計サイズが 10 MB 以下である', () => {
     let totalBytes = 0;
     const sizeBreakdown = [];
 

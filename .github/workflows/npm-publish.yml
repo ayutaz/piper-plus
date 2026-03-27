@@ -51,8 +51,8 @@ jobs:
           fi
           echo "OK: Package size is within the 10MB limit"
 
-      - name: Run tests
-        run: npm test
+      - name: Run npm package tests
+        run: npm run test:npm-package:all
 
   publish:
     needs: validate

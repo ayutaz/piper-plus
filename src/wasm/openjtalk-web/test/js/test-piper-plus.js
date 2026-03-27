@@ -7,113 +7,144 @@
  * No actual model loading or ONNX inference is performed.
  */
 
-import { describe, it, mock, beforeEach } from 'node:test';
+import { describe, it, mock, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 
 // ---------------------------------------------------------------------------
-// Minimal browser API mocks
+// Minimal browser API mocks — saved originals for safe restoration
 // ---------------------------------------------------------------------------
 
-// Mock fetch — returns a config.json with the fields PiperPlus._init reads
-globalThis.fetch = async (url) => {
-  if (typeof url === 'string' && url.endsWith('.json')) {
+const ORIGINAL_FETCH = globalThis.fetch;
+const ORIGINAL_ORT = globalThis.ort;
+const ORIGINAL_INDEXEDDB = globalThis.indexedDB;
+
+/** Default mock config.json returned by the mock fetch. */
+function makeConfigJson(overrides = {}) {
+  return {
+    audio: { sample_rate: 22050 },
+    inference: {
+      noise_scale: 0.667,
+      length_scale: 1.0,
+      noise_w: 0.8,
+    },
+    phoneme_id_map: { _: [0], '^': [1], $: [2] },
+    num_speakers: 1,
+    num_languages: 6,
+    ...overrides,
+  };
+}
+
+/** Install default global mocks. */
+function installGlobalMocks() {
+  globalThis.fetch = async (url) => {
+    if (typeof url === 'string' && url.endsWith('.json')) {
+      return {
+        ok: true,
+        status: 200,
+        statusText: 'OK',
+        json: async () => makeConfigJson(),
+      };
+    }
     return {
       ok: true,
       status: 200,
       statusText: 'OK',
-      json: async () => ({
-        audio: { sample_rate: 22050 },
-        inference: {
-          noise_scale: 0.667,
-          length_scale: 1.0,
-          noise_w: 0.8,
-        },
-        phoneme_id_map: { _: [0], '^': [1], $: [2] },
-        num_speakers: 1,
-        num_languages: 6,
-      }),
+      arrayBuffer: async () => new ArrayBuffer(16),
     };
-  }
-  // Non-JSON URLs (model download etc.)
-  return {
-    ok: true,
-    status: 200,
-    statusText: 'OK',
-    arrayBuffer: async () => new ArrayBuffer(16),
   };
-};
 
-// Mock onnxruntime-web
-globalThis.ort = {
-  InferenceSession: {
-    create: async () => ({
-      inputNames: ['input', 'input_lengths', 'scales'],
-      outputNames: ['output'],
-      run: async () => ({
-        output: { data: new Float32Array(22050), dims: [1, 22050] },
+  globalThis.ort = {
+    InferenceSession: {
+      create: async () => ({
+        inputNames: ['input', 'input_lengths', 'scales'],
+        outputNames: ['output'],
+        run: async () => ({
+          output: { data: new Float32Array(22050), dims: [1, 22050] },
+        }),
+        release: () => {},
       }),
-      release: () => {},
-    }),
-  },
-  Tensor: class {
-    constructor(type, data, dims) {
-      this.type = type;
-      this.data = data;
-      this.dims = dims;
-    }
-  },
-};
+    },
+    Tensor: class {
+      constructor(type, data, dims) {
+        this.type = type;
+        this.data = data;
+        this.dims = dims;
+      }
+    },
+  };
 
-// Mock indexedDB (needed by ModelManager / DictManager internally)
-globalThis.indexedDB = {
-  open: () => {
-    const req = {};
-    setTimeout(() => {
-      if (req.onupgradeneeded) {
-        req.onupgradeneeded({
-          target: {
-            result: {
-              objectStoreNames: { contains: () => false },
-              createObjectStore: () => ({}),
+  globalThis.indexedDB = {
+    open: () => {
+      const req = {};
+      setTimeout(() => {
+        if (req.onupgradeneeded) {
+          req.onupgradeneeded({
+            target: {
+              result: {
+                objectStoreNames: { contains: () => false },
+                createObjectStore: () => ({}),
+              },
             },
-          },
-        });
-      }
-      if (req.onsuccess) {
-        req.result = {
-          transaction: () => ({
-            objectStore: () => ({
-              get: () => {
-                const r = {};
-                setTimeout(() => {
-                  r.result = null;
-                  if (r.onsuccess) r.onsuccess();
-                }, 0);
-                return r;
-              },
-              put: () => {
-                const r = {};
-                setTimeout(() => {
-                  if (r.onsuccess) r.onsuccess();
-                }, 0);
-                return r;
-              },
-              clear: () => {
-                const r = {};
-                setTimeout(() => {
-                  if (r.onsuccess) r.onsuccess();
-                }, 0);
-                return r;
-              },
+          });
+        }
+        if (req.onsuccess) {
+          req.result = {
+            transaction: () => ({
+              objectStore: () => ({
+                get: () => {
+                  const r = {};
+                  setTimeout(() => {
+                    r.result = null;
+                    if (r.onsuccess) r.onsuccess();
+                  }, 0);
+                  return r;
+                },
+                put: () => {
+                  const r = {};
+                  setTimeout(() => {
+                    if (r.onsuccess) r.onsuccess();
+                  }, 0);
+                  return r;
+                },
+                clear: () => {
+                  const r = {};
+                  setTimeout(() => {
+                    if (r.onsuccess) r.onsuccess();
+                  }, 0);
+                  return r;
+                },
+              }),
             }),
-          }),
-        };
-        req.onsuccess();
-      }
-    }, 0);
-    return req;
-  },
-};
+          };
+          req.onsuccess();
+        }
+      }, 0);
+      return req;
+    },
+  };
+}
+
+/** Restore all global mocks to their originals. */
+function restoreGlobalMocks() {
+  if (ORIGINAL_FETCH !== undefined) {
+    globalThis.fetch = ORIGINAL_FETCH;
+  } else {
+    delete globalThis.fetch;
+  }
+  if (ORIGINAL_ORT !== undefined) {
+    globalThis.ort = ORIGINAL_ORT;
+  } else {
+    delete globalThis.ort;
+  }
+  if (ORIGINAL_INDEXEDDB !== undefined) {
+    globalThis.indexedDB = ORIGINAL_INDEXEDDB;
+  } else {
+    delete globalThis.indexedDB;
+  }
+}
+
+// Install mocks before importing the module under test.
+installGlobalMocks();
 
 // ---------------------------------------------------------------------------
 // Import the module under test (after mocks are in place)
@@ -139,397 +170,619 @@ try {
 
 const skip = PiperPlus == null;
 
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/** Epsilon for float comparisons. */
+const FLOAT_EPSILON = 1e-3;
+
+/**
+ * Assert that two numbers are within epsilon of each other.
+ * @param {number} actual
+ * @param {number} expected
+ * @param {string} [message]
+ */
+function assertCloseTo(actual, expected, message) {
+  assert.ok(
+    Math.abs(actual - expected) < FLOAT_EPSILON,
+    `${message || 'assertCloseTo'}: expected ${expected}, got ${actual} (epsilon=${FLOAT_EPSILON})`
+  );
+}
+
+/**
+ * Build a PiperPlus instance with mocked internals that behaves as if
+ * _init() completed successfully. This centralises all private-field
+ * setup so individual tests never touch underscored properties directly.
+ *
+ * @param {Object} [overrides]
+ * @param {Object} [overrides.config]       - config.json contents
+ * @param {Object} [overrides.sessionRun]   - mock for session.run()
+ * @param {Object} [overrides.phonemizer]   - mock phonemizer methods
+ * @returns {PiperPlus}
+ */
+function createInitializedInstance(overrides = {}) {
+  const instance = new PiperPlus();
+
+  // Config — simulates what _init() reads from config.json
+  const config = overrides.config ?? {
+    phoneme_id_map: { _: [0], '^': [1], $: [2], a: [7] },
+  };
+
+  // Session — simulates the ONNX session created by _init()
+  const sessionRunFn = overrides.sessionRun ?? (async () => ({
+    output: { data: new Float32Array(100), dims: [1, 100] },
+  }));
+  const session = {
+    run: typeof sessionRunFn === 'function' && sessionRunFn.mock
+      ? sessionRunFn
+      : mock.fn(sessionRunFn),
+    release: mock.fn(),
+  };
+
+  // Phonemizer — simulates SimpleUnifiedPhonemizer after initialize()
+  const defaultPhonemizer = {
+    detectLanguage: mock.fn(() => 'ja'),
+    textToPhonemes: mock.fn(async () => 'xx^xx-sil+a=sil/A:0+0+0'),
+    extractPhonemes: mock.fn(() => ['^', 'a', '$']),
+    dispose: mock.fn(),
+  };
+  const phonemizer = { ...defaultPhonemizer, ...(overrides.phonemizer || {}) };
+
+  // Wire up the instance as _init() would
+  instance._config = config;
+  instance._session = session;
+  instance._phonemizer = phonemizer;
+  instance._ort = globalThis.ort;
+  instance._initialized = true;
+
+  return instance;
+}
+
 // ===========================================================================
-// 1. PiperPlus class existence
+// 1. PiperPlus クラスの存在確認
 // ===========================================================================
 
-describe('PiperPlus class existence', { skip }, () => {
-  it('should be importable from src/index.js', () => {
+describe('PiperPlus クラスの存在確認', { skip }, () => {
+  it('src/index.js からインポートできる', () => {
     assert.ok(PiperPlus, 'PiperPlus should be defined');
-    assert.equal(typeof PiperPlus, 'function', 'PiperPlus should be a constructor');
+    assert.equal(typeof PiperPlus, 'function');
   });
 
-  it('PiperPlus.initialize should be a static function', () => {
+  it('PiperPlus.initialize は静的関数である', () => {
     assert.equal(typeof PiperPlus.initialize, 'function');
   });
 
-  it('prototype should expose synthesize, synthesizeStreaming, dispose', () => {
+  it('synthesize メソッドを公開している', () => {
     assert.equal(typeof PiperPlus.prototype.synthesize, 'function');
+  });
+
+  it('synthesizeStreaming メソッドを公開している', () => {
     assert.equal(typeof PiperPlus.prototype.synthesizeStreaming, 'function');
+  });
+
+  it('dispose メソッドを公開している', () => {
     assert.equal(typeof PiperPlus.prototype.dispose, 'function');
   });
 
-  it('prototype should expose isInitialized and config getters', () => {
+  it('未初期化の isInitialized は false を返す', () => {
+    // Arrange
     const instance = new PiperPlus();
+
+    // Act & Assert
     assert.equal(instance.isInitialized, false);
+  });
+
+  it('未初期化の config は null を返す', () => {
+    // Arrange
+    const instance = new PiperPlus();
+
+    // Act & Assert
     assert.equal(instance.config, null);
   });
 });
 
 // ===========================================================================
-// 2. Re-exports
+// 2. 再エクスポートの確認
 // ===========================================================================
 
-describe('re-exports from src/index.js', { skip }, () => {
-  it('SimpleUnifiedPhonemizer is exported', () => {
-    assert.ok(SimpleUnifiedPhonemizer, 'SimpleUnifiedPhonemizer should be exported');
+describe('再エクスポートの確認', { skip }, () => {
+  it('SimpleUnifiedPhonemizer がエクスポートされている', () => {
+    assert.ok(SimpleUnifiedPhonemizer);
     assert.equal(typeof SimpleUnifiedPhonemizer, 'function');
   });
 
-  it('WebGPUSessionManager is exported', () => {
-    assert.ok(WebGPUSessionManager, 'WebGPUSessionManager should be exported');
+  it('WebGPUSessionManager がエクスポートされている', () => {
+    assert.ok(WebGPUSessionManager);
     assert.equal(typeof WebGPUSessionManager, 'function');
   });
 
-  it('ModelManager is exported', () => {
-    assert.ok(ModelManager, 'ModelManager should be exported');
+  it('ModelManager がエクスポートされている', () => {
+    assert.ok(ModelManager);
     assert.equal(typeof ModelManager, 'function');
   });
 
-  it('DictManager is exported', () => {
-    assert.ok(DictManager, 'DictManager should be exported');
+  it('DictManager がエクスポートされている', () => {
+    assert.ok(DictManager);
     assert.equal(typeof DictManager, 'function');
   });
 
-  it('AudioResult is exported', () => {
-    assert.ok(AudioResult, 'AudioResult should be exported');
+  it('AudioResult がエクスポートされている', () => {
+    assert.ok(AudioResult);
     assert.equal(typeof AudioResult, 'function');
   });
 
-  it('StreamingTTSPipeline is exported', () => {
-    assert.ok(StreamingTTSPipeline, 'StreamingTTSPipeline should be exported');
+  it('StreamingTTSPipeline がエクスポートされている', () => {
+    assert.ok(StreamingTTSPipeline);
     assert.equal(typeof StreamingTTSPipeline, 'function');
   });
 });
 
 // ===========================================================================
-// 3. PiperPlus.initialize validation
+// 3. PiperPlus.initialize バリデーション
 // ===========================================================================
 
-describe('PiperPlus.initialize validation', { skip }, () => {
-  it('should reject when model option is not provided', async () => {
+describe('PiperPlus.initialize バリデーション', { skip }, () => {
+  // Guarantee global mocks are always restored even if a test throws.
+  afterEach(() => {
+    installGlobalMocks();
+  });
+
+  it('model オプション未指定でリジェクトされる', async () => {
     await assert.rejects(
       () => PiperPlus.initialize({ ort: globalThis.ort }),
       (err) => {
-        assert.ok(err instanceof Error, 'should throw an Error');
+        assert.ok(err instanceof Error);
         return true;
-      },
-      'initialize() without model should reject'
+      }
     );
   });
 
-  it('should reject when model is an empty string', async () => {
+  it('model が空文字列でリジェクトされる', async () => {
     await assert.rejects(
       () => PiperPlus.initialize({ model: '', ort: globalThis.ort }),
       (err) => {
         assert.ok(err instanceof Error);
         return true;
-      },
-      'initialize() with empty model string should reject'
+      }
     );
   });
 
-  it('should reject when model name cannot be resolved', async () => {
-    // Override fetch to simulate a 404 from HuggingFace
-    const originalFetch = globalThis.fetch;
+  it('モデル名が解決できない場合リジェクトされる', async () => {
+    // Arrange — fetch returns 404 for model resolution
+    const savedFetch = globalThis.fetch;
     globalThis.fetch = async (url) => {
       if (typeof url === 'string' && url.includes('api/models')) {
         return { ok: false, status: 404, statusText: 'Not Found' };
       }
-      return originalFetch(url);
+      return savedFetch(url);
     };
 
+    // Act & Assert
     await assert.rejects(
       () => PiperPlus.initialize({ model: 'nonexistent/model', ort: globalThis.ort }),
       (err) => {
         assert.ok(err instanceof Error);
         return true;
-      },
-      'initialize() with unresolvable model should reject'
+      }
     );
-
-    globalThis.fetch = originalFetch;
+    // afterEach handles restoration
   });
 
-  it('should reject when ort is not available', async () => {
-    const savedOrt = globalThis.ort;
+  it('ort が利用不可の場合 onnxruntime-web エラーでリジェクトされる', async () => {
+    // Arrange
     delete globalThis.ort;
 
+    // Act & Assert
     await assert.rejects(
       () => PiperPlus.initialize({ model: 'tsukuyomi' }),
       (err) => {
         assert.ok(err instanceof Error);
         assert.ok(
           err.message.includes('onnxruntime-web'),
-          `message should mention onnxruntime-web, got: "${err.message}"`
+          `メッセージに onnxruntime-web が含まれること: "${err.message}"`
         );
         return true;
+      }
+    );
+    // afterEach handles restoration
+  });
+});
+
+// ===========================================================================
+// 4. SynthesizeOptions デフォルト値
+// ===========================================================================
+
+describe('SynthesizeOptions デフォルト値', { skip }, () => {
+  it('language 未指定時は自動検出にフォールバックする', async () => {
+    // Arrange
+    const detectLanguageFn = mock.fn(() => 'ja');
+    const instance = createInitializedInstance({
+      phonemizer: {
+        detectLanguage: detectLanguageFn,
+        textToPhonemes: mock.fn(async () => 'xx^xx-sil+a=sil/A:0+0+0'),
+        extractPhonemes: mock.fn(() => ['^', 'a', '$']),
+        dispose: mock.fn(),
       },
-      'initialize() without ort should reject'
-    );
+    });
 
-    globalThis.ort = savedOrt;
+    // Act
+    await instance.synthesize('test text');
+
+    // Assert — detectLanguage was called (language was auto-detected)
+    assert.equal(detectLanguageFn.mock.callCount(), 1);
+  });
+
+  it('noiseScale のデフォルトは 0.667', async () => {
+    // Arrange
+    let capturedScales = null;
+    const instance = createInitializedInstance({
+      sessionRun: async (feeds) => {
+        capturedScales = Array.from(feeds.scales.data);
+        return { output: { data: new Float32Array(100), dims: [1, 100] } };
+      },
+    });
+
+    // Act
+    await instance.synthesize('a');
+
+    // Assert
+    assert.ok(capturedScales, 'scales が session.run に渡されること');
+    assertCloseTo(capturedScales[0], 0.667, 'noiseScale デフォルト');
+  });
+
+  it('lengthScale のデフォルトは 1.0', async () => {
+    // Arrange
+    let capturedScales = null;
+    const instance = createInitializedInstance({
+      sessionRun: async (feeds) => {
+        capturedScales = Array.from(feeds.scales.data);
+        return { output: { data: new Float32Array(100), dims: [1, 100] } };
+      },
+    });
+
+    // Act
+    await instance.synthesize('a');
+
+    // Assert
+    assert.ok(capturedScales, 'scales が session.run に渡されること');
+    assertCloseTo(capturedScales[1], 1.0, 'lengthScale デフォルト');
+  });
+
+  it('noiseW のデフォルトは 0.8', async () => {
+    // Arrange
+    let capturedScales = null;
+    const instance = createInitializedInstance({
+      sessionRun: async (feeds) => {
+        capturedScales = Array.from(feeds.scales.data);
+        return { output: { data: new Float32Array(100), dims: [1, 100] } };
+      },
+    });
+
+    // Act
+    await instance.synthesize('a');
+
+    // Assert
+    assert.ok(capturedScales, 'scales が session.run に渡されること');
+    assertCloseTo(capturedScales[2], 0.8, 'noiseW デフォルト');
   });
 });
 
 // ===========================================================================
-// 4. SynthesizeOptions default values
+// 5. config.inference によるデフォルト上書き
 // ===========================================================================
 
-describe('SynthesizeOptions default values', { skip }, () => {
-  it('language defaults to auto-detection when not specified', () => {
-    // Verify by inspecting the synthesize() source path:
-    // options.language is optional per the JSDoc — when omitted, the code
-    // falls back to this._phonemizer.detectLanguage(text).
-    // We confirm the contract by constructing a raw instance and checking
-    // that synthesize() does not require language.
-    const instance = new PiperPlus();
-    // Set up minimal internals to exercise the code path
-    instance._initialized = true;
-    instance._config = {
-      inference: {},
-      phoneme_id_map: { _: [0] },
-    };
-    instance._phonemizer = {
-      detectLanguage: mock.fn(() => 'ja'),
-      textToPhonemes: mock.fn(async () => 'mock-labels'),
-      extractPhonemes: mock.fn(() => ['^', 'a', '$']),
-      dispose: () => {},
-    };
-    instance._session = {
-      run: mock.fn(async () => ({
-        output: { data: new Float32Array(100), dims: [1, 100] },
-      })),
-      release: () => {},
-    };
-    instance._ort = globalThis.ort;
-
-    // Call synthesize without specifying language — should not throw
-    assert.doesNotReject(
-      () => instance.synthesize('test text'),
-      'synthesize() without language option should not reject'
-    );
-  });
-
-  it('noiseScale defaults to 0.667', () => {
-    // The default constant is defined in index.js; verify via a round-trip:
-    // construct an instance with a config that has no inference overrides,
-    // and confirm the infer call receives the expected default.
-    const instance = new PiperPlus();
-    instance._initialized = true;
-    instance._config = {
-      phoneme_id_map: { _: [0], '^': [1], $: [2], a: [7] },
-    };
-    instance._ort = globalThis.ort;
-
+describe('config.inference によるデフォルト上書き', { skip }, () => {
+  /** Shared capture helper for this suite. */
+  function createInstanceWithConfigInference() {
     let capturedScales = null;
-    instance._session = {
-      run: mock.fn(async (feeds) => {
+    const instance = createInitializedInstance({
+      config: {
+        inference: { noise_scale: 0.5, length_scale: 1.2, noise_w: 0.6 },
+        phoneme_id_map: { _: [0], '^': [1], $: [2], a: [7] },
+      },
+      sessionRun: async (feeds) => {
         capturedScales = Array.from(feeds.scales.data);
         return { output: { data: new Float32Array(100), dims: [1, 100] } };
-      }),
-      release: () => {},
-    };
-    instance._phonemizer = {
-      detectLanguage: () => 'ja',
-      textToPhonemes: async () => 'xx^xx-sil+a=sil/A:0+0+0',
-      extractPhonemes: () => ['^', 'a', '$'],
-      dispose: () => {},
-    };
-
-    return instance.synthesize('a').then(() => {
-      assert.ok(capturedScales, 'scales should have been captured');
-      // [noiseScale, lengthScale, noiseW]
-      assert.ok(Math.abs(capturedScales[0] - 0.667) < 1e-3, 'noiseScale default');
-      assert.ok(Math.abs(capturedScales[1] - 1.0) < 1e-3, 'lengthScale default');
-      assert.ok(Math.abs(capturedScales[2] - 0.8) < 1e-3, 'noiseW default');
+      },
     });
+    return { instance, getCapturedScales: () => capturedScales };
+  }
+
+  it('config.inference.noise_scale がハードコードデフォルトより優先される', async () => {
+    // Arrange
+    const { instance, getCapturedScales } = createInstanceWithConfigInference();
+
+    // Act
+    await instance.synthesize('a');
+
+    // Assert
+    assertCloseTo(getCapturedScales()[0], 0.5, 'noiseScale from config');
   });
 
-  it('config inference overrides take precedence over hard-coded defaults', () => {
-    const instance = new PiperPlus();
-    instance._initialized = true;
-    instance._config = {
-      inference: { noise_scale: 0.5, length_scale: 1.2, noise_w: 0.6 },
-      phoneme_id_map: { _: [0], '^': [1], $: [2], a: [7] },
-    };
-    instance._ort = globalThis.ort;
+  it('config.inference.length_scale がハードコードデフォルトより優先される', async () => {
+    // Arrange
+    const { instance, getCapturedScales } = createInstanceWithConfigInference();
 
-    let capturedScales = null;
-    instance._session = {
-      run: mock.fn(async (feeds) => {
-        capturedScales = Array.from(feeds.scales.data);
-        return { output: { data: new Float32Array(100), dims: [1, 100] } };
-      }),
-      release: () => {},
-    };
-    instance._phonemizer = {
-      detectLanguage: () => 'ja',
-      textToPhonemes: async () => 'labels',
-      extractPhonemes: () => ['^', 'a', '$'],
-      dispose: () => {},
-    };
+    // Act
+    await instance.synthesize('a');
 
-    return instance.synthesize('a').then(() => {
-      assert.ok(capturedScales);
-      assert.ok(Math.abs(capturedScales[0] - 0.5) < 1e-3, 'noiseScale from config');
-      assert.ok(Math.abs(capturedScales[1] - 1.2) < 1e-3, 'lengthScale from config');
-      assert.ok(Math.abs(capturedScales[2] - 0.6) < 1e-3, 'noiseW from config');
-    });
+    // Assert
+    assertCloseTo(getCapturedScales()[1], 1.2, 'lengthScale from config');
   });
 
-  it('explicit options override config defaults', () => {
-    const instance = new PiperPlus();
-    instance._initialized = true;
-    instance._config = {
-      inference: { noise_scale: 0.5, length_scale: 1.2, noise_w: 0.6 },
-      phoneme_id_map: { _: [0], '^': [1], $: [2], a: [7] },
-    };
-    instance._ort = globalThis.ort;
+  it('config.inference.noise_w がハードコードデフォルトより優先される', async () => {
+    // Arrange
+    const { instance, getCapturedScales } = createInstanceWithConfigInference();
 
-    let capturedScales = null;
-    instance._session = {
-      run: mock.fn(async (feeds) => {
-        capturedScales = Array.from(feeds.scales.data);
-        return { output: { data: new Float32Array(100), dims: [1, 100] } };
-      }),
-      release: () => {},
-    };
-    instance._phonemizer = {
-      detectLanguage: () => 'ja',
-      textToPhonemes: async () => 'labels',
-      extractPhonemes: () => ['^', 'a', '$'],
-      dispose: () => {},
-    };
+    // Act
+    await instance.synthesize('a');
 
-    return instance
-      .synthesize('a', { noiseScale: 0.3, lengthScale: 0.9, noiseW: 0.4 })
-      .then(() => {
-        assert.ok(capturedScales);
-        assert.ok(Math.abs(capturedScales[0] - 0.3) < 1e-3, 'noiseScale from explicit option');
-        assert.ok(Math.abs(capturedScales[1] - 0.9) < 1e-3, 'lengthScale from explicit option');
-        assert.ok(Math.abs(capturedScales[2] - 0.4) < 1e-3, 'noiseW from explicit option');
-      });
+    // Assert
+    assertCloseTo(getCapturedScales()[2], 0.6, 'noiseW from config');
   });
 });
 
 // ===========================================================================
-// 5. dispose()
+// 6. 明示的オプションによる上書き
+// ===========================================================================
+
+describe('明示的オプションによる上書き', { skip }, () => {
+  /** Shared capture helper for this suite. */
+  function createInstanceWithConfigAndExplicit() {
+    let capturedScales = null;
+    const instance = createInitializedInstance({
+      config: {
+        inference: { noise_scale: 0.5, length_scale: 1.2, noise_w: 0.6 },
+        phoneme_id_map: { _: [0], '^': [1], $: [2], a: [7] },
+      },
+      sessionRun: async (feeds) => {
+        capturedScales = Array.from(feeds.scales.data);
+        return { output: { data: new Float32Array(100), dims: [1, 100] } };
+      },
+    });
+    return { instance, getCapturedScales: () => capturedScales };
+  }
+
+  it('noiseScale の明示的オプションが config より優先される', async () => {
+    // Arrange
+    const { instance, getCapturedScales } = createInstanceWithConfigAndExplicit();
+
+    // Act
+    await instance.synthesize('a', { noiseScale: 0.3, lengthScale: 0.9, noiseW: 0.4 });
+
+    // Assert
+    assertCloseTo(getCapturedScales()[0], 0.3, 'noiseScale from explicit option');
+  });
+
+  it('lengthScale の明示的オプションが config より優先される', async () => {
+    // Arrange
+    const { instance, getCapturedScales } = createInstanceWithConfigAndExplicit();
+
+    // Act
+    await instance.synthesize('a', { noiseScale: 0.3, lengthScale: 0.9, noiseW: 0.4 });
+
+    // Assert
+    assertCloseTo(getCapturedScales()[1], 0.9, 'lengthScale from explicit option');
+  });
+
+  it('noiseW の明示的オプションが config より優先される', async () => {
+    // Arrange
+    const { instance, getCapturedScales } = createInstanceWithConfigAndExplicit();
+
+    // Act
+    await instance.synthesize('a', { noiseScale: 0.3, lengthScale: 0.9, noiseW: 0.4 });
+
+    // Assert
+    assertCloseTo(getCapturedScales()[2], 0.4, 'noiseW from explicit option');
+  });
+});
+
+// ===========================================================================
+// 7. synthesize() 正常系 (ハッピーパス)
+// ===========================================================================
+
+describe('synthesize() 正常系', { skip }, () => {
+  it('テキストから AudioResult を返す', async () => {
+    // Arrange
+    const expectedSamples = new Float32Array([0.1, 0.2, 0.3, -0.1, -0.2]);
+    const instance = createInitializedInstance({
+      config: {
+        audio: { sample_rate: 22050 },
+        phoneme_id_map: { _: [0], '^': [1], $: [2], a: [7] },
+      },
+      sessionRun: async () => ({
+        output: { data: expectedSamples, dims: [1, expectedSamples.length] },
+      }),
+    });
+
+    // Act
+    const result = await instance.synthesize('テスト');
+
+    // Assert
+    assert.ok(result instanceof AudioResult, '戻り値は AudioResult のインスタンスであること');
+  });
+
+  it('返された AudioResult に正しい sampleRate が設定される', async () => {
+    // Arrange
+    const instance = createInitializedInstance({
+      config: {
+        audio: { sample_rate: 44100 },
+        phoneme_id_map: { _: [0], '^': [1], $: [2], a: [7] },
+      },
+    });
+
+    // Act
+    const result = await instance.synthesize('テスト');
+
+    // Assert
+    assert.equal(result.sampleRate, 44100);
+  });
+
+  it('返された AudioResult に音声サンプルが含まれる', async () => {
+    // Arrange
+    const expectedSamples = new Float32Array([0.5, -0.5, 0.25]);
+    const instance = createInitializedInstance({
+      sessionRun: async () => ({
+        output: { data: expectedSamples, dims: [1, expectedSamples.length] },
+      }),
+    });
+
+    // Act
+    const result = await instance.synthesize('テスト');
+
+    // Assert
+    assert.ok(result.samples instanceof Float32Array, 'samples は Float32Array であること');
+    assert.equal(result.samples.length, expectedSamples.length, '出力サンプル数が一致すること');
+  });
+
+  it('phonemize から infer までのパイプラインが実行される', async () => {
+    // Arrange
+    const textToPhonemesFn = mock.fn(async () => 'xx^xx-sil+a=sil/A:0+0+0');
+    const extractPhonemesFn = mock.fn(() => ['^', 'a', '$']);
+    const sessionRunFn = mock.fn(async () => ({
+      output: { data: new Float32Array(100), dims: [1, 100] },
+    }));
+
+    const instance = createInitializedInstance({
+      sessionRun: sessionRunFn,
+      phonemizer: {
+        detectLanguage: mock.fn(() => 'ja'),
+        textToPhonemes: textToPhonemesFn,
+        extractPhonemes: extractPhonemesFn,
+        dispose: mock.fn(),
+      },
+    });
+
+    // Act
+    await instance.synthesize('こんにちは');
+
+    // Assert — each stage of the pipeline was invoked
+    assert.equal(textToPhonemesFn.mock.callCount(), 1, 'textToPhonemes が呼ばれること');
+    assert.equal(extractPhonemesFn.mock.callCount(), 1, 'extractPhonemes が呼ばれること');
+    assert.equal(sessionRunFn.mock.callCount(), 1, 'session.run が呼ばれること');
+  });
+});
+
+// ===========================================================================
+// 8. dispose()
 // ===========================================================================
 
 describe('dispose()', { skip }, () => {
-  it('should not throw on first call', () => {
+  it('未初期化インスタンスでも例外を投げない', () => {
+    // Arrange
     const instance = new PiperPlus();
+
+    // Act & Assert
     assert.doesNotThrow(() => instance.dispose());
   });
 
-  it('should not throw on double dispose', () => {
-    const instance = new PiperPlus();
-    instance.dispose();
-    assert.doesNotThrow(
-      () => instance.dispose(),
-      'second dispose() call should not throw'
-    );
-  });
+  it('二重 dispose でも例外を投げない', () => {
+    // Arrange
+    const instance = createInitializedInstance();
 
-  it('should release the ONNX session', () => {
-    const instance = new PiperPlus();
-    const releaseFn = mock.fn();
-    instance._session = { release: releaseFn };
-    instance._phonemizer = { dispose: () => {} };
-    instance._initialized = true;
-
+    // Act
     instance.dispose();
 
-    assert.equal(releaseFn.mock.callCount(), 1, 'session.release() should be called once');
-    assert.equal(instance._session, null, 'session should be nulled');
+    // Assert
+    assert.doesNotThrow(() => instance.dispose());
   });
 
-  it('should dispose the phonemizer', () => {
-    const instance = new PiperPlus();
-    const disposeFn = mock.fn();
-    instance._session = { release: () => {} };
-    instance._phonemizer = { dispose: disposeFn };
-    instance._initialized = true;
+  it('ONNX セッションの release() を呼び出す', () => {
+    // Arrange
+    const instance = createInitializedInstance();
+    const session = instance._session; // capture ref before dispose nulls it
 
+    // Act
     instance.dispose();
 
-    assert.equal(disposeFn.mock.callCount(), 1, 'phonemizer.dispose() should be called once');
-    assert.equal(instance._phonemizer, null, 'phonemizer should be nulled');
+    // Assert
+    assert.equal(session.release.mock.callCount(), 1);
   });
 
-  it('should set isInitialized to false after dispose', () => {
-    const instance = new PiperPlus();
-    instance._session = { release: () => {} };
-    instance._phonemizer = { dispose: () => {} };
-    instance._initialized = true;
+  it('dispose 後にセッションが null になる', () => {
+    // Arrange
+    const instance = createInitializedInstance();
 
-    assert.equal(instance.isInitialized, true);
+    // Act
     instance.dispose();
-    assert.equal(instance.isInitialized, false);
-  });
 
-  it('should handle session without release method gracefully', () => {
-    const instance = new PiperPlus();
-    instance._session = {}; // no release method
-    instance._phonemizer = { dispose: () => {} };
-    instance._initialized = true;
-
-    assert.doesNotThrow(
-      () => instance.dispose(),
-      'dispose() should not throw when session lacks release()'
-    );
+    // Assert
     assert.equal(instance._session, null);
   });
 
-  it('synthesize() should reject after dispose', async () => {
-    const instance = new PiperPlus();
-    instance._initialized = true;
-    instance._session = { release: () => {} };
-    instance._phonemizer = { dispose: () => {} };
+  it('phonemizer の dispose() を呼び出す', () => {
+    // Arrange
+    const instance = createInitializedInstance();
+    const phonemizer = instance._phonemizer; // capture ref before dispose nulls it
 
+    // Act
     instance.dispose();
 
+    // Assert
+    assert.equal(phonemizer.dispose.mock.callCount(), 1);
+  });
+
+  it('dispose 後に phonemizer が null になる', () => {
+    // Arrange
+    const instance = createInitializedInstance();
+
+    // Act
+    instance.dispose();
+
+    // Assert
+    assert.equal(instance._phonemizer, null);
+  });
+
+  it('dispose 後に isInitialized が false になる', () => {
+    // Arrange
+    const instance = createInitializedInstance();
+    assert.equal(instance.isInitialized, true);
+
+    // Act
+    instance.dispose();
+
+    // Assert
+    assert.equal(instance.isInitialized, false);
+  });
+
+  it('release メソッドのないセッションでも例外を投げない', () => {
+    // Arrange
+    const instance = createInitializedInstance();
+    instance._session = {}; // overwrite with no release()
+
+    // Act & Assert
+    assert.doesNotThrow(() => instance.dispose());
+  });
+
+  it('dispose 後の synthesize() はリジェクトされる', async () => {
+    // Arrange
+    const instance = createInitializedInstance();
+    instance.dispose();
+
+    // Act & Assert
     await assert.rejects(
       () => instance.synthesize('hello'),
       (err) => {
         assert.ok(err.message.includes('not initialized'));
         return true;
-      },
-      'synthesize() after dispose should reject'
+      }
     );
   });
 });
 
 // ===========================================================================
-// 6. synthesize() input validation
+// 9. synthesize() 入力バリデーション
 // ===========================================================================
 
-describe('synthesize() input validation', { skip }, () => {
+describe('synthesize() 入力バリデーション', { skip }, () => {
   let instance;
 
   beforeEach(() => {
-    instance = new PiperPlus();
-    instance._initialized = true;
-    instance._config = {
-      phoneme_id_map: { _: [0] },
-    };
-    instance._ort = globalThis.ort;
-    instance._session = {
-      run: async () => ({
-        output: { data: new Float32Array(100), dims: [1, 100] },
-      }),
-      release: () => {},
-    };
-    instance._phonemizer = {
-      detectLanguage: () => 'ja',
-      textToPhonemes: async () => 'labels',
-      extractPhonemes: () => ['^', '$'],
-      dispose: () => {},
-    };
+    instance = createInitializedInstance();
   });
 
-  it('should reject when text is empty', async () => {
+  it('空文字列でリジェクトされる', async () => {
     await assert.rejects(
       () => instance.synthesize(''),
       (err) => {
@@ -539,7 +792,7 @@ describe('synthesize() input validation', { skip }, () => {
     );
   });
 
-  it('should reject when text is null', async () => {
+  it('null でリジェクトされる', async () => {
     await assert.rejects(
       () => instance.synthesize(null),
       (err) => {
@@ -549,8 +802,11 @@ describe('synthesize() input validation', { skip }, () => {
     );
   });
 
-  it('should reject when called before initialization', async () => {
+  it('初期化前に呼び出すとリジェクトされる', async () => {
+    // Arrange — raw uninitialized instance
     const raw = new PiperPlus();
+
+    // Act & Assert
     await assert.rejects(
       () => raw.synthesize('hello'),
       (err) => {
@@ -562,14 +818,15 @@ describe('synthesize() input validation', { skip }, () => {
 });
 
 // ===========================================================================
-// 7. synthesizeStreaming() input validation
+// 10. synthesizeStreaming() 入力バリデーション
 // ===========================================================================
 
-describe('synthesizeStreaming() input validation', { skip }, () => {
-  it('should reject when text is empty', async () => {
-    const instance = new PiperPlus();
-    instance._initialized = true;
+describe('synthesizeStreaming() 入力バリデーション', { skip }, () => {
+  it('空文字列でリジェクトされる', async () => {
+    // Arrange
+    const instance = createInitializedInstance();
 
+    // Act & Assert
     await assert.rejects(
       () => instance.synthesizeStreaming(''),
       (err) => {
@@ -579,8 +836,11 @@ describe('synthesizeStreaming() input validation', { skip }, () => {
     );
   });
 
-  it('should reject when called before initialization', async () => {
+  it('初期化前に呼び出すとリジェクトされる', async () => {
+    // Arrange
     const raw = new PiperPlus();
+
+    // Act & Assert
     await assert.rejects(
       () => raw.synthesizeStreaming('hello'),
       (err) => {
@@ -592,7 +852,7 @@ describe('synthesizeStreaming() input validation', { skip }, () => {
 });
 
 // ===========================================================================
-// Report import error if PiperPlus could not be loaded
+// インポートエラーの報告
 // ===========================================================================
 
 if (importError) {
