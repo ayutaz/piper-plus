@@ -1,0 +1,80 @@
+name: npm publish
+
+on:
+  push:
+    tags:
+      - 'npm-v*'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: src/wasm/openjtalk-web
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+
+      - name: Verify tag matches package.json version
+        run: |
+          TAG="${GITHUB_REF#refs/tags/npm-v}"
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          echo "Git tag version: $TAG"
+          echo "package.json version: $PKG_VERSION"
+          if [ "$TAG" != "$PKG_VERSION" ]; then
+            echo "ERROR: Tag version ($TAG) does not match package.json version ($PKG_VERSION)"
+            exit 1
+          fi
+
+      - name: Dry-run pack and verify contents
+        run: |
+          npm pack --dry-run 2>&1 | tee /tmp/pack-output.txt
+          echo ""
+          echo "=== Package contents above ==="
+
+      - name: Check package size is under 10MB
+        run: |
+          TARBALL=$(npm pack 2>/dev/null)
+          SIZE=$(stat -c%s "$TARBALL")
+          SIZE_MB=$(awk "BEGIN {printf \"%.2f\", $SIZE / 1048576}")
+          echo "Package size: $SIZE bytes ($SIZE_MB MB)"
+          rm -f "$TARBALL"
+          if [ "$SIZE" -gt 10485760 ]; then
+            echo "ERROR: Package size ($SIZE_MB MB) exceeds 10MB limit"
+            exit 1
+          fi
+          echo "OK: Package size is within the 10MB limit"
+
+      - name: Run npm package tests
+        run: npm run test:npm-package:all
+
+  publish:
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write
+    defaults:
+      run:
+        working-directory: src/wasm/openjtalk-web
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+          registry-url: https://registry.npmjs.org
+
+      - name: Publish to npm
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

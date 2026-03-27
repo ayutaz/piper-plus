@@ -512,9 +512,27 @@ jobs:
       - name: Check piper-plus-python
         run: cargo check -p piper-plus-python
 
+  npm-package-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: src/wasm/openjtalk-web
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+
+      - name: Run npm package tests
+        run: npm run test:npm-package:all
+
   lint:
     runs-on: ubuntu-latest
-    
+
     steps:
       - uses: actions/checkout@v6
       

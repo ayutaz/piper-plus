@@ -1,0 +1,51 @@
+# espeak-ng (GPL, excluded from npm package)
+dist/espeak-ng/
+
+# Backup files
+dist/*.bak
+
+# Large assets (downloaded dynamically at runtime)
+assets/
+
+# ONNX models (downloaded from HuggingFace at runtime)
+models/
+
+# Build scripts and artifacts
+build/
+
+# Tests
+test/
+
+# Demo files
+demo/
+
+# Patches
+patches/
+
+# Scripts
+scripts/
+
+# C/C++ source files
+src/*.c
+src/*.cpp
+
+# HTML test/demo files
+*.html
+
+# Python servers
+serve.py
+server.py
+
+# Shell scripts
+prepare-*.sh
+build-local.sh
+
+# GitHub Pages test
+github-pages-test.html
+
+# Development documentation
+DEVELOPMENT.md
+TESTING.md
+
+# Git
+.gitignore
