@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- PyPI パッケージ名を `piper-tts-plus` から `piper-plus` に変更 — 全レジストリ (npm, crates.io, NuGet) で名前統一
+  - `pip install piper-plus` でインストール可能に
+  - 旧パッケージ `piper-tts-plus` はスタブリリースで `piper-plus` へリダイレクト予定
+
 ## [1.9.0] - 2026-03-28
 
 ### Added

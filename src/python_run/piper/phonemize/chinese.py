@@ -1,6 +1,6 @@
 """Chinese (Mandarin) phonemizer using pypinyin for Piper TTS.
 
-Runtime version for piper-tts-plus inference.
+Runtime version for piper-plus inference.
 Converts Chinese text to IPA phonemes via pinyin intermediate representation.
 G2P logic is identical to the training side (piper_train.phonemize.chinese).
 """

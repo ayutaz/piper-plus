@@ -1,4 +1,4 @@
-"""Phonemization modules for piper-tts-plus inference."""
+"""Phonemization modules for piper-plus inference."""
 
 from .chinese import phonemize_chinese
 from .english import phonemize_english

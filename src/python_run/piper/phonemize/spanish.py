@@ -1,6 +1,6 @@
 """Rule-based Spanish G2P (grapheme-to-phoneme) module.
 
-Runtime version for piper-tts-plus inference.
+Runtime version for piper-plus inference.
 Converts Spanish text to IPA phonemes using orthographic rules.
 G2P logic is identical to the training side (piper_train.phonemize.spanish).
 

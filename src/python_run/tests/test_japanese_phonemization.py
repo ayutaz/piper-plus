@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Test Japanese phonemization functionality for piper-tts-plus"""
+"""Test Japanese phonemization functionality for piper-plus"""
 
 import json
 from unittest.mock import MagicMock, patch

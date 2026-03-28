@@ -3,8 +3,8 @@
 English | [日本語](README.md) | [中文](README_ZH.md) | [Français](README_FR.md)
 
 [![CI](https://github.com/ayutaz/piper-plus/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/ayutaz/piper-plus/actions/workflows/ci.yml)
-[![PyPI](https://img.shields.io/pypi/v/piper-tts-plus)](https://pypi.org/project/piper-tts-plus/)
-[![Python](https://img.shields.io/pypi/pyversions/piper-tts-plus)](https://pypi.org/project/piper-tts-plus/)
+[![PyPI](https://img.shields.io/pypi/v/piper-plus)](https://pypi.org/project/piper-plus/)
+[![Python](https://img.shields.io/pypi/pyversions/piper-plus)](https://pypi.org/project/piper-plus/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Hugging Face Demo](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Demo-blue)](https://huggingface.co/spaces/ayousanz/piper-plus-demo)
 [![Hugging Face Model](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Model-orange)](https://huggingface.co/ayousanz/piper-plus-base)
@@ -55,7 +55,7 @@ A fast, high-quality neural text-to-speech (TTS) system. Built on the [VITS](htt
 - **C++ CLI** — Streaming, CUDA inference, phoneme timing output, custom dictionary
 - **[WebAssembly](src/wasm/openjtalk-web/README.md)** — Fully runs in browser, no server
 - **[Docker](docker/README.md)** — 5 images for inference, training, WebUI, and C++
-- **PyPI** — `pip install piper-tts-plus`
+- **PyPI** — `pip install piper-plus`
 - **C# CLI** — .NET 8/9 cross-platform, 6-language multilingual, ONNX inference
 - **Rust CLI** — piper-plus/piper-plus-cli, streaming, CUDA/CoreML/DirectML support, auto dictionary download
 
@@ -193,14 +193,14 @@ uv pip install ".[dev]"
 Also available from PyPI:
 
 ```bash
-pip install piper-tts-plus
+pip install piper-plus
 ```
 
 ### Install from Package Managers
 
 **Python (PyPI):**
 ```bash
-pip install piper-tts-plus
+pip install piper-plus
 ```
 
 **C# CLI (.NET Global Tool):**

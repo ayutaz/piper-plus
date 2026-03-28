@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "piper-tts-plus"
+dynamic = ["version"]
+description = "This package has been renamed to piper-plus. Install piper-plus instead."
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+authors = [
+    {name = "yousan", email = "rabbitcats77@gmail.com"},
+]
+dependencies = ["piper-plus"]
+classifiers = [
+    "Development Status :: 7 - Inactive",
+    "Intended Audience :: Developers",
+    "Topic :: Text Processing :: Linguistic",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+keywords = ["piper", "tts", "deprecated", "renamed"]
+
+[project.urls]
+Homepage = "https://github.com/ayutaz/piper-plus"
+"New Package" = "https://pypi.org/project/piper-plus/"
+
+[tool.setuptools.dynamic]
+version = {file = "../../VERSION"}

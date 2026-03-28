@@ -3,8 +3,8 @@
 [English](README_EN.md) | [日本語](README.md) | 中文 | [Français](README_FR.md)
 
 [![CI](https://github.com/ayutaz/piper-plus/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/ayutaz/piper-plus/actions/workflows/ci.yml)
-[![PyPI](https://img.shields.io/pypi/v/piper-tts-plus)](https://pypi.org/project/piper-tts-plus/)
-[![Python](https://img.shields.io/pypi/pyversions/piper-tts-plus)](https://pypi.org/project/piper-tts-plus/)
+[![PyPI](https://img.shields.io/pypi/v/piper-plus)](https://pypi.org/project/piper-plus/)
+[![Python](https://img.shields.io/pypi/pyversions/piper-plus)](https://pypi.org/project/piper-plus/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Hugging Face Demo](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Demo-blue)](https://huggingface.co/spaces/ayousanz/piper-plus-demo)
 [![Hugging Face Model](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Model-orange)](https://huggingface.co/ayousanz/piper-plus-base)
@@ -55,7 +55,7 @@
 - **C++ CLI** — 流式处理、CUDA 推理、音素时间输出、自定义词典
 - **[WebAssembly](src/wasm/openjtalk-web/README.md)** — 完全在浏览器中运行，无需服务器
 - **[Docker](docker/README.md)** — 提供推理、训练、WebUI、C++ 共 5 个镜像
-- **PyPI** — `pip install piper-tts-plus`
+- **PyPI** — `pip install piper-plus`
 - **C# CLI** — .NET 8/9 跨平台，6语言多语言支持，ONNX 推理
 - **Rust CLI** — piper-plus/piper-plus-cli，流式处理，CUDA/CoreML/DirectML 支持，词典自动下载
 
@@ -242,14 +242,14 @@ uv pip install ".[dev]"
 也可从 PyPI 安装：
 
 ```bash
-pip install piper-tts-plus
+pip install piper-plus
 ```
 
 ### 从包管理器安装
 
 **Python (PyPI):**
 ```bash
-pip install piper-tts-plus
+pip install piper-plus
 ```
 
 **C# CLI (.NET 全局工具):**

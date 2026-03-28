@@ -126,7 +126,7 @@ jobs:
           echo "### 📦 Installation" >> $GITHUB_OUTPUT
           echo "\`\`\`bash" >> $GITHUB_OUTPUT
           echo "# Python" >> $GITHUB_OUTPUT
-          echo "pip install piper-tts-plus==${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          echo "pip install piper-plus==${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
           echo "" >> $GITHUB_OUTPUT
           echo "# C# (.NET Global Tool) — v0.1.0" >> $GITHUB_OUTPUT
           echo "dotnet tool install -g PiperPlus.Cli --version 0.1.0" >> $GITHUB_OUTPUT
@@ -140,7 +140,7 @@ jobs:
           echo "" >> $GITHUB_OUTPUT
 
           echo "### 🔗 Links" >> $GITHUB_OUTPUT
-          echo "- [PyPI Package](https://pypi.org/project/piper-tts-plus/${{ github.event.inputs.version }}/)" >> $GITHUB_OUTPUT
+          echo "- [PyPI Package](https://pypi.org/project/piper-plus/${{ github.event.inputs.version }}/)" >> $GITHUB_OUTPUT
           echo "- [NuGet Package (CLI)](https://www.nuget.org/packages/PiperPlus.Cli)" >> $GITHUB_OUTPUT
           echo "- [NuGet Package (Core)](https://www.nuget.org/packages/PiperPlus.Core)" >> $GITHUB_OUTPUT
           echo "- [crates.io Package (CLI)](https://crates.io/crates/piper-plus-cli)" >> $GITHUB_OUTPUT
@@ -252,6 +252,45 @@ jobs:
             twine upload --skip-existing dist/*.whl
           else
             echo "⚠️ PyPI token not found or no wheels to upload, skipping"
+          fi
+
+  # Publish stub package (piper-tts-plus -> piper-plus redirect)
+  publish_pypi_stub:
+    name: Publish PyPI Stub (piper-tts-plus)
+    needs: [publish_pypi]
+    if: |
+      always() &&
+      needs.publish_pypi.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+
+      - name: Install build tools
+        run: pip install build twine
+
+      - name: Update VERSION for stub
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          echo "$VERSION" > VERSION
+
+      - name: Build stub package
+        working-directory: src/python_stub
+        run: python -m build
+
+      - name: Publish stub to PyPI
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PIPY_TOKEN }}
+        run: |
+          if [ -n "$TWINE_PASSWORD" ]; then
+            twine upload --skip-existing src/python_stub/dist/*
+          else
+            echo "⚠️ PyPI token not found, skipping stub publish"
           fi
 
   # C# CLI builds
@@ -530,7 +569,7 @@ jobs:
   release_summary:
     name: Release Summary
     runs-on: ubuntu-latest
-    needs: [create_release, build_all, publish_pypi, publish_nuget, publish_crates, csharp-cli, rust-cli]
+    needs: [create_release, build_all, publish_pypi, publish_pypi_stub, publish_nuget, publish_crates, csharp-cli, rust-cli]
     if: always()
     steps:
       - name: Summary
@@ -544,6 +583,7 @@ jobs:
           echo "- Create Release: ${{ needs.create_release.result }}"
           echo "- Build All: ${{ needs.build_all.result }}"
           echo "- Publish PyPI: ${{ needs.publish_pypi.result }}"
+          echo "- Publish PyPI Stub: ${{ needs.publish_pypi_stub.result }}"
           echo "- Publish NuGet: ${{ needs.publish_nuget.result }}"
           echo "- Publish crates.io: ${{ needs.publish_crates.result }}"
           echo "- C# CLI: ${{ needs.csharp-cli.result }}"
@@ -553,6 +593,7 @@ jobs:
           echo "## Release Summary" >> $GITHUB_STEP_SUMMARY
           echo "- C++/Python Build: ${{ needs.build_all.result }}" >> $GITHUB_STEP_SUMMARY
           echo "- PyPI: ${{ needs.publish_pypi.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- PyPI Stub: ${{ needs.publish_pypi_stub.result }}" >> $GITHUB_STEP_SUMMARY
           echo "- NuGet: ${{ needs.publish_nuget.result }}" >> $GITHUB_STEP_SUMMARY
           echo "- crates.io: ${{ needs.publish_crates.result }}" >> $GITHUB_STEP_SUMMARY
           echo "- C# CLI: ${{ needs.csharp-cli.result }}" >> $GITHUB_STEP_SUMMARY
