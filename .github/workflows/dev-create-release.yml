@@ -134,8 +134,9 @@ jobs:
           echo "# Rust — v0.1.0" >> $GITHUB_OUTPUT
           echo "cargo install piper-plus-cli --version 0.1.0" >> $GITHUB_OUTPUT
           echo "" >> $GITHUB_OUTPUT
-          echo "# npm (Browser WASM) — v0.1.1" >> $GITHUB_OUTPUT
-          echo "npm install piper-plus@0.1.1" >> $GITHUB_OUTPUT
+          NPM_VERSION=$(node -p "require('./src/wasm/openjtalk-web/package.json').version")
+          echo "# npm (Browser WASM) — v${NPM_VERSION}" >> $GITHUB_OUTPUT
+          echo "npm install piper-plus@${NPM_VERSION}" >> $GITHUB_OUTPUT
           echo "\`\`\`" >> $GITHUB_OUTPUT
           echo "" >> $GITHUB_OUTPUT
 
