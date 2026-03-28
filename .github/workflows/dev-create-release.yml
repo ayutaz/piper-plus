@@ -133,6 +133,9 @@ jobs:
           echo "" >> $GITHUB_OUTPUT
           echo "# Rust — v0.1.0" >> $GITHUB_OUTPUT
           echo "cargo install piper-plus-cli --version 0.1.0" >> $GITHUB_OUTPUT
+          echo "" >> $GITHUB_OUTPUT
+          echo "# npm (Browser WASM) — v0.1.0" >> $GITHUB_OUTPUT
+          echo "npm install piper-plus" >> $GITHUB_OUTPUT
           echo "\`\`\`" >> $GITHUB_OUTPUT
           echo "" >> $GITHUB_OUTPUT
 
@@ -142,6 +145,7 @@ jobs:
           echo "- [NuGet Package (Core)](https://www.nuget.org/packages/PiperPlus.Core)" >> $GITHUB_OUTPUT
           echo "- [crates.io Package (CLI)](https://crates.io/crates/piper-plus-cli)" >> $GITHUB_OUTPUT
           echo "- [crates.io Package (Core)](https://crates.io/crates/piper-plus)" >> $GITHUB_OUTPUT
+          echo "- [npm Package](https://www.npmjs.com/package/piper-plus)" >> $GITHUB_OUTPUT
           echo "- [Documentation](https://github.com/ayutaz/piper-plus#readme)" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
