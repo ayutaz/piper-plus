@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.9.0] - 2026-03-28
+
+### Added
+- npm パッケージ `piper-plus` v0.1.0 — ブラウザ内で完全オフラインの多言語 TTS (JA/EN/ZH/ES/FR/PT) を提供 (#285)
+  - OpenJTalk WASM (JA)、SimpleEnglishPhonemizer (EN)、キャラクタベース (ZH/ES/FR/PT)
+  - `onnxruntime-web` による ONNX 推論、eSpeak-ng 不使用 (GPL リスク回避)
+  - `PiperPlus`, `ModelManager`, `DictManager`, `AudioResult` 高レベル API
+  - HuggingFace モデル自動 DL + IndexedDB キャッシュ
+  - 282 テスト、CI (`npm-publish.yml`)
+- PyPI パッケージ (`piper-tts-plus`) にプロジェクト説明 (README.md) を追加 (#286)
+
 ## [1.8.2] - 2026-03-24
 
 ### Added
