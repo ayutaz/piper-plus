@@ -135,7 +135,7 @@ jobs:
           echo "cargo install piper-plus-cli --version 0.1.0" >> $GITHUB_OUTPUT
           echo "" >> $GITHUB_OUTPUT
           echo "# npm (Browser WASM) — v0.1.0" >> $GITHUB_OUTPUT
-          echo "npm install piper-plus" >> $GITHUB_OUTPUT
+          echo "npm install piper-plus@0.1.0" >> $GITHUB_OUTPUT
           echo "\`\`\`" >> $GITHUB_OUTPUT
           echo "" >> $GITHUB_OUTPUT
 
