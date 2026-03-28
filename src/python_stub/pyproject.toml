@@ -12,7 +12,7 @@ license = {text = "MIT"}
 authors = [
     {name = "yousan", email = "rabbitcats77@gmail.com"},
 ]
-dependencies = ["piper-plus"]
+dependencies = ["piper-plus>=1.10.0"]
 classifiers = [
     "Development Status :: 7 - Inactive",
     "Intended Audience :: Developers",
