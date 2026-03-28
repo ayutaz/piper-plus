@@ -129,11 +129,20 @@ export class SimpleUnifiedPhonemizer {
 
         // ---- Pre-loaded data path (from DictManager.loadDictionary()) ----
         if (config.dictData && config.voiceData) {
+            // Validate all required files are present
+            const missing = dictFileNames.filter(f => !(config.dictData[f] instanceof ArrayBuffer));
+            if (missing.length > 0) {
+                throw new Error(
+                    `Missing required dictionary files: ${missing.join(', ')}. ` +
+                    'All 8 OpenJTalk dictionary files must be provided.'
+                );
+            }
+            if (!(config.voiceData instanceof ArrayBuffer)) {
+                throw new Error('voiceData must be an ArrayBuffer.');
+            }
+
             for (const file of dictFileNames) {
-                const data = config.dictData[file];
-                if (data) {
-                    this.openjtalkModule.FS.writeFile(`/dict/${file}`, new Uint8Array(data));
-                }
+                this.openjtalkModule.FS.writeFile(`/dict/${file}`, new Uint8Array(config.dictData[file]));
             }
             this.openjtalkModule.FS.writeFile(
                 '/voice/voice.htsvoice',

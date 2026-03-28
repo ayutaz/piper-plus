@@ -144,6 +144,12 @@ async function fetchWithProgress(url, onProgress) {
  * @returns {Promise<boolean>}
  */
 async function verifySha256(buffer, expectedHex) {
+  if (!globalThis.crypto?.subtle?.digest) {
+    throw new Error(
+      'Web Crypto API (crypto.subtle) is not available. ' +
+      'A secure context (HTTPS) is required for SHA-256 verification.'
+    );
+  }
   const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
   const hashArray = new Uint8Array(hashBuffer);
   let hex = '';
@@ -237,16 +243,20 @@ function parseTar(tarBuffer) {
  * @returns {Promise<Object<string, ArrayBuffer>>} filename -> ArrayBuffer
  */
 async function downloadAndExtractDict(tarGzUrl, onProgress) {
+  const isDefaultUrl = tarGzUrl === DICT_TAR_GZ_URL;
+
   // 1. Download tar.gz
   const compressedData = await fetchWithProgress(tarGzUrl, onProgress);
 
-  // 2. Verify SHA-256
-  const valid = await verifySha256(compressedData, DICT_SHA256);
-  if (!valid) {
-    throw new Error(
-      'Dictionary archive SHA-256 verification failed. ' +
-      'The downloaded file may be corrupted or tampered with.'
-    );
+  // 2. Verify SHA-256 (only for the default archive; custom URLs may differ)
+  if (isDefaultUrl) {
+    const valid = await verifySha256(compressedData, DICT_SHA256);
+    if (!valid) {
+      throw new Error(
+        'Dictionary archive SHA-256 verification failed. ' +
+        'The downloaded file may be corrupted or tampered with.'
+      );
+    }
   }
 
   // 3. Decompress gzip
@@ -256,9 +266,23 @@ async function downloadAndExtractDict(tarGzUrl, onProgress) {
   const allFiles = parseTar(tarData);
   const dictFiles = {};
 
+  // Auto-detect tar root directory by looking for the first required file
+  let rootDir = isDefaultUrl ? TAR_ROOT_DIR : '';
+  if (!isDefaultUrl) {
+    const firstFile = DICT_FILES[0];
+    for (const key of allFiles.keys()) {
+      if (key.endsWith('/' + firstFile)) {
+        rootDir = key.slice(0, -(firstFile.length + 1));
+        break;
+      } else if (key === firstFile) {
+        rootDir = '';
+        break;
+      }
+    }
+  }
+
   for (const filename of DICT_FILES) {
-    // Files in the tar are prefixed with the root directory name
-    const tarPath = `${TAR_ROOT_DIR}/${filename}`;
+    const tarPath = rootDir ? `${rootDir}/${filename}` : filename;
     const data = allFiles.get(tarPath);
     if (!data) {
       throw new Error(
