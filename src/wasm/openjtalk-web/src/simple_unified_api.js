@@ -48,43 +48,42 @@ export class SimpleUnifiedPhonemizer {
      */
     async initializeOpenJTalk(config) {
         console.log('Loading OpenJTalk WebAssembly...');
-        
-        // Import OpenJTalk module
+
+        // Import OpenJTalk module -- resolve jsPath relative to this package
         let jsPath = config.jsPath;
-        if (this.deploymentConfig.isGitHubPages && this.deploymentConfig.basePath) {
+        if (!jsPath) {
+            // Auto-resolve from package: dist/openjtalk.js is a sibling of src/
+            jsPath = new URL('../dist/openjtalk.js', import.meta.url).href;
+        } else if (this.deploymentConfig.isGitHubPages && this.deploymentConfig.basePath) {
             jsPath = this.adjustPathForDeployment(jsPath);
         }
-        
+
         const OpenJTalkModule = (await import(jsPath)).default;
-        
-        // Adjust wasmPath for GitHub Pages
+
+        // Resolve wasmPath
         let wasmPath = config.wasmPath;
-        if (window.location.hostname.includes('github.io')) {
-            // Get repository base path from URL
+        if (!wasmPath) {
+            wasmPath = new URL('../dist/openjtalk.wasm', import.meta.url).href;
+        } else if (typeof window !== 'undefined' && window.location.hostname.includes('github.io')) {
             const pathParts = window.location.pathname.split('/').filter(p => p);
             const repoName = pathParts.length > 0 ? pathParts[0] : '';
             const basePath = repoName ? `/${repoName}` : '';
-            
-            // Convert relative path to absolute path with repo base
             if (wasmPath.startsWith('./') || wasmPath.startsWith('../')) {
                 wasmPath = basePath + '/dist/openjtalk.wasm';
             }
-            console.log('GitHub Pages WASM path:', wasmPath);
         }
-        
-        // Fetch the WASM binary for GitHub Pages
+
+        // Fetch the WASM binary if needed (GitHub Pages or absolute URL)
         let wasmBinary = null;
-        if (window.location.hostname.includes('github.io')) {
-            // Use absolute URL with origin
+        if (typeof window !== 'undefined' && window.location.hostname.includes('github.io')) {
             const absoluteWasmPath = new URL(wasmPath, window.location.origin).href;
-            console.log('Fetching WASM from:', absoluteWasmPath);
             const wasmResponse = await fetch(absoluteWasmPath);
             if (!wasmResponse.ok) {
                 throw new Error(`Failed to load WASM: ${wasmResponse.status} ${wasmResponse.statusText}`);
             }
             wasmBinary = await wasmResponse.arrayBuffer();
         }
-        
+
         this.openjtalkModule = await OpenJTalkModule({
             locateFile: (path) => {
                 if (path.endsWith('.wasm')) {
@@ -94,73 +93,84 @@ export class SimpleUnifiedPhonemizer {
             },
             wasmBinary: wasmBinary
         });
-        
+
         // Create directories
         this.openjtalkModule.FS.mkdir('/dict');
         this.openjtalkModule.FS.mkdir('/voice');
-        
+
         // Load dictionary and voice files
         await this.loadOpenJTalkData(config);
-        
+
         // Initialize OpenJTalk
         const dictPtr = this.openjtalkModule.allocateUTF8('/dict');
         const voicePtr = this.openjtalkModule.allocateUTF8('/voice/voice.htsvoice');
         const result = this.openjtalkModule._openjtalk_initialize(dictPtr, voicePtr);
         this.openjtalkModule._free(dictPtr);
         this.openjtalkModule._free(voicePtr);
-        
+
         if (result !== 0) {
             throw new Error(`OpenJTalk initialization failed with code: ${result}`);
         }
-        
+
         console.log('OpenJTalk initialized');
     }
 
     /**
-     * Load OpenJTalk data files
+     * Load OpenJTalk data files.
+     *
+     * Accepts either pre-loaded ArrayBuffer data (from DictManager) or
+     * URL paths (for standalone demo usage).
      */
     async loadOpenJTalkData(config) {
-        // Adjust paths for GitHub Pages
+        const dictFileNames = [
+            'char.bin', 'matrix.bin', 'sys.dic', 'unk.dic',
+            'left-id.def', 'pos-id.def', 'rewrite.def', 'right-id.def'
+        ];
+
+        // ---- Pre-loaded data path (from DictManager.loadDictionary()) ----
+        if (config.dictData && config.voiceData) {
+            for (const file of dictFileNames) {
+                const data = config.dictData[file];
+                if (data) {
+                    this.openjtalkModule.FS.writeFile(`/dict/${file}`, new Uint8Array(data));
+                }
+            }
+            this.openjtalkModule.FS.writeFile(
+                '/voice/voice.htsvoice',
+                new Uint8Array(config.voiceData)
+            );
+            return;
+        }
+
+        // ---- URL-based path (for standalone demos) ----
         let dictPath = config.dictPath;
         let voicePath = config.voicePath;
-        
-        if (window.location.hostname.includes('github.io')) {
-            // Get repository base path from URL
+
+        if (typeof window !== 'undefined' && window.location.hostname.includes('github.io')) {
             const pathParts = window.location.pathname.split('/').filter(p => p);
             const repoName = pathParts.length > 0 ? pathParts[0] : '';
             const basePath = repoName ? `/${repoName}` : '';
-            
-            // Convert relative paths to absolute paths with repo base
+
             if (dictPath.startsWith('./') || dictPath.startsWith('../')) {
                 dictPath = basePath + '/assets/dict';
             }
             if (voicePath.startsWith('./') || voicePath.startsWith('../')) {
                 voicePath = basePath + '/assets/voice/mei_normal.htsvoice';
             }
-            console.log('GitHub Pages dict path:', dictPath);
-            console.log('GitHub Pages voice path:', voicePath);
         }
-        
-        // Convert to absolute URLs
+
         const absoluteDictPath = new URL(dictPath, window.location.origin).href;
         const absoluteVoicePath = new URL(voicePath, window.location.origin).href;
-        
-        // Load dictionary files
-        const dictFiles = [
-            'char.bin', 'matrix.bin', 'sys.dic', 'unk.dic',
-            'left-id.def', 'pos-id.def', 'rewrite.def', 'right-id.def'
-        ];
-        
-        const dictPromises = dictFiles.map(file => 
+
+        const dictPromises = dictFileNames.map(file =>
             fetch(`${absoluteDictPath}/${file}`).then(r => r.arrayBuffer())
         );
         const dictData = await Promise.all(dictPromises);
-        
-        dictFiles.forEach((file, i) => {
+
+        dictFileNames.forEach((file, i) => {
             this.openjtalkModule.FS.writeFile(`/dict/${file}`, new Uint8Array(dictData[i]));
         });
-        
-        // Load voice file
+
         const voiceResponse = await fetch(absoluteVoicePath);
         const voiceData = await voiceResponse.arrayBuffer();
         this.openjtalkModule.FS.writeFile('/voice/voice.htsvoice', new Uint8Array(voiceData));

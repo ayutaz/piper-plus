@@ -237,19 +237,28 @@ export class PiperPlus {
 
     // --- 3. Initialise phonemizer (OpenJTalk + dict + voice) -----------------
 
-    progress({ stage: 'phonemizer', progress: 0, message: 'Initializing phonemizer...' });
+    progress({ stage: 'phonemizer', progress: 0, message: 'Downloading dictionary...' });
 
     const dictManager = new DictManager();
-    const { dictBaseUrl, voiceUrl } = await dictManager.resolveUrls({
+    const { dictFiles, voiceData } = await dictManager.loadDictionary({
       dictUrl: options.dictUrl,
       voiceUrl: options.voiceUrl,
+      onProgress: ({ phase, overallPercent }) => {
+        progress({
+          stage: 'phonemizer',
+          progress: overallPercent / 100 * 0.8,
+          message: phase === 'dict' ? 'Downloading dictionary...' : 'Downloading voice...',
+        });
+      },
     });
+
+    progress({ stage: 'phonemizer', progress: 0.8, message: 'Initializing phonemizer...' });
 
     this._phonemizer = new SimpleUnifiedPhonemizer();
     await this._phonemizer.initialize({
       openjtalk: {
-        dictPath: dictBaseUrl,
-        voicePath: voiceUrl,
+        dictData: dictFiles,
+        voiceData: voiceData,
       },
     });
 
