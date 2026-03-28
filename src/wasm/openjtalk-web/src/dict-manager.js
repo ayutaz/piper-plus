@@ -1,8 +1,9 @@
 /**
- * DictManager -- OpenJTalk dictionary dynamic download + IndexedDB cache.
+ * DictManager -- OpenJTalk dictionary download + IndexedDB cache.
  *
- * Downloads individual dictionary files from HuggingFace (or a custom URL)
- * and caches them in IndexedDB so that subsequent loads are instant.
+ * Downloads the dictionary archive from the same GitHub Release used by
+ * Rust / C# / C++ implementations, extracts individual files in the browser,
+ * verifies the SHA-256 hash, and caches them in IndexedDB.
  *
  * Usage:
  *   const dm = new DictManager();
@@ -12,6 +13,21 @@
  */
 
 // ---- Constants ----------------------------------------------------------------
+
+/**
+ * The same GitHub Release URL that Rust, C#, and C++ use.
+ * @see src/rust/piper-core/src/dictionary_manager.rs
+ * @see src/csharp/PiperPlus.Core/Config/DictionaryManager.cs
+ */
+const DICT_TAR_GZ_URL =
+  'https://github.com/r9y9/open_jtalk/releases/download/v1.11.1/open_jtalk_dic_utf_8-1.11.tar.gz';
+
+/** SHA-256 of the tar.gz archive (same hash used by Rust / C#). */
+const DICT_SHA256 =
+  'fe6ba0e43542cef98339abdffd903e062008ea170b04e7e2a35da805902f382a';
+
+/** Root directory inside the tar archive. */
+const TAR_ROOT_DIR = 'open_jtalk_dic_utf_8-1.11';
 
 const DICT_FILES = [
   'char.bin',
@@ -26,8 +42,6 @@ const DICT_FILES = [
 
 const VOICE_KEY = 'voice/mei_normal.htsvoice';
 
-const DEFAULT_DICT_BASE_URL =
-  'https://huggingface.co/ayousanz/piper-plus-base/resolve/main/dict';
 const DEFAULT_VOICE_URL =
   'https://huggingface.co/ayousanz/piper-plus-base/resolve/main/voice/mei_normal.htsvoice';
 
@@ -120,6 +134,167 @@ async function fetchWithProgress(url, onProgress) {
   return merged.buffer;
 }
 
+// ---- SHA-256 verification -----------------------------------------------------
+
+/**
+ * Verify the SHA-256 hash of an ArrayBuffer using the Web Crypto API.
+ *
+ * @param {ArrayBuffer} buffer
+ * @param {string} expectedHex - lowercase hex SHA-256 hash
+ * @returns {Promise<boolean>}
+ */
+async function verifySha256(buffer, expectedHex) {
+  if (!globalThis.crypto?.subtle?.digest) {
+    throw new Error(
+      'Web Crypto API (crypto.subtle) is not available. ' +
+      'A secure context (HTTPS) is required for SHA-256 verification.'
+    );
+  }
+  const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
+  const hashArray = new Uint8Array(hashBuffer);
+  let hex = '';
+  for (let i = 0; i < hashArray.length; i++) {
+    hex += hashArray[i].toString(16).padStart(2, '0');
+  }
+  return hex === expectedHex;
+}
+
+// ---- Tar extraction -----------------------------------------------------------
+
+/**
+ * Decompress a gzip buffer using the DecompressionStream API.
+ *
+ * @param {ArrayBuffer} compressedBuffer
+ * @returns {Promise<ArrayBuffer>}
+ */
+async function decompressGzip(compressedBuffer) {
+  if (typeof DecompressionStream === 'undefined') {
+    throw new Error(
+      'DecompressionStream API is not available. ' +
+      'Please use a modern browser (Chrome 80+, Firefox 113+, Safari 16.4+).'
+    );
+  }
+  const stream = new Blob([compressedBuffer]).stream();
+  const decompressed = stream.pipeThrough(new DecompressionStream('gzip'));
+  return new Response(decompressed).arrayBuffer();
+}
+
+/**
+ * Parse a POSIX tar archive and extract files as a Map of name -> ArrayBuffer.
+ *
+ * @param {ArrayBuffer} tarBuffer - Uncompressed tar data
+ * @returns {Map<string, ArrayBuffer>}
+ */
+function parseTar(tarBuffer) {
+  const files = new Map();
+  const view = new Uint8Array(tarBuffer);
+  let offset = 0;
+
+  while (offset + 512 <= view.length) {
+    const header = view.subarray(offset, offset + 512);
+    offset += 512;
+
+    // End-of-archive: zero block
+    if (header.every((b) => b === 0)) break;
+
+    // Filename (bytes 0-99)
+    let name = '';
+    for (let i = 0; i < 100 && header[i] !== 0; i++) {
+      name += String.fromCharCode(header[i]);
+    }
+
+    // UStar prefix (bytes 345-499)
+    let prefix = '';
+    for (let i = 345; i < 500 && header[i] !== 0; i++) {
+      prefix += String.fromCharCode(header[i]);
+    }
+    if (prefix) {
+      name = prefix + '/' + name;
+    }
+
+    // File size (octal, bytes 124-135)
+    let sizeStr = '';
+    for (let i = 124; i < 136 && header[i] !== 0; i++) {
+      sizeStr += String.fromCharCode(header[i]);
+    }
+    const size = parseInt(sizeStr.trim(), 8) || 0;
+
+    // Type flag (byte 156): '0' or NUL = regular file
+    const typeFlag = header[156];
+
+    if (size > 0) {
+      const paddedSize = Math.ceil(size / 512) * 512;
+      if (typeFlag === 0x30 || typeFlag === 0) {
+        files.set(name, tarBuffer.slice(offset, offset + size));
+      }
+      offset += paddedSize;
+    }
+  }
+
+  return files;
+}
+
+/**
+ * Download the tar.gz archive, verify its SHA-256 hash, decompress and
+ * extract the required dictionary files.
+ *
+ * @param {string} tarGzUrl
+ * @param {(loaded: number, total: number) => void} [onProgress]
+ * @returns {Promise<Object<string, ArrayBuffer>>} filename -> ArrayBuffer
+ */
+async function downloadAndExtractDict(tarGzUrl, onProgress) {
+  const isDefaultUrl = tarGzUrl === DICT_TAR_GZ_URL;
+
+  // 1. Download tar.gz
+  const compressedData = await fetchWithProgress(tarGzUrl, onProgress);
+
+  // 2. Verify SHA-256 (only for the default archive; custom URLs may differ)
+  if (isDefaultUrl) {
+    const valid = await verifySha256(compressedData, DICT_SHA256);
+    if (!valid) {
+      throw new Error(
+        'Dictionary archive SHA-256 verification failed. ' +
+        'The downloaded file may be corrupted or tampered with.'
+      );
+    }
+  }
+
+  // 3. Decompress gzip
+  const tarData = await decompressGzip(compressedData);
+
+  // 4. Parse tar and extract required files
+  const allFiles = parseTar(tarData);
+  const dictFiles = {};
+
+  // Auto-detect tar root directory by looking for the first required file
+  let rootDir = isDefaultUrl ? TAR_ROOT_DIR : '';
+  if (!isDefaultUrl) {
+    const firstFile = DICT_FILES[0];
+    for (const key of allFiles.keys()) {
+      if (key.endsWith('/' + firstFile)) {
+        rootDir = key.slice(0, -(firstFile.length + 1));
+        break;
+      } else if (key === firstFile) {
+        rootDir = '';
+        break;
+      }
+    }
+  }
+
+  for (const filename of DICT_FILES) {
+    const tarPath = rootDir ? `${rootDir}/${filename}` : filename;
+    const data = allFiles.get(tarPath);
+    if (!data) {
+      throw new Error(
+        `Required dictionary file "${filename}" not found in archive (expected "${tarPath}").`
+      );
+    }
+    dictFiles[filename] = data;
+  }
+
+  return dictFiles;
+}
+
 // ---- DictManager --------------------------------------------------------------
 
 export class DictManager {
@@ -138,93 +313,79 @@ export class DictManager {
   /**
    * Resolve dictionary and voice URLs without downloading anything.
    *
-   * Applies the same default-fallback logic used by {@link loadDictionary} so
-   * that callers (e.g. `PiperPlus._init()`) can inspect the final URLs before
-   * any network request is made.
-   *
    * @param {Object} [options]
-   * @param {string} [options.dictUrl]  - Base URL for dictionary files.
+   * @param {string} [options.dictUrl]  - Custom tar.gz URL for the dictionary archive.
    * @param {string} [options.voiceUrl] - URL for the HTS voice file.
-   * @returns {{ dictBaseUrl: string, voiceUrl: string }}
+   * @returns {{ dictUrl: string, voiceUrl: string }}
    */
   resolveUrls(options = {}) {
-    const dictBaseUrl = (options.dictUrl || DEFAULT_DICT_BASE_URL).replace(
-      /\/+$/,
-      ''
-    );
+    const dictUrl = options.dictUrl || DICT_TAR_GZ_URL;
     const voiceUrl = options.voiceUrl || DEFAULT_VOICE_URL;
-    return { dictBaseUrl, voiceUrl };
+    return { dictUrl, voiceUrl };
   }
 
   /**
    * Download (or retrieve from cache) dictionary files and the HTS voice file.
    *
+   * On the first call the full tar.gz is downloaded from GitHub Releases,
+   * its SHA-256 is verified, and the individual files are cached in IndexedDB.
+   * Subsequent calls return instantly from the cache.
+   *
    * @param {Object} [options]
-   * @param {string} [options.dictUrl]    - Base URL for dictionary files.
+   * @param {string} [options.dictUrl]    - Custom tar.gz URL (default: GitHub Releases).
    * @param {string} [options.voiceUrl]   - URL for the HTS voice file.
    * @param {Function} [options.onProgress] - Progress callback.
    *   Called with `{ phase, file, loaded, total, overallPercent }`.
    *   - phase: 'dict' | 'voice'
-   *   - file: current filename (only during 'dict' phase)
-   *   - loaded / total: bytes for the current file
-   *   - overallPercent: 0-100 across all files
+   *   - file: current filename or archive name
+   *   - loaded / total: bytes
+   *   - overallPercent: 0-100
    * @returns {Promise<{dictFiles: Object<string,ArrayBuffer>, voiceData: ArrayBuffer}>}
    */
   async loadDictionary(options = {}) {
-    const { dictBaseUrl, voiceUrl } = this.resolveUrls(options);
+    const { dictUrl, voiceUrl } = this.resolveUrls(options);
     const onProgress = options.onProgress || null;
 
     const db = await this._openDB();
 
-    // Total number of items to track (dict files + voice).
-    const totalItems = DICT_FILES.length + 1;
-    let completedItems = 0;
-
     // ---- Dictionary files ---------------------------------------------------
 
     /** @type {Object<string,ArrayBuffer>} */
-    const dictFiles = {};
+    let dictFiles = {};
+    const allCached = await this._allDictFilesCached(db);
 
-    for (const filename of DICT_FILES) {
-      const cacheKey = `dict/${filename}`;
-      const cached = await this._getFromCache(db, cacheKey);
-
-      if (cached) {
-        dictFiles[filename] = cached;
-        completedItems++;
-        if (onProgress) {
-          onProgress({
-            phase: 'dict',
-            file: filename,
-            loaded: cached.byteLength,
-            total: cached.byteLength,
-            overallPercent: Math.round((completedItems / totalItems) * 100),
-          });
-        }
-        continue;
+    if (allCached) {
+      // All files in cache — load from IndexedDB
+      for (const filename of DICT_FILES) {
+        dictFiles[filename] = await this._getFromCache(db, `dict/${filename}`);
       }
-
-      // Not cached -- download.
-      const url = `${dictBaseUrl}/${filename}`;
-      const data = await fetchWithProgress(url, (loaded, total) => {
+      if (onProgress) {
+        onProgress({
+          phase: 'dict',
+          file: 'cache',
+          loaded: 1,
+          total: 1,
+          overallPercent: 50,
+        });
+      }
+    } else {
+      // Download tar.gz, verify, extract, and cache
+      dictFiles = await downloadAndExtractDict(dictUrl, (loaded, total) => {
         if (onProgress) {
           onProgress({
             phase: 'dict',
-            file: filename,
+            file: 'open_jtalk_dic_utf_8-1.11.tar.gz',
             loaded,
             total,
-            overallPercent: Math.round(
-              ((completedItems + loaded / Math.max(total, 1)) / totalItems) * 100
-            ),
+            overallPercent: Math.round((loaded / Math.max(total, 1)) * 50),
           });
         }
       });
 
-      // Cache the downloaded file.
-      await this._putToCache(db, cacheKey, data);
-
-      dictFiles[filename] = data;
-      completedItems++;
+      // Cache individual extracted files
+      for (const filename of DICT_FILES) {
+        await this._putToCache(db, `dict/${filename}`, dictFiles[filename]);
+      }
     }
 
     // ---- Voice file ---------------------------------------------------------
@@ -234,7 +395,6 @@ export class DictManager {
 
     if (cachedVoice) {
       voiceData = cachedVoice;
-      completedItems++;
       if (onProgress) {
         onProgress({
           phase: 'voice',
@@ -252,15 +412,12 @@ export class DictManager {
             file: VOICE_KEY,
             loaded,
             total,
-            overallPercent: Math.round(
-              ((completedItems + loaded / Math.max(total, 1)) / totalItems) * 100
-            ),
+            overallPercent: 50 + Math.round((loaded / Math.max(total, 1)) * 50),
           });
         }
       });
 
       await this._putToCache(db, VOICE_KEY, voiceData);
-      completedItems++;
     }
 
     return { dictFiles, voiceData };
@@ -274,16 +431,10 @@ export class DictManager {
   async isCached() {
     try {
       const db = await this._openDB();
+      if (!(await this._allDictFilesCached(db))) return false;
+
       const tx = db.transaction(STORE_NAME, 'readonly');
       const store = tx.objectStore(STORE_NAME);
-
-      // Check every dict file key.
-      for (const filename of DICT_FILES) {
-        const result = await wrapRequest(store.get(`dict/${filename}`));
-        if (!result || !result.data) return false;
-      }
-
-      // Check voice key.
       const voiceResult = await wrapRequest(store.get(VOICE_KEY));
       if (!voiceResult || !voiceResult.data) return false;
 
@@ -306,6 +457,26 @@ export class DictManager {
   }
 
   // ---- Private helpers ------------------------------------------------------
+
+  /**
+   * Check whether all 8 dictionary files are present in the cache.
+   *
+   * @param {IDBDatabase} db
+   * @returns {Promise<boolean>}
+   */
+  async _allDictFilesCached(db) {
+    try {
+      const tx = db.transaction(STORE_NAME, 'readonly');
+      const store = tx.objectStore(STORE_NAME);
+      for (const filename of DICT_FILES) {
+        const result = await wrapRequest(store.get(`dict/${filename}`));
+        if (!result || !result.data) return false;
+      }
+      return true;
+    } catch {
+      return false;
+    }
+  }
 
   /**
    * Lazily open (and cache) the IndexedDB connection.

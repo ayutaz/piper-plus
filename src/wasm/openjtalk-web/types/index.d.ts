@@ -223,12 +223,18 @@ export interface DictManagerOptions {
 
 /** Options for DictManager.loadDictionary(). */
 export interface LoadDictionaryOptions {
-  /** Base URL for dictionary files. */
+  /** Custom tar.gz URL for the dictionary archive (default: GitHub Releases). */
   dictUrl?: string;
   /** URL for the HTS voice file. */
   voiceUrl?: string;
   /** Progress callback. */
   onProgress?: (info: DictDownloadProgress) => void;
+}
+
+/** Result returned by DictManager.resolveUrls(). */
+export interface DictResolveResult {
+  dictUrl: string;
+  voiceUrl: string;
 }
 
 /** Result returned by DictManager.loadDictionary(). */
@@ -237,9 +243,15 @@ export interface DictLoadResult {
   voiceData: ArrayBuffer;
 }
 
-/** Download and cache OpenJTalk dictionary files and HTS voice from HuggingFace. */
+/**
+ * Download and cache OpenJTalk dictionary files from GitHub Releases
+ * (same source as Rust/C#/C++ implementations) and HTS voice file.
+ */
 export class DictManager {
   constructor(options?: DictManagerOptions);
+
+  /** Resolve dictionary and voice URLs without downloading. */
+  resolveUrls(options?: { dictUrl?: string; voiceUrl?: string }): DictResolveResult;
 
   /** Download (or retrieve from cache) dictionary files and the HTS voice file. */
   loadDictionary(options?: LoadDictionaryOptions): Promise<DictLoadResult>;
