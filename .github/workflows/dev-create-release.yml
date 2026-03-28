@@ -273,10 +273,11 @@ jobs:
       - name: Install build tools
         run: pip install build twine
 
-      - name: Update VERSION for stub
+      - name: Copy VERSION for stub
         run: |
           VERSION="${{ github.event.inputs.version }}"
           echo "$VERSION" > VERSION
+          cp VERSION src/python_stub/VERSION
 
       - name: Build stub package
         working-directory: src/python_stub

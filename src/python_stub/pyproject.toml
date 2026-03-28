@@ -12,7 +12,12 @@ license = {text = "MIT"}
 authors = [
     {name = "yousan", email = "rabbitcats77@gmail.com"},
 ]
-dependencies = ["piper-plus>=1.10.0"]
+dependencies = ["piper-plus"]
+
+[project.optional-dependencies]
+gpu = ["piper-plus[gpu]"]
+http = ["piper-plus[http]"]
+
 classifiers = [
     "Development Status :: 7 - Inactive",
     "Intended Audience :: Developers",
@@ -29,4 +34,4 @@ Homepage = "https://github.com/ayutaz/piper-plus"
 "New Package" = "https://pypi.org/project/piper-plus/"
 
 [tool.setuptools.dynamic]
-version = {file = "../../VERSION"}
+version = {file = "VERSION"}
