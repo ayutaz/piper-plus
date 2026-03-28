@@ -88,7 +88,7 @@ jobs:
         pytest tests/ -v --tb=short -m "inference and unit"
 
     # ---------------------------------------------------------------
-    # Runtime package tests (src/python_run — PyPI piper-tts-plus)
+    # Runtime package tests (src/python_run — PyPI piper-plus)
     # ---------------------------------------------------------------
     - name: Install runtime package dependencies
       run: |

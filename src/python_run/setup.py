@@ -41,7 +41,7 @@ data_files = [module_dir / "voices.json"]
 # -----------------------------------------------------------------------------
 
 setup(
-    name="piper-tts-plus",
+    name="piper-plus",
     version=version,
     description=(
         "A fast, high-quality neural text-to-speech system supporting "

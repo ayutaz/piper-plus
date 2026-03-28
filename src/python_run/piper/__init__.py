@@ -4,7 +4,7 @@ from .voice import PiperVoice
 
 
 try:
-    __version__ = version("piper-tts-plus")
+    __version__ = version("piper-plus")
 except PackageNotFoundError:
     # Fallback for development (running from source tree)
     from pathlib import Path

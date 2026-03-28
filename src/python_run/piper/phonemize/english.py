@@ -1,6 +1,6 @@
 """English G2P module using g2p-en (Apache-2.0 licensed).
 
-Runtime version for piper-tts-plus inference.
+Runtime version for piper-plus inference.
 Converts English text to phoneme tokens after map_sequence conversion.
 G2P logic is identical to the training side (piper_train.phonemize.english).
 """

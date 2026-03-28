@@ -1,6 +1,6 @@
 """Rule-based French phonemizer for Piper TTS.
 
-Runtime version for piper-tts-plus inference.
+Runtime version for piper-plus inference.
 Converts French text to IPA phonemes using grapheme-to-phoneme rules.
 G2P logic is identical to the training side (piper_train.phonemize.french).
 No external G2P engine required.

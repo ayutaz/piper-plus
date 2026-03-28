@@ -3,8 +3,8 @@
 [English](README_EN.md) | [日本語](README.md) | [中文](README_ZH.md) | Français
 
 [![CI](https://github.com/ayutaz/piper-plus/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/ayutaz/piper-plus/actions/workflows/ci.yml)
-[![PyPI](https://img.shields.io/pypi/v/piper-tts-plus)](https://pypi.org/project/piper-tts-plus/)
-[![Python](https://img.shields.io/pypi/pyversions/piper-tts-plus)](https://pypi.org/project/piper-tts-plus/)
+[![PyPI](https://img.shields.io/pypi/v/piper-plus)](https://pypi.org/project/piper-plus/)
+[![Python](https://img.shields.io/pypi/pyversions/piper-plus)](https://pypi.org/project/piper-plus/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Hugging Face Demo](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Demo-blue)](https://huggingface.co/spaces/ayousanz/piper-plus-demo)
 [![Hugging Face Model](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Model-orange)](https://huggingface.co/ayousanz/piper-plus-base)
@@ -57,7 +57,7 @@ Systeme de synthese vocale neuronale (TTS) rapide et de haute qualite. Base sur 
 - **CLI Rust** — piper-plus/piper-plus-cli, streaming, CUDA/CoreML/DirectML, telechargement automatique des dictionnaires
 - **[WebAssembly](src/wasm/openjtalk-web/README.md)** — Fonctionne entierement dans le navigateur, sans serveur
 - **[Docker](docker/README.md)** — 5 images pour l'inference, l'entrainement, WebUI et C++
-- **PyPI** — `pip install piper-tts-plus`
+- **PyPI** — `pip install piper-plus`
 
 ### Plateformes
 
@@ -178,14 +178,14 @@ uv pip install ".[dev]"
 Egalement disponible sur PyPI :
 
 ```bash
-pip install piper-tts-plus
+pip install piper-plus
 ```
 
 ### Installation depuis les gestionnaires de paquets
 
 **Python (PyPI) :**
 ```bash
-pip install piper-tts-plus
+pip install piper-plus
 ```
 
 **C# CLI (Outil global .NET) :**
