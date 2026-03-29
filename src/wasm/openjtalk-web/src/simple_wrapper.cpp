@@ -10,7 +10,7 @@ extern "C" {
 
 EMSCRIPTEN_KEEPALIVE
 const char* get_version() {
-    return "OpenJTalk WebAssembly 0.1.0";
+    return "OpenJTalk WebAssembly 0.1.1";
 }
 
 EMSCRIPTEN_KEEPALIVE

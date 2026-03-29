@@ -252,6 +252,11 @@ pip install piper-plus
 pip install piper-plus
 ```
 
+**npm (浏览器 WASM):**
+```bash
+npm install piper-plus onnxruntime-web
+```
+
 **C# CLI (.NET 全局工具):**
 ```bash
 dotnet tool install -g PiperPlus.Cli
@@ -702,7 +707,7 @@ Piper 的 Unity 插件：[github.com/ayutaz/uPiper](https://github.com/ayutaz/uP
 
 ### People using Piper
 
-[Home Assistant](https://github.com/home-assistant/addons/blob/master/piper/README.md) · [Rhasspy 3](https://github.com/rhasspy/rhasspy3/) · [NVDA](https://www.nvaccess.org/post/in-process-8th-may-2023/#voices) · [Open Voice OS](https://github.com/OpenVoiceOS/ovos-tts-plugin-piper) · [LocalAI](https://github.com/go-skynet/LocalAI) · [JetsonGPT](https://github.com/shahizat/jetsonGPT) · [mintPiper](https://github.com/evuraan/mintPiper) · [Vim-Piper](https://github.com/wolandark/vim-piper)
+[Home Assistant](https://github.com/home-assistant/addons/blob/master/piper/README.md) · [Rhasspy 3](https://github.com/rhasspy/rhasspy3/) · [NVDA](https://github.com/nvaccess/nvda/wiki/ExtraVoices) · [Open Voice OS](https://github.com/OpenVoiceOS/ovos-tts-plugin-piper) · [LocalAI](https://github.com/go-skynet/LocalAI) · [JetsonGPT](https://github.com/shahizat/jetsonGPT) · [mintPiper](https://github.com/evuraan/mintPiper) · [Vim-Piper](https://github.com/wolandark/vim-piper)
 
 ---
 
