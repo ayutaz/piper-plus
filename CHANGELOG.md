@@ -7,17 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.10.0] - 2026-03-28
+
 ### Changed
-- PyPI パッケージ名を `piper-tts-plus` から `piper-plus` に変更 — 全レジストリ (npm, crates.io, NuGet) で名前統一
+- PyPI パッケージ名を `piper-tts-plus` から `piper-plus` に変更 — 全レジストリ (npm, crates.io, NuGet) で名前統一 (#289)
   - `pip install piper-plus` でインストール可能に
   - 旧パッケージ `piper-tts-plus` はスタブリリースで `piper-plus` へリダイレクト予定
 
 ### Fixed
-- npm: DictManager の辞書ダウンロードを GitHub Releases (r9y9/open_jtalk) に統一 — Rust/C#/C++ と同一ソース
+- npm: DictManager の辞書ダウンロードを GitHub Releases (r9y9/open_jtalk) に統一 — Rust/C#/C++ と同一ソース (#288)
   - 旧: HuggingFace 個別ファイル (404 エラー) → 新: tar.gz 一括 DL + SHA-256 検証 + DecompressionStream 展開
   - voice ファイル (mei_normal.htsvoice) を HuggingFace `piper-plus-base` にアップロード
   - PiperPlus._init() が DictManager.loadDictionary() + IndexedDB キャッシュを使用するように修正
   - SimpleUnifiedPhonemizer にプリロード済みデータ受け取り対応 (dictData/voiceData)
+  - npm パッケージ v0.1.1 としてリリース
 
 ## [1.9.0] - 2026-03-28
 
