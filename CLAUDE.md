@@ -345,7 +345,7 @@ Rust によるONNX推論エンジン。ストリーミング、CUDA/CoreML/Direc
 | 項目 | 詳細 |
 |------|------|
 | パッケージ名 | piper-plus |
-| バージョン | 0.1.0 |
+| バージョン | 0.1.1 |
 | 対応言語 | JA, EN, ZH, ES, FR, PT (6言語) |
 | 音素化 | OpenJTalk WASM (JA), SimpleEnglishPhonemizer (EN), キャラクタベース (ZH/ES/FR/PT) |
 | 推論 | onnxruntime-web (peerDependency) |
