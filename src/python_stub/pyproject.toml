@@ -13,11 +13,6 @@ authors = [
     {name = "yousan", email = "rabbitcats77@gmail.com"},
 ]
 dependencies = ["piper-plus"]
-
-[project.optional-dependencies]
-gpu = ["piper-plus[gpu]"]
-http = ["piper-plus[http]"]
-
 classifiers = [
     "Development Status :: 7 - Inactive",
     "Intended Audience :: Developers",
@@ -28,6 +23,10 @@ classifiers = [
     "Programming Language :: Python :: 3.13",
 ]
 keywords = ["piper", "tts", "deprecated", "renamed"]
+
+[project.optional-dependencies]
+gpu = ["piper-plus[gpu]"]
+http = ["piper-plus[http]"]
 
 [project.urls]
 Homepage = "https://github.com/ayutaz/piper-plus"
