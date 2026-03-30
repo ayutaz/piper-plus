@@ -1,7 +1,7 @@
 /**
  * Simple Unified Phonemizer API
  * Uses OpenJTalk for Japanese, a simple phonemizer for English,
- * and character-based fallbacks for zh/es/fr/pt/sv/sv.
+ * and character-based fallbacks for zh/es/fr/pt/sv.
  */
 
 import { SimpleEnglishPhonemizer, createEnglishPhonemeMap } from './simple_english_phonemizer.js';
@@ -375,7 +375,7 @@ export class SimpleUnifiedPhonemizer {
         if (language === 'en') {
             return this.englishPhonemeMap;
         }
-        if (language === 'zh' || language === 'es' || language === 'fr' || language === 'pt') {
+        if (language === 'zh' || language === 'es' || language === 'fr' || language === 'pt' || language === 'sv') {
             // zh/es/fr/pt/sv use the model's phoneme_id_map directly
             return this.phonemeIdMap;
         }

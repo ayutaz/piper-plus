@@ -6,7 +6,7 @@
 use std::collections::HashMap;
 use std::sync::LazyLock;
 
-/// 固定 PUA マッピング (87 エントリ)
+/// 固定 PUA マッピング (96 エントリ)
 /// 多文字音素トークン → Unicode Private Use Area コードポイント
 pub static FIXED_PUA_MAP: LazyLock<Vec<(&'static str, u32)>> = LazyLock::new(|| {
     vec![

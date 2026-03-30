@@ -243,20 +243,20 @@ static const std::unordered_set<std::string> HARD_K_WORDS = {
     "kick", "kilt", "kimono", "kitsch", "kibbutz", "kiwi", "kilo",
     "kex", "kent", "kerna", "keso", "kikare", "kines", "kinesisk",
     "leker", "leken", "lekerska", "steker", "steket",
-    "soker", "soket", "tanker", "tanket",
-    "dyker", "dyket", "ryker", "roker", "roket",
-    "smeker", "laker", "laket", "marker", "market",
-    "racker", "vacker", "viker", "stryker", "sjunker", "sticker",
-    "pojke", "froken", "onkel", "sockel", "socker", "ocker",
-    "marke", "morker", "tecken", "naken", "saker",
+    "söker", "söket", "tänker", "tänket",
+    "dyker", "dyket", "ryker", "röker", "röket",
+    "smeker", "läker", "läket", "märker", "märket",
+    "räcker", "väcker", "viker", "stryker", "sjunker", "sticker",
+    "pojke", "fröken", "onkel", "sockel", "socker", "ocker",
+    "märke", "mörker", "tecken", "naken", "säker",
     "enkel", "paket", "raket", "staket", "silke", "vinkel",
     "skelett", "ficka", "dricka", "docka", "backe", "flicka",
     "bricka", "trycke", "skicka", "rike", "kirke",
 };
 
 static const std::unordered_set<std::string> HARD_K_STEMS = {
-    "lek", "stek", "sok", "tank", "dyk", "ryk", "rok", "smek",
-    "lak", "mark", "rack", "vack", "vik", "stryk", "sjunk", "stick",
+    "lek", "stek", "sök", "tänk", "dyk", "ryk", "rök", "smek",
+    "läk", "märk", "räck", "väck", "vik", "stryk", "sjunk", "stick",
     "back", "block", "trick", "tryck", "skick", "flick", "brick",
     "drick", "dock", "fick", "sick", "tack", "sack", "pack",
     "lock", "sock", "rock",
@@ -264,20 +264,20 @@ static const std::unordered_set<std::string> HARD_K_STEMS = {
 
 // Words where g before front vowel is hard /ɡ/ (not /j/)
 static const std::unordered_set<std::string> HARD_G_WORDS = {
-    "bagel", "bageri", "bygel", "bygge", "bage", "dager", "flygel",
-    "gecko", "hage", "hagel", "hunger", "lager", "lage", "lager",
+    "bagel", "bageri", "bygel", "bygge", "båge", "dager", "flygel",
+    "gecko", "hage", "hagel", "hunger", "lager", "läge", "läger",
     "mage", "nagel", "regel", "segel", "seger", "stege", "tagel",
-    "tegel", "tiger", "tygel", "finger", "angel", "fagel", "spegel",
-    "fogel", "duger", "flyger", "ligger", "ljuger", "lagger",
-    "stiger", "suger", "tigger", "vager", "ager", "ger",
+    "tegel", "tiger", "tygel", "finger", "ängel", "fågel", "spegel",
+    "fogel", "duger", "flyger", "ligger", "ljuger", "lägger",
+    "stiger", "suger", "tigger", "väger", "äger", "ger",
     "agera", "delegera", "reagera", "segregera", "tangera",
     "engagera", "arrangera", "ignorera", "navigera", "negera",
     "intrigera", "ge", "gel",
 };
 
 static const std::unordered_set<std::string> HARD_G_STEMS = {
-    "lig", "stig", "sug", "tig", "vag", "ag", "flyg", "ljug",
-    "lagg", "dug", "drag", "lag", "dag", "mag", "nag", "bag",
+    "lig", "stig", "sug", "tig", "väg", "äg", "flyg", "ljug",
+    "lägg", "dug", "drag", "lag", "dag", "mag", "nag", "bag",
     "byg", "tag", "seg", "vag", "reg",
 };
 
@@ -292,22 +292,22 @@ static const std::unordered_set<std::string> O_LONG_AS_OO = {
 // Words ending in m that use short vowel despite single-C ending
 static const std::unordered_set<std::string> FINAL_M_SHORT_WORDS = {
     "hem", "rum", "fem", "lem", "kam", "dam", "ham", "lam", "ram",
-    "stam", "tom", "som", "dom", "dum", "gum", "glom", "drom", "strom",
+    "stam", "tom", "som", "dom", "dum", "gum", "glöm", "dröm", "ström",
 };
 
 // Function words (unstressed)
 static const std::unordered_set<std::string> FUNCTION_WORDS = {
     "jag", "du", "han", "hon", "vi", "de", "dem", "den", "det",
     "sig", "sin", "min", "din",
-    "av", "i", "pa", "for", "med", "om", "till", "fran", "hos", "ur",
-    "och", "men", "att", "som", "nar", "var",
+    "av", "i", "på", "för", "med", "om", "till", "från", "hos", "ur",
+    "och", "men", "att", "som", "när", "var",
     "en", "ett",
-    "ar", "har", "kan", "ska", "vill", "inte",
+    "är", "har", "kan", "ska", "vill", "inte",
 };
 
 // Exceptions where sk before back vowel still produces /ɧ/
 static const std::unordered_set<std::string> SK_BACK_VOWEL_EXCEPTIONS = {
-    "manniska", "marskalk",
+    "människa", "marskalk",
 };
 
 // ch exceptions that are /k/ not /ɧ/
@@ -326,16 +326,16 @@ static const std::unordered_set<std::string> AGE_NATIVE_WORDS = {
 // Unstressed prefixes for stress detection
 // -----------------------------------------------------------------------
 static const std::vector<std::string> UNSTRESSED_PREFIXES = {
-    "for", "be", "ge", "er", "an",
+    "för", "be", "ge", "er", "an",
 };
 
 // Stress-attracting suffixes (checked in order, longest first)
 static const std::vector<std::string> STRESS_ATTRACTING_SUFFIXES = {
     "ssion", "tion", "sion",
     "itet", "eri", "era",
-    "ist", "or", "ment",
+    "ist", "ör", "ment",
     "ans", "ens", "ell",
-    "ent", "ant", "ik", "ur", "al", "os",
+    "ent", "ant", "ik", "ur", "al", "ös",
 };
 
 // -----------------------------------------------------------------------

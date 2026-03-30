@@ -106,12 +106,14 @@ HARD_G_WORDS: frozenset[str] = frozenset({
     "agera", "delegera", "reagera", "segregera", "tangera",
     "engagera", "arrangera", "ignorera", "navigera", "negera",
     "intrigera", "ge", "gel",
+    "berg", "borg",
 })
 
 HARD_G_STEMS: frozenset[str] = frozenset({
     "lig", "stig", "sug", "tig", "väg", "äg", "flyg", "ljug",
     "lägg", "dug", "drag", "lag", "dag", "mag", "nag", "bag",
     "byg", "tag", "seg", "vag", "reg",
+    "berg", "borg",
 })
 
 # "o" → /oː/ instead of default /uː/
@@ -296,6 +298,10 @@ def _is_hard_g(word: str) -> bool:
     """Check if g in this word is hard /ɡ/ before a front vowel."""
     if word in HARD_G_WORDS:
         return True
+    # -era verb heuristic: words ending in -era/-erar/-erade are typically
+    # Swedish verbs derived from loanwords with hard g (e.g. navigera, ignorera)
+    if word.endswith(("era", "erar", "erade")):
+        return True
     for suffix_len in (3, 2, 1):
         if len(word) > suffix_len:
             stem = word[:-suffix_len]
@@ -384,14 +390,21 @@ def _convert_consonant(
         if di == "ck":
             return (["k"], 2)  # geminate marker (vowel already short)
 
+        if di == "gj":
+            if pos == 0:
+                return (["j"], 2)
+
         if di == "lj":
-            return (["j"], 2)
+            if pos == 0:
+                return (["j"], 2)
 
         if di == "dj":
-            return (["j"], 2)
+            if pos == 0:
+                return (["j"], 2)
 
         if di == "hj":
-            return (["j"], 2)
+            if pos == 0:
+                return (["j"], 2)
 
     # === 1-char patterns ===
 

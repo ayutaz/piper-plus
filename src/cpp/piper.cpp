@@ -1124,7 +1124,7 @@ void textToAudio(PiperConfig &config, Voice &voice, std::string text,
         // If the user set --language, reverse-lookup the code and prefer it
         // when it is a Latin-script language.
         std::string defaultLatin = "en";
-        static const std::set<std::string> latinLangs = {"en", "es", "pt", "fr"};
+        static const std::set<std::string> latinLangs = {"en", "es", "fr", "pt", "sv"};
         bool defaultLatinSet = false;
         if (voice.synthesisConfig.languageId && voice.modelConfig.languageIdMap) {
           for (const auto& [code, id] : *voice.modelConfig.languageIdMap) {
@@ -1137,7 +1137,7 @@ void textToAudio(PiperConfig &config, Voice &voice, std::string text,
         }
         // Fallback: pick the first available Latin language by priority
         if (!defaultLatinSet) {
-          for (const auto& lang : {"en", "es", "pt", "fr"}) {
+          for (const auto& lang : {"en", "es", "fr", "pt", "sv"}) {
             if (std::find(multiLangs.begin(), multiLangs.end(), lang) != multiLangs.end()) {
               defaultLatin = lang;
               break;

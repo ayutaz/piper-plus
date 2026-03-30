@@ -6,7 +6,7 @@
 // ---------------------------------------------------------------------------
 
 /** Supported language codes. */
-export type Language = 'ja' | 'en' | 'zh' | 'es' | 'fr' | 'pt';
+export type Language = 'ja' | 'en' | 'zh' | 'es' | 'fr' | 'pt' | 'sv';
 
 // ---------------------------------------------------------------------------
 // ModelConfig
