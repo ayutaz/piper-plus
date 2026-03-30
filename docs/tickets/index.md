@@ -14,12 +14,12 @@
 
 | チケット | マイルストーン | Phase | タイトル | ステータス | 依存先 | ブロック対象 |
 |---------|-------------|-------|---------|-----------|--------|------------|
-| [M1.1](M1.1-nst-dictionary-preparation.md) | M1.1 | Phase 1 | データ準備 (NST辞書 + SAMPA→IPA変換) | 未着手 | なし | M1.4 |
-| [M1.2](M1.2-phoneme-inventory-pua.md) | M1.2 | Phase 1 | 音素インベントリ + PUA割り当て | 未着手 | なし | M1.3 |
-| [M1.3](M1.3-rule-based-g2p-engine.md) | M1.3 | Phase 1 | Rule-based G2P エンジン | 未着手 | M1.2 | M1.4 |
-| [M1.4](M1.4-dictionary-lookup-integration.md) | M1.4 | Phase 1 | 辞書ルックアップ統合 | 未着手 | M1.1, M1.3 | M1.5 |
-| [M1.5](M1.5-multilingual-integration.md) | M1.5 | Phase 1 | マルチリンガル統合 | 未着手 | M1.4 | M1.6 |
-| [M1.6](M1.6-test-suite-ci.md) | M1.6 | Phase 1 | テストスイート + CI | 未着手 | M1.5 | Phase 2 全体 |
+| [M1.1](M1.1-nst-dictionary-preparation.md) | M1.1 | Phase 1 | データ準備 (NST辞書 + SAMPA→IPA変換) | **完了** | なし | M1.4 |
+| [M1.2](M1.2-phoneme-inventory-pua.md) | M1.2 | Phase 1 | 音素インベントリ + PUA割り当て | **完了** | なし | M1.3 |
+| [M1.3](M1.3-rule-based-g2p-engine.md) | M1.3 | Phase 1 | Rule-based G2P エンジン | **完了** | M1.2 | M1.4 |
+| [M1.4](M1.4-dictionary-lookup-integration.md) | M1.4 | Phase 1 | 辞書ルックアップ統合 | **完了** | M1.1, M1.3 | M1.5 |
+| [M1.5](M1.5-multilingual-integration.md) | M1.5 | Phase 1 | マルチリンガル統合 | **完了** | M1.4 | M1.6 |
+| [M1.6](M1.6-test-suite-ci.md) | M1.6 | Phase 1 | テストスイート + CI | **完了** | M1.5 | Phase 2 全体 |
 | M2.1 | M2.1 | Phase 2 | Rust 実装 | 未着手 | Phase 1 | M3.3 |
 | M2.2 | M2.2 | Phase 2 | C# 実装 | 未着手 | Phase 1 | M3.3 |
 | M2.3 | M2.3 | Phase 2 | C++ 実装 | 未着手 | Phase 1 | M3.3 |
@@ -84,12 +84,12 @@ Phase 2: クロスプラットフォーム   Phase 3: TTSモデル学習     Pha
 
 | Phase | マイルストーン | ステータス | 着手日 | 完了日 | 備考 |
 |-------|-------------|-----------|--------|--------|------|
-| Phase 1 | M1.1 データ準備 | 未着手 | - | - | M1.2 と並行可 |
-| Phase 1 | M1.2 音素インベントリ | 未着手 | - | - | M1.1 と並行可 |
-| Phase 1 | M1.3 Rule-based G2P | 未着手 | - | - | M1.2 完了待ち |
-| Phase 1 | M1.4 辞書ルックアップ統合 | 未着手 | - | - | M1.1 + M1.3 完了待ち |
-| Phase 1 | M1.5 マルチリンガル統合 | 未着手 | - | - | M1.4 完了待ち |
-| Phase 1 | M1.6 テストスイート + CI | 未着手 | - | - | M1.5 完了待ち |
+| Phase 1 | M1.1 データ準備 | 完了 | 2026-03-30 | 2026-03-30 | convert_nst_dictionary.py + 26テスト |
+| Phase 1 | M1.2 音素インベントリ | 完了 | 2026-03-30 | 2026-03-30 | sv_id_map.py + PUA 0xE059-0xE061 + 16テスト |
+| Phase 1 | M1.3 Rule-based G2P | 完了 | 2026-03-30 | 2026-03-30 | swedish.py G2Pエンジン (797行) |
+| Phase 1 | M1.4 辞書ルックアップ統合 | 完了 | 2026-03-30 | 2026-03-30 | SwedishPhonemizer + 辞書 + Prosody |
+| Phase 1 | M1.5 マルチリンガル統合 | 完了 | 2026-03-30 | 2026-03-30 | registry/multilingual/id_map 統合 |
+| Phase 1 | M1.6 テストスイート + CI | 完了 | 2026-03-30 | 2026-03-30 | 175テスト全PASS (129 SV + 46 M1.1/M1.2) |
 | Phase 2 | M2.1 Rust 実装 | 未着手 | - | - | Phase 1 完了待ち |
 | Phase 2 | M2.2 C# 実装 | 未着手 | - | - | Phase 1 完了待ち |
 | Phase 2 | M2.3 C++ 実装 | 未着手 | - | - | Phase 1 完了待ち |
@@ -107,8 +107,8 @@ Phase 2: クロスプラットフォーム   Phase 3: TTSモデル学習     Pha
 
 | Phase | チケット数 | 完了数 | 進捗率 |
 |-------|-----------|--------|--------|
-| Phase 1 | 6 | 0 | 0% |
+| Phase 1 | 6 | 6 | 100% |
 | Phase 2 | 4 | 0 | 0% |
 | Phase 3 | 3 | 0 | 0% |
 | Phase 4 | 3 | 0 | 0% |
-| **合計** | **16** | **0** | **0%** |
+| **合計** | **16** | **6** | **37.5%** |
