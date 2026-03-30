@@ -747,12 +747,14 @@ class TestRegressionExistingLanguages:
 
     @pytest.mark.unit
     def test_en_phonemizer_still_works(self):
-        pytest.importorskip("nltk")  # EN phonemizer needs nltk data
-        from piper_train.phonemize.registry import get_phonemizer
+        try:
+            from piper_train.phonemize.registry import get_phonemizer
 
-        p = get_phonemizer("en")
-        r = p.phonemize("hello")
-        assert len(r) > 0
+            p = get_phonemizer("en")
+            r = p.phonemize("hello")
+            assert len(r) > 0
+        except (LookupError, OSError):
+            pytest.skip("EN phonemizer requires nltk data not available in CI")
 
     @pytest.mark.unit
     def test_6lang_id_map_unchanged(self):
