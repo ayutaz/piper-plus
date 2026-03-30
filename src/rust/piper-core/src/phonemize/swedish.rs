@@ -103,8 +103,25 @@ fn is_vowel(c: char) -> bool {
 fn is_consonant(c: char) -> bool {
     matches!(
         c,
-        'b' | 'c' | 'd' | 'f' | 'g' | 'h' | 'j' | 'k' | 'l' | 'm' | 'n' | 'p' | 'q' | 'r'
-            | 's' | 't' | 'v' | 'w' | 'x' | 'z'
+        'b' | 'c'
+            | 'd'
+            | 'f'
+            | 'g'
+            | 'h'
+            | 'j'
+            | 'k'
+            | 'l'
+            | 'm'
+            | 'n'
+            | 'p'
+            | 'q'
+            | 'r'
+            | 's'
+            | 't'
+            | 'v'
+            | 'w'
+            | 'x'
+            | 'z'
     )
 }
 
@@ -261,19 +278,15 @@ fn chars_to_string(chars: &[char]) -> String {
 
 static HARD_K_WORDS: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
     [
-        "kille", "kissa", "kiosk", "kebab", "kennel", "keps", "ketchup",
-        "kick", "kilt", "kimono", "kitsch", "kibbutz", "kiwi", "kilo",
-        "kex", "kent", "kerna", "keso", "kikare", "kines", "kinesisk",
-        "leker", "leken", "lekerska", "steker", "steket",
-        "söker", "söket", "tänker", "tänket",
-        "dyker", "dyket", "ryker", "röker", "röket",
-        "smeker", "läker", "läket", "märker", "märket",
-        "räcker", "väcker", "viker", "stryker", "sjunker", "sticker",
-        "pojke", "fröken", "onkel", "sockel", "socker", "ocker",
-        "märke", "mörker", "tecken", "vacker", "naken", "säker",
-        "enkel", "paket", "raket", "staket", "silke", "vinkel",
-        "skelett", "ficka", "dricka", "docka", "backe", "flicka",
-        "bricka", "trycke", "skicka", "rike", "kirke",
+        "kille", "kissa", "kiosk", "kebab", "kennel", "keps", "ketchup", "kick", "kilt", "kimono",
+        "kitsch", "kibbutz", "kiwi", "kilo", "kex", "kent", "kerna", "keso", "kikare", "kines",
+        "kinesisk", "leker", "leken", "lekerska", "steker", "steket", "söker", "söket", "tänker",
+        "tänket", "dyker", "dyket", "ryker", "röker", "röket", "smeker", "läker", "läket",
+        "märker", "märket", "räcker", "väcker", "viker", "stryker", "sjunker", "sticker", "pojke",
+        "fröken", "onkel", "sockel", "socker", "ocker", "märke", "mörker", "tecken", "vacker",
+        "naken", "säker", "enkel", "paket", "raket", "staket", "silke", "vinkel", "skelett",
+        "ficka", "dricka", "docka", "backe", "flicka", "bricka", "trycke", "skicka", "rike",
+        "kirke",
     ]
     .into_iter()
     .collect()
@@ -281,11 +294,9 @@ static HARD_K_WORDS: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
 
 static HARD_K_STEMS: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
     [
-        "lek", "stek", "sök", "tänk", "dyk", "ryk", "rök", "smek",
-        "läk", "märk", "räck", "väck", "vik", "stryk", "sjunk", "stick",
-        "back", "block", "trick", "tryck", "skick", "flick", "brick",
-        "drick", "dock", "fick", "sick", "tack", "sack", "pack",
-        "lock", "sock", "rock",
+        "lek", "stek", "sök", "tänk", "dyk", "ryk", "rök", "smek", "läk", "märk", "räck", "väck",
+        "vik", "stryk", "sjunk", "stick", "back", "block", "trick", "tryck", "skick", "flick",
+        "brick", "drick", "dock", "fick", "sick", "tack", "sack", "pack", "lock", "sock", "rock",
     ]
     .into_iter()
     .collect()
@@ -293,15 +304,59 @@ static HARD_K_STEMS: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
 
 static HARD_G_WORDS: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
     [
-        "bagel", "bageri", "bygel", "bygge", "båge", "dager", "flygel",
-        "gecko", "hage", "hagel", "hunger", "lager", "läge", "läger",
-        "mage", "nagel", "regel", "segel", "seger", "stege", "tagel",
-        "tegel", "tiger", "tygel", "finger", "ängel", "fågel", "spegel",
-        "fogel", "duger", "flyger", "ligger", "ljuger", "lägger",
-        "stiger", "suger", "tigger", "väger", "äger", "ger",
-        "agera", "delegera", "reagera", "segregera", "tangera",
-        "engagera", "arrangera", "ignorera", "navigera", "negera",
-        "intrigera", "ge", "gel",
+        "bagel",
+        "bageri",
+        "bygel",
+        "bygge",
+        "båge",
+        "dager",
+        "flygel",
+        "gecko",
+        "hage",
+        "hagel",
+        "hunger",
+        "lager",
+        "läge",
+        "läger",
+        "mage",
+        "nagel",
+        "regel",
+        "segel",
+        "seger",
+        "stege",
+        "tagel",
+        "tegel",
+        "tiger",
+        "tygel",
+        "finger",
+        "ängel",
+        "fågel",
+        "spegel",
+        "fogel",
+        "duger",
+        "flyger",
+        "ligger",
+        "ljuger",
+        "lägger",
+        "stiger",
+        "suger",
+        "tigger",
+        "väger",
+        "äger",
+        "ger",
+        "agera",
+        "delegera",
+        "reagera",
+        "segregera",
+        "tangera",
+        "engagera",
+        "arrangera",
+        "ignorera",
+        "navigera",
+        "negera",
+        "intrigera",
+        "ge",
+        "gel",
     ]
     .into_iter()
     .collect()
@@ -309,9 +364,8 @@ static HARD_G_WORDS: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
 
 static HARD_G_STEMS: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
     [
-        "lig", "stig", "sug", "tig", "väg", "äg", "flyg", "ljug",
-        "lägg", "dug", "drag", "lag", "dag", "mag", "nag", "bag",
-        "byg", "tag", "seg", "vag", "reg",
+        "lig", "stig", "sug", "tig", "väg", "äg", "flyg", "ljug", "lägg", "dug", "drag", "lag",
+        "dag", "mag", "nag", "bag", "byg", "tag", "seg", "vag", "reg",
     ]
     .into_iter()
     .collect()
@@ -320,10 +374,9 @@ static HARD_G_STEMS: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
 /// "o" -> /o:/ instead of default /u:/
 static O_LONG_AS_OO: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
     [
-        "son", "mor", "bror", "lov", "dom", "ton", "zon", "fon", "ion",
-        "ko", "lo", "ro", "tro", "bo", "god", "jord", "ord", "kol",
-        "pol", "kontroll", "roll", "mol", "fot", "rot",
-        "blod", "flod", "mod", "nod", "rod", "tog",
+        "son", "mor", "bror", "lov", "dom", "ton", "zon", "fon", "ion", "ko", "lo", "ro", "tro",
+        "bo", "god", "jord", "ord", "kol", "pol", "kontroll", "roll", "mol", "fot", "rot", "blod",
+        "flod", "mod", "nod", "rod", "tog",
     ]
     .into_iter()
     .collect()
@@ -332,8 +385,8 @@ static O_LONG_AS_OO: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
 /// Words ending in m that use short vowel despite single-C ending
 static FINAL_M_SHORT_WORDS: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
     [
-        "hem", "rum", "fem", "lem", "kam", "dam", "ham", "lam", "ram",
-        "stam", "tom", "som", "dom", "dum", "gum", "glöm", "dröm", "ström",
+        "hem", "rum", "fem", "lem", "kam", "dam", "ham", "lam", "ram", "stam", "tom", "som", "dom",
+        "dum", "gum", "glöm", "dröm", "ström",
     ]
     .into_iter()
     .collect()
@@ -341,20 +394,16 @@ static FINAL_M_SHORT_WORDS: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
 
 static FUNCTION_WORDS: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
     [
-        "jag", "du", "han", "hon", "vi", "de", "dem", "den", "det",
-        "sig", "sin", "min", "din",
-        "av", "i", "på", "för", "med", "om", "till", "från", "hos", "ur",
-        "och", "men", "att", "som", "när", "var",
-        "en", "ett",
-        "är", "har", "kan", "ska", "vill", "inte",
+        "jag", "du", "han", "hon", "vi", "de", "dem", "den", "det", "sig", "sin", "min", "din",
+        "av", "i", "på", "för", "med", "om", "till", "från", "hos", "ur", "och", "men", "att",
+        "som", "när", "var", "en", "ett", "är", "har", "kan", "ska", "vill", "inte",
     ]
     .into_iter()
     .collect()
 });
 
-static SK_BACK_VOWEL_EXCEPTIONS: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
-    ["människa", "marskalk"].into_iter().collect()
-});
+static SK_BACK_VOWEL_EXCEPTIONS: LazyLock<HashSet<&'static str>> =
+    LazyLock::new(|| ["människa", "marskalk"].into_iter().collect());
 
 /// ch exceptions that are /k/ not /ɧ/
 static CH_EXCEPTIONS_K: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
@@ -366,8 +415,7 @@ static CH_EXCEPTIONS_K: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
 /// Words where -age is Swedish (not French loan)
 static AGE_NATIVE_WORDS: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
     [
-        "bage", "lage", "sage", "dage", "mage", "hage", "tage",
-        "klage", "frage", "plage", "drage",
+        "bage", "lage", "sage", "dage", "mage", "hage", "tage", "klage", "frage", "plage", "drage",
     ]
     .into_iter()
     .collect()
@@ -380,11 +428,8 @@ static AGE_NATIVE_WORDS: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
 const UNSTRESSED_PREFIXES: &[&str] = &["för", "be", "ge", "er", "an"];
 
 const STRESS_ATTRACTING_SUFFIXES: &[&str] = &[
-    "ssion", "tion", "sion",
-    "itet", "eri", "era",
-    "ist", "ör", "ment",
-    "ans", "ens", "ell",
-    "ent", "ant", "ik", "ur", "al", "ös",
+    "ssion", "tion", "sion", "itet", "eri", "era", "ist", "ör", "ment", "ans", "ens", "ell", "ent",
+    "ant", "ik", "ur", "al", "ös",
 ];
 
 // ---------------------------------------------------------------------------
@@ -411,14 +456,14 @@ fn long_vowel(ch: char) -> &'static str {
 fn short_vowel(ch: char) -> char {
     match ch {
         'a' => 'a',
-        'e' => IPA_OPEN_E,         // ɛ
-        'i' => IPA_SMALL_I,        // ɪ
-        'o' => IPA_OPEN_O,         // ɔ
-        'u' => IPA_BARRED_O,       // ɵ
-        'y' => IPA_SMALL_Y,        // ʏ
-        '\u{00E5}' => IPA_OPEN_O,  // å → ɔ
-        '\u{00E4}' => IPA_OPEN_E,  // ä → ɛ
-        '\u{00F6}' => IPA_OE_LIG,  // ö → œ
+        'e' => IPA_OPEN_E,        // ɛ
+        'i' => IPA_SMALL_I,       // ɪ
+        'o' => IPA_OPEN_O,        // ɔ
+        'u' => IPA_BARRED_O,      // ɵ
+        'y' => IPA_SMALL_Y,       // ʏ
+        '\u{00E5}' => IPA_OPEN_O, // å → ɔ
+        '\u{00E4}' => IPA_OPEN_E, // ä → ɛ
+        '\u{00F6}' => IPA_OE_LIG, // ö → œ
         _ => ch,
     }
 }
@@ -449,34 +494,34 @@ fn is_propagating_retroflex(c: char) -> bool {
 
 /// (suffix, phoneme_chars)
 const LOANWORD_SUFFIX_RULES: &[(&str, &[&str])] = &[
-    ("ssion", &["\u{0267}", "u\u{02D0}", "n"]),  // ɧ uː n
-    ("tion", &["\u{0267}", "u\u{02D0}", "n"]),    // ɧ uː n
-    ("sion", &["\u{0267}", "u\u{02D0}", "n"]),    // ɧ uː n
-    ("age", &["\u{0251}\u{02D0}", "\u{0267}"]),    // ɑː ɧ
-    ("eur", &["\u{00F8}\u{02D0}", "r"]),           // øː r
-    ("eum", &["e\u{02D0}", "\u{0275}", "m"]),      // eː ɵ m
-    ("ium", &["\u{026A}", "\u{0275}", "m"]),        // ɪ ɵ m
+    ("ssion", &["\u{0267}", "u\u{02D0}", "n"]), // ɧ uː n
+    ("tion", &["\u{0267}", "u\u{02D0}", "n"]),  // ɧ uː n
+    ("sion", &["\u{0267}", "u\u{02D0}", "n"]),  // ɧ uː n
+    ("age", &["\u{0251}\u{02D0}", "\u{0267}"]), // ɑː ɧ
+    ("eur", &["\u{00F8}\u{02D0}", "r"]),        // øː r
+    ("eum", &["e\u{02D0}", "\u{0275}", "m"]),   // eː ɵ m
+    ("ium", &["\u{026A}", "\u{0275}", "m"]),    // ɪ ɵ m
 ];
 
 /// Unstressed suffix phoneme replacements (reserved for future dictionary-aware pipeline).
 #[allow(dead_code)]
 const UNSTRESSED_SUFFIXES: &[(&str, &[&str])] = &[
-    ("ling", &["l", "\u{026A}", "\u{014B}"]),       // l ɪ ŋ
-    ("ning", &["n", "\u{026A}", "\u{014B}"]),        // n ɪ ŋ
-    ("ande", &["a", "n", "d", "\u{025B}"]),          // a n d ɛ
-    ("erna", &["\u{025B}", "r", "n", "a"]),          // ɛ r n a
-    ("arna", &["a", "r", "n", "a"]),                 // a r n a
-    ("lig", &["l", "\u{026A}", "\u{0261}"]),         // l ɪ ɡ
-    ("en", &["\u{025B}", "n"]),                      // ɛ n
-    ("er", &["\u{025B}", "r"]),                      // ɛ r
-    ("el", &["\u{025B}", "l"]),                      // ɛ l
-    ("et", &["\u{025B}", "t"]),                      // ɛ t
-    ("ar", &["a", "r"]),                             // a r
-    ("or", &["\u{0254}", "r"]),                      // ɔ r
-    ("ig", &["\u{026A}", "\u{0261}"]),               // ɪ ɡ
-    ("ad", &["a", "d"]),                             // a d
-    ("a", &["a"]),                                   // a
-    ("e", &["\u{025B}"]),                            // ɛ
+    ("ling", &["l", "\u{026A}", "\u{014B}"]), // l ɪ ŋ
+    ("ning", &["n", "\u{026A}", "\u{014B}"]), // n ɪ ŋ
+    ("ande", &["a", "n", "d", "\u{025B}"]),   // a n d ɛ
+    ("erna", &["\u{025B}", "r", "n", "a"]),   // ɛ r n a
+    ("arna", &["a", "r", "n", "a"]),          // a r n a
+    ("lig", &["l", "\u{026A}", "\u{0261}"]),  // l ɪ ɡ
+    ("en", &["\u{025B}", "n"]),               // ɛ n
+    ("er", &["\u{025B}", "r"]),               // ɛ r
+    ("el", &["\u{025B}", "l"]),               // ɛ l
+    ("et", &["\u{025B}", "t"]),               // ɛ t
+    ("ar", &["a", "r"]),                      // a r
+    ("or", &["\u{0254}", "r"]),               // ɔ r
+    ("ig", &["\u{026A}", "\u{0261}"]),        // ɪ ɡ
+    ("ad", &["a", "d"]),                      // a d
+    ("a", &["a"]),                            // a
+    ("e", &["\u{025B}"]),                     // ɛ
 ];
 
 // ---------------------------------------------------------------------------
@@ -489,7 +534,7 @@ fn default_consonant(ch: char) -> &'static str {
         'c' => "k",
         'd' => "d",
         'f' => "f",
-        'g' => "\u{0261}",  // ɡ
+        'g' => "\u{0261}", // ɡ
         'h' => "h",
         'j' => "j",
         'k' => "k",
@@ -550,11 +595,7 @@ fn is_hard_g(word: &str) -> bool {
 // ---------------------------------------------------------------------------
 
 fn char_at(word: &[char], pos: usize) -> char {
-    if pos < word.len() {
-        word[pos]
-    } else {
-        '\0'
-    }
+    if pos < word.len() { word[pos] } else { '\0' }
 }
 
 // ---------------------------------------------------------------------------
@@ -563,11 +604,7 @@ fn char_at(word: &[char], pos: usize) -> char {
 
 /// Convert consonant(s) starting at `pos`.
 /// Returns (ipa_phonemes, chars_consumed).
-fn convert_consonant(
-    word: &[char],
-    pos: usize,
-    full_word: &str,
-) -> (Vec<String>, usize) {
+fn convert_consonant(word: &[char], pos: usize, full_word: &str) -> (Vec<String>, usize) {
     let remaining = word.len() - pos;
     let ch = word[pos];
     let next_ch = char_at(word, pos + 1);
@@ -591,10 +628,11 @@ fn convert_consonant(
         let di: String = word[pos..pos + 2].iter().collect();
         match di.as_str() {
             "sk" => {
-                if remaining >= 3 && is_front_vowel(char_at(word, pos + 2)) {
-                    if !SK_BACK_VOWEL_EXCEPTIONS.contains(full_word) {
-                        return (vec![IPA_HOOK_H.to_string()], 2);
-                    }
+                if remaining >= 3
+                    && is_front_vowel(char_at(word, pos + 2))
+                    && !SK_BACK_VOWEL_EXCEPTIONS.contains(full_word)
+                {
+                    return (vec![IPA_HOOK_H.to_string()], 2);
                 }
                 return (vec!["s".into(), "k".into()], 2);
             }
@@ -692,12 +730,7 @@ fn count_following_consonants(word: &[char], pos: usize) -> usize {
 // Vowel phoneme assignment (Complementary Quantity)
 // ---------------------------------------------------------------------------
 
-fn get_vowel_phoneme(
-    word: &[char],
-    pos: usize,
-    full_word: &str,
-    is_stressed: bool,
-) -> String {
+fn get_vowel_phoneme(word: &[char], pos: usize, full_word: &str, is_stressed: bool) -> String {
     let ch = word[pos];
 
     // Unstressed -> short
@@ -729,11 +762,7 @@ fn get_vowel_phoneme(
 
     // r + single C exception: vowel stays long (r merges into retroflex)
     // Exception: 'o' is excluded
-    if n_following == 2
-        && ch != 'o'
-        && pos + 1 < word.len()
-        && word[pos + 1] == 'r'
-    {
+    if n_following == 2 && ch != 'o' && pos + 1 < word.len() && word[pos + 1] == 'r' {
         return long_vowel(ch).to_string();
     }
 
@@ -888,8 +917,7 @@ fn detect_stress(word: &str) -> i32 {
 
 fn is_ipa_vowel_str(ph: &str) -> bool {
     const IPA_VOWEL_CHARS: &[char] = &[
-        'a', 'e', 'i', 'o', 'u', 'y',
-        '\u{00E5}', '\u{00E4}', '\u{00F6}',  // å ä ö
+        'a', 'e', 'i', 'o', 'u', 'y', '\u{00E5}', '\u{00E4}', '\u{00F6}', // å ä ö
         '\u{0251}', // ɑ
         '\u{025B}', // ɛ
         '\u{026A}', // ɪ
@@ -976,11 +1004,7 @@ fn detect_loanword_suffix(word: &str) -> Option<(String, Vec<String>)> {
 // Native word conversion (Stage 4)
 // ---------------------------------------------------------------------------
 
-fn convert_word_native(
-    word_chars: &[char],
-    full_word: &str,
-    stressed_syl: i32,
-) -> Vec<String> {
+fn convert_word_native(word_chars: &[char], full_word: &str, stressed_syl: i32) -> Vec<String> {
     let mut phonemes: Vec<String> = Vec::new();
     let mut pos = 0;
     let mut syl_count: i32 = 0;
@@ -1116,10 +1140,8 @@ pub fn phonemize_swedish_with_prosody(text: &str) -> (Vec<String>, Vec<Option<Pr
 
                 // Count non-stress phonemes for a3
                 let stress_str = IPA_STRESS.to_string();
-                let word_phoneme_count = word_phonemes
-                    .iter()
-                    .filter(|p| **p != stress_str)
-                    .count() as i32;
+                let word_phoneme_count =
+                    word_phonemes.iter().filter(|p| **p != stress_str).count() as i32;
 
                 for ph in &word_phonemes {
                     let a2 = if *ph == stress_str {
@@ -1259,22 +1281,14 @@ mod tests {
         // "sjö" -> ɧ + øː (sj -> sj-sound)
         let result = ph("sjö");
         let hook_h = IPA_HOOK_H.to_string();
-        assert!(
-            result.contains(&hook_h),
-            "sj -> ɧ: {:?}",
-            result
-        );
+        assert!(result.contains(&hook_h), "sj -> ɧ: {:?}", result);
     }
 
     #[test]
     fn test_sj_sound_skj() {
         let result = ph("skjorta");
         let hook_h = IPA_HOOK_H.to_string();
-        assert!(
-            result.contains(&hook_h),
-            "skj -> ɧ: {:?}",
-            result
-        );
+        assert!(result.contains(&hook_h), "skj -> ɧ: {:?}", result);
     }
 
     #[test]
@@ -1310,11 +1324,7 @@ mod tests {
         // "tjugo" -> ɕ u: ɡ ɔ
         let result = ph("tjugo");
         let curly_c = IPA_CURLY_C.to_string();
-        assert!(
-            result.contains(&curly_c),
-            "tj -> ɕ: {:?}",
-            result
-        );
+        assert!(result.contains(&curly_c), "tj -> ɕ: {:?}", result);
     }
 
     #[test]
@@ -1322,11 +1332,7 @@ mod tests {
         // "kung" -> k ɵ ŋ
         let result = ph("kung");
         let eng = IPA_ENG.to_string();
-        assert!(
-            result.contains(&eng),
-            "ng -> ŋ: {:?}",
-            result
-        );
+        assert!(result.contains(&eng), "ng -> ŋ: {:?}", result);
     }
 
     #[test]
@@ -1476,11 +1482,7 @@ mod tests {
         // "station" -> stress on the suffix "-tion"
         let result = ph("station");
         let stress = IPA_STRESS.to_string();
-        assert!(
-            result.contains(&stress),
-            "station has stress: {:?}",
-            result
-        );
+        assert!(result.contains(&stress), "station has stress: {:?}", result);
     }
 
     #[test]
@@ -1539,7 +1541,7 @@ mod tests {
     #[test]
     fn test_long_vowel_pua_mapping() {
         // Long vowels should be mapped to PUA codepoints
-        let result = ph("sol");  // s + uː + l  (o -> uː default)
+        let result = ph("sol"); // s + uː + l  (o -> uː default)
         let pua_u_long = '\u{E060}'.to_string(); // uː
         assert!(
             result.contains(&pua_u_long),
@@ -1652,11 +1654,7 @@ mod tests {
         // "chef" -> ɧ e: f
         let result = ph("chef");
         let hook_h = IPA_HOOK_H.to_string();
-        assert!(
-            result.contains(&hook_h),
-            "ch -> ɧ in 'chef': {:?}",
-            result
-        );
+        assert!(result.contains(&hook_h), "ch -> ɧ in 'chef': {:?}", result);
     }
 
     #[test]
@@ -1665,11 +1663,7 @@ mod tests {
         let result = ph("och");
         // 'och' is a function word so no stress
         let stress = IPA_STRESS.to_string();
-        assert!(
-            !result.contains(&stress),
-            "'och' no stress: {:?}",
-            result
-        );
+        assert!(!result.contains(&stress), "'och' no stress: {:?}", result);
     }
 
     // ===== Retroflex cascade =====

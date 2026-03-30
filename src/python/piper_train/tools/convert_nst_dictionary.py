@@ -22,6 +22,7 @@ import unicodedata
 from collections import Counter
 from pathlib import Path
 
+
 _LOGGER = logging.getLogger("convert_nst_dictionary")
 
 # =========================================================================
@@ -210,7 +211,7 @@ def run_spot_check(dictionary: dict[str, str]) -> bool:
     Returns True if all pass.
     """
     all_ok = True
-    for word, sampa, expected_ipa in SPOT_CHECK:
+    for word, _sampa, expected_ipa in SPOT_CHECK:
         actual = dictionary.get(word)
         if actual is None:
             _LOGGER.error("Spot check FAIL: %r not found in dictionary", word)
@@ -293,7 +294,7 @@ def main() -> None:
 
     try:
         with open(args.input, encoding="utf-8") as fp:
-            for line_num, line in enumerate(fp, 1):
+            for _line_num, line in enumerate(fp, 1):
                 stats["input_lines"] += 1
 
                 parsed = parse_nst_line(line)

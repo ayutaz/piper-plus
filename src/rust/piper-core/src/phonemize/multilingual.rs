@@ -52,12 +52,10 @@ const SWEDISH_CHARS: [char; 6] = [
 /// These are highly distinctive and do not appear in EN/ES/PT/FR.
 /// 45 words, matching the Python `_SWEDISH_FUNCTION_WORDS`.
 const SWEDISH_FUNCTION_WORDS: [&str; 45] = [
-    "och", "att", "jag", "det", "den", "inte", "som", "han", "hon",
-    "var", "har", "kan", "ska", "med", "för", "sig", "sin", "min",
-    "din", "vill", "från", "när", "här", "där", "också", "alla",
-    "denna", "efter", "eller", "under", "utan", "mycket", "mellan",
-    "genom", "bara", "sedan", "redan", "aldrig", "alltid", "igen",
-    "något", "några", "varje", "vilken", "vilket",
+    "och", "att", "jag", "det", "den", "inte", "som", "han", "hon", "var", "har", "kan", "ska",
+    "med", "för", "sig", "sin", "min", "din", "vill", "från", "när", "här", "där", "också", "alla",
+    "denna", "efter", "eller", "under", "utan", "mycket", "mellan", "genom", "bara", "sedan",
+    "redan", "aldrig", "alltid", "igen", "något", "några", "varje", "vilken", "vilket",
 ];
 
 impl UnicodeLanguageDetector {
@@ -275,10 +273,10 @@ fn refine_latin_segments_for_swedish(
                 if word_lower.is_empty() {
                     continue;
                 }
-                // Check for Swedish-specific characters (ä/ö/å)
-                if word_lower.chars().any(|c| SWEDISH_CHARS.contains(&c)) {
-                    sv_score += 1;
-                } else if func_words.contains(word_lower.as_str()) {
+                // Check for Swedish-specific characters (ä/ö/å) or function words
+                if word_lower.chars().any(|c| SWEDISH_CHARS.contains(&c))
+                    || func_words.contains(word_lower.as_str())
+                {
                     sv_score += 1;
                 }
             }

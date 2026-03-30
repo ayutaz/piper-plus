@@ -136,7 +136,7 @@ pub static FIXED_PUA_MAP: LazyLock<Vec<(&'static str, u32)>> = LazyLock::new(|| 
         ("o\u{02D0}", 0xE05F),        // oː  close-mid back rounded long
         ("u\u{02D0}", 0xE060),        // uː  close back rounded long
         ("\u{0289}\u{02D0}", 0xE061), // ʉː  close central rounded long
-        // 0xE062-0xE063 reserved for SV future expansion
+                                      // 0xE062-0xE063 reserved for SV future expansion
     ]
 });
 

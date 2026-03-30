@@ -24,6 +24,7 @@ from pathlib import Path
 
 from .base import Phonemizer, ProsodyInfo
 
+
 _LOGGER = logging.getLogger(__name__)
 
 __all__ = [
@@ -310,7 +311,7 @@ def _is_hard_g(word: str) -> bool:
     return False
 
 
-def _convert_consonant(
+def _convert_consonant(  # noqa: PLR0911
     word: str, pos: int, full_word: str
 ) -> tuple[list[str], int]:
     """Convert consonant(s) starting at pos.
@@ -321,7 +322,6 @@ def _convert_consonant(
     remaining = len(word) - pos
     ch = word[pos]
     next_ch = _char_at(word, pos + 1)
-    next2 = _char_at(word, pos + 2)
 
     # === 3-char patterns (highest priority) ===
     if remaining >= 3:
@@ -460,7 +460,7 @@ def _count_following_consonants(word: str, pos: int) -> int:
     return count
 
 
-def get_vowel_phoneme(
+def get_vowel_phoneme(  # noqa: PLR0911
     word: str, pos: int, full_word: str, is_stressed: bool
 ) -> str:
     """Determine vowel phoneme (long or short) at position.
