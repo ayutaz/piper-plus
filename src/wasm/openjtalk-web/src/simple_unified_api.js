@@ -1,7 +1,7 @@
 /**
  * Simple Unified Phonemizer API
  * Uses OpenJTalk for Japanese, a simple phonemizer for English,
- * and character-based fallbacks for zh/es/fr/pt.
+ * and character-based fallbacks for zh/es/fr/pt/sv/sv.
  */
 
 import { SimpleEnglishPhonemizer, createEnglishPhonemeMap } from './simple_english_phonemizer.js';
@@ -208,7 +208,7 @@ export class SimpleUnifiedPhonemizer {
             // Chinese: character-based phoneme_id_map fallback
             return this.phonemizeChinese(text);
         } else {
-            // es/fr/pt: Latin-script character-based fallback
+            // es/fr/pt/sv: Latin-script character-based fallback
             return this.phonemizeLatinFallback(text);
         }
     }
@@ -293,7 +293,7 @@ export class SimpleUnifiedPhonemizer {
 
     /**
      * Set the phoneme_id_map from model config.
-     * Required for zh/es/fr/pt fallback phonemization.
+     * Required for zh/es/fr/pt/sv fallback phonemization.
      * @param {Object} phonemeIdMap - mapping from character/phoneme string to array of IDs
      */
     setPhonemeIdMap(phonemeIdMap) {
@@ -309,7 +309,7 @@ export class SimpleUnifiedPhonemizer {
         } else if (language === 'en') {
             return this.extractPhonemesFromIPA(labels);
         } else {
-            // zh/es/fr/pt: textToPhonemes already returns phoneme ID arrays,
+            // zh/es/fr/pt/sv: textToPhonemes already returns phoneme ID arrays,
             // so pass through directly
             return labels;
         }
@@ -376,7 +376,7 @@ export class SimpleUnifiedPhonemizer {
             return this.englishPhonemeMap;
         }
         if (language === 'zh' || language === 'es' || language === 'fr' || language === 'pt') {
-            // zh/es/fr/pt use the model's phoneme_id_map directly
+            // zh/es/fr/pt/sv use the model's phoneme_id_map directly
             return this.phonemeIdMap;
         }
         // For Japanese, the map should come from the model config
@@ -386,7 +386,7 @@ export class SimpleUnifiedPhonemizer {
     /**
      * Detect language from text.
      * Priority: JA (Hiragana/Katakana) > ZH (CJK without Kana) > EN (default).
-     * Note: es/fr/pt cannot be reliably distinguished from EN by characters alone,
+     * Note: es/fr/pt/sv cannot be reliably distinguished from EN by characters alone,
      * so they must be specified explicitly via the language parameter.
      */
     detectLanguage(text) {
