@@ -248,7 +248,7 @@ static const std::unordered_set<std::string> HARD_K_WORDS = {
     "smeker", "läker", "läket", "märker", "märket",
     "räcker", "väcker", "viker", "stryker", "sjunker", "sticker",
     "pojke", "fröken", "onkel", "sockel", "socker", "ocker",
-    "märke", "mörker", "tecken", "naken", "säker",
+    "märke", "mörker", "tecken", "vacker", "naken", "säker",
     "enkel", "paket", "raket", "staket", "silke", "vinkel",
     "skelett", "ficka", "dricka", "docka", "backe", "flicka",
     "bricka", "trycke", "skicka", "rike", "kirke",
@@ -273,12 +273,14 @@ static const std::unordered_set<std::string> HARD_G_WORDS = {
     "agera", "delegera", "reagera", "segregera", "tangera",
     "engagera", "arrangera", "ignorera", "navigera", "negera",
     "intrigera", "ge", "gel",
+    "berg", "borg",
 };
 
 static const std::unordered_set<std::string> HARD_G_STEMS = {
     "lig", "stig", "sug", "tig", "väg", "äg", "flyg", "ljug",
     "lägg", "dug", "drag", "lag", "dag", "mag", "nag", "bag",
     "byg", "tag", "seg", "vag", "reg",
+    "berg", "borg",
 };
 
 // "o" -> /oː/ instead of default /uː/
@@ -393,6 +395,13 @@ static bool isHardK(const std::string &fullWord) {
 
 static bool isHardG(const std::string &fullWord) {
     if (HARD_G_WORDS.count(fullWord) > 0) return true;
+    // -era verb heuristic: words ending in -era/-erar/-erade are typically
+    // Swedish verbs derived from loanwords with hard g (e.g. navigera, ignorera)
+    if (endsWithStr(fullWord, "erade") ||
+        endsWithStr(fullWord, "erar") ||
+        endsWithStr(fullWord, "era")) {
+        return true;
+    }
     for (int suffLen = 3; suffLen >= 1; --suffLen) {
         if ((int)fullWord.size() > suffLen) {
             std::string stem = fullWord.substr(0, fullWord.size() - suffLen);
@@ -672,19 +681,32 @@ static ConvertResult convertConsonant(const std::vector<char32_t> &word,
             return {{'k'}, 2};
         }
 
-        // lj -> j
+        // gj -> j (word-initial only)
+        if (c0 == 'g' && c1 == 'j') {
+            if (pos == 0) {
+                return {{'j'}, 2};
+            }
+        }
+
+        // lj -> j (word-initial only)
         if (c0 == 'l' && c1 == 'j') {
-            return {{'j'}, 2};
+            if (pos == 0) {
+                return {{'j'}, 2};
+            }
         }
 
-        // dj -> j
+        // dj -> j (word-initial only)
         if (c0 == 'd' && c1 == 'j') {
-            return {{'j'}, 2};
+            if (pos == 0) {
+                return {{'j'}, 2};
+            }
         }
 
-        // hj -> j
+        // hj -> j (word-initial only)
         if (c0 == 'h' && c1 == 'j') {
-            return {{'j'}, 2};
+            if (pos == 0) {
+                return {{'j'}, 2};
+            }
         }
     }
 
