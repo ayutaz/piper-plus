@@ -357,6 +357,8 @@ static HARD_G_WORDS: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
         "intrigera",
         "ge",
         "gel",
+        "berg",
+        "borg",
     ]
     .into_iter()
     .collect()
@@ -365,7 +367,7 @@ static HARD_G_WORDS: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
 static HARD_G_STEMS: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
     [
         "lig", "stig", "sug", "tig", "väg", "äg", "flyg", "ljug", "lägg", "dug", "drag", "lag",
-        "dag", "mag", "nag", "bag", "byg", "tag", "seg", "vag", "reg",
+        "dag", "mag", "nag", "bag", "byg", "tag", "seg", "vag", "reg", "berg", "borg",
     ]
     .into_iter()
     .collect()
@@ -578,6 +580,10 @@ fn is_hard_g(word: &str) -> bool {
     if HARD_G_WORDS.contains(word) {
         return true;
     }
+    // -era/-erar/-erade verb heuristic: loanword verbs keep hard g
+    if word.ends_with("era") || word.ends_with("erar") || word.ends_with("erade") {
+        return true;
+    }
     let char_count = word.chars().count();
     for suffix_len in [3, 2, 1] {
         if char_count > suffix_len {
@@ -657,9 +663,10 @@ fn convert_consonant(word: &[char], pos: usize, full_word: &str) -> (Vec<String>
             "ng" => return (vec![IPA_ENG.to_string()], 2),
             "nk" => return (vec![IPA_ENG.to_string(), "k".into()], 2),
             "ck" => return (vec!["k".into()], 2),
-            "lj" => return (vec!["j".into()], 2),
-            "dj" => return (vec!["j".into()], 2),
-            "hj" => return (vec!["j".into()], 2),
+            "gj" if pos == 0 => return (vec!["j".into()], 2),
+            "lj" if pos == 0 => return (vec!["j".into()], 2),
+            "dj" if pos == 0 => return (vec!["j".into()], 2),
+            "hj" if pos == 0 => return (vec!["j".into()], 2),
             _ => {}
         }
     }
