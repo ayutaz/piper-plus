@@ -60,10 +60,31 @@ public sealed class UnicodeLanguageDetector
         (ch >= '\u00D8' && ch <= '\u00F6') ||
         (ch >= '\u00F8' && ch <= '\u00FF');
 
+    // Swedish-specific characters not used by EN/ES/PT/FR.
+    // a-diaeresis (U+00E4), o-diaeresis (U+00F6), a-ring (U+00E5) and uppercase variants.
+    private static readonly HashSet<char> SwedishChars = new()
+    {
+        '\u00E4', '\u00F6', '\u00C4', '\u00D6', '\u00E5', '\u00C5',
+    };
+
+    // Swedish function words for word-level disambiguation.
+    // These are highly distinctive and do not appear in EN/ES/PT/FR.
+    private static readonly HashSet<string> SwedishFunctionWords = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "och", "att", "jag", "det", "den", "inte", "som", "han", "hon",
+        "var", "har", "kan", "ska", "med", "för", "sig", "sin", "min",
+        "din", "vill", "från", "när", "här", "där", "också", "alla",
+        "denna", "efter", "eller", "under", "utan", "mycket", "mellan",
+        "genom", "bara", "sedan", "redan", "aldrig", "alltid", "igen",
+        "något", "några", "varje", "vilken", "vilket",
+    };
+
     private readonly HashSet<string> _languages;
     private readonly bool _hasJa;
     private readonly bool _hasZh;
     private readonly bool _hasKo;
+    private readonly bool _hasSv;
+    private readonly bool _detectSwedish;
     private readonly string? _defaultLatinResult;
 
     /// <summary>
@@ -93,7 +114,19 @@ public sealed class UnicodeLanguageDetector
         _hasJa = _languages.Contains("ja");
         _hasZh = _languages.Contains("zh");
         _hasKo = _languages.Contains("ko");
+        _hasSv = _languages.Contains("sv");
         _defaultLatinResult = _languages.Contains(defaultLatinLanguage) ? defaultLatinLanguage : null;
+
+        // Latin-script languages available (for Swedish disambiguation).
+        int latinLangCount = 0;
+        foreach (string lang in languages)
+        {
+            if (lang is "en" or "es" or "pt" or "fr" or "sv")
+                latinLangCount++;
+        }
+
+        // Enable Swedish detection when sv is present alongside other Latin langs.
+        _detectSwedish = _hasSv && latinLangCount >= 2;
     }
 
     /// <summary>
@@ -243,6 +276,77 @@ public sealed class UnicodeLanguageDetector
             segments.Add((DefaultLatinLanguage, text));
         }
 
+        // Post-pass: word-level Swedish detection within Latin segments.
+        // When sv is in the language set alongside other Latin languages,
+        // re-examine default-Latin segments for Swedish function words.
+        if (_detectSwedish)
+        {
+            segments = RefineLatinSegmentsForSwedish(segments);
+        }
+
         return segments;
+    }
+
+    /// <summary>
+    /// Re-classify Latin segments as Swedish based on indicator count.
+    /// <para>
+    /// For each segment assigned to the default Latin language, count Swedish
+    /// indicators (characters in <see cref="SwedishChars"/> + function words
+    /// in <see cref="SwedishFunctionWords"/>). If at least one indicator is
+    /// found, the entire segment is re-classified as <c>"sv"</c>.
+    /// </para>
+    /// </summary>
+    private List<(string Lang, string Text)> RefineLatinSegmentsForSwedish(
+        List<(string Lang, string Text)> segments)
+    {
+        string defaultLang = DefaultLatinLanguage;
+
+        // If the default Latin language is already Swedish, nothing to refine.
+        if (defaultLang == "sv")
+            return segments;
+
+        var result = new List<(string Lang, string Text)>(segments.Count);
+
+        foreach (var (lang, segText) in segments)
+        {
+            if (lang != defaultLang)
+            {
+                result.Add((lang, segText));
+                continue;
+            }
+
+            // Count Swedish indicators in this segment.
+            int svScore = 0;
+            foreach (string rawWord in segText.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+            {
+                string word = rawWord.Trim('.', ',', ';', ':', '!', '?').ToLowerInvariant();
+                if (word.Length == 0)
+                    continue;
+
+                // Swedish-specific characters
+                bool hasSwedishChar = false;
+                foreach (char c in word)
+                {
+                    if (SwedishChars.Contains(c))
+                    {
+                        hasSwedishChar = true;
+                        break;
+                    }
+                }
+
+                if (hasSwedishChar)
+                {
+                    svScore++;
+                }
+                else if (SwedishFunctionWords.Contains(word))
+                {
+                    svScore++;
+                }
+            }
+
+            result.Add(svScore >= 1 ? ("sv", segText) : (defaultLang, segText));
+        }
+
+        return result;
     }
 }

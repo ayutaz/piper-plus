@@ -7,6 +7,23 @@
 import { SimpleEnglishPhonemizer, createEnglishPhonemeMap } from './simple_english_phonemizer.js';
 import { extractPhonemesFromLabels as extractJaPhonemes } from './japanese_phoneme_extract.js';
 
+// Swedish-specific characters not used by EN/ES/PT/FR.
+// ä (U+00E4), ö (U+00F6), å (U+00E5) and uppercase variants.
+const SWEDISH_CHARS = new Set([
+    '\u00E4', '\u00F6', '\u00C4', '\u00D6', '\u00E5', '\u00C5',
+]);
+
+// Swedish function words for word-level disambiguation.
+// These are highly distinctive and do not appear in EN/ES/PT/FR.
+const SWEDISH_FUNCTION_WORDS = new Set([
+    'och', 'att', 'jag', 'det', 'den', 'inte', 'som', 'han', 'hon',
+    'var', 'har', 'kan', 'ska', 'med', 'för', 'sig', 'sin', 'min',
+    'din', 'vill', 'från', 'när', 'här', 'där', 'också', 'alla',
+    'denna', 'efter', 'eller', 'under', 'utan', 'mycket', 'mellan',
+    'genom', 'bara', 'sedan', 'redan', 'aldrig', 'alltid', 'igen',
+    'något', 'några', 'varje', 'vilken', 'vilket',
+]);
+
 export class SimpleUnifiedPhonemizer {
     constructor(options = {}) {
         this.openjtalkModule = null;
@@ -385,9 +402,8 @@ export class SimpleUnifiedPhonemizer {
 
     /**
      * Detect language from text.
-     * Priority: JA (Hiragana/Katakana) > ZH (CJK without Kana) > EN (default).
-     * Note: es/fr/pt/sv cannot be reliably distinguished from EN by characters alone,
-     * so they must be specified explicitly via the language parameter.
+     * Priority: JA (Hiragana/Katakana) > ZH (CJK without Kana) > SV (Swedish indicators) > EN (default).
+     * Swedish is detected by the presence of ä/ö/å characters or Swedish function words.
      */
     detectLanguage(text) {
         // Simple detection based on character ranges
@@ -413,6 +429,22 @@ export class SimpleUnifiedPhonemizer {
             // CJK characters without Kana → Chinese
             return 'zh';
         }
+
+        // Swedish detection: scan for Swedish-specific characters and function words.
+        // Check characters for ä/ö/å
+        for (const char of text) {
+            if (SWEDISH_CHARS.has(char)) {
+                return 'sv';
+            }
+        }
+        // Check words for Swedish function words
+        for (const rawWord of text.split(/\s+/)) {
+            const word = rawWord.replace(/^[.,;:!?]+|[.,;:!?]+$/g, '').toLowerCase();
+            if (word && SWEDISH_FUNCTION_WORDS.has(word)) {
+                return 'sv';
+            }
+        }
+
         return 'en';
     }
 
