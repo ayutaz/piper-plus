@@ -19,6 +19,7 @@ pub mod multilingual;
 pub mod phoneme_converter;
 pub mod portuguese;
 pub mod spanish;
+pub mod swedish;
 pub mod token_map;
 
 /// プロソディ情報 (言語間で共有)
