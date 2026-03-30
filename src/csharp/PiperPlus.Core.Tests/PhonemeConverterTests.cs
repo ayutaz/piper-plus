@@ -63,8 +63,8 @@ public sealed class PhonemeConverterTests
 
         var actual = OpenJTalkToPiperMapping.TokenToChar;
 
-        // 87 total entries: 29 JA + 2 shared + 43 ZH + 8 KO + 2 ES/PT + 3 FR
-        Assert.Equal(87, actual.Count);
+        // 96 total entries: 29 JA + 2 shared + 43 ZH + 8 KO + 2 ES/PT + 3 FR + 9 SV
+        Assert.Equal(96, actual.Count);
 
         foreach (var (token, expectedChar) in expected)
         {
