@@ -20,10 +20,10 @@
 | [M1.4](M1.4-dictionary-lookup-integration.md) | M1.4 | Phase 1 | 辞書ルックアップ統合 | **完了** | M1.1, M1.3 | M1.5 |
 | [M1.5](M1.5-multilingual-integration.md) | M1.5 | Phase 1 | マルチリンガル統合 | **完了** | M1.4 | M1.6 |
 | [M1.6](M1.6-test-suite-ci.md) | M1.6 | Phase 1 | テストスイート + CI | **完了** | M1.5 | Phase 2 全体 |
-| M2.1 | M2.1 | Phase 2 | Rust 実装 | 未着手 | Phase 1 | M3.3 |
-| M2.2 | M2.2 | Phase 2 | C# 実装 | 未着手 | Phase 1 | M3.3 |
-| M2.3 | M2.3 | Phase 2 | C++ 実装 | 未着手 | Phase 1 | M3.3 |
-| M2.4 | M2.4 | Phase 2 | WASM/JS 実装 | 未着手 | Phase 1 | M3.3 |
+| M2.1 | M2.1 | Phase 2 | Rust 実装 | **完了** | Phase 1 | M3.3 |
+| M2.2 | M2.2 | Phase 2 | C# 実装 | **完了** | Phase 1 | M3.3 |
+| M2.3 | M2.3 | Phase 2 | C++ 実装 | **完了** | Phase 1 | M3.3 |
+| M2.4 | M2.4 | Phase 2 | WASM/JS 実装 | **完了** | Phase 1 | M3.3 |
 | M3.1 | M3.1 | Phase 3 | データセット準備 | 未着手 | Phase 1 | M3.2 |
 | M3.2 | M3.2 | Phase 3 | ファインチューニング | 未着手 | M3.1 | M3.3 |
 | M3.3 | M3.3 | Phase 3 | ONNX エクスポート + リリース | 未着手 | M3.2 | なし |
@@ -90,10 +90,10 @@ Phase 2: クロスプラットフォーム   Phase 3: TTSモデル学習     Pha
 | Phase 1 | M1.4 辞書ルックアップ統合 | 完了 | 2026-03-30 | 2026-03-30 | SwedishPhonemizer + 辞書 + Prosody |
 | Phase 1 | M1.5 マルチリンガル統合 | 完了 | 2026-03-30 | 2026-03-30 | registry/multilingual/id_map 統合 |
 | Phase 1 | M1.6 テストスイート + CI | 完了 | 2026-03-30 | 2026-03-30 | 175テスト全PASS (129 SV + 46 M1.1/M1.2) |
-| Phase 2 | M2.1 Rust 実装 | 未着手 | - | - | Phase 1 完了待ち |
-| Phase 2 | M2.2 C# 実装 | 未着手 | - | - | Phase 1 完了待ち |
-| Phase 2 | M2.3 C++ 実装 | 未着手 | - | - | Phase 1 完了待ち |
-| Phase 2 | M2.4 WASM/JS 実装 | 未着手 | - | - | Phase 1 完了待ち |
+| Phase 2 | M2.1 Rust 実装 | 完了 | 2026-03-30 | 2026-03-30 | swedish.rs 1705行 + token_map PUA + 35テスト |
+| Phase 2 | M2.2 C# 実装 | 完了 | 2026-03-30 | 2026-03-30 | SwedishPhonemizer + ISwedishG2PEngine + PUA |
+| Phase 2 | M2.3 C++ 実装 | 完了 | 2026-03-30 | 2026-03-30 | swedish_phonemize.cpp 1065行 + CMake + piper.cpp |
+| Phase 2 | M2.4 WASM/JS 実装 | 完了 | 2026-03-30 | 2026-03-30 | simple_unified_api.js phonemizeLatinFallback |
 | Phase 3 | M3.1 データセット準備 | 未着手 | - | - | Phase 1 完了待ち |
 | Phase 3 | M3.2 ファインチューニング | 未着手 | - | - | M3.1 完了待ち |
 | Phase 3 | M3.3 ONNX + リリース | 未着手 | - | - | M3.2 完了待ち |
@@ -108,7 +108,7 @@ Phase 2: クロスプラットフォーム   Phase 3: TTSモデル学習     Pha
 | Phase | チケット数 | 完了数 | 進捗率 |
 |-------|-----------|--------|--------|
 | Phase 1 | 6 | 6 | 100% |
-| Phase 2 | 4 | 0 | 0% |
+| Phase 2 | 4 | 4 | 100% |
 | Phase 3 | 3 | 0 | 0% |
 | Phase 4 | 3 | 0 | 0% |
-| **合計** | **16** | **6** | **37.5%** |
+| **合計** | **16** | **10** | **62.5%** |
