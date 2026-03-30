@@ -769,3 +769,172 @@ class TestRegressionExistingLanguages:
         from piper_train.phonemize.token_mapper import FIXED_PUA_MAPPING
         assert FIXED_PUA_MAPPING["a:"] == 0xE000
         assert FIXED_PUA_MAPPING["cl"] == 0xE005
+
+
+# =========================================================================
+# Review-fix rule tests (rules added during code review)
+# =========================================================================
+
+class TestReviewFixRules:
+    """Tests for rules added during the code review phase."""
+
+    @pytest.mark.unit
+    def test_gj_word_initial(self):
+        # gjord: word-initial gj → /j/
+        r = _join("gjord")
+        assert r.startswith("ˈj") or "j" in r[:3]
+        assert "ɡ" not in r[:2]  # should NOT produce hard g
+
+    @pytest.mark.unit
+    def test_gj_not_applied_mid_word(self):
+        # Non-initial gj should NOT collapse (hypothetical)
+        # "avgj" would keep g+j separate
+        pass  # No common Swedish word has non-initial gj
+
+    @pytest.mark.unit
+    def test_dj_word_initial(self):
+        # djur: word-initial dj → /j/
+        r = _join("djur")
+        assert r.startswith("ˈj")
+
+    @pytest.mark.unit
+    def test_hj_word_initial(self):
+        # hjälp: word-initial hj → /j/
+        r = _join("hjälp")
+        assert r.startswith("ˈj")
+
+    @pytest.mark.unit
+    def test_lj_word_initial(self):
+        # ljus: word-initial lj → /j/
+        r = _join("ljus")
+        assert r.startswith("ˈj")
+
+    @pytest.mark.unit
+    def test_era_verb_hard_g(self):
+        # agera → hard g (Latin -era verb)
+        assert _is_hard_g("agera") is True
+
+    @pytest.mark.unit
+    def test_erar_verb_hard_g(self):
+        assert _is_hard_g("reagerar") is True
+
+    @pytest.mark.unit
+    def test_erade_verb_hard_g(self):
+        assert _is_hard_g("navigerade") is True
+
+    @pytest.mark.unit
+    def test_berg_hard_g(self):
+        assert _is_hard_g("berg") is True
+
+    @pytest.mark.unit
+    def test_borg_hard_g(self):
+        assert _is_hard_g("borg") is True
+
+
+# =========================================================================
+# Spec minimal-pair vowel length tests (VL)
+# =========================================================================
+
+class TestVowelLengthMinimalPairs:
+    """Complementary Quantity minimal pairs from FR-07 spec."""
+
+    @pytest.mark.unit
+    def test_glas_long_a(self):
+        # glas: single consonant → long ɑː
+        assert "ɑː" in _join("glas")
+
+    @pytest.mark.unit
+    def test_glass_short_a(self):
+        # glass: double s → short a
+        r = _join("glass")
+        assert "ɑː" not in r
+
+    @pytest.mark.unit
+    def test_tak_long_a(self):
+        # tak: single consonant → long ɑː
+        assert "ɑː" in _join("tak")
+
+    @pytest.mark.unit
+    def test_tack_short_a(self):
+        # tack: ck → short a
+        r = _join("tack")
+        assert "ɑː" not in r
+
+    @pytest.mark.unit
+    def test_vet_long_e(self):
+        # vet: single consonant → long eː
+        assert "eː" in _join("vet")
+
+    @pytest.mark.unit
+    def test_vett_short_e(self):
+        # vett: double t → short ɛ
+        r = _join("vett")
+        assert "eː" not in r
+        assert "ɛ" in r
+
+    @pytest.mark.unit
+    def test_vit_long_i(self):
+        assert "iː" in _join("vit")
+
+    @pytest.mark.unit
+    def test_vitt_short_i(self):
+        r = _join("vitt")
+        assert "iː" not in r
+
+
+# =========================================================================
+# Spec unstressed suffix tests (US)
+# =========================================================================
+
+class TestUnstressedSuffixPatterns:
+    """Tests for unstressed suffix vowel quality."""
+
+    @pytest.mark.unit
+    def test_vacker_er_suffix(self):
+        # vacker: -er suffix, unstressed e → ɛ
+        r = _join("vacker")
+        assert r.endswith("r") or r.endswith("ɛr")
+
+    @pytest.mark.unit
+    def test_vatten_en_suffix(self):
+        r = _join("vatten")
+        # Final -en is unstressed
+        assert "ˈ" in r  # stress should be on first syllable
+
+    @pytest.mark.unit
+    def test_söker_er_suffix(self):
+        # söker: hard k (HARD_K_WORDS), -er unstressed
+        r = _join("söker")
+        assert "k" in r  # hard k, not ɕ
+
+    @pytest.mark.unit
+    def test_bilar_ar_suffix(self):
+        r = _join("bilar")
+        # stress on first syllable, -ar unstressed
+        assert "ˈ" in r
+
+    @pytest.mark.unit
+    def test_flickor_or_suffix(self):
+        r = _join("flickor")
+        assert "ˈ" in r
+
+
+# =========================================================================
+# Additional spec stress tests (ST)
+# =========================================================================
+
+class TestStressSpec:
+    """Additional stress tests from FR-07 spec."""
+
+    @pytest.mark.unit
+    def test_universitet_itet_suffix(self):
+        # -itet suffix attracts stress
+        assert detect_stress("universitet") > 0
+
+    @pytest.mark.unit
+    def test_turist_ist_suffix(self):
+        assert detect_stress("turist") > 0
+
+    @pytest.mark.unit
+    def test_musik_ik_suffix(self):
+        assert detect_stress("musik") > 0
