@@ -80,7 +80,7 @@ def _detect_default_latin(languages: list[str]) -> str:
     present (e.g. "ja-zh"), returns ``languages[0]`` so the caller always gets
     a language that is actually in the combo.
     """
-    latin_langs = ["en", "es", "pt", "fr"]
+    latin_langs = ["en", "es", "pt", "fr", "sv"]
     for lang in latin_langs:
         if lang in languages:
             return lang
@@ -135,6 +135,12 @@ def _auto_register():
         from .french import FrenchPhonemizer  # noqa: PLC0415
 
         register_language("fr", FrenchPhonemizer())
+    except ImportError:
+        pass
+    try:
+        from .swedish import SwedishPhonemizer  # noqa: PLC0415
+
+        register_language("sv", SwedishPhonemizer())
     except ImportError:
         pass
     # Register ja-en bilingual combo (backward compatibility)
