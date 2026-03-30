@@ -73,7 +73,7 @@ class UnicodeLanguageDetector:
 
         # Latin-script languages available (for disambiguation if needed)
         self._latin_languages = {
-            lang for lang in languages if lang in ("en", "es", "pt", "fr")
+            lang for lang in languages if lang in ("en", "es", "pt", "fr", "sv")
         }
 
     def detect_char(self, ch: str, context_has_kana: bool = False) -> str | None:  # noqa: PLR0911

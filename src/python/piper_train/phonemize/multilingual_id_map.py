@@ -74,6 +74,14 @@ def _register_builtin_phonemes():
     except ImportError:
         pass
 
+    # Swedish
+    try:
+        from .sv_id_map import SWEDISH_PHONEMES  # noqa: PLC0415
+
+        LANGUAGE_PHONEMES["sv"] = SWEDISH_PHONEMES
+    except ImportError:
+        pass
+
 
 _register_builtin_phonemes()
 

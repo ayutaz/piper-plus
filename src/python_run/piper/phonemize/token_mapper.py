@@ -135,6 +135,18 @@ FIXED_PUA_MAPPING = {
     "\u025b\u0303": 0xE056,  # ɛ̃  nasal open-mid front unrounded (vin, pain)
     "\u0251\u0303": 0xE057,  # ɑ̃  nasal open back unrounded (France, temps)
     "\u0254\u0303": 0xE058,  # ɔ̃  nasal open-mid back rounded (bon, nom)
+    # =======================================================================
+    # Swedish (SV) — swedish_phonemize.cpp
+    # =======================================================================
+    # --- Long vowels (vowel + length marker ː) ---
+    "i\u02d0": 0xE059,      # iː  lång i (bil)
+    "y\u02d0": 0xE05A,      # yː  lång y (by)
+    "e\u02d0": 0xE05B,      # eː  lång e (ben)
+    "\u025b\u02d0": 0xE05C, # ɛː  lång ɛ (bär)
+    "\u00f8\u02d0": 0xE05D, # øː  lång ø (höst)
+    "\u0251\u02d0": 0xE05E, # ɑː  lång a (far)
+    "o\u02d0": 0xE05F,      # oː  lång o (bok)
+    "u\u02d0": 0xE060,      # uː  lång u (ful)
 }
 
 # Build bidirectional mappings
@@ -148,8 +160,8 @@ for token, codepoint in FIXED_PUA_MAPPING.items():
     CHAR2TOKEN[ch] = token
 
 # Private Use Area for dynamic allocation (starting after the last FIXED codepoint)
-# 0xE058 is the last used fixed codepoint (FR ɔ̃), so dynamic starts at 0xE059.
-_PUA_START = 0xE059
+# 0xE060 is the last used fixed codepoint (SV uː), so dynamic starts at 0xE061.
+_PUA_START = 0xE061
 _next = _PUA_START
 
 

@@ -70,7 +70,7 @@ class UnicodeLanguageDetector:
 
         # Latin-script languages available (for disambiguation if needed)
         self._latin_languages = {
-            lang for lang in languages if lang in ("en", "es", "pt", "fr")
+            lang for lang in languages if lang in ("en", "es", "pt", "fr", "sv")
         }
 
     def detect_char(self, ch: str, context_has_kana: bool = False) -> str | None:  # noqa: PLR0911
@@ -230,6 +230,10 @@ def _get_phonemize_func(lang: str):
         from .portuguese import phonemize_portuguese  # noqa: PLC0415
 
         func = phonemize_portuguese
+    elif lang == "sv":
+        from .swedish import phonemize_swedish  # noqa: PLC0415
+
+        func = phonemize_swedish
     else:
         raise ValueError(f"Unsupported language: {lang}")
 
