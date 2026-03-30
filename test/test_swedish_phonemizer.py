@@ -32,34 +32,29 @@ class TestSwedishPhonemizer:
         phonemes = phonemize_swedish("här")  # here
         assert len(phonemes) >= 2
 
-    def test_sje_ljud_corrections(self):
-        """Test that sje-ljud (ɧ) corrections are applied."""
-        # Test skj- words: should get ɧ not ɕ
-        corrections = ["ɕ", "o", "ː", "t", "a"]  # fake espeak output 
-        corrected = _apply_swedish_corrections(corrections, "skjorta")
-        assert "ɧ" in corrected
-        assert "ɕ" not in corrected
+    def test_sje_ljud_phonemes(self):
+        """Test that sje-ljud (ɧ) is produced correctly."""
+        # Test skj- words
+        phonemes = phonemize_swedish("skjorta")
+        assert "ɧ" in phonemes
         
-        # Test sch- words: should get ɧ not ʃ
-        corrections = ["ʃ", "e", "ː", "m", "a"]  # fake espeak output
-        corrected = _apply_swedish_corrections(corrections, "schema") 
-        assert "ɧ" in corrected
-        assert "ʃ" not in corrected
+        # Test sj- words
+        phonemes = phonemize_swedish("sjö")
+        assert "ɧ" in phonemes
+        
+        # Test sch- words
+        phonemes = phonemize_swedish("schema")
+        assert "ɧ" in phonemes
 
-    def test_retroflex_corrections(self):
-        """Test retroflex consonant corrections (r + consonant)."""
-        # barn: rn → ɳ
-        corrections = ["b", "a", "r", "n"]  # fake espeak output
-        corrected = _apply_swedish_corrections(corrections, "barn")
-        # Should apply retroflex correction
-        expected_retroflex = any("ɳ" in "".join(corrected) or "rn" not in "".join(corrected) 
-                                for _ in [True])  # Basic check that some correction happened
+    def test_retroflex_phonemes(self):
+        """Test retroflex consonant production (r + consonant).""" 
+        # barn: should contain ɳ
+        phonemes = phonemize_swedish("barn")
+        assert "ɳ" in phonemes
         
-        # bord: rd → ɖ  
-        corrections = ["b", "u", "r", "d"]
-        corrected = _apply_swedish_corrections(corrections, "bord")
-        # Should apply some correction
-        assert len(corrected) >= 3
+        # kart: should contain ʈ
+        phonemes = phonemize_swedish("kart") 
+        assert "ʈ" in phonemes
 
     def test_stress_markers(self):
         """Test that stress markers are preserved.""" 
@@ -121,28 +116,27 @@ class TestSwedishPhonemizer:
         assert phonemize_swedish("") == []
         assert phonemize_swedish("   ") == []
 
-    def test_corrections_dict_coverage(self):
-        """Test that key Swedish pronunciation issues are covered."""
-        from piper_train.phonemize.swedish import SWEDISH_POST_CORRECTIONS
+    def test_vowel_length_rules(self):
+        """Test Swedish vowel length determination."""
+        # Monosyllabic words should have long vowels (unless geminate)
+        phonemes = phonemize_swedish("hej")
+        assert "eː" in phonemes  # Long vowel
         
-        # Should have skj corrections
-        assert any("ɕ" in wrong for wrong in SWEDISH_POST_CORRECTIONS)
-        # Should have sch corrections 
-        assert any("ʃ" in wrong for wrong in SWEDISH_POST_CORRECTIONS)
-        # Should have retroflex corrections
-        assert any("barn" in word for word in SWEDISH_POST_CORRECTIONS)
+        phonemes = phonemize_swedish("kött") 
+        assert "œ" in phonemes   # Short vowel before geminate
+        assert "ɧ" not in phonemes  # Should be ɧøt not ɧøːt
+        
+        # CV.CV patterns should have long first vowel
+        phonemes = phonemize_swedish("mata")
+        assert "ɑː" in phonemes  # Long first vowel
 
-    @pytest.mark.slow
-    def test_espeak_ng_available(self):
-        """Test that espeak-ng is available and works with Swedish."""
-        try:
-            phonemes = phonemize_swedish("test svenska")
-            assert len(phonemes) > 0
-        except RuntimeError as e:
-            if "espeak-ng is required" in str(e):
-                pytest.skip("espeak-ng not available")
-            else:
-                raise
+    def test_rule_based_no_external_deps(self):
+        """Test that the rule-based phonemizer works without external dependencies.""" 
+        # Should work without espeak-ng
+        phonemes = phonemize_swedish("test svenska")
+        assert len(phonemes) > 0
+        assert "t" in phonemes
+        assert "ɛ" in phonemes  # Short e in "svenska"
 
     def test_compound_words(self):
         """Test Swedish compound words."""

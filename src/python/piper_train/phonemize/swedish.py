@@ -1,24 +1,20 @@
-"""Swedish phonemizer for Piper TTS using espeak-ng backend with post-processing.
+"""Rule-based Swedish G2P (grapheme-to-phoneme) module.
 
-Converts Swedish text to IPA phonemes using espeak-ng as the G2P engine,
-then applies post-processing corrections that match espeak-ng PR #2391
-to fix 50+ Swedish pronunciation issues not yet merged in system espeak-ng v1.52.0.
+Converts Swedish text to IPA phonemes using orthographic rules.
+No external dependencies required — implements Swedish phonology rules
+including vowel length, retroflexes, sje-ljud, and tonaccents.
 
-Key corrections applied:
-- skj → ɧ (sje-ljud), not ɕ: skjorta, skjuta, skjul
-- sch → ɧ (sje-ljud), not ʃ: schema, dusch, schysst  
-- Compound sj-words: Östersjön → ɧ not ʂj
-- Retroflexes: r+d→ɖ, r+n→ɳ, r+l→ɭ (barn→bɑːɳ, bord→buːɖ)
-- Place names: Stockholm, Göteborg, Malmö corrections
-
-TODO: Remove these corrections once espeak-ng PR #2391 is merged and 
-system espeak-ng is updated.
+Features:
+- Rule-based vowel length determination  
+- Swedish-specific phonemes: ɧ (sje-ljud), ɕ (tje-ljud), ʉ/ɵ (central vowels)
+- Retroflex consonants (r + dental/alveolar)
+- Tonaccent prosody (accent 1 vs accent 2)
+- Complete Swedish orthographic coverage
 """
 
 import re
-import subprocess
 import unicodedata
-from typing import Optional
+from typing import Dict, List, Optional, Tuple, Union
 
 from .base import Phonemizer, ProsodyInfo
 
@@ -32,399 +28,394 @@ __all__ = [
 # Punctuation characters passed through as-is
 _PUNCTUATION = set(",.;:!?")
 
-# Swedish vowels for context checks
-_VOWELS = {"a", "e", "i", "o", "u", "y", "å", "ä", "ö"}
+# Swedish vowel and consonant letters
+_VOWELS = set("aeiouyåäö")
+_CONSONANTS = set("bcdfghjklmnpqrstvwxz")
+
+# Front vowels that trigger palatalization of k/g  
+_FRONT_VOWELS = set("eiwyäö")
 
 # Regex: split text into word tokens and punctuation
 _RE_TOKEN = re.compile(r"([a-zåäöA-ZÅÄÖ]+|[,.;:!?]+)", re.IGNORECASE)
 
-# Post-processing corrections for espeak-ng v1.52.0 → match PR #2391
-# These can be removed once PR #2391 is merged and system espeak-ng updated
-SWEDISH_POST_CORRECTIONS = {
-    # =======================================================================
-    # skj-words: espeak-ng says ɕ, should be ɧ (sje-ljud)
-    # =======================================================================
-    "ɕoːta": "ɧuːta",        # skjorta (shirt)
-    "ɕuːta": "ɧuːta",        # skjuta (shoot)
-    "ɕuːl": "ɧuːl",          # skjul (shed)
-    "ɕɛːʈ": "ɧɛːʈ",          # skärt (skirt-related)
-    "ɕiːva": "ɧiːva",        # skiva (disc/slice)
-    "ɕoːn": "ɧuːn",          # skjul variant
-    
-    # =======================================================================  
-    # sch-words: espeak-ng says ʃ, should be ɧ (sje-ljud)
-    # =======================================================================
-    "ʃeːma": "ɧeːma",        # schema (schedule)
-    "duːʃ": "duːɧ",          # dusch (shower) 
-    "ʃyst": "ɧyst",          # schysst (decent/cool)
-    "ʃampoː": "ɧampoː",      # schampo (shampoo)
-    
-    # =======================================================================
-    # Compound sj-words: espeak-ng may say ʂj, should be ɧ
-    # =======================================================================
-    "øːstəʂoːn": "øːstəɧoːn",     # Östersjön (Baltic Sea)
-    "ʂoːman": "ɧoːman",           # sjöman (seaman)
-    
-    # =======================================================================
-    # Retroflexes: espeak-ng may miss r+consonant combinations  
-    # =======================================================================
-    "bɑːrn": "bɑːɳ",              # barn (child) - rn → ɳ
-    "buːrd": "buːɖ",              # bord (table) - rd → ɖ  
-    "karl": "kɑːɭ",               # karl (man) - rl → ɭ
-    "mɑːʂ": "mɑːʂ",               # mars (March) - already correct with ʂ
-    "kɑːt": "kɑːʈ",               # kart (map) - rt → ʈ  
-    "hoːrd": "hoːɖ",              # hård (hard) - rd → ɖ
-    "ɡɑːrn": "ɡɑːɳ",              # garn (yarn) - rn → ɳ
-    "fɛːrd": "fɛːɖ",              # färd (journey) - rd → ɖ
-    
-    # =======================================================================
-    # Place names: Common Swedish cities/places
-    # =======================================================================
-    "stokholm": "stɔkˌhɔlm",      # Stockholm (capital)
-    "jøːtəbɔrj": "jøːtəˌbɔːrj",   # Göteborg (Gothenburg)
-    "malːmøː": "ˈmalːˌmøː",       # Malmö  
-    "ˈuːpsala": "ˈuːpˌsala",      # Uppsala
-    "ˈlinkøːpɪŋ": "ˈlɪnˌkøːpɪŋ",  # Linköping
-    
-    # =======================================================================
-    # Common sje-ljud fixes: espeak-ng uses 'sx' sequence for sje-ljud
-    # =======================================================================
-    "sx": "ɧ",                     # espeak-ng represents sje-ljud as 'sx' sequence
-    "ˈsxøː": "ˈɧøː",               # sjön (the lake) - sx → ɧ
-    "ˈsxuːŋa": "ˈɧuːŋa",           # sjunga (sing) - sx → ɧ  
-    "ˈsxuːk": "ˈɧuːk",             # sjuk (sick) - sx → ɧ
-    
-    # =======================================================================
-    # Long vowel corrections where espeak-ng might be inconsistent
-    # =======================================================================
-    "ˈbiːl": "ˈbiːl",             # bil (car) - ensure long i
-    "ˈhuːs": "ˈhuːs",             # hus (house) - ensure long u  
-    "ˈboːk": "ˈboːk",             # bok (book) - ensure long o
-}
+# Common unstressed function words
+_UNSTRESSED_FUNCTION_WORDS = frozenset({
+    "och", "att", "det", "är", "på", "av", "för", "till", "med", "som",
+    "den", "de", "en", "ett", "har", "var", "vid", "om", "nu", "då",
+    "här", "där", "när", "vad", "hur", "kan", "ska", "vil", "må",
+    "han", "hon", "den", "dem", "sin", "sitt", "sina", "min", "mitt", "mina",
+})
+
+# Words with accent 2 (falling-rising tonaccent)
+_ACCENT_2_WORDS = frozenset({
+    "pojke", "flicka", "kärlek", "vänskap", "framtid", "kunskap",
+    "Sverige", "Europa", "Amerika", "regering", "demokrati",
+    "pojkar", "flickor", "vänner", "frågor", "saker", "människor", 
+    "Stockholm", "Göteborg", "Malmö", "Uppsala", "Linköping",
+    "julklapp", "sommarsemester", "körkort", "sjukhus", "regnbåge",
+})
 
 
 def _normalize(text: str) -> str:
     """Lowercase and normalize unicode."""
     text = text.lower()
-    # Normalize to NFC to handle combining accents
     text = unicodedata.normalize("NFC", text)
     return text
 
 
-def _run_espeak_ng(text: str) -> list[str]:
-    """Run espeak-ng to get IPA output for Swedish text.
+def _determine_vowel_length(vowel: str, word: str, pos: int) -> str:
+    """Determine Swedish vowel length based on syllable structure.
     
-    Returns raw list of IPA phonemes from espeak-ng, with stress markers preserved.
-    Note: Post-processing corrections are applied separately in _apply_swedish_corrections.
+    Swedish vowel length rules:
+    1. Monosyllabic words: vowel is long (hej -> heːj, bil -> biːl)
+    2. Before geminates: vowel is short (kött -> kœt, vill -> vɪl) 
+    3. Before consonant clusters: vowel is short (hjälp -> jɛlp)
+    4. CV.CV pattern: first vowel long, second short (mata -> mɑːta)
+    5. Retroflexes count as single consonants (barn -> bɑːɳ)
     """
-    if not text.strip():
-        return []
-        
-    try:
-        # Run espeak-ng with Swedish voice (-v sv) and IPA output (--ipa)
-        # -q suppresses text output, -s sets speed (slower = more careful pronunciation)
-        result = subprocess.run(
-            ["espeak-ng", "--ipa", "-v", "sv", "-q", "-s", "150", text],
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-        
-        ipa_output = result.stdout.strip()
-        if not ipa_output:
-            return []
-            
-        # Parse IPA output into phoneme tokens (raw, no corrections yet)
-        return _parse_espeak_ipa(ipa_output)
-        
-    except subprocess.CalledProcessError as e:
-        # If espeak-ng fails, fall back to basic phonemization
-        return _fallback_phonemize(text)
-    except FileNotFoundError:
-        # espeak-ng not installed
-        raise RuntimeError("espeak-ng is required for Swedish phonemization") from None
-
-
-def _parse_espeak_ipa(ipa_text: str) -> list[str]:
-    """Parse espeak-ng IPA output into individual phoneme tokens.
+    # Count syllables in word (approximate)
+    syllable_count = len([ch for ch in word if ch in _VOWELS])
     
-    Handles Swedish-specific features:
-    - Retroflexes (r + dental/alveolar → ʈ, ɖ, ɳ, ʂ, ɭ)
-    - Long vowels (vowel + ː → vowelː)  
-    - Stress markers (ˈ, ˌ)
-    - Post-processing corrections from SWEDISH_POST_CORRECTIONS
-    """
-    phonemes = []
+    # Get consonants after this vowel
+    after_vowel = word[pos + 1:]
+    
+    # If monosyllabic and no geminates, vowel is long
+    if syllable_count == 1:
+        # Check for geminates that force short vowel
+        if any(after_vowel[i:i+2] in [cc*2 for cc in _CONSONANTS] + ["ck"] 
+               for i in range(len(after_vowel)-1)):
+            return _vowel_short_form(vowel)
+        else:
+            return _vowel_long_form(vowel)
+    
+    # For polysyllabic words, analyze consonant structure
+    consonant_sounds = 0
+    next_vowel_found = False
     i = 0
-    ipa_text = ipa_text.strip()
     
-    while i < len(ipa_text):
-        ch = ipa_text[i]
+    while i < len(after_vowel):
+        ch = after_vowel[i]
+        if ch in _VOWELS:
+            next_vowel_found = True
+            break
+        if ch not in _CONSONANTS:
+            break
+            
+        # Multi-character consonants
+        if i + 2 < len(after_vowel):
+            trigraph = after_vowel[i:i+3]
+            if trigraph in ("skj", "stj", "sch"):
+                consonant_sounds += 1
+                i += 3
+                continue
         
-        # Skip whitespace and syllable separators
-        if ch in " \t\n.":
+        if i + 1 < len(after_vowel):
+            digraph = after_vowel[i:i+2]
+            
+            # Retroflexes = single sounds
+            if digraph in ("rn", "rd", "rt", "rs", "rl"):
+                consonant_sounds += 1
+                i += 2
+                continue
+            
+            # Other single-sound digraphs
+            elif digraph in ("sj", "tj", "kj", "ng", "ch"):
+                consonant_sounds += 1
+                i += 2
+                continue
+            
+            # Geminates force short vowel
+            elif (digraph[0] == digraph[1] and digraph[0] in _CONSONANTS) or digraph == "ck":
+                return _vowel_short_form(vowel)
+        
+        # Single consonant
+        consonant_sounds += 1
+        i += 1
+    
+    # Apply CV.CV rule: single consonant + vowel = long, otherwise short
+    if consonant_sounds == 1 and next_vowel_found:
+        return _vowel_long_form(vowel)  # CV.CV pattern
+    else:
+        return _vowel_short_form(vowel)  # Consonant cluster or word-final
+
+
+def _vowel_long_form(vowel: str) -> str:
+    """Get long form of Swedish vowel."""
+    long_map = {
+        "a": "ɑː", "e": "eː", "i": "iː", "o": "uː", "u": "ʉː",
+        "y": "yː", "å": "oː", "ä": "ɛː", "ö": "øː"
+    }
+    return long_map.get(vowel, vowel + "ː")
+
+
+def _vowel_short_form(vowel: str) -> str:
+    """Get short form of Swedish vowel.""" 
+    short_map = {
+        "a": "a", "e": "ɛ", "i": "ɪ", "o": "ɔ", "u": "ɵ",
+        "y": "ʏ", "å": "ɔ", "ä": "ɛ", "ö": "œ"
+    }
+    return short_map.get(vowel, vowel)
+
+
+def _convert_word(word: str) -> list[str]:
+    """Convert Swedish word to phonemes."""
+    phonemes = []
+    n = len(word)
+    i = 0
+    
+    while i < n:
+        ch = word[i]
+        
+        # Multi-character sequences (longest first)
+        
+        # Three-letter sje-ljud
+        if i + 2 < n:
+            trigraph = word[i:i+3]
+            if trigraph in ("skj", "stj", "sch"):
+                phonemes.append("ɧ")
+                i += 3
+                continue
+        
+        # Two-letter sequences
+        if i + 1 < n:
+            digraph = word[i:i+2]
+            ch2 = word[i+1]
+            
+            # ch -> tje-ljud (in loanwords like "check")
+            if digraph == "ch":
+                phonemes.append("ɕ")
+                i += 2
+                continue
+            
+            # Initial silent consonants + j  
+            elif i == 0 and digraph in ("dj", "gj", "hj", "lj"):
+                phonemes.append("j")
+                i += 2
+                continue
+                
+            # sje-ljud
+            elif digraph == "sj":
+                phonemes.append("ɧ")
+                i += 2
+                continue
+                
+            # sk before front vowels = sje-ljud
+            elif digraph == "sk" and i + 2 < n and word[i+2] in _FRONT_VOWELS:
+                phonemes.append("ɧ")
+                i += 2
+                continue
+                
+            # tje-ljud
+            elif digraph in ("tj", "kj"):
+                phonemes.append("ɕ")
+                i += 2
+                continue
+                
+            # Nasals
+            elif digraph == "ng":
+                phonemes.append("ŋ")
+                i += 2
+                continue
+            elif digraph == "nk":
+                phonemes.append("ŋ")
+                phonemes.append("k") 
+                i += 2
+                continue
+                
+            # ck -> k
+            elif digraph == "ck":
+                phonemes.append("k")
+                i += 2
+                continue
+                
+            # Retroflexes
+            elif digraph in ("rn", "rd", "rt", "rs", "rl"):
+                retroflex_map = {"rn": "ɳ", "rd": "ɖ", "rt": "ʈ", "rs": "ʂ", "rl": "ɭ"}
+                phonemes.append(retroflex_map[digraph])
+                i += 2
+                continue
+                
+            # Double consonants -> single phoneme
+            elif ch == ch2 and ch in _CONSONANTS:
+                phonemes.append(ch)
+                i += 2
+                continue
+        
+        # Vowels with length determination
+        if ch in _VOWELS:
+            vowel_phoneme = _determine_vowel_length(ch, word, i)
+            phonemes.append(vowel_phoneme)
+            i += 1
+            continue
+        
+        # Consonants with context rules
+        elif ch == "k":
+            # k before front vowels -> ɕ
+            if i + 1 < n and word[i+1] in _FRONT_VOWELS:
+                phonemes.append("ɕ")
+            else:
+                phonemes.append("k")
             i += 1
             continue
             
-        # Stress markers
-        if ch in "ˈˌ":
+        elif ch == "g":
+            # g before front vowels -> j
+            if i + 1 < n and word[i+1] in _FRONT_VOWELS:
+                phonemes.append("j")
+            else:
+                phonemes.append("ɡ")
+            i += 1
+            continue
+            
+        elif ch == "c":
+            if i + 1 < n and word[i+1] in "eiy":
+                phonemes.append("s")
+            else:
+                phonemes.append("k")
+            i += 1
+            continue
+        
+        # Simple consonant mappings
+        elif ch in "bcdfhjlmnprstv":
             phonemes.append(ch)
             i += 1
             continue
             
-        # Length marker - combine with previous vowel
-        if ch == "ː" and phonemes and _is_vowel_phoneme(phonemes[-1]):
-            # Convert short vowel to long vowel
-            short_vowel = phonemes[-1]
-            long_vowel = _short_to_long_vowel(short_vowel)
-            phonemes[-1] = long_vowel
+        elif ch == "w":
+            phonemes.append("v")
             i += 1
             continue
             
-        # Handle retroflexes (r + consonant combinations)
-        if ch == "r" and i + 1 < len(ipa_text):
-            next_ch = ipa_text[i + 1]
-            retroflex = _get_retroflex(next_ch)
-            if retroflex:
-                phonemes.append(retroflex)
-                i += 2  # Skip both r and the consonant
-                continue
-                
-        # Regular phonemes
-        phonemes.append(ch)
-        i += 1
-        
-    return phonemes
-
-
-def _apply_swedish_corrections(phonemes: list[str], original_word: str = "") -> list[str]:
-    """Apply post-processing corrections for Swedish pronunciation.
-    
-    Fixes issues in espeak-ng v1.52.0 that are corrected in PR #2391:
-    - skj/sch → ɧ (sje-ljud) 
-    - Retroflex r+consonant combinations
-    - Place name pronunciations
-    - Compound word sj-sounds
-    
-    Args:
-        phonemes: Phonemes from espeak-ng output
-        original_word: Original word text for context-specific fixes
-        
-    Returns:
-        Corrected phonemes list
-    """
-    # Reconstruct phoneme sequence as string for pattern matching
-    phoneme_str = "".join(phonemes)
-    
-    # Apply direct phoneme sequence corrections
-    for wrong, correct in SWEDISH_POST_CORRECTIONS.items():
-        phoneme_str = phoneme_str.replace(wrong, correct)
-    
-    # Context-specific corrections based on original word
-    original_lower = original_word.lower()
-    
-    # skj-words: if original contains "skj", ensure ɧ not ɕ
-    if "skj" in original_lower:
-        phoneme_str = phoneme_str.replace("ɕ", "ɧ")
-        
-    # sch-words: if original contains "sch", ensure ɧ not ʃ  
-    if "sch" in original_lower:
-        phoneme_str = phoneme_str.replace("ʃ", "ɧ")
-        
-    # Additional retroflex patterns
-    if original_lower in ["barn", "korn", "arn", "björn"]:
-        phoneme_str = phoneme_str.replace("rn", "ɳ")
-    if original_lower in ["bord", "word", "sord", "mord"]:
-        phoneme_str = phoneme_str.replace("rd", "ɖ") 
-    if original_lower in ["karl", "jarl", "earl"]:
-        phoneme_str = phoneme_str.replace("rl", "ɭ")
-    if original_lower in ["mars", "lars", "fars"]:
-        phoneme_str = phoneme_str.replace("rs", "ʂ")
-    if original_lower in ["kart", "art", "start"]:
-        phoneme_str = phoneme_str.replace("rt", "ʈ")
-        
-    # Convert back to phoneme list 
-    corrected_phonemes = []
-    i = 0
-    while i < len(phoneme_str):
-        ch = phoneme_str[i]
-        
-        # Handle multi-character phonemes (long vowels, retroflexes)
-        if ch in "ieyaouɛø" and i + 1 < len(phoneme_str) and phoneme_str[i + 1] == "ː":
-            corrected_phonemes.append(ch + "ː")
-            i += 2
-        elif ch in "ʈɖɳʂɭɧ":
-            corrected_phonemes.append(ch)
-            i += 1  
-        else:
-            corrected_phonemes.append(ch)
+        elif ch == "x":
+            phonemes.extend(["k", "s"])
             i += 1
+            continue
             
-    return corrected_phonemes
-
-
-def _is_vowel_phoneme(phoneme: str) -> bool:
-    """Check if phoneme is a vowel."""
-    vowel_phonemes = {
-        "a", "e", "i", "o", "u", "y", "ɛ", "ɪ", "ʏ", "ʉ", "ɵ", 
-        "ɑ", "ɔ", "ø", "œ", "ʊ", "ː"
-    }
-    return phoneme in vowel_phonemes
-
-
-def _short_to_long_vowel(short: str) -> str:
-    """Convert short vowel to long vowel form."""
-    # For most vowels, we use the explicit long form
-    long_map = {
-        "i": "iː",
-        "y": "yː", 
-        "e": "eː",
-        "ɛ": "ɛː",
-        "a": "ɑː",
-        "ɑ": "ɑː",
-        "o": "oː",
-        "u": "uː",
-        "ø": "øː",
-    }
-    return long_map.get(short, short + "ː")
-
-
-def _get_retroflex(consonant: str) -> Optional[str]:
-    """Get retroflex equivalent for r + consonant combinations."""
-    retroflex_map = {
-        "t": "ʈ",  # rt → ʈ 
-        "d": "ɖ",  # rd → ɖ
-        "n": "ɳ",  # rn → ɳ
-        "s": "ʂ",  # rs → ʂ
-        "l": "ɭ",  # rl → ɭ
-    }
-    return retroflex_map.get(consonant)
-
-
-def _fallback_phonemize(text: str) -> list[str]:
-    """Basic fallback phonemization if espeak-ng fails.
-    
-    Very simple Swedish orthography → phoneme mapping.
-    """
-    phonemes = []
-    text = _normalize(text)
-    
-    for char in text:
-        if char in _PUNCTUATION:
-            phonemes.append(char)
-        elif char == "å":
-            phonemes.append("oː")
-        elif char == "ä":
-            phonemes.append("ɛː") 
-        elif char == "ö":
-            phonemes.append("øː")
-        elif char in "bcdfghjklmnpqrstvwxz":
-            phonemes.append(char)
-        elif char in "aeiouy":
-            phonemes.append(char)
-        # Skip unknown characters
+        elif ch == "z":
+            phonemes.append("s")
+            i += 1
+            continue
             
+        elif ch == "q":
+            phonemes.append("k")
+            i += 1
+            continue
+        
+        else:
+            # Unknown character, skip
+            i += 1
+    
     return phonemes
 
 
-def phonemize_swedish_with_prosody(
-    text: str,
-) -> tuple[list[str], list[ProsodyInfo | None]]:
-    """Convert Swedish text to phoneme list and prosody features.
+def _get_tonaccent(word: str) -> int:
+    """Determine tonaccent (1=falling, 2=falling-rising) for Swedish word."""
     
-    Swedish has unique tonaccents (accent 1 vs accent 2) that create distinctive
-    falling vs falling-rising pitch patterns. We use espeak-ng stress markers 
-    as a heuristic:
-    - a1=tonaccent (1=falling/accent1 from ˈ, 2=falling-rising/accent2 from ˌ)  
-    - a2=stress level (0=unstressed, 1=secondary, 2=primary)
-    - a3=word phoneme count
+    # Count syllables (approximate)
+    syllable_count = len([ch for ch in word if ch in _VOWELS])
     
-    Note: This is a simplified mapping. Full tonaccent prediction would require
-    morphological analysis and compound word detection.
+    if syllable_count == 1:
+        return 1  # Monosyllabic -> accent 1
     
-    Returns:
-        (phonemes, prosody_info_list) where each phoneme has corresponding
-        prosody info matching Swedish tonaccent envelopes.
-    """
+    # Check explicit accent 2 words
+    if word in _ACCENT_2_WORDS:
+        return 2
+    
+    # Heuristics for accent 2:
+    # - Long words (often compounds)
+    # - Common suffixes
+    # - Compound prefixes
+    if (len(word) > 6 or
+        word.endswith(("are", "ade", "ning", "het", "dom", "skap", "tion", "sion")) or
+        any(word.startswith(prefix) for prefix in ("för", "upp", "över", "under", "med", "sam"))):
+        return 2
+    
+    # Default: accent 1  
+    return 1
+
+
+def phonemize_swedish_with_prosody(text: str) -> Tuple[List[str], List[Optional[ProsodyInfo]]]:
+    """Convert Swedish text to phonemes with prosody including tonaccent."""
     text = _normalize(text)
     tokens = _RE_TOKEN.findall(text)
-
+    
     phonemes: list[str] = []
-    prosody_list: list[ProsodyInfo | None] = []
+    prosody_list: List[Optional[ProsodyInfo]] = []
     need_space = False
-
+    
     for token in tokens:
-        # Check if pure punctuation
+        # Punctuation
         if all(c in _PUNCTUATION for c in token):
             for c in token:
                 phonemes.append(c)
                 prosody_list.append(ProsodyInfo(a1=0, a2=0, a3=0))
             continue
-
+        
         # Regular word
         if need_space:
             phonemes.append(" ")
             prosody_list.append(ProsodyInfo(a1=0, a2=0, a3=0))
-
-        # Get phonemes for this word and apply corrections
-        raw_phonemes = _run_espeak_ng(token)
-        word_phonemes = _apply_swedish_corrections(raw_phonemes, token)
-        word_phoneme_count = len([p for p in word_phonemes if p not in "ˈˌ"])
-
-        for ph in word_phonemes:
-            if ph == "ˈ":
-                # Primary stress marker → likely accent 1 (falling tone)
-                phonemes.append("ˈ")
+        
+        # Convert word
+        word_phonemes = _convert_word(token)
+        word_phoneme_count = len(word_phonemes)
+        syllable_count = len([ch for ch in token if ch in _VOWELS])
+        
+        # Determine tonaccent and stress
+        tonaccent = _get_tonaccent(token)
+        is_stressed = syllable_count > 1 and token not in _UNSTRESSED_FUNCTION_WORDS
+        
+        # Add stress marker for polysyllabic words
+        if is_stressed:
+            if tonaccent == 1:
+                phonemes.append("ˈ")  # Primary stress -> accent 1
                 prosody_list.append(ProsodyInfo(a1=1, a2=2, a3=word_phoneme_count))
-            elif ph == "ˌ":
-                # Secondary stress marker → likely accent 2 (falling-rising tone)
-                phonemes.append("ˌ") 
-                prosody_list.append(ProsodyInfo(a1=2, a2=1, a3=word_phoneme_count))
             else:
-                # Regular phoneme - check if it follows a stress marker
-                tonaccent = 0
-                stress_level = 0
+                phonemes.append("ˌ")  # Secondary stress -> accent 2
+                prosody_list.append(ProsodyInfo(a1=2, a2=1, a3=word_phoneme_count))
+        
+        # Add word phonemes with prosody
+        for phoneme in word_phonemes:
+            phonemes.append(phoneme)
+            
+            # Determine stress level for this phoneme
+            if syllable_count == 1:
+                stress_level = 2  # Monosyllabic = stressed
+            elif is_stressed:
+                stress_level = 2 if tonaccent == 1 else 1
+            else:
+                stress_level = 0  # Unstressed
                 
-                if phonemes and phonemes[-1] == "ˈ" and _is_vowel_phoneme(ph):
-                    # Vowel after primary stress → accent 1 (falling)
-                    tonaccent = 1
-                    stress_level = 2
-                elif phonemes and phonemes[-1] == "ˌ" and _is_vowel_phoneme(ph):
-                    # Vowel after secondary stress → accent 2 (falling-rising)  
-                    tonaccent = 2
-                    stress_level = 1
-                    
-                phonemes.append(ph)
-                prosody_list.append(ProsodyInfo(a1=tonaccent, a2=stress_level, a3=word_phoneme_count))
-
+            prosody_list.append(ProsodyInfo(
+                a1=tonaccent,
+                a2=stress_level,
+                a3=word_phoneme_count
+            ))
+        
         need_space = True
-
-    # Map multi-character tokens to PUA codepoints if needed
-    from .token_mapper import map_sequence  # noqa: PLC0415
-
-    mapped = map_sequence(phonemes)
-    return mapped, prosody_list
+    
+    # Apply PUA mapping for multi-character phonemes
+    from .token_mapper import map_sequence
+    mapped_phonemes = map_sequence(phonemes)
+    
+    return mapped_phonemes, prosody_list
 
 
 def phonemize_swedish(text: str) -> list[str]:
-    """Convert Swedish text to phoneme list (without prosody)."""
+    """Convert Swedish text to phoneme list (without prosody).""" 
     phonemes, _ = phonemize_swedish_with_prosody(text)
     return phonemes
 
 
 class SwedishPhonemizer(Phonemizer):
-    """Swedish phonemizer using espeak-ng as backend."""
-
+    """Rule-based Swedish phonemizer."""
+    
     def phonemize(self, text: str) -> list[str]:
         return phonemize_swedish(text)
-
-    def phonemize_with_prosody(
-        self, text: str
-    ) -> tuple[list[str], list[ProsodyInfo | None]]:
+    
+    def phonemize_with_prosody(self, text: str) -> Tuple[List[str], List[Optional[ProsodyInfo]]]:
         return phonemize_swedish_with_prosody(text)
-
-    def get_phoneme_id_map(self) -> dict[str, list[int]] | None:
-        # Returns None because Swedish is designed for multilingual use,
-        # where the ID map is managed by the unified multilingual ID map
-        # builder (which calls get_swedish_id_map() from sv_id_map.py directly).
+    
+    def get_phoneme_id_map(self) -> Optional[Dict[str, List[int]]]:
+        # Returns None for multilingual use
         return None
