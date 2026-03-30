@@ -61,115 +61,373 @@ class StressLevel(IntEnum):
 # ---------------------------------------------------------------------------
 
 _CONSONANT_DEFAULT: dict[str, str] = {
-    "b": "b", "c": "k", "d": "d", "f": "f",
+    "b": "b",
+    "c": "k",
+    "d": "d",
+    "f": "f",
     "g": "\u0261",  # ɡ (IPA, U+0261)
-    "h": "h", "j": "j", "k": "k", "l": "l",
-    "m": "m", "n": "n", "p": "p", "q": "k",
-    "r": "r", "s": "s", "t": "t", "v": "v",
-    "w": "v", "x": "ks", "z": "s",
+    "h": "h",
+    "j": "j",
+    "k": "k",
+    "l": "l",
+    "m": "m",
+    "n": "n",
+    "p": "p",
+    "q": "k",
+    "r": "r",
+    "s": "s",
+    "t": "t",
+    "v": "v",
+    "w": "v",
+    "x": "ks",
+    "z": "s",
 }
 
 # ---------------------------------------------------------------------------
 # Exception word lists
 # ---------------------------------------------------------------------------
 
-HARD_K_WORDS: frozenset[str] = frozenset({
-    "kille", "kissa", "kiosk", "kebab", "kennel", "keps", "ketchup",
-    "kick", "kilt", "kimono", "kitsch", "kibbutz", "kiwi", "kilo",
-    "kex", "kent", "kerna", "keso", "kikare", "kines", "kinesisk",
-    "leker", "leken", "lekerska", "steker", "steket",
-    "söker", "söket", "tänker", "tänket",
-    "dyker", "dyket", "ryker", "röker", "röket",
-    "smeker", "läker", "läket", "märker", "märket",
-    "räcker", "väcker", "viker", "stryker", "sjunker", "sticker",
-    "pojke", "fröken", "onkel", "sockel", "socker", "ocker",
-    "märke", "mörker", "tecken", "vacker", "naken", "säker",
-    "enkel", "paket", "raket", "staket", "silke", "vinkel",
-    "skelett", "ficka", "dricka", "docka", "backe", "flicka",
-    "bricka", "trycke", "skicka", "rike", "kirke",
-})
+HARD_K_WORDS: frozenset[str] = frozenset(
+    {
+        "kille",
+        "kissa",
+        "kiosk",
+        "kebab",
+        "kennel",
+        "keps",
+        "ketchup",
+        "kick",
+        "kilt",
+        "kimono",
+        "kitsch",
+        "kibbutz",
+        "kiwi",
+        "kilo",
+        "kex",
+        "kent",
+        "kerna",
+        "keso",
+        "kikare",
+        "kines",
+        "kinesisk",
+        "leker",
+        "leken",
+        "lekerska",
+        "steker",
+        "steket",
+        "söker",
+        "söket",
+        "tänker",
+        "tänket",
+        "dyker",
+        "dyket",
+        "ryker",
+        "röker",
+        "röket",
+        "smeker",
+        "läker",
+        "läket",
+        "märker",
+        "märket",
+        "räcker",
+        "väcker",
+        "viker",
+        "stryker",
+        "sjunker",
+        "sticker",
+        "pojke",
+        "fröken",
+        "onkel",
+        "sockel",
+        "socker",
+        "ocker",
+        "märke",
+        "mörker",
+        "tecken",
+        "vacker",
+        "naken",
+        "säker",
+        "enkel",
+        "paket",
+        "raket",
+        "staket",
+        "silke",
+        "vinkel",
+        "skelett",
+        "ficka",
+        "dricka",
+        "docka",
+        "backe",
+        "flicka",
+        "bricka",
+        "trycke",
+        "skicka",
+        "rike",
+        "kirke",
+    }
+)
 
-HARD_K_STEMS: frozenset[str] = frozenset({
-    "lek", "stek", "sök", "tänk", "dyk", "ryk", "rök", "smek",
-    "läk", "märk", "räck", "väck", "vik", "stryk", "sjunk", "stick",
-    "back", "block", "trick", "tryck", "skick", "flick", "brick",
-    "drick", "dock", "fick", "sick", "tack", "sack", "pack",
-    "lock", "sock", "rock",
-})
+HARD_K_STEMS: frozenset[str] = frozenset(
+    {
+        "lek",
+        "stek",
+        "sök",
+        "tänk",
+        "dyk",
+        "ryk",
+        "rök",
+        "smek",
+        "läk",
+        "märk",
+        "räck",
+        "väck",
+        "vik",
+        "stryk",
+        "sjunk",
+        "stick",
+        "back",
+        "block",
+        "trick",
+        "tryck",
+        "skick",
+        "flick",
+        "brick",
+        "drick",
+        "dock",
+        "fick",
+        "sick",
+        "tack",
+        "sack",
+        "pack",
+        "lock",
+        "sock",
+        "rock",
+    }
+)
 
-HARD_G_WORDS: frozenset[str] = frozenset({
-    "bagel", "bageri", "bygel", "bygge", "båge", "dager", "flygel",
-    "gecko", "hage", "hagel", "hunger", "lager", "läge", "läger",
-    "mage", "nagel", "regel", "segel", "seger", "stege", "tagel",
-    "tegel", "tiger", "tygel", "finger", "ängel", "fågel", "spegel",
-    "fogel", "duger", "flyger", "ligger", "ljuger", "lägger",
-    "stiger", "suger", "tigger", "väger", "äger", "ger",
-    "agera", "delegera", "reagera", "segregera", "tangera",
-    "engagera", "arrangera", "ignorera", "navigera", "negera",
-    "intrigera", "ge", "gel",
-    "berg", "borg",
-})
+HARD_G_WORDS: frozenset[str] = frozenset(
+    {
+        "bagel",
+        "bageri",
+        "bygel",
+        "bygge",
+        "båge",
+        "dager",
+        "flygel",
+        "gecko",
+        "hage",
+        "hagel",
+        "hunger",
+        "lager",
+        "läge",
+        "läger",
+        "mage",
+        "nagel",
+        "regel",
+        "segel",
+        "seger",
+        "stege",
+        "tagel",
+        "tegel",
+        "tiger",
+        "tygel",
+        "finger",
+        "ängel",
+        "fågel",
+        "spegel",
+        "fogel",
+        "duger",
+        "flyger",
+        "ligger",
+        "ljuger",
+        "lägger",
+        "stiger",
+        "suger",
+        "tigger",
+        "väger",
+        "äger",
+        "ger",
+        "agera",
+        "delegera",
+        "reagera",
+        "segregera",
+        "tangera",
+        "engagera",
+        "arrangera",
+        "ignorera",
+        "navigera",
+        "negera",
+        "intrigera",
+        "ge",
+        "gel",
+        "berg",
+        "borg",
+    }
+)
 
-HARD_G_STEMS: frozenset[str] = frozenset({
-    "lig", "stig", "sug", "tig", "väg", "äg", "flyg", "ljug",
-    "lägg", "dug", "drag", "lag", "dag", "mag", "nag", "bag",
-    "byg", "tag", "seg", "vag", "reg",
-    "berg", "borg",
-})
+HARD_G_STEMS: frozenset[str] = frozenset(
+    {
+        "lig",
+        "stig",
+        "sug",
+        "tig",
+        "väg",
+        "äg",
+        "flyg",
+        "ljug",
+        "lägg",
+        "dug",
+        "drag",
+        "lag",
+        "dag",
+        "mag",
+        "nag",
+        "bag",
+        "byg",
+        "tag",
+        "seg",
+        "vag",
+        "reg",
+        "berg",
+        "borg",
+    }
+)
 
 # "o" → /oː/ instead of default /uː/
-O_LONG_AS_OO: frozenset[str] = frozenset({
-    "son", "mor", "bror", "lov", "dom", "ton", "zon", "fon", "ion",
-    "ko", "lo", "ro", "tro", "bo", "god", "jord", "ord", "kol",
-    "pol", "kontroll", "roll", "mol", "fot", "rot",
-    "blod", "flod", "mod", "nod", "rod", "tog",
-})
+O_LONG_AS_OO: frozenset[str] = frozenset(
+    {
+        "son",
+        "mor",
+        "bror",
+        "lov",
+        "dom",
+        "ton",
+        "zon",
+        "fon",
+        "ion",
+        "ko",
+        "lo",
+        "ro",
+        "tro",
+        "bo",
+        "god",
+        "jord",
+        "ord",
+        "kol",
+        "pol",
+        "kontroll",
+        "roll",
+        "mol",
+        "fot",
+        "rot",
+        "blod",
+        "flod",
+        "mod",
+        "nod",
+        "rod",
+        "tog",
+    }
+)
 
 # Words ending in m that use short vowel despite single-C ending
-FINAL_M_SHORT_WORDS: frozenset[str] = frozenset({
-    "hem", "rum", "fem", "lem", "kam", "dam", "ham", "lam", "ram",
-    "stam", "tom", "som", "dom", "dum", "gum", "glöm", "dröm", "ström",
-})
+FINAL_M_SHORT_WORDS: frozenset[str] = frozenset(
+    {
+        "hem",
+        "rum",
+        "fem",
+        "lem",
+        "kam",
+        "dam",
+        "ham",
+        "lam",
+        "ram",
+        "stam",
+        "tom",
+        "som",
+        "dom",
+        "dum",
+        "gum",
+        "glöm",
+        "dröm",
+        "ström",
+    }
+)
 
-FUNCTION_WORDS: frozenset[str] = frozenset({
-    "jag", "du", "han", "hon", "vi", "de", "dem", "den", "det",
-    "sig", "sin", "min", "din",
-    "av", "i", "på", "för", "med", "om", "till", "från", "hos", "ur",
-    "och", "men", "att", "som", "när", "var",
-    "en", "ett",
-    "är", "har", "kan", "ska", "vill", "inte",
-})
+FUNCTION_WORDS: frozenset[str] = frozenset(
+    {
+        "jag",
+        "du",
+        "han",
+        "hon",
+        "vi",
+        "de",
+        "dem",
+        "den",
+        "det",
+        "sig",
+        "sin",
+        "min",
+        "din",
+        "av",
+        "i",
+        "på",
+        "för",
+        "med",
+        "om",
+        "till",
+        "från",
+        "hos",
+        "ur",
+        "och",
+        "men",
+        "att",
+        "som",
+        "när",
+        "var",
+        "en",
+        "ett",
+        "är",
+        "har",
+        "kan",
+        "ska",
+        "vill",
+        "inte",
+    }
+)
 
-SK_BACK_VOWEL_EXCEPTIONS: frozenset[str] = frozenset({
-    "människa", "marskalk",
-})
+SK_BACK_VOWEL_EXCEPTIONS: frozenset[str] = frozenset(
+    {
+        "människa",
+        "marskalk",
+    }
+)
 
 # ---------------------------------------------------------------------------
 # Vowel mappings (Complementary Quantity)
 # ---------------------------------------------------------------------------
 
 _LONG_VOWEL_MAP: dict[str, str] = {
-    "a": "\u0251\u02D0",   # ɑː
-    "e": "e\u02D0",        # eː
-    "i": "i\u02D0",        # iː
-    "o": "u\u02D0",        # uː (default; /oː/ from O_LONG_AS_OO)
-    "u": "\u0289\u02D0",   # ʉː
-    "y": "y\u02D0",        # yː
-    "\u00E5": "o\u02D0",   # å → oː
-    "\u00E4": "\u025B\u02D0",  # ä → ɛː
-    "\u00F6": "\u00F8\u02D0",  # ö → øː
+    "a": "\u0251\u02d0",  # ɑː
+    "e": "e\u02d0",  # eː
+    "i": "i\u02d0",  # iː
+    "o": "u\u02d0",  # uː (default; /oː/ from O_LONG_AS_OO)
+    "u": "\u0289\u02d0",  # ʉː
+    "y": "y\u02d0",  # yː
+    "\u00e5": "o\u02d0",  # å → oː
+    "\u00e4": "\u025b\u02d0",  # ä → ɛː
+    "\u00f6": "\u00f8\u02d0",  # ö → øː
 }
 
 _SHORT_VOWEL_MAP: dict[str, str] = {
     "a": "a",
-    "e": "\u025B",          # ɛ
-    "i": "\u026A",          # ɪ
-    "o": "\u0254",          # ɔ
-    "u": "\u0275",          # ɵ
-    "y": "\u028F",          # ʏ
-    "\u00E5": "\u0254",     # å → ɔ
-    "\u00E4": "\u025B",     # ä → ɛ
-    "\u00F6": "\u0153",     # ö → œ
+    "e": "\u025b",  # ɛ
+    "i": "\u026a",  # ɪ
+    "o": "\u0254",  # ɔ
+    "u": "\u0275",  # ɵ
+    "y": "\u028f",  # ʏ
+    "\u00e5": "\u0254",  # å → ɔ
+    "\u00e4": "\u025b",  # ä → ɛ
+    "\u00f6": "\u0153",  # ö → œ
 }
 
 # ---------------------------------------------------------------------------
@@ -181,27 +439,49 @@ RETROFLEX_MAP: dict[str, str] = {
     "d": "\u0256",  # ɖ
     "s": "\u0282",  # ʂ
     "n": "\u0273",  # ɳ
-    "l": "\u026D",  # ɭ
+    "l": "\u026d",  # ɭ
 }
 
-PROPAGATING_RETROFLEXES: frozenset[str] = frozenset({
-    "\u0288", "\u0256", "\u0282", "\u0273",  # ʈ ɖ ʂ ɳ
-})
+PROPAGATING_RETROFLEXES: frozenset[str] = frozenset(
+    {
+        "\u0288",
+        "\u0256",
+        "\u0282",
+        "\u0273",  # ʈ ɖ ʂ ɳ
+    }
+)
 
 # ---------------------------------------------------------------------------
 # Stress detection
 # ---------------------------------------------------------------------------
 
 UNSTRESSED_PREFIXES: tuple[str, ...] = (
-    "för", "be", "ge", "er", "an",
+    "för",
+    "be",
+    "ge",
+    "er",
+    "an",
 )
 
 STRESS_ATTRACTING_SUFFIXES: tuple[str, ...] = (
-    "ssion", "tion", "sion",
-    "itet", "eri", "era",
-    "ist", "ör", "ment",
-    "ans", "ens", "ell",
-    "ent", "ant", "ik", "ur", "al", "ös",
+    "ssion",
+    "tion",
+    "sion",
+    "itet",
+    "eri",
+    "era",
+    "ist",
+    "ör",
+    "ment",
+    "ans",
+    "ens",
+    "ell",
+    "ent",
+    "ant",
+    "ik",
+    "ur",
+    "al",
+    "ös",
 )
 
 # ---------------------------------------------------------------------------
@@ -209,22 +489,22 @@ STRESS_ATTRACTING_SUFFIXES: tuple[str, ...] = (
 # ---------------------------------------------------------------------------
 
 _UNSTRESSED_SUFFIXES: tuple[tuple[str, list[str]], ...] = (
-    ("ling", ["l", "\u026A", "\u014B"]),        # -ling → l ɪ ŋ
-    ("ning", ["n", "\u026A", "\u014B"]),         # -ning → n ɪ ŋ
-    ("ande", ["a", "n", "d", "\u025B"]),         # -ande → a n d ɛ
-    ("erna", ["\u025B", "r", "n", "a"]),         # -erna → ɛ r n a
-    ("arna", ["a", "r", "n", "a"]),              # -arna → a r n a
-    ("lig",  ["l", "\u026A", "\u0261"]),         # -lig → l ɪ ɡ
-    ("en",   ["\u025B", "n"]),                   # -en → ɛ n
-    ("er",   ["\u025B", "r"]),                   # -er → ɛ r
-    ("el",   ["\u025B", "l"]),                   # -el → ɛ l
-    ("et",   ["\u025B", "t"]),                   # -et → ɛ t
-    ("ar",   ["a", "r"]),                        # -ar → a r
-    ("or",   ["\u0254", "r"]),                   # -or → ɔ r
-    ("ig",   ["\u026A", "\u0261"]),              # -ig → ɪ ɡ
-    ("ad",   ["a", "d"]),                        # -ad → a d
-    ("a",    ["a"]),                             # -a → a
-    ("e",    ["\u025B"]),                        # -e → ɛ
+    ("ling", ["l", "\u026a", "\u014b"]),  # -ling → l ɪ ŋ
+    ("ning", ["n", "\u026a", "\u014b"]),  # -ning → n ɪ ŋ
+    ("ande", ["a", "n", "d", "\u025b"]),  # -ande → a n d ɛ
+    ("erna", ["\u025b", "r", "n", "a"]),  # -erna → ɛ r n a
+    ("arna", ["a", "r", "n", "a"]),  # -arna → a r n a
+    ("lig", ["l", "\u026a", "\u0261"]),  # -lig → l ɪ ɡ
+    ("en", ["\u025b", "n"]),  # -en → ɛ n
+    ("er", ["\u025b", "r"]),  # -er → ɛ r
+    ("el", ["\u025b", "l"]),  # -el → ɛ l
+    ("et", ["\u025b", "t"]),  # -et → ɛ t
+    ("ar", ["a", "r"]),  # -ar → a r
+    ("or", ["\u0254", "r"]),  # -or → ɔ r
+    ("ig", ["\u026a", "\u0261"]),  # -ig → ɪ ɡ
+    ("ad", ["a", "d"]),  # -ad → a d
+    ("a", ["a"]),  # -a → a
+    ("e", ["\u025b"]),  # -e → ɛ
 )
 
 # ---------------------------------------------------------------------------
@@ -232,26 +512,42 @@ _UNSTRESSED_SUFFIXES: tuple[tuple[str, list[str]], ...] = (
 # ---------------------------------------------------------------------------
 
 _LOANWORD_SUFFIX_RULES: tuple[tuple[str, list[str]], ...] = (
-    ("ssion", ["\u0267", "u\u02D0", "n"]),       # -ssion → ɧ uː n
-    ("tion",  ["\u0267", "u\u02D0", "n"]),       # -tion → ɧ uː n
-    ("sion",  ["\u0267", "u\u02D0", "n"]),       # -sion → ɧ uː n
-    ("age",   ["\u0251\u02D0", "\u0267"]),       # -age → ɑː ɧ
-    ("eur",   ["\u00F8\u02D0", "r"]),            # -eur → øː r
-    ("eum",   ["e\u02D0", "\u0275", "m"]),       # -eum → eː ɵ m
-    ("ium",   ["\u026A", "\u0275", "m"]),        # -ium → ɪ ɵ m
+    ("ssion", ["\u0267", "u\u02d0", "n"]),  # -ssion → ɧ uː n
+    ("tion", ["\u0267", "u\u02d0", "n"]),  # -tion → ɧ uː n
+    ("sion", ["\u0267", "u\u02d0", "n"]),  # -sion → ɧ uː n
+    ("age", ["\u0251\u02d0", "\u0267"]),  # -age → ɑː ɧ
+    ("eur", ["\u00f8\u02d0", "r"]),  # -eur → øː r
+    ("eum", ["e\u02d0", "\u0275", "m"]),  # -eum → eː ɵ m
+    ("ium", ["\u026a", "\u0275", "m"]),  # -ium → ɪ ɵ m
 )
 
 # ch exceptions that are /k/ not /ɧ/
-CH_EXCEPTIONS_K: frozenset[str] = frozenset({
-    "kristus", "krist", "kron", "kronik",
-    "och",  # "and" → /ɔk/ or /ɔ/
-})
+CH_EXCEPTIONS_K: frozenset[str] = frozenset(
+    {
+        "kristus",
+        "krist",
+        "kron",
+        "kronik",
+        "och",  # "and" → /ɔk/ or /ɔ/
+    }
+)
 
 # Words where -age is Swedish (not French loan)
-AGE_NATIVE_WORDS: frozenset[str] = frozenset({
-    "bage", "lage", "sage", "dage", "mage", "hage", "tage",
-    "klage", "frage", "plage", "drage",
-})
+AGE_NATIVE_WORDS: frozenset[str] = frozenset(
+    {
+        "bage",
+        "lage",
+        "sage",
+        "dage",
+        "mage",
+        "hage",
+        "tage",
+        "klage",
+        "frage",
+        "plage",
+        "drage",
+    }
+)
 
 
 # =========================================================================
@@ -325,7 +621,7 @@ def _convert_consonant(  # noqa: PLR0911
 
     # === 3-char patterns (highest priority) ===
     if remaining >= 3:
-        tri = word[pos:pos + 3]
+        tri = word[pos : pos + 3]
         if tri == "skj":
             return (["\u0267"], 3)  # ɧ
         if tri == "stj":
@@ -339,7 +635,7 @@ def _convert_consonant(  # noqa: PLR0911
 
     # === 2-char patterns ===
     if remaining >= 2:
-        di = word[pos:pos + 2]
+        di = word[pos : pos + 2]
 
         # sk + context
         if di == "sk":
@@ -379,13 +675,13 @@ def _convert_consonant(  # noqa: PLR0911
             # word-initial gn → /ɡn/, elsewhere /ŋn/
             if pos == 0:
                 return (["\u0261", "n"], 2)  # ɡn
-            return (["\u014B", "n"], 2)  # ŋn
+            return (["\u014b", "n"], 2)  # ŋn
 
         if di == "ng":
-            return (["\u014B"], 2)  # ŋ
+            return (["\u014b"], 2)  # ŋ
 
         if di == "nk":
-            return (["\u014B", "k"], 2)  # ŋk
+            return (["\u014b", "k"], 2)  # ŋk
 
         if di == "ck":
             return (["k"], 2)  # geminate marker (vowel already short)
@@ -495,15 +791,12 @@ def get_vowel_phoneme(  # noqa: PLR0911
     if n_following == 0 and pos == len(word) - 1:
         vowel = _LONG_VOWEL_MAP.get(ch, ch)
         if ch == "o" and full_word in O_LONG_AS_OO:
-            vowel = "o\u02D0"  # oː
+            vowel = "o\u02d0"  # oː
         return vowel
 
     # r + single C exception: vowel stays long (r merges into retroflex)
     # Exception: 'o' is excluded (too ambiguous: kort=/ɔ/, bord=/uː/)
-    if (n_following == 2
-            and ch != "o"
-            and pos + 1 < len(word)
-            and word[pos + 1] == "r"):
+    if n_following == 2 and ch != "o" and pos + 1 < len(word) and word[pos + 1] == "r":
         vowel = _LONG_VOWEL_MAP.get(ch, ch)
         return vowel
 
@@ -514,7 +807,7 @@ def get_vowel_phoneme(  # noqa: PLR0911
     # Single consonant → long
     vowel = _LONG_VOWEL_MAP.get(ch, ch)
     if ch == "o" and full_word in O_LONG_AS_OO:
-        vowel = "o\u02D0"  # oː
+        vowel = "o\u02d0"  # oː
     return vowel
 
 
@@ -621,7 +914,7 @@ def detect_stress(word: str) -> int:
     for suffix in STRESS_ATTRACTING_SUFFIXES:
         if word.endswith(suffix) and len(word) > len(suffix):
             # Count syllables before suffix to find position
-            prefix_part = word[:-len(suffix)]
+            prefix_part = word[: -len(suffix)]
             return _count_syllables(prefix_part)
 
     # Check unstressed prefixes
@@ -636,15 +929,15 @@ def detect_stress(word: str) -> int:
 
 def _is_ipa_vowel(ph: str) -> bool:
     """Check if a phoneme string represents a vowel."""
-    ipa_vowel_chars = frozenset("aeiouyo\u00E5\u00E4\u00F6"
-                                "\u0251\u025B\u026A\u0254\u028A\u0289\u028F"
-                                "\u0153\u00F8\u0275")
+    ipa_vowel_chars = frozenset(
+        "aeiouyo\u00e5\u00e4\u00f6"
+        "\u0251\u025b\u026a\u0254\u028a\u0289\u028f"
+        "\u0153\u00f8\u0275"
+    )
     return any(c in ipa_vowel_chars for c in ph)
 
 
-def _insert_stress_marker(
-    phonemes: list[str], stress_syl: int
-) -> list[str]:
+def _insert_stress_marker(phonemes: list[str], stress_syl: int) -> list[str]:
     """Insert ˈ before the onset of the stressed syllable."""
     if stress_syl < 0 or not phonemes:
         return phonemes
@@ -679,7 +972,7 @@ def _insert_stress_marker(
         onset_idx = 0
 
     result = list(phonemes)
-    result.insert(onset_idx, "\u02C8")  # ˈ
+    result.insert(onset_idx, "\u02c8")  # ˈ
     return result
 
 
@@ -698,7 +991,7 @@ def detect_loanword_suffix(word: str) -> tuple[str, list[str]] | None:
             # Check native exceptions for -age
             if suffix == "age" and word in AGE_NATIVE_WORDS:
                 continue
-            stem = word[:-len(suffix)]
+            stem = word[: -len(suffix)]
             return (stem, phonemes)
     return None
 
@@ -708,9 +1001,7 @@ def detect_loanword_suffix(word: str) -> tuple[str, list[str]] | None:
 # ---------------------------------------------------------------------------
 
 
-def _convert_word_native(
-    word: str, full_word: str, stressed_syl: int
-) -> list[str]:
+def _convert_word_native(word: str, full_word: str, stressed_syl: int) -> list[str]:
     """Convert a word using native Swedish G2P rules.
 
     Processes characters left-to-right, applying consonant rules and
@@ -726,7 +1017,7 @@ def _convert_word_native(
 
         if ch in ALL_VOWELS:
             if not prev_was_vowel:
-                is_stressed = (syl_count == stressed_syl and stressed_syl >= 0)
+                is_stressed = syl_count == stressed_syl and stressed_syl >= 0
                 vowel = get_vowel_phoneme(word, pos, full_word, is_stressed)
                 phonemes.append(vowel)
                 syl_count += 1
@@ -829,11 +1120,11 @@ def _split_ipa_to_phonemes(ipa: str) -> list[str]:
     while i < len(ipa):
         ch = ipa[i]
         # Stress markers: single codepoint
-        if ch in ("\u02C8", "\u02CC"):  # ˈ ˌ
+        if ch in ("\u02c8", "\u02cc"):  # ˈ ˌ
             tokens.append(ch)
             i += 1
         # Length mark ː following a vowel → merge with previous
-        elif ch == "\u02D0" and tokens:
+        elif ch == "\u02d0" and tokens:
             tokens[-1] = tokens[-1] + ch
             i += 1
         else:
@@ -898,13 +1189,13 @@ def phonemize_swedish_with_prosody(
 
         # Count non-stress phonemes for a3
         word_phoneme_count = sum(
-            1 for p in word_phonemes if p not in ("\u02C8", "\u02CC")
+            1 for p in word_phonemes if p not in ("\u02c8", "\u02cc")
         )
 
         for ph in word_phonemes:
-            if ph == "\u02C8":
+            if ph == "\u02c8":
                 a2 = 2  # primary stress
-            elif ph == "\u02CC":
+            elif ph == "\u02cc":
                 a2 = 1  # secondary stress
             else:
                 a2 = 0

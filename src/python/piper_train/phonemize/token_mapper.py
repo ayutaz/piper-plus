@@ -139,15 +139,15 @@ FIXED_PUA_MAPPING = {
     # Swedish (SV)
     # =======================================================================
     # --- Long vowels (母音長 — Complementary Quantity) ---
-    "i\u02D0": 0xE059,  # iː  close front unrounded long
-    "y\u02D0": 0xE05A,  # yː  close front rounded long
-    "e\u02D0": 0xE05B,  # eː  close-mid front unrounded long
-    "\u025B\u02D0": 0xE05C,  # ɛː  open-mid front unrounded long
-    "\u00F8\u02D0": 0xE05D,  # øː  close-mid front rounded long
-    "\u0251\u02D0": 0xE05E,  # ɑː  open back unrounded long
-    "o\u02D0": 0xE05F,  # oː  close-mid back rounded long
-    "u\u02D0": 0xE060,  # uː  close back rounded long
-    "\u0289\u02D0": 0xE061,  # ʉː  close central rounded long
+    "i\u02d0": 0xE059,  # iː  close front unrounded long
+    "y\u02d0": 0xE05A,  # yː  close front rounded long
+    "e\u02d0": 0xE05B,  # eː  close-mid front unrounded long
+    "\u025b\u02d0": 0xE05C,  # ɛː  open-mid front unrounded long
+    "\u00f8\u02d0": 0xE05D,  # øː  close-mid front rounded long
+    "\u0251\u02d0": 0xE05E,  # ɑː  open back unrounded long
+    "o\u02d0": 0xE05F,  # oː  close-mid back rounded long
+    "u\u02d0": 0xE060,  # uː  close back rounded long
+    "\u0289\u02d0": 0xE061,  # ʉː  close central rounded long
     # 0xE062-0xE063 reserved for SV future expansion (e.g., tonal accent)
 }
 

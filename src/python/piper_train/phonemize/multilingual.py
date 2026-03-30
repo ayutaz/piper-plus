@@ -65,18 +65,59 @@ class UnicodeLanguageDetector:
     # Swedish-specific characters not used by EN/ES/PT/FR
     # ä (U+00E4), ö (U+00F6) — also å (U+00E5) is shared with DA/NO but
     # neither is in piper-plus, so it's a safe Swedish indicator.
-    _SWEDISH_CHARS = frozenset("\u00E4\u00F6\u00C4\u00D6\u00E5\u00C5")
+    _SWEDISH_CHARS = frozenset("\u00e4\u00f6\u00c4\u00d6\u00e5\u00c5")
 
     # Swedish function words for word-level disambiguation.
     # These are highly distinctive and do not appear in EN/ES/PT/FR.
-    _SWEDISH_FUNCTION_WORDS = frozenset({
-        "och", "att", "jag", "det", "den", "inte", "som", "han", "hon",
-        "var", "har", "kan", "ska", "med", "för", "sig", "sin", "min",
-        "din", "vill", "från", "när", "här", "där", "också", "alla",
-        "denna", "efter", "eller", "under", "utan", "mycket", "mellan",
-        "genom", "bara", "sedan", "redan", "aldrig", "alltid", "igen",
-        "något", "några", "varje", "vilken", "vilket",
-    })
+    _SWEDISH_FUNCTION_WORDS = frozenset(
+        {
+            "och",
+            "att",
+            "jag",
+            "det",
+            "den",
+            "inte",
+            "som",
+            "han",
+            "hon",
+            "var",
+            "har",
+            "kan",
+            "ska",
+            "med",
+            "för",
+            "sig",
+            "sin",
+            "min",
+            "din",
+            "vill",
+            "från",
+            "när",
+            "här",
+            "där",
+            "också",
+            "alla",
+            "denna",
+            "efter",
+            "eller",
+            "under",
+            "utan",
+            "mycket",
+            "mellan",
+            "genom",
+            "bara",
+            "sedan",
+            "redan",
+            "aldrig",
+            "alltid",
+            "igen",
+            "något",
+            "några",
+            "varje",
+            "vilken",
+            "vilket",
+        }
+    )
 
     def __init__(self, languages: list[str], default_latin_language: str = "en"):
         self.languages = set(languages)
@@ -93,9 +134,7 @@ class UnicodeLanguageDetector:
             lang for lang in languages if lang in ("en", "es", "pt", "fr", "sv")
         }
         # Enable Swedish detection when sv is present alongside other Latin langs
-        self._detect_swedish = (
-            self._has_sv and len(self._latin_languages) >= 2
-        )
+        self._detect_swedish = self._has_sv and len(self._latin_languages) >= 2
 
     def detect_char(self, ch: str, context_has_kana: bool = False) -> str | None:  # noqa: PLR0911
         """Detect language for a single character.

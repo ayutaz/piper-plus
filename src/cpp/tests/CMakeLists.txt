@@ -221,6 +221,7 @@ foreach(test_source ${TEST_SOURCES})
             ../spanish_phonemize.cpp
             ../french_phonemize.cpp
             ../portuguese_phonemize.cpp
+            ../swedish_phonemize.cpp
             ../openjtalk_phonemize.cpp
             ../openjtalk_phonemize_utils.cpp
             ../openjtalk_wrapper.c
@@ -336,6 +337,7 @@ foreach(test_source ${TEST_SOURCES})
             ../spanish_phonemize.cpp
             ../french_phonemize.cpp
             ../portuguese_phonemize.cpp
+            ../swedish_phonemize.cpp
             ../openjtalk_phonemize.cpp
             ../openjtalk_phonemize_utils.cpp
             ../openjtalk_wrapper.c
@@ -450,6 +452,7 @@ foreach(test_source ${TEST_SOURCES})
             ../spanish_phonemize.cpp
             ../french_phonemize.cpp
             ../portuguese_phonemize.cpp
+            ../swedish_phonemize.cpp
             ../korean_phonemize.cpp
             ../phoneme_parser.cpp
         )

@@ -747,7 +747,9 @@ class TestRegressionExistingLanguages:
 
     @pytest.mark.unit
     def test_en_phonemizer_still_works(self):
+        pytest.importorskip("nltk")  # EN phonemizer needs nltk data
         from piper_train.phonemize.registry import get_phonemizer
+
         p = get_phonemizer("en")
         r = p.phonemize("hello")
         assert len(r) > 0
