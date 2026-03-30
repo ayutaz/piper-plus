@@ -938,3 +938,67 @@ class TestStressSpec:
     @pytest.mark.unit
     def test_musik_ik_suffix(self):
         assert detect_stress("musik") > 0
+
+
+# =========================================================================
+# Gap-fill tests: consonant rules with zero coverage
+# =========================================================================
+
+
+class TestConsonantGapFill:
+    """Tests for consonant rules that had zero test coverage."""
+
+    @pytest.mark.unit
+    def test_nk_digraph(self):
+        # nk → [ŋ, k]
+        r = _join("bank")
+        assert "ŋ" in r
+
+    @pytest.mark.unit
+    def test_c_before_e(self):
+        # c before e → /s/
+        r = _join("center")
+        assert r.startswith("ˈs")
+
+    @pytest.mark.unit
+    def test_c_before_a(self):
+        # c before a → /k/
+        r = _join("camping")
+        assert r.startswith("ˈk")
+
+    @pytest.mark.unit
+    def test_gn_word_initial(self):
+        # word-initial gn → /ɡn/
+        r = _join("gnaga")
+        assert "ɡ" in r or "ɡ" in r
+
+    @pytest.mark.unit
+    def test_gn_medial(self):
+        # medial gn → /ŋn/
+        r = _join("signal")
+        assert "ŋ" in r
+
+    @pytest.mark.unit
+    def test_sk_back_vowel_exception_manniska(self):
+        # människa is in SK_BACK_VOWEL_EXCEPTIONS → sk stays /sk/
+        r = _join("människa")
+        assert "ɧ" not in r
+
+    @pytest.mark.unit
+    def test_ium_loanword(self):
+        result = detect_loanword_suffix("stadium")
+        assert result is not None
+        assert result[0] == "stad"
+
+    @pytest.mark.unit
+    def test_multilingual_swedish_detection(self):
+        """Test that Swedish detection works in multilingual mode."""
+        from piper_train.phonemize.multilingual import (
+            UnicodeLanguageDetector,
+            _segment_text_multilingual,
+        )
+
+        det = UnicodeLanguageDetector(["en", "sv"], default_latin_language="en")
+        segs = _segment_text_multilingual("Jag vill inte gå hem.", det)
+        langs = [lang for lang, _ in segs]
+        assert "sv" in langs
