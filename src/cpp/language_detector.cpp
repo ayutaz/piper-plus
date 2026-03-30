@@ -2,8 +2,10 @@
 #include "utf8.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cstdint>
 #include <map>
+#include <unordered_set>
 
 namespace piper {
 
@@ -66,6 +68,26 @@ bool UnicodeLanguageDetector::isLatin(char32_t cp) {
            (cp >= 0x00F8 && cp <= 0x00FF);    // o-stroke .. y-diaeresis
 }
 
+// Swedish-specific characters not used by EN/ES/PT/FR:
+// ä (U+00E4), ö (U+00F6), å (U+00E5) and their uppercase variants.
+// å is shared with DA/NO but neither is in piper-plus, so it's a safe indicator.
+bool UnicodeLanguageDetector::isSwedishChar(char32_t cp) {
+    return cp == 0x00E4 || cp == 0x00F6 || cp == 0x00E5 ||   // ä ö å
+           cp == 0x00C4 || cp == 0x00D6 || cp == 0x00C5;     // Ä Ö Å
+}
+
+// Swedish function words -- highly distinctive, do not appear in EN/ES/PT/FR.
+// Same 45 words as the Python implementation.
+const std::unordered_set<std::string>
+    UnicodeLanguageDetector::SWEDISH_FUNCTION_WORDS = {
+        "och", "att", "jag", "det", "den", "inte", "som", "han", "hon",
+        "var", "har", "kan", "ska", "med", "för", "sig", "sin", "min",
+        "din", "vill", "från", "när", "här", "där", "också", "alla",
+        "denna", "efter", "eller", "under", "utan", "mycket", "mellan",
+        "genom", "bara", "sedan", "redan", "aldrig", "alltid", "igen",
+        "något", "några", "varje", "vilken", "vilket",
+};
+
 // ---------------------------------------------------------------------------
 // Constructor
 // ---------------------------------------------------------------------------
@@ -77,7 +99,21 @@ UnicodeLanguageDetector::UnicodeLanguageDetector(
       defaultLatinLang_(defaultLatinLang),
       hasJa_(languages_.count("ja") > 0),
       hasZh_(languages_.count("zh") > 0),
-      hasKo_(languages_.count("ko") > 0) {
+      hasKo_(languages_.count("ko") > 0),
+      hasSv_(languages_.count("sv") > 0),
+      detectSwedish_(false) {
+    // Enable Swedish detection when sv is present alongside at least one
+    // other Latin-script language (mirrors Python's _detect_swedish logic).
+    static const std::set<std::string> latinLangs = {"en", "es", "pt", "fr", "sv"};
+    if (hasSv_) {
+        int latinCount = 0;
+        for (const auto& lang : languages_) {
+            if (latinLangs.count(lang) > 0) {
+                latinCount++;
+            }
+        }
+        detectSwedish_ = (latinCount >= 2);
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -221,7 +257,154 @@ std::vector<LangSegment> UnicodeLanguageDetector::segmentText(
         segments.push_back({defaultLatinLang_, utf8Text});
     }
 
+    // Post-pass: word-level Swedish detection within Latin segments.
+    // When sv is in the language set alongside other Latin languages,
+    // re-examine default-Latin segments for Swedish function words / chars.
+    if (detectSwedish_) {
+        segments = refineLatinSegmentsForSwedish(std::move(segments));
+    }
+
     return segments;
+}
+
+// ---------------------------------------------------------------------------
+// refineLatinSegmentsForSwedish -- post-pass matching Python's
+// _refine_latin_segments_for_swedish
+// ---------------------------------------------------------------------------
+
+// Helper: lowercased UTF-8 codepoint (ASCII + Swedish letters only)
+static char32_t toLowerCP(char32_t cp) {
+    if (cp >= 'A' && cp <= 'Z') return cp + 32;
+    if (cp == 0x00C4) return 0x00E4; // Ä -> ä
+    if (cp == 0x00D6) return 0x00F6; // Ö -> ö
+    if (cp == 0x00C5) return 0x00E5; // Å -> å
+    return cp;
+}
+
+// Helper: convert UTF-8 string to lowercase (ASCII + Swedish diacritics)
+static std::string toLowerUTF8(const std::string& s) {
+    std::string result;
+    result.reserve(s.size());
+    auto it = s.begin();
+    auto end = s.end();
+    while (it != end) {
+        uint32_t cp = utf8::unchecked::next(it);
+        char32_t lower = toLowerCP(static_cast<char32_t>(cp));
+        utf8::unchecked::append(lower, std::back_inserter(result));
+    }
+    return result;
+}
+
+// Helper: strip leading/trailing punctuation (.,;:!?) from a UTF-8 word
+static std::string stripPunct(const std::string& word) {
+    static const std::string punct = ".,;:!?";
+    auto begin = word.begin();
+    auto end = word.end();
+    // Strip leading
+    while (begin != end) {
+        auto next = begin;
+        uint32_t cp = utf8::unchecked::peek_next(next);
+        if (cp < 128 && punct.find(static_cast<char>(cp)) != std::string::npos) {
+            utf8::unchecked::next(begin);
+        } else {
+            break;
+        }
+    }
+    // Strip trailing -- work on the remaining substring
+    std::string trimmed(begin, end);
+    while (!trimmed.empty()) {
+        // Find the last codepoint
+        auto it = trimmed.begin();
+        auto last = it;
+        while (it != trimmed.end()) {
+            last = it;
+            utf8::unchecked::next(it);
+        }
+        uint32_t cp = utf8::unchecked::peek_next(last);
+        if (cp < 128 && punct.find(static_cast<char>(cp)) != std::string::npos) {
+            trimmed.erase(last, trimmed.end());
+        } else {
+            break;
+        }
+    }
+    return trimmed;
+}
+
+std::vector<LangSegment> UnicodeLanguageDetector::refineLatinSegmentsForSwedish(
+    std::vector<LangSegment> segments) const {
+    // If Swedish IS the default Latin language, no refinement needed --
+    // all Latin segments are already classified as "sv".
+    if (defaultLatinLang_ == "sv") {
+        return segments;
+    }
+
+    std::vector<LangSegment> result;
+    result.reserve(segments.size());
+
+    for (auto& seg : segments) {
+        if (seg.lang != defaultLatinLang_) {
+            result.push_back(std::move(seg));
+            continue;
+        }
+
+        // Count Swedish indicators in this segment
+        int svScore = 0;
+
+        // Split on whitespace and check each word
+        std::string remaining = seg.text;
+        size_t pos = 0;
+        while (pos < remaining.size()) {
+            // Skip whitespace
+            while (pos < remaining.size() && (remaining[pos] == ' ' ||
+                   remaining[pos] == '\t' || remaining[pos] == '\n' ||
+                   remaining[pos] == '\r')) {
+                pos++;
+            }
+            if (pos >= remaining.size()) break;
+
+            // Find word boundary
+            size_t wordStart = pos;
+            while (pos < remaining.size() && remaining[pos] != ' ' &&
+                   remaining[pos] != '\t' && remaining[pos] != '\n' &&
+                   remaining[pos] != '\r') {
+                pos++;
+            }
+
+            std::string word = remaining.substr(wordStart, pos - wordStart);
+            std::string wordLower = toLowerUTF8(stripPunct(word));
+            if (wordLower.empty()) continue;
+
+            // Check for Swedish-specific characters (ä/ö/å)
+            bool hasSvChar = false;
+            {
+                auto wit = wordLower.begin();
+                auto wend = wordLower.end();
+                while (wit != wend) {
+                    uint32_t cp = utf8::unchecked::next(wit);
+                    if (isSwedishChar(static_cast<char32_t>(cp))) {
+                        hasSvChar = true;
+                        break;
+                    }
+                }
+            }
+
+            if (hasSvChar) {
+                svScore++;
+            } else if (SWEDISH_FUNCTION_WORDS.count(wordLower) > 0) {
+                // Swedish function words (only checked when no Swedish char
+                // was found, matching Python's elif logic)
+                svScore++;
+            }
+        }
+
+        if (svScore >= 1) {
+            result.push_back({"sv", std::move(seg.text)});
+        } else {
+            result.push_back(std::move(seg));
+        }
+    }
+
+    return result;
 }
 
 // ---------------------------------------------------------------------------

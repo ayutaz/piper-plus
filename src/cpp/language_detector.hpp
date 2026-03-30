@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 #include <set>
+#include <unordered_set>
 
 namespace piper {
 
@@ -36,12 +37,22 @@ private:
     static bool isFullwidthLatin(char32_t cp);
     static bool isCJKPunct(char32_t cp);
     static bool isLatin(char32_t cp);
+    static bool isSwedishChar(char32_t cp);
+
+    // Post-pass: re-classify Latin segments as Swedish based on indicators
+    std::vector<LangSegment> refineLatinSegmentsForSwedish(
+        std::vector<LangSegment> segments) const;
+
+    // Swedish function words (highly distinctive, not shared with EN/ES/PT/FR)
+    static const std::unordered_set<std::string> SWEDISH_FUNCTION_WORDS;
 
     std::set<std::string> languages_;
     std::string defaultLatinLang_;
     bool hasJa_;
     bool hasZh_;
     bool hasKo_;
+    bool hasSv_;
+    bool detectSwedish_;  // sv present alongside other Latin languages
 };
 
 // Detect the dominant language in text (most non-neutral characters)
