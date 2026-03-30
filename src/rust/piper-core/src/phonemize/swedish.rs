@@ -1688,4 +1688,1104 @@ mod tests {
             result
         );
     }
+
+    // ===== Vowel length minimal pairs (Python: TestVowelLengthMinimalPairs) =====
+
+    #[test]
+    fn test_glas_long_a() {
+        // glas: single consonant after vowel -> long ɑː
+        let result = ph("glas");
+        let pua_alpha_long = '\u{E05E}'.to_string(); // ɑː
+        assert!(
+            result.contains(&pua_alpha_long),
+            "glas should have long ɑː: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_glass_short_a() {
+        // glass: double s -> short a (no ɑː)
+        let result = ph("glass");
+        let pua_alpha_long = '\u{E05E}'.to_string(); // ɑː
+        assert!(
+            !result.contains(&pua_alpha_long),
+            "glass should NOT have long ɑː: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_tak_long_a() {
+        // tak: single consonant -> long ɑː
+        let result = ph("tak");
+        let pua_alpha_long = '\u{E05E}'.to_string();
+        assert!(
+            result.contains(&pua_alpha_long),
+            "tak should have long ɑː: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_tack_short_a() {
+        // tack: ck -> short a (no ɑː)
+        let result = ph("tack");
+        let pua_alpha_long = '\u{E05E}'.to_string();
+        assert!(
+            !result.contains(&pua_alpha_long),
+            "tack should NOT have long ɑː: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_vet_long_e() {
+        // vet: single consonant -> long eː
+        let result = ph("vet");
+        let pua_e_long = '\u{E05B}'.to_string(); // eː
+        assert!(
+            result.contains(&pua_e_long),
+            "vet should have long eː: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_vett_short_e() {
+        // vett: double t -> short ɛ (no eː)
+        let result = ph("vett");
+        let pua_e_long = '\u{E05B}'.to_string(); // eː
+        let open_e = IPA_OPEN_E.to_string(); // ɛ
+        assert!(
+            !result.contains(&pua_e_long),
+            "vett should NOT have long eː: {:?}",
+            result
+        );
+        assert!(
+            result.contains(&open_e),
+            "vett should have short ɛ: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_vit_long_i() {
+        // vit: single consonant -> long iː
+        let result = ph("vit");
+        let pua_i_long = '\u{E059}'.to_string(); // iː
+        assert!(
+            result.contains(&pua_i_long),
+            "vit should have long iː: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_vitt_short_i() {
+        // vitt: double t -> short ɪ (no iː)
+        let result = ph("vitt");
+        let pua_i_long = '\u{E059}'.to_string(); // iː
+        assert!(
+            !result.contains(&pua_i_long),
+            "vitt should NOT have long iː: {:?}",
+            result
+        );
+    }
+
+    // ===== "o" ambiguity (Python: TestOAmbiguity) =====
+
+    #[test]
+    fn test_o_sol_long_u() {
+        // sol: "o" default -> uː
+        let result = ph("sol");
+        let pua_u_long = '\u{E060}'.to_string(); // uː
+        assert!(
+            result.contains(&pua_u_long),
+            "sol should have long uː: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_o_son_long_oo() {
+        // son: in O_LONG_AS_OO -> oː
+        let result = ph("son");
+        let pua_o_long = '\u{E05F}'.to_string(); // oː
+        assert!(
+            result.contains(&pua_o_long),
+            "son should have long oː: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_o_kort_short() {
+        // kort: o + rt (2 consonants) -> short ɔ
+        let result = ph("kort");
+        let open_o = IPA_OPEN_O.to_string(); // ɔ
+        assert!(
+            result.contains(&open_o),
+            "kort should have short ɔ: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_o_bott_short() {
+        // bott: double t -> short ɔ
+        let result = ph("bott");
+        let open_o = IPA_OPEN_O.to_string(); // ɔ
+        assert!(
+            result.contains(&open_o),
+            "bott should have short ɔ: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_o_mor_long_oo() {
+        // mor: in O_LONG_AS_OO -> oː
+        let result = ph("mor");
+        let pua_o_long = '\u{E05F}'.to_string(); // oː
+        assert!(
+            result.contains(&pua_o_long),
+            "mor should have long oː: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_o_bror_long_oo() {
+        // bror: in O_LONG_AS_OO -> oː
+        let result = ph("bror");
+        let pua_o_long = '\u{E05F}'.to_string(); // oː
+        assert!(
+            result.contains(&pua_o_long),
+            "bror should have long oː: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_o_ton_long_oo() {
+        // ton: in O_LONG_AS_OO -> oː
+        let result = ph("ton");
+        let pua_o_long = '\u{E05F}'.to_string(); // oː
+        assert!(
+            result.contains(&pua_o_long),
+            "ton should have long oː: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_o_bok_long_u() {
+        // bok: NOT in O_LONG_AS_OO -> default uː
+        let result = ph("bok");
+        let pua_u_long = '\u{E060}'.to_string(); // uː
+        assert!(
+            result.contains(&pua_u_long),
+            "bok should have long uː (default): {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_o_god_long_oo() {
+        // god: in O_LONG_AS_OO -> oː
+        let result = ph("god");
+        let pua_o_long = '\u{E05F}'.to_string(); // oː
+        assert!(
+            result.contains(&pua_o_long),
+            "god should have long oː: {:?}",
+            result
+        );
+    }
+
+    // ===== Review-fix rules (Python: TestReviewFixRules) =====
+
+    #[test]
+    fn test_gj_word_initial() {
+        // gjord: word-initial gj -> /j/
+        let result = ph("gjord");
+        let stress = IPA_STRESS.to_string();
+        assert!(
+            result.contains(&"j".to_string()),
+            "gj word-initial should produce /j/: {:?}",
+            result
+        );
+        // Should NOT start with hard g
+        let g_str = IPA_G.to_string();
+        let first_non_stress: Option<&String> = result.iter().find(|s| *s != &stress);
+        assert!(
+            first_non_stress != Some(&g_str),
+            "gjord should NOT start with hard ɡ: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_dj_word_initial() {
+        // djur: word-initial dj -> /j/
+        let result = ph("djur");
+        let stress = IPA_STRESS.to_string();
+        let first_non_stress: Option<&String> = result.iter().find(|s| *s != &stress);
+        assert_eq!(
+            first_non_stress,
+            Some(&"j".to_string()),
+            "djur word-initial dj -> /j/: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_hj_word_initial() {
+        // hjälp: word-initial hj -> /j/
+        let result = ph("hj\u{00E4}lp");
+        let stress = IPA_STRESS.to_string();
+        let first_non_stress: Option<&String> = result.iter().find(|s| *s != &stress);
+        assert_eq!(
+            first_non_stress,
+            Some(&"j".to_string()),
+            "hjälp word-initial hj -> /j/: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_lj_word_initial() {
+        // ljus: word-initial lj -> /j/
+        let result = ph("ljus");
+        let stress = IPA_STRESS.to_string();
+        let first_non_stress: Option<&String> = result.iter().find(|s| *s != &stress);
+        assert_eq!(
+            first_non_stress,
+            Some(&"j".to_string()),
+            "ljus word-initial lj -> /j/: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_era_verb_hard_g() {
+        // agera: Latin -era verb -> hard g
+        assert!(is_hard_g("agera"), "agera should have hard g (-era verb)");
+    }
+
+    #[test]
+    fn test_erar_verb_hard_g() {
+        assert!(
+            is_hard_g("reagerar"),
+            "reagerar should have hard g (-erar verb)"
+        );
+    }
+
+    #[test]
+    fn test_erade_verb_hard_g() {
+        assert!(
+            is_hard_g("navigerade"),
+            "navigerade should have hard g (-erade verb)"
+        );
+    }
+
+    #[test]
+    fn test_berg_hard_g() {
+        assert!(is_hard_g("berg"), "berg should have hard g");
+    }
+
+    #[test]
+    fn test_borg_hard_g() {
+        assert!(is_hard_g("borg"), "borg should have hard g");
+    }
+
+    // ===== Unstressed suffix patterns (Python: TestUnstressedSuffixPatterns) =====
+
+    #[test]
+    fn test_vacker_er_suffix() {
+        // vacker: -er suffix, stress on first syllable
+        let result = ph("vacker");
+        let stress = IPA_STRESS.to_string();
+        assert!(result.contains(&stress), "vacker should have stress: {:?}", result);
+        // Stress should be on position 0 (first syllable)
+        assert_eq!(
+            result[0], stress,
+            "vacker stress at position 0: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_vatten_en_suffix() {
+        // vatten: -en suffix, stress on first syllable
+        let result = ph("vatten");
+        let stress = IPA_STRESS.to_string();
+        assert!(result.contains(&stress), "vatten should have stress: {:?}", result);
+        assert_eq!(
+            result[0], stress,
+            "vatten stress at position 0: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_bilar_ar_suffix() {
+        // bilar: -ar suffix, stress on first syllable
+        let result = ph("bilar");
+        let stress = IPA_STRESS.to_string();
+        assert!(result.contains(&stress), "bilar should have stress: {:?}", result);
+        assert_eq!(
+            result[0], stress,
+            "bilar stress at position 0: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_flickor_or_suffix() {
+        // flickor: -or suffix, stress on first syllable
+        let result = ph("flickor");
+        let stress = IPA_STRESS.to_string();
+        assert!(result.contains(&stress), "flickor should have stress: {:?}", result);
+        assert_eq!(
+            result[0], stress,
+            "flickor stress at position 0: {:?}",
+            result
+        );
+    }
+
+    // ===== Consonant gap-fill tests (Python: TestConsonantGapFill) =====
+
+    #[test]
+    fn test_nk_digraph() {
+        // bank: nk -> [ŋ, k]
+        let result = ph("bank");
+        let eng = IPA_ENG.to_string(); // ŋ
+        assert!(
+            result.contains(&eng),
+            "nk -> ŋ in 'bank': {:?}",
+            result
+        );
+        assert!(
+            result.contains(&"k".to_string()),
+            "nk -> k in 'bank': {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_c_before_e_soft() {
+        // center: c before e -> /s/
+        let result = ph("center");
+        let stress = IPA_STRESS.to_string();
+        let first_non_stress: Option<&String> = result.iter().find(|s| *s != &stress);
+        assert_eq!(
+            first_non_stress,
+            Some(&"s".to_string()),
+            "c before e -> /s/ in 'center': {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_c_before_a_hard() {
+        // camping: c before a -> /k/
+        let result = ph("camping");
+        let stress = IPA_STRESS.to_string();
+        let first_non_stress: Option<&String> = result.iter().find(|s| *s != &stress);
+        assert_eq!(
+            first_non_stress,
+            Some(&"k".to_string()),
+            "c before a -> /k/ in 'camping': {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_gn_word_initial() {
+        // gnaga: word-initial gn -> /ɡn/
+        let result = ph("gnaga");
+        let g_str = IPA_G.to_string();
+        assert!(
+            result.contains(&g_str),
+            "word-initial gn -> ɡ in 'gnaga': {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_gn_medial() {
+        // signal: medial gn -> /ŋn/
+        let result = ph("signal");
+        let eng = IPA_ENG.to_string(); // ŋ
+        assert!(
+            result.contains(&eng),
+            "medial gn -> ŋ in 'signal': {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_sk_back_vowel_exception_manniska() {
+        // människa is in SK_BACK_VOWEL_EXCEPTIONS -> sk stays /sk/, no ɧ
+        let result = ph("m\u{00E4}nniska");
+        let hook_h = IPA_HOOK_H.to_string();
+        assert!(
+            !result.contains(&hook_h),
+            "människa should NOT have ɧ: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_ium_loanword_suffix() {
+        // stadium: -ium loanword suffix
+        let result = detect_loanword_suffix("stadium");
+        assert!(result.is_some(), "stadium should detect -ium loanword suffix");
+        let (prefix, _) = result.unwrap();
+        assert_eq!(prefix, "stad", "stadium prefix should be 'stad'");
+    }
+
+    #[test]
+    fn test_eum_loanword_suffix() {
+        // museum: -eum loanword suffix
+        let result = detect_loanword_suffix("museum");
+        assert!(result.is_some(), "museum should detect -eum loanword suffix");
+    }
+
+    // ===== Additional basic vowel tests (Python: TestBasicVowels coverage) =====
+
+    #[test]
+    fn test_long_i_fin() {
+        // fin -> long iː
+        let result = ph("fin");
+        let pua_i_long = '\u{E059}'.to_string(); // iː
+        assert!(
+            result.contains(&pua_i_long),
+            "fin should have long iː: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_short_i_flicka() {
+        // flicka -> short ɪ
+        let result = ph("flicka");
+        let small_i = IPA_SMALL_I.to_string(); // ɪ
+        assert!(
+            result.contains(&small_i),
+            "flicka should have short ɪ: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_long_u_hus() {
+        // hus -> long ʉː
+        let result = ph("hus");
+        let pua_barred_u_long = '\u{E061}'.to_string(); // ʉː
+        assert!(
+            result.contains(&pua_barred_u_long),
+            "hus should have long ʉː: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_long_y_syn() {
+        // syn -> long yː
+        let result = ph("syn");
+        let pua_y_long = '\u{E05A}'.to_string(); // yː
+        assert!(
+            result.contains(&pua_y_long),
+            "syn should have long yː: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_long_oe_oel() {
+        // öl -> long øː
+        let result = ph("\u{00F6}l");
+        let pua_oe_long = '\u{E05D}'.to_string(); // øː
+        assert!(
+            result.contains(&pua_oe_long),
+            "öl should have long øː: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_long_ae_sael() {
+        // säl -> long ɛː
+        let result = ph("s\u{00E4}l");
+        let pua_ae_long = '\u{E05C}'.to_string(); // ɛː
+        assert!(
+            result.contains(&pua_ae_long),
+            "säl should have long ɛː: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_short_e_cluster_fest() {
+        // fest -> short ɛ (cluster)
+        let result = ph("fest");
+        let open_e = IPA_OPEN_E.to_string(); // ɛ
+        let pua_e_long = '\u{E05B}'.to_string(); // eː
+        assert!(
+            result.contains(&open_e),
+            "fest should have short ɛ: {:?}",
+            result
+        );
+        assert!(
+            !result.contains(&pua_e_long),
+            "fest should NOT have long eː: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_short_oe_hoest() {
+        // höst -> short ö = œ
+        let result = ph("h\u{00F6}st");
+        let oe_lig = IPA_OE_LIG.to_string(); // œ
+        assert!(
+            result.contains(&oe_lig),
+            "höst should have short œ: {:?}",
+            result
+        );
+    }
+
+    // ===== Additional retroflex tests (Python: TestRetroflex coverage) =====
+
+    #[test]
+    fn test_retroflex_rn_barn() {
+        // barn -> ˈbɑːɳ (r+n -> retroflex ɳ)
+        let result = ph("barn");
+        let retro_n = IPA_RETRO_N.to_string();
+        assert!(
+            result.contains(&retro_n),
+            "r+n -> ɳ in 'barn': {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_retroflex_rl() {
+        // apply_retroflex directly for r+l -> ɭ
+        let input: Vec<String> = vec!["r".into(), "l".into()];
+        let result = apply_retroflex(&input);
+        let retro_l = IPA_RETRO_L.to_string();
+        assert!(result.contains(&retro_l), "r+l -> ɭ: {:?}", result);
+    }
+
+    #[test]
+    fn test_retroflex_cascade_rst() {
+        // apply_retroflex: f + œ + r + s + t -> f + œ + ʂ + ʈ
+        let input: Vec<String> = vec!["f".into(), "\u{0153}".into(), "r".into(), "s".into(), "t".into()];
+        let result = apply_retroflex(&input);
+        let retro_s = IPA_RETRO_S.to_string();
+        let retro_t = IPA_RETRO_T.to_string();
+        assert!(
+            result.contains(&retro_s),
+            "cascade r+s -> ʂ: {:?}",
+            result
+        );
+        assert!(
+            result.contains(&retro_t),
+            "cascade ʂ+t -> ʈ: {:?}",
+            result
+        );
+        // r should be consumed
+        assert!(
+            !result.contains(&"r".to_string()),
+            "r consumed in cascade: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_retroflex_l_stops_cascade() {
+        // apply_retroflex: k + ɑː + r + l + s -> k + ɑː + ɭ + s
+        // ɭ does NOT propagate, so s stays as /s/
+        let input: Vec<String> = vec![
+            "k".into(),
+            "\u{0251}\u{02D0}".into(),
+            "r".into(),
+            "l".into(),
+            "s".into(),
+        ];
+        let result = apply_retroflex(&input);
+        let retro_l = IPA_RETRO_L.to_string();
+        assert!(result.contains(&retro_l), "r+l -> ɭ: {:?}", result);
+        assert!(
+            result.contains(&"s".to_string()),
+            "s NOT retroflex (ɭ stops cascade): {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_rr_blocks_retroflex() {
+        // apply_retroflex: b + ɔ + r + r + s -> unchanged (rr blocks)
+        let input: Vec<String> = vec!["b".into(), "\u{0254}".into(), "r".into(), "r".into(), "s".into()];
+        let result = apply_retroflex(&input);
+        assert_eq!(result, input, "rr blocks retroflex: {:?}", result);
+    }
+
+    #[test]
+    fn test_r_plus_k_no_change() {
+        // apply_retroflex: b + ɑː + r + k -> unchanged (k not retroflex target)
+        let input: Vec<String> = vec!["b".into(), "\u{0251}\u{02D0}".into(), "r".into(), "k".into()];
+        let result = apply_retroflex(&input);
+        assert_eq!(
+            result, input,
+            "r+k no retroflex change: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_word_final_r_no_change() {
+        // apply_retroflex: f + ɑː + r -> unchanged (word-final r)
+        let input: Vec<String> = vec!["f".into(), "\u{0251}\u{02D0}".into(), "r".into()];
+        let result = apply_retroflex(&input);
+        assert_eq!(result, input, "word-final r unchanged: {:?}", result);
+    }
+
+    // ===== Additional sj-sound tests (Python: TestSjSound coverage) =====
+
+    #[test]
+    fn test_sj_sound_stj() {
+        // stjärna: stj -> ɧ
+        let result = ph("stj\u{00E4}rna");
+        let hook_h = IPA_HOOK_H.to_string();
+        assert!(result.contains(&hook_h), "stj -> ɧ: {:?}", result);
+    }
+
+    #[test]
+    fn test_sj_sound_sch() {
+        // schema: sch -> ɧ
+        let result = ph("schema");
+        let hook_h = IPA_HOOK_H.to_string();
+        assert!(result.contains(&hook_h), "sch -> ɧ: {:?}", result);
+    }
+
+    #[test]
+    fn test_sj_sound_sh() {
+        // show: sh -> ɧ
+        let result = ph("show");
+        let hook_h = IPA_HOOK_H.to_string();
+        assert!(result.contains(&hook_h), "sh -> ɧ: {:?}", result);
+    }
+
+    #[test]
+    fn test_sk_front_i() {
+        // skinn: sk + front i -> ɧ
+        let result = ph("skinn");
+        let hook_h = IPA_HOOK_H.to_string();
+        assert!(result.contains(&hook_h), "sk + i -> ɧ: {:?}", result);
+    }
+
+    #[test]
+    fn test_sk_front_y() {
+        // sky: sk + front y -> ɧ
+        let result = ph("sky");
+        let hook_h = IPA_HOOK_H.to_string();
+        assert!(result.contains(&hook_h), "sk + y -> ɧ: {:?}", result);
+    }
+
+    #[test]
+    fn test_sk_front_ae() {
+        // skäl: sk + front ä -> ɧ
+        let result = ph("sk\u{00E4}l");
+        let hook_h = IPA_HOOK_H.to_string();
+        assert!(result.contains(&hook_h), "sk + ä -> ɧ: {:?}", result);
+    }
+
+    #[test]
+    fn test_sk_front_oe() {
+        // sköld: sk + front ö -> ɧ
+        let result = ph("sk\u{00F6}ld");
+        let hook_h = IPA_HOOK_H.to_string();
+        assert!(result.contains(&hook_h), "sk + ö -> ɧ: {:?}", result);
+    }
+
+    #[test]
+    fn test_sk_back_o_no_sj() {
+        // skog: sk + back o -> /sk/ (no ɧ)
+        let result = ph("skog");
+        let hook_h = IPA_HOOK_H.to_string();
+        assert!(!result.contains(&hook_h), "sk + o no ɧ: {:?}", result);
+    }
+
+    #[test]
+    fn test_sk_back_u_no_sj() {
+        // skum: sk + back u -> /sk/ (no ɧ)
+        let result = ph("skum");
+        let hook_h = IPA_HOOK_H.to_string();
+        assert!(!result.contains(&hook_h), "sk + u no ɧ: {:?}", result);
+    }
+
+    #[test]
+    fn test_loanword_sion() {
+        // passion: -sion -> ɧ
+        let result = ph("passion");
+        let hook_h = IPA_HOOK_H.to_string();
+        assert!(result.contains(&hook_h), "-sion -> ɧ: {:?}", result);
+    }
+
+    #[test]
+    fn test_loanword_ssion() {
+        // mission: -ssion -> ɧ
+        let result = ph("mission");
+        let hook_h = IPA_HOOK_H.to_string();
+        assert!(result.contains(&hook_h), "-ssion -> ɧ: {:?}", result);
+    }
+
+    #[test]
+    fn test_loanword_tion_station() {
+        // station: -tion -> ɧ
+        let result = ph("station");
+        let hook_h = IPA_HOOK_H.to_string();
+        assert!(result.contains(&hook_h), "-tion -> ɧ: {:?}", result);
+    }
+
+    // ===== Additional loanword tests (Python: TestLoanwords coverage) =====
+
+    #[test]
+    fn test_ph_as_f() {
+        // photo: ph -> /f/
+        let result = ph("photo");
+        assert!(
+            result.contains(&"f".to_string()),
+            "ph -> f in 'photo': {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_th_as_t() {
+        // theme: th -> /t/
+        let result = ph("theme");
+        let stress = IPA_STRESS.to_string();
+        let first_non_stress: Option<&String> = result.iter().find(|s| *s != &stress);
+        assert_eq!(
+            first_non_stress,
+            Some(&"t".to_string()),
+            "th -> t in 'theme': {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_loanword_sion_detected() {
+        let result = detect_loanword_suffix("passion");
+        assert!(result.is_some(), "passion should detect -sion suffix");
+    }
+
+    #[test]
+    fn test_loanword_age_detected() {
+        let result = detect_loanword_suffix("garage");
+        assert!(result.is_some(), "garage should detect -age suffix");
+    }
+
+    #[test]
+    fn test_native_age_excluded() {
+        // "mage" is native Swedish, not French -age
+        let result = detect_loanword_suffix("mage");
+        assert!(result.is_none(), "mage is native, should NOT detect -age");
+    }
+
+    // ===== Additional stress tests (Python: TestStress + TestStressSpec coverage) =====
+
+    #[test]
+    fn test_detect_stress_monosyllable() {
+        assert_eq!(detect_stress("hus"), 0, "monosyllable stress on 0");
+    }
+
+    #[test]
+    fn test_detect_stress_function_word() {
+        assert_eq!(detect_stress("och"), -1, "function word no stress");
+    }
+
+    #[test]
+    fn test_detect_stress_tion_suffix() {
+        assert!(
+            detect_stress("station") > 0,
+            "-tion suffix attracts stress"
+        );
+    }
+
+    #[test]
+    fn test_detect_stress_eri_suffix() {
+        assert!(detect_stress("bageri") > 0, "-eri suffix attracts stress");
+    }
+
+    #[test]
+    fn test_detect_stress_be_prefix() {
+        assert_eq!(
+            detect_stress("betala"),
+            1,
+            "be- prefix: stress on syllable 1"
+        );
+    }
+
+    #[test]
+    fn test_detect_stress_foer_prefix() {
+        assert_eq!(
+            detect_stress("f\u{00F6}rst\u{00E5}"),
+            1,
+            "för- prefix: stress on syllable 1"
+        );
+    }
+
+    #[test]
+    fn test_detect_stress_default_first() {
+        assert_eq!(detect_stress("flicka"), 0, "default stress on first syllable");
+    }
+
+    #[test]
+    fn test_detect_stress_itet_suffix() {
+        assert!(
+            detect_stress("universitet") > 0,
+            "-itet suffix attracts stress"
+        );
+    }
+
+    #[test]
+    fn test_detect_stress_ist_suffix() {
+        assert!(detect_stress("turist") > 0, "-ist suffix attracts stress");
+    }
+
+    #[test]
+    fn test_detect_stress_ik_suffix() {
+        assert!(detect_stress("musik") > 0, "-ik suffix attracts stress");
+    }
+
+    // ===== Additional edge case tests (Python: TestEdgeCases coverage) =====
+
+    #[test]
+    fn test_single_vowel() {
+        let result = ph("a");
+        assert!(!result.is_empty(), "single vowel 'a' should produce output");
+    }
+
+    #[test]
+    fn test_multiple_words() {
+        let result = ph("hej du");
+        assert!(
+            result.contains(&" ".to_string()),
+            "multiple words should contain space: {:?}",
+            result
+        );
+    }
+
+    // ===== Vowel length edge cases (Python: TestVowelLength extra) =====
+
+    #[test]
+    fn test_final_vowel_long_bo() {
+        // bo: word-final vowel -> long
+        let result = ph("bo");
+        let pua_o_long = '\u{E05F}'.to_string(); // oː (bo is in O_LONG_AS_OO)
+        let pua_u_long = '\u{E060}'.to_string(); // uː
+        assert!(
+            result.contains(&pua_o_long) || result.contains(&pua_u_long),
+            "bo should have long vowel: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_function_word_for_short() {
+        // för -> short (function word), no long øː
+        let result = ph("f\u{00F6}r");
+        let pua_oe_long = '\u{E05D}'.to_string(); // øː
+        assert!(
+            !result.contains(&pua_oe_long),
+            "function word 'för' should NOT have long øː: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_final_m_short_hem() {
+        // hem -> short vowel despite single m ending
+        let result = ph("hem");
+        let pua_e_long = '\u{E05B}'.to_string(); // eː
+        assert!(
+            !result.contains(&pua_e_long),
+            "hem should NOT have long eː (FINAL_M_SHORT): {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_r_plus_c_preserves_long_barn() {
+        // barn: r + C exception, vowel stays long ɑː
+        let result = ph("barn");
+        let pua_alpha_long = '\u{E05E}'.to_string(); // ɑː
+        assert!(
+            result.contains(&pua_alpha_long),
+            "barn should have long ɑː (r+C exception): {:?}",
+            result
+        );
+    }
+
+    // ===== Unstressed vowel tests (Python: TestUnstressedVowels coverage) =====
+
+    #[test]
+    fn test_function_word_att_no_stress() {
+        let result = ph("att");
+        let stress = IPA_STRESS.to_string();
+        assert!(
+            !result.contains(&stress),
+            "function word 'att' no stress: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_function_word_det_no_stress() {
+        let result = ph("det");
+        let stress = IPA_STRESS.to_string();
+        assert!(
+            !result.contains(&stress),
+            "function word 'det' no stress: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_function_word_som_no_stress() {
+        let result = ph("som");
+        let stress = IPA_STRESS.to_string();
+        assert!(
+            !result.contains(&stress),
+            "function word 'som' no stress: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_stressed_monosyllable_bil() {
+        let result = ph("bil");
+        let stress = IPA_STRESS.to_string();
+        assert!(
+            result.contains(&stress),
+            "content monosyllable 'bil' should have stress: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_unstressed_prefix_betala() {
+        // betala: stress on 2nd syllable (be- is unstressed prefix)
+        let result = ph("betala");
+        let stress = IPA_STRESS.to_string();
+        assert!(result.contains(&stress), "betala should have stress: {:?}", result);
+        // Stress should NOT be at position 0 (it's after the unstressed prefix)
+        let stress_pos = result.iter().position(|s| s == &stress).unwrap();
+        assert!(
+            stress_pos > 0,
+            "betala stress not at position 0 (after be- prefix): {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_function_words_count() {
+        assert!(
+            FUNCTION_WORDS.len() >= 35,
+            "should have at least 35 function words, got {}",
+            FUNCTION_WORDS.len()
+        );
+    }
+
+    // ===== Hard k/g exception tests (Python extra coverage) =====
+
+    #[test]
+    fn test_hard_k_flicka() {
+        let result = ph("flicka");
+        assert!(
+            result.contains(&"k".to_string()),
+            "flicka should have hard /k/: {:?}",
+            result
+        );
+        let curly_c = IPA_CURLY_C.to_string();
+        assert!(
+            !result.contains(&curly_c),
+            "flicka should NOT have soft ɕ: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_hard_k_pojke() {
+        let result = ph("pojke");
+        assert!(
+            result.contains(&"k".to_string()),
+            "pojke should have hard /k/: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_hard_k_socker() {
+        let result = ph("socker");
+        assert!(
+            result.contains(&"k".to_string()),
+            "socker should have hard /k/: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_hard_g_finger() {
+        assert!(is_hard_g("finger"), "finger should have hard g");
+    }
+
+    #[test]
+    fn test_hard_g_ger() {
+        assert!(is_hard_g("ger"), "ger should have hard g");
+    }
+
+    #[test]
+    fn test_kj_soft_sound() {
+        // kjol: kj -> ɕ
+        let result = ph("kjol");
+        let curly_c = IPA_CURLY_C.to_string();
+        assert!(result.contains(&curly_c), "kj -> ɕ: {:?}", result);
+    }
+
+    // ===== Prosody extra tests (Python: TestProsody coverage) =====
+
+    #[test]
+    fn test_prosody_a1_always_zero() {
+        let (_, prosody) = ph_with_prosody("flickan gick");
+        for pi in &prosody {
+            if let Some(info) = pi {
+                assert_eq!(info.a1, 0, "a1 should always be 0: {:?}", info);
+            }
+        }
+    }
+
+    #[test]
+    fn test_prosody_a3_word_phoneme_count() {
+        let (phonemes, prosody) = ph_with_prosody("hus");
+        // a3 should reflect word phoneme count
+        for (ph, pi) in phonemes.iter().zip(prosody.iter()) {
+            if let Some(info) = pi {
+                if info.a3 > 0 {
+                    assert!(
+                        info.a3 >= 3,
+                        "a3 for 'hus' should be >= 3 (h, ʉː, s), got {}: ph={:?}",
+                        info.a3,
+                        ph
+                    );
+                }
+            }
+        }
+    }
 }
