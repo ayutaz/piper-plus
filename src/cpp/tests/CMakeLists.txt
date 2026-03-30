@@ -56,6 +56,7 @@ set(TEST_SOURCES
     test_model_manager.cpp
     test_download_utils.cpp
     test_multilingual_g2p.cpp
+    test_swedish_phonemize.cpp
 )
 
 # Add dictionary manager test for Unix platforms
@@ -482,6 +483,16 @@ foreach(test_source ${TEST_SOURCES})
         endif()
         # Ensure dependencies are built first
         add_dependencies(${test_name} spdlog_external fmt_external)
+    endif()
+
+    # Link additional dependencies for Swedish phonemize test
+    if(${test_name} STREQUAL "test_swedish_phonemize")
+        target_sources(${test_name} PRIVATE
+            ../swedish_phonemize.cpp
+        )
+        target_include_directories(${test_name} PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/..
+        )
     endif()
 
     add_test(NAME ${test_name} COMMAND ${test_name})
