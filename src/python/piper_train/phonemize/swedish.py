@@ -13,9 +13,24 @@ Pipeline (per word):
 
 from __future__ import annotations
 
+import gzip
+import json
+import logging
+import os
 import re
 import unicodedata
 from enum import IntEnum
+from pathlib import Path
+
+from .base import Phonemizer, ProsodyInfo
+
+_LOGGER = logging.getLogger(__name__)
+
+__all__ = [
+    "phonemize_swedish",
+    "phonemize_swedish_with_prosody",
+    "SwedishPhonemizer",
+]
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -770,28 +785,169 @@ def _phonemize_word(word: str) -> list[str]:
 # =========================================================================
 
 
-def phonemize_swedish_text(text: str) -> list[str]:
-    """Convert Swedish text to a flat list of IPA phonemes.
+# =========================================================================
+# Dictionary lookup (Stage 1 — FR-01)
+# =========================================================================
 
-    Handles tokenization, punctuation pass-through, and inter-word spaces.
+
+def _load_dictionary(dict_path: str | Path) -> dict[str, str]:
+    """Load a JSON IPA dictionary (plain or gzip)."""
+    path = Path(dict_path)
+    if not path.exists():
+        _LOGGER.warning("Dictionary file not found: %s", path)
+        return {}
+
+    if path.suffix == ".gz" or path.name.endswith(".json.gz"):
+        with gzip.open(path, "rt", encoding="utf-8") as f:
+            return json.load(f)
+    else:
+        with open(path, encoding="utf-8") as f:
+            return json.load(f)
+
+
+def _split_ipa_to_phonemes(ipa: str) -> list[str]:
+    """Split an IPA string from the dictionary into individual phoneme tokens.
+
+    Handles multi-codepoint tokens like long vowels (e.g., 'ɑː' → single token),
+    stress markers, and single-codepoint phonemes.
+    """
+    tokens: list[str] = []
+    i = 0
+    while i < len(ipa):
+        ch = ipa[i]
+        # Stress markers: single codepoint
+        if ch in ("\u02C8", "\u02CC"):  # ˈ ˌ
+            tokens.append(ch)
+            i += 1
+        # Length mark ː following a vowel → merge with previous
+        elif ch == "\u02D0" and tokens:
+            tokens[-1] = tokens[-1] + ch
+            i += 1
+        else:
+            tokens.append(ch)
+            i += 1
+    return tokens
+
+
+# =========================================================================
+# Text-level pipeline with dictionary
+# =========================================================================
+
+
+def _phonemize_word_with_dict(
+    word: str, dictionary: dict[str, str] | None
+) -> list[str]:
+    """Stage 1 (dictionary) → Stage 2-6 (rule-based) fallback."""
+    if dictionary:
+        ipa = dictionary.get(word)
+        if ipa is not None:
+            return _split_ipa_to_phonemes(ipa)
+    return _phonemize_word(word)
+
+
+def phonemize_swedish_with_prosody(
+    text: str,
+    dictionary: dict[str, str] | None = None,
+) -> tuple[list[str], list[ProsodyInfo | None]]:
+    """Convert Swedish text to phoneme list with prosody features.
+
+    Parameters
+    ----------
+    text : str
+        Input Swedish text.
+    dictionary : dict[str, str] | None
+        Optional pre-loaded IPA dictionary (word → IPA string).
+
+    Returns
+    -------
+    (phonemes, prosody_info_list)
+        a1=0, a2=stress (0/1/2), a3=word phoneme count
     """
     text = _normalize(text)
     tokens = _RE_TOKEN.findall(text)
 
     phonemes: list[str] = []
+    prosody_list: list[ProsodyInfo | None] = []
     need_space = False
 
     for token in tokens:
         if all(c in PUNCTUATION for c in token):
             for c in token:
                 phonemes.append(c)
+                prosody_list.append(ProsodyInfo(a1=0, a2=0, a3=0))
             continue
 
         if need_space:
             phonemes.append(" ")
+            prosody_list.append(ProsodyInfo(a1=0, a2=0, a3=0))
 
-        word_phonemes = _phonemize_word(token)
-        phonemes.extend(word_phonemes)
+        word_phonemes = _phonemize_word_with_dict(token, dictionary)
+
+        # Count non-stress phonemes for a3
+        word_phoneme_count = sum(
+            1 for p in word_phonemes if p not in ("\u02C8", "\u02CC")
+        )
+
+        for ph in word_phonemes:
+            if ph == "\u02C8":
+                a2 = 2  # primary stress
+            elif ph == "\u02CC":
+                a2 = 1  # secondary stress
+            else:
+                a2 = 0
+            phonemes.append(ph)
+            prosody_list.append(ProsodyInfo(a1=0, a2=a2, a3=word_phoneme_count))
+
         need_space = True
 
+    # Map multi-character tokens to PUA codepoints
+    from .token_mapper import map_sequence  # noqa: PLC0415
+
+    mapped = map_sequence(phonemes)
+    return mapped, prosody_list
+
+
+def phonemize_swedish(
+    text: str,
+    dictionary: dict[str, str] | None = None,
+) -> list[str]:
+    """Convert Swedish text to phoneme list (without prosody)."""
+    phonemes, _ = phonemize_swedish_with_prosody(text, dictionary=dictionary)
     return phonemes
+
+
+# =========================================================================
+# SwedishPhonemizer (Phonemizer ABC — FR-05)
+# =========================================================================
+
+
+class SwedishPhonemizer(Phonemizer):
+    """Swedish phonemizer: NST dictionary lookup + rule-based G2P fallback.
+
+    Parameters
+    ----------
+    dict_path : str | Path | None
+        Path to the IPA dictionary JSON file. Falls back to the
+        ``PIPER_SV_DICT_PATH`` environment variable if not provided.
+    """
+
+    def __init__(self, dict_path: str | Path | None = None) -> None:
+        self._dict: dict[str, str] | None = None
+
+        # Resolve dict path
+        resolved = dict_path or os.environ.get("PIPER_SV_DICT_PATH")
+        if resolved:
+            _LOGGER.info("Loading Swedish dictionary from %s", resolved)
+            self._dict = _load_dictionary(resolved)
+            _LOGGER.info("Loaded %d dictionary entries", len(self._dict))
+
+    def phonemize(self, text: str) -> list[str]:
+        return phonemize_swedish(text, dictionary=self._dict)
+
+    def phonemize_with_prosody(
+        self, text: str
+    ) -> tuple[list[str], list[ProsodyInfo | None]]:
+        return phonemize_swedish_with_prosody(text, dictionary=self._dict)
+
+    def get_phoneme_id_map(self) -> dict[str, list[int]] | None:
+        return None
