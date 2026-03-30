@@ -6,7 +6,6 @@ loanwords, dictionary lookup, SwedishPhonemizer ABC, multilingual integration.
 
 from __future__ import annotations
 
-import gzip
 import json
 import tempfile
 from pathlib import Path
@@ -15,18 +14,13 @@ import pytest
 
 from piper_train.phonemize.swedish import (
     FUNCTION_WORDS,
-    HARD_G_WORDS,
-    HARD_K_WORDS,
-    O_LONG_AS_OO,
     SwedishPhonemizer,
     _is_hard_g,
-    _is_hard_k,
     _phonemize_word,
     _split_ipa_to_phonemes,
     apply_retroflex,
     detect_loanword_suffix,
     detect_stress,
-    get_vowel_phoneme,
     phonemize_swedish,
     phonemize_swedish_with_prosody,
 )
@@ -75,12 +69,12 @@ class TestBasicVowels:
         assert "yː" in _join("syn")
 
     @pytest.mark.unit
-    def test_long_ö(self):
+    def test_long_oe(self):
         # öl → ˈøːl
         assert "øː" in _join("öl")
 
     @pytest.mark.unit
-    def test_long_ä(self):
+    def test_long_ae(self):
         # säl → ˈsɛːl
         assert "ɛː" in _join("säl")
 
@@ -90,7 +84,7 @@ class TestBasicVowels:
         assert _join("fest") == "ˈfɛst"
 
     @pytest.mark.unit
-    def test_short_ö(self):
+    def test_short_oe(self):
         # höst → short ö = œ
         assert "œ" in _join("höst")
 
@@ -248,7 +242,7 @@ class TestSjSound:
         assert "ɧ" in _join("sjuk")
 
     @pytest.mark.unit
-    def test_sj_sjö(self):
+    def test_sj_sjoe(self):
         assert "ɧ" in _join("sjö")
 
     @pytest.mark.unit
@@ -284,11 +278,11 @@ class TestSjSound:
         assert "ɧ" in _join("sky")
 
     @pytest.mark.unit
-    def test_sk_front_ä(self):
+    def test_sk_front_ae(self):
         assert "ɧ" in _join("skäl")
 
     @pytest.mark.unit
-    def test_sk_front_ö(self):
+    def test_sk_front_oe(self):
         assert "ɧ" in _join("sköld")
 
     @pytest.mark.unit
@@ -513,7 +507,7 @@ class TestStress:
         assert detect_stress("betala") == 1
 
     @pytest.mark.unit
-    def test_för_prefix_stress_after(self):
+    def test_foer_prefix_stress_after(self):
         assert detect_stress("förstå") == 1
 
     @pytest.mark.unit
@@ -683,7 +677,7 @@ class TestProsody:
     @pytest.mark.unit
     def test_stress_marker_a2(self):
         phonemes, prosody = phonemize_swedish_with_prosody("flicka")
-        for ph, pr in zip(phonemes, prosody):
+        for ph, pr in zip(phonemes, prosody, strict=True):
             if ph == "\u02C8":
                 assert pr.a2 == 2  # primary stress
 
@@ -787,9 +781,13 @@ class TestReviewFixRules:
 
     @pytest.mark.unit
     def test_gj_not_applied_mid_word(self):
-        # Non-initial gj should NOT collapse (hypothetical)
-        # "avgj" would keep g+j separate
-        pass  # No common Swedish word has non-initial gj
+        # Non-initial gj should NOT collapse to /j/
+        # Construct a word with gj not at position 0
+        from piper_train.phonemize.swedish import _convert_consonant
+        # At pos=2, gj should NOT use the word-initial gj→j rule
+        ipa, consumed = _convert_consonant("avgj", 2, "avgj")
+        # Should fall through to g+front vowel or default g, not j
+        assert ipa != ["j"] or consumed != 2
 
     @pytest.mark.unit
     def test_dj_word_initial(self):
@@ -902,7 +900,7 @@ class TestUnstressedSuffixPatterns:
         assert "ˈ" in r  # stress should be on first syllable
 
     @pytest.mark.unit
-    def test_söker_er_suffix(self):
+    def test_soeker_er_suffix(self):
         # söker: hard k (HARD_K_WORDS), -er unstressed
         r = _join("söker")
         assert "k" in r  # hard k, not ɕ

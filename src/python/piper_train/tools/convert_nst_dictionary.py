@@ -257,8 +257,8 @@ def main() -> None:
         help="Run spot-check validation on 20 reference words",
     )
     parser.add_argument(
-        "-s", "--stats", action="store_true", default=True,
-        help="Print conversion statistics to stderr (default: True)",
+        "--no-stats", action="store_true",
+        help="Suppress conversion statistics output",
     )
     parser.add_argument(
         "-q", "--quiet", action="store_true",
@@ -322,8 +322,8 @@ def main() -> None:
     except UnicodeDecodeError as e:
         print(f"Error: Failed to decode input file: {e}", file=sys.stderr)
         sys.exit(2)
-
-    _LOGGER.warning = original_warning  # type: ignore[assignment]
+    finally:
+        _LOGGER.warning = original_warning  # type: ignore[assignment]
 
     # 3. Validate
     if args.validate:
@@ -346,7 +346,7 @@ def main() -> None:
         sys.exit(3)
 
     # 5. Stats
-    if args.stats:
+    if not args.no_stats:
         total_skipped = (
             stats["silence_marker"]
             + stats["unknown_marker"]
