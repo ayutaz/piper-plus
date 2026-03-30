@@ -29,6 +29,7 @@
 #include "english_phonemize.hpp"
 #include "chinese_phonemize.hpp"
 #include "korean_phonemize.hpp"
+#include "swedish_phonemize.hpp"
 
 #ifdef USE_ARM64_NEON
 #include "audio_neon.hpp"
@@ -1241,6 +1242,9 @@ void textToAudio(PiperConfig &config, Voice &voice, std::string text,
           } else if (langSeg.lang == "ko") {
             // Korean: Hangul decomposition (no external data needed)
             phonemize_korean(langSeg.text, langPhonemes);
+          } else if (langSeg.lang == "sv") {
+            // Swedish: native rule-based phonemizer
+            phonemize_swedish(langSeg.text, langPhonemes);
           } else {
             spdlog::warn("No native phonemizer for language '{}'; skipping segment", langSeg.lang);
           }
