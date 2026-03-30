@@ -55,6 +55,20 @@ _ACCENT_2_WORDS = frozenset({
     "julklapp", "sommarsemester", "körkort", "sjukhus", "regnbåge",
 })
 
+# Exception words with irregular pronunciation
+_EXCEPTION_WORDS = {
+    "hej": ["h", "ɛ", "j"],
+    "och": ["ɔ", "k"],
+    "jag": ["j", "ɑː"],
+    "det": ["d", "eː"],
+    "är": ["ɛː"],
+    "har": ["h", "ɑː", "r"],
+    "inte": ["ɪ", "n", "t", "ɛ"],
+    "var": ["v", "ɑː", "r"],
+    "hur": ["h", "ʉː", "r"],
+    "vad": ["v", "ɑː", "d"],
+}
+
 
 def _normalize(text: str) -> str:
     """Lowercase and normalize unicode."""
@@ -67,28 +81,26 @@ def _determine_vowel_length(vowel: str, word: str, pos: int) -> str:
     """Determine Swedish vowel length based on syllable structure.
     
     Swedish vowel length rules:
-    1. Monosyllabic words: vowel is long (hej -> heːj, bil -> biːl)
-    2. Before geminates: vowel is short (kött -> kœt, vill -> vɪl) 
-    3. Before consonant clusters: vowel is short (hjälp -> jɛlp)
-    4. CV.CV pattern: first vowel long, second short (mata -> mɑːta)
-    5. Retroflexes count as single consonants (barn -> bɑːɳ)
+    1. Before SINGLE consonant (open syllable) = LONG
+    2. Before consonant CLUSTER or double consonant = SHORT  
+    3. BUT: retroflex combinations (rn, rd, rt, rl, rs) count as ONE consonant!
+    4. ng always blocks vowel length (u before ng = short [ɵ])
+    5. Exception: closed syllables like "hej" = short vowel
     """
-    # Count syllables in word (approximate)
-    syllable_count = len([ch for ch in word if ch in _VOWELS])
-    
     # Get consonants after this vowel
     after_vowel = word[pos + 1:]
     
-    # If monosyllabic and no geminates, vowel is long
-    if syllable_count == 1:
-        # Check for geminates that force short vowel
-        if any(after_vowel[i:i+2] in [cc*2 for cc in _CONSONANTS] + ["ck"] 
-               for i in range(len(after_vowel)-1)):
-            return _vowel_short_form(vowel)
-        else:
-            return _vowel_long_form(vowel)
+    if not after_vowel:
+        # Word-final vowel: typically long in open syllables
+        return _vowel_long_form(vowel)
     
-    # For polysyllabic words, analyze consonant structure
+    # Check for immediate double consonants or ck (forces short)
+    if len(after_vowel) >= 2:
+        first_two = after_vowel[:2]
+        if first_two == "ck" or (first_two[0] == first_two[1] and first_two[0] in _CONSONANTS):
+            return _vowel_short_form(vowel)
+    
+    # Analyze consonant structure to determine length
     consonant_sounds = 0
     next_vowel_found = False
     i = 0
@@ -101,7 +113,7 @@ def _determine_vowel_length(vowel: str, word: str, pos: int) -> str:
         if ch not in _CONSONANTS:
             break
             
-        # Multi-character consonants
+        # Multi-character consonants (longest first)
         if i + 2 < len(after_vowel):
             trigraph = after_vowel[i:i+3]
             if trigraph in ("skj", "stj", "sch"):
@@ -112,31 +124,40 @@ def _determine_vowel_length(vowel: str, word: str, pos: int) -> str:
         if i + 1 < len(after_vowel):
             digraph = after_vowel[i:i+2]
             
-            # Retroflexes = single sounds
+            # ng always makes preceding vowel short (special rule)
+            if digraph == "ng":
+                return _vowel_short_form(vowel)
+            
+            # Retroflexes count as SINGLE sounds for vowel length
             if digraph in ("rn", "rd", "rt", "rs", "rl"):
                 consonant_sounds += 1
                 i += 2
                 continue
             
             # Other single-sound digraphs
-            elif digraph in ("sj", "tj", "kj", "ng", "ch"):
+            elif digraph in ("sj", "tj", "kj", "ch", "ck"):
                 consonant_sounds += 1
                 i += 2
                 continue
-            
-            # Geminates force short vowel
-            elif (digraph[0] == digraph[1] and digraph[0] in _CONSONANTS) or digraph == "ck":
-                return _vowel_short_form(vowel)
         
         # Single consonant
         consonant_sounds += 1
         i += 1
     
-    # Apply CV.CV rule: single consonant + vowel = long, otherwise short
-    if consonant_sounds == 1 and next_vowel_found:
-        return _vowel_long_form(vowel)  # CV.CV pattern
+    # Special case: closed syllables without following vowel
+    # But NOT when the consonant is a single retroflex (counts as one sound)
+    if not next_vowel_found:
+        # Exception: if the consonant after vowel is a single retroflex, still make vowel long
+        if consonant_sounds == 1 and len(after_vowel) >= 2 and after_vowel[:2] in ("rn", "rd", "rt", "rs", "rl"):
+            return _vowel_long_form(vowel)
+        else:
+            return _vowel_short_form(vowel)
+    
+    # Main rule: single consonant before vowel = long, multiple = short
+    if consonant_sounds == 1:
+        return _vowel_long_form(vowel)
     else:
-        return _vowel_short_form(vowel)  # Consonant cluster or word-final
+        return _vowel_short_form(vowel)
 
 
 def _vowel_long_form(vowel: str) -> str:
@@ -157,8 +178,20 @@ def _vowel_short_form(vowel: str) -> str:
     return short_map.get(vowel, vowel)
 
 
-def _convert_word(word: str) -> list[str]:
+def _get_unstressed_vowel(vowel: str, context: str = "") -> str:
+    """Get unstressed/reduced form of Swedish vowel (for endings like -en, -er, -el)."""
+    # Unstressed 'e' in common endings becomes schwa-like [ɛ] or [e]
+    if vowel == "e" and context in ("en", "er", "el", "et"):
+        return "e"  # Reduced, not full [ɛ]
+    return _vowel_short_form(vowel)
+
+
+def _convert_word(word: str) -> List[str]:
     """Convert Swedish word to phonemes."""
+    # Check exception words first
+    if word in _EXCEPTION_WORDS:
+        return _EXCEPTION_WORDS[word].copy()
+    
     phonemes = []
     n = len(word)
     i = 0
@@ -243,7 +276,11 @@ def _convert_word(word: str) -> list[str]:
         
         # Vowels with length determination
         if ch in _VOWELS:
-            vowel_phoneme = _determine_vowel_length(ch, word, i)
+            # Check if this is an unstressed ending
+            if i >= n - 2 and word[i:] in ("en", "er", "el", "et"):
+                vowel_phoneme = _get_unstressed_vowel(ch, word[i:])
+            else:
+                vowel_phoneme = _determine_vowel_length(ch, word, i)
             phonemes.append(vowel_phoneme)
             i += 1
             continue
@@ -339,7 +376,7 @@ def phonemize_swedish_with_prosody(text: str) -> Tuple[List[str], List[Optional[
     text = _normalize(text)
     tokens = _RE_TOKEN.findall(text)
     
-    phonemes: list[str] = []
+    phonemes: List[str] = []
     prosody_list: List[Optional[ProsodyInfo]] = []
     need_space = False
     
@@ -401,7 +438,7 @@ def phonemize_swedish_with_prosody(text: str) -> Tuple[List[str], List[Optional[
     return mapped_phonemes, prosody_list
 
 
-def phonemize_swedish(text: str) -> list[str]:
+def phonemize_swedish(text: str) -> List[str]:
     """Convert Swedish text to phoneme list (without prosody).""" 
     phonemes, _ = phonemize_swedish_with_prosody(text)
     return phonemes
@@ -410,7 +447,7 @@ def phonemize_swedish(text: str) -> list[str]:
 class SwedishPhonemizer(Phonemizer):
     """Rule-based Swedish phonemizer."""
     
-    def phonemize(self, text: str) -> list[str]:
+    def phonemize(self, text: str) -> List[str]:
         return phonemize_swedish(text)
     
     def phonemize_with_prosody(self, text: str) -> Tuple[List[str], List[Optional[ProsodyInfo]]]:
@@ -419,3 +456,4 @@ class SwedishPhonemizer(Phonemizer):
     def get_phoneme_id_map(self) -> Optional[Dict[str, List[int]]]:
         # Returns None for multilingual use
         return None
+
