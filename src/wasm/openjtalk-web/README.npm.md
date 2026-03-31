@@ -7,7 +7,7 @@ Browser-based multilingual neural TTS powered by VITS. No server required.
 
 ## Features
 
-- **6 languages** -- Japanese, English, Chinese, Spanish, French, and Portuguese
+- **7 languages** -- Japanese, English, Chinese, Spanish, French, Portuguese, and Swedish
 - **Runs entirely in the browser** -- WebAssembly + ONNX Runtime Web, no backend needed
 - **No server or API key required** -- all processing happens client-side
 - **Streaming synthesis** -- sentence-by-sentence generation with chunk callbacks
@@ -125,7 +125,7 @@ Synthesize speech from text.
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `language` | `string` | auto-detect | `'ja'` \| `'en'` \| `'zh'` \| `'es'` \| `'fr'` \| `'pt'` |
+| `language` | `string` | auto-detect | `'ja'` \| `'en'` \| `'zh'` \| `'es'` \| `'fr'` \| `'pt'` \| `'sv'` |
 | `noiseScale` | `number` | `0.667` | Controls voice variation. |
 | `lengthScale` | `number` | `1.0` | Controls speech speed (lower = faster). |
 | `noiseW` | `number` | `0.8` | Controls phoneme duration variation. |
@@ -228,8 +228,9 @@ The config file is expected at `<model-url>.json` (e.g. `model.onnx.json`).
 | Spanish | `es` | Character-based mapping | Maps characters through the model's phoneme_id_map |
 | French | `fr` | Character-based mapping | Maps characters through the model's phoneme_id_map |
 | Portuguese | `pt` | Character-based mapping | Maps characters through the model's phoneme_id_map |
+| Swedish | `sv` | Character-based mapping | Maps characters through the model's phoneme_id_map |
 
-Language auto-detection works reliably for Japanese (Kana characters) and Chinese (CJK without Kana). For Spanish, French, and Portuguese, specify the language explicitly since their Latin-script characters cannot be distinguished from English.
+Language auto-detection works reliably for Japanese (Kana characters) and Chinese (CJK without Kana). For Spanish, French, Portuguese, and Swedish, specify the language explicitly since their Latin-script characters cannot be distinguished from English.
 
 ## Browser Compatibility
 

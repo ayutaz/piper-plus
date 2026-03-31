@@ -12,7 +12,7 @@ license: mit
 
 # piper-plus Demo
 
-A web-based demo for [piper-plus](https://github.com/ayutaz/piper-plus), featuring high-quality text-to-speech synthesis supporting 6 languages: Japanese, English, Chinese, Spanish, French, and Portuguese.
+A web-based demo for [piper-plus](https://github.com/ayutaz/piper-plus), featuring high-quality text-to-speech synthesis. The code supports 7 languages (Japanese, English, Chinese, Spanish, French, Portuguese, Swedish); the current demo model covers 6 languages (Swedish model not yet trained).
 
 ## Features
 

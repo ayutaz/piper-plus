@@ -34,7 +34,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Note: eSpeak-ng and piper-phonemize are NO LONGER needed.
-# piper-plus uses self-contained G2P for all 6 languages (JA/EN/ZH/ES/FR/PT).
+# piper-plus uses self-contained G2P for all 7 languages (JA/EN/ZH/ES/FR/PT/SV).
 
 # Install ONNX Runtime (CPU, Linux x64)
 RUN wget -q https://github.com/microsoft/onnxruntime/releases/download/v1.14.1/onnxruntime-linux-x64-1.14.1.tgz && \

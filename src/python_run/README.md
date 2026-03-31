@@ -5,13 +5,13 @@
 [![Python](https://img.shields.io/pypi/pyversions/piper-plus)](https://pypi.org/project/piper-plus/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-高速・高品質なニューラルテキスト音声合成 (TTS) システム。[VITS](https://github.com/jaywalnut310/vits/) アーキテクチャを採用し、6言語マルチスピーカー音声合成に対応。[Piper](https://github.com/rhasspy/piper) のフォークで、日本語対応・音質向上・学習機能を大幅に強化しています。
+高速・高品質なニューラルテキスト音声合成 (TTS) システム。[VITS](https://github.com/jaywalnut310/vits/) アーキテクチャを採用し、7言語マルチスピーカー音声合成に対応。[Piper](https://github.com/rhasspy/piper) のフォークで、日本語対応・音質向上・学習機能を大幅に強化しています。
 
 **[Hugging Face デモ](https://huggingface.co/spaces/ayousanz/piper-plus-demo)** | **[WebAssembly デモ](https://ayutaz.github.io/piper-plus/)** | **[GitHub](https://github.com/ayutaz/piper-plus)**
 
 ## 主要機能
 
-- **6言語対応** — 日本語・英語・中国語・スペイン語・フランス語・ポルトガル語
+- **7言語対応** — 日本語・英語・中国語・スペイン語・フランス語・ポルトガル語・スウェーデン語
 - **日本語 TTS** — OpenJTalk統合、韻律情報 (A1/A2/A3)、文脈依存音素バリアント
 - **英語 TTS** — GPL-free G2P ([g2p-en](https://github.com/Kyubyong/g2p), Apache-2.0)、espeak-ng 不要
 - **マルチスピーカー** — ベースモデル571話者、言語グループ均等サンプリング
