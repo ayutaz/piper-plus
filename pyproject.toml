@@ -80,7 +80,7 @@ train = [
 ]
 
 dev = [
-    "black==23.11.0",
+    "black>=26.3.1",
     "flake8==6.1.0",
     "mypy==1.7.1",
     "pylint==3.0.2",
@@ -135,6 +135,7 @@ dev-dependencies = [
     "ruff==0.12.5",
     "pytest==7.4.3",
     "pytest-timeout>=2.2.0",
+    "black>=26.3.1",
 ]
 
 [tool.ruff]
