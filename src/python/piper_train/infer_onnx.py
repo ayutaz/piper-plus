@@ -185,8 +185,8 @@ def main():
     parser.add_argument(
         "--language",
         default="ja",
-        help="Language for --text mode. Single (ja, en, zh, ko, es, pt, fr) "
-        "or multilingual combo (ja-en, ja-en-zh-ko, etc.) (default: ja)",
+        help="Language for --text mode. Single (ja, en, zh, ko, es, pt, fr, sv) "
+        "or multilingual combo (ja-en, ja-en-zh-ko-sv, etc.) (default: ja)",
     )
     parser.add_argument(
         "--speaker-id",
