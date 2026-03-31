@@ -11,15 +11,21 @@ type LangSegment struct {
 	Text     string
 }
 
-// svChars contains Swedish-specific characters not used by EN/ES/PT/FR.
-// Used for word-level Swedish detection within Latin segments.
-var svChars = map[rune]bool{
+// svUniqueChars contains characters uniquely Swedish (not shared with German).
+// å (U+00E5/U+00C5) is distinctive to Swedish among Latin-script languages.
+var svUniqueChars = map[rune]bool{
+	'\u00e5': true, // å
+	'\u00c5': true, // Å
+}
+
+// svSharedChars contains characters shared between Swedish and German.
+// ä (U+00E4/U+00C4) and ö (U+00F6/U+00D6) appear in both languages,
+// so they carry lower weight for Swedish detection.
+var svSharedChars = map[rune]bool{
 	'\u00e4': true, // ä
 	'\u00f6': true, // ö
 	'\u00c4': true, // Ä
 	'\u00d6': true, // Ö
-	'\u00e5': true, // å
-	'\u00c5': true, // Å
 }
 
 // svDetectFunctionWords contains highly distinctive Swedish function words
@@ -250,9 +256,18 @@ func SegmentText(text string, detector *UnicodeLanguageDetector) []LangSegment {
 }
 
 // refineLatinSegmentsForSwedish re-examines Latin-script segments for
-// Swedish indicators (specific characters and function words). If any
-// indicator is found (svScore >= 1), the segment is reclassified as "sv".
-// This matches the Python _refine_latin_segments_for_swedish function.
+// Swedish indicators (specific characters and function words). Segments
+// are reclassified as "sv" when a strong indicator is found.
+//
+// Strong indicators (sufficient to trigger SV classification):
+//   - å/Å (uniquely Swedish among Latin-script languages)
+//   - Swedish function words (och, att, jag, det, inte, ...)
+//
+// Weak indicators (NOT sufficient alone):
+//   - ä/Ä, ö/Ö (shared with German)
+//
+// This prevents false positives on German text that contains ä/ö but
+// no Swedish-specific indicators.
 func refineLatinSegmentsForSwedish(segments []LangSegment, d *UnicodeLanguageDetector) []LangSegment {
 	if d.defaultLatinLanguage == "sv" {
 		return segments // SV is already the default; no reclassification needed.
@@ -264,27 +279,29 @@ func refineLatinSegmentsForSwedish(segments []LangSegment, d *UnicodeLanguageDet
 			continue
 		}
 		// Score Swedish indicators in this Latin segment.
-		svScore := 0
+		// A "strong" indicator (å or function word) is required for SV
+		// classification. ä/ö alone (shared with German) are not sufficient.
+		hasStrongIndicator := false
 		for _, word := range strings.Fields(seg.Text) {
 			wordLower := strings.ToLower(strings.Trim(word, ".,;:!?"))
 			if wordLower == "" {
 				continue
 			}
-			// Check for Swedish-specific characters (ä/ö/å).
-			hasSvChar := false
+			// Function words are a strong Swedish signal.
+			if svDetectFunctionWords[wordLower] {
+				hasStrongIndicator = true
+				continue
+			}
+			// å/Å is uniquely Swedish among Latin-script languages.
+			// ä/ö are shared with German, so they alone cannot trigger SV.
 			for _, r := range wordLower {
-				if svChars[r] {
-					hasSvChar = true
+				if svUniqueChars[r] {
+					hasStrongIndicator = true
 					break
 				}
 			}
-			if hasSvChar {
-				svScore++
-			} else if svDetectFunctionWords[wordLower] {
-				svScore++
-			}
 		}
-		if svScore >= 1 {
+		if hasStrongIndicator {
 			result = append(result, LangSegment{Language: "sv", Text: seg.Text})
 		} else {
 			result = append(result, seg)

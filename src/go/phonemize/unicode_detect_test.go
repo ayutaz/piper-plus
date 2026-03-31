@@ -603,3 +603,49 @@ func TestSegmentText_SwedishAring(t *testing.T) {
 		t.Errorf("expected language sv, got %q", segs[0].Language)
 	}
 }
+
+// ---------------------------------------------------------------------------
+// German false-positive prevention tests
+// ---------------------------------------------------------------------------
+// ä/ö are shared between Swedish and German. When SV is in the language set,
+// text containing only ä/ö (without å or Swedish function words) should NOT
+// be misclassified as Swedish.
+
+// T11: "Äpfel und Größe" — ä/ö present but no Swedish-unique indicators.
+func TestSegmentText_GermanNotMisdetectedAsSV_Apfel(t *testing.T) {
+	d := NewUnicodeLanguageDetector([]string{"en", "sv"}, "en")
+	segs := SegmentText("\u00c4pfel und Gr\u00f6\u00dfe", d) // Äpfel und Größe
+	if len(segs) != 1 {
+		t.Fatalf("expected 1 segment, got %d: %+v", len(segs), segs)
+	}
+	if segs[0].Language == "sv" {
+		t.Errorf("German text %q should NOT be detected as sv, got %q",
+			segs[0].Text, segs[0].Language)
+	}
+}
+
+// T12: "schöne Blumen" — ö present but German text.
+func TestSegmentText_GermanNotMisdetectedAsSV_Schone(t *testing.T) {
+	d := NewUnicodeLanguageDetector([]string{"en", "sv"}, "en")
+	segs := SegmentText("sch\u00f6ne Blumen", d) // schöne Blumen
+	if len(segs) != 1 {
+		t.Fatalf("expected 1 segment, got %d: %+v", len(segs), segs)
+	}
+	if segs[0].Language == "sv" {
+		t.Errorf("German text %q should NOT be detected as sv, got %q",
+			segs[0].Text, segs[0].Language)
+	}
+}
+
+// T13: "Das ist gut" — no SV indicators at all.
+func TestSegmentText_GermanNotMisdetectedAsSV_DasIstGut(t *testing.T) {
+	d := NewUnicodeLanguageDetector([]string{"en", "sv"}, "en")
+	segs := SegmentText("Das ist gut", d)
+	if len(segs) != 1 {
+		t.Fatalf("expected 1 segment, got %d: %+v", len(segs), segs)
+	}
+	if segs[0].Language == "sv" {
+		t.Errorf("German text %q should NOT be detected as sv, got %q",
+			segs[0].Text, segs[0].Language)
+	}
+}

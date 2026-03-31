@@ -923,3 +923,77 @@ func TestSvIntegration(t *testing.T) {
 		}
 	})
 }
+
+// ===========================================================================
+// Edge Case Tests
+// ===========================================================================
+
+func TestSvEdgeCaseEmptyString(t *testing.T) {
+	p := NewSwedishPhonemizer()
+	r, err := p.PhonemizeWithProsody("")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(r.Tokens) != 0 {
+		t.Errorf("empty input: expected 0 tokens, got %d: %v", len(r.Tokens), r.Tokens)
+	}
+	if len(r.Prosody) != 0 {
+		t.Errorf("empty input: expected 0 prosody, got %d", len(r.Prosody))
+	}
+}
+
+func TestSvEdgeCaseWhitespaceOnly(t *testing.T) {
+	p := NewSwedishPhonemizer()
+	r, err := p.PhonemizeWithProsody("   ")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(r.Tokens) != 0 {
+		t.Errorf("whitespace-only input: expected 0 tokens, got %d: %v", len(r.Tokens), r.Tokens)
+	}
+	if len(r.Prosody) != 0 {
+		t.Errorf("whitespace-only input: expected 0 prosody, got %d", len(r.Prosody))
+	}
+}
+
+func TestSvEdgeCaseSinglePunctuation(t *testing.T) {
+	p := NewSwedishPhonemizer()
+	r, err := p.PhonemizeWithProsody("?")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// Should produce a punctuation token
+	joined := strings.Join(r.Tokens, "")
+	if !strings.Contains(joined, "?") {
+		t.Errorf("single '?' input: expected '?' in tokens, got %v", r.Tokens)
+	}
+	if r.EOSToken != "?" {
+		t.Errorf("single '?' input: expected EOS='?', got %q", r.EOSToken)
+	}
+}
+
+func TestSvEdgeCaseUnicodeCombiningChar(t *testing.T) {
+	// e + combining acute accent (U+0301) should be NFC-normalized to é (U+00E9).
+	// The phonemizer applies NFC normalization via svNormalize, so the combining
+	// form should be treated identically to the precomposed form.
+	p := NewSwedishPhonemizer()
+	// e\u0301 = e + combining acute accent -> NFC: é
+	combiningInput := "e\u0301"
+	precomposedInput := "\u00e9"
+
+	r1, err1 := p.PhonemizeWithProsody(combiningInput)
+	if err1 != nil {
+		t.Fatalf("unexpected error for combining input: %v", err1)
+	}
+	r2, err2 := p.PhonemizeWithProsody(precomposedInput)
+	if err2 != nil {
+		t.Fatalf("unexpected error for precomposed input: %v", err2)
+	}
+
+	joined1 := strings.Join(r1.Tokens, "")
+	joined2 := strings.Join(r2.Tokens, "")
+	if joined1 != joined2 {
+		t.Errorf("NFC normalization: combining %q -> %q, precomposed %q -> %q (should match)",
+			combiningInput, joined1, precomposedInput, joined2)
+	}
+}

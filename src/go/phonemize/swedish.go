@@ -662,17 +662,12 @@ func svConvertConsonant(runes []rune, pos int, fullWord string) ([]string, int) 
 
 		// sk + context
 		if di == "sk" {
-			if remaining >= 3 && svFrontVowels[runes[pos+2]] {
-				// sk + front vowel → /ɧ/ unless SK_BACK_VOWEL_EXCEPTIONS
-				if !svSKBackVowelExceptions[fullWord] {
-					return []string{"\u0267"}, 2 // ɧ
-				}
-			}
-			// sk + back vowel / consonant / word-final → /sk/
-			// but check back-vowel exceptions
-			if svSKBackVowelExceptions[fullWord] {
+			// sk + front vowel → /ɧ/ (sj-sound)
+			// Exception: SK_BACK_VOWEL_EXCEPTIONS
+			if remaining >= 3 && svFrontVowels[runes[pos+2]] && !svSKBackVowelExceptions[fullWord] {
 				return []string{"\u0267"}, 2 // ɧ
 			}
+			// sk + back vowel / consonant / word-final → /sk/
 			return []string{"s", "k"}, 2
 		}
 
