@@ -459,7 +459,7 @@ func TestKoLanguageCode(t *testing.T) {
 	}
 }
 
-func TestKoProsodyAllZero(t *testing.T) {
+func TestKoProsody_SingleSyllable(t *testing.T) {
 	p := NewKoreanPhonemizer()
 	result, err := p.PhonemizeWithProsody("가")
 	if err != nil {
@@ -471,13 +471,58 @@ func TestKoProsodyAllZero(t *testing.T) {
 	if len(result.Tokens) != len(result.Prosody) {
 		t.Fatalf("tokens len (%d) != prosody len (%d)", len(result.Tokens), len(result.Prosody))
 	}
+	// 가 is a single Hangul syllable word -> A3=1
 	for i, pi := range result.Prosody {
 		if pi == nil {
 			t.Errorf("prosody[%d] is nil, want non-nil", i)
 			continue
 		}
-		if pi.A1 != 0 || pi.A2 != 0 || pi.A3 != 0 {
-			t.Errorf("prosody[%d] = (%d,%d,%d), want (0,0,0)", i, pi.A1, pi.A2, pi.A3)
+		if pi.A1 != 0 || pi.A2 != 0 || pi.A3 != 1 {
+			t.Errorf("prosody[%d] = (%d,%d,%d), want (0,0,1)", i, pi.A1, pi.A2, pi.A3)
+		}
+	}
+}
+
+func TestKoProsody_MultiSyllableWord(t *testing.T) {
+	p := NewKoreanPhonemizer()
+	// 한글 = 2 Hangul syllables -> all phoneme tokens should have A3=2
+	result, err := p.PhonemizeWithProsody("한글")
+	if err != nil {
+		t.Fatalf("PhonemizeWithProsody error: %v", err)
+	}
+	for i, pi := range result.Prosody {
+		if pi == nil {
+			t.Errorf("prosody[%d] is nil, want non-nil", i)
+			continue
+		}
+		if pi.A3 != 2 {
+			t.Errorf("prosody[%d].A3 = %d, want 2", i, pi.A3)
+		}
+	}
+}
+
+func TestKoProsody_SpaceSeparatedWords(t *testing.T) {
+	p := NewKoreanPhonemizer()
+	// 가 나 = two 1-syllable words with a space between
+	result, err := p.PhonemizeWithProsody("가 나")
+	if err != nil {
+		t.Fatalf("PhonemizeWithProsody error: %v", err)
+	}
+	// Expect: tokens for 가 (A3=1), space (A3=0), tokens for 나 (A3=1)
+	for i, pi := range result.Prosody {
+		if pi == nil {
+			t.Errorf("prosody[%d] is nil, want non-nil", i)
+			continue
+		}
+		tok := result.Tokens[i]
+		if tok == " " {
+			if pi.A3 != 0 {
+				t.Errorf("space prosody[%d].A3 = %d, want 0", i, pi.A3)
+			}
+		} else {
+			if pi.A3 != 1 {
+				t.Errorf("prosody[%d].A3 = %d, want 1 (token=%q)", i, pi.A3, tok)
+			}
 		}
 	}
 }

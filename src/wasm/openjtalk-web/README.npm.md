@@ -228,7 +228,7 @@ The config file is expected at `<model-url>.json` (e.g. `model.onnx.json`).
 | Spanish | `es` | Character-based mapping | Maps characters through the model's phoneme_id_map |
 | French | `fr` | Character-based mapping | Maps characters through the model's phoneme_id_map |
 | Portuguese | `pt` | Character-based mapping | Maps characters through the model's phoneme_id_map |
-| Korean | `ko` | Character-based mapping | Maps characters through the model's phoneme_id_map |
+| Korean | `ko` | Hangul decomposition + mapping | Decomposes Hangul syllables to Jamo, then maps via the model's phoneme_id_map |
 | Swedish | `sv` | Character-based mapping | Maps characters through the model's phoneme_id_map |
 
 Language auto-detection works reliably for Japanese (Kana characters), Chinese (CJK without Kana), and Korean (Hangul characters). For Spanish, French, Portuguese, and Swedish, specify the language explicitly since their Latin-script characters cannot be distinguished from English.

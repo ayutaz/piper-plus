@@ -8,7 +8,7 @@ import "strings"
 // into jamo (initial, medial, final) and mapping each to IPA tokens.
 // Basic liaison (연음화) is applied as the only phonological rule.
 //
-// Prosody values are fixed at A1=0, A2=0, A3=0 for Korean.
+// Prosody values: A1=0, A2=0, A3=number of Hangul syllables in the current word.
 type KoreanPhonemizer struct{}
 
 // NewKoreanPhonemizer returns a new KoreanPhonemizer.
@@ -21,12 +21,16 @@ func (p *KoreanPhonemizer) LanguageCode() string { return "ko" }
 
 // PhonemizeWithProsody converts Korean text to phoneme tokens with prosody.
 func (p *KoreanPhonemizer) PhonemizeWithProsody(text string) (*PhonemizeResult, error) {
-	tokens, eos := koProcess(text)
+	tokens, a3Values, eos := koProcessWithA3(text)
 	mapped := MapSequence(tokens)
 
 	prosody := make([]*ProsodyInfo, len(mapped))
 	for i := range mapped {
-		prosody[i] = &ProsodyInfo{A1: 0, A2: 0, A3: 0}
+		a3 := 0
+		if i < len(a3Values) {
+			a3 = a3Values[i]
+		}
+		prosody[i] = &ProsodyInfo{A1: 0, A2: 0, A3: a3}
 	}
 
 	return &PhonemizeResult{Tokens: mapped, Prosody: prosody, EOSToken: eos}, nil
@@ -326,6 +330,106 @@ func koProcessHangulRun(cps []rune, out *[]string) {
 // ---------------------------------------------------------------------------
 // Core processing
 // ---------------------------------------------------------------------------
+
+// koCountHangulSyllables counts the number of Hangul syllable characters in a slice of runes.
+func koCountHangulSyllables(cps []rune) int {
+	count := 0
+	for _, ch := range cps {
+		if koIsHangulSyllable(ch) {
+			count++
+		}
+	}
+	return count
+}
+
+// koProcessWithA3 is like koProcess but also returns per-token A3 values.
+// A3 is the number of Hangul syllables in the word that produced each token.
+// Space tokens get A3=0; Latin tokens get A3=1 (max(0,1) like Python).
+func koProcessWithA3(text string) (tokens []string, a3Values []int, eos string) {
+	cps := []rune(strings.ToLower(text))
+	if len(cps) == 0 {
+		return nil, nil, "$"
+	}
+
+	// Recompose NFD Hangul jamo sequences into NFC precomposed syllables
+	cps = koComposeHangulJamo(cps)
+
+	eos = "$"
+	needSpace := false
+	n := len(cps)
+	i := 0
+
+	for i < n {
+		ch := cps[i]
+
+		// Whitespace -> mark word boundary
+		if ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r' {
+			needSpace = true
+			i++
+			continue
+		}
+
+		// Punctuation -> emit directly
+		if koPunctuation[ch] {
+			s := string(ch)
+			tokens = append(tokens, s)
+			a3Values = append(a3Values, 0)
+			switch ch {
+			case '?', '\uFF1F':
+				eos = "?"
+			case '!', '\uFF01':
+				eos = "!"
+			}
+			needSpace = false
+			i++
+			continue
+		}
+
+		// Hangul syllable run
+		if koIsHangulSyllable(ch) {
+			if needSpace && len(tokens) > 0 {
+				tokens = append(tokens, " ")
+				a3Values = append(a3Values, 0)
+			}
+
+			// Find the extent of the Hangul run
+			runStart := i
+			for i < n && koIsHangulSyllable(cps[i]) {
+				i++
+			}
+			syllableCount := koCountHangulSyllables(cps[runStart:i])
+			if syllableCount < 1 {
+				syllableCount = 1
+			}
+			tokensBefore := len(tokens)
+			koProcessHangulRun(cps[runStart:i], &tokens)
+			tokensAdded := len(tokens) - tokensBefore
+			for j := 0; j < tokensAdded; j++ {
+				a3Values = append(a3Values, syllableCount)
+			}
+			needSpace = true
+			continue
+		}
+
+		// Latin alphabetic -> pass through lowercase
+		if ch >= 'a' && ch <= 'z' {
+			if needSpace && len(tokens) > 0 {
+				tokens = append(tokens, " ")
+				a3Values = append(a3Values, 0)
+			}
+			tokens = append(tokens, string(ch))
+			a3Values = append(a3Values, 1)
+			needSpace = true
+			i++
+			continue
+		}
+
+		// Unknown character -> skip
+		i++
+	}
+
+	return tokens, a3Values, eos
+}
 
 func koProcess(text string) (tokens []string, eos string) {
 	cps := []rune(strings.ToLower(text))

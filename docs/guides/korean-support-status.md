@@ -1,8 +1,9 @@
 # 韓国語 (ko) 対応状況
 
 > **作成日:** 2026-03-31
+> **更新日:** 2026-04-01
 > **ブランチ:** `feat/korean-support`
-> **目的:** 韓国語対応の実装済み/未対応箇所を整理し、追加作業を明確化する
+> **ステータス:** 全プラットフォーム実装済み
 
 ---
 
@@ -13,10 +14,10 @@
 | **Python** | ✅ | ✅ | ✅ | ✅ 27件 | **完了** |
 | **Rust** | ✅ | ✅ | ✅ | ✅ 35件 | **完了** |
 | **C++** | ✅ | — | ✅ | — | **完了** |
-| **C#** | ❌ | ✅ | ✅ | ❌ | **要実装** |
-| **Go** | ❌ | ✅ | — | ❌ | **要実装** |
-| **npm/WASM** | ❌ | ❌ | — | ❌ | **要実装** |
-| **CI/ドキュメント** | — | — | — | — | **要更新** |
+| **C#** | ✅ | ✅ | ✅ | ✅ | **完了** |
+| **Go** | ✅ | ✅ | ✅ | ✅ | **完了** |
+| **npm/WASM** | ✅ | ✅ | ✅ | ✅ | **完了** |
+| **CI/ドキュメント** | — | — | — | — | **更新済み** |
 
 ---
 
@@ -62,109 +63,42 @@
 
 ---
 
-## 2. 未対応: C# 実装
-
-### 2.1 既に準備済み (変更不要)
+## 2. 実装済み: C#
 
 | ファイル | 内容 |
 |---------|------|
-| `UnicodeLanguageDetector.cs` | `IsHangul()` + `_hasKo` — Hangul検出完全実装 |
-| `OpenJTalkToPiperMapping.cs` | PUA: U+E04B-E052 (8エントリ) 登録済み |
-| `MultilingualPhonemizer.cs` | 汎用的 — phonemizerが登録されれば自動対応 |
-| `UnicodeLanguageDetectorTests.cs` | `Hangul_DetectsKorean()`, `HangulJamo_Detected()` テスト済み |
-
-### 2.2 新規作成が必要
-
-| ファイル | 内容 | 参考 |
-|---------|------|------|
-| `PiperPlus.Core/Phonemize/IKoreanG2PEngine.cs` | G2Pエンジンインターフェース | `ISpanishG2PEngine.cs` |
-| `PiperPlus.Core/Phonemize/KoreanG2PEngine.cs` | Hangul分解 + IPA変換エンジン | `SpanishG2PEngine.cs` |
-| `PiperPlus.Core/Phonemize/KoreanPhonemizer.cs` | `IPhonemizer` 実装 | `SpanishPhonemizer.cs` |
-| `PiperPlus.Core.Tests/KoreanPhonemizerTests.cs` | xUnitテスト (40+件想定) | `SpanishPhonemizerTests.cs` |
-
-### 2.3 既存ファイルの修正が必要
-
-| ファイル | 修正内容 |
-|---------|---------|
-| `PiperPlus.Cli/Program.cs` | `ResolveTextModePhonemizer()` に `case "ko":` 追加 |
-| `PiperPlus.Cli/Program.cs` | `--language` ヘルプテキストに `ko` 追加 |
+| `PiperPlus.Core/Phonemize/KoreanPhonemizer.cs` | `IPhonemizer` 実装 |
+| `PiperPlus.Core/Phonemize/KoreanG2PEngine.cs` | Hangul分解 + IPA変換エンジン |
+| `PiperPlus.Core/Phonemize/IKoreanG2PEngine.cs` | G2Pエンジンインターフェース |
+| `PiperPlus.Core.Tests/KoreanPhonemizerTests.cs` | xUnitテスト |
+| `PiperPlus.Cli/Program.cs` | `case "ko":` 統合済み |
 
 ---
 
-## 3. 未対応: Go 実装
-
-### 3.1 既に準備済み (変更不要)
+## 3. 実装済み: Go
 
 | ファイル | 内容 |
 |---------|------|
-| `phonemize/unicode_detect.go` | `hasKO` + Hangul検出 (AC00-D7AF, 1100-11FF, 3130-318F) |
-| `phonemize/unicode_detect_test.go` | Hangul検出テスト (境界値, 未登録時) 9件 |
-| `phonemize/phonemizer.go` | `Phonemizer` インターフェース (言語中立) |
-
-### 3.2 新規作成が必要
-
-| ファイル | 内容 | 参考 |
-|---------|------|------|
-| `phonemize/korean.go` | `KoreanPhonemizer` — Hangul分解 + IPA変換 (推定250-400行) | `spanish.go` |
-| `phonemize/korean_test.go` | ユニットテスト (30+件想定) | `spanish_test.go` |
-
-### 3.3 既存ファイルの修正が必要
-
-| ファイル | 修正内容 |
-|---------|---------|
-| `piperplus/synthesize.go` | `phonemizerForLanguage()` に `case "ko":` 追加 |
-| `cmd/piper-plus/main.go` | `--language` ヘルプテキストに `ko` 追加 |
-| `phonemize/phonemizer.go` | `ProsodyInfo` コメントに ko の A1/A2/A3 仕様追加 |
+| `phonemize/korean.go` | `KoreanPhonemizer` -- Hangul分解 + IPA変換 + liaison |
+| `phonemize/korean_test.go` | ユニットテスト |
+| `piperplus/synthesize.go` | `case "ko":` 統合済み |
 
 ---
 
-## 4. 未対応: npm/WASM 実装
+## 4. 実装済み: npm/WASM
 
-### 4.1 既に準備済み
-
-なし — 韓国語関連コードは一切含まれていない。
-
-### 4.2 既存ファイルの修正が必要
-
-| ファイル | 修正内容 |
-|---------|---------|
-| `types/index.d.ts` | `Language` 型に `'ko'` 追加 |
-| `src/simple_unified_api.js` | `_classifyChar()` に Hangul範囲追加 |
-| `src/simple_unified_api.js` | `textToPhonemes()` に `ko` ケース追加 |
-| `src/simple_unified_api.js` | `phonemizeKorean()` メソッド新規追加 |
-| `src/index.js` | `_textToPhonemeIds()` の言語リストに `ko` 追加 |
-| `src/index.js` | JSDoc の言語リスト更新 |
-| `package.json` | description + keywords に Korean 追加 |
-
-### 4.3 新規作成が必要
-
-| ファイル | 内容 | 参考 |
-|---------|------|------|
-| `test/js/test-korean.js` | 言語検出 + 音素化テスト (30+件想定) | `test-swedish.js` |
+| ファイル | 内容 |
+|---------|------|
+| `src/simple_unified_api.js` | `phonemizeKorean()` -- Hangul Jamo 分解 |
+| `src/index.js` | direct-ID 言語リストに `ko` 追加済み |
+| `types/index.d.ts` | `Language` 型に `'ko'` 追加済み |
+| `test/js/test-korean.js` | 言語検出 + 音素化テスト |
 
 ---
 
-## 5. 未対応: CI/ドキュメント更新
+## 5. ドキュメント/CI (更新済み)
 
-### 5.1 ドキュメント
-
-| ファイル | 修正内容 |
-|---------|---------|
-| `README.md` | 「7言語」→「8言語」、言語リストに韓国語追加 |
-| `README_EN.md` | 同上 (英語版) |
-| `README_ZH.md` | 同上 (中国語版) |
-| `README_FR.md` | 同上 (フランス語版) |
-| `src/wasm/openjtalk-web/README.npm.md` | 言語数・Language型・テーブルに韓国語追加 |
-| `docs/guides/testing/multilingual-testing.md` | テスト対象言語に韓国語追加 |
-| `CLAUDE.md` | フォネマイザーテーブル + ファイルパスに韓国語追加 |
-
-### 5.2 CI ワークフロー
-
-| ファイル | 修正内容 |
-|---------|---------|
-| `.github/workflows/test-multilingual-tts.yml` | テスト対象言語リストに `ko` 追加 (モデル対応後) |
-
-> **注意:** Python/Rust/C#/Go の CI ワークフローは言語をコード内で定義しているため、ワークフロー自体の修正は不要。テストファイルが追加されれば自動実行される。
+README系 (全言語版)、CLAUDE.md、npm README、テストガイド -- 全て韓国語対応に更新済み。
 
 ---
 
@@ -178,30 +112,9 @@
 
 ---
 
-## 実装順序 (推奨)
+## 実装完了
 
-```
-Phase 1: C# 実装 (Python参照実装をミラー)
-  1.1 IKoreanG2PEngine + KoreanG2PEngine
-  1.2 KoreanPhonemizer
-  1.3 Program.cs 統合
-  1.4 KoreanPhonemizerTests
-
-Phase 2: Go 実装
-  2.1 korean.go (Phonemizer)
-  2.2 synthesize.go 統合
-  2.3 korean_test.go
-
-Phase 3: npm/WASM 実装
-  3.1 言語検出 + 型定義
-  3.2 phonemizeKorean()
-  3.3 test-korean.js
-
-Phase 4: ドキュメント + CI
-  4.1 README系更新 (全言語版)
-  4.2 CLAUDE.md 更新
-  4.3 テストガイド更新
-```
+全フェーズ (C#, Go, npm/WASM, ドキュメント/CI) が実装済み。残作業はモデル/データセットのみ。
 
 ---
 

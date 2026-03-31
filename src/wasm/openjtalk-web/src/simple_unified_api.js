@@ -7,6 +7,32 @@
 import { SimpleEnglishPhonemizer, createEnglishPhonemeMap } from './simple_english_phonemizer.js';
 import { extractPhonemesFromLabels as extractJaPhonemes } from './japanese_phoneme_extract.js';
 
+// ---------------------------------------------------------------------------
+// Korean Hangul decomposition tables (module-scope constants)
+// ---------------------------------------------------------------------------
+
+// Initial consonants (초성) — 19 Compatibility Jamo codepoints
+const KO_INITIALS = [
+    0x3131, 0x3132, 0x3134, 0x3137, 0x3138, 0x3139, 0x3141, 0x3142,
+    0x3143, 0x3145, 0x3146, 0x3147, 0x3148, 0x3149, 0x314A, 0x314B,
+    0x314C, 0x314D, 0x314E,
+];
+
+// Medial vowels (중성) — 21 Compatibility Jamo codepoints
+const KO_MEDIALS = [
+    0x314F, 0x3150, 0x3151, 0x3152, 0x3153, 0x3154, 0x3155, 0x3156,
+    0x3157, 0x3158, 0x3159, 0x315A, 0x315B, 0x315C, 0x315D, 0x315E,
+    0x315F, 0x3160, 0x3161, 0x3162, 0x3163,
+];
+
+// Final consonants (종성) — 28 entries, index 0 = none
+const KO_FINALS = [
+    0,      0x3131, 0x3132, 0x3133, 0x3134, 0x3135, 0x3136, 0x3137,
+    0x3139, 0x313A, 0x313B, 0x313C, 0x313D, 0x313E, 0x313F, 0x3140,
+    0x3141, 0x3142, 0x3144, 0x3145, 0x3146, 0x3147, 0x3148, 0x314A,
+    0x314B, 0x314C, 0x314D, 0x314E,
+];
+
 // Swedish-specific characters not used by EN/ES/PT/FR.
 // ä (U+00E4), ö (U+00F6), å (U+00E5) and uppercase variants.
 const SWEDISH_CHARS = new Set([
@@ -295,27 +321,6 @@ export class SimpleUnifiedPhonemizer {
             throw new Error('phonemeIdMap is required for Korean phonemization. Call setPhonemeIdMap() first.');
         }
 
-        // Compatibility Jamo tables for Hangul syllable decomposition
-        // Initial consonants (초성) — 19 entries
-        const INITIALS = [
-            0x3131, 0x3132, 0x3134, 0x3137, 0x3138, 0x3139, 0x3141, 0x3142,
-            0x3143, 0x3145, 0x3146, 0x3147, 0x3148, 0x3149, 0x314A, 0x314B,
-            0x314C, 0x314D, 0x314E,
-        ];
-        // Medial vowels (중성) — 21 entries
-        const MEDIALS = [
-            0x314F, 0x3150, 0x3151, 0x3152, 0x3153, 0x3154, 0x3155, 0x3156,
-            0x3157, 0x3158, 0x3159, 0x315A, 0x315B, 0x315C, 0x315D, 0x315E,
-            0x315F, 0x3160, 0x3161, 0x3162, 0x3163,
-        ];
-        // Final consonants (종성) — 28 entries, index 0 = none
-        const FINALS = [
-            0,      0x3131, 0x3132, 0x3133, 0x3134, 0x3135, 0x3136, 0x3137,
-            0x3139, 0x313A, 0x313B, 0x313C, 0x313D, 0x313E, 0x313F, 0x3140,
-            0x3141, 0x3142, 0x3144, 0x3145, 0x3146, 0x3147, 0x3148, 0x314A,
-            0x314B, 0x314C, 0x314D, 0x314E,
-        ];
-
         const phonemeIds = [1]; // BOS
         for (const char of text) {
             const code = char.charCodeAt(0);
@@ -327,14 +332,14 @@ export class SimpleUnifiedPhonemizer {
                 const finalIdx = offset % 28;
 
                 // Initial consonant
-                const initialChar = String.fromCharCode(INITIALS[initialIdx]);
+                const initialChar = String.fromCharCode(KO_INITIALS[initialIdx]);
                 if (phonemeIdMap[initialChar]) {
                     phonemeIds.push(...phonemeIdMap[initialChar]);
                     phonemeIds.push(0); // PAD
                 }
 
                 // Medial vowel
-                const medialChar = String.fromCharCode(MEDIALS[medialIdx]);
+                const medialChar = String.fromCharCode(KO_MEDIALS[medialIdx]);
                 if (phonemeIdMap[medialChar]) {
                     phonemeIds.push(...phonemeIdMap[medialChar]);
                     phonemeIds.push(0); // PAD
@@ -342,7 +347,7 @@ export class SimpleUnifiedPhonemizer {
 
                 // Final consonant (index 0 = none)
                 if (finalIdx > 0) {
-                    const finalChar = String.fromCharCode(FINALS[finalIdx]);
+                    const finalChar = String.fromCharCode(KO_FINALS[finalIdx]);
                     if (phonemeIdMap[finalChar]) {
                         phonemeIds.push(...phonemeIdMap[finalChar]);
                         phonemeIds.push(0); // PAD

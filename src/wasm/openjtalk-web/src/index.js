@@ -91,7 +91,7 @@ export class PiperPlus {
    *
    * @param {string} text
    * @param {Object} [options]
-   * @param {string} [options.language] - 'ja'|'en'|'zh'|'ko'|'es'|'fr'|'pt'.
+   * @param {string} [options.language] - 'ja'|'en'|'zh'|'ko'|'es'|'fr'|'pt'|'sv'.
    *   Omit for auto-detection.
    * @param {number} [options.noiseScale]
    * @param {number} [options.lengthScale]
@@ -280,8 +280,8 @@ export class PiperPlus {
    * @private
    */
   async _textToPhonemeIds(text, language) {
-    // For zh/ko/es/fr/pt the phonemizer returns IDs directly
-    if (['zh', 'ko', 'es', 'fr', 'pt'].includes(language)) {
+    // For zh/ko/es/fr/pt/sv the phonemizer returns IDs directly
+    if (['zh', 'ko', 'es', 'fr', 'pt', 'sv'].includes(language)) {
       const ids = await this._phonemizer.textToPhonemes(text, language);
       return { phonemeIds: ids, prosodyFeatures: null };
     }
