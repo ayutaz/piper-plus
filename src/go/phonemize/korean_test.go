@@ -1,7 +1,6 @@
 package phonemize
 
 import (
-	"strings"
 	"testing"
 )
 
@@ -12,10 +11,6 @@ import (
 func koPhonemes(text string) []string {
 	tokens, _ := koProcess(text)
 	return tokens
-}
-
-func koPhonemeStr(text string) string {
-	return strings.Join(koPhonemes(text), "|")
 }
 
 // ===========================================================================

@@ -52,12 +52,12 @@ const (
 // ---------------------------------------------------------------------------
 
 const (
-	koFlap          = "\u027E" // ɾ alveolar flap (ㄹ initial)
-	koEng           = "\u014B" // ŋ velar nasal (ㅇ coda)
-	koOpenE         = "\u025B" // ɛ open-mid front unrounded (ㅐ)
-	koOpenMidBack   = "\u028C" // ʌ open-mid back unrounded (ㅓ)
-	koCloseBackUnr  = "\u026F" // ɯ close back unrounded (ㅡ)
-	koVelarApprox   = "\u0270" // ɰ velar approximant (ㅢ)
+	koFlap         = "\u027E" // ɾ alveolar flap (ㄹ initial)
+	koEng          = "\u014B" // ŋ velar nasal (ㅇ coda)
+	koOpenE        = "\u025B" // ɛ open-mid front unrounded (ㅐ)
+	koOpenMidBack  = "\u028C" // ʌ open-mid back unrounded (ㅓ)
+	koCloseBackUnr = "\u026F" // ɯ close back unrounded (ㅡ)
+	koVelarApprox  = "\u0270" // ɰ velar approximant (ㅢ)
 )
 
 // ---------------------------------------------------------------------------
@@ -66,25 +66,25 @@ const (
 // ---------------------------------------------------------------------------
 
 var koInitialTable = [koNInitials]string{
-	"k",   //  0: ㄱ
+	"k",    //  0: ㄱ
 	"k͈",   //  1: ㄲ (tense)
-	"n",   //  2: ㄴ
-	"t",   //  3: ㄷ
+	"n",    //  2: ㄴ
+	"t",    //  3: ㄷ
 	"t͈",   //  4: ㄸ (tense)
 	koFlap, //  5: ㄹ
-	"m",   //  6: ㅁ
-	"p",   //  7: ㅂ
+	"m",    //  6: ㅁ
+	"p",    //  7: ㅂ
 	"p͈",   //  8: ㅃ (tense)
-	"s",   //  9: ㅅ
+	"s",    //  9: ㅅ
 	"s͈",   // 10: ㅆ (tense)
-	"",    // 11: ㅇ (silent in initial)
-	"tɕ",  // 12: ㅈ
+	"",     // 11: ㅇ (silent in initial)
+	"tɕ",   // 12: ㅈ
 	"t͈ɕ",  // 13: ㅉ (tense)
-	"tɕʰ", // 14: ㅊ (aspirated)
-	"kʰ",  // 15: ㅋ (aspirated)
-	"tʰ",  // 16: ㅌ (aspirated)
-	"pʰ",  // 17: ㅍ (aspirated)
-	"h",   // 18: ㅎ
+	"tɕʰ",  // 14: ㅊ (aspirated)
+	"kʰ",   // 15: ㅋ (aspirated)
+	"tʰ",   // 16: ㅌ (aspirated)
+	"pʰ",   // 17: ㅍ (aspirated)
+	"h",    // 18: ㅎ
 }
 
 // ---------------------------------------------------------------------------
@@ -98,27 +98,27 @@ type koMedialEntry struct {
 }
 
 var koMedialTable = [koNMedials]koMedialEntry{
-	{"a", ""},           //  0: ㅏ
-	{koOpenE, ""},       //  1: ㅐ
-	{"j", "a"},          //  2: ㅑ
-	{"j", koOpenE},      //  3: ㅒ
-	{koOpenMidBack, ""}, //  4: ㅓ
-	{"e", ""},           //  5: ㅔ
+	{"a", ""},            //  0: ㅏ
+	{koOpenE, ""},        //  1: ㅐ
+	{"j", "a"},           //  2: ㅑ
+	{"j", koOpenE},       //  3: ㅒ
+	{koOpenMidBack, ""},  //  4: ㅓ
+	{"e", ""},            //  5: ㅔ
 	{"j", koOpenMidBack}, //  6: ㅕ
-	{"j", "e"},          //  7: ㅖ
-	{"o", ""},           //  8: ㅗ
-	{"w", "a"},          //  9: ㅘ
-	{"w", koOpenE},      // 10: ㅙ
-	{"w", "e"},          // 11: ㅚ (modern Seoul: [we])
-	{"j", "o"},          // 12: ㅛ
-	{"u", ""},           // 13: ㅜ
+	{"j", "e"},           //  7: ㅖ
+	{"o", ""},            //  8: ㅗ
+	{"w", "a"},           //  9: ㅘ
+	{"w", koOpenE},       // 10: ㅙ
+	{"w", "e"},           // 11: ㅚ (modern Seoul: [we])
+	{"j", "o"},           // 12: ㅛ
+	{"u", ""},            // 13: ㅜ
 	{"w", koOpenMidBack}, // 14: ㅝ
-	{"w", "e"},          // 15: ㅞ
-	{"w", "i"},          // 16: ㅟ
-	{"j", "u"},          // 17: ㅠ
+	{"w", "e"},           // 15: ㅞ
+	{"w", "i"},           // 16: ㅟ
+	{"j", "u"},           // 17: ㅠ
 	{koCloseBackUnr, ""}, // 18: ㅡ
 	{koVelarApprox, "i"}, // 19: ㅢ
-	{"i", ""},           // 20: ㅣ
+	{"i", ""},            // 20: ㅣ
 }
 
 // ---------------------------------------------------------------------------
@@ -141,34 +141,34 @@ type koFinalEntry struct {
 }
 
 var koFinalTable = [koNFinals]koFinalEntry{
-	{"", -1, 0},     //  0: (none)
-	{"k̚", 0, 0},     //  1: ㄱ
-	{"k̚", 1, 0},     //  2: ㄲ
-	{"k̚", 9, 1},     //  3: ㄳ -> ㅅ, residual ㄱ
-	{"n", -1, 0},    //  4: ㄴ
-	{"n", 12, 4},    //  5: ㄵ -> ㅈ, residual ㄴ
-	{"n", -1, 0},    //  6: ㄶ (ㄴ+ㅎ -> n)
-	{"t̚", 3, 0},     //  7: ㄷ
-	{"l", 5, 0},     //  8: ㄹ
-	{"k̚", 0, 8},     //  9: ㄺ -> ㄱ, residual ㄹ
-	{"m", 6, 8},     // 10: ㄻ -> ㅁ, residual ㄹ
-	{"l", 7, 8},     // 11: ㄼ -> ㅂ, residual ㄹ
-	{"l", 9, 8},     // 12: ㄽ -> ㅅ, residual ㄹ
-	{"l", 16, 8},    // 13: ㄾ -> ㅌ, residual ㄹ
-	{"l", 17, 8},    // 14: ㄿ -> ㅍ, residual ㄹ
-	{"l", -1, 0},    // 15: ㅀ (ㄹ+ㅎ -> l)
-	{"m", -1, 0},    // 16: ㅁ
-	{"p̚", 7, 0},     // 17: ㅂ
-	{"p̚", 9, 17},    // 18: ㅄ -> ㅅ, residual ㅂ
-	{"t̚", 9, 0},     // 19: ㅅ
-	{"t̚", 10, 0},    // 20: ㅆ
-	{koEng, -1, 0},  // 21: ㅇ (velar nasal)
-	{"t̚", 12, 0},    // 22: ㅈ
-	{"t̚", 14, 0},    // 23: ㅊ
-	{"k̚", 15, 0},    // 24: ㅋ
-	{"t̚", 16, 0},    // 25: ㅌ
-	{"p̚", 17, 0},    // 26: ㅍ
-	{"t̚", -1, 0},    // 27: ㅎ (h dropped)
+	{"", -1, 0},    //  0: (none)
+	{"k̚", 0, 0},   //  1: ㄱ
+	{"k̚", 1, 0},   //  2: ㄲ
+	{"k̚", 9, 1},   //  3: ㄳ -> ㅅ, residual ㄱ
+	{"n", -1, 0},   //  4: ㄴ
+	{"n", 12, 4},   //  5: ㄵ -> ㅈ, residual ㄴ
+	{"n", -1, 0},   //  6: ㄶ (ㄴ+ㅎ -> n)
+	{"t̚", 3, 0},   //  7: ㄷ
+	{"l", 5, 0},    //  8: ㄹ
+	{"k̚", 0, 8},   //  9: ㄺ -> ㄱ, residual ㄹ
+	{"m", 6, 8},    // 10: ㄻ -> ㅁ, residual ㄹ
+	{"l", 7, 8},    // 11: ㄼ -> ㅂ, residual ㄹ
+	{"l", 9, 8},    // 12: ㄽ -> ㅅ, residual ㄹ
+	{"l", 16, 8},   // 13: ㄾ -> ㅌ, residual ㄹ
+	{"l", 17, 8},   // 14: ㄿ -> ㅍ, residual ㄹ
+	{"l", -1, 0},   // 15: ㅀ (ㄹ+ㅎ -> l)
+	{"m", -1, 0},   // 16: ㅁ
+	{"p̚", 7, 0},   // 17: ㅂ
+	{"p̚", 9, 17},  // 18: ㅄ -> ㅅ, residual ㅂ
+	{"t̚", 9, 0},   // 19: ㅅ
+	{"t̚", 10, 0},  // 20: ㅆ
+	{koEng, -1, 0}, // 21: ㅇ (velar nasal)
+	{"t̚", 12, 0},  // 22: ㅈ
+	{"t̚", 14, 0},  // 23: ㅊ
+	{"k̚", 15, 0},  // 24: ㅋ
+	{"t̚", 16, 0},  // 25: ㅌ
+	{"p̚", 17, 0},  // 26: ㅍ
+	{"t̚", -1, 0},  // 27: ㅎ (h dropped)
 }
 
 // ---------------------------------------------------------------------------
@@ -355,9 +355,10 @@ func koProcess(text string) (tokens []string, eos string) {
 		if koPunctuation[ch] {
 			s := string(ch)
 			tokens = append(tokens, s)
-			if ch == '?' || ch == '\uFF1F' {
+			switch ch {
+			case '?', '\uFF1F':
 				eos = "?"
-			} else if ch == '!' || ch == '\uFF01' {
+			case '!', '\uFF01':
 				eos = "!"
 			}
 			needSpace = false
