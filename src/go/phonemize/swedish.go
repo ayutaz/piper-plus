@@ -93,10 +93,6 @@ var svFrontVowels = map[rune]bool{
 	'e': true, 'i': true, 'y': true, '\u00e4': true, '\u00f6': true,
 }
 
-var svBackVowels = map[rune]bool{
-	'a': true, 'o': true, 'u': true, '\u00e5': true,
-}
-
 var svAllVowels = map[rune]bool{
 	'a': true, 'e': true, 'i': true, 'o': true, 'u': true,
 	'y': true, '\u00e5': true, '\u00e4': true, '\u00f6': true,
@@ -131,14 +127,14 @@ var svLongVowelMap = map[rune]string{
 // Values are single-character IPA (no PUA needed).
 var svShortVowelMap = map[rune]string{
 	'a':      "a",
-	'e':      "\u025b",  // ɛ
-	'i':      "\u026a",  // ɪ
-	'o':      "\u0254",  // ɔ
-	'u':      "\u0275",  // ɵ
-	'y':      "\u028f",  // ʏ
-	'\u00e5': "\u0254",  // å → ɔ
-	'\u00e4': "\u025b",  // ä → ɛ
-	'\u00f6': "\u0153",  // ö → œ
+	'e':      "\u025b", // ɛ
+	'i':      "\u026a", // ɪ
+	'o':      "\u0254", // ɔ
+	'u':      "\u0275", // ɵ
+	'y':      "\u028f", // ʏ
+	'\u00e5': "\u0254", // å → ɔ
+	'\u00e4': "\u025b", // ä → ɛ
+	'\u00f6': "\u0153", // ö → œ
 }
 
 // svOLongAsOOPhoneme is the long vowel for "o" in O_LONG_AS_OO words.
@@ -526,13 +522,13 @@ type svLoanwordRule struct {
 
 // svLoanwordSuffixRules ordered longest-suffix first for correct matching.
 var svLoanwordSuffixRules = []svLoanwordRule{
-	{"ssion", []string{"\u0267", "u\u02d0", "n"}},       // -ssion → ɧ uː n
-	{"tion", []string{"\u0267", "u\u02d0", "n"}},         // -tion  → ɧ uː n
-	{"sion", []string{"\u0267", "u\u02d0", "n"}},         // -sion  → ɧ uː n
-	{"age", []string{"\u0251\u02d0", "\u0267"}},           // -age   → ɑː ɧ
-	{"eur", []string{"\u00f8\u02d0", "r"}},                // -eur   → øː r
-	{"eum", []string{"e\u02d0", "\u0275", "m"}},           // -eum   → eː ɵ m
-	{"ium", []string{"\u026a", "\u0275", "m"}},            // -ium   → ɪ ɵ m
+	{"ssion", []string{"\u0267", "u\u02d0", "n"}}, // -ssion → ɧ uː n
+	{"tion", []string{"\u0267", "u\u02d0", "n"}},  // -tion  → ɧ uː n
+	{"sion", []string{"\u0267", "u\u02d0", "n"}},  // -sion  → ɧ uː n
+	{"age", []string{"\u0251\u02d0", "\u0267"}},   // -age   → ɑː ɧ
+	{"eur", []string{"\u00f8\u02d0", "r"}},        // -eur   → øː r
+	{"eum", []string{"e\u02d0", "\u0275", "m"}},   // -eum   → eː ɵ m
+	{"ium", []string{"\u026a", "\u0275", "m"}},    // -ium   → ɪ ɵ m
 }
 
 // ---------------------------------------------------------------------------
@@ -916,7 +912,8 @@ func svConvertWordNative(word string, fullWord string, stressedSyl int) []string
 	for pos < n {
 		ch := runes[pos]
 
-		if svAllVowels[ch] {
+		switch {
+		case svAllVowels[ch]:
 			if !prevWasVowel {
 				isStressed := sylCount == stressedSyl && stressedSyl >= 0
 				vowel := svGetVowelPhoneme(runes, pos, fullWord, isStressed)
@@ -933,13 +930,13 @@ func svConvertWordNative(word string, fullWord string, stressedSyl int) []string
 			prevWasVowel = true
 			pos++
 
-		} else if svConsonants[ch] {
+		case svConsonants[ch]:
 			prevWasVowel = false
 			ipaList, consumed := svConvertConsonant(runes, pos, fullWord)
 			phonemes = append(phonemes, ipaList...)
 			pos += consumed
 
-		} else {
+		default:
 			// Unknown character: skip
 			prevWasVowel = false
 			pos++
@@ -1204,7 +1201,8 @@ func svPhonemizeWord(word string) []string {
 			stemStress = -1 // stress is in the suffix → stem is unstressed
 		}
 		stemPhonemes := svConvertWordNative(stem, word, stemStress)
-		rawPhonemes = append(stemPhonemes, suffixPhonemes...)
+		rawPhonemes = append(rawPhonemes, stemPhonemes...)
+		rawPhonemes = append(rawPhonemes, suffixPhonemes...)
 	} else {
 		// Stage 4: Native G2P
 		rawPhonemes = svConvertWordNative(word, word, stressedSyl)

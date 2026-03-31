@@ -18,16 +18,6 @@ var svUniqueChars = map[rune]bool{
 	'\u00c5': true, // Å
 }
 
-// svSharedChars contains characters shared between Swedish and German.
-// ä (U+00E4/U+00C4) and ö (U+00F6/U+00D6) appear in both languages,
-// so they carry lower weight for Swedish detection.
-var svSharedChars = map[rune]bool{
-	'\u00e4': true, // ä
-	'\u00f6': true, // ö
-	'\u00c4': true, // Ä
-	'\u00d6': true, // Ö
-}
-
 // svDetectFunctionWords contains highly distinctive Swedish function words
 // that do not appear in EN/ES/PT/FR. Used for word-level language detection
 // disambiguation (distinct from svFunctionWords in swedish.go which is used

@@ -130,15 +130,15 @@ var allFixedPUA = []struct {
 	{"\u0254\u0303", 0xE058, "FR"}, // ɔ̃
 
 	// Swedish (0xE059-0xE061) — 9 entries (long vowels)
-	{"i\u02d0", 0xE059, "SV"},       // iː
-	{"y\u02d0", 0xE05A, "SV"},       // yː
-	{"e\u02d0", 0xE05B, "SV"},       // eː
-	{"\u025b\u02d0", 0xE05C, "SV"},  // ɛː
-	{"\u00f8\u02d0", 0xE05D, "SV"},  // øː
-	{"\u0251\u02d0", 0xE05E, "SV"},  // ɑː
-	{"o\u02d0", 0xE05F, "SV"},       // oː
-	{"u\u02d0", 0xE060, "SV"},       // uː
-	{"\u0289\u02d0", 0xE061, "SV"},  // ʉː
+	{"i\u02d0", 0xE059, "SV"},      // iː
+	{"y\u02d0", 0xE05A, "SV"},      // yː
+	{"e\u02d0", 0xE05B, "SV"},      // eː
+	{"\u025b\u02d0", 0xE05C, "SV"}, // ɛː
+	{"\u00f8\u02d0", 0xE05D, "SV"}, // øː
+	{"\u0251\u02d0", 0xE05E, "SV"}, // ɑː
+	{"o\u02d0", 0xE05F, "SV"},      // oː
+	{"u\u02d0", 0xE060, "SV"},      // uː
+	{"\u0289\u02d0", 0xE061, "SV"}, // ʉː
 }
 
 // TestFixedPUA_TotalCount ensures the Go fixedPUA map has exactly 96 entries,

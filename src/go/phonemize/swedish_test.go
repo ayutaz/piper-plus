@@ -66,16 +66,16 @@ func TestSvLongVowels(t *testing.T) {
 		word string
 		want string // IPA substring that must be present (pre-PUA)
 	}{
-		{"gata", "ɑː"},  // V-01: a + single consonant -> long ɑː
-		{"vet", "eː"},   // V-02: e + single consonant -> eː
-		{"fin", "iː"},   // V-03: i + single consonant -> iː
-		{"sol", "uː"},   // V-04: o default + single consonant -> uː
-		{"hus", "ʉː"},   // V-05: u + single consonant -> ʉː
-		{"syn", "yː"},   // V-06: y + single consonant -> yː
-		{"säl", "ɛː"},   // V-07: ä + single consonant -> ɛː
-		{"öl", "øː"},    // V-08: ö + single consonant -> øː
-		{"år", "oː"},    // V-09: å + single consonant -> oː
-		{"glas", "ɑː"},  // V-10: glas single C after vowel -> long ɑː
+		{"gata", "ɑː"}, // V-01: a + single consonant -> long ɑː
+		{"vet", "eː"},  // V-02: e + single consonant -> eː
+		{"fin", "iː"},  // V-03: i + single consonant -> iː
+		{"sol", "uː"},  // V-04: o default + single consonant -> uː
+		{"hus", "ʉː"},  // V-05: u + single consonant -> ʉː
+		{"syn", "yː"},  // V-06: y + single consonant -> yː
+		{"säl", "ɛː"},  // V-07: ä + single consonant -> ɛː
+		{"öl", "øː"},   // V-08: ö + single consonant -> øː
+		{"år", "oː"},   // V-09: å + single consonant -> oː
+		{"glas", "ɑː"}, // V-10: glas single C after vowel -> long ɑː
 	}
 	for _, tt := range tests {
 		t.Run(tt.word, func(t *testing.T) {
@@ -97,13 +97,13 @@ func TestSvShortVowels(t *testing.T) {
 		want    string // IPA substring that must be present
 		exclude string // IPA substring that must NOT be present ("" = no check)
 	}{
-		{"katt", "a", "ɑː"},   // V-11: geminate -> short a
-		{"fest", "ɛ", "eː"},   // V-12: cluster -> short ɛ
-		{"flicka", "ɪ", ""},   // V-13: HARD_K exception + short ɪ
-		{"kort", "ɔ", ""},     // V-14: o + 2 consonants -> short ɔ
+		{"katt", "a", "ɑː"},  // V-11: geminate -> short a
+		{"fest", "ɛ", "eː"},  // V-12: cluster -> short ɛ
+		{"flicka", "ɪ", ""},  // V-13: HARD_K exception + short ɪ
+		{"kort", "ɔ", ""},    // V-14: o + 2 consonants -> short ɔ
 		{"hund", "ɵ", "ʉː"},  // V-15: cluster -> short ɵ
-		{"mygg", "ʏ", ""},     // V-16: geminate -> short ʏ
-		{"höst", "œ", ""},     // V-17: cluster -> short œ
+		{"mygg", "ʏ", ""},    // V-16: geminate -> short ʏ
+		{"höst", "œ", ""},    // V-17: cluster -> short œ
 		{"glass", "a", "ɑː"}, // V-18: double s -> short a
 		{"tack", "a", "ɑː"},  // V-19: ck -> short a
 		{"vett", "ɛ", "eː"},  // V-20: geminate -> short ɛ
@@ -133,7 +133,7 @@ func TestSvConsonant3Char(t *testing.T) {
 	}{
 		{"skjorta", "ɧ", "skj -> ɧ"},     // C-01
 		{"stjärna", "ɧ", "stj -> ɧ"},     // C-02
-		{"schema", "ɧ", "sch -> ɧ"},       // C-03
+		{"schema", "ɧ", "sch -> ɧ"},      // C-03
 		{"sång", "ŋ", "sng -> s+ng (ŋ)"}, // C-04: sng rule, ng is processed as ŋ
 	}
 	for _, tt := range tests {
@@ -156,11 +156,11 @@ func TestSvConsonantSK(t *testing.T) {
 		word string
 		desc string
 	}{
-		{"sked", "sk+e -> ɧ"},    // C-06
-		{"skinn", "sk+i -> ɧ"},   // C-07
-		{"sky", "sk+y -> ɧ"},     // C-08
-		{"skäl", "sk+ä -> ɧ"},   // C-09
-		{"sköld", "sk+ö -> ɧ"},  // C-10
+		{"sked", "sk+e -> ɧ"},  // C-06
+		{"skinn", "sk+i -> ɧ"}, // C-07
+		{"sky", "sk+y -> ɧ"},   // C-08
+		{"skäl", "sk+ä -> ɧ"},  // C-09
+		{"sköld", "sk+ö -> ɧ"}, // C-10
 	}
 	for _, tt := range frontTests {
 		t.Run(tt.desc, func(t *testing.T) {
@@ -176,7 +176,7 @@ func TestSvConsonantSK(t *testing.T) {
 		word string
 		desc string
 	}{
-		{"ska", "sk+a -> sk (hard)"}, // C-11
+		{"ska", "sk+a -> sk (hard)"},  // C-11
 		{"skog", "sk+o -> sk (hard)"}, // C-12
 	}
 	for _, tt := range backTests {
@@ -200,14 +200,14 @@ func TestSvConsonant2Char(t *testing.T) {
 		exclude string
 		desc    string
 	}{
-		{"sjuk", "ɧ", "", "sj -> ɧ"},              // C-13
-		{"show", "ɧ", "", "sh -> ɧ"},               // C-14
-		{"chef", "ɧ", "", "ch -> ɧ (default)"},     // C-15
+		{"sjuk", "ɧ", "", "sj -> ɧ"},                // C-13
+		{"show", "ɧ", "", "sh -> ɧ"},                // C-14
+		{"chef", "ɧ", "", "ch -> ɧ (default)"},      // C-15
 		{"och", "", "ɧ", "ch -> k (CH_EXCEPTIONS)"}, // C-16
-		{"tjuv", "ɕ", "", "tj -> ɕ"},               // C-17
-		{"kjol", "ɕ", "", "kj -> ɕ"},               // C-18
-		{"kung", "ŋ", "", "ng -> ŋ"},               // C-19
-		{"bank", "ŋ", "", "nk -> ŋ+k"},             // C-20
+		{"tjuv", "ɕ", "", "tj -> ɕ"},                // C-17
+		{"kjol", "ɕ", "", "kj -> ɕ"},                // C-18
+		{"kung", "ŋ", "", "ng -> ŋ"},                // C-19
+		{"bank", "ŋ", "", "nk -> ŋ+k"},              // C-20
 		{"docka", "ɔ", "", "ck -> k (short vowel)"}, // C-21
 		{"photo", "f", "", "ph -> f"},               // C-22
 	}
@@ -235,14 +235,14 @@ func TestSvConsonant1CharAndInitialDigraphs(t *testing.T) {
 		exclude string
 		desc    string
 	}{
-		{"gjord", "j", "", "gj word-initial -> j"},         // C-23
-		{"djur", "j", "", "dj word-initial -> j"},           // C-24
-		{"hjälp", "j", "", "hj word-initial -> j"},         // C-25
-		{"ljus", "j", "", "lj word-initial -> j"},           // C-26
-		{"center", "s", "", "c+e -> s"},                     // C-27
-		{"camping", "k", "", "c+a -> k"},                    // C-28
-		{"gnaga", "ɡ", "", "gn word-initial -> ɡ+n"},       // C-29
-		{"signal", "ŋ", "", "gn word-medial -> ŋ+n"},       // C-30
+		{"gjord", "j", "", "gj word-initial -> j"},   // C-23
+		{"djur", "j", "", "dj word-initial -> j"},    // C-24
+		{"hjälp", "j", "", "hj word-initial -> j"},   // C-25
+		{"ljus", "j", "", "lj word-initial -> j"},    // C-26
+		{"center", "s", "", "c+e -> s"},              // C-27
+		{"camping", "k", "", "c+a -> k"},             // C-28
+		{"gnaga", "ɡ", "", "gn word-initial -> ɡ+n"}, // C-29
+		{"signal", "ŋ", "", "gn word-medial -> ŋ+n"}, // C-30
 	}
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
@@ -303,11 +303,11 @@ func TestSvSoftHardK(t *testing.T) {
 		exclude string
 		desc    string
 	}{
-		{"flicka", "k", "ɕ", "HARD_K: flicka"},  // KG-05
-		{"pojke", "k", "", "HARD_K: pojke"},       // KG-06
-		{"socker", "k", "", "HARD_K: socker"},     // KG-07
-		{"kille", "k", "", "HARD_K: kille"},       // KG-08
-		{"söker", "k", "", "HARD_K: söker"},       // KG-09
+		{"flicka", "k", "ɕ", "HARD_K: flicka"}, // KG-05
+		{"pojke", "k", "", "HARD_K: pojke"},    // KG-06
+		{"socker", "k", "", "HARD_K: socker"},  // KG-07
+		{"kille", "k", "", "HARD_K: kille"},    // KG-08
+		{"söker", "k", "", "HARD_K: söker"},    // KG-09
 	}
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
@@ -332,8 +332,8 @@ func TestSvSoftHardG(t *testing.T) {
 		word string
 		desc string
 	}{
-		{"finger", "HARD_G: finger"},  // KG-10
-		{"ger", "HARD_G: ger"},        // KG-11
+		{"finger", "HARD_G: finger"},   // KG-10
+		{"ger", "HARD_G: ger"},         // KG-11
 		{"agera", "-era verb -> hard"}, // KG-13
 		{"berg", "-erg -> hard"},       // KG-14
 		{"borg", "-org -> hard"},       // KG-15
@@ -581,10 +581,10 @@ func TestSvStressAttractingSuffixes(t *testing.T) {
 		word string
 		desc string
 	}{
-		{"station", "-tion attracts stress"},      // ST-07
-		{"bageri", "-eri attracts stress"},         // ST-08
-		{"universitet", "-itet attracts stress"},   // ST-09
-		{"turist", "-ist attracts stress"},         // ST-10
+		{"station", "-tion attracts stress"},     // ST-07
+		{"bageri", "-eri attracts stress"},       // ST-08
+		{"universitet", "-itet attracts stress"}, // ST-09
+		{"turist", "-ist attracts stress"},       // ST-10
 	}
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
@@ -660,14 +660,14 @@ func TestSvLoanwordSuffixDetection(t *testing.T) {
 		wantStem string
 		wantOk   bool
 	}{
-		{"station", "sta", true},   // LW-01
-		{"passion", "pa", true},    // LW-02: matches -ssion (longest first)
-		{"mission", "mi", true},    // LW-03: matches -ssion (longest first)
-		{"garage", "gar", true},    // LW-04
-		{"mage", "", false},        // LW-05: AGE_NATIVE excluded
-		{"friseur", "fris", true},  // LW-06
-		{"museum", "mus", true},    // LW-07
-		{"stadium", "stad", true},  // LW-08
+		{"station", "sta", true},  // LW-01
+		{"passion", "pa", true},   // LW-02: matches -ssion (longest first)
+		{"mission", "mi", true},   // LW-03: matches -ssion (longest first)
+		{"garage", "gar", true},   // LW-04
+		{"mage", "", false},       // LW-05: AGE_NATIVE excluded
+		{"friseur", "fris", true}, // LW-06
+		{"museum", "mus", true},   // LW-07
+		{"stadium", "stad", true}, // LW-08
 	}
 	for _, tt := range tests {
 		t.Run(tt.word, func(t *testing.T) {
@@ -710,16 +710,16 @@ func TestSvOAmbiguity(t *testing.T) {
 		exclude string
 		desc    string
 	}{
-		{"sol", "uː", "", "o default -> uː"},       // O-01
-		{"son", "oː", "", "O_LONG_AS_OO -> oː"},    // O-02
+		{"sol", "uː", "", "o default -> uː"},         // O-01
+		{"son", "oː", "", "O_LONG_AS_OO -> oː"},      // O-02
 		{"kort", "ɔ", "", "2 consonants -> short ɔ"}, // O-03
-		{"mor", "oː", "", "O_LONG_AS_OO"},           // O-04
-		{"bror", "oː", "", "O_LONG_AS_OO"},          // O-05
-		{"ton", "oː", "", "O_LONG_AS_OO"},           // O-06
-		{"bok", "uː", "oː", "not in O_LONG_AS_OO"},  // O-07
-		{"god", "oː", "", "O_LONG_AS_OO"},           // O-08
+		{"mor", "oː", "", "O_LONG_AS_OO"},            // O-04
+		{"bror", "oː", "", "O_LONG_AS_OO"},           // O-05
+		{"ton", "oː", "", "O_LONG_AS_OO"},            // O-06
+		{"bok", "uː", "oː", "not in O_LONG_AS_OO"},   // O-07
+		{"god", "oː", "", "O_LONG_AS_OO"},            // O-08
 		{"bott", "ɔ", "", "geminate -> short ɔ"},     // O-09
-		{"ord", "ɔ", "", "o+rd (2C) -> short ɔ"},    // O-10
+		{"ord", "ɔ", "", "o+rd (2C) -> short ɔ"},     // O-10
 	}
 	for _, tt := range tests {
 		t.Run(tt.word+"_"+tt.desc, func(t *testing.T) {
@@ -802,15 +802,15 @@ func TestSvPUAMapping(t *testing.T) {
 		wantPUA rune
 		desc    string
 	}{
-		{"fin", 0xE059, "iː -> PUA"},             // PUA-01
-		{"syn", 0xE05A, "yː -> PUA"},             // PUA-02
-		{"vet", 0xE05B, "eː -> PUA"},             // PUA-03
-		{"säl", 0xE05C, "ɛː -> PUA"},             // PUA-04
-		{"öl", 0xE05D, "øː -> PUA"},              // PUA-05
-		{"gata", 0xE05E, "ɑː -> PUA"},            // PUA-06
-		{"år", 0xE05F, "oː -> PUA (å)"},          // PUA-07
-		{"sol", 0xE060, "uː -> PUA (o default)"},  // PUA-08
-		{"hus", 0xE061, "ʉː -> PUA"},             // PUA-09
+		{"fin", 0xE059, "iː -> PUA"},                // PUA-01
+		{"syn", 0xE05A, "yː -> PUA"},                // PUA-02
+		{"vet", 0xE05B, "eː -> PUA"},                // PUA-03
+		{"säl", 0xE05C, "ɛː -> PUA"},                // PUA-04
+		{"öl", 0xE05D, "øː -> PUA"},                 // PUA-05
+		{"gata", 0xE05E, "ɑː -> PUA"},               // PUA-06
+		{"år", 0xE05F, "oː -> PUA (å)"},             // PUA-07
+		{"sol", 0xE060, "uː -> PUA (o default)"},    // PUA-08
+		{"hus", 0xE061, "ʉː -> PUA"},                // PUA-09
 		{"son", 0xE05F, "oː -> PUA (O_LONG_AS_OO)"}, // PUA-10
 	}
 	for _, tt := range tests {
