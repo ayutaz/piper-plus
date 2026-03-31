@@ -153,7 +153,7 @@ func DefaultLatinLanguage(languages []string) string {
 	for _, l := range languages {
 		langSet[l] = true
 	}
-	for _, preferred := range []string{"en", "es", "fr", "pt"} {
+	for _, preferred := range []string{"en", "es", "fr", "pt", "sv"} {
 		if langSet[preferred] {
 			return preferred
 		}

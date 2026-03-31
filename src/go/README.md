@@ -6,10 +6,10 @@ Go 1.26+ bindings for [Piper Plus](https://github.com/ayutaz/piper-plus) neural 
 Built on the VITS architecture, these bindings provide idiomatic Go access to high-quality multilingual TTS
 with ONNX Runtime inference via [yalue/onnxruntime_go](https://github.com/yalue/onnxruntime_go).
 
-**Supported languages (対応言語):** Japanese (JA), English (EN), Chinese (ZH), Spanish (ES), French (FR), Portuguese (PT)
+**Supported languages (対応言語):** Japanese (JA), English (EN), Chinese (ZH), Spanish (ES), French (FR), Portuguese (PT), Swedish (SV)
 
 **Key features:**
-- Text-to-speech with automatic phonemization for 6 languages
+- Text-to-speech with automatic phonemization for 7 languages
 - Streaming synthesis with sentence-level chunking
 - GPU acceleration: CUDA, CoreML, DirectML, TensorRT (with automatic fallback to CPU)
 - Built-in HTTP API server
@@ -90,6 +90,10 @@ result, _ := voice.Synthesize(ctx, "你好，今天天气很好。",
 // Spanish
 result, _ := voice.Synthesize(ctx, "Hola, como estas hoy?",
     piperplus.WithLanguage("es"))
+
+// Swedish
+result, _ := voice.Synthesize(ctx, "Hej, hur mår du idag?",
+    piperplus.WithLanguage("sv"))
 ```
 
 ## CLI Usage / CLIの使い方
@@ -131,7 +135,7 @@ piper-plus -m model.onnx -t "Hello" --streaming | aplay -r 22050 -f S16_LE
 | `-m, --model` | `$PIPER_DEFAULT_MODEL` | Path to ONNX model file |
 | `-c, --config` | auto-detected | Path to config.json |
 | `-t, --text` | | Text to synthesize (single utterance) |
-| `--language` | | Language code (ja, en, zh, es, fr, pt) |
+| `--language` | | Language code (ja, en, zh, es, fr, pt, sv) |
 | `-s, --speaker` | `0` | Speaker ID for multi-speaker models |
 | `-f, --output-file` | | Output WAV path (`-` for stdout) |
 | `-d, --output-dir` | `.` | Output directory for generated files |
@@ -251,7 +255,7 @@ piper-plus -m model.onnx -t "Hello" --streaming | aplay -r 22050 -f S16_LE
 
 | Function | Default | Description |
 |----------|---------|-------------|
-| `WithLanguage(lang string)` | `""` | Target language code (ja, en, zh, es, fr, pt). |
+| `WithLanguage(lang string)` | `""` | Target language code (ja, en, zh, es, fr, pt, sv). |
 | `WithSpeakerID(id int64)` | `0` | Speaker ID for multi-speaker models. |
 | `WithNoiseScale(v float32)` | `0.667` | Generation noise scale (higher = more variation). |
 | `WithLengthScale(v float32)` | `1.0` | Speech rate (< 1.0 = faster, > 1.0 = slower). |
@@ -448,6 +452,7 @@ src/go/
     spanish.go                    # Spanish phonemizer
     french.go                     # French phonemizer
     portuguese.go                 # Portuguese phonemizer
+    swedish.go                    # Swedish phonemizer
     *_test.go                     # Unit tests
   docker/
     Dockerfile                    # Multi-stage build (Go + ONNX Runtime)

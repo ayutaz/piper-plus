@@ -480,3 +480,126 @@ func TestSegmentText_WhitespaceOnly(t *testing.T) {
 		}
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Swedish (SV) language detection tests
+// ---------------------------------------------------------------------------
+
+// T1: ä/ö/å characters trigger SV detection.
+func TestSegmentText_SwedishCharsDetected(t *testing.T) {
+	d := NewUnicodeLanguageDetector([]string{"en", "sv"}, "en")
+	segs := SegmentText("Jag är glad", d)
+	// "är" contains ä -> sv_score >= 1 -> segment is SV
+	if len(segs) != 1 {
+		t.Fatalf("expected 1 segment, got %d: %+v", len(segs), segs)
+	}
+	if segs[0].Language != "sv" {
+		t.Errorf("expected language sv, got %q", segs[0].Language)
+	}
+}
+
+// T2: Function words alone trigger SV detection.
+func TestSegmentText_SwedishFunctionWords(t *testing.T) {
+	d := NewUnicodeLanguageDetector([]string{"en", "sv"}, "en")
+	segs := SegmentText("jag och hon", d)
+	// "jag", "och", "hon" are all SV function words -> sv_score >= 1
+	if len(segs) != 1 {
+		t.Fatalf("expected 1 segment, got %d: %+v", len(segs), segs)
+	}
+	if segs[0].Language != "sv" {
+		t.Errorf("expected language sv, got %q", segs[0].Language)
+	}
+}
+
+// T3: Latin text without SV indicators stays as default language (EN).
+func TestSegmentText_NoSwedishIndicators(t *testing.T) {
+	d := NewUnicodeLanguageDetector([]string{"en", "sv"}, "en")
+	segs := SegmentText("hello world", d)
+	if len(segs) != 1 {
+		t.Fatalf("expected 1 segment, got %d: %+v", len(segs), segs)
+	}
+	if segs[0].Language != "en" {
+		t.Errorf("expected language en, got %q", segs[0].Language)
+	}
+}
+
+// T4: SV not in language set -> no SV detection (post-processing disabled).
+func TestSegmentText_NoSVInLanguages(t *testing.T) {
+	d := NewUnicodeLanguageDetector([]string{"en", "fr"}, "en")
+	segs := SegmentText("Jag är glad", d) // ä is Latin extended -> EN
+	if len(segs) != 1 {
+		t.Fatalf("expected 1 segment, got %d: %+v", len(segs), segs)
+	}
+	if segs[0].Language != "en" {
+		t.Errorf("expected language en, got %q", segs[0].Language)
+	}
+}
+
+// T5: ja-sv with Latin text routed to SV (SV is defaultLatinLanguage).
+func TestSegmentText_JaSvLatinGoesToSv(t *testing.T) {
+	d := NewUnicodeLanguageDetector([]string{"ja", "sv"}, "sv")
+	segs := SegmentText("こんにちは hej", d)
+	if len(segs) != 2 {
+		t.Fatalf("expected 2 segments, got %d: %+v", len(segs), segs)
+	}
+	if segs[0].Language != "ja" {
+		t.Errorf("segment 0: expected ja, got %q", segs[0].Language)
+	}
+	if segs[1].Language != "sv" {
+		t.Errorf("segment 1: expected sv, got %q", segs[1].Language)
+	}
+}
+
+// T6: "Det är en bra dag" -> SV detected via ä character.
+func TestSegmentText_SwedishRingA(t *testing.T) {
+	d := NewUnicodeLanguageDetector([]string{"en", "sv"}, "en")
+	segs := SegmentText("Det \u00e4r en bra dag", d)
+	if len(segs) != 1 {
+		t.Fatalf("expected 1 segment, got %d: %+v", len(segs), segs)
+	}
+	if segs[0].Language != "sv" {
+		t.Errorf("expected language sv, got %q", segs[0].Language)
+	}
+}
+
+// T7: DefaultLatinLanguage with ja-sv returns SV.
+func TestDefaultLatinLanguage_JaSv(t *testing.T) {
+	got := DefaultLatinLanguage([]string{"ja", "sv"})
+	if got != "sv" {
+		t.Errorf("expected sv, got %q", got)
+	}
+}
+
+// T8: DefaultLatinLanguage with en-sv returns EN (higher priority).
+func TestDefaultLatinLanguage_EnSv(t *testing.T) {
+	got := DefaultLatinLanguage([]string{"en", "sv"})
+	if got != "en" {
+		t.Errorf("expected en, got %q", got)
+	}
+}
+
+// T9: SV single Latin language -> detectSwedish is false (no ambiguity).
+func TestSegmentText_SvOnlyLatin_NoDetection(t *testing.T) {
+	d := NewUnicodeLanguageDetector([]string{"ja", "sv"}, "sv")
+	// With only sv as Latin language, detectSwedish=false.
+	// "hello" should be SV (the default Latin).
+	segs := SegmentText("hello", d)
+	if len(segs) != 1 {
+		t.Fatalf("expected 1 segment, got %d: %+v", len(segs), segs)
+	}
+	if segs[0].Language != "sv" {
+		t.Errorf("expected language sv, got %q", segs[0].Language)
+	}
+}
+
+// T10: å character (U+00E5) triggers SV detection.
+func TestSegmentText_SwedishAring(t *testing.T) {
+	d := NewUnicodeLanguageDetector([]string{"en", "sv"}, "en")
+	segs := SegmentText("Vi g\u00e5r hem", d) // "går" contains å
+	if len(segs) != 1 {
+		t.Fatalf("expected 1 segment, got %d: %+v", len(segs), segs)
+	}
+	if segs[0].Language != "sv" {
+		t.Errorf("expected language sv, got %q", segs[0].Language)
+	}
+}

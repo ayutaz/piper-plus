@@ -1081,3 +1081,133 @@ func TestMultilingualPhonemizer_ConcurrentSafe(t *testing.T) {
 		}
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Swedish (SV) multilingual integration tests
+// ---------------------------------------------------------------------------
+
+// E2E-1: SV text with ä character routes to SV mock phonemizer.
+func TestMultilingualPhonemizer_SwedishRouting(t *testing.T) {
+	mp := newTestMultilingualPhonemizer(
+		[]string{"en", "sv"},
+		"en",
+		map[string]*mockPhonemizer{
+			"en": {lang: "en", tokens: []string{"^", "h", "$"}},
+			"sv": {lang: "sv", tokens: []string{"^", "s", "v", "$"}},
+		},
+	)
+	// "Jag är glad" has ä -> SV detected
+	result, err := mp.PhonemizeWithProsody("Jag \u00e4r glad")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// SV mock returns ["^", "s", "v", "$"], BOS/EOS stripped -> ["s", "v"]
+	if len(result.Tokens) != 2 {
+		t.Fatalf("expected 2 tokens, got %d: %v", len(result.Tokens), result.Tokens)
+	}
+	if result.Tokens[0] != "s" || result.Tokens[1] != "v" {
+		t.Errorf("expected [s v], got %v", result.Tokens)
+	}
+}
+
+// E2E-2: JA + SV mixed text routes correctly.
+func TestMultilingualPhonemizer_JaSvMixed(t *testing.T) {
+	mp := newTestMultilingualPhonemizer(
+		[]string{"ja", "sv"},
+		"sv",
+		map[string]*mockPhonemizer{
+			"ja": {lang: "ja", tokens: []string{"^", "a", "$"}},
+			"sv": {lang: "sv", tokens: []string{"^", "b", "$"}},
+		},
+	)
+	result, err := mp.PhonemizeWithProsody("こんにちは Hej")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// JA segment: ["a"], SV segment: ["b"]
+	if len(result.Tokens) != 2 {
+		t.Fatalf("expected 2 tokens, got %d: %v", len(result.Tokens), result.Tokens)
+	}
+	if result.Tokens[0] != "a" || result.Tokens[1] != "b" {
+		t.Errorf("expected [a b], got %v", result.Tokens)
+	}
+}
+
+// E2E-3: Latin text without SV indicators routes to EN, not SV.
+func TestMultilingualPhonemizer_LatinDefaultsToEnNotSv(t *testing.T) {
+	mp := newTestMultilingualPhonemizer(
+		[]string{"en", "sv"},
+		"en",
+		map[string]*mockPhonemizer{
+			"en": {lang: "en", tokens: []string{"^", "e", "$"}},
+			"sv": {lang: "sv", tokens: []string{"^", "s", "$"}},
+		},
+	)
+	result, err := mp.PhonemizeWithProsody("hello world")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// No SV indicators -> EN
+	if len(result.Tokens) != 1 {
+		t.Fatalf("expected 1 token, got %d: %v", len(result.Tokens), result.Tokens)
+	}
+	if result.Tokens[0] != "e" {
+		t.Errorf("expected [e], got %v", result.Tokens)
+	}
+}
+
+// E2E-4: 7-language set (ja-en-zh-es-fr-pt-sv) with SV text detection.
+func TestMultilingualPhonemizer_7LangSvDetection(t *testing.T) {
+	mp := newTestMultilingualPhonemizer(
+		[]string{"en", "es", "fr", "ja", "pt", "sv", "zh"},
+		"en",
+		map[string]*mockPhonemizer{
+			"ja": {lang: "ja", tokens: []string{"^", "j", "$"}},
+			"en": {lang: "en", tokens: []string{"^", "e", "$"}},
+			"zh": {lang: "zh", tokens: []string{"^", "z", "$"}},
+			"es": {lang: "es", tokens: []string{"^", "s", "$"}},
+			"fr": {lang: "fr", tokens: []string{"^", "f", "$"}},
+			"pt": {lang: "pt", tokens: []string{"^", "p", "$"}},
+			"sv": {lang: "sv", tokens: []string{"^", "v", "$"}},
+		},
+	)
+	// Swedish text with ä should be detected as SV
+	result, err := mp.PhonemizeWithProsody("Jag \u00e4r glad")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(result.Tokens) != 1 {
+		t.Fatalf("expected 1 token, got %d: %v", len(result.Tokens), result.Tokens)
+	}
+	if result.Tokens[0] != "v" {
+		t.Errorf("expected [v] (SV mock), got %v", result.Tokens)
+	}
+}
+
+// E2E-5: 7-language set: non-SV Latin text still routes to EN.
+func TestMultilingualPhonemizer_7LangNonSvLatin(t *testing.T) {
+	mp := newTestMultilingualPhonemizer(
+		[]string{"en", "es", "fr", "ja", "pt", "sv", "zh"},
+		"en",
+		map[string]*mockPhonemizer{
+			"ja": {lang: "ja", tokens: []string{"^", "j", "$"}},
+			"en": {lang: "en", tokens: []string{"^", "e", "$"}},
+			"zh": {lang: "zh", tokens: []string{"^", "z", "$"}},
+			"es": {lang: "es", tokens: []string{"^", "s", "$"}},
+			"fr": {lang: "fr", tokens: []string{"^", "f", "$"}},
+			"pt": {lang: "pt", tokens: []string{"^", "p", "$"}},
+			"sv": {lang: "sv", tokens: []string{"^", "v", "$"}},
+		},
+	)
+	// Plain English without SV indicators -> EN
+	result, err := mp.PhonemizeWithProsody("hello world")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(result.Tokens) != 1 {
+		t.Fatalf("expected 1 token, got %d: %v", len(result.Tokens), result.Tokens)
+	}
+	if result.Tokens[0] != "e" {
+		t.Errorf("expected [e] (EN mock), got %v", result.Tokens)
+	}
+}

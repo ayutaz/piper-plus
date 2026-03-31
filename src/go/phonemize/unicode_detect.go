@@ -11,11 +11,43 @@ type LangSegment struct {
 	Text     string
 }
 
+// svChars contains Swedish-specific characters not used by EN/ES/PT/FR.
+// Used for word-level Swedish detection within Latin segments.
+var svChars = map[rune]bool{
+	'\u00e4': true, // ä
+	'\u00f6': true, // ö
+	'\u00c4': true, // Ä
+	'\u00d6': true, // Ö
+	'\u00e5': true, // å
+	'\u00c5': true, // Å
+}
+
+// svDetectFunctionWords contains highly distinctive Swedish function words
+// that do not appear in EN/ES/PT/FR. Used for word-level language detection
+// disambiguation (distinct from svFunctionWords in swedish.go which is used
+// for G2P vowel length / stress rules).
+var svDetectFunctionWords = map[string]bool{
+	"och":    true, // and
+	"att":    true, // to/that
+	"jag":    true, // I (first person pronoun)
+	"det":    true, // it/that
+	"inte":   true, // not
+	"han":    true, // he
+	"hon":    true, // she
+	"som":    true, // who/which/as
+	"ska":    true, // shall/will
+	"med":    true, // with
+	"aldrig": true, // never
+	"alltid": true, // always
+}
+
 // UnicodeLanguageDetector detects language from Unicode character ranges.
 type UnicodeLanguageDetector struct {
 	languages            map[string]bool
 	defaultLatinLanguage string
 	hasJA, hasZH, hasKO  bool
+	hasSV                bool // whether SV is in the language set
+	detectSwedish        bool // hasSV && len(latinLanguages) >= 2
 }
 
 // NewUnicodeLanguageDetector creates a detector for the given language set.
@@ -34,12 +66,25 @@ func NewUnicodeLanguageDetector(languages []string, defaultLatinLang string) *Un
 			hasKO = true
 		}
 	}
+
+	hasSV := langSet["sv"]
+	// Count Latin-script languages for Swedish detection
+	latinLangs := 0
+	for _, l := range []string{"en", "es", "fr", "pt", "sv"} {
+		if langSet[l] {
+			latinLangs++
+		}
+	}
+	detectSwedish := hasSV && latinLangs >= 2
+
 	return &UnicodeLanguageDetector{
 		languages:            langSet,
 		defaultLatinLanguage: defaultLatinLang,
 		hasJA:                hasJA,
 		hasZH:                hasZH,
 		hasKO:                hasKO,
+		hasSV:                hasSV,
+		detectSwedish:        detectSwedish,
 	}
 }
 
@@ -196,5 +241,54 @@ func SegmentText(text string, detector *UnicodeLanguageDetector) []LangSegment {
 		})
 	}
 
+	// Post-pass: word-level Swedish detection within Latin segments.
+	if detector.detectSwedish {
+		segments = refineLatinSegmentsForSwedish(segments, detector)
+	}
+
 	return segments
+}
+
+// refineLatinSegmentsForSwedish re-examines Latin-script segments for
+// Swedish indicators (specific characters and function words). If any
+// indicator is found (svScore >= 1), the segment is reclassified as "sv".
+// This matches the Python _refine_latin_segments_for_swedish function.
+func refineLatinSegmentsForSwedish(segments []LangSegment, d *UnicodeLanguageDetector) []LangSegment {
+	if d.defaultLatinLanguage == "sv" {
+		return segments // SV is already the default; no reclassification needed.
+	}
+	result := make([]LangSegment, 0, len(segments))
+	for _, seg := range segments {
+		if seg.Language != d.defaultLatinLanguage {
+			result = append(result, seg)
+			continue
+		}
+		// Score Swedish indicators in this Latin segment.
+		svScore := 0
+		for _, word := range strings.Fields(seg.Text) {
+			wordLower := strings.ToLower(strings.Trim(word, ".,;:!?"))
+			if wordLower == "" {
+				continue
+			}
+			// Check for Swedish-specific characters (ä/ö/å).
+			hasSvChar := false
+			for _, r := range wordLower {
+				if svChars[r] {
+					hasSvChar = true
+					break
+				}
+			}
+			if hasSvChar {
+				svScore++
+			} else if svDetectFunctionWords[wordLower] {
+				svScore++
+			}
+		}
+		if svScore >= 1 {
+			result = append(result, LangSegment{Language: "sv", Text: seg.Text})
+		} else {
+			result = append(result, seg)
+		}
+	}
+	return result
 }

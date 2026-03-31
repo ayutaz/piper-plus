@@ -7,7 +7,7 @@ import (
 )
 
 // fixedPUA maps multi-character phoneme tokens to single PUA codepoints.
-// 87 entries total, covering JA, ZH, KO, ES/PT, FR, and shared tokens.
+// 96 entries total, covering JA, ZH, KO, ES/PT, FR, SV, and shared tokens.
 var fixedPUA = map[string]rune{
 	// Japanese (0xE000-0xE01C) — 29 entries
 	"a:":       0xE000,
@@ -107,6 +107,17 @@ var fixedPUA = map[string]rune{
 	"ɛ̃": 0xE056,
 	"ɑ̃": 0xE057,
 	"ɔ̃": 0xE058,
+
+	// Swedish (0xE059-0xE061) — 9 entries (long vowels)
+	"iː": 0xE059,
+	"yː": 0xE05A,
+	"eː": 0xE05B,
+	"ɛː": 0xE05C,
+	"øː": 0xE05D,
+	"ɑː": 0xE05E,
+	"oː": 0xE05F,
+	"uː": 0xE060,
+	"ʉː": 0xE061,
 }
 
 // reversePUA maps PUA codepoints back to multi-character tokens.
@@ -122,7 +133,7 @@ var (
 var (
 	dynamicPUA  = make(map[string]string)
 	dynamicMu   sync.Mutex
-	nextDynamic = rune(0xE059) // Start after last fixed PUA (0xE058 = ɔ̃)
+	nextDynamic = rune(0xE064) // Start after last fixed PUA (0xE061 = ʉː) + 2 reserved
 )
 
 // maxPUA is the upper bound of the Unicode Private Use Area (BMP).
@@ -199,7 +210,7 @@ func ResetDynamicPUA() {
 		delete(reversePUA, r)
 	}
 	dynamicPUA = make(map[string]string)
-	nextDynamic = 0xE059
+	nextDynamic = 0xE064
 }
 
 // ErrPUAExhausted is returned when the PUA codepoint space is exhausted.
