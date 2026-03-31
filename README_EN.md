@@ -9,7 +9,7 @@ English | [日本語](README.md) | [中文](README_ZH.md) | [Français](README_F
 [![Hugging Face Demo](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Demo-blue)](https://huggingface.co/spaces/ayousanz/piper-plus-demo)
 [![Hugging Face Model](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Model-orange)](https://huggingface.co/ayousanz/piper-plus-base)
 
-A fast, high-quality neural text-to-speech (TTS) system. Built on the [VITS](https://github.com/jaywalnut310/vits/) architecture with multi-speaker support for 7 languages (Japanese, English, Mandarin Chinese, Spanish, French, Portuguese, Swedish). A fork of [Piper](https://github.com/rhasspy/piper) with significantly enhanced Japanese support, improved voice quality, and advanced training features.
+A fast, high-quality neural text-to-speech (TTS) system. Built on the [VITS](https://github.com/jaywalnut310/vits/) architecture with multi-speaker support for 8 languages (Japanese, English, Mandarin Chinese, Korean, Spanish, French, Portuguese, Swedish). A fork of [Piper](https://github.com/rhasspy/piper) with significantly enhanced Japanese support, improved voice quality, and advanced training features.
 
 **[Hugging Face Demo](https://huggingface.co/spaces/ayousanz/piper-plus-demo)** | **[WebAssembly Demo](https://ayutaz.github.io/piper-plus/)** (runs in browser, no server needed)
 
@@ -33,10 +33,10 @@ A fast, high-quality neural text-to-speech (TTS) system. Built on the [VITS](htt
 
 ### Speech Synthesis
 
-- **7-Language Support** — Japanese, English, Mandarin Chinese, Spanish, French, Portuguese, Swedish (language codes: ja=0, en=1, zh=2, es=3, fr=4, pt=5, sv=6)
+- **8-Language Support** — Japanese, English, Mandarin Chinese, Korean, Spanish, French, Portuguese, Swedish (language codes: ja=0, en=1, zh=2, ko=3, es=4, fr=5, pt=6, sv=7)
 - **Japanese TTS** — OpenJTalk integration, prosody features (A1/A2/A3), question markers (#204), context-dependent "N" variants (#207)
 - **English TTS** — GPL-free G2P ([g2p-en](https://github.com/Kyubyong/g2p), Apache-2.0), no espeak-ng dependency
-- **Multi-speaker** — 571 speakers in 6-language base model (code supports 7 languages including Swedish), SpeakerBalancedBatchSampler with language-balanced sampling
+- **Multi-speaker** — 571 speakers in 6-language base model (code supports 8 languages including Swedish and Korean), SpeakerBalancedBatchSampler with language-balanced sampling
 - **Custom Dictionary** — 200+ built-in technical term pronunciations
 - **Phoneme Input** — Direct phoneme specification with `[[ phonemes ]]` notation — [Guide](docs/features/phoneme-input.md)
 
@@ -56,7 +56,7 @@ A fast, high-quality neural text-to-speech (TTS) system. Built on the [VITS](htt
 - **[WebAssembly](src/wasm/openjtalk-web/README.md)** — Fully runs in browser, no server
 - **[Docker](docker/README.md)** — 5 images for inference, training, WebUI, and C++
 - **PyPI** — `pip install piper-plus`
-- **C# CLI** — .NET 8/9 cross-platform, 7-language multilingual, ONNX inference
+- **C# CLI** — .NET 8/9 cross-platform, 8-language multilingual, ONNX inference
 - **Rust CLI** — piper-plus/piper-plus-cli, streaming, CUDA/CoreML/DirectML support, auto dictionary download
 - **[Go CLI](src/go/README.md)** — HTTP API server, session pooling, Docker, single binary
 
@@ -317,7 +317,7 @@ piper-plus-cli --model model.onnx --text "hello" --language en --quiet
 piper-plus-cli --model model.onnx --text "hello" --language en --output-raw | aplay -r 22050 -f S16_LE
 ```
 
-> **Note:** Install C# CLI with `dotnet tool install -g PiperPlus.Cli` and Rust CLI with `cargo install piper-plus-cli`. Both support 7 languages, custom dictionaries, and streaming.
+> **Note:** Install C# CLI with `dotnet tool install -g PiperPlus.Cli` and Rust CLI with `cargo install piper-plus-cli`. Both support 8 languages, custom dictionaries, and streaming.
 
 ### Building from Source (Rust)
 

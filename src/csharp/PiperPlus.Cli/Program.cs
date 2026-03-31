@@ -144,7 +144,7 @@ internal static class Program
         // --language
         var languageOption = new Option<string>("--language")
         {
-            Description = "Language for --text mode: ja, en, zh, es, fr, pt, sv, or combined (e.g. ja-en-zh-es-fr-pt-sv) (default: ja)",
+            Description = "Language for --text mode: ja, en, zh, ko, es, fr, pt, sv, or combined (e.g. ja-en-zh-ko-es-fr-pt-sv) (default: ja)",
             DefaultValueFactory = _ => "ja",
         };
 
@@ -1445,6 +1445,9 @@ internal static class Program
             case "zh":
                 return new ChinesePhonemizer(new DotNetChineseG2PEngine());
 
+            case "ko":
+                return new KoreanPhonemizer(new DotNetKoreanG2PEngine());
+
             case "es":
                 return new SpanishPhonemizer(new DotNetSpanishG2PEngine());
 
@@ -1460,7 +1463,7 @@ internal static class Program
             default:
                 throw new NotSupportedException(
                     $"Unsupported language for --text mode: {language}. " +
-                    "Supported languages: ja, en, zh, es, fr, pt, sv, or combined (e.g. ja-en-zh-es-fr-pt).");
+                    "Supported languages: ja, en, zh, ko, es, fr, pt, sv, or combined (e.g. ja-en-zh-ko-es-fr-pt).");
         }
     }
 

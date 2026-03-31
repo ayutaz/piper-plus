@@ -71,7 +71,7 @@ func init() {
 	f.StringVarP(&modelPath, "model", "m", "", "path to ONNX model file (or $PIPER_DEFAULT_MODEL)")
 	f.StringVarP(&configPath, "config", "c", "", "path to config.json (auto-detected if omitted)")
 	f.StringVarP(&textInput, "text", "t", "", "text to synthesize (single utterance mode)")
-	f.StringVar(&language, "language", "", "language code (e.g. ja, en, zh)")
+	f.StringVar(&language, "language", "", "language code (e.g. ja, en, zh, ko)")
 	f.Int64VarP(&speakerID, "speaker", "s", 0, "speaker ID for multi-speaker models")
 	f.StringVarP(&outputFile, "output-file", "f", "", "output WAV path (- for stdout)")
 	f.StringVarP(&outputDir, "output-dir", "d", ".", "output directory for generated files")

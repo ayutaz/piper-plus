@@ -101,7 +101,7 @@ Note: Chinese (zh_CN) tests are skipped on Windows due to phonemizer limitations
 
 The C# implementation has 829 tests using xUnit v3 in the `PiperPlus.Core.Tests` project. These tests cover:
 
-- All 7 language phonemizers (Japanese, English, Chinese, Spanish, Portuguese, French, Swedish)
+- All 8 language phonemizers (Japanese, English, Chinese, Korean, Spanish, Portuguese, French, Swedish)
 - `PostProcessIds` logic
 - PUA (Private Use Area) mapping
 - IPA tokenizer
@@ -172,7 +172,7 @@ The workflow also includes `cargo check`, `cargo fmt`, and `cargo clippy` jobs o
 
 The Go `piperplus` package has 690+ unit tests and 11 integration tests covering:
 
-- All 7 language phonemizers (Japanese, English, Chinese, Spanish, Portuguese, French, Swedish)
+- All 8 language phonemizers (Japanese, English, Chinese, Korean, Spanish, Portuguese, French, Swedish)
 - Unicode language detection and text segmentation
 - PUA (Private Use Area) bidirectional mapping (87 entries)
 - Config parsing, WAV output, error types
@@ -210,7 +210,7 @@ CI is defined in `.github/workflows/go-ci.yml` and runs:
 
 ## 6-Language Multilingual Model Testing
 
-Piper Plus ships a 6-language multilingual model (571 speakers, 173 symbols) trained on JA, EN, ZH, ES, FR, PT. The G2P code supports 7 languages (including Swedish/sv), but the current model was trained on 6. Use the following sample texts to verify all model languages work correctly.
+Piper Plus ships a 6-language multilingual model (571 speakers, 173 symbols) trained on JA, EN, ZH, ES, FR, PT. The G2P code supports 8 languages (including Swedish/sv and Korean/ko), but the current model was trained on 6. Use the following sample texts to verify all model languages work correctly.
 
 ### Sample Texts by Language
 

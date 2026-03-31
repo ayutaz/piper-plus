@@ -9,7 +9,7 @@
 [![Hugging Face Demo](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Demo-blue)](https://huggingface.co/spaces/ayousanz/piper-plus-demo)
 [![Hugging Face Model](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Model-orange)](https://huggingface.co/ayousanz/piper-plus-base)
 
-快速、高质量的神经网络文本转语音 (TTS) 系统。基于 [VITS](https://github.com/jaywalnut310/vits/) 架构，支持7种语言（日语、英语、普通话、西班牙语、法语、葡萄牙语、瑞典语）的多说话人语音合成。本项目是 [Piper](https://github.com/rhasspy/piper) 的分支，大幅增强了日语支持、音质和训练功能。
+快速、高质量的神经网络文本转语音 (TTS) 系统。基于 [VITS](https://github.com/jaywalnut310/vits/) 架构，支持8种语言（日语、英语、普通话、韩语、西班牙语、法语、葡萄牙语、瑞典语）的多说话人语音合成。本项目是 [Piper](https://github.com/rhasspy/piper) 的分支，大幅增强了日语支持、音质和训练功能。
 
 **[Hugging Face 演示](https://huggingface.co/spaces/ayousanz/piper-plus-demo)** | **[WebAssembly 演示](https://ayutaz.github.io/piper-plus/)** (浏览器运行，无需服务器)
 
@@ -33,7 +33,7 @@
 
 ### 语音合成
 
-- **7语言支持** — 日语、英语、普通话、西班牙语、法语、葡萄牙语、瑞典语 (ja=0, en=1, zh=2, es=3, fr=4, pt=5, sv=6)
+- **8语言支持** — 日语、英语、普通话、韩语、西班牙语、法语、葡萄牙语、瑞典语 (ja=0, en=1, zh=2, ko=3, es=4, fr=5, pt=6, sv=7)
 - **日语 TTS** — OpenJTalk 集成、韵律特征 (A1/A2/A3)、疑问标记 (#204)、上下文相关「ん」变体 (#207)
 - **英语 TTS** — 无 GPL 依赖的 G2P ([g2p-en](https://github.com/Kyubyong/g2p), Apache-2.0)，无需 espeak-ng
 - **多说话人** — 571说话人的6语言基础模型，SpeakerBalancedBatchSampler，语言均衡采样自动启用
@@ -56,7 +56,7 @@
 - **[WebAssembly](src/wasm/openjtalk-web/README.md)** — 完全在浏览器中运行，无需服务器
 - **[Docker](docker/README.md)** — 提供推理、训练、WebUI、C++ 共 5 个镜像
 - **PyPI** — `pip install piper-plus`
-- **C# CLI** — .NET 8/9 跨平台，7语言多语言支持，ONNX 推理
+- **C# CLI** — .NET 8/9 跨平台，8语言多语言支持，ONNX 推理
 - **Rust CLI** — piper-plus/piper-plus-cli，流式处理，CUDA/CoreML/DirectML 支持，词典自动下载
 - **[Go CLI](src/go/README.md)** — HTTP API服务器、会话池、Docker、单一二进制文件
 
@@ -366,7 +366,7 @@ piper-plus-cli --model model.onnx --text "hello" --language en --quiet
 piper-plus-cli --model model.onnx --text "hello" --language en --output-raw | aplay -r 22050 -f S16_LE
 ```
 
-> **注意：** C# CLI 可通过 `dotnet tool install -g PiperPlus.Cli` 安装，Rust CLI 可通过 `cargo install piper-plus-cli` 安装。两者均支持7语言、自定义词典和流式处理。
+> **注意：** C# CLI 可通过 `dotnet tool install -g PiperPlus.Cli` 安装，Rust CLI 可通过 `cargo install piper-plus-cli` 安装。两者均支持8语言、自定义词典和流式处理。
 
 ### 从源码构建 (Rust)
 

@@ -9,7 +9,7 @@
 [![Hugging Face Demo](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Demo-blue)](https://huggingface.co/spaces/ayousanz/piper-plus-demo)
 [![Hugging Face Model](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Model-orange)](https://huggingface.co/ayousanz/piper-plus-base)
 
-Systeme de synthese vocale neuronale (TTS) rapide et de haute qualite. Base sur l'architecture [VITS](https://github.com/jaywalnut310/vits/), il prend en charge la synthese vocale multi-locuteurs en 7 langues (japonais, anglais, chinois mandarin, espagnol, francais, portugais, suedois). Fork de [Piper](https://github.com/rhasspy/piper) avec un support japonais, une qualite audio et des fonctionnalites d'entrainement considerablement ameliores.
+Systeme de synthese vocale neuronale (TTS) rapide et de haute qualite. Base sur l'architecture [VITS](https://github.com/jaywalnut310/vits/), il prend en charge la synthese vocale multi-locuteurs en 8 langues (japonais, anglais, chinois mandarin, coreen, espagnol, francais, portugais, suedois). Fork de [Piper](https://github.com/rhasspy/piper) avec un support japonais, une qualite audio et des fonctionnalites d'entrainement considerablement ameliores.
 
 **[Demo Hugging Face](https://huggingface.co/spaces/ayousanz/piper-plus-demo)** | **[Demo WebAssembly](https://ayutaz.github.io/piper-plus/)** (fonctionne dans le navigateur, sans serveur)
 
@@ -35,7 +35,7 @@ Systeme de synthese vocale neuronale (TTS) rapide et de haute qualite. Base sur 
 
 - **TTS japonais** — Integration OpenJTalk, caracteristiques prosodiques (A1/A2/A3), marqueurs interrogatifs (#204), variantes contextuelles du "N" (#207)
 - **TTS anglais** — G2P sans GPL ([g2p-en](https://github.com/Kyubyong/g2p), Apache-2.0), pas de dependance a espeak-ng
-- **Multilingue 7 langues** — Japonais, anglais, chinois mandarin, espagnol, francais, portugais, suedois (ja=0, en=1, zh=2, es=3, fr=4, pt=5, sv=6)
+- **Multilingue 8 langues** — Japonais, anglais, chinois mandarin, coreen, espagnol, francais, portugais, suedois (ja=0, en=1, zh=2, ko=3, es=4, fr=5, pt=6, sv=7)
 - **Multi-locuteurs** — 571 locuteurs dans le modele de base 6 langues, SpeakerBalancedBatchSampler
 - **Dictionnaire personnalise** — 200+ termes techniques integres
 - **Saisie phonemique** — Specification directe avec la notation `[[ phonemes ]]` — [Guide](docs/features/phoneme-input.md)
@@ -53,7 +53,7 @@ Systeme de synthese vocale neuronale (TTS) rapide et de haute qualite. Base sur 
 
 - **[WebUI (Gradio)](docs/features/webui.md)** — Inference et entrainement, compatible Docker
 - **CLI C++** — Streaming, inference CUDA, sortie de timing phonemique, dictionnaire personnalise
-- **CLI C#** — .NET 8/9 multiplateforme, 7 langues multilingue, inference ONNX
+- **CLI C#** — .NET 8/9 multiplateforme, 8 langues multilingue, inference ONNX
 - **CLI Rust** — piper-plus/piper-plus-cli, streaming, CUDA/CoreML/DirectML, telechargement automatique des dictionnaires
 - **[WebAssembly](src/wasm/openjtalk-web/README.md)** — Fonctionne entierement dans le navigateur, sans serveur
 - **[Docker](docker/README.md)** — 5 images pour l'inference, l'entrainement, WebUI et C++
@@ -313,7 +313,7 @@ piper-plus-cli --model model.onnx --text "hello" --language en --quiet
 piper-plus-cli --model model.onnx --text "hello" --language en --output-raw | aplay -r 22050 -f S16_LE
 ```
 
-> **Note :** Le CLI C# s'installe via `dotnet tool install -g PiperPlus.Cli` et le CLI Rust via `cargo install piper-plus-cli`. Les deux prennent en charge 7 langues, les dictionnaires personnalises et le streaming.
+> **Note :** Le CLI C# s'installe via `dotnet tool install -g PiperPlus.Cli` et le CLI Rust via `cargo install piper-plus-cli`. Les deux prennent en charge 8 langues, les dictionnaires personnalises et le streaming.
 
 ---
 
