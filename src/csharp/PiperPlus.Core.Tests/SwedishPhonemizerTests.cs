@@ -824,3 +824,1047 @@ public sealed class SwedishPhonemizerTests
         Assert.Equal("sv", segments[0].Lang);
     }
 }
+
+// ====================================================================
+// SwedishG2PEngine unit tests
+// ====================================================================
+
+/// <summary>
+/// Tests for <see cref="SwedishG2PEngine"/>: verifies the full rule-based
+/// G2P pipeline including consonant rules, vowel length, retroflex
+/// assimilation, stress placement, loanword suffixes, and function words.
+/// </summary>
+public sealed class SwedishG2PEngineTests
+{
+    private readonly SwedishG2PEngine _engine = new();
+
+    // Helper: extract just phoneme tokens (no spaces/punctuation) from output.
+    private List<string> PhonemeTokens(List<string> tokens)
+    {
+        return tokens.Where(t => t != " " && t.Length == 1 && ".,:;!?".Contains(t[0]) == false
+            || t.Length > 1
+            || (t.Length == 1 && !".,:;!?".Contains(t[0]) && t != " ")).ToList();
+    }
+
+    // ================================================================
+    // 1. Consonant rules: soft k before front vowel
+    // ================================================================
+
+    [Fact]
+    public void SoftK_BeforeFrontVowel_ProducesAlveopalatal()
+    {
+        // "köpa" -> k before ö (front vowel) = /ɕ/ (soft)
+        // köpa is NOT in HardKWords
+        var tokens = _engine.ToPhonemeList("köpa");
+        Assert.Contains("\u0255", tokens);  // ɕ
+    }
+
+    // ================================================================
+    // 2. Consonant rules: hard k exception word
+    // ================================================================
+
+    [Fact]
+    public void HardK_ExceptionWord_ProducesK()
+    {
+        // "kille" is in HardKWords -> hard /k/ before front vowel
+        var tokens = _engine.ToPhonemeList("kille");
+        // Should have "k" but not "\u0255"
+        Assert.Contains("k", tokens);
+        Assert.DoesNotContain("\u0255", tokens);
+    }
+
+    // ================================================================
+    // 3. Consonant rules: soft g before front vowel
+    // ================================================================
+
+    [Fact]
+    public void SoftG_BeforeFrontVowel_ProducesJ()
+    {
+        // "göra" -> g before ö (front vowel) = /j/ (soft)
+        // göra is NOT in HardGWords
+        var tokens = _engine.ToPhonemeList("göra");
+        // First phoneme should be "j" (not "ɡ")
+        // Filter out stress markers
+        var filtered = tokens.Where(t => t != "\u02c8" && t != "\u02cc").ToList();
+        Assert.Equal("j", filtered[0]);
+    }
+
+    // ================================================================
+    // 4. Consonant rules: hard g exception word
+    // ================================================================
+
+    [Fact]
+    public void HardG_ExceptionWord_ProducesG()
+    {
+        // "ger" is in HardGWords -> hard /ɡ/ before front vowel
+        var tokens = _engine.ToPhonemeList("ger");
+        Assert.Contains("\u0261", tokens);  // ɡ
+    }
+
+    // ================================================================
+    // 5. Hard g -era verb heuristic
+    // ================================================================
+
+    [Fact]
+    public void HardG_EraVerbHeuristic()
+    {
+        // Words ending in -era get hard g (e.g. navigera)
+        var tokens = _engine.ToPhonemeList("navigera");
+        // The g before e should be hard /ɡ/
+        Assert.Contains("\u0261", tokens);
+    }
+
+    // ================================================================
+    // 6. Digraph: sj -> /ɧ/
+    // ================================================================
+
+    [Fact]
+    public void Digraph_Sj_ProducesFricative()
+    {
+        // "sjö" -> sj = /ɧ/
+        var tokens = _engine.ToPhonemeList("sjö");
+        Assert.Contains("\u0267", tokens);  // ɧ
+    }
+
+    // ================================================================
+    // 7. Digraph: tj -> /ɕ/
+    // ================================================================
+
+    [Fact]
+    public void Digraph_Tj_ProducesTjSound()
+    {
+        // "tjugo" -> tj = /ɕ/
+        var tokens = _engine.ToPhonemeList("tjugo");
+        Assert.Contains("\u0255", tokens);  // ɕ
+    }
+
+    // ================================================================
+    // 8. Digraph: ng -> /ŋ/
+    // ================================================================
+
+    [Fact]
+    public void Digraph_Ng_ProducesVelarNasal()
+    {
+        // "ring" -> ng = /ŋ/
+        var tokens = _engine.ToPhonemeList("ring");
+        Assert.Contains("\u014b", tokens);  // ŋ
+    }
+
+    // ================================================================
+    // 9. Digraph: sk before front vowel -> /ɧ/
+    // ================================================================
+
+    [Fact]
+    public void Digraph_Sk_BeforeFrontVowel_ProducesFricative()
+    {
+        // "sked" -> sk + e (front) = /ɧ/
+        var tokens = _engine.ToPhonemeList("sked");
+        Assert.Contains("\u0267", tokens);  // ɧ
+    }
+
+    // ================================================================
+    // 10. Digraph: sk before back vowel -> /sk/
+    // ================================================================
+
+    [Fact]
+    public void Digraph_Sk_BeforeBackVowel_ProducesSK()
+    {
+        // "skog" -> sk + o (back) = /sk/
+        var tokens = _engine.ToPhonemeList("skog");
+        Assert.Contains("s", tokens);
+        Assert.Contains("k", tokens);
+    }
+
+    // ================================================================
+    // 11. Trigraph: skj -> /ɧ/
+    // ================================================================
+
+    [Fact]
+    public void Trigraph_Skj_ProducesFricative()
+    {
+        var tokens = _engine.ToPhonemeList("skjorta");
+        Assert.Contains("\u0267", tokens);  // ɧ
+    }
+
+    // ================================================================
+    // 12. Trigraph: stj -> /ɧ/
+    // ================================================================
+
+    [Fact]
+    public void Trigraph_Stj_ProducesFricative()
+    {
+        var tokens = _engine.ToPhonemeList("stjärna");
+        Assert.Contains("\u0267", tokens);  // ɧ
+    }
+
+    // ================================================================
+    // 13. Digraph: ch -> /ɧ/ (default) or /k/ (exception)
+    // ================================================================
+
+    [Fact]
+    public void Digraph_Ch_Default_ProducesFricative()
+    {
+        // "check" -> ch = /ɧ/ (not in CH_EXCEPTIONS_K)
+        var tokens = _engine.ToPhonemeList("check");
+        Assert.Contains("\u0267", tokens);
+    }
+
+    [Fact]
+    public void Digraph_Ch_Exception_ProducesK()
+    {
+        // "och" is in ChExceptionsK -> ch = /k/
+        var tokens = _engine.ToPhonemeList("och");
+        Assert.Contains("k", tokens);
+        Assert.DoesNotContain("\u0267", tokens);
+    }
+
+    // ================================================================
+    // 14. Digraph: nk -> /ŋk/
+    // ================================================================
+
+    [Fact]
+    public void Digraph_Nk_ProducesVelarNasalPlusK()
+    {
+        var tokens = _engine.ToPhonemeList("bank");
+        Assert.Contains("\u014b", tokens);
+        Assert.Contains("k", tokens);
+    }
+
+    // ================================================================
+    // 15. Digraph: ck -> /k/
+    // ================================================================
+
+    [Fact]
+    public void Digraph_Ck_ProducesK()
+    {
+        var tokens = _engine.ToPhonemeList("bäck");
+        Assert.Contains("k", tokens);
+    }
+
+    // ================================================================
+    // 16. Digraph: gn initial -> /ɡn/, medial -> /ŋn/
+    // ================================================================
+
+    [Fact]
+    public void Digraph_Gn_Initial_ProducesGN()
+    {
+        var tokens = _engine.ToPhonemeList("gnaga");
+        var filtered = tokens.Where(t => t != "\u02c8").ToList();
+        // gn at position 0 -> ɡ n
+        Assert.Equal("\u0261", filtered[0]);  // ɡ
+        Assert.Equal("n", filtered[1]);
+    }
+
+    [Fact]
+    public void Digraph_Gn_Medial_ProducesVelarN()
+    {
+        // "vagn" -> gn not at position 0 -> /ŋn/
+        var tokens = _engine.ToPhonemeList("vagn");
+        Assert.Contains("\u014b", tokens);  // ŋ
+    }
+
+    // ================================================================
+    // 17. Word-initial digraphs: gj, lj, dj, hj -> /j/
+    // ================================================================
+
+    [Theory]
+    [InlineData("gjord")]
+    [InlineData("ljus")]
+    [InlineData("djur")]
+    [InlineData("hjälp")]
+    public void WordInitialDigraph_ProducesJ(string word)
+    {
+        var tokens = _engine.ToPhonemeList(word);
+        var filtered = tokens.Where(t => t != "\u02c8").ToList();
+        Assert.Equal("j", filtered[0]);
+    }
+
+    // ================================================================
+    // 18. Vowel length: long vowel with single consonant
+    // ================================================================
+
+    [Fact]
+    public void VowelLength_SingleConsonant_LongVowel()
+    {
+        // "mat" -> 'a' + single 't' -> long ɑː
+        var tokens = _engine.ToPhonemeList("mat");
+        Assert.Contains("\u0251\u02d0", tokens);  // ɑː
+    }
+
+    // ================================================================
+    // 19. Vowel length: short vowel with consonant cluster
+    // ================================================================
+
+    [Fact]
+    public void VowelLength_ConsonantCluster_ShortVowel()
+    {
+        // "katt" -> a + tt (2 consonants) -> short 'a'
+        var tokens = _engine.ToPhonemeList("katt");
+        Assert.Contains("a", tokens);
+        Assert.DoesNotContain("\u0251\u02d0", tokens);
+    }
+
+    // ================================================================
+    // 20. Vowel length: word-final vowel -> long
+    // ================================================================
+
+    [Fact]
+    public void VowelLength_WordFinal_LongVowel()
+    {
+        // "bo" -> o in O_LONG_AS_OO + word-final -> oː
+        var tokens = _engine.ToPhonemeList("bo");
+        Assert.Contains("o\u02d0", tokens);
+    }
+
+    // ================================================================
+    // 21. Vowel length: O_LONG_AS_OO
+    // ================================================================
+
+    [Fact]
+    public void VowelLength_OLongAsOo_ProducesLongO()
+    {
+        // "son" -> o + single n AND in O_LONG_AS_OO -> oː (not uː)
+        var tokens = _engine.ToPhonemeList("son");
+        Assert.Contains("o\u02d0", tokens);
+        Assert.DoesNotContain("u\u02d0", tokens);
+    }
+
+    // ================================================================
+    // 22. Vowel length: default o (not in O_LONG_AS_OO) -> uː
+    // ================================================================
+
+    [Fact]
+    public void VowelLength_DefaultO_ProducesLongU()
+    {
+        // "bok" -> o + single k AND not in O_LONG_AS_OO -> uː
+        var tokens = _engine.ToPhonemeList("bok");
+        Assert.Contains("u\u02d0", tokens);
+    }
+
+    // ================================================================
+    // 23. Vowel length: FinalMShortWords
+    // ================================================================
+
+    [Fact]
+    public void VowelLength_FinalMShort_ProducesShortVowel()
+    {
+        // "hem" is in FinalMShortWords -> short vowel despite single consonant
+        var tokens = _engine.ToPhonemeList("hem");
+        // 'e' -> short ɛ
+        Assert.Contains("\u025b", tokens);
+        Assert.DoesNotContain("e\u02d0", tokens);
+    }
+
+    // ================================================================
+    // 24. Function words: no stress marker
+    // ================================================================
+
+    [Fact]
+    public void FunctionWord_NoStressMarker()
+    {
+        // "och" is a function word -> stress_syl = -1 -> no stress marker
+        var tokens = _engine.ToPhonemeList("och");
+        Assert.DoesNotContain("\u02c8", tokens);
+        Assert.DoesNotContain("\u02cc", tokens);
+    }
+
+    // ================================================================
+    // 25. Function words: short vowel
+    // ================================================================
+
+    [Fact]
+    public void FunctionWord_ShortVowel()
+    {
+        // "du" is a function word -> short vowel
+        var tokens = _engine.ToPhonemeList("du");
+        // 'u' short = /ɵ/
+        Assert.Contains("\u0275", tokens);
+    }
+
+    // ================================================================
+    // 26. Retroflex assimilation: r+t -> /ʈ/
+    // ================================================================
+
+    [Fact]
+    public void Retroflex_RT_ProducesRetroflexT()
+    {
+        // "kort" -> r+t -> /ʈ/
+        var tokens = _engine.ToPhonemeList("kort");
+        Assert.Contains("\u0288", tokens);  // ʈ
+    }
+
+    // ================================================================
+    // 27. Retroflex assimilation: r+d -> /ɖ/
+    // ================================================================
+
+    [Fact]
+    public void Retroflex_RD_ProducesRetroflexD()
+    {
+        // "bord" -> r+d -> /ɖ/
+        var tokens = _engine.ToPhonemeList("bord");
+        Assert.Contains("\u0256", tokens);  // ɖ
+    }
+
+    // ================================================================
+    // 28. Retroflex assimilation: r+s -> /ʂ/
+    // ================================================================
+
+    [Fact]
+    public void Retroflex_RS_ProducesRetroflexS()
+    {
+        // "mars" -> r+s -> /ʂ/
+        var tokens = _engine.ToPhonemeList("mars");
+        Assert.Contains("\u0282", tokens);  // ʂ
+    }
+
+    // ================================================================
+    // 29. Retroflex assimilation: r+n -> /ɳ/
+    // ================================================================
+
+    [Fact]
+    public void Retroflex_RN_ProducesRetroflexN()
+    {
+        // "barn" -> r+n -> /ɳ/
+        var tokens = _engine.ToPhonemeList("barn");
+        Assert.Contains("\u0273", tokens);  // ɳ
+    }
+
+    // ================================================================
+    // 30. Retroflex assimilation: r+l -> /ɭ/
+    // ================================================================
+
+    [Fact]
+    public void Retroflex_RL_ProducesRetroflexL()
+    {
+        // "karl" -> r+l -> /ɭ/
+        var tokens = _engine.ToPhonemeList("karl");
+        Assert.Contains("\u026d", tokens);  // ɭ
+    }
+
+    // ================================================================
+    // 31. Retroflex: rr blocks assimilation
+    // ================================================================
+
+    [Fact]
+    public void Retroflex_RR_BlocksAssimilation()
+    {
+        // Test apply_retroflex directly: ["r","r","t"] -> ["r","r","t"]
+        var input = new List<string> { "r", "r", "t" };
+        var result = SwedishG2PEngine.ApplyRetroflex(input);
+        Assert.Equal(new List<string> { "r", "r", "t" }, result);
+    }
+
+    // ================================================================
+    // 32. Retroflex cascade: r+t+s -> /ʈ/ /ʂ/
+    // ================================================================
+
+    [Fact]
+    public void Retroflex_Cascade_RTS()
+    {
+        // Cascade: r+t -> ʈ (propagating), then t+s -> ʂ
+        var input = new List<string> { "r", "t", "s" };
+        var result = SwedishG2PEngine.ApplyRetroflex(input);
+        Assert.Equal(new List<string> { "\u0288", "\u0282" }, result);
+    }
+
+    // ================================================================
+    // 33. Retroflex: ɭ stops cascade
+    // ================================================================
+
+    [Fact]
+    public void Retroflex_ReflexL_StopsCascade()
+    {
+        // r+l -> ɭ (non-propagating), then next consonant should NOT be retroflex
+        var input = new List<string> { "r", "l", "t" };
+        var result = SwedishG2PEngine.ApplyRetroflex(input);
+        // ɭ stops cascade, so t stays as t
+        Assert.Equal(new List<string> { "\u026d", "t" }, result);
+    }
+
+    // ================================================================
+    // 34. Stress: monosyllabic word gets stress on syllable 0
+    // ================================================================
+
+    [Fact]
+    public void Stress_Monosyllabic_SyllableZero()
+    {
+        // "hej" is monosyllabic -> stress on syllable 0
+        var tokens = _engine.ToPhonemeList("hej");
+        Assert.Contains("\u02c8", tokens);
+        // Stress marker should be at the beginning
+        Assert.Equal("\u02c8", tokens[0]);
+    }
+
+    // ================================================================
+    // 35. Stress: stress-attracting suffix
+    // ================================================================
+
+    [Fact]
+    public void Stress_AttractingSuffix_Tion()
+    {
+        // "station" -> -tion is stress-attracting
+        var tokens = _engine.ToPhonemeList("station");
+        Assert.Contains("\u02c8", tokens);
+    }
+
+    // ================================================================
+    // 36. Stress: unstressed prefix
+    // ================================================================
+
+    [Fact]
+    public void Stress_UnstressedPrefix_Foer()
+    {
+        // "förstå" -> "för" is unstressed prefix -> stress on 2nd syllable
+        int stressSyl = SwedishG2PEngine.DetectStress("förstå");
+        Assert.Equal(1, stressSyl);
+    }
+
+    // ================================================================
+    // 37. Stress: default first syllable
+    // ================================================================
+
+    [Fact]
+    public void Stress_DefaultFirstSyllable()
+    {
+        // "vatten" has 2 syllables, no special suffix/prefix -> stress on 0
+        int stressSyl = SwedishG2PEngine.DetectStress("vatten");
+        Assert.Equal(0, stressSyl);
+    }
+
+    // ================================================================
+    // 38. Stress: function word returns -1
+    // ================================================================
+
+    [Fact]
+    public void Stress_FunctionWord_ReturnsNegativeOne()
+    {
+        Assert.Equal(-1, SwedishG2PEngine.DetectStress("jag"));
+        Assert.Equal(-1, SwedishG2PEngine.DetectStress("och"));
+        Assert.Equal(-1, SwedishG2PEngine.DetectStress("inte"));
+    }
+
+    // ================================================================
+    // 39. Loanword suffix: -tion
+    // ================================================================
+
+    [Fact]
+    public void Loanword_Tion_ProducesCorrectPhonemes()
+    {
+        // "nation" -> stem "na" + suffix -tion -> ɧ uː n
+        var tokens = _engine.ToPhonemeList("nation");
+        Assert.Contains("\u0267", tokens);    // ɧ
+        Assert.Contains("u\u02d0", tokens);   // uː
+    }
+
+    // ================================================================
+    // 40. Loanword suffix: -age (not native)
+    // ================================================================
+
+    [Fact]
+    public void Loanword_Age_NonNative_ProducesLoanPhonemes()
+    {
+        // "garage" is not in AgeNativeWords -> loanword suffix
+        var tokens = _engine.ToPhonemeList("garage");
+        Assert.Contains("\u0251\u02d0", tokens); // ɑː
+        Assert.Contains("\u0267", tokens);        // ɧ
+    }
+
+    // ================================================================
+    // 41. Loanword suffix: -age (native exception)
+    // ================================================================
+
+    [Fact]
+    public void Loanword_Age_NativeException_NoLoanPhonemes()
+    {
+        // "mage" is in AgeNativeWords -> NOT treated as loanword
+        var tokens = _engine.ToPhonemeList("mage");
+        // Should not have the loanword ɑː ɧ pattern;
+        // instead native G2P applies
+        Assert.DoesNotContain("\u0267", tokens);
+    }
+
+    // ================================================================
+    // 42. Loanword suffix: -eur
+    // ================================================================
+
+    [Fact]
+    public void Loanword_Eur_ProducesCorrectPhonemes()
+    {
+        // "friseur" -> stem "fris" + suffix -eur -> øː r
+        var tokens = _engine.ToPhonemeList("friseur");
+        Assert.Contains("\u00f8\u02d0", tokens);  // øː
+    }
+
+    // ================================================================
+    // 43. Punctuation preserved
+    // ================================================================
+
+    [Fact]
+    public void Punctuation_Preserved()
+    {
+        var tokens = _engine.ToPhonemeList("hej!");
+        Assert.Contains("!", tokens);
+    }
+
+    // ================================================================
+    // 44. Word boundaries
+    // ================================================================
+
+    [Fact]
+    public void WordBoundary_SpaceToken()
+    {
+        var tokens = _engine.ToPhonemeList("hej alla");
+        Assert.Contains(" ", tokens);
+    }
+
+    // ================================================================
+    // 45. Empty input
+    // ================================================================
+
+    [Fact]
+    public void EmptyInput_ReturnsEmptyList()
+    {
+        var tokens = _engine.ToPhonemeList("");
+        Assert.Empty(tokens);
+    }
+
+    // ================================================================
+    // 46. Digraph: ph -> /f/
+    // ================================================================
+
+    [Fact]
+    public void Digraph_Ph_ProducesF()
+    {
+        var tokens = _engine.ToPhonemeList("photo");
+        Assert.Contains("f", tokens);
+    }
+
+    // ================================================================
+    // 47. Digraph: th -> /t/
+    // ================================================================
+
+    [Fact]
+    public void Digraph_Th_ProducesT()
+    {
+        var tokens = _engine.ToPhonemeList("thema");
+        var filtered = tokens.Where(t => t != "\u02c8").ToList();
+        Assert.Equal("t", filtered[0]);
+    }
+
+    // ================================================================
+    // 48. Long vowel: all 9 Swedish long vowels
+    // ================================================================
+
+    [Theory]
+    [InlineData("mat", "\u0251\u02d0")]   // a -> ɑː
+    [InlineData("bok", "u\u02d0")]        // o -> uː (default)
+    [InlineData("se", "e\u02d0")]         // e -> eː (word-final)
+    public void LongVowel_Produced(string word, string expectedVowel)
+    {
+        var tokens = _engine.ToPhonemeList(word);
+        Assert.Contains(expectedVowel, tokens);
+    }
+
+    // ================================================================
+    // 49. CountSyllables
+    // ================================================================
+
+    [Theory]
+    [InlineData("hej", 1)]
+    [InlineData("vatten", 2)]
+    [InlineData("station", 2)]
+    [InlineData("telefon", 3)]
+    public void CountSyllables_Correct(string word, int expected)
+    {
+        Assert.Equal(expected, SwedishG2PEngine.CountSyllables(word));
+    }
+
+    // ================================================================
+    // 50. r + C exception preserves long vowel
+    // ================================================================
+
+    [Fact]
+    public void VowelLength_RPlusSingleC_LongVowel()
+    {
+        // "barn" -> a + rn (2 consonants with r first) -> long ɑː
+        // (r+C exception: 'a' != 'o', and word[pos+1]=='r')
+        var tokens = _engine.ToPhonemeList("barn");
+        Assert.Contains("\u0251\u02d0", tokens);  // ɑː
+    }
+
+    // ================================================================
+    // 51. x -> /ks/
+    // ================================================================
+
+    [Fact]
+    public void Consonant_X_ProducesKS()
+    {
+        var tokens = _engine.ToPhonemeList("box");
+        Assert.Contains("k", tokens);
+        Assert.Contains("s", tokens);
+    }
+
+    // ================================================================
+    // 52. c before e -> /s/
+    // ================================================================
+
+    [Fact]
+    public void Consonant_C_BeforeE_ProducesS()
+    {
+        var tokens = _engine.ToPhonemeList("cell");
+        var filtered = tokens.Where(t => t != "\u02c8").ToList();
+        Assert.Equal("s", filtered[0]);
+    }
+
+    // ================================================================
+    // 53. w -> /v/
+    // ================================================================
+
+    [Fact]
+    public void Consonant_W_ProducesV()
+    {
+        var tokens = _engine.ToPhonemeList("webb");
+        Assert.Contains("v", tokens);
+    }
+
+    // ================================================================
+    // 54. z -> /s/
+    // ================================================================
+
+    [Fact]
+    public void Consonant_Z_ProducesS()
+    {
+        var tokens = _engine.ToPhonemeList("zon");
+        Assert.Contains("s", tokens);
+    }
+
+    // ================================================================
+    // 55. Trigraph: sch -> /ɧ/
+    // ================================================================
+
+    [Fact]
+    public void Trigraph_Sch_ProducesFricative()
+    {
+        var tokens = _engine.ToPhonemeList("schema");
+        Assert.Contains("\u0267", tokens);  // ɧ
+    }
+
+    // ================================================================
+    // 56. Multiple words with stress
+    // ================================================================
+
+    [Fact]
+    public void MultipleWords_EachHasStress()
+    {
+        var tokens = _engine.ToPhonemeList("hej alla");
+        // Should have two stress markers
+        int stressCount = tokens.Count(t => t == "\u02c8");
+        Assert.Equal(2, stressCount);
+    }
+
+    // ================================================================
+    // 57. Digraph: kj -> /ɕ/
+    // ================================================================
+
+    [Fact]
+    public void Digraph_Kj_ProducesTjSound()
+    {
+        var tokens = _engine.ToPhonemeList("kjol");
+        Assert.Contains("\u0255", tokens);  // ɕ
+    }
+
+    // ================================================================
+    // 58. Stress-attracting suffix: -eri
+    // ================================================================
+
+    [Fact]
+    public void Stress_AttractingSuffix_Eri()
+    {
+        // "bageri" -> -eri suffix -> stress on syllable after "bag"
+        int stressSyl = SwedishG2PEngine.DetectStress("bageri");
+        // "bag" = 1 syllable, so stress on syllable index 1
+        Assert.Equal(1, stressSyl);
+    }
+
+    // ================================================================
+    // 59. Loanword -ssion suffix
+    // ================================================================
+
+    [Fact]
+    public void Loanword_Ssion_ProducesCorrectPhonemes()
+    {
+        var tokens = _engine.ToPhonemeList("passion");
+        Assert.Contains("\u0267", tokens);    // ɧ
+        Assert.Contains("u\u02d0", tokens);   // uː
+    }
+
+    // ================================================================
+    // 60. Hard k stem matching
+    // ================================================================
+
+    [Fact]
+    public void HardK_StemMatch_ProducesK()
+    {
+        // "leker" -> stem "lek" is in HardKStems -> hard k
+        var tokens = _engine.ToPhonemeList("leker");
+        Assert.Contains("k", tokens);
+        Assert.DoesNotContain("\u0255", tokens);
+    }
+
+    // ================================================================
+    // 61. Retroflex: r at end of word (flush pending r)
+    // ================================================================
+
+    [Fact]
+    public void Retroflex_FlushPendingR()
+    {
+        var input = new List<string> { "a", "r" };
+        var result = SwedishG2PEngine.ApplyRetroflex(input);
+        Assert.Equal(new List<string> { "a", "r" }, result);
+    }
+
+    // ================================================================
+    // 62. Digraph: sh -> /ɧ/
+    // ================================================================
+
+    [Fact]
+    public void Digraph_Sh_ProducesFricative()
+    {
+        var tokens = _engine.ToPhonemeList("shop");
+        Assert.Contains("\u0267", tokens);  // ɧ
+    }
+
+    // ================================================================
+    // 63. Normalization: uppercase input
+    // ================================================================
+
+    [Fact]
+    public void Normalization_UppercaseInput()
+    {
+        var lower = _engine.ToPhonemeList("hej");
+        var upper = _engine.ToPhonemeList("HEJ");
+        Assert.Equal(lower, upper);
+    }
+
+    // ================================================================
+    // 64. Long vowel ö -> øː
+    // ================================================================
+
+    [Fact]
+    public void LongVowel_Oe_ProducesLongOSlash()
+    {
+        // "söt" -> ö + single t -> long øː
+        var tokens = _engine.ToPhonemeList("söt");
+        Assert.Contains("\u00f8\u02d0", tokens);  // øː
+    }
+
+    // ================================================================
+    // 65. Long vowel ä -> ɛː
+    // ================================================================
+
+    [Fact]
+    public void LongVowel_Ae_ProducesLongEpsilon()
+    {
+        // "säl" -> ä + single l -> long ɛː
+        var tokens = _engine.ToPhonemeList("säl");
+        Assert.Contains("\u025b\u02d0", tokens);  // ɛː
+    }
+
+    // ================================================================
+    // 66. Long vowel å -> oː
+    // ================================================================
+
+    [Fact]
+    public void LongVowel_Aa_ProducesLongO()
+    {
+        // "bål" -> å + single l -> long oː
+        var tokens = _engine.ToPhonemeList("bål");
+        Assert.Contains("o\u02d0", tokens);  // oː
+    }
+
+    // ================================================================
+    // 67. Short vowel ö -> œ
+    // ================================================================
+
+    [Fact]
+    public void ShortVowel_Oe_ProducesOE()
+    {
+        // "höst" -> ö + st (cluster) -> short œ
+        var tokens = _engine.ToPhonemeList("höst");
+        Assert.Contains("\u0153", tokens);  // œ
+    }
+
+    // ================================================================
+    // 68. Short vowel i -> ɪ
+    // ================================================================
+
+    [Fact]
+    public void ShortVowel_I_ProducesNearCloseI()
+    {
+        // "vill" -> i + ll (cluster) -> short ɪ
+        // But "vill" is function word -> short anyway
+        var tokens = _engine.ToPhonemeList("vill");
+        Assert.Contains("\u026a", tokens);  // ɪ
+    }
+
+    // ================================================================
+    // 69. Loanword -ium suffix
+    // ================================================================
+
+    [Fact]
+    public void Loanword_Ium_ProducesCorrectPhonemes()
+    {
+        var tokens = _engine.ToPhonemeList("stadium");
+        Assert.Contains("\u026a", tokens);   // ɪ
+        Assert.Contains("\u0275", tokens);   // ɵ
+    }
+
+    // ================================================================
+    // 70. Multiple punctuation characters
+    // ================================================================
+
+    [Fact]
+    public void MultiplePunctuation_AllPreserved()
+    {
+        var tokens = _engine.ToPhonemeList("hej!?");
+        Assert.Contains("!", tokens);
+        Assert.Contains("?", tokens);
+    }
+
+    // ================================================================
+    // 71. Hard G stem: berg/borg compounds
+    // ================================================================
+
+    [Fact]
+    public void HardG_Berg_ProducesHardG()
+    {
+        // "berg" is in HardGWords -> hard g
+        var tokens = _engine.ToPhonemeList("berg");
+        Assert.Contains("\u0261", tokens);  // ɡ
+    }
+
+    // ================================================================
+    // 72. Trigraph: ckj -> /ɕ/
+    // ================================================================
+
+    [Fact]
+    public void Trigraph_Ckj_ProducesTjSound()
+    {
+        var input = new List<string> { "a" };
+        // Test via full word containing ckj... (rare but we test the rule)
+        // Since ckj is unusual, let's test via the engine
+        // "rackjobb" is not a real word but tests the trigraph
+        // Let's just test the retroflex helper doesn't interfere
+        // Actually test with a constructed word
+        var tokens = _engine.ToPhonemeList("rackjobb");
+        // ckj -> ɕ
+        Assert.Contains("\u0255", tokens);
+    }
+
+    // ================================================================
+    // 73. DetectStress: stress-attracting suffix -itet
+    // ================================================================
+
+    [Fact]
+    public void Stress_AttractingSuffix_Itet()
+    {
+        // "kvalitet" -> -itet suffix -> stress after "kval"
+        int stressSyl = SwedishG2PEngine.DetectStress("kvalitet");
+        // "kval" = 1 syllable -> stress on syllable index 1
+        Assert.Equal(1, stressSyl);
+    }
+
+    // ================================================================
+    // 74. Full E2E: engine output fed to SwedishPhonemizer
+    // ================================================================
+
+    [Fact]
+    public void E2E_EngineToPhonemizerIntegration()
+    {
+        var engine = new SwedishG2PEngine();
+        var phonemizer = new SwedishPhonemizer(engine);
+
+        var (tokens, prosody) = phonemizer.PhonemizeWithProsody("hej");
+
+        Assert.NotEmpty(tokens);
+        Assert.Equal(tokens.Count, prosody.Count);
+        // Should have stress marker somewhere in the output
+        Assert.Contains("\u02c8", tokens);
+    }
+
+    // ================================================================
+    // 75. E2E: multi-word with prosody
+    // ================================================================
+
+    [Fact]
+    public void E2E_MultiWord_ProsodyAlignment()
+    {
+        var engine = new SwedishG2PEngine();
+        var phonemizer = new SwedishPhonemizer(engine);
+
+        var (tokens, prosody) = phonemizer.PhonemizeWithProsody("hej alla");
+
+        Assert.Equal(tokens.Count, prosody.Count);
+        Assert.Contains(" ", tokens);  // word boundary
+    }
+
+    // ================================================================
+    // 76. Stress-attracting suffix -ist
+    // ================================================================
+
+    [Fact]
+    public void Stress_AttractingSuffix_Ist()
+    {
+        int stressSyl = SwedishG2PEngine.DetectStress("pianist");
+        // "pian" -> 'ia' is one vowel cluster -> 1 syllable -> stress on index 1
+        Assert.Equal(1, stressSyl);
+    }
+
+    // ================================================================
+    // 77. Long vowel u -> ʉː
+    // ================================================================
+
+    [Fact]
+    public void LongVowel_U_ProducesBarredU()
+    {
+        // "hus" -> u + single s -> long ʉː
+        var tokens = _engine.ToPhonemeList("hus");
+        Assert.Contains("\u0289\u02d0", tokens);  // ʉː
+    }
+
+    // ================================================================
+    // 78. Long vowel y -> yː
+    // ================================================================
+
+    [Fact]
+    public void LongVowel_Y_ProducesLongY()
+    {
+        // "by" -> y word-final -> long yː
+        var tokens = _engine.ToPhonemeList("by");
+        Assert.Contains("y\u02d0", tokens);  // yː
+    }
+
+    // ================================================================
+    // 79. Long vowel i -> iː
+    // ================================================================
+
+    [Fact]
+    public void LongVowel_I_ProducesLongI()
+    {
+        // "bil" -> i + single l -> long iː
+        var tokens = _engine.ToPhonemeList("bil");
+        Assert.Contains("i\u02d0", tokens);  // iː
+    }
+
+    // ================================================================
+    // 80. Loanword -eum suffix
+    // ================================================================
+
+    [Fact]
+    public void Loanword_Eum_ProducesCorrectPhonemes()
+    {
+        var tokens = _engine.ToPhonemeList("museum");
+        Assert.Contains("e\u02d0", tokens);  // eː
+        Assert.Contains("\u0275", tokens);   // ɵ
+    }
+}
