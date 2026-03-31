@@ -1,0 +1,63 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "piper-g2p"
+version = "0.0.1"
+description = "Multilingual G2P (Grapheme-to-Phoneme) for TTS — eSpeak-ng free, MIT licensed"
+requires-python = ">=3.11"
+license = "MIT"
+authors = [
+    {name = "piper-plus contributors"},
+]
+keywords = ["g2p", "grapheme-to-phoneme", "tts", "phonemizer", "ipa"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Multimedia :: Sound/Audio :: Speech",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Typing :: Typed",
+]
+readme = "README.md"
+
+[project.optional-dependencies]
+ja = ["pyopenjtalk-plus"]
+en = ["g2p-en>=2.1.0"]
+all = ["pyopenjtalk-plus", "g2p-en>=2.1.0"]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+    "ruff>=0.8.0",
+    "mypy>=1.13",
+]
+
+[project.urls]
+Homepage = "https://github.com/yousan/piper-plus"
+Repository = "https://github.com/yousan/piper-plus"
+Issues = "https://github.com/yousan/piper-plus/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["piper_g2p"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 88
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM"]
+
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true
+warn_return_any = true
+warn_unused_configs = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
