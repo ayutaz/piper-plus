@@ -101,7 +101,7 @@ Note: Chinese (zh_CN) tests are skipped on Windows due to phonemizer limitations
 
 The C# implementation has 829 tests using xUnit v3 in the `PiperPlus.Core.Tests` project. These tests cover:
 
-- All 6 language phonemizers (Japanese, English, Chinese, Spanish, Portuguese, French)
+- All 7 language phonemizers (Japanese, English, Chinese, Spanish, Portuguese, French, Swedish)
 - `PostProcessIds` logic
 - PUA (Private Use Area) mapping
 - IPA tokenizer
@@ -170,7 +170,7 @@ The workflow also includes `cargo check`, `cargo fmt`, and `cargo clippy` jobs o
 
 ## 6-Language Multilingual Model Testing
 
-Piper Plus ships a 6-language multilingual model (571 speakers, 173 symbols) trained on JA, EN, ZH, ES, FR, PT. Use the following sample texts to verify all languages work correctly.
+Piper Plus ships a 6-language multilingual model (571 speakers, 173 symbols) trained on JA, EN, ZH, ES, FR, PT. The G2P code supports 7 languages (including Swedish/sv), but the current model was trained on 6. Use the following sample texts to verify all model languages work correctly.
 
 ### Sample Texts by Language
 
@@ -239,7 +239,7 @@ CUDA_VISIBLE_DEVICES="" uv run python -m piper_train.infer_onnx \
 
 ### What to Check
 
-- All 6 languages produce audible, non-silent output
+- All 6 model languages produce audible, non-silent output
 - Audio duration is reasonable (typically 1-3 seconds for the sample texts)
 - No "beep" artifacts (indicates Duration Predictor failure)
 - Language detection routes text to the correct phonemizer

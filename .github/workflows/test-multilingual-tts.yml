@@ -353,7 +353,8 @@ jobs:
           OUTDIR="${RUNNER_TEMP}/multilingual_test"
           mkdir -p "$OUTDIR"
 
-          # Test all 6 languages with the bundled multilingual model (no eSpeak needed)
+          # Test all 6 model languages with the bundled multilingual model (no eSpeak needed)
+          # Note: code supports 7 languages (incl. sv) but the test model was trained on 6
           echo "こんにちは" | "$PIPER" --model "$MODEL" --language ja --output_file "$OUTDIR/ja.wav"
           echo "Hello world" | "$PIPER" --model "$MODEL" --language en --output_file "$OUTDIR/en.wav"
           echo "你好世界" | "$PIPER" --model "$MODEL" --language zh --output_file "$OUTDIR/zh.wav"

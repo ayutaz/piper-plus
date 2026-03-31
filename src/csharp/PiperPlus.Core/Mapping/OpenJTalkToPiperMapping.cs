@@ -6,21 +6,21 @@ namespace PiperPlus.Core.Mapping;
 /// Provides bidirectional mapping between multi-character phoneme tokens
 /// and single PUA (Private Use Area) codepoints used by the Piper TTS pipeline.
 /// <para>
-/// The 87 fixed entries mirror <c>FIXED_PUA_MAPPING</c> in the Python
+/// The 96 fixed entries mirror <c>FIXED_PUA_MAPPING</c> in the Python
 /// <c>token_mapper.py</c> and the C++ phonemizer implementations.
 /// </para>
 /// </summary>
 public static class OpenJTalkToPiperMapping
 {
     // ----------------------------------------------------------------
-    // Fixed PUA mapping table (U+E000 .. U+E058) -- 87 entries
+    // Fixed PUA mapping table (U+E000 .. U+E061) -- 96 entries
     // ----------------------------------------------------------------
 
     /// <summary>
     /// Multi-character token to single PUA character.
     /// </summary>
     public static IReadOnlyDictionary<string, char> TokenToChar { get; } =
-        new Dictionary<string, char>(87)
+        new Dictionary<string, char>(96)
         {
             // =============================================================
             // Japanese (JA) — U+E000–U+E01C (29 entries)
@@ -168,6 +168,21 @@ public static class OpenJTalkToPiperMapping
             ["\u025B\u0303"] = '\uE056',     // ɛ̃  nasal open-mid front unrounded
             ["\u0251\u0303"] = '\uE057',     // ɑ̃  nasal open back unrounded
             ["\u0254\u0303"] = '\uE058',     // ɔ̃  nasal open-mid back rounded
+
+            // =============================================================
+            // Swedish (SV) — U+E059–U+E061 (9 entries)
+            // =============================================================
+
+            // --- Long vowels (Complementary Quantity) ---
+            ["i\u02D0"] = '\uE059',          // iː  close front unrounded long
+            ["y\u02D0"] = '\uE05A',          // yː  close front rounded long
+            ["e\u02D0"] = '\uE05B',          // eː  close-mid front unrounded long
+            ["\u025B\u02D0"] = '\uE05C',     // ɛː  open-mid front unrounded long
+            ["\u00F8\u02D0"] = '\uE05D',     // øː  close-mid front rounded long
+            ["\u0251\u02D0"] = '\uE05E',     // ɑː  open back unrounded long
+            ["o\u02D0"] = '\uE05F',          // oː  close-mid back rounded long
+            ["u\u02D0"] = '\uE060',          // uː  close back rounded long
+            ["\u0289\u02D0"] = '\uE061',     // ʉː  close central rounded long
         }.AsReadOnly();
 
     /// <summary>

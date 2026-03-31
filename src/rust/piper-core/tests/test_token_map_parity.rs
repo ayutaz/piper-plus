@@ -225,8 +225,8 @@ fn test_nonexistent_tokens_return_none() {
 
 #[test]
 fn test_total_entry_count_matches_python() {
-    // Python FIXED_PUA_MAPPING has exactly 87 entries
-    assert_eq!(FIXED_PUA_MAP.len(), 87);
+    // Python FIXED_PUA_MAPPING has exactly 96 entries
+    assert_eq!(FIXED_PUA_MAP.len(), 96);
 }
 
 #[test]

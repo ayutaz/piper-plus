@@ -135,6 +135,20 @@ FIXED_PUA_MAPPING = {
     "\u025b\u0303": 0xE056,  # ɛ̃  nasal open-mid front unrounded (vin, pain)
     "\u0251\u0303": 0xE057,  # ɑ̃  nasal open back unrounded (France, temps)
     "\u0254\u0303": 0xE058,  # ɔ̃  nasal open-mid back rounded (bon, nom)
+    # =======================================================================
+    # Swedish (SV)
+    # =======================================================================
+    # --- Long vowels (母音長 — Complementary Quantity) ---
+    "i\u02d0": 0xE059,  # iː  close front unrounded long
+    "y\u02d0": 0xE05A,  # yː  close front rounded long
+    "e\u02d0": 0xE05B,  # eː  close-mid front unrounded long
+    "\u025b\u02d0": 0xE05C,  # ɛː  open-mid front unrounded long
+    "\u00f8\u02d0": 0xE05D,  # øː  close-mid front rounded long
+    "\u0251\u02d0": 0xE05E,  # ɑː  open back unrounded long
+    "o\u02d0": 0xE05F,  # oː  close-mid back rounded long
+    "u\u02d0": 0xE060,  # uː  close back rounded long
+    "\u0289\u02d0": 0xE061,  # ʉː  close central rounded long
+    # 0xE062-0xE063 reserved for SV future expansion (e.g., tonal accent)
 }
 
 # Build bidirectional mappings
@@ -148,8 +162,9 @@ for token, codepoint in FIXED_PUA_MAPPING.items():
     CHAR2TOKEN[ch] = token
 
 # Private Use Area for dynamic allocation (starting after the last FIXED codepoint)
-# 0xE058 is the last used fixed codepoint (FR ɔ̃), so dynamic starts at 0xE059.
-_PUA_START = 0xE059
+# 0xE061 is the last used fixed codepoint (SV ʉː).
+# 0xE062-0xE063 are reserved for SV future expansion, so dynamic starts at 0xE064.
+_PUA_START = 0xE064
 _next = _PUA_START
 
 

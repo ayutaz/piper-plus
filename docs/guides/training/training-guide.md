@@ -10,11 +10,11 @@ For Windows, see [ssamjh's guide using WSL](https://ssamjh.nz/create-custom-pipe
 - [Preparing a Dataset](#preparing-a-dataset)
 - [Training a Model](#training-a-model)
 - [Multi-Speaker Fine-Tuning](#multi-speaker-fine-tuning)
-- [Multilingual Training (6言語)](#multilingual-training-6言語)
+- [Multilingual Training (7言語)](#multilingual-training-7言語)
 - [Transfer Learning (転移学習)](#transfer-learning-転移学習)
 - [WavLM Discriminator](#wavlm-discriminator)
 - [Testing](#testing)
-- [Multilingual Inference (6言語推論)](#multilingual-inference-6言語推論)
+- [Multilingual Inference (7言語推論)](#multilingual-inference-7言語推論)
 - [Tensorboard](#tensorboard)
 - [Exporting a Model](#exporting-a-model)
 - [CLI Options Reference](#cli-options-reference)
@@ -258,7 +258,7 @@ You can adjust the validation split (5% = 0.05) and number of test examples for 
 
 Batch size can be tricky to get right. It depends on the size of your GPU's vRAM, the model's quality/size, and the length of the longest sentence in your dataset. The `--max-phoneme-ids <N>` argument to `piper_train` will drop sentences that have more than `N` phoneme ids. In practice, using `--batch-size 32` and `--max-phoneme-ids 400` will work for 24 GB of vRAM (RTX 3090/4090).
 
-**Note on 6-language multilingual models:** The 6-language model uses 173 symbols (vs 97 for bilingual JA+EN), which increases embedding table size and GPU memory usage. On V100 16GB, `--batch-size 20` with `--max-phoneme-ids 400` is recommended. For fine-tuning a single speaker from a multilingual base, `--batch-size 4` works well.
+**Note on multilingual models:** The current 6-language model uses 173 symbols (vs 97 for bilingual JA+EN), which increases embedding table size and GPU memory usage. Code supports 7 languages (including Swedish), which would increase the symbol count further. On V100 16GB, `--batch-size 20` with `--max-phoneme-ids 400` is recommended. For fine-tuning a single speaker from a multilingual base, `--batch-size 4` works well.
 
 ### Advanced Training Options
 
@@ -282,9 +282,9 @@ If you're training a multi-speaker model, use `--resume_from_single_speaker_chec
 For multi-speaker models, use `--samples-per-speaker <N>` to activate the `SpeakerBalancedBatchSampler`, which ensures each batch contains balanced speaker representation and prevents Duration Predictor collapse. For example, `--batch-size 20 --samples-per-speaker 2` with 10 speakers gives an effective batch of 20.
 
 
-### Multilingual Training (6言語)
+### Multilingual Training (7言語)
 
-Piper supports multilingual pretraining with up to 6 languages: Japanese (ja), English (en), Chinese (zh), Spanish (es), French (fr), and Portuguese (pt).
+Piper supports multilingual pretraining with up to 7 languages: Japanese (ja), English (en), Chinese (zh), Spanish (es), French (fr), Portuguese (pt), and Swedish (sv).
 
 **Supported languages and Phonemizers:**
 
@@ -296,6 +296,9 @@ Piper supports multilingual pretraining with up to 6 languages: Japanese (ja), E
 | Spanish | es | SpanishPhonemizer | Rule-based (no dependency) |
 | French | fr | FrenchPhonemizer | Rule-based (no dependency) |
 | Portuguese | pt | PortuguesePhonemizer | Rule-based (no dependency) |
+| Swedish | sv | SwedishPhonemizer | Rule-based (no dependency) |
+
+> **Note:** Swedish (sv) G2P is code-ready but no Swedish model has been trained yet. The current 6-language base model does not include Swedish data.
 
 **Multilingual pretraining command template:**
 
@@ -321,13 +324,13 @@ uv run python -m piper_train \
 |-----------|-------|-----------|
 | `--max_epochs 75` | 75 epochs with large dataset yields ~282K gradient steps |
 | `--batch-size 20` | Fits on V100 16GB with 173 symbols |
-| `--samples-per-speaker 2` | Balances speaker representation across 6 languages |
+| `--samples-per-speaker 2` | Balances speaker representation across languages |
 | `--precision 32-true` | V100 requires FP32 (FP16-mixed causes slow backward pass) |
 | `--no-wavlm` | Recommended on V100 for training speed |
 
 **Language-balanced sampling:** When the speaker count ratio between languages exceeds 3:1, `--language-balanced-sampling` is **automatically enabled** to ensure balanced representation across language groups. You can also force it on with `--language-balanced-sampling`.
 
-**Dataset preparation:** Use `uv run python -m piper_train.tools.prepare_multilingual_dataset` to create a 6-language dataset from individual language sources. The resulting dataset uses 173 symbols in the `phoneme_id_map`.
+**Dataset preparation:** Use `uv run python -m piper_train.tools.prepare_multilingual_dataset` to create a multilingual dataset from individual language sources. The current 6-language dataset uses 173 symbols in the `phoneme_id_map`; adding Swedish would increase this count.
 
 
 ### Transfer Learning (転移学習)
@@ -467,7 +470,7 @@ lib/piper_phonemize -l en-us --espeak-data lib/espeak-ng-data/ < my_test_sentenc
 ```
 
 
-### Multilingual Inference (6言語推論)
+### Multilingual Inference (7言語推論)
 
 For multilingual models, use `--language` to specify the language combination and `--speaker-id` to select a speaker. The `--language` value uses a hyphen-separated list of language codes (order does not matter; it is normalized internally).
 

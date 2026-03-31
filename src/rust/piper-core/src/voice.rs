@@ -72,7 +72,7 @@ impl PiperVoice {
                 } else {
                     languages
                         .iter()
-                        .find(|l| matches!(l.as_str(), "es" | "fr" | "pt"))
+                        .find(|l| matches!(l.as_str(), "es" | "fr" | "pt" | "sv"))
                         .cloned()
                         .unwrap_or_else(|| languages[0].clone())
                 };
@@ -146,6 +146,7 @@ impl PiperVoice {
                 crate::phonemize::portuguese::PortuguesePhonemizer::new(),
             )),
             "ko" => Ok(Box::new(crate::phonemize::korean::KoreanPhonemizer::new())),
+            "sv" => Ok(Box::new(crate::phonemize::swedish::SwedishPhonemizer::new())),
             _ => Ok(Box::new(
                 crate::phonemize::multilingual::PassthroughPhonemizer::new(lang),
             )),

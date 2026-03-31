@@ -53,6 +53,22 @@ class _DominantLanguageDetector:
         if not counts:
             return self._language_id_map.get("en", 0)
         dominant = max(counts, key=lambda k: counts[k])
+
+        # Apply word-level Swedish refinement (matching multilingual.py)
+        if (
+            dominant == self._detector.default_latin_language
+            and self._detector._detect_swedish
+        ):
+            from .phonemize.multilingual import (  # noqa: PLC0415
+                _refine_latin_segments_for_swedish,
+            )
+
+            refined = _refine_latin_segments_for_swedish(
+                [(dominant, text)], self._detector
+            )
+            if refined and refined[0][0] == "sv":
+                dominant = "sv"
+
         return self._language_id_map.get(dominant, 0)
 
 
@@ -185,8 +201,8 @@ def main():
     parser.add_argument(
         "--language",
         default="ja",
-        help="Language for --text mode. Single (ja, en, zh, ko, es, pt, fr) "
-        "or multilingual combo (ja-en, ja-en-zh-ko, etc.) (default: ja)",
+        help="Language for --text mode. Single (ja, en, zh, ko, es, pt, fr, sv) "
+        "or multilingual combo (ja-en, ja-en-zh-ko-sv, etc.) (default: ja)",
     )
     parser.add_argument(
         "--speaker-id",

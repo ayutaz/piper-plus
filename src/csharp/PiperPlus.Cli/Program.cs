@@ -144,7 +144,7 @@ internal static class Program
         // --language
         var languageOption = new Option<string>("--language")
         {
-            Description = "Language for --text mode: ja, en, zh, es, fr, pt, or combined (e.g. ja-en-zh-es-fr-pt) (default: ja)",
+            Description = "Language for --text mode: ja, en, zh, es, fr, pt, sv, or combined (e.g. ja-en-zh-es-fr-pt-sv) (default: ja)",
             DefaultValueFactory = _ => "ja",
         };
 
@@ -1422,7 +1422,7 @@ internal static class Program
 
             // Determine default Latin language (prefer en, then es, pt, fr)
             string defaultLatin = "en";
-            foreach (var lat in new[] { "en", "es", "pt", "fr" })
+            foreach (var lat in new[] { "en", "es", "pt", "fr", "sv" })
             {
                 if (phonemizers.ContainsKey(lat))
                 {
@@ -1454,10 +1454,13 @@ internal static class Program
             case "pt":
                 return new PortuguesePhonemizer(new DotNetPortugueseG2PEngine());
 
+            case "sv":
+                return new SwedishPhonemizer(new DotNetSwedishG2PEngine());
+
             default:
                 throw new NotSupportedException(
                     $"Unsupported language for --text mode: {language}. " +
-                    "Supported languages: ja, en, zh, es, fr, pt, or combined (e.g. ja-en-zh-es-fr-pt).");
+                    "Supported languages: ja, en, zh, es, fr, pt, sv, or combined (e.g. ja-en-zh-es-fr-pt).");
         }
     }
 

@@ -62,6 +62,63 @@ class UnicodeLanguageDetector:
     # Excludes × (U+00D7) and ÷ (U+00F7) which are in the À-ÿ range
     _RE_LATIN = re.compile(r"[A-Za-zÀ-ÖØ-öø-ÿ]")
 
+    # Swedish-specific characters not used by EN/ES/PT/FR
+    # ä (U+00E4), ö (U+00F6) — also å (U+00E5) is shared with DA/NO but
+    # neither is in piper-plus, so it's a safe Swedish indicator.
+    _SWEDISH_CHARS = frozenset("\u00e4\u00f6\u00c4\u00d6\u00e5\u00c5")
+
+    # Swedish function words for word-level disambiguation.
+    # These are highly distinctive and do not appear in EN/ES/PT/FR.
+    _SWEDISH_FUNCTION_WORDS = frozenset(
+        {
+            "och",
+            "att",
+            "jag",
+            "det",
+            "den",
+            "inte",
+            "som",
+            "han",
+            "hon",
+            "var",
+            "har",
+            "kan",
+            "ska",
+            "med",
+            "för",
+            "sig",
+            "sin",
+            "min",
+            "din",
+            "vill",
+            "från",
+            "när",
+            "här",
+            "där",
+            "också",
+            "alla",
+            "denna",
+            "efter",
+            "eller",
+            "under",
+            "utan",
+            "mycket",
+            "mellan",
+            "genom",
+            "bara",
+            "sedan",
+            "redan",
+            "aldrig",
+            "alltid",
+            "igen",
+            "något",
+            "några",
+            "varje",
+            "vilken",
+            "vilket",
+        }
+    )
+
     def __init__(self, languages: list[str], default_latin_language: str = "en"):
         self.languages = set(languages)
         self.default_latin_language = default_latin_language
@@ -70,11 +127,14 @@ class UnicodeLanguageDetector:
         self._has_ja = "ja" in self.languages
         self._has_zh = "zh" in self.languages
         self._has_ko = "ko" in self.languages
+        self._has_sv = "sv" in self.languages
 
         # Latin-script languages available (for disambiguation if needed)
         self._latin_languages = {
-            lang for lang in languages if lang in ("en", "es", "pt", "fr")
+            lang for lang in languages if lang in ("en", "es", "pt", "fr", "sv")
         }
+        # Enable Swedish detection when sv is present alongside other Latin langs
+        self._detect_swedish = self._has_sv and len(self._latin_languages) >= 2
 
     def detect_char(self, ch: str, context_has_kana: bool = False) -> str | None:  # noqa: PLR0911
         """Detect language for a single character.
@@ -123,7 +183,8 @@ class UnicodeLanguageDetector:
                 return "ja"
             return None
 
-        # Latin characters
+        # Latin characters (including Swedish ä/ö/å — word-level disambiguation
+        # is handled by _refine_latin_segments_for_swedish post-pass)
         if self._RE_LATIN.match(ch):
             if self.default_latin_language in self.languages:
                 return self.default_latin_language
@@ -194,7 +255,58 @@ def _segment_text_multilingual(
         )
         segments = [(default_lang, text)]
 
+    # Post-pass: word-level Swedish detection within Latin segments.
+    # When sv is in the language set alongside other Latin languages,
+    # re-examine default-Latin segments for Swedish function words.
+    if detector._detect_swedish:
+        segments = _refine_latin_segments_for_swedish(segments, detector)
+
     return segments
+
+
+def _refine_latin_segments_for_swedish(
+    segments: list[tuple[str, str]],
+    detector: "UnicodeLanguageDetector",
+) -> list[tuple[str, str]]:
+    """Re-classify Latin segments as Swedish based on indicator count.
+
+    For each segment assigned to the default Latin language, count Swedish
+    indicators (ä/ö/å characters + function words). If at least one
+    indicator is found, the entire segment is re-classified as Swedish.
+    This avoids over-fragmentation from word-by-word splitting.
+
+    O(n) text scan + O(1) hash-set lookups per word.
+    """
+    default = detector.default_latin_language
+    if default == "sv":
+        return segments
+
+    result: list[tuple[str, str]] = []
+
+    for lang, text in segments:
+        if lang != default:
+            result.append((lang, text))
+            continue
+
+        # Count Swedish indicators in this segment
+        sv_score = 0
+        for word in text.split():
+            word_lower = word.strip(".,;:!?").lower()
+            if not word_lower:
+                continue
+            # Swedish-specific characters (ä/ö/å)
+            if any(c in detector._SWEDISH_CHARS for c in word_lower):
+                sv_score += 1
+            # Swedish function words
+            elif word_lower in detector._SWEDISH_FUNCTION_WORDS:
+                sv_score += 1
+
+        if sv_score >= 1:
+            result.append(("sv", text))
+        else:
+            result.append((default, text))
+
+    return result
 
 
 class MultilingualPhonemizer(Phonemizer):

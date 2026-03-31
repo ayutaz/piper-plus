@@ -32,8 +32,8 @@ src/python_run/dist/
 lightning_logs/
 
 # Claude settings
-.claude/
-*.claude/
+.claude/*
+!.claude/commands/
 settings.local.json
 
 # Generated audio files

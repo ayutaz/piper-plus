@@ -6,7 +6,7 @@
 use std::collections::HashMap;
 use std::sync::LazyLock;
 
-/// 固定 PUA マッピング (87 エントリ)
+/// 固定 PUA マッピング (96 エントリ)
 /// 多文字音素トークン → Unicode Private Use Area コードポイント
 pub static FIXED_PUA_MAP: LazyLock<Vec<(&'static str, u32)>> = LazyLock::new(|| {
     vec![
@@ -125,6 +125,18 @@ pub static FIXED_PUA_MAP: LazyLock<Vec<(&'static str, u32)>> = LazyLock::new(|| 
         ("\u{025b}\u{0303}", 0xE056), // ɛ̃  nasal open-mid front unrounded
         ("\u{0251}\u{0303}", 0xE057), // ɑ̃  nasal open back unrounded
         ("\u{0254}\u{0303}", 0xE058), // ɔ̃  nasal open-mid back rounded
+        // === Swedish (U+E059-E061) ===
+        // --- Long vowels (Complementary Quantity) ---
+        ("i\u{02D0}", 0xE059),        // iː  close front unrounded long
+        ("y\u{02D0}", 0xE05A),        // yː  close front rounded long
+        ("e\u{02D0}", 0xE05B),        // eː  close-mid front unrounded long
+        ("\u{025B}\u{02D0}", 0xE05C), // ɛː  open-mid front unrounded long
+        ("\u{00F8}\u{02D0}", 0xE05D), // øː  close-mid front rounded long
+        ("\u{0251}\u{02D0}", 0xE05E), // ɑː  open back unrounded long
+        ("o\u{02D0}", 0xE05F),        // oː  close-mid back rounded long
+        ("u\u{02D0}", 0xE060),        // uː  close back rounded long
+        ("\u{0289}\u{02D0}", 0xE061), // ʉː  close central rounded long
+                                      // 0xE062-0xE063 reserved for SV future expansion
     ]
 });
 
@@ -161,7 +173,8 @@ mod tests {
     #[test]
     fn test_fixed_pua_count() {
         // Must match Python token_mapper.py FIXED_PUA_MAPPING count exactly
-        assert_eq!(FIXED_PUA_MAP.len(), 87);
+        // 87 (pre-SV) + 9 (SV long vowels) = 96
+        assert_eq!(FIXED_PUA_MAP.len(), 96);
     }
 
     #[test]

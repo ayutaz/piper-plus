@@ -29,6 +29,7 @@
 #include "english_phonemize.hpp"
 #include "chinese_phonemize.hpp"
 #include "korean_phonemize.hpp"
+#include "swedish_phonemize.hpp"
 
 #ifdef USE_ARM64_NEON
 #include "audio_neon.hpp"
@@ -1123,7 +1124,7 @@ void textToAudio(PiperConfig &config, Voice &voice, std::string text,
         // If the user set --language, reverse-lookup the code and prefer it
         // when it is a Latin-script language.
         std::string defaultLatin = "en";
-        static const std::set<std::string> latinLangs = {"en", "es", "pt", "fr"};
+        static const std::set<std::string> latinLangs = {"en", "es", "fr", "pt", "sv"};
         bool defaultLatinSet = false;
         if (voice.synthesisConfig.languageId && voice.modelConfig.languageIdMap) {
           for (const auto& [code, id] : *voice.modelConfig.languageIdMap) {
@@ -1136,7 +1137,7 @@ void textToAudio(PiperConfig &config, Voice &voice, std::string text,
         }
         // Fallback: pick the first available Latin language by priority
         if (!defaultLatinSet) {
-          for (const auto& lang : {"en", "es", "pt", "fr"}) {
+          for (const auto& lang : {"en", "es", "fr", "pt", "sv"}) {
             if (std::find(multiLangs.begin(), multiLangs.end(), lang) != multiLangs.end()) {
               defaultLatin = lang;
               break;
@@ -1241,6 +1242,9 @@ void textToAudio(PiperConfig &config, Voice &voice, std::string text,
           } else if (langSeg.lang == "ko") {
             // Korean: Hangul decomposition (no external data needed)
             phonemize_korean(langSeg.text, langPhonemes);
+          } else if (langSeg.lang == "sv") {
+            // Swedish: native rule-based phonemizer
+            phonemize_swedish(langSeg.text, langPhonemes);
           } else {
             spdlog::warn("No native phonemizer for language '{}'; skipping segment", langSeg.lang);
           }

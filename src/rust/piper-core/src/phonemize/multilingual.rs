@@ -28,7 +28,35 @@ pub struct UnicodeLanguageDetector {
     has_ja: bool,
     has_zh: bool,
     has_ko: bool,
+    /// Whether Swedish detection post-pass is enabled.
+    /// True when "sv" is in `languages` AND there are 2+ Latin-script languages.
+    detect_swedish: bool,
 }
+
+// ---------------------------------------------------------------------------
+// Swedish detection constants
+// ---------------------------------------------------------------------------
+
+/// Swedish-specific characters not used by EN/ES/PT/FR.
+/// ä (U+00E4), ö (U+00F6), å (U+00E5) and their uppercase variants.
+const SWEDISH_CHARS: [char; 6] = [
+    '\u{00E4}', // ä
+    '\u{00F6}', // ö
+    '\u{00E5}', // å
+    '\u{00C4}', // Ä
+    '\u{00D6}', // Ö
+    '\u{00C5}', // Å
+];
+
+/// Swedish function words for word-level disambiguation.
+/// These are highly distinctive and do not appear in EN/ES/PT/FR.
+/// 45 words, matching the Python `_SWEDISH_FUNCTION_WORDS`.
+const SWEDISH_FUNCTION_WORDS: [&str; 45] = [
+    "och", "att", "jag", "det", "den", "inte", "som", "han", "hon", "var", "har", "kan", "ska",
+    "med", "för", "sig", "sin", "min", "din", "vill", "från", "när", "här", "där", "också", "alla",
+    "denna", "efter", "eller", "under", "utan", "mycket", "mellan", "genom", "bara", "sedan",
+    "redan", "aldrig", "alltid", "igen", "något", "några", "varje", "vilken", "vilket",
+];
 
 impl UnicodeLanguageDetector {
     /// Create a new detector for the given set of languages.
@@ -37,10 +65,17 @@ impl UnicodeLanguageDetector {
     /// characters (A-Z, a-z, accented Latin) are assigned to.
     pub fn new(languages: &[String], default_latin_language: &str) -> Self {
         let lang_set: HashSet<String> = languages.iter().cloned().collect();
+        let has_sv = lang_set.contains("sv");
+        // Latin-script languages in piper-plus
+        let latin_count = ["en", "es", "pt", "fr", "sv"]
+            .iter()
+            .filter(|l| lang_set.contains(**l))
+            .count();
         Self {
             has_ja: lang_set.contains("ja"),
             has_zh: lang_set.contains("zh"),
             has_ko: lang_set.contains("ko"),
+            detect_swedish: has_sv && latin_count >= 2,
             default_latin_language: default_latin_language.to_string(),
             languages: lang_set,
         }
@@ -192,7 +227,67 @@ pub fn segment_text(text: &str, detector: &UnicodeLanguageDetector) -> Vec<(Stri
         segments.push((detector.default_latin_language.clone(), text.to_string()));
     }
 
+    // Post-pass: segment-level Swedish detection within Latin segments.
+    if detector.detect_swedish {
+        segments = refine_latin_segments_for_swedish(segments, &detector.default_latin_language);
+    }
+
     segments
+}
+
+/// Lazily-initialized `HashSet` for O(1) Swedish function-word lookups.
+fn swedish_function_word_set() -> &'static HashSet<&'static str> {
+    static SET: OnceLock<HashSet<&'static str>> = OnceLock::new();
+    SET.get_or_init(|| SWEDISH_FUNCTION_WORDS.iter().copied().collect())
+}
+
+/// Re-classify Latin segments as Swedish based on indicator count.
+///
+/// For each segment assigned to the default Latin language, count Swedish
+/// indicators (ä/ö/å characters + function words). If at least one
+/// indicator is found, the entire segment is re-classified as Swedish.
+/// This avoids over-fragmentation from word-by-word splitting.
+fn refine_latin_segments_for_swedish(
+    segments: Vec<(String, String)>,
+    default_latin: &str,
+) -> Vec<(String, String)> {
+    // If the default Latin language IS Swedish, no refinement is needed.
+    if default_latin == "sv" {
+        return segments;
+    }
+
+    let func_words = swedish_function_word_set();
+
+    segments
+        .into_iter()
+        .map(|(lang, text)| {
+            if lang != default_latin {
+                return (lang, text);
+            }
+
+            let mut sv_score: usize = 0;
+            for word in text.split_whitespace() {
+                let word_lower = word
+                    .trim_matches(|c: char| matches!(c, '.' | ',' | ';' | ':' | '!' | '?'))
+                    .to_lowercase();
+                if word_lower.is_empty() {
+                    continue;
+                }
+                // Check for Swedish-specific characters (ä/ö/å) or function words
+                if word_lower.chars().any(|c| SWEDISH_CHARS.contains(&c))
+                    || func_words.contains(word_lower.as_str())
+                {
+                    sv_score += 1;
+                }
+            }
+
+            if sv_score >= 1 {
+                ("sv".to_string(), text)
+            } else {
+                (lang, text)
+            }
+        })
+        .collect()
 }
 
 // ---------------------------------------------------------------------------
@@ -868,5 +963,121 @@ mod tests {
             out_ids.len(),
             out_prosody.len()
         );
+    }
+
+    // ===== Swedish detection =====
+
+    #[test]
+    fn test_detect_swedish_enabled_when_sv_and_en() {
+        let det = make_detector(&["en", "sv", "ja"], "en");
+        assert!(det.detect_swedish);
+    }
+
+    #[test]
+    fn test_detect_swedish_disabled_when_sv_is_only_latin() {
+        // Only one Latin-script language → no ambiguity → disabled
+        let det = make_detector(&["sv", "ja"], "sv");
+        assert!(!det.detect_swedish);
+    }
+
+    #[test]
+    fn test_detect_swedish_disabled_when_no_sv() {
+        let det = make_detector(&["en", "fr"], "en");
+        assert!(!det.detect_swedish);
+    }
+
+    #[test]
+    fn test_segment_swedish_chars_reclassify_segment() {
+        // ä/ö/å trigger Swedish reclassification
+        let det = make_detector(&["en", "sv", "ja"], "en");
+        let segs = segment_text("Jag tycker om räkor", &det);
+        assert_eq!(segs.len(), 1);
+        assert_eq!(segs[0].0, "sv"); // "räkor" contains ä
+    }
+
+    #[test]
+    fn test_segment_swedish_function_word_reclassify() {
+        // "och" is a Swedish function word
+        let det = make_detector(&["en", "sv", "ja"], "en");
+        let segs = segment_text("Stockholm och Malmö", &det);
+        assert_eq!(segs.len(), 1);
+        assert_eq!(segs[0].0, "sv"); // "och" is a function word + "Malmö" has ö
+    }
+
+    #[test]
+    fn test_segment_pure_english_stays_english() {
+        // No Swedish indicators → stays as default Latin (en)
+        let det = make_detector(&["en", "sv", "ja"], "en");
+        let segs = segment_text("Hello world", &det);
+        assert_eq!(segs.len(), 1);
+        assert_eq!(segs[0].0, "en");
+    }
+
+    #[test]
+    fn test_segment_swedish_mixed_with_japanese() {
+        let det = make_detector(&["en", "sv", "ja"], "en");
+        let segs = segment_text("こんにちはJag tycker om räkor", &det);
+        assert_eq!(segs.len(), 2);
+        assert_eq!(segs[0].0, "ja");
+        assert_eq!(segs[1].0, "sv"); // "räkor" has ä
+    }
+
+    #[test]
+    fn test_segment_no_swedish_refinement_when_default_is_sv() {
+        // When default Latin IS Swedish, refinement is skipped
+        let det = make_detector(&["sv", "en", "ja"], "sv");
+        let segs = segment_text("Hello world", &det);
+        assert_eq!(segs.len(), 1);
+        // default is sv, so Latin text goes to sv directly (no refinement needed)
+        assert_eq!(segs[0].0, "sv");
+    }
+
+    #[test]
+    fn test_segment_swedish_function_word_alone() {
+        // Single function word "jag" should trigger Swedish
+        let det = make_detector(&["en", "sv"], "en");
+        let segs = segment_text("jag", &det);
+        assert_eq!(segs.len(), 1);
+        assert_eq!(segs[0].0, "sv");
+    }
+
+    #[test]
+    fn test_segment_swedish_uppercase_chars() {
+        // Uppercase Ä/Ö/Å should also trigger Swedish
+        let det = make_detector(&["en", "sv"], "en");
+        let segs = segment_text("ÖVERRASKNING", &det);
+        assert_eq!(segs.len(), 1);
+        assert_eq!(segs[0].0, "sv"); // Ö triggers it
+    }
+
+    #[test]
+    fn test_refine_skips_non_default_segments() {
+        // Segments already classified as "ja" should not be touched
+        let input = vec![
+            ("ja".to_string(), "こんにちは".to_string()),
+            ("en".to_string(), "och hej".to_string()),
+        ];
+        let result = refine_latin_segments_for_swedish(input, "en");
+        assert_eq!(result[0].0, "ja");
+        assert_eq!(result[1].0, "sv"); // "och" is a function word
+    }
+
+    #[test]
+    fn test_refine_no_indicators_stays_default() {
+        let input = vec![("en".to_string(), "Hello world".to_string())];
+        let result = refine_latin_segments_for_swedish(input, "en");
+        assert_eq!(result[0].0, "en");
+    }
+
+    #[test]
+    fn test_swedish_function_words_count() {
+        // Verify the constant has 45 entries (matching Python)
+        assert_eq!(SWEDISH_FUNCTION_WORDS.len(), 45);
+    }
+
+    #[test]
+    fn test_swedish_chars_count() {
+        // 6 characters: ä, ö, å, Ä, Ö, Å
+        assert_eq!(SWEDISH_CHARS.len(), 6);
     }
 }

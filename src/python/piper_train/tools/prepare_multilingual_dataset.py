@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Prepare multilingual (6-language) dataset for Piper TTS.
+"""Prepare multilingual (7-language) dataset for Piper TTS.
 
 Merges existing JA+EN v4 dataset with new ZH (AISHELL-3), ES/FR/PT (CML-TTS)
 corpora. The bilingual phoneme IDs (0-96) are 100% compatible with the
@@ -38,10 +38,10 @@ from pathlib import Path
 _LOGGER = logging.getLogger("prepare_multilingual")
 
 # Language ID mapping (must match model config)
-LANGUAGE_ID_MAP = {"ja": 0, "en": 1, "zh": 2, "es": 3, "fr": 4, "pt": 5}
+LANGUAGE_ID_MAP = {"ja": 0, "en": 1, "zh": 2, "es": 3, "fr": 4, "pt": 5, "sv": 6}
 
 # All languages in canonical order
-ALL_LANGUAGES = ["ja", "en", "zh", "es", "fr", "pt"]
+ALL_LANGUAGES = ["ja", "en", "zh", "es", "fr", "pt", "sv"]
 
 # Batch sizes for parallel processing
 _RESAMPLE_BATCH_SIZE = 50
