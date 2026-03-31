@@ -8,7 +8,7 @@ use piper_plus::phonemize::custom_dict::CustomDictionary;
 use piper_plus::{OnnxEngine, PiperVoice, VoiceConfig, audio, config, input::JsonlReader};
 
 /// サポートされている言語コード
-const SUPPORTED_LANGUAGES: &[&str] = &["ja", "en", "zh", "ko", "es", "fr", "pt"];
+const SUPPORTED_LANGUAGES: &[&str] = &["ja", "en", "zh", "ko", "es", "fr", "pt", "sv"];
 
 #[derive(Parser, Debug)]
 #[command(name = "piper", version, about = "Piper-Plus TTS inference")]
