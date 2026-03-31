@@ -2006,7 +2006,11 @@ mod tests {
         // vacker: -er suffix, stress on first syllable
         let result = ph("vacker");
         let stress = IPA_STRESS.to_string();
-        assert!(result.contains(&stress), "vacker should have stress: {:?}", result);
+        assert!(
+            result.contains(&stress),
+            "vacker should have stress: {:?}",
+            result
+        );
         // Stress should be on position 0 (first syllable)
         assert_eq!(
             result[0], stress,
@@ -2020,7 +2024,11 @@ mod tests {
         // vatten: -en suffix, stress on first syllable
         let result = ph("vatten");
         let stress = IPA_STRESS.to_string();
-        assert!(result.contains(&stress), "vatten should have stress: {:?}", result);
+        assert!(
+            result.contains(&stress),
+            "vatten should have stress: {:?}",
+            result
+        );
         assert_eq!(
             result[0], stress,
             "vatten stress at position 0: {:?}",
@@ -2033,7 +2041,11 @@ mod tests {
         // bilar: -ar suffix, stress on first syllable
         let result = ph("bilar");
         let stress = IPA_STRESS.to_string();
-        assert!(result.contains(&stress), "bilar should have stress: {:?}", result);
+        assert!(
+            result.contains(&stress),
+            "bilar should have stress: {:?}",
+            result
+        );
         assert_eq!(
             result[0], stress,
             "bilar stress at position 0: {:?}",
@@ -2046,7 +2058,11 @@ mod tests {
         // flickor: -or suffix, stress on first syllable
         let result = ph("flickor");
         let stress = IPA_STRESS.to_string();
-        assert!(result.contains(&stress), "flickor should have stress: {:?}", result);
+        assert!(
+            result.contains(&stress),
+            "flickor should have stress: {:?}",
+            result
+        );
         assert_eq!(
             result[0], stress,
             "flickor stress at position 0: {:?}",
@@ -2061,11 +2077,7 @@ mod tests {
         // bank: nk -> [ŋ, k]
         let result = ph("bank");
         let eng = IPA_ENG.to_string(); // ŋ
-        assert!(
-            result.contains(&eng),
-            "nk -> ŋ in 'bank': {:?}",
-            result
-        );
+        assert!(result.contains(&eng), "nk -> ŋ in 'bank': {:?}", result);
         assert!(
             result.contains(&"k".to_string()),
             "nk -> k in 'bank': {:?}",
@@ -2141,7 +2153,10 @@ mod tests {
     fn test_ium_loanword_suffix() {
         // stadium: -ium loanword suffix
         let result = detect_loanword_suffix("stadium");
-        assert!(result.is_some(), "stadium should detect -ium loanword suffix");
+        assert!(
+            result.is_some(),
+            "stadium should detect -ium loanword suffix"
+        );
         let (prefix, _) = result.unwrap();
         assert_eq!(prefix, "stad", "stadium prefix should be 'stad'");
     }
@@ -2150,7 +2165,10 @@ mod tests {
     fn test_eum_loanword_suffix() {
         // museum: -eum loanword suffix
         let result = detect_loanword_suffix("museum");
-        assert!(result.is_some(), "museum should detect -eum loanword suffix");
+        assert!(
+            result.is_some(),
+            "museum should detect -eum loanword suffix"
+        );
     }
 
     // ===== Additional basic vowel tests (Python: TestBasicVowels coverage) =====
@@ -2283,20 +2301,18 @@ mod tests {
     #[test]
     fn test_retroflex_cascade_rst() {
         // apply_retroflex: f + œ + r + s + t -> f + œ + ʂ + ʈ
-        let input: Vec<String> = vec!["f".into(), "\u{0153}".into(), "r".into(), "s".into(), "t".into()];
+        let input: Vec<String> = vec![
+            "f".into(),
+            "\u{0153}".into(),
+            "r".into(),
+            "s".into(),
+            "t".into(),
+        ];
         let result = apply_retroflex(&input);
         let retro_s = IPA_RETRO_S.to_string();
         let retro_t = IPA_RETRO_T.to_string();
-        assert!(
-            result.contains(&retro_s),
-            "cascade r+s -> ʂ: {:?}",
-            result
-        );
-        assert!(
-            result.contains(&retro_t),
-            "cascade ʂ+t -> ʈ: {:?}",
-            result
-        );
+        assert!(result.contains(&retro_s), "cascade r+s -> ʂ: {:?}", result);
+        assert!(result.contains(&retro_t), "cascade ʂ+t -> ʈ: {:?}", result);
         // r should be consumed
         assert!(
             !result.contains(&"r".to_string()),
@@ -2329,7 +2345,13 @@ mod tests {
     #[test]
     fn test_rr_blocks_retroflex() {
         // apply_retroflex: b + ɔ + r + r + s -> unchanged (rr blocks)
-        let input: Vec<String> = vec!["b".into(), "\u{0254}".into(), "r".into(), "r".into(), "s".into()];
+        let input: Vec<String> = vec![
+            "b".into(),
+            "\u{0254}".into(),
+            "r".into(),
+            "r".into(),
+            "s".into(),
+        ];
         let result = apply_retroflex(&input);
         assert_eq!(result, input, "rr blocks retroflex: {:?}", result);
     }
@@ -2337,13 +2359,14 @@ mod tests {
     #[test]
     fn test_r_plus_k_no_change() {
         // apply_retroflex: b + ɑː + r + k -> unchanged (k not retroflex target)
-        let input: Vec<String> = vec!["b".into(), "\u{0251}\u{02D0}".into(), "r".into(), "k".into()];
+        let input: Vec<String> = vec![
+            "b".into(),
+            "\u{0251}\u{02D0}".into(),
+            "r".into(),
+            "k".into(),
+        ];
         let result = apply_retroflex(&input);
-        assert_eq!(
-            result, input,
-            "r+k no retroflex change: {:?}",
-            result
-        );
+        assert_eq!(result, input, "r+k no retroflex change: {:?}", result);
     }
 
     #[test]
@@ -2512,10 +2535,7 @@ mod tests {
 
     #[test]
     fn test_detect_stress_tion_suffix() {
-        assert!(
-            detect_stress("station") > 0,
-            "-tion suffix attracts stress"
-        );
+        assert!(detect_stress("station") > 0, "-tion suffix attracts stress");
     }
 
     #[test]
@@ -2543,7 +2563,11 @@ mod tests {
 
     #[test]
     fn test_detect_stress_default_first() {
-        assert_eq!(detect_stress("flicka"), 0, "default stress on first syllable");
+        assert_eq!(
+            detect_stress("flicka"),
+            0,
+            "default stress on first syllable"
+        );
     }
 
     #[test]
@@ -2684,7 +2708,11 @@ mod tests {
         // betala: stress on 2nd syllable (be- is unstressed prefix)
         let result = ph("betala");
         let stress = IPA_STRESS.to_string();
-        assert!(result.contains(&stress), "betala should have stress: {:?}", result);
+        assert!(
+            result.contains(&stress),
+            "betala should have stress: {:?}",
+            result
+        );
         // Stress should NOT be at position 0 (it's after the unstressed prefix)
         let stress_pos = result.iter().position(|s| s == &stress).unwrap();
         assert!(
