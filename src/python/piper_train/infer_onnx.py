@@ -55,7 +55,10 @@ class _DominantLanguageDetector:
         dominant = max(counts, key=lambda k: counts[k])
 
         # Apply word-level Swedish refinement (matching multilingual.py)
-        if dominant == self._detector.default_latin_language and self._detector._detect_swedish:
+        if (
+            dominant == self._detector.default_latin_language
+            and self._detector._detect_swedish
+        ):
             from .phonemize.multilingual import (  # noqa: PLC0415
                 _refine_latin_segments_for_swedish,
             )
