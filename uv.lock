@@ -2683,7 +2683,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "black", marker = "extra == 'dev'", specifier = ">=26.3.1" },
+    { name = "black", marker = "extra == 'dev'", specifier = "==26.3.1" },
     { name = "coverage", extras = ["toml"], marker = "extra == 'dev'", specifier = ">=7.3" },
     { name = "coverage", extras = ["toml"], marker = "extra == 'test'", specifier = ">=7.3" },
     { name = "cython", specifier = ">=3.2.4" },
@@ -2769,7 +2769,7 @@ provides-extras = ["preprocess", "inference", "inference-gpu", "multilingual", "
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "black", specifier = ">=26.3.1" },
+    { name = "black", specifier = "==26.3.1" },
     { name = "pytest", specifier = "==7.4.3" },
     { name = "pytest-timeout", specifier = ">=2.2.0" },
     { name = "ruff", specifier = "==0.12.5" },
