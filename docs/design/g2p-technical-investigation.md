@@ -166,7 +166,9 @@ pub use piper_g2p::{Phonemizer, ProsodyInfo, ProsodyFeature, PhonemeIdMap};
 
 ---
 
-## 4. C# プロジェクト分離分析
+## 4. C# プロジェクト分離分析 → 対象外
+
+> DotNetG2P (NuGet) が既に独立 G2P パッケージとして公開済みのため、`PiperPlus.Phonemize` の分離は不要。以下は参考情報として残す。
 
 ### 4.1 移動対象: 21 ファイル (Phonemize/) + 1 ファイル (Mapping/)
 
