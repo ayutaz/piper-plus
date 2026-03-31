@@ -1,0 +1,70 @@
+{
+  "dataset": "piper",
+  "audio": {
+    "sample_rate": 22050,
+    "quality": "medium",
+    "hop_size": 256
+  },
+  "espeak": {
+    "voice": "multilingual"
+  },
+  "language": {
+    "code": "multilingual"
+  },
+  "inference": {
+    "noise_scale": 0.667,
+    "length_scale": 1,
+    "noise_w": 0.8
+  },
+  "phoneme_type": "multilingual",
+  "phoneme_map": {},
+  "phoneme_id_map": {
+    "_": [0],
+    "^": [1],
+    "$": [2],
+    " ": [3],
+    "a": [10],
+    "i": [11],
+    "u": [12],
+    "e": [13],
+    "o": [14],
+    "\ue000": [20],
+    "\ue001": [21],
+    "\ue002": [22],
+    "k": [32],
+    "s": [40],
+    "t": [45],
+    "n": [57],
+    "h": [60],
+    "m": [65],
+    "r": [70],
+    "w": [75]
+  },
+  "num_symbols": 173,
+  "num_speakers": 1,
+  "speaker_id_map": {},
+  "piper_version": "1.5.4",
+  "num_languages": 6,
+  "language_id_map": {
+    "ja": 0,
+    "en": 1,
+    "zh": 2,
+    "es": 3,
+    "fr": 4,
+    "pt": 5
+  },
+  "prosody_num_symbols": 11,
+  "prosody_id_map": {
+    "0": [0],
+    "1": [1],
+    "2": [2],
+    "3": [3],
+    "4": [4],
+    "5": [5],
+    "6": [6],
+    "7": [7],
+    "8": [8],
+    "9": [9],
+    "10": [10]
+  }
+}

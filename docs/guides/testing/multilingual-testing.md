@@ -168,6 +168,46 @@ CI is defined in `.github/workflows/rust-tests.yml` and runs on:
 
 The workflow also includes `cargo check`, `cargo fmt`, and `cargo clippy` jobs on ubuntu-24.04.
 
+## Go Tests (piperplus)
+
+The Go `piperplus` package has 690+ unit tests and 11 integration tests covering:
+
+- All 7 language phonemizers (Japanese, English, Chinese, Spanish, Portuguese, French, Swedish)
+- Unicode language detection and text segmentation
+- PUA (Private Use Area) bidirectional mapping (87 entries)
+- Config parsing, WAV output, error types
+- ONNX inference engine, end-to-end synthesis (integration)
+- HTTP API server handlers (/synthesize, /health, /info)
+- Custom dictionary (text substitution, JSON v2.0)
+- Dictionary loading (CMU, Pinyin, OpenJTalk 3-tier search)
+
+### Running Go Tests Locally
+
+Unit tests (no ONNX Runtime required):
+
+```bash
+cd src/go && go test -v -race -count=1 ./...
+```
+
+Integration tests (requires ONNX Runtime and test model):
+
+```bash
+cd src/go && go test -v -race -count=1 -tags integration ./... \
+  -env ONNX_RUNTIME_SHARED_LIBRARY_PATH=/path/to/libonnxruntime.so \
+  -env PIPER_TEST_MODEL=/path/to/multilingual-test-medium.onnx
+```
+
+### Go CI Configuration
+
+CI is defined in `.github/workflows/go-ci.yml` and runs:
+
+| Job | OS | Requirements | Content |
+|-----|----|-------------|---------|
+| unit-test | Ubuntu, macOS, Windows | Go 1.26+ | Phonemizer, config, WAV, Unicode detection |
+| integration-test | Ubuntu | Go 1.26+, ONNX Runtime 1.24.4 | ONNX inference, end-to-end synthesis |
+| build | Ubuntu, macOS, Windows | Go 1.26+ | CLI binary generation, artifact upload |
+| lint | Ubuntu | golangci-lint v1.64.8 | Static analysis |
+
 ## 6-Language Multilingual Model Testing
 
 Piper Plus ships a 6-language multilingual model (571 speakers, 173 symbols) trained on JA, EN, ZH, ES, FR, PT. The G2P code supports 7 languages (including Swedish/sv), but the current model was trained on 6. Use the following sample texts to verify all model languages work correctly.

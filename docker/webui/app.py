@@ -20,6 +20,7 @@ SAMPLE_TEXTS = {
     "es": "Hola, ¿cómo estás hoy? El clima es hermoso, vamos a dar un paseo.",
     "fr": "Bonjour, comment allez-vous aujourd'hui? Il fait beau, allons nous promener.",
     "pt": "Olá, como você está hoje? O tempo está lindo, vamos dar um passeio.",
+    "sv": "Hej, hur mår du idag?",
 }
 
 
@@ -181,7 +182,7 @@ def create_ui(model_dir: str, output_dir: str):
                     value=model_choices[0] if models else None,
                 )
                 language = gr.Radio(
-                    choices=["ja", "en", "zh", "es", "fr", "pt"],
+                    choices=["ja", "en", "zh", "es", "fr", "pt", "sv"],
                     label="Language",
                     value="ja",
                 )

@@ -58,6 +58,7 @@ A fast, high-quality neural text-to-speech (TTS) system. Built on the [VITS](htt
 - **PyPI** — `pip install piper-plus`
 - **C# CLI** — .NET 8/9 cross-platform, 7-language multilingual, ONNX inference
 - **Rust CLI** — piper-plus/piper-plus-cli, streaming, CUDA/CoreML/DirectML support, auto dictionary download
+- **[Go CLI](src/go/README.md)** — HTTP API server, session pooling, Docker, single binary
 
 ### Platforms
 
@@ -69,6 +70,7 @@ A fast, high-quality neural text-to-speech (TTS) system. Built on the [VITS](htt
 | Web | WebAssembly | Chrome/Edge/Firefox/Safari |
 | C# (.NET) | x64 / ARM64 | .NET 8/9, Linux/macOS/Windows |
 | Rust | x64 / ARM64 | Linux/macOS/Windows, CUDA/CoreML/DirectML |
+| Go | x64 / ARM64 | Linux/macOS/Windows, HTTP API, Docker |
 
 ---
 

@@ -1,0 +1,139 @@
+name: Go CI
+
+on:
+  pull_request:
+    branches: [dev]
+    paths:
+      - 'src/go/**'
+      - '.github/workflows/go-ci.yml'
+  push:
+    branches: [dev]
+    paths:
+      - 'src/go/**'
+  workflow_call:
+
+env:
+  ORT_VERSION: '1.24.4'
+
+jobs:
+  unit-test:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, macos-latest, windows-latest]
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: src/go
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # NOTE: sparse-checkout only fetches src/go/. Integration tests that
+          # reference test models outside this path (e.g. test/models/) will not
+          # find them here. Those tests run in the integration-test job which
+          # does a full checkout.
+          sparse-checkout: src/go
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26'
+          cache-dependency-path: src/go/go.sum
+      - run: go vet ./...
+      - run: go test -v -race -count=1 ./...
+
+  integration-test:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: src/go
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26'
+          cache-dependency-path: src/go/go.sum
+      - name: Cache ONNX Runtime
+        uses: actions/cache@v4
+        with:
+          path: onnxruntime
+          key: onnxruntime-linux-x64-${{ env.ORT_VERSION }}
+      - name: Download ONNX Runtime
+        run: |
+          if [ ! -f onnxruntime/lib/libonnxruntime.so ]; then
+            wget -q https://github.com/microsoft/onnxruntime/releases/download/v${ORT_VERSION}/onnxruntime-linux-x64-${ORT_VERSION}.tgz
+            tar xzf onnxruntime-linux-x64-${ORT_VERSION}.tgz
+            mkdir -p onnxruntime/lib
+            cp onnxruntime-linux-x64-${ORT_VERSION}/lib/libonnxruntime.so onnxruntime/lib/
+          fi
+        working-directory: .
+      - run: go test -v -race -count=1 -tags integration ./...
+        env:
+          ONNX_RUNTIME_SHARED_LIBRARY_PATH: ${{ github.workspace }}/onnxruntime/lib/libonnxruntime.so
+          PIPER_TEST_MODEL: ${{ github.workspace }}/test/models/multilingual-test-medium.onnx
+
+  build:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            goos: linux
+            goarch: amd64
+            artifact: piper-plus-linux-amd64
+          - os: macos-latest
+            goos: darwin
+            goarch: arm64
+            artifact: piper-plus-darwin-arm64
+          - os: windows-latest
+            goos: windows
+            goarch: amd64
+            artifact: piper-plus-windows-amd64
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: src/go
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: src/go
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26'
+          cache-dependency-path: src/go/go.sum
+      - name: Build CLI binary
+        run: go build -trimpath -ldflags="-s -w" -o ${{ matrix.artifact }}${{ matrix.goos == 'windows' && '.exe' || '' }} ./cmd/piper-plus
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+      - name: Upload binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: src/go/${{ matrix.artifact }}${{ matrix.goos == 'windows' && '.exe' || '' }}
+          retention-days: 14
+
+  lint:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # NOTE: sparse-checkout only fetches src/go/. This is sufficient for
+          # linting since golangci-lint only needs the Go source files.
+          sparse-checkout: src/go
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26'
+      - uses: golangci/golangci-lint-action@v7
+        with:
+          working-directory: src/go

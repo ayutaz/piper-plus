@@ -1,0 +1,38 @@
+version: "2"
+
+run:
+  timeout: 5m
+
+linters:
+  enable:
+    - errcheck
+    - govet
+    - staticcheck
+    - unused
+    - ineffassign
+    - gocritic
+    - misspell
+  disable:
+    - exhaustruct  # too strict for this project
+    - wrapcheck    # error wrapping is handled case-by-case
+  settings:
+    gocritic:
+      enabled-checks:
+        - dupImport
+        - ifElseChain
+        - nestingReduce
+    misspell:
+      locale: US
+  exclusions:
+    rules:
+      - path: _test\.go
+        linters:
+          - errcheck  # test error checking is more relaxed
+      - path: examples/
+        linters:
+          - errcheck
+
+formatters:
+  enable:
+    - gofmt
+    - goimports

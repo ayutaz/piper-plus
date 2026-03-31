@@ -47,4 +47,5 @@ Piper Plus documentation. Guides and references for using and developing with Pi
 - **C++ (libpiper)**: メインの推論ライブラリ — [src/cpp/](../src/cpp/)
 - **C# CLI (PiperPlus)**: .NET 8/9 クロスプラットフォーム CLI — [src/csharp/](../src/csharp/)
 - **Rust 推論エンジン**: piper-plus / piper-plus-cli — [src/rust/](../src/rust/)
+- **Go バインディング**: サーバーサイド推論・HTTP API・セッションプーリング — [src/go/](../src/go/) ([README](../src/go/README.md))
 - **WebAssembly**: Browser-based TTS — [src/wasm/openjtalk-web/](../src/wasm/openjtalk-web/)
