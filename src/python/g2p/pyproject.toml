@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "piper-g2p"
-version = "0.0.1"
+version = "0.1.0"
 description = "Multilingual G2P (Grapheme-to-Phoneme) for TTS — eSpeak-ng free, MIT licensed"
 requires-python = ">=3.11"
 license = "MIT"
@@ -30,7 +30,17 @@ readme = "README.md"
 [project.optional-dependencies]
 ja = ["pyopenjtalk-plus"]
 en = ["g2p-en>=2.1.0"]
-all = ["pyopenjtalk-plus", "g2p-en>=2.1.0"]
+zh = ["pypinyin>=0.55.0"]
+ko = ["g2pk2>=0.0.3"]
+es = []
+fr = []
+pt = []
+all = [
+    "pyopenjtalk-plus",
+    "g2p-en>=2.1.0",
+    "pypinyin>=0.55.0",
+    "g2pk2>=0.0.3",
+]
 dev = [
     "pytest>=8.0",
     "pytest-cov>=5.0",

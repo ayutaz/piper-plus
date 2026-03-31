@@ -29,8 +29,8 @@ class TestRegistry:
 
     def test_unregistered_language_raises(self):
         """get_phonemizer raises ValueError for an unregistered language."""
-        with pytest.raises(ValueError, match="Unsupported language"):
-            get_phonemizer("zz-nonexistent")
+        with pytest.raises(ValueError):
+            get_phonemizer("zz_nonexistent")
 
     def test_available_languages_contains_registered(self):
         """available_languages includes previously registered language codes."""

@@ -149,6 +149,18 @@ wheels = [
 ]
 
 [[package]]
+name = "g2pk2"
+version = "0.0.3"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "jamo" },
+    { name = "nltk" },
+]
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/53/52/6b77a9c3e4ea32dfb53238422dabf4fa977681d2bf4087bff53c084ab7c5/g2pk2-0.0.3-py3-none-any.whl", hash = "sha256:e708316125248c10432cbead85cf52dd9ed252c423cce531f9df617386978cf2", size = 25716, upload-time = "2023-08-18T17:05:33.705Z" },
+]
+
+[[package]]
 name = "inflect"
 version = "7.5.0"
 source = { registry = "https://pypi.org/simple" }
@@ -168,6 +180,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/72/34/14ca021ce8e5dfedc35312d08ba8bf51fdd999c576889fc2c24cb97f4f10/iniconfig-2.3.0.tar.gz", hash = "sha256:c76315c77db068650d49c5b56314774a7804df16fee4402c1f19d6d15d8c4730", size = 20503, upload-time = "2025-10-18T21:55:43.219Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/cb/b1/3846dd7f199d53cb17f49cba7e651e9ce294d8497c8c150530ed11865bb8/iniconfig-2.3.0-py3-none-any.whl", hash = "sha256:f631c04d2c48c52b84d0d0549c99ff3859c98df65b3101406327ecc7d53fbf12", size = 7484, upload-time = "2025-10-18T21:55:41.639Z" },
+]
+
+[[package]]
+name = "jamo"
+version = "0.4.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/b1/a2/bda770579809726e929ca6356743f9f50f64a2cbaee578fa9d4824afb00e/jamo-0.4.1.tar.gz", hash = "sha256:ea65cf9d35338d0e0af48d75ff426d8a369b0ebde6f07051c3ac37256f56d025", size = 7386, upload-time = "2017-11-06T19:28:51.729Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/ac/cc/49812faae67f9a24be6ddaf58a2cf7e8c3cbfcf5b762d9414f7103d2ea2c/jamo-0.4.1-py3-none-any.whl", hash = "sha256:d4b94fd23324c606ed2fbc4037c603e2c3a7ae9390c05d3473aea1ccb6b1c3fb", size = 9543, upload-time = "2017-11-06T19:28:49.624Z" },
 ]
 
 [[package]]
@@ -429,7 +450,9 @@ source = { editable = "." }
 [package.optional-dependencies]
 all = [
     { name = "g2p-en" },
+    { name = "g2pk2" },
     { name = "pyopenjtalk-plus" },
+    { name = "pypinyin" },
 ]
 dev = [
     { name = "mypy" },
@@ -443,27 +466,29 @@ en = [
 ja = [
     { name = "pyopenjtalk-plus" },
 ]
-
-[package.dev-dependencies]
-dev = [
-    { name = "pytest" },
+ko = [
+    { name = "g2pk2" },
+]
+zh = [
+    { name = "pypinyin" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "g2p-en", marker = "extra == 'all'", specifier = ">=2.1.0" },
     { name = "g2p-en", marker = "extra == 'en'", specifier = ">=2.1.0" },
+    { name = "g2pk2", marker = "extra == 'all'", specifier = ">=0.0.3" },
+    { name = "g2pk2", marker = "extra == 'ko'", specifier = ">=0.0.3" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.13" },
     { name = "pyopenjtalk-plus", marker = "extra == 'all'" },
     { name = "pyopenjtalk-plus", marker = "extra == 'ja'" },
+    { name = "pypinyin", marker = "extra == 'all'", specifier = ">=0.55.0" },
+    { name = "pypinyin", marker = "extra == 'zh'", specifier = ">=0.55.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=5.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.8.0" },
 ]
-provides-extras = ["ja", "en", "all", "dev"]
-
-[package.metadata.requires-dev]
-dev = [{ name = "pytest", specifier = ">=8.0" }]
+provides-extras = ["ja", "en", "zh", "ko", "es", "fr", "pt", "all", "dev"]
 
 [[package]]
 name = "pluggy"
@@ -510,6 +535,15 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/8f/f1/8edf559e0b85296c28c18c113bc62d26eb24b3c3cfa007b937583a2d18f1/pyopenjtalk_plus-0.4.1.post8-cp314-cp314-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:b087cd8018ecd98948e0ad9a7619b136de453ebb8abafb7b6ba0e68d08e8e1ea", size = 30872048, upload-time = "2026-03-30T22:15:46.562Z" },
     { url = "https://files.pythonhosted.org/packages/44/d5/7b92e8a5cf4ce7318d48a10d7dabf063826b7333701c82c7b778f1f01ccd/pyopenjtalk_plus-0.4.1.post8-cp314-cp314-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:eb65c83d632ee48cae78686c3b908553add5e0f14d55f5b194374c40d77fffd6", size = 30946357, upload-time = "2026-03-30T22:15:49.228Z" },
     { url = "https://files.pythonhosted.org/packages/d4/9d/3911562c71312ada4caf18a5f0d3fb787a0b72248ce030027da513bc6be9/pyopenjtalk_plus-0.4.1.post8-cp314-cp314-win_amd64.whl", hash = "sha256:5e4e46607178d242490dc8d29bff2abbdf9f30d128d1bbb7e015010c29c485d3", size = 25426929, upload-time = "2026-03-30T22:15:52.116Z" },
+]
+
+[[package]]
+name = "pypinyin"
+version = "0.55.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/b4/a4/784cf98c09e0dc22776b0d7d8a4a5b761218bcae4608c2416ce1e167c8af/pypinyin-0.55.0.tar.gz", hash = "sha256:b5711b3a0c6f76e67408ec6b2e3c4987a3a806b7c528076e7c7b86fcf0eaa66b", size = 839836, upload-time = "2025-07-20T12:01:50.657Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b9/7b/4cabc76fcc21c3c7d5c671d8783984d30ac9d3bb387c4ba784fca3cdfa3a/pypinyin-0.55.0-py2.py3-none-any.whl", hash = "sha256:d53b1e8ad2cdb815fb2cb604ed3123372f5a28c6f447571244aca36fc62a286f", size = 840203, upload-time = "2025-07-20T12:01:48.535Z" },
 ]
 
 [[package]]
