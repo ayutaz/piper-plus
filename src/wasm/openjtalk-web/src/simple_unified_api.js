@@ -402,50 +402,151 @@ export class SimpleUnifiedPhonemizer {
 
     /**
      * Detect language from text.
+     * Uses segment-level scoring consistent with Python/Rust/C#/C++ implementations.
      * Priority: JA (Hiragana/Katakana) > ZH (CJK without Kana) > SV (Swedish indicators) > EN (default).
-     * Swedish is detected by the presence of ä/ö/å characters or Swedish function words.
      */
     detectLanguage(text) {
-        // Simple detection based on character ranges
+        const segments = this._segmentText(text);
+        // Return the language of the first significant segment
+        for (const seg of segments) {
+            if (seg.lang !== null) {
+                return seg.lang;
+            }
+        }
+        return 'en';
+    }
+
+    /**
+     * Segment text into consecutive runs of the same language.
+     * Pre-scans for kana to disambiguate JA vs ZH for CJK characters.
+     * Applies Swedish refinement as a post-pass on Latin/'en' segments.
+     * @param {string} text
+     * @returns {Array<{lang: string, text: string}>}
+     */
+    _segmentText(text) {
+        if (!text || text.trim().length === 0) {
+            return [{ lang: 'en', text: text || '' }];
+        }
+
+        // Pre-scan: check if any kana exists (for CJK disambiguation)
         let hasKana = false;
-        let hasCJK = false;
         for (const char of text) {
             const code = char.charCodeAt(0);
-            // Check for Japanese Kana (definitive JA indicator)
             if ((code >= 0x3040 && code <= 0x309F) || // Hiragana
                 (code >= 0x30A0 && code <= 0x30FF)) { // Katakana
                 hasKana = true;
-                break; // Kana is definitive for JA
-            }
-            // Check for CJK Unified Ideographs (shared by JA and ZH)
-            if (code >= 0x4E00 && code <= 0x9FFF) {
-                hasCJK = true;
+                break;
             }
         }
-        if (hasKana) {
+
+        // Walk character-by-character, classifying each
+        const segments = [];
+        let currentLang = null;
+        let currentText = '';
+
+        for (const char of text) {
+            const lang = this._classifyChar(char, hasKana);
+
+            if (lang === currentLang || lang === null) {
+                // Same language or neutral (punctuation/space) -- extend current segment
+                currentText += char;
+            } else if (currentLang === null) {
+                // First language-bearing character in this segment
+                currentLang = lang;
+                currentText += char;
+            } else {
+                // Language switch -- flush and start new segment
+                if (currentText.length > 0) {
+                    segments.push({ lang: currentLang, text: currentText });
+                }
+                currentLang = lang;
+                currentText = char;
+            }
+        }
+        // Flush final segment
+        if (currentText.length > 0) {
+            segments.push({ lang: currentLang, text: currentText });
+        }
+
+        // Fall back to 'en' for segments with no language-specific characters
+        for (const seg of segments) {
+            if (seg.lang === null) {
+                seg.lang = 'en';
+            }
+        }
+
+        // Post-pass: refine Latin/'en' segments for Swedish
+        return this._refineLatinSegmentsForSwedish(segments);
+    }
+
+    /**
+     * Classify a single character into a language or null (neutral).
+     * @param {string} char
+     * @param {boolean} hasKana - whether the full text contains kana
+     * @returns {string|null} 'ja', 'zh', 'en', or null
+     */
+    _classifyChar(char, hasKana) {
+        const code = char.charCodeAt(0);
+
+        // Hiragana / Katakana → JA
+        if ((code >= 0x3040 && code <= 0x309F) ||
+            (code >= 0x30A0 && code <= 0x30FF)) {
             return 'ja';
         }
-        if (hasCJK) {
-            // CJK characters without Kana → Chinese
-            return 'zh';
+
+        // CJK Unified Ideographs → JA if kana present, else ZH
+        if (code >= 0x4E00 && code <= 0x9FFF) {
+            return hasKana ? 'ja' : 'zh';
         }
 
-        // Swedish detection: scan for Swedish-specific characters and function words.
-        // Check characters for ä/ö/å
-        for (const char of text) {
-            if (SWEDISH_CHARS.has(char)) {
-                return 'sv';
-            }
-        }
-        // Check words for Swedish function words
-        for (const rawWord of text.split(/\s+/)) {
-            const word = rawWord.replace(/^[.,;:!?]+|[.,;:!?]+$/g, '').toLowerCase();
-            if (word && SWEDISH_FUNCTION_WORDS.has(word)) {
-                return 'sv';
-            }
+        // Latin letters (basic + extended, excluding × U+00D7 and ÷ U+00F7)
+        // Matches Python's [A-Za-zÀ-ÖØ-öø-ÿ]
+        if ((code >= 0x0041 && code <= 0x005A) || // A-Z
+            (code >= 0x0061 && code <= 0x007A) || // a-z
+            (code >= 0x00C0 && code <= 0x00D6) || // À-Ö
+            (code >= 0x00D8 && code <= 0x00F6) || // Ø-ö
+            (code >= 0x00F8 && code <= 0x00FF)) { // ø-ÿ
+            return 'en';
         }
 
-        return 'en';
+        // Everything else (spaces, punctuation, digits) → neutral
+        return null;
+    }
+
+    /**
+     * Refine 'en' segments that may actually be Swedish.
+     * For each 'en' segment, count Swedish indicators (ä/ö/å characters
+     * and Swedish function words). Re-classify as 'sv' if score >= 1.
+     * @param {Array<{lang: string, text: string}>} segments
+     * @returns {Array<{lang: string, text: string}>}
+     */
+    _refineLatinSegmentsForSwedish(segments) {
+        for (const seg of segments) {
+            if (seg.lang !== 'en') {
+                continue;
+            }
+
+            let score = 0;
+
+            // Per-word scoring matching Python's elif pattern:
+            // Each word counts as +1 if it contains a Swedish character
+            // OR is a Swedish function word (mutually exclusive per word).
+            for (const rawWord of seg.text.split(/\s+/)) {
+                const word = rawWord.replace(/^[.,;:!?]+|[.,;:!?]+$/g, '').toLowerCase();
+                if (!word) continue;
+
+                if ([...word].some(c => SWEDISH_CHARS.has(c))) {
+                    score++;
+                } else if (SWEDISH_FUNCTION_WORDS.has(word)) {
+                    score++;
+                }
+            }
+
+            if (score >= 1) {
+                seg.lang = 'sv';
+            }
+        }
+        return segments;
     }
 
     /**
