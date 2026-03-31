@@ -114,6 +114,7 @@ jobs:
     timeout-minutes: 10
     permissions:
       contents: read
+      id-token: write  # Required for PyPI Trusted Publisher (OIDC)
     steps:
       - uses: actions/checkout@v4
 
@@ -121,6 +122,8 @@ jobs:
         with:
           python-version: "3.13"
 
+      # TODO: Migrate to PyPI Trusted Publisher (OIDC) to eliminate PYPI_TOKEN secret.
+      #       See: https://docs.pypi.org/trusted-publishers/using-a-publisher/
       - name: Build and publish
         working-directory: src/python/g2p
         run: |

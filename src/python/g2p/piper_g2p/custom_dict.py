@@ -4,8 +4,13 @@
 """
 
 import json
+import logging
 import re
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
+
+MAX_DICT_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
 
 
 class CustomDictionary:
@@ -68,8 +73,27 @@ class CustomDictionary:
         if not path.exists():
             raise FileNotFoundError(f"Dictionary file not found: {dict_path}")
 
-        with open(path, encoding="utf-8") as f:
-            data = json.load(f)
+        # パストラバーサル対策: シンボリックリンクを解決して警告
+        resolved = path.resolve()
+        if resolved != Path(dict_path).absolute():
+            logger.warning(
+                "Dictionary path resolved via symlink: %s -> %s", dict_path, resolved
+            )
+
+        # ファイルサイズ上限チェック
+        file_size = resolved.stat().st_size
+        if file_size > MAX_DICT_FILE_SIZE:
+            raise ValueError(
+                f"Dictionary file too large: {file_size} bytes > {MAX_DICT_FILE_SIZE}"
+            )
+
+        try:
+            with open(resolved, encoding="utf-8") as f:
+                data = json.load(f)
+        except json.JSONDecodeError as e:
+            raise ValueError(
+                f"Invalid JSON in dictionary file {dict_path}: {e}"
+            ) from e
 
         # バージョンチェック
         version = data.get("version", "1.0")

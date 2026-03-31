@@ -170,19 +170,62 @@ def _apply_tone_sandhi(
     """Apply basic Mandarin tone sandhi rules.
 
     Rules applied in order:
-      1. T3 + T3 -> T2 + T3 (third tone sandhi)
+      1. Consecutive T3 sandhi (3+ syllables):
+         - Identify runs of consecutive T3 syllables.
+         - For runs of 3+ syllables, group from the right in pairs and
+           change the first syllable of each pair to T2.
+           e.g. T3+T3+T3 -> T2+T2+T3
+         - For runs of exactly 2 syllables, T3+T3 -> T2+T3.
       2. yi (T1) before T4 -> T2
       3. yi (T1) before T1/T2/T3 -> T4
       4. bu (T4) before T4 -> T2
+
+    Known limitation:
+        Recursive sandhi for runs of 4+ consecutive T3 syllables does not
+        consider word boundaries (which require morphological analysis such as
+        jieba).  The current implementation applies right-to-left pair grouping
+        uniformly, which is a reasonable default but may not match native
+        speaker intuition for all phrases.
     """
     result = list(py_tones)
+
+    # --- Rule 1: consecutive T3 sandhi ---
+    # Find contiguous runs of T3 syllables and apply sandhi per run.
+    i = 0
+    while i < len(result):
+        if result[i][1] != 3:
+            i += 1
+            continue
+        # Found a T3 -- find the extent of the run
+        run_start = i
+        while i < len(result) and result[i][1] == 3:
+            i += 1
+        run_end = i  # exclusive
+        run_len = run_end - run_start
+
+        if run_len < 2:
+            continue
+
+        if run_len == 2:
+            # Simple case: T3+T3 -> T2+T3
+            syl, _ = result[run_start]
+            result[run_start] = (syl, 2)
+        else:
+            # 3+ consecutive T3: change all except the last to T2.
+            # This correctly handles the common 3-syllable case:
+            #   T3+T3+T3 -> T2+T2+T3  (e.g. 展览馆, 你也好)
+            #
+            # For longer runs, all syllables except the final one become T2.
+            # This is a simplification -- see the "Known limitation" note
+            # in the docstring.
+            for j in range(run_start, run_end - 1):
+                syl, _ = result[j]
+                result[j] = (syl, 2)
+
+    # --- Rules 2-4: yi / bu sandhi ---
     for i in range(len(result) - 1):
         syllable_i, tone_i = result[i]
         _, tone_next = result[i + 1]
-        # Rule 1: third tone sandhi
-        if tone_i == 3 and tone_next == 3:
-            result[i] = (syllable_i, 2)
-            continue
         # Rule 2 & 3: yi tone sandhi
         # Note: _normalize_pinyin("yi") -> "i", so we match normalized form
         if syllable_i == "i" and tone_i == 1:

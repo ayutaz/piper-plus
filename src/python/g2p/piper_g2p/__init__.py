@@ -3,11 +3,17 @@
 __version__ = "0.1.0"
 
 from .base import Phonemizer, ProsodyInfo
-from .registry import available_languages, get_phonemizer, register_language
+from .registry import (
+    PhonemizerRegistry,
+    available_languages,
+    get_phonemizer,
+    register_language,
+)
 
 __all__ = [
     "__version__",
     "Phonemizer",
+    "PhonemizerRegistry",
     "ProsodyInfo",
     "get_phonemizer",
     "register_language",

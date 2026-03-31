@@ -5,6 +5,15 @@ No external dependencies required -- Spanish has nearly phonemic
 orthography, making rule-based G2P highly effective.
 
 Uses Latin American Spanish pronunciation by default (seseo: c/z -> s).
+
+Known limitations
+-----------------
+* **Seseo only** -- ``c`` (before e/i) and ``z`` are always mapped to /s/.
+  Castilian /\u03b8/ (distincion) is not supported.
+* **Voseo not modelled** -- verb morphology for *vos* conjugation is not
+  handled; phoneme output will still be intelligible but stress placement
+  on *vos*-inflected forms (e.g. *tenes*, *hablás*) may be inaccurate.
+* No allophonic nasalisation or aspiration rules.
 """
 
 import re
@@ -31,6 +40,24 @@ _ACCENT_MAP = {"\u00e1": "a", "\u00e9": "e", "\u00ed": "i", "\u00f3": "o", "\u00
 # Letters that trigger word-final stress (Spanish stress rule:
 # words ending in consonant other than n/s get final-syllable stress)
 _STRESS_FINAL_EXCEPTIONS = {"n", "s"}
+
+# 1-to-1 grapheme-to-phoneme mapping for consonants with no context
+# dependency.  Characters listed here are handled by a single dict
+# lookup in ``_g2p_word`` instead of individual ``if`` blocks.
+_SIMPLE_CONSONANT_MAP: dict[str, str] = {
+    "f": "f",
+    "j": "x",
+    "k": "k",
+    "l": "l",
+    "m": "m",
+    "n": "n",
+    "\u00f1": "\u0272",  # ñ -> ɲ
+    "p": "p",
+    "s": "s",
+    "t": "t",
+    "w": "w",
+    "z": "s",  # seseo
+}
 
 # Regex: split text into word tokens and punctuation
 _RE_TOKEN = re.compile(r"([a-z\u00e1\u00e9\u00ed\u00f3\u00fa\u00fc\u00f1]+|[,.;:!?\u00a1\u00bf]+)", re.IGNORECASE)
@@ -524,10 +551,14 @@ def _g2p_word(
             i += 1
             continue
 
-        if base_ch == "f":
-            phonemes.append("f")
+        # --- Simple 1-to-1 consonants (no context dependency) ---
+        simple_ph = _SIMPLE_CONSONANT_MAP.get(base_ch)
+        if simple_ph is not None:
+            phonemes.append(simple_ph)
             i += 1
             continue
+
+        # --- Context-dependent consonants ---
 
         if base_ch == "g":
             if i + 1 < n and base_word[i + 1] in ("e", "i"):
@@ -548,41 +579,6 @@ def _g2p_word(
             i += 1
             continue
 
-        if base_ch == "j":
-            phonemes.append("x")
-            i += 1
-            continue
-
-        if base_ch == "k":
-            phonemes.append("k")
-            i += 1
-            continue
-
-        if base_ch == "l":
-            phonemes.append("l")
-            i += 1
-            continue
-
-        if base_ch == "m":
-            phonemes.append("m")
-            i += 1
-            continue
-
-        if base_ch == "n":
-            phonemes.append("n")
-            i += 1
-            continue
-
-        if base_ch == "\u00f1":
-            phonemes.append("\u0272")
-            i += 1
-            continue
-
-        if base_ch == "p":
-            phonemes.append("p")
-            i += 1
-            continue
-
         if base_ch == "r":
             if _is_word_initial():
                 phonemes.append("rr")
@@ -590,21 +586,6 @@ def _g2p_word(
                 phonemes.append("rr")
             else:
                 phonemes.append("\u027e")
-            i += 1
-            continue
-
-        if base_ch == "s":
-            phonemes.append("s")
-            i += 1
-            continue
-
-        if base_ch == "t":
-            phonemes.append("t")
-            i += 1
-            continue
-
-        if base_ch == "w":
-            phonemes.append("w")
             i += 1
             continue
 
@@ -631,11 +612,6 @@ def _g2p_word(
                 phonemes.append("i")
             else:
                 phonemes.append("\u029d")
-            i += 1
-            continue
-
-        if base_ch == "z":
-            phonemes.append("s")
             i += 1
             continue
 

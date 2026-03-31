@@ -2,6 +2,17 @@
 
 Converts French text to IPA phonemes using grapheme-to-phoneme rules.
 No external G2P engine required.
+
+Liaison / elision support (limited):
+    - **Elision**: apostrophe clitics (l', d', j', n', s', c', qu', m', t')
+      are merged with the following word so no spurious space or silent-final
+      rule fires between the clitic and its host.
+    - **Liaison**: the most frequent *obligatory* liaison patterns are handled:
+      determiner/pronoun + vowel-initial word (les amis -> /lez‿ami/,
+      un ami -> /ɛ̃n‿ami/, en été -> /ɑ̃n‿ete/, etc.).
+    - **Known limitations**: h aspiré / h muet distinction is not implemented
+      (all h is treated as silent).  Enchaînement, optional liaisons, and
+      liaison blocking (e.g. after singular nouns) are not handled.
 """
 
 import logging
@@ -33,6 +44,66 @@ _SILENT_FINAL = set("dghmnpstxz")
 
 # Words where "ille" is pronounced /il/ not /ij/
 _ILLE_AS_IL = {"ville", "mille", "tranquille"}
+
+# Elision clitics: word fragments that appear before an apostrophe.
+# When followed by a vowel-initial word, the clitic is merged with
+# the host word for phonemization (no space, no silent-final rule).
+_ELISION_CLITICS = {"l", "d", "j", "n", "s", "c", "m", "t", "qu"}
+
+# Liaison rules: (trigger_word, linking_consonant)
+# Only the most frequent obligatory liaison contexts are covered.
+# The linking consonant is prepended to the following vowel-initial word.
+_LIAISON_WORDS: dict[str, str] = {
+    # Articles / determiners
+    "les": "z",
+    "des": "z",
+    "ces": "z",
+    "mes": "z",
+    "tes": "z",
+    "ses": "z",
+    "nos": "z",
+    "vos": "z",
+    "aux": "z",
+    # Adjectives (common prenominal)
+    "petits": "z",
+    "grands": "z",
+    "gros": "z",
+    # Numerals
+    "deux": "z",
+    "trois": "z",
+    "six": "z",
+    "dix": "z",
+    # Subject pronouns
+    "nous": "z",
+    "vous": "z",
+    "ils": "z",
+    "elles": "z",
+    "on": "n",
+    # Prepositions / adverbs
+    "en": "n",
+    "dans": "z",
+    "sans": "z",
+    "chez": "z",
+    # "un" -> /n/ liaison
+    "un": "n",
+    # "mon/ton/son" already end in pronounced /n/ via nasal rules,
+    # but liaison adds explicit /n/ before vowel-initial words.
+    "mon": "n",
+    "ton": "n",
+    "son": "n",
+    # Common short words
+    "tout": "t",
+    "quand": "t",
+    "très": "z",
+    "plus": "z",
+    # est (3rd person singular of être)
+    "est": "t",
+    # Verbs (3rd person plural)
+    "ont": "t",
+    "sont": "t",
+    "font": "t",
+    "vont": "t",
+}
 
 # Polysyllabic words ending in -er that are pronounced /ɛʁ/ (not /e/)
 # These are exceptions to the verb infinitive -er → /e/ rule.
@@ -669,19 +740,112 @@ def _convert_word(word: str) -> list[str]:
     return phonemes
 
 
+def _starts_with_vowel_sound(word: str) -> bool:
+    """Check whether a word starts with a vowel sound.
+
+    In French, words starting with a vowel letter or silent 'h' followed by a
+    vowel are considered vowel-initial for liaison / elision purposes.
+
+    Known limitation: h aspiré (e.g. "haricot", "héros") is NOT distinguished
+    from h muet (e.g. "homme", "heure").  All 'h' is treated as silent.
+    """
+    if not word:
+        return False
+    first = word[0]
+    if first in _VOWELS:
+        return True
+    # Silent h + vowel
+    if first == "h" and len(word) > 1 and word[1] in _VOWELS:
+        return True
+    return False
+
+
 def _split_words(text: str) -> list[str]:
     """Split text into words and punctuation tokens.
 
-    Apostrophes (both straight ' and curly '\u2019') act as word boundaries in French
-    elision (l'ami -> ["l", "ami"]). They are normalised away before splitting so
-    that "l\u2019ami" and "l'ami" both tokenise identically.
+    Apostrophes (both straight ' and curly right-single-quote) act as word
+    boundaries in French elision.  Recognised elision clitics (l', d', j',
+    n', s', c', qu', m', t') are merged with the following word so that the
+    phonemizer treats them as a single unit -- e.g. "l'ami" -> ["lami"],
+    "d'accord" -> ["daccord"], "qu'il" -> ["quil"].
+
+    This prevents spurious silent-final rules from firing on the clitic
+    fragment and ensures the clitic consonant is always pronounced.
     """
-    # Normalise curly/typographic apostrophes to straight apostrophe, then drop them
-    # (apostrophe is not in the letter character class, so it already acts as a
-    # word boundary -- this just ensures curly variants behave the same way).
+    # Normalise curly/typographic apostrophes to straight apostrophe.
     text = text.replace("\u2019", "'").replace("\u2018", "'")
-    tokens = re.findall(r"[a-zàâæéèêëîïôùûüœçñ]+|[,.;:!?¡¿—–…«»]", text, re.IGNORECASE)
+
+    # Tokenise keeping apostrophes attached so we can detect clitics.
+    # Pattern: sequences of letters possibly containing internal apostrophes,
+    # OR standalone punctuation.
+    raw_tokens = re.findall(
+        r"[a-zàâæéèêëîïôùûüœçñ]+(?:'[a-zàâæéèêëîïôùûüœçñ]+)*|[,.;:!?¡¿—–…«»]",
+        text,
+        re.IGNORECASE,
+    )
+
+    tokens: list[str] = []
+    for raw in raw_tokens:
+        if "'" not in raw:
+            tokens.append(raw)
+            continue
+
+        # Split on apostrophe and merge recognised clitics.
+        parts = raw.split("'")
+        buf = ""
+        for k, part in enumerate(parts):
+            if buf:
+                # Previous part was a recognised clitic -- merge.
+                buf += part
+            elif k < len(parts) - 1 and part.lower() in _ELISION_CLITICS:
+                # This part is a clitic; start merging with next part.
+                buf = part
+            else:
+                # Not a clitic; emit as standalone token.
+                if part:
+                    tokens.append(part)
+        if buf:
+            tokens.append(buf)
+
     return tokens
+
+
+def _apply_liaison(tokens: list[str]) -> list[tuple[str, str | None]]:
+    """Determine liaison linking consonants between adjacent word tokens.
+
+    Returns a list of ``(token, liaison_phoneme)`` pairs.  ``liaison_phoneme``
+    is a single IPA consonant string (e.g. ``"z"``, ``"n"``, ``"t"``) when
+    the token triggers a liaison with the *next* vowel-initial word, or
+    ``None`` otherwise.
+
+    Only the most frequent obligatory liaison contexts are handled
+    (determiners, pronouns, common prepositions).  Optional and forbidden
+    liaisons are not attempted.
+    """
+    result: list[tuple[str, str | None]] = []
+    for idx, token in enumerate(tokens):
+        is_punct = all(ch in _PUNCTUATION for ch in token)
+        if is_punct:
+            result.append((token, None))
+            continue
+
+        linking: str | None = None
+        lower_token = token.lower()
+        if lower_token in _LIAISON_WORDS:
+            # Look ahead for the next non-punctuation token.
+            next_word: str | None = None
+            for j in range(idx + 1, len(tokens)):
+                candidate = tokens[j]
+                if not all(ch in _PUNCTUATION for ch in candidate):
+                    next_word = candidate
+                    break
+                # Stop at punctuation (liaison blocked by sentence boundary).
+                break
+            if next_word is not None and _starts_with_vowel_sound(next_word.lower()):
+                linking = _LIAISON_WORDS[lower_token]
+
+        result.append((token, linking))
+    return result
 
 
 def phonemize_french_with_prosody(
@@ -691,18 +855,53 @@ def phonemize_french_with_prosody(
 
     French has fixed stress on the last syllable of each word/phrase.
 
+    Elision clitics (l', d', j', ...) are merged with the following word
+    during tokenisation so they are phonemized as one unit.  Obligatory
+    liaison linking consonants (e.g. /z/ in "les amis") are inserted between
+    words when the trigger word is in ``_LIAISON_WORDS`` and the next word
+    starts with a vowel sound.
+
+    Known limitations: h aspire / h muet distinction is not implemented.
+    Enchainement and optional liaisons are not handled.
+
     Returns:
         (phonemes, prosody_list) with ProsodyInfo for each phoneme.
         a1=0, a2=stress level (0 or 2 for last syllable), a3=word phoneme count.
     """
     text = _normalize(text)
     tokens = _split_words(text)
+    liaison_pairs = _apply_liaison(tokens)
 
     phonemes: list[str] = []
     prosody_list: list[ProsodyInfo | None] = []
     need_space = False
 
-    for token in tokens:
+    # Vowel phoneme set for stress detection
+    vowel_phonemes = {
+        "a",
+        "e",
+        "ɛ",
+        "i",
+        "o",
+        "ɔ",
+        "u",
+        "y_vowel",
+        "ə",
+        "ø",
+        "œ",
+        "ɛ̃",
+        "ɑ̃",
+        "ɔ̃",
+    }
+
+    # IPA symbols for liaison consonant phonemes
+    _liaison_consonant_ipa: dict[str, str] = {
+        "z": "z",
+        "n": "n",
+        "t": "t",
+    }
+
+    for token, liaison in liaison_pairs:
         is_punct = all(ch in _PUNCTUATION for ch in token)
 
         if not is_punct and need_space:
@@ -715,26 +914,18 @@ def phonemize_french_with_prosody(
                 prosody_list.append(ProsodyInfo(a1=0, a2=0, a3=0))
         else:
             word_phonemes = _convert_word(token)
+
+            # If this word has a liaison consonant, append it to the word's
+            # phoneme list so it is heard before the following vowel-initial
+            # word.  The linking consonant is treated as part of this word
+            # for prosody purposes.
+            if liaison is not None:
+                ipa = _liaison_consonant_ipa.get(liaison, liaison)
+                word_phonemes.append(ipa)
+
             word_phoneme_count = len(word_phonemes)
 
             # French: stress always on last syllable (last vowel phoneme)
-            # Find last vowel-like phoneme for stress marking
-            vowel_phonemes = {
-                "a",
-                "e",
-                "ɛ",
-                "i",
-                "o",
-                "ɔ",
-                "u",
-                "y_vowel",
-                "ə",
-                "ø",
-                "œ",
-                "ɛ̃",
-                "ɑ̃",
-                "ɔ̃",
-            }
             last_vowel_idx = -1
             for j in range(len(word_phonemes) - 1, -1, -1):
                 if word_phonemes[j] in vowel_phonemes:

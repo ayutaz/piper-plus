@@ -2,6 +2,17 @@
 
 Converts Brazilian Portuguese text to IPA phonemes using grapheme-to-phoneme
 rules. No external G2P engine required.
+
+Known limitations
+-----------------
+* **Brazilian Portuguese (PT-BR) only** -- European Portuguese (PT-PT)
+  phonology differs significantly (e.g. vowel reduction patterns,
+  sibilant realisations, absence of /tʃ dʒ/ palatalisation) and is
+  not modelled.
+* The ``x`` grapheme is highly irregular in Portuguese; only a simplified
+  positional heuristic is applied (initial/post-consonant -> /ʃ/,
+  intervocalic -> /z/).
+* Vowel harmony and pretonic mid-vowel raising are not implemented.
 """
 
 import logging
@@ -384,19 +395,9 @@ def _convert_word(word: str) -> tuple[list[str], int]:
             i += 1
             continue
 
-        # Simple consonant mappings
-        if ch in "bfklmnpv":
+        # Simple 1-to-1 consonant mappings (identity: grapheme == phoneme)
+        if ch in "bfklmnpvwz":
             phonemes.append(ch)
-            i += 1
-            continue
-
-        if ch == "z":
-            phonemes.append("z")
-            i += 1
-            continue
-
-        if ch == "w":
-            phonemes.append("w")
             i += 1
             continue
 

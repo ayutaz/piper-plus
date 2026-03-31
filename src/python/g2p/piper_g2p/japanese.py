@@ -24,11 +24,10 @@ __all__ = [
     "JapanesePhonemizer",
 ]
 
-# Regular expressions reused many times
-_RE_PHONEME = re.compile(r"-([^+]+)\+")
-_RE_A1 = re.compile(r"/A:([\d-]+)\+")
-_RE_A2 = re.compile(r"\+([0-9]+)\+")
-_RE_A3 = re.compile(r"\+([0-9]+)/")
+# Phoneme extraction (always matches, including sil/pau labels)
+_RE_PHONEME = re.compile(r"-(?P<ph>[^+]+)\+")
+# Prosody extraction (3 regexes unified into 1; only matches non-sil labels)
+_RE_PROSODY = re.compile(r"/A:(?P<a1>[\d-]+)\+(?P<a2>[0-9]+)\+(?P<a3>[0-9]+)/")
 
 
 def _is_question(text: str) -> bool:
@@ -93,6 +92,8 @@ def _apply_n_phoneme_rules(tokens: list[str]) -> list[str]:
     - N_ng    : before k/g (velar assimilation)
     - N_uvular: at phrase end or before vowels/other consonants
 
+    Uses a single reverse pass (O(n)) to track the next real phoneme.
+
     Parameters
     ----------
     tokens : list[str]
@@ -103,31 +104,25 @@ def _apply_n_phoneme_rules(tokens: list[str]) -> list[str]:
     list[str]
         List with 'N' replaced by context-appropriate variants.
     """
-    result = []
-    for i, token in enumerate(tokens):
-        if token != "N":
-            result.append(token)
-            continue
-
-        # Look ahead to find next actual phoneme
-        next_phoneme = None
-        for j in range(i + 1, len(tokens)):
-            if tokens[j] not in _SKIP_TOKENS:
-                next_phoneme = tokens[j]
-                break
-
-        # Determine N variant based on next phoneme
-        if next_phoneme is None:
-            result.append("N_uvular")  # End of phrase
-        elif next_phoneme in ("m", "my", "b", "by", "p", "py"):
-            result.append("N_m")  # Bilabial
-        elif next_phoneme in ("n", "ny", "t", "ty", "d", "dy", "ts", "ch"):
-            result.append("N_n")  # Alveolar
-        elif next_phoneme in ("k", "ky", "kw", "g", "gy", "gw"):
-            result.append("N_ng")  # Velar
-        else:
-            result.append("N_uvular")  # Vowels, other consonants
-
+    result = list(tokens)  # copy
+    next_phoneme = None
+    for i in range(len(result) - 1, -1, -1):
+        token = result[i]
+        if token not in _SKIP_TOKENS and token != "N":
+            next_phoneme = token
+        elif token == "N":
+            # Determine N variant based on next phoneme
+            if next_phoneme is None:
+                result[i] = "N_uvular"  # End of phrase
+            elif next_phoneme in ("m", "my", "b", "by", "p", "py"):
+                result[i] = "N_m"  # Bilabial
+            elif next_phoneme in ("n", "ny", "t", "ty", "d", "dy", "ts", "ch"):
+                result[i] = "N_n"  # Alveolar
+            elif next_phoneme in ("k", "ky", "kw", "g", "gy", "gw"):
+                result[i] = "N_ng"  # Velar
+            else:
+                result[i] = "N_uvular"  # Vowels, other consonants
+            next_phoneme = result[i]  # N_* itself is not a skip token
     return result
 
 
@@ -147,17 +142,14 @@ def _phonemize_core(
     for idx, label in enumerate(labels):
         m_ph = _RE_PHONEME.search(label)
         if not m_ph:
-            # Should never happen — skip just in case
             continue
-        phoneme = m_ph.group(1)
+        phoneme = m_ph.group("ph")
 
         # Beginning / end silence handling
         if phoneme == "sil":
             if idx == 0:
-                # No BOS — skip leading sil
                 pass
             elif idx == len(labels) - 1:
-                # EOS: only emit question marker if present
                 if question_marker:
                     tokens.append(question_marker)
                     prosody_info.append(None)
@@ -172,23 +164,19 @@ def _phonemize_core(
         # Add phoneme token
         tokens.append(phoneme)
 
-        # ------------------------------------------------------------------
-        # Prosody mark extraction — see Open JTalk label definition
-        # ------------------------------------------------------------------
-        m_a1 = _RE_A1.search(label)
-        m_a2 = _RE_A2.search(label)
-        m_a3 = _RE_A3.search(label)
+        # Prosody extraction (unified A1/A2/A3 regex)
+        m_p = _RE_PROSODY.search(label)
 
-        if m_a1 and m_a2 and m_a3:
-            a1 = int(m_a1.group(1))
-            a2 = int(m_a2.group(1))
-            a3 = int(m_a3.group(1))
+        if m_p:
+            a1 = int(m_p.group("a1"))
+            a2 = int(m_p.group("a2"))
+            a3 = int(m_p.group("a3"))
             prosody_info.append(ProsodyInfo(a1=a1, a2=a2, a3=a3))
 
             # Look-ahead to next label to fetch a2_next
             if idx < len(labels) - 1:
-                m_a2_next = _RE_A2.search(labels[idx + 1])
-                a2_next = int(m_a2_next.group(1)) if m_a2_next else -1
+                m_next = _RE_PROSODY.search(labels[idx + 1])
+                a2_next = int(m_next.group("a2")) if m_next else -1
             else:
                 a2_next = -1
 

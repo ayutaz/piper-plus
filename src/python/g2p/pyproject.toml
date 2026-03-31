@@ -28,18 +28,18 @@ classifiers = [
 readme = "README.md"
 
 [project.optional-dependencies]
-ja = ["pyopenjtalk-plus"]
-en = ["g2p-en>=2.1.0"]
-zh = ["pypinyin>=0.55.0"]
-ko = ["g2pk2>=0.0.3"]
+ja = ["pyopenjtalk-plus>=0.3,<1"]
+en = ["g2p-en>=2.1.0,<3"]
+zh = ["pypinyin>=0.55.0,<1"]
+ko = ["g2pk2>=0.0.3,<1"]
 es = []
 fr = []
 pt = []
 all = [
-    "pyopenjtalk-plus",
-    "g2p-en>=2.1.0",
-    "pypinyin>=0.55.0",
-    "g2pk2>=0.0.3",
+    "pyopenjtalk-plus>=0.3,<1",
+    "g2p-en>=2.1.0,<3",
+    "pypinyin>=0.55.0,<1",
+    "g2pk2>=0.0.3,<1",
 ]
 dev = [
     "pytest>=8.0",
@@ -52,6 +52,11 @@ dev = [
 Homepage = "https://github.com/yousan/piper-plus"
 Repository = "https://github.com/yousan/piper-plus"
 Issues = "https://github.com/yousan/piper-plus/issues"
+Documentation = "https://github.com/yousan/piper-plus/tree/dev/src/python/g2p"
+
+[project.entry-points."piper_g2p.phonemizers"]
+# Built-in languages (documented for reference)
+# Third-party packages can add their own entry points here
 
 [tool.hatch.build.targets.wheel]
 packages = ["piper_g2p"]

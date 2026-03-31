@@ -100,9 +100,10 @@ class TestPiperEncoder:
         assert isinstance(ids, list)
         assert isinstance(prosody_out, list)
         assert len(ids) == len(prosody_out)
-        # At least some entries should be dicts with a1/a2/a3
-        dicts = [p for p in prosody_out if p is not None]
-        assert len(dicts) > 0
-        assert "a1" in dicts[0]
-        assert "a2" in dicts[0]
-        assert "a3" in dicts[0]
+        # At least some entries should be ProsodyInfo with a1/a2/a3
+        infos = [p for p in prosody_out if p is not None]
+        assert len(infos) > 0
+        assert isinstance(infos[0], ProsodyInfo)
+        assert hasattr(infos[0], "a1")
+        assert hasattr(infos[0], "a2")
+        assert hasattr(infos[0], "a3")

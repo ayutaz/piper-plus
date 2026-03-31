@@ -54,3 +54,21 @@ requires_zh = pytest.mark.skipif(
 requires_ko = pytest.mark.skipif(
     not _has_g2pk2(), reason="g2pk2 not installed"
 )
+
+
+@pytest.fixture(scope="session")
+def ja_phonemizer():
+    if not _has_pyopenjtalk():
+        pytest.skip("pyopenjtalk not installed")
+    from piper_g2p import get_phonemizer
+
+    return get_phonemizer("ja")
+
+
+@pytest.fixture(scope="session")
+def en_phonemizer():
+    if not _has_g2p_en():
+        pytest.skip("g2p-en not installed")
+    from piper_g2p import get_phonemizer
+
+    return get_phonemizer("en")

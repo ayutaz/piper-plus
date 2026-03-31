@@ -36,7 +36,7 @@ def _get_g2p():
             from g2p_en import G2p  # noqa: PLC0415
 
             _g2p_instance = G2p()
-        except (ImportError, Exception) as exc:
+        except ImportError as exc:
             _LOGGER.warning("g2p_en unavailable: %s", exc)
             _g2p_unavailable = True
             return None
@@ -96,9 +96,9 @@ _RE_ARPABET = re.compile(r"^([A-Z]+)(\d)?$")
 # Punctuation characters (attached to previous word, no space before)
 _PUNCTUATION = set(",.;:!?")
 
-# English function words — stress is removed to match espeak-ng behavior.
-# espeak-ng does not place primary stress on common function words in
-# connected speech.  g2p-en, however, marks them with stress=1 by default.
+# English function words (89 words) — stress is removed to match espeak-ng
+# behavior.  espeak-ng does not place primary stress on common function words
+# in connected speech.  g2p-en, however, marks them with stress=1 by default.
 _FUNCTION_WORDS = {
     # articles / determiners
     "a",

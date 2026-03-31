@@ -444,7 +444,7 @@ wheels = [
 
 [[package]]
 name = "piper-g2p"
-version = "0.0.1"
+version = "0.1.0"
 source = { editable = "." }
 
 [package.optional-dependencies]
@@ -475,15 +475,15 @@ zh = [
 
 [package.metadata]
 requires-dist = [
-    { name = "g2p-en", marker = "extra == 'all'", specifier = ">=2.1.0" },
-    { name = "g2p-en", marker = "extra == 'en'", specifier = ">=2.1.0" },
-    { name = "g2pk2", marker = "extra == 'all'", specifier = ">=0.0.3" },
-    { name = "g2pk2", marker = "extra == 'ko'", specifier = ">=0.0.3" },
+    { name = "g2p-en", marker = "extra == 'all'", specifier = ">=2.1.0,<3" },
+    { name = "g2p-en", marker = "extra == 'en'", specifier = ">=2.1.0,<3" },
+    { name = "g2pk2", marker = "extra == 'all'", specifier = ">=0.0.3,<1" },
+    { name = "g2pk2", marker = "extra == 'ko'", specifier = ">=0.0.3,<1" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.13" },
-    { name = "pyopenjtalk-plus", marker = "extra == 'all'" },
-    { name = "pyopenjtalk-plus", marker = "extra == 'ja'" },
-    { name = "pypinyin", marker = "extra == 'all'", specifier = ">=0.55.0" },
-    { name = "pypinyin", marker = "extra == 'zh'", specifier = ">=0.55.0" },
+    { name = "pyopenjtalk-plus", marker = "extra == 'all'", specifier = ">=0.3,<1" },
+    { name = "pyopenjtalk-plus", marker = "extra == 'ja'", specifier = ">=0.3,<1" },
+    { name = "pypinyin", marker = "extra == 'all'", specifier = ">=0.55.0,<1" },
+    { name = "pypinyin", marker = "extra == 'zh'", specifier = ">=0.55.0,<1" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=5.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.8.0" },

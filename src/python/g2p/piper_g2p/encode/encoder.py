@@ -58,7 +58,7 @@ class PiperEncoder:
             Integer phoneme IDs ready for ONNX inference.
         """
         raw_ids = self._tokens_to_raw_ids(tokens)
-        dummy_prosody: list[dict | None] = [None] * len(raw_ids)
+        dummy_prosody: list[ProsodyInfo | None] = [None] * len(raw_ids)
         result_ids, _ = self._post_process(raw_ids, dummy_prosody, eos_token)
         return result_ids
 
@@ -67,7 +67,7 @@ class PiperEncoder:
         tokens: list[str],
         prosody_list: list[ProsodyInfo | None],
         eos_token: str = "$",
-    ) -> tuple[list[int], list[dict | None]]:
+    ) -> tuple[list[int], list[ProsodyInfo | None]]:
         """Convert IPA tokens + prosody to ``(phoneme_ids, prosody_features)``.
 
         Parameters
@@ -81,10 +81,10 @@ class PiperEncoder:
 
         Returns
         -------
-        tuple[list[int], list[dict | None]]
-            ``(phoneme_ids, prosody_features)`` where prosody dicts
-            have keys ``{"a1", "a2", "a3"}`` and padding positions are
-            ``None``.
+        tuple[list[int], list[ProsodyInfo | None]]
+            ``(phoneme_ids, prosody_features)`` where each entry is a
+            :class:`ProsodyInfo` with attributes ``a1``, ``a2``, ``a3``
+            and padding positions are ``None``.
         """
         raw_ids = self._tokens_to_raw_ids(tokens)
         raw_prosody = self._convert_prosody(prosody_list, len(raw_ids))
@@ -108,14 +108,9 @@ class PiperEncoder:
     def _convert_prosody(
         prosody_list: list[ProsodyInfo | None],
         expected_len: int,
-    ) -> list[dict | None]:
-        """Convert ProsodyInfo objects to dicts, padding if needed."""
-        result: list[dict | None] = []
-        for p in prosody_list:
-            if p is not None:
-                result.append({"a1": p.a1, "a2": p.a2, "a3": p.a3})
-            else:
-                result.append(None)
+    ) -> list[ProsodyInfo | None]:
+        """Pass through ProsodyInfo objects, padding with None if needed."""
+        result: list[ProsodyInfo | None] = list(prosody_list)
 
         # If token->id expansion produced more IDs than prosody entries,
         # pad with None (shouldn't happen with well-formed input, but
@@ -125,12 +120,38 @@ class PiperEncoder:
 
         return result[:expected_len]
 
+    @staticmethod
+    def prosody_to_dicts(
+        prosody: list[ProsodyInfo | None],
+    ) -> list[dict | None]:
+        """Convert a prosody list to plain dicts for JSON serialization.
+
+        Use this when you need ``{"a1", "a2", "a3"}`` dicts (e.g. for
+        JSONL output) instead of :class:`ProsodyInfo` objects.
+
+        Parameters
+        ----------
+        prosody : list[ProsodyInfo | None]
+            Prosody list as returned by :meth:`encode_with_prosody`.
+
+        Returns
+        -------
+        list[dict | None]
+            Each :class:`ProsodyInfo` is converted to
+            ``{"a1": ..., "a2": ..., "a3": ...}``; ``None`` entries
+            remain ``None``.
+        """
+        return [
+            {"a1": p.a1, "a2": p.a2, "a3": p.a3} if p else None
+            for p in prosody
+        ]
+
     def _post_process(
         self,
         phoneme_ids: list[int],
-        prosody_features: list[dict | None],
+        prosody_features: list[ProsodyInfo | None],
         eos_token: str,
-    ) -> tuple[list[int], list[dict | None]]:
+    ) -> tuple[list[int], list[ProsodyInfo | None]]:
         """Insert BOS/EOS and inter-phoneme padding.
 
         Mirrors ``piper_train.phonemize.base.Phonemizer.post_process_ids()``.
@@ -143,7 +164,7 @@ class PiperEncoder:
         # Insert pad between every phoneme ID, but skip after existing
         # pad/pause tokens (whose ID is in pad_ids).
         padded_ids: list[int] = []
-        padded_prosody: list[dict | None] = []
+        padded_prosody: list[ProsodyInfo | None] = []
         for phoneme_id, prosody_feature in zip(
             phoneme_ids, prosody_features, strict=True
         ):

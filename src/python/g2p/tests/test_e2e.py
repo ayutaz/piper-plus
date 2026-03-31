@@ -50,11 +50,11 @@ class TestJAEndToEnd:
         # Verify prosody output contains some real values
         non_none = [p for p in prosody_out if p is not None]
         assert len(non_none) > 0, "Expected some non-None prosody entries"
-        # Verify dict structure
+        # Verify ProsodyInfo structure
         sample = non_none[0]
-        assert "a1" in sample
-        assert "a2" in sample
-        assert "a3" in sample
+        assert hasattr(sample, "a1")
+        assert hasattr(sample, "a2")
+        assert hasattr(sample, "a3")
 
 
 @requires_en
