@@ -123,6 +123,8 @@ export class G2P {
      * @param text - Input text to phonemize.
      * @param options - Optional language specification.
      * @returns Phonemize result with IPA tokens and language.
+     * @throws {Error} If the instance has been disposed via `dispose()`.
+     * @throws {Error} If the detected/specified language was not initialised in `G2P.create()`.
      */
     phonemize(text: string, options?: PhonemizeOptions): PhonemizeResult;
 
@@ -135,6 +137,8 @@ export class G2P {
      * @param text - Input text to phonemize.
      * @param options - Optional language specification.
      * @returns Phonemize result with IPA tokens, prosody info, and language.
+     * @throws {Error} If the instance has been disposed via `dispose()`.
+     * @throws {Error} If the detected/specified language was not initialised in `G2P.create()`.
      */
     phonemizeWithProsody(text: string, options?: PhonemizeOptions): PhonemizeResult;
 
@@ -148,6 +152,8 @@ export class G2P {
      * @param phonemeIdMap - Phoneme-to-ID mapping from Piper model config.
      * @param options - Optional language specification.
      * @returns Encoded phoneme IDs and optional flattened prosody features.
+     * @throws {Error} If the instance has been disposed via `dispose()`.
+     * @throws {Error} If the detected/specified language was not initialised in `G2P.create()`.
      */
     encode(text: string, phonemeIdMap: Record<string, number[]>, options?: PhonemizeOptions): EncodeResult;
 
@@ -159,6 +165,7 @@ export class G2P {
      *
      * @param text - Text to analyze.
      * @returns Detected language code.
+     * @throws {Error} If the instance has been disposed via `dispose()`.
      */
     detectLanguage(text: string): Language;
 
@@ -170,6 +177,7 @@ export class G2P {
      *
      * @param text - Mixed-language text to segment.
      * @returns Array of segments with language and text.
+     * @throws {Error} If the instance has been disposed via `dispose()`.
      */
     segmentText(text: string): Array<{ language: Language; text: string }>;
 
@@ -269,6 +277,15 @@ export class DictLoader {
      * Remove all cached dictionary and voice data from IndexedDB.
      */
     clearCache(): Promise<void>;
+
+    /**
+     * Close the IndexedDB connection and release resources.
+     *
+     * Safe to call multiple times. After calling `destroy()`, subsequent
+     * operations (e.g. `loadJaDict()`) will re-open the database connection
+     * as needed.
+     */
+    destroy(): void;
 }
 
 // ---------------------------------------------------------------------------
@@ -653,8 +670,20 @@ export class CustomDictionary {
      *
      * @param text - Input text to process.
      * @returns Object with the (possibly modified) text and a map of replacements applied.
+     * @deprecated Use {@link applyToText} instead for cross-language API consistency.
      */
     apply(text: string): { text: string; replacements: Map<string, string[]> };
+
+    /**
+     * Apply dictionary entries to the input text.
+     *
+     * Recommended method name, consistent with Python (`apply_to_text()`)
+     * and Rust (`apply_to_text()`).
+     *
+     * @param text - Input text to process.
+     * @returns Object with the (possibly modified) text and a map of replacements applied.
+     */
+    applyToText(text: string): { text: string; replacements: Map<string, string[]> };
 }
 
 // ---------------------------------------------------------------------------

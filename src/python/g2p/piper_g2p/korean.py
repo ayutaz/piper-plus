@@ -279,6 +279,10 @@ def phonemize_korean(text: str) -> list[str]:
 class KoreanPhonemizer(Phonemizer):
     """Korean phonemizer using g2pk2 and Hangul decomposition."""
 
+    @property
+    def language_code(self) -> str:
+        return "ko"
+
     def phonemize(self, text: str) -> list[str]:
         return phonemize_korean(text)
 

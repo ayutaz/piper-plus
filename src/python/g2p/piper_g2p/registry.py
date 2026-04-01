@@ -41,6 +41,14 @@ _LANGUAGE_TABLE = [
     ("pt", ".portuguese", "PortuguesePhonemizer"),
 ]
 
+# Human-readable skip reasons for languages with optional dependencies
+_SKIP_REASONS: dict[str, str] = {
+    "ja": "pyopenjtalk not installed",
+    "en": "g2p_en not installed",
+    "zh": "pypinyin not installed",
+    "ko": "g2pk2 not installed",
+}
+
 
 class PhonemizerRegistry:
     """Registry that maps language codes to :class:`Phonemizer` instances.
@@ -239,7 +247,8 @@ def _auto_register() -> None:
             cls = getattr(mod, class_name)
             register_language(code, cls())
         except ImportError:
-            pass
+            reason = _SKIP_REASONS.get(code, "missing dependency")
+            _LOGGER.info("Skipping %s: %s", code.upper(), reason)
 
     # Third-party phonemizers via entry_points
     try:

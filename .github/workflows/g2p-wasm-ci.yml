@@ -31,6 +31,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: src/wasm/g2p/package.json
 
       - name: Install dependencies
         run: npm install
@@ -62,6 +64,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+          cache-dependency-path: src/wasm/g2p/package.json
 
       - name: Install dependencies
         run: npm install
@@ -84,6 +88,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: src/wasm/g2p/package.json
 
       - name: Install dependencies
         run: npm install
@@ -120,6 +126,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: src/wasm/g2p/package.json
           registry-url: https://registry.npmjs.org
 
       - name: Verify tag matches package.json version

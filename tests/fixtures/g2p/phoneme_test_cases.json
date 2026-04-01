@@ -1,0 +1,247 @@
+{
+  "version": 1,
+  "description": "Cross-platform G2P consistency test fixtures for Python, Rust, and JS runtimes. JA cases use structural checks (token_count_min) because OpenJTalk output varies by dictionary version. Rule-based languages (ES/FR/PT) can use exact expected_tokens. EN uses g2p-en which may vary across versions, so structural checks are preferred.",
+  "pua_compat_version": 1,
+  "test_cases": [
+    {
+      "language": "ja",
+      "input": "こんにちは",
+      "description": "Basic Japanese greeting — 5 morae, tests OpenJTalk pipeline",
+      "expected_token_count_min": 7,
+      "expected_contains": ["k", "o", "n", "i", "a"]
+    },
+    {
+      "language": "ja",
+      "input": "東京都に住んでいます。",
+      "description": "Japanese sentence with N-phoneme variant (ん before d -> N_n) and long vowel",
+      "expected_token_count_min": 12,
+      "expected_contains": ["t"]
+    },
+    {
+      "language": "ja",
+      "input": "今日は何曜日ですか？",
+      "description": "Japanese question — should produce interrogative EOS marker",
+      "expected_token_count_min": 10,
+      "expected_has_question_marker": true
+    },
+    {
+      "language": "ja",
+      "input": "さっぽろは寒いです。",
+      "description": "Japanese with geminate consonant (sokuon っ) — tests cl token",
+      "expected_token_count_min": 8,
+      "expected_contains": ["cl"]
+    },
+    {
+      "language": "ja",
+      "input": "新聞を読みました。",
+      "description": "Japanese with N before bilabial (んb -> N_m) — tests N-variant context rule",
+      "expected_token_count_min": 8
+    },
+    {
+      "language": "en",
+      "input": "hello",
+      "description": "Simple English word — basic g2p-en pipeline test",
+      "expected_token_count_min": 3,
+      "expected_contains": ["h"]
+    },
+    {
+      "language": "en",
+      "input": "The quick brown fox jumps.",
+      "description": "English sentence with function word stress removal (the)",
+      "expected_token_count_min": 10,
+      "expected_contains": ["ð"]
+    },
+    {
+      "language": "en",
+      "input": "She's reading a book.",
+      "description": "English with contraction and multi-word sentence",
+      "expected_token_count_min": 8
+    },
+    {
+      "language": "zh",
+      "input": "你好",
+      "description": "Chinese greeting (ni3 hao3) — tests pypinyin pipeline and tone markers",
+      "expected_token_count_min": 4,
+      "expected_contains_any_tone": true
+    },
+    {
+      "language": "zh",
+      "input": "北京欢迎你。",
+      "description": "Chinese sentence with punctuation — tests multi-syllable processing",
+      "expected_token_count_min": 8
+    },
+    {
+      "language": "zh",
+      "input": "我是学生。",
+      "description": "Chinese sentence with tone 3 sandhi (wo3 shi4) — tests tone marker output",
+      "expected_token_count_min": 6,
+      "expected_contains_any_tone": true
+    },
+    {
+      "language": "es",
+      "input": "hola",
+      "description": "Simple Spanish word — rule-based, deterministic output",
+      "expected_tokens": ["ˈ", "o", "l", "a"]
+    },
+    {
+      "language": "es",
+      "input": "¿Cómo estás?",
+      "description": "Spanish question with inverted question mark and accent",
+      "expected_token_count_min": 6,
+      "expected_contains": ["k"]
+    },
+    {
+      "language": "es",
+      "input": "perro grande",
+      "description": "Spanish with trill rr — tests rr PUA token in rule-based phonemizer",
+      "expected_token_count_min": 6,
+      "expected_contains": ["rr"]
+    },
+    {
+      "language": "fr",
+      "input": "bonjour",
+      "description": "French greeting — tests nasal vowel and silent final consonant",
+      "expected_token_count_min": 3,
+      "expected_contains": ["b"]
+    },
+    {
+      "language": "fr",
+      "input": "Comment allez-vous?",
+      "description": "French question — tests liaison context and multi-word processing",
+      "expected_token_count_min": 6
+    },
+    {
+      "language": "fr",
+      "input": "Je suis français.",
+      "description": "French with nasal vowel (français -> ɑ̃) and cedilla (ç)",
+      "expected_token_count_min": 6
+    },
+    {
+      "language": "pt",
+      "input": "olá",
+      "description": "Portuguese greeting — tests accented vowel stress",
+      "expected_token_count_min": 3,
+      "expected_contains": ["o"]
+    },
+    {
+      "language": "pt",
+      "input": "Bom dia, como você está?",
+      "description": "Portuguese sentence — tests nasal vowel (bom) and palatalization",
+      "expected_token_count_min": 8
+    },
+    {
+      "language": "pt",
+      "input": "Obrigado pela ajuda.",
+      "description": "Portuguese polite phrase — tests multi-word processing and stress",
+      "expected_token_count_min": 8
+    }
+  ],
+  "pua_map_count": 87,
+  "pua_spot_checks": [
+    { "token": "a:", "codepoint": "0xE000", "description": "JA long vowel a" },
+    { "token": "cl", "codepoint": "0xE005", "description": "JA geminate consonant (sokuon)" },
+    { "token": "ch", "codepoint": "0xE00E", "description": "JA voiceless postalveolar affricate" },
+    { "token": "sh", "codepoint": "0xE010", "description": "JA voiceless postalveolar fricative" },
+    { "token": "N_m", "codepoint": "0xE019", "description": "JA moraic nasal before bilabial" },
+    { "token": "N_n", "codepoint": "0xE01A", "description": "JA moraic nasal before alveolar" },
+    { "token": "N_uvular", "codepoint": "0xE01C", "description": "JA moraic nasal uvular (word-final)" },
+    { "token": "?!", "codepoint": "0xE016", "description": "JA emphatic question marker" },
+    { "token": "rr", "codepoint": "0xE01D", "description": "ES/shared alveolar trill" },
+    { "token": "y_vowel", "codepoint": "0xE01E", "description": "Shared front rounded vowel [y]" },
+    { "token": "tone1", "codepoint": "0xE046", "description": "ZH tone 1 (high level)" },
+    { "token": "tone3", "codepoint": "0xE048", "description": "ZH tone 3 (dipping)" },
+    { "token": "an", "codepoint": "0xE02C", "description": "ZH nasal final an" },
+    { "token": "t\u0283", "codepoint": "0xE054", "description": "ES voiceless postalveolar affricate" },
+    { "token": "\u0251\u0303", "codepoint": "0xE057", "description": "FR nasal open back unrounded vowel" }
+  ],
+  "encode_test_cases": [
+    {
+      "tokens": ["k", "o", "a", "i"],
+      "description": "BOS/PAD/EOS insertion — verifies ^ prefix, $ suffix, and inter-phoneme _ padding",
+      "expected_has_bos": true,
+      "expected_has_eos": true,
+      "expected_min_length": 11,
+      "expected_first_token": "^"
+    },
+    {
+      "tokens": ["k", "o", "N_n", "n", "i", "ch", "i", "h", "a"],
+      "description": "Multi-char tokens (N_n, ch) are PUA-mapped before ID lookup",
+      "expected_has_bos": true,
+      "expected_has_eos": true,
+      "expected_min_length": 21
+    },
+    {
+      "tokens": ["a"],
+      "description": "Single-token minimal input — still gets BOS + PAD + token + PAD + EOS",
+      "expected_has_bos": true,
+      "expected_has_eos": true,
+      "expected_min_length": 5
+    },
+    {
+      "tokens": ["sh", "i", "N_m", "b", "u", "N_uvular"],
+      "description": "Multi-char JA tokens (sh, N_m, N_uvular) requiring PUA mapping",
+      "expected_has_bos": true,
+      "expected_has_eos": true,
+      "expected_min_length": 15
+    },
+    {
+      "tokens": ["ts", "u", "ky", "o", "cl", "k", "a"],
+      "description": "JA tokens with geminate (cl) and palatalized consonant (ky, ts) PUA tokens",
+      "expected_has_bos": true,
+      "expected_has_eos": true,
+      "expected_min_length": 17
+    }
+  ],
+  "detect_test_cases": [
+    {
+      "input": "こんにちは",
+      "expected_language": "ja",
+      "description": "Hiragana text -> JA"
+    },
+    {
+      "input": "hello world",
+      "expected_language": "en",
+      "description": "Latin-only text -> EN (default Latin language)"
+    },
+    {
+      "input": "你好世界",
+      "expected_language": "zh",
+      "description": "CJK ideographs without kana -> ZH"
+    },
+    {
+      "input": "東京タワー",
+      "expected_language": "ja",
+      "description": "CJK ideographs with katakana -> JA (kana presence disambiguates)"
+    },
+    {
+      "input": "카카오톡",
+      "expected_language": "ko",
+      "description": "Hangul syllables -> KO"
+    },
+    {
+      "input": "今日はとても良い天気です。",
+      "expected_language": "ja",
+      "description": "Mixed CJK + hiragana sentence -> JA (kana disambiguates from ZH)"
+    },
+    {
+      "input": "今天天气很好",
+      "expected_language": "zh",
+      "description": "CJK ideographs without any kana -> ZH"
+    },
+    {
+      "input": "ラーメンを食べたい",
+      "expected_language": "ja",
+      "description": "Katakana + hiragana + kanji -> JA (katakana triggers kana detection)"
+    },
+    {
+      "input": "Bonjour le monde",
+      "expected_language": "en",
+      "description": "Latin-only French text -> EN (default Latin; detector cannot distinguish Latin-script langs)"
+    },
+    {
+      "input": "渋谷でcoffeeを飲む",
+      "expected_language": "ja",
+      "description": "Mixed Japanese-English text -> JA (kana in を disambiguates CJK from ZH; Latin is minority)"
+    }
+  ]
+}

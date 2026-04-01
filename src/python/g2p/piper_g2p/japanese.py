@@ -214,6 +214,10 @@ class JapanesePhonemizer(Phonemizer):
     Multi-character tokens are returned as-is (no PUA mapping).
     """
 
+    @property
+    def language_code(self) -> str:
+        return "ja"
+
     def phonemize(self, text: str) -> list[str]:
         tokens, _prosody = _phonemize_core(text)
         return tokens

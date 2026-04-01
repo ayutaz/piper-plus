@@ -600,6 +600,10 @@ def phonemize_chinese(text: str) -> list[str]:
 class ChinesePhonemizer(Phonemizer):
     """Chinese (Mandarin) phonemizer using pypinyin."""
 
+    @property
+    def language_code(self) -> str:
+        return "zh"
+
     def phonemize(self, text: str) -> list[str]:
         return phonemize_chinese(text)
 

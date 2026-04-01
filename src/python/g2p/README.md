@@ -54,15 +54,17 @@ en.phonemize("Hello world")
 
 ## Advanced Usage
 
-### MultilingualPhonemizer
+### Multilingual (Composite Language Code)
 
-Handles code-switching text across multiple languages with automatic Unicode-based language detection.
+Pass a hyphen-joined code like `"ja-en-zh"` to `get_phonemizer` to
+automatically create a `MultilingualPhonemizer`. Language detection is
+Unicode-based, so mixed-script text is handled without explicit tagging.
 
 ```python
-from piper_g2p.multilingual import MultilingualPhonemizer
+from piper_g2p import get_phonemizer
 
-mp = MultilingualPhonemizer(languages=["ja", "en"])
-tokens, _ = mp.phonemize("こんにちはworld")
+multi = get_phonemizer("ja-en-zh")
+tokens = multi.phonemize("こんにちは Hello 你好")
 ```
 
 ### PiperEncoder

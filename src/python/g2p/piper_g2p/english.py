@@ -421,6 +421,10 @@ def phonemize_english(text: str) -> list[str]:
 class EnglishPhonemizer(Phonemizer):
     """English phonemizer using g2p-en."""
 
+    @property
+    def language_code(self) -> str:
+        return "en"
+
     def phonemize(self, text: str) -> list[str]:
         return phonemize_english(text)
 

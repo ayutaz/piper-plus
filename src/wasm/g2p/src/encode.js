@@ -7,7 +7,7 @@
  * @module encode
  */
 
-import { mapToken } from './pua-map.js';
+import { PUA_MAP } from './pua-map.js';
 
 /**
  * Encoder for converting phoneme tokens to integer ID sequences
@@ -24,6 +24,24 @@ export class Encoder {
             throw new Error('phonemeIdMap is required and must be an object');
         }
         this._map = phonemeIdMap;
+
+        // Build unified lookup Map: original keys + PUA reverse entries.
+        // For each PUA_MAP entry (e.g. "ch" -> "\uE00E"), if the PUA char
+        // exists in phonemeIdMap, register the multi-char source token too.
+        // This eliminates the per-call mapToken() fallback in _lookupToken().
+        this._lookupMap = new Map();
+        for (const [key, ids] of Object.entries(phonemeIdMap)) {
+            this._lookupMap.set(key, ids);
+        }
+        for (const [srcToken, puaChar] of Object.entries(PUA_MAP)) {
+            if (!this._lookupMap.has(srcToken)) {
+                const ids = phonemeIdMap[puaChar];
+                if (ids) {
+                    this._lookupMap.set(srcToken, ids);
+                }
+            }
+        }
+
         this._bos = this._resolveId('^', 'BOS');
         this._eos = this._resolveId('$', 'EOS');
         this._pad = this._resolveId('_', 'PAD');
@@ -34,7 +52,7 @@ export class Encoder {
      * @private
      */
     _resolveId(token, label) {
-        const ids = this._map[token];
+        const ids = this._lookupMap.get(token);
         if (!ids || ids.length === 0) {
             throw new Error(
                 `phonemeIdMap is missing required '${token}' (${label}) entry`
@@ -44,25 +62,15 @@ export class Encoder {
     }
 
     /**
-     * Look up a token in the phoneme_id_map.
-     * Applies PUA mapping for multi-character tokens before lookup.
+     * Look up a token in the unified lookup map.
+     * PUA reverse mappings are pre-indexed at construction time,
+     * so no per-call mapToken() overhead.
      * @private
      * @param {string} token
      * @returns {number[]|null} Array of IDs, or null if not found
      */
     _lookupToken(token) {
-        // Direct lookup first
-        const direct = this._map[token];
-        if (direct) return direct;
-
-        // Try PUA-mapped form
-        const mapped = mapToken(token);
-        if (mapped !== token) {
-            const puaIds = this._map[mapped];
-            if (puaIds) return puaIds;
-        }
-
-        return null;
+        return this._lookupMap.get(token) ?? null;
     }
 
     /**

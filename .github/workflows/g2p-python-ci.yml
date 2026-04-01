@@ -129,22 +129,18 @@ jobs:
     needs: [build]
     if: startsWith(github.ref, 'refs/tags/python-g2p-v')
     timeout-minutes: 10
+    environment: pypi
     permissions:
       contents: read
-      id-token: write  # Required for PyPI Trusted Publisher (OIDC)
+      id-token: write
     steps:
       - uses: actions/checkout@v4
 
       - uses: astral-sh/setup-uv@v6
-        with:
-          python-version: "3.13"
 
-      # TODO: Migrate to PyPI Trusted Publisher (OIDC) to eliminate PYPI_TOKEN secret.
-      #       See: https://docs.pypi.org/trusted-publishers/using-a-publisher/
-      - name: Build and publish
+      - run: uv build
         working-directory: src/python/g2p
-        run: |
-          uv build
-          uv publish
-        env:
-          UV_PUBLISH_TOKEN: ${{ secrets.PYPI_TOKEN }}
+
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: src/python/g2p/dist/

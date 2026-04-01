@@ -157,7 +157,10 @@ class UnicodeLanguageDetector:
 
 
 def _segment_text_multilingual(
-    text: str, detector: UnicodeLanguageDetector
+    text: str,
+    detector: UnicodeLanguageDetector,
+    *,
+    context_has_kana: bool | None = None,
 ) -> list[tuple[str, str]]:
     """Split text into (language, segment) pairs using Unicode detection.
 
@@ -170,6 +173,10 @@ def _segment_text_multilingual(
         Input text to segment.
     detector : UnicodeLanguageDetector
         Language detector instance.
+    context_has_kana : bool | None
+        Pre-computed result of ``detector.has_kana(text)``.  When ``None``
+        (default) the scan is performed here.  Callers that already know
+        the result can pass it to avoid a redundant full-text scan.
 
     Returns
     -------
@@ -179,8 +186,9 @@ def _segment_text_multilingual(
     if not text.strip():
         return []
 
-    # Pre-scan for kana to help CJK disambiguation
-    context_has_kana = detector.has_kana(text)
+    # Use pre-computed value or scan now
+    if context_has_kana is None:
+        context_has_kana = detector.has_kana(text)
 
     segments: list[tuple[str, str]] = []
     current_lang: str | None = None
@@ -256,6 +264,10 @@ class MultilingualPhonemizer(Phonemizer):
         )
 
     @property
+    def language_code(self) -> str:
+        return "multilingual"
+
+    @property
     def languages(self) -> list[str]:
         """Return the list of supported languages."""
         return self._languages
@@ -276,7 +288,12 @@ class MultilingualPhonemizer(Phonemizer):
         """
         from .registry import get_phonemizer  # noqa: PLC0415
 
-        segments = _segment_text_multilingual(text, self._detector)
+        # Pre-compute has_kana once and pass to _segment_text_multilingual
+        # to avoid a redundant full-text scan inside the segmenter.
+        context_has_kana = self._detector.has_kana(text)
+        segments = _segment_text_multilingual(
+            text, self._detector, context_has_kana=context_has_kana
+        )
         if not segments:
             return [], []
 

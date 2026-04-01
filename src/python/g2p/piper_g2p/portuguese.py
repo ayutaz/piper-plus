@@ -667,6 +667,10 @@ def phonemize_portuguese(text: str) -> list[str]:
 class PortuguesePhonemizer(Phonemizer):
     """Brazilian Portuguese rule-based phonemizer."""
 
+    @property
+    def language_code(self) -> str:
+        return "pt"
+
     def phonemize(self, text: str) -> list[str]:
         return phonemize_portuguese(text)
 

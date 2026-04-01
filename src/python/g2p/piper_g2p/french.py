@@ -951,6 +951,10 @@ def phonemize_french(text: str) -> list[str]:
 class FrenchPhonemizer(Phonemizer):
     """French rule-based phonemizer."""
 
+    @property
+    def language_code(self) -> str:
+        return "fr"
+
     def phonemize(self, text: str) -> list[str]:
         return phonemize_french(text)
 
