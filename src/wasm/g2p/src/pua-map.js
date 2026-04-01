@@ -1,10 +1,10 @@
 /**
  * PUA (Private Use Area) mapping table.
  *
- * Canonical source: src/python/g2p/piper_g2p/data/pua.json (87 entries)
+ * Canonical source: src/python/g2p/piper_g2p/data/pua.json (96 entries)
  *
  * Multi-character phoneme tokens are mapped to single Unicode PUA codepoints
- * (U+E000..U+E058) so that the model's phoneme_id_map can look them up as
+ * (U+E000..U+E061) so that the model's phoneme_id_map can look them up as
  * single characters.
  *
  * @module pua-map
@@ -37,7 +37,7 @@ export function checkPuaCompat(modelVersion) {
 }
 
 /**
- * Forward mapping: multi-char token -> PUA character (87 entries).
+ * Forward mapping: multi-char token -> PUA character (96 entries).
  * @type {Record<string, string>}
  */
 export const PUA_MAP = {

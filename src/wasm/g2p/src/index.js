@@ -2,7 +2,7 @@
  * @piper-plus/g2p -- Multilingual G2P (Grapheme-to-Phoneme) entry point.
  *
  * Provides a unified API for converting text to phoneme tokens across
- * 7 languages (JA, EN, ZH, ES, FR, PT, SV) without eSpeak-ng dependency.
+ * 8 languages (JA, EN, ZH, KO, ES, FR, PT, SV) without eSpeak-ng dependency.
  *
  * @module @piper-plus/g2p
  */
@@ -14,18 +14,20 @@ import { SpanishG2P } from './es/index.js';
 import { FrenchG2P } from './fr/index.js';
 import { PortugueseG2P } from './pt/index.js';
 import { SwedishG2P } from './sv/index.js';
+import { KoreanG2P } from './ko/index.js';
 import { UnicodeLanguageDetector } from './detect.js';
 import { Encoder } from './encode.js';
 
 // ---- Constants ---------------------------------------------------------------
 
 /** All supported language codes. */
-const ALL_LANGUAGES = ['ja', 'en', 'zh', 'es', 'fr', 'pt', 'sv'];
+const ALL_LANGUAGES = ['ja', 'en', 'zh', 'ko', 'es', 'fr', 'pt', 'sv'];
 
 /** Map from language code to G2P constructor (for non-JA languages). */
 const LANGUAGE_FACTORIES = {
   en: () => new EnglishG2P(),
   zh: () => new ChineseG2P(),
+  ko: () => new KoreanG2P(),
   es: () => new SpanishG2P(),
   fr: () => new FrenchG2P(),
   pt: () => new PortugueseG2P(),
@@ -73,7 +75,7 @@ export class G2P {
    * Create and initialise a G2P instance.
    *
    * @param {Object} [options]
-   * @param {string[]} [options.languages]        Languages to enable (default: all 6).
+   * @param {string[]} [options.languages]        Languages to enable (default: all 8).
    * @param {object}   [options.openjtalkModule]  Pre-loaded OpenJTalk WASM module (DI).
    * @param {import('./dict-loader.js').JaDictData} [options.jaDict]
    *   Japanese dictionary data obtained from `DictLoader.loadJaDict()`.
@@ -227,7 +229,7 @@ export class G2P {
    * use `options.language` to specify them explicitly.
    *
    * @param {string} text  Input text.
-   * @returns {string}  Language code ('ja'|'en'|'zh'|'es'|'fr'|'pt').
+   * @returns {string}  Language code ('ja'|'en'|'zh'|'ko'|'es'|'fr'|'pt'|'sv').
    */
   detectLanguage(text) {
     this._ensureNotDisposed();
@@ -327,6 +329,7 @@ export { SpanishG2P } from './es/index.js';
 export { FrenchG2P } from './fr/index.js';
 export { PortugueseG2P } from './pt/index.js';
 export { SwedishG2P } from './sv/index.js';
+export { KoreanG2P } from './ko/index.js';
 export { DictLoader } from './dict-loader.js';
 export { Encoder } from './encode.js';
 export { UnicodeLanguageDetector } from './detect.js';

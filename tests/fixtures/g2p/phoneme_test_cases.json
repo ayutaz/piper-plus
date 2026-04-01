@@ -153,6 +153,34 @@
       "expected_has_question_marker": true
     },
     {
+      "language": "ko",
+      "input": "가",
+      "description": "Single Korean syllable (ㄱ+ㅏ) — basic Hangul decomposition verification",
+      "expected_token_count_min": 2,
+      "expected_contains": ["k", "a"]
+    },
+    {
+      "language": "ko",
+      "input": "안녕하세요",
+      "description": "Korean greeting — covers basic Hangul decomposition across 5 syllables",
+      "expected_token_count_min": 10,
+      "expected_contains": ["a", "n", "h", "s", "e"]
+    },
+    {
+      "language": "ko",
+      "input": "한국어",
+      "description": "Korean word with liaison (국어: final ㄱ + initial ㅇ → released k)",
+      "expected_token_count_min": 6,
+      "expected_contains": ["h", "a", "n", "k", "u"]
+    },
+    {
+      "language": "ko",
+      "input": "감사합니다",
+      "description": "Korean polite phrase — covers nasals (ㅁ,ㄴ) and unreleased stops",
+      "expected_token_count_min": 10,
+      "expected_contains": ["k", "a", "m", "s", "n", "i", "t"]
+    },
+    {
       "language": "sv",
       "input": "Hej, hur mår du?",
       "description": "Swedish greeting question — tests basic Swedish pipeline",

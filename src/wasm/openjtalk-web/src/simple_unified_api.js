@@ -386,7 +386,7 @@ export class SimpleUnifiedPhonemizer {
     }
 
     /**
-     * Latin-script language (es/fr/pt) text to phoneme IDs using character-based
+     * Latin-script language (es/fr/pt/sv) text to phoneme IDs using character-based
      * phoneme_id_map fallback. Lowercases the text and maps each character
      * through the model's phoneme_id_map.
      * Returns an array of phoneme IDs (integers).

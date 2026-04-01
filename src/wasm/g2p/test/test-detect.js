@@ -202,6 +202,104 @@ describe('UnicodeLanguageDetector.segmentText', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Korean (Hangul) detection
+// ---------------------------------------------------------------------------
+
+describe('UnicodeLanguageDetector Korean detection', () => {
+    // Default languages do NOT include 'ko', so we need to add it explicitly.
+    const detector = new UnicodeLanguageDetector(
+        ['ja', 'en', 'zh', 'ko', 'es', 'fr', 'pt', 'sv']
+    );
+
+    it('should detect Hangul syllables as Korean', () => {
+        assert.equal(detector.detectLanguage('한국어'), 'ko');
+    });
+
+    it('should detect Hangul Jamo as Korean', () => {
+        // Hangul Compatibility Jamo: U+3130-318F
+        assert.equal(detector.detectLanguage('ㅎㅏㄴ'), 'ko');
+    });
+
+    it('should detect mixed Korean/English text by majority', () => {
+        // 3 Hangul syllables vs 2 Latin chars -- Korean wins
+        assert.equal(detector.detectLanguage('한국어hi'), 'ko');
+    });
+
+    it('should detect Korean char via detectChar', () => {
+        assert.equal(detector.detectChar('한'), 'ko');
+    });
+
+    it('should detect Hangul Jamo char via detectChar', () => {
+        assert.equal(detector.detectChar('ㅎ'), 'ko');
+    });
+
+    it('should return null for Hangul when ko is not in languages', () => {
+        const detectorNoKo = new UnicodeLanguageDetector(['ja', 'en', 'zh']);
+        assert.equal(detectorNoKo.detectChar('한'), null);
+    });
+
+    it('should segment Korean + English mixed text', () => {
+        const segments = detector.segmentText('한국어Hello');
+        assert.equal(segments.length, 2);
+        assert.equal(segments[0].language, 'ko');
+        assert.equal(segments[0].text, '한국어');
+        assert.equal(segments[1].language, 'en');
+        assert.equal(segments[1].text, 'Hello');
+    });
+});
+
+// ---------------------------------------------------------------------------
+// Swedish (å/ä/ö) detection
+// ---------------------------------------------------------------------------
+
+describe('UnicodeLanguageDetector Swedish detection', () => {
+    const detector = new UnicodeLanguageDetector();
+
+    it('should detect Swedish-specific characters as sv', () => {
+        assert.equal(detector.detectChar('å'), 'sv');
+        assert.equal(detector.detectChar('ä'), 'sv');
+        assert.equal(detector.detectChar('ö'), 'sv');
+    });
+
+    it('should detect uppercase Swedish characters as sv', () => {
+        assert.equal(detector.detectChar('Å'), 'sv');
+        assert.equal(detector.detectChar('Ä'), 'sv');
+        assert.equal(detector.detectChar('Ö'), 'sv');
+    });
+
+    it('should detect text with å/ä/ö as Swedish by majority', () => {
+        // 'åäö' -- all 3 chars are Swedish-specific, so sv wins
+        assert.equal(detector.detectLanguage('åäö'), 'sv');
+    });
+
+    it('should detect plain Latin as en even when text has few Swedish chars', () => {
+        // 'räksmörgås': ä, ö, å = 3 sv chars vs r, k, s, m, r, g, s = 7 en chars
+        // English wins by majority -- this is the expected behaviour
+        assert.equal(detector.detectLanguage('räksmörgås'), 'en');
+    });
+
+    it('should detect mixed Swedish/English text by majority', () => {
+        // 4 Swedish-specific chars vs 2 plain Latin -> sv wins
+        assert.equal(detector.detectLanguage('åäöö go'), 'sv');
+    });
+
+    it('should fall back to default Latin when sv is not in languages', () => {
+        const detectorNoSv = new UnicodeLanguageDetector(['ja', 'en', 'zh']);
+        assert.equal(detectorNoSv.detectChar('å'), 'en');
+    });
+
+    it('should segment Swedish chars + Japanese text', () => {
+        // 'ö' is sv, then 'こんにちは' is ja
+        const segments = detector.segmentText('öこんにちは');
+        assert.equal(segments.length, 2);
+        assert.equal(segments[0].language, 'sv');
+        assert.equal(segments[0].text, 'ö');
+        assert.equal(segments[1].language, 'ja');
+        assert.equal(segments[1].text, 'こんにちは');
+    });
+});
+
+// ---------------------------------------------------------------------------
 // Constructor with limited languages
 // ---------------------------------------------------------------------------
 

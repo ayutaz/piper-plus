@@ -1,8 +1,10 @@
 """Language-specific phoneme-to-ID maps for Piper TTS.
 
-Phase 0 ships a built-in ID map for Japanese only.  Other languages
-require the ``phoneme_id_map`` from the model's ``config.json`` and
-will raise ``ValueError`` here.
+Built-in ID maps for Japanese (single-language) and the 8-language
+multilingual map (JA/EN/ZH/ES/FR/PT/KO/SV).  The multilingual map is
+returned for composite language codes (e.g. ``"ja-en-zh-ko-es-fr-pt-sv"``),
+``"multilingual"``, or single codes ``"ko"`` / ``"sv"`` that require the
+combined symbol set.
 """
 
 from __future__ import annotations
@@ -108,9 +110,9 @@ def _build_japanese_id_map() -> dict[str, list[int]]:
 
 
 # -------------------------------------------------------------------------
-# Multilingual (6-language) phoneme inventory
+# Multilingual (8-language) phoneme inventory
 # Combined symbol set matching piper_train's multilingual_id_map output
-# for the canonical language set: ja-en-zh-es-fr-pt
+# for the canonical language set: ja-en-zh-es-fr-pt-ko-sv
 # -------------------------------------------------------------------------
 _ENGLISH_PHONEMES: list[str] = [
     "ɪ",
@@ -253,11 +255,62 @@ _PORTUGUESE_PHONEMES: list[str] = [
     "ũ",
 ]
 
+_KOREAN_PHONEMES: list[str] = [
+    # Aspirated consonants
+    "pʰ",
+    "tʰ",
+    "kʰ",
+    # Tense consonants (fortis / 경음)
+    "p͈",
+    "t͈",
+    "k͈",
+    "s͈",
+    # Affricates
+    "tɕ",
+    "tɕʰ",
+    "t͈ɕ",
+    # Unreleased finals (내파음)
+    "k̚",
+    "t̚",
+    "p̚",
+    # Vowels unique to Korean
+    "ɯ",  # close back unrounded vowel (ㅡ)
+    # Consonants / glides
+    "ɾ",  # alveolar flap (ㄹ initial)
+    "ɰ",  # velar approximant (ㅢ first element)
+]
+
+_SWEDISH_PHONEMES: list[str] = [
+    # Retroflex consonants
+    "ɖ",  # retroflex voiced plosive (rd)
+    "ʈ",  # retroflex voiceless plosive (rt)
+    "ɳ",  # retroflex nasal (rn)
+    "ɭ",  # retroflex lateral (rl)
+    # Special fricatives
+    "ɧ",  # sj-sound (voiceless dorso-palatal/velar fricative)
+    # Vowels unique to Swedish (single codepoint)
+    "ɵ",  # close-mid central rounded
+    "ʏ",  # near-close front rounded
+    "œ",  # open-mid front rounded
+    "ɑ",  # open back unrounded
+    "ø",  # close-mid front rounded
+    # Long vowels (multi-codepoint -> PUA U+E059-E061)
+    "iː",
+    "yː",
+    "eː",
+    "ɛː",
+    "øː",
+    "ɑː",
+    "oː",
+    "uː",
+    "ʉː",
+]
+
 
 def _build_multilingual_id_map() -> dict[str, list[int]]:
     """Build the combined multilingual phoneme_id_map.
 
-    Symbol ordering: special tokens -> JA -> EN -> ZH -> ES -> FR -> PT.
+    Symbol ordering: special tokens -> JA -> EN -> ZH -> ES -> FR -> PT -> KO -> SV.
     Shared symbols deduplicated (first occurrence wins).
     """
     all_inventories = [
@@ -267,6 +320,8 @@ def _build_multilingual_id_map() -> dict[str, list[int]]:
         _SPANISH_PHONEMES,
         _FRENCH_PHONEMES,
         _PORTUGUESE_PHONEMES,
+        _KOREAN_PHONEMES,
+        _SWEDISH_PHONEMES,
     ]
     symbols: list[str] = []
     seen: set[str] = set()
@@ -305,14 +360,20 @@ def get_phoneme_id_map(language: str) -> dict[str, list[int]]:
     Raises
     ------
     ValueError
-        If *language* is not ``"ja"``.  Phase 0 only ships a built-in
-        ID map for Japanese; other languages need the map from the
-        model's ``config.json``.
+        If *language* is not a recognized code.  Supported single-language
+        codes: ``"ja"``, ``"ko"``, ``"sv"``.  Composite codes (e.g.
+        ``"ja-en-zh-ko-es-fr-pt-sv"``) and ``"multilingual"`` also work.
     """
     if language == "ja":
         return _build_japanese_id_map()
 
-    # Multilingual composite code (e.g. "ja-en-zh-es-fr-pt")
+    # Single-language codes that use the multilingual map
+    # (ko and sv share symbols with other languages via the unified map)
+    if language in ("ko", "sv"):
+        return _build_multilingual_id_map()
+
+    # Multilingual composite code (e.g. "ja-en-zh-es-fr-pt",
+    # "ja-en-zh-ko-es-fr-pt-sv")
     if "-" in language or language == "multilingual":
         return _build_multilingual_id_map()
 

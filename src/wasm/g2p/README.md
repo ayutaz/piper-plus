@@ -36,6 +36,8 @@ Each language can be imported independently to minimize bundle size:
 ```js
 import { JapaneseG2P } from '@piper-plus/g2p/ja';
 import { EnglishG2P } from '@piper-plus/g2p/en';
+import { KoreanG2P } from '@piper-plus/g2p/ko';
+import { SwedishG2P } from '@piper-plus/g2p/sv';
 ```
 
 ## Supported Languages
@@ -48,6 +50,8 @@ import { EnglishG2P } from '@piper-plus/g2p/en';
 | Spanish    | es   | Rule-based          | None |
 | French     | fr   | Rule-based          | None |
 | Portuguese | pt   | Rule-based          | None |
+| Korean     | ko   | Hangul decomposition | None |
+| Swedish    | sv   | Rule-based          | None |
 
 ## Features
 
@@ -63,7 +67,7 @@ import { EnglishG2P } from '@piper-plus/g2p/en';
 | Feature             | @piper-plus/g2p | phonemizer | gruut  | Misaki  |
 |---------------------|:--------------:|:----------:|:------:|:-------:|
 | License             | MIT            | GPL-3.0    | MIT    | Apache-2.0 |
-| Languages           | 6              | 100+       | ~20    | 2       |
+| Languages           | 8              | 100+       | ~20    | 2       |
 | Japanese            | Yes            | No         | No     | Yes     |
 | Browser/WASM        | Yes            | No         | No     | No      |
 | eSpeak-ng free      | Yes            | No         | Yes    | Yes     |
@@ -102,7 +106,7 @@ and are validated against a common test fixture.
 ## Zero Dependencies
 
 @piper-plus/g2p has **zero npm runtime dependencies** for rule-based
-languages (EN, ZH, ES, FR, PT, SV). Only Japanese requires the bundled
+languages (EN, ZH, KO, ES, FR, PT, SV). Only Japanese requires the bundled
 OpenJTalk WASM binary. This eliminates the most common vector for
 supply chain attacks in the JavaScript ecosystem.
 

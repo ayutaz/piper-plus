@@ -1,11 +1,11 @@
 # piper-g2p
 
-Multilingual G2P (Grapheme-to-Phoneme) for TTS. eSpeak-ng free. MIT licensed. 7 languages.
+Multilingual G2P (Grapheme-to-Phoneme) for TTS. eSpeak-ng free. MIT licensed. 8 languages.
 
 ## Why piper-g2p?
 
 - **MIT licensed** -- no eSpeak-ng (GPL) dependency in your TTS pipeline
-- **7 languages** -- JA, EN, ZH, KO, ES, FR, PT with consistent IPA output
+- **8 languages** -- JA, EN, ZH, KO, ES, FR, PT, SV with consistent IPA output
 - **IPA-first design** -- returns pure IPA token sequences, ready for any TTS model
 
 ## Comparison
@@ -13,7 +13,7 @@ Multilingual G2P (Grapheme-to-Phoneme) for TTS. eSpeak-ng free. MIT licensed. 7 
 | | piper-g2p | phonemizer | gruut | Misaki |
 |---|---|---|---|---|
 | License | MIT | GPL (eSpeak-ng) | MIT | Apache-2.0 |
-| Languages | 7 | 100+ | 20+ | EN only |
+| Languages | 8 | 100+ | 20+ | EN only |
 | eSpeak-ng required | No | Yes | No | No |
 | IPA output | Yes | Yes | Yes | Yes |
 
@@ -51,6 +51,7 @@ en.phonemize("Hello world")
 | Spanish | `es` | -- | Rule-based | No external dependency |
 | French | `fr` | -- | Rule-based | No external dependency |
 | Portuguese | `pt` | -- | Rule-based | No external dependency |
+| Swedish | `sv` | -- | Rule-based | No external dependency |
 
 ## Advanced Usage
 

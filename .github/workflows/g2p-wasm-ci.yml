@@ -71,7 +71,7 @@ jobs:
         run: npm install
 
       - name: Run tests
-        run: node --test test/test-e2e.js test/test-encode.js test/test-english.js test/test-g2p.js test/test-languages.js test/test-detect.js test/test-pua-map.js test/test-swedish.js test/test-custom-dict.js test/test-strict-mode.js
+        run: node --test test/test-e2e.js test/test-encode.js test/test-english.js test/test-g2p.js test/test-languages.js test/test-detect.js test/test-pua-map.js test/test-swedish.js test/test-korean.js test/test-custom-dict.js test/test-strict-mode.js
 
   size-check:
     name: size-check

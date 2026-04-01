@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 
-from tests.conftest import requires_en, requires_ja, requires_zh
+from tests.conftest import requires_en, requires_ja, requires_ko, requires_zh
 
 FIXTURE_PATH = (
     Path(__file__).parents[4] / "tests" / "fixtures" / "g2p" / "phoneme_test_cases.json"
@@ -395,6 +395,38 @@ class TestPTPhonemeFixtures:
                 )
 
 
+@requires_ko
+class TestKOPhonemeFixtures:
+    """Korean phonemize results match fixture structural expectations."""
+
+    def test_ko_token_count_min(self, fixtures):
+        """KO phonemize output meets minimum token count."""
+        from piper_g2p import get_phonemizer
+
+        p = get_phonemizer("ko")
+        for case in _cases_for_language(fixtures, "ko"):
+            tokens = p.phonemize(case["input"])
+            expected_min = case["expected_token_count_min"]
+            assert len(tokens) >= expected_min, (
+                f"KO token count {len(tokens)} < {expected_min} "
+                f"for {case['input']!r}: {tokens}"
+            )
+
+    def test_ko_contains(self, fixtures):
+        """KO phonemize output contains expected tokens."""
+        from piper_g2p import get_phonemizer
+
+        p = get_phonemizer("ko")
+        for case in _cases_for_language(fixtures, "ko"):
+            if "expected_contains" not in case:
+                continue
+            tokens = p.phonemize(case["input"])
+            for expected in case["expected_contains"]:
+                assert expected in tokens, (
+                    f"KO output missing {expected!r} for {case['input']!r}: {tokens}"
+                )
+
+
 # =====================================================================
 # Fixture schema sanity
 # =====================================================================
@@ -409,12 +441,12 @@ class TestFixtureSanity:
 
     def test_all_languages_covered(self, fixtures):
         """Fixture covers all 8 expected languages
-        (ja/en/zh/es/fr/pt/sv + ko for detect)."""
+        (ja/en/zh/ko/es/fr/pt/sv)."""
         test_langs = {c["language"] for c in fixtures["test_cases"]}
         detect_langs = {c["expected_language"] for c in fixtures["detect_test_cases"]}
         all_langs = test_langs | detect_langs
-        # phoneme test_cases cover 7 languages; detect_test_cases add ko
-        assert {"ja", "en", "zh", "es", "fr", "pt", "sv"} <= test_langs
+        # phoneme test_cases cover all 8 languages
+        assert {"ja", "en", "zh", "ko", "es", "fr", "pt", "sv"} <= test_langs
         assert "ko" in detect_langs
         assert len(all_langs) == 8
 
