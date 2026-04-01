@@ -101,9 +101,12 @@ class CustomDictionary:
             entries = data.get("entries", {})
             for word, pronunciation in entries.items():
                 if isinstance(pronunciation, str):
-                    entry = {"pronunciation": pronunciation, "priority": 5}
+                    entry: dict[str, str | int] = {
+                        "pronunciation": pronunciation,
+                        "priority": 5,
+                    }
                 else:
-                    entry = pronunciation
+                    entry = dict(pronunciation)
                 self._add_entry(word, entry)
 
         elif version == "2.0":
@@ -116,12 +119,19 @@ class CustomDictionary:
 
                 if isinstance(entry, str):
                     # 互換性のため文字列も受け入れる
-                    entry = {"pronunciation": entry, "priority": 5}
-                elif isinstance(entry, dict) and "priority" not in entry:
-                    # priorityがない場合はデフォルト値を設定
-                    entry["priority"] = 5
+                    typed_entry: dict[str, str | int] = {
+                        "pronunciation": entry,
+                        "priority": 5,
+                    }
+                elif isinstance(entry, dict):
+                    typed_entry = dict(entry)
+                    if "priority" not in typed_entry:
+                        # priorityがない場合はデフォルト値を設定
+                        typed_entry["priority"] = 5
+                else:
+                    continue
 
-                self._add_entry(word, entry)
+                self._add_entry(word, typed_entry)
 
     def _add_entry(self, word: str, entry: dict[str, str | int]) -> None:
         """エントリを辞書に追加
@@ -140,8 +150,10 @@ class CustomDictionary:
 
             # 既存エントリとの優先度比較
             if normalized_word in self.entries:
-                existing_priority = self.entries[normalized_word].get("priority", 0)
-                new_priority = entry.get("priority", 0)
+                existing_priority = int(
+                    self.entries[normalized_word].get("priority", 0)
+                )
+                new_priority = int(entry.get("priority", 0))
                 if new_priority <= existing_priority:
                     return  # 既存の方が優先度が高い
 
@@ -224,12 +236,12 @@ class CustomDictionary:
         """
         # まず大文字小文字を区別してチェック
         if word in self.case_sensitive_entries:
-            return self.case_sensitive_entries[word]["pronunciation"]
+            return str(self.case_sensitive_entries[word]["pronunciation"])
 
         # 次に正規化してチェック
         normalized_word = word.lower()
         if normalized_word in self.entries:
-            return self.entries[normalized_word]["pronunciation"]
+            return str(self.entries[normalized_word]["pronunciation"])
 
         return None
 
@@ -241,7 +253,10 @@ class CustomDictionary:
             pronunciation: 読み（カタカナ）
             priority: 優先度（0-10、大きいほど優先）
         """
-        entry = {"pronunciation": pronunciation, "priority": priority}
+        entry: dict[str, str | int] = {
+            "pronunciation": pronunciation,
+            "priority": priority,
+        }
         self._add_entry(word, entry)
 
         # パターンキャッシュをクリア（再構築のため）

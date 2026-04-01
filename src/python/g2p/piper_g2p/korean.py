@@ -181,7 +181,7 @@ def _apply_g2p(text: str) -> str:
                 "Install with: pip install g2pk2"
             ) from exc
     try:
-        return _g2p_instance(text)
+        return str(_g2p_instance(text))
     except AttributeError:
         # G2p() succeeded but mecab is None (python-mecab-ko not installed).
         _g2p_instance = None

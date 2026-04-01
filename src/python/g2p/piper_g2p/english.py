@@ -321,7 +321,7 @@ def _get_source_words(text: str) -> list[str]:
 
 def phonemize_english_with_prosody(
     text: str,
-) -> tuple[list[str], list[ProsodyInfo]]:
+) -> tuple[list[str], list[ProsodyInfo | None]]:
     """Convert English text to phoneme list and prosody features.
 
     Produces espeak-ng compatible output:
@@ -338,7 +338,7 @@ def phonemize_english_with_prosody(
     source_words = _get_source_words(text)
 
     phonemes: list[str] = []
-    prosody_list: list[ProsodyInfo] = []
+    prosody_list: list[ProsodyInfo | None] = []
 
     # Build a mapping from word index (skipping punctuation) to source word
     src_idx = 0
