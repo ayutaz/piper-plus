@@ -47,6 +47,9 @@
     "clean": "rm -rf dist build/build-*",
     "prepublishOnly": "echo 'Ready to publish'"
   },
+  "dependencies": {
+    "@piper-plus/g2p": "^0.1.0"
+  },
   "peerDependencies": {
     "onnxruntime-web": ">=1.21.0"
   },

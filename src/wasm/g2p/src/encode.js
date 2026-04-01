@@ -1,0 +1,155 @@
+/**
+ * Encoder — converts IPA token sequences into Piper phoneme ID arrays.
+ *
+ * Handles BOS/EOS/PAD insertion and optional prosody feature alignment.
+ * The phoneme_id_map comes from the model's config.json.
+ *
+ * @module encode
+ */
+
+import { mapToken } from './pua-map.js';
+
+/**
+ * Encoder for converting phoneme tokens to integer ID sequences
+ * compatible with Piper TTS ONNX models.
+ */
+export class Encoder {
+    /**
+     * @param {Record<string, number[]>} phonemeIdMap
+     *   Mapping from phoneme string to array of integer IDs.
+     *   Must contain at least '^' (BOS), '$' (EOS), and '_' (PAD).
+     */
+    constructor(phonemeIdMap) {
+        if (!phonemeIdMap || typeof phonemeIdMap !== 'object') {
+            throw new Error('phonemeIdMap is required and must be an object');
+        }
+        this._map = phonemeIdMap;
+        this._bos = this._resolveId('^', 'BOS');
+        this._eos = this._resolveId('$', 'EOS');
+        this._pad = this._resolveId('_', 'PAD');
+    }
+
+    /**
+     * Resolve a special token to its first ID value.
+     * @private
+     */
+    _resolveId(token, label) {
+        const ids = this._map[token];
+        if (!ids || ids.length === 0) {
+            throw new Error(
+                `phonemeIdMap is missing required '${token}' (${label}) entry`
+            );
+        }
+        return ids[0];
+    }
+
+    /**
+     * Look up a token in the phoneme_id_map.
+     * Applies PUA mapping for multi-character tokens before lookup.
+     * @private
+     * @param {string} token
+     * @returns {number[]|null} Array of IDs, or null if not found
+     */
+    _lookupToken(token) {
+        // Direct lookup first
+        const direct = this._map[token];
+        if (direct) return direct;
+
+        // Try PUA-mapped form
+        const mapped = mapToken(token);
+        if (mapped !== token) {
+            const puaIds = this._map[mapped];
+            if (puaIds) return puaIds;
+        }
+
+        return null;
+    }
+
+    /**
+     * Encode a token sequence into phoneme IDs.
+     *
+     * The output format is:
+     *   BOS + token0_ids + PAD + token1_ids + PAD + ... + tokenN_ids + PAD + EOS
+     *
+     * @param {string[]} tokens - Array of IPA phoneme tokens (no BOS/EOS)
+     * @returns {{ phonemeIds: number[] }}
+     */
+    encode(tokens) {
+        const ids = [this._bos];
+
+        for (let i = 0; i < tokens.length; i++) {
+            const tokenIds = this._lookupToken(tokens[i]);
+            if (tokenIds) {
+                ids.push(...tokenIds);
+            }
+            // Insert PAD between tokens and after the last token
+            ids.push(this._pad);
+        }
+
+        ids.push(this._eos);
+
+        return { phonemeIds: ids };
+    }
+
+    /**
+     * Encode a token sequence into phoneme IDs with aligned prosody features.
+     *
+     * Each phoneme ID is assigned prosody values [a1, a2, a3].
+     * The returned prosodyFlat is a flat array: [a1,a2,a3, a1,a2,a3, ...]
+     * with length = phonemeIds.length * 3.
+     *
+     * - BOS/EOS/PAD positions get [0, 0, 0].
+     * - Each token's IDs all get the same prosody from the corresponding
+     *   entry in the prosody array.
+     *
+     * @param {string[]} tokens - Array of IPA phoneme tokens (no BOS/EOS)
+     * @param {Array<{a1: number, a2: number, a3: number}|null>|null} prosody
+     *   Per-token prosody info. Must have same length as tokens, or be null.
+     *   Null entries or a null array result in [0,0,0] for all positions.
+     * @returns {{ phonemeIds: number[], prosodyFlat: number[]|null }}
+     */
+    encodeWithProsody(tokens, prosody) {
+        if (!prosody) {
+            const result = this.encode(tokens);
+            return { phonemeIds: result.phonemeIds, prosodyFlat: null };
+        }
+
+        if (prosody.length !== tokens.length) {
+            throw new Error(
+                `prosody length (${prosody.length}) must match tokens length (${tokens.length})`
+            );
+        }
+
+        const ids = [];
+        const flat = [];
+
+        // BOS
+        ids.push(this._bos);
+        flat.push(0, 0, 0);
+
+        for (let i = 0; i < tokens.length; i++) {
+            const p = prosody[i];
+            const a1 = p ? p.a1 : 0;
+            const a2 = p ? p.a2 : 0;
+            const a3 = p ? p.a3 : 0;
+
+            const tokenIds = this._lookupToken(tokens[i]);
+            if (tokenIds) {
+                for (const id of tokenIds) {
+                    ids.push(id);
+                    flat.push(a1, a2, a3);
+                }
+            }
+
+            // PAD after each token
+            ids.push(this._pad);
+            flat.push(0, 0, 0);
+        }
+
+        // EOS
+        ids.push(this._eos);
+        flat.push(0, 0, 0);
+
+        return { phonemeIds: ids, prosodyFlat: flat };
+    }
+}
