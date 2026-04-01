@@ -4,7 +4,8 @@ Converts the output of a ``Phonemizer`` (a list of IPA token strings)
 into the integer ``phoneme_ids`` array expected by the Piper ONNX model,
 inserting BOS/EOS markers and inter-phoneme padding.
 
-The padding scheme is identical to ``piper_train.phonemize.base.Phonemizer.post_process_ids()``.
+The padding scheme is identical to
+``piper_train.phonemize.base.Phonemizer.post_process_ids()``.
 """
 
 from __future__ import annotations

@@ -28,7 +28,8 @@ class TestJAEndToEnd:
         assert ids[-1] == eos_id
 
     def test_ja_prosody_pipeline(self):
-        """JA full pipeline with prosody: text -> phonemize_with_prosody -> encode_with_prosody."""
+        """JA full pipeline with prosody:
+        text -> phonemize_with_prosody -> encode_with_prosody."""
         from piper_g2p.encode.encoder import PiperEncoder
         from piper_g2p.encode.id_maps import get_phoneme_id_map
         from piper_g2p.japanese import JapanesePhonemizer

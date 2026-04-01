@@ -17,9 +17,9 @@
 use std::collections::HashSet;
 use std::sync::LazyLock;
 
-use crate::token_map::token_to_pua;
-use crate::phonemizer::{Phonemizer, ProsodyInfo};
 use crate::error::G2pError;
+use crate::phonemizer::{Phonemizer, ProsodyInfo};
+use crate::token_map::token_to_pua;
 
 // ---------------------------------------------------------------------------
 // IPA codepoints used in output

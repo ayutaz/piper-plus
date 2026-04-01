@@ -67,7 +67,10 @@ def benchmark_phonemize():
 
             med_ms = statistics.median(times) * 1000
             cps = len(text) / statistics.median(times)
-            print(f"  {lang}: {med_ms:.2f} ms/call, {cps:.0f} chars/sec ({len(text)} chars)")
+            print(
+                f"  {lang}: {med_ms:.2f} ms/call,"
+                f" {cps:.0f} chars/sec ({len(text)} chars)"
+            )
 
         print()
 

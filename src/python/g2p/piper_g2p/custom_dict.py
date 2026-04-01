@@ -119,10 +119,9 @@ class CustomDictionary:
                 if isinstance(entry, str):
                     # 互換性のため文字列も受け入れる
                     entry = {"pronunciation": entry, "priority": 5}
-                elif isinstance(entry, dict):
+                elif isinstance(entry, dict) and "priority" not in entry:
                     # priorityがない場合はデフォルト値を設定
-                    if "priority" not in entry:
-                        entry["priority"] = 5
+                    entry["priority"] = 5
 
                 self._add_entry(word, entry)
 

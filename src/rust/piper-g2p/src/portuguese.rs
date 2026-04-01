@@ -17,8 +17,8 @@
 //! - BR post-processing (final vowel reduction, t/d palatalization before
 //!   unstressed final e)
 
-use crate::phonemizer::{Phonemizer, ProsodyInfo};
 use crate::error::G2pError;
+use crate::phonemizer::{Phonemizer, ProsodyInfo};
 
 // ---------------------------------------------------------------------------
 // PUA codepoints for multi-codepoint IPA tokens

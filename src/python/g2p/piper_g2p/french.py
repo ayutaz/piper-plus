@@ -245,49 +245,64 @@ def _convert_word(word: str) -> list[str]:
             continue
 
         # "ain", "aim" -> ɛ̃ (before consonant or end)
-        if ch == "a" and i + 2 < n and word[i + 1] == "i" and word[i + 2] in "nm":
-            if i + 3 >= n or not _is_vowel_char(word[i + 3]):
-                phonemes.append("ɛ̃")
-                i += 3
-                continue
+        if (
+            ch == "a" and i + 2 < n
+            and word[i + 1] == "i" and word[i + 2] in "nm"
+            and (i + 3 >= n or not _is_vowel_char(word[i + 3]))
+        ):
+            phonemes.append("ɛ̃")
+            i += 3
+            continue
 
         # "ein", "eim" -> ɛ̃
-        if ch == "e" and i + 2 < n and word[i + 1] == "i" and word[i + 2] in "nm":
-            if i + 3 >= n or not _is_vowel_char(word[i + 3]):
-                phonemes.append("ɛ̃")
-                i += 3
-                continue
+        if (
+            ch == "e" and i + 2 < n
+            and word[i + 1] == "i" and word[i + 2] in "nm"
+            and (i + 3 >= n or not _is_vowel_char(word[i + 3]))
+        ):
+            phonemes.append("ɛ̃")
+            i += 3
+            continue
 
         # "oin" -> wɛ̃
-        if ch == "o" and i + 2 < n and word[i + 1 : i + 3] == "in":
-            if i + 3 >= n or not _is_vowel_char(word[i + 3]):
-                phonemes.append("w")
-                phonemes.append("ɛ̃")
-                i += 3
-                continue
+        if (
+            ch == "o" and i + 2 < n
+            and word[i + 1 : i + 3] == "in"
+            and (i + 3 >= n or not _is_vowel_char(word[i + 3]))
+        ):
+            phonemes.append("w")
+            phonemes.append("ɛ̃")
+            i += 3
+            continue
 
         # "ien" -> jɛ̃
-        if ch == "i" and i + 2 < n and word[i + 1 : i + 3] == "en":
-            if i + 3 >= n or not _is_vowel_char(word[i + 3]):
-                phonemes.append("j")
-                phonemes.append("ɛ̃")
-                i += 3
-                continue
+        if (
+            ch == "i" and i + 2 < n
+            and word[i + 1 : i + 3] == "en"
+            and (i + 3 >= n or not _is_vowel_char(word[i + 3]))
+        ):
+            phonemes.append("j")
+            phonemes.append("ɛ̃")
+            i += 3
+            continue
 
         # "stion" -> /stjɔ̃/ (NOT /ssjɔ̃/)
         # "tion" -> /sjɔ̃/ (only when NOT preceded by 's')
-        if ch == "t" and i + 3 < n and word[i + 1 : i + 4] == "ion":
-            if i + 4 >= n or not _is_vowel_char(word[i + 4]):
-                # Check if preceded by 's' — if so, produce /tjɔ̃/
-                # (the 's' already produced /s/, so we just need /t/)
-                if i > 0 and word[i - 1] == "s":
-                    phonemes.append("t")
-                else:
-                    phonemes.append("s")
-                phonemes.append("j")
-                phonemes.append("ɔ̃")
-                i += 4
-                continue
+        if (
+            ch == "t" and i + 3 < n
+            and word[i + 1 : i + 4] == "ion"
+            and (i + 4 >= n or not _is_vowel_char(word[i + 4]))
+        ):
+            # Check if preceded by 's' — if so, produce /tjɔ̃/
+            # (the 's' already produced /s/, so we just need /t/)
+            if i > 0 and word[i - 1] == "s":
+                phonemes.append("t")
+            else:
+                phonemes.append("s")
+            phonemes.append("j")
+            phonemes.append("ɔ̃")
+            i += 4
+            continue
 
         # "ille" -> /ij/ by default, but /il/ for exceptions (ville, mille, etc.)
         if (
@@ -336,11 +351,13 @@ def _convert_word(word: str) -> list[str]:
             continue
 
         # "gu" before e/i -> ɡ (u silent)
-        if ch == "g" and i + 1 < n and word[i + 1] == "u":
-            if i + 2 < n and word[i + 2] in "eiéèêëîï":
-                phonemes.append("ɡ")
-                i += 2
-                continue
+        if (
+            ch == "g" and i + 1 < n and word[i + 1] == "u"
+            and i + 2 < n and word[i + 2] in "eiéèêëîï"
+        ):
+            phonemes.append("ɡ")
+            i += 2
+            continue
 
         # ---------------------------------------------------------------
         # Nasal vowels: vowel + n/m before consonant or end
@@ -586,8 +603,10 @@ def _convert_word(word: str) -> list[str]:
                         consonant_count += 1
                     else:
                         break
-                if consonant_count >= 2 or all(c in _CONSONANTS for c in remaining) and any(
-                    c not in _SILENT_FINAL for c in remaining
+                if (
+                    consonant_count >= 2
+                    or all(c in _CONSONANTS for c in remaining)
+                    and any(c not in _SILENT_FINAL for c in remaining)
                 ):
                     phonemes.append("ɛ")
                 else:
@@ -752,9 +771,7 @@ def _starts_with_vowel_sound(word: str) -> bool:
     if first in _VOWELS:
         return True
     # Silent h + vowel
-    if first == "h" and len(word) > 1 and word[1] in _VOWELS:
-        return True
-    return False
+    return bool(first == "h" and len(word) > 1 and word[1] in _VOWELS)
 
 
 def _split_words(text: str) -> list[str]:

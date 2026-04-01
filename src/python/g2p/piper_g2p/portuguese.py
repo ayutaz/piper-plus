@@ -98,10 +98,7 @@ def _is_intervocalic(i: int, word: str) -> bool:
 
 def _has_accent(word: str) -> bool:
     """Check if word has any accent mark."""
-    for ch in word:
-        if ch in _ACCENTED:
-            return True
-    return False
+    return any(ch in _ACCENTED for ch in word)
 
 
 def _count_vowel_groups(word: str) -> int:
@@ -127,11 +124,13 @@ def _count_vowel_groups(word: str) -> int:
                 i += 2
                 continue
         # Handle 'gu' digraph: u is silent before e/i
-        if ch == "g" and i + 1 < n and word[i + 1] == "u":
-            if i + 2 < n and word[i + 2] in "eiéêí":
-                # gu before e/i: u is silent, skip both g and u
-                i += 2
-                continue
+        if (
+            ch == "g" and i + 1 < n and word[i + 1] == "u"
+            and i + 2 < n and word[i + 2] in "eiéêí"
+        ):
+            # gu before e/i: u is silent, skip both g and u
+            i += 2
+            continue
         # Handle 'ou' diphthong: two vowel letters but one vowel group
         if ch == "o" and i + 1 < n and word[i + 1] == "u":
             count += 1
@@ -171,10 +170,12 @@ def _find_stress_position(word: str) -> int:
                 # qu before a/o: u is /w/ glide, not a vowel group
                 i += 2
                 continue
-        if ch == "g" and i + 1 < n and word[i + 1] == "u":
-            if i + 2 < n and word[i + 2] in "eiéêí":
-                i += 2
-                continue
+        if (
+            ch == "g" and i + 1 < n and word[i + 1] == "u"
+            and i + 2 < n and word[i + 2] in "eiéêí"
+        ):
+            i += 2
+            continue
         if ch == "o" and i + 1 < n and word[i + 1] == "u":
             # Check if either letter in 'ou' is accented (e.g. 'óu')
             if ch in _STRESS_ACCENTS or ch in _CIRCUMFLEX or ch in _TILDE:
@@ -259,11 +260,13 @@ def _convert_word(word: str) -> tuple[list[str], int]:
             continue
 
         # "sc" before e/i -> s (no geminate; like Spanish seseo)
-        if ch == "s" and i + 1 < n and word[i + 1] == "c":
-            if i + 2 < n and word[i + 2] in "eiéêí":
-                phonemes.append("s")
-                i += 2  # skip "sc", vowel handled next
-                continue
+        if (
+            ch == "s" and i + 1 < n and word[i + 1] == "c"
+            and i + 2 < n and word[i + 2] in "eiéêí"
+        ):
+            phonemes.append("s")
+            i += 2  # skip "sc", vowel handled next
+            continue
 
         # "qu" before e/i -> k (u is silent)
         # "qu" before a/o -> kw (u is pronounced)
@@ -279,11 +282,13 @@ def _convert_word(word: str) -> tuple[list[str], int]:
             continue
 
         # "gu" before e/i -> ɡ (u is silent)
-        if ch == "g" and i + 1 < n and word[i + 1] == "u":
-            if i + 2 < n and word[i + 2] in "eiéêí":
-                phonemes.append("ɡ")
-                i += 2
-                continue
+        if (
+            ch == "g" and i + 1 < n and word[i + 1] == "u"
+            and i + 2 < n and word[i + 2] in "eiéêí"
+        ):
+            phonemes.append("ɡ")
+            i += 2
+            continue
 
         # "ou" -> o (common BR reduction, single vowel group)
         if ch == "o" and i + 1 < n and word[i + 1] == "u":

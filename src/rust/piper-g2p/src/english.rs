@@ -34,8 +34,8 @@ use std::collections::{HashMap, HashSet};
 use std::path::Path;
 use std::sync::{LazyLock, OnceLock};
 
-use crate::phonemizer::{Phonemizer, ProsodyInfo};
 use crate::error::G2pError;
+use crate::phonemizer::{Phonemizer, ProsodyInfo};
 
 // ---------------------------------------------------------------------------
 // ARPAbet-to-IPA mapping table

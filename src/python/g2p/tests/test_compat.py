@@ -67,7 +67,8 @@ class TestJACompat:
         assert g2p_mapping == train_mapping
 
     def test_ja_id_map_matches(self):
-        """piper_g2p get_phoneme_id_map('ja') matches piper_train get_japanese_id_map()."""
+        """piper_g2p get_phoneme_id_map('ja') matches
+        piper_train get_japanese_id_map()."""
         from piper_train.phonemize.jp_id_map import get_japanese_id_map
 
         from piper_g2p.encode.id_maps import get_phoneme_id_map

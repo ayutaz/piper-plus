@@ -11,9 +11,9 @@ use std::collections::{HashMap, HashSet};
 use std::path::Path;
 use std::sync::{LazyLock, OnceLock};
 
-use crate::token_map::token_to_pua;
-use crate::phonemizer::{Phonemizer, ProsodyInfo};
 use crate::error::G2pError;
+use crate::phonemizer::{Phonemizer, ProsodyInfo};
+use crate::token_map::token_to_pua;
 
 // =========================================================================
 // IPA token strings (matching Python _INITIAL_TO_IPA / _FINAL_TO_IPA)

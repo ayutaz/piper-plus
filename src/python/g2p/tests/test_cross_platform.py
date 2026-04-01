@@ -164,10 +164,7 @@ class TestDetectConsistency:
                 if lang is not None:
                     lang_votes[lang] = lang_votes.get(lang, 0) + 1
 
-            if not lang_votes:
-                detected = None
-            else:
-                detected = max(lang_votes, key=lang_votes.get)
+            detected = None if not lang_votes else max(lang_votes, key=lang_votes.get)
 
             assert detected == expected_lang, (
                 f"Detection mismatch for {case['description']}: "
@@ -296,7 +293,8 @@ class TestZHPhonemeFixtures:
 
 
 class TestESPhonemeFixtures:
-    """Spanish phonemize results match fixture expectations (rule-based, deterministic)."""
+    """Spanish phonemize results match fixture expectations
+    (rule-based, deterministic)."""
 
     def test_es_exact_tokens(self, fixtures):
         """ES deterministic output matches fixture expected_tokens exactly."""
@@ -420,7 +418,8 @@ class TestFixtureSanity:
         assert fixtures["version"] == 1
 
     def test_all_languages_covered(self, fixtures):
-        """Fixture covers all 8 expected languages (ja/en/zh/es/fr/pt/sv + ko for detect)."""
+        """Fixture covers all 8 expected languages
+        (ja/en/zh/es/fr/pt/sv + ko for detect)."""
         test_langs = {c["language"] for c in fixtures["test_cases"]}
         detect_langs = {c["expected_language"] for c in fixtures["detect_test_cases"]}
         all_langs = test_langs | detect_langs

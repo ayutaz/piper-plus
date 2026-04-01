@@ -636,10 +636,13 @@ def _convert_consonant(  # noqa: PLR0911
 
         # sk + context
         if di == "sk":
-            if remaining >= 3 and _char_at(word, pos + 2) in FRONT_VOWELS:
+            if (
+                remaining >= 3
+                and _char_at(word, pos + 2) in FRONT_VOWELS
+                and full_word not in SK_BACK_VOWEL_EXCEPTIONS
+            ):
                 # sk + front vowel -> /ɧ/ (sj-sound)
-                if full_word not in SK_BACK_VOWEL_EXCEPTIONS:
-                    return (["\u0267"], 2)  # ɧ
+                return (["\u0267"], 2)  # ɧ
             # sk + back vowel / consonant / word-final -> /sk/
             return (["s", "k"], 2)
 
@@ -682,21 +685,17 @@ def _convert_consonant(  # noqa: PLR0911
         if di == "ck":
             return (["k"], 2)  # geminate marker (vowel already short)
 
-        if di == "gj":
-            if pos == 0:
-                return (["j"], 2)
+        if di == "gj" and pos == 0:
+            return (["j"], 2)
 
-        if di == "lj":
-            if pos == 0:
-                return (["j"], 2)
+        if di == "lj" and pos == 0:
+            return (["j"], 2)
 
-        if di == "dj":
-            if pos == 0:
-                return (["j"], 2)
+        if di == "dj" and pos == 0:
+            return (["j"], 2)
 
-        if di == "hj":
-            if pos == 0:
-                return (["j"], 2)
+        if di == "hj" and pos == 0:
+            return (["j"], 2)
 
     # === 1-char patterns ===
 
@@ -840,11 +839,7 @@ def apply_retroflex(phonemes: list[str]) -> list[str]:
             elif ph in RETROFLEX_MAP:
                 retro = RETROFLEX_MAP[ph]
                 result.append(retro)
-                if retro in PROPAGATING_RETROFLEXES:
-                    state = "CASCADING"
-                else:
-                    # ɭ stops cascade
-                    state = "NORMAL"
+                state = "CASCADING" if retro in PROPAGATING_RETROFLEXES else "NORMAL"
             else:
                 # r + non-assimilable -> output r and reprocess
                 result.append("r")

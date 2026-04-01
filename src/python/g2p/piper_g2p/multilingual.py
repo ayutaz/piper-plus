@@ -138,7 +138,11 @@ class UnicodeLanguageDetector:
 
         # Extended Latin with diacritics:
         # U+00C0-00D6 (À-Ö), U+00D8-00F6 (Ø-ö), U+00F8-00FF (ø-ÿ)
-        if (0x00C0 <= code <= 0x00D6) or (0x00D8 <= code <= 0x00F6) or (0x00F8 <= code <= 0x00FF):
+        if (
+            (0x00C0 <= code <= 0x00D6)
+            or (0x00D8 <= code <= 0x00F6)
+            or (0x00F8 <= code <= 0x00FF)
+        ):
             return self._default_latin
 
         # Neutral: whitespace, digits, ASCII punctuation, etc.

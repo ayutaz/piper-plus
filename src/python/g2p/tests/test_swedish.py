@@ -7,7 +7,6 @@ piper_train SwedishPhonemizer.
 from piper_g2p.base import ProsodyInfo
 from piper_g2p.swedish import SwedishPhonemizer, apply_retroflex
 
-
 # ===========================================================================
 # Helpers
 # ===========================================================================
@@ -475,7 +474,10 @@ class TestProsody:
         p = SwedishPhonemizer()
         tokens, prosody = p.phonemize_with_prosody("sol")
         # Filter out stress marker
-        non_stress = [pi for t, pi in zip(tokens, prosody) if t != "\u02c8"]
+        non_stress = [
+            pi for t, pi in zip(tokens, prosody, strict=False)
+            if t != "\u02c8"
+        ]
         if non_stress:
             # All non-stress phonemes should have same a3
             a3_values = {pi.a3 for pi in non_stress if pi is not None}
@@ -552,7 +554,7 @@ class TestEdgeCases:
         p = SwedishPhonemizer()
         try:
             p.phonemize(123)  # type: ignore[arg-type]
-            assert False, "Expected TypeError"
+            raise AssertionError("Expected TypeError")
         except TypeError:
             pass
 

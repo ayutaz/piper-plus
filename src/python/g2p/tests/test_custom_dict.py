@@ -33,9 +33,14 @@ class TestJsonV1:
                 "GPU": "ジーピーユー",
             },
         }
-        dict_file.write_text(json.dumps(dict_data, ensure_ascii=False), encoding="utf-8")
+        dict_file.write_text(
+            json.dumps(dict_data, ensure_ascii=False),
+            encoding="utf-8",
+        )
 
-        d = CustomDictionary(dict_paths=str(dict_file), load_defaults=False)
+        d = CustomDictionary(
+            dict_paths=str(dict_file), load_defaults=False
+        )
         assert d.get_pronunciation("AI") == "エーアイ"
         assert d.get_pronunciation("GPU") == "ジーピーユー"
 
@@ -48,7 +53,10 @@ class TestJsonV1:
                 "TTS": "ティーティーエス",
             },
         }
-        dict_file.write_text(json.dumps(dict_data, ensure_ascii=False), encoding="utf-8")
+        dict_file.write_text(
+            json.dumps(dict_data, ensure_ascii=False),
+            encoding="utf-8",
+        )
 
         d = CustomDictionary(dict_paths=str(dict_file), load_defaults=False)
         result = d.apply_to_text("TTS技術")
@@ -72,9 +80,14 @@ class TestJsonV2:
                 },
             },
         }
-        dict_file.write_text(json.dumps(dict_data, ensure_ascii=False), encoding="utf-8")
+        dict_file.write_text(
+            json.dumps(dict_data, ensure_ascii=False),
+            encoding="utf-8",
+        )
 
-        d = CustomDictionary(dict_paths=str(dict_file), load_defaults=False)
+        d = CustomDictionary(
+            dict_paths=str(dict_file), load_defaults=False
+        )
         assert d.get_pronunciation("CUDA") == "クーダ"
         assert d.get_pronunciation("PyTorch") == "パイトーチ"
 
@@ -95,8 +108,14 @@ class TestJsonV2:
                 "API": {"pronunciation": "アピ", "priority": 9},
             },
         }
-        dict_file1.write_text(json.dumps(low_data, ensure_ascii=False), encoding="utf-8")
-        dict_file2.write_text(json.dumps(high_data, ensure_ascii=False), encoding="utf-8")
+        dict_file1.write_text(
+            json.dumps(low_data, ensure_ascii=False),
+            encoding="utf-8",
+        )
+        dict_file2.write_text(
+            json.dumps(high_data, ensure_ascii=False),
+            encoding="utf-8",
+        )
 
         d = CustomDictionary(
             dict_paths=[str(dict_file1), str(dict_file2)],

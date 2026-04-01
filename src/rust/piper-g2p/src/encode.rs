@@ -3,8 +3,8 @@
 //! Converts phoneme token strings to phoneme_id integers using the
 //! phoneme_id_map from config.json.
 
-use crate::phonemizer::PhonemeIdMap;
 use crate::error::G2pError;
+use crate::phonemizer::PhonemeIdMap;
 
 use crate::phonemizer::ProsodyFeature;
 use crate::phonemizer::ProsodyInfo;
@@ -45,18 +45,13 @@ pub fn prosody_to_features(prosody: &[Option<ProsodyInfo>]) -> Vec<ProsodyFeatur
 }
 
 /// Encoding mode for handling unknown tokens.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum UnknownTokenMode {
     /// Raise an error on unknown tokens (strict mode).
     Strict,
     /// Skip unknown tokens with a warning log (default).
+    #[default]
     Skip,
-}
-
-impl Default for UnknownTokenMode {
-    fn default() -> Self {
-        Self::Skip
-    }
 }
 
 /// High-level encoder that converts IPA token sequences into
@@ -72,16 +67,25 @@ pub struct PiperEncoder {
 impl PiperEncoder {
     /// Create a new encoder from a phoneme ID map.
     pub fn new(id_map: PhonemeIdMap, mode: UnknownTokenMode) -> Result<Self, G2pError> {
-        let bos_id = id_map.get("^")
+        let bos_id = id_map
+            .get("^")
             .and_then(|ids| ids.first().copied())
             .ok_or_else(|| G2pError::Phonemize("phoneme_id_map missing '^' (BOS)".into()))?;
-        let eos_id = id_map.get("$")
+        let eos_id = id_map
+            .get("$")
             .and_then(|ids| ids.first().copied())
             .ok_or_else(|| G2pError::Phonemize("phoneme_id_map missing '$' (EOS)".into()))?;
-        let pad_id = id_map.get("_")
+        let pad_id = id_map
+            .get("_")
             .and_then(|ids| ids.first().copied())
             .ok_or_else(|| G2pError::Phonemize("phoneme_id_map missing '_' (PAD)".into()))?;
-        Ok(Self { id_map, mode, bos_id, eos_id, pad_id })
+        Ok(Self {
+            id_map,
+            mode,
+            bos_id,
+            eos_id,
+            pad_id,
+        })
     }
 
     /// Encode IPA tokens to phoneme IDs with BOS/EOS/PAD insertion.
@@ -250,7 +254,13 @@ mod tests {
 
     #[test]
     fn test_piper_encoder_basic() {
-        let map = make_map(&[("^", &[1]), ("_", &[0]), ("$", &[2]), ("a", &[15]), ("k", &[30])]);
+        let map = make_map(&[
+            ("^", &[1]),
+            ("_", &[0]),
+            ("$", &[2]),
+            ("a", &[15]),
+            ("k", &[30]),
+        ]);
         let encoder = PiperEncoder::new(map, UnknownTokenMode::Skip).unwrap();
         let tokens: Vec<String> = vec!["a", "k"].into_iter().map(String::from).collect();
         let ids = encoder.encode(&tokens).unwrap();

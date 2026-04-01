@@ -45,27 +45,33 @@
 //! // let ids = piper_g2p::encode::tokens_to_ids(&tokens, &phoneme_id_map)?;
 //! ```
 
+pub mod custom_dict;
+pub mod encode;
 pub mod error;
 pub mod phonemizer;
 pub mod token_map;
-pub mod custom_dict;
-pub mod encode;
 
+#[cfg(feature = "chinese")]
+pub mod chinese;
+#[cfg(feature = "english")]
+pub mod english;
+#[cfg(feature = "french")]
+pub mod french;
 #[cfg(feature = "japanese")]
 pub mod japanese;
-pub mod english;
-pub mod chinese;
+#[cfg(feature = "korean")]
 pub mod korean;
-pub mod spanish;
-pub mod french;
+pub mod multilingual;
+#[cfg(feature = "portuguese")]
 pub mod portuguese;
+#[cfg(feature = "spanish")]
+pub mod spanish;
 #[cfg(feature = "swedish")]
 pub mod swedish;
-pub mod multilingual;
 
 #[cfg(feature = "ffi")]
 pub mod ffi;
 
-pub use error::G2pError;
-pub use phonemizer::{Phonemizer, PhonemizerRegistry, ProsodyInfo, ProsodyFeature, PhonemeIdMap};
 pub use encode::{PiperEncoder, UnknownTokenMode};
+pub use error::G2pError;
+pub use phonemizer::{PhonemeIdMap, Phonemizer, PhonemizerRegistry, ProsodyFeature, ProsodyInfo};

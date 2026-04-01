@@ -7,8 +7,8 @@
 //!
 //! Without g2pk2, only basic liaison (연음화) is applied as a phonological rule.
 
-use crate::phonemizer::{Phonemizer, ProsodyInfo};
 use crate::error::G2pError;
+use crate::phonemizer::{Phonemizer, ProsodyInfo};
 
 // ---------------------------------------------------------------------------
 // Hangul syllable block range (U+AC00 .. U+D7A3)

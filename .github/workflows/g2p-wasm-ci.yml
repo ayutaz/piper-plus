@@ -71,7 +71,7 @@ jobs:
         run: npm install
 
       - name: Run tests
-        run: node --test test/
+        run: node --test 'test/test-*.js'
 
   size-check:
     name: size-check

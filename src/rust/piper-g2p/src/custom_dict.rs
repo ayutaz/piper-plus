@@ -108,10 +108,9 @@ impl CustomDictionary {
     /// JSON 辞書ファイルを読み込む (v1.0 / v2.0 対応)
     pub fn load_dictionary(&mut self, path: &Path) -> Result<(), G2pError> {
         // ファイルサイズチェック (DoS 防止)
-        let metadata =
-            std::fs::metadata(path).map_err(|_| G2pError::DictionaryLoad {
-                path: path.display().to_string(),
-            })?;
+        let metadata = std::fs::metadata(path).map_err(|_| G2pError::DictionaryLoad {
+            path: path.display().to_string(),
+        })?;
         if metadata.len() > MAX_DICT_SIZE {
             return Err(G2pError::DictionaryLoad {
                 path: format!(
@@ -392,7 +391,11 @@ mod tests {
         assert!(result.is_err());
 
         let err_msg = format!("{}", result.unwrap_err());
-        assert!(err_msg.contains("file too large"), "error should mention 'file too large': {}", err_msg);
+        assert!(
+            err_msg.contains("file too large"),
+            "error should mention 'file too large': {}",
+            err_msg
+        );
 
         // テスト後クリーンアップ
         let _ = std::fs::remove_file(&path);

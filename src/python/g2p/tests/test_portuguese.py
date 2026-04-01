@@ -25,7 +25,8 @@ class TestBasic:
         p = PortuguesePhonemizer()
         tokens = p.phonemize("mundo")
         # "mundo" contains "un" before consonant -> nasal vowel "u\u0303" (ũ)
-        nasal_vowels = {"\u00e3", "\u1ebd", "\u0129", "\u00f5", "\u0169"}  # ã, ẽ, ĩ, õ, ũ
+        # ã, ẽ, ĩ, õ, ũ
+        nasal_vowels = {"\u00e3", "\u1ebd", "\u0129", "\u00f5", "\u0169"}
         has_nasal = any(t in nasal_vowels for t in tokens)
         assert has_nasal, f"Expected nasal vowel in {tokens}"
 

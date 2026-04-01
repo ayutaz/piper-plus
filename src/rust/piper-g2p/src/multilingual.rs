@@ -9,9 +9,9 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::{Mutex, OnceLock};
 
-use crate::token_map::token_to_pua;
-use crate::phonemizer::{Phonemizer, ProsodyFeature, ProsodyInfo, PhonemeIdMap};
 use crate::error::G2pError;
+use crate::phonemizer::{PhonemeIdMap, Phonemizer, ProsodyFeature, ProsodyInfo};
+use crate::token_map::token_to_pua;
 
 // ---------------------------------------------------------------------------
 // UnicodeLanguageDetector

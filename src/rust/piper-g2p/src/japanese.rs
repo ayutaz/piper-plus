@@ -25,9 +25,9 @@ use std::sync::LazyLock;
 use regex::Regex;
 
 use crate::custom_dict::CustomDictionary;
-use crate::token_map::token_to_pua;
-use crate::phonemizer::{Phonemizer, ProsodyInfo};
 use crate::error::G2pError;
+use crate::phonemizer::{Phonemizer, ProsodyInfo};
+use crate::token_map::token_to_pua;
 
 // ---------------------------------------------------------------------------
 // Compiled regex patterns for fullcontext label parsing

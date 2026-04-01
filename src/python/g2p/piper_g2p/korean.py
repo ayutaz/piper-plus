@@ -189,7 +189,7 @@ def _apply_g2p(text: str) -> str:
         raise ImportError(
             "g2pk2 mecab backend not available. "
             "Install with: pip install python-mecab-ko"
-        )
+        ) from None
     except Exception as exc:  # noqa: BLE001
         # Catch any other runtime error (IndexError, KeyError, ValueError, etc.)
         # that can occur with unusual or mixed-script input.

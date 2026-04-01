@@ -34,7 +34,14 @@ _PUNCTUATION = set(",.;:!?\u00a1\u00bf")
 _VOWELS = set("aeiou")
 
 # Accented vowel -> base vowel mapping
-_ACCENT_MAP = {"\u00e1": "a", "\u00e9": "e", "\u00ed": "i", "\u00f3": "o", "\u00fa": "u", "\u00fc": "u"}
+_ACCENT_MAP = {
+    "\u00e1": "a",
+    "\u00e9": "e",
+    "\u00ed": "i",
+    "\u00f3": "o",
+    "\u00fa": "u",
+    "\u00fc": "u",
+}
 
 # Letters that trigger word-final stress (Spanish stress rule:
 # words ending in consonant other than n/s get final-syllable stress)
@@ -59,7 +66,11 @@ _SIMPLE_CONSONANT_MAP: dict[str, str] = {
 }
 
 # Regex: split text into word tokens and punctuation
-_RE_TOKEN = re.compile(r"([a-z\u00e1\u00e9\u00ed\u00f3\u00fa\u00fc\u00f1]+|[,.;:!?\u00a1\u00bf]+)", re.IGNORECASE)
+_RE_TOKEN = re.compile(
+    r"([a-z\u00e1\u00e9\u00ed\u00f3\u00fa\u00fc\u00f1]+|"
+    r"[,.;:!?\u00a1\u00bf]+)",
+    re.IGNORECASE,
+)
 
 # Common monosyllabic function words that are phonologically unstressed
 # in connected speech and should not receive the primary stress marker.
@@ -292,7 +303,12 @@ def _find_syllable_boundaries(
                 else:
                     # Accented weak vowel forces hiatus (diphthong breaking)
                     weak = {"i", "u"}
-                    if curr_base in weak and _has_accent_on_char(curr_grapheme) or prev_base in weak and _has_accent_on_char(prev_grapheme):
+                    if (
+                        curr_base in weak
+                        and _has_accent_on_char(curr_grapheme)
+                        or prev_base in weak
+                        and _has_accent_on_char(prev_grapheme)
+                    ):
                         ns_boundaries.append(i)
             i += 1
         else:

@@ -19,9 +19,9 @@
 //! - Exception dictionaries for ille-as-il and er-as-ehr words
 //! - Prosody: a1=0, a2=word-final vowel stress, a3=word phoneme count
 
-use crate::token_map::token_to_pua;
-use crate::phonemizer::{Phonemizer, ProsodyInfo};
 use crate::error::G2pError;
+use crate::phonemizer::{Phonemizer, ProsodyInfo};
+use crate::token_map::token_to_pua;
 
 // ---------------------------------------------------------------------------
 // PUA codepoints for multi-character phoneme tokens
