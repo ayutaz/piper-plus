@@ -16,6 +16,7 @@ __all__ = [
     "__version__",
     "Phonemizer",
     "PhonemizerRegistry",
+    "PiperEncoder",
     "ProsodyInfo",
     "MultilingualPhonemizer",
     "UnicodeLanguageDetector",
