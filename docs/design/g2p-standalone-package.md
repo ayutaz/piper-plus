@@ -2,6 +2,12 @@
 
 > 調査日: 2026-03-31
 
+> **ステータス: 全 Phase 実装完了 (2026-04-01)**
+> - Phase 0 (Python MVP): ✅ 完了
+> - Phase 1 (全言語): ✅ 完了
+> - Phase 2 (Rust crate): ✅ 完了
+> - Phase 3 (JS/WASM): ✅ 完了
+
 Piper Plus の G2P (Grapheme-to-Phoneme) コンポーネントを、他の TTS システムから利用しやすい独立パッケージとして切り出す構想の調査結果。
 
 ---

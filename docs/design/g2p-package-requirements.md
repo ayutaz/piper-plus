@@ -2,7 +2,7 @@
 
 > 作成日: 2026-03-31
 > ベース: `g2p-standalone-package.md` (調査レポート), `g2p-technical-investigation.md` (技術調査)
-> ステータス: 10 人レビュー合意事項反映済み
+> ステータス: 全 Phase 実装完了。本ドキュメントは ADR (Architecture Decision Record) として保持。
 
 ---
 
