@@ -154,7 +154,10 @@ mod tests {
             assert!(!s.is_empty(), "phonemize result should not be empty");
             // Result is JSON with "tokens" and "language" keys
             assert!(s.contains("\"tokens\""), "result should contain tokens key");
-            assert!(s.contains("\"language\""), "result should contain language key");
+            assert!(
+                s.contains("\"language\""),
+                "result should contain language key"
+            );
 
             piper_g2p_free_string(result);
             piper_g2p_free(handle);
@@ -174,7 +177,10 @@ mod tests {
 
             let langs_str = CStr::from_ptr(langs_ptr).to_str().unwrap();
             let langs: Vec<&str> = langs_str.split(',').collect();
-            assert!(langs.contains(&"ko"), "available languages should contain 'ko', got: {langs_str}");
+            assert!(
+                langs.contains(&"ko"),
+                "available languages should contain 'ko', got: {langs_str}"
+            );
 
             piper_g2p_free_string(langs_ptr);
             piper_g2p_free(handle);
@@ -211,7 +217,10 @@ mod tests {
             let s = CStr::from_ptr(result).to_str().unwrap();
             assert!(!s.is_empty(), "phonemize result should not be empty");
             assert!(s.contains("\"tokens\""), "result should contain tokens key");
-            assert!(s.contains("\"language\""), "result should contain language key");
+            assert!(
+                s.contains("\"language\""),
+                "result should contain language key"
+            );
 
             piper_g2p_free_string(result);
             piper_g2p_free(handle);
@@ -231,7 +240,10 @@ mod tests {
 
             let langs_str = CStr::from_ptr(langs_ptr).to_str().unwrap();
             let langs: Vec<&str> = langs_str.split(',').collect();
-            assert!(langs.contains(&"sv"), "available languages should contain 'sv', got: {langs_str}");
+            assert!(
+                langs.contains(&"sv"),
+                "available languages should contain 'sv', got: {langs_str}"
+            );
 
             piper_g2p_free_string(langs_ptr);
             piper_g2p_free(handle);
@@ -255,8 +267,14 @@ mod tests {
 
             let avail_str = CStr::from_ptr(avail_ptr).to_str().unwrap();
             let avail: Vec<&str> = avail_str.split(',').collect();
-            assert!(avail.contains(&"ko"), "should contain 'ko', got: {avail_str}");
-            assert!(avail.contains(&"sv"), "should contain 'sv', got: {avail_str}");
+            assert!(
+                avail.contains(&"ko"),
+                "should contain 'ko', got: {avail_str}"
+            );
+            assert!(
+                avail.contains(&"sv"),
+                "should contain 'sv', got: {avail_str}"
+            );
 
             // Phonemize Korean text
             let ko_text = CString::new("가").unwrap();

@@ -91,7 +91,10 @@ mod korean_encoding {
         let encoder = PiperEncoder::new(id_map, UnknownTokenMode::Skip).unwrap();
         let ids = encoder.encode(&tokens).unwrap();
 
-        assert!(ids.contains(&50), "encoded IDs should contain the PUA-mapped tense k ID");
+        assert!(
+            ids.contains(&50),
+            "encoded IDs should contain the PUA-mapped tense k ID"
+        );
         assert!(ids.contains(&11), "encoded IDs should contain 'a' ID");
     }
 
@@ -101,8 +104,7 @@ mod korean_encoding {
         let phonemizer = KoreanPhonemizer::new();
         let (tokens, _) = phonemizer.phonemize_with_prosody("박").unwrap();
 
-        let pua_k_unrel =
-            token_to_pua("k\u{031a}").expect("PUA mapping for k̚ should exist");
+        let pua_k_unrel = token_to_pua("k\u{031a}").expect("PUA mapping for k̚ should exist");
         let pua_str = pua_k_unrel.to_string();
 
         assert!(
@@ -148,7 +150,10 @@ mod korean_encoding {
         // BOS + (token + PAD) * N + EOS
         assert_eq!(ids[0], 1, "should start with BOS");
         assert_eq!(*ids.last().unwrap(), 2, "should end with EOS");
-        assert!(ids.len() > tokens.len(), "encoded IDs should include padding");
+        assert!(
+            ids.len() > tokens.len(),
+            "encoded IDs should include padding"
+        );
     }
 }
 
@@ -166,7 +171,10 @@ mod swedish_encoding {
         let phonemizer = SwedishPhonemizer::new();
         let (tokens, prosody) = phonemizer.phonemize_with_prosody("hej").unwrap();
 
-        assert!(!tokens.is_empty(), "phonemization of 'hej' should produce tokens");
+        assert!(
+            !tokens.is_empty(),
+            "phonemization of 'hej' should produce tokens"
+        );
         assert_eq!(tokens.len(), prosody.len());
 
         // Build an id_map from the actual produced tokens
@@ -193,14 +201,14 @@ mod swedish_encoding {
 
         // Verify PUA mappings exist for Swedish long vowels
         let long_vowels = [
-            ("i\u{02D0}", '\u{E059}'),  // iː
-            ("y\u{02D0}", '\u{E05A}'),  // yː
-            ("e\u{02D0}", '\u{E05B}'),  // eː
+            ("i\u{02D0}", '\u{E059}'),        // iː
+            ("y\u{02D0}", '\u{E05A}'),        // yː
+            ("e\u{02D0}", '\u{E05B}'),        // eː
             ("\u{025B}\u{02D0}", '\u{E05C}'), // ɛː
             ("\u{00F8}\u{02D0}", '\u{E05D}'), // øː
             ("\u{0251}\u{02D0}", '\u{E05E}'), // ɑː
-            ("o\u{02D0}", '\u{E05F}'),  // oː
-            ("u\u{02D0}", '\u{E060}'),  // uː
+            ("o\u{02D0}", '\u{E05F}'),        // oː
+            ("u\u{02D0}", '\u{E060}'),        // uː
             ("\u{0289}\u{02D0}", '\u{E061}'), // ʉː
         ];
 
@@ -220,9 +228,9 @@ mod swedish_encoding {
 
         // Check that at least one token is a PUA long vowel char
         let pua_chars: Vec<char> = long_vowels.iter().map(|(_, pua)| *pua).collect();
-        let has_long_vowel = tokens.iter().any(|t| {
-            t.chars().count() == 1 && pua_chars.contains(&t.chars().next().unwrap())
-        });
+        let has_long_vowel = tokens
+            .iter()
+            .any(|t| t.chars().count() == 1 && pua_chars.contains(&t.chars().next().unwrap()));
         assert!(
             has_long_vowel,
             "Swedish 'mat' should produce a long vowel PUA token; got tokens: {:?}",
@@ -237,9 +245,7 @@ mod swedish_encoding {
         let (tokens, _) = phonemizer.phonemize_with_prosody("hej").unwrap();
 
         let stress_marker = '\u{02C8}'; // ˈ
-        let has_stress = tokens
-            .iter()
-            .any(|t| t.chars().any(|c| c == stress_marker));
+        let has_stress = tokens.iter().any(|t| t.chars().any(|c| c == stress_marker));
         assert!(
             has_stress,
             "Swedish output should contain stress marker; got: {:?}",
@@ -331,10 +337,8 @@ mod korean_custom_dict {
         use std::io::Write;
 
         let json = r#"{"version":"1.0","entries":{"컴퓨터":"콤퓨타"}}"#;
-        let path = std::env::temp_dir().join(format!(
-            "piper_g2p_ko_dict_{}.json",
-            std::process::id()
-        ));
+        let path =
+            std::env::temp_dir().join(format!("piper_g2p_ko_dict_{}.json", std::process::id()));
         let mut f = std::fs::File::create(&path).unwrap();
         f.write_all(json.as_bytes()).unwrap();
         f.flush().unwrap();
@@ -401,10 +405,8 @@ mod swedish_custom_dict {
         use std::io::Write;
 
         let json = r#"{"version":"2.0","entries":{"IKEA":{"pronunciation":"ikea","priority":8}}}"#;
-        let path = std::env::temp_dir().join(format!(
-            "piper_g2p_sv_dict_{}.json",
-            std::process::id()
-        ));
+        let path =
+            std::env::temp_dir().join(format!("piper_g2p_sv_dict_{}.json", std::process::id()));
         let mut f = std::fs::File::create(&path).unwrap();
         f.write_all(json.as_bytes()).unwrap();
         f.flush().unwrap();
@@ -537,11 +539,7 @@ mod multilingual_ko_sv_en {
         // English phonemizer needs a dictionary -- use minimal HashMap
         let en = EnglishPhonemizer::new_with_hashmap(HashMap::new());
 
-        let languages = vec![
-            "ko".to_string(),
-            "sv".to_string(),
-            "en".to_string(),
-        ];
+        let languages = vec!["ko".to_string(), "sv".to_string(), "en".to_string()];
         let mut phonemizers: HashMap<String, Box<dyn Phonemizer>> = HashMap::new();
         phonemizers.insert("ko".to_string(), Box::new(KoreanPhonemizer::new()));
         phonemizers.insert("sv".to_string(), Box::new(SwedishPhonemizer::new()));
