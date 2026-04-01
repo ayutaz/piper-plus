@@ -1,0 +1,74 @@
+name: "G2P Cross-Platform Consistency"
+
+on:
+  push:
+    branches: [dev, main]
+    paths:
+      - 'src/python/g2p/**'
+      - 'src/rust/piper-g2p/**'
+      - 'src/wasm/g2p/**'
+      - 'tests/fixtures/g2p/**'
+      - '.github/workflows/g2p-cross-platform-ci.yml'
+  pull_request:
+    paths:
+      - 'src/python/g2p/**'
+      - 'src/rust/piper-g2p/**'
+      - 'src/wasm/g2p/**'
+      - 'tests/fixtures/g2p/**'
+      - '.github/workflows/g2p-cross-platform-ci.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  consistency-check:
+    name: cross-platform consistency
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.13"
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src/rust
+
+      - name: Install Python deps
+        working-directory: src/python/g2p
+        run: uv sync --extra all --extra dev
+
+      - name: Python cross-platform tests
+        working-directory: src/python/g2p
+        run: uv run pytest tests/test_cross_platform.py -v
+
+      - name: Rust build check
+        working-directory: src/rust
+        run: cargo check -p piper-g2p --all-features
+
+      - name: JS fixture tests
+        working-directory: src/wasm/g2p
+        run: node --test test/test-g2p.js
+
+      - name: PUA map count validation
+        run: |
+          python3 -c "
+          import json
+          with open('src/python/g2p/piper_g2p/data/pua.json') as f:
+              data = json.load(f)
+          with open('tests/fixtures/g2p/phoneme_test_cases.json') as f:
+              fixture = json.load(f)
+          pua_count = len(data['entries'])
+          expected = fixture['pua_map_count']
+          print(f'PUA entries: {pua_count}, fixture expects: {expected}')
+          assert pua_count >= expected, f'PUA count {pua_count} < fixture expected {expected}'
+          print('PUA map count validation passed')
+          "

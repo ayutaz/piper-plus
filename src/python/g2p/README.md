@@ -79,6 +79,43 @@ encoder = PiperEncoder(id_map)
 phoneme_ids = encoder.encode(["k", "o", "[", "N_n", "n", "i", "ch", "i", "w", "a"])
 ```
 
+## Piper Model Compatibility
+
+piper-g2p produces phoneme tokens directly compatible with
+[Piper TTS](https://github.com/rhasspy/piper) ONNX models. Use
+`PiperEncoder` with the model's `phoneme_id_map` from `config.json`:
+
+```python
+import json
+from piper_g2p import get_phonemizer
+from piper_g2p.encode import PiperEncoder
+
+with open("model/config.json") as f:
+    config = json.load(f)
+
+encoder = PiperEncoder(config["phoneme_id_map"])
+phonemizer = get_phonemizer("ja")
+tokens = phonemizer.phonemize("こんにちは")
+phoneme_ids = encoder.encode(tokens)
+# -> ready for ONNX inference
+```
+
+Use `strict=True` to raise errors on unknown tokens instead of silently
+skipping them:
+
+```python
+encoder = PiperEncoder(config["phoneme_id_map"], strict=True)
+```
+
+## Cross-Platform Consistency
+
+piper-g2p is also available as:
+- **Rust crate**: `piper-g2p` on crates.io
+- **npm package**: `@piper-plus/g2p` for browser/WASM
+
+All three implementations share the same PUA mapping table and are
+validated against a common test fixture.
+
 ## Requirements
 
 - Python >= 3.11

@@ -11,6 +11,32 @@
  */
 
 /**
+ * PUA compatibility version. Increment when new PUA mappings are added.
+ * @type {number}
+ */
+export const PUA_COMPAT_VERSION = 1;
+
+/**
+ * Check if a model's PUA version is compatible.
+ * @param {number|undefined|null} modelVersion
+ * @returns {{ compatible: boolean, message?: string }}
+ */
+export function checkPuaCompat(modelVersion) {
+    if (modelVersion === undefined || modelVersion === null) {
+        return { compatible: true };
+    }
+    if (modelVersion === PUA_COMPAT_VERSION) {
+        return { compatible: true };
+    }
+    return {
+        compatible: false,
+        message: `PUA version mismatch: model has pua_compat_version=${modelVersion}, ` +
+            `but @piper-plus/g2p expects version ${PUA_COMPAT_VERSION}. ` +
+            `Some phoneme tokens may not encode correctly.`,
+    };
+}
+
+/**
  * Forward mapping: multi-char token -> PUA character (87 entries).
  * @type {Record<string, string>}
  */

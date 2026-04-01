@@ -6,6 +6,21 @@
 use std::collections::HashMap;
 use std::sync::LazyLock;
 
+/// PUA compatibility version. Increment when new PUA mappings are added.
+pub const PUA_COMPAT_VERSION: u32 = 1;
+
+/// Check if a model's PUA version is compatible.
+pub fn check_pua_compat(model_version: Option<u32>) -> Result<(), String> {
+    match model_version {
+        None => Ok(()),
+        Some(v) if v == PUA_COMPAT_VERSION => Ok(()),
+        Some(v) => Err(format!(
+            "PUA version mismatch: model has pua_compat_version={v}, \
+             but piper-g2p expects version {PUA_COMPAT_VERSION}"
+        )),
+    }
+}
+
 /// 固定 PUA マッピング (96 エントリ)
 /// 多文字音素トークン → Unicode Private Use Area コードポイント
 pub static FIXED_PUA_MAP: LazyLock<Vec<(&'static str, u32)>> = LazyLock::new(|| {

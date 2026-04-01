@@ -73,6 +73,78 @@ def _build_japanese_id_map() -> dict[str, list[int]]:
     return {symbol: [idx] for idx, symbol in enumerate(symbols)}
 
 
+# -------------------------------------------------------------------------
+# Multilingual (6-language) phoneme inventory
+# Combined symbol set matching piper_train's multilingual_id_map output
+# for the canonical language set: ja-en-zh-es-fr-pt
+# -------------------------------------------------------------------------
+_ENGLISH_PHONEMES: list[str] = [
+    "ɪ", "ʊ", "ɛ", "ɔ", "æ", "ɑ", "ʌ", "ə", "ɜ",
+    "ɹ", "ɝ", "ɫ", "ð", "θ", "ŋ", "ʃ", "ʒ",
+    "dʒ", "tʃ",
+    "p", "b", "t", "d", "f", "v", "s", "z", "h",
+    "l", "m", "n", "r", "w", "j", "g", "ɡ", "x",
+    "ˈ", "ˌ", "ː",
+    "i", "u", "e", "o", "aɪ", "aʊ", "eɪ", "oʊ", "ɔɪ",
+]
+
+_CHINESE_PHONEMES: list[str] = [
+    "tone1", "tone2", "tone3", "tone4", "tone5",
+    "ai", "ao", "an", "ang", "ei", "en", "eng", "er",
+    "ia", "iao", "ian", "iang", "ie", "in", "ing", "iong", "iu",
+    "ou", "ong", "ua", "uai", "uan", "uang", "ui", "un", "uo",
+    "üe", "üan", "ün",
+    "zh", "ch", "sh", "ng",
+    "c", "q", "ü",
+    "tɕ", "tɕʰ", "ɕ", "ts", "tsʰ", "tʂ", "tʂʰ", "ʂ", "ʐ",
+]
+
+_SPANISH_PHONEMES: list[str] = [
+    "rr", "ɲ", "ʎ", "β", "ɣ", "tʃ", "x",
+]
+
+_FRENCH_PHONEMES: list[str] = [
+    "ʁ", "ɲ", "ɑ̃", "ɔ̃", "ɛ̃", "œ̃", "y", "ø", "œ", "y_vowel",
+]
+
+_PORTUGUESE_PHONEMES: list[str] = [
+    "ɲ", "ʎ", "ʃ", "ʒ", "ɐ", "ɐ̃", "ẽ", "ĩ", "õ", "ũ",
+]
+
+
+def _build_multilingual_id_map() -> dict[str, list[int]]:
+    """Build the combined multilingual phoneme_id_map.
+
+    Symbol ordering: special tokens -> JA -> EN -> ZH -> ES -> FR -> PT.
+    Shared symbols deduplicated (first occurrence wins).
+    """
+    all_inventories = [
+        _JAPANESE_PHONEMES,
+        _ENGLISH_PHONEMES,
+        _CHINESE_PHONEMES,
+        _SPANISH_PHONEMES,
+        _FRENCH_PHONEMES,
+        _PORTUGUESE_PHONEMES,
+    ]
+    symbols: list[str] = []
+    seen: set[str] = set()
+
+    for s in _SPECIAL_TOKENS:
+        mapped = map_token(s)
+        if mapped not in seen:
+            symbols.append(mapped)
+            seen.add(mapped)
+
+    for inventory in all_inventories:
+        for s in inventory:
+            mapped = map_token(s)
+            if mapped not in seen:
+                symbols.append(mapped)
+                seen.add(mapped)
+
+    return {symbol: [idx] for idx, symbol in enumerate(symbols)}
+
+
 @lru_cache(maxsize=8)
 def get_phoneme_id_map(language: str) -> dict[str, list[int]]:
     """Return the built-in phoneme_id_map for *language*.
@@ -98,7 +170,12 @@ def get_phoneme_id_map(language: str) -> dict[str, list[int]]:
     if language == "ja":
         return _build_japanese_id_map()
 
+    # Multilingual composite code (e.g. "ja-en-zh-es-fr-pt")
+    if "-" in language or language == "multilingual":
+        return _build_multilingual_id_map()
+
     raise ValueError(
-        f"No built-in phoneme_id_map for language {language!r}. "
-        "Use the phoneme_id_map from the model's config.json instead."
+        f"No built-in phoneme_id_map for single language {language!r}. "
+        "Use get_phoneme_id_map('multilingual') for the combined map, "
+        "or load phoneme_id_map from the model's config.json."
     )

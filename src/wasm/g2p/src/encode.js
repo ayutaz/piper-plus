@@ -16,14 +16,14 @@ import { PUA_MAP } from './pua-map.js';
 export class Encoder {
     /**
      * @param {Record<string, number[]>} phonemeIdMap
-     *   Mapping from phoneme string to array of integer IDs.
-     *   Must contain at least '^' (BOS), '$' (EOS), and '_' (PAD).
+     * @param {{ strict?: boolean }} [options]
      */
-    constructor(phonemeIdMap) {
+    constructor(phonemeIdMap, options = {}) {
         if (!phonemeIdMap || typeof phonemeIdMap !== 'object') {
             throw new Error('phonemeIdMap is required and must be an object');
         }
         this._map = phonemeIdMap;
+        this._strict = options.strict === true;
 
         // Build unified lookup Map: original keys + PUA reverse entries.
         // For each PUA_MAP entry (e.g. "ch" -> "\uE00E"), if the PUA char
@@ -89,6 +89,10 @@ export class Encoder {
             const tokenIds = this._lookupToken(tokens[i]);
             if (tokenIds) {
                 ids.push(...tokenIds);
+            } else if (this._strict) {
+                throw new Error(
+                    `Unknown phoneme symbol "${tokens[i]}" not in phonemeIdMap`
+                );
             }
             // Insert PAD between tokens and after the last token
             ids.push(this._pad);
@@ -147,6 +151,10 @@ export class Encoder {
                     ids.push(id);
                     flat.push(a1, a2, a3);
                 }
+            } else if (this._strict) {
+                throw new Error(
+                    `Unknown phoneme symbol "${tokens[i]}" not in phonemeIdMap`
+                );
             }
 
             // PAD after each token

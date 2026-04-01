@@ -194,6 +194,15 @@ pub fn segment_text(text: &str, detector: &UnicodeLanguageDetector) -> Vec<(Stri
     segments
 }
 
+/// A text segment with its detected language.
+#[derive(Debug, Clone)]
+pub struct TextSegment {
+    /// ISO 639-1 language code.
+    pub language: String,
+    /// The text content of this segment.
+    pub text: String,
+}
+
 // ---------------------------------------------------------------------------
 // default_post_process_ids
 // ---------------------------------------------------------------------------
@@ -360,6 +369,23 @@ impl MultilingualPhonemizer {
             .lock()
             .map(|g| g.clone())
             .unwrap_or_else(|_| "$".to_string())
+    }
+
+    /// Segment mixed-language text into per-language chunks.
+    ///
+    /// Each segment contains contiguous characters of the same detected
+    /// language. Neutral characters (whitespace, digits, punctuation) are
+    /// absorbed into the preceding segment.
+    ///
+    /// Returns a list of `TextSegment { language, text }` structs.
+    pub fn segment_text_structured(&self, text: &str) -> Vec<TextSegment> {
+        segment_text(text, &self.detector)
+            .into_iter()
+            .map(|(lang, txt)| TextSegment {
+                language: lang,
+                text: txt,
+            })
+            .collect()
     }
 
     /// Detect the primary language of the text.

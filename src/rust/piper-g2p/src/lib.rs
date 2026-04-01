@@ -63,5 +63,9 @@ pub mod portuguese;
 pub mod swedish;
 pub mod multilingual;
 
+#[cfg(feature = "ffi")]
+pub mod ffi;
+
 pub use error::G2pError;
 pub use phonemizer::{Phonemizer, PhonemizerRegistry, ProsodyInfo, ProsodyFeature, PhonemeIdMap};
+pub use encode::{PiperEncoder, UnknownTokenMode};

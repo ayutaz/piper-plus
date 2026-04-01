@@ -1,0 +1,97 @@
+name: "G2P Rust CI"
+
+on:
+  push:
+    branches: [dev, main]
+    paths:
+      - 'src/rust/piper-g2p/**'
+      - '.github/workflows/g2p-rust-ci.yml'
+    tags:
+      - 'rust-g2p-v*'
+  pull_request:
+    paths:
+      - 'src/rust/piper-g2p/**'
+      - '.github/workflows/g2p-rust-ci.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src/rust
+
+      - name: Cargo fmt
+        working-directory: src/rust
+        run: cargo fmt -p piper-g2p -- --check
+
+      - name: Cargo clippy
+        working-directory: src/rust
+        run: cargo clippy -p piper-g2p --all-features -- -D warnings
+
+  test:
+    name: test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src/rust
+
+      - name: Run tests (all features)
+        working-directory: src/rust
+        run: cargo test -p piper-g2p --all-features
+
+  test-minimal:
+    name: test-minimal (default features)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src/rust
+
+      - name: Run tests (default features only)
+        working-directory: src/rust
+        run: cargo test -p piper-g2p
+
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    needs: [lint, test]
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src/rust
+
+      - name: Build release
+        working-directory: src/rust
+        run: cargo build -p piper-g2p --release

@@ -30,8 +30,14 @@ class PiperEncoder:
         ``config.json``.
     """
 
-    def __init__(self, phoneme_id_map: dict[str, list[int]]) -> None:
+    def __init__(
+        self,
+        phoneme_id_map: dict[str, list[int]],
+        *,
+        strict: bool = False,
+    ) -> None:
         self._id_map = phoneme_id_map
+        self._strict = strict
 
     # -----------------------------------------------------------------
     # Public API
@@ -107,6 +113,10 @@ class PiperEncoder:
                 if ch in self._id_map:
                     ids.extend(self._id_map[ch])
                 else:
+                    if self._strict:
+                        raise KeyError(
+                            f"Unknown phoneme symbol {ch!r} not in phoneme_id_map"
+                        )
                     _log.warning(
                         "Unknown symbol %r dropped"
                         " (not in phoneme_id_map)",

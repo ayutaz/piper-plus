@@ -1,6 +1,6 @@
 {
   "name": "piper-plus",
-  "version": "0.1.1",
+  "version": "0.2.0-alpha.0",
   "description": "Browser-based multilingual neural TTS with VITS. Supports Japanese, English, Chinese, Korean, Spanish, French, Portuguese, and Swedish.",
   "type": "module",
   "main": "src/index.js",
@@ -48,7 +48,7 @@
     "prepublishOnly": "echo 'Ready to publish'"
   },
   "dependencies": {
-    "@piper-plus/g2p": "^0.1.0"
+    "@piper-plus/g2p": "file:../g2p"
   },
   "peerDependencies": {
     "onnxruntime-web": ">=1.21.0"

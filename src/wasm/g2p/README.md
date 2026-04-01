@@ -90,6 +90,22 @@ Returns `{ tokens, prosody }` with per-token prosody features (Japanese only).
 
 Encodes IPA tokens to Piper-compatible phoneme IDs with BOS/EOS/padding.
 
+## Cross-Platform Consistency
+
+Also available as:
+- **Python**: `piper-g2p` on PyPI
+- **Rust crate**: `piper-g2p` on crates.io
+
+All implementations share the same PUA mapping (`pua_compat_version: 1`)
+and are validated against a common test fixture.
+
+## Zero Dependencies
+
+@piper-plus/g2p has **zero npm runtime dependencies** for rule-based
+languages (EN, ZH, ES, FR, PT, SV). Only Japanese requires the bundled
+OpenJTalk WASM binary. This eliminates the most common vector for
+supply chain attacks in the JavaScript ecosystem.
+
 ## License
 
 MIT

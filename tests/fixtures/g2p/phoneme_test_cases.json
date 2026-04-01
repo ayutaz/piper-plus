@@ -134,6 +134,36 @@
       "input": "Obrigado pela ajuda.",
       "description": "Portuguese polite phrase — tests multi-word processing and stress",
       "expected_token_count_min": 8
+    },
+    {
+      "language": "ja",
+      "input": "東京は晴れです。",
+      "description": "City name + weather — tests kanji reading",
+      "expected_token_count_min": 10,
+      "expected_contains": ["t", "o"],
+      "expected_not_contains": ["x", "q"],
+      "expected_has_question_marker": false
+    },
+    {
+      "language": "ja",
+      "input": "これは何ですか？",
+      "description": "Question sentence — tests question marker detection",
+      "expected_token_count_min": 8,
+      "expected_contains": ["k", "o", "e"],
+      "expected_has_question_marker": true
+    },
+    {
+      "language": "sv",
+      "input": "Hej, hur mår du?",
+      "description": "Swedish greeting question — tests basic Swedish pipeline",
+      "expected_token_count_min": 6,
+      "expected_contains": ["h"]
+    },
+    {
+      "language": "sv",
+      "input": "God morgon Sverige.",
+      "description": "Swedish sentence — tests multi-word processing",
+      "expected_token_count_min": 6
     }
   ],
   "pua_map_count": 96,

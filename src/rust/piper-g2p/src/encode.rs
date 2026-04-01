@@ -8,6 +8,7 @@ use crate::error::G2pError;
 
 use crate::phonemizer::ProsodyFeature;
 use crate::phonemizer::ProsodyInfo;
+use crate::token_map::token_to_pua;
 
 /// Convert a sequence of phoneme token strings to phoneme IDs.
 ///
@@ -41,6 +42,108 @@ pub fn prosody_to_features(prosody: &[Option<ProsodyInfo>]) -> Vec<ProsodyFeatur
             None => [0, 0, 0],
         })
         .collect()
+}
+
+/// Encoding mode for handling unknown tokens.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UnknownTokenMode {
+    /// Raise an error on unknown tokens (strict mode).
+    Strict,
+    /// Skip unknown tokens with a warning log (default).
+    Skip,
+}
+
+impl Default for UnknownTokenMode {
+    fn default() -> Self {
+        Self::Skip
+    }
+}
+
+/// High-level encoder that converts IPA token sequences into
+/// Piper-compatible phoneme ID arrays with BOS/EOS/PAD insertion.
+pub struct PiperEncoder {
+    id_map: PhonemeIdMap,
+    mode: UnknownTokenMode,
+    bos_id: i64,
+    eos_id: i64,
+    pad_id: i64,
+}
+
+impl PiperEncoder {
+    /// Create a new encoder from a phoneme ID map.
+    pub fn new(id_map: PhonemeIdMap, mode: UnknownTokenMode) -> Result<Self, G2pError> {
+        let bos_id = id_map.get("^")
+            .and_then(|ids| ids.first().copied())
+            .ok_or_else(|| G2pError::Phonemize("phoneme_id_map missing '^' (BOS)".into()))?;
+        let eos_id = id_map.get("$")
+            .and_then(|ids| ids.first().copied())
+            .ok_or_else(|| G2pError::Phonemize("phoneme_id_map missing '$' (EOS)".into()))?;
+        let pad_id = id_map.get("_")
+            .and_then(|ids| ids.first().copied())
+            .ok_or_else(|| G2pError::Phonemize("phoneme_id_map missing '_' (PAD)".into()))?;
+        Ok(Self { id_map, mode, bos_id, eos_id, pad_id })
+    }
+
+    /// Encode IPA tokens to phoneme IDs with BOS/EOS/PAD insertion.
+    pub fn encode(&self, tokens: &[String]) -> Result<Vec<i64>, G2pError> {
+        let (ids, _) = self.encode_with_prosody(tokens, &[])?;
+        Ok(ids)
+    }
+
+    /// Encode IPA tokens with prosody alignment.
+    pub fn encode_with_prosody(
+        &self,
+        tokens: &[String],
+        prosody: &[Option<ProsodyInfo>],
+    ) -> Result<(Vec<i64>, Vec<ProsodyFeature>), G2pError> {
+        let mut ids = Vec::with_capacity(tokens.len() * 3 + 3);
+        let mut pros = Vec::with_capacity(tokens.len() * 3 + 3);
+
+        // BOS + PAD
+        ids.push(self.bos_id);
+        pros.push([0, 0, 0]);
+        ids.push(self.pad_id);
+        pros.push([0, 0, 0]);
+
+        for (i, token) in tokens.iter().enumerate() {
+            // If the token has a PUA mapping, use the single PUA char;
+            // otherwise iterate the chars of the original token.
+            let mapped: String = match token_to_pua(token) {
+                Some(pua_char) => pua_char.to_string(),
+                None => token.clone(),
+            };
+            for ch in mapped.chars() {
+                let ch_str = ch.to_string();
+                match self.id_map.get(&ch_str) {
+                    Some(id_list) => {
+                        let p = prosody.get(i).and_then(|o| o.as_ref());
+                        let feat = match p {
+                            Some(info) => [info.a1, info.a2, info.a3],
+                            None => [0, 0, 0],
+                        };
+                        for &id in id_list {
+                            ids.push(id);
+                            pros.push(feat);
+                        }
+                    }
+                    None => match self.mode {
+                        UnknownTokenMode::Strict => {
+                            return Err(G2pError::PhonemeIdNotFound { phoneme: ch_str });
+                        }
+                        UnknownTokenMode::Skip => {
+                            tracing::warn!(phoneme = %ch_str, "unknown symbol dropped");
+                        }
+                    },
+                }
+            }
+            ids.push(self.pad_id);
+            pros.push([0, 0, 0]);
+        }
+
+        ids.push(self.eos_id);
+        pros.push([0, 0, 0]);
+        Ok((ids, pros))
+    }
 }
 
 #[cfg(test)]
@@ -143,5 +246,40 @@ mod tests {
 
         let ids = tokens_to_ids(&tokens, &map).unwrap();
         assert!(ids.is_empty());
+    }
+
+    #[test]
+    fn test_piper_encoder_basic() {
+        let map = make_map(&[("^", &[1]), ("_", &[0]), ("$", &[2]), ("a", &[15]), ("k", &[30])]);
+        let encoder = PiperEncoder::new(map, UnknownTokenMode::Skip).unwrap();
+        let tokens: Vec<String> = vec!["a", "k"].into_iter().map(String::from).collect();
+        let ids = encoder.encode(&tokens).unwrap();
+        assert_eq!(ids[0], 1); // BOS
+        assert_eq!(*ids.last().unwrap(), 2); // EOS
+        assert!(ids.contains(&15));
+        assert!(ids.contains(&30));
+    }
+
+    #[test]
+    fn test_piper_encoder_strict_error() {
+        let map = make_map(&[("^", &[1]), ("_", &[0]), ("$", &[2]), ("a", &[15])]);
+        let encoder = PiperEncoder::new(map, UnknownTokenMode::Strict).unwrap();
+        let tokens: Vec<String> = vec!["a", "Z"].into_iter().map(String::from).collect();
+        assert!(encoder.encode(&tokens).is_err());
+    }
+
+    #[test]
+    fn test_piper_encoder_skip_unknown() {
+        let map = make_map(&[("^", &[1]), ("_", &[0]), ("$", &[2]), ("a", &[15])]);
+        let encoder = PiperEncoder::new(map, UnknownTokenMode::Skip).unwrap();
+        let tokens: Vec<String> = vec!["a", "Z"].into_iter().map(String::from).collect();
+        let ids = encoder.encode(&tokens).unwrap();
+        assert!(ids.contains(&15));
+    }
+
+    #[test]
+    fn test_piper_encoder_missing_bos() {
+        let map = make_map(&[("_", &[0]), ("$", &[2])]);
+        assert!(PiperEncoder::new(map, UnknownTokenMode::Skip).is_err());
     }
 }

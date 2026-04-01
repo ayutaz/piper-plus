@@ -16,7 +16,14 @@ import json
 import logging
 import warnings
 
-__all__ = ["FIXED_PUA_MAPPING", "TOKEN2CHAR", "CHAR2TOKEN", "map_token"]
+__all__ = [
+    "FIXED_PUA_MAPPING",
+    "TOKEN2CHAR",
+    "CHAR2TOKEN",
+    "map_token",
+    "PUA_COMPAT_VERSION",
+    "check_pua_compat",
+]
 
 _log = logging.getLogger(__name__)
 
@@ -50,6 +57,32 @@ for _token, _codepoint in FIXED_PUA_MAPPING.items():
     _ch = chr(_codepoint)
     TOKEN2CHAR[_token] = _ch
     CHAR2TOKEN[_ch] = _token
+
+
+# PUA compatibility version. Increment when new PUA mappings are added.
+PUA_COMPAT_VERSION: int = 1
+
+
+def check_pua_compat(config: dict) -> None:
+    """Warn if the model's PUA version doesn't match the package version.
+
+    Parameters
+    ----------
+    config : dict
+        Model config (from config.json). May contain a
+        ``pua_compat_version`` key.
+    """
+    model_version = config.get("pua_compat_version")
+    if model_version is None:
+        return
+    if model_version != PUA_COMPAT_VERSION:
+        warnings.warn(
+            f"PUA version mismatch: model has pua_compat_version={model_version}, "
+            f"but piper-g2p expects version {PUA_COMPAT_VERSION}. "
+            "Some phoneme tokens may not encode correctly.",
+            UserWarning,
+            stacklevel=2,
+        )
 
 
 def map_token(token: str) -> str:

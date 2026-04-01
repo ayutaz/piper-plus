@@ -299,7 +299,7 @@ class MultilingualPhonemizer(Phonemizer):
         all_phonemes: list[str] = []
         all_prosody: list[ProsodyInfo | None] = []
 
-        for lang, segment_text in segments:
+        for lang, segment_text in segments:  # noqa: PLW2901
             phonemizer = get_phonemizer(lang)
             phonemes, prosody_list = phonemizer.phonemize_with_prosody(segment_text)
 
@@ -307,3 +307,18 @@ class MultilingualPhonemizer(Phonemizer):
             all_prosody.extend(prosody_list)
 
         return all_phonemes, all_prosody
+
+    def segment_text(self, text: str) -> list[dict[str, str]]:
+        """Segment mixed-language text into per-language chunks.
+
+        Each segment contains contiguous characters of the same detected
+        language. Neutral characters (whitespace, digits, punctuation)
+        are absorbed into the preceding segment.
+
+        Returns
+        -------
+        list[dict[str, str]]
+            List of dicts with ``'language'`` and ``'text'`` keys.
+        """
+        segments = _segment_text_multilingual(text, self._detector)
+        return [{"language": lang, "text": seg} for lang, seg in segments]

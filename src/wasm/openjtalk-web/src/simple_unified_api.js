@@ -2,6 +2,19 @@
  * Simple Unified Phonemizer API
  * Uses OpenJTalk for Japanese, a simple phonemizer for English,
  * and character-based fallbacks for zh/ko/es/fr/pt/sv.
+ *
+ * @deprecated Use `@piper-plus/g2p` directly for phonemization.
+ * This module will be removed in v1.0.0.
+ *
+ * Migration:
+ * ```js
+ * // Before (piper-plus internal)
+ * import { PiperPlus } from 'piper-plus';
+ *
+ * // After (standalone G2P)
+ * import { G2P } from '@piper-plus/g2p';
+ * const g2p = await G2P.create({ languages: ['ja', 'en'] });
+ * ```
  */
 
 import { SimpleEnglishPhonemizer, createEnglishPhonemeMap } from './simple_english_phonemizer.js';
