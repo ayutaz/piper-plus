@@ -782,6 +782,14 @@ export class SwedishG2P {
     }
 
     /**
+     * Language code for this G2P instance.
+     * @type {string}
+     */
+    get languageCode() {
+        return 'sv';
+    }
+
+    /**
      * Convert Swedish text to phoneme tokens.
      *
      * @param {string} text - Input Swedish text.

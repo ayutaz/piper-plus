@@ -3,6 +3,7 @@
 import json
 
 from piper_g2p.custom_dict import CustomDictionary
+from tests.conftest import requires_ko
 
 
 class TestApplyToText:
@@ -139,3 +140,106 @@ class TestLongestMatch:
         result = d.apply_to_text("GPUとCPU")
         assert "ジーピーユー" in result
         assert "シーピーユー" in result
+
+
+class TestSwedishIntegration:
+    """Integration tests: CustomDictionary + SwedishPhonemizer."""
+
+    def test_word_replacement(self):
+        """Custom dict overrides default phonemization for a Swedish word."""
+        from piper_g2p.swedish import SwedishPhonemizer
+
+        p = SwedishPhonemizer()
+
+        # Default phonemization of "hej"
+        default_tokens = p.phonemize("hej")
+
+        # Override "hej" with a custom pronunciation
+        d = CustomDictionary(load_defaults=False)
+        d.add_word("hej", "hallansen")
+        replaced = d.apply_to_text("hej")
+        custom_tokens = p.phonemize(replaced)
+
+        assert default_tokens != custom_tokens, (
+            "Custom dict should change phonemizer output"
+        )
+
+    def test_non_overridden_words_unchanged(self):
+        """Words not in the custom dict still use default phonemization."""
+        from piper_g2p.swedish import SwedishPhonemizer
+
+        p = SwedishPhonemizer()
+        default_tokens = p.phonemize("världen")
+
+        d = CustomDictionary(load_defaults=False)
+        d.add_word("hej", "hallansen")
+        replaced = d.apply_to_text("världen")
+        custom_tokens = p.phonemize(replaced)
+
+        assert default_tokens == custom_tokens
+
+    def test_empty_dict_no_effect(self):
+        """Empty custom dict does not alter phonemizer output."""
+        from piper_g2p.swedish import SwedishPhonemizer
+
+        p = SwedishPhonemizer()
+        text = "God morgon"
+        default_tokens = p.phonemize(text)
+
+        d = CustomDictionary(load_defaults=False)
+        replaced = d.apply_to_text(text)
+        custom_tokens = p.phonemize(replaced)
+
+        assert default_tokens == custom_tokens
+
+
+@requires_ko
+class TestKoreanIntegration:
+    """Integration tests: CustomDictionary + KoreanPhonemizer."""
+
+    def test_word_replacement(self):
+        """Custom dict overrides default phonemization for a Korean word."""
+        from piper_g2p.korean import KoreanPhonemizer
+
+        p = KoreanPhonemizer()
+
+        # Default phonemization of "서울"
+        default_tokens = p.phonemize("서울")
+
+        # Override "서울" with a custom pronunciation
+        d = CustomDictionary(load_defaults=False)
+        d.add_word("서울", "수도")
+        replaced = d.apply_to_text("서울")
+        custom_tokens = p.phonemize(replaced)
+
+        assert default_tokens != custom_tokens, (
+            "Custom dict should change phonemizer output"
+        )
+
+    def test_non_overridden_words_unchanged(self):
+        """Words not in the custom dict still use default phonemization."""
+        from piper_g2p.korean import KoreanPhonemizer
+
+        p = KoreanPhonemizer()
+        default_tokens = p.phonemize("감사합니다")
+
+        d = CustomDictionary(load_defaults=False)
+        d.add_word("서울", "수도")
+        replaced = d.apply_to_text("감사합니다")
+        custom_tokens = p.phonemize(replaced)
+
+        assert default_tokens == custom_tokens
+
+    def test_empty_dict_no_effect(self):
+        """Empty custom dict does not alter phonemizer output."""
+        from piper_g2p.korean import KoreanPhonemizer
+
+        p = KoreanPhonemizer()
+        text = "안녕하세요"
+        default_tokens = p.phonemize(text)
+
+        d = CustomDictionary(load_defaults=False)
+        replaced = d.apply_to_text(text)
+        custom_tokens = p.phonemize(replaced)
+
+        assert default_tokens == custom_tokens

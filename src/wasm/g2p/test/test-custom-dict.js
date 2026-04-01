@@ -131,3 +131,94 @@ describe('CustomDictionary edge cases', { skip: !moduleAvailable && 'custom-dict
         assert.ok(lower === null || lower === undefined);
     });
 });
+
+// ---------------------------------------------------------------------------
+// Korean custom dictionary
+// ---------------------------------------------------------------------------
+
+describe('CustomDictionary Korean entries', { skip: !moduleAvailable && 'custom-dictionary.js not yet implemented' }, () => {
+    it('should override Korean word with custom pronunciation', () => {
+        const dict = new CustomDictionary();
+        // Override 서울 with custom IPA tokens (tense consonant PUA included)
+        dict.add('서울', { tokens: ['s', '\u028C', 'u', '\u027E'] });
+        const entry = dict.lookup('서울');
+        assert.ok(entry);
+        assert.deepEqual(entry.tokens, ['s', '\u028C', 'u', '\u027E']);
+    });
+
+    it('should return null for unregistered Korean word', () => {
+        const dict = new CustomDictionary();
+        dict.add('서울', { tokens: ['s', '\u028C'] });
+        const entry = dict.lookup('부산');
+        assert.ok(entry === null || entry === undefined);
+    });
+
+    it('should support Korean tense consonant PUA tokens in entries', () => {
+        const dict = new CustomDictionary();
+        // ㅃ tense bilabial -> PUA \uE04B, ㅆ tense sibilant -> PUA \uE04E
+        dict.add('빠른', { tokens: ['\uE04B', 'a', '\u027E', '\u026F', 'n'] });
+        const entry = dict.lookup('빠른');
+        assert.ok(entry);
+        assert.equal(entry.tokens[0], '\uE04B', 'first token should be tense bilabial PUA');
+    });
+
+    it('should overwrite existing Korean entry', () => {
+        const dict = new CustomDictionary();
+        dict.add('한국', { tokens: ['h', 'a', 'n'] });
+        dict.add('한국', { tokens: ['h', 'a', '\u014B', 'k', 'u', '\uE050'] });
+        const entry = dict.lookup('한국');
+        assert.deepEqual(entry.tokens, ['h', 'a', '\u014B', 'k', 'u', '\uE050']);
+    });
+});
+
+// ---------------------------------------------------------------------------
+// Swedish custom dictionary
+// ---------------------------------------------------------------------------
+
+describe('CustomDictionary Swedish entries', { skip: !moduleAvailable && 'custom-dictionary.js not yet implemented' }, () => {
+    it('should override Swedish word with custom pronunciation', () => {
+        const dict = new CustomDictionary();
+        // Override "hej" with custom IPA tokens
+        dict.add('hej', { tokens: ['h', '\u025B', 'j'] });
+        const entry = dict.lookup('hej');
+        assert.ok(entry);
+        assert.deepEqual(entry.tokens, ['h', '\u025B', 'j']);
+    });
+
+    it('should return null for unregistered Swedish word', () => {
+        const dict = new CustomDictionary();
+        dict.add('hej', { tokens: ['h', '\u025B', 'j'] });
+        const entry = dict.lookup('tack');
+        assert.ok(entry === null || entry === undefined);
+    });
+
+    it('should support Swedish long vowel PUA tokens in entries', () => {
+        const dict = new CustomDictionary();
+        // "tal" with long ɑː -> PUA \uE05E
+        dict.add('tal', { tokens: ['t', '\uE05E', 'l'] });
+        const entry = dict.lookup('tal');
+        assert.ok(entry);
+        assert.equal(entry.tokens[1], '\uE05E', 'second token should be long ɑː PUA');
+    });
+
+    it('should support multiple Swedish long vowel PUA tokens', () => {
+        const dict = new CustomDictionary();
+        // iː -> \uE059, eː -> \uE05B, oː -> \uE05F, uː -> \uE060
+        dict.add('sju', { tokens: ['\u0267', '\uE060'] });
+        dict.add('skog', { tokens: ['s', 'k', '\uE05F', '\u0261'] });
+        const sju = dict.lookup('sju');
+        assert.ok(sju);
+        assert.equal(sju.tokens[1], '\uE060', 'uː PUA should be preserved');
+        const skog = dict.lookup('skog');
+        assert.ok(skog);
+        assert.equal(skog.tokens[2], '\uE05F', 'oː PUA should be preserved');
+    });
+
+    it('should overwrite existing Swedish entry', () => {
+        const dict = new CustomDictionary();
+        dict.add('kall', { tokens: ['k', 'a', 'l'] });
+        dict.add('kall', { tokens: ['k', '\uE05E', 'l'] });
+        const entry = dict.lookup('kall');
+        assert.deepEqual(entry.tokens, ['k', '\uE05E', 'l']);
+    });
+});

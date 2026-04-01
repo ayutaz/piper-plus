@@ -604,6 +604,166 @@ describe('KoreanG2P -- token format', () => {
 });
 
 // ===========================================================================
+// Missing medial vowels (7 of 21 previously untested)
+// ===========================================================================
+
+describe('KoreanG2P -- missing medial vowels', () => {
+    const ko = new KoreanG2P();
+
+    it('should phonemize ㅒ (yae) in 얘 -> j ɛ', () => {
+        // 얘 = ㅇ(silent) + ㅒ(medial=3: j+ɛ) -> j ɛ
+        const { tokens } = ko.phonemize('\uC598');
+        assert.deepEqual(tokens, ['j', IPA_OPEN_E]);
+    });
+
+    it('should phonemize ㅖ (ye) in 예 -> j e', () => {
+        // 예 = ㅇ(silent) + ㅖ(medial=7: j+e) -> j e
+        const { tokens } = ko.phonemize('\uC608');
+        assert.deepEqual(tokens, ['j', 'e']);
+    });
+
+    it('should phonemize ㅙ (wae) in 왜 -> w ɛ', () => {
+        // 왜 = ㅇ(silent) + ㅙ(medial=10: w+ɛ) -> w ɛ
+        const { tokens } = ko.phonemize('\uC65C');
+        assert.deepEqual(tokens, ['w', IPA_OPEN_E]);
+    });
+
+    it('should phonemize ㅚ (oe) in 외 -> w e', () => {
+        // 외 = ㅇ(silent) + ㅚ(medial=11: w+e, modern Seoul) -> w e
+        const { tokens } = ko.phonemize('\uC678');
+        assert.deepEqual(tokens, ['w', 'e']);
+    });
+
+    it('should phonemize ㅝ (wo) in 워 -> w ʌ', () => {
+        // 워 = ㅇ(silent) + ㅝ(medial=14: w+ʌ) -> w ʌ
+        const { tokens } = ko.phonemize('\uC6CC');
+        assert.deepEqual(tokens, ['w', IPA_OPEN_MID_BACK]);
+    });
+
+    it('should phonemize ㅞ (we) in 웨 -> w e', () => {
+        // 웨 = ㅇ(silent) + ㅞ(medial=15: w+e) -> w e
+        const { tokens } = ko.phonemize('\uC6E8');
+        assert.deepEqual(tokens, ['w', 'e']);
+    });
+
+    it('should phonemize ㅟ (wi) in 위 -> w i', () => {
+        // 위 = ㅇ(silent) + ㅟ(medial=16: w+i) -> w i
+        const { tokens } = ko.phonemize('\uC704');
+        assert.deepEqual(tokens, ['w', 'i']);
+    });
+});
+
+// ===========================================================================
+// Complex finals (겹받침) -- standalone (no liaison)
+// ===========================================================================
+
+describe('KoreanG2P -- complex finals', () => {
+    const ko = new KoreanG2P();
+
+    it('should phonemize 넋 (ㄳ final=3) -> n ʌ k̚', () => {
+        // 넋 = ㄴ(2) + ㅓ(4) + ㄳ(final=3) -> neutralized to k̚
+        const { tokens } = ko.phonemize('\uB10B');
+        assert.deepEqual(tokens, ['n', IPA_OPEN_MID_BACK, PUA_K_UNREL]);
+    });
+
+    it('should phonemize 앉 (ㄵ final=5) -> a n', () => {
+        // 앉 = ㅇ(silent) + ㅏ(0) + ㄵ(final=5) -> neutralized to n
+        const { tokens } = ko.phonemize('\uC549');
+        assert.deepEqual(tokens, ['a', 'n']);
+    });
+
+    it('should phonemize 않 (ㄶ final=6) -> a n', () => {
+        // 않 = ㅇ(silent) + ㅏ(0) + ㄶ(final=6) -> neutralized to n (ㅎ dropped)
+        const { tokens } = ko.phonemize('\uC54A');
+        assert.deepEqual(tokens, ['a', 'n']);
+    });
+
+    it('should phonemize 읽 (ㄺ final=9) -> i k̚', () => {
+        // 읽 = ㅇ(silent) + ㅣ(20) + ㄺ(final=9) -> neutralized to k̚
+        const { tokens } = ko.phonemize('\uC77D');
+        assert.deepEqual(tokens, ['i', PUA_K_UNREL]);
+    });
+
+    it('should phonemize 삶 (ㄻ final=10) -> s a m', () => {
+        // 삶 = ㅅ(9) + ㅏ(0) + ㄻ(final=10) -> neutralized to m
+        const { tokens } = ko.phonemize('\uC0B6');
+        assert.deepEqual(tokens, ['s', 'a', 'm']);
+    });
+
+    it('should phonemize 넓 (ㄼ final=11) -> n ʌ l', () => {
+        // 넓 = ㄴ(2) + ㅓ(4) + ㄼ(final=11) -> neutralized to l
+        const { tokens } = ko.phonemize('\uB113');
+        assert.deepEqual(tokens, ['n', IPA_OPEN_MID_BACK, 'l']);
+    });
+
+    it('should phonemize 핥 (ㄾ final=13) -> h a l', () => {
+        // 핥 = ㅎ(18) + ㅏ(0) + ㄾ(final=13) -> neutralized to l
+        const { tokens } = ko.phonemize('\uD565');
+        assert.deepEqual(tokens, ['h', 'a', 'l']);
+    });
+
+    it('should phonemize 읊 (ㄿ final=14) -> ɯ l', () => {
+        // 읊 = ㅇ(silent) + ㅡ(18) + ㄿ(final=14) -> neutralized to l
+        const { tokens } = ko.phonemize('\uC74A');
+        assert.deepEqual(tokens, [IPA_CLOSE_BACK_UNR, 'l']);
+    });
+
+    it('should phonemize 잃 (ㅀ final=15) -> i l', () => {
+        // 잃 = ㅇ(silent) + ㅣ(20) + ㅀ(final=15) -> neutralized to l (ㅎ dropped)
+        const { tokens } = ko.phonemize('\uC783');
+        assert.deepEqual(tokens, ['i', 'l']);
+    });
+
+    it('should phonemize 없 (ㅄ final=18) -> ʌ p̚', () => {
+        // 없 = ㅇ(silent) + ㅓ(4) + ㅄ(final=18) -> neutralized to p̚
+        const { tokens } = ko.phonemize('\uC5C6');
+        assert.deepEqual(tokens, [IPA_OPEN_MID_BACK, PUA_P_UNREL]);
+    });
+});
+
+// ===========================================================================
+// NFD Hangul jamo handling (macOS decomposition)
+// ===========================================================================
+
+describe('KoreanG2P -- NFD Hangul handling', () => {
+    const ko = new KoreanG2P();
+
+    it('should recompose NFD jamo to same result as NFC: 한 (U+1112+U+1161+U+11AB)', () => {
+        // NFD: ㅎ(U+1112) + ㅏ(U+1161) + ㄴ(U+11AB) -> should recompose to 한(U+D55C)
+        const nfd = String.fromCodePoint(0x1112, 0x1161, 0x11AB);
+        const nfc = '\uD55C'; // 한
+        const resultNFD = ko.phonemize(nfd);
+        const resultNFC = ko.phonemize(nfc);
+        assert.deepEqual(resultNFD.tokens, resultNFC.tokens,
+            'NFD jamo input should produce same tokens as NFC precomposed');
+        assert.deepEqual(resultNFD.tokens, ['h', 'a', 'n']);
+    });
+
+    it('should recompose NFD jamo without trailing: 가 (U+1100+U+1161)', () => {
+        // NFD: ㄱ(U+1100) + ㅏ(U+1161) -> should recompose to 가(U+AC00)
+        const nfd = String.fromCodePoint(0x1100, 0x1161);
+        const nfc = '\uAC00'; // 가
+        const resultNFD = ko.phonemize(nfd);
+        const resultNFC = ko.phonemize(nfc);
+        assert.deepEqual(resultNFD.tokens, resultNFC.tokens,
+            'NFD without trailing jamo should produce same tokens as NFC');
+        assert.deepEqual(resultNFD.tokens, ['k', 'a']);
+    });
+
+    it('should recompose multi-syllable NFD: 한글 via jamo', () => {
+        // 한 = ㅎ(U+1112) + ㅏ(U+1161) + ㄴ(U+11AB)
+        // 글 = ㄱ(U+1100) + ㅡ(U+1173) + ㄹ(U+11AF)
+        const nfd = String.fromCodePoint(0x1112, 0x1161, 0x11AB, 0x1100, 0x1173, 0x11AF);
+        const nfc = '\uD55C\uAE00'; // 한글
+        const resultNFD = ko.phonemize(nfd);
+        const resultNFC = ko.phonemize(nfc);
+        assert.deepEqual(resultNFD.tokens, resultNFC.tokens,
+            'Multi-syllable NFD should match NFC');
+        assert.deepEqual(resultNFD.tokens, ['h', 'a', 'n', 'k', IPA_CLOSE_BACK_UNR, 'l']);
+    });
+});
+
+// ===========================================================================
 // Case normalization
 // ===========================================================================
 
@@ -615,5 +775,55 @@ describe('KoreanG2P -- normalization', () => {
         const r2 = ko.phonemize('a');
         assert.deepEqual(r1.tokens, r2.tokens,
             'uppercase and lowercase should produce same tokens');
+    });
+});
+
+// ===========================================================================
+// Error handling / robustness
+// ===========================================================================
+
+describe('KoreanG2P -- error handling', () => {
+    const ko = new KoreanG2P();
+
+    it('should handle numeric-only input without crashing', () => {
+        const { tokens } = ko.phonemize('12345');
+        assert.ok(Array.isArray(tokens), 'should return an array');
+    });
+
+    it('should handle symbol-only input without crashing', () => {
+        const { tokens } = ko.phonemize('@#$%^&*');
+        assert.ok(Array.isArray(tokens), 'should return an array');
+    });
+
+    it('should handle very long input (1000+ characters) without crashing', () => {
+        const longText = '\uAC00\uB098\uB2E4 '.repeat(250); // ~1000 characters of Hangul
+        const { tokens } = ko.phonemize(longText);
+        assert.ok(Array.isArray(tokens), 'should return an array');
+        assert.ok(tokens.length > 0, 'should produce tokens for valid long input');
+    });
+
+    it('should handle phonemizeWithProsody for numeric-only input', () => {
+        const { tokens, prosody } = ko.phonemizeWithProsody('12345');
+        assert.ok(Array.isArray(tokens), 'should return tokens array');
+        assert.ok(Array.isArray(prosody), 'should return prosody array');
+        assert.equal(tokens.length, prosody.length,
+            'tokens and prosody should have same length');
+    });
+
+    it('should handle phonemizeWithProsody for symbol-only input', () => {
+        const { tokens, prosody } = ko.phonemizeWithProsody('@#$%^&*');
+        assert.ok(Array.isArray(tokens), 'should return tokens array');
+        assert.ok(Array.isArray(prosody), 'should return prosody array');
+        assert.equal(tokens.length, prosody.length,
+            'tokens and prosody should have same length');
+    });
+
+    it('should handle phonemizeWithProsody for very long input', () => {
+        const longText = '\uD55C\uAE00 '.repeat(400); // ~1200 characters of Hangul
+        const { tokens, prosody } = ko.phonemizeWithProsody(longText);
+        assert.ok(Array.isArray(tokens), 'should return tokens array');
+        assert.ok(tokens.length > 0, 'should produce tokens');
+        assert.equal(tokens.length, prosody.length,
+            'tokens and prosody should have same length');
     });
 });

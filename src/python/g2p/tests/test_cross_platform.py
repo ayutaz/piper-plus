@@ -427,6 +427,41 @@ class TestKOPhonemeFixtures:
                 )
 
 
+class TestSVPhonemeFixtures:
+    """Swedish phonemize results match fixture structural expectations.
+
+    Swedish uses a rule-based phonemizer with no external dependencies,
+    so no skip decorator is needed.
+    """
+
+    def test_sv_token_count_min(self, fixtures):
+        """SV phonemize output meets minimum token count."""
+        from piper_g2p import get_phonemizer
+
+        p = get_phonemizer("sv")
+        for case in _cases_for_language(fixtures, "sv"):
+            tokens = p.phonemize(case["input"])
+            expected_min = case["expected_token_count_min"]
+            assert len(tokens) >= expected_min, (
+                f"SV token count {len(tokens)} < {expected_min} "
+                f"for {case['input']!r}: {tokens}"
+            )
+
+    def test_sv_contains(self, fixtures):
+        """SV phonemize output contains expected tokens."""
+        from piper_g2p import get_phonemizer
+
+        p = get_phonemizer("sv")
+        for case in _cases_for_language(fixtures, "sv"):
+            if "expected_contains" not in case:
+                continue
+            tokens = p.phonemize(case["input"])
+            for expected in case["expected_contains"]:
+                assert expected in tokens, (
+                    f"SV output missing {expected!r} for {case['input']!r}: {tokens}"
+                )
+
+
 # =====================================================================
 # Fixture schema sanity
 # =====================================================================

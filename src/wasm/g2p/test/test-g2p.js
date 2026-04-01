@@ -50,6 +50,37 @@ describe('G2P.create', () => {
             /no valid languages/
         );
     });
+
+    it('should create instance with Korean only', async () => {
+        const g2p = await G2P.create({ languages: ['ko'] });
+        assert.ok(g2p);
+        const result = g2p.phonemize('\uD55C\uAD6D\uC5B4', { language: 'ko' }); // 한국어
+        assert.ok(result.tokens.length > 0, 'should phonemize Korean text');
+        assert.equal(result.language, 'ko');
+        g2p.dispose();
+    });
+
+    it('should create instance with Swedish only', async () => {
+        const g2p = await G2P.create({ languages: ['sv'] });
+        assert.ok(g2p);
+        const result = g2p.phonemize('hej', { language: 'sv' });
+        assert.ok(result.tokens.length > 0, 'should phonemize Swedish text');
+        assert.equal(result.language, 'sv');
+        g2p.dispose();
+    });
+
+    it('should create multilingual instance with ko, sv, and en', async () => {
+        const g2p = await G2P.create({ languages: ['ko', 'sv', 'en'] });
+        assert.ok(g2p);
+        // Verify all three languages are functional
+        const koResult = g2p.phonemize('\uAC00', { language: 'ko' }); // 가
+        assert.ok(koResult.tokens.length > 0);
+        const svResult = g2p.phonemize('hej', { language: 'sv' });
+        assert.ok(svResult.tokens.length > 0);
+        const enResult = g2p.phonemize('hello', { language: 'en' });
+        assert.ok(enResult.tokens.length > 0);
+        g2p.dispose();
+    });
 });
 
 // ---------------------------------------------------------------------------
@@ -82,6 +113,48 @@ describe('G2P.detectLanguage', () => {
     it('should handle empty string', () => {
         const result = g2p.detectLanguage('');
         assert.equal(typeof result, 'string');
+    });
+});
+
+describe('G2P.detectLanguage (ko)', () => {
+    let g2p;
+
+    before(async () => {
+        g2p = await G2P.create({ languages: ['ko', 'en'] });
+    });
+
+    after(() => {
+        if (g2p) g2p.dispose();
+    });
+
+    it('should detect Korean for Hangul text', () => {
+        assert.equal(g2p.detectLanguage('\uD55C\uAD6D\uC5B4'), 'ko'); // 한국어
+    });
+
+    it('should detect Korean for mixed Hangul text', () => {
+        assert.equal(g2p.detectLanguage('\uC548\uB155\uD558\uC138\uC694 hello'), 'ko'); // 안녕하세요 hello
+    });
+});
+
+describe('G2P.detectLanguage (sv)', () => {
+    let g2p;
+
+    before(async () => {
+        g2p = await G2P.create({ languages: ['sv', 'en'] });
+    });
+
+    after(() => {
+        if (g2p) g2p.dispose();
+    });
+
+    it('should detect Swedish for text dominated by \u00e5/\u00e4/\u00f6', () => {
+        // å ä ö are Swedish-specific chars; when they outnumber plain Latin chars
+        // the detector returns 'sv'
+        assert.equal(g2p.detectLanguage('\u00e5\u00e4\u00f6'), 'sv'); // åäö
+    });
+
+    it('should detect Swedish for short word with \u00e5/\u00e4/\u00f6', () => {
+        assert.equal(g2p.detectLanguage('\u00f6l'), 'sv'); // öl
     });
 });
 

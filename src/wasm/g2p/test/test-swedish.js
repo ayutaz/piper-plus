@@ -11,6 +11,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { SwedishG2P } from '../src/sv/index.js';
+import { mapToken } from '../src/pua-map.js';
 
 // ---------------------------------------------------------------------------
 // Helper: check that a token array contains a specific phoneme
@@ -73,6 +74,11 @@ describe('SwedishG2P -- API structure', () => {
         assert.deepEqual(r1.tokens, []);
         const r2 = sv.phonemize(undefined);
         assert.deepEqual(r2.tokens, []);
+    });
+
+    it('should have languageCode "sv"', () => {
+        const sv = new SwedishG2P();
+        assert.equal(sv.languageCode, 'sv');
     });
 });
 
@@ -427,6 +433,43 @@ describe('SwedishG2P -- prosody', () => {
                 `a3 should be ${expectedA3}, got ${p.a3}`);
         }
     });
+
+    it('should have a2=2 only for stress marker and a2=0 for all others', () => {
+        const { tokens, prosody } = sv.phonemizeWithProsody('huset');
+        const stressIdx = tokens.indexOf('\u02c8');
+        assert.ok(stressIdx >= 0, 'huset (content word) should have a stress marker');
+        assert.equal(prosody[stressIdx].a2, 2,
+            'stress marker token should have a2=2');
+        for (let i = 0; i < tokens.length; i++) {
+            if (i !== stressIdx) {
+                assert.equal(prosody[i].a2, 0,
+                    `non-stress token "${tokens[i]}" at index ${i} should have a2=0`);
+            }
+        }
+    });
+
+    it('should set a3 = phoneme count per word in multi-word sentence', () => {
+        const { tokens, prosody } = sv.phonemizeWithProsody('hej du');
+        // Find the space separator to split into two words
+        const spaceIdx = tokens.indexOf(' ');
+        assert.ok(spaceIdx > 0, 'should have a space separator');
+
+        // Word 1: tokens before the space
+        const word1Tokens = tokens.slice(0, spaceIdx);
+        const word1PhCount = word1Tokens.filter(t => t !== '\u02c8' && t !== '\u02cc').length;
+        for (let i = 0; i < spaceIdx; i++) {
+            assert.equal(prosody[i].a3, word1PhCount,
+                `word1 token "${tokens[i]}" should have a3=${word1PhCount}`);
+        }
+
+        // Word 2: tokens after the space
+        const word2Tokens = tokens.slice(spaceIdx + 1);
+        const word2PhCount = word2Tokens.filter(t => t !== '\u02c8' && t !== '\u02cc').length;
+        for (let i = spaceIdx + 1; i < tokens.length; i++) {
+            assert.equal(prosody[i].a3, word2PhCount,
+                `word2 token "${tokens[i]}" should have a3=${word2PhCount}`);
+        }
+    });
 });
 
 // ===========================================================================
@@ -480,5 +523,92 @@ describe('SwedishG2P -- word-initial digraphs', () => {
         const { tokens } = sv.phonemize('hj\u00e4lp');
         assert.equal(tokens.filter(t => t !== '\u02c8')[0], 'j',
             `expected initial j in hj\u00e4lp, got [${tokens.join(', ')}]`);
+    });
+});
+
+// ===========================================================================
+// Single-character tokens (after PUA mapping)
+// ===========================================================================
+
+describe('SwedishG2P -- token format', () => {
+    const sv = new SwedishG2P();
+
+    it('should produce single-character tokens after PUA mapping', () => {
+        // 'gata' produces long vowel ɑː which is multi-char before PUA mapping
+        const { tokens } = sv.phonemize('gata');
+        const mapped = tokens.map(t => mapToken(t));
+        for (const t of mapped) {
+            assert.equal(t.length, 1,
+                `Expected single-char token after PUA mapping, got "${t}" (length ${t.length})`);
+        }
+    });
+
+    it('should produce single-character tokens for short-vowel words', () => {
+        // 'katt' has only short vowels and single-char consonants
+        const { tokens } = sv.phonemize('katt');
+        const mapped = tokens.map(t => mapToken(t));
+        for (const t of mapped) {
+            assert.equal(t.length, 1,
+                `Expected single-char token after PUA mapping, got "${t}" (length ${t.length})`);
+        }
+    });
+
+    it('should produce single-character tokens for multi-word input', () => {
+        const { tokens } = sv.phonemize('hej du');
+        const mapped = tokens.map(t => mapToken(t));
+        for (const t of mapped) {
+            assert.equal(t.length, 1,
+                `Expected single-char token after PUA mapping, got "${t}" (length ${t.length})`);
+        }
+    });
+});
+
+// ===========================================================================
+// Error handling / robustness
+// ===========================================================================
+
+describe('SwedishG2P -- error handling', () => {
+    const sv = new SwedishG2P();
+
+    it('should handle numeric-only input without crashing', () => {
+        const { tokens } = sv.phonemize('12345');
+        assert.ok(Array.isArray(tokens), 'should return an array');
+    });
+
+    it('should handle symbol-only input without crashing', () => {
+        const { tokens } = sv.phonemize('@#$%^&*');
+        assert.ok(Array.isArray(tokens), 'should return an array');
+    });
+
+    it('should handle very long input (1000+ characters) without crashing', () => {
+        const longText = 'hej '.repeat(300); // 1200 characters
+        const { tokens } = sv.phonemize(longText);
+        assert.ok(Array.isArray(tokens), 'should return an array');
+        assert.ok(tokens.length > 0, 'should produce tokens for valid long input');
+    });
+
+    it('should handle phonemizeWithProsody for numeric-only input', () => {
+        const { tokens, prosody } = sv.phonemizeWithProsody('12345');
+        assert.ok(Array.isArray(tokens), 'should return tokens array');
+        assert.ok(Array.isArray(prosody), 'should return prosody array');
+        assert.equal(tokens.length, prosody.length,
+            'tokens and prosody should have same length');
+    });
+
+    it('should handle phonemizeWithProsody for symbol-only input', () => {
+        const { tokens, prosody } = sv.phonemizeWithProsody('@#$%^&*');
+        assert.ok(Array.isArray(tokens), 'should return tokens array');
+        assert.ok(Array.isArray(prosody), 'should return prosody array');
+        assert.equal(tokens.length, prosody.length,
+            'tokens and prosody should have same length');
+    });
+
+    it('should handle phonemizeWithProsody for very long input', () => {
+        const longText = 'huset '.repeat(250); // 1500 characters
+        const { tokens, prosody } = sv.phonemizeWithProsody(longText);
+        assert.ok(Array.isArray(tokens), 'should return tokens array');
+        assert.ok(tokens.length > 0, 'should produce tokens');
+        assert.equal(tokens.length, prosody.length,
+            'tokens and prosody should have same length');
     });
 });
