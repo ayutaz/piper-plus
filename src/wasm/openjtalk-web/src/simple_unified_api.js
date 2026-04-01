@@ -1,11 +1,37 @@
 /**
  * Simple Unified Phonemizer API
  * Uses OpenJTalk for Japanese, a simple phonemizer for English,
- * and character-based fallbacks for zh/es/fr/pt/sv.
+ * and character-based fallbacks for zh/ko/es/fr/pt/sv.
  */
 
 import { SimpleEnglishPhonemizer, createEnglishPhonemeMap } from './simple_english_phonemizer.js';
 import { extractPhonemesFromLabels as extractJaPhonemes } from './japanese_phoneme_extract.js';
+
+// ---------------------------------------------------------------------------
+// Korean Hangul decomposition tables (module-scope constants)
+// ---------------------------------------------------------------------------
+
+// Initial consonants (초성) — 19 Compatibility Jamo codepoints
+const KO_INITIALS = [
+    0x3131, 0x3132, 0x3134, 0x3137, 0x3138, 0x3139, 0x3141, 0x3142,
+    0x3143, 0x3145, 0x3146, 0x3147, 0x3148, 0x3149, 0x314A, 0x314B,
+    0x314C, 0x314D, 0x314E,
+];
+
+// Medial vowels (중성) — 21 Compatibility Jamo codepoints
+const KO_MEDIALS = [
+    0x314F, 0x3150, 0x3151, 0x3152, 0x3153, 0x3154, 0x3155, 0x3156,
+    0x3157, 0x3158, 0x3159, 0x315A, 0x315B, 0x315C, 0x315D, 0x315E,
+    0x315F, 0x3160, 0x3161, 0x3162, 0x3163,
+];
+
+// Final consonants (종성) — 28 entries, index 0 = none
+const KO_FINALS = [
+    0,      0x3131, 0x3132, 0x3133, 0x3134, 0x3135, 0x3136, 0x3137,
+    0x3139, 0x313A, 0x313B, 0x313C, 0x313D, 0x313E, 0x313F, 0x3140,
+    0x3141, 0x3142, 0x3144, 0x3145, 0x3146, 0x3147, 0x3148, 0x314A,
+    0x314B, 0x314C, 0x314D, 0x314E,
+];
 
 // Swedish-specific characters not used by EN/ES/PT/FR.
 // ä (U+00E4), ö (U+00F6), å (U+00E5) and uppercase variants.
@@ -224,6 +250,9 @@ export class SimpleUnifiedPhonemizer {
         } else if (language === 'zh') {
             // Chinese: character-based phoneme_id_map fallback
             return this.phonemizeChinese(text);
+        } else if (language === 'ko') {
+            // Korean: Hangul Jamo decomposition + phoneme_id_map fallback
+            return this.phonemizeKorean(text);
         } else {
             // es/fr/pt/sv: Latin-script character-based fallback
             return this.phonemizeLatinFallback(text);
@@ -280,6 +309,70 @@ export class SimpleUnifiedPhonemizer {
     }
 
     /**
+     * Korean text to phoneme IDs using Hangul Jamo decomposition.
+     * Decomposes each Hangul syllable (U+AC00..U+D7A3) into initial/medial/final
+     * Compatibility Jamo (U+3131..U+3163) and maps each through the model's
+     * phoneme_id_map. Non-Hangul characters are looked up directly.
+     * Returns an array of phoneme IDs (integers).
+     */
+    phonemizeKorean(text) {
+        const phonemeIdMap = this.phonemeIdMap;
+        if (!phonemeIdMap) {
+            throw new Error('phonemeIdMap is required for Korean phonemization. Call setPhonemeIdMap() first.');
+        }
+
+        const phonemeIds = [1]; // BOS
+        for (const char of text) {
+            const code = char.charCodeAt(0);
+            // Hangul Syllable decomposition
+            if (code >= 0xAC00 && code <= 0xD7A3) {
+                const offset = code - 0xAC00;
+                const initialIdx = Math.floor(offset / (21 * 28));
+                const medialIdx = Math.floor((offset % (21 * 28)) / 28);
+                const finalIdx = offset % 28;
+
+                // Initial consonant
+                const initialChar = String.fromCharCode(KO_INITIALS[initialIdx]);
+                if (phonemeIdMap[initialChar]) {
+                    phonemeIds.push(...phonemeIdMap[initialChar]);
+                    phonemeIds.push(0); // PAD
+                }
+
+                // Medial vowel
+                const medialChar = String.fromCharCode(KO_MEDIALS[medialIdx]);
+                if (phonemeIdMap[medialChar]) {
+                    phonemeIds.push(...phonemeIdMap[medialChar]);
+                    phonemeIds.push(0); // PAD
+                }
+
+                // Final consonant (index 0 = none)
+                if (finalIdx > 0) {
+                    const finalChar = String.fromCharCode(KO_FINALS[finalIdx]);
+                    if (phonemeIdMap[finalChar]) {
+                        phonemeIds.push(...phonemeIdMap[finalChar]);
+                        phonemeIds.push(0); // PAD
+                    }
+                }
+            } else if (char === ' ') {
+                // Space
+                if (phonemeIdMap[' ']) {
+                    phonemeIds.push(...phonemeIdMap[' ']);
+                    phonemeIds.push(0); // PAD
+                }
+            } else {
+                // Non-Hangul characters (punctuation, Jamo, Latin, etc.)
+                if (phonemeIdMap[char]) {
+                    phonemeIds.push(...phonemeIdMap[char]);
+                    phonemeIds.push(0); // PAD
+                }
+                // Unknown characters are skipped
+            }
+        }
+        phonemeIds.push(2); // EOS
+        return phonemeIds;
+    }
+
+    /**
      * Latin-script language (es/fr/pt) text to phoneme IDs using character-based
      * phoneme_id_map fallback. Lowercases the text and maps each character
      * through the model's phoneme_id_map.
@@ -310,7 +403,7 @@ export class SimpleUnifiedPhonemizer {
 
     /**
      * Set the phoneme_id_map from model config.
-     * Required for zh/es/fr/pt/sv fallback phonemization.
+     * Required for zh/ko/es/fr/pt/sv fallback phonemization.
      * @param {Object} phonemeIdMap - mapping from character/phoneme string to array of IDs
      */
     setPhonemeIdMap(phonemeIdMap) {
@@ -326,7 +419,7 @@ export class SimpleUnifiedPhonemizer {
         } else if (language === 'en') {
             return this.extractPhonemesFromIPA(labels);
         } else {
-            // zh/es/fr/pt/sv: textToPhonemes already returns phoneme ID arrays,
+            // zh/ko/es/fr/pt/sv: textToPhonemes already returns phoneme ID arrays,
             // so pass through directly
             return labels;
         }
@@ -392,8 +485,8 @@ export class SimpleUnifiedPhonemizer {
         if (language === 'en') {
             return this.englishPhonemeMap;
         }
-        if (language === 'zh' || language === 'es' || language === 'fr' || language === 'pt' || language === 'sv') {
-            // zh/es/fr/pt/sv use the model's phoneme_id_map directly
+        if (language === 'zh' || language === 'ko' || language === 'es' || language === 'fr' || language === 'pt' || language === 'sv') {
+            // zh/ko/es/fr/pt/sv use the model's phoneme_id_map directly
             return this.phonemeIdMap;
         }
         // For Japanese, the map should come from the model config
@@ -403,7 +496,7 @@ export class SimpleUnifiedPhonemizer {
     /**
      * Detect language from text.
      * Uses segment-level scoring consistent with Python/Rust/C#/C++ implementations.
-     * Priority: JA (Hiragana/Katakana) > ZH (CJK without Kana) > SV (Swedish indicators) > EN (default).
+     * Priority: JA (Hiragana/Katakana) > KO (Hangul) > ZH (CJK without Kana) > SV (Swedish indicators) > EN (default).
      */
     detectLanguage(text) {
         const segments = this._segmentText(text);
@@ -483,7 +576,7 @@ export class SimpleUnifiedPhonemizer {
      * Classify a single character into a language or null (neutral).
      * @param {string} char
      * @param {boolean} hasKana - whether the full text contains kana
-     * @returns {string|null} 'ja', 'zh', 'en', or null
+     * @returns {string|null} 'ja', 'zh', 'ko', 'en', or null
      */
     _classifyChar(char, hasKana) {
         const code = char.charCodeAt(0);
@@ -493,6 +586,11 @@ export class SimpleUnifiedPhonemizer {
             (code >= 0x30A0 && code <= 0x30FF)) {
             return 'ja';
         }
+
+        // Hangul Syllables (U+AC00-D7A3)
+        if (code >= 0xAC00 && code <= 0xD7A3) return 'ko';
+        // Hangul Compatibility Jamo (U+3130-318F)
+        if (code >= 0x3130 && code <= 0x318F) return 'ko';
 
         // CJK Unified Ideographs → JA if kana present, else ZH
         if (code >= 0x4E00 && code <= 0x9FFF) {

@@ -6,7 +6,7 @@
 // ---------------------------------------------------------------------------
 
 /** Supported language codes. */
-export type Language = 'ja' | 'en' | 'zh' | 'es' | 'fr' | 'pt' | 'sv';
+export type Language = 'ja' | 'en' | 'zh' | 'ko' | 'es' | 'fr' | 'pt' | 'sv';
 
 // ---------------------------------------------------------------------------
 // ModelConfig
@@ -296,7 +296,7 @@ export interface PhonemizerInitConfig {
 
 /**
  * Unified phonemizer supporting Japanese (OpenJTalk), English (rule-based),
- * and character-based fallbacks for zh/es/fr/pt.
+ * and character-based fallbacks for zh/ko/es/fr/pt/sv.
  */
 export class SimpleUnifiedPhonemizer {
   constructor(options?: SimpleUnifiedPhonemizerOptions);
@@ -312,7 +312,7 @@ export class SimpleUnifiedPhonemizer {
    *
    * For ja: returns OpenJTalk full-context labels (string).
    * For en: returns IPA string.
-   * For zh/es/fr/pt: returns phoneme ID array (number[]).
+   * For zh/ko/es/fr/pt/sv: returns phoneme ID array (number[]).
    *
    * @param text - Input text.
    * @param language - Language code. Omit for auto-detection.
@@ -324,13 +324,13 @@ export class SimpleUnifiedPhonemizer {
    *
    * For ja: extracts phonemes from OpenJTalk labels.
    * For en: extracts phonemes from IPA string.
-   * For zh/es/fr/pt: passes through the phoneme ID array.
+   * For zh/ko/es/fr/pt/sv: passes through the phoneme ID array.
    */
   extractPhonemes(labels: string | number[], language?: Language): string[] | number[];
 
   /**
    * Set the phoneme_id_map from model config.
-   * Required for zh/es/fr/pt fallback phonemization.
+   * Required for zh/ko/es/fr/pt/sv fallback phonemization.
    */
   setPhonemeIdMap(phonemeIdMap: Record<string, number[]>): void;
 
@@ -342,7 +342,7 @@ export class SimpleUnifiedPhonemizer {
 
   /**
    * Detect language from text.
-   * Priority: JA (Hiragana/Katakana) > ZH (CJK without Kana) > EN (default).
+   * Priority: JA (Hiragana/Katakana) > KO (Hangul) > ZH (CJK without Kana) > SV (Swedish indicators) > EN (default).
    */
   detectLanguage(text: string): Language;
 

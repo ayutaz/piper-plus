@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Prepare multilingual (7-language) dataset for Piper TTS.
+"""Prepare multilingual (8-language G2P support) dataset for Piper TTS.
 
 Merges existing JA+EN v4 dataset with new ZH (AISHELL-3), ES/FR/PT (CML-TTS)
 corpora. The bilingual phoneme IDs (0-96) are 100% compatible with the

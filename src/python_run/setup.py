@@ -45,7 +45,7 @@ setup(
     version=version,
     description=(
         "A fast, high-quality neural text-to-speech system supporting "
-        "7 languages (ja/en/zh/es/fr/pt/sv) with VITS architecture."
+        "8 languages (ja/en/zh/ko/es/fr/pt/sv) with VITS architecture."
     ),
     url="https://github.com/ayutaz/piper-plus",
     author="yousan",

@@ -9,7 +9,7 @@
 [![Hugging Face Demo](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Demo-blue)](https://huggingface.co/spaces/ayousanz/piper-plus-demo)
 [![Hugging Face Model](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Model-orange)](https://huggingface.co/ayousanz/piper-plus-base)
 
-高速・高品質なニューラルテキスト音声合成 (TTS) システム。[VITS](https://github.com/jaywalnut310/vits/) アーキテクチャを採用し、日本語・英語・中国語・スペイン語・フランス語・ポルトガル語・スウェーデン語の7言語マルチスピーカー音声合成に対応。[Piper](https://github.com/rhasspy/piper) のフォークで、日本語対応・音質向上・学習機能を大幅に強化しています。
+高速・高品質なニューラルテキスト音声合成 (TTS) システム。[VITS](https://github.com/jaywalnut310/vits/) アーキテクチャを採用し、日本語・英語・中国語・韓国語・スペイン語・フランス語・ポルトガル語・スウェーデン語の8言語マルチスピーカー音声合成に対応。[Piper](https://github.com/rhasspy/piper) のフォークで、日本語対応・音質向上・学習機能を大幅に強化しています。
 
 **[Hugging Face デモ](https://huggingface.co/spaces/ayousanz/piper-plus-demo)** | **[WebAssembly デモ](https://ayutaz.github.io/piper-plus/)** (ブラウザで動作、サーバー不要)
 
@@ -33,7 +33,7 @@
 
 ### 音声合成
 
-- **7言語対応** — 日本語・英語・中国語・スペイン語・フランス語・ポルトガル語・スウェーデン語 (ja=0, en=1, zh=2, es=3, fr=4, pt=5, sv=6)
+- **8言語対応** — 日本語・英語・中国語・韓国語・スペイン語・フランス語・ポルトガル語・スウェーデン語 (ja=0, en=1, zh=2, ko=3, es=4, fr=5, pt=6, sv=7)
 - **日本語 TTS** — OpenJTalk統合、韻律情報 (A1/A2/A3)、疑問詞マーカー (#204)、文脈依存「ん」バリアント (#207)
 - **英語 TTS** — GPL-free G2P ([g2p-en](https://github.com/Kyubyong/g2p), Apache-2.0)、espeak-ng 不要
 - **マルチスピーカー** — 571話者対応 (学習用ベースモデル)、SpeakerBalancedBatchSampler、言語グループ均等サンプリング
@@ -56,7 +56,7 @@
 - **[WebAssembly](src/wasm/openjtalk-web/README.md)** — ブラウザ内で完全動作、サーバー不要
 - **[Docker](docker/README.md)** — 推論・学習・WebUI・C++の5イメージ提供
 - **PyPI** — `pip install piper-plus` で簡単インストール
-- **C# CLI** — .NET 8/9 クロスプラットフォーム、7言語マルチリンガル、ONNX推論
+- **C# CLI** — .NET 8/9 クロスプラットフォーム、8言語マルチリンガル、ONNX推論
 - **Rust CLI** — piper-plus/piper-plus-cli、ストリーミング、CUDA/CoreML/DirectML対応、辞書自動ダウンロード
 - **[Go CLI](src/go/README.md)** — HTTP APIサーバー、セッションプーリング、Docker対応、シングルバイナリ
 
@@ -357,7 +357,7 @@ piper-plus-cli --model model.onnx --text "hello" --language en --quiet
 piper-plus-cli --model model.onnx --text "hello" --language en --output-raw | aplay -r 22050 -f S16_LE
 ```
 
-> **Note:** C# CLI は `dotnet tool install -g PiperPlus.Cli` で、Rust CLI は `cargo install piper-plus-cli` でインストールできます。両方とも7言語対応・カスタム辞書・ストリーミングをサポートしています。
+> **Note:** C# CLI は `dotnet tool install -g PiperPlus.Cli` で、Rust CLI は `cargo install piper-plus-cli` でインストールできます。両方とも8言語対応・カスタム辞書・ストリーミングをサポートしています。
 
 ### ソースからビルド (Rust)
 

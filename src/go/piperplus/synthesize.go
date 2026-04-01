@@ -124,6 +124,8 @@ func phonemizerForLanguage(lang string, dicts *dictData) (phonemize.Phonemizer, 
 		return phonemize.NewFrenchPhonemizer(), nil
 	case "pt":
 		return phonemize.NewPortuguesePhonemizer(), nil
+	case "ko":
+		return phonemize.NewKoreanPhonemizer(), nil
 	case "sv":
 		return phonemize.NewSwedishPhonemizer(), nil
 	default:

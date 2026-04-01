@@ -6,10 +6,10 @@ Go 1.26+ bindings for [Piper Plus](https://github.com/ayutaz/piper-plus) neural 
 Built on the VITS architecture, these bindings provide idiomatic Go access to high-quality multilingual TTS
 with ONNX Runtime inference via [yalue/onnxruntime_go](https://github.com/yalue/onnxruntime_go).
 
-**Supported languages (対応言語):** Japanese (JA), English (EN), Chinese (ZH), Spanish (ES), French (FR), Portuguese (PT), Swedish (SV)
+**Supported languages (対応言語):** Japanese (JA), English (EN), Chinese (ZH), Korean (KO), Spanish (ES), French (FR), Portuguese (PT), Swedish (SV)
 
 **Key features:**
-- Text-to-speech with automatic phonemization for 7 languages
+- Text-to-speech with automatic phonemization for 8 languages
 - Streaming synthesis with sentence-level chunking
 - GPU acceleration: CUDA, CoreML, DirectML, TensorRT (with automatic fallback to CPU)
 - Built-in HTTP API server
