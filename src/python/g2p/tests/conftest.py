@@ -56,6 +56,20 @@ requires_ko = pytest.mark.skipif(
 )
 
 
+def _has_piper_train():
+    try:
+        import piper_train  # noqa: F401
+
+        return True
+    except ImportError:
+        return False
+
+
+requires_piper_train = pytest.mark.skipif(
+    not _has_piper_train(), reason="piper_train not installed"
+)
+
+
 @pytest.fixture(scope="session")
 def ja_phonemizer():
     if not _has_pyopenjtalk():

@@ -6,7 +6,6 @@ language-specific phonemizers, and returns unified phoneme tokens.
 """
 
 import logging
-import re
 
 from .base import Phonemizer, ProsodyInfo
 
@@ -23,6 +22,9 @@ class UnicodeLanguageDetector:
     Supports CJK disambiguation (JA vs ZH) by checking for kana presence.
     Latin characters are mapped to a configurable default language.
 
+    Language detection uses ``ord()``-based range checks instead of compiled
+    regular expressions for better per-character throughput.
+
     Parameters
     ----------
     languages : list[str]
@@ -30,34 +32,6 @@ class UnicodeLanguageDetector:
     default_latin_language : str
         Language code for Latin-script characters (default: "en").
     """
-
-    # Hiragana: U+3040-309F, Katakana: U+30A0-30FF, Katakana Phonetic: U+31F0-31FF
-    _RE_KANA = re.compile(r"[\u3040-\u309F\u30A0-\u30FF\u31F0-\u31FF]")
-
-    # CJK Unified Ideographs: U+4E00-9FFF, Extension A: U+3400-4DBF
-    # CJK Compatibility: U+F900-FAFF
-    _RE_CJK = re.compile(r"[\u4E00-\u9FFF\u3400-\u4DBF\uF900-\uFAFF]")
-
-    # Japanese-specific: CJK punctuation (etc) + fullwidth forms
-    # Excludes fullwidth Latin letters (U+FF21-FF3A, U+FF41-FF5A) which are
-    # handled separately as Latin characters.
-    _RE_JA_PUNCT = re.compile(
-        r"[\u3000-\u303F"
-        r"\uFF00-\uFF20"  # Fullwidth digits and symbols
-        r"\uFF3B-\uFF40"  # Fullwidth brackets and symbols
-        r"\uFF5B-\uFFEF"  # Fullwidth braces onwards
-        r"]"
-    )
-
-    # Fullwidth Latin letters: U+FF21-FF3A, U+FF41-FF5A
-    _RE_FULLWIDTH_LATIN = re.compile(r"[\uFF21-\uFF3A\uFF41-\uFF5A]")
-
-    # Hangul Syllables: U+AC00-D7AF, Jamo: U+1100-11FF, Compat Jamo: U+3130-318F
-    _RE_HANGUL = re.compile(r"[\uAC00-\uD7AF\u1100-\u11FF\u3130-\u318F]")
-
-    # Basic Latin letters (including extended Latin with diacritics)
-    # Excludes multiplication sign (U+00D7) and division sign (U+00F7)
-    _RE_LATIN = re.compile(r"[A-Za-zÀ-ÖØ-öø-ÿ]")
 
     def __init__(self, languages: list[str], default_latin_language: str = "en"):
         self.languages = set(languages)
@@ -67,6 +41,13 @@ class UnicodeLanguageDetector:
         self._has_ja = "ja" in self.languages
         self._has_zh = "zh" in self.languages
         self._has_ko = "ko" in self.languages
+
+        # Pre-compute the default latin return value (None when unsupported)
+        self._default_latin: str | None = (
+            default_latin_language
+            if default_latin_language in self.languages
+            else None
+        )
 
         # Latin-script languages available (for disambiguation if needed)
         self._latin_languages = {
@@ -88,18 +69,26 @@ class UnicodeLanguageDetector:
         str | None
             Language code, or None for neutral characters (whitespace, digits, etc.).
         """
-        # Kana -> always Japanese
-        if self._RE_KANA.match(ch):
-            return "ja" if self._has_ja else None
+        code = ord(ch)
 
-        # Hangul -> Korean
-        if self._RE_HANGUL.match(ch):
+        # Hiragana U+3040-309F, Katakana U+30A0-30FF, Katakana Phonetic U+31F0-31FF
+        if 0x3040 <= code <= 0x31FF:
+            # Skip Bopomofo (U+3100-U+312F) and Hangul Compat Jamo (U+3130-U+318F)
+            # that fall within this range but are not kana.
+            if code <= 0x30FF or code >= 0x31F0:
+                return "ja" if self._has_ja else None
+            # Hangul Compatibility Jamo: U+3130-318F
+            if 0x3130 <= code <= 0x318F:
+                return "ko" if self._has_ko else None
+            return None
+
+        # Hangul Jamo: U+1100-11FF
+        if 0x1100 <= code <= 0x11FF:
             return "ko" if self._has_ko else None
 
-        # CJK ideographs -> JA or ZH depending on context
-        if self._RE_CJK.match(ch):
+        # CJK Extension A: U+3400-4DBF
+        if 0x3400 <= code <= 0x4DBF:
             if self._has_ja and self._has_zh:
-                # Disambiguate: if context has kana, it's Japanese
                 return "ja" if context_has_kana else "zh"
             if self._has_ja:
                 return "ja"
@@ -107,31 +96,64 @@ class UnicodeLanguageDetector:
                 return "zh"
             return None
 
-        # Fullwidth Latin letters -> treat as Latin, not Japanese
-        if self._RE_FULLWIDTH_LATIN.match(ch):
-            if self.default_latin_language in self.languages:
-                return self.default_latin_language
-            return None
-
-        # Japanese-specific punctuation (CJK punct + fullwidth forms,
-        # excluding fullwidth Latin already handled above)
-        if self._RE_JA_PUNCT.match(ch):
+        # CJK Unified Ideographs: U+4E00-9FFF
+        if 0x4E00 <= code <= 0x9FFF:
+            if self._has_ja and self._has_zh:
+                return "ja" if context_has_kana else "zh"
             if self._has_ja:
                 return "ja"
+            if self._has_zh:
+                return "zh"
             return None
 
-        # Latin characters
-        if self._RE_LATIN.match(ch):
-            if self.default_latin_language in self.languages:
-                return self.default_latin_language
+        # Hangul Syllables: U+AC00-D7AF
+        if 0xAC00 <= code <= 0xD7AF:
+            return "ko" if self._has_ko else None
+
+        # CJK Compatibility Ideographs: U+F900-FAFF
+        if 0xF900 <= code <= 0xFAFF:
+            if self._has_ja and self._has_zh:
+                return "ja" if context_has_kana else "zh"
+            if self._has_ja:
+                return "ja"
+            if self._has_zh:
+                return "zh"
             return None
 
-        # Neutral: whitespace, digits, punctuation
+        # CJK Symbols and Punctuation: U+3000-303F (Japanese-specific punct)
+        if 0x3000 <= code <= 0x303F:
+            return "ja" if self._has_ja else None
+
+        # Fullwidth forms: U+FF00-FFEF
+        if 0xFF00 <= code <= 0xFFEF:
+            # Fullwidth Latin uppercase U+FF21-FF3A, lowercase U+FF41-FF5A
+            if (0xFF21 <= code <= 0xFF3A) or (0xFF41 <= code <= 0xFF5A):
+                return self._default_latin
+            # Remaining fullwidth forms -> Japanese punctuation/symbols
+            # (digits U+FF00-FF20, brackets U+FF3B-FF40, braces U+FF5B-FFEF)
+            return "ja" if self._has_ja else None
+
+        # Basic Latin letters: A-Z (0x41-5A), a-z (0x61-7A)
+        if (0x41 <= code <= 0x5A) or (0x61 <= code <= 0x7A):
+            return self._default_latin
+
+        # Extended Latin with diacritics:
+        # U+00C0-00D6 (À-Ö), U+00D8-00F6 (Ø-ö), U+00F8-00FF (ø-ÿ)
+        if (0x00C0 <= code <= 0x00D6) or (0x00D8 <= code <= 0x00F6) or (0x00F8 <= code <= 0x00FF):
+            return self._default_latin
+
+        # Neutral: whitespace, digits, ASCII punctuation, etc.
         return None
 
     def has_kana(self, text: str) -> bool:
         """Check if text contains any kana characters."""
-        return bool(self._RE_KANA.search(text))
+        for ch in text:
+            code = ord(ch)
+            # Hiragana U+3040-309F, Katakana U+30A0-30FF,
+            # Katakana Phonetic Extensions U+31F0-31FF
+            if (0x3040 <= code <= 0x30FF) or (0x31F0 <= code <= 0x31FF):
+                return True
+        return False
 
 
 def _segment_text_multilingual(

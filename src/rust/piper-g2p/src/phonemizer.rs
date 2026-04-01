@@ -1,4 +1,8 @@
-//! Phonemizer trait and common types.
+//! Core [`Phonemizer`] trait, [`PhonemizerRegistry`], and shared types
+//! ([`ProsodyInfo`], [`ProsodyFeature`], [`PhonemeIdMap`]).
+//!
+//! Each language module (e.g. [`crate::english`], [`crate::chinese`])
+//! provides a concrete implementation of [`Phonemizer`].
 
 use std::collections::HashMap;
 
@@ -17,6 +21,9 @@ pub struct ProsodyInfo {
 
 /// Prosody feature array for ONNX input.
 pub type ProsodyFeature = [i32; 3];
+
+/// Maximum input text length (characters).
+const MAX_INPUT_LENGTH: usize = 10_000;
 
 /// G2P abstract trait — IPA-first design.
 ///
@@ -43,6 +50,26 @@ pub trait Phonemizer: Send + Sync {
     /// the dominant language. The default returns `language_code()`.
     fn detect_primary_language(&self, _text: &str) -> &str {
         self.language_code()
+    }
+
+    /// Validate and sanitize input text.
+    ///
+    /// Default implementation checks length and strips control characters.
+    /// Returns sanitized text or error.
+    fn validate_input(&self, text: &str) -> Result<String, G2pError> {
+        if text.len() > MAX_INPUT_LENGTH {
+            return Err(G2pError::Phonemize(format!(
+                "input too long: {} chars (max {})",
+                text.chars().count(),
+                MAX_INPUT_LENGTH
+            )));
+        }
+        // Strip control characters (keep \n, \t, \r)
+        let sanitized: String = text
+            .chars()
+            .filter(|c| !c.is_control() || *c == '\n' || *c == '\t' || *c == '\r')
+            .collect();
+        Ok(sanitized)
     }
 }
 

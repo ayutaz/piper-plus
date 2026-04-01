@@ -8,7 +8,7 @@ import logging
 import re
 from pathlib import Path
 
-logger = logging.getLogger(__name__)
+_LOGGER = logging.getLogger(__name__)
 
 MAX_DICT_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
 
@@ -61,7 +61,7 @@ class CustomDictionary:
             try:
                 self.load_dictionary(str(dict_path))
             except Exception as e:
-                print(f"Warning: Failed to load dictionary {dict_path}: {e}")
+                _LOGGER.warning("Failed to load dictionary %s: %s", dict_path, e)
 
     def load_dictionary(self, dict_path: str) -> None:
         """辞書ファイルを読み込む
@@ -76,7 +76,7 @@ class CustomDictionary:
         # パストラバーサル対策: シンボリックリンクを解決して警告
         resolved = path.resolve()
         if resolved != Path(dict_path).absolute():
-            logger.warning(
+            _LOGGER.warning(
                 "Dictionary path resolved via symlink: %s -> %s", dict_path, resolved
             )
 

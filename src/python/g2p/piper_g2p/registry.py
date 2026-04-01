@@ -1,4 +1,22 @@
-"""Language phonemizer registry."""
+"""Language phonemizer registry.
+
+This module provides two ways to interact with the registry:
+
+1. **Recommended** -- Use :class:`PhonemizerRegistry` directly to create
+   isolated registries (useful for testing or embedding scenarios)::
+
+       registry = PhonemizerRegistry()
+       registry.register("ja", JapanesePhonemizer())
+       phonemizer = registry.get("ja")
+
+2. **Module-level convenience functions** -- :func:`register_language`,
+   :func:`get_phonemizer`, and :func:`available_languages` delegate to
+   a default singleton :class:`PhonemizerRegistry` instance.  They are
+   kept for backward compatibility::
+
+       register_language("ja", JapanesePhonemizer())
+       phonemizer = get_phonemizer("ja")
+"""
 
 from __future__ import annotations
 
@@ -25,21 +43,76 @@ _LANGUAGE_TABLE = [
 
 
 class PhonemizerRegistry:
-    """Registry that maps language codes to ``Phonemizer`` instances."""
+    """Registry that maps language codes to :class:`Phonemizer` instances.
+
+    Each instance maintains its own isolated mapping.  For most
+    applications the module-level convenience functions
+    (:func:`register_language`, :func:`get_phonemizer`,
+    :func:`available_languages`) are sufficient -- they delegate to a
+    shared default instance created at import time.
+
+    Create your own :class:`PhonemizerRegistry` when you need an
+    isolated set of phonemizers (e.g. in tests or multi-tenant
+    scenarios).
+    """
 
     def __init__(self) -> None:
         self._registry: dict[str, Phonemizer] = {}
 
+    # ------------------------------------------------------------------
+    # Registration
+    # ------------------------------------------------------------------
+
     def register(self, code: str, phonemizer: Phonemizer) -> None:
-        """Register a phonemizer for a language code."""
+        """Register *phonemizer* under the language *code*.
+
+        Parameters
+        ----------
+        code:
+            ISO 639-1 language code (e.g. ``"ja"``, ``"en"``).
+        phonemizer:
+            A :class:`Phonemizer` instance.  A :class:`TypeError` is
+            raised if *phonemizer* is not a :class:`Phonemizer` instance.
+
+        Raises
+        ------
+        TypeError
+            If *phonemizer* is not a :class:`Phonemizer` instance.
+        """
+        if not isinstance(phonemizer, Phonemizer):
+            raise TypeError(
+                f"Expected a Phonemizer instance, got {type(phonemizer).__name__}"
+            )
         self._registry[code] = phonemizer
 
-    def get(self, language: str) -> Phonemizer:
-        """Get the phonemizer for a language code.
+    # ------------------------------------------------------------------
+    # Lookup
+    # ------------------------------------------------------------------
 
-        Supports composite language codes (e.g. "ja-en-zh") which
-        automatically create a ``MultilingualPhonemizer`` wrapping the
-        individual registered phonemizers.
+    def get(self, language: str) -> Phonemizer:
+        """Return the :class:`Phonemizer` registered for *language*.
+
+        Supports composite language codes (e.g. ``"ja-en-zh"``) which
+        automatically create a :class:`MultilingualPhonemizer` wrapping
+        the individual registered phonemizers.
+
+        Parameters
+        ----------
+        language:
+            A single language code (``"ja"``) or a composite code
+            (``"ja-en-zh"``).
+
+        Returns
+        -------
+        Phonemizer
+            The registered phonemizer (or a newly created
+            :class:`MultilingualPhonemizer` for composite codes).
+
+        Raises
+        ------
+        ValueError
+            If the language code (or any component of a composite code)
+            is not registered.
         """
         if language in self._registry:
             return self._registry[language]
@@ -76,8 +149,12 @@ class PhonemizerRegistry:
             f"Available: {list(self._registry.keys())}"
         )
 
+    # ------------------------------------------------------------------
+    # Introspection
+    # ------------------------------------------------------------------
+
     def available(self) -> list[str]:
-        """Return list of registered language codes."""
+        """Return a list of all registered language codes."""
         return list(self._registry.keys())
 
 
@@ -98,27 +175,48 @@ def _detect_default_latin(parts: list[str]) -> str:
 
 
 # ------------------------------------------------------------------
-# Backward-compatible module-level functions (delegate to _default_registry)
+# Backward-compatible module-level functions
+# ------------------------------------------------------------------
+# These convenience functions delegate to ``_default_registry``, the
+# singleton :class:`PhonemizerRegistry` created at import time.
+# They are kept for backward compatibility; prefer using
+# :class:`PhonemizerRegistry` directly for new code.
 # ------------------------------------------------------------------
 
 
 def register_language(code: str, phonemizer: Phonemizer) -> None:
-    """Register a phonemizer for a language code."""
+    """Register *phonemizer* under *code* in the default registry.
+
+    This is a convenience wrapper around
+    :meth:`PhonemizerRegistry.register` on the default singleton
+    instance.  For new code, prefer creating and using a
+    :class:`PhonemizerRegistry` directly.
+    """
     _default_registry.register(code, phonemizer)
 
 
 def get_phonemizer(language: str) -> Phonemizer:
-    """Get the phonemizer for a language code.
+    """Return the :class:`Phonemizer` for *language* from the default registry.
 
-    Supports composite language codes (e.g. "ja-en-zh") which
-    automatically create a ``MultilingualPhonemizer`` wrapping the
-    individual registered phonemizers.
+    This is a convenience wrapper around
+    :meth:`PhonemizerRegistry.get` on the default singleton instance.
+    For new code, prefer creating and using a
+    :class:`PhonemizerRegistry` directly.
+
+    Supports composite language codes (e.g. ``"ja-en-zh"``) -- see
+    :meth:`PhonemizerRegistry.get` for details.
     """
     return _default_registry.get(language)
 
 
 def available_languages() -> list[str]:
-    """Return list of registered language codes."""
+    """Return registered language codes from the default registry.
+
+    This is a convenience wrapper around
+    :meth:`PhonemizerRegistry.available` on the default singleton
+    instance.  For new code, prefer creating and using a
+    :class:`PhonemizerRegistry` directly.
+    """
     return _default_registry.available()
 
 

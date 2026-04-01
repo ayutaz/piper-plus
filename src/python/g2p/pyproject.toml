@@ -49,10 +49,10 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/yousan/piper-plus"
-Repository = "https://github.com/yousan/piper-plus"
-Issues = "https://github.com/yousan/piper-plus/issues"
-Documentation = "https://github.com/yousan/piper-plus/tree/dev/src/python/g2p"
+Homepage = "https://github.com/ayutaz/piper-plus"
+Repository = "https://github.com/ayutaz/piper-plus"
+Issues = "https://github.com/ayutaz/piper-plus/issues"
+Documentation = "https://github.com/ayutaz/piper-plus/tree/dev/src/python/g2p#readme"
 
 [project.entry-points."piper_g2p.phonemizers"]
 # Built-in languages (documented for reference)

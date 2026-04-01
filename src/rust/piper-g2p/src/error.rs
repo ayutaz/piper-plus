@@ -1,4 +1,8 @@
 //! G2P-specific error types.
+//!
+//! [`G2pError`] is independent of `piper-core`'s `PiperError` so that
+//! downstream crates can use `piper-g2p` without pulling in the full
+//! inference stack.
 
 use thiserror::Error;
 

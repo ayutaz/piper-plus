@@ -6,6 +6,7 @@ requiring espeak-ng or piper-phonemize (GPL dependencies).
 
 import logging
 import re
+import threading
 
 from .base import Phonemizer, ProsodyInfo
 
@@ -21,25 +22,37 @@ __all__ = [
 # ---------------------------------------------------------------------------
 # G2p instance cache — instantiating G2p() takes 100–500 ms; cache it at
 # module level so repeated calls to phonemize_english() are fast.
+# Thread-safe via double-checked locking.
 # ---------------------------------------------------------------------------
+_g2p_lock = threading.Lock()
 _g2p_instance = None
 _g2p_unavailable = False
 
 
 def _get_g2p():
-    """Return a cached G2p instance (or None if g2p_en is unavailable)."""
+    """Return a cached G2p instance (or None if g2p_en is unavailable).
+
+    Thread-safe: uses double-checked locking to avoid redundant
+    instantiation when called from multiple threads.
+    """
     global _g2p_instance, _g2p_unavailable
     if _g2p_unavailable:
         return None
-    if _g2p_instance is None:
-        try:
-            from g2p_en import G2p  # noqa: PLC0415
-
-            _g2p_instance = G2p()
-        except ImportError as exc:
-            _LOGGER.warning("g2p_en unavailable: %s", exc)
-            _g2p_unavailable = True
+    if _g2p_instance is not None:
+        return _g2p_instance
+    with _g2p_lock:
+        # Double-check after acquiring lock
+        if _g2p_unavailable:
             return None
+        if _g2p_instance is None:
+            try:
+                from g2p_en import G2p  # noqa: PLC0415
+
+                _g2p_instance = G2p()
+            except ImportError as exc:
+                _LOGGER.warning("g2p_en unavailable: %s", exc)
+                _g2p_unavailable = True
+                return None
     return _g2p_instance
 
 

@@ -2,7 +2,7 @@
 
 import pytest
 
-from tests.conftest import requires_ja
+from tests.conftest import requires_ja, requires_piper_train
 
 from piper_g2p.encode.pua import FIXED_PUA_MAPPING, map_token
 from piper_g2p.encode.id_maps import get_phoneme_id_map
@@ -38,6 +38,7 @@ class TestJAIDMap:
         assert "$" in id_map, "'$' (EOS) must be in id map"
 
     @requires_ja
+    @requires_piper_train
     def test_ja_id_map_matches_piper_train(self):
         """piper_g2p JA id map matches piper_train's get_japanese_id_map()."""
         from piper_train.phonemize.jp_id_map import get_japanese_id_map

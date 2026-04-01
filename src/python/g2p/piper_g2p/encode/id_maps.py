@@ -7,6 +7,8 @@ will raise ``ValueError`` here.
 
 from __future__ import annotations
 
+from functools import lru_cache
+
 from .pua import map_token
 
 __all__ = ["get_phoneme_id_map"]
@@ -71,6 +73,7 @@ def _build_japanese_id_map() -> dict[str, list[int]]:
     return {symbol: [idx] for idx, symbol in enumerate(symbols)}
 
 
+@lru_cache(maxsize=8)
 def get_phoneme_id_map(language: str) -> dict[str, list[int]]:
     """Return the built-in phoneme_id_map for *language*.
 

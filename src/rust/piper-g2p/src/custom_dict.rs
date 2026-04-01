@@ -24,6 +24,9 @@ use serde::Deserialize;
 
 use crate::error::G2pError;
 
+/// 辞書ファイルの最大サイズ (10 MB) — Python 側の制限と一致
+const MAX_DICT_SIZE: u64 = 10 * 1024 * 1024;
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -104,6 +107,22 @@ impl CustomDictionary {
 
     /// JSON 辞書ファイルを読み込む (v1.0 / v2.0 対応)
     pub fn load_dictionary(&mut self, path: &Path) -> Result<(), G2pError> {
+        // ファイルサイズチェック (DoS 防止)
+        let metadata =
+            std::fs::metadata(path).map_err(|_| G2pError::DictionaryLoad {
+                path: path.display().to_string(),
+            })?;
+        if metadata.len() > MAX_DICT_SIZE {
+            return Err(G2pError::DictionaryLoad {
+                path: format!(
+                    "{}: file too large ({} bytes, max {})",
+                    path.display(),
+                    metadata.len(),
+                    MAX_DICT_SIZE,
+                ),
+            });
+        }
+
         let content = std::fs::read_to_string(path).map_err(|_| G2pError::DictionaryLoad {
             path: path.display().to_string(),
         })?;
@@ -352,6 +371,31 @@ mod tests {
         let mut dict = CustomDictionary::new();
         let result = dict.load_dictionary(Path::new("/no/such/file.json"));
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_load_file_too_large() {
+        // MAX_DICT_SIZE (10 MB) を超えるファイルは拒否される
+        let id = COUNTER.fetch_add(1, Ordering::SeqCst);
+        let path = std::env::temp_dir().join(format!(
+            "piper_test_dict_large_{}_{}.json",
+            std::process::id(),
+            id,
+        ));
+        // 10 MB + 1 byte のダミーファイルを作成
+        let size = (super::MAX_DICT_SIZE + 1) as usize;
+        let data = vec![b' '; size];
+        std::fs::write(&path, &data).unwrap();
+
+        let mut dict = CustomDictionary::new();
+        let result = dict.load_dictionary(&path);
+        assert!(result.is_err());
+
+        let err_msg = format!("{}", result.unwrap_err());
+        assert!(err_msg.contains("file too large"), "error should mention 'file too large': {}", err_msg);
+
+        // テスト後クリーンアップ
+        let _ = std::fs::remove_file(&path);
     }
 
     // ----- Case sensitivity -----

@@ -67,10 +67,14 @@ class Phonemizer(ABC):
     def phonemize(self, text: str) -> list[str]:
         """Convert text to a list of IPA phoneme tokens.
 
-        The default implementation delegates to
+        The default implementation sanitizes *text* via
+        :meth:`_sanitize_input`, then delegates to
         :meth:`phonemize_with_prosody` and discards prosody info.
         Subclasses may override this for a more efficient path.
         """
+        text = self._sanitize_input(text)
+        if not text:
+            return []
         tokens, _ = self.phonemize_with_prosody(text)
         return tokens
 

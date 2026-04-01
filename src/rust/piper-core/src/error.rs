@@ -1,3 +1,4 @@
+use piper_g2p::G2pError;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -68,4 +69,18 @@ pub enum PiperError {
 
     #[error("WASM error: {0}")]
     Wasm(String),
+}
+
+impl From<G2pError> for PiperError {
+    fn from(e: G2pError) -> Self {
+        match e {
+            G2pError::UnsupportedLanguage { code } => PiperError::UnsupportedLanguage { code },
+            G2pError::UnknownPhoneme { phoneme } => PiperError::UnknownPhoneme { phoneme },
+            G2pError::Phonemize(msg) => PiperError::Phonemize(msg),
+            G2pError::DictionaryLoad { path } => PiperError::DictionaryLoad { path },
+            G2pError::PhonemeIdNotFound { phoneme } => PiperError::PhonemeIdNotFound { phoneme },
+            G2pError::LabelParse(msg) => PiperError::LabelParse(msg),
+            G2pError::JPreprocessInit(msg) => PiperError::JPreprocessInit(msg),
+        }
+    }
 }

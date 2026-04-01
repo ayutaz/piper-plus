@@ -2,7 +2,7 @@
 
 import pytest
 
-from tests.conftest import requires_ja
+from tests.conftest import requires_en, requires_ja, requires_zh
 
 
 class TestUnicodeDetector:
@@ -116,6 +116,153 @@ class TestMixedText:
         tokens, prosody = p.phonemize_with_prosody(
             "\u4eca\u65e5\u306f\u826f\u3044\u5929\u6c17\u3067\u3059\u306d"
         )
+        assert len(tokens) == len(prosody), (
+            f"Length mismatch: {len(tokens)} tokens vs {len(prosody)} prosody"
+        )
+
+
+class TestMixedLanguageText:
+    """Tests for mixed-language (code-switching) text via MultilingualPhonemizer."""
+
+    @requires_ja
+    @requires_en
+    def test_mixed_ja_en(self):
+        """Japanese-English mixed text produces phonemes from both languages."""
+        from piper_g2p.registry import get_phonemizer
+
+        p = get_phonemizer("ja-en")
+        # "こんにちは Hello"
+        tokens = p.phonemize("こんにちは Hello")
+        assert len(tokens) > 0
+
+        # Prosody alignment must hold for mixed text too
+        tokens_p, prosody = p.phonemize_with_prosody("こんにちは Hello")
+        assert len(tokens_p) == len(prosody)
+
+    @requires_ja
+    @requires_zh
+    def test_mixed_ja_zh(self):
+        """CJK mixed text: Japanese with kana context disambiguates from Chinese."""
+        from piper_g2p.registry import get_phonemizer
+
+        p = get_phonemizer("ja-zh")
+        # "東京は Tokyo 北京是 Beijing" -- kana は triggers JA context for CJK
+        # Use a simpler example with clear kana to force JA detection:
+        # "東京のラーメン 北京烤鸭" (no kana in 北京烤鸭 part, but global kana
+        # context applies)
+        tokens = p.phonemize("東京のラーメン")
+        assert len(tokens) > 0
+
+        # Pure Chinese text (no kana) should also work
+        tokens_zh = p.phonemize("北京是首都")
+        assert len(tokens_zh) > 0
+
+        # Prosody alignment
+        tokens_p, prosody = p.phonemize_with_prosody("東京のラーメン")
+        assert len(tokens_p) == len(prosody)
+
+    @requires_ja
+    @requires_en
+    @requires_zh
+    def test_mixed_three_languages(self):
+        """Three-language mixed text (JA + EN + ZH) is phonemized correctly."""
+        from piper_g2p.registry import get_phonemizer
+
+        p = get_phonemizer("ja-en-zh")
+        # "こんにちは Hello 你好" -- JA kana + EN Latin + ZH ideographs
+        # With kana present, CJK ideographs will be detected as JA, but
+        # the phonemizer should still produce valid output for all segments.
+        tokens = p.phonemize("こんにちは Hello 你好")
+        assert len(tokens) > 0
+
+        tokens_p, prosody = p.phonemize_with_prosody("こんにちは Hello 你好")
+        assert len(tokens_p) == len(prosody)
+
+    @requires_ja
+    @requires_en
+    def test_mixed_en_es_fr(self):
+        """Three Latin-script languages: EN is default_latin, ES/FR are rule-based."""
+        from piper_g2p.registry import get_phonemizer
+
+        # ES and FR are rule-based (always available). EN requires g2p-en.
+        p = get_phonemizer("en-es-fr")
+        # Latin text defaults to EN (highest priority in _LATIN_PRIORITY)
+        tokens = p.phonemize("Hello world")
+        assert len(tokens) > 0
+
+    @requires_ja
+    def test_single_language_in_multilingual_ja(self):
+        """Single-language JA text through a multilingual phonemizer."""
+        from piper_g2p.registry import get_phonemizer
+
+        try:
+            p = get_phonemizer("ja-en")
+        except ValueError:
+            pytest.skip("ja and/or en phonemizers not registered")
+        tokens = p.phonemize("今日は良い天気ですね")
+        assert len(tokens) > 0
+
+        tokens_p, prosody = p.phonemize_with_prosody("今日は良い天気ですね")
+        assert len(tokens_p) == len(prosody)
+
+    @requires_en
+    def test_single_language_in_multilingual_en(self):
+        """Single-language EN text through a multilingual phonemizer."""
+        from piper_g2p.registry import get_phonemizer
+
+        # ES is rule-based (always available), EN requires g2p-en
+        p = get_phonemizer("en-es")
+        tokens = p.phonemize("This is a test sentence.")
+        assert len(tokens) > 0
+
+        tokens_p, prosody = p.phonemize_with_prosody("This is a test sentence.")
+        assert len(tokens_p) == len(prosody)
+
+    def test_single_language_in_multilingual_es(self):
+        """Single-language ES text through a multilingual phonemizer (rule-based)."""
+        from piper_g2p.registry import get_phonemizer
+
+        # ES, FR, PT are all rule-based -- no external dependency
+        p = get_phonemizer("es-fr")
+        tokens = p.phonemize("Hola mundo")
+        assert len(tokens) > 0
+
+    def test_empty_string_multilingual(self):
+        """Empty string returns empty token list."""
+        from piper_g2p.registry import get_phonemizer
+
+        # ES and PT are rule-based (always available)
+        p = get_phonemizer("es-pt")
+        tokens = p.phonemize("")
+        assert tokens == []
+
+        tokens_p, prosody = p.phonemize_with_prosody("")
+        assert tokens_p == []
+        assert prosody == []
+
+    def test_whitespace_only_multilingual(self):
+        """Whitespace-only string returns empty token list."""
+        from piper_g2p.registry import get_phonemizer
+
+        p = get_phonemizer("es-pt")
+        tokens = p.phonemize("   ")
+        assert tokens == []
+
+        tokens_p, prosody = p.phonemize_with_prosody("   ")
+        assert tokens_p == []
+        assert prosody == []
+
+    @requires_ja
+    @requires_en
+    def test_mixed_ja_en_prosody_alignment(self):
+        """Prosody alignment holds for multi-segment JA+EN text."""
+        from piper_g2p.registry import get_phonemizer
+
+        p = get_phonemizer("ja-en")
+        # Multiple switches: JA -> EN -> JA
+        text = "東京タワーはTokyoTowerと呼ばれています"
+        tokens, prosody = p.phonemize_with_prosody(text)
+        assert len(tokens) > 0
         assert len(tokens) == len(prosody), (
             f"Length mismatch: {len(tokens)} tokens vs {len(prosody)} prosody"
         )
