@@ -412,9 +412,9 @@ class TestProsody:
         _, prosody = p.phonemize_with_prosody("감사합니다")
         for pi in prosody:
             if pi is not None:
-                assert isinstance(pi.a1, (int, float)), f"a1 not numeric: {pi.a1!r}"
-                assert isinstance(pi.a2, (int, float)), f"a2 not numeric: {pi.a2!r}"
-                assert isinstance(pi.a3, (int, float)), f"a3 not numeric: {pi.a3!r}"
+                assert isinstance(pi.a1, int | float), f"a1 not numeric: {pi.a1!r}"
+                assert isinstance(pi.a2, int | float), f"a2 not numeric: {pi.a2!r}"
+                assert isinstance(pi.a3, int | float), f"a3 not numeric: {pi.a3!r}"
 
     def test_prosody_a1_is_zero(self):
         """Korean a1 is always 0 (no pitch accent)."""

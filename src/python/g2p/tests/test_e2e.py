@@ -186,10 +186,19 @@ class TestKoreanE2E:
 
         # Verify that KO-specific PUA characters are present in the map
         ko_pua_tokens = [
-            "p͈", "t͈", "k͈", "s͈",       # tense consonants
-            "tɕ", "tɕʰ", "t͈ɕ",          # affricates
-            "pʰ", "tʰ", "kʰ",            # aspirated
-            "k̚", "t̚", "p̚",              # unreleased finals
+            "p͈",
+            "t͈",
+            "k͈",
+            "s͈",  # tense consonants
+            "tɕ",
+            "tɕʰ",
+            "t͈ɕ",  # affricates
+            "pʰ",
+            "tʰ",
+            "kʰ",  # aspirated
+            "k̚",
+            "t̚",
+            "p̚",  # unreleased finals
         ]
         for token in ko_pua_tokens:
             pua_char = map_token(token)
