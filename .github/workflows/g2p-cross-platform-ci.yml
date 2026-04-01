@@ -46,6 +46,10 @@ jobs:
         working-directory: src/python/g2p
         run: uv sync --extra all --extra dev
 
+      - name: Download NLTK data (for g2p-en)
+        working-directory: src/python/g2p
+        run: uv run python -c "import nltk; nltk.download('averaged_perceptron_tagger_eng', quiet=True)"
+
       - name: Python cross-platform tests
         working-directory: src/python/g2p
         run: uv run pytest tests/test_cross_platform.py -v

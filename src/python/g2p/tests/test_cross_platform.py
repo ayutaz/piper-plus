@@ -420,14 +420,14 @@ class TestFixtureSanity:
         assert fixtures["version"] == 1
 
     def test_all_languages_covered(self, fixtures):
-        """Fixture covers all 7 expected languages (ja/en/zh/es/fr/pt + ko for detect)."""
+        """Fixture covers all 8 expected languages (ja/en/zh/es/fr/pt/sv + ko for detect)."""
         test_langs = {c["language"] for c in fixtures["test_cases"]}
         detect_langs = {c["expected_language"] for c in fixtures["detect_test_cases"]}
         all_langs = test_langs | detect_langs
-        # phoneme test_cases cover 6 languages; detect_test_cases add ko
-        assert {"ja", "en", "zh", "es", "fr", "pt"} <= test_langs
+        # phoneme test_cases cover 7 languages; detect_test_cases add ko
+        assert {"ja", "en", "zh", "es", "fr", "pt", "sv"} <= test_langs
         assert "ko" in detect_langs
-        assert len(all_langs) == 7
+        assert len(all_langs) == 8
 
     def test_pua_spot_check_count(self, fixtures):
         """Fixture contains at least 5 PUA spot checks."""
