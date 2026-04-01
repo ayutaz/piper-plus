@@ -39,6 +39,7 @@ _LANGUAGE_TABLE = [
     ("es", ".spanish", "SpanishPhonemizer"),
     ("fr", ".french", "FrenchPhonemizer"),
     ("pt", ".portuguese", "PortuguesePhonemizer"),
+    ("sv", ".swedish", "SwedishPhonemizer"),
 ]
 
 # Human-readable skip reasons for languages with optional dependencies

@@ -19,19 +19,20 @@
 
 export class UnicodeLanguageDetector {
     /**
-     * @param {string[]} [languages=['ja', 'en', 'zh', 'es', 'fr', 'pt']]
+     * @param {string[]} [languages=['ja', 'en', 'zh', 'es', 'fr', 'pt', 'sv']]
      *   Language codes supported by this detector.
      * @param {object} [options]
      * @param {string} [options.defaultLatinLanguage='en']
      *   Language code assigned to Latin-script characters.
      */
-    constructor(languages = ['ja', 'en', 'zh', 'es', 'fr', 'pt'], options = {}) {
+    constructor(languages = ['ja', 'en', 'zh', 'es', 'fr', 'pt', 'sv'], options = {}) {
         this.languages = new Set(languages);
         this.defaultLatinLanguage = options.defaultLatinLanguage || 'en';
 
         this._hasJa = this.languages.has('ja');
         this._hasZh = this.languages.has('zh');
         this._hasKo = this.languages.has('ko');
+        this._hasSv = this.languages.has('sv');
     }
 
     // ------------------------------------------------------------------
@@ -85,6 +86,14 @@ export class UnicodeLanguageDetector {
                (code >= 0xFF00 && code <= 0xFF20) ||
                (code >= 0xFF3B && code <= 0xFF40) ||
                (code >= 0xFF5B && code <= 0xFFEF);
+    }
+
+    /** @private */
+    _isSwedishSpecific(code) {
+        // å (U+00E5), ä (U+00E4), ö (U+00F6)
+        // Å (U+00C5), Ä (U+00C4), Ö (U+00D6)
+        return code === 0xE5 || code === 0xE4 || code === 0xF6 ||
+               code === 0xC5 || code === 0xC4 || code === 0xD6;
     }
 
     /** @private */
@@ -160,6 +169,12 @@ export class UnicodeLanguageDetector {
             return this._hasJa ? 'ja' : null;
         }
 
+        // Swedish-specific characters: å (U+00E5), ä (U+00E4), ö (U+00F6)
+        if (this._isSwedishSpecific(code)) {
+            return this._hasSv ? 'sv' : (this.languages.has(this.defaultLatinLanguage)
+                ? this.defaultLatinLanguage : null);
+        }
+
         // Latin characters
         if (this._isLatin(code)) {
             return this.languages.has(this.defaultLatinLanguage)
@@ -200,6 +215,18 @@ export class UnicodeLanguageDetector {
                 bestCount = count;
                 bestLang = lang;
             }
+        }
+
+        // When all detected characters are Latin, emit a debug hint so
+        // that developers know the result is a best-guess default rather
+        // than a confident detection.
+        const uniqueLangs = Object.keys(counts);
+        if (uniqueLangs.length <= 1 && bestLang === this.defaultLatinLanguage && bestCount > 0) {
+            // eslint-disable-next-line no-console
+            console.debug(
+                `[g2p/detect] Latin-only text detected -- defaulting to '${bestLang}'. ` +
+                'If this text is ES, FR, PT, or SV, pass options.language explicitly.'
+            );
         }
 
         return bestLang;

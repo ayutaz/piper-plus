@@ -6,7 +6,7 @@
 // ---------------------------------------------------------------------------
 
 /** Supported language codes. */
-export type Language = 'ja' | 'en' | 'zh' | 'es' | 'fr' | 'pt';
+export type Language = 'ja' | 'en' | 'zh' | 'es' | 'fr' | 'pt' | 'sv';
 
 /**
  * Prosody features extracted from OpenJTalk full-context labels.
@@ -519,6 +519,47 @@ export class PortugueseG2P {
      *
      * @param text - Portuguese text to phonemize.
      * @returns Phonemize result with phoneme tokens (prosody entries are null).
+     */
+    phonemizeWithProsody(text: string): PhonemizeResult;
+}
+
+/**
+ * Swedish G2P using rule-based phonemization.
+ *
+ * Converts Swedish text to IPA phoneme sequences with stress markers.
+ * Features: complementary quantity (9 long/short vowel pairs), soft k/g rules,
+ * retroflex assimilation (rt/rd/rs/rn/rl), loanword suffix rules, and
+ * stress detection with prosody (A1=0, A2=stress, A3=syllable count).
+ * No external dependencies required.
+ *
+ * @example
+ * ```js
+ * import { SwedishG2P } from '@piper-plus/g2p/sv';
+ *
+ * const sv = new SwedishG2P();
+ * const result = sv.phonemize('Hej, hur m\u00e5r du?');
+ * // result.tokens => ["\u02c8", "h", "e\u02d0", "j", ...]
+ * ```
+ */
+export class SwedishG2P {
+    constructor(options?: {});
+
+    /**
+     * Convert Swedish text to phoneme tokens.
+     *
+     * @param text - Swedish text to phonemize.
+     * @returns Phonemize result with IPA tokens and stress markers.
+     */
+    phonemize(text: string): PhonemizeResult;
+
+    /**
+     * Convert Swedish text to phoneme tokens with prosody features.
+     *
+     * Returns ProsodyInfo(a1=0, a2=stress_level, a3=word_phoneme_count)
+     * for each phoneme token. a2=2 for primary stress markers.
+     *
+     * @param text - Swedish text to phonemize.
+     * @returns Phonemize result with IPA tokens and prosody info.
      */
     phonemizeWithProsody(text: string): PhonemizeResult;
 }

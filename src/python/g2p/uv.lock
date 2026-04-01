@@ -488,7 +488,7 @@ requires-dist = [
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=5.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.8.0" },
 ]
-provides-extras = ["ja", "en", "zh", "ko", "es", "fr", "pt", "all", "dev"]
+provides-extras = ["ja", "en", "zh", "ko", "es", "fr", "pt", "sv", "all", "dev"]
 
 [[package]]
 name = "pluggy"

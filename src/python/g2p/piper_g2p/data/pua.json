@@ -88,6 +88,15 @@
     {"token": "d\u0292", "codepoint": "0xE055", "language": "es", "description": "Voiced postalveolar affricate"},
     {"token": "\u025b\u0303", "codepoint": "0xE056", "language": "fr", "description": "Nasal open-mid front unrounded vowel"},
     {"token": "\u0251\u0303", "codepoint": "0xE057", "language": "fr", "description": "Nasal open back unrounded vowel"},
-    {"token": "\u0254\u0303", "codepoint": "0xE058", "language": "fr", "description": "Nasal open-mid back rounded vowel"}
+    {"token": "\u0254\u0303", "codepoint": "0xE058", "language": "fr", "description": "Nasal open-mid back rounded vowel"},
+    {"token": "i\u02d0", "codepoint": "0xE059", "language": "sv", "description": "close front unrounded long"},
+    {"token": "y\u02d0", "codepoint": "0xE05A", "language": "sv", "description": "close front rounded long"},
+    {"token": "e\u02d0", "codepoint": "0xE05B", "language": "sv", "description": "close-mid front unrounded long"},
+    {"token": "\u025b\u02d0", "codepoint": "0xE05C", "language": "sv", "description": "open-mid front unrounded long"},
+    {"token": "\u00f8\u02d0", "codepoint": "0xE05D", "language": "sv", "description": "close-mid front rounded long"},
+    {"token": "\u0251\u02d0", "codepoint": "0xE05E", "language": "sv", "description": "open back unrounded long"},
+    {"token": "o\u02d0", "codepoint": "0xE05F", "language": "sv", "description": "close-mid back rounded long"},
+    {"token": "u\u02d0", "codepoint": "0xE060", "language": "sv", "description": "close back rounded long"},
+    {"token": "\u0289\u02d0", "codepoint": "0xE061", "language": "sv", "description": "close central rounded long"}
   ]
 }

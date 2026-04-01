@@ -12,6 +12,7 @@
     "./es": "./src/es/index.js",
     "./fr": "./src/fr/index.js",
     "./pt": "./src/pt/index.js",
+    "./sv": "./src/sv/index.js",
     "./detect": "./src/detect.js",
     "./dict": "./src/dict-loader.js",
     "./custom-dict": "./src/custom-dictionary.js",

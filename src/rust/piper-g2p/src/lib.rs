@@ -11,15 +11,16 @@
 //!
 //! ## Supported languages
 //!
-//! | Language   | Code | Feature flag |
-//! |------------|------|--------------|
-//! | Japanese   | ja   | `japanese`   |
-//! | English    | en   | (default)    |
-//! | Chinese    | zh   | (default)    |
-//! | Korean     | ko   | (default)    |
-//! | Spanish    | es   | (default)    |
-//! | French     | fr   | (default)    |
-//! | Portuguese | pt   | (default)    |
+//! | Language   | Code | Feature flag   |
+//! |------------|------|----------------|
+//! | Japanese   | ja   | `japanese`     |
+//! | English    | en   | `english` (default) |
+//! | Chinese    | zh   | `chinese` (default) |
+//! | Korean     | ko   | `korean` (default)  |
+//! | Spanish    | es   | `spanish` (default) |
+//! | French     | fr   | `french` (default)  |
+//! | Portuguese | pt   | `portuguese` (default) |
+//! | Swedish    | sv   | `swedish`              |
 //!
 //! ## Quick start
 //!
@@ -58,6 +59,8 @@ pub mod korean;
 pub mod spanish;
 pub mod french;
 pub mod portuguese;
+#[cfg(feature = "swedish")]
+pub mod swedish;
 pub mod multilingual;
 
 pub use error::G2pError;

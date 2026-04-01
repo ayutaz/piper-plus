@@ -10,8 +10,8 @@ from tests.conftest import requires_ja, requires_piper_train
 
 class TestPUAMapping:
     def test_pua_mapping_count(self):
-        """FIXED_PUA_MAPPING has exactly 87 entries."""
-        assert len(FIXED_PUA_MAPPING) == 87
+        """FIXED_PUA_MAPPING has exactly 96 entries."""
+        assert len(FIXED_PUA_MAPPING) == 96
 
     def test_pua_single_char_passthrough(self):
         """Single-character tokens pass through map_token unchanged."""

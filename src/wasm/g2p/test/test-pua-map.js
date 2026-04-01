@@ -16,8 +16,8 @@ import { PUA_MAP, mapToken, unmapToken } from '../src/pua-map.js';
 // ---------------------------------------------------------------------------
 
 describe('PUA_MAP table', () => {
-    it('should have exactly 87 entries', () => {
-        assert.equal(Object.keys(PUA_MAP).length, 87);
+    it('should have exactly 96 entries', () => {
+        assert.equal(Object.keys(PUA_MAP).length, 96);
     });
 
     it('should have unique PUA codepoints (no duplicates)', () => {
@@ -27,13 +27,13 @@ describe('PUA_MAP table', () => {
             'Duplicate PUA codepoints detected');
     });
 
-    it('should map all values to PUA range U+E000..U+E058', () => {
+    it('should map all values to PUA range U+E000..U+E061', () => {
         for (const [token, puaChar] of Object.entries(PUA_MAP)) {
             const code = puaChar.codePointAt(0);
             assert.ok(
-                code >= 0xE000 && code <= 0xE058,
+                code >= 0xE000 && code <= 0xE061,
                 `Token "${token}" maps to U+${code.toString(16).toUpperCase()}, ` +
-                `outside expected range U+E000..U+E058`
+                `outside expected range U+E000..U+E061`
             );
         }
     });
@@ -149,7 +149,7 @@ describe('unmapToken', () => {
 // ---------------------------------------------------------------------------
 
 describe('PUA round-trip', () => {
-    it('should round-trip all 87 entries correctly', () => {
+    it('should round-trip all 96 entries correctly', () => {
         for (const [token, puaChar] of Object.entries(PUA_MAP)) {
             const mapped = mapToken(token);
             assert.equal(mapped, puaChar,

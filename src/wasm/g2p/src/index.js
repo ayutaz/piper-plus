@@ -2,7 +2,7 @@
  * @piper-plus/g2p -- Multilingual G2P (Grapheme-to-Phoneme) entry point.
  *
  * Provides a unified API for converting text to phoneme tokens across
- * 6 languages (JA, EN, ZH, ES, FR, PT) without eSpeak-ng dependency.
+ * 7 languages (JA, EN, ZH, ES, FR, PT, SV) without eSpeak-ng dependency.
  *
  * @module @piper-plus/g2p
  */
@@ -13,13 +13,14 @@ import { ChineseG2P } from './zh/index.js';
 import { SpanishG2P } from './es/index.js';
 import { FrenchG2P } from './fr/index.js';
 import { PortugueseG2P } from './pt/index.js';
+import { SwedishG2P } from './sv/index.js';
 import { UnicodeLanguageDetector } from './detect.js';
 import { Encoder } from './encode.js';
 
 // ---- Constants ---------------------------------------------------------------
 
 /** All supported language codes. */
-const ALL_LANGUAGES = ['ja', 'en', 'zh', 'es', 'fr', 'pt'];
+const ALL_LANGUAGES = ['ja', 'en', 'zh', 'es', 'fr', 'pt', 'sv'];
 
 /** Map from language code to G2P constructor (for non-JA languages). */
 const LANGUAGE_FACTORIES = {
@@ -28,6 +29,7 @@ const LANGUAGE_FACTORIES = {
   es: () => new SpanishG2P(),
   fr: () => new FrenchG2P(),
   pt: () => new PortugueseG2P(),
+  sv: () => new SwedishG2P(),
 };
 
 // ---- G2P class ---------------------------------------------------------------
@@ -324,6 +326,7 @@ export { ChineseG2P } from './zh/index.js';
 export { SpanishG2P } from './es/index.js';
 export { FrenchG2P } from './fr/index.js';
 export { PortugueseG2P } from './pt/index.js';
+export { SwedishG2P } from './sv/index.js';
 export { DictLoader } from './dict-loader.js';
 export { Encoder } from './encode.js';
 export { UnicodeLanguageDetector } from './detect.js';

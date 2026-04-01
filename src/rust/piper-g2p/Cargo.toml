@@ -9,10 +9,18 @@ homepage.workspace = true
 description = "Multilingual G2P (Grapheme-to-Phoneme) for TTS — eSpeak-ng free"
 
 [features]
-default = []
+default = ["english", "chinese", "korean", "spanish", "french", "portuguese", "swedish"]
 japanese = ["dep:jpreprocess"]
 naist-jdic = ["japanese", "jpreprocess/naist-jdic"]
-all-languages = ["japanese"]
+english = []
+chinese = []
+korean = []
+spanish = []
+french = []
+portuguese = []
+swedish = []
+ffi = []
+all-languages = ["japanese", "english", "chinese", "korean", "spanish", "french", "portuguese", "swedish"]
 
 [dependencies]
 thiserror = "2"

@@ -113,6 +113,17 @@ export const PUA_MAP = {
     '\u025B\u0303':     '\uE056',  // Nasal open-mid front unrounded vowel
     '\u0251\u0303':     '\uE057',  // Nasal open back unrounded vowel
     '\u0254\u0303':     '\uE058',  // Nasal open-mid back rounded vowel
+
+    // --- Swedish (sv) --- 9 entries (long vowels)
+    'i\u02D0':          '\uE059',  // iː  Long close front unrounded vowel
+    'y\u02D0':          '\uE05A',  // yː  Long close front rounded vowel
+    'e\u02D0':          '\uE05B',  // eː  Long close-mid front unrounded vowel
+    '\u025B\u02D0':     '\uE05C',  // ɛː  Long open-mid front unrounded vowel
+    '\u00F8\u02D0':     '\uE05D',  // øː  Long close-mid front rounded vowel
+    '\u0251\u02D0':     '\uE05E',  // ɑː  Long open back unrounded vowel
+    'o\u02D0':          '\uE05F',  // oː  Long close-mid back rounded vowel
+    'u\u02D0':          '\uE060',  // uː  Long close back rounded vowel
+    '\u0289\u02D0':     '\uE061',  // ʉː  Long close central rounded vowel
 };
 
 /**
