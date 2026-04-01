@@ -1859,6 +1859,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8b870d8c151b6f2fb93e84a13146138f05d02ed11c7e7c54f8826aaaf7c9f184"
 
 [[package]]
+name = "piper-g2p"
+version = "0.1.0"
+dependencies = [
+ "jpreprocess",
+ "regex",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tracing",
+]
+
+[[package]]
 name = "piper-plus"
 version = "0.1.0"
 dependencies = [
@@ -1867,6 +1879,7 @@ dependencies = [
  "jpreprocess",
  "ndarray 0.17.2",
  "ort",
+ "piper-g2p",
  "regex",
  "reqwest",
  "rodio",

@@ -1,0 +1,23 @@
+[package]
+name = "piper-g2p"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "Multilingual G2P (Grapheme-to-Phoneme) for TTS — eSpeak-ng free"
+
+[features]
+default = []
+japanese = ["dep:jpreprocess"]
+naist-jdic = ["japanese", "jpreprocess/naist-jdic"]
+all-languages = ["japanese"]
+
+[dependencies]
+thiserror = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+regex = "1"
+tracing = "0.1"
+jpreprocess = { version = "0.9", optional = true }
