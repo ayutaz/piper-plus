@@ -1,17 +1,15 @@
 """End-to-end tests: text -> phonemize -> encode -> phoneme_ids."""
 
-import pytest
-
-from tests.conftest import requires_ja, requires_en
+from tests.conftest import requires_en, requires_ja
 
 
 @requires_ja
 class TestJAEndToEnd:
     def test_ja_text_to_ids(self):
         """JA text -> phonemize -> encode -> phoneme_ids produces valid IDs."""
-        from piper_g2p.japanese import JapanesePhonemizer
-        from piper_g2p.encode.id_maps import get_phoneme_id_map
         from piper_g2p.encode.encoder import PiperEncoder
+        from piper_g2p.encode.id_maps import get_phoneme_id_map
+        from piper_g2p.japanese import JapanesePhonemizer
 
         p = JapanesePhonemizer()
         tokens = p.phonemize("こんにちは")
@@ -31,9 +29,9 @@ class TestJAEndToEnd:
 
     def test_ja_prosody_pipeline(self):
         """JA full pipeline with prosody: text -> phonemize_with_prosody -> encode_with_prosody."""
-        from piper_g2p.japanese import JapanesePhonemizer
-        from piper_g2p.encode.id_maps import get_phoneme_id_map
         from piper_g2p.encode.encoder import PiperEncoder
+        from piper_g2p.encode.id_maps import get_phoneme_id_map
+        from piper_g2p.japanese import JapanesePhonemizer
 
         p = JapanesePhonemizer()
         tokens, prosody = p.phonemize_with_prosody("今日は良い天気ですね。")

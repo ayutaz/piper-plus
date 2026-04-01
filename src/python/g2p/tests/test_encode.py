@@ -2,11 +2,10 @@
 
 import pytest
 
-from tests.conftest import requires_ja, requires_piper_train
-
-from piper_g2p.encode.pua import FIXED_PUA_MAPPING, map_token
-from piper_g2p.encode.id_maps import get_phoneme_id_map
 from piper_g2p.encode.encoder import PiperEncoder
+from piper_g2p.encode.id_maps import get_phoneme_id_map
+from piper_g2p.encode.pua import FIXED_PUA_MAPPING, map_token
+from tests.conftest import requires_ja, requires_piper_train
 
 
 class TestPUAMapping:

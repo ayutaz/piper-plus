@@ -9,7 +9,6 @@ import pytest
 
 from piper_g2p import get_phonemizer
 
-
 # =====================================================================
 # JA snapshots (requires pyopenjtalk)
 # =====================================================================

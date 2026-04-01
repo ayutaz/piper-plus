@@ -9,7 +9,7 @@ where only piper_g2p is available).
 
 import pytest
 
-from tests.conftest import requires_ja, requires_en
+from tests.conftest import requires_en, requires_ja
 
 _has_piper_train = pytest.importorskip is not None  # always True, placeholder
 
@@ -35,9 +35,10 @@ class TestJACompat:
         After adding BOS/EOS and applying PUA mapping, the result should
         match piper_train's phonemize_japanese().
         """
-        from piper_g2p.japanese import JapanesePhonemizer
-        from piper_g2p.encode.pua import map_token
         from piper_train.phonemize.japanese import phonemize_japanese
+
+        from piper_g2p.encode.pua import map_token
+        from piper_g2p.japanese import JapanesePhonemizer
 
         text = "こんにちは"
         p = JapanesePhonemizer()
@@ -57,17 +58,19 @@ class TestJACompat:
 
     def test_pua_mapping_matches(self):
         """piper_g2p FIXED_PUA_MAPPING matches piper_train's FIXED_PUA_MAPPING."""
-        from piper_g2p.encode.pua import FIXED_PUA_MAPPING as g2p_mapping
         from piper_train.phonemize.token_mapper import (
             FIXED_PUA_MAPPING as train_mapping,
         )
+
+        from piper_g2p.encode.pua import FIXED_PUA_MAPPING as g2p_mapping
 
         assert g2p_mapping == train_mapping
 
     def test_ja_id_map_matches(self):
         """piper_g2p get_phoneme_id_map('ja') matches piper_train get_japanese_id_map()."""
-        from piper_g2p.encode.id_maps import get_phoneme_id_map
         from piper_train.phonemize.jp_id_map import get_japanese_id_map
+
+        from piper_g2p.encode.id_maps import get_phoneme_id_map
 
         g2p_map = get_phoneme_id_map("ja")
         train_map = get_japanese_id_map()
@@ -80,8 +83,9 @@ class TestJACompat:
 class TestENCompat:
     def test_en_phonemize_matches(self):
         """piper_g2p EN output matches piper_train EN output for the same text."""
-        from piper_g2p.english import EnglishPhonemizer
         from piper_train.phonemize.english import phonemize_english
+
+        from piper_g2p.english import EnglishPhonemizer
 
         text = "Hello, how are you today?"
         p = EnglishPhonemizer()

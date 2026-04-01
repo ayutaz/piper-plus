@@ -246,9 +246,16 @@ def _auto_register() -> None:
             mod = importlib.import_module(module, package=__package__)
             cls = getattr(mod, class_name)
             register_language(code, cls())
-        except ImportError:
+        except ModuleNotFoundError:
             reason = _SKIP_REASONS.get(code, "missing dependency")
             _LOGGER.info("Skipping %s: %s", code.upper(), reason)
+        except ImportError:
+            _LOGGER.warning(
+                "Failed to import %s phonemizer from %s",
+                code.upper(),
+                module,
+                exc_info=True,
+            )
 
     # Third-party phonemizers via entry_points
     try:

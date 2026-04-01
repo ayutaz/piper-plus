@@ -1,6 +1,5 @@
 """Tests for piper_g2p.japanese — JapanesePhonemizer."""
 
-import pytest
 
 from tests.conftest import requires_ja
 

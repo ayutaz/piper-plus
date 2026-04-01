@@ -10,7 +10,6 @@ import threading
 
 from .base import Phonemizer, ProsodyInfo
 
-
 _LOGGER = logging.getLogger(__name__)
 
 __all__ = [

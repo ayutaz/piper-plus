@@ -2,9 +2,7 @@
 
 import pytest
 
-from piper_g2p import get_phonemizer, available_languages
-from piper_g2p.base import Phonemizer
-
+from piper_g2p import get_phonemizer
 from tests.conftest import requires_en, requires_ja, requires_ko, requires_zh
 
 

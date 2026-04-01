@@ -11,21 +11,23 @@ Codepoints are baked into trained models and **must not** be changed.
 
 from __future__ import annotations
 
+import importlib.resources
 import json
 import logging
 import warnings
-from pathlib import Path
 
 __all__ = ["FIXED_PUA_MAPPING", "TOKEN2CHAR", "CHAR2TOKEN", "map_token"]
 
 _log = logging.getLogger(__name__)
 
-_PUA_JSON = Path(__file__).parent.parent / "data" / "pua.json"
-
 
 def _load_pua_mapping() -> dict[str, int]:
     """Load PUA mapping from the canonical JSON file."""
-    with open(_PUA_JSON) as f:
+    data_files = importlib.resources.files("piper_g2p") / "data" / "pua.json"
+    with (
+        importlib.resources.as_file(data_files) as pua_path,
+        open(pua_path, encoding="utf-8") as f,
+    ):
         data = json.load(f)
     return {entry["token"]: int(entry["codepoint"], 16) for entry in data["entries"]}
 

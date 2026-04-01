@@ -9,10 +9,14 @@ The padding scheme is identical to ``piper_train.phonemize.base.Phonemizer.post_
 
 from __future__ import annotations
 
+import logging
+
 from ..base import ProsodyInfo
 from .pua import map_token
 
 __all__ = ["PiperEncoder"]
+
+_log = logging.getLogger(__name__)
 
 
 class PiperEncoder:
@@ -102,6 +106,12 @@ class PiperEncoder:
             for ch in mapped:
                 if ch in self._id_map:
                     ids.extend(self._id_map[ch])
+                else:
+                    _log.warning(
+                        "Unknown symbol %r dropped"
+                        " (not in phoneme_id_map)",
+                        ch,
+                    )
         return ids
 
     @staticmethod

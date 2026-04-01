@@ -2,7 +2,7 @@
 
 import pytest
 
-from piper_g2p.base import Phonemizer, ProsodyInfo
+from piper_g2p.base import Phonemizer
 from piper_g2p.registry import (
     available_languages,
     get_phonemizer,

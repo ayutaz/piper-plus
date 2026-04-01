@@ -2,8 +2,6 @@
 
 import json
 
-import pytest
-
 from piper_g2p.custom_dict import CustomDictionary
 
 

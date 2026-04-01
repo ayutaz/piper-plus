@@ -1,7 +1,5 @@
 """Tests for piper_g2p.korean -- KoreanPhonemizer."""
 
-import pytest
-
 from tests.conftest import requires_ko
 
 

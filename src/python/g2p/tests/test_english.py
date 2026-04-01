@@ -1,7 +1,5 @@
 """Tests for piper_g2p.english — EnglishPhonemizer."""
 
-import pytest
-
 from tests.conftest import requires_en
 
 

@@ -33,11 +33,11 @@ from piper_g2p import get_phonemizer
 
 ja = get_phonemizer("ja")
 ja.phonemize("こんにちは")
-# -> ["k", "o", "N_n", "n", "i", "ch", "i", "h", "a"]
+# -> ["k", "o", "[", "N_n", "n", "i", "ch", "i", "w", "a"]
 
 en = get_phonemizer("en")
 en.phonemize("Hello world")
-# -> ["h", "ʌ", "ˈ", "l", "oʊ", " ", "ˈ", "w", "ɜː", "l", "d"]
+# -> ["h", "ə", "l", "ˈ", "o", "ʊ", " ", "w", "ˈ", "ɜ", "ː", "l", "d"]
 ```
 
 ## Supported Languages
@@ -76,7 +76,7 @@ from piper_g2p.encode import PiperEncoder, get_phoneme_id_map
 
 id_map = get_phoneme_id_map("ja")
 encoder = PiperEncoder(id_map)
-phoneme_ids = encoder.encode(["k", "o", "N_n", "n", "i", "ch", "i", "h", "a"])
+phoneme_ids = encoder.encode(["k", "o", "[", "N_n", "n", "i", "ch", "i", "w", "a"])
 ```
 
 ## Requirements

@@ -21,7 +21,6 @@ import unicodedata
 
 from .base import Phonemizer, ProsodyInfo
 
-
 _LOGGER = logging.getLogger(__name__)
 
 __all__ = [
@@ -587,9 +586,7 @@ def _convert_word(word: str) -> list[str]:
                         consonant_count += 1
                     else:
                         break
-                if consonant_count >= 2:
-                    phonemes.append("ɛ")
-                elif all(c in _CONSONANTS for c in remaining) and any(
+                if consonant_count >= 2 or all(c in _CONSONANTS for c in remaining) and any(
                     c not in _SILENT_FINAL for c in remaining
                 ):
                     phonemes.append("ɛ")

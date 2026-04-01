@@ -7,7 +7,7 @@ name = "piper-g2p"
 version = "0.1.0"
 description = "Multilingual G2P (Grapheme-to-Phoneme) for TTS — eSpeak-ng free, MIT licensed"
 requires-python = ">=3.11"
-license = "MIT"
+license = { text = "MIT" }
 authors = [
     {name = "piper-plus contributors"},
 ]

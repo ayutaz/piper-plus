@@ -1,7 +1,5 @@
 """Tests for piper_g2p.spanish -- SpanishPhonemizer."""
 
-import pytest
-
 from piper_g2p.spanish import SpanishPhonemizer
 
 
