@@ -34,7 +34,7 @@ def fixtures():
         "Run from the repository root or check that "
         "tests/fixtures/g2p/phoneme_test_cases.json exists."
     )
-    with open(FIXTURE_PATH) as f:
+    with open(FIXTURE_PATH, encoding="utf-8") as f:
         return json.load(f)
 
 
