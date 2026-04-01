@@ -35,10 +35,11 @@ def _has_pypinyin():
 
 def _has_g2pk2():
     try:
-        import g2pk2  # noqa: F401
+        from g2pk2 import G2p  # noqa: F401
 
+        G2p()("test")
         return True
-    except ImportError:
+    except Exception:  # noqa: BLE001
         return False
 
 
