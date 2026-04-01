@@ -197,7 +197,8 @@ class PiperEncoder:
         # Wrap with BOS / EOS
         if bos_ids:
             phoneme_ids = bos_ids + [pad_ids[0]] + phoneme_ids
-            prosody_features = [None] * (len(bos_ids) + 1) + prosody_features
+            bos_prosody: list[ProsodyInfo | None] = [None] * (len(bos_ids) + 1)
+            prosody_features = bos_prosody + prosody_features
         if eos_ids:
             phoneme_ids = phoneme_ids + eos_ids
             prosody_features = prosody_features + [None] * len(eos_ids)
