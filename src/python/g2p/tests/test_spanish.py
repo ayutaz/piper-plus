@@ -14,9 +14,7 @@ class TestBasic:
         """phonemize() includes primary stress marker for content words."""
         p = SpanishPhonemizer()
         tokens = p.phonemize("Hola")
-        assert "\u02c8" in tokens, (
-            f"Expected primary stress marker in {tokens}"
-        )
+        assert "\u02c8" in tokens, f"Expected primary stress marker in {tokens}"
 
     def test_trill_r(self):
         """'perro' produces the trill 'rr' token."""
@@ -46,8 +44,5 @@ class TestProsody:
 
         p = SpanishPhonemizer()
         tokens, prosody = p.phonemize_with_prosody("Hola")
-        has_stress = any(
-            isinstance(pi, ProsodyInfo) and pi.a2 == 2
-            for pi in prosody
-        )
+        has_stress = any(isinstance(pi, ProsodyInfo) and pi.a2 == 2 for pi in prosody)
         assert has_stress, "Expected at least one ProsodyInfo with a2=2 (stress)"

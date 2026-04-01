@@ -91,8 +91,10 @@ def benchmark_memory():
     peak = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
 
     scale = (1024 * 1024) if sys.platform == "darwin" else 1024
-    print(f"Memory: baseline={baseline / scale:.1f} MB, peak={peak / scale:.1f} MB, "
-          f"G2P overhead={( peak - baseline) / scale:.1f} MB\n")
+    print(
+        f"Memory: baseline={baseline / scale:.1f} MB, peak={peak / scale:.1f} MB, "
+        f"G2P overhead={(peak - baseline) / scale:.1f} MB\n"
+    )
 
 
 def main():

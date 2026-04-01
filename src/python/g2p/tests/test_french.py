@@ -30,9 +30,7 @@ class TestBasic:
         p = FrenchPhonemizer()
         tokens = p.phonemize("petit")
         # "petit" should not end with "t" (silent final)
-        assert tokens[-1] != "t", (
-            f"Expected silent final 't' to be omitted in {tokens}"
-        )
+        assert tokens[-1] != "t", f"Expected silent final 't' to be omitted in {tokens}"
 
 
 class TestProsody:
@@ -50,8 +48,5 @@ class TestProsody:
 
         p = FrenchPhonemizer()
         tokens, prosody = p.phonemize_with_prosody("Bonjour")
-        has_stress = any(
-            isinstance(pi, ProsodyInfo) and pi.a2 == 2
-            for pi in prosody
-        )
+        has_stress = any(isinstance(pi, ProsodyInfo) and pi.a2 == 2 for pi in prosody)
         assert has_stress, "Expected at least one ProsodyInfo with a2=2 (stress)"

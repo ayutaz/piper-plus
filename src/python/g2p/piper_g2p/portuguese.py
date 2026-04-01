@@ -125,8 +125,11 @@ def _count_vowel_groups(word: str) -> int:
                 continue
         # Handle 'gu' digraph: u is silent before e/i
         if (
-            ch == "g" and i + 1 < n and word[i + 1] == "u"
-            and i + 2 < n and word[i + 2] in "eiéêí"
+            ch == "g"
+            and i + 1 < n
+            and word[i + 1] == "u"
+            and i + 2 < n
+            and word[i + 2] in "eiéêí"
         ):
             # gu before e/i: u is silent, skip both g and u
             i += 2
@@ -171,8 +174,11 @@ def _find_stress_position(word: str) -> int:
                 i += 2
                 continue
         if (
-            ch == "g" and i + 1 < n and word[i + 1] == "u"
-            and i + 2 < n and word[i + 2] in "eiéêí"
+            ch == "g"
+            and i + 1 < n
+            and word[i + 1] == "u"
+            and i + 2 < n
+            and word[i + 2] in "eiéêí"
         ):
             i += 2
             continue
@@ -261,8 +267,11 @@ def _convert_word(word: str) -> tuple[list[str], int]:
 
         # "sc" before e/i -> s (no geminate; like Spanish seseo)
         if (
-            ch == "s" and i + 1 < n and word[i + 1] == "c"
-            and i + 2 < n and word[i + 2] in "eiéêí"
+            ch == "s"
+            and i + 1 < n
+            and word[i + 1] == "c"
+            and i + 2 < n
+            and word[i + 2] in "eiéêí"
         ):
             phonemes.append("s")
             i += 2  # skip "sc", vowel handled next
@@ -283,8 +292,11 @@ def _convert_word(word: str) -> tuple[list[str], int]:
 
         # "gu" before e/i -> ɡ (u is silent)
         if (
-            ch == "g" and i + 1 < n and word[i + 1] == "u"
-            and i + 2 < n and word[i + 2] in "eiéêí"
+            ch == "g"
+            and i + 1 < n
+            and word[i + 1] == "u"
+            and i + 2 < n
+            and word[i + 2] in "eiéêí"
         ):
             phonemes.append("ɡ")
             i += 2

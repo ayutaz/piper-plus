@@ -43,9 +43,7 @@ class UnicodeLanguageDetector:
 
         # Pre-compute the default latin return value (None when unsupported)
         self._default_latin: str | None = (
-            default_latin_language
-            if default_latin_language in self.languages
-            else None
+            default_latin_language if default_latin_language in self.languages else None
         )
 
         # Latin-script languages available (for disambiguation if needed)

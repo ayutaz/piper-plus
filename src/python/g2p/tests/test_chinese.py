@@ -71,7 +71,6 @@ class TestProsody:
         tokens, prosody = p.phonemize_with_prosody("你好")
         # At least one prosody entry should have a1 in range 1-5 (tone)
         has_tone = any(
-            isinstance(pi, ProsodyInfo) and 1 <= pi.a1 <= 5
-            for pi in prosody
+            isinstance(pi, ProsodyInfo) and 1 <= pi.a1 <= 5 for pi in prosody
         )
         assert has_tone, "Expected at least one ProsodyInfo with tone (a1=1..5)"

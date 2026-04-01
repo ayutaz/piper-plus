@@ -388,20 +388,14 @@ def phonemize_english_with_prosody(
             # Insert stress marker before stressed vowels (espeak-ng compatible)
             if stress == 1:
                 phonemes.append("ˈ")
-                prosody_list.append(
-                    ProsodyInfo(a1=0, a2=a2, a3=word_phoneme_count)
-                )
+                prosody_list.append(ProsodyInfo(a1=0, a2=a2, a3=word_phoneme_count))
             elif stress == 2:
                 phonemes.append("ˌ")
-                prosody_list.append(
-                    ProsodyInfo(a1=0, a2=a2, a3=word_phoneme_count)
-                )
+                prosody_list.append(ProsodyInfo(a1=0, a2=a2, a3=word_phoneme_count))
 
             # Each IPA character becomes a separate phoneme token
             for ch in ipa:
-                prosody_list.append(
-                    ProsodyInfo(a1=0, a2=a2, a3=word_phoneme_count)
-                )
+                prosody_list.append(ProsodyInfo(a1=0, a2=a2, a3=word_phoneme_count))
                 phonemes.append(ch)
 
         # After a punctuation word, next word still needs space

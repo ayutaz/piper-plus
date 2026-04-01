@@ -119,8 +119,7 @@ class PiperEncoder:
                             f"Unknown phoneme symbol {ch!r} not in phoneme_id_map"
                         )
                     _log.warning(
-                        "Unknown symbol %r dropped"
-                        " (not in phoneme_id_map)",
+                        "Unknown symbol %r dropped (not in phoneme_id_map)",
                         ch,
                     )
         return ids
@@ -162,10 +161,7 @@ class PiperEncoder:
             ``{"a1": ..., "a2": ..., "a3": ...}``; ``None`` entries
             remain ``None``.
         """
-        return [
-            {"a1": p.a1, "a2": p.a2, "a3": p.a3} if p else None
-            for p in prosody
-        ]
+        return [{"a1": p.a1, "a2": p.a2, "a3": p.a3} if p else None for p in prosody]
 
     def _post_process(
         self,

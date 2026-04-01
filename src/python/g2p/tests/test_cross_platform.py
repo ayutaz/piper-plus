@@ -112,8 +112,7 @@ class TestEncodeConsistency:
             ids = self._encoder.encode(case["tokens"])
             expected_min = case["expected_min_length"]
             assert len(ids) >= expected_min, (
-                f"Encoded length {len(ids)} < {expected_min} "
-                f"for {case['description']}"
+                f"Encoded length {len(ids)} < {expected_min} for {case['description']}"
             )
 
     def test_encode_first_token(self, fixtures):
@@ -147,9 +146,7 @@ class TestDetectConsistency:
         all_langs = sorted(
             {c["expected_language"] for c in fixtures["detect_test_cases"]}
         )
-        detector = UnicodeLanguageDetector(
-            all_langs, default_latin_language="en"
-        )
+        detector = UnicodeLanguageDetector(all_langs, default_latin_language="en")
 
         for case in fixtures["detect_test_cases"]:
             text = case["input"]
@@ -206,8 +203,7 @@ class TestJAPhonemeFixtures:
             tokens = p.phonemize(case["input"])
             for expected in case["expected_contains"]:
                 assert expected in tokens, (
-                    f"JA output missing {expected!r} for "
-                    f"{case['input']!r}: {tokens}"
+                    f"JA output missing {expected!r} for {case['input']!r}: {tokens}"
                 )
 
     def test_ja_question_marker(self, fixtures):
@@ -221,8 +217,7 @@ class TestJAPhonemeFixtures:
             tokens = p.phonemize(case["input"])
             has_marker = bool(set(tokens) & _JA_QUESTION_MARKERS)
             assert has_marker, (
-                f"JA output missing question marker for "
-                f"{case['input']!r}: {tokens}"
+                f"JA output missing question marker for {case['input']!r}: {tokens}"
             )
 
 
@@ -254,8 +249,7 @@ class TestENPhonemeFixtures:
             tokens = p.phonemize(case["input"])
             for expected in case["expected_contains"]:
                 assert expected in tokens, (
-                    f"EN output missing {expected!r} for "
-                    f"{case['input']!r}: {tokens}"
+                    f"EN output missing {expected!r} for {case['input']!r}: {tokens}"
                 )
 
 
@@ -287,8 +281,7 @@ class TestZHPhonemeFixtures:
             tokens = p.phonemize(case["input"])
             has_tone = bool(set(tokens) & _ZH_TONE_TOKENS)
             assert has_tone, (
-                f"ZH output missing tone marker for "
-                f"{case['input']!r}: {tokens}"
+                f"ZH output missing tone marker for {case['input']!r}: {tokens}"
             )
 
 
@@ -336,8 +329,7 @@ class TestESPhonemeFixtures:
             tokens = p.phonemize(case["input"])
             for expected in case["expected_contains"]:
                 assert expected in tokens, (
-                    f"ES output missing {expected!r} for "
-                    f"{case['input']!r}: {tokens}"
+                    f"ES output missing {expected!r} for {case['input']!r}: {tokens}"
                 )
 
 
@@ -368,8 +360,7 @@ class TestFRPhonemeFixtures:
             tokens = p.phonemize(case["input"])
             for expected in case["expected_contains"]:
                 assert expected in tokens, (
-                    f"FR output missing {expected!r} for "
-                    f"{case['input']!r}: {tokens}"
+                    f"FR output missing {expected!r} for {case['input']!r}: {tokens}"
                 )
 
 
@@ -400,8 +391,7 @@ class TestPTPhonemeFixtures:
             tokens = p.phonemize(case["input"])
             for expected in case["expected_contains"]:
                 assert expected in tokens, (
-                    f"PT output missing {expected!r} for "
-                    f"{case['input']!r}: {tokens}"
+                    f"PT output missing {expected!r} for {case['input']!r}: {tokens}"
                 )
 
 

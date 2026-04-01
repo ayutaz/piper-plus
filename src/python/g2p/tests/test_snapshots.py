@@ -34,8 +34,27 @@ class TestJASnapshots:
     def test_arigatou(self, ja_phonemizer):
         tokens = ja_phonemizer.phonemize("ありがとうございます")
         assert tokens == [
-            "a", "[", "r", "i", "]", "g", "a", "t", "o", "o",
-            "g", "o", "[", "z", "a", "i", "m", "a", "]", "s", "U",
+            "a",
+            "[",
+            "r",
+            "i",
+            "]",
+            "g",
+            "a",
+            "t",
+            "o",
+            "o",
+            "g",
+            "o",
+            "[",
+            "z",
+            "a",
+            "i",
+            "m",
+            "a",
+            "]",
+            "s",
+            "U",
         ]
 
     def test_prosody_konnichiwa(self, ja_phonemizer):
@@ -61,22 +80,53 @@ class TestENSnapshots:
     def test_goodbye_with_period(self, en_phonemizer):
         tokens = en_phonemizer.phonemize("Goodbye.")
         assert tokens == [
-            "ɡ", "\u02cc", "ʊ", "d", "b", "\u02c8", "a", "ɪ", ".",
+            "ɡ",
+            "\u02cc",
+            "ʊ",
+            "d",
+            "b",
+            "\u02c8",
+            "a",
+            "ɪ",
+            ".",
         ]
 
     def test_how_are_you(self, en_phonemizer):
         tokens = en_phonemizer.phonemize("How are you?")
         assert tokens == [
-            "h", "\u02c8", "a", "ʊ", " ",
-            "ɑ", "\u02d0", "ɹ", " ",
-            "j", "u", "\u02d0", "?",
+            "h",
+            "\u02c8",
+            "a",
+            "ʊ",
+            " ",
+            "ɑ",
+            "\u02d0",
+            "ɹ",
+            " ",
+            "j",
+            "u",
+            "\u02d0",
+            "?",
         ]
 
     def test_hello_world(self, en_phonemizer):
         tokens = en_phonemizer.phonemize("Hello, world!")
         assert tokens == [
-            "h", "ə", "l", "\u02c8", "o", "ʊ", ",", " ",
-            "w", "\u02c8", "ɜ", "\u02d0", "l", "d", "!",
+            "h",
+            "ə",
+            "l",
+            "\u02c8",
+            "o",
+            "ʊ",
+            ",",
+            " ",
+            "w",
+            "\u02c8",
+            "ɜ",
+            "\u02d0",
+            "l",
+            "d",
+            "!",
         ]
 
     def test_prosody_hello(self, en_phonemizer):
@@ -113,12 +163,24 @@ class TestZHSnapshots:
         zh = get_phonemizer("zh")
         tokens = zh.phonemize("今天天气很好。")
         assert tokens == [
-            "tɕ", "in", "tone1",
-            "tʰ", "iɛn", "tone1",
-            "tʰ", "iɛn", "tone1",
-            "tɕʰ", "i", "tone4",
-            "x", "ən", "tone2",
-            "x", "aʊ", "tone3",
+            "tɕ",
+            "in",
+            "tone1",
+            "tʰ",
+            "iɛn",
+            "tone1",
+            "tʰ",
+            "iɛn",
+            "tone1",
+            "tɕʰ",
+            "i",
+            "tone4",
+            "x",
+            "ən",
+            "tone2",
+            "x",
+            "aʊ",
+            "tone3",
             ".",
         ]
 
@@ -138,25 +200,73 @@ class TestESSnapshots:
     def test_buenos_dias(self):
         tokens = get_phonemizer("es").phonemize("Buenos días")
         assert tokens == [
-            "b", "\u02c8", "u", "e", "n", "o", "s", " ",
-            "d", "\u02c8", "i", "a", "s",
+            "b",
+            "\u02c8",
+            "u",
+            "e",
+            "n",
+            "o",
+            "s",
+            " ",
+            "d",
+            "\u02c8",
+            "i",
+            "a",
+            "s",
         ]
 
     def test_question(self):
         tokens = get_phonemizer("es").phonemize("¿Hola, cómo estás?")
         assert tokens == [
-            "¿", "\u02c8", "o", "l", "a", ",", " ",
-            "k", "\u02c8", "o", "m", "o", " ",
-            "e", "s", "t", "\u02c8", "a", "s", "?",
+            "¿",
+            "\u02c8",
+            "o",
+            "l",
+            "a",
+            ",",
+            " ",
+            "k",
+            "\u02c8",
+            "o",
+            "m",
+            "o",
+            " ",
+            "e",
+            "s",
+            "t",
+            "\u02c8",
+            "a",
+            "s",
+            "?",
         ]
 
     def test_el_gato(self):
         tokens = get_phonemizer("es").phonemize("El gato come pescado.")
         assert tokens == [
-            "e", "l", " ",
-            "ɡ", "\u02c8", "a", "t", "o", " ",
-            "k", "\u02c8", "o", "m", "e", " ",
-            "p", "e", "s", "k", "\u02c8", "a", "ð", "o", ".",
+            "e",
+            "l",
+            " ",
+            "ɡ",
+            "\u02c8",
+            "a",
+            "t",
+            "o",
+            " ",
+            "k",
+            "\u02c8",
+            "o",
+            "m",
+            "e",
+            " ",
+            "p",
+            "e",
+            "s",
+            "k",
+            "\u02c8",
+            "a",
+            "ð",
+            "o",
+            ".",
         ]
 
     def test_prosody_hola(self):
@@ -181,24 +291,50 @@ class TestFRSnapshots:
     def test_comment_allez_vous(self):
         tokens = get_phonemizer("fr").phonemize("Comment allez-vous?")
         assert tokens == [
-            "k", "o", "m", "ɑ̃", " ",
-            "a", "l", "ə", " ",
-            "v", "u", "?",
+            "k",
+            "o",
+            "m",
+            "ɑ̃",
+            " ",
+            "a",
+            "l",
+            "ə",
+            " ",
+            "v",
+            "u",
+            "?",
         ]
 
     def test_merci_beaucoup(self):
         tokens = get_phonemizer("fr").phonemize("Merci beaucoup.")
         assert tokens == [
-            "m", "ɛ", "ʁ", "s", "i", " ",
-            "b", "o", "k", "u", ".",
+            "m",
+            "ɛ",
+            "ʁ",
+            "s",
+            "i",
+            " ",
+            "b",
+            "o",
+            "k",
+            "u",
+            ".",
         ]
 
     def test_je_suis(self):
         tokens = get_phonemizer("fr").phonemize("Je suis content.")
         assert tokens == [
-            "ʒ", " ",
-            "s", "ɥ", "i", " ",
-            "k", "ɔ̃", "t", "ɑ̃", ".",
+            "ʒ",
+            " ",
+            "s",
+            "ɥ",
+            "i",
+            " ",
+            "k",
+            "ɔ̃",
+            "t",
+            "ɑ̃",
+            ".",
         ]
 
 
@@ -221,17 +357,46 @@ class TestPTSnapshots:
     def test_brasil(self):
         tokens = get_phonemizer("pt").phonemize("O Brasil é grande.")
         assert tokens == [
-            "o", " ",
-            "b", "ʁ", "a", "z", "i", "w", " ",
-            "ɛ", " ",
-            "ɡ", "ʁ", "ã", "dʒ", "i", ".",
+            "o",
+            " ",
+            "b",
+            "ʁ",
+            "a",
+            "z",
+            "i",
+            "w",
+            " ",
+            "ɛ",
+            " ",
+            "ɡ",
+            "ʁ",
+            "ã",
+            "dʒ",
+            "i",
+            ".",
         ]
 
     def test_como_voce(self):
         tokens = get_phonemizer("pt").phonemize("Olá, como você está?")
         assert tokens == [
-            "o", "l", "a", ",", " ",
-            "k", "o", "m", "u", " ",
-            "v", "o", "s", "e", " ",
-            "e", "s", "t", "a", "?",
+            "o",
+            "l",
+            "a",
+            ",",
+            " ",
+            "k",
+            "o",
+            "m",
+            "u",
+            " ",
+            "v",
+            "o",
+            "s",
+            "e",
+            " ",
+            "e",
+            "s",
+            "t",
+            "a",
+            "?",
         ]

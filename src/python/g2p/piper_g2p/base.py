@@ -54,9 +54,7 @@ class Phonemizer(ABC):
         if not isinstance(text, str):
             raise TypeError(f"Expected str, got {type(text).__name__}")
         if len(text) > self.MAX_INPUT_LENGTH:
-            raise ValueError(
-                f"Input too long: {len(text)} > {self.MAX_INPUT_LENGTH}"
-            )
+            raise ValueError(f"Input too long: {len(text)} > {self.MAX_INPUT_LENGTH}")
         # Remove control characters, keep newline / tab / carriage-return
         return "".join(ch for ch in text if ch >= " " or ch in "\n\t\r")
 

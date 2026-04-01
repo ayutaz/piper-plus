@@ -235,9 +235,7 @@ class TestProsodyConsistency:
         assert len(tokens) == len(prosody)
 
     @requires_ja
-    @pytest.mark.parametrize(
-        "text", ["こんにちは", "", "123", "今日は良い天気です"]
-    )
+    @pytest.mark.parametrize("text", ["こんにちは", "", "123", "今日は良い天気です"])
     def test_prosody_length_equals_tokens_ja(self, text):
         from piper_g2p.japanese import JapanesePhonemizer
 

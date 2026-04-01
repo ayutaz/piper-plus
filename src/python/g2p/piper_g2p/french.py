@@ -246,8 +246,10 @@ def _convert_word(word: str) -> list[str]:
 
         # "ain", "aim" -> ɛ̃ (before consonant or end)
         if (
-            ch == "a" and i + 2 < n
-            and word[i + 1] == "i" and word[i + 2] in "nm"
+            ch == "a"
+            and i + 2 < n
+            and word[i + 1] == "i"
+            and word[i + 2] in "nm"
             and (i + 3 >= n or not _is_vowel_char(word[i + 3]))
         ):
             phonemes.append("ɛ̃")
@@ -256,8 +258,10 @@ def _convert_word(word: str) -> list[str]:
 
         # "ein", "eim" -> ɛ̃
         if (
-            ch == "e" and i + 2 < n
-            and word[i + 1] == "i" and word[i + 2] in "nm"
+            ch == "e"
+            and i + 2 < n
+            and word[i + 1] == "i"
+            and word[i + 2] in "nm"
             and (i + 3 >= n or not _is_vowel_char(word[i + 3]))
         ):
             phonemes.append("ɛ̃")
@@ -266,7 +270,8 @@ def _convert_word(word: str) -> list[str]:
 
         # "oin" -> wɛ̃
         if (
-            ch == "o" and i + 2 < n
+            ch == "o"
+            and i + 2 < n
             and word[i + 1 : i + 3] == "in"
             and (i + 3 >= n or not _is_vowel_char(word[i + 3]))
         ):
@@ -277,7 +282,8 @@ def _convert_word(word: str) -> list[str]:
 
         # "ien" -> jɛ̃
         if (
-            ch == "i" and i + 2 < n
+            ch == "i"
+            and i + 2 < n
             and word[i + 1 : i + 3] == "en"
             and (i + 3 >= n or not _is_vowel_char(word[i + 3]))
         ):
@@ -289,7 +295,8 @@ def _convert_word(word: str) -> list[str]:
         # "stion" -> /stjɔ̃/ (NOT /ssjɔ̃/)
         # "tion" -> /sjɔ̃/ (only when NOT preceded by 's')
         if (
-            ch == "t" and i + 3 < n
+            ch == "t"
+            and i + 3 < n
             and word[i + 1 : i + 4] == "ion"
             and (i + 4 >= n or not _is_vowel_char(word[i + 4]))
         ):
@@ -352,8 +359,11 @@ def _convert_word(word: str) -> list[str]:
 
         # "gu" before e/i -> ɡ (u silent)
         if (
-            ch == "g" and i + 1 < n and word[i + 1] == "u"
-            and i + 2 < n and word[i + 2] in "eiéèêëîï"
+            ch == "g"
+            and i + 1 < n
+            and word[i + 1] == "u"
+            and i + 2 < n
+            and word[i + 2] in "eiéèêëîï"
         ):
             phonemes.append("ɡ")
             i += 2

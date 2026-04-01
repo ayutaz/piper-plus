@@ -52,8 +52,5 @@ class TestProsody:
 
         p = PortuguesePhonemizer()
         tokens, prosody = p.phonemize_with_prosody("Ol\u00e1")
-        has_stress = any(
-            isinstance(pi, ProsodyInfo) and pi.a2 == 2
-            for pi in prosody
-        )
+        has_stress = any(isinstance(pi, ProsodyInfo) and pi.a2 == 2 for pi in prosody)
         assert has_stress, "Expected at least one ProsodyInfo with a2=2 (stress)"

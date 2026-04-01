@@ -10,9 +10,7 @@ class TestUnicodeDetector:
         """UnicodeLanguageDetector classifies Latin characters correctly."""
         from piper_g2p.multilingual import UnicodeLanguageDetector
 
-        detector = UnicodeLanguageDetector(
-            ["ja", "en"], default_latin_language="en"
-        )
+        detector = UnicodeLanguageDetector(["ja", "en"], default_latin_language="en")
         assert detector.detect_char("A") == "en"
         assert detector.detect_char("z") == "en"
 
@@ -20,19 +18,15 @@ class TestUnicodeDetector:
         """UnicodeLanguageDetector classifies kana as Japanese."""
         from piper_g2p.multilingual import UnicodeLanguageDetector
 
-        detector = UnicodeLanguageDetector(
-            ["ja", "en"], default_latin_language="en"
-        )
+        detector = UnicodeLanguageDetector(["ja", "en"], default_latin_language="en")
         assert detector.detect_char("\u3042") == "ja"  # hiragana 'a'
-        assert detector.detect_char("\u30A2") == "ja"  # katakana 'a'
+        assert detector.detect_char("\u30a2") == "ja"  # katakana 'a'
 
     def test_unicode_detector_cjk_disambiguation(self):
         """CJK ideographs are disambiguated by kana context."""
         from piper_g2p.multilingual import UnicodeLanguageDetector
 
-        detector = UnicodeLanguageDetector(
-            ["ja", "zh"], default_latin_language="ja"
-        )
+        detector = UnicodeLanguageDetector(["ja", "zh"], default_latin_language="ja")
         # Without kana context -> zh
         assert detector.detect_char("\u4e2d", context_has_kana=False) == "zh"
         # With kana context -> ja
@@ -45,15 +39,13 @@ class TestUnicodeDetector:
         detector = UnicodeLanguageDetector(
             ["ja", "en", "ko"], default_latin_language="en"
         )
-        assert detector.detect_char("\uAC00") == "ko"  # Hangul syllable 'ga'
+        assert detector.detect_char("\uac00") == "ko"  # Hangul syllable 'ga'
 
     def test_unicode_detector_neutral(self):
         """Neutral characters (digits, whitespace) return None."""
         from piper_g2p.multilingual import UnicodeLanguageDetector
 
-        detector = UnicodeLanguageDetector(
-            ["ja", "en"], default_latin_language="en"
-        )
+        detector = UnicodeLanguageDetector(["ja", "en"], default_latin_language="en")
         assert detector.detect_char("1") is None
         assert detector.detect_char(" ") is None
 

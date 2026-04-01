@@ -91,9 +91,7 @@ class CustomDictionary:
             with open(resolved, encoding="utf-8") as f:
                 data = json.load(f)
         except json.JSONDecodeError as e:
-            raise ValueError(
-                f"Invalid JSON in dictionary file {dict_path}: {e}"
-            ) from e
+            raise ValueError(f"Invalid JSON in dictionary file {dict_path}: {e}") from e
 
         # バージョンチェック
         version = data.get("version", "1.0")

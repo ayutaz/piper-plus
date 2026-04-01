@@ -42,11 +42,13 @@ def main():
         p = get_phonemizer(lang)
         for text in test_texts.get(lang, []):
             tokens = p.phonemize(text)
-            golden["cases"].append({
-                "language": lang,
-                "input": text,
-                "expected_tokens": tokens,
-            })
+            golden["cases"].append(
+                {
+                    "language": lang,
+                    "input": text,
+                    "expected_tokens": tokens,
+                }
+            )
 
     output_path = (
         Path(__file__).resolve().parent.parent.parent.parent.parent

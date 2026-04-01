@@ -38,9 +38,7 @@ class TestJsonV1:
             encoding="utf-8",
         )
 
-        d = CustomDictionary(
-            dict_paths=str(dict_file), load_defaults=False
-        )
+        d = CustomDictionary(dict_paths=str(dict_file), load_defaults=False)
         assert d.get_pronunciation("AI") == "エーアイ"
         assert d.get_pronunciation("GPU") == "ジーピーユー"
 
@@ -85,9 +83,7 @@ class TestJsonV2:
             encoding="utf-8",
         )
 
-        d = CustomDictionary(
-            dict_paths=str(dict_file), load_defaults=False
-        )
+        d = CustomDictionary(dict_paths=str(dict_file), load_defaults=False)
         assert d.get_pronunciation("CUDA") == "クーダ"
         assert d.get_pronunciation("PyTorch") == "パイトーチ"
 

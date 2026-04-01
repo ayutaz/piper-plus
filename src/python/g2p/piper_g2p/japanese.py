@@ -32,7 +32,7 @@ _RE_PROSODY = re.compile(r"/A:(?P<a1>[\d-]+)\+(?P<a2>[0-9]+)\+(?P<a3>[0-9]+)/")
 
 def _is_question(text: str) -> bool:
     """Return True if *text* ends with a Japanese/ASCII question mark."""
-    return text.strip().endswith("?") or text.strip().endswith("\uFF1F")
+    return text.strip().endswith("?") or text.strip().endswith("\uff1f")
 
 
 def _get_question_type(text: str) -> str:
@@ -53,25 +53,25 @@ def _get_question_type(text: str) -> str:
     # Multi-char patterns first (check longer patterns before shorter)
     if (
         stripped.endswith("?!")
-        or stripped.endswith("\uFF01\uFF1F")
-        or stripped.endswith("\uFF1F\uFF01")
+        or stripped.endswith("\uff01\uff1f")
+        or stripped.endswith("\uff1f\uff01")
     ):
         return "?!"
     if (
         stripped.endswith("?.")
-        or stripped.endswith("\u3002\uFF1F")
-        or stripped.endswith("\uFF1F\u3002")
+        or stripped.endswith("\u3002\uff1f")
+        or stripped.endswith("\uff1f\u3002")
     ):
         return "?."
     if (
         stripped.endswith("?~")
-        or stripped.endswith("\uFF5E\uFF1F")
-        or stripped.endswith("\uFF1F\uFF5E")
+        or stripped.endswith("\uff5e\uff1f")
+        or stripped.endswith("\uff1f\uff5e")
     ):
         return "?~"
 
     # Single ? fallback
-    if stripped.endswith("?") or stripped.endswith("\uFF1F"):
+    if stripped.endswith("?") or stripped.endswith("\uff1f"):
         return "?"
 
     return ""  # Not a question

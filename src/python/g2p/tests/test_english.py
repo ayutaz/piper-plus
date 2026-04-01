@@ -30,9 +30,7 @@ class TestStress:
 
         p = EnglishPhonemizer()
         tokens = p.phonemize("happy")
-        assert "\u02C8" in tokens, (
-            f"Expected primary stress marker in {tokens}"
-        )
+        assert "\u02c8" in tokens, f"Expected primary stress marker in {tokens}"
 
     def test_secondary_stress(self):
         """'multiplication' should include secondary stress marker."""
@@ -40,9 +38,7 @@ class TestStress:
 
         p = EnglishPhonemizer()
         tokens = p.phonemize("multiplication")
-        assert "\u02CC" in tokens, (
-            f"Expected secondary stress marker in {tokens}"
-        )
+        assert "\u02cc" in tokens, f"Expected secondary stress marker in {tokens}"
 
     def test_function_word_no_stress(self):
         """Function word 'the' in 'the cat' should have stress removed (a2=0)."""
@@ -55,9 +51,7 @@ class TestStress:
         the_prosody = prosody[:space_idx]
         for pi in the_prosody:
             if pi is not None:
-                assert pi.a2 == 0, (
-                    f"Function word 'the' should have a2=0, got {pi.a2}"
-                )
+                assert pi.a2 == 0, f"Function word 'the' should have a2=0, got {pi.a2}"
 
 
 @requires_en

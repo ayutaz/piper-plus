@@ -334,11 +334,13 @@ class TestSoftHardKG:
     def test_hard_g_finger(self):
         """KG-10: HARD_G: finger."""
         from piper_g2p.swedish import _is_hard_g
+
         assert _is_hard_g("finger")
 
     def test_hard_g_ger(self):
         """KG-11: HARD_G: ger."""
         from piper_g2p.swedish import _is_hard_g
+
         assert _is_hard_g("ger")
 
     def test_hard_g_ge_output(self):
@@ -348,16 +350,19 @@ class TestSoftHardKG:
     def test_hard_g_agera(self):
         """KG-13: -era verb -> hard."""
         from piper_g2p.swedish import _is_hard_g
+
         assert _is_hard_g("agera")
 
     def test_hard_g_berg(self):
         """KG-14: -erg -> hard."""
         from piper_g2p.swedish import _is_hard_g
+
         assert _is_hard_g("berg")
 
     def test_hard_g_borg(self):
         """KG-15: -org -> hard."""
         from piper_g2p.swedish import _is_hard_g
+
         assert _is_hard_g("borg")
 
 
@@ -436,12 +441,14 @@ class TestStress:
     def test_stress_attracting_suffix(self):
         """Words with stress-attracting suffixes are stressed on the suffix."""
         from piper_g2p.swedish import detect_stress
+
         # -tion suffix: stress on syllable after stem
         assert detect_stress("station") > 0
 
     def test_monosyllabic_stress(self):
         """Monosyllabic words are stressed on syllable 0."""
         from piper_g2p.swedish import detect_stress
+
         assert detect_stress("hus") == 0
 
 
@@ -463,10 +470,7 @@ class TestProsody:
         """Stressed phonemes have a2=2 in prosody info."""
         p = SwedishPhonemizer()
         tokens, prosody = p.phonemize_with_prosody("Hej")
-        has_stress = any(
-            isinstance(pi, ProsodyInfo) and pi.a2 == 2
-            for pi in prosody
-        )
+        has_stress = any(isinstance(pi, ProsodyInfo) and pi.a2 == 2 for pi in prosody)
         assert has_stress, "Expected at least one ProsodyInfo with a2=2 (stress)"
 
     def test_prosody_a3_word_count(self):
@@ -475,8 +479,7 @@ class TestProsody:
         tokens, prosody = p.phonemize_with_prosody("sol")
         # Filter out stress marker
         non_stress = [
-            pi for t, pi in zip(tokens, prosody, strict=False)
-            if t != "\u02c8"
+            pi for t, pi in zip(tokens, prosody, strict=False) if t != "\u02c8"
         ]
         if non_stress:
             # All non-stress phonemes should have same a3

@@ -163,9 +163,7 @@ class TestProsodyToDictsRoundtrip:
         assert dicts[2] == {"a1": 0, "a2": 3, "a3": 7}
 
         # Reconstruct ProsodyInfo from dicts
-        reconstructed = [
-            ProsodyInfo(**d) if d is not None else None for d in dicts
-        ]
+        reconstructed = [ProsodyInfo(**d) if d is not None else None for d in dicts]
 
         assert reconstructed == list(original)
 
@@ -188,8 +186,6 @@ class TestProsodyToDictsRoundtrip:
 
         _, prosody_out = encoder.encode_with_prosody(tokens, prosody)
         dicts = PiperEncoder.prosody_to_dicts(prosody_out)
-        reconstructed = [
-            ProsodyInfo(**d) if d is not None else None for d in dicts
-        ]
+        reconstructed = [ProsodyInfo(**d) if d is not None else None for d in dicts]
 
         assert reconstructed == prosody_out

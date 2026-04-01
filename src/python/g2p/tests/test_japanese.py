@@ -1,6 +1,5 @@
 """Tests for piper_g2p.japanese — JapanesePhonemizer."""
 
-
 from tests.conftest import requires_ja
 
 
@@ -37,9 +36,7 @@ class TestBasic:
         tokens = p.phonemize("今日は良い天気ですね。")
         all_tokens_str = " ".join(tokens)
         has_prosody = any(t in ("#", "[", "]") for t in tokens)
-        assert has_prosody, (
-            f"Expected at least one prosody marker in: {all_tokens_str}"
-        )
+        assert has_prosody, f"Expected at least one prosody marker in: {all_tokens_str}"
 
 
 @requires_ja
@@ -109,7 +106,7 @@ class TestQuestionMarkers:
 
         p = JapanesePhonemizer()
         # U+FF5E (full-width tilde) + U+FF1F (full-width question mark)
-        tokens = p.phonemize("何\uFF5E\uFF1F")
+        tokens = p.phonemize("何\uff5e\uff1f")
         assert "?~" in tokens, f"Expected '?~' in {tokens}"
 
 
