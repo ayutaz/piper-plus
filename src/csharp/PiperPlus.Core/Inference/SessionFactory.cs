@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.ML.OnnxRuntime;
@@ -87,19 +88,164 @@ public static class SessionFactory
 
         var options = new SessionOptions();
 
-        // Match C++ piper.cpp: disable graph optimisation.
-        options.GraphOptimizationLevel = GraphOptimizationLevel.ORT_DISABLE_ALL;
+        // ORT_ENABLE_ALL: セッション作成時にグラフ最適化を一度実行し、
+        // 以降の推論コストを削減する (COLD-M1)。
+        options.GraphOptimizationLevel = GraphOptimizationLevel.ORT_ENABLE_ALL;
 
         if (useCuda)
         {
             TryAppendCudaProvider(options, resolvedDeviceId, logger);
         }
 
+        // COLD-M5: 最適化済みモデルキャッシュ
+        // .opt.onnx が存在すれば直接ロード (最適化スキップ) し、
+        // 存在しなければ元モデルをロード＆最適化結果を .opt.onnx に保存する。
+        var optimizedPath = Path.ChangeExtension(modelPath, ".opt.onnx");
+        string effectiveModelPath;
+
+        if (File.Exists(optimizedPath))
+        {
+            logger.LogInformation("Loading pre-optimized model from {Path}", optimizedPath);
+            options.GraphOptimizationLevel = GraphOptimizationLevel.ORT_DISABLE_ALL;
+            effectiveModelPath = optimizedPath;
+        }
+        else
+        {
+            try
+            {
+                options.OptimizedModelFilePath = optimizedPath;
+                logger.LogInformation("ORT will save optimized model to {Path}", optimizedPath);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(
+                    "Could not set optimized model path {Path}: {Message} (continuing without cache)",
+                    optimizedPath, ex.Message);
+            }
+
+            effectiveModelPath = modelPath;
+        }
+
         logger.LogDebug(
             "Creating InferenceSession for {ModelPath} (CUDA={UseCuda}, device={DeviceId}, testMode={TestMode})",
-            modelPath, useCuda, resolvedDeviceId, testMode);
+            effectiveModelPath, useCuda, resolvedDeviceId, testMode);
 
-        return new InferenceSession(modelPath, options);
+        return new InferenceSession(effectiveModelPath, options);
+    }
+
+    /// <summary>
+    /// Warms up the ORT graph-optimization cache by running a small number of
+    /// dummy inferences. This eliminates the ~500-800ms JIT overhead that would
+    /// otherwise hit the user's first real synthesis call.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The method inspects <see cref="InferenceSession.InputMetadata"/> to
+    /// dynamically build the minimal set of required input tensors, so it
+    /// works for single-speaker, multi-speaker, multilingual, and prosody
+    /// models alike.
+    /// </para>
+    /// <para>
+    /// Any exception during warmup is caught and logged as a warning.
+    /// Warmup failure must never prevent the application from starting.
+    /// </para>
+    /// </remarks>
+    /// <param name="session">A configured <see cref="InferenceSession"/>.</param>
+    /// <param name="runs">Number of warmup inferences to execute (default: 3).</param>
+    /// <param name="logger">Optional logger for diagnostic messages.</param>
+    public static void Warmup(
+        InferenceSession session,
+        int runs = 3,
+        ILogger? logger = null)
+    {
+        ArgumentNullException.ThrowIfNull(session);
+        logger ??= NullLogger.Instance;
+
+        try
+        {
+            var sw = Stopwatch.StartNew();
+
+            // Minimal valid phoneme IDs: BOS(1) + 3 dummy phonemes + EOS(2)
+            long[] phonemeIds = [1, 8, 8, 8, 2];
+            int phonemeLength = phonemeIds.Length;
+
+            // ---- Build required inputs ----
+            using var inputTensor = OrtValue.CreateTensorValueFromMemory(
+                phonemeIds, [1, phonemeLength]);
+
+            long[] lengths = [phonemeLength];
+            using var inputLengths = OrtValue.CreateTensorValueFromMemory(
+                lengths, [1]);
+
+            float[] scales = [0.667f, 1.0f, 0.8f];
+            using var scalesTensor = OrtValue.CreateTensorValueFromMemory(
+                scales, [3]);
+
+            var inputNames = new List<string>(6) { "input", "input_lengths", "scales" };
+            var inputValues = new List<OrtValue>(6) { inputTensor, inputLengths, scalesTensor };
+
+            // ---- Dynamically add optional inputs based on model metadata ----
+            var metadata = session.InputMetadata;
+
+            OrtValue? sidTensor = null;
+            if (metadata.ContainsKey("sid"))
+            {
+                long[] sid = [0];
+                sidTensor = OrtValue.CreateTensorValueFromMemory(sid, [1]);
+                inputNames.Add("sid");
+                inputValues.Add(sidTensor);
+            }
+
+            OrtValue? lidTensor = null;
+            if (metadata.ContainsKey("lid"))
+            {
+                long[] lid = [0];
+                lidTensor = OrtValue.CreateTensorValueFromMemory(lid, [1]);
+                inputNames.Add("lid");
+                inputValues.Add(lidTensor);
+            }
+
+            OrtValue? prosodyTensor = null;
+            if (metadata.ContainsKey("prosody_features"))
+            {
+                long[] prosody = new long[phonemeLength * 3]; // zero-filled
+                prosodyTensor = OrtValue.CreateTensorValueFromMemory(
+                    prosody, [1, phonemeLength, 3]);
+                inputNames.Add("prosody_features");
+                inputValues.Add(prosodyTensor);
+            }
+
+            string[] outputNames = session.OutputMetadata.ContainsKey("durations")
+                ? ["output", "durations"]
+                : ["output"];
+
+            try
+            {
+                for (int i = 0; i < runs; i++)
+                {
+                    using var runOptions = new RunOptions();
+                    using var results = session.Run(
+                        runOptions, inputNames, inputValues, outputNames);
+                }
+            }
+            finally
+            {
+                sidTensor?.Dispose();
+                lidTensor?.Dispose();
+                prosodyTensor?.Dispose();
+            }
+
+            sw.Stop();
+            logger.LogInformation(
+                "Warmup completed ({Runs} runs in {ElapsedMs}ms)",
+                runs, sw.ElapsedMilliseconds);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(
+                "Warmup failed (non-fatal, inference will still work): {Message}",
+                ex.Message);
+        }
     }
 
     // ------------------------------------------------------------------

@@ -548,10 +548,50 @@ fn try_morphological_fallback(word: &str, cmu_dict: &HashMap<String, String>) ->
 
 static CMU_DICT_CACHE: OnceLock<HashMap<String, String>> = OnceLock::new();
 
+/// Try to load a dictionary from a bincode cache file.
+///
+/// Returns `Some(dict)` if the `.bincode` file exists, is newer than the
+/// source JSON file, and deserializes successfully. Returns `None` otherwise,
+/// allowing the caller to fall back to JSON parsing.
+fn try_load_bincode_cache<T: serde::de::DeserializeOwned>(json_path: &Path) -> Option<T> {
+    let bincode_path = json_path.with_extension("json.bincode");
+    if !bincode_path.exists() {
+        return None;
+    }
+    // Only use cache if it is at least as new as the JSON source.
+    let json_modified = std::fs::metadata(json_path).ok()?.modified().ok()?;
+    let bin_modified = std::fs::metadata(&bincode_path).ok()?.modified().ok()?;
+    if bin_modified < json_modified {
+        return None;
+    }
+    let bytes = std::fs::read(&bincode_path).ok()?;
+    bincode::deserialize(&bytes).ok()
+}
+
+/// Save a dictionary to a bincode cache file next to the JSON source.
+///
+/// Failures are silently ignored — the JSON fallback will always work.
+fn save_bincode_cache<T: serde::Serialize>(json_path: &Path, dict: &T) {
+    let bincode_path = json_path.with_extension("json.bincode");
+    if let Ok(bytes) = bincode::serialize(dict) {
+        let _ = std::fs::write(&bincode_path, bytes);
+    }
+}
+
 /// Load and parse a CMU dictionary JSON file into a HashMap.
 ///
-/// Standalone function used by the `OnceLock` cache initializer.
+/// On the first call, if a `.bincode` cache file exists next to the JSON
+/// and is newer, the dictionary is deserialized from bincode (fast path).
+/// Otherwise the JSON is parsed and a `.bincode` cache is written for the
+/// next invocation.
 fn load_cmu_dict(dict_path: &Path) -> Result<HashMap<String, String>, PiperError> {
+    // Fast path: bincode cache
+    if let Some(dict) = try_load_bincode_cache::<HashMap<String, String>>(dict_path) {
+        tracing::info!("CMU dict loaded from bincode cache");
+        return Ok(dict);
+    }
+
+    // Slow path: JSON parse
     let content = std::fs::read_to_string(dict_path).map_err(|_| PiperError::DictionaryLoad {
         path: dict_path.display().to_string(),
     })?;
@@ -571,6 +611,10 @@ fn load_cmu_dict(dict_path: &Path) -> Result<HashMap<String, String>, PiperError
             cmu_dict.insert(key.clone(), arpa.to_string());
         }
     }
+
+    // Write bincode cache for next time (best-effort).
+    save_bincode_cache(dict_path, &cmu_dict);
+    tracing::info!("CMU dict loaded from JSON, bincode cache saved");
 
     Ok(cmu_dict)
 }
@@ -1322,5 +1366,46 @@ mod tests {
             "should append AH0 S T, got: {}",
             arpa
         );
+    }
+
+    // ===== 21. Bincode roundtrip =====
+
+    #[test]
+    fn test_bincode_roundtrip_cmu_dict() {
+        let mut dict = HashMap::new();
+        dict.insert("hello".to_string(), "HH AH0 L OW1".to_string());
+        dict.insert("world".to_string(), "W ER1 L D".to_string());
+        let bytes = bincode::serialize(&dict).unwrap();
+        let restored: HashMap<String, String> = bincode::deserialize(&bytes).unwrap();
+        assert_eq!(dict, restored);
+    }
+
+    #[test]
+    fn test_bincode_cache_roundtrip_via_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let json_path = dir.path().join("test_cmu.json");
+
+        // Write a small JSON dict
+        let mut dict = HashMap::new();
+        dict.insert("test".to_string(), "T EH1 S T".to_string());
+        dict.insert("rust".to_string(), "R AH1 S T".to_string());
+        let json_content: serde_json::Value = dict
+            .iter()
+            .map(|(k, v)| (k.clone(), serde_json::Value::String(v.clone())))
+            .collect();
+        std::fs::write(&json_path, serde_json::to_string(&json_content).unwrap()).unwrap();
+
+        // First load: should parse JSON and create bincode cache
+        let loaded1 = load_cmu_dict(&json_path).unwrap();
+        assert_eq!(loaded1.len(), 2);
+        assert_eq!(loaded1.get("test").unwrap(), "T EH1 S T");
+
+        // Verify bincode cache file was created
+        let bincode_path = json_path.with_extension("json.bincode");
+        assert!(bincode_path.exists(), "bincode cache should be created");
+
+        // Second load: should use bincode cache
+        let loaded2 = load_cmu_dict(&json_path).unwrap();
+        assert_eq!(loaded1, loaded2);
     }
 }

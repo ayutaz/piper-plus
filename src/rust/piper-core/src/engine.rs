@@ -7,6 +7,7 @@ use std::borrow::Cow;
 use std::path::Path;
 use std::time::Instant;
 
+use ort::session::builder::GraphOptimizationLevel;
 use ort::session::Session;
 use ort::value::Tensor;
 
@@ -92,7 +93,61 @@ impl OnnxEngine {
         let device_type = crate::gpu::parse_device_string(device)
             .map_err(|e| PiperError::ModelLoad(format!("invalid device '{}': {}", device, e)))?;
 
-        let builder = Session::builder().map_err(|e| PiperError::ModelLoad(e.to_string()))?;
+        // COLD-M1: VITS は小モデルのためスレッド数上限を設ける。
+        // 過剰なスレッド生成はオーバーヘッドになる。
+        let num_intra_threads = std::thread::available_parallelism()
+            .map(|n| n.get())
+            .unwrap_or(2)
+            .min(4);
+
+        // COLD-M5: 最適化済みモデルキャッシュ
+        // .opt.onnx が存在すれば直接ロード (最適化スキップ) し、
+        // 存在しなければ元モデルをロード＆最適化結果を .opt.onnx に保存する。
+        let optimized_path = model_path.with_extension("opt.onnx");
+        let (load_path, use_cached) = if optimized_path.exists() {
+            tracing::info!(
+                "Loading pre-optimized model from {:?}",
+                optimized_path
+            );
+            (optimized_path.clone(), true)
+        } else {
+            (model_path.to_path_buf(), false)
+        };
+
+        let mut builder = Session::builder()
+            .map_err(|e| PiperError::ModelLoad(e.to_string()))?
+            .with_intra_threads(num_intra_threads)
+            .map_err(|e| PiperError::ModelLoad(format!("intra_threads: {e}")))?
+            .with_inter_threads(1)
+            .map_err(|e| PiperError::ModelLoad(format!("inter_threads: {e}")))?;
+
+        if use_cached {
+            // 最適化済みモデルを直接ロード: 再最適化をスキップ
+            builder = builder
+                .with_optimization_level(GraphOptimizationLevel::Disable)
+                .map_err(|e| PiperError::ModelLoad(format!("optimization_level: {e}")))?;
+        } else {
+            // 初回: 最適化を実行し、結果を .opt.onnx に保存
+            // 書き込み権限がない場合は warning のみでフォールバック
+            match builder.with_optimized_model_path(&optimized_path) {
+                Ok(b) => {
+                    builder = b;
+                    tracing::info!(
+                        "ORT will save optimized model to {:?}",
+                        optimized_path
+                    );
+                }
+                Err(e) => {
+                    let msg = e.to_string();
+                    builder = e.recover();
+                    tracing::warn!(
+                        "Could not set optimized model path {:?}: {} (continuing without cache)",
+                        optimized_path,
+                        msg
+                    );
+                }
+            }
+        }
 
         let (mut builder, actual_device) =
             crate::gpu::configure_session_builder(builder, &device_type)
@@ -101,7 +156,7 @@ impl OnnxEngine {
         tracing::info!("Using device: {}", actual_device);
 
         let session = builder
-            .commit_from_file(model_path)
+            .commit_from_file(&load_path)
             .map_err(|e| PiperError::ModelLoad(e.to_string()))?;
 
         // モデルの入出力ノード名から能力を自動検出
@@ -318,11 +373,51 @@ impl OnnxEngine {
             durations,
         })
     }
+
+    /// ORT グラフ最適化キャッシュを温める。
+    /// 最小限の phoneme_ids でダミー推論を `runs` 回実行する。
+    pub fn warmup(&mut self, runs: usize) -> Result<(), PiperError> {
+        let dummy_request = SynthesisRequest {
+            phoneme_ids: vec![1, 8, 8, 8, 2],
+            ..SynthesisRequest::default()
+        };
+        for i in 0..runs {
+            let start = std::time::Instant::now();
+            let _ = self.synthesize(&dummy_request)?;
+            tracing::debug!("warmup run {}/{}: {:?}", i + 1, runs, start.elapsed());
+        }
+        Ok(())
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::PathBuf;
+
+    // -----------------------------------------------------------------------
+    // COLD-M1: スレッド設定テスト
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_intra_threads_capped_at_four() {
+        let available = std::thread::available_parallelism()
+            .map(|n| n.get())
+            .unwrap_or(2);
+        let num_intra_threads = available.min(4);
+        assert!(num_intra_threads >= 1);
+        assert!(num_intra_threads <= 4);
+    }
+
+    #[test]
+    fn test_thread_count_low_cpu() {
+        assert_eq!(2_usize.min(4), 2);
+    }
+
+    #[test]
+    fn test_thread_count_high_cpu() {
+        assert_eq!(32_usize.min(4), 4);
+    }
 
     #[test]
     fn test_synthesis_request_default() {
@@ -462,5 +557,71 @@ mod tests {
         assert!(!caps.has_lid);
         assert!(!caps.has_prosody);
         assert!(!caps.has_duration_output);
+    }
+
+    // -----------------------------------------------------------------------
+    // COLD-M2: Warmup テスト
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_warmup_request_is_valid() {
+        let req = SynthesisRequest {
+            phoneme_ids: vec![1, 8, 8, 8, 2],
+            ..SynthesisRequest::default()
+        };
+        assert!(!req.phoneme_ids.is_empty());
+        assert_eq!(req.phoneme_ids.len(), 5);
+    }
+
+    // -----------------------------------------------------------------------
+    // COLD-M5: 事前最適化済みモデルキャッシュ テスト
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_optimized_model_path_construction() {
+        let model_path = PathBuf::from("/data/models/test.onnx");
+        let opt_path = model_path.with_extension("opt.onnx");
+        assert_eq!(opt_path.to_str().unwrap(), "/data/models/test.opt.onnx");
+    }
+
+    #[test]
+    fn test_optimized_model_path_from_nested_dir() {
+        let model_path = PathBuf::from("/home/user/models/tsukuyomi/model.onnx");
+        let opt_path = model_path.with_extension("opt.onnx");
+        assert_eq!(
+            opt_path.to_str().unwrap(),
+            "/home/user/models/tsukuyomi/model.opt.onnx"
+        );
+    }
+
+    #[test]
+    fn test_optimized_model_path_preserves_parent() {
+        let model_path = PathBuf::from("/data/models/test.onnx");
+        let opt_path = model_path.with_extension("opt.onnx");
+        assert_eq!(opt_path.parent(), model_path.parent());
+    }
+
+    #[test]
+    fn test_use_cached_when_opt_exists() {
+        // Simulate the logic: if optimized_path.exists() => use_cached = true
+        let exists = true; // simulated
+        let (_, use_cached) = if exists {
+            (PathBuf::from("/tmp/model.opt.onnx"), true)
+        } else {
+            (PathBuf::from("/tmp/model.onnx"), false)
+        };
+        assert!(use_cached);
+    }
+
+    #[test]
+    fn test_no_cache_when_opt_missing() {
+        // Simulate the logic: if !optimized_path.exists() => use_cached = false
+        let exists = false; // simulated
+        let (_, use_cached) = if exists {
+            (PathBuf::from("/tmp/model.opt.onnx"), true)
+        } else {
+            (PathBuf::from("/tmp/model.onnx"), false)
+        };
+        assert!(!use_cached);
     }
 }

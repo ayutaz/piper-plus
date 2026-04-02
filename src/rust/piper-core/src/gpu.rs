@@ -12,6 +12,8 @@
 //! For the high-level, user-facing device enumeration and selection API, see
 //! [`crate::device`].
 
+use std::sync::OnceLock;
+
 use crate::error::PiperError;
 
 /// Supported GPU device types.
@@ -115,37 +117,50 @@ pub fn parse_device_string(device: &str) -> Result<DeviceType, PiperError> {
     })
 }
 
+/// Cached result of `auto_detect_device()`.
+///
+/// `OnceLock` ensures the detection logic runs at most once per process,
+/// avoiding repeated ~100 ms probe overhead when multiple models are loaded.
+static AUTO_DEVICE_CACHE: OnceLock<DeviceType> = OnceLock::new();
+
 /// Auto-detect the best available device.
 ///
 /// Priority: CUDA -> CoreML -> DirectML -> CPU.
 /// Only checks providers whose corresponding feature is enabled.
+///
+/// The result is cached in a process-wide `OnceLock` so that subsequent
+/// calls return immediately (~0 ns) instead of re-probing providers.
 fn auto_detect_device() -> DeviceType {
-    #[cfg(feature = "cuda")]
-    {
-        if is_cuda_available() {
-            tracing::info!("Auto-detected CUDA device");
-            return DeviceType::Cuda { device_id: 0 };
-        }
-    }
+    AUTO_DEVICE_CACHE
+        .get_or_init(|| {
+            #[cfg(feature = "cuda")]
+            {
+                if is_cuda_available() {
+                    tracing::info!("Auto-detected CUDA device");
+                    return DeviceType::Cuda { device_id: 0 };
+                }
+            }
 
-    #[cfg(feature = "coreml")]
-    {
-        if is_coreml_available() {
-            tracing::info!("Auto-detected CoreML device");
-            return DeviceType::CoreML;
-        }
-    }
+            #[cfg(feature = "coreml")]
+            {
+                if is_coreml_available() {
+                    tracing::info!("Auto-detected CoreML device");
+                    return DeviceType::CoreML;
+                }
+            }
 
-    #[cfg(feature = "directml")]
-    {
-        if is_directml_available() {
-            tracing::info!("Auto-detected DirectML device");
-            return DeviceType::DirectML { device_id: 0 };
-        }
-    }
+            #[cfg(feature = "directml")]
+            {
+                if is_directml_available() {
+                    tracing::info!("Auto-detected DirectML device");
+                    return DeviceType::DirectML { device_id: 0 };
+                }
+            }
 
-    tracing::info!("No GPU providers available, using CPU");
-    DeviceType::Cpu
+            tracing::info!("No GPU providers available, using CPU");
+            DeviceType::Cpu
+        })
+        .clone()
 }
 
 /// List all available compute devices.
@@ -744,6 +759,14 @@ mod tests {
             | DeviceType::DirectML { .. }
             | DeviceType::TensorRT { .. } => {} // all valid
         }
+    }
+
+    #[test]
+    fn test_auto_detect_device_is_deterministic() {
+        // OnceLock cache guarantees the same result within a single process.
+        let d1 = auto_detect_device();
+        let d2 = auto_detect_device();
+        assert_eq!(d1, d2);
     }
 
     #[test]

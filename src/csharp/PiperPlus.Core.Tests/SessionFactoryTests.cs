@@ -1,5 +1,6 @@
 using System.Reflection;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.ML.OnnxRuntime;
 using PiperPlus.Core.Inference;
 
 namespace PiperPlus.Core.Tests;
@@ -138,5 +139,73 @@ public sealed class SessionFactoryTests
         {
             Environment.SetEnvironmentVariable("PIPER_GPU_DEVICE_ID", original);
         }
+    }
+
+    // ================================================================
+    // Warmup — signature and behaviour tests
+    // ================================================================
+
+    [Fact]
+    public void Warmup_MethodExists_WithCorrectSignature()
+    {
+        var method = typeof(SessionFactory).GetMethod("Warmup");
+        Assert.NotNull(method);
+        Assert.True(method!.IsStatic);
+
+        // Should accept (InferenceSession, int, ILogger?)
+        var parameters = method.GetParameters();
+        Assert.Equal(3, parameters.Length);
+        Assert.Equal(typeof(InferenceSession), parameters[0].ParameterType);
+        Assert.Equal(typeof(int), parameters[1].ParameterType);
+        Assert.True(parameters[1].HasDefaultValue);
+        Assert.Equal(3, parameters[1].DefaultValue);
+    }
+
+    [Fact]
+    public void Warmup_NullSession_ThrowsArgumentNullException()
+    {
+        Assert.Throws<ArgumentNullException>(
+            () => SessionFactory.Warmup(session: null!));
+    }
+
+    // ================================================================
+    // COLD-M5: 最適化済みモデルキャッシュ テスト
+    // ================================================================
+
+    [Fact]
+    public void OptimizedModelPath_IsConstructedCorrectly()
+    {
+        var original = "/data/models/test.onnx";
+        var optimized = Path.ChangeExtension(original, ".opt.onnx");
+        Assert.EndsWith(".opt.onnx", optimized);
+    }
+
+    [Fact]
+    public void OptimizedModelPath_PreservesDirectory()
+    {
+        var original = "/data/models/subdir/model.onnx";
+        var optimized = Path.ChangeExtension(original, ".opt.onnx");
+        Assert.Equal(
+            Path.GetDirectoryName(original),
+            Path.GetDirectoryName(optimized));
+    }
+
+    [Fact]
+    public void OptimizedModelPath_FromWindowsPath()
+    {
+        var original = @"C:\Users\test\models\model.onnx";
+        var optimized = Path.ChangeExtension(original, ".opt.onnx");
+        Assert.EndsWith(".opt.onnx", optimized);
+        Assert.Equal(
+            Path.GetDirectoryName(original),
+            Path.GetDirectoryName(optimized));
+    }
+
+    [Fact]
+    public void OptimizedModelPath_FileName()
+    {
+        var original = "/data/models/test.onnx";
+        var optimized = Path.ChangeExtension(original, ".opt.onnx");
+        Assert.Equal("test.opt.onnx", Path.GetFileName(optimized));
     }
 }

@@ -659,11 +659,46 @@ fn phonemize_chinese_internal(
 // Dictionary loading
 // =========================================================================
 
+/// Try to load a dictionary from a bincode cache file.
+///
+/// Returns `Some(dict)` if the `.bincode` file exists, is newer than the
+/// source JSON file, and deserializes successfully. Returns `None` otherwise,
+/// allowing the caller to fall back to JSON parsing.
+fn try_load_bincode_cache<T: serde::de::DeserializeOwned>(json_path: &Path) -> Option<T> {
+    let bincode_path = json_path.with_extension("json.bincode");
+    if !bincode_path.exists() {
+        return None;
+    }
+    let json_modified = std::fs::metadata(json_path).ok()?.modified().ok()?;
+    let bin_modified = std::fs::metadata(&bincode_path).ok()?.modified().ok()?;
+    if bin_modified < json_modified {
+        return None;
+    }
+    let bytes = std::fs::read(&bincode_path).ok()?;
+    bincode::deserialize(&bytes).ok()
+}
+
+/// Save a dictionary to a bincode cache file next to the JSON source.
+///
+/// Failures are silently ignored — the JSON fallback will always work.
+fn save_bincode_cache<T: serde::Serialize>(json_path: &Path, dict: &T) {
+    let bincode_path = json_path.with_extension("json.bincode");
+    if let Ok(bytes) = bincode::serialize(dict) {
+        let _ = std::fs::write(&bincode_path, bytes);
+    }
+}
+
 /// Load pinyin single-char dictionary from JSON.
 ///
 /// JSON format: `{ "19968": "yi1", "19969": "ding1,zheng4", ... }`
 /// Keys are codepoint values as strings.
 fn load_single_char_dict(path: &Path) -> Result<HashMap<char, String>, PiperError> {
+    // Fast path: bincode cache
+    if let Some(dict) = try_load_bincode_cache::<HashMap<char, String>>(path) {
+        tracing::info!("ZH single-char dict loaded from bincode cache");
+        return Ok(dict);
+    }
+
     let content = std::fs::read_to_string(path).map_err(|_| PiperError::DictionaryLoad {
         path: path.display().to_string(),
     })?;
@@ -705,6 +740,10 @@ fn load_single_char_dict(path: &Path) -> Result<HashMap<char, String>, PiperErro
         }
     }
 
+    // Write bincode cache for next time (best-effort).
+    save_bincode_cache(path, &dict);
+    tracing::info!("ZH single-char dict loaded from JSON, bincode cache saved");
+
     Ok(dict)
 }
 
@@ -715,6 +754,12 @@ fn load_single_char_dict(path: &Path) -> Result<HashMap<char, String>, PiperErro
 ///   - array of arrays: `"一个": [["yi2"], ["ge4"]]` (pypinyin format)
 ///   - array of strings: `"一个": ["yi2", "ge4"]`
 fn load_phrase_dict(path: &Path) -> Result<HashMap<String, Vec<String>>, PiperError> {
+    // Fast path: bincode cache
+    if let Some(dict) = try_load_bincode_cache::<HashMap<String, Vec<String>>>(path) {
+        tracing::info!("ZH phrase dict loaded from bincode cache");
+        return Ok(dict);
+    }
+
     let content = std::fs::read_to_string(path).map_err(|_| PiperError::DictionaryLoad {
         path: path.display().to_string(),
     })?;
@@ -754,6 +799,10 @@ fn load_phrase_dict(path: &Path) -> Result<HashMap<String, Vec<String>>, PiperEr
             dict.insert(key.clone(), pinyins);
         }
     }
+
+    // Write bincode cache for next time (best-effort).
+    save_bincode_cache(path, &dict);
+    tracing::info!("ZH phrase dict loaded from JSON, bincode cache saved");
 
     Ok(dict)
 }
@@ -1321,5 +1370,82 @@ mod tests {
         assert_eq!(first_alternative("hao3,hao4"), "hao3");
         assert_eq!(first_alternative("ma1"), "ma1");
         assert_eq!(first_alternative(""), "");
+    }
+
+    // ===== 15. Bincode roundtrip =====
+
+    #[test]
+    fn test_bincode_roundtrip_single_char_dict() {
+        let mut dict: HashMap<char, String> = HashMap::new();
+        dict.insert('\u{4F60}', "ni3".to_string()); // 你
+        dict.insert('\u{597D}', "hao3".to_string()); // 好
+        let bytes = bincode::serialize(&dict).unwrap();
+        let restored: HashMap<char, String> = bincode::deserialize(&bytes).unwrap();
+        assert_eq!(dict, restored);
+    }
+
+    #[test]
+    fn test_bincode_roundtrip_phrase_dict() {
+        let mut dict: HashMap<String, Vec<String>> = HashMap::new();
+        dict.insert(
+            "\u{4F60}\u{597D}".to_string(),
+            vec!["ni3".to_string(), "hao3".to_string()],
+        );
+        let bytes = bincode::serialize(&dict).unwrap();
+        let restored: HashMap<String, Vec<String>> = bincode::deserialize(&bytes).unwrap();
+        assert_eq!(dict, restored);
+    }
+
+    #[test]
+    fn test_bincode_cache_roundtrip_single_char() {
+        let dir = tempfile::tempdir().unwrap();
+        let json_path = dir.path().join("pinyin_single.json");
+
+        // Write JSON: { "20320": "ni3", "22909": "hao3" }
+        std::fs::write(
+            &json_path,
+            r#"{"20320": "ni3", "22909": "hao3"}"#,
+        )
+        .unwrap();
+
+        // First load: JSON parse + bincode cache creation
+        let loaded1 = load_single_char_dict(&json_path).unwrap();
+        assert_eq!(loaded1.len(), 2);
+        assert_eq!(loaded1.get(&'\u{4F60}').unwrap(), "ni3");
+
+        // Verify bincode cache file was created
+        let bincode_path = json_path.with_extension("json.bincode");
+        assert!(bincode_path.exists(), "bincode cache should be created");
+
+        // Second load: should use bincode cache
+        let loaded2 = load_single_char_dict(&json_path).unwrap();
+        assert_eq!(loaded1, loaded2);
+    }
+
+    #[test]
+    fn test_bincode_cache_roundtrip_phrase() {
+        let dir = tempfile::tempdir().unwrap();
+        let json_path = dir.path().join("pinyin_phrases.json");
+
+        // Write JSON with space-separated pinyin string format
+        std::fs::write(
+            &json_path,
+            r#"{"\u4f60\u597d": "ni3 hao3"}"#,
+        )
+        .unwrap();
+
+        // First load: JSON parse + bincode cache creation
+        let loaded1 = load_phrase_dict(&json_path).unwrap();
+        assert_eq!(loaded1.len(), 1);
+        let pinyins = loaded1.get("\u{4F60}\u{597D}").unwrap();
+        assert_eq!(pinyins, &vec!["ni3".to_string(), "hao3".to_string()]);
+
+        // Verify bincode cache file was created
+        let bincode_path = json_path.with_extension("json.bincode");
+        assert!(bincode_path.exists(), "bincode cache should be created");
+
+        // Second load: should use bincode cache
+        let loaded2 = load_phrase_dict(&json_path).unwrap();
+        assert_eq!(loaded1, loaded2);
     }
 }

@@ -31,8 +31,20 @@ impl PiperVoice {
         let resolved_config = VoiceConfig::resolve_config_path(model_path, config_path)?;
         let config = VoiceConfig::load(&resolved_config)?;
         let model_dir = model_path.parent().map(|p| p.to_path_buf());
-        let phonemizer = Self::create_phonemizer(&config, model_dir.as_deref())?;
+
+        // COLD-M3: phonemizer と engine の初期化を並列化。
+        // 両者は独立しているため、max(phonemizer_time, engine_time) に短縮できる。
+        let config_clone = config.clone();
+        let model_dir_clone = model_dir.clone();
+        let phonemizer_handle = std::thread::spawn(move || {
+            Self::create_phonemizer(&config_clone, model_dir_clone.as_deref())
+        });
+
         let engine = OnnxEngine::load(model_path, &config, device)?;
+
+        let phonemizer = phonemizer_handle
+            .join()
+            .map_err(|_| PiperError::ModelLoad("phonemizer thread panicked".to_string()))??;
 
         Ok(Self {
             config,
@@ -358,6 +370,11 @@ impl PiperVoice {
                 }
             }
         }
+    }
+
+    /// ORT warmup をこの Voice インスタンスで実行する。
+    pub fn warmup(&mut self, runs: usize) -> Result<(), PiperError> {
+        self.engine.warmup(runs)
     }
 
     /// config への参照を返す

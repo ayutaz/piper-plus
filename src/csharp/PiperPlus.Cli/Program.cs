@@ -214,6 +214,10 @@ internal static class Program
         var tashkeelModelOption = new Option<string?>("--tashkeel_model")
         { Description = "libtashkeel model (ignored in C# CLI)" };
 
+        // --no-warmup
+        var noWarmupOption = new Option<bool>("--no-warmup")
+        { Description = "Skip ORT warmup (dummy inference at startup)" };
+
         // --test-mode
         var testModeOption = new Option<bool>("--test-mode")
         { Description = "Skip ONNX inference (CI testing)" };
@@ -262,6 +266,7 @@ internal static class Program
             customDictOption,
             espeakDataOption,
             tashkeelModelOption,
+            noWarmupOption,
             testModeOption,
             listModelsOption,
             downloadModelOption,
@@ -349,6 +354,7 @@ internal static class Program
                 string? outputTimingPath = parseResult.GetValue(outputTimingOption);
                 string timingFormat = parseResult.GetValue(timingFormatOption)!;
                 string? customDictPaths = parseResult.GetValue(customDictOption);
+                bool noWarmup = parseResult.GetValue(noWarmupOption);
                 bool testMode = parseResult.GetValue(testModeOption);
 
                 // --model-dir: resolve from CLI > PIPER_MODEL_DIR env
@@ -707,6 +713,14 @@ internal static class Program
                                $"hasSid={model.HasSpeakerId}, " +
                                $"hasLid={model.HasLanguageId}, " +
                                $"hasProsody={model.HasProsody})");
+
+                // Warmup: run dummy inferences to eliminate ORT JIT overhead
+                if (!noWarmup)
+                {
+                    LogDebug(debug, quiet, "Running ORT warmup...");
+                    SessionFactory.Warmup(session);
+                    LogDebug(debug, quiet, "ORT warmup complete");
+                }
 
                 // Resolve language ID from config's language_id_map
                 int languageId = ResolveLanguageId(config, language);
