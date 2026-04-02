@@ -67,11 +67,14 @@ function createMockInstance(overrides = {}) {
 
   const outputAudio = overrides.outputAudio || new Float32Array(22050);
 
-  instance._phonemizer = {
+  // Default encode returns IDs for [k, o, N, n, i, ch, i, w, a] = [10,11,12,13,14,15,14,16,17]
+  instance._g2p = {
     detectLanguage: overrides.detectLanguage || ((text) => 'ja'),
-    textToPhonemes: overrides.textToPhonemes || (async (text, lang) => 'k o N n i ch i w a'),
-    extractPhonemes: overrides.extractPhonemes || ((raw, lang) => ['k', 'o', 'N', 'n', 'i', 'ch', 'i', 'w', 'a']),
-    dispose: overrides.phonemizerDispose || (() => {}),
+    encode: overrides.encode || ((_text, _map, _opts) => ({
+      phonemeIds: [10, 11, 12, 13, 14, 15, 14, 16, 17],
+      prosodyFlat: null,
+    })),
+    dispose: overrides.g2pDispose || (() => {}),
   };
 
   instance._session = {
@@ -113,8 +116,10 @@ describe('PiperPlus synthesize() end-to-end flow', { skip }, () => {
     // Arrange
     const instance = createMockInstance({
       detectLanguage: () => 'en',
-      textToPhonemes: async (text, lang) => 'h @ l oU',
-      extractPhonemes: (raw, lang) => ['h', '@', 'l', 'oU'],
+      encode: (_text, _map, _opts) => ({
+        phonemeIds: [14, 21, 22, 23],
+        prosodyFlat: null,
+      }),
     });
 
     // Act
@@ -151,8 +156,11 @@ describe('PiperPlus synthesize() end-to-end flow', { skip }, () => {
     // Arrange
     let capturedFeeds = null;
     const instance = createMockInstance({
-      // Return 3 phonemes to make verification straightforward
-      extractPhonemes: () => ['k', 'o', 'a'],
+      // encode returns 3 phoneme IDs to make verification straightforward
+      encode: (_text, _map, _opts) => ({
+        phonemeIds: [10, 11, 17],
+        prosodyFlat: null,
+      }),
       sessionRun: async (feeds) => {
         capturedFeeds = feeds;
         return { output: { data: new Float32Array(100), dims: [1, 100] } };
@@ -203,9 +211,10 @@ describe('PiperPlus synthesize() end-to-end flow', { skip }, () => {
     let detectCalled = false;
     const instance = createMockInstance({
       detectLanguage: () => { detectCalled = true; return 'ja'; },
-      // Provide English-like phonemizer responses
-      textToPhonemes: async (text, lang) => 'h @ l oU',
-      extractPhonemes: (raw, lang) => ['h', '@', 'l', 'oU'],
+      encode: (_text, _map, _opts) => ({
+        phonemeIds: [14, 21, 22, 23],
+        prosodyFlat: null,
+      }),
     });
 
     // Act — pass language explicitly

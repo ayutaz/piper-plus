@@ -90,7 +90,6 @@ describe('exports バリデーション', () => {
     'AudioResult',
     'ModelManager',
     'DictManager',
-    'SimpleUnifiedPhonemizer',
     'WebGPUSessionManager',
     'StreamingTTSPipeline',
     'TextChunker',
