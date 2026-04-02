@@ -6,6 +6,8 @@ on:
       - dev
     paths:
       - 'huggingface-space/**'
+      - 'src/python/g2p/**'
+      - 'src/python/piper_train/infer_onnx.py'
       - '.github/workflows/deploy-huggingface.yml'
   workflow_dispatch:
     inputs:
@@ -63,40 +65,14 @@ jobs:
           # Show total size of models
           echo "Total model size: $(du -sh hf-space-deploy/models | cut -f1)"
 
-          # Copy piper_train phonemize module (inference-only, no torch dependency)
-          echo "Copying piper_train phonemize module..."
-          mkdir -p hf-space-deploy/piper_train/phonemize
+          # Copy piper_train inference module (inference-only, no torch dependency)
+          echo "Copying piper_train inference module..."
           mkdir -p hf-space-deploy/piper_train/vits
 
           # piper_train package init (empty - avoids importing heavy dependencies)
           touch hf-space-deploy/piper_train/__init__.py
 
-          # Phonemize module
-          cp src/python/piper_train/phonemize/__init__.py hf-space-deploy/piper_train/phonemize/
-          cp src/python/piper_train/phonemize/base.py hf-space-deploy/piper_train/phonemize/
-          cp src/python/piper_train/phonemize/registry.py hf-space-deploy/piper_train/phonemize/
-          cp src/python/piper_train/phonemize/multilingual.py hf-space-deploy/piper_train/phonemize/
-          cp src/python/piper_train/phonemize/bilingual.py hf-space-deploy/piper_train/phonemize/
-          cp src/python/piper_train/phonemize/japanese.py hf-space-deploy/piper_train/phonemize/
-          cp src/python/piper_train/phonemize/english.py hf-space-deploy/piper_train/phonemize/
-          cp src/python/piper_train/phonemize/chinese.py hf-space-deploy/piper_train/phonemize/
-          cp src/python/piper_train/phonemize/korean.py hf-space-deploy/piper_train/phonemize/
-          cp src/python/piper_train/phonemize/spanish.py hf-space-deploy/piper_train/phonemize/
-          cp src/python/piper_train/phonemize/portuguese.py hf-space-deploy/piper_train/phonemize/
-          cp src/python/piper_train/phonemize/french.py hf-space-deploy/piper_train/phonemize/
-          cp src/python/piper_train/phonemize/token_mapper.py hf-space-deploy/piper_train/phonemize/
-          cp src/python/piper_train/phonemize/custom_dict.py hf-space-deploy/piper_train/phonemize/
-          cp src/python/piper_train/phonemize/jp_id_map.py hf-space-deploy/piper_train/phonemize/
-          cp src/python/piper_train/phonemize/multilingual_id_map.py hf-space-deploy/piper_train/phonemize/
-          cp src/python/piper_train/phonemize/bilingual_id_map.py hf-space-deploy/piper_train/phonemize/
-          cp src/python/piper_train/phonemize/zh_id_map.py hf-space-deploy/piper_train/phonemize/
-          cp src/python/piper_train/phonemize/ko_id_map.py hf-space-deploy/piper_train/phonemize/
-          cp src/python/piper_train/phonemize/es_id_map.py hf-space-deploy/piper_train/phonemize/
-          cp src/python/piper_train/phonemize/pt_id_map.py hf-space-deploy/piper_train/phonemize/
-          cp src/python/piper_train/phonemize/fr_id_map.py hf-space-deploy/piper_train/phonemize/
-          echo "✓ Copied phonemize module ($(find hf-space-deploy/piper_train/phonemize -name '*.py' | wc -l) files)"
-
-          # Inference script (text_to_phoneme_ids_and_prosody)
+          # Inference script (text_to_phoneme_ids_and_prosody uses piper_g2p)
           cp src/python/piper_train/infer_onnx.py hf-space-deploy/piper_train/
           echo "✓ Copied infer_onnx.py"
 
@@ -106,7 +82,13 @@ jobs:
           cp src/python/piper_train/vits/wavfile.py hf-space-deploy/piper_train/vits/
           echo "✓ Copied piper_train/vits/ (utils.py, wavfile.py)"
 
+          # Copy piper_g2p package (G2P module — replaces piper_train/phonemize)
+          echo "Copying piper_g2p package..."
+          cp -r src/python/g2p/piper_g2p hf-space-deploy/
+          echo "✓ Copied piper_g2p ($(find hf-space-deploy/piper_g2p -name '*.py' | wc -l) Python files)"
+
           echo "piper_train module ready: $(find hf-space-deploy/piper_train -name '*.py' | wc -l) total Python files"
+          echo "piper_g2p module ready: $(find hf-space-deploy/piper_g2p -name '*.py' | wc -l) total Python files"
 
           # List files to be deployed
           echo "Files to deploy:"
@@ -130,12 +112,11 @@ jobs:
 
           modules = [
               ("piper_train.infer_onnx", "text_to_phoneme_ids_and_prosody"),
-              ("piper_train.phonemize.registry", "get_phonemizer"),
-              ("piper_train.phonemize.base", "Phonemizer"),
-              ("piper_train.phonemize.multilingual", "UnicodeLanguageDetector"),
-              ("piper_train.phonemize.token_mapper", None),
-              ("piper_train.phonemize.jp_id_map", None),
-              ("piper_train.phonemize.multilingual_id_map", None),
+              ("piper_g2p", "get_phonemizer"),
+              ("piper_g2p.base", "Phonemizer"),
+              ("piper_g2p.multilingual", "UnicodeLanguageDetector"),
+              ("piper_g2p.registry", "get_phonemizer"),
+              ("piper_g2p.encode.encoder", "PiperEncoder"),
               ("piper_train.vits.utils", "audio_float_to_int16"),
               ("piper_train.vits.wavfile", "write"),
           ]

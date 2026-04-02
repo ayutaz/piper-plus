@@ -5,7 +5,7 @@ on:
     branches: [dev, feat/multilingual-ui-hf-demo]
     paths:
       - 'huggingface-space/**'
-      - 'src/python/piper_train/phonemize/**'
+      - 'src/python/g2p/**'
       - 'src/python/piper_train/infer_onnx.py'
       - 'src/python/piper_train/vits/utils.py'
       - 'src/python/piper_train/vits/wavfile.py'
@@ -14,7 +14,7 @@ on:
   pull_request:
     paths:
       - 'huggingface-space/**'
-      - 'src/python/piper_train/phonemize/**'
+      - 'src/python/g2p/**'
       - 'src/python/piper_train/infer_onnx.py'
   workflow_dispatch:
 
@@ -39,10 +39,8 @@ jobs:
           cp huggingface-space/requirements.txt hf-space-deploy/
 
           # Copy piper_train module (same as deploy-huggingface.yml)
-          mkdir -p hf-space-deploy/piper_train/phonemize
           mkdir -p hf-space-deploy/piper_train/vits
           touch hf-space-deploy/piper_train/__init__.py
-          cp src/python/piper_train/phonemize/*.py hf-space-deploy/piper_train/phonemize/
           cp src/python/piper_train/infer_onnx.py hf-space-deploy/piper_train/
           touch hf-space-deploy/piper_train/vits/__init__.py
           cp src/python/piper_train/vits/utils.py hf-space-deploy/piper_train/vits/
@@ -57,6 +55,10 @@ jobs:
           find hf-space-deploy -name '*.py' | wc -l
           echo "Python files"
 
+      - name: Install piper-g2p (local package)
+        run: |
+          pip install src/python/g2p
+
       - name: "Layer 1: Core import validation (no external deps)"
         working-directory: hf-space-deploy
         run: |
@@ -65,17 +67,17 @@ jobs:
 
           # Only modules that have NO external dependencies (no numpy, no pyopenjtalk, etc.)
           modules = [
-              ('piper_train.phonemize.registry', 'get_phonemizer'),
-              ('piper_train.phonemize.base', 'Phonemizer'),
-              ('piper_train.phonemize.multilingual', 'UnicodeLanguageDetector'),
-              ('piper_train.phonemize.english', None),
-              ('piper_train.phonemize.chinese', None),
-              ('piper_train.phonemize.spanish', None),
-              ('piper_train.phonemize.french', None),
-              ('piper_train.phonemize.portuguese', None),
-              ('piper_train.phonemize.token_mapper', None),
-              ('piper_train.phonemize.jp_id_map', None),
-              ('piper_train.phonemize.multilingual_id_map', None),
+              ('piper_g2p', 'get_phonemizer'),
+              ('piper_g2p', 'UnicodeLanguageDetector'),
+              ('piper_g2p.base', 'Phonemizer'),
+              ('piper_g2p.multilingual', 'UnicodeLanguageDetector'),
+              ('piper_g2p.registry', 'get_phonemizer'),
+              ('piper_g2p.english', None),
+              ('piper_g2p.chinese', None),
+              ('piper_g2p.spanish', None),
+              ('piper_g2p.french', None),
+              ('piper_g2p.portuguese', None),
+              ('piper_g2p.encode.encoder', 'PiperEncoder'),
           ]
 
           failed = []
@@ -111,7 +113,7 @@ jobs:
           # Modules that require external deps (numpy, pyopenjtalk, etc.)
           modules = [
               ('piper_train.infer_onnx', 'text_to_phoneme_ids_and_prosody'),
-              ('piper_train.phonemize.japanese', None),
+              ('piper_g2p.japanese', None),
               ('piper_train.vits.utils', 'audio_float_to_int16'),
               ('piper_train.vits.wavfile', 'write'),
           ]
