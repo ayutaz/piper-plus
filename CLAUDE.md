@@ -204,8 +204,11 @@ nohup /data/piper/.venv/bin/python -m piper_train \
 
 > **Note:** スウェーデン語 (sv) と韓国語 (ko) はG2Pコード実装済みだが、学習済みモデルには未含有 (sv=6, ko=7)。
 
-**実装:** `phonemize/multilingual.py`, `phonemize/multilingual_id_map.py`, `phonemize/{chinese,korean,spanish,portuguese,french,swedish}.py`, `phonemize/{zh,ko,es,pt,fr,sv}_id_map.py`
-**Phonemizer ABC:** `phonemize/base.py` (抽象基底), `phonemize/registry.py` (言語レジストリ)
+**実装 (Python):** `src/python/g2p/piper_g2p/multilingual.py`, `piper_g2p/{chinese,korean,spanish,portuguese,french,swedish}.py`
+**実装 (Rust):** `src/rust/piper-g2p/src/multilingual.rs`, `piper-g2p/src/{chinese,korean,spanish,portuguese,french,swedish}.rs`
+**実装 (JS):** `src/wasm/g2p/src/` (`@piper-plus/g2p` パッケージ)
+**Phonemizer ABC (Python):** `piper_g2p/base.py` (抽象基底), `piper_g2p/registry.py` (言語レジストリ)
+**Phonemizer ABC (Rust):** `piper-g2p/src/phonemizer.rs` (`piper_g2p::Phonemizer` トレイト)
 
 ### 言語グループ均等サンプリング (--language-balanced-sampling)
 
@@ -352,7 +355,7 @@ Rust によるONNX推論エンジン。ストリーミング、CUDA/CoreML/Direc
 | パッケージ名 | piper-plus |
 | バージョン | 0.1.1 |
 | 対応言語 | JA, EN, ZH, KO, ES, FR, PT, SV (8言語) |
-| 音素化 | OpenJTalk WASM (JA), SimpleEnglishPhonemizer (EN), キャラクタベース (ZH/KO/ES/FR/PT/SV) |
+| 音素化 | @piper-plus/g2p (OpenJTalk WASM: JA, IPA規則ベース: EN/ZH/KO/ES/FR/PT/SV) |
 | 推論 | onnxruntime-web (peerDependency) |
 | テスト | 282テスト (Node.js test runner) |
 | CI | ci.yml (PR/push), npm-publish.yml (タグトリガー) |
@@ -363,7 +366,7 @@ Rust によるONNX推論エンジン。ストリーミング、CUDA/CoreML/Direc
 - `ModelManager` — HuggingFace モデル DL + IndexedDB キャッシュ
 - `DictManager` — OpenJTalk 辞書 DL + IndexedDB キャッシュ
 - `AudioResult` — WAV エンコード + 再生 + ダウンロード
-- `SimpleUnifiedPhonemizer` — 8言語音素化 (eSpeak-ng 不使用)
+- `G2P` (@piper-plus/g2p) — 8言語音素化 (eSpeak-ng 不使用)
 
 **実装:** `src/wasm/openjtalk-web/src/`, `src/wasm/openjtalk-web/types/index.d.ts`
 **テスト:** `src/wasm/openjtalk-web/test/js/test-*.js` (282テスト)
@@ -380,25 +383,12 @@ Rust によるONNX推論エンジン。ストリーミング、CUDA/CoreML/Direc
 |------|------|
 | 学習スクリプト | `src/python/piper_train/__main__.py` |
 | VITS実装 | `src/python/piper_train/vits/` |
-| Phonemizer ABC | `src/python/piper_train/phonemize/base.py` |
-| 言語レジストリ | `src/python/piper_train/phonemize/registry.py` |
-| 英語音素化 | `src/python/piper_train/phonemize/english.py` |
-| 日本語音素化 | `src/python/piper_train/phonemize/japanese.py` |
-| 中国語音素化 | `src/python/piper_train/phonemize/chinese.py` |
-| 韓国語音素化 | `src/python/piper_train/phonemize/korean.py` |
-| スペイン語音素化 | `src/python/piper_train/phonemize/spanish.py` |
-| ポルトガル語音素化 | `src/python/piper_train/phonemize/portuguese.py` |
-| フランス語音素化 | `src/python/piper_train/phonemize/french.py` |
-| スウェーデン語音素化 | `src/python/piper_train/phonemize/swedish.py` |
-| IDマップ (JA) | `src/python/piper_train/phonemize/jp_id_map.py` |
-| IDマップ (ZH/KO/ES/PT/FR/SV) | `src/python/piper_train/phonemize/{zh,ko,es,pt,fr,sv}_id_map.py` |
-| トークンマッパー | `src/python/piper_train/phonemize/token_mapper.py` |
 | ONNXエクスポート | `src/python/piper_train/export_onnx.py` |
 | 推論スクリプト | `src/python/piper_train/infer_onnx.py` |
-| マルチリンガルPhonemizer | `src/python/piper_train/phonemize/multilingual.py` |
-| マルチリンガルIDマップ | `src/python/piper_train/phonemize/multilingual_id_map.py` |
-| バイリンガルPhonemizer | `src/python/piper_train/phonemize/bilingual.py` |
-| バイリンガルIDマップ | `src/python/piper_train/phonemize/bilingual_id_map.py` |
+| G2P パッケージ (Python) | `src/python/g2p/piper_g2p/` (piper-g2p スタンドアロンパッケージ) |
+| 多言語Phonemizer (Python) | `src/python/g2p/piper_g2p/multilingual.py` |
+| 各言語Phonemizer (Python) | `src/python/g2p/piper_g2p/{japanese,english,chinese,korean,spanish,portuguese,french,swedish}.py` |
+| クロスプラットフォームテスト | `src/python/g2p/tests/test_cross_platform.py` |
 
 ### C# ソースコード
 
@@ -433,11 +423,15 @@ Rust によるONNX推論エンジン。ストリーミング、CUDA/CoreML/Direc
 | コアライブラリ | `src/rust/piper-core/` |
 | CLI アプリケーション | `src/rust/piper-cli/` |
 | Python バインディング | `src/rust/piper-python/` |
-| 音素化 | `src/rust/piper-core/src/phonemize/` |
+| G2P クレート | `src/rust/piper-g2p/` (piper-g2p スタンドアロンクレート) |
+| G2P Phonemizer トレイト | `src/rust/piper-g2p/src/phonemizer.rs` |
+| G2P 多言語 | `src/rust/piper-g2p/src/multilingual.rs` |
+| G2P adapter (piper-core) | `src/rust/piper-core/src/phonemize/adapter.rs` |
 | 推論エンジン | `src/rust/piper-core/src/engine.rs` |
 | 辞書マネージャ | `src/rust/piper-core/src/dictionary_manager.rs` |
 | カスタム辞書テスト | `src/rust/piper-core/tests/test_custom_dict_integration.rs` |
 | デフォルト出力テスト | `src/rust/piper-core/tests/test_default_output.rs` |
+| G2P ゴールデンテスト | `src/rust/piper-core/tests/test_g2p_golden.rs` |
 
 ### npm パッケージ ソースコード
 
@@ -450,6 +444,12 @@ Rust によるONNX推論エンジン。ストリーミング、CUDA/CoreML/Direc
 | TypeScript型定義 | `src/wasm/openjtalk-web/types/index.d.ts` |
 | npm パッケージ設定 | `src/wasm/openjtalk-web/package.json` |
 | npm publish CI | `.github/workflows/npm-publish.yml` |
+| G2P パッケージ (JS) | `src/wasm/g2p/` (@piper-plus/g2p パッケージ) |
+| G2P エントリーポイント | `src/wasm/g2p/src/index.js` |
+| G2P ゴールデンテスト | `src/wasm/openjtalk-web/test/js/test-g2p-golden.js` |
+| 音声回帰テスト | `src/wasm/openjtalk-web/test/js/test-audio-regression.js` |
+| 音声回帰ベースライン | `tests/fixtures/g2p/audio-regression-baseline.json` |
+| クロスプラットフォームフィクスチャ | `tests/fixtures/g2p/phoneme_test_cases.json` |
 
 ### データセット
 

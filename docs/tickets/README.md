@@ -10,11 +10,11 @@
 | マイルストーン | チケット数 | 完了 | 状態 |
 |---|---|---|---|
 | [M0: API ギャップ修正](#m0-piper-g2p-api-ギャップ修正) | 4 | 4/4 | 完了 |
-| [M1: Python 移行](#m1-python-移行) | 8 | 1/8 | 進行中 |
-| [M2: Rust 移行](#m2-rust-移行) | 8 | 0/8 | 未着手 |
+| [M1: Python 移行](#m1-python-移行) | 8 | 8/8 | 完了 |
+| [M2: Rust 移行](#m2-rust-移行) | 8 | 8/8 | 完了 |
 | [M3: JS/WASM 移行](#m3-jswasm-移行) | 6 | 6/6 | 完了 |
-| [M4: 検証・クリーンアップ](#m4-検証クリーンアップ) | 4 | 0/4 | 未着手 |
-| **合計** | **30** | **11/30** | |
+| [M4: 検証・クリーンアップ](#m4-検証クリーンアップ) | 4 | 4/4 | 完了 |
+| **合計** | **30** | **30/30** | **🎉 全完了** |
 
 ---
 
@@ -37,14 +37,14 @@
 
 | ID | チケット | 見積り | リスク | 前提 | 状態 |
 |---|---|---|---|---|---|
-| M1-1 | [依存関係の追加](M1-1-add-piper-g2p-dependency.md) | 小 | 低 | M0 | 未着手 |
-| M1-2 | [低リスク import 置換](M1-2-drop-in-import-replacement.md) | 小 | 低 | M1-1 | 未着手 |
-| M1-3 | [ID マップ API 置換](M1-3-id-map-api-replacement.md) | 中 | 中 | M0-3, M1-1 | 未着手 |
-| M1-4 | [preprocess.py リファクタ](M1-4-preprocess-pipeline-refactor.md) | 大 | **高** | M0-1, M0-2, M1-1, M1-3 | 未着手 |
-| M1-5 | [tools/ スクリプト移行](M1-5-tools-scripts-migration.md) | 中 | 中 | M1-1, M1-3 | 未着手 |
+| M1-1 | [依存関係の追加](M1-1-add-piper-g2p-dependency.md) | 小 | 低 | M0 | 完了 |
+| M1-2 | [低リスク import 置換](M1-2-drop-in-import-replacement.md) | 小 | 低 | M1-1 | 完了 |
+| M1-3 | [ID マップ API 置換](M1-3-id-map-api-replacement.md) | 中 | 中 | M0-3, M1-1 | 完了 |
+| M1-4 | [preprocess.py リファクタ](M1-4-preprocess-pipeline-refactor.md) | 大 | **高** | M0-1, M0-2, M1-1, M1-3 | 完了 |
+| M1-5 | [tools/ スクリプト移行](M1-5-tools-scripts-migration.md) | 中 | 中 | M1-1, M1-3 | 完了 |
 | M1-6 | [dead code 削除](M1-6-dead-code-removal.md) | 小 | 低 | なし | 完了 |
-| M1-7 | [旧 phonemize ディレクトリ削除](M1-7-delete-old-phonemize-dir.md) | 中 | 中 | M1-2〜M1-6 | 未着手 |
-| M1-8 | [テスト・CI 対応](M1-8-test-ci-updates.md) | 中 | 中 | M1-7 | 未着手 |
+| M1-7 | [旧 phonemize ディレクトリ削除](M1-7-delete-old-phonemize-dir.md) | 中 | 中 | M1-2〜M1-6 | 完了 |
+| M1-8 | [テスト・CI 対応](M1-8-test-ci-updates.md) | 中 | 中 | M1-7 | 完了 |
 
 ---
 
@@ -54,14 +54,14 @@
 
 | ID | チケット | 見積り | リスク | 前提 | 状態 |
 |---|---|---|---|---|---|
-| M2-1 | [Cargo.toml features 有効化](M2-1-enable-g2p-features.md) | 小 | 低 | M0-4 | 未着手 |
-| M2-2 | [adapter 層の作成](M2-2-create-adapter-layer.md) | 中 | 中 | M0-4, M2-1 | 未着手 |
-| M2-3 | [voice.rs ファクトリ書き換え](M2-3-voice-factory-rewrite.md) | 中 | 中 | M2-2 | 未着手 |
-| M2-4 | [phoneme_converter.rs 統合](M2-4-phoneme-converter-consolidation.md) | 小 | 低 | M2-1 | 未着手 |
-| M2-5 | [MultilingualPhonemizer 統合](M2-5-multilingual-phonemizer-consolidation.md) | 中 | 中 | M2-2, M2-3 | 未着手 |
-| M2-6 | [custom_dict.rs 統合](M2-6-custom-dict-consolidation.md) | 小 | 低 | M2-1 | 未着手 |
-| M2-7 | [旧 phonemize ファイル削除](M2-7-delete-old-phonemize-files.md) | 中 | 中 | M2-2〜M2-6 | 未着手 |
-| M2-8 | [テスト・CI 対応](M2-8-test-ci-updates.md) | 中 | 中 | M2-7 | 未着手 |
+| M2-1 | [Cargo.toml features 有効化](M2-1-enable-g2p-features.md) | 小 | 低 | M0-4 | 完了 |
+| M2-2 | [adapter 層の作成](M2-2-create-adapter-layer.md) | 中 | 中 | M0-4, M2-1 | 完了 |
+| M2-3 | [voice.rs ファクトリ書き換え](M2-3-voice-factory-rewrite.md) | 中 | 中 | M2-2 | 完了 |
+| M2-4 | [phoneme_converter.rs 統合](M2-4-phoneme-converter-consolidation.md) | 小 | 低 | M2-1 | 完了 |
+| M2-5 | [MultilingualPhonemizer 統合](M2-5-multilingual-phonemizer-consolidation.md) | 中 | 中 | M2-2, M2-3 | 完了 |
+| M2-6 | [custom_dict.rs 統合](M2-6-custom-dict-consolidation.md) | 小 | 低 | M2-1 | 完了 |
+| M2-7 | [旧 phonemize ファイル削除](M2-7-delete-old-phonemize-files.md) | 中 | 中 | M2-2〜M2-6 | 完了 |
+| M2-8 | [テスト・CI 対応](M2-8-test-ci-updates.md) | 中 | 中 | M2-7 | 完了 |
 
 ---
 
@@ -86,10 +86,10 @@
 
 | ID | チケット | 見積り | リスク | 前提 | 状態 |
 |---|---|---|---|---|---|
-| M4-1 | [クロスプラットフォーム互換テスト](M4-1-cross-platform-compat-tests.md) | 中 | 中 | M1-8, M2-8, M3-6 | 未着手 |
-| M4-2 | [音声品質の回帰テスト](M4-2-audio-quality-regression.md) | 小 | 低 | M4-1 | 未着手 |
-| M4-3 | [CLAUDE.md 更新](M4-3-update-claude-md.md) | 小 | 低 | M1-7, M2-7, M3-5 | 未着手 |
-| M4-4 | [最終確認と削除ファイル数確認](M4-4-final-verification.md) | 小 | 低 | M4-1〜M4-3 | 未着手 |
+| M4-1 | [クロスプラットフォーム互換テスト](M4-1-cross-platform-compat-tests.md) | 中 | 中 | M1-8, M2-8, M3-6 | 完了 |
+| M4-2 | [音声品質の回帰テスト](M4-2-audio-quality-regression.md) | 小 | 低 | M4-1 | 完了 |
+| M4-3 | [CLAUDE.md 更新](M4-3-update-claude-md.md) | 小 | 低 | M1-7, M2-7, M3-5 | 完了 |
+| M4-4 | [最終確認と削除ファイル数確認](M4-4-final-verification.md) | 小 | 低 | M4-1〜M4-3 | 完了 |
 
 ---
 
