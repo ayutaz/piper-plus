@@ -206,9 +206,11 @@ nohup /data/piper/.venv/bin/python -m piper_train \
 
 **実装 (Python):** `src/python/g2p/piper_plus_g2p/multilingual.py`, `piper_plus_g2p/{chinese,korean,spanish,portuguese,french,swedish}.py`
 **実装 (Rust):** `src/rust/piper-g2p/src/multilingual.rs`, `piper-g2p/src/{chinese,korean,spanish,portuguese,french,swedish}.rs`
+**実装 (Go):** `src/go/phonemize/multilingual.go` (`github.com/ayutaz/piper-plus-g2p/phonemize` 独立モジュール)
 **実装 (JS):** `src/wasm/g2p/src/` (`@piper-plus/g2p` パッケージ)
 **Phonemizer ABC (Python):** `piper_plus_g2p/base.py` (抽象基底), `piper_plus_g2p/registry.py` (言語レジストリ)
 **Phonemizer ABC (Rust):** `piper-g2p/src/phonemizer.rs` (`piper_plus_g2p::Phonemizer` トレイト)
+**Phonemizer interface (Go):** `src/go/phonemize/phonemizer.go` (`Phonemizer` インターフェース、独立モジュール `github.com/ayutaz/piper-plus-g2p/phonemize`)
 
 ### 言語グループ均等サンプリング (--language-balanced-sampling)
 
@@ -346,6 +348,28 @@ Rust によるONNX推論エンジン。ストリーミング、CUDA/CoreML/Direc
 
 **実装:** `src/rust/piper-core/`, `src/rust/piper-cli/`, `src/rust/piper-python/`
 
+### Go 推論エンジン (piper-plus)
+
+Go 1.26+ による ONNX 推論エンジン。ストリーミング、CUDA/CoreML/DirectML/TensorRT 対応。HTTP API サーバー内蔵。
+
+| 項目 | 詳細 |
+|------|------|
+| モジュール | `github.com/ayutaz/piper-plus/src/go` |
+| 対応言語 | JA, EN, ZH, KO, ES, FR, PT, SV (8言語) |
+| G2P | `github.com/ayutaz/piper-plus-g2p/phonemize` (独立モジュール、他TTSエンジンからも利用可能) |
+| 特徴 | ストリーミング、GPU推論、HTTP API、VoicePool (並行処理)、音素タイミング出力 |
+| ビルド | `go build ./src/go/cmd/piper-plus` |
+
+**追加機能:**
+- VoicePool: 並行合成のためのセッションプール (`NewVoicePool`)
+- HTTP API サーバー: `GET/POST /synthesize`, `GET /health`, `GET /info`
+- 音素タイミング出力: JSON/TSV 形式 (`--output-timing`)
+- モデル管理: 自動 DL + キャッシュ (`ModelManager`)
+- 環境変数: ONNX_RUNTIME_SHARED_LIBRARY_PATH, PIPER_DEFAULT_MODEL, PIPER_MODEL_DIR
+
+**実装:** `src/go/piperplus/`, `src/go/cmd/piper-plus/`
+**G2P 実装 (独立モジュール):** `src/go/phonemize/`
+
 ### JavaScript/WASM npm パッケージ (piper-plus)
 
 ブラウザ内で完全オフラインの多言語 TTS を `npm install piper-plus` で利用可能にする npm パッケージ。eSpeak-ng 不使用 (GPL リスク回避)。
@@ -432,6 +456,22 @@ Rust によるONNX推論エンジン。ストリーミング、CUDA/CoreML/Direc
 | カスタム辞書テスト | `src/rust/piper-core/tests/test_custom_dict_integration.rs` |
 | デフォルト出力テスト | `src/rust/piper-core/tests/test_default_output.rs` |
 | G2P ゴールデンテスト | `src/rust/piper-core/tests/test_g2p_golden.rs` |
+
+### Go ソースコード
+
+| 用途 | パス |
+|------|------|
+| モジュールルート | `src/go/` (モジュール: `github.com/ayutaz/piper-plus/src/go`) |
+| CLI アプリケーション | `src/go/cmd/piper-plus/` |
+| コアライブラリ | `src/go/piperplus/` |
+| G2P モジュール (独立) | `src/go/phonemize/` (モジュール: `github.com/ayutaz/piper-plus-g2p/phonemize`、他TTSエンジンからも利用可能) |
+| G2P Phonemizer インターフェース | `src/go/phonemize/phonemizer.go` |
+| G2P 多言語 | `src/go/phonemize/multilingual.go` |
+| G2P 各言語 | `src/go/phonemize/{japanese,english,chinese,korean,spanish,portuguese,french,swedish}.go` |
+| 推論エンジン | `src/go/piperplus/engine.go` |
+| モデルマネージャ | `src/go/piperplus/model_manager.go` |
+| HTTP サーバー | `src/go/piperplus/server.go` |
+| README | `src/go/README.md` |
 
 ### npm パッケージ ソースコード
 

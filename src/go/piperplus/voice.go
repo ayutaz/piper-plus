@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"sync/atomic"
 
-	"github.com/ayutaz/piper-plus/src/go/phonemize"
+	"github.com/ayutaz/piper-plus-g2p/phonemize"
 )
 
 // Voice represents a loaded TTS model ready for synthesis.

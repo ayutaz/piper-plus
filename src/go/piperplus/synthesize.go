@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"sort"
 
-	"github.com/ayutaz/piper-plus/src/go/phonemize"
+	"github.com/ayutaz/piper-plus-g2p/phonemize"
 )
 
 // createPhonemizer builds the appropriate Phonemizer based on VoiceConfig.
