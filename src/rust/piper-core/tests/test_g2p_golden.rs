@@ -206,11 +206,14 @@ fn test_zh_golden() {
     for case in cases_for(&fixture, "zh") {
         let (tokens, _) = p.phonemize_with_prosody(&case.input).unwrap();
         // ZH: structural checks (tone markers)
+        // Rust phonemizer returns PUA-encoded chars; convert tone names to PUA form.
         if case.expected_contains_any_tone == Some(true) {
-            let tone_tokens = ["tone1", "tone2", "tone3", "tone4", "tone5"];
-            let has_tone = tokens
+            let tone_pua: Vec<String> = ["tone1", "tone2", "tone3", "tone4", "tone5"]
                 .iter()
-                .any(|t: &String| tone_tokens.contains(&t.as_str()));
+                .filter_map(|t| piper_g2p::token_map::token_to_pua(t))
+                .map(|c| c.to_string())
+                .collect();
+            let has_tone = tokens.iter().any(|t| tone_pua.contains(t));
             assert!(
                 has_tone,
                 "ZH output missing tone marker for {:?}: {:?}",

@@ -11,7 +11,7 @@ import sys
 from collections import Counter
 from collections.abc import Iterable
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from multiprocessing import JoinableQueue, Process, Queue
 from pathlib import Path
 
@@ -76,7 +76,7 @@ _LOGGER = logging.getLogger("preprocess")
 _HAS_SIGALRM = hasattr(signal, "SIGALRM")
 
 
-class PhonemeType(str, Enum):
+class PhonemeType(StrEnum):
     ESPEAK = "espeak"
     """Phonemes come from espeak-ng"""
 
