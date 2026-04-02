@@ -239,7 +239,7 @@ def _auto_register() -> None:
 
     Built-in phonemizers are loaded from ``_LANGUAGE_TABLE``.
     Third-party phonemizers are discovered via the
-    ``piper_g2p.phonemizers`` entry-point group.
+    ``piper_plus_g2p.phonemizers`` entry-point group.
     """
     # Built-in phonemizers (table-driven)
     for code, module, class_name in _LANGUAGE_TABLE:
@@ -262,7 +262,7 @@ def _auto_register() -> None:
     try:
         from importlib.metadata import entry_points  # noqa: PLC0415
 
-        for ep in entry_points(group="piper_g2p.phonemizers"):
+        for ep in entry_points(group="piper_plus_g2p.phonemizers"):
             try:
                 cls = ep.load()
                 _default_registry.register(ep.name, cls())

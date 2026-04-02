@@ -1,6 +1,6 @@
-"""Tests for piper_g2p.portuguese -- PortuguesePhonemizer."""
+"""Tests for piper_plus_g2p.portuguese -- PortuguesePhonemizer."""
 
-from piper_g2p.portuguese import PortuguesePhonemizer
+from piper_plus_g2p.portuguese import PortuguesePhonemizer
 
 
 class TestBasic:
@@ -48,7 +48,7 @@ class TestProsody:
 
     def test_prosody_has_stress(self):
         """Stressed syllable has a2=2 in prosody info."""
-        from piper_g2p.base import ProsodyInfo
+        from piper_plus_g2p.base import ProsodyInfo
 
         p = PortuguesePhonemizer()
         tokens, prosody = p.phonemize_with_prosody("Ol\u00e1")

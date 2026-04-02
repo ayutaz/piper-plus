@@ -8,7 +8,7 @@
 
 ## タスク目的とゴール
 
-API が完全に同一である 4 箇所の import を piper_g2p 経由に切り替える。いずれも関数シグネチャ・戻り値が同一のドロップイン置換であり、ロジック変更は不要。
+API が完全に同一である 4 箇所の import を piper_plus_g2p 経由に切り替える。いずれも関数シグネチャ・戻り値が同一のドロップイン置換であり、ロジック変更は不要。
 
 ## 実装する内容の詳細
 
@@ -16,10 +16,10 @@ API が完全に同一である 4 箇所の import を piper_g2p 経由に切り
 
 | ファイル | 行 | 現在の import | 置換後の import | 対象シンボル |
 |---------|-----|--------------|----------------|-------------|
-| `infer_onnx.py` | 31, 62 | `from .phonemize.multilingual import UnicodeLanguageDetector` | `from piper_g2p import UnicodeLanguageDetector` | `UnicodeLanguageDetector` |
-| `infer_onnx.py` | 106 | `from .phonemize.registry import get_phonemizer` | `from piper_g2p import get_phonemizer` | `get_phonemizer` |
-| `vits/lightning.py` | 177 | `from ..phonemize.registry import get_phonemizer` | `from piper_g2p import get_phonemizer` | `get_phonemizer` |
-| `update_model_config.py` | 16 | `from .phonemize.token_mapper import FIXED_PUA_MAPPING, TOKEN2CHAR` | `from piper_g2p.encode.pua import FIXED_PUA_MAPPING, TOKEN2CHAR` | `FIXED_PUA_MAPPING`, `TOKEN2CHAR` |
+| `infer_onnx.py` | 31, 62 | `from .phonemize.multilingual import UnicodeLanguageDetector` | `from piper_plus_g2p import UnicodeLanguageDetector` | `UnicodeLanguageDetector` |
+| `infer_onnx.py` | 106 | `from .phonemize.registry import get_phonemizer` | `from piper_plus_g2p import get_phonemizer` | `get_phonemizer` |
+| `vits/lightning.py` | 177 | `from ..phonemize.registry import get_phonemizer` | `from piper_plus_g2p import get_phonemizer` | `get_phonemizer` |
+| `update_model_config.py` | 16 | `from .phonemize.token_mapper import FIXED_PUA_MAPPING, TOKEN2CHAR` | `from piper_plus_g2p.encode.pua import FIXED_PUA_MAPPING, TOKEN2CHAR` | `FIXED_PUA_MAPPING`, `TOKEN2CHAR` |
 
 ### 変更手順
 
@@ -56,9 +56,9 @@ API が完全に同一である 4 箇所の import を piper_g2p 経由に切り
 
 1. **import 検証**: 各置換後のシンボルが正しく import できることを確認
    ```python
-   from piper_g2p import UnicodeLanguageDetector
-   from piper_g2p import get_phonemizer
-   from piper_g2p import FIXED_PUA_MAPPING, TOKEN2CHAR
+   from piper_plus_g2p import UnicodeLanguageDetector
+   from piper_plus_g2p import get_phonemizer
+   from piper_plus_g2p import FIXED_PUA_MAPPING, TOKEN2CHAR
    ```
 2. **関数呼び出し検証**: `get_phonemizer("ja")` が JapanesePhonemizer インスタンスを返すことを確認
 3. **定数一致検証**: `FIXED_PUA_MAPPING` と `TOKEN2CHAR` の値が旧実装と完全一致することを確認
@@ -79,8 +79,8 @@ API が完全に同一である 4 箇所の import を piper_g2p 経由に切り
 
 ### 懸念事項
 
-1. **piper_g2p の公開 API 名の差異**: piper_g2p 側で `UnicodeLanguageDetector` 等がトップレベル `__init__.py` から公開されていることを事前に確認する必要がある。M0 の API 設計で確定済みの前提だが、念のため確認する
-2. **循環 import**: piper_g2p が piper_train の何かを import している場合に循環が発生する可能性。piper_g2p は独立パッケージなので通常は問題ないが確認する
+1. **piper_plus_g2p の公開 API 名の差異**: piper_plus_g2p 側で `UnicodeLanguageDetector` 等がトップレベル `__init__.py` から公開されていることを事前に確認する必要がある。M0 の API 設計で確定済みの前提だが、念のため確認する
+2. **循環 import**: piper_plus_g2p が piper_train の何かを import している場合に循環が発生する可能性。piper_plus_g2p は独立パッケージなので通常は問題ないが確認する
 
 ### レビュー項目
 
@@ -91,10 +91,10 @@ API が完全に同一である 4 箇所の import を piper_g2p 経由に切り
 
 ## 一から作り直すとしたら
 
-piper_train 内部に G2P コードを持たず、最初から piper_g2p を外部依存として参照する設計にする。そうすれば import 置換作業自体が不要になる。
+piper_train 内部に G2P コードを持たず、最初から piper_plus_g2p を外部依存として参照する設計にする。そうすれば import 置換作業自体が不要になる。
 
 ## 後続タスクへの連絡事項
 
 - このチケットで置換した 4 ファイルの旧 import パス元モジュールは、M1-7 の削除対象候補に含まれる
-- `get_phonemizer` が piper_g2p 側に切り替わったことにより、M1-4 の preprocess.py リファクタでも同じ piper_g2p 版を使用すること
+- `get_phonemizer` が piper_plus_g2p 側に切り替わったことにより、M1-4 の preprocess.py リファクタでも同じ piper_plus_g2p 版を使用すること
 - `UnicodeLanguageDetector`, `FIXED_PUA_MAPPING`, `TOKEN2CHAR` は他のファイルからも参照される可能性があるため、M1-7 の削除前に全参照箇所を再確認すること

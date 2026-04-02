@@ -1,4 +1,4 @@
-"""Tests for piper_g2p.japanese — JapanesePhonemizer."""
+"""Tests for piper_plus_g2p.japanese — JapanesePhonemizer."""
 
 from tests.conftest import requires_ja
 
@@ -7,7 +7,7 @@ from tests.conftest import requires_ja
 class TestBasic:
     def test_basic_phonemize(self):
         """phonemize() returns tokens without BOS marker; '$' is sentence-end."""
-        from piper_g2p.japanese import JapanesePhonemizer
+        from piper_plus_g2p.japanese import JapanesePhonemizer
 
         p = JapanesePhonemizer()
         tokens = p.phonemize("こんにちは")
@@ -16,7 +16,7 @@ class TestBasic:
 
     def test_no_pua_characters(self):
         """phonemize() returns no PUA characters (U+E000-U+F8FF)."""
-        from piper_g2p.japanese import JapanesePhonemizer
+        from piper_plus_g2p.japanese import JapanesePhonemizer
 
         p = JapanesePhonemizer()
         tokens = p.phonemize("東京タワーに行きましょう")
@@ -28,7 +28,7 @@ class TestBasic:
 
     def test_prosody_symbols(self):
         """phonemize() includes prosody markers '#', '[', ']'."""
-        from piper_g2p.japanese import JapanesePhonemizer
+        from piper_plus_g2p.japanese import JapanesePhonemizer
 
         p = JapanesePhonemizer()
         # Use a multi-phrase sentence to trigger prosody markers
@@ -42,7 +42,7 @@ class TestBasic:
 class TestNVariants:
     def test_n_bilabial(self):
         """'新聞' should produce N_m (before bilabial m/b/p)."""
-        from piper_g2p.japanese import JapanesePhonemizer
+        from piper_plus_g2p.japanese import JapanesePhonemizer
 
         p = JapanesePhonemizer()
         tokens = p.phonemize("新聞")
@@ -50,7 +50,7 @@ class TestNVariants:
 
     def test_n_alveolar(self):
         """'こんにちは' should produce N_n (before alveolar n)."""
-        from piper_g2p.japanese import JapanesePhonemizer
+        from piper_plus_g2p.japanese import JapanesePhonemizer
 
         p = JapanesePhonemizer()
         tokens = p.phonemize("こんにちは")
@@ -58,7 +58,7 @@ class TestNVariants:
 
     def test_n_velar(self):
         """'文化' should produce N_ng (before velar k/g)."""
-        from piper_g2p.japanese import JapanesePhonemizer
+        from piper_plus_g2p.japanese import JapanesePhonemizer
 
         p = JapanesePhonemizer()
         tokens = p.phonemize("文化")
@@ -66,7 +66,7 @@ class TestNVariants:
 
     def test_n_uvular(self):
         """'本' should produce N_uvular (phrase-final)."""
-        from piper_g2p.japanese import JapanesePhonemizer
+        from piper_plus_g2p.japanese import JapanesePhonemizer
 
         p = JapanesePhonemizer()
         tokens = p.phonemize("本")
@@ -77,7 +77,7 @@ class TestNVariants:
 class TestQuestionMarkers:
     def test_generic_question(self):
         """'何？' should produce '?' marker."""
-        from piper_g2p.japanese import JapanesePhonemizer
+        from piper_plus_g2p.japanese import JapanesePhonemizer
 
         p = JapanesePhonemizer()
         tokens = p.phonemize("何？")
@@ -85,7 +85,7 @@ class TestQuestionMarkers:
 
     def test_emphatic_question(self):
         """'何？！' should produce '?!' marker."""
-        from piper_g2p.japanese import JapanesePhonemizer
+        from piper_plus_g2p.japanese import JapanesePhonemizer
 
         p = JapanesePhonemizer()
         tokens = p.phonemize("何？！")
@@ -93,7 +93,7 @@ class TestQuestionMarkers:
 
     def test_neutral_question(self):
         """'何。？' should produce '?.' marker."""
-        from piper_g2p.japanese import JapanesePhonemizer
+        from piper_plus_g2p.japanese import JapanesePhonemizer
 
         p = JapanesePhonemizer()
         tokens = p.phonemize("何。？")
@@ -101,7 +101,7 @@ class TestQuestionMarkers:
 
     def test_tag_question(self):
         """'何～？' should produce '?~' marker."""
-        from piper_g2p.japanese import JapanesePhonemizer
+        from piper_plus_g2p.japanese import JapanesePhonemizer
 
         p = JapanesePhonemizer()
         # U+FF5E (full-width tilde) + U+FF1F (full-width question mark)
@@ -113,17 +113,17 @@ class TestQuestionMarkers:
 class TestGetQuestionType:
     def test_get_question_type_declarative(self):
         """Non-question returns '$'."""
-        from piper_g2p.japanese import _get_question_type
+        from piper_plus_g2p.japanese import _get_question_type
 
         assert _get_question_type("今日は良い天気です。") == "$"
 
     def test_get_question_type_question(self):
-        from piper_g2p.japanese import _get_question_type
+        from piper_plus_g2p.japanese import _get_question_type
 
         assert _get_question_type("元気ですか？") == "?"
 
     def test_get_question_type_emphatic(self):
-        from piper_g2p.japanese import _get_question_type
+        from piper_plus_g2p.japanese import _get_question_type
 
         assert _get_question_type("本当ですか？！") == "?!"
 
@@ -132,8 +132,8 @@ class TestGetQuestionType:
 class TestCustomDict:
     def test_japanese_phonemizer_with_custom_dict(self):
         """Custom dict replaces words before phonemization."""
-        from piper_g2p.custom_dict import CustomDictionary
-        from piper_g2p.japanese import JapanesePhonemizer
+        from piper_plus_g2p.custom_dict import CustomDictionary
+        from piper_plus_g2p.japanese import JapanesePhonemizer
 
         d = CustomDictionary(load_defaults=False)
         d.add_word("API", "エーピーアイ")
@@ -144,7 +144,7 @@ class TestCustomDict:
 
     def test_japanese_phonemizer_no_custom_dict(self):
         """Default constructor still works."""
-        from piper_g2p.japanese import JapanesePhonemizer
+        from piper_plus_g2p.japanese import JapanesePhonemizer
 
         p = JapanesePhonemizer()
         tokens = p.phonemize("こんにちは")
@@ -156,7 +156,7 @@ class TestCustomDict:
 class TestProsody:
     def test_prosody_length_matches(self):
         """phonemize_with_prosody returns tokens and prosody of same length."""
-        from piper_g2p.japanese import JapanesePhonemizer
+        from piper_plus_g2p.japanese import JapanesePhonemizer
 
         p = JapanesePhonemizer()
         tokens, prosody = p.phonemize_with_prosody("こんにちは")
@@ -166,8 +166,8 @@ class TestProsody:
 
     def test_prosody_has_values(self):
         """At least some prosody entries are ProsodyInfo (not all None)."""
-        from piper_g2p.base import ProsodyInfo
-        from piper_g2p.japanese import JapanesePhonemizer
+        from piper_plus_g2p.base import ProsodyInfo
+        from piper_plus_g2p.japanese import JapanesePhonemizer
 
         p = JapanesePhonemizer()
         tokens, prosody = p.phonemize_with_prosody("こんにちは")

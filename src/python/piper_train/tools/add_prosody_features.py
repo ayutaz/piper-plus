@@ -10,9 +10,9 @@ import shutil
 from multiprocessing import Pool, cpu_count
 from pathlib import Path
 
-from piper_g2p.encode.id_maps import get_phoneme_id_map
-from piper_g2p.encode.pua import map_token
-from piper_g2p.japanese import JapanesePhonemizer
+from piper_plus_g2p.encode.id_maps import get_phoneme_id_map
+from piper_plus_g2p.encode.pua import map_token
+from piper_plus_g2p.japanese import JapanesePhonemizer
 from tqdm import tqdm
 
 
@@ -27,7 +27,7 @@ def process_utterance(item: dict) -> dict | None:
         phonemes, prosody_info_list = JapanesePhonemizer().phonemize_with_prosody(text)
 
         # phoneme_ids を更新（新しいトークン体系: ?!, ?., ?~, N_m, N_n, N_ng, N_uvular）
-        # piper_g2p returns clean tokens; PUA-map them for id_map lookup
+        # piper_plus_g2p returns clean tokens; PUA-map them for id_map lookup
         id_map = get_phoneme_id_map("ja")
         phoneme_ids = []
         for p in phonemes:

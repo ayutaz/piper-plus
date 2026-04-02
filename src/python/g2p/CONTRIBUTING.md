@@ -6,13 +6,13 @@
 cd src/python/g2p
 uv sync --extra all --extra dev
 uv run pytest                    # run the full test suite
-uv run ruff check piper_g2p/    # lint
-uv run mypy piper_g2p/          # type-check
+uv run ruff check piper_plus_g2p/    # lint
+uv run mypy piper_plus_g2p/          # type-check
 ```
 
 ## How to Add a New Language
 
-1. **Create `piper_g2p/<lang>.py`** -- subclass `Phonemizer` (from `piper_g2p.base`).
+1. **Create `piper_plus_g2p/<lang>.py`** -- subclass `Phonemizer` (from `piper_plus_g2p.base`).
 2. **Implement `phonemize_with_prosody()`** -- return `(tokens, prosody)` where
    `tokens` is a list of IPA strings and `prosody` is a list of `ProsodyInfo | None`.
 3. **Create `tests/test_<lang>.py`** with at least 4 tests: basic phonemization,
@@ -21,7 +21,7 @@ uv run mypy piper_g2p/          # type-check
 4. **Update `pyproject.toml`** -- add the language code under
    `[project.optional-dependencies]` and include any new dependency in the `all` extra.
 5. **Register the phonemizer** -- add a `(code, module, class)` tuple to
-   `_LANGUAGE_TABLE` in `piper_g2p/registry.py`, then open a PR.
+   `_LANGUAGE_TABLE` in `piper_plus_g2p/registry.py`, then open a PR.
 
 ## Plugin System (entry_points)
 
@@ -29,7 +29,7 @@ External packages can register phonemizers without modifying this repo.
 In your package's `pyproject.toml`:
 
 ```toml
-[project.entry-points."piper_g2p.phonemizers"]
+[project.entry-points."piper_plus_g2p.phonemizers"]
 xx = "my_package:MyPhonemizer"
 ```
 

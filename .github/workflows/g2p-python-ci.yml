@@ -34,15 +34,15 @@ jobs:
 
       - name: Ruff check
         working-directory: src/python/g2p
-        run: uv run ruff check piper_g2p/ tests/
+        run: uv run ruff check piper_plus_g2p/ tests/
 
       - name: Ruff format check
         working-directory: src/python/g2p
-        run: uv run ruff format --check piper_g2p/ tests/
+        run: uv run ruff format --check piper_plus_g2p/ tests/
 
       - name: Mypy
         working-directory: src/python/g2p
-        run: uv run mypy --ignore-missing-imports piper_g2p/
+        run: uv run mypy --ignore-missing-imports piper_plus_g2p/
 
   test:
     name: test (${{ matrix.os }}, ${{ matrix.python-version }})
@@ -70,7 +70,7 @@ jobs:
 
       - name: Run tests
         working-directory: src/python/g2p
-        run: uv run pytest --cov=piper_g2p --cov-report=term-missing -v
+        run: uv run pytest --cov=piper_plus_g2p --cov-report=term-missing -v
 
       - name: Upload coverage report
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.13'
@@ -117,8 +117,8 @@ jobs:
         working-directory: src/python/g2p
         run: |
           ls -la dist/
-          test -f dist/piper_g2p-*.whl
-          test -f dist/piper_g2p-*.tar.gz
+          test -f dist/piper_plus_g2p-*.whl
+          test -f dist/piper_plus_g2p-*.tar.gz
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v7

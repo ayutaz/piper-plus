@@ -1,4 +1,4 @@
-"""Tests for piper_g2p.korean -- KoreanPhonemizer.
+"""Tests for piper_plus_g2p.korean -- KoreanPhonemizer.
 
 Test cases exercise the interface, edge cases, Hangul phonemization
 structural properties, phonological features, prosody, and mixed input.
@@ -15,7 +15,7 @@ from tests.conftest import requires_ko
 
 def _make():
     """Create a KoreanPhonemizer instance (import inside function for skip)."""
-    from piper_g2p.korean import KoreanPhonemizer
+    from piper_plus_g2p.korean import KoreanPhonemizer
 
     return KoreanPhonemizer()
 
@@ -66,8 +66,8 @@ class TestAPIStructure:
 
     def test_phonemizer_is_subclass_of_base(self):
         """KoreanPhonemizer inherits from Phonemizer ABC."""
-        from piper_g2p.base import Phonemizer
-        from piper_g2p.korean import KoreanPhonemizer
+        from piper_plus_g2p.base import Phonemizer
+        from piper_plus_g2p.korean import KoreanPhonemizer
 
         assert issubclass(KoreanPhonemizer, Phonemizer)
 
@@ -267,21 +267,21 @@ class TestPhonologicalFeatures:
 
     def test_unreleased_final_k(self):
         """ㄱ in final position maps to unreleased 'k̚'."""
-        from piper_g2p.korean import _FINAL_TO_IPA
+        from piper_plus_g2p.korean import _FINAL_TO_IPA
 
         # Index 1 = ㄱ final
         assert _FINAL_TO_IPA[1] == ["k\u031a"]
 
     def test_unreleased_final_t(self):
         """ㄷ in final position maps to unreleased 't̚'."""
-        from piper_g2p.korean import _FINAL_TO_IPA
+        from piper_plus_g2p.korean import _FINAL_TO_IPA
 
         # Index 7 = ㄷ final
         assert _FINAL_TO_IPA[7] == ["t\u031a"]
 
     def test_unreleased_final_p(self):
         """ㅂ in final position maps to unreleased 'p̚'."""
-        from piper_g2p.korean import _FINAL_TO_IPA
+        from piper_plus_g2p.korean import _FINAL_TO_IPA
 
         # Index 17 = ㅂ final
         assert _FINAL_TO_IPA[17] == ["p\u031a"]
@@ -298,14 +298,14 @@ class TestDecomposition:
 
     def test_is_hangul_syllable_true(self):
         """Hangul syllable block characters are detected."""
-        from piper_g2p.korean import _is_hangul_syllable
+        from piper_plus_g2p.korean import _is_hangul_syllable
 
         assert _is_hangul_syllable("가")  # U+AC00
         assert _is_hangul_syllable("힣")  # U+D7A3
 
     def test_is_hangul_syllable_false(self):
         """Non-Hangul characters are not detected as syllables."""
-        from piper_g2p.korean import _is_hangul_syllable
+        from piper_plus_g2p.korean import _is_hangul_syllable
 
         assert not _is_hangul_syllable("A")
         assert not _is_hangul_syllable("1")
@@ -313,7 +313,7 @@ class TestDecomposition:
 
     def test_decompose_ga(self):
         """'가' decomposes to initial=0(ㄱ), medial=0(ㅏ), final=0(none)."""
-        from piper_g2p.korean import _decompose_syllable
+        from piper_plus_g2p.korean import _decompose_syllable
 
         initial, medial, final = _decompose_syllable("가")
         assert initial == 0  # ㄱ
@@ -322,7 +322,7 @@ class TestDecomposition:
 
     def test_decompose_han(self):
         """'한' decomposes to initial=18(ㅎ), medial=0(ㅏ), final=4(ㄴ)."""
-        from piper_g2p.korean import _decompose_syllable
+        from piper_plus_g2p.korean import _decompose_syllable
 
         initial, medial, final = _decompose_syllable("한")
         assert initial == 18  # ㅎ
@@ -331,21 +331,21 @@ class TestDecomposition:
 
     def test_syllable_to_ipa_ga(self):
         """'가' -> ['k', 'a'] (initial ㄱ=k, medial ㅏ=a, no final)."""
-        from piper_g2p.korean import _syllable_to_ipa
+        from piper_plus_g2p.korean import _syllable_to_ipa
 
         result = _syllable_to_ipa("가")
         assert result == ["k", "a"]
 
     def test_syllable_to_ipa_with_final(self):
         """'강' -> ['k', 'a', 'ŋ'] (initial ㄱ, medial ㅏ, final ㅇ=ŋ)."""
-        from piper_g2p.korean import _syllable_to_ipa
+        from piper_plus_g2p.korean import _syllable_to_ipa
 
         result = _syllable_to_ipa("강")
         assert result == ["k", "a", "ŋ"]
 
     def test_count_hangul_syllables(self):
         """_count_hangul_syllables counts only Hangul syllable blocks."""
-        from piper_g2p.korean import _count_hangul_syllables
+        from piper_plus_g2p.korean import _count_hangul_syllables
 
         assert _count_hangul_syllables("안녕하세요") == 5
         assert _count_hangul_syllables("Hello") == 0
@@ -353,25 +353,25 @@ class TestDecomposition:
 
     def test_initial_table_length(self):
         """Initial consonant IPA table has 19 entries."""
-        from piper_g2p.korean import _INITIAL_TO_IPA
+        from piper_plus_g2p.korean import _INITIAL_TO_IPA
 
         assert len(_INITIAL_TO_IPA) == 19
 
     def test_medial_table_length(self):
         """Medial vowel IPA table has 21 entries."""
-        from piper_g2p.korean import _MEDIAL_TO_IPA
+        from piper_plus_g2p.korean import _MEDIAL_TO_IPA
 
         assert len(_MEDIAL_TO_IPA) == 21
 
     def test_final_table_length(self):
         """Final consonant IPA table has 28 entries."""
-        from piper_g2p.korean import _FINAL_TO_IPA
+        from piper_plus_g2p.korean import _FINAL_TO_IPA
 
         assert len(_FINAL_TO_IPA) == 28
 
     def test_silent_ieung_initial(self):
         """ㅇ in initial position (index 11) maps to empty list (silent)."""
-        from piper_g2p.korean import _INITIAL_TO_IPA
+        from piper_plus_g2p.korean import _INITIAL_TO_IPA
 
         assert _INITIAL_TO_IPA[11] == []
 
@@ -395,7 +395,7 @@ class TestProsody:
 
     def test_prosody_structure(self):
         """Each non-None prosody element has a1, a2, a3 attributes."""
-        from piper_g2p.base import ProsodyInfo
+        from piper_plus_g2p.base import ProsodyInfo
 
         p = _make()
         _, prosody = p.phonemize_with_prosody("한국어")
@@ -461,7 +461,7 @@ class TestProsody:
 
     def test_prosody_space_token(self):
         """Space tokens between words have prosody with a3=0."""
-        from piper_g2p.base import ProsodyInfo
+        from piper_plus_g2p.base import ProsodyInfo
 
         p = _make()
         tokens, prosody = p.phonemize_with_prosody("안녕 하세요")
@@ -581,7 +581,7 @@ class TestModuleFunctions:
 
     def test_phonemize_korean_function(self):
         """phonemize_korean() module function works."""
-        from piper_g2p.korean import phonemize_korean
+        from piper_plus_g2p.korean import phonemize_korean
 
         result = phonemize_korean("안녕하세요")
         assert isinstance(result, list)
@@ -589,7 +589,7 @@ class TestModuleFunctions:
 
     def test_phonemize_korean_with_prosody_function(self):
         """phonemize_korean_with_prosody() module function works."""
-        from piper_g2p.korean import phonemize_korean_with_prosody
+        from piper_plus_g2p.korean import phonemize_korean_with_prosody
 
         tokens, prosody = phonemize_korean_with_prosody("안녕하세요")
         assert isinstance(tokens, list)
@@ -598,7 +598,7 @@ class TestModuleFunctions:
 
     def test_module_exports(self):
         """__all__ contains the expected public names."""
-        from piper_g2p import korean
+        from piper_plus_g2p import korean
 
         assert "phonemize_korean" in korean.__all__
         assert "phonemize_korean_with_prosody" in korean.__all__

@@ -70,7 +70,7 @@ jobs:
         run: |
           python3 -c "
           import json
-          with open('src/python/g2p/piper_g2p/data/pua.json') as f:
+          with open('src/python/g2p/piper_plus_g2p/data/pua.json') as f:
               data = json.load(f)
           with open('tests/fixtures/g2p/phoneme_test_cases.json') as f:
               fixture = json.load(f)
@@ -96,7 +96,7 @@ jobs:
           # Python: count from canonical pua.json
           py_count=$(python3 -c "
           import json
-          with open('src/python/g2p/piper_g2p/data/pua.json') as f:
+          with open('src/python/g2p/piper_plus_g2p/data/pua.json') as f:
               print(len(json.load(f)['entries']))
           ")
           echo "Python PUA entries: $py_count (expected: $EXPECTED)"

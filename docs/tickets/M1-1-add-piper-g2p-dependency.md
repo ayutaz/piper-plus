@@ -49,14 +49,14 @@
 ### テスト項目
 
 - `uv sync` が正常に完了すること
-- `uv run python -c "import piper_g2p"` が成功すること
-- `uv run python -c "from piper_g2p import get_phonemizer, get_phoneme_id_map"` が成功すること
+- `uv run python -c "import piper_plus_g2p"` が成功すること
+- `uv run python -c "from piper_plus_g2p import get_phonemizer, get_phoneme_id_map"` が成功すること
 - 既存の個別言語 import (`import pyopenjtalk`, `import g2p_en` 等) が引き続き動作すること
 
 ### Unit テスト
 
-- `piper_g2p` のインポートが成功することを確認するスモークテスト
-- `piper_g2p` の主要公開 API (`get_phonemizer`, `get_phoneme_id_map`, `PiperEncoder`) が存在することを確認
+- `piper_plus_g2p` のインポートが成功することを確認するスモークテスト
+- `piper_plus_g2p` の主要公開 API (`get_phonemizer`, `get_phoneme_id_map`, `PiperEncoder`) が存在することを確認
 
 ### E2E テスト
 
@@ -82,6 +82,6 @@
 
 ## 後続タスクへの連絡事項
 
-- M1-2 以降のチケットは、このチケットの完了後に `from piper_g2p import ...` が利用可能であることを前提とする
+- M1-2 以降のチケットは、このチケットの完了後に `from piper_plus_g2p import ...` が利用可能であることを前提とする
 - 既存の個別言語 import パスは M1 完了まで並行して動作する。M1-7 で最終削除を行う
 - piper-g2p のバージョンが確定したら、後続チケットの実装者に共有すること

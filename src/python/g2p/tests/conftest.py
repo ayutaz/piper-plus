@@ -69,7 +69,7 @@ requires_piper_train = pytest.mark.skipif(
 def ja_phonemizer():
     if not _has_pyopenjtalk():
         pytest.skip("pyopenjtalk not installed")
-    from piper_g2p import get_phonemizer
+    from piper_plus_g2p import get_phonemizer
 
     return get_phonemizer("ja")
 
@@ -78,6 +78,6 @@ def ja_phonemizer():
 def en_phonemizer():
     if not _has_g2p_en():
         pytest.skip("g2p-en not installed")
-    from piper_g2p import get_phonemizer
+    from piper_plus_g2p import get_phonemizer
 
     return get_phonemizer("en")

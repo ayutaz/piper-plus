@@ -56,13 +56,13 @@ except ImportError:
     phonemize_espeak = None
     tashkeel_run = None
 
-# piper_g2p: G2P and encoding
-from piper_g2p.custom_dict import CustomDictionary
-from piper_g2p.encode.encoder import PiperEncoder
-from piper_g2p.encode.id_maps import get_phoneme_id_map
-from piper_g2p.encode.pua import map_token
-from piper_g2p.japanese import JapanesePhonemizer
-from piper_g2p.multilingual import MultilingualPhonemizer, UnicodeLanguageDetector
+# piper_plus_g2p: G2P and encoding
+from piper_plus_g2p.custom_dict import CustomDictionary
+from piper_plus_g2p.encode.encoder import PiperEncoder
+from piper_plus_g2p.encode.id_maps import get_phoneme_id_map
+from piper_plus_g2p.encode.pua import map_token
+from piper_plus_g2p.japanese import JapanesePhonemizer
+from piper_plus_g2p.multilingual import MultilingualPhonemizer, UnicodeLanguageDetector
 
 from .f0_extraction import cache_f0
 from .norm_audio import cache_norm_audio, cache_norm_audio_fast, make_silence_detector
@@ -689,7 +689,7 @@ def phonemize_batch_openjtalk(
         else:
             _LOGGER.debug(f"No custom dictionary found at {dict_path}")
 
-        # Create JapanesePhonemizer from piper_g2p (once per worker)
+        # Create JapanesePhonemizer from piper_plus_g2p (once per worker)
         ja_phonemizer = JapanesePhonemizer(custom_dict=custom_dict)
 
         timeout_sec = getattr(args, "timeout_seconds", 0)
@@ -716,11 +716,11 @@ def phonemize_batch_openjtalk(
                     if timeout_sec > 0 and _HAS_SIGALRM:
                         signal.alarm(timeout_sec)
                     _LOGGER.debug(utt)
-                    # piper_g2p: clean tokens (no BOS, has EOS, no PUA)
+                    # piper_plus_g2p: clean tokens (no BOS, has EOS, no PUA)
                     raw_tokens, prosody_info_list = (
                         ja_phonemizer.phonemize_with_prosody(casing(utt.text))
                     )
-                    # Prepend BOS "^" (piper_g2p omits it)
+                    # Prepend BOS "^" (piper_plus_g2p omits it)
                     raw_tokens = ["^"] + raw_tokens
                     prosody_info_list = [None] + list(prosody_info_list)
 
@@ -803,7 +803,7 @@ def _phonemize_batch_multilingual_impl(
     Parameters
     ----------
     phonemizer : MultilingualPhonemizer
-        The phonemizer instance to use for text conversion (from piper_g2p).
+        The phonemizer instance to use for text conversion (from piper_plus_g2p).
     label : str
         Label for error logging (e.g. "multilingual" or "bilingual").
     """
@@ -867,12 +867,12 @@ def _phonemize_batch_multilingual_impl(
                     _LOGGER.debug(utt)
                     text = casing(utt.text)
 
-                    # piper_g2p: clean tokens (no BOS, no PUA mapping)
+                    # piper_plus_g2p: clean tokens (no BOS, no PUA mapping)
                     # JA segments may include EOS markers ("$", "?" etc.)
                     raw_tokens, raw_prosody = phonemizer.phonemize_with_prosody(text)
 
                     # Strip EOS markers from segments, tracking the last one
-                    # (piper_g2p MultilingualPhonemizer does not strip them)
+                    # (piper_plus_g2p MultilingualPhonemizer does not strip them)
                     clean_tokens = []
                     clean_prosody = []
                     last_eos = "$"
@@ -950,7 +950,7 @@ def _phonemize_batch_multilingual_impl(
 def phonemize_batch_multilingual(
     args: argparse.Namespace, queue_in: JoinableQueue, queue_out: Queue
 ):
-    """Multilingual (N languages) phonemization using piper_g2p MultilingualPhonemizer."""
+    """Multilingual (N languages) phonemization using piper_plus_g2p MultilingualPhonemizer."""
     lang_parts = getattr(args, "lang_parts", args.language.split("-"))
     phonemizer = MultilingualPhonemizer(lang_parts)
     _phonemize_batch_multilingual_impl(
@@ -961,7 +961,7 @@ def phonemize_batch_multilingual(
 def phonemize_batch_bilingual(
     args: argparse.Namespace, queue_in: JoinableQueue, queue_out: Queue
 ):
-    """Bilingual (JA+EN) phonemization using piper_g2p MultilingualPhonemizer.
+    """Bilingual (JA+EN) phonemization using piper_plus_g2p MultilingualPhonemizer.
 
     Uses MultilingualPhonemizer with ["ja", "en"] language list.
     """

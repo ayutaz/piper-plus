@@ -27,14 +27,14 @@
 
 | 言語 | 現在のコンストラクタ | 新しいコンストラクタ (piper-g2p) |
 |------|--------------------|---------------------------------|
-| ja | `JapanesePhonemizer::new(dict_path)` | `piper_g2p::JapanesePhonemizer::new_bundled()` |
-| en | `EnglishPhonemizer::new(dict_path)` | `piper_g2p::EnglishPhonemizer::new_with_dict(&path)` |
-| zh | `ChinesePhonemizer::new()` | `piper_g2p::ChinesePhonemizer::new(&single, &phrases)` |
-| es | `SpanishPhonemizer::new()` | `piper_g2p::SpanishPhonemizer::new()` |
-| fr | `FrenchPhonemizer::new()` | `piper_g2p::FrenchPhonemizer::new()` |
-| pt | `PortuguesePhonemizer::new()` | `piper_g2p::PortuguesePhonemizer::new()` |
-| ko | `KoreanPhonemizer::new()` | `piper_g2p::KoreanPhonemizer::new()` |
-| sv | `SwedishPhonemizer::new()` | `piper_g2p::SwedishPhonemizer::new()` |
+| ja | `JapanesePhonemizer::new(dict_path)` | `piper_plus_g2p::JapanesePhonemizer::new_bundled()` |
+| en | `EnglishPhonemizer::new(dict_path)` | `piper_plus_g2p::EnglishPhonemizer::new_with_dict(&path)` |
+| zh | `ChinesePhonemizer::new()` | `piper_plus_g2p::ChinesePhonemizer::new(&single, &phrases)` |
+| es | `SpanishPhonemizer::new()` | `piper_plus_g2p::SpanishPhonemizer::new()` |
+| fr | `FrenchPhonemizer::new()` | `piper_plus_g2p::FrenchPhonemizer::new()` |
+| pt | `PortuguesePhonemizer::new()` | `piper_plus_g2p::PortuguesePhonemizer::new()` |
+| ko | `KoreanPhonemizer::new()` | `piper_plus_g2p::KoreanPhonemizer::new()` |
+| sv | `SwedishPhonemizer::new()` | `piper_plus_g2p::SwedishPhonemizer::new()` |
 
 各コンストラクタの戻り値を `G2pAdapter::new()` でラップして返す。
 
@@ -44,7 +44,7 @@
 
 ```rust
 // 辞書パスが無効な場合のフォールバック例
-match piper_g2p::EnglishPhonemizer::new_with_dict(&path) {
+match piper_plus_g2p::EnglishPhonemizer::new_with_dict(&path) {
     Ok(p) => Box::new(G2pAdapter::new(Box::new(p))),
     Err(_) => Box::new(PassthroughPhonemizer::new("en")),
 }
@@ -108,7 +108,7 @@ fn test_factory_fallback_to_passthrough() { ... }
 
 ### 懸念事項
 
-1. **中国語辞書パスの解決ロジック**: `piper_g2p::ChinesePhonemizer::new(&single, &phrases)` は辞書ファイルのパスを要求する。現在の piper-core が辞書パスをどのように解決しているかを確認し、同等のロジックを維持する必要がある
+1. **中国語辞書パスの解決ロジック**: `piper_plus_g2p::ChinesePhonemizer::new(&single, &phrases)` は辞書ファイルのパスを要求する。現在の piper-core が辞書パスをどのように解決しているかを確認し、同等のロジックを維持する必要がある
 2. **日本語辞書バンドリング**: `new_bundled()` は naist-jdic をバイナリに埋め込む。feature gate (`naist-jdic`) が無効の場合の動作を確認すること
 3. **英語辞書パスの互換性**: piper-g2p の `new_with_dict(&path)` が期待する辞書フォーマットが piper-core の現行辞書と互換であることを確認する
 4. **エラーハンドリングの変更**: 各コンストラクタのエラー型が変わるため、呼び出し元のエラーハンドリングが正しく動作するか確認する

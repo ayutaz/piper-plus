@@ -1,8 +1,8 @@
-"""Tests for piper_g2p.base — Phonemizer ABC and ProsodyInfo."""
+"""Tests for piper_plus_g2p.base — Phonemizer ABC and ProsodyInfo."""
 
 import pytest
 
-from piper_g2p.base import Phonemizer, ProsodyInfo
+from piper_plus_g2p.base import Phonemizer, ProsodyInfo
 
 
 class TestProsodyInfo:

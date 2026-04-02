@@ -15,7 +15,7 @@ from pathlib import Path
 
 
 def main():
-    from piper_g2p import available_languages, get_phonemizer
+    from piper_plus_g2p import available_languages, get_phonemizer
 
     DETERMINISTIC_LANGUAGES = ["es", "fr", "pt", "sv"]
 

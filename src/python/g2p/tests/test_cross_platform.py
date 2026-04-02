@@ -53,13 +53,13 @@ class TestPUAMapConsistency:
 
     def test_pua_map_count(self, fixtures):
         """FIXED_PUA_MAPPING entry count matches fixture pua_map_count."""
-        from piper_g2p.encode.pua import FIXED_PUA_MAPPING
+        from piper_plus_g2p.encode.pua import FIXED_PUA_MAPPING
 
         assert len(FIXED_PUA_MAPPING) == fixtures["pua_map_count"]
 
     def test_pua_spot_checks(self, fixtures):
         """PUA spot-check codepoints match fixture expectations."""
-        from piper_g2p.encode.pua import map_token
+        from piper_plus_g2p.encode.pua import map_token
 
         for check in fixtures["pua_spot_checks"]:
             result = map_token(check["token"])
@@ -81,8 +81,8 @@ class TestEncodeConsistency:
 
     @pytest.fixture(autouse=True)
     def _setup_encoder(self):
-        from piper_g2p.encode.encoder import PiperEncoder
-        from piper_g2p.encode.id_maps import get_phoneme_id_map
+        from piper_plus_g2p.encode.encoder import PiperEncoder
+        from piper_plus_g2p.encode.id_maps import get_phoneme_id_map
 
         self._id_map = get_phoneme_id_map("ja")
         self._encoder = PiperEncoder(self._id_map)
@@ -140,7 +140,7 @@ class TestDetectConsistency:
 
     def test_detect_cases(self, fixtures):
         """Language detection matches fixture expectations."""
-        from piper_g2p.multilingual import UnicodeLanguageDetector
+        from piper_plus_g2p.multilingual import UnicodeLanguageDetector
 
         # Build a detector with all languages referenced in the fixture
         all_langs = sorted(
@@ -181,7 +181,7 @@ class TestJAPhonemeFixtures:
 
     def test_ja_token_count_min(self, fixtures):
         """JA phonemize output meets minimum token count."""
-        from piper_g2p import get_phonemizer
+        from piper_plus_g2p import get_phonemizer
 
         p = get_phonemizer("ja")
         for case in _cases_for_language(fixtures, "ja"):
@@ -194,7 +194,7 @@ class TestJAPhonemeFixtures:
 
     def test_ja_contains(self, fixtures):
         """JA phonemize output contains expected tokens."""
-        from piper_g2p import get_phonemizer
+        from piper_plus_g2p import get_phonemizer
 
         p = get_phonemizer("ja")
         for case in _cases_for_language(fixtures, "ja"):
@@ -208,7 +208,7 @@ class TestJAPhonemeFixtures:
 
     def test_ja_question_marker(self, fixtures):
         """JA question sentences produce an interrogative EOS marker."""
-        from piper_g2p import get_phonemizer
+        from piper_plus_g2p import get_phonemizer
 
         p = get_phonemizer("ja")
         for case in _cases_for_language(fixtures, "ja"):
@@ -227,7 +227,7 @@ class TestENPhonemeFixtures:
 
     def test_en_token_count_min(self, fixtures):
         """EN phonemize output meets minimum token count."""
-        from piper_g2p import get_phonemizer
+        from piper_plus_g2p import get_phonemizer
 
         p = get_phonemizer("en")
         for case in _cases_for_language(fixtures, "en"):
@@ -240,7 +240,7 @@ class TestENPhonemeFixtures:
 
     def test_en_contains(self, fixtures):
         """EN phonemize output contains expected tokens."""
-        from piper_g2p import get_phonemizer
+        from piper_plus_g2p import get_phonemizer
 
         p = get_phonemizer("en")
         for case in _cases_for_language(fixtures, "en"):
@@ -259,7 +259,7 @@ class TestZHPhonemeFixtures:
 
     def test_zh_token_count_min(self, fixtures):
         """ZH phonemize output meets minimum token count."""
-        from piper_g2p import get_phonemizer
+        from piper_plus_g2p import get_phonemizer
 
         p = get_phonemizer("zh")
         for case in _cases_for_language(fixtures, "zh"):
@@ -272,7 +272,7 @@ class TestZHPhonemeFixtures:
 
     def test_zh_tone_markers(self, fixtures):
         """ZH phonemize output contains tone markers when expected."""
-        from piper_g2p import get_phonemizer
+        from piper_plus_g2p import get_phonemizer
 
         p = get_phonemizer("zh")
         for case in _cases_for_language(fixtures, "zh"):
@@ -291,7 +291,7 @@ class TestESPhonemeFixtures:
 
     def test_es_exact_tokens(self, fixtures):
         """ES deterministic output matches fixture expected_tokens exactly."""
-        from piper_g2p import get_phonemizer
+        from piper_plus_g2p import get_phonemizer
 
         p = get_phonemizer("es")
         for case in _cases_for_language(fixtures, "es"):
@@ -305,7 +305,7 @@ class TestESPhonemeFixtures:
 
     def test_es_token_count_min(self, fixtures):
         """ES phonemize output meets minimum token count."""
-        from piper_g2p import get_phonemizer
+        from piper_plus_g2p import get_phonemizer
 
         p = get_phonemizer("es")
         for case in _cases_for_language(fixtures, "es"):
@@ -320,7 +320,7 @@ class TestESPhonemeFixtures:
 
     def test_es_contains(self, fixtures):
         """ES phonemize output contains expected tokens."""
-        from piper_g2p import get_phonemizer
+        from piper_plus_g2p import get_phonemizer
 
         p = get_phonemizer("es")
         for case in _cases_for_language(fixtures, "es"):
@@ -338,7 +338,7 @@ class TestFRPhonemeFixtures:
 
     def test_fr_token_count_min(self, fixtures):
         """FR phonemize output meets minimum token count."""
-        from piper_g2p import get_phonemizer
+        from piper_plus_g2p import get_phonemizer
 
         p = get_phonemizer("fr")
         for case in _cases_for_language(fixtures, "fr"):
@@ -351,7 +351,7 @@ class TestFRPhonemeFixtures:
 
     def test_fr_contains(self, fixtures):
         """FR phonemize output contains expected tokens."""
-        from piper_g2p import get_phonemizer
+        from piper_plus_g2p import get_phonemizer
 
         p = get_phonemizer("fr")
         for case in _cases_for_language(fixtures, "fr"):
@@ -369,7 +369,7 @@ class TestPTPhonemeFixtures:
 
     def test_pt_token_count_min(self, fixtures):
         """PT phonemize output meets minimum token count."""
-        from piper_g2p import get_phonemizer
+        from piper_plus_g2p import get_phonemizer
 
         p = get_phonemizer("pt")
         for case in _cases_for_language(fixtures, "pt"):
@@ -382,7 +382,7 @@ class TestPTPhonemeFixtures:
 
     def test_pt_contains(self, fixtures):
         """PT phonemize output contains expected tokens."""
-        from piper_g2p import get_phonemizer
+        from piper_plus_g2p import get_phonemizer
 
         p = get_phonemizer("pt")
         for case in _cases_for_language(fixtures, "pt"):
@@ -401,7 +401,7 @@ class TestKOPhonemeFixtures:
 
     def test_ko_token_count_min(self, fixtures):
         """KO phonemize output meets minimum token count."""
-        from piper_g2p import get_phonemizer
+        from piper_plus_g2p import get_phonemizer
 
         p = get_phonemizer("ko")
         for case in _cases_for_language(fixtures, "ko"):
@@ -414,7 +414,7 @@ class TestKOPhonemeFixtures:
 
     def test_ko_contains(self, fixtures):
         """KO phonemize output contains expected tokens."""
-        from piper_g2p import get_phonemizer
+        from piper_plus_g2p import get_phonemizer
 
         p = get_phonemizer("ko")
         for case in _cases_for_language(fixtures, "ko"):
@@ -436,7 +436,7 @@ class TestSVPhonemeFixtures:
 
     def test_sv_token_count_min(self, fixtures):
         """SV phonemize output meets minimum token count."""
-        from piper_g2p import get_phonemizer
+        from piper_plus_g2p import get_phonemizer
 
         p = get_phonemizer("sv")
         for case in _cases_for_language(fixtures, "sv"):
@@ -449,7 +449,7 @@ class TestSVPhonemeFixtures:
 
     def test_sv_contains(self, fixtures):
         """SV phonemize output contains expected tokens."""
-        from piper_g2p import get_phonemizer
+        from piper_plus_g2p import get_phonemizer
 
         p = get_phonemizer("sv")
         for case in _cases_for_language(fixtures, "sv"):

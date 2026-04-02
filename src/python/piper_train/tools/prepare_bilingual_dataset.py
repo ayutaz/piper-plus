@@ -20,8 +20,8 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from hashlib import sha256 as _sha256
 from pathlib import Path
 
-from piper_g2p.encode.id_maps import get_phoneme_id_map
-from piper_g2p.multilingual import MultilingualPhonemizer
+from piper_plus_g2p.encode.id_maps import get_phoneme_id_map
+from piper_plus_g2p.multilingual import MultilingualPhonemizer
 
 from piper_train.norm_audio import cache_norm_audio, make_silence_detector
 
@@ -444,7 +444,7 @@ _phonemize_worker_state: dict = {}
 
 def _init_phonemize_worker(bilingual_id_map: dict[str, list[int]]):
     """Initialize MultilingualPhonemizer once per worker process."""
-    from piper_g2p.multilingual import MultilingualPhonemizer  # noqa: PLC0415
+    from piper_plus_g2p.multilingual import MultilingualPhonemizer  # noqa: PLC0415
 
     _phonemize_worker_state["phonemizer"] = MultilingualPhonemizer(["ja", "en"])
     _phonemize_worker_state["id_map"] = bilingual_id_map

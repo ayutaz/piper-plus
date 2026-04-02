@@ -52,7 +52,7 @@ grep -r "japanese_phoneme_extract" src/wasm/
 |------------|---------|
 | `ci.yml` | メイン CI (Python テスト + openjtalk-web テスト) |
 | `csharp-ci.yml` | C# テスト (G2P 移行の影響なし) |
-| `rust-tests.yml` | Rust テスト (piper_g2p 依存に移行済み) |
+| `rust-tests.yml` | Rust テスト (piper_plus_g2p 依存に移行済み) |
 | `npm-publish.yml` | npm パッケージビルド・テスト |
 | `g2p-wasm-ci.yml` | @piper-plus/g2p WASM テスト |
 
@@ -126,5 +126,5 @@ grep -r "japanese_phoneme_extract" src/wasm/
 ## 後続タスクへの連絡事項
 
 - このチケットは G2P スタンドアロンパッケージ化プロジェクトの最終チケット。後続タスクなし
-- プロジェクト完了後、`piper_g2p` パッケージの公開 (PyPI / crates.io / npm) は別プロジェクトとして管理する
+- プロジェクト完了後、`piper_plus_g2p` パッケージの公開 (PyPI / crates.io / npm) は別プロジェクトとして管理する
 - CLAUDE.md の「現在の状態」セクションに G2P スタンドアロン化完了を反映する (M4-3 で実施済み)

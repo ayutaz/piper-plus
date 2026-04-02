@@ -8,7 +8,7 @@
 
 ## タスク目的とゴール
 
-`src/python/piper_train/phonemize/` ディレクトリ全体 (24 ファイル、約 4,000 行) を削除する。M1-2 から M1-6 で全ての内部参照が `piper_g2p` に移行済みであることが前提条件。この削除により、G2P ロジックの重複が解消され、piper_g2p が唯一の G2P 実装となる。
+`src/python/piper_train/phonemize/` ディレクトリ全体 (24 ファイル、約 4,000 行) を削除する。M1-2 から M1-6 で全ての内部参照が `piper_plus_g2p` に移行済みであることが前提条件。この削除により、G2P ロジックの重複が解消され、piper_plus_g2p が唯一の G2P 実装となる。
 
 ## 実装する内容の詳細
 
@@ -122,7 +122,7 @@
 ### E2E テスト
 
 - CI マトリクス全エントリ (ubuntu-22.04, windows-latest, macos-latest) で全テストが pass すること
-- `test/` ディレクトリ配下の phonemizer テスト (31 ファイル) が `piper_g2p` 経由で動作すること
+- `test/` ディレクトリ配下の phonemizer テスト (31 ファイル) が `piper_plus_g2p` 経由で動作すること
 
 ## 懸念事項とレビュー項目
 
@@ -143,10 +143,10 @@
 
 ## 一から作り直すとしたら
 
-piper_g2p を設計する時点で、piper_train.phonemize は薄いラッパー (re-export のみ) にリファクタリングし、段階的に参照を移行する戦略を取る。これにより、最終削除がリスクの低い機械的作業になる。
+piper_plus_g2p を設計する時点で、piper_train.phonemize は薄いラッパー (re-export のみ) にリファクタリングし、段階的に参照を移行する戦略を取る。これにより、最終削除がリスクの低い機械的作業になる。
 
 ## 後続タスクへの連絡事項
 
 - M1-8 (テスト・CI 対応): 本チケットの削除により fail するテストがあれば M1-8 で修正すること。特に `test/` ディレクトリ配下の phonemizer テストと `test_compat.py` の `requires_piper_train` デコレータの動作を確認すること
-- M4-3 (CLAUDE.md 更新): 「重要なファイルパス」セクションの phonemize 関連パスを piper_g2p のパスに更新すること
+- M4-3 (CLAUDE.md 更新): 「重要なファイルパス」セクションの phonemize 関連パスを piper_plus_g2p のパスに更新すること
 - pyproject.toml から旧 G2P 依存 (pyopenjtalk-plus, g2p-en, pypinyin, g2pk2) の直接参照を削除するかどうかは M1-1 の後続判断に委ねる

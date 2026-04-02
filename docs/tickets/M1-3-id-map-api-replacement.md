@@ -8,7 +8,7 @@
 
 ## タスク目的とゴール
 
-言語別に分散している ID マップ取得関数 (`get_japanese_id_map()`, `get_bilingual_id_map()`, `get_multilingual_id_map()`) を、piper_g2p の統一 API `get_phoneme_id_map()` に置き換える。これにより言語構成の変更時にコード修正が不要になり、新言語追加のコストが大幅に削減される。
+言語別に分散している ID マップ取得関数 (`get_japanese_id_map()`, `get_bilingual_id_map()`, `get_multilingual_id_map()`) を、piper_plus_g2p の統一 API `get_phoneme_id_map()` に置き換える。これにより言語構成の変更時にコード修正が不要になり、新言語追加のコストが大幅に削減される。
 
 ## 実装する内容の詳細
 
@@ -28,18 +28,18 @@
 
 | ファイル | 行 | 現在のコード | 置換後のコード |
 |---------|-----|-------------|---------------|
-| `preprocess.py` | 76 | `from .phonemize.jp_id_map import get_japanese_id_map` | `from piper_g2p import get_phoneme_id_map` |
+| `preprocess.py` | 76 | `from .phonemize.jp_id_map import get_japanese_id_map` | `from piper_plus_g2p import get_phoneme_id_map` |
 | `preprocess.py` | 230 | `id_map = get_japanese_id_map()` | `id_map = get_phoneme_id_map("ja")` |
 | `preprocess.py` | 244 | `id_map = get_multilingual_id_map(languages)` | `id_map = get_phoneme_id_map("-".join(languages))` |
-| `tools/prepare_bilingual_dataset.py` | 25-30 | `from ..phonemize.bilingual_id_map import get_bilingual_id_map` | `from piper_g2p import get_phoneme_id_map` |
+| `tools/prepare_bilingual_dataset.py` | 25-30 | `from ..phonemize.bilingual_id_map import get_bilingual_id_map` | `from piper_plus_g2p import get_phoneme_id_map` |
 | `tools/prepare_bilingual_dataset.py` | (呼び出し箇所) | `get_bilingual_id_map()` | `get_phoneme_id_map("ja-en")` |
-| `tools/add_prosody_features.py` | 16 | `from ..phonemize.jp_id_map import get_japanese_id_map` | `from piper_g2p import get_phoneme_id_map` |
+| `tools/add_prosody_features.py` | 16 | `from ..phonemize.jp_id_map import get_japanese_id_map` | `from piper_plus_g2p import get_phoneme_id_map` |
 | `tools/add_prosody_features.py` | (呼び出し箇所) | `get_japanese_id_map()` | `get_phoneme_id_map("ja")` |
 | `tools/prepare_multilingual_dataset.py` | 1213 | `get_multilingual_id_map(languages)` | `get_phoneme_id_map("-".join(languages))` |
 
 ### 変更の詳細
 
-1. **import 文の置換**: 各ファイルの言語別 import を `from piper_g2p import get_phoneme_id_map` に統一
+1. **import 文の置換**: 各ファイルの言語別 import を `from piper_plus_g2p import get_phoneme_id_map` に統一
 2. **関数呼び出しの置換**: 上記マッピングに従い呼び出しを置換
 3. **引数形式の変換**: `get_multilingual_id_map` はリスト引数だが、`get_phoneme_id_map` はハイフン区切り文字列。`"-".join(languages)` で変換する
 4. **バイリンガル後方互換**: `get_phoneme_id_map("ja-en")` が旧 `get_bilingual_id_map()` と同一のマップを返すことは M0-3 の互換テストで検証済み

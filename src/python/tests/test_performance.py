@@ -25,8 +25,8 @@ class TestPerformance:
     def test_phonemization_single_conversion(self):
         """Benchmark single text to phoneme conversion"""
         try:
-            from piper_g2p.japanese import JapanesePhonemizer as _JaPhonemizer
-            from piper_g2p.encode.pua import map_token as _mt
+            from piper_plus_g2p.japanese import JapanesePhonemizer as _JaPhonemizer
+            from piper_plus_g2p.encode.pua import map_token as _mt
 
             def phonemize_japanese(text):
                 p = _JaPhonemizer()
@@ -78,8 +78,8 @@ class TestPerformance:
     def test_batch_conversion_performance(self):
         """Benchmark batch text processing"""
         try:
-            from piper_g2p.japanese import JapanesePhonemizer as _JaPhonemizer
-            from piper_g2p.encode.pua import map_token as _mt
+            from piper_plus_g2p.japanese import JapanesePhonemizer as _JaPhonemizer
+            from piper_plus_g2p.encode.pua import map_token as _mt
 
             def phonemize_japanese(text):
                 p = _JaPhonemizer()
@@ -125,8 +125,8 @@ class TestPerformance:
         try:
             import gc
 
-            from piper_g2p.japanese import JapanesePhonemizer as _JaPhonemizer
-            from piper_g2p.encode.pua import map_token as _mt
+            from piper_plus_g2p.japanese import JapanesePhonemizer as _JaPhonemizer
+            from piper_plus_g2p.encode.pua import map_token as _mt
 
             def phonemize_japanese(text):
                 p = _JaPhonemizer()
@@ -197,8 +197,8 @@ class TestPerformance:
     def test_stress_test(self):
         """Stress test with extreme inputs"""
         try:
-            from piper_g2p.japanese import JapanesePhonemizer as _JaPhonemizer
-            from piper_g2p.encode.pua import map_token as _mt
+            from piper_plus_g2p.japanese import JapanesePhonemizer as _JaPhonemizer
+            from piper_plus_g2p.encode.pua import map_token as _mt
 
             def phonemize_japanese(text):
                 p = _JaPhonemizer()

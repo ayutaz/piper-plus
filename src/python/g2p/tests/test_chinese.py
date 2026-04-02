@@ -1,4 +1,4 @@
-"""Tests for piper_g2p.chinese -- ChinesePhonemizer."""
+"""Tests for piper_plus_g2p.chinese -- ChinesePhonemizer."""
 
 from tests.conftest import requires_zh
 
@@ -7,7 +7,7 @@ from tests.conftest import requires_zh
 class TestBasic:
     def test_basic_phonemize(self):
         """phonemize() returns tokens without BOS/EOS markers."""
-        from piper_g2p.chinese import ChinesePhonemizer
+        from piper_plus_g2p.chinese import ChinesePhonemizer
 
         p = ChinesePhonemizer()
         tokens = p.phonemize("你好")
@@ -17,7 +17,7 @@ class TestBasic:
 
     def test_no_pua_characters(self):
         """phonemize() returns no PUA characters (U+E000-U+F8FF)."""
-        from piper_g2p.chinese import ChinesePhonemizer
+        from piper_plus_g2p.chinese import ChinesePhonemizer
 
         p = ChinesePhonemizer()
         tokens = p.phonemize("今天天气很好")
@@ -29,7 +29,7 @@ class TestBasic:
 
     def test_tone_markers(self):
         """phonemize() includes tone markers (tone1 through tone5)."""
-        from piper_g2p.chinese import ChinesePhonemizer
+        from piper_plus_g2p.chinese import ChinesePhonemizer
 
         p = ChinesePhonemizer()
         # Use a sentence with varied tones
@@ -43,7 +43,7 @@ class TestBasic:
 
     def test_punctuation(self):
         """Chinese punctuation characters are processed."""
-        from piper_g2p.chinese import ChinesePhonemizer
+        from piper_plus_g2p.chinese import ChinesePhonemizer
 
         p = ChinesePhonemizer()
         tokens = p.phonemize("你好！")
@@ -54,7 +54,7 @@ class TestBasic:
 class TestProsody:
     def test_prosody_length_matches(self):
         """phonemize_with_prosody returns tokens and prosody of same length."""
-        from piper_g2p.chinese import ChinesePhonemizer
+        from piper_plus_g2p.chinese import ChinesePhonemizer
 
         p = ChinesePhonemizer()
         tokens, prosody = p.phonemize_with_prosody("你好世界")
@@ -64,8 +64,8 @@ class TestProsody:
 
     def test_prosody_has_tone_info(self):
         """ProsodyInfo a1 carries tone number for Chinese characters."""
-        from piper_g2p.base import ProsodyInfo
-        from piper_g2p.chinese import ChinesePhonemizer
+        from piper_plus_g2p.base import ProsodyInfo
+        from piper_plus_g2p.chinese import ChinesePhonemizer
 
         p = ChinesePhonemizer()
         tokens, prosody = p.phonemize_with_prosody("你好")

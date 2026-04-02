@@ -7,9 +7,9 @@ from tests.conftest import requires_en, requires_ja, requires_ko
 class TestJAEndToEnd:
     def test_ja_text_to_ids(self):
         """JA text -> phonemize -> encode -> phoneme_ids produces valid IDs."""
-        from piper_g2p.encode.encoder import PiperEncoder
-        from piper_g2p.encode.id_maps import get_phoneme_id_map
-        from piper_g2p.japanese import JapanesePhonemizer
+        from piper_plus_g2p.encode.encoder import PiperEncoder
+        from piper_plus_g2p.encode.id_maps import get_phoneme_id_map
+        from piper_plus_g2p.japanese import JapanesePhonemizer
 
         p = JapanesePhonemizer()
         tokens = p.phonemize("こんにちは")
@@ -30,9 +30,9 @@ class TestJAEndToEnd:
     def test_ja_prosody_pipeline(self):
         """JA full pipeline with prosody:
         text -> phonemize_with_prosody -> encode_with_prosody."""
-        from piper_g2p.encode.encoder import PiperEncoder
-        from piper_g2p.encode.id_maps import get_phoneme_id_map
-        from piper_g2p.japanese import JapanesePhonemizer
+        from piper_plus_g2p.encode.encoder import PiperEncoder
+        from piper_plus_g2p.encode.id_maps import get_phoneme_id_map
+        from piper_plus_g2p.japanese import JapanesePhonemizer
 
         p = JapanesePhonemizer()
         tokens, prosody = p.phonemize_with_prosody("今日は良い天気ですね。")
@@ -65,7 +65,7 @@ class TestENEndToEnd:
         step produces valid tokens and prosody that could be encoded
         with a config.json-sourced ID map.
         """
-        from piper_g2p.english import EnglishPhonemizer
+        from piper_plus_g2p.english import EnglishPhonemizer
 
         p = EnglishPhonemizer()
         tokens = p.phonemize("Hello world")
@@ -91,9 +91,9 @@ class TestENEndToEnd:
 class TestSwedishE2E:
     def test_sv_phonemize_encode_roundtrip(self):
         """SV text -> phonemize -> encode -> phoneme_ids has BOS/EOS/padding."""
-        from piper_g2p.encode.encoder import PiperEncoder
-        from piper_g2p.encode.id_maps import get_phoneme_id_map
-        from piper_g2p.swedish import SwedishPhonemizer
+        from piper_plus_g2p.encode.encoder import PiperEncoder
+        from piper_plus_g2p.encode.id_maps import get_phoneme_id_map
+        from piper_plus_g2p.swedish import SwedishPhonemizer
 
         p = SwedishPhonemizer()
         tokens = p.phonemize("Hej, hur mår du?")
@@ -113,10 +113,10 @@ class TestSwedishE2E:
 
     def test_sv_pua_tokens_in_ids(self):
         """SV long vowel PUA tokens get proper IDs in multilingual map."""
-        from piper_g2p.encode.encoder import PiperEncoder
-        from piper_g2p.encode.id_maps import get_phoneme_id_map
-        from piper_g2p.encode.pua import map_token
-        from piper_g2p.swedish import SwedishPhonemizer
+        from piper_plus_g2p.encode.encoder import PiperEncoder
+        from piper_plus_g2p.encode.id_maps import get_phoneme_id_map
+        from piper_plus_g2p.encode.pua import map_token
+        from piper_plus_g2p.swedish import SwedishPhonemizer
 
         p = SwedishPhonemizer()
         # "God morgon Sverige" produces long vowels (e.g. eː in Sverige)
@@ -149,9 +149,9 @@ class TestSwedishE2E:
 class TestKoreanE2E:
     def test_ko_phonemize_encode_roundtrip(self):
         """KO text -> phonemize -> encode -> phoneme_ids has BOS/EOS."""
-        from piper_g2p.encode.encoder import PiperEncoder
-        from piper_g2p.encode.id_maps import get_phoneme_id_map
-        from piper_g2p.korean import KoreanPhonemizer
+        from piper_plus_g2p.encode.encoder import PiperEncoder
+        from piper_plus_g2p.encode.id_maps import get_phoneme_id_map
+        from piper_plus_g2p.korean import KoreanPhonemizer
 
         p = KoreanPhonemizer()
         tokens = p.phonemize("안녕하세요")
@@ -171,10 +171,10 @@ class TestKoreanE2E:
 
     def test_ko_pua_tokens_in_ids(self):
         """KO tense/aspirated PUA tokens get proper IDs in multilingual map."""
-        from piper_g2p.encode.encoder import PiperEncoder
-        from piper_g2p.encode.id_maps import get_phoneme_id_map
-        from piper_g2p.encode.pua import map_token
-        from piper_g2p.korean import KoreanPhonemizer
+        from piper_plus_g2p.encode.encoder import PiperEncoder
+        from piper_plus_g2p.encode.id_maps import get_phoneme_id_map
+        from piper_plus_g2p.encode.pua import map_token
+        from piper_plus_g2p.korean import KoreanPhonemizer
 
         p = KoreanPhonemizer()
         # "감사합니다" includes aspirated and tense consonants

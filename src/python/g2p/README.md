@@ -29,7 +29,7 @@ pip install piper-g2p[all]      # All languages with native backends
 ## Quick Start
 
 ```python
-from piper_g2p import get_phonemizer
+from piper_plus_g2p import get_phonemizer
 
 ja = get_phonemizer("ja")
 ja.phonemize("こんにちは")
@@ -62,7 +62,7 @@ automatically create a `MultilingualPhonemizer`. Language detection is
 Unicode-based, so mixed-script text is handled without explicit tagging.
 
 ```python
-from piper_g2p import get_phonemizer
+from piper_plus_g2p import get_phonemizer
 
 multi = get_phonemizer("ja-en-zh")
 tokens = multi.phonemize("こんにちは Hello 你好")
@@ -73,7 +73,7 @@ tokens = multi.phonemize("こんにちは Hello 你好")
 Converts IPA token lists into integer `phoneme_ids` for Piper ONNX models.
 
 ```python
-from piper_g2p.encode import PiperEncoder, get_phoneme_id_map
+from piper_plus_g2p.encode import PiperEncoder, get_phoneme_id_map
 
 id_map = get_phoneme_id_map("ja")
 encoder = PiperEncoder(id_map)
@@ -88,8 +88,8 @@ piper-g2p produces phoneme tokens directly compatible with
 
 ```python
 import json
-from piper_g2p import get_phonemizer
-from piper_g2p.encode import PiperEncoder
+from piper_plus_g2p import get_phonemizer
+from piper_plus_g2p.encode import PiperEncoder
 
 with open("model/config.json") as f:
     config = json.load(f)

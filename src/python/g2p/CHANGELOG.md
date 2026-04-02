@@ -38,4 +38,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Architecture
 - IPA-first: `phonemize()` returns clean IPA tokens; encoding to integer IDs is handled separately by `PiperEncoder`
 - GPL-free: no eSpeak-ng dependency; all runtime dependencies are MIT/Apache-2.0/BSD-3-Clause
-- Plugin system via setuptools `entry_points` (`piper_g2p.phonemizers` group)
+- Plugin system via setuptools `entry_points` (`piper_plus_g2p.phonemizers` group)

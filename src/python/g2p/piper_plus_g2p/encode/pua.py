@@ -4,7 +4,7 @@ Multi-character IPA tokens (e.g. ``"a:"``, ``"ch"``, ``"tɕʰ"``) are mapped
 to single Unicode codepoints in the Private Use Area so that downstream
 ID-map lookups work character-by-character.
 
-The mapping table is loaded from ``piper_g2p/data/pua.json`` which is the
+The mapping table is loaded from ``piper_plus_g2p/data/pua.json`` which is the
 single source of truth shared across Python, Rust and JS implementations.
 Codepoints are baked into trained models and **must not** be changed.
 """
@@ -30,7 +30,7 @@ _log = logging.getLogger(__name__)
 
 def _load_pua_mapping() -> dict[str, int]:
     """Load PUA mapping from the canonical JSON file."""
-    data_files = importlib.resources.files("piper_g2p") / "data" / "pua.json"
+    data_files = importlib.resources.files("piper_plus_g2p") / "data" / "pua.json"
     with (
         importlib.resources.as_file(data_files) as pua_path,
         open(pua_path, encoding="utf-8") as f,

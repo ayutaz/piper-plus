@@ -2,9 +2,9 @@
 
 import pytest
 
-from piper_g2p.base import ProsodyInfo
-from piper_g2p.encode import PiperEncoder
-from piper_g2p.encode.id_maps import get_phoneme_id_map
+from piper_plus_g2p.base import ProsodyInfo
+from piper_plus_g2p.encode import PiperEncoder
+from piper_plus_g2p.encode.id_maps import get_phoneme_id_map
 
 
 @pytest.fixture()

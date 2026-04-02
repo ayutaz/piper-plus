@@ -1,8 +1,8 @@
-"""Tests for piper_g2p.custom_dict -- CustomDictionary."""
+"""Tests for piper_plus_g2p.custom_dict -- CustomDictionary."""
 
 import json
 
-from piper_g2p.custom_dict import CustomDictionary
+from piper_plus_g2p.custom_dict import CustomDictionary
 from tests.conftest import requires_ko
 
 
@@ -147,7 +147,7 @@ class TestSwedishIntegration:
 
     def test_word_replacement(self):
         """Custom dict overrides default phonemization for a Swedish word."""
-        from piper_g2p.swedish import SwedishPhonemizer
+        from piper_plus_g2p.swedish import SwedishPhonemizer
 
         p = SwedishPhonemizer()
 
@@ -166,7 +166,7 @@ class TestSwedishIntegration:
 
     def test_non_overridden_words_unchanged(self):
         """Words not in the custom dict still use default phonemization."""
-        from piper_g2p.swedish import SwedishPhonemizer
+        from piper_plus_g2p.swedish import SwedishPhonemizer
 
         p = SwedishPhonemizer()
         default_tokens = p.phonemize("världen")
@@ -180,7 +180,7 @@ class TestSwedishIntegration:
 
     def test_empty_dict_no_effect(self):
         """Empty custom dict does not alter phonemizer output."""
-        from piper_g2p.swedish import SwedishPhonemizer
+        from piper_plus_g2p.swedish import SwedishPhonemizer
 
         p = SwedishPhonemizer()
         text = "God morgon"
@@ -199,7 +199,7 @@ class TestKoreanIntegration:
 
     def test_word_replacement(self):
         """Custom dict overrides default phonemization for a Korean word."""
-        from piper_g2p.korean import KoreanPhonemizer
+        from piper_plus_g2p.korean import KoreanPhonemizer
 
         p = KoreanPhonemizer()
 
@@ -218,7 +218,7 @@ class TestKoreanIntegration:
 
     def test_non_overridden_words_unchanged(self):
         """Words not in the custom dict still use default phonemization."""
-        from piper_g2p.korean import KoreanPhonemizer
+        from piper_plus_g2p.korean import KoreanPhonemizer
 
         p = KoreanPhonemizer()
         default_tokens = p.phonemize("감사합니다")
@@ -232,7 +232,7 @@ class TestKoreanIntegration:
 
     def test_empty_dict_no_effect(self):
         """Empty custom dict does not alter phonemizer output."""
-        from piper_g2p.korean import KoreanPhonemizer
+        from piper_plus_g2p.korean import KoreanPhonemizer
 
         p = KoreanPhonemizer()
         text = "안녕하세요"

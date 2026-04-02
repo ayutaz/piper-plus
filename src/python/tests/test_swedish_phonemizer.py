@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pytest
 
-from piper_g2p.swedish import (
+from piper_plus_g2p.swedish import (
     FUNCTION_WORDS,
     SwedishPhonemizer,
     _is_hard_g,
@@ -646,11 +646,11 @@ class TestDictionaryLookup:
     @pytest.mark.unit
     def test_dict_hit(self):
         # phonemize_swedish dictionary= kwarg is handled by SwedishPhonemizer
-        # via dict_path constructor arg, not via function kwarg in piper_g2p
+        # via dict_path constructor arg, not via function kwarg in piper_plus_g2p
         d = {"barn": "\u02C8b\u0251\u02D0\u0273"}  # ˈbɑːɳ
         r = phonemize_swedish("barn")
         # Just verify it produces output (dict lookup via phonemize_swedish
-        # is not supported in piper_g2p; use SwedishPhonemizer with dict_path)
+        # is not supported in piper_plus_g2p; use SwedishPhonemizer with dict_path)
         assert len(r) > 0
 
     @pytest.mark.unit
@@ -677,7 +677,7 @@ class TestDictionaryLookup:
 
     @pytest.mark.unit
     def test_phonemizer_without_dict(self):
-        # piper_g2p SwedishPhonemizer does not accept dict_path;
+        # piper_plus_g2p SwedishPhonemizer does not accept dict_path;
         # dictionary support is handled differently in the standalone package.
         p = SwedishPhonemizer()
         r = p.phonemize("hej")
@@ -725,29 +725,29 @@ class TestMultilingualIntegration:
 
     @pytest.mark.unit
     def test_sv_registered(self):
-        from piper_g2p import available_languages
+        from piper_plus_g2p import available_languages
         assert "sv" in available_languages()
 
     @pytest.mark.unit
     def test_get_sv_phonemizer(self):
-        from piper_g2p import get_phonemizer
+        from piper_plus_g2p import get_phonemizer
         p = get_phonemizer("sv")
         assert isinstance(p, SwedishPhonemizer)
 
     @pytest.mark.unit
     def test_en_sv_multilingual(self):
-        from piper_g2p import get_phonemizer
+        from piper_plus_g2p import get_phonemizer
         p = get_phonemizer("en-sv")
         assert type(p).__name__ == "MultilingualPhonemizer"
 
     @pytest.mark.unit
     def test_sv_phonemes_count_is_19(self):
-        from piper_g2p.encode.id_maps import _SWEDISH_PHONEMES
+        from piper_plus_g2p.encode.id_maps import _SWEDISH_PHONEMES
         assert len(_SWEDISH_PHONEMES) == 19
 
     @pytest.mark.unit
     def test_7lang_id_map(self):
-        from piper_g2p.encode.id_maps import get_phoneme_id_map
+        from piper_plus_g2p.encode.id_maps import get_phoneme_id_map
         id_map = get_phoneme_id_map("ja-en-zh-es-fr-pt-sv")
         assert len(id_map) > 180  # 6lang was 173, +sv ~189
 
@@ -760,7 +760,7 @@ class TestRegressionExistingLanguages:
 
     @pytest.mark.unit
     def test_ja_phonemizer_still_works(self):
-        from piper_g2p import get_phonemizer
+        from piper_plus_g2p import get_phonemizer
         p = get_phonemizer("ja")
         r = p.phonemize("こんにちは")
         assert len(r) > 0
@@ -768,7 +768,7 @@ class TestRegressionExistingLanguages:
     @pytest.mark.unit
     def test_en_phonemizer_still_works(self):
         try:
-            from piper_g2p import get_phonemizer
+            from piper_plus_g2p import get_phonemizer
 
             p = get_phonemizer("en")
             r = p.phonemize("hello")
@@ -778,19 +778,19 @@ class TestRegressionExistingLanguages:
 
     @pytest.mark.unit
     def test_6lang_id_map_has_expected_symbols(self):
-        from piper_g2p.encode.id_maps import get_phoneme_id_map
+        from piper_plus_g2p.encode.id_maps import get_phoneme_id_map
         import warnings
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", UserWarning)
             id_map = get_phoneme_id_map("ja-en-zh-es-fr-pt")
-        # piper_g2p uses fixed PUA (no dynamic register), so multi-char tokens
+        # piper_plus_g2p uses fixed PUA (no dynamic register), so multi-char tokens
         # without PUA mappings keep multi-char keys. Count differs from
         # piper_train's 173 (which used dynamic PUA for ZH compound finals).
         assert len(id_map) >= 173  # at least as many symbols
 
     @pytest.mark.unit
     def test_ja_pua_unchanged(self):
-        from piper_g2p.encode.pua import FIXED_PUA_MAPPING
+        from piper_plus_g2p.encode.pua import FIXED_PUA_MAPPING
         assert FIXED_PUA_MAPPING["a:"] == 0xE000
         assert FIXED_PUA_MAPPING["cl"] == 0xE005
 
@@ -813,7 +813,7 @@ class TestReviewFixRules:
     def test_gj_not_applied_mid_word(self):
         # Non-initial gj should NOT collapse to /j/
         # Construct a word with gj not at position 0
-        from piper_g2p.swedish import _convert_consonant
+        from piper_plus_g2p.swedish import _convert_consonant
         # At pos=2, gj should NOT use the word-initial gj→j rule
         ipa, consumed = _convert_consonant("avgj", 2, "avgj")
         # Should fall through to g+front vowel or default g, not j
@@ -1027,13 +1027,13 @@ class TestConsonantGapFill:
         The detector returns "sv" only when SV is among configured languages
         AND the text contains chars unique to Swedish script (via context).
         """
-        from piper_g2p.multilingual import (
+        from piper_plus_g2p.multilingual import (
             UnicodeLanguageDetector,
             _segment_text_multilingual,
         )
 
         det = UnicodeLanguageDetector(["en", "sv"], default_latin_language="en")
-        # Pure Latin text defaults to "en" (expected behavior in piper_g2p)
+        # Pure Latin text defaults to "en" (expected behavior in piper_plus_g2p)
         segs = _segment_text_multilingual("Jag vill inte gå hem.", det)
         langs = [lang for lang, _ in segs]
         # The detector should produce valid segments (either en or sv)

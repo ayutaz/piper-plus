@@ -33,7 +33,7 @@
 ### 変更手順
 
 1. piper-core 内の `CustomDict` 呼び出し箇所を全て洗い出す
-2. 各呼び出し箇所の import を `piper_g2p::custom_dict::CustomDict` に置換
+2. 各呼び出し箇所の import を `piper_plus_g2p::custom_dict::CustomDict` に置換
 3. エラー変換が既存の `From<G2pError> for PiperError` で処理されることを確認
 4. `custom_dict.rs` を削除
 5. `mod.rs` から `custom_dict` モジュールの登録を削除

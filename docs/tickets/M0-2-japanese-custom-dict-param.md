@@ -8,16 +8,16 @@
 
 ## タスク目的とゴール
 
-`piper_train` の `preprocess.py:733` は `phonemize_japanese_with_prosody(text, custom_dict=custom_dict)` を呼び出すが、`piper_g2p` の `JapanesePhonemizer` には `custom_dict` パラメータが存在しない。
-`piper_g2p/custom_dict.py` に `CustomDictionary` クラスは既に実装済みだが、`JapanesePhonemizer.phonemize()` / `phonemize_with_prosody()` に統合されていない。
+`piper_train` の `preprocess.py:733` は `phonemize_japanese_with_prosody(text, custom_dict=custom_dict)` を呼び出すが、`piper_plus_g2p` の `JapanesePhonemizer` には `custom_dict` パラメータが存在しない。
+`piper_plus_g2p/custom_dict.py` に `CustomDictionary` クラスは既に実装済みだが、`JapanesePhonemizer.phonemize()` / `phonemize_with_prosody()` に統合されていない。
 
-**ゴール**: `JapanesePhonemizer` の `phonemize()` と `phonemize_with_prosody()` が `custom_dict` を受け取り、音素化前にカスタム辞書によるテキスト置換を適用する。preprocess.py から `piper_g2p` への移行時にカスタム辞書機能が失われないようにする。
+**ゴール**: `JapanesePhonemizer` の `phonemize()` と `phonemize_with_prosody()` が `custom_dict` を受け取り、音素化前にカスタム辞書によるテキスト置換を適用する。preprocess.py から `piper_plus_g2p` への移行時にカスタム辞書機能が失われないようにする。
 
 ## 実装する内容の詳細
 
 ### 変更箇所
 
-**ファイル**: `src/python/g2p/piper_g2p/japanese.py:207-233`
+**ファイル**: `src/python/g2p/piper_plus_g2p/japanese.py:207-233`
 
 #### 1. `JapanesePhonemizer` にコンストラクタを追加
 
@@ -65,7 +65,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from piper_g2p.custom_dict import CustomDictionary
+    from piper_plus_g2p.custom_dict import CustomDictionary
 ```
 
 `TYPE_CHECKING` ガードにより、実行時の循環 import を回避する。
@@ -78,7 +78,7 @@ if TYPE_CHECKING:
 
 ### 確認事項
 
-- `CustomDictionary.apply_to_text(text)` メソッドが存在し、テキスト置換を行うことを確認する (`src/python/g2p/piper_g2p/custom_dict.py`)
+- `CustomDictionary.apply_to_text(text)` メソッドが存在し、テキスト置換を行うことを確認する (`src/python/g2p/piper_plus_g2p/custom_dict.py`)
 - 実際のメソッド名は `apply_to_text()` である (`apply()` ではない)
 
 ## エージェントチーム構成
@@ -92,7 +92,7 @@ if TYPE_CHECKING:
 
 ### 提供範囲
 
-- `src/python/g2p/piper_g2p/japanese.py` の `JapanesePhonemizer` クラス修正 (~10行追加)
+- `src/python/g2p/piper_plus_g2p/japanese.py` の `JapanesePhonemizer` クラス修正 (~10行追加)
 - ユニットテスト追加
 - 既存テストの通過確認 (`custom_dict=None` がデフォルトなので後方互換性あり)
 
@@ -118,7 +118,7 @@ class TestJapanesePhonemizer CustomDict:
     @requires_ja
     def test_phonemize_with_custom_dict(self):
         """custom_dict で 'API' -> 'エーピーアイ' を置換後に音素化"""
-        from piper_g2p.custom_dict import CustomDictionary
+        from piper_plus_g2p.custom_dict import CustomDictionary
         d = CustomDictionary(load_defaults=False)
         d.add_entry("API", "エーピーアイ")
         p = JapanesePhonemizer(custom_dict=d)
@@ -129,7 +129,7 @@ class TestJapanesePhonemizer CustomDict:
     @requires_ja
     def test_phonemize_with_prosody_custom_dict(self):
         """phonemize_with_prosody でも custom_dict が適用される"""
-        from piper_g2p.custom_dict import CustomDictionary
+        from piper_plus_g2p.custom_dict import CustomDictionary
         d = CustomDictionary(load_defaults=False)
         d.add_entry("API", "エーピーアイ")
         p = JapanesePhonemizer(custom_dict=d)
@@ -144,8 +144,8 @@ class TestJapanesePhonemizer CustomDict:
 @requires_ja
 def test_custom_dict_full_pipeline(self):
     """custom_dict -> phonemize -> encode -> phoneme_ids の全パイプライン"""
-    from piper_g2p.custom_dict import CustomDictionary
-    from piper_g2p.encode import PiperEncoder, get_phoneme_id_map
+    from piper_plus_g2p.custom_dict import CustomDictionary
+    from piper_plus_g2p.encode import PiperEncoder, get_phoneme_id_map
 
     d = CustomDictionary(load_defaults=False)
     d.add_entry("API", "エーピーアイ")

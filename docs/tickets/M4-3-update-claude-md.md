@@ -8,7 +8,7 @@
 
 ## タスク目的とゴール
 
-`CLAUDE.md` を G2P 移行完了後の状態に更新する。旧音素化モジュールのファイルパスを削除し、`piper_g2p` パッケージへの依存関係を追記し、「多言語 Phonemizer」セクションの実装パスを新しい構成に合わせて更新する。
+`CLAUDE.md` を G2P 移行完了後の状態に更新する。旧音素化モジュールのファイルパスを削除し、`piper_plus_g2p` パッケージへの依存関係を追記し、「多言語 Phonemizer」セクションの実装パスを新しい構成に合わせて更新する。
 
 ## 実装する内容の詳細
 
@@ -21,8 +21,8 @@
 ```
 
 変更後:
-- 実装パスを `piper_g2p` パッケージに変更
-- `piper_g2p` パッケージが全プラットフォーム (Python/Rust/JS) で共通の G2P 基盤を提供することを記載
+- 実装パスを `piper_plus_g2p` パッケージに変更
+- `piper_plus_g2p` パッケージが全プラットフォーム (Python/Rust/JS) で共通の G2P 基盤を提供することを記載
 
 ### 2. 「重要なファイルパス > ソースコード」テーブルの更新
 
@@ -32,7 +32,7 @@
 - その他: `phonemize/base.py`, `phonemize/registry.py`, `phonemize/token_mapper.py`, `phonemize/multilingual.py`, `phonemize/multilingual_id_map.py`, `phonemize/bilingual.py`, `phonemize/bilingual_id_map.py`
 
 追加するパス:
-- `piper_g2p` パッケージへの参照 (パッケージ構成とインポートパス)
+- `piper_plus_g2p` パッケージへの参照 (パッケージ構成とインポートパス)
 
 ### 3. 「重要なファイルパス > npm パッケージ ソースコード」テーブルの更新
 
@@ -48,20 +48,20 @@
 - `src/rust/piper-core/src/phonemize/` 以下の各言語ファイル
 
 追加するパス:
-- `piper_g2p` クレートへの参照
+- `piper_plus_g2p` クレートへの参照
 
-### 5. `piper_g2p` 依存関係の追記
+### 5. `piper_plus_g2p` 依存関係の追記
 
 「実装済み機能」セクションまたは新セクションとして:
-- `piper_g2p` パッケージの概要 (スタンドアロン G2P パッケージ)
+- `piper_plus_g2p` パッケージの概要 (スタンドアロン G2P パッケージ)
 - 対応プラットフォーム: Python (PyPI), Rust (crates.io), JS (npm @piper-plus/g2p)
-- 依存関係の構成 (piper_train → piper_g2p, piper-core → piper_g2p, openjtalk-web → @piper-plus/g2p)
+- 依存関係の構成 (piper_train → piper_plus_g2p, piper-core → piper_plus_g2p, openjtalk-web → @piper-plus/g2p)
 
 ### 変更ファイル
 
 | ファイル | 変更内容 |
 |---------|---------|
-| `CLAUDE.md` | 多言語 Phonemizer セクション更新、ファイルパステーブル更新、piper_g2p 依存追記 |
+| `CLAUDE.md` | 多言語 Phonemizer セクション更新、ファイルパステーブル更新、piper_plus_g2p 依存追記 |
 
 ## エージェントチーム構成
 
@@ -78,7 +78,7 @@
 ### テスト項目
 
 - CLAUDE.md に記載されたファイルパスが実際に存在すること (削除済みパスが残っていないこと)
-- piper_g2p の依存関係記述が正確であること
+- piper_plus_g2p の依存関係記述が正確であること
 
 ### Unit テスト
 
@@ -98,7 +98,7 @@
 ### レビュー項目
 
 1. 削除済みファイルパスが CLAUDE.md に残っていないこと
-2. 新規追加パス (`piper_g2p` 関連) が正確であること
+2. 新規追加パス (`piper_plus_g2p` 関連) が正確であること
 3. セクション間の整合性 (「実装済み機能」と「ファイルパス」が一致)
 4. マークダウンの書式が壊れていないこと
 

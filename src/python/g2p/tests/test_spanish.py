@@ -1,6 +1,6 @@
-"""Tests for piper_g2p.spanish -- SpanishPhonemizer."""
+"""Tests for piper_plus_g2p.spanish -- SpanishPhonemizer."""
 
-from piper_g2p.spanish import SpanishPhonemizer
+from piper_plus_g2p.spanish import SpanishPhonemizer
 
 
 class TestBasic:
@@ -40,7 +40,7 @@ class TestProsody:
 
     def test_prosody_stress_value(self):
         """Stressed phonemes have a2=2 in prosody info."""
-        from piper_g2p.base import ProsodyInfo
+        from piper_plus_g2p.base import ProsodyInfo
 
         p = SpanishPhonemizer()
         tokens, prosody = p.phonemize_with_prosody("Hola")

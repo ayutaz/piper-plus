@@ -1,8 +1,8 @@
 """Tests for English G2P module (g2p-en based)."""
 
 from piper_train.infer_onnx import text_to_phoneme_ids_and_prosody
-from piper_g2p.base import ProsodyInfo
-from piper_g2p.english import (
+from piper_plus_g2p.base import ProsodyInfo
+from piper_plus_g2p.english import (
     ARPABET_TO_IPA,
     _arpabet_to_ipa,
     _convert_word_to_ipa,

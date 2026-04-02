@@ -9,9 +9,9 @@ import pytest
 try:
     import pyopenjtalk  # noqa: F401
 
-    from piper_g2p import ProsodyInfo
-    from piper_g2p.japanese import JapanesePhonemizer
-    from piper_g2p.encode.pua import map_token as _map_token
+    from piper_plus_g2p import ProsodyInfo
+    from piper_plus_g2p.japanese import JapanesePhonemizer
+    from piper_plus_g2p.encode.pua import map_token as _map_token
 
     _EOS_TOKENS = {"$", "?", "?!", "?.", "?~"}
 
@@ -19,7 +19,7 @@ try:
         """Wrapper that matches old piper_train API: returns PUA-mapped tokens with BOS/EOS."""
         p = JapanesePhonemizer()
         tokens = p.phonemize(text)
-        # piper_g2p returns raw tokens; add BOS and EOS
+        # piper_plus_g2p returns raw tokens; add BOS and EOS
         full_tokens = ["^"] + list(tokens)
         if not tokens or tokens[-1] not in _EOS_TOKENS:
             full_tokens.append("$")
@@ -476,7 +476,7 @@ class TestProsodyDatasetValidation:
         if not HAS_JAPANESE:
             pytest.skip("Japanese phonemizer not available")
 
-        from piper_g2p.encode.id_maps import get_phoneme_id_map as _get_map
+        from piper_plus_g2p.encode.id_maps import get_phoneme_id_map as _get_map
 
         def get_japanese_id_map():
             return _get_map("ja")

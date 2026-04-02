@@ -19,7 +19,7 @@ from pathlib import Path
 import numpy as np
 import onnxruntime
 import soundfile as sf
-from piper_g2p.registry import get_phonemizer
+from piper_plus_g2p.registry import get_phonemizer
 
 
 _LOGGER = logging.getLogger(__name__)

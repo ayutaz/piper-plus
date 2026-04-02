@@ -8,7 +8,7 @@
 
 ## タスク目的とゴール
 
-`src/python/piper_train/tools/` 配下の 3 つのデータセット準備スクリプトが `piper_train.phonemize` を直接 import している。これらを `piper_g2p` 経由の import に書き換え、旧 phonemize ディレクトリへの依存を解消する。また、PiperEncoder が代替するヘルパー関数 (ID リマップ・パディング挿入) を削除する。
+`src/python/piper_train/tools/` 配下の 3 つのデータセット準備スクリプトが `piper_train.phonemize` を直接 import している。これらを `piper_plus_g2p` 経由の import に書き換え、旧 phonemize ディレクトリへの依存を解消する。また、PiperEncoder が代替するヘルパー関数 (ID リマップ・パディング挿入) を削除する。
 
 ## 実装する内容の詳細
 
@@ -18,11 +18,11 @@
 
 | 箇所 | 旧 import | 新 import |
 |------|----------|----------|
-| L279-281 | `from piper_train.phonemize.multilingual import MultilingualPhonemizer` | `from piper_g2p.multilingual import MultilingualPhonemizer` |
-| L282 | `from piper_train.phonemize.registry import get_phonemizer` | `from piper_g2p.registry import get_phonemizer` |
-| L374-376 | `from piper_train.phonemize.multilingual import MultilingualPhonemizer` | `from piper_g2p.multilingual import MultilingualPhonemizer` |
-| L390 | `from piper_train.phonemize.chinese import phonemize_from_pinyin_syllables` | `from piper_g2p.chinese import phonemize_from_pinyin_syllables` |
-| L1213-1215 | `from piper_train.phonemize.multilingual_id_map import get_multilingual_id_map` | `from piper_g2p.encode.id_maps import get_phoneme_id_map` |
+| L279-281 | `from piper_train.phonemize.multilingual import MultilingualPhonemizer` | `from piper_plus_g2p.multilingual import MultilingualPhonemizer` |
+| L282 | `from piper_train.phonemize.registry import get_phonemizer` | `from piper_plus_g2p.registry import get_phonemizer` |
+| L374-376 | `from piper_train.phonemize.multilingual import MultilingualPhonemizer` | `from piper_plus_g2p.multilingual import MultilingualPhonemizer` |
+| L390 | `from piper_train.phonemize.chinese import phonemize_from_pinyin_syllables` | `from piper_plus_g2p.chinese import phonemize_from_pinyin_syllables` |
+| L1213-1215 | `from piper_train.phonemize.multilingual_id_map import get_multilingual_id_map` | `from piper_plus_g2p.encode.id_maps import get_phoneme_id_map` |
 
 API 変更:
 - `get_multilingual_id_map(languages)` を `get_phoneme_id_map("ja-en-zh-es-fr-pt")` に変更 (リスト引数からハイフン区切り文字列に)
@@ -33,9 +33,9 @@ API 変更:
 
 | 箇所 | 旧 import | 新 import |
 |------|----------|----------|
-| L23 | `from piper_train.phonemize.bilingual import BilingualPhonemizer` | `from piper_g2p.multilingual import MultilingualPhonemizer` |
-| L24-26 | `from piper_train.phonemize.bilingual_id_map import get_bilingual_id_map` | `from piper_g2p.encode.id_maps import get_phoneme_id_map` |
-| L27-29 | `from piper_train.phonemize.jp_id_map import get_japanese_id_map` | `from piper_g2p.encode.id_maps import get_phoneme_id_map` |
+| L23 | `from piper_train.phonemize.bilingual import BilingualPhonemizer` | `from piper_plus_g2p.multilingual import MultilingualPhonemizer` |
+| L24-26 | `from piper_train.phonemize.bilingual_id_map import get_bilingual_id_map` | `from piper_plus_g2p.encode.id_maps import get_phoneme_id_map` |
+| L27-29 | `from piper_train.phonemize.jp_id_map import get_japanese_id_map` | `from piper_plus_g2p.encode.id_maps import get_phoneme_id_map` |
 
 削除する関数:
 - `remap_ja_phoneme_ids()` (L43-67): PiperEncoder が ID マッピングを一貫して処理するため不要
@@ -47,8 +47,8 @@ API 変更:
 
 | 箇所 | 旧 import | 新 import |
 |------|----------|----------|
-| L14 | `from piper_train.phonemize.japanese import phonemize_japanese_with_prosody` | `from piper_g2p.japanese import phonemize_japanese_with_prosody` |
-| L15 | `from piper_train.phonemize.jp_id_map import get_japanese_id_map` | `from piper_g2p.encode.id_maps import get_phoneme_id_map` |
+| L14 | `from piper_train.phonemize.japanese import phonemize_japanese_with_prosody` | `from piper_plus_g2p.japanese import phonemize_japanese_with_prosody` |
+| L15 | `from piper_train.phonemize.jp_id_map import get_japanese_id_map` | `from piper_plus_g2p.encode.id_maps import get_phoneme_id_map` |
 
 API 変更:
 - `get_japanese_id_map()` を `get_phoneme_id_map("ja")` に変更
@@ -92,8 +92,8 @@ API 変更:
 ### 懸念事項
 
 1. **`remap_ja_phoneme_ids()` と `_add_inter_phoneme_padding()` の完全代替**: PiperEncoder がこれらの関数のすべてのエッジケース (空リスト、BOS/EOS ストリッピング、既存パディングのスキップ等) をカバーしているか検証が必要。`remap_ja_phoneme_ids()` と `_add_inter_phoneme_padding()` の挙動が PiperEncoder で完全に再現されることを、実装前に手動テストで確認すること。具体的には、同一入力に対して旧関数と PiperEncoder の出力 (phoneme_ids, prosody_features) を比較し、完全一致することを検証する。差異がある場合は PiperEncoder 側の修正を M0 に追加する。
-2. **AISHELL-3 pinyin ショートカット**: `_phonemize_zh_pinyin_single` が `piper_g2p.chinese.phonemize_from_pinyin_syllables` を使用可能か (関数シグネチャの互換性)
-3. **Worker プロセスの初期化**: `ProcessPoolExecutor` の worker 内で `piper_g2p` の import が正常に動作すること (マルチプロセス環境でのモジュール初期化)
+2. **AISHELL-3 pinyin ショートカット**: `_phonemize_zh_pinyin_single` が `piper_plus_g2p.chinese.phonemize_from_pinyin_syllables` を使用可能か (関数シグネチャの互換性)
+3. **Worker プロセスの初期化**: `ProcessPoolExecutor` の worker 内で `piper_plus_g2p` の import が正常に動作すること (マルチプロセス環境でのモジュール初期化)
 4. **行番号の参照値について**: 行番号は調査時点の参照値。実装時は関数名で grep して最新位置を確認すること。
 
 ### レビュー項目
@@ -104,7 +104,7 @@ API 変更:
 
 ## 一から作り直すとしたら
 
-tools/ スクリプトは piper_g2p が最初に作られた時点で真っ先に移行すべきだった。データセット準備ツールは G2P パイプラインの主要な消費者であり、piper_g2p の設計段階でこれらのユースケースを考慮していれば、`remap_ja_phoneme_ids()` のような中間的なヘルパー関数は最初から不要だった。
+tools/ スクリプトは piper_plus_g2p が最初に作られた時点で真っ先に移行すべきだった。データセット準備ツールは G2P パイプラインの主要な消費者であり、piper_plus_g2p の設計段階でこれらのユースケースを考慮していれば、`remap_ja_phoneme_ids()` のような中間的なヘルパー関数は最初から不要だった。
 
 ## 後続タスクへの連絡事項
 

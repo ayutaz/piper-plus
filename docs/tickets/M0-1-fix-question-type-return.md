@@ -8,19 +8,19 @@
 
 ## タスク目的とゴール
 
-`piper_g2p` の `_get_question_type()` が非疑問文に対して空文字列 `""` を返す。
+`piper_plus_g2p` の `_get_question_type()` が非疑問文に対して空文字列 `""` を返す。
 一方 `piper_train` 側では非疑問文の EOS マーカーとして `"$"` を返す。
 この不一致により、`MultilingualPhonemizer` が EOS トークンを正しく追跡できない。
 
 **ゴール**: `_get_question_type()` が非疑問文に対して `"$"` を返すようにする。
-piper_train と piper_g2p の EOS 動作が完全に一致し、`MultilingualPhonemizer` の
+piper_train と piper_plus_g2p の EOS 動作が完全に一致し、`MultilingualPhonemizer` の
 EOS 追跡が正常に機能する状態。
 
 ## 実装する内容の詳細
 
 ### 変更箇所
 
-**ファイル**: `src/python/g2p/piper_g2p/japanese.py:77`
+**ファイル**: `src/python/g2p/piper_plus_g2p/japanese.py:77`
 
 ```python
 # 変更前 (L77)
@@ -33,12 +33,12 @@ return "$"  # Not a question — declarative EOS
 1行変更のみ。ただし以下を確認すること:
 
 - `_get_question_type()` の呼び出し元を全て検索し、空文字列に依存するロジックがないか確認する
-- `piper_g2p/japanese.py` 内の `_phonemize_core()` で `_get_question_type()` の戻り値がどのように使われるか確認する
+- `piper_plus_g2p/japanese.py` 内の `_phonemize_core()` で `_get_question_type()` の戻り値がどのように使われるか確認する
 - `_SKIP_TOKENS` (L81) には既に `"$"` が含まれているため、N phoneme ルール等への影響はない
 
 ### 影響確認
 
-`_get_question_type()` の呼び出し箇所 (`src/python/g2p/piper_g2p/japanese.py` 内):
+`_get_question_type()` の呼び出し箇所 (`src/python/g2p/piper_plus_g2p/japanese.py` 内):
 
 - `_phonemize_core()` 内で呼ばれ、戻り値が空文字列でない場合にトークンリストに追加される
 - 空文字列 `""` を返す場合、EOS マーカーが追加されない動作になっている
@@ -55,7 +55,7 @@ return "$"  # Not a question — declarative EOS
 
 ### 提供範囲
 
-- `src/python/g2p/piper_g2p/japanese.py` の `_get_question_type()` 修正 (1行)
+- `src/python/g2p/piper_plus_g2p/japanese.py` の `_get_question_type()` 修正 (1行)
 - ユニットテスト追加
 - 既存テストの通過確認
 
@@ -100,7 +100,7 @@ class TestGetQuestionType:
 def test_ja_declarative_eos_is_dollar(self):
     """MultilingualPhonemizer で JA 非疑問文を処理し、
     EOS トークンが '$' であることを確認"""
-    # piper_g2p の JapanesePhonemizer で非疑問文を処理
+    # piper_plus_g2p の JapanesePhonemizer で非疑問文を処理
     # tokens の末尾が "$" であることを検証
     # piper_train の phonemize_japanese() と一致することを検証
 ```
@@ -167,4 +167,4 @@ class TestPhonemizeCoreEosIntegration:
 
 - M1-4 (preprocess.py リファクタリング) は、この修正により `_get_question_type()` が常に有効な EOS マーカーを返すことを前提とする
 - テスト結果 (特に二重 EOS の有無) をチケット完了時に記載すること
-- `piper_train` 側の `_get_question_type()` と `piper_g2p` 側の出力が完全一致することの確認結果を記載すること
+- `piper_train` 側の `_get_question_type()` と `piper_plus_g2p` 側の出力が完全一致することの確認結果を記載すること

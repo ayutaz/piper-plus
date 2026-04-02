@@ -7,7 +7,7 @@ should be reviewed and updated intentionally.
 
 import pytest
 
-from piper_g2p import get_phonemizer
+from piper_plus_g2p import get_phonemizer
 
 # =====================================================================
 # JA snapshots (requires pyopenjtalk)

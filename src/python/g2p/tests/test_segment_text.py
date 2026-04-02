@@ -1,6 +1,6 @@
 """Tests for MultilingualPhonemizer.segment_text()."""
 
-from piper_g2p.multilingual import MultilingualPhonemizer
+from piper_plus_g2p.multilingual import MultilingualPhonemizer
 
 
 class TestSegmentText:

@@ -34,7 +34,7 @@ class Phonemizer(ABC):
 
     phonemize() returns IPA token lists.
     BOS/EOS/padding/PUA encoding is NOT included — that is
-    the responsibility of ``piper_g2p.encode.PiperEncoder``.
+    the responsibility of ``piper_plus_g2p.encode.PiperEncoder``.
     """
 
     MAX_INPUT_LENGTH: int = 10_000  # character limit

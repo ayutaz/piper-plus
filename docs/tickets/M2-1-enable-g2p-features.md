@@ -94,6 +94,6 @@ piper-core の Cargo.toml で piper-g2p を最初から `features = ["all-langua
 
 ## 後続タスクへの連絡事項
 
-- M2-2 以降のチケットは、このチケットの完了後に `piper_g2p` の全言語 Phonemizer が piper-core から利用可能であることを前提とする
+- M2-2 以降のチケットは、このチケットの完了後に `piper_plus_g2p` の全言語 Phonemizer が piper-core から利用可能であることを前提とする
 - ビルド時間の計測結果を共有すること (CI タイムアウト調整の判断材料)
 - `Cargo.lock` の変更は大きくなる可能性があるため、コミットメッセージにその旨を記載すること

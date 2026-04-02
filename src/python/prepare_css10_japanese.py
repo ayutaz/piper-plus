@@ -16,9 +16,9 @@ from tqdm import tqdm
 
 sys.path.append(str(Path(__file__).parent))
 
-from piper_g2p.encode.id_maps import get_phoneme_id_map
-from piper_g2p.encode.pua import map_token
-from piper_g2p.japanese import JapanesePhonemizer
+from piper_plus_g2p.encode.id_maps import get_phoneme_id_map
+from piper_plus_g2p.encode.pua import map_token
+from piper_plus_g2p.japanese import JapanesePhonemizer
 
 
 def get_japanese_id_map():

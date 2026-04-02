@@ -1,9 +1,9 @@
-"""Tests for piper_g2p.registry — language phonemizer registry."""
+"""Tests for piper_plus_g2p.registry — language phonemizer registry."""
 
 import pytest
 
-from piper_g2p.base import Phonemizer
-from piper_g2p.registry import (
+from piper_plus_g2p.base import Phonemizer
+from piper_plus_g2p.registry import (
     available_languages,
     get_phonemizer,
     register_language,
@@ -47,6 +47,6 @@ class TestRegistry:
         """
         # If we got this far, the module imported without error.
         # Re-invoke to ensure idempotent behavior.
-        from piper_g2p.registry import _auto_register
+        from piper_plus_g2p.registry import _auto_register
 
         _auto_register()  # should not raise

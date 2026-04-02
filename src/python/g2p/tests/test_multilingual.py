@@ -1,4 +1,4 @@
-"""Tests for piper_g2p.multilingual -- MultilingualPhonemizer."""
+"""Tests for piper_plus_g2p.multilingual -- MultilingualPhonemizer."""
 
 import pytest
 
@@ -8,7 +8,7 @@ from tests.conftest import requires_en, requires_ja, requires_zh
 class TestUnicodeDetector:
     def test_unicode_detector_latin(self):
         """UnicodeLanguageDetector classifies Latin characters correctly."""
-        from piper_g2p.multilingual import UnicodeLanguageDetector
+        from piper_plus_g2p.multilingual import UnicodeLanguageDetector
 
         detector = UnicodeLanguageDetector(["ja", "en"], default_latin_language="en")
         assert detector.detect_char("A") == "en"
@@ -16,7 +16,7 @@ class TestUnicodeDetector:
 
     def test_unicode_detector_kana(self):
         """UnicodeLanguageDetector classifies kana as Japanese."""
-        from piper_g2p.multilingual import UnicodeLanguageDetector
+        from piper_plus_g2p.multilingual import UnicodeLanguageDetector
 
         detector = UnicodeLanguageDetector(["ja", "en"], default_latin_language="en")
         assert detector.detect_char("\u3042") == "ja"  # hiragana 'a'
@@ -24,7 +24,7 @@ class TestUnicodeDetector:
 
     def test_unicode_detector_cjk_disambiguation(self):
         """CJK ideographs are disambiguated by kana context."""
-        from piper_g2p.multilingual import UnicodeLanguageDetector
+        from piper_plus_g2p.multilingual import UnicodeLanguageDetector
 
         detector = UnicodeLanguageDetector(["ja", "zh"], default_latin_language="ja")
         # Without kana context -> zh
@@ -34,7 +34,7 @@ class TestUnicodeDetector:
 
     def test_unicode_detector_hangul(self):
         """UnicodeLanguageDetector classifies Hangul as Korean."""
-        from piper_g2p.multilingual import UnicodeLanguageDetector
+        from piper_plus_g2p.multilingual import UnicodeLanguageDetector
 
         detector = UnicodeLanguageDetector(
             ["ja", "en", "ko"], default_latin_language="en"
@@ -43,7 +43,7 @@ class TestUnicodeDetector:
 
     def test_unicode_detector_neutral(self):
         """Neutral characters (digits, whitespace) return None."""
-        from piper_g2p.multilingual import UnicodeLanguageDetector
+        from piper_plus_g2p.multilingual import UnicodeLanguageDetector
 
         detector = UnicodeLanguageDetector(["ja", "en"], default_latin_language="en")
         assert detector.detect_char("1") is None
@@ -53,7 +53,7 @@ class TestUnicodeDetector:
 class TestCompositeCode:
     def test_composite_code(self):
         """get_phonemizer('ja-en') returns a MultilingualPhonemizer."""
-        from piper_g2p.registry import get_phonemizer
+        from piper_plus_g2p.registry import get_phonemizer
 
         # This requires at least 'ja' and 'en' to be registered.
         # If they are not available, skip gracefully.
@@ -61,13 +61,13 @@ class TestCompositeCode:
             p = get_phonemizer("ja-en")
         except ValueError:
             pytest.skip("ja and/or en phonemizers not registered")
-        from piper_g2p.multilingual import MultilingualPhonemizer
+        from piper_plus_g2p.multilingual import MultilingualPhonemizer
 
         assert isinstance(p, MultilingualPhonemizer)
 
     def test_canonical_key(self):
         """'ja-en' and 'en-ja' resolve to the same instance."""
-        from piper_g2p.registry import get_phonemizer
+        from piper_plus_g2p.registry import get_phonemizer
 
         try:
             p1 = get_phonemizer("ja-en")
@@ -78,7 +78,7 @@ class TestCompositeCode:
 
     def test_missing_language_raises(self):
         """Composite code with an unknown language raises ValueError."""
-        from piper_g2p.registry import get_phonemizer
+        from piper_plus_g2p.registry import get_phonemizer
 
         with pytest.raises(ValueError, match="Missing language"):
             get_phonemizer("ja-xx")
@@ -88,7 +88,7 @@ class TestCompositeCode:
 class TestMixedText:
     def test_ja_en_mixed(self):
         """Mixed Japanese-English text is phonemized without error."""
-        from piper_g2p.registry import get_phonemizer
+        from piper_plus_g2p.registry import get_phonemizer
 
         try:
             p = get_phonemizer("ja-en")
@@ -99,7 +99,7 @@ class TestMixedText:
 
     def test_prosody_length(self):
         """phonemize_with_prosody returns tokens and prosody of same length."""
-        from piper_g2p.registry import get_phonemizer
+        from piper_plus_g2p.registry import get_phonemizer
 
         try:
             p = get_phonemizer("ja-en")
@@ -120,7 +120,7 @@ class TestMixedLanguageText:
     @requires_en
     def test_mixed_ja_en(self):
         """Japanese-English mixed text produces phonemes from both languages."""
-        from piper_g2p.registry import get_phonemizer
+        from piper_plus_g2p.registry import get_phonemizer
 
         p = get_phonemizer("ja-en")
         # "こんにちは Hello"
@@ -135,7 +135,7 @@ class TestMixedLanguageText:
     @requires_zh
     def test_mixed_ja_zh(self):
         """CJK mixed text: Japanese with kana context disambiguates from Chinese."""
-        from piper_g2p.registry import get_phonemizer
+        from piper_plus_g2p.registry import get_phonemizer
 
         p = get_phonemizer("ja-zh")
         # "東京は Tokyo 北京是 Beijing" -- kana は triggers JA context for CJK
@@ -158,7 +158,7 @@ class TestMixedLanguageText:
     @requires_zh
     def test_mixed_three_languages(self):
         """Three-language mixed text (JA + EN + ZH) is phonemized correctly."""
-        from piper_g2p.registry import get_phonemizer
+        from piper_plus_g2p.registry import get_phonemizer
 
         p = get_phonemizer("ja-en-zh")
         # "こんにちは Hello 你好" -- JA kana + EN Latin + ZH ideographs
@@ -174,7 +174,7 @@ class TestMixedLanguageText:
     @requires_en
     def test_mixed_en_es_fr(self):
         """Three Latin-script languages: EN is default_latin, ES/FR are rule-based."""
-        from piper_g2p.registry import get_phonemizer
+        from piper_plus_g2p.registry import get_phonemizer
 
         # ES and FR are rule-based (always available). EN requires g2p-en.
         p = get_phonemizer("en-es-fr")
@@ -185,7 +185,7 @@ class TestMixedLanguageText:
     @requires_ja
     def test_single_language_in_multilingual_ja(self):
         """Single-language JA text through a multilingual phonemizer."""
-        from piper_g2p.registry import get_phonemizer
+        from piper_plus_g2p.registry import get_phonemizer
 
         try:
             p = get_phonemizer("ja-en")
@@ -200,7 +200,7 @@ class TestMixedLanguageText:
     @requires_en
     def test_single_language_in_multilingual_en(self):
         """Single-language EN text through a multilingual phonemizer."""
-        from piper_g2p.registry import get_phonemizer
+        from piper_plus_g2p.registry import get_phonemizer
 
         # ES is rule-based (always available), EN requires g2p-en
         p = get_phonemizer("en-es")
@@ -212,7 +212,7 @@ class TestMixedLanguageText:
 
     def test_single_language_in_multilingual_es(self):
         """Single-language ES text through a multilingual phonemizer (rule-based)."""
-        from piper_g2p.registry import get_phonemizer
+        from piper_plus_g2p.registry import get_phonemizer
 
         # ES, FR, PT are all rule-based -- no external dependency
         p = get_phonemizer("es-fr")
@@ -221,7 +221,7 @@ class TestMixedLanguageText:
 
     def test_empty_string_multilingual(self):
         """Empty string returns empty token list."""
-        from piper_g2p.registry import get_phonemizer
+        from piper_plus_g2p.registry import get_phonemizer
 
         # ES and PT are rule-based (always available)
         p = get_phonemizer("es-pt")
@@ -234,7 +234,7 @@ class TestMixedLanguageText:
 
     def test_whitespace_only_multilingual(self):
         """Whitespace-only string returns empty token list."""
-        from piper_g2p.registry import get_phonemizer
+        from piper_plus_g2p.registry import get_phonemizer
 
         p = get_phonemizer("es-pt")
         tokens = p.phonemize("   ")
@@ -248,7 +248,7 @@ class TestMixedLanguageText:
     @requires_en
     def test_mixed_ja_en_prosody_alignment(self):
         """Prosody alignment holds for multi-segment JA+EN text."""
-        from piper_g2p.registry import get_phonemizer
+        from piper_plus_g2p.registry import get_phonemizer
 
         p = get_phonemizer("ja-en")
         # Multiple switches: JA -> EN -> JA

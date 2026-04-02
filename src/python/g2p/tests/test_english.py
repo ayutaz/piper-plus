@@ -1,4 +1,4 @@
-"""Tests for piper_g2p.english — EnglishPhonemizer."""
+"""Tests for piper_plus_g2p.english — EnglishPhonemizer."""
 
 from tests.conftest import requires_en
 
@@ -7,7 +7,7 @@ from tests.conftest import requires_en
 class TestBasic:
     def test_basic_phonemize(self):
         """phonemize() returns a non-empty token list."""
-        from piper_g2p.english import EnglishPhonemizer
+        from piper_plus_g2p.english import EnglishPhonemizer
 
         p = EnglishPhonemizer()
         tokens = p.phonemize("Hello")
@@ -15,7 +15,7 @@ class TestBasic:
 
     def test_word_boundary(self):
         """'Hello world' contains a space token as word boundary."""
-        from piper_g2p.english import EnglishPhonemizer
+        from piper_plus_g2p.english import EnglishPhonemizer
 
         p = EnglishPhonemizer()
         tokens = p.phonemize("Hello world")
@@ -26,7 +26,7 @@ class TestBasic:
 class TestStress:
     def test_primary_stress(self):
         """'happy' should include primary stress marker."""
-        from piper_g2p.english import EnglishPhonemizer
+        from piper_plus_g2p.english import EnglishPhonemizer
 
         p = EnglishPhonemizer()
         tokens = p.phonemize("happy")
@@ -34,7 +34,7 @@ class TestStress:
 
     def test_secondary_stress(self):
         """'multiplication' should include secondary stress marker."""
-        from piper_g2p.english import EnglishPhonemizer
+        from piper_plus_g2p.english import EnglishPhonemizer
 
         p = EnglishPhonemizer()
         tokens = p.phonemize("multiplication")
@@ -42,7 +42,7 @@ class TestStress:
 
     def test_function_word_no_stress(self):
         """Function word 'the' in 'the cat' should have stress removed (a2=0)."""
-        from piper_g2p.english import EnglishPhonemizer
+        from piper_plus_g2p.english import EnglishPhonemizer
 
         p = EnglishPhonemizer()
         tokens, prosody = p.phonemize_with_prosody("the cat")
@@ -58,7 +58,7 @@ class TestStress:
 class TestProsody:
     def test_prosody_a1_zero(self):
         """English prosody a1 is always 0."""
-        from piper_g2p.english import EnglishPhonemizer
+        from piper_plus_g2p.english import EnglishPhonemizer
 
         p = EnglishPhonemizer()
         _tokens, prosody = p.phonemize_with_prosody("Hello world")
@@ -68,7 +68,7 @@ class TestProsody:
 
     def test_prosody_length_matches(self):
         """phonemize_with_prosody returns tokens and prosody of same length."""
-        from piper_g2p.english import EnglishPhonemizer
+        from piper_plus_g2p.english import EnglishPhonemizer
 
         p = EnglishPhonemizer()
         tokens, prosody = p.phonemize_with_prosody("Hello world")

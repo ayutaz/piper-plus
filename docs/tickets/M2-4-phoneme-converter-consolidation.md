@@ -8,7 +8,7 @@
 
 ## タスク目的とゴール
 
-`piper-core/src/phonemize/phoneme_converter.rs` に含まれる `tokens_to_ids()` と `prosody_to_features()` を piper-g2p の `piper_g2p::encode` モジュールに統合し、重複コードを削除する。
+`piper-core/src/phonemize/phoneme_converter.rs` に含まれる `tokens_to_ids()` と `prosody_to_features()` を piper-g2p の `piper_plus_g2p::encode` モジュールに統合し、重複コードを削除する。
 
 piper-core と piper-g2p の両方に同一機能の `tokens_to_ids()` と `prosody_to_features()` が存在しており、メンテナンスコストが二重になっている。piper-g2p 側の実装を正とし、piper-core 側を削除する。
 
@@ -25,14 +25,14 @@ piper-core と piper-g2p の両方に同一機能の `tokens_to_ids()` と `pros
 - `prosody_to_features()` -- A1/A2/A3 prosody 値を特徴量テンソルに変換
 - `build_synthesis_request()` -- phoneme_ids + prosody_features から SynthesisRequest を構築
 
-**piper-g2p**: `piper_g2p::encode` モジュール
+**piper-g2p**: `piper_plus_g2p::encode` モジュール
 - `tokens_to_ids()` -- 同一機能
 - `prosody_to_features()` -- 同一機能
 
 ### 変更手順
 
-1. piper-core 内の `tokens_to_ids()` 呼び出しを `piper_g2p::encode::tokens_to_ids()` に置換
-2. piper-core 内の `prosody_to_features()` 呼び出しを `piper_g2p::encode::prosody_to_features()` に置換
+1. piper-core 内の `tokens_to_ids()` 呼び出しを `piper_plus_g2p::encode::tokens_to_ids()` に置換
+2. piper-core 内の `prosody_to_features()` 呼び出しを `piper_plus_g2p::encode::prosody_to_features()` に置換
 3. `build_synthesis_request()` を voice.rs (または新規 `synthesis.rs` モジュール) に移動
 4. `phoneme_converter.rs` を削除
 5. `mod.rs` から `phoneme_converter` モジュールの登録を削除

@@ -1,6 +1,6 @@
-"""Tests for piper_g2p.french -- FrenchPhonemizer."""
+"""Tests for piper_plus_g2p.french -- FrenchPhonemizer."""
 
-from piper_g2p.french import FrenchPhonemizer
+from piper_plus_g2p.french import FrenchPhonemizer
 
 
 class TestBasic:
@@ -44,7 +44,7 @@ class TestProsody:
 
     def test_prosody_has_stress(self):
         """French word-final syllable receives stress (a2=2)."""
-        from piper_g2p.base import ProsodyInfo
+        from piper_plus_g2p.base import ProsodyInfo
 
         p = FrenchPhonemizer()
         tokens, prosody = p.phonemize_with_prosody("Bonjour")

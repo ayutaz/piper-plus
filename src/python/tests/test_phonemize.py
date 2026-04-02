@@ -4,7 +4,7 @@ Unified phonemization tests - combines all phonemization testing
 
 import pytest
 
-from piper_g2p.encode.pua import (
+from piper_plus_g2p.encode.pua import (
     CHAR2TOKEN,
     TOKEN2CHAR,
     map_token,
@@ -20,8 +20,8 @@ def map_sequence(tokens: list[str]) -> list[str]:
 try:
     import pyopenjtalk  # noqa: F401
 
-    from piper_g2p.japanese import JapanesePhonemizer
-    from piper_g2p.encode.pua import map_token as _map_token
+    from piper_plus_g2p.japanese import JapanesePhonemizer
+    from piper_plus_g2p.encode.pua import map_token as _map_token
 
     def phonemize_japanese(text):
         """Wrapper that matches old piper_train API: returns PUA-mapped tokens with BOS/EOS."""

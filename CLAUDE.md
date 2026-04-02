@@ -204,11 +204,11 @@ nohup /data/piper/.venv/bin/python -m piper_train \
 
 > **Note:** スウェーデン語 (sv) と韓国語 (ko) はG2Pコード実装済みだが、学習済みモデルには未含有 (sv=6, ko=7)。
 
-**実装 (Python):** `src/python/g2p/piper_g2p/multilingual.py`, `piper_g2p/{chinese,korean,spanish,portuguese,french,swedish}.py`
+**実装 (Python):** `src/python/g2p/piper_plus_g2p/multilingual.py`, `piper_plus_g2p/{chinese,korean,spanish,portuguese,french,swedish}.py`
 **実装 (Rust):** `src/rust/piper-g2p/src/multilingual.rs`, `piper-g2p/src/{chinese,korean,spanish,portuguese,french,swedish}.rs`
 **実装 (JS):** `src/wasm/g2p/src/` (`@piper-plus/g2p` パッケージ)
-**Phonemizer ABC (Python):** `piper_g2p/base.py` (抽象基底), `piper_g2p/registry.py` (言語レジストリ)
-**Phonemizer ABC (Rust):** `piper-g2p/src/phonemizer.rs` (`piper_g2p::Phonemizer` トレイト)
+**Phonemizer ABC (Python):** `piper_plus_g2p/base.py` (抽象基底), `piper_plus_g2p/registry.py` (言語レジストリ)
+**Phonemizer ABC (Rust):** `piper-g2p/src/phonemizer.rs` (`piper_plus_g2p::Phonemizer` トレイト)
 
 ### 言語グループ均等サンプリング (--language-balanced-sampling)
 
@@ -385,9 +385,9 @@ Rust によるONNX推論エンジン。ストリーミング、CUDA/CoreML/Direc
 | VITS実装 | `src/python/piper_train/vits/` |
 | ONNXエクスポート | `src/python/piper_train/export_onnx.py` |
 | 推論スクリプト | `src/python/piper_train/infer_onnx.py` |
-| G2P パッケージ (Python) | `src/python/g2p/piper_g2p/` (piper-g2p スタンドアロンパッケージ) |
-| 多言語Phonemizer (Python) | `src/python/g2p/piper_g2p/multilingual.py` |
-| 各言語Phonemizer (Python) | `src/python/g2p/piper_g2p/{japanese,english,chinese,korean,spanish,portuguese,french,swedish}.py` |
+| G2P パッケージ (Python) | `src/python/g2p/piper_plus_g2p/` (piper-g2p スタンドアロンパッケージ) |
+| 多言語Phonemizer (Python) | `src/python/g2p/piper_plus_g2p/multilingual.py` |
+| 各言語Phonemizer (Python) | `src/python/g2p/piper_plus_g2p/{japanese,english,chinese,korean,spanish,portuguese,french,swedish}.py` |
 | クロスプラットフォームテスト | `src/python/g2p/tests/test_cross_platform.py` |
 
 ### C# ソースコード

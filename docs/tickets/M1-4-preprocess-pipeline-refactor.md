@@ -8,7 +8,7 @@
 
 ## タスク目的とゴール
 
-preprocess.py の音素化パイプラインを piper_g2p に移行する。preprocess.py には 2 つの独立した音素化パスが存在し、それぞれ異なる BOS/EOS/パディング処理を行っている。この移行により、音素化ロジックを piper_g2p に委譲し、BOS/EOS/パディングの責務を PiperEncoder に統一する。
+preprocess.py の音素化パイプラインを piper_plus_g2p に移行する。preprocess.py には 2 つの独立した音素化パスが存在し、それぞれ異なる BOS/EOS/パディング処理を行っている。この移行により、音素化ロジックを piper_plus_g2p に委譲し、BOS/EOS/パディングの責務を PiperEncoder に統一する。
 
 **これは M1 で最もリスクの高いチケットである。** BOS/EOS の欠落は学習データの破損に直結し、モデル品質に不可逆的な影響を与える。
 
@@ -57,7 +57,7 @@ preprocess.py には 2 つの音素化パスが存在する:
 
 ```
 移行後のフロー (パス A / パス B 共通):
-  piper_g2p の Phonemizer.phonemize_with_prosody(text)
+  piper_plus_g2p の Phonemizer.phonemize_with_prosody(text)
     → 純粋な IPA トークン列 (BOS/EOS なし)
     → PiperEncoder.encode_with_prosody()
       → BOS/EOS/パディングの付与
@@ -65,7 +65,7 @@ preprocess.py には 2 つの音素化パスが存在する:
       → phoneme_ids + prosody_features を出力
 ```
 
-- piper_g2p の Phonemizer は純粋な IPA トークンのみを返す (BOS/EOS を含まない)
+- piper_plus_g2p の Phonemizer は純粋な IPA トークンのみを返す (BOS/EOS を含まない)
 - PiperEncoder が BOS/EOS/パディングの付与とトークン → ID 変換を一括で担当
 - 日本語疑問文の動的 EOS も PiperEncoder 内で処理
 
@@ -77,14 +77,14 @@ preprocess.py には 2 つの音素化パスが存在する:
 
 | 項目 | 現在 | 移行後 |
 |------|------|--------|
-| 音素化関数 | `phonemize_japanese_with_prosody(text, custom_dict=...)` | `piper_g2p.JapanesePhonemizer(custom_dict=...).phonemize_with_prosody(text)` |
+| 音素化関数 | `phonemize_japanese_with_prosody(text, custom_dict=...)` | `piper_plus_g2p.JapanesePhonemizer(custom_dict=...).phonemize_with_prosody(text)` |
 | 戻り値 | BOS/EOS 埋め込み済みトークン列 | 純粋な IPA トークン列 (BOS/EOS なし) |
 
 **パス B (マルチリンガル):**
 
 | 項目 | 現在 | 移行後 |
 |------|------|--------|
-| 音素化クラス | `piper_train.phonemize.MultilingualPhonemizer` | `piper_g2p.MultilingualPhonemizer` |
+| 音素化クラス | `piper_train.phonemize.MultilingualPhonemizer` | `piper_plus_g2p.MultilingualPhonemizer` |
 | 戻り値 | セグメント単位の BOS/EOS 除去済みトークン列 | 純粋な IPA トークン列 (BOS/EOS なし) |
 
 #### 作業 2: PiperEncoder による BOS/EOS/パディングの付与
@@ -99,7 +99,7 @@ preprocess.py には 2 つの音素化パスが存在する:
   - フォニーム間パディング (id=0) の挿入
   - 日本語疑問文の動的 EOS マーカー処理
 
-**危険: パス A で PiperEncoder を追加し忘れると、BOS/EOS が完全に欠落する。** 旧コードでは音素化関数自体が BOS/EOS を埋め込んでいたため、piper_g2p に切り替えた後に PiperEncoder を入れ忘れるリスクが極めて高い。
+**危険: パス A で PiperEncoder を追加し忘れると、BOS/EOS が完全に欠落する。** 旧コードでは音素化関数自体が BOS/EOS を埋め込んでいたため、piper_plus_g2p に切り替えた後に PiperEncoder を入れ忘れるリスクが極めて高い。
 
 #### 作業 3: トークン → ID 変換ループの統一
 
@@ -128,11 +128,11 @@ prosody_features = result.prosody_features
 
 #### 作業 4: prosody dict → ProsodyInfo 型の統一
 
-現在、prosody 情報は辞書型 (`{"a1": int, "a2": int, "a3": int}`) で管理されている。piper_g2p は `ProsodyInfo` 型 (または同等の型) を使用する。両パスで型を統一する。
+現在、prosody 情報は辞書型 (`{"a1": int, "a2": int, "a3": int}`) で管理されている。piper_plus_g2p は `ProsodyInfo` 型 (または同等の型) を使用する。両パスで型を統一する。
 
 | 項目 | 現在 | 移行後 |
 |------|------|--------|
-| prosody 型 | `list[dict[str, int]]` | `list[ProsodyInfo]` (piper_g2p 定義) |
+| prosody 型 | `list[dict[str, int]]` | `list[ProsodyInfo]` (piper_plus_g2p 定義) |
 | 変換 | 手動で辞書を構築 | PiperEncoder が型変換を担当 |
 
 ### 変更対象ファイル
@@ -234,7 +234,7 @@ prosody_features = result.prosody_features
 
 ### 懸念事項
 
-1. **BOS/EOS 欠落 (最大リスク)**: パス A で piper_g2p に切り替えた後、PiperEncoder を追加し忘れると BOS/EOS が完全に欠落する。旧コードでは音素化関数自体が BOS/EOS を埋め込んでいたため、「音素化関数を差し替えれば動く」という誤解が生じやすい。**実装者は必ず PiperEncoder の追加を最初に行い、BOS/EOS の存在を Unit テストで確認してから後続作業に進むこと。**
+1. **BOS/EOS 欠落 (最大リスク)**: パス A で piper_plus_g2p に切り替えた後、PiperEncoder を追加し忘れると BOS/EOS が完全に欠落する。旧コードでは音素化関数自体が BOS/EOS を埋め込んでいたため、「音素化関数を差し替えれば動く」という誤解が生じやすい。**実装者は必ず PiperEncoder の追加を最初に行い、BOS/EOS の存在を Unit テストで確認してから後続作業に進むこと。**
 
 2. **学習データ破損の不可逆性**: BOS/EOS やパディングの誤りは、生成される phoneme_ids を汚染する。汚染されたデータで学習を開始すると、数日間の GPU 時間が無駄になる。E2E テストで移行前後の phoneme_ids 完全一致を確認してから学習に進むこと。
 
@@ -258,7 +258,7 @@ prosody_features = result.prosody_features
 
 ## 一から作り直すとしたら
 
-piper_g2p の IPA ファースト設計が正しいアプローチである。音素化 (Phonemizer) は純粋な IPA トークンの生成のみを担当し、BOS/EOS/パディングの付与はエンコーディングレイヤー (PiperEncoder) が担当するべきだった。旧 piper_train のコードでは音素化関数が BOS/EOS を埋め込んでおり、これが責務の混在を引き起こしていた。
+piper_plus_g2p の IPA ファースト設計が正しいアプローチである。音素化 (Phonemizer) は純粋な IPA トークンの生成のみを担当し、BOS/EOS/パディングの付与はエンコーディングレイヤー (PiperEncoder) が担当するべきだった。旧 piper_train のコードでは音素化関数が BOS/EOS を埋め込んでおり、これが責務の混在を引き起こしていた。
 
 具体的には:
 

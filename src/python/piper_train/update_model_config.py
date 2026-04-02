@@ -13,7 +13,7 @@ import shutil
 from pathlib import Path
 from typing import Any
 
-from piper_g2p.encode.pua import FIXED_PUA_MAPPING, TOKEN2CHAR
+from piper_plus_g2p.encode.pua import FIXED_PUA_MAPPING, TOKEN2CHAR
 
 
 def update_phoneme_id_map(config: dict[str, Any]) -> bool:

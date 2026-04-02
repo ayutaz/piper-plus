@@ -2,7 +2,7 @@
 
 import pytest
 
-from piper_g2p.encode.encoder import PiperEncoder
+from piper_plus_g2p.encode.encoder import PiperEncoder
 
 
 @pytest.fixture

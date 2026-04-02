@@ -285,7 +285,7 @@ class MultilingualPhonemizer(Phonemizer):
 
         Each language segment is phonemized independently, then
         concatenated. BOS/EOS markers are NOT added here -- they are
-        the responsibility of ``piper_g2p.encode.PiperEncoder``.
+        the responsibility of ``piper_plus_g2p.encode.PiperEncoder``.
         """
         from .registry import get_phonemizer  # noqa: PLC0415
 

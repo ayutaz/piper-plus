@@ -1,10 +1,10 @@
-"""Tests for piper_g2p.encode — PUA mapping, ID maps, and PiperEncoder."""
+"""Tests for piper_plus_g2p.encode — PUA mapping, ID maps, and PiperEncoder."""
 
 import pytest
 
-from piper_g2p.encode.encoder import PiperEncoder
-from piper_g2p.encode.id_maps import get_phoneme_id_map
-from piper_g2p.encode.pua import FIXED_PUA_MAPPING, map_token
+from piper_plus_g2p.encode.encoder import PiperEncoder
+from piper_plus_g2p.encode.id_maps import get_phoneme_id_map
+from piper_plus_g2p.encode.pua import FIXED_PUA_MAPPING, map_token
 from tests.conftest import requires_ja
 
 
@@ -38,7 +38,7 @@ class TestJAIDMap:
 
     @requires_ja
     def test_ja_id_map_has_correct_size(self):
-        """piper_g2p JA id map should have 65 symbols (10 special + 55 phonemes)."""
+        """piper_plus_g2p JA id map should have 65 symbols (10 special + 55 phonemes)."""
         g2p_map = get_phoneme_id_map("ja")
         assert len(g2p_map) == 65
 
@@ -84,7 +84,7 @@ class TestPiperEncoder:
 
     def test_encode_with_prosody(self):
         """encode_with_prosody returns (phoneme_ids, prosody_features) tuple."""
-        from piper_g2p.base import ProsodyInfo
+        from piper_plus_g2p.base import ProsodyInfo
 
         id_map = get_phoneme_id_map("ja")
         enc = PiperEncoder(id_map)

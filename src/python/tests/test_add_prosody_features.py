@@ -13,8 +13,8 @@ import pytest
 try:
     import pyopenjtalk  # noqa: F401
 
-    from piper_g2p.japanese import JapanesePhonemizer
-    from piper_g2p.encode.id_maps import get_phoneme_id_map
+    from piper_plus_g2p.japanese import JapanesePhonemizer
+    from piper_plus_g2p.encode.id_maps import get_phoneme_id_map
 
     def get_japanese_id_map():
         return get_phoneme_id_map("ja")

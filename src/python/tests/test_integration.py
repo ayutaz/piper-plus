@@ -100,8 +100,8 @@ class TestRealIntegration:
 
             import psutil
 
-            from piper_g2p.japanese import JapanesePhonemizer as _JaPhonemizer
-            from piper_g2p.encode.pua import map_token as _mt
+            from piper_plus_g2p.japanese import JapanesePhonemizer as _JaPhonemizer
+            from piper_plus_g2p.encode.pua import map_token as _mt
 
             def phonemize_japanese(text):
                 p = _JaPhonemizer()
@@ -151,8 +151,8 @@ class TestRealIntegration:
     def test_special_character_handling(self):
         """Test processing of special characters and punctuation"""
         try:
-            from piper_g2p.japanese import JapanesePhonemizer as _JaPhonemizer
-            from piper_g2p.encode.pua import map_token as _mt
+            from piper_plus_g2p.japanese import JapanesePhonemizer as _JaPhonemizer
+            from piper_plus_g2p.encode.pua import map_token as _mt
 
             def phonemize_japanese(text):
                 p = _JaPhonemizer()
@@ -196,8 +196,8 @@ class TestRealIntegration:
             import concurrent.futures
             import threading
 
-            from piper_g2p.japanese import JapanesePhonemizer as _JaPhonemizer
-            from piper_g2p.encode.pua import map_token as _mt
+            from piper_plus_g2p.japanese import JapanesePhonemizer as _JaPhonemizer
+            from piper_plus_g2p.encode.pua import map_token as _mt
 
             def phonemize_japanese(text):
                 p = _JaPhonemizer()
@@ -262,8 +262,8 @@ class TestRealIntegration:
 
             import psutil
 
-            from piper_g2p.japanese import JapanesePhonemizer as _JaPhonemizer
-            from piper_g2p.encode.pua import map_token as _mt
+            from piper_plus_g2p.japanese import JapanesePhonemizer as _JaPhonemizer
+            from piper_plus_g2p.encode.pua import map_token as _mt
 
             def phonemize_japanese(text):
                 p = _JaPhonemizer()

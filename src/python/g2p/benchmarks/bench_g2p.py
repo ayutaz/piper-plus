@@ -38,7 +38,7 @@ TEXTS = {
 
 def benchmark_phonemize():
     """Measure phonemization latency and throughput."""
-    from piper_g2p import available_languages, get_phonemizer
+    from piper_plus_g2p import available_languages, get_phonemizer
 
     langs = sorted(available_languages())
     print(f"Available languages: {', '.join(langs)}\n")
@@ -83,7 +83,7 @@ def benchmark_memory():
         print("(memory benchmark skipped: resource module unavailable)\n")
         return
 
-    from piper_g2p import available_languages, get_phonemizer
+    from piper_plus_g2p import available_languages, get_phonemizer
 
     baseline = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
     for lang in available_languages():

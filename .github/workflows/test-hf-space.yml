@@ -67,17 +67,17 @@ jobs:
 
           # Only modules that have NO external dependencies (no numpy, no pyopenjtalk, etc.)
           modules = [
-              ('piper_g2p', 'get_phonemizer'),
-              ('piper_g2p', 'UnicodeLanguageDetector'),
-              ('piper_g2p.base', 'Phonemizer'),
-              ('piper_g2p.multilingual', 'UnicodeLanguageDetector'),
-              ('piper_g2p.registry', 'get_phonemizer'),
-              ('piper_g2p.english', None),
-              ('piper_g2p.chinese', None),
-              ('piper_g2p.spanish', None),
-              ('piper_g2p.french', None),
-              ('piper_g2p.portuguese', None),
-              ('piper_g2p.encode.encoder', 'PiperEncoder'),
+              ('piper_plus_g2p', 'get_phonemizer'),
+              ('piper_plus_g2p', 'UnicodeLanguageDetector'),
+              ('piper_plus_g2p.base', 'Phonemizer'),
+              ('piper_plus_g2p.multilingual', 'UnicodeLanguageDetector'),
+              ('piper_plus_g2p.registry', 'get_phonemizer'),
+              ('piper_plus_g2p.english', None),
+              ('piper_plus_g2p.chinese', None),
+              ('piper_plus_g2p.spanish', None),
+              ('piper_plus_g2p.french', None),
+              ('piper_plus_g2p.portuguese', None),
+              ('piper_plus_g2p.encode.encoder', 'PiperEncoder'),
           ]
 
           failed = []
@@ -113,7 +113,7 @@ jobs:
           # Modules that require external deps (numpy, pyopenjtalk, etc.)
           modules = [
               ('piper_train.infer_onnx', 'text_to_phoneme_ids_and_prosody'),
-              ('piper_g2p.japanese', None),
+              ('piper_plus_g2p.japanese', None),
               ('piper_train.vits.utils', 'audio_float_to_int16'),
               ('piper_train.vits.wavfile', 'write'),
           ]

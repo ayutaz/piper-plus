@@ -1,11 +1,11 @@
 """
-Tests for PUA token mapping implementation (piper_g2p.encode.pua)
+Tests for PUA token mapping implementation (piper_plus_g2p.encode.pua)
 Testing the actual implementation without modifying it
 """
 
 import pytest
 
-from piper_g2p.encode.pua import (
+from piper_plus_g2p.encode.pua import (
     CHAR2TOKEN,
     FIXED_PUA_MAPPING,
     TOKEN2CHAR,

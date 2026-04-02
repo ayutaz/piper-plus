@@ -3,7 +3,7 @@
 import pytest
 
 from piper_train.infer_onnx import text_to_phoneme_ids_and_prosody
-from piper_g2p.encode.id_maps import get_phoneme_id_map
+from piper_plus_g2p.encode.id_maps import get_phoneme_id_map
 
 
 class TestTextToPhonemeIdsAndProsody:

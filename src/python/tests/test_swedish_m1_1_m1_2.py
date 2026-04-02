@@ -13,13 +13,13 @@ import pytest
 # M1.2: Phoneme inventory + PUA
 # ---------------------------------------------------------------------------
 
-from piper_g2p.encode.pua import (
+from piper_plus_g2p.encode.pua import (
     CHAR2TOKEN,
     FIXED_PUA_MAPPING,
     TOKEN2CHAR,
     map_token,
 )
-from piper_g2p.encode.id_maps import _SWEDISH_PHONEMES as SWEDISH_PHONEMES
+from piper_plus_g2p.encode.id_maps import _SWEDISH_PHONEMES as SWEDISH_PHONEMES
 
 
 class TestM12PhonemeInventory:

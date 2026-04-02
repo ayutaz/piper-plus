@@ -28,7 +28,7 @@ class _DominantLanguageDetector:
     _cache: "dict[tuple[tuple[str, int], ...], _DominantLanguageDetector]" = {}
 
     def __init__(self, language_id_map: dict[str, int]):
-        from piper_g2p import UnicodeLanguageDetector  # noqa: PLC0415
+        from piper_plus_g2p import UnicodeLanguageDetector  # noqa: PLC0415
 
         self._language_id_map = language_id_map
         languages = list(language_id_map.keys())
@@ -88,7 +88,7 @@ def text_to_phoneme_ids_and_prosody(
         - phoneme_ids: List of phoneme IDs
         - prosody_features: List of {"a1": int, "a2": int, "a3": int} or None
     """
-    from piper_g2p import get_phonemizer  # noqa: PLC0415
+    from piper_plus_g2p import get_phonemizer  # noqa: PLC0415
 
     # For multilingual models with JA input, auto-promote to multilingual
     # phonemizer so that intersperse padding is applied correctly.
@@ -114,7 +114,7 @@ def text_to_phoneme_ids_and_prosody(
     phonemizer = get_phonemizer(effective_language)
     phonemes, prosody_info_list = phonemizer.phonemize_with_prosody(text)
 
-    from piper_g2p.encode.encoder import PiperEncoder  # noqa: PLC0415
+    from piper_plus_g2p.encode.encoder import PiperEncoder  # noqa: PLC0415
 
     encoder = PiperEncoder(phoneme_id_map)
 
@@ -125,7 +125,7 @@ def text_to_phoneme_ids_and_prosody(
         # JA-only: convert tokens to IDs directly (no encoder wrapping)
         phoneme_ids: list[int] = []
         prosody_features: list[dict | None] = []
-        from piper_g2p.encode.pua import map_token  # noqa: PLC0415
+        from piper_plus_g2p.encode.pua import map_token  # noqa: PLC0415
 
         for phoneme, prosody_info in zip(phonemes, prosody_info_list, strict=True):
             mapped = map_token(phoneme)
