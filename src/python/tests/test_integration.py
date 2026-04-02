@@ -100,7 +100,13 @@ class TestRealIntegration:
 
             import psutil
 
-            from piper_train.phonemize.japanese import phonemize_japanese
+            from piper_g2p.japanese import JapanesePhonemizer as _JaPhonemizer
+            from piper_g2p.encode.pua import map_token as _mt
+
+            def phonemize_japanese(text):
+                p = _JaPhonemizer()
+                tokens = p.phonemize(text)
+                return [_mt(t) for t in ["^"] + tokens + ["$"]]
 
             # Create a moderate amount of Japanese text
             # OpenJTalk has issues with very large texts, so we test with smaller chunks
@@ -145,7 +151,13 @@ class TestRealIntegration:
     def test_special_character_handling(self):
         """Test processing of special characters and punctuation"""
         try:
-            from piper_train.phonemize.japanese import phonemize_japanese
+            from piper_g2p.japanese import JapanesePhonemizer as _JaPhonemizer
+            from piper_g2p.encode.pua import map_token as _mt
+
+            def phonemize_japanese(text):
+                p = _JaPhonemizer()
+                tokens = p.phonemize(text)
+                return [_mt(t) for t in ["^"] + tokens + ["$"]]
 
             test_cases = [
                 # Mixed with text - more likely to succeed
@@ -184,7 +196,13 @@ class TestRealIntegration:
             import concurrent.futures
             import threading
 
-            from piper_train.phonemize.japanese import phonemize_japanese
+            from piper_g2p.japanese import JapanesePhonemizer as _JaPhonemizer
+            from piper_g2p.encode.pua import map_token as _mt
+
+            def phonemize_japanese(text):
+                p = _JaPhonemizer()
+                tokens = p.phonemize(text)
+                return [_mt(t) for t in ["^"] + tokens + ["$"]]
 
             # Test data
             test_texts = [
@@ -244,7 +262,13 @@ class TestRealIntegration:
 
             import psutil
 
-            from piper_train.phonemize.japanese import phonemize_japanese
+            from piper_g2p.japanese import JapanesePhonemizer as _JaPhonemizer
+            from piper_g2p.encode.pua import map_token as _mt
+
+            def phonemize_japanese(text):
+                p = _JaPhonemizer()
+                tokens = p.phonemize(text)
+                return [_mt(t) for t in ["^"] + tokens + ["$"]]
 
             process = psutil.Process(os.getpid())
 

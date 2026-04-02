@@ -13,14 +13,13 @@ import pytest
 # M1.2: Phoneme inventory + PUA
 # ---------------------------------------------------------------------------
 
-from piper_train.phonemize.sv_id_map import SWEDISH_PHONEMES
-from piper_train.phonemize.token_mapper import (
+from piper_g2p.encode.pua import (
     CHAR2TOKEN,
     FIXED_PUA_MAPPING,
     TOKEN2CHAR,
-    _PUA_START,
-    register,
+    map_token,
 )
+from piper_g2p.encode.id_maps import _SWEDISH_PHONEMES as SWEDISH_PHONEMES
 
 
 class TestM12PhonemeInventory:
@@ -39,14 +38,14 @@ class TestM12PhonemeInventory:
         single_cp = ["ɖ", "ʈ", "ɳ", "ɭ", "ɧ", "ɵ", "ʏ", "œ", "ɑ", "ø"]
         for ph in single_cp:
             assert len(ph) == 1, f"{ph!r} is not single codepoint"
-            ch = register(ph)
+            ch = map_token(ph)
             assert ch == ph, f"Single-CP {ph!r} should map to itself"
 
     @pytest.mark.unit
     def test_long_vowels_have_pua(self):
         long_vowels = ["iː", "yː", "eː", "ɛː", "øː", "ɑː", "oː", "uː", "ʉː"]
         for lv in long_vowels:
-            ch = register(lv)
+            ch = map_token(lv)
             assert len(ch) == 1, f"{lv!r} should map to single PUA char"
             cp = ord(ch)
             assert 0xE059 <= cp <= 0xE061, (
@@ -64,8 +63,10 @@ class TestM12PhonemeInventory:
         assert len(keys) == len(set(keys)), "Duplicate PUA token keys found"
 
     @pytest.mark.unit
-    def test_pua_start_updated(self):
-        assert _PUA_START == 0xE064
+    def test_pua_max_codepoint(self):
+        # SV long vowels end at 0xE061; reserved range ends at 0xE063
+        max_cp = max(FIXED_PUA_MAPPING.values())
+        assert max_cp <= 0xE063, f"Max PUA codepoint 0x{max_cp:04X} exceeds SV reserved range"
 
     @pytest.mark.unit
     def test_sv_pua_range(self):
@@ -102,9 +103,9 @@ class TestM12PhonemeInventory:
             )
 
     @pytest.mark.unit
-    def test_register_idempotent(self):
-        ch1 = register("ɧ")
-        ch2 = register("ɧ")
+    def test_map_token_idempotent(self):
+        ch1 = map_token("ɧ")
+        ch2 = map_token("ɧ")
         assert ch1 == ch2
 
     @pytest.mark.unit
@@ -137,10 +138,12 @@ class TestM12PhonemeInventory:
         assert FIXED_PUA_MAPPING["ɔ̃"] == 0xE058
 
     @pytest.mark.unit
-    def test_dynamic_allocation_starts_after_reserved(self):
+    def test_all_sv_pua_within_reserved_range(self):
         # 0xE062-0xE063 are reserved for SV future expansion
-        assert _PUA_START == 0xE064
-        assert _PUA_START > 0xE063
+        sv_long_vowels = ["iː", "yː", "eː", "ɛː", "øː", "ɑː", "oː", "uː", "ʉː"]
+        for lv in sv_long_vowels:
+            cp = FIXED_PUA_MAPPING[lv]
+            assert cp <= 0xE063, f"{lv!r} PUA 0x{cp:04X} exceeds reserved range"
 
 
 # ---------------------------------------------------------------------------

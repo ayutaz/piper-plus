@@ -114,34 +114,56 @@ def text_to_phoneme_ids_and_prosody(
     phonemizer = get_phonemizer(effective_language)
     phonemes, prosody_info_list = phonemizer.phonemize_with_prosody(text)
 
-    # Convert phonemes to IDs
-    phoneme_ids: list[int] = []
-    prosody_features: list[dict | None] = []
+    from piper_g2p.encode.encoder import PiperEncoder  # noqa: PLC0415
 
-    for phoneme, prosody_info in zip(phonemes, prosody_info_list, strict=True):
-        if phoneme in phoneme_id_map:
-            ids = phoneme_id_map[phoneme]
-            phoneme_ids.extend(ids)
-            for _ in ids:
-                if prosody_info is not None:
-                    prosody_features.append(
-                        {
-                            "a1": prosody_info.a1,
-                            "a2": prosody_info.a2,
-                            "a3": prosody_info.a3,
-                        }
-                    )
+    encoder = PiperEncoder(phoneme_id_map)
+
+    # JA-only models (no language_id_map or single language) do NOT get
+    # BOS/EOS/padding from PiperEncoder -- the JA phonemizer already
+    # includes these inline. Only multilingual / non-JA paths use the encoder.
+    if (
+        language == "ja"
+        and (not language_id_map or len(language_id_map) <= 1)
+    ):
+        # JA-only: convert tokens to IDs directly (no encoder wrapping)
+        phoneme_ids: list[int] = []
+        prosody_features: list[dict | None] = []
+        from piper_g2p.encode.pua import map_token  # noqa: PLC0415
+
+        for phoneme, prosody_info in zip(phonemes, prosody_info_list, strict=True):
+            mapped = map_token(phoneme)
+            for ch in mapped:
+                if ch in phoneme_id_map:
+                    ids = phoneme_id_map[ch]
+                    phoneme_ids.extend(ids)
+                    for _ in ids:
+                        if prosody_info is not None:
+                            prosody_features.append(
+                                {
+                                    "a1": prosody_info.a1,
+                                    "a2": prosody_info.a2,
+                                    "a3": prosody_info.a3,
+                                }
+                            )
+                        else:
+                            prosody_features.append(None)
                 else:
-                    prosody_features.append(None)
-        else:
-            _LOGGER.warning("Unknown phoneme: %s", phoneme)
+                    _LOGGER.warning("Unknown phoneme: %s", ch)
+        return phoneme_ids, prosody_features
 
-    # Language-specific post-processing (BOS/EOS/padding)
-    phoneme_ids, prosody_features = phonemizer.post_process_ids(
-        phoneme_ids, prosody_features, phoneme_id_map
+    # All other languages / multilingual: use PiperEncoder for BOS/EOS/padding
+    result_ids, result_prosody = encoder.encode_with_prosody(
+        phonemes, prosody_info_list
     )
+    # Convert ProsodyInfo objects to dicts for JSON compatibility
+    prosody_features_out: list[dict | None] = []
+    for p in result_prosody:
+        if p is not None:
+            prosody_features_out.append({"a1": p.a1, "a2": p.a2, "a3": p.a3})
+        else:
+            prosody_features_out.append(None)
 
-    return phoneme_ids, prosody_features
+    return result_ids, prosody_features_out
 
 
 def main():

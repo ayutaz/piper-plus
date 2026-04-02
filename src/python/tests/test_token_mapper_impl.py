@@ -1,16 +1,21 @@
 """
-Tests for existing token_mapper implementation
+Tests for PUA token mapping implementation (piper_g2p.encode.pua)
 Testing the actual implementation without modifying it
 """
 
 import pytest
 
-from piper_train.phonemize.token_mapper import (
+from piper_g2p.encode.pua import (
     CHAR2TOKEN,
+    FIXED_PUA_MAPPING,
     TOKEN2CHAR,
-    map_sequence,
-    register,
+    map_token,
 )
+
+
+def map_sequence(tokens: list[str]) -> list[str]:
+    """Map a sequence of IPA tokens through PUA mapping."""
+    return [map_token(t) for t in tokens]
 
 
 class TestTokenMapperImplementation:
@@ -50,30 +55,29 @@ class TestTokenMapperImplementation:
             assert CHAR2TOKEN[expected_char] == token
 
     @pytest.mark.unit
-    def test_register_new_mapping(self):
-        """Test registering a new token mapping"""
-        # Register a new mapping (using unreserved PUA character)
-        new_token = "test_token"
-        new_char = register(new_token)
-
-        # Verify it was registered
-        assert new_char is not None
-        assert TOKEN2CHAR[new_token] == new_char
-        assert CHAR2TOKEN[new_char] == new_token
-
-        # Verify it's in PUA range
-        code_point = ord(new_char)
-        assert 0xE000 <= code_point <= 0xF8FF
-
-    @pytest.mark.unit
-    def test_register_existing_token_returns_same_char(self):
-        """Test registering an existing token returns the same character"""
-        # Try to register an existing token
+    def test_map_token_known_multi_char(self):
+        """Test mapping a known multi-character token returns PUA character"""
         existing_token = "ch"
         expected_char = "\ue00e"
 
-        result = register(existing_token)
+        result = map_token(existing_token)
         assert result == expected_char
+        assert TOKEN2CHAR[existing_token] == expected_char
+        assert CHAR2TOKEN[expected_char] == existing_token
+
+    @pytest.mark.unit
+    def test_map_token_single_char_passthrough(self):
+        """Test that single-character tokens pass through unchanged"""
+        result = map_token("a")
+        assert result == "a"
+
+    @pytest.mark.unit
+    def test_fixed_pua_mapping_in_pua_range(self):
+        """Test all FIXED_PUA_MAPPING values are in PUA range"""
+        for token, codepoint in FIXED_PUA_MAPPING.items():
+            assert 0xE000 <= codepoint <= 0xF8FF, (
+                f"Token {token!r} codepoint 0x{codepoint:04X} outside PUA range"
+            )
 
     @pytest.mark.unit
     def test_map_sequence_basic(self):

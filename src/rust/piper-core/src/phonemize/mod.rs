@@ -12,6 +12,7 @@ use crate::error::PiperError;
 pub use piper_g2p::G2pError;
 pub use piper_g2p::PhonemeIdMap as G2pPhonemeIdMap;
 
+pub mod adapter;
 pub mod chinese;
 pub mod custom_dict;
 pub mod english;

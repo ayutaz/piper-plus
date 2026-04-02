@@ -1,14 +1,17 @@
 """Tests for English G2P module (g2p-en based)."""
 
 from piper_train.infer_onnx import text_to_phoneme_ids_and_prosody
-from piper_train.phonemize.english import (
+from piper_g2p.base import ProsodyInfo
+from piper_g2p.english import (
     ARPABET_TO_IPA,
-    EnglishProsodyInfo,
     _arpabet_to_ipa,
     _convert_word_to_ipa,
     phonemize_english,
     phonemize_english_with_prosody,
 )
+
+# EnglishProsodyInfo was always an alias for ProsodyInfo
+EnglishProsodyInfo = ProsodyInfo
 
 
 class TestArpabetToIpa:

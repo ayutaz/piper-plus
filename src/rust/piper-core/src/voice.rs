@@ -8,6 +8,7 @@ use crate::config::VoiceConfig;
 use crate::engine::{OnnxEngine, SynthesisRequest, SynthesisResult};
 use crate::error::PiperError;
 use crate::phonemize::Phonemizer;
+use crate::phonemize::adapter::G2pAdapter;
 use crate::phonemize::phoneme_converter;
 
 /// テキストから音声を合成する高レベル API
@@ -53,7 +54,9 @@ impl PiperVoice {
         match config.phoneme_type {
             #[cfg(feature = "japanese")]
             crate::config::PhonemeType::OpenJTalk => {
-                Ok(Box::new(Self::create_japanese_phonemizer()?))
+                Ok(Box::new(G2pAdapter::new(Box::new(
+                    Self::create_japanese_phonemizer()?,
+                ))))
             }
             crate::config::PhonemeType::Bilingual | crate::config::PhonemeType::Multilingual => {
                 // Extract language codes from language_id_map
@@ -103,9 +106,9 @@ impl PiperVoice {
 
     /// 言語コードに基づいて適切な Phonemizer を生成する。
     ///
-    /// 各言語の専用 Phonemizer を使用し、辞書が必要な言語 (ja, en, zh) は
-    /// `model_dir` 配下またはデフォルトパスから辞書を検索する。
-    /// JA は dictionary_manager による自動ダウンロードも対応。
+    /// piper-g2p の言語実装を `G2pAdapter` でラップして返す。
+    /// 辞書が必要な言語 (ja, en, zh) は `model_dir` 配下またはデフォルトパスから
+    /// 辞書を検索する。JA は dictionary_manager による自動ダウンロードも対応。
     /// 辞書が見つからない場合は PassthroughPhonemizer にフォールバックする。
     fn create_language_phonemizer(
         lang: &str,
@@ -114,7 +117,7 @@ impl PiperVoice {
         match lang {
             #[cfg(feature = "japanese")]
             "ja" => match Self::create_japanese_phonemizer() {
-                Ok(p) => Ok(Box::new(p)),
+                Ok(p) => Ok(Box::new(G2pAdapter::new(Box::new(p)))),
                 Err(e) => {
                     tracing::warn!("Japanese phonemizer unavailable ({}), using passthrough", e);
                     Ok(Box::new(
@@ -123,7 +126,7 @@ impl PiperVoice {
                 }
             },
             "en" => match Self::create_english_phonemizer(model_dir) {
-                Ok(p) => Ok(Box::new(p)),
+                Ok(p) => Ok(Box::new(G2pAdapter::new(Box::new(p)))),
                 Err(e) => {
                     tracing::warn!("English phonemizer unavailable ({}), using passthrough", e);
                     Ok(Box::new(
@@ -132,7 +135,7 @@ impl PiperVoice {
                 }
             },
             "zh" => match Self::create_chinese_phonemizer(model_dir) {
-                Ok(p) => Ok(Box::new(p)),
+                Ok(p) => Ok(Box::new(G2pAdapter::new(Box::new(p)))),
                 Err(e) => {
                     tracing::warn!("Chinese phonemizer unavailable ({}), using passthrough", e);
                     Ok(Box::new(
@@ -140,20 +143,28 @@ impl PiperVoice {
                     ))
                 }
             },
-            "es" => Ok(Box::new(crate::phonemize::spanish::SpanishPhonemizer::new())),
-            "fr" => Ok(Box::new(crate::phonemize::french::FrenchPhonemizer::new())),
-            "pt" => Ok(Box::new(
-                crate::phonemize::portuguese::PortuguesePhonemizer::new(),
-            )),
-            "ko" => Ok(Box::new(crate::phonemize::korean::KoreanPhonemizer::new())),
-            "sv" => Ok(Box::new(crate::phonemize::swedish::SwedishPhonemizer::new())),
+            "es" => Ok(Box::new(G2pAdapter::new(Box::new(
+                piper_g2p::spanish::SpanishPhonemizer::new(),
+            )))),
+            "fr" => Ok(Box::new(G2pAdapter::new(Box::new(
+                piper_g2p::french::FrenchPhonemizer::new(),
+            )))),
+            "pt" => Ok(Box::new(G2pAdapter::new(Box::new(
+                piper_g2p::portuguese::PortuguesePhonemizer::new(),
+            )))),
+            "ko" => Ok(Box::new(G2pAdapter::new(Box::new(
+                piper_g2p::korean::KoreanPhonemizer::new(),
+            )))),
+            "sv" => Ok(Box::new(G2pAdapter::new(Box::new(
+                piper_g2p::swedish::SwedishPhonemizer::new(),
+            )))),
             _ => Ok(Box::new(
                 crate::phonemize::multilingual::PassthroughPhonemizer::new(lang),
             )),
         }
     }
 
-    /// EnglishPhonemizer を生成する。
+    /// EnglishPhonemizer を生成する (piper-g2p)。
     ///
     /// CMU辞書を以下の順で検索:
     /// 1. `CMUDICT_PATH` 環境変数
@@ -162,19 +173,20 @@ impl PiperVoice {
     /// 4. `/usr/share/piper/cmudict_data.json`
     fn create_english_phonemizer(
         model_dir: Option<&Path>,
-    ) -> Result<crate::phonemize::english::EnglishPhonemizer, PiperError> {
+    ) -> Result<piper_g2p::english::EnglishPhonemizer, PiperError> {
         // Try model_dir first if available
         if let Some(dir) = model_dir {
             let model_dict = dir.join("cmudict_data.json");
             if model_dict.exists() {
-                return crate::phonemize::english::EnglishPhonemizer::new_with_dict(&model_dict);
+                return piper_g2p::english::EnglishPhonemizer::new_with_dict(&model_dict)
+                    .map_err(PiperError::from);
             }
         }
         // Fall back to default search (env var, local, system)
-        crate::phonemize::english::EnglishPhonemizer::new()
+        piper_g2p::english::EnglishPhonemizer::new().map_err(PiperError::from)
     }
 
-    /// ChinesePhonemizer を生成する。
+    /// ChinesePhonemizer を生成する (piper-g2p)。
     ///
     /// Pinyin辞書を以下の順で検索:
     /// 1. `PINYIN_SINGLE_PATH` / `PINYIN_PHRASES_PATH` 環境変数
@@ -182,7 +194,7 @@ impl PiperVoice {
     /// 3. `./pinyin_single.json` + `./pinyin_phrases.json`
     fn create_chinese_phonemizer(
         model_dir: Option<&Path>,
-    ) -> Result<crate::phonemize::chinese::ChinesePhonemizer, PiperError> {
+    ) -> Result<piper_g2p::chinese::ChinesePhonemizer, PiperError> {
         // 1. Environment variable override
         if let (Ok(single), Ok(phrases)) = (
             std::env::var("PINYIN_SINGLE_PATH"),
@@ -191,7 +203,8 @@ impl PiperVoice {
             let sp = std::path::PathBuf::from(&single);
             let pp = std::path::PathBuf::from(&phrases);
             if sp.exists() && pp.exists() {
-                return crate::phonemize::chinese::ChinesePhonemizer::new(&sp, &pp);
+                return piper_g2p::chinese::ChinesePhonemizer::new(&sp, &pp)
+                    .map_err(PiperError::from);
             }
         }
 
@@ -200,7 +213,8 @@ impl PiperVoice {
             let single = dir.join("pinyin_single.json");
             let phrases = dir.join("pinyin_phrases.json");
             if single.exists() && phrases.exists() {
-                return crate::phonemize::chinese::ChinesePhonemizer::new(&single, &phrases);
+                return piper_g2p::chinese::ChinesePhonemizer::new(&single, &phrases)
+                    .map_err(PiperError::from);
             }
         }
 
@@ -208,7 +222,8 @@ impl PiperVoice {
         let single = std::path::PathBuf::from("pinyin_single.json");
         let phrases = std::path::PathBuf::from("pinyin_phrases.json");
         if single.exists() && phrases.exists() {
-            return crate::phonemize::chinese::ChinesePhonemizer::new(&single, &phrases);
+            return piper_g2p::chinese::ChinesePhonemizer::new(&single, &phrases)
+                .map_err(PiperError::from);
         }
 
         Err(PiperError::DictionaryLoad {
@@ -329,17 +344,17 @@ impl PiperVoice {
         self.phonemizer.detect_primary_language(text)
     }
 
-    /// JapanesePhonemizer を生成する。
+    /// JapanesePhonemizer を生成する (piper-g2p)。
     ///
     /// `naist-jdic` feature が有効なら bundled 辞書を使用し、
     /// 無効なら `dictionary_manager::ensure_dictionary()` で外部辞書を
     /// 自動検索・ダウンロードする。
     #[cfg(feature = "japanese")]
-    fn create_japanese_phonemizer()
-    -> Result<crate::phonemize::japanese::JapanesePhonemizer, PiperError> {
+    fn create_japanese_phonemizer(
+    ) -> Result<piper_g2p::japanese::JapanesePhonemizer, PiperError> {
         #[cfg(feature = "naist-jdic")]
         {
-            crate::phonemize::japanese::JapanesePhonemizer::new_bundled()
+            piper_g2p::japanese::JapanesePhonemizer::new_bundled().map_err(PiperError::from)
         }
         #[cfg(not(feature = "naist-jdic"))]
         {
@@ -347,7 +362,8 @@ impl PiperVoice {
             match crate::dictionary_manager::ensure_dictionary() {
                 Ok(dict_path) => {
                     tracing::info!("Using OpenJTalk dictionary from {}", dict_path.display());
-                    crate::phonemize::japanese::JapanesePhonemizer::new_with_dict(&dict_path)
+                    piper_g2p::japanese::JapanesePhonemizer::new_with_dict(&dict_path)
+                        .map_err(PiperError::from)
                 }
                 Err(e) => {
                     tracing::warn!(
@@ -355,7 +371,7 @@ impl PiperVoice {
                         e
                     );
                     // Fall back to jpreprocess's own dictionary search
-                    crate::phonemize::japanese::JapanesePhonemizer::new()
+                    piper_g2p::japanese::JapanesePhonemizer::new().map_err(PiperError::from)
                 }
             }
         }

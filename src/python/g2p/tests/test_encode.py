@@ -5,7 +5,7 @@ import pytest
 from piper_g2p.encode.encoder import PiperEncoder
 from piper_g2p.encode.id_maps import get_phoneme_id_map
 from piper_g2p.encode.pua import FIXED_PUA_MAPPING, map_token
-from tests.conftest import requires_ja, requires_piper_train
+from tests.conftest import requires_ja
 
 
 class TestPUAMapping:
@@ -37,14 +37,10 @@ class TestJAIDMap:
         assert "$" in id_map, "'$' (EOS) must be in id map"
 
     @requires_ja
-    @requires_piper_train
-    def test_ja_id_map_matches_piper_train(self):
-        """piper_g2p JA id map matches piper_train's get_japanese_id_map()."""
-        from piper_train.phonemize.jp_id_map import get_japanese_id_map
-
+    def test_ja_id_map_has_correct_size(self):
+        """piper_g2p JA id map should have 65 symbols (10 special + 55 phonemes)."""
         g2p_map = get_phoneme_id_map("ja")
-        train_map = get_japanese_id_map()
-        assert g2p_map == train_map
+        assert len(g2p_map) == 65
 
     def test_en_id_map_raises(self):
         """get_phoneme_id_map('en') raises ValueError (not built-in)."""

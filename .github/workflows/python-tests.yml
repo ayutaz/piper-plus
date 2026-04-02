@@ -44,7 +44,7 @@ jobs:
         python -m pip install --upgrade pip setuptools wheel
         pip install --no-cache-dir uv
         cd src/python
-        uv pip install --system -e ".[test,train]"
+        uv pip install --system -e "g2p[all]" -e ".[test,train]"
 
     - name: Install Python dependencies (Unix)
       if: runner.os != 'Windows'
@@ -52,7 +52,7 @@ jobs:
         python -m pip install --upgrade pip
         pip install --no-cache-dir uv
         cd src/python
-        uv pip install --system -e ".[test,train]"
+        uv pip install --system -e "g2p[all]" -e ".[test,train]"
 
     - name: Build Cython extensions (Unix)
       if: runner.os != 'Windows'

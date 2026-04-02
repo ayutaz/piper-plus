@@ -25,7 +25,13 @@ class TestPerformance:
     def test_phonemization_single_conversion(self):
         """Benchmark single text to phoneme conversion"""
         try:
-            from piper_train.phonemize.japanese import phonemize_japanese
+            from piper_g2p.japanese import JapanesePhonemizer as _JaPhonemizer
+            from piper_g2p.encode.pua import map_token as _mt
+
+            def phonemize_japanese(text):
+                p = _JaPhonemizer()
+                tokens = p.phonemize(text)
+                return [_mt(t) for t in ["^"] + tokens + ["$"]]
 
             # Test texts of various lengths
             test_texts = [
@@ -72,7 +78,13 @@ class TestPerformance:
     def test_batch_conversion_performance(self):
         """Benchmark batch text processing"""
         try:
-            from piper_train.phonemize.japanese import phonemize_japanese
+            from piper_g2p.japanese import JapanesePhonemizer as _JaPhonemizer
+            from piper_g2p.encode.pua import map_token as _mt
+
+            def phonemize_japanese(text):
+                p = _JaPhonemizer()
+                tokens = p.phonemize(text)
+                return [_mt(t) for t in ["^"] + tokens + ["$"]]
 
             # Create batch of texts
             batch_sizes = [10, 50, 100]
@@ -113,7 +125,13 @@ class TestPerformance:
         try:
             import gc
 
-            from piper_train.phonemize.japanese import phonemize_japanese
+            from piper_g2p.japanese import JapanesePhonemizer as _JaPhonemizer
+            from piper_g2p.encode.pua import map_token as _mt
+
+            def phonemize_japanese(text):
+                p = _JaPhonemizer()
+                tokens = p.phonemize(text)
+                return [_mt(t) for t in ["^"] + tokens + ["$"]]
 
             process = psutil.Process(os.getpid())
 
@@ -179,7 +197,13 @@ class TestPerformance:
     def test_stress_test(self):
         """Stress test with extreme inputs"""
         try:
-            from piper_train.phonemize.japanese import phonemize_japanese
+            from piper_g2p.japanese import JapanesePhonemizer as _JaPhonemizer
+            from piper_g2p.encode.pua import map_token as _mt
+
+            def phonemize_japanese(text):
+                p = _JaPhonemizer()
+                tokens = p.phonemize(text)
+                return [_mt(t) for t in ["^"] + tokens + ["$"]]
 
             # Long text (~5KB, safe for pyopenjtalk)
             very_long_text = "あいうえおかきくけこ" * 500

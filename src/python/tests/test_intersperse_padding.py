@@ -21,8 +21,7 @@ pyopenjtalk = pytest.importorskip(
 g2p_en = pytest.importorskip("g2p_en", reason="g2p_en required for EN tests")
 
 from piper_train.infer_onnx import text_to_phoneme_ids_and_prosody
-from piper_train.phonemize.multilingual_id_map import get_multilingual_id_map
-from piper_train.phonemize.jp_id_map import get_japanese_id_map
+from piper_g2p.encode.id_maps import get_phoneme_id_map
 
 
 # ---------------------------------------------------------------------------
@@ -40,7 +39,7 @@ _LANGUAGE_ID_MAP: dict[str, int] = {
 
 def _get_multilingual_id_map() -> dict[str, list[int]]:
     """Return the real multilingual phoneme ID map."""
-    return get_multilingual_id_map(_ALL_LANGUAGES)
+    return get_phoneme_id_map("-".join(_ALL_LANGUAGES))
 
 
 def has_intersperse_padding(ids: list[int], pad_id: int = 0) -> bool:
@@ -205,7 +204,7 @@ class TestJaOnlyNoIntersperse:
 
     def test_ja_only_no_intersperse(self):
         """JA text without language_id_map should use JapanesePhonemizer (no-op post_process)."""
-        phoneme_id_map = get_japanese_id_map()
+        phoneme_id_map = get_phoneme_id_map("ja")
         text = "こんにちは"
 
         ids, prosody = text_to_phoneme_ids_and_prosody(
@@ -396,7 +395,7 @@ class TestPaddingLengthRelation:
         We verify the ratio is between 1.5 and 2.5 to account for differences
         in BOS/EOS handling between the two paths.
         """
-        ja_only_map = get_japanese_id_map()
+        ja_only_map = get_phoneme_id_map("ja")
         multilingual_map = _get_multilingual_id_map()
 
         text = "こんにちは"

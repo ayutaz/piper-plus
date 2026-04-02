@@ -16,8 +16,19 @@ from tqdm import tqdm
 
 sys.path.append(str(Path(__file__).parent))
 
-from piper_train.phonemize.japanese import phonemize_japanese
-from piper_train.phonemize.jp_id_map import get_japanese_id_map
+from piper_g2p.japanese import JapanesePhonemizer
+from piper_g2p.encode.pua import map_token
+from piper_g2p.encode.id_maps import get_phoneme_id_map
+
+
+def get_japanese_id_map():
+    return get_phoneme_id_map("ja")
+
+
+def phonemize_japanese(text):
+    p = JapanesePhonemizer()
+    tokens = p.phonemize(text)
+    return [map_token(t) for t in ["^"] + tokens + ["$"]]
 
 
 def download_css10_japanese(output_dir: Path):

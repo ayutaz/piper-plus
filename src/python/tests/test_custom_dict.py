@@ -7,7 +7,7 @@ import tempfile
 from pathlib import Path
 import pytest
 
-from piper_train.phonemize.custom_dict import CustomDictionary, apply_custom_dictionary
+from piper_g2p.custom_dict import CustomDictionary, apply_custom_dictionary
 
 
 @pytest.mark.unit
@@ -198,7 +198,14 @@ class TestJapaneseIntegration:
     
     def test_phonemize_with_custom_dict(self):
         """カスタム辞書を使った音素化のテスト"""
-        from piper_train.phonemize.japanese import phonemize_japanese
+        from piper_g2p.japanese import JapanesePhonemizer
+        from piper_g2p.encode.pua import map_token
+
+        def phonemize_japanese(text, custom_dict=None):
+            p = JapanesePhonemizer()
+            tokens = p.phonemize(text, custom_dict=custom_dict)
+            full_tokens = ["^"] + tokens + ["$"]
+            return [map_token(t) for t in full_tokens]
         
         # カスタム辞書を作成
         dict_obj = CustomDictionary()

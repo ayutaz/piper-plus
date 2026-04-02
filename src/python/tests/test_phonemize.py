@@ -4,23 +4,31 @@ Unified phonemization tests - combines all phonemization testing
 
 import pytest
 
-
-# Try to import implementation, skip if not available
-pytest.importorskip("piper_train.phonemize")
-
-# noqa: E402 - Import after pytest.importorskip
-from piper_train.phonemize.token_mapper import (
-    CHAR2TOKEN,  # noqa: E402
+from piper_g2p.encode.pua import (
+    CHAR2TOKEN,
     TOKEN2CHAR,
-    map_sequence,
+    map_token,
 )
+
+
+def map_sequence(tokens: list[str]) -> list[str]:
+    """Map a sequence of IPA tokens through PUA mapping."""
+    return [map_token(t) for t in tokens]
 
 
 # Japanese imports are optional
 try:
     import pyopenjtalk  # noqa: F401
 
-    from piper_train.phonemize.japanese import phonemize_japanese
+    from piper_g2p.japanese import JapanesePhonemizer
+    from piper_g2p.encode.pua import map_token as _map_token
+
+    def phonemize_japanese(text):
+        """Wrapper that matches old piper_train API: returns PUA-mapped tokens with BOS/EOS."""
+        p = JapanesePhonemizer()
+        tokens = p.phonemize(text)
+        full_tokens = ["^"] + tokens + ["$"]
+        return [_map_token(t) for t in full_tokens]
 
     HAS_JAPANESE = True
 except ImportError:
