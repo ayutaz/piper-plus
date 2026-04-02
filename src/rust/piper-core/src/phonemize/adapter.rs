@@ -8,7 +8,7 @@
 
 use piper_g2p::Phonemizer as G2pPhonemizer;
 
-use super::multilingual::default_post_process_ids;
+use piper_g2p::multilingual::default_post_process_ids;
 use super::{Phonemizer, ProsodyFeature, ProsodyInfo};
 use crate::config::PhonemeIdMap;
 use crate::error::PiperError;

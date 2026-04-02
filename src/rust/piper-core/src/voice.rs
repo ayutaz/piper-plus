@@ -9,7 +9,6 @@ use crate::engine::{OnnxEngine, SynthesisRequest, SynthesisResult};
 use crate::error::PiperError;
 use crate::phonemize::Phonemizer;
 use crate::phonemize::adapter::G2pAdapter;
-use crate::phonemize::phoneme_converter;
 
 /// テキストから音声を合成する高レベル API
 pub struct PiperVoice {
@@ -59,17 +58,13 @@ impl PiperVoice {
                 ))))
             }
             crate::config::PhonemeType::Bilingual | crate::config::PhonemeType::Multilingual => {
-                // Extract language codes from language_id_map
                 let mut languages: Vec<String> = config.language_id_map.keys().cloned().collect();
-                languages.sort(); // canonical order
-
+                languages.sort();
                 if languages.is_empty() {
                     return Err(PiperError::InvalidConfig {
                         reason: "multilingual model requires language_id_map".to_string(),
                     });
                 }
-
-                // Determine default Latin language
                 let default_latin = if languages.contains(&"en".to_string()) {
                     "en".to_string()
                 } else {
@@ -79,24 +74,19 @@ impl PiperVoice {
                         .cloned()
                         .unwrap_or_else(|| languages[0].clone())
                 };
-
-                // Build per-language phonemizers
-                let mut phonemizers: std::collections::HashMap<String, Box<dyn Phonemizer>> =
+                let mut g2p_phonemizers: std::collections::HashMap<String, Box<dyn piper_g2p::Phonemizer>> =
                     std::collections::HashMap::new();
-
                 for lang in &languages {
-                    let phonemizer: Box<dyn Phonemizer> =
-                        Self::create_language_phonemizer(lang, model_dir)?;
-                    phonemizers.insert(lang.clone(), phonemizer);
+                    let p = Self::create_language_g2p_phonemizer(lang, model_dir)?;
+                    g2p_phonemizers.insert(lang.clone(), p);
                 }
-
-                Ok(Box::new(
-                    crate::phonemize::multilingual::MultilingualPhonemizer::new(
+                Ok(Box::new(G2pAdapter::new(Box::new(
+                    piper_g2p::multilingual::MultilingualPhonemizer::new(
                         languages,
                         default_latin,
-                        phonemizers,
+                        g2p_phonemizers,
                     ),
-                ))
+                ))))
             }
             _ => Err(PiperError::UnsupportedLanguage {
                 code: format!("{:?}", config.phoneme_type),
@@ -104,63 +94,44 @@ impl PiperVoice {
         }
     }
 
-    /// 言語コードに基づいて適切な Phonemizer を生成する。
+    /// 言語コードに基づいて適切な piper_g2p::Phonemizer を生成する。
     ///
-    /// piper-g2p の言語実装を `G2pAdapter` でラップして返す。
     /// 辞書が必要な言語 (ja, en, zh) は `model_dir` 配下またはデフォルトパスから
     /// 辞書を検索する。JA は dictionary_manager による自動ダウンロードも対応。
     /// 辞書が見つからない場合は PassthroughPhonemizer にフォールバックする。
-    fn create_language_phonemizer(
+    fn create_language_g2p_phonemizer(
         lang: &str,
         model_dir: Option<&Path>,
-    ) -> Result<Box<dyn Phonemizer>, PiperError> {
+    ) -> Result<Box<dyn piper_g2p::Phonemizer>, PiperError> {
         match lang {
             #[cfg(feature = "japanese")]
             "ja" => match Self::create_japanese_phonemizer() {
-                Ok(p) => Ok(Box::new(G2pAdapter::new(Box::new(p)))),
+                Ok(p) => Ok(Box::new(p)),
                 Err(e) => {
                     tracing::warn!("Japanese phonemizer unavailable ({}), using passthrough", e);
-                    Ok(Box::new(
-                        crate::phonemize::multilingual::PassthroughPhonemizer::new(lang),
-                    ))
+                    Ok(Box::new(piper_g2p::multilingual::PassthroughPhonemizer::new(lang)))
                 }
             },
             "en" => match Self::create_english_phonemizer(model_dir) {
-                Ok(p) => Ok(Box::new(G2pAdapter::new(Box::new(p)))),
+                Ok(p) => Ok(Box::new(p)),
                 Err(e) => {
                     tracing::warn!("English phonemizer unavailable ({}), using passthrough", e);
-                    Ok(Box::new(
-                        crate::phonemize::multilingual::PassthroughPhonemizer::new(lang),
-                    ))
+                    Ok(Box::new(piper_g2p::multilingual::PassthroughPhonemizer::new(lang)))
                 }
             },
             "zh" => match Self::create_chinese_phonemizer(model_dir) {
-                Ok(p) => Ok(Box::new(G2pAdapter::new(Box::new(p)))),
+                Ok(p) => Ok(Box::new(p)),
                 Err(e) => {
                     tracing::warn!("Chinese phonemizer unavailable ({}), using passthrough", e);
-                    Ok(Box::new(
-                        crate::phonemize::multilingual::PassthroughPhonemizer::new(lang),
-                    ))
+                    Ok(Box::new(piper_g2p::multilingual::PassthroughPhonemizer::new(lang)))
                 }
             },
-            "es" => Ok(Box::new(G2pAdapter::new(Box::new(
-                piper_g2p::spanish::SpanishPhonemizer::new(),
-            )))),
-            "fr" => Ok(Box::new(G2pAdapter::new(Box::new(
-                piper_g2p::french::FrenchPhonemizer::new(),
-            )))),
-            "pt" => Ok(Box::new(G2pAdapter::new(Box::new(
-                piper_g2p::portuguese::PortuguesePhonemizer::new(),
-            )))),
-            "ko" => Ok(Box::new(G2pAdapter::new(Box::new(
-                piper_g2p::korean::KoreanPhonemizer::new(),
-            )))),
-            "sv" => Ok(Box::new(G2pAdapter::new(Box::new(
-                piper_g2p::swedish::SwedishPhonemizer::new(),
-            )))),
-            _ => Ok(Box::new(
-                crate::phonemize::multilingual::PassthroughPhonemizer::new(lang),
-            )),
+            "es" => Ok(Box::new(piper_g2p::spanish::SpanishPhonemizer::new())),
+            "fr" => Ok(Box::new(piper_g2p::french::FrenchPhonemizer::new())),
+            "pt" => Ok(Box::new(piper_g2p::portuguese::PortuguesePhonemizer::new())),
+            "ko" => Ok(Box::new(piper_g2p::korean::KoreanPhonemizer::new())),
+            "sv" => Ok(Box::new(piper_g2p::swedish::SwedishPhonemizer::new())),
+            _ => Ok(Box::new(piper_g2p::multilingual::PassthroughPhonemizer::new(lang))),
         }
     }
 
@@ -255,7 +226,7 @@ impl PiperVoice {
             .get_phoneme_id_map()
             .unwrap_or(&self.config.phoneme_id_map);
 
-        let ids = phoneme_converter::tokens_to_ids(&tokens, phoneme_id_map)?;
+        let ids = piper_g2p::encode::tokens_to_ids(&tokens, phoneme_id_map).map_err(PiperError::from)?;
         let prosody_feats = prosody_to_optional_features(&prosody);
 
         // 3. Post-process IDs (BOS/EOS/padding insertion, language-specific)
@@ -313,7 +284,7 @@ impl PiperVoice {
             .get_phoneme_id_map()
             .unwrap_or(&self.config.phoneme_id_map);
 
-        let ids = phoneme_converter::tokens_to_ids(&tokens, phoneme_id_map)?;
+        let ids = piper_g2p::encode::tokens_to_ids(&tokens, phoneme_id_map).map_err(PiperError::from)?;
         let prosody_feats = prosody_to_optional_features(&prosody);
 
         let (ids, _prosody_feats) =
@@ -933,7 +904,7 @@ mod tests {
         id_map.insert("o".into(), vec![15]);
 
         let tokens: Vec<String> = vec!["a".into(), "k".into(), "o".into()];
-        let ids = phoneme_converter::tokens_to_ids(&tokens, &id_map).unwrap();
+        let ids = piper_g2p::encode::tokens_to_ids(&tokens, &id_map).map_err(PiperError::from).unwrap();
         assert_eq!(ids, vec![5, 10, 15]);
     }
 
@@ -941,7 +912,7 @@ mod tests {
     fn test_tokens_to_ids_unknown_phoneme() {
         let id_map: HashMap<String, Vec<i64>> = HashMap::new();
         let tokens: Vec<String> = vec!["xyz".into()];
-        let result = phoneme_converter::tokens_to_ids(&tokens, &id_map);
+        let result = piper_g2p::encode::tokens_to_ids(&tokens, &id_map).map_err(PiperError::from);
         assert!(result.is_err());
         match result.unwrap_err() {
             PiperError::PhonemeIdNotFound { phoneme } => {
