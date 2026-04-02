@@ -115,7 +115,7 @@ encoder = PiperEncoder(config["phoneme_id_map"], strict=True)
 
 piper-plus-g2p is also available as:
 - **Rust crate**: `piper-plus-g2p` on crates.io
-- **Go module**: `github.com/ayutaz/piper-plus-g2p/phonemize`
+- **Go module**: `github.com/ayutaz/piper-plus/src/go/phonemize`
 - **npm package**: `@piper-plus/g2p` for browser/WASM
 
 All three implementations share the same PUA mapping table and are

@@ -77,7 +77,7 @@
 
 ## 3. 実装済み: Go
 
-> **Note:** Go の phonemize パッケージは独立モジュール `github.com/ayutaz/piper-plus-g2p/phonemize` として分離済み (`src/go/phonemize/go.mod`)。他の TTS エンジンからも `go get github.com/ayutaz/piper-plus-g2p/phonemize` で利用可能。
+> **Note:** Go の phonemize パッケージは独立モジュール `github.com/ayutaz/piper-plus/src/go/phonemize` として分離済み (`src/go/phonemize/go.mod`)。他の TTS エンジンからも `go get github.com/ayutaz/piper-plus/src/go/phonemize` で利用可能。
 
 | ファイル | 内容 |
 |---------|------|

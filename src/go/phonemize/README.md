@@ -7,13 +7,13 @@ This is a standalone Go module that can be used independently of the piper-plus 
 ## Install
 
 ```sh
-go get github.com/ayutaz/piper-plus-g2p/phonemize
+go get github.com/ayutaz/piper-plus/src/go/phonemize
 ```
 
 ## Quick Start
 
 ```go
-import "github.com/ayutaz/piper-plus-g2p/phonemize"
+import "github.com/ayutaz/piper-plus/src/go/phonemize"
 
 // Single language
 p := phonemize.NewEnglishPhonemizer(cmuDict)

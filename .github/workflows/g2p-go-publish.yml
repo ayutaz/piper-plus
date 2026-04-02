@@ -22,7 +22,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          sparse-checkout: src/go
+          sparse-checkout: |
+            src/go
+            tests/fixtures/g2p
       - uses: actions/setup-go@v5
         with:
           go-version: '1.26'
@@ -30,9 +32,21 @@ jobs:
       - run: go vet ./phonemize/...
       - run: go test -v -race -count=1 ./phonemize/...
 
+  lint:
+    name: golangci-lint (phonemize)
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26'
+      - uses: golangci/golangci-lint-action@v7
+        with:
+          working-directory: src/go/phonemize
+
   publish:
     name: Tag and publish to pkg.go.dev
-    needs: test
+    needs: [test, lint]
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
@@ -64,7 +78,7 @@ jobs:
 
       - name: Request pkg.go.dev indexing
         run: |
-          MODULE="github.com/ayutaz/piper-plus-g2p/phonemize"
+          MODULE="github.com/ayutaz/piper-plus/src/go/phonemize"
           VERSION="v${{ steps.version.outputs.version }}"
           echo "Requesting indexing for $MODULE@$VERSION"
           curl -s "https://proxy.golang.org/${MODULE}/@v/${VERSION}.info" || true

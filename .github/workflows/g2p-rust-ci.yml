@@ -41,25 +41,32 @@ jobs:
         run: cargo clippy -p piper-plus-g2p --all-features -- -D warnings
 
   test:
-    name: test (${{ matrix.os }})
+    name: test (${{ matrix.os }}, ${{ matrix.toolchain }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-24.04, macos-latest, windows-latest]
+        include:
+          - toolchain: stable
+            features: --all-features
+          - toolchain: "1.88"
+            features: --all-features
     steps:
       - uses: actions/checkout@v6
 
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ matrix.toolchain }}
 
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src/rust
 
-      - name: Run tests (all features)
+      - name: Run tests (${{ matrix.features }})
         working-directory: src/rust
-        run: cargo test -p piper-plus-g2p --all-features
+        run: cargo test -p piper-plus-g2p ${{ matrix.features }}
 
   test-minimal:
     name: test-minimal (default features)
@@ -77,6 +84,27 @@ jobs:
       - name: Run tests (default features only)
         working-directory: src/rust
         run: cargo test -p piper-plus-g2p
+
+  test-features:
+    name: feature flags
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: src/rust
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src/rust -> target
+      - name: No default features
+        run: cargo check -p piper-plus-g2p --no-default-features
+      - name: English only
+        run: cargo test -p piper-plus-g2p --no-default-features --features english
+      - name: Japanese only
+        run: cargo test -p piper-plus-g2p --no-default-features --features japanese,naist-jdic
+      - name: All features
+        run: cargo test -p piper-plus-g2p --all-features
 
   build:
     name: build

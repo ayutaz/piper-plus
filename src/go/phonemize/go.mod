@@ -1,4 +1,4 @@
-module github.com/ayutaz/piper-plus-g2p/phonemize
+module github.com/ayutaz/piper-plus/src/go/phonemize
 
 go 1.26
 

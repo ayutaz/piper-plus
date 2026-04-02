@@ -7,6 +7,10 @@ authors.workspace = true
 repository.workspace = true
 homepage.workspace = true
 description = "Multilingual G2P (Grapheme-to-Phoneme) for TTS — eSpeak-ng free"
+keywords = ["g2p", "tts", "phoneme", "ipa", "speech-synthesis"]
+categories = ["text-processing", "multimedia::audio"]
+documentation = "https://docs.rs/piper-plus-g2p"
+readme = "README.md"
 
 [features]
 default = ["english", "chinese", "korean", "spanish", "french", "portuguese", "swedish"]
