@@ -24,7 +24,7 @@ use std::sync::LazyLock;
 
 use regex::Regex;
 
-use super::custom_dict::CustomDictionary;
+use piper_g2p::custom_dict::CustomDictionary;
 use super::token_map::token_to_pua;
 use super::{Phonemizer, ProsodyFeature, ProsodyInfo};
 use crate::config::PhonemeIdMap;
