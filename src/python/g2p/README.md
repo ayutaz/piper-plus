@@ -1,8 +1,10 @@
-# piper-g2p
+# piper-plus-g2p
 
 Multilingual G2P (Grapheme-to-Phoneme) for TTS. eSpeak-ng free. MIT licensed. 8 languages.
 
-## Why piper-g2p?
+**Standalone package** — piper-plus TTS エンジンなしで G2P 単体として利用可能です。任意の TTS エンジンと組み合わせて使えます。
+
+## Why piper-plus-g2p?
 
 - **MIT licensed** -- no eSpeak-ng (GPL) dependency in your TTS pipeline
 - **8 languages** -- JA, EN, ZH, KO, ES, FR, PT, SV with consistent IPA output
@@ -10,7 +12,7 @@ Multilingual G2P (Grapheme-to-Phoneme) for TTS. eSpeak-ng free. MIT licensed. 8 
 
 ## Comparison
 
-| | piper-g2p | phonemizer | gruut | Misaki |
+| | piper-plus-g2p | phonemizer | gruut | Misaki |
 |---|---|---|---|---|
 | License | MIT | GPL (eSpeak-ng) | MIT | Apache-2.0 |
 | Languages | 8 | 100+ | 20+ | EN only |
@@ -20,8 +22,9 @@ Multilingual G2P (Grapheme-to-Phoneme) for TTS. eSpeak-ng free. MIT licensed. 8 
 ## Installation
 
 ```bash
-pip install piper-g2p[ja,en]    # Japanese + English
-pip install piper-g2p[all]      # All languages with native backends
+pip install piper-plus-g2p               # Rule-based languages (ES, FR, PT, SV)
+pip install piper-plus-g2p[ja,en]        # Japanese + English
+pip install piper-plus-g2p[all]          # All 8 languages
 ```
 
 > **Note:** The `ja` extra requires `pyopenjtalk-plus`, which provides pre-built wheels for Linux, macOS, and Windows. See [pyopenjtalk-plus](https://pypi.org/project/pyopenjtalk-plus/) for platform details.
@@ -44,10 +47,10 @@ en.phonemize("Hello world")
 
 | Language | Code | Extra | Backend | Notes |
 |---|---|---|---|---|
-| Japanese | `ja` | `piper-g2p[ja]` | pyopenjtalk-plus | Context-dependent N variants, prosody info |
-| English | `en` | `piper-g2p[en]` | g2p-en | CMU-dict + neural fallback |
-| Chinese | `zh` | `piper-g2p[zh]` | pypinyin | Pinyin-to-IPA conversion |
-| Korean | `ko` | `piper-g2p[ko]` | g2pk2 | Optional dependency |
+| Japanese | `ja` | `piper-plus-g2p[ja]` | pyopenjtalk-plus | Context-dependent N variants, prosody info |
+| English | `en` | `piper-plus-g2p[en]` | g2p-en | CMU-dict + neural fallback |
+| Chinese | `zh` | `piper-plus-g2p[zh]` | pypinyin | Pinyin-to-IPA conversion |
+| Korean | `ko` | `piper-plus-g2p[ko]` | g2pk2 | Optional dependency |
 | Spanish | `es` | -- | Rule-based | No external dependency |
 | French | `fr` | -- | Rule-based | No external dependency |
 | Portuguese | `pt` | -- | Rule-based | No external dependency |
@@ -82,7 +85,7 @@ phoneme_ids = encoder.encode(["k", "o", "[", "N_n", "n", "i", "ch", "i", "w", "a
 
 ## Piper Model Compatibility
 
-piper-g2p produces phoneme tokens directly compatible with
+piper-plus-g2p produces phoneme tokens directly compatible with
 [Piper TTS](https://github.com/rhasspy/piper) ONNX models. Use
 `PiperEncoder` with the model's `phoneme_id_map` from `config.json`:
 
@@ -110,8 +113,9 @@ encoder = PiperEncoder(config["phoneme_id_map"], strict=True)
 
 ## Cross-Platform Consistency
 
-piper-g2p is also available as:
-- **Rust crate**: `piper-g2p` on crates.io
+piper-plus-g2p is also available as:
+- **Rust crate**: `piper-plus-g2p` on crates.io
+- **Go module**: `github.com/ayutaz/piper-plus-g2p/phonemize`
 - **npm package**: `@piper-plus/g2p` for browser/WASM
 
 All three implementations share the same PUA mapping table and are

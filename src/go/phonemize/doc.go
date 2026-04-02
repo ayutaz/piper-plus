@@ -1,7 +1,11 @@
-// Package phonemize provides text-to-phoneme conversion for 6 languages.
+// Package phonemize provides text-to-phoneme conversion for 8 languages.
 //
-// Supported languages: Japanese (ja), English (en), Chinese (zh),
-// Spanish (es), French (fr), Portuguese (pt).
+// Supported languages: Japanese (ja), English (en), Chinese (zh), Korean (ko),
+// Spanish (es), French (fr), Portuguese (pt), Swedish (sv).
+//
+// Japanese requires OpenJTalk and must be built with the openjtalk build tag:
+//
+//	go build -tags openjtalk
 //
 // # Architecture
 //

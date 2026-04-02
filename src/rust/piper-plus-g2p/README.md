@@ -1,11 +1,11 @@
 # piper-plus-g2p
 
-Multilingual G2P (Grapheme-to-Phoneme) for TTS. eSpeak-ng free. MIT licensed. 7 languages.
+Multilingual G2P (Grapheme-to-Phoneme) for TTS. eSpeak-ng free. MIT licensed. 8 languages.
 
 ## Why piper-plus-g2p?
 
 - **MIT licensed** -- no eSpeak-ng (GPL) dependency in your TTS pipeline
-- **7 languages** -- JA, EN, ZH, KO, ES, FR, PT with consistent IPA output
+- **8 languages** -- JA, EN, ZH, KO, ES, FR, PT, SV with consistent IPA output
 - **IPA-first design** -- returns pure IPA token sequences; encoding to model-specific phoneme IDs is a separate step
 
 ## Quick Start
@@ -18,8 +18,8 @@ piper-plus-g2p = { version = "0.1", features = ["naist-jdic"] }
 ```
 
 ```rust
-use piper_g2p::{Phonemizer, PhonemizerRegistry};
-use piper_g2p::english::EnglishPhonemizer;
+use piper_plus_g2p::{Phonemizer, PhonemizerRegistry};
+use piper_plus_g2p::english::EnglishPhonemizer;
 
 let mut registry = PhonemizerRegistry::new();
 registry.register("en", Box::new(EnglishPhonemizer::new().unwrap()));
@@ -30,7 +30,7 @@ let (tokens, prosody) = phonemizer
     .unwrap();
 
 // Encode tokens to phoneme IDs for a Piper ONNX model:
-// let ids = piper_g2p::encode::tokens_to_ids(&tokens, &phoneme_id_map)?;
+// let ids = piper_plus_g2p::encode::tokens_to_ids(&tokens, &phoneme_id_map)?;
 ```
 
 ## Feature Flags
@@ -65,13 +65,14 @@ piper-plus-g2p = { version = "0.1", default-features = false, features = ["engli
 | Spanish | `es` | `spanish` | Rule-based |
 | French | `fr` | `french` | Rule-based |
 | Portuguese | `pt` | `portuguese` | Rule-based |
+| Swedish    | `sv` | `swedish`    | Rule-based |
 
 ## Piper Model Compatibility
 
 Use `PiperEncoder` to convert IPA tokens to phoneme IDs for Piper ONNX models:
 
 ```rust
-use piper_g2p::encode::{PiperEncoder, UnknownTokenMode};
+use piper_plus_g2p::encode::{PiperEncoder, UnknownTokenMode};
 
 // Load phoneme_id_map from model's config.json
 let encoder = PiperEncoder::new(phoneme_id_map, UnknownTokenMode::Strict)?;

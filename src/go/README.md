@@ -34,6 +34,16 @@ with ONNX Runtime inference via [yalue/onnxruntime_go](https://github.com/yalue/
 go get github.com/ayutaz/piper-plus/src/go@latest
 ```
 
+### G2P Only (Standalone) / G2Pのみ使用する場合
+
+Phonemization (G2P) だけを使用したい場合は、TTS エンジン全体をインストールせずに `phonemize` スタンドアロンモジュールのみ取得できます:
+
+```bash
+go get github.com/ayutaz/piper-plus-g2p/phonemize@latest
+```
+
+詳細は [`phonemize/README.md`](phonemize/README.md) を参照してください。
+
 ## Quick Start / クイックスタート
 
 ```go
