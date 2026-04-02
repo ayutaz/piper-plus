@@ -56,10 +56,6 @@ except ImportError:
     phonemize_espeak = None
     tashkeel_run = None
 
-from .f0_extraction import cache_f0
-from .norm_audio import cache_norm_audio, cache_norm_audio_fast, make_silence_detector
-
-
 # piper_g2p: G2P and encoding
 from piper_g2p.custom_dict import CustomDictionary
 from piper_g2p.encode.encoder import PiperEncoder
@@ -67,6 +63,10 @@ from piper_g2p.encode.id_maps import get_phoneme_id_map
 from piper_g2p.encode.pua import map_token
 from piper_g2p.japanese import JapanesePhonemizer
 from piper_g2p.multilingual import MultilingualPhonemizer, UnicodeLanguageDetector
+
+from .f0_extraction import cache_f0
+from .norm_audio import cache_norm_audio, cache_norm_audio_fast, make_silence_detector
+
 
 _DIR = Path(__file__).parent
 _VERSION = (_DIR / "VERSION").read_text(encoding="utf-8").strip()

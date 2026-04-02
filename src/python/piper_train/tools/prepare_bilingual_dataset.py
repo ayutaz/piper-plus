@@ -20,9 +20,10 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from hashlib import sha256 as _sha256
 from pathlib import Path
 
-from piper_train.norm_audio import cache_norm_audio, make_silence_detector
 from piper_g2p.encode.id_maps import get_phoneme_id_map
 from piper_g2p.multilingual import MultilingualPhonemizer
+
+from piper_train.norm_audio import cache_norm_audio, make_silence_detector
 
 
 _LOGGER = logging.getLogger("prepare_bilingual")

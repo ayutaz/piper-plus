@@ -10,11 +10,10 @@ import shutil
 from multiprocessing import Pool, cpu_count
 from pathlib import Path
 
-from tqdm import tqdm
-
 from piper_g2p.encode.id_maps import get_phoneme_id_map
 from piper_g2p.encode.pua import map_token
 from piper_g2p.japanese import JapanesePhonemizer
+from tqdm import tqdm
 
 
 def process_utterance(item: dict) -> dict | None:
