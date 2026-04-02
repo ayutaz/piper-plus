@@ -337,8 +337,10 @@ mod korean_custom_dict {
         use std::io::Write;
 
         let json = r#"{"version":"1.0","entries":{"컴퓨터":"콤퓨타"}}"#;
-        let path =
-            std::env::temp_dir().join(format!("piper_plus_g2p_ko_dict_{}.json", std::process::id()));
+        let path = std::env::temp_dir().join(format!(
+            "piper_plus_g2p_ko_dict_{}.json",
+            std::process::id()
+        ));
         let mut f = std::fs::File::create(&path).unwrap();
         f.write_all(json.as_bytes()).unwrap();
         f.flush().unwrap();
@@ -405,8 +407,10 @@ mod swedish_custom_dict {
         use std::io::Write;
 
         let json = r#"{"version":"2.0","entries":{"IKEA":{"pronunciation":"ikea","priority":8}}}"#;
-        let path =
-            std::env::temp_dir().join(format!("piper_plus_g2p_sv_dict_{}.json", std::process::id()));
+        let path = std::env::temp_dir().join(format!(
+            "piper_plus_g2p_sv_dict_{}.json",
+            std::process::id()
+        ));
         let mut f = std::fs::File::create(&path).unwrap();
         f.write_all(json.as_bytes()).unwrap();
         f.flush().unwrap();

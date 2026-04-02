@@ -11,7 +11,7 @@ from tests.conftest import requires_en, requires_ja, requires_zh
 @requires_ja
 class TestJACorrectness:
     def test_ja_tokens_ipa_to_pua(self):
-        """piper_plus_g2p tokens + BOS/EOS + PUA should produce valid phoneme sequence."""
+        """Tokens + BOS/EOS + PUA should produce valid phoneme sequence."""
         from piper_plus_g2p.encode.pua import map_token
         from piper_plus_g2p.japanese import JapanesePhonemizer
 

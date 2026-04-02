@@ -134,7 +134,9 @@ impl PiperVoice {
             },
             "es" => Ok(Box::new(piper_plus_g2p::spanish::SpanishPhonemizer::new())),
             "fr" => Ok(Box::new(piper_plus_g2p::french::FrenchPhonemizer::new())),
-            "pt" => Ok(Box::new(piper_plus_g2p::portuguese::PortuguesePhonemizer::new())),
+            "pt" => Ok(Box::new(
+                piper_plus_g2p::portuguese::PortuguesePhonemizer::new(),
+            )),
             "ko" => Ok(Box::new(piper_plus_g2p::korean::KoreanPhonemizer::new())),
             "sv" => Ok(Box::new(piper_plus_g2p::swedish::SwedishPhonemizer::new())),
             _ => Ok(Box::new(
@@ -234,8 +236,8 @@ impl PiperVoice {
             .get_phoneme_id_map()
             .unwrap_or(&self.config.phoneme_id_map);
 
-        let ids =
-            piper_plus_g2p::encode::tokens_to_ids(&tokens, phoneme_id_map).map_err(PiperError::from)?;
+        let ids = piper_plus_g2p::encode::tokens_to_ids(&tokens, phoneme_id_map)
+            .map_err(PiperError::from)?;
         let prosody_feats = prosody_to_optional_features(&prosody);
 
         // 3. Post-process IDs (BOS/EOS/padding insertion, language-specific)
@@ -293,8 +295,8 @@ impl PiperVoice {
             .get_phoneme_id_map()
             .unwrap_or(&self.config.phoneme_id_map);
 
-        let ids =
-            piper_plus_g2p::encode::tokens_to_ids(&tokens, phoneme_id_map).map_err(PiperError::from)?;
+        let ids = piper_plus_g2p::encode::tokens_to_ids(&tokens, phoneme_id_map)
+            .map_err(PiperError::from)?;
         let prosody_feats = prosody_to_optional_features(&prosody);
 
         let (ids, _prosody_feats) =
@@ -331,7 +333,8 @@ impl PiperVoice {
     /// 無効なら `dictionary_manager::ensure_dictionary()` で外部辞書を
     /// 自動検索・ダウンロードする。
     #[cfg(feature = "japanese")]
-    fn create_japanese_phonemizer() -> Result<piper_plus_g2p::japanese::JapanesePhonemizer, PiperError> {
+    fn create_japanese_phonemizer()
+    -> Result<piper_plus_g2p::japanese::JapanesePhonemizer, PiperError> {
         #[cfg(feature = "naist-jdic")]
         {
             piper_plus_g2p::japanese::JapanesePhonemizer::new_bundled().map_err(PiperError::from)
@@ -923,7 +926,8 @@ mod tests {
     fn test_tokens_to_ids_unknown_phoneme() {
         let id_map: HashMap<String, Vec<i64>> = HashMap::new();
         let tokens: Vec<String> = vec!["xyz".into()];
-        let result = piper_plus_g2p::encode::tokens_to_ids(&tokens, &id_map).map_err(PiperError::from);
+        let result =
+            piper_plus_g2p::encode::tokens_to_ids(&tokens, &id_map).map_err(PiperError::from);
         assert!(result.is_err());
         match result.unwrap_err() {
             PiperError::PhonemeIdNotFound { phoneme } => {

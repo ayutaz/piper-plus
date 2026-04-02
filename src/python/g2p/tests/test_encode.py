@@ -38,7 +38,7 @@ class TestJAIDMap:
 
     @requires_ja
     def test_ja_id_map_has_correct_size(self):
-        """piper_plus_g2p JA id map should have 65 symbols (10 special + 55 phonemes)."""
+        """JA id map should have 65 symbols (10 special + 55 phonemes)."""
         g2p_map = get_phoneme_id_map("ja")
         assert len(g2p_map) == 65
 
