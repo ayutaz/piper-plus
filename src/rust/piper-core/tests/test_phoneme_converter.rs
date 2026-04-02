@@ -1,5 +1,5 @@
-use piper_plus::phonemize::ProsodyInfo;
-use piper_plus::phonemize::phoneme_converter;
+use piper_g2p::encode as phoneme_converter;
+use piper_g2p::ProsodyInfo;
 use std::collections::HashMap;
 
 fn make_test_id_map() -> HashMap<String, Vec<i64>> {
@@ -47,6 +47,12 @@ fn test_unknown_phoneme_error() {
     let tokens: Vec<String> = vec!["z"].iter().map(|s| s.to_string()).collect();
     let result = phoneme_converter::tokens_to_ids(&tokens, &map);
     assert!(result.is_err());
+    let err = result.unwrap_err();
+    let msg = format!("{err}");
+    assert!(
+        msg.contains("z"),
+        "error message should contain the unknown phoneme 'z', got: {msg}"
+    );
 }
 
 #[test]
