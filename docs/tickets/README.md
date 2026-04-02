@@ -12,9 +12,9 @@
 | [M0: API ギャップ修正](#m0-piper-g2p-api-ギャップ修正) | 4 | 4/4 | 完了 |
 | [M1: Python 移行](#m1-python-移行) | 8 | 1/8 | 進行中 |
 | [M2: Rust 移行](#m2-rust-移行) | 8 | 0/8 | 未着手 |
-| [M3: JS/WASM 移行](#m3-jswasm-移行) | 6 | 0/6 | 未着手 |
+| [M3: JS/WASM 移行](#m3-jswasm-移行) | 6 | 6/6 | 完了 |
 | [M4: 検証・クリーンアップ](#m4-検証クリーンアップ) | 4 | 0/4 | 未着手 |
-| **合計** | **30** | **5/30** | |
+| **合計** | **30** | **11/30** | |
 
 ---
 
@@ -71,12 +71,12 @@
 
 | ID | チケット | 見積り | リスク | 前提 | 状態 |
 |---|---|---|---|---|---|
-| M3-1 | [PiperPlus 初期化の切り替え](M3-1-piperplus-init-switch.md) | 中 | 中 | M0 | 未着手 |
-| M3-2 | [_textToPhonemeIds() 統一](M3-2-unify-text-to-phoneme-ids.md) | 中 | 中 | M3-1 | 未着手 |
-| M3-3 | [prosody 抽出の統合](M3-3-prosody-extraction-consolidation.md) | 小 | 低 | M3-1, M3-2 | 未着手 |
-| M3-4 | [テスト更新 (11 ファイル)](M3-4-test-updates.md) | 中 | 中 | M3-1〜M3-3 | 未着手 |
-| M3-5 | [deprecated コード削除](M3-5-deprecated-code-removal.md) | 中 | 中 | M3-4 | 未着手 |
-| M3-6 | [CI 対応](M3-6-ci-updates.md) | 小 | 低 | M3-4, M3-5 | 未着手 |
+| M3-1 | [PiperPlus 初期化の切り替え](M3-1-piperplus-init-switch.md) | 中 | 中 | M0 | 完了 |
+| M3-2 | [_textToPhonemeIds() 統一](M3-2-unify-text-to-phoneme-ids.md) | 中 | 中 | M3-1 | 完了 |
+| M3-3 | [prosody 抽出の統合](M3-3-prosody-extraction-consolidation.md) | 小 | 低 | M3-1, M3-2 | 完了 |
+| M3-4 | [テスト更新 (11 ファイル)](M3-4-test-updates.md) | 中 | 中 | M3-1〜M3-3 | 完了 |
+| M3-5 | [deprecated コード削除](M3-5-deprecated-code-removal.md) | 中 | 中 | M3-4 | 完了 |
+| M3-6 | [CI 対応](M3-6-ci-updates.md) | 小 | 低 | M3-4, M3-5 | 完了 |
 
 ---
 
