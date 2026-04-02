@@ -178,6 +178,110 @@ describe('EnglishG2P.phonemizeWithProsody', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Complex / irregular pronunciation words
+// ---------------------------------------------------------------------------
+
+describe('EnglishG2P.phonemize - irregular words', () => {
+    const en = new EnglishG2P();
+
+    it('should handle "through" (silent gh, dictionary entry)', () => {
+        const { tokens } = en.phonemize('through');
+        assert.ok(tokens.length > 0, '"through" should produce tokens');
+        // "through" is in the dictionary: TH R UW1 -> theta, rho, u:
+        // Should contain theta (TH -> θ)
+        assert.ok(
+            tokens.includes('\u03b8'),
+            '"through" should contain \u03b8 (theta)'
+        );
+    });
+
+    it('should handle "thought" (dictionary fallback)', () => {
+        const { tokens } = en.phonemize('thought');
+        assert.ok(tokens.length > 0, '"thought" should produce tokens');
+        // Falls back to digraph/letter rules; "th" -> TH -> theta
+        assert.ok(
+            tokens.includes('\u03b8'),
+            '"thought" should contain \u03b8 (theta) from "th" digraph'
+        );
+    });
+
+    it('should handle "tough" (irregular ough)', () => {
+        const { tokens } = en.phonemize('tough');
+        assert.ok(tokens.length > 0, '"tough" should produce tokens');
+        // Not in dictionary; uses fallback rules
+        // Output should be IPA (no ARPAbet)
+        const hasArpabet = tokens.some(t => /^[A-Z]{2,}$/.test(t));
+        assert.ok(!hasArpabet, 'tokens should be IPA, not ARPAbet');
+    });
+
+    it('should produce different outputs for "through" vs "tough"', () => {
+        const through = en.phonemize('through');
+        const tough = en.phonemize('tough');
+        // These words have very different pronunciations
+        const throughStr = through.tokens.join('');
+        const toughStr = tough.tokens.join('');
+        assert.notEqual(throughStr, toughStr,
+            '"through" and "tough" should have different phonemizations');
+    });
+
+    it('should handle "read" (dictionary entry)', () => {
+        const { tokens } = en.phonemize('read');
+        assert.ok(tokens.length > 0);
+        // "read" -> R IY1 D in dictionary (present tense)
+    });
+
+    it('should handle "woman" (irregular vowel)', () => {
+        const { tokens } = en.phonemize('woman');
+        assert.ok(tokens.length >= 3,
+            '"woman" should produce at least 3 IPA tokens');
+    });
+});
+
+// ---------------------------------------------------------------------------
+// Unknown word fallback
+// ---------------------------------------------------------------------------
+
+describe('EnglishG2P.phonemize - unknown word fallback', () => {
+    const en = new EnglishG2P();
+
+    it('should fall back to letter rules for unknown words', () => {
+        // "flurb" is not in the dictionary
+        const { tokens } = en.phonemize('flurb');
+        assert.ok(tokens.length > 0,
+            'unknown word "flurb" should still produce tokens via fallback');
+    });
+
+    it('should apply digraph rules in fallback', () => {
+        // "shim" is not in the dictionary
+        // "sh" digraph -> SH -> esh
+        const { tokens } = en.phonemize('shim');
+        assert.ok(tokens.length > 0);
+        // Should contain the IPA esh character from "sh" digraph
+        assert.ok(
+            tokens.includes('\u0283'),
+            '"shim" should contain \u0283 (esh) from "sh" digraph fallback'
+        );
+    });
+
+    it('should handle completely unknown gibberish', () => {
+        const { tokens } = en.phonemize('xyzzy');
+        assert.ok(tokens.length > 0,
+            'gibberish input should produce tokens via letter rules');
+        // All tokens should be IPA
+        const hasArpabet = tokens.some(t => /^[A-Z]{2,}$/.test(t));
+        assert.ok(!hasArpabet, 'tokens should be IPA even for unknown words');
+    });
+
+    it('should handle mixed known and unknown words', () => {
+        const { tokens } = en.phonemize('the flurb is good');
+        assert.ok(tokens.length > 0);
+        // Should have space separators
+        const spaceCount = tokens.filter(t => t === ' ').length;
+        assert.ok(spaceCount >= 3, `Expected >= 3 spaces, got ${spaceCount}`);
+    });
+});
+
+// ---------------------------------------------------------------------------
 // Edge cases
 // ---------------------------------------------------------------------------
 

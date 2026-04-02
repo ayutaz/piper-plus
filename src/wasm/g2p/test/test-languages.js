@@ -103,6 +103,52 @@ describe('ChineseG2P', () => {
             assert.deepEqual(r1.prosody, r2.prosody);
         });
     });
+
+    describe('multi-character input', () => {
+        it('should produce one token per character for a sentence', () => {
+            const zh = new ChineseG2P();
+            const input = '北京欢迎你';
+            const { tokens } = zh.phonemize(input);
+            assert.equal(tokens.length, 5,
+                `Expected 5 tokens for 5-character input, got ${tokens.length}`);
+        });
+
+        it('should include punctuation characters as tokens', () => {
+            const zh = new ChineseG2P();
+            // 6 Chinese chars + 1 period (fullwidth or ASCII)
+            const { tokens } = zh.phonemize('我是学生。');
+            assert.ok(tokens.length >= 5,
+                `Expected at least 5 tokens, got ${tokens.length}`);
+            // The period character should be present as a token
+            assert.ok(
+                tokens.includes('。'),
+                'Fullwidth period should be preserved as a token'
+            );
+        });
+
+        it('should handle mixed Chinese and ASCII text', () => {
+            const zh = new ChineseG2P();
+            const { tokens } = zh.phonemize('你好world');
+            // 2 Chinese + 5 ASCII = 7 tokens
+            assert.equal(tokens.length, 7);
+            assert.equal(tokens[0], '你');
+            assert.equal(tokens[1], '好');
+        });
+    });
+
+    describe('tone marker note', () => {
+        // The JS ChineseG2P is character-based (no pypinyin), so it does
+        // NOT produce tone1..tone5 markers. This test documents the behavior.
+        it('should NOT produce tone markers (JS is character-based)', () => {
+            const zh = new ChineseG2P();
+            const { tokens } = zh.phonemize('你好');
+            const toneTokens = tokens.filter(
+                t => /^tone[1-5]$/.test(t)
+            );
+            assert.equal(toneTokens.length, 0,
+                'JS ChineseG2P is character-based and should not produce tone markers');
+        });
+    });
 });
 
 // ===========================================================================

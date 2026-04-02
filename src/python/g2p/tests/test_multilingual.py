@@ -2,6 +2,7 @@
 
 import pytest
 
+from piper_plus_g2p.base import ProsodyInfo
 from tests.conftest import requires_en, requires_ja, requires_zh
 
 
@@ -258,3 +259,141 @@ class TestMixedLanguageText:
         assert len(tokens) == len(prosody), (
             f"Length mismatch: {len(tokens)} tokens vs {len(prosody)} prosody"
         )
+
+
+class TestMultilingualProsodyPunctuation:
+    """Tests for prosody and punctuation handling in mixed-language text."""
+
+    @requires_ja
+    @requires_en
+    def test_punctuation_mixed_ja_en_zh_sentence(self):
+        """Punctuated mixed text: JA period + EN comma/exclamation."""
+        from piper_plus_g2p.registry import get_phonemizer
+
+        p = get_phonemizer("ja-en")
+        text = "こんにちは。Hello, world!"
+        tokens, prosody = p.phonemize_with_prosody(text)
+        assert len(tokens) > 0, "Should produce phoneme tokens"
+        assert len(tokens) == len(prosody), (
+            f"Length mismatch: {len(tokens)} tokens vs {len(prosody)} prosody"
+        )
+
+    @requires_ja
+    @requires_en
+    @requires_zh
+    def test_punctuation_mixed_three_lang(self):
+        """Punctuated mixed text across three languages: JA + EN + ZH."""
+        from piper_plus_g2p.registry import get_phonemizer
+
+        p = get_phonemizer("ja-en-zh")
+        # Note: With kana present, CJK ideographs are detected as JA,
+        # but the phonemizer still produces valid output.
+        text = "こんにちは。Hello, world! 你好。"
+        tokens, prosody = p.phonemize_with_prosody(text)
+        assert len(tokens) > 0
+        assert len(tokens) == len(prosody), (
+            f"Length mismatch: {len(tokens)} tokens vs {len(prosody)} prosody"
+        )
+
+    @requires_ja
+    @requires_en
+    def test_language_switch_boundary_prosody(self):
+        """Prosody features at language switch boundaries are well-formed."""
+        from piper_plus_g2p.registry import get_phonemizer
+
+        p = get_phonemizer("ja-en")
+        text = "東京のTokyo Tower"
+        tokens, prosody = p.phonemize_with_prosody(text)
+        assert len(tokens) == len(prosody)
+
+        # JA segment should have ProsodyInfo entries (a1/a2/a3 from OpenJTalk)
+        ja_prosody = [pr for pr in prosody if isinstance(pr, ProsodyInfo)]
+        assert len(ja_prosody) > 0, "JA segment should produce ProsodyInfo entries"
+
+        # Every prosody entry must be either ProsodyInfo or None
+        for i, pr in enumerate(prosody):
+            assert pr is None or isinstance(pr, ProsodyInfo), (
+                f"prosody[{i}] is {type(pr).__name__}, expected ProsodyInfo or None"
+            )
+
+    @requires_ja
+    @requires_en
+    def test_question_mark_mixed_ja_en(self):
+        """Question marks in mixed JA-EN text: JA '？' + EN '?'."""
+        from piper_plus_g2p.registry import get_phonemizer
+
+        p = get_phonemizer("ja-en")
+        text = "これは何？What is this?"
+        tokens, prosody = p.phonemize_with_prosody(text)
+        assert len(tokens) > 0
+        assert len(tokens) == len(prosody), (
+            f"Length mismatch: {len(tokens)} tokens vs {len(prosody)} prosody"
+        )
+
+    @requires_ja
+    @requires_en
+    def test_question_mark_ja_produces_marker(self):
+        """JA segment with '？' should produce a question marker token."""
+        from piper_plus_g2p.registry import get_phonemizer
+
+        p = get_phonemizer("ja-en")
+        # Pure JA question through multilingual phonemizer
+        text = "これは何ですか？"
+        tokens = p.phonemize(text)
+        # JA question markers: bare "?" for standard questions,
+        # or extended markers "?!", "?.", "?~" for specific types.
+        question_markers = {"?", "?!", "?.", "?~"}
+        has_question = any(t in question_markers for t in tokens)
+        assert has_question, (
+            f"Expected a question marker token in {tokens}, "
+            f"but none of {question_markers} found"
+        )
+
+    @requires_ja
+    @requires_en
+    def test_prosody_valid_for_en_segment(self):
+        """EN segments should have valid prosody entries (ProsodyInfo or None)."""
+        from piper_plus_g2p.registry import get_phonemizer
+
+        p = get_phonemizer("ja-en")
+        # Pure EN through multilingual phonemizer
+        text = "Hello world"
+        tokens, prosody = p.phonemize_with_prosody(text)
+        assert len(tokens) > 0
+        assert len(tokens) == len(prosody)
+        # EN phonemizer returns ProsodyInfo with a1=0, a2=stress, a3=word length.
+        # Every entry must be either ProsodyInfo or None.
+        for i, pr in enumerate(prosody):
+            assert pr is None or isinstance(pr, ProsodyInfo), (
+                f"prosody[{i}] for EN text should be ProsodyInfo or None, got {type(pr).__name__}"
+            )
+
+    @requires_ja
+    @requires_en
+    def test_mixed_multiple_switches_prosody(self):
+        """Multiple JA-EN-JA switches maintain prosody alignment."""
+        from piper_plus_g2p.registry import get_phonemizer
+
+        p = get_phonemizer("ja-en")
+        text = "今日はGood morningですね"
+        tokens, prosody = p.phonemize_with_prosody(text)
+        assert len(tokens) > 0
+        assert len(tokens) == len(prosody)
+
+        # Should have both ProsodyInfo (from JA) and None (from EN)
+        has_prosody_info = any(isinstance(pr, ProsodyInfo) for pr in prosody)
+        has_none = any(pr is None for pr in prosody)
+        assert has_prosody_info, "JA segments should contribute ProsodyInfo"
+        assert has_none, "EN segment should contribute None prosody"
+
+    @requires_ja
+    @requires_en
+    def test_exclamation_mixed(self):
+        """Exclamation marks in mixed text do not break prosody alignment."""
+        from piper_plus_g2p.registry import get_phonemizer
+
+        p = get_phonemizer("ja-en")
+        text = "すごい！Amazing!"
+        tokens, prosody = p.phonemize_with_prosody(text)
+        assert len(tokens) > 0
+        assert len(tokens) == len(prosody)

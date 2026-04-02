@@ -1,11 +1,32 @@
 """Tests for piper_plus_g2p.encode — PUA mapping, ID maps, and PiperEncoder."""
 
+import json
+import warnings
+from pathlib import Path
+
 import pytest
 
 from piper_plus_g2p.encode.encoder import PiperEncoder
 from piper_plus_g2p.encode.id_maps import get_phoneme_id_map
-from piper_plus_g2p.encode.pua import FIXED_PUA_MAPPING, map_token
+from piper_plus_g2p.encode.pua import (
+    CHAR2TOKEN,
+    FIXED_PUA_MAPPING,
+    TOKEN2CHAR,
+    map_token,
+)
 from tests.conftest import requires_ja
+
+# Path to the cross-platform fixture
+_FIXTURE_PATH = (
+    Path(__file__).resolve().parents[4] / "tests" / "fixtures" / "g2p" / "phoneme_test_cases.json"
+)
+
+
+def _load_pua_spot_checks() -> list[dict]:
+    """Load pua_spot_checks from the cross-platform fixture."""
+    with open(_FIXTURE_PATH, encoding="utf-8") as f:
+        data = json.load(f)
+    return data["pua_spot_checks"]
 
 
 class TestPUAMapping:
@@ -23,6 +44,129 @@ class TestPUAMapping:
         """Multi-character token 'ch' maps to U+E00E."""
         result = map_token("ch")
         assert result == chr(0xE00E)
+
+
+class TestPUAAllEntries:
+    """Verify every entry in FIXED_PUA_MAPPING via map_token round-trip."""
+
+    @pytest.mark.parametrize(
+        "token,codepoint",
+        list(FIXED_PUA_MAPPING.items()),
+        ids=[t for t in FIXED_PUA_MAPPING],
+    )
+    def test_map_token_matches_fixed_mapping(self, token: str, codepoint: int):
+        """map_token(token) returns the PUA char for every registered entry."""
+        expected_char = chr(codepoint)
+        assert map_token(token) == expected_char
+
+    @pytest.mark.parametrize(
+        "token,codepoint",
+        list(FIXED_PUA_MAPPING.items()),
+        ids=[t for t in FIXED_PUA_MAPPING],
+    )
+    def test_token2char_matches(self, token: str, codepoint: int):
+        """TOKEN2CHAR[token] equals chr(codepoint) for every entry."""
+        assert TOKEN2CHAR[token] == chr(codepoint)
+
+    @pytest.mark.parametrize(
+        "token,codepoint",
+        list(FIXED_PUA_MAPPING.items()),
+        ids=[t for t in FIXED_PUA_MAPPING],
+    )
+    def test_char2token_reverse(self, token: str, codepoint: int):
+        """CHAR2TOKEN[chr(codepoint)] maps back to the original token."""
+        assert CHAR2TOKEN[chr(codepoint)] == token
+
+
+class TestPUASpotChecks:
+    """Verify spot-check entries from the cross-platform fixture file."""
+
+    @pytest.mark.parametrize(
+        "entry",
+        _load_pua_spot_checks(),
+        ids=[e["token"] for e in _load_pua_spot_checks()],
+    )
+    def test_fixture_spot_check(self, entry: dict):
+        """Each pua_spot_checks entry matches FIXED_PUA_MAPPING."""
+        token = entry["token"]
+        expected_codepoint = int(entry["codepoint"], 16)
+        assert token in FIXED_PUA_MAPPING, f"Token {token!r} not in FIXED_PUA_MAPPING"
+        assert FIXED_PUA_MAPPING[token] == expected_codepoint
+        assert map_token(token) == chr(expected_codepoint)
+
+
+class TestPUAUnmappedTokens:
+    """Test map_token behaviour for tokens NOT in the fixed mapping."""
+
+    def test_unknown_multi_char_returns_unchanged_with_warning(self):
+        """Unknown multi-char token is returned unchanged and emits a warning."""
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            result = map_token("xyz_unknown")
+            assert result == "xyz_unknown"
+            assert len(w) == 1
+            assert "no pua mapping" in str(w[0].message).lower()
+
+    def test_unknown_two_char_returns_unchanged(self):
+        """Two-character token not in the mapping is returned unchanged."""
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            result = map_token("zq")
+            assert result == "zq"
+            assert len(w) == 1
+
+    def test_single_char_not_in_mapping_passes_through(self):
+        """Single char not in FIXED_PUA_MAPPING passes through without warning."""
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            result = map_token("Z")
+            assert result == "Z"
+            assert len(w) == 0, "Single-char passthrough should not emit a warning"
+
+
+class TestPUABoundaryValues:
+    """Boundary-value tests for the PUA codepoint range."""
+
+    def test_first_pua_mapping(self):
+        """First PUA mapping starts at U+E000 (token 'a:')."""
+        assert FIXED_PUA_MAPPING["a:"] == 0xE000
+        assert map_token("a:") == chr(0xE000)
+
+    def test_last_pua_mapping(self):
+        """Last PUA mapping is the highest codepoint in the table."""
+        max_codepoint = max(FIXED_PUA_MAPPING.values())
+        max_token = [t for t, cp in FIXED_PUA_MAPPING.items() if cp == max_codepoint][0]
+        assert map_token(max_token) == chr(max_codepoint)
+        # Verify it's still in the BMP PUA range (U+E000-U+F8FF)
+        assert 0xE000 <= max_codepoint <= 0xF8FF
+
+    def test_all_codepoints_in_pua_range(self):
+        """Every codepoint in the mapping is within U+E000-U+F8FF (BMP PUA)."""
+        for token, codepoint in FIXED_PUA_MAPPING.items():
+            assert 0xE000 <= codepoint <= 0xF8FF, (
+                f"Token {token!r} has codepoint U+{codepoint:04X} outside PUA range"
+            )
+
+    def test_no_duplicate_codepoints(self):
+        """Every codepoint in the mapping is unique (no two tokens share one)."""
+        codepoints = list(FIXED_PUA_MAPPING.values())
+        assert len(codepoints) == len(set(codepoints)), "Duplicate codepoints found"
+
+    def test_no_duplicate_tokens(self):
+        """Every token string in the mapping is unique."""
+        tokens = list(FIXED_PUA_MAPPING.keys())
+        assert len(tokens) == len(set(tokens)), "Duplicate tokens found"
+
+    def test_bidirectional_map_sizes_match(self):
+        """TOKEN2CHAR and CHAR2TOKEN have the same size as FIXED_PUA_MAPPING."""
+        assert len(TOKEN2CHAR) == len(FIXED_PUA_MAPPING)
+        assert len(CHAR2TOKEN) == len(FIXED_PUA_MAPPING)
+
+    def test_fixture_pua_map_count_matches(self):
+        """The fixture's pua_map_count matches the actual mapping size."""
+        with open(_FIXTURE_PATH, encoding="utf-8") as f:
+            data = json.load(f)
+        assert data["pua_map_count"] == len(FIXED_PUA_MAPPING)
 
 
 class TestJAIDMap:

@@ -53,7 +53,7 @@ RUN uv pip install \
 COPY src/python /tmp/src/python
 COPY VERSION /tmp/VERSION
 
-# Install piper_g2p (standalone G2P package, not on PyPI)
+# Install piper_plus_g2p (standalone G2P package, not on PyPI)
 RUN uv pip install "/tmp/src/python/g2p"
 
 # Install piper_train with training extras

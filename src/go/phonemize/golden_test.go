@@ -2,6 +2,7 @@ package phonemize
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"testing"
 )
@@ -24,11 +25,12 @@ const fixtureFile = "../../../tests/fixtures/g2p/phoneme_test_cases.json"
 // ---------------------------------------------------------------------------
 
 type goldenFixture struct {
-	Version        int               `json:"version"`
-	TestCases      []goldenTestCase  `json:"test_cases"`
-	PUAMapCount    int               `json:"pua_map_count"`
-	PUASpotChecks  []puaSpotCheck    `json:"pua_spot_checks"`
-	DetectCases    []detectTestCase  `json:"detect_test_cases"`
+	Version          int                `json:"version"`
+	TestCases        []goldenTestCase   `json:"test_cases"`
+	PUAMapCount      int                `json:"pua_map_count"`
+	PUASpotChecks    []puaSpotCheck     `json:"pua_spot_checks"`
+	DetectCases      []detectTestCase   `json:"detect_test_cases"`
+	EncodeTestCases  []encodeTestCase   `json:"encode_test_cases"`
 }
 
 type goldenTestCase struct {
@@ -53,6 +55,15 @@ type detectTestCase struct {
 	Input            string `json:"input"`
 	ExpectedLanguage string `json:"expected_language"`
 	Description      string `json:"description"`
+}
+
+type encodeTestCase struct {
+	Tokens            []string `json:"tokens"`
+	Description       string   `json:"description"`
+	ExpectedHasBOS    bool     `json:"expected_has_bos"`
+	ExpectedHasEOS    bool     `json:"expected_has_eos"`
+	ExpectedMinLength int      `json:"expected_min_length"`
+	ExpectedFirstTok  string   `json:"expected_first_token,omitempty"`
 }
 
 // ---------------------------------------------------------------------------
@@ -149,6 +160,169 @@ func parseHexCodepoint(s string) (int64, error) {
 		}
 	}
 	return val, nil
+}
+
+// ===========================================================================
+// PUA full map consistency — verify all 96 fixedPUA entries round-trip
+// ===========================================================================
+
+func TestGolden_PUAFullMapRoundTrip(t *testing.T) {
+	f := loadGoldenFixture(t)
+	if len(fixedPUA) != f.PUAMapCount {
+		t.Fatalf("fixedPUA has %d entries, fixture expects %d — cannot run full check",
+			len(fixedPUA), f.PUAMapCount)
+	}
+
+	for token, expectedRune := range fixedPUA {
+		t.Run(fmt.Sprintf("RegisterToken_%s", token), func(t *testing.T) {
+			mapped := RegisterToken(token)
+
+			// Verify RegisterToken returns the expected PUA codepoint.
+			var gotRune rune
+			for _, r := range mapped {
+				gotRune = r
+				break
+			}
+			if gotRune != expectedRune {
+				t.Errorf("RegisterToken(%q) = U+%04X, want U+%04X", token, gotRune, expectedRune)
+			}
+
+			// Verify PUAToToken reverses back to the original token.
+			reversed, ok := PUAToToken(expectedRune)
+			if !ok {
+				t.Errorf("PUAToToken(U+%04X) not found for token %q", expectedRune, token)
+			} else if reversed != token {
+				t.Errorf("PUAToToken(U+%04X) = %q, want %q", expectedRune, reversed, token)
+			}
+		})
+	}
+}
+
+// ===========================================================================
+// Encode (TokensToIDs + PostProcessIDs) consistency
+// ===========================================================================
+
+// buildTestPhonemeIDMap creates a minimal phoneme_id_map sufficient for
+// the fixture encode_test_cases. It includes BOS, EOS, pad, and all
+// JA phonemes (single-char and PUA-mapped multi-char).
+func buildTestPhonemeIDMap() map[string][]int64 {
+	// Start with special tokens
+	idMap := map[string][]int64{
+		"_": {0},
+		"^": {1},
+		"$": {2},
+	}
+	nextID := int64(3)
+
+	// Add single-character tokens used by encode test cases
+	singleChars := "aiueoAIUEONqkgtnsmrhbpdfjwyvzl"
+	for _, ch := range singleChars {
+		s := string(ch)
+		if _, exists := idMap[s]; !exists {
+			idMap[s] = []int64{nextID}
+			nextID++
+		}
+	}
+
+	// Add all PUA-mapped multi-char tokens from fixedPUA
+	for token, puaRune := range fixedPUA {
+		key := string(puaRune)
+		if _, exists := idMap[key]; !exists {
+			idMap[key] = []int64{nextID}
+			nextID++
+		}
+		_ = token
+	}
+
+	return idMap
+}
+
+func TestGolden_EncodeTestCases_BOSEOS(t *testing.T) {
+	f := loadGoldenFixture(t)
+	if len(f.EncodeTestCases) == 0 {
+		t.Skip("no encode_test_cases in fixture")
+	}
+
+	idMap := buildTestPhonemeIDMap()
+	bosID := idMap["^"][0]
+	eosID := idMap["$"][0]
+
+	for _, tc := range f.EncodeTestCases {
+		t.Run(tc.Description, func(t *testing.T) {
+			rawIDs := TokensToIDs(tc.Tokens, idMap)
+			ids, _ := PostProcessIDs(rawIDs, nil, idMap, "$")
+
+			if tc.ExpectedHasBOS {
+				if len(ids) == 0 || ids[0] != bosID {
+					t.Errorf("missing BOS: first id=%v, expected %d", safeFirst(ids), bosID)
+				}
+			}
+			if tc.ExpectedHasEOS {
+				if len(ids) == 0 || ids[len(ids)-1] != eosID {
+					t.Errorf("missing EOS: last id=%v, expected %d", safeLast(ids), eosID)
+				}
+			}
+		})
+	}
+}
+
+func TestGolden_EncodeTestCases_MinLength(t *testing.T) {
+	f := loadGoldenFixture(t)
+	if len(f.EncodeTestCases) == 0 {
+		t.Skip("no encode_test_cases in fixture")
+	}
+
+	idMap := buildTestPhonemeIDMap()
+
+	for _, tc := range f.EncodeTestCases {
+		t.Run(tc.Description, func(t *testing.T) {
+			rawIDs := TokensToIDs(tc.Tokens, idMap)
+			ids, _ := PostProcessIDs(rawIDs, nil, idMap, "$")
+
+			if len(ids) < tc.ExpectedMinLength {
+				t.Errorf("encoded length %d < expected min %d", len(ids), tc.ExpectedMinLength)
+			}
+		})
+	}
+}
+
+func TestGolden_EncodeTestCases_FirstToken(t *testing.T) {
+	f := loadGoldenFixture(t)
+	if len(f.EncodeTestCases) == 0 {
+		t.Skip("no encode_test_cases in fixture")
+	}
+
+	idMap := buildTestPhonemeIDMap()
+
+	for _, tc := range f.EncodeTestCases {
+		if tc.ExpectedFirstTok == "" {
+			continue
+		}
+		t.Run(tc.Description, func(t *testing.T) {
+			rawIDs := TokensToIDs(tc.Tokens, idMap)
+			ids, _ := PostProcessIDs(rawIDs, nil, idMap, "$")
+
+			expectedID := idMap[tc.ExpectedFirstTok][0]
+			if len(ids) == 0 || ids[0] != expectedID {
+				t.Errorf("first token mismatch: got id=%v, expected id=%d (symbol %q)",
+					safeFirst(ids), expectedID, tc.ExpectedFirstTok)
+			}
+		})
+	}
+}
+
+func safeFirst(ids []int64) interface{} {
+	if len(ids) == 0 {
+		return "<empty>"
+	}
+	return ids[0]
+}
+
+func safeLast(ids []int64) interface{} {
+	if len(ids) == 0 {
+		return "<empty>"
+	}
+	return ids[len(ids)-1]
 }
 
 // ===========================================================================

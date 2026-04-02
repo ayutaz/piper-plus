@@ -1,7 +1,7 @@
 /**
  * PUA (Private Use Area) mapping table.
  *
- * Canonical source: src/python/g2p/piper_g2p/data/pua.json (96 entries)
+ * Canonical source: src/python/g2p/piper_plus_g2p/data/pua.json (96 entries)
  *
  * Multi-character phoneme tokens are mapped to single Unicode PUA codepoints
  * (U+E000..U+E061) so that the model's phoneme_id_map can look them up as

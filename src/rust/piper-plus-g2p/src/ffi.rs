@@ -251,6 +251,203 @@ mod tests {
     }
 
     // -----------------------------------------------------------------------
+    // NULL pointer tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_ffi_create_null_languages() {
+        // NULL languages pointer should succeed (uses default language set)
+        unsafe {
+            let handle = piper_plus_g2p_create(ptr::null());
+            assert!(!handle.is_null(), "NULL languages should create a handle with defaults");
+            piper_plus_g2p_free(handle);
+        }
+    }
+
+    #[test]
+    fn test_ffi_phonemize_null_text() {
+        let lang = CString::new("en").unwrap();
+        unsafe {
+            let handle = piper_plus_g2p_create(lang.as_ptr());
+            assert!(!handle.is_null());
+
+            // NULL text should return NULL without crashing
+            let result = piper_plus_g2p_phonemize(handle, ptr::null(), lang.as_ptr());
+            assert!(result.is_null(), "NULL text should return NULL");
+
+            piper_plus_g2p_free(handle);
+        }
+    }
+
+    #[test]
+    fn test_ffi_phonemize_null_handle() {
+        let text = CString::new("hello").unwrap();
+        let lang = CString::new("en").unwrap();
+        unsafe {
+            // NULL handle should return NULL without crashing
+            let result = piper_plus_g2p_phonemize(ptr::null(), text.as_ptr(), lang.as_ptr());
+            assert!(result.is_null(), "NULL handle should return NULL");
+        }
+    }
+
+    #[test]
+    fn test_ffi_phonemize_null_language() {
+        // NULL language defaults to "en" inside piper_plus_g2p_phonemize.
+        // Register "en" (plus "es" as fallback) so the test works in environments
+        // where the CMU dictionary is available. If "en" fails to register
+        // (no dictionary), the result will be NULL — which is still safe.
+        let langs = CString::new("en,es").unwrap();
+        let text = CString::new("hello").unwrap();
+        unsafe {
+            let handle = piper_plus_g2p_create(langs.as_ptr());
+            assert!(!handle.is_null());
+
+            // NULL language triggers the default "en" path — must not crash
+            let result = piper_plus_g2p_phonemize(handle, text.as_ptr(), ptr::null());
+            if !result.is_null() {
+                let s = CStr::from_ptr(result).to_str().unwrap();
+                assert!(s.contains("\"language\":\"en\""), "should default to 'en', got: {s}");
+                piper_plus_g2p_free_string(result);
+            }
+            // If result is NULL, "en" was not registered (no CMU dict) — still safe
+
+            piper_plus_g2p_free(handle);
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // Invalid language code tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_ffi_phonemize_unsupported_language() {
+        // Create handle with defaults, then try to phonemize with unsupported language
+        let lang = CString::new("en").unwrap();
+        let text = CString::new("hello").unwrap();
+        unsafe {
+            let handle = piper_plus_g2p_create(lang.as_ptr());
+            assert!(!handle.is_null());
+
+            let unsupported = CString::new("xx").unwrap();
+            let result = piper_plus_g2p_phonemize(handle, text.as_ptr(), unsupported.as_ptr());
+            assert!(result.is_null(), "unsupported language 'xx' should return NULL");
+
+            let invalid = CString::new("invalid").unwrap();
+            let result = piper_plus_g2p_phonemize(handle, text.as_ptr(), invalid.as_ptr());
+            assert!(result.is_null(), "unsupported language 'invalid' should return NULL");
+
+            piper_plus_g2p_free(handle);
+        }
+    }
+
+    #[test]
+    fn test_ffi_create_unsupported_language() {
+        // Creating with an unsupported language should still return a handle
+        // (register_one silently fails for unknown languages)
+        let lang = CString::new("xx").unwrap();
+        unsafe {
+            let handle = piper_plus_g2p_create(lang.as_ptr());
+            assert!(!handle.is_null(), "handle should be non-NULL even if language is unsupported");
+
+            // The handle should have no registered languages
+            let avail_ptr = piper_plus_g2p_available_languages(handle);
+            assert!(!avail_ptr.is_null());
+            let avail_str = CStr::from_ptr(avail_ptr).to_str().unwrap();
+            assert!(avail_str.is_empty(), "no languages should be registered, got: {avail_str}");
+
+            piper_plus_g2p_free_string(avail_ptr);
+            piper_plus_g2p_free(handle);
+        }
+    }
+
+    #[test]
+    fn test_ffi_phonemize_empty_language() {
+        // Empty language string in phonemize should fail (not registered)
+        let lang = CString::new("en").unwrap();
+        let text = CString::new("hello").unwrap();
+        unsafe {
+            let handle = piper_plus_g2p_create(lang.as_ptr());
+            assert!(!handle.is_null());
+
+            let empty_lang = CString::new("").unwrap();
+            let result = piper_plus_g2p_phonemize(handle, text.as_ptr(), empty_lang.as_ptr());
+            assert!(result.is_null(), "empty language code should return NULL");
+
+            piper_plus_g2p_free(handle);
+        }
+    }
+
+    #[test]
+    fn test_ffi_create_empty_language() {
+        // Empty string for languages in create should use defaults
+        let lang = CString::new("").unwrap();
+        unsafe {
+            let handle = piper_plus_g2p_create(lang.as_ptr());
+            assert!(!handle.is_null(), "empty languages string should use defaults");
+
+            let avail_ptr = piper_plus_g2p_available_languages(handle);
+            assert!(!avail_ptr.is_null());
+            let avail_str = CStr::from_ptr(avail_ptr).to_str().unwrap();
+            assert!(!avail_str.is_empty(), "defaults should register at least one language");
+
+            piper_plus_g2p_free_string(avail_ptr);
+            piper_plus_g2p_free(handle);
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // Empty string input tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_ffi_phonemize_empty_text() {
+        let lang = CString::new("en").unwrap();
+        let text = CString::new("").unwrap();
+        unsafe {
+            let handle = piper_plus_g2p_create(lang.as_ptr());
+            assert!(!handle.is_null());
+
+            // Empty text: the phonemizer may return NULL or an empty tokens result.
+            // Either way it must not crash.
+            let result = piper_plus_g2p_phonemize(handle, text.as_ptr(), lang.as_ptr());
+            if !result.is_null() {
+                piper_plus_g2p_free_string(result);
+            }
+
+            piper_plus_g2p_free(handle);
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // Memory safety tests (NULL to free functions)
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_ffi_free_string_null() {
+        // Passing NULL to free_string should be a no-op, not crash
+        unsafe {
+            piper_plus_g2p_free_string(ptr::null_mut());
+        }
+    }
+
+    #[test]
+    fn test_ffi_free_null_handle() {
+        // Passing NULL to free should be a no-op, not crash
+        unsafe {
+            piper_plus_g2p_free(ptr::null_mut());
+        }
+    }
+
+    #[test]
+    fn test_ffi_available_languages_null_handle() {
+        // NULL handle should return NULL, not crash
+        unsafe {
+            let result = piper_plus_g2p_available_languages(ptr::null());
+            assert!(result.is_null(), "NULL handle should return NULL from available_languages");
+        }
+    }
+
+    // -----------------------------------------------------------------------
     // Combined test
     // -----------------------------------------------------------------------
 
