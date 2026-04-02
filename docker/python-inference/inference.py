@@ -19,7 +19,6 @@ from pathlib import Path
 import numpy as np
 import onnxruntime
 import soundfile as sf
-
 from piper_g2p.registry import get_phonemizer
 
 
