@@ -60,19 +60,13 @@ from .f0_extraction import cache_f0
 from .norm_audio import cache_norm_audio, cache_norm_audio_fast, make_silence_detector
 
 
-# Custom Japanese phonemizer
-try:
-    from .phonemize.custom_dict import CustomDictionary  # type: ignore
-    from .phonemize.japanese import phonemize_japanese_with_prosody  # type: ignore
-except ImportError:
-    # When running as script, relative import may fail; try absolute import fallback
-    from piper_train.phonemize.custom_dict import CustomDictionary  # type: ignore
-    from piper_train.phonemize.japanese import (  # type: ignore
-        phonemize_japanese_with_prosody,
-    )
-
-# Phoneme id map support (unified API from piper_g2p)
+# piper_g2p: G2P and encoding
+from piper_g2p.custom_dict import CustomDictionary
+from piper_g2p.encode.encoder import PiperEncoder
 from piper_g2p.encode.id_maps import get_phoneme_id_map
+from piper_g2p.encode.pua import map_token
+from piper_g2p.japanese import JapanesePhonemizer
+from piper_g2p.multilingual import MultilingualPhonemizer, UnicodeLanguageDetector
 
 _DIR = Path(__file__).parent
 _VERSION = (_DIR / "VERSION").read_text(encoding="utf-8").strip()
@@ -695,6 +689,9 @@ def phonemize_batch_openjtalk(
         else:
             _LOGGER.debug(f"No custom dictionary found at {dict_path}")
 
+        # Create JapanesePhonemizer from piper_g2p (once per worker)
+        ja_phonemizer = JapanesePhonemizer(custom_dict=custom_dict)
+
         timeout_sec = getattr(args, "timeout_seconds", 0)
 
         def _timeout_handler(signum, frame):
@@ -719,24 +716,27 @@ def phonemize_batch_openjtalk(
                     if timeout_sec > 0 and _HAS_SIGALRM:
                         signal.alarm(timeout_sec)
                     _LOGGER.debug(utt)
-                    # 高低アクセントを含む日本語 phonemizer（カスタム辞書適用）
-                    # プロソディ情報 (A1/A2/A3) も同時に抽出
-                    utt.phonemes, prosody_info_list = phonemize_japanese_with_prosody(
-                        casing(utt.text), custom_dict=custom_dict
+                    # piper_g2p: clean tokens (no BOS, has EOS, no PUA)
+                    raw_tokens, prosody_info_list = ja_phonemizer.phonemize_with_prosody(
+                        casing(utt.text)
                     )
-                    # phoneme_ids は phoneme_id_map から取得
+                    # Prepend BOS "^" (piper_g2p omits it)
+                    raw_tokens = ["^"] + raw_tokens
+                    prosody_info_list = [None] + list(prosody_info_list)
+
+                    # Apply PUA mapping and build phoneme_ids
+                    utt.phonemes = []
                     utt.phoneme_ids = []
-                    for phoneme in utt.phonemes:
-                        if phoneme in args.phoneme_id_map:
-                            utt.phoneme_ids.extend(args.phoneme_id_map[phoneme])
+                    for token in raw_tokens:
+                        mapped = map_token(token)
+                        utt.phonemes.append(mapped)
+                        if mapped in args.phoneme_id_map:
+                            utt.phoneme_ids.extend(args.phoneme_id_map[mapped])
                         else:
-                            utt.missing_phonemes[phoneme] += 1
-                            _LOGGER.warning(f"Missing phoneme: {phoneme}")
+                            utt.missing_phonemes[mapped] += 1
+                            _LOGGER.warning(f"Missing phoneme: {mapped}")
 
                     # prosody_features: A1/A2/A3 値を辞書形式で保存
-                    # A1: アクセント核からの相対位置（負値可）
-                    # A2: アクセント句内のモーラ位置（1-based）
-                    # A3: アクセント句内の総モーラ数
                     utt.prosody_features = [
                         {"a1": p.a1, "a2": p.a2, "a3": p.a3} if p is not None else None
                         for p in prosody_info_list
@@ -795,15 +795,15 @@ def _phonemize_batch_multilingual_impl(
     args: argparse.Namespace,
     queue_in: JoinableQueue,
     queue_out: Queue,
-    phonemizer,
+    phonemizer: MultilingualPhonemizer,
     label: str,
 ):
     """Shared implementation for multilingual/bilingual batch phonemization.
 
     Parameters
     ----------
-    phonemizer : MultilingualPhonemizer or BilingualPhonemizer
-        The phonemizer instance to use for text conversion.
+    phonemizer : MultilingualPhonemizer
+        The phonemizer instance to use for text conversion (from piper_g2p).
     label : str
         Label for error logging (e.g. "multilingual" or "bilingual").
     """
@@ -816,6 +816,12 @@ def _phonemize_batch_multilingual_impl(
         silence_detector = (
             make_silence_detector() if not getattr(args, "energy_vad", True) else None
         )
+
+        # PiperEncoder handles PUA mapping + BOS/EOS/padding
+        encoder = PiperEncoder(args.phoneme_id_map)
+
+        # EOS tokens that JapanesePhonemizer may emit (strip from segments)
+        _eos_tokens = frozenset({"$", "?", "?!", "?.", "?~"})
 
         timeout_sec = getattr(args, "timeout_seconds", 0)
 
@@ -836,8 +842,6 @@ def _phonemize_batch_multilingual_impl(
         _lang_detector = None
         if hasattr(args, "lang_parts") and args.lang_parts:
             language_id_map = {lang: idx for idx, lang in enumerate(args.lang_parts)}
-            from .phonemize.multilingual import UnicodeLanguageDetector  # noqa: PLC0415
-
             _lang_detector = UnicodeLanguageDetector(
                 args.lang_parts,
                 default_latin_language="en"
@@ -846,8 +850,6 @@ def _phonemize_batch_multilingual_impl(
             )
         elif getattr(args, "phoneme_type", None) == PhonemeType.BILINGUAL:
             language_id_map = {"ja": 0, "en": 1}
-            from .phonemize.multilingual import UnicodeLanguageDetector  # noqa: PLC0415
-
             _lang_detector = UnicodeLanguageDetector(
                 ["ja", "en"],
                 default_latin_language="en",
@@ -864,17 +866,30 @@ def _phonemize_batch_multilingual_impl(
                         signal.alarm(timeout_sec)
                     _LOGGER.debug(utt)
                     text = casing(utt.text)
-                    utt.phonemes, prosody_info_list = phonemizer.phonemize_with_prosody(
-                        text
+
+                    # piper_g2p: clean tokens (no BOS, no PUA mapping)
+                    # JA segments may include EOS markers ("$", "?" etc.)
+                    raw_tokens, raw_prosody = phonemizer.phonemize_with_prosody(text)
+
+                    # Strip EOS markers from segments, tracking the last one
+                    # (piper_g2p MultilingualPhonemizer does not strip them)
+                    clean_tokens = []
+                    clean_prosody = []
+                    last_eos = "$"
+                    for tok, pro in zip(raw_tokens, raw_prosody, strict=True):
+                        if tok in _eos_tokens:
+                            last_eos = tok
+                            continue
+                        clean_tokens.append(tok)
+                        clean_prosody.append(pro)
+
+                    # PiperEncoder: PUA map -> phoneme_ids -> BOS/EOS/padding
+                    utt.phoneme_ids, prosody_out = encoder.encode_with_prosody(
+                        clean_tokens, clean_prosody, eos_token=last_eos
                     )
-                    # phoneme_ids from phoneme_id_map
-                    utt.phoneme_ids = []
-                    for phoneme in utt.phonemes:
-                        if phoneme in args.phoneme_id_map:
-                            utt.phoneme_ids.extend(args.phoneme_id_map[phoneme])
-                        else:
-                            utt.missing_phonemes[phoneme] += 1
-                            _LOGGER.warning(f"Missing phoneme: {phoneme}")
+                    utt.phonemes = clean_tokens
+                    utt.prosody_features = PiperEncoder.prosody_to_dicts(prosody_out)
+                    utt.prosody_ids = []
 
                     # Detect and set language_id for multilingual/bilingual utterances
                     if _lang_detector is not None and language_id_map:
@@ -891,17 +906,6 @@ def _phonemize_batch_multilingual_impl(
                             utt.language_id = language_id_map.get(dominant, 0)
                         else:
                             utt.language_id = 0
-
-                    # Post-process (BOS/EOS/padding)
-                    prosody_features_raw = [
-                        {"a1": p.a1, "a2": p.a2, "a3": p.a3} if p is not None else None
-                        for p in prosody_info_list
-                    ]
-                    utt.phoneme_ids, prosody_features_raw = phonemizer.post_process_ids(
-                        utt.phoneme_ids, prosody_features_raw, args.phoneme_id_map
-                    )
-                    utt.prosody_features = prosody_features_raw
-                    utt.prosody_ids = []
 
                     # Length validation
                     if len(utt.phoneme_ids) != len(utt.prosody_features):
@@ -946,9 +950,7 @@ def _phonemize_batch_multilingual_impl(
 def phonemize_batch_multilingual(
     args: argparse.Namespace, queue_in: JoinableQueue, queue_out: Queue
 ):
-    """Multilingual (N languages) phonemization using MultilingualPhonemizer."""
-    from .phonemize.multilingual import MultilingualPhonemizer  # noqa: PLC0415
-
+    """Multilingual (N languages) phonemization using piper_g2p MultilingualPhonemizer."""
     lang_parts = getattr(args, "lang_parts", args.language.split("-"))
     phonemizer = MultilingualPhonemizer(lang_parts)
     _phonemize_batch_multilingual_impl(
@@ -959,14 +961,11 @@ def phonemize_batch_multilingual(
 def phonemize_batch_bilingual(
     args: argparse.Namespace, queue_in: JoinableQueue, queue_out: Queue
 ):
-    """Bilingual (JA+EN) phonemization using BilingualPhonemizer.
+    """Bilingual (JA+EN) phonemization using piper_g2p MultilingualPhonemizer.
 
-    Delegates to the shared multilingual implementation since
-    BilingualPhonemizer is a subclass of MultilingualPhonemizer.
+    Uses MultilingualPhonemizer with ["ja", "en"] language list.
     """
-    from .phonemize.bilingual import BilingualPhonemizer  # noqa: PLC0415
-
-    phonemizer = BilingualPhonemizer(["ja", "en"])
+    phonemizer = MultilingualPhonemizer(["ja", "en"])
     _phonemize_batch_multilingual_impl(
         args, queue_in, queue_out, phonemizer, "bilingual"
     )
