@@ -150,7 +150,7 @@ def _phonemize_core(
         if phoneme == "sil":
             if idx == 0:
                 pass
-            elif idx == len(labels) - 1 and question_marker:
+            elif idx == len(labels) - 1 and question_marker and question_marker != "$":
                 tokens.append(question_marker)
                 prosody_info.append(None)
             continue

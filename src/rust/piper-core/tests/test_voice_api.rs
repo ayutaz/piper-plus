@@ -19,8 +19,8 @@ fn test_load_missing_config_fails() {
 }
 
 // Additional tests for phoneme_converter integration
-use piper_g2p::encode as phoneme_converter;
 use piper_g2p::ProsodyInfo;
+use piper_g2p::encode as phoneme_converter;
 use std::collections::HashMap;
 
 #[test]

@@ -20,7 +20,7 @@ import numpy as np
 import onnxruntime
 import soundfile as sf
 
-from piper_train.phonemize.registry import get_phonemizer
+from piper_g2p.registry import get_phonemizer
 
 
 _LOGGER = logging.getLogger(__name__)

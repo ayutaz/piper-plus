@@ -66,10 +66,7 @@ fn cases_for<'a>(fixture: &'a Fixture, lang: &str) -> Vec<&'a TestCase> {
 // ---------------------------------------------------------------------------
 
 fn assert_case(tokens: &[String], case: &TestCase) {
-    let desc = case
-        .description
-        .as_deref()
-        .unwrap_or(case.input.as_str());
+    let desc = case.description.as_deref().unwrap_or(case.input.as_str());
 
     if let Some(min) = case.expected_token_count_min {
         assert!(
@@ -82,7 +79,8 @@ fn assert_case(tokens: &[String], case: &TestCase) {
 
     if let Some(expected) = &case.expected_tokens {
         assert_eq!(
-            tokens, expected,
+            tokens,
+            expected,
             "{lang} exact token mismatch for {desc:?}",
             lang = case.language,
         );
@@ -177,13 +175,37 @@ fn test_ko_golden() {
 #[test]
 fn test_zh_golden() {
     let fixture = load_fixture();
-    let p = piper_g2p::chinese::ChinesePhonemizer::new();
+    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .unwrap()
+        .parent()
+        .unwrap()
+        .parent()
+        .unwrap()
+        .to_path_buf();
+    let single_path = repo_root
+        .join("test")
+        .join("models")
+        .join("pinyin_single.json");
+    let phrase_path = repo_root
+        .join("test")
+        .join("models")
+        .join("pinyin_phrases.json");
+    let p = match piper_g2p::chinese::ChinesePhonemizer::new(&single_path, &phrase_path) {
+        Ok(p) => p,
+        Err(_) => {
+            eprintln!("SKIP: pinyin dictionary not found — skipping ZH golden test");
+            return;
+        }
+    };
     for case in cases_for(&fixture, "zh") {
         let (tokens, _) = p.phonemize_with_prosody(&case.input).unwrap();
         // ZH: structural checks (tone markers)
         if case.expected_contains_any_tone == Some(true) {
             let tone_tokens = ["tone1", "tone2", "tone3", "tone4", "tone5"];
-            let has_tone = tokens.iter().any(|t| tone_tokens.contains(&t.as_str()));
+            let has_tone = tokens
+                .iter()
+                .any(|t: &String| tone_tokens.contains(&t.as_str()));
             assert!(
                 has_tone,
                 "ZH output missing tone marker for {:?}: {:?}",
@@ -224,7 +246,7 @@ fn test_ja_golden() {
     let fixture = load_fixture();
     use piper_g2p::japanese::JapanesePhonemizer;
 
-    let p = match JapanesePhonemizer::new(None) {
+    let p = match JapanesePhonemizer::new() {
         Ok(p) => p,
         Err(_) => {
             eprintln!("SKIP: OpenJTalk dictionary not found — skipping JA golden test");
@@ -241,7 +263,10 @@ fn test_ja_golden() {
             assert!(
                 tokens.len() >= min,
                 "JA token count {} < {} for {:?}: {:?}",
-                tokens.len(), min, case.input, tokens
+                tokens.len(),
+                min,
+                case.input,
+                tokens
             );
         }
         if let Some(expected_contains) = &case.expected_contains {
@@ -250,7 +275,9 @@ fn test_ja_golden() {
                 assert!(
                     token_set.contains(expected.as_str()),
                     "JA output missing {:?} for {:?}: {:?}",
-                    expected, case.input, tokens
+                    expected,
+                    case.input,
+                    tokens
                 );
             }
         }

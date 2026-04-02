@@ -1,5 +1,5 @@
-use piper_g2p::encode as phoneme_converter;
 use piper_g2p::ProsodyInfo;
+use piper_g2p::encode as phoneme_converter;
 use std::collections::HashMap;
 
 fn make_test_id_map() -> HashMap<String, Vec<i64>> {
