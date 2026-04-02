@@ -27,6 +27,8 @@ const DICT_FILE_NAMES = [
     'left-id.def', 'pos-id.def', 'rewrite.def', 'right-id.def'
 ];
 
+export { extractPhonemesFromLabels } from './phoneme-extract.js';
+
 export class JapaneseG2P {
     /**
      * @param {Object} [options]

@@ -189,16 +189,6 @@ function installPrototypeStubs() {
     };
   };
 
-  // Stub SimpleUnifiedPhonemizer.prototype.initialize so it does not attempt
-  // real OpenJTalk WASM loading.
-  const SUPproto = Object.getPrototypeOf(
-    Object.getPrototypeOf(new PiperPlus())
-  );
-  // Access via the imported module instead.
-  // We cannot easily reach SUP prototype; override on _init return path:
-  // A simpler approach: stub the phonemizer after PiperPlus creates it,
-  // by monkey-patching PiperPlus.prototype._init's phonemizer creation.
-  // The cleanest way: import SimpleUnifiedPhonemizer and stub its prototype.
 }
 
 function removePrototypeStubs() {
@@ -215,27 +205,6 @@ function removePrototypeStubs() {
   }
 }
 
-// ---------------------------------------------------------------------------
-// We also need to stub SimpleUnifiedPhonemizer.prototype.initialize because
-// it attempts dynamic import() of the OpenJTalk JS path.
-// ---------------------------------------------------------------------------
-
-let _origSUPInitialize;
-let _origSUPSetMap;
-let _origSUPDetectLang;
-let _origSUPTextToPhonemes;
-let _origSUPExtractPhonemes;
-let _origSUPDispose;
-let SUP;
-
-function installPhonemizerStubs() {
-  // Get the class through the module re-export.
-  const { SimpleUnifiedPhonemizer } = /** @type {any} */ (
-    /** @type {unknown} */ ({ SimpleUnifiedPhonemizer: null })
-  );
-  // Dynamically fetch from the already-imported module.
-}
-
 // We will apply the phonemizer stubs using a wrapper around _init.
 let _origInit;
 
@@ -243,26 +212,6 @@ function installInitWrapper() {
   _origInit = PiperPlus.prototype._init;
 
   PiperPlus.prototype._init = async function (options) {
-    // Patch: replace the phonemizer methods after _init creates it.
-    // We intercept _init, set up a trap on this._phonemizer assignment,
-    // then call the original.
-    //
-    // Strategy: override the SimpleUnifiedPhonemizer prototype methods
-    // *before* calling the original _init, and restore them after.
-
-    // Dynamically get the SUP constructor via a temporary instance.
-    // Since we stubbed resolveUrls already, _init will create an SUP
-    // internally. We need to stub SUP.prototype.initialize to be a no-op.
-
-    // We can get the SUP class from the module import — but since
-    // index.js re-exports it, it was already loaded.  The internal
-    // `new SimpleUnifiedPhonemizer()` in _init uses the same class
-    // that we imported.  We can thus stub its prototype.
-
-    // We already know `this._phonemizer` will be a SimpleUnifiedPhonemizer.
-    // The class is constructed inside _init before .initialize() is called.
-    // We override on the class prototype directly.
-
     // This wrapper performs the same steps as _init but with full control.
     const ort = options.ort || globalThis.ort;
     if (!ort) {
@@ -355,7 +304,7 @@ function restoreGlobals() {
 // Tests
 // ===========================================================================
 
-// NOTE: _init() は WebGPUSessionManager, SimpleUnifiedPhonemizer (WASM),
+// NOTE: _init() は WebGPUSessionManager, G2P (WASM),
 // IndexedDB 等のブラウザ専用 API に依存するため、Node.js 環境では
 // prototype stub で代替している。ブラウザ統合テストは別途 E2E で実施する。
 describe('PiperPlus.initialize() 正常系', { skip }, () => {

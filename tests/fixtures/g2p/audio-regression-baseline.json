@@ -1,0 +1,39 @@
+{
+  "description": "M4-2 audio regression baseline — phoneme_ids post G2P unification migration",
+  "generated_at": "2026-04-02",
+  "generated_by": "@piper-plus/g2p (post M3 migration)",
+  "note": "ベースラインは M3 移行後に生成。M1/M2/M3 作業前のベースライン取得は未実施。今後の G2P 変更に対する回帰テストとして機能する。",
+  "phoneme_id_map_source": "test/models/multilingual-test-medium.onnx.json (173 symbols)",
+  "tests": [
+    {
+      "language": "es",
+      "text": "¿Hola, cómo estás hoy?",
+      "phoneme_ids": [1, 154, 0, 54, 0, 14, 0, 77, 0, 10, 0, 90, 0, 89, 0, 0, 0, 59, 0, 14, 0, 89, 0, 13, 0, 48, 0, 38, 0, 0, 48, 0, 89, 0, 54, 0, 14, 0, 64, 0, 3, 0, 2],
+      "token_count": 22
+    },
+    {
+      "language": "fr",
+      "text": "Bonjour, comment allez-vous?",
+      "phoneme_ids": [1, 44, 0, 14, 0, 57, 0, 51, 0, 14, 0, 12, 0, 61, 0, 90, 0, 89, 0, 0, 14, 0, 59, 0, 59, 0, 13, 0, 57, 0, 38, 0, 89, 0, 10, 0, 77, 0, 77, 0, 13, 0, 50, 0, 95, 0, 56, 0, 14, 0, 12, 0, 48, 0, 3, 0, 2],
+      "token_count": 28
+    },
+    {
+      "language": "pt",
+      "text": "Olá, como você está hoje?",
+      "phoneme_ids": [1, 14, 0, 77, 0, 0, 90, 0, 89, 0, 0, 14, 0, 59, 0, 14, 0, 89, 0, 56, 0, 14, 0, 0, 0, 89, 0, 13, 0, 48, 0, 38, 0, 0, 89, 0, 54, 0, 14, 0, 51, 0, 13, 0, 3, 0, 2],
+      "token_count": 25
+    },
+    {
+      "language": "sv",
+      "text": "God morgon Sverige.",
+      "phoneme_ids": [1, 87, 0, 78, 0, 0, 40, 0, 89, 0, 87, 0, 59, 0, 69, 0, 61, 0, 78, 0, 69, 0, 57, 0, 89, 0, 87, 0, 48, 0, 56, 0, 0, 61, 0, 73, 0, 51, 0, 70, 0, 91, 0, 2],
+      "token_count": 22
+    },
+    {
+      "language": "ko",
+      "text": "안녕하세요",
+      "phoneme_ids": [1, 10, 0, 57, 0, 57, 0, 51, 0, 67, 0, 79, 0, 54, 0, 10, 0, 48, 0, 13, 0, 51, 0, 14, 0, 2],
+      "token_count": 12
+    }
+  ]
+}

@@ -3,7 +3,7 @@
  */
 
 import { DictionaryLoader } from './dictionary-loader.js';
-import { extractPhonemesFromLabels as extractJaPhonemes } from './japanese_phoneme_extract.js';
+import { extractPhonemesFromLabels as extractJaPhonemes } from '@piper-plus/g2p/ja';
 
 export class OpenJTalkWeb {
   constructor() {
