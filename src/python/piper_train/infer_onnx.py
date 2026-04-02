@@ -121,10 +121,7 @@ def text_to_phoneme_ids_and_prosody(
     # JA-only models (no language_id_map or single language) do NOT get
     # BOS/EOS/padding from PiperEncoder -- the JA phonemizer already
     # includes these inline. Only multilingual / non-JA paths use the encoder.
-    if (
-        language == "ja"
-        and (not language_id_map or len(language_id_map) <= 1)
-    ):
+    if language == "ja" and (not language_id_map or len(language_id_map) <= 1):
         # JA-only: convert tokens to IDs directly (no encoder wrapping)
         phoneme_ids: list[int] = []
         prosody_features: list[dict | None] = []

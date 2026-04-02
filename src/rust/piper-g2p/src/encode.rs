@@ -415,8 +415,9 @@ mod tests {
             a2: 1,
             a3: 5,
         })];
-        let (ids, pros) =
-            encoder.encode_with_prosody_and_eos(&tokens, &prosody, Some("?")).unwrap();
+        let (ids, pros) = encoder
+            .encode_with_prosody_and_eos(&tokens, &prosody, Some("?"))
+            .unwrap();
         // Last ID should be custom EOS
         assert_eq!(*ids.last().unwrap(), 99);
         // Prosody for EOS should be zero

@@ -717,8 +717,8 @@ def phonemize_batch_openjtalk(
                         signal.alarm(timeout_sec)
                     _LOGGER.debug(utt)
                     # piper_g2p: clean tokens (no BOS, has EOS, no PUA)
-                    raw_tokens, prosody_info_list = ja_phonemizer.phonemize_with_prosody(
-                        casing(utt.text)
+                    raw_tokens, prosody_info_list = (
+                        ja_phonemizer.phonemize_with_prosody(casing(utt.text))
                     )
                     # Prepend BOS "^" (piper_g2p omits it)
                     raw_tokens = ["^"] + raw_tokens
