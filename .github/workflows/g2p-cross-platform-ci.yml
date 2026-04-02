@@ -5,14 +5,14 @@ on:
     branches: [dev, main]
     paths:
       - 'src/python/g2p/**'
-      - 'src/rust/piper-g2p/**'
+      - 'src/rust/piper-plus-g2p/**'
       - 'src/wasm/g2p/**'
       - 'tests/fixtures/g2p/**'
       - '.github/workflows/g2p-cross-platform-ci.yml'
   pull_request:
     paths:
       - 'src/python/g2p/**'
-      - 'src/rust/piper-g2p/**'
+      - 'src/rust/piper-plus-g2p/**'
       - 'src/wasm/g2p/**'
       - 'tests/fixtures/g2p/**'
       - '.github/workflows/g2p-cross-platform-ci.yml'
@@ -56,7 +56,7 @@ jobs:
 
       - name: Rust build check
         working-directory: src/rust
-        run: cargo check -p piper-g2p --all-features
+        run: cargo check -p piper-plus-g2p --all-features
 
       - name: JS fixture tests
         working-directory: src/wasm/g2p
@@ -90,7 +90,7 @@ jobs:
           echo "JS  PUA entries: $js_count (expected: $EXPECTED)"
 
           # Rust: count PUA tuple entries (', 0xE0xx') in token_map.rs
-          rust_count=$(grep -c ', 0xE0' src/rust/piper-g2p/src/token_map.rs || true)
+          rust_count=$(grep -c ', 0xE0' src/rust/piper-plus-g2p/src/token_map.rs || true)
           echo "Rust PUA entries: $rust_count (expected: $EXPECTED)"
 
           # Python: count from canonical pua.json

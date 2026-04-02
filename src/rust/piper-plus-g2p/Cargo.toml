@@ -1,5 +1,5 @@
 [package]
-name = "piper-g2p"
+name = "piper-plus-g2p"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

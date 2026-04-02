@@ -9,21 +9,21 @@ use crate::config::PhonemeIdMap;
 use crate::error::PiperError;
 
 // Re-export from piper-g2p for backward compatibility
-pub use piper_g2p::G2pError;
-pub use piper_g2p::PhonemeIdMap as G2pPhonemeIdMap;
+pub use piper_plus_g2p::G2pError;
+pub use piper_plus_g2p::PhonemeIdMap as G2pPhonemeIdMap;
 
 pub mod adapter;
 pub mod chinese;
-pub use piper_g2p::custom_dict;
+pub use piper_plus_g2p::custom_dict;
 pub mod english;
 pub mod french;
 #[cfg(feature = "japanese")]
 pub mod japanese;
 pub mod korean;
-pub use piper_g2p::multilingual;
+pub use piper_plus_g2p::multilingual;
 pub mod portuguese;
 pub mod spanish;
-pub use piper_g2p::token_map;
+pub use piper_plus_g2p::token_map;
 
 /// プロソディ情報 (言語間で共有)
 #[derive(Debug, Clone, Copy)]

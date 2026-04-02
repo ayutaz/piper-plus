@@ -25,8 +25,8 @@
 //! ## Quick start
 //!
 //! ```rust,no_run
-//! use piper_g2p::{Phonemizer, PhonemizerRegistry};
-//! use piper_g2p::english::EnglishPhonemizer;
+//! use piper_plus_g2p::{Phonemizer, PhonemizerRegistry};
+//! use piper_plus_g2p::english::EnglishPhonemizer;
 //!
 //! // Create a registry and register language phonemizers
 //! let mut registry = PhonemizerRegistry::new();
@@ -42,7 +42,7 @@
 //!     .unwrap();
 //!
 //! // Encode tokens to phoneme IDs using a model's phoneme_id_map
-//! // let ids = piper_g2p::encode::tokens_to_ids(&tokens, &phoneme_id_map)?;
+//! // let ids = piper_plus_g2p::encode::tokens_to_ids(&tokens, &phoneme_id_map)?;
 //! ```
 
 pub mod custom_dict;

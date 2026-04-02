@@ -17,7 +17,7 @@ pub struct PiperG2pHandle {
 /// # Safety
 /// `languages` must be a valid null-terminated UTF-8 string or NULL.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn piper_g2p_create(languages: *const c_char) -> *mut PiperG2pHandle {
+pub unsafe extern "C" fn piper_plus_g2p_create(languages: *const c_char) -> *mut PiperG2pHandle {
     let result = std::panic::catch_unwind(|| {
         let mut registry = PhonemizerRegistry::new();
         let langs: Vec<&str> = if languages.is_null() {
@@ -38,12 +38,12 @@ pub unsafe extern "C" fn piper_g2p_create(languages: *const c_char) -> *mut Pipe
 }
 
 /// Phonemize text, returning JSON: `{"tokens":[...],"language":".."}`.
-/// Caller must free result with `piper_g2p_free_string`.
+/// Caller must free result with `piper_plus_g2p_free_string`.
 ///
 /// # Safety
 /// All pointer args must be valid null-terminated UTF-8 or NULL.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn piper_g2p_phonemize(
+pub unsafe extern "C" fn piper_plus_g2p_phonemize(
     handle: *const PiperG2pHandle,
     text: *const c_char,
     language: *const c_char,
@@ -70,11 +70,11 @@ pub unsafe extern "C" fn piper_g2p_phonemize(
     }
 }
 
-/// Free a string from piper_g2p functions.
+/// Free a string from piper_plus_g2p functions.
 /// # Safety
-/// `ptr` must be from a piper_g2p function, or NULL.
+/// `ptr` must be from a piper_plus_g2p function, or NULL.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn piper_g2p_free_string(ptr: *mut c_char) {
+pub unsafe extern "C" fn piper_plus_g2p_free_string(ptr: *mut c_char) {
     if !ptr.is_null() {
         unsafe {
             drop(CString::from_raw(ptr));
@@ -84,9 +84,9 @@ pub unsafe extern "C" fn piper_g2p_free_string(ptr: *mut c_char) {
 
 /// Destroy a G2P handle.
 /// # Safety
-/// `handle` must be from `piper_g2p_create`, or NULL.
+/// `handle` must be from `piper_plus_g2p_create`, or NULL.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn piper_g2p_free(handle: *mut PiperG2pHandle) {
+pub unsafe extern "C" fn piper_plus_g2p_free(handle: *mut PiperG2pHandle) {
     if !handle.is_null() {
         unsafe {
             drop(Box::from_raw(handle));
@@ -98,7 +98,7 @@ pub unsafe extern "C" fn piper_g2p_free(handle: *mut PiperG2pHandle) {
 /// # Safety
 /// `handle` must be valid or NULL.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn piper_g2p_available_languages(
+pub unsafe extern "C" fn piper_plus_g2p_available_languages(
     handle: *const PiperG2pHandle,
 ) -> *mut c_char {
     if handle.is_null() {
@@ -132,9 +132,9 @@ mod tests {
     fn test_ffi_create_with_korean() {
         let lang = CString::new("ko").unwrap();
         unsafe {
-            let handle = piper_g2p_create(lang.as_ptr());
+            let handle = piper_plus_g2p_create(lang.as_ptr());
             assert!(!handle.is_null(), "handle should not be NULL for 'ko'");
-            piper_g2p_free(handle);
+            piper_plus_g2p_free(handle);
         }
     }
 
@@ -144,10 +144,10 @@ mod tests {
         let lang = CString::new("ko").unwrap();
         let text = CString::new("가").unwrap();
         unsafe {
-            let handle = piper_g2p_create(lang.as_ptr());
+            let handle = piper_plus_g2p_create(lang.as_ptr());
             assert!(!handle.is_null());
 
-            let result = piper_g2p_phonemize(handle, text.as_ptr(), lang.as_ptr());
+            let result = piper_plus_g2p_phonemize(handle, text.as_ptr(), lang.as_ptr());
             assert!(!result.is_null(), "phonemize result should not be NULL");
 
             let s = CStr::from_ptr(result).to_str().unwrap();
@@ -159,8 +159,8 @@ mod tests {
                 "result should contain language key"
             );
 
-            piper_g2p_free_string(result);
-            piper_g2p_free(handle);
+            piper_plus_g2p_free_string(result);
+            piper_plus_g2p_free(handle);
         }
     }
 
@@ -169,10 +169,10 @@ mod tests {
     fn test_ffi_korean_available_languages() {
         let lang = CString::new("ko").unwrap();
         unsafe {
-            let handle = piper_g2p_create(lang.as_ptr());
+            let handle = piper_plus_g2p_create(lang.as_ptr());
             assert!(!handle.is_null());
 
-            let langs_ptr = piper_g2p_available_languages(handle);
+            let langs_ptr = piper_plus_g2p_available_languages(handle);
             assert!(!langs_ptr.is_null());
 
             let langs_str = CStr::from_ptr(langs_ptr).to_str().unwrap();
@@ -182,8 +182,8 @@ mod tests {
                 "available languages should contain 'ko', got: {langs_str}"
             );
 
-            piper_g2p_free_string(langs_ptr);
-            piper_g2p_free(handle);
+            piper_plus_g2p_free_string(langs_ptr);
+            piper_plus_g2p_free(handle);
         }
     }
 
@@ -196,9 +196,9 @@ mod tests {
     fn test_ffi_create_with_swedish() {
         let lang = CString::new("sv").unwrap();
         unsafe {
-            let handle = piper_g2p_create(lang.as_ptr());
+            let handle = piper_plus_g2p_create(lang.as_ptr());
             assert!(!handle.is_null(), "handle should not be NULL for 'sv'");
-            piper_g2p_free(handle);
+            piper_plus_g2p_free(handle);
         }
     }
 
@@ -208,10 +208,10 @@ mod tests {
         let lang = CString::new("sv").unwrap();
         let text = CString::new("hej").unwrap();
         unsafe {
-            let handle = piper_g2p_create(lang.as_ptr());
+            let handle = piper_plus_g2p_create(lang.as_ptr());
             assert!(!handle.is_null());
 
-            let result = piper_g2p_phonemize(handle, text.as_ptr(), lang.as_ptr());
+            let result = piper_plus_g2p_phonemize(handle, text.as_ptr(), lang.as_ptr());
             assert!(!result.is_null(), "phonemize result should not be NULL");
 
             let s = CStr::from_ptr(result).to_str().unwrap();
@@ -222,8 +222,8 @@ mod tests {
                 "result should contain language key"
             );
 
-            piper_g2p_free_string(result);
-            piper_g2p_free(handle);
+            piper_plus_g2p_free_string(result);
+            piper_plus_g2p_free(handle);
         }
     }
 
@@ -232,10 +232,10 @@ mod tests {
     fn test_ffi_swedish_available_languages() {
         let lang = CString::new("sv").unwrap();
         unsafe {
-            let handle = piper_g2p_create(lang.as_ptr());
+            let handle = piper_plus_g2p_create(lang.as_ptr());
             assert!(!handle.is_null());
 
-            let langs_ptr = piper_g2p_available_languages(handle);
+            let langs_ptr = piper_plus_g2p_available_languages(handle);
             assert!(!langs_ptr.is_null());
 
             let langs_str = CStr::from_ptr(langs_ptr).to_str().unwrap();
@@ -245,8 +245,8 @@ mod tests {
                 "available languages should contain 'sv', got: {langs_str}"
             );
 
-            piper_g2p_free_string(langs_ptr);
-            piper_g2p_free(handle);
+            piper_plus_g2p_free_string(langs_ptr);
+            piper_plus_g2p_free(handle);
         }
     }
 
@@ -259,10 +259,10 @@ mod tests {
     fn test_ffi_create_multilingual() {
         let langs = CString::new("ko,sv").unwrap();
         unsafe {
-            let handle = piper_g2p_create(langs.as_ptr());
+            let handle = piper_plus_g2p_create(langs.as_ptr());
             assert!(!handle.is_null(), "handle should not be NULL for 'ko,sv'");
 
-            let avail_ptr = piper_g2p_available_languages(handle);
+            let avail_ptr = piper_plus_g2p_available_languages(handle);
             assert!(!avail_ptr.is_null());
 
             let avail_str = CStr::from_ptr(avail_ptr).to_str().unwrap();
@@ -279,19 +279,19 @@ mod tests {
             // Phonemize Korean text
             let ko_text = CString::new("가").unwrap();
             let ko_lang = CString::new("ko").unwrap();
-            let ko_result = piper_g2p_phonemize(handle, ko_text.as_ptr(), ko_lang.as_ptr());
+            let ko_result = piper_plus_g2p_phonemize(handle, ko_text.as_ptr(), ko_lang.as_ptr());
             assert!(!ko_result.is_null(), "Korean phonemize should succeed");
-            piper_g2p_free_string(ko_result);
+            piper_plus_g2p_free_string(ko_result);
 
             // Phonemize Swedish text
             let sv_text = CString::new("hej").unwrap();
             let sv_lang = CString::new("sv").unwrap();
-            let sv_result = piper_g2p_phonemize(handle, sv_text.as_ptr(), sv_lang.as_ptr());
+            let sv_result = piper_plus_g2p_phonemize(handle, sv_text.as_ptr(), sv_lang.as_ptr());
             assert!(!sv_result.is_null(), "Swedish phonemize should succeed");
-            piper_g2p_free_string(sv_result);
+            piper_plus_g2p_free_string(sv_result);
 
-            piper_g2p_free_string(avail_ptr);
-            piper_g2p_free(handle);
+            piper_plus_g2p_free_string(avail_ptr);
+            piper_plus_g2p_free(handle);
         }
     }
 }

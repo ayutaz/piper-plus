@@ -1,7 +1,7 @@
 //! M4-1: クロスプラットフォーム G2P ゴールデンテスト (Rust)
 //!
 //! `tests/fixtures/g2p/phoneme_test_cases.json` を読み込み、
-//! piper_g2p の各言語 Phonemizer に対してアサーションを実行する。
+//! piper_plus_g2p の各言語 Phonemizer に対してアサーションを実行する。
 //! Python/JS と同じフィクスチャを共有することで 3 プラットフォームの
 //! 出力一致を保証する。
 //!
@@ -10,7 +10,7 @@
 use std::collections::HashSet;
 use std::path::PathBuf;
 
-use piper_g2p::Phonemizer;
+use piper_plus_g2p::Phonemizer;
 use serde::Deserialize;
 
 // ---------------------------------------------------------------------------
@@ -92,7 +92,7 @@ fn assert_case(tokens: &[String], case: &TestCase) {
             // Rust phonemizer returns PUA-encoded single chars for multi-char tokens.
             // Convert expected token names to their PUA form if a mapping exists.
             let pua_str: Option<String> =
-                piper_g2p::token_map::token_to_pua(expected).map(|c| c.to_string());
+                piper_plus_g2p::token_map::token_to_pua(expected).map(|c| c.to_string());
             let lookup = pua_str.as_deref().unwrap_or(expected.as_str());
             assert!(
                 token_set.contains(lookup),
@@ -110,7 +110,7 @@ fn assert_case(tokens: &[String], case: &TestCase) {
 #[test]
 fn test_es_golden() {
     let fixture = load_fixture();
-    let p = piper_g2p::spanish::SpanishPhonemizer::new();
+    let p = piper_plus_g2p::spanish::SpanishPhonemizer::new();
     for case in cases_for(&fixture, "es") {
         let (tokens, _) = p.phonemize_with_prosody(&case.input).unwrap();
         assert_case(&tokens, case);
@@ -124,7 +124,7 @@ fn test_es_golden() {
 #[test]
 fn test_fr_golden() {
     let fixture = load_fixture();
-    let p = piper_g2p::french::FrenchPhonemizer::new();
+    let p = piper_plus_g2p::french::FrenchPhonemizer::new();
     for case in cases_for(&fixture, "fr") {
         let (tokens, _) = p.phonemize_with_prosody(&case.input).unwrap();
         assert_case(&tokens, case);
@@ -138,7 +138,7 @@ fn test_fr_golden() {
 #[test]
 fn test_pt_golden() {
     let fixture = load_fixture();
-    let p = piper_g2p::portuguese::PortuguesePhonemizer::new();
+    let p = piper_plus_g2p::portuguese::PortuguesePhonemizer::new();
     for case in cases_for(&fixture, "pt") {
         let (tokens, _) = p.phonemize_with_prosody(&case.input).unwrap();
         assert_case(&tokens, case);
@@ -152,7 +152,7 @@ fn test_pt_golden() {
 #[test]
 fn test_sv_golden() {
     let fixture = load_fixture();
-    let p = piper_g2p::swedish::SwedishPhonemizer::new();
+    let p = piper_plus_g2p::swedish::SwedishPhonemizer::new();
     for case in cases_for(&fixture, "sv") {
         let (tokens, _) = p.phonemize_with_prosody(&case.input).unwrap();
         assert_case(&tokens, case);
@@ -166,7 +166,7 @@ fn test_sv_golden() {
 #[test]
 fn test_ko_golden() {
     let fixture = load_fixture();
-    let p = piper_g2p::korean::KoreanPhonemizer::new();
+    let p = piper_plus_g2p::korean::KoreanPhonemizer::new();
     for case in cases_for(&fixture, "ko") {
         let (tokens, _) = p.phonemize_with_prosody(&case.input).unwrap();
         assert_case(&tokens, case);
@@ -196,7 +196,7 @@ fn test_zh_golden() {
         .join("test")
         .join("models")
         .join("pinyin_phrases.json");
-    let p = match piper_g2p::chinese::ChinesePhonemizer::new(&single_path, &phrase_path) {
+    let p = match piper_plus_g2p::chinese::ChinesePhonemizer::new(&single_path, &phrase_path) {
         Ok(p) => p,
         Err(_) => {
             eprintln!("SKIP: pinyin dictionary not found — skipping ZH golden test");
@@ -210,7 +210,7 @@ fn test_zh_golden() {
         if case.expected_contains_any_tone == Some(true) {
             let tone_pua: Vec<String> = ["tone1", "tone2", "tone3", "tone4", "tone5"]
                 .iter()
-                .filter_map(|t| piper_g2p::token_map::token_to_pua(t))
+                .filter_map(|t| piper_plus_g2p::token_map::token_to_pua(t))
                 .map(|c| c.to_string())
                 .collect();
             let has_tone = tokens.iter().any(|t| tone_pua.contains(t));
@@ -231,7 +231,7 @@ fn test_zh_golden() {
 #[test]
 fn test_en_golden() {
     let fixture = load_fixture();
-    let p = match piper_g2p::english::EnglishPhonemizer::new() {
+    let p = match piper_plus_g2p::english::EnglishPhonemizer::new() {
         Ok(p) => p,
         Err(_) => {
             eprintln!("SKIP: CMU dictionary not found — skipping EN golden test");
@@ -252,7 +252,7 @@ fn test_en_golden() {
 #[test]
 fn test_ja_golden() {
     let fixture = load_fixture();
-    use piper_g2p::japanese::JapanesePhonemizer;
+    use piper_plus_g2p::japanese::JapanesePhonemizer;
 
     let p = match JapanesePhonemizer::new() {
         Ok(p) => p,

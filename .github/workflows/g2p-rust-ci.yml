@@ -4,13 +4,13 @@ on:
   push:
     branches: [dev, main]
     paths:
-      - 'src/rust/piper-g2p/**'
+      - 'src/rust/piper-plus-g2p/**'
       - '.github/workflows/g2p-rust-ci.yml'
     tags:
       - 'rust-g2p-v*'
   pull_request:
     paths:
-      - 'src/rust/piper-g2p/**'
+      - 'src/rust/piper-plus-g2p/**'
       - '.github/workflows/g2p-rust-ci.yml'
 
 permissions:
@@ -34,11 +34,11 @@ jobs:
 
       - name: Cargo fmt
         working-directory: src/rust
-        run: cargo fmt -p piper-g2p -- --check
+        run: cargo fmt -p piper-plus-g2p -- --check
 
       - name: Cargo clippy
         working-directory: src/rust
-        run: cargo clippy -p piper-g2p --all-features -- -D warnings
+        run: cargo clippy -p piper-plus-g2p --all-features -- -D warnings
 
   test:
     name: test (${{ matrix.os }})
@@ -59,7 +59,7 @@ jobs:
 
       - name: Run tests (all features)
         working-directory: src/rust
-        run: cargo test -p piper-g2p --all-features
+        run: cargo test -p piper-plus-g2p --all-features
 
   test-minimal:
     name: test-minimal (default features)
@@ -76,7 +76,7 @@ jobs:
 
       - name: Run tests (default features only)
         working-directory: src/rust
-        run: cargo test -p piper-g2p
+        run: cargo test -p piper-plus-g2p
 
   build:
     name: build
@@ -94,4 +94,4 @@ jobs:
 
       - name: Build release
         working-directory: src/rust
-        run: cargo build -p piper-g2p --release
+        run: cargo build -p piper-plus-g2p --release

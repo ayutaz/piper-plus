@@ -5,9 +5,9 @@
 
 use std::collections::HashMap;
 
-use piper_g2p::encode::{PiperEncoder, UnknownTokenMode};
-use piper_g2p::phonemizer::{PhonemeIdMap, Phonemizer};
-use piper_g2p::token_map::token_to_pua;
+use piper_plus_g2p::encode::{PiperEncoder, UnknownTokenMode};
+use piper_plus_g2p::phonemizer::{PhonemeIdMap, Phonemizer};
+use piper_plus_g2p::token_map::token_to_pua;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -35,7 +35,7 @@ fn make_id_map(extra: &[(&str, i64)]) -> PhonemeIdMap {
 #[cfg(feature = "korean")]
 mod korean_encoding {
     use super::*;
-    use piper_g2p::korean::KoreanPhonemizer;
+    use piper_plus_g2p::korean::KoreanPhonemizer;
 
     #[test]
     fn test_korean_encoding_roundtrip_ga() {
@@ -164,7 +164,7 @@ mod korean_encoding {
 #[cfg(feature = "swedish")]
 mod swedish_encoding {
     use super::*;
-    use piper_g2p::swedish::SwedishPhonemizer;
+    use piper_plus_g2p::swedish::SwedishPhonemizer;
 
     #[test]
     fn test_swedish_encoding_roundtrip_hej() {
@@ -287,8 +287,8 @@ mod swedish_encoding {
 #[cfg(feature = "korean")]
 mod korean_custom_dict {
     use super::*;
-    use piper_g2p::custom_dict::CustomDictionary;
-    use piper_g2p::korean::KoreanPhonemizer;
+    use piper_plus_g2p::custom_dict::CustomDictionary;
+    use piper_plus_g2p::korean::KoreanPhonemizer;
 
     #[test]
     fn test_korean_custom_dict_word_override() {
@@ -338,7 +338,7 @@ mod korean_custom_dict {
 
         let json = r#"{"version":"1.0","entries":{"컴퓨터":"콤퓨타"}}"#;
         let path =
-            std::env::temp_dir().join(format!("piper_g2p_ko_dict_{}.json", std::process::id()));
+            std::env::temp_dir().join(format!("piper_plus_g2p_ko_dict_{}.json", std::process::id()));
         let mut f = std::fs::File::create(&path).unwrap();
         f.write_all(json.as_bytes()).unwrap();
         f.flush().unwrap();
@@ -366,8 +366,8 @@ mod korean_custom_dict {
 #[cfg(feature = "swedish")]
 mod swedish_custom_dict {
     use super::*;
-    use piper_g2p::custom_dict::CustomDictionary;
-    use piper_g2p::swedish::SwedishPhonemizer;
+    use piper_plus_g2p::custom_dict::CustomDictionary;
+    use piper_plus_g2p::swedish::SwedishPhonemizer;
 
     #[test]
     fn test_swedish_custom_dict_word_override() {
@@ -406,7 +406,7 @@ mod swedish_custom_dict {
 
         let json = r#"{"version":"2.0","entries":{"IKEA":{"pronunciation":"ikea","priority":8}}}"#;
         let path =
-            std::env::temp_dir().join(format!("piper_g2p_sv_dict_{}.json", std::process::id()));
+            std::env::temp_dir().join(format!("piper_plus_g2p_sv_dict_{}.json", std::process::id()));
         let mut f = std::fs::File::create(&path).unwrap();
         f.write_all(json.as_bytes()).unwrap();
         f.flush().unwrap();
@@ -430,9 +430,9 @@ mod swedish_custom_dict {
 #[cfg(all(feature = "korean", feature = "swedish"))]
 mod multilingual_ko_sv {
     use super::*;
-    use piper_g2p::korean::KoreanPhonemizer;
-    use piper_g2p::multilingual::MultilingualPhonemizer;
-    use piper_g2p::swedish::SwedishPhonemizer;
+    use piper_plus_g2p::korean::KoreanPhonemizer;
+    use piper_plus_g2p::multilingual::MultilingualPhonemizer;
+    use piper_plus_g2p::swedish::SwedishPhonemizer;
 
     fn make_ko_sv_multilingual() -> MultilingualPhonemizer {
         let languages = vec!["ko".to_string(), "sv".to_string()];
@@ -529,10 +529,10 @@ mod multilingual_ko_sv {
 #[cfg(all(feature = "korean", feature = "swedish", feature = "english"))]
 mod multilingual_ko_sv_en {
     use super::*;
-    use piper_g2p::english::EnglishPhonemizer;
-    use piper_g2p::korean::KoreanPhonemizer;
-    use piper_g2p::multilingual::MultilingualPhonemizer;
-    use piper_g2p::swedish::SwedishPhonemizer;
+    use piper_plus_g2p::english::EnglishPhonemizer;
+    use piper_plus_g2p::korean::KoreanPhonemizer;
+    use piper_plus_g2p::multilingual::MultilingualPhonemizer;
+    use piper_plus_g2p::swedish::SwedishPhonemizer;
 
     #[test]
     fn test_three_language_multilingual() {

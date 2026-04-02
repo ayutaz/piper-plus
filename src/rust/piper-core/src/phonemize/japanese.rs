@@ -28,7 +28,7 @@ use super::token_map::token_to_pua;
 use super::{Phonemizer, ProsodyFeature, ProsodyInfo};
 use crate::config::PhonemeIdMap;
 use crate::error::PiperError;
-use piper_g2p::custom_dict::CustomDictionary;
+use piper_plus_g2p::custom_dict::CustomDictionary;
 
 // ---------------------------------------------------------------------------
 // Compiled regex patterns for fullcontext label parsing

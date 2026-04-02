@@ -1,4 +1,4 @@
-use piper_g2p::G2pError;
+use piper_plus_g2p::G2pError;
 use thiserror::Error;
 
 #[derive(Error, Debug)]

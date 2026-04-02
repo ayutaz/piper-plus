@@ -1,4 +1,4 @@
-//! Adapter from `piper_g2p::Phonemizer` to `piper_core::phonemize::Phonemizer`.
+//! Adapter from `piper_plus_g2p::Phonemizer` to `piper_core::phonemize::Phonemizer`.
 //!
 //! `piper-g2p`'s `Phonemizer` trait is IPA-first: it returns clean token lists
 //! without BOS/EOS/padding or `phoneme_id_map` knowledge.  The adapter fills
@@ -6,14 +6,14 @@
 //! `post_process_ids()` (delegates to `default_post_process_ids` for non-JA
 //! languages; no-op for JA which handles markers inline).
 
-use piper_g2p::Phonemizer as G2pPhonemizer;
+use piper_plus_g2p::Phonemizer as G2pPhonemizer;
 
 use super::{Phonemizer, ProsodyFeature, ProsodyInfo};
 use crate::config::PhonemeIdMap;
 use crate::error::PiperError;
-use piper_g2p::multilingual::default_post_process_ids;
+use piper_plus_g2p::multilingual::default_post_process_ids;
 
-/// Wraps a `piper_g2p::Phonemizer` so it satisfies
+/// Wraps a `piper_plus_g2p::Phonemizer` so it satisfies
 /// `piper_core::phonemize::Phonemizer`.
 pub struct G2pAdapter {
     inner: Box<dyn G2pPhonemizer>,
@@ -36,7 +36,7 @@ impl Phonemizer for G2pAdapter {
     ) -> Result<(Vec<String>, Vec<Option<ProsodyInfo>>), PiperError> {
         let (tokens, prosody) = self.inner.phonemize_with_prosody(text)?;
 
-        // Convert piper_g2p::ProsodyInfo -> piper_core::phonemize::ProsodyInfo
+        // Convert piper_plus_g2p::ProsodyInfo -> piper_core::phonemize::ProsodyInfo
         let prosody = prosody
             .into_iter()
             .map(|opt| {

@@ -1,4 +1,4 @@
-name: Publish piper-g2p (Rust)
+name: Publish piper-plus-g2p (Rust)
 
 on:
   push:
@@ -12,7 +12,7 @@ env:
 
 jobs:
   test:
-    name: cargo test (piper-g2p)
+    name: cargo test (piper-plus-g2p)
     runs-on: ubuntu-24.04
     defaults:
       run:
@@ -23,7 +23,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src/rust -> target
-      - run: cargo test -p piper-g2p --all-features
+      - run: cargo test -p piper-plus-g2p --all-features
 
   publish:
     name: Publish to crates.io
@@ -39,7 +39,7 @@ jobs:
         working-directory: src/rust
         run: |
           TAG_VERSION="${GITHUB_REF#refs/tags/rust-g2p-v}"
-          CARGO_VERSION=$(grep '^version' piper-g2p/Cargo.toml | head -1 | sed 's/.*"\(.*\)".*/\1/')
+          CARGO_VERSION=$(grep '^version' piper-plus-g2p/Cargo.toml | head -1 | sed 's/.*"\(.*\)".*/\1/')
           if [ -z "$CARGO_VERSION" ]; then
             # workspace version
             CARGO_VERSION=$(grep '^version' Cargo.toml | head -1 | sed 's/.*"\(.*\)".*/\1/')
@@ -50,21 +50,21 @@ jobs:
             echo "ERROR: Tag version ($TAG_VERSION) does not match Cargo.toml ($CARGO_VERSION)"
             exit 1
           fi
-      - name: Publish piper-g2p
+      - name: Publish piper-plus-g2p
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
         run: |
           if [ -n "$CARGO_REGISTRY_TOKEN" ]; then
             set +e
-            OUTPUT=$(cargo publish -p piper-g2p 2>&1)
+            OUTPUT=$(cargo publish -p piper-plus-g2p 2>&1)
             STATUS=$?
             set -e
             echo "$OUTPUT"
             if [ "$STATUS" -ne 0 ]; then
               if echo "$OUTPUT" | grep -q "already uploaded\|already exists"; then
-                echo "piper-g2p version already published on crates.io (skipping)"
+                echo "piper-plus-g2p version already published on crates.io (skipping)"
               else
-                echo "::error::Failed to publish piper-g2p to crates.io"
+                echo "::error::Failed to publish piper-plus-g2p to crates.io"
                 exit "$STATUS"
               fi
             fi

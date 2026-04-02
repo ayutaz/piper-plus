@@ -93,9 +93,9 @@ jobs:
         with:
           workspaces: src/rust
 
-      - name: Cargo check piper-g2p
+      - name: Cargo check piper-plus-g2p
         working-directory: src/rust
-        run: cargo check -p piper-g2p --all-features
+        run: cargo check -p piper-plus-g2p --all-features
 
   build:
     name: build

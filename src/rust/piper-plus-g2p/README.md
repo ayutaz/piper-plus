@@ -1,8 +1,8 @@
-# piper-g2p
+# piper-plus-g2p
 
 Multilingual G2P (Grapheme-to-Phoneme) for TTS. eSpeak-ng free. MIT licensed. 7 languages.
 
-## Why piper-g2p?
+## Why piper-plus-g2p?
 
 - **MIT licensed** -- no eSpeak-ng (GPL) dependency in your TTS pipeline
 - **7 languages** -- JA, EN, ZH, KO, ES, FR, PT with consistent IPA output
@@ -14,7 +14,7 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-piper-g2p = { version = "0.1", features = ["naist-jdic"] }
+piper-plus-g2p = { version = "0.1", features = ["naist-jdic"] }
 ```
 
 ```rust
@@ -51,7 +51,7 @@ To use only specific languages, disable defaults:
 
 ```toml
 [dependencies]
-piper-g2p = { version = "0.1", default-features = false, features = ["english", "japanese"] }
+piper-plus-g2p = { version = "0.1", default-features = false, features = ["english", "japanese"] }
 ```
 
 ## Supported Languages
@@ -84,13 +84,13 @@ Enable the `ffi` feature for C-compatible functions suitable for
 iOS (Swift) and Android (Kotlin) bindings via UniFFI:
 
 ```toml
-piper-g2p = { version = "0.1", features = ["ffi", "english"] }
+piper-plus-g2p = { version = "0.1", features = ["ffi", "english"] }
 ```
 
 ## Cross-Platform Consistency
 
 Also available as:
-- **Python**: `piper-g2p` on PyPI
+- **Python**: `piper-plus-g2p` on PyPI
 - **npm**: `@piper-plus/g2p` for browser/WASM
 
 All implementations share the same PUA mapping and are validated
