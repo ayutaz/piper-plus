@@ -89,8 +89,13 @@ fn assert_case(tokens: &[String], case: &TestCase) {
     if let Some(expected_contains) = &case.expected_contains {
         let token_set: HashSet<&str> = tokens.iter().map(|s| s.as_str()).collect();
         for expected in expected_contains {
+            // Rust phonemizer returns PUA-encoded single chars for multi-char tokens.
+            // Convert expected token names to their PUA form if a mapping exists.
+            let pua_str: Option<String> =
+                piper_g2p::token_map::token_to_pua(expected).map(|c| c.to_string());
+            let lookup = pua_str.as_deref().unwrap_or(expected.as_str());
             assert!(
-                token_set.contains(expected.as_str()),
+                token_set.contains(lookup),
                 "{lang} output missing {expected:?} for {desc:?}: {tokens:?}",
                 lang = case.language,
             );

@@ -65,9 +65,6 @@ def text_to_phoneme_ids_and_prosody(
         else:
             _LOGGER.warning("Unknown phoneme: %s", phoneme)
 
-    phoneme_ids, prosody_features = phonemizer.post_process_ids(
-        phoneme_ids, prosody_features, phoneme_id_map
-    )
     return phoneme_ids, prosody_features
 
 

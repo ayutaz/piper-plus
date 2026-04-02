@@ -97,18 +97,14 @@ impl PiperEncoder {
             None => Ok(self.eos_id),
             Some(token) => {
                 // Try direct lookup first
-                if let Some(ids) = self.id_map.get(token) {
-                    if let Some(&id) = ids.first() {
-                        return Ok(id);
-                    }
+                if let Some(&id) = self.id_map.get(token).and_then(|ids| ids.first()) {
+                    return Ok(id);
                 }
                 // Try PUA mapping
                 if let Some(pua_char) = token_to_pua(token) {
                     let pua_str = pua_char.to_string();
-                    if let Some(ids) = self.id_map.get(&pua_str) {
-                        if let Some(&id) = ids.first() {
-                            return Ok(id);
-                        }
+                    if let Some(&id) = self.id_map.get(&pua_str).and_then(|ids| ids.first()) {
+                        return Ok(id);
                     }
                 }
                 Err(G2pError::PhonemeIdNotFound {
