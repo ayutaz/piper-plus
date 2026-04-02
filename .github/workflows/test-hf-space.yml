@@ -55,7 +55,7 @@ jobs:
           find hf-space-deploy -name '*.py' | wc -l
           echo "Python files"
 
-      - name: Install piper-g2p (local package)
+      - name: Install piper-plus-g2p (local package)
         run: |
           pip install src/python/g2p
 
