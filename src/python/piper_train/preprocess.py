@@ -71,11 +71,8 @@ except ImportError:
         phonemize_japanese_with_prosody,
     )
 
-# Japanese phoneme id map support
-try:
-    from .phonemize.jp_id_map import get_japanese_id_map  # type: ignore
-except ImportError:
-    from piper_train.phonemize.jp_id_map import get_japanese_id_map  # type: ignore
+# Phoneme id map support (unified API from piper_g2p)
+from piper_g2p.encode.id_maps import get_phoneme_id_map
 
 _DIR = Path(__file__).parent
 _VERSION = (_DIR / "VERSION").read_text(encoding="utf-8").strip()
@@ -227,11 +224,7 @@ def main() -> None:
     if len(lang_parts) >= 3:
         # Multilingual mode: 3+ languages (e.g., ja-en-zh-ko)
         args.phoneme_type = PhonemeType.MULTILINGUAL
-        from .phonemize.multilingual_id_map import (
-            get_multilingual_id_map,  # noqa: PLC0415
-        )
-
-        multilingual_id_map = get_multilingual_id_map(lang_parts)
+        multilingual_id_map = get_phoneme_id_map("-".join(sorted(lang_parts)))
         args.phoneme_id_map = multilingual_id_map
         args.lang_parts = lang_parts
         _LOGGER.info(
@@ -241,9 +234,7 @@ def main() -> None:
         )
     elif args.language == "ja-en":
         args.phoneme_type = PhonemeType.BILINGUAL
-        from .phonemize.bilingual_id_map import get_bilingual_id_map  # noqa: PLC0415
-
-        bilingual_id_map = get_bilingual_id_map()
+        bilingual_id_map = get_phoneme_id_map("ja-en")
         args.phoneme_id_map = bilingual_id_map
         _LOGGER.info(
             "Using bilingual (JA+EN) phonemization (%s symbols)",
@@ -251,7 +242,7 @@ def main() -> None:
         )
     elif args.language == "ja":
         args.phoneme_type = PhonemeType.OPENJTALK
-        japanese_id_map = get_japanese_id_map()
+        japanese_id_map = get_phoneme_id_map("ja")
         args.phoneme_id_map = japanese_id_map  # 子プロセスへ渡すため
         _LOGGER.info(
             "Using pyopenjtalk for Japanese phonemization (%s symbols)",
