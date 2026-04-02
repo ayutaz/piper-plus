@@ -88,9 +88,52 @@ impl PiperEncoder {
         })
     }
 
+    /// Resolve the EOS phoneme ID for the given token.
+    ///
+    /// - `None` → default EOS (`"$"`)
+    /// - `Some(token)` → look up the token in the id_map (direct, then PUA)
+    fn resolve_eos_id(&self, eos_token: Option<&str>) -> Result<i64, G2pError> {
+        match eos_token {
+            None => Ok(self.eos_id),
+            Some(token) => {
+                // Try direct lookup first
+                if let Some(ids) = self.id_map.get(token) {
+                    if let Some(&id) = ids.first() {
+                        return Ok(id);
+                    }
+                }
+                // Try PUA mapping
+                if let Some(pua_char) = token_to_pua(token) {
+                    let pua_str = pua_char.to_string();
+                    if let Some(ids) = self.id_map.get(&pua_str) {
+                        if let Some(&id) = ids.first() {
+                            return Ok(id);
+                        }
+                    }
+                }
+                Err(G2pError::PhonemeIdNotFound {
+                    phoneme: token.to_string(),
+                })
+            }
+        }
+    }
+
     /// Encode IPA tokens to phoneme IDs with BOS/EOS/PAD insertion.
     pub fn encode(&self, tokens: &[String]) -> Result<Vec<i64>, G2pError> {
-        let (ids, _) = self.encode_with_prosody(tokens, &[])?;
+        self.encode_with_eos(tokens, None)
+    }
+
+    /// Encode IPA tokens with a custom EOS token.
+    ///
+    /// - `eos_token = None` → default EOS (`"$"`)
+    /// - `eos_token = Some("?")` → look up `"?"` in id_map
+    /// - `eos_token = Some("?!")` → look up PUA-mapped `"?!"` in id_map
+    pub fn encode_with_eos(
+        &self,
+        tokens: &[String],
+        eos_token: Option<&str>,
+    ) -> Result<Vec<i64>, G2pError> {
+        let (ids, _) = self.encode_with_prosody_and_eos(tokens, &[], eos_token)?;
         Ok(ids)
     }
 
@@ -100,6 +143,17 @@ impl PiperEncoder {
         tokens: &[String],
         prosody: &[Option<ProsodyInfo>],
     ) -> Result<(Vec<i64>, Vec<ProsodyFeature>), G2pError> {
+        self.encode_with_prosody_and_eos(tokens, prosody, None)
+    }
+
+    /// Encode IPA tokens with prosody alignment and a custom EOS token.
+    pub fn encode_with_prosody_and_eos(
+        &self,
+        tokens: &[String],
+        prosody: &[Option<ProsodyInfo>],
+        eos_token: Option<&str>,
+    ) -> Result<(Vec<i64>, Vec<ProsodyFeature>), G2pError> {
+        let resolved_eos = self.resolve_eos_id(eos_token)?;
         let mut ids = Vec::with_capacity(tokens.len() * 3 + 3);
         let mut pros = Vec::with_capacity(tokens.len() * 3 + 3);
 
@@ -144,7 +198,7 @@ impl PiperEncoder {
             pros.push([0, 0, 0]);
         }
 
-        ids.push(self.eos_id);
+        ids.push(resolved_eos);
         pros.push([0, 0, 0]);
         Ok((ids, pros))
     }
@@ -291,5 +345,97 @@ mod tests {
     fn test_piper_encoder_missing_bos() {
         let map = make_map(&[("_", &[0]), ("$", &[2])]);
         assert!(PiperEncoder::new(map, UnknownTokenMode::Skip).is_err());
+    }
+
+    #[test]
+    fn test_encode_with_default_eos() {
+        let map = make_map(&[
+            ("^", &[1]),
+            ("_", &[0]),
+            ("$", &[2]),
+            ("a", &[15]),
+            ("k", &[30]),
+        ]);
+        let encoder = PiperEncoder::new(map, UnknownTokenMode::Skip).unwrap();
+        let tokens: Vec<String> = vec!["a", "k"].into_iter().map(String::from).collect();
+        let ids_default = encoder.encode(&tokens).unwrap();
+        let ids_none = encoder.encode_with_eos(&tokens, None).unwrap();
+        assert_eq!(ids_default, ids_none);
+    }
+
+    #[test]
+    fn test_encode_with_question_eos() {
+        let map = make_map(&[
+            ("^", &[1]),
+            ("_", &[0]),
+            ("$", &[2]),
+            ("?", &[99]),
+            ("a", &[15]),
+        ]);
+        let encoder = PiperEncoder::new(map, UnknownTokenMode::Skip).unwrap();
+        let tokens: Vec<String> = vec!["a"].into_iter().map(String::from).collect();
+        let ids = encoder.encode_with_eos(&tokens, Some("?")).unwrap();
+        // Last element should be "?" ID (99), not default EOS (2)
+        assert_eq!(*ids.last().unwrap(), 99);
+        // BOS should still be first
+        assert_eq!(ids[0], 1);
+    }
+
+    #[test]
+    fn test_encode_with_pua_eos() {
+        // "?!" maps to PUA U+E016 via token_to_pua
+        let pua_char = crate::token_map::token_to_pua("?!").unwrap();
+        let pua_str = pua_char.to_string();
+        let map = make_map(&[
+            ("^", &[1]),
+            ("_", &[0]),
+            ("$", &[2]),
+            (&pua_str, &[88]),
+            ("a", &[15]),
+        ]);
+        let encoder = PiperEncoder::new(map, UnknownTokenMode::Skip).unwrap();
+        let tokens: Vec<String> = vec!["a"].into_iter().map(String::from).collect();
+        let ids = encoder.encode_with_eos(&tokens, Some("?!")).unwrap();
+        assert_eq!(*ids.last().unwrap(), 88);
+    }
+
+    #[test]
+    fn test_encode_with_prosody_and_eos() {
+        let map = make_map(&[
+            ("^", &[1]),
+            ("_", &[0]),
+            ("$", &[2]),
+            ("?", &[99]),
+            ("a", &[15]),
+        ]);
+        let encoder = PiperEncoder::new(map, UnknownTokenMode::Skip).unwrap();
+        let tokens: Vec<String> = vec!["a"].into_iter().map(String::from).collect();
+        let prosody = vec![Some(ProsodyInfo {
+            a1: -2,
+            a2: 1,
+            a3: 5,
+        })];
+        let (ids, pros) =
+            encoder.encode_with_prosody_and_eos(&tokens, &prosody, Some("?")).unwrap();
+        // Last ID should be custom EOS
+        assert_eq!(*ids.last().unwrap(), 99);
+        // Prosody for EOS should be zero
+        assert_eq!(*pros.last().unwrap(), [0, 0, 0]);
+        // ids and pros must have same length
+        assert_eq!(ids.len(), pros.len());
+    }
+
+    #[test]
+    fn test_resolve_eos_invalid() {
+        let map = make_map(&[("^", &[1]), ("_", &[0]), ("$", &[2]), ("a", &[15])]);
+        let encoder = PiperEncoder::new(map, UnknownTokenMode::Skip).unwrap();
+        let tokens: Vec<String> = vec!["a"].into_iter().map(String::from).collect();
+        let result = encoder.encode_with_eos(&tokens, Some("NONEXISTENT"));
+        assert!(result.is_err());
+        let msg = format!("{}", result.unwrap_err());
+        assert!(
+            msg.contains("NONEXISTENT"),
+            "error should mention the unknown token, got: {msg}"
+        );
     }
 }

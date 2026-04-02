@@ -19,6 +19,7 @@ except ImportError:
         ) from None
 
 from .base import Phonemizer, ProsodyInfo
+from .custom_dict import CustomDictionary
 
 __all__ = [
     "JapanesePhonemizer",
@@ -38,15 +39,15 @@ def _is_question(text: str) -> bool:
 def _get_question_type(text: str) -> str:
     """Return the appropriate question marker based on text ending.
 
-    Returns one of: ``"?!"``, ``"?."``, ``"?~"``, ``"?"``, or ``""``
-    (empty string for non-questions).
+    Returns one of: ``"?!"``, ``"?."``, ``"?~"``, ``"?"``, or ``"$"``
+    for non-questions.
 
     Markers:
     - ``"?!"`` : Emphatic question (強調疑問) — ends with ?! or ！？
     - ``"?."`` : Neutral/rhetorical question (平叙疑問) — ends with ?. or 。？
     - ``"?~"`` : Tag question (確認疑問) — ends with ?~ or ～？ or ？～
     - ``"?"``  : Generic question — ends with ? or ？
-    - ``""``   : Declarative (non-question)
+    - ``"$"``  : Declarative (non-question)
     """
     stripped = text.strip()
 
@@ -74,7 +75,7 @@ def _get_question_type(text: str) -> str:
     if stripped.endswith("?") or stripped.endswith("\uff1f"):
         return "?"
 
-    return ""  # Not a question
+    return "$"  # Not a question
 
 
 # Set of tokens that should be skipped when looking for next phoneme
@@ -213,11 +214,22 @@ class JapanesePhonemizer(Phonemizer):
     Multi-character tokens are returned as-is (no PUA mapping).
     """
 
+    def __init__(self, custom_dict: CustomDictionary | str | list[str] | None = None):
+        if custom_dict is not None and not isinstance(custom_dict, CustomDictionary):
+            custom_dict = CustomDictionary(custom_dict)
+        self._custom_dict = custom_dict
+
     @property
     def language_code(self) -> str:
         return "ja"
 
+    def _apply_custom_dict(self, text: str) -> str:
+        if self._custom_dict is not None:
+            text = self._custom_dict.apply_to_text(text)
+        return text
+
     def phonemize(self, text: str) -> list[str]:
+        text = self._apply_custom_dict(text)
         text = self._sanitize_input(text)
         if not text:
             return []
@@ -227,6 +239,7 @@ class JapanesePhonemizer(Phonemizer):
     def phonemize_with_prosody(
         self, text: str
     ) -> tuple[list[str], list[ProsodyInfo | None]]:
+        text = self._apply_custom_dict(text)
         text = self._sanitize_input(text)
         if not text:
             return [], []

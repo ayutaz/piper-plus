@@ -9,7 +9,7 @@ where only piper_g2p is available).
 
 import pytest
 
-from tests.conftest import requires_en, requires_ja
+from tests.conftest import requires_en, requires_ja, requires_zh
 
 _has_piper_train = pytest.importorskip is not None  # always True, placeholder
 
@@ -95,3 +95,159 @@ class TestENCompat:
         assert g2p_tokens == train_tokens, (
             f"Mismatch:\n  g2p:   {g2p_tokens}\n  train: {train_tokens}"
         )
+
+
+@requires_piper_train
+class TestMultilingualIDMapCompat:
+    @pytest.mark.xfail(
+        reason=(
+            "piper_g2p uses fixed PUA mapping (pua.json) while piper_train "
+            "uses dynamic register() which assigns extra PUA codepoints for "
+            "Chinese compound finals (ai, ao, ang, etc.) not in pua.json"
+        ),
+        strict=True,
+    )
+    def test_multilingual_8lang_id_map_matches(self):
+        """piper_g2p multilingual ID map matches piper_train for 8-language set."""
+        from piper_train.phonemize.multilingual_id_map import get_multilingual_id_map
+
+        from piper_g2p.encode.id_maps import get_phoneme_id_map
+
+        g2p_map = get_phoneme_id_map("ja-en-zh-ko-es-fr-pt-sv")
+        train_map = get_multilingual_id_map(
+            ["ja", "en", "zh", "ko", "es", "fr", "pt", "sv"]
+        )
+        assert g2p_map == train_map
+
+
+@requires_zh
+@requires_piper_train
+class TestZHCompat:
+    def test_zh_phonemize_matches(self):
+        """piper_g2p ZH output + PUA matches piper_train ZH output."""
+        from piper_train.phonemize.chinese import phonemize_chinese
+
+        from piper_g2p.chinese import ChinesePhonemizer
+        from piper_g2p.encode.pua import map_token
+
+        text = "你好世界"
+        p = ChinesePhonemizer()
+        g2p_tokens = p.phonemize(text)
+        g2p_mapped = [map_token(t) for t in g2p_tokens]
+        train_tokens = phonemize_chinese(text)
+        assert g2p_mapped == train_tokens, (
+            f"Mismatch:\n  g2p+PUA: {g2p_mapped}\n  train:   {train_tokens}"
+        )
+
+
+@requires_piper_train
+class TestESCompat:
+    def test_es_phonemize_matches(self):
+        """piper_g2p ES output + PUA matches piper_train ES output."""
+        from piper_train.phonemize.spanish import phonemize_spanish
+
+        from piper_g2p.encode.pua import map_token
+        from piper_g2p.spanish import SpanishPhonemizer
+
+        text = "Hola mundo"
+        p = SpanishPhonemizer()
+        g2p_tokens = p.phonemize(text)
+        g2p_mapped = [map_token(t) for t in g2p_tokens]
+        train_tokens = phonemize_spanish(text)
+        assert g2p_mapped == train_tokens, (
+            f"Mismatch:\n  g2p+PUA: {g2p_mapped}\n  train:   {train_tokens}"
+        )
+
+
+@requires_piper_train
+class TestFRCompat:
+    def test_fr_phonemize_matches(self):
+        """piper_g2p FR output + PUA matches piper_train FR output."""
+        from piper_train.phonemize.french import phonemize_french
+
+        from piper_g2p.encode.pua import map_token
+        from piper_g2p.french import FrenchPhonemizer
+
+        text = "Bonjour le monde"
+        p = FrenchPhonemizer()
+        g2p_tokens = p.phonemize(text)
+        g2p_mapped = [map_token(t) for t in g2p_tokens]
+        train_tokens = phonemize_french(text)
+        assert g2p_mapped == train_tokens, (
+            f"Mismatch:\n  g2p+PUA: {g2p_mapped}\n  train:   {train_tokens}"
+        )
+
+
+@requires_piper_train
+class TestPTCompat:
+    def test_pt_phonemize_matches(self):
+        """piper_g2p PT output + PUA matches piper_train PT output."""
+        from piper_train.phonemize.portuguese import phonemize_portuguese
+
+        from piper_g2p.encode.pua import map_token
+        from piper_g2p.portuguese import PortuguesePhonemizer
+
+        text = "Olá mundo"
+        p = PortuguesePhonemizer()
+        g2p_tokens = p.phonemize(text)
+        g2p_mapped = [map_token(t) for t in g2p_tokens]
+        train_tokens = phonemize_portuguese(text)
+        assert g2p_mapped == train_tokens, (
+            f"Mismatch:\n  g2p+PUA: {g2p_mapped}\n  train:   {train_tokens}"
+        )
+
+
+@requires_piper_train
+class TestSVCompat:
+    def test_sv_phonemize_matches(self):
+        """piper_g2p SV output + PUA matches piper_train SV output."""
+        from piper_train.phonemize.swedish import phonemize_swedish
+
+        from piper_g2p.encode.pua import map_token
+        from piper_g2p.swedish import SwedishPhonemizer
+
+        text = "Hej världen"
+        p = SwedishPhonemizer()
+        g2p_tokens = p.phonemize(text)
+        g2p_mapped = [map_token(t) for t in g2p_tokens]
+        train_tokens = phonemize_swedish(text)
+        assert g2p_mapped == train_tokens, (
+            f"Mismatch:\n  g2p+PUA: {g2p_mapped}\n  train:   {train_tokens}"
+        )
+
+
+@requires_ja
+@requires_piper_train
+class TestJAProsodyCompat:
+    def test_ja_prosody_a1_a2_a3_matches(self):
+        """piper_g2p JA prosody (a1/a2/a3) matches piper_train for same input.
+
+        piper_train includes BOS (^) at the start while piper_g2p does not,
+        so we strip the leading BOS entry from piper_train before comparing.
+        """
+        from piper_train.phonemize.japanese import phonemize_japanese_with_prosody
+
+        from piper_g2p.japanese import JapanesePhonemizer
+
+        text = "こんにちは"
+        p = JapanesePhonemizer()
+        _, g2p_prosody = p.phonemize_with_prosody(text)
+        train_tokens, train_prosody = phonemize_japanese_with_prosody(text)
+
+        # Strip the leading BOS (^) entry that piper_train adds
+        if train_tokens and train_tokens[0] == "^":
+            train_prosody = train_prosody[1:]
+
+        assert len(g2p_prosody) == len(train_prosody), (
+            f"Length mismatch: g2p={len(g2p_prosody)}, train={len(train_prosody)}"
+        )
+        for i, (g, t) in enumerate(zip(g2p_prosody, train_prosody)):
+            if g is None and t is None:
+                continue
+            assert g is not None and t is not None, (
+                f"Position {i}: one is None (g2p={g}, train={t})"
+            )
+            assert (g.a1, g.a2, g.a3) == (t.a1, t.a2, t.a3), (
+                f"Position {i}: g2p=({g.a1},{g.a2},{g.a3}) "
+                f"!= train=({t.a1},{t.a2},{t.a3})"
+            )

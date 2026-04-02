@@ -6,14 +6,13 @@ from tests.conftest import requires_ja
 @requires_ja
 class TestBasic:
     def test_basic_phonemize(self):
-        """phonemize() returns tokens without BOS/EOS markers."""
+        """phonemize() returns tokens without BOS marker; '$' is sentence-end."""
         from piper_g2p.japanese import JapanesePhonemizer
 
         p = JapanesePhonemizer()
         tokens = p.phonemize("こんにちは")
         assert len(tokens) > 0
         assert "^" not in tokens, "BOS should not be present"
-        assert "$" not in tokens, "EOS should not be present"
 
     def test_no_pua_characters(self):
         """phonemize() returns no PUA characters (U+E000-U+F8FF)."""
@@ -108,6 +107,49 @@ class TestQuestionMarkers:
         # U+FF5E (full-width tilde) + U+FF1F (full-width question mark)
         tokens = p.phonemize("何\uff5e\uff1f")
         assert "?~" in tokens, f"Expected '?~' in {tokens}"
+
+
+@requires_ja
+class TestGetQuestionType:
+    def test_get_question_type_declarative(self):
+        """Non-question returns '$'."""
+        from piper_g2p.japanese import _get_question_type
+
+        assert _get_question_type("今日は良い天気です。") == "$"
+
+    def test_get_question_type_question(self):
+        from piper_g2p.japanese import _get_question_type
+
+        assert _get_question_type("元気ですか？") == "?"
+
+    def test_get_question_type_emphatic(self):
+        from piper_g2p.japanese import _get_question_type
+
+        assert _get_question_type("本当ですか？！") == "?!"
+
+
+@requires_ja
+class TestCustomDict:
+    def test_japanese_phonemizer_with_custom_dict(self):
+        """Custom dict replaces words before phonemization."""
+        from piper_g2p.custom_dict import CustomDictionary
+        from piper_g2p.japanese import JapanesePhonemizer
+
+        d = CustomDictionary(load_defaults=False)
+        d.add_word("API", "エーピーアイ")
+        p = JapanesePhonemizer(custom_dict=d)
+        tokens = p.phonemize("APIを使う")
+        assert isinstance(tokens, list)
+        assert len(tokens) > 0
+
+    def test_japanese_phonemizer_no_custom_dict(self):
+        """Default constructor still works."""
+        from piper_g2p.japanese import JapanesePhonemizer
+
+        p = JapanesePhonemizer()
+        tokens = p.phonemize("こんにちは")
+        assert isinstance(tokens, list)
+        assert len(tokens) > 0
 
 
 @requires_ja
