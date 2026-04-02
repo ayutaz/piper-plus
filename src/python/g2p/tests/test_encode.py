@@ -18,7 +18,11 @@ from tests.conftest import requires_ja
 
 # Path to the cross-platform fixture
 _FIXTURE_PATH = (
-    Path(__file__).resolve().parents[4] / "tests" / "fixtures" / "g2p" / "phoneme_test_cases.json"
+    Path(__file__).resolve().parents[4]
+    / "tests"
+    / "fixtures"
+    / "g2p"
+    / "phoneme_test_cases.json"
 )
 
 

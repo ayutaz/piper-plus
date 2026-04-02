@@ -138,8 +138,9 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: astral-sh/setup-uv@v6
-      - run: uv pip install --system "./src/python/g2p[${{ matrix.extra }}]"
-      - run: python -c "from piper_plus_g2p import get_phonemizer; p = get_phonemizer('${{ matrix.extra }}'); print(p.phonemize('test'))"
+      - run: uv venv .venv-extras
+      - run: uv pip install --python .venv-extras "./src/python/g2p[${{ matrix.extra }}]"
+      - run: .venv-extras/bin/python -c "from piper_plus_g2p import get_phonemizer; p = get_phonemizer('${{ matrix.extra }}'); print(p.phonemize('test'))"
 
   publish:
     name: publish

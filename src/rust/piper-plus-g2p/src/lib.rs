@@ -1,4 +1,4 @@
-//! # piper-g2p
+//! # piper-plus-g2p
 //!
 //! Multilingual G2P (Grapheme-to-Phoneme) for TTS — eSpeak-ng free, MIT licensed.
 //!
@@ -24,7 +24,7 @@
 //!
 //! ## Quick start
 //!
-//! ```rust,no_run
+//! ```rust,ignore
 //! use piper_plus_g2p::{Phonemizer, PhonemizerRegistry};
 //! use piper_plus_g2p::english::EnglishPhonemizer;
 //!

@@ -380,7 +380,8 @@ fn test_encode_golden() {
         // Check BOS
         if case.expected_has_bos {
             assert_eq!(
-                ids[0], bos_id,
+                ids[0],
+                bos_id,
                 "first ID should be BOS ({bos_id}) for {desc:?}, got {got}",
                 desc = case.description,
                 got = ids[0],
@@ -400,7 +401,8 @@ fn test_encode_golden() {
 
         // Check PAD insertion: second element should be PAD (BOS, PAD, ...)
         assert_eq!(
-            ids[1], pad_id,
+            ids[1],
+            pad_id,
             "second ID should be PAD ({pad_id}) for {desc:?}, got {got}",
             desc = case.description,
             got = ids[1],
@@ -412,7 +414,8 @@ fn test_encode_golden() {
         // Verify PAD appears before EOS (the second-to-last element).
         let second_last = ids[ids.len() - 2];
         assert_eq!(
-            second_last, pad_id,
+            second_last,
+            pad_id,
             "second-to-last ID should be PAD ({pad_id}) for {desc:?}, got {got}",
             desc = case.description,
             got = second_last,
@@ -425,7 +428,8 @@ fn test_encode_golden() {
                 .and_then(|ids| ids.first().copied())
                 .unwrap_or_else(|| panic!("expected_first_token {first_token:?} not in id_map"));
             assert_eq!(
-                ids[0], expected_first_id,
+                ids[0],
+                expected_first_id,
                 "first token should map to {first_token:?} ({expected_first_id}) for {desc:?}",
                 desc = case.description,
             );

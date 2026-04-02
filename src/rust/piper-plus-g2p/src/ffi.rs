@@ -259,7 +259,10 @@ mod tests {
         // NULL languages pointer should succeed (uses default language set)
         unsafe {
             let handle = piper_plus_g2p_create(ptr::null());
-            assert!(!handle.is_null(), "NULL languages should create a handle with defaults");
+            assert!(
+                !handle.is_null(),
+                "NULL languages should create a handle with defaults"
+            );
             piper_plus_g2p_free(handle);
         }
     }
@@ -306,7 +309,10 @@ mod tests {
             let result = piper_plus_g2p_phonemize(handle, text.as_ptr(), ptr::null());
             if !result.is_null() {
                 let s = CStr::from_ptr(result).to_str().unwrap();
-                assert!(s.contains("\"language\":\"en\""), "should default to 'en', got: {s}");
+                assert!(
+                    s.contains("\"language\":\"en\""),
+                    "should default to 'en', got: {s}"
+                );
                 piper_plus_g2p_free_string(result);
             }
             // If result is NULL, "en" was not registered (no CMU dict) — still safe
@@ -330,11 +336,17 @@ mod tests {
 
             let unsupported = CString::new("xx").unwrap();
             let result = piper_plus_g2p_phonemize(handle, text.as_ptr(), unsupported.as_ptr());
-            assert!(result.is_null(), "unsupported language 'xx' should return NULL");
+            assert!(
+                result.is_null(),
+                "unsupported language 'xx' should return NULL"
+            );
 
             let invalid = CString::new("invalid").unwrap();
             let result = piper_plus_g2p_phonemize(handle, text.as_ptr(), invalid.as_ptr());
-            assert!(result.is_null(), "unsupported language 'invalid' should return NULL");
+            assert!(
+                result.is_null(),
+                "unsupported language 'invalid' should return NULL"
+            );
 
             piper_plus_g2p_free(handle);
         }
@@ -347,13 +359,19 @@ mod tests {
         let lang = CString::new("xx").unwrap();
         unsafe {
             let handle = piper_plus_g2p_create(lang.as_ptr());
-            assert!(!handle.is_null(), "handle should be non-NULL even if language is unsupported");
+            assert!(
+                !handle.is_null(),
+                "handle should be non-NULL even if language is unsupported"
+            );
 
             // The handle should have no registered languages
             let avail_ptr = piper_plus_g2p_available_languages(handle);
             assert!(!avail_ptr.is_null());
             let avail_str = CStr::from_ptr(avail_ptr).to_str().unwrap();
-            assert!(avail_str.is_empty(), "no languages should be registered, got: {avail_str}");
+            assert!(
+                avail_str.is_empty(),
+                "no languages should be registered, got: {avail_str}"
+            );
 
             piper_plus_g2p_free_string(avail_ptr);
             piper_plus_g2p_free(handle);
@@ -383,12 +401,18 @@ mod tests {
         let lang = CString::new("").unwrap();
         unsafe {
             let handle = piper_plus_g2p_create(lang.as_ptr());
-            assert!(!handle.is_null(), "empty languages string should use defaults");
+            assert!(
+                !handle.is_null(),
+                "empty languages string should use defaults"
+            );
 
             let avail_ptr = piper_plus_g2p_available_languages(handle);
             assert!(!avail_ptr.is_null());
             let avail_str = CStr::from_ptr(avail_ptr).to_str().unwrap();
-            assert!(!avail_str.is_empty(), "defaults should register at least one language");
+            assert!(
+                !avail_str.is_empty(),
+                "defaults should register at least one language"
+            );
 
             piper_plus_g2p_free_string(avail_ptr);
             piper_plus_g2p_free(handle);
@@ -443,7 +467,10 @@ mod tests {
         // NULL handle should return NULL, not crash
         unsafe {
             let result = piper_plus_g2p_available_languages(ptr::null());
-            assert!(result.is_null(), "NULL handle should return NULL from available_languages");
+            assert!(
+                result.is_null(),
+                "NULL handle should return NULL from available_languages"
+            );
         }
     }
 
