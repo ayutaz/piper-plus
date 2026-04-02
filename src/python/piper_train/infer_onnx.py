@@ -28,7 +28,7 @@ class _DominantLanguageDetector:
     _cache: "dict[tuple[tuple[str, int], ...], _DominantLanguageDetector]" = {}
 
     def __init__(self, language_id_map: dict[str, int]):
-        from .phonemize.multilingual import UnicodeLanguageDetector  # noqa: PLC0415
+        from piper_g2p import UnicodeLanguageDetector  # noqa: PLC0415
 
         self._language_id_map = language_id_map
         languages = list(language_id_map.keys())
@@ -57,7 +57,7 @@ class _DominantLanguageDetector:
         # Apply word-level Swedish refinement (matching multilingual.py)
         if (
             dominant == self._detector.default_latin_language
-            and self._detector._detect_swedish
+            and getattr(self._detector, "_detect_swedish", False)
         ):
             from .phonemize.multilingual import (  # noqa: PLC0415
                 _refine_latin_segments_for_swedish,
@@ -103,7 +103,7 @@ def text_to_phoneme_ids_and_prosody(
         - phoneme_ids: List of phoneme IDs
         - prosody_features: List of {"a1": int, "a2": int, "a3": int} or None
     """
-    from .phonemize.registry import get_phonemizer  # noqa: PLC0415
+    from piper_g2p import get_phonemizer  # noqa: PLC0415
 
     # For multilingual models with JA input, auto-promote to multilingual
     # phonemizer so that intersperse padding is applied correctly.

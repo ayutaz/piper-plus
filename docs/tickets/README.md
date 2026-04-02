@@ -9,12 +9,12 @@
 
 | マイルストーン | チケット数 | 完了 | 状態 |
 |---|---|---|---|
-| [M0: API ギャップ修正](#m0-piper-g2p-api-ギャップ修正) | 4 | 0/4 | 未着手 |
-| [M1: Python 移行](#m1-python-移行) | 8 | 0/8 | 未着手 |
+| [M0: API ギャップ修正](#m0-piper-g2p-api-ギャップ修正) | 4 | 4/4 | 完了 |
+| [M1: Python 移行](#m1-python-移行) | 8 | 1/8 | 進行中 |
 | [M2: Rust 移行](#m2-rust-移行) | 8 | 0/8 | 未着手 |
 | [M3: JS/WASM 移行](#m3-jswasm-移行) | 6 | 0/6 | 未着手 |
 | [M4: 検証・クリーンアップ](#m4-検証クリーンアップ) | 4 | 0/4 | 未着手 |
-| **合計** | **30** | **0/30** | |
+| **合計** | **30** | **5/30** | |
 
 ---
 
@@ -24,10 +24,10 @@
 
 | ID | チケット | 見積り | リスク | 状態 |
 |---|---|---|---|---|
-| M0-1 | [`_get_question_type()` 戻り値修正](M0-1-fix-question-type-return.md) | 小 | 中 | 未着手 |
-| M0-2 | [JapanesePhonemizer custom_dict パラメータ追加](M0-2-japanese-custom-dict-param.md) | 小 | 低 | 未着手 |
-| M0-3 | [互換テスト拡充](M0-3-expand-compat-tests.md) | 中 | 低 | 未着手 |
-| M0-4 | [Rust PiperEncoder 動的 EOS 対応](M0-4-rust-dynamic-eos.md) | 中 | 中 | 未着手 |
+| M0-1 | [`_get_question_type()` 戻り値修正](M0-1-fix-question-type-return.md) | 小 | 中 | 完了 |
+| M0-2 | [JapanesePhonemizer custom_dict パラメータ追加](M0-2-japanese-custom-dict-param.md) | 小 | 低 | 完了 |
+| M0-3 | [互換テスト拡充](M0-3-expand-compat-tests.md) | 中 | 低 | 完了 |
+| M0-4 | [Rust PiperEncoder 動的 EOS 対応](M0-4-rust-dynamic-eos.md) | 中 | 中 | 完了 |
 
 ---
 
@@ -42,7 +42,7 @@
 | M1-3 | [ID マップ API 置換](M1-3-id-map-api-replacement.md) | 中 | 中 | M0-3, M1-1 | 未着手 |
 | M1-4 | [preprocess.py リファクタ](M1-4-preprocess-pipeline-refactor.md) | 大 | **高** | M0-1, M0-2, M1-1, M1-3 | 未着手 |
 | M1-5 | [tools/ スクリプト移行](M1-5-tools-scripts-migration.md) | 中 | 中 | M1-1, M1-3 | 未着手 |
-| M1-6 | [dead code 削除](M1-6-dead-code-removal.md) | 小 | 低 | なし | 未着手 |
+| M1-6 | [dead code 削除](M1-6-dead-code-removal.md) | 小 | 低 | なし | 完了 |
 | M1-7 | [旧 phonemize ディレクトリ削除](M1-7-delete-old-phonemize-dir.md) | 中 | 中 | M1-2〜M1-6 | 未着手 |
 | M1-8 | [テスト・CI 対応](M1-8-test-ci-updates.md) | 中 | 中 | M1-7 | 未着手 |
 
