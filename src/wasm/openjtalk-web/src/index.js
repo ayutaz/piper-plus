@@ -11,7 +11,6 @@
 // Re-exports
 // ---------------------------------------------------------------------------
 
-export { SimpleUnifiedPhonemizer } from './simple_unified_api.js';
 export { WebGPUSessionManager } from './webgpu-session-manager.js';
 export { StreamingTTSPipeline, TextChunker } from './streaming-pipeline.js';
 export { AudioBackendFactory } from './audio-backend-factory.js';
@@ -24,7 +23,7 @@ export { AudioResult } from './audio-result.js';
 // Imports used by PiperPlus
 // ---------------------------------------------------------------------------
 
-import { SimpleUnifiedPhonemizer } from './simple_unified_api.js';
+import { G2P } from '@piper-plus/g2p';
 import { WebGPUSessionManager } from './webgpu-session-manager.js';
 import { StreamingTTSPipeline, TextChunker } from './streaming-pipeline.js';
 import { ModelManager } from './model-manager.js';
@@ -49,7 +48,7 @@ export class PiperPlus {
   constructor() {
     this._session = null;
     this._config = null;
-    this._phonemizer = null;
+    this._g2p = null;
     this._ort = null;
     this._initialized = false;
   }
@@ -104,7 +103,7 @@ export class PiperPlus {
       throw new Error('text is required');
     }
 
-    const language = options.language || this._phonemizer.detectLanguage(text);
+    const language = options.language || this._g2p.detectLanguage(text);
     const noiseScale = options.noiseScale ?? this._config.inference?.noise_scale ?? DEFAULT_NOISE_SCALE;
     const lengthScale = options.lengthScale ?? this._config.inference?.length_scale ?? DEFAULT_LENGTH_SCALE;
     const noiseW = options.noiseW ?? this._config.inference?.noise_w ?? DEFAULT_NOISE_W;
@@ -140,7 +139,7 @@ export class PiperPlus {
       throw new Error('text is required');
     }
 
-    const language = options.language || this._phonemizer.detectLanguage(text);
+    const language = options.language || this._g2p.detectLanguage(text);
     const noiseScale = options.noiseScale ?? this._config.inference?.noise_scale ?? DEFAULT_NOISE_SCALE;
     const lengthScale = options.lengthScale ?? this._config.inference?.length_scale ?? DEFAULT_LENGTH_SCALE;
     const noiseW = options.noiseW ?? this._config.inference?.noise_w ?? DEFAULT_NOISE_W;
@@ -173,9 +172,9 @@ export class PiperPlus {
       }
       this._session = null;
     }
-    if (this._phonemizer) {
-      this._phonemizer.dispose();
-      this._phonemizer = null;
+    if (this._g2p) {
+      this._g2p.dispose();
+      this._g2p = null;
     }
     this._initialized = false;
   }
@@ -254,18 +253,16 @@ export class PiperPlus {
 
     progress({ stage: 'phonemizer', progress: 0.8, message: 'Initializing phonemizer...' });
 
-    this._phonemizer = new SimpleUnifiedPhonemizer();
-    await this._phonemizer.initialize({
-      openjtalk: {
+    const languages = this._config.language_id_map
+      ? Object.keys(this._config.language_id_map)
+      : undefined;
+    this._g2p = await G2P.create({
+      languages,
+      jaDict: {
         dictData: dictFiles,
         voiceData: voiceData,
       },
     });
-
-    // Provide phoneme_id_map from model config so zh/ko/es/fr/pt fallback works
-    if (this._config.phoneme_id_map) {
-      this._phonemizer.setPhonemeIdMap(this._config.phoneme_id_map);
-    }
 
     progress({ stage: 'phonemizer', progress: 1, message: 'Phonemizer ready.' });
 
@@ -280,91 +277,23 @@ export class PiperPlus {
    * @private
    */
   async _textToPhonemeIds(text, language) {
-    // For zh/ko/es/fr/pt/sv the phonemizer returns IDs directly
-    if (['zh', 'ko', 'es', 'fr', 'pt', 'sv'].includes(language)) {
-      const ids = await this._phonemizer.textToPhonemes(text, language);
-      return { phonemeIds: ids, prosodyFeatures: null };
-    }
-
-    // ja / en — phonemizer returns labels (ja) or IPA string (en)
-    const rawOutput = await this._phonemizer.textToPhonemes(text, language);
-    const phonemes = this._phonemizer.extractPhonemes(rawOutput, language);
-
-    const phonemeIds = this._phonemesToIds(phonemes, language);
-
-    // Prosody features are only available for Japanese (from OpenJTalk labels)
-    let prosodyFeatures = null;
-    if (language === 'ja' && this._config.prosody_id_map) {
-      prosodyFeatures = this._extractProsodyFromLabels(rawOutput, phonemeIds.length);
-    }
-
-    return { phonemeIds, prosodyFeatures };
-  }
-
-  /**
-   * Map phoneme tokens to integer IDs using the model's phoneme_id_map.
-   * Mirrors the demo/index.html `phonemesToIds` logic.
-   * @private
-   */
-  _phonemesToIds(phonemes, language) {
     const phonemeIdMap = this._config.phoneme_id_map;
     if (!phonemeIdMap) {
       throw new Error('Model config is missing phoneme_id_map');
     }
+    const result = this._g2p.encode(text, phonemeIdMap, { language });
 
-    const ids = [];
-    for (const phoneme of phonemes) {
-      if (phonemeIdMap[phoneme]) {
-        ids.push(...phonemeIdMap[phoneme]);
-      } else {
-        // Fallback: silence/space token
-        if (language === 'ja') {
-          ids.push(...(phonemeIdMap['_'] || [0]));
-        } else {
-          ids.push(...(phonemeIdMap[' '] || [3]));
-        }
-      }
-    }
-    return ids;
-  }
-
-  /**
-   * Extract A1/A2/A3 prosody features from OpenJTalk full-context labels.
-   * Mirrors the demo/index.html `extractProsodyFromLabels` logic.
-   * @private
-   */
-  _extractProsodyFromLabels(labels, phonemeCount) {
-    const lines = labels.split('\n').filter(line => line.trim());
-    const prosodyPerPhoneme = [];
-
-    const reA1 = /\/A:([\d-]+)\+/;
-    const reA2 = /\+([0-9]+)\+/;
-    const reA3 = /\+([0-9]+)\//;
-
-    // BOS gets default prosody
-    prosodyPerPhoneme.push([0, 0, 0]);
-
-    for (const line of lines) {
-      const match = line.match(/-([^+]+)\+/);
-      if (match && match[1] !== 'sil' && match[1] !== 'pau') {
-        const mA1 = reA1.exec(line);
-        const mA2 = reA2.exec(line);
-        const mA3 = reA3.exec(line);
-        const a1 = mA1 ? Math.max(0, Math.min(10, parseInt(mA1[1]) + 5)) : 0;
-        const a2 = mA2 ? Math.min(10, parseInt(mA2[1])) : 0;
-        const a3 = mA3 ? Math.min(10, parseInt(mA3[1])) : 0;
-        prosodyPerPhoneme.push([a1, a2, a3]);
+    // Convert flat prosodyFlat [a1,a2,a3,...] to nested [[a1,a2,a3],...] for _infer()
+    let prosodyFeatures = null;
+    if (result.prosodyFlat && result.prosodyFlat.length > 0) {
+      const flat = result.prosodyFlat;
+      prosodyFeatures = [];
+      for (let i = 0; i < flat.length; i += 3) {
+        prosodyFeatures.push([flat[i], flat[i + 1], flat[i + 2]]);
       }
     }
 
-    // EOS gets default prosody
-    prosodyPerPhoneme.push([0, 0, 0]);
-
-    // Pad or trim to match phoneme count
-    while (prosodyPerPhoneme.length < phonemeCount) {
-      prosodyPerPhoneme.push([0, 0, 0]);
-    }
-    return prosodyPerPhoneme.slice(0, phonemeCount);
+    return { phonemeIds: result.phonemeIds, prosodyFeatures };
   }
 
   /**

@@ -12,7 +12,7 @@
       "import": "./src/index.js"
     },
     "./phonemizer": {
-      "import": "./src/simple_unified_api.js"
+      "import": "./src/phonemizer-compat.js"
     },
     "./streaming": {
       "import": "./src/streaming-pipeline.js"
