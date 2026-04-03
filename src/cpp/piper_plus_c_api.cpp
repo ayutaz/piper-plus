@@ -61,10 +61,15 @@ struct IteratorState {
     bool active = false;
     piper::SynthesisConfig configSnapshot_;  // saved by synth_start, restored by finish()
 
+    // M5-3: crossfade between sentence chunks
+    static constexpr size_t CROSSFADE_SAMPLES = 220; // 10ms @ 22050Hz
+    std::vector<float> prevTail; // previous chunk's tail samples for crossfade
+
     /// Restore synthesisConfig from snapshot, mark inactive, release inProgress.
     void finish(piper::SynthesisConfig &liveConfig, std::atomic<bool> &inProgress) {
         liveConfig = configSnapshot_;
         active = false;
+        prevTail.clear();
         inProgress.store(false, std::memory_order_release);
     }
 };
@@ -470,6 +475,7 @@ PIPER_PLUS_API PiperPlusStatus piper_plus_synth_start(
 
         engine->iterState.currentIndex = 0;
         engine->iterState.currentChunkSamples.clear();
+        engine->iterState.prevTail.clear();  // M5-3: reset crossfade state
         engine->iterState.active = true;
 
         // Empty sentences: mark done immediately (let BusyGuard release)
@@ -541,11 +547,46 @@ PIPER_PLUS_API PiperPlusStatus piper_plus_synth_next(
         // M4-2: Cache timing info from last synthesis
         engine->lastSynthResult = synthResult;
 
-        // Move to chunk buffer (no int16 conversion needed)
-        state.currentChunkSamples = std::move(audioBuffer);
-
         state.currentIndex++;
         bool isLast = (state.currentIndex >= state.sentences.size());
+
+        // M5-3: Apply crossfade between sentence chunks
+        // Step 1: Crossfade prevTail with the beginning of audioBuffer
+        if (!state.prevTail.empty() &&
+            audioBuffer.size() >= IteratorState::CROSSFADE_SAMPLES) {
+            for (size_t i = 0; i < IteratorState::CROSSFADE_SAMPLES; ++i) {
+                float alpha = static_cast<float>(i) / IteratorState::CROSSFADE_SAMPLES;
+                audioBuffer[i] = state.prevTail[i] * (1.0f - alpha)
+                               + audioBuffer[i] * alpha;
+            }
+            state.prevTail.clear();
+        }
+
+        // Step 2: Save tail / append prevTail depending on last-chunk status
+        if (!isLast) {
+            // Non-final chunk: save tail for next crossfade, trim from output
+            if (audioBuffer.size() >= IteratorState::CROSSFADE_SAMPLES) {
+                state.prevTail.assign(
+                    audioBuffer.end() - static_cast<std::ptrdiff_t>(IteratorState::CROSSFADE_SAMPLES),
+                    audioBuffer.end());
+                audioBuffer.resize(audioBuffer.size() - IteratorState::CROSSFADE_SAMPLES);
+            } else {
+                state.prevTail.clear();
+            }
+        } else {
+            // Final chunk: flush any remaining prevTail into output
+            if (!state.prevTail.empty()) {
+                // prevTail was not consumed by crossfade (e.g. audioBuffer was short)
+                // Prepend it to the output
+                audioBuffer.insert(audioBuffer.begin(),
+                                   state.prevTail.begin(),
+                                   state.prevTail.end());
+                state.prevTail.clear();
+            }
+        }
+
+        // Move to chunk buffer
+        state.currentChunkSamples = std::move(audioBuffer);
 
         // Fill output chunk
         if (state.currentChunkSamples.size() > static_cast<size_t>(INT32_MAX)) {

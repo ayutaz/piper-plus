@@ -38,15 +38,13 @@
 #include "audio_neon.hpp"
 #endif
 
+#include "library_path.h"
+
 #ifdef _WIN32
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
 #include <windows.h>
-#elif defined(__APPLE__)
-#include <mach-o/dyld.h>
-#else
-#include <unistd.h>
 #endif
 
 using json = nlohmann::json;
@@ -514,32 +512,14 @@ void loadModel(std::string modelPath, ModelSession &session,
 }
 
 // Get the directory containing the running executable.
+// Delegates to piper_plus_get_exe_dir() in library_path.c.
 // Returns empty path on failure.
 static std::filesystem::path getExeDir() {
-#ifdef _WIN32
-  wchar_t wpath[MAX_PATH];
-  DWORD len = GetModuleFileNameW(NULL, wpath, MAX_PATH);
-  if (len == 0 || len >= MAX_PATH) return {};
-  return std::filesystem::path(wpath).parent_path();
-#elif defined(__APPLE__)
-  uint32_t size = 0;
-  _NSGetExecutablePath(nullptr, &size); // query required size
-  std::vector<char> buf(size);
-  if (_NSGetExecutablePath(buf.data(), &size) != 0) return {};
-  return std::filesystem::path(buf.data()).parent_path();
-#else
-  // Try with a reasonable initial buffer, then grow if needed
-  std::vector<char> buf(1024);
-  while (true) {
-    ssize_t len = readlink("/proc/self/exe", buf.data(), buf.size());
-    if (len <= 0) return {};
-    if (static_cast<size_t>(len) < buf.size()) {
-      buf[len] = '\0';
-      return std::filesystem::path(buf.data()).parent_path();
-    }
-    buf.resize(buf.size() * 2);
+  char buf[4096];
+  if (piper_plus_get_exe_dir(buf, sizeof(buf)) == 0) {
+    return std::filesystem::path(buf);
   }
-#endif
+  return {};
 }
 
 // Search for a dictionary file in multiple locations:

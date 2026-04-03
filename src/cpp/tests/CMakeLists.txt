@@ -129,6 +129,7 @@ foreach(test_source ${TEST_SOURCES})
     if(${test_name} STREQUAL "test_model_manager")
         target_sources(${test_name} PRIVATE
             ../model_manager.cpp
+            ../library_path.c
         )
         target_include_directories(${test_name} PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/..
@@ -147,6 +148,10 @@ foreach(test_source ${TEST_SOURCES})
             )
         else()
             target_link_libraries(${test_name} spdlog fmt)
+            # library_path.c uses dladdr which requires libdl on Linux
+            if(UNIX AND NOT APPLE)
+                target_link_libraries(${test_name} dl)
+            endif()
         endif()
     endif()
 
@@ -215,6 +220,7 @@ foreach(test_source ${TEST_SOURCES})
             ../phoneme_parser.cpp
             ../custom_dictionary.cpp
             ../model_manager.cpp
+            ../library_path.c
             ../language_detector.cpp
             ../english_phonemize.cpp
             ../chinese_phonemize.cpp
@@ -274,8 +280,12 @@ foreach(test_source ${TEST_SOURCES})
         if(UNIX)
             find_package(Threads REQUIRED)
             target_link_libraries(${test_name} Threads::Threads)
+            # library_path.c uses dladdr which requires libdl on Linux
+            if(NOT APPLE)
+                target_link_libraries(${test_name} dl)
+            endif()
         endif()
-        
+
         # Link OpenJTalk static library
         link_openjtalk_to_test(${test_name})
 
@@ -331,6 +341,7 @@ foreach(test_source ${TEST_SOURCES})
             ../phoneme_parser.cpp
             ../custom_dictionary.cpp
             ../model_manager.cpp
+            ../library_path.c
             ../language_detector.cpp
             ../english_phonemize.cpp
             ../chinese_phonemize.cpp
@@ -390,8 +401,12 @@ foreach(test_source ${TEST_SOURCES})
         if(UNIX)
             find_package(Threads REQUIRED)
             target_link_libraries(${test_name} Threads::Threads)
+            # library_path.c uses dladdr which requires libdl on Linux
+            if(NOT APPLE)
+                target_link_libraries(${test_name} dl)
+            endif()
         endif()
-        
+
         # Link OpenJTalk static library
         link_openjtalk_to_test(${test_name})
 

@@ -8,3 +8,6 @@ target_link_libraries(basic PRIVATE PiperPlus::piper_plus)
 
 add_executable(streaming streaming.c)
 target_link_libraries(streaming PRIVATE PiperPlus::piper_plus)
+
+add_executable(multi_language multi_language.c)
+target_link_libraries(multi_language PRIVATE PiperPlus::piper_plus)

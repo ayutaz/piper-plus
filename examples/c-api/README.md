@@ -41,4 +41,22 @@ cmake --build build
 
 # Streaming synthesis (outputs WAV file)
 ./streaming multilingual-test-medium.onnx /usr/local/share/open_jtalk/dic "First. Second. Third." streaming.wav
+
+# Multi-language synthesis (outputs one WAV per language)
+./multi_language multilingual-test-medium.onnx /usr/local/share/open_jtalk/dic
 ```
+
+### Multi-language example
+
+`multi_language` demonstrates synthesizing text in 6 languages (JA, EN, ZH, ES, FR, PT)
+using both explicit `language_id` and auto-detection (`language_id = -1`).
+
+It produces 12 WAV files: `output_JA.wav`, `output_EN.wav`, ... (explicit) and
+`output_JA_auto.wav`, `output_EN_auto.wav`, ... (auto-detected).
+
+```bash
+./multi_language <model.onnx> [dict_dir] [config.json]
+```
+
+A multi-language model is recommended. A single-language model will still run but
+only the matching language will produce meaningful audio.

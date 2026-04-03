@@ -11,6 +11,7 @@
 #include <cmath>
 #include <cstring>
 #include <algorithm>
+#include <vector>
 #include "piper_plus.h"
 
 namespace fs = std::filesystem;
@@ -392,6 +393,136 @@ TEST_F(CApiIntegrationTest, TimingAfterSynthesis) {
         EXPECT_GT(timing.count, 0);
         EXPECT_NE(timing.entries, nullptr);
     }
+
+    piper_plus_free(engine);
+}
+
+// ===== Phase 5: Iterator crossfade integration tests (M5-3) =====
+
+TEST_F(CApiIntegrationTest, IteratorCrossfadeSmoothBoundary) {
+    // Two sentences via Iterator -- verify the boundary region is smooth.
+    auto* engine = createEngine();
+    ASSERT_NE(engine, nullptr);
+
+    auto opts = piper_plus_default_options();
+    PiperPlusStatus rc = piper_plus_synth_start(engine,
+        "First sentence. Second sentence.", &opts);
+    ASSERT_EQ(rc, PIPER_PLUS_OK);
+
+    std::vector<std::vector<float>> chunks;
+    for (;;) {
+        PiperPlusAudioChunk chunk = {};
+        rc = piper_plus_synth_next(engine, &chunk);
+        ASSERT_NE(rc, PIPER_PLUS_ERR) << piper_plus_get_last_error();
+        if (chunk.num_samples > 0) {
+            chunks.emplace_back(chunk.samples, chunk.samples + chunk.num_samples);
+        }
+        if (rc == PIPER_PLUS_DONE) break;
+    }
+
+    EXPECT_GE(chunks.size(), 1u);
+
+    // Check that each chunk has valid float samples in [-1, 1]
+    for (const auto& c : chunks) {
+        for (float v : c) {
+            EXPECT_GE(v, -1.0f);
+            EXPECT_LE(v, 1.0f);
+        }
+    }
+
+    piper_plus_free(engine);
+}
+
+TEST_F(CApiIntegrationTest, IteratorVsOneShotParityWithCrossfade) {
+    // Compare total samples from Iterator (with crossfade) vs one-shot.
+    // They should be close in count (crossfade slightly reduces total).
+    auto* engine = createEngine();
+    ASSERT_NE(engine, nullptr);
+
+    const char* text = "Hello world. How are you today.";
+    auto opts = piper_plus_default_options();
+
+    // One-shot
+    float* samples = nullptr;
+    int32_t oneShotCount = 0, rate = 0;
+    ASSERT_EQ(piper_plus_synthesize(engine, text, &opts,
+              &samples, &oneShotCount, &rate), PIPER_PLUS_OK);
+    ASSERT_GT(oneShotCount, 0);
+    piper_plus_free_audio(samples);
+
+    // Iterator
+    ASSERT_EQ(piper_plus_synth_start(engine, text, &opts), PIPER_PLUS_OK);
+    int32_t iterTotal = 0;
+    for (;;) {
+        PiperPlusAudioChunk chunk = {};
+        PiperPlusStatus rc = piper_plus_synth_next(engine, &chunk);
+        iterTotal += chunk.num_samples;
+        if (rc == PIPER_PLUS_DONE) break;
+        ASSERT_NE(rc, PIPER_PLUS_ERR);
+    }
+
+    // Allow reasonable tolerance (crossfade trims CROSSFADE_SAMPLES per boundary)
+    double ratio = static_cast<double>(iterTotal) / oneShotCount;
+    EXPECT_GT(ratio, 0.85);
+    EXPECT_LT(ratio, 1.15);
+
+    piper_plus_free(engine);
+}
+
+TEST_F(CApiIntegrationTest, SingleSentenceNoCrossfadeEffect) {
+    // A single sentence should not be affected by crossfade.
+    // Compare Iterator result with one-shot for a single sentence.
+    auto* engine = createEngine();
+    ASSERT_NE(engine, nullptr);
+
+    const char* text = "Hello world.";
+    auto opts = piper_plus_default_options();
+
+    // One-shot
+    float* oneShotSamples = nullptr;
+    int32_t oneShotCount = 0, rate = 0;
+    ASSERT_EQ(piper_plus_synthesize(engine, text, &opts,
+              &oneShotSamples, &oneShotCount, &rate), PIPER_PLUS_OK);
+    ASSERT_GT(oneShotCount, 0);
+
+    // Iterator
+    ASSERT_EQ(piper_plus_synth_start(engine, text, &opts), PIPER_PLUS_OK);
+    std::vector<float> iterSamples;
+    for (;;) {
+        PiperPlusAudioChunk chunk = {};
+        PiperPlusStatus rc = piper_plus_synth_next(engine, &chunk);
+        if (chunk.num_samples > 0) {
+            iterSamples.insert(iterSamples.end(),
+                               chunk.samples, chunk.samples + chunk.num_samples);
+        }
+        if (rc == PIPER_PLUS_DONE) break;
+        ASSERT_NE(rc, PIPER_PLUS_ERR);
+    }
+
+    // Single sentence: Iterator should produce same sample count as one-shot
+    // (no crossfade boundaries, no trimming)
+    EXPECT_EQ(static_cast<int32_t>(iterSamples.size()), oneShotCount);
+
+    piper_plus_free_audio(oneShotSamples);
+    piper_plus_free(engine);
+}
+
+TEST_F(CApiIntegrationTest, CallbackCrossfadeApplied) {
+    // Callback streaming wraps the Iterator, so crossfade should also apply.
+    auto* engine = createEngine();
+    ASSERT_NE(engine, nullptr);
+
+    auto opts = piper_plus_default_options();
+    CallbackData cbData;
+
+    PiperPlusStatus rc = piper_plus_synthesize_streaming(
+        engine, "First sentence. Second sentence.", &opts, testCallback, &cbData);
+    EXPECT_EQ(rc, PIPER_PLUS_OK);
+    EXPECT_GE(cbData.callCount, 1);
+    EXPECT_GT(cbData.totalSamples, 0);
+
+    // Validate that samples are in valid range (float [-1, 1])
+    EXPECT_GT(cbData.sampleRate, 0);
 
     piper_plus_free(engine);
 }

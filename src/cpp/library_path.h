@@ -15,6 +15,20 @@ extern "C" {
  */
 int piper_plus_get_library_dir(char *buf, int size);
 
+/**
+ * Get the directory containing the current executable.
+ * Uses /proc/self/exe (Linux), _NSGetExecutablePath (macOS),
+ * GetModuleFileName(NULL) (Windows).
+ *
+ * NOTE: This returns the *executable* path, NOT the shared library path.
+ * For the shared library directory, use piper_plus_get_library_dir().
+ *
+ * @param buf    Output buffer for the directory path
+ * @param size   Buffer size in bytes
+ * @return 0 on success, -1 on failure
+ */
+int piper_plus_get_exe_dir(char *buf, int size);
+
 #ifdef __cplusplus
 }
 #endif
