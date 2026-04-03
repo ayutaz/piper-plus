@@ -207,14 +207,81 @@ if(PIPER_PLUS_BUILD_SHARED)
         copy_dlls_to_target(piper_plus)
     endif()
 
-    # Install targets
+    # ---- GNUInstallDirs (M3-1 / M3-4 から前倒し統合) ----
+    include(GNUInstallDirs)
+
+    # ---- Install targets with EXPORT (M3-1 / M3-3 から前倒し統合) ----
+    # EXPORT 句は M3-3 (CMake Config パッケージ) で使用する。
+    # 事前に含めておくことで M3-3 での差分を最小化する。
     install(TARGETS piper_plus
-        LIBRARY DESTINATION lib
-        ARCHIVE DESTINATION lib
-        RUNTIME DESTINATION bin
-        PUBLIC_HEADER DESTINATION include
+        EXPORT PiperPlusTargets
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+        PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
     )
 endif()
+```
+
+#### 2.5 RPATH 設定 (M3-4 から前倒し統合)
+
+共有ライブラリが install 先で依存ライブラリ (特に ONNX Runtime) を正しく見つけられるようにする。実行ファイル (`piper`) と共有ライブラリ (`piper_plus`) では RPATH の基準が異なるため、明確に分離する。
+
+```cmake
+if(PIPER_PLUS_BUILD_SHARED)
+    if(APPLE)
+        set_target_properties(piper_plus PROPERTIES
+            MACOSX_RPATH TRUE
+            # 共有ライブラリ自身の位置基準で依存ライブラリを検索
+            INSTALL_RPATH "@loader_path"
+            # ビルドツリーでの ORT 検索パス
+            BUILD_RPATH "${CMAKE_CURRENT_BINARY_DIR}/ort/lib"
+            BUILD_WITH_INSTALL_RPATH FALSE
+            # install_name を @rpath ベースに設定
+            INSTALL_NAME_DIR ""
+        )
+    elseif(UNIX)
+        set_target_properties(piper_plus PROPERTIES
+            # Linux: ライブラリ自身の位置基準
+            INSTALL_RPATH "$ORIGIN"
+            BUILD_WITH_INSTALL_RPATH FALSE
+        )
+    endif()
+    # Windows は RPATH 不要 (DLL 検索パスで解決)
+endif()
+```
+
+**`@loader_path` vs `@executable_path` の違い:**
+
+| マクロ | 展開先 | 適用対象 |
+|--------|--------|---------|
+| `@executable_path` | 実行ファイル (`piper`) のディレクトリ | 実行ファイルの依存ライブラリ検索 |
+| `@loader_path` | ロード元 (`libpiper_plus.dylib`) のディレクトリ | 共有ライブラリの依存ライブラリ検索 |
+
+共有ライブラリが Flutter/Godot/Python から dlopen される場合、`@executable_path` はホストアプリのパスに展開されるため、同梱の ORT が見つからない。`@loader_path` なら `libpiper_plus.dylib` 自身と同じディレクトリの ORT を確実に見つけられる。
+
+#### 2.6 GNUInstallDirs 導入
+
+ハードコードされた `bin`, `lib`, `include` パスを CMake 標準モジュールで置き換える。これにより `lib64` (Fedora/RHEL) や `lib/x86_64-linux-gnu` (Debian multiarch) に自動対応する。
+
+```cmake
+include(GNUInstallDirs)
+```
+
+M3-1 で本来行う予定だった GNUInstallDirs 導入を Phase 1 に前倒し。install ターゲットの `DESTINATION` に `${CMAKE_INSTALL_LIBDIR}` / `${CMAKE_INSTALL_BINDIR}` / `${CMAKE_INSTALL_INCLUDEDIR}` を使用する (2.4 節の install ターゲット参照)。
+
+#### 2.7 EXPORT PiperPlusTargets
+
+`install(TARGETS ... EXPORT PiperPlusTargets)` を M1-4 の時点で含めておくことで、M3-3 (CMake Config パッケージ) では `install(EXPORT PiperPlusTargets ...)` と Config テンプレートを追加するだけで済む。
+
+```cmake
+install(TARGETS piper_plus
+    EXPORT PiperPlusTargets
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+)
 ```
 
 ---
@@ -238,14 +305,19 @@ endif()
 - `piper` / `test_piper` の `piper_common` からの再構成
 - `PIPER_PLUS_BUILD_SHARED` オプションと `piper_plus` SHARED ターゲット
 - プラットフォーム別の RPATH / SOVERSION / visibility 設定
-- install ターゲット (`lib/` + `include/`)
+- RPATH 設定: Linux `$ORIGIN`, macOS `@loader_path` (M3-4 から前倒し統合)
+- GNUInstallDirs 導入 (M3-1 から前倒し統合)
+- EXPORT PiperPlusTargets (M3-1 / M3-3 から前倒し統合)
+- install ターゲット (`${CMAKE_INSTALL_LIBDIR}` + `${CMAKE_INSTALL_INCLUDEDIR}`)
 
 ### スコープ外
 
 - `piper_plus_c_api.cpp` の実装 (M1-6)
 - `piper_plus.h` ヘッダーの内容 (M1-5)
 - テストの追加 (M1-7)
-- pkg-config / CMake Config (M3-2, M3-3)
+- ONNX Runtime 同梱 install ルール (M3-1 に残置)
+- ONNX Runtime の install_name 修正 (M3-4 に残置)
+- pkg-config / CMake Config ファイル生成 (M3-2, M3-3)
 
 ### テスト項目
 
@@ -284,6 +356,11 @@ endif()
 - [ ] Linux の RPATH が `$ORIGIN` であるか
 - [ ] Windows で `copy_dlls_to_target(piper_plus)` が呼ばれているか
 - [ ] `PIPER_PLUS_BUILD_SHARED=OFF` (デフォルト) で `piper_plus` ターゲットが定義されないか
+- [ ] `include(GNUInstallDirs)` が追加されているか
+- [ ] install の `DESTINATION` に `${CMAKE_INSTALL_LIBDIR}` 等の GNUInstallDirs 変数が使われているか
+- [ ] `EXPORT PiperPlusTargets` が install ルールに含まれているか
+- [ ] macOS の RPATH に `BUILD_WITH_INSTALL_RPATH FALSE` と `BUILD_RPATH` が設定されているか
+- [ ] Linux の RPATH に `BUILD_WITH_INSTALL_RPATH FALSE` が設定されているか
 
 ---
 
@@ -303,4 +380,6 @@ endif()
 - **M1-6 (実装):** `piper_plus_c_api.cpp` は `src/cpp/piper_plus_c_api.cpp` に配置すること。CMake の `add_library(piper_plus SHARED ...)` のソースリストに含まれている。
 - **M1-7 (テスト):** テストから共有ライブラリをリンクする場合、`target_link_libraries(test_c_api piper_plus)` で OK。ただし、M1-7 のモデル不要テストは共有ライブラリ API のヘッダー + 実装を直接コンパイルする方式も検討可能。
 - **M1-8 (CI):** `-DPIPER_PLUS_BUILD_SHARED=ON` をビルドオプションに追加するだけで共有ライブラリがビルドされる。
+- **M3-1 (install manifest):** GNUInstallDirs と EXPORT PiperPlusTargets は M1-4 で対応済み。M3-1 では ONNX Runtime 同梱 install、辞書 install、検証スクリプト等の配布固有ルールのみ追加すればよい。
+- **M3-4 (RPATH):** piper_plus の RPATH (`$ORIGIN` / `@loader_path`) は M1-4 で対応済み。M3-4 では ONNX Runtime の install_name 修正 (macOS) と install 後の検証のみ対応すればよい。
 - **`OPENJTALK_DIC_PATH` について:** `piper_plus` 共有ライブラリにはコンパイル時辞書パスを設定していない。利用者は `PiperPlusConfig.dict_dir` (M1-3) または `OPENJTALK_DICTIONARY_PATH` 環境変数で辞書パスを指定する必要がある。テストモデルが OpenJTalk 辞書を必要としないケース (英語のみ等) では問題にならない。

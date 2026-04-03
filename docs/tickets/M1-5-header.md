@@ -311,6 +311,12 @@ config.cb_size = sizeof(PiperPlusConfig);  // バージョン識別
 
 ---
 
+## 実装推奨
+
+> **M1-6 と同一 PR で対応すること。** M1-5 (ヘッダー) は M1-6 (C API 実装) と密結合しており、ヘッダーと実装を分割して PR にする意味が薄い。振り返りで「M1-3 + M1-5 + M1-6 は統合可能だった」と指摘されている (c-api-milestones.md Phase 1 振り返り参照)。
+
+---
+
 ## 7. 後続タスクへの連絡事項
 
 - **M1-3 (dict_dir):** `PiperPlusConfig` に `dict_dir` フィールドが含まれている。`_reserved` は 7 要素。

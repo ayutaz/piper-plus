@@ -198,6 +198,12 @@ set(CONFIGURE_ENV "CC=aarch64-linux-gnu-gcc" "CFLAGS=-fPIC" ...)
 
 ---
 
+## 実装推奨
+
+> **M1-4 と同一 PR で対応すること。** M1-1 (fPIC) は M1-4 (CMake SHARED + OBJECT ライブラリ) のビルド前提条件であり、ビルドシステム変更を 1 つの PR に集約した方がレビュー効率が高い。振り返りで「M1-1 + M1-2 + M1-4 は統合可能だった」と指摘されている (c-api-milestones.md Phase 1 振り返り参照)。
+
+---
+
 ## 7. 後続タスクへの連絡事項
 
 - **M1-4 (CMake SHARED):** このチケットの完了により、`piper_plus` SHARED ライブラリターゲットから OpenJTalk / spdlog / hts_engine_stub を `-fPIC` エラーなしでリンクできるようになる。M1-4 では `piper_common` OBJECT ライブラリの `POSITION_INDEPENDENT_CODE ON` を別途設定すること。

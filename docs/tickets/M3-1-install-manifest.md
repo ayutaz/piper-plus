@@ -13,7 +13,9 @@
 
 ## 1. タスク目的とゴール
 
-Phase 2 までで `libpiper_plus.so` / `.dylib` / `.dll` のビルドと API テストが完成している。しかし、`cmake --install` で生成される配布パッケージのレイアウトがまだ整備されていない。
+> **注意 (振り返り反映):** GNUInstallDirs 導入、`EXPORT PiperPlusTargets`、および piper_plus の基本 install ターゲット (`LIBRARY`, `ARCHIVE`, `RUNTIME`, `PUBLIC_HEADER`) は **M1-4 で対応済み**。本チケットでは M1-4 のスコープ外である配布固有の install ルール (ONNX Runtime 同梱、辞書 install、検証スクリプト等) を追加する。
+
+Phase 2 までで `libpiper_plus.so` / `.dylib` / `.dll` のビルドと API テストが完成している。しかし、`cmake --install` で生成される配布パッケージのレイアウト (ONNX Runtime 同梱、辞書配布) がまだ整備されていない。
 
 **ゴール:** `cmake --install --prefix <dir>` を実行した際に、以下の配布レイアウトが 3 プラットフォームで正しく生成されること。
 
@@ -52,34 +54,18 @@ Phase 2 までで `libpiper_plus.so` / `.dylib` / `.dll` のビルドと API テ
 
 ### 2.2 CMakeLists.txt への変更
 
-#### A. GNUInstallDirs の導入
+#### A. GNUInstallDirs の導入 (M1-4 で対応済み)
 
-ハードコードされた `bin`, `lib`, `include` パスを CMake 標準モジュールで置き換える。これにより `lib64` (Fedora/RHEL) や `lib/x86_64-linux-gnu` (Debian multiarch) に自動対応する。
+> `include(GNUInstallDirs)` は M1-4 で導入済み。本チケットでの追加作業は不要。
 
-```cmake
-include(GNUInstallDirs)
-```
+#### B. 共有ライブラリ本体 + ヘッダー install (M1-4 で対応済み)
 
-#### B. 共有ライブラリの install ターゲット
+> `install(TARGETS piper_plus EXPORT PiperPlusTargets ...)` と `PUBLIC_HEADER` install は M1-4 で対応済み。本チケットでの追加作業は不要。
 
-現在 Phase 1 (M1-4) で追加された簡易的な `install(TARGETS piper_plus DESTINATION lib)` を、プラットフォーム別の正しい配置に拡張する。
+#### C. ONNX Runtime 同梱 install (本チケットのスコープ)
 
 ```cmake
 if(PIPER_PLUS_BUILD_SHARED)
-  # --- 共有ライブラリ本体 ---
-  # EXPORT 句は M3-3 (CMake Config) で使用する
-  install(TARGETS piper_plus
-    EXPORT PiperPlusTargets
-    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}      # Windows: .dll
-    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}      # Linux: .so, macOS: .dylib
-    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}      # Windows: .lib (import library)
-  )
-
-  # --- 公開ヘッダー ---
-  install(FILES src/cpp/piper_plus.h
-    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
-  )
-
   # --- ONNX Runtime 同梱 ---
   if(WIN32)
     if(ONNXRUNTIME_DLL)
@@ -121,7 +107,7 @@ endif()
 
 **重要:** `EXPORT PiperPlusTargets` は M3-3 (CMake Config パッケージ) で使用する。本チケットで事前に含めておくことで、M3-3 での差分を最小化する。
 
-#### C. VERSION / SOVERSION の確認
+#### D. VERSION / SOVERSION の確認
 
 Phase 1 (M1-4) で設定済みの以下を確認:
 

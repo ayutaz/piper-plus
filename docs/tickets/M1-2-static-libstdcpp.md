@@ -153,6 +153,12 @@ endfunction()
 
 ---
 
+## 実装推奨
+
+> **M1-4 と同一 PR で対応すること。** M1-2 (-static-libstdc++) は M1-4 (CMake SHARED + OBJECT ライブラリ) のリンカフラグ分離であり、同一の CMakeLists.txt 変更に含めた方が整合性が高い。振り返りで「M1-1 + M1-2 + M1-4 は統合可能だった」と指摘されている (c-api-milestones.md Phase 1 振り返り参照)。
+
+---
+
 ## 7. 後続タスクへの連絡事項
 
 - **M1-4 (CMake SHARED):** `piper_plus` SHARED ターゲットを追加する際、以下を確認すること:

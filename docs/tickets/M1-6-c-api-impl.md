@@ -26,6 +26,17 @@
 
 ## 2. 実装する内容の詳細
 
+### 高リスク項目 (最優先)
+
+> 以下の 3 項目は技術調査で「高リスク」として識別されており、実装の最初に対処すること。
+> テスト (M1-7) でも優先的にカバーすること。
+
+| # | リスク項目 | 根拠 | 対処箇所 |
+|---|-----------|------|---------|
+| 1 | **`languageId` 未復元バグ** | `textToAudio()` が `voice.synthesisConfig.languageId` を内部で上書きする (技術調査 5.1)。2 回目以降の合成で言語が固定される | 2.7 節 `piper_plus_synthesize()` の `synthesisConfig` save/restore |
+| 2 | **辞書パス自動検出の失敗** | 共有ライブラリでは `getExeDir()` がホストアプリのパスを返すため、OpenJTalk 辞書が見つからない (技術調査 5.1) | 2.5 節 `piper_plus_create()` の `dict_dir` → `setenv` |
+| 3 | **再入による未定義動作** | `piper_plus_synthesize()` をマルチスレッドで同一エンジンに対して呼ぶと ONNX Runtime セッションの状態が破壊される (技術調査 5.3) | 2.7 節 `inProgress` atomic flag による `PIPER_PLUS_ERR_BUSY` |
+
 ### 変更対象ファイル
 
 | ファイル | 状態 |

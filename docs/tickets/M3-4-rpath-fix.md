@@ -13,19 +13,24 @@
 
 ## 1. タスク目的とゴール
 
-M3-1 で install レイアウトが整備された後、実際に install されたライブラリが実行時に依存ライブラリ (特に ONNX Runtime) を正しく見つけられるようにする。
+> **注意 (振り返り反映):** `piper_plus` の RPATH 設定 (Linux `$ORIGIN`, macOS `@loader_path`) は **M1-4 で対応済み**。本チケットでは M1-4 のスコープ外である ONNX Runtime の install_name 修正 (macOS) と install 後の RPATH 検証のみを対象とする。
 
-**現状の問題:**
-- 技術調査 5.2 で発見: macOS の RPATH が `@executable_path` (実行ファイル基準) になっており、共有ライブラリとして利用する場合は `@loader_path` (ライブラリ自身基準) が必要
-- CMakeLists.txt L145-157 で `piper` / `test_piper` に設定されている RPATH は実行ファイル前提の設定であり、共有ライブラリ `piper_plus` には不適切
-- Linux の `$ORIGIN` は M1-4 で設定済みだが、install 後の検証が不足
+M3-1 で install レイアウトが整備された後、install された ONNX Runtime の install_name が正しく設定されていないと、RPATH 経由の解決が失敗する。
+
+**M1-4 で対応済みの項目:**
+- macOS: `piper_plus` の `INSTALL_RPATH "@loader_path"`, `INSTALL_NAME_DIR ""`
+- Linux: `piper_plus` の `INSTALL_RPATH "$ORIGIN"`
+
+**本チケットで対応する項目:**
+- macOS: ONNX Runtime dylib の `install_name` を `@rpath/...` に修正
+- install 後の RPATH 検証テスト
 
 **ゴール:**
 
 | プラットフォーム | 設定 | 動作 |
 |----------------|------|------|
-| Linux | `INSTALL_RPATH "$ORIGIN"` | `lib/libpiper_plus.so` が同じ `lib/` 内の `libonnxruntime.so` を見つける |
-| macOS | `INSTALL_RPATH "@loader_path"` | `lib/libpiper_plus.dylib` が同じ `lib/` 内の `libonnxruntime.dylib` を見つける |
+| Linux | (M1-4 で設定済み) | `lib/libpiper_plus.so` が同じ `lib/` 内の `libonnxruntime.so` を見つける |
+| macOS | ORT install_name 修正 | `lib/libpiper_plus.dylib` が同じ `lib/` 内の `libonnxruntime.dylib` を RPATH 経由で見つける |
 | Windows | N/A (DLL 検索パスで解決) | `piper_plus.dll` と `onnxruntime.dll` が同じディレクトリにあれば動作 |
 
 ---
@@ -38,44 +43,11 @@ M3-1 で install レイアウトが整備された後、実際に install され
 |---------|---------|
 | `CMakeLists.txt` | `piper_plus` ターゲットの RPATH 設定修正、ONNX Runtime install name 修正 |
 
-### 2.2 piper_plus の RPATH 設定
+### 2.2 piper_plus の RPATH 設定 (M1-4 で対応済み)
 
-M1-4 で定義された `piper_plus` ターゲットに以下の RPATH 設定を追加/修正する:
+> `piper_plus` の RPATH 設定 (`INSTALL_RPATH`, `BUILD_RPATH`, `MACOSX_RPATH`, `INSTALL_NAME_DIR`) は M1-4 で対応済み。本チケットでの変更は不要。
 
-```cmake
-if(PIPER_PLUS_BUILD_SHARED)
-  if(APPLE)
-    set_target_properties(piper_plus PROPERTIES
-      MACOSX_RPATH TRUE
-      # 共有ライブラリ自身の位置基準で依存ライブラリを検索
-      INSTALL_RPATH "@loader_path"
-      # ビルドツリーでの ORT 検索パス
-      BUILD_RPATH "${CMAKE_CURRENT_BINARY_DIR}/ort/lib"
-      BUILD_WITH_INSTALL_RPATH FALSE
-      # install_name を @rpath ベースに設定
-      INSTALL_NAME_DIR ""
-    )
-  elseif(UNIX)
-    set_target_properties(piper_plus PROPERTIES
-      # Linux: ライブラリ自身の位置基準
-      INSTALL_RPATH "$ORIGIN"
-      BUILD_WITH_INSTALL_RPATH FALSE
-    )
-  endif()
-  # Windows は RPATH 不要 (DLL 検索パスで解決)
-endif()
-```
-
-**`@loader_path` vs `@executable_path` の違い:**
-
-| マクロ | 展開先 | 適用対象 |
-|--------|--------|---------|
-| `@executable_path` | 実行ファイル (`piper`) のディレクトリ | 実行ファイルの依存ライブラリ検索 |
-| `@loader_path` | ロード元 (`libpiper_plus.dylib`) のディレクトリ | 共有ライブラリの依存ライブラリ検索 |
-
-共有ライブラリが Flutter/Godot/Python から dlopen される場合、`@executable_path` はホストアプリ (Flutter Runner 等) のパスに展開されるため、同梱の ORT が見つからない。`@loader_path` なら `libpiper_plus.dylib` 自身と同じディレクトリの ORT を確実に見つけられる。
-
-### 2.3 ONNX Runtime の install_name 修正 (macOS)
+### 2.3 ONNX Runtime の install_name 修正 (macOS) --- 本チケットのスコープ
 
 install 時に ONNX Runtime の install_name を `@rpath` ベースに修正する。これにより `piper_plus` が RPATH で ORT を解決できる。
 
