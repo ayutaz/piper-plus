@@ -267,3 +267,106 @@ TEST(CApiStatusCodes, SpecificValuesMatchHeader) {
     EXPECT_EQ(PIPER_PLUS_ERR_TEXT, -4);
     EXPECT_EQ(PIPER_PLUS_ERR_BUSY, -5);
 }
+
+// ===== Phase 2: Streaming tests (M2-4) =====
+
+// --- Iterator: NULL safety ---
+
+TEST(CApiIterator, SynthStartNullEngine) {
+    int32_t rc = piper_plus_synth_start(nullptr, "hello", nullptr);
+    EXPECT_EQ(rc, PIPER_PLUS_ERR);
+    const char* err = piper_plus_get_last_error();
+    EXPECT_NE(err, nullptr);
+}
+
+TEST(CApiIterator, SynthStartNullText) {
+    int32_t rc = piper_plus_synth_start(nullptr, nullptr, nullptr);
+    EXPECT_EQ(rc, PIPER_PLUS_ERR);
+}
+
+TEST(CApiIterator, SynthStartEmptyText) {
+    int32_t rc = piper_plus_synth_start(nullptr, "", nullptr);
+    EXPECT_EQ(rc, PIPER_PLUS_ERR);
+}
+
+TEST(CApiIterator, SynthNextNullEngine) {
+    PiperPlusAudioChunk chunk = {};
+    int32_t rc = piper_plus_synth_next(nullptr, &chunk);
+    EXPECT_EQ(rc, PIPER_PLUS_ERR);
+}
+
+TEST(CApiIterator, SynthNextNullChunk) {
+    int32_t rc = piper_plus_synth_next(nullptr, nullptr);
+    EXPECT_EQ(rc, PIPER_PLUS_ERR);
+}
+
+// --- Iterator: state machine ---
+
+TEST(CApiIterator, SynthStartRepeatedNullEngine) {
+    // NULL engine should not corrupt state
+    int32_t rc1 = piper_plus_synth_start(nullptr, "hello", nullptr);
+    EXPECT_EQ(rc1, PIPER_PLUS_ERR);
+    int32_t rc2 = piper_plus_synth_start(nullptr, "hello", nullptr);
+    EXPECT_EQ(rc2, PIPER_PLUS_ERR);
+}
+
+// --- Callback: NULL safety ---
+
+// Helper: dummy callback for testing
+static void dummy_callback(const float*, int32_t, int32_t, void*) {}
+
+TEST(CApiCallback, StreamingNullEngine) {
+    int32_t rc = piper_plus_synthesize_streaming(
+        nullptr, "hello", nullptr, dummy_callback, nullptr);
+    EXPECT_EQ(rc, PIPER_PLUS_ERR);
+}
+
+TEST(CApiCallback, StreamingNullText) {
+    int32_t rc = piper_plus_synthesize_streaming(
+        nullptr, nullptr, nullptr, dummy_callback, nullptr);
+    EXPECT_EQ(rc, PIPER_PLUS_ERR);
+}
+
+TEST(CApiCallback, StreamingEmptyText) {
+    int32_t rc = piper_plus_synthesize_streaming(
+        nullptr, "", nullptr, dummy_callback, nullptr);
+    EXPECT_EQ(rc, PIPER_PLUS_ERR);
+}
+
+TEST(CApiCallback, StreamingNullCallback) {
+    int32_t rc = piper_plus_synthesize_streaming(
+        nullptr, "hello", nullptr, nullptr, nullptr);
+    EXPECT_EQ(rc, PIPER_PLUS_ERR);
+}
+
+// --- Audio chunk struct ---
+
+TEST(CApiAudioChunk, DefaultInitialization) {
+    PiperPlusAudioChunk chunk = {};
+    EXPECT_EQ(chunk.samples, nullptr);
+    EXPECT_EQ(chunk.num_samples, 0);
+    EXPECT_EQ(chunk.sample_rate, 0);
+    EXPECT_EQ(chunk.is_last, 0);
+}
+
+TEST(CApiAudioChunk, FieldsSettable) {
+    PiperPlusAudioChunk chunk = {};
+    float dummy[] = {0.1f, 0.2f, 0.3f};
+    chunk.samples = dummy;
+    chunk.num_samples = 3;
+    chunk.sample_rate = 22050;
+    chunk.is_last = 1;
+
+    EXPECT_FLOAT_EQ(chunk.samples[0], 0.1f);
+    EXPECT_FLOAT_EQ(chunk.samples[2], 0.3f);
+    EXPECT_EQ(chunk.num_samples, 3);
+    EXPECT_EQ(chunk.sample_rate, 22050);
+    EXPECT_EQ(chunk.is_last, 1);
+}
+
+TEST(CApiAudioChunk, ReasonableSize) {
+    // 64-bit: ptr(8) + 3*int32(12) = 20, padded to 24
+    // 32-bit: ptr(4) + 3*int32(12) = 16
+    EXPECT_GE(sizeof(PiperPlusAudioChunk), 16u);
+    EXPECT_LE(sizeof(PiperPlusAudioChunk), 32u);
+}
