@@ -160,6 +160,25 @@ PIPER_PLUS_API PiperPlusStatus piper_plus_synthesize_streaming(
     PiperPlusAudioCallback        callback,
     void                         *user_data);
 
+/* ===== Cancellable streaming callback (M5-7) ===== */
+
+/** Callback that returns 0 to continue, non-zero to abort. */
+typedef int (*PiperPlusAudioCallbackEx)(
+    const float *samples,
+    int32_t      num_samples,
+    int32_t      sample_rate,
+    void        *user_data);
+
+/** Synthesize with cancellable streaming.
+ *  If callback returns non-zero, synthesis stops and function returns
+ *  PIPER_PLUS_OK (not an error -- caller requested abort). */
+PIPER_PLUS_API PiperPlusStatus piper_plus_synthesize_streaming_ex(
+    PiperPlusEngine              *engine,
+    const char                   *text,
+    const PiperPlusSynthOptions  *opts,
+    PiperPlusAudioCallbackEx      callback,
+    void                         *user_data);
+
 /* ===== Custom dictionary (M4-1) ===== */
 
 PIPER_PLUS_API PiperPlusStatus piper_plus_load_custom_dict(

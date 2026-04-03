@@ -209,12 +209,13 @@ void outputTimingsAsTSV(const std::vector<PhonemeInfo> &timings,
 struct PhonemizeResult {
     std::vector<std::vector<Phoneme>> phonemes;        // Phonemes per sentence
     std::vector<std::vector<ProsodyFeature>> prosody;   // Prosody per sentence (optional)
+    std::optional<int64_t> detectedLanguageId;          // Auto-detected dominant language ID
 };
 
 /// Phonemize text into per-sentence phoneme sequences.
-/// @note May modify voice.synthesisConfig.languageId (auto-detect side effect).
-///       Caller must save/restore if needed.
-void phonemizeText(Voice &voice, const std::string &text,
+/// Pure: does not modify voice.  Auto-detected language is returned
+/// in result.detectedLanguageId.
+void phonemizeText(const Voice &voice, const std::string &text,
                    PhonemizeResult &result,
                    const std::vector<ProsodyFeature> *externalProsody = nullptr);
 

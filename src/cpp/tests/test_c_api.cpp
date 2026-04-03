@@ -554,3 +554,46 @@ TEST(CApiPhonemeResult, ZeroInitReserved) {
         EXPECT_EQ(result._reserved[i], 0);
     }
 }
+
+// ===== Phase 5: Cancellable streaming tests (M5-7) =====
+
+// Helper: cancellable callback that always continues
+static int dummy_callback_ex(const float*, int32_t, int32_t, void*) {
+    return 0;  // continue
+}
+
+TEST(CApiStreamingEx, NullEngine) {
+    PiperPlusStatus rc = piper_plus_synthesize_streaming_ex(
+        nullptr, "hello", nullptr, dummy_callback_ex, nullptr);
+    EXPECT_EQ(rc, PIPER_PLUS_ERR);
+    const char* err = piper_plus_get_last_error();
+    EXPECT_NE(err, nullptr);
+}
+
+TEST(CApiStreamingEx, NullCallback) {
+    PiperPlusStatus rc = piper_plus_synthesize_streaming_ex(
+        nullptr, "hello", nullptr, nullptr, nullptr);
+    EXPECT_EQ(rc, PIPER_PLUS_ERR);
+    const char* err = piper_plus_get_last_error();
+    EXPECT_NE(err, nullptr);
+}
+
+TEST(CApiStreamingEx, NullText) {
+    PiperPlusStatus rc = piper_plus_synthesize_streaming_ex(
+        nullptr, nullptr, nullptr, dummy_callback_ex, nullptr);
+    EXPECT_EQ(rc, PIPER_PLUS_ERR);
+}
+
+TEST(CApiStreamingEx, EmptyText) {
+    PiperPlusStatus rc = piper_plus_synthesize_streaming_ex(
+        nullptr, "", nullptr, dummy_callback_ex, nullptr);
+    EXPECT_EQ(rc, PIPER_PLUS_ERR);
+}
+
+TEST(CApiStreamingEx, WithOptsNullEngine) {
+    PiperPlusSynthOptions opts = piper_plus_default_options();
+    opts.noise_scale = 0.3f;
+    PiperPlusStatus rc = piper_plus_synthesize_streaming_ex(
+        nullptr, "hello", &opts, dummy_callback_ex, nullptr);
+    EXPECT_EQ(rc, PIPER_PLUS_ERR);
+}

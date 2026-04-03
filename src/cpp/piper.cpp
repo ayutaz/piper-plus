@@ -1261,11 +1261,6 @@ void textToAudio(PiperConfig &config, Voice &voice, std::string text,
                  const std::function<void()> &audioCallback,
                  const std::vector<ProsodyFeature> *externalProsody) {
 
-  // Save the original language ID to detect if the user explicitly set it.
-  // This prevents dominant-language auto-detection from overwriting an
-  // explicit user choice (M3 fix).
-  auto originalLanguageId = voice.synthesisConfig.languageId;
-
   std::size_t sentenceSilenceSamples = 0;
   if (voice.synthesisConfig.sentenceSilenceSeconds > 0) {
     sentenceSilenceSamples = (std::size_t)(
@@ -1273,20 +1268,17 @@ void textToAudio(PiperConfig &config, Voice &voice, std::string text,
         voice.synthesisConfig.sampleRate * voice.synthesisConfig.channels);
   }
 
-  // Phonemize text (delegated to phonemizeText).
-  // phonemizeText may modify voice.synthesisConfig.languageId (auto-detect).
-  // We restore it afterwards if the user explicitly set it.
+  // Phonemize text (pure -- does not modify voice).
   PhonemizeResult phonResult;
   phonemizeText(voice, text, phonResult, externalProsody);
   auto &phonemes = phonResult.phonemes;
   auto &allProsodyFeatures = phonResult.prosody;
   bool useProsody = !allProsodyFeatures.empty();
 
-  // Restore original language ID if the user explicitly set it (M3 fix).
-  // phonemizeText always auto-detects dominant language; if the caller
-  // had an explicit setting we must not overwrite it.
-  if (originalLanguageId.has_value()) {
-    voice.synthesisConfig.languageId = originalLanguageId;
+  // Apply auto-detected language only if the caller did not explicitly set one.
+  if (!voice.synthesisConfig.languageId.has_value() &&
+      phonResult.detectedLanguageId.has_value()) {
+    voice.synthesisConfig.languageId = phonResult.detectedLanguageId;
   }
 
   // Synthesize each sentence independently.
@@ -1494,8 +1486,6 @@ void textToAudioFloat(PiperConfig &config, Voice &voice, std::string text,
                       const std::function<void()> &audioCallback,
                       const std::vector<ProsodyFeature> *externalProsody) {
 
-  auto originalLanguageId = voice.synthesisConfig.languageId;
-
   std::size_t sentenceSilenceSamples = 0;
   if (voice.synthesisConfig.sentenceSilenceSeconds > 0) {
     sentenceSilenceSamples = (std::size_t)(
@@ -1503,14 +1493,17 @@ void textToAudioFloat(PiperConfig &config, Voice &voice, std::string text,
         voice.synthesisConfig.sampleRate * voice.synthesisConfig.channels);
   }
 
+  // Phonemize text (pure -- does not modify voice).
   PhonemizeResult phonResult;
   phonemizeText(voice, text, phonResult, externalProsody);
   auto &phonemes = phonResult.phonemes;
   auto &allProsodyFeatures = phonResult.prosody;
   bool useProsody = !allProsodyFeatures.empty();
 
-  if (originalLanguageId.has_value()) {
-    voice.synthesisConfig.languageId = originalLanguageId;
+  // Apply auto-detected language only if the caller did not explicitly set one.
+  if (!voice.synthesisConfig.languageId.has_value() &&
+      phonResult.detectedLanguageId.has_value()) {
+    voice.synthesisConfig.languageId = phonResult.detectedLanguageId;
   }
 
   // Synthesize each sentence independently.
@@ -1811,10 +1804,19 @@ std::vector<std::string> splitTextToSentences(
   static const std::regex japaneseSentenceBoundary(u8"([。！？、]+)");
   static const std::regex englishSentenceBoundary("([.!?,;:]+|\\s+(?:and|or|but|because|while|when|if|that|which)\\s+)");
 
+  // Multilingual pattern: JA/ZH fullwidth + EN/ES/FR/PT ASCII sentence-end punctuation.
+  // Note: usesOpenJTalk() returns true for MultilingualPhonemes too, so we must
+  // check phonemeType directly to avoid falling into the JA-only branch.
+  static const std::regex multilingualSentenceEnd(
+      u8"([。！？.!?]+|[…]+|[\\.]{3,})"
+  );
+
   const std::regex& sentenceBoundary =
-    (usesOpenJTalk(phonemeType))
-    ? japaneseSentenceBoundary
-    : englishSentenceBoundary;
+    (phonemeType == MultilingualPhonemes)
+    ? multilingualSentenceEnd
+    : (usesOpenJTalk(phonemeType))
+      ? japaneseSentenceBoundary
+      : englishSentenceBoundary;
 
   std::vector<std::string> chunks;
   std::sregex_token_iterator iter(text.begin(), text.end(), sentenceBoundary, {-1, 1});
@@ -1887,13 +1889,15 @@ static void crossfadeAudioChunks(
 }
 
 // Phonemize text into per-sentence phoneme sequences (public API).
-// May modify voice.synthesisConfig.languageId as a side effect (auto-detect).
-void phonemizeText(Voice &voice, const std::string &text,
+// Pure: does not modify voice.  Auto-detected language is returned
+// in result.detectedLanguageId.
+void phonemizeText(const Voice &voice, const std::string &text,
                    PhonemizeResult &result,
                    const std::vector<ProsodyFeature> *externalProsody) {
 
   result.phonemes.clear();
   result.prosody.clear();
+  result.detectedLanguageId = std::nullopt;
 
   // Parse text for [[ phonemes ]] notation
   auto textSegments = parsePhonemeNotation(text);
@@ -2096,17 +2100,15 @@ void phonemizeText(Voice &voice, const std::string &text,
           }
         }
 
-        // Set dominant language for lid.
-        // Note: this modifies voice.synthesisConfig.languageId as a side effect.
-        // Caller is responsible for saving/restoring if needed.
+        // Detect dominant language and store in result (no side effect on voice).
         if (!langSegments.empty()) {
           auto dominantLang = detectDominantLanguage(segment.text, detector);
           if (voice.modelConfig.languageIdMap &&
               voice.modelConfig.languageIdMap->count(dominantLang) > 0) {
-            voice.synthesisConfig.languageId =
-                (*voice.modelConfig.languageIdMap)[dominantLang];
+            result.detectedLanguageId =
+                voice.modelConfig.languageIdMap->at(dominantLang);
             spdlog::debug("Multilingual: auto-detected dominant language '{}' (lid={})",
-                          dominantLang, voice.synthesisConfig.languageId.value());
+                          dominantLang, result.detectedLanguageId.value());
           }
         }
 

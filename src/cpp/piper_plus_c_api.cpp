@@ -643,6 +643,87 @@ PIPER_PLUS_API PiperPlusStatus piper_plus_synthesize_streaming(
     }
 }
 
+// ===== M5-7: Cancellable streaming callback =====
+
+PIPER_PLUS_API PiperPlusStatus piper_plus_synthesize_streaming_ex(
+    PiperPlusEngine *engine,
+    const char *text,
+    const PiperPlusSynthOptions *opts,
+    PiperPlusAudioCallbackEx callback,
+    void *user_data)
+{
+    if (!engine) {
+        set_error("engine is NULL");
+        return PIPER_PLUS_ERR;
+    }
+    if (!text || text[0] == '\0') {
+        set_error("text is NULL or empty");
+        return PIPER_PLUS_ERR_TEXT;
+    }
+    if (!callback) {
+        set_error("callback is NULL");
+        return PIPER_PLUS_ERR;
+    }
+
+    // Start iterator (handles busy check internally)
+    PiperPlusStatus rc = piper_plus_synth_start(engine, text, opts);
+    if (rc != PIPER_PLUS_OK) {
+        return rc;
+    }
+
+    // Drive iterator, checking callback return value for abort
+    try {
+        PiperPlusAudioChunk chunk;
+        for (;;) {
+            rc = piper_plus_synth_next(engine, &chunk);
+
+            if (rc == PIPER_PLUS_ERR) {
+                return PIPER_PLUS_ERR;
+            }
+
+            // Deliver chunk via callback
+            if (chunk.num_samples > 0) {
+                int cbResult;
+                try {
+                    cbResult = callback(chunk.samples, chunk.num_samples,
+                                        chunk.sample_rate, user_data);
+                } catch (...) {
+                    // Callback threw - clean up via finish()
+                    engine->iterState.finish(engine->voice.synthesisConfig,
+                                             engine->inProgress);
+                    set_error("callback threw an exception");
+                    return PIPER_PLUS_ERR;
+                }
+
+                // Caller requested abort
+                if (cbResult != 0) {
+                    // If synth_next already marked done, state is already cleaned up
+                    if (rc != PIPER_PLUS_DONE) {
+                        engine->iterState.finish(engine->voice.synthesisConfig,
+                                                 engine->inProgress);
+                    }
+                    return PIPER_PLUS_OK;  // Not an error
+                }
+            }
+
+            if (rc == PIPER_PLUS_DONE) {
+                break;
+            }
+        }
+
+        return PIPER_PLUS_OK;
+
+    } catch (const std::exception &e) {
+        set_error(e.what());
+        engine->iterState.finish(engine->voice.synthesisConfig, engine->inProgress);
+        return PIPER_PLUS_ERR;
+    } catch (...) {
+        set_error("Unknown error in synthesize_streaming_ex");
+        engine->iterState.finish(engine->voice.synthesisConfig, engine->inProgress);
+        return PIPER_PLUS_ERR;
+    }
+}
+
 // ===== M4-1: Custom dictionary =====
 
 PIPER_PLUS_API PiperPlusStatus piper_plus_load_custom_dict(
@@ -748,9 +829,12 @@ PIPER_PLUS_API PiperPlusStatus piper_plus_phonemize(
         BusyGuard busy(engine->inProgress);
         ConfigGuard cfgGuard(engine->voice.synthesisConfig);
 
+        // Resolve explicit language to ID (affects defaultLatin selection inside phonemizeText)
+        std::optional<int64_t> explicitLangId;
         if (language && language[0] != '\0' && engine->voice.modelConfig.languageIdMap) {
             auto it = engine->voice.modelConfig.languageIdMap->find(language);
             if (it != engine->voice.modelConfig.languageIdMap->end()) {
+                explicitLangId = it->second;
                 engine->voice.synthesisConfig.languageId = it->second;
             }
         }
@@ -764,12 +848,20 @@ PIPER_PLUS_API PiperPlusStatus piper_plus_phonemize(
         piper::PhonemizeResult phonResult;
         piper::phonemizeText(engine->voice, processedText, phonResult);
 
-        // Detect language from current config
+        // Determine effective language ID: explicit > auto-detected > current config
+        std::optional<int64_t> effectiveLangId = explicitLangId;
+        if (!effectiveLangId && phonResult.detectedLanguageId) {
+            effectiveLangId = phonResult.detectedLanguageId;
+        }
+        if (!effectiveLangId) {
+            effectiveLangId = engine->voice.synthesisConfig.languageId;
+        }
+
+        // Reverse-lookup language code from effective ID
         engine->g2pLanguage = "unknown";
-        if (engine->voice.synthesisConfig.languageId &&
-            engine->voice.modelConfig.languageIdMap) {
+        if (effectiveLangId && engine->voice.modelConfig.languageIdMap) {
             for (const auto &[code, id] : *engine->voice.modelConfig.languageIdMap) {
-                if (id == *engine->voice.synthesisConfig.languageId) {
+                if (id == *effectiveLangId) {
                     engine->g2pLanguage = code;
                     break;
                 }
