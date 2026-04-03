@@ -157,103 +157,124 @@ Android NDK ツールチェインで `libpiper_plus.so` (arm64-v8a) をクロス
 - **見積り**: 小
 - **概要**: `piper_plus_c_api.cpp` の手動 SynthesisConfig save/restore (14 箇所) と `inProgress.store(false)` (17 箇所) を RAII クラスで自動化
 - **成果物**: ConfigGuard / BusyGuard クラス追加、手動管理コード全廃。既存テスト全 PASS のリファクタリングのみ
+- **変更ファイル**: `src/cpp/piper_plus_c_api.cpp`
 
 ### M5-2: 多言語文分割の改善
 - **見積り**: 中
 - **概要**: `splitTextToSentences()` が JA 正規表現のみで多言語テキストを分割していた問題を修正。`MultilingualPhonemes` 用の統合正規表現パターンで 6 言語全ての句読点を認識
 - **成果物**: `piper.cpp` に多言語統合正規表現パターン追加、ZH/FR/ES/PT テキストの文分割が正常動作
+- **変更ファイル**: `src/cpp/piper.cpp`
 
 ### M5-3: Iterator crossfade 対応
 - **見積り**: 中
 - **概要**: Iterator パターン (`synth_start` / `synth_next`) の文境界でのクリック音を crossfade 処理で解消。ワンショット合成と同等の音質をストリーミングでも実現
 - **成果物**: `IteratorState` に `prevTail` バッファ追加、10ms (220 サンプル @ 22050Hz) の線形 crossfade。Callback パターンにも自動適用
+- **変更ファイル**: `src/cpp/piper_plus_c_api.cpp`, `src/cpp/tests/test_c_api_integration.cpp`
 
 ### M5-4: multi_language.c サンプル追加
 - **見積り**: 小
 - **概要**: M3-6 で未作成だった多言語合成デモを `examples/c-api/multi_language.c` に追加。6 言語テキストの順次合成と `language_id` 自動検出のデモ
 - **成果物**: C99 互換サンプル、Makefile / CMakeLists.txt 統合、README 更新
+- **変更ファイル**: `examples/c-api/multi_language.c` (新規), `examples/c-api/Makefile`, `examples/c-api/CMakeLists.txt`, `examples/c-api/README.md`
 
 ### M5-5: num_threads ORT SessionOptions 接続
 - **見積り**: 小
 - **概要**: `PiperPlusConfig.num_threads` が宣言済みながら未接続だった問題を修正。`Ort::SessionOptions::SetIntraOpNumThreads()` に接続しスレッド数制御を有効化
 - **成果物**: `loadVoice` に `numThreads` パラメータ追加 (デフォルト引数で後方互換)、`num_threads=0` は ORT デフォルト維持
+- **変更ファイル**: `src/cpp/piper.hpp`, `src/cpp/piper.cpp`, `src/cpp/piper_plus_c_api.cpp`
 
 ### M5-6: CoreML / DirectML provider 対応
 - **見積り**: 小
 - **概要**: `PiperPlusConfig.provider` に `"coreml"` (macOS/iOS) と `"directml"` (Windows) を追加。`useCuda` フラグを `provider` 文字列に置換し ORT Execution Provider を統一的に管理
 - **成果物**: `loadVoice` の `useCuda` を `provider` 文字列に変更、不明 provider はエラー返却、`#ifdef` ガードでプラットフォーム分岐
+- **変更ファイル**: `src/cpp/piper.hpp`, `src/cpp/piper.cpp`, `src/cpp/piper_plus_c_api.cpp`, `src/cpp/piper_plus.h`
 
 ### M5-7: ストリーミング中断 API (synthesize_streaming_ex)
 - **見積り**: 小
 - **概要**: コールバック戻り値 (`int`: 0=continue, 非0=abort) で合成を途中中断できる `piper_plus_synthesize_streaming_ex()` を追加。既存の void 戻り値コールバック API は後方互換で維持
 - **成果物**: `PiperPlusAudioCallbackEx` typedef + `piper_plus_synthesize_streaming_ex` 関数。中断後もエンジン再利用可能
+- **変更ファイル**: `src/cpp/piper_plus.h`, `src/cpp/piper_plus_c_api.cpp`, `src/cpp/tests/test_c_api.cpp`
 
 ### M5-8: phonemizeText 副作用除去
 - **見積り**: 中
 - **概要**: `phonemizeText()` が `voice.synthesisConfig.languageId` を副作用として変更していた問題をリファクタリング。検出結果を `PhonemizeResult.detectedLanguageId` で返す純粋関数に変更
 - **成果物**: `phonemizeText` を `const Voice &` 化、C API の save/restore コード削除、`PhonemizeResult` に `detectedLanguageId` 追加
+- **変更ファイル**: `src/cpp/piper.hpp`, `src/cpp/piper.cpp`, `src/cpp/piper_plus_c_api.cpp`
 
 ### M5-9: SynthOptions ゼロ初期化対策
 - **見積り**: 小
 - **概要**: FFI 利用者が `memset` / `calloc` でゼロ初期化した `PiperPlusSynthOptions` を使用した場合に無音や異常音声が生成される問題を防止
 - **成果物**: `applySynthOptions()` で `noise_scale=0.0` / `length_scale=0.0` / `noise_w=0.0` をデフォルト値に自動置換
+- **変更ファイル**: `src/cpp/piper_plus_c_api.cpp`
 
 ### M5-10: getExeDir() 統一
 - **見積り**: 小
 - **概要**: `piper.cpp` と `model_manager.cpp` に重複定義されていた `getExeDir()` を `library_path.h/c` の `piper_plus_get_exe_dir()` に統一。既存の `piper_plus_get_library_dir()` (dladdr ベース) とは独立して共存
 - **成果物**: `library_path.h/c` に `piper_plus_get_exe_dir()` 追加、2 箇所の重複実装を削除
+- **変更ファイル**: `src/cpp/library_path.h`, `src/cpp/library_path.c`, `src/cpp/piper.cpp`, `src/cpp/model_manager.cpp`
 
 ### M5-11: Android armeabi-v7a / x86_64 対応
 - **見積り**: 中
 - **概要**: `android-build.yml` を `arm64-v8a` 単一から 3 ABI マトリクス (`arm64-v8a`, `armeabi-v7a`, `x86_64`) に拡張。Flutter Android の全主要デバイスカバレッジを実現
 - **成果物**: CI マトリクス化、ABI 別 ORT 抽出、3 ABI 統合 ZIP 成果物
+- **変更ファイル**: `.github/workflows/android-build.yml`
 
 ### M5-12: PiperPlusPhonemeResult._reserved 追加
 - **見積り**: 小
 - **概要**: `PiperPlusPhonemeResult` に `_reserved[4]` フィールドを追加し、他の構造体 (`PiperPlusConfig`, `PiperPlusSynthOptions`) と同等の ABI 拡張性を確保
 - **成果物**: ヘッダーに `_reserved[4]` 追加、`piper_plus_phonemize` でゼロ初期化
+- **変更ファイル**: `src/cpp/piper_plus.h`, `src/cpp/piper_plus_c_api.cpp`
 
 ### M5-13: ステータスコード enum 化
 - **見積り**: 小
 - **概要**: `#define` マクロで定義されていたステータスコードを `typedef enum PiperPlusStatus` に変更。デバッガでのシンボル名表示と型安全性を改善
 - **成果物**: 全関数の戻り値型を `PiperPlusStatus` に変更、`static_assert` で `int32_t` とのサイズ一致を保証。ABI 互換
+- **変更ファイル**: `src/cpp/piper_plus.h`, `src/cpp/piper_plus_c_api.cpp`
 
 ### M5-14: piper_plus_create を status + out_engine パターンに変更
 - **見積り**: 中
 - **概要**: `piper_plus_create()` の戻り値を `PiperPlusEngine*` から `PiperPlusStatus` に変更し、エンジンは `out_engine` で返却。`ERR_ORT` (-6) 追加で失敗原因の区別が可能に
 - **成果物**: API シグネチャ変更 (破壊的)、例外種別による `ERR_MODEL` / `ERR_CONFIG` / `ERR_ORT` 分岐、全テスト・サンプル更新
+- **変更ファイル**: `src/cpp/piper_plus.h`, `src/cpp/piper_plus_c_api.cpp`, `src/cpp/tests/test_c_api.cpp`, `src/cpp/tests/test_c_api_integration.cpp`, `examples/c-api/*.c`
 
 ### M5-15: CMakeLists.txt ファイル分割
 - **見積り**: 中
 - **概要**: 1,080 行超のルート `CMakeLists.txt` を機能単位で 8 ファイル (`cmake/*.cmake`) に分割し、ルートを ~50 行の `include()` に縮小
 - **成果物**: `cmake/CompilerSettings.cmake`, `ExternalDeps.cmake`, `OnnxRuntime.cmake`, `PiperCommon.cmake`, `PiperPlusShared.cmake`, `PiperExecutable.cmake`, `Testing.cmake`, `Install.cmake`
+- **変更ファイル**: `CMakeLists.txt`, `cmake/CompilerSettings.cmake` (新規), `cmake/ExternalDeps.cmake` (新規), `cmake/OnnxRuntime.cmake` (新規), `cmake/PiperCommon.cmake` (新規), `cmake/PiperPlusShared.cmake` (新規), `cmake/PiperExecutable.cmake` (新規), `cmake/Testing.cmake` (新規), `cmake/Install.cmake` (新規)
 
 ### M5-16: textToAudioStreaming Iterator 駆動移行
 - **見積り**: 大
 - **概要**: `piper.cpp` の `textToAudioStreaming()` 内部を Iterator 駆動に書き換え、`MultilingualPhonemes` デッドコード問題を根本解決。C API ストリーミングと内部実装を統一
 - **成果物**: `textToAudioStreaming` の Iterator 駆動化、デッドコード除去、CLI ストリーミング回帰なし
+- **変更ファイル**: `src/cpp/piper.cpp`, `src/cpp/piper.hpp`, `src/cpp/piper_plus_c_api.cpp`, `src/cpp/tests/test_c_api_integration.cpp`
 
 ### M5-17: cpp-tests.yml / ci.yml 重複解消
 - **見積り**: 小
 - **概要**: `cpp-tests.yml` と `ci.yml` の C++ テスト部分を reusable workflow (`_build-test-cpp.yml`) に抽出し、二重管理を解消
 - **成果物**: `_build-test-cpp.yml` 新規作成、両ワークフローから `uses:` で呼び出し
+- **変更ファイル**: `.github/workflows/_build-test-cpp.yml` (新規), `.github/workflows/cpp-tests.yml`, `.github/workflows/ci.yml`
 
 ### M5-18: Dart FFI サンプル
 - **見積り**: 中
 - **概要**: `examples/dart/` に Flutter での C API 利用リファレンスを作成。`dart:ffi` + `ffigen` によるバインディング生成、`NativeCallable.listener` でストリーミングを `Stream<Uint8List>` に変換
 - **成果物**: Dart プロジェクト一式 (pubspec.yaml, ffigen.yaml, 高レベル API ラッパー, ワンショット / ストリーミングデモ)
+- **変更ファイル**: `examples/dart/` (新規ディレクトリ一式: `pubspec.yaml`, `ffigen.yaml`, `lib/piper_plus_bindings.dart`, `lib/piper_plus.dart`, `example/main.dart`, `example/streaming.dart`)
 
 ### M5-19: Godot GDExtension サンプル
 - **見積り**: 中
 - **概要**: `examples/godot/` に C API 経由の GDExtension ラッパーを作成。godot-piper-plus のソースコピー方式 (25+ ファイル) から C API 方式 (~4 ファイル + SConstruct) への移行パスを提示
 - **成果物**: PiperTTS ノード (AudioStreamPlayer 派生)、SConstruct (pkg-config)、Godot デモプロジェクト
+- **変更ファイル**: `examples/godot/` (新規ディレクトリ一式: `SConstruct`, `src/piper_tts.h`, `src/piper_tts.cpp`, `src/register_types.cpp`, `demo/`)
 
 ### M5-20: Android AAR パッケージング
 - **見積り**: 大
 - **概要**: Gradle ベースの AAR パッケージで `implementation 'com.piperplus:piper-plus:x.y.z'` による Android 統合を実現。JNI ラッパーで C API を Kotlin API に公開
 - **成果物**: JNI ブリッジ、Kotlin 高レベル API (`PiperPlus.kt`)、AAR に .so + ORT + 辞書バンドル、サンプルアプリ
+- **変更ファイル**: `android/` (新規ディレクトリ一式: `piper-plus/build.gradle.kts`, JNI/Kotlin ソース, `example/`), `.github/workflows/` (AAR ビルド + publish ワークフロー)
 
 ### M5-21: 音声回帰テスト
 - **見積り**: 中
 - **概要**: C API 合成出力の deterministic ハッシュ比較による音声回帰テスト。リファクタリングや ORT バージョン更新による音質劣化を自動検出
 - **成果物**: `test_c_api_audio_regression.cpp`、`tests/fixtures/c-api/audio-regression-baseline.json`、`UPDATE_BASELINE=1` による更新メカニズム
+- **変更ファイル**: `src/cpp/tests/test_c_api_audio_regression.cpp` (新規), `tests/fixtures/c-api/audio-regression-baseline.json` (新規), `cmake/Testing.cmake`, `.github/workflows/cpp-tests.yml`
