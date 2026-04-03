@@ -295,6 +295,7 @@ int32_t piper_plus_synth_next(PiperPlusEngine *engine,
 | 文分割の粒度がワンショットと異なる | 中 | `splitTextToSentences()` は `textToAudioStreaming()` の文分割ロジックを使うため、ワンショットとは文の粒度が異なる可能性がある。ワンショットでは `textToAudio()` が全テキストを 1 つの合成単位として処理するのに対し、Iterator は文ごとに分離する。音質の微差は許容する |
 | 空文が `splitTextToSentences()` から返る可能性 | 低 | `synth_next` で空文はスキップし、次の文に進む |
 | `IteratorState` のメモリ消費 | 低 | 文リスト + 現在のチャンクバッファのみ。チャンクは 1 文分なので通常数 KB 程度 |
+| crossfade 非対応によるワンショットとの音質差 | 中 | `textToAudio` ベースの Iterator は文間の crossfade を行わない。`textToAudioStreaming()` (L1836-1844) は crossfade を実装しているが、Iterator はこのコードパスを使わない。そのため、文境界でのクリック音や不自然な接続が生じる可能性がある。対策として `sentence_silence_sec` (文間無音) を適切に設定することで接続部を滑らかにする。crossfade の Iterator 対応は Phase 4 候補として検討する (M2-6 後続タスクに記載) |
 
 ### 5.2 レビュー項目
 
