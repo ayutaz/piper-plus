@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🎤 piper-plus</title>
+    <title>piper-plus</title>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -177,20 +177,6 @@
             font-size: 14px;
             line-height: 1.5;
         }
-        .phoneme-list {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-            margin-top: 10px;
-        }
-        .phoneme {
-            background: #e8f5e9;
-            color: #2e7d32;
-            padding: 6px 12px;
-            border-radius: 20px;
-            font-size: 14px;
-            font-weight: 500;
-        }
         .feature-list {
             background: #fff3e0;
             border: 1px solid #ffe0b2;
@@ -231,73 +217,69 @@
             font-size: 14px;
         }
     </style>
-    <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.21.0/dist/ort.min.js"></script>
 </head>
 <body>
     <div class="container">
-        <h1>🎤 piper-plus</h1>
-        <p class="subtitle">WebAssemblyとONNX Runtimeを使用した6言語マルチリンガルニューラル音声合成</p>
-        
-        <div id="status" class="status info">
-            初期化中...
-        </div>
+        <h1>piper-plus</h1>
+        <p class="subtitle">WebAssembly + ONNX Runtime Web - 6 languages multilingual neural TTS</p>
+
+        <div id="status" class="status info"></div>
 
         <div class="feature-list">
-            <h3>📝 対応機能</h3>
+            <h3>Features</h3>
             <ul>
-                <li>🇯🇵 日本語音声合成（OpenJTalk WASM + Piperニューラルモデル）</li>
-                <li>🇺🇸 英語音声合成（@piper-plus/g2p + Piperニューラルモデル）</li>
-                <li>🇨🇳 中国語音声合成（@piper-plus/g2p + Piperニューラルモデル）</li>
-                <li>🇪🇸 スペイン語音声合成（@piper-plus/g2p + Piperニューラルモデル）</li>
-                <li>🇫🇷 フランス語音声合成（@piper-plus/g2p + Piperニューラルモデル）</li>
-                <li>🇧🇷 ポルトガル語音声合成（@piper-plus/g2p + Piperニューラルモデル）</li>
-                <li>🎯 完全ブラウザ実装（サーバー不要）</li>
-                <li>⚡ WebAssembly + ONNX Runtime Webによる高速処理</li>
+                <li>Japanese TTS (Rust WASM jpreprocess + Piper neural model)</li>
+                <li>English TTS (rule-based G2P + Piper neural model)</li>
+                <li>Chinese TTS (character-based + Piper neural model)</li>
+                <li>Spanish TTS (rule-based + Piper neural model)</li>
+                <li>French TTS (rule-based + Piper neural model)</li>
+                <li>Portuguese TTS (rule-based + Piper neural model)</li>
+                <li>Fully in-browser (no server required)</li>
+                <li>WebAssembly + ONNX Runtime Web</li>
             </ul>
         </div>
 
         <div class="language-selector">
-            <label>言語選択 / Language Selection</label>
+            <label>Language Selection</label>
             <div class="language-buttons">
-                <button class="lang-button active" data-lang="ja">🇯🇵 日本語</button>
-                <button class="lang-button" data-lang="en">🇺🇸 English</button>
-                <button class="lang-button" data-lang="zh">🇨🇳 中文</button>
-                <button class="lang-button" data-lang="es">🇪🇸 Español</button>
-                <button class="lang-button" data-lang="fr">🇫🇷 Français</button>
-                <button class="lang-button" data-lang="pt">🇧🇷 Português</button>
+                <button class="lang-button active" data-lang="ja">Japanese</button>
+                <button class="lang-button" data-lang="en">English</button>
+                <button class="lang-button" data-lang="zh">Chinese</button>
+                <button class="lang-button" data-lang="es">Spanish</button>
+                <button class="lang-button" data-lang="fr">French</button>
+                <button class="lang-button" data-lang="pt">Portuguese</button>
             </div>
         </div>
 
         <div class="language-info" id="languageInfo">
-            <h3>日本語：OpenJTalkによる音素化</h3>
-            <p>MeCab形態素解析とHTS音声合成エンジンを使用した高精度な日本語音素化</p>
+            <h3>Japanese: Rust WASM jpreprocess phonemizer</h3>
+            <p>High-accuracy Japanese phonemization using Rust WASM jpreprocess with built-in dictionary</p>
         </div>
 
-
         <div class="input-group">
-            <label for="inputText">テキスト入力 / Text Input</label>
+            <label for="inputText">Text Input</label>
             <div class="template-selector">
-                <label for="templateSelect">テンプレート選択 / Template Selection</label>
+                <label for="templateSelect">Template Selection</label>
                 <select id="templateSelect">
-                    <option value="">-- 自由入力 / Free Input --</option>
+                    <option value="">-- Free Input --</option>
                 </select>
             </div>
-            <textarea id="inputText" placeholder="ここにテキストを入力してください / Enter text here">こんにちは、世界！今日は良い天気ですね。</textarea>
+            <textarea id="inputText"></textarea>
         </div>
 
         <div class="button-group">
-            <button id="synthesizeBtn" disabled>🎵 音声合成 / Synthesize</button>
-            <button id="stopBtn" class="secondary" disabled>⏹️ 停止 / Stop</button>
+            <button id="synthesizeBtn" disabled>Synthesize</button>
+            <button id="stopBtn" class="secondary" disabled>Stop</button>
         </div>
 
         <div class="output-section" id="outputSection" style="display: none;">
-            <h2>出力結果 / Output</h2>
-            
+            <h2>Output</h2>
+
             <div class="output-group">
-                <label>音声 / Audio:</label>
+                <label>Audio:</label>
                 <audio id="audioPlayer" controls style="width: 100%;"></audio>
             </div>
-            
+
         </div>
     </div>
 
@@ -307,20 +289,115 @@
         let piper = null;
         let currentLanguage = 'ja';
 
+        // UI i18n — auto-detect browser language
+        const uiStrings = {
+            'ja': {
+                title: 'piper-plus',
+                subtitle: 'WebAssembly + ONNX Runtime Web — 6言語マルチリンガル ニューラル音声合成',
+                features: '特徴',
+                featureList: [
+                    '日本語 TTS (Rust WASM jpreprocess + Piper ニューラルモデル)',
+                    '英語 TTS (ルールベース G2P + Piper ニューラルモデル)',
+                    '中国語 TTS (文字ベース + Piper ニューラルモデル)',
+                    'スペイン語 TTS (ルールベース + Piper ニューラルモデル)',
+                    'フランス語 TTS (ルールベース + Piper ニューラルモデル)',
+                    'ポルトガル語 TTS (ルールベース + Piper ニューラルモデル)',
+                    'ブラウザ内で完結 (サーバー不要)',
+                    'WebAssembly + ONNX Runtime Web',
+                ],
+                langSelection: '言語選択',
+                langNames: { ja: '日本語', en: '英語', zh: '中国語', es: 'スペイン語', fr: 'フランス語', pt: 'ポルトガル語' },
+                textInput: 'テキスト入力',
+                templateSelection: 'テンプレート選択',
+                freeInput: '-- 自由入力 --',
+                synthesize: '音声合成',
+                stop: '停止',
+                output: '出力',
+                audio: '音声:',
+                initializing: '初期化中...',
+                loadingOrt: 'onnxruntime-web を読み込み中...',
+                loadingModel: 'PiperPlus を初期化中 (モデルDL + WASM 音素化)...',
+                ready: '準備完了！',
+                synthesizing: '音声を合成中...',
+                done: '完了',
+                error: '初期化エラー',
+            },
+            'en': {
+                title: 'piper-plus',
+                subtitle: 'WebAssembly + ONNX Runtime Web - 6 languages multilingual neural TTS',
+                features: 'Features',
+                featureList: [
+                    'Japanese TTS (Rust WASM jpreprocess + Piper neural model)',
+                    'English TTS (rule-based G2P + Piper neural model)',
+                    'Chinese TTS (character-based + Piper neural model)',
+                    'Spanish TTS (rule-based + Piper neural model)',
+                    'French TTS (rule-based + Piper neural model)',
+                    'Portuguese TTS (rule-based + Piper neural model)',
+                    'Fully in-browser (no server required)',
+                    'WebAssembly + ONNX Runtime Web',
+                ],
+                langSelection: 'Language Selection',
+                langNames: { ja: 'Japanese', en: 'English', zh: 'Chinese', es: 'Spanish', fr: 'French', pt: 'Portuguese' },
+                textInput: 'Text Input',
+                templateSelection: 'Template Selection',
+                freeInput: '-- Free Input --',
+                synthesize: 'Synthesize',
+                stop: 'Stop',
+                output: 'Output',
+                audio: 'Audio:',
+                initializing: 'Initializing...',
+                loadingOrt: 'Loading onnxruntime-web...',
+                loadingModel: 'Initializing PiperPlus (downloading model + WASM phonemizer)...',
+                ready: 'Ready!',
+                synthesizing: 'Synthesizing...',
+                done: 'Done',
+                error: 'Initialization error',
+            }
+        };
+
+        // Detect browser UI language (ja → 'ja', others → 'en')
+        const browserLang = (navigator.language || '').slice(0, 2);
+        const ui = uiStrings[browserLang] || uiStrings['en'];
+
+        // Apply UI strings to static HTML elements
+        function applyUiStrings() {
+            document.querySelector('h1').textContent = ui.title;
+            document.querySelector('.subtitle').textContent = ui.subtitle;
+            document.querySelector('.feature-list h3').textContent = ui.features;
+            const featureItems = document.querySelectorAll('.feature-list li');
+            ui.featureList.forEach((text, i) => { if (featureItems[i]) featureItems[i].textContent = text; });
+            document.querySelector('.language-selector > label').textContent = ui.langSelection;
+            document.querySelectorAll('.lang-button').forEach(btn => {
+                const lang = btn.getAttribute('data-lang');
+                if (ui.langNames[lang]) btn.textContent = ui.langNames[lang];
+            });
+            document.querySelector('.input-group > label').textContent = ui.textInput;
+            document.querySelector('.template-selector > label').textContent = ui.templateSelection;
+            document.querySelector('#templateSelect option').textContent = ui.freeInput;
+            document.getElementById('synthesizeBtn').textContent = ui.synthesize;
+            document.getElementById('stopBtn').textContent = ui.stop;
+            document.querySelector('.output-section h2').textContent = ui.output;
+            document.querySelector('.output-group > label').textContent = ui.audio;
+            document.documentElement.lang = browserLang === 'ja' ? 'ja' : 'en';
+            document.getElementById('status').textContent = ui.initializing;
+            document.getElementById('inputText').placeholder = ui.textInput;
+        }
+        applyUiStrings();
+
         const languageConfigs = {
             'ja': {
-                name: '日本語',
-                testText: 'こんにちは、世界！今日は良い天気ですね。',
+                name: 'Japanese',
+                testText: 'こんにちは、今日はとても良い天気ですね。',
                 templates: [
-                    'こんにちは、世界！',
-                    '今日は良い天気ですね。',
-                    'OpenJTalkとPiperを使った音声合成のデモです。',
-                    '日本語の音声合成は、とても自然に聞こえます。',
-                    '桜の花が美しく咲いています。'
+                    'こんにちは、今日はとても良い天気ですね。',
+                    'これはPiper Plusの音声合成デモです。',
+                    'ニューラル音声合成はとても自然に聞こえます。',
+                    '桜の花が美しく咲いています。',
+                    '東京タワーは東京のシンボルです。'
                 ]
             },
             'en': {
-                name: '英語',
+                name: 'English',
                 testText: 'Hello world! This is a test of the Piper text to speech system.',
                 templates: [
                     'Hello world!',
@@ -331,44 +408,40 @@
                 ]
             },
             'zh': {
-                name: '中国語',
-                testText: '你好，今天天气非常好。我们一起去散步吧。',
+                name: 'Chinese',
+                testText: '你好，今天天气非常好。',
                 templates: [
                     '你好，今天天气非常好。',
-                    '我们一起去散步吧。',
-                    '欢迎来到语音合成演示。',
-                    '中文语音合成听起来很自然。',
-                    '春天的花开得很美丽。'
+                    '欢迎使用语音合成演示。',
+                    '中文语音合成听起来非常自然。',
+                    '春天的花开得很美。'
                 ]
             },
             'es': {
-                name: 'スペイン語',
-                testText: 'Hola, ¿cómo estás hoy? El clima es hermoso, vamos a dar un paseo.',
+                name: 'Spanish',
+                testText: 'Hola, el tiempo es hermoso, vamos a dar un paseo.',
                 templates: [
-                    '¡Hola, mundo!',
-                    'Hola, ¿cómo estás hoy? El clima es hermoso, vamos a dar un paseo.',
+                    'Hola, el tiempo es hermoso, vamos a dar un paseo.',
                     'Bienvenido a la demostración de síntesis de voz.',
                     'La síntesis de voz en español suena muy natural.',
                     'Las flores de primavera son muy hermosas.'
                 ]
             },
             'fr': {
-                name: 'フランス語',
-                testText: 'Bonjour, comment allez-vous aujourd\'hui? Il fait beau, allons nous promener.',
+                name: 'French',
+                testText: 'Bonjour, comment allez-vous aujourd\'hui?',
                 templates: [
-                    'Bonjour, le monde!',
                     'Bonjour, comment allez-vous aujourd\'hui?',
-                    'Bienvenue à la démonstration de synthèse vocale.',
-                    'La synthèse vocale en français sonne très naturelle.',
+                    'Bienvenue dans la démonstration de synthèse vocale.',
+                    'La synthèse vocale en français sonne très naturellement.',
                     'Les fleurs du printemps sont très belles.'
                 ]
             },
             'pt': {
-                name: 'ポルトガル語',
-                testText: 'Olá, como você está hoje? O tempo está lindo, vamos dar um passeio.',
+                name: 'Portuguese',
+                testText: 'Olá, como você está hoje?',
                 templates: [
-                    'Olá, mundo!',
-                    'Olá, como você está hoje? O tempo está lindo, vamos dar um passeio.',
+                    'Olá, como você está hoje?',
                     'Bem-vindo à demonstração de síntese de voz.',
                     'A síntese de voz em português soa muito natural.',
                     'As flores da primavera são muito bonitas.'
@@ -385,20 +458,36 @@
         const templateSelect = document.getElementById('templateSelect');
         const languageInfo = document.getElementById('languageInfo');
 
+        // Helper: load a script tag dynamically
+        function loadScript(src) {
+            return new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = src;
+                script.onload = resolve;
+                script.onerror = reject;
+                document.head.appendChild(script);
+            });
+        }
+
         // Initialize
         async function init() {
             try {
-                updateStatus('初期化中...');
+                updateStatus(ui.loadingOrt);
+
+                // Load onnxruntime-web from CDN
+                await loadScript('https://cdn.jsdelivr.net/npm/onnxruntime-web@1.21.0/dist/ort.min.js');
+
+                updateStatus(ui.loadingModel);
 
                 piper = await PiperPlus.initialize({
-                    model: 'ayousanz/piper-plus-tsukuyomi-chan',
+                    model: 'tsukuyomi',
                     ort: globalThis.ort,
-                    onProgress: ({ stage, message }) => {
-                        updateStatus(message);
+                    onProgress: ({ stage, progress, message }) => {
+                        updateStatus(`[${stage}] ${message} (${Math.round(progress * 100)}%)`);
                     }
                 });
 
-                updateStatus('準備完了！', 'success');
+                updateStatus(ui.ready, 'success');
                 synthesizeBtn.disabled = false;
 
                 // Initialize templates for default language
@@ -409,7 +498,7 @@
 
             } catch (error) {
                 console.error('Initialization failed:', error);
-                updateStatus(`初期化エラー: ${error.message}`, 'error');
+                updateStatus(`${ui.error}: ${error.message}`, 'error');
             }
         }
 
@@ -469,15 +558,15 @@
             // Update language info
             updateLanguageInfo(lang);
 
-            updateStatus('準備完了！', 'success');
+            updateStatus('Ready!', 'success');
         }
 
         // Update templates
         function updateTemplates(lang) {
             const config = languageConfigs[lang];
-            templateSelect.innerHTML = '<option value="">-- 自由入力 / Free Input --</option>';
+            templateSelect.innerHTML = '<option value="">-- Free Input --</option>';
 
-            config.templates.forEach((template, index) => {
+            config.templates.forEach((template) => {
                 const option = document.createElement('option');
                 option.value = template;
                 option.textContent = template;
@@ -489,28 +578,28 @@
         function updateLanguageInfo(lang) {
             const langInfoMap = {
                 'ja': {
-                    title: '日本語：OpenJTalk WASMによる音素化',
-                    desc: 'MeCab形態素解析とHTS音声合成エンジンを使用した高精度な日本語音素化'
+                    title: 'Japanese: Rust WASM jpreprocess phonemizer',
+                    desc: 'High-accuracy Japanese phonemization using Rust WASM jpreprocess with built-in dictionary'
                 },
                 'en': {
-                    title: '英語：IPA規則ベースG2Pによる音声合成',
-                    desc: '@piper-plus/g2p 規則ベースG2PとPiperニューラル音声合成'
+                    title: 'English: Rule-based G2P + Piper neural synthesis',
+                    desc: 'English phonemization using rule-based G2P and Piper neural speech synthesis'
                 },
                 'zh': {
-                    title: '中国語：IPA規則ベースG2Pによる音声合成',
-                    desc: '@piper-plus/g2p 規則ベースG2PとPiperニューラル音声合成'
+                    title: 'Chinese: Character-based + Piper neural synthesis',
+                    desc: 'Chinese phonemization using character-based approach and Piper neural speech synthesis'
                 },
                 'es': {
-                    title: 'スペイン語：IPA規則ベースG2Pによる音声合成',
-                    desc: '@piper-plus/g2p 規則ベースG2PとPiperニューラル音声合成'
+                    title: 'Spanish: Rule-based + Piper neural synthesis',
+                    desc: 'Spanish phonemization using rule-based approach and Piper neural speech synthesis'
                 },
                 'fr': {
-                    title: 'フランス語：IPA規則ベースG2Pによる音声合成',
-                    desc: '@piper-plus/g2p 規則ベースG2PとPiperニューラル音声合成'
+                    title: 'French: Rule-based + Piper neural synthesis',
+                    desc: 'French phonemization using rule-based approach and Piper neural speech synthesis'
                 },
                 'pt': {
-                    title: 'ポルトガル語：IPA規則ベースG2Pによる音声合成',
-                    desc: '@piper-plus/g2p 規則ベースG2PとPiperニューラル音声合成'
+                    title: 'Portuguese: Rule-based + Piper neural synthesis',
+                    desc: 'Portuguese phonemization using rule-based approach and Piper neural speech synthesis'
                 }
             };
             const info = langInfoMap[lang] || langInfoMap['ja'];
@@ -524,29 +613,27 @@
         async function synthesize() {
             const text = inputText.value.trim();
             if (!text) {
-                updateStatus('テキストを入力してください。', 'error');
+                updateStatus('Please enter text.', 'error');
                 return;
             }
 
             try {
-                updateStatus('音声合成中...');
+                updateStatus(ui.synthesizing);
                 synthesizeBtn.disabled = true;
 
-                const audioResult = await piper.synthesize(text, {
-                    language: currentLanguage
-                });
+                const audio = await piper.synthesize(text, { language: currentLanguage });
 
-                // Create WAV blob and play via <audio> element
-                const wavBlob = audioResult.toBlob();
+                // Use AudioResult.toBlob() for playback via <audio> element
+                const wavBlob = audio.toBlob();
                 const audioUrl = URL.createObjectURL(wavBlob);
                 audioPlayer.src = audioUrl;
 
                 outputSection.style.display = 'block';
-                updateStatus('合成完了！', 'success');
+                updateStatus(ui.done, 'success');
 
             } catch (error) {
                 console.error('Synthesis failed:', error);
-                updateStatus(`合成エラー: ${error.message}`, 'error');
+                updateStatus(`Synthesis error: ${error.message}`, 'error');
             } finally {
                 synthesizeBtn.disabled = false;
             }

@@ -1,0 +1,51 @@
+[package]
+name = "piper-plus-wasm"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "WASM phonemizer for Piper Plus TTS — 8-language G2P with bundled NAIST-JDIC dictionary"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+default = []
+multilingual = ["ja", "ko", "es", "fr", "pt", "sv"]
+multilingual-external = ["ja-external", "ko", "es", "fr", "pt", "sv"]
+ja = ["piper-plus-g2p/naist-jdic"]
+ja-external = ["piper-plus-g2p/japanese"]
+ko = []
+es = []
+fr = []
+pt = []
+sv = []
+
+[dependencies]
+wasm-bindgen = "0.2"
+js-sys = "0.3"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+piper-plus = { path = "../piper-core", default-features = false }
+piper-plus-g2p = { path = "../piper-plus-g2p", default-features = false }
+web-sys = "0.3"
+console_error_panic_hook = "0.1"
+log = "0.4"
+wasm-logger = "0.2"
+
+[dev-dependencies]
+wasm-bindgen-test = "0.3"
+
+# wasm-pack build --release uses the standard [profile.release] from the
+# workspace Cargo.toml for Rust compiler flags, plus [package.metadata.wasm-pack.profile.release]
+# below for the post-build wasm-opt pass.
+#
+# wasm-opt: '-Os' balances size and speed. The binary is 96% dictionary data
+# (NAIST-JDIC), so code-level optimization has minimal impact on total size.
+# '-Oz' would degrade runtime performance for negligible size savings.
+# '-O3' would optimize speed but slightly increase code size.
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = ['-Os']

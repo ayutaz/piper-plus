@@ -139,72 +139,41 @@
             line-height: 1.5;
             border: 1px solid #e9ecef;
         }
-        .phoneme-list {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-            margin-top: 10px;
-        }
-        .phoneme {
-            background: #e8f5e9;
-            color: #2e7d32;
-            padding: 6px 12px;
-            border-radius: 20px;
-            font-size: 14px;
-            font-weight: 500;
-        }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>Simple Multilingual TTS Demo</h1>
-        <p class="subtitle">簡易多言語音声合成デモ - 日本語・英語・中国語・スペイン語・フランス語・ポルトガル語</p>
-        
+        <p class="subtitle">Simple multilingual speech synthesis demo - JA / EN / ZH / ES / FR / PT</p>
+
         <div id="status" class="status info">
-            初期化中...
+            Initializing...
         </div>
 
         <div class="language-selector">
-            <label>言語選択 / Language Selection</label>
+            <label>Language Selection</label>
             <div class="language-buttons">
-                <button class="lang-button active" data-lang="ja">
-                    🇯🇵 日本語
-                </button>
-                <button class="lang-button" data-lang="en">
-                    🇺🇸 English
-                </button>
-                <button class="lang-button" data-lang="zh">
-                    🇨🇳 中文
-                </button>
-                <button class="lang-button" data-lang="es">
-                    🇪🇸 Español
-                </button>
-                <button class="lang-button" data-lang="fr">
-                    🇫🇷 Français
-                </button>
-                <button class="lang-button" data-lang="pt">
-                    🇧🇷 Português
-                </button>
+                <button class="lang-button active" data-lang="ja">Japanese</button>
+                <button class="lang-button" data-lang="en">English</button>
+                <button class="lang-button" data-lang="zh">Chinese</button>
+                <button class="lang-button" data-lang="es">Spanish</button>
+                <button class="lang-button" data-lang="fr">French</button>
+                <button class="lang-button" data-lang="pt">Portuguese</button>
             </div>
         </div>
 
         <div class="input-group">
-            <label for="inputText">テキスト入力 / Text Input</label>
-            <textarea id="inputText" placeholder="ここにテキストを入力してください / Enter text here">こんにちは、今日はとても良い天気ですね。散歩に出かけましょう。</textarea>
+            <label for="inputText">Text Input</label>
+            <textarea id="inputText" placeholder="Enter text here">こんにちは、今日はとても良い天気ですね。</textarea>
         </div>
 
         <div class="button-group">
-            <button id="generateBtn" disabled>音声生成 / Generate</button>
-            <button id="clearBtn" style="background: #757575;">クリア / Clear</button>
+            <button id="generateBtn" disabled>Generate</button>
+            <button id="clearBtn" style="background: #757575;">Clear</button>
         </div>
 
         <div class="output-section" id="outputSection" style="display: none;">
             <h2>Results</h2>
-            
-            <div class="output-group">
-                <label>Phonemes:</label>
-                <div id="phonemeOutput" class="phoneme-list"></div>
-            </div>
 
             <div class="output-group">
                 <label>Audio:</label>
@@ -218,7 +187,6 @@
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.21.0/dist/ort.min.js"></script>
     <script type="module">
         import { PiperPlus } from '../../src/index.js';
 
@@ -230,9 +198,28 @@
         const clearBtn = document.getElementById('clearBtn');
         const inputText = document.getElementById('inputText');
         const outputSection = document.getElementById('outputSection');
-        const phonemeOutput = document.getElementById('phonemeOutput');
         const debugOutput = document.getElementById('debugOutput');
         const audioPlayer = document.getElementById('audioPlayer');
+
+        const sampleTexts = {
+            'ja': 'こんにちは、今日はとても良い天気ですね。',
+            'en': 'Hello world! This is a test of the Piper text to speech system.',
+            'zh': '你好，今天天气非常好。',
+            'es': '\u00a1Hola, mundo! Hoy hace un d\u00eda muy bonito.',
+            'fr': 'Bonjour, comment allez-vous aujourd\'hui?',
+            'pt': 'Ol\u00e1, como voc\u00ea est\u00e1 hoje?'
+        };
+
+        // Helper: load a script tag dynamically
+        function loadScript(src) {
+            return new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = src;
+                script.onload = resolve;
+                script.onerror = reject;
+                document.head.appendChild(script);
+            });
+        }
 
         // Language buttons
         document.querySelectorAll('.lang-button').forEach(btn => {
@@ -242,22 +229,27 @@
         // Initialize
         async function init() {
             try {
-                updateStatus('PiperPlusを初期化しています...');
+                updateStatus('Loading onnxruntime-web...');
+
+                // Load ONNX Runtime from CDN
+                await loadScript('https://cdn.jsdelivr.net/npm/onnxruntime-web@1.21.0/dist/ort.min.js');
+
+                updateStatus('Initializing PiperPlus...');
 
                 piper = await PiperPlus.initialize({
-                    model: 'ayousanz/piper-plus-tsukuyomi-chan',
+                    model: 'tsukuyomi',
                     ort: globalThis.ort,
-                    onProgress: ({ stage, message }) => {
-                        updateStatus(message);
+                    onProgress: ({ stage, progress, message }) => {
+                        updateStatus(`[${stage}] ${message} (${Math.round(progress * 100)}%)`);
                     }
                 });
 
-                updateStatus('準備完了！', 'success');
+                updateStatus('Ready!', 'success');
                 generateBtn.disabled = false;
 
             } catch (error) {
                 console.error('Initialization failed:', error);
-                updateStatus(`初期化エラー: ${error.message}`, 'error');
+                updateStatus(`Initialization error: ${error.message}`, 'error');
             }
         }
 
@@ -271,17 +263,9 @@
             });
 
             // Update example text
-            const sampleTexts = {
-                'ja': 'こんにちは、今日はとても良い天気ですね。散歩に出かけましょう。',
-                'en': 'Hello, how are you today? The weather is beautiful, let\'s go for a walk.',
-                'zh': '你好，今天天气非常好。我们一起去散步吧。',
-                'es': 'Hola, \u00bfc\u00f3mo est\u00e1s hoy? El clima es hermoso, vamos a dar un paseo.',
-                'fr': "Bonjour, comment allez-vous aujourd'hui? Il fait beau, allons nous promener.",
-                'pt': 'Ol\u00e1, como voc\u00ea est\u00e1 hoje? O tempo est\u00e1 lindo, vamos dar um passeio.'
-            };
             inputText.value = sampleTexts[lang] || sampleTexts['en'];
 
-            updateStatus('準備完了！', 'success');
+            updateStatus('Ready!', 'success');
 
             // Clear output
             clearOutput();
@@ -291,42 +275,35 @@
         async function generate() {
             const text = inputText.value.trim();
             if (!text) {
-                updateStatus('テキストを入力してください。', 'error');
+                updateStatus('Please enter text.', 'error');
                 return;
             }
 
             try {
-                updateStatus('音声合成中...');
+                updateStatus('Synthesizing...');
                 generateBtn.disabled = true;
 
-                const audioResult = await piper.synthesize(text, {
-                    language: currentLanguage
-                });
+                const audio = await piper.synthesize(text, { language: currentLanguage });
 
-                // Display debug info
-                debugOutput.textContent = JSON.stringify({
-                    language: currentLanguage,
-                    text: text,
-                    audioSamples: audioResult.samples.length,
-                    duration: audioResult.duration.toFixed(2) + ' seconds',
-                    sampleRate: audioResult.sampleRate,
-                    modelConfig: {
-                        sampleRate: piper.config.audio.sample_rate,
-                        numSymbols: piper.config.num_symbols,
-                    }
-                }, null, 2);
-
-                // Create WAV blob and play via <audio> element
-                const wavBlob = audioResult.toBlob();
+                // Display audio
+                const wavBlob = audio.toBlob();
                 const audioUrl = URL.createObjectURL(wavBlob);
                 audioPlayer.src = audioUrl;
 
+                // Debug info
+                debugOutput.textContent = JSON.stringify({
+                    language: currentLanguage,
+                    text: text,
+                    duration: audio.duration.toFixed(2) + ' seconds',
+                    sampleRate: audio.sampleRate
+                }, null, 2);
+
                 outputSection.style.display = 'block';
-                updateStatus('生成完了！', 'success');
+                updateStatus('Generation complete!', 'success');
 
             } catch (error) {
                 console.error('Generation failed:', error);
-                updateStatus(`生成エラー: ${error.message}`, 'error');
+                updateStatus(`Generation error: ${error.message}`, 'error');
             } finally {
                 generateBtn.disabled = false;
             }
@@ -334,8 +311,8 @@
 
         // Clear output
         function clearOutput() {
+            inputText.value = '';
             outputSection.style.display = 'none';
-            phonemeOutput.innerHTML = '';
             debugOutput.textContent = '';
             audioPlayer.src = '';
         }
@@ -348,10 +325,7 @@
 
         // Event listeners
         generateBtn.addEventListener('click', generate);
-        clearBtn.addEventListener('click', () => {
-            inputText.value = '';
-            clearOutput();
-        });
+        clearBtn.addEventListener('click', clearOutput);
 
         // Initialize on load
         init();

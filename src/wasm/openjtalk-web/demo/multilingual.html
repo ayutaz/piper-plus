@@ -157,20 +157,6 @@
             line-height: 1.5;
             border: 1px solid #e9ecef;
         }
-        .phoneme-list {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-            margin-top: 10px;
-        }
-        .phoneme {
-            background: #e8f5e9;
-            color: #2e7d32;
-            padding: 6px 12px;
-            border-radius: 20px;
-            font-size: 14px;
-            font-weight: 500;
-        }
         .examples {
             margin-top: 20px;
         }
@@ -209,195 +195,150 @@
 <body>
     <div class="container">
         <h1>Multilingual TTS WebAssembly Demo</h1>
-        <p class="subtitle">多言語対応音声合成エンジン - 日本語（OpenJTalk）・英語（eSpeak-ng）</p>
-        
+        <p class="subtitle">Multilingual speech synthesis engine - PiperPlus (Rust WASM)</p>
+
         <div id="status" class="status info">
-            初期化中... <span class="loading-spinner"></span>
+            Initializing... <span class="loading-spinner"></span>
         </div>
 
         <div class="language-selector">
-            <label>言語選択 / Language Selection</label>
+            <label>Language Selection</label>
             <div class="language-buttons">
-                <button class="lang-button active" data-lang="ja" data-model="multilingual-test-medium">
-                    🇯🇵 日本語
+                <button class="lang-button active" data-lang="ja">
+                    Japanese
                 </button>
-                <button class="lang-button" data-lang="en" data-model="multilingual-test-medium">
-                    🇺🇸 English
+                <button class="lang-button" data-lang="en">
+                    English
                 </button>
             </div>
             <div class="model-info" id="modelInfo">
-                モデル: multilingual-test-medium.onnx (OpenJTalk)
+                Phonemizer: PiperPlus (Rust WASM) | Model: tsukuyomi (HuggingFace auto-download)
             </div>
         </div>
 
         <div class="input-group">
-            <label for="inputText">テキスト入力 / Text Input</label>
-            <textarea id="inputText" placeholder="ここにテキストを入力してください / Enter text here">今日は良い天気です。</textarea>
+            <label for="inputText">Text Input</label>
+            <textarea id="inputText" placeholder="Enter text here">こんにちは、今日はとても良い天気ですね。</textarea>
         </div>
 
         <div class="button-group">
-            <button id="generateBtn" disabled>音声生成 / Generate</button>
-            <button id="clearBtn" class="secondary">クリア / Clear</button>
+            <button id="generateBtn" disabled>Generate</button>
+            <button id="clearBtn" class="secondary">Clear</button>
         </div>
 
         <div class="examples">
-            <label>例文 / Examples:</label>
+            <label>Examples:</label>
             <div id="exampleButtons">
                 <!-- Examples will be populated based on selected language -->
             </div>
         </div>
 
         <div class="output-section" id="outputSection" style="display: none;">
-            <h2>生成結果 / Results</h2>
-            
-            <div class="output-group">
-                <label>音素列 / Phonemes:</label>
-                <div id="phonemeOutput" class="phoneme-list"></div>
-            </div>
+            <h2>Results</h2>
 
             <div class="output-group">
-                <label>音声 / Audio:</label>
+                <label>Audio:</label>
                 <audio id="audioPlayer" controls style="width: 100%;"></audio>
             </div>
 
             <div class="output-group">
-                <label>詳細 / Details:</label>
+                <label>Details:</label>
                 <pre id="detailsOutput"></pre>
             </div>
         </div>
     </div>
 
     <script type="module">
-        import { UnifiedPhonemizer } from '../src/unified_api.js';
-        
+        import { PiperPlus } from '../src/index.js';
+
         // Example texts for different languages
         const examples = {
             'ja': [
                 { text: 'こんにちは、世界！', label: '挨拶' },
-                { text: '人工知能による音声合成技術', label: '技術用語' },
-                { text: '東京スカイツリーの高さは634メートルです。', label: '数字' },
+                { text: 'AI音声合成技術はとても進歩しています。', label: '技術' },
+                { text: '東京スカイツリーは634メートルです。', label: '数字' },
                 { text: '吾輩は猫である。名前はまだ無い。', label: '文学' }
             ],
             'en': [
                 { text: 'Hello, world!', label: 'Greeting' },
-                { text: 'Artificial intelligence text-to-speech technology', label: 'Technical' },
+                { text: 'Artificial intelligence text-to-speech technology.', label: 'Technical' },
                 { text: 'The quick brown fox jumps over the lazy dog.', label: 'Pangram' },
                 { text: 'To be or not to be, that is the question.', label: 'Literature' }
             ]
         };
-        
-        let phonemizer = null;
+
+        let piper = null;
         let currentLanguage = 'ja';
-        let onnxSession = null;
-        let modelConfig = null;
-        
+        let previousAudioUrl = null;
+
         const statusEl = document.getElementById('status');
         const generateBtn = document.getElementById('generateBtn');
         const clearBtn = document.getElementById('clearBtn');
         const inputText = document.getElementById('inputText');
         const outputSection = document.getElementById('outputSection');
-        const phonemeOutput = document.getElementById('phonemeOutput');
         const detailsOutput = document.getElementById('detailsOutput');
         const audioPlayer = document.getElementById('audioPlayer');
         const modelInfo = document.getElementById('modelInfo');
         const exampleButtons = document.getElementById('exampleButtons');
-        
+
         // Language buttons
         document.querySelectorAll('.lang-button').forEach(btn => {
-            btn.addEventListener('click', () => switchLanguage(btn.dataset.lang, btn.dataset.model));
+            btn.addEventListener('click', () => switchLanguage(btn.dataset.lang));
         });
-        
+
         // Initialize
         async function init() {
             try {
-                updateStatus('音素化エンジンを初期化しています...', 'loading');
-                
-                phonemizer = new UnifiedPhonemizer();
-                await phonemizer.initialize({
-                    jsUrl: '../dist/unified_phonemizer.js',
-                    wasmUrl: '../dist/unified_phonemizer.wasm',
-                    openjtalk: {
-                        dictPath: '../assets/dict',
-                        voicePath: '../assets/voice/mei_normal.htsvoice'
-                    },
-                    espeak: {
-                        // eSpeak data is embedded in the .data file
+                updateStatus('Loading onnxruntime-web...', 'loading');
+
+                await loadScript('https://cdn.jsdelivr.net/npm/onnxruntime-web@1.21.0/dist/ort.min.js');
+
+                updateStatus('Initializing PiperPlus...', 'loading');
+
+                piper = await PiperPlus.initialize({
+                    model: 'tsukuyomi',
+                    ort: ort,
+                    onProgress: ({ stage, progress, message }) => {
+                        updateStatus(`[${stage}] ${message}`, 'loading');
                     }
                 });
-                
-                updateStatus('ONNXモデルを読み込んでいます...', 'loading');
-                
-                // Load ONNX Runtime
-                await loadScript('https://cdn.jsdelivr.net/npm/onnxruntime-web@1.21.0/dist/ort.min.js');
-                
-                // Load initial model
-                await loadModel('multilingual-test-medium');
-                
-                updateStatus('準備完了！', 'success');
+
+                updateStatus('Ready!', 'success');
                 generateBtn.disabled = false;
-                
+
                 // Populate examples
                 updateExamples();
-                
+
             } catch (error) {
                 console.error('Initialization failed:', error);
-                updateStatus(`初期化エラー: ${error.message}`, 'error');
+                updateStatus(`Initialization error: ${error.message}`, 'error');
             }
         }
-        
-        // Load ONNX model
-        async function loadModel(modelName) {
-            const modelPath = `../models/${modelName}.onnx`;
-            const configPath = `../models/${modelName}.onnx.json`;
-            
-            // Load model config
-            const configResponse = await fetch(configPath);
-            modelConfig = await configResponse.json();
-            
-            // Create ONNX session
-            onnxSession = await ort.InferenceSession.create(modelPath, {
-                executionProviders: ['wasm'],
-                graphOptimizationLevel: 'extended',
-                enableMemPattern: true
-            });
-            
-            console.log(`Loaded model: ${modelName}`);
-        }
-        
+
         // Switch language
-        async function switchLanguage(lang, model) {
+        function switchLanguage(lang) {
             currentLanguage = lang;
-            
+
             // Update UI
             document.querySelectorAll('.lang-button').forEach(btn => {
                 btn.classList.toggle('active', btn.dataset.lang === lang);
             });
-            
+
             // Update model info
-            const phonemizerType = lang === 'ja' ? 'OpenJTalk' : 'eSpeak-ng';
-            modelInfo.textContent = `モデル: ${model}.onnx (${phonemizerType})`;
-            
-            // Load new model
-            updateStatus('モデルを切り替えています...', 'loading');
-            try {
-                await loadModel(model);
-                updateStatus('準備完了！', 'success');
-            } catch (error) {
-                updateStatus(`モデル読み込みエラー: ${error.message}`, 'error');
-            }
-            
+            modelInfo.textContent = `Phonemizer: PiperPlus (Rust WASM) | Language: ${lang}`;
+
             // Update examples
             updateExamples();
-            
+
             // Clear output
             clearOutput();
         }
-        
+
         // Update example buttons
         function updateExamples() {
             exampleButtons.innerHTML = '';
             const langExamples = examples[currentLanguage] || [];
-            
+
             langExamples.forEach(example => {
                 const btn = document.createElement('button');
                 btn.className = 'example-button';
@@ -409,137 +350,64 @@
                 exampleButtons.appendChild(btn);
             });
         }
-        
+
         // Generate speech
         async function generate() {
             const text = inputText.value.trim();
             if (!text) {
-                updateStatus('テキストを入力してください。', 'error');
+                updateStatus('Please enter text.', 'error');
                 return;
             }
-            
+
             try {
-                updateStatus('音素変換中...', 'loading');
+                updateStatus('Synthesizing...', 'loading');
                 generateBtn.disabled = true;
-                
-                // Get phonemes
-                const phonemeData = await phonemizer.textToPhonemes(text, currentLanguage);
-                
-                let phonemes;
-                if (currentLanguage === 'ja') {
-                    // Extract phonemes from OpenJTalk labels
-                    phonemes = phonemizer.extractPhonemesFromLabels(phonemeData);
-                } else {
-                    // Extract phonemes from eSpeak IPA
-                    phonemes = phonemizer.extractPhonemesFromIPA(phonemeData);
+
+                const result = await piper.synthesize(text, {
+                    language: currentLanguage
+                });
+
+                // Revoke previous audio URL to prevent memory leak
+                if (previousAudioUrl) {
+                    URL.revokeObjectURL(previousAudioUrl);
                 }
-                
-                // Display phonemes
-                displayPhonemes(phonemes);
-                
-                updateStatus('音声合成中...', 'loading');
-                
-                // Convert phonemes to IDs
-                const phonemeIds = phonemesToIds(phonemes);
-                
-                // Synthesize audio
-                const audio = await synthesizeAudio(phonemeIds);
-                
-                // Create WAV and play
-                const wavBlob = createWAV(audio, modelConfig.audio.sample_rate);
-                const audioUrl = URL.createObjectURL(wavBlob);
-                audioPlayer.src = audioUrl;
-                
+
+                // Set audio player source
+                const wavBlob = result.toBlob();
+                previousAudioUrl = URL.createObjectURL(wavBlob);
+                audioPlayer.src = previousAudioUrl;
+
                 // Show details
                 detailsOutput.textContent = JSON.stringify({
                     language: currentLanguage,
-                    phonemizer: currentLanguage === 'ja' ? 'OpenJTalk' : 'eSpeak-ng',
-                    phonemes: phonemes.join(' '),
-                    phonemeCount: phonemes.length,
-                    sampleRate: modelConfig.audio.sample_rate
+                    phonemizer: 'PiperPlus (Rust WASM)',
+                    duration: result.duration.toFixed(2) + ' seconds',
+                    sampleRate: result.sampleRate
                 }, null, 2);
-                
+
                 outputSection.style.display = 'block';
-                updateStatus('生成完了！', 'success');
-                
+                updateStatus('Generation complete!', 'success');
+
             } catch (error) {
                 console.error('Generation failed:', error);
-                updateStatus(`生成エラー: ${error.message}`, 'error');
+                updateStatus(`Generation error: ${error.message}`, 'error');
             } finally {
                 generateBtn.disabled = false;
             }
         }
-        
-        // Convert phonemes to IDs
-        function phonemesToIds(phonemes) {
-            const ids = [];
-            const phonemeIdMap = modelConfig.phoneme_id_map;
-            
-            for (const phoneme of phonemes) {
-                if (phonemeIdMap[phoneme]) {
-                    ids.push(...phonemeIdMap[phoneme]);
-                } else {
-                    console.warn(`Unknown phoneme: ${phoneme}`);
-                    ids.push(0); // Use padding ID
-                }
-            }
-            
-            return ids;
-        }
-        
-        // Synthesize audio using ONNX
-        async function synthesizeAudio(phonemeIds) {
-            const inputTensor = new ort.Tensor('int64', 
-                new BigInt64Array(phonemeIds.map(id => BigInt(id))), 
-                [1, phonemeIds.length]
-            );
-            
-            const lengthTensor = new ort.Tensor('int64', 
-                new BigInt64Array([BigInt(phonemeIds.length)]), 
-                [1]
-            );
-            
-            const scalesTensor = new ort.Tensor('float32', 
-                new Float32Array([
-                    modelConfig.inference.noise_scale || 0.667,
-                    modelConfig.inference.length_scale || 1.0,
-                    modelConfig.inference.noise_w || 0.8
-                ]), 
-                [3]
-            );
-            
-            const feeds = {
-                'input': inputTensor,
-                'input_lengths': lengthTensor,
-                'scales': scalesTensor
-            };
-            
-            const results = await onnxSession.run(feeds);
-            const audioTensor = results['output'] || results[Object.keys(results)[0]];
-            
-            return new Float32Array(audioTensor.data);
-        }
-        
-        // Display phonemes
-        function displayPhonemes(phonemes) {
-            phonemeOutput.innerHTML = '';
-            phonemes.forEach(phoneme => {
-                const span = document.createElement('span');
-                span.className = 'phoneme';
-                span.textContent = phoneme;
-                phonemeOutput.appendChild(span);
-            });
-        }
-        
+
         // Clear output
         function clearOutput() {
             inputText.value = '';
             outputSection.style.display = 'none';
-            phonemeOutput.innerHTML = '';
             detailsOutput.textContent = '';
+            if (previousAudioUrl) {
+                URL.revokeObjectURL(previousAudioUrl);
+                previousAudioUrl = null;
+            }
             audioPlayer.src = '';
         }
-        
+
         // Utility functions
         function updateStatus(message, type = 'info') {
             statusEl.className = `status ${type}`;
@@ -548,58 +416,31 @@
                 statusEl.innerHTML += ' <span class="loading-spinner"></span>';
             }
         }
-        
+
         function loadScript(src) {
             return new Promise((resolve, reject) => {
                 const script = document.createElement('script');
                 script.src = src;
                 script.onload = resolve;
-                script.onerror = reject;
+                script.onerror = () => reject(new Error(`Failed to load script: ${src}`));
                 document.head.appendChild(script);
             });
         }
-        
-        function createWAV(audioData, sampleRate) {
-            const length = audioData.length;
-            const arrayBuffer = new ArrayBuffer(44 + length * 2);
-            const view = new DataView(arrayBuffer);
-            
-            // WAV header
-            const writeString = (offset, string) => {
-                for (let i = 0; i < string.length; i++) {
-                    view.setUint8(offset + i, string.charCodeAt(i));
-                }
-            };
-            
-            writeString(0, 'RIFF');
-            view.setUint32(4, 36 + length * 2, true);
-            writeString(8, 'WAVE');
-            writeString(12, 'fmt ');
-            view.setUint32(16, 16, true);
-            view.setUint16(20, 1, true);
-            view.setUint16(22, 1, true);
-            view.setUint32(24, sampleRate, true);
-            view.setUint32(28, sampleRate * 2, true);
-            view.setUint16(32, 2, true);
-            view.setUint16(34, 16, true);
-            writeString(36, 'data');
-            view.setUint32(40, length * 2, true);
-            
-            // Convert float to int16
-            const offset = 44;
-            for (let i = 0; i < length; i++) {
-                const val = Math.max(-1, Math.min(1, audioData[i]));
-                const int16 = val < 0 ? val * 0x8000 : val * 0x7FFF;
-                view.setInt16(offset + i * 2, int16, true);
-            }
-            
-            return new Blob([arrayBuffer], { type: 'audio/wav' });
-        }
-        
+
         // Event listeners
         generateBtn.addEventListener('click', generate);
         clearBtn.addEventListener('click', clearOutput);
-        
+
+        // Clean up on page unload
+        window.addEventListener('beforeunload', () => {
+            if (previousAudioUrl) {
+                URL.revokeObjectURL(previousAudioUrl);
+            }
+            if (piper) {
+                piper.dispose();
+            }
+        });
+
         // Initialize on load
         init();
     </script>

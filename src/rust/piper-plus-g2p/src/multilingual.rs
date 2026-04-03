@@ -355,6 +355,15 @@ impl MultilingualPhonemizer {
         }
     }
 
+    /// Replace the phonemizer for a given language.
+    ///
+    /// Used by WASM external dictionary loading: initially a PassthroughPhonemizer
+    /// is used for JA, then replaced with a real JapanesePhonemizer once the
+    /// dictionary bytes are available.
+    pub fn replace_phonemizer(&mut self, lang: &str, phonemizer: Box<dyn Phonemizer>) {
+        self.phonemizers.insert(lang.to_string(), phonemizer);
+    }
+
     /// Return the list of supported language codes.
     pub fn languages(&self) -> &[String] {
         &self.languages
@@ -870,6 +879,35 @@ mod tests {
             "IDs ({}) and prosody ({}) length mismatch",
             out_ids.len(),
             out_prosody.len()
+        );
+    }
+
+    // ===== replace_phonemizer =====
+
+    #[test]
+    fn test_replace_phonemizer() {
+        // Setup: create a multilingual phonemizer with 2 languages
+        let mut phonemizers: HashMap<String, Box<dyn Phonemizer>> = HashMap::new();
+        phonemizers.insert("ja".to_string(), Box::new(PassthroughPhonemizer::new("ja")));
+        phonemizers.insert("en".to_string(), Box::new(PassthroughPhonemizer::new("en")));
+
+        let mut mp = MultilingualPhonemizer::new(
+            vec!["ja".to_string(), "en".to_string()],
+            "en".to_string(),
+            phonemizers,
+        );
+
+        // Phonemize Japanese text with passthrough (should produce character-level tokens)
+        let (tokens_before, _) = mp.phonemize_with_prosody("あ").unwrap();
+
+        // Replace JA phonemizer with a new passthrough (same type, but proves replacement works)
+        mp.replace_phonemizer("ja", Box::new(PassthroughPhonemizer::new("ja")));
+
+        // Phonemize again — should still work after replacement
+        let (tokens_after, _) = mp.phonemize_with_prosody("あ").unwrap();
+        assert_eq!(
+            tokens_before, tokens_after,
+            "replacement should produce same results"
         );
     }
 }

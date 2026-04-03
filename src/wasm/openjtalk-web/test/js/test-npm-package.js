@@ -89,7 +89,6 @@ describe('exports バリデーション', () => {
     'PiperPlus',
     'AudioResult',
     'ModelManager',
-    'DictManager',
     'WebGPUSessionManager',
     'StreamingTTSPipeline',
     'TextChunker',
@@ -277,16 +276,6 @@ describe('files フィールドバリデーション', () => {
     );
   });
 
-  it('dist/openjtalk.wasm が存在する', () => {
-    const wasmPath = join(PROJECT_ROOT, 'dist', 'openjtalk.wasm');
-    assert.ok(existsSync(wasmPath), 'dist/openjtalk.wasm is missing');
-  });
-
-  it('dist/openjtalk.js が存在する', () => {
-    const jsPath = join(PROJECT_ROOT, 'dist', 'openjtalk.js');
-    assert.ok(existsSync(jsPath), 'dist/openjtalk.js is missing');
-  });
-
   it('types/index.d.ts が存在する', () => {
     const dtsPath = join(PROJECT_ROOT, 'types', 'index.d.ts');
     assert.ok(existsSync(dtsPath), 'types/index.d.ts is missing');
@@ -315,9 +304,9 @@ describe('files フィールドバリデーション', () => {
 // ---------------------------------------------------------------------------
 
 describe('パッケージサイズ見積もり', () => {
-  const MAX_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
+  const MAX_SIZE_BYTES = 100 * 1024 * 1024; // 100 MB (WASM binary with bundled NAIST-JDIC dict is ~57 MB)
 
-  it('files エントリの合計サイズが 10 MB 以下である', () => {
+  it('files エントリの合計サイズが 100 MB 以下である', () => {
     let totalBytes = 0;
     const sizeBreakdown = [];
 
@@ -341,13 +330,13 @@ describe('パッケージサイズ見積もり', () => {
 
     const totalMB = (totalBytes / (1024 * 1024)).toFixed(2);
     const detail = [
-      `Total: ${totalMB} MB (limit: 10 MB)`,
+      `Total: ${totalMB} MB (limit: 100 MB)`,
       ...sizeBreakdown,
     ].join('\n');
 
     assert.ok(
       totalBytes <= MAX_SIZE_BYTES,
-      `Package is too large (${totalMB} MB > 10 MB).\n${detail}`,
+      `Package is too large (${totalMB} MB > 100 MB).\n${detail}`,
     );
   });
 });

@@ -41,7 +41,8 @@ function log(message, type = 'info') {
 function startServer() {
     return new Promise((resolve) => {
         const server = http.createServer((req, res) => {
-            let filePath = path.join(PROJECT_DIR, req.url === '/' ? '/test/headless-test.html' : req.url);
+            // TODO: M2 で新テストページに差し替え
+            let filePath = path.join(PROJECT_DIR, req.url === '/' ? '/demo/index.html' : req.url);
             
             // Security check
             if (!filePath.startsWith(PROJECT_DIR)) {
@@ -259,7 +260,8 @@ function createTestHTML() {
 </body>
 </html>`;
     
-    const testPath = path.join(PROJECT_DIR, 'test', 'headless-test.html');
+    // TODO: M2 で新テストページに差し替え (createTestHTML() が生成する一時ファイル)
+    const testPath = path.join(PROJECT_DIR, 'test', 'headless-test-generated.html');
     fs.writeFileSync(testPath, html);
     return testPath;
 }
@@ -294,7 +296,8 @@ async function runHeadlessTest() {
         // Run Chrome in headless mode
         log('Launching headless Chrome...', 'info');
         const chromeOutput = execSync(
-            `"${chromePath}" --headless --disable-gpu --no-sandbox --enable-logging --dump-dom http://localhost:${PORT}/test/headless-test.html 2>&1 | grep -E "(TEST_LOG:|TEST_COMPLETE:|TEST_ERROR:)" || true`,
+            // TODO: M2 で新テストページに差し替え
+            `"${chromePath}" --headless --disable-gpu --no-sandbox --enable-logging --dump-dom http://localhost:${PORT}/test/headless-test-generated.html 2>&1 | grep -E "(TEST_LOG:|TEST_COMPLETE:|TEST_ERROR:)" || true`,
             { encoding: 'utf-8', shell: '/bin/bash' }
         );
         

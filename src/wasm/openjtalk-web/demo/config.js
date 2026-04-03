@@ -1,19 +1,16 @@
-// GitHub Pages deployment configuration
+// GitHub Pages deployment configuration for PiperPlus demo
 const deploymentConfig = {
     // Set to true when deploying to GitHub Pages
     isGitHubPages: false,
-    
-    // Base path for GitHub Pages (e.g., '/piper-plus/wasm-demo/')
+
+    // Base path for GitHub Pages (e.g., '/piper-plus/')
     basePath: '',
-    
-    // Get the correct path based on deployment
-    getPath: function(relativePath) {
-        if (this.isGitHubPages && this.basePath) {
-            // Remove leading '../' and add base path
-            return this.basePath + relativePath.replace(/^\.\.\//, '');
-        }
-        return relativePath;
-    }
+
+    // Default model for PiperPlus.initialize()
+    defaultModel: 'tsukuyomi',
+
+    // ONNX Runtime Web CDN URL
+    ortCdnUrl: 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.21.0/dist/ort.min.js',
 };
 
 // Export for use in other modules

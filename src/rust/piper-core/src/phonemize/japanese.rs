@@ -383,6 +383,29 @@ impl JapanesePhonemizer {
         })
     }
 
+    /// Create from a pre-built lindera Dictionary (for WASM external dict loading).
+    ///
+    /// This bypasses the filesystem entirely, suitable for WASM targets
+    /// where the dictionary is fetched via HTTP and passed as bytes.
+    pub fn new_from_dictionary(dictionary: jpreprocess::Dictionary) -> Self {
+        let njd = jpreprocess::JPreprocess::with_dictionaries(dictionary, None);
+        Self {
+            njd,
+            dictionary: None,
+        }
+    }
+
+    /// Create from a bincode-serialized Dictionary blob.
+    ///
+    /// The blob should be produced by `bincode::serialize(&dictionary)` where
+    /// `dictionary` is a `jpreprocess::Dictionary` (re-exported from lindera-core).
+    pub fn new_from_serialized_dict(data: &[u8]) -> Result<Self, PiperError> {
+        let dictionary: jpreprocess::Dictionary = bincode::deserialize(data).map_err(|e| {
+            PiperError::JPreprocessInit(format!("dictionary deserialize failed: {e}"))
+        })?;
+        Ok(Self::new_from_dictionary(dictionary))
+    }
+
     /// Search well-known locations for the jpreprocess NAIST-JDIC dictionary.
     fn find_dictionary() -> Result<std::path::PathBuf, PiperError> {
         // 1. Environment variable override
@@ -1153,5 +1176,28 @@ mod tests {
         let (tokens, prosody) = labels_to_tokens_with_prosody(&labels, "");
         assert!(tokens.is_empty());
         assert!(prosody.is_empty());
+    }
+
+    // ===== new_from_serialized_dict error handling =====
+
+    #[test]
+    fn test_new_from_serialized_dict_invalid_data() {
+        let invalid_data = b"this is not a valid bincode dictionary";
+        let result = JapanesePhonemizer::new_from_serialized_dict(invalid_data);
+        match result {
+            Ok(_) => panic!("invalid data should return error"),
+            Err(err) => {
+                assert!(
+                    err.to_string().contains("deserialize"),
+                    "error should mention deserialization: {err}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_new_from_serialized_dict_empty_data() {
+        let result = JapanesePhonemizer::new_from_serialized_dict(&[]);
+        assert!(result.is_err(), "empty data should return error");
     }
 }

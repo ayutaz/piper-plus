@@ -1,11 +1,11 @@
 /**
- * テスト用モック G2P を生成する。
- * G2P クラスの公開インターフェースを再現し、
+ * テスト用モック Phonemizer を生成する。
+ * SimpleUnifiedPhonemizer の公開インターフェースを再現し、
  * 呼び出し履歴をキャプチャする。
  */
 
 /**
- * Default stub implementations matching G2P behaviour.
+ * Default stub implementations matching SimpleUnifiedPhonemizer behaviour.
  * Each returns a deterministic value suitable for snapshot-free assertions.
  */
 const DEFAULT_STUBS = {
@@ -14,20 +14,35 @@ const DEFAULT_STUBS = {
 
   /**
    * @param {string} _text
-   * @param {Record<string, number[]>} _phonemeIdMap
-   * @param {Object} [_options]
-   * @returns {{ phonemeIds: number[], prosodyFlat: number[]|null }}
+   * @param {string|null} _lang
+   * @returns {Promise<string>}
    */
-  encode: (_text, _phonemeIdMap, _options) => ({
-    phonemeIds: [1, 5, 2],
-    prosodyFlat: null,
+  textToPhonemes: async (_text, _lang) => ({
+    phonemeIds: [1, 0, 4, 0, 2],
+    prosodyFeatures: null,
   }),
+
+  /**
+   * @param {string|Array} _phonemeStr
+   * @param {string} _language
+   * @returns {Array<string>}
+   */
+  extractPhonemes: (_phonemeStr, _language) => ['^', 'k', 'o', 'N', '$'],
+
+  /** @param {string} _language */
+  getPhonemeIdMap: (_language) => null,
+
+  /** @param {Object} _phonemeIdMap */
+  setPhonemeIdMap: (_phonemeIdMap) => {},
+
+  /** @param {Object} _config */
+  initialize: async (_config) => {},
 
   dispose: () => {},
 };
 
 /**
- * Tracked method names whose call arguments are recorded in `g2p.calls`.
+ * Tracked method names whose call arguments are recorded in `phonemizer.calls`.
  * @type {ReadonlyArray<string>}
  */
 const TRACKED_METHODS = Object.keys(DEFAULT_STUBS);
@@ -61,42 +76,61 @@ function wrapWithTracking(methodName, impl, calls) {
 }
 
 /**
- * Create a mock G2P that mirrors the G2P public API used by PiperPlus.
+ * Create a mock phonemizer that mirrors the SimpleUnifiedPhonemizer public API.
  *
  * Every public method is tracked -- call arguments are pushed to
- * `g2p.calls.<methodName>` as arrays so tests can assert on
+ * `phonemizer.calls.<methodName>` as arrays so tests can assert on
  * invocation count and parameter values.
  *
  * @param {Object} [options={}] - Per-method overrides. Each key is a method
- *   name from G2P; the value is a replacement function.
- *   Methods not listed fall back to sensible defaults.
+ *   name from SimpleUnifiedPhonemizer; the value is a replacement function.
+ *   Methods not listed fall back to sensible defaults (e.g. `detectLanguage`
+ *   returns `'ja'`).
  *
  * @returns {{
+ *   initialized: boolean,
+ *   phonemeIdMap: Object|null,
  *   calls: Record<string, Array<Array<*>>>,
  *   detectLanguage: Function,
- *   encode: Function,
+ *   textToPhonemes: Function,
+ *   extractPhonemes: Function,
+ *   getPhonemeIdMap: Function,
+ *   setPhonemeIdMap: Function,
+ *   initialize: Function,
  *   dispose: Function,
  *   reset: Function,
  * }}
  *
  * @example
  * // Basic usage with defaults
- * const g2p = createMockG2P();
- * const lang = g2p.detectLanguage('hello');
+ * const phonemizer = createMockPhonemizer();
+ * const lang = phonemizer.detectLanguage('hello');
  * assert.strictEqual(lang, 'ja');
- * assert.strictEqual(g2p.calls.detectLanguage.length, 1);
+ * assert.strictEqual(phonemizer.calls.detectLanguage.length, 1);
  *
  * @example
  * // Override specific methods
- * const g2p = createMockG2P({
+ * const phonemizer = createMockPhonemizer({
  *   detectLanguage: () => 'en',
- *   encode: (text, map, opts) => ({ phonemeIds: [1, 10, 2], prosodyFlat: null }),
+ *   textToPhonemes: async (text, lang) => 'h eh l ow',
+ * });
+ *
+ * @example
+ * // Simulate errors
+ * const phonemizer = createMockPhonemizer({
+ *   textToPhonemes: async () => { throw new Error('phonemize failed'); },
  * });
  */
-export function createMockG2P(options = {}) {
+export function createMockPhonemizer(options = {}) {
   const calls = createCallsMap();
 
-  const g2p = {
+  const phonemizer = {
+    /** @type {boolean} Mirrors SimpleUnifiedPhonemizer.initialized */
+    initialized: false,
+
+    /** @type {Object|null} Mirrors SimpleUnifiedPhonemizer.phonemeIdMap */
+    phonemeIdMap: null,
+
     /**
      * Call-tracking map.
      * Keys are method names; values are arrays of argument-arrays.
@@ -112,6 +146,8 @@ export function createMockG2P(options = {}) {
       for (const name of TRACKED_METHODS) {
         calls[name] = [];
       }
+      phonemizer.initialized = false;
+      phonemizer.phonemeIdMap = null;
     },
   };
 
@@ -119,14 +155,42 @@ export function createMockG2P(options = {}) {
   // then wrap with call tracking.
   for (const name of TRACKED_METHODS) {
     const impl = options[name] || DEFAULT_STUBS[name];
-    g2p[name] = wrapWithTracking(name, impl, calls);
+    phonemizer[name] = wrapWithTracking(name, impl, calls);
   }
 
-  return g2p;
-}
+  // initialize / setPhonemeIdMap have side-effects on instance state.
+  // Wrap them so the mock's own `initialized` and `phonemeIdMap` stay in sync.
+  const userInitialize = options.initialize;
+  const originalInitialize = phonemizer.initialize;
+  phonemizer.initialize = async function (...args) {
+    const result = await originalInitialize.apply(this, args);
+    // Only flip initialized when the user did not supply a custom impl
+    // (a custom impl is responsible for its own semantics).
+    if (!userInitialize) {
+      phonemizer.initialized = true;
+    }
+    return result;
+  };
 
-/**
- * Alias for backwards compatibility with tests that imported createMockPhonemizer.
- * @deprecated Use createMockG2P instead.
- */
-export const createMockPhonemizer = createMockG2P;
+  const userSetMap = options.setPhonemeIdMap;
+  const originalSetMap = phonemizer.setPhonemeIdMap;
+  phonemizer.setPhonemeIdMap = function (...args) {
+    const result = originalSetMap.apply(this, args);
+    if (!userSetMap) {
+      phonemizer.phonemeIdMap = args[0];
+    }
+    return result;
+  };
+
+  const userDispose = options.dispose;
+  const originalDispose = phonemizer.dispose;
+  phonemizer.dispose = function (...args) {
+    const result = originalDispose.apply(this, args);
+    if (!userDispose) {
+      phonemizer.initialized = false;
+    }
+    return result;
+  };
+
+  return phonemizer;
+}

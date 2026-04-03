@@ -1,3 +1,4 @@
+#![cfg(feature = "onnx")]
 //! Integration tests for the device module.
 //!
 //! Validates DeviceSelection constructors, from_str parsing (valid & invalid),

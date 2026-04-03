@@ -1,3 +1,4 @@
+#![cfg(feature = "onnx")]
 //! Tests for the default output.wav behavior.
 //!
 //! The CLI writes to "output.wav" in the current directory when

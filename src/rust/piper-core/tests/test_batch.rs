@@ -1,3 +1,5 @@
+#![cfg(feature = "onnx")]
+
 use piper_plus::batch::*;
 use std::path::{Path, PathBuf};
 

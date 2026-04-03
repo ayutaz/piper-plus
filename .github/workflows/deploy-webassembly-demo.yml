@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - dev
-      - feat/english-model-support
     paths:
       - 'src/wasm/**'
       - '.github/workflows/deploy-webassembly-demo.yml'
@@ -32,11 +31,39 @@ jobs:
         uses: actions/checkout@v6
         with:
           submodules: recursive
-      
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            src/rust/target
+          key: wasm-cargo-${{ hashFiles('src/rust/Cargo.lock') }}
+          restore-keys: wasm-cargo-
+
+      - name: Install wasm-pack
+        run: cargo install wasm-pack --locked
+
+      - name: Build WASM
+        working-directory: src/rust/piper-wasm
+        run: |
+          wasm-pack build --target web --release --features multilingual
+          rm -rf ../../wasm/openjtalk-web/dist/rust-wasm
+          mv pkg ../../wasm/openjtalk-web/dist/rust-wasm
+
+      - name: Verify WASM output
+        run: test -f src/wasm/openjtalk-web/dist/rust-wasm/piper_plus_wasm_bg.wasm
+
       - name: Prepare deployment directory
         run: |
           mkdir -p deploy
-          echo "Deploying WebAssembly demo with English model support"
+          echo "Deploying PiperPlus WebAssembly demo"
           
           # Function to copy model files from fallback location
           copy_models_fallback() {
@@ -68,12 +95,13 @@ jobs:
             fi
           }
           
-          # Copy WebAssembly artifacts
-          if [ -d "src/wasm/openjtalk-web/dist" ]; then
-            cp -r src/wasm/openjtalk-web/dist deploy/
+          # Copy WebAssembly artifacts (only rust-wasm, exclude legacy espeak-ng)
+          if [ -d "src/wasm/openjtalk-web/dist/rust-wasm" ]; then
+            mkdir -p deploy/dist
+            cp -r src/wasm/openjtalk-web/dist/rust-wasm deploy/dist/
           else
-            echo "ERROR: WebAssembly dist directory not found!"
-            echo "Please build the WebAssembly files before deployment."
+            echo "ERROR: WebAssembly dist/rust-wasm directory not found!"
+            echo "Please build the WASM files before deployment."
             exit 1
           fi
           
@@ -176,34 +204,34 @@ jobs:
             mkdir -p deploy/multilingual-demo
             cp -r src/wasm/openjtalk-web/test/multilingual-demo/* deploy/multilingual-demo/
             
-            # Update paths for multilingual demo
+            # Update paths for multilingual demo (one level deep in deploy/)
             for file in deploy/multilingual-demo/*.html; do
               if [ -f "$file" ]; then
-                sed -i 's|../../dist/|../dist/|g' "$file"
-                sed -i 's|../../assets/|../assets/|g' "$file"
-                sed -i 's|../../models/|../models/|g' "$file"
-                sed -i 's|../../src/|../src/|g' "$file"
-                # Fix g2p direct import (piper-espeak-english.html)
-                sed -i "s|from '../../../g2p/|from '../g2p/|g" "$file"
+                # src attribute paths
+                sed -i 's|src="../../dist/|src="../dist/|g' "$file"
+                sed -i 's|src="../../assets/|src="../assets/|g' "$file"
+                sed -i 's|src="../../models/|src="../models/|g' "$file"
+                sed -i 's|src="../../src/|src="../src/|g' "$file"
+                # ES module import paths
+                sed -i "s|from '../../|from '../|g" "$file"
+                # JS string paths
+                sed -i "s|'../../models/|'../models/|g" "$file"
+                sed -i "s|'../../assets/|'../assets/|g" "$file"
+                sed -i "s|'../../dist/|'../dist/|g" "$file"
               fi
             done
           fi
           
           
-          # Copy src files for multilingual demo (index.js + all dependencies)
+          # Copy all JS src files for PiperPlus API (index.js + all dependencies)
           if [ -d "src/wasm/openjtalk-web/src" ]; then
             mkdir -p deploy/src
             cp src/wasm/openjtalk-web/src/*.js deploy/src/
-
-            # Rewrite bare @piper-plus/g2p imports to relative paths
-            sed -i "s|from '@piper-plus/g2p/ja'|from '../g2p/src/ja/index.js'|g" deploy/src/*.js
-            sed -i "s|from '@piper-plus/g2p'|from '../g2p/src/index.js'|g" deploy/src/*.js
-
-            # Fix paths in src files for root deployment
-            sed -i "s|'../dist/|'./dist/|g" deploy/src/espeak_phoneme_extractor.js
-            sed -i "s|'../../dist/|'./dist/|g" deploy/src/*.js
-            sed -i "s|'../../assets/|'./assets/|g" deploy/src/*.js
-            sed -i "s|'../../models/|'./models/|g" deploy/src/*.js
+            echo "Copied JS src files:"
+            ls -la deploy/src/
+            # Note: src/*.js use '../dist/' to reference deploy/dist/ from deploy/src/.
+            # This relative path is correct for the deployed directory structure, so no
+            # sed path rewriting is needed here.
           fi
 
           # Copy @piper-plus/g2p package (needed by src/index.js and piper-espeak-english.html)

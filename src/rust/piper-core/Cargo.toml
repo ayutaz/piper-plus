@@ -12,6 +12,8 @@ description = "High-quality neural text-to-speech engine with 7-language support
 
 [features]
 default = ["naist-jdic", "dict-download"]
+onnx = ["dep:ort", "dep:ndarray", "dep:hound"]
+inference = ["onnx"]  # backward compat alias
 japanese = ["dep:jpreprocess", "piper-plus-g2p/japanese"]
 naist-jdic = ["japanese", "jpreprocess/naist-jdic", "piper-plus-g2p/naist-jdic"]
 playback = ["dep:rodio"]
@@ -25,14 +27,13 @@ tensorrt = []
 
 [dependencies]
 piper-plus-g2p = { path = "../piper-plus-g2p", features = ["all-languages"] }
-ort = { version = "2.0.0-rc.12", default-features = false, features = ["std", "ndarray", "tracing", "download-binaries", "tls-rustls", "copy-dylibs", "api-24"] }
-bincode = "1"
+ort = { version = "2.0.0-rc.12", default-features = false, features = ["std", "ndarray", "tracing", "download-binaries", "tls-rustls", "copy-dylibs", "api-24"], optional = true }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "2"
 tracing = "0.1"
-hound = "3.5"
-ndarray = "0.17"
+hound = { version = "3.5", optional = true }
+ndarray = { version = "0.17", optional = true }
 regex = "1"
 jpreprocess = { version = "0.9", optional = true }
 rodio = { version = "0.19", optional = true }
@@ -41,6 +42,8 @@ sha2 = { version = "0.10", optional = true }
 flate2 = { version = "1", optional = true }
 tar = { version = "0.4", optional = true }
 rubato = { version = "0.16", optional = true }
+bincode = "1"
 
 [dev-dependencies]
 tempfile = "3"
+hound = "3.5"

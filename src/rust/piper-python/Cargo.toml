@@ -16,7 +16,7 @@ name = "piper_plus"
 crate-type = ["cdylib"]
 
 [dependencies]
-piper_core = { package = "piper-plus", path = "../piper-core", version = "0.1.0" }
+piper_core = { package = "piper-plus", path = "../piper-core", version = "0.1.0", features = ["naist-jdic", "onnx"] }
 pyo3 = { version = "0.23", features = ["extension-module"] }
 numpy = "0.23"
 

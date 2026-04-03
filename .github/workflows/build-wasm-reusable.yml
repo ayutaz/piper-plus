@@ -1,0 +1,104 @@
+name: Build WASM (Reusable)
+
+on:
+  workflow_call:
+    outputs:
+      wasm-size:
+        description: "WASM binary size in bytes (multilingual)"
+        value: ${{ jobs.build.outputs.wasm-size }}
+      wasm-size-ja:
+        description: "WASM binary size in bytes (ja-only)"
+        value: ${{ jobs.build.outputs.wasm-size-ja }}
+      wasm-size-ja-lite:
+        description: "WASM binary size in bytes (ja-lite, no bundled dict)"
+        value: ${{ jobs.build.outputs.wasm-size-ja-lite }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      wasm-size: ${{ steps.size.outputs.size }}
+      wasm-size-ja: ${{ steps.size-ja.outputs.size }}
+      wasm-size-ja-lite: ${{ steps.size-ja-lite.outputs.size }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src/rust -> target
+
+      - name: Install wasm-pack
+        run: cargo install wasm-pack --locked
+
+      - name: Build WASM (multilingual)
+        working-directory: src/rust/piper-wasm
+        run: |
+          wasm-pack build --target web --release --features multilingual
+          rm -rf ../../wasm/openjtalk-web/dist/rust-wasm
+          mv pkg ../../wasm/openjtalk-web/dist/rust-wasm
+
+      - name: Verify output (multilingual)
+        run: test -f src/wasm/openjtalk-web/dist/rust-wasm/piper_plus_wasm_bg.wasm
+
+      - name: Report size (multilingual)
+        id: size
+        run: |
+          SIZE=$(stat -c%s src/wasm/openjtalk-web/dist/rust-wasm/piper_plus_wasm_bg.wasm)
+          echo "size=$SIZE" >> "$GITHUB_OUTPUT"
+          echo "WASM multilingual size: $SIZE bytes ($(( SIZE / 1048576 )) MB)"
+
+      - name: Build WASM (ja-only)
+        working-directory: src/rust/piper-wasm
+        run: |
+          wasm-pack build --target web --release --features ja
+          rm -rf ../../wasm/openjtalk-web/dist/rust-wasm-ja
+          mv pkg ../../wasm/openjtalk-web/dist/rust-wasm-ja
+
+      - name: Verify output (ja-only)
+        run: test -f src/wasm/openjtalk-web/dist/rust-wasm-ja/piper_plus_wasm_bg.wasm
+
+      - name: Report size (ja-only)
+        id: size-ja
+        run: |
+          SIZE=$(stat -c%s src/wasm/openjtalk-web/dist/rust-wasm-ja/piper_plus_wasm_bg.wasm)
+          echo "size=$SIZE" >> "$GITHUB_OUTPUT"
+          echo "WASM ja-only size: $SIZE bytes ($(( SIZE / 1048576 )) MB)"
+
+      - name: Build WASM (ja-lite)
+        working-directory: src/rust/piper-wasm
+        run: |
+          wasm-pack build --target web --release --no-default-features --features ja-external
+          rm -rf ../../wasm/openjtalk-web/dist/rust-wasm-ja-lite
+          mv pkg ../../wasm/openjtalk-web/dist/rust-wasm-ja-lite
+
+      - name: Verify output (ja-lite)
+        run: test -f src/wasm/openjtalk-web/dist/rust-wasm-ja-lite/piper_plus_wasm_bg.wasm
+
+      - name: Report size (ja-lite)
+        id: size-ja-lite
+        run: |
+          SIZE=$(stat -c%s src/wasm/openjtalk-web/dist/rust-wasm-ja-lite/piper_plus_wasm_bg.wasm)
+          echo "size=$SIZE" >> "$GITHUB_OUTPUT"
+          echo "WASM ja-lite size: $SIZE bytes ($(( SIZE / 1048576 )) MB)"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: piper-plus-wasm
+          path: src/wasm/openjtalk-web/dist/rust-wasm/
+          retention-days: 7
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: piper-plus-wasm-ja
+          path: src/wasm/openjtalk-web/dist/rust-wasm-ja/
+          retention-days: 7
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: piper-plus-wasm-ja-lite
+          path: src/wasm/openjtalk-web/dist/rust-wasm-ja-lite/
+          retention-days: 7

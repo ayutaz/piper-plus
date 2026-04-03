@@ -40,11 +40,9 @@ def main():
         print(f"Serving directory: {DIRECTORY}")
         print("\nTest URLs:")
         print(
-            f"  - Simple Multilingual Demo: http://localhost:{PORT}/test/multilingual-demo/simple-multilingual.html"
+            f"  - Simple Multilingual Demo: http://localhost:{PORT}/demo/simple-multilingual.html"
         )
-        print(
-            f"  - Japanese Demo: http://localhost:{PORT}/test/multilingual-demo/index.html"
-        )
+        print(f"  - Japanese Demo: http://localhost:{PORT}/demo/index.html")
         print("\nPress Ctrl+C to stop")
 
         try:

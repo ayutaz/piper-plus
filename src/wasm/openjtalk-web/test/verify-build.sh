@@ -41,11 +41,6 @@ echo ""
 echo "Checking voice files..."
 check_file "assets/voice/mei_normal.htsvoice" || FAILED=1
 
-echo ""
-echo "Checking test files..."
-check_file "test/full-test.html" || FAILED=1
-check_file "test/browser-test.html" || FAILED=1
-
 # Check WASM module exports using wasm-objdump if available
 if command -v wasm-objdump &> /dev/null; then
     echo ""
@@ -61,8 +56,7 @@ if [ $FAILED -eq 0 ]; then
     echo ""
     echo "To test in browser:"
     echo "  1. Run: python3 -m http.server 8080"
-    echo "  2. Open: http://localhost:8080/test/full-test.html"
-    echo "  3. Click 'Initialize All Components'"
+    echo "  2. Open: http://localhost:8080/demo/index.html"
     exit 0
 else
     echo -e "${RED}❌ Some files are missing${NC}"

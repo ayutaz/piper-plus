@@ -127,7 +127,6 @@ async function testProjectStructure() {
         'build/emscripten-flags.mk',
         'build/docker-build-simple.sh',
         'src/api.js',
-        'src/dictionary-loader.js',
         'src/simple_wrapper.cpp'
     ];
     

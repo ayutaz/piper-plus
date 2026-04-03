@@ -1,3 +1,4 @@
+#[cfg(feature = "onnx")]
 use std::path::Path;
 
 use crate::error::PiperError;
@@ -22,6 +23,7 @@ pub fn audio_float_to_int16(audio: &[f32]) -> Vec<i16> {
 }
 
 /// WAV ファイルを書き出す
+#[cfg(feature = "onnx")]
 pub fn write_wav(path: &Path, sample_rate: u32, audio: &[i16]) -> Result<(), PiperError> {
     let spec = hound::WavSpec {
         channels: 1,
@@ -47,6 +49,7 @@ pub fn write_wav(path: &Path, sample_rate: u32, audio: &[i16]) -> Result<(), Pip
 }
 
 /// WAV データを stdout にバイナリで書き出す (パイプ用)
+#[cfg(feature = "onnx")]
 pub fn write_wav_to_stdout(sample_rate: u32, audio: &[i16]) -> Result<(), PiperError> {
     use std::io::Write;
 
@@ -98,6 +101,7 @@ pub fn write_raw_pcm(writer: &mut impl std::io::Write, samples: &[i16]) -> Resul
 }
 
 /// raw PCM int16 データを stdout にバイナリで書き出す (WAV ヘッダなし)
+#[cfg(feature = "onnx")]
 pub fn write_raw_to_stdout(audio: &[i16]) -> Result<(), PiperError> {
     let mut stdout = std::io::stdout().lock();
     write_raw_pcm(&mut stdout, audio)
