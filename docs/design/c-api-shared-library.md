@@ -1,9 +1,9 @@
 # C API 共有ライブラリ (Issue #295) — 要求定義書
 
-> **Status:** Draft
+> **Status:** Implemented (Phase 1〜5 全完了)
 > **Issue:** [#295](https://github.com/ayutaz/piper-plus/issues/295)
 > **Branch:** `feature/c-api-shared-library`
-> **Date:** 2026-04-02
+> **Date:** 2026-04-03 (Phase 5 完了時点に更新)
 
 ---
 
@@ -373,10 +373,11 @@ piper_shared (共有ライブラリに含める)
 
 #### NFR-4: エラーハンドリング
 
-- 全関数は `int32_t` を返す (0 = 成功, 負 = エラー)
-- エラーコード定数: `PIPER_PLUS_OK`, `PIPER_PLUS_ERR`, `PIPER_PLUS_ERR_MODEL`, `PIPER_PLUS_ERR_CONFIG`, `PIPER_PLUS_ERR_TEXT`, `PIPER_PLUS_DONE`
-- `piper_plus_get_last_error()` でエラーメッセージ取得
+- 全関数は `PiperPlusStatus` (enum) を返す (0 = 成功, 正 = 完了, 負 = エラー)
+- ステータスコード (`typedef enum PiperPlusStatus`): `PIPER_PLUS_OK` (0), `PIPER_PLUS_DONE` (1), `PIPER_PLUS_ERR` (-1), `PIPER_PLUS_ERR_MODEL` (-2), `PIPER_PLUS_ERR_CONFIG` (-3), `PIPER_PLUS_ERR_TEXT` (-4), `PIPER_PLUS_ERR_BUSY` (-5), `PIPER_PLUS_ERR_ORT` (-6)
+- `piper_plus_get_last_error()` でエラーメッセージ取得 (スレッドローカル)
 - C++ 例外は API 境界で全捕捉 (例外がライブラリ外に漏れない)
+- **実装済み (M5-13):** `#define` 定数から `typedef enum PiperPlusStatus` に変更し、`ERR_BUSY` / `ERR_ORT` を追加
 
 #### NFR-5: シンボル可視性
 
@@ -392,153 +393,109 @@ piper_shared (共有ライブラリに含める)
 
 ---
 
-## 5. 推奨 API 設計
+## 5. 実装済み API (Phase 5 完了時点)
 
-以下は sherpa-onnx / libpiper / endo5501 実装のベストプラクティスを統合した設計案。
+> **注:** 以下は実装済みの `src/cpp/piper_plus.h` の内容を反映。初期設計案からの主な変更点は 5.1 節で説明。
+
+**全 API 関数一覧:**
+
+| カテゴリ | 関数 | Phase |
+|---------|------|-------|
+| Version | `piper_plus_version()`, `piper_plus_api_version()` | 1 |
+| Error | `piper_plus_get_last_error()` | 1 |
+| Lifecycle | `piper_plus_create(config, &out_engine)`, `piper_plus_free(engine)` | 1 (M5-14 で status+out パターンに変更) |
+| Options | `piper_plus_default_options()` | 1 |
+| One-shot | `piper_plus_synthesize(...)`, `piper_plus_free_audio(samples)` | 1 |
+| Iterator | `piper_plus_synth_start(...)`, `piper_plus_synth_next(...)` | 2 |
+| Streaming | `piper_plus_synthesize_streaming(...)` | 2 |
+| Streaming (cancel) | `piper_plus_synthesize_streaming_ex(...)` | 5 (M5-7) |
+| Query | `piper_plus_sample_rate()`, `piper_plus_num_speakers()`, `piper_plus_num_languages()`, `piper_plus_language_id()` | 1 |
+| Custom dict | `piper_plus_load_custom_dict()`, `piper_plus_clear_custom_dict()`, `piper_plus_add_dict_word()`, `piper_plus_dict_entry_count()` | 4 (M4-1) |
+| Timing | `piper_plus_get_phoneme_timing()` | 4 (M4-2) |
+| G2P | `piper_plus_phonemize()`, `piper_plus_available_languages()` | 4 (M4-3) |
+
+**ステータスコード (typedef enum PiperPlusStatus):**
+
+| 値 | 名前 | 説明 |
+|----|------|------|
+| 0 | `PIPER_PLUS_OK` | 成功 |
+| 1 | `PIPER_PLUS_DONE` | Iterator: チャンク終了 |
+| -1 | `PIPER_PLUS_ERR` | 汎用エラー |
+| -2 | `PIPER_PLUS_ERR_MODEL` | モデル読み込み失敗 |
+| -3 | `PIPER_PLUS_ERR_CONFIG` | 設定読み込み失敗 |
+| -4 | `PIPER_PLUS_ERR_TEXT` | 不正テキスト入力 |
+| -5 | `PIPER_PLUS_ERR_BUSY` | 合成中の再入 |
+| -6 | `PIPER_PLUS_ERR_ORT` | ONNX Runtime エラー |
+
+**Config struct (POD, memset-safe):**
 
 ```c
-#ifndef PIPER_PLUS_H_
-#define PIPER_PLUS_H_
-
-#include <stdint.h>
-#include <stddef.h>
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-/* ===== Export macro ===== */
-#if defined(_WIN32) || defined(_WIN64)
-  #ifdef PIPER_PLUS_BUILDING_DLL
-    #define PIPER_PLUS_API __declspec(dllexport)
-  #else
-    #define PIPER_PLUS_API __declspec(dllimport)
-  #endif
-#elif defined(__GNUC__) && __GNUC__ >= 4
-  #define PIPER_PLUS_API __attribute__((visibility("default")))
-#else
-  #define PIPER_PLUS_API
-#endif
-
-/* ===== Version ===== */
-#define PIPER_PLUS_API_VERSION 1
-
-PIPER_PLUS_API const char *piper_plus_version(void);
-PIPER_PLUS_API int32_t     piper_plus_api_version(void);
-
-/* ===== Status codes ===== */
-#define PIPER_PLUS_OK          0
-#define PIPER_PLUS_DONE        1   /* Iterator: no more chunks */
-#define PIPER_PLUS_ERR        -1   /* Generic error */
-#define PIPER_PLUS_ERR_MODEL  -2   /* Model load failure */
-#define PIPER_PLUS_ERR_CONFIG -3   /* Config load failure */
-#define PIPER_PLUS_ERR_TEXT   -4   /* Invalid text input */
-
-PIPER_PLUS_API const char *piper_plus_get_last_error(void);
-
-/* ===== Opaque types ===== */
-typedef struct PiperPlusEngine PiperPlusEngine;
-
-/* ===== Config structs (POD) ===== */
 typedef struct PiperPlusConfig {
-    const char *model_path;       /* .onnx file path (UTF-8) */
-    const char *config_path;      /* .json config path (UTF-8, NULL = model_path + ".json") */
-    const char *provider;         /* "cpu", "cuda", "coreml", "directml" (NULL = "cpu") */
-    int32_t     num_threads;      /* ONNX Runtime intra-op threads (0 = auto) */
-    int32_t     gpu_device_id;    /* GPU device index (provider != "cpu" の場合) */
-    int32_t     _reserved[8];     /* ABI padding */
+    const char *model_path;       /* Required: .onnx file path (UTF-8) */
+    const char *config_path;      /* Optional: .json config path (NULL = model_path + ".json") */
+    const char *provider;         /* Optional: "cpu","cuda","coreml","directml" (NULL = "cpu") */
+    int32_t     num_threads;      /* ONNX intra-op threads (0 = auto) */
+    int32_t     gpu_device_id;    /* GPU device index (ignored for cpu) */
+    const char *dict_dir;         /* Optional: OpenJTalk dict dir (NULL = auto-detect) */
+    int32_t     _reserved[7];     /* Must be zero */
 } PiperPlusConfig;
-
-typedef struct PiperPlusSynthOptions {
-    int32_t speaker_id;           /* 話者 ID (default: 0) */
-    int32_t language_id;          /* 言語 ID (-1 = auto-detect) */
-    float   noise_scale;          /* default: 0.667 */
-    float   length_scale;         /* default: 1.0 */
-    float   noise_w;              /* default: 0.8 */
-    float   sentence_silence_sec; /* default: 0.2 */
-    int32_t _reserved[8];         /* ABI padding */
-} PiperPlusSynthOptions;
-
-/* ===== Audio output ===== */
-typedef struct PiperPlusAudioChunk {
-    const float *samples;         /* PCM float32 [-1.0, 1.0] */
-    int32_t      num_samples;
-    int32_t      sample_rate;
-    int32_t      is_last;         /* 1 if final chunk */
-} PiperPlusAudioChunk;
-
-/* ===== Streaming callback ===== */
-typedef void (*PiperPlusAudioCallback)(
-    const float *samples,
-    int32_t      num_samples,
-    int32_t      sample_rate,
-    void        *user_data
-);
-
-/* ===== Lifecycle ===== */
-PIPER_PLUS_API PiperPlusEngine *piper_plus_create(
-    const PiperPlusConfig *config);
-
-PIPER_PLUS_API void piper_plus_free(
-    PiperPlusEngine *engine);
-
-/* ===== Default options ===== */
-PIPER_PLUS_API PiperPlusSynthOptions piper_plus_default_options(void);
-
-/* ===== Synthesis: one-shot ===== */
-PIPER_PLUS_API int32_t piper_plus_synthesize(
-    PiperPlusEngine              *engine,
-    const char                   *text,
-    const PiperPlusSynthOptions  *opts,         /* NULL = defaults */
-    float                       **out_samples,
-    int32_t                      *out_num_samples,
-    int32_t                      *out_sample_rate);
-
-PIPER_PLUS_API void piper_plus_free_audio(float *samples);
-
-/* ===== Synthesis: iterator pattern ===== */
-PIPER_PLUS_API int32_t piper_plus_synth_start(
-    PiperPlusEngine              *engine,
-    const char                   *text,
-    const PiperPlusSynthOptions  *opts);        /* NULL = defaults */
-
-PIPER_PLUS_API int32_t piper_plus_synth_next(
-    PiperPlusEngine      *engine,
-    PiperPlusAudioChunk  *out_chunk);           /* caller provides, callee fills */
-
-/* ===== Synthesis: streaming with callback ===== */
-PIPER_PLUS_API int32_t piper_plus_synthesize_streaming(
-    PiperPlusEngine              *engine,
-    const char                   *text,
-    const PiperPlusSynthOptions  *opts,         /* NULL = defaults */
-    PiperPlusAudioCallback        callback,
-    void                         *user_data);
-
-/* ===== Query ===== */
-PIPER_PLUS_API int32_t piper_plus_sample_rate(const PiperPlusEngine *engine);
-PIPER_PLUS_API int32_t piper_plus_num_speakers(const PiperPlusEngine *engine);
-PIPER_PLUS_API int32_t piper_plus_num_languages(const PiperPlusEngine *engine);
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif /* PIPER_PLUS_H_ */
 ```
 
-### 5.1 API 設計判断の根拠
+**SynthOptions (zero-init safe):**
+
+```c
+typedef struct PiperPlusSynthOptions {
+    int32_t speaker_id;           /* Speaker index (default: 0) */
+    int32_t language_id;          /* Language index (-1 = auto-detect, default: -1) */
+    float   noise_scale;          /* VITS noise_scale (0.0 = default 0.667) */
+    float   length_scale;         /* VITS length_scale (0.0 = default 1.0) */
+    float   noise_w;              /* VITS noise_w (0.0 = default 0.8) */
+    float   sentence_silence_sec; /* Silence between sentences (default: 0.2) */
+    int32_t _reserved[8];         /* Must be zero */
+} PiperPlusSynthOptions;
+```
+
+**Cancellable streaming callback (M5-7):**
+
+```c
+typedef int (*PiperPlusAudioCallbackEx)(
+    const float *samples, int32_t num_samples, int32_t sample_rate, void *user_data);
+
+PIPER_PLUS_API PiperPlusStatus piper_plus_synthesize_streaming_ex(
+    PiperPlusEngine *engine, const char *text,
+    const PiperPlusSynthOptions *opts, PiperPlusAudioCallbackEx callback, void *user_data);
+```
+
+> 完全なヘッダーは `src/cpp/piper_plus.h` を参照。
+
+### 5.1 初期設計案からの変更点 (Phase 5)
+
+| 変更 | 初期設計案 | 実装 (Phase 5 後) | 理由 / チケット |
+|------|-----------|------------------|----------------|
+| ステータスコード | `#define` 定数 | `typedef enum PiperPlusStatus` | デバッガでの可読性向上。ABI 互換性は `int32_t` と同等 (M5-13) |
+| `piper_plus_create` | `PiperPlusEngine*` 戻り | `PiperPlusStatus` 戻り + `out_engine` | `ERR_MODEL` / `ERR_CONFIG` / `ERR_ORT` の正確な返却 (M5-14) |
+| `PiperPlusConfig` | `_reserved[8]` | `dict_dir` フィールド + `_reserved[7]` | 共有ライブラリでの辞書パス指定 (M1-3) |
+| `num_threads` | 設計のみ (Phase 1 では無視) | `Ort::SessionOptions::SetIntraOpNumThreads()` に反映 (M5-5) |
+| `provider` | `"cpu"` / `"cuda"` のみ | `"coreml"` / `"directml"` も実装済み (M5-6) |
+| ゼロ初期化 | 未規定 | `noise_scale` 等が 0.0 ならデフォルト値に自動置換 (M5-9) |
+| ストリーミング中断 | 未設計 | `synthesize_streaming_ex` + `PiperPlusAudioCallbackEx` (M5-7) |
+| 追加エラーコード | なし | `ERR_BUSY` (-5), `ERR_ORT` (-6) (M5-13) |
+
+### 5.2 API 設計判断の根拠
 
 | 設計判断 | 根拠 |
 |----------|------|
-| 3つの合成パターン (one-shot / iterator / callback) | one-shot は Python/C#、iterator は Go/Rust、callback は Flutter/Dart に最適 |
-| `_reserved[8]` | struct サイズ変更なしで将来フィールド追加可能 (ABI 互換) |
+| 4つの合成パターン (one-shot / iterator / callback / cancel-callback) | one-shot は Python/C#、iterator は Go/Rust、callback は Flutter/Dart、cancel-callback はリアルタイム中断に最適 |
+| `_reserved[7]`/`[8]` | struct サイズ変更なしで将来フィールド追加可能 (ABI 互換) |
 | `language_id = -1` で自動検出 | piper-plus の `MultilingualPhonemizer` / `LanguageDetector` を活用 |
 | `provider` 文字列 | ONNX Runtime の ExecutionProvider 名をそのまま渡せる |
 | `PiperPlusAudioCallback` が `void` 戻り | Dart `NativeCallable.listener` との互換性 (void 戻りのみ対応) |
+| `PiperPlusAudioCallbackEx` が `int` 戻り | 非ゼロで中断。ゲームエンジン等のリアルタイム用途向け |
 | `piper_plus_free_audio()` 専用関数 | アロケータ不一致 (malloc vs new) を防止 |
 | `const char*` UTF-8 統一 | ONNX Runtime ガイドライン準拠、全 FFI 言語と互換 |
 | グローバルステートなし | 複数エンジンインスタンスの並行利用を許可 |
-| `#define` 定数 (enum 不使用) | C enum は ABI 脆弱。Fuchsia ガイドライン準拠 |
+| `typedef enum PiperPlusStatus` | デバッガでの可読性。`int32_t` とサイズ互換なので ABI は安全 |
+| RAII ガード (ConfigGuard / BusyGuard) | 例外発生時も `synthesisConfig` 復元 + `inProgress` フラグ解除を保証 |
 
 ### 5.2 endo5501 実装との差分
 
@@ -554,138 +511,120 @@ PIPER_PLUS_API int32_t piper_plus_num_languages(const PiperPlusEngine *engine);
 
 ---
 
-## 6. CMake ビルド設計
+## 6. CMake ビルド設計 (実装済み)
 
-### 6.1 概要
+### 6.1 CMake モジュール分割 (M5-15)
 
-```cmake
-option(PIPER_PLUS_BUILD_SHARED "Build piper-plus shared library" OFF)
+ルート `CMakeLists.txt` を 9 つの `cmake/*.cmake` モジュールに分割済み:
 
-if(PIPER_PLUS_BUILD_SHARED)
-    add_library(piper_plus SHARED
-        src/cpp/piper_plus_c_api.cpp    # C API ラッパー (新規)
-        src/cpp/piper.cpp
-        src/cpp/phoneme_parser.cpp
-        src/cpp/custom_dictionary.cpp
-        src/cpp/language_detector.cpp
-        src/cpp/english_phonemize.cpp
-        src/cpp/chinese_phonemize.cpp
-        src/cpp/korean_phonemize.cpp
-        src/cpp/spanish_phonemize.cpp
-        src/cpp/french_phonemize.cpp
-        src/cpp/portuguese_phonemize.cpp
-        src/cpp/swedish_phonemize.cpp
-        src/cpp/openjtalk_phonemize.cpp
-        src/cpp/openjtalk_phonemize_utils.cpp
-        src/cpp/openjtalk_wrapper.c
-        src/cpp/openjtalk_dictionary_manager.c
-        src/cpp/openjtalk_error.c
-        src/cpp/openjtalk_security.c
-        src/cpp/openjtalk_optimized.c
-        src/cpp/openjtalk_api.c
-        # ARM64 条件付き
-        # $<$<STREQUAL:${CMAKE_SYSTEM_PROCESSOR},aarch64>:src/cpp/audio_neon.cpp>
-    )
+| モジュール | 役割 |
+|-----------|------|
+| `cmake/CompilerSettings.cmake` | コンパイラフラグ、C/C++ 標準設定 |
+| `cmake/ExternalDeps.cmake` | OpenJTalk, spdlog, fmt 等の ExternalProject (-fPIC 設定含む) |
+| `cmake/OnnxRuntime.cmake` | ONNX Runtime 検出/自動ダウンロード |
+| `cmake/PiperCommon.cmake` | OBJECT ライブラリ `piper_common` (ソース一元管理) |
+| `cmake/PiperPlusShared.cmake` | 共有ライブラリ `piper_plus` (`PIPER_PLUS_BUILD_SHARED=ON` 時) |
+| `cmake/PiperExecutable.cmake` | CLI 実行ファイル `piper` |
+| `cmake/PiperLink.cmake` | リンク設定共通化 |
+| `cmake/Testing.cmake` | テストターゲット (Google Test) |
+| `cmake/Install.cmake` | install ルール (GNUInstallDirs, EXPORT) |
 
-    target_compile_definitions(piper_plus PRIVATE PIPER_PLUS_BUILDING_DLL)
-    set_target_properties(piper_plus PROPERTIES
-        C_VISIBILITY_PRESET hidden
-        CXX_VISIBILITY_PRESET hidden
-        VISIBILITY_INLINES_HIDDEN ON
-        VERSION ${PIPER_VERSION}
-        SOVERSION 1
-    )
-
-    # 依存ライブラリのリンク (既存と同等)
-    target_link_libraries(piper_plus PRIVATE
-        onnxruntime fmt spdlog openjtalk hts_engine Threads::Threads)
-
-    install(TARGETS piper_plus DESTINATION lib)
-    install(FILES src/cpp/piper_plus.h DESTINATION include)
-endif()
-```
+**OBJECT ライブラリ `piper_common`** でコアソースを一元管理し、`piper` (実行ファイル)、`piper_plus` (共有ライブラリ)、`test_piper` (テスト) で共有。
 
 ### 6.2 プラットフォーム別設定
 
 | 設定 | Linux | macOS | Windows |
 |------|-------|-------|---------|
 | 出力名 | `libpiper_plus.so.1` | `libpiper_plus.1.dylib` | `piper_plus.dll` + `piper_plus.lib` |
-| RPATH | `$ORIGIN` | `@rpath` | N/A |
-| C++ runtime | `-static-libstdc++` | system | MSVC DLL |
+| RPATH | `$ORIGIN` | `@loader_path` | N/A |
+| C++ runtime | `libstdc++` 動的リンク (共有ライブラリ)、`-static-libstdc++` (CLI のみ) | system | MSVC DLL |
 | export | `visibility("default")` | `visibility("default")` | `__declspec(dllexport)` |
+| -fPIC | ExternalProject に `CMAKE_POSITION_INDEPENDENT_CODE=ON` 適用済み | 常に PIC | 常に PIC |
 
 ---
 
-## 7. CI 拡張計画
+## 7. CI 構成 (実装済み)
 
-### 7.1 既存 CI の活用
+### 7.1 Reusable workflow (M5-17)
 
-既存の CI マトリクスにビルドオプションを追加:
+C++ テスト部分を `_build-test-cpp.yml` reusable workflow に抽出し、`cpp-tests.yml` と `ci.yml` の両方から呼び出す構造に統一。
 
-```yaml
-# cpp-tests.yml への追加
-strategy:
-  matrix:
-    os: [ubuntu-22.04, macos-latest, windows-latest]
-    build_type: [Release]
-    include:
-      - os: ubuntu-22.04
-        shared_lib: ON
-      - os: macos-latest
-        shared_lib: ON
-      - os: windows-latest
-        shared_lib: ON
-```
+### 7.2 CI マトリクス
 
-### 7.2 検証項目
+| ワークフロー | プラットフォーム | 内容 |
+|-------------|-----------------|------|
+| `_build-test-cpp.yml` | Linux, macOS, Windows | 共有ライブラリビルド + C API テスト (単体/統合) |
+| `android-build.yml` | Android arm64-v8a/armeabi-v7a/x86_64 | NDK クロスコンパイル + multi-ABI |
+| 既存 `cpp-tests.yml` | Linux, macOS, Windows | reusable workflow 経由 |
+
+### 7.3 検証項目 (実装済み)
 
 | テスト | 内容 |
 |--------|------|
-| ビルド成功 | 3 プラットフォームで `.so`/`.dylib`/`.dll` 生成 |
-| シンボル確認 | `nm -D` / `otool -t` で公開 API のみエクスポートされていること |
-| リンクテスト | C プログラムから `piper_plus_create()` を呼び出し |
-| ライフサイクル | create → synthesize → free が正常動作 |
+| ビルド成功 | 3 プラットフォーム + 3 Android ABI で `.so`/`.dylib`/`.dll` 生成 |
+| シンボル確認 | `nm -D` / `nm -gU` / `dumpbin /EXPORTS` で公開 API のみエクスポート |
+| 単体テスト | モデル不要テスト (NULL safety, バージョン, デフォルトオプション等) |
+| 統合テスト | テストモデルによるライフサイクル (create → synthesize → free)、Iterator、ストリーミング |
+| 音声回帰テスト | deterministic 合成の SHA-256 ハッシュ比較 (M5-21) |
+| テストモデルキャッシュ | CI キャッシュによるモデルダウンロード高速化 |
 
 ---
 
-## 8. 実装フェーズ
+## 8. 実装フェーズ (全完了)
 
-### Phase 1: 基本 C API (MVP)
-
-**スコープ:**
-- `piper_plus.h` ヘッダー
-- `piper_plus_c_api.cpp` 実装
-- CMake `PIPER_PLUS_BUILD_SHARED` オプション
-- ワンショット合成 (`piper_plus_synthesize`)
-- speaker_id / language_id 対応
-- 3 プラットフォームビルド
+### Phase 1: 基本 C API (MVP) -- Done
 
 **成果物:**
 - `libpiper_plus.so` / `.dylib` / `.dll`
 - `piper_plus.h` ヘッダー
+- ワンショット合成 (`piper_plus_synthesize`)
+- speaker_id / language_id / dict_dir 対応
+- 3 プラットフォームビルド
 
-### Phase 2: ストリーミング + テスト
+### Phase 2: ストリーミング + テスト -- Done
 
-**スコープ:**
+**成果物:**
 - Iterator パターン (`synth_start` / `synth_next`)
 - コールバック合成 (`synthesize_streaming`)
-- Google Test でユニットテスト
+- 単体テスト + 統合テスト (Google Test)
 - CI 統合
 
-### Phase 3: 配布
+### Phase 3: 配布 -- Done
 
-**スコープ:**
-- リリースワークフローでバイナリ配布
-- pkg-config / CMake Config 生成
-- 使用例ドキュメント (C / Dart / Go)
+**成果物:**
+- リリースワークフロー (`cmake --install` ベース)
+- pkg-config / CMake Config パッケージ生成
+- 使用例ドキュメント (`examples/c-api/`)
 
-### Phase 4: 拡張 (将来)
+### Phase 4: 拡張 -- Done
 
-**候補:**
-- カスタム辞書 API
-- Phoneme timing 出力
-- G2P 単独利用 API (`piper_plus_phonemize`)
-- Android NDK ビルド
+**成果物:**
+- カスタム辞書 API (`load_custom_dict`, `clear_custom_dict`, `add_dict_word`)
+- Phoneme timing 出力 (`get_phoneme_timing`)
+- G2P 単独利用 API (`piper_plus_phonemize`, `available_languages`)
+- Android NDK ビルド (arm64-v8a)
+- float32 直接出力パス
+- dladdr 辞書自動検出
+
+### Phase 5: 品質改善 + エコシステム拡大 -- Done
+
+**成果物:**
+- RAII ガード (ConfigGuard / BusyGuard) (M5-1)
+- num_threads / CoreML / DirectML provider 対応 (M5-5, M5-6)
+- ゼロ初期化安全対策 (M5-9)
+- PiperPlusStatus enum 化 + ERR_BUSY / ERR_ORT 追加 (M5-13)
+- piper_plus_create の status+out_engine パターン (M5-14)
+- ストリーミング中断 API: synthesize_streaming_ex (M5-7)
+- 多言語文分割改善 (M5-2)
+- phonemizeText 副作用除去 (M5-8)
+- Iterator crossfade (M5-3)
+- CMake 分割 (9ファイル) (M5-15)
+- CI reusable workflow (M5-17)
+- Android multi-ABI (arm64-v8a / armeabi-v7a / x86_64) (M5-11)
+- Dart FFI サンプル (`examples/dart/`) (M5-18)
+- Godot GDExtension サンプル (`examples/godot/`) (M5-19)
+- Android AAR パッケージング (M5-20)
+- 音声回帰テスト (M5-21)
 
 ---
 
