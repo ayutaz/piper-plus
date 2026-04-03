@@ -83,15 +83,40 @@ if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|ARM64")
   # add_compile_definitions(USE_ARM64_NEON)
 endif()
 
-add_executable(piper src/cpp/main.cpp src/cpp/piper.cpp src/cpp/phoneme_parser.cpp src/cpp/custom_dictionary.cpp src/cpp/model_manager.cpp src/cpp/language_detector.cpp src/cpp/english_phonemize.cpp src/cpp/chinese_phonemize.cpp src/cpp/korean_phonemize.cpp src/cpp/spanish_phonemize.cpp src/cpp/french_phonemize.cpp src/cpp/portuguese_phonemize.cpp src/cpp/swedish_phonemize.cpp)
-add_executable(test_piper src/cpp/test.cpp src/cpp/piper.cpp src/cpp/phoneme_parser.cpp src/cpp/custom_dictionary.cpp src/cpp/model_manager.cpp src/cpp/language_detector.cpp src/cpp/english_phonemize.cpp src/cpp/chinese_phonemize.cpp src/cpp/korean_phonemize.cpp src/cpp/spanish_phonemize.cpp src/cpp/french_phonemize.cpp src/cpp/portuguese_phonemize.cpp src/cpp/swedish_phonemize.cpp)
+# ---- piper_common OBJECT library (shared between piper, test_piper, piper_plus) ----
+set(PIPER_COMMON_SOURCES
+  src/cpp/piper.cpp
+  src/cpp/phoneme_parser.cpp
+  src/cpp/custom_dictionary.cpp
+  src/cpp/model_manager.cpp
+  src/cpp/language_detector.cpp
+  src/cpp/english_phonemize.cpp
+  src/cpp/chinese_phonemize.cpp
+  src/cpp/korean_phonemize.cpp
+  src/cpp/spanish_phonemize.cpp
+  src/cpp/french_phonemize.cpp
+  src/cpp/portuguese_phonemize.cpp
+  src/cpp/swedish_phonemize.cpp
+  src/cpp/openjtalk_phonemize.cpp
+  src/cpp/openjtalk_phonemize_utils.cpp
+  src/cpp/openjtalk_wrapper.c
+  src/cpp/openjtalk_dictionary_manager.c
+  src/cpp/openjtalk_error.c
+  src/cpp/openjtalk_security.c
+  src/cpp/openjtalk_optimized.c
+  src/cpp/openjtalk_api.c
+)
 
 # Add NEON optimized audio processing for ARM64
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|ARM64")
-  target_sources(piper PRIVATE src/cpp/audio_neon.cpp)
-  target_sources(test_piper PRIVATE src/cpp/audio_neon.cpp)
+  list(APPEND PIPER_COMMON_SOURCES src/cpp/audio_neon.cpp)
 endif()
 
+add_library(piper_common OBJECT ${PIPER_COMMON_SOURCES})
+set_target_properties(piper_common PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
+add_executable(piper src/cpp/main.cpp $<TARGET_OBJECTS:piper_common>)
+add_executable(test_piper src/cpp/test.cpp $<TARGET_OBJECTS:piper_common>)
 
 # Testing support
 option(BUILD_TESTS "Build unit tests" OFF)
@@ -112,27 +137,7 @@ if(BUILD_TESTS)
   # targets are defined, so that if(TARGET openjtalk_external) etc. work correctly.
 endif()
 
-# Add OpenJTalk support on all platforms
-target_sources(piper PRIVATE
-  src/cpp/openjtalk_phonemize.cpp
-  src/cpp/openjtalk_phonemize_utils.cpp
-  src/cpp/openjtalk_wrapper.c
-  src/cpp/openjtalk_dictionary_manager.c
-  src/cpp/openjtalk_error.c
-  src/cpp/openjtalk_security.c
-  src/cpp/openjtalk_optimized.c
-  src/cpp/openjtalk_api.c
-)
-target_sources(test_piper PRIVATE
-  src/cpp/openjtalk_phonemize.cpp
-  src/cpp/openjtalk_phonemize_utils.cpp
-  src/cpp/openjtalk_wrapper.c
-  src/cpp/openjtalk_dictionary_manager.c
-  src/cpp/openjtalk_error.c
-  src/cpp/openjtalk_security.c
-  src/cpp/openjtalk_optimized.c
-  src/cpp/openjtalk_api.c
-)
+# OpenJTalk sources are included in piper_common OBJECT library above
 
 # Link pthread library on Unix systems
 if(UNIX AND NOT APPLE)
@@ -198,8 +203,10 @@ if(NOT DEFINED FMT_DIR)
                -DFMT_TEST:BOOL=OFF  # Don't build all the tests
                -DFMT_HEADER_ONLY:BOOL=ON  # Build as header-only library
                -DBUILD_SHARED_LIBS:BOOL=OFF  # Build static libraries
+               -DCMAKE_POSITION_INDEPENDENT_CODE:BOOL=ON
                ${EXTERNAL_CMAKE_ARGS}
   )
+  add_dependencies(piper_common fmt_external)
   add_dependencies(piper fmt_external)
   add_dependencies(test_piper fmt_external)
 endif()
@@ -222,9 +229,11 @@ if(NOT DEFINED SPDLOG_DIR)
                -DSPDLOG_FMT_EXTERNAL:BOOL=ON  # Use external fmt
                -DCMAKE_PREFIX_PATH:PATH=${FMT_DIR}
                -DFMT_HEADER_ONLY:BOOL=ON  # Use fmt as header-only
+               -DCMAKE_POSITION_INDEPENDENT_CODE:BOOL=ON
                ${EXTERNAL_CMAKE_ARGS}
   )
   add_dependencies(spdlog_external fmt_external)
+  add_dependencies(piper_common spdlog_external)
   add_dependencies(piper spdlog_external)
   add_dependencies(test_piper spdlog_external)
 endif()
@@ -261,9 +270,11 @@ elseif(NOT DEFINED ONNXRUNTIME_DIR)
     INSTALL_COMMAND ${CMAKE_COMMAND} -E copy_directory <SOURCE_DIR>/lib ${ONNXRUNTIME_DIR}/lib
     COMMAND ${CMAKE_COMMAND} -E copy_directory <SOURCE_DIR>/include ${ONNXRUNTIME_DIR}/include
   )
+  add_dependencies(piper_common onnxruntime_external)
   add_dependencies(piper onnxruntime_external)
   add_dependencies(test_piper onnxruntime_external)
 
+  target_include_directories(piper_common PUBLIC ${ONNXRUNTIME_DIR}/include)
   target_include_directories(piper PUBLIC ${ONNXRUNTIME_DIR}/include)
   target_include_directories(test_piper PUBLIC ${ONNXRUNTIME_DIR}/include)
   target_link_directories(piper PUBLIC ${ONNXRUNTIME_DIR}/lib)
@@ -288,13 +299,14 @@ if(USE_HTS_ENGINE_STUB)
   # Build stub library
   add_library(hts_engine_stub STATIC ${CMAKE_CURRENT_SOURCE_DIR}/cmake/hts_engine_stub.c)
   target_include_directories(hts_engine_stub PUBLIC ${HTS_ENGINE_DIR}/include)
+  set_target_properties(hts_engine_stub PROPERTIES POSITION_INDEPENDENT_CODE ON)
   if(WIN32)
-    set_target_properties(hts_engine_stub PROPERTIES 
+    set_target_properties(hts_engine_stub PROPERTIES
       ARCHIVE_OUTPUT_DIRECTORY ${HTS_ENGINE_DIR}/lib
       OUTPUT_NAME HTSEngine
       PREFIX "")
   else()
-    set_target_properties(hts_engine_stub PROPERTIES 
+    set_target_properties(hts_engine_stub PROPERTIES
       ARCHIVE_OUTPUT_DIRECTORY ${HTS_ENGINE_DIR}/lib
       OUTPUT_NAME HTSEngine
       PREFIX "lib")
@@ -328,11 +340,12 @@ elseif(NOT DEFINED HTS_ENGINE_DIR)
         hts_engine_external
         PREFIX "${CMAKE_CURRENT_BINARY_DIR}/h"
         URL "https://downloads.sourceforge.net/project/hts-engine/hts_engine%20API/hts_engine_API-${HTS_ENGINE_VERSION}/hts_engine_API-${HTS_ENGINE_VERSION}.tar.gz"
-        CMAKE_ARGS 
+        CMAKE_ARGS
           -DCMAKE_INSTALL_PREFIX:PATH=${HTS_ENGINE_DIR}
           -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}
           -DBUILD_SHARED_LIBS:BOOL=OFF
           -DHTS_EMBEDDED:BOOL=ON
+          -DCMAKE_POSITION_INDEPENDENT_CODE:BOOL=ON
           -DCMAKE_MSVC_RUNTIME_LIBRARY:STRING=${CMAKE_MSVC_RUNTIME_LIBRARY}
           ${EXTERNAL_CMAKE_ARGS}
         PATCH_COMMAND ${CMAKE_COMMAND} -E copy 
@@ -346,14 +359,14 @@ elseif(NOT DEFINED HTS_ENGINE_DIR)
       if(APPLE)
         # Apple Silicon (arm64) only
         set(CONFIGURE_HOST "--host=aarch64-apple-darwin")
-        set(CONFIGURE_ENV "CFLAGS=-arch arm64" "CXXFLAGS=-arch arm64" "LDFLAGS=-arch arm64")
+        set(CONFIGURE_ENV "CFLAGS=-arch arm64 -fPIC" "CXXFLAGS=-arch arm64 -fPIC" "LDFLAGS=-arch arm64")
       elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64" AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
         # Linux ARM64 cross-compilation
         set(CONFIGURE_HOST "--host=aarch64-linux-gnu")
-        set(CONFIGURE_ENV "CC=aarch64-linux-gnu-gcc" "CXX=aarch64-linux-gnu-g++" "AR=aarch64-linux-gnu-ar" "RANLIB=aarch64-linux-gnu-ranlib")
+        set(CONFIGURE_ENV "CC=aarch64-linux-gnu-gcc" "CXX=aarch64-linux-gnu-g++" "AR=aarch64-linux-gnu-ar" "RANLIB=aarch64-linux-gnu-ranlib" "CFLAGS=-fPIC" "CXXFLAGS=-fPIC")
       else()
         set(CONFIGURE_HOST "")
-        set(CONFIGURE_ENV "")
+        set(CONFIGURE_ENV "CFLAGS=-fPIC" "CXXFLAGS=-fPIC")
       endif()
 
       ExternalProject_Add(
@@ -386,6 +399,7 @@ if(NOT DEFINED OPENJTALK_DIR)
       -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}
       -DBUILD_SHARED_LIBS:BOOL=OFF
       -DCHARSET:STRING=utf8
+      -DCMAKE_POSITION_INDEPENDENT_CODE:BOOL=ON
       ${EXTERNAL_CMAKE_ARGS}
     )
 
@@ -486,10 +500,12 @@ endif()
 
 # Link OpenJTalk libraries
 # Ensure OpenJTalk is built before linking
+add_dependencies(piper_common openjtalk_external)
 add_dependencies(piper openjtalk_external)
 add_dependencies(test_piper openjtalk_external)
 
 # Link HTS_Engine (required for OpenJTalk build)
+add_dependencies(piper_common hts_engine_external)
 add_dependencies(piper hts_engine_external)
 add_dependencies(test_piper hts_engine_external)
 
@@ -514,6 +530,27 @@ else()
   endif()
 endif()
 
+# ---- piper_common include directories and compile definitions ----
+# piper_common needs these at compile time for OBJECT files
+target_include_directories(piper_common PUBLIC
+  ${FMT_DIR}/include
+  ${SPDLOG_DIR}/include
+  ${OPENJTALK_DIR}/include
+  ${OPENJTALK_DIR}/include/openjtalk
+  ${HTS_ENGINE_DIR}/include
+)
+target_compile_definitions(piper_common PUBLIC
+  _PIPER_VERSION=${piper_version}
+  SPDLOG_FMT_EXTERNAL=1
+  FMT_HEADER_ONLY=1
+)
+
+# Add ONNX Runtime include directory for Windows (piper_common)
+if(WIN32 AND ONNXRUNTIME_INCLUDE_DIR)
+  target_include_directories(piper_common PUBLIC ${ONNXRUNTIME_INCLUDE_DIR})
+endif()
+
+# ---- piper / test_piper link directories and include directories ----
 target_link_directories(piper PUBLIC
   ${FMT_DIR}/lib
   ${SPDLOG_DIR}/lib
@@ -641,6 +678,125 @@ endif()
 
 # OpenJTalk is linked as a static library (r9y9 fork) for direct API access
 
+# ---- piper_plus SHARED library (C API) ----
+
+option(PIPER_PLUS_BUILD_SHARED "Build piper-plus shared library (C API)" OFF)
+
+if(PIPER_PLUS_BUILD_SHARED)
+  add_library(piper_plus SHARED
+    src/cpp/piper_plus_c_api.cpp
+    $<TARGET_OBJECTS:piper_common>
+  )
+
+  # Dependencies (same as piper/test_piper)
+  add_dependencies(piper_plus fmt_external spdlog_external openjtalk_external hts_engine_external)
+  if(TARGET onnxruntime_external)
+    add_dependencies(piper_plus onnxruntime_external)
+  endif()
+
+  # Include directories (same as piper_common)
+  target_include_directories(piper_plus PUBLIC
+    ${FMT_DIR}/include
+    ${SPDLOG_DIR}/include
+    ${OPENJTALK_DIR}/include
+    ${OPENJTALK_DIR}/include/openjtalk
+    ${HTS_ENGINE_DIR}/include
+  )
+  if(WIN32 AND ONNXRUNTIME_INCLUDE_DIR)
+    target_include_directories(piper_plus PUBLIC ${ONNXRUNTIME_INCLUDE_DIR})
+  elseif(NOT WIN32 AND DEFINED ONNXRUNTIME_DIR)
+    target_include_directories(piper_plus PUBLIC ${ONNXRUNTIME_DIR}/include)
+  endif()
+
+  # Compile definitions (same as piper_common, but NO OPENJTALK_DIC_PATH -- C API uses dict_dir)
+  target_compile_definitions(piper_plus PRIVATE
+    PIPER_PLUS_BUILDING_DLL
+    _PIPER_VERSION=${piper_version}
+    SPDLOG_FMT_EXTERNAL=1
+    FMT_HEADER_ONLY=1
+  )
+
+  # Link directories
+  target_link_directories(piper_plus PUBLIC
+    ${FMT_DIR}/lib
+    ${SPDLOG_DIR}/lib
+  )
+  if(NOT WIN32 AND DEFINED ONNXRUNTIME_DIR)
+    target_link_directories(piper_plus PUBLIC ${ONNXRUNTIME_DIR}/lib)
+  endif()
+
+  # Link libraries -- NOTE: -static-libstdc++ is intentionally NOT applied (M1-2)
+  if(WIN32)
+    target_link_libraries(piper_plus PRIVATE
+      optimized ${FMT_DIR}/lib/fmt.lib
+      debug ${FMT_DIR}/lib/fmtd.lib
+      optimized ${SPDLOG_DIR}/lib/spdlog.lib
+      debug ${SPDLOG_DIR}/lib/spdlogd.lib
+      ${ONNXRUNTIME_LIB}
+      ${OPENJTALK_DIR}/lib/openjtalk.lib
+    )
+  else()
+    target_link_libraries(piper_plus PRIVATE
+      fmt
+      spdlog
+      onnxruntime
+      ${PIPER_EXTRA_LIBRARIES}
+    )
+    # Link OpenJTalk static library
+    target_link_libraries(piper_plus PRIVATE ${OPENJTALK_DIR}/lib/libopenjtalk.a)
+  endif()
+
+  # Link HTS Engine
+  if(USE_HTS_ENGINE_STUB)
+    target_link_libraries(piper_plus PRIVATE hts_engine_stub)
+  else()
+    if(WIN32)
+      target_link_libraries(piper_plus PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/he/lib/HTSEngine.lib)
+    else()
+      target_link_libraries(piper_plus PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/he/lib/libHTSEngine.a)
+    endif()
+  endif()
+
+  # Link pthread on Linux
+  if(UNIX AND NOT APPLE)
+    find_package(Threads REQUIRED)
+    target_link_libraries(piper_plus PRIVATE Threads::Threads)
+  endif()
+
+  # Visibility and output settings
+  set_target_properties(piper_plus PROPERTIES
+    C_VISIBILITY_PRESET hidden
+    CXX_VISIBILITY_PRESET hidden
+    VISIBILITY_INLINES_HIDDEN ON
+    OUTPUT_NAME "piper_plus"
+  )
+
+  # RPATH settings
+  if(APPLE)
+    set_target_properties(piper_plus PROPERTIES
+      MACOSX_RPATH TRUE
+      INSTALL_RPATH "@loader_path"
+    )
+  elseif(UNIX)
+    set_target_properties(piper_plus PROPERTIES
+      INSTALL_RPATH "$ORIGIN"
+      BUILD_WITH_INSTALL_RPATH TRUE
+    )
+  endif()
+
+  # Install targets
+  include(GNUInstallDirs)
+  install(TARGETS piper_plus
+    EXPORT PiperPlusTargets
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+  )
+  install(FILES src/cpp/piper_plus.h
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+  )
+endif()
+
 # ---- Declare install targets ----
 
 install(
@@ -708,9 +864,12 @@ if(WIN32)
     endif()
   endfunction()
   
-  # Apply DLL copying to both targets
+  # Apply DLL copying to targets
   copy_dlls_to_target(piper)
   copy_dlls_to_target(test_piper)
+  if(PIPER_PLUS_BUILD_SHARED)
+    copy_dlls_to_target(piper_plus)
+  endif()
   
   # Install ONNX Runtime DLL
   if(ONNXRUNTIME_DLL)
