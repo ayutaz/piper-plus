@@ -1,6 +1,7 @@
 # M4-3: G2P 単独利用 API
 
 > **Phase:** 4 -- 拡張 (将来)
+> **利用者視点の優先度:** 低 -- 利用者フィードバック待ちでも可 (TTS 利用者の多くは G2P 単独利用を必要としない)
 > **見積り:** 中
 > **依存:** Phase 3 完了
 > **ブロック:** なし (独立実装可能)
@@ -253,7 +254,37 @@ void                piper_plus_g2p_free(PiperPlusG2pHandle *h);
 
 ---
 
-## 7. 後続タスクへの連絡事項
+## 7. Rust FFI との整合性
+
+> **Phase 4 振り返りで追加 (2026-04-03)**
+
+### 二重実装のトレードオフ
+
+Rust `piper-plus-g2p` の FFI (`ffi.rs`) と C++ C API の M4-3 は設計哲学が異なる:
+
+| 側 | API | ハンドル | 辞書管理 | 特徴 |
+|----|-----|---------|---------|------|
+| Rust `piper-plus-g2p` FFI | `piper_plus_g2p_create/phonemize/free` | `PiperG2pHandle` (モデル非依存) | レジストリ内で自動ロード | G2P のみ提供、軽量 |
+| C++ C API (M4-3) | `piper_plus_phonemize` | `PiperPlusEngine` (モデル依存) | エンジン作成時にロード済み | モデルの言語設定を自動利用 |
+
+**メリット (二重実装):**
+- C++ 版はエンジン内の辞書データ (CMU dict, pinyin dict, OpenJTalk) を自動利用でき、利用者の追加設定が不要
+- Rust FFI はモデルなしで G2P のみ利用可能 (学習データ前処理、検索インデックス等)
+- シンボル名が異なる (`piper_plus_g2p_*` vs `piper_plus_*`) ため、同一プロセスでの共存が可能
+
+**デメリット (二重実装):**
+- 辞書バージョンや G2P ロジックの差異により、同一テキストで異なる音素が返される可能性
+- 2 つの API の保守コスト
+
+### 長期的な統合方針
+
+1. **短期 (Phase 4):** C++ エンジンベースの `piper_plus_phonemize` を提供。Rust FFI とは独立して運用。
+2. **中期:** Rust `piper-plus-g2p` FFI が成熟し、全 8 言語で安定した場合、C++ C API の G2P はエンジン内部で Rust FFI を呼び出す設計に移行可能。ただし C++ ビルドに Rust ツールチェインへの依存が追加されるため、ビルドの複雑さが増す。
+3. **長期:** Rust FFI を唯一の G2P C API とし、C++ 版の `piper_plus_phonemize` を deprecated にする選択肢も残す。この判断は利用者の Rust FFI 採用状況に基づく。
+
+---
+
+## 8. 後続タスクへの連絡事項
 
 - **M2-1 (音素化ループ抽出) との依存:** M2-1 で `phonemizeText()` が抽出されていれば M4-3 の工数が大幅に削減される。M2-1 が未完了の場合、M4-3 で抽出を行い、M2-1 のスコープに反映する。
 - **M4-1 (カスタム辞書) との統合:** G2P API でもカスタム辞書を適用する。`piper_plus_phonemize()` 内で `customDict->applyToText()` を呼ぶ。

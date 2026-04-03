@@ -541,7 +541,21 @@ on:
 
 ---
 
-## 10. 後続タスクへの連絡事項
+## 10. 将来拡張: Android ビルド (M4-4 参照)
+
+> **Phase 4 振り返りで追加 (2026-04-03)**
+
+Flutter 最大ターゲットが Android であるため、本ワークフローに Android ビルドをオプショナルステップとして追加することを推奨。M4-4 ([M4-4-android-ndk.md](M4-4-android-ndk.md)) の実装完了時に以下の拡張を行う:
+
+- `build-piper.yml` に `build-android` input (デフォルト `false`) を予約
+- M4-4 完了時にフラグを有効化し、`piper-plus-shared-android-arm64.tar.gz` をリリースアセットに追加
+- 対象 ABI: `arm64-v8a` のみ (最小スコープ)
+
+詳細は M4-4 のセクション 7「Phase 3 M3-5 への統合オプション」を参照。
+
+---
+
+## 11. 後続タスクへの連絡事項
 
 - **M3-6 (使用例):** リリースアセットのダウンロード先 URL 形式は `https://github.com/ayutaz/piper-plus/releases/download/v{version}/piper-plus-shared-{platform}.tar.gz`。使用例ドキュメントにこの URL パターンを記載する。
 - **dev-create-release.yml のリリースノート:** `release_summary` ジョブに共有ライブラリのアセット情報を追加する。

@@ -1,6 +1,7 @@
 # M4-4: Android NDK ビルド
 
 > **Phase:** 4 -- 拡張 (将来)
+> **利用者視点の優先度:** 高 -- Flutter 最大ターゲットが Android。Phase 3 完了直後に着手推奨。
 > **見積り:** 大
 > **依存:** Phase 3 完了
 > **ブロック:** なし (独立実装可能)
@@ -271,7 +272,46 @@ jobs:
 
 ---
 
-## 7. 後続タスクへの連絡事項
+## 7. Phase 3 M3-5 への統合オプション
+
+> **Phase 4 振り返りで追加 (2026-04-03)**
+
+Flutter 最大ターゲットが Android であるため、M3-5 のリリースワークフローに Android ビルドをオプショナルステップとして含めることで、`v1.0.0` リリース時点で Android バイナリが即座に利用可能になる。
+
+### 統合案
+
+M3-5 (`build-piper.yml`) に以下のオプショナルステップを追加:
+
+```yaml
+build-android:
+  description: 'Build Android arm64-v8a shared library'
+  required: false
+  type: boolean
+  default: false
+```
+
+**最小スコープ:** `arm64-v8a` のみ (armeabi-v7a なし)。M3-5 に +1 日程度で統合可能と推定。
+
+**リリースアセット追加:** `piper-plus-shared-android-arm64.tar.gz` を GitHub Release にアップロード。
+
+### トレードオフ
+
+| 観点 | M3-5 統合 | M4-4 独立 |
+|------|----------|----------|
+| 初期提供の速さ | v1.0.0 で Android 対応 | Phase 4 着手まで待機 |
+| M3-5 の複雑さ | 条件分岐が増加 | M3-5 のスコープを維持 |
+| テスト範囲 | M3-5 の CI に Android ビルドが追加 | 独立した CI ワークフロー |
+| 依存管理 | ExternalProject のクロスコンパイル問題が M3-5 に波及 | 問題が M4-4 内に閉じる |
+
+### 推奨
+
+M3-5 の実装時に Android ビルドのオプショナルフラグを「予約」しておき (`build-android: false`)、M4-4 の実装完了時にフラグを有効化する方式が最も安全。これにより M3-5 のスコープを維持しつつ、M4-4 完了時の統合コストを最小化できる。
+
+**参照:** M3-5 ([M3-5-release-workflow.md](M3-5-release-workflow.md)) に「将来拡張: Android ビルド (M4-4 参照)」の注記を追加済み。
+
+---
+
+## 8. 後続タスクへの連絡事項
 
 - **M3-5 (リリースワークフロー):** Android ビルドが完了すれば、リリースワークフローに `arm64-v8a` のアーティファクトを追加可能。
 - **M4-6 (dladdr 辞書自動検出):** Android では `dladdr()` が利用可能 (`<dlfcn.h>`)。M4-6 の実装は Android でも動作するため、`dict_dir = NULL` 時の自動検出が改善される。
