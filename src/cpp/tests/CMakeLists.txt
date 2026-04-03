@@ -509,3 +509,79 @@ target_link_libraries(test_phoneme_timing
 )
 
 add_test(NAME test_phoneme_timing COMMAND test_phoneme_timing)
+
+# ---- test_c_api: C API shared library unit tests ----
+# Compiles piper_plus_c_api.cpp directly with piper_common object library.
+# piper_plus_c_api.cpp wraps the full piper:: namespace, so it needs
+# the same dependencies as the streaming tests (onnxruntime, openjtalk, etc.).
+add_executable(test_c_api
+    test_c_api.cpp
+    ../piper_plus_c_api.cpp
+    $<TARGET_OBJECTS:piper_common>
+)
+
+target_link_libraries(test_c_api PRIVATE
+    gtest
+    gtest_main
+)
+
+# Include directories: piper_plus.h lives in src/cpp/
+target_include_directories(test_c_api PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+    ${CMAKE_BINARY_DIR}/fi/include
+    ${CMAKE_BINARY_DIR}/si/include
+    ${ORT_INCLUDE_DIR}
+    ${CMAKE_BINARY_DIR}/oj/include
+    ${CMAKE_BINARY_DIR}/oj/include/openjtalk
+    ${CMAKE_BINARY_DIR}/hts_stub/include
+)
+
+# Library directories
+target_link_directories(test_c_api PRIVATE
+    ${CMAKE_BINARY_DIR}/fi/lib
+    ${CMAKE_BINARY_DIR}/si/lib
+    ${ORT_LIB_DIR}
+)
+
+# Platform-specific library linking
+if(WIN32)
+    target_link_libraries(test_c_api PRIVATE
+        optimized ${CMAKE_BINARY_DIR}/fi/lib/fmt.lib
+        debug ${CMAKE_BINARY_DIR}/fi/lib/fmtd.lib
+        optimized ${CMAKE_BINARY_DIR}/si/lib/spdlog.lib
+        debug ${CMAKE_BINARY_DIR}/si/lib/spdlogd.lib
+        ${ORT_LIB_DIR}/onnxruntime.lib
+    )
+    target_link_libraries(test_c_api PRIVATE ${CMAKE_BINARY_DIR}/oj/lib/openjtalk.lib)
+else()
+    target_link_libraries(test_c_api PRIVATE
+        fmt
+        spdlog
+        onnxruntime
+    )
+    target_link_libraries(test_c_api PRIVATE ${CMAKE_BINARY_DIR}/oj/lib/libopenjtalk.a)
+endif()
+
+# HTS Engine stub
+if(TARGET hts_engine_stub)
+    target_link_libraries(test_c_api PRIVATE hts_engine_stub)
+endif()
+
+# Platform-specific threading
+if(UNIX)
+    find_package(Threads REQUIRED)
+    target_link_libraries(test_c_api PRIVATE Threads::Threads)
+endif()
+
+# Build order dependencies
+if(TARGET fmt_external)
+    add_dependencies(test_c_api fmt_external)
+endif()
+if(TARGET spdlog_external)
+    add_dependencies(test_c_api spdlog_external)
+endif()
+if(TARGET openjtalk_external)
+    add_dependencies(test_c_api openjtalk_external)
+endif()
+
+add_test(NAME test_c_api COMMAND test_c_api)
