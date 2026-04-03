@@ -94,6 +94,57 @@ PIPER_PLUS_API int32_t piper_plus_language_id(
     const PiperPlusEngine *engine,
     const char            *language_name);
 
+/* ===== Audio chunk (for iterator/streaming) ===== */
+
+typedef struct PiperPlusAudioChunk {
+    const float *samples;         /* Audio samples (internal buffer, valid until next call) */
+    int32_t      num_samples;     /* Number of samples */
+    int32_t      sample_rate;     /* Sample rate in Hz */
+    int32_t      is_last;         /* 1 if this is the last chunk, 0 otherwise */
+} PiperPlusAudioChunk;
+
+/* ===== Iterator pattern (sentence-by-sentence synthesis) ===== */
+
+/**
+ * Start iterative synthesis.
+ * Splits text into sentences and prepares internal queue.
+ * Call piper_plus_synth_next() repeatedly to get audio chunks.
+ *
+ * @note One engine = one synthesis at a time (NOT thread-safe).
+ * @note out_chunk->samples points to internal buffer;
+ *       valid until next synth_next() or synth_start() call.
+ */
+PIPER_PLUS_API int32_t piper_plus_synth_start(
+    PiperPlusEngine              *engine,
+    const char                   *text,
+    const PiperPlusSynthOptions  *opts);
+
+PIPER_PLUS_API int32_t piper_plus_synth_next(
+    PiperPlusEngine      *engine,
+    PiperPlusAudioChunk  *out_chunk);
+
+/* ===== Streaming callback synthesis ===== */
+
+typedef void (*PiperPlusAudioCallback)(
+    const float *samples,
+    int32_t      num_samples,
+    int32_t      sample_rate,
+    void        *user_data);
+
+/**
+ * Synthesize text with streaming callback.
+ * Internally drives synth_start/synth_next and delivers chunks via callback.
+ *
+ * @note Callback is invoked on caller's thread (synchronous).
+ * @note samples pointer in callback is valid only during invocation.
+ */
+PIPER_PLUS_API int32_t piper_plus_synthesize_streaming(
+    PiperPlusEngine              *engine,
+    const char                   *text,
+    const PiperPlusSynthOptions  *opts,
+    PiperPlusAudioCallback        callback,
+    void                         *user_data);
+
 #ifdef __cplusplus
 }
 #endif

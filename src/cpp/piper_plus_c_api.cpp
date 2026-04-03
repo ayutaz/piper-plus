@@ -38,12 +38,23 @@ static void set_error(const std::string &msg) {
     g_last_error = msg;
 }
 
+// ===== Iterator state for streaming synthesis =====
+
+struct IteratorState {
+    std::vector<std::string> sentences;
+    size_t currentIndex = 0;
+    std::vector<float> currentChunkSamples;
+    bool active = false;
+    piper::SynthesisConfig savedConfig;
+};
+
 // ===== Opaque engine structure =====
 
 struct PiperPlusEngine {
     piper::PiperConfig config;
     piper::Voice voice;
     std::atomic<bool> inProgress{false};
+    IteratorState iterState;          // Phase 2: streaming state
 };
 
 // ===== Helpers =====
@@ -71,6 +82,28 @@ static float *int16_to_float(const std::vector<int16_t> &buf, int32_t *out_count
         samples[i] = static_cast<float>(buf[i]) / NORM_FACTOR;
     }
     return samples;
+}
+
+// ===== Shared helper: apply synthesis options =====
+
+static void applySynthOptions(piper::SynthesisConfig &synthConfig,
+                              const PiperPlusSynthOptions *opts) {
+    PiperPlusSynthOptions effectiveOpts;
+    if (opts) {
+        effectiveOpts = *opts;
+    } else {
+        effectiveOpts = piper_plus_default_options();
+    }
+    if (effectiveOpts.speaker_id >= 0) {
+        synthConfig.speakerId = effectiveOpts.speaker_id;
+    }
+    if (effectiveOpts.language_id >= 0) {
+        synthConfig.languageId = effectiveOpts.language_id;
+    }
+    synthConfig.noiseScale = effectiveOpts.noise_scale;
+    synthConfig.lengthScale = effectiveOpts.length_scale;
+    synthConfig.noiseW = effectiveOpts.noise_w;
+    synthConfig.sentenceSilenceSeconds = effectiveOpts.sentence_silence_sec;
 }
 
 // ===== API implementation =====
@@ -208,24 +241,7 @@ PIPER_PLUS_API int32_t piper_plus_synthesize(
 
     try {
         // Apply options
-        PiperPlusSynthOptions effectiveOpts;
-        if (opts) {
-            effectiveOpts = *opts;
-        } else {
-            effectiveOpts = piper_plus_default_options();
-        }
-
-        // Apply user options
-        if (effectiveOpts.speaker_id >= 0) {
-            engine->voice.synthesisConfig.speakerId = effectiveOpts.speaker_id;
-        }
-        if (effectiveOpts.language_id >= 0) {
-            engine->voice.synthesisConfig.languageId = effectiveOpts.language_id;
-        }
-        engine->voice.synthesisConfig.noiseScale = effectiveOpts.noise_scale;
-        engine->voice.synthesisConfig.lengthScale = effectiveOpts.length_scale;
-        engine->voice.synthesisConfig.noiseW = effectiveOpts.noise_w;
-        engine->voice.synthesisConfig.sentenceSilenceSeconds = effectiveOpts.sentence_silence_sec;
+        applySynthOptions(engine->voice.synthesisConfig, opts);
 
         // Synthesize
         std::vector<int16_t> audioBuffer;
@@ -290,6 +306,218 @@ PIPER_PLUS_API int32_t piper_plus_language_id(
     if (it == langMap->end()) return -1;
 
     return static_cast<int32_t>(it->second);
+}
+
+// ===== Iterator / Streaming synthesis =====
+
+PIPER_PLUS_API int32_t piper_plus_synth_start(
+    PiperPlusEngine *engine,
+    const char *text,
+    const PiperPlusSynthOptions *opts)
+{
+    if (!engine) {
+        set_error("engine is NULL");
+        return PIPER_PLUS_ERR;
+    }
+    if (!text || text[0] == '\0') {
+        set_error("text is NULL or empty");
+        return PIPER_PLUS_ERR_TEXT;
+    }
+
+    // Reentrancy guard
+    bool expected = false;
+    if (!engine->inProgress.compare_exchange_strong(expected, true)) {
+        set_error("Engine is busy (synthesis in progress)");
+        return PIPER_PLUS_ERR_BUSY;
+    }
+
+    try {
+        // Apply options
+        applySynthOptions(engine->voice.synthesisConfig, opts);
+
+        // Save config for restore
+        engine->iterState.savedConfig = engine->voice.synthesisConfig;
+
+        // Split text into sentences
+        engine->iterState.sentences = piper::splitTextToSentences(
+            text,
+            engine->voice.phonemizeConfig.phonemeType,
+            0);
+
+        engine->iterState.currentIndex = 0;
+        engine->iterState.currentChunkSamples.clear();
+        engine->iterState.active = true;
+
+        // Empty sentences: mark done immediately
+        if (engine->iterState.sentences.empty()) {
+            engine->iterState.active = false;
+            engine->inProgress.store(false);
+        }
+
+        return PIPER_PLUS_OK;
+
+    } catch (const std::exception &e) {
+        set_error(e.what());
+        engine->inProgress.store(false);
+        return PIPER_PLUS_ERR;
+    } catch (...) {
+        set_error("Unknown error in synth_start");
+        engine->inProgress.store(false);
+        return PIPER_PLUS_ERR;
+    }
+}
+
+PIPER_PLUS_API int32_t piper_plus_synth_next(
+    PiperPlusEngine *engine,
+    PiperPlusAudioChunk *out_chunk)
+{
+    if (!engine) {
+        set_error("engine is NULL");
+        return PIPER_PLUS_ERR;
+    }
+    if (!out_chunk) {
+        set_error("out_chunk is NULL");
+        return PIPER_PLUS_ERR;
+    }
+    if (!engine->iterState.active) {
+        set_error("synth_start() was not called or iterator already finished");
+        return PIPER_PLUS_ERR;
+    }
+
+    auto &state = engine->iterState;
+
+    try {
+        // All sentences done?
+        if (state.currentIndex >= state.sentences.size()) {
+            engine->voice.synthesisConfig = state.savedConfig;
+            state.active = false;
+            engine->inProgress.store(false);
+
+            out_chunk->samples = nullptr;
+            out_chunk->num_samples = 0;
+            out_chunk->sample_rate = engine->voice.synthesisConfig.sampleRate;
+            out_chunk->is_last = 1;
+            return PIPER_PLUS_DONE;
+        }
+
+        // Synthesize current sentence
+        const std::string &sentence = state.sentences[state.currentIndex];
+        std::vector<int16_t> audioBuffer;
+        piper::SynthesisResult synthResult;
+
+        piper::textToAudio(engine->config, engine->voice, sentence,
+                           audioBuffer, synthResult, nullptr);
+
+        // Convert int16 -> float32
+        state.currentChunkSamples.resize(audioBuffer.size());
+        for (size_t i = 0; i < audioBuffer.size(); i++) {
+            state.currentChunkSamples[i] =
+                static_cast<float>(audioBuffer[i]) / NORM_FACTOR;
+        }
+
+        state.currentIndex++;
+        bool isLast = (state.currentIndex >= state.sentences.size());
+
+        // Fill output chunk
+        out_chunk->samples = state.currentChunkSamples.data();
+        out_chunk->num_samples = static_cast<int32_t>(state.currentChunkSamples.size());
+        out_chunk->sample_rate = engine->voice.synthesisConfig.sampleRate;
+        out_chunk->is_last = isLast ? 1 : 0;
+
+        if (isLast) {
+            engine->voice.synthesisConfig = state.savedConfig;
+            state.active = false;
+            engine->inProgress.store(false);
+        }
+
+        return isLast ? PIPER_PLUS_DONE : PIPER_PLUS_OK;
+
+    } catch (const std::exception &e) {
+        engine->voice.synthesisConfig = state.savedConfig;
+        set_error(e.what());
+        state.active = false;
+        engine->inProgress.store(false);
+        return PIPER_PLUS_ERR;
+    } catch (...) {
+        engine->voice.synthesisConfig = state.savedConfig;
+        set_error("Unknown error in synth_next");
+        state.active = false;
+        engine->inProgress.store(false);
+        return PIPER_PLUS_ERR;
+    }
+}
+
+PIPER_PLUS_API int32_t piper_plus_synthesize_streaming(
+    PiperPlusEngine *engine,
+    const char *text,
+    const PiperPlusSynthOptions *opts,
+    PiperPlusAudioCallback callback,
+    void *user_data)
+{
+    if (!engine) {
+        set_error("engine is NULL");
+        return PIPER_PLUS_ERR;
+    }
+    if (!text || text[0] == '\0') {
+        set_error("text is NULL or empty");
+        return PIPER_PLUS_ERR_TEXT;
+    }
+    if (!callback) {
+        set_error("callback is NULL");
+        return PIPER_PLUS_ERR;
+    }
+
+    // Start iterator (handles busy check internally)
+    int32_t rc = piper_plus_synth_start(engine, text, opts);
+    if (rc != PIPER_PLUS_OK) {
+        return rc;
+    }
+
+    // Drive iterator to completion
+    try {
+        PiperPlusAudioChunk chunk;
+        for (;;) {
+            rc = piper_plus_synth_next(engine, &chunk);
+
+            if (rc == PIPER_PLUS_ERR) {
+                return PIPER_PLUS_ERR;
+            }
+
+            // Deliver chunk via callback
+            if (chunk.num_samples > 0) {
+                try {
+                    callback(chunk.samples, chunk.num_samples,
+                             chunk.sample_rate, user_data);
+                } catch (...) {
+                    // Callback threw - clean up
+                    engine->iterState.active = false;
+                    engine->inProgress.store(false);
+                    engine->voice.synthesisConfig = engine->iterState.savedConfig;
+                    set_error("callback threw an exception");
+                    return PIPER_PLUS_ERR;
+                }
+            }
+
+            if (rc == PIPER_PLUS_DONE) {
+                break;
+            }
+        }
+
+        return PIPER_PLUS_OK;
+
+    } catch (const std::exception &e) {
+        set_error(e.what());
+        engine->iterState.active = false;
+        engine->inProgress.store(false);
+        engine->voice.synthesisConfig = engine->iterState.savedConfig;
+        return PIPER_PLUS_ERR;
+    } catch (...) {
+        set_error("Unknown error in synthesize_streaming");
+        engine->iterState.active = false;
+        engine->inProgress.store(false);
+        engine->voice.synthesisConfig = engine->iterState.savedConfig;
+        return PIPER_PLUS_ERR;
+    }
 }
 
 } // extern "C"
