@@ -12,8 +12,10 @@
 #include "piper.hpp"
 
 #include <atomic>
+#include <climits>
 #include <cstdlib>
 #include <cstring>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -46,11 +48,16 @@ struct PiperPlusEngine {
 
 // ===== Helpers =====
 
-static const float MAX_WAV_VALUE = 32767.0f;
+// Use 32768.0f to normalize symmetrically: -32768/32768 = -1.0, 32767/32768 ≈ 1.0
+static const float NORM_FACTOR = 32768.0f;
 
 // Convert int16_t audio buffer to float32 [-1.0, 1.0]
 static float *int16_to_float(const std::vector<int16_t> &buf, int32_t *out_count) {
     if (buf.empty()) {
+        *out_count = 0;
+        return nullptr;
+    }
+    if (buf.size() > static_cast<size_t>(INT32_MAX)) {
         *out_count = 0;
         return nullptr;
     }
@@ -61,7 +68,7 @@ static float *int16_to_float(const std::vector<int16_t> &buf, int32_t *out_count
         return nullptr;
     }
     for (size_t i = 0; i < buf.size(); i++) {
-        samples[i] = static_cast<float>(buf[i]) / MAX_WAV_VALUE;
+        samples[i] = static_cast<float>(buf[i]) / NORM_FACTOR;
     }
     return samples;
 }
@@ -71,8 +78,12 @@ static float *int16_to_float(const std::vector<int16_t> &buf, int32_t *out_count
 extern "C" {
 
 PIPER_PLUS_API const char *piper_plus_version(void) {
-    static std::string ver = piper::getVersion();
-    return ver.c_str();
+    try {
+        static std::string ver = piper::getVersion();
+        return ver.c_str();
+    } catch (...) {
+        return "unknown";
+    }
 }
 
 PIPER_PLUS_API int32_t piper_plus_api_version(void) {
@@ -109,7 +120,7 @@ PIPER_PLUS_API PiperPlusEngine *piper_plus_create(const PiperPlusConfig *config)
     }
 
     try {
-        auto *engine = new PiperPlusEngine();
+        auto engine = std::make_unique<PiperPlusEngine>();
         piper::initialize(engine->config);
 
         // dict_dir: set environment variable before loadVoice (M1-3)
@@ -142,14 +153,14 @@ PIPER_PLUS_API PiperPlusEngine *piper_plus_create(const PiperPlusConfig *config)
         piper::loadVoice(engine->config, modelPath, configPath,
                          engine->voice, speakerId, useCuda, gpuDeviceId);
 
-        return engine;
+        return engine.release();  // Transfer ownership to caller
 
     } catch (const std::exception &e) {
         set_error(e.what());
-        return nullptr;
+        return nullptr;  // unique_ptr auto-deletes engine
     } catch (...) {
         set_error("Unknown error during engine creation");
-        return nullptr;
+        return nullptr;  // unique_ptr auto-deletes engine
     }
 }
 
@@ -192,6 +203,9 @@ PIPER_PLUS_API int32_t piper_plus_synthesize(
         return PIPER_PLUS_ERR_BUSY;
     }
 
+    // Save synthesisConfig before try block so catch can restore it
+    auto savedConfig = engine->voice.synthesisConfig;
+
     try {
         // Apply options
         PiperPlusSynthOptions effectiveOpts;
@@ -200,9 +214,6 @@ PIPER_PLUS_API int32_t piper_plus_synthesize(
         } else {
             effectiveOpts = piper_plus_default_options();
         }
-
-        // Save and restore synthesisConfig to avoid languageId mutation bug
-        auto savedConfig = engine->voice.synthesisConfig;
 
         // Apply user options
         if (effectiveOpts.speaker_id >= 0) {
@@ -233,10 +244,12 @@ PIPER_PLUS_API int32_t piper_plus_synthesize(
         return PIPER_PLUS_OK;
 
     } catch (const std::exception &e) {
+        engine->voice.synthesisConfig = savedConfig;  // Restore on error
         set_error(e.what());
         engine->inProgress.store(false);
         return PIPER_PLUS_ERR;
     } catch (...) {
+        engine->voice.synthesisConfig = savedConfig;  // Restore on error
         set_error("Unknown error during synthesis");
         engine->inProgress.store(false);
         return PIPER_PLUS_ERR;

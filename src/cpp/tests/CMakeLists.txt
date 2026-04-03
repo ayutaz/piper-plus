@@ -525,6 +525,11 @@ target_link_libraries(test_c_api PRIVATE
     gtest_main
 )
 
+target_compile_definitions(test_c_api PRIVATE
+    PIPER_PLUS_BUILDING_DLL
+    _PIPER_VERSION=${piper_version}
+)
+
 # Include directories: piper_plus.h lives in src/cpp/
 target_include_directories(test_c_api PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/..

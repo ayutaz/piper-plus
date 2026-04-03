@@ -769,6 +769,8 @@ if(PIPER_PLUS_BUILD_SHARED)
     CXX_VISIBILITY_PRESET hidden
     VISIBILITY_INLINES_HIDDEN ON
     OUTPUT_NAME "piper_plus"
+    VERSION ${piper_version}
+    SOVERSION 1
   )
 
   # RPATH settings

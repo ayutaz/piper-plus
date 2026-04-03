@@ -18,6 +18,7 @@
 #include <gtest/gtest.h>
 #include <cstring>
 #include <set>
+#include <thread>
 #include "piper_plus.h"
 
 // ===== Version tests =====
@@ -204,4 +205,65 @@ TEST(CApiConfigStruct, SynthOptionsMemsetSafe) {
     EXPECT_EQ(opts.language_id, 0);
     EXPECT_FLOAT_EQ(opts.noise_scale, 0.0f);
     EXPECT_FLOAT_EQ(opts.length_scale, 0.0f);
+}
+
+// ===== Review fix: additional tests =====
+
+TEST(CApiCreateError, EmptyModelPathReturnsNull) {
+    PiperPlusConfig config;
+    memset(&config, 0, sizeof(config));
+    config.model_path = "";
+    PiperPlusEngine* engine = piper_plus_create(&config);
+    EXPECT_EQ(engine, nullptr);
+    const char* err = piper_plus_get_last_error();
+    ASSERT_NE(err, nullptr);
+    EXPECT_GT(strlen(err), 0u);
+}
+
+TEST(CApiErrorMessage, InitialStateReturnsNullInNewThread) {
+    std::thread t([] {
+        const char* err = piper_plus_get_last_error();
+        EXPECT_EQ(err, nullptr);
+    });
+    t.join();
+}
+
+TEST(CApiThreadSafety, LastErrorIsThreadLocal) {
+    // メインスレッドでエラーを発生させる
+    PiperPlusConfig config;
+    memset(&config, 0, sizeof(config));
+    config.model_path = nullptr;
+    piper_plus_create(&config);
+    const char* main_err = piper_plus_get_last_error();
+    ASSERT_NE(main_err, nullptr);
+
+    // 子スレッドではエラーが独立している
+    std::thread t([] {
+        const char* child_err = piper_plus_get_last_error();
+        EXPECT_EQ(child_err, nullptr);
+    });
+    t.join();
+
+    // メインスレッドのエラーは保持されている
+    const char* main_err2 = piper_plus_get_last_error();
+    EXPECT_NE(main_err2, nullptr);
+}
+
+TEST(CApiDefaultOptions, ReturnValueIsIndependentCopy) {
+    PiperPlusSynthOptions opts1 = piper_plus_default_options();
+    opts1.speaker_id = 42;
+    opts1.noise_scale = 0.0f;
+    PiperPlusSynthOptions opts2 = piper_plus_default_options();
+    EXPECT_EQ(opts2.speaker_id, 0);
+    EXPECT_FLOAT_EQ(opts2.noise_scale, 0.667f);
+}
+
+TEST(CApiStatusCodes, SpecificValuesMatchHeader) {
+    EXPECT_EQ(PIPER_PLUS_OK, 0);
+    EXPECT_EQ(PIPER_PLUS_DONE, 1);
+    EXPECT_EQ(PIPER_PLUS_ERR, -1);
+    EXPECT_EQ(PIPER_PLUS_ERR_MODEL, -2);
+    EXPECT_EQ(PIPER_PLUS_ERR_CONFIG, -3);
+    EXPECT_EQ(PIPER_PLUS_ERR_TEXT, -4);
+    EXPECT_EQ(PIPER_PLUS_ERR_BUSY, -5);
 }
