@@ -470,7 +470,7 @@ if(APPLE)
   set(PIPER_EXTRA_LIBRARIES "pthread")
 elseif(NOT MSVC)
   # Linux flags
-  string(APPEND CMAKE_CXX_FLAGS " -Wall -Wextra -Wl,-rpath,'$ORIGIN'")
+  string(APPEND CMAKE_CXX_FLAGS " -Wall -Wextra")
   string(APPEND CMAKE_C_FLAGS " -Wall -Wextra")
   target_link_libraries(piper PRIVATE -static-libgcc -static-libstdc++)
 
@@ -809,12 +809,36 @@ if(PIPER_PLUS_BUILD_SHARED)
     install(FILES ${_ort_libs} DESTINATION ${CMAKE_INSTALL_LIBDIR})
   endif()
 
+  # --- ONNX Runtime license ---
+  set(_ort_license "${ONNXRUNTIME_DIR}/../ort_dl/src/onnxruntime_external/LICENSE")
+  if(NOT EXISTS "${_ort_license}")
+    # Fallback: try common locations
+    set(_ort_license "${ONNXRUNTIME_DIR}/LICENSE")
+  endif()
+  if(EXISTS "${_ort_license}")
+    install(FILES "${_ort_license}"
+            DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/onnxruntime
+            RENAME LICENSE)
+  endif()
+
   # --- Dictionary install (optional) ---
   # OpenJTalk dictionary
   if(EXISTS "${CMAKE_BINARY_DIR}/oj/dic")
     install(DIRECTORY "${CMAKE_BINARY_DIR}/oj/dic/"
             DESTINATION share/open_jtalk/dic)
   endif()
+
+  # --- G2P dictionaries (English CMU, Chinese Pinyin) ---
+  set(_g2p_dict_files
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/cpp/cmudict_data.json
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/cpp/pinyin_single.json
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/cpp/pinyin_phrases.json
+  )
+  foreach(_dict ${_g2p_dict_files})
+    if(EXISTS "${_dict}")
+      install(FILES "${_dict}" DESTINATION ${CMAKE_INSTALL_DATADIR}/piper/dicts)
+    endif()
+  endforeach()
 
   # --- macOS: fix ONNX Runtime install_name ---
   if(APPLE)

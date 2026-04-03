@@ -9,30 +9,36 @@
 #include <stdint.h>
 #include "piper_plus.h"
 
-/* Minimal WAV header for 16-bit mono PCM */
+/* Write a 16-bit LE value */
+static void write_le16(FILE *f, uint16_t v) {
+    uint8_t buf[2] = {(uint8_t)v, (uint8_t)(v >> 8)};
+    fwrite(buf, 1, 2, f);
+}
+
+/* Write a 32-bit LE value */
+static void write_le32(FILE *f, uint32_t v) {
+    uint8_t buf[4] = {(uint8_t)v, (uint8_t)(v >> 8), (uint8_t)(v >> 16), (uint8_t)(v >> 24)};
+    fwrite(buf, 1, 4, f);
+}
+
+/* Minimal WAV header for 16-bit mono PCM (endian-safe) */
 static void write_wav_header(FILE *f, int32_t num_samples, int32_t sample_rate) {
-    int32_t data_size = num_samples * 2; /* 16-bit = 2 bytes per sample */
-    int32_t file_size = 36 + data_size;
-    int16_t bits_per_sample = 16;
-    int16_t num_channels = 1;
-    int32_t byte_rate = sample_rate * num_channels * bits_per_sample / 8;
-    int16_t block_align = (int16_t)(num_channels * bits_per_sample / 8);
+    uint32_t data_size = (uint32_t)num_samples * 2;
+    uint32_t file_size = 36 + data_size;
 
     fwrite("RIFF", 1, 4, f);
-    fwrite(&file_size, 4, 1, f);
+    write_le32(f, file_size);
     fwrite("WAVE", 1, 4, f);
     fwrite("fmt ", 1, 4, f);
-    int32_t fmt_size = 16;
-    fwrite(&fmt_size, 4, 1, f);
-    int16_t audio_format = 1; /* PCM */
-    fwrite(&audio_format, 2, 1, f);
-    fwrite(&num_channels, 2, 1, f);
-    fwrite(&sample_rate, 4, 1, f);
-    fwrite(&byte_rate, 4, 1, f);
-    fwrite(&block_align, 2, 1, f);
-    fwrite(&bits_per_sample, 2, 1, f);
+    write_le32(f, 16);            /* fmt chunk size */
+    write_le16(f, 1);             /* PCM format */
+    write_le16(f, 1);             /* mono */
+    write_le32(f, (uint32_t)sample_rate);
+    write_le32(f, (uint32_t)(sample_rate * 2)); /* byte rate */
+    write_le16(f, 2);             /* block align */
+    write_le16(f, 16);            /* bits per sample */
     fwrite("data", 1, 4, f);
-    fwrite(&data_size, 4, 1, f);
+    write_le32(f, data_size);
 }
 
 int main(int argc, char *argv[]) {
