@@ -590,3 +590,82 @@ if(TARGET openjtalk_external)
 endif()
 
 add_test(NAME test_c_api COMMAND test_c_api)
+
+# ---- test_c_api_integration: C API integration tests (model required) ----
+# Links against the piper_plus shared library (or object lib for static build).
+# Uses piper_common objects for the full piper engine.
+add_executable(test_c_api_integration
+    test_c_api_integration.cpp
+    ../piper_plus_c_api.cpp
+    $<TARGET_OBJECTS:piper_common>
+)
+
+target_link_libraries(test_c_api_integration PRIVATE
+    gtest
+    gtest_main
+)
+
+target_compile_definitions(test_c_api_integration PRIVATE
+    PIPER_PLUS_BUILDING_DLL
+    _PIPER_VERSION=${piper_version}
+)
+
+target_include_directories(test_c_api_integration PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+    ${CMAKE_BINARY_DIR}/fi/include
+    ${CMAKE_BINARY_DIR}/si/include
+    ${ORT_INCLUDE_DIR}
+    ${CMAKE_BINARY_DIR}/oj/include
+    ${CMAKE_BINARY_DIR}/oj/include/openjtalk
+    ${CMAKE_BINARY_DIR}/hts_stub/include
+)
+
+target_link_directories(test_c_api_integration PRIVATE
+    ${CMAKE_BINARY_DIR}/fi/lib
+    ${CMAKE_BINARY_DIR}/si/lib
+    ${ORT_LIB_DIR}
+)
+
+if(WIN32)
+    target_link_libraries(test_c_api_integration PRIVATE
+        optimized ${CMAKE_BINARY_DIR}/fi/lib/fmt.lib
+        debug ${CMAKE_BINARY_DIR}/fi/lib/fmtd.lib
+        optimized ${CMAKE_BINARY_DIR}/si/lib/spdlog.lib
+        debug ${CMAKE_BINARY_DIR}/si/lib/spdlogd.lib
+        ${ORT_LIB_DIR}/onnxruntime.lib
+    )
+    target_link_libraries(test_c_api_integration PRIVATE ${CMAKE_BINARY_DIR}/oj/lib/openjtalk.lib)
+else()
+    target_link_libraries(test_c_api_integration PRIVATE
+        fmt
+        spdlog
+        onnxruntime
+    )
+    target_link_libraries(test_c_api_integration PRIVATE ${CMAKE_BINARY_DIR}/oj/lib/libopenjtalk.a)
+endif()
+
+if(TARGET hts_engine_stub)
+    target_link_libraries(test_c_api_integration PRIVATE hts_engine_stub)
+endif()
+
+if(UNIX)
+    find_package(Threads REQUIRED)
+    target_link_libraries(test_c_api_integration PRIVATE Threads::Threads)
+endif()
+
+if(TARGET fmt_external)
+    add_dependencies(test_c_api_integration fmt_external)
+endif()
+if(TARGET spdlog_external)
+    add_dependencies(test_c_api_integration spdlog_external)
+endif()
+if(TARGET openjtalk_external)
+    add_dependencies(test_c_api_integration openjtalk_external)
+endif()
+
+# Set working directory to project root for model path resolution
+set_tests_properties(test_c_api_integration PROPERTIES
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+
+add_test(NAME test_c_api_integration COMMAND test_c_api_integration)
