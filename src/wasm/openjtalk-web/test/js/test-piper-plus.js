@@ -151,7 +151,7 @@ installGlobalMocks();
 // ---------------------------------------------------------------------------
 
 let PiperPlus;
-let WebGPUSessionManager, ModelManager, DictManager;
+let WebGPUSessionManager, ModelManager;
 let AudioResult, StreamingTTSPipeline;
 
 let importError = null;
@@ -160,7 +160,6 @@ try {
   PiperPlus = mod.PiperPlus;
   WebGPUSessionManager = mod.WebGPUSessionManager;
   ModelManager = mod.ModelManager;
-  DictManager = mod.DictManager;
   AudioResult = mod.AudioResult;
   StreamingTTSPipeline = mod.StreamingTTSPipeline;
 } catch (e) {
@@ -296,11 +295,6 @@ describe('再エクスポートの確認', { skip }, () => {
   it('ModelManager がエクスポートされている', () => {
     assert.ok(ModelManager);
     assert.equal(typeof ModelManager, 'function');
-  });
-
-  it('DictManager がエクスポートされている', () => {
-    assert.ok(DictManager);
-    assert.equal(typeof DictManager, 'function');
   });
 
   it('AudioResult がエクスポートされている', () => {

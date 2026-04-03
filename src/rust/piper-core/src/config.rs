@@ -142,6 +142,68 @@ impl VoiceConfig {
             path: format!("no config found for {}", model_path.display()),
         })
     }
+
+    /// Validate the config for correctness.
+    /// Returns Ok(()) if valid, or Err with a description of the first problem found.
+    pub fn validate(&self) -> Result<(), String> {
+        // 1. phoneme_id_map must not be empty
+        if self.phoneme_id_map.is_empty() {
+            return Err("phoneme_id_map is empty".to_string());
+        }
+
+        // 2-4. Required markers
+        if !self.phoneme_id_map.contains_key("^") {
+            return Err("phoneme_id_map missing required BOS marker '^'".to_string());
+        }
+        if !self.phoneme_id_map.contains_key("_") {
+            return Err("phoneme_id_map missing required PAD marker '_'".to_string());
+        }
+        if !self.phoneme_id_map.contains_key("$") {
+            return Err("phoneme_id_map missing required EOS marker '$'".to_string());
+        }
+
+        // 5. Each ID list must be non-empty
+        for (key, ids) in &self.phoneme_id_map {
+            if ids.is_empty() {
+                return Err(format!("phoneme_id_map[\"{key}\"] has empty ID list"));
+            }
+        }
+
+        // 6. sample_rate range check
+        if self.audio.sample_rate < 8000 || self.audio.sample_rate > 48000 {
+            return Err(format!(
+                "audio.sample_rate={} out of range [8000, 48000]",
+                self.audio.sample_rate
+            ));
+        }
+
+        // 7-8. Multilingual/Bilingual require non-empty language_id_map
+        if matches!(
+            self.phoneme_type,
+            PhonemeType::Multilingual | PhonemeType::Bilingual
+        ) {
+            if self.language_id_map.is_empty() {
+                return Err("multilingual model requires non-empty language_id_map".to_string());
+            }
+            if self.num_languages > 1 && self.language_id_map.len() != self.num_languages {
+                return Err(format!(
+                    "num_languages={} but language_id_map has {} entries",
+                    self.num_languages,
+                    self.language_id_map.len()
+                ));
+            }
+        }
+
+        // 9. speaker_id_map warning (non-blocking)
+        if self.num_speakers > 1 && self.speaker_id_map.is_empty() {
+            eprintln!(
+                "warning: num_speakers={} but speaker_id_map is empty",
+                self.num_speakers
+            );
+        }
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -180,5 +242,111 @@ mod tests {
         let json = r#"{"phoneme_type": "openjtalk"}"#;
         let config: VoiceConfig = serde_json::from_str(json).unwrap();
         assert_eq!(config.phoneme_type, PhonemeType::OpenJTalk);
+    }
+
+    #[test]
+    fn test_validate_minimal_valid() {
+        let json = r#"{
+            "phoneme_id_map": {"^": [1], "_": [0], "$": [2], "a": [15]},
+            "audio": {"sample_rate": 22050}
+        }"#;
+        let config: VoiceConfig = serde_json::from_str(json).unwrap();
+        assert!(config.validate().is_ok());
+    }
+
+    #[test]
+    fn test_validate_empty_phoneme_id_map() {
+        let json = r#"{"phoneme_id_map": {}, "audio": {"sample_rate": 22050}}"#;
+        let config: VoiceConfig = serde_json::from_str(json).unwrap();
+        let err = config.validate().unwrap_err();
+        assert!(err.contains("empty"), "Error: {err}");
+    }
+
+    #[test]
+    fn test_validate_missing_bos() {
+        let json = r#"{"phoneme_id_map": {"_": [0], "$": [2]}, "audio": {"sample_rate": 22050}}"#;
+        let config: VoiceConfig = serde_json::from_str(json).unwrap();
+        let err = config.validate().unwrap_err();
+        assert!(err.contains("BOS"), "Error: {err}");
+    }
+
+    #[test]
+    fn test_validate_missing_pad() {
+        let json = r#"{"phoneme_id_map": {"^": [1], "$": [2]}, "audio": {"sample_rate": 22050}}"#;
+        let config: VoiceConfig = serde_json::from_str(json).unwrap();
+        let err = config.validate().unwrap_err();
+        assert!(err.contains("PAD"), "Error: {err}");
+    }
+
+    #[test]
+    fn test_validate_missing_eos() {
+        let json = r#"{"phoneme_id_map": {"^": [1], "_": [0]}, "audio": {"sample_rate": 22050}}"#;
+        let config: VoiceConfig = serde_json::from_str(json).unwrap();
+        let err = config.validate().unwrap_err();
+        assert!(err.contains("EOS"), "Error: {err}");
+    }
+
+    #[test]
+    fn test_validate_empty_id_list() {
+        let json = r#"{"phoneme_id_map": {"^": [1], "_": [0], "$": [2], "a": []}, "audio": {"sample_rate": 22050}}"#;
+        let config: VoiceConfig = serde_json::from_str(json).unwrap();
+        let err = config.validate().unwrap_err();
+        assert!(err.contains("empty ID list"), "Error: {err}");
+    }
+
+    #[test]
+    fn test_validate_sample_rate_zero() {
+        let json =
+            r#"{"phoneme_id_map": {"^": [1], "_": [0], "$": [2]}, "audio": {"sample_rate": 0}}"#;
+        let config: VoiceConfig = serde_json::from_str(json).unwrap();
+        let err = config.validate().unwrap_err();
+        assert!(err.contains("out of range"), "Error: {err}");
+    }
+
+    #[test]
+    fn test_validate_sample_rate_too_high() {
+        let json = r#"{"phoneme_id_map": {"^": [1], "_": [0], "$": [2]}, "audio": {"sample_rate": 100000}}"#;
+        let config: VoiceConfig = serde_json::from_str(json).unwrap();
+        let err = config.validate().unwrap_err();
+        assert!(err.contains("out of range"), "Error: {err}");
+    }
+
+    #[test]
+    fn test_validate_multilingual_empty_lang_map() {
+        let json = r#"{
+            "phoneme_id_map": {"^": [1], "_": [0], "$": [2]},
+            "audio": {"sample_rate": 22050},
+            "phoneme_type": "multilingual",
+            "num_languages": 6,
+            "language_id_map": {}
+        }"#;
+        let config: VoiceConfig = serde_json::from_str(json).unwrap();
+        let err = config.validate().unwrap_err();
+        assert!(err.contains("requires non-empty"), "Error: {err}");
+    }
+
+    #[test]
+    fn test_validate_multilingual_valid() {
+        let json = r#"{
+            "phoneme_id_map": {"^": [1], "_": [0], "$": [2], "a": [15]},
+            "audio": {"sample_rate": 22050},
+            "phoneme_type": "multilingual",
+            "num_languages": 6,
+            "language_id_map": {"ja": 0, "en": 1, "zh": 2, "es": 3, "fr": 4, "pt": 5}
+        }"#;
+        let config: VoiceConfig = serde_json::from_str(json).unwrap();
+        assert!(config.validate().is_ok());
+    }
+
+    #[test]
+    fn test_validate_single_lang_empty_lang_map_ok() {
+        let json = r#"{
+            "phoneme_id_map": {"^": [1], "_": [0], "$": [2]},
+            "audio": {"sample_rate": 22050},
+            "num_languages": 1,
+            "language_id_map": {}
+        }"#;
+        let config: VoiceConfig = serde_json::from_str(json).unwrap();
+        assert!(config.validate().is_ok());
     }
 }

@@ -204,13 +204,8 @@ nohup /data/piper/.venv/bin/python -m piper_train \
 
 > **Note:** スウェーデン語 (sv) と韓国語 (ko) はG2Pコード実装済みだが、学習済みモデルには未含有 (sv=6, ko=7)。
 
-**実装 (Python):** `src/python/g2p/piper_plus_g2p/multilingual.py`, `piper_plus_g2p/{chinese,korean,spanish,portuguese,french,swedish}.py`
-**実装 (Rust):** `src/rust/piper-g2p/src/multilingual.rs`, `piper-g2p/src/{chinese,korean,spanish,portuguese,french,swedish}.rs`
-**実装 (Go):** `src/go/phonemize/multilingual.go` (`github.com/ayutaz/piper-plus-g2p/phonemize` 独立モジュール)
-**実装 (JS):** `src/wasm/g2p/src/` (`@piper-plus/g2p` パッケージ)
-**Phonemizer ABC (Python):** `piper_plus_g2p/base.py` (抽象基底), `piper_plus_g2p/registry.py` (言語レジストリ)
-**Phonemizer ABC (Rust):** `piper-g2p/src/phonemizer.rs` (`piper_plus_g2p::Phonemizer` トレイト)
-**Phonemizer interface (Go):** `src/go/phonemize/phonemizer.go` (`Phonemizer` インターフェース、独立モジュール `github.com/ayutaz/piper-plus-g2p/phonemize`)
+**実装:** `phonemize/multilingual.py`, `phonemize/multilingual_id_map.py`, `phonemize/{chinese,korean,spanish,portuguese,french,swedish}.py`, `phonemize/{zh,ko,es,pt,fr,sv}_id_map.py`
+**Phonemizer ABC:** `phonemize/base.py` (抽象基底), `phonemize/registry.py` (言語レジストリ)
 
 ### 言語グループ均等サンプリング (--language-balanced-sampling)
 
@@ -348,28 +343,6 @@ Rust によるONNX推論エンジン。ストリーミング、CUDA/CoreML/Direc
 
 **実装:** `src/rust/piper-core/`, `src/rust/piper-cli/`, `src/rust/piper-python/`
 
-### Go 推論エンジン (piper-plus)
-
-Go 1.26+ による ONNX 推論エンジン。ストリーミング、CUDA/CoreML/DirectML/TensorRT 対応。HTTP API サーバー内蔵。
-
-| 項目 | 詳細 |
-|------|------|
-| モジュール | `github.com/ayutaz/piper-plus/src/go` |
-| 対応言語 | JA, EN, ZH, KO, ES, FR, PT, SV (8言語) |
-| G2P | `github.com/ayutaz/piper-plus-g2p/phonemize` (独立モジュール、他TTSエンジンからも利用可能) |
-| 特徴 | ストリーミング、GPU推論、HTTP API、VoicePool (並行処理)、音素タイミング出力 |
-| ビルド | `go build ./src/go/cmd/piper-plus` |
-
-**追加機能:**
-- VoicePool: 並行合成のためのセッションプール (`NewVoicePool`)
-- HTTP API サーバー: `GET/POST /synthesize`, `GET /health`, `GET /info`
-- 音素タイミング出力: JSON/TSV 形式 (`--output-timing`)
-- モデル管理: 自動 DL + キャッシュ (`ModelManager`)
-- 環境変数: ONNX_RUNTIME_SHARED_LIBRARY_PATH, PIPER_DEFAULT_MODEL, PIPER_MODEL_DIR
-
-**実装:** `src/go/piperplus/`, `src/go/cmd/piper-plus/`
-**G2P 実装 (独立モジュール):** `src/go/phonemize/`
-
 ### JavaScript/WASM npm パッケージ (piper-plus)
 
 ブラウザ内で完全オフラインの多言語 TTS を `npm install piper-plus` で利用可能にする npm パッケージ。eSpeak-ng 不使用 (GPL リスク回避)。
@@ -377,25 +350,26 @@ Go 1.26+ による ONNX 推論エンジン。ストリーミング、CUDA/CoreML
 | 項目 | 詳細 |
 |------|------|
 | パッケージ名 | piper-plus |
-| バージョン | 0.1.1 |
+| バージョン | 0.2.0 |
 | 対応言語 | JA, EN, ZH, KO, ES, FR, PT, SV (8言語) |
-| 音素化 | @piper-plus/g2p (OpenJTalk WASM: JA, IPA規則ベース: EN/ZH/KO/ES/FR/PT/SV) |
+| 音素化 | jpreprocess WASM (JA、辞書内蔵), SimpleEnglishPhonemizer (EN), キャラクタベース (ZH/KO/ES/FR/PT/SV) |
 | 推論 | onnxruntime-web (peerDependency) |
-| テスト | 282テスト (Node.js test runner) |
-| CI | ci.yml (PR/push), npm-publish.yml (タグトリガー) |
+| テスト | 282テスト (JS Node.js test runner) + 27テスト (Rust native) + 15テスト (wasm-bindgen-test) |
+| CI | ci.yml (PR/push), npm-publish.yml (タグトリガー), wasm-build.yml (WASM ビルド + feature flag 組み合わせ) |
 | ビルド | ブラウザ専用 (Node.js 非対応) |
 
 **コアクラス:**
 - `PiperPlus` — 高レベル API (initialize → synthesize → AudioResult)
 - `ModelManager` — HuggingFace モデル DL + IndexedDB キャッシュ
-- `DictManager` — OpenJTalk 辞書 DL + IndexedDB キャッシュ
+- `WasmPhonemizer` — Rust WASM 音素化 (`phonemize(text, language?)`, `detect_language()`, `get_supported_languages()`)。構造化エラー (`.code` プロパティ: `CONFIG_PARSE_ERROR`, `PHONEMIZE_ERROR`, `UNSUPPORTED_LANGUAGE`, `EMPTY_INPUT`)
 - `AudioResult` — WAV エンコード + 再生 + ダウンロード
-- `G2P` (@piper-plus/g2p) — 8言語音素化 (eSpeak-ng 不使用)
+- `SimpleUnifiedPhonemizer` — 8言語音素化 (eSpeak-ng 不使用)。WASM エラーバウンダリ、入力バリデーション (10万文字上限)、初期化競合防止、30秒タイムアウト
 
-**実装:** `src/wasm/openjtalk-web/src/`, `src/wasm/openjtalk-web/types/index.d.ts`
-**テスト:** `src/wasm/openjtalk-web/test/js/test-*.js` (282テスト)
+**実装:** `src/wasm/openjtalk-web/src/`, `src/rust/piper-wasm/`, `src/wasm/openjtalk-web/types/index.d.ts`
+**テスト:** `src/wasm/openjtalk-web/test/js/test-*.js` (282テスト), `src/rust/piper-wasm/src/lib.rs` (27 native + 15 wasm-bindgen)
 **npm README:** `src/wasm/openjtalk-web/README.npm.md`
-**設計ドキュメント:** `docs/design/npm-package-plan.md`
+**設計ドキュメント:** `docs/design/npm-package-plan.md`, `docs/design/wasm-architecture-review.md`
+**WASM ビルド CI:** `.github/workflows/wasm-build.yml`
 
 ---
 
@@ -407,12 +381,25 @@ Go 1.26+ による ONNX 推論エンジン。ストリーミング、CUDA/CoreML
 |------|------|
 | 学習スクリプト | `src/python/piper_train/__main__.py` |
 | VITS実装 | `src/python/piper_train/vits/` |
+| Phonemizer ABC | `src/python/piper_train/phonemize/base.py` |
+| 言語レジストリ | `src/python/piper_train/phonemize/registry.py` |
+| 英語音素化 | `src/python/piper_train/phonemize/english.py` |
+| 日本語音素化 | `src/python/piper_train/phonemize/japanese.py` |
+| 中国語音素化 | `src/python/piper_train/phonemize/chinese.py` |
+| 韓国語音素化 | `src/python/piper_train/phonemize/korean.py` |
+| スペイン語音素化 | `src/python/piper_train/phonemize/spanish.py` |
+| ポルトガル語音素化 | `src/python/piper_train/phonemize/portuguese.py` |
+| フランス語音素化 | `src/python/piper_train/phonemize/french.py` |
+| スウェーデン語音素化 | `src/python/piper_train/phonemize/swedish.py` |
+| IDマップ (JA) | `src/python/piper_train/phonemize/jp_id_map.py` |
+| IDマップ (ZH/KO/ES/PT/FR/SV) | `src/python/piper_train/phonemize/{zh,ko,es,pt,fr,sv}_id_map.py` |
+| トークンマッパー | `src/python/piper_train/phonemize/token_mapper.py` |
 | ONNXエクスポート | `src/python/piper_train/export_onnx.py` |
 | 推論スクリプト | `src/python/piper_train/infer_onnx.py` |
-| G2P パッケージ (Python) | `src/python/g2p/piper_plus_g2p/` (piper-g2p スタンドアロンパッケージ) |
-| 多言語Phonemizer (Python) | `src/python/g2p/piper_plus_g2p/multilingual.py` |
-| 各言語Phonemizer (Python) | `src/python/g2p/piper_plus_g2p/{japanese,english,chinese,korean,spanish,portuguese,french,swedish}.py` |
-| クロスプラットフォームテスト | `src/python/g2p/tests/test_cross_platform.py` |
+| マルチリンガルPhonemizer | `src/python/piper_train/phonemize/multilingual.py` |
+| マルチリンガルIDマップ | `src/python/piper_train/phonemize/multilingual_id_map.py` |
+| バイリンガルPhonemizer | `src/python/piper_train/phonemize/bilingual.py` |
+| バイリンガルIDマップ | `src/python/piper_train/phonemize/bilingual_id_map.py` |
 
 ### C# ソースコード
 
@@ -447,31 +434,13 @@ Go 1.26+ による ONNX 推論エンジン。ストリーミング、CUDA/CoreML
 | コアライブラリ | `src/rust/piper-core/` |
 | CLI アプリケーション | `src/rust/piper-cli/` |
 | Python バインディング | `src/rust/piper-python/` |
-| G2P クレート | `src/rust/piper-g2p/` (piper-g2p スタンドアロンクレート) |
-| G2P Phonemizer トレイト | `src/rust/piper-g2p/src/phonemizer.rs` |
-| G2P 多言語 | `src/rust/piper-g2p/src/multilingual.rs` |
-| G2P adapter (piper-core) | `src/rust/piper-core/src/phonemize/adapter.rs` |
+| 音素化 | `src/rust/piper-core/src/phonemize/` |
+| 音素変換 (SynthesisRequestData) | `src/rust/piper-core/src/phonemize/phoneme_converter.rs` |
 | 推論エンジン | `src/rust/piper-core/src/engine.rs` |
 | 辞書マネージャ | `src/rust/piper-core/src/dictionary_manager.rs` |
 | カスタム辞書テスト | `src/rust/piper-core/tests/test_custom_dict_integration.rs` |
 | デフォルト出力テスト | `src/rust/piper-core/tests/test_default_output.rs` |
-| G2P ゴールデンテスト | `src/rust/piper-core/tests/test_g2p_golden.rs` |
-
-### Go ソースコード
-
-| 用途 | パス |
-|------|------|
-| モジュールルート | `src/go/` (モジュール: `github.com/ayutaz/piper-plus/src/go`) |
-| CLI アプリケーション | `src/go/cmd/piper-plus/` |
-| コアライブラリ | `src/go/piperplus/` |
-| G2P モジュール (独立) | `src/go/phonemize/` (モジュール: `github.com/ayutaz/piper-plus-g2p/phonemize`、他TTSエンジンからも利用可能) |
-| G2P Phonemizer インターフェース | `src/go/phonemize/phonemizer.go` |
-| G2P 多言語 | `src/go/phonemize/multilingual.go` |
-| G2P 各言語 | `src/go/phonemize/{japanese,english,chinese,korean,spanish,portuguese,french,swedish}.go` |
-| 推論エンジン | `src/go/piperplus/engine.go` |
-| モデルマネージャ | `src/go/piperplus/model_manager.go` |
-| HTTP サーバー | `src/go/piperplus/server.go` |
-| README | `src/go/README.md` |
+| WASM 音素化 | `src/rust/piper-wasm/` |
 
 ### npm パッケージ ソースコード
 
@@ -479,17 +448,12 @@ Go 1.26+ による ONNX 推論エンジン。ストリーミング、CUDA/CoreML
 |------|------|
 | エントリーポイント | `src/wasm/openjtalk-web/src/index.js` |
 | モデルマネージャ | `src/wasm/openjtalk-web/src/model-manager.js` |
-| 辞書マネージャ | `src/wasm/openjtalk-web/src/dict-manager.js` |
 | 音声結果 | `src/wasm/openjtalk-web/src/audio-result.js` |
+| Rust WASM ビルド成果物 | `src/wasm/openjtalk-web/dist/rust-wasm/` |
 | TypeScript型定義 | `src/wasm/openjtalk-web/types/index.d.ts` |
 | npm パッケージ設定 | `src/wasm/openjtalk-web/package.json` |
 | npm publish CI | `.github/workflows/npm-publish.yml` |
-| G2P パッケージ (JS) | `src/wasm/g2p/` (@piper-plus/g2p パッケージ) |
-| G2P エントリーポイント | `src/wasm/g2p/src/index.js` |
-| G2P ゴールデンテスト | `src/wasm/openjtalk-web/test/js/test-g2p-golden.js` |
-| 音声回帰テスト | `src/wasm/openjtalk-web/test/js/test-audio-regression.js` |
-| 音声回帰ベースライン | `tests/fixtures/g2p/audio-regression-baseline.json` |
-| クロスプラットフォームフィクスチャ | `tests/fixtures/g2p/phoneme_test_cases.json` |
+| WASM ビルド CI | `.github/workflows/wasm-build.yml` |
 
 ### データセット
 

@@ -145,7 +145,7 @@ if [ $FAILED -eq 0 ]; then
     echo -e "${GREEN}✅ All pre-flight checks passed!${NC}"
     echo ""
     echo "Ready for browser testing at:"
-    echo "  http://localhost:8081/test/debug-test.html"
+    echo "  http://localhost:8081/demo/index.html"
 else
     echo -e "${RED}❌ Some checks failed. Please fix the issues above.${NC}"
 fi

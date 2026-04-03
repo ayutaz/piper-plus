@@ -15,7 +15,7 @@ import assert from 'node:assert/strict';
 // ---------------------------------------------------------------------------
 
 let PiperPlus;
-let ModelManager, DictManager;
+let ModelManager;
 let importError = null;
 
 // Save original globals before any mocks are installed.
@@ -141,7 +141,6 @@ try {
   const mod = await import('../../src/index.js');
   PiperPlus = mod.PiperPlus;
   ModelManager = mod.ModelManager;
-  DictManager = mod.DictManager;
 } catch (e) {
   importError = e;
 }
@@ -149,7 +148,7 @@ try {
 const skip = PiperPlus == null;
 
 // ---------------------------------------------------------------------------
-// Stub helpers: ModelManager.resolveUrls / DictManager.resolveUrls
+// Stub helpers: ModelManager.resolveUrls
 //
 // The _init() method calls these as public synchronous methods.
 // They are not yet implemented on the classes, so we stub them on the
@@ -158,9 +157,6 @@ const skip = PiperPlus == null;
 
 /** Saved originals (may be undefined). */
 let _origModelResolve;
-let _origDictResolve;
-let _origPhonemizerInit;
-let _origPhonemizerSetMap;
 
 function installPrototypeStubs() {
   _origModelResolve = ModelManager.prototype.resolveUrls;
@@ -176,19 +172,6 @@ function installPrototypeStubs() {
       configUrl: `https://huggingface.co/mock/${modelNameOrUrl}/model.onnx.json`,
     };
   };
-
-  _origDictResolve = DictManager.prototype.resolveUrls;
-  DictManager.prototype.resolveUrls = function (opts = {}) {
-    return {
-      dictUrl: {
-        jsPath: opts.dictUrl || 'https://mock-dict/openjtalk.js',
-        wasmPath: opts.dictUrl || 'https://mock-dict/openjtalk.wasm',
-        dictPath: opts.dictUrl || 'https://mock-dict/dict',
-      },
-      voiceUrl: opts.voiceUrl || 'https://mock-dict/mei_normal.htsvoice',
-    };
-  };
-
 }
 
 function removePrototypeStubs() {
@@ -196,12 +179,6 @@ function removePrototypeStubs() {
     ModelManager.prototype.resolveUrls = _origModelResolve;
   } else {
     delete ModelManager.prototype.resolveUrls;
-  }
-
-  if (_origDictResolve !== undefined) {
-    DictManager.prototype.resolveUrls = _origDictResolve;
-  } else {
-    delete DictManager.prototype.resolveUrls;
   }
 }
 
@@ -248,12 +225,6 @@ function installInitWrapper() {
 
     // 3. G2P — stub (no real OpenJTalk)
     progress({ stage: 'phonemizer', progress: 0, message: 'Initializing phonemizer...' });
-
-    const dm = new DictManager();
-    const { dictUrl, voiceUrl } = dm.resolveUrls({
-      dictUrl: options.dictUrl,
-      voiceUrl: options.voiceUrl,
-    });
 
     this._g2p = {
       detectLanguage: () => 'ja',

@@ -7,7 +7,8 @@
 
 const DB_NAME = 'piper-plus-models';
 const STORE_NAME = 'models';
-const DB_VERSION = 1;
+const DICT_STORE = 'dictionaries';
+const DB_VERSION = 2;
 
 const HUGGINGFACE_API_BASE = 'https://huggingface.co/api/models';
 const HUGGINGFACE_RESOLVE_BASE = 'https://huggingface.co';
@@ -34,6 +35,9 @@ function openDatabase(dbName) {
       const db = event.target.result;
       if (!db.objectStoreNames.contains(STORE_NAME)) {
         db.createObjectStore(STORE_NAME);
+      }
+      if (!db.objectStoreNames.contains(DICT_STORE)) {
+        db.createObjectStore(DICT_STORE);
       }
     };
     request.onsuccess = () => resolve(request.result);
@@ -136,10 +140,12 @@ export class ModelManager {
   /**
    * @param {Object} [options]
    * @param {string} [options.cachePrefix='piper-plus-models'] - IndexedDB database name
+   * @param {boolean} [options.verifyOnCacheHit=false] - Re-verify SHA-256 on cache retrieval
    */
   constructor(options = {}) {
     this._dbName = options.cachePrefix || DB_NAME;
     this._db = null;
+    this._verifyOnCacheHit = options.verifyOnCacheHit || false;
   }
 
   /**
@@ -153,6 +159,30 @@ export class ModelManager {
       this._db = await openDatabase(this._dbName);
     }
     return this._db;
+  }
+
+  /**
+   * Compute the SHA-256 hex digest of an ArrayBuffer.
+   *
+   * Returns null when crypto.subtle is unavailable (e.g. insecure HTTP
+   * context) so callers can degrade gracefully.
+   *
+   * @param {ArrayBuffer} arrayBuffer
+   * @returns {Promise<string|null>} - Lowercase hex string, or null
+   */
+  async _computeSha256(arrayBuffer) {
+    if (typeof globalThis.crypto === 'undefined' ||
+        !globalThis.crypto.subtle ||
+        typeof globalThis.crypto.subtle.digest !== 'function') {
+      return null;
+    }
+    try {
+      const hashBuffer = await globalThis.crypto.subtle.digest('SHA-256', arrayBuffer);
+      const hashArray = new Uint8Array(hashBuffer);
+      return Array.from(hashArray).map(b => b.toString(16).padStart(2, '0')).join('');
+    } catch {
+      return null;
+    }
   }
 
   /**
@@ -182,7 +212,8 @@ export class ModelManager {
     const onnxFilename = await resolveOnnxFilename(repoName);
 
     const modelUrl = `${HUGGINGFACE_RESOLVE_BASE}/${repoName}/resolve/main/${onnxFilename}`;
-    const configUrl = `${HUGGINGFACE_RESOLVE_BASE}/${repoName}/resolve/main/${onnxFilename}.json`;
+    // Config is always "config.json" in the repo root (not "<model>.onnx.json")
+    const configUrl = `${HUGGINGFACE_RESOLVE_BASE}/${repoName}/resolve/main/config.json`;
 
     return { modelUrl, configUrl, cacheKey: repoName };
   }
@@ -229,13 +260,27 @@ export class ModelManager {
     // Download model with progress tracking.
     const modelData = await fetchWithProgress(modelUrl, onProgress);
 
-    // Store in cache.
+    // Compute SHA-256 integrity hash.
+    const sha256 = await this._computeSha256(modelData);
+
+    if (sha256 === null) {
+      console.warn('[piper-plus] crypto.subtle unavailable — skipping SHA-256 integrity verification. Serve over HTTPS for full integrity checks.');
+    } else if (config.sha256) {
+      // Verify against the expected hash in the model config.
+      if (sha256 !== config.sha256) {
+        throw new Error(
+          `SHA-256 mismatch for downloaded model: expected ${config.sha256}, got ${sha256}`
+        );
+      }
+    }
+
+    // Store in cache (include hash for later verification).
     const db = await this._getDb();
     const tx = db.transaction(STORE_NAME, 'readwrite');
     const store = tx.objectStore(STORE_NAME);
     await wrapRequest(
       store.put(
-        { modelData, config, timestamp: Date.now() },
+        { modelData, config, timestamp: Date.now(), sha256 },
         cacheKey,
       )
     );
@@ -245,6 +290,10 @@ export class ModelManager {
 
   /**
    * Retrieve a model from the IndexedDB cache.
+   *
+   * When {@link _verifyOnCacheHit} is true and a stored SHA-256 hash exists,
+   * the hash is recomputed and compared.  A mismatch logs a warning and
+   * returns null so that the caller re-downloads the model.
    *
    * @param {string} key - Cache key (repo name or URL)
    * @returns {Promise<{modelData: ArrayBuffer, config: Object}|null>}
@@ -257,18 +306,96 @@ export class ModelManager {
     if (!entry) {
       return null;
     }
+
+    // Optionally verify integrity of cached data.
+    if (this._verifyOnCacheHit && entry.sha256) {
+      const currentHash = await this._computeSha256(entry.modelData);
+      if (currentHash !== null && currentHash !== entry.sha256) {
+        console.warn(
+          `[piper-plus] Cached model "${key}" failed SHA-256 integrity check (expected ${entry.sha256}, got ${currentHash}). Re-downloading.`
+        );
+        return null;
+      }
+    }
+
     return { modelData: entry.modelData, config: entry.config };
   }
 
+  // -------------------------------------------------------------------------
+  // Dictionary caching (for ja-external / ja-lite WASM variant)
+  // -------------------------------------------------------------------------
+
   /**
-   * Remove all cached models.
+   * Retrieve a dictionary from the IndexedDB cache.
+   *
+   * @param {string} key - Cache key (e.g. 'naist-jdic-v1')
+   * @returns {Promise<ArrayBuffer|null>}
+   */
+  async getDictionaryFromCache(key) {
+    const db = await this._getDb();
+    const tx = db.transaction(DICT_STORE, 'readonly');
+    const store = tx.objectStore(DICT_STORE);
+    const entry = await wrapRequest(store.get(key));
+    if (!entry) {
+      return null;
+    }
+    return entry.data;
+  }
+
+  /**
+   * Save a dictionary to the IndexedDB cache.
+   *
+   * @param {string} key - Cache key (e.g. 'naist-jdic-v1')
+   * @param {ArrayBuffer} data - Dictionary binary data
+   * @returns {Promise<void>}
+   */
+  async cacheDictionary(key, data) {
+    const db = await this._getDb();
+    const tx = db.transaction(DICT_STORE, 'readwrite');
+    const store = tx.objectStore(DICT_STORE);
+    await wrapRequest(
+      store.put(
+        { data, timestamp: Date.now() },
+        key,
+      )
+    );
+  }
+
+  /**
+   * Fetch a dictionary from a URL, cache it in IndexedDB, and return the data.
+   * If the dictionary is already cached, returns the cached version.
+   *
+   * @param {string} url - URL to fetch the dictionary from
+   * @param {string} key - Cache key (e.g. 'naist-jdic-v1')
+   * @param {Object} [options]
+   * @param {Function} [options.onProgress] - ({loaded, total, percentage}) => void
+   * @returns {Promise<ArrayBuffer>}
+   */
+  async fetchAndCacheDictionary(url, key, options = {}) {
+    // Try cache first.
+    const cached = await this.getDictionaryFromCache(key);
+    if (cached) {
+      return cached;
+    }
+
+    // Fetch from URL.
+    const data = await fetchWithProgress(url, options.onProgress);
+
+    // Store in cache.
+    await this.cacheDictionary(key, data);
+
+    return data;
+  }
+
+  /**
+   * Remove all cached models and dictionaries.
    *
    * @returns {Promise<void>}
    */
   async clearCache() {
     const db = await this._getDb();
-    const tx = db.transaction(STORE_NAME, 'readwrite');
-    const store = tx.objectStore(STORE_NAME);
-    await wrapRequest(store.clear());
+    const tx = db.transaction([STORE_NAME, DICT_STORE], 'readwrite');
+    await wrapRequest(tx.objectStore(STORE_NAME).clear());
+    await wrapRequest(tx.objectStore(DICT_STORE).clear());
   }
 }

@@ -382,6 +382,21 @@ impl JapanesePhonemizer {
         })
     }
 
+    /// Create a `JapanesePhonemizer` from a bincode-serialized jpreprocess dictionary.
+    ///
+    /// Used by WASM for external dictionary loading (fetched from URL, cached in IndexedDB).
+    pub fn new_from_serialized_dict(data: &[u8]) -> Result<Self, G2pError> {
+        let dictionary: jpreprocess::Dictionary =
+            bincode::deserialize(data).map_err(|e| G2pError::DictionaryLoad {
+                path: format!("(serialized, {} bytes): {e}", data.len()),
+            })?;
+        let njd = jpreprocess::JPreprocess::with_dictionaries(dictionary, None);
+        Ok(Self {
+            njd,
+            dictionary: None,
+        })
+    }
+
     /// Search well-known locations for the jpreprocess NAIST-JDIC dictionary.
     fn find_dictionary() -> Result<std::path::PathBuf, G2pError> {
         // 1. Environment variable override

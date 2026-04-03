@@ -1,134 +1,158 @@
-# GitHub Pages デプロイメント手順
+# GitHub Pages Deployment Guide
 
-## 概要
-このドキュメントでは、WebAssembly版Piperのデモページを GitHub Pages にデプロイする手順を説明します。
+## Overview
 
-## 必要な修正
+This document describes how to deploy the PiperPlus WebAssembly TTS demo to GitHub Pages. The demo uses the PiperPlus high-level API with Rust WASM phonemization and ONNX Runtime Web for fully in-browser speech synthesis.
 
-### 1. 相対パスの調整
-現在の実装では、すべてのリソースが `../` で始まる相対パスを使用しています。
-GitHub Pages でホストする場合は、これらのパスを調整する必要があります。
+## Architecture
 
-### 2. config.js の設定
-`demo/config.js` を以下のように編集：
+| Component | Technology |
+|-----------|-----------|
+| Japanese phonemization | Rust WASM (jpreprocess, dictionary embedded in binary) |
+| English phonemization | SimpleEnglishPhonemizer (rule-based) |
+| Multilingual phonemization (ZH/KO/ES/FR/PT/SV) | SimpleUnifiedPhonemizer (character/rule-based) |
+| Model loading | ModelManager (HuggingFace auto-download + IndexedDB cache) |
+| ONNX inference | onnxruntime-web (WebGPU with WASM fallback) |
 
-```javascript
-const deploymentConfig = {
-    isGitHubPages: true,  // true に変更
-    basePath: '/piper-plus/src/wasm/openjtalk-web/',  // リポジトリとパスに合わせて設定
-};
-```
+## Directory Structure
 
-### 3. index.html の修正が必要な箇所
-
-```javascript
-// 例：カスタム辞書の読み込み
-const dictPath = deploymentConfig.getPath('../assets/custom_dictionary.json');
-await customDict.loadFromJSON(dictPath);
-
-// OpenJTalk の初期化
-await unifiedPhonemizer.initialize({
-    openjtalk: {
-        jsPath: deploymentConfig.getPath('../dist/openjtalk.js'),
-        wasmPath: deploymentConfig.getPath('../dist/openjtalk.wasm'),
-        dictPath: deploymentConfig.getPath('../assets/dict'),
-        voicePath: deploymentConfig.getPath('../assets/voice/mei_normal.htsvoice')
-    }
-});
-```
-
-## デプロイ方法
-
-### 方法1: gh-pages ブランチを使用
-
-```bash
-# gh-pages ブランチを作成
-git checkout -b gh-pages
-
-# 必要なファイルをルートにコピー
-cp -r src/wasm/openjtalk-web/* .
-
-# コミット & プッシュ
-git add .
-git commit -m "Deploy to GitHub Pages"
-git push origin gh-pages
-```
-
-### 方法2: GitHub Actions を使用
-
-`.github/workflows/deploy-demo.yml` を作成：
-
-```yaml
-name: Deploy Demo to GitHub Pages
-
-on:
-  push:
-    branches: [ main ]
-
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      
-      - name: Setup directories
-        run: |
-          mkdir -p public
-          cp -r src/wasm/openjtalk-web/* public/
-          
-      - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v3
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./public
-```
-
-## 必要なディレクトリ構造
-
-GitHub Pages で正しく動作するには、以下の構造が必要：
+### Source layout (repository)
 
 ```
-/（GitHub Pages ルート）
-├── index.html (demo/index.html)
-├── config.js
-├── assets/
-│   ├── custom_dictionary.json
-│   ├── dict/
-│   └── voice/
+src/wasm/openjtalk-web/
+├── demo/
+│   ├── index.html                   # Main demo page
+│   ├── simple-multilingual.html     # Simplified demo
+│   ├── multilingual.html            # Multilingual demo with examples
+│   ├── piper-espeak-english.html    # English-only demo
+│   ├── piper-espeak-complete.html   # Full-featured demo
+│   └── config.js                    # Deployment configuration
+├── src/
+│   ├── index.js                     # PiperPlus entry point
+│   ├── model-manager.js             # HuggingFace model download + IndexedDB cache
+│   ├── audio-result.js              # WAV encoding + playback
+│   └── ...                          # Other PiperPlus modules
 ├── dist/
-│   ├── openjtalk.js
-│   ├── openjtalk.wasm
-│   └── espeak-ng/
+│   └── rust-wasm/
+│       ├── piper_plus_wasm_bg.wasm  # Rust WASM binary (~15MB, dictionary embedded)
+│       ├── piper_plus_wasm.js       # WASM JS bindings
+│       └── piper_plus_wasm.d.ts     # TypeScript definitions
+└── test/
+    └── multilingual-demo/
+        └── index.html               # 6-language multilingual demo (deployed as main page)
+```
+
+### Deployed layout (GitHub Pages root)
+
+```
+/ (GitHub Pages root)
+├── index.html              (from test/multilingual-demo/index.html, paths rewritten)
+├── 404.html                (copy of index.html)
 ├── src/
 │   ├── index.js
 │   ├── model-manager.js
-│   ├── dict-manager.js
 │   ├── audio-result.js
-│   ├── espeak_phoneme_extractor.js
-│   └── custom_dictionary.js
-└── models/
-    ├── multilingual-test-medium.onnx
-    └── multilingual-test-medium.onnx.json
+│   └── ...
+├── dist/
+│   └── rust-wasm/
+│       ├── piper_plus_wasm_bg.wasm
+│       ├── piper_plus_wasm.js
+│       └── piper_plus_wasm.d.ts
+└── multilingual-demo/
+    └── *.html
 ```
 
-## 注意事項
+Note: ONNX models are NOT bundled in the deployment. The `ModelManager` downloads models from HuggingFace on first use and caches them in IndexedDB.
 
-1. **ファイルサイズ**: GitHub Pages には 100MB のファイルサイズ制限があります
-2. **帯域幅**: 月間 100GB の帯域幅制限があります
-3. **HTTPS**: GitHub Pages は HTTPS でのみ提供されます
-4. **CORS**: 外部リソースへのアクセスには CORS 設定が必要です
+## Initialization Code
 
-## 代替案：CDN の使用
-
-大きなモデルファイルは CDN にホストすることを検討：
+The PiperPlus API handles model download, WASM phonemizer initialization, and ONNX session creation in a single call:
 
 ```javascript
-// モデルを CDN から読み込む例
-const modelPath = 'https://cdn.jsdelivr.net/gh/username/repo@version/models/multilingual-test-medium.onnx';
+import { PiperPlus } from './src/index.js';
+
+// Load ONNX Runtime from CDN
+const script = document.createElement('script');
+script.src = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.21.0/dist/ort.min.js';
+document.head.appendChild(script);
+
+// Initialize PiperPlus (downloads model from HuggingFace on first use)
+const piper = await PiperPlus.initialize({
+    model: 'tsukuyomi',
+    ort: globalThis.ort,
+    onProgress: ({ stage, progress, message }) => {
+        console.log(`[${stage}] ${(progress * 100).toFixed(0)}% - ${message}`);
+    }
+});
+
+// Synthesize and play
+const audio = await piper.synthesize('Hello, world!', { language: 'en' });
+await audio.play();
 ```
 
-## トラブルシューティング
+## Deployment Method: GitHub Actions
 
-1. **404 エラー**: パスが正しく設定されているか確認
-2. **CORS エラー**: すべてのリソースが同一オリジンからアクセスされているか確認
-3. **読み込みエラー**: ブラウザの開発者ツールでネットワークタブを確認
+Deployment is handled by `.github/workflows/deploy-webassembly-demo.yml`. This workflow:
+
+1. **Builds Rust WASM** via `wasm-pack build --target web --release`
+2. **Prepares deployment directory** by copying `dist/`, `src/`, and HTML files
+3. **Rewrites paths** using `sed` to adjust relative paths (`../../` to `./` or `../`) for the flat deployment structure
+4. **Deploys to GitHub Pages** via `actions/deploy-pages@v4`
+
+### Triggering a deployment
+
+- **Automatic**: Push to `dev` branch with changes under `src/wasm/`
+- **Manual**: Use `workflow_dispatch` from the Actions tab
+
+### WASM build prerequisite
+
+The workflow installs `wasm-pack` and builds the Rust WASM binary automatically. To build locally:
+
+```bash
+# Install wasm-pack
+cargo install wasm-pack --locked
+
+# Build WASM (from repository root)
+cd src/rust/piper-wasm
+wasm-pack build --target web --release --out-dir ../../wasm/openjtalk-web/dist/rust-wasm
+```
+
+## config.js
+
+`demo/config.js` provides centralized deployment settings:
+
+```javascript
+const deploymentConfig = {
+    isGitHubPages: false,       // Set to true for GitHub Pages
+    basePath: '',               // e.g., '/piper-plus/'
+    defaultModel: 'tsukuyomi',  // Model name for PiperPlus.initialize()
+    ortCdnUrl: 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.21.0/dist/ort.min.js',
+};
+```
+
+Note: The current demo HTML files use inline configuration (model name and CDN URL are hardcoded in each HTML file). `config.js` is provided for external tools (e.g., deployment scripts) that need to modify settings programmatically.
+
+## Important Notes
+
+### File size limits
+- GitHub Pages has a 100MB per-file limit. The WASM binary (~15MB) is well within this limit
+- ONNX models are downloaded from HuggingFace at runtime, not bundled in the deployment
+
+### HTTPS requirement
+- `PiperPlus.initialize()` fetches models from HuggingFace via HTTPS
+- GitHub Pages serves content over HTTPS automatically
+
+### Cross-Origin Isolation
+- `onnxruntime-web` WASM threads require `Cross-Origin-Isolation` headers (`Cross-Origin-Opener-Policy: same-origin` + `Cross-Origin-Embedder-Policy: require-corp`)
+- GitHub Pages does not set these headers by default, so onnxruntime-web falls back to the single-threaded `wasm` execution provider (not `wasm-threads`)
+
+### CORS
+- HuggingFace Hub API supports CORS, so model downloads work from any origin
+- All static assets are served from the same origin (no CORS issues)
+
+## Troubleshooting
+
+1. **404 errors**: Verify that the deploy workflow's `sed` path rewriting matches the actual import paths in the HTML files
+2. **Model download failures**: Check the browser console for HuggingFace API errors. The model name must match a known alias in `ModelManager` (e.g., `'tsukuyomi'`)
+3. **WASM load failures**: Ensure `dist/rust-wasm/piper_plus_wasm_bg.wasm` is present in the deployment. Check the workflow's "Verify WASM output" step
+4. **Slow first load**: The first visit downloads the ONNX model (~35MB). Subsequent visits use the IndexedDB cache

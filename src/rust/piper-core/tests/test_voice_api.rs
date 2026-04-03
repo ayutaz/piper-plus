@@ -1,3 +1,5 @@
+#![cfg(feature = "onnx")]
+
 use piper_plus::PiperVoice;
 use std::path::PathBuf;
 

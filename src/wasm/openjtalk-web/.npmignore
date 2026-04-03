@@ -40,9 +40,6 @@ server.py
 prepare-*.sh
 build-local.sh
 
-# GitHub Pages test
-github-pages-test.html
-
 # Development documentation
 DEVELOPMENT.md
 TESTING.md

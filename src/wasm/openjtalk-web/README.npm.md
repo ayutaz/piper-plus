@@ -12,7 +12,9 @@ Browser-based multilingual neural TTS powered by VITS. No server required.
 - **No server or API key required** -- all processing happens client-side
 - **Streaming synthesis** -- sentence-by-sentence generation with chunk callbacks
 - **WebGPU acceleration** -- automatic fallback to WASM when WebGPU is unavailable
-- **IndexedDB caching** -- models and dictionaries are cached after the first download
+- **IndexedDB caching** -- models are cached after the first download
+- **Bundled Japanese dictionary** -- NAIST-JDIC compiled into WASM binary (~19MB gzip), no separate download
+- **Structured error codes** -- errors carry a `.code` property for programmatic handling
 - **~4 MB npm package** -- models are downloaded on demand from HuggingFace
 
 ## Install
@@ -31,7 +33,7 @@ npm install piper-plus onnxruntime-web
 import { PiperPlus } from "piper-plus";
 import * as ort from "onnxruntime-web";
 
-// Initialize (downloads and caches model + dictionary automatically)
+// Initialize (downloads and caches model automatically; dictionary is bundled in WASM)
 const tts = await PiperPlus.initialize({
   model: "ayousanz/piper-plus-tsukuyomi-chan",
   ort,
@@ -107,14 +109,12 @@ const tts = await PiperPlus.initialize({
 
 ### `PiperPlus.initialize(options)`
 
-Static async factory that downloads (and caches) the ONNX model, config, OpenJTalk dictionary, and HTS voice file, then creates an ONNX inference session.
+Static async factory that downloads (and caches) the ONNX model and config, then creates an ONNX inference session and initializes the Rust WASM phonemizer. The Japanese dictionary (NAIST-JDIC) is bundled in the WASM binary and requires no separate download.
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `model` | `string` | -- | **Required.** HuggingFace repo name (e.g. `"ayousanz/piper-plus-tsukuyomi-chan"`), registry shortcut (e.g. `"tsukuyomi"`), or direct URL to an ONNX file. |
 | `ort` | `object` | `globalThis.ort` | `onnxruntime-web` module instance. |
-| `dictUrl` | `string` | auto | Custom URL for OpenJTalk dictionary files. |
-| `voiceUrl` | `string` | auto | Custom URL for the HTS voice file. |
 | `onProgress` | `function` | -- | Callback receiving `{ stage, progress, message }`. |
 
 Returns `Promise<PiperPlus>`.
@@ -179,14 +179,6 @@ Resolves a model identifier to concrete URLs without downloading.
 - `modelNameOrUrl` -- Registry shortcut (`"tsukuyomi"`), HuggingFace repo (`"ayousanz/piper-plus-tsukuyomi-chan"`), or direct URL
 - Returns: `Promise<{ modelUrl: string, configUrl: string, cacheKey: string }>`
 
-### `dictManager.resolveUrls(options?)`
-
-Returns resolved dictionary and voice URLs without downloading.
-
-- `options.dictUrl` -- Custom base URL for dictionary files (default: HuggingFace)
-- `options.voiceUrl` -- Custom URL for HTS voice file (default: HuggingFace)
-- Returns: `{ dictBaseUrl: string, voiceUrl: string }`
-
 ## Available Models
 
 | Model | HuggingFace Repo | Description |
@@ -222,8 +214,8 @@ The config file is expected at `<model-url>.json` (e.g. `model.onnx.json`).
 
 | Language | Code | Phonemization Engine | Notes |
 |----------|------|---------------------|-------|
-| Japanese | `ja` | OpenJTalk (WASM) | Full phoneme analysis with prosody features (A1/A2/A3) |
-| English | `en` | Dictionary + rules (JS) | Built-in dictionary-based G2P |
+| Japanese | `ja` | jpreprocess (Rust WASM) | Full phoneme analysis with prosody features (A1/A2/A3); NAIST-JDIC dictionary bundled |
+| English | `en` | Rule-based (JS) | SimpleEnglishPhonemizer |
 | Chinese | `zh` | Character-based mapping | Maps characters through the model's phoneme_id_map |
 | Spanish | `es` | Character-based mapping | Maps characters through the model's phoneme_id_map |
 | French | `fr` | Character-based mapping | Maps characters through the model's phoneme_id_map |
@@ -244,6 +236,8 @@ Language auto-detection works reliably for Japanese (Kana characters), Chinese (
 
 WebGPU is used automatically when available for faster inference. When WebGPU is not supported, the runtime falls back to the WASM execution provider.
 
+**Note:** The Rust WASM phonemizer binary (with bundled Japanese dictionary) is ~58MB uncompressed (~19MB gzip transfer). It is fetched at runtime via `fetch()` and cached by the browser's WASM compilation cache, so subsequent page loads are fast (0.3-1s).
+
 ## Advanced Usage
 
 ### Using SimpleUnifiedPhonemizer Directly
@@ -255,17 +249,12 @@ import { SimpleUnifiedPhonemizer } from "piper-plus";
 
 const phonemizer = new SimpleUnifiedPhonemizer();
 await phonemizer.initialize({
-  openjtalk: {
-    jsPath: "./dist/openjtalk.js",
-    wasmPath: "./dist/openjtalk.wasm",
-    dictPath: "./assets/dict",
-    voicePath: "./assets/voice/mei_normal.htsvoice",
-  },
+  configJson: JSON.stringify(modelConfig),  // model's config.json content
 });
 
-// Japanese: returns OpenJTalk full-context labels
-const jaLabels = await phonemizer.textToPhonemes("こんにちは", "ja");
-const jaPhonemes = phonemizer.extractPhonemes(jaLabels, "ja");
+// Japanese: phonemized via Rust WASM (jpreprocess) with bundled dictionary
+const jaResult = await phonemizer.textToPhonemes("こんにちは", "ja");
+// jaResult.phonemeIds: Int32Array, jaResult.prosodyFeatures: Int32Array
 
 // English: returns IPA string
 const enIPA = await phonemizer.textToPhonemes("Hello world", "en");
@@ -276,41 +265,29 @@ phonemizer.dispose();
 
 ### Cache Management
 
-Models and dictionaries are cached in IndexedDB. You can manage caches programmatically:
+Models are cached in IndexedDB. You can manage caches programmatically:
 
 ```javascript
-import { ModelManager, DictManager } from "piper-plus";
-
-// Check if dictionaries are already cached
-const dictManager = new DictManager();
-const isCached = await dictManager.isCached();
+import { ModelManager } from "piper-plus";
 
 // Clear model cache
 const modelManager = new ModelManager();
 await modelManager.clearCache();
-
-// Clear dictionary cache
-await dictManager.clearCache();
 ```
+
+> **Note:** In v0.2.0, the Japanese dictionary is bundled in the WASM binary. There is no separate dictionary cache. If upgrading from v0.1.x, see [MIGRATION.md](./MIGRATION.md) for instructions on cleaning up legacy IndexedDB dictionary data.
 
 ### URL Resolution
 
-Resolve model or dictionary URLs without downloading:
+Resolve model URLs without downloading:
 
 ```javascript
-import { ModelManager, DictManager } from "piper-plus";
+import { ModelManager } from "piper-plus";
 
 // Resolve model URL from a shortcut or repo name
 const modelMgr = new ModelManager();
 const { modelUrl, configUrl, cacheKey } = await modelMgr.resolveUrls("tsukuyomi");
 console.log(modelUrl);  // https://huggingface.co/ayousanz/piper-plus-tsukuyomi-chan/resolve/main/...
-
-// Resolve dictionary URLs
-const dictMgr = new DictManager();
-const { dictBaseUrl, voiceUrl } = dictMgr.resolveUrls({
-  dictUrl: "https://custom-cdn.example.com/dict",
-});
-console.log(dictBaseUrl);  // https://custom-cdn.example.com/dict (trailing slash removed)
 ```
 
 ### Sub-path Imports
@@ -324,6 +301,12 @@ import { SimpleUnifiedPhonemizer } from "piper-plus/phonemizer";
 // Streaming pipeline
 import { StreamingTTSPipeline, TextChunker } from "piper-plus/streaming";
 ```
+
+## Upgrading from v0.1.x
+
+See [MIGRATION.md](./MIGRATION.md) for a detailed migration guide covering all breaking changes, removed exports, and step-by-step upgrade instructions.
+
+See [CHANGELOG.md](./CHANGELOG.md) for the full list of changes in each release.
 
 ## License
 

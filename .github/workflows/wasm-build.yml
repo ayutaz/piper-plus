@@ -1,0 +1,162 @@
+name: WASM Build
+
+on:
+  push:
+    branches: [dev, 'feat/wasm-*']
+    paths:
+      - 'src/rust/piper-core/**'
+      - 'src/rust/piper-wasm/**'
+      - 'src/rust/Cargo.toml'
+  pull_request:
+    branches: [dev]
+    paths:
+      - 'src/rust/piper-core/**'
+      - 'src/rust/piper-wasm/**'
+      - 'src/rust/Cargo.toml'
+
+jobs:
+  wasm-build:
+    uses: ./.github/workflows/build-wasm-reusable.yml
+
+  wasm-test:
+    needs: wasm-build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src/rust -> target
+
+      - name: Check piper-plus (no inference, native)
+        working-directory: src/rust
+        run: cargo check -p piper-plus --no-default-features --features naist-jdic
+
+      - name: Check piper-plus (wasm32 target)
+        working-directory: src/rust
+        run: cargo check -p piper-plus --target wasm32-unknown-unknown --no-default-features --features naist-jdic
+
+      - name: Check piper-plus-wasm (wasm32 target)
+        working-directory: src/rust
+        run: cargo check -p piper-plus-wasm --target wasm32-unknown-unknown
+
+      - name: Download WASM artifact (multilingual)
+        uses: actions/download-artifact@v4
+        with:
+          name: piper-plus-wasm
+          path: src/wasm/openjtalk-web/dist/rust-wasm/
+
+      - name: Download WASM artifact (ja-only)
+        uses: actions/download-artifact@v4
+        with:
+          name: piper-plus-wasm-ja
+          path: src/wasm/openjtalk-web/dist/rust-wasm-ja/
+
+      - name: Download WASM artifact (ja-lite)
+        uses: actions/download-artifact@v4
+        with:
+          name: piper-plus-wasm-ja-lite
+          path: src/wasm/openjtalk-web/dist/rust-wasm-ja-lite/
+
+      - name: Verify output files (multilingual)
+        run: |
+          test -f src/wasm/openjtalk-web/dist/rust-wasm/piper_plus_wasm_bg.wasm
+          test -f src/wasm/openjtalk-web/dist/rust-wasm/piper_plus_wasm.js
+          test -f src/wasm/openjtalk-web/dist/rust-wasm/piper_plus_wasm.d.ts
+
+      - name: Verify output files (ja-only)
+        run: |
+          test -f src/wasm/openjtalk-web/dist/rust-wasm-ja/piper_plus_wasm_bg.wasm
+          test -f src/wasm/openjtalk-web/dist/rust-wasm-ja/piper_plus_wasm.js
+          test -f src/wasm/openjtalk-web/dist/rust-wasm-ja/piper_plus_wasm.d.ts
+
+      - name: Verify output files (ja-lite)
+        run: |
+          test -f src/wasm/openjtalk-web/dist/rust-wasm-ja-lite/piper_plus_wasm_bg.wasm
+          test -f src/wasm/openjtalk-web/dist/rust-wasm-ja-lite/piper_plus_wasm.js
+          test -f src/wasm/openjtalk-web/dist/rust-wasm-ja-lite/piper_plus_wasm.d.ts
+
+      - name: Report WASM size (multilingual)
+        run: |
+          echo "=== Multilingual ==="
+          ls -lh src/wasm/openjtalk-web/dist/rust-wasm/piper_plus_wasm_bg.wasm
+          gzip -k src/wasm/openjtalk-web/dist/rust-wasm/piper_plus_wasm_bg.wasm
+          ls -lh src/wasm/openjtalk-web/dist/rust-wasm/piper_plus_wasm_bg.wasm.gz
+          rm src/wasm/openjtalk-web/dist/rust-wasm/piper_plus_wasm_bg.wasm.gz
+
+      - name: Report WASM size (ja-only)
+        run: |
+          echo "=== JA-only ==="
+          ls -lh src/wasm/openjtalk-web/dist/rust-wasm-ja/piper_plus_wasm_bg.wasm
+          gzip -k src/wasm/openjtalk-web/dist/rust-wasm-ja/piper_plus_wasm_bg.wasm
+          ls -lh src/wasm/openjtalk-web/dist/rust-wasm-ja/piper_plus_wasm_bg.wasm.gz
+          rm src/wasm/openjtalk-web/dist/rust-wasm-ja/piper_plus_wasm_bg.wasm.gz
+
+      - name: Report WASM size (ja-lite)
+        run: |
+          echo "=== JA-lite ==="
+          ls -lh src/wasm/openjtalk-web/dist/rust-wasm-ja-lite/piper_plus_wasm_bg.wasm
+          gzip -k src/wasm/openjtalk-web/dist/rust-wasm-ja-lite/piper_plus_wasm_bg.wasm
+          ls -lh src/wasm/openjtalk-web/dist/rust-wasm-ja-lite/piper_plus_wasm_bg.wasm.gz
+          rm src/wasm/openjtalk-web/dist/rust-wasm-ja-lite/piper_plus_wasm_bg.wasm.gz
+
+      - name: WASM size regression check (multilingual)
+        working-directory: src/wasm/openjtalk-web
+        run: |
+          WASM_FILE="dist/rust-wasm/piper_plus_wasm_bg.wasm"
+          SIZE=$(stat -f%z "$WASM_FILE" 2>/dev/null || stat -c%s "$WASM_FILE" 2>/dev/null)
+          MAX_SIZE=67108864  # 64MB threshold
+          echo "WASM multilingual size: $SIZE bytes (max: $MAX_SIZE)"
+          if [ "$SIZE" -gt "$MAX_SIZE" ]; then
+            echo "::error::WASM multilingual binary exceeds 64MB threshold ($SIZE bytes)"
+            exit 1
+          fi
+          echo "Multilingual size within threshold"
+
+      - name: WASM size regression check (ja-only)
+        working-directory: src/wasm/openjtalk-web
+        run: |
+          WASM_FILE="dist/rust-wasm-ja/piper_plus_wasm_bg.wasm"
+          SIZE=$(stat -f%z "$WASM_FILE" 2>/dev/null || stat -c%s "$WASM_FILE" 2>/dev/null)
+          MAX_SIZE=67108864  # 64MB threshold
+          echo "WASM ja-only size: $SIZE bytes (max: $MAX_SIZE)"
+          if [ "$SIZE" -gt "$MAX_SIZE" ]; then
+            echo "::error::WASM ja-only binary exceeds 64MB threshold ($SIZE bytes)"
+            exit 1
+          fi
+          echo "JA-only size within threshold"
+
+      - name: WASM size regression check (ja-lite)
+        working-directory: src/wasm/openjtalk-web
+        run: |
+          WASM_FILE="dist/rust-wasm-ja-lite/piper_plus_wasm_bg.wasm"
+          SIZE=$(stat -f%z "$WASM_FILE" 2>/dev/null || stat -c%s "$WASM_FILE" 2>/dev/null)
+          MAX_SIZE=10485760  # 10MB threshold (no bundled dictionary)
+          echo "WASM ja-lite size: $SIZE bytes (max: $MAX_SIZE)"
+          if [ "$SIZE" -gt "$MAX_SIZE" ]; then
+            echo "::error::WASM ja-lite binary exceeds 10MB threshold ($SIZE bytes)"
+            exit 1
+          fi
+          echo "JA-lite size within threshold"
+
+      - name: Run piper-plus-wasm tests (native)
+        working-directory: src/rust
+        run: cargo test -p piper-plus-wasm
+
+      - name: Run piper-plus-wasm tests (ja-external)
+        working-directory: src/rust
+        run: cargo test -p piper-plus-wasm --features ja-external --no-fail-fast
+
+      - name: Test feature flag combinations
+        working-directory: src/rust
+        run: |
+          cargo check -p piper-plus-wasm --target wasm32-unknown-unknown --no-default-features --features ja
+          cargo check -p piper-plus-wasm --target wasm32-unknown-unknown --no-default-features --features ja-external
+          cargo check -p piper-plus-wasm --target wasm32-unknown-unknown --no-default-features --features "ko,es"
+          cargo check -p piper-plus-wasm --target wasm32-unknown-unknown --no-default-features
+          cargo check -p piper-plus-wasm --target wasm32-unknown-unknown --all-features

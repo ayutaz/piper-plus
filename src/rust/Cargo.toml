@@ -1,5 +1,5 @@
 [workspace]
-members = ["piper-plus-g2p", "piper-core", "piper-cli", "piper-python"]
+members = ["piper-plus-g2p", "piper-core", "piper-cli", "piper-python", "piper-wasm"]
 resolver = "2"
 
 [workspace.package]
@@ -12,3 +12,10 @@ repository = "https://github.com/ayutaz/piper-plus"
 homepage = "https://github.com/ayutaz/piper-plus"
 keywords = ["tts", "text-to-speech", "piper", "onnx", "vits"]
 categories = ["multimedia::audio"]
+
+# NOTE: wasm-pack build --release uses [profile.release], not custom named profiles.
+# WASM-specific post-build optimization (wasm-opt) is configured in
+# piper-wasm/Cargo.toml via [package.metadata.wasm-pack.profile.release].
+# We intentionally do NOT set opt-level = 'z' or lto here, because
+# [profile.release] applies to ALL workspace crates (cli, python, etc.)
+# and 'z' would degrade runtime performance for non-WASM targets.

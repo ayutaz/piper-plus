@@ -1,7 +1,7 @@
 /**
  * piper-plus — Browser-based multilingual neural TTS
  *
- * High-level API that orchestrates phonemization (OpenJTalk WASM + rule-based),
+ * High-level API that orchestrates phonemization (Rust WASM + rule-based),
  * ONNX inference (via onnxruntime-web), and audio output.
  *
  * @module piper-plus
@@ -16,7 +16,6 @@ export { StreamingTTSPipeline, TextChunker } from './streaming-pipeline.js';
 export { AudioBackendFactory } from './audio-backend-factory.js';
 export { CacheManager } from './cache-manager.js';
 export { ModelManager } from './model-manager.js';
-export { DictManager } from './dict-manager.js';
 export { AudioResult } from './audio-result.js';
 
 // ---------------------------------------------------------------------------
@@ -27,7 +26,6 @@ import { G2P } from '@piper-plus/g2p';
 import { WebGPUSessionManager } from './webgpu-session-manager.js';
 import { StreamingTTSPipeline, TextChunker } from './streaming-pipeline.js';
 import { ModelManager } from './model-manager.js';
-import { DictManager } from './dict-manager.js';
 import { AudioResult } from './audio-result.js';
 
 // ---------------------------------------------------------------------------
@@ -59,19 +57,15 @@ export class PiperPlus {
   // -------------------------------------------------------------------------
 
   /**
-   * Initialize PiperPlus.  Downloads (and caches) the ONNX model, config,
-   * OpenJTalk dictionary, and HTS voice, then creates an ONNX inference
-   * session.
+   * Initialize PiperPlus.  Downloads (and caches) the ONNX model and config,
+   * then creates an ONNX inference session and initialises the Rust WASM
+   * phonemizer.
    *
    * @param {Object} options
    * @param {string} options.model - HuggingFace model name
    *   (e.g. "ayousanz/piper-plus-tsukuyomi-chan") or direct URL to an ONNX file.
    * @param {Object} [options.ort] - onnxruntime-web instance.  When omitted
    *   the global `globalThis.ort` is used.
-   * @param {string} [options.dictUrl] - OpenJTalk dictionary URL.  Defaults to
-   *   the DictManager auto-resolution.
-   * @param {string} [options.voiceUrl] - HTS voice URL.  Defaults to the
-   *   DictManager auto-resolution.
    * @param {Function} [options.onProgress] - Progress callback receiving
    *   `{ stage: string, progress: number, message: string }`.
    * @returns {Promise<PiperPlus>}
@@ -214,71 +208,54 @@ export class PiperPlus {
 
     const progress = options.onProgress || (() => {});
 
-    // --- 1. Resolve model & config -------------------------------------------
+    try {
+      // --- 1. Resolve model & config -----------------------------------------
 
-    progress({ stage: 'model', progress: 0, message: 'Resolving model...' });
+      progress({ stage: 'model', progress: 0, message: 'Resolving model...' });
 
-    const modelManager = new ModelManager();
-    const { modelUrl, configUrl } = await modelManager.resolveUrls(options.model);
+      const modelManager = new ModelManager();
+      const { modelUrl, configUrl } = await modelManager.resolveUrls(options.model);
 
-    progress({ stage: 'model', progress: 0.1, message: 'Downloading config...' });
-    const configResponse = await fetch(configUrl);
-    if (!configResponse.ok) {
-      throw new Error(`Failed to fetch config: ${configResponse.status} ${configResponse.statusText}`);
+      progress({ stage: 'model', progress: 0.1, message: 'Downloading config...' });
+      const configResponse = await fetch(configUrl);
+      if (!configResponse.ok) {
+        throw new Error(`Failed to fetch config: ${configResponse.status} ${configResponse.statusText}`);
+      }
+      this._config = await configResponse.json();
+
+      // --- 2. Download & cache ONNX model, create session --------------------
+
+      progress({ stage: 'model', progress: 0.3, message: 'Creating ONNX session...' });
+
+      const sessionManager = new WebGPUSessionManager({
+        ort,
+        gpu: typeof navigator !== 'undefined' ? navigator.gpu : undefined,
+      });
+      this._session = await sessionManager.createSession(modelUrl);
+
+      progress({ stage: 'model', progress: 0.7, message: 'Model loaded.' });
+
+      // --- 3. Initialise phonemizer (@piper-plus/g2p) --------------------------
+
+      progress({ stage: 'phonemizer', progress: 0, message: 'Initializing phonemizer...' });
+
+      const languages = this._config.language_id_map
+        ? Object.keys(this._config.language_id_map)
+        : undefined;
+      this._g2p = await G2P.create({ languages });
+
+      progress({ stage: 'phonemizer', progress: 1, message: 'Phonemizer ready.' });
+
+      // --- Done --------------------------------------------------------------
+
+      this._initialized = true;
+      progress({ stage: 'ready', progress: 1, message: 'PiperPlus ready.' });
+    } catch (error) {
+      // Clean up any partially-initialized resources so the instance
+      // does not leak sessions, WASM memory, etc.
+      this.dispose();
+      throw error;
     }
-    this._config = await configResponse.json();
-
-    // --- 2. Download & cache ONNX model, create session ----------------------
-
-    progress({ stage: 'model', progress: 0.3, message: 'Creating ONNX session...' });
-
-    const sessionManager = new WebGPUSessionManager({
-      ort,
-      gpu: typeof navigator !== 'undefined' ? navigator.gpu : undefined,
-    });
-    this._session = await sessionManager.createSession(modelUrl);
-
-    progress({ stage: 'model', progress: 0.7, message: 'Model loaded.' });
-
-    // --- 3. Initialise phonemizer (OpenJTalk + dict + voice) -----------------
-
-    progress({ stage: 'phonemizer', progress: 0, message: 'Downloading dictionary...' });
-
-    const dictManager = new DictManager();
-    const { dictFiles, voiceData } = await dictManager.loadDictionary({
-      dictUrl: options.dictUrl,
-      voiceUrl: options.voiceUrl,
-      onProgress: ({ phase, overallPercent }) => {
-        progress({
-          stage: 'phonemizer',
-          progress: overallPercent / 100 * 0.8,
-          message: phase === 'dict' ? 'Downloading dictionary...' : 'Downloading voice...',
-        });
-      },
-    });
-
-    progress({ stage: 'phonemizer', progress: 0.8, message: 'Initializing phonemizer...' });
-
-    const languages = this._config.language_id_map
-      ? Object.keys(this._config.language_id_map)
-      : undefined;
-    this._g2p = await G2P.create({
-      languages,
-      jaDict: {
-        dictData: dictFiles,
-        voiceData: voiceData,
-      },
-    });
-
-    progress({ stage: 'phonemizer', progress: 1, message: 'Phonemizer ready.' });
-
-    // --- Done ----------------------------------------------------------------
-
-    // COLD-M2: ORT グラフ最適化キャッシュを非同期で温める
-    this._warmupPromise = this._runWarmup(2);
-
-    this._initialized = true;
-    progress({ stage: 'ready', progress: 1, message: 'PiperPlus ready.' });
   }
 
   /**
@@ -292,7 +269,7 @@ export class PiperPlus {
     }
     const result = this._g2p.encode(text, phonemeIdMap, { language });
 
-    // Convert flat prosodyFlat [a1,a2,a3,...] to nested [[a1,a2,a3],...] for _infer()
+    // Convert flat prosodyFlat [a1,a2,a3,...] to nested [[a1,a2,a3],...] for #infer()
     let prosodyFeatures = null;
     if (result.prosodyFlat && result.prosodyFlat.length > 0) {
       const flat = result.prosodyFlat;
@@ -320,7 +297,7 @@ export class PiperPlus {
 
     const inputTensor = new ort.Tensor(
       'int64',
-      new BigInt64Array(phonemeIds.map(id => BigInt(id))),
+      new BigInt64Array(Array.from(phonemeIds, id => BigInt(id))),
       [1, phonemeIds.length]
     );
 

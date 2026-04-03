@@ -126,7 +126,7 @@ function createHuggingFaceRoutes(options = {}) {
       ok: true,
       json: () => Promise.resolve({ siblings }),
     }],
-    [/huggingface\.co\/.*\/resolve\/main\/.*\.onnx\.json$/, {
+    [/huggingface\.co\/.*\/resolve\/main\/config\.json$/, {
       ok: true,
       json: () => Promise.resolve(config),
     }],
@@ -346,22 +346,17 @@ describe('ModelManager.loadModel() 成功ケース', { skip }, () => {
             { rfilename: 'README.md' },
             { rfilename: 'tsukuyomi-medium.onnx' },
             { rfilename: 'tsukuyomi-medium-fp16.onnx' },
-            { rfilename: 'tsukuyomi-medium.onnx.json' },
-            { rfilename: 'tsukuyomi-medium-fp16.onnx.json' },
+            { rfilename: 'config.json' },
           ],
         }),
       }],
-      [/fp16\.onnx\.json$/, {
+      [/config\.json$/, {
         ok: true,
         json: () => Promise.resolve(SAMPLE_CONFIG),
       }],
       [/fp16\.onnx$/, {
         ok: true,
         arrayBuffer: () => Promise.resolve(fp16Buffer),
-      }],
-      [/medium\.onnx\.json$/, {
-        ok: true,
-        json: () => Promise.resolve(SAMPLE_CONFIG),
       }],
       [/medium\.onnx$/, {
         ok: true,

@@ -15,34 +15,45 @@
 //! - バッチ合成 (`batch`)
 //! - デバイス列挙 (`device`)
 
-// --- Core modules ---
+// --- Core modules (常に有効) ---
 pub mod audio;
 pub mod config;
 pub mod dictionary_manager;
-pub mod engine;
 pub mod error;
-pub mod input;
 pub mod phonemize;
-pub mod voice;
 
-// --- Phase 4 modules ---
-pub mod audio_format;
+// --- Inference-dependent modules ---
+#[cfg(feature = "onnx")]
 pub mod batch;
+#[cfg(feature = "onnx")]
 pub mod device;
+#[cfg(feature = "onnx")]
+pub mod engine;
+#[cfg(feature = "onnx")]
 pub mod gpu;
+#[cfg(feature = "onnx")]
+pub mod input;
+#[cfg(feature = "onnx")]
+pub mod voice;
+#[cfg(feature = "onnx")]
+pub mod wasm;
+
+// --- Phase 4 modules (推論非依存) ---
+pub mod audio_format;
 pub mod model_download;
 pub mod streaming;
 pub mod text_splitter;
 pub mod timing;
-pub mod wasm;
 
 pub mod playback;
 
 // Re-exports
 pub use config::{PhonemeIdMap, PhonemeType, VoiceConfig};
+#[cfg(feature = "onnx")]
 pub use engine::{
     DEFAULT_WARMUP_RUNS, ModelCapabilities, OnnxEngine, SynthesisRequest, SynthesisResult,
 };
 pub use error::PiperError;
 pub use phonemize::{ProsodyFeature, ProsodyInfo};
+#[cfg(feature = "onnx")]
 pub use voice::PiperVoice;

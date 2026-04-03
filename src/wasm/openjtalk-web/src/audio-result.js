@@ -28,7 +28,7 @@ function getAudioContext() {
   if (sharedAudioContext.state === 'suspended') {
     void sharedAudioContext.resume().catch((err) => {
       if (typeof console !== 'undefined' && console.warn) {
-        console.warn('AudioContext.resume() failed:', err);
+        console.warn('[piper-plus] AudioContext.resume() failed:', err);
       }
     });
   }

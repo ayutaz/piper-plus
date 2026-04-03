@@ -103,11 +103,11 @@ function createHuggingFaceRoutes(repoName, onnxFilename, config) {
         siblings: [
           { rfilename: 'README.md' },
           { rfilename: onnxFilename },
-          { rfilename: `${onnxFilename}.json` },
+          { rfilename: 'config.json' },
         ],
       }),
     }],
-    [new RegExp(`huggingface\\.co/${repoName.replace('/', '\\/')}.*${onnxFilename}\\.json`), {
+    [new RegExp(`huggingface\\.co/${repoName.replace('/', '\\/')}.*config\\.json`), {
       ok: true,
       json: () => Promise.resolve(config),
     }],
@@ -501,7 +501,7 @@ describe('ModelManager', { skip }, () => {
       assert.equal(urls.configUrl, 'https://example.com/model.onnx.json');
     });
 
-    it('HuggingFaceリポジトリのconfigUrlが.onnx.jsonで終わる', async () => {
+    it('HuggingFaceリポジトリのconfigUrlがconfig.jsonで終わる', async () => {
       globalThis.fetch = createMockFetch(new Map([
         [/huggingface\.co\/api\/models\//, {
           ok: true,
@@ -514,7 +514,7 @@ describe('ModelManager', { skip }, () => {
       const mgr = new ModelManager();
       const urls = await mgr._resolveUrls('ayousanz/piper-plus-base');
 
-      assert.ok(urls.configUrl.endsWith('.onnx.json'));
+      assert.ok(urls.configUrl.endsWith('config.json'));
     });
 
     it('HuggingFaceリポジトリのconfigUrlにhuggingface.coが含まれる', async () => {

@@ -386,6 +386,7 @@ mod tests {
     // AudioSink: WavFileSink
     // ===================================================================
 
+    #[cfg(feature = "onnx")]
     #[test]
     fn test_wav_file_sink_writes_valid_wav() {
         let dir = tempfile::tempdir().unwrap();
@@ -409,6 +410,7 @@ mod tests {
         assert_eq!(read_samples, expected);
     }
 
+    #[cfg(feature = "onnx")]
     #[test]
     fn test_wav_file_sink_multiple_chunks() {
         let dir = tempfile::tempdir().unwrap();
@@ -650,6 +652,7 @@ mod tests {
     // TDD追加テスト: WavFileSink error paths
     // ===================================================================
 
+    #[cfg(feature = "onnx")]
     #[test]
     fn test_wav_file_sink_drop_finalizes() {
         // Drop without calling finalize() should still produce a valid WAV.
@@ -690,6 +693,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "onnx")]
     #[test]
     fn test_wav_file_sink_same_sample_rate_ok() {
         // Multiple chunks with the same sample rate should succeed.

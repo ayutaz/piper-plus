@@ -176,8 +176,7 @@ def main():
             print("\n✅ All tests passed!")
             print("\nTo run full browser test:")
             print("  1. Keep this server running")
-            print(f"  2. Open http://localhost:{PORT}/test/full-test.html in browser")
-            print("  3. Click 'Initialize All Components'")
+            print(f"  2. Open http://localhost:{PORT}/demo/index.html in browser")
             print("\nPress Ctrl+C to stop server")
 
             # Keep server running

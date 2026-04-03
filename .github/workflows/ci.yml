@@ -515,7 +515,7 @@ jobs:
 
   npm-package-tests:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: src/wasm/openjtalk-web
@@ -527,6 +527,35 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: '20'
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            src/rust/target
+          key: wasm-cargo-${{ hashFiles('src/rust/Cargo.lock') }}
+          restore-keys: wasm-cargo-
+
+      - name: Install wasm-pack
+        run: cargo install wasm-pack --locked
+
+      - name: Build WASM artifacts
+        working-directory: src/rust/piper-wasm
+        run: |
+          wasm-pack build --target web --release --features multilingual
+          rm -rf ../../wasm/openjtalk-web/dist/rust-wasm
+          mv pkg ../../wasm/openjtalk-web/dist/rust-wasm
+
+      - name: Run piper-wasm tests (ja-external)
+        working-directory: src/rust
+        run: cargo test -p piper-plus-wasm --features ja-external --no-fail-fast
 
       - name: Install dependencies
         run: npm install

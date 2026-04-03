@@ -22,7 +22,7 @@ export class AudioBackendFactory {
         return new AudioWorkletBackend(ctx);
       }
     } catch (e) {
-      console.warn('AudioWorklet not available, falling back:', e.message);
+      console.warn('[piper-plus] AudioWorklet not available, falling back:', e.message);
     }
     // Close unused AudioContext before trying next fallback
     if (ctx && ctx.state !== 'closed') {
@@ -34,7 +34,7 @@ export class AudioBackendFactory {
       ctx = new AudioContext({ sampleRate });
       return new ScriptProcessorBackend(ctx);
     } catch (e) {
-      console.warn('ScriptProcessor not available, falling back:', e.message);
+      console.warn('[piper-plus] ScriptProcessor not available, falling back:', e.message);
       if (ctx && ctx.state !== 'closed') {
         try { await ctx.close(); } catch { /* ignore close errors */ }
       }
@@ -170,7 +170,7 @@ class HTMLAudioBackend {
 
   pushChunk(chunk) {
     // HTMLAudio doesn't support streaming — buffer and play at end
-    console.warn('HTMLAudioBackend does not support streaming pushChunk');
+    console.warn('[piper-plus] HTMLAudioBackend does not support streaming pushChunk');
   }
 
   stop() {

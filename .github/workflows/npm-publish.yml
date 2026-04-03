@@ -57,8 +57,11 @@ jobs:
       - name: Run npm package tests
         run: npm run test:npm-package:all
 
+  wasm-build:
+    uses: ./.github/workflows/build-wasm-reusable.yml
+
   publish:
-    needs: validate
+    needs: [validate, wasm-build]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -76,6 +79,15 @@ jobs:
         with:
           node-version: '20'
           registry-url: https://registry.npmjs.org
+
+      - name: Download WASM artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: piper-plus-wasm
+          path: src/wasm/openjtalk-web/dist/rust-wasm/
+
+      - name: Verify WASM output
+        run: test -f dist/rust-wasm/piper_plus_wasm_bg.wasm
 
       - name: Publish to npm
         run: npm publish --provenance --access public

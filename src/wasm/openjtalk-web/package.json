@@ -1,6 +1,6 @@
 {
   "name": "piper-plus",
-  "version": "0.2.0-alpha.0",
+  "version": "0.2.0",
   "description": "Browser-based multilingual neural TTS with VITS. Supports Japanese, English, Chinese, Korean, Spanish, French, Portuguese, and Swedish.",
   "type": "module",
   "main": "src/index.js",
@@ -16,30 +16,38 @@
     },
     "./streaming": {
       "import": "./src/streaming-pipeline.js"
+    },
+    "./wasm/multilingual": {
+      "import": "./dist/rust-wasm/piper_plus_wasm.js"
+    },
+    "./wasm/ja": {
+      "import": "./dist/rust-wasm-ja/piper_plus_wasm.js"
+    },
+    "./wasm/ja-lite": {
+      "import": "./dist/rust-wasm-ja-lite/piper_plus_wasm.js"
     }
   },
   "files": [
     "src/**/*.js",
-    "dist/openjtalk.wasm",
-    "dist/openjtalk.js",
-    "dist/load-dictionary.js",
+    "dist/rust-wasm/**",
     "types/",
     "THIRD-PARTY-LICENSES.md",
     "LICENSE.md",
     "README.npm.md"
   ],
   "scripts": {
-    "test": "node --test test/js/test-openjtalk-integration.js test/js/test-github-pages-paths.js",
-    "test:integration": "node --test test/js/test-openjtalk-integration.js",
-    "test:paths": "node --test test/js/test-github-pages-paths.js",
-    "test:optimization": "node --test test/js/test-benchmark-runner.js test/js/test-memory-pool.js test/js/test-resampler.js test/js/test-webgpu-session.js test/js/test-streaming-pipeline.js test/js/test-cache-manager.js test/js/test-dictionary-cache.js test/js/test-audio-backend.js test/js/test-phase2-integration.js",
-    "test:optimization:phase1": "node --test test/js/test-benchmark-runner.js test/js/test-cache-manager.js test/js/test-dictionary-cache.js",
+    "test": "node --test test/js/test-piper-plus.js test/js/test-npm-package.js",
+    "test:optimization": "node --test test/js/test-benchmark-runner.js test/js/test-memory-pool.js test/js/test-resampler.js test/js/test-webgpu-session.js test/js/test-streaming-pipeline.js test/js/test-cache-manager.js test/js/test-audio-backend.js test/js/test-phase2-integration.js",
+    "test:optimization:phase1": "node --test test/js/test-benchmark-runner.js test/js/test-cache-manager.js",
     "test:optimization:phase2": "node --test test/js/test-resampler.js test/js/test-webgpu-session.js test/js/test-audio-backend.js",
     "test:optimization:phase3": "node --test test/js/test-streaming-pipeline.js test/js/test-memory-pool.js",
     "test:optimization:integration": "node --test test/js/test-phase2-integration.js",
     "test:npm-package": "node --test test/js/test-npm-package.js",
-    "test:npm-package:all": "node --test test/js/test-audio-result.js test/js/test-audio-result-wav-edge.js test/js/test-piper-plus.js test/js/test-piper-plus-boundary.js test/js/test-piper-plus-init-success.js test/js/test-piper-plus-synthesize-flow.js test/js/test-model-manager.js test/js/test-model-manager-load.js test/js/test-model-manager-cache.js test/js/test-model-manager-boundary.js test/js/test-dict-manager.js test/js/test-dict-manager-cache.js test/js/test-dict-manager-progress.js test/js/test-dict-manager-boundary.js test/js/test-npm-package.js",
-    "test:watch": "node --test --watch test/js/test-openjtalk-integration.js",
+    "test:npm-package:all": "node --test test/js/test-audio-result.js test/js/test-audio-result-wav-edge.js test/js/test-piper-plus.js test/js/test-piper-plus-boundary.js test/js/test-piper-plus-init-success.js test/js/test-piper-plus-synthesize-flow.js test/js/test-model-manager.js test/js/test-model-manager-load.js test/js/test-model-manager-cache.js test/js/test-model-manager-boundary.js test/js/test-dictionary-cache.js test/js/test-npm-package.js",
+    "build:wasm": "cd ../../rust/piper-wasm && wasm-pack build --target web --release --out-dir ../../wasm/openjtalk-web/dist/rust-wasm",
+    "build:wasm:multilingual": "cd ../../rust/piper-wasm && wasm-pack build --target web --release --features multilingual --out-dir ../../../src/wasm/openjtalk-web/dist/rust-wasm",
+    "build:wasm:ja": "cd ../../rust/piper-wasm && wasm-pack build --target web --release --features ja --out-dir ../../../src/wasm/openjtalk-web/dist/rust-wasm-ja",
+    "build:wasm:ja-lite": "cd ../../rust/piper-wasm && wasm-pack build --target web --release --no-default-features --features ja-external --out-dir ../../../src/wasm/openjtalk-web/dist/rust-wasm-ja-lite",
     "build:debug": "cd build && ./build-safe.sh",
     "build:production": "cd build && ./build-production.sh",
     "build": "npm run build:production",

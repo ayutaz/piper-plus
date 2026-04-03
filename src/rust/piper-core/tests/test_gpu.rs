@@ -1,3 +1,4 @@
+#![cfg(feature = "onnx")]
 //! Integration tests for the GPU module.
 //!
 //! Validates device string parsing, device enumeration,

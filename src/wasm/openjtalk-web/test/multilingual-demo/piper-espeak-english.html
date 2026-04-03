@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🎤 Piper 英語音声合成デモ</title>
+    <title>Piper English TTS Demo</title>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -106,20 +106,6 @@
             line-height: 1.5;
             border: 1px solid #e9ecef;
         }
-        .phoneme-list {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-            margin-top: 10px;
-        }
-        .phoneme {
-            background: #e8f5e9;
-            color: #2e7d32;
-            padding: 6px 12px;
-            border-radius: 20px;
-            font-size: 14px;
-            font-weight: 500;
-        }
         .feature-list {
             background: #fff3e0;
             border: 1px solid #ffe0b2;
@@ -142,58 +128,46 @@
             color: #666;
         }
     </style>
-    <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.21.0/dist/ort.min.js"></script>
 </head>
 <body>
     <div class="container">
-        <h1>🎤 Piper 英語音声合成デモ</h1>
-        <p class="subtitle">@piper-plus/g2p（音素化）+ Piper（ONNXモデル）による英語音声合成</p>
-        
+        <h1>Piper English TTS Demo</h1>
+        <p class="subtitle">PiperPlus API - English speech synthesis (rule-based G2P + Piper neural model)</p>
+
         <div id="status" class="status info">
-            初期化中...
+            Initializing...
         </div>
 
         <div class="feature-list">
-            <h3>📝 実装内容</h3>
+            <h3>Features</h3>
             <ul>
-                <li>🔤 @piper-plus/g2p による英語テキストの音素化（eSpeak-ng不要）</li>
-                <li>🎯 PiperニューラルONNXモデルによる高品質音声合成</li>
-                <li>🔊 PiperPlus APIによる統合的な音声合成パイプライン</li>
-                <li>⚡ WebAssembly + ONNX Runtime Webによる高速処理</li>
+                <li>Rule-based English G2P phonemization</li>
+                <li>Piper neural ONNX model for high quality speech synthesis</li>
+                <li>Same architecture as Python implementation, running in browser</li>
+                <li>WebAssembly + ONNX Runtime Web</li>
             </ul>
         </div>
 
         <div class="input-group">
-            <label for="inputText">英語テキスト入力 / English Text Input</label>
+            <label for="inputText">English Text Input</label>
             <textarea id="inputText" placeholder="Enter English text here">Hello world! This is a test of the Piper text-to-speech system.</textarea>
         </div>
 
         <div class="button-group">
-            <button id="analyzeBtn" disabled>🔍 音素解析 / Analyze Phonemes</button>
-            <button id="synthesizeBtn" disabled>🎵 音声生成 / Synthesize</button>
-            <button id="clearBtn">🗑️ クリア / Clear</button>
+            <button id="synthesizeBtn" disabled>Synthesize</button>
+            <button id="clearBtn">Clear</button>
         </div>
 
         <div class="output-section" id="outputSection" style="display: none;">
-            <h2>結果 / Results</h2>
-            
-            <div class="output-group">
-                <label>音素解析 / Phoneme Analysis:</label>
-                <pre id="phonemeAnalysis"></pre>
-            </div>
-            
-            <div class="output-group">
-                <label>抽出された音素 / Extracted Phonemes:</label>
-                <div id="phonemeOutput" class="phoneme-list"></div>
-            </div>
+            <h2>Results</h2>
 
             <div class="output-group">
-                <label>音声 / Audio:</label>
+                <label>Audio:</label>
                 <audio id="audioPlayer" controls style="width: 100%;"></audio>
             </div>
 
             <div class="output-group">
-                <label>詳細情報 / Details:</label>
+                <label>Details:</label>
                 <pre id="detailsOutput"></pre>
             </div>
         </div>
@@ -201,85 +175,52 @@
 
     <script type="module">
         import { PiperPlus } from '../../src/index.js';
-        import { G2P } from '../../../g2p/src/index.js';
 
         let piper = null;
-        let g2p = null;
 
         const statusEl = document.getElementById('status');
-        const analyzeBtn = document.getElementById('analyzeBtn');
         const synthesizeBtn = document.getElementById('synthesizeBtn');
         const clearBtn = document.getElementById('clearBtn');
         const inputText = document.getElementById('inputText');
         const outputSection = document.getElementById('outputSection');
-        const phonemeAnalysis = document.getElementById('phonemeAnalysis');
-        const phonemeOutput = document.getElementById('phonemeOutput');
         const detailsOutput = document.getElementById('detailsOutput');
         const audioPlayer = document.getElementById('audioPlayer');
+
+        // Helper: load a script tag dynamically
+        function loadScript(src) {
+            return new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = src;
+                script.onload = resolve;
+                script.onerror = reject;
+                document.head.appendChild(script);
+            });
+        }
 
         // Initialize
         async function init() {
             try {
-                updateStatus('PiperPlusを初期化しています...');
+                updateStatus('Loading onnxruntime-web...');
+
+                // Load ONNX Runtime from CDN
+                await loadScript('https://cdn.jsdelivr.net/npm/onnxruntime-web@1.21.0/dist/ort.min.js');
+
+                updateStatus('Initializing PiperPlus...');
 
                 piper = await PiperPlus.initialize({
-                    model: 'ayousanz/piper-plus-tsukuyomi-chan',
+                    model: 'tsukuyomi',
                     ort: globalThis.ort,
-                    onProgress: ({ stage, message }) => {
-                        updateStatus(message);
+                    onProgress: ({ stage, progress, message }) => {
+                        updateStatus(`[${stage}] ${message} (${Math.round(progress * 100)}%)`);
                     }
                 });
 
-                // Create a standalone G2P instance for phoneme analysis display
-                g2p = await G2P.create({ languages: ['en'] });
-
-                updateStatus('準備完了！', 'success');
-                analyzeBtn.disabled = false;
+                updateStatus('Ready!', 'success');
                 synthesizeBtn.disabled = false;
 
             } catch (error) {
                 console.error('Initialization failed:', error);
-                updateStatus(`初期化エラー: ${error.message}`, 'error');
-            }
-        }
-
-        // Analyze phonemes (display only -- uses standalone G2P)
-        async function analyzePhonemes() {
-            const text = inputText.value.trim();
-            if (!text) {
-                updateStatus('テキストを入力してください。', 'error');
-                return;
-            }
-
-            updateStatus('音素を解析中...');
-
-            try {
-                const result = g2p.phonemize(text, { language: 'en' });
-                const tokens = result.tokens;
-
-                // Check which phonemes are in the model's phoneme_id_map
-                const phonemeIdMap = piper.config.phoneme_id_map;
-                const availableInModel = tokens.filter(p => phonemeIdMap[p]).length;
-                const missingFromModel = tokens.filter(p => !phonemeIdMap[p]);
-
-                // Display analysis
-                phonemeAnalysis.textContent = JSON.stringify({
-                    input: text,
-                    phonemeCount: tokens.length,
-                    phonemes: tokens,
-                    availableInModel: availableInModel,
-                    missingFromModel: missingFromModel
-                }, null, 2);
-
-                // Display phonemes
-                displayPhonemes(tokens);
-
-                outputSection.style.display = 'block';
-                updateStatus('解析完了！', 'success');
-
-            } catch (error) {
-                console.error('Analysis failed:', error);
-                updateStatus(`解析エラー: ${error.message}`, 'error');
+                updateStatus(`Initialization error: ${error.message}`, 'error');
             }
         }
 
@@ -287,59 +228,44 @@
         async function synthesize() {
             const text = inputText.value.trim();
             if (!text) {
-                updateStatus('テキストを入力してください。', 'error');
+                updateStatus('Please enter text.', 'error');
                 return;
             }
 
             try {
-                updateStatus('音声合成中...');
+                updateStatus('Synthesizing...');
                 synthesizeBtn.disabled = true;
 
-                const audioResult = await piper.synthesize(text, {
-                    language: 'en'
-                });
+                const audio = await piper.synthesize(text, { language: 'en' });
 
-                // Create WAV blob and play via <audio> element
-                const wavBlob = audioResult.toBlob();
+                // Display audio
+                const wavBlob = audio.toBlob();
                 const audioUrl = URL.createObjectURL(wavBlob);
                 audioPlayer.src = audioUrl;
 
                 // Show details
                 detailsOutput.textContent = JSON.stringify({
                     text: text,
-                    audioSamples: audioResult.samples.length,
-                    duration: audioResult.duration.toFixed(2) + ' seconds',
-                    sampleRate: audioResult.sampleRate
+                    language: 'en',
+                    duration: audio.duration.toFixed(2) + ' seconds',
+                    sampleRate: audio.sampleRate
                 }, null, 2);
 
                 outputSection.style.display = 'block';
-                updateStatus('生成完了！', 'success');
+                updateStatus('Synthesis complete!', 'success');
 
             } catch (error) {
                 console.error('Synthesis failed:', error);
-                updateStatus(`生成エラー: ${error.message}`, 'error');
+                updateStatus(`Synthesis error: ${error.message}`, 'error');
             } finally {
                 synthesizeBtn.disabled = false;
             }
-        }
-
-        // Display phonemes
-        function displayPhonemes(phonemes) {
-            phonemeOutput.innerHTML = '';
-            phonemes.forEach(phoneme => {
-                const span = document.createElement('span');
-                span.className = 'phoneme';
-                span.textContent = phoneme;
-                phonemeOutput.appendChild(span);
-            });
         }
 
         // Clear output
         function clearOutput() {
             inputText.value = '';
             outputSection.style.display = 'none';
-            phonemeOutput.innerHTML = '';
-            phonemeAnalysis.textContent = '';
             detailsOutput.textContent = '';
             audioPlayer.src = '';
         }
@@ -351,7 +277,6 @@
         }
 
         // Event listeners
-        analyzeBtn.addEventListener('click', analyzePhonemes);
         synthesizeBtn.addEventListener('click', synthesize);
         clearBtn.addEventListener('click', clearOutput);
 

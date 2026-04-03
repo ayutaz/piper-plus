@@ -51,7 +51,7 @@ export interface ModelConfig {
 
 /** Progress information emitted during PiperPlus initialization. */
 export interface ProgressInfo {
-  stage: 'model' | 'dict' | 'voice' | 'phonemizer' | 'ready' | 'init';
+  stage: 'model' | 'phonemizer' | 'ready' | 'init';
   progress: number;
   message: string;
 }
@@ -61,15 +61,6 @@ export interface ModelDownloadProgress {
   loaded: number;
   total: number;
   percentage: number;
-}
-
-/** Progress information emitted during dictionary download. */
-export interface DictDownloadProgress {
-  phase: 'dict' | 'voice';
-  file: string;
-  loaded: number;
-  total: number;
-  overallPercent: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -82,10 +73,6 @@ export interface PiperPlusOptions {
   model: string;
   /** onnxruntime-web instance. When omitted, globalThis.ort is used. */
   ort?: any;
-  /** OpenJTalk dictionary URL. */
-  dictUrl?: string;
-  /** HTS voice URL. */
-  voiceUrl?: string;
   /** Progress callback invoked during initialization. */
   onProgress?: (info: ProgressInfo) => void;
 }
@@ -207,59 +194,34 @@ export class ModelManager {
   /** Retrieve a model from the IndexedDB cache. Returns null if not cached. */
   getFromCache(key: string): Promise<ModelLoadResult | null>;
 
-  /** Remove all cached models. */
-  clearCache(): Promise<void>;
-}
+  /**
+   * Retrieve a dictionary from the IndexedDB cache.
+   * @param key - Cache key (e.g. 'naist-jdic-v1').
+   * @returns The dictionary data, or null if not cached.
+   */
+  getDictionaryFromCache(key: string): Promise<ArrayBuffer | null>;
 
-// ---------------------------------------------------------------------------
-// DictManager
-// ---------------------------------------------------------------------------
+  /**
+   * Save a dictionary to the IndexedDB cache.
+   * @param key - Cache key (e.g. 'naist-jdic-v1').
+   * @param data - Dictionary binary data.
+   */
+  cacheDictionary(key: string, data: ArrayBuffer): Promise<void>;
 
-/** Options for the DictManager constructor. */
-export interface DictManagerOptions {
-  /** IndexedDB database name for caching. Default: 'piper-plus-dict'. */
-  cachePrefix?: string;
-}
+  /**
+   * Fetch a dictionary from a URL, cache it in IndexedDB, and return the data.
+   * If the dictionary is already cached, returns the cached version.
+   * @param url - URL to fetch the dictionary from.
+   * @param key - Cache key (e.g. 'naist-jdic-v1').
+   * @param options - Optional settings including progress callback.
+   */
+  fetchAndCacheDictionary(
+    url: string,
+    key: string,
+    options?: { onProgress?: (info: ModelDownloadProgress) => void },
+  ): Promise<ArrayBuffer>;
 
-/** Options for DictManager.loadDictionary(). */
-export interface LoadDictionaryOptions {
-  /** Custom tar.gz URL for the dictionary archive (default: GitHub Releases). */
-  dictUrl?: string;
-  /** URL for the HTS voice file. */
-  voiceUrl?: string;
-  /** Progress callback. */
-  onProgress?: (info: DictDownloadProgress) => void;
-}
-
-/** Result returned by DictManager.resolveUrls(). */
-export interface DictResolveResult {
-  dictUrl: string;
-  voiceUrl: string;
-}
-
-/** Result returned by DictManager.loadDictionary(). */
-export interface DictLoadResult {
-  dictFiles: Record<string, ArrayBuffer>;
-  voiceData: ArrayBuffer;
-}
-
-/**
- * Download and cache OpenJTalk dictionary files from GitHub Releases
- * (same source as Rust/C#/C++ implementations) and HTS voice file.
- */
-export class DictManager {
-  constructor(options?: DictManagerOptions);
-
-  /** Resolve dictionary and voice URLs without downloading. */
-  resolveUrls(options?: { dictUrl?: string; voiceUrl?: string }): DictResolveResult;
-
-  /** Download (or retrieve from cache) dictionary files and the HTS voice file. */
-  loadDictionary(options?: LoadDictionaryOptions): Promise<DictLoadResult>;
-
-  /** Check whether all dictionary files and the voice file are already cached. */
-  isCached(): Promise<boolean>;
-
-  /** Remove all cached dictionary and voice data. */
+  /** Remove all cached models and dictionaries. */
   clearCache(): Promise<void>;
 }
 
