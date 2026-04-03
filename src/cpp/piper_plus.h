@@ -1,0 +1,101 @@
+#ifndef PIPER_PLUS_H_
+#define PIPER_PLUS_H_
+
+#include <stdint.h>
+#include <stddef.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/* ===== Export macro ===== */
+#if defined(_WIN32) || defined(_WIN64)
+  #ifdef PIPER_PLUS_BUILDING_DLL
+    #define PIPER_PLUS_API __declspec(dllexport)
+  #else
+    #define PIPER_PLUS_API __declspec(dllimport)
+  #endif
+#elif defined(__GNUC__) && __GNUC__ >= 4
+  #define PIPER_PLUS_API __attribute__((visibility("default")))
+#else
+  #define PIPER_PLUS_API
+#endif
+
+/* ===== Version ===== */
+#define PIPER_PLUS_API_VERSION 1
+
+PIPER_PLUS_API const char *piper_plus_version(void);
+PIPER_PLUS_API int32_t     piper_plus_api_version(void);
+
+/* ===== Status codes ===== */
+#define PIPER_PLUS_OK          0
+#define PIPER_PLUS_DONE        1
+#define PIPER_PLUS_ERR        (-1)
+#define PIPER_PLUS_ERR_MODEL  (-2)
+#define PIPER_PLUS_ERR_CONFIG (-3)
+#define PIPER_PLUS_ERR_TEXT   (-4)
+#define PIPER_PLUS_ERR_BUSY   (-5)
+
+/* ===== Error ===== */
+PIPER_PLUS_API const char *piper_plus_get_last_error(void);
+
+/* ===== Opaque engine handle ===== */
+typedef struct PiperPlusEngine PiperPlusEngine;
+
+/* ===== Config structs (POD, memset-safe) ===== */
+
+typedef struct PiperPlusConfig {
+    const char *model_path;       /* Required: .onnx model file path (UTF-8) */
+    const char *config_path;      /* Optional: .json config path (NULL = model_path + ".json") */
+    const char *provider;         /* Optional: "cpu","cuda","coreml","directml" (NULL = "cpu") */
+    int32_t     num_threads;      /* ONNX intra-op threads (0 = auto) */
+    int32_t     gpu_device_id;    /* GPU device index (ignored for cpu) */
+    const char *dict_dir;         /* Optional: OpenJTalk dict dir (NULL = auto-detect) */
+    int32_t     _reserved[7];     /* Must be zero */
+} PiperPlusConfig;
+
+typedef struct PiperPlusSynthOptions {
+    int32_t speaker_id;           /* Speaker index (default: 0) */
+    int32_t language_id;          /* Language index (-1 = auto-detect, default: -1) */
+    float   noise_scale;          /* VITS noise_scale (default: 0.667) */
+    float   length_scale;         /* VITS length_scale (default: 1.0) */
+    float   noise_w;              /* VITS noise_w (default: 0.8) */
+    float   sentence_silence_sec; /* Silence between sentences in sec (default: 0.2) */
+    int32_t _reserved[8];         /* Must be zero */
+} PiperPlusSynthOptions;
+
+/* ===== Lifecycle ===== */
+
+PIPER_PLUS_API PiperPlusEngine *piper_plus_create(const PiperPlusConfig *config);
+PIPER_PLUS_API void             piper_plus_free(PiperPlusEngine *engine);
+
+/* ===== Default options ===== */
+
+PIPER_PLUS_API PiperPlusSynthOptions piper_plus_default_options(void);
+
+/* ===== One-shot synthesis ===== */
+
+PIPER_PLUS_API int32_t piper_plus_synthesize(
+    PiperPlusEngine              *engine,
+    const char                   *text,
+    const PiperPlusSynthOptions  *opts,       /* NULL = defaults */
+    float                       **out_samples,
+    int32_t                      *out_num_samples,
+    int32_t                      *out_sample_rate);
+
+PIPER_PLUS_API void piper_plus_free_audio(float *samples);
+
+/* ===== Query ===== */
+
+PIPER_PLUS_API int32_t piper_plus_sample_rate(const PiperPlusEngine *engine);
+PIPER_PLUS_API int32_t piper_plus_num_speakers(const PiperPlusEngine *engine);
+PIPER_PLUS_API int32_t piper_plus_num_languages(const PiperPlusEngine *engine);
+PIPER_PLUS_API int32_t piper_plus_language_id(
+    const PiperPlusEngine *engine,
+    const char            *language_name);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* PIPER_PLUS_H_ */
