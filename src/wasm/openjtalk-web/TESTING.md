@@ -16,9 +16,8 @@ This guide explains how to test the multilingual Text-to-Speech (TTS) implementa
    ```
 
 2. **Open test pages in your browser:**
-   - Simple Multilingual Demo: http://localhost:8080/demo/simple-multilingual.html
-   - Phonemizer Test: http://localhost:8080/test/test-simple-phonemizer.html
-   - Japanese Demo: http://localhost:8080/demo/index.html
+   - Simple Multilingual Demo: http://localhost:8080/test/multilingual-demo/simple-multilingual.html
+   - Japanese Demo: http://localhost:8080/test/multilingual-demo/index.html
 
 ## Test Scenarios
 
@@ -98,17 +97,6 @@ This guide explains how to test the multilingual Text-to-Speech (TTS) implementa
    - Verify phoneme extraction logic
 
 ## Development Notes
-
-### Adding New English Words
-
-Edit `src/simple_english_phonemizer.js`:
-```javascript
-this.dictionary = {
-    // Add new words here
-    'example': ['ɪ', 'g', 'z', 'æ', 'm', 'p', 'əl'],
-    // ...
-};
-```
 
 ### Model Configuration
 
