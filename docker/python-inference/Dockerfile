@@ -27,7 +27,8 @@ COPY VERSION /app/VERSION
 COPY pyproject.toml /app/pyproject.toml
 COPY src/python/ /app/src/python/
 
-# Install piper_train with inference-gpu extras (includes onnxruntime-gpu)
+# Install piper_plus_g2p (standalone G2P package) and piper_train
+RUN uv pip install --system "/app/src/python/g2p"
 RUN uv pip install --system "/app/src/python[inference-gpu]"
 
 # Install Gradio WebUI requirements

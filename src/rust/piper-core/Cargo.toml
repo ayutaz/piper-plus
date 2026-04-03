@@ -12,8 +12,8 @@ description = "High-quality neural text-to-speech engine with 7-language support
 
 [features]
 default = ["naist-jdic", "dict-download"]
-japanese = ["dep:jpreprocess"]
-naist-jdic = ["japanese", "jpreprocess/naist-jdic"]
+japanese = ["dep:jpreprocess", "piper-plus-g2p/japanese"]
+naist-jdic = ["japanese", "jpreprocess/naist-jdic", "piper-plus-g2p/naist-jdic"]
 playback = ["dep:rodio"]
 download = ["dep:reqwest"]
 dict-download = ["download", "dep:sha2", "dep:flate2", "dep:tar"]
@@ -24,6 +24,7 @@ directml = []
 tensorrt = []
 
 [dependencies]
+piper-plus-g2p = { path = "../piper-plus-g2p", features = ["all-languages"] }
 ort = { version = "2.0.0-rc.12", default-features = false, features = ["std", "ndarray", "tracing", "download-binaries", "tls-rustls", "copy-dylibs", "api-24"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

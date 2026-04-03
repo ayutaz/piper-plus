@@ -276,10 +276,8 @@ def _init_phonemize_worker(
     ml_id_map: dict[str, list[int]],
 ):
     """Initialize MultilingualPhonemizer once per worker process."""
-    from piper_train.phonemize.multilingual import (  # noqa: PLC0415
-        MultilingualPhonemizer,
-    )
-    from piper_train.phonemize.registry import get_phonemizer  # noqa: PLC0415
+    from piper_plus_g2p import get_phonemizer  # noqa: PLC0415
+    from piper_plus_g2p.multilingual import MultilingualPhonemizer  # noqa: PLC0415
 
     _phonemize_worker_state["ml_phonemizer"] = MultilingualPhonemizer(languages)
     _phonemize_worker_state["id_map"] = ml_id_map
@@ -371,9 +369,7 @@ def _init_zh_pinyin_worker(
     ml_id_map: dict[str, list[int]],
 ):
     """Initialize worker state for ZH pinyin shortcut."""
-    from piper_train.phonemize.multilingual import (  # noqa: PLC0415
-        MultilingualPhonemizer,
-    )
+    from piper_plus_g2p.multilingual import MultilingualPhonemizer  # noqa: PLC0415
 
     _phonemize_worker_state["ml_phonemizer"] = MultilingualPhonemizer(languages)
     _phonemize_worker_state["id_map"] = ml_id_map
@@ -387,7 +383,7 @@ def _phonemize_zh_pinyin_single(
     pinyin_syllables: list[str],
 ) -> dict:
     """Phonemize Chinese from pre-computed pinyin (bypasses pypinyin)."""
-    from piper_train.phonemize.chinese import (  # noqa: PLC0415
+    from piper_plus_g2p.chinese import (  # noqa: PLC0415
         phonemize_from_pinyin_syllables,
     )
 
@@ -1210,11 +1206,9 @@ def main():
 
     # Get multilingual phoneme ID map
     _LOGGER.info("Building multilingual phoneme ID map for %s...", ALL_LANGUAGES)
-    from piper_train.phonemize.multilingual_id_map import (  # noqa: PLC0415
-        get_multilingual_id_map,
-    )
+    from piper_plus_g2p.encode.id_maps import get_phoneme_id_map  # noqa: PLC0415
 
-    ml_id_map = get_multilingual_id_map(ALL_LANGUAGES)
+    ml_id_map = get_phoneme_id_map("-".join(sorted(ALL_LANGUAGES)))
     _LOGGER.info("Multilingual ID map: %d symbols", len(ml_id_map))
 
     # Log optimization settings

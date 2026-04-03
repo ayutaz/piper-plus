@@ -174,7 +174,7 @@ class VitsModel(pl.LightningModule):
 
                 # Mixed sentences (language_id == -1) need phonemization
                 if data.get("language_id", 0) == -1:
-                    from ..phonemize.registry import get_phonemizer
+                    from piper_plus_g2p import get_phonemizer
 
                     phonemizer = get_phonemizer("ja-en")
                     phonemes, prosody_info_list = phonemizer.phonemize_with_prosody(

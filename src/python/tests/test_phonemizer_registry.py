@@ -2,13 +2,16 @@
 
 import pytest
 
-from piper_train.phonemize.base import Phonemizer, ProsodyInfo
-from piper_train.phonemize.english import EnglishPhonemizer, EnglishProsodyInfo
-from piper_train.phonemize.japanese import JapanesePhonemizer
-from piper_train.phonemize.registry import (
+from piper_plus_g2p import Phonemizer, ProsodyInfo
+from piper_plus_g2p.english import EnglishPhonemizer
+from piper_plus_g2p.japanese import JapanesePhonemizer
+from piper_plus_g2p import (
     available_languages,
     get_phonemizer,
 )
+
+# EnglishProsodyInfo was always an alias for ProsodyInfo
+EnglishProsodyInfo = ProsodyInfo
 
 
 class TestProsodyInfoUnification:
@@ -18,7 +21,7 @@ class TestProsodyInfoUnification:
         assert EnglishProsodyInfo is ProsodyInfo
 
     def test_japanese_reexport(self):
-        from piper_train.phonemize.japanese import ProsodyInfo as JaProsody
+        from piper_plus_g2p import ProsodyInfo as JaProsody
 
         assert JaProsody is ProsodyInfo
 

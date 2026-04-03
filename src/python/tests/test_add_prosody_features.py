@@ -9,16 +9,15 @@ import json
 import pytest
 
 
-# Try to import implementation, skip if not available
-pytest.importorskip("piper_train.phonemize")
-
-
 # Japanese imports are optional
 try:
     import pyopenjtalk  # noqa: F401
 
-    from piper_train.phonemize.japanese import phonemize_japanese_with_prosody
-    from piper_train.phonemize.jp_id_map import get_japanese_id_map
+    from piper_plus_g2p.japanese import JapanesePhonemizer
+    from piper_plus_g2p.encode.id_maps import get_phoneme_id_map
+
+    def get_japanese_id_map():
+        return get_phoneme_id_map("ja")
 
     HAS_JAPANESE = True
 except ImportError:

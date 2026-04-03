@@ -77,11 +77,13 @@
 
 ## 3. 実装済み: Go
 
+> **Note:** Go の phonemize パッケージは独立モジュール `github.com/ayutaz/piper-plus/src/go/phonemize` として分離済み (`src/go/phonemize/go.mod`)。他の TTS エンジンからも `go get github.com/ayutaz/piper-plus/src/go/phonemize` で利用可能。
+
 | ファイル | 内容 |
 |---------|------|
-| `phonemize/korean.go` | `KoreanPhonemizer` -- Hangul分解 + IPA変換 + liaison |
-| `phonemize/korean_test.go` | ユニットテスト |
-| `piperplus/synthesize.go` | `case "ko":` 統合済み |
+| `src/go/phonemize/korean.go` | `KoreanPhonemizer` -- Hangul分解 + IPA変換 + liaison (独立モジュール) |
+| `src/go/phonemize/korean_test.go` | ユニットテスト |
+| `src/go/piperplus/synthesize.go` | `case "ko":` 統合済み |
 
 ---
 

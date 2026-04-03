@@ -1,0 +1,79 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "piper-plus-g2p"
+version = "0.1.0"
+description = "Multilingual G2P (Grapheme-to-Phoneme) for TTS — eSpeak-ng free, MIT licensed"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [
+    {name = "piper-plus contributors"},
+]
+keywords = ["g2p", "grapheme-to-phoneme", "tts", "phonemizer", "ipa"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Multimedia :: Sound/Audio :: Speech",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Typing :: Typed",
+]
+readme = "README.md"
+
+[project.optional-dependencies]
+ja = ["pyopenjtalk-plus>=0.3,<1"]
+en = ["g2p-en>=2.1.0,<3"]
+zh = ["pypinyin>=0.55.0,<1"]
+ko = ["g2pk2>=0.0.3,<1"]
+es = []
+fr = []
+pt = []
+sv = []
+all = [
+    "pyopenjtalk-plus>=0.3,<1",
+    "g2p-en>=2.1.0,<3",
+    "pypinyin>=0.55.0,<1",
+    "g2pk2>=0.0.3,<1",
+]
+dev = [
+    "pytest>=7.4",
+    "pytest-cov>=4.1",
+    "ruff>=0.8.0",
+    "mypy>=1.13",
+]
+
+[project.urls]
+Homepage = "https://github.com/ayutaz/piper-plus"
+Repository = "https://github.com/ayutaz/piper-plus"
+Issues = "https://github.com/ayutaz/piper-plus/issues"
+Documentation = "https://github.com/ayutaz/piper-plus/tree/dev/src/python/g2p#readme"
+
+[project.entry-points."piper_plus_g2p.phonemizers"]
+# Built-in languages (documented for reference)
+# Third-party packages can add their own entry points here
+
+[tool.hatch.build.targets.wheel]
+packages = ["piper_plus_g2p"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 88
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM"]
+
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true
+warn_return_any = true
+warn_unused_configs = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

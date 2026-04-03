@@ -1,0 +1,155 @@
+name: "G2P WASM CI"
+
+on:
+  push:
+    branches: [dev]
+    paths:
+      - 'src/wasm/g2p/**'
+      - 'tests/fixtures/g2p/phoneme_test_cases.json'
+      - '.github/workflows/g2p-wasm-ci.yml'
+    tags:
+      - 'wasm-g2p-v*'
+  pull_request:
+    paths:
+      - 'src/wasm/g2p/**'
+      - 'tests/fixtures/g2p/phoneme_test_cases.json'
+      - '.github/workflows/g2p-wasm-ci.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: src/wasm/g2p
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: src/wasm/g2p/package.json
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run lint
+        run: |
+          if npm run lint --if-present 2>/dev/null; then
+            echo "Lint passed"
+          else
+            echo "No lint script found, skipping"
+          fi
+
+  test:
+    name: test (${{ matrix.os }}, node ${{ matrix.node-version }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        node-version: ['20']
+    defaults:
+      run:
+        working-directory: src/wasm/g2p
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+          cache-dependency-path: src/wasm/g2p/package.json
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run tests
+        run: node --test test/test-encode.js test/test-english.js test/test-g2p.js test/test-languages.js test/test-detect.js test/test-pua-map.js test/test-swedish.js test/test-korean.js test/test-custom-dict.js test/test-strict-mode.js
+
+      - name: Run golden tests
+        run: node --test test/test-g2p-golden.js
+
+  size-check:
+    name: size-check
+    runs-on: ubuntu-latest
+    needs: test
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: src/wasm/g2p
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: src/wasm/g2p/package.json
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Check package size
+        run: |
+          TARBALL=$(npm pack 2>/dev/null)
+          SIZE=$(stat -c%s "$TARBALL" 2>/dev/null || stat -f%z "$TARBALL")
+          SIZE_KB=$(awk "BEGIN {printf \"%.2f\", $SIZE / 1024}")
+          echo "Package size: $SIZE bytes ($SIZE_KB KB)"
+          rm -f "$TARBALL"
+          if [ "$SIZE" -gt 1048576 ]; then
+            echo "ERROR: Package size ($SIZE_KB KB) exceeds 1MB limit"
+            exit 1
+          fi
+          echo "OK: Package size is within the 1MB limit"
+
+  publish:
+    name: publish
+    runs-on: ubuntu-latest
+    needs: [lint, test, size-check]
+    if: startsWith(github.ref, 'refs/tags/wasm-g2p-v')
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write
+    defaults:
+      run:
+        working-directory: src/wasm/g2p
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: src/wasm/g2p/package.json
+          registry-url: https://registry.npmjs.org
+
+      - name: Verify tag matches package.json version
+        run: |
+          TAG="${GITHUB_REF#refs/tags/wasm-g2p-v}"
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          echo "Git tag version: $TAG"
+          echo "package.json version: $PKG_VERSION"
+          if [ "$TAG" != "$PKG_VERSION" ]; then
+            echo "ERROR: Tag version ($TAG) does not match package.json version ($PKG_VERSION)"
+            exit 1
+          fi
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Publish to npm
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

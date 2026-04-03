@@ -1,6 +1,6 @@
 {
   "name": "piper-plus",
-  "version": "0.1.1",
+  "version": "0.2.0-alpha.0",
   "description": "Browser-based multilingual neural TTS with VITS. Supports Japanese, English, Chinese, Korean, Spanish, French, Portuguese, and Swedish.",
   "type": "module",
   "main": "src/index.js",
@@ -12,7 +12,7 @@
       "import": "./src/index.js"
     },
     "./phonemizer": {
-      "import": "./src/simple_unified_api.js"
+      "import": "./src/phonemizer-compat.js"
     },
     "./streaming": {
       "import": "./src/streaming-pipeline.js"
@@ -46,6 +46,9 @@
     "serve": "python3 -m http.server 8081",
     "clean": "rm -rf dist build/build-*",
     "prepublishOnly": "echo 'Ready to publish'"
+  },
+  "dependencies": {
+    "@piper-plus/g2p": "file:../g2p"
   },
   "peerDependencies": {
     "onnxruntime-web": ">=1.21.0"

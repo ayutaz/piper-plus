@@ -1,0 +1,35 @@
+[package]
+name = "piper-plus-g2p"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "Multilingual G2P (Grapheme-to-Phoneme) for TTS — eSpeak-ng free"
+keywords = ["g2p", "tts", "phoneme", "ipa", "speech-synthesis"]
+categories = ["text-processing", "multimedia::audio"]
+documentation = "https://docs.rs/piper-plus-g2p"
+readme = "README.md"
+
+[features]
+default = ["english", "chinese", "korean", "spanish", "french", "portuguese", "swedish"]
+japanese = ["dep:jpreprocess"]
+naist-jdic = ["japanese", "jpreprocess/naist-jdic"]
+english = []
+chinese = []
+korean = []
+spanish = []
+french = []
+portuguese = []
+swedish = []
+ffi = []
+all-languages = ["japanese", "english", "chinese", "korean", "spanish", "french", "portuguese", "swedish"]
+
+[dependencies]
+thiserror = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+regex = "1"
+tracing = "0.1"
+jpreprocess = { version = "0.9", optional = true }

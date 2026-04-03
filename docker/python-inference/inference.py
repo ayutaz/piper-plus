@@ -19,8 +19,7 @@ from pathlib import Path
 import numpy as np
 import onnxruntime
 import soundfile as sf
-
-from piper_train.phonemize.registry import get_phonemizer
+from piper_plus_g2p.registry import get_phonemizer
 
 
 _LOGGER = logging.getLogger(__name__)
@@ -66,9 +65,6 @@ def text_to_phoneme_ids_and_prosody(
         else:
             _LOGGER.warning("Unknown phoneme: %s", phoneme)
 
-    phoneme_ids, prosody_features = phonemizer.post_process_ids(
-        phoneme_ids, prosody_features, phoneme_id_map
-    )
     return phoneme_ids, prosody_features
 
 

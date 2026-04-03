@@ -1,0 +1,54 @@
+{
+  "name": "@piper-plus/g2p",
+  "version": "0.1.0",
+  "description": "Multilingual G2P (Grapheme-to-Phoneme) for TTS — eSpeak-ng free, MIT licensed",
+  "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./ja": "./src/ja/index.js",
+    "./en": "./src/en/index.js",
+    "./zh": "./src/zh/index.js",
+    "./es": "./src/es/index.js",
+    "./fr": "./src/fr/index.js",
+    "./pt": "./src/pt/index.js",
+    "./sv": "./src/sv/index.js",
+    "./ko": "./src/ko/index.js",
+    "./detect": "./src/detect.js",
+    "./dict": "./src/dict-loader.js",
+    "./custom-dict": "./src/custom-dictionary.js",
+    "./encode": "./src/encode.js"
+  },
+  "files": [
+    "src/**/*.js",
+    "dist/openjtalk.wasm",
+    "dist/openjtalk.js",
+    "types/",
+    "CHANGELOG.md"
+  ],
+  "types": "types/index.d.ts",
+  "keywords": [
+    "g2p",
+    "grapheme-to-phoneme",
+    "tts",
+    "text-to-speech",
+    "phoneme",
+    "ipa",
+    "japanese",
+    "multilingual",
+    "wasm"
+  ],
+  "license": "MIT",
+  "author": "ayousanz",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ayutaz/piper-plus",
+    "directory": "src/wasm/g2p"
+  },
+  "homepage": "https://github.com/ayutaz/piper-plus/tree/dev/src/wasm/g2p#readme",
+  "bugs": "https://github.com/ayutaz/piper-plus/issues",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "pua_compat_version": 1
+}

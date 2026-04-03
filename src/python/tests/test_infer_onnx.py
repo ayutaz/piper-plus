@@ -3,7 +3,7 @@
 import pytest
 
 from piper_train.infer_onnx import text_to_phoneme_ids_and_prosody
-from piper_train.phonemize.jp_id_map import get_japanese_id_map
+from piper_plus_g2p.encode.id_maps import get_phoneme_id_map
 
 
 class TestTextToPhonemeIdsAndProsody:
@@ -12,7 +12,7 @@ class TestTextToPhonemeIdsAndProsody:
     @pytest.fixture
     def phoneme_id_map(self):
         """Get the Japanese phoneme ID map."""
-        return get_japanese_id_map()
+        return get_phoneme_id_map("ja")
 
     def test_basic_conversion(self, phoneme_id_map):
         """Test basic text to phoneme conversion."""
@@ -131,7 +131,7 @@ class TestPhonemeIdMapCompatibility:
 
     def test_config_phoneme_id_map_format(self):
         """Test that get_japanese_id_map returns correct format."""
-        phoneme_id_map = get_japanese_id_map()
+        phoneme_id_map = get_phoneme_id_map("ja")
 
         # Should be a dictionary
         assert isinstance(phoneme_id_map, dict)
@@ -143,7 +143,7 @@ class TestPhonemeIdMapCompatibility:
 
     def test_required_symbols_present(self):
         """Test that required symbols are in the map."""
-        phoneme_id_map = get_japanese_id_map()
+        phoneme_id_map = get_phoneme_id_map("ja")
 
         # BOS and EOS should be present
         assert "^" in phoneme_id_map  # BOS

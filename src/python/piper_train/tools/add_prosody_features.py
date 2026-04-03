@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 既存データセットにprosody_featuresを追加する最適化スクリプト
-音声処理をスキップし、phonemize_japanese_with_prosodyのみ実行
+音声処理をスキップし、JapanesePhonemizer().phonemize_with_prosody()のみ実行
 """
 
 import argparse
@@ -10,10 +10,10 @@ import shutil
 from multiprocessing import Pool, cpu_count
 from pathlib import Path
 
+from piper_plus_g2p.encode.id_maps import get_phoneme_id_map
+from piper_plus_g2p.encode.pua import map_token
+from piper_plus_g2p.japanese import JapanesePhonemizer
 from tqdm import tqdm
-
-from piper_train.phonemize.japanese import phonemize_japanese_with_prosody
-from piper_train.phonemize.jp_id_map import get_japanese_id_map
 
 
 def process_utterance(item: dict) -> dict | None:
@@ -24,14 +24,17 @@ def process_utterance(item: dict) -> dict | None:
             return None
 
         # prosody情報付きで再phonemize（新しいトークン体系を使用）
-        phonemes, prosody_info_list = phonemize_japanese_with_prosody(text)
+        phonemes, prosody_info_list = JapanesePhonemizer().phonemize_with_prosody(text)
 
         # phoneme_ids を更新（新しいトークン体系: ?!, ?., ?~, N_m, N_n, N_ng, N_uvular）
-        id_map = get_japanese_id_map()
+        # piper_plus_g2p returns clean tokens; PUA-map them for id_map lookup
+        id_map = get_phoneme_id_map("ja")
         phoneme_ids = []
         for p in phonemes:
-            if p in id_map:
-                phoneme_ids.extend(id_map[p])
+            mapped = map_token(p)
+            for ch in mapped:
+                if ch in id_map:
+                    phoneme_ids.extend(id_map[ch])
 
         # prosody_features を生成
         prosody_features = [
@@ -114,7 +117,7 @@ def main():
             config = json.load(f)
 
         # 新しいトークン体系でphoneme_id_mapを更新
-        id_map = get_japanese_id_map()
+        id_map = get_phoneme_id_map("ja")
         config["num_symbols"] = len(id_map)  # 65 (10 special + 55 phonemes)
         config["phoneme_id_map"] = id_map
 

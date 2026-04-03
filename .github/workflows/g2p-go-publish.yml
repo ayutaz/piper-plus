@@ -1,0 +1,86 @@
+name: Publish piper-plus-g2p (Go)
+
+on:
+  push:
+    tags: ["go-g2p-v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    name: go test (phonemize)
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, macos-latest, windows-latest]
+    defaults:
+      run:
+        working-directory: src/go
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            src/go
+            tests/fixtures/g2p
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26'
+          cache-dependency-path: src/go/go.sum
+      - run: go vet ./phonemize/...
+      - run: go test -v -race -count=1 ./phonemize/...
+
+  lint:
+    name: golangci-lint (phonemize)
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26'
+      - uses: golangci/golangci-lint-action@v7
+        with:
+          working-directory: src/go/phonemize
+
+  publish:
+    name: Tag and publish to pkg.go.dev
+    needs: [test, lint]
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          TAG_VERSION="${GITHUB_REF#refs/tags/go-g2p-v}"
+          echo "version=$TAG_VERSION" >> "$GITHUB_OUTPUT"
+          echo "Extracted version: $TAG_VERSION"
+
+      - name: Create Go module tag
+        run: |
+          MODULE_TAG="src/go/phonemize/v${{ steps.version.outputs.version }}"
+          echo "Creating tag: $MODULE_TAG"
+
+          # Check if the module tag already exists
+          if git rev-parse "$MODULE_TAG" >/dev/null 2>&1; then
+            echo "Tag $MODULE_TAG already exists (skipping)"
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "$MODULE_TAG" -m "Release piper-plus-g2p/phonemize v${{ steps.version.outputs.version }}"
+          git push origin "$MODULE_TAG"
+
+      - name: Request pkg.go.dev indexing
+        run: |
+          MODULE="github.com/ayutaz/piper-plus/src/go/phonemize"
+          VERSION="v${{ steps.version.outputs.version }}"
+          echo "Requesting indexing for $MODULE@$VERSION"
+          curl -s "https://proxy.golang.org/${MODULE}/@v/${VERSION}.info" || true
+          echo ""
+          echo "Module will be available at: https://pkg.go.dev/${MODULE}@${VERSION}"

@@ -176,12 +176,13 @@ function createMockedInstance(overrides = {}) {
     ...overrides.config,
   };
 
-  instance._phonemizer = overrides.phonemizer || {
+  instance._g2p = overrides.g2p || {
     detectLanguage: mock.fn(() => 'ja'),
-    textToPhonemes: mock.fn(async () => 'mock-labels'),
-    extractPhonemes: mock.fn(() => ['^', 'a', '$']),
+    encode: mock.fn((_text, _map, _opts) => ({
+      phonemeIds: [1, 7, 2],
+      prosodyFlat: null,
+    })),
     dispose: mock.fn(),
-    setPhonemeIdMap: mock.fn(),
   };
 
   const capturedFeeds = [];
@@ -252,46 +253,55 @@ describe('非常に長いテキストでも synthesize が成功する', { skip 
 });
 
 // ===========================================================================
-// 3. Phoneme fallback for unknown phonemes
+// 3. Phoneme encoding via G2P
 // ===========================================================================
 
-describe('phoneme_id_map に存在しない phoneme のフォールバック', { skip }, () => {
-  it('日本語で未知の phoneme は _ にフォールバックする', () => {
+describe('G2P encode を経由した phoneme ID 取得', { skip }, () => {
+  it('G2P.encode の返す phonemeIds が ONNX テンソルに使用される', async () => {
     // Arrange
-    const instance = createMockedInstance();
-    const unknownPhonemes = ['UNKNOWN_PHONEME'];
+    let capturedFeeds = null;
+    const expectedIds = [1, 10, 11, 2];
+    const instance = createMockedInstance({
+      g2p: {
+        detectLanguage: mock.fn(() => 'ja'),
+        encode: mock.fn((_text, _map, _opts) => ({
+          phonemeIds: expectedIds,
+          prosodyFlat: null,
+        })),
+        dispose: mock.fn(),
+      },
+      session: {
+        run: mock.fn(async (feeds) => {
+          capturedFeeds = feeds;
+          return { output: { data: new Float32Array(100), dims: [1, 100] } };
+        }),
+        release: mock.fn(),
+      },
+    });
 
     // Act
-    const ids = instance._phonemesToIds(unknownPhonemes, 'ja');
+    await instance.synthesize('test');
 
-    // Assert — for ja, fallback is phoneme_id_map['_'] which is [0]
-    assert.deepStrictEqual(ids, [0]);
+    // Assert — phoneme IDs from encode are passed to ONNX
+    assert.ok(capturedFeeds, 'session.run should have been called');
+    const ids = Array.from(capturedFeeds.input.data).map(Number);
+    assert.deepStrictEqual(ids, expectedIds);
   });
 
-  it('英語で未知の phoneme はスペースにフォールバックする', () => {
-    // Arrange
-    const instance = createMockedInstance();
-    const unknownPhonemes = ['UNKNOWN_PHONEME'];
-
-    // Act
-    const ids = instance._phonemesToIds(unknownPhonemes, 'en');
-
-    // Assert — for non-ja, fallback is phoneme_id_map[' '] which is [3]
-    assert.deepStrictEqual(ids, [3]);
-  });
-
-  it('phoneme_id_map に _ もない場合はハードコード値 [0] にフォールバックする', () => {
+  it('phoneme_id_map が config にない場合はエラーになる', async () => {
     // Arrange
     const instance = createMockedInstance({
-      config: { phoneme_id_map: { '^': [1] } },
+      config: { audio: undefined, inference: undefined, phoneme_id_map: undefined },
     });
-    const unknownPhonemes = ['UNKNOWN'];
 
-    // Act
-    const ids = instance._phonemesToIds(unknownPhonemes, 'ja');
-
-    // Assert — fallback chain: phoneme_id_map['_'] || [0] => [0]
-    assert.deepStrictEqual(ids, [0]);
+    // Act & Assert
+    await assert.rejects(
+      () => instance.synthesize('test'),
+      (err) => {
+        assert.ok(err.message.includes('phoneme_id_map'));
+        return true;
+      }
+    );
   });
 });
 
@@ -336,23 +346,25 @@ describe('noiseScale に負の値を渡した場合の挙動', { skip }, () => {
 // ===========================================================================
 
 describe('language に未知のコードを渡した場合', { skip }, () => {
-  it('未知の言語コードでも phonemizer に委譲される', async () => {
+  it('未知の言語コードでも G2P.encode に委譲される', async () => {
     // Arrange
-    const textToPhonemesFn = mock.fn(async () => 'mock-labels');
+    const encodeFn = mock.fn((_text, _map, _opts) => ({
+      phonemeIds: [1, 7, 2],
+      prosodyFlat: null,
+    }));
     const instance = createMockedInstance({
-      phonemizer: {
+      g2p: {
         detectLanguage: () => 'ja',
-        textToPhonemes: textToPhonemesFn,
-        extractPhonemes: mock.fn(() => ['^', 'a', '$']),
+        encode: encodeFn,
         dispose: mock.fn(),
       },
     });
 
-    // Act — 'xx' is not in ['zh','es','fr','pt'] so it takes the ja/en path
+    // Act — pass explicit language
     await instance.synthesize('test', { language: 'xx' });
 
-    // Assert — textToPhonemes is called with the unknown language
-    assert.strictEqual(textToPhonemesFn.mock.calls[0].arguments[1], 'xx');
+    // Assert — encode is called with the language in options
+    assert.strictEqual(encodeFn.mock.calls[0].arguments[2].language, 'xx');
   });
 });
 

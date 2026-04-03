@@ -1867,6 +1867,7 @@ dependencies = [
  "jpreprocess",
  "ndarray 0.17.2",
  "ort",
+ "piper-plus-g2p",
  "regex",
  "reqwest",
  "rodio",
@@ -1890,6 +1891,18 @@ dependencies = [
  "serde_json",
  "tracing",
  "tracing-subscriber",
+]
+
+[[package]]
+name = "piper-plus-g2p"
+version = "0.1.0"
+dependencies = [
+ "jpreprocess",
+ "regex",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tracing",
 ]
 
 [[package]]

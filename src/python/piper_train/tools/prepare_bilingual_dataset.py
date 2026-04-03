@@ -20,25 +20,21 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from hashlib import sha256 as _sha256
 from pathlib import Path
 
+from piper_plus_g2p.encode.id_maps import get_phoneme_id_map
+from piper_plus_g2p.multilingual import MultilingualPhonemizer
+
 from piper_train.norm_audio import cache_norm_audio, make_silence_detector
-from piper_train.phonemize.bilingual import BilingualPhonemizer
-from piper_train.phonemize.bilingual_id_map import (
-    get_bilingual_id_map as _get_bilingual_id_map,
-)
-from piper_train.phonemize.jp_id_map import (
-    get_japanese_id_map as _get_japanese_id_map,
-)
 
 
 _LOGGER = logging.getLogger("prepare_bilingual")
 
 
 def get_bilingual_id_map():
-    return _get_bilingual_id_map()
+    return get_phoneme_id_map("ja-en")
 
 
 def get_japanese_id_map():
-    return _get_japanese_id_map()
+    return get_phoneme_id_map("ja")
 
 
 def remap_ja_phoneme_ids(
@@ -79,7 +75,7 @@ def _add_inter_phoneme_padding(
     but no inter-phoneme padding (ID 0). This function:
     1. Strips existing BOS/EOS
     2. Inserts pad (ID 0) between every phoneme
-    3. Wraps with BOS + pad + ... + EOS (matching BilingualPhonemizer.post_process_ids)
+    3. Wraps with BOS + pad + ... + EOS (matching MultilingualPhonemizer.post_process_ids)
     """
     pad_id = bilingual_id_map.get("_", [0])[0]
     bos_ids = bilingual_id_map.get("^", [1])
@@ -447,10 +443,10 @@ _phonemize_worker_state: dict = {}
 
 
 def _init_phonemize_worker(bilingual_id_map: dict[str, list[int]]):
-    """Initialize BilingualPhonemizer once per worker process."""
-    from piper_train.phonemize.bilingual import BilingualPhonemizer  # noqa: PLC0415
+    """Initialize MultilingualPhonemizer once per worker process."""
+    from piper_plus_g2p.multilingual import MultilingualPhonemizer  # noqa: PLC0415
 
-    _phonemize_worker_state["phonemizer"] = BilingualPhonemizer(["ja", "en"])
+    _phonemize_worker_state["phonemizer"] = MultilingualPhonemizer(["ja", "en"])
     _phonemize_worker_state["id_map"] = bilingual_id_map
 
 
@@ -683,7 +679,7 @@ def process_en_dataset(
                 if done % 1000 == 0:
                     _LOGGER.info("Phonemized %d/%d EN utterances", done, len(tasks))
     else:
-        phonemizer = BilingualPhonemizer(["ja", "en"])
+        phonemizer = MultilingualPhonemizer(["ja", "en"])
         for task_idx, (filename, text, wav_path_str, speaker_id) in enumerate(tasks):
             try:
                 phonemes, prosody_list = phonemizer.phonemize_with_prosody(text)

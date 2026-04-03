@@ -18,7 +18,7 @@ def test_imports():
         "soundfile",
         "piper_train",
         "piper_train.infer_onnx",
-        "piper_train.phonemize.registry",
+        "piper_plus_g2p.registry",
     ]
 
     failed = []
@@ -52,7 +52,7 @@ def test_phonemizer():
     """Test phonemizer registry."""
     print("\nTesting phonemizer registry...")
     try:
-        from piper_train.phonemize.registry import available_languages, get_phonemizer
+        from piper_plus_g2p.registry import available_languages, get_phonemizer
 
         langs = available_languages()
         print(f"  Available languages: {langs}")

@@ -82,7 +82,7 @@ train = [
 dev = [
     "black==26.3.1",
     "flake8==6.1.0",
-    "mypy==1.7.1",
+    "mypy>=1.13",
     "pylint==3.0.2",
     "ruff==0.12.5",
     "pytest==7.4.3",
@@ -106,7 +106,7 @@ test = [
     "pytest-mock==3.12.0",
     "coverage[toml]>=7.3",
     "ruff==0.12.5",
-    "mypy==1.7.1",
+    "mypy>=1.13",
     "types-requests==2.31.0",
     "types-PyYAML==6.0.12",
 ]
@@ -124,10 +124,12 @@ torchaudio = [
     { index = "pytorch-cu128", marker = "sys_platform == 'linux'" },
 ]
 piper-train = { workspace = true, editable = true }
+piper-plus-g2p = { workspace = true, editable = true }
 
 [tool.uv.workspace]
 members = [
     "src/python",
+    "src/python/g2p",
 ]
 
 [tool.uv]

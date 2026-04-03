@@ -1,0 +1,179 @@
+name: "G2P Python CI"
+
+on:
+  push:
+    branches: [dev, main]
+    paths:
+      - 'src/python/g2p/**'
+      - '.github/workflows/g2p-python-ci.yml'
+    tags:
+      - 'python-g2p-v*'
+  pull_request:
+    paths:
+      - 'src/python/g2p/**'
+      - '.github/workflows/g2p-python-ci.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        working-directory: src/python/g2p
+        run: uv sync --extra all --extra dev
+
+      - name: Ruff check
+        working-directory: src/python/g2p
+        run: uv run ruff check piper_plus_g2p/ tests/
+
+      - name: Ruff format check
+        working-directory: src/python/g2p
+        run: uv run ruff format --check piper_plus_g2p/ tests/
+
+      - name: Mypy
+        working-directory: src/python/g2p
+        run: uv run mypy --ignore-missing-imports piper_plus_g2p/
+
+  test:
+    name: test (${{ matrix.os }}, ${{ matrix.python-version }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python-version: ['3.11', '3.12', '3.13']
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        working-directory: src/python/g2p
+        run: uv sync --extra all --extra dev
+
+      - name: Download NLTK data (for g2p-en)
+        working-directory: src/python/g2p
+        run: uv run python -c "import nltk; nltk.download('averaged_perceptron_tagger_eng', quiet=True)"
+
+      - name: Run tests
+        working-directory: src/python/g2p
+        run: uv run pytest --cov=piper_plus_g2p --cov-report=term-missing -v
+
+      - name: Upload coverage report
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.13'
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-report
+          path: src/python/g2p/.coverage
+          retention-days: 7
+
+  rust-check:
+    name: rust-check
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src/rust
+
+      - name: Cargo check piper-plus-g2p
+        working-directory: src/rust
+        run: cargo check -p piper-plus-g2p --all-features
+
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    needs: [lint, test, rust-check]
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.13"
+
+      - name: Build package
+        working-directory: src/python/g2p
+        run: uv build
+
+      - name: Verify wheel
+        working-directory: src/python/g2p
+        run: |
+          ls -la dist/
+          test -f dist/piper_plus_g2p-*.whl
+          test -f dist/piper_plus_g2p-*.tar.gz
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: dist
+          path: src/python/g2p/dist/
+          retention-days: 7
+
+  test-extras:
+    name: test extras (${{ matrix.extra }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        extra: [ja, en, zh]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v6
+      - run: uv venv .venv-extras
+      - run: uv pip install --python .venv-extras "./src/python/g2p[${{ matrix.extra }}]"
+      - name: Download NLTK data (EN only)
+        if: matrix.extra == 'en'
+        run: .venv-extras/bin/python -c "import nltk; nltk.download('averaged_perceptron_tagger_eng')"
+      - run: .venv-extras/bin/python -c "from piper_plus_g2p import get_phonemizer; p = get_phonemizer('${{ matrix.extra }}'); print(p.phonemize('test'))"
+
+  publish:
+    name: publish
+    runs-on: ubuntu-latest
+    needs: [build]
+    if: startsWith(github.ref, 'refs/tags/python-g2p-v')
+    timeout-minutes: 10
+    environment: pypi
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: astral-sh/setup-uv@v6
+
+      - name: Verify version matches tag
+        run: |
+          TAG_VERSION="${GITHUB_REF#refs/tags/python-g2p-v}"
+          TOML_VERSION=$(grep '^version' src/python/g2p/pyproject.toml | head -1 | sed 's/.*"\(.*\)".*/\1/')
+          echo "Tag version: $TAG_VERSION"
+          echo "pyproject.toml version: $TOML_VERSION"
+          if [ "$TAG_VERSION" != "$TOML_VERSION" ]; then
+            echo "ERROR: Tag ($TAG_VERSION) != pyproject.toml ($TOML_VERSION)"
+            exit 1
+          fi
+
+      - run: uv build
+        working-directory: src/python/g2p
+
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: src/python/g2p/dist/

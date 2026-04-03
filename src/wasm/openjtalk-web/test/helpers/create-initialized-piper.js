@@ -107,21 +107,19 @@ export function createDefaultConfig(overrides = {}) {
 // ---------------------------------------------------------------------------
 
 /**
- * Create a default phonemizer mock with all methods required by PiperPlus.
+ * Create a default G2P mock with all methods required by PiperPlus.
  *
  * Returned methods are plain functions (not node:test mocks) so this helper
  * stays self-contained. Tests that need call-tracking can wrap individual
  * methods with `mock.fn()` via the overrides parameter.
  *
  * @param {object} [overrides] - Per-method replacements.
- * @returns {object} phonemizer mock
+ * @returns {object} G2P mock
  */
-function buildPhonemizerMock(overrides = {}) {
+function buildG2PMock(overrides = {}) {
   return {
     detectLanguage: overrides.detectLanguage || (() => 'ja'),
-    textToPhonemes: overrides.textToPhonemes || (async () => 'mock-labels'),
-    extractPhonemes: overrides.extractPhonemes || (() => ['^', 'a', '$']),
-    setPhonemeIdMap: overrides.setPhonemeIdMap || (() => {}),
+    encode: overrides.encode || (() => ({ phonemeIds: [1, 7, 2], prosodyFlat: null })),
     dispose: overrides.dispose || (() => {}),
   };
 }
@@ -162,10 +160,10 @@ function buildSessionMock(overrides = {}) {
  *
  * @param {object} [options]
  * @param {object} [options.config]     - Custom config override (merged with defaults).
- * @param {object} [options.phonemizer] - Custom phonemizer mock (per-method overrides).
+ * @param {object} [options.g2p]        - Custom G2P mock (per-method overrides).
  * @param {object} [options.session]    - Custom ONNX session mock (`{ run, release }`).
  * @param {object} [options.ort]        - Custom ort mock. Defaults to a minimal Tensor-only mock.
- * @returns {{ instance: InstanceType<typeof PiperPlus>, mocks: { phonemizer: object, session: object, config: object, ort: object } } | null}
+ * @returns {{ instance: InstanceType<typeof PiperPlus>, mocks: { g2p: object, session: object, config: object, ort: object } } | null}
  *
  * @example
  * // Basic usage -- all defaults
@@ -201,7 +199,7 @@ export function createInitializedPiper(options = {}) {
     ? createDefaultConfig(options.config)
     : createDefaultConfig();
 
-  const phonemizer = buildPhonemizerMock(options.phonemizer);
+  const g2p = buildG2PMock(options.g2p);
   const session = buildSessionMock(options.session);
   const ort = options.ort || createOrtMock();
 
@@ -210,7 +208,7 @@ export function createInitializedPiper(options = {}) {
   // Centralised private-field wiring -- mirrors what _init() does.
   // This is the ONLY place in the test suite that should touch these fields.
   instance._config = config;
-  instance._phonemizer = phonemizer;
+  instance._g2p = g2p;
   instance._session = session;
   instance._ort = ort;
   instance._initialized = true;
@@ -218,7 +216,7 @@ export function createInitializedPiper(options = {}) {
   return {
     instance,
     mocks: {
-      phonemizer,
+      g2p,
       session,
       config,
       ort,

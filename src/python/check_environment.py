@@ -5,8 +5,17 @@ import sys
 
 
 try:
-    from piper_train.phonemize.japanese import phonemize_japanese
-    from piper_train.phonemize.jp_id_map import JAPANESE_PHONEMES, get_japanese_id_map
+    from piper_plus_g2p.japanese import JapanesePhonemizer
+    from piper_plus_g2p.encode.pua import map_token
+    from piper_plus_g2p.encode.id_maps import get_phoneme_id_map, _JAPANESE_PHONEMES as JAPANESE_PHONEMES
+
+    def get_japanese_id_map():
+        return get_phoneme_id_map("ja")
+
+    def phonemize_japanese(text):
+        p = JapanesePhonemizer()
+        tokens = p.phonemize(text)
+        return [map_token(t) for t in ["^"] + tokens + ["$"]]
 
     print("=== 環境チェック ===")
     print(f"Python: {sys.executable}")

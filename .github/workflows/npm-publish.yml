@@ -21,6 +21,9 @@ jobs:
         with:
           node-version: '20'
 
+      - name: Install dependencies
+        run: npm install
+
       - name: Verify tag matches package.json version
         run: |
           TAG="${GITHUB_REF#refs/tags/npm-v}"

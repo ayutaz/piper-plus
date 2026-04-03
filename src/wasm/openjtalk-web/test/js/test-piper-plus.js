@@ -151,14 +151,13 @@ installGlobalMocks();
 // ---------------------------------------------------------------------------
 
 let PiperPlus;
-let SimpleUnifiedPhonemizer, WebGPUSessionManager, ModelManager, DictManager;
+let WebGPUSessionManager, ModelManager, DictManager;
 let AudioResult, StreamingTTSPipeline;
 
 let importError = null;
 try {
   const mod = await import('../../src/index.js');
   PiperPlus = mod.PiperPlus;
-  SimpleUnifiedPhonemizer = mod.SimpleUnifiedPhonemizer;
   WebGPUSessionManager = mod.WebGPUSessionManager;
   ModelManager = mod.ModelManager;
   DictManager = mod.DictManager;
@@ -220,19 +219,21 @@ function createInitializedInstance(overrides = {}) {
     release: mock.fn(),
   };
 
-  // Phonemizer — simulates SimpleUnifiedPhonemizer after initialize()
-  const defaultPhonemizer = {
+  // G2P mock — simulates G2P after G2P.create()
+  const defaultG2P = {
     detectLanguage: mock.fn(() => 'ja'),
-    textToPhonemes: mock.fn(async () => 'xx^xx-sil+a=sil/A:0+0+0'),
-    extractPhonemes: mock.fn(() => ['^', 'a', '$']),
+    encode: mock.fn((_text, _phonemeIdMap, _opts) => ({
+      phonemeIds: [1, 7, 2],
+      prosodyFlat: null,
+    })),
     dispose: mock.fn(),
   };
-  const phonemizer = { ...defaultPhonemizer, ...(overrides.phonemizer || {}) };
+  const g2p = { ...defaultG2P, ...(overrides.g2p || {}) };
 
   // Wire up the instance as _init() would
   instance._config = config;
   instance._session = session;
-  instance._phonemizer = phonemizer;
+  instance._g2p = g2p;
   instance._ort = globalThis.ort;
   instance._initialized = true;
 
@@ -287,11 +288,6 @@ describe('PiperPlus クラスの存在確認', { skip }, () => {
 // ===========================================================================
 
 describe('再エクスポートの確認', { skip }, () => {
-  it('SimpleUnifiedPhonemizer がエクスポートされている', () => {
-    assert.ok(SimpleUnifiedPhonemizer);
-    assert.equal(typeof SimpleUnifiedPhonemizer, 'function');
-  });
-
   it('WebGPUSessionManager がエクスポートされている', () => {
     assert.ok(WebGPUSessionManager);
     assert.equal(typeof WebGPUSessionManager, 'function');
@@ -398,10 +394,12 @@ describe('SynthesizeOptions デフォルト値', { skip }, () => {
     // Arrange
     const detectLanguageFn = mock.fn(() => 'ja');
     const instance = createInitializedInstance({
-      phonemizer: {
+      g2p: {
         detectLanguage: detectLanguageFn,
-        textToPhonemes: mock.fn(async () => 'xx^xx-sil+a=sil/A:0+0+0'),
-        extractPhonemes: mock.fn(() => ['^', 'a', '$']),
+        encode: mock.fn((_text, _phonemeIdMap, _opts) => ({
+          phonemeIds: [1, 7, 2],
+          prosodyFlat: null,
+        })),
         dispose: mock.fn(),
       },
     });
@@ -638,18 +636,19 @@ describe('synthesize() 正常系', { skip }, () => {
 
   it('phonemize から infer までのパイプラインが実行される', async () => {
     // Arrange
-    const textToPhonemesFn = mock.fn(async () => 'xx^xx-sil+a=sil/A:0+0+0');
-    const extractPhonemesFn = mock.fn(() => ['^', 'a', '$']);
+    const encodeFn = mock.fn((_text, _phonemeIdMap, _opts) => ({
+      phonemeIds: [1, 7, 2],
+      prosodyFlat: null,
+    }));
     const sessionRunFn = mock.fn(async () => ({
       output: { data: new Float32Array(100), dims: [1, 100] },
     }));
 
     const instance = createInitializedInstance({
       sessionRun: sessionRunFn,
-      phonemizer: {
+      g2p: {
         detectLanguage: mock.fn(() => 'ja'),
-        textToPhonemes: textToPhonemesFn,
-        extractPhonemes: extractPhonemesFn,
+        encode: encodeFn,
         dispose: mock.fn(),
       },
     });
@@ -658,8 +657,7 @@ describe('synthesize() 正常系', { skip }, () => {
     await instance.synthesize('こんにちは');
 
     // Assert — each stage of the pipeline was invoked
-    assert.equal(textToPhonemesFn.mock.callCount(), 1, 'textToPhonemes が呼ばれること');
-    assert.equal(extractPhonemesFn.mock.callCount(), 1, 'extractPhonemes が呼ばれること');
+    assert.equal(encodeFn.mock.callCount(), 1, 'encode が呼ばれること');
     assert.equal(sessionRunFn.mock.callCount(), 1, 'session.run が呼ばれること');
   });
 });
@@ -711,19 +709,19 @@ describe('dispose()', { skip }, () => {
     assert.equal(instance._session, null);
   });
 
-  it('phonemizer の dispose() を呼び出す', () => {
+  it('G2P の dispose() を呼び出す', () => {
     // Arrange
     const instance = createInitializedInstance();
-    const phonemizer = instance._phonemizer; // capture ref before dispose nulls it
+    const g2p = instance._g2p; // capture ref before dispose nulls it
 
     // Act
     instance.dispose();
 
     // Assert
-    assert.equal(phonemizer.dispose.mock.callCount(), 1);
+    assert.equal(g2p.dispose.mock.callCount(), 1);
   });
 
-  it('dispose 後に phonemizer が null になる', () => {
+  it('dispose 後に _g2p が null になる', () => {
     // Arrange
     const instance = createInitializedInstance();
 
@@ -731,7 +729,7 @@ describe('dispose()', { skip }, () => {
     instance.dispose();
 
     // Assert
-    assert.equal(instance._phonemizer, null);
+    assert.equal(instance._g2p, null);
   });
 
   it('dispose 後に isInitialized が false になる', () => {

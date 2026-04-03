@@ -42,16 +42,22 @@ _skip_no_nltk = pytest.mark.skipif(
 
 def _get_multilingual_id_map(languages):
     """Build a multilingual phoneme_id_map for the given languages."""
-    from piper_train.phonemize.multilingual_id_map import get_multilingual_id_map
+    from piper_plus_g2p.encode.id_maps import get_phoneme_id_map
 
-    return get_multilingual_id_map(languages)
+    key = "-".join(languages)
+    # Single non-JA languages (e.g. "en") don't have standalone built-in maps;
+    # use the full multilingual map instead.
+    try:
+        return get_phoneme_id_map(key)
+    except ValueError:
+        return get_phoneme_id_map("multilingual")
 
 
 def _get_ja_only_id_map():
     """Build a JA-only phoneme_id_map (no multilingual promotion)."""
-    from piper_train.phonemize.jp_id_map import get_japanese_id_map
+    from piper_plus_g2p.encode.id_maps import get_phoneme_id_map
 
-    return get_japanese_id_map()
+    return get_phoneme_id_map("ja")
 
 
 def _call_text_to_phoneme_ids(text, phoneme_id_map, language, language_id_map=None):
