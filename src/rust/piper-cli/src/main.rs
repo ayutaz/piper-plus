@@ -326,7 +326,9 @@ fn main() -> Result<()> {
         // ORT warmup: JIT 最適化キャッシュを温める
         if !cli.no_warmup {
             tracing::info!("Warming up ORT session...");
-            voice.warmup(piper_plus::DEFAULT_WARMUP_RUNS).context("ORT warmup failed")?;
+            voice
+                .warmup(piper_plus::DEFAULT_WARMUP_RUNS)
+                .context("ORT warmup failed")?;
         }
 
         // Load custom dictionaries
@@ -423,7 +425,9 @@ fn main() -> Result<()> {
         // ORT warmup: JIT 最適化キャッシュを温める
         if !cli.no_warmup && !cli.test_mode {
             tracing::info!("Warming up ORT session...");
-            voice.warmup(piper_plus::DEFAULT_WARMUP_RUNS).context("ORT warmup failed")?;
+            voice
+                .warmup(piper_plus::DEFAULT_WARMUP_RUNS)
+                .context("ORT warmup failed")?;
         }
 
         // Load custom dictionaries
@@ -644,7 +648,9 @@ fn main() -> Result<()> {
         // ORT warmup: JIT 最適化キャッシュを温める
         if !cli.no_warmup {
             tracing::info!("Warming up ORT session...");
-            engine.warmup(piper_plus::DEFAULT_WARMUP_RUNS).context("ORT warmup failed")?;
+            engine
+                .warmup(piper_plus::DEFAULT_WARMUP_RUNS)
+                .context("ORT warmup failed")?;
         }
 
         let stdin = std::io::stdin();

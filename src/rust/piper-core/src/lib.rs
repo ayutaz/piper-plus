@@ -41,7 +41,7 @@ pub mod playback;
 // Re-exports
 pub use config::{PhonemeIdMap, PhonemeType, VoiceConfig};
 pub use engine::{
-    ModelCapabilities, OnnxEngine, SynthesisRequest, SynthesisResult, DEFAULT_WARMUP_RUNS,
+    DEFAULT_WARMUP_RUNS, ModelCapabilities, OnnxEngine, SynthesisRequest, SynthesisResult,
 };
 pub use error::PiperError;
 pub use phonemize::{ProsodyFeature, ProsodyInfo};

@@ -1402,11 +1402,7 @@ mod tests {
         let json_path = dir.path().join("pinyin_single.json");
 
         // Write JSON: { "20320": "ni3", "22909": "hao3" }
-        std::fs::write(
-            &json_path,
-            r#"{"20320": "ni3", "22909": "hao3"}"#,
-        )
-        .unwrap();
+        std::fs::write(&json_path, r#"{"20320": "ni3", "22909": "hao3"}"#).unwrap();
 
         // First load: JSON parse + bincode cache creation
         let loaded1 = load_single_char_dict(&json_path).unwrap();
@@ -1428,11 +1424,7 @@ mod tests {
         let json_path = dir.path().join("pinyin_phrases.json");
 
         // Write JSON with space-separated pinyin string format
-        std::fs::write(
-            &json_path,
-            r#"{"\u4f60\u597d": "ni3 hao3"}"#,
-        )
-        .unwrap();
+        std::fs::write(&json_path, r#"{"\u4f60\u597d": "ni3 hao3"}"#).unwrap();
 
         // First load: JSON parse + bincode cache creation
         let loaded1 = load_phrase_dict(&json_path).unwrap();

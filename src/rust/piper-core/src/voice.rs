@@ -46,15 +46,14 @@ impl PiperVoice {
 
             let engine = OnnxEngine::load(model_path, &config, device)?;
 
-            let phonemizer = phonemizer_handle
-                .join()
-                .map_err(|e| {
-                    let msg = e.downcast_ref::<&str>()
-                        .map(|s| s.to_string())
-                        .or_else(|| e.downcast_ref::<String>().cloned())
-                        .unwrap_or_else(|| "unknown panic".to_string());
-                    PiperError::ModelLoad(format!("phonemizer init panicked: {}", msg))
-                })??;
+            let phonemizer = phonemizer_handle.join().map_err(|e| {
+                let msg = e
+                    .downcast_ref::<&str>()
+                    .map(|s| s.to_string())
+                    .or_else(|| e.downcast_ref::<String>().cloned())
+                    .unwrap_or_else(|| "unknown panic".to_string());
+                PiperError::ModelLoad(format!("phonemizer init panicked: {}", msg))
+            })??;
 
             (phonemizer, engine)
         };

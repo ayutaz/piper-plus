@@ -7,8 +7,8 @@ use std::borrow::Cow;
 use std::path::Path;
 use std::time::Instant;
 
-use ort::session::builder::GraphOptimizationLevel;
 use ort::session::Session;
+use ort::session::builder::GraphOptimizationLevel;
 use ort::value::Tensor;
 
 use crate::audio::audio_float_to_int16;
@@ -128,10 +128,7 @@ impl OnnxEngine {
         let use_cached = optimized_path.exists() && sentinel_path.exists();
 
         let (load_path, use_cached) = if use_cached {
-            tracing::info!(
-                "Loading pre-optimized model from {:?}",
-                optimized_path
-            );
+            tracing::info!("Loading pre-optimized model from {:?}", optimized_path);
             (optimized_path.clone(), true)
         } else {
             // 不完全なキャッシュがあれば削除
@@ -163,10 +160,7 @@ impl OnnxEngine {
             match builder.with_optimized_model_path(&optimized_path) {
                 Ok(b) => {
                     builder = b;
-                    tracing::info!(
-                        "ORT will save optimized model to {:?}",
-                        optimized_path
-                    );
+                    tracing::info!("ORT will save optimized model to {:?}", optimized_path);
                 }
                 Err(e) => {
                     let msg = e.to_string();
@@ -417,11 +411,8 @@ impl OnnxEngine {
     /// ORT グラフ最適化キャッシュを温める。
     /// 本番入力と同程度の形状でダミー推論を `runs` 回実行する。
     pub fn warmup(&mut self, runs: usize) -> Result<(), PiperError> {
-        let mut dummy_ids = vec![0i64; WARMUP_PHONEME_LENGTH];
+        let mut dummy_ids = vec![8i64; WARMUP_PHONEME_LENGTH]; // dummy phonemes
         dummy_ids[0] = 1; // BOS
-        for i in 1..WARMUP_PHONEME_LENGTH - 1 {
-            dummy_ids[i] = 8; // dummy phoneme
-        }
         dummy_ids[WARMUP_PHONEME_LENGTH - 1] = 2; // EOS
         let dummy_request = SynthesisRequest {
             phoneme_ids: dummy_ids,
@@ -611,11 +602,8 @@ mod tests {
 
     #[test]
     fn test_warmup_request_is_valid() {
-        let mut dummy_ids = vec![0i64; WARMUP_PHONEME_LENGTH];
+        let mut dummy_ids = vec![8i64; WARMUP_PHONEME_LENGTH]; // dummy phonemes
         dummy_ids[0] = 1; // BOS
-        for i in 1..WARMUP_PHONEME_LENGTH - 1 {
-            dummy_ids[i] = 8; // dummy phoneme
-        }
         dummy_ids[WARMUP_PHONEME_LENGTH - 1] = 2; // EOS
         let req = SynthesisRequest {
             phoneme_ids: dummy_ids,
