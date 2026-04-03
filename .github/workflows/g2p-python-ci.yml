@@ -140,6 +140,9 @@ jobs:
       - uses: astral-sh/setup-uv@v6
       - run: uv venv .venv-extras
       - run: uv pip install --python .venv-extras "./src/python/g2p[${{ matrix.extra }}]"
+      - name: Download NLTK data (EN only)
+        if: matrix.extra == 'en'
+        run: .venv-extras/bin/python -c "import nltk; nltk.download('averaged_perceptron_tagger_eng')"
       - run: .venv-extras/bin/python -c "from piper_plus_g2p import get_phonemizer; p = get_phonemizer('${{ matrix.extra }}'); print(p.phonemize('test'))"
 
   publish:
