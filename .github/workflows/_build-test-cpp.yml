@@ -259,7 +259,7 @@ jobs:
 
             # Build test list: always include unit tests
             UNIT_TESTS="test_gpu_device_id test_phoneme_parser test_model_speaker_detection test_prosody_inference test_swedish_phonemize test_c_api"
-            INTEGRATION_TESTS="test_c_api_integration"
+            INTEGRATION_TESTS="test_c_api_integration test_c_api_audio_regression"
 
             if [ "${{ inputs.run-integration-tests }}" == "true" ]; then
               TEST_LIST="${UNIT_TESTS} ${INTEGRATION_TESTS}"

@@ -1,0 +1,27 @@
+{
+  "version": "1.0",
+  "model": "multilingual-test-medium.onnx",
+  "description": "Audio regression baseline for C API. Generated with noise_scale=0.001, noise_w=0.001",
+  "test_cases": [
+    {
+      "id": "ja_greeting",
+      "text": "こんにちは",
+      "language_id": 0,
+      "noise_scale": 0.001,
+      "noise_w": 0.001,
+      "expected_num_samples_min": 10000,
+      "expected_num_samples_max": 50000,
+      "sample_rate": 22050
+    },
+    {
+      "id": "en_greeting",
+      "text": "Hello",
+      "language_id": -1,
+      "noise_scale": 0.001,
+      "noise_w": 0.001,
+      "expected_num_samples_min": 5000,
+      "expected_num_samples_max": 30000,
+      "sample_rate": 22050
+    }
+  ]
+}
