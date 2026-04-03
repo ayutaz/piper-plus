@@ -10,6 +10,8 @@
 
 #include "piper_plus.h"
 #include "piper.hpp"
+#include "custom_dictionary.hpp"
+#include "library_path.h"
 
 #include <atomic>
 #include <climits>
@@ -19,6 +21,8 @@
 #include <mutex>
 #include <string>
 #include <vector>
+
+#include <sys/stat.h>
 
 #ifdef _WIN32
 #ifndef NOMINMAX
@@ -56,6 +60,19 @@ struct PiperPlusEngine {
     piper::Voice voice;
     std::atomic<bool> inProgress{false};
     IteratorState iterState;          // Phase 2: streaming state
+
+    // M4-1: Custom dictionary
+    std::unique_ptr<piper::CustomDictionary> customDict;
+
+    // M4-2: Phoneme timing cache
+    piper::SynthesisResult lastSynthResult;
+    std::vector<PiperPlusPhonemeInfo> cachedTimings;
+    std::vector<std::string> timingStrings;  // storage for phoneme string pointers
+
+    // M4-3: G2P cache
+    std::string g2pPhonemeStr;
+    std::string g2pLanguage;
+    std::string availableLanguagesStr;
 };
 
 // ===== Helpers =====
@@ -162,12 +179,27 @@ PIPER_PLUS_API PiperPlusEngine *piper_plus_create(const PiperPlusConfig *config)
 
         piper::initialize(engine->config);
 
-        // dict_dir: set environment variable before loadVoice (M1-3)
+        // dict_dir: explicit path or auto-detect from library location
+        std::string dictPath;
         if (config->dict_dir && config->dict_dir[0] != '\0') {
+            dictPath = config->dict_dir;
+        } else {
+            // Try to auto-detect from library path: ../share/open_jtalk/dic
+            char libDir[4096];
+            if (piper_plus_get_library_dir(libDir, sizeof(libDir)) == 0) {
+                std::string candidate = std::string(libDir) + "/../share/open_jtalk/dic";
+                struct stat st;
+                if (stat(candidate.c_str(), &st) == 0 && S_ISDIR(st.st_mode)) {
+                    dictPath = candidate;
+                }
+            }
+        }
+
+        if (!dictPath.empty()) {
 #ifdef _WIN32
-            _putenv_s("OPENJTALK_DICTIONARY_PATH", config->dict_dir);
+            _putenv_s("OPENJTALK_DICTIONARY_PATH", dictPath.c_str());
 #else
-            setenv("OPENJTALK_DICTIONARY_PATH", config->dict_dir, 1);
+            setenv("OPENJTALK_DICTIONARY_PATH", dictPath.c_str(), 1);
 #endif
         }
 
@@ -270,6 +302,9 @@ PIPER_PLUS_API int32_t piper_plus_synthesize(
         piper::SynthesisResult result;
         piper::textToAudio(engine->config, engine->voice, text,
                            audioBuffer, result, nullptr);
+
+        // M4-2: Cache timing info from last synthesis
+        engine->lastSynthResult = result;
 
         // Restore config
         engine->voice.synthesisConfig = savedConfig;
@@ -435,6 +470,9 @@ PIPER_PLUS_API int32_t piper_plus_synth_next(
         piper::textToAudio(engine->config, engine->voice, sentence,
                            audioBuffer, synthResult, nullptr);
 
+        // M4-2: Cache timing info from last synthesis
+        engine->lastSynthResult = synthResult;
+
         // Convert int16 -> float32
         state.currentChunkSamples.resize(audioBuffer.size());
         for (size_t i = 0; i < audioBuffer.size(); i++) {
@@ -552,6 +590,194 @@ PIPER_PLUS_API int32_t piper_plus_synthesize_streaming(
         engine->voice.synthesisConfig = engine->iterState.savedConfig;
         return PIPER_PLUS_ERR;
     }
+}
+
+// ===== M4-1: Custom dictionary =====
+
+PIPER_PLUS_API int32_t piper_plus_load_custom_dict(
+    PiperPlusEngine *engine, const char *dict_path) {
+    if (!engine) { set_error("engine is NULL"); return PIPER_PLUS_ERR; }
+    if (!dict_path) { set_error("dict_path is NULL"); return PIPER_PLUS_ERR; }
+
+    try {
+        if (!engine->customDict) {
+            engine->customDict = std::make_unique<piper::CustomDictionary>();
+        }
+        engine->customDict->loadDictionary(dict_path);
+        return PIPER_PLUS_OK;
+    } catch (const std::exception &e) {
+        set_error(e.what());
+        return PIPER_PLUS_ERR;
+    } catch (...) {
+        set_error("Unknown error loading dictionary");
+        return PIPER_PLUS_ERR;
+    }
+}
+
+PIPER_PLUS_API int32_t piper_plus_clear_custom_dict(PiperPlusEngine *engine) {
+    if (!engine) { set_error("engine is NULL"); return PIPER_PLUS_ERR; }
+    engine->customDict.reset();
+    return PIPER_PLUS_OK;
+}
+
+PIPER_PLUS_API int32_t piper_plus_add_dict_word(
+    PiperPlusEngine *engine, const char *word,
+    const char *pronunciation, int32_t priority) {
+    if (!engine) { set_error("engine is NULL"); return PIPER_PLUS_ERR; }
+    if (!word || !pronunciation) { set_error("word or pronunciation is NULL"); return PIPER_PLUS_ERR; }
+
+    try {
+        if (!engine->customDict) {
+            engine->customDict = std::make_unique<piper::CustomDictionary>();
+        }
+        engine->customDict->addWord(word, pronunciation, static_cast<int>(priority));
+        return PIPER_PLUS_OK;
+    } catch (const std::exception &e) {
+        set_error(e.what());
+        return PIPER_PLUS_ERR;
+    } catch (...) {
+        set_error("Unknown error adding dictionary word");
+        return PIPER_PLUS_ERR;
+    }
+}
+
+PIPER_PLUS_API int32_t piper_plus_dict_entry_count(const PiperPlusEngine *engine) {
+    if (!engine || !engine->customDict) return 0;
+    auto stats = engine->customDict->getStats();
+    return static_cast<int32_t>(stats.totalEntries);
+}
+
+// ===== M4-2: Phoneme timing =====
+
+PIPER_PLUS_API int32_t piper_plus_get_phoneme_timing(
+    const PiperPlusEngine *engine, PiperPlusTimingResult *out_timing) {
+    if (!engine) { set_error("engine is NULL"); return PIPER_PLUS_ERR; }
+    if (!out_timing) { set_error("out_timing is NULL"); return PIPER_PLUS_ERR; }
+
+    if (!engine->lastSynthResult.hasTimingInfo ||
+        engine->lastSynthResult.phonemeTimings.empty()) {
+        set_error("No timing information available (model may not support duration output)");
+        out_timing->entries = nullptr;
+        out_timing->count = 0;
+        return PIPER_PLUS_ERR;
+    }
+
+    // Build C-compatible timing array (cached in mutable engine state)
+    auto *mutableEngine = const_cast<PiperPlusEngine*>(engine);
+    const auto &timings = engine->lastSynthResult.phonemeTimings;
+
+    mutableEngine->timingStrings.clear();
+    mutableEngine->cachedTimings.clear();
+    mutableEngine->timingStrings.reserve(timings.size());
+    mutableEngine->cachedTimings.reserve(timings.size());
+
+    for (const auto &t : timings) {
+        mutableEngine->timingStrings.push_back(t.phoneme);
+        PiperPlusPhonemeInfo info;
+        info.phoneme = mutableEngine->timingStrings.back().c_str();
+        info.start_time = t.start_time;
+        info.end_time = t.end_time;
+        mutableEngine->cachedTimings.push_back(info);
+    }
+
+    out_timing->entries = mutableEngine->cachedTimings.data();
+    out_timing->count = static_cast<int32_t>(mutableEngine->cachedTimings.size());
+    return PIPER_PLUS_OK;
+}
+
+// ===== M4-3: G2P / Phonemization =====
+
+PIPER_PLUS_API int32_t piper_plus_phonemize(
+    PiperPlusEngine *engine, const char *text,
+    const char *language, PiperPlusPhonemeResult *out_result) {
+    if (!engine) { set_error("engine is NULL"); return PIPER_PLUS_ERR; }
+    if (!text) { set_error("text is NULL"); return PIPER_PLUS_ERR_TEXT; }
+    if (!out_result) { set_error("out_result is NULL"); return PIPER_PLUS_ERR; }
+
+    try {
+        // Save and optionally set language
+        auto savedLangId = engine->voice.synthesisConfig.languageId;
+        if (language && language[0] != '\0' && engine->voice.modelConfig.languageIdMap) {
+            auto it = engine->voice.modelConfig.languageIdMap->find(language);
+            if (it != engine->voice.modelConfig.languageIdMap->end()) {
+                engine->voice.synthesisConfig.languageId = it->second;
+            }
+        }
+
+        piper::PhonemizeResult phonResult;
+        piper::phonemizeText(engine->voice, text, phonResult);
+
+        // Detect language from current config
+        engine->g2pLanguage = "unknown";
+        if (engine->voice.synthesisConfig.languageId &&
+            engine->voice.modelConfig.languageIdMap) {
+            for (const auto &[code, id] : *engine->voice.modelConfig.languageIdMap) {
+                if (id == *engine->voice.synthesisConfig.languageId) {
+                    engine->g2pLanguage = code;
+                    break;
+                }
+            }
+        }
+
+        // Build space-separated phoneme string from codepoints
+        engine->g2pPhonemeStr.clear();
+        int32_t count = 0;
+        for (const auto &sentence : phonResult.phonemes) {
+            for (auto ph : sentence) {
+                if (!engine->g2pPhonemeStr.empty()) engine->g2pPhonemeStr += ' ';
+                // Convert char32_t codepoint to UTF-8
+                if (ph < 0x80) {
+                    engine->g2pPhonemeStr += static_cast<char>(ph);
+                } else if (ph < 0x800) {
+                    engine->g2pPhonemeStr += static_cast<char>(0xC0 | (ph >> 6));
+                    engine->g2pPhonemeStr += static_cast<char>(0x80 | (ph & 0x3F));
+                } else if (ph < 0x10000) {
+                    engine->g2pPhonemeStr += static_cast<char>(0xE0 | (ph >> 12));
+                    engine->g2pPhonemeStr += static_cast<char>(0x80 | ((ph >> 6) & 0x3F));
+                    engine->g2pPhonemeStr += static_cast<char>(0x80 | (ph & 0x3F));
+                } else {
+                    engine->g2pPhonemeStr += static_cast<char>(0xF0 | (ph >> 18));
+                    engine->g2pPhonemeStr += static_cast<char>(0x80 | ((ph >> 12) & 0x3F));
+                    engine->g2pPhonemeStr += static_cast<char>(0x80 | ((ph >> 6) & 0x3F));
+                    engine->g2pPhonemeStr += static_cast<char>(0x80 | (ph & 0x3F));
+                }
+                count++;
+            }
+        }
+
+        // Restore language
+        engine->voice.synthesisConfig.languageId = savedLangId;
+
+        out_result->phonemes = engine->g2pPhonemeStr.c_str();
+        out_result->language = engine->g2pLanguage.c_str();
+        out_result->num_phonemes = count;
+        return PIPER_PLUS_OK;
+
+    } catch (const std::exception &e) {
+        set_error(e.what());
+        return PIPER_PLUS_ERR;
+    } catch (...) {
+        set_error("Unknown error in phonemize");
+        return PIPER_PLUS_ERR;
+    }
+}
+
+PIPER_PLUS_API const char *piper_plus_available_languages(const PiperPlusEngine *engine) {
+    if (!engine) return "";
+
+    auto *mutableEngine = const_cast<PiperPlusEngine*>(engine);
+    if (!engine->voice.modelConfig.languageIdMap) {
+        mutableEngine->availableLanguagesStr = "";
+        return mutableEngine->availableLanguagesStr.c_str();
+    }
+
+    mutableEngine->availableLanguagesStr.clear();
+    for (const auto &[code, id] : *engine->voice.modelConfig.languageIdMap) {
+        if (!mutableEngine->availableLanguagesStr.empty())
+            mutableEngine->availableLanguagesStr += ',';
+        mutableEngine->availableLanguagesStr += code;
+    }
+    return mutableEngine->availableLanguagesStr.c_str();
 }
 
 } // extern "C"

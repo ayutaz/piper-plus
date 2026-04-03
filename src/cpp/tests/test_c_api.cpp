@@ -413,3 +413,62 @@ TEST(CApiCallback, StreamingWithOptsNullEngine) {
         nullptr, "hello", &opts, dummy_callback, nullptr);
     EXPECT_EQ(rc, PIPER_PLUS_ERR);
 }
+
+// ===== Phase 4: Custom dictionary tests (M4-1) =====
+
+TEST(CApiCustomDict, LoadNullEngine) {
+    EXPECT_EQ(piper_plus_load_custom_dict(nullptr, "dict.json"), PIPER_PLUS_ERR);
+}
+
+TEST(CApiCustomDict, LoadNullPath) {
+    EXPECT_EQ(piper_plus_load_custom_dict(nullptr, nullptr), PIPER_PLUS_ERR);
+}
+
+TEST(CApiCustomDict, ClearNullEngine) {
+    EXPECT_EQ(piper_plus_clear_custom_dict(nullptr), PIPER_PLUS_ERR);
+}
+
+TEST(CApiCustomDict, AddWordNullEngine) {
+    EXPECT_EQ(piper_plus_add_dict_word(nullptr, "test", "t ɛ s t", 0), PIPER_PLUS_ERR);
+}
+
+TEST(CApiCustomDict, AddWordNullWord) {
+    EXPECT_EQ(piper_plus_add_dict_word(nullptr, nullptr, "t ɛ s t", 0), PIPER_PLUS_ERR);
+}
+
+TEST(CApiCustomDict, EntryCountNullEngine) {
+    EXPECT_EQ(piper_plus_dict_entry_count(nullptr), 0);
+}
+
+// ===== Phase 4: Phoneme timing tests (M4-2) =====
+
+TEST(CApiTiming, GetTimingNullEngine) {
+    PiperPlusTimingResult timing = {};
+    EXPECT_EQ(piper_plus_get_phoneme_timing(nullptr, &timing), PIPER_PLUS_ERR);
+}
+
+TEST(CApiTiming, GetTimingNullResult) {
+    EXPECT_EQ(piper_plus_get_phoneme_timing(nullptr, nullptr), PIPER_PLUS_ERR);
+}
+
+// ===== Phase 4: G2P tests (M4-3) =====
+
+TEST(CApiG2P, PhonemizeNullEngine) {
+    PiperPlusPhonemeResult result = {};
+    EXPECT_EQ(piper_plus_phonemize(nullptr, "hello", nullptr, &result), PIPER_PLUS_ERR);
+}
+
+TEST(CApiG2P, PhonemizeNullText) {
+    PiperPlusPhonemeResult result = {};
+    EXPECT_EQ(piper_plus_phonemize(nullptr, nullptr, nullptr, &result), PIPER_PLUS_ERR);
+}
+
+TEST(CApiG2P, PhonemizeNullResult) {
+    EXPECT_EQ(piper_plus_phonemize(nullptr, "hello", nullptr, nullptr), PIPER_PLUS_ERR);
+}
+
+TEST(CApiG2P, AvailableLanguagesNullEngine) {
+    const char *langs = piper_plus_available_languages(nullptr);
+    EXPECT_NE(langs, nullptr);
+    EXPECT_EQ(std::strlen(langs), 0u);
+}

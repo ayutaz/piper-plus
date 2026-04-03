@@ -155,6 +155,58 @@ PIPER_PLUS_API int32_t piper_plus_synthesize_streaming(
     PiperPlusAudioCallback        callback,
     void                         *user_data);
 
+/* ===== Custom dictionary (M4-1) ===== */
+
+PIPER_PLUS_API int32_t piper_plus_load_custom_dict(
+    PiperPlusEngine *engine,
+    const char      *dict_path);
+
+PIPER_PLUS_API int32_t piper_plus_clear_custom_dict(PiperPlusEngine *engine);
+
+PIPER_PLUS_API int32_t piper_plus_add_dict_word(
+    PiperPlusEngine *engine,
+    const char      *word,
+    const char      *pronunciation,
+    int32_t          priority);
+
+PIPER_PLUS_API int32_t piper_plus_dict_entry_count(const PiperPlusEngine *engine);
+
+/* ===== Phoneme timing (M4-2) ===== */
+
+typedef struct PiperPlusPhonemeInfo {
+    const char *phoneme;       /**< Phoneme string (BORROWED, valid until next synthesis) */
+    float       start_time;    /**< Start time in seconds */
+    float       end_time;      /**< End time in seconds */
+} PiperPlusPhonemeInfo;
+
+typedef struct PiperPlusTimingResult {
+    const PiperPlusPhonemeInfo *entries;  /**< Array of phoneme timing entries */
+    int32_t                     count;    /**< Number of entries */
+} PiperPlusTimingResult;
+
+/** Get phoneme timing from the last synthesis. Valid until next synthesis call. */
+PIPER_PLUS_API int32_t piper_plus_get_phoneme_timing(
+    const PiperPlusEngine   *engine,
+    PiperPlusTimingResult   *out_timing);
+
+/* ===== G2P / Phonemization (M4-3) ===== */
+
+typedef struct PiperPlusPhonemeResult {
+    const char *phonemes;      /**< Space-separated IPA phoneme string (BORROWED) */
+    const char *language;      /**< Detected language code (BORROWED) */
+    int32_t     num_phonemes;  /**< Number of phoneme tokens */
+} PiperPlusPhonemeResult;
+
+/** Phonemize text without synthesis. language=NULL for auto-detect. */
+PIPER_PLUS_API int32_t piper_plus_phonemize(
+    PiperPlusEngine         *engine,
+    const char              *text,
+    const char              *language,
+    PiperPlusPhonemeResult  *out_result);
+
+/** Get available language codes (comma-separated, BORROWED). */
+PIPER_PLUS_API const char *piper_plus_available_languages(const PiperPlusEngine *engine);
+
 #ifdef __cplusplus
 }
 #endif
