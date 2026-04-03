@@ -364,9 +364,9 @@ class TestMultilingualProsodyPunctuation:
         # EN phonemizer returns ProsodyInfo with a1=0, a2=stress, a3=word length.
         # Every entry must be either ProsodyInfo or None.
         for i, pr in enumerate(prosody):
-            assert pr is None or isinstance(
-                pr, ProsodyInfo
-            ), f"prosody[{i}]: expected ProsodyInfo|None, got {type(pr).__name__}"
+            assert pr is None or isinstance(pr, ProsodyInfo), (
+                f"prosody[{i}]: expected ProsodyInfo|None, got {type(pr).__name__}"
+            )
 
     @requires_ja
     @requires_en
