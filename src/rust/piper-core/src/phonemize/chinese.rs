@@ -1448,4 +1448,23 @@ mod tests {
         let loaded2 = load_phrase_dict(&json_path).unwrap();
         assert_eq!(loaded1, loaded2);
     }
+
+    // ===== 16. Corrupted bincode fallback =====
+
+    #[test]
+    fn test_corrupted_bincode_falls_back_to_json_single_char() {
+        let dir = tempfile::tempdir().unwrap();
+        let json_path = dir.path().join("pinyin_single.json");
+        let bincode_path = json_path.with_extension("json.bincode");
+
+        // 有効な JSON を作成
+        std::fs::write(&json_path, r#"{"20320": "ni3"}"#).unwrap();
+
+        // 破損した bincode を作成 (JSON より新しいタイムスタンプ)
+        std::fs::write(&bincode_path, b"CORRUPT_DATA_HERE").unwrap();
+
+        // bincode deserialization が失敗し、None が返ること
+        let result: Option<HashMap<char, String>> = try_load_bincode_cache(&json_path);
+        assert!(result.is_none(), "corrupted bincode should return None");
+    }
 }

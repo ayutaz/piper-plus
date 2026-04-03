@@ -1408,4 +1408,25 @@ mod tests {
         let loaded2 = load_cmu_dict(&json_path).unwrap();
         assert_eq!(loaded1, loaded2);
     }
+
+    // ===== 22. Corrupted bincode fallback =====
+
+    #[test]
+    fn test_corrupted_bincode_falls_back_to_json() {
+        let dir = tempfile::tempdir().unwrap();
+        let json_path = dir.path().join("cmudict.json");
+        let bincode_path = json_path.with_extension("json.bincode");
+
+        // 有効な JSON を作成
+        let dict: HashMap<String, String> =
+            [("hello".to_string(), "HH AH0 L OW1".to_string())].into();
+        std::fs::write(&json_path, serde_json::to_string(&dict).unwrap()).unwrap();
+
+        // 破損した bincode を作成 (JSON より新しいタイムスタンプ)
+        std::fs::write(&bincode_path, b"CORRUPT_DATA_HERE").unwrap();
+
+        // bincode deserialization が失敗し、None が返ること
+        let result: Option<HashMap<String, String>> = try_load_bincode_cache(&json_path);
+        assert!(result.is_none(), "corrupted bincode should return None");
+    }
 }

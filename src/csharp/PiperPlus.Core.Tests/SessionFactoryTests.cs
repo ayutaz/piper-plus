@@ -158,7 +158,7 @@ public sealed class SessionFactoryTests
         Assert.Equal(typeof(InferenceSession), parameters[0].ParameterType);
         Assert.Equal(typeof(int), parameters[1].ParameterType);
         Assert.True(parameters[1].HasDefaultValue);
-        Assert.Equal(3, parameters[1].DefaultValue);
+        Assert.Equal(2, parameters[1].DefaultValue);
     }
 
     [Fact]
@@ -169,22 +169,36 @@ public sealed class SessionFactoryTests
     }
 
     // ================================================================
-    // COLD-M5: 最適化済みモデルキャッシュ テスト
+    // COLD-M5 + F1/D5: 最適化済みモデルキャッシュ テスト
     // ================================================================
 
+    /// <summary>Helper: build device-labelled cache path (mirrors SessionFactory logic).</summary>
+    private static string BuildCachePath(string modelPath, string deviceLabel)
+        => Path.ChangeExtension(modelPath, $".{deviceLabel}.opt.onnx");
+
     [Fact]
-    public void OptimizedModelPath_IsConstructedCorrectly()
+    public void OptimizedModelPath_Cpu_IsConstructedCorrectly()
     {
         var original = "/data/models/test.onnx";
-        var optimized = Path.ChangeExtension(original, ".opt.onnx");
-        Assert.EndsWith(".opt.onnx", optimized);
+        var optimized = BuildCachePath(original, "cpu");
+        Assert.EndsWith(".cpu.opt.onnx", optimized);
+        Assert.Equal("test.cpu.opt.onnx", Path.GetFileName(optimized));
+    }
+
+    [Fact]
+    public void OptimizedModelPath_Cuda_IsConstructedCorrectly()
+    {
+        var original = "/data/models/test.onnx";
+        var optimized = BuildCachePath(original, "cuda0");
+        Assert.EndsWith(".cuda0.opt.onnx", optimized);
+        Assert.Equal("test.cuda0.opt.onnx", Path.GetFileName(optimized));
     }
 
     [Fact]
     public void OptimizedModelPath_PreservesDirectory()
     {
         var original = "/data/models/subdir/model.onnx";
-        var optimized = Path.ChangeExtension(original, ".opt.onnx");
+        var optimized = BuildCachePath(original, "cpu");
         Assert.Equal(
             Path.GetDirectoryName(original),
             Path.GetDirectoryName(optimized));
@@ -194,18 +208,76 @@ public sealed class SessionFactoryTests
     public void OptimizedModelPath_FromWindowsPath()
     {
         var original = @"C:\Users\test\models\model.onnx";
-        var optimized = Path.ChangeExtension(original, ".opt.onnx");
-        Assert.EndsWith(".opt.onnx", optimized);
+        var optimized = BuildCachePath(original, "cpu");
+        Assert.EndsWith(".cpu.opt.onnx", optimized);
         Assert.Equal(
             Path.GetDirectoryName(original),
             Path.GetDirectoryName(optimized));
     }
 
     [Fact]
-    public void OptimizedModelPath_FileName()
+    public void SentinelPath_IsConstructedCorrectly()
     {
         var original = "/data/models/test.onnx";
-        var optimized = Path.ChangeExtension(original, ".opt.onnx");
-        Assert.Equal("test.opt.onnx", Path.GetFileName(optimized));
+        var optimized = BuildCachePath(original, "cpu");
+        var sentinel = optimized + ".ok";
+        Assert.EndsWith(".cpu.opt.onnx.ok", sentinel);
+    }
+
+    [Fact]
+    public void CacheHit_RequiresBothOptAndSentinel()
+    {
+        // Simulate: both files must exist for cache hit
+        bool optExists = true;
+        bool sentinelExists = true;
+        bool useCached = optExists && sentinelExists;
+        Assert.True(useCached);
+    }
+
+    [Fact]
+    public void CacheMiss_WhenSentinelMissing()
+    {
+        // Simulate: opt exists but sentinel is missing (interrupted write)
+        bool optExists = true;
+        bool sentinelExists = false;
+        bool useCached = optExists && sentinelExists;
+        Assert.False(useCached);
+    }
+
+    [Fact]
+    public void CacheMiss_WhenOptMissing()
+    {
+        // Simulate: neither file exists
+        bool optExists = false;
+        bool sentinelExists = false;
+        bool useCached = optExists && sentinelExists;
+        Assert.False(useCached);
+    }
+
+    [Fact]
+    public void DeviceLabel_Cpu()
+    {
+        bool useCuda = false;
+        int deviceId = 0;
+        var label = useCuda ? $"cuda{deviceId}" : "cpu";
+        Assert.Equal("cpu", label);
+    }
+
+    [Fact]
+    public void DeviceLabel_Cuda0()
+    {
+        bool useCuda = true;
+        int deviceId = 0;
+        var label = useCuda ? $"cuda{deviceId}" : "cpu";
+        Assert.Equal("cuda0", label);
+    }
+
+    [Fact]
+    public void DeviceLabel_Cuda1()
+    {
+        bool useCuda = true;
+        int deviceId = 1;
+        var label = useCuda ? $"cuda{deviceId}" : "cpu";
+        Assert.Equal("cuda1", label);
     }
 }

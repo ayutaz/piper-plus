@@ -36,6 +36,21 @@ public static class SessionFactory
     private const string GpuDeviceIdEnvVar = "PIPER_GPU_DEVICE_ID";
 
     /// <summary>
+    /// Default number of warmup inference runs.
+    /// ORT JIT cache stabilises in 1-2 runs; 2 provides a safety margin.
+    /// </summary>
+    private const int DefaultWarmupRuns = 2;
+
+    /// <summary>
+    /// Length of the dummy phoneme input used during warmup.
+    /// Matches typical production input length (50-200) to warm ORT memory allocations.
+    /// </summary>
+    private const int WarmupPhonemeLength = 100;
+
+    /// <summary>VITS 小モデルの intra-op スレッド上限。</summary>
+    private const int MaxIntraThreads = 4;
+
+    /// <summary>
     /// Creates an ONNX <see cref="InferenceSession"/> for the given model,
     /// conditionally enabling the CUDA execution provider.
     /// </summary>
@@ -59,6 +74,14 @@ public static class SessionFactory
     /// Optional logger for diagnostic messages. Pass <c>null</c> to suppress output.
     /// </param>
     /// <returns>A configured <see cref="InferenceSession"/> ready for inference.</returns>
+    /// <remarks>
+    /// <para>
+    /// <b>Side effect:</b> 初回呼び出し時、モデルと同じディレクトリに
+    /// <c>{model}.opt.onnx</c> を生成する。このキャッシュファイルは
+    /// ORT バージョンおよびデバイスに依存するため、変更後は削除して再生成が必要。
+    /// 書き込み権限がない場合は警告を出力してスキップする（推論への影響なし）。
+    /// </para>
+    /// </remarks>
     /// <exception cref="ArgumentException">
     /// Thrown when <paramref name="modelPath"/> is null or empty.
     /// </exception>
@@ -92,18 +115,30 @@ public static class SessionFactory
         // 以降の推論コストを削減する (COLD-M1)。
         options.GraphOptimizationLevel = GraphOptimizationLevel.ORT_ENABLE_ALL;
 
+        // COLD-M1: VITS は小モデルのためスレッド数を制限する。
+        // 物理コア数の半分（最大4）を intra-op スレッドに割り当て。
+        options.IntraOpNumThreads = Math.Min(Environment.ProcessorCount / 2, MaxIntraThreads);
+        options.InterOpNumThreads = 1;
+        // VITS は単一グラフで並列サブグラフがないため Sequential が最適。
+        options.ExecutionMode = ExecutionMode.ORT_SEQUENTIAL;
+
         if (useCuda)
         {
             TryAppendCudaProvider(options, resolvedDeviceId, logger);
         }
 
-        // COLD-M5: 最適化済みモデルキャッシュ
-        // .opt.onnx が存在すれば直接ロード (最適化スキップ) し、
-        // 存在しなければ元モデルをロード＆最適化結果を .opt.onnx に保存する。
-        var optimizedPath = Path.ChangeExtension(modelPath, ".opt.onnx");
+        // COLD-M5 + F1/D5: 最適化済みモデルキャッシュ
+        // キャッシュパスにデバイス名を含める (D5: CPU/CUDA 混用防止)。
+        // センチネルファイル (.ok) で書き込み完了を保証 (F1: 中断耐性)。
+        var deviceLabel = useCuda ? $"cuda{resolvedDeviceId}" : "cpu";
+        var optimizedPath = Path.ChangeExtension(modelPath, $".{deviceLabel}.opt.onnx");
+        var sentinelPath = optimizedPath + ".ok";
         string effectiveModelPath;
 
-        if (File.Exists(optimizedPath))
+        // キャッシュ有効: .opt.onnx と .ok の両方が存在する場合のみ
+        bool useCached = File.Exists(optimizedPath) && File.Exists(sentinelPath);
+
+        if (useCached)
         {
             logger.LogInformation("Loading pre-optimized model from {Path}", optimizedPath);
             options.GraphOptimizationLevel = GraphOptimizationLevel.ORT_DISABLE_ALL;
@@ -111,6 +146,14 @@ public static class SessionFactory
         }
         else
         {
+            // 不完全なキャッシュがあれば削除
+            if (File.Exists(optimizedPath) && !File.Exists(sentinelPath))
+            {
+                logger.LogWarning(
+                    "Removing incomplete cache {Path} (missing sentinel)", optimizedPath);
+                try { File.Delete(optimizedPath); } catch { /* best effort */ }
+            }
+
             try
             {
                 options.OptimizedModelFilePath = optimizedPath;
@@ -130,7 +173,23 @@ public static class SessionFactory
             "Creating InferenceSession for {ModelPath} (CUDA={UseCuda}, device={DeviceId}, testMode={TestMode})",
             effectiveModelPath, useCuda, resolvedDeviceId, testMode);
 
-        return new InferenceSession(effectiveModelPath, options);
+        var session = new InferenceSession(effectiveModelPath, options);
+
+        // F1: セッション作成成功後にセンチネルファイルを書き込む
+        if (!useCached && File.Exists(optimizedPath))
+        {
+            try
+            {
+                File.WriteAllText(sentinelPath, "ok");
+                logger.LogInformation("Cache sentinel written: {Path}", sentinelPath);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning("Failed to write sentinel {Path}: {Message}", sentinelPath, ex.Message);
+            }
+        }
+
+        return session;
     }
 
     /// <summary>
@@ -146,16 +205,21 @@ public static class SessionFactory
     /// models alike.
     /// </para>
     /// <para>
+    /// ダミー入力は本番と同程度の長さ (100 トークン) を使用する。ORT は形状変更時に
+    /// 内部バッファを再割り当てするため、本番と同程度の形状で warmup することで
+    /// メモリアロケーションも温まり、初回推論の遅延を最小化できる。
+    /// </para>
+    /// <para>
     /// Any exception during warmup is caught and logged as a warning.
     /// Warmup failure must never prevent the application from starting.
     /// </para>
     /// </remarks>
     /// <param name="session">A configured <see cref="InferenceSession"/>.</param>
-    /// <param name="runs">Number of warmup inferences to execute (default: 3).</param>
+    /// <param name="runs">Number of warmup inferences to execute (default: <see cref="DefaultWarmupRuns"/>).</param>
     /// <param name="logger">Optional logger for diagnostic messages.</param>
     public static void Warmup(
         InferenceSession session,
-        int runs = 3,
+        int runs = DefaultWarmupRuns,
         ILogger? logger = null)
     {
         ArgumentNullException.ThrowIfNull(session);
@@ -165,8 +229,12 @@ public static class SessionFactory
         {
             var sw = Stopwatch.StartNew();
 
-            // Minimal valid phoneme IDs: BOS(1) + 3 dummy phonemes + EOS(2)
-            long[] phonemeIds = [1, 8, 8, 8, 2];
+            // Dummy phoneme IDs with production-like length: BOS(1) + dummy phonemes(8) + EOS(2)
+            long[] phonemeIds = new long[WarmupPhonemeLength];
+            phonemeIds[0] = 1; // BOS
+            for (int j = 1; j < WarmupPhonemeLength - 1; j++)
+                phonemeIds[j] = 8; // dummy phoneme
+            phonemeIds[WarmupPhonemeLength - 1] = 2; // EOS
             int phonemeLength = phonemeIds.Length;
 
             // ---- Build required inputs ----

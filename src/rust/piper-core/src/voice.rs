@@ -34,17 +34,38 @@ impl PiperVoice {
 
         // COLD-M3: phonemizer と engine の初期化を並列化。
         // 両者は独立しているため、max(phonemizer_time, engine_time) に短縮できる。
-        let config_clone = config.clone();
-        let model_dir_clone = model_dir.clone();
-        let phonemizer_handle = std::thread::spawn(move || {
-            Self::create_phonemizer(&config_clone, model_dir_clone.as_deref())
-        });
 
-        let engine = OnnxEngine::load(model_path, &config, device)?;
+        // Native: std::thread::spawn で並列化
+        #[cfg(not(target_arch = "wasm32"))]
+        let (phonemizer, engine) = {
+            let config_clone = config.clone();
+            let model_dir_clone = model_dir.clone();
+            let phonemizer_handle = std::thread::spawn(move || {
+                Self::create_phonemizer(&config_clone, model_dir_clone.as_deref())
+            });
 
-        let phonemizer = phonemizer_handle
-            .join()
-            .map_err(|_| PiperError::ModelLoad("phonemizer thread panicked".to_string()))??;
+            let engine = OnnxEngine::load(model_path, &config, device)?;
+
+            let phonemizer = phonemizer_handle
+                .join()
+                .map_err(|e| {
+                    let msg = e.downcast_ref::<&str>()
+                        .map(|s| s.to_string())
+                        .or_else(|| e.downcast_ref::<String>().cloned())
+                        .unwrap_or_else(|| "unknown panic".to_string());
+                    PiperError::ModelLoad(format!("phonemizer init panicked: {}", msg))
+                })??;
+
+            (phonemizer, engine)
+        };
+
+        // WASM: 逐次実行 (std::thread::spawn は wasm32 で不可)
+        #[cfg(target_arch = "wasm32")]
+        let (phonemizer, engine) = {
+            let phonemizer = Self::create_phonemizer(&config, model_dir.as_deref())?;
+            let engine = OnnxEngine::load(model_path, &config, device)?;
+            (phonemizer, engine)
+        };
 
         Ok(Self {
             config,

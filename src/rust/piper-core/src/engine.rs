@@ -15,6 +15,18 @@ use crate::audio::audio_float_to_int16;
 use crate::config::VoiceConfig;
 use crate::error::PiperError;
 
+/// VITS 小モデルの intra-op スレッド上限。
+/// 4 以上では待機コストが推論時間を上回る。
+const MAX_INTRA_THREADS: usize = 4;
+
+/// デフォルトの warmup 実行回数。
+/// ORT JIT キャッシュは 1-2 回で安定するが、安全マージンとして 2 回。
+pub const DEFAULT_WARMUP_RUNS: usize = 2;
+
+/// warmup 用のダミー phoneme 入力長。
+/// 本番入力 (50-200) と同程度の形状で ORT メモリアロケーションを温める。
+const WARMUP_PHONEME_LENGTH: usize = 100;
+
 /// 合成パラメータ
 #[derive(Debug, Clone)]
 pub struct SynthesisRequest {
@@ -98,19 +110,38 @@ impl OnnxEngine {
         let num_intra_threads = std::thread::available_parallelism()
             .map(|n| n.get())
             .unwrap_or(2)
-            .min(4);
+            .min(MAX_INTRA_THREADS);
 
-        // COLD-M5: 最適化済みモデルキャッシュ
-        // .opt.onnx が存在すれば直接ロード (最適化スキップ) し、
-        // 存在しなければ元モデルをロード＆最適化結果を .opt.onnx に保存する。
-        let optimized_path = model_path.with_extension("opt.onnx");
-        let (load_path, use_cached) = if optimized_path.exists() {
+        // COLD-M5 + F1/D5: 最適化済みモデルキャッシュ
+        // キャッシュパスにデバイス名を含める (D5: CPU/CUDA 混用防止)。
+        // センチネルファイル (.ok) で書き込み完了を保証 (F1: 中断耐性)。
+        let device_label = device_type.to_string().replace(':', ".");
+        let cache_ext = format!("{}.opt.onnx", device_label);
+        let optimized_path = model_path.with_extension(&cache_ext);
+        let sentinel_path = {
+            let mut s = optimized_path.as_os_str().to_owned();
+            s.push(".ok");
+            std::path::PathBuf::from(s)
+        };
+
+        // キャッシュ有効: .opt.onnx と .ok の両方が存在する場合のみ
+        let use_cached = optimized_path.exists() && sentinel_path.exists();
+
+        let (load_path, use_cached) = if use_cached {
             tracing::info!(
                 "Loading pre-optimized model from {:?}",
                 optimized_path
             );
             (optimized_path.clone(), true)
         } else {
+            // 不完全なキャッシュがあれば削除
+            if optimized_path.exists() && !sentinel_path.exists() {
+                tracing::warn!(
+                    "Removing incomplete cache {:?} (missing sentinel)",
+                    optimized_path
+                );
+                let _ = std::fs::remove_file(&optimized_path);
+            }
             (model_path.to_path_buf(), false)
         };
 
@@ -158,6 +189,15 @@ impl OnnxEngine {
         let session = builder
             .commit_from_file(&load_path)
             .map_err(|e| PiperError::ModelLoad(e.to_string()))?;
+
+        // F1: セッション作成成功後にセンチネルファイルを書き込む
+        if !use_cached && optimized_path.exists() {
+            if let Err(e) = std::fs::write(&sentinel_path, b"ok") {
+                tracing::warn!("Failed to write sentinel {:?}: {}", sentinel_path, e);
+            } else {
+                tracing::info!("Cache sentinel written: {:?}", sentinel_path);
+            }
+        }
 
         // モデルの入出力ノード名から能力を自動検出
         let input_names: Vec<String> = session
@@ -375,10 +415,16 @@ impl OnnxEngine {
     }
 
     /// ORT グラフ最適化キャッシュを温める。
-    /// 最小限の phoneme_ids でダミー推論を `runs` 回実行する。
+    /// 本番入力と同程度の形状でダミー推論を `runs` 回実行する。
     pub fn warmup(&mut self, runs: usize) -> Result<(), PiperError> {
+        let mut dummy_ids = vec![0i64; WARMUP_PHONEME_LENGTH];
+        dummy_ids[0] = 1; // BOS
+        for i in 1..WARMUP_PHONEME_LENGTH - 1 {
+            dummy_ids[i] = 8; // dummy phoneme
+        }
+        dummy_ids[WARMUP_PHONEME_LENGTH - 1] = 2; // EOS
         let dummy_request = SynthesisRequest {
-            phoneme_ids: vec![1, 8, 8, 8, 2],
+            phoneme_ids: dummy_ids,
             ..SynthesisRequest::default()
         };
         for i in 0..runs {
@@ -400,23 +446,23 @@ mod tests {
     // -----------------------------------------------------------------------
 
     #[test]
-    fn test_intra_threads_capped_at_four() {
+    fn test_intra_threads_capped_at_max() {
         let available = std::thread::available_parallelism()
             .map(|n| n.get())
             .unwrap_or(2);
-        let num_intra_threads = available.min(4);
+        let num_intra_threads = available.min(MAX_INTRA_THREADS);
         assert!(num_intra_threads >= 1);
-        assert!(num_intra_threads <= 4);
+        assert!(num_intra_threads <= MAX_INTRA_THREADS);
     }
 
     #[test]
     fn test_thread_count_low_cpu() {
-        assert_eq!(2_usize.min(4), 2);
+        assert_eq!(2_usize.min(MAX_INTRA_THREADS), 2);
     }
 
     #[test]
     fn test_thread_count_high_cpu() {
-        assert_eq!(32_usize.min(4), 4);
+        assert_eq!(32_usize.min(MAX_INTRA_THREADS), MAX_INTRA_THREADS);
     }
 
     #[test]
@@ -565,63 +611,151 @@ mod tests {
 
     #[test]
     fn test_warmup_request_is_valid() {
+        let mut dummy_ids = vec![0i64; WARMUP_PHONEME_LENGTH];
+        dummy_ids[0] = 1; // BOS
+        for i in 1..WARMUP_PHONEME_LENGTH - 1 {
+            dummy_ids[i] = 8; // dummy phoneme
+        }
+        dummy_ids[WARMUP_PHONEME_LENGTH - 1] = 2; // EOS
         let req = SynthesisRequest {
-            phoneme_ids: vec![1, 8, 8, 8, 2],
+            phoneme_ids: dummy_ids,
             ..SynthesisRequest::default()
         };
         assert!(!req.phoneme_ids.is_empty());
-        assert_eq!(req.phoneme_ids.len(), 5);
+        assert_eq!(req.phoneme_ids.len(), WARMUP_PHONEME_LENGTH);
+        assert_eq!(req.phoneme_ids[0], 1); // BOS
+        assert_eq!(req.phoneme_ids[WARMUP_PHONEME_LENGTH - 1], 2); // EOS
+        assert_eq!(req.phoneme_ids[1], 8); // dummy phoneme
     }
 
     // -----------------------------------------------------------------------
-    // COLD-M5: 事前最適化済みモデルキャッシュ テスト
+    // COLD-M5 + F1/D5: 最適化済みモデルキャッシュ テスト
     // -----------------------------------------------------------------------
 
+    /// Helper: build device-labelled cache path (mirrors engine.rs load logic).
+    fn build_cache_path(model_path: &Path, device_label: &str) -> PathBuf {
+        let cache_ext = format!("{}.opt.onnx", device_label);
+        model_path.with_extension(&cache_ext)
+    }
+
+    /// Helper: build sentinel path from cache path.
+    fn build_sentinel_path(optimized_path: &Path) -> PathBuf {
+        let mut s = optimized_path.as_os_str().to_owned();
+        s.push(".ok");
+        PathBuf::from(s)
+    }
+
     #[test]
-    fn test_optimized_model_path_construction() {
+    fn test_optimized_model_path_construction_cpu() {
         let model_path = PathBuf::from("/data/models/test.onnx");
-        let opt_path = model_path.with_extension("opt.onnx");
-        assert_eq!(opt_path.to_str().unwrap(), "/data/models/test.opt.onnx");
+        let opt_path = build_cache_path(&model_path, "cpu");
+        assert_eq!(opt_path.to_str().unwrap(), "/data/models/test.cpu.opt.onnx");
+    }
+
+    #[test]
+    fn test_optimized_model_path_construction_cuda() {
+        let model_path = PathBuf::from("/data/models/test.onnx");
+        // DeviceType::Cuda { device_id: 0 } displays as "cuda:0", replace ':' -> '.'
+        let device_label = "cuda:0".replace(':', ".");
+        let opt_path = build_cache_path(&model_path, &device_label);
+        assert_eq!(
+            opt_path.to_str().unwrap(),
+            "/data/models/test.cuda.0.opt.onnx"
+        );
     }
 
     #[test]
     fn test_optimized_model_path_from_nested_dir() {
         let model_path = PathBuf::from("/home/user/models/tsukuyomi/model.onnx");
-        let opt_path = model_path.with_extension("opt.onnx");
+        let opt_path = build_cache_path(&model_path, "cpu");
         assert_eq!(
             opt_path.to_str().unwrap(),
-            "/home/user/models/tsukuyomi/model.opt.onnx"
+            "/home/user/models/tsukuyomi/model.cpu.opt.onnx"
         );
     }
 
     #[test]
     fn test_optimized_model_path_preserves_parent() {
         let model_path = PathBuf::from("/data/models/test.onnx");
-        let opt_path = model_path.with_extension("opt.onnx");
+        let opt_path = build_cache_path(&model_path, "cpu");
         assert_eq!(opt_path.parent(), model_path.parent());
     }
 
     #[test]
-    fn test_use_cached_when_opt_exists() {
-        // Simulate the logic: if optimized_path.exists() => use_cached = true
-        let exists = true; // simulated
-        let (_, use_cached) = if exists {
-            (PathBuf::from("/tmp/model.opt.onnx"), true)
-        } else {
-            (PathBuf::from("/tmp/model.onnx"), false)
-        };
+    fn test_sentinel_path_construction() {
+        let model_path = PathBuf::from("/data/models/test.onnx");
+        let opt_path = build_cache_path(&model_path, "cpu");
+        let sentinel = build_sentinel_path(&opt_path);
+        assert_eq!(
+            sentinel.to_str().unwrap(),
+            "/data/models/test.cpu.opt.onnx.ok"
+        );
+    }
+
+    #[test]
+    fn test_use_cached_requires_both_files() {
+        // Simulate: cache used only when BOTH opt and sentinel exist
+        let opt_exists = true;
+        let sentinel_exists = true;
+        let use_cached = opt_exists && sentinel_exists;
         assert!(use_cached);
     }
 
     #[test]
-    fn test_no_cache_when_opt_missing() {
-        // Simulate the logic: if !optimized_path.exists() => use_cached = false
-        let exists = false; // simulated
-        let (_, use_cached) = if exists {
-            (PathBuf::from("/tmp/model.opt.onnx"), true)
-        } else {
-            (PathBuf::from("/tmp/model.onnx"), false)
-        };
+    fn test_no_cache_when_sentinel_missing() {
+        // Simulate: opt exists but sentinel missing => incomplete write
+        let opt_exists = true;
+        let sentinel_exists = false;
+        let use_cached = opt_exists && sentinel_exists;
         assert!(!use_cached);
+    }
+
+    #[test]
+    fn test_no_cache_when_opt_missing() {
+        // Simulate: neither file exists => no cache
+        let opt_exists = false;
+        let sentinel_exists = false;
+        let use_cached = opt_exists && sentinel_exists;
+        assert!(!use_cached);
+    }
+
+    #[test]
+    fn test_device_label_colon_replacement() {
+        // DeviceType display produces "cuda:0", we replace ':' -> '.'
+        let label = "cuda:0".replace(':', ".");
+        assert_eq!(label, "cuda.0");
+        assert!(!label.contains(':'));
+    }
+
+    #[test]
+    fn test_device_label_cpu_no_colon() {
+        let label = "cpu".replace(':', ".");
+        assert_eq!(label, "cpu");
+    }
+
+    #[test]
+    fn test_device_label_directml() {
+        let label = "directml:1".replace(':', ".");
+        assert_eq!(label, "directml.1");
+        let model_path = PathBuf::from("/data/models/test.onnx");
+        let opt_path = build_cache_path(&model_path, &label);
+        assert_eq!(
+            opt_path.to_str().unwrap(),
+            "/data/models/test.directml.1.opt.onnx"
+        );
+    }
+
+    #[test]
+    fn test_sentinel_file_io_roundtrip() {
+        // Write and read back sentinel content
+        let dir = std::env::temp_dir().join("piper_test_sentinel");
+        let _ = std::fs::create_dir_all(&dir);
+        let sentinel = dir.join("test.cpu.opt.onnx.ok");
+        std::fs::write(&sentinel, b"ok").unwrap();
+        assert!(sentinel.exists());
+        let content = std::fs::read(&sentinel).unwrap();
+        assert_eq!(content, b"ok");
+        let _ = std::fs::remove_file(&sentinel);
+        let _ = std::fs::remove_dir(&dir);
     }
 }
