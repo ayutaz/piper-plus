@@ -229,7 +229,7 @@ describe('ModelManager 境界/エラーケース', { skip }, () => {
           siblings: [{ rfilename: 'model.onnx' }],
         }),
       }],
-      [/resolve\/main\/config\.json/, {
+      [/resolve\/main\/config\.json$/, {
         ok: false,
         status: 503,
         statusText: 'Service Unavailable',
@@ -299,7 +299,7 @@ describe('ModelManager 境界/エラーケース', { skip }, () => {
           siblings: [{ rfilename: 'model.onnx' }],
         }),
       }],
-      [/resolve\/main\/config\.json/, {
+      [/resolve\/main\/config\.json$/, {
         ok: true,
         json: () => { throw new SyntaxError('Unexpected token < in JSON'); },
       }],

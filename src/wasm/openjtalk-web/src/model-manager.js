@@ -106,13 +106,17 @@ async function fetchWithProgress(url, onProgress) {
 }
 
 /**
- * Query the HuggingFace API for repository metadata and find the ONNX
- * filename from the siblings list.
+ * Query the HuggingFace API for repository metadata and resolve the ONNX
+ * model filename and its companion config filename from the siblings list.
+ *
+ * Config resolution order:
+ *   1. Sidecar: `{onnxFilename}.json` (e.g. `model.onnx.json`)
+ *   2. Fallback: `config.json`
  *
  * @param {string} repoName - e.g. "ayousanz/piper-plus-tsukuyomi-chan"
- * @returns {Promise<string>} - The ONNX filename found in the repository
+ * @returns {Promise<{onnxFilename: string, configFilename: string}>}
  */
-async function resolveOnnxFilename(repoName) {
+async function resolveModelFiles(repoName) {
   const apiUrl = `${HUGGINGFACE_API_BASE}/${repoName}`;
   const response = await fetch(apiUrl);
   if (!response.ok) {
@@ -123,9 +127,8 @@ async function resolveOnnxFilename(repoName) {
 
   const metadata = await response.json();
   const siblings = metadata.siblings || [];
-  const onnxFiles = siblings
-    .map((s) => s.rfilename)
-    .filter((name) => name.endsWith('.onnx'));
+  const filenames = siblings.map((s) => s.rfilename);
+  const onnxFiles = filenames.filter((name) => name.endsWith('.onnx'));
 
   if (onnxFiles.length === 0) {
     throw new Error(`No .onnx file found in repository "${repoName}"`);
@@ -133,7 +136,15 @@ async function resolveOnnxFilename(repoName) {
 
   // If multiple ONNX files exist, prefer one with "fp16" in the name.
   const fp16File = onnxFiles.find((name) => name.includes('fp16'));
-  return fp16File || onnxFiles[0];
+  const onnxFilename = fp16File || onnxFiles[0];
+
+  // Resolve config: prefer sidecar {onnx}.json, fall back to config.json.
+  const sidecarConfig = `${onnxFilename}.json`;
+  const configFilename = filenames.includes(sidecarConfig)
+    ? sidecarConfig
+    : 'config.json';
+
+  return { onnxFilename, configFilename };
 }
 
 export class ModelManager {
@@ -202,20 +213,24 @@ export class ModelManager {
     if (/^https?:\/\//i.test(modelNameOrUrl)) {
       const modelUrl = modelNameOrUrl;
       const configUrl = modelUrl + '.json';
-      return { modelUrl, configUrl, cacheKey: modelUrl };
+      // Fallback: config.json in the same directory as the model.
+      const lastSlash = modelUrl.lastIndexOf('/');
+      const configFallbackUrl = lastSlash >= 0
+        ? modelUrl.substring(0, lastSlash + 1) + 'config.json'
+        : null;
+      return { modelUrl, configUrl, configFallbackUrl, cacheKey: modelUrl };
     }
 
     // Registry shortcut.
     const repoName = MODEL_REGISTRY[modelNameOrUrl] || modelNameOrUrl;
 
-    // Resolve the ONNX filename from the HuggingFace API.
-    const onnxFilename = await resolveOnnxFilename(repoName);
+    // Resolve ONNX and config filenames from the HuggingFace API.
+    const { onnxFilename, configFilename } = await resolveModelFiles(repoName);
 
     const modelUrl = `${HUGGINGFACE_RESOLVE_BASE}/${repoName}/resolve/main/${onnxFilename}`;
-    // Config is always "config.json" in the repo root (not "<model>.onnx.json")
-    const configUrl = `${HUGGINGFACE_RESOLVE_BASE}/${repoName}/resolve/main/config.json`;
+    const configUrl = `${HUGGINGFACE_RESOLVE_BASE}/${repoName}/resolve/main/${configFilename}`;
 
-    return { modelUrl, configUrl, cacheKey: repoName };
+    return { modelUrl, configUrl, configFallbackUrl: null, cacheKey: repoName };
   }
 
   /**
@@ -240,7 +255,7 @@ export class ModelManager {
    */
   async loadModel(modelNameOrUrl, options = {}) {
     const { onProgress } = options;
-    const { modelUrl, configUrl, cacheKey } = await this._resolveUrls(modelNameOrUrl);
+    const { modelUrl, configUrl, configFallbackUrl, cacheKey } = await this._resolveUrls(modelNameOrUrl);
 
     // Try the cache first.
     const cached = await this.getFromCache(cacheKey);
@@ -248,8 +263,11 @@ export class ModelManager {
       return cached;
     }
 
-    // Download config (small, no progress tracking needed).
-    const configResponse = await fetch(configUrl);
+    // Download config with fallback (small, no progress tracking needed).
+    let configResponse = await fetch(configUrl);
+    if (!configResponse.ok && configFallbackUrl) {
+      configResponse = await fetch(configFallbackUrl);
+    }
     if (!configResponse.ok) {
       throw new Error(
         `Failed to fetch model config from ${configUrl}: ${configResponse.status} ${configResponse.statusText}`

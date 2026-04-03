@@ -501,7 +501,26 @@ describe('ModelManager', { skip }, () => {
       assert.equal(urls.configUrl, 'https://example.com/model.onnx.json');
     });
 
-    it('HuggingFaceリポジトリのconfigUrlがconfig.jsonで終わる', async () => {
+    it('HuggingFaceリポジトリのconfigUrlはサイドカー.onnx.jsonを優先する', async () => {
+      globalThis.fetch = createMockFetch(new Map([
+        [/huggingface\.co\/api\/models\//, {
+          ok: true,
+          json: () => Promise.resolve({
+            siblings: [
+              { rfilename: 'model.onnx' },
+              { rfilename: 'model.onnx.json' },
+            ],
+          }),
+        }],
+      ]));
+
+      const mgr = new ModelManager();
+      const urls = await mgr._resolveUrls('ayousanz/piper-plus-base');
+
+      assert.ok(urls.configUrl.endsWith('.onnx.json'));
+    });
+
+    it('サイドカーがない場合はconfig.jsonにフォールバックする', async () => {
       globalThis.fetch = createMockFetch(new Map([
         [/huggingface\.co\/api\/models\//, {
           ok: true,
@@ -514,7 +533,30 @@ describe('ModelManager', { skip }, () => {
       const mgr = new ModelManager();
       const urls = await mgr._resolveUrls('ayousanz/piper-plus-base');
 
-      assert.ok(urls.configUrl.endsWith('config.json'));
+      assert.ok(urls.configUrl.endsWith('/config.json'));
+    });
+
+    it('直接URLのconfigFallbackUrlはconfig.jsonになる', async () => {
+      const mgr = new ModelManager();
+      const urls = await mgr._resolveUrls('https://example.com/models/model.onnx');
+
+      assert.equal(urls.configFallbackUrl, 'https://example.com/models/config.json');
+    });
+
+    it('HuggingFaceリポジトリのconfigFallbackUrlはnullになる', async () => {
+      globalThis.fetch = createMockFetch(new Map([
+        [/huggingface\.co\/api\/models\//, {
+          ok: true,
+          json: () => Promise.resolve({
+            siblings: [{ rfilename: 'model.onnx' }],
+          }),
+        }],
+      ]));
+
+      const mgr = new ModelManager();
+      const urls = await mgr._resolveUrls('ayousanz/piper-plus-base');
+
+      assert.equal(urls.configFallbackUrl, null);
     });
 
     it('HuggingFaceリポジトリのconfigUrlにhuggingface.coが含まれる', async () => {
