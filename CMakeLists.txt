@@ -887,8 +887,9 @@ if(PIPER_PLUS_BUILD_SHARED)
     file(GLOB _ort_dlls "${ONNXRUNTIME_DIR}/lib/*.dll")
     install(FILES ${_ort_dlls} DESTINATION ${CMAKE_INSTALL_BINDIR})
   else()
-    # Unix: copy shared libs to lib/
+    # Unix: copy shared libs to lib/ (exclude .dSYM directories on macOS)
     file(GLOB _ort_libs "${ONNXRUNTIME_DIR}/lib/libonnxruntime*${CMAKE_SHARED_LIBRARY_SUFFIX}*")
+    list(FILTER _ort_libs EXCLUDE REGEX "\\.dSYM$")
     install(FILES ${_ort_libs} DESTINATION ${CMAKE_INSTALL_LIBDIR})
   endif()
 

@@ -20,6 +20,7 @@
 #include <cstring>
 #include <memory>
 #include <mutex>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -34,6 +35,10 @@
 #define S_ISDIR(m) (((m) & _S_IFMT) == _S_IFDIR)
 #endif
 #endif
+
+// ===== ABI safety: enum must be int32_t-sized =====
+static_assert(sizeof(PiperPlusStatus) == sizeof(int32_t),
+              "PiperPlusStatus must be the same size as int32_t");
 
 // ===== Thread-local error message =====
 
@@ -54,7 +59,14 @@ struct IteratorState {
     size_t currentIndex = 0;
     std::vector<float> currentChunkSamples;
     bool active = false;
-    piper::SynthesisConfig savedConfig;
+    piper::SynthesisConfig configSnapshot_;  // saved by synth_start, restored by finish()
+
+    /// Restore synthesisConfig from snapshot, mark inactive, release inProgress.
+    void finish(piper::SynthesisConfig &liveConfig, std::atomic<bool> &inProgress) {
+        liveConfig = configSnapshot_;
+        active = false;
+        inProgress.store(false, std::memory_order_release);
+    }
 };
 
 // ===== Opaque engine structure =====
@@ -79,6 +91,55 @@ struct PiperPlusEngine {
     std::string availableLanguagesStr;
 };
 
+// ===== RAII guards (M5-1) =====
+
+namespace {
+
+/// Saves a SynthesisConfig on construction and restores it on destruction.
+/// Guarantees config is restored even if an exception is thrown.
+class ConfigGuard {
+public:
+    ConfigGuard(piper::SynthesisConfig &config)
+        : config_(config), saved_(config) {}
+    ~ConfigGuard() { config_ = saved_; }
+
+    ConfigGuard(const ConfigGuard &) = delete;
+    ConfigGuard &operator=(const ConfigGuard &) = delete;
+
+private:
+    piper::SynthesisConfig &config_;
+    piper::SynthesisConfig  saved_;
+};
+
+/// Acquires an atomic bool flag (CAS) on construction, releases on destruction.
+/// Construction fails with std::runtime_error if the flag is already set.
+/// Call disarm() to prevent the destructor from releasing (e.g. synth_start
+/// keeps inProgress=true so that synth_next can continue).
+class BusyGuard {
+public:
+    BusyGuard(std::atomic<bool> &flag) : flag_(flag), armed_(true) {
+        bool expected = false;
+        if (!flag_.compare_exchange_strong(expected, true)) {
+            throw std::runtime_error("Engine is busy");
+        }
+    }
+    ~BusyGuard() {
+        if (armed_) flag_.store(false, std::memory_order_release);
+    }
+
+    /// Prevent the destructor from releasing the flag.
+    void disarm() { armed_ = false; }
+
+    BusyGuard(const BusyGuard &) = delete;
+    BusyGuard &operator=(const BusyGuard &) = delete;
+
+private:
+    std::atomic<bool> &flag_;
+    bool armed_;
+};
+
+} // anonymous namespace
+
 // ===== Shared helper: apply synthesis options =====
 
 static void applySynthOptions(piper::SynthesisConfig &synthConfig,
@@ -89,6 +150,16 @@ static void applySynthOptions(piper::SynthesisConfig &synthConfig,
     } else {
         effectiveOpts = piper_plus_default_options();
     }
+
+    // Zero-init safety: replace 0.0 with sensible defaults
+    // 注意: ゼロ値置換により意図的な deterministic 推論 (noise_scale=0) が無効化される
+    if (effectiveOpts.noise_scale == 0.0f)
+        effectiveOpts.noise_scale = 0.667f;
+    if (effectiveOpts.length_scale == 0.0f)
+        effectiveOpts.length_scale = 1.0f;
+    if (effectiveOpts.noise_w == 0.0f)
+        effectiveOpts.noise_w = 0.8f;
+
     if (effectiveOpts.speaker_id >= 0) {
         synthConfig.speakerId = effectiveOpts.speaker_id;
     }
@@ -189,17 +260,17 @@ PIPER_PLUS_API PiperPlusEngine *piper_plus_create(const PiperPlusConfig *config)
             configPath = modelPath + ".json";
         }
 
-        // Determine CUDA usage
-        bool useCuda = false;
+        // Determine provider and GPU device
+        std::string provider = (config->provider && config->provider[0] != '\0')
+                               ? config->provider : "cpu";
         int gpuDeviceId = config->gpu_device_id;
-        if (config->provider && std::strcmp(config->provider, "cuda") == 0) {
-            useCuda = true;
-        }
+        int numThreads = (config->num_threads < 0) ? 0 : config->num_threads;
 
         std::optional<piper::SpeakerId> speakerId;  // loadVoice sets default
 
         piper::loadVoice(engine->config, modelPath, configPath,
-                         engine->voice, speakerId, useCuda, gpuDeviceId);
+                         engine->voice, speakerId, provider, gpuDeviceId,
+                         numThreads);
 
         return engine.release();  // Transfer ownership to caller
 
@@ -233,7 +304,7 @@ PIPER_PLUS_API void piper_plus_free(PiperPlusEngine *engine) {
     delete engine;
 }
 
-PIPER_PLUS_API int32_t piper_plus_synthesize(
+PIPER_PLUS_API PiperPlusStatus piper_plus_synthesize(
     PiperPlusEngine *engine,
     const char *text,
     const PiperPlusSynthOptions *opts,
@@ -260,17 +331,10 @@ PIPER_PLUS_API int32_t piper_plus_synthesize(
         return PIPER_PLUS_ERR;
     }
 
-    // Reentrancy guard
-    bool expected = false;
-    if (!engine->inProgress.compare_exchange_strong(expected, true)) {
-        set_error("Engine is busy (synthesis in progress)");
-        return PIPER_PLUS_ERR_BUSY;
-    }
-
-    // Save synthesisConfig before try block so catch can restore it
-    auto savedConfig = engine->voice.synthesisConfig;
-
     try {
+        BusyGuard busy(engine->inProgress);
+        ConfigGuard cfgGuard(engine->voice.synthesisConfig);
+
         // Apply options
         applySynthOptions(engine->voice.synthesisConfig, opts);
 
@@ -288,9 +352,6 @@ PIPER_PLUS_API int32_t piper_plus_synthesize(
 
         // M4-2: Cache timing info from last synthesis
         engine->lastSynthResult = result;
-
-        // Restore config
-        engine->voice.synthesisConfig = savedConfig;
 
         // Copy to malloc'd buffer for caller
         if (audioBuffer.empty()) {
@@ -310,18 +371,21 @@ PIPER_PLUS_API int32_t piper_plus_synthesize(
         }
         *out_sample_rate = engine->voice.synthesisConfig.sampleRate;
 
-        engine->inProgress.store(false);
         return PIPER_PLUS_OK;
 
-    } catch (const std::exception &e) {
-        engine->voice.synthesisConfig = savedConfig;  // Restore on error
+    } catch (const std::runtime_error &e) {
+        // BusyGuard throws runtime_error when engine is busy
+        if (std::string(e.what()) == "Engine is busy") {
+            set_error("Engine is busy (synthesis in progress)");
+            return PIPER_PLUS_ERR_BUSY;
+        }
         set_error(e.what());
-        engine->inProgress.store(false);
+        return PIPER_PLUS_ERR;
+    } catch (const std::exception &e) {
+        set_error(e.what());
         return PIPER_PLUS_ERR;
     } catch (...) {
-        engine->voice.synthesisConfig = savedConfig;  // Restore on error
         set_error("Unknown error during synthesis");
-        engine->inProgress.store(false);
         return PIPER_PLUS_ERR;
     }
 }
@@ -364,7 +428,7 @@ PIPER_PLUS_API int32_t piper_plus_language_id(
 
 // ===== Iterator / Streaming synthesis =====
 
-PIPER_PLUS_API int32_t piper_plus_synth_start(
+PIPER_PLUS_API PiperPlusStatus piper_plus_synth_start(
     PiperPlusEngine *engine,
     const char *text,
     const PiperPlusSynthOptions *opts)
@@ -383,16 +447,11 @@ PIPER_PLUS_API int32_t piper_plus_synth_start(
         return PIPER_PLUS_ERR_TEXT;
     }
 
-    // Reentrancy guard
-    bool expected = false;
-    if (!engine->inProgress.compare_exchange_strong(expected, true)) {
-        set_error("Engine is busy (synthesis in progress)");
-        return PIPER_PLUS_ERR_BUSY;
-    }
-
     try {
-        // Save config BEFORE applying options (so we can restore later)
-        engine->iterState.savedConfig = engine->voice.synthesisConfig;
+        BusyGuard busy(engine->inProgress);
+
+        // Save config BEFORE applying options (so we can restore in synth_next)
+        engine->iterState.configSnapshot_ = engine->voice.synthesisConfig;
 
         // Apply options
         applySynthOptions(engine->voice.synthesisConfig, opts);
@@ -413,26 +472,34 @@ PIPER_PLUS_API int32_t piper_plus_synth_start(
         engine->iterState.currentChunkSamples.clear();
         engine->iterState.active = true;
 
-        // Empty sentences: mark done immediately
+        // Empty sentences: mark done immediately (let BusyGuard release)
         if (engine->iterState.sentences.empty()) {
             engine->iterState.active = false;
-            engine->inProgress.store(false);
+            // armed_ remains true → destructor releases inProgress
+        } else {
+            // Non-empty: keep inProgress=true for synth_next to use
+            busy.disarm();
         }
 
         return PIPER_PLUS_OK;
 
+    } catch (const std::runtime_error &e) {
+        if (std::string(e.what()) == "Engine is busy") {
+            set_error("Engine is busy (synthesis in progress)");
+            return PIPER_PLUS_ERR_BUSY;
+        }
+        set_error(e.what());
+        return PIPER_PLUS_ERR;
     } catch (const std::exception &e) {
         set_error(e.what());
-        engine->inProgress.store(false);
         return PIPER_PLUS_ERR;
     } catch (...) {
         set_error("Unknown error in synth_start");
-        engine->inProgress.store(false);
         return PIPER_PLUS_ERR;
     }
 }
 
-PIPER_PLUS_API int32_t piper_plus_synth_next(
+PIPER_PLUS_API PiperPlusStatus piper_plus_synth_next(
     PiperPlusEngine *engine,
     PiperPlusAudioChunk *out_chunk)
 {
@@ -454,9 +521,7 @@ PIPER_PLUS_API int32_t piper_plus_synth_next(
     try {
         // All sentences done?
         if (state.currentIndex >= state.sentences.size()) {
-            engine->voice.synthesisConfig = state.savedConfig;
-            state.active = false;
-            engine->inProgress.store(false);
+            state.finish(engine->voice.synthesisConfig, engine->inProgress);
 
             out_chunk->samples = nullptr;
             out_chunk->num_samples = 0;
@@ -485,9 +550,7 @@ PIPER_PLUS_API int32_t piper_plus_synth_next(
         // Fill output chunk
         if (state.currentChunkSamples.size() > static_cast<size_t>(INT32_MAX)) {
             set_error("Audio chunk too large");
-            engine->voice.synthesisConfig = state.savedConfig;
-            state.active = false;
-            engine->inProgress.store(false);
+            state.finish(engine->voice.synthesisConfig, engine->inProgress);
             return PIPER_PLUS_ERR;
         }
         out_chunk->samples = state.currentChunkSamples.data();
@@ -496,29 +559,23 @@ PIPER_PLUS_API int32_t piper_plus_synth_next(
         out_chunk->is_last = isLast ? 1 : 0;
 
         if (isLast) {
-            engine->voice.synthesisConfig = state.savedConfig;
-            state.active = false;
-            engine->inProgress.store(false);
+            state.finish(engine->voice.synthesisConfig, engine->inProgress);
         }
 
         return isLast ? PIPER_PLUS_DONE : PIPER_PLUS_OK;
 
     } catch (const std::exception &e) {
-        engine->voice.synthesisConfig = state.savedConfig;
         set_error(e.what());
-        state.active = false;
-        engine->inProgress.store(false);
+        state.finish(engine->voice.synthesisConfig, engine->inProgress);
         return PIPER_PLUS_ERR;
     } catch (...) {
-        engine->voice.synthesisConfig = state.savedConfig;
         set_error("Unknown error in synth_next");
-        state.active = false;
-        engine->inProgress.store(false);
+        state.finish(engine->voice.synthesisConfig, engine->inProgress);
         return PIPER_PLUS_ERR;
     }
 }
 
-PIPER_PLUS_API int32_t piper_plus_synthesize_streaming(
+PIPER_PLUS_API PiperPlusStatus piper_plus_synthesize_streaming(
     PiperPlusEngine *engine,
     const char *text,
     const PiperPlusSynthOptions *opts,
@@ -539,7 +596,7 @@ PIPER_PLUS_API int32_t piper_plus_synthesize_streaming(
     }
 
     // Start iterator (handles busy check internally)
-    int32_t rc = piper_plus_synth_start(engine, text, opts);
+    PiperPlusStatus rc = piper_plus_synth_start(engine, text, opts);
     if (rc != PIPER_PLUS_OK) {
         return rc;
     }
@@ -560,10 +617,9 @@ PIPER_PLUS_API int32_t piper_plus_synthesize_streaming(
                     callback(chunk.samples, chunk.num_samples,
                              chunk.sample_rate, user_data);
                 } catch (...) {
-                    // Callback threw - clean up
-                    engine->iterState.active = false;
-                    engine->inProgress.store(false);
-                    engine->voice.synthesisConfig = engine->iterState.savedConfig;
+                    // Callback threw - clean up via finish()
+                    engine->iterState.finish(engine->voice.synthesisConfig,
+                                             engine->inProgress);
                     set_error("callback threw an exception");
                     return PIPER_PLUS_ERR;
                 }
@@ -578,22 +634,18 @@ PIPER_PLUS_API int32_t piper_plus_synthesize_streaming(
 
     } catch (const std::exception &e) {
         set_error(e.what());
-        engine->iterState.active = false;
-        engine->inProgress.store(false);
-        engine->voice.synthesisConfig = engine->iterState.savedConfig;
+        engine->iterState.finish(engine->voice.synthesisConfig, engine->inProgress);
         return PIPER_PLUS_ERR;
     } catch (...) {
         set_error("Unknown error in synthesize_streaming");
-        engine->iterState.active = false;
-        engine->inProgress.store(false);
-        engine->voice.synthesisConfig = engine->iterState.savedConfig;
+        engine->iterState.finish(engine->voice.synthesisConfig, engine->inProgress);
         return PIPER_PLUS_ERR;
     }
 }
 
 // ===== M4-1: Custom dictionary =====
 
-PIPER_PLUS_API int32_t piper_plus_load_custom_dict(
+PIPER_PLUS_API PiperPlusStatus piper_plus_load_custom_dict(
     PiperPlusEngine *engine, const char *dict_path) {
     if (!engine) { set_error("engine is NULL"); return PIPER_PLUS_ERR; }
     if (!dict_path) { set_error("dict_path is NULL"); return PIPER_PLUS_ERR; }
@@ -613,13 +665,13 @@ PIPER_PLUS_API int32_t piper_plus_load_custom_dict(
     }
 }
 
-PIPER_PLUS_API int32_t piper_plus_clear_custom_dict(PiperPlusEngine *engine) {
+PIPER_PLUS_API PiperPlusStatus piper_plus_clear_custom_dict(PiperPlusEngine *engine) {
     if (!engine) { set_error("engine is NULL"); return PIPER_PLUS_ERR; }
     engine->customDict.reset();
     return PIPER_PLUS_OK;
 }
 
-PIPER_PLUS_API int32_t piper_plus_add_dict_word(
+PIPER_PLUS_API PiperPlusStatus piper_plus_add_dict_word(
     PiperPlusEngine *engine, const char *word,
     const char *pronunciation, int32_t priority) {
     if (!engine) { set_error("engine is NULL"); return PIPER_PLUS_ERR; }
@@ -648,7 +700,7 @@ PIPER_PLUS_API int32_t piper_plus_dict_entry_count(const PiperPlusEngine *engine
 
 // ===== M4-2: Phoneme timing =====
 
-PIPER_PLUS_API int32_t piper_plus_get_phoneme_timing(
+PIPER_PLUS_API PiperPlusStatus piper_plus_get_phoneme_timing(
     PiperPlusEngine *engine, PiperPlusTimingResult *out_timing) {
     if (!engine) { set_error("engine is NULL"); return PIPER_PLUS_ERR; }
     if (!out_timing) { set_error("out_timing is NULL"); return PIPER_PLUS_ERR; }
@@ -685,24 +737,17 @@ PIPER_PLUS_API int32_t piper_plus_get_phoneme_timing(
 
 // ===== M4-3: G2P / Phonemization =====
 
-PIPER_PLUS_API int32_t piper_plus_phonemize(
+PIPER_PLUS_API PiperPlusStatus piper_plus_phonemize(
     PiperPlusEngine *engine, const char *text,
     const char *language, PiperPlusPhonemeResult *out_result) {
     if (!engine) { set_error("engine is NULL"); return PIPER_PLUS_ERR; }
     if (!text) { set_error("text is NULL"); return PIPER_PLUS_ERR_TEXT; }
     if (!out_result) { set_error("out_result is NULL"); return PIPER_PLUS_ERR; }
 
-    // Reentrancy guard
-    bool expected = false;
-    if (!engine->inProgress.compare_exchange_strong(expected, true)) {
-        set_error("Engine is busy");
-        return PIPER_PLUS_ERR_BUSY;
-    }
-
-    // Save language before try block so catch can restore it
-    auto savedLangId = engine->voice.synthesisConfig.languageId;
-
     try {
+        BusyGuard busy(engine->inProgress);
+        ConfigGuard cfgGuard(engine->voice.synthesisConfig);
+
         if (language && language[0] != '\0' && engine->voice.modelConfig.languageIdMap) {
             auto it = engine->voice.modelConfig.languageIdMap->find(language);
             if (it != engine->voice.modelConfig.languageIdMap->end()) {
@@ -757,25 +802,25 @@ PIPER_PLUS_API int32_t piper_plus_phonemize(
             }
         }
 
-        // Restore language
-        engine->voice.synthesisConfig.languageId = savedLangId;
-
         out_result->phonemes = engine->g2pPhonemeStr.c_str();
         out_result->language = engine->g2pLanguage.c_str();
         out_result->num_phonemes = count;
+        std::memset(out_result->_reserved, 0, sizeof(out_result->_reserved));
 
-        engine->inProgress.store(false);
         return PIPER_PLUS_OK;
 
-    } catch (const std::exception &e) {
-        engine->voice.synthesisConfig.languageId = savedLangId;
+    } catch (const std::runtime_error &e) {
+        if (std::string(e.what()) == "Engine is busy") {
+            set_error("Engine is busy");
+            return PIPER_PLUS_ERR_BUSY;
+        }
         set_error(e.what());
-        engine->inProgress.store(false);
+        return PIPER_PLUS_ERR;
+    } catch (const std::exception &e) {
+        set_error(e.what());
         return PIPER_PLUS_ERR;
     } catch (...) {
-        engine->voice.synthesisConfig.languageId = savedLangId;
         set_error("Unknown error in phonemize");
-        engine->inProgress.store(false);
         return PIPER_PLUS_ERR;
     }
 }

@@ -663,9 +663,9 @@ if(TARGET openjtalk_external)
     add_dependencies(test_c_api_integration openjtalk_external)
 endif()
 
+add_test(NAME test_c_api_integration COMMAND test_c_api_integration)
+
 # Set working directory to project root for model path resolution
 set_tests_properties(test_c_api_integration PROPERTIES
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
 )
-
-add_test(NAME test_c_api_integration COMMAND test_c_api_integration)

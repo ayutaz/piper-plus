@@ -47,7 +47,7 @@ int main(int argc, char *argv[]) {
 
   try {
     loadVoice(piperConfig, modelPath, modelPath + ".json", voice, speakerId,
-              false);
+              "cpu");
     piper::initialize(piperConfig);
   } catch (const std::exception &e) {
     std::cout << "SKIPPED: Failed to initialize: " << e.what() << std::endl;

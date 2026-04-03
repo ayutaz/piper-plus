@@ -29,13 +29,16 @@ PIPER_PLUS_API const char *piper_plus_version(void);
 PIPER_PLUS_API int32_t     piper_plus_api_version(void);
 
 /* ===== Status codes ===== */
-#define PIPER_PLUS_OK          0
-#define PIPER_PLUS_DONE        1
-#define PIPER_PLUS_ERR        (-1)
-#define PIPER_PLUS_ERR_MODEL  (-2)
-#define PIPER_PLUS_ERR_CONFIG (-3)
-#define PIPER_PLUS_ERR_TEXT   (-4)
-#define PIPER_PLUS_ERR_BUSY   (-5)
+
+typedef enum PiperPlusStatus {
+    PIPER_PLUS_OK          =  0,
+    PIPER_PLUS_DONE        =  1,
+    PIPER_PLUS_ERR         = -1,
+    PIPER_PLUS_ERR_MODEL   = -2,
+    PIPER_PLUS_ERR_CONFIG  = -3,
+    PIPER_PLUS_ERR_TEXT    = -4,
+    PIPER_PLUS_ERR_BUSY    = -5
+} PiperPlusStatus;
 
 /* ===== Error ===== */
 PIPER_PLUS_API const char *piper_plus_get_last_error(void);
@@ -63,6 +66,8 @@ typedef struct PiperPlusConfig {
     int32_t     _reserved[7];     /* Must be zero */
 } PiperPlusConfig;
 
+/** @note Zero-init safe: noise_scale, length_scale, noise_w が 0.0 の場合は
+ *        デフォルト値 (0.667, 1.0, 0.8) に自動置換されます。 */
 typedef struct PiperPlusSynthOptions {
     int32_t speaker_id;           /* Speaker index (default: 0) */
     int32_t language_id;          /* Language index (-1 = auto-detect, default: -1) */
@@ -84,7 +89,7 @@ PIPER_PLUS_API PiperPlusSynthOptions piper_plus_default_options(void);
 
 /* ===== One-shot synthesis ===== */
 
-PIPER_PLUS_API int32_t piper_plus_synthesize(
+PIPER_PLUS_API PiperPlusStatus piper_plus_synthesize(
     PiperPlusEngine              *engine,
     const char                   *text,
     const PiperPlusSynthOptions  *opts,       /* NULL = defaults */
@@ -124,12 +129,12 @@ typedef struct PiperPlusAudioChunk {
  * @note out_chunk->samples points to internal buffer;
  *       valid until next synth_next() or synth_start() call.
  */
-PIPER_PLUS_API int32_t piper_plus_synth_start(
+PIPER_PLUS_API PiperPlusStatus piper_plus_synth_start(
     PiperPlusEngine              *engine,
     const char                   *text,
     const PiperPlusSynthOptions  *opts);
 
-PIPER_PLUS_API int32_t piper_plus_synth_next(
+PIPER_PLUS_API PiperPlusStatus piper_plus_synth_next(
     PiperPlusEngine      *engine,
     PiperPlusAudioChunk  *out_chunk);
 
@@ -148,7 +153,7 @@ typedef void (*PiperPlusAudioCallback)(
  * @note Callback is invoked on caller's thread (synchronous).
  * @note samples pointer in callback is valid only during invocation.
  */
-PIPER_PLUS_API int32_t piper_plus_synthesize_streaming(
+PIPER_PLUS_API PiperPlusStatus piper_plus_synthesize_streaming(
     PiperPlusEngine              *engine,
     const char                   *text,
     const PiperPlusSynthOptions  *opts,
@@ -157,13 +162,13 @@ PIPER_PLUS_API int32_t piper_plus_synthesize_streaming(
 
 /* ===== Custom dictionary (M4-1) ===== */
 
-PIPER_PLUS_API int32_t piper_plus_load_custom_dict(
+PIPER_PLUS_API PiperPlusStatus piper_plus_load_custom_dict(
     PiperPlusEngine *engine,
     const char      *dict_path);
 
-PIPER_PLUS_API int32_t piper_plus_clear_custom_dict(PiperPlusEngine *engine);
+PIPER_PLUS_API PiperPlusStatus piper_plus_clear_custom_dict(PiperPlusEngine *engine);
 
-PIPER_PLUS_API int32_t piper_plus_add_dict_word(
+PIPER_PLUS_API PiperPlusStatus piper_plus_add_dict_word(
     PiperPlusEngine *engine,
     const char      *word,
     const char      *pronunciation,
@@ -185,7 +190,7 @@ typedef struct PiperPlusTimingResult {
 } PiperPlusTimingResult;
 
 /** Get phoneme timing from the last synthesis. Valid until next synthesis call. */
-PIPER_PLUS_API int32_t piper_plus_get_phoneme_timing(
+PIPER_PLUS_API PiperPlusStatus piper_plus_get_phoneme_timing(
     PiperPlusEngine         *engine,
     PiperPlusTimingResult   *out_timing);
 
@@ -195,10 +200,11 @@ typedef struct PiperPlusPhonemeResult {
     const char *phonemes;      /**< Space-separated IPA phoneme string (BORROWED) */
     const char *language;      /**< Detected language code (BORROWED) */
     int32_t     num_phonemes;  /**< Number of phoneme tokens */
+    int32_t     _reserved[4];  /**< Must be zero -- reserved for future fields */
 } PiperPlusPhonemeResult;
 
 /** Phonemize text without synthesis. language=NULL for auto-detect. */
-PIPER_PLUS_API int32_t piper_plus_phonemize(
+PIPER_PLUS_API PiperPlusStatus piper_plus_phonemize(
     PiperPlusEngine         *engine,
     const char              *text,
     const char              *language,

@@ -80,7 +80,7 @@ TEST(CApiNullSafety, SynthesizeWithNullEngine) {
     float* samples = nullptr;
     int32_t num_samples = 0;
     int32_t sample_rate = 0;
-    int32_t status = piper_plus_synthesize(
+    PiperPlusStatus status = piper_plus_synthesize(
         nullptr, "hello", nullptr, &samples, &num_samples, &sample_rate);
     EXPECT_LT(status, 0);
 }
@@ -89,13 +89,13 @@ TEST(CApiNullSafety, SynthesizeWithNullText) {
     float* samples = nullptr;
     int32_t num_samples = 0;
     int32_t sample_rate = 0;
-    int32_t status = piper_plus_synthesize(
+    PiperPlusStatus status = piper_plus_synthesize(
         nullptr, nullptr, nullptr, &samples, &num_samples, &sample_rate);
     EXPECT_LT(status, 0);
 }
 
 TEST(CApiNullSafety, SynthesizeWithNullOutputParams) {
-    int32_t status = piper_plus_synthesize(
+    PiperPlusStatus status = piper_plus_synthesize(
         nullptr, "hello", nullptr, nullptr, nullptr, nullptr);
     EXPECT_LT(status, 0);
 }
@@ -273,30 +273,30 @@ TEST(CApiStatusCodes, SpecificValuesMatchHeader) {
 // --- Iterator: NULL safety ---
 
 TEST(CApiIterator, SynthStartNullEngine) {
-    int32_t rc = piper_plus_synth_start(nullptr, "hello", nullptr);
+    PiperPlusStatus rc = piper_plus_synth_start(nullptr, "hello", nullptr);
     EXPECT_EQ(rc, PIPER_PLUS_ERR);
     const char* err = piper_plus_get_last_error();
     EXPECT_NE(err, nullptr);
 }
 
 TEST(CApiIterator, SynthStartNullText) {
-    int32_t rc = piper_plus_synth_start(nullptr, nullptr, nullptr);
+    PiperPlusStatus rc = piper_plus_synth_start(nullptr, nullptr, nullptr);
     EXPECT_EQ(rc, PIPER_PLUS_ERR);
 }
 
 TEST(CApiIterator, SynthStartEmptyText) {
-    int32_t rc = piper_plus_synth_start(nullptr, "", nullptr);
+    PiperPlusStatus rc = piper_plus_synth_start(nullptr, "", nullptr);
     EXPECT_EQ(rc, PIPER_PLUS_ERR);
 }
 
 TEST(CApiIterator, SynthNextNullEngine) {
     PiperPlusAudioChunk chunk = {};
-    int32_t rc = piper_plus_synth_next(nullptr, &chunk);
+    PiperPlusStatus rc = piper_plus_synth_next(nullptr, &chunk);
     EXPECT_EQ(rc, PIPER_PLUS_ERR);
 }
 
 TEST(CApiIterator, SynthNextNullChunk) {
-    int32_t rc = piper_plus_synth_next(nullptr, nullptr);
+    PiperPlusStatus rc = piper_plus_synth_next(nullptr, nullptr);
     EXPECT_EQ(rc, PIPER_PLUS_ERR);
 }
 
@@ -304,9 +304,9 @@ TEST(CApiIterator, SynthNextNullChunk) {
 
 TEST(CApiIterator, SynthStartRepeatedNullEngine) {
     // NULL engine should not corrupt state
-    int32_t rc1 = piper_plus_synth_start(nullptr, "hello", nullptr);
+    PiperPlusStatus rc1 = piper_plus_synth_start(nullptr, "hello", nullptr);
     EXPECT_EQ(rc1, PIPER_PLUS_ERR);
-    int32_t rc2 = piper_plus_synth_start(nullptr, "hello", nullptr);
+    PiperPlusStatus rc2 = piper_plus_synth_start(nullptr, "hello", nullptr);
     EXPECT_EQ(rc2, PIPER_PLUS_ERR);
 }
 
@@ -316,25 +316,25 @@ TEST(CApiIterator, SynthStartRepeatedNullEngine) {
 static void dummy_callback(const float*, int32_t, int32_t, void*) {}
 
 TEST(CApiCallback, StreamingNullEngine) {
-    int32_t rc = piper_plus_synthesize_streaming(
+    PiperPlusStatus rc = piper_plus_synthesize_streaming(
         nullptr, "hello", nullptr, dummy_callback, nullptr);
     EXPECT_EQ(rc, PIPER_PLUS_ERR);
 }
 
 TEST(CApiCallback, StreamingNullText) {
-    int32_t rc = piper_plus_synthesize_streaming(
+    PiperPlusStatus rc = piper_plus_synthesize_streaming(
         nullptr, nullptr, nullptr, dummy_callback, nullptr);
     EXPECT_EQ(rc, PIPER_PLUS_ERR);
 }
 
 TEST(CApiCallback, StreamingEmptyText) {
-    int32_t rc = piper_plus_synthesize_streaming(
+    PiperPlusStatus rc = piper_plus_synthesize_streaming(
         nullptr, "", nullptr, dummy_callback, nullptr);
     EXPECT_EQ(rc, PIPER_PLUS_ERR);
 }
 
 TEST(CApiCallback, StreamingNullCallback) {
-    int32_t rc = piper_plus_synthesize_streaming(
+    PiperPlusStatus rc = piper_plus_synthesize_streaming(
         nullptr, "hello", nullptr, nullptr, nullptr);
     EXPECT_EQ(rc, PIPER_PLUS_ERR);
 }
@@ -382,7 +382,7 @@ TEST(CApiTextLimit, SynthesizeRejectsHugeText) {
 
     // engine is NULL so ERR takes precedence over text limit,
     // but we can verify the function doesn't crash with huge text
-    int32_t rc = piper_plus_synthesize(
+    PiperPlusStatus rc = piper_plus_synthesize(
         nullptr, hugeText.c_str(), nullptr,
         &samples, &num_samples, &sample_rate);
     EXPECT_EQ(rc, PIPER_PLUS_ERR);
@@ -390,7 +390,7 @@ TEST(CApiTextLimit, SynthesizeRejectsHugeText) {
 
 TEST(CApiTextLimit, SynthStartRejectsHugeText) {
     std::string hugeText(1024 * 1024 + 1, 'a');
-    int32_t rc = piper_plus_synth_start(nullptr, hugeText.c_str(), nullptr);
+    PiperPlusStatus rc = piper_plus_synth_start(nullptr, hugeText.c_str(), nullptr);
     EXPECT_EQ(rc, PIPER_PLUS_ERR);
 }
 
@@ -401,7 +401,7 @@ TEST(CApiIterator, SynthStartWithOptsNullEngine) {
     opts.noise_scale = 0.3f;
     opts.length_scale = 1.5f;
     // NULL engine should return ERR without crashing
-    int32_t rc = piper_plus_synth_start(nullptr, "hello", &opts);
+    PiperPlusStatus rc = piper_plus_synth_start(nullptr, "hello", &opts);
     EXPECT_EQ(rc, PIPER_PLUS_ERR);
 }
 
@@ -409,7 +409,7 @@ TEST(CApiIterator, SynthStartWithOptsNullEngine) {
 TEST(CApiCallback, StreamingWithOptsNullEngine) {
     PiperPlusSynthOptions opts = piper_plus_default_options();
     opts.noise_scale = 0.3f;
-    int32_t rc = piper_plus_synthesize_streaming(
+    PiperPlusStatus rc = piper_plus_synthesize_streaming(
         nullptr, "hello", &opts, dummy_callback, nullptr);
     EXPECT_EQ(rc, PIPER_PLUS_ERR);
 }
@@ -471,4 +471,86 @@ TEST(CApiG2P, AvailableLanguagesNullEngine) {
     const char *langs = piper_plus_available_languages(nullptr);
     EXPECT_NE(langs, nullptr);
     EXPECT_EQ(std::strlen(langs), 0u);
+}
+
+// ===== Phase 5: Zero-init safety tests (M5-9) =====
+
+TEST(CApiZeroInit, ZeroInitOptsNotCrash) {
+    // memset で0初期化した opts を使用してもクラッシュしないことを確認
+    // NULL engine なので ERR が返るが、opts のゼロ値でクラッシュしないことが重要
+    PiperPlusSynthOptions opts;
+    memset(&opts, 0, sizeof(opts));
+
+    // One-shot synthesis with zero-init opts (NULL engine -> ERR)
+    float *samples = nullptr;
+    int32_t num_samples = 0, sample_rate = 0;
+    PiperPlusStatus rc = piper_plus_synthesize(
+        nullptr, "hello", &opts, &samples, &num_samples, &sample_rate);
+    EXPECT_EQ(rc, PIPER_PLUS_ERR);
+
+    // Iterator with zero-init opts (NULL engine -> ERR)
+    rc = piper_plus_synth_start(nullptr, "hello", &opts);
+    EXPECT_EQ(rc, PIPER_PLUS_ERR);
+
+    // Streaming callback with zero-init opts (NULL engine -> ERR)
+    rc = piper_plus_synthesize_streaming(
+        nullptr, "hello", &opts, dummy_callback, nullptr);
+    EXPECT_EQ(rc, PIPER_PLUS_ERR);
+}
+
+TEST(CApiZeroInit, DefaultOptionsNotZero) {
+    // piper_plus_default_options() の noise_scale, length_scale, noise_w がゼロでないことを確認
+    PiperPlusSynthOptions opts = piper_plus_default_options();
+    EXPECT_NE(opts.noise_scale, 0.0f);
+    EXPECT_NE(opts.length_scale, 0.0f);
+    EXPECT_NE(opts.noise_w, 0.0f);
+
+    // 具体的なデフォルト値も検証
+    EXPECT_FLOAT_EQ(opts.noise_scale, 0.667f);
+    EXPECT_FLOAT_EQ(opts.length_scale, 1.0f);
+    EXPECT_FLOAT_EQ(opts.noise_w, 0.8f);
+}
+
+// ===== Phase 5: Status enum tests (M5-13) =====
+
+TEST(CApiStatusEnum, EnumSize) {
+    // PiperPlusStatus must be the same size as int32_t for ABI compatibility
+    EXPECT_EQ(sizeof(PiperPlusStatus), sizeof(int32_t));
+}
+
+TEST(CApiStatusEnum, EnumValues) {
+    EXPECT_EQ(PIPER_PLUS_OK,         0);
+    EXPECT_EQ(PIPER_PLUS_DONE,       1);
+    EXPECT_EQ(PIPER_PLUS_ERR,       -1);
+    EXPECT_EQ(PIPER_PLUS_ERR_MODEL, -2);
+    EXPECT_EQ(PIPER_PLUS_ERR_CONFIG,-3);
+    EXPECT_EQ(PIPER_PLUS_ERR_TEXT,  -4);
+    EXPECT_EQ(PIPER_PLUS_ERR_BUSY,  -5);
+}
+
+TEST(CApiStatusEnum, EnumIsSignedInt) {
+    // Negative values must work (signed representation)
+    PiperPlusStatus s = PIPER_PLUS_ERR;
+    EXPECT_LT(static_cast<int>(s), 0);
+}
+
+// ===== Phase 5: PhonemeResult _reserved tests (M5-12) =====
+
+TEST(CApiPhonemeResult, ReservedSize) {
+    // PiperPlusPhonemeResult must contain _reserved[4]
+    // On 64-bit: ptr(8) + ptr(8) + int32(4) + int32[4](16) = 36, padded to 40
+    // On 32-bit: ptr(4) + ptr(4) + int32(4) + int32[4](16) = 28
+    PiperPlusPhonemeResult result;
+    (void)result;  // suppress unused warning
+
+    // Verify _reserved array has 4 elements
+    EXPECT_EQ(sizeof(result._reserved), 4 * sizeof(int32_t));
+}
+
+TEST(CApiPhonemeResult, ZeroInitReserved) {
+    // When zero-initialized, _reserved must all be zero
+    PiperPlusPhonemeResult result = {};
+    for (int i = 0; i < 4; i++) {
+        EXPECT_EQ(result._reserved[i], 0);
+    }
 }

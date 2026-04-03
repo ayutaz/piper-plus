@@ -11,6 +11,9 @@
 #include <regex>
 
 #include <onnxruntime_cxx_api.h>
+#ifdef __APPLE__
+#include <coreml_provider_factory.h>
+#endif
 #include <spdlog/spdlog.h>
 
 // Self-contained phoneme ID conversion
@@ -402,7 +405,9 @@ void terminate(PiperConfig &config) {
   spdlog::info("Terminated piper");
 }
 
-void loadModel(std::string modelPath, ModelSession &session, bool useCuda, int gpuDeviceId = 0) {
+void loadModel(std::string modelPath, ModelSession &session,
+               const std::string &provider, int gpuDeviceId = 0,
+               int numThreads = 0) {
   spdlog::debug("loadModel called with path: {}", modelPath);
   spdlog::debug("Creating ONNX Runtime environment");
   try {
@@ -414,17 +419,38 @@ void loadModel(std::string modelPath, ModelSession &session, bool useCuda, int g
     throw;
   }
 
-  if (useCuda) {
+  // Execution provider selection
+  if (provider == "cuda") {
     // Use CUDA provider
     OrtCUDAProviderOptions cuda_options{};
     cuda_options.device_id = gpuDeviceId;
     cuda_options.cudnn_conv_algo_search = OrtCudnnConvAlgoSearchHeuristic;
     session.options.AppendExecutionProvider_CUDA(cuda_options);
     spdlog::info("Using CUDA execution provider with GPU device ID: {}", gpuDeviceId);
+  } else if (provider == "coreml") {
+#ifdef __APPLE__
+    Ort::ThrowOnError(OrtSessionOptionsAppendExecutionProvider_CoreML(session.options, 0));
+    spdlog::info("Using CoreML execution provider");
+#else
+    throw std::runtime_error("CoreML is only available on macOS/iOS");
+#endif
+  } else if (provider == "directml") {
+#ifdef _WIN32
+    Ort::ThrowOnError(OrtSessionOptionsAppendExecutionProvider_DML(session.options, gpuDeviceId));
+    spdlog::info("Using DirectML execution provider with device ID: {}", gpuDeviceId);
+#else
+    throw std::runtime_error("DirectML is only available on Windows");
+#endif
+  } else if (!provider.empty() && provider != "cpu") {
+    throw std::runtime_error("Unknown provider: " + provider);
   }
 
-  // Slows down performance by ~2x
-  // session.options.SetIntraOpNumThreads(1);
+  // Set number of intra-op threads if requested (clamp negative to 0)
+  int effectiveThreads = (numThreads < 0) ? 0 : numThreads;
+  if (effectiveThreads > 0) {
+    session.options.SetIntraOpNumThreads(effectiveThreads);
+    spdlog::info("Set IntraOpNumThreads to {}", effectiveThreads);
+  }
 
   // Roughly doubles load time for no visible inference benefit
   // session.options.SetGraphOptimizationLevel(
@@ -562,8 +588,9 @@ static std::string findDictionaryFile(const std::string &filename,
 // Load Onnx model and JSON config file
 void loadVoice(PiperConfig &config, std::string modelPath,
                std::string modelConfigPath, Voice &voice,
-               std::optional<SpeakerId> &speakerId, bool useCuda,
-               int gpuDeviceId) {
+               std::optional<SpeakerId> &speakerId,
+               const std::string &provider,
+               int gpuDeviceId, int numThreads) {
   spdlog::debug("loadVoice called with modelPath={}, configPath={}", modelPath, modelConfigPath);
   spdlog::debug("Parsing voice config at {}", modelConfigPath);
   std::ifstream modelConfigFile(modelConfigPath);
@@ -631,7 +658,7 @@ void loadVoice(PiperConfig &config, std::string modelPath,
 
   spdlog::debug("Voice contains {} speaker(s)", voice.modelConfig.numSpeakers);
 
-  loadModel(modelPath, voice.session, useCuda, gpuDeviceId);
+  loadModel(modelPath, voice.session, provider, gpuDeviceId, numThreads);
 
 } /* loadVoice */
 

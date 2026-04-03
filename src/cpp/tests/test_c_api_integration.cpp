@@ -66,7 +66,7 @@ TEST_F(CApiIntegrationTest, OneShotProducesAudio) {
     int32_t num_samples = 0, sample_rate = 0;
     auto opts = piper_plus_default_options();
 
-    int32_t rc = piper_plus_synthesize(engine, "Hello world.", &opts,
+    PiperPlusStatus rc = piper_plus_synthesize(engine, "Hello world.", &opts,
                                        &samples, &num_samples, &sample_rate);
     EXPECT_EQ(rc, PIPER_PLUS_OK);
     EXPECT_NE(samples, nullptr);
@@ -91,7 +91,7 @@ TEST_F(CApiIntegrationTest, OneShotJapanese) {
     int32_t num_samples = 0, sample_rate = 0;
     auto opts = piper_plus_default_options();
 
-    int32_t rc = piper_plus_synthesize(engine,
+    PiperPlusStatus rc = piper_plus_synthesize(engine,
         u8"こんにちは、今日は良い天気ですね。", &opts,
         &samples, &num_samples, &sample_rate);
     EXPECT_EQ(rc, PIPER_PLUS_OK);
@@ -108,7 +108,7 @@ TEST_F(CApiIntegrationTest, IteratorProducesChunks) {
     ASSERT_NE(engine, nullptr);
 
     auto opts = piper_plus_default_options();
-    int32_t rc = piper_plus_synth_start(engine,
+    PiperPlusStatus rc = piper_plus_synth_start(engine,
         "First sentence. Second sentence. Third sentence.", &opts);
     EXPECT_EQ(rc, PIPER_PLUS_OK);
 
@@ -154,7 +154,7 @@ TEST_F(CApiIntegrationTest, IteratorVsOneShot) {
     int32_t iterTotal = 0;
     for (;;) {
         PiperPlusAudioChunk chunk = {};
-        int32_t rc = piper_plus_synth_next(engine, &chunk);
+        PiperPlusStatus rc = piper_plus_synth_next(engine, &chunk);
         iterTotal += chunk.num_samples;
         if (rc == PIPER_PLUS_DONE) break;
         ASSERT_NE(rc, PIPER_PLUS_ERR);
@@ -190,7 +190,7 @@ TEST_F(CApiIntegrationTest, CallbackInvoked) {
     auto opts = piper_plus_default_options();
     CallbackData cbData;
 
-    int32_t rc = piper_plus_synthesize_streaming(
+    PiperPlusStatus rc = piper_plus_synthesize_streaming(
         engine, "Hello world.", &opts, testCallback, &cbData);
     EXPECT_EQ(rc, PIPER_PLUS_OK);
     EXPECT_GE(cbData.callCount, 1);
@@ -210,7 +210,7 @@ TEST_F(CApiIntegrationTest, CallbackUserData) {
         *static_cast<int32_t*>(ud) = 42;
     };
 
-    int32_t rc = piper_plus_synthesize_streaming(
+    PiperPlusStatus rc = piper_plus_synthesize_streaming(
         engine, "Hello.", &opts,
         reinterpret_cast<PiperPlusAudioCallback>(+cb), &magic);
     EXPECT_EQ(rc, PIPER_PLUS_OK);
@@ -278,7 +278,7 @@ TEST_F(CApiIntegrationTest, BusyDuringIterator) {
     // Drain
     for (;;) {
         PiperPlusAudioChunk chunk = {};
-        int32_t rc = piper_plus_synth_next(engine, &chunk);
+        PiperPlusStatus rc = piper_plus_synth_next(engine, &chunk);
         if (rc == PIPER_PLUS_DONE) break;
         ASSERT_NE(rc, PIPER_PLUS_ERR);
     }
@@ -309,7 +309,7 @@ TEST_F(CApiIntegrationTest, IteratorReuse) {
     int32_t total = 0;
     for (;;) {
         PiperPlusAudioChunk chunk = {};
-        int32_t rc = piper_plus_synth_next(engine, &chunk);
+        PiperPlusStatus rc = piper_plus_synth_next(engine, &chunk);
         total += chunk.num_samples;
         if (rc == PIPER_PLUS_DONE) break;
         ASSERT_NE(rc, PIPER_PLUS_ERR);
@@ -345,7 +345,7 @@ TEST_F(CApiIntegrationTest, PhonemizeProducesOutput) {
     ASSERT_NE(engine, nullptr);
 
     PiperPlusPhonemeResult result = {};
-    int32_t rc = piper_plus_phonemize(engine, "Hello world.", nullptr, &result);
+    PiperPlusStatus rc = piper_plus_phonemize(engine, "Hello world.", nullptr, &result);
     EXPECT_EQ(rc, PIPER_PLUS_OK);
     EXPECT_NE(result.phonemes, nullptr);
     if (result.phonemes) {
@@ -379,7 +379,7 @@ TEST_F(CApiIntegrationTest, TimingAfterSynthesis) {
     float* samples = nullptr;
     int32_t num_samples = 0, sample_rate = 0;
     auto opts = piper_plus_default_options();
-    int32_t rc = piper_plus_synthesize(engine, "Hello.", &opts,
+    PiperPlusStatus rc = piper_plus_synthesize(engine, "Hello.", &opts,
                                        &samples, &num_samples, &sample_rate);
     ASSERT_EQ(rc, PIPER_PLUS_OK);
     piper_plus_free_audio(samples);
