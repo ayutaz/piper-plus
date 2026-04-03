@@ -197,6 +197,27 @@ void outputTimingsAsJSON(const std::vector<PhonemeInfo> &timings,
 void outputTimingsAsTSV(const std::vector<PhonemeInfo> &timings,
                         std::ostream &output);
 
+// Phonemize result (extracted from textToAudio)
+struct PhonemizeResult {
+    std::vector<std::vector<Phoneme>> phonemes;        // Phonemes per sentence
+    std::vector<std::vector<ProsodyFeature>> prosody;   // Prosody per sentence (optional)
+};
+
+/// Phonemize text into per-sentence phoneme sequences.
+/// @note May modify voice.synthesisConfig.languageId (auto-detect side effect).
+///       Caller must save/restore if needed.
+void phonemizeText(Voice &voice, const std::string &text,
+                   PhonemizeResult &result,
+                   const std::vector<ProsodyFeature> *externalProsody = nullptr);
+
+/// Split text into sentences at natural boundaries.
+/// @param phonemeType  Used to select Japanese vs English regex
+/// @param maxChunkSize Maximum chunk size (0 = default 50)
+std::vector<std::string> splitTextToSentences(
+    const std::string &text,
+    PhonemeType phonemeType,
+    size_t maxChunkSize = 0);
+
 } // namespace piper
 
 #endif // PIPER_H_

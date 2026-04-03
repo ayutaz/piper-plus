@@ -1064,256 +1064,20 @@ void textToAudio(PiperConfig &config, Voice &voice, std::string text,
         voice.synthesisConfig.sampleRate * voice.synthesisConfig.channels);
   }
 
-  // Parse text for [[ phonemes ]] notation
-  auto textSegments = parsePhonemeNotation(text);
-  
-  // Phonemes for each sentence
-  spdlog::debug("Phonemizing text: {}", text);
-  std::vector<std::vector<Phoneme>> phonemes;
+  // Phonemize text (delegated to phonemizeText).
+  // phonemizeText may modify voice.synthesisConfig.languageId (auto-detect).
+  // We restore it afterwards if the user explicitly set it.
+  PhonemizeResult phonResult;
+  phonemizeText(voice, text, phonResult, externalProsody);
+  auto &phonemes = phonResult.phonemes;
+  auto &allProsodyFeatures = phonResult.prosody;
+  bool useProsody = !allProsodyFeatures.empty();
 
-  // Prosody features for each sentence (only used for OpenJTalk with prosody-enabled models)
-  std::vector<std::vector<ProsodyFeature>> allProsodyFeatures;
-  bool useProsody = voice.session.hasProsodyInput &&
-                    usesOpenJTalk(voice.phonemizeConfig.phonemeType);
-
-  // Process each segment
-  for (const auto& segment : textSegments) {
-    if (segment.isPhonemes) {
-      // Direct phoneme input
-      spdlog::debug("Processing direct phoneme input: {}", segment.text);
-      auto parsedPhonemes = parsePhonemeString(segment.text, static_cast<int>(voice.phonemizeConfig.phonemeType));
-
-      // Add as a single "sentence"
-      phonemes.push_back(parsedPhonemes);
-
-      // Add empty prosody features for direct phoneme input
-      if (useProsody) {
-        std::vector<ProsodyFeature> emptyProsody(parsedPhonemes.size(), {0, 0, 0});
-        allProsodyFeatures.push_back(std::move(emptyProsody));
-      }
-    } else {
-      // Regular text - phonemize as usual
-      std::vector<std::vector<Phoneme>> segmentPhonemes;
-      std::vector<std::vector<ProsodyFeature>> segmentProsody;
-
-      if (voice.phonemizeConfig.phonemeType == OpenJTalkPhonemes) {
-        // Japanese OpenJTalk phonemizer
-        if (useProsody) {
-          phonemize_openjtalk_with_prosody(segment.text, segmentPhonemes, segmentProsody);
-        } else {
-          phonemize_openjtalk(segment.text, segmentPhonemes);
-        }
-
-        // If OpenJTalk failed, report error (eSpeak is no longer available)
-        if (segmentPhonemes.empty() && !segment.text.empty()) {
-          spdlog::error("OpenJTalk failed to process text; skipping segment");
-        }
-      } else if (voice.phonemizeConfig.phonemeType == MultilingualPhonemes) {
-        // Multilingual: segment text by language, phonemize each segment
-        // with the appropriate engine, strip BOS/EOS from JA segments.
-        std::vector<std::string> multiLangs;
-        if (voice.modelConfig.languageIdMap) {
-          for (const auto& [code, id] : *voice.modelConfig.languageIdMap) {
-            multiLangs.push_back(code);
-          }
-        } else {
-          multiLangs = {"ja", "en"};  // Default bilingual
-        }
-
-        // Determine default Latin language.
-        // If the user set --language, reverse-lookup the code and prefer it
-        // when it is a Latin-script language.
-        std::string defaultLatin = "en";
-        static const std::set<std::string> latinLangs = {"en", "es", "fr", "pt", "sv"};
-        bool defaultLatinSet = false;
-        if (voice.synthesisConfig.languageId && voice.modelConfig.languageIdMap) {
-          for (const auto& [code, id] : *voice.modelConfig.languageIdMap) {
-            if (id == *voice.synthesisConfig.languageId && latinLangs.count(code)) {
-              defaultLatin = code;
-              defaultLatinSet = true;
-              break;
-            }
-          }
-        }
-        // Fallback: pick the first available Latin language by priority
-        if (!defaultLatinSet) {
-          for (const auto& lang : {"en", "es", "fr", "pt", "sv"}) {
-            if (std::find(multiLangs.begin(), multiLangs.end(), lang) != multiLangs.end()) {
-              defaultLatin = lang;
-              break;
-            }
-          }
-        }
-
-        UnicodeLanguageDetector detector(multiLangs, defaultLatin);
-        auto langSegments = detector.segmentText(segment.text);
-
-        // BOS/EOS codepoints to strip from JA segments
-        std::set<Phoneme> bosEosTokens = {
-          0x5E,    // ^ (BOS)
-          0x24,    // $ (EOS)
-          0x3F,    // ? (question EOS)
-          0xE016,  // ?! (emphatic question)
-          0xE017,  // ?. (neutral question)
-          0xE018   // ?~ (tag question)
-        };
-
-        // Track last EOS for dynamic EOS selection
-        Phoneme lastEos = 0x24;  // Default: $
-
-        std::vector<Phoneme> allPhonemes;
-        std::vector<ProsodyFeature> allProsody;
-
-        for (const auto& langSeg : langSegments) {
-          std::vector<std::vector<Phoneme>> langPhonemes;
-          std::vector<std::vector<ProsodyFeature>> langProsody;
-
-          if (langSeg.lang == "ja") {
-            // Japanese: use OpenJTalk
-            if (voice.session.hasProsodyInput) {
-              phonemize_openjtalk_with_prosody(langSeg.text, langPhonemes, langProsody);
-            } else {
-              phonemize_openjtalk(langSeg.text, langPhonemes);
-            }
-
-            // Strip BOS/EOS from JA phonemes
-            for (size_t s = 0; s < langPhonemes.size(); s++) {
-              for (auto ph : langPhonemes[s]) {
-                if (bosEosTokens.count(ph)) {
-                  if (ph != 0x5E) {  // Not BOS
-                    lastEos = ph;    // Track EOS
-                  }
-                  continue;  // Skip BOS/EOS
-                }
-                allPhonemes.push_back(ph);
-                if (voice.session.hasProsodyInput && s < langProsody.size()) {
-                  // Find matching prosody index (approximate)
-                  // JA phonemizer produces 1:1 phoneme:prosody
-                }
-              }
-              // Add prosody for JA phonemes (after stripping)
-              if (voice.session.hasProsodyInput && s < langProsody.size()) {
-                // We need to rebuild prosody without BOS/EOS entries
-                for (size_t pi = 0; pi < langPhonemes[s].size(); pi++) {
-                  if (!bosEosTokens.count(langPhonemes[s][pi])) {
-                    if (pi < langProsody[s].size()) {
-                      allProsody.push_back(langProsody[s][pi]);
-                    } else {
-                      allProsody.push_back({0, 0, 0});
-                    }
-                  }
-                }
-              }
-            }
-          } else if (langSeg.lang == "es") {
-            // Spanish: native rule-based phonemizer
-            phonemize_spanish(langSeg.text, langPhonemes);
-          } else if (langSeg.lang == "fr") {
-            // French: native rule-based phonemizer
-            phonemize_french(langSeg.text, langPhonemes);
-          } else if (langSeg.lang == "pt") {
-            // Portuguese: native rule-based phonemizer
-            phonemize_portuguese(langSeg.text, langPhonemes);
-          } else if (langSeg.lang == "en") {
-            // English: CMU dictionary-based G2P
-            static bool warnedNoCmuDict = false;
-            if (voice.cmuDict.empty() && !warnedNoCmuDict) {
-              spdlog::warn("English CMU dictionary not loaded; English text may not be phonemized correctly");
-              warnedNoCmuDict = true;
-            }
-            phonemize_english(langSeg.text, langPhonemes, voice.cmuDict);
-            // Check if CMU dict produced any phonemes
-            bool hasAnyPhonemes = false;
-            for (const auto& s : langPhonemes) {
-              if (!s.empty()) { hasAnyPhonemes = true; break; }
-            }
-            if (!hasAnyPhonemes) {
-              spdlog::debug("English segment '{}' has no CMU dict matches; skipping", langSeg.text);
-            }
-          } else if (langSeg.lang == "zh") {
-            // Chinese: pypinyin-based G2P
-            static bool warnedNoPinyinDict = false;
-            if (voice.pinyinSingleDict.empty() && !warnedNoPinyinDict) {
-              spdlog::warn("Chinese pinyin dictionary not loaded; Chinese text may not be phonemized correctly");
-              warnedNoPinyinDict = true;
-            }
-            phonemize_chinese(langSeg.text, langPhonemes,
-                              voice.pinyinSingleDict, voice.pinyinPhraseDict);
-          } else if (langSeg.lang == "ko") {
-            // Korean: Hangul decomposition (no external data needed)
-            phonemize_korean(langSeg.text, langPhonemes);
-          } else if (langSeg.lang == "sv") {
-            // Swedish: native rule-based phonemizer
-            phonemize_swedish(langSeg.text, langPhonemes);
-          } else {
-            spdlog::warn("No native phonemizer for language '{}'; skipping segment", langSeg.lang);
-          }
-
-          // Add phonemes from non-JA segment with language-specific prosody
-          if (langSeg.lang != "ja") {
-            for (const auto& sentence : langPhonemes) {
-              if (voice.session.hasProsodyInput) {
-                auto sentenceProsody = computeNonJaProsody(sentence, langSeg.lang);
-                for (size_t pi = 0; pi < sentence.size(); pi++) {
-                  allPhonemes.push_back(sentence[pi]);
-                  allProsody.push_back(sentenceProsody[pi]);
-                }
-              } else {
-                for (auto ph : sentence) {
-                  allPhonemes.push_back(ph);
-                }
-              }
-            }
-          }
-        }
-
-        // Set dominant language for lid, but only if the user did not
-        // explicitly set a language ID before this call (M3 fix).
-        // originalLanguageId was captured at the start of textToAudio().
-        // If the current value still matches the original, auto-detect is safe.
-        if (!langSegments.empty() &&
-            voice.synthesisConfig.languageId == originalLanguageId) {
-          auto dominantLang = detectDominantLanguage(segment.text, detector);
-          if (voice.modelConfig.languageIdMap &&
-              voice.modelConfig.languageIdMap->count(dominantLang) > 0) {
-            voice.synthesisConfig.languageId =
-                (*voice.modelConfig.languageIdMap)[dominantLang];
-            spdlog::debug("Multilingual: auto-detected dominant language '{}' (lid={})",
-                          dominantLang, voice.synthesisConfig.languageId.value());
-          }
-        }
-
-        // Add as a single sentence
-        if (!allPhonemes.empty()) {
-          segmentPhonemes.push_back(std::move(allPhonemes));
-          if (voice.session.hasProsodyInput) {
-            segmentProsody.push_back(std::move(allProsody));
-          }
-        }
-      }
-
-      // Add all sentences from this segment
-      for (size_t i = 0; i < segmentPhonemes.size(); i++) {
-        phonemes.push_back(std::move(segmentPhonemes[i]));
-
-        if (useProsody) {
-          if (i < segmentProsody.size()) {
-            allProsodyFeatures.push_back(std::move(segmentProsody[i]));
-          } else {
-            // Fallback: create zero prosody features
-            std::vector<ProsodyFeature> zeroProsody(phonemes.back().size(), {0, 0, 0});
-            allProsodyFeatures.push_back(std::move(zeroProsody));
-          }
-        }
-      }
-    }
-  }
-
-  // Override prosody features with external data if provided
-  if (externalProsody && !externalProsody->empty() && useProsody) {
-    allProsodyFeatures.clear();
-    allProsodyFeatures.push_back(*externalProsody);
-    spdlog::debug("Using {} external prosody features", externalProsody->size());
+  // Restore original language ID if the user explicitly set it (M3 fix).
+  // phonemizeText always auto-detects dominant language; if the caller
+  // had an explicit setting we must not overwrite it.
+  if (originalLanguageId.has_value()) {
+    voice.synthesisConfig.languageId = originalLanguageId;
   }
 
   // Synthesize each sentence independently.
@@ -1623,6 +1387,56 @@ static size_t calculateDynamicChunkSize(const std::string& text, size_t baseSize
   return baseSize * 2;  // Medium density
 }
 
+// Split text into sentences at natural boundaries (public API)
+std::vector<std::string> splitTextToSentences(
+    const std::string &text,
+    PhonemeType phonemeType,
+    size_t maxChunkSize) {
+
+  if (text.empty()) {
+    return {};
+  }
+
+  size_t baseSize = maxChunkSize > 0 ? maxChunkSize : 50;
+  size_t dynamicChunkSize = calculateDynamicChunkSize(text, baseSize);
+
+  static const std::regex japaneseSentenceBoundary(u8"([。！？、]+)");
+  static const std::regex englishSentenceBoundary("([.!?,;:]+|\\s+(?:and|or|but|because|while|when|if|that|which)\\s+)");
+
+  const std::regex& sentenceBoundary =
+    (usesOpenJTalk(phonemeType))
+    ? japaneseSentenceBoundary
+    : englishSentenceBoundary;
+
+  std::vector<std::string> chunks;
+  std::sregex_token_iterator iter(text.begin(), text.end(), sentenceBoundary, {-1, 1});
+  std::sregex_token_iterator end;
+
+  std::string currentChunk;
+  for (; iter != end; ++iter) {
+    std::string token = *iter;
+    if (token.empty()) continue;
+
+    if (std::regex_match(token, sentenceBoundary)) {
+      currentChunk += token;
+      if (!currentChunk.empty() &&
+          (token.find_first_of(u8"。！？.!?") != std::string::npos ||
+           currentChunk.length() > dynamicChunkSize)) {
+        chunks.push_back(currentChunk);
+        currentChunk.clear();
+      }
+    } else {
+      currentChunk += token;
+    }
+  }
+
+  if (!currentChunk.empty()) {
+    chunks.push_back(currentChunk);
+  }
+
+  return chunks;
+}
+
 // Helper function for audio crossfade to reduce chunk boundary artifacts
 static void crossfadeAudioChunks(
     const std::vector<int16_t>& prevChunk,
@@ -1664,6 +1478,265 @@ static void crossfadeAudioChunks(
   output.insert(output.end(), newChunk.begin() + actualOverlap, newChunk.end());
 }
 
+// Phonemize text into per-sentence phoneme sequences (public API).
+// May modify voice.synthesisConfig.languageId as a side effect (auto-detect).
+void phonemizeText(Voice &voice, const std::string &text,
+                   PhonemizeResult &result,
+                   const std::vector<ProsodyFeature> *externalProsody) {
+
+  result.phonemes.clear();
+  result.prosody.clear();
+
+  // Parse text for [[ phonemes ]] notation
+  auto textSegments = parsePhonemeNotation(text);
+
+  // Phonemes for each sentence
+  spdlog::debug("Phonemizing text: {}", text);
+
+  // Prosody features for each sentence (only used for OpenJTalk with prosody-enabled models)
+  bool useProsody = voice.session.hasProsodyInput &&
+                    usesOpenJTalk(voice.phonemizeConfig.phonemeType);
+
+  // Process each segment
+  for (const auto& segment : textSegments) {
+    if (segment.isPhonemes) {
+      // Direct phoneme input
+      spdlog::debug("Processing direct phoneme input: {}", segment.text);
+      auto parsedPhonemes = parsePhonemeString(segment.text, static_cast<int>(voice.phonemizeConfig.phonemeType));
+
+      // Add as a single "sentence"
+      result.phonemes.push_back(parsedPhonemes);
+
+      // Add empty prosody features for direct phoneme input
+      if (useProsody) {
+        std::vector<ProsodyFeature> emptyProsody(parsedPhonemes.size(), {0, 0, 0});
+        result.prosody.push_back(std::move(emptyProsody));
+      }
+    } else {
+      // Regular text - phonemize as usual
+      std::vector<std::vector<Phoneme>> segmentPhonemes;
+      std::vector<std::vector<ProsodyFeature>> segmentProsody;
+
+      if (voice.phonemizeConfig.phonemeType == OpenJTalkPhonemes) {
+        // Japanese OpenJTalk phonemizer
+        if (useProsody) {
+          phonemize_openjtalk_with_prosody(segment.text, segmentPhonemes, segmentProsody);
+        } else {
+          phonemize_openjtalk(segment.text, segmentPhonemes);
+        }
+
+        // If OpenJTalk failed, report error (eSpeak is no longer available)
+        if (segmentPhonemes.empty() && !segment.text.empty()) {
+          spdlog::error("OpenJTalk failed to process text; skipping segment");
+        }
+      } else if (voice.phonemizeConfig.phonemeType == MultilingualPhonemes) {
+        // Multilingual: segment text by language, phonemize each segment
+        // with the appropriate engine, strip BOS/EOS from JA segments.
+        std::vector<std::string> multiLangs;
+        if (voice.modelConfig.languageIdMap) {
+          for (const auto& [code, id] : *voice.modelConfig.languageIdMap) {
+            multiLangs.push_back(code);
+          }
+        } else {
+          multiLangs = {"ja", "en"};  // Default bilingual
+        }
+
+        // Determine default Latin language.
+        // If the user set --language, reverse-lookup the code and prefer it
+        // when it is a Latin-script language.
+        std::string defaultLatin = "en";
+        static const std::set<std::string> latinLangs = {"en", "es", "fr", "pt", "sv"};
+        bool defaultLatinSet = false;
+        if (voice.synthesisConfig.languageId && voice.modelConfig.languageIdMap) {
+          for (const auto& [code, id] : *voice.modelConfig.languageIdMap) {
+            if (id == *voice.synthesisConfig.languageId && latinLangs.count(code)) {
+              defaultLatin = code;
+              defaultLatinSet = true;
+              break;
+            }
+          }
+        }
+        // Fallback: pick the first available Latin language by priority
+        if (!defaultLatinSet) {
+          for (const auto& lang : {"en", "es", "fr", "pt", "sv"}) {
+            if (std::find(multiLangs.begin(), multiLangs.end(), lang) != multiLangs.end()) {
+              defaultLatin = lang;
+              break;
+            }
+          }
+        }
+
+        UnicodeLanguageDetector detector(multiLangs, defaultLatin);
+        auto langSegments = detector.segmentText(segment.text);
+
+        // BOS/EOS codepoints to strip from JA segments
+        std::set<Phoneme> bosEosTokens = {
+          0x5E,    // ^ (BOS)
+          0x24,    // $ (EOS)
+          0x3F,    // ? (question EOS)
+          0xE016,  // ?! (emphatic question)
+          0xE017,  // ?. (neutral question)
+          0xE018   // ?~ (tag question)
+        };
+
+        // Track last EOS for dynamic EOS selection
+        Phoneme lastEos = 0x24;  // Default: $
+
+        std::vector<Phoneme> allPhonemes;
+        std::vector<ProsodyFeature> allProsody;
+
+        for (const auto& langSeg : langSegments) {
+          std::vector<std::vector<Phoneme>> langPhonemes;
+          std::vector<std::vector<ProsodyFeature>> langProsody;
+
+          if (langSeg.lang == "ja") {
+            // Japanese: use OpenJTalk
+            if (voice.session.hasProsodyInput) {
+              phonemize_openjtalk_with_prosody(langSeg.text, langPhonemes, langProsody);
+            } else {
+              phonemize_openjtalk(langSeg.text, langPhonemes);
+            }
+
+            // Strip BOS/EOS from JA phonemes
+            for (size_t s = 0; s < langPhonemes.size(); s++) {
+              for (auto ph : langPhonemes[s]) {
+                if (bosEosTokens.count(ph)) {
+                  if (ph != 0x5E) {  // Not BOS
+                    lastEos = ph;    // Track EOS
+                  }
+                  continue;  // Skip BOS/EOS
+                }
+                allPhonemes.push_back(ph);
+                if (voice.session.hasProsodyInput && s < langProsody.size()) {
+                  // Find matching prosody index (approximate)
+                  // JA phonemizer produces 1:1 phoneme:prosody
+                }
+              }
+              // Add prosody for JA phonemes (after stripping)
+              if (voice.session.hasProsodyInput && s < langProsody.size()) {
+                // We need to rebuild prosody without BOS/EOS entries
+                for (size_t pi = 0; pi < langPhonemes[s].size(); pi++) {
+                  if (!bosEosTokens.count(langPhonemes[s][pi])) {
+                    if (pi < langProsody[s].size()) {
+                      allProsody.push_back(langProsody[s][pi]);
+                    } else {
+                      allProsody.push_back({0, 0, 0});
+                    }
+                  }
+                }
+              }
+            }
+          } else if (langSeg.lang == "es") {
+            // Spanish: native rule-based phonemizer
+            phonemize_spanish(langSeg.text, langPhonemes);
+          } else if (langSeg.lang == "fr") {
+            // French: native rule-based phonemizer
+            phonemize_french(langSeg.text, langPhonemes);
+          } else if (langSeg.lang == "pt") {
+            // Portuguese: native rule-based phonemizer
+            phonemize_portuguese(langSeg.text, langPhonemes);
+          } else if (langSeg.lang == "en") {
+            // English: CMU dictionary-based G2P
+            static bool warnedNoCmuDict = false;
+            if (voice.cmuDict.empty() && !warnedNoCmuDict) {
+              spdlog::warn("English CMU dictionary not loaded; English text may not be phonemized correctly");
+              warnedNoCmuDict = true;
+            }
+            phonemize_english(langSeg.text, langPhonemes, voice.cmuDict);
+            // Check if CMU dict produced any phonemes
+            bool hasAnyPhonemes = false;
+            for (const auto& s : langPhonemes) {
+              if (!s.empty()) { hasAnyPhonemes = true; break; }
+            }
+            if (!hasAnyPhonemes) {
+              spdlog::debug("English segment '{}' has no CMU dict matches; skipping", langSeg.text);
+            }
+          } else if (langSeg.lang == "zh") {
+            // Chinese: pypinyin-based G2P
+            static bool warnedNoPinyinDict = false;
+            if (voice.pinyinSingleDict.empty() && !warnedNoPinyinDict) {
+              spdlog::warn("Chinese pinyin dictionary not loaded; Chinese text may not be phonemized correctly");
+              warnedNoPinyinDict = true;
+            }
+            phonemize_chinese(langSeg.text, langPhonemes,
+                              voice.pinyinSingleDict, voice.pinyinPhraseDict);
+          } else if (langSeg.lang == "ko") {
+            // Korean: Hangul decomposition (no external data needed)
+            phonemize_korean(langSeg.text, langPhonemes);
+          } else if (langSeg.lang == "sv") {
+            // Swedish: native rule-based phonemizer
+            phonemize_swedish(langSeg.text, langPhonemes);
+          } else {
+            spdlog::warn("No native phonemizer for language '{}'; skipping segment", langSeg.lang);
+          }
+
+          // Add phonemes from non-JA segment with language-specific prosody
+          if (langSeg.lang != "ja") {
+            for (const auto& sentence : langPhonemes) {
+              if (voice.session.hasProsodyInput) {
+                auto sentenceProsody = computeNonJaProsody(sentence, langSeg.lang);
+                for (size_t pi = 0; pi < sentence.size(); pi++) {
+                  allPhonemes.push_back(sentence[pi]);
+                  allProsody.push_back(sentenceProsody[pi]);
+                }
+              } else {
+                for (auto ph : sentence) {
+                  allPhonemes.push_back(ph);
+                }
+              }
+            }
+          }
+        }
+
+        // Set dominant language for lid.
+        // Note: this modifies voice.synthesisConfig.languageId as a side effect.
+        // Caller is responsible for saving/restoring if needed.
+        if (!langSegments.empty()) {
+          auto dominantLang = detectDominantLanguage(segment.text, detector);
+          if (voice.modelConfig.languageIdMap &&
+              voice.modelConfig.languageIdMap->count(dominantLang) > 0) {
+            voice.synthesisConfig.languageId =
+                (*voice.modelConfig.languageIdMap)[dominantLang];
+            spdlog::debug("Multilingual: auto-detected dominant language '{}' (lid={})",
+                          dominantLang, voice.synthesisConfig.languageId.value());
+          }
+        }
+
+        // Add as a single sentence
+        if (!allPhonemes.empty()) {
+          segmentPhonemes.push_back(std::move(allPhonemes));
+          if (voice.session.hasProsodyInput) {
+            segmentProsody.push_back(std::move(allProsody));
+          }
+        }
+      }
+
+      // Add all sentences from this segment
+      for (size_t i = 0; i < segmentPhonemes.size(); i++) {
+        result.phonemes.push_back(std::move(segmentPhonemes[i]));
+
+        if (useProsody) {
+          if (i < segmentProsody.size()) {
+            result.prosody.push_back(std::move(segmentProsody[i]));
+          } else {
+            // Fallback: create zero prosody features
+            std::vector<ProsodyFeature> zeroProsody(result.phonemes.back().size(), {0, 0, 0});
+            result.prosody.push_back(std::move(zeroProsody));
+          }
+        }
+      }
+    }
+  }
+
+  // Override prosody features with external data if provided
+  if (externalProsody && !externalProsody->empty() && useProsody) {
+    result.prosody.clear();
+    result.prosody.push_back(*externalProsody);
+    spdlog::debug("Using {} external prosody features", externalProsody->size());
+  }
+
+} /* phonemizeText */
+
 // Streaming text-to-audio synthesis with reduced latency
 void textToAudioStreaming(PiperConfig &config, Voice &voice, std::string text,
                           std::vector<int16_t> &audioBuffer, SynthesisResult &result,
@@ -1683,52 +1756,12 @@ void textToAudioStreaming(PiperConfig &config, Voice &voice, std::string text,
     return;
   }
   
-  // Calculate dynamic chunk size based on text characteristics
-  size_t dynamicChunkSize = calculateDynamicChunkSize(text, chunkSize > 0 ? chunkSize : 50);
-  
-  // Static regex patterns for better performance (cached compilation)
-  static const std::regex japaneseSentenceBoundary(u8"([。！？、]+)");
-  static const std::regex englishSentenceBoundary("([.!?,;:]+|\\s+(?:and|or|but|because|while|when|if|that|which)\\s+)");
-  
-  // Select appropriate regex based on language
-  const std::regex& sentenceBoundary =
-    (usesOpenJTalk(voice.phonemizeConfig.phonemeType))
-    ? japaneseSentenceBoundary
-    : englishSentenceBoundary;
-  
-  // Split text into chunks at natural boundaries
-  std::vector<std::string> chunks;
-  std::sregex_token_iterator iter(text.begin(), text.end(), sentenceBoundary, {-1, 1});
-  std::sregex_token_iterator end;
-  
-  std::string currentChunk;
-  for (; iter != end; ++iter) {
-    std::string token = *iter;
-    if (token.empty()) continue;
-    
-    // Check if this is a delimiter
-    if (std::regex_match(token, sentenceBoundary)) {
-      // Add delimiter to current chunk
-      currentChunk += token;
-      if (!currentChunk.empty() && 
-          (token.find_first_of(u8"。！？.!?") != std::string::npos ||
-           currentChunk.length() > dynamicChunkSize)) {
-        // End of sentence or chunk is getting long
-        chunks.push_back(currentChunk);
-        currentChunk.clear();
-      }
-    } else {
-      // Regular text
-      currentChunk += token;
-    }
-  }
-  
-  // Add any remaining text
-  if (!currentChunk.empty()) {
-    chunks.push_back(currentChunk);
-  }
-  
-  spdlog::debug("Split text into {} chunks with dynamic chunk size: {}", chunks.size(), dynamicChunkSize);
+  // Split text into sentences using the shared helper
+  auto chunks = splitTextToSentences(text,
+                                     voice.phonemizeConfig.phonemeType,
+                                     chunkSize > 0 ? chunkSize : 0);
+
+  spdlog::debug("Split text into {} chunks", chunks.size());
   
   // Track previous chunk for crossfading
   std::vector<int16_t> previousChunkAudio;
