@@ -1,0 +1,101 @@
+name: Android Build
+
+on:
+  pull_request:
+    branches: [dev]
+    paths:
+      - 'src/cpp/**'
+      - 'CMakeLists.txt'
+      - '.github/workflows/android-build.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-android:
+    name: Android arm64-v8a
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+
+    env:
+      ANDROID_NDK_VERSION: "26.1.10909125"
+      ANDROID_API_LEVEL: "24"
+      ONNXRUNTIME_VERSION: "1.14.1"
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Setup Android NDK
+        uses: android-actions/setup-android@v3
+        with:
+          cmdline-tools-version: 11076708
+
+      - name: Install NDK
+        run: |
+          sdkmanager "ndk;${{ env.ANDROID_NDK_VERSION }}"
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/${{ env.ANDROID_NDK_VERSION }}" >> $GITHUB_ENV
+
+      - name: Cache ONNX Runtime Android
+        id: cache-ort-android
+        uses: actions/cache@v4
+        with:
+          path: ort-android/
+          key: ort-android-${{ env.ONNXRUNTIME_VERSION }}
+
+      - name: Download ONNX Runtime Android
+        if: steps.cache-ort-android.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ort-android
+          # Download AAR and extract arm64-v8a JNI library
+          curl -sL "https://repo1.maven.org/maven2/com/microsoft/onnxruntime/onnxruntime-android/${{ env.ONNXRUNTIME_VERSION }}/onnxruntime-android-${{ env.ONNXRUNTIME_VERSION }}.aar" \
+            -o /tmp/ort.aar
+          cd ort-android
+          unzip -o /tmp/ort.aar "jni/arm64-v8a/*" -d .
+          mkdir -p lib include
+          cp jni/arm64-v8a/libonnxruntime.so lib/
+
+          # Download headers separately (from Linux x64 release)
+          curl -sL "https://github.com/microsoft/onnxruntime/releases/download/v${{ env.ONNXRUNTIME_VERSION }}/onnxruntime-linux-x64-${{ env.ONNXRUNTIME_VERSION }}.tgz" \
+            -o /tmp/ort-headers.tgz
+          tar -xzf /tmp/ort-headers.tgz --strip-components=1 -C . "onnxruntime-linux-x64-${{ env.ONNXRUNTIME_VERSION }}/include"
+
+      - name: Configure CMake
+        run: |
+          cmake -B build \
+            -DCMAKE_TOOLCHAIN_FILE=${{ env.ANDROID_NDK_HOME }}/build/cmake/android.toolchain.cmake \
+            -DANDROID_ABI=arm64-v8a \
+            -DANDROID_PLATFORM=android-${{ env.ANDROID_API_LEVEL }} \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DPIPER_PLUS_BUILD_SHARED=ON \
+            -DBUILD_TESTS=OFF \
+            -DONNXRUNTIME_DIR=${{ github.workspace }}/ort-android \
+            -DONNXRUNTIME_INCLUDE_DIR=${{ github.workspace }}/ort-android/include \
+            -DONNXRUNTIME_LIB=${{ github.workspace }}/ort-android/lib/libonnxruntime.so
+
+      - name: Build
+        run: cmake --build build --config Release --target piper_plus -j$(nproc)
+
+      - name: Verify binary
+        run: |
+          echo "=== Checking shared library ==="
+          file build/libpiper_plus.so || file build/lib/libpiper_plus.so || true
+
+          echo "=== Architecture check ==="
+          readelf -h build/libpiper_plus.so 2>/dev/null | grep Machine || \
+            readelf -h build/lib/libpiper_plus.so 2>/dev/null | grep Machine || true
+
+          echo "=== Dependencies ==="
+          readelf -d build/libpiper_plus.so 2>/dev/null | grep NEEDED || \
+            readelf -d build/lib/libpiper_plus.so 2>/dev/null | grep NEEDED || true
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: piper-plus-android-arm64-v8a
+          path: |
+            build/libpiper_plus.so
+            build/lib/libpiper_plus.so
+          if-no-files-found: warn
