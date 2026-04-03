@@ -217,7 +217,7 @@ describe('ModelManager 境界/エラーケース', { skip }, () => {
   });
 
   // =====================================================================
-  // 6. config.json 取得失敗で適切なエラー
+  // 6. config.json 取得失敗で適切なエラー (siblings に config.json あり、fetch が 503)
   // =====================================================================
 
   it('config.json 取得失敗で適切なエラー', async () => {
@@ -226,10 +226,13 @@ describe('ModelManager 境界/エラーケース', { skip }, () => {
       [/huggingface\.co\/api\/models\//, {
         ok: true,
         json: () => Promise.resolve({
-          siblings: [{ rfilename: 'model.onnx' }],
+          siblings: [
+            { rfilename: 'model.onnx' },
+            { rfilename: 'config.json' },
+          ],
         }),
       }],
-      [/resolve\/main\/config\.json/, {
+      [/resolve\/main\/config\.json$/, {
         ok: false,
         status: 503,
         statusText: 'Service Unavailable',
@@ -244,6 +247,31 @@ describe('ModelManager 境界/エラーケース', { skip }, () => {
     await assert.rejects(
       () => mgr.loadModel('some-org/some-repo'),
       (err) => err.message.includes('503'),
+    );
+  });
+
+  // =====================================================================
+  // 6b. siblings にサイドカーも config.json もない場合 resolveModelFiles でエラー
+  // =====================================================================
+
+  it('siblings にサイドカーも config.json もない場合エラーをスローする', async () => {
+    setupMocks();
+    globalThis.fetch = createMockFetch(new Map([
+      [/huggingface\.co\/api\/models\//, {
+        ok: true,
+        json: () => Promise.resolve({
+          siblings: [
+            { rfilename: 'model.onnx' },
+            { rfilename: 'README.md' },
+          ],
+        }),
+      }],
+    ]));
+    const mgr = new ModelManager();
+
+    await assert.rejects(
+      () => mgr.loadModel('some-org/no-config-repo'),
+      (err) => err.message.includes('No config file found'),
     );
   });
 
@@ -296,10 +324,10 @@ describe('ModelManager 境界/エラーケース', { skip }, () => {
       [/huggingface\.co\/api\/models\//, {
         ok: true,
         json: () => Promise.resolve({
-          siblings: [{ rfilename: 'model.onnx' }],
+          siblings: [{ rfilename: 'model.onnx' }, { rfilename: 'config.json' }],
         }),
       }],
-      [/resolve\/main\/config\.json/, {
+      [/resolve\/main\/config\.json$/, {
         ok: true,
         json: () => { throw new SyntaxError('Unexpected token < in JSON'); },
       }],

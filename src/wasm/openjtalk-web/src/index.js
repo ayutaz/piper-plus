@@ -214,10 +214,13 @@ export class PiperPlus {
       progress({ stage: 'model', progress: 0, message: 'Resolving model...' });
 
       const modelManager = new ModelManager();
-      const { modelUrl, configUrl } = await modelManager.resolveUrls(options.model);
+      const { modelUrl, configUrl, configFallbackUrl } = await modelManager.resolveUrls(options.model);
 
       progress({ stage: 'model', progress: 0.1, message: 'Downloading config...' });
-      const configResponse = await fetch(configUrl);
+      let configResponse = await fetch(configUrl);
+      if (!configResponse.ok && configResponse.status === 404 && configFallbackUrl) {
+        configResponse = await fetch(configFallbackUrl);
+      }
       if (!configResponse.ok) {
         throw new Error(`Failed to fetch config: ${configResponse.status} ${configResponse.statusText}`);
       }

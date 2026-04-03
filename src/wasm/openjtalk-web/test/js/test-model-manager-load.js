@@ -117,7 +117,7 @@ function createMockFetch(routes) {
  * @returns {Map<string|RegExp, Object>}
  */
 function createHuggingFaceRoutes(options = {}) {
-  const siblings = (options.siblings || ['model.onnx']).map((f) => ({ rfilename: f }));
+  const siblings = (options.siblings || ['model.onnx', 'config.json']).map((f) => ({ rfilename: f }));
   const config = options.config || SAMPLE_CONFIG;
   const modelBuffer = options.modelBuffer || SAMPLE_MODEL_BUFFER;
 
@@ -126,7 +126,7 @@ function createHuggingFaceRoutes(options = {}) {
       ok: true,
       json: () => Promise.resolve({ siblings }),
     }],
-    [/huggingface\.co\/.*\/resolve\/main\/config\.json$/, {
+    [/huggingface\.co\/.*\/resolve\/main\/(?:.*\.onnx\.json|config\.json)$/, {
       ok: true,
       json: () => Promise.resolve(config),
     }],
@@ -201,7 +201,7 @@ describe('ModelManager.loadModel() 成功ケース', { skip }, () => {
     installIndexedDBMock(mockDb);
 
     const { fetch: mockFetch } = createMockFetch(
-      createHuggingFaceRoutes({ siblings: ['tsukuyomi.onnx'] })
+      createHuggingFaceRoutes({ siblings: ['tsukuyomi.onnx', 'config.json'] })
     );
     globalThis.fetch = mockFetch;
 
@@ -227,7 +227,7 @@ describe('ModelManager.loadModel() 成功ケース', { skip }, () => {
     installIndexedDBMock(mockDb);
 
     const { fetch: mockFetch, calledUrls } = createMockFetch(
-      createHuggingFaceRoutes({ siblings: ['model-fp16.onnx', 'README.md'] })
+      createHuggingFaceRoutes({ siblings: ['model-fp16.onnx', 'README.md', 'config.json'] })
     );
     globalThis.fetch = mockFetch;
 
@@ -583,5 +583,101 @@ describe('ModelManager.loadModel() 成功ケース', { skip }, () => {
     assert.equal(result.config.inference.noise_scale, 0.667);
     assert.equal(result.config.inference.length_scale, 1.0);
     assert.equal(result.config.inference.noise_w, 0.8);
+  });
+
+  // =====================================================================
+  // 9. HF リポジトリが config.json のみの場合にロードできる
+  // =====================================================================
+
+  it('HF リポジトリが config.json のみ（サイドカーなし）でロードできる', async () => {
+    // Arrange — 実際の ayousanz/piper-plus-tsukuyomi-chan と同じ構造
+    const mockDb = createMockIndexedDB();
+    installIndexedDBMock(mockDb);
+
+    const customConfig = { audio: { sample_rate: 22050 }, num_speakers: 1 };
+
+    const routes = new Map([
+      [/huggingface\.co\/api\/models\//, {
+        ok: true,
+        json: () => Promise.resolve({
+          siblings: [
+            { rfilename: 'tsukuyomi-chan-6lang-fp16.onnx' },
+            { rfilename: 'config.json' },
+            { rfilename: 'README.md' },
+          ],
+        }),
+      }],
+      [/resolve\/main\/config\.json$/, {
+        ok: true,
+        json: () => Promise.resolve(customConfig),
+      }],
+      [/resolve\/main\/.*\.onnx$/, {
+        ok: true,
+        arrayBuffer: () => Promise.resolve(new ArrayBuffer(64)),
+      }],
+    ]);
+
+    const { fetch: mockFetch, calledUrls } = createMockFetch(routes);
+    globalThis.fetch = mockFetch;
+
+    const mgr = new ModelManager();
+
+    // Act
+    const result = await mgr.loadModel('ayousanz/piper-plus-tsukuyomi-chan');
+
+    // Assert
+    assert.ok(result.modelData instanceof ArrayBuffer);
+    assert.deepEqual(result.config, customConfig);
+
+    // config.json が取得されていることを確認
+    const configFetch = calledUrls.find((u) => u.includes('/resolve/main/config.json'));
+    assert.ok(configFetch, 'config.json should have been fetched');
+  });
+
+  // =====================================================================
+  // 10. 直接 URL で primary config が 404 の場合フォールバックする
+  // =====================================================================
+
+  it('直接 URL で primary config 404 時に config.json にフォールバックする', async () => {
+    // Arrange
+    const mockDb = createMockIndexedDB();
+    installIndexedDBMock(mockDb);
+
+    const customConfig = { audio: { sample_rate: 22050 }, num_speakers: 1 };
+    const modelUrl = 'https://example.com/models/my-model.onnx';
+
+    const routes = new Map([
+      // Primary config URL returns 404
+      [modelUrl + '.json', {
+        ok: false,
+        status: 404,
+        statusText: 'Not Found',
+      }],
+      // Fallback config.json succeeds
+      ['https://example.com/models/config.json', {
+        ok: true,
+        json: () => Promise.resolve(customConfig),
+      }],
+      [modelUrl, {
+        ok: true,
+        arrayBuffer: () => Promise.resolve(new ArrayBuffer(128)),
+      }],
+    ]);
+
+    const { fetch: mockFetch, calledUrls } = createMockFetch(routes);
+    globalThis.fetch = mockFetch;
+
+    const mgr = new ModelManager();
+
+    // Act
+    const result = await mgr.loadModel(modelUrl);
+
+    // Assert
+    assert.ok(result.modelData instanceof ArrayBuffer);
+    assert.deepEqual(result.config, customConfig);
+
+    // 両方のconfig URLが試行されたことを確認
+    assert.ok(calledUrls.includes(modelUrl + '.json'), 'primary config URL should be tried first');
+    assert.ok(calledUrls.includes('https://example.com/models/config.json'), 'fallback config.json should be tried');
   });
 });
