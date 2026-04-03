@@ -126,9 +126,26 @@ jobs:
           fi
           echo "Build succeeded"
 
+      - name: Cache test model
+        id: cache-test-model
+        uses: actions/cache@v4
+        with:
+          path: test/models/
+          key: test-model-multilingual-medium-v1
+
+      - name: Download test model
+        if: steps.cache-test-model.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          mkdir -p test/models
+          curl -sL "https://huggingface.co/ayousanz/piper-plus-base/resolve/main/multilingual-test-medium.onnx" \
+            -o test/models/multilingual-test-medium.onnx || true
+          curl -sL "https://huggingface.co/ayousanz/piper-plus-base/resolve/main/multilingual-test-medium.onnx.json" \
+            -o test/models/multilingual-test-medium.onnx.json || true
+
       - name: Run tests
         run: |
-          
+
           cd build
           # Check test location
           echo "Looking for test executables..."
@@ -144,7 +161,7 @@ jobs:
           
           # Check if our critical tests pass
           TESTS_FOUND=false
-          for test in test_gpu_device_id test_phoneme_parser test_model_speaker_detection test_prosody_inference test_swedish_phonemize test_c_api; do
+          for test in test_gpu_device_id test_phoneme_parser test_model_speaker_detection test_prosody_inference test_swedish_phonemize test_c_api test_c_api_integration; do
             if ctest -N | grep -q "${test}"; then
               TESTS_FOUND=true
               if ctest -R "^${test}$" --output-on-failure -V --timeout 60; then
