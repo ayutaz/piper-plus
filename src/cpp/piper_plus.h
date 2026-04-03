@@ -8,6 +8,21 @@
 extern "C" {
 #endif
 
+/* ===== ABI Policy =====
+ * - All input structs (Config, SynthOptions) have _reserved fields for future
+ *   expansion without breaking ABI. Output structs (AudioChunk, PhonemeInfo,
+ *   TimingResult) are read-only and versioned via PIPER_PLUS_API_VERSION.
+ * - Callers MUST zero-initialize input structs with memset() or = {0} before
+ *   populating fields. This ensures that _reserved fields and any fields added
+ *   in future versions default to zero.
+ * - _reserved fields MUST be zero. Non-zero values in _reserved are reserved
+ *   for future use and may cause errors in later versions.
+ * - Query functions (piper_plus_sample_rate, num_speakers, num_languages,
+ *   language_id, dict_entry_count) return a sentinel value on error (see each
+ *   function's documentation) rather than a Status code, for ergonomic use in
+ *   expressions. Use piper_plus_get_last_error() if you need the error message.
+ */
+
 /* ===== Export macro ===== */
 #if defined(_WIN32) || defined(_WIN64)
   #ifdef PIPER_PLUS_BUILDING_DLL
@@ -42,6 +57,14 @@ typedef enum PiperPlusStatus {
 } PiperPlusStatus;
 
 /* ===== Error ===== */
+
+/** Returns the error message for the CALLING thread (thread-local storage).
+ *  @return NUL-terminated error string, or NULL if no error has occurred.
+ *  @note The returned pointer is valid until the next piper_plus_* call on
+ *        the same thread. Caller should copy the string if persistence is
+ *        needed beyond that point.
+ *  @threading Safe to call from any thread. Each thread has independent
+ *             error state. */
 PIPER_PLUS_API const char *piper_plus_get_last_error(void);
 
 /* ===== Opaque engine handle ===== */
@@ -101,20 +124,40 @@ PIPER_PLUS_API PiperPlusStatus piper_plus_synthesize(
 
 PIPER_PLUS_API void piper_plus_free_audio(float *samples);
 
-/* ===== Query ===== */
+/* ===== Query =====
+ * These functions return scalar values directly for ergonomic use.
+ * On error (NULL engine, invalid argument), they return a sentinel value
+ * (0 or -1 as documented below) and set the thread-local error string. */
 
+/** Returns sample rate in Hz, or 0 on error (NULL engine). */
 PIPER_PLUS_API int32_t piper_plus_sample_rate(const PiperPlusEngine *engine);
+
+/** Returns number of speakers in the model, or 0 on error (NULL engine). */
 PIPER_PLUS_API int32_t piper_plus_num_speakers(const PiperPlusEngine *engine);
+
+/** Returns number of languages in the model, or 0 on error (NULL engine). */
 PIPER_PLUS_API int32_t piper_plus_num_languages(const PiperPlusEngine *engine);
+
+/** Returns language index for the given name, or -1 if not found or on error.
+ *  @param language_name  Language code string (e.g. "ja", "en"). */
 PIPER_PLUS_API int32_t piper_plus_language_id(
     const PiperPlusEngine *engine,
     const char            *language_name);
 
 /* ===== Audio chunk (for iterator/streaming) ===== */
 
+/**
+ * Audio data returned by iterator/streaming synthesis.
+ *
+ * @lifetime The samples pointer is BORROWED from the engine's internal buffer.
+ *   - For synth_next(): valid until the next synth_next() or synth_start() call
+ *     on the same engine.
+ *   - For streaming callback (PiperPlusAudioCallback / PiperPlusAudioCallbackEx):
+ *     valid only during the callback invocation.
+ *   - Caller MUST copy the data if retention is needed beyond these boundaries.
+ */
 typedef struct PiperPlusAudioChunk {
-    const float *samples;         /**< BORROWED: valid until next synth_next()
-                                       or synth_start() call. Copy if needed. */
+    const float *samples;         /**< BORROWED: see struct-level @lifetime doc */
     int32_t      num_samples;     /**< Number of float samples */
     int32_t      sample_rate;     /**< Sample rate in Hz */
     int32_t      is_last;         /**< 1 if this is the last chunk, 0 otherwise */
@@ -142,6 +185,12 @@ PIPER_PLUS_API PiperPlusStatus piper_plus_synth_next(
 
 /* ===== Streaming callback synthesis ===== */
 
+/** Audio callback for streaming synthesis.
+ *  @param samples      BORROWED: valid only during this callback invocation.
+ *                      Caller MUST copy if retention is needed.
+ *  @param num_samples  Number of float samples in the buffer.
+ *  @param sample_rate  Sample rate in Hz.
+ *  @param user_data    Opaque pointer passed to synthesize_streaming(). */
 typedef void (*PiperPlusAudioCallback)(
     const float *samples,
     int32_t      num_samples,
@@ -164,7 +213,13 @@ PIPER_PLUS_API PiperPlusStatus piper_plus_synthesize_streaming(
 
 /* ===== Cancellable streaming callback (M5-7) ===== */
 
-/** Callback that returns 0 to continue, non-zero to abort. */
+/** Cancellable audio callback. Return 0 to continue, non-zero to abort.
+ *  @param samples      BORROWED: valid only during this callback invocation.
+ *                      Caller MUST copy if retention is needed.
+ *  @param num_samples  Number of float samples in the buffer.
+ *  @param sample_rate  Sample rate in Hz.
+ *  @param user_data    Opaque pointer passed to synthesize_streaming_ex().
+ *  @return 0 to continue synthesis, non-zero to abort (not treated as error). */
 typedef int (*PiperPlusAudioCallbackEx)(
     const float *samples,
     int32_t      num_samples,
@@ -195,31 +250,50 @@ PIPER_PLUS_API PiperPlusStatus piper_plus_add_dict_word(
     const char      *pronunciation,
     int32_t          priority);
 
+/** Returns number of entries in the custom dictionary, or 0 on error
+ *  (NULL engine or no dictionary loaded). */
 PIPER_PLUS_API int32_t piper_plus_dict_entry_count(const PiperPlusEngine *engine);
 
 /* ===== Phoneme timing (M4-2) ===== */
 
+/**
+ * Phoneme timing entry from the last synthesis.
+ *
+ * @lifetime All BORROWED pointers (phoneme string, entries array) are valid
+ *   until the next synthesis call (synthesize, synth_start, synth_next, or
+ *   synthesize_streaming*) on the same engine. Caller MUST copy the data if
+ *   retention is needed beyond that point.
+ */
 typedef struct PiperPlusPhonemeInfo {
-    const char *phoneme;       /**< Phoneme string (BORROWED, valid until next synthesis) */
+    const char *phoneme;       /**< BORROWED: phoneme string (UTF-8, NUL-terminated) */
     float       start_time;    /**< Start time in seconds */
     float       end_time;      /**< End time in seconds */
 } PiperPlusPhonemeInfo;
 
 typedef struct PiperPlusTimingResult {
-    const PiperPlusPhonemeInfo *entries;  /**< Array of phoneme timing entries */
+    const PiperPlusPhonemeInfo *entries;  /**< BORROWED: array of timing entries */
     int32_t                     count;    /**< Number of entries */
 } PiperPlusTimingResult;
 
-/** Get phoneme timing from the last synthesis. Valid until next synthesis call. */
+/** Get phoneme timing from the last synthesis.
+ *  @lifetime Result is BORROWED; valid until next synthesis call on this engine.
+ *  Caller MUST copy entries if persistence is needed. */
 PIPER_PLUS_API PiperPlusStatus piper_plus_get_phoneme_timing(
     PiperPlusEngine         *engine,
     PiperPlusTimingResult   *out_timing);
 
 /* ===== G2P / Phonemization (M4-3) ===== */
 
+/**
+ * Result of piper_plus_phonemize().
+ *
+ * @lifetime BORROWED pointers (phonemes, language) are valid until the next
+ *   piper_plus_phonemize() or synthesis call on the same engine. Caller MUST
+ *   copy strings if persistence is needed.
+ */
 typedef struct PiperPlusPhonemeResult {
-    const char *phonemes;      /**< Space-separated IPA phoneme string (BORROWED) */
-    const char *language;      /**< Detected language code (BORROWED) */
+    const char *phonemes;      /**< BORROWED: space-separated IPA phoneme string */
+    const char *language;      /**< BORROWED: detected/resolved language code */
     int32_t     num_phonemes;  /**< Number of phoneme tokens */
     int32_t     _reserved[4];  /**< Must be zero -- reserved for future fields */
 } PiperPlusPhonemeResult;
@@ -231,7 +305,10 @@ PIPER_PLUS_API PiperPlusStatus piper_plus_phonemize(
     const char              *language,
     PiperPlusPhonemeResult  *out_result);
 
-/** Get available language codes (comma-separated, BORROWED). */
+/** Get available language codes as a comma-separated string (e.g. "en,fr,ja").
+ *  @return BORROWED pointer; valid until next call to this function on the
+ *          same engine. Returns "" (empty string) on error (NULL engine or
+ *          no language map). Caller MUST copy if persistence is needed. */
 PIPER_PLUS_API const char *piper_plus_available_languages(PiperPlusEngine *engine);
 
 #ifdef __cplusplus

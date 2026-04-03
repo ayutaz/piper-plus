@@ -296,6 +296,27 @@ jobs:
             exit 1
           fi
 
+      # ── Test result summary ──────────────────────────────────
+      - name: Test result summary
+        if: always()
+        shell: bash
+        run: |
+          cd build
+          echo "## C++ Test Results (${{ matrix.os }} / ${{ matrix.build-type }})" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          ctest -C ${{ matrix.build-type }} -N 2>/dev/null | grep -E "Test #|Total Tests:" >> "$GITHUB_STEP_SUMMARY" || echo "No tests registered" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          if [ -f Testing/Temporary/LastTest.log ]; then
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "<details><summary>Last test log (truncated)</summary>" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            tail -100 Testing/Temporary/LastTest.log >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            echo "</details>" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
       # ── Post-build verification ───────────────────────────────
       - name: Test install (shared library)
         if: success()

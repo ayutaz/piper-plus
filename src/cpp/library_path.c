@@ -85,60 +85,93 @@ int piper_plus_get_library_dir(char *buf, int size) {
     if (!dladdr((void *)piper_plus_get_library_dir, &info)) return -1;
     if (!info.dli_fname) return -1;
 
-    /* realpath to resolve symlinks */
-    char resolved[4096];
-    if (!realpath(info.dli_fname, resolved)) {
-        /* Fallback: use dli_fname directly */
-        strncpy(resolved, info.dli_fname, sizeof(resolved) - 1);
-        resolved[sizeof(resolved) - 1] = '\0';
+    /* realpath with NULL: POSIX.1-2008 dynamic allocation (no fixed buffer) */
+    char *resolved = realpath(info.dli_fname, NULL);
+    if (!resolved) {
+        /* Fallback: copy dli_fname for dirname (which may modify its argument) */
+        size_t fname_len = strlen(info.dli_fname);
+        resolved = (char *)malloc(fname_len + 1);
+        if (!resolved) return -1;
+        memcpy(resolved, info.dli_fname, fname_len + 1);
     }
 
-    /* dirname modifies its argument, so make a copy */
+    /* dirname may modify its argument or return a pointer into it —
+     * 'resolved' is our own heap buffer so this is safe. */
     char *dir = dirname(resolved);
-    if (!dir) return -1;
+    if (!dir) { free(resolved); return -1; }
 
     int dir_len = (int)strlen(dir);
-    if (dir_len >= size) return -1;
+    if (dir_len >= size) { free(resolved); return -1; }
 
     memcpy(buf, dir, dir_len);
     buf[dir_len] = '\0';
+    free(resolved);
     return 0;
 }
 
 int piper_plus_get_exe_dir(char *buf, int size) {
     if (!buf || size <= 0) return -1;
 
-    char fullpath[4096];
+    char *resolved = NULL;
 
 #ifdef __APPLE__
-    uint32_t pathsize = (uint32_t)sizeof(fullpath);
-    if (_NSGetExecutablePath(fullpath, &pathsize) != 0) return -1;
+    {
+        /* First call to get required buffer size */
+        uint32_t pathsize = 0;
+        _NSGetExecutablePath(NULL, &pathsize);
 
-    /* Resolve symlinks with realpath */
-    char resolved[4096];
-    if (!realpath(fullpath, resolved)) {
-        /* Fallback: use raw path */
-        strncpy(resolved, fullpath, sizeof(resolved) - 1);
-        resolved[sizeof(resolved) - 1] = '\0';
+        char *rawpath = (char *)malloc(pathsize);
+        if (!rawpath) return -1;
+        if (_NSGetExecutablePath(rawpath, &pathsize) != 0) {
+            free(rawpath);
+            return -1;
+        }
+
+        /* realpath with NULL: dynamic allocation */
+        resolved = realpath(rawpath, NULL);
+        if (!resolved) {
+            /* Fallback: use raw path (already heap-allocated) */
+            resolved = rawpath;
+        } else {
+            free(rawpath);
+        }
     }
-
-    char *dir = dirname(resolved);
 #else
-    /* Linux: readlink /proc/self/exe */
-    ssize_t len = readlink("/proc/self/exe", fullpath, sizeof(fullpath) - 1);
-    if (len <= 0) return -1;
-    fullpath[len] = '\0';
+    {
+        /* Linux: readlink /proc/self/exe
+         * Use a dynamically-sized buffer in case PATH_MAX is insufficient. */
+        size_t bufsize = 4096;
+#ifdef PATH_MAX
+        if ((size_t)PATH_MAX > bufsize) bufsize = (size_t)PATH_MAX;
+#endif
+        char *linkbuf = (char *)malloc(bufsize);
+        if (!linkbuf) return -1;
 
-    char *dir = dirname(fullpath);
+        ssize_t len = readlink("/proc/self/exe", linkbuf, bufsize - 1);
+        if (len <= 0) { free(linkbuf); return -1; }
+        linkbuf[len] = '\0';
+
+        /* realpath with NULL: dynamic allocation */
+        resolved = realpath(linkbuf, NULL);
+        if (!resolved) {
+            /* Fallback: use linkbuf directly */
+            resolved = linkbuf;
+        } else {
+            free(linkbuf);
+        }
+    }
 #endif
 
-    if (!dir) return -1;
+    /* dirname may modify its argument — 'resolved' is our own heap buffer */
+    char *dir = dirname(resolved);
+    if (!dir) { free(resolved); return -1; }
 
     int dir_len = (int)strlen(dir);
-    if (dir_len >= size) return -1;
+    if (dir_len >= size) { free(resolved); return -1; }
 
     memcpy(buf, dir, dir_len);
     buf[dir_len] = '\0';
+    free(resolved);
     return 0;
 }
 

@@ -1,0 +1,17 @@
+name: C++ Lint
+on:
+  pull_request:
+    branches: [dev]
+    paths: ['src/cpp/**']
+permissions:
+  contents: read
+jobs:
+  clang-format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check formatting
+        run: |
+          find src/cpp -name '*.cpp' -o -name '*.h' -o -name '*.c' | \
+            xargs clang-format --dry-run --Werror 2>&1 || true
+          echo "Note: clang-format check is advisory only"

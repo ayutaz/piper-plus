@@ -96,10 +96,13 @@ void PiperTTS::_ensure_engine() {
     load_model();
 }
 
+// Idempotent: safe to call multiple times (e.g., from both _exit_tree and ~PiperTTS).
+// Sets m_engine to nullptr after freeing to prevent double-free.
 void PiperTTS::_destroy_engine() {
     if (m_engine) {
-        piper_plus_free(m_engine);
-        m_engine = nullptr;
+        PiperPlusEngine *tmp = m_engine;
+        m_engine = nullptr;  // Clear first to prevent re-entrant double-free
+        piper_plus_free(tmp);
     }
 }
 

@@ -210,13 +210,23 @@ class PiperPlus {
 
     final controller = StreamController<Uint8List>();
 
-    // The NativeCallable must be stored so it is not GC'd before the
-    // callback completes.  We close it when synthesis finishes.
+    // IMPORTANT: NativeCallable lifetime management.
+    //
+    // The NativeCallable must be stored in a local variable so it is not
+    // garbage-collected before the C callback completes.  The variable
+    // `nativeCallback` is captured by the closures below, which keeps it
+    // alive for the duration of the microtask.  We call `.close()` in the
+    // `finally` block after piper_plus_synthesize_streaming returns, which
+    // guarantees the native trampoline is released exactly once and only
+    // after all callback invocations have finished (the C function is
+    // synchronous and invokes all callbacks before returning).
     late final NativeCallable<PiperPlusAudioCallbackNative> nativeCallback;
 
     nativeCallback = NativeCallable<PiperPlusAudioCallbackNative>.listener(
       (Pointer<Float> samples, int numSamples, int sr, Pointer<Void> _) {
-        // Copy samples before the pointer becomes invalid
+        // Copy samples before the pointer becomes invalid.
+        // The C API only guarantees the samples pointer is valid for the
+        // duration of this callback invocation.
         final floats = samples.asTypedList(numSamples);
         final pcm = _floatToPcm16(floats);
         controller.add(pcm);

@@ -605,6 +605,7 @@ if(TARGET openjtalk_external)
 endif()
 
 add_test(NAME test_c_api COMMAND test_c_api)
+set_tests_properties(test_c_api PROPERTIES TIMEOUT 60)
 
 # ---- test_c_api_integration: C API integration tests (model required) ----
 # Links against the piper_plus shared library (or object lib for static build).
@@ -683,6 +684,7 @@ add_test(NAME test_c_api_integration COMMAND test_c_api_integration)
 # Set working directory to project root for model path resolution
 set_tests_properties(test_c_api_integration PROPERTIES
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    TIMEOUT 300
 )
 
 # ---- test_c_api_audio_regression: Audio regression tests (M5-21, model required) ----
@@ -761,4 +763,5 @@ add_test(NAME test_c_api_audio_regression COMMAND test_c_api_audio_regression)
 # Set working directory to project root for model path resolution
 set_tests_properties(test_c_api_audio_regression PROPERTIES
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    TIMEOUT 300
 )

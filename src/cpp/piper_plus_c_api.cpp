@@ -145,6 +145,12 @@ private:
 
 } // anonymous namespace
 
+// ===== Text length limit =====
+
+// Maximum text input length (bytes). Prevents excessive memory allocation
+// and unbounded synthesis time from very large inputs.
+static constexpr size_t MAX_TEXT_LENGTH = 1024 * 1024; // 1 MB
+
 // ===== Shared helper: apply synthesis options =====
 
 static void applySynthOptions(piper::SynthesisConfig &synthConfig,
@@ -175,6 +181,44 @@ static void applySynthOptions(piper::SynthesisConfig &synthConfig,
     synthConfig.lengthScale = effectiveOpts.length_scale;
     synthConfig.noiseW = effectiveOpts.noise_w;
     synthConfig.sentenceSilenceSeconds = effectiveOpts.sentence_silence_sec;
+}
+
+// ===== Boundary validation for speaker_id / language_id =====
+
+/// Validate that the current synthesisConfig speaker_id and language_id are
+/// within the model's valid range. Returns PIPER_PLUS_OK on success, or an
+/// error status (with set_error) if out of range.
+///
+/// speaker_id is only checked when numSpeakers > 0 (multi-speaker model).
+/// language_id == -1 means auto-detect and is always valid.
+static PiperPlusStatus validateSynthIds(const PiperPlusEngine *engine) {
+    const auto &synthConfig = engine->voice.synthesisConfig;
+    const auto &modelConfig = engine->voice.modelConfig;
+
+    // speaker_id check: only for multi-speaker models (numSpeakers > 0)
+    if (synthConfig.speakerId.has_value() && modelConfig.numSpeakers > 0) {
+        int64_t sid = static_cast<int64_t>(synthConfig.speakerId.value());
+        if (sid < 0 || sid >= static_cast<int64_t>(modelConfig.numSpeakers)) {
+            set_error("speaker_id " + std::to_string(sid) +
+                      " out of range [0, " +
+                      std::to_string(modelConfig.numSpeakers) + ")");
+            return PIPER_PLUS_ERR_TEXT;
+        }
+    }
+
+    // language_id check: only for multi-language models (numLanguages > 1)
+    if (synthConfig.languageId.has_value() && modelConfig.numLanguages > 1) {
+        int64_t lid = static_cast<int64_t>(synthConfig.languageId.value());
+        // lid == -1 means auto-detect → always valid (already handled by applySynthOptions)
+        if (lid >= 0 && lid >= static_cast<int64_t>(modelConfig.numLanguages)) {
+            set_error("language_id " + std::to_string(lid) +
+                      " out of range [0, " +
+                      std::to_string(modelConfig.numLanguages) + ")");
+            return PIPER_PLUS_ERR_TEXT;
+        }
+    }
+
+    return PIPER_PLUS_OK;
 }
 
 // ===== API implementation =====
@@ -351,8 +395,8 @@ PIPER_PLUS_API PiperPlusStatus piper_plus_synthesize(
         set_error("text is NULL");
         return PIPER_PLUS_ERR_TEXT;
     }
-    // Text length limit (1 MB)
-    if (std::strlen(text) > 1024 * 1024) {
+    // Text length limit
+    if (std::strlen(text) > MAX_TEXT_LENGTH) {
         set_error("text exceeds maximum length (1 MB)");
         return PIPER_PLUS_ERR_TEXT;
     }
@@ -367,6 +411,10 @@ PIPER_PLUS_API PiperPlusStatus piper_plus_synthesize(
 
         // Apply options
         applySynthOptions(engine->voice.synthesisConfig, opts);
+
+        // Validate speaker_id / language_id bounds
+        PiperPlusStatus idCheck = validateSynthIds(engine);
+        if (idCheck != PIPER_PLUS_OK) return idCheck;
 
         // Apply custom dictionary
         std::string processedText = text;
@@ -471,8 +519,8 @@ PIPER_PLUS_API PiperPlusStatus piper_plus_synth_start(
         set_error("text is NULL or empty");
         return PIPER_PLUS_ERR_TEXT;
     }
-    // Text length limit (1 MB)
-    if (std::strlen(text) > 1024 * 1024) {
+    // Text length limit
+    if (std::strlen(text) > MAX_TEXT_LENGTH) {
         set_error("text exceeds maximum length (1 MB)");
         return PIPER_PLUS_ERR_TEXT;
     }
@@ -485,6 +533,14 @@ PIPER_PLUS_API PiperPlusStatus piper_plus_synth_start(
 
         // Apply options
         applySynthOptions(engine->voice.synthesisConfig, opts);
+
+        // Validate speaker_id / language_id bounds
+        PiperPlusStatus idCheck = validateSynthIds(engine);
+        if (idCheck != PIPER_PLUS_OK) {
+            // Restore config before returning (ConfigGuard not used here)
+            engine->voice.synthesisConfig = engine->iterState.configSnapshot_;
+            return idCheck;
+        }
 
         // Apply custom dictionary
         std::string processedText = text;

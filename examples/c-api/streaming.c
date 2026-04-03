@@ -10,35 +10,49 @@
 #include "piper_plus.h"
 
 /* Write a 16-bit LE value */
-static void write_le16(FILE *f, uint16_t v) {
+static int write_le16(FILE *f, uint16_t v) {
     uint8_t buf[2] = {(uint8_t)v, (uint8_t)(v >> 8)};
-    fwrite(buf, 1, 2, f);
+    if (fwrite(buf, 1, 2, f) != 2) {
+        fprintf(stderr, "Error: failed to write 16-bit value\n");
+        return -1;
+    }
+    return 0;
 }
 
 /* Write a 32-bit LE value */
-static void write_le32(FILE *f, uint32_t v) {
+static int write_le32(FILE *f, uint32_t v) {
     uint8_t buf[4] = {(uint8_t)v, (uint8_t)(v >> 8), (uint8_t)(v >> 16), (uint8_t)(v >> 24)};
-    fwrite(buf, 1, 4, f);
+    if (fwrite(buf, 1, 4, f) != 4) {
+        fprintf(stderr, "Error: failed to write 32-bit value\n");
+        return -1;
+    }
+    return 0;
 }
 
-/* Minimal WAV header for 16-bit mono PCM (endian-safe) */
-static void write_wav_header(FILE *f, int32_t num_samples, int32_t sample_rate) {
+/* Minimal WAV header for 16-bit mono PCM (endian-safe).
+ * Returns 0 on success, -1 on write error. */
+static int write_wav_header(FILE *f, int32_t num_samples, int32_t sample_rate) {
     uint32_t data_size = (uint32_t)num_samples * 2;
     uint32_t file_size = 36 + data_size;
 
-    fwrite("RIFF", 1, 4, f);
-    write_le32(f, file_size);
-    fwrite("WAVE", 1, 4, f);
-    fwrite("fmt ", 1, 4, f);
-    write_le32(f, 16);            /* fmt chunk size */
-    write_le16(f, 1);             /* PCM format */
-    write_le16(f, 1);             /* mono */
-    write_le32(f, (uint32_t)sample_rate);
-    write_le32(f, (uint32_t)(sample_rate * 2)); /* byte rate */
-    write_le16(f, 2);             /* block align */
-    write_le16(f, 16);            /* bits per sample */
-    fwrite("data", 1, 4, f);
-    write_le32(f, data_size);
+    if (fwrite("RIFF", 1, 4, f) != 4) goto fail;
+    if (write_le32(f, file_size) != 0) goto fail;
+    if (fwrite("WAVE", 1, 4, f) != 4) goto fail;
+    if (fwrite("fmt ", 1, 4, f) != 4) goto fail;
+    if (write_le32(f, 16) != 0) goto fail;            /* fmt chunk size */
+    if (write_le16(f, 1) != 0) goto fail;             /* PCM format */
+    if (write_le16(f, 1) != 0) goto fail;             /* mono */
+    if (write_le32(f, (uint32_t)sample_rate) != 0) goto fail;
+    if (write_le32(f, (uint32_t)(sample_rate * 2)) != 0) goto fail; /* byte rate */
+    if (write_le16(f, 2) != 0) goto fail;             /* block align */
+    if (write_le16(f, 16) != 0) goto fail;            /* bits per sample */
+    if (fwrite("data", 1, 4, f) != 4) goto fail;
+    if (write_le32(f, data_size) != 0) goto fail;
+    return 0;
+
+fail:
+    fprintf(stderr, "Error: failed to write WAV header\n");
+    return -1;
 }
 
 struct StreamState {
@@ -64,7 +78,12 @@ static void on_audio_chunk(const float *samples, int32_t num_samples,
     if (state->all_count + num_samples > state->all_capacity) {
         int32_t new_cap = (state->all_capacity == 0) ? 65536 : state->all_capacity * 2;
         while (new_cap < state->all_count + num_samples) new_cap *= 2;
-        state->all_samples = (float *)realloc(state->all_samples, (size_t)new_cap * sizeof(float));
+        float *tmp = (float *)realloc(state->all_samples, (size_t)new_cap * sizeof(float));
+        if (!tmp) {
+            fprintf(stderr, "Error: realloc failed for %d samples\n", new_cap);
+            return;
+        }
+        state->all_samples = tmp;
         state->all_capacity = new_cap;
     }
     memcpy(state->all_samples + state->all_count, samples, (size_t)num_samples * sizeof(float));
@@ -116,16 +135,26 @@ int main(int argc, char *argv[]) {
         const char *output_wav = argc > 4 ? argv[4] : "streaming_output.wav";
         FILE *f = fopen(output_wav, "wb");
         if (f) {
-            write_wav_header(f, state.all_count, state.sample_rate);
-            for (int32_t i = 0; i < state.all_count; i++) {
+            int write_ok = 1;
+            if (write_wav_header(f, state.all_count, state.sample_rate) != 0) {
+                write_ok = 0;
+            }
+            for (int32_t i = 0; i < state.all_count && write_ok; i++) {
                 float s = state.all_samples[i];
                 if (s > 1.0f) s = 1.0f;
                 if (s < -1.0f) s = -1.0f;
                 int16_t pcm = (int16_t)(s * 32767.0f);
-                fwrite(&pcm, 2, 1, f);
+                if (fwrite(&pcm, 2, 1, f) != 1) {
+                    fprintf(stderr, "Error: failed to write PCM sample %d\n", i);
+                    write_ok = 0;
+                }
             }
             fclose(f);
-            printf("Saved: %s\n", output_wav);
+            if (write_ok) {
+                printf("Saved: %s\n", output_wav);
+            } else {
+                fprintf(stderr, "Error: WAV file may be incomplete: %s\n", output_wav);
+            }
         }
     }
     free(state.all_samples);

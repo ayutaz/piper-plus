@@ -257,12 +257,18 @@ TEST(StreamingSimpleTest, CrossfadeAudioChunks) {
 // These tests verify the crossfade math used in synth_next.
 // The Iterator uses float samples (textToAudioFloat), so crossfade
 // operates on float rather than int16_t.
+//
+// NOTE: Unit tests use TEST_CROSSFADE_SAMPLES=4 for logic verification.
+// The production value CROSSFADE_SAMPLES=220 (10ms @ 22050Hz) is validated
+// in integration tests (test_c_api_integration.cpp: IteratorCrossfade*).
 
 // Simulate the Iterator crossfade logic extracted from synth_next.
 // This mirrors the exact algorithm in piper_plus_c_api.cpp.
 namespace {
 
-static constexpr size_t TEST_CROSSFADE_SAMPLES = 4;  // small value for testing
+// Small value for unit testing -- keeps expected values hand-computable.
+// Production code uses CROSSFADE_SAMPLES = 220 (10ms @ 22050Hz).
+static constexpr size_t TEST_CROSSFADE_SAMPLES = 4;
 
 /// Apply crossfade between prevTail and the beginning of currentChunk.
 /// Save tail of currentChunk into prevTail for next iteration.

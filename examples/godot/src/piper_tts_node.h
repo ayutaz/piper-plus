@@ -55,6 +55,8 @@ protected:
 
 private:
     void _ensure_engine();
+    /// Idempotent: safe to call multiple times. Clears m_engine before freeing
+    /// to prevent double-free when called from both _exit_tree() and ~PiperTTS().
     void _destroy_engine();
     void _push_samples_to_generator(const float *samples, int32_t num_samples, int32_t sample_rate);
 

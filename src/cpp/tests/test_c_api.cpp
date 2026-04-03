@@ -641,3 +641,53 @@ TEST(CApiCreate, StatusCodeErrOrt) {
     // ERR_ORT must equal -6
     EXPECT_EQ(PIPER_PLUS_ERR_ORT, -6);
 }
+
+// ===== Boundary value tests for speaker_id / language_id =====
+
+TEST(CApiBoundary, SpeakerIdNegative) {
+    // speaker_id=-1 should be silently ignored by applySynthOptions
+    // (the condition is "if (speaker_id >= 0)"), so it never sets speakerId.
+    // With NULL engine the call returns ERR (null-safety), not a boundary error.
+    PiperPlusSynthOptions opts = piper_plus_default_options();
+    opts.speaker_id = -1;
+
+    float *samples = nullptr;
+    int32_t num_samples = 0, sample_rate = 0;
+    PiperPlusStatus rc = piper_plus_synthesize(
+        nullptr, "hello", &opts, &samples, &num_samples, &sample_rate);
+    // NULL engine -> ERR, but must not crash with speaker_id=-1
+    EXPECT_EQ(rc, PIPER_PLUS_ERR);
+
+    // Also verify iterator path
+    rc = piper_plus_synth_start(nullptr, "hello", &opts);
+    EXPECT_EQ(rc, PIPER_PLUS_ERR);
+
+    // And streaming path
+    rc = piper_plus_synthesize_streaming(
+        nullptr, "hello", &opts, dummy_callback, nullptr);
+    EXPECT_EQ(rc, PIPER_PLUS_ERR);
+}
+
+TEST(CApiBoundary, LanguageIdNegative) {
+    // language_id=-1 means auto-detect and is the default value.
+    // This must always be accepted (never treated as out-of-range).
+    // With NULL engine the call returns ERR (null-safety), not a boundary error.
+    PiperPlusSynthOptions opts = piper_plus_default_options();
+    EXPECT_EQ(opts.language_id, -1);  // confirm default is -1
+
+    float *samples = nullptr;
+    int32_t num_samples = 0, sample_rate = 0;
+    PiperPlusStatus rc = piper_plus_synthesize(
+        nullptr, "hello", &opts, &samples, &num_samples, &sample_rate);
+    // NULL engine -> ERR, but must not crash with language_id=-1
+    EXPECT_EQ(rc, PIPER_PLUS_ERR);
+
+    // Also verify iterator path
+    rc = piper_plus_synth_start(nullptr, "hello", &opts);
+    EXPECT_EQ(rc, PIPER_PLUS_ERR);
+
+    // And streaming path
+    rc = piper_plus_synthesize_streaming(
+        nullptr, "hello", &opts, dummy_callback, nullptr);
+    EXPECT_EQ(rc, PIPER_PLUS_ERR);
+}
