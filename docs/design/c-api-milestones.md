@@ -1,0 +1,500 @@
+# C API 共有ライブラリ — マイルストーン (Issue #295)
+
+> **要求定義書:** [c-api-shared-library.md](c-api-shared-library.md)
+> **技術調査:** [c-api-technical-investigation.md](c-api-technical-investigation.md)
+> **Date:** 2026-04-03
+
+---
+
+## 概要
+
+| Phase | 内容 | チケット数 |
+|-------|------|-----------|
+| Phase 1 | 基本 C API (MVP) — ワンショット合成 + 3 プラットフォームビルド | 8 |
+| Phase 2 | ストリーミング + テスト | 6 |
+| Phase 3 | 配布 | 6 |
+| Phase 4 | 拡張 (将来) | 6 |
+| **合計** | | **26** |
+
+---
+
+## Phase 1: 基本 C API (MVP)
+
+### 依存関係グラフ
+
+```
+M1-1 (-fPIC)  ──────────────────────────────┐
+                                             v
+M1-5 (piper_plus.h) ──┬──> M1-4 (CMake + OBJECT lib) ──┐
+                       │                                 │
+M1-2 (-static-libstdc++)                                 v
+                                                  M1-6 (C API 実装)
+M1-3 (dict_dir) ─────────────────────────────────┘      │
+                                                         v
+                                                  M1-7 (テスト)
+                                                         │
+                                                         v
+                                                  M1-8 (CI)
+```
+
+---
+
+### M1-1: ExternalProject に `-fPIC` を追加
+
+**見積り:** 小
+
+**変更対象:** `CMakeLists.txt`
+
+**変更内容:**
+- `openjtalk_external` の `OPENJTALK_CMAKE_ARGS` に `-DCMAKE_POSITION_INDEPENDENT_CODE:BOOL=ON` 追加
+- `spdlog_external` の `CMAKE_ARGS` に `-DCMAKE_POSITION_INDEPENDENT_CODE:BOOL=ON` 追加
+- `hts_engine_stub` に `set_target_properties(... POSITION_INDEPENDENT_CODE ON)` 追加
+- `hts_engine_external` (autotools) の `CONFIGURE_ENV` に `CFLAGS=-fPIC` 追加
+
+**依存関係:** なし (最初に着手)
+
+**受け入れ基準:**
+- Linux x86_64 で `-DPIPER_PLUS_BUILD_SHARED=ON` のビルドが `-fPIC` リンクエラーなしで成功
+- macOS / Windows のビルドが回帰しない
+
+---
+
+### M1-2: `-static-libstdc++` を共有ライブラリに適用しない
+
+**見積り:** 小
+
+**変更対象:** `CMakeLists.txt`
+
+**変更内容:**
+- `-static-libgcc -static-libstdc++` を `piper` (実行ファイル) のみに適用
+- `piper_plus` (共有ライブラリ) には適用しない
+
+**依存関係:** M1-4 と同時に実装
+
+**受け入れ基準:**
+- `ldd libpiper_plus.so` で `libstdc++.so` が動的リンクされている
+- `piper` 実行ファイルは従来通り静的リンク
+
+---
+
+### M1-3: `PiperPlusConfig` に `dict_dir` フィールド追加
+
+**見積り:** 中
+
+**変更対象:** `src/cpp/piper_plus.h`, `src/cpp/piper_plus_c_api.cpp`
+
+**変更内容:**
+- `PiperPlusConfig` に `const char *dict_dir` フィールド追加
+- `piper_plus_create()` で `dict_dir` が非 NULL なら `setenv("OPENJTALK_DICTIONARY_PATH", ...)` を設定
+- `dict_dir = NULL` の場合は既存の自動検出にフォールバック
+
+**依存関係:** M1-5 (ヘッダー)
+
+**受け入れ基準:**
+- `dict_dir` を指定した場合、その辞書が使用される
+- NULL の場合は既存の自動検出にフォールバック
+- ヘッダーに「共有ライブラリ利用時は `dict_dir` の明示指定を推奨」と記載
+
+**技術的背景:** 共有ライブラリでは `getExeDir()` がホストアプリのパスを返すため、辞書自動検出が機能しない (技術調査 5.1)
+
+---
+
+### M1-4: CMake `PIPER_PLUS_BUILD_SHARED` + OBJECT ライブラリ
+
+**見積り:** 大
+
+**変更対象:** `CMakeLists.txt`
+
+**変更内容:**
+- `option(PIPER_PLUS_BUILD_SHARED "Build piper-plus shared library" OFF)` 追加
+- `piper_common` OBJECT ライブラリ定義 (ソース一元管理、`POSITION_INDEPENDENT_CODE ON`)
+- 既存 `piper` / `test_piper` を `piper_common` から構成するようリファクタ
+- `OPENJTALK_DIC_PATH` コンパイル定義を `piper_common` から除外し、消費側で個別設定
+- `piper_plus` SHARED ライブラリターゲット定義:
+  - visibility: hidden デフォルト + `PIPER_PLUS_BUILDING_DLL`
+  - SOVERSION 1, VERSION `${piper_version}`
+  - プラットフォーム別 RPATH: Linux `$ORIGIN`, macOS `@loader_path`, Windows `copy_dlls_to_target`
+- install ターゲット: `lib/` + `include/`
+
+**依存関係:** M1-1 (-fPIC)
+
+**受け入れ基準:**
+- `-DPIPER_PLUS_BUILD_SHARED=ON` で `.so` / `.dylib` / `.dll` がビルドされる
+- `-DPIPER_PLUS_BUILD_SHARED=OFF` (デフォルト) で従来通り `piper` のみビルド
+- 既存の `piper` / `test_piper` のビルドが回帰しない
+- `nm -D libpiper_plus.so | grep ' T '` で `piper_plus_` プレフィックスのみエクスポート
+
+---
+
+### M1-5: `piper_plus.h` ヘッダー作成
+
+**見積り:** 中
+
+**変更対象:** `src/cpp/piper_plus.h` (新規)
+
+**変更内容:**
+- `PIPER_PLUS_API` export マクロ
+- `PIPER_PLUS_API_VERSION 1` + ステータスコード定数 (`OK`, `ERR`, `ERR_MODEL`, `ERR_CONFIG`, `ERR_TEXT`, `ERR_BUSY`)
+- `PiperPlusConfig`: `model_path`, `config_path`, `provider`, `num_threads`, `gpu_device_id`, `dict_dir`, `_reserved[7]`
+- `PiperPlusSynthOptions`: `speaker_id`, `language_id`, `noise_scale`, `length_scale`, `noise_w`, `sentence_silence_sec`, `_reserved[8]`
+- Phase 1 関数宣言: `create`, `free`, `synthesize`, `free_audio`, `default_options`, `version`, `api_version`, `get_last_error`, `sample_rate`, `num_speakers`, `num_languages`, `language_id`
+- スレッドセーフティ・排他制約のドキュメントコメント
+
+**依存関係:** なし (M1-4 と並行可能)
+
+**受け入れ基準:**
+- C (`gcc -std=c99`) と C++ (`g++ -std=c++17`) の両方でコンパイルエラーなし
+- Dart `ffigen` 互換 (POD struct + opaque pointer のみ)
+
+---
+
+### M1-6: `piper_plus_c_api.cpp` 実装
+
+**見積り:** 大
+
+**変更対象:** `src/cpp/piper_plus_c_api.cpp` (新規)
+
+**変更内容:**
+- `PiperPlusEngine` 内部構造体: `PiperConfig`, `Voice`, `inProgress` フラグ
+- `thread_local std::string g_last_error`
+- `PIPER_PLUS_TRY` / `PIPER_PLUS_CATCH` マクロ
+- **`piper_plus_create`**: NULL チェック → dict_dir 設定 → config_path 自動生成 → `loadVoice()`
+- **`piper_plus_synthesize`**: 再入チェック → `synthesisConfig` save/restore → `textToAudio()` → int16→float32 → `malloc()` 確保
+- **`piper_plus_free_audio`**: `free()`
+- **クエリ関数**: `sample_rate`, `num_speakers`, `num_languages`, `language_id`
+
+**依存関係:** M1-5 (ヘッダー), M1-4 (CMake)
+
+**受け入れ基準:**
+- create → synthesize → free のライフサイクルが正常動作
+- `synthesisConfig` が呼び出し後に復元される (`languageId` 未復元バグの回避)
+- 合成中の再入は `PIPER_PLUS_ERR_BUSY` を返す
+- 不正なモデルパスで `create` → NULL + `get_last_error()` でメッセージ取得可能
+- NULL ポインタを全関数に渡してもクラッシュしない
+
+---
+
+### M1-7: C API 単体テスト (モデル不要)
+
+**見積り:** 中
+
+**変更対象:** `src/cpp/tests/test_c_api.cpp` (新規), `src/cpp/tests/CMakeLists.txt`
+
+**テストケース:**
+- `TestVersion`: `version()` が非 NULL、`api_version()` が定数と一致
+- `TestDefaultOptions`: デフォルト値の確認
+- `TestNullSafety`: `create(NULL)` → NULL、`synthesize(NULL)` → ERR、`free(NULL)` → クラッシュなし
+- `TestInvalidModelPath`: 存在しないパス → NULL + エラーメッセージ
+- `TestErrorMessage`: エラー発生後に `get_last_error()` が非 NULL
+- `TestQueryNullEngine`: `sample_rate(NULL)` → 0
+
+**依存関係:** M1-6 (実装)
+
+**受け入れ基準:**
+- 全テストが 3 プラットフォームで PASS
+- モデルファイル不要
+
+---
+
+### M1-8: CI 統合 (3 プラットフォームビルド検証)
+
+**見積り:** 中
+
+**変更対象:** `.github/workflows/cpp-tests.yml`
+
+**変更内容:**
+- trigger paths に `piper_plus.h`, `piper_plus_c_api.cpp` 追加
+- 共有ライブラリビルドステップ追加 (`-DPIPER_PLUS_BUILD_SHARED=ON`)
+- シンボル可視性検証 (`nm -D` / `nm -gU` / `dumpbin /EXPORTS`)
+- C API テスト実行
+
+**依存関係:** M1-4 (CMake), M1-7 (テスト)
+
+**受け入れ基準:**
+- ubuntu-latest, macos-latest, windows-latest で CI GREEN
+
+---
+
+## Phase 2: ストリーミング + テスト
+
+### M2-1: `textToAudio` の音素化ループを再利用可能関数に抽出
+
+**見積り:** 中
+
+**変更対象:** `src/cpp/piper.cpp`, `src/cpp/piper.hpp`
+
+**変更内容:**
+- `textToAudio()` (L1067-1309) の音素化 → phoneme_ids 変換ループを `phonemizeText()` 関数に抽出
+- 文分割ロジック (`textToAudioStreaming` L1689-1729) も再利用可能に
+- 既存の `textToAudio` / `textToAudioStreaming` は抽出関数を呼ぶようリファクタ
+
+**依存関係:** Phase 1 完了
+
+**受け入れ基準:**
+- 既存テストが回帰しない
+- 抽出関数が `piper.hpp` で宣言され、C API から利用可能
+
+**技術的背景:** Iterator パターンでは文単位の逐次合成が必要だが、`textToAudio` は一括処理。音素化ループの抽出が前提 (技術調査 5.2)
+
+---
+
+### M2-2: Iterator パターン (`synth_start` / `synth_next`)
+
+**見積り:** 大
+
+**変更対象:** `src/cpp/piper_plus.h`, `src/cpp/piper_plus_c_api.cpp`
+
+**変更内容:**
+- `PiperPlusAudioChunk` 構造体をヘッダーに追加
+- `PiperPlusEngine` に `IteratorState` (文分割結果キュー、currentChunkSamples) 追加
+- `piper_plus_synth_start`: テキスト文分割 → キュー保持、`synthesisConfig` save
+- `piper_plus_synth_next`: 1 文ずつ `textToAudio` → float 変換 → チャンク返却、最終チャンクで `is_last=1` + `PIPER_PLUS_DONE`
+
+**依存関係:** M2-1 (音素化ループ抽出)
+
+**受け入れ基準:**
+- `synth_start` → 複数回 `synth_next` → `PIPER_PLUS_DONE` のフローが正常動作
+- `out_chunk->samples` が次の `synth_next` まで有効
+- Iterator 中の `synthesize` 呼び出しは `PIPER_PLUS_ERR_BUSY`
+
+---
+
+### M2-3: コールバック合成 (`synthesize_streaming`)
+
+**見積り:** 小
+
+**変更対象:** `src/cpp/piper_plus.h`, `src/cpp/piper_plus_c_api.cpp`
+
+**変更内容:**
+- `PiperPlusAudioCallback` typedef をヘッダーに追加
+- `piper_plus_synthesize_streaming`: M2-2 の Iterator を内部で駆動し、チャンクごとにコールバック呼び出し
+
+**依存関係:** M2-2 (Iterator)
+
+**受け入れ基準:**
+- コールバックがチャンクごとに呼ばれる
+- `user_data` が正しく転送される
+
+---
+
+### M2-4: ストリーミング単体テスト (モデル不要)
+
+**見積り:** 中
+
+**変更対象:** `src/cpp/tests/test_c_api.cpp`
+
+**テストケース:**
+- `TestSynthStartNullEngine`: NULL エンジン → ERR
+- `TestSynthNextWithoutStart`: start なしの next → ERR
+- `TestStreamingNullCallback`: NULL コールバック → ERR
+- `TestSynthStartBusyDuringSynthesize`: one-shot 合成中の start → ERR_BUSY
+- `TestAudioChunkStruct`: `PiperPlusAudioChunk` のフィールドサイズ・アラインメント確認
+
+**依存関係:** M2-2, M2-3
+
+**受け入れ基準:**
+- 全テストが 3 プラットフォームで PASS
+
+---
+
+### M2-5: 統合テスト (モデル必要)
+
+**見積り:** 中
+
+**変更対象:** `src/cpp/tests/test_c_api_integration.cpp` (新規)
+
+**テストケース:**
+- ワンショット合成 → 音声サンプル数 > 0、サンプルレート確認
+- Iterator → 全チャンクのサンプル数合計 ≈ ワンショットのサンプル数
+- ストリーミング → コールバック呼び出し回数 ≥ 1
+- speaker_id 変更 → 異なる音声出力
+- language_id 自動検出 → 日本語/英語テキストで正常動作
+- `language_id("ja")` → 0 (つくよみちゃんモデル基準)
+- シンボル可視性 (`nm -D` で内部シンボル非公開を確認)
+
+**依存関係:** M2-4
+
+**受け入れ基準:**
+- テストモデル (`test/models/multilingual-test-medium.onnx`) で全テスト PASS
+- モデル未存在時は SKIP (`return 77`)
+
+---
+
+### M2-6: CI 統合更新
+
+**見積り:** 中
+
+**変更対象:** `.github/workflows/cpp-tests.yml`
+
+**変更内容:**
+- ストリーミングテスト追加
+- 統合テスト (モデルあり) の追加
+- テストモデルのキャッシュ設定
+
+**依存関係:** M2-4, M2-5
+
+**受け入れ基準:**
+- 3 プラットフォームで CI GREEN
+
+---
+
+## Phase 3: 配布
+
+### M3-1: 配布ファイルマニフェスト + install ターゲット整備
+
+**見積り:** 中
+
+**変更対象:** `CMakeLists.txt`
+
+**配布レイアウト:**
+```
+lib/libpiper_plus.so(.1)(.1.10.0) | .dylib | .dll + .lib
+lib/libonnxruntime.so | .dylib | .dll
+include/piper_plus.h
+share/open_jtalk/dic/
+share/piper/dicts/ (CMU, pinyin)
+lib/pkgconfig/piper_plus.pc
+lib/cmake/PiperPlus/
+```
+
+**依存関係:** Phase 2 完了
+
+---
+
+### M3-2: pkg-config ファイル生成
+
+**見積り:** 小
+
+**変更対象:** `cmake/piper_plus.pc.in` (新規), `CMakeLists.txt`
+
+**依存関係:** M3-1
+
+---
+
+### M3-3: CMake Config パッケージ生成
+
+**見積り:** 中
+
+**変更対象:** `cmake/PiperPlusConfig.cmake.in` (新規), `CMakeLists.txt`
+
+利用側: `find_package(PiperPlus)` + `target_link_libraries(app PiperPlus::piper_plus)`
+
+**依存関係:** M3-1
+
+---
+
+### M3-4: macOS RPATH 修正 + プラットフォーム別リンク設定
+
+**見積り:** 小
+
+**変更対象:** `CMakeLists.txt`
+
+**変更内容:**
+- macOS: `INSTALL_RPATH "@loader_path"` (現在の `@executable_path` から修正)
+- Linux: `INSTALL_RPATH "$ORIGIN"`
+- ONNX Runtime の同梱 install ルール
+
+**依存関係:** M3-1
+
+---
+
+### M3-5: リリースワークフロー拡張
+
+**見積り:** 大
+
+**変更対象:** `.github/workflows/` (新規 or 既存 `dev-build-all.yml` 拡張)
+
+**配布プラットフォーム:**
+- Linux x86_64, Linux aarch64
+- macOS arm64
+- Windows x64
+
+**依存関係:** M3-1, M3-4
+
+---
+
+### M3-6: 使用例ドキュメント
+
+**見積り:** 中
+
+**変更対象:** `examples/c-api/` (新規)
+
+**サンプル:**
+- `basic.c`: create → synthesize → WAV 保存 → free
+- `streaming.c`: streaming callback で逐次再生
+- `multi_language.c`: 多言語合成デモ
+
+**依存関係:** M3-2, M3-3
+
+---
+
+## Phase 4: 拡張 (将来)
+
+全チケット独立実装可能。優先度は利用者フィードバックに基づく。
+
+### M4-1: カスタム辞書 API
+
+**見積り:** 中
+
+`piper_plus_load_custom_dict(engine, path)` / `piper_plus_clear_custom_dict(engine)` を追加。既存の `custom_dictionary.cpp` を C API でラップ。
+
+---
+
+### M4-2: Phoneme timing 出力
+
+**見積り:** 中
+
+`piper_plus_get_phoneme_timing(engine, ...)` で合成後の音素タイミング情報を取得。`SynthesisResult.phonemeTimings` をラップ。
+
+---
+
+### M4-3: G2P 単独利用 API
+
+**見積り:** 中
+
+`piper_plus_phonemize(engine, text, language)` でテキスト→音素変換のみ実行。Rust `piper-plus-g2p` の `ffi.rs` を参考設計。
+
+---
+
+### M4-4: Android NDK ビルド
+
+**見積り:** 大
+
+CMake ツールチェインファイルで Android arm64-v8a ビルド対応。ONNX Runtime Android 版 (aar) との統合。
+
+---
+
+### M4-5: int16/float32 二重変換の解消
+
+**見積り:** 中
+
+`piper::synthesize()` に float 出力バリアントを追加し、int16→float32 の変換ステップを排除。精度向上 + CPU コスト削減。
+
+---
+
+### M4-6: `dladdr` による辞書自動検出改善
+
+**見積り:** 中
+
+`dict_dir = NULL` 時に `dladdr()` (Linux/macOS) / `GetModuleHandleEx(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS)` (Windows) でライブラリ自身のパスを取得し、相対パスで辞書を検索。Phase 1 の `dict_dir` 明示指定から自動検出への改善。
+
+---
+
+## 全体スケジュール
+
+```
+Phase 1 (MVP)         Phase 2 (ストリーミング)   Phase 3 (配布)          Phase 4 (拡張)
+M1-1 → M1-4 ──────→ M2-1 → M2-2 ──────────→ M3-1 ──────────────→ M4-1〜M4-6
+M1-5 ↗   ↘ M1-6     M2-3 ↗  ↘ M2-4          M3-2, M3-3, M3-4      (独立)
+M1-2 ↗     ↘ M1-7        M2-5 → M2-6       M3-5 → M3-6
+M1-3 ↗       ↘ M1-8
+```
+
+## Phase 別サマリ
+
+| Phase | チケット | 見積り (小/中/大) | 主要成果物 |
+|-------|---------|-----------------|-----------|
+| Phase 1 | M1-1〜M1-8 | 小×2 + 中×4 + 大×2 | `libpiper_plus.so/dylib/dll` + `piper_plus.h` + ワンショット合成 |
+| Phase 2 | M2-1〜M2-6 | 小×1 + 中×4 + 大×1 | Iterator + callback 合成 + テストスイート |
+| Phase 3 | M3-1〜M3-6 | 小×2 + 中×3 + 大×1 | バイナリ配布 + pkg-config + ドキュメント |
+| Phase 4 | M4-1〜M4-6 | 中×5 + 大×1 | カスタム辞書、タイミング、G2P、Android |
