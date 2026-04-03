@@ -218,7 +218,7 @@ export class PiperPlus {
 
       progress({ stage: 'model', progress: 0.1, message: 'Downloading config...' });
       let configResponse = await fetch(configUrl);
-      if (!configResponse.ok && configFallbackUrl) {
+      if (!configResponse.ok && configResponse.status === 404 && configFallbackUrl) {
         configResponse = await fetch(configFallbackUrl);
       }
       if (!configResponse.ok) {

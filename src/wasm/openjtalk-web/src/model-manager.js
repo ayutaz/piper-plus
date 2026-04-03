@@ -140,9 +140,16 @@ async function resolveModelFiles(repoName) {
 
   // Resolve config: prefer sidecar {onnx}.json, fall back to config.json.
   const sidecarConfig = `${onnxFilename}.json`;
-  const configFilename = filenames.includes(sidecarConfig)
-    ? sidecarConfig
-    : 'config.json';
+  let configFilename;
+  if (filenames.includes(sidecarConfig)) {
+    configFilename = sidecarConfig;
+  } else if (filenames.includes('config.json')) {
+    configFilename = 'config.json';
+  } else {
+    throw new Error(
+      `No config file found in repository "${repoName}"; expected "${sidecarConfig}" or "config.json"`
+    );
+  }
 
   return { onnxFilename, configFilename };
 }
@@ -206,7 +213,7 @@ export class ModelManager {
    *   - Direct URL:        "https://example.com/model.onnx"
    *
    * @param {string} modelNameOrUrl
-   * @returns {Promise<{modelUrl: string, configUrl: string, cacheKey: string}>}
+   * @returns {Promise<{modelUrl: string, configUrl: string, configFallbackUrl: string|null, cacheKey: string}>}
    */
   async _resolveUrls(modelNameOrUrl) {
     // Direct URL.
@@ -239,7 +246,7 @@ export class ModelManager {
    * This is the public entry point that delegates to {@link _resolveUrls}.
    *
    * @param {string} modelNameOrUrl - Registry shortcut, HuggingFace repo, or direct URL
-   * @returns {Promise<{modelUrl: string, configUrl: string, cacheKey: string}>}
+   * @returns {Promise<{modelUrl: string, configUrl: string, configFallbackUrl: string|null, cacheKey: string}>}
    */
   async resolveUrls(modelNameOrUrl) {
     return this._resolveUrls(modelNameOrUrl);
@@ -265,12 +272,15 @@ export class ModelManager {
 
     // Download config with fallback (small, no progress tracking needed).
     let configResponse = await fetch(configUrl);
-    if (!configResponse.ok && configFallbackUrl) {
+    if (configResponse.status === 404 && configFallbackUrl) {
       configResponse = await fetch(configFallbackUrl);
     }
     if (!configResponse.ok) {
+      const tried = configFallbackUrl
+        ? `${configUrl} and ${configFallbackUrl}`
+        : configUrl;
       throw new Error(
-        `Failed to fetch model config from ${configUrl}: ${configResponse.status} ${configResponse.statusText}`
+        `Failed to fetch model config from ${tried}: ${configResponse.status} ${configResponse.statusText}`
       );
     }
     const config = await configResponse.json();

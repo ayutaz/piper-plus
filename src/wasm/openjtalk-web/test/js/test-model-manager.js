@@ -404,7 +404,7 @@ describe('ModelManager', { skip }, () => {
         [/huggingface\.co\/api\/models\//, {
           ok: true,
           json: () => Promise.resolve({
-            siblings: [{ rfilename: 'model-fp16.onnx' }],
+            siblings: [{ rfilename: 'model-fp16.onnx' }, { rfilename: 'config.json' }],
           }),
         }],
       ]));
@@ -420,7 +420,7 @@ describe('ModelManager', { skip }, () => {
         [/huggingface\.co\/api\/models\//, {
           ok: true,
           json: () => Promise.resolve({
-            siblings: [{ rfilename: 'model-fp16.onnx' }],
+            siblings: [{ rfilename: 'model-fp16.onnx' }, { rfilename: 'config.json' }],
           }),
         }],
       ]));
@@ -436,7 +436,7 @@ describe('ModelManager', { skip }, () => {
         [/huggingface\.co\/api\/models\//, {
           ok: true,
           json: () => Promise.resolve({
-            siblings: [{ rfilename: 'model-fp16.onnx' }],
+            siblings: [{ rfilename: 'model-fp16.onnx' }, { rfilename: 'config.json' }],
           }),
         }],
       ]));
@@ -452,7 +452,7 @@ describe('ModelManager', { skip }, () => {
         [/huggingface\.co\/api\/models\//, {
           ok: true,
           json: () => Promise.resolve({
-            siblings: [{ rfilename: 'model-fp16.onnx' }],
+            siblings: [{ rfilename: 'model-fp16.onnx' }, { rfilename: 'config.json' }],
           }),
         }],
       ]));
@@ -468,7 +468,7 @@ describe('ModelManager', { skip }, () => {
         [/huggingface\.co\/api\/models\/ayousanz\/piper-plus-tsukuyomi-chan/, {
           ok: true,
           json: () => Promise.resolve({
-            siblings: [{ rfilename: 'tsukuyomi.onnx' }],
+            siblings: [{ rfilename: 'tsukuyomi.onnx' }, { rfilename: 'config.json' }],
           }),
         }],
       ]));
@@ -525,7 +525,7 @@ describe('ModelManager', { skip }, () => {
         [/huggingface\.co\/api\/models\//, {
           ok: true,
           json: () => Promise.resolve({
-            siblings: [{ rfilename: 'model.onnx' }],
+            siblings: [{ rfilename: 'model.onnx' }, { rfilename: 'config.json' }],
           }),
         }],
       ]));
@@ -548,7 +548,7 @@ describe('ModelManager', { skip }, () => {
         [/huggingface\.co\/api\/models\//, {
           ok: true,
           json: () => Promise.resolve({
-            siblings: [{ rfilename: 'model.onnx' }],
+            siblings: [{ rfilename: 'model.onnx' }, { rfilename: 'config.json' }],
           }),
         }],
       ]));
@@ -564,7 +564,7 @@ describe('ModelManager', { skip }, () => {
         [/huggingface\.co\/api\/models\//, {
           ok: true,
           json: () => Promise.resolve({
-            siblings: [{ rfilename: 'model.onnx' }],
+            siblings: [{ rfilename: 'model.onnx' }, { rfilename: 'config.json' }],
           }),
         }],
       ]));
@@ -583,6 +583,7 @@ describe('ModelManager', { skip }, () => {
             siblings: [
               { rfilename: 'model.onnx' },
               { rfilename: 'model-fp16.onnx' },
+              { rfilename: 'config.json' },
             ],
           }),
         }],
@@ -605,7 +606,7 @@ describe('ModelManager', { skip }, () => {
         [/huggingface\.co\/api\/models\//, {
           ok: true,
           json: () => Promise.resolve({
-            siblings: [{ rfilename: 'model.onnx' }],
+            siblings: [{ rfilename: 'model.onnx' }, { rfilename: 'config.json' }],
           }),
         }],
       ]));
@@ -622,7 +623,7 @@ describe('ModelManager', { skip }, () => {
         [/huggingface\.co\/api\/models\//, {
           ok: true,
           json: () => Promise.resolve({
-            siblings: [{ rfilename: 'model.onnx' }],
+            siblings: [{ rfilename: 'model.onnx' }, { rfilename: 'config.json' }],
           }),
         }],
       ]));
@@ -639,7 +640,7 @@ describe('ModelManager', { skip }, () => {
         [/huggingface\.co\/api\/models\//, {
           ok: true,
           json: () => Promise.resolve({
-            siblings: [{ rfilename: 'model.onnx' }],
+            siblings: [{ rfilename: 'model.onnx' }, { rfilename: 'config.json' }],
           }),
         }],
       ]));

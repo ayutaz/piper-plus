@@ -117,7 +117,7 @@ function createMockFetch(routes) {
  * @returns {Map<string|RegExp, Object>}
  */
 function createHuggingFaceRoutes(options = {}) {
-  const siblings = (options.siblings || ['model.onnx']).map((f) => ({ rfilename: f }));
+  const siblings = (options.siblings || ['model.onnx', 'config.json']).map((f) => ({ rfilename: f }));
   const config = options.config || SAMPLE_CONFIG;
   const modelBuffer = options.modelBuffer || SAMPLE_MODEL_BUFFER;
 
@@ -201,7 +201,7 @@ describe('ModelManager.loadModel() 成功ケース', { skip }, () => {
     installIndexedDBMock(mockDb);
 
     const { fetch: mockFetch } = createMockFetch(
-      createHuggingFaceRoutes({ siblings: ['tsukuyomi.onnx'] })
+      createHuggingFaceRoutes({ siblings: ['tsukuyomi.onnx', 'config.json'] })
     );
     globalThis.fetch = mockFetch;
 
@@ -227,7 +227,7 @@ describe('ModelManager.loadModel() 成功ケース', { skip }, () => {
     installIndexedDBMock(mockDb);
 
     const { fetch: mockFetch, calledUrls } = createMockFetch(
-      createHuggingFaceRoutes({ siblings: ['model-fp16.onnx', 'README.md'] })
+      createHuggingFaceRoutes({ siblings: ['model-fp16.onnx', 'README.md', 'config.json'] })
     );
     globalThis.fetch = mockFetch;
 
