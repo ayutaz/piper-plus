@@ -394,7 +394,154 @@ on:
 
 ---
 
-## 7. 後続タスクへの連絡事項
+## 7. CLI パッケージングの cmake --install 移行計画
+
+> **背景 (Phase 3 振り返り反映):** 現在の `build-piper.yml` (L262-489) は 200+ 行の手動ファイルコピーロジックを含んでいる。共有ライブラリでは `cmake --install` を採用するが、CLI (`piper`) 側は既存の手動コピーのまま残す保守的な選択をした。
+
+**現状:**
+
+| 配布物 | パッケージング方式 | ファイル |
+|--------|-----------------|---------|
+| CLI (`piper`) | 手動ファイルコピー (200+ 行) | `build-piper.yml` L262-489 |
+| 共有ライブラリ (`libpiper_plus`) | `cmake --install` | 本チケットで導入 |
+
+**ロードマップ (Phase 3 スコープ外):**
+
+1. **CLI の `cmake --install` 移行:** `piper` 実行ファイル + 辞書 + ORT を `cmake --install --prefix dist/piper` で配布パッケージに含める。`install(TARGETS piper ...)` + `install(FILES ...)` で手動コピーを置換。
+2. **共有ライブラリとの install ルール共有:** ORT 同梱 (`install(FILES libonnxruntime...)`) と辞書 install (`install(DIRECTORY share/open_jtalk/...)`) は CLI と共有ライブラリで共通化できる。CMake の `install(TARGETS ...)` を条件分岐ではなくコンポーネント (`COMPONENT cli` / `COMPONENT shared`) で管理。
+3. **`build-piper.yml` の簡素化:** 手動コピーロジックを `cmake --install --component cli --prefix dist/piper` に置換し、ワークフロー YAML を ~50 行に削減。
+
+**Phase 3 での判断:** 共有ライブラリのみ `cmake --install` を使用。CLI の移行は後続タスクとして Issue 化を推奨。既存の CLI 配布に影響を与えないことを最優先とする。
+
+---
+
+## 8. ワークフロー設計の判断
+
+> **背景 (Phase 3 振り返り反映):** `build-piper.yml` に `build-shared` フラグを追加する方式と、`build-piper-shared.yml` として分離する方式のトレードオフ。
+
+**選択肢の比較:**
+
+| 観点 | 選択肢 1: build-piper.yml に統合 | 選択肢 2: build-piper-shared.yml 分離 |
+|------|-------------------------------|-------------------------------------|
+| 保守コスト | 1 ファイルで完結 | 2 ファイルの同期が必要 |
+| 可読性 | `if: inputs.build-shared` の条件分岐が増加 | 各ファイルが単一責任で明快 |
+| セットアップ重複 | なし | ORT ダウンロード・OpenJTalk ビルド等が重複 |
+| 回帰リスク | 共有ライブラリの変更が CLI ビルドに影響し得る | 完全分離で相互影響なし |
+| テスト容易性 | 単一 workflow のテストが複雑化 | 独立テスト可能 |
+
+**推奨:** composite action でセットアップを共有し、ワークフローは分離する。
+
+```
+.github/
+├── actions/
+│   └── setup-piper-build/    # composite action (ORT DL, OpenJTalk, deps)
+│       └── action.yml
+├── workflows/
+│   ├── build-piper.yml       # CLI ビルド (既存)
+│   └── build-piper-shared.yml  # 共有ライブラリビルド (新規)
+```
+
+**本チケットでの選択:** 本チケットでは選択肢 1 (build-piper.yml に統合) を採用する。理由:
+- 初期実装コストが最も低い
+- `build-shared: false` のデフォルトで既存動作に影響しない
+- composite action への分離は後続リファクタリングとして実施可能
+
+**後続リファクタリング:** CI の条件分岐が複雑化した場合、composite action + ワークフロー分離に移行する。この判断基準は `build-piper.yml` の条件分岐が 5 箇所を超えた時点。
+
+---
+
+## 9. リリースアセット検証ステップ
+
+> **背景 (Phase 3 振り返り反映):** 現在の CI はビルド検証のみで、リリースアセットの tar.gz/zip を展開して動作確認するステップがない。
+
+**検証パイプライン:**
+
+```
+ダウンロード → 展開 → verify_install_layout.cmake → サンプルビルド → モデル不要テスト
+```
+
+**`dev-create-release.yml` に追加する検証ジョブ:**
+
+```yaml
+  verify_shared_assets:
+    name: Verify Shared Library Assets
+    needs: [upload_shared_libs]
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            asset: piper-plus-shared-linux-x64.tar.gz
+            extract: tar -xzf
+          - os: macos-14
+            asset: piper-plus-shared-macos-arm64.tar.gz
+            extract: tar -xzf
+          - os: windows-2022
+            asset: piper-plus-shared-windows-x64.zip
+            extract: Expand-Archive -Path
+    steps:
+      - uses: actions/checkout@v6
+
+      # 1. リリースアセットをダウンロード
+      - name: Download release asset
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release download "${{ needs.create_release.outputs.tag_name }}" \
+            --pattern "${{ matrix.asset }}" --dir dist/
+
+      # 2. 展開
+      - name: Extract asset (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          mkdir -p /tmp/piper-plus-install
+          ${{ matrix.extract }} dist/${{ matrix.asset }} -C /tmp/piper-plus-install
+
+      - name: Extract asset (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          New-Item -ItemType Directory -Force -Path $env:TEMP/piper-plus-install
+          Expand-Archive -Path dist/${{ matrix.asset }} `
+            -DestinationPath $env:TEMP/piper-plus-install
+
+      # 3. Install layout 検証
+      - name: Verify install layout
+        run: |
+          cmake -P cmake/verify_install_layout.cmake -- \
+            /tmp/piper-plus-install
+
+      # 4. サンプルビルド (CMake find_package)
+      - name: Build examples
+        run: |
+          cmake -B /tmp/ex-build \
+            -S examples/c-api \
+            -DCMAKE_PREFIX_PATH=/tmp/piper-plus-install
+          cmake --build /tmp/ex-build
+
+      # 5. モデル不要テスト (エラーハンドリング確認)
+      - name: Smoke test (no model required)
+        if: runner.os != 'Windows'
+        run: |
+          LD_LIBRARY_PATH=/tmp/piper-plus-install/lib \
+            /tmp/ex-build/basic nonexistent.onnx /tmp/dict "test" /dev/null \
+            2>&1 | grep -q "Error:" && echo "Error handling OK"
+```
+
+**検証項目:**
+
+| ステップ | 検証内容 | 失敗時のアクション |
+|---------|---------|----------------|
+| ダウンロード | アセットが GitHub Release に存在する | ジョブ失敗 → リリースをドラフトに戻す |
+| 展開 | tar.gz/zip が破損なく展開できる | ジョブ失敗 |
+| Layout 検証 | `verify_install_layout.cmake` が全必須ファイルを確認 | ジョブ失敗 |
+| サンプルビルド | `find_package(PiperPlus)` + ビルド成功 | ジョブ失敗 |
+| Smoke テスト | エラーメッセージが正しく出力される | ジョブ失敗 |
+
+**M3-6 (使用例) との連携:** サンプルビルドのステップは M3-6 で作成する `examples/c-api/CMakeLists.txt` を使用する。M3-6 が先に完了している必要がある。
+
+---
+
+## 10. 後続タスクへの連絡事項
 
 - **M3-6 (使用例):** リリースアセットのダウンロード先 URL 形式は `https://github.com/ayutaz/piper-plus/releases/download/v{version}/piper-plus-shared-{platform}.tar.gz`。使用例ドキュメントにこの URL パターンを記載する。
 - **dev-create-release.yml のリリースノート:** `release_summary` ジョブに共有ライブラリのアセット情報を追加する。

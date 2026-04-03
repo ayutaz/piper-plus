@@ -557,6 +557,9 @@ lib/cmake/PiperPlus/                                        (M3-3)
 2. **pkg-config + CMake Config 両方の必要性**: Godot GDExtension (SCons) のために pkg-config は必須。CMake Config は CMake ユーザー向け。両方の提供コストは低いので両立は正しい。
 
 3. **リリースワークフローの自動化範囲**: 既存の `build-piper.yml` に input 追加するのが最も低コスト。独立ワークフローを作ると保守が二重化する。
+   > **対応済み (3a):** M3-5 にセクション 7「CLI パッケージングの cmake --install 移行計画」を追加。共有ライブラリのみ `cmake --install` を使い、CLI 側は後続タスクとして記載。
+   > **対応済み (3b):** M3-5 にセクション 8「ワークフロー設計の判断」を追加。統合 vs 分離のトレードオフを明記し、初期は統合、将来的に composite action + 分離を推奨。
+   > **対応済み (3c):** M3-5 にセクション 9「リリースアセット検証ステップ」を追加。ダウンロード → 展開 → layout 検証 → サンプルビルド → smoke テストのパイプラインを記載。
 
 ---
 
