@@ -14,9 +14,9 @@
 
 ## 1. タスク目的とゴール
 
-`piper_plus_c_api.cpp` 内の 14 箇所に散在する手動の SynthesisConfig save/restore と `inProgress` atomic の acquire/release を RAII クラスで自動化し、例外安全性と保守性を向上させる。
+`piper_plus_c_api.cpp` 内に散在する手動の SynthesisConfig save/restore (`savedConfig` 復元 11 箇所 + `savedLangId` 復元 3 箇所 = 計 14 箇所) と `inProgress.store(false)` (17 箇所) を RAII クラスで自動化し、例外安全性と保守性を向上させる。
 
-**現状:** `synthesize`, `synth_start`, `synth_next`, `synthesize_streaming`, `phonemize` の各関数で、`SynthesisConfig` の一時変更と復元を手動で行っている。早期 return や例外発生時に restore が漏れるリスクがある。同様に `inProgress` atomic の release も手動で管理されている。
+**現状:** `synthesize`, `synth_start`, `synth_next`, `synthesize_streaming`, `phonemize` の各関数で、`SynthesisConfig` の一時変更と復元を手動で行っている (`savedConfig` 復元 11 箇所、`phonemize` の `savedLangId` 復元 3 箇所)。`inProgress.store(false)` は 17 箇所に散在している。早期 return や例外発生時に restore が漏れるリスクがある。
 
 **ゴール:** RAII クラスにより手動の `savedConfig` restore と `inProgress.store(false)` が 0 箇所になること。既存の動作は一切変更しないリファクタリングのみ。
 

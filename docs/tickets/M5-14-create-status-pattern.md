@@ -18,7 +18,7 @@
 
 **現状の問題:** `piper_plus_create()` は失敗時に `NULL` を返すが、失敗原因 (モデルファイル不在、config 不正、ONNX Runtime 初期化失敗) を区別できない。`piper_plus_get_last_error()` で文字列は取得できるが、プログラム的な分岐には不向き。
 
-**ゴール:** `ERR_MODEL` / `ERR_CONFIG` / `ERR_ORT` 等の具体的なステータスコードを返し、FFI 利用側でエラー種別に応じたハンドリング (リトライ、ユーザーへのメッセージ表示) を可能にする。
+**ゴール:** 既存の `ERR_MODEL` (-2) / `ERR_CONFIG` (-3) を活用しつつ、新規に `ERR_ORT` (-6) を追加し、FFI 利用側でエラー種別に応じたハンドリング (リトライ、ユーザーへのメッセージ表示) を可能にする。
 
 ---
 
@@ -35,16 +35,24 @@ PIPER_PLUS_API int32_t piper_plus_create(
     const PiperPlusConfig *config,
     PiperPlusEngine      **out_engine);
 
-/* 新ステータスコード */
-#define PIPER_PLUS_ERR_MODEL   (-10)  /* モデルファイルが見つからない/読み込み失敗 */
-#define PIPER_PLUS_ERR_CONFIG  (-11)  /* config.json 不正 */
-#define PIPER_PLUS_ERR_ORT     (-12)  /* ONNX Runtime 初期化失敗 */
+/* 既存ステータスコード (変更なし、そのまま活用) */
+// #define PIPER_PLUS_ERR_MODEL  (-2)  /* モデルファイルが見つからない/読み込み失敗 */
+// #define PIPER_PLUS_ERR_CONFIG (-3)  /* config.json 不正 */
+
+/* 新規追加のみ (既存 ERR_BUSY = -5 の次) */
+#define PIPER_PLUS_ERR_ORT     (-6)  /* ONNX Runtime 初期化失敗 */
 ```
+
+> **注意:** `PIPER_PLUS_ERR_MODEL` (-2) と `PIPER_PLUS_ERR_CONFIG` (-3) は既にヘッダーに定義済み。新規追加は `PIPER_PLUS_ERR_ORT` (-6) のみ。
 
 ### 2.2 C API 実装 (`src/cpp/piper_plus_c_api.cpp`)
 
 - `piper_plus_create` のシグネチャを変更
-- try-catch で例外種別を判別し、対応するエラーコードを返却
+- try-catch で例外種別を判別し、対応するエラーコードを返却:
+  - モデルファイル関連の例外 -> `PIPER_PLUS_ERR_MODEL` (-2)
+  - config.json 関連の例外 -> `PIPER_PLUS_ERR_CONFIG` (-3)
+  - ONNX Runtime 初期化の例外 -> `PIPER_PLUS_ERR_ORT` (-6)
+  - その他の例外 -> `PIPER_PLUS_ERR` (-1)
 - 成功時は `*out_engine` にポインタを設定し `PIPER_PLUS_OK` を返却
 - `out_engine == NULL` の場合は `PIPER_PLUS_ERR` を即座に返却
 
@@ -75,16 +83,16 @@ PIPER_PLUS_API int32_t piper_plus_create(
 ### スコープ
 
 - `piper_plus_create` のシグネチャ変更
-- 新ステータスコード 3 種の追加
+- 新ステータスコード `PIPER_PLUS_ERR_ORT` (-6) の追加 (ERR_MODEL / ERR_CONFIG は既存を活用)
 - 既存テスト・サンプルの更新
 
 ### ユニットテスト (モデル不要)
 
 | テスト | 内容 | 期待結果 |
 |--------|------|----------|
-| `TestCreateOutEngineNull` | `out_engine = NULL` で呼び出し | `PIPER_PLUS_ERR` + クラッシュなし |
-| `TestCreateInvalidModel` | 存在しないモデルパス | `PIPER_PLUS_ERR_MODEL` |
-| `TestCreateInvalidConfig` | 不正な JSON config | `PIPER_PLUS_ERR_CONFIG` |
+| `TestCreateOutEngineNull` | `out_engine = NULL` で呼び出し | `PIPER_PLUS_ERR` (-1) + クラッシュなし |
+| `TestCreateInvalidModel` | 存在しないモデルパス | `PIPER_PLUS_ERR_MODEL` (-2) |
+| `TestCreateInvalidConfig` | 不正な JSON config | `PIPER_PLUS_ERR_CONFIG` (-3) |
 
 ### E2E テスト (モデル必要)
 
@@ -103,6 +111,7 @@ PIPER_PLUS_API int32_t piper_plus_create(
 |--------|--------|------|
 | ABI 破壊的変更 | 高 | semver メジャーバージョンアップで対応。CHANGELOG に明記 |
 | 例外種別の判別精度 | 中 | C++ 例外メッセージのパターンマッチに依存。判別不能な場合は汎用 `PIPER_PLUS_ERR` にフォールバック |
+| 既存エラーコードとの整合性 | 中 | `ERR_MODEL` (-2) / `ERR_CONFIG` (-3) は既にヘッダーで定義済み。新規コードは既存の連番 (-5 = ERR_BUSY) の次 (-6) を使用し、値の衝突を回避する |
 
 ### レビュー時の確認項目
 

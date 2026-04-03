@@ -14,9 +14,9 @@
 
 ## 1. タスク目的とゴール
 
-`splitTextToSentences()` が JA/EN の正規表現のみで文分割を行っており、ZH/FR/ES/PT のテキストが近似処理されている問題を改善する。
+`splitTextToSentences()` が JA 正規表現 (`。！？、`) のみで多言語テキストの文分割を行っており、EN/FR/ES/PT のテキストが近似処理されている問題を改善する。
 
-**現状:** `piper.cpp` の `splitTextToSentences()` は日本語の句読点 (`。！？`) と英語のピリオド・疑問符・感嘆符 (`.!?`) をベースに文分割を行っている。中国語の句点 (`。`)、フランス語のギュメ、スペイン語の逆疑問符 (`?`) などは正規表現に含まれておらず、長いテキストが 1 文として処理される場合がある。
+**現状:** `piper.cpp` の `splitTextToSentences()` は `usesOpenJTalk(phonemeType)` で分岐しており、`usesOpenJTalk()` は `OpenJTalkPhonemes` だけでなく `MultilingualPhonemes` でも `true` を返す (`piper.hpp:35`)。そのため `MultilingualPhonemes` 使用時には**日本語正規表現 (`。！？、`) のみ**が適用され、英語正規表現 (`.!?,;:` 等) は使用されない。中国語の句点 (`。`) は JA 正規表現に含まれるため部分的に動作するが、FR/ES/PT の ASCII 句読点 (`.!?`) は認識されず、長いテキストが 1 文として処理される場合がある。
 
 **ゴール:** `PhonemeType::MultilingualPhonemes` 使用時に、6 言語全ての句読点を正しく認識する統合正規表現パターンを適用し、各言語のテキストが正しく文分割されること。
 
@@ -50,10 +50,13 @@ void splitTextToSentences(const PiperConfig &config,
 
     if (phonemeType == PhonemeType::MultilingualPhonemes) {
         // 多言語統合パターンで分割
+        // 注意: 現状の usesOpenJTalk() は MultilingualPhonemes でも true を返すため、
+        // JA 正規表現のみが適用されている。ここで MultilingualPhonemes を明示的に分岐させ、
+        // 6 言語全ての句読点を認識する統合パターンを使用する。
         splitWithPattern(text, multilingualSentenceEnd, sentences);
     } else {
         // 既存の JA/EN パターンを維持
-        // (OpenJTalkPhonemes / その他)
+        // (OpenJTalkPhonemes → JA正規表現、それ以外 → EN正規表現)
         splitWithExistingLogic(config, voice, text, sentences);
     }
 }
@@ -87,7 +90,8 @@ void splitTextToSentences(const PiperConfig &config,
 
 - `splitTextToSentences` に多言語統合正規表現パターンを追加
 - `PhonemeType::MultilingualPhonemes` の場合のみ新パターンを使用
-- 既存の JA/EN (OpenJTalkPhonemes) パターンは維持
+- 既存の OpenJTalkPhonemes (JA正規表現) / その他 (EN正規表現) パターンは維持
+- ZH の句点 (`。`) は JA 正規表現に既に含まれるため現状でも部分的に動作するが、統合パターンで明示的に対応
 
 ### ユニットテスト (モデル不要)
 

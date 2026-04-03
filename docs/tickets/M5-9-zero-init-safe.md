@@ -37,6 +37,7 @@ static void applySynthOptions(piper::SynthesisConfig &synthConfig,
     }
 
     // Zero-init safety: replace 0.0 with sensible defaults
+    // 注意: ゼロ値置換により意図的な deterministic 推論 (noise_scale=0) が無効化される
     if (effectiveOpts.noise_scale == 0.0f)
         effectiveOpts.noise_scale = 0.667f;
     if (effectiveOpts.length_scale == 0.0f)
@@ -90,7 +91,7 @@ static void applySynthOptions(piper::SynthesisConfig &synthConfig,
 
 | リスク | 影響度 | 対策 |
 |--------|--------|------|
-| 意図的に `noise_scale=0` (決定論的推論) を使いたいユーザー | 低 | 極めて稀なユースケース。必要なら `noise_scale=0.001` 等の微小値を使用可能。ドキュメントに注記 |
+| 意図的に `noise_scale=0` (決定論的推論) を使いたいユーザー | 低 | 極めて稀なユースケース。`noise_scale=0.001` 等の微小値で代替可能だが、`noise_scale=0.001` で決定論的推論を得られるかは VITS 実装に依存するため、実装前に `piper::textToAudioFloat` の動作確認を推奨。ドキュメントに注記 |
 | `sentence_silence_sec=0` は意図的な設定の可能性 | 低 | `sentence_silence_sec` はゼロ値でも安全 (無音なし) のため置換しない |
 
 ### レビュー時の確認項目
