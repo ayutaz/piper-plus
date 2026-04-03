@@ -1827,47 +1827,6 @@ std::vector<std::string> splitTextToSentences(
   return chunks;
 }
 
-// Helper function for audio crossfade to reduce chunk boundary artifacts
-static void crossfadeAudioChunks(
-    const std::vector<int16_t>& prevChunk,
-    const std::vector<int16_t>& newChunk,
-    std::vector<int16_t>& output,
-    size_t overlapSamples = 220  // 10ms @ 22050Hz
-) {
-  if (prevChunk.empty() || newChunk.empty() || overlapSamples == 0) {
-    // No crossfade possible, just append
-    output.insert(output.end(), newChunk.begin(), newChunk.end());
-    return;
-  }
-  
-  // Ensure we don't exceed chunk boundaries
-  size_t actualOverlap = std::min({overlapSamples, prevChunk.size() / 4, newChunk.size() / 4});
-  if (actualOverlap < 44) {  // Less than 2ms - not worth crossfading
-    output.insert(output.end(), newChunk.begin(), newChunk.end());
-    return;
-  }
-  
-  // Remove the overlap from the output (it was already added with prevChunk)
-  if (output.size() >= actualOverlap) {
-    output.resize(output.size() - actualOverlap);
-  }
-  
-  // Perform crossfade
-  for (size_t i = 0; i < actualOverlap; ++i) {
-    float fadeOut = 1.0f - (static_cast<float>(i) / actualOverlap);
-    float fadeIn = static_cast<float>(i) / actualOverlap;
-    
-    size_t prevIdx = prevChunk.size() - actualOverlap + i;
-    int16_t mixed = static_cast<int16_t>(
-      prevChunk[prevIdx] * fadeOut + newChunk[i] * fadeIn
-    );
-    output.push_back(mixed);
-  }
-  
-  // Append the rest of the new chunk
-  output.insert(output.end(), newChunk.begin() + actualOverlap, newChunk.end());
-}
-
 // Phonemize text into per-sentence phoneme sequences (public API).
 // Pure: does not modify voice.  Auto-detected language is returned
 // in result.detectedLanguageId.
@@ -2127,163 +2086,74 @@ void phonemizeText(const Voice &voice, const std::string &text,
 
 } /* phonemizeText */
 
-// Streaming text-to-audio synthesis with reduced latency
+// Streaming text-to-audio synthesis with reduced latency.
+// Splits text into sentences via splitTextToSentences(), synthesizes each
+// sentence through textToAudio(), and delivers per-sentence audio via
+// chunkCallback.  This eliminates the duplicated phonemization logic that
+// previously existed here (including the dead MultilingualPhonemes branch).
 void textToAudioStreaming(PiperConfig &config, Voice &voice, std::string text,
                           std::vector<int16_t> &audioBuffer, SynthesisResult &result,
                           const std::function<void(const std::vector<int16_t>&)> &chunkCallback,
                           size_t chunkSize) {
   spdlog::debug("textToAudioStreaming: text='{}', chunkSize={}", text, chunkSize);
-  
+
   // Clear result
   result.inferSeconds = 0;
   result.audioSeconds = 0;
   result.realTimeFactor = 0;
-  
+
   // Clear output buffer
   audioBuffer.clear();
-  
+
   if (text.empty()) {
     return;
   }
-  
-  // Split text into sentences using the shared helper
-  auto chunks = splitTextToSentences(text,
-                                     voice.phonemizeConfig.phonemeType,
-                                     chunkSize > 0 ? chunkSize : 0);
 
-  spdlog::debug("Split text into {} chunks", chunks.size());
-  
-  // Track previous chunk for crossfading
-  std::vector<int16_t> previousChunkAudio;
-  
-  // Process each chunk
-  for (size_t i = 0; i < chunks.size(); ++i) {
-    const auto& chunk = chunks[i];
-    spdlog::debug("Processing chunk {}/{}: '{}'", i+1, chunks.size(), chunk);
-    
-    // Phonemize chunk
-    std::vector<std::vector<Phoneme>> chunkSentences;
-    std::vector<std::vector<ProsodyFeature>> chunkProsody;
+  // Split text into sentences using the shared helper (M2-1 / M5-2)
+  auto sentences = splitTextToSentences(text,
+                                        voice.phonemizeConfig.phonemeType,
+                                        chunkSize > 0 ? chunkSize : 0);
 
-    // Check if model supports prosody input
-    bool useProsody = voice.session.hasProsodyInput &&
-                      usesOpenJTalk(voice.phonemizeConfig.phonemeType);
+  spdlog::debug("Split text into {} sentence(s)", sentences.size());
 
-    if (usesOpenJTalk(voice.phonemizeConfig.phonemeType)) {
-      // Japanese/Multilingual OpenJTalk phonemizer
-      if (useProsody) {
-        phonemize_openjtalk_with_prosody(chunk, chunkSentences, chunkProsody);
-      } else {
-        phonemize_openjtalk(chunk, chunkSentences);
-      }
-    } else if (voice.phonemizeConfig.phonemeType == MultilingualPhonemes) {
-      // TODO: Implement proper multilingual streaming dispatch
-      // For now, fall back to OpenJTalk for multilingual streaming
-      spdlog::warn("Multilingual streaming not yet implemented; falling back to OpenJTalk for chunk");
-      phonemize_openjtalk(chunk, chunkSentences);
-    }
+  // Synthesize each sentence through the unified textToAudio() path.
+  // textToAudio handles all phoneme types (OpenJTalk, MultilingualPhonemes)
+  // correctly, including prosody, language detection, and phoneme silence.
+  for (size_t i = 0; i < sentences.size(); ++i) {
+    const auto &sentence = sentences[i];
+    spdlog::debug("Streaming sentence {}/{}: '{}'", i + 1, sentences.size(), sentence);
 
-    // Process each sentence in the chunk
-    for (size_t sentIdx = 0; sentIdx < chunkSentences.size(); sentIdx++) {
-      auto& sentencePhonemes = chunkSentences[sentIdx];
-      if (sentencePhonemes.empty()) {
-        continue;
-      }
+    std::vector<int16_t> sentenceAudio;
+    SynthesisResult sentenceResult;
 
-      // Convert phonemes to IDs
-      std::vector<PhonemeId> phonemeIds;
-      std::map<Phoneme, std::size_t> missingPhonemes;
-      // Create PhonemeIdConfig from voice config
-      PhonemeIdConfig idConfig;
-      idConfig.phonemeIdMap =
-          std::make_shared<PhonemeIdMap>(voice.phonemizeConfig.phonemeIdMap);
-      idConfig.interspersePad = voice.phonemizeConfig.interspersePad;
-      // OpenJTalk: BOS/EOS are already in the phoneme list from phonemizer
-      if (usesOpenJTalk(voice.phonemizeConfig.phonemeType)) {
-        idConfig.addBos = false;
-        idConfig.addEos = false;
-      } else {
-        idConfig.addBos = true;
-        idConfig.addEos = true;
-      }
+    // Synthesize via textToAudio with no audioCallback so that the full
+    // sentence audio (including sentence silence) is accumulated in
+    // sentenceAudio.
+    textToAudio(config, voice, sentence, sentenceAudio, sentenceResult,
+                nullptr /* audioCallback */);
 
-      phonemes_to_ids(sentencePhonemes, idConfig, phonemeIds,
-                      missingPhonemes);
+    // Accumulate into the full output buffer
+    audioBuffer.insert(audioBuffer.end(),
+                       sentenceAudio.begin(), sentenceAudio.end());
 
-      // Report missing phonemes
-      if (!missingPhonemes.empty()) {
-        for (auto& [phoneme, count] : missingPhonemes) {
-          spdlog::warn("Missing phoneme: '{}' (count={})",
-                       phonemeToString(phoneme), count);
-        }
-      }
+    // Update cumulative timing
+    result.inferSeconds += sentenceResult.inferSeconds;
+    result.audioSeconds += sentenceResult.audioSeconds;
 
-      // Prepare prosody features if available
-      std::vector<int64_t> *prosodyPtr = nullptr;
-      std::vector<int64_t> prosodyFlat;
-
-      if (useProsody && sentIdx < chunkProsody.size()) {
-        const auto &sentenceProsody = chunkProsody[sentIdx];
-        size_t numPhonemeIds = phonemeIds.size();
-        prosodyFlat.resize(numPhonemeIds * 3, 0);
-
-        if (voice.phonemizeConfig.interspersePad) {
-          size_t prosodyIdx = 0;
-          for (size_t i = 1; i < numPhonemeIds && prosodyIdx < sentenceProsody.size(); i += 2) {
-            prosodyFlat[i * 3 + 0] = sentenceProsody[prosodyIdx].a1;
-            prosodyFlat[i * 3 + 1] = sentenceProsody[prosodyIdx].a2;
-            prosodyFlat[i * 3 + 2] = sentenceProsody[prosodyIdx].a3;
-            prosodyIdx++;
-          }
-        } else {
-          for (size_t i = 0; i < numPhonemeIds && i < sentenceProsody.size(); i++) {
-            prosodyFlat[i * 3 + 0] = sentenceProsody[i].a1;
-            prosodyFlat[i * 3 + 1] = sentenceProsody[i].a2;
-            prosodyFlat[i * 3 + 2] = sentenceProsody[i].a3;
-          }
-        }
-        prosodyPtr = &prosodyFlat;
-      }
-
-      // Synthesize audio for this chunk
-      std::vector<int16_t> chunkAudioBuffer;
-      SynthesisResult chunkResult;
-      synthesize(phonemeIds, voice.synthesisConfig, voice.session,
-                 chunkAudioBuffer, chunkResult, &voice, prosodyPtr);
-      
-      // Update cumulative result
-      result.inferSeconds += chunkResult.inferSeconds;
-      result.audioSeconds += chunkResult.audioSeconds;
-      
-      // Apply crossfade if we have a previous chunk
-      if (!previousChunkAudio.empty() && !chunkAudioBuffer.empty()) {
-        // Crossfade with previous chunk to reduce boundary artifacts
-        crossfadeAudioChunks(previousChunkAudio, chunkAudioBuffer, audioBuffer);
-      } else {
-        // No previous chunk or empty current chunk - just append
-        audioBuffer.insert(audioBuffer.end(), 
-                           chunkAudioBuffer.begin(), 
-                           chunkAudioBuffer.end());
-      }
-      
-      // Store current chunk for next iteration's crossfade
-      previousChunkAudio = chunkAudioBuffer;
-      
-      // Call chunk callback for all chunks (including empty ones for progress tracking)
-      if (chunkCallback) {
-        chunkCallback(chunkAudioBuffer);
-      }
+    // Deliver sentence audio via callback
+    if (chunkCallback && !sentenceAudio.empty()) {
+      chunkCallback(sentenceAudio);
     }
   }
-  
+
   // Calculate final real-time factor
   if (result.audioSeconds > 0) {
     result.realTimeFactor = result.inferSeconds / result.audioSeconds;
   }
-  
-  spdlog::debug("Streaming synthesis complete: {} chunks, {:.2f}s audio, RTF={:.2f}",
-                chunks.size(), result.audioSeconds, result.realTimeFactor);
-  
+
+  spdlog::debug("Streaming synthesis complete: {} sentence(s), {:.2f}s audio, RTF={:.2f}",
+                sentences.size(), result.audioSeconds, result.realTimeFactor);
+
 } /* textToAudioStreaming */
 
 // Streaming phonemes-to-audio synthesis with reduced latency

@@ -14,7 +14,11 @@ permissions:
 
 jobs:
   build-android:
-    name: Android arm64-v8a
+    strategy:
+      fail-fast: false
+      matrix:
+        abi: [arm64-v8a, armeabi-v7a, x86_64]
+    name: Android ${{ matrix.abi }}
     runs-on: ubuntu-22.04
     timeout-minutes: 30
 
@@ -43,19 +47,19 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ort-android/
-          key: ort-android-${{ env.ONNXRUNTIME_VERSION }}
+          key: ort-android-${{ env.ONNXRUNTIME_VERSION }}-${{ matrix.abi }}
 
       - name: Download ONNX Runtime Android
         if: steps.cache-ort-android.outputs.cache-hit != 'true'
         run: |
           mkdir -p ort-android
-          # Download AAR and extract arm64-v8a JNI library
+          # Download AAR and extract JNI library for target ABI
           curl -sL "https://repo1.maven.org/maven2/com/microsoft/onnxruntime/onnxruntime-android/${{ env.ONNXRUNTIME_VERSION }}/onnxruntime-android-${{ env.ONNXRUNTIME_VERSION }}.aar" \
             -o /tmp/ort.aar
           cd ort-android
-          unzip -o /tmp/ort.aar "jni/arm64-v8a/*" -d .
+          unzip -o /tmp/ort.aar "jni/${{ matrix.abi }}/*" -d .
           mkdir -p lib include
-          cp jni/arm64-v8a/libonnxruntime.so lib/
+          cp jni/${{ matrix.abi }}/libonnxruntime.so lib/
 
           # Download headers separately (from Linux x64 release)
           curl -sL "https://github.com/microsoft/onnxruntime/releases/download/v${{ env.ONNXRUNTIME_VERSION }}/onnxruntime-linux-x64-${{ env.ONNXRUNTIME_VERSION }}.tgz" \
@@ -64,16 +68,23 @@ jobs:
 
       - name: Configure CMake
         run: |
+          CMAKE_EXTRA_FLAGS=""
+          # armeabi-v7a requires NEON for ONNX Runtime
+          if [ "${{ matrix.abi }}" = "armeabi-v7a" ]; then
+            CMAKE_EXTRA_FLAGS="-DANDROID_ARM_NEON=ON"
+          fi
+
           cmake -B build \
             -DCMAKE_TOOLCHAIN_FILE=${{ env.ANDROID_NDK_HOME }}/build/cmake/android.toolchain.cmake \
-            -DANDROID_ABI=arm64-v8a \
+            -DANDROID_ABI=${{ matrix.abi }} \
             -DANDROID_PLATFORM=android-${{ env.ANDROID_API_LEVEL }} \
             -DCMAKE_BUILD_TYPE=Release \
             -DPIPER_PLUS_BUILD_SHARED=ON \
             -DBUILD_TESTS=OFF \
             -DONNXRUNTIME_DIR=${{ github.workspace }}/ort-android \
             -DONNXRUNTIME_INCLUDE_DIR=${{ github.workspace }}/ort-android/include \
-            -DONNXRUNTIME_LIB=${{ github.workspace }}/ort-android/lib/libonnxruntime.so
+            -DONNXRUNTIME_LIB=${{ github.workspace }}/ort-android/lib/libonnxruntime.so \
+            $CMAKE_EXTRA_FLAGS
 
       - name: Build
         run: cmake --build build --config Release --target piper_plus -j$(nproc)
@@ -91,11 +102,62 @@ jobs:
           readelf -d build/libpiper_plus.so 2>/dev/null | grep NEEDED || \
             readelf -d build/lib/libpiper_plus.so 2>/dev/null | grep NEEDED || true
 
+      - name: Prepare artifact
+        run: |
+          mkdir -p staging/${{ matrix.abi }}
+          # Copy libpiper_plus.so (may be in build/ or build/lib/)
+          cp build/libpiper_plus.so staging/${{ matrix.abi }}/ 2>/dev/null || \
+            cp build/lib/libpiper_plus.so staging/${{ matrix.abi }}/ || true
+          # Include ORT shared library alongside piper_plus
+          cp ort-android/lib/libonnxruntime.so staging/${{ matrix.abi }}/
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: piper-plus-android-arm64-v8a
-          path: |
-            build/libpiper_plus.so
-            build/lib/libpiper_plus.so
+          name: piper-plus-android-${{ matrix.abi }}
+          path: staging/${{ matrix.abi }}/
           if-no-files-found: warn
+
+  # Combine all ABI artifacts into a single ZIP for release
+  package-android:
+    name: Package Android (all ABIs)
+    needs: build-android
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Download all ABI artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: piper-plus-android-*
+          path: piper-plus-android/
+
+      - name: Verify structure
+        run: |
+          echo "=== Artifact structure ==="
+          find piper-plus-android -type f | sort
+          echo ""
+          echo "=== Checking all ABIs ==="
+          for abi in arm64-v8a armeabi-v7a x86_64; do
+            dir="piper-plus-android/piper-plus-android-${abi}"
+            if [ -f "${dir}/libpiper_plus.so" ] && [ -f "${dir}/libonnxruntime.so" ]; then
+              echo "${abi}: OK"
+            else
+              echo "${abi}: MISSING" && exit 1
+            fi
+          done
+
+      - name: Reorganize for jniLibs layout
+        run: |
+          mkdir -p release/piper-plus-android
+          for abi in arm64-v8a armeabi-v7a x86_64; do
+            mkdir -p release/piper-plus-android/${abi}
+            cp piper-plus-android/piper-plus-android-${abi}/*.so \
+               release/piper-plus-android/${abi}/
+          done
+          echo "=== Final layout ==="
+          find release -type f | sort
+
+      - name: Upload combined artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: piper-plus-android
+          path: release/piper-plus-android/

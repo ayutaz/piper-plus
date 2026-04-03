@@ -1,0 +1,61 @@
+# ffigen configuration for piper-plus C API bindings
+#
+# Generate bindings:
+#   dart run ffigen --config ffigen.yaml
+#
+# Prerequisites:
+#   - piper_plus.h (from piper-plus release archive or source tree)
+
+name: PiperPlusBindings
+description: Auto-generated Dart FFI bindings for piper-plus C API.
+output: "lib/piper_plus_bindings.dart"
+
+headers:
+  entry-points:
+    - "../../src/cpp/piper_plus.h"
+
+compiler-opts:
+  # Ignore platform-specific export macros
+  - "-DPIPER_PLUS_API="
+  - "-DPIPER_PLUS_BUILDING_DLL="
+
+functions:
+  include:
+    - "piper_plus_.*"
+
+structs:
+  include:
+    - "PiperPlusConfig"
+    - "PiperPlusSynthOptions"
+    - "PiperPlusAudioChunk"
+    - "PiperPlusPhonemeInfo"
+    - "PiperPlusTimingResult"
+    - "PiperPlusPhonemeResult"
+
+enums:
+  include:
+    - "PiperPlusStatus"
+
+unnamed-enums:
+  include:
+    - "PIPER_PLUS_API_VERSION"
+
+typedefs:
+  include:
+    - "PiperPlusAudioCallback"
+    - "PiperPlusAudioCallbackEx"
+
+macros:
+  include:
+    - "PIPER_PLUS_API_VERSION"
+  exclude:
+    - "PIPER_PLUS_API"
+    - "PIPER_PLUS_BUILDING_DLL"
+
+# Treat PiperPlusEngine as opaque (forward-declared struct)
+type-map:
+  typedefs:
+    "PiperPlusEngine":
+      lib: "ffi"
+      c-type: "Opaque"
+      dart-type: "Opaque"

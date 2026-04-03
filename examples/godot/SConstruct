@@ -1,0 +1,19 @@
+#!/usr/bin/env python
+"""SConstruct for piper-plus Godot GDExtension example.
+
+Prerequisites:
+  - godot-cpp cloned into godot-cpp/ (git submodule or manual clone)
+  - piper_plus installed and discoverable via pkg-config
+
+Build:
+  scons                        # debug build
+  scons target=template_release  # release build
+"""
+
+env = SConscript("godot-cpp/SConstruct")
+
+# Link piper_plus via pkg-config
+env.ParseConfig("pkg-config --cflags --libs piper_plus")
+
+# Build shared library into demo/bin/
+env.SharedLibrary("demo/bin/piper_tts", Glob("src/*.cpp"))

@@ -1,0 +1,19 @@
+; Engine configuration file.
+; It's best edited using the editor UI and not directly,
+; but it can also be manually edited with this file.
+
+[application]
+
+config/name="PiperTTS Demo"
+config/description="piper-plus GDExtension TTS demo"
+run/main_scene="res://main.tscn"
+config/features=PackedStringArray("4.3")
+
+[display]
+
+window/size/viewport_width=800
+window/size/viewport_height=400
+
+[native_extensions]
+
+paths=["res://bin/piper_tts.gdextension"]

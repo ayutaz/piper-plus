@@ -1,0 +1,13 @@
+[configuration]
+
+entry_symbol = "piper_tts_init"
+compatibility_minimum = "4.3"
+
+[libraries]
+
+linux.debug.x86_64 = "res://bin/libpiper_tts.linux.template_debug.x86_64.so"
+linux.release.x86_64 = "res://bin/libpiper_tts.linux.template_release.x86_64.so"
+macos.debug = "res://bin/libpiper_tts.macos.template_debug.framework"
+macos.release = "res://bin/libpiper_tts.macos.template_release.framework"
+windows.debug.x86_64 = "res://bin/piper_tts.windows.template_debug.x86_64.dll"
+windows.release.x86_64 = "res://bin/piper_tts.windows.template_release.x86_64.dll"
