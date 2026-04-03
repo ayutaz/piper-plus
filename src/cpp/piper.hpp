@@ -156,6 +156,13 @@ void textToAudio(PiperConfig &config, Voice &voice, std::string text,
                  const std::function<void()> &audioCallback,
                  const std::vector<ProsodyFeature> *externalProsody = nullptr);
 
+// Float32 output variant — avoids int16 intermediate conversion.
+// Audio samples are normalized to [-1.0, 1.0].
+void textToAudioFloat(PiperConfig &config, Voice &voice, std::string text,
+                      std::vector<float> &audioBuffer, SynthesisResult &result,
+                      const std::function<void()> &audioCallback = nullptr,
+                      const std::vector<ProsodyFeature> *externalProsody = nullptr);
+
 // Phonemize text and synthesize audio to WAV file
 void textToWavFile(PiperConfig &config, Voice &voice, std::string text,
                    std::ostream &audioFile, SynthesisResult &result,

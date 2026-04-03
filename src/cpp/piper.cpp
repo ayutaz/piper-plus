@@ -835,6 +835,188 @@ void synthesize(std::vector<PhonemeId> &phonemeIds,
   }
 }
 
+// Float32 variant of synthesize — outputs normalized [-1.0, 1.0] samples
+// instead of converting to int16.
+void synthesizeFloat(std::vector<PhonemeId> &phonemeIds,
+                     SynthesisConfig &synthesisConfig, ModelSession &session,
+                     std::vector<float> &audioBuffer, SynthesisResult &result,
+                     Voice *voice = nullptr,
+                     std::vector<int64_t> *prosodyFeatures = nullptr) {
+  spdlog::debug("Synthesizing audio (float32) for {} phoneme id(s)", phonemeIds.size());
+
+  auto memoryInfo = Ort::MemoryInfo::CreateCpu(
+      OrtAllocatorType::OrtArenaAllocator, OrtMemType::OrtMemTypeDefault);
+
+  // Allocate
+  std::vector<int64_t> phonemeIdLengths{(int64_t)phonemeIds.size()};
+  std::vector<float> scales{synthesisConfig.noiseScale,
+                            synthesisConfig.lengthScale,
+                            synthesisConfig.noiseW};
+
+  std::vector<Ort::Value> inputTensors;
+  std::vector<int64_t> phonemeIdsShape{1, (int64_t)phonemeIds.size()};
+  inputTensors.push_back(Ort::Value::CreateTensor<int64_t>(
+      memoryInfo, phonemeIds.data(), phonemeIds.size(), phonemeIdsShape.data(),
+      phonemeIdsShape.size()));
+
+  std::vector<int64_t> phomemeIdLengthsShape{(int64_t)phonemeIdLengths.size()};
+  inputTensors.push_back(Ort::Value::CreateTensor<int64_t>(
+      memoryInfo, phonemeIdLengths.data(), phonemeIdLengths.size(),
+      phomemeIdLengthsShape.data(), phomemeIdLengthsShape.size()));
+
+  std::vector<int64_t> scalesShape{(int64_t)scales.size()};
+  inputTensors.push_back(
+      Ort::Value::CreateTensor<float>(memoryInfo, scales.data(), scales.size(),
+                                      scalesShape.data(), scalesShape.size()));
+
+  // Build input names dynamically based on model capabilities
+  std::vector<const char *> inputNamesVec = {"input", "input_lengths", "scales"};
+
+  // Add speaker id only for multi-speaker models
+  std::vector<int64_t> speakerId{
+      (int64_t)synthesisConfig.speakerId.value_or(0)};
+  std::vector<int64_t> speakerIdShape{(int64_t)speakerId.size()};
+
+  if (session.hasMultiSpeaker) {
+    inputTensors.push_back(Ort::Value::CreateTensor<int64_t>(
+        memoryInfo, speakerId.data(), speakerId.size(), speakerIdShape.data(),
+        speakerIdShape.size()));
+    inputNamesVec.push_back("sid");
+  }
+
+  // Add language id for multilingual models
+  auto lid = synthesisConfig.languageId.value_or(0);
+  if (voice && (lid < 0 || lid >= voice->modelConfig.numLanguages)) {
+    spdlog::warn("Language ID {} out of range [0, {}), using 0",
+                 lid, voice->modelConfig.numLanguages);
+    lid = 0;
+  }
+  std::vector<int64_t> languageId{(int64_t)lid};
+  std::vector<int64_t> languageIdShape{(int64_t)languageId.size()};
+
+  if (session.hasLidInput) {
+    inputTensors.push_back(Ort::Value::CreateTensor<int64_t>(
+        memoryInfo, languageId.data(), languageId.size(),
+        languageIdShape.data(), languageIdShape.size()));
+    inputNamesVec.push_back("lid");
+  }
+
+  // Add prosody features if model supports them and they are provided
+  std::vector<int64_t> zeroProsody;
+  if (session.hasProsodyInput) {
+    std::vector<int64_t> prosodyShape{1, (int64_t)phonemeIds.size(), 3};
+    if (prosodyFeatures && prosodyFeatures->size() == phonemeIds.size() * 3) {
+      inputTensors.push_back(Ort::Value::CreateTensor<int64_t>(
+          memoryInfo, prosodyFeatures->data(), prosodyFeatures->size(),
+          prosodyShape.data(), prosodyShape.size()));
+    } else {
+      zeroProsody.resize(phonemeIds.size() * 3, 0);
+      inputTensors.push_back(Ort::Value::CreateTensor<int64_t>(
+          memoryInfo, zeroProsody.data(), zeroProsody.size(),
+          prosodyShape.data(), prosodyShape.size()));
+    }
+    inputNamesVec.push_back("prosody_features");
+  }
+
+  // Check if we should get duration output
+  std::vector<const char *> outputNamesVec;
+  outputNamesVec.push_back("output");
+  if (session.hasDurationOutput) {
+    outputNamesVec.push_back("durations");
+  }
+
+  // Infer
+  auto startTime = std::chrono::steady_clock::now();
+  auto outputTensors = session.onnx.Run(
+      Ort::RunOptions{nullptr}, inputNamesVec.data(), inputTensors.data(),
+      inputTensors.size(), outputNamesVec.data(), outputNamesVec.size());
+  auto endTime = std::chrono::steady_clock::now();
+
+  if (outputTensors.empty() || (!outputTensors.front().IsTensor())) {
+    throw std::runtime_error("Invalid output tensors");
+  }
+  auto inferDuration = std::chrono::duration<double>(endTime - startTime);
+  result.inferSeconds = inferDuration.count();
+
+  const float *audio = outputTensors.front().GetTensorData<float>();
+  auto audioShape =
+      outputTensors.front().GetTensorTypeAndShapeInfo().GetShape();
+  int64_t audioCount = audioShape[audioShape.size() - 1];
+
+  result.audioSeconds = (double)audioCount / (double)synthesisConfig.sampleRate;
+  result.realTimeFactor = 0.0;
+  if (result.audioSeconds > 0) {
+    result.realTimeFactor = result.inferSeconds / result.audioSeconds;
+  }
+  spdlog::debug("Synthesized {} second(s) of audio in {} second(s)",
+                result.audioSeconds, result.inferSeconds);
+
+  // Get max audio value for normalization to [-1.0, 1.0]
+  float maxAudioValue = 0.01f;
+
+#ifdef USE_ARM64_NEON
+  maxAudioValue = findMaxAudioValueNEON(audio, audioCount);
+#else
+  for (int64_t i = 0; i < audioCount; i++) {
+    float audioValue = std::abs(audio[i]);
+    if (audioValue > maxAudioValue) {
+      maxAudioValue = audioValue;
+    }
+  }
+#endif
+
+  // We know the size up front
+  audioBuffer.reserve(audioBuffer.size() + audioCount);
+
+  // Normalize audio to [-1.0, 1.0] and copy directly as float
+  float invMax = 1.0f / std::max(0.01f, maxAudioValue);
+  for (int64_t i = 0; i < audioCount; i++) {
+    audioBuffer.push_back(
+        std::clamp(audio[i] * invMax, -1.0f, 1.0f));
+  }
+
+  // Extract phoneme timing information if available
+  if (session.hasDurationOutput && outputTensors.size() >= 2 && voice != nullptr) {
+    auto& durationTensor = outputTensors[1];
+    if (durationTensor.IsTensor()) {
+      const float *durations = durationTensor.GetTensorData<float>();
+      auto durationShape = durationTensor.GetTensorTypeAndShapeInfo().GetShape();
+      size_t durationCount = 1;
+      for (auto dim : durationShape) {
+        durationCount *= dim;
+      }
+
+      std::vector<float> durationVec(durations, durations + durationCount);
+
+      int hopSize = DEFAULT_HOP_SIZE;
+      if (voice->configRoot.contains("audio") &&
+          voice->configRoot["audio"].contains("hop_size")) {
+        hopSize = voice->configRoot["audio"]["hop_size"];
+      }
+
+      result.phonemeTimings = extractTimingsFromDurations(
+          durationVec, phonemeIds,
+          voice->phonemizeConfig.phonemeIdMap,
+          hopSize,
+          voice->synthesisConfig.sampleRate,
+          voice->phonemizeConfig.phonemeType
+      );
+      result.hasTimingInfo = true;
+
+      spdlog::debug("Extracted timing for {} phonemes", result.phonemeTimings.size());
+    }
+  }
+
+  // Clean up
+  for (std::size_t i = 0; i < outputTensors.size(); i++) {
+    Ort::detail::OrtRelease(outputTensors[i].release());
+  }
+
+  for (std::size_t i = 0; i < inputTensors.size(); i++) {
+    Ort::detail::OrtRelease(inputTensors[i].release());
+  }
+}
+
 // ----------------------------------------------------------------------------
 
 // Compute prosody features (a1, a2, a3) for non-JA languages.
@@ -1277,6 +1459,205 @@ void textToAudio(PiperConfig &config, Voice &voice, std::string text,
   }
 
 } /* textToAudio */
+
+// Float32 output variant — avoids int16 intermediate conversion.
+// Audio samples are normalized to [-1.0, 1.0].
+void textToAudioFloat(PiperConfig &config, Voice &voice, std::string text,
+                      std::vector<float> &audioBuffer, SynthesisResult &result,
+                      const std::function<void()> &audioCallback,
+                      const std::vector<ProsodyFeature> *externalProsody) {
+
+  auto originalLanguageId = voice.synthesisConfig.languageId;
+
+  std::size_t sentenceSilenceSamples = 0;
+  if (voice.synthesisConfig.sentenceSilenceSeconds > 0) {
+    sentenceSilenceSamples = (std::size_t)(
+        voice.synthesisConfig.sentenceSilenceSeconds *
+        voice.synthesisConfig.sampleRate * voice.synthesisConfig.channels);
+  }
+
+  PhonemizeResult phonResult;
+  phonemizeText(voice, text, phonResult, externalProsody);
+  auto &phonemes = phonResult.phonemes;
+  auto &allProsodyFeatures = phonResult.prosody;
+  bool useProsody = !allProsodyFeatures.empty();
+
+  if (originalLanguageId.has_value()) {
+    voice.synthesisConfig.languageId = originalLanguageId;
+  }
+
+  // Synthesize each sentence independently.
+  std::vector<PhonemeId> phonemeIds;
+  std::map<Phoneme, std::size_t> missingPhonemes;
+  size_t sentenceIdx = 0;
+  for (auto phonemesIter = phonemes.begin(); phonemesIter != phonemes.end();
+       ++phonemesIter, ++sentenceIdx) {
+    std::vector<Phoneme> &sentencePhonemes = *phonemesIter;
+
+    if (spdlog::should_log(spdlog::level::debug)) {
+      std::string phonemesStr;
+      for (auto phoneme : sentencePhonemes) {
+        phonemesStr += phonemeToString(phoneme);
+        phonemesStr += " ";
+      }
+      if (!phonemesStr.empty()) {
+        phonemesStr.pop_back();
+      }
+
+      spdlog::debug("Converting {} phoneme(s) to ids: {}",
+                    sentencePhonemes.size(), phonemesStr);
+    }
+
+    std::vector<std::shared_ptr<std::vector<Phoneme>>> phrasePhonemes;
+    std::vector<SynthesisResult> phraseResults;
+    std::vector<size_t> phraseSilenceSamples;
+
+    PhonemeIdConfig idConfig;
+    idConfig.phonemeIdMap =
+        std::make_shared<PhonemeIdMap>(voice.phonemizeConfig.phonemeIdMap);
+    idConfig.interspersePad = voice.phonemizeConfig.interspersePad;
+
+    if (usesOpenJTalk(voice.phonemizeConfig.phonemeType)) {
+        idConfig.addBos = false;
+        idConfig.addEos = false;
+    }
+
+    if (voice.synthesisConfig.phonemeSilenceSeconds) {
+      std::map<Phoneme, float> &phonemeSilenceSeconds =
+          *voice.synthesisConfig.phonemeSilenceSeconds;
+
+      auto currentPhrasePhonemes = std::make_shared<std::vector<Phoneme>>();
+      phrasePhonemes.push_back(currentPhrasePhonemes);
+
+      for (auto sentencePhonemesIter = sentencePhonemes.begin();
+           sentencePhonemesIter != sentencePhonemes.end();
+           sentencePhonemesIter++) {
+        Phoneme &currentPhoneme = *sentencePhonemesIter;
+        currentPhrasePhonemes->push_back(currentPhoneme);
+
+        if (phonemeSilenceSeconds.count(currentPhoneme) > 0) {
+          phraseSilenceSamples.push_back(
+              (std::size_t)(phonemeSilenceSeconds[currentPhoneme] *
+                            voice.synthesisConfig.sampleRate *
+                            voice.synthesisConfig.channels));
+
+          currentPhrasePhonemes = std::make_shared<std::vector<Phoneme>>();
+          phrasePhonemes.push_back(currentPhrasePhonemes);
+        }
+      }
+    } else {
+      phrasePhonemes.push_back(
+          std::make_shared<std::vector<Phoneme>>(sentencePhonemes));
+    }
+
+    while (phraseResults.size() < phrasePhonemes.size()) {
+      phraseResults.emplace_back();
+    }
+
+    while (phraseSilenceSamples.size() < phrasePhonemes.size()) {
+      phraseSilenceSamples.push_back(0);
+    }
+
+    // phonemes -> ids -> audio
+    for (size_t phraseIdx = 0; phraseIdx < phrasePhonemes.size(); phraseIdx++) {
+      if (phrasePhonemes[phraseIdx]->size() <= 0) {
+        continue;
+      }
+
+      phonemes_to_ids(*(phrasePhonemes[phraseIdx]), idConfig, phonemeIds,
+                      missingPhonemes);
+      if (spdlog::should_log(spdlog::level::debug)) {
+        std::stringstream phonemeIdsStr;
+        for (auto phonemeId : phonemeIds) {
+          phonemeIdsStr << phonemeId << ", ";
+        }
+
+        spdlog::debug("Converted {} phoneme(s) to {} phoneme id(s): {}",
+                      phrasePhonemes[phraseIdx]->size(), phonemeIds.size(),
+                      phonemeIdsStr.str());
+      }
+
+      // ids -> audio (float32)
+      std::vector<int64_t> *prosodyPtr = nullptr;
+      std::vector<int64_t> prosodyFlat;
+
+      if (useProsody && sentenceIdx < allProsodyFeatures.size()) {
+        const auto &sentenceProsody = allProsodyFeatures[sentenceIdx];
+
+        size_t numPhonemeIds = phonemeIds.size();
+        prosodyFlat.resize(numPhonemeIds * 3, 0);
+
+        spdlog::debug("Prosody mapping: {} phonemeIds, {} prosody features, interspersePad={}",
+                      phonemeIds.size(), sentenceProsody.size(),
+                      voice.phonemizeConfig.interspersePad);
+
+        if (voice.phonemizeConfig.interspersePad) {
+          size_t prosodyIdx = 0;
+          for (size_t i = 1; i < numPhonemeIds && prosodyIdx < sentenceProsody.size(); i += 2) {
+            prosodyFlat[i * 3 + 0] = sentenceProsody[prosodyIdx].a1;
+            prosodyFlat[i * 3 + 1] = sentenceProsody[prosodyIdx].a2;
+            prosodyFlat[i * 3 + 2] = sentenceProsody[prosodyIdx].a3;
+            prosodyIdx++;
+          }
+        } else {
+          for (size_t i = 0; i < numPhonemeIds && i < sentenceProsody.size(); i++) {
+            prosodyFlat[i * 3 + 0] = sentenceProsody[i].a1;
+            prosodyFlat[i * 3 + 1] = sentenceProsody[i].a2;
+            prosodyFlat[i * 3 + 2] = sentenceProsody[i].a3;
+          }
+        }
+
+        prosodyPtr = &prosodyFlat;
+        spdlog::debug("Using prosody features: {} phoneme IDs, {} original prosody values",
+                      numPhonemeIds, sentenceProsody.size());
+      }
+
+      synthesizeFloat(phonemeIds, voice.synthesisConfig, voice.session, audioBuffer,
+                      phraseResults[phraseIdx], &voice, prosodyPtr);
+
+      // Add end of phrase silence (float 0.0)
+      for (std::size_t i = 0; i < phraseSilenceSamples[phraseIdx]; i++) {
+        audioBuffer.push_back(0.0f);
+      }
+
+      result.audioSeconds += phraseResults[phraseIdx].audioSeconds;
+      result.inferSeconds += phraseResults[phraseIdx].inferSeconds;
+
+      phonemeIds.clear();
+    }
+
+    // Add end of sentence silence (float 0.0)
+    if (sentenceSilenceSamples > 0) {
+      for (std::size_t i = 0; i < sentenceSilenceSamples; i++) {
+        audioBuffer.push_back(0.0f);
+      }
+    }
+
+    if (audioCallback) {
+      audioCallback();
+      audioBuffer.clear();
+    }
+
+    phonemeIds.clear();
+  }
+
+  if (missingPhonemes.size() > 0) {
+    spdlog::warn("Missing {} phoneme(s) from phoneme/id map!",
+                 missingPhonemes.size());
+
+    for (auto phonemeCount : missingPhonemes) {
+      std::string phonemeStr;
+      utf8::append(phonemeCount.first, std::back_inserter(phonemeStr));
+      spdlog::warn("Missing \"{}\" (\\u{:04X}): {} time(s)", phonemeStr,
+                   (uint32_t)phonemeCount.first, phonemeCount.second);
+    }
+  }
+
+  if (result.audioSeconds > 0) {
+    result.realTimeFactor = result.inferSeconds / result.audioSeconds;
+  }
+
+} /* textToAudioFloat */
 
 // Phonemize text and synthesize audio to WAV file
 void textToWavFile(PiperConfig &config, Voice &voice, std::string text,
