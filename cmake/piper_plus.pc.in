@@ -1,0 +1,13 @@
+prefix=@CMAKE_INSTALL_PREFIX@
+exec_prefix=${prefix}
+libdir=${prefix}/@CMAKE_INSTALL_LIBDIR@
+includedir=${prefix}/@CMAKE_INSTALL_INCLUDEDIR@
+
+Name: piper-plus
+Description: piper-plus C API shared library for neural text-to-speech
+URL: https://github.com/ayutaz/piper-plus
+Version: @piper_version@
+
+Cflags: -I${includedir}
+Libs: -L${libdir} -lpiper_plus
+Libs.private: -lonnxruntime

@@ -1,0 +1,13 @@
+@PACKAGE_INIT@
+
+include(CMakeFindDependencyMacro)
+
+if(NOT TARGET PiperPlus::piper_plus)
+  include("${CMAKE_CURRENT_LIST_DIR}/PiperPlusTargets.cmake")
+endif()
+
+set(PiperPlus_VERSION "@piper_version@")
+set(PiperPlus_DICT_DIR "${PACKAGE_PREFIX_DIR}/share/open_jtalk/dic")
+set(PiperPlus_G2P_DICT_DIR "${PACKAGE_PREFIX_DIR}/share/piper/dicts")
+
+check_required_components(PiperPlus)
