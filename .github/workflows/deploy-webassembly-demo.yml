@@ -191,11 +191,8 @@ jobs:
           # Copy src files for multilingual demo
           if [ -d "src/wasm/openjtalk-web/src" ]; then
             mkdir -p deploy/src
-            cp src/wasm/openjtalk-web/src/simple_unified_api.js deploy/src/
-            cp src/wasm/openjtalk-web/src/simple_english_phonemizer.js deploy/src/
             cp src/wasm/openjtalk-web/src/espeak_phoneme_extractor.js deploy/src/
             cp src/wasm/openjtalk-web/src/custom_dictionary.js deploy/src/
-            cp src/wasm/openjtalk-web/src/japanese_phoneme_extract.js deploy/src/
             
             # Fix paths in src files for root deployment
             sed -i "s|'../dist/|'./dist/|g" deploy/src/espeak_phoneme_extractor.js

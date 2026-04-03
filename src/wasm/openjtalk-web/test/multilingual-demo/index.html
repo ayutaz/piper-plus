@@ -231,7 +231,7 @@
             font-size: 14px;
         }
     </style>
-    <script type="text/javascript" src="../../dist/espeak-ng/espeakng.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.21.0/dist/ort.min.js"></script>
 </head>
 <body>
     <div class="container">
@@ -245,12 +245,12 @@
         <div class="feature-list">
             <h3>📝 対応機能</h3>
             <ul>
-                <li>🇯🇵 日本語音声合成（OpenJTalk + Piperニューラルモデル）</li>
-                <li>🇺🇸 英語音声合成（eSpeak-ng + Piperニューラルモデル）</li>
-                <li>🇨🇳 中国語音声合成（eSpeak-ng + Piperニューラルモデル）</li>
-                <li>🇪🇸 スペイン語音声合成（eSpeak-ng + Piperニューラルモデル）</li>
-                <li>🇫🇷 フランス語音声合成（eSpeak-ng + Piperニューラルモデル）</li>
-                <li>🇧🇷 ポルトガル語音声合成（eSpeak-ng + Piperニューラルモデル）</li>
+                <li>🇯🇵 日本語音声合成（OpenJTalk WASM + Piperニューラルモデル）</li>
+                <li>🇺🇸 英語音声合成（@piper-plus/g2p + Piperニューラルモデル）</li>
+                <li>🇨🇳 中国語音声合成（@piper-plus/g2p + Piperニューラルモデル）</li>
+                <li>🇪🇸 スペイン語音声合成（@piper-plus/g2p + Piperニューラルモデル）</li>
+                <li>🇫🇷 フランス語音声合成（@piper-plus/g2p + Piperニューラルモデル）</li>
+                <li>🇧🇷 ポルトガル語音声合成（@piper-plus/g2p + Piperニューラルモデル）</li>
                 <li>🎯 完全ブラウザ実装（サーバー不要）</li>
                 <li>⚡ WebAssembly + ONNX Runtime Webによる高速処理</li>
             </ul>
@@ -302,22 +302,14 @@
     </div>
 
     <script type="module">
-        import { SimpleUnifiedPhonemizer } from '../../src/simple_unified_api.js';
-        import { ESpeakPhonemeExtractor } from '../../src/espeak_phoneme_extractor.js';
-        import { CustomDictionary } from '../../src/custom_dictionary.js';
-        
-        let unifiedPhonemizer = null;
-        let espeakExtractor = null;
-        let onnxSession = null;
-        let customDict = null;
-        let currentModelConfig = null;
+        import { PiperPlus } from '../../src/index.js';
+
+        let piper = null;
         let currentLanguage = 'ja';
-        
+
         const languageConfigs = {
             'ja': {
                 name: '日本語',
-                model: 'multilingual-test-medium.onnx',
-                phonemizer: 'openjtalk',
                 testText: 'こんにちは、世界！今日は良い天気ですね。',
                 templates: [
                     'こんにちは、世界！',
@@ -328,10 +320,7 @@
                 ]
             },
             'en': {
-                name: '英語 (eSpeak-ng)',
-                model: 'multilingual-test-medium.onnx',
-                phonemizer: 'espeak-ng',
-                espeakLang: 'en-us',
+                name: '英語',
                 testText: 'Hello world! This is a test of the Piper text to speech system.',
                 templates: [
                     'Hello world!',
@@ -343,9 +332,6 @@
             },
             'zh': {
                 name: '中国語',
-                model: 'multilingual-test-medium.onnx',
-                phonemizer: 'espeak-ng',
-                espeakLang: 'cmn',
                 testText: '你好，今天天气非常好。我们一起去散步吧。',
                 templates: [
                     '你好，今天天气非常好。',
@@ -357,9 +343,6 @@
             },
             'es': {
                 name: 'スペイン語',
-                model: 'multilingual-test-medium.onnx',
-                phonemizer: 'espeak-ng',
-                espeakLang: 'es',
                 testText: 'Hola, ¿cómo estás hoy? El clima es hermoso, vamos a dar un paseo.',
                 templates: [
                     '¡Hola, mundo!',
@@ -371,9 +354,6 @@
             },
             'fr': {
                 name: 'フランス語',
-                model: 'multilingual-test-medium.onnx',
-                phonemizer: 'espeak-ng',
-                espeakLang: 'fr',
                 testText: 'Bonjour, comment allez-vous aujourd\'hui? Il fait beau, allons nous promener.',
                 templates: [
                     'Bonjour, le monde!',
@@ -385,9 +365,6 @@
             },
             'pt': {
                 name: 'ポルトガル語',
-                model: 'multilingual-test-medium.onnx',
-                phonemizer: 'espeak-ng',
-                espeakLang: 'pt-br',
                 testText: 'Olá, como você está hoje? O tempo está lindo, vamos dar um passeio.',
                 templates: [
                     'Olá, mundo!',
@@ -398,7 +375,7 @@
                 ]
             }
         };
-        
+
         const statusEl = document.getElementById('status');
         const synthesizeBtn = document.getElementById('synthesizeBtn');
         const stopBtn = document.getElementById('stopBtn');
@@ -407,66 +384,35 @@
         const audioPlayer = document.getElementById('audioPlayer');
         const templateSelect = document.getElementById('templateSelect');
         const languageInfo = document.getElementById('languageInfo');
-        
+
         // Initialize
         async function init() {
             try {
                 updateStatus('初期化中...');
-                
-                // Initialize custom dictionary
-                updateStatus('カスタム辞書を読み込んでいます...');
-                customDict = new CustomDictionary();
-                const dictLoaded = await customDict.loadFromJSON('../../assets/custom_dictionary.json');
-                if (!dictLoaded) {
-                    console.warn('カスタム辞書の読み込みに失敗しました。デフォルト設定を使用します。');
-                }
-                
-                // Initialize Simple Unified Phonemizer
-                updateStatus('音素化エンジンを初期化しています...');
-                
-                // Check if running on GitHub Pages
-                const isGitHubPages = window.location.hostname.includes('github.io');
-                const deploymentConfig = {
-                    isGitHubPages: isGitHubPages,
-                    basePath: isGitHubPages ? '/' + window.location.pathname.split('/')[1] : ''
-                };
-                
-                unifiedPhonemizer = new SimpleUnifiedPhonemizer({ deploymentConfig });
-                await unifiedPhonemizer.initialize({
-                    openjtalk: {
-                        jsPath: '../../dist/openjtalk.js',
-                        wasmPath: '../../dist/openjtalk.wasm',
-                        dictPath: '../../assets/dict',
-                        voicePath: '../../assets/voice/mei_normal.htsvoice'
+
+                piper = await PiperPlus.initialize({
+                    model: 'ayousanz/piper-plus-tsukuyomi-chan',
+                    ort: globalThis.ort,
+                    onProgress: ({ stage, message }) => {
+                        updateStatus(message);
                     }
                 });
-                
-                // Initialize eSpeak-ng for non-Japanese languages (en/zh/es/fr/pt)
-                updateStatus('eSpeak-ngを初期化しています...');
-                espeakExtractor = new ESpeakPhonemeExtractor();
-                await espeakExtractor.initialize();
-                
-                // Load ONNX Runtime
-                await loadScript('https://cdn.jsdelivr.net/npm/onnxruntime-web@1.21.0/dist/ort.min.js');
-                
-                // Load default model
-                await loadModel(currentLanguage);
-                
+
                 updateStatus('準備完了！', 'success');
                 synthesizeBtn.disabled = false;
-                
+
                 // Initialize templates for default language
                 updateTemplates(currentLanguage);
-                
+
                 // Setup event listeners
                 setupEventListeners();
-                
+
             } catch (error) {
                 console.error('Initialization failed:', error);
                 updateStatus(`初期化エラー: ${error.message}`, 'error');
             }
         }
-        
+
         // Setup event listeners
         function setupEventListeners() {
             // Language buttons
@@ -476,69 +422,61 @@
                     await switchLanguage(lang);
                 });
             });
-            
+
             // Template selector
             templateSelect.addEventListener('change', (e) => {
                 if (e.target.value) {
                     inputText.value = e.target.value;
                 }
             });
-            
+
             // Synthesis button
             synthesizeBtn.addEventListener('click', synthesize);
-            
+
             // Stop button
             stopBtn.addEventListener('click', () => {
                 audioPlayer.pause();
                 audioPlayer.currentTime = 0;
                 stopBtn.disabled = true;
             });
-            
+
             // Audio player events
             audioPlayer.addEventListener('play', () => {
                 stopBtn.disabled = false;
             });
-            
+
             audioPlayer.addEventListener('ended', () => {
                 stopBtn.disabled = true;
             });
         }
-        
+
         // Switch language
         async function switchLanguage(lang) {
             currentLanguage = lang;
-            
+
             // Update UI
             document.querySelectorAll('.lang-button').forEach(btn => {
                 btn.classList.toggle('active', btn.getAttribute('data-lang') === lang);
             });
-            
+
             // Update text
             const config = languageConfigs[lang];
             inputText.value = config.testText;
-            
+
             // Update templates
             updateTemplates(lang);
-            
+
             // Update language info
             updateLanguageInfo(lang);
-            
-            
-            // Load model
-            updateStatus(`${config.name}モデルを読み込んでいます...`);
-            try {
-                await loadModel(lang);
-                updateStatus('準備完了！', 'success');
-            } catch (error) {
-                updateStatus(`モデルロードエラー: ${error.message}`, 'error');
-            }
+
+            updateStatus('準備完了！', 'success');
         }
-        
+
         // Update templates
         function updateTemplates(lang) {
             const config = languageConfigs[lang];
             templateSelect.innerHTML = '<option value="">-- 自由入力 / Free Input --</option>';
-            
+
             config.templates.forEach((template, index) => {
                 const option = document.createElement('option');
                 option.value = template;
@@ -546,33 +484,33 @@
                 templateSelect.appendChild(option);
             });
         }
-        
+
         // Update language info
         function updateLanguageInfo(lang) {
             const langInfoMap = {
                 'ja': {
-                    title: '日本語：OpenJTalkによる音素化',
+                    title: '日本語：OpenJTalk WASMによる音素化',
                     desc: 'MeCab形態素解析とHTS音声合成エンジンを使用した高精度な日本語音素化'
                 },
                 'en': {
-                    title: '英語：eSpeak-ng + Piperによる音声合成',
-                    desc: 'Python版と同等のeSpeak-ng音素化とPiperニューラル音声合成'
+                    title: '英語：IPA規則ベースG2Pによる音声合成',
+                    desc: '@piper-plus/g2p 規則ベースG2PとPiperニューラル音声合成'
                 },
                 'zh': {
-                    title: '中国語：eSpeak-ng + Piperによる音声合成',
-                    desc: 'eSpeak-ng (cmn) による中国語音素化とPiperニューラル音声合成'
+                    title: '中国語：IPA規則ベースG2Pによる音声合成',
+                    desc: '@piper-plus/g2p 規則ベースG2PとPiperニューラル音声合成'
                 },
                 'es': {
-                    title: 'スペイン語：eSpeak-ng + Piperによる音声合成',
-                    desc: 'eSpeak-ng (es) によるスペイン語音素化とPiperニューラル音声合成'
+                    title: 'スペイン語：IPA規則ベースG2Pによる音声合成',
+                    desc: '@piper-plus/g2p 規則ベースG2PとPiperニューラル音声合成'
                 },
                 'fr': {
-                    title: 'フランス語：eSpeak-ng + Piperによる音声合成',
-                    desc: 'eSpeak-ng (fr) によるフランス語音素化とPiperニューラル音声合成'
+                    title: 'フランス語：IPA規則ベースG2Pによる音声合成',
+                    desc: '@piper-plus/g2p 規則ベースG2PとPiperニューラル音声合成'
                 },
                 'pt': {
-                    title: 'ポルトガル語：eSpeak-ng + Piperによる音声合成',
-                    desc: 'eSpeak-ng (pt-br) によるポルトガル語音素化とPiperニューラル音声合成'
+                    title: 'ポルトガル語：IPA規則ベースG2Pによる音声合成',
+                    desc: '@piper-plus/g2p 規則ベースG2PとPiperニューラル音声合成'
                 }
             };
             const info = langInfoMap[lang] || langInfoMap['ja'];
@@ -581,52 +519,7 @@
                 <p>${info.desc}</p>
             `;
         }
-        
-        // Load ONNX model
-        async function loadModel(lang) {
-            const config = languageConfigs[lang];
-            const modelPath = `../../models/${config.model}`;
-            const configPath = `../../models/${config.model}.json`;
-            
-            // Load model config
-            const configResponse = await fetch(configPath);
-            currentModelConfig = await configResponse.json();
-            
-            // Create ONNX session
-            onnxSession = await ort.InferenceSession.create(modelPath, {
-                executionProviders: ['wasm'],
-                graphOptimizationLevel: 'extended',
-                enableMemPattern: true
-            });
-            
-        }
-        
-        // Get phonemes based on language
-        async function getPhonemes(text, lang) {
-            return new Promise((resolve, reject) => {
-                if (lang === 'ja') {
-                    // Use custom dictionary to preprocess text
-                    let processedText = text;
-                    if (customDict && customDict.initialized) {
-                        processedText = customDict.processText(text);
-                    }
 
-                    // Use OpenJTalk for Japanese
-                    unifiedPhonemizer.textToPhonemes(processedText, 'ja').then(labels => {
-                        const phonemes = unifiedPhonemizer.extractPhonemes(labels, 'ja');
-                        resolve({ phonemes, labels });
-                    }).catch(reject);
-                } else {
-                    // Use eSpeak-ng for all non-Japanese languages
-                    const config = languageConfigs[lang];
-                    const espeakLang = config.espeakLang || 'en-us';
-                    espeakExtractor.phonemize(text, espeakLang).then(phonemes => {
-                        resolve({ phonemes, labels: null });
-                    }).catch(reject);
-                }
-            });
-        }
-        
         // Synthesize speech
         async function synthesize() {
             const text = inputText.value.trim();
@@ -634,39 +527,23 @@
                 updateStatus('テキストを入力してください。', 'error');
                 return;
             }
-            
+
             try {
-                updateStatus('音素を抽出中...');
-                synthesizeBtn.disabled = true;
-                
-                // Get phonemes
-                const result = await getPhonemes(text, currentLanguage);
-                const phonemes = result.phonemes;
-                const labels = result.labels;
-
                 updateStatus('音声合成中...');
+                synthesizeBtn.disabled = true;
 
-                // Convert phonemes to IDs
-                const phonemeIds = phonemesToIds(phonemes);
+                const audioResult = await piper.synthesize(text, {
+                    language: currentLanguage
+                });
 
-                // Extract prosody features if available
-                let prosodyFeatures = null;
-                if (labels && currentModelConfig.prosody_id_map) {
-                    prosodyFeatures = extractProsodyFromLabels(labels, phonemeIds.length);
-                }
-
-                // Synthesize audio
-                const audio = await synthesizeAudio(phonemeIds, prosodyFeatures);
-                
-                // Create WAV and play
-                const wavBlob = createWAV(audio, currentModelConfig.audio.sample_rate);
+                // Create WAV blob and play via <audio> element
+                const wavBlob = audioResult.toBlob();
                 const audioUrl = URL.createObjectURL(wavBlob);
                 audioPlayer.src = audioUrl;
-                
-                
+
                 outputSection.style.display = 'block';
                 updateStatus('合成完了！', 'success');
-                
+
             } catch (error) {
                 console.error('Synthesis failed:', error);
                 updateStatus(`合成エラー: ${error.message}`, 'error');
@@ -674,183 +551,13 @@
                 synthesizeBtn.disabled = false;
             }
         }
-        
-        // Extract prosody features (A1/A2/A3) from OpenJTalk labels
-        function extractProsodyFromLabels(labels, phonemeCount) {
-            const lines = labels.split('\n').filter(line => line.trim());
-            const prosodyPerPhoneme = [];
-            const reA1 = /\/A:([\d-]+)\+/;
-            const reA2 = /\+([0-9]+)\+/;
-            const reA3 = /\+([0-9]+)\//;
 
-            // BOS token
-            prosodyPerPhoneme.push([0, 0, 0]);
-
-            for (const line of lines) {
-                const match = line.match(/\-([^+]+)\+/);
-                if (match && match[1] !== 'sil' && match[1] !== 'pau') {
-                    const mA1 = reA1.exec(line);
-                    const mA2 = reA2.exec(line);
-                    const mA3 = reA3.exec(line);
-                    const a1 = mA1 ? Math.max(0, Math.min(10, parseInt(mA1[1]) + 5)) : 0;
-                    const a2 = mA2 ? Math.min(10, parseInt(mA2[1])) : 0;
-                    const a3 = mA3 ? Math.min(10, parseInt(mA3[1])) : 0;
-                    prosodyPerPhoneme.push([a1, a2, a3]);
-                }
-            }
-
-            // EOS token
-            prosodyPerPhoneme.push([0, 0, 0]);
-
-            // Pad to match phoneme count
-            while (prosodyPerPhoneme.length < phonemeCount) {
-                prosodyPerPhoneme.push([0, 0, 0]);
-            }
-
-            return prosodyPerPhoneme.slice(0, phonemeCount);
-        }
-
-        // Convert phonemes to IDs
-        function phonemesToIds(phonemes) {
-            const phonemeIdMap = currentModelConfig.phoneme_id_map;
-            const padIds = phonemeIdMap['_'] || [0];
-            const bosIds = phonemeIdMap['^'] || [1];
-            const eosIds = phonemeIdMap['$'] || [2];
-
-            // Build IDs with BOS/EOS and PAD intersperse between every phoneme
-            // Format: [BOS, PAD, phoneme1, PAD, phoneme2, PAD, ..., EOS]
-            const ids = [];
-            ids.push(...bosIds);
-            ids.push(...padIds);
-
-            for (const phoneme of phonemes) {
-                // Skip BOS/EOS markers from phoneme list (we add them ourselves)
-                if (phoneme === '^' || phoneme === '$') continue;
-
-                if (phonemeIdMap[phoneme]) {
-                    ids.push(...phonemeIdMap[phoneme]);
-                } else {
-                    // Unknown phoneme: skip
-                    continue;
-                }
-                ids.push(...padIds);  // PAD after each phoneme
-            }
-
-            ids.push(...eosIds);
-            return ids;
-        }
-        
-        // Synthesize audio using ONNX
-        async function synthesizeAudio(phonemeIds, prosodyFeatures) {
-            const inputTensor = new ort.Tensor('int64',
-                new BigInt64Array(phonemeIds.map(id => BigInt(id))),
-                [1, phonemeIds.length]
-            );
-
-            const lengthTensor = new ort.Tensor('int64',
-                new BigInt64Array([BigInt(phonemeIds.length)]),
-                [1]
-            );
-
-            const scalesTensor = new ort.Tensor('float32',
-                new Float32Array([
-                    currentModelConfig.inference.noise_scale || 0.667,
-                    currentModelConfig.inference.length_scale || 1.0,
-                    currentModelConfig.inference.noise_w || 0.8
-                ]),
-                [3]
-            );
-
-            const feeds = {
-                'input': inputTensor,
-                'input_lengths': lengthTensor,
-                'scales': scalesTensor
-            };
-
-            // Add language ID (lid) tensor for multilingual models
-            const langIdMap = { 'ja': 0, 'en': 1, 'zh': 2, 'es': 3, 'fr': 4, 'pt': 5 };
-            const langId = langIdMap[currentLanguage] || 0;
-            feeds['lid'] = new ort.Tensor('int64', new BigInt64Array([BigInt(langId)]), [1]);
-
-            // Add prosody features (required input for this model)
-            if (prosodyFeatures && currentModelConfig.prosody_id_map) {
-                const flatProsody = [];
-                for (const [a1, a2, a3] of prosodyFeatures) {
-                    flatProsody.push(BigInt(a1), BigInt(a2), BigInt(a3));
-                }
-                feeds['prosody_features'] = new ort.Tensor('int64',
-                    new BigInt64Array(flatProsody),
-                    [1, phonemeIds.length, 3]
-                );
-            } else {
-                // Zero-filled prosody for non-JA languages or when prosody data unavailable
-                const zeroProsody = new BigInt64Array(phonemeIds.length * 3);
-                feeds['prosody_features'] = new ort.Tensor('int64',
-                    zeroProsody,
-                    [1, phonemeIds.length, 3]
-                );
-            }
-
-            const results = await onnxSession.run(feeds);
-            const audioTensor = results['output'] || results[Object.keys(results)[0]];
-            
-            return new Float32Array(audioTensor.data);
-        }
-        
-        
         // Utility functions
         function updateStatus(message, type = 'info') {
             statusEl.className = `status ${type}`;
             statusEl.textContent = message;
         }
-        
-        function loadScript(src) {
-            return new Promise((resolve, reject) => {
-                const script = document.createElement('script');
-                script.src = src;
-                script.onload = resolve;
-                script.onerror = reject;
-                document.head.appendChild(script);
-            });
-        }
-        
-        function createWAV(audioData, sampleRate) {
-            const length = audioData.length;
-            const arrayBuffer = new ArrayBuffer(44 + length * 2);
-            const view = new DataView(arrayBuffer);
-            
-            // WAV header
-            const writeString = (offset, string) => {
-                for (let i = 0; i < string.length; i++) {
-                    view.setUint8(offset + i, string.charCodeAt(i));
-                }
-            };
-            
-            writeString(0, 'RIFF');
-            view.setUint32(4, 36 + length * 2, true);
-            writeString(8, 'WAVE');
-            writeString(12, 'fmt ');
-            view.setUint32(16, 16, true);
-            view.setUint16(20, 1, true);
-            view.setUint16(22, 1, true);
-            view.setUint32(24, sampleRate, true);
-            view.setUint32(28, sampleRate * 2, true);
-            view.setUint16(32, 2, true);
-            view.setUint16(34, 16, true);
-            writeString(36, 'data');
-            view.setUint32(40, length * 2, true);
-            
-            // Convert float to int16
-            const offset = 44;
-            for (let i = 0; i < length; i++) {
-                const val = Math.max(-1, Math.min(1, audioData[i]));
-                const int16 = val < 0 ? val * 0x8000 : val * 0x7FFF;
-                view.setInt16(offset + i * 2, int16, true);
-            }
-            
-            return new Blob([arrayBuffer], { type: 'audio/wav' });
-        }
-        
+
         // Initialize on load
         init();
     </script>
