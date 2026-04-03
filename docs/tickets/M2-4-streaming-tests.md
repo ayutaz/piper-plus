@@ -7,7 +7,7 @@
 > **マイルストーン:** [c-api-milestones.md](../design/c-api-milestones.md#m2-4-ストリーミング単体テスト-モデル不要)
 > **要求定義書:** [c-api-shared-library.md](../design/c-api-shared-library.md)
 > **技術調査:** [c-api-technical-investigation.md](../design/c-api-technical-investigation.md)
-> **Status:** Open
+> **Status:** Done
 
 ---
 

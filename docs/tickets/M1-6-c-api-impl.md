@@ -7,7 +7,7 @@
 > **マイルストーン:** [c-api-milestones.md](../design/c-api-milestones.md#m1-6-piper_plus_c_apicpp-実装)
 > **要求定義書:** [c-api-shared-library.md](../design/c-api-shared-library.md)
 > **技術調査:** [c-api-technical-investigation.md](../design/c-api-technical-investigation.md)
-> **Status:** Open
+> **Status:** Done
 
 ---
 
