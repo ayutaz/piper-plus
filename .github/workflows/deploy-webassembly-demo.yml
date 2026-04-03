@@ -183,22 +183,33 @@ jobs:
                 sed -i 's|../../assets/|../assets/|g' "$file"
                 sed -i 's|../../models/|../models/|g' "$file"
                 sed -i 's|../../src/|../src/|g' "$file"
+                # Fix g2p direct import (piper-espeak-english.html)
+                sed -i "s|from '../../../g2p/|from '../g2p/|g" "$file"
               fi
             done
           fi
           
           
-          # Copy src files for multilingual demo
+          # Copy src files for multilingual demo (index.js + all dependencies)
           if [ -d "src/wasm/openjtalk-web/src" ]; then
             mkdir -p deploy/src
-            cp src/wasm/openjtalk-web/src/espeak_phoneme_extractor.js deploy/src/
-            cp src/wasm/openjtalk-web/src/custom_dictionary.js deploy/src/
-            
+            cp src/wasm/openjtalk-web/src/*.js deploy/src/
+
+            # Rewrite bare @piper-plus/g2p imports to relative paths
+            sed -i "s|from '@piper-plus/g2p/ja'|from '../g2p/src/ja/index.js'|g" deploy/src/*.js
+            sed -i "s|from '@piper-plus/g2p'|from '../g2p/src/index.js'|g" deploy/src/*.js
+
             # Fix paths in src files for root deployment
             sed -i "s|'../dist/|'./dist/|g" deploy/src/espeak_phoneme_extractor.js
             sed -i "s|'../../dist/|'./dist/|g" deploy/src/*.js
             sed -i "s|'../../assets/|'./assets/|g" deploy/src/*.js
             sed -i "s|'../../models/|'./models/|g" deploy/src/*.js
+          fi
+
+          # Copy @piper-plus/g2p package (needed by src/index.js and piper-espeak-english.html)
+          if [ -d "src/wasm/g2p/src" ]; then
+            mkdir -p deploy/g2p/src
+            cp -r src/wasm/g2p/src/* deploy/g2p/src/
           fi
           
           # Create 404 page
