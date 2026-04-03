@@ -15,7 +15,8 @@
 | Phase 2 | ストリーミング + テスト | 6 | Open |
 | Phase 3 | 配布 | 6 | Open |
 | Phase 4 | 拡張 (将来) | 6 | Open |
-| **合計** | | **26** | |
+| Phase 5 | 低優先度改善 | 8 | Open |
+| **合計** | | **34** | |
 
 ---
 
@@ -645,12 +646,96 @@ CMake ツールチェインファイルで Android arm64-v8a ビルド対応。O
 
 ---
 
+## Phase 5: 低優先度改善
+
+全チケット独立実装可能。Phase 4 の拡張とは異なり、API 改善・ビルド保守性・エコシステム拡大を目的とする。
+
+### M5-14: piper_plus_create を status + out_engine パターンに変更
+
+> **チケット:** [M5-14-create-status-pattern.md](../tickets/M5-14-create-status-pattern.md)
+
+**見積り:** 中 (API 破壊的変更)
+
+戻り値を `int32_t` (ステータスコード) に変更し、エンジンは `PiperPlusEngine** out_engine` で返す。`ERR_MODEL` / `ERR_CONFIG` / `ERR_ORT` の正確な返却が可能になる。
+
+---
+
+### M5-15: CMakeLists.txt ファイル分割
+
+> **チケット:** [M5-15-cmake-split.md](../tickets/M5-15-cmake-split.md)
+
+**見積り:** 中
+
+1,080 行のルート `CMakeLists.txt` を 8 ファイルに分割: `cmake/CompilerSettings.cmake`, `ExternalDeps.cmake`, `OnnxRuntime.cmake`, `PiperCommon.cmake`, `PiperPlusShared.cmake`, `PiperExecutable.cmake`, `Testing.cmake`, `Install.cmake`。
+
+---
+
+### M5-16: textToAudioStreaming Iterator 駆動移行
+
+> **チケット:** [M5-16-streaming-iterator-migration.md](../tickets/M5-16-streaming-iterator-migration.md)
+
+**見積り:** 大
+
+`textToAudioStreaming()` の内部を Iterator (`synth_start` / `synth_next`) 駆動に置換。`MultilingualPhonemes` デッドコード問題の根本解決。
+
+---
+
+### M5-17: cpp-tests.yml / ci.yml 重複解消
+
+> **チケット:** [M5-17-reusable-workflow.md](../tickets/M5-17-reusable-workflow.md)
+
+**見積り:** 小
+
+C++ テスト部分を reusable workflow (`_build-test-cpp.yml`) に抽出し、`cpp-tests.yml` と `ci.yml` の両方から呼び出す。
+
+---
+
+### M5-18: Dart FFI サンプル
+
+> **チケット:** [M5-18-dart-ffi-example.md](../tickets/M5-18-dart-ffi-example.md)
+
+**見積り:** 中
+
+`examples/dart/` に Flutter での piper-plus 利用例を作成。`NativeCallable.listener` でストリーミング合成。
+
+---
+
+### M5-19: Godot GDExtension サンプル
+
+> **チケット:** [M5-19-godot-example.md](../tickets/M5-19-godot-example.md)
+
+**見積り:** 中
+
+`examples/godot/` に GDExtension ラッパーの基本構造を作成。godot-piper-plus のソースコピー方式からの移行パスを提示。
+
+---
+
+### M5-20: Android AAR パッケージング
+
+> **チケット:** [M5-20-android-aar.md](../tickets/M5-20-android-aar.md)
+
+**見積り:** 大
+
+Gradle ベースの AAR 配布 (`implementation 'com.piperplus:piper-plus:x.y.z'`)。JNI ラッパー + Kotlin API。
+
+---
+
+### M5-21: 音声回帰テスト
+
+> **チケット:** [M5-21-audio-regression.md](../tickets/M5-21-audio-regression.md)
+
+**見積り:** 中
+
+ゴールデンオーディオとの比較テスト。deterministic 合成の SHA-256 ハッシュ比較 (初期)、将来的に PESQ / STOI メトリクスベースに拡張。
+
+---
+
 ## 全体スケジュール
 
 ```
-Phase 1 (MVP)         Phase 2 (ストリーミング)   Phase 3 (配布)          Phase 4 (拡張)
-M1-1 → M1-4 ──────→ M2-1 → M2-2 ──────────→ M3-1 ──────────────→ M4-1〜M4-6
-M1-5 ↗   ↘ M1-6     M2-3 ↗  ↘ M2-4          M3-2, M3-3, M3-4      (独立)
+Phase 1 (MVP)         Phase 2 (ストリーミング)   Phase 3 (配布)          Phase 4 (拡張)      Phase 5 (低優先度)
+M1-1 → M1-4 ──────→ M2-1 → M2-2 ──────────→ M3-1 ──────────────→ M4-1〜M4-6 ────→ M5-14〜M5-21
+M1-5 ↗   ↘ M1-6     M2-3 ↗  ↘ M2-4          M3-2, M3-3, M3-4      (独立)             (独立)
 M1-2 ↗     ↘ M1-7        M2-5 → M2-6       M3-5 → M3-6
 M1-3 ↗       ↘ M1-8
 ```
@@ -663,3 +748,4 @@ M1-3 ↗       ↘ M1-8
 | Phase 2 | M2-1〜M2-6 | 小×1 + 中×4 + 大×1 | Iterator + callback 合成 + テストスイート |
 | Phase 3 | M3-1〜M3-6 | 小×2 + 中×3 + 大×1 | バイナリ配布 + pkg-config + ドキュメント |
 | Phase 4 | M4-1〜M4-6 | 中×5 + 大×1 | カスタム辞書、タイミング、G2P、Android |
+| Phase 5 | M5-14〜M5-21 | 小×1 + 中×5 + 大×2 | API 改善、ビルド保守性、Dart/Godot サンプル、AAR、回帰テスト |
