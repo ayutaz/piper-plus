@@ -797,6 +797,73 @@ if(PIPER_PLUS_BUILD_SHARED)
   install(FILES src/cpp/piper_plus.h
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
   )
+
+  # --- ONNX Runtime shared library install ---
+  if(WIN32)
+    # Windows: copy DLLs to bin/
+    file(GLOB _ort_dlls "${ONNXRUNTIME_DIR}/lib/*.dll")
+    install(FILES ${_ort_dlls} DESTINATION ${CMAKE_INSTALL_BINDIR})
+  else()
+    # Unix: copy shared libs to lib/
+    file(GLOB _ort_libs "${ONNXRUNTIME_DIR}/lib/libonnxruntime*${CMAKE_SHARED_LIBRARY_SUFFIX}*")
+    install(FILES ${_ort_libs} DESTINATION ${CMAKE_INSTALL_LIBDIR})
+  endif()
+
+  # --- Dictionary install (optional) ---
+  # OpenJTalk dictionary
+  if(EXISTS "${CMAKE_BINARY_DIR}/oj/dic")
+    install(DIRECTORY "${CMAKE_BINARY_DIR}/oj/dic/"
+            DESTINATION share/open_jtalk/dic)
+  endif()
+
+  # --- macOS: fix ONNX Runtime install_name ---
+  if(APPLE)
+    install(CODE "
+      file(GLOB _ort_dylibs \"\${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}/libonnxruntime*.dylib\")
+      foreach(_dylib IN LISTS _ort_dylibs)
+        get_filename_component(_name \${_dylib} NAME)
+        execute_process(
+          COMMAND install_name_tool -id \"@rpath/\${_name}\" \"\${_dylib}\"
+        )
+      endforeach()
+    ")
+  endif()
+
+  # --- pkg-config ---
+  configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/cmake/piper_plus.pc.in
+    ${CMAKE_CURRENT_BINARY_DIR}/piper_plus.pc
+    @ONLY
+  )
+  install(FILES ${CMAKE_CURRENT_BINARY_DIR}/piper_plus.pc
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig)
+
+  # --- CMake Config package ---
+  include(CMakePackageConfigHelpers)
+
+  install(EXPORT PiperPlusTargets
+    FILE PiperPlusTargets.cmake
+    NAMESPACE PiperPlus::
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/PiperPlus
+  )
+
+  configure_package_config_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/cmake/PiperPlusConfig.cmake.in
+    ${CMAKE_CURRENT_BINARY_DIR}/PiperPlusConfig.cmake
+    INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/PiperPlus
+  )
+
+  write_basic_package_version_file(
+    ${CMAKE_CURRENT_BINARY_DIR}/PiperPlusConfigVersion.cmake
+    VERSION ${piper_version}
+    COMPATIBILITY SameMajorVersion
+  )
+
+  install(FILES
+    ${CMAKE_CURRENT_BINARY_DIR}/PiperPlusConfig.cmake
+    ${CMAKE_CURRENT_BINARY_DIR}/PiperPlusConfigVersion.cmake
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/PiperPlus
+  )
 endif()
 
 # ---- Declare install targets ----
