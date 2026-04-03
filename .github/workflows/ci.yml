@@ -84,7 +84,7 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          choco install cmake ninja
+          # cmake and ninja are pre-installed on windows-latest runner
 
           # Download and extract ONNX Runtime using PowerShell
           Invoke-WebRequest -Uri https://github.com/microsoft/onnxruntime/releases/download/v1.14.1/onnxruntime-win-x64-1.14.1.zip -OutFile onnxruntime-win-x64-1.14.1.zip

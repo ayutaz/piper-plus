@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🎤 Piper + eSpeak-ng 英語音声合成デモ</title>
+    <title>🎤 Piper 英語音声合成デモ</title>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -142,12 +142,12 @@
             color: #666;
         }
     </style>
-    <script type="text/javascript" src="../dist/espeak-ng/espeakng.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.21.0/dist/ort.min.js"></script>
 </head>
 <body>
     <div class="container">
-        <h1>🎤 Piper + eSpeak-ng 英語音声合成デモ</h1>
-        <p class="subtitle">eSpeak-ng（音素化）+ Piper（英語ONNXモデル）による音声合成</p>
+        <h1>🎤 Piper 英語音声合成デモ</h1>
+        <p class="subtitle">@piper-plus/g2p（音素化）+ Piper（ONNXモデル）による英語音声合成</p>
         
         <div id="status" class="status info">
             初期化中...
@@ -156,9 +156,9 @@
         <div class="feature-list">
             <h3>📝 実装内容</h3>
             <ul>
-                <li>🔤 eSpeak-ngによる英語テキストの音素化</li>
-                <li>🎯 Piper英語ONNXモデルによる高品質音声合成</li>
-                <li>🔊 Pythonと同じアーキテクチャをWebで実現</li>
+                <li>🔤 @piper-plus/g2p による英語テキストの音素化（eSpeak-ng不要）</li>
+                <li>🎯 PiperニューラルONNXモデルによる高品質音声合成</li>
+                <li>🔊 PiperPlus APIによる統合的な音声合成パイプライン</li>
                 <li>⚡ WebAssembly + ONNX Runtime Webによる高速処理</li>
             </ul>
         </div>
@@ -178,7 +178,7 @@
             <h2>結果 / Results</h2>
             
             <div class="output-group">
-                <label>eSpeak-ng音素解析 / Phoneme Analysis:</label>
+                <label>音素解析 / Phoneme Analysis:</label>
                 <pre id="phonemeAnalysis"></pre>
             </div>
             
@@ -200,13 +200,12 @@
     </div>
 
     <script type="module">
-        import { SimpleUnifiedPhonemizer } from '../src/simple_unified_api.js';
-        
-        let espeakNG = null;
-        let onnxSession = null;
-        let modelConfig = null;
-        let phonemizer = null;
-        
+        import { PiperPlus } from '../../src/index.js';
+        import { G2P } from '../../../g2p/src/index.js';
+
+        let piper = null;
+        let g2p = null;
+
         const statusEl = document.getElementById('status');
         const analyzeBtn = document.getElementById('analyzeBtn');
         const synthesizeBtn = document.getElementById('synthesizeBtn');
@@ -217,197 +216,73 @@
         const phonemeOutput = document.getElementById('phonemeOutput');
         const detailsOutput = document.getElementById('detailsOutput');
         const audioPlayer = document.getElementById('audioPlayer');
-        
+
         // Initialize
         async function init() {
             try {
-                updateStatus('eSpeak-ngを初期化しています...');
-                
-                // Initialize eSpeak-ng
-                await initializeESpeakNG();
-                
-                updateStatus('ONNXモデルを読み込んでいます...');
-                
-                // Load ONNX Runtime
-                await loadScript('https://cdn.jsdelivr.net/npm/onnxruntime-web@1.21.0/dist/ort.min.js');
-                
-                // Load English model
-                await loadModel();
-                
-                // Initialize simple phonemizer as fallback
-                phonemizer = new SimpleUnifiedPhonemizer();
-                await phonemizer.initialize({});
-                
+                updateStatus('PiperPlusを初期化しています...');
+
+                piper = await PiperPlus.initialize({
+                    model: 'ayousanz/piper-plus-tsukuyomi-chan',
+                    ort: globalThis.ort,
+                    onProgress: ({ stage, message }) => {
+                        updateStatus(message);
+                    }
+                });
+
+                // Create a standalone G2P instance for phoneme analysis display
+                g2p = await G2P.create({ languages: ['en'] });
+
                 updateStatus('準備完了！', 'success');
                 analyzeBtn.disabled = false;
                 synthesizeBtn.disabled = false;
-                
+
             } catch (error) {
                 console.error('Initialization failed:', error);
                 updateStatus(`初期化エラー: ${error.message}`, 'error');
             }
         }
-        
-        // Initialize eSpeak-ng
-        function initializeESpeakNG() {
-            return new Promise((resolve, reject) => {
-                try {
-                    espeakNG = new eSpeakNG('../dist/espeak-ng/espeakng.worker.js', function() {
-                        console.log('eSpeak-ng initialized successfully');
-                        espeakNG.set_voice.apply(espeakNG, ['en-us']);
-                        resolve();
-                    });
-                } catch (error) {
-                    console.error('eSpeak-ng initialization failed:', error);
-                    reject(error);
-                }
-            });
-        }
-        
-        // Load ONNX model
-        async function loadModel() {
-            const modelPath = '../models/multilingual-test-medium.onnx';
-            const configPath = '../models/multilingual-test-medium.onnx.json';
-            
-            // Load model config
-            const configResponse = await fetch(configPath);
-            modelConfig = await configResponse.json();
-            
-            // Create ONNX session
-            onnxSession = await ort.InferenceSession.create(modelPath, {
-                executionProviders: ['wasm'],
-                graphOptimizationLevel: 'extended',
-                enableMemPattern: true
-            });
-            
-            console.log('Loaded English model:', modelPath);
-            console.log('Sample rate:', modelConfig.audio.sample_rate);
-        }
-        
-        // Analyze phonemes
+
+        // Analyze phonemes (display only -- uses standalone G2P)
         async function analyzePhonemes() {
             const text = inputText.value.trim();
             if (!text) {
                 updateStatus('テキストを入力してください。', 'error');
                 return;
             }
-            
+
             updateStatus('音素を解析中...');
-            
+
             try {
-                // Get phonemes from eSpeak-ng
-                const phonemes = await getESpeakPhonemes(text);
-                
+                const result = g2p.phonemize(text, { language: 'en' });
+                const tokens = result.tokens;
+
+                // Check which phonemes are in the model's phoneme_id_map
+                const phonemeIdMap = piper.config.phoneme_id_map;
+                const availableInModel = tokens.filter(p => phonemeIdMap[p]).length;
+                const missingFromModel = tokens.filter(p => !phonemeIdMap[p]);
+
                 // Display analysis
                 phonemeAnalysis.textContent = JSON.stringify({
                     input: text,
-                    phonemeCount: phonemes.length,
-                    phonemes: phonemes,
-                    availableInModel: phonemes.filter(p => modelConfig.phoneme_id_map[p]).length,
-                    missingFromModel: phonemes.filter(p => !modelConfig.phoneme_id_map[p])
+                    phonemeCount: tokens.length,
+                    phonemes: tokens,
+                    availableInModel: availableInModel,
+                    missingFromModel: missingFromModel
                 }, null, 2);
-                
+
                 // Display phonemes
-                displayPhonemes(phonemes);
-                
+                displayPhonemes(tokens);
+
                 outputSection.style.display = 'block';
                 updateStatus('解析完了！', 'success');
-                
+
             } catch (error) {
                 console.error('Analysis failed:', error);
                 updateStatus(`解析エラー: ${error.message}`, 'error');
             }
         }
-        
-        // Get phonemes from eSpeak-ng
-        function getESpeakPhonemes(text) {
-            return new Promise((resolve, reject) => {
-                const phonemes = [];
-                let phonemeBuffer = '';
-                
-                // Synthesize to get phoneme events
-                espeakNG.synthesize(text, function(samples, events) {
-                    if (events && events.length > 0) {
-                        for (const event of events) {
-                            console.log('Event:', event);
-                            
-                            // Extract phoneme information from events
-                            if (event.type === 'phoneme' && event.id) {
-                                // Convert phoneme ID to character
-                                const phonemeChar = String.fromCharCode(event.id);
-                                if (phonemeChar && phonemeChar.trim()) {
-                                    phonemes.push(phonemeChar);
-                                }
-                            }
-                        }
-                    }
-                    
-                    if (samples === undefined) {
-                        // Synthesis complete
-                        if (phonemes.length === 0) {
-                            // Fallback: extract from simple text
-                            console.log('No phoneme events, using fallback');
-                            const fallbackPhonemes = extractPhonemesFromText(text);
-                            resolve(fallbackPhonemes);
-                        } else {
-                            resolve(phonemes);
-                        }
-                    }
-                });
-            });
-        }
-        
-        // Simple fallback phoneme extraction
-        function extractPhonemesFromText(text) {
-            // Very simple extraction - just for demo
-            const words = text.toLowerCase().split(/\s+/);
-            const phonemes = [];
-            
-            // Add sentence start
-            phonemes.push('^');
-            
-            for (const word of words) {
-                // Simple mapping for common words
-                const simpleMap = {
-                    'hello': ['h', 'ə', 'l', 'oʊ'],
-                    'world': ['w', 'ɜ', 'r', 'l', 'd'],
-                    'this': ['ð', 'ɪ', 's'],
-                    'is': ['ɪ', 'z'],
-                    'a': ['ə'],
-                    'test': ['t', 'ɛ', 's', 't'],
-                    'of': ['ə', 'v'],
-                    'the': ['ð', 'ə'],
-                    'piper': ['p', 'aɪ', 'p', 'ər'],
-                    'text': ['t', 'ɛ', 'k', 's', 't'],
-                    'to': ['t', 'u'],
-                    'speech': ['s', 'p', 'i', 'tʃ'],
-                    'system': ['s', 'ɪ', 's', 't', 'ə', 'm']
-                };
-                
-                if (simpleMap[word]) {
-                    phonemes.push(...simpleMap[word]);
-                } else {
-                    // Very simple fallback
-                    for (const char of word) {
-                        if (modelConfig.phoneme_id_map[char]) {
-                            phonemes.push(char);
-                        }
-                    }
-                }
-                
-                // Add space between words
-                phonemes.push(' ');
-            }
-            
-            // Remove last space and add sentence end
-            if (phonemes[phonemes.length - 1] === ' ') {
-                phonemes.pop();
-            }
-            phonemes.push('$');
-            
-            return phonemes;
-        }
-        
+
         // Synthesize speech
         async function synthesize() {
             const text = inputText.value.trim();
@@ -415,43 +290,31 @@
                 updateStatus('テキストを入力してください。', 'error');
                 return;
             }
-            
+
             try {
-                updateStatus('音素を取得中...');
-                synthesizeBtn.disabled = true;
-                
-                // Get phonemes
-                const phonemes = await getESpeakPhonemes(text);
-                
-                // Display phonemes
-                displayPhonemes(phonemes);
-                
                 updateStatus('音声合成中...');
-                
-                // Convert phonemes to IDs
-                const phonemeIds = phonemesToIds(phonemes);
-                
-                // Synthesize audio
-                const audio = await synthesizeAudio(phonemeIds);
-                
-                // Create WAV and play
-                const wavBlob = createWAV(audio, modelConfig.audio.sample_rate);
+                synthesizeBtn.disabled = true;
+
+                const audioResult = await piper.synthesize(text, {
+                    language: 'en'
+                });
+
+                // Create WAV blob and play via <audio> element
+                const wavBlob = audioResult.toBlob();
                 const audioUrl = URL.createObjectURL(wavBlob);
                 audioPlayer.src = audioUrl;
-                
+
                 // Show details
                 detailsOutput.textContent = JSON.stringify({
                     text: text,
-                    phonemes: phonemes,
-                    phonemeIds: phonemeIds,
-                    audioLength: audio.length,
-                    duration: (audio.length / modelConfig.audio.sample_rate).toFixed(2) + ' seconds',
-                    sampleRate: modelConfig.audio.sample_rate
+                    audioSamples: audioResult.samples.length,
+                    duration: audioResult.duration.toFixed(2) + ' seconds',
+                    sampleRate: audioResult.sampleRate
                 }, null, 2);
-                
+
                 outputSection.style.display = 'block';
                 updateStatus('生成完了！', 'success');
-                
+
             } catch (error) {
                 console.error('Synthesis failed:', error);
                 updateStatus(`生成エラー: ${error.message}`, 'error');
@@ -459,58 +322,7 @@
                 synthesizeBtn.disabled = false;
             }
         }
-        
-        // Convert phonemes to IDs
-        function phonemesToIds(phonemes) {
-            const ids = [];
-            const phonemeIdMap = modelConfig.phoneme_id_map;
-            
-            for (const phoneme of phonemes) {
-                if (phonemeIdMap[phoneme]) {
-                    ids.push(...phonemeIdMap[phoneme]);
-                } else {
-                    console.warn(`Unknown phoneme: ${phoneme}`);
-                    // Use space as fallback
-                    ids.push(...(phonemeIdMap[' '] || [3]));
-                }
-            }
-            
-            return ids;
-        }
-        
-        // Synthesize audio using ONNX
-        async function synthesizeAudio(phonemeIds) {
-            const inputTensor = new ort.Tensor('int64', 
-                new BigInt64Array(phonemeIds.map(id => BigInt(id))), 
-                [1, phonemeIds.length]
-            );
-            
-            const lengthTensor = new ort.Tensor('int64', 
-                new BigInt64Array([BigInt(phonemeIds.length)]), 
-                [1]
-            );
-            
-            const scalesTensor = new ort.Tensor('float32', 
-                new Float32Array([
-                    modelConfig.inference.noise_scale || 0.667,
-                    modelConfig.inference.length_scale || 1.0,
-                    modelConfig.inference.noise_w || 0.8
-                ]), 
-                [3]
-            );
-            
-            const feeds = {
-                'input': inputTensor,
-                'input_lengths': lengthTensor,
-                'scales': scalesTensor
-            };
-            
-            const results = await onnxSession.run(feeds);
-            const audioTensor = results['output'] || results[Object.keys(results)[0]];
-            
-            return new Float32Array(audioTensor.data);
-        }
-        
+
         // Display phonemes
         function displayPhonemes(phonemes) {
             phonemeOutput.innerHTML = '';
@@ -521,7 +333,7 @@
                 phonemeOutput.appendChild(span);
             });
         }
-        
+
         // Clear output
         function clearOutput() {
             inputText.value = '';
@@ -531,65 +343,18 @@
             detailsOutput.textContent = '';
             audioPlayer.src = '';
         }
-        
+
         // Utility functions
         function updateStatus(message, type = 'info') {
             statusEl.className = `status ${type}`;
             statusEl.textContent = message;
         }
-        
-        function loadScript(src) {
-            return new Promise((resolve, reject) => {
-                const script = document.createElement('script');
-                script.src = src;
-                script.onload = resolve;
-                script.onerror = reject;
-                document.head.appendChild(script);
-            });
-        }
-        
-        function createWAV(audioData, sampleRate) {
-            const length = audioData.length;
-            const arrayBuffer = new ArrayBuffer(44 + length * 2);
-            const view = new DataView(arrayBuffer);
-            
-            // WAV header
-            const writeString = (offset, string) => {
-                for (let i = 0; i < string.length; i++) {
-                    view.setUint8(offset + i, string.charCodeAt(i));
-                }
-            };
-            
-            writeString(0, 'RIFF');
-            view.setUint32(4, 36 + length * 2, true);
-            writeString(8, 'WAVE');
-            writeString(12, 'fmt ');
-            view.setUint32(16, 16, true);
-            view.setUint16(20, 1, true);
-            view.setUint16(22, 1, true);
-            view.setUint32(24, sampleRate, true);
-            view.setUint32(28, sampleRate * 2, true);
-            view.setUint16(32, 2, true);
-            view.setUint16(34, 16, true);
-            writeString(36, 'data');
-            view.setUint32(40, length * 2, true);
-            
-            // Convert float to int16
-            const offset = 44;
-            for (let i = 0; i < length; i++) {
-                const val = Math.max(-1, Math.min(1, audioData[i]));
-                const int16 = val < 0 ? val * 0x8000 : val * 0x7FFF;
-                view.setInt16(offset + i * 2, int16, true);
-            }
-            
-            return new Blob([arrayBuffer], { type: 'audio/wav' });
-        }
-        
+
         // Event listeners
         analyzeBtn.addEventListener('click', analyzePhonemes);
         synthesizeBtn.addEventListener('click', synthesize);
         clearBtn.addEventListener('click', clearOutput);
-        
+
         // Initialize on load
         init();
     </script>

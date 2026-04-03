@@ -8,12 +8,12 @@
 ## 1. package.json
 
 - [ ] `name` が `"piper-plus"` である
-- [ ] `version` が `"0.1.1"` である
+- [ ] `version` が `"0.2.0-alpha.0"` である
 - [ ] `license` が `"MIT"` である
 - [ ] `type` が `"module"` である
 - [ ] `exports["."].import` が `"./src/index.js"` を指す
 - [ ] `exports["."].types` が `"./types/index.d.ts"` を指す
-- [ ] `exports["./phonemizer"].import` が `"./src/simple_unified_api.js"` を指す
+- [ ] `exports["./phonemizer"].import` が `"./src/phonemizer-compat.js"` を指す
 - [ ] `exports["./streaming"].import` が `"./src/streaming-pipeline.js"` を指す
 - [ ] `main` が `"src/index.js"` を指す
 - [ ] `types` が `"types/index.d.ts"` を指す
@@ -39,13 +39,13 @@
 ## 2. エントリーポイント (src/index.js)
 
 - [ ] `PiperPlus` クラスが export されている
-- [ ] `SimpleUnifiedPhonemizer` が re-export されている (`simple_unified_api.js` から)
-- [ ] `StreamingPipeline` が re-export されている (`streaming-pipeline.js` から)
+- [ ] `G2P` 関連クラスが `@piper-plus/g2p` から re-export されている (`phonemizer-compat.js` 経由)
+- [ ] `StreamingTTSPipeline` / `TextChunker` が re-export されている (`streaming-pipeline.js` から)
 - [ ] `AudioResult` が re-export されている (`audio-result.js` から)
 - [ ] 全 re-export のパスが実在するファイルを指している
 - [ ] 存在しないモジュールを import していない
 - [ ] ES Module 形式 (`import`/`export`) を使用している (`require` 不使用)
-- [ ] eSpeak-ng 関連モジュールを import して**いない** (`espeak_ng_wrapper.js`, `espeak_phoneme_extractor.js`, `espeak_phonemizer.js`, `unified_api_with_espeak.js`)
+- [ ] eSpeak-ng 関連モジュールを import して**いない** (`espeak_ng_wrapper.js`, `espeak_phoneme_extractor.js`, `espeak_phonemizer.js`)
 
 ---
 
@@ -69,10 +69,10 @@
 - [ ] `audio.play()` メソッドが存在する
 - [ ] `audio.toBlob()` メソッドが存在する
 
-### SimpleUnifiedPhonemizer
+### G2P (phonemizer-compat 経由)
 
-- [ ] `phonemizer.initialize()` が `Promise` を返す
-- [ ] `phonemizer.textToPhonemes(text, language)` が機能する
+- [ ] `G2P.create(options)` が `Promise` を返す
+- [ ] `g2p.encode(text, phonemeIdMap, { language })` が機能する
 
 ### オプションのデフォルト値
 
@@ -88,8 +88,8 @@
 - [ ] `PiperPlusOptions` (initialize のオプション) の型が定義されている
 - [ ] `SynthesizeOptions` の型が定義されている
 - [ ] `AudioResult` の型が定義されている
-- [ ] `SimpleUnifiedPhonemizer` の型が定義されている
-- [ ] `StreamingPipeline` の型が定義されている
+- [ ] `StreamingTTSPipeline` の型が定義されている
+- [ ] `TextChunker` の型が定義されている
 - [ ] オプショナルパラメータに `?` がついている
 - [ ] `initialize()` の戻り値が `Promise<PiperPlus>` である
 - [ ] `synthesize()` の戻り値型が正しい
@@ -177,7 +177,7 @@
 `package.json` の `exports` と `files` で参照される全パスが実在すること。
 
 - [ ] `src/index.js` が存在する
-- [ ] `src/simple_unified_api.js` が存在する
+- [ ] `src/phonemizer-compat.js` が存在する
 - [ ] `src/streaming-pipeline.js` が存在する
 - [ ] `types/index.d.ts` が存在する
 - [ ] `dist/openjtalk.wasm` が存在する

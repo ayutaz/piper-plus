@@ -100,12 +100,13 @@ GitHub Pages で正しく動作するには、以下の構造が必要：
 │   ├── openjtalk.wasm
 │   └── espeak-ng/
 ├── src/
-│   ├── simple_unified_api.js
+│   ├── index.js
+│   ├── model-manager.js
+│   ├── dict-manager.js
+│   ├── audio-result.js
 │   ├── espeak_phoneme_extractor.js
 │   └── custom_dictionary.js
 └── models/
-    ├── multilingual-test-medium.onnx
-    ├── multilingual-test-medium.onnx.json
     ├── multilingual-test-medium.onnx
     └── multilingual-test-medium.onnx.json
 ```
