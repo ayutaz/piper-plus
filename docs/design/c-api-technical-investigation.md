@@ -223,10 +223,51 @@ strategy:
 
 ## 5. 発見された技術的リスク
 
+### 5.1 レビューで追加発見されたリスク (高)
+
+| リスク | 影響度 | 詳細 | 対策 |
+|--------|--------|------|------|
+| `textToAudio` が `languageId` を変更して復元しない | **高** | piper.cpp L1279 で `voice.synthesisConfig.languageId` を自動検出値に上書きし、関数終了まで復元しない。C API ラッパーで save/restore しないと次回呼び出しの自動検出が壊れる | C API ラッパーで `synthesisConfig` を呼び出し前に保存、呼び出し後に復元 |
+| 辞書パス自動検出が共有ライブラリで機能しない | **高** | `getExeDir()` / `get_exe_relative_dict_path()` が `readlink("/proc/self/exe")` / `_NSGetExecutablePath` を使用し、ホストアプリのパスを返す。Flutter/Godot/Python から呼ぶと辞書が見つからない | `PiperPlusConfig` に `dict_dir` フィールドを追加。自動検出は `dladdr()` (Linux/macOS) / `GetModuleHandleEx(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS)` (Windows) でライブラリ自身のパスを取得する方式に変更 |
+| Iterator / one-shot 合成の再入問題 | **高** | `PiperPlusEngine` の `iterState` と `voice.synthesisConfig` が共有される。Iterator 中に `synthesize()` を呼ぶと状態破壊 | エンジンに `inProgress` フラグを追加し、合成中の新規合成は `PIPER_PLUS_ERR` を返す。ヘッダーに「1エンジン1合成」制約を明記 |
+
+### 5.2 レビューで追加発見されたリスク (中)
+
+| リスク | 影響度 | 詳細 | 対策 |
+|--------|--------|------|------|
+| 言語名→ID 変換 API の欠如 | **中** | ユーザーが `"ja"` → `0` の変換を自力でやる必要がある | `piper_plus_language_id(engine, "ja")` クエリ関数を追加 |
+| `-static-libstdc++` の共有ライブラリ競合 | **中** | 共有ライブラリと消費側アプリで `libstdc++` のコピーが二重になり、例外テーブルが分離してキャッチ失敗の可能性 | 共有ライブラリには `-static-libstdc++` を**適用しない** (実行ファイル `piper` のみ) |
+| macOS RPATH が `@executable_path` | **中** | 共有ライブラリには `@loader_path` (ライブラリ自身の位置) が必要 | `INSTALL_RPATH "@loader_path"` に修正 |
+| Iterator の文分割が想定より複雑 | **中** | `textToAudio` は全テキストを一括処理し文分割しない。Iterator には `textToAudioStreaming` の文分割ロジックの抽出、またはフォネマイズループの分離が必要 | Phase 2 で `textToAudio` の音素化ループ (L1067-1309) を再利用可能関数に抽出 |
+| `OPENJTALK_DIC_PATH` コンパイル定義が OBJECT ライブラリと非互換 | **中** | 現在 target ごとに異なる相対パスを設定。OBJECT ライブラリでは単一定義しか持てない | OBJECT ライブラリから除外し、消費側 target で個別設定。または実行時検出に切り替え |
+
+### 5.3 初回調査で発見済みのリスク
+
 | リスク | 影響度 | 対策 |
 |--------|--------|------|
 | OpenJTalk/spdlog の -fPIC 不足 | **高** (Linux でビルド失敗) | ExternalProject に `CMAKE_POSITION_INDEPENDENT_CODE=ON` 追加 |
 | int16↔float32 2 重変換 | 低 (精度劣化 + CPU コスト) | 将来 float 出力バリアントを追加 |
-| textToAudioStreaming のマルチリンガル未対応 | 中 | Iterator は textToAudio ベースで実装 |
+| textToAudioStreaming のマルチリンガル未対応 | 中 (該当 else-if はデッドコード) | Iterator は textToAudio ベースで実装 |
 | 辞書パス初期化のレース条件 | 低 (実害は起きにくい) | ドキュメントで「初回 create は単一スレッドから」と記載 |
 | num_threads の未対応 | 低 | PiperPlusConfig に含めるが Phase 1 では無視 |
+
+---
+
+## 6. レビュー指摘事項と正誤表
+
+### 6.1 正誤表
+
+| セクション | 元の記述 | 正しい内容 |
+|-----------|---------|-----------|
+| 1.3 言語自動検出 | 「languageId をデフォルト値 (0) のまま渡すだけで自動検出が有効」 | 正確には「`synthesisConfig.languageId` が `textToAudio` 入口時点の `originalLanguageId` と一致していれば自動検出が発動」。デフォルト 0 なら `originalLanguageId` も 0 なので実質的には正しいが、メカニズムは「unchanged from original」 |
+| 1.6 ストリーミングのマルチリンガル | 「piper.cpp L1756-1761 で TODO」 | TODO は存在するが、`usesOpenJTalk()` が `MultilingualPhonemes` でも true を返すため、この `else if` ブランチは**デッドコード**。結論 (textToAudio ベースが安全) は変わらないが、理由が異なる |
+| 3.3 グローバルステート | `dict_path` と `g_openjtalk_bin_path` のみ列挙 | 追加: `data_dir` (L143), `exe_dict_path` (L194), `warnedNoCmuDict` (piper.cpp L1219, static bool) |
+
+### 6.2 要求定義書への反映推奨事項
+
+1. **`PiperPlusConfig` に `dict_dir` フィールド追加** — 共有ライブラリでは辞書自動検出が機能しないため必須
+2. **Phase 2 に `textToAudioStreaming` マルチリンガル制約の注記追加**
+3. **Phase 1 に `-fPIC` 前提条件を追記**
+4. **合成の排他制約 (1エンジン1合成) をヘッダーコメントに明記**
+5. **`piper_plus_language_id(engine, name)` クエリ関数の追加検討**
+6. **共有ライブラリに `-static-libstdc++` を適用しないことを明記**
