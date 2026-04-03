@@ -9,6 +9,7 @@
 #include <gtest/gtest.h>
 #include <filesystem>
 #include <cmath>
+#include <cstring>
 #include <algorithm>
 #include "piper_plus.h"
 
@@ -314,5 +315,83 @@ TEST_F(CApiIntegrationTest, IteratorReuse) {
         ASSERT_NE(rc, PIPER_PLUS_ERR);
     }
     EXPECT_GT(total, 0);
+    piper_plus_free(engine);
+}
+
+// ===== Phase 4: Custom dictionary integration tests =====
+
+TEST_F(CApiIntegrationTest, CustomDictLoadAndCount) {
+    auto* engine = createEngine();
+    ASSERT_NE(engine, nullptr);
+
+    // Add words programmatically
+    EXPECT_EQ(piper_plus_add_dict_word(engine, "TTS", "text to speech", 0),
+              PIPER_PLUS_OK);
+    EXPECT_EQ(piper_plus_add_dict_word(engine, "AI", "artificial intelligence", 0),
+              PIPER_PLUS_OK);
+    EXPECT_EQ(piper_plus_dict_entry_count(engine), 2);
+
+    // Clear
+    EXPECT_EQ(piper_plus_clear_custom_dict(engine), PIPER_PLUS_OK);
+    EXPECT_EQ(piper_plus_dict_entry_count(engine), 0);
+
+    piper_plus_free(engine);
+}
+
+// ===== Phase 4: G2P integration tests =====
+
+TEST_F(CApiIntegrationTest, PhonemizeProducesOutput) {
+    auto* engine = createEngine();
+    ASSERT_NE(engine, nullptr);
+
+    PiperPlusPhonemeResult result = {};
+    int32_t rc = piper_plus_phonemize(engine, "Hello world.", nullptr, &result);
+    EXPECT_EQ(rc, PIPER_PLUS_OK);
+    EXPECT_NE(result.phonemes, nullptr);
+    if (result.phonemes) {
+        EXPECT_GT(std::strlen(result.phonemes), 0u);
+    }
+    EXPECT_GT(result.num_phonemes, 0);
+
+    piper_plus_free(engine);
+}
+
+TEST_F(CApiIntegrationTest, AvailableLanguagesNonEmpty) {
+    auto* engine = createEngine();
+    ASSERT_NE(engine, nullptr);
+
+    const char* langs = piper_plus_available_languages(engine);
+    EXPECT_NE(langs, nullptr);
+    EXPECT_GT(std::strlen(langs), 0u);
+    // Should contain "ja" for the test model
+    EXPECT_NE(std::string(langs).find("ja"), std::string::npos);
+
+    piper_plus_free(engine);
+}
+
+// ===== Phase 4: Phoneme timing integration tests =====
+
+TEST_F(CApiIntegrationTest, TimingAfterSynthesis) {
+    auto* engine = createEngine();
+    ASSERT_NE(engine, nullptr);
+
+    // Synthesize first
+    float* samples = nullptr;
+    int32_t num_samples = 0, sample_rate = 0;
+    auto opts = piper_plus_default_options();
+    int32_t rc = piper_plus_synthesize(engine, "Hello.", &opts,
+                                       &samples, &num_samples, &sample_rate);
+    ASSERT_EQ(rc, PIPER_PLUS_OK);
+    piper_plus_free_audio(samples);
+
+    // Get timing (may or may not be available depending on model)
+    PiperPlusTimingResult timing = {};
+    rc = piper_plus_get_phoneme_timing(engine, &timing);
+    // Either OK with data, or ERR if model doesn't support timing
+    if (rc == PIPER_PLUS_OK) {
+        EXPECT_GT(timing.count, 0);
+        EXPECT_NE(timing.entries, nullptr);
+    }
+
     piper_plus_free(engine);
 }

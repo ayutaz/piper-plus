@@ -13,6 +13,7 @@
 #include "custom_dictionary.hpp"
 #include "library_path.h"
 
+#include <algorithm>
 #include <atomic>
 #include <climits>
 #include <cstdlib>
@@ -29,6 +30,9 @@
 #define NOMINMAX
 #endif
 #include <windows.h>
+#ifndef S_ISDIR
+#define S_ISDIR(m) (((m) & _S_IFMT) == _S_IFDIR)
+#endif
 #endif
 
 // ===== Thread-local error message =====
@@ -74,33 +78,6 @@ struct PiperPlusEngine {
     std::string g2pLanguage;
     std::string availableLanguagesStr;
 };
-
-// ===== Helpers =====
-
-// Use 32768.0f to normalize symmetrically: -32768/32768 = -1.0, 32767/32768 ≈ 1.0
-static const float NORM_FACTOR = 32768.0f;
-
-// Convert int16_t audio buffer to float32 [-1.0, 1.0]
-static float *int16_to_float(const std::vector<int16_t> &buf, int32_t *out_count) {
-    if (buf.empty()) {
-        *out_count = 0;
-        return nullptr;
-    }
-    if (buf.size() > static_cast<size_t>(INT32_MAX)) {
-        *out_count = 0;
-        return nullptr;
-    }
-    *out_count = static_cast<int32_t>(buf.size());
-    float *samples = static_cast<float *>(std::malloc(buf.size() * sizeof(float)));
-    if (!samples) {
-        *out_count = 0;
-        return nullptr;
-    }
-    for (size_t i = 0; i < buf.size(); i++) {
-        samples[i] = static_cast<float>(buf[i]) / NORM_FACTOR;
-    }
-    return samples;
-}
 
 // ===== Shared helper: apply synthesis options =====
 
@@ -297,11 +274,17 @@ PIPER_PLUS_API int32_t piper_plus_synthesize(
         // Apply options
         applySynthOptions(engine->voice.synthesisConfig, opts);
 
-        // Synthesize
-        std::vector<int16_t> audioBuffer;
+        // Apply custom dictionary
+        std::string processedText = text;
+        if (engine->customDict) {
+            processedText = engine->customDict->applyToText(processedText);
+        }
+
+        // Synthesize directly to float32 (avoids int16 intermediate conversion)
+        std::vector<float> audioBuffer;
         piper::SynthesisResult result;
-        piper::textToAudio(engine->config, engine->voice, text,
-                           audioBuffer, result, nullptr);
+        piper::textToAudioFloat(engine->config, engine->voice, processedText,
+                                audioBuffer, result, nullptr);
 
         // M4-2: Cache timing info from last synthesis
         engine->lastSynthResult = result;
@@ -309,8 +292,22 @@ PIPER_PLUS_API int32_t piper_plus_synthesize(
         // Restore config
         engine->voice.synthesisConfig = savedConfig;
 
-        // Convert to float32
-        *out_samples = int16_to_float(audioBuffer, out_num_samples);
+        // Copy to malloc'd buffer for caller
+        if (audioBuffer.empty()) {
+            *out_samples = nullptr;
+            *out_num_samples = 0;
+        } else if (audioBuffer.size() > static_cast<size_t>(INT32_MAX)) {
+            *out_samples = nullptr;
+            *out_num_samples = 0;
+        } else {
+            *out_num_samples = static_cast<int32_t>(audioBuffer.size());
+            *out_samples = static_cast<float*>(std::malloc(audioBuffer.size() * sizeof(float)));
+            if (*out_samples) {
+                std::memcpy(*out_samples, audioBuffer.data(), audioBuffer.size() * sizeof(float));
+            } else {
+                *out_num_samples = 0;
+            }
+        }
         *out_sample_rate = engine->voice.synthesisConfig.sampleRate;
 
         engine->inProgress.store(false);
@@ -400,9 +397,15 @@ PIPER_PLUS_API int32_t piper_plus_synth_start(
         // Apply options
         applySynthOptions(engine->voice.synthesisConfig, opts);
 
+        // Apply custom dictionary
+        std::string processedText = text;
+        if (engine->customDict) {
+            processedText = engine->customDict->applyToText(processedText);
+        }
+
         // Split text into sentences
         engine->iterState.sentences = piper::splitTextToSentences(
-            text,
+            processedText,
             engine->voice.phonemizeConfig.phonemeType,
             0);
 
@@ -462,23 +465,19 @@ PIPER_PLUS_API int32_t piper_plus_synth_next(
             return PIPER_PLUS_DONE;
         }
 
-        // Synthesize current sentence
+        // Synthesize current sentence directly to float32
         const std::string &sentence = state.sentences[state.currentIndex];
-        std::vector<int16_t> audioBuffer;
+        std::vector<float> audioBuffer;
         piper::SynthesisResult synthResult;
 
-        piper::textToAudio(engine->config, engine->voice, sentence,
-                           audioBuffer, synthResult, nullptr);
+        piper::textToAudioFloat(engine->config, engine->voice, sentence,
+                                audioBuffer, synthResult, nullptr);
 
         // M4-2: Cache timing info from last synthesis
         engine->lastSynthResult = synthResult;
 
-        // Convert int16 -> float32
-        state.currentChunkSamples.resize(audioBuffer.size());
-        for (size_t i = 0; i < audioBuffer.size(); i++) {
-            state.currentChunkSamples[i] =
-                static_cast<float>(audioBuffer[i]) / NORM_FACTOR;
-        }
+        // Move to chunk buffer (no int16 conversion needed)
+        state.currentChunkSamples = std::move(audioBuffer);
 
         state.currentIndex++;
         bool isLast = (state.currentIndex >= state.sentences.size());
@@ -650,7 +649,7 @@ PIPER_PLUS_API int32_t piper_plus_dict_entry_count(const PiperPlusEngine *engine
 // ===== M4-2: Phoneme timing =====
 
 PIPER_PLUS_API int32_t piper_plus_get_phoneme_timing(
-    const PiperPlusEngine *engine, PiperPlusTimingResult *out_timing) {
+    PiperPlusEngine *engine, PiperPlusTimingResult *out_timing) {
     if (!engine) { set_error("engine is NULL"); return PIPER_PLUS_ERR; }
     if (!out_timing) { set_error("out_timing is NULL"); return PIPER_PLUS_ERR; }
 
@@ -662,26 +661,25 @@ PIPER_PLUS_API int32_t piper_plus_get_phoneme_timing(
         return PIPER_PLUS_ERR;
     }
 
-    // Build C-compatible timing array (cached in mutable engine state)
-    auto *mutableEngine = const_cast<PiperPlusEngine*>(engine);
+    // Build C-compatible timing array (cached in engine state)
     const auto &timings = engine->lastSynthResult.phonemeTimings;
 
-    mutableEngine->timingStrings.clear();
-    mutableEngine->cachedTimings.clear();
-    mutableEngine->timingStrings.reserve(timings.size());
-    mutableEngine->cachedTimings.reserve(timings.size());
+    engine->timingStrings.clear();
+    engine->cachedTimings.clear();
+    engine->timingStrings.reserve(timings.size());
+    engine->cachedTimings.reserve(timings.size());
 
     for (const auto &t : timings) {
-        mutableEngine->timingStrings.push_back(t.phoneme);
+        engine->timingStrings.push_back(t.phoneme);
         PiperPlusPhonemeInfo info;
-        info.phoneme = mutableEngine->timingStrings.back().c_str();
+        info.phoneme = engine->timingStrings.back().c_str();
         info.start_time = t.start_time;
         info.end_time = t.end_time;
-        mutableEngine->cachedTimings.push_back(info);
+        engine->cachedTimings.push_back(info);
     }
 
-    out_timing->entries = mutableEngine->cachedTimings.data();
-    out_timing->count = static_cast<int32_t>(mutableEngine->cachedTimings.size());
+    out_timing->entries = engine->cachedTimings.data();
+    out_timing->count = static_cast<int32_t>(engine->cachedTimings.size());
     return PIPER_PLUS_OK;
 }
 
@@ -694,9 +692,17 @@ PIPER_PLUS_API int32_t piper_plus_phonemize(
     if (!text) { set_error("text is NULL"); return PIPER_PLUS_ERR_TEXT; }
     if (!out_result) { set_error("out_result is NULL"); return PIPER_PLUS_ERR; }
 
+    // Reentrancy guard
+    bool expected = false;
+    if (!engine->inProgress.compare_exchange_strong(expected, true)) {
+        set_error("Engine is busy");
+        return PIPER_PLUS_ERR_BUSY;
+    }
+
+    // Save language before try block so catch can restore it
+    auto savedLangId = engine->voice.synthesisConfig.languageId;
+
     try {
-        // Save and optionally set language
-        auto savedLangId = engine->voice.synthesisConfig.languageId;
         if (language && language[0] != '\0' && engine->voice.modelConfig.languageIdMap) {
             auto it = engine->voice.modelConfig.languageIdMap->find(language);
             if (it != engine->voice.modelConfig.languageIdMap->end()) {
@@ -704,8 +710,14 @@ PIPER_PLUS_API int32_t piper_plus_phonemize(
             }
         }
 
+        // Apply custom dictionary
+        std::string processedText = text;
+        if (engine->customDict) {
+            processedText = engine->customDict->applyToText(processedText);
+        }
+
         piper::PhonemizeResult phonResult;
-        piper::phonemizeText(engine->voice, text, phonResult);
+        piper::phonemizeText(engine->voice, processedText, phonResult);
 
         // Detect language from current config
         engine->g2pLanguage = "unknown";
@@ -751,33 +763,45 @@ PIPER_PLUS_API int32_t piper_plus_phonemize(
         out_result->phonemes = engine->g2pPhonemeStr.c_str();
         out_result->language = engine->g2pLanguage.c_str();
         out_result->num_phonemes = count;
+
+        engine->inProgress.store(false);
         return PIPER_PLUS_OK;
 
     } catch (const std::exception &e) {
+        engine->voice.synthesisConfig.languageId = savedLangId;
         set_error(e.what());
+        engine->inProgress.store(false);
         return PIPER_PLUS_ERR;
     } catch (...) {
+        engine->voice.synthesisConfig.languageId = savedLangId;
         set_error("Unknown error in phonemize");
+        engine->inProgress.store(false);
         return PIPER_PLUS_ERR;
     }
 }
 
-PIPER_PLUS_API const char *piper_plus_available_languages(const PiperPlusEngine *engine) {
+PIPER_PLUS_API const char *piper_plus_available_languages(PiperPlusEngine *engine) {
     if (!engine) return "";
 
-    auto *mutableEngine = const_cast<PiperPlusEngine*>(engine);
     if (!engine->voice.modelConfig.languageIdMap) {
-        mutableEngine->availableLanguagesStr = "";
-        return mutableEngine->availableLanguagesStr.c_str();
+        engine->availableLanguagesStr = "";
+        return engine->availableLanguagesStr.c_str();
     }
 
-    mutableEngine->availableLanguagesStr.clear();
+    // Sort language codes for deterministic output
+    std::vector<std::string> codes;
     for (const auto &[code, id] : *engine->voice.modelConfig.languageIdMap) {
-        if (!mutableEngine->availableLanguagesStr.empty())
-            mutableEngine->availableLanguagesStr += ',';
-        mutableEngine->availableLanguagesStr += code;
+        codes.push_back(code);
     }
-    return mutableEngine->availableLanguagesStr.c_str();
+    std::sort(codes.begin(), codes.end());
+
+    engine->availableLanguagesStr.clear();
+    for (const auto &code : codes) {
+        if (!engine->availableLanguagesStr.empty())
+            engine->availableLanguagesStr += ',';
+        engine->availableLanguagesStr += code;
+    }
+    return engine->availableLanguagesStr.c_str();
 }
 
 } // extern "C"

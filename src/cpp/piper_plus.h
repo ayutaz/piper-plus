@@ -186,7 +186,7 @@ typedef struct PiperPlusTimingResult {
 
 /** Get phoneme timing from the last synthesis. Valid until next synthesis call. */
 PIPER_PLUS_API int32_t piper_plus_get_phoneme_timing(
-    const PiperPlusEngine   *engine,
+    PiperPlusEngine         *engine,
     PiperPlusTimingResult   *out_timing);
 
 /* ===== G2P / Phonemization (M4-3) ===== */
@@ -205,7 +205,7 @@ PIPER_PLUS_API int32_t piper_plus_phonemize(
     PiperPlusPhonemeResult  *out_result);
 
 /** Get available language codes (comma-separated, BORROWED). */
-PIPER_PLUS_API const char *piper_plus_available_languages(const PiperPlusEngine *engine);
+PIPER_PLUS_API const char *piper_plus_available_languages(PiperPlusEngine *engine);
 
 #ifdef __cplusplus
 }
