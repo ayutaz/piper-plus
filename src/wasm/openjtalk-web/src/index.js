@@ -51,6 +51,7 @@ export class PiperPlus {
     this._g2p = null;
     this._ort = null;
     this._initialized = false;
+    this._warmupPromise = null;
   }
 
   // -------------------------------------------------------------------------
@@ -99,6 +100,10 @@ export class PiperPlus {
    */
   async synthesize(text, options = {}) {
     this._assertReady();
+    if (this._warmupPromise) {
+      await this._warmupPromise;
+      this._warmupPromise = null;
+    }
     if (!text) {
       throw new Error('text is required');
     }
@@ -176,6 +181,7 @@ export class PiperPlus {
       this._g2p.dispose();
       this._g2p = null;
     }
+    this._warmupPromise = null;
     this._initialized = false;
   }
 
@@ -268,6 +274,9 @@ export class PiperPlus {
 
     // --- Done ----------------------------------------------------------------
 
+    // COLD-M2: ORT グラフ最適化キャッシュを非同期で温める
+    this._warmupPromise = this._runWarmup(2);
+
     this._initialized = true;
     progress({ stage: 'ready', progress: 1, message: 'PiperPlus ready.' });
   }
@@ -349,6 +358,32 @@ export class PiperPlus {
     const results = await this._session.run(feeds);
     const audioTensor = results.output || results[Object.keys(results)[0]];
     return new Float32Array(audioTensor.data);
+  }
+
+  /**
+   * ORT グラフ最適化キャッシュをバックグラウンドで温める。
+   * 本番と同程度の形状 (長さ100) でダミー推論を実行する。
+   * @private
+   */
+  async _runWarmup(runs = 2) {
+    const WARMUP_LENGTH = 100;
+    const dummyIds = new Array(WARMUP_LENGTH);
+    dummyIds[0] = 1; // BOS
+    for (let i = 1; i < WARMUP_LENGTH - 1; i++) dummyIds[i] = 8;
+    dummyIds[WARMUP_LENGTH - 1] = 2; // EOS
+
+    for (let i = 0; i < runs; i++) {
+      try {
+        await this._infer(dummyIds, null, {
+          noiseScale: DEFAULT_NOISE_SCALE,
+          lengthScale: DEFAULT_LENGTH_SCALE,
+          noiseW: DEFAULT_NOISE_W,
+        });
+      } catch (e) {
+        console.warn(`[piper-plus] warmup run ${i + 1}/${runs} failed:`, e);
+        return;
+      }
+    }
   }
 
   /**

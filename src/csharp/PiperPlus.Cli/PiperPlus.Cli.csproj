@@ -12,6 +12,9 @@
          which cannot be statically analyzed. This is intentional and documented. -->
     <SuppressTrimAnalysisWarnings>true</SuppressTrimAnalysisWarnings>
 
+    <!-- Pre-compile IL to native code at publish time to eliminate JIT overhead -->
+    <PublishReadyToRun>true</PublishReadyToRun>
+
     <!-- NuGet Package Metadata -->
     <PackageId>PiperPlus.Cli</PackageId>
     <Version>0.1.0</Version>

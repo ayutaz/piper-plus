@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.ML.OnnxRuntime;
@@ -35,6 +36,21 @@ public static class SessionFactory
     private const string GpuDeviceIdEnvVar = "PIPER_GPU_DEVICE_ID";
 
     /// <summary>
+    /// Default number of warmup inference runs.
+    /// ORT JIT cache stabilises in 1-2 runs; 2 provides a safety margin.
+    /// </summary>
+    private const int DefaultWarmupRuns = 2;
+
+    /// <summary>
+    /// Length of the dummy phoneme input used during warmup.
+    /// Matches typical production input length (50-200) to warm ORT memory allocations.
+    /// </summary>
+    private const int WarmupPhonemeLength = 100;
+
+    /// <summary>VITS 小モデルの intra-op スレッド上限。</summary>
+    private const int MaxIntraThreads = 4;
+
+    /// <summary>
     /// Creates an ONNX <see cref="InferenceSession"/> for the given model,
     /// conditionally enabling the CUDA execution provider.
     /// </summary>
@@ -58,6 +74,14 @@ public static class SessionFactory
     /// Optional logger for diagnostic messages. Pass <c>null</c> to suppress output.
     /// </param>
     /// <returns>A configured <see cref="InferenceSession"/> ready for inference.</returns>
+    /// <remarks>
+    /// <para>
+    /// <b>Side effect:</b> 初回呼び出し時、モデルと同じディレクトリに
+    /// <c>{model}.opt.onnx</c> を生成する。このキャッシュファイルは
+    /// ORT バージョンおよびデバイスに依存するため、変更後は削除して再生成が必要。
+    /// 書き込み権限がない場合は警告を出力してスキップする（推論への影響なし）。
+    /// </para>
+    /// </remarks>
     /// <exception cref="ArgumentException">
     /// Thrown when <paramref name="modelPath"/> is null or empty.
     /// </exception>
@@ -87,19 +111,209 @@ public static class SessionFactory
 
         var options = new SessionOptions();
 
-        // Match C++ piper.cpp: disable graph optimisation.
-        options.GraphOptimizationLevel = GraphOptimizationLevel.ORT_DISABLE_ALL;
+        // ORT_ENABLE_ALL: セッション作成時にグラフ最適化を一度実行し、
+        // 以降の推論コストを削減する (COLD-M1)。
+        options.GraphOptimizationLevel = GraphOptimizationLevel.ORT_ENABLE_ALL;
+
+        // COLD-M1: VITS は小モデルのためスレッド数を制限する。
+        // 物理コア数の半分（最大4）を intra-op スレッドに割り当て。
+        options.IntraOpNumThreads = Math.Min(Environment.ProcessorCount / 2, MaxIntraThreads);
+        options.InterOpNumThreads = 1;
+        // VITS は単一グラフで並列サブグラフがないため Sequential が最適。
+        options.ExecutionMode = ExecutionMode.ORT_SEQUENTIAL;
 
         if (useCuda)
         {
             TryAppendCudaProvider(options, resolvedDeviceId, logger);
         }
 
+        // COLD-M5 + F1/D5: 最適化済みモデルキャッシュ
+        // キャッシュパスにデバイス名を含める (D5: CPU/CUDA 混用防止)。
+        // センチネルファイル (.ok) で書き込み完了を保証 (F1: 中断耐性)。
+        var deviceLabel = useCuda ? $"cuda{resolvedDeviceId}" : "cpu";
+        var optimizedPath = Path.ChangeExtension(modelPath, $".{deviceLabel}.opt.onnx");
+        var sentinelPath = optimizedPath + ".ok";
+        string effectiveModelPath;
+
+        // キャッシュ有効: .opt.onnx と .ok の両方が存在する場合のみ
+        bool useCached = File.Exists(optimizedPath) && File.Exists(sentinelPath);
+
+        if (useCached)
+        {
+            logger.LogInformation("Loading pre-optimized model from {Path}", optimizedPath);
+            options.GraphOptimizationLevel = GraphOptimizationLevel.ORT_DISABLE_ALL;
+            effectiveModelPath = optimizedPath;
+        }
+        else
+        {
+            // 不完全なキャッシュがあれば削除
+            if (File.Exists(optimizedPath) && !File.Exists(sentinelPath))
+            {
+                logger.LogWarning(
+                    "Removing incomplete cache {Path} (missing sentinel)", optimizedPath);
+                try { File.Delete(optimizedPath); } catch { /* best effort */ }
+            }
+
+            try
+            {
+                options.OptimizedModelFilePath = optimizedPath;
+                logger.LogInformation("ORT will save optimized model to {Path}", optimizedPath);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(
+                    "Could not set optimized model path {Path}: {Message} (continuing without cache)",
+                    optimizedPath, ex.Message);
+            }
+
+            effectiveModelPath = modelPath;
+        }
+
         logger.LogDebug(
             "Creating InferenceSession for {ModelPath} (CUDA={UseCuda}, device={DeviceId}, testMode={TestMode})",
-            modelPath, useCuda, resolvedDeviceId, testMode);
+            effectiveModelPath, useCuda, resolvedDeviceId, testMode);
 
-        return new InferenceSession(modelPath, options);
+        var session = new InferenceSession(effectiveModelPath, options);
+
+        // F1: セッション作成成功後にセンチネルファイルを書き込む
+        if (!useCached && File.Exists(optimizedPath))
+        {
+            try
+            {
+                File.WriteAllText(sentinelPath, "ok");
+                logger.LogInformation("Cache sentinel written: {Path}", sentinelPath);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning("Failed to write sentinel {Path}: {Message}", sentinelPath, ex.Message);
+            }
+        }
+
+        return session;
+    }
+
+    /// <summary>
+    /// Warms up the ORT graph-optimization cache by running a small number of
+    /// dummy inferences. This eliminates the ~500-800ms JIT overhead that would
+    /// otherwise hit the user's first real synthesis call.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The method inspects <see cref="InferenceSession.InputMetadata"/> to
+    /// dynamically build the minimal set of required input tensors, so it
+    /// works for single-speaker, multi-speaker, multilingual, and prosody
+    /// models alike.
+    /// </para>
+    /// <para>
+    /// ダミー入力は本番と同程度の長さ (100 トークン) を使用する。ORT は形状変更時に
+    /// 内部バッファを再割り当てするため、本番と同程度の形状で warmup することで
+    /// メモリアロケーションも温まり、初回推論の遅延を最小化できる。
+    /// </para>
+    /// <para>
+    /// Any exception during warmup is caught and logged as a warning.
+    /// Warmup failure must never prevent the application from starting.
+    /// </para>
+    /// </remarks>
+    /// <param name="session">A configured <see cref="InferenceSession"/>.</param>
+    /// <param name="runs">Number of warmup inferences to execute (default: <see cref="DefaultWarmupRuns"/>).</param>
+    /// <param name="logger">Optional logger for diagnostic messages.</param>
+    public static void Warmup(
+        InferenceSession session,
+        int runs = DefaultWarmupRuns,
+        ILogger? logger = null)
+    {
+        ArgumentNullException.ThrowIfNull(session);
+        logger ??= NullLogger.Instance;
+
+        try
+        {
+            var sw = Stopwatch.StartNew();
+
+            // Dummy phoneme IDs with production-like length: BOS(1) + dummy phonemes(8) + EOS(2)
+            long[] phonemeIds = new long[WarmupPhonemeLength];
+            phonemeIds[0] = 1; // BOS
+            for (int j = 1; j < WarmupPhonemeLength - 1; j++)
+                phonemeIds[j] = 8; // dummy phoneme
+            phonemeIds[WarmupPhonemeLength - 1] = 2; // EOS
+            int phonemeLength = phonemeIds.Length;
+
+            // ---- Build required inputs ----
+            using var inputTensor = OrtValue.CreateTensorValueFromMemory(
+                phonemeIds, [1, phonemeLength]);
+
+            long[] lengths = [phonemeLength];
+            using var inputLengths = OrtValue.CreateTensorValueFromMemory(
+                lengths, [1]);
+
+            float[] scales = [0.667f, 1.0f, 0.8f];
+            using var scalesTensor = OrtValue.CreateTensorValueFromMemory(
+                scales, [3]);
+
+            var inputNames = new List<string>(6) { "input", "input_lengths", "scales" };
+            var inputValues = new List<OrtValue>(6) { inputTensor, inputLengths, scalesTensor };
+
+            // ---- Dynamically add optional inputs based on model metadata ----
+            var metadata = session.InputMetadata;
+
+            OrtValue? sidTensor = null;
+            if (metadata.ContainsKey("sid"))
+            {
+                long[] sid = [0];
+                sidTensor = OrtValue.CreateTensorValueFromMemory(sid, [1]);
+                inputNames.Add("sid");
+                inputValues.Add(sidTensor);
+            }
+
+            OrtValue? lidTensor = null;
+            if (metadata.ContainsKey("lid"))
+            {
+                long[] lid = [0];
+                lidTensor = OrtValue.CreateTensorValueFromMemory(lid, [1]);
+                inputNames.Add("lid");
+                inputValues.Add(lidTensor);
+            }
+
+            OrtValue? prosodyTensor = null;
+            if (metadata.ContainsKey("prosody_features"))
+            {
+                long[] prosody = new long[phonemeLength * 3]; // zero-filled
+                prosodyTensor = OrtValue.CreateTensorValueFromMemory(
+                    prosody, [1, phonemeLength, 3]);
+                inputNames.Add("prosody_features");
+                inputValues.Add(prosodyTensor);
+            }
+
+            string[] outputNames = session.OutputMetadata.ContainsKey("durations")
+                ? ["output", "durations"]
+                : ["output"];
+
+            try
+            {
+                for (int i = 0; i < runs; i++)
+                {
+                    using var runOptions = new RunOptions();
+                    using var results = session.Run(
+                        runOptions, inputNames, inputValues, outputNames);
+                }
+            }
+            finally
+            {
+                sidTensor?.Dispose();
+                lidTensor?.Dispose();
+                prosodyTensor?.Dispose();
+            }
+
+            sw.Stop();
+            logger.LogInformation(
+                "Warmup completed ({Runs} runs in {ElapsedMs}ms)",
+                runs, sw.ElapsedMilliseconds);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(
+                "Warmup failed (non-fatal, inference will still work): {Message}",
+                ex.Message);
+        }
     }
 
     // ------------------------------------------------------------------

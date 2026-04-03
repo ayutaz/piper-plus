@@ -112,6 +112,10 @@ struct Cli {
     /// raw PCM int16 を stdout に出力 (WAVヘッダなし)
     #[arg(long)]
     output_raw: bool,
+
+    /// ORT warmup を無効化 (デフォルト: 起動時にダミー推論2回で JIT キャッシュを温める)
+    #[arg(long)]
+    no_warmup: bool,
 }
 
 /// --phoneme-silence の値をパースして HashMap に変換する。
@@ -319,6 +323,14 @@ fn main() -> Result<()> {
         let mut voice = PiperVoice::load(&model_path, config_arg.as_deref(), &cli.device)
             .context("Failed to initialize PiperVoice")?;
 
+        // ORT warmup: JIT 最適化キャッシュを温める
+        if !cli.no_warmup {
+            tracing::info!("Warming up ORT session...");
+            voice
+                .warmup(piper_plus::DEFAULT_WARMUP_RUNS)
+                .context("ORT warmup failed")?;
+        }
+
         // Load custom dictionaries
         let custom_dict = if !cli.custom_dicts.is_empty() {
             let mut dict = CustomDictionary::new();
@@ -409,6 +421,14 @@ fn main() -> Result<()> {
         // --text モード: PiperVoice でテキストから直接音声合成
         let mut voice = PiperVoice::load(&model_path, config_arg.as_deref(), &cli.device)
             .context("Failed to initialize PiperVoice")?;
+
+        // ORT warmup: JIT 最適化キャッシュを温める
+        if !cli.no_warmup && !cli.test_mode {
+            tracing::info!("Warming up ORT session...");
+            voice
+                .warmup(piper_plus::DEFAULT_WARMUP_RUNS)
+                .context("ORT warmup failed")?;
+        }
 
         // Load custom dictionaries
         let custom_dict = if !cli.custom_dicts.is_empty() {
@@ -624,6 +644,14 @@ fn main() -> Result<()> {
         // JSONL stdin パイプライン (既存)
         let mut engine = OnnxEngine::load(&model_path, &voice_config, &cli.device)
             .context("Failed to load ONNX model")?;
+
+        // ORT warmup: JIT 最適化キャッシュを温める
+        if !cli.no_warmup {
+            tracing::info!("Warming up ORT session...");
+            engine
+                .warmup(piper_plus::DEFAULT_WARMUP_RUNS)
+                .context("ORT warmup failed")?;
+        }
 
         let stdin = std::io::stdin();
         let reader = JsonlReader::new(stdin.lock());
