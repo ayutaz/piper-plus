@@ -16,6 +16,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <vector>
 
@@ -154,6 +155,11 @@ PIPER_PLUS_API PiperPlusEngine *piper_plus_create(const PiperPlusConfig *config)
 
     try {
         auto engine = std::make_unique<PiperPlusEngine>();
+
+        // Mutex to protect setenv + loadVoice (setenv is not thread-safe)
+        static std::mutex g_create_mutex;
+        std::lock_guard<std::mutex> lock(g_create_mutex);
+
         piper::initialize(engine->config);
 
         // dict_dir: set environment variable before loadVoice (M1-3)
@@ -189,7 +195,18 @@ PIPER_PLUS_API PiperPlusEngine *piper_plus_create(const PiperPlusConfig *config)
         return engine.release();  // Transfer ownership to caller
 
     } catch (const std::exception &e) {
-        set_error(e.what());
+        std::string msg = e.what();
+        if (msg.find("model") != std::string::npos ||
+            msg.find("onnx") != std::string::npos ||
+            msg.find("ONNX") != std::string::npos) {
+            set_error("Model error: " + msg);
+        } else if (msg.find("config") != std::string::npos ||
+                   msg.find("json") != std::string::npos ||
+                   msg.find("JSON") != std::string::npos) {
+            set_error("Config error: " + msg);
+        } else {
+            set_error(msg);
+        }
         return nullptr;  // unique_ptr auto-deletes engine
     } catch (...) {
         set_error("Unknown error during engine creation");
@@ -222,6 +239,11 @@ PIPER_PLUS_API int32_t piper_plus_synthesize(
     }
     if (!text) {
         set_error("text is NULL");
+        return PIPER_PLUS_ERR_TEXT;
+    }
+    // Text length limit (1 MB)
+    if (std::strlen(text) > 1024 * 1024) {
+        set_error("text exceeds maximum length (1 MB)");
         return PIPER_PLUS_ERR_TEXT;
     }
     if (!out_samples || !out_num_samples || !out_sample_rate) {
@@ -323,6 +345,11 @@ PIPER_PLUS_API int32_t piper_plus_synth_start(
         set_error("text is NULL or empty");
         return PIPER_PLUS_ERR_TEXT;
     }
+    // Text length limit (1 MB)
+    if (std::strlen(text) > 1024 * 1024) {
+        set_error("text exceeds maximum length (1 MB)");
+        return PIPER_PLUS_ERR_TEXT;
+    }
 
     // Reentrancy guard
     bool expected = false;
@@ -332,11 +359,11 @@ PIPER_PLUS_API int32_t piper_plus_synth_start(
     }
 
     try {
+        // Save config BEFORE applying options (so we can restore later)
+        engine->iterState.savedConfig = engine->voice.synthesisConfig;
+
         // Apply options
         applySynthOptions(engine->voice.synthesisConfig, opts);
-
-        // Save config for restore
-        engine->iterState.savedConfig = engine->voice.synthesisConfig;
 
         // Split text into sentences
         engine->iterState.sentences = piper::splitTextToSentences(
@@ -419,6 +446,13 @@ PIPER_PLUS_API int32_t piper_plus_synth_next(
         bool isLast = (state.currentIndex >= state.sentences.size());
 
         // Fill output chunk
+        if (state.currentChunkSamples.size() > static_cast<size_t>(INT32_MAX)) {
+            set_error("Audio chunk too large");
+            engine->voice.synthesisConfig = state.savedConfig;
+            state.active = false;
+            engine->inProgress.store(false);
+            return PIPER_PLUS_ERR;
+        }
         out_chunk->samples = state.currentChunkSamples.data();
         out_chunk->num_samples = static_cast<int32_t>(state.currentChunkSamples.size());
         out_chunk->sample_rate = engine->voice.synthesisConfig.sampleRate;

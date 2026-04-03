@@ -24,6 +24,7 @@ extern "C" {
 /* ===== Version ===== */
 #define PIPER_PLUS_API_VERSION 1
 
+/** Returns version string. The returned pointer is static storage; do not free. */
 PIPER_PLUS_API const char *piper_plus_version(void);
 PIPER_PLUS_API int32_t     piper_plus_api_version(void);
 
@@ -40,6 +41,14 @@ PIPER_PLUS_API int32_t     piper_plus_api_version(void);
 PIPER_PLUS_API const char *piper_plus_get_last_error(void);
 
 /* ===== Opaque engine handle ===== */
+
+/**
+ * Opaque engine handle.
+ *
+ * @note PiperPlusEngine is NOT thread-safe. Do not call any function on
+ *       the same engine from multiple threads concurrently.
+ *       Use one engine per thread, or protect with an external mutex.
+ */
 typedef struct PiperPlusEngine PiperPlusEngine;
 
 /* ===== Config structs (POD, memset-safe) ===== */
@@ -97,10 +106,11 @@ PIPER_PLUS_API int32_t piper_plus_language_id(
 /* ===== Audio chunk (for iterator/streaming) ===== */
 
 typedef struct PiperPlusAudioChunk {
-    const float *samples;         /* Audio samples (internal buffer, valid until next call) */
-    int32_t      num_samples;     /* Number of samples */
-    int32_t      sample_rate;     /* Sample rate in Hz */
-    int32_t      is_last;         /* 1 if this is the last chunk, 0 otherwise */
+    const float *samples;         /**< BORROWED: valid until next synth_next()
+                                       or synth_start() call. Copy if needed. */
+    int32_t      num_samples;     /**< Number of float samples */
+    int32_t      sample_rate;     /**< Sample rate in Hz */
+    int32_t      is_last;         /**< 1 if this is the last chunk, 0 otherwise */
 } PiperPlusAudioChunk;
 
 /* ===== Iterator pattern (sentence-by-sentence synthesis) ===== */
