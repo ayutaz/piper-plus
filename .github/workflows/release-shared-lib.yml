@@ -1,0 +1,91 @@
+name: Release Shared Library
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-shared:
+    name: Build ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            name: linux-x64
+            artifact: piper-plus-shared-linux-x64
+            archive_ext: tar.gz
+          - os: macos-14
+            name: macos-arm64
+            artifact: piper-plus-shared-macos-arm64
+            archive_ext: tar.gz
+          - os: windows-2022
+            name: windows-x64
+            artifact: piper-plus-shared-windows-x64
+            archive_ext: zip
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Configure CMake
+        shell: bash
+        run: |
+          cmake -B build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DPIPER_PLUS_BUILD_SHARED=ON \
+            -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/install
+
+      - name: Build
+        shell: bash
+        run: cmake --build build --config Release -j$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)
+
+      - name: Install
+        shell: bash
+        run: cmake --install build --config Release
+
+      - name: Verify install layout
+        shell: bash
+        run: cmake -DPREFIX=${{ github.workspace }}/install -P cmake/verify_install_layout.cmake
+
+      - name: Create archive (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          cd ${{ github.workspace }}/install
+          tar -czf ${{ github.workspace }}/${{ matrix.artifact }}.tar.gz .
+
+      - name: Create archive (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Compress-Archive -Path "${{ github.workspace }}/install/*" -DestinationPath "${{ github.workspace }}/${{ matrix.artifact }}.zip"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ github.workspace }}/${{ matrix.artifact }}.${{ matrix.archive_ext }}
+
+  release:
+    name: Create Release
+    needs: build-shared
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/**/*
+          generate_release_notes: true

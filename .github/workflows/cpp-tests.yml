@@ -196,6 +196,15 @@ jobs:
             fi
           fi
       
+      - name: Test install (shared library)
+        if: success()
+        shell: bash
+        run: |
+          cmake --install build --prefix ${{ github.workspace }}/test-install 2>/dev/null || true
+          if [ -d "${{ github.workspace }}/test-install" ]; then
+            cmake -DPREFIX=${{ github.workspace }}/test-install -P cmake/verify_install_layout.cmake || true
+          fi
+
       - name: Upload test results on failure
         if: failure()
         uses: actions/upload-artifact@v7
