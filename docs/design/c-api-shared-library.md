@@ -13,15 +13,49 @@ piper-plus の C++ 実装を共有ライブラリ (`.dll` / `.so` / `.dylib`) + 
 
 ### 1.1 解決する課題
 
-現在の C++ ビルドは `add_executable(piper ...)` のみで、スタンドアロン実行ファイルしか生成されない。外部アプリケーションから piper-plus を利用するには `subprocess` でプロセス起動するしかなく、以下のユースケースがブロックされている:
+piper-plus は既に Rust / Python / Go / C# / JS(WASM) でネイティブライブラリを提供しているが、C API (`.so`/`.dylib`/`.dll` + `extern "C"`) が存在しないため、**C FFI に依存するプラットフォーム**からの利用がブロックされている:
 
 | ユースケース | 必要なバインディング | 現状 |
 |---|---|---|
-| Flutter/Dart アプリ | `dart:ffi` | 不可 |
-| Godot GDExtension | C バインディング | 不可 (Issue #153) |
-| Go サーバー (cgo) | C バインディング | 不可 |
-| Swift / iOS アプリ | C interop | 不可 |
-| Python 拡張 (ctypes/cffi) | C バインディング | Rust PyO3 経由のみ |
+| Flutter/Dart アプリ | `dart:ffi` (C のみ) | **不可** |
+| Godot GDExtension | C バインディング | piper-plus C++ ソースを丸ごとコピーして直接ビルド ([godot-piper-plus](https://github.com/ayutaz/godot-piper-plus)) — 保守コスト大 |
+| Swift / iOS アプリ | C interop | **不可** |
+
+#### 1.1.1 Godot GDExtension の現状と課題
+
+[godot-piper-plus](https://github.com/ayutaz/godot-piper-plus) は C API がないため、piper-plus の C++ ソース 25+ ファイルを `src/piper_core/` にコピー (vendor) して GDExtension に直接コンパイルしている。
+
+**現在の技術的課題:**
+
+| 課題 | 詳細 |
+|------|------|
+| ソース同期の保守コスト | piper-plus 更新のたびに 25+ ファイルの手動コピー + 改変が必要 |
+| 日本語のみ対応 | 8言語 G2P 中、OpenJTalk (日本語) のみ統合。英語 G2P は未実装 (TODO) |
+| 複雑なビルドシステム | 227行 CMakeLists.txt + ExternalProject で OpenJTalk/HTSEngine をソースからクロスコンパイル |
+| 手動改変が必要 | spdlog → no-op シム差替え、eSpeak 除去、PhonemeType 再番号付け等 |
+| ABI 不安定 | C++ 名前空間を直接呼び出すため、コンパイラ・標準ライブラリの一致が必要 |
+
+**C API 共有ライブラリがあれば:**
+
+| 項目 | 現状 (ソースコピー) | C API 方式 |
+|------|-------------------|-----------|
+| GDExtension 側ソースファイル | 25+ | **4** (register_types + TTS ノード) |
+| ビルドスクリプト | 227行 CMake + ExternalProject | **~30行** |
+| 多言語 G2P | 日本語のみ | **8言語が即時利用可能** |
+| piper-plus 更新の追従 | ファイルコピー + 手動改変 | **ヘッダー + バイナリ差し替えのみ** |
+| OpenJTalk/HTSEngine ビルド | GDExtension 側でクロスコンパイル | **不要 (C API に内包)** |
+
+> **参考:** [godot-kokoro](https://github.com/PhilNikitin/godot-kokoro) が sherpa-onnx の C API 共有ライブラリを GDExtension から利用する方式で同パターンを実証済み (SConstruct 43行、ソースファイル 4つのみ)。
+
+> **Note:** 以下の言語は既にネイティブライブラリが提供済みのため、C API は不要。
+>
+> | 言語 | パッケージ | 提供形態 |
+> |------|-----------|---------|
+> | Rust | `piper-plus` クレート (`src/rust/piper-core/`) | `PiperVoice::synthesize_text()` 等の完全な TTS API |
+> | Python | `piper-plus` PyO3 バインディング (`src/rust/piper-python/`) | `PiperVoice.synthesize()` + numpy 統合 |
+> | Go | `github.com/ayutaz/piper-plus/src/go` (`src/go/piperplus/`) | `Voice.Synthesize()` + HTTP API サーバー |
+> | C# | `PiperPlus.Core` (`src/csharp/PiperPlus.Core/`) | `PiperSession` + NuGet 配布準備済み |
+> | JS/WASM | `piper-plus` npm (`src/wasm/openjtalk-web/`) | `PiperPlus.synthesize()` + ストリーミング |
 
 ---
 
