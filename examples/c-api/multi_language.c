@@ -121,10 +121,11 @@ int main(int argc, char *argv[]) {
     config.dict_dir    = argc > 2 ? argv[2] : NULL;
     config.config_path = argc > 3 ? argv[3] : NULL;
 
-    PiperPlusEngine *engine = piper_plus_create(&config);
-    if (!engine) {
-        fprintf(stderr, "Engine creation failed: %s\n",
-                piper_plus_get_last_error());
+    PiperPlusEngine *engine = NULL;
+    int32_t create_rc = piper_plus_create(&config, &engine);
+    if (create_rc != PIPER_PLUS_OK) {
+        fprintf(stderr, "Engine creation failed (code %d): %s\n",
+                create_rc, piper_plus_get_last_error());
         return 1;
     }
 

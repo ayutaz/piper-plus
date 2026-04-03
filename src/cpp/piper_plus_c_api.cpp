@@ -213,14 +213,23 @@ PIPER_PLUS_API PiperPlusSynthOptions piper_plus_default_options(void) {
     return opts;
 }
 
-PIPER_PLUS_API PiperPlusEngine *piper_plus_create(const PiperPlusConfig *config) {
+PIPER_PLUS_API PiperPlusStatus piper_plus_create(
+    const PiperPlusConfig *config,
+    PiperPlusEngine      **out_engine)
+{
+    if (!out_engine) {
+        set_error("out_engine is NULL");
+        return PIPER_PLUS_ERR;
+    }
+    *out_engine = nullptr;
+
     if (!config) {
         set_error("config is NULL");
-        return nullptr;
+        return PIPER_PLUS_ERR;
     }
     if (!config->model_path || config->model_path[0] == '\0') {
         set_error("model_path is NULL or empty");
-        return nullptr;
+        return PIPER_PLUS_ERR_MODEL;
     }
 
     try {
@@ -277,25 +286,41 @@ PIPER_PLUS_API PiperPlusEngine *piper_plus_create(const PiperPlusConfig *config)
                          engine->voice, speakerId, provider, gpuDeviceId,
                          numThreads);
 
-        return engine.release();  // Transfer ownership to caller
+        *out_engine = engine.release();  // Transfer ownership to caller
+        return PIPER_PLUS_OK;
 
     } catch (const std::exception &e) {
         std::string msg = e.what();
+
+        // Classify exception by message content
+        if (msg.find("onnxruntime") != std::string::npos ||
+            msg.find("OrtException") != std::string::npos ||
+            msg.find("ORT ") != std::string::npos ||
+            msg.find("InferenceSession") != std::string::npos ||
+            msg.find("SessionOptions") != std::string::npos) {
+            set_error("ORT error: " + msg);
+            return PIPER_PLUS_ERR_ORT;
+        }
         if (msg.find("model") != std::string::npos ||
             msg.find("onnx") != std::string::npos ||
-            msg.find("ONNX") != std::string::npos) {
+            msg.find("ONNX") != std::string::npos ||
+            msg.find("No such file") != std::string::npos ||
+            msg.find("not found") != std::string::npos ||
+            msg.find("Failed to open") != std::string::npos) {
             set_error("Model error: " + msg);
-        } else if (msg.find("config") != std::string::npos ||
-                   msg.find("json") != std::string::npos ||
-                   msg.find("JSON") != std::string::npos) {
-            set_error("Config error: " + msg);
-        } else {
-            set_error(msg);
+            return PIPER_PLUS_ERR_MODEL;
         }
-        return nullptr;  // unique_ptr auto-deletes engine
+        if (msg.find("config") != std::string::npos ||
+            msg.find("json") != std::string::npos ||
+            msg.find("JSON") != std::string::npos) {
+            set_error("Config error: " + msg);
+            return PIPER_PLUS_ERR_CONFIG;
+        }
+        set_error(msg);
+        return PIPER_PLUS_ERR;
     } catch (...) {
         set_error("Unknown error during engine creation");
-        return nullptr;  // unique_ptr auto-deletes engine
+        return PIPER_PLUS_ERR;
     }
 }
 

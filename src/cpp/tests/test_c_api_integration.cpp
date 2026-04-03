@@ -53,7 +53,10 @@ protected:
         config.config_path = g_config_path;
         config.provider = "cpu";
         config.num_threads = 1;
-        return piper_plus_create(&config);
+        PiperPlusEngine* engine = nullptr;
+        PiperPlusStatus rc = piper_plus_create(&config, &engine);
+        if (rc != PIPER_PLUS_OK) return nullptr;
+        return engine;
     }
 };
 

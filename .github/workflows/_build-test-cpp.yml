@@ -1,0 +1,315 @@
+name: C++ Build & Test (reusable)
+
+on:
+  workflow_call:
+    inputs:
+      run-integration-tests:
+        description: "Run integration tests that require a test model"
+        type: boolean
+        default: true
+      cmake-args:
+        description: "Additional CMake configure arguments"
+        type: string
+        default: ""
+      os-matrix:
+        description: 'JSON array of runner OS labels, e.g. ["ubuntu-latest","macos-latest"]'
+        type: string
+        default: '["ubuntu-latest", "macos-latest"]'
+      build-type-matrix:
+        description: 'JSON array of build types, e.g. ["Release"]'
+        type: string
+        default: '["Release"]'
+      timeout-minutes:
+        description: "Job timeout in minutes"
+        type: number
+        default: 25
+
+jobs:
+  build-and-test:
+    name: C++ ${{ matrix.build-type }} on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ${{ fromJson(inputs.os-matrix) }}
+        build-type: ${{ fromJson(inputs.build-type-matrix) }}
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      # ── Dependencies ──────────────────────────────────────────
+      - name: Install dependencies (Ubuntu)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential cmake ccache wget
+
+          # Install ONNX Runtime
+          wget -q https://github.com/microsoft/onnxruntime/releases/download/v1.14.1/onnxruntime-linux-x64-1.14.1.tgz
+          tar -xzf onnxruntime-linux-x64-1.14.1.tgz
+          sudo cp -r onnxruntime-linux-x64-1.14.1/lib/* /usr/local/lib/
+          sudo cp -r onnxruntime-linux-x64-1.14.1/include/* /usr/local/include/
+          sudo ldconfig
+          rm -rf onnxruntime-linux-x64-1.14.1*
+
+      - name: Install dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          # Workaround for GitHub Actions cmake pinning issue
+          # See: https://github.com/actions/runner-images/issues/12912
+          brew uninstall cmake 2>/dev/null || true
+          brew untap local/pinned 2>/dev/null || true
+
+          brew update || true
+          brew install cmake || true
+          brew install ccache || brew upgrade ccache || true
+          brew install wget || brew upgrade wget || true
+
+          # Install ONNX Runtime (architecture-aware)
+          sudo mkdir -p /usr/local/lib /usr/local/include
+
+          if [[ $(uname -m) == "arm64" ]]; then
+            echo "Installing ONNX Runtime for Apple Silicon..."
+            wget -q https://github.com/microsoft/onnxruntime/releases/download/v1.14.1/onnxruntime-osx-arm64-1.14.1.tgz
+            tar -xzf onnxruntime-osx-arm64-1.14.1.tgz
+            sudo cp -r onnxruntime-osx-arm64-1.14.1/lib/* /usr/local/lib/ 2>/dev/null || true
+            sudo cp -r onnxruntime-osx-arm64-1.14.1/include/* /usr/local/include/ 2>/dev/null || true
+            rm -rf onnxruntime-osx-arm64-1.14.1*
+          else
+            echo "Installing ONNX Runtime for Intel Mac..."
+            wget -q https://github.com/microsoft/onnxruntime/releases/download/v1.14.1/onnxruntime-osx-x86_64-1.14.1.tgz
+            tar -xzf onnxruntime-osx-x86_64-1.14.1.tgz
+            sudo cp -r onnxruntime-osx-x86_64-1.14.1/lib/* /usr/local/lib/ 2>/dev/null || true
+            sudo cp -r onnxruntime-osx-x86_64-1.14.1/include/* /usr/local/include/ 2>/dev/null || true
+            rm -rf onnxruntime-osx-x86_64-1.14.1*
+          fi
+
+      - name: Install dependencies (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          # cmake is pre-installed on windows-latest runner
+          Invoke-WebRequest -Uri https://github.com/microsoft/onnxruntime/releases/download/v1.14.1/onnxruntime-win-x64-1.14.1.zip -OutFile onnxruntime-win-x64-1.14.1.zip
+          Expand-Archive -Path onnxruntime-win-x64-1.14.1.zip -DestinationPath .
+          echo "ONNXRUNTIME_ROOT_PATH=$PWD/onnxruntime-win-x64-1.14.1" >> $env:GITHUB_ENV
+
+      # ── Build cache ───────────────────────────────────────────
+      - name: Setup build cache
+        if: runner.os != 'Windows'
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/ccache
+            ~/Library/Caches/ccache
+          key: ${{ runner.os }}-ccache-${{ matrix.build-type }}-${{ hashFiles('**/CMakeLists.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-ccache-${{ matrix.build-type }}-
+            ${{ runner.os }}-ccache-
+
+      # ── Configure & Build ─────────────────────────────────────
+      - name: Configure CMake
+        shell: bash
+        run: |
+          export PATH="/usr/lib/ccache:/usr/local/opt/ccache/libexec:$PATH"
+          CMAKE_ARGS="-DCMAKE_BUILD_TYPE=${{ matrix.build-type }} -DBUILD_TESTS=ON -DUSE_CUDA=OFF"
+
+          # Append caller-provided extra args
+          if [ -n "${{ inputs.cmake-args }}" ]; then
+            CMAKE_ARGS="${CMAKE_ARGS} ${{ inputs.cmake-args }}"
+          fi
+
+          if [ "${{ runner.os }}" == "Windows" ]; then
+            cmake -B build \
+              -G "Visual Studio 17 2022" \
+              -A x64 \
+              ${CMAKE_ARGS} \
+              -DONNXRUNTIME_ROOT_PATH="$ONNXRUNTIME_ROOT_PATH"
+          elif [ "${{ runner.os }}" == "macOS" ]; then
+            if [[ $(uname -m) == "arm64" ]]; then
+              CMAKE_ARGS="${CMAKE_ARGS} -DCMAKE_OSX_ARCHITECTURES=arm64"
+            else
+              CMAKE_ARGS="${CMAKE_ARGS} -DCMAKE_OSX_ARCHITECTURES=x86_64"
+            fi
+            cmake -B build ${CMAKE_ARGS}
+          else
+            cmake -B build ${CMAKE_ARGS}
+          fi
+
+      - name: Build
+        shell: bash
+        run: |
+          export PATH="/usr/lib/ccache:/usr/local/opt/ccache/libexec:$PATH"
+          # Windows needs less parallelism to avoid timeout
+          if [ "${{ runner.os }}" == "Windows" ]; then
+            PARALLEL_JOBS="--parallel 2"
+          else
+            PARALLEL_JOBS="-j$(nproc 2>/dev/null || sysctl -n hw.ncpu)"
+          fi
+
+          if ! cmake --build build --config ${{ matrix.build-type }} $PARALLEL_JOBS; then
+            echo "Build failed"
+            exit 1
+          fi
+          echo "Build succeeded"
+
+      # ── Runtime data (non-Windows) ────────────────────────────
+      - name: Download OpenJTalk dictionary
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          mkdir -p build/naist-jdic
+          if [ -d "/usr/share/open_jtalk/dic" ]; then
+            cp -r /usr/share/open_jtalk/dic/* build/naist-jdic/
+          elif [ -d "/opt/homebrew/share/open_jtalk/dic" ]; then
+            cp -r /opt/homebrew/share/open_jtalk/dic/* build/naist-jdic/
+          elif [ -d "/usr/local/share/open_jtalk/dic" ]; then
+            cp -r /usr/local/share/open_jtalk/dic/* build/naist-jdic/
+          else
+            echo "Downloading OpenJTalk dictionary..."
+            curl -sL https://sourceforge.net/projects/open-jtalk/files/Dictionary/open_jtalk_dic-1.11/open_jtalk_dic_utf_8-1.11.tar.gz/download \
+              | tar xzf - -C build/
+            mv build/open_jtalk_dic_utf_8-1.11/* build/naist-jdic/
+          fi
+
+      - name: Download espeak-ng-data
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          mkdir -p build
+          cd build
+          if wget -q https://github.com/rhasspy/espeak-ng/releases/download/2023.9.7-4/espeak-ng-data.tar.gz; then
+            tar -xzf espeak-ng-data.tar.gz
+            rm espeak-ng-data.tar.gz
+            echo "espeak-ng-data downloaded successfully"
+          else
+            echo "Warning: Failed to download espeak-ng-data, some tests may be skipped"
+            mkdir -p espeak-ng-data
+          fi
+
+      - name: Download espeak-ng-data (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          echo "Skipping espeak-ng-data download on Windows (not required for build verification)"
+          New-Item -ItemType Directory -Force -Path build\espeak-ng-data
+
+      # ── Test model (integration tests only) ───────────────────
+      - name: Cache test model
+        if: ${{ inputs.run-integration-tests }}
+        id: cache-test-model
+        uses: actions/cache@v4
+        with:
+          path: test/models/
+          key: test-model-multilingual-medium-v1
+
+      - name: Download test model
+        if: ${{ inputs.run-integration-tests && steps.cache-test-model.outputs.cache-hit != 'true' }}
+        shell: bash
+        run: |
+          mkdir -p test/models
+          curl -sL "https://huggingface.co/ayousanz/piper-plus-base/resolve/main/multilingual-test-medium.onnx" \
+            -o test/models/multilingual-test-medium.onnx || true
+          curl -sL "https://huggingface.co/ayousanz/piper-plus-base/resolve/main/multilingual-test-medium.onnx.json" \
+            -o test/models/multilingual-test-medium.onnx.json || true
+
+      # ── Run tests ─────────────────────────────────────────────
+      - name: Run tests
+        shell: bash
+        run: |
+          cd build
+
+          echo "Looking for test executables..."
+          find . -name "test_*" -type f 2>/dev/null | head -20 || echo "No test executables found"
+
+          # Environment variables
+          if [ "${{ runner.os }}" == "Windows" ]; then
+            export ESPEAK_NG_DATA="${PWD}/espeak-ng-data"
+            export PATH="${ONNXRUNTIME_ROOT_PATH}/lib:${PATH}"
+          else
+            export OPENJTALK_VOICE="dummy.htsvoice"
+            export OPENJTALK_SKIP_TESTS_IF_UNAVAILABLE=1
+            export OPENJTALK_DICTIONARY_DIR="${PWD}/naist-jdic"
+            export ESPEAK_NG_DATA="${PWD}/espeak-ng-data"
+          fi
+
+          echo "Running C++ tests for ${{ runner.os }} ${{ matrix.build-type }}"
+          echo "Available tests:"
+          ctest -C ${{ matrix.build-type }} -N | grep -E "Test #" || echo "No tests found"
+
+          CRITICAL_TESTS_PASSED=true
+
+          if [ "${{ runner.os }}" == "Windows" ]; then
+            echo "Running minimal tests on Windows..."
+            if ctest -C ${{ matrix.build-type }} -N | grep -q "Test #"; then
+              if ctest -C ${{ matrix.build-type }} -R "test_gpu_device_id" --output-on-failure --timeout 30; then
+                echo "At least one test passed on Windows"
+              else
+                echo "Tests failed on Windows, but build completed"
+              fi
+            else
+              echo "No tests found on Windows, but build completed"
+            fi
+            CRITICAL_TESTS_PASSED=true
+          else
+            # Unix platforms — run critical tests
+            TESTS_FOUND=false
+
+            # Build test list: always include unit tests
+            UNIT_TESTS="test_gpu_device_id test_phoneme_parser test_model_speaker_detection test_prosody_inference test_swedish_phonemize test_c_api"
+            INTEGRATION_TESTS="test_c_api_integration"
+
+            if [ "${{ inputs.run-integration-tests }}" == "true" ]; then
+              TEST_LIST="${UNIT_TESTS} ${INTEGRATION_TESTS}"
+            else
+              TEST_LIST="${UNIT_TESTS}"
+            fi
+
+            for test in ${TEST_LIST}; do
+              echo "Checking for ${test}..."
+              if ctest -C ${{ matrix.build-type }} -N | grep -q "${test}"; then
+                TESTS_FOUND=true
+                echo "Running ${test}..."
+                if ctest -C ${{ matrix.build-type }} -R "^${test}$" --output-on-failure -V --timeout 60; then
+                  echo "${test} passed"
+                else
+                  echo "${test} failed"
+                  CRITICAL_TESTS_PASSED=false
+                fi
+              else
+                echo "${test} not found in test list"
+              fi
+            done
+
+            if [ "$TESTS_FOUND" = "false" ]; then
+              echo "No critical tests found, but build succeeded."
+              CRITICAL_TESTS_PASSED=true
+            fi
+          fi
+
+          if [ "$CRITICAL_TESTS_PASSED" = "true" ]; then
+            echo "All critical tests passed!"
+          else
+            echo "Critical tests failed!"
+            exit 1
+          fi
+
+      # ── Post-build verification ───────────────────────────────
+      - name: Test install (shared library)
+        if: success()
+        continue-on-error: true
+        shell: bash
+        run: |
+          cmake --install build --prefix ${{ github.workspace }}/test-install
+          cmake -DPREFIX=${{ github.workspace }}/test-install -P cmake/verify_install_layout.cmake
+
+      - name: Upload test results on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-results-${{ matrix.os }}-${{ matrix.build-type }}
+          path: |
+            build/Testing/Temporary/
+          retention-days: 7

@@ -60,7 +60,9 @@ TEST(CApiDefaultOptions, ReservedFieldsAreZero) {
 // ===== NULL safety tests =====
 
 TEST(CApiNullSafety, CreateWithNullConfig) {
-    PiperPlusEngine* engine = piper_plus_create(nullptr);
+    PiperPlusEngine* engine = nullptr;
+    PiperPlusStatus rc = piper_plus_create(nullptr, &engine);
+    EXPECT_NE(rc, PIPER_PLUS_OK);
     EXPECT_EQ(engine, nullptr);
     const char* err = piper_plus_get_last_error();
     EXPECT_NE(err, nullptr);
@@ -70,7 +72,9 @@ TEST(CApiNullSafety, CreateWithNullModelPath) {
     PiperPlusConfig config;
     memset(&config, 0, sizeof(config));
     config.model_path = nullptr;
-    PiperPlusEngine* engine = piper_plus_create(&config);
+    PiperPlusEngine* engine = nullptr;
+    PiperPlusStatus rc = piper_plus_create(&config, &engine);
+    EXPECT_EQ(rc, PIPER_PLUS_ERR_MODEL);
     EXPECT_EQ(engine, nullptr);
     const char* err = piper_plus_get_last_error();
     EXPECT_NE(err, nullptr);
@@ -136,7 +140,9 @@ TEST(CApiCreateError, InvalidModelPath) {
     PiperPlusConfig config;
     memset(&config, 0, sizeof(config));
     config.model_path = "/nonexistent/path/model.onnx";
-    PiperPlusEngine* engine = piper_plus_create(&config);
+    PiperPlusEngine* engine = nullptr;
+    PiperPlusStatus rc = piper_plus_create(&config, &engine);
+    EXPECT_EQ(rc, PIPER_PLUS_ERR_MODEL);
     EXPECT_EQ(engine, nullptr);
     const char* err = piper_plus_get_last_error();
     EXPECT_NE(err, nullptr);
@@ -148,7 +154,9 @@ TEST(CApiCreateError, InvalidModelPathAutoConfig) {
     memset(&config, 0, sizeof(config));
     config.model_path = "/nonexistent/path/model.onnx";
     config.config_path = nullptr;
-    PiperPlusEngine* engine = piper_plus_create(&config);
+    PiperPlusEngine* engine = nullptr;
+    PiperPlusStatus rc = piper_plus_create(&config, &engine);
+    EXPECT_NE(rc, PIPER_PLUS_OK);
     EXPECT_EQ(engine, nullptr);
 }
 
@@ -158,7 +166,8 @@ TEST(CApiErrorMessage, ErrorAvailableAfterFailure) {
     PiperPlusConfig config;
     memset(&config, 0, sizeof(config));
     config.model_path = "/nonexistent";
-    piper_plus_create(&config);
+    PiperPlusEngine* engine = nullptr;
+    piper_plus_create(&config, &engine);
     const char* err = piper_plus_get_last_error();
     EXPECT_NE(err, nullptr);
 }
@@ -173,6 +182,7 @@ TEST(CApiStatusCodes, ValuesAreDefined) {
     EXPECT_LT(PIPER_PLUS_ERR_CONFIG, 0);
     EXPECT_LT(PIPER_PLUS_ERR_TEXT, 0);
     EXPECT_LT(PIPER_PLUS_ERR_BUSY, 0);
+    EXPECT_LT(PIPER_PLUS_ERR_ORT, 0);
 }
 
 TEST(CApiStatusCodes, ErrorCodesAreDistinct) {
@@ -180,9 +190,9 @@ TEST(CApiStatusCodes, ErrorCodesAreDistinct) {
         PIPER_PLUS_OK, PIPER_PLUS_DONE,
         PIPER_PLUS_ERR, PIPER_PLUS_ERR_MODEL,
         PIPER_PLUS_ERR_CONFIG, PIPER_PLUS_ERR_TEXT,
-        PIPER_PLUS_ERR_BUSY
+        PIPER_PLUS_ERR_BUSY, PIPER_PLUS_ERR_ORT
     };
-    EXPECT_EQ(codes.size(), 7u);
+    EXPECT_EQ(codes.size(), 8u);
 }
 
 // ===== Config struct tests =====
@@ -213,7 +223,9 @@ TEST(CApiCreateError, EmptyModelPathReturnsNull) {
     PiperPlusConfig config;
     memset(&config, 0, sizeof(config));
     config.model_path = "";
-    PiperPlusEngine* engine = piper_plus_create(&config);
+    PiperPlusEngine* engine = nullptr;
+    PiperPlusStatus rc = piper_plus_create(&config, &engine);
+    EXPECT_EQ(rc, PIPER_PLUS_ERR_MODEL);
     EXPECT_EQ(engine, nullptr);
     const char* err = piper_plus_get_last_error();
     ASSERT_NE(err, nullptr);
@@ -233,7 +245,8 @@ TEST(CApiThreadSafety, LastErrorIsThreadLocal) {
     PiperPlusConfig config;
     memset(&config, 0, sizeof(config));
     config.model_path = nullptr;
-    piper_plus_create(&config);
+    PiperPlusEngine* engine = nullptr;
+    piper_plus_create(&config, &engine);
     const char* main_err = piper_plus_get_last_error();
     ASSERT_NE(main_err, nullptr);
 
@@ -266,6 +279,7 @@ TEST(CApiStatusCodes, SpecificValuesMatchHeader) {
     EXPECT_EQ(PIPER_PLUS_ERR_CONFIG, -3);
     EXPECT_EQ(PIPER_PLUS_ERR_TEXT, -4);
     EXPECT_EQ(PIPER_PLUS_ERR_BUSY, -5);
+    EXPECT_EQ(PIPER_PLUS_ERR_ORT, -6);
 }
 
 // ===== Phase 2: Streaming tests (M2-4) =====
@@ -526,6 +540,7 @@ TEST(CApiStatusEnum, EnumValues) {
     EXPECT_EQ(PIPER_PLUS_ERR_CONFIG,-3);
     EXPECT_EQ(PIPER_PLUS_ERR_TEXT,  -4);
     EXPECT_EQ(PIPER_PLUS_ERR_BUSY,  -5);
+    EXPECT_EQ(PIPER_PLUS_ERR_ORT,   -6);
 }
 
 TEST(CApiStatusEnum, EnumIsSignedInt) {
@@ -596,4 +611,33 @@ TEST(CApiStreamingEx, WithOptsNullEngine) {
     PiperPlusStatus rc = piper_plus_synthesize_streaming_ex(
         nullptr, "hello", &opts, dummy_callback_ex, nullptr);
     EXPECT_EQ(rc, PIPER_PLUS_ERR);
+}
+
+// ===== Phase 5: piper_plus_create status + out_engine pattern tests (M5-14) =====
+
+TEST(CApiCreate, OutEngineNull) {
+    // out_engine=NULL must return ERR without crashing
+    PiperPlusConfig config;
+    memset(&config, 0, sizeof(config));
+    config.model_path = "/some/model.onnx";
+    PiperPlusStatus rc = piper_plus_create(&config, nullptr);
+    EXPECT_EQ(rc, PIPER_PLUS_ERR);
+    const char* err = piper_plus_get_last_error();
+    EXPECT_NE(err, nullptr);
+}
+
+TEST(CApiCreate, InvalidModelPath) {
+    // Non-existent model path must return ERR_MODEL
+    PiperPlusConfig config;
+    memset(&config, 0, sizeof(config));
+    config.model_path = "/nonexistent/path/to/model.onnx";
+    PiperPlusEngine* engine = nullptr;
+    PiperPlusStatus rc = piper_plus_create(&config, &engine);
+    EXPECT_EQ(rc, PIPER_PLUS_ERR_MODEL);
+    EXPECT_EQ(engine, nullptr);
+}
+
+TEST(CApiCreate, StatusCodeErrOrt) {
+    // ERR_ORT must equal -6
+    EXPECT_EQ(PIPER_PLUS_ERR_ORT, -6);
 }

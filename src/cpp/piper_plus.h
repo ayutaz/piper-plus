@@ -37,7 +37,8 @@ typedef enum PiperPlusStatus {
     PIPER_PLUS_ERR_MODEL   = -2,
     PIPER_PLUS_ERR_CONFIG  = -3,
     PIPER_PLUS_ERR_TEXT    = -4,
-    PIPER_PLUS_ERR_BUSY    = -5
+    PIPER_PLUS_ERR_BUSY    = -5,
+    PIPER_PLUS_ERR_ORT     = -6
 } PiperPlusStatus;
 
 /* ===== Error ===== */
@@ -80,7 +81,8 @@ typedef struct PiperPlusSynthOptions {
 
 /* ===== Lifecycle ===== */
 
-PIPER_PLUS_API PiperPlusEngine *piper_plus_create(const PiperPlusConfig *config);
+PIPER_PLUS_API PiperPlusStatus  piper_plus_create(const PiperPlusConfig *config,
+                                                  PiperPlusEngine      **out_engine);
 PIPER_PLUS_API void             piper_plus_free(PiperPlusEngine *engine);
 
 /* ===== Default options ===== */

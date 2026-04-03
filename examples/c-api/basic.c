@@ -60,9 +60,10 @@ int main(int argc, char *argv[]) {
     config.model_path = model_path;
     config.dict_dir   = dict_dir;
 
-    PiperPlusEngine *engine = piper_plus_create(&config);
-    if (!engine) {
-        fprintf(stderr, "Error: %s\n", piper_plus_get_last_error());
+    PiperPlusEngine *engine = NULL;
+    int32_t create_rc = piper_plus_create(&config, &engine);
+    if (create_rc != PIPER_PLUS_OK) {
+        fprintf(stderr, "Error (code %d): %s\n", create_rc, piper_plus_get_last_error());
         return 1;
     }
 
