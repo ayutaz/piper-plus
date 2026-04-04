@@ -3,11 +3,12 @@
 import os
 import sys
 import tempfile
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 from piper_train.model_manager import (
+    download_model,
     find_voice,
     get_default_model_dir,
     list_models,
@@ -107,3 +108,93 @@ class TestResolveModelPath:
         # No model file exists
         result = resolve_model_path("tsukuyomi", str(tmp_path))
         assert result is None
+
+
+class TestDownloadModel:
+    def test_unknown_model_returns_false(self, capsys):
+        assert download_model("nonexistent-model-xyz") is False
+        captured = capsys.readouterr()
+        assert "not found" in captured.err
+
+    def test_skips_existing_file_with_matching_size(self, tmp_path, capsys):
+        voice = find_voice("tsukuyomi")
+        assert voice is not None
+
+        # Create files with matching sizes
+        for filename, file_info in voice["files"].items():
+            f = tmp_path / filename
+            f.write_bytes(b"\x00" * file_info["size_bytes"])
+
+        with patch("piper_train.model_manager.hf_hub_download", side_effect=AssertionError("should not be called")) if False else patch.dict("sys.modules", {}):
+            # hf_hub_download is imported lazily; mock it at call site
+            mock_dl = MagicMock()
+            with patch.dict("sys.modules", {"huggingface_hub": MagicMock(hf_hub_download=mock_dl)}):
+                result = download_model("tsukuyomi", str(tmp_path))
+
+        assert result is True
+        mock_dl.assert_not_called()
+        captured = capsys.readouterr()
+        assert "already exists" in captured.err
+
+    def test_downloads_missing_files(self, tmp_path, capsys):
+        mock_dl = MagicMock()
+        mock_hf = MagicMock(hf_hub_download=mock_dl)
+
+        with patch.dict("sys.modules", {"huggingface_hub": mock_hf}):
+            result = download_model("tsukuyomi", str(tmp_path))
+
+        assert result is True
+        voice = find_voice("tsukuyomi")
+        assert mock_dl.call_count == len(voice["files"])
+        for call_args in mock_dl.call_args_list:
+            assert call_args.kwargs["repo_id"] == voice["repo_id"]
+            assert call_args.kwargs["local_dir"] == str(tmp_path)
+
+    def test_downloads_file_with_wrong_size(self, tmp_path):
+        voice = find_voice("tsukuyomi")
+        # Create files with wrong sizes
+        for filename in voice["files"]:
+            (tmp_path / filename).write_bytes(b"\x00" * 100)
+
+        mock_dl = MagicMock()
+        mock_hf = MagicMock(hf_hub_download=mock_dl)
+
+        with patch.dict("sys.modules", {"huggingface_hub": mock_hf}):
+            result = download_model("tsukuyomi", str(tmp_path))
+
+        assert result is True
+        assert mock_dl.call_count == len(voice["files"])
+
+    def test_returns_false_on_download_error(self, tmp_path, capsys):
+        mock_dl = MagicMock(side_effect=Exception("network error"))
+        mock_hf = MagicMock(hf_hub_download=mock_dl)
+
+        with patch.dict("sys.modules", {"huggingface_hub": mock_hf}):
+            result = download_model("tsukuyomi", str(tmp_path))
+
+        assert result is False
+        captured = capsys.readouterr()
+        assert "Failed" in captured.err
+
+    def test_uses_default_model_dir_when_none(self):
+        mock_dl = MagicMock()
+        mock_hf = MagicMock(hf_hub_download=mock_dl)
+
+        with patch.dict("sys.modules", {"huggingface_hub": mock_hf}), \
+             patch("piper_train.model_manager.get_default_model_dir", return_value="/tmp/piper-test-models"):
+            download_model("tsukuyomi")
+
+        for call_args in mock_dl.call_args_list:
+            assert call_args.kwargs["local_dir"] == "/tmp/piper-test-models"
+
+    def test_creates_model_dir(self, tmp_path):
+        target = tmp_path / "sub" / "dir"
+        assert not target.exists()
+
+        mock_dl = MagicMock()
+        mock_hf = MagicMock(hf_hub_download=mock_dl)
+
+        with patch.dict("sys.modules", {"huggingface_hub": mock_hf}):
+            download_model("tsukuyomi", str(target))
+
+        assert target.exists()

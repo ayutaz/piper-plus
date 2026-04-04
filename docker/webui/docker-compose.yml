@@ -12,6 +12,8 @@ services:
       - ${MODELS_DIR:-./models}:/models
       - ${OUTPUT_DIR:-./output}:/output
     environment:
+      - PIPER_MODEL=${PIPER_MODEL:-}
+      - PIPER_MODEL_DIR=/models
       - GRADIO_SERVER_NAME=0.0.0.0
       - GRADIO_SERVER_PORT=7860
       - PYTHONUNBUFFERED=1
