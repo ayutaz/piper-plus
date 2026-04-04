@@ -115,7 +115,7 @@ jobs:
         shell: bash
         run: |
           export PATH="/usr/lib/ccache:/usr/local/opt/ccache/libexec:$PATH"
-          CMAKE_ARGS="-DCMAKE_BUILD_TYPE=${{ matrix.build-type }} -DBUILD_TESTS=ON -DUSE_CUDA=OFF"
+          CMAKE_ARGS="-DCMAKE_BUILD_TYPE=${{ matrix.build-type }} -DBUILD_TESTS=ON -DPIPER_PLUS_BUILD_SHARED=ON -DUSE_CUDA=OFF"
 
           # Append caller-provided extra args
           if [ -n "${{ inputs.cmake-args }}" ]; then
@@ -318,13 +318,75 @@ jobs:
           fi
 
       # ── Post-build verification ───────────────────────────────
-      - name: Test install (shared library)
-        if: success()
-        continue-on-error: true
+      - name: Install shared library
+        if: success() && runner.os != 'Windows'
         shell: bash
         run: |
           cmake --install build --prefix ${{ github.workspace }}/test-install
           cmake -DPREFIX=${{ github.workspace }}/test-install -P cmake/verify_install_layout.cmake
+
+      - name: Verify C API symbols
+        if: success() && runner.os != 'Windows'
+        shell: bash
+        run: |
+          INSTALL_DIR="${{ github.workspace }}/test-install"
+
+          if [ "${{ runner.os }}" == "macOS" ]; then
+            LIB=$(find "$INSTALL_DIR" -name "libpiper_plus*.dylib" -not -name "*onnx*" | head -1)
+            SYMBOLS=$(nm -gU "$LIB" 2>/dev/null | grep " T _piper_plus_" | sed 's/.* T _//')
+          else
+            LIB=$(find "$INSTALL_DIR" -name "libpiper_plus.so" | head -1)
+            SYMBOLS=$(nm -gD "$LIB" 2>/dev/null | grep " T piper_plus_" | awk '{print $3}')
+          fi
+
+          echo "Library: $LIB"
+
+          REQUIRED_SYMBOLS=(
+            piper_plus_version
+            piper_plus_api_version
+            piper_plus_create
+            piper_plus_free
+            piper_plus_synthesize
+            piper_plus_synth_start
+            piper_plus_synth_next
+            piper_plus_synthesize_streaming
+            piper_plus_free_audio
+            piper_plus_default_options
+            piper_plus_get_last_error
+            piper_plus_sample_rate
+            piper_plus_num_speakers
+            piper_plus_num_languages
+            piper_plus_phonemize
+            piper_plus_available_languages
+            piper_plus_get_library_dir
+          )
+
+          MISSING=0
+          for sym in "${REQUIRED_SYMBOLS[@]}"; do
+            if echo "$SYMBOLS" | grep -q "^${sym}$"; then
+              echo "  OK: $sym"
+            else
+              echo "  MISSING: $sym"
+              MISSING=$((MISSING + 1))
+            fi
+          done
+
+          if [ $MISSING -gt 0 ]; then
+            echo "Symbol verification FAILED: $MISSING required symbol(s) missing"
+            exit 1
+          fi
+          echo "Symbol verification PASSED (${#REQUIRED_SYMBOLS[@]} symbols)"
+
+      - name: Compile C API examples
+        if: success() && runner.os != 'Windows'
+        shell: bash
+        run: |
+          INSTALL_DIR="${{ github.workspace }}/test-install"
+          cmake -B build-examples -S examples/c-api \
+            -DCMAKE_PREFIX_PATH="$INSTALL_DIR" \
+            -DCMAKE_BUILD_TYPE=${{ matrix.build-type }}
+          cmake --build build-examples
+          echo "C API examples compiled successfully: basic, streaming, multi_language"
 
       - name: Upload test results on failure
         if: failure()
