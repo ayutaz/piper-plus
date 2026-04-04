@@ -34,7 +34,7 @@ run_test "entrypoint.sh exists" "test -f '$ENTRYPOINT'"
 run_test "entrypoint.sh is executable" "test -x '$ENTRYPOINT' || chmod +x '$ENTRYPOINT' && test -x '$ENTRYPOINT'"
 
 # 2. entrypoint.sh has LF line endings (not CRLF — Docker requirement)
-run_test "LF line endings" "! grep -qP '\r' '$ENTRYPOINT'"
+run_test "LF line endings" "! grep -qU $'\r' '$ENTRYPOINT'"
 
 # 3. Starts with bash shebang
 run_test "bash shebang" "head -1 '$ENTRYPOINT' | grep -q '#!/bin/bash'"

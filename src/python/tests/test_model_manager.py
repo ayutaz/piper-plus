@@ -120,16 +120,15 @@ class TestDownloadModel:
         voice = find_voice("tsukuyomi")
         assert voice is not None
 
-        # Create files with matching sizes
+        # Create files with matching sizes (sparse files to avoid ~39MB allocation)
         for filename, file_info in voice["files"].items():
             f = tmp_path / filename
-            f.write_bytes(b"\x00" * file_info["size_bytes"])
+            f.touch()
+            os.truncate(f, file_info["size_bytes"])
 
-        with patch("piper_train.model_manager.hf_hub_download", side_effect=AssertionError("should not be called")) if False else patch.dict("sys.modules", {}):
-            # hf_hub_download is imported lazily; mock it at call site
-            mock_dl = MagicMock()
-            with patch.dict("sys.modules", {"huggingface_hub": MagicMock(hf_hub_download=mock_dl)}):
-                result = download_model("tsukuyomi", str(tmp_path))
+        mock_dl = MagicMock()
+        with patch.dict("sys.modules", {"huggingface_hub": MagicMock(hf_hub_download=mock_dl)}):
+            result = download_model("tsukuyomi", str(tmp_path))
 
         assert result is True
         mock_dl.assert_not_called()
@@ -176,16 +175,17 @@ class TestDownloadModel:
         captured = capsys.readouterr()
         assert "Failed" in captured.err
 
-    def test_uses_default_model_dir_when_none(self):
+    def test_uses_default_model_dir_when_none(self, tmp_path):
         mock_dl = MagicMock()
         mock_hf = MagicMock(hf_hub_download=mock_dl)
+        default_model_dir = str(tmp_path)
 
         with patch.dict("sys.modules", {"huggingface_hub": mock_hf}), \
-             patch("piper_train.model_manager.get_default_model_dir", return_value="/tmp/piper-test-models"):
+             patch("piper_train.model_manager.get_default_model_dir", return_value=default_model_dir):
             download_model("tsukuyomi")
 
         for call_args in mock_dl.call_args_list:
-            assert call_args.kwargs["local_dir"] == "/tmp/piper-test-models"
+            assert call_args.kwargs["local_dir"] == default_model_dir
 
     def test_creates_model_dir(self, tmp_path):
         target = tmp_path / "sub" / "dir"
