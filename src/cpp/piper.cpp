@@ -14,6 +14,12 @@
 #ifdef __APPLE__
 #include <coreml_provider_factory.h>
 #endif
+#ifdef _WIN32
+#if __has_include(<dml_provider_factory.h>)
+#include <dml_provider_factory.h>
+#define PIPER_HAS_DIRECTML 1
+#endif
+#endif
 #include <spdlog/spdlog.h>
 
 // Self-contained phoneme ID conversion
@@ -433,9 +439,11 @@ void loadModel(std::string modelPath, ModelSession &session,
     throw std::runtime_error("CoreML is only available on macOS/iOS");
 #endif
   } else if (provider == "directml") {
-#ifdef _WIN32
+#ifdef PIPER_HAS_DIRECTML
     Ort::ThrowOnError(OrtSessionOptionsAppendExecutionProvider_DML(session.options, gpuDeviceId));
     spdlog::info("Using DirectML execution provider with device ID: {}", gpuDeviceId);
+#elif defined(_WIN32)
+    throw std::runtime_error("DirectML support requires the DirectML ONNX Runtime package");
 #else
     throw std::runtime_error("DirectML is only available on Windows");
 #endif
