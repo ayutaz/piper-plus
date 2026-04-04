@@ -22,8 +22,10 @@ COPY src/python_run/requirements_webui.txt /app/requirements_webui.txt
 RUN uv pip install --system "/app/src/python[inference,multilingual]" && \
     uv pip install --system -r /app/requirements_webui.txt
 
-# Copy WebUI application
+# Copy WebUI application and entrypoint
 COPY docker/webui/app.py /app/app.py
+COPY docker/webui/entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
 
 # Create models directory
 RUN mkdir -p /models /output
@@ -35,5 +37,4 @@ EXPOSE 7860
 ENV GRADIO_SERVER_NAME=0.0.0.0
 ENV GRADIO_SERVER_PORT=7860
 
-# Run the WebUI
-CMD ["python", "/app/app.py", "--model-dir", "/models", "--output-dir", "/output"]
+ENTRYPOINT ["/app/entrypoint.sh"]
