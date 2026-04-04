@@ -525,6 +525,28 @@ target_link_libraries(test_phoneme_timing
 
 add_test(NAME test_phoneme_timing COMMAND test_phoneme_timing)
 
+# ---- test_library_path: library_path.c unit tests ----
+add_executable(test_library_path
+    test_library_path.cpp
+    ../library_path.c
+)
+
+target_link_libraries(test_library_path
+    gtest
+    gtest_main
+)
+
+target_include_directories(test_library_path PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+)
+
+# library_path.c uses dladdr which requires libdl on Linux
+if(UNIX AND NOT APPLE)
+    target_link_libraries(test_library_path dl)
+endif()
+
+add_test(NAME test_library_path COMMAND test_library_path)
+
 # ---- test_c_api: C API shared library unit tests ----
 # Compiles piper_plus_c_api.cpp directly with piper_common object library.
 # piper_plus_c_api.cpp wraps the full piper:: namespace, so it needs

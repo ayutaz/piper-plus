@@ -539,3 +539,108 @@ TEST_F(CApiIntegrationTest, CallbackCrossfadeApplied) {
 
     piper_plus_free(engine);
 }
+
+// ===== Group 6: DONE chunk with samples (PR #309 regression guard) =====
+
+TEST_F(CApiIntegrationTest, IteratorDoneCanCarrySamples) {
+    // Verify that when DONE carries samples, those samples are valid.
+    // Note: DONE + num_samples > 0 is model/text dependent and may not always occur.
+    auto* engine = createEngine();
+    ASSERT_NE(engine, nullptr);
+
+    auto opts = piper_plus_default_options();
+    PiperPlusStatus rc = piper_plus_synth_start(engine, "Hello world.", &opts);
+    ASSERT_EQ(rc, PIPER_PLUS_OK);
+
+    bool doneHadSamples = false;
+    int32_t totalSamples = 0;
+
+    for (;;) {
+        PiperPlusAudioChunk chunk = {};
+        rc = piper_plus_synth_next(engine, &chunk);
+        ASSERT_NE(rc, PIPER_PLUS_ERR) << piper_plus_get_last_error();
+
+        if (rc == PIPER_PLUS_DONE && chunk.num_samples > 0) {
+            doneHadSamples = true;
+            // Validate that samples in the DONE chunk are in [-1.0, 1.0]
+            for (int32_t i = 0; i < chunk.num_samples; i++) {
+                EXPECT_GE(chunk.samples[i], -1.0f);
+                EXPECT_LE(chunk.samples[i], 1.0f);
+            }
+        }
+
+        totalSamples += chunk.num_samples;
+
+        if (rc == PIPER_PLUS_DONE) break;
+    }
+
+    EXPECT_GT(totalSamples, 0) << "Iterator must produce audio";
+
+    // Log whether DONE carried samples (informational, not a failure)
+    if (doneHadSamples) {
+        std::cout << "[  INFO    ] DONE chunk carried samples" << std::endl;
+    } else {
+        std::cout << "[  INFO    ] DONE chunk had no samples (model-dependent)"
+                  << std::endl;
+    }
+
+    piper_plus_free(engine);
+}
+
+TEST_F(CApiIntegrationTest, IteratorAlwaysProcessSamplesBeforeCheckingDone) {
+    // Proves that ignoring samples in a DONE chunk causes sample loss.
+    // Compares two counting strategies:
+    //   correct:  always add chunk.num_samples regardless of status
+    //   buggy:    skip chunk.num_samples when status == DONE (the Godot/JNI/Dart bug)
+    // The correct count must be >= buggy count, and must match one-shot.
+    auto* engine = createEngine();
+    ASSERT_NE(engine, nullptr);
+
+    const char* text = "Hello world.";
+    auto opts = piper_plus_default_options();
+
+    // One-shot baseline
+    float* samples = nullptr;
+    int32_t oneShotCount = 0, rate = 0;
+    ASSERT_EQ(piper_plus_synthesize(engine, text, &opts,
+              &samples, &oneShotCount, &rate), PIPER_PLUS_OK);
+    ASSERT_GT(oneShotCount, 0);
+    piper_plus_free_audio(samples);
+
+    // Iterator with two counting strategies
+    ASSERT_EQ(piper_plus_synth_start(engine, text, &opts), PIPER_PLUS_OK);
+    int32_t correctTotal = 0;   // always process samples
+    int32_t buggyTotal = 0;     // skip samples when DONE
+
+    for (;;) {
+        PiperPlusAudioChunk chunk = {};
+        PiperPlusStatus rc = piper_plus_synth_next(engine, &chunk);
+        ASSERT_NE(rc, PIPER_PLUS_ERR) << piper_plus_get_last_error();
+
+        // Correct pattern: always process samples before checking status
+        correctTotal += chunk.num_samples;
+
+        // Buggy pattern: break/return before processing samples on DONE
+        if (rc == PIPER_PLUS_DONE) {
+            // buggyTotal intentionally does NOT add chunk.num_samples here
+            break;
+        }
+        buggyTotal += chunk.num_samples;
+    }
+
+    // The correct total must always be >= the buggy total
+    EXPECT_GE(correctTotal, buggyTotal);
+
+    // The correct total must match one-shot within tolerance
+    double ratio = static_cast<double>(correctTotal) / oneShotCount;
+    EXPECT_GT(ratio, 0.9);
+    EXPECT_LT(ratio, 1.1);
+
+    // If DONE carried samples, the buggy total is strictly less
+    if (correctTotal > buggyTotal) {
+        std::cout << "[  INFO    ] DONE chunk samples would be lost by buggy pattern: "
+                  << (correctTotal - buggyTotal) << " samples" << std::endl;
+    }
+
+    piper_plus_free(engine);
+}

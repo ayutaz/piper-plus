@@ -17,8 +17,12 @@
 
 #include <gtest/gtest.h>
 #include <cstring>
+#include <cstdio>
+#include <fstream>
 #include <set>
+#include <string>
 #include <thread>
+#include <unistd.h>
 #include "piper_plus.h"
 
 // ===== Version tests =====
@@ -691,3 +695,152 @@ TEST(CApiBoundary, LanguageIdNegative) {
         nullptr, "hello", &opts, dummy_callback, nullptr);
     EXPECT_EQ(rc, PIPER_PLUS_ERR);
 }
+
+// ===== Provider error handling tests =====
+
+// Helper: create a minimal valid config JSON so that loadVoice config parsing
+// succeeds and execution reaches the provider selection code in loadModel.
+// Returns the path to the temporary file.  Caller is responsible for cleanup.
+static std::string createMinimalConfigFile() {
+    char tmpl[] = "/tmp/piper_test_XXXXXX";
+    int fd = mkstemp(tmpl);
+    if (fd < 0) return "";
+    // Rename to .json extension (mkstemp creates a plain file)
+    std::string path = std::string(tmpl) + ".json";
+    std::rename(tmpl, path.c_str());
+    close(fd);
+    std::ofstream ofs(path);
+    ofs << R"({"num_speakers": 1})";
+    ofs.close();
+    return path;
+}
+
+// Helper RAII guard to remove a temporary file on scope exit.
+struct TempFileGuard {
+    std::string path;
+    explicit TempFileGuard(const std::string &p) : path(p) {}
+    ~TempFileGuard() { std::remove(path.c_str()); }
+};
+
+TEST(CApiProviderError, UnknownProviderReturnsError) {
+    // Use a minimal valid config so config parsing succeeds and the provider
+    // check in loadModel is actually reached.
+    std::string configPath = createMinimalConfigFile();
+    TempFileGuard guard(configPath);
+
+    PiperPlusConfig config;
+    memset(&config, 0, sizeof(config));
+    config.model_path = "/nonexistent/model.onnx";
+    config.config_path = configPath.c_str();
+    config.provider = "opencl";
+
+    PiperPlusEngine* engine = nullptr;
+    PiperPlusStatus rc = piper_plus_create(&config, &engine);
+
+    EXPECT_NE(rc, PIPER_PLUS_OK);
+    EXPECT_EQ(engine, nullptr);
+
+    const char* err = piper_plus_get_last_error();
+    ASSERT_NE(err, nullptr);
+    EXPECT_NE(std::string(err).find("opencl"), std::string::npos)
+        << "Error message should contain the provider name, got: " << err;
+}
+
+TEST(CApiProviderError, ProviderNullDefaultsToCpu) {
+    PiperPlusConfig config;
+    memset(&config, 0, sizeof(config));
+    config.model_path = "/nonexistent/model.onnx";
+    config.provider = nullptr;
+
+    PiperPlusEngine* engine = nullptr;
+    PiperPlusStatus rc = piper_plus_create(&config, &engine);
+
+    // Creation will fail (model/config not found), but the error must NOT be
+    // about the provider -- it should be a model or config error instead.
+    EXPECT_NE(rc, PIPER_PLUS_OK);
+    EXPECT_EQ(engine, nullptr);
+
+    const char* err = piper_plus_get_last_error();
+    ASSERT_NE(err, nullptr);
+    std::string errStr(err);
+    EXPECT_EQ(errStr.find("provider"), std::string::npos)
+        << "NULL provider should default to CPU without provider error, got: " << err;
+    EXPECT_EQ(errStr.find("Unknown provider"), std::string::npos)
+        << "NULL provider must not trigger unknown provider error, got: " << err;
+}
+
+TEST(CApiProviderError, ProviderEmptyStringDefaultsToCpu) {
+    PiperPlusConfig config;
+    memset(&config, 0, sizeof(config));
+    config.model_path = "/nonexistent/model.onnx";
+    config.provider = "";
+
+    PiperPlusEngine* engine = nullptr;
+    PiperPlusStatus rc = piper_plus_create(&config, &engine);
+
+    // Same as NULL: fails for model/config reasons, not provider.
+    EXPECT_NE(rc, PIPER_PLUS_OK);
+    EXPECT_EQ(engine, nullptr);
+
+    const char* err = piper_plus_get_last_error();
+    ASSERT_NE(err, nullptr);
+    std::string errStr(err);
+    EXPECT_EQ(errStr.find("provider"), std::string::npos)
+        << "Empty provider should default to CPU without provider error, got: " << err;
+    EXPECT_EQ(errStr.find("Unknown provider"), std::string::npos)
+        << "Empty provider must not trigger unknown provider error, got: " << err;
+}
+
+#ifndef _WIN32
+TEST(CApiProviderError, DirectmlOnNonWindowsReturnsError) {
+    // On macOS/Linux, requesting DirectML must fail with a platform error.
+    std::string configPath = createMinimalConfigFile();
+    TempFileGuard guard(configPath);
+
+    PiperPlusConfig config;
+    memset(&config, 0, sizeof(config));
+    config.model_path = "/nonexistent/model.onnx";
+    config.config_path = configPath.c_str();
+    config.provider = "directml";
+
+    PiperPlusEngine* engine = nullptr;
+    PiperPlusStatus rc = piper_plus_create(&config, &engine);
+
+    EXPECT_NE(rc, PIPER_PLUS_OK);
+    EXPECT_EQ(engine, nullptr);
+
+    const char* err = piper_plus_get_last_error();
+    ASSERT_NE(err, nullptr);
+    EXPECT_NE(std::string(err).find("DirectML"), std::string::npos)
+        << "Error should mention DirectML, got: " << err;
+    EXPECT_NE(std::string(err).find("Windows"), std::string::npos)
+        << "Error should mention Windows, got: " << err;
+}
+#endif // !_WIN32
+
+#ifndef __APPLE__
+TEST(CApiProviderError, CoremlOnNonAppleReturnsError) {
+    // On Linux/Windows, requesting CoreML must fail with a platform error.
+    std::string configPath = createMinimalConfigFile();
+    TempFileGuard guard(configPath);
+
+    PiperPlusConfig config;
+    memset(&config, 0, sizeof(config));
+    config.model_path = "/nonexistent/model.onnx";
+    config.config_path = configPath.c_str();
+    config.provider = "coreml";
+
+    PiperPlusEngine* engine = nullptr;
+    PiperPlusStatus rc = piper_plus_create(&config, &engine);
+
+    EXPECT_NE(rc, PIPER_PLUS_OK);
+    EXPECT_EQ(engine, nullptr);
+
+    const char* err = piper_plus_get_last_error();
+    ASSERT_NE(err, nullptr);
+    EXPECT_NE(std::string(err).find("CoreML"), std::string::npos)
+        << "Error should mention CoreML, got: " << err;
+    EXPECT_NE(std::string(err).find("macOS"), std::string::npos)
+        << "Error should mention macOS, got: " << err;
+}
+#endif // !__APPLE__
